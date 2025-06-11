@@ -9,7 +9,7 @@ import {
 } from '@embedpdf/models';
 import { ViewportMetrics } from '@embedpdf/plugin-viewport';
 import { VirtualItem } from '../types/virtual-item';
-import { ScrollMetrics } from '../types';
+import { ScrollMetrics, ScrollMode } from '../types';
 
 export interface ScrollStrategyConfig {
   pageGap?: number;
@@ -37,7 +37,19 @@ export abstract class BaseScrollStrategy {
     viewport: ViewportMetrics,
     virtualItems: VirtualItem[],
     scale: number,
+    mode: ScrollMode,
+    currentPageState: number,
   ): { start: number; end: number } {
+    if (mode === ScrollMode.Page) {
+      const currentItemIndex = virtualItems.findIndex((item) =>
+        item.pageNumbers.includes(currentPageState),
+      );
+      if (currentItemIndex !== -1) {
+        return { start: currentItemIndex, end: currentItemIndex };
+      }
+      return { start: 0, end: 0 };
+    }
+
     const scrollOffset = this.getScrollOffset(viewport);
     const clientSize = this.getClientSize(viewport);
     const viewportStart = scrollOffset;
@@ -66,8 +78,10 @@ export abstract class BaseScrollStrategy {
     viewport: ViewportMetrics,
     virtualItems: VirtualItem[],
     scale: number,
+    mode: ScrollMode,
+    currentPageState: number,
   ): ScrollMetrics {
-    const range = this.getVisibleRange(viewport, virtualItems, scale);
+    const range = this.getVisibleRange(viewport, virtualItems, scale, mode, currentPageState);
     const visibleItems = virtualItems.slice(range.start, range.end + 1);
     const pageVisibilityMetrics = this.calculatePageVisibility(visibleItems, viewport, scale);
     const visiblePages = pageVisibilityMetrics.map((m) => m.pageNumber);

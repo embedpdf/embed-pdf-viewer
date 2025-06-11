@@ -12,6 +12,7 @@ import {
 import { Viewport } from '@embedpdf/plugin-viewport/preact';
 import {
   SCROLL_PLUGIN_ID,
+  ScrollMode,
   ScrollPlugin,
   ScrollPluginPackage,
   ScrollState,
@@ -135,6 +136,7 @@ export interface PluginConfigs {
   };
   scroll?: {
     strategy?: ScrollStrategy;
+    mode?: ScrollMode;
   };
   zoom?: {
     defaultZoomLevel?: ZoomMode;
@@ -175,6 +177,7 @@ const DEFAULT_PLUGIN_CONFIGS: Required<PluginConfigs> = {
   },
   scroll: {
     strategy: ScrollStrategy.Vertical,
+    mode: ScrollMode.Page,
   },
   zoom: {
     defaultZoomLevel: ZoomMode.FitPage,
@@ -296,7 +299,7 @@ export const icons: IconRegistry = {
   },
   singlePage: {
     id: 'singlePage',
-    svg: '<svg  xmlns="http://www.w3.org/2000/svg"  width="100%"  height="100%"  viewBox="0 0 24 24"  fill="none"  stroke="currentColor"  stroke-width="2"  stroke-linecap="round"  stroke-linejoin="round"  class="icon icon-tabler icons-tabler-outline icon-tabler-columns-1"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M5 3m0 1a1 1 0 0 1 1 -1h12a1 1 0 0 1 1 1v16a1 1 0 0 1 -1 1h-12a1 1 0 0 1 -1 -1z" /></svg>',
+    svg: '<svg  xmlns="http://www.w3.org/2000/svg"  width="100%"  height="100%"  viewBox="0 0 24 24"  fill="none"  stroke="currentColor"  stroke-width="2"  stroke-linecap="round"  stroke-linejoin="round"  class="icon icon-tabler icons-tabler-outline icon-tabler-file"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M14 3v4a1 1 0 0 0 1 1h4" /><path d="M17 21h-10a2 2 0 0 1 -2 -2v-14a2 2 0 0 1 2 -2h7l5 5v11a2 2 0 0 1 -2 2z" /></svg>',
   },
   doublePage: {
     id: 'doublePage',
@@ -413,6 +416,14 @@ export const icons: IconRegistry = {
   zoomInArea: {
     id: 'zoomInArea',
     svg: '<svg  xmlns="http://www.w3.org/2000/svg"  width="100%"  height="100%"  viewBox="0 0 24 24"  fill="none"  stroke="currentColor"  stroke-width="2"  stroke-linecap="round"  stroke-linejoin="round"  class="icon icon-tabler icons-tabler-outline icon-tabler-zoom-in-area"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M15 13v4" /><path d="M13 15h4" /><path d="M15 15m-5 0a5 5 0 1 0 10 0a5 5 0 1 0 -10 0" /><path d="M22 22l-3 -3" /><path d="M6 18h-1a2 2 0 0 1 -2 -2v-1" /><path d="M3 11v-1" /><path d="M3 6v-1a2 2 0 0 1 2 -2h1" /><path d="M10 3h1" /><path d="M15 3h1a2 2 0 0 1 2 2v1" /></svg>',
+  },
+  verticalScroll: {
+    id: 'verticalScroll',
+    svg: '<svg  xmlns="http://www.w3.org/2000/svg"  width="100%"  height="100%"  viewBox="0 0 24 24"  fill="none"  stroke="currentColor"  stroke-width="2"  stroke-linecap="round"  stroke-linejoin="round"  class="icon icon-tabler icons-tabler-outline icon-tabler-carousel-vertical"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M19 8v8a1 1 0 0 1 -1 1h-12a1 1 0 0 1 -1 -1v-8a1 1 0 0 1 1 -1h12a1 1 0 0 1 1 1z" /><path d="M7 22v-1a1 1 0 0 1 1 -1h8a1 1 0 0 1 1 1v1" /><path d="M17 2v1a1 1 0 0 1 -1 1h-8a1 1 0 0 1 -1 -1v-1" /></svg>',
+  },
+  pageByPage: {
+    id: 'pageByPage',
+    svg: '<svg  xmlns="http://www.w3.org/2000/svg"  width="100%"  height="100%"  viewBox="0 0 24 24"  fill="none"  stroke="currentColor"  stroke-width="2"  stroke-linecap="round"  stroke-linejoin="round"  class="icon icon-tabler icons-tabler-outline icon-tabler-carousel-horizontal"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M7 5m0 1a1 1 0 0 1 1 -1h8a1 1 0 0 1 1 1v12a1 1 0 0 1 -1 1h-8a1 1 0 0 1 -1 -1z" /></svg>',
   },
 };
 
@@ -533,7 +544,7 @@ export const menuItems: Record<string, MenuItem<State>> = {
     //shortcut: 'Shift+V',
     //shortcutLabel: 'V',
     type: 'menu',
-    children: ['pageOrientation', 'scrollLayout', 'pageLayout', 'enterFS'],
+    children: ['pageTransition', 'pageOrientation', 'scrollLayout', 'pageLayout', 'enterFS'],
     active: (storeState) =>
       storeState.plugins.ui.commandMenu.commandMenu.activeCommand === 'viewCtr',
   },
@@ -542,6 +553,26 @@ export const menuItems: Record<string, MenuItem<State>> = {
     label: 'Page orientation',
     type: 'group',
     children: ['rotateClockwise', 'rotateCounterClockwise'],
+  },
+  pageTransition: {
+    id: 'pageTransition',
+    label: 'Page transition',
+    type: 'group',
+    children: ['continuousPage', 'pageByPage'],
+  },
+  continuousPage: {
+    id: 'continuousPage',
+    label: 'Continuous page',
+    type: 'action',
+    icon: 'verticalScroll',
+    action: (registry) => {},
+  },
+  pageByPage: {
+    id: 'pageByPage',
+    label: 'Page by page',
+    type: 'action',
+    icon: 'pageByPage',
+    action: (registry) => {},
   },
   rotateClockwise: {
     id: 'rotateClockwise',
@@ -2007,6 +2038,8 @@ export function PDFViewer({ config }: PDFViewerProps) {
 
   // **Merge user configurations with defaults**
   const pluginConfigs = mergePluginConfigs(config.plugins);
+
+  console.log('pluginConfigs', pluginConfigs);
 
   if (!engine)
     return (

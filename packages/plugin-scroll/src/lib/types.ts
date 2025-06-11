@@ -8,6 +8,7 @@ export interface ScrollState extends ScrollMetrics {
   totalContentSize: { width: number; height: number };
   desiredScrollPosition: { x: number; y: number };
   strategy: ScrollStrategy;
+  mode: ScrollMode;
   pageGap: number;
   scale: number;
 }
@@ -25,6 +26,11 @@ export interface ScrollerLayout {
 export enum ScrollStrategy {
   Vertical = 'vertical',
   Horizontal = 'horizontal',
+}
+
+export enum ScrollMode {
+  Continuous = 'continuous',
+  Page = 'page',
 }
 
 export interface PageVisibilityMetrics {
@@ -70,6 +76,7 @@ export interface ScrollStrategyInterface {
 
 export interface ScrollPluginConfig extends BasePluginConfig {
   strategy?: ScrollStrategy;
+  mode?: ScrollMode;
   initialPage?: number;
   bufferSize?: number;
   pageGap?: number;

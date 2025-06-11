@@ -30,6 +30,7 @@ import {
   LayoutChangePayload,
   ScrollerLayout,
   ScrollToPageOptions,
+  ScrollMode,
 } from './types';
 import { BaseScrollStrategy, ScrollStrategyConfig } from './strategies/base-strategy';
 import { VerticalScrollStrategy } from './strategies/vertical-strategy';
@@ -115,7 +116,13 @@ export class ScrollPlugin extends BasePlugin<
   }
 
   private computeMetrics(vp: ViewportMetrics, items: VirtualItem[] = this.state.virtualItems) {
-    return this.strategy.handleScroll(vp, items, this.currentScale);
+    return this.strategy.handleScroll(
+      vp,
+      items,
+      this.currentScale,
+      this.state.mode,
+      this.currentPage,
+    );
   }
 
   /* ------------------------------------------------------------------ */
@@ -131,7 +138,10 @@ export class ScrollPlugin extends BasePlugin<
     if (emit?.metrics) {
       this.scroll$.emit(emit.metrics);
 
-      if (emit.metrics.currentPage !== this.currentPage) {
+      if (
+        this.state.mode === ScrollMode.Continuous &&
+        emit.metrics.currentPage !== this.currentPage
+      ) {
         this.currentPage = emit.metrics.currentPage;
         this.pageChange$.emit(this.currentPage);
       }
@@ -143,7 +153,12 @@ export class ScrollPlugin extends BasePlugin<
 
   /* convenience wrappers */
   private commitMetrics(metrics: ScrollMetrics) {
-    this.commit(metrics, { metrics });
+    if (this.state.mode === ScrollMode.Page) {
+      const { currentPage, ...rest } = metrics;
+      this.commit(rest, { metrics });
+    } else {
+      this.commit(metrics, { metrics });
+    }
   }
 
   /* full re-compute after page-spread or initialisation */
@@ -241,16 +256,26 @@ export class ScrollPlugin extends BasePlugin<
         const currentItemIndex = virtualItems.findIndex((item) =>
           item.pageNumbers.includes(this.currentPage),
         );
-        if (currentItemIndex >= 0 && currentItemIndex < virtualItems.length - 1) {
-          const nextItem = virtualItems[currentItemIndex + 1];
-          const position = this.strategy.getScrollPositionForPage(
-            nextItem.pageNumbers[0],
-            virtualItems,
-            this.currentScale,
-            this.currentRotation,
-          );
-          if (position) {
-            this.viewport.scrollTo({ ...position, behavior });
+        if (this.state.mode === ScrollMode.Page) {
+          if (currentItemIndex >= 0 && currentItemIndex < virtualItems.length - 1) {
+            const nextItem = virtualItems[currentItemIndex + 1];
+            const nextPageNumber = nextItem.pageNumbers[0];
+            this.currentPage = nextPageNumber;
+            this.pageChange$.emit(this.currentPage);
+            this.dispatch(updateScrollState({ currentPage: nextPageNumber }));
+          }
+        } else {
+          if (currentItemIndex >= 0 && currentItemIndex < virtualItems.length - 1) {
+            const nextItem = virtualItems[currentItemIndex + 1];
+            const position = this.strategy.getScrollPositionForPage(
+              nextItem.pageNumbers[0],
+              virtualItems,
+              this.currentScale,
+              this.currentRotation,
+            );
+            if (position) {
+              this.viewport.scrollTo({ ...position, behavior });
+            }
           }
         }
       },
@@ -261,6 +286,13 @@ export class ScrollPlugin extends BasePlugin<
         );
         if (currentItemIndex > 0) {
           const prevItem = virtualItems[currentItemIndex - 1];
+          const prevPageNumber = prevItem.pageNumbers[0];
+
+          if (this.state.mode === ScrollMode.Page) {
+            this.currentPage = prevPageNumber;
+            this.pageChange$.emit(this.currentPage);
+            this.commitMetrics(this.computeMetrics(this.viewport.getMetrics()));
+          }
           const position = this.strategy.getScrollPositionForPage(
             prevItem.pageNumbers[0],
             virtualItems,
@@ -284,7 +316,13 @@ export class ScrollPlugin extends BasePlugin<
   private getMetrics(viewport?: ViewportMetrics): ScrollMetrics {
     const metrics = viewport || this.viewport.getMetrics();
     const virtualItems = this.getVirtualItemsFromState();
-    return this.strategy.handleScroll(metrics, virtualItems, this.currentScale);
+    return this.strategy.handleScroll(
+      metrics,
+      virtualItems,
+      this.currentScale,
+      this.state.mode,
+      this.currentPage,
+    );
   }
 
   private getLayout(): LayoutChangePayload {
