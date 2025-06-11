@@ -199,4 +199,22 @@ export const functions = {
   FPDF_CreateNewDocument: [[], 'number'],
   FPDF_ImportPagesByIndex: [['number', 'number', 'number', 'number', 'number'], 'boolean'],
   FPDF_ImportPages: [['number', 'number', 'number', 'number'], 'boolean'],
+
+  // === Read Page Boxes ===
+  FPDFPage_GetArtBox: [['number', 'number', 'number', 'number', 'number'], 'boolean'],
+  FPDFPage_GetBleedBox: [['number', 'number', 'number', 'number', 'number'], 'boolean'],
+  FPDFPage_GetCropBox: [['number', 'number', 'number', 'number', 'number'], 'boolean'],
+  FPDFPage_GetMediaBox: [['number', 'number', 'number', 'number', 'number'], 'boolean'],
+  FPDFPage_GetTrimBox: [['number', 'number', 'number', 'number', 'number'], 'boolean'],
+
+  // === Write Page Boxes ===
+  FPDFPage_SetArtBox: [['number', 'number', 'number', 'number', 'number'], 'boolean'],
+  FPDFPage_SetBleedBox: [['number', 'number', 'number', 'number', 'number'], 'boolean'],
+  FPDFPage_SetCropBox: [['number', 'number', 'number', 'number', 'number'], 'boolean'],
+  FPDFPage_SetMediaBox: [['number', 'number', 'number', 'number', 'number'], 'boolean'],
+  FPDFPage_SetTrimBox: [['number', 'number', 'number', 'number', 'number'], 'boolean'],
+
+  // === Create and pages and save ===
+  FPDFPage_New: [['number', 'number', 'number', 'number'], 'number'],
+  FPDF_SaveAsCopy: [['number', 'number', 'number'], 'number'],
 };
