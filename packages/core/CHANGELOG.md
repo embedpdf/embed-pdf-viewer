@@ -1,5 +1,11 @@
 # @embedpdf/core
 
+## 1.0.5
+
+### Patch Changes
+
+- [`0e8f5d1`](https://github.com/embedpdf/embed-pdf-viewer/commit/0e8f5d1da3a331d00e1310d9f4249028f2d731b9) by [@bobsingor](https://github.com/bobsingor) – Make onInitialized function optional on the EmbedPDF component
+
 ## 1.0.4
 
 ### Patch Changes
