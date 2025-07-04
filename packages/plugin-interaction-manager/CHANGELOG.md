@@ -1,5 +1,13 @@
 # @embedpdf/plugin-interaction-manager
 
+## 1.0.7
+
+### Patch Changes
+
+- [#33](https://github.com/embedpdf/embed-pdf-viewer/pull/33) by [@bobsingor](https://github.com/bobsingor) – Allow one handler for multiple modes and add event for when handler becomes active and ends
+
+- [#34](https://github.com/embedpdf/embed-pdf-viewer/pull/34) by [@bobsingor](https://github.com/bobsingor) – Update pointer handler hooks to deal with multiple modes and option to update modes on the register function
+
 ## 1.0.6
 
 ## 1.0.5
