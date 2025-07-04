@@ -1,5 +1,11 @@
 # @embedpdf/plugin-selection
 
+## 1.0.7
+
+### Patch Changes
+
+- [#31](https://github.com/embedpdf/embed-pdf-viewer/pull/31) by [@bobsingor](https://github.com/bobsingor) – Make copy to clipboard work
+
 ## 1.0.6
 
 ### Patch Changes
