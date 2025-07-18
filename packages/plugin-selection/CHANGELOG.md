@@ -1,5 +1,11 @@
 # @embedpdf/plugin-selection
 
+## 1.0.12
+
+### Patch Changes
+
+- [#43](https://github.com/embedpdf/embed-pdf-viewer/pull/43) by [@bobsingor](https://github.com/bobsingor) – Add vue layer to the selection plugin
+
 ## 1.0.11
 
 ### Patch Changes
