@@ -1,5 +1,11 @@
 # @embedpdf/plugin-viewport
 
+## 1.0.12
+
+### Patch Changes
+
+- [#43](https://github.com/embedpdf/embed-pdf-viewer/pull/43) by [@bobsingor](https://github.com/bobsingor) – Add support for Vue to viewport plugin
+
 ## 1.0.11
 
 ## 1.0.10

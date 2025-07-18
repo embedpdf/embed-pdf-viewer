@@ -1,5 +1,11 @@
 # @embedpdf/plugin-scroll
 
+## 1.0.12
+
+### Patch Changes
+
+- [#43](https://github.com/embedpdf/embed-pdf-viewer/pull/43) by [@bobsingor](https://github.com/bobsingor) – Make the scroll plugin work with Vue
+
 ## 1.0.11
 
 ### Patch Changes
