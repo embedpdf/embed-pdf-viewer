@@ -29,14 +29,19 @@ var createPdfium = (() => {
     [
       '_EPDF_RenderAnnotBitmap',
       '_EPDFAnnot_GenerateAppearance',
+      '_EPDFAnnot_GenerateAppearanceWithBlend',
+      '_EPDFAnnot_GetBlendMode',
       '_EPDFAnnot_GetBorderDashPattern',
       '_EPDFAnnot_GetBorderDashPatternCount',
       '_EPDFAnnot_GetBorderEffect',
       '_EPDFAnnot_GetBorderStyle',
       '_EPDFAnnot_GetColor',
+      '_EPDFAnnot_GetIntent',
       '_EPDFAnnot_GetRectangleDifferences',
+      '_EPDFAnnot_GetRichContent',
       '_EPDFAnnot_SetBorderStyle',
       '_EPDFAnnot_SetColor',
+      '_EPDFAnnot_SetIntent',
       '_FORM_CanRedo',
       '_FORM_CanUndo',
       '_FORM_DoDocumentAAction',
@@ -5961,6 +5966,24 @@ var createPdfium = (() => {
     ));
     var _EPDFAnnot_GenerateAppearance = (Module['_EPDFAnnot_GenerateAppearance'] =
       createExportWrapper('EPDFAnnot_GenerateAppearance', 1));
+    var _EPDFAnnot_GenerateAppearanceWithBlend = (Module['_EPDFAnnot_GenerateAppearanceWithBlend'] =
+      createExportWrapper('EPDFAnnot_GenerateAppearanceWithBlend', 2));
+    var _EPDFAnnot_GetBlendMode = (Module['_EPDFAnnot_GetBlendMode'] = createExportWrapper(
+      'EPDFAnnot_GetBlendMode',
+      1,
+    ));
+    var _EPDFAnnot_SetIntent = (Module['_EPDFAnnot_SetIntent'] = createExportWrapper(
+      'EPDFAnnot_SetIntent',
+      2,
+    ));
+    var _EPDFAnnot_GetIntent = (Module['_EPDFAnnot_GetIntent'] = createExportWrapper(
+      'EPDFAnnot_GetIntent',
+      3,
+    ));
+    var _EPDFAnnot_GetRichContent = (Module['_EPDFAnnot_GetRichContent'] = createExportWrapper(
+      'EPDFAnnot_GetRichContent',
+      3,
+    ));
     var _FPDFDoc_GetAttachmentCount = (Module['_FPDFDoc_GetAttachmentCount'] = createExportWrapper(
       'FPDFDoc_GetAttachmentCount',
       1,

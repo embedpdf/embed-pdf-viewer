@@ -11,6 +11,7 @@ import {
   AppearanceMode,
   PdfPageObject,
   PdfDocumentObject,
+  PdfBlendMode,
 } from '@embedpdf/models';
 
 /* Metadata tracked per anno */
@@ -47,81 +48,64 @@ export interface RenderAnnotationOptions {
 }
 
 export interface BaseAnnotationDefaults extends WebAlphaColor {
+  name: string;
+  subtype: PdfAnnotationSubtype;
   interaction: {
     mode: string;
     exclusive: boolean;
     cursor?: string;
   };
   textSelection?: boolean;
+  blendMode?: PdfBlendMode;
 }
 
-export interface HighlightDefaults extends BaseAnnotationDefaults {
-  name: 'Highlight';
-}
+export type TextMarkupSubtype =
+  | PdfAnnotationSubtype.HIGHLIGHT
+  | PdfAnnotationSubtype.UNDERLINE
+  | PdfAnnotationSubtype.STRIKEOUT
+  | PdfAnnotationSubtype.SQUIGGLY;
 
-export interface UnderlineDefaults extends BaseAnnotationDefaults {
-  name: 'Underline';
-}
-
-export interface StrikeoutDefaults extends BaseAnnotationDefaults {
-  name: 'Strikeout';
-}
-
-export interface SquigglyDefaults extends BaseAnnotationDefaults {
-  name: 'Squiggly';
+export interface TextMarkupDefaults extends BaseAnnotationDefaults {
+  subtype: TextMarkupSubtype;
+  blendMode: PdfBlendMode;
 }
 
 export interface InkDefaults extends BaseAnnotationDefaults {
-  name: 'Ink';
+  subtype: PdfAnnotationSubtype.INK;
   strokeWidth: number;
+  intent?: string;
 }
 
-export type AnnotationDefaults =
-  | HighlightDefaults
-  | UnderlineDefaults
-  | StrikeoutDefaults
-  | SquigglyDefaults
-  | InkDefaults;
+export interface TextDefaults extends BaseAnnotationDefaults {
+  subtype: PdfAnnotationSubtype.FREETEXT;
+  fontSize: number;
+}
 
-export type ToolDefaultsBySubtype = {
-  [PdfAnnotationSubtype.HIGHLIGHT]: HighlightDefaults;
-  [PdfAnnotationSubtype.UNDERLINE]: UnderlineDefaults;
-  [PdfAnnotationSubtype.STRIKEOUT]: StrikeoutDefaults;
-  [PdfAnnotationSubtype.SQUIGGLY]: SquigglyDefaults;
-  [PdfAnnotationSubtype.INK]: InkDefaults;
+export type AnnotationDefaults = TextMarkupDefaults | InkDefaults | TextDefaults;
+
+export type ToolDefaultsByMode = {
+  [K in string]: AnnotationDefaults;
 };
 
-export type StylableSubtype = keyof ToolDefaultsBySubtype;
-
-export type ToolDefaults<S extends PdfAnnotationSubtype> = ToolDefaultsBySubtype[Extract<
-  S,
-  keyof ToolDefaultsBySubtype
->];
-
 export type ActiveTool =
-  | { mode: null; defaults: null }
-  | {
-      [K in StylableSubtype]: {
-        mode: K;
-        defaults: ToolDefaultsBySubtype[K];
-      };
-    }[StylableSubtype];
+  | { variantKey: null; defaults: null }
+  | { [K in string]: { variantKey: K; defaults: ToolDefaultsByMode[K] } }[string];
 
 export interface AnnotationState {
   pages: Record<number, string[]>; // pageIndex → list of UIDs
   byUid: Record<string, TrackedAnnotation>; // UID → latest object
 
   selectedUid: string | null;
-  annotationMode: StylableSubtype | null;
+  activeVariant: string | null;
 
-  toolDefaults: ToolDefaultsBySubtype;
+  toolDefaults: Record<string, AnnotationDefaults>;
   colorPresets: string[];
 
   hasPendingChanges: boolean;
 }
 
 export interface AnnotationPluginConfig extends BasePluginConfig {
-  toolDefaults?: Partial<ToolDefaultsBySubtype>;
+  toolDefaults?: Record<string, AnnotationDefaults>;
   colorPresets?: string[];
   /**
    * When `false` mutations are kept in memory and must be
@@ -137,15 +121,17 @@ export interface AnnotationCapability {
   getSelectedAnnotation: () => TrackedAnnotation | null;
   selectAnnotation: (pageIndex: number, annotationId: number) => void;
   deselectAnnotation: () => void;
-  getAnnotationMode: () => StylableSubtype | null;
-  setAnnotationMode: (mode: StylableSubtype | null) => void;
+  getActiveVariant: () => string | null;
+  setActiveVariant: (variantKey: string | null) => void;
   /** strongly typed – only sub-types we have defaults for */
-  getToolDefaults: <S extends StylableSubtype>(subtype: S) => ToolDefaultsBySubtype[S];
+  getToolDefaults: (variantKey: string) => AnnotationDefaults;
+  getToolDefaultsBySubtypeAndIntent: (
+    subtype: PdfAnnotationSubtype,
+    intent?: string,
+  ) => AnnotationDefaults;
+  getToolDefaultsBySubtype: (subtype: PdfAnnotationSubtype) => AnnotationDefaults;
   /** Partially patch a single tool’s defaults */
-  setToolDefaults: <S extends StylableSubtype>(
-    subtype: S,
-    patch: Partial<ToolDefaultsBySubtype[S]>,
-  ) => void;
+  setToolDefaults: (variantKey: string, patch: Partial<AnnotationDefaults>) => void;
   /** current palette – UI just reads this */
   getColorPresets: () => string[];
   /** append a swatch (deduped by RGBA) */
@@ -160,7 +146,7 @@ export interface AnnotationCapability {
   renderAnnotation: (options: RenderAnnotationOptions) => Task<Blob, PdfErrorReason>;
   /** undo / redo */
   onStateChange: EventHook<AnnotationState>;
-  onModeChange: EventHook<StylableSubtype | null>;
+  onActiveVariantChange: EventHook<string | null>;
   onActiveToolChange: EventHook<ActiveTool>;
   commit: () => void;
 }

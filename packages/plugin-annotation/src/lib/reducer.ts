@@ -1,5 +1,5 @@
 import { Reducer } from '@embedpdf/core';
-import { PdfAnnotationSubtype } from '@embedpdf/models';
+import { PdfAnnotationSubtype, PdfBlendMode } from '@embedpdf/models';
 import {
   ADD_COLOR_PRESET,
   COMMIT_PENDING_CHANGES,
@@ -15,9 +15,16 @@ import {
   PURGE_ANNOTATION,
   STORE_PDF_ID,
   REINDEX_PAGE_ANNOTATIONS,
+  SET_ACTIVE_VARIANT,
 } from './actions';
-import { AnnotationPluginConfig, AnnotationState, TrackedAnnotation } from './types';
+import {
+  AnnotationDefaults,
+  AnnotationPluginConfig,
+  AnnotationState,
+  TrackedAnnotation,
+} from './types';
 import { makeUid } from './utils';
+import { makeVariantKey } from './variant-key';
 
 /* ─────────── util helpers ─────────── */
 const DEFAULT_COLORS = [
@@ -58,44 +65,70 @@ export const initialState = (cfg: AnnotationPluginConfig): AnnotationState => ({
   pages: {},
   byUid: {},
   selectedUid: null,
-  annotationMode: null,
+  activeVariant: null,
 
   toolDefaults: {
-    [PdfAnnotationSubtype.HIGHLIGHT]: {
+    [makeVariantKey(PdfAnnotationSubtype.HIGHLIGHT)]: {
       name: 'Highlight',
-      color: '#FFCD45',
-      opacity: 1,
+      subtype: PdfAnnotationSubtype.HIGHLIGHT,
       interaction: { mode: 'highlight', exclusive: false },
       textSelection: true,
-    },
-    [PdfAnnotationSubtype.UNDERLINE]: {
-      name: 'Underline',
-      color: '#E44234',
+      color: '#FFCD45',
       opacity: 1,
+      blendMode: PdfBlendMode.Multiply,
+    },
+    [makeVariantKey(PdfAnnotationSubtype.UNDERLINE)]: {
+      name: 'Underline',
+      subtype: PdfAnnotationSubtype.UNDERLINE,
       interaction: { mode: 'underline', exclusive: false },
       textSelection: true,
-    },
-    [PdfAnnotationSubtype.STRIKEOUT]: {
-      name: 'Strikeout',
       color: '#E44234',
       opacity: 1,
+      blendMode: PdfBlendMode.Normal,
+    },
+    [makeVariantKey(PdfAnnotationSubtype.STRIKEOUT)]: {
+      name: 'Strikeout',
+      subtype: PdfAnnotationSubtype.STRIKEOUT,
       interaction: { mode: 'strikeout', exclusive: false },
       textSelection: true,
-    },
-    [PdfAnnotationSubtype.SQUIGGLY]: {
-      name: 'Squiggly',
       color: '#E44234',
       opacity: 1,
+      blendMode: PdfBlendMode.Normal,
+    },
+    [makeVariantKey(PdfAnnotationSubtype.SQUIGGLY)]: {
+      name: 'Squiggly',
+      subtype: PdfAnnotationSubtype.SQUIGGLY,
       interaction: { mode: 'squiggly', exclusive: false },
       textSelection: true,
+      color: '#E44234',
+      opacity: 1,
+      blendMode: PdfBlendMode.Normal,
     },
-    [PdfAnnotationSubtype.INK]: {
+    [makeVariantKey(PdfAnnotationSubtype.INK)]: {
       name: 'Ink',
+      subtype: PdfAnnotationSubtype.INK,
+      interaction: { mode: 'ink', exclusive: true, cursor: 'crosshair' },
       color: '#E44234',
       opacity: 1,
       strokeWidth: 11,
-      interaction: { mode: 'ink', exclusive: true, cursor: 'crosshair' },
-      textSelection: false,
+      blendMode: PdfBlendMode.Normal,
+    },
+    [makeVariantKey(PdfAnnotationSubtype.INK, 'InkHighlight')]: {
+      name: 'Ink Highlight',
+      subtype: PdfAnnotationSubtype.INK,
+      interaction: { mode: 'inkHighlight', exclusive: true, cursor: 'crosshair' },
+      color: '#E44234',
+      opacity: 1,
+      strokeWidth: 11,
+      blendMode: PdfBlendMode.Multiply,
+    },
+    [makeVariantKey(PdfAnnotationSubtype.FREETEXT)]: {
+      name: 'Free Text',
+      subtype: PdfAnnotationSubtype.FREETEXT,
+      interaction: { mode: 'freeText', exclusive: true, cursor: 'crosshair' },
+      color: '#E44234',
+      opacity: 1,
+      fontSize: 16,
     },
     ...cfg.toolDefaults,
   },
@@ -128,8 +161,8 @@ export const reducer: Reducer<AnnotationState, AnnotationAction> = (state, actio
     }
 
     /* ───── GUI bits ───── */
-    case SET_ANNOTATION_MODE:
-      return { ...state, annotationMode: action.payload };
+    case SET_ACTIVE_VARIANT:
+      return { ...state, activeVariant: action.payload };
     case SELECT_ANNOTATION:
       return {
         ...state,
@@ -144,12 +177,14 @@ export const reducer: Reducer<AnnotationState, AnnotationAction> = (state, actio
         : { ...state, colorPresets: [...state.colorPresets, action.payload] };
 
     case UPDATE_TOOL_DEFAULTS: {
-      const { subtype, patch } = action.payload;
+      const { variantKey, patch } = action.payload;
+      const prev = state.toolDefaults[variantKey];
+      if (!prev) return state;
       return {
         ...state,
         toolDefaults: {
           ...state.toolDefaults,
-          [subtype]: { ...state.toolDefaults[subtype], ...patch },
+          [variantKey]: { ...prev, ...patch } as AnnotationDefaults,
         },
       };
     }

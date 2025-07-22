@@ -41,6 +41,7 @@
     "@embedpdf/plugin-pan": "workspace:*",
     "@embedpdf/plugin-capture": "workspace:*",
     "@embedpdf/plugin-history": "workspace:*",
+    "@embedpdf/plugin-rich-text": "workspace:*",
     "preact": "^10.17.0"
   },
   "devDependencies": {

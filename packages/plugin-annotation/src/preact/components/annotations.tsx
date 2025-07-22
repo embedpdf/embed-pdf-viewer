@@ -1,6 +1,12 @@
 /** @jsxImportSource preact */
 import { JSX } from 'preact';
-import { PdfAnnotationSubtype, PdfInkAnnoObject } from '@embedpdf/models';
+import {
+  blendModeToCss,
+  PdfAnnotationSubtype,
+  PdfBlendMode,
+  PdfFreeTextAnnoObject,
+  PdfInkAnnoObject,
+} from '@embedpdf/models';
 import { PointerEventHandlers } from '@embedpdf/plugin-interaction-manager';
 import { usePointerHandlers } from '@embedpdf/plugin-interaction-manager/preact';
 import {
@@ -18,6 +24,7 @@ import { Squiggly } from './text-markup/squiggly';
 import { Ink } from './annotations/ink';
 import { useSelectionCapability } from '@embedpdf/plugin-selection/preact';
 import { resizeInkAnnotation } from '../../shared/resize-ink';
+import { FreeText } from './annotations/free-text';
 
 interface AnnotationsProps {
   pageIndex: number;
@@ -83,7 +90,9 @@ export function Annotations(annotationsProps: AnnotationsProps) {
                 isSelected={isSelected}
                 isDraggable={false}
                 isResizable={false}
-                style={{ mixBlendMode: 'multiply' }}
+                style={{
+                  mixBlendMode: blendModeToCss(annotation.object.blendMode ?? PdfBlendMode.Normal),
+                }}
                 {...annotationsProps}
               >
                 <Underline
@@ -104,7 +113,9 @@ export function Annotations(annotationsProps: AnnotationsProps) {
                 isSelected={isSelected}
                 isDraggable={false}
                 isResizable={false}
-                style={{ mixBlendMode: 'multiply' }}
+                style={{
+                  mixBlendMode: blendModeToCss(annotation.object.blendMode ?? PdfBlendMode.Normal),
+                }}
                 {...annotationsProps}
               >
                 <Strikeout
@@ -125,7 +136,9 @@ export function Annotations(annotationsProps: AnnotationsProps) {
                 isSelected={isSelected}
                 isDraggable={false}
                 isResizable={false}
-                style={{ mixBlendMode: 'multiply' }}
+                style={{
+                  mixBlendMode: blendModeToCss(annotation.object.blendMode ?? PdfBlendMode.Normal),
+                }}
                 {...annotationsProps}
               >
                 <Squiggly
@@ -146,7 +159,11 @@ export function Annotations(annotationsProps: AnnotationsProps) {
                 isSelected={isSelected}
                 isDraggable={false}
                 isResizable={false}
-                style={{ mixBlendMode: 'multiply' }}
+                style={{
+                  mixBlendMode: blendModeToCss(
+                    annotation.object.blendMode ?? PdfBlendMode.Multiply,
+                  ),
+                }}
                 {...annotationsProps}
               >
                 <Highlight
@@ -167,6 +184,9 @@ export function Annotations(annotationsProps: AnnotationsProps) {
                 trackedAnnotation={annotation}
                 outlineOffset={6}
                 computeResizePatch={resizeInkAnnotation}
+                style={{
+                  mixBlendMode: blendModeToCss(annotation.object.blendMode ?? PdfBlendMode.Normal),
+                }}
                 {...annotationsProps}
               >
                 {(obj: PdfInkAnnoObject) => (
@@ -175,6 +195,29 @@ export function Annotations(annotationsProps: AnnotationsProps) {
                     opacity={obj.opacity}
                     strokeWidth={obj.strokeWidth}
                     inkList={obj.inkList}
+                    rect={obj.rect}
+                    scale={scale}
+                    onClick={(e) => handleClick(e, annotation)}
+                  />
+                )}
+              </AnnotationContainer>
+            );
+          case PdfAnnotationSubtype.FREETEXT:
+            return (
+              <AnnotationContainer
+                key={annotation.localId}
+                trackedAnnotation={annotation}
+                isSelected={isSelected}
+                isDraggable={false}
+                isResizable={false}
+                style={{
+                  mixBlendMode: blendModeToCss(annotation.object.blendMode ?? PdfBlendMode.Normal),
+                }}
+                {...annotationsProps}
+              >
+                {(obj: PdfFreeTextAnnoObject) => (
+                  <FreeText
+                    richContent={obj.richContent}
                     rect={obj.rect}
                     scale={scale}
                     onClick={(e) => handleClick(e, annotation)}

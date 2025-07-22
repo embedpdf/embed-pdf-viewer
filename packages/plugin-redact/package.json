@@ -1,0 +1,57 @@
+{
+  "name": "@embedpdf/plugin-redact",
+  "version": "1.0.11",
+  "type": "module",
+  "main": "./dist/index.cjs",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "require": "./dist/index.cjs"
+    }
+  },
+  "scripts": {
+    "build": "vite build",
+    "build:watch": "vite build --watch",
+    "clean": "PROJECT_CWD=$(pwd) pnpm -w p:clean",
+    "lint": "PROJECT_CWD=$(pwd) pnpm -w p:lint",
+    "lint:fix": "PROJECT_CWD=$(pwd) pnpm -w p:lint:fix",
+    "typecheck": "PROJECT_CWD=$(pwd) pnpm -w p:typecheck"
+  },
+  "dependencies": {
+    "@embedpdf/models": "workspace:*"
+  },
+  "devDependencies": {
+    "@embedpdf/core": "workspace:*",
+    "@types/react": "^18.2.0",
+    "@vitejs/plugin-vue": "^6.0.0",
+    "typescript": "^5.0.0",
+    "unplugin-dts": "1.0.0-beta.4",
+    "vite": "^6.3.5"
+  },
+  "peerDependencies": {
+    "@embedpdf/core": "workspace:*",
+    "react": ">=16.8.0",
+    "react-dom": ">=16.8.0",
+    "preact": "^10.26.4",
+    "vue": ">=3.2.0"
+  },
+  "files": [
+    "dist",
+    "README.md"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/embedpdf/embed-pdf-viewer",
+    "directory": "packages/plugin-redact"
+  },
+  "homepage": "https://www.embedpdf.com/docs",
+  "bugs": {
+    "url": "https://github.com/embedpdf/embed-pdf-viewer/issues"
+  },
+  "publishConfig": {
+    "access": "public"
+  }
+}

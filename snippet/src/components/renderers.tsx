@@ -51,11 +51,7 @@ import { usePrintAction } from '@embedpdf/plugin-print/preact';
 import { PageRange, PageRangeType, PrintOptions, PrintQuality } from '@embedpdf/plugin-print';
 import { useBookmarkCapability } from '@embedpdf/plugin-bookmark/preact';
 import { useStoreState } from '@embedpdf/core/preact';
-import {
-  SelectedAnnotation,
-  StylableSubtype,
-  TrackedAnnotation,
-} from '@embedpdf/plugin-annotation';
+import { SelectedAnnotation, TrackedAnnotation } from '@embedpdf/plugin-annotation';
 import { useAnnotationCapability } from '@embedpdf/plugin-annotation/preact';
 
 export const iconButtonRenderer: ComponentRenderFunction<IconButtonProps> = (

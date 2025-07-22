@@ -18,6 +18,7 @@ import {
   PdfTask,
   Rotation,
   AppearanceMode,
+  PdfBlendMode,
 } from '@embedpdf/models';
 import {
   ActiveTool,
@@ -27,8 +28,8 @@ import {
   BaseAnnotationDefaults,
   GetPageAnnotationsOptions,
   RenderAnnotationOptions,
-  StylableSubtype,
-  ToolDefaultsBySubtype,
+  TextMarkupSubtype,
+  ToolDefaultsByMode,
   TrackedAnnotation,
 } from './types';
 import {
@@ -46,6 +47,7 @@ import {
   storePdfId,
   purgeAnnotation,
   reindexPageAnnotations,
+  setActiveVariant,
 } from './actions';
 import {
   InteractionManagerCapability,
@@ -56,6 +58,7 @@ import { SelectionPlugin, SelectionCapability } from '@embedpdf/plugin-selection
 import { HistoryPlugin, HistoryCapability, Command } from '@embedpdf/plugin-history';
 import { getSelectedAnnotation } from './selectors';
 import { makeUid, parseUid } from './utils';
+import { makeVariantKey } from './variant-key';
 
 export class AnnotationPlugin extends BasePlugin<
   AnnotationPluginConfig,
@@ -75,13 +78,12 @@ export class AnnotationPlugin extends BasePlugin<
   private readonly selection: SelectionCapability | null;
   private readonly history: HistoryCapability | null;
 
-  /** Map <subtype> → <modeId>.  Filled once in `initialize()`. */
-  private readonly modeBySubtype = new Map<StylableSubtype, string>();
-  /** The inverse map for quick lookup in onModeChange().          */
-  private readonly subtypeByMode = new Map<string, StylableSubtype>();
-  private readonly modeChange$ = createBehaviorEmitter<StylableSubtype | null>();
+  private readonly modeByVariant = new Map<string, string>();
+  private readonly variantByMode = new Map<string, string>();
+
+  private readonly activeVariantChange$ = createBehaviorEmitter<string | null>();
   private readonly activeTool$ = createBehaviorEmitter<ActiveTool>({
-    mode: null,
+    variantKey: null,
     defaults: null,
   });
 
@@ -113,8 +115,8 @@ export class AnnotationPlugin extends BasePlugin<
   }
 
   async initialize(): Promise<void> {
-    for (const [subtype, defaults] of enumEntries(this.state.toolDefaults)) {
-      this.registerTool(subtype, defaults);
+    for (const [variantKey, defaults] of Object.entries(this.state.toolDefaults)) {
+      this.registerTool(variantKey, defaults);
     }
 
     this.history?.onHistoryChange((topic) => {
@@ -124,22 +126,23 @@ export class AnnotationPlugin extends BasePlugin<
     });
 
     this.interactionManager?.onModeChange((s) => {
-      const newSubtype = this.subtypeByMode.get(s.activeMode) ?? null;
-      if (newSubtype !== this.state.annotationMode) {
-        this.dispatch(setAnnotationMode(newSubtype));
-        this.modeChange$.emit(newSubtype);
+      const newVariant = this.variantByMode.get(s.activeMode) ?? null;
+      console.log(newVariant, this.state.activeVariant);
+      if (newVariant !== this.state.activeVariant) {
+        this.dispatch(setActiveVariant(newVariant));
+        this.activeVariantChange$.emit(newVariant);
       }
     });
 
     this.selection?.onEndSelection(() => {
-      if (!this.state.annotationMode) return;
+      if (!this.state.activeVariant) return;
 
       if (
         !(
-          this.state.annotationMode === PdfAnnotationSubtype.HIGHLIGHT ||
-          this.state.annotationMode === PdfAnnotationSubtype.UNDERLINE ||
-          this.state.annotationMode === PdfAnnotationSubtype.STRIKEOUT ||
-          this.state.annotationMode === PdfAnnotationSubtype.SQUIGGLY
+          this.state.activeVariant === makeVariantKey(PdfAnnotationSubtype.HIGHLIGHT) ||
+          this.state.activeVariant === makeVariantKey(PdfAnnotationSubtype.UNDERLINE) ||
+          this.state.activeVariant === makeVariantKey(PdfAnnotationSubtype.STRIKEOUT) ||
+          this.state.activeVariant === makeVariantKey(PdfAnnotationSubtype.SQUIGGLY)
         )
       ) {
         return;
@@ -151,16 +154,19 @@ export class AnnotationPlugin extends BasePlugin<
       for (const selection of formattedSelection) {
         const rect = selection.rect;
         const segmentRects = selection.segmentRects;
-        const type = this.state.annotationMode;
+        const type = this.state.activeVariant;
+        const subtype = this.state.toolDefaults[type].subtype;
         const color = this.state.toolDefaults[type].color;
         const opacity = this.state.toolDefaults[type].opacity;
+        const blendMode = this.state.toolDefaults[type].blendMode ?? PdfBlendMode.Normal;
 
         this.createAnnotation(selection.pageIndex, {
-          type,
+          type: subtype as TextMarkupSubtype,
           rect,
           segmentRects,
           color,
           opacity,
+          blendMode,
           pageIndex: selection.pageIndex,
           id: Date.now() + Math.random(),
         });
@@ -170,7 +176,7 @@ export class AnnotationPlugin extends BasePlugin<
     });
   }
 
-  private registerTool(subtype: StylableSubtype, defaults: BaseAnnotationDefaults) {
+  private registerTool(variantKey: string, defaults: BaseAnnotationDefaults) {
     const modeId = defaults.interaction.mode;
     const interactionMode: InteractionMode = {
       id: modeId,
@@ -184,8 +190,9 @@ export class AnnotationPlugin extends BasePlugin<
     if (defaults.textSelection) {
       this.selection?.enableForMode(modeId);
     }
-    this.modeBySubtype.set(subtype, modeId);
-    this.subtypeByMode.set(modeId, subtype);
+
+    this.modeByVariant.set(variantKey, modeId);
+    this.variantByMode.set(modeId, variantKey);
   }
 
   protected buildCapability(): AnnotationCapability {
@@ -202,28 +209,43 @@ export class AnnotationPlugin extends BasePlugin<
       deselectAnnotation: () => {
         this.dispatch(deselectAnnotation());
       },
-      getAnnotationMode: () => {
-        return this.state.annotationMode;
+      getActiveVariant: () => {
+        return this.state.activeVariant;
       },
-      setAnnotationMode: (subtype: StylableSubtype | null) => {
-        if (subtype === this.state.annotationMode) return;
-        if (subtype) {
-          const mode = this.modeBySubtype.get(subtype);
-          if (!mode) throw new Error(`Mode missing for subtype ${subtype}`);
+      setActiveVariant: (variantKey: string | null) => {
+        if (variantKey === this.state.activeVariant) return;
+        if (variantKey) {
+          const mode = this.modeByVariant.get(variantKey);
+          if (!mode) throw new Error(`Mode missing for variant ${variantKey}`);
           this.interactionManager?.activate(mode);
         } else {
           this.interactionManager?.activate('default');
         }
       },
-      getToolDefaults: (subtype) => {
+      getToolDefaults: (variantKey) => {
+        const defaults = this.state.toolDefaults[variantKey];
+        if (!defaults) {
+          throw new Error(`No defaults found for variant: ${variantKey}`);
+        }
+        return defaults;
+      },
+      getToolDefaultsBySubtypeAndIntent: (subtype, intent) => {
+        const variantKey = makeVariantKey(subtype, intent);
+        const defaults = this.state.toolDefaults[variantKey];
+        if (!defaults) {
+          throw new Error(`No defaults found for variant: ${variantKey}`);
+        }
+        return defaults;
+      },
+      getToolDefaultsBySubtype: (subtype) => {
         const defaults = this.state.toolDefaults[subtype];
         if (!defaults) {
           throw new Error(`No defaults found for subtype: ${subtype}`);
         }
         return defaults;
       },
-      setToolDefaults: (subtype, patch) => {
-        this.dispatch(updateToolDefaults(subtype, patch));
+      setToolDefaults: (variantKey, patch) => {
+        this.dispatch(updateToolDefaults(variantKey, patch));
       },
       getColorPresets: () => [...this.state.colorPresets],
       addColorPreset: (color) => this.dispatch(addColorPreset(color)),
@@ -235,33 +257,30 @@ export class AnnotationPlugin extends BasePlugin<
         this.deleteAnnotation(pageIndex, localId),
       renderAnnotation: (options: RenderAnnotationOptions) => this.renderAnnotation(options),
       onStateChange: this.state$.on,
-      onModeChange: this.modeChange$.on,
+      onActiveVariantChange: this.activeVariantChange$.on,
       onActiveToolChange: this.activeTool$.on,
       commit: () => this.commit(),
     };
   }
 
-  private createActiveTool(
-    mode: StylableSubtype | null,
-    toolDefaults: ToolDefaultsBySubtype,
-  ): ActiveTool {
+  private createActiveTool(mode: string | null, toolDefaults: ToolDefaultsByMode): ActiveTool {
     if (mode === null) {
-      return { mode: null, defaults: null };
+      return { variantKey: null, defaults: null };
     }
-    return { mode, defaults: toolDefaults[mode] } as ActiveTool;
+    return { variantKey: mode, defaults: toolDefaults[mode] } as ActiveTool;
   }
 
   private emitActiveTool(state: AnnotationState) {
-    const activeTool = this.createActiveTool(state.annotationMode, state.toolDefaults);
+    const activeTool = this.createActiveTool(state.activeVariant, state.toolDefaults);
     this.activeTool$.emit(activeTool);
   }
 
   override onStoreUpdated(prev: AnnotationState, next: AnnotationState): void {
     this.state$.emit(next);
     if (
-      prev.annotationMode !== next.annotationMode ||
-      prev.toolDefaults[prev.annotationMode ?? PdfAnnotationSubtype.HIGHLIGHT] !==
-        next.toolDefaults[next.annotationMode ?? PdfAnnotationSubtype.HIGHLIGHT]
+      prev.activeVariant !== next.activeVariant ||
+      prev.toolDefaults[prev.activeVariant ?? PdfAnnotationSubtype.HIGHLIGHT] !==
+        next.toolDefaults[next.activeVariant ?? PdfAnnotationSubtype.HIGHLIGHT]
     ) {
       this.emitActiveTool(next);
     }

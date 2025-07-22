@@ -114,6 +114,7 @@ import {
   AnnotationState,
   getSelectedAnnotation,
   getSelectedAnnotationWithPageIndex,
+  makeVariantKey,
 } from '@embedpdf/plugin-annotation';
 import { AnnotationLayer } from '@embedpdf/plugin-annotation/preact';
 import { PinchWrapper, MarqueeZoom } from '@embedpdf/plugin-zoom/preact';
@@ -144,6 +145,7 @@ import { PanMode } from '@embedpdf/plugin-pan/preact';
 import { PanPluginPackage } from '@embedpdf/plugin-pan';
 import { CAPTURE_PLUGIN_ID, CapturePlugin, CapturePluginPackage } from '@embedpdf/plugin-capture';
 import { MarqueeCapture } from '@embedpdf/plugin-capture/preact';
+import { RichTextPluginPackage } from '@embedpdf/plugin-rich-text';
 import {
   HISTORY_PLUGIN_ID,
   HistoryPlugin,
@@ -424,6 +426,10 @@ export const icons: IconRegistry = {
   pencilMarker: {
     id: 'pencilMarker',
     svg: '<svg  xmlns="http://www.w3.org/2000/svg"  width="100%"  height="100%"  viewBox="0 0 24 24" class="icon icon-tabler icons-tabler-outline icon-tabler-writing-draw" stroke-linejoin="round" stroke-linecap="round" stroke-width="2" fill="none"><g transform="rotate(47.565 12.1875 10.75)"><path stroke="#000000" d="m14.18752,16.75l0,-12c0,-1.1 -0.9,-2 -2,-2s-2,0.9 -2,2l0,12l2,2l2,-2z"/><path stroke="#000000" d="m10.18752,6.75l4,0"/></g><path stroke="currentColor" d="m19.37499,20.125c0.56874,0.0625 -4.04999,-0.5625 -6.41249,-0.4375c-2.3625,0.125 -4.75833,1.22916 -6.85624,1.625c-1.76458,0.6875 -3.40416,-0.9375 -1.98125,-2.49999"/></svg>',
+  },
+  text: {
+    id: 'text',
+    svg: '<svg  xmlns="http://www.w3.org/2000/svg"  width="100%"  height="100%"  viewBox="0 0 24 24"  fill="none"  stroke="currentColor"  stroke-width="2"  stroke-linecap="round"  stroke-linejoin="round"  class="icon icon-tabler icons-tabler-outline icon-tabler-letter-case"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M17.5 15.5m-3.5 0a3.5 3.5 0 1 0 7 0a3.5 3.5 0 1 0 -7 0" /><path d="M3 19v-10.5a3.5 3.5 0 0 1 7 0v10.5" /><path d="M3 13h7" /><path d="M21 12v7" /></svg>',
   },
 };
 
@@ -1045,7 +1051,7 @@ export const menuItems: Record<string, MenuItem<State>> = {
       const annotation = registry.getPlugin<AnnotationPlugin>(ANNOTATION_PLUGIN_ID)?.provides();
       if (ui) {
         ui.setHeaderVisible({ id: 'toolsHeader', visible: false });
-        annotation?.setAnnotationMode(null);
+        annotation?.setActiveVariant(null);
       }
     },
     active: (storeState) => storeState.plugins.ui.header.toolsHeader.visible === false,
@@ -1176,15 +1182,18 @@ export const menuItems: Record<string, MenuItem<State>> = {
     action: (registry, state) => {
       const annotation = registry.getPlugin<AnnotationPlugin>(ANNOTATION_PLUGIN_ID)?.provides();
       if (annotation) {
-        if (state.plugins.annotation.annotationMode === PdfAnnotationSubtype.UNDERLINE) {
-          annotation.setAnnotationMode(null);
+        if (
+          state.plugins.annotation.activeVariant === makeVariantKey(PdfAnnotationSubtype.UNDERLINE)
+        ) {
+          annotation.setActiveVariant(null);
         } else {
-          annotation.setAnnotationMode(PdfAnnotationSubtype.UNDERLINE);
+          annotation.setActiveVariant(makeVariantKey(PdfAnnotationSubtype.UNDERLINE));
         }
       }
     },
     active: (storeState) =>
-      storeState.plugins.annotation.annotationMode === PdfAnnotationSubtype.UNDERLINE,
+      storeState.plugins.annotation.activeVariant ===
+      makeVariantKey(PdfAnnotationSubtype.UNDERLINE),
   },
   squiggly: {
     id: 'squiggly',
@@ -1194,15 +1203,17 @@ export const menuItems: Record<string, MenuItem<State>> = {
     action: (registry, state) => {
       const annotation = registry.getPlugin<AnnotationPlugin>(ANNOTATION_PLUGIN_ID)?.provides();
       if (annotation) {
-        if (state.plugins.annotation.annotationMode === PdfAnnotationSubtype.SQUIGGLY) {
-          annotation.setAnnotationMode(null);
+        if (
+          state.plugins.annotation.activeVariant === makeVariantKey(PdfAnnotationSubtype.SQUIGGLY)
+        ) {
+          annotation.setActiveVariant(null);
         } else {
-          annotation.setAnnotationMode(PdfAnnotationSubtype.SQUIGGLY);
+          annotation.setActiveVariant(makeVariantKey(PdfAnnotationSubtype.SQUIGGLY));
         }
       }
     },
     active: (storeState) =>
-      storeState.plugins.annotation.annotationMode === PdfAnnotationSubtype.SQUIGGLY,
+      storeState.plugins.annotation.activeVariant === makeVariantKey(PdfAnnotationSubtype.SQUIGGLY),
   },
   strikethrough: {
     id: 'strikethrough',
@@ -1212,15 +1223,18 @@ export const menuItems: Record<string, MenuItem<State>> = {
     action: (registry, state) => {
       const annotation = registry.getPlugin<AnnotationPlugin>(ANNOTATION_PLUGIN_ID)?.provides();
       if (annotation) {
-        if (state.plugins.annotation.annotationMode === PdfAnnotationSubtype.STRIKEOUT) {
-          annotation.setAnnotationMode(null);
+        if (
+          state.plugins.annotation.activeVariant === makeVariantKey(PdfAnnotationSubtype.STRIKEOUT)
+        ) {
+          annotation.setActiveVariant(null);
         } else {
-          annotation.setAnnotationMode(PdfAnnotationSubtype.STRIKEOUT);
+          annotation.setActiveVariant(makeVariantKey(PdfAnnotationSubtype.STRIKEOUT));
         }
       }
     },
     active: (storeState) =>
-      storeState.plugins.annotation.annotationMode === PdfAnnotationSubtype.STRIKEOUT,
+      storeState.plugins.annotation.activeVariant ===
+      makeVariantKey(PdfAnnotationSubtype.STRIKEOUT),
   },
   highlight: {
     id: 'highlight',
@@ -1230,15 +1244,18 @@ export const menuItems: Record<string, MenuItem<State>> = {
     action: (registry, state) => {
       const annotation = registry.getPlugin<AnnotationPlugin>(ANNOTATION_PLUGIN_ID)?.provides();
       if (annotation) {
-        if (state.plugins.annotation.annotationMode === PdfAnnotationSubtype.HIGHLIGHT) {
-          annotation.setAnnotationMode(null);
+        if (
+          state.plugins.annotation.activeVariant === makeVariantKey(PdfAnnotationSubtype.HIGHLIGHT)
+        ) {
+          annotation.setActiveVariant(null);
         } else {
-          annotation.setAnnotationMode(PdfAnnotationSubtype.HIGHLIGHT);
+          annotation.setActiveVariant(makeVariantKey(PdfAnnotationSubtype.HIGHLIGHT));
         }
       }
     },
     active: (storeState) =>
-      storeState.plugins.annotation.annotationMode === PdfAnnotationSubtype.HIGHLIGHT,
+      storeState.plugins.annotation.activeVariant ===
+      makeVariantKey(PdfAnnotationSubtype.HIGHLIGHT),
   },
   freehand: {
     id: 'freehand',
@@ -1248,16 +1265,38 @@ export const menuItems: Record<string, MenuItem<State>> = {
     action: (registry, state) => {
       const annotation = registry.getPlugin<AnnotationPlugin>(ANNOTATION_PLUGIN_ID)?.provides();
       if (annotation) {
-        if (state.plugins.annotation.annotationMode === PdfAnnotationSubtype.INK) {
-          annotation.setAnnotationMode(null);
+        console.log(state.plugins.annotation.activeVariant);
+        if (state.plugins.annotation.activeVariant === makeVariantKey(PdfAnnotationSubtype.INK)) {
+          annotation.setActiveVariant(null);
         } else {
           annotation.deselectAnnotation();
-          annotation.setAnnotationMode(PdfAnnotationSubtype.INK);
+          annotation.setActiveVariant(makeVariantKey(PdfAnnotationSubtype.INK));
         }
       }
     },
     active: (storeState) =>
-      storeState.plugins.annotation.annotationMode === PdfAnnotationSubtype.INK,
+      storeState.plugins.annotation.activeVariant === makeVariantKey(PdfAnnotationSubtype.INK),
+  },
+  freeText: {
+    id: 'freeText',
+    label: 'Free Text',
+    type: 'action',
+    icon: 'text',
+    action: (registry, state) => {
+      const annotation = registry.getPlugin<AnnotationPlugin>(ANNOTATION_PLUGIN_ID)?.provides();
+      if (annotation) {
+        if (
+          state.plugins.annotation.activeVariant === makeVariantKey(PdfAnnotationSubtype.FREETEXT)
+        ) {
+          annotation.setActiveVariant(null);
+        } else {
+          annotation.deselectAnnotation();
+          annotation.setActiveVariant(makeVariantKey(PdfAnnotationSubtype.FREETEXT));
+        }
+      }
+    },
+    active: (storeState) =>
+      storeState.plugins.annotation.activeVariant === makeVariantKey(PdfAnnotationSubtype.FREETEXT),
   },
   squigglySelection: {
     id: 'squigglySelection',
@@ -1269,7 +1308,9 @@ export const menuItems: Record<string, MenuItem<State>> = {
       const selection = registry.getPlugin<SelectionPlugin>(SELECTION_PLUGIN_ID)?.provides();
       if (!selection || !annotation) return;
 
-      const defaultSettings = annotation.getToolDefaults(PdfAnnotationSubtype.SQUIGGLY);
+      const defaultSettings = annotation.getToolDefaults(
+        makeVariantKey(PdfAnnotationSubtype.SQUIGGLY),
+      );
       const formattedSelection = selection.getFormattedSelection();
       for (const selection of formattedSelection) {
         annotation.createAnnotation(selection.pageIndex, {
@@ -1296,7 +1337,9 @@ export const menuItems: Record<string, MenuItem<State>> = {
       const selection = registry.getPlugin<SelectionPlugin>(SELECTION_PLUGIN_ID)?.provides();
       if (!selection || !annotation) return;
 
-      const defaultSettings = annotation.getToolDefaults(PdfAnnotationSubtype.UNDERLINE);
+      const defaultSettings = annotation.getToolDefaults(
+        makeVariantKey(PdfAnnotationSubtype.UNDERLINE),
+      );
       const formattedSelection = selection.getFormattedSelection();
       for (const selection of formattedSelection) {
         annotation.createAnnotation(selection.pageIndex, {
@@ -1323,7 +1366,9 @@ export const menuItems: Record<string, MenuItem<State>> = {
       const selection = registry.getPlugin<SelectionPlugin>(SELECTION_PLUGIN_ID)?.provides();
       if (!selection || !annotation) return;
 
-      const defaultSettings = annotation.getToolDefaults(PdfAnnotationSubtype.STRIKEOUT);
+      const defaultSettings = annotation.getToolDefaults(
+        makeVariantKey(PdfAnnotationSubtype.STRIKEOUT),
+      );
       const formattedSelection = selection.getFormattedSelection();
       for (const selection of formattedSelection) {
         annotation.createAnnotation(selection.pageIndex, {
@@ -1350,7 +1395,9 @@ export const menuItems: Record<string, MenuItem<State>> = {
       const selection = registry.getPlugin<SelectionPlugin>(SELECTION_PLUGIN_ID)?.provides();
       if (!selection || !annotation) return;
 
-      const defaultSettings = annotation.getToolDefaults(PdfAnnotationSubtype.HIGHLIGHT);
+      const defaultSettings = annotation.getToolDefaults(
+        makeVariantKey(PdfAnnotationSubtype.HIGHLIGHT),
+      );
       const formattedSelection = selection.getFormattedSelection();
       for (const selection of formattedSelection) {
         annotation.createAnnotation(selection.pageIndex, {
@@ -1582,7 +1629,9 @@ export const components: Record<string, UIComponentType<State>> = {
     mapStateToProps: (storeState, ownProps) => ({
       ...ownProps,
       active: isActive(menuItems.underline, storeState),
-      color: storeState.plugins.annotation.toolDefaults[PdfAnnotationSubtype.UNDERLINE]!.color,
+      color:
+        storeState.plugins.annotation.toolDefaults[makeVariantKey(PdfAnnotationSubtype.UNDERLINE)]!
+          .color,
     }),
   },
   squigglyButton: {
@@ -1597,7 +1646,9 @@ export const components: Record<string, UIComponentType<State>> = {
     mapStateToProps: (storeState, ownProps) => ({
       ...ownProps,
       active: isActive(menuItems.squiggly, storeState),
-      color: storeState.plugins.annotation.toolDefaults[PdfAnnotationSubtype.SQUIGGLY]!.color,
+      color:
+        storeState.plugins.annotation.toolDefaults[makeVariantKey(PdfAnnotationSubtype.SQUIGGLY)]!
+          .color,
     }),
   },
   strikethroughButton: {
@@ -1612,7 +1663,9 @@ export const components: Record<string, UIComponentType<State>> = {
     mapStateToProps: (storeState, ownProps) => ({
       ...ownProps,
       active: isActive(menuItems.strikethrough, storeState),
-      color: storeState.plugins.annotation.toolDefaults[PdfAnnotationSubtype.STRIKEOUT]!.color,
+      color:
+        storeState.plugins.annotation.toolDefaults[makeVariantKey(PdfAnnotationSubtype.STRIKEOUT)]!
+          .color,
     }),
   },
   highlightButton: {
@@ -1627,7 +1680,9 @@ export const components: Record<string, UIComponentType<State>> = {
     mapStateToProps: (storeState, ownProps) => ({
       ...ownProps,
       active: isActive(menuItems.highlight, storeState),
-      color: storeState.plugins.annotation.toolDefaults[PdfAnnotationSubtype.HIGHLIGHT]!.color,
+      color:
+        storeState.plugins.annotation.toolDefaults[makeVariantKey(PdfAnnotationSubtype.HIGHLIGHT)]!
+          .color,
     }),
   },
   freehandButton: {
@@ -1642,7 +1697,25 @@ export const components: Record<string, UIComponentType<State>> = {
     mapStateToProps: (storeState, ownProps) => ({
       ...ownProps,
       active: isActive(menuItems.freehand, storeState),
-      color: storeState.plugins.annotation.toolDefaults[PdfAnnotationSubtype.INK]!.color,
+      color:
+        storeState.plugins.annotation.toolDefaults[makeVariantKey(PdfAnnotationSubtype.INK)]!.color,
+    }),
+  },
+  freeTextButton: {
+    type: 'iconButton',
+    id: 'freeTextButton',
+    props: {
+      commandId: 'freeText',
+      active: false,
+      label: 'Free Text',
+      color: '#e44234',
+    },
+    mapStateToProps: (storeState, ownProps) => ({
+      ...ownProps,
+      active: isActive(menuItems.freeText, storeState),
+      color:
+        storeState.plugins.annotation.toolDefaults[makeVariantKey(PdfAnnotationSubtype.FREETEXT)]!
+          .color,
     }),
   },
   highlightSelectionButton: {
@@ -1654,7 +1727,9 @@ export const components: Record<string, UIComponentType<State>> = {
     },
     mapStateToProps: (storeState, ownProps) => ({
       ...ownProps,
-      color: storeState.plugins.annotation.toolDefaults[PdfAnnotationSubtype.HIGHLIGHT]!.color,
+      color:
+        storeState.plugins.annotation.toolDefaults[makeVariantKey(PdfAnnotationSubtype.HIGHLIGHT)]!
+          .color,
     }),
   },
   underlineSelectionButton: {
@@ -1666,7 +1741,9 @@ export const components: Record<string, UIComponentType<State>> = {
     },
     mapStateToProps: (storeState, ownProps) => ({
       ...ownProps,
-      color: storeState.plugins.annotation.toolDefaults[PdfAnnotationSubtype.UNDERLINE]!.color,
+      color:
+        storeState.plugins.annotation.toolDefaults[makeVariantKey(PdfAnnotationSubtype.UNDERLINE)]!
+          .color,
     }),
   },
   strikethroughSelectionButton: {
@@ -1678,7 +1755,9 @@ export const components: Record<string, UIComponentType<State>> = {
     },
     mapStateToProps: (storeState, ownProps) => ({
       ...ownProps,
-      color: storeState.plugins.annotation.toolDefaults[PdfAnnotationSubtype.STRIKEOUT]!.color,
+      color:
+        storeState.plugins.annotation.toolDefaults[makeVariantKey(PdfAnnotationSubtype.STRIKEOUT)]!
+          .color,
     }),
   },
   squigglySelectionButton: {
@@ -1690,7 +1769,9 @@ export const components: Record<string, UIComponentType<State>> = {
     },
     mapStateToProps: (storeState, ownProps) => ({
       ...ownProps,
-      color: storeState.plugins.annotation.toolDefaults[PdfAnnotationSubtype.SQUIGGLY]!.color,
+      color:
+        storeState.plugins.annotation.toolDefaults[makeVariantKey(PdfAnnotationSubtype.SQUIGGLY)]!
+          .color,
     }),
   },
   viewCtrButton: {
@@ -2079,11 +2160,12 @@ export const components: Record<string, UIComponentType<State>> = {
       { componentId: 'strikethroughButton', priority: 3 },
       { componentId: 'squigglyButton', priority: 4 },
       { componentId: 'freehandButton', priority: 5 },
-      { componentId: 'divider1', priority: 6 },
-      { componentId: 'styleButton', priority: 7 },
-      { componentId: 'divider1', priority: 8 },
-      { componentId: 'undoButton', priority: 9 },
-      { componentId: 'redoButton', priority: 10 },
+      { componentId: 'freeTextButton', priority: 6 },
+      { componentId: 'divider1', priority: 7 },
+      { componentId: 'styleButton', priority: 8 },
+      { componentId: 'divider1', priority: 9 },
+      { componentId: 'undoButton', priority: 10 },
+      { componentId: 'redoButton', priority: 11 },
     ],
     props: {
       gap: 10,
@@ -2125,7 +2207,7 @@ export const components: Record<string, UIComponentType<State>> = {
       selectedAnnotation: getSelectedAnnotationWithPageIndex(
         storeState.plugins[ANNOTATION_PLUGIN_ID],
       ),
-      annotationMode: storeState.plugins[ANNOTATION_PLUGIN_ID].annotationMode,
+      activeVariant: storeState.plugins[ANNOTATION_PLUGIN_ID].activeVariant,
       colorPresets: storeState.plugins[ANNOTATION_PLUGIN_ID].colorPresets,
       toolDefaults: storeState.plugins[ANNOTATION_PLUGIN_ID].toolDefaults,
     }),
@@ -2397,6 +2479,9 @@ export function PDFViewer({ config }: PDFViewerProps) {
             imageType: 'image/png',
           }),
           createPluginRegistration(HistoryPluginPackage, {}),
+          createPluginRegistration(RichTextPluginPackage, {
+            document,
+          }),
         ]}
       >
         {({ pluginsReady }) => (

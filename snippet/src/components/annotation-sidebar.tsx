@@ -19,8 +19,14 @@ import {
   WebAlphaColor,
   PdfAnnotationObject,
   PdfInkAnnoObject,
+  blendModeSelectOptions,
+  PdfBlendMode,
 } from '@embedpdf/models';
-import type { InkDefaults, SelectedAnnotation, StylableSubtype } from '@embedpdf/plugin-annotation';
+import {
+  makeVariantKey,
+  type InkDefaults,
+  type SelectedAnnotation,
+} from '@embedpdf/plugin-annotation';
 import { useAnnotationCapability } from '@embedpdf/plugin-annotation/preact';
 import { useDebounce } from '../hooks/use-debounce';
 import { Icon } from './ui/icon';
@@ -30,13 +36,13 @@ import { Icon } from './ui/icon';
 \* ---------------------------------------------------------------- */
 interface LeftPanelAnnotationStyleProps {
   selectedAnnotation: SelectedAnnotation | null;
-  annotationMode: PdfAnnotationSubtype | null;
+  activeVariant: string | null;
   colorPresets: string[];
 }
 
 /** A single control description – used to generate the UI. */
 interface ControlConfig {
-  id: 'color' | 'opacity' | 'strokeWidth';
+  id: 'color' | 'opacity' | 'strokeWidth' | 'blendMode';
   label: string;
   min?: number;
   max?: number;
@@ -46,24 +52,33 @@ interface ControlConfig {
 /* ---------------------------------------------------------------- *\
 |* Control map – extend for new sub‑types                            *|
 \* ---------------------------------------------------------------- */
-const CONTROL_MAP: Partial<Record<PdfAnnotationSubtype, ControlConfig[]>> = {
-  [PdfAnnotationSubtype.HIGHLIGHT]: [
+const CONTROL_MAP: Partial<Record<string, ControlConfig[]>> = {
+  [makeVariantKey(PdfAnnotationSubtype.HIGHLIGHT)]: [
     { id: 'color', label: 'Color' },
     { id: 'opacity', label: 'Opacity', min: 0.1, max: 1, step: 0.05 },
+    { id: 'blendMode', label: 'Blend Mode' },
   ],
-  [PdfAnnotationSubtype.UNDERLINE]: [
+  [makeVariantKey(PdfAnnotationSubtype.UNDERLINE)]: [
     { id: 'color', label: 'Color' },
     { id: 'opacity', label: 'Opacity', min: 0.1, max: 1, step: 0.05 },
+    { id: 'blendMode', label: 'Blend Mode' },
   ],
-  [PdfAnnotationSubtype.STRIKEOUT]: [
+  [makeVariantKey(PdfAnnotationSubtype.STRIKEOUT)]: [
     { id: 'color', label: 'Color' },
     { id: 'opacity', label: 'Opacity', min: 0.1, max: 1, step: 0.05 },
+    { id: 'blendMode', label: 'Blend Mode' },
   ],
-  [PdfAnnotationSubtype.SQUIGGLY]: [
+  [makeVariantKey(PdfAnnotationSubtype.SQUIGGLY)]: [
     { id: 'color', label: 'Color' },
     { id: 'opacity', label: 'Opacity', min: 0.1, max: 1, step: 0.05 },
+    { id: 'blendMode', label: 'Blend Mode' },
   ],
-  [PdfAnnotationSubtype.INK]: [
+  [makeVariantKey(PdfAnnotationSubtype.INK)]: [
+    { id: 'color', label: 'Color' },
+    { id: 'opacity', label: 'Opacity', min: 0.1, max: 1, step: 0.05 },
+    { id: 'strokeWidth', label: 'Stroke width', min: 1, max: 30, step: 1 },
+  ],
+  [makeVariantKey(PdfAnnotationSubtype.INK, 'InkHighlight')]: [
     { id: 'color', label: 'Color' },
     { id: 'opacity', label: 'Opacity', min: 0.1, max: 1, step: 0.05 },
     { id: 'strokeWidth', label: 'Stroke width', min: 1, max: 30, step: 1 },
@@ -137,16 +152,14 @@ const getAlphaFromAnnotation = (anno: PdfAnnotationObject): WebAlphaColor => {
 \* ---------------------------------------------------------------- */
 export const leftPanelAnnotationStyleRenderer = ({
   selectedAnnotation,
-  annotationMode,
+  activeVariant,
   colorPresets,
 }: LeftPanelAnnotationStyleProps) => {
   const { provides: annotation } = useAnnotationCapability();
 
-  // Resolve active subtype (selected annotation > current tool)
-  const activeSubtype: PdfAnnotationSubtype | null =
-    selectedAnnotation?.annotation.type ?? annotationMode ?? null;
+  if (!annotation) return null;
 
-  if (!activeSubtype || !annotation) {
+  if (!selectedAnnotation && !activeVariant)
     return (
       <div class="flex flex-col items-center gap-2 p-4 text-gray-500">
         <Icon icon="palette" className="h-18 w-18 text-gray-500" />
@@ -155,15 +168,20 @@ export const leftPanelAnnotationStyleRenderer = ({
         </div>
       </div>
     );
-  }
 
-  const controls = CONTROL_MAP[activeSubtype] ?? [];
+  const activeVariantKey = selectedAnnotation
+    ? makeVariantKey(selectedAnnotation.annotation.type, selectedAnnotation.annotation.intent)
+    : activeVariant!;
 
-  /* ---------- current base values ---------- */
-  const defaultsForSubtype = annotation.getToolDefaults(activeSubtype as StylableSubtype);
+  const defaults = annotation?.getToolDefaults(activeVariantKey);
+  // Resolve active subtype (selected annotation > current tool)
+  const activeSubtype: PdfAnnotationSubtype | null = defaults?.subtype ?? null;
+
+  const controls = CONTROL_MAP[activeVariantKey] ?? [];
+
   const baseAlpha: WebAlphaColor = selectedAnnotation
     ? getAlphaFromAnnotation(selectedAnnotation.annotation)
-    : { color: defaultsForSubtype.color, opacity: defaultsForSubtype.opacity };
+    : { color: defaults.color, opacity: defaults.opacity };
 
   /* ----------------- Color ----------------- */
   const [color, setColor] = useState<string>(baseAlpha.color);
@@ -185,10 +203,11 @@ export const leftPanelAnnotationStyleRenderer = ({
     if (activeSubtype !== PdfAnnotationSubtype.INK) return 1;
     return selectedAnnotation?.annotation.type === PdfAnnotationSubtype.INK
       ? (selectedAnnotation.annotation as PdfInkAnnoObject).strokeWidth
-      : (defaultsForSubtype as InkDefaults).strokeWidth;
+      : (defaults as InkDefaults).strokeWidth;
   })();
 
   const [strokeWidthLocal, setStrokeWidthLocal] = useState<number>(initialStrokeWidth);
+  useEffect(() => setStrokeWidthLocal(initialStrokeWidth), [initialStrokeWidth]);
   const debouncedStroke = useDebounce(strokeWidthLocal, 300);
   useEffect(() => {
     if (activeSubtype === PdfAnnotationSubtype.INK) {
@@ -196,12 +215,29 @@ export const leftPanelAnnotationStyleRenderer = ({
     }
   }, [debouncedStroke]);
 
+  /* ----- Blend mode ----- */
+  const baseBlendMode: PdfBlendMode =
+    (selectedAnnotation?.annotation as any)?.blendMode ??
+    (activeSubtype !== PdfAnnotationSubtype.INK && 'blendMode' in defaults
+      ? defaults.blendMode
+      : undefined) ??
+    PdfBlendMode.Normal;
+
+  const [blendModeLocal, setBlendModeLocal] = useState<PdfBlendMode>(baseBlendMode);
+  useEffect(() => setBlendModeLocal(baseBlendMode), [baseBlendMode]);
+
+  const onBlendModeChange = (val: number) => {
+    const bm = val as PdfBlendMode;
+    setBlendModeLocal(bm);
+    applyPatch({ blendMode: bm });
+  };
+
   /* ---------------- Patch util ------------- */
   function applyPatch(patch: Partial<any>) {
     if (selectedAnnotation) {
       annotation?.updateAnnotation(selectedAnnotation.pageIndex, selectedAnnotation.localId, patch);
-    } else {
-      annotation?.setToolDefaults(activeSubtype as StylableSubtype, patch);
+    } else if (activeVariant) {
+      annotation?.setToolDefaults(activeVariant, patch);
     }
   }
 
@@ -209,7 +245,7 @@ export const leftPanelAnnotationStyleRenderer = ({
   return (
     <div class="p-4">
       <h2 class="text-md mb-4 font-medium">
-        {selectedAnnotation ? 'Annotation styles' : 'Tool defaults'}
+        {selectedAnnotation ? `${defaults.name} styles` : `${defaults.name} defaults`}
       </h2>
 
       {controls.map((ctrl) => {
@@ -244,7 +280,6 @@ export const leftPanelAnnotationStyleRenderer = ({
               </section>
             );
           case 'strokeWidth':
-            if (activeSubtype !== PdfAnnotationSubtype.INK) return null;
             return (
               <section key="strokeWidth" class="mb-6">
                 <label class="mb-1 block text-sm font-medium text-gray-900 dark:text-white">
@@ -258,6 +293,28 @@ export const leftPanelAnnotationStyleRenderer = ({
                   onChange={setStrokeWidthLocal}
                 />
                 <span class="text-xs text-gray-500">{strokeWidthLocal}px</span>
+              </section>
+            );
+          case 'blendMode':
+            return (
+              <section key="blendMode" class="mb-6">
+                <label class="mb-1 block text-sm font-medium text-gray-900 dark:text-white">
+                  {ctrl.label}
+                </label>
+                <select
+                  name="blendMode"
+                  class="w-full rounded border border-gray-300 bg-white px-2 py-1 text-sm dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100"
+                  value={blendModeLocal}
+                  onChange={(e) =>
+                    onBlendModeChange(parseInt((e.target as HTMLSelectElement).value, 10))
+                  }
+                >
+                  {blendModeSelectOptions.map((o) => (
+                    <option key={o.value} value={o.value}>
+                      {o.label}
+                    </option>
+                  ))}
+                </select>
               </section>
             );
           default:

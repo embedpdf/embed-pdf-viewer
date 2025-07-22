@@ -1,7 +1,7 @@
 /** @jsxImportSource preact */
 import { JSX } from 'preact';
-import { PdfAnnotationSubtype, Rect } from '@embedpdf/models';
-import { ActiveTool } from '@embedpdf/plugin-annotation';
+import { blendModeToCss, PdfAnnotationSubtype, PdfBlendMode, Rect } from '@embedpdf/models';
+import { ActiveTool, makeVariantKey } from '@embedpdf/plugin-annotation';
 import { useSelectionCapability } from '@embedpdf/plugin-selection/preact';
 
 import { useEffect, useState } from 'preact/hooks';
@@ -21,7 +21,7 @@ export function TextMarkup({ pageIndex, scale }: TextMarkupProps) {
   const { provides: annotationProvides } = useAnnotationCapability();
   const [rects, setRects] = useState<Array<Rect>>([]);
   const [boundingRect, setBoundingRect] = useState<Rect | null>(null);
-  const [activeTool, setActiveTool] = useState<ActiveTool>({ mode: null, defaults: null });
+  const [activeTool, setActiveTool] = useState<ActiveTool>({ variantKey: null, defaults: null });
 
   useEffect(() => {
     if (!selectionProvides) return;
@@ -42,12 +42,12 @@ export function TextMarkup({ pageIndex, scale }: TextMarkupProps) {
 
   if (!boundingRect) return null;
 
-  switch (activeTool.mode) {
-    case PdfAnnotationSubtype.UNDERLINE:
+  switch (activeTool.variantKey) {
+    case makeVariantKey(PdfAnnotationSubtype.UNDERLINE):
       return (
         <div
           style={{
-            mixBlendMode: 'multiply',
+            mixBlendMode: blendModeToCss(activeTool.defaults?.blendMode ?? PdfBlendMode.Normal),
             pointerEvents: 'none',
             position: 'absolute',
             inset: 0,
@@ -61,11 +61,11 @@ export function TextMarkup({ pageIndex, scale }: TextMarkupProps) {
           />
         </div>
       );
-    case PdfAnnotationSubtype.HIGHLIGHT:
+    case makeVariantKey(PdfAnnotationSubtype.HIGHLIGHT):
       return (
         <div
           style={{
-            mixBlendMode: 'multiply',
+            mixBlendMode: blendModeToCss(activeTool.defaults?.blendMode ?? PdfBlendMode.Multiply),
             pointerEvents: 'none',
             position: 'absolute',
             inset: 0,
@@ -79,11 +79,11 @@ export function TextMarkup({ pageIndex, scale }: TextMarkupProps) {
           />
         </div>
       );
-    case PdfAnnotationSubtype.STRIKEOUT:
+    case makeVariantKey(PdfAnnotationSubtype.STRIKEOUT):
       return (
         <div
           style={{
-            mixBlendMode: 'multiply',
+            mixBlendMode: blendModeToCss(activeTool.defaults?.blendMode ?? PdfBlendMode.Normal),
             pointerEvents: 'none',
             position: 'absolute',
             inset: 0,
@@ -97,11 +97,11 @@ export function TextMarkup({ pageIndex, scale }: TextMarkupProps) {
           />
         </div>
       );
-    case PdfAnnotationSubtype.SQUIGGLY:
+    case makeVariantKey(PdfAnnotationSubtype.SQUIGGLY):
       return (
         <div
           style={{
-            mixBlendMode: 'multiply',
+            mixBlendMode: blendModeToCss(activeTool.defaults?.blendMode ?? PdfBlendMode.Normal),
             pointerEvents: 'none',
             position: 'absolute',
             inset: 0,

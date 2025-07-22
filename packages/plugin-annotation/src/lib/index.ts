@@ -22,3 +22,4 @@ export * from './annotation-plugin';
 export * from './types';
 export * from './manifest';
 export * from './selectors';
+export * from './variant-key';

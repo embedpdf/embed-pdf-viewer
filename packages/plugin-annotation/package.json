@@ -32,6 +32,7 @@
     "@embedpdf/plugin-interaction-manager": "workspace:*",
     "@embedpdf/plugin-selection": "workspace:*",
     "@embedpdf/plugin-history": "workspace:*",
+    "@embedpdf/plugin-rich-text": "workspace:*",
     "@types/react": "^18.2.0",
     "tsup": "^8.0.0",
     "typescript": "^5.0.0"
@@ -40,6 +41,7 @@
     "@embedpdf/core": "workspace:*",
     "@embedpdf/plugin-interaction-manager": "workspace:*",
     "@embedpdf/plugin-selection": "workspace:*",
+    "@embedpdf/plugin-rich-text": "workspace:*",
     "react": ">=16.8.0",
     "react-dom": ">=16.8.0",
     "preact": "^10.26.4"

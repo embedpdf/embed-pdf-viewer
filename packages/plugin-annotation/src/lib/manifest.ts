@@ -9,7 +9,7 @@ export const manifest: PluginManifest<AnnotationPluginConfig> = {
   version: '1.0.0',
   provides: ['annotation'],
   requires: ['interaction-manager', 'selection'],
-  optional: ['history'],
+  optional: ['history', 'rich-text'],
   defaultConfig: {
     enabled: true,
     autoCommit: true,

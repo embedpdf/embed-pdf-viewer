@@ -1168,7 +1168,12 @@ export class PdfiumEngine<T = Blob> implements PdfEngine<T> {
       });
     }
 
-    this.pdfiumModule.EPDFAnnot_GenerateAppearance(annotationPtr);
+    if (annotation.blendMode !== undefined) {
+      this.pdfiumModule.EPDFAnnot_GenerateAppearanceWithBlend(annotationPtr, annotation.blendMode);
+    } else {
+      this.pdfiumModule.EPDFAnnot_GenerateAppearance(annotationPtr);
+    }
+
     this.pdfiumModule.FPDFPage_GenerateContent(pageCtx.pagePtr);
 
     const annotId = this.pdfiumModule.FPDFPage_GetAnnotIndex(pageCtx.pagePtr, annotationPtr);
@@ -1305,7 +1310,11 @@ export class PdfiumEngine<T = Blob> implements PdfEngine<T> {
 
     /* 3 ── regenerate appearance if payload was changed ───────────────────── */
     if (ok) {
-      this.pdfiumModule.EPDFAnnot_GenerateAppearance(annotPtr);
+      if (annotation.blendMode !== undefined) {
+        this.pdfiumModule.EPDFAnnot_GenerateAppearanceWithBlend(annotPtr, annotation.blendMode);
+      } else {
+        this.pdfiumModule.EPDFAnnot_GenerateAppearance(annotPtr);
+      }
       this.pdfiumModule.FPDFPage_GenerateContent(pageCtx.pagePtr);
     }
 
@@ -3727,11 +3736,13 @@ export class PdfiumEngine<T = Blob> implements PdfEngine<T> {
     const author = this.getAnnotString(annotationPtr, 'T');
     const modifiedRaw = this.getAnnotString(annotationPtr, 'M');
     const modified = pdfDateToDate(modifiedRaw);
+    const richContent = this.getAnnotRichContent(annotationPtr);
 
     return {
       pageIndex: page.index,
       id: index,
       type: PdfAnnotationSubtype.FREETEXT,
+      richContent,
       contents,
       author,
       modified,
@@ -3909,11 +3920,15 @@ export class PdfiumEngine<T = Blob> implements PdfEngine<T> {
     const webAlphaColor = this.resolveAnnotationColor(annotationPtr);
     const { width: strokeWidth } = this.getBorderStyle(annotationPtr);
     const inkList = this.getInkList(page, annotationPtr);
+    const blendMode = this.pdfiumModule.EPDFAnnot_GetBlendMode(annotationPtr);
+    const intent = this.getAnnotIntent(annotationPtr);
 
     return {
       pageIndex: page.index,
       id: index,
       type: PdfAnnotationSubtype.INK,
+      ...(intent && { intent }),
+      blendMode,
       ...webAlphaColor,
       strokeWidth,
       rect,
@@ -4066,6 +4081,7 @@ export class PdfiumEngine<T = Blob> implements PdfEngine<T> {
     const rect = this.convertPageRectToDeviceRect(page, pagePtr, pageRect);
     const segmentRects = this.getQuadPointsAnno(page, annotationPtr);
     const webAlphaColor = this.resolveAnnotationColor(annotationPtr);
+    const blendMode = this.pdfiumModule.EPDFAnnot_GetBlendMode(annotationPtr);
 
     const author = this.getAnnotString(annotationPtr, 'T');
     const modifiedRaw = this.getAnnotString(annotationPtr, 'M');
@@ -4075,6 +4091,7 @@ export class PdfiumEngine<T = Blob> implements PdfEngine<T> {
     return {
       pageIndex: page.index,
       id: index,
+      blendMode,
       type: PdfAnnotationSubtype.HIGHLIGHT,
       rect,
       contents,
@@ -4109,10 +4126,12 @@ export class PdfiumEngine<T = Blob> implements PdfEngine<T> {
     const segmentRects = this.getQuadPointsAnno(page, annotationPtr);
     const contents = this.getAnnotString(annotationPtr, 'Contents') || '';
     const webAlphaColor = this.resolveAnnotationColor(annotationPtr);
+    const blendMode = this.pdfiumModule.EPDFAnnot_GetBlendMode(annotationPtr);
 
     return {
       pageIndex: page.index,
       id: index,
+      blendMode,
       type: PdfAnnotationSubtype.UNDERLINE,
       rect,
       contents,
@@ -4147,10 +4166,12 @@ export class PdfiumEngine<T = Blob> implements PdfEngine<T> {
     const segmentRects = this.getQuadPointsAnno(page, annotationPtr);
     const contents = this.getAnnotString(annotationPtr, 'Contents') || '';
     const webAlphaColor = this.resolveAnnotationColor(annotationPtr);
+    const blendMode = this.pdfiumModule.EPDFAnnot_GetBlendMode(annotationPtr);
 
     return {
       pageIndex: page.index,
       id: index,
+      blendMode,
       type: PdfAnnotationSubtype.STRIKEOUT,
       rect,
       contents,
@@ -4185,10 +4206,12 @@ export class PdfiumEngine<T = Blob> implements PdfEngine<T> {
     const segmentRects = this.getQuadPointsAnno(page, annotationPtr);
     const contents = this.getAnnotString(annotationPtr, 'Contents') || '';
     const webAlphaColor = this.resolveAnnotationColor(annotationPtr);
+    const blendMode = this.pdfiumModule.EPDFAnnot_GetBlendMode(annotationPtr);
 
     return {
       pageIndex: page.index,
       id: index,
+      blendMode,
       type: PdfAnnotationSubtype.SQUIGGLY,
       rect,
       contents,
@@ -4721,6 +4744,52 @@ export class PdfiumEngine<T = Blob> implements PdfEngine<T> {
 
     this.pdfiumModule.FPDFAnnot_GetStringValue(annotationPtr, key, ptr, bytes);
     const value = this.pdfiumModule.pdfium.UTF16ToString(ptr);
+    this.free(ptr);
+
+    return value || undefined;
+  }
+
+  /**
+   * Fetches the /IT (Intent) name from an annotation as a UTF-8 JS string.
+   *
+   * Mirrors getAnnotString(): calls EPDFAnnot_GetIntent twice (length probe + copy).
+   * Returns `undefined` if no intent present.
+   */
+  private getAnnotIntent(annotationPtr: number): string | undefined {
+    const len = this.pdfiumModule.EPDFAnnot_GetIntent(annotationPtr, 0, 0);
+    if (len === 0) return;
+
+    const codeUnits = len + 1;
+    const bytes = codeUnits * 2;
+    const ptr = this.malloc(bytes);
+
+    this.pdfiumModule.EPDFAnnot_GetIntent(annotationPtr, ptr, bytes);
+    const value = this.pdfiumModule.pdfium.UTF16ToString(ptr);
+
+    this.free(ptr);
+
+    return value && value !== 'undefined' ? value : undefined;
+  }
+
+  /**
+   * Returns the rich‑content string stored in the annotation’s `/RC` entry.
+   *
+   * Works like `getAnnotIntent()`: first probe for length, then copy.
+   * `undefined` when the annotation has no rich content.
+   */
+  private getAnnotRichContent(annotationPtr: number): string | undefined {
+    // First call → number of UTF‑16 code units (excluding NUL)
+    const len = this.pdfiumModule.EPDFAnnot_GetRichContent(annotationPtr, 0, 0);
+    if (len === 0) return;
+
+    // +1 for the implicit NUL added by PDFium → bytes = 2 × code units
+    const codeUnits = len + 1;
+    const bytes = codeUnits * 2;
+    const ptr = this.malloc(bytes);
+
+    this.pdfiumModule.EPDFAnnot_GetRichContent(annotationPtr, ptr, bytes);
+    const value = this.pdfiumModule.pdfium.UTF16ToString(ptr);
+
     this.free(ptr);
 
     return value || undefined;

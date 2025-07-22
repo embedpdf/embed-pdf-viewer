@@ -33,7 +33,7 @@ export const InkPaint = ({ pageIndex, scale, pageWidth, pageHeight }: InkPaintPr
   /* ------------------------------------------------------------------ */
   /* active tool state                                                  */
   /* ------------------------------------------------------------------ */
-  const [activeTool, setActiveTool] = useState<ActiveTool>({ mode: null, defaults: null });
+  const [activeTool, setActiveTool] = useState<ActiveTool>({ variantKey: null, defaults: null });
 
   useEffect(() => {
     if (!annotationProvides) return;
@@ -42,7 +42,8 @@ export const InkPaint = ({ pageIndex, scale, pageWidth, pageHeight }: InkPaintPr
     return off;
   }, [annotationProvides]);
 
-  if (activeTool.mode !== PdfAnnotationSubtype.INK) return null;
+  if (!activeTool.defaults) return null;
+  if (activeTool.defaults.subtype !== PdfAnnotationSubtype.INK) return null;
 
   const toolColor = activeTool.defaults?.color ?? '#000000';
   const toolOpacity = activeTool.defaults?.opacity ?? 1;
@@ -149,7 +150,7 @@ export const InkPaint = ({ pageIndex, scale, pageWidth, pageHeight }: InkPaintPr
             };
 
             annotationProvides.createAnnotation(pageIndex, anno);
-            annotationProvides.setAnnotationMode(null);
+            annotationProvides.setActiveVariant(null);
             annotationProvides.selectAnnotation(pageIndex, anno.id);
           }
 

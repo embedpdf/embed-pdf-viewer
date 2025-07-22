@@ -42,8 +42,8 @@ export const getSelectedAnnotationByPageIndex = (s: AnnotationState, pageIndex: 
   return null;
 };
 
-export const isInAnnotationMode = (s: AnnotationState) => s.annotationMode !== null;
-export const getSelectedAnnotationMode = (s: AnnotationState) => s.annotationMode;
+export const isInAnnotationVariant = (s: AnnotationState) => s.activeVariant !== null;
+export const getSelectedAnnotationVariant = (s: AnnotationState) => s.activeVariant;
 
 /** Check if a given anno on a page is the current selection. */
 export const isAnnotationSelected = (s: AnnotationState, page: number, id: number) =>
