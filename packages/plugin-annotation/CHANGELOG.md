@@ -1,5 +1,11 @@
 # @embedpdf/plugin-annotation
 
+## 1.0.13
+
+### Patch Changes
+
+- [`0a83f83`](https://github.com/embedpdf/embed-pdf-viewer/commit/0a83f838728b5d2d5c8d44c91b95f99a08248d30) by [@bobsingor](https://github.com/bobsingor) – Abilty to add selection menu, Proper page boundries on annotation moving, and proper cursor
+
 ## 1.0.12
 
 ### Patch Changes
