@@ -1,5 +1,7 @@
 # @embedpdf/plugin-tiling
 
+## 1.0.13
+
 ## 1.0.12
 
 ### Patch Changes
