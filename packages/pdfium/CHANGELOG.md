@@ -1,5 +1,11 @@
 # @embedpdf/pdfium
 
+## 1.0.18
+
+### Patch Changes
+
+- [`3f32381`](https://github.com/embedpdf/embed-pdf-viewer/commit/3f323812871b3014604769ba9c95c399fb91f8ba) by [@bobsingor](https://github.com/bobsingor) – Update removeAnnotByName to properly remove indirect object when there
+
 ## 1.0.17
 
 ### Patch Changes

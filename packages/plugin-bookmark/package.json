@@ -1,6 +1,6 @@
 {
   "name": "@embedpdf/plugin-bookmark",
-  "version": "1.0.17",
+  "version": "1.0.18",
   "type": "module",
   "main": "./dist/index.cjs",
   "module": "./dist/index.js",
