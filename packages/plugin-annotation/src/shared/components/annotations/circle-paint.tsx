@@ -151,7 +151,8 @@ export const CirclePaint = ({
   /* ------------------------------------------------------------------ */
   /* render preview                                                     */
   /* ------------------------------------------------------------------ */
-  if (!activeTool.defaults || activeTool.defaults.subtype !== PdfAnnotationSubtype.CIRCLE) return null;
+  if (!activeTool.defaults || activeTool.defaults.subtype !== PdfAnnotationSubtype.CIRCLE)
+    return null;
 
   if (!start || !current) return null;
 

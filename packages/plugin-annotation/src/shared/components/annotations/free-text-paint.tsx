@@ -3,7 +3,15 @@ import { useEffect, useMemo, useState } from '@framework';
 import type { PointerEventHandlers } from '@embedpdf/plugin-interaction-manager';
 import { usePointerHandlers } from '@embedpdf/plugin-interaction-manager/@framework';
 import { ActiveTool } from '@embedpdf/plugin-annotation';
-import { PdfAnnotationSubtype, PdfFreeTextAnnoObject, PdfStandardFont, PdfTextAlignment, PdfVerticalAlignment, Rect, uuidV4 } from '@embedpdf/models';
+import {
+  PdfAnnotationSubtype,
+  PdfFreeTextAnnoObject,
+  PdfStandardFont,
+  PdfTextAlignment,
+  PdfVerticalAlignment,
+  Rect,
+  uuidV4,
+} from '@embedpdf/models';
 import { useAnnotationCapability, useAnnotationPlugin } from '../../hooks';
 
 interface FreeTextPaintProps {
@@ -131,7 +139,8 @@ export const FreeTextPaint = ({
   /* ------------------------------------------------------------------ */
   /* render preview while dragging                                      */
   /* ------------------------------------------------------------------ */
-  if (!activeTool.defaults || activeTool.defaults.subtype !== PdfAnnotationSubtype.FREETEXT) return null;
+  if (!activeTool.defaults || activeTool.defaults.subtype !== PdfAnnotationSubtype.FREETEXT)
+    return null;
 
   if (!start || !current) return null;
 

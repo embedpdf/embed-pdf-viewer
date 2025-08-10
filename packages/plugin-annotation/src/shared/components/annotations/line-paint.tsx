@@ -134,7 +134,8 @@ export const LinePaint = ({ pageIndex, scale, pageWidth, pageHeight, cursor }: L
   /* ------------------------------------------------------------------ */
   /* render preview                                                     */
   /* ------------------------------------------------------------------ */
-  if (!activeTool.defaults || activeTool.defaults.subtype !== PdfAnnotationSubtype.LINE) return null;
+  if (!activeTool.defaults || activeTool.defaults.subtype !== PdfAnnotationSubtype.LINE)
+    return null;
 
   if (!start || !current) return null;
 

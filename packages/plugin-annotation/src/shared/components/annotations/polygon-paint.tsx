@@ -163,7 +163,8 @@ export const PolygonPaint = ({
     return d.trim();
   }, [allPts, svgMinX, svgMinY]);
 
-  if (!activeTool.defaults || activeTool.defaults.subtype !== PdfAnnotationSubtype.POLYGON) return null;
+  if (!activeTool.defaults || activeTool.defaults.subtype !== PdfAnnotationSubtype.POLYGON)
+    return null;
 
   if (!vertices.length || !current) return null;
 

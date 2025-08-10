@@ -137,7 +137,8 @@ export const PolylinePaint = ({
   /* ------------------------------------------------------------------ */
   /* render preview                                                     */
   /* ------------------------------------------------------------------ */
-  if (!activeTool.defaults || activeTool.defaults.subtype !== PdfAnnotationSubtype.POLYLINE) return null;
+  if (!activeTool.defaults || activeTool.defaults.subtype !== PdfAnnotationSubtype.POLYLINE)
+    return null;
 
   if (!vertices.length || !current) return null;
 

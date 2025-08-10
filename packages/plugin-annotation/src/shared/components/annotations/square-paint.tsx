@@ -152,7 +152,8 @@ export const SquarePaint = ({
   /* ------------------------------------------------------------------ */
   /* render preview                                                     */
   /* ------------------------------------------------------------------ */
-  if (!activeTool.defaults || activeTool.defaults.subtype !== PdfAnnotationSubtype.SQUARE) return null;
+  if (!activeTool.defaults || activeTool.defaults.subtype !== PdfAnnotationSubtype.SQUARE)
+    return null;
 
   if (!start || !current) return null;
 
