@@ -47,14 +47,11 @@ export const InkPaint = ({ pageIndex, scale, pageWidth, pageHeight }: InkPaintPr
     return off;
   }, [annotationProvides]);
 
-  if (!activeTool.defaults) return null;
-  if (activeTool.defaults.subtype !== PdfAnnotationSubtype.INK) return null;
-
   const toolColor = activeTool.defaults?.color ?? '#000000';
   const toolOpacity = activeTool.defaults?.opacity ?? 1;
   const toolStrokeWidth = activeTool.defaults?.strokeWidth ?? 2;
   const toolBlendMode = activeTool.defaults?.blendMode ?? PdfBlendMode.Normal;
-  const intent = activeTool.defaults?.intent;
+  const intent = activeTool.defaults?.intent ?? undefined;
   /* ------------------------------------------------------------------ */
   /* integration with interaction-manager                               */
   /* ------------------------------------------------------------------ */
@@ -193,6 +190,8 @@ export const InkPaint = ({ pageIndex, scale, pageWidth, pageHeight }: InkPaintPr
   /* ------------------------------------------------------------------ */
   /* render preview                                                     */
   /* ------------------------------------------------------------------ */
+  if (!activeTool.defaults || activeTool.defaults.subtype !== PdfAnnotationSubtype.INK) return null;
+
   if (!currentStrokes.length) return null;
 
   const allPoints = currentStrokes.flatMap((s) => s.points);

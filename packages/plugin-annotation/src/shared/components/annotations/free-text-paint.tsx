@@ -3,7 +3,7 @@ import { useEffect, useMemo, useState } from '@framework';
 import type { PointerEventHandlers } from '@embedpdf/plugin-interaction-manager';
 import { usePointerHandlers } from '@embedpdf/plugin-interaction-manager/@framework';
 import { ActiveTool } from '@embedpdf/plugin-annotation';
-import { PdfAnnotationSubtype, PdfFreeTextAnnoObject, Rect, uuidV4 } from '@embedpdf/models';
+import { PdfAnnotationSubtype, PdfFreeTextAnnoObject, PdfStandardFont, PdfTextAlignment, PdfVerticalAlignment, Rect, uuidV4 } from '@embedpdf/models';
 import { useAnnotationCapability, useAnnotationPlugin } from '../../hooks';
 
 interface FreeTextPaintProps {
@@ -32,17 +32,14 @@ export const FreeTextPaint = ({
   const [activeTool, setActiveTool] = useState<ActiveTool>({ variantKey: null, defaults: null });
   useEffect(() => annotationProvides?.onActiveToolChange(setActiveTool), [annotationProvides]);
 
-  if (!activeTool.defaults || activeTool.defaults.subtype !== PdfAnnotationSubtype.FREETEXT)
-    return null;
-
-  const toolFontColor = activeTool.defaults.fontColor ?? '#000000';
-  const toolOpacity = activeTool.defaults.opacity ?? 1;
-  const toolFontSize = activeTool.defaults.fontSize ?? 12;
-  const toolFontFamily = activeTool.defaults.fontFamily;
-  const toolBackgroundColor = activeTool.defaults.backgroundColor ?? 'transparent';
-  const toolTextAlign = activeTool.defaults.textAlign;
-  const toolVerticalAlign = activeTool.defaults.verticalAlign;
-  const toolContent = activeTool.defaults.content ?? 'Insert text here';
+  const toolFontColor = activeTool.defaults?.fontColor ?? '#000000';
+  const toolOpacity = activeTool.defaults?.opacity ?? 1;
+  const toolFontSize = activeTool.defaults?.fontSize ?? 12;
+  const toolFontFamily = activeTool.defaults?.fontFamily ?? PdfStandardFont.Unknown;
+  const toolBackgroundColor = activeTool.defaults?.backgroundColor ?? 'transparent';
+  const toolTextAlign = activeTool.defaults?.textAlign ?? PdfTextAlignment.Left;
+  const toolVerticalAlign = activeTool.defaults?.verticalAlign ?? PdfVerticalAlignment.Top;
+  const toolContent = activeTool.defaults?.content ?? 'Insert text here';
 
   /* ------------------------------------------------------------------ */
   /* interaction-manager integration                                    */
@@ -134,6 +131,8 @@ export const FreeTextPaint = ({
   /* ------------------------------------------------------------------ */
   /* render preview while dragging                                      */
   /* ------------------------------------------------------------------ */
+  if (!activeTool.defaults || activeTool.defaults.subtype !== PdfAnnotationSubtype.FREETEXT) return null;
+
   if (!start || !current) return null;
 
   const minX = Math.min(start.x, current.x);

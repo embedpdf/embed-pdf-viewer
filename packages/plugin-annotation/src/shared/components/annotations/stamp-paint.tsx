@@ -31,9 +31,6 @@ export const StampPaint = ({ pageIndex, scale, pageWidth, pageHeight }: StampPai
     return annotationProvides.onActiveToolChange(setActiveTool);
   }, [annotationProvides]);
 
-  if (!activeTool.defaults) return null;
-  if (activeTool.defaults.subtype !== PdfAnnotationSubtype.STAMP) return null;
-
   /* ------------------------------------------------------------------ */
   /* integration with interaction-manager                               */
   /* ------------------------------------------------------------------ */
@@ -61,6 +58,8 @@ export const StampPaint = ({ pageIndex, scale, pageWidth, pageHeight }: StampPai
 
   /* register with the interaction-manager */
   useEffect(() => (register ? register(handlers) : undefined), [register, handlers]);
+
+  if (!activeTool.defaults || activeTool.defaults.subtype !== PdfAnnotationSubtype.STAMP) return null;
 
   const onChange = async (e: ChangeEvent<HTMLInputElement>) => {
     if (!annotationProvides || !start) return;

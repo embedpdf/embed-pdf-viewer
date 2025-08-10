@@ -33,15 +33,12 @@ export const PolygonPaint = ({
   const [activeTool, setActiveTool] = useState<ActiveTool>({ variantKey: null, defaults: null });
   useEffect(() => annotationProvides?.onActiveToolChange(setActiveTool), [annotationProvides]);
 
-  if (!activeTool.defaults || activeTool.defaults.subtype !== PdfAnnotationSubtype.POLYGON)
-    return null;
-
-  const toolColor = activeTool.defaults.color ?? '#000000';
-  const toolOpacity = activeTool.defaults.opacity ?? 1;
-  const toolStrokeWidth = activeTool.defaults.strokeWidth ?? 2;
-  const toolStrokeColor = activeTool.defaults.strokeColor ?? '#000000';
-  const toolStrokeStyle = activeTool.defaults.strokeStyle ?? PdfAnnotationBorderStyle.SOLID;
-  const toolStrokeDashArray = activeTool.defaults.strokeDashArray;
+  const toolColor = activeTool.defaults?.color ?? '#000000';
+  const toolOpacity = activeTool.defaults?.opacity ?? 1;
+  const toolStrokeWidth = activeTool.defaults?.strokeWidth ?? 2;
+  const toolStrokeColor = activeTool.defaults?.strokeColor ?? '#000000';
+  const toolStrokeStyle = activeTool.defaults?.strokeStyle ?? PdfAnnotationBorderStyle.SOLID;
+  const toolStrokeDashArray = activeTool.defaults?.strokeDashArray ?? [];
 
   const { register } = usePointerHandlers({ modeId: 'polygon', pageIndex });
 
@@ -141,9 +138,8 @@ export const PolygonPaint = ({
   useEffect(() => (register ? register(handlers) : undefined), [register, handlers]);
 
   // ---------- preview ----------
-  if (!vertices.length || !current) return null;
-
-  const allPts = [...vertices, current];
+  const allPts = [...vertices];
+  if (current) allPts.push(current);
   const xs = allPts.map((p) => p.x),
     ys = allPts.map((p) => p.y);
   const minX = Math.min(...xs),
@@ -166,6 +162,10 @@ export const PolygonPaint = ({
     });
     return d.trim();
   }, [allPts, svgMinX, svgMinY]);
+
+  if (!activeTool.defaults || activeTool.defaults.subtype !== PdfAnnotationSubtype.POLYGON) return null;
+
+  if (!vertices.length || !current) return null;
 
   const dottedPath =
     vertices.length >= 2

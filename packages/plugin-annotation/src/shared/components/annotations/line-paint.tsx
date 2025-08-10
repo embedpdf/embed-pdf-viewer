@@ -36,17 +36,14 @@ export const LinePaint = ({ pageIndex, scale, pageWidth, pageHeight, cursor }: L
     return annotationProvides.onActiveToolChange(setActiveTool);
   }, [annotationProvides]);
 
-  if (!activeTool.defaults) return null;
-  if (activeTool.defaults.subtype !== PdfAnnotationSubtype.LINE) return null;
-
-  const toolColor = activeTool.defaults.color ?? '#000000';
-  const toolOpacity = activeTool.defaults.opacity ?? 1;
-  const toolStrokeWidth = activeTool.defaults.strokeWidth ?? 2;
-  const toolStrokeColor = activeTool.defaults.strokeColor ?? '#000000';
-  const toolStrokeStyle = activeTool.defaults.strokeStyle ?? PdfAnnotationBorderStyle.SOLID;
-  const toolStrokeDashArray = activeTool.defaults.strokeDashArray;
-  const toolLineEndings = activeTool.defaults.lineEndings;
-  const intent = activeTool.defaults.intent;
+  const toolColor = activeTool.defaults?.color ?? '#000000';
+  const toolOpacity = activeTool.defaults?.opacity ?? 1;
+  const toolStrokeWidth = activeTool.defaults?.strokeWidth ?? 2;
+  const toolStrokeColor = activeTool.defaults?.strokeColor ?? '#000000';
+  const toolStrokeStyle = activeTool.defaults?.strokeStyle ?? PdfAnnotationBorderStyle.SOLID;
+  const toolStrokeDashArray = activeTool.defaults?.strokeDashArray ?? [];
+  const toolLineEndings = activeTool.defaults?.lineEndings ?? undefined;
+  const intent = activeTool.defaults?.intent ?? undefined;
   /* ------------------------------------------------------------------ */
   /* interaction manager integration                                    */
   /* ------------------------------------------------------------------ */
@@ -137,6 +134,8 @@ export const LinePaint = ({ pageIndex, scale, pageWidth, pageHeight, cursor }: L
   /* ------------------------------------------------------------------ */
   /* render preview                                                     */
   /* ------------------------------------------------------------------ */
+  if (!activeTool.defaults || activeTool.defaults.subtype !== PdfAnnotationSubtype.LINE) return null;
+
   if (!start || !current) return null;
 
   const rect = patching.lineRectWithEndings([start, current], toolStrokeWidth, toolLineEndings);
