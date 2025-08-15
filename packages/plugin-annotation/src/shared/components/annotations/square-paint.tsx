@@ -44,15 +44,12 @@ export const SquarePaint = ({
     return annotationProvides.onActiveToolChange(setActiveTool);
   }, [annotationProvides]);
 
-  if (!activeTool.defaults) return null;
-  if (activeTool.defaults.subtype !== PdfAnnotationSubtype.SQUARE) return null;
-
-  const toolColor = activeTool.defaults.color ?? '#000000';
-  const toolOpacity = activeTool.defaults.opacity ?? 1;
-  const toolStrokeWidth = activeTool.defaults.strokeWidth ?? 2;
-  const toolStrokeColor = activeTool.defaults.strokeColor ?? '#000000';
-  const toolStrokeStyle = activeTool.defaults.strokeStyle ?? PdfAnnotationBorderStyle.SOLID;
-  const toolStrokeDashArray = activeTool.defaults.strokeDashArray ?? [];
+  const toolColor = activeTool.defaults?.color ?? '#000000';
+  const toolOpacity = activeTool.defaults?.opacity ?? 1;
+  const toolStrokeWidth = activeTool.defaults?.strokeWidth ?? 2;
+  const toolStrokeColor = activeTool.defaults?.strokeColor ?? '#000000';
+  const toolStrokeStyle = activeTool.defaults?.strokeStyle ?? PdfAnnotationBorderStyle.SOLID;
+  const toolStrokeDashArray = activeTool.defaults?.strokeDashArray ?? [];
 
   /* ------------------------------------------------------------------ */
   /* integration with interaction-manager                               */
@@ -151,6 +148,9 @@ export const SquarePaint = ({
   /* ------------------------------------------------------------------ */
   /* render preview                                                     */
   /* ------------------------------------------------------------------ */
+  if (!activeTool.defaults || activeTool.defaults.subtype !== PdfAnnotationSubtype.SQUARE)
+    return null;
+
   if (!start || !current) return null;
 
   const minX = Math.min(start.x, current.x);
