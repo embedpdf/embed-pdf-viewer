@@ -1,5 +1,11 @@
 # @embedpdf/plugin-interaction-manager
 
+## 1.0.20
+
+### Patch Changes
+
+- [`da0c418`](https://github.com/embedpdf/embed-pdf-viewer/commit/da0c418d40ada1911f8a6b30ab26bd23dafca9b4) by [@bobsingor](https://github.com/bobsingor) – Fix firefox issue
+
 ## 1.0.19
 
 ## 1.0.18
