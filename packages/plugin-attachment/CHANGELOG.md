@@ -1,5 +1,7 @@
 # @embedpdf/plugin-attachment
 
+## 1.0.21
+
 ## 1.0.20
 
 ## 1.0.19
