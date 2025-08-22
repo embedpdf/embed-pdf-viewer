@@ -1,5 +1,11 @@
 # @embedpdf/pdfium
 
+## 1.0.21
+
+### Patch Changes
+
+- [#118](https://github.com/embedpdf/embed-pdf-viewer/pull/118) by [@bobsingor](https://github.com/bobsingor) – Add the option to setMetadata for a PDF document
+
 ## 1.0.20
 
 ### Patch Changes
