@@ -7,8 +7,6 @@
     "paths": {
       "@framework": ["src/react/adapter.ts"],
       "@embedpdf/core/@framework": ["src/react/core.ts"],
-      "@embedpdf/plugin-interaction-manager/@framework": ["src/react/interaction-manager.ts"],
-      "@embedpdf/plugin-viewport/@framework": ["src/react/viewport.ts"],
       "@embedpdf/plugin-pan": ["src/lib/index.ts"]
     }
   },

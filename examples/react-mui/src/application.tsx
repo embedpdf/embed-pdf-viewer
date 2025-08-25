@@ -2,36 +2,25 @@ import { createPluginRegistration } from '@embedpdf/core';
 import { EmbedPDF } from '@embedpdf/core/react';
 import { usePdfiumEngine } from '@embedpdf/engines/react';
 import { ConsoleLogger } from '@embedpdf/models';
-import { ViewportPluginPackage } from '@embedpdf/plugin-viewport';
-import { Viewport } from '@embedpdf/plugin-viewport/react';
-import { ScrollPluginPackage, ScrollStrategy } from '@embedpdf/plugin-scroll';
-import { Scroller } from '@embedpdf/plugin-scroll/react';
-import { LoaderPluginPackage } from '@embedpdf/plugin-loader';
-import { FilePicker } from '@embedpdf/plugin-loader/react';
-import { RenderPluginPackage } from '@embedpdf/plugin-render';
-import { RenderLayer } from '@embedpdf/plugin-render/react';
-import { TilingPluginPackage } from '@embedpdf/plugin-tiling';
-import { TilingLayer } from '@embedpdf/plugin-tiling/react';
-import { ZoomMode, ZoomPluginPackage } from '@embedpdf/plugin-zoom';
-import { MarqueeZoom } from '@embedpdf/plugin-zoom/react';
-import { SearchPluginPackage } from '@embedpdf/plugin-search';
-import { SearchLayer } from '@embedpdf/plugin-search/react';
-import { InteractionManagerPluginPackage } from '@embedpdf/plugin-interaction-manager';
+import { Viewport, ViewportPluginPackage } from '@embedpdf/plugin-viewport/react';
+import { Scroller, ScrollPluginPackage, ScrollStrategy } from '@embedpdf/plugin-scroll/react';
+import { LoaderPluginPackage } from '@embedpdf/plugin-loader/react';
+import { RenderLayer, RenderPluginPackage } from '@embedpdf/plugin-render/react';
+import { TilingLayer, TilingPluginPackage } from '@embedpdf/plugin-tiling/react';
+import { MarqueeZoom, ZoomMode, ZoomPluginPackage } from '@embedpdf/plugin-zoom/react';
+import { SearchLayer, SearchPluginPackage } from '@embedpdf/plugin-search/react';
 import {
   GlobalPointerProvider,
   PagePointerProvider,
+  InteractionManagerPluginPackage,
 } from '@embedpdf/plugin-interaction-manager/react';
-import { PanPluginPackage } from '@embedpdf/plugin-pan';
-import { PanMode } from '@embedpdf/plugin-pan/react';
-import { RotatePluginPackage } from '@embedpdf/plugin-rotate';
-import { Rotate } from '@embedpdf/plugin-rotate/react';
-import { SpreadPluginPackage } from '@embedpdf/plugin-spread';
-import { FullscreenPluginPackage } from '@embedpdf/plugin-fullscreen';
-import { FullscreenProvider } from '@embedpdf/plugin-fullscreen/react';
-import { ExportPluginPackage } from '@embedpdf/plugin-export';
-import { Download } from '@embedpdf/plugin-export/react';
-import { ThumbnailPluginPackage } from '@embedpdf/plugin-thumbnail';
-import { SelectionPluginPackage } from '@embedpdf/plugin-selection';
+import { PanPluginPackage } from '@embedpdf/plugin-pan/react';
+import { Rotate, RotatePluginPackage } from '@embedpdf/plugin-rotate/react';
+import { SpreadPluginPackage } from '@embedpdf/plugin-spread/react';
+import { FullscreenPluginPackage } from '@embedpdf/plugin-fullscreen/react';
+import { ExportPluginPackage } from '@embedpdf/plugin-export/react';
+import { ThumbnailPluginPackage } from '@embedpdf/plugin-thumbnail/react';
+import { SelectionPluginPackage } from '@embedpdf/plugin-selection/react';
 import { SelectionLayer } from '@embedpdf/plugin-selection/react';
 
 import { CircularProgress, Box, Alert } from '@mui/material';
@@ -144,120 +133,110 @@ function App() {
     <DrawerProvider components={drawerComponents}>
       <EmbedPDF engine={engine} plugins={plugins}>
         {({ pluginsReady }) => (
-          <FullscreenProvider>
-            <Box
-              sx={{
-                height: '100%',
-                width: '100%',
-                display: 'flex',
-                flexDirection: 'column',
-                position: 'relative',
-                userSelect: 'none',
-              }}
-            >
-              <Toolbar />
+          <Box
+            sx={{
+              height: '100%',
+              width: '100%',
+              display: 'flex',
+              flexDirection: 'column',
+              position: 'relative',
+              userSelect: 'none',
+            }}
+          >
+            <Toolbar />
 
-              {/* Main content area with sidebars */}
-              <Box sx={{ display: 'flex', flexGrow: 1, overflow: 'hidden' }}>
-                {/* Left Sidebar */}
-                <Drawer position="left" />
+            {/* Main content area with sidebars */}
+            <Box sx={{ display: 'flex', flexGrow: 1, overflow: 'hidden' }}>
+              {/* Left Sidebar */}
+              <Drawer position="left" />
 
-                {/* Main Viewport */}
-                <Box
-                  sx={{
-                    flex: '1 1 0', // grow / shrink, flex-basis 0
-                    minWidth: 0, // allow shrinking inside flex row
-                    display: 'flex',
-                    flexDirection: 'column',
-                    position: 'relative',
-                  }}
-                >
-                  <GlobalPointerProvider>
-                    <PanMode />
-                    <Viewport
-                      style={{
-                        width: '100%',
-                        height: '100%',
-                        flexGrow: 1,
-                        backgroundColor: '#f1f3f5',
-                        overflow: 'auto',
-                      }}
-                    >
-                      {!pluginsReady && (
-                        <Box
-                          sx={{
-                            display: 'flex',
-                            justifyContent: 'center',
-                            alignItems: 'center',
-                            height: '100%',
-                            width: '100%',
-                          }}
-                        >
-                          <CircularProgress size={48} />
-                        </Box>
-                      )}
-                      {pluginsReady && (
-                        <Scroller
-                          renderPage={({
-                            document,
-                            width,
-                            height,
-                            pageIndex,
-                            scale,
-                            rotatedHeight,
-                            rotatedWidth,
-                            rotation,
-                          }) => (
-                            <Rotate key={document?.id} pageSize={{ width, height }}>
-                              <PagePointerProvider
+              {/* Main Viewport */}
+              <Box
+                sx={{
+                  flex: '1 1 0', // grow / shrink, flex-basis 0
+                  minWidth: 0, // allow shrinking inside flex row
+                  display: 'flex',
+                  flexDirection: 'column',
+                  position: 'relative',
+                }}
+              >
+                <GlobalPointerProvider>
+                  <Viewport
+                    style={{
+                      width: '100%',
+                      height: '100%',
+                      flexGrow: 1,
+                      backgroundColor: '#f1f3f5',
+                      overflow: 'auto',
+                    }}
+                  >
+                    {!pluginsReady && (
+                      <Box
+                        sx={{
+                          display: 'flex',
+                          justifyContent: 'center',
+                          alignItems: 'center',
+                          height: '100%',
+                          width: '100%',
+                        }}
+                      >
+                        <CircularProgress size={48} />
+                      </Box>
+                    )}
+                    {pluginsReady && (
+                      <Scroller
+                        renderPage={({
+                          document,
+                          width,
+                          height,
+                          pageIndex,
+                          scale,
+                          rotatedHeight,
+                          rotatedWidth,
+                          rotation,
+                        }) => (
+                          <Rotate key={document?.id} pageSize={{ width, height }}>
+                            <PagePointerProvider
+                              pageIndex={pageIndex}
+                              pageWidth={rotatedWidth}
+                              pageHeight={rotatedHeight}
+                              rotation={rotation}
+                              scale={scale}
+                              style={{
+                                width,
+                                height,
+                              }}
+                            >
+                              <RenderLayer
                                 pageIndex={pageIndex}
-                                pageWidth={rotatedWidth}
-                                pageHeight={rotatedHeight}
-                                rotation={rotation}
+                                style={{ pointerEvents: 'none' }}
+                              />
+                              <TilingLayer
+                                pageIndex={pageIndex}
                                 scale={scale}
-                                style={{
-                                  width,
-                                  height,
-                                }}
-                              >
-                                <RenderLayer
-                                  pageIndex={pageIndex}
-                                  style={{ pointerEvents: 'none' }}
-                                />
-                                <TilingLayer
-                                  pageIndex={pageIndex}
-                                  scale={scale}
-                                  style={{ pointerEvents: 'none' }}
-                                />
-                                <SearchLayer
-                                  pageIndex={pageIndex}
-                                  scale={scale}
-                                  style={{ pointerEvents: 'none' }}
-                                />
-                                <MarqueeZoom
-                                  pageIndex={pageIndex}
-                                  scale={scale}
-                                  pageWidth={width}
-                                  pageHeight={height}
-                                />
-                                <SelectionLayer pageIndex={pageIndex} scale={scale} />
-                              </PagePointerProvider>
-                            </Rotate>
-                          )}
-                        />
-                      )}
-                      <PageControls />
-                    </Viewport>
-                  </GlobalPointerProvider>
-                </Box>
-
-                {/* Right Sidebar */}
-                <Drawer position="right" />
+                                style={{ pointerEvents: 'none' }}
+                              />
+                              <SearchLayer
+                                pageIndex={pageIndex}
+                                scale={scale}
+                                style={{ pointerEvents: 'none' }}
+                              />
+                              <MarqueeZoom pageIndex={pageIndex} scale={scale} />
+                              <SelectionLayer pageIndex={pageIndex} scale={scale} />
+                            </PagePointerProvider>
+                          </Rotate>
+                        )}
+                      />
+                    )}
+                    <PageControls />
+                  </Viewport>
+                </GlobalPointerProvider>
               </Box>
+
+              {/* Right Sidebar */}
+              <Drawer position="right" />
             </Box>
-            <Download />
-            <FilePicker />
-          </FullscreenProvider>
+          </Box>
         )}
       </EmbedPDF>
     </DrawerProvider>

@@ -520,6 +520,9 @@ importers:
       '@embedpdf/models':
         specifier: workspace:*
         version: link:../models
+      '@embedpdf/utils':
+        specifier: workspace:*
+        version: link:../utils
       preact:
         specifier: ^10.26.4
         version: 10.26.4
@@ -591,6 +594,9 @@ importers:
       react-dom:
         specifier: '>=16.8.0'
         version: 18.3.1(react@18.3.1)
+      vue:
+        specifier: '>=3.2.0'
+        version: 3.5.17(typescript@5.8.3)
     devDependencies:
       '@embedpdf/build':
         specifier: workspace:*
@@ -619,6 +625,9 @@ importers:
       react-dom:
         specifier: '>=16.8.0'
         version: 18.3.1(react@18.3.1)
+      vue:
+        specifier: '>=3.2.0'
+        version: 3.5.17(typescript@5.8.3)
     devDependencies:
       '@embedpdf/build':
         specifier: workspace:*
@@ -653,6 +662,9 @@ importers:
       react-dom:
         specifier: '>=16.8.0'
         version: 18.3.1(react@18.3.1)
+      vue:
+        specifier: '>=3.2.0'
+        version: 3.5.17(typescript@5.8.3)
     devDependencies:
       '@embedpdf/build':
         specifier: workspace:*
@@ -681,6 +693,9 @@ importers:
       react-dom:
         specifier: '>=16.8.0'
         version: 18.3.1(react@18.3.1)
+      vue:
+        specifier: '>=3.2.0'
+        version: 3.5.17(typescript@5.8.3)
     devDependencies:
       '@embedpdf/build':
         specifier: workspace:*
@@ -709,6 +724,9 @@ importers:
       react-dom:
         specifier: '>=16.8.0'
         version: 18.3.1(react@18.3.1)
+      vue:
+        specifier: '>=3.2.0'
+        version: 3.5.17(typescript@5.8.3)
     devDependencies:
       '@embedpdf/build':
         specifier: workspace:*
@@ -768,6 +786,9 @@ importers:
       react-dom:
         specifier: '>=16.8.0'
         version: 18.3.1(react@18.3.1)
+      vue:
+        specifier: '>=3.2.0'
+        version: 3.5.17(typescript@5.8.2)
     devDependencies:
       '@embedpdf/build':
         specifier: workspace:*
@@ -799,6 +820,9 @@ importers:
       react-dom:
         specifier: '>=16.8.0'
         version: 18.3.1(react@18.3.1)
+      vue:
+        specifier: '>=3.2.0'
+        version: 3.5.17(typescript@5.8.3)
     devDependencies:
       '@embedpdf/build':
         specifier: workspace:*
@@ -833,6 +857,9 @@ importers:
       react-dom:
         specifier: '>=18.0.0'
         version: 18.3.1(react@18.3.1)
+      vue:
+        specifier: '>=3.2.0'
+        version: 3.5.17(typescript@5.8.3)
     devDependencies:
       '@embedpdf/build':
         specifier: workspace:*
@@ -855,6 +882,9 @@ importers:
       '@embedpdf/models':
         specifier: workspace:*
         version: link:../models
+      '@embedpdf/utils':
+        specifier: workspace:*
+        version: link:../utils
       preact:
         specifier: ^10.26.4
         version: 10.26.4
@@ -997,6 +1027,9 @@ importers:
       react-dom:
         specifier: '>=16.8.0'
         version: 18.3.1(react@18.3.1)
+      vue:
+        specifier: '>=3.2.0'
+        version: 3.5.17(typescript@5.8.2)
     devDependencies:
       '@embedpdf/build':
         specifier: workspace:*
@@ -1065,6 +1098,9 @@ importers:
       react-dom:
         specifier: '>=16.8.0'
         version: 18.3.1(react@18.3.1)
+      vue:
+        specifier: '>=3.2.0'
+        version: 3.5.17(typescript@5.8.2)
     devDependencies:
       '@embedpdf/build':
         specifier: workspace:*
@@ -1229,6 +1265,9 @@ importers:
       react-dom:
         specifier: '>=16.8.0'
         version: 18.3.1(react@18.3.1)
+      vue:
+        specifier: '>=3.2.0'
+        version: 3.5.17(typescript@5.8.2)
     devDependencies:
       '@embedpdf/build':
         specifier: workspace:*
@@ -1255,6 +1294,34 @@ importers:
         specifier: ^5.0.0
         version: 5.8.2
 
+  packages/utils:
+    dependencies:
+      preact:
+        specifier: ^10.26.4
+        version: 10.26.4
+      react:
+        specifier: '>=16.8.0'
+        version: 18.3.1
+      react-dom:
+        specifier: '>=16.8.0'
+        version: 18.3.1(react@18.3.1)
+      vue:
+        specifier: '>=3.2.0'
+        version: 3.5.17(typescript@5.9.2)
+    devDependencies:
+      '@embedpdf/build':
+        specifier: workspace:*
+        version: link:../build
+      '@embedpdf/models':
+        specifier: workspace:*
+        version: link:../models
+      '@types/react':
+        specifier: ^18.2.0
+        version: 18.3.18
+      typescript:
+        specifier: ^5.0.0
+        version: 5.9.2
+
   snippet:
     dependencies:
       '@embedpdf/core':
@@ -1272,6 +1339,9 @@ importers:
       '@embedpdf/plugin-annotation':
         specifier: workspace:*
         version: link:../packages/plugin-annotation
+      '@embedpdf/plugin-attachment':
+        specifier: workspace:*
+        version: link:../packages/plugin-attachment
       '@embedpdf/plugin-bookmark':
         specifier: workspace:*
         version: link:../packages/plugin-bookmark

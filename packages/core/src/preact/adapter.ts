@@ -1,4 +1,4 @@
-import { createContext, JSX, Fragment } from 'preact';
+import { createContext, JSX, Fragment, FunctionComponent } from 'preact';
 export { useEffect, useRef, useState, useCallback, useMemo, useContext } from 'preact/hooks';
 export type { ComponentChildren as ReactNode, JSX } from 'preact';
 
@@ -13,3 +13,4 @@ export type MouseEvent<T = Element> = JSX.TargetedMouseEvent<T extends EventTarg
 export type PointerEvent<T = Element> = JSX.TargetedPointerEvent<T extends EventTarget ? T : never>;
 export type ChangeEvent<T = Element> = JSX.TargetedInputEvent<T extends EventTarget ? T : never>;
 export type TouchEvent<T = Element> = JSX.TargetedTouchEvent<T extends EventTarget ? T : never>;
+export type ComponentType<P = any> = FunctionComponent<P>;

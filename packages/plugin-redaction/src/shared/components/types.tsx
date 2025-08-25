@@ -1,4 +1,4 @@
-import { MenuWrapperProps } from '@embedpdf/core/@framework';
+import { MenuWrapperProps } from '@embedpdf/utils/@framework';
 import { Rect } from '@embedpdf/models';
 import { RedactionItem } from '@embedpdf/plugin-redaction';
 

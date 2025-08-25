@@ -1,4 +1,4 @@
-import { BasePluginConfig } from '@embedpdf/core';
+import { BasePluginConfig, EventHook } from '@embedpdf/core';
 
 export type PanDefaultMode = 'never' | 'mobile' | 'always';
 
@@ -11,6 +11,7 @@ export interface PanPluginConfig extends BasePluginConfig {
 }
 
 export interface PanCapability {
+  onPanModeChange: EventHook<boolean>;
   enablePan: () => void;
   disablePan: () => void;
   togglePan: () => void;

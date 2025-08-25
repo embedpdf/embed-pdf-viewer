@@ -1,5 +1,4 @@
 import { useCapability, usePlugin } from '@embedpdf/core/@framework';
-import { useInteractionManagerCapability } from '@embedpdf/plugin-interaction-manager/@framework';
 import { PanPlugin } from '@embedpdf/plugin-pan';
 import { useEffect, useState } from '@framework';
 
@@ -8,16 +7,14 @@ export const usePanCapability = () => useCapability<PanPlugin>(PanPlugin.id);
 
 export const usePan = () => {
   const { provides } = usePanCapability();
-  const { provides: interactionManager } = useInteractionManagerCapability();
-
   const [isPanning, setIsPanning] = useState(false);
 
   useEffect(() => {
-    if (!interactionManager) return;
-    return interactionManager.onStateChange((state) => {
-      setIsPanning(state.activeMode === 'panMode');
+    if (!provides) return;
+    return provides.onPanModeChange((isPanning) => {
+      setIsPanning(isPanning);
     });
-  }, [interactionManager]);
+  }, [provides]);
 
   return {
     provides,

@@ -9,6 +9,7 @@
       "@embedpdf/core/@framework": ["src/preact/core.ts"],
       "@embedpdf/plugin-interaction-manager/@framework": ["src/preact/interaction-manager.ts"],
       "@embedpdf/plugin-selection/@framework": ["src/preact/selection.ts"],
+      "@embedpdf/utils/@framework": ["src/preact/utils.ts"],
       "@embedpdf/plugin-annotation": ["src/lib/index.ts"]
     }
   },

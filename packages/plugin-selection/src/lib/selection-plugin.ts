@@ -3,12 +3,10 @@ import {
   PluginRegistry,
   REFRESH_PAGES,
   SET_DOCUMENT,
-  Unsubscribe,
   createBehaviorEmitter,
   createEmitter,
 } from '@embedpdf/core';
 import {
-  PdfEngine,
   PdfPageGeometry,
   Rect,
   PdfTask,
@@ -17,7 +15,13 @@ import {
   ignore,
   PageTextSlice,
   Task,
+  Position,
 } from '@embedpdf/models';
+import {
+  InteractionManagerCapability,
+  InteractionManagerPlugin,
+  PointerEventHandlersWithLifecycle,
+} from '@embedpdf/plugin-interaction-manager';
 
 import {
   cachePageGeometry,
@@ -36,8 +40,10 @@ import {
   SelectionPluginConfig,
   SelectionRangeX,
   SelectionState,
+  RegisterSelectionOnPageOptions,
+  SelectionRectsCallback,
 } from './types';
-import { sliceBounds, rectsWithinSlice } from './utils';
+import { sliceBounds, rectsWithinSlice, glyphAt } from './utils';
 
 export class SelectionPlugin extends BasePlugin<
   SelectionPluginConfig,
@@ -54,24 +60,36 @@ export class SelectionPlugin extends BasePlugin<
   private selecting = false;
   private anchor?: { page: number; index: number };
 
+  /** Page callbacks for rect updates */
+  private pageCallbacks = new Map<number, (data: SelectionRectsCallback) => void>();
+
   private readonly selChange$ = createBehaviorEmitter<SelectionState['selection']>();
   private readonly textRetrieved$ = createBehaviorEmitter<string[]>();
   private readonly copyToClipboard$ = createEmitter<string>();
   private readonly beginSelection$ = createEmitter<{ page: number; index: number }>();
   private readonly endSelection$ = createEmitter<void>();
-  private readonly refreshPages$ = createEmitter<number[]>();
+
+  private interactionManagerCapability: InteractionManagerCapability | undefined;
 
   constructor(id: string, registry: PluginRegistry) {
     super(id, registry);
 
+    this.interactionManagerCapability = this.registry
+      .getPlugin<InteractionManagerPlugin>('interaction-manager')
+      ?.provides();
+
     this.coreStore.onAction(SET_DOCUMENT, (_action) => {
       this.dispatch(reset());
+      this.notifyAllPages();
     });
 
     this.coreStore.onAction(REFRESH_PAGES, (action) => {
       const tasks = action.payload.map((pageIdx) => this.getNewPageGeometryAndCache(pageIdx));
       Task.all(tasks).wait(() => {
-        this.refreshPages$.emit(action.payload);
+        // Notify affected pages about geometry updates
+        action.payload.forEach((pageIdx) => {
+          this.notifyPage(pageIdx);
+        });
       }, ignore);
     });
   }
@@ -106,11 +124,113 @@ export class SelectionPlugin extends BasePlugin<
       enableForMode: (id: string) => this.enabledModes.add(id),
       isEnabledForMode: (id: string) => this.enabledModes.has(id),
       getState: () => this.state,
+      registerSelectionOnPage: (opts) => this.registerSelectionOnPage(opts),
     };
   }
 
-  public onRefreshPages(fn: (pages: number[]) => void): Unsubscribe {
-    return this.refreshPages$.on(fn);
+  public registerSelectionOnPage(opts: RegisterSelectionOnPageOptions) {
+    if (!this.interactionManagerCapability) {
+      this.logger.warn(
+        'SelectionPlugin',
+        'MissingDependency',
+        'Interaction manager plugin not loaded, text selection disabled',
+      );
+      return () => {};
+    }
+
+    const { pageIndex, onRectsChange } = opts;
+
+    // Track this callback for the page
+    this.pageCallbacks.set(pageIndex, onRectsChange);
+
+    const geoTask = this.getOrLoadGeometry(pageIndex);
+
+    // Send initial state
+    onRectsChange({
+      rects: selector.selectRectsForPage(this.state, pageIndex),
+      boundingRect: selector.selectBoundingRectForPage(this.state, pageIndex),
+    });
+
+    const handlers: PointerEventHandlersWithLifecycle<PointerEvent> = {
+      onPointerDown: (point: Position, _evt, modeId) => {
+        if (!this.enabledModes.has(modeId)) return;
+
+        // Clear the selection
+        this.clearSelection();
+
+        // Get geometry from cache (or load if needed)
+        const cached = this.state.geometry[pageIndex];
+        if (cached) {
+          const g = glyphAt(cached, point);
+          if (g !== -1) {
+            this.beginSelection(pageIndex, g);
+          }
+        }
+      },
+      onPointerMove: (point: Position, _evt, modeId) => {
+        if (!this.enabledModes.has(modeId)) return;
+
+        // Get cached geometry (should be instant if already loaded)
+        const cached = this.state.geometry[pageIndex];
+        if (cached) {
+          const g = glyphAt(cached, point);
+
+          // Update cursor
+          if (g !== -1) {
+            this.interactionManagerCapability?.setCursor('selection-text', 'text', 10);
+          } else {
+            this.interactionManagerCapability?.removeCursor('selection-text');
+          }
+
+          // Update selection if we're selecting
+          if (this.selecting && g !== -1) {
+            this.updateSelection(pageIndex, g);
+          }
+        }
+      },
+      onPointerUp: (_point: Position, _evt, modeId) => {
+        if (!this.enabledModes.has(modeId)) return;
+        this.endSelection();
+      },
+      onHandlerActiveEnd: (modeId) => {
+        if (!this.enabledModes.has(modeId)) return;
+        this.clearSelection();
+      },
+    };
+
+    // Register the handlers with interaction manager
+    const unregisterHandlers = this.interactionManagerCapability.registerAlways({
+      scope: { type: 'page', pageIndex },
+      handlers,
+    });
+
+    // Return cleanup function
+    return () => {
+      unregisterHandlers();
+      this.pageCallbacks.delete(pageIndex);
+      geoTask.abort({ code: PdfErrorCode.Cancelled, message: 'Cleanup' });
+    };
+  }
+
+  private notifyPage(pageIndex: number) {
+    const callback = this.pageCallbacks.get(pageIndex);
+    if (callback) {
+      const mode = this.interactionManagerCapability?.getActiveMode();
+      if (mode === 'pointerMode') {
+        callback({
+          rects: selector.selectRectsForPage(this.state, pageIndex),
+          boundingRect: selector.selectBoundingRectForPage(this.state, pageIndex),
+        });
+      } else {
+        callback({ rects: [], boundingRect: null });
+      }
+    }
+  }
+
+  private notifyAllPages() {
+    this.pageCallbacks.forEach((_, pageIndex) => {
+      this.notifyPage(pageIndex);
+    });
   }
 
   private getNewPageGeometryAndCache(pageIdx: number): PdfTask<PdfPageGeometry> {
@@ -152,6 +272,7 @@ export class SelectionPlugin extends BasePlugin<
     this.anchor = undefined;
     this.dispatch(clearSelection());
     this.selChange$.emit(null);
+    this.notifyAllPages();
   }
 
   private updateSelection(page: number, index: number) {
@@ -167,6 +288,11 @@ export class SelectionPlugin extends BasePlugin<
     this.dispatch(setSelection(range));
     this.updateRectsAndSlices(range);
     this.selChange$.emit(range);
+
+    // Notify affected pages
+    for (let p = range.start.page; p <= range.end.page; p++) {
+      this.notifyPage(p);
+    }
   }
 
   private updateRectsAndSlices(range: SelectionRangeX) {

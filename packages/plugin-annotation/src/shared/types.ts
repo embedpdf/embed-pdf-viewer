@@ -1,7 +1,7 @@
 import { Rect } from '@embedpdf/models';
 import { TrackedAnnotation } from '@embedpdf/plugin-annotation';
 import { JSX } from '@framework';
-import { MenuWrapperProps } from './components/counter-rotate-container';
+import { MenuWrapperProps } from '@embedpdf/utils/@framework';
 
 export type ResizeDirection = 'top-left' | 'top-right' | 'bottom-left' | 'bottom-right' | 'none';
 

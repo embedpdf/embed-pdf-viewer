@@ -66,6 +66,7 @@ var createPdfium = (() => {
       '_EPDFPage_GetAnnotCountRaw',
       '_EPDFPage_GetAnnotRaw',
       '_EPDFPage_RemoveAnnotByName',
+      '_EPDFPage_RemoveAnnotRaw',
       '_EPDFText_RedactInQuads',
       '_EPDFText_RedactInRect',
       '_FORM_CanRedo',
@@ -6074,6 +6075,10 @@ var createPdfium = (() => {
     ));
     var _EPDFPage_GetAnnotRaw = (Module['_EPDFPage_GetAnnotRaw'] = createExportWrapper(
       'EPDFPage_GetAnnotRaw',
+      3,
+    ));
+    var _EPDFPage_RemoveAnnotRaw = (Module['_EPDFPage_RemoveAnnotRaw'] = createExportWrapper(
+      'EPDFPage_RemoveAnnotRaw',
       3,
     ));
     var _EPDFAnnot_SetIcon = (Module['_EPDFAnnot_SetIcon'] = createExportWrapper(

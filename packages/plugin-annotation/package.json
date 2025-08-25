@@ -32,7 +32,8 @@
     "lint:fix": "eslint src --color --fix"
   },
   "dependencies": {
-    "@embedpdf/models": "workspace:*"
+    "@embedpdf/models": "workspace:*",
+    "@embedpdf/utils": "workspace:*"
   },
   "devDependencies": {
     "@embedpdf/build": "workspace:*",

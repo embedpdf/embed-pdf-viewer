@@ -33,7 +33,8 @@
     "lint:fix": "eslint src --color --fix"
   },
   "dependencies": {
-    "@embedpdf/models": "workspace:*"
+    "@embedpdf/models": "workspace:*",
+    "@embedpdf/utils": "workspace:*"
   },
   "devDependencies": {
     "@embedpdf/build": "workspace:*",
@@ -59,7 +60,7 @@
   "repository": {
     "type": "git",
     "url": "https://github.com/embedpdf/embed-pdf-viewer",
-    "directory": "packages/plugin-render"
+    "directory": "packages/plugin-redaction"
   },
   "homepage": "https://www.embedpdf.com/docs",
   "bugs": {

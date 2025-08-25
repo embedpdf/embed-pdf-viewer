@@ -8,7 +8,7 @@ export const manifest: PluginManifest<PanPluginConfig> = {
   name: 'Pan Plugin',
   version: '1.0.0',
   provides: ['pan'],
-  requires: ['interaction-manager'],
+  requires: ['interaction-manager', 'viewport'],
   optional: [],
   defaultConfig: {
     enabled: true,

@@ -31,6 +31,16 @@ export interface FormattedSelection {
   segmentRects: Rect[];
 }
 
+export interface SelectionRectsCallback {
+  rects: Rect[];
+  boundingRect: Rect | null;
+}
+
+export interface RegisterSelectionOnPageOptions {
+  pageIndex: number;
+  onRectsChange: (data: SelectionRectsCallback) => void;
+}
+
 export interface SelectionCapability {
   /* geometry (cached) */
   getGeometry(page: number): PdfTask<PdfPageGeometry>;
@@ -67,4 +77,6 @@ export interface SelectionCapability {
   isEnabledForMode(modeId: string): boolean;
   /** Get the current state of the selection plugin. */
   getState(): SelectionState;
+  /** Register selection handlers for a specific page */
+  registerSelectionOnPage: (opts: RegisterSelectionOnPageOptions) => () => void;
 }

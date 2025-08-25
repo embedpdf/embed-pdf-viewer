@@ -293,6 +293,9 @@ export class EngineRunner {
       case 'getMetadata':
         task = this.engine[name]!(...args);
         break;
+      case 'setMetadata':
+        task = this.engine[name]!(...args);
+        break;
       case 'getBookmarks':
         task = this.engine[name]!(...args);
         break;
@@ -372,6 +375,9 @@ export class EngineRunner {
         task = this.engine[name]!(...args);
         break;
       case 'mergePages':
+        task = this.engine[name]!(...args);
+        break;
+      case 'preparePrintDocument':
         task = this.engine[name]!(...args);
         break;
     }

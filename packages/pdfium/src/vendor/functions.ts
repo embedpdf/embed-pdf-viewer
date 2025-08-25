@@ -57,6 +57,7 @@ export const functions = {
   EPDFPage_GetAnnotCountRaw: [['number', 'number'] as const, 'number'] as const,
   EPDFPage_GetAnnotRaw: [['number', 'number', 'number'] as const, 'number'] as const,
   EPDFPage_RemoveAnnotByName: [['number', 'number'] as const, 'boolean'] as const,
+  EPDFPage_RemoveAnnotRaw: [['number', 'number', 'number'] as const, 'boolean'] as const,
   EPDFText_RedactInQuads: [
     ['number', 'number', 'number', 'boolean', 'boolean'] as const,
     'boolean',

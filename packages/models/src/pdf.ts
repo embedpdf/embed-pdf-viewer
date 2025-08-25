@@ -42,6 +42,11 @@ export interface PdfDocumentObject {
   id: string;
 
   /**
+   * Name of the document
+   */
+  name?: string;
+
+  /**
    * Count of pages in this document
    */
   pageCount: number;
@@ -2234,6 +2239,11 @@ export interface PdfFileWithoutContent {
    * id of file
    */
   id: string;
+
+  /**
+   * Name of the file
+   */
+  name?: string;
 }
 
 export interface PdfFileLoader extends PdfFileWithoutContent {
@@ -2447,6 +2457,25 @@ export interface PdfFlattenPageOptions {
    * Flatten flag
    */
   flag?: PdfPageFlattenFlag;
+}
+
+/**
+ * Options for preparing a PDF document for printing
+ */
+export interface PdfPrintOptions {
+  /**
+   * Whether to include annotations in the printed document
+   * @default true
+   */
+  includeAnnotations?: boolean;
+
+  /**
+   * Page range string defining which pages to include
+   * Examples: "1,3,5-7" or "1-10,15,20-25"
+   * If not specified, all pages are included
+   * @default null (all pages)
+   */
+  pageRange?: string;
 }
 
 /**
@@ -2760,6 +2789,13 @@ export interface PdfEngine<T = Blob> {
    * @public
    */
   mergePages: (mergeConfigs: Array<{ docId: string; pageIndices: number[] }>) => PdfTask<PdfFile>;
+  /**
+   * Prepare a PDF document for printing
+   * @param doc - pdf document
+   * @param options - options for preparing the document for printing
+   * @returns task contains the prepared pdf file content
+   */
+  preparePrintDocument: (doc: PdfDocumentObject, options?: PdfPrintOptions) => PdfTask<ArrayBuffer>;
   /**
    * Save a copy of pdf document
    * @param doc - pdf document

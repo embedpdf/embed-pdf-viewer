@@ -1,5 +1,5 @@
 import { Fragment, useEffect, useState, useCallback, MouseEvent, TouchEvent } from '@framework';
-import { CounterRotate } from '@embedpdf/core/@framework';
+import { CounterRotate } from '@embedpdf/utils/@framework';
 import { useRedactionCapability } from '../hooks';
 import { RedactionItem } from '@embedpdf/plugin-redaction';
 import { Highlight } from './highlight';

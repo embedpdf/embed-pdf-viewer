@@ -6,7 +6,7 @@ import { ExportPluginConfig } from './types';
 
 export const ExportPluginPackage: PluginPackage<ExportPlugin, ExportPluginConfig> = {
   manifest,
-  create: (registry) => new ExportPlugin(EXPORT_PLUGIN_ID, registry),
+  create: (registry, config) => new ExportPlugin(EXPORT_PLUGIN_ID, registry, config),
   reducer: () => {},
   initialState: {},
 };

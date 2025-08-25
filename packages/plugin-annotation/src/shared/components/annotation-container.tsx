@@ -12,7 +12,7 @@ import { TrackedAnnotation } from '@embedpdf/plugin-annotation';
 import { PdfAnnotationObject, Position, Rect, rectEquals } from '@embedpdf/models';
 import { useAnnotationCapability } from '../hooks';
 import { SelectionMenuProps } from '../../shared/types';
-import { CounterRotate } from './counter-rotate-container';
+import { CounterRotate } from '@embedpdf/utils/@framework';
 import { VertexEditor } from './vertex-editor';
 import { ComputePatch } from '../patchers';
 import { useDragResize } from '../hooks/use-drag-resize';

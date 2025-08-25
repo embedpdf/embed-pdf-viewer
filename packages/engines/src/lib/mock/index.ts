@@ -34,6 +34,9 @@ import {
   PdfSearchAllPagesOptions,
   PdfOpenDocumentBufferOptions,
   uuidV4,
+  PdfMetadataObject,
+  PdfTask,
+  PdfPrintOptions,
 } from '@embedpdf/models';
 
 /**
@@ -51,17 +54,21 @@ export function createMockPdfEngine(partialEngine?: Partial<PdfEngine>): PdfEngi
     openDocumentBuffer: jest.fn((file: PdfFile, options?: PdfOpenDocumentBufferOptions) => {
       return PdfTaskHelper.create();
     }),
-    getMetadata: () => {
-      return PdfTaskHelper.resolve({
+    getMetadata: (doc: PdfDocumentObject) => {
+      const metadata: PdfMetadataObject = {
         title: 'title',
         author: 'author',
         subject: 'subject',
         keywords: 'keywords',
         producer: 'producer',
         creator: 'creator',
-        creationDate: 'creationDate',
-        modificationDate: 'modificationDate',
-      });
+        creationDate: new Date(),
+        modificationDate: new Date(),
+      };
+      return PdfTaskHelper.resolve(metadata);
+    },
+    setMetadata: (doc: PdfDocumentObject, metadata: Partial<PdfMetadataObject>) => {
+      return PdfTaskHelper.resolve(true);
     },
     getDocPermissions: (doc: PdfDocumentObject) => {
       return PdfTaskHelper.resolve(0xffffffff);
@@ -311,6 +318,9 @@ export function createMockPdfEngine(partialEngine?: Partial<PdfEngine>): PdfEngi
         id: 'id',
         content: new ArrayBuffer(0),
       });
+    },
+    preparePrintDocument: (doc: PdfDocumentObject, options?: PdfPrintOptions) => {
+      return PdfTaskHelper.resolve(new ArrayBuffer(0));
     },
     searchAllPages: (
       doc: PdfDocumentObject,

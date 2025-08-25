@@ -117,6 +117,7 @@ import {
   PdfRenderPageOptions,
   PdfAnnotationsProgress,
   PdfMetadataObject,
+  PdfPrintOptions,
 } from '@embedpdf/models';
 import { readArrayBuffer, readString } from './helper';
 import { WrappedPdfiumModule } from '@embedpdf/pdfium';
@@ -386,6 +387,7 @@ export class PdfiumEngine<T = Blob> implements PdfEngine<T> {
     // 2. create a PdfFile object
     const pdfFile: PdfFile = {
       id: file.id,
+      name: file.name,
       content: arrayBuf,
     };
 
@@ -530,8 +532,9 @@ export class PdfiumEngine<T = Blob> implements PdfEngine<T> {
     }
     this.free(sizePtr);
 
-    const pdfDoc = {
+    const pdfDoc: PdfDocumentObject = {
       id: file.id,
+      name: file.name,
       pageCount,
       pages,
     };
@@ -641,8 +644,9 @@ export class PdfiumEngine<T = Blob> implements PdfEngine<T> {
     }
     this.free(sizePtr);
 
-    const pdfDoc = {
+    const pdfDoc: PdfDocumentObject = {
       id: file.id,
+      name: file.name,
       pageCount,
       pages,
     };
@@ -658,7 +662,7 @@ export class PdfiumEngine<T = Blob> implements PdfEngine<T> {
    *
    * @public
    */
-  getMetadata(doc: PdfDocumentObject) {
+  getMetadata(doc: PdfDocumentObject): PdfTask<PdfMetadataObject, PdfErrorReason> {
     this.logger.debug(LOG_SOURCE, LOG_CATEGORY, 'getMetadata', doc);
     this.logger.perf(LOG_SOURCE, LOG_CATEGORY, `GetMetadata`, 'Begin', doc.id);
 
@@ -7251,5 +7255,321 @@ export class PdfiumEngine<T = Blob> implements PdfEngine<T> {
       this.pdfiumModule.FPDFText_FindClose(searchHandle);
       return pageResults;
     });
+  }
+
+  /**
+   * {@inheritDoc @embedpdf/models!PdfEngine.preparePrintDocument}
+   *
+   * Prepares a PDF document for printing with specified options.
+   * Creates a new document with selected pages and optionally removes annotations
+   * for optimal printing performance.
+   *
+   * @public
+   */
+  preparePrintDocument(doc: PdfDocumentObject, options?: PdfPrintOptions): PdfTask<ArrayBuffer> {
+    const { includeAnnotations = true, pageRange = null } = options ?? {};
+
+    this.logger.debug(LOG_SOURCE, LOG_CATEGORY, 'preparePrintDocument', doc, options);
+    this.logger.perf(LOG_SOURCE, LOG_CATEGORY, `PreparePrintDocument`, 'Begin', doc.id);
+
+    // Verify document is open
+    const ctx = this.cache.getContext(doc.id);
+    if (!ctx) {
+      this.logger.perf(LOG_SOURCE, LOG_CATEGORY, `PreparePrintDocument`, 'End', doc.id);
+      return PdfTaskHelper.reject({
+        code: PdfErrorCode.DocNotOpen,
+        message: 'Document is not open',
+      });
+    }
+
+    // Create new document for printing
+    const printDocPtr = this.pdfiumModule.FPDF_CreateNewDocument();
+    if (!printDocPtr) {
+      this.logger.perf(LOG_SOURCE, LOG_CATEGORY, `PreparePrintDocument`, 'End', doc.id);
+      return PdfTaskHelper.reject({
+        code: PdfErrorCode.CantCreateNewDoc,
+        message: 'Cannot create print document',
+      });
+    }
+
+    try {
+      // Validate and sanitize page range
+      const sanitizedPageRange = this.sanitizePageRange(pageRange, doc.pageCount);
+
+      // Import pages from source document
+      // pageRange null means import all pages
+      if (
+        !this.pdfiumModule.FPDF_ImportPages(
+          printDocPtr,
+          ctx.docPtr,
+          sanitizedPageRange ?? '',
+          0, // Insert at beginning
+        )
+      ) {
+        this.pdfiumModule.FPDF_CloseDocument(printDocPtr);
+        this.logger.error(LOG_SOURCE, LOG_CATEGORY, 'Failed to import pages for printing');
+        this.logger.perf(LOG_SOURCE, LOG_CATEGORY, `PreparePrintDocument`, 'End', doc.id);
+
+        return PdfTaskHelper.reject({
+          code: PdfErrorCode.CantImportPages,
+          message: 'Failed to import pages for printing',
+        });
+      }
+
+      // Remove annotations if requested
+      if (!includeAnnotations) {
+        const removalResult = this.removeAnnotationsFromPrintDocument(printDocPtr);
+
+        if (!removalResult.success) {
+          this.pdfiumModule.FPDF_CloseDocument(printDocPtr);
+          this.logger.error(
+            LOG_SOURCE,
+            LOG_CATEGORY,
+            `Failed to remove annotations: ${removalResult.error}`,
+          );
+          this.logger.perf(LOG_SOURCE, LOG_CATEGORY, `PreparePrintDocument`, 'End', doc.id);
+
+          return PdfTaskHelper.reject({
+            code: PdfErrorCode.Unknown,
+            message: `Failed to prepare print document: ${removalResult.error}`,
+          });
+        }
+
+        this.logger.debug(
+          LOG_SOURCE,
+          LOG_CATEGORY,
+          `Removed ${removalResult.annotationsRemoved} annotations from ${removalResult.pagesProcessed} pages`,
+        );
+      }
+
+      // Save the prepared document to buffer
+      const buffer = this.saveDocument(printDocPtr);
+
+      // Clean up
+      this.pdfiumModule.FPDF_CloseDocument(printDocPtr);
+
+      this.logger.perf(LOG_SOURCE, LOG_CATEGORY, `PreparePrintDocument`, 'End', doc.id);
+      return PdfTaskHelper.resolve(buffer);
+    } catch (error) {
+      // Ensure cleanup on any error
+      if (printDocPtr) {
+        this.pdfiumModule.FPDF_CloseDocument(printDocPtr);
+      }
+
+      this.logger.error(LOG_SOURCE, LOG_CATEGORY, 'preparePrintDocument failed', error);
+      this.logger.perf(LOG_SOURCE, LOG_CATEGORY, `PreparePrintDocument`, 'End', doc.id);
+
+      return PdfTaskHelper.reject({
+        code: PdfErrorCode.Unknown,
+        message: error instanceof Error ? error.message : 'Failed to prepare print document',
+      });
+    }
+  }
+
+  /**
+   * Removes all annotations from a print document using fast raw annotation functions.
+   * This method is optimized for performance by avoiding full page loading.
+   *
+   * @param printDocPtr - Pointer to the print document
+   * @returns Result object with success status and statistics
+   *
+   * @private
+   */
+  private removeAnnotationsFromPrintDocument(printDocPtr: number): {
+    success: boolean;
+    annotationsRemoved: number;
+    pagesProcessed: number;
+    error?: string;
+  } {
+    let totalAnnotationsRemoved = 0;
+    let pagesProcessed = 0;
+
+    try {
+      const pageCount = this.pdfiumModule.FPDF_GetPageCount(printDocPtr);
+
+      // Process each page
+      for (let pageIndex = 0; pageIndex < pageCount; pageIndex++) {
+        // Get annotation count using the fast raw function
+        const annotCount = this.pdfiumModule.EPDFPage_GetAnnotCountRaw(printDocPtr, pageIndex);
+
+        if (annotCount <= 0) {
+          pagesProcessed++;
+          continue;
+        }
+
+        // Remove annotations in reverse order to maintain indices
+        // This is important because removing an annotation shifts the indices of subsequent ones
+        let annotationsRemovedFromPage = 0;
+
+        for (let annotIndex = annotCount - 1; annotIndex >= 0; annotIndex--) {
+          // Use the fast raw removal function
+          const removed = this.pdfiumModule.EPDFPage_RemoveAnnotRaw(
+            printDocPtr,
+            pageIndex,
+            annotIndex,
+          );
+
+          if (removed) {
+            annotationsRemovedFromPage++;
+            totalAnnotationsRemoved++;
+          } else {
+            this.logger.warn(
+              LOG_SOURCE,
+              LOG_CATEGORY,
+              `Failed to remove annotation ${annotIndex} from page ${pageIndex}`,
+            );
+          }
+        }
+
+        // Generate content for the page if annotations were removed
+        if (annotationsRemovedFromPage > 0) {
+          // We need to regenerate the page content after removing annotations
+          const pagePtr = this.pdfiumModule.FPDF_LoadPage(printDocPtr, pageIndex);
+          if (pagePtr) {
+            this.pdfiumModule.FPDFPage_GenerateContent(pagePtr);
+            this.pdfiumModule.FPDF_ClosePage(pagePtr);
+          }
+        }
+
+        pagesProcessed++;
+      }
+
+      return {
+        success: true,
+        annotationsRemoved: totalAnnotationsRemoved,
+        pagesProcessed: pagesProcessed,
+      };
+    } catch (error) {
+      return {
+        success: false,
+        annotationsRemoved: totalAnnotationsRemoved,
+        pagesProcessed: pagesProcessed,
+        error: error instanceof Error ? error.message : 'Unknown error during annotation removal',
+      };
+    }
+  }
+
+  /**
+   * Sanitizes and validates a page range string.
+   * Ensures page numbers are within valid bounds and properly formatted.
+   *
+   * @param pageRange - Page range string (e.g., "1,3,5-7") or null for all pages
+   * @param totalPages - Total number of pages in the document
+   * @returns Sanitized page range string or null for all pages
+   *
+   * @private
+   */
+  private sanitizePageRange(
+    pageRange: string | null | undefined,
+    totalPages: number,
+  ): string | null {
+    // Null or empty means all pages
+    if (!pageRange || pageRange.trim() === '') {
+      return null;
+    }
+
+    try {
+      const sanitized: number[] = [];
+      const parts = pageRange.split(',');
+
+      for (const part of parts) {
+        const trimmed = part.trim();
+
+        if (trimmed.includes('-')) {
+          // Handle range (e.g., "5-7")
+          const [startStr, endStr] = trimmed.split('-').map((s) => s.trim());
+          const start = parseInt(startStr, 10);
+          const end = parseInt(endStr, 10);
+
+          if (isNaN(start) || isNaN(end)) {
+            this.logger.warn(LOG_SOURCE, LOG_CATEGORY, `Invalid range: ${trimmed}`);
+            continue;
+          }
+
+          // Clamp to valid bounds (1-based page numbers)
+          const validStart = Math.max(1, Math.min(start, totalPages));
+          const validEnd = Math.max(1, Math.min(end, totalPages));
+
+          // Add all pages in range
+          for (let i = validStart; i <= validEnd; i++) {
+            if (!sanitized.includes(i)) {
+              sanitized.push(i);
+            }
+          }
+        } else {
+          // Handle single page number
+          const pageNum = parseInt(trimmed, 10);
+
+          if (isNaN(pageNum)) {
+            this.logger.warn(LOG_SOURCE, LOG_CATEGORY, `Invalid page number: ${trimmed}`);
+            continue;
+          }
+
+          // Clamp to valid bounds
+          const validPageNum = Math.max(1, Math.min(pageNum, totalPages));
+
+          if (!sanitized.includes(validPageNum)) {
+            sanitized.push(validPageNum);
+          }
+        }
+      }
+
+      // If no valid pages found, return null (all pages)
+      if (sanitized.length === 0) {
+        this.logger.warn(LOG_SOURCE, LOG_CATEGORY, 'No valid pages in range, using all pages');
+        return null;
+      }
+
+      // Sort and convert back to range string
+      sanitized.sort((a, b) => a - b);
+
+      // Optimize consecutive pages into ranges
+      const optimized: string[] = [];
+      let rangeStart = sanitized[0];
+      let rangeEnd = sanitized[0];
+
+      for (let i = 1; i < sanitized.length; i++) {
+        if (sanitized[i] === rangeEnd + 1) {
+          rangeEnd = sanitized[i];
+        } else {
+          // End current range
+          if (rangeStart === rangeEnd) {
+            optimized.push(rangeStart.toString());
+          } else if (rangeEnd - rangeStart === 1) {
+            optimized.push(rangeStart.toString());
+            optimized.push(rangeEnd.toString());
+          } else {
+            optimized.push(`${rangeStart}-${rangeEnd}`);
+          }
+
+          // Start new range
+          rangeStart = sanitized[i];
+          rangeEnd = sanitized[i];
+        }
+      }
+
+      // Add final range
+      if (rangeStart === rangeEnd) {
+        optimized.push(rangeStart.toString());
+      } else if (rangeEnd - rangeStart === 1) {
+        optimized.push(rangeStart.toString());
+        optimized.push(rangeEnd.toString());
+      } else {
+        optimized.push(`${rangeStart}-${rangeEnd}`);
+      }
+
+      const result = optimized.join(',');
+
+      this.logger.debug(
+        LOG_SOURCE,
+        LOG_CATEGORY,
+        `Sanitized page range: "${pageRange}" -> "${result}"`,
+      );
+
+      return result;
+    } catch (error) {
+      this.logger.error(LOG_SOURCE, LOG_CATEGORY, `Error sanitizing page range: ${error}`);
+      return null; // Fallback to all pages
+    }
   }
 }

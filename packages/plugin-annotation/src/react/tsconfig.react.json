@@ -9,6 +9,7 @@
       "@embedpdf/core/@framework": ["src/react/core.ts"],
       "@embedpdf/plugin-interaction-manager/@framework": ["src/react/interaction-manager.ts"],
       "@embedpdf/plugin-selection/@framework": ["src/react/selection.ts"],
+      "@embedpdf/utils/@framework": ["src/react/utils.ts"],
       "@embedpdf/plugin-annotation": ["src/lib/index.ts"]
     }
   },

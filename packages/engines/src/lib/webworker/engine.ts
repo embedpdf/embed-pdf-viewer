@@ -36,6 +36,7 @@ import {
   PdfOpenDocumentUrlOptions,
   PdfOpenDocumentBufferOptions,
   PdfAnnotationsProgress,
+  PdfPrintOptions,
 } from '@embedpdf/models';
 import { ExecuteRequest, Response, SpecificExecuteRequest } from './runner';
 
@@ -279,6 +280,22 @@ export class WebWorkerEngine implements PdfEngine {
     const task = new WorkerTask<PdfMetadataObject>(this.worker, requestId);
 
     const request: ExecuteRequest = createRequest(requestId, 'getMetadata', [doc]);
+    this.proxy(task, request);
+
+    return task;
+  }
+
+  /**
+   * {@inheritDoc @embedpdf/models!PdfEngine.setMetadata}
+   *
+   * @public
+   */
+  setMetadata(doc: PdfDocumentObject, metadata: Partial<PdfMetadataObject>) {
+    this.logger.debug(LOG_SOURCE, LOG_CATEGORY, 'setMetadata', doc, metadata);
+    const requestId = this.generateRequestId(doc.id);
+    const task = new WorkerTask<boolean>(this.worker, requestId);
+
+    const request: ExecuteRequest = createRequest(requestId, 'setMetadata', [doc, metadata]);
     this.proxy(task, request);
 
     return task;
@@ -820,6 +837,25 @@ export class WebWorkerEngine implements PdfEngine {
     const task = new WorkerTask<PdfFile>(this.worker, requestId);
 
     const request: ExecuteRequest = createRequest(requestId, 'mergePages', [mergeConfigs]);
+    this.proxy(task, request);
+
+    return task;
+  }
+
+  /**
+   * {@inheritDoc @embedpdf/models!PdfEngine.preparePrintDocument}
+   *
+   * @public
+   */
+  preparePrintDocument(doc: PdfDocumentObject, options?: PdfPrintOptions) {
+    this.logger.debug(LOG_SOURCE, LOG_CATEGORY, 'preparePrintDocument', doc, options);
+    const requestId = this.generateRequestId(doc.id);
+    const task = new WorkerTask<ArrayBuffer>(this.worker, requestId);
+
+    const request: ExecuteRequest = createRequest(requestId, 'preparePrintDocument', [
+      doc,
+      options,
+    ]);
     this.proxy(task, request);
 
     return task;

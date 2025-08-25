@@ -7,8 +7,6 @@
     "paths": {
       "@framework": ["src/preact/adapter.ts"],
       "@embedpdf/core/@framework": ["src/preact/core.ts"],
-      "@embedpdf/plugin-interaction-manager/@framework": ["src/preact/interaction-manager.ts"],
-      "@embedpdf/plugin-viewport/@framework": ["src/preact/viewport.ts"],
       "@embedpdf/plugin-pan": ["src/lib/index.ts"]
     }
   },

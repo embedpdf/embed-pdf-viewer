@@ -33,6 +33,7 @@
     "@embedpdf/plugin-tiling": "workspace:*",
     "@embedpdf/plugin-thumbnail": "workspace:*",
     "@embedpdf/plugin-annotation": "workspace:*",
+    "@embedpdf/plugin-attachment": "workspace:*",
     "@embedpdf/plugin-print": "workspace:*",
     "@embedpdf/plugin-fullscreen": "workspace:*",
     "@embedpdf/plugin-bookmark": "workspace:*",

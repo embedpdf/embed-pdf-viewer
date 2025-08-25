@@ -51,6 +51,37 @@ export interface PluginPackage<
   initialState: TState | ((coreState: CoreState, config: TConfig) => TState);
 }
 
+export type Component = any;
+
+// Use semantic names that describe PURPOSE, not implementation
+export type StandaloneComponent = Component; // Doesn't wrap content
+export type ContainerComponent = Component; // Wraps/contains content
+
+export type AutoMountElement =
+  | {
+      component: StandaloneComponent;
+      type: 'utility';
+    }
+  | {
+      component: ContainerComponent;
+      type: 'wrapper';
+    };
+
+export type WithAutoMount<T extends PluginPackage<any, any, any, any>> = T & {
+  /**
+   * Returns an array of components/elements with their mount type.
+   * - 'utility': Mounted as hidden DOM elements (file pickers, download anchors)
+   * - 'wrapper': Wraps the viewer content (fullscreen providers, theme providers)
+   */
+  autoMountElements: () => AutoMountElement[];
+};
+
+export function hasAutoMountElements<T extends PluginPackage<any, any, any, any>>(
+  pkg: T,
+): pkg is WithAutoMount<T> {
+  return 'autoMountElements' in pkg && typeof pkg.autoMountElements === 'function';
+}
+
 export type PluginStatus =
   | 'registered' // Plugin is registered but not initialized
   | 'active' // Plugin is initialized and running

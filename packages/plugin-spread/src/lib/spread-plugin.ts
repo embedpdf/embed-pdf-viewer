@@ -1,4 +1,10 @@
-import { BasePlugin, createEmitter, PluginRegistry, setPages } from '@embedpdf/core';
+import {
+  BasePlugin,
+  createBehaviorEmitter,
+  createEmitter,
+  PluginRegistry,
+  setPages,
+} from '@embedpdf/core';
 import { PdfDocumentObject, PdfPageObject } from '@embedpdf/models';
 import { LoaderPlugin } from '@embedpdf/plugin-loader';
 import { SpreadCapability, SpreadMode, SpreadPluginConfig, SpreadState } from './types';
@@ -13,7 +19,7 @@ export class SpreadPlugin extends BasePlugin<
 > {
   static readonly id = 'spread' as const;
 
-  private readonly spreadEmitter$ = createEmitter<SpreadMode>();
+  private readonly spreadEmitter$ = createBehaviorEmitter<SpreadMode>();
 
   constructor(id: string, registry: PluginRegistry, cfg: SpreadPluginConfig) {
     super(id, registry);
