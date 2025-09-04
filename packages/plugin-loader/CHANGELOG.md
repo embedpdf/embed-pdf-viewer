@@ -1,5 +1,11 @@
 # @embedpdf/plugin-loader
 
+## 1.0.27
+
+### Patch Changes
+
+- [#137](https://github.com/embedpdf/embed-pdf-viewer/pull/137) by [@bobsingor](https://github.com/bobsingor) – Properly close document when loading a new document
+
 ## 1.0.26
 
 ## 1.0.25
