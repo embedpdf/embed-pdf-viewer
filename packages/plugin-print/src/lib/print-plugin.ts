@@ -30,15 +30,16 @@ export class PrintPlugin extends BasePlugin<PrintPluginConfig, PrintCapability> 
     return this.printReady$.on(listener);
   }
 
-  private print(options: PdfPrintOptions): Task<ArrayBuffer, PdfErrorReason, PrintProgress> {
+  private print(options?: PdfPrintOptions): Task<ArrayBuffer, PdfErrorReason, PrintProgress> {
+    const printOptions = options ?? {};
     const task = new Task<ArrayBuffer, PdfErrorReason, PrintProgress>();
     task.progress({ stage: 'preparing', message: 'Preparing document...' });
 
-    const prepare = this.preparePrintDocument(options);
+    const prepare = this.preparePrintDocument(printOptions);
     prepare.wait((buffer) => {
       task.progress({ stage: 'document-ready', message: 'Document prepared successfully' });
       // Emit buffer + task for the framework layer to display & trigger print
-      this.printReady$.emit({ options, buffer, task });
+      this.printReady$.emit({ options: printOptions, buffer, task });
     }, task.fail);
 
     return task;

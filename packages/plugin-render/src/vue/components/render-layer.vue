@@ -1,18 +1,26 @@
 <script setup lang="ts">
-import { ref, watch, onBeforeUnmount } from 'vue';
+import { ref, watch, onBeforeUnmount, computed } from 'vue';
 import { ignore, PdfErrorCode, PdfErrorReason, Task } from '@embedpdf/models';
 
 import { useRenderCapability, useRenderPlugin } from '../hooks';
 
 interface Props {
   pageIndex: number;
+  /**
+   * The scale factor for rendering the page.
+   */
+  scale?: number;
+  /**
+   * @deprecated Use `scale` instead. Will be removed in the next major release.
+   */
   scaleFactor?: number;
   dpr?: number;
 }
 
-const props = withDefaults(defineProps<Props>(), {
-  scaleFactor: 1,
-});
+const props = defineProps<Props>();
+
+// Handle deprecation: prefer scale over scaleFactor, but fall back to scaleFactor if scale is not provided
+const actualScale = computed(() => props.scale ?? props.scaleFactor ?? 1);
 
 const { provides: renderProvides } = useRenderCapability();
 const { plugin: renderPlugin } = useRenderPlugin();
@@ -55,7 +63,7 @@ function startRender() {
   const task = renderProvides.value.renderPage({
     pageIndex: props.pageIndex,
     options: {
-      scaleFactor: props.scaleFactor,
+      scaleFactor: actualScale.value,
       dpr: props.dpr || window.devicePixelRatio,
     },
   });
@@ -87,7 +95,7 @@ watch(
 
 // Watch for changes that require a re-render
 watch(
-  () => [props.pageIndex, props.scaleFactor, props.dpr, renderProvides.value, refreshTick.value],
+  () => [props.pageIndex, actualScale.value, props.dpr, renderProvides.value, refreshTick.value],
   startRender,
   { immediate: true },
 );

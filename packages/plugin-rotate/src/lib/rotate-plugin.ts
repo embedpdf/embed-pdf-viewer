@@ -1,15 +1,7 @@
 import { BasePlugin, createBehaviorEmitter, PluginRegistry, setRotation } from '@embedpdf/core';
 import { Rotation } from '@embedpdf/models';
-import { RotateCapability, RotatePluginConfig } from './types';
-import { rotationMatrix } from './utils';
-
-function getNextRotation(current: Rotation): Rotation {
-  return ((current + 1) % 4) as Rotation;
-}
-
-function getPreviousRotation(current: Rotation): Rotation {
-  return ((current + 3) % 4) as Rotation; // +3 is equivalent to -1 in modulo 4
-}
+import { GetMatrixOptions, RotateCapability, RotatePluginConfig } from './types';
+import { getNextRotation, getPreviousRotation, getRotationMatrixString } from './utils';
 
 export class RotatePlugin extends BasePlugin<RotatePluginConfig, RotateCapability> {
   static readonly id = 'rotate' as const;
@@ -31,6 +23,7 @@ export class RotatePlugin extends BasePlugin<RotatePluginConfig, RotateCapabilit
       throw new Error('Pages not loaded');
     }
 
+    this.rotate$.emit(rotation);
     this.dispatchCoreAction(setRotation(rotation));
   }
 
@@ -51,9 +44,11 @@ export class RotatePlugin extends BasePlugin<RotatePluginConfig, RotateCapabilit
       getRotation: () => this.coreState.core.rotation,
       rotateForward: () => this.rotateForward(),
       rotateBackward: () => this.rotateBackward(),
-      getMatrix: ({ w = 0, h = 0, asString = true } = {}) =>
-        rotationMatrix(this.coreState.core.rotation, w, h, asString),
     };
+  }
+
+  public getMatrixAsString(options: GetMatrixOptions = { w: 0, h: 0 }): string {
+    return getRotationMatrixString(this.coreState.core.rotation, options.w, options.h);
   }
 
   async destroy(): Promise<void> {

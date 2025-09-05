@@ -72,6 +72,9 @@ export const PagePointerProvider = ({
     <div
       ref={ref}
       style={{
+        position: 'relative',
+        width: pageWidth,
+        height: pageHeight,
         ...style,
       }}
       {...props}

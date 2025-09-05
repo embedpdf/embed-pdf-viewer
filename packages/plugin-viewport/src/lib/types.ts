@@ -48,6 +48,14 @@ export interface ScrollToPayload {
   center?: boolean;
 }
 
+// New scroll activity type
+export interface ScrollActivity {
+  /** Whether a smooth scroll animation is in progress */
+  isSmoothScrolling: boolean;
+  /** Whether any scrolling activity is happening */
+  isScrolling: boolean;
+}
+
 export interface ViewportCapability {
   getViewportGap: () => number;
   getMetrics: () => ViewportMetrics;
@@ -55,7 +63,7 @@ export interface ViewportCapability {
   onViewportChange: EventHook<ViewportMetrics>;
   onViewportResize: EventHook<ViewportMetrics>;
   onScrollChange: EventHook<ViewportScrollMetrics>;
-  onScrollActivity: EventHook<boolean>;
+  onScrollActivity: EventHook<ScrollActivity>;
   isScrolling: () => boolean;
   isSmoothScrolling: () => boolean;
   getBoundingRect(): Rect;

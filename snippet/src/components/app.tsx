@@ -3009,10 +3009,6 @@ export function PDFViewer({ config }: PDFViewerProps) {
                                         pageWidth={width}
                                         pageHeight={height}
                                         pageIndex={pageIndex}
-                                        style={{
-                                          width,
-                                          height,
-                                        }}
                                       >
                                         <RenderLayer
                                           pageIndex={pageIndex}

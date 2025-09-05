@@ -51,7 +51,10 @@ watchEffect((onCleanup) => {
 </script>
 
 <template>
-  <div ref="divRef">
+  <div
+    ref="divRef"
+    :style="{ position: 'relative', width: pageWidth + 'px', height: pageHeight + 'px' }"
+  >
     <slot />
     <div
       v-if="isPageExclusive"

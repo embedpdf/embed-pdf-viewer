@@ -7,6 +7,13 @@ import { useRenderCapability, useRenderPlugin } from '../hooks/use-render';
 
 type RenderLayerProps = Omit<HTMLAttributes<HTMLImageElement>, 'style'> & {
   pageIndex: number;
+  /**
+   * The scale factor for rendering the page.
+   */
+  scale?: number;
+  /**
+   * @deprecated Use `scale` instead. Will be removed in the next major release.
+   */
   scaleFactor?: number;
   dpr?: number;
   style?: CSSProperties;
@@ -14,13 +21,17 @@ type RenderLayerProps = Omit<HTMLAttributes<HTMLImageElement>, 'style'> & {
 
 export function RenderLayer({
   pageIndex,
-  scaleFactor = 1,
+  scale,
+  scaleFactor,
   dpr,
   style,
   ...props
 }: RenderLayerProps) {
   const { provides: renderProvides } = useRenderCapability();
   const { plugin: renderPlugin } = useRenderPlugin();
+
+  // Handle deprecation: prefer scale over scaleFactor, but fall back to scaleFactor if scale is not provided
+  const actualScale = scale ?? scaleFactor ?? 1;
 
   const [imageUrl, setImageUrl] = useState<string | null>(null);
   const urlRef = useRef<string | null>(null);
@@ -39,7 +50,7 @@ export function RenderLayer({
     if (renderProvides) {
       const task = renderProvides.renderPage({
         pageIndex,
-        options: { scaleFactor, dpr: dpr || window.devicePixelRatio },
+        options: { scaleFactor: actualScale, dpr: dpr || window.devicePixelRatio },
       });
       task.wait((blob) => {
         const url = URL.createObjectURL(blob);
@@ -59,7 +70,7 @@ export function RenderLayer({
         }
       };
     }
-  }, [pageIndex, scaleFactor, dpr, renderProvides, refreshTick]);
+  }, [pageIndex, actualScale, dpr, renderProvides, refreshTick]);
 
   const handleImageLoad = () => {
     if (urlRef.current) {

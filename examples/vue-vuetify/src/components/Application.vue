@@ -149,10 +149,6 @@ const { engine, isLoading: engineLoading, error: engineError } = usePdfiumEngine
                             :rotation="page.rotation"
                             :scale="page.scale"
                             class="position-absolute"
-                            :style="{
-                              width: page.width + 'px',
-                              height: page.height + 'px',
-                            }"
                           >
                             <RenderLayer
                               :page-index="page.pageIndex"

@@ -69,7 +69,7 @@ export const PDFViewer = () => {
             renderPage={({ width, height, pageIndex, scale }) => (
               <div style={{ width, height }}>
                 {/* The RenderLayer is responsible for drawing the page */}
-                <RenderLayer pageIndex={pageIndex} scaleFactor={scale} />
+                <RenderLayer pageIndex={pageIndex} scale={scale} />
               </div>
             )}
           />

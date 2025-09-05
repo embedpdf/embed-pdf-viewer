@@ -42,14 +42,12 @@
   },
   "devDependencies": {
     "@embedpdf/build": "workspace:*",
-    "@embedpdf/plugin-render": "workspace:*",
     "@types/react": "^18.2.0",
     "@types/react-dom": "^18.2.0",
     "typescript": "^5.0.0"
   },
   "peerDependencies": {
     "@embedpdf/core": "workspace:*",
-    "@embedpdf/plugin-render": "workspace:*",
     "react": ">=18.0.0",
     "react-dom": ">=18.0.0",
     "preact": "^10.26.4",

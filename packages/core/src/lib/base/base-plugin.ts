@@ -21,8 +21,9 @@ export abstract class BasePlugin<
   protected readonly logger: Logger;
   protected readonly engine: PdfEngine;
 
-  // Track debounced actions
-  private debouncedActions: Record<string, number> = {};
+  // Track cooldown actions (renamed from debouncedActions)
+  private cooldownActions: Record<string, number> = {};
+  private debouncedTimeouts: Record<string, number> = {};
   private unsubscribeFromState: (() => void) | null = null;
   private unsubscribeFromCoreStore: (() => void) | null = null;
 
@@ -126,22 +127,55 @@ export abstract class BasePlugin<
   }
 
   /**
-   * Dispatch an action with debouncing to prevent rapid repeated calls
+   * Dispatch an action with a cooldown to prevent rapid repeated calls
+   * This executes immediately if cooldown has expired, then blocks subsequent calls
    * @param action The action to dispatch
-   * @param debounceTime Time in ms to debounce (default: 100ms)
-   * @returns boolean indicating whether the action was dispatched or debounced
+   * @param cooldownTime Time in ms for cooldown (default: 100ms)
+   * @returns boolean indicating whether the action was dispatched or blocked
    */
-  protected debouncedDispatch(action: TAction, debounceTime: number = 100): boolean {
+  protected cooldownDispatch(action: TAction, cooldownTime: number = 100): boolean {
     const now = Date.now();
-    const lastActionTime = this.debouncedActions[action.type] || 0;
+    const lastActionTime = this.cooldownActions[action.type] || 0;
 
-    if (now - lastActionTime >= debounceTime) {
-      this.debouncedActions[action.type] = now;
+    if (now - lastActionTime >= cooldownTime) {
+      this.cooldownActions[action.type] = now;
       this.dispatch(action);
       return true;
     }
 
     return false;
+  }
+
+  /**
+   * Dispatch an action with true debouncing - waits for the delay after the last call
+   * Each new call resets the timer. Action only executes after no calls for the specified time.
+   * @param action The action to dispatch
+   * @param debounceTime Time in ms to wait after the last call
+   */
+  protected debouncedDispatch(action: TAction, debounceTime: number = 100): void {
+    const actionKey = action.type;
+
+    // Clear existing timeout
+    if (this.debouncedTimeouts[actionKey]) {
+      clearTimeout(this.debouncedTimeouts[actionKey]);
+    }
+
+    // Set new timeout
+    this.debouncedTimeouts[actionKey] = setTimeout(() => {
+      this.dispatch(action);
+      delete this.debouncedTimeouts[actionKey];
+    }, debounceTime) as unknown as number;
+  }
+
+  /**
+   * Cancel a pending debounced action
+   * @param actionType The action type to cancel
+   */
+  protected cancelDebouncedDispatch(actionType: string): void {
+    if (this.debouncedTimeouts[actionType]) {
+      clearTimeout(this.debouncedTimeouts[actionType]);
+      delete this.debouncedTimeouts[actionType];
+    }
   }
 
   /**
@@ -185,6 +219,12 @@ export abstract class BasePlugin<
    * Cleanup method to be called when plugin is being destroyed
    */
   public destroy(): void {
+    // Clear all pending timeouts
+    Object.values(this.debouncedTimeouts).forEach((timeout) => {
+      clearTimeout(timeout);
+    });
+    this.debouncedTimeouts = {};
+
     if (this.unsubscribeFromState) {
       this.unsubscribeFromState();
       this.unsubscribeFromState = null;

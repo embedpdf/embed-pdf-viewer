@@ -258,7 +258,7 @@ export class UIPlugin extends BasePlugin<
       registerComponent: this.addComponent.bind(this),
       getCommandMenu: () =>
         Object.values(this.components).find((component) => isCommandMenuComponent(component)),
-      hideCommandMenu: () => this.debouncedDispatch(uiHideCommandMenu({ id: 'commandMenu' }), 100),
+      hideCommandMenu: () => this.cooldownDispatch(uiHideCommandMenu({ id: 'commandMenu' }), 100),
       getFloatingComponents: (scrollerPosition?: 'inside' | 'outside') =>
         Object.values(this.components)
           .filter((component) => isFloatingComponent(component))

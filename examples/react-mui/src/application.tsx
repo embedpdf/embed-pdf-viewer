@@ -193,10 +193,6 @@ function App() {
                               pageHeight={height}
                               rotation={rotation}
                               scale={scale}
-                              style={{
-                                width,
-                                height,
-                              }}
                             >
                               <RenderLayer
                                 pageIndex={pageIndex}

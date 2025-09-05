@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed } from 'vue';
 import type { Size } from '@embedpdf/models';
-import { useRotateCapability } from '../hooks';
+import { useRotatePlugin } from '../hooks';
 
 interface Props {
   pageSize: Size;
@@ -9,7 +9,7 @@ interface Props {
 
 const props = defineProps<Props>();
 
-const { provides: rotate } = useRotateCapability();
+const { plugin: rotate } = useRotatePlugin();
 
 const transformMatrix = computed(() => {
   // If the capability is not yet available, return an identity matrix.
@@ -18,11 +18,10 @@ const transformMatrix = computed(() => {
   }
 
   // Get the CSS transform matrix string from the capability.
-  return rotate.value.getMatrix({
+  return rotate.value.getMatrixAsString({
     w: props.pageSize.width,
     h: props.pageSize.height,
-    asString: true,
-  }) as string;
+  });
 });
 </script>
 

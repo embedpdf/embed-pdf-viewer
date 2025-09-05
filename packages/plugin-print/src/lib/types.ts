@@ -16,5 +16,5 @@ export interface PrintReadyEvent {
 }
 
 export interface PrintCapability {
-  print: (options: PdfPrintOptions) => Task<ArrayBuffer, PdfErrorReason, PrintProgress>;
+  print: (options?: PdfPrintOptions) => Task<ArrayBuffer, PdfErrorReason, PrintProgress>;
 }

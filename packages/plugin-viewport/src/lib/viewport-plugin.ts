@@ -4,7 +4,6 @@ import {
   createEmitter,
   createBehaviorEmitter,
   Listener,
-  EventListener,
 } from '@embedpdf/core';
 
 import {
@@ -23,6 +22,7 @@ import {
   ViewportScrollMetrics,
   ViewportInputMetrics,
   ScrollToPayload,
+  ScrollActivity,
 } from './types';
 import { Rect } from '@embedpdf/models';
 
@@ -42,14 +42,13 @@ export class ViewportPlugin extends BasePlugin<
     y: number;
     behavior?: ScrollBehavior;
   }>();
-  private readonly scrollActivity$ = createBehaviorEmitter<boolean>();
+  private readonly scrollActivity$ = createBehaviorEmitter<ScrollActivity>();
 
   /* ------------------------------------------------------------------ */
   /* “live rect” infrastructure                                          */
   /* ------------------------------------------------------------------ */
   private rectProvider: (() => Rect) | null = null;
 
-  private scrollEndTimer?: number;
   private readonly scrollEndDelay: number;
 
   constructor(
@@ -144,12 +143,26 @@ export class ViewportPlugin extends BasePlugin<
     }
   }
 
+  private emitScrollActivity() {
+    const scrollActivity: ScrollActivity = {
+      isSmoothScrolling: this.state.isSmoothScrolling,
+      isScrolling: this.state.isScrolling,
+    };
+
+    this.scrollActivity$.emit(scrollActivity);
+  }
+
   // Subscribe to store changes to notify onViewportChange
   override onStoreUpdated(prevState: ViewportState, newState: ViewportState): void {
     if (prevState !== newState) {
       this.viewportMetrics$.emit(newState.viewportMetrics);
-      if (prevState.isScrolling !== newState.isScrolling) {
-        this.scrollActivity$.emit(newState.isScrolling);
+
+      // Emit scroll activity when scrolling state changes
+      if (
+        prevState.isScrolling !== newState.isScrolling ||
+        prevState.isSmoothScrolling !== newState.isSmoothScrolling
+      ) {
+        this.emitScrollActivity();
       }
     }
   }
@@ -167,6 +180,5 @@ export class ViewportPlugin extends BasePlugin<
     this.scrollReq$.clear();
     this.scrollActivity$.clear();
     this.rectProvider = null;
-    if (this.scrollEndTimer) clearTimeout(this.scrollEndTimer);
   }
 }
