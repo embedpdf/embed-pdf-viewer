@@ -1078,6 +1078,56 @@ export class PdfiumEngine<T = Blob> implements PdfEngine<T> {
     return annotationsByPage;
   }
 
+  getPageAnnoWidgets(
+    doc: PdfDocumentObject,
+    page: PdfPageObject,
+  ): PdfTask<PdfWidgetAnnoObject[], PdfErrorReason> {
+    this.logger.debug(LOG_SOURCE, LOG_CATEGORY, 'getPageAnnoWidgets', doc, page);
+    this.logger.perf(
+      LOG_SOURCE,
+      LOG_CATEGORY,
+      `GetPageAnnoWidgets`,
+      'Begin',
+      `${doc.id}-${page.index}`,
+    );
+
+    const ctx = this.cache.getContext(doc.id);
+
+    if (!ctx) {
+      this.logger.perf(
+        LOG_SOURCE,
+        LOG_CATEGORY,
+        `GetPageAnnoWidgets`,
+        'End',
+        `${doc.id}-${page.index}`,
+      );
+      return PdfTaskHelper.reject({
+        code: PdfErrorCode.DocNotOpen,
+        message: 'document does not open',
+      });
+    }
+
+    const annotationWidgets = this.readPageAnnoWidgets(ctx, page);
+
+    this.logger.perf(
+      LOG_SOURCE,
+      LOG_CATEGORY,
+      `GetPageAnnoWidgets`,
+      'End',
+      `${doc.id}-${page.index}`,
+    );
+
+    this.logger.debug(
+      LOG_SOURCE,
+      LOG_CATEGORY,
+      `GetPageAnnoWidgets`,
+      `${doc.id}-${page.index}`,
+      annotationWidgets,
+    );
+
+    return PdfTaskHelper.resolve(annotationWidgets);
+  }
+
   /**
    * {@inheritDoc @embedpdf/models!PdfEngine.getPageAnnotations}
    *
@@ -3755,6 +3805,30 @@ export class PdfiumEngine<T = Blob> implements PdfEngine<T> {
   }
 
   /**
+   *
+   *
+   * @param ctx - document context
+   * @param page - page info
+   * @returns form fields on the pdf page
+   *
+   * @private
+   */
+  private readPageAnnoWidgets(ctx: DocumentContext, page: PdfPageObject): PdfWidgetAnnoObject[] {
+    return ctx.borrowPage(page.index, (pageCtx) => {
+      const annotationCount = this.pdfiumModule.FPDFPage_GetAnnotCount(pageCtx.pagePtr);
+
+      const annotations: PdfWidgetAnnoObject[] = [];
+      for (let i = 0; i < annotationCount; i++) {
+        pageCtx.withAnnotation(i, (annotPtr) => {
+          const anno = this.readPageAnnoWidget(page, annotPtr, pageCtx);
+          if (anno) annotations.push(anno);
+        });
+      }
+      return annotations;
+    });
+  }
+
+  /**
    * Read page annotations
    *
    * @param ctx - document context
@@ -3781,6 +3855,36 @@ export class PdfiumEngine<T = Blob> implements PdfEngine<T> {
       }
     }
     return out;
+  }
+
+  /**
+   * Read page form field
+   *
+   * @param ctx - document context
+   * @param page - page info
+   * @param annotationPtr - pointer to pdf annotation
+   * @param pageCtx - page context
+   * @returns form field
+   *
+   * @private
+   */
+  private readPageAnnoWidget(
+    page: PdfPageObject,
+    annotationPtr: number,
+    pageCtx: PageContext,
+  ): PdfWidgetAnnoObject | undefined {
+    let index = this.getAnnotString(annotationPtr, 'NM');
+    if (!index || !isUuidV4(index)) {
+      index = uuidV4();
+      this.setAnnotString(annotationPtr, 'NM', index);
+    }
+    const subType = this.pdfiumModule.FPDFAnnot_GetSubtype(
+      annotationPtr,
+    ) as PdfAnnotationObject['type'];
+
+    if (subType !== PdfAnnotationSubtype.WIDGET) return;
+
+    return this.readPdfWidgetAnno(page, annotationPtr, pageCtx.getFormHandle(), index);
   }
 
   /**

@@ -172,6 +172,7 @@ import {
   RedactionState,
 } from '@embedpdf/plugin-redaction/preact';
 import { AttachmentPluginPackage } from '@embedpdf/plugin-attachment/preact';
+import { FormPluginPackage, FormLayer } from '@embedpdf/plugin-form/preact';
 import { Capture } from './capture';
 import { HintLayer } from './hint-layer';
 import { AnnotationMenu } from './annotation-menu';
@@ -2959,6 +2960,7 @@ export function PDFViewer({ config }: PDFViewerProps) {
             drawBlackBoxes: true,
           }),
           createPluginRegistration(AttachmentPluginPackage),
+          createPluginRegistration(FormPluginPackage),
         ]}
       >
         {({ pluginsReady }) => (
@@ -3092,6 +3094,7 @@ export function PDFViewer({ config }: PDFViewerProps) {
                                             </div>
                                           )}
                                         />
+                                        <FormLayer pageIndex={pageIndex} scale={scale} />
                                         <SelectionLayer pageIndex={pageIndex} scale={scale} />
                                       </PagePointerProvider>
                                     </Rotate>

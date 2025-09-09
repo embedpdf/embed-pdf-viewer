@@ -217,6 +217,9 @@ export function createMockPdfEngine(partialEngine?: Partial<PdfEngine>): PdfEngi
     getAllAnnotations: jest.fn((doc: PdfDocumentObject) => {
       return PdfTaskHelper.resolve({});
     }),
+    getPageAnnoWidgets: jest.fn((doc: PdfDocumentObject, page: PdfPageObject) => {
+      return PdfTaskHelper.resolve([] as PdfWidgetAnnoObject[]);
+    }),
     getPageAnnotations: jest.fn((doc: PdfDocumentObject, page: PdfPageObject) => {
       const link: PdfLinkAnnoObject = {
         pageIndex: page.index,

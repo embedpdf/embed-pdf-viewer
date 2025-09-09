@@ -2670,6 +2670,16 @@ export interface PdfEngine<T = Blob> {
     page: PdfPageObject,
   ) => PdfTask<PdfAnnotationObject[]>;
   /**
+   * Get form fields of pdf page
+   * @param doc - pdf document
+   * @param page - pdf page
+   * @returns task contains the form fields or error
+   */
+  getPageAnnoWidgets: (
+    doc: PdfDocumentObject,
+    page: PdfPageObject,
+  ) => PdfTask<PdfWidgetAnnoObject[]>;
+  /**
    * Create a annotation on specified page
    * @param doc - pdf document
    * @param page - pdf page

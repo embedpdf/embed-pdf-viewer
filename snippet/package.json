@@ -43,6 +43,7 @@
     "@embedpdf/plugin-capture": "workspace:*",
     "@embedpdf/plugin-history": "workspace:*",
     "@embedpdf/plugin-redaction": "workspace:*",
+    "@embedpdf/plugin-form": "workspace:*",
     "preact": "^10.17.0"
   },
   "devDependencies": {

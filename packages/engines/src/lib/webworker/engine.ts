@@ -470,6 +470,23 @@ export class WebWorkerEngine implements PdfEngine {
   }
 
   /**
+   *
+   * {@inheritDoc @embedpdf/models!PdfEngine.getPageFormFields}
+   *
+   * @public
+   */
+  getPageAnnoWidgets(doc: PdfDocumentObject, page: PdfPageObject) {
+    this.logger.debug(LOG_SOURCE, LOG_CATEGORY, 'getPageAnnoWidgets', doc, page);
+    const requestId = this.generateRequestId(doc.id);
+    const task = new WorkerTask<PdfWidgetAnnoObject[]>(this.worker, requestId);
+
+    const request: ExecuteRequest = createRequest(requestId, 'getPageAnnoWidgets', [doc, page]);
+    this.proxy(task, request);
+
+    return task;
+  }
+
+  /**
    * {@inheritDoc @embedpdf/models!PdfEngine.createPageAnnotation}
    *
    * @public

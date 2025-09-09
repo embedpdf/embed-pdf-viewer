@@ -360,6 +360,9 @@ export class EngineRunner {
       case 'getPageAnnotations':
         task = this.engine[name]!(...args);
         break;
+      case 'getPageAnnoWidgets':
+        task = this.engine[name]!(...args);
+        break;
       case 'createPageAnnotation':
         task = this.engine[name]!(...args);
         break;
