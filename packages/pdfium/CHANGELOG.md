@@ -1,5 +1,11 @@
 # @embedpdf/pdfium
 
+## 1.1.2
+
+### Patch Changes
+
+- [#150](https://github.com/embedpdf/embed-pdf-viewer/pull/150) by [@bobsingor](https://github.com/bobsingor) – Add ability to get the language from the root, add function to PDFium EPDFCatalog_GetLanguage
+
 ## 1.1.1
 
 ## 1.1.0
