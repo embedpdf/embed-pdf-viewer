@@ -43,16 +43,13 @@ export const PolylinePaint = ({
     return annotationProvides.onActiveToolChange(setActiveTool);
   }, [annotationProvides]);
 
-  if (!activeTool.defaults) return null;
-  if (activeTool.defaults.subtype !== PdfAnnotationSubtype.POLYLINE) return null;
-
-  const toolColor = activeTool.defaults.color ?? '#000000';
-  const toolOpacity = activeTool.defaults.opacity ?? 1;
-  const toolStrokeWidth = activeTool.defaults.strokeWidth ?? 2;
-  const toolStrokeColor = activeTool.defaults.strokeColor ?? '#000000';
-  const toolLineEndings = activeTool.defaults.lineEndings;
-  const toolStrokeStyle = activeTool.defaults.strokeStyle ?? PdfAnnotationBorderStyle.SOLID;
-  const toolStrokeDashArray = activeTool.defaults.strokeDashArray;
+  const toolColor = activeTool.defaults?.color ?? '#000000';
+  const toolOpacity = activeTool.defaults?.opacity ?? 1;
+  const toolStrokeWidth = activeTool.defaults?.strokeWidth ?? 2;
+  const toolStrokeColor = activeTool.defaults?.strokeColor ?? '#000000';
+  const toolLineEndings = activeTool.defaults?.lineEndings ?? undefined;
+  const toolStrokeStyle = activeTool.defaults?.strokeStyle ?? PdfAnnotationBorderStyle.SOLID;
+  const toolStrokeDashArray = activeTool.defaults?.strokeDashArray ?? [];
 
   /* ------------------------------------------------------------------ */
   /* integration with interaction-manager                               */
@@ -136,6 +133,9 @@ export const PolylinePaint = ({
   /* ------------------------------------------------------------------ */
   /* render preview                                                     */
   /* ------------------------------------------------------------------ */
+  if (!activeTool.defaults || activeTool.defaults.subtype !== PdfAnnotationSubtype.POLYLINE)
+    return null;
+
   if (!vertices.length || !current) return null;
 
   const allPts = [...vertices, current];
