@@ -244,15 +244,6 @@ export function mergeAdjacentRects(textRuns: TextRunInfo[]): Rect[] {
 } 
 
 
-/**
- * Calculates the Euclidean distance between two points
- * @param p1 - First point
- * @param p2 - Second point
- * @returns Distance between the points in PDF units
- */
-function distance(p1: Position, p2: Position): number {
-  return Math.sqrt((p1.x - p2.x) ** 2 + (p1.y - p2.y) ** 2);
-}
 
 /**
  * Fast squared distance calculation - avoids expensive sqrt operation
@@ -365,44 +356,6 @@ export interface GlyphAccelerationModel {
    * All detected text lines on the page, sorted top-to-bottom
    */
   lines: TextLineIndex[];
-  /**
-   * Spatial grid that divides the page into cells for faster lookups
-   */
-  grid: {
-    /**
-     * Bounding rectangle that encompasses all text on the page
-     */
-    bounds: {
-      x: number;
-      y: number;
-      width: number;
-      height: number;
-    };
-    /**
-     * Number of rows in the spatial grid
-     */
-    rows: number;
-    /**
-     * Number of columns in the spatial grid
-     */
-    cols: number;
-    /**
-     * Width of each grid cell in PDF units
-     */
-    cellWidth: number;
-    /**
-     * Height of each grid cell in PDF units
-     */
-    cellHeight: number;
-    /**
-     * 2D array of grid cells (rows x cols)
-     */
-    cells: GridCell[][];
-  };
-  /**
-   * Flat array of all glyphs on the page for fallback searches
-   */
-  allGlyphs: GlyphIndexEntry[];
   geo: PdfPageGeometry;
 }
 
@@ -563,15 +516,6 @@ export function buildGlyphAccelerationModel(geo: PdfPageGeometry): GlyphAccelera
   return {
     geo,
     lines,
-    grid: {
-      bounds: { x: minX, y: minY, width: gridWidth, height: gridHeight },
-      rows: gridRows,
-      cols: gridCols,
-      cellWidth,
-      cellHeight,
-      cells,
-    },
-    allGlyphs,
   };
 }
 
@@ -616,10 +560,9 @@ export function findNearestGlyphWithModel(
   pt: Position,
 ): NearestGlyphResult | null {
   // Handle empty page case
-  if (model.allGlyphs.length === 0) {
-    return null;
-  }
   const geo = model.geo;
+
+  if(geo.runs.length === 0) return null
 
   const candidateLines: TextLineIndex[] = [];
 
@@ -707,44 +650,6 @@ export function findNearestGlyphWithModel(
       if (weightedDistanceSq < minDistance) {
         minDistance = weightedDistanceSq;
         nearestGlyph = glyph;
-      }
-    }
-  }
-
-  // Stage 3: Fallback to grid-based search if line search didn't find a good match
-  // Calculate fallback threshold based on a reasonable default
-  const fallbackThreshold = 100; // Fixed threshold for simplicity and performance
-  if (!nearestGlyph || minDistance > fallbackThreshold) {
-    const grid = model.grid;
-
-    // Find the grid cell containing the query point
-    const centerCol = Math.floor((pt.x - grid.bounds.x) / grid.cellWidth);
-    const centerRow = Math.floor((pt.y - grid.bounds.y) / grid.cellHeight);
-
-    // Search nearby grid cells - adaptive radius based on grid density
-    const searchRadiusGrid = Math.min(3, Math.max(1, Math.ceil(Math.sqrt(grid.rows * grid.cols) / 10)));
-
-    for (
-      let row = Math.max(0, centerRow - searchRadiusGrid);
-      row <= Math.min(grid.rows - 1, centerRow + searchRadiusGrid);
-      row++
-    ) {
-      for (
-        let col = Math.max(0, centerCol - searchRadiusGrid);
-        col <= Math.min(grid.cols - 1, centerCol + searchRadiusGrid);
-        col++
-      ) {
-        const cell = grid.cells[row][col];
-
-        // Check all glyphs in this grid cell using fast squared distance
-        for (const glyph of cell.glyphs) {
-          const distSq = distanceSquared(pt, glyph.center);
-
-          if (distSq < minDistance) {
-            minDistance = distSq;
-            nearestGlyph = glyph;
-          }
-        }
       }
     }
   }
