@@ -21,9 +21,7 @@ import { Icon } from '../ui/icon';
 
 export const FreeTextSidebar = ({
   selected,
-  subtype,
-  activeVariant,
-  intent,
+  activeTool,
   colorPresets,
 }: SidebarPropsBase<PdfFreeTextAnnoObject>) => {
   /* ────────────────────────  Model / capability  ─────────────────────── */
@@ -31,21 +29,27 @@ export const FreeTextSidebar = ({
   if (!annotation) return null;
 
   const anno = selected?.object;
-  const defaults = annotation.getToolDefaultsBySubtypeAndIntent(subtype, intent);
+  const defaults = activeTool?.defaults;
   const editing = !!anno;
 
   /* ────────────────────────  Derive initial values  ──────────────────── */
-  const baseFont: PdfStandardFont = editing ? anno.fontFamily : defaults.fontFamily;
+  const baseFont: PdfStandardFont = editing
+    ? anno.fontFamily
+    : (defaults?.fontFamily ?? PdfStandardFont.Helvetica);
   const baseFamily = standardFontFamily(baseFont);
   const baseBold = standardFontIsBold(baseFont);
   const baseItalic = standardFontIsItalic(baseFont);
 
-  const baseFontColor = editing ? anno.fontColor : defaults.fontColor;
-  const baseOpacity = editing ? anno.opacity : defaults.opacity;
-  const baseBackgroundColor = editing ? anno.backgroundColor : defaults.backgroundColor;
-  const baseFontSize = editing ? anno.fontSize : defaults.fontSize;
-  const baseTextAlign = editing ? anno.textAlign : defaults.textAlign;
-  const baseVerticalAlign = editing ? anno.verticalAlign : defaults.verticalAlign;
+  const baseFontColor = editing ? anno.fontColor : (defaults?.fontColor ?? '#000000');
+  const baseOpacity = editing ? anno.opacity : (defaults?.opacity ?? 1);
+  const baseBackgroundColor = editing
+    ? anno.backgroundColor
+    : (defaults?.backgroundColor ?? '#000000');
+  const baseFontSize = editing ? anno.fontSize : (defaults?.fontSize ?? 12);
+  const baseTextAlign = editing ? anno.textAlign : (defaults?.textAlign ?? PdfTextAlignment.Left);
+  const baseVerticalAlign = editing
+    ? anno.verticalAlign
+    : (defaults?.verticalAlign ?? PdfVerticalAlignment.Top);
 
   /* ────────────────────────  UI state  ───────────────────────────────── */
   const [fontFamily, setFontFamily] = useState(baseFamily);
@@ -78,8 +82,8 @@ export const FreeTextSidebar = ({
     if (!annotation) return;
     if (editing) {
       annotation.updateAnnotation(anno.pageIndex, anno.id, patch);
-    } else if (activeVariant) {
-      annotation.setToolDefaults(activeVariant, patch);
+    } else if (activeTool) {
+      annotation.setToolDefaults(activeTool.id, patch);
     }
   }
 

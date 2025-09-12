@@ -1,10 +1,10 @@
-import { MouseEvent, TouchEvent, useMemo } from '@framework';
+import { useMemo, MouseEvent, TouchEvent } from '@framework';
 import { Rect, Position, PdfAnnotationBorderStyle } from '@embedpdf/models';
 
 interface PolygonProps {
   rect: Rect;
   vertices: Position[];
-  color?: string; // interior fill colour
+  color?: string;
   strokeColor?: string;
   opacity?: number;
   strokeWidth: number;
@@ -13,6 +13,10 @@ interface PolygonProps {
   scale: number;
   isSelected: boolean;
   onClick?: (e: MouseEvent<SVGElement> | TouchEvent<SVGElement>) => void;
+
+  // New optional props for preview rendering
+  currentVertex?: Position;
+  handleSize?: number;
 }
 
 export function Polygon({
@@ -27,18 +31,29 @@ export function Polygon({
   scale,
   isSelected,
   onClick,
+  currentVertex, // A preview-only prop
+  handleSize = 14, // in CSS pixels
 }: PolygonProps): JSX.Element {
-  // Translate vertices into local coords
+  const allPoints = currentVertex ? [...vertices, currentVertex] : vertices;
+
   const localPts = useMemo(
-    () => vertices.map(({ x, y }) => ({ x: x - rect.origin.x, y: y - rect.origin.y })),
-    [vertices, rect],
+    () => allPoints.map(({ x, y }) => ({ x: x - rect.origin.x, y: y - rect.origin.y })),
+    [allPoints, rect],
   );
 
   const pathData = useMemo(() => {
     if (!localPts.length) return '';
     const [first, ...rest] = localPts;
-    return (`M ${first.x} ${first.y} ` + rest.map((p) => `L ${p.x} ${p.y} `).join('') + 'Z').trim();
-  }, [localPts]);
+    const isPreview = !!currentVertex;
+    // Don't close the path with 'Z' if it's a preview
+    return (
+      `M ${first.x} ${first.y} ` +
+      rest.map((p) => `L ${p.x} ${p.y}`).join(' ') +
+      (isPreview ? '' : ' Z')
+    ).trim();
+  }, [localPts, currentVertex]);
+
+  const isPreviewing = currentVertex && vertices.length > 0;
 
   const width = rect.size.width * scale;
   const height = rect.size.height * scale;
@@ -63,7 +78,7 @@ export function Polygon({
         onTouchStart={onClick}
         opacity={opacity}
         style={{
-          fill: color,
+          fill: currentVertex ? 'none' : color, // No fill during preview
           stroke: strokeColor ?? color,
           strokeWidth,
           cursor: isSelected ? 'move' : 'pointer',
@@ -79,6 +94,26 @@ export function Polygon({
           }),
         }}
       />
+      {/* --- Preview-only elements --- */}
+      {isPreviewing && vertices.length > 1 && (
+        <path
+          d={`M ${localPts[localPts.length - 1].x} ${localPts[localPts.length - 1].y} L ${localPts[0].x} ${localPts[0].y}`}
+          fill="none"
+          style={{ stroke: strokeColor, strokeWidth, strokeDasharray: '4,4', opacity: 0.7 }}
+        />
+      )}
+      {isPreviewing && vertices.length >= 2 && (
+        <rect
+          x={localPts[0].x - handleSize / scale / 2}
+          y={localPts[0].y - handleSize / scale / 2}
+          width={handleSize / scale}
+          height={handleSize / scale}
+          fill={strokeColor}
+          opacity={0.4}
+          stroke={strokeColor}
+          strokeWidth={strokeWidth / 2}
+        />
+      )}
     </svg>
   );
 }

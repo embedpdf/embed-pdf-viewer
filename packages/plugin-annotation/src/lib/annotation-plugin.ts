@@ -5,22 +5,18 @@ import {
   PdfDocumentObject,
   PdfErrorReason,
   Task,
-  PdfAnnotationSubtype,
   PdfTaskHelper,
   PdfErrorCode,
-  PdfBlendMode,
   AnnotationCreateContext,
   uuidV4,
+  PdfAnnotationSubtype,
 } from '@embedpdf/models';
 import {
-  ActiveTool,
   AnnotationCapability,
   AnnotationPluginConfig,
   AnnotationState,
-  BaseAnnotationDefaults,
   GetPageAnnotationsOptions,
   RenderAnnotationOptions,
-  ToolDefaultsByMode,
   TrackedAnnotation,
 } from './types';
 import {
@@ -28,26 +24,33 @@ import {
   selectAnnotation,
   deselectAnnotation,
   AnnotationAction,
-  updateToolDefaults,
   addColorPreset,
   createAnnotation,
   patchAnnotation,
   deleteAnnotation,
   commitPendingChanges,
   purgeAnnotation,
-  setActiveVariant,
+  setToolDefaults,
+  setActiveToolId,
 } from './actions';
 import {
   InteractionManagerCapability,
   InteractionManagerPlugin,
-  InteractionMode,
 } from '@embedpdf/plugin-interaction-manager';
 import { SelectionPlugin, SelectionCapability } from '@embedpdf/plugin-selection';
 import { HistoryPlugin, HistoryCapability, Command } from '@embedpdf/plugin-history';
-import { getSelectedAnnotation, getToolDefaultsBySubtypeAndIntent } from './selectors';
-import { parseVariantKey } from './variant-key';
+import { getSelectedAnnotation } from './selectors';
 import { deriveRect } from './patching';
-import { isTextMarkupDefaults } from './helpers';
+import { AnnotationTool } from './tools/types';
+import { AnyPreviewState, HandlerContext, HandlerFactory, HandlerServices } from './handlers/types';
+import { circleHandlerFactory } from './handlers/circle.handler';
+import { squareHandlerFactory } from './handlers/square.handler';
+import { stampHandlerFactory } from './handlers/stamp.handler';
+import { polygonHandlerFactory } from './handlers/polygon.handler';
+import { polylineHandlerFactory } from './handlers/polyline.handler';
+import { lineHandlerFactory } from './handlers/line.handler';
+import { inkHandlerFactory } from './handlers/ink.handler';
+import { freeTextHandlerFactory } from './handlers/free-text.handler';
 
 export class AnnotationPlugin extends BasePlugin<
   AnnotationPluginConfig,
@@ -56,51 +59,45 @@ export class AnnotationPlugin extends BasePlugin<
   AnnotationAction
 > {
   static readonly id = 'annotation' as const;
-
   private readonly ANNOTATION_HISTORY_TOPIC = 'annotations';
 
   public readonly config: AnnotationPluginConfig;
-
   private readonly state$ = createBehaviorEmitter<AnnotationState>();
   private readonly interactionManager: InteractionManagerCapability | null;
   private readonly selection: SelectionCapability | null;
   private readonly history: HistoryCapability | null;
 
-  private readonly modeByVariant = new Map<string, string>();
-  private readonly variantByMode = new Map<string, string>();
   private pendingContexts = new Map<string, unknown>();
-
-  private readonly activeVariantChange$ = createBehaviorEmitter<string | null>();
-  private readonly activeTool$ = createBehaviorEmitter<ActiveTool>({
-    variantKey: null,
-    defaults: null,
-  });
+  private handlerFactories = new Map<PdfAnnotationSubtype, HandlerFactory<any>>();
+  private readonly activeTool$ = createBehaviorEmitter<AnnotationTool | null>(null);
 
   constructor(id: string, registry: PluginRegistry, config: AnnotationPluginConfig) {
     super(id, registry);
     this.config = config;
 
-    const selection = registry.getPlugin<SelectionPlugin>('selection');
-    this.selection = selection?.provides() ?? null;
+    this.selection = registry.getPlugin<SelectionPlugin>('selection')?.provides() ?? null;
+    this.history = registry.getPlugin<HistoryPlugin>('history')?.provides() ?? null;
+    this.interactionManager =
+      registry.getPlugin<InteractionManagerPlugin>('interaction-manager')?.provides() ?? null;
 
-    const history = registry.getPlugin<HistoryPlugin>('history');
-    this.history = history?.provides() ?? null;
-
-    const interactionManager = registry.getPlugin<InteractionManagerPlugin>('interaction-manager');
-    this.interactionManager = interactionManager?.provides() ?? null;
-
-    this.coreStore.onAction(SET_DOCUMENT, (_action, state) => {
+    this.coreStore.onAction(SET_DOCUMENT, (_, state) => {
       const doc = state.core.document;
-      if (doc) {
-        this.getAllAnnotations(doc);
-      }
+      if (doc) this.getAllAnnotations(doc);
     });
+
+    this.handlerFactories.set(PdfAnnotationSubtype.CIRCLE, circleHandlerFactory);
+    this.handlerFactories.set(PdfAnnotationSubtype.SQUARE, squareHandlerFactory);
+    this.handlerFactories.set(PdfAnnotationSubtype.STAMP, stampHandlerFactory);
+    this.handlerFactories.set(PdfAnnotationSubtype.POLYGON, polygonHandlerFactory);
+    this.handlerFactories.set(PdfAnnotationSubtype.POLYLINE, polylineHandlerFactory);
+    this.handlerFactories.set(PdfAnnotationSubtype.LINE, lineHandlerFactory);
+    this.handlerFactories.set(PdfAnnotationSubtype.INK, inkHandlerFactory);
+    this.handlerFactories.set(PdfAnnotationSubtype.FREETEXT, freeTextHandlerFactory);
   }
 
   async initialize(): Promise<void> {
-    for (const [variantKey, defaults] of Object.entries(this.state.toolDefaults)) {
-      this.registerTool(variantKey, defaults);
-    }
+    // Register interaction modes for all tools defined in the initial state
+    this.state.tools.forEach((tool) => this.registerInteractionForTool(tool));
 
     this.history?.onHistoryChange((topic) => {
       if (topic === this.ANNOTATION_HISTORY_TOPIC && this.config.autoCommit !== false) {
@@ -109,157 +106,122 @@ export class AnnotationPlugin extends BasePlugin<
     });
 
     this.interactionManager?.onModeChange((s) => {
-      const newVariant = this.variantByMode.get(s.activeMode) ?? null;
-      if (newVariant !== this.state.activeVariant) {
-        this.dispatch(setActiveVariant(newVariant));
-        this.activeVariantChange$.emit(newVariant);
+      const newToolId =
+        this.state.tools.find((t) => t.interaction.mode === s.activeMode)?.id ?? null;
+      if (newToolId !== this.state.activeToolId) {
+        this.dispatch(setActiveToolId(newToolId));
       }
     });
 
     this.selection?.onEndSelection(() => {
-      if (!this.state.activeVariant) return;
-      const defaults = this.state.toolDefaults[this.state.activeVariant];
-      if (!defaults || !isTextMarkupDefaults(defaults)) return;
+      const activeTool = this.getActiveTool();
+      if (!activeTool || !activeTool.interaction.textSelection) return;
 
       const formattedSelection = this.selection?.getFormattedSelection();
-      const selectionText = this.selection?.getSelectedText();
-      if (!formattedSelection || !selectionText) return;
+      if (!formattedSelection) return;
 
       for (const selection of formattedSelection) {
-        const rect = selection.rect;
-        const segmentRects = selection.segmentRects;
-        const subtype = defaults.subtype;
-        const color = defaults.color;
-        const opacity = defaults.opacity;
-        const blendMode = defaults.blendMode ?? PdfBlendMode.Normal;
-
-        selectionText.wait((text) => {
-          this.createAnnotation(selection.pageIndex, {
-            type: subtype,
-            rect,
-            segmentRects,
-            color,
-            opacity,
-            flags: ['print'],
-            blendMode,
-            pageIndex: selection.pageIndex,
-            id: uuidV4(),
-            author: this.config.annotationAuthor,
-            custom: {
-              text: text.join('\n'),
-            },
-          });
-        }, ignore);
+        // Create an annotation using the defaults from the active text tool
+        this.createAnnotation(selection.pageIndex, {
+          ...activeTool.defaults,
+          rect: selection.rect,
+          segmentRects: selection.segmentRects,
+          pageIndex: selection.pageIndex,
+          id: uuidV4(),
+        } as PdfAnnotationObject);
       }
-
       this.selection?.clear();
     });
   }
 
-  private registerTool(variantKey: string, defaults: BaseAnnotationDefaults) {
-    const modeId = defaults.interaction.mode;
-    const interactionMode: InteractionMode = {
-      id: modeId,
+  private registerInteractionForTool(tool: AnnotationTool) {
+    this.interactionManager?.registerMode({
+      id: tool.interaction.mode,
       scope: 'page',
-      exclusive: defaults.interaction.exclusive,
-      cursor: defaults.interaction.cursor,
-    };
-
-    this.interactionManager?.registerMode(interactionMode);
-
-    if (defaults.textSelection) {
-      this.selection?.enableForMode(modeId);
+      exclusive: tool.interaction.exclusive,
+      cursor: tool.interaction.cursor,
+    });
+    if (tool.interaction.textSelection) {
+      this.selection?.enableForMode(tool.interaction.mode);
     }
-
-    this.modeByVariant.set(variantKey, modeId);
-    this.variantByMode.set(modeId, variantKey);
   }
 
   protected buildCapability(): AnnotationCapability {
     return {
-      getPageAnnotations: (options: GetPageAnnotationsOptions) => {
-        return this.getPageAnnotations(options);
-      },
-      getSelectedAnnotation: () => {
-        return getSelectedAnnotation(this.state);
-      },
-      selectAnnotation: (pageIndex: number, annotationId: string) => {
-        this.selectAnnotation(pageIndex, annotationId);
-      },
-      deselectAnnotation: () => {
-        this.dispatch(deselectAnnotation());
-      },
-      getActiveVariant: () => {
-        return this.state.activeVariant;
-      },
-      setActiveVariant: (variantKey: string | null) => {
-        if (variantKey === this.state.activeVariant) return;
-        if (variantKey) {
-          const mode = this.modeByVariant.get(variantKey);
-          if (!mode) throw new Error(`Mode missing for variant ${variantKey}`);
-          this.interactionManager?.activate(mode);
-        } else {
-          this.interactionManager?.activateDefaultMode();
-        }
-      },
-      getSubtypeAndIntentByVariant: (variantKey) => {
-        return parseVariantKey(variantKey);
-      },
-      getToolDefaults: (variantKey) => {
-        const defaults = this.state.toolDefaults[variantKey];
-        if (!defaults) {
-          throw new Error(`No defaults found for variant: ${variantKey}`);
-        }
-        return defaults;
-      },
-      getToolDefaultsBySubtypeAndIntent: (subtype, intent) => {
-        return getToolDefaultsBySubtypeAndIntent(this.state, subtype, intent);
-      },
-      getToolDefaultsBySubtype: (subtype) => {
-        return getToolDefaultsBySubtypeAndIntent(this.state, subtype);
-      },
-      setToolDefaults: (variantKey, patch) => {
-        this.dispatch(updateToolDefaults(variantKey, patch));
-      },
+      getPageAnnotations: (options) => this.getPageAnnotations(options),
+      getSelectedAnnotation: () => getSelectedAnnotation(this.state),
+      selectAnnotation: (pageIndex, id) => this.selectAnnotation(pageIndex, id),
+      deselectAnnotation: () => this.dispatch(deselectAnnotation()),
+      getActiveTool: () => this.getActiveTool(),
+      setActiveTool: (toolId) => this.setActiveTool(toolId),
+      getTools: () => this.state.tools,
+      getTool: (toolId) => this.getTool(toolId),
+      findToolForAnnotation: (anno) => this.findToolForAnnotation(anno),
+      setToolDefaults: (toolId, patch) => this.dispatch(setToolDefaults(toolId, patch)),
       getColorPresets: () => [...this.state.colorPresets],
       addColorPreset: (color) => this.dispatch(addColorPreset(color)),
-      createAnnotation: <A extends PdfAnnotationObject>(
-        pageIndex: number,
-        annotation: A,
-        ctx?: AnnotationCreateContext<A>,
-      ) => this.createAnnotation(pageIndex, annotation, ctx),
-      updateAnnotation: (pageIndex: number, id: string, patch: Partial<PdfAnnotationObject>) =>
-        this.updateAnnotation(pageIndex, id, patch),
-      deleteAnnotation: (pageIndex: number, id: string) => this.deleteAnnotation(pageIndex, id),
-      renderAnnotation: (options: RenderAnnotationOptions) => this.renderAnnotation(options),
+      createAnnotation: (pageIndex, anno, ctx) => this.createAnnotation(pageIndex, anno, ctx),
+      updateAnnotation: (pageIndex, id, patch) => this.updateAnnotation(pageIndex, id, patch),
+      deleteAnnotation: (pageIndex, id) => this.deleteAnnotation(pageIndex, id),
+      renderAnnotation: (options) => this.renderAnnotation(options),
       onStateChange: this.state$.on,
-      onActiveVariantChange: this.activeVariantChange$.on,
       onActiveToolChange: this.activeTool$.on,
       commit: () => this.commit(),
     };
   }
 
-  private createActiveTool(mode: string | null, toolDefaults: ToolDefaultsByMode): ActiveTool {
-    if (mode === null) {
-      return { variantKey: null, defaults: null };
-    }
-    return { variantKey: mode, defaults: toolDefaults[mode] } as ActiveTool;
-  }
-
-  private emitActiveTool(state: AnnotationState) {
-    const activeTool = this.createActiveTool(state.activeVariant, state.toolDefaults);
-    this.activeTool$.emit(activeTool);
-  }
-
   override onStoreUpdated(prev: AnnotationState, next: AnnotationState): void {
     this.state$.emit(next);
-    if (
-      prev.activeVariant !== next.activeVariant ||
-      prev.toolDefaults[prev.activeVariant ?? PdfAnnotationSubtype.HIGHLIGHT] !==
-        next.toolDefaults[next.activeVariant ?? PdfAnnotationSubtype.HIGHLIGHT]
-    ) {
-      this.emitActiveTool(next);
+
+    // If the active tool ID changes, or the tools array itself changes, emit the new active tool
+    if (prev.activeToolId !== next.activeToolId || prev.tools !== next.tools) {
+      this.activeTool$.emit(this.getActiveTool());
     }
+  }
+
+  public registerPageHandlers(
+    pageIndex: number,
+    scale: number,
+    callbacks: {
+      services: HandlerServices;
+      onPreview: (toolId: string, state: AnyPreviewState | null) => void;
+    },
+  ) {
+    const page = this.coreState.core.document?.pages[pageIndex];
+    if (!page) return () => {};
+    if (!this.interactionManager) return () => {};
+
+    const unregisterFns: (() => void)[] = [];
+
+    for (const tool of this.state.tools) {
+      if (!tool.defaults.type) continue;
+      const factory = this.handlerFactories.get(tool.defaults.type);
+      if (!factory) continue;
+
+      const context: HandlerContext<PdfAnnotationObject> = {
+        pageIndex,
+        pageSize: page.size,
+        scale,
+        services: callbacks.services, // Pass through services
+        onPreview: (state) => callbacks.onPreview(tool.id, state),
+        onCommit: (annotation, ctx) => {
+          this.createAnnotation(pageIndex, annotation, ctx);
+          this.setActiveTool(null);
+          this.selectAnnotation(pageIndex, annotation.id);
+        },
+        getTool: () => this.state.tools.find((t) => t.id === tool.id),
+      };
+
+      const unregister = this.interactionManager.registerHandlers({
+        modeId: tool.interaction.mode,
+        handlers: factory.create(context),
+        pageIndex,
+      });
+
+      unregisterFns.push(unregister);
+    }
+
+    return () => unregisterFns.forEach((fn) => fn());
   }
 
   private getAllAnnotations(doc: PdfDocumentObject) {
@@ -291,19 +253,15 @@ export class AnnotationPlugin extends BasePlugin<
     const coreState = this.coreState.core;
 
     if (!coreState.document) {
-      throw new Error('document does not open');
+      return PdfTaskHelper.reject({ code: PdfErrorCode.NotFound, message: 'Document not found' });
     }
 
     const page = coreState.document.pages.find((page) => page.index === pageIndex);
     if (!page) {
-      throw new Error('page does not exist');
+      return PdfTaskHelper.reject({ code: PdfErrorCode.NotFound, message: 'Page not found' });
     }
 
     return this.engine.renderPageAnnotation(coreState.document, page, annotation, options);
-  }
-
-  private selectAnnotation(pageIndex: number, annotationId: string) {
-    this.dispatch(selectAnnotation(pageIndex, annotationId));
   }
 
   private createAnnotation<A extends PdfAnnotationObject>(
@@ -371,15 +329,15 @@ export class AnnotationPlugin extends BasePlugin<
   }
 
   private deleteAnnotation(pageIndex: number, id: string) {
+    const originalAnnotation = this.state.byUid[id]?.object;
+    if (!originalAnnotation) return;
+
     if (!this.history) {
       this.dispatch(deselectAnnotation());
       this.dispatch(deleteAnnotation(pageIndex, id));
-      if (this.config.autoCommit !== false) {
-        this.commit();
-      }
+      if (this.config.autoCommit !== false) this.commit();
       return;
     }
-    const originalAnnotation = this.state.byUid[id].object;
     const command: Command = {
       execute: () => {
         this.dispatch(deselectAnnotation());
@@ -388,6 +346,42 @@ export class AnnotationPlugin extends BasePlugin<
       undo: () => this.dispatch(createAnnotation(pageIndex, originalAnnotation)),
     };
     this.history.register(command, this.ANNOTATION_HISTORY_TOPIC);
+  }
+
+  private selectAnnotation(pageIndex: number, id: string) {
+    this.dispatch(selectAnnotation(pageIndex, id));
+  }
+
+  public getActiveTool(): AnnotationTool | null {
+    if (!this.state.activeToolId) return null;
+    return this.state.tools.find((t) => t.id === this.state.activeToolId) ?? null;
+  }
+
+  public setActiveTool(toolId: string | null): void {
+    if (toolId === this.state.activeToolId) return;
+    const tool = this.state.tools.find((t) => t.id === toolId);
+    if (tool) {
+      this.interactionManager?.activate(tool.interaction.mode);
+    } else {
+      this.interactionManager?.activateDefaultMode();
+    }
+  }
+
+  public getTool<T extends AnnotationTool>(toolId: string): T | undefined {
+    return this.state.tools.find((t) => t.id === toolId) as T | undefined;
+  }
+
+  public findToolForAnnotation(annotation: PdfAnnotationObject): AnnotationTool | null {
+    let bestTool: AnnotationTool | null = null;
+    let bestScore = 0;
+    for (const tool of this.state.tools) {
+      const score = tool.matchScore(annotation);
+      if (score > bestScore) {
+        bestScore = score;
+        bestTool = tool;
+      }
+    }
+    return bestTool;
   }
 
   private commit(): Task<boolean, PdfErrorReason> {

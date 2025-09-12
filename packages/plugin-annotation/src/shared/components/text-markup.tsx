@@ -1,5 +1,5 @@
 import { blendModeToCss, PdfAnnotationSubtype, PdfBlendMode, Rect } from '@embedpdf/models';
-import { ActiveTool } from '@embedpdf/plugin-annotation';
+import { AnnotationTool } from '@embedpdf/plugin-annotation';
 import { useSelectionCapability } from '@embedpdf/plugin-selection/@framework';
 
 import { useEffect, useState } from '@framework';
@@ -19,7 +19,7 @@ export function TextMarkup({ pageIndex, scale }: TextMarkupProps) {
   const { provides: annotationProvides } = useAnnotationCapability();
   const [rects, setRects] = useState<Array<Rect>>([]);
   const [boundingRect, setBoundingRect] = useState<Rect | null>(null);
-  const [activeTool, setActiveTool] = useState<ActiveTool>({ variantKey: null, defaults: null });
+  const [activeTool, setActiveTool] = useState<AnnotationTool | null>(null);
 
   useEffect(() => {
     if (!selectionProvides) return;
@@ -39,9 +39,9 @@ export function TextMarkup({ pageIndex, scale }: TextMarkupProps) {
   }, [annotationProvides]);
 
   if (!boundingRect) return null;
-  if (!activeTool.defaults) return null;
+  if (!activeTool || !activeTool.defaults) return null;
 
-  switch (activeTool.defaults.subtype) {
+  switch (activeTool.defaults.type) {
     case PdfAnnotationSubtype.UNDERLINE:
       return (
         <div

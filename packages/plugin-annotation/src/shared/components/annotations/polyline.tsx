@@ -52,20 +52,21 @@ export function Polyline({
     if (localPts.length < 2) return { start: null, end: null };
     const toAngle = (a: Position, b: Position) => Math.atan2(b.y - a.y, b.x - a.x);
 
-    const startRad = toAngle(localPts[1], localPts[0]); // direction INTO first segment
-    const endRad = toAngle(localPts[localPts.length - 2], localPts[localPts.length - 1]);
+    // Calculate angles in the direction of the line segments
+    const startRad = toAngle(localPts[0], localPts[1]); // direction FROM first TO second
+    const endRad = toAngle(localPts[localPts.length - 2], localPts[localPts.length - 1]); // direction FROM second-to-last TO last
 
     const start = patching.createEnding(
       lineEndings?.start,
       strokeWidth,
-      startRad + Math.PI, // tip points outward from first segment start
+      startRad + Math.PI, // tip points outward from line start
       localPts[0].x,
       localPts[0].y,
     );
     const end = patching.createEnding(
       lineEndings?.end,
       strokeWidth,
-      endRad,
+      endRad, // tip points in line direction
       localPts[localPts.length - 1].x,
       localPts[localPts.length - 1].y,
     );

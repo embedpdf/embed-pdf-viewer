@@ -1,59 +1,52 @@
 /** @jsxImportSource preact */
 import { h } from 'preact';
-import { useAnnotationCapability } from '@embedpdf/plugin-annotation/preact';
-import { PdfAnnotationSubtype } from '@embedpdf/models';
+import { useAnnotationCapability, AnnotationTool } from '@embedpdf/plugin-annotation/preact';
+import { PdfAnnotationSubtype, PdfAnnotationObject } from '@embedpdf/models';
 import { TrackedAnnotation } from '@embedpdf/plugin-annotation';
 
 import { SidebarPropsBase } from './annotation-sidebar/common';
 import { SIDEbars } from './annotation-sidebar/registry';
 import { EmptyState } from './annotation-sidebar/empty-state';
 
-// ─────────────────────────────────────────────────────────────────────────
-//  Public API (signature unchanged so callers don’t change)
-// ─────────────────────────────────────────────────────────────────────────
 export function leftPanelAnnotationStyleRenderer({
   selectedAnnotation,
-  activeVariant,
+  activeToolId,
   colorPresets,
 }: {
   selectedAnnotation: TrackedAnnotation | null;
-  activeVariant: string | null;
+  activeToolId: string | null;
   colorPresets: string[];
 }) {
   const { provides: annotation } = useAnnotationCapability();
   if (!annotation) return null;
 
-  let intent: string | undefined = undefined;
-  /* ------------------------------------------------------------
-   * 1. Work out which subtype we’re editing (selected note > tool)
-   * ------------------------------------------------------------ */
+  let tool: AnnotationTool | null = null;
   let subtype: PdfAnnotationSubtype | null = null;
 
+  // 1. Determine which tool and subtype we are working with
   if (selectedAnnotation) {
+    // If an annotation is selected, find the best tool that matches it
+    tool = annotation.findToolForAnnotation(selectedAnnotation.object);
     subtype = selectedAnnotation.object.type;
-    intent = selectedAnnotation.object.intent;
-  } else if (activeVariant) {
-    const { subtype: s, intent: i } = annotation.getSubtypeAndIntentByVariant(activeVariant);
-    subtype = s;
-    intent = i;
+  } else if (activeToolId) {
+    // If no annotation is selected, use the active tool from the toolbar
+    tool = annotation.getTool(activeToolId) ?? null;
+    subtype = tool?.defaults.type ?? null;
   }
 
-  /* ------------------------------------------------------------
-   * 2. Dispatch to concrete sidebar or show empty state
-   * ------------------------------------------------------------ */
-  if (subtype == null) return <EmptyState />;
+  // 2. If we couldn't determine a subtype, show the empty state
+  if (subtype === null) return <EmptyState />;
 
   const entry = SIDEbars[subtype];
   if (!entry) return <EmptyState />;
 
   const { component: Sidebar, title } = entry;
 
-  const commonProps: SidebarPropsBase = {
+  // 3. Prepare the simplified props for the sidebar component
+  const commonProps: SidebarPropsBase<any> = {
     selected: selectedAnnotation,
-    subtype,
-    activeVariant,
+    activeTool: tool,
     colorPresets,
-    intent,
   };
 
   const computedTitle = typeof title === 'function' ? title(commonProps as any) : title;
