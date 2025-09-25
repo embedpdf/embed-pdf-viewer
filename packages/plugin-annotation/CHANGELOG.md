@@ -1,5 +1,45 @@
 # @embedpdf/plugin-annotation
 
+## 1.3.1
+
+## 1.3.0
+
+### Minor Changes
+
+- [#172](https://github.com/embedpdf/embed-pdf-viewer/pull/172) by [@bobsingor](https://github.com/bobsingor) – Custom render function if you want the frontend behaviour of annotation to be different
+
+### Patch Changes
+
+- [#172](https://github.com/embedpdf/embed-pdf-viewer/pull/172) by [@bobsingor](https://github.com/bobsingor) – Fix issue with forwarding props on text markups
+
+- [#168](https://github.com/embedpdf/embed-pdf-viewer/pull/168) by [@Ludy87](https://github.com/Ludy87) – Add license fields to the package.json with the value MIT
+
+## 1.2.1
+
+### Patch Changes
+
+- [#164](https://github.com/embedpdf/embed-pdf-viewer/pull/164) by [@bobsingor](https://github.com/bobsingor) – Fix defaults on annotation stamp
+
+- [#164](https://github.com/embedpdf/embed-pdf-viewer/pull/164) by [@bobsingor](https://github.com/bobsingor) – Make interaction mode optional fallback on tool id
+
+## 1.2.0
+
+### Minor Changes
+
+- [#153](https://github.com/embedpdf/embed-pdf-viewer/pull/153) by [@bobsingor](https://github.com/bobsingor) – Remove active variant and make it easier with addTool
+
+### Patch Changes
+
+- [#153](https://github.com/embedpdf/embed-pdf-viewer/pull/153) by [@bobsingor](https://github.com/bobsingor) – Add events on update,delete,create annotations
+
+- [#153](https://github.com/embedpdf/embed-pdf-viewer/pull/153) by [@bobsingor](https://github.com/bobsingor) – Ability to customize the vertex UI and resize UI and the outline selection color
+
+- [#153](https://github.com/embedpdf/embed-pdf-viewer/pull/153) by [@bobsingor](https://github.com/bobsingor) – Fix issue with free text that the text is not selectable
+
+- [#153](https://github.com/embedpdf/embed-pdf-viewer/pull/153) by [@bobsingor](https://github.com/bobsingor) – Move the handlers to the annotation plugin itself to make the framework layer smaller
+
+- [#153](https://github.com/embedpdf/embed-pdf-viewer/pull/153) by [@bobsingor](https://github.com/bobsingor) – Ability to selectAfterCreate, deactiveToolAfterCreate and also overwrite this behavrious on the tool itself
+
 ## 1.1.1
 
 ## 1.1.0

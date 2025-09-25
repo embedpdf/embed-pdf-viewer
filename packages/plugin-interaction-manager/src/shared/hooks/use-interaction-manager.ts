@@ -3,7 +3,6 @@ import {
   initialState,
   InteractionManagerPlugin,
   InteractionManagerState,
-  PointerEventHandlers,
   PointerEventHandlersWithLifecycle,
 } from '@embedpdf/plugin-interaction-manager';
 import { useState, useEffect } from '@framework';

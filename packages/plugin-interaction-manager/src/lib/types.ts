@@ -1,7 +1,10 @@
 import { BasePluginConfig, EventHook } from '@embedpdf/core';
 import { Position } from '@embedpdf/models';
 
-export interface InteractionManagerPluginConfig extends BasePluginConfig {}
+export interface InteractionManagerPluginConfig extends BasePluginConfig {
+  /** Initial exclusion rules */
+  exclusionRules?: InteractionExclusionRules;
+}
 
 export interface InteractionManagerState {
   /** Mode-id that is currently active (e.g. `"default"` or `"annotationCreation"`). */
@@ -12,6 +15,15 @@ export interface InteractionManagerState {
   paused: boolean;
   /** Mode-id that is treated as the resolver’s fall-back (“finish → …”). */
   defaultMode: string;
+  /** Exclusion rules for interaction */
+  exclusionRules: InteractionExclusionRules;
+}
+
+export interface InteractionExclusionRules {
+  /** Class names that should be excluded */
+  classes?: string[];
+  /** Data attributes that should be excluded (e.g., 'data-no-interaction') */
+  dataAttributes?: string[];
 }
 
 export interface InteractionMode {
@@ -135,4 +147,16 @@ export interface InteractionManagerCapability {
   setDefaultMode(id: string): void;
   /** Get the default mode */
   getDefaultMode(): string;
+  /** Get current exclusion rules */
+  getExclusionRules(): InteractionExclusionRules;
+  /** Update exclusion rules */
+  setExclusionRules(rules: InteractionExclusionRules): void;
+  /** Add a class to exclusion */
+  addExclusionClass(className: string): void;
+  /** Remove a class from exclusion */
+  removeExclusionClass(className: string): void;
+  /** Add a data attribute to exclusion */
+  addExclusionAttribute(attribute: string): void;
+  /** Remove a data attribute from exclusion */
+  removeExclusionAttribute(attribute: string): void;
 }

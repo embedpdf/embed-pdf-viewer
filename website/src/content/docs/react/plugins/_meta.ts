@@ -3,6 +3,7 @@ export default {
   'plugin-scroll': 'Scroll',
   'plugin-render': 'Render',
   'plugin-tiling': 'Tiling',
+  'plugin-annotation': 'Annotation',
   'plugin-selection': 'Selection',
   'plugin-zoom': 'Zoom',
   'plugin-rotate': 'Rotate',

@@ -339,6 +339,12 @@ export class EngineRunner {
       case 'getBookmarks':
         task = this.engine[name]!(...args);
         break;
+      case 'setBookmarks':
+        task = this.engine[name]!(...args);
+        break;
+      case 'deleteBookmarks':
+        task = this.engine[name]!(...args);
+        break;
       case 'getSignatures':
         task = this.engine[name]!(...args);
         break;
@@ -388,6 +394,12 @@ export class EngineRunner {
         task = this.engine[name]!(...args);
         break;
       case 'getAttachments':
+        task = this.engine[name]!(...args);
+        break;
+      case 'addAttachment':
+        task = this.engine[name]!(...args);
+        break;
+      case 'removeAttachment':
         task = this.engine[name]!(...args);
         break;
       case 'readAttachmentContent':

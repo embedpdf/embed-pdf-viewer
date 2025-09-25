@@ -87,7 +87,6 @@ export class SpreadPlugin extends BasePlugin<
       onSpreadChange: this.spreadEmitter$.on,
       setSpreadMode: (mode) => this.setSpreadMode(mode),
       getSpreadMode: () => this.state.spreadMode,
-      getSpreadPagesObjects: (pages) => this.getSpreadPagesObjects(pages),
     };
   }
 

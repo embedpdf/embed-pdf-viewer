@@ -30,6 +30,8 @@
     "@embedpdf/plugin-interaction-manager": "workspace:*",
     "@embedpdf/plugin-pan": "workspace:*",
     "@embedpdf/plugin-tiling": "workspace:*",
+    "@embedpdf/plugin-annotation": "workspace:*",
+    "@embedpdf/plugin-history": "workspace:*",
     "@headlessui/react": "^2.2.0",
     "@mdx-js/loader": "^3.0.0",
     "@mdx-js/react": "^3.0.0",

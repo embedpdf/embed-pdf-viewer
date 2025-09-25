@@ -3,6 +3,7 @@
   "private": true,
   "version": "0.0.0",
   "packageManager": "pnpm@10.4.0",
+  "license": "MIT",
   "scripts": {
     "dev": "turbo run dev --parallel",
     "dev:vanilla": "pnpm --filter @embedpdf/example-vanilla run dev",

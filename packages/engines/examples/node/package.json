@@ -4,6 +4,7 @@
   "private": true,
   "description": "Node.js examples for @embedpdf/engines",
   "type": "module",
+  "license": "MIT",
   "main": "basic-example.js",
   "scripts": {
     "start": "node basic-example.js",
@@ -22,6 +23,5 @@
     "node",
     "examples"
   ],
-  "author": "EmbedPDF",
-  "license": "MIT"
+  "author": "EmbedPDF"
 }

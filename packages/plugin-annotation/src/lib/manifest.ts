@@ -14,5 +14,7 @@ export const manifest: PluginManifest<AnnotationPluginConfig> = {
     enabled: true,
     autoCommit: true,
     annotationAuthor: 'Guest',
+    deactivateToolAfterCreate: false,
+    selectAfterCreate: true,
   },
 };

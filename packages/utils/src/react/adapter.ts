@@ -18,3 +18,5 @@ export type {
   TouchEvent,
   ComponentType,
 } from 'react';
+
+export const dblClickProp = 'onDoubleClick' as const;

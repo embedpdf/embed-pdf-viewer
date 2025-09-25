@@ -13,6 +13,20 @@ export default {
       timestamp: false,
     },
   },
+  ['pdf-outline-editor']: {
+    title: 'PDF Outline Editor',
+    type: 'page',
+    theme: {
+      timestamp: false,
+    },
+  },
+  ['pdf-attachment-editor']: {
+    title: 'PDF Attachment Editor',
+    type: 'page',
+    theme: {
+      timestamp: false,
+    },
+  },
   index: {
     title: 'Tools',
     type: 'page',

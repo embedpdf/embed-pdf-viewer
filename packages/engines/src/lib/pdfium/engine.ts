@@ -117,6 +117,8 @@ import {
   PdfMetadataObject,
   PdfPrintOptions,
   PdfTrappedStatus,
+  PdfStampFit,
+  PdfAddAttachmentParams,
 } from '@embedpdf/models';
 import { isValidCustomKey, readArrayBuffer, readString } from './helper';
 import { WrappedPdfiumModule } from '@embedpdf/pdfium';
@@ -305,6 +307,40 @@ export class PdfiumEngine<T = Blob> implements PdfEngine<T> {
     }
     this.logger.perf(LOG_SOURCE, LOG_CATEGORY, `Destroy`, 'End', 'General');
     return PdfTaskHelper.resolve(true);
+  }
+
+  /** Write a UTF-16LE (WIDESTRING) to wasm, call `fn(ptr)`, then free. */
+  private withWString<T>(value: string, fn: (ptr: number) => T): T {
+    // bytes = (len + 1) * 2
+    const length = (value.length + 1) * 2;
+    const ptr = this.memoryManager.malloc(length);
+    try {
+      // emscripten runtime exposes stringToUTF16
+      this.pdfiumModule.pdfium.stringToUTF16(value, ptr, length);
+      return fn(ptr);
+    } finally {
+      this.memoryManager.free(ptr);
+    }
+  }
+
+  /** Write a float[] to wasm, call `fn(ptr, count)`, then free. */
+  private withFloatArray<T>(
+    values: number[] | undefined,
+    fn: (ptr: number, count: number) => T,
+  ): T {
+    const arr = values ?? [];
+    const bytes = arr.length * 4;
+    const ptr = bytes ? this.memoryManager.malloc(bytes) : WasmPointer(0);
+    try {
+      if (bytes) {
+        for (let i = 0; i < arr.length; i++) {
+          this.pdfiumModule.pdfium.setValue(ptr + i * 4, arr[i], 'float');
+        }
+      }
+      return fn(ptr, arr.length);
+    } finally {
+      if (bytes) this.memoryManager.free(ptr);
+    }
   }
 
   /**
@@ -950,6 +986,101 @@ export class PdfiumEngine<T = Blob> implements PdfEngine<T> {
     return PdfTaskHelper.resolve({
       bookmarks,
     });
+  }
+
+  /**
+   * {@inheritDoc @embedpdf/models!PdfEngine.setBookmarks}
+   *
+   * @public
+   */
+  setBookmarks(doc: PdfDocumentObject, list: PdfBookmarkObject[]) {
+    this.logger.debug(LOG_SOURCE, LOG_CATEGORY, 'setBookmarks', doc, list);
+    this.logger.perf(LOG_SOURCE, LOG_CATEGORY, `SetBookmarks`, 'Begin', doc.id);
+
+    const ctx = this.cache.getContext(doc.id);
+    if (!ctx) {
+      this.logger.perf(LOG_SOURCE, LOG_CATEGORY, `SetBookmarks`, 'End', doc.id);
+      return PdfTaskHelper.reject({
+        code: PdfErrorCode.DocNotOpen,
+        message: 'document does not open',
+      });
+    }
+
+    // Clear any existing outlines
+    if (!this.pdfiumModule.EPDFBookmark_Clear(ctx.docPtr)) {
+      this.logger.perf(LOG_SOURCE, LOG_CATEGORY, `SetBookmarks`, 'End', doc.id);
+      return PdfTaskHelper.reject({
+        code: PdfErrorCode.Unknown,
+        message: 'failed to clear existing bookmarks',
+      });
+    }
+
+    // Recursive builder
+    const build = (parentPtr: number, items: PdfBookmarkObject[]): boolean => {
+      let prevChild = 0;
+      for (const item of items) {
+        // Create
+        const bmPtr = this.withWString(item.title ?? '', (wptr) =>
+          this.pdfiumModule.EPDFBookmark_AppendChild(ctx.docPtr, parentPtr, wptr),
+        );
+        if (!bmPtr) return false;
+
+        // Target (optional)
+        if (item.target) {
+          const ok = this.applyBookmarkTarget(ctx.docPtr, bmPtr, item.target);
+          if (!ok) return false;
+        }
+
+        // Children
+        if (item.children?.length) {
+          const ok = build(bmPtr, item.children);
+          if (!ok) return false;
+        }
+
+        prevChild = bmPtr;
+      }
+      return true;
+    };
+
+    const ok = build(/*top-level*/ 0, list);
+    this.logger.perf(LOG_SOURCE, LOG_CATEGORY, `SetBookmarks`, 'End', doc.id);
+
+    if (!ok) {
+      return PdfTaskHelper.reject({
+        code: PdfErrorCode.Unknown,
+        message: 'failed to build bookmark tree',
+      });
+    }
+    return PdfTaskHelper.resolve(true);
+  }
+
+  /**
+   * {@inheritDoc @embedpdf/models!PdfEngine.deleteBookmarks}
+   *
+   * @public
+   */
+  deleteBookmarks(doc: PdfDocumentObject) {
+    this.logger.debug(LOG_SOURCE, LOG_CATEGORY, 'deleteBookmarks', doc);
+    this.logger.perf(LOG_SOURCE, LOG_CATEGORY, `DeleteBookmarks`, 'Begin', doc.id);
+
+    const ctx = this.cache.getContext(doc.id);
+    if (!ctx) {
+      this.logger.perf(LOG_SOURCE, LOG_CATEGORY, `DeleteBookmarks`, 'End', doc.id);
+      return PdfTaskHelper.reject({
+        code: PdfErrorCode.DocNotOpen,
+        message: 'document does not open',
+      });
+    }
+
+    const ok = this.pdfiumModule.EPDFBookmark_Clear(ctx.docPtr);
+    this.logger.perf(LOG_SOURCE, LOG_CATEGORY, `DeleteBookmarks`, 'End', doc.id);
+
+    return ok
+      ? PdfTaskHelper.resolve(true)
+      : PdfTaskHelper.reject({
+          code: PdfErrorCode.Unknown,
+          message: 'failed to clear bookmarks',
+        });
   }
 
   /**
@@ -1697,6 +1828,127 @@ export class PdfiumEngine<T = Blob> implements PdfEngine<T> {
   }
 
   /**
+   * {@inheritDoc @embedpdf/models!PdfEngine.addAttachment}
+   *
+   * @public
+   */
+  addAttachment(doc: PdfDocumentObject, params: PdfAddAttachmentParams): PdfTask<boolean> {
+    this.logger.debug(LOG_SOURCE, LOG_CATEGORY, 'addAttachment', doc, params?.name);
+    this.logger.perf(LOG_SOURCE, LOG_CATEGORY, `AddAttachment`, 'Begin', doc.id);
+
+    const ctx = this.cache.getContext(doc.id);
+    if (!ctx) {
+      this.logger.perf(LOG_SOURCE, LOG_CATEGORY, `AddAttachment`, 'End', doc.id);
+      return PdfTaskHelper.reject({
+        code: PdfErrorCode.DocNotOpen,
+        message: 'document does not open',
+      });
+    }
+
+    const { name, description, mimeType, data } = params ?? {};
+    if (!name) {
+      this.logger.perf(LOG_SOURCE, LOG_CATEGORY, `AddAttachment`, 'End', doc.id);
+      return PdfTaskHelper.reject({
+        code: PdfErrorCode.NotFound,
+        message: 'attachment name is required',
+      });
+    }
+    if (!data || (data instanceof Uint8Array ? data.byteLength === 0 : data.byteLength === 0)) {
+      this.logger.perf(LOG_SOURCE, LOG_CATEGORY, `AddAttachment`, 'End', doc.id);
+      return PdfTaskHelper.reject({
+        code: PdfErrorCode.NotFound,
+        message: 'attachment data is empty',
+      });
+    }
+
+    // 1) Create the attachment handle (also inserts into the EmbeddedFiles name tree).
+    const attachmentPtr = this.withWString(name, (wNamePtr) =>
+      this.pdfiumModule.FPDFDoc_AddAttachment(ctx.docPtr, wNamePtr),
+    );
+
+    if (!attachmentPtr) {
+      // Most likely: duplicate name in the name tree.
+      this.logger.perf(LOG_SOURCE, LOG_CATEGORY, `AddAttachment`, 'End', doc.id);
+      return PdfTaskHelper.reject({
+        code: PdfErrorCode.Unknown,
+        message: `An attachment named "${name}" already exists`,
+      });
+    }
+
+    this.withWString(description, (wDescriptionPtr) =>
+      this.pdfiumModule.EPDFAttachment_SetDescription(attachmentPtr, wDescriptionPtr),
+    );
+
+    this.pdfiumModule.EPDFAttachment_SetSubtype(attachmentPtr, mimeType);
+
+    // 3) Copy data into WASM memory and call SetFile (this stores bytes and fills Size/CreationDate/CheckSum)
+    const u8 = data instanceof Uint8Array ? data : new Uint8Array(data);
+    const len = u8.byteLength;
+
+    const contentPtr = this.memoryManager.malloc(len);
+    try {
+      this.pdfiumModule.pdfium.HEAPU8.set(u8, contentPtr);
+      const ok = this.pdfiumModule.FPDFAttachment_SetFile(
+        attachmentPtr,
+        ctx.docPtr,
+        contentPtr,
+        len,
+      );
+      if (!ok) {
+        this.logger.perf(LOG_SOURCE, LOG_CATEGORY, `AddAttachment`, 'End', doc.id);
+        return PdfTaskHelper.reject({
+          code: PdfErrorCode.Unknown,
+          message: 'failed to write attachment bytes',
+        });
+      }
+    } finally {
+      this.memoryManager.free(contentPtr);
+    }
+
+    this.logger.perf(LOG_SOURCE, LOG_CATEGORY, `AddAttachment`, 'End', doc.id);
+    return PdfTaskHelper.resolve<boolean>(true);
+  }
+
+  /**
+   * {@inheritDoc @embedpdf/models!PdfEngine.removeAttachment}
+   *
+   * @public
+   */
+  removeAttachment(doc: PdfDocumentObject, attachment: PdfAttachmentObject): PdfTask<boolean> {
+    this.logger.debug(LOG_SOURCE, LOG_CATEGORY, 'deleteAttachment', doc, attachment);
+    this.logger.perf(LOG_SOURCE, LOG_CATEGORY, `DeleteAttachment`, 'Begin', doc.id);
+
+    const ctx = this.cache.getContext(doc.id);
+    if (!ctx) {
+      this.logger.perf(LOG_SOURCE, LOG_CATEGORY, `DeleteAttachment`, 'End', doc.id);
+      return PdfTaskHelper.reject({
+        code: PdfErrorCode.DocNotOpen,
+        message: 'document does not open',
+      });
+    }
+
+    const count = this.pdfiumModule.FPDFDoc_GetAttachmentCount(ctx.docPtr);
+    if (attachment.index < 0 || attachment.index >= count) {
+      this.logger.perf(LOG_SOURCE, LOG_CATEGORY, `DeleteAttachment`, 'End', doc.id);
+      return PdfTaskHelper.reject({
+        code: PdfErrorCode.Unknown,
+        message: `attachment index ${attachment.index} out of range`,
+      });
+    }
+
+    const ok = this.pdfiumModule.FPDFDoc_DeleteAttachment(ctx.docPtr, attachment.index);
+    this.logger.perf(LOG_SOURCE, LOG_CATEGORY, `DeleteAttachment`, 'End', doc.id);
+
+    if (!ok) {
+      return PdfTaskHelper.reject({
+        code: PdfErrorCode.Unknown,
+        message: 'failed to delete attachment',
+      });
+    }
+    return PdfTaskHelper.resolve<boolean>(true);
+  }
+
+  /**
    * {@inheritDoc @embedpdf/models!PdfEngine.readAttachmentContent}
    *
    * @public
@@ -2405,9 +2657,6 @@ export class PdfiumEngine<T = Blob> implements PdfEngine<T> {
     annotationPtr: number,
     annotation: PdfTextAnnoObject,
   ) {
-    if (!this.setPageAnnoRect(page, pagePtr, annotationPtr, annotation.rect)) {
-      return false;
-    }
     if (!this.setAnnotString(annotationPtr, 'Contents', annotation.contents ?? '')) {
       return false;
     }
@@ -2481,9 +2730,6 @@ export class PdfiumEngine<T = Blob> implements PdfEngine<T> {
       return false;
     }
     if (!this.setAnnotString(annotationPtr, 'Contents', annotation.contents ?? '')) {
-      return false;
-    }
-    if (!this.setPageAnnoRect(page, pagePtr, annotationPtr, annotation.rect)) {
       return false;
     }
     if (!this.setAnnotString(annotationPtr, 'T', annotation.author || '')) {
@@ -2563,9 +2809,6 @@ export class PdfiumEngine<T = Blob> implements PdfEngine<T> {
     ) {
       return false;
     }
-    if (!this.setPageAnnoRect(page, pagePtr, annotationPtr, annotation.rect)) {
-      return false;
-    }
     if (!this.setInkList(page, annotationPtr, annotation.inkList)) {
       return false;
     }
@@ -2614,9 +2857,6 @@ export class PdfiumEngine<T = Blob> implements PdfEngine<T> {
       return false;
     }
     if (annotation.modified && !this.setAnnotationDate(annotationPtr, 'M', annotation.modified)) {
-      return false;
-    }
-    if (!this.setPageAnnoRect(page, pagePtr, annotationPtr, annotation.rect)) {
       return false;
     }
     if (
@@ -2711,9 +2951,6 @@ export class PdfiumEngine<T = Blob> implements PdfEngine<T> {
     if (annotation.flags && !this.setAnnotationFlags(annotationPtr, annotation.flags)) {
       return false;
     }
-    if (!this.setPageAnnoRect(page, pagePtr, annotationPtr, annotation.rect)) {
-      return false;
-    }
     if (
       annotation.type === PdfAnnotationSubtype.POLYLINE &&
       !this.setLineEndings(
@@ -2798,9 +3035,6 @@ export class PdfiumEngine<T = Blob> implements PdfEngine<T> {
     if (annotation.modified && !this.setAnnotationDate(annotationPtr, 'M', annotation.modified)) {
       return false;
     }
-    if (!this.setPageAnnoRect(page, pagePtr, annotationPtr, annotation.rect)) {
-      return false;
-    }
     if (!this.setAnnotString(annotationPtr, 'Contents', annotation.contents ?? '')) {
       return false;
     }
@@ -2872,13 +3106,13 @@ export class PdfiumEngine<T = Blob> implements PdfEngine<T> {
     ) {
       return false;
     }
+    if (annotation.custom && !this.setAnnotCustom(annotationPtr, annotation.custom)) {
+      return false;
+    }
     if (annotation.flags && !this.setAnnotationFlags(annotationPtr, annotation.flags)) {
       return false;
     }
     if (annotation.modified && !this.setAnnotationDate(annotationPtr, 'M', annotation.modified)) {
-      return false;
-    }
-    if (!this.setPageAnnoRect(page, pagePtr, annotationPtr, annotation.rect)) {
       return false;
     }
     if (!this.syncQuadPointsAnno(page, annotationPtr, annotation.segmentRects)) {
@@ -2938,6 +3172,12 @@ export class PdfiumEngine<T = Blob> implements PdfEngine<T> {
     if (annotation.modified && !this.setAnnotationDate(annotationPtr, 'M', annotation.modified)) {
       return false;
     }
+    if (annotation.icon && !this.setAnnotationIcon(annotationPtr, annotation.icon)) {
+      return false;
+    }
+    if (annotation.subject && !this.setAnnotString(annotationPtr, 'Subj', annotation.subject)) {
+      return false;
+    }
     if (!this.setAnnotString(annotationPtr, 'Contents', annotation.contents ?? '')) {
       return false;
     }
@@ -2946,14 +3186,12 @@ export class PdfiumEngine<T = Blob> implements PdfEngine<T> {
         this.pdfiumModule.FPDFAnnot_RemoveObject(annotationPtr, i);
       }
 
-      return this.addImageObject(
-        docPtr,
-        page,
-        pagePtr,
-        annotationPtr,
-        annotation.rect.origin,
-        imageData,
-      );
+      if (!this.addImageObject(docPtr, page, pagePtr, annotationPtr, annotation.rect, imageData)) {
+        return false;
+      }
+    }
+    if (!this.pdfiumModule.EPDFAnnot_UpdateAppearanceToRect(annotationPtr, PdfStampFit.Cover)) {
+      return false;
     }
 
     return true;
@@ -2976,7 +3214,7 @@ export class PdfiumEngine<T = Blob> implements PdfEngine<T> {
     page: PdfPageObject,
     pagePtr: number,
     annotationPtr: number,
-    position: Position,
+    rect: Rect,
     imageData: ImageData,
   ) {
     const bytesPerPixel = 4;
@@ -3043,8 +3281,8 @@ export class PdfiumEngine<T = Blob> implements PdfEngine<T> {
     this.memoryManager.free(matrixPtr);
 
     const pagePos = this.convertDevicePointToPagePoint(page, {
-      x: position.x,
-      y: position.y + imageData.height, // shift down by the image height
+      x: rect.origin.x,
+      y: rect.origin.y + imageData.height, // shift down by the image height
     });
     this.pdfiumModule.FPDFPageObj_Transform(imageObjectPtr, 1, 0, 0, 1, pagePos.x, pagePos.y);
 
@@ -3083,6 +3321,37 @@ export class PdfiumEngine<T = Blob> implements PdfEngine<T> {
     this.pdfiumModule.PDFiumExt_CloseFileWriter(writerPtr);
 
     return buffer;
+  }
+
+  /**
+   * Read Catalog /Lang via EPDFCatalog_GetLanguage (UTF-16LE → JS string).
+   * Returns:
+   *   null  -> /Lang not present (getter returned 0) OR doc not open,
+   *   ''    -> /Lang exists but is explicitly empty,
+   *   'en', 'en-US', ... -> normal tag.
+   *
+   * Note: EPDFCatalog_GetLanguage lengths are BYTES (incl. trailing NUL).
+   *
+   * @private
+   */
+  private readCatalogLanguage(docPtr: number): string | null {
+    // Probe required length in BYTES (includes UTF-16LE trailing NUL).
+    const byteLen = this.pdfiumModule.EPDFCatalog_GetLanguage(docPtr, 0, 0) >>> 0;
+
+    // 0 => /Lang missing (or invalid doc/root) → expose as null
+    if (byteLen === 0) return null;
+
+    // 2 => empty UTF-16LE string (just the NUL) → explicitly empty
+    if (byteLen === 2) return '';
+
+    // Read exact buffer to avoid extra allocs.
+    return readString(
+      this.pdfiumModule.pdfium,
+      (buffer, bufferLength) =>
+        this.pdfiumModule.EPDFCatalog_GetLanguage(docPtr, buffer, bufferLength),
+      this.pdfiumModule.pdfium.UTF16ToString,
+      byteLen,
+    );
   }
 
   /**
@@ -4394,6 +4663,38 @@ export class PdfiumEngine<T = Blob> implements PdfEngine<T> {
   private setAnnotationDate(annotationPtr: number, key: 'M' | 'CreationDate', date: Date): boolean {
     const raw = dateToPdfDate(date);
     return this.setAnnotString(annotationPtr, key, raw);
+  }
+
+  /**
+   * Get the date of the attachment
+   *
+   * @param attachmentPtr - pointer to an `FPDF_ATTACHMENT`
+   * @param key - 'ModDate' for modified date, 'CreationDate' for creation date
+   * @returns `Date` or `undefined` when PDFium can't read the date
+   */
+  private getAttachmentDate(
+    attachmentPtr: number,
+    key: 'ModDate' | 'CreationDate',
+  ): Date | undefined {
+    const raw = this.getAttachmentString(attachmentPtr, key);
+    return raw ? pdfDateToDate(raw) : undefined;
+  }
+
+  /**
+   * Set the date of the attachment
+   *
+   * @param attachmentPtr - pointer to an `FPDF_ATTACHMENT`
+   * @param key - 'ModDate' for modified date, 'CreationDate' for creation date
+   * @param date - `Date` to set
+   * @returns `true` on success
+   */
+  private setAttachmentDate(
+    attachmentPtr: number,
+    key: 'ModDate' | 'CreationDate',
+    date: Date,
+  ): boolean {
+    const raw = dateToPdfDate(date);
+    return this.setAttachmentString(attachmentPtr, key, raw);
   }
 
   /**
@@ -6062,6 +6363,50 @@ export class PdfiumEngine<T = Blob> implements PdfEngine<T> {
   }
 
   /**
+   * Get a string value (`/T`, `/M`, `/State`, …) from an attachment.
+   *
+   * @returns decoded UTF-8 string or `undefined` when the key is absent
+   *
+   * @private
+   */
+  private getAttachmentString(attachmentPtr: number, key: string): string | undefined {
+    const len = this.pdfiumModule.FPDFAttachment_GetStringValue(attachmentPtr, key, 0, 0);
+    if (len === 0) return;
+
+    const bytes = (len + 1) * 2;
+    const ptr = this.memoryManager.malloc(bytes);
+
+    this.pdfiumModule.FPDFAttachment_GetStringValue(attachmentPtr, key, ptr, bytes);
+    const value = this.pdfiumModule.pdfium.UTF16ToString(ptr);
+    this.memoryManager.free(ptr);
+
+    return value || undefined;
+  }
+
+  /**
+   * Get a number value (`/Size`) from an attachment.
+   *
+   * @returns number or `null` when the key is absent
+   *
+   * @private
+   */
+  private getAttachmentNumber(attachmentPtr: number, key: string): number | undefined {
+    const outPtr = this.memoryManager.malloc(4); // int32
+    try {
+      const ok = this.pdfiumModule.EPDFAttachment_GetIntegerValue(
+        attachmentPtr,
+        key, // FPDF_BYTESTRING → ASCII JS string is fine in your glue
+        outPtr,
+      );
+      if (!ok) return undefined;
+      // Treat as unsigned to avoid negative values if >2GB (rare on wasm, but harmless)
+      return this.pdfiumModule.pdfium.getValue(outPtr, 'i32') >>> 0;
+    } finally {
+      this.memoryManager.free(outPtr);
+    }
+  }
+
+  /**
    * Get custom data of the annotation
    * @param annotationPtr - pointer to pdf annotation
    * @returns custom data of the annotation
@@ -6170,12 +6515,9 @@ export class PdfiumEngine<T = Blob> implements PdfEngine<T> {
    * @private
    */
   private getAnnotationByName(pagePtr: number, name: string): number | undefined {
-    const bytes = 2 * (name.length + 1);
-    const ptr = this.memoryManager.malloc(bytes);
-    this.pdfiumModule.pdfium.stringToUTF16(name, ptr, bytes);
-    const ok = this.pdfiumModule.EPDFPage_GetAnnotByName(pagePtr, ptr);
-    this.memoryManager.free(ptr);
-    return ok;
+    return this.withWString(name, (wNamePtr) => {
+      return this.pdfiumModule.EPDFPage_GetAnnotByName(pagePtr, wNamePtr);
+    });
   }
 
   /**
@@ -6187,12 +6529,9 @@ export class PdfiumEngine<T = Blob> implements PdfEngine<T> {
    * @private
    */
   private removeAnnotationByName(pagePtr: number, name: string): boolean {
-    const bytes = 2 * (name.length + 1);
-    const ptr = this.memoryManager.malloc(bytes);
-    this.pdfiumModule.pdfium.stringToUTF16(name, ptr, bytes);
-    const ok = this.pdfiumModule.EPDFPage_RemoveAnnotByName(pagePtr, ptr);
-    this.memoryManager.free(ptr);
-    return ok;
+    return this.withWString(name, (wNamePtr) => {
+      return this.pdfiumModule.EPDFPage_RemoveAnnotByName(pagePtr, wNamePtr);
+    });
   }
 
   /**
@@ -6203,12 +6542,23 @@ export class PdfiumEngine<T = Blob> implements PdfEngine<T> {
    * @private
    */
   private setAnnotString(annotationPtr: number, key: string, value: string): boolean {
-    const bytes = 2 * (value.length + 1);
-    const ptr = this.memoryManager.malloc(bytes);
-    this.pdfiumModule.pdfium.stringToUTF16(value, ptr, bytes);
-    const ok = this.pdfiumModule.FPDFAnnot_SetStringValue(annotationPtr, key, ptr);
-    this.memoryManager.free(ptr);
-    return ok;
+    return this.withWString(value, (wValPtr) => {
+      return this.pdfiumModule.FPDFAnnot_SetStringValue(annotationPtr, key, wValPtr);
+    });
+  }
+
+  /**
+   * Set a string value (`/T`, `/M`, `/State`, …) to an attachment.
+   *
+   * @returns `true` if the operation was successful
+   *
+   * @private
+   */
+  private setAttachmentString(attachmentPtr: number, key: string, value: string): boolean {
+    return this.withWString(value, (wValPtr) => {
+      // FPDFAttachment_SetStringValue writes into /Params dictionary
+      return this.pdfiumModule.FPDFAttachment_SetStringValue(attachmentPtr, key, wValPtr);
+    });
   }
 
   /**
@@ -6480,7 +6830,10 @@ export class PdfiumEngine<T = Blob> implements PdfEngine<T> {
 
     // 2) device size (rotation-aware) → integer pixels
     const finalScale = Math.max(0.01, scaleFactor * dpr);
-    const devRect = toIntRect(transformRect(page.size, annotation.rect, rotation, finalScale));
+
+    const rect = toIntRect(annotation.rect);
+    const devRect = toIntRect(transformRect(page.size, rect, rotation, finalScale));
+
     const wDev = Math.max(1, devRect.size.width);
     const hDev = Math.max(1, devRect.size.height);
     const stride = wDev * 4;
@@ -6499,7 +6852,7 @@ export class PdfiumEngine<T = Blob> implements PdfEngine<T> {
 
     // 4) user matrix (no Y-flip; includes -origin translate)
     const M = buildUserToDeviceMatrix(
-      annotation.rect, // {origin:{L,B}, size:{W,H}}
+      rect, // {origin:{L,B}, size:{W,H}}
       rotation,
       wDev,
       hDev,
@@ -6808,6 +7161,110 @@ export class PdfiumEngine<T = Blob> implements PdfEngine<T> {
     }
   }
 
+  private createLocalDestPtr(docPtr: number, dest: PdfDestinationObject): number {
+    // Load page for local destinations.
+    const pagePtr = this.pdfiumModule.FPDF_LoadPage(docPtr, dest.pageIndex);
+    if (!pagePtr) return 0;
+
+    try {
+      if (dest.zoom.mode === PdfZoomMode.XYZ) {
+        const { x, y, zoom } = dest.zoom.params;
+        // We treat provided x/y/zoom as “specified”.
+        return this.pdfiumModule.EPDFDest_CreateXYZ(
+          pagePtr,
+          /*has_left*/ true,
+          x,
+          /*has_top*/ true,
+          y,
+          /*has_zoom*/ true,
+          zoom,
+        );
+      }
+
+      // Map non-XYZ “view modes” to PDFDEST_VIEW_* and params.
+      let viewEnum: PdfZoomMode;
+      let params: number[] = [];
+
+      switch (dest.zoom.mode) {
+        case PdfZoomMode.FitPage:
+          viewEnum = PdfZoomMode.FitPage; // no params
+          break;
+        case PdfZoomMode.FitHorizontal:
+          // FitH needs top; use view[0] if provided, else 0
+          viewEnum = PdfZoomMode.FitHorizontal;
+          params = [dest.view?.[0] ?? 0];
+          break;
+        case PdfZoomMode.FitVertical:
+          // FitV needs left; use view[0] if provided, else 0
+          viewEnum = PdfZoomMode.FitVertical;
+          params = [dest.view?.[0] ?? 0];
+          break;
+        case PdfZoomMode.FitRectangle:
+          // FitR needs left, bottom, right, top (pad with zeros).
+          {
+            const v = dest.view ?? [];
+            params = [v[0] ?? 0, v[1] ?? 0, v[2] ?? 0, v[3] ?? 0];
+            viewEnum = PdfZoomMode.FitRectangle;
+          }
+          break;
+        case PdfZoomMode.Unknown:
+        default:
+          // Unknown cannot be encoded as a valid explicit destination.
+          return 0;
+      }
+
+      return this.withFloatArray(params, (ptr, count) =>
+        this.pdfiumModule.EPDFDest_CreateView(pagePtr, viewEnum, ptr, count),
+      );
+    } finally {
+      this.pdfiumModule.FPDF_ClosePage(pagePtr);
+    }
+  }
+
+  private applyBookmarkTarget(docPtr: number, bmPtr: number, target: PdfLinkTarget): boolean {
+    if (target.type === 'destination') {
+      const destPtr = this.createLocalDestPtr(docPtr, target.destination);
+      if (!destPtr) return false;
+      const ok = this.pdfiumModule.EPDFBookmark_SetDest(docPtr, bmPtr, destPtr);
+      return !!ok;
+    }
+
+    // target.type === 'action'
+    const action = target.action;
+    switch (action.type) {
+      case PdfActionType.Goto: {
+        const destPtr = this.createLocalDestPtr(docPtr, action.destination);
+        if (!destPtr) return false;
+        const actPtr = this.pdfiumModule.EPDFAction_CreateGoTo(docPtr, destPtr);
+        if (!actPtr) return false;
+        return !!this.pdfiumModule.EPDFBookmark_SetAction(docPtr, bmPtr, actPtr);
+      }
+
+      case PdfActionType.URI: {
+        const actPtr = this.pdfiumModule.EPDFAction_CreateURI(docPtr, action.uri);
+        if (!actPtr) return false;
+        return !!this.pdfiumModule.EPDFBookmark_SetAction(docPtr, bmPtr, actPtr);
+      }
+
+      case PdfActionType.LaunchAppOrOpenFile: {
+        const actPtr = this.withWString(action.path, (wptr) =>
+          this.pdfiumModule.EPDFAction_CreateLaunch(docPtr, wptr),
+        );
+        if (!actPtr) return false;
+        return !!this.pdfiumModule.EPDFBookmark_SetAction(docPtr, bmPtr, actPtr);
+      }
+
+      case PdfActionType.RemoteGoto:
+        // We need a file path to build a GoToR action. Your Action shape
+        // doesn’t carry a path, so we’ll reject for now.
+        return false;
+
+      case PdfActionType.Unsupported:
+      default:
+        return false;
+    }
+  }
+
   /**
    * Read pdf action from pdf document
    * @param docPtr - pointer to pdf document object
@@ -7016,18 +7473,21 @@ export class PdfiumEngine<T = Blob> implements PdfEngine<T> {
       },
       this.pdfiumModule.pdfium.UTF16ToString,
     );
-    const creationDate = readString(
+    const description = readString(
       this.pdfiumModule.pdfium,
       (buffer, bufferLength) => {
-        return this.pdfiumModule.FPDFAttachment_GetStringValue(
-          attachmentPtr,
-          'CreationDate',
-          buffer,
-          bufferLength,
-        );
+        return this.pdfiumModule.EPDFAttachment_GetDescription(attachmentPtr, buffer, bufferLength);
       },
       this.pdfiumModule.pdfium.UTF16ToString,
     );
+    const mimeType = readString(
+      this.pdfiumModule.pdfium,
+      (buffer, bufferLength) => {
+        return this.pdfiumModule.FPDFAttachment_GetSubtype(attachmentPtr, buffer, bufferLength);
+      },
+      this.pdfiumModule.pdfium.UTF16ToString,
+    );
+    const creationDate = this.getAttachmentDate(attachmentPtr, 'CreationDate');
     const checksum = readString(
       this.pdfiumModule.pdfium,
       (buffer, bufferLength) => {
@@ -7040,10 +7500,14 @@ export class PdfiumEngine<T = Blob> implements PdfEngine<T> {
       },
       this.pdfiumModule.pdfium.UTF16ToString,
     );
+    const size = this.getAttachmentNumber(attachmentPtr, 'Size');
 
     return {
       index,
       name,
+      description,
+      mimeType,
+      size,
       creationDate,
       checksum,
     };
@@ -7148,6 +7612,32 @@ export class PdfiumEngine<T = Blob> implements PdfEngine<T> {
     this.memoryManager.free(bufferPtr);
 
     return ap;
+  }
+
+  /**
+   * Set the appearance stream of annotation
+   * @param annotationPtr - pointer to pdf annotation
+   * @param mode - appearance mode
+   * @param apContent - appearance stream content (null to remove)
+   * @returns whether the appearance stream was set successfully
+   *
+   * @private
+   */
+  private setPageAnnoAppearanceStream(
+    annotationPtr: number,
+    mode: AppearanceMode = AppearanceMode.Normal,
+    apContent: string,
+  ): boolean {
+    // UTF-16LE buffer (+2 bytes for NUL)
+    const bytes = 2 * (apContent.length + 1);
+    const ptr = this.memoryManager.malloc(bytes);
+    try {
+      this.pdfiumModule.pdfium.stringToUTF16(apContent, ptr, bytes);
+      const ok = this.pdfiumModule.FPDFAnnot_SetAP(annotationPtr, mode, ptr);
+      return !!ok;
+    } finally {
+      this.memoryManager.free(ptr);
+    }
   }
 
   /**

@@ -8,7 +8,6 @@ import {
   ListItemIcon,
   ListItemText,
   Divider,
-  Icon,
   SvgIconTypeMap,
 } from '@mui/material';
 import AddCircleOutlineOutlinedIcon from '@mui/icons-material/AddCircleOutlineOutlined';
@@ -17,11 +16,14 @@ import KeyboardArrowDownIcon from '@mui/icons-material/KeyboardArrowDown';
 import WidthNormalIcon from '@mui/icons-material/WidthNormal';
 import WidthFullIcon from '@mui/icons-material/WidthFull';
 import CropFreeOutlinedIcon from '@mui/icons-material/CropFreeOutlined';
-import { useState, MouseEvent } from 'react';
+import ZoomInOutlinedIcon from '@mui/icons-material/ZoomInOutlined';
+import ZoomOutOutlinedIcon from '@mui/icons-material/ZoomOutOutlined';
+import { useState, MouseEvent, Fragment } from 'react';
 import { ZoomLevel, ZoomMode } from '@embedpdf/plugin-zoom';
 import { OverridableComponent } from '@mui/material/OverridableComponent';
 import { useInteractionManager } from '@embedpdf/plugin-interaction-manager/react';
 import { ToggleIconButton } from '../toggle-icon-button';
+import { useIsMobile } from '../../hooks/use-is-mobile';
 
 interface ZoomModeItem {
   value: ZoomLevel;
@@ -56,6 +58,7 @@ export const ZoomControls = () => {
   const { state: interactionManagerState } = useInteractionManager();
   const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null);
   const open = Boolean(anchorEl);
+  const isMobile = useIsMobile();
 
   const handleClick = (event: MouseEvent<HTMLElement>) => {
     setAnchorEl(event.currentTarget);
@@ -75,27 +78,63 @@ export const ZoomControls = () => {
     handleClose();
   };
 
+  const handleZoomIn = () => {
+    provides?.zoomIn();
+    handleClose();
+  };
+
+  const handleZoomOut = () => {
+    provides?.zoomOut();
+    handleClose();
+  };
+
   const zoomPercentage = Math.round(state.currentZoomLevel * 100);
 
   return (
-    <Box
-      sx={{
-        backgroundColor: 'rgba(255, 255, 255, 0.2)',
-        borderRadius: 1,
-        pl: 1,
-        pr: 0.3,
-        py: 0.3,
-        display: 'flex',
-        alignItems: 'center',
-        gap: 0.5,
-      }}
-    >
-      <Typography variant="body2" sx={{ color: 'white', fontWeight: 500 }}>
-        {zoomPercentage}%
-      </Typography>
-      <ToggleIconButton isOpen={open} sx={{ color: 'white', p: 0.4 }} onClick={handleClick}>
-        <KeyboardArrowDownIcon fontSize="small" />
-      </ToggleIconButton>
+    <Fragment>
+      {isMobile ? (
+        <ToggleIconButton isOpen={open} sx={{ color: 'white', p: 0.4 }} onClick={handleClick}>
+          <AddCircleOutlineOutlinedIcon fontSize="small" />
+        </ToggleIconButton>
+      ) : (
+        <Box
+          sx={{
+            backgroundColor: 'rgba(255, 255, 255, 0.2)',
+            borderRadius: 1,
+            pl: 1,
+            pr: 0.3,
+            py: 0.3,
+            display: 'flex',
+            alignItems: 'center',
+            gap: 0.5,
+          }}
+        >
+          <Typography variant="body2" sx={{ color: 'white', fontWeight: 500 }}>
+            {zoomPercentage}%
+          </Typography>
+          <ToggleIconButton isOpen={open} sx={{ color: 'white', p: 0.4 }} onClick={handleClick}>
+            <KeyboardArrowDownIcon fontSize="small" />
+          </ToggleIconButton>
+          <IconButton
+            onClick={handleZoomOut}
+            edge="start"
+            size="small"
+            sx={{ color: 'white', p: 0.4 }}
+            aria-label="zoom out"
+          >
+            <RemoveCircleOutlineOutlinedIcon fontSize="small" />
+          </IconButton>
+          <IconButton
+            onClick={handleZoomIn}
+            edge="start"
+            size="small"
+            sx={{ color: 'white', p: 0.4 }}
+            aria-label="zoom in"
+          >
+            <AddCircleOutlineOutlinedIcon fontSize="small" />
+          </IconButton>
+        </Box>
+      )}
       <Menu
         anchorEl={anchorEl}
         open={open}
@@ -110,7 +149,19 @@ export const ZoomControls = () => {
           horizontal: 'left',
         }}
       >
-        {/* Zoom Presets */}
+        <MenuItem onClick={handleZoomIn}>
+          <ListItemIcon>
+            <ZoomInOutlinedIcon fontSize="small" />
+          </ListItemIcon>
+          <ListItemText>Zoom In</ListItemText>
+        </MenuItem>
+        <MenuItem onClick={handleZoomOut}>
+          <ListItemIcon>
+            <ZoomOutOutlinedIcon fontSize="small" />
+          </ListItemIcon>
+          <ListItemText>Zoom Out</ListItemText>
+        </MenuItem>
+        <Divider />
         {ZOOM_PRESETS.map(({ value, label }) => (
           <MenuItem
             key={value}
@@ -121,7 +172,6 @@ export const ZoomControls = () => {
           </MenuItem>
         ))}
         <Divider />
-        {/* Zoom Modes */}
         {ZOOM_MODES.map(({ value, label, icon: Icon }) => (
           <MenuItem
             key={value}
@@ -145,25 +195,6 @@ export const ZoomControls = () => {
           <ListItemText>Marquee Zoom</ListItemText>
         </MenuItem>
       </Menu>
-
-      <IconButton
-        onClick={() => provides?.zoomOut()}
-        edge="start"
-        size="small"
-        sx={{ color: 'white', p: 0.4 }}
-        aria-label="zoom out"
-      >
-        <RemoveCircleOutlineOutlinedIcon fontSize="small" />
-      </IconButton>
-      <IconButton
-        onClick={() => provides?.zoomIn()}
-        edge="start"
-        size="small"
-        sx={{ color: 'white', p: 0.4 }}
-        aria-label="zoom in"
-      >
-        <AddCircleOutlineOutlinedIcon fontSize="small" />
-      </IconButton>
-    </Box>
+    </Fragment>
   );
 };

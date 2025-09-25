@@ -1,5 +1,25 @@
 # @embedpdf/models
 
+## 1.3.1
+
+### Patch Changes
+
+- [#175](https://github.com/embedpdf/embed-pdf-viewer/pull/175) by [@bobsingor](https://github.com/bobsingor) – add addAttachment and removeAttachment functions to pdfium and the engine
+
+## 1.3.0
+
+### Patch Changes
+
+- [#170](https://github.com/embedpdf/embed-pdf-viewer/pull/170) by [@bobsingor](https://github.com/bobsingor) – Add ability to setBookmarks and deleteBookmarks
+
+## 1.2.1
+
+## 1.2.0
+
+### Patch Changes
+
+- [#153](https://github.com/embedpdf/embed-pdf-viewer/pull/153) by [@bobsingor](https://github.com/bobsingor) – Add new function to PDFium EPDFAnnot_UpdateAppearanceToRect to be able to update the appearance stream on resize of the stamp image annotation
+
 ## 1.1.1
 
 ## 1.1.0

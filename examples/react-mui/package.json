@@ -3,6 +3,7 @@
   "private": true,
   "version": "0.0.0",
   "type": "module",
+  "license": "MIT",
   "scripts": {
     "dev": "vite",
     "build": "vite build",
@@ -26,6 +27,8 @@
     "@embedpdf/plugin-export": "workspace:*",
     "@embedpdf/plugin-thumbnail": "workspace:*",
     "@embedpdf/plugin-selection": "workspace:*",
+    "@embedpdf/plugin-annotation": "workspace:*",
+    "@embedpdf/utils": "workspace:*",
     "@embedpdf/models": "workspace:*",
     "@embedpdf/pdfium": "workspace:*",
     "@embedpdf/engines": "workspace:*",

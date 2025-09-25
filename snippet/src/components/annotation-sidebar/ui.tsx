@@ -78,7 +78,7 @@ const GenericSelect = <T,>({
       {/* Trigger Button */}
       <button
         type="button"
-        class={`flex w-full items-center justify-between gap-2 rounded border border-gray-300 bg-white dark:border-gray-600 dark:bg-gray-800 ${triggerClass}`}
+        class={`flex w-full items-center justify-between gap-2 rounded border border-gray-300 bg-white ${triggerClass}`}
         onClick={() => setOpen((o) => !o)}
       >
         {renderValue(value)}
@@ -98,7 +98,7 @@ const GenericSelect = <T,>({
 
       {/* Dropdown Panel */}
       {open && (
-        <div class="absolute z-10 mt-1 max-h-60 w-full overflow-y-auto rounded border bg-white p-1 shadow-lg dark:border-gray-600 dark:bg-gray-800">
+        <div class="absolute z-10 mt-1 max-h-60 w-full overflow-y-auto rounded border bg-white p-1 shadow-lg">
           {options.map((option) => {
             const isSelected = getOptionKey(option) === getOptionKey(value);
             return (
@@ -106,7 +106,7 @@ const GenericSelect = <T,>({
                 // @ts-ignore
                 ref={isSelected ? selectedItemRef : null}
                 key={getOptionKey(option)}
-                class={`block w-full rounded text-left hover:bg-gray-100 dark:hover:bg-gray-700 ${
+                class={`block w-full rounded text-left hover:bg-gray-100 ${
                   isSelected ? 'bg-gray-100 dark:bg-gray-700' : ''
                 }`}
                 onClick={() => {
@@ -145,7 +145,7 @@ export const Slider = ({
 }) => (
   <input
     type="range"
-    class="range-sm mb-2 h-1 w-full cursor-pointer appearance-none rounded-lg bg-gray-200 dark:bg-gray-700"
+    class="range-sm mb-2 h-1 w-full cursor-pointer appearance-none rounded-lg bg-gray-200"
     value={value}
     min={min}
     max={max}
@@ -286,7 +286,7 @@ const LineEndingIcon = ({
   const groupTransform = position === 'start' ? 'rotate(180 40 10)' : '';
 
   return (
-    <svg width="80" height="20" viewBox="0 0 80 20" class="text-black dark:text-white">
+    <svg width="80" height="20" viewBox="0 0 80 20" class="text-black">
       <g transform={groupTransform}>
         <line x1="4" y1="10" x2={lineEndX} y2="10" stroke="currentColor" stroke-width="1.5" />
         {marker && (
@@ -363,7 +363,7 @@ export const FontSizeInputSelect = ({
       <input
         type="number"
         min="1"
-        class="w-full rounded border border-gray-300 bg-white px-2 py-1 pr-7 text-sm dark:border-gray-600 dark:bg-gray-800 dark:text-white"
+        class="w-full rounded border border-gray-300 bg-white px-2 py-1 pr-7 text-sm"
         value={value}
         onInput={handleInput}
         onClick={() => setOpen(true)} // Open on click as well
@@ -385,7 +385,7 @@ export const FontSizeInputSelect = ({
       </button>
 
       {open && (
-        <div class="absolute z-10 mt-1 max-h-48 w-full overflow-y-auto rounded border bg-white shadow-lg dark:border-gray-600 dark:bg-gray-800">
+        <div class="absolute z-10 mt-1 max-h-48 w-full overflow-y-auto rounded border bg-white shadow-lg">
           {options.map((sz) => {
             const isSelected = sz === value;
             return (
@@ -393,8 +393,8 @@ export const FontSizeInputSelect = ({
                 // @ts-ignore
                 ref={isSelected ? selectedItemRef : null}
                 key={sz}
-                class={`block w-full px-2 py-1 text-left text-sm hover:bg-gray-100 dark:hover:bg-gray-700 ${
-                  isSelected ? 'bg-gray-100 dark:bg-gray-700' : ''
+                class={`block w-full px-2 py-1 text-left text-sm hover:bg-gray-100 ${
+                  isSelected ? 'bg-gray-100' : ''
                 }`}
                 onClick={() => {
                   onChange(sz);

@@ -13,7 +13,8 @@ export const InteractionManagerPluginPackage: PluginPackage<
   InteractionManagerAction
 > = {
   manifest,
-  create: (registry) => new InteractionManagerPlugin(INTERACTION_MANAGER_PLUGIN_ID, registry),
+  create: (registry, config) =>
+    new InteractionManagerPlugin(INTERACTION_MANAGER_PLUGIN_ID, registry, config),
   reducer,
   initialState,
 };

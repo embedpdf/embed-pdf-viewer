@@ -37,6 +37,8 @@ import {
   PdfOpenDocumentBufferOptions,
   PdfAnnotationsProgress,
   PdfPrintOptions,
+  PdfBookmarkObject,
+  PdfAddAttachmentParams,
 } from '@embedpdf/models';
 import { ExecuteRequest, Response, SpecificExecuteRequest } from './runner';
 
@@ -350,6 +352,38 @@ export class WebWorkerEngine implements PdfEngine {
   }
 
   /**
+   * {@inheritDoc @embedpdf/models!PdfEngine.setBookmarks}
+   *
+   * @public
+   */
+  setBookmarks(doc: PdfDocumentObject, payload: PdfBookmarkObject[]) {
+    this.logger.debug(LOG_SOURCE, LOG_CATEGORY, 'setBookmarks', doc, payload);
+    const requestId = this.generateRequestId(doc.id);
+    const task = new WorkerTask<boolean>(this.worker, requestId);
+
+    const request: ExecuteRequest = createRequest(requestId, 'setBookmarks', [doc, payload]);
+    this.proxy(task, request);
+
+    return task;
+  }
+
+  /**
+   * {@inheritDoc @embedpdf/models!PdfEngine.deleteBookmarks}
+   *
+   * @public
+   */
+  deleteBookmarks(doc: PdfDocumentObject) {
+    this.logger.debug(LOG_SOURCE, LOG_CATEGORY, 'deleteBookmarks', doc);
+    const requestId = this.generateRequestId(doc.id);
+    const task = new WorkerTask<boolean>(this.worker, requestId);
+
+    const request: ExecuteRequest = createRequest(requestId, 'deleteBookmarks', [doc]);
+    this.proxy(task, request);
+
+    return task;
+  }
+
+  /**
    * {@inheritDoc @embedpdf/models!PdfEngine.getSignatures}
    *
    * @public
@@ -654,6 +688,38 @@ export class WebWorkerEngine implements PdfEngine {
     const task = new WorkerTask<PdfAttachmentObject[]>(this.worker, requestId);
 
     const request: ExecuteRequest = createRequest(requestId, 'getAttachments', [doc]);
+    this.proxy(task, request);
+
+    return task;
+  }
+
+  /**
+   * {@inheritDoc @embedpdf/models!PdfEngine.addAttachment}
+   *
+   * @public
+   */
+  addAttachment(doc: PdfDocumentObject, params: PdfAddAttachmentParams) {
+    this.logger.debug(LOG_SOURCE, LOG_CATEGORY, 'addAttachment', doc, params);
+    const requestId = this.generateRequestId(doc.id);
+    const task = new WorkerTask<boolean>(this.worker, requestId);
+
+    const request: ExecuteRequest = createRequest(requestId, 'addAttachment', [doc, params]);
+    this.proxy(task, request);
+
+    return task;
+  }
+
+  /**
+   * {@inheritDoc @embedpdf/models!PdfEngine.removeAttachment}
+   *
+   * @public
+   */
+  removeAttachment(doc: PdfDocumentObject, attachment: PdfAttachmentObject) {
+    this.logger.debug(LOG_SOURCE, LOG_CATEGORY, 'removeAttachment', doc, attachment);
+    const requestId = this.generateRequestId(doc.id);
+    const task = new WorkerTask<boolean>(this.worker, requestId);
+
+    const request: ExecuteRequest = createRequest(requestId, 'removeAttachment', [doc, attachment]);
     this.proxy(task, request);
 
     return task;
