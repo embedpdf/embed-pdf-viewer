@@ -5357,10 +5357,10 @@ export class PdfiumEngine<T = Blob> implements PdfEngine<T> {
     const custom = this.getAnnotCustom(annotationPtr);
     const pageRect = this.readPageAnnoRect(annotationPtr);
     const rect = this.convertPageRectToDeviceRect(page, pageRect);
-    const author = this.getAnnotString(annotationPtr, 'T');
     const modified = this.getAnnotationDate(annotationPtr, 'M');
     const created = this.getAnnotationDate(annotationPtr, 'CreationDate');
     const flags = this.getAnnotationFlags(annotationPtr);
+    const da = this.getAnnotationDefaultAppearance(annotationPtr);
     const field = this.readPdfWidgetAnnoField(formHandle, annotationPtr);
 
     return {
@@ -5369,9 +5369,11 @@ export class PdfiumEngine<T = Blob> implements PdfEngine<T> {
       id: index,
       type: PdfAnnotationSubtype.WIDGET,
       flags,
+      fontFamily: da?.fontFamily ?? PdfStandardFont.Unknown,
+      fontSize: da?.fontSize ?? 12,
+      fontColor: da?.fontColor ?? '#000000',
       rect,
       field,
-      author,
       modified,
       created,
     };

@@ -1341,6 +1341,18 @@ export interface PdfWidgetAnnoObject extends PdfAnnotationObjectBase {
    * Field of pdf widget object
    */
   field: PdfWidgetAnnoField;
+  /**
+   * font family of pdf widget object
+   */
+  fontFamily: PdfStandardFont;
+  /**
+   * font size of pdf widget object
+   */
+  fontSize: number;
+  /**
+   * font color of pdf widget object
+   */
+  fontColor: string;
 }
 
 /**

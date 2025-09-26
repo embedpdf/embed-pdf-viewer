@@ -6,6 +6,14 @@ export interface FieldProps {
    */
   annotation: PdfWidgetAnnoObject;
   /**
+   * scale factor
+   */
+  scale: number;
+  /**
+   * page index
+   */
+  pageIndex: number;
+  /**
    * Field info
    */
   field: PdfWidgetAnnoField;

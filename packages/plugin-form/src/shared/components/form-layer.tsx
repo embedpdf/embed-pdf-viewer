@@ -1,7 +1,7 @@
-import { Fragment, useEffect, useRef, useState } from '@framework';
+import { Fragment, useCallback, useEffect, useRef, useState } from '@framework';
 import type { CSSProperties, HTMLAttributes } from '@framework';
 
-import { ignore, PdfErrorCode, PdfWidgetAnnoObject } from '@embedpdf/models';
+import { FormFieldValue, ignore, PdfErrorCode, PdfWidgetAnnoObject } from '@embedpdf/models';
 
 import { useFormCapability, useFormPlugin } from '../hooks/use-form';
 import { Field } from './field';
@@ -27,17 +27,27 @@ export function FormLayer({ pageIndex, scale, style, ...props }: FormLayerProps)
     task.wait(setAnnoWidgets, ignore);
   }, [formPlugin, pageIndex]);
 
+  const onChangeValues = useCallback(
+    (annotation: PdfWidgetAnnoObject, values: FormFieldValue[]) => {
+      if (!formPlugin) return;
+      const task = formPlugin.setFormFieldValues(pageIndex, annotation, values);
+      task.wait(ignore, ignore);
+    },
+    [formPlugin, pageIndex],
+  );
+
   return (
     <div style={style} {...props}>
-      <h1>Form Layer</h1>
       {annoWidgets.map((annoWidget) => (
         <Field
           key={annoWidget.id}
+          scale={scale || 1}
+          pageIndex={pageIndex}
           annotation={annoWidget}
           field={annoWidget.field}
           isEditable={true}
           values={[]}
-          onChangeValues={() => {}}
+          onChangeValues={(values) => onChangeValues(annoWidget, values)}
         />
       ))}
     </div>

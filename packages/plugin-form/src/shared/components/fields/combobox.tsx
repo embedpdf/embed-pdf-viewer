@@ -2,6 +2,7 @@ import { PdfWidgetAnnoOption, PDF_FORM_FIELD_FLAG } from '@embedpdf/models';
 import { FormEvent, useCallback, useMemo, selectProps, optionProps } from '@framework';
 
 import { FieldProps } from '../types';
+import { selectStyle } from './style';
 
 /**
  *
@@ -51,6 +52,7 @@ export function ComboboxField(props: FieldProps) {
       aria-label={name}
       {...selectProps(isMultipleChoice, selectedTexts)}
       onChange={handleChange}
+      style={selectStyle}
     >
       {options.map((option: PdfWidgetAnnoOption, index) => {
         return (

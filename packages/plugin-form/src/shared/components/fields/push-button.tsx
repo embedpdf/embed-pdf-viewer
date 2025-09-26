@@ -1,5 +1,6 @@
 import { PDF_FORM_FIELD_FLAG } from '@embedpdf/models';
 import { FieldProps } from '../types';
+import { buttonStyle } from './style';
 
 /**
  *
@@ -15,7 +16,7 @@ export function PushButtonField(props: FieldProps) {
   const isDisabled = !isEditable || !!(flag & PDF_FORM_FIELD_FLAG.READONLY);
 
   return (
-    <button disabled={isDisabled} aria-label={name}>
+    <button disabled={isDisabled} aria-label={name} style={buttonStyle}>
       {name}
     </button>
   );

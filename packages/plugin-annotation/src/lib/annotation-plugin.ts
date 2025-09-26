@@ -341,7 +341,11 @@ export class AnnotationPlugin extends BasePlugin<
     return this.engine.getPageAnnotations(doc, page);
   }
 
-  private renderAnnotation({ pageIndex, annotation, options }: RenderAnnotationOptions) {
+  private renderAnnotation({
+    pageIndex,
+    annotation,
+    options,
+  }: RenderAnnotationOptions): Task<Blob, PdfErrorReason> {
     const coreState = this.coreState.core;
 
     if (!coreState.document) {

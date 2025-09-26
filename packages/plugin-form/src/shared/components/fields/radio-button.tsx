@@ -2,6 +2,7 @@ import { PdfWidgetAnnoOption, PDF_FORM_FIELD_FLAG } from '@embedpdf/models';
 import { FormEvent, useCallback, useMemo } from '@framework';
 
 import { FieldProps } from '../types';
+import { buttonStyle } from './style';
 
 /**
  *
@@ -49,6 +50,7 @@ export function RadioButtonField(props: FieldProps) {
       value={defaultValue}
       checked={isChecked}
       onChange={handleChange}
+      style={buttonStyle}
     />
   );
 }

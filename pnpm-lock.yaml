@@ -833,6 +833,9 @@ importers:
       '@embedpdf/core':
         specifier: workspace:*
         version: link:../core
+      '@embedpdf/plugin-annotation':
+        specifier: workspace:*
+        version: link:../plugin-annotation
       '@types/react':
         specifier: ^18.2.0
         version: 18.3.18

@@ -9,7 +9,7 @@ export const manifest: PluginManifest<FormPluginConfig> = {
   version: '1.0.0',
   provides: ['form'],
   requires: ['interaction-manager'],
-  optional: ['history'],
+  optional: ['history', 'annotation'],
   defaultConfig: {
     enabled: true,
   },

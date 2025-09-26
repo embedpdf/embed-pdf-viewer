@@ -2,6 +2,7 @@ import { PDF_FORM_FIELD_FLAG } from '@embedpdf/models';
 import { FormEvent, useCallback, useMemo } from '@framework';
 
 import { FieldProps } from '../types';
+import { checkboxStyle } from './style';
 
 /**
  *
@@ -43,6 +44,7 @@ export function CheckboxField(props: FieldProps) {
       value={field.value}
       checked={isChecked}
       onChange={handleChange}
+      style={checkboxStyle}
     />
   );
 }
