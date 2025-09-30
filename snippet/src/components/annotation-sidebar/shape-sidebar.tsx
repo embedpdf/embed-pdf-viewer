@@ -9,16 +9,14 @@ import { PdfAnnotationBorderStyle } from '@embedpdf/models';
 
 export const ShapeSidebar = ({
   selected,
-  subtype,
-  intent,
-  activeVariant,
+  activeTool,
   colorPresets,
 }: SidebarPropsBase<PdfCircleAnnoObject | PdfSquareAnnoObject>) => {
   const { provides: annotation } = useAnnotationCapability();
   if (!annotation) return null;
 
   const anno = selected?.object;
-  const defaults = annotation.getToolDefaultsBySubtypeAndIntent(subtype, intent);
+  const defaults = activeTool?.defaults;
   const editing = !!anno;
 
   const baseFill = editing ? anno.color : (defaults?.color ?? '#000000');
@@ -66,8 +64,8 @@ export const ShapeSidebar = ({
     if (!annotation) return;
     if (editing) {
       annotation.updateAnnotation(anno.pageIndex, anno.id, patch);
-    } else if (activeVariant) {
-      annotation.setToolDefaults(activeVariant, patch);
+    } else if (activeTool) {
+      annotation.setToolDefaults(activeTool.id, patch);
     }
   }
 

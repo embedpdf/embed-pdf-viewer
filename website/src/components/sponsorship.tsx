@@ -219,7 +219,7 @@ const Sponsorship2: React.FC = () => {
                 >
                   <path d="M12 2C6.477 2 2 6.477 2 12c0 4.42 2.865 8.17 6.839 9.49.5.092.682-.217.682-.482 0-.237-.008-.866-.013-1.7-2.782.604-3.369-1.34-3.369-1.34-.454-1.156-1.11-1.462-1.11-1.462-.908-.62.069-.608.069-.608 1.003.07 1.531 1.03 1.531 1.03.892 1.529 2.341 1.087 2.91.832.092-.647.35-1.088.636-1.338-2.22-.253-4.555-1.11-4.555-4.943 0-1.091.39-1.984 1.029-2.683-.103-.253-.446-1.27.098-2.647 0 0 .84-.269 2.75 1.025A9.578 9.578 0 0112 6.836a9.59 9.59 0 012.504.337c1.909-1.294 2.747-1.025 2.747-1.025.546 1.377.203 2.394.1 2.647.64.699 1.028 1.592 1.028 2.683 0 3.842-2.339 4.687-4.566 4.935.359.309.678.919.678 1.852 0 1.336-.012 2.415-.012 2.743 0 .267.18.578.688.48C19.138 20.167 22 16.418 22 12c0-5.523-4.477-10-10-10z"></path>
                 </svg>
-                <span>1,800+ Stars on GitHub</span>
+                <span>2,000+ Stars on GitHub</span>
               </div>
             </a>
           </div>
@@ -231,7 +231,7 @@ const Sponsorship2: React.FC = () => {
         <div className="mx-auto max-w-5xl px-6">
           <div className="text-center">
             <h2 className="mb-6 text-3xl font-bold text-gray-900 md:text-4xl">
-              What We Built in 7 Months{' '}
+              What We Built in 8 Months{' '}
               <span className="text-gray-500">(With Zero Funding)</span>
             </h2>
 
@@ -239,7 +239,7 @@ const Sponsorship2: React.FC = () => {
               <div className="grid gap-6 text-center md:grid-cols-3">
                 <div>
                   <div className="mb-1 text-3xl font-black text-blue-600">
-                    1,800+
+                    2,000+
                   </div>
                   <div className="text-lg font-semibold">GitHub Stars</div>
                   <div className="text-sm text-gray-500">
@@ -498,17 +498,17 @@ const Sponsorship2: React.FC = () => {
                       Current Progress
                     </div>
                     <div className="text-lg font-bold sm:text-xl">
-                      $2,000 / $30,000 per month
+                      $2,650 / $30,000 per month
                     </div>
                   </div>
                   <div className="h-6 overflow-hidden rounded-full bg-white/20 sm:h-8">
                     <div
                       className="h-full rounded-full bg-gradient-to-r from-green-400 to-emerald-500 transition-all duration-1000 ease-out"
-                      style={{ width: 'max(3%, 6.67%)' }}
+                      style={{ width: 'max(3%, 8.83%)' }}
                     ></div>
                   </div>
                   <div className="mt-2 text-center text-xs text-white/70 sm:text-left sm:text-sm">
-                    6.67% funded
+                    8.83% funded
                   </div>
                 </div>
               </div>
@@ -550,10 +550,10 @@ const Sponsorship2: React.FC = () => {
             Become a Founding Sponsor
           </h2>
           <p className="mx-auto mb-20 max-w-3xl text-center text-xl text-gray-600">
-            The first 10 sponsors that commit for 1 year will be permanently
-            recognized as founding sponsors who made this project possible.
+            The first 10 sponsors that commit to one of the plans below for 1
+            year will be permanently recognized as founding sponsors who made
+            this project possible.
           </p>
-
           <div className="grid gap-8 md:grid-cols-3">
             {/* Bronze */}
             <div className="rounded-2xl border-2 border-gray-200 p-8 transition hover:scale-105 hover:transform hover:border-blue-500">
@@ -891,8 +891,8 @@ const Sponsorship2: React.FC = () => {
                 Why should I trust this will succeed?
               </h3>
               <p className="text-gray-700">
-                Fair question. Look at our track record: 1,800+ GitHub stars and
-                a working Web SDK in just 7 months with zero funding. I&apos;ve
+                Fair question. Look at our track record: 2,000+ GitHub stars and
+                a working Web SDK in just 8 months with zero funding. I&apos;ve
                 been building PDF technology for years and understand the
                 ecosystem deeply. The project has real momentum, active
                 community engagement, and proven development velocity.

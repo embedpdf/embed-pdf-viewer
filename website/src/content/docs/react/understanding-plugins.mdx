@@ -68,7 +68,7 @@ export const ZoomToolbar = () => {
       <span>Current Zoom: {Math.round(zoomState.currentZoomLevel * 100)}%</span>
       <button onClick={zoomProvides.zoomOut}>-</button>
       <button onClick={zoomProvides.zoomIn}>+</button>
-      <button onClick={() => zoomProvides.requestZoom(1.0))}>Reset</button>
+      <button onClick={() => zoomProvides.requestZoom(1.0)}>Reset</button>
     </div>
   );
 };

@@ -2,6 +2,7 @@
   "name": "@embedpdf/example-vue-vuetify",
   "private": true,
   "type": "module",
+  "license": "MIT",
   "version": "0.0.0",
   "scripts": {
     "dev": "vite",
@@ -29,6 +30,7 @@
     "@embedpdf/plugin-spread": "workspace:*",
     "@embedpdf/plugin-print": "workspace:*",
     "@embedpdf/plugin-search": "workspace:*",
+    "@embedpdf/plugin-thumbnail": "workspace:*",
     "@fontsource/roboto": "5.2.6",
     "@mdi/font": "7.4.47",
     "vue": "^3.5.0",

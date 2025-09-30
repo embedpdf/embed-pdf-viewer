@@ -1,5 +1,31 @@
 # @embedpdf/plugin-scroll
 
+## 1.3.6
+
+## 1.3.5
+
+### Patch Changes
+
+- [#187](https://github.com/embedpdf/embed-pdf-viewer/pull/187) by [@bobsingor](https://github.com/bobsingor) – Add isPageChanging event to the scrol plugin
+
+## 1.3.4
+
+## 1.3.3
+
+## 1.3.2
+
+## 1.3.1
+
+## 1.3.0
+
+### Patch Changes
+
+- [#168](https://github.com/embedpdf/embed-pdf-viewer/pull/168) by [@Ludy87](https://github.com/Ludy87) – Add license fields to the package.json with the value MIT
+
+## 1.2.1
+
+## 1.2.0
+
 ## 1.1.1
 
 ## 1.1.0

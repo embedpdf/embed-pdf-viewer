@@ -1,5 +1,37 @@
 # @embedpdf/plugin-thumbnail
 
+## 1.3.6
+
+### Patch Changes
+
+- [#189](https://github.com/embedpdf/embed-pdf-viewer/pull/189) by [@bobsingor](https://github.com/bobsingor) – Fix bug Cannot read properties of null (reading 'totalHeight') on thumbnails
+
+## 1.3.5
+
+### Patch Changes
+
+- [#187](https://github.com/embedpdf/embed-pdf-viewer/pull/187) by [@bobsingor](https://github.com/bobsingor) – Fix bug that prevents from scrolling down in the thumbnail container
+
+- [#187](https://github.com/embedpdf/embed-pdf-viewer/pull/187) by [@bobsingor](https://github.com/bobsingor) – Add Vue framework layer for thumbnail plugin
+
+## 1.3.4
+
+## 1.3.3
+
+## 1.3.2
+
+## 1.3.1
+
+## 1.3.0
+
+### Patch Changes
+
+- [#168](https://github.com/embedpdf/embed-pdf-viewer/pull/168) by [@Ludy87](https://github.com/Ludy87) – Add license fields to the package.json with the value MIT
+
+## 1.2.1
+
+## 1.2.0
+
 ## 1.1.1
 
 ## 1.1.0

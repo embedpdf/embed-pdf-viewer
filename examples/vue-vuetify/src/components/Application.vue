@@ -22,6 +22,7 @@ import { ExportPluginPackage } from '@embedpdf/plugin-export/vue';
 import { SpreadPluginPackage } from '@embedpdf/plugin-spread/vue';
 import { PrintPluginPackage } from '@embedpdf/plugin-print/vue';
 import { SearchPluginPackage, SearchLayer } from '@embedpdf/plugin-search/vue';
+import { ThumbnailPluginPackage } from '@embedpdf/plugin-thumbnail/vue';
 
 import Toolbar from './Toolbar.vue';
 import DrawerProvider from './drawer-system/DrawerProvider.vue';
@@ -106,6 +107,10 @@ const { engine, isLoading: engineLoading, error: engineError } = usePdfiumEngine
         createPluginRegistration(ExportPluginPackage),
         createPluginRegistration(SpreadPluginPackage),
         createPluginRegistration(PrintPluginPackage),
+        createPluginRegistration(ThumbnailPluginPackage, {
+          imagePadding: 10,
+          labelHeight: 25,
+        }),
         createPluginRegistration(SearchPluginPackage, {
           flags: [],
           showAllResults: true,

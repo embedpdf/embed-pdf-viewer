@@ -9,6 +9,7 @@ import {
   ignore,
   PdfAnnotationSubtype,
   PdfBlendMode,
+  PdfSquigglyAnnoObject,
   PerfLogger,
   Rotation,
   uuidV4,
@@ -125,8 +126,11 @@ import {
   AnnotationState,
   getSelectedAnnotation,
   getSidebarAnnotationsWithRepliesGroupedByPage,
-  getToolDefaultsBySubtypeAndIntent,
-  makeVariantKey,
+  isSquigglyTool,
+  isUnderlineTool,
+  isStrikeoutTool,
+  isHighlightTool,
+  getToolDefaultsById,
 } from '@embedpdf/plugin-annotation/preact';
 import { LoadingIndicator } from './ui/loading-indicator';
 import { PrintPluginConfig, PrintPluginPackage } from '@embedpdf/plugin-print/preact';
@@ -879,7 +883,7 @@ export const menuItems: Record<string, MenuItem<State>> = {
       const annotation = registry.getPlugin<AnnotationPlugin>(ANNOTATION_PLUGIN_ID)?.provides();
       if (ui) {
         ui.setHeaderVisible({ id: 'toolsHeader', visible: false });
-        annotation?.setActiveVariant(null);
+        annotation?.setActiveTool(null);
       }
     },
     active: (storeState) => storeState.plugins.ui.header.toolsHeader.visible === false,
@@ -1049,26 +1053,19 @@ export const menuItems: Record<string, MenuItem<State>> = {
     type: 'action',
     icon: 'underline',
     iconProps: (storeState) => ({
-      primaryColor: getToolDefaultsBySubtypeAndIntent(
-        storeState.plugins.annotation,
-        PdfAnnotationSubtype.UNDERLINE,
-      ).color,
+      primaryColor: getToolDefaultsById(storeState.plugins.annotation, 'underline')?.color,
     }),
     action: (registry, state) => {
       const annotation = registry.getPlugin<AnnotationPlugin>(ANNOTATION_PLUGIN_ID)?.provides();
       if (annotation) {
-        if (
-          state.plugins.annotation.activeVariant === makeVariantKey(PdfAnnotationSubtype.UNDERLINE)
-        ) {
-          annotation.setActiveVariant(null);
+        if (state.plugins.annotation.activeToolId === 'underline') {
+          annotation.setActiveTool(null);
         } else {
-          annotation.setActiveVariant(makeVariantKey(PdfAnnotationSubtype.UNDERLINE));
+          annotation.setActiveTool('underline');
         }
       }
     },
-    active: (storeState) =>
-      storeState.plugins.annotation.activeVariant ===
-      makeVariantKey(PdfAnnotationSubtype.UNDERLINE),
+    active: (storeState) => storeState.plugins.annotation.activeToolId === 'underline',
   },
   squiggly: {
     id: 'squiggly',
@@ -1076,25 +1073,19 @@ export const menuItems: Record<string, MenuItem<State>> = {
     type: 'action',
     icon: 'squiggly',
     iconProps: (storeState) => ({
-      primaryColor: getToolDefaultsBySubtypeAndIntent(
-        storeState.plugins.annotation,
-        PdfAnnotationSubtype.SQUIGGLY,
-      ).color,
+      primaryColor: getToolDefaultsById(storeState.plugins.annotation, 'squiggly')?.color,
     }),
     action: (registry, state) => {
       const annotation = registry.getPlugin<AnnotationPlugin>(ANNOTATION_PLUGIN_ID)?.provides();
       if (annotation) {
-        if (
-          state.plugins.annotation.activeVariant === makeVariantKey(PdfAnnotationSubtype.SQUIGGLY)
-        ) {
-          annotation.setActiveVariant(null);
+        if (state.plugins.annotation.activeToolId === 'squiggly') {
+          annotation.setActiveTool(null);
         } else {
-          annotation.setActiveVariant(makeVariantKey(PdfAnnotationSubtype.SQUIGGLY));
+          annotation.setActiveTool('squiggly');
         }
       }
     },
-    active: (storeState) =>
-      storeState.plugins.annotation.activeVariant === makeVariantKey(PdfAnnotationSubtype.SQUIGGLY),
+    active: (storeState) => storeState.plugins.annotation.activeToolId === 'squiggly',
   },
   strikethrough: {
     id: 'strikethrough',
@@ -1102,26 +1093,19 @@ export const menuItems: Record<string, MenuItem<State>> = {
     type: 'action',
     icon: 'strikethrough',
     iconProps: (storeState) => ({
-      primaryColor: getToolDefaultsBySubtypeAndIntent(
-        storeState.plugins.annotation,
-        PdfAnnotationSubtype.STRIKEOUT,
-      ).color,
+      primaryColor: getToolDefaultsById(storeState.plugins.annotation, 'strikeout')?.color,
     }),
     action: (registry, state) => {
       const annotation = registry.getPlugin<AnnotationPlugin>(ANNOTATION_PLUGIN_ID)?.provides();
       if (annotation) {
-        if (
-          state.plugins.annotation.activeVariant === makeVariantKey(PdfAnnotationSubtype.STRIKEOUT)
-        ) {
-          annotation.setActiveVariant(null);
+        if (state.plugins.annotation.activeToolId === 'strikeout') {
+          annotation.setActiveTool(null);
         } else {
-          annotation.setActiveVariant(makeVariantKey(PdfAnnotationSubtype.STRIKEOUT));
+          annotation.setActiveTool('strikeout');
         }
       }
     },
-    active: (storeState) =>
-      storeState.plugins.annotation.activeVariant ===
-      makeVariantKey(PdfAnnotationSubtype.STRIKEOUT),
+    active: (storeState) => storeState.plugins.annotation.activeToolId === 'strikeout',
   },
   highlight: {
     id: 'highlight',
@@ -1129,26 +1113,19 @@ export const menuItems: Record<string, MenuItem<State>> = {
     type: 'action',
     icon: 'highlight',
     iconProps: (storeState) => ({
-      primaryColor: getToolDefaultsBySubtypeAndIntent(
-        storeState.plugins.annotation,
-        PdfAnnotationSubtype.HIGHLIGHT,
-      ).color,
+      primaryColor: getToolDefaultsById(storeState.plugins.annotation, 'highlight')?.color,
     }),
     action: (registry, state) => {
       const annotation = registry.getPlugin<AnnotationPlugin>(ANNOTATION_PLUGIN_ID)?.provides();
       if (annotation) {
-        if (
-          state.plugins.annotation.activeVariant === makeVariantKey(PdfAnnotationSubtype.HIGHLIGHT)
-        ) {
-          annotation.setActiveVariant(null);
+        if (state.plugins.annotation.activeToolId === 'highlight') {
+          annotation.setActiveTool(null);
         } else {
-          annotation.setActiveVariant(makeVariantKey(PdfAnnotationSubtype.HIGHLIGHT));
+          annotation.setActiveTool('highlight');
         }
       }
     },
-    active: (storeState) =>
-      storeState.plugins.annotation.activeVariant ===
-      makeVariantKey(PdfAnnotationSubtype.HIGHLIGHT),
+    active: (storeState) => storeState.plugins.annotation.activeToolId === 'highlight',
   },
   freehand: {
     id: 'freehand',
@@ -1156,24 +1133,20 @@ export const menuItems: Record<string, MenuItem<State>> = {
     type: 'action',
     icon: 'pencilMarker',
     iconProps: (storeState) => ({
-      primaryColor: getToolDefaultsBySubtypeAndIntent(
-        storeState.plugins.annotation,
-        PdfAnnotationSubtype.INK,
-      ).color,
+      primaryColor: getToolDefaultsById(storeState.plugins.annotation, 'ink')?.color,
     }),
     action: (registry, state) => {
       const annotation = registry.getPlugin<AnnotationPlugin>(ANNOTATION_PLUGIN_ID)?.provides();
       if (annotation) {
-        if (state.plugins.annotation.activeVariant === makeVariantKey(PdfAnnotationSubtype.INK)) {
-          annotation.setActiveVariant(null);
+        if (state.plugins.annotation.activeToolId === 'ink') {
+          annotation.setActiveTool(null);
         } else {
           annotation.deselectAnnotation();
-          annotation.setActiveVariant(makeVariantKey(PdfAnnotationSubtype.INK));
+          annotation.setActiveTool('ink');
         }
       }
     },
-    active: (storeState) =>
-      storeState.plugins.annotation.activeVariant === makeVariantKey(PdfAnnotationSubtype.INK),
+    active: (storeState) => storeState.plugins.annotation.activeToolId === 'ink',
   },
   circle: {
     id: 'circle',
@@ -1181,29 +1154,20 @@ export const menuItems: Record<string, MenuItem<State>> = {
     type: 'action',
     icon: 'circle',
     iconProps: (storeState) => ({
-      primaryColor: getToolDefaultsBySubtypeAndIntent(
-        storeState.plugins.annotation,
-        PdfAnnotationSubtype.CIRCLE,
-      ).strokeColor,
-      secondaryColor: getToolDefaultsBySubtypeAndIntent(
-        storeState.plugins.annotation,
-        PdfAnnotationSubtype.CIRCLE,
-      ).color,
+      primaryColor: getToolDefaultsById(storeState.plugins.annotation, 'circle')?.strokeColor,
+      secondaryColor: getToolDefaultsById(storeState.plugins.annotation, 'circle')?.color,
     }),
     action: (registry, state) => {
       const annotation = registry.getPlugin<AnnotationPlugin>(ANNOTATION_PLUGIN_ID)?.provides();
       if (annotation) {
-        if (
-          state.plugins.annotation.activeVariant === makeVariantKey(PdfAnnotationSubtype.CIRCLE)
-        ) {
-          annotation.setActiveVariant(null);
+        if (state.plugins.annotation.activeToolId === 'circle') {
+          annotation.setActiveTool(null);
         } else {
-          annotation.setActiveVariant(makeVariantKey(PdfAnnotationSubtype.CIRCLE));
+          annotation.setActiveTool('circle');
         }
       }
     },
-    active: (storeState) =>
-      storeState.plugins.annotation.activeVariant === makeVariantKey(PdfAnnotationSubtype.CIRCLE),
+    active: (storeState) => storeState.plugins.annotation.activeToolId === 'circle',
   },
   square: {
     id: 'square',
@@ -1211,29 +1175,20 @@ export const menuItems: Record<string, MenuItem<State>> = {
     type: 'action',
     icon: 'square',
     iconProps: (storeState) => ({
-      primaryColor: getToolDefaultsBySubtypeAndIntent(
-        storeState.plugins.annotation,
-        PdfAnnotationSubtype.SQUARE,
-      ).strokeColor,
-      secondaryColor: getToolDefaultsBySubtypeAndIntent(
-        storeState.plugins.annotation,
-        PdfAnnotationSubtype.SQUARE,
-      ).color,
+      primaryColor: getToolDefaultsById(storeState.plugins.annotation, 'square')?.strokeColor,
+      secondaryColor: getToolDefaultsById(storeState.plugins.annotation, 'square')?.color,
     }),
     action: (registry, state) => {
       const annotation = registry.getPlugin<AnnotationPlugin>(ANNOTATION_PLUGIN_ID)?.provides();
       if (annotation) {
-        if (
-          state.plugins.annotation.activeVariant === makeVariantKey(PdfAnnotationSubtype.SQUARE)
-        ) {
-          annotation.setActiveVariant(null);
+        if (state.plugins.annotation.activeToolId === 'square') {
+          annotation.setActiveTool(null);
         } else {
-          annotation.setActiveVariant(makeVariantKey(PdfAnnotationSubtype.SQUARE));
+          annotation.setActiveTool('square');
         }
       }
     },
-    active: (storeState) =>
-      storeState.plugins.annotation.activeVariant === makeVariantKey(PdfAnnotationSubtype.SQUARE),
+    active: (storeState) => storeState.plugins.annotation.activeToolId === 'square',
   },
   line: {
     id: 'line',
@@ -1241,23 +1196,19 @@ export const menuItems: Record<string, MenuItem<State>> = {
     type: 'action',
     icon: 'line',
     iconProps: (storeState) => ({
-      primaryColor: getToolDefaultsBySubtypeAndIntent(
-        storeState.plugins.annotation,
-        PdfAnnotationSubtype.LINE,
-      ).strokeColor,
+      primaryColor: getToolDefaultsById(storeState.plugins.annotation, 'line')?.strokeColor,
     }),
     action: (registry, state) => {
       const annotation = registry.getPlugin<AnnotationPlugin>(ANNOTATION_PLUGIN_ID)?.provides();
       if (annotation) {
-        if (state.plugins.annotation.activeVariant === makeVariantKey(PdfAnnotationSubtype.LINE)) {
-          annotation.setActiveVariant(null);
+        if (state.plugins.annotation.activeToolId === 'line') {
+          annotation.setActiveTool(null);
         } else {
-          annotation.setActiveVariant(makeVariantKey(PdfAnnotationSubtype.LINE));
+          annotation.setActiveTool('line');
         }
       }
     },
-    active: (storeState) =>
-      storeState.plugins.annotation.activeVariant === makeVariantKey(PdfAnnotationSubtype.LINE),
+    active: (storeState) => storeState.plugins.annotation.activeToolId === 'line',
   },
   lineArrow: {
     id: 'lineArrow',
@@ -1265,27 +1216,19 @@ export const menuItems: Record<string, MenuItem<State>> = {
     type: 'action',
     icon: 'lineArrow',
     iconProps: (storeState) => ({
-      primaryColor: getToolDefaultsBySubtypeAndIntent(
-        storeState.plugins.annotation,
-        PdfAnnotationSubtype.LINE,
-      ).strokeColor,
+      primaryColor: getToolDefaultsById(storeState.plugins.annotation, 'line')?.strokeColor,
     }),
     action: (registry, state) => {
       const annotation = registry.getPlugin<AnnotationPlugin>(ANNOTATION_PLUGIN_ID)?.provides();
       if (annotation) {
-        if (
-          state.plugins.annotation.activeVariant ===
-          makeVariantKey(PdfAnnotationSubtype.LINE, 'LineArrow')
-        ) {
-          annotation.setActiveVariant(null);
+        if (state.plugins.annotation.activeToolId === 'lineArrow') {
+          annotation.setActiveTool(null);
         } else {
-          annotation.setActiveVariant(makeVariantKey(PdfAnnotationSubtype.LINE, 'LineArrow'));
+          annotation.setActiveTool('lineArrow');
         }
       }
     },
-    active: (storeState) =>
-      storeState.plugins.annotation.activeVariant ===
-      makeVariantKey(PdfAnnotationSubtype.LINE, 'LineArrow'),
+    active: (storeState) => storeState.plugins.annotation.activeToolId === 'lineArrow',
   },
   polyline: {
     id: 'polyline',
@@ -1293,25 +1236,19 @@ export const menuItems: Record<string, MenuItem<State>> = {
     type: 'action',
     icon: 'zigzag',
     iconProps: (storeState) => ({
-      primaryColor: getToolDefaultsBySubtypeAndIntent(
-        storeState.plugins.annotation,
-        PdfAnnotationSubtype.POLYLINE,
-      ).strokeColor,
+      primaryColor: getToolDefaultsById(storeState.plugins.annotation, 'polyline')?.strokeColor,
     }),
     action: (registry, state) => {
       const annotation = registry.getPlugin<AnnotationPlugin>(ANNOTATION_PLUGIN_ID)?.provides();
       if (annotation) {
-        if (
-          state.plugins.annotation.activeVariant === makeVariantKey(PdfAnnotationSubtype.POLYLINE)
-        ) {
-          annotation.setActiveVariant(null);
+        if (state.plugins.annotation.activeToolId === 'polyline') {
+          annotation.setActiveTool(null);
         } else {
-          annotation.setActiveVariant(makeVariantKey(PdfAnnotationSubtype.POLYLINE));
+          annotation.setActiveTool('polyline');
         }
       }
     },
-    active: (storeState) =>
-      storeState.plugins.annotation.activeVariant === makeVariantKey(PdfAnnotationSubtype.POLYLINE),
+    active: (storeState) => storeState.plugins.annotation.activeToolId === 'polyline',
   },
   polygon: {
     id: 'polygon',
@@ -1319,29 +1256,20 @@ export const menuItems: Record<string, MenuItem<State>> = {
     type: 'action',
     icon: 'polygon',
     iconProps: (storeState) => ({
-      primaryColor: getToolDefaultsBySubtypeAndIntent(
-        storeState.plugins.annotation,
-        PdfAnnotationSubtype.POLYGON,
-      ).strokeColor,
-      secondaryColor: getToolDefaultsBySubtypeAndIntent(
-        storeState.plugins.annotation,
-        PdfAnnotationSubtype.POLYGON,
-      ).color,
+      primaryColor: getToolDefaultsById(storeState.plugins.annotation, 'polygon')?.strokeColor,
+      secondaryColor: getToolDefaultsById(storeState.plugins.annotation, 'polygon')?.color,
     }),
     action: (registry, state) => {
       const annotation = registry.getPlugin<AnnotationPlugin>(ANNOTATION_PLUGIN_ID)?.provides();
       if (annotation) {
-        if (
-          state.plugins.annotation.activeVariant === makeVariantKey(PdfAnnotationSubtype.POLYGON)
-        ) {
-          annotation.setActiveVariant(null);
+        if (state.plugins.annotation.activeToolId === 'polygon') {
+          annotation.setActiveTool(null);
         } else {
-          annotation.setActiveVariant(makeVariantKey(PdfAnnotationSubtype.POLYGON));
+          annotation.setActiveTool('polygon');
         }
       }
     },
-    active: (storeState) =>
-      storeState.plugins.annotation.activeVariant === makeVariantKey(PdfAnnotationSubtype.POLYGON),
+    active: (storeState) => storeState.plugins.annotation.activeToolId === 'polygon',
   },
   freeText: {
     id: 'freeText',
@@ -1349,25 +1277,19 @@ export const menuItems: Record<string, MenuItem<State>> = {
     type: 'action',
     icon: 'text',
     iconProps: (storeState) => ({
-      primaryColor: getToolDefaultsBySubtypeAndIntent(
-        storeState.plugins.annotation,
-        PdfAnnotationSubtype.FREETEXT,
-      ).fontColor,
+      primaryColor: getToolDefaultsById(storeState.plugins.annotation, 'freeText')?.fontColor,
     }),
     action: (registry, state) => {
       const annotation = registry.getPlugin<AnnotationPlugin>(ANNOTATION_PLUGIN_ID)?.provides();
       if (annotation) {
-        if (
-          state.plugins.annotation.activeVariant === makeVariantKey(PdfAnnotationSubtype.FREETEXT)
-        ) {
-          annotation.setActiveVariant(null);
+        if (state.plugins.annotation.activeToolId === 'freeText') {
+          annotation.setActiveTool(null);
         } else {
-          annotation.setActiveVariant(makeVariantKey(PdfAnnotationSubtype.FREETEXT));
+          annotation.setActiveTool('freeText');
         }
       }
     },
-    active: (storeState) =>
-      storeState.plugins.annotation.activeVariant === makeVariantKey(PdfAnnotationSubtype.FREETEXT),
+    active: (storeState) => storeState.plugins.annotation.activeToolId === 'freeText',
   },
   photo: {
     id: 'photo',
@@ -1377,15 +1299,14 @@ export const menuItems: Record<string, MenuItem<State>> = {
     action: (registry, state) => {
       const annotation = registry.getPlugin<AnnotationPlugin>(ANNOTATION_PLUGIN_ID)?.provides();
       if (annotation) {
-        if (state.plugins.annotation.activeVariant === makeVariantKey(PdfAnnotationSubtype.STAMP)) {
-          annotation.setActiveVariant(null);
+        if (state.plugins.annotation.activeToolId === 'stamp') {
+          annotation.setActiveTool(null);
         } else {
-          annotation.setActiveVariant(makeVariantKey(PdfAnnotationSubtype.STAMP));
+          annotation.setActiveTool('stamp');
         }
       }
     },
-    active: (storeState) =>
-      storeState.plugins.annotation.activeVariant === makeVariantKey(PdfAnnotationSubtype.STAMP),
+    active: (storeState) => storeState.plugins.annotation.activeToolId === 'stamp',
   },
   squigglySelection: {
     id: 'squigglySelection',
@@ -1393,17 +1314,19 @@ export const menuItems: Record<string, MenuItem<State>> = {
     type: 'action',
     icon: 'squiggly',
     iconProps: (storeState) => ({
-      primaryColor: getToolDefaultsBySubtypeAndIntent(
-        storeState.plugins.annotation,
-        PdfAnnotationSubtype.SQUIGGLY,
-      ).color,
+      primaryColor: getToolDefaultsById(storeState.plugins.annotation, 'squiggly')?.color,
     }),
     action: (registry) => {
       const annotation = registry.getPlugin<AnnotationPlugin>(ANNOTATION_PLUGIN_ID)?.provides();
       const selection = registry.getPlugin<SelectionPlugin>(SELECTION_PLUGIN_ID)?.provides();
       if (!selection || !annotation) return;
 
-      const defaultSettings = annotation.getToolDefaultsBySubtype(PdfAnnotationSubtype.SQUIGGLY);
+      const tool = annotation.getTool('squiggly');
+      if (!tool) return;
+
+      if (!isSquigglyTool(tool)) return;
+
+      const defaultSettings = tool.defaults;
       const formattedSelection = selection.getFormattedSelection();
       const selectionText = selection.getSelectedText();
 
@@ -1413,6 +1336,7 @@ export const menuItems: Record<string, MenuItem<State>> = {
           annotation.createAnnotation(selection.pageIndex, {
             id: annotationId,
             created: new Date(),
+            flags: ['print'],
             type: PdfAnnotationSubtype.SQUIGGLY,
             blendMode: PdfBlendMode.Normal,
             color: defaultSettings.color,
@@ -1437,17 +1361,17 @@ export const menuItems: Record<string, MenuItem<State>> = {
     type: 'action',
     icon: 'underline',
     iconProps: (storeState) => ({
-      primaryColor: getToolDefaultsBySubtypeAndIntent(
-        storeState.plugins.annotation,
-        PdfAnnotationSubtype.UNDERLINE,
-      ).color,
+      primaryColor: getToolDefaultsById(storeState.plugins.annotation, 'underline')?.color,
     }),
     action: (registry) => {
       const annotation = registry.getPlugin<AnnotationPlugin>(ANNOTATION_PLUGIN_ID)?.provides();
       const selection = registry.getPlugin<SelectionPlugin>(SELECTION_PLUGIN_ID)?.provides();
       if (!selection || !annotation) return;
 
-      const defaultSettings = annotation.getToolDefaultsBySubtype(PdfAnnotationSubtype.UNDERLINE);
+      const tool = annotation.getTool('underline');
+      if (!tool) return;
+      if (!isUnderlineTool(tool)) return;
+      const defaultSettings = tool.defaults;
 
       const formattedSelection = selection.getFormattedSelection();
       const selectionText = selection.getSelectedText();
@@ -1458,6 +1382,7 @@ export const menuItems: Record<string, MenuItem<State>> = {
           annotation.createAnnotation(selection.pageIndex, {
             id: annotationId,
             created: new Date(),
+            flags: ['print'],
             type: PdfAnnotationSubtype.UNDERLINE,
             blendMode: PdfBlendMode.Normal,
             color: defaultSettings.color,
@@ -1482,17 +1407,18 @@ export const menuItems: Record<string, MenuItem<State>> = {
     type: 'action',
     icon: 'strikethrough',
     iconProps: (storeState) => ({
-      primaryColor: getToolDefaultsBySubtypeAndIntent(
-        storeState.plugins.annotation,
-        PdfAnnotationSubtype.STRIKEOUT,
-      ).color,
+      primaryColor: getToolDefaultsById(storeState.plugins.annotation, 'strikeout')?.color,
     }),
     action: (registry) => {
       const annotation = registry.getPlugin<AnnotationPlugin>(ANNOTATION_PLUGIN_ID)?.provides();
       const selection = registry.getPlugin<SelectionPlugin>(SELECTION_PLUGIN_ID)?.provides();
       if (!selection || !annotation) return;
 
-      const defaultSettings = annotation.getToolDefaultsBySubtype(PdfAnnotationSubtype.STRIKEOUT);
+      const tool = annotation.getTool('strikeout');
+      if (!tool) return;
+      if (!isStrikeoutTool(tool)) return;
+      const defaultSettings = tool.defaults;
+
       const formattedSelection = selection.getFormattedSelection();
       const selectionText = selection.getSelectedText();
 
@@ -1502,6 +1428,7 @@ export const menuItems: Record<string, MenuItem<State>> = {
           annotation.createAnnotation(selection.pageIndex, {
             id: annotationId,
             created: new Date(),
+            flags: ['print'],
             type: PdfAnnotationSubtype.STRIKEOUT,
             blendMode: PdfBlendMode.Normal,
             color: defaultSettings.color,
@@ -1526,17 +1453,18 @@ export const menuItems: Record<string, MenuItem<State>> = {
     type: 'action',
     icon: 'highlight',
     iconProps: (storeState) => ({
-      primaryColor: getToolDefaultsBySubtypeAndIntent(
-        storeState.plugins.annotation,
-        PdfAnnotationSubtype.HIGHLIGHT,
-      ).color,
+      primaryColor: getToolDefaultsById(storeState.plugins.annotation, 'highlight')?.color,
     }),
     action: (registry) => {
       const annotation = registry.getPlugin<AnnotationPlugin>(ANNOTATION_PLUGIN_ID)?.provides();
       const selection = registry.getPlugin<SelectionPlugin>(SELECTION_PLUGIN_ID)?.provides();
       if (!selection || !annotation) return;
 
-      const defaultSettings = annotation.getToolDefaultsBySubtype(PdfAnnotationSubtype.HIGHLIGHT);
+      const tool = annotation.getTool('highlight');
+      if (!tool) return;
+      if (!isHighlightTool(tool)) return;
+      const defaultSettings = tool.defaults;
+
       const formattedSelection = selection.getFormattedSelection();
       const selectionText = selection.getSelectedText();
 
@@ -1546,6 +1474,7 @@ export const menuItems: Record<string, MenuItem<State>> = {
           annotation.createAnnotation(selection.pageIndex, {
             id: annotationId,
             created: new Date(),
+            flags: ['print'],
             type: PdfAnnotationSubtype.HIGHLIGHT,
             blendMode: PdfBlendMode.Multiply,
             color: defaultSettings.color,
@@ -2675,9 +2604,9 @@ export const components: Record<string, UIComponentType<State>> = {
     mapStateToProps: (storeState, ownProps) => ({
       ...ownProps,
       selectedAnnotation: getSelectedAnnotation(storeState.plugins[ANNOTATION_PLUGIN_ID]),
-      activeVariant: storeState.plugins[ANNOTATION_PLUGIN_ID].activeVariant,
+      activeToolId: storeState.plugins[ANNOTATION_PLUGIN_ID].activeToolId,
       colorPresets: storeState.plugins[ANNOTATION_PLUGIN_ID].colorPresets,
-      toolDefaults: storeState.plugins[ANNOTATION_PLUGIN_ID].toolDefaults,
+      tools: storeState.plugins[ANNOTATION_PLUGIN_ID].tools,
     }),
   },
   leftPanelMain: defineComponent<{ visibleChild: string }, LeftPanelMainProps, State>()({

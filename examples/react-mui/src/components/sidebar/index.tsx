@@ -4,10 +4,10 @@ import { useScroll } from '@embedpdf/plugin-scroll/react';
 import { ThumbnailsPane, ThumbImg } from '@embedpdf/plugin-thumbnail/react';
 
 export const Sidebar: React.FC = () => {
-  const { currentPage, scrollToPage } = useScroll();
+  const { state, provides } = useScroll();
 
   return (
-    <ThumbnailsPane style={{ paddingTop: 20, paddingBottom: 20 }} selectedPage={currentPage}>
+    <ThumbnailsPane>
       {(m) => (
         <Box
           key={m.pageIndex}
@@ -23,7 +23,7 @@ export const Sidebar: React.FC = () => {
             padding: '8px',
           }}
           onClick={() => {
-            scrollToPage?.({
+            provides?.scrollToPage?.({
               pageNumber: m.pageIndex + 1,
             });
           }}
@@ -34,7 +34,7 @@ export const Sidebar: React.FC = () => {
               width: m.width,
               height: m.height,
               border: '2px solid',
-              borderColor: currentPage === m.pageIndex + 1 ? 'primary.main' : '#e0e0e0',
+              borderColor: state.currentPage === m.pageIndex + 1 ? 'primary.main' : '#e0e0e0',
               borderRadius: 1,
               overflow: 'hidden',
               '&:hover': {

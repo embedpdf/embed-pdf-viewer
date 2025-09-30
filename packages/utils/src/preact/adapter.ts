@@ -14,3 +14,5 @@ export type PointerEvent<T = Element> = JSX.TargetedPointerEvent<T extends Event
 export type ChangeEvent<T = Element> = JSX.TargetedInputEvent<T extends EventTarget ? T : never>;
 export type TouchEvent<T = Element> = JSX.TargetedTouchEvent<T extends EventTarget ? T : never>;
 export type ComponentType = FunctionComponent;
+
+export const dblClickProp = 'onDblClick' as const;

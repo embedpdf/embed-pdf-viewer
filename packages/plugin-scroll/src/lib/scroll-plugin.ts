@@ -23,11 +23,12 @@ import {
   ScrollToPageOptions,
   PageChangePayload,
   ScrollBehavior,
+  PageChangeState,
 } from './types';
 import { BaseScrollStrategy, ScrollStrategyConfig } from './strategies/base-strategy';
 import { VerticalScrollStrategy } from './strategies/vertical-strategy';
 import { HorizontalScrollStrategy } from './strategies/horizontal-strategy';
-import { updateScrollState, ScrollAction, updateTotalPages } from './actions';
+import { updateScrollState, ScrollAction, updateTotalPages, setPageChangeState } from './actions';
 import { VirtualItem } from './types/virtual-item';
 import { getScrollerLayout } from './selectors';
 
@@ -53,6 +54,7 @@ export class ScrollPlugin extends BasePlugin<
   private currentPage: number = 1;
   private layoutReady: boolean = false;
 
+  private readonly pageChangeState$ = createBehaviorEmitter<PageChangeState>();
   private readonly layout$ = createBehaviorEmitter<LayoutChangePayload>();
   private readonly scroll$ = createBehaviorEmitter<ScrollMetrics>();
   private readonly state$ = createBehaviorEmitter<ScrollState>();
@@ -83,6 +85,13 @@ export class ScrollPlugin extends BasePlugin<
     this.initialPage = this.config?.initialPage;
     this.currentScale = this.coreState.core.scale;
     this.currentRotation = this.coreState.core.rotation;
+    // Subscribe to viewport scroll activity to detect when smooth scrolling ends
+    this.viewport.onScrollActivity((activity) => {
+      if (this.state.pageChangeState.isChanging && !activity.isSmoothScrolling) {
+        // Smooth scrolling has ended
+        this.completePageChange();
+      }
+    });
     // Subscribe to viewport and page manager events
     this.viewport.onViewportChange((vp) => this.commitMetrics(this.computeMetrics(vp)), {
       mode: 'throttle',
@@ -100,6 +109,36 @@ export class ScrollPlugin extends BasePlugin<
     this.coreStore.onAction(SET_PAGES, (_action, state) =>
       this.refreshAll(getPagesWithRotatedSize(state.core), this.viewport.getMetrics()),
     );
+  }
+
+  private startPageChange(targetPage: number, behavior: ScrollBehavior = 'smooth') {
+    const pageChangeState: PageChangeState = {
+      isChanging: true,
+      targetPage,
+      fromPage: this.currentPage,
+      startTime: Date.now(),
+    };
+
+    this.dispatch(setPageChangeState(pageChangeState));
+
+    // For instant behavior, complete immediately
+    if (behavior === 'instant') {
+      // Use setTimeout to ensure the scroll happens first
+      this.completePageChange();
+    }
+  }
+
+  private completePageChange() {
+    if (!this.state.pageChangeState.isChanging) return;
+
+    const pageChangeState: PageChangeState = {
+      isChanging: false,
+      targetPage: this.state.pageChangeState.targetPage,
+      fromPage: this.state.pageChangeState.fromPage,
+      startTime: this.state.pageChangeState.startTime,
+    };
+
+    this.dispatch(setPageChangeState(pageChangeState));
   }
 
   /* ------------------------------------------------------------------ */
@@ -169,8 +208,12 @@ export class ScrollPlugin extends BasePlugin<
     this.scrollerLayout$.emit(this.getScrollerLayout());
   }
 
-  override onStoreUpdated(_prevState: ScrollState, _newState: ScrollState): void {
+  override onStoreUpdated(prevState: ScrollState, newState: ScrollState): void {
     this.pushScrollLayout();
+
+    if (prevState.pageChangeState !== newState.pageChangeState) {
+      this.pageChangeState$.emit(newState.pageChangeState);
+    }
   }
 
   override onCoreStoreUpdated(
@@ -235,8 +278,10 @@ export class ScrollPlugin extends BasePlugin<
       onScroll: this.scroll$.on,
       onPageChange: this.pageChange$.on,
       onLayoutReady: this.layoutReady$.on,
+      onPageChangeState: this.pageChangeState$.on,
       getCurrentPage: () => this.currentPage,
       getTotalPages: () => this.state.totalPages,
+      getPageChangeState: () => this.state.pageChangeState,
       scrollToPage: this.scrollToPage.bind(this),
       scrollToNextPage: this.scrollToNextPage.bind(this),
       scrollToPreviousPage: this.scrollToPreviousPage.bind(this),
@@ -250,6 +295,7 @@ export class ScrollPlugin extends BasePlugin<
 
   private scrollToPage(options: ScrollToPageOptions) {
     const { pageNumber, behavior = 'smooth', pageCoordinates, center = false } = options;
+    this.startPageChange(pageNumber, behavior);
     const virtualItems = this.getVirtualItemsFromState();
     const position = this.strategy.getScrollPositionForPage(
       pageNumber,
@@ -260,6 +306,9 @@ export class ScrollPlugin extends BasePlugin<
     );
     if (position) {
       this.viewport.scrollTo({ ...position, behavior, center });
+    } else {
+      // If we couldn't find the position, complete the page change immediately
+      this.completePageChange();
     }
   }
 
@@ -270,6 +319,9 @@ export class ScrollPlugin extends BasePlugin<
     );
     if (currentItemIndex >= 0 && currentItemIndex < virtualItems.length - 1) {
       const nextItem = virtualItems[currentItemIndex + 1];
+      const targetPage = nextItem.pageNumbers[0];
+      this.startPageChange(targetPage, behavior);
+
       const position = this.strategy.getScrollPositionForPage(
         nextItem.pageNumbers[0],
         virtualItems,
@@ -278,6 +330,9 @@ export class ScrollPlugin extends BasePlugin<
       );
       if (position) {
         this.viewport.scrollTo({ ...position, behavior });
+      } else {
+        // If we couldn't find the position, complete the page change immediately
+        this.completePageChange();
       }
     }
   }
@@ -289,6 +344,9 @@ export class ScrollPlugin extends BasePlugin<
     );
     if (currentItemIndex > 0) {
       const prevItem = virtualItems[currentItemIndex - 1];
+      const targetPage = prevItem.pageNumbers[0];
+      this.startPageChange(targetPage, behavior);
+
       const position = this.strategy.getScrollPositionForPage(
         prevItem.pageNumbers[0],
         virtualItems,
@@ -297,6 +355,9 @@ export class ScrollPlugin extends BasePlugin<
       );
       if (position) {
         this.viewport.scrollTo({ ...position, behavior });
+      } else {
+        // If we couldn't find the position, complete the page change immediately
+        this.completePageChange();
       }
     }
   }
@@ -340,6 +401,7 @@ export class ScrollPlugin extends BasePlugin<
     this.state$.clear();
     this.scrollerLayout$.clear();
     this.layoutReady$.clear();
+    this.pageChangeState$.clear();
     super.destroy();
   }
 }

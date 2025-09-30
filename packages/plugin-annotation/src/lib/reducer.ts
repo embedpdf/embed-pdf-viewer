@@ -1,36 +1,23 @@
 import { Reducer } from '@embedpdf/core';
 import {
-  PdfAnnotationBorderStyle,
-  PdfAnnotationLineEnding,
-  PdfAnnotationSubtype,
-  PdfBlendMode,
-  PdfStandardFont,
-  PdfTextAlignment,
-  PdfVerticalAlignment,
-} from '@embedpdf/models';
-import {
   ADD_COLOR_PRESET,
   COMMIT_PENDING_CHANGES,
   CREATE_ANNOTATION,
+  DELETE_ANNOTATION,
   DESELECT_ANNOTATION,
   PATCH_ANNOTATION,
-  DELETE_ANNOTATION,
-  SELECT_ANNOTATION,
-  SET_ANNOTATIONS,
-  UPDATE_TOOL_DEFAULTS,
-  AnnotationAction,
   PURGE_ANNOTATION,
-  SET_ACTIVE_VARIANT,
+  SELECT_ANNOTATION,
+  SET_ACTIVE_TOOL_ID,
+  SET_ANNOTATIONS,
+  AnnotationAction,
+  SET_TOOL_DEFAULTS,
+  ADD_TOOL,
 } from './actions';
-import {
-  AnnotationDefaults,
-  AnnotationPluginConfig,
-  AnnotationState,
-  TrackedAnnotation,
-} from './types';
-import { makeVariantKey } from './variant-key';
+import { AnnotationPluginConfig, AnnotationState, TrackedAnnotation } from './types';
+import { defaultTools } from './tools/default-tools';
+import { AnnotationTool } from './tools/types';
 
-/* ─────────── util helpers ─────────── */
 const DEFAULT_COLORS = [
   '#E44234',
   '#FF8D00',
@@ -44,7 +31,6 @@ const DEFAULT_COLORS = [
   '#FFFFFF',
 ];
 
-/* helper to immutably replace one annotation */
 const patchAnno = (
   state: AnnotationState,
   uid: string,
@@ -66,162 +52,31 @@ const patchAnno = (
   };
 };
 
-/* ─────────── initialState ─────────── */
-export const initialState = (cfg: AnnotationPluginConfig): AnnotationState => ({
-  pages: {},
-  byUid: {},
-  selectedUid: null,
-  activeVariant: null,
+export const initialState = (cfg: AnnotationPluginConfig): AnnotationState => {
+  // Create a Map with a general type signature. This resolves the type conflicts.
+  const toolMap = new Map<string, AnnotationTool>();
 
-  toolDefaults: {
-    [makeVariantKey(PdfAnnotationSubtype.HIGHLIGHT)]: {
-      name: 'Highlight',
-      subtype: PdfAnnotationSubtype.HIGHLIGHT,
-      interaction: { mode: 'highlight', exclusive: false },
-      textSelection: true,
-      color: '#FFCD45',
-      opacity: 1,
-      blendMode: PdfBlendMode.Multiply,
-    },
-    [makeVariantKey(PdfAnnotationSubtype.UNDERLINE)]: {
-      name: 'Underline',
-      subtype: PdfAnnotationSubtype.UNDERLINE,
-      interaction: { mode: 'underline', exclusive: false },
-      textSelection: true,
-      color: '#E44234',
-      opacity: 1,
-      blendMode: PdfBlendMode.Normal,
-    },
-    [makeVariantKey(PdfAnnotationSubtype.STRIKEOUT)]: {
-      name: 'Strikeout',
-      subtype: PdfAnnotationSubtype.STRIKEOUT,
-      interaction: { mode: 'strikeout', exclusive: false },
-      textSelection: true,
-      color: '#E44234',
-      opacity: 1,
-      blendMode: PdfBlendMode.Normal,
-    },
-    [makeVariantKey(PdfAnnotationSubtype.SQUIGGLY)]: {
-      name: 'Squiggly',
-      subtype: PdfAnnotationSubtype.SQUIGGLY,
-      interaction: { mode: 'squiggly', exclusive: false },
-      textSelection: true,
-      color: '#E44234',
-      opacity: 1,
-      blendMode: PdfBlendMode.Normal,
-    },
-    [makeVariantKey(PdfAnnotationSubtype.INK)]: {
-      name: 'Ink',
-      subtype: PdfAnnotationSubtype.INK,
-      interaction: { mode: 'ink', exclusive: true, cursor: 'crosshair' },
-      color: '#E44234',
-      opacity: 1,
-      strokeWidth: 11,
-      blendMode: PdfBlendMode.Normal,
-    },
-    [makeVariantKey(PdfAnnotationSubtype.INK, 'InkHighlight')]: {
-      name: 'Ink Highlight',
-      subtype: PdfAnnotationSubtype.INK,
-      intent: 'InkHighlight',
-      interaction: { mode: 'inkHighlight', exclusive: true, cursor: 'crosshair' },
-      color: '#E44234',
-      opacity: 1,
-      strokeWidth: 11,
-      blendMode: PdfBlendMode.Multiply,
-    },
-    [makeVariantKey(PdfAnnotationSubtype.CIRCLE)]: {
-      name: 'Circle',
-      subtype: PdfAnnotationSubtype.CIRCLE,
-      interaction: { mode: 'circle', exclusive: true, cursor: 'crosshair' },
-      color: 'transparent',
-      opacity: 1,
-      strokeWidth: 4,
-      strokeColor: '#E44234',
-      strokeStyle: PdfAnnotationBorderStyle.SOLID,
-    },
-    [makeVariantKey(PdfAnnotationSubtype.SQUARE)]: {
-      name: 'Square',
-      subtype: PdfAnnotationSubtype.SQUARE,
-      interaction: { mode: 'square', exclusive: true, cursor: 'crosshair' },
-      color: 'transparent',
-      opacity: 1,
-      strokeWidth: 4,
-      strokeColor: '#E44234',
-      strokeStyle: PdfAnnotationBorderStyle.SOLID,
-    },
-    [makeVariantKey(PdfAnnotationSubtype.LINE)]: {
-      name: 'Line',
-      subtype: PdfAnnotationSubtype.LINE,
-      interaction: { mode: 'line', exclusive: true, cursor: 'crosshair' },
-      color: 'transparent',
-      opacity: 1,
-      strokeWidth: 4,
-      strokeColor: '#E44234',
-      strokeStyle: PdfAnnotationBorderStyle.SOLID,
-    },
-    [makeVariantKey(PdfAnnotationSubtype.LINE, 'LineArrow')]: {
-      name: 'Line Arrow',
-      subtype: PdfAnnotationSubtype.LINE,
-      interaction: { mode: 'lineArrow', exclusive: true, cursor: 'crosshair' },
-      color: 'transparent',
-      intent: 'LineArrow',
-      opacity: 1,
-      strokeWidth: 4,
-      strokeColor: '#E44234',
-      strokeStyle: PdfAnnotationBorderStyle.SOLID,
-      lineEndings: {
-        start: PdfAnnotationLineEnding.None,
-        end: PdfAnnotationLineEnding.OpenArrow,
-      },
-    },
-    [makeVariantKey(PdfAnnotationSubtype.POLYLINE)]: {
-      name: 'Polyline',
-      subtype: PdfAnnotationSubtype.POLYLINE,
-      interaction: { mode: 'polyline', exclusive: true, cursor: 'crosshair' },
-      color: 'transparent',
-      opacity: 1,
-      strokeWidth: 4,
-      strokeColor: '#E44234',
-      strokeStyle: PdfAnnotationBorderStyle.SOLID,
-    },
-    [makeVariantKey(PdfAnnotationSubtype.POLYGON)]: {
-      name: 'Polygon',
-      subtype: PdfAnnotationSubtype.POLYGON,
-      interaction: { mode: 'polygon', exclusive: true, cursor: 'crosshair' },
-      color: 'transparent',
-      opacity: 1,
-      strokeWidth: 4,
-      strokeColor: '#E44234',
-      strokeStyle: PdfAnnotationBorderStyle.SOLID,
-    },
-    [makeVariantKey(PdfAnnotationSubtype.FREETEXT)]: {
-      name: 'Free Text',
-      subtype: PdfAnnotationSubtype.FREETEXT,
-      interaction: { mode: 'freeText', exclusive: true, cursor: 'crosshair' },
-      backgroundColor: 'transparent',
-      opacity: 1,
-      fontSize: 14,
-      fontColor: '#E44234',
-      content: 'Insert text here',
-      fontFamily: PdfStandardFont.Helvetica,
-      textAlign: PdfTextAlignment.Left,
-      verticalAlign: PdfVerticalAlignment.Top,
-    },
-    [makeVariantKey(PdfAnnotationSubtype.STAMP)]: {
-      name: 'Photo',
-      subtype: PdfAnnotationSubtype.STAMP,
-      interaction: { mode: 'stamp', exclusive: true, cursor: 'crosshair' },
-    },
-    ...cfg.toolDefaults,
-  },
-  colorPresets: cfg.colorPresets ?? DEFAULT_COLORS,
-  hasPendingChanges: false,
-});
+  // The `satisfies` operator has already validated the specific types in `defaultTools`.
+  // Now, we cast each one to the general `AnnotationTool` type for storage in our unified map.
+  defaultTools.forEach((t) => toolMap.set(t.id, t as AnnotationTool));
 
-/* ─────────── reducer ─────────── */
+  // User-provided tools can now be safely added, as they also match the `AnnotationTool` type.
+  (cfg.tools || []).forEach((t) => toolMap.set(t.id, t));
+
+  return {
+    pages: {},
+    byUid: {},
+    selectedUid: null,
+    activeToolId: null,
+    // `Array.from(toolMap.values())` now correctly returns `AnnotationTool[]`, which matches the state's type.
+    tools: Array.from(toolMap.values()),
+    colorPresets: cfg.colorPresets ?? DEFAULT_COLORS,
+    hasPendingChanges: false,
+  };
+};
+
 export const reducer: Reducer<AnnotationState, AnnotationAction> = (state, action) => {
   switch (action.type) {
-    /* ───── bulk load from engine ───── */
     case SET_ANNOTATIONS: {
       const newPages = { ...state.pages };
       const newByUid = { ...state.byUid };
@@ -241,14 +96,31 @@ export const reducer: Reducer<AnnotationState, AnnotationAction> = (state, actio
       return { ...state, pages: newPages, byUid: newByUid };
     }
 
-    /* ───── GUI bits ───── */
-    case SET_ACTIVE_VARIANT:
-      return { ...state, activeVariant: action.payload };
-    case SELECT_ANNOTATION:
+    case SET_ACTIVE_TOOL_ID:
+      return { ...state, activeToolId: action.payload };
+
+    case ADD_TOOL: {
+      const toolMap = new Map(state.tools.map((t) => [t.id, t]));
+      toolMap.set(action.payload.id, action.payload);
+      return { ...state, tools: Array.from(toolMap.values()) };
+    }
+
+    case SET_TOOL_DEFAULTS: {
+      const { toolId, patch } = action.payload;
       return {
         ...state,
-        selectedUid: action.payload.id,
+        tools: state.tools.map((tool) => {
+          if (tool.id === toolId) {
+            return { ...tool, defaults: { ...tool.defaults, ...patch } };
+          }
+          return tool;
+        }),
       };
+    }
+
+    case SELECT_ANNOTATION:
+      return { ...state, selectedUid: action.payload.id };
+
     case DESELECT_ANNOTATION:
       return { ...state, selectedUid: null };
 
@@ -257,36 +129,17 @@ export const reducer: Reducer<AnnotationState, AnnotationAction> = (state, actio
         ? state
         : { ...state, colorPresets: [...state.colorPresets, action.payload] };
 
-    case UPDATE_TOOL_DEFAULTS: {
-      const { variantKey, patch } = action.payload;
-      const prev = state.toolDefaults[variantKey];
-      if (!prev) return state;
-      return {
-        ...state,
-        toolDefaults: {
-          ...state.toolDefaults,
-          [variantKey]: { ...prev, ...patch } as AnnotationDefaults,
-        },
-      };
-    }
-
-    /* ───── create ───── */
     case CREATE_ANNOTATION: {
       const { pageIndex, annotation } = action.payload;
       const uid = annotation.id;
-
       return {
         ...state,
         pages: { ...state.pages, [pageIndex]: [...(state.pages[pageIndex] ?? []), uid] },
-        byUid: {
-          ...state.byUid,
-          [uid]: { commitState: 'new', object: annotation },
-        },
+        byUid: { ...state.byUid, [uid]: { commitState: 'new', object: annotation } },
         hasPendingChanges: true,
       };
     }
 
-    /* ───── delete ───── */
     case DELETE_ANNOTATION: {
       const { pageIndex, id: uid } = action.payload;
       if (!state.byUid[uid]) return state;
@@ -306,13 +159,9 @@ export const reducer: Reducer<AnnotationState, AnnotationAction> = (state, actio
       };
     }
 
-    /* ───── field edits ───── */
-    case PATCH_ANNOTATION: {
-      const uid = action.payload.id;
-      return patchAnno(state, uid, action.payload.patch);
-    }
+    case PATCH_ANNOTATION:
+      return patchAnno(state, action.payload.id, action.payload.patch);
 
-    /* ───── commit bookkeeping ───── */
     case COMMIT_PENDING_CHANGES: {
       const cleaned: AnnotationState['byUid'] = {};
       for (const [uid, ta] of Object.entries(state.byUid)) {

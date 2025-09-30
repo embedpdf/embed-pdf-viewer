@@ -15,9 +15,7 @@ import { useDebounce } from '../../hooks/use-debounce';
 
 export const TextMarkupSidebar = ({
   selected,
-  subtype,
-  activeVariant,
-  intent,
+  activeTool,
   colorPresets,
 }: SidebarPropsBase<
   PdfHighlightAnnoObject | PdfUnderlineAnnoObject | PdfStrikeOutAnnoObject | PdfSquigglyAnnoObject
@@ -26,7 +24,7 @@ export const TextMarkupSidebar = ({
   if (!annotation) return null;
 
   const anno = selected?.object;
-  const defaults = annotation.getToolDefaultsBySubtypeAndIntent(subtype, intent);
+  const defaults = activeTool?.defaults;
   const editing = !!anno;
 
   const baseColor = editing ? anno.color : (defaults?.color ?? '#FFFF00');
@@ -61,8 +59,8 @@ export const TextMarkupSidebar = ({
     if (!annotation) return;
     if (editing) {
       annotation.updateAnnotation(anno.pageIndex, anno.id, patch);
-    } else if (activeVariant) {
-      annotation.setToolDefaults(activeVariant, patch);
+    } else if (activeTool) {
+      annotation.setToolDefaults(activeTool.id, patch);
     }
   }
 

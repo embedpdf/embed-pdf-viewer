@@ -1,12 +1,7 @@
-import {
-  AnnotationDefaults,
-  AnnotationState,
-  SidebarAnnotationEntry,
-  TrackedAnnotation,
-} from './types';
-import { makeVariantKey } from './variant-key';
+import { AnnotationState, SidebarAnnotationEntry, TrackedAnnotation } from './types';
 import { PdfTextAnnoObject } from '@embedpdf/models';
 import { isSidebarAnnotation, isText } from './helpers';
+import { ToolMap } from './tools/tools-utils';
 
 /* ─────────── public selectors ─────────── */
 
@@ -38,40 +33,27 @@ export const getSelectedAnnotationByPageIndex = (s: AnnotationState, pageIndex: 
   return null;
 };
 
-export const isInAnnotationVariant = (s: AnnotationState) => s.activeVariant !== null;
-export const getSelectedAnnotationVariant = (s: AnnotationState) => s.activeVariant;
-
 /** Check if a given anno on a page is the current selection. */
 export const isAnnotationSelected = (s: AnnotationState, id: string) => s.selectedUid === id;
 
 /**
- * Return the tool-defaults for a given subtype and (optionally) intent.
- * If the exact variant (subtype + intent) is not present, it gracefully
- * falls back to the plain subtype variant.
+ * Returns the current defaults for a specific tool by its ID.
+ * This is fully type-safe and infers the correct return type.
  *
- * The return type is inferred so that you always get the concrete default
- * interface for the supplied subtype (e.g. `InkDefaults` for `INK`,
- * `CircleDefaults` for `CIRCLE`, …).
+ * @param state The annotation plugin's state.
+ * @param toolId The ID of the tool (e.g., 'highlight', 'pen').
+ * @returns The tool's current `defaults` object, or `undefined` if not found.
  */
-export function getToolDefaultsBySubtypeAndIntent<
-  S extends AnnotationState,
-  TSub extends AnnotationDefaults['subtype'],
->(state: S, subtype: TSub, intent?: string | null): Extract<AnnotationDefaults, { subtype: TSub }> {
-  // Build keys
-  const variantKey = makeVariantKey(subtype, intent ?? undefined);
-  const fallbackKey = makeVariantKey(subtype);
+export function getToolDefaultsById<K extends keyof ToolMap>(
+  state: AnnotationState,
+  toolId: K,
+): ToolMap[K]['defaults'] | undefined {
+  // Find the tool in the state's tool array.
+  const tool = state.tools.find((t) => t.id === toolId);
 
-  // Try exact match first, otherwise fall back to plain subtype
-  const defaults = state.toolDefaults[variantKey] ?? state.toolDefaults[fallbackKey];
-
-  if (!defaults) {
-    throw new Error(
-      `No tool defaults found for subtype ${subtype}${intent ? ` and intent ${intent}` : ''}`,
-    );
-  }
-
-  // Cast is safe because we narrow the union by subtype
-  return defaults as Extract<AnnotationDefaults, { subtype: TSub }>;
+  // The `as` cast is safe because the generic signature guarantees
+  // the return type to the caller.
+  return tool?.defaults as ToolMap[K]['defaults'] | undefined;
 }
 
 /**
@@ -96,7 +78,7 @@ export const getSidebarAnnotationsWithRepliesGroupedByPage = (
   for (const uidList of Object.values(s.pages)) {
     for (const uid of uidList) {
       const ta = s.byUid[uid];
-      if (isText(ta)) {
+      if (ta && isText(ta)) {
         const parentId = ta.object.inReplyToId;
         if (parentId) (repliesByParent[parentId] ||= []).push(ta);
       }
@@ -114,7 +96,7 @@ export const getSidebarAnnotationsWithRepliesGroupedByPage = (
 
     for (const uid of uidList) {
       const ta = s.byUid[uid];
-      if (isSidebarAnnotation(ta)) {
+      if (ta && isSidebarAnnotation(ta)) {
         pageAnnotations.push({
           page,
           annotation: ta,

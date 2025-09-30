@@ -1,9 +1,10 @@
 {
   "name": "@embedpdf/utils",
-  "version": "1.1.1",
+  "version": "1.3.6",
   "private": false,
   "description": "Shared utility helpers (geometry, tasks, logging, PDF primitives) that underpin every package in the EmbedPDF ecosystem.",
   "type": "module",
+  "license": "MIT",
   "main": "./dist/index.cjs",
   "module": "./dist/index.js",
   "types": "./dist/index.d.ts",
@@ -53,7 +54,6 @@
     "url": "https://github.com/embedpdf/embed-pdf-viewer/issues"
   },
   "author": "Bob Singor",
-  "license": "MIT",
   "devDependencies": {
     "@embedpdf/models": "workspace:*",
     "@embedpdf/build": "workspace:*",

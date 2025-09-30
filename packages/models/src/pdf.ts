@@ -16,6 +16,11 @@ export interface PdfPageObject {
    * Orignal size of this page
    */
   size: Size;
+
+  /**
+   * Rotation of this page
+   */
+  rotation: Rotation;
 }
 
 /**
@@ -183,7 +188,7 @@ export function stripPdfUnwantedMarkers(text: string): string {
 }
 
 /**
- * zoom mode
+ * Zoom mode
  *
  * @public
  */
@@ -198,17 +203,29 @@ export enum PdfZoomMode {
    */
   FitPage = 2,
   /**
-   * Fit the page width.
+   * Fit the entire page width to the window.
    */
   FitHorizontal = 3,
   /**
-   * Fit the page height.
+   * Fit the entire page height to the window.
    */
   FitVertical = 4,
   /**
    * Fit a specific rectangle area within the window.
    */
   FitRectangle = 5,
+  /**
+   * Fit bounding box of the entire page (including annotations).
+   */
+  FitBoundingBox = 6,
+  /**
+   * Fit the bounding box width of the page.
+   */
+  FitBoundingBoxHorizontal = 7,
+  /**
+   * Fit the bounding box height of the page.
+   */
+  FitBoundingBoxVertical = 8,
 }
 
 /**
@@ -299,6 +316,15 @@ export enum PdfBlendMode {
 }
 
 /**
+ * Stamp fit
+ */
+export enum PdfStampFit {
+  Contain = 0,
+  Cover = 1,
+  Stretch = 2,
+}
+
+/**
  * Representation of the linked destination
  *
  * @public
@@ -327,6 +353,15 @@ export interface PdfDestinationObject {
       }
     | {
         mode: PdfZoomMode.FitRectangle;
+      }
+    | {
+        mode: PdfZoomMode.FitBoundingBox;
+      }
+    | {
+        mode: PdfZoomMode.FitBoundingBoxHorizontal;
+      }
+    | {
+        mode: PdfZoomMode.FitBoundingBoxVertical;
       };
   view: number[];
 }
@@ -1668,6 +1703,14 @@ export type PdfStampAnnoObjectContents = Array<PdfPathObject | PdfImageObject | 
 export interface PdfStampAnnoObject extends PdfAnnotationObjectBase {
   /** {@inheritDoc PdfAnnotationObjectBase.type} */
   type: PdfAnnotationSubtype.STAMP;
+  /**
+   * Icon of the stamp annotation
+   */
+  icon?: PdfAnnotationIcon;
+  /**
+   * Subject of the stamp annotation
+   */
+  subject?: string;
 }
 
 /**
@@ -1961,7 +2004,10 @@ export type PdfAnnotationObject = PdfSupportedAnnoObject | PdfUnsupportedAnnoObj
 export interface PdfAttachmentObject {
   index: number;
   name: string;
-  creationDate: string;
+  description: string;
+  mimeType: string;
+  size?: number;
+  creationDate?: Date;
   checksum: string;
 }
 
@@ -2527,6 +2573,28 @@ export interface PdfPrintOptions {
 }
 
 /**
+ * Parameters for adding an attachment to a PDF document
+ */
+export interface PdfAddAttachmentParams {
+  /**
+   * Name of the attachment
+   */
+  name: string;
+  /**
+   * Description of the attachment
+   */
+  description: string;
+  /**
+   * MIME type of the attachment
+   */
+  mimeType: string;
+  /**
+   * Data of the attachment
+   */
+  data: ArrayBuffer | Uint8Array;
+}
+
+/**
  * Pdf engine
  *
  * @public
@@ -2605,6 +2673,19 @@ export interface PdfEngine<T = Blob> {
    * @returns task that contains the bookmarks or error
    */
   getBookmarks: (doc: PdfDocumentObject) => PdfTask<PdfBookmarksObject>;
+  /**
+   * Set the bookmarks of the file
+   * @param doc - pdf document
+   * @param payload - bookmarks to set
+   * @returns task that contains whether the bookmarks are set successfully or not
+   */
+  setBookmarks: (doc: PdfDocumentObject, payload: PdfBookmarkObject[]) => PdfTask<boolean>;
+  /**
+   * Remove all bookmarks from the document.
+   * @param doc - pdf document
+   * @returns task that contains whether the bookmarks are removed successfully or not
+   */
+  deleteBookmarks: (doc: PdfDocumentObject) => PdfTask<boolean>;
   /**
    * Render the specified pdf page
    * @param doc - pdf document
@@ -2741,6 +2822,22 @@ export interface PdfEngine<T = Blob> {
    * @returns task that contains the attachments or error
    */
   getAttachments: (doc: PdfDocumentObject) => PdfTask<PdfAttachmentObject[]>;
+  /**
+   * Add a attachment to the file
+  /**
+   * @param doc - pdf document
+   * @param attachment - pdf attachment
+   * @returns task that contains the attachment or error
+   */
+  addAttachment: (doc: PdfDocumentObject, params: PdfAddAttachmentParams) => PdfTask<boolean>;
+  /**
+   * Remove a attachment from the file
+  /**
+   * @param doc - pdf document
+   * @param attachment - pdf attachment
+   * @returns task that contains the attachment or error
+   */
+  removeAttachment: (doc: PdfDocumentObject, attachment: PdfAttachmentObject) => PdfTask<boolean>;
   /**
    * Read content of pdf attachment
    * @param doc - pdf document

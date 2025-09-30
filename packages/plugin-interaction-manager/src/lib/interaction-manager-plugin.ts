@@ -1,6 +1,7 @@
 import { BasePlugin, createBehaviorEmitter, createEmitter, PluginRegistry } from '@embedpdf/core';
 
 import {
+  InteractionExclusionRules,
   InteractionManagerCapability,
   InteractionManagerPluginConfig,
   InteractionManagerState,
@@ -13,10 +14,15 @@ import {
 } from './types';
 import {
   activateMode,
+  addExclusionAttribute,
+  addExclusionClass,
   pauseInteraction,
+  removeExclusionAttribute,
+  removeExclusionClass,
   resumeInteraction,
   setCursor,
   setDefaultMode,
+  setExclusionRules,
 } from './actions';
 import { mergeHandlers } from './helper';
 
@@ -56,7 +62,7 @@ export class InteractionManagerPlugin extends BasePlugin<
   private readonly onCursorChange$ = createEmitter<string>();
   private readonly onStateChange$ = createBehaviorEmitter<InteractionManagerState>();
 
-  constructor(id: string, registry: PluginRegistry) {
+  constructor(id: string, registry: PluginRegistry, config: InteractionManagerPluginConfig) {
     super(id, registry);
 
     this.registerMode({
@@ -68,6 +74,9 @@ export class InteractionManagerPlugin extends BasePlugin<
 
     this.setDefaultMode(INITIAL_MODE);
     this.activate(INITIAL_MODE);
+    if (config.exclusionRules) {
+      this.dispatch(setExclusionRules(config.exclusionRules));
+    }
   }
 
   async initialize(_: InteractionManagerPluginConfig): Promise<void> {}
@@ -96,6 +105,14 @@ export class InteractionManagerPlugin extends BasePlugin<
       isPaused: () => this.state.paused,
       setDefaultMode: (id: string) => this.setDefaultMode(id),
       getDefaultMode: () => this.state.defaultMode,
+      getExclusionRules: () => this.state.exclusionRules,
+      setExclusionRules: (rules: InteractionExclusionRules) =>
+        this.dispatch(setExclusionRules(rules)),
+      addExclusionClass: (className: string) => this.dispatch(addExclusionClass(className)),
+      removeExclusionClass: (className: string) => this.dispatch(removeExclusionClass(className)),
+      addExclusionAttribute: (attribute: string) => this.dispatch(addExclusionAttribute(attribute)),
+      removeExclusionAttribute: (attribute: string) =>
+        this.dispatch(removeExclusionAttribute(attribute)),
     };
   }
 

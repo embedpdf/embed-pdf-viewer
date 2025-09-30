@@ -1,10 +1,10 @@
-import { HTMLAttributes, CSSProperties, MouseEvent, TouchEvent } from '@framework';
+import { CSSProperties, MouseEvent, TouchEvent } from '@framework';
 import { Rect } from '@embedpdf/models';
 
-type StrikeoutProps = Omit<HTMLAttributes<HTMLDivElement>, 'style'> & {
+type StrikeoutProps = {
   color?: string;
   opacity?: number;
-  rects: Rect[];
+  segmentRects: Rect[];
   rect?: Rect;
   scale: number;
   onClick?: (e: MouseEvent<HTMLDivElement> | TouchEvent<HTMLDivElement>) => void;
@@ -14,18 +14,17 @@ type StrikeoutProps = Omit<HTMLAttributes<HTMLDivElement>, 'style'> & {
 export function Strikeout({
   color = '#FFFF00',
   opacity = 0.5,
-  rects,
+  segmentRects,
   rect,
   scale,
   onClick,
   style,
-  ...props
 }: StrikeoutProps) {
   const thickness = 2 * scale;
 
   return (
     <>
-      {rects.map((r, i) => (
+      {segmentRects.map((r, i) => (
         <div
           key={i}
           onPointerDown={onClick}
@@ -42,7 +41,6 @@ export function Strikeout({
             zIndex: onClick ? 1 : 0,
             ...style,
           }}
-          {...props}
         >
           {/* Visual strikeout line */}
           <div

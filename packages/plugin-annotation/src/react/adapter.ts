@@ -18,4 +18,6 @@ export type {
   TouchEvent,
 } from 'react';
 
-export const mapDoubleClick = (handler: any) => (handler ? { onDoubleClick: handler } : {});
+export const suppressContentEditableWarningProps = {
+  suppressContentEditableWarning: true,
+};

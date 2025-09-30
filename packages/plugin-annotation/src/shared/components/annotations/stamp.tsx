@@ -20,6 +20,7 @@ export function Stamp({ isSelected, annotation, pageIndex, scale, onClick }: Sta
         height: '100%',
         zIndex: 2,
         pointerEvents: isSelected ? 'none' : 'auto',
+        cursor: 'pointer',
       }}
       onPointerDown={onClick}
       onTouchStart={onClick}

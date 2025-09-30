@@ -4,6 +4,7 @@ import type {
   InteractionScope,
   PointerEventHandlers,
   EmbedPdfPointerEvent,
+  InteractionExclusionRules,
 } from '@embedpdf/plugin-interaction-manager';
 
 /* -------------------------------------------------- */
@@ -53,7 +54,9 @@ const pointerEventTypes = [
 ];
 
 const touchEventTypes = ['touchstart', 'touchend', 'touchmove', 'touchcancel'];
-const allEventTypes = [...pointerEventTypes, ...touchEventTypes];
+const HAS_POINTER = typeof PointerEvent !== 'undefined';
+// If the browser supports Pointer Events, don't attach legacy touch events to avoid double-dispatch.
+const allEventTypes = HAS_POINTER ? pointerEventTypes : [...pointerEventTypes, ...touchEventTypes];
 
 /* -------------------------------------------------- */
 /* helper: decide listener options per event type     */
@@ -65,6 +68,41 @@ function listenerOpts(eventType: string, wantsRawTouch: boolean): AddEventListen
 
 function isTouchEvent(evt: Event): evt is TouchEvent {
   return typeof TouchEvent !== 'undefined' && evt instanceof TouchEvent;
+}
+
+/**
+ * Check if an element should be excluded based on rules
+ * This is in the framework layer, not the plugin
+ */
+function shouldExcludeElement(element: Element | null, rules: InteractionExclusionRules): boolean {
+  if (!element) return false;
+
+  let current: Element | null = element;
+
+  while (current) {
+    // Check classes
+    if (rules.classes?.length) {
+      for (const className of rules.classes) {
+        if (current.classList?.contains(className)) {
+          return true;
+        }
+      }
+    }
+
+    // Check data attributes
+    if (rules.dataAttributes?.length) {
+      for (const attr of rules.dataAttributes) {
+        if (current.hasAttribute(attr)) {
+          return true;
+        }
+      }
+    }
+
+    // Move up the DOM tree
+    current = current.parentElement;
+  }
+
+  return false;
 }
 
 /* -------------------------------------------------- */
@@ -101,6 +139,7 @@ export function createPointerProvider(
 
   /* attach for the first time */
   addListeners(attachedWithRawTouch);
+  element.style.touchAction = attachedWithRawTouch ? 'none' : '';
 
   /* ---------- mode & handler change hooks --------------------------------------- */
   const stopMode = cap.onModeChange(() => {
@@ -118,6 +157,7 @@ export function createPointerProvider(
       removeListeners();
       addListeners(raw);
       attachedWithRawTouch = raw;
+      element.style.touchAction = attachedWithRawTouch ? 'none' : '';
     }
   });
 
@@ -146,6 +186,12 @@ export function createPointerProvider(
   /* ---------- central event handler --------------------------------------------- */
   function handleEvent(evt: Event) {
     if (cap.isPaused()) return;
+
+    // Get exclusion rules from capability and check in framework layer
+    const exclusionRules = cap.getExclusionRules();
+    if (evt.target && shouldExcludeElement(evt.target as Element, exclusionRules)) {
+      return; // Skip processing this event
+    }
 
     const handlerKey = domEventMap[evt.type];
     if (!handlerKey || !active?.[handlerKey]) return;

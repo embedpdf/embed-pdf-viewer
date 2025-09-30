@@ -1,10 +1,10 @@
-import { HTMLAttributes, CSSProperties, MouseEvent, TouchEvent } from '@framework';
+import { CSSProperties, MouseEvent, TouchEvent } from '@framework';
 import { Rect } from '@embedpdf/models';
 
-type UnderlineProps = Omit<HTMLAttributes<HTMLDivElement>, 'style'> & {
+type UnderlineProps = {
   color?: string;
   opacity?: number;
-  rects: Rect[];
+  segmentRects: Rect[];
   rect?: Rect;
   scale: number;
   onClick?: (e: MouseEvent<HTMLDivElement> | TouchEvent<HTMLDivElement>) => void;
@@ -14,18 +14,17 @@ type UnderlineProps = Omit<HTMLAttributes<HTMLDivElement>, 'style'> & {
 export function Underline({
   color = '#FFFF00',
   opacity = 0.5,
-  rects,
+  segmentRects,
   rect,
   scale,
   onClick,
   style,
-  ...props
 }: UnderlineProps) {
   const thickness = 2 * scale; // 2 CSS px at 100 % zoom
 
   return (
     <>
-      {rects.map((r, i) => (
+      {segmentRects.map((r, i) => (
         <div
           key={i}
           onPointerDown={onClick}
@@ -42,7 +41,6 @@ export function Underline({
             zIndex: onClick ? 1 : 0,
             ...style,
           }}
-          {...props}
         >
           {/* Visual underline */}
           <div

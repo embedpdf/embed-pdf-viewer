@@ -8,18 +8,16 @@ import { useDebounce } from '../../hooks/use-debounce';
 
 export const InkSidebar = ({
   selected,
-  subtype,
-  intent,
-  activeVariant,
+  activeTool,
   colorPresets,
 }: SidebarPropsBase<PdfInkAnnoObject>) => {
   const { provides: annotation } = useAnnotationCapability();
   if (!annotation) return null;
 
   const anno = selected?.object;
-  const defaults = annotation.getToolDefaultsBySubtypeAndIntent(subtype, intent);
+  const defaults = activeTool?.defaults;
 
-  /* base values */
+  /* base values from the selected annotation or the tool's current defaults */
   const baseColor = anno?.color ?? defaults?.color ?? '#000000';
   const baseOpacity = anno?.opacity ?? defaults?.opacity ?? 1;
   const baseStroke = anno?.strokeWidth ?? defaults?.strokeWidth ?? 2;
@@ -45,9 +43,11 @@ export const InkSidebar = ({
   function applyPatch(patch: Partial<PdfInkAnnoObject>) {
     if (!annotation) return;
     if (anno) {
+      // If editing a selected annotation, update it
       annotation.updateAnnotation(anno.pageIndex, anno.id, patch);
-    } else if (activeVariant) {
-      annotation.setToolDefaults(activeVariant, patch);
+    } else if (activeTool) {
+      // If editing tool defaults, update the tool by its ID
+      annotation.setToolDefaults(activeTool.id, patch);
     }
   }
 

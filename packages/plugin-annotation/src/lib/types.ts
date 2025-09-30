@@ -1,33 +1,37 @@
 import { BasePluginConfig, EventHook } from '@embedpdf/core';
 import {
-  PdfAnnotationObject,
-  PdfErrorReason,
-  Task,
-  PdfAnnotationSubtype,
-  WebAlphaColor,
-  PdfBlendMode,
-  PdfAnnotationBorderStyle,
-  LineEndings,
-  PdfStandardFont,
-  PdfTextAlignment,
-  PdfVerticalAlignment,
   AnnotationCreateContext,
-  PdfTextAnnoObject,
+  PdfAnnotationObject,
+  PdfAnnotationSubtype,
+  PdfErrorReason,
   PdfRenderPageAnnotationOptions,
+  PdfTextAnnoObject,
+  Task,
 } from '@embedpdf/models';
+import { AnnotationTool } from './tools/types';
 
-/* Metadata tracked per anno */
-export type CommitState =
-  | 'new' // created locally, not yet written to the PDF
-  | 'dirty' // exists remotely, but local fields diverge
-  | 'deleted' // deleted locally, not yet written to the PDF
-  | 'synced' // identical to the PDF
-  | 'ignored'; // managed by a different plugin – never auto-committed
+export type AnnotationEvent =
+  | {
+      type: 'create';
+      annotation: PdfAnnotationObject;
+      pageIndex: number;
+      ctx?: AnnotationCreateContext<any>;
+      committed: boolean;
+    }
+  | {
+      type: 'update';
+      annotation: PdfAnnotationObject;
+      pageIndex: number;
+      patch: Partial<PdfAnnotationObject>;
+      committed: boolean;
+    }
+  | { type: 'delete'; annotation: PdfAnnotationObject; pageIndex: number; committed: boolean }
+  | { type: 'loaded'; total: number };
+
+export type CommitState = 'new' | 'dirty' | 'deleted' | 'synced' | 'ignored';
 
 export interface TrackedAnnotation<T extends PdfAnnotationObject = PdfAnnotationObject> {
-  /** local commit bookkeeping */
   commitState: CommitState;
-  /** the actual annotation object, where `object.id` is the stable string ID */
   object: T;
 }
 
@@ -37,171 +41,62 @@ export interface RenderAnnotationOptions {
   options?: PdfRenderPageAnnotationOptions;
 }
 
-export interface BaseAnnotationDefaults {
-  name: string;
-  subtype: PdfAnnotationSubtype;
-  interaction: {
-    mode: string;
-    exclusive: boolean;
-    cursor?: string;
-  };
-  textSelection?: boolean;
-  blendMode?: PdfBlendMode;
-}
-
-export interface HighlightDefaults extends BaseAnnotationDefaults {
-  subtype: PdfAnnotationSubtype.HIGHLIGHT;
-  blendMode: PdfBlendMode;
-  color: string;
-  opacity: number;
-}
-
-export interface UnderlineDefaults extends BaseAnnotationDefaults {
-  subtype: PdfAnnotationSubtype.UNDERLINE;
-  blendMode: PdfBlendMode;
-  color: string;
-  opacity: number;
-}
-
-export interface StrikeoutDefaults extends BaseAnnotationDefaults {
-  subtype: PdfAnnotationSubtype.STRIKEOUT;
-  blendMode: PdfBlendMode;
-  color: string;
-  opacity: number;
-}
-
-export interface SquigglyDefaults extends BaseAnnotationDefaults {
-  subtype: PdfAnnotationSubtype.SQUIGGLY;
-  blendMode: PdfBlendMode;
-  color: string;
-  opacity: number;
-}
-
-export interface InkDefaults extends BaseAnnotationDefaults {
-  subtype: PdfAnnotationSubtype.INK;
-  strokeWidth: number;
-  intent?: string;
-  color: string;
-  opacity: number;
-}
-
-export interface TextDefaults extends BaseAnnotationDefaults {
-  subtype: PdfAnnotationSubtype.FREETEXT;
-  fontSize: number;
-  fontColor: string;
-  fontFamily: PdfStandardFont;
-  textAlign: PdfTextAlignment;
-  verticalAlign: PdfVerticalAlignment;
-  content: string;
-  backgroundColor: string;
-  opacity: number;
-}
-
-export interface CircleDefaults extends BaseAnnotationDefaults {
-  subtype: PdfAnnotationSubtype.CIRCLE;
-  strokeWidth: number;
-  strokeColor: string;
-  strokeStyle: PdfAnnotationBorderStyle;
-  strokeDashArray?: number[];
-  color: string;
-  opacity: number;
-}
-
-export interface SquareDefaults extends BaseAnnotationDefaults {
-  subtype: PdfAnnotationSubtype.SQUARE;
-  strokeWidth: number;
-  strokeColor: string;
-  strokeStyle: PdfAnnotationBorderStyle;
-  strokeDashArray?: number[];
-  color: string;
-  opacity: number;
-}
-
-export interface LineDefaults extends BaseAnnotationDefaults {
-  subtype: PdfAnnotationSubtype.LINE;
-  intent?: string;
-  strokeWidth: number;
-  strokeColor: string;
-  strokeStyle: PdfAnnotationBorderStyle;
-  strokeDashArray?: number[];
-  lineEndings?: LineEndings;
-  color: string;
-  opacity: number;
-}
-
-export interface PolylineDefaults extends BaseAnnotationDefaults {
-  subtype: PdfAnnotationSubtype.POLYLINE;
-  strokeWidth: number;
-  strokeColor: string;
-  strokeStyle: PdfAnnotationBorderStyle;
-  strokeDashArray?: number[];
-  lineEndings?: LineEndings;
-  color: string;
-  opacity: number;
-}
-
-export interface PolygonDefaults extends BaseAnnotationDefaults {
-  subtype: PdfAnnotationSubtype.POLYGON;
-  strokeWidth: number;
-  strokeColor: string;
-  strokeStyle: PdfAnnotationBorderStyle;
-  strokeDashArray?: number[];
-  color: string;
-  opacity: number;
-}
-
-export interface PhotoDefaults extends BaseAnnotationDefaults {
-  subtype: PdfAnnotationSubtype.STAMP;
-}
-
-export type AnnotationDefaults =
-  | HighlightDefaults
-  | UnderlineDefaults
-  | StrikeoutDefaults
-  | SquigglyDefaults
-  | InkDefaults
-  | TextDefaults
-  | CircleDefaults
-  | SquareDefaults
-  | LineDefaults
-  | PolylineDefaults
-  | PolygonDefaults
-  | PhotoDefaults;
-
-export type ToolDefaultsByMode = {
-  [K in string]: AnnotationDefaults;
-};
-
-export type ActiveTool =
-  | { variantKey: null; defaults: null }
-  | { [K in string]: { variantKey: K; defaults: ToolDefaultsByMode[K] } }[string];
-
 export interface AnnotationState {
-  pages: Record<number, string[]>; // pageIndex → list of UIDs
-  byUid: Record<string, TrackedAnnotation>; // UID → latest object
-
+  pages: Record<number, string[]>;
+  byUid: Record<string, TrackedAnnotation>;
   selectedUid: string | null;
-  activeVariant: string | null;
+  activeToolId: string | null;
 
-  toolDefaults: Record<string, AnnotationDefaults>;
+  /** The complete list of available tools, including any user modifications. */
+  tools: AnnotationTool[];
+
   colorPresets: string[];
-
   hasPendingChanges: boolean;
 }
 
 export interface AnnotationPluginConfig extends BasePluginConfig {
-  toolDefaults?: Record<string, AnnotationDefaults>;
+  /** A list of custom tools to add or default tools to override. */
+  tools?: AnnotationTool[];
   colorPresets?: string[];
-  /**
-   * When `false` mutations are kept in memory and must be
-   * flushed with `commitPendingChanges()`.
-   */
+  /** When true (default), automatically commit the annotation changes into the PDF document. */
   autoCommit?: boolean;
-  /**
-   * Author of the annotation
-   */
+  /** The author of the annotation. */
   annotationAuthor?: string;
+  /** When true (default false), deactivate the active tool after creating an annotation. */
+  deactivateToolAfterCreate?: boolean;
+  /** When true (default false), select the annotation immediately after creation. */
+  selectAfterCreate?: boolean;
 }
+
+/**
+ * Options for transforming an annotation
+ */
+export interface TransformOptions<T extends PdfAnnotationObject = PdfAnnotationObject> {
+  /** The type of transformation */
+  type: 'move' | 'resize' | 'vertex-edit' | 'property-update';
+
+  /** The changes to apply */
+  changes: Partial<T>;
+
+  /** Optional metadata */
+  metadata?: {
+    maintainAspectRatio?: boolean;
+    [key: string]: any;
+  };
+}
+
+/**
+ * Function type for custom patch functions
+ */
+export type PatchFunction<T extends PdfAnnotationObject> = (
+  original: T,
+  context: TransformOptions<T>,
+) => Partial<T>;
+
+export type ImportAnnotationItem<T extends PdfAnnotationObject = PdfAnnotationObject> = {
+  annotation: T;
+  ctx?: AnnotationCreateContext<T>;
+};
 
 export interface AnnotationCapability {
   getPageAnnotations: (
@@ -210,32 +105,23 @@ export interface AnnotationCapability {
   getSelectedAnnotation: () => TrackedAnnotation | null;
   selectAnnotation: (pageIndex: number, annotationId: string) => void;
   deselectAnnotation: () => void;
-  getActiveVariant: () => string | null;
-  setActiveVariant: (variantKey: string | null) => void;
-  /** strongly typed – only sub-types we have defaults for */
-  getToolDefaults: (variantKey: string) => AnnotationDefaults;
-  getToolDefaultsBySubtypeAndIntent: <Sub extends AnnotationDefaults['subtype']>(
-    subtype: Sub,
-    intent?: string | null,
-  ) => Extract<AnnotationDefaults, { subtype: Sub }>;
-  getToolDefaultsBySubtype: <Sub extends AnnotationDefaults['subtype']>(
-    subtype: Sub,
-  ) => Extract<AnnotationDefaults, { subtype: Sub }>;
-  /** Return the subtype and intent for a given variant key */
-  getSubtypeAndIntentByVariant: (variantKey: string) => {
-    subtype: PdfAnnotationSubtype;
-    intent?: string;
-  };
-  /** Partially patch a single tool’s defaults */
-  setToolDefaults: (variantKey: string, patch: Partial<AnnotationDefaults>) => void;
-  /** current palette – UI just reads this */
+
+  getActiveTool: () => AnnotationTool | null;
+  setActiveTool: (toolId: string | null) => void;
+  getTools: () => AnnotationTool[];
+  getTool: <T extends AnnotationTool>(toolId: string) => T | undefined;
+  addTool: <T extends AnnotationTool>(tool: T) => void;
+  findToolForAnnotation: (annotation: PdfAnnotationObject) => AnnotationTool | null;
+  setToolDefaults: (toolId: string, patch: Partial<any>) => void;
+
   getColorPresets: () => string[];
-  /** append a swatch (deduped by RGBA) */
   addColorPreset: (color: string) => void;
+
+  importAnnotations: (items: ImportAnnotationItem<PdfAnnotationObject>[]) => void;
   createAnnotation: <A extends PdfAnnotationObject>(
     pageIndex: number,
     annotation: A,
-    ctx?: AnnotationCreateContext<A>,
+    context?: AnnotationCreateContext<A>,
   ) => void;
   updateAnnotation: (
     pageIndex: number,
@@ -243,28 +129,38 @@ export interface AnnotationCapability {
     patch: Partial<PdfAnnotationObject>,
   ) => void;
   deleteAnnotation: (pageIndex: number, annotationId: string) => void;
+
+  /**
+   * Transform an annotation based on interaction (move, resize, etc.)
+   * This applies annotation-specific logic to ensure consistency.
+   */
+  transformAnnotation: <T extends PdfAnnotationObject>(
+    annotation: T,
+    options: TransformOptions<T>,
+  ) => Partial<T>;
+  /**
+   * Register a custom patch function for a specific annotation type.
+   * This allows extending the transformation logic for custom annotations.
+   */
+  registerPatchFunction: <T extends PdfAnnotationObject>(
+    type: PdfAnnotationSubtype,
+    patchFn: PatchFunction<T>,
+  ) => void;
+
   renderAnnotation: (options: RenderAnnotationOptions) => Task<Blob, PdfErrorReason>;
-  /** undo / redo */
+
   onStateChange: EventHook<AnnotationState>;
-  onActiveVariantChange: EventHook<string | null>;
-  onActiveToolChange: EventHook<ActiveTool>;
-  commit: () => void;
+  onActiveToolChange: EventHook<AnnotationTool | null>;
+  onAnnotationEvent: EventHook<AnnotationEvent>;
+  commit: () => Task<boolean, PdfErrorReason>;
 }
 
 export interface GetPageAnnotationsOptions {
   pageIndex: number;
 }
 
-export interface UpdateAnnotationColorOptions extends WebAlphaColor {
-  pageIndex: number;
-  annotationId: string;
-}
-
 export interface SidebarAnnotationEntry {
-  /** Zero-based page index */
   page: number;
-  /** The tracked root annotation shown in the sidebar */
   annotation: TrackedAnnotation;
-  /** Any TEXT-type annotations whose `inReplyToId` points to the root */
   replies: TrackedAnnotation<PdfTextAnnoObject>[];
 }

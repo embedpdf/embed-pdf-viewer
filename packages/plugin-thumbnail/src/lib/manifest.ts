@@ -9,12 +9,16 @@ export const manifest: PluginManifest<ThumbnailPluginConfig> = {
   version: '1.0.0',
   provides: ['thumbnail'],
   requires: ['render'],
-  optional: [],
+  optional: ['scroll'],
   defaultConfig: {
     enabled: true,
     width: 150,
     gap: 10,
     buffer: 3,
     labelHeight: 16,
+    autoScroll: true,
+    scrollBehavior: 'smooth',
+    imagePadding: 0,
+    paddingY: 0,
   },
 };
