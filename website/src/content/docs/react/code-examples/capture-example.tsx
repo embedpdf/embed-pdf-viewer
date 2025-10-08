@@ -17,8 +17,8 @@ import {
 import {
   CapturePluginPackage,
   MarqueeCapture,
-  useCaptureCapability,
   CaptureAreaEvent,
+  useCapture,
 } from '@embedpdf/plugin-capture/react'
 import { useEffect, useState } from 'react'
 
@@ -45,27 +45,19 @@ const plugins = [
 
 // 2. Create a toolbar to activate capture mode
 const CaptureToolbar = () => {
-  const { provides: capture } = useCaptureCapability()
-  const [isActive, setIsActive] = useState(false)
-
-  // The isMarqueeCaptureActive method is synchronous, but we need to listen for mode changes
-  // to update the UI reactively. This could also be done by listening to the InteractionManager's state.
-  useEffect(() => {
-    const interval = setInterval(() => {
-      setIsActive(capture?.isMarqueeCaptureActive() ?? false)
-    }, 100)
-    return () => clearInterval(interval)
-  }, [capture])
+  const { provides: capture, isMarqueeCaptureActive } = useCapture()
 
   return (
     <div className="mb-4 mt-4 flex items-center gap-2 rounded-lg border border-gray-200 bg-white p-2 shadow-sm">
       <button
         onClick={() => capture?.toggleMarqueeCapture()}
         className={`rounded-md px-3 py-1 text-sm font-medium transition-colors ${
-          isActive ? 'bg-blue-500 text-white' : 'bg-gray-100 hover:bg-gray-200'
+          isMarqueeCaptureActive
+            ? 'bg-blue-500 text-white'
+            : 'bg-gray-100 hover:bg-gray-200'
         }`}
       >
-        {isActive ? 'Cancel Capture' : 'Capture Area'}
+        {isMarqueeCaptureActive ? 'Cancel Capture' : 'Capture Area'}
       </button>
     </div>
   )
@@ -73,7 +65,7 @@ const CaptureToolbar = () => {
 
 // 3. Create a component to display the captured image
 const CaptureResult = () => {
-  const { provides: capture } = useCaptureCapability()
+  const { provides: capture } = useCapture()
   const [captureResult, setCaptureResult] = useState<CaptureAreaEvent | null>(
     null,
   )

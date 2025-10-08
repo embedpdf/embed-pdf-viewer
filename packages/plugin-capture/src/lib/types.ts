@@ -29,6 +29,7 @@ export interface RegisterMarqueeOnPageOptions {
 
 export interface CaptureCapability {
   onCaptureArea: EventHook<CaptureAreaEvent>;
+  onMarqueeCaptureActiveChange: EventHook<boolean>;
   captureArea(pageIndex: number, rect: Rect): void;
   enableMarqueeCapture: () => void;
   disableMarqueeCapture: () => void;

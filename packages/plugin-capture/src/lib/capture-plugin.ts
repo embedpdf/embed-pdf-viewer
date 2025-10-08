@@ -1,4 +1,4 @@
-import { BasePlugin, createEmitter, PluginRegistry } from '@embedpdf/core';
+import { BasePlugin, createBehaviorEmitter, createEmitter, PluginRegistry } from '@embedpdf/core';
 import { ignore, Rect } from '@embedpdf/models';
 import {
   InteractionManagerCapability,
@@ -18,6 +18,7 @@ export class CapturePlugin extends BasePlugin<CapturePluginConfig, CaptureCapabi
   static readonly id = 'capture' as const;
 
   private captureArea$ = createEmitter<CaptureAreaEvent>();
+  private marqueeCaptureActive$ = createBehaviorEmitter<boolean>();
 
   private renderCapability: RenderCapability;
   private interactionManagerCapability: InteractionManagerCapability | undefined;
@@ -40,6 +41,14 @@ export class CapturePlugin extends BasePlugin<CapturePluginConfig, CaptureCapabi
         exclusive: true,
         cursor: 'crosshair',
       });
+
+      this.interactionManagerCapability.onModeChange((state) => {
+        if (state.activeMode === 'marqueeCapture') {
+          this.marqueeCaptureActive$.emit(true);
+        } else {
+          this.marqueeCaptureActive$.emit(false);
+        }
+      });
     }
   }
 
@@ -48,6 +57,7 @@ export class CapturePlugin extends BasePlugin<CapturePluginConfig, CaptureCapabi
   protected buildCapability(): CaptureCapability {
     return {
       onCaptureArea: this.captureArea$.on,
+      onMarqueeCaptureActiveChange: this.marqueeCaptureActive$.on,
       captureArea: this.captureArea.bind(this),
       enableMarqueeCapture: this.enableMarqueeCapture.bind(this),
       disableMarqueeCapture: this.disableMarqueeCapture.bind(this),

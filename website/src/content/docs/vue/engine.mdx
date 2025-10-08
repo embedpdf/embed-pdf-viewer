@@ -1,0 +1,97 @@
+---
+title: PDFium Engine for Vue
+description: How to use the usePdfiumEngine composable to power your Vue PDF viewer.
+searchable: true
+---
+
+# PDFium Engine for Vue
+
+The `usePdfiumEngine` composable is the bridge between the core PDF processing engine and your Vue application. Its **primary purpose is to provide a managed engine instance for the main `<EmbedPDF>` component**, which then orchestrates all the plugins and UI components.
+
+## Installation
+
+The composable is included in the `@embedpdf/engines` package, which should be installed alongside `@embedpdf/core`.
+
+```sh npm2yarn
+npm install @embedpdf/core @embedpdf/engines
+````
+
+## Primary Use Case: Powering the `<EmbedPDF>` Component
+
+Most of the time, you will simply get the `engine` from the composable and pass it to the `<EmbedPDF>` provider. The provider and its plugins will handle the rest.
+
+This pattern allows you to build your entire viewer without ever calling `engine.openDocument()` or `engine.renderPage()` yourself.
+
+```vue filename="MyViewer.vue"
+<script setup lang="ts">
+import { usePdfiumEngine } from '@embedpdf/engines/vue';
+import { EmbedPDF } from '@embedpdf/core/vue';
+// ... import your desired plugins and components
+
+// The composable returns reactive state
+const { engine, isLoading, error } = usePdfiumEngine();
+</script>
+
+<template>
+  <div v-if="isLoading">Loading PDF Engine...</div>
+  <div v-else-if="error">Error loading engine: {{ error.message }}</div>
+  
+  <EmbedPDF v-else :engine="engine" :plugins="[/* ... your plugins ... */]">
+  </EmbedPDF>
+</template>
+```
+
+## Advanced Use Case: Direct Engine Interaction
+
+For tasks that fall outside the plugin system—such as exporting a page image on a button click or performing a one-off text extraction—you can use the `engine` object directly. The `engine` returned by the composable is a `Ref<PdfEngine | null>`, so you'll need to access its `.value`.
+
+```vue
+<script setup lang="ts">
+import { usePdfiumEngine } from '@embedpdf/engines/vue';
+import { ignore } from '@embedpdf/models';
+
+const { isLoading, error, engine } = usePdfiumEngine();
+
+const handleDirectOperation = () => {
+  if (!engine.value) {
+    console.error('Engine not available');
+    return;
+  }
+  // Example: You can now use engine methods directly
+  console.log('Engine is ready for direct operations', engine.value);
+};
+</script>
+
+<template>
+  <div v-if="isLoading">Loading...</div>
+  <div v-else-if="error" class="error-message">
+    Failed to initialize PDF engine: {{ error.message }}
+  </div>
+  <div v-else class="success-message">
+    <p>Engine loaded successfully!</p>
+    <button @click="handleDirectOperation">Perform Direct Operation</button>
+  </div>
+</template>
+```
+
+## Composable API Reference
+
+The `usePdfiumEngine` composable accepts an optional configuration object and returns the engine's state as reactive refs.
+
+#### **Configuration Options**
+
+| Option | Type | Default | Description |
+| :--- | :--- | :--- | :--- |
+| **`wasmUrl`** | `string` | CDN URL | Custom WebAssembly file URL |
+| **`worker`** | `boolean` | `true` | Whether to run the engine in a Web Worker |
+| **`logger`** | `Logger` | `undefined` | Custom logger instance |
+
+#### **Return Values**
+
+All return values are Vue `Ref` objects.
+
+  - **`engine`**: `Ref<PdfEngine | null>` - The `PdfEngine` instance (already initialized), or `null` while loading.
+  - **`isLoading`**: `Ref<boolean>` - A boolean that is `true` while the engine's WebAssembly is being downloaded and instantiated.
+  - **`error`**: `Ref<Error | null>` - An `Error` object if loading or initialization fails, otherwise `null`.
+
+For complete documentation of all available engine methods, see the **[@embedpdf/engines package documentation](/docs/engines/introduction)**.

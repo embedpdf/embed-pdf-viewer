@@ -4,9 +4,24 @@
   "version": "0.0.0",
   "type": "module",
   "license": "MIT",
+  "exports": {
+    "./*": "./dist/examples/*.js"
+  },
+  "typesVersions": {
+    "*": {
+      "*": [
+        "./dist/examples/*.d.ts"
+      ]
+    }
+  },
+  "files": [
+    "dist"
+  ],
   "scripts": {
     "dev": "vite",
-    "build": "vite build",
+    "build": "pnpm build:app && pnpm build:examples",
+    "build:app": "vite build",
+    "build:examples": "vite --config vite.lib.config.ts build",
     "preview": "vite preview",
     "lint": "eslint . --ext ts,vue --report-unused-disable-directives --max-warnings 0"
   },
@@ -14,15 +29,25 @@
     "@embedpdf/core": "workspace:*",
     "@embedpdf/engines": "workspace:*",
     "@embedpdf/models": "workspace:*",
-    "@embedpdf/plugin-loader": "workspace:*",
-    "@embedpdf/plugin-viewport": "workspace:*",
-    "@embedpdf/plugin-scroll": "workspace:*",
-    "@embedpdf/plugin-render": "workspace:*",
-    "@embedpdf/plugin-tiling": "workspace:*",
-    "@embedpdf/plugin-interaction-manager": "workspace:*",
-    "@embedpdf/plugin-selection": "workspace:*",
-    "@embedpdf/plugin-rotate": "workspace:*",
+    "@embedpdf/plugin-annotation": "workspace:*",
+    "@embedpdf/plugin-capture": "workspace:*",
+    "@embedpdf/plugin-export": "workspace:*",
     "@embedpdf/plugin-fullscreen": "workspace:*",
+    "@embedpdf/plugin-history": "workspace:*",
+    "@embedpdf/plugin-interaction-manager": "workspace:*",
+    "@embedpdf/plugin-loader": "workspace:*",
+    "@embedpdf/plugin-pan": "workspace:*",
+    "@embedpdf/plugin-print": "workspace:*",
+    "@embedpdf/plugin-redaction": "workspace:*",
+    "@embedpdf/plugin-render": "workspace:*",
+    "@embedpdf/plugin-rotate": "workspace:*",
+    "@embedpdf/plugin-scroll": "workspace:*",
+    "@embedpdf/plugin-search": "workspace:*",
+    "@embedpdf/plugin-selection": "workspace:*",
+    "@embedpdf/plugin-spread": "workspace:*",
+    "@embedpdf/plugin-thumbnail": "workspace:*",
+    "@embedpdf/plugin-tiling": "workspace:*",
+    "@embedpdf/plugin-viewport": "workspace:*",
     "@embedpdf/plugin-zoom": "workspace:*",
     "vue": "^3.5.0"
   },
@@ -33,8 +58,11 @@
     "@vitejs/plugin-vue": "^5.0.4",
     "eslint": "^9.17.0",
     "eslint-plugin-vue": "^9.25.0",
+    "glob": "^10.4.5",
     "tailwindcss": "^4.1.11",
     "typescript": "^5.7.3",
-    "vite": "^6.3.5"
+    "vite": "^6.3.5",
+    "vite-plugin-dts": "^4.5.4",
+    "vue-tsc": "^3.0.1"
   }
 }
