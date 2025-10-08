@@ -9,9 +9,18 @@ import { useSpread, SpreadMode } from '@embedpdf/plugin-spread/vue';
 import { useInteractionManager } from '@embedpdf/plugin-interaction-manager/vue';
 import PrintDialog from './PrintDialog.vue';
 import ZoomControls from './ZoomControls.vue';
-import DrawerToggleButton from './drawer-system/DrawerToggleButton.vue';
 import AnnotationToolbar from './AnnotationToolbar.vue';
 import RedactToolbar from './RedactToolbar.vue';
+
+const props = defineProps<{
+  leftDrawerOpen: boolean;
+  rightDrawerOpen: boolean;
+}>();
+
+const emit = defineEmits<{
+  (event: 'toggle-left-drawer'): void;
+  (event: 'toggle-right-drawer'): void;
+}>();
 
 const { provides: fullscreenProvider, state: fullscreenState } = useFullscreen();
 const { provides: panProvider, isPanning } = usePan();
@@ -77,8 +86,8 @@ const handlePrintDialogClose = () => {
 </script>
 
 <template>
-  <q-header elevated class="toolbar bg-white text-dark">
-    <q-toolbar class="q-px-md q-gutter-sm">
+  <div class="toolbar bg-white text-dark">
+    <div class="toolbar__inner row items-center no-wrap q-px-md q-gutter-sm">
       <!-- Main Menu -->
       <q-btn
         flat
@@ -124,7 +133,16 @@ const handlePrintDialogClose = () => {
       <q-separator vertical spaced />
 
       <!-- Sidebar Toggle -->
-      <DrawerToggleButton component-id="sidebar" />
+      <q-btn
+        flat
+        round
+        dense
+        icon="mdi-dock-left"
+        :color="props.leftDrawerOpen ? 'primary' : undefined"
+        @click="emit('toggle-left-drawer')"
+      >
+        <q-tooltip>Sidebar</q-tooltip>
+      </q-btn>
 
       <!-- Page Settings Menu -->
       <q-btn
@@ -254,27 +272,60 @@ const handlePrintDialogClose = () => {
       <q-space />
 
       <!-- Search Toggle -->
-      <DrawerToggleButton component-id="search" />
-    </q-toolbar>
-    <AnnotationToolbar v-if="mode === 'annotate'" />
-    <RedactToolbar v-if="mode === 'redact'" />
-  </q-header>
-
-  <!-- Print Dialog -->
-  <PrintDialog :open="printDialogOpen" @close="handlePrintDialogClose" />
+      <q-btn
+        flat
+        round
+        dense
+        icon="mdi-magnify"
+        :color="props.rightDrawerOpen ? 'primary' : undefined"
+        @click="emit('toggle-right-drawer')"
+      >
+        <q-tooltip>Search</q-tooltip>
+      </q-btn>
+    </div>
+    <div v-if="mode === 'annotate'" class="toolbar__secondary">
+      <div class="toolbar__secondary-inner">
+        <AnnotationToolbar />
+      </div>
+    </div>
+    <div v-else-if="mode === 'redact'" class="toolbar__secondary">
+      <div class="toolbar__secondary-inner">
+        <RedactToolbar />
+      </div>
+    </div>
+    <PrintDialog :open="printDialogOpen" @close="handlePrintDialogClose" />
+  </div>
 </template>
 
 <style scoped>
 .toolbar {
-  border-bottom: 1px solid #cfd4da;
+  display: flex;
+  flex-direction: column;
+  border-bottom: 1px solid var(--q-color-grey-4);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.08);
+}
+
+.toolbar__inner {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 56px;
+  flex-wrap: nowrap;
+}
+
+.toolbar__secondary {
+  border-top: 1px solid var(--q-color-grey-4);
+  padding: 8px 16px;
+}
+
+.toolbar__secondary-inner {
+  display: flex;
+  align-items: center;
+  gap: 8px;
 }
 
 .mode-tabs-container {
   display: flex;
   align-items: center;
-}
-
-.mode-tabs :deep(.q-tab__label) {
-  font-weight: 500;
 }
 </style>

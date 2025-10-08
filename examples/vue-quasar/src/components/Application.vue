@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { ref } from 'vue';
 import { usePdfiumEngine } from '@embedpdf/engines/vue';
 import { EmbedPDF } from '@embedpdf/core/vue';
 import { createPluginRegistration, PluginRegistry } from '@embedpdf/core';
@@ -32,34 +33,35 @@ import {
 import type { AnnotationTool } from '@embedpdf/plugin-annotation/vue';
 import { PdfAnnotationSubtype } from '@embedpdf/models';
 import type { PdfStampAnnoObject } from '@embedpdf/models';
-
 import Toolbar from './Toolbar.vue';
-import DrawerProvider from './drawer-system/DrawerProvider.vue';
-import Drawer from './drawer-system/Drawer.vue';
-import Search from './Search.vue';
-import Sidebar from './Sidebar.vue';
 import PageControls from './PageControls.vue';
 import RedactionSelectionMenu from './RedactionSelectionMenu.vue';
 import AnnotationSelectionMenu from './AnnotationSelectionMenu.vue';
 
-// Define drawer components
-const drawerComponents = [
-  {
-    id: 'search',
-    component: Search,
-    icon: 'mdi-magnify',
-    label: 'Search',
-    position: 'right' as const,
-  },
-  {
-    id: 'sidebar',
-    component: Sidebar,
-    icon: 'mdi-dock-left',
-    label: 'Sidebar',
-    position: 'left' as const,
-  },
-];
+import Search from './Search.vue';
+import Sidebar from './Sidebar.vue';
 
+const leftDrawerOpen = ref(false);
+const rightDrawerOpen = ref(false);
+
+const toggleLeftDrawer = () => {
+  leftDrawerOpen.value = !leftDrawerOpen.value;
+  if (leftDrawerOpen.value && rightDrawerOpen.value) {
+    rightDrawerOpen.value = false;
+  }
+};
+
+const toggleRightDrawer = () => {
+  rightDrawerOpen.value = !rightDrawerOpen.value;
+  if (leftDrawerOpen.value && rightDrawerOpen.value) {
+    leftDrawerOpen.value = false;
+  }
+};
+
+const closeDrawers = () => {
+  leftDrawerOpen.value = false;
+  rightDrawerOpen.value = false;
+};
 const { engine, isLoading: engineLoading, error: engineError } = usePdfiumEngine();
 
 const handleInitialized = async (registry: PluginRegistry) => {
@@ -99,11 +101,12 @@ const handleInitialized = async (registry: PluginRegistry) => {
     </div>
 
     <!-- Main application -->
-    <div v-else-if="engine" class="fit">
-      <EmbedPDF
-        :engine="engine"
-        :on-initialized="handleInitialized"
-        :plugins="[
+    <div v-else-if="engine" class="application__root">
+      <div class="application__embed">
+        <EmbedPDF
+          :engine="engine"
+          :on-initialized="handleInitialized"
+          :plugins="[
           createPluginRegistration(LoaderPluginPackage, {
             loadingOptions: {
               type: 'url',
@@ -149,17 +152,27 @@ const handleInitialized = async (registry: PluginRegistry) => {
           createPluginRegistration(RedactionPluginPackage),
           createPluginRegistration(AnnotationPluginPackage),
         ]"
-      >
-        <template #default="{ pluginsReady }">
-          <DrawerProvider :components="drawerComponents">
-            <q-layout view="hHh Lpr fFf" class="application__layout">
-              <Toolbar />
+        >
+          <template #default="{ pluginsReady }">
+            <div class="application__shell">
+              <Toolbar
+                :left-drawer-open="leftDrawerOpen"
+                :right-drawer-open="rightDrawerOpen"
+                @toggle-left-drawer="toggleLeftDrawer"
+                @toggle-right-drawer="toggleRightDrawer"
+              />
 
-              <Drawer position="left" />
+              <div class="application__body">
+                <aside
+                  class="application__drawer application__drawer--left"
+                  :class="{ 'is-open': leftDrawerOpen }"
+                  aria-hidden="true"
+                >
+                  <Sidebar />
+                </aside>
 
-              <q-page-container class="application__page-container">
-                <q-page class="application__page q-pa-none">
-                  <GlobalPointerProvider>
+                <div class="application__main">
+                  <GlobalPointerProvider class="application__pointer-provider">
                     <Viewport class="application__viewport">
                       <div
                         v-if="!pluginsReady"
@@ -219,7 +232,9 @@ const handleInitialized = async (registry: PluginRegistry) => {
                                 :scale="page.scale"
                                 :rotation="page.rotation"
                               >
-                                <template #selection-menu="{ item, selected, menuWrapperProps, rect }">
+                                <template
+                                  #selection-menu="{ item, selected, menuWrapperProps, rect }"
+                                >
                                   <RedactionSelectionMenu
                                     v-if="selected"
                                     :item="item"
@@ -237,14 +252,28 @@ const handleInitialized = async (registry: PluginRegistry) => {
                       <PageControls />
                     </Viewport>
                   </GlobalPointerProvider>
-                </q-page>
-              </q-page-container>
+                </div>
 
-              <Drawer position="right" />
-            </q-layout>
-          </DrawerProvider>
-        </template>
-      </EmbedPDF>
+                <aside
+                  class="application__drawer application__drawer--right"
+                  :class="{ 'is-open': rightDrawerOpen }"
+                  aria-hidden="true"
+                >
+                  <Search />
+                </aside>
+
+                <button
+                  v-if="leftDrawerOpen || rightDrawerOpen"
+                  type="button"
+                  class="application__drawer-overlay"
+                  aria-label="Close drawers"
+                  @click="closeDrawers"
+                />
+              </div>
+            </div>
+          </template>
+        </EmbedPDF>
+      </div>
     </div>
 
     <!-- Engine not ready state -->
@@ -257,19 +286,94 @@ const handleInitialized = async (registry: PluginRegistry) => {
 <style scoped>
 .application {
   user-select: none;
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
 }
 
-.application__layout {
+.application__root {
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  height: 100%;
+}
+
+.application__embed {
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  height: 100%;
+}
+
+.application__shell {
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  height: 100%;
   background-color: #f5f5f5;
 }
 
-.application__page-container,
-.application__page {
-  height: 100%;
+.application__body {
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  position: relative;
+  overflow: hidden;
+}
+
+.application__drawer {
+  width: 300px;
+  flex: 0 0 auto;
+  background-color: #ffffff;
+  border-right: 1px solid var(--q-color-grey-4);
+  overflow: auto;
+  transform: translateX(-100%);
+  transition: transform 0.2s ease;
+  z-index: 2;
+}
+
+.application__drawer--right {
+  border-right: none;
+  border-left: 1px solid var(--q-color-grey-4);
+  transform: translateX(100%);
+}
+
+.application__drawer.is-open {
+  transform: translateX(0);
+}
+
+.application__drawer-overlay {
+  position: absolute;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.25);
+  border: none;
+  padding: 0;
+  margin: 0;
+  cursor: pointer;
+  z-index: 1;
+}
+
+.application__drawer-overlay:focus {
+  outline: 2px solid var(--q-color-primary);
+}
+
+.application__main {
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+}
+
+.application__pointer-provider {
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
 }
 
 .application__viewport {
-  height: 100%;
+  flex: 1 1 auto;
+  min-height: 0;
   background-color: #f5f5f5;
   overflow: auto;
   position: relative;
