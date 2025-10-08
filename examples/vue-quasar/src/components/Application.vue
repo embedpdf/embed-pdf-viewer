@@ -262,13 +262,6 @@ const handleInitialized = async (registry: PluginRegistry) => {
                   <Search />
                 </aside>
 
-                <button
-                  v-if="leftDrawerOpen || rightDrawerOpen"
-                  type="button"
-                  class="application__drawer-overlay"
-                  aria-label="Close drawers"
-                  @click="closeDrawers"
-                />
               </div>
             </div>
           </template>
@@ -324,17 +317,27 @@ const handleInitialized = async (registry: PluginRegistry) => {
 }
 
 .application__drawer {
+  position: absolute;
+  top: 0;
+  bottom: 0;
   width: 300px;
-  flex: 0 0 auto;
   background-color: #ffffff;
   border-right: 1px solid var(--q-color-grey-4);
   overflow: auto;
   transform: translateX(-100%);
-  transition: transform 0.2s ease;
+  transition: transform 0.2s ease, opacity 0.2s ease;
+  pointer-events: none;
+  opacity: 0;
   z-index: 2;
 }
 
+.application__drawer--left {
+  left: 0;
+}
+
 .application__drawer--right {
+  right: 0;
+  left: auto;
   border-right: none;
   border-left: 1px solid var(--q-color-grey-4);
   transform: translateX(100%);
@@ -342,21 +345,8 @@ const handleInitialized = async (registry: PluginRegistry) => {
 
 .application__drawer.is-open {
   transform: translateX(0);
-}
-
-.application__drawer-overlay {
-  position: absolute;
-  inset: 0;
-  background: rgba(0, 0, 0, 0.25);
-  border: none;
-  padding: 0;
-  margin: 0;
-  cursor: pointer;
-  z-index: 1;
-}
-
-.application__drawer-overlay:focus {
-  outline: 2px solid var(--q-color-primary);
+  pointer-events: auto;
+  opacity: 1;
 }
 
 .application__main {

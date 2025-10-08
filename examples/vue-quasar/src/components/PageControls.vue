@@ -89,9 +89,10 @@ const handleNextPage = () => {
   }
 };
 
-const handleInputChange = (value: string) => {
+const handleInputChange = (value: string | number | null) => {
   // Only allow numeric input
-  const numericValue = value.replace(/[^0-9]/g, '');
+  const stringValue = value === null ? '' : String(value);
+  const numericValue = stringValue.replace(/[^0-9]/g, '');
   inputValue.value = numericValue;
 };
 
@@ -142,19 +143,21 @@ const isNextDisabled = computed(() => state.value.currentPage === state.value.to
 
 <style scoped>
 .page-controls {
-  position: absolute;
-  bottom: 16px;
+  position: fixed;
   left: 50%;
+  bottom: 32px;
   transform: translateX(-50%);
   z-index: 1000;
-  opacity: v-bind(isVisible ? 1: 0);
+  opacity: v-bind('isVisible ? 1 : 0');
   transition: opacity 0.2s ease-in-out;
+  pointer-events: none;
 }
 
 .page-controls-card {
   background-color: #f8f9fa;
   padding: 6px 10px;
   border-radius: 10px;
+  pointer-events: auto;
 }
 
 .page-input {
