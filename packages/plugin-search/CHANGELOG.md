@@ -1,5 +1,11 @@
 # @embedpdf/plugin-search
 
+## 1.3.15
+
+### Patch Changes
+
+- [#218](https://github.com/embedpdf/embed-pdf-viewer/pull/218) by [@odedindi](https://github.com/odedindi) – Use unique key prop in search layer component results mapping
+
 ## 1.3.14
 
 ## 1.3.13
