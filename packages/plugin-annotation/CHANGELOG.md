@@ -1,5 +1,7 @@
 # @embedpdf/plugin-annotation
 
+## 1.3.15
+
 ## 1.3.14
 
 ### Patch Changes
