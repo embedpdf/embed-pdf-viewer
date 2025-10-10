@@ -43,7 +43,14 @@ import {
   RegisterSelectionOnPageOptions,
   SelectionRectsCallback,
 } from './types';
-import { sliceBounds, rectsWithinSlice, glyphAt } from './utils';
+import {
+  sliceBounds,
+  rectsWithinSlice,
+  glyphAt,
+  findNearestGlyphWithModel,
+  GlyphAccelerationModel,
+  buildGlyphAccelerationModel,
+} from './utils';
 
 export class SelectionPlugin extends BasePlugin<
   SelectionPluginConfig,
@@ -59,6 +66,7 @@ export class SelectionPlugin extends BasePlugin<
   /* interactive state */
   private selecting = false;
   private anchor?: { page: number; index: number };
+  private mouseDown = false;
 
   /** Page callbacks for rect updates */
   private pageCallbacks = new Map<number, (data: SelectionRectsCallback) => void>();
@@ -145,50 +153,75 @@ export class SelectionPlugin extends BasePlugin<
       rects: selector.selectRectsForPage(this.state, pageIndex),
       boundingRect: selector.selectBoundingRectForPage(this.state, pageIndex),
     });
+    let mouseDownData: {
+      x: number;
+      y: number;
+      num: number;
+      time: number;
+      clientX: number;
+      clientY: number;
+    } | null = null;
 
     const handlers: PointerEventHandlersWithLifecycle<PointerEvent> = {
-      onPointerDown: (point: Position, _evt, modeId) => {
+      onPointerDown: (point: Position, evt, modeId) => {
         if (!this.enabledModes.has(modeId)) return;
 
-        // Clear the selection
         this.clearSelection();
 
-        // Get geometry from cache (or load if needed)
         const cached = this.state.geometry[pageIndex];
-        if (cached) {
-          const g = glyphAt(cached, point);
-          if (g !== -1) {
-            this.beginSelection(pageIndex, g);
-          }
-        }
+        if (!cached) return;
+
+        const res = findNearestGlyphWithModel(cached, { x: point.x, y: point.y });
+        const num = res?.globalIndex ?? -1;
+
+        mouseDownData = {
+          x: point.x,
+          y: point.y,
+          num,
+          time: performance.now(),
+          clientX: evt.clientX,
+          clientY: evt.clientY,
+        };
+        this.mouseDown = true;
       },
-      onPointerMove: (point: Position, _evt, modeId) => {
+      onPointerMove: (point: Position, evt, modeId) => {
         if (!this.enabledModes.has(modeId)) return;
 
         // Get cached geometry (should be instant if already loaded)
         const cached = this.state.geometry[pageIndex];
-        if (cached) {
-          const g = glyphAt(cached, point);
+        if (!cached) return;
+        const res = findNearestGlyphWithModel(cached, point);
+        if (!res) {
+          this.interactionManagerCapability?.removeCursor('selection-text');
+          return;
+        }
+        if (res.isExactMatch) {
+          this.interactionManagerCapability?.setCursor('selection-text', 'text', 10);
+        } else {
+          this.interactionManagerCapability?.removeCursor('selection-text');
+        }
 
-          // Update cursor
-          if (g !== -1) {
-            this.interactionManagerCapability?.setCursor('selection-text', 'text', 10);
-          } else {
-            this.interactionManagerCapability?.removeCursor('selection-text');
-          }
-
-          // Update selection if we're selecting
-          if (this.selecting && g !== -1) {
-            this.updateSelection(pageIndex, g);
-          }
+        const g = res.globalIndex;
+        const isMouseDown = this.mouseDown;
+        if (isMouseDown && mouseDownData && !this.selecting) {
+          const deltaX = evt.clientX - mouseDownData.clientX;
+          const deltaY = evt.clientY - mouseDownData.clientY;
+          const distance = deltaX * deltaX + deltaY * deltaY;
+          if (distance > 25) this.beginSelection(pageIndex, g);
+        } else if (this.selecting) {
+          this.updateSelection(pageIndex, g);
         }
       },
       onPointerUp: (_point: Position, _evt, modeId) => {
         if (!this.enabledModes.has(modeId)) return;
+        this.mouseDown = false;
+        mouseDownData = null;
         this.endSelection();
       },
       onHandlerActiveEnd: (modeId) => {
         if (!this.enabledModes.has(modeId)) return;
+        this.mouseDown = false;
+        mouseDownData = null;
         this.clearSelection();
       },
     };
@@ -228,19 +261,34 @@ export class SelectionPlugin extends BasePlugin<
     });
   }
 
-  private getNewPageGeometryAndCache(pageIdx: number): PdfTask<PdfPageGeometry> {
+  private getNewPageGeometryAndCache(pageIdx: number): PdfTask<GlyphAccelerationModel> {
     if (!this.coreState.core.document)
       return PdfTaskHelper.reject({ code: PdfErrorCode.NotFound, message: 'Doc Not Found' });
     const page = this.coreState.core.document.pages.find((p) => p.index === pageIdx)!;
+    const resTask: PdfTask<GlyphAccelerationModel> = new Task();
+
     const task = this.engine.getPageGeometry(this.coreState.core.document, page);
     task.wait((geo) => {
-      this.dispatch(cachePageGeometry(pageIdx, geo));
+      const model = buildGlyphAccelerationModel(geo);
+      this.dispatch(cachePageGeometry(pageIdx, model));
+      resTask.resolve(model);
     }, ignore);
-    return task;
+
+    // listen task abort to abort webworker task
+    resTask.wait(
+      () => {},
+      (err) => {
+        if (err.type === 'abort') {
+          task.abort(err.reason);
+        }
+      },
+    );
+
+    return resTask;
   }
 
   /* ── geometry cache ───────────────────────────────────── */
-  private getOrLoadGeometry(pageIdx: number): PdfTask<PdfPageGeometry> {
+  private getOrLoadGeometry(pageIdx: number): PdfTask<GlyphAccelerationModel> {
     const cached = this.state.geometry[pageIdx];
     if (cached) return PdfTaskHelper.resolve(cached);
 
@@ -264,6 +312,7 @@ export class SelectionPlugin extends BasePlugin<
 
   private clearSelection() {
     this.selecting = false;
+    this.mouseDown = false;
     this.anchor = undefined;
     this.dispatch(clearSelection());
     this.selChange$.emit(null);
@@ -296,10 +345,10 @@ export class SelectionPlugin extends BasePlugin<
 
     for (let p = range.start.page; p <= range.end.page; p++) {
       const geo = this.state.geometry[p];
-      const sb = sliceBounds(range, geo, p);
+      const sb = sliceBounds(range, geo.geo, p);
       if (!sb) continue;
 
-      allRects[p] = rectsWithinSlice(geo!, sb.from, sb.to);
+      allRects[p] = rectsWithinSlice(geo.geo!, sb.from, sb.to);
       allSlices[p] = { start: sb.from, count: sb.to - sb.from + 1 };
     }
 
