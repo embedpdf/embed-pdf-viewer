@@ -351,6 +351,7 @@ export class PdfiumEngine<T = Blob> implements PdfEngine<T> {
   public openDocumentUrl(file: PdfFileUrl, options?: PdfOpenDocumentUrlOptions) {
     const mode = options?.mode ?? 'auto';
     const password = options?.password ?? '';
+    const headers = options?.headers ?? {};
 
     this.logger.debug(LOG_SOURCE, LOG_CATEGORY, 'openDocumentUrl called', file.url, mode);
 
@@ -360,7 +361,7 @@ export class PdfiumEngine<T = Blob> implements PdfEngine<T> {
     // Start an async procedure
     (async () => {
       try {
-        const fetchFullTask = await this.fetchFullAndOpen(file, password);
+        const fetchFullTask = await this.fetchFullAndOpen(file, password, headers);
         fetchFullTask.wait(
           (doc) => task.resolve(doc),
           (err) => task.reject(err.reason),
@@ -433,11 +434,15 @@ export class PdfiumEngine<T = Blob> implements PdfEngine<T> {
    * Fully fetch the file (using fetch) into an ArrayBuffer,
    * then call openDocumentFromBuffer.
    */
-  private async fetchFullAndOpen(file: PdfFileUrl, password: string) {
+  private async fetchFullAndOpen(
+    file: PdfFileUrl,
+    password: string,
+    headers: Record<string, string> = {},
+  ) {
     this.logger.debug(LOG_SOURCE, LOG_CATEGORY, 'fetchFullAndOpen', file.url);
 
     // 1. fetch entire PDF as array buffer
-    const response = await fetch(file.url);
+    const response = await fetch(file.url, { headers });
     if (!response.ok) {
       throw new Error(`Could not fetch PDF: ${response.statusText}`);
     }

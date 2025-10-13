@@ -1,6 +1,17 @@
 import { IPlugin } from '../types/plugin';
 import { PluginRegistry } from '../registry/plugin-registry';
-import { Action, CoreAction, CoreState, PluginStore, Store, StoreState } from '../store';
+import {
+  Action,
+  CLOSE_DOCUMENT,
+  CoreAction,
+  CoreState,
+  PluginStore,
+  SET_ACTIVE_DOCUMENT,
+  SET_DOCUMENT_LOADED,
+  START_LOADING_DOCUMENT,
+  Store,
+  StoreState,
+} from '../store';
 import { Logger, PdfEngine } from '@embedpdf/models';
 
 export interface StateChangeHandler<TState> {
@@ -26,6 +37,10 @@ export abstract class BasePlugin<
   private debouncedTimeouts: Record<string, number> = {};
   private unsubscribeFromState: (() => void) | null = null;
   private unsubscribeFromCoreStore: (() => void) | null = null;
+  private unsubscribeFromStartLoadingDocument: (() => void) | null = null;
+  private unsubscribeFromSetDocumentLoaded: (() => void) | null = null;
+  private unsubscribeFromCloseDocument: (() => void) | null = null;
+  private unsubscribeFromSetActiveDocument: (() => void) | null = null;
 
   private _capability?: Readonly<TCapability>;
 
@@ -51,6 +66,27 @@ export abstract class BasePlugin<
     this.unsubscribeFromCoreStore = this.coreStore.subscribe((action, newState, oldState) => {
       this.onCoreStoreUpdated(oldState, newState);
     });
+    this.unsubscribeFromStartLoadingDocument = this.coreStore.onAction(
+      START_LOADING_DOCUMENT,
+      (action) => {
+        this.onDocumentLoadingStarted(action.payload.documentId);
+      },
+    );
+    this.unsubscribeFromSetDocumentLoaded = this.coreStore.onAction(
+      SET_DOCUMENT_LOADED,
+      (action) => {
+        this.onDocumentLoaded(action.payload.documentId);
+      },
+    );
+    this.unsubscribeFromCloseDocument = this.coreStore.onAction(CLOSE_DOCUMENT, (action) => {
+      this.onDocumentClosed(action.payload.documentId);
+    });
+    this.unsubscribeFromSetActiveDocument = this.coreStore.onAction(
+      SET_ACTIVE_DOCUMENT,
+      (action, _state, oldState) => {
+        this.onActiveDocumentChanged(oldState.core.activeDocumentId, action.payload);
+      },
+    );
 
     // Initialize ready state
     this.readyPromise = new Promise((resolve) => {
@@ -216,6 +252,41 @@ export abstract class BasePlugin<
   }
 
   /**
+   * Called when a document is opened
+   * Override to initialize per-document state
+   * @param documentId The ID of the document that was opened
+   */
+  protected onDocumentLoadingStarted(documentId: string): void {
+    // Default: no-op
+  }
+
+  /**
+   * Called when a document is loaded
+   * @param documentId The ID of the document that is loaded
+   */
+  protected onDocumentLoaded(documentId: string): void {
+    // Default: no-op
+  }
+
+  /**
+   * Called when a document is closed
+   * Override to cleanup per-document state
+   * @param documentId The ID of the document that was closed
+   */
+  protected onDocumentClosed(documentId: string): void {
+    // Default: no-op
+  }
+
+  /**
+   * Called when the active document changes
+   * @param previousId The ID of the previous active document
+   * @param currentId The ID of the new active document
+   */
+  protected onActiveDocumentChanged(previousId: string | null, currentId: string | null): void {
+    // Default: no-op
+  }
+
+  /**
    * Cleanup method to be called when plugin is being destroyed
    */
   public destroy(): void {
@@ -232,6 +303,22 @@ export abstract class BasePlugin<
     if (this.unsubscribeFromCoreStore) {
       this.unsubscribeFromCoreStore();
       this.unsubscribeFromCoreStore = null;
+    }
+    if (this.unsubscribeFromStartLoadingDocument) {
+      this.unsubscribeFromStartLoadingDocument();
+      this.unsubscribeFromStartLoadingDocument = null;
+    }
+    if (this.unsubscribeFromSetDocumentLoaded) {
+      this.unsubscribeFromSetDocumentLoaded();
+      this.unsubscribeFromSetDocumentLoaded = null;
+    }
+    if (this.unsubscribeFromCloseDocument) {
+      this.unsubscribeFromCloseDocument();
+      this.unsubscribeFromCloseDocument = null;
+    }
+    if (this.unsubscribeFromSetActiveDocument) {
+      this.unsubscribeFromSetActiveDocument();
+      this.unsubscribeFromSetActiveDocument = null;
     }
   }
 

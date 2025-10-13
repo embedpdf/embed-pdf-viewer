@@ -1,20 +1,44 @@
-import { PdfDocumentObject, PdfPageObject, Rotation } from '@embedpdf/models';
+import { PdfDocumentObject, PdfErrorCode, PdfPageObject, Rotation } from '@embedpdf/models';
 import { PluginRegistryConfig } from '../types/plugin';
 
-export interface CoreState {
-  scale: number;
-  rotation: Rotation;
+export type DocumentStatus = 'loading' | 'loaded' | 'error';
+
+export interface DocumentState {
+  id: string;
+  // Lifecycle status
+  status: DocumentStatus;
+
+  // Loading progress (0-100)
+  loadingProgress?: number;
+
+  // Error information (when status is 'error')
+  error: string | null;
+  errorCode?: PdfErrorCode;
+  errorDetails?: any;
+
+  // Document data (null when loading or error)
   document: PdfDocumentObject | null;
   pages: PdfPageObject[][];
-  loading: boolean;
-  error: string | null;
+
+  // View settings (set even during loading for when it succeeds)
+  scale: number;
+  rotation: Rotation;
+
+  // Metadata
+  loadStartedAt: number;
+  loadedAt?: number;
+}
+
+export interface CoreState {
+  documents: Record<string, DocumentState>;
+  activeDocumentId: string | null;
+  defaultScale: number;
+  defaultRotation: Rotation;
 }
 
 export const initialCoreState: (config?: PluginRegistryConfig) => CoreState = (config) => ({
-  scale: config?.scale ?? 1,
-  rotation: config?.rotation ?? Rotation.Degree0,
-  document: null,
-  pages: [],
-  loading: false,
-  error: null,
+  documents: {},
+  activeDocumentId: null,
+  defaultScale: config?.defaultScale ?? 1,
+  defaultRotation: config?.defaultRotation ?? Rotation.Degree0,
 });

@@ -5,7 +5,11 @@ import { ScrollActivity, ViewportPlugin } from '@embedpdf/plugin-viewport';
 export const useViewportPlugin = () => usePlugin<ViewportPlugin>(ViewportPlugin.id);
 export const useViewportCapability = () => useCapability<ViewportPlugin>(ViewportPlugin.id);
 
-export const useViewportScrollActivity = () => {
+/**
+ * Hook to get scroll activity for a specific document
+ * @param documentId Optional document ID. If not provided, uses active document.
+ */
+export const useViewportScrollActivity = (documentId?: string) => {
   const { provides } = useViewportCapability();
   const [scrollActivity, setScrollActivity] = useState<ScrollActivity>({
     isScrolling: false,
@@ -15,8 +19,14 @@ export const useViewportScrollActivity = () => {
   useEffect(() => {
     if (!provides) return;
 
-    return provides.onScrollActivity(setScrollActivity);
-  }, [provides]);
+    // Subscribe to scroll activity events
+    return provides.onScrollActivity((event) => {
+      // Filter by documentId if provided
+      if (!documentId || event.documentId === documentId) {
+        setScrollActivity(event.activity);
+      }
+    });
+  }, [provides, documentId]);
 
   return scrollActivity;
 };

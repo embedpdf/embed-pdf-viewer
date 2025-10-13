@@ -1,8 +1,16 @@
-import { BasePluginConfig, EventControlOptions, EventHook } from '@embedpdf/core';
+import { BasePluginConfig, EventHook } from '@embedpdf/core';
 import { Rect } from '@embedpdf/models';
 
 export interface ViewportState {
   viewportGap: number;
+  // Per-document viewport state (persisted)
+  documents: Record<string, ViewportDocumentState>;
+  // Currently active/mounted viewports (temporary)
+  activeViewports: Set<string>; // documentIds that have mounted viewports
+  activeDocumentId: string | null;
+}
+
+export interface ViewportDocumentState {
   viewportMetrics: ViewportMetrics;
   isScrolling: boolean;
   isSmoothScrolling: boolean;
@@ -36,11 +44,6 @@ export interface ViewportScrollMetrics {
   scrollLeft: number;
 }
 
-export interface ScrollControlOptions {
-  mode: 'debounce' | 'throttle';
-  wait: number;
-}
-
 export interface ScrollToPayload {
   x: number;
   y: number;
@@ -48,23 +51,59 @@ export interface ScrollToPayload {
   center?: boolean;
 }
 
-// New scroll activity type
 export interface ScrollActivity {
-  /** Whether a smooth scroll animation is in progress */
   isSmoothScrolling: boolean;
-  /** Whether any scrolling activity is happening */
   isScrolling: boolean;
 }
 
-export interface ViewportCapability {
-  getViewportGap: () => number;
-  getMetrics: () => ViewportMetrics;
+// Events include documentId
+export interface ViewportEvent {
+  documentId: string;
+  metrics: ViewportMetrics;
+}
+
+export interface ScrollActivityEvent {
+  documentId: string;
+  activity: ScrollActivity;
+}
+
+export interface ScrollChangeEvent {
+  documentId: string;
+  scrollMetrics: ViewportScrollMetrics;
+}
+
+// Scoped viewport capability
+export interface ViewportScope {
+  getMetrics(): ViewportMetrics;
   scrollTo(position: ScrollToPayload): void;
+  isScrolling(): boolean;
+  isSmoothScrolling(): boolean;
+  getBoundingRect(): Rect;
   onViewportChange: EventHook<ViewportMetrics>;
-  onViewportResize: EventHook<ViewportMetrics>;
   onScrollChange: EventHook<ViewportScrollMetrics>;
   onScrollActivity: EventHook<ScrollActivity>;
-  isScrolling: () => boolean;
-  isSmoothScrolling: () => boolean;
+}
+
+export interface ViewportCapability {
+  // Global
+  getViewportGap(): number;
+
+  // Active document operations
+  getMetrics(): ViewportMetrics;
+  scrollTo(position: ScrollToPayload): void;
+  isScrolling(): boolean;
+  isSmoothScrolling(): boolean;
   getBoundingRect(): Rect;
+
+  // Document-scoped operations
+  forDocument(documentId: string): ViewportScope;
+
+  // Check if viewport is mounted
+  isViewportMounted(documentId: string): boolean;
+
+  // Events
+  onViewportChange: EventHook<ViewportEvent>;
+  onViewportResize: EventHook<ViewportEvent>;
+  onScrollChange: EventHook<ScrollChangeEvent>;
+  onScrollActivity: EventHook<ScrollActivityEvent>;
 }

@@ -18,8 +18,8 @@ export interface BasePluginConfig {
 }
 
 export interface PluginRegistryConfig {
-  rotation?: Rotation;
-  scale?: number;
+  defaultRotation?: Rotation;
+  defaultScale?: number;
   logger?: Logger;
 }
 

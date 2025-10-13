@@ -832,6 +832,37 @@ importers:
         specifier: ^5.0.0
         version: 5.8.3
 
+  packages/plugin-document-manager:
+    dependencies:
+      '@embedpdf/models':
+        specifier: workspace:*
+        version: link:../models
+      preact:
+        specifier: ^10.26.4
+        version: 10.26.4
+      react:
+        specifier: '>=16.8.0'
+        version: 18.3.1
+      react-dom:
+        specifier: '>=16.8.0'
+        version: 18.3.1(react@18.3.1)
+      vue:
+        specifier: '>=3.2.0'
+        version: 3.5.17(typescript@5.9.3)
+    devDependencies:
+      '@embedpdf/build':
+        specifier: workspace:*
+        version: link:../build
+      '@embedpdf/core':
+        specifier: workspace:*
+        version: link:../core
+      '@types/react':
+        specifier: ^18.2.0
+        version: 18.3.18
+      typescript:
+        specifier: ^5.0.0
+        version: 5.9.3
+
   packages/plugin-export:
     dependencies:
       '@embedpdf/models':

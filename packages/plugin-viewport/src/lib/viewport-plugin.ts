@@ -1,3 +1,5 @@
+// packages/plugin-viewport/src/lib/viewport-plugin.ts
+
 import {
   BasePlugin,
   PluginRegistry,
@@ -5,9 +7,14 @@ import {
   createBehaviorEmitter,
   Listener,
 } from '@embedpdf/core';
+import { Rect } from '@embedpdf/models';
 
 import {
   ViewportAction,
+  initViewportState,
+  cleanupViewportState,
+  registerViewport,
+  unregisterViewport,
   setViewportMetrics,
   setViewportScrollMetrics,
   setViewportGap,
@@ -18,13 +25,16 @@ import {
   ViewportPluginConfig,
   ViewportState,
   ViewportCapability,
+  ViewportScope,
   ViewportMetrics,
   ViewportScrollMetrics,
   ViewportInputMetrics,
   ScrollToPayload,
   ScrollActivity,
+  ViewportEvent,
+  ScrollActivityEvent,
+  ScrollChangeEvent,
 } from './types';
-import { Rect } from '@embedpdf/models';
 
 export class ViewportPlugin extends BasePlugin<
   ViewportPluginConfig,
@@ -34,20 +44,19 @@ export class ViewportPlugin extends BasePlugin<
 > {
   static readonly id = 'viewport' as const;
 
-  private readonly viewportResize$ = createBehaviorEmitter<ViewportMetrics>();
-  private readonly viewportMetrics$ = createBehaviorEmitter<ViewportMetrics>();
-  private readonly scrollMetrics$ = createBehaviorEmitter<ViewportScrollMetrics>();
-  private readonly scrollReq$ = createEmitter<{
-    x: number;
-    y: number;
-    behavior?: ScrollBehavior;
-  }>();
-  private readonly scrollActivity$ = createBehaviorEmitter<ScrollActivity>();
+  private readonly viewportResize$ = createBehaviorEmitter<ViewportEvent>();
+  private readonly viewportMetrics$ = createBehaviorEmitter<ViewportEvent>();
+  private readonly scrollMetrics$ = createBehaviorEmitter<ScrollChangeEvent>();
+  private readonly scrollActivity$ = createBehaviorEmitter<ScrollActivityEvent>();
 
-  /* ------------------------------------------------------------------ */
-  /* “live rect” infrastructure                                          */
-  /* ------------------------------------------------------------------ */
-  private rectProvider: (() => Rect) | null = null;
+  // Scroll request emitters per document (persisted with state)
+  private readonly scrollRequests$ = new Map<
+    string,
+    ReturnType<typeof createEmitter<ScrollToPayload>>
+  >();
+
+  // Rect providers per document (only for mounted viewports)
+  private rectProviders = new Map<string, () => Rect>();
 
   private readonly scrollEndDelay: number;
 
@@ -65,120 +74,317 @@ export class ViewportPlugin extends BasePlugin<
     this.scrollEndDelay = config.scrollEndDelay || 100;
   }
 
+  // ─────────────────────────────────────────────────────────
+  // Document Lifecycle (from BasePlugin)
+  // ─────────────────────────────────────────────────────────
+
+  protected override onDocumentLoadingStarted(documentId: string): void {
+    // Initialize viewport state for this document
+    this.dispatch(initViewportState(documentId));
+
+    // Create scroll request emitter
+    this.scrollRequests$.set(documentId, createEmitter<ScrollToPayload>());
+
+    this.logger.debug(
+      'ViewportPlugin',
+      'DocumentOpened',
+      `Initialized viewport state for document: ${documentId}`,
+    );
+  }
+
+  protected override onDocumentClosed(documentId: string): void {
+    // Cleanup viewport state
+    this.dispatch(cleanupViewportState(documentId));
+
+    // Cleanup scroll request emitter
+    this.scrollRequests$.get(documentId)?.clear();
+    this.scrollRequests$.delete(documentId);
+
+    // Cleanup rect provider if exists
+    this.rectProviders.delete(documentId);
+
+    this.logger.debug(
+      'ViewportPlugin',
+      'DocumentClosed',
+      `Cleaned up viewport state for document: ${documentId}`,
+    );
+  }
+
+  // ─────────────────────────────────────────────────────────
+  // Capability
+  // ─────────────────────────────────────────────────────────
+
   protected buildCapability(): ViewportCapability {
     return {
+      // Global
       getViewportGap: () => this.state.viewportGap,
-      getMetrics: () => this.state.viewportMetrics,
-      getBoundingRect: (): Rect =>
-        this.rectProvider?.() ?? {
-          origin: { x: 0, y: 0 },
-          size: { width: 0, height: 0 },
-        },
+
+      // Active document operations
+      getMetrics: () => this.getMetrics(),
       scrollTo: (pos: ScrollToPayload) => this.scrollTo(pos),
-      isScrolling: () => this.state.isScrolling,
-      isSmoothScrolling: () => this.state.isSmoothScrolling,
-      onScrollChange: this.scrollMetrics$.on,
+      isScrolling: () => this.isScrolling(),
+      isSmoothScrolling: () => this.isSmoothScrolling(),
+      getBoundingRect: () => this.getBoundingRect(),
+
+      // Document-scoped operations
+      forDocument: (documentId: string) => this.createViewportScope(documentId),
+
+      // Check if viewport is currently mounted
+      isViewportMounted: (documentId: string) => this.state.activeViewports.has(documentId),
+
+      // Events
       onViewportChange: this.viewportMetrics$.on,
       onViewportResize: this.viewportResize$.on,
+      onScrollChange: this.scrollMetrics$.on,
       onScrollActivity: this.scrollActivity$.on,
     };
   }
 
-  public setViewportResizeMetrics(viewportMetrics: ViewportInputMetrics) {
-    this.dispatch(setViewportMetrics(viewportMetrics));
-    this.viewportResize$.emit(this.state.viewportMetrics);
+  // ─────────────────────────────────────────────────────────
+  // Document Scoping
+  // ─────────────────────────────────────────────────────────
+
+  private createViewportScope(documentId: string): ViewportScope {
+    return {
+      getMetrics: () => this.getMetrics(documentId),
+      scrollTo: (pos: ScrollToPayload) => this.scrollTo(pos, documentId),
+      isScrolling: () => this.isScrolling(documentId),
+      isSmoothScrolling: () => this.isSmoothScrolling(documentId),
+      getBoundingRect: () => this.getBoundingRect(documentId),
+      onViewportChange: (listener: Listener<ViewportMetrics>) =>
+        this.viewportMetrics$.on((event) => {
+          if (event.documentId === documentId) listener(event.metrics);
+        }),
+      onScrollChange: (listener: Listener<ViewportScrollMetrics>) =>
+        this.scrollMetrics$.on((event) => {
+          if (event.documentId === documentId) listener(event.scrollMetrics);
+        }),
+      onScrollActivity: (listener: Listener<ScrollActivity>) =>
+        this.scrollActivity$.on((event) => {
+          if (event.documentId === documentId) listener(event.activity);
+        }),
+    };
   }
 
-  public setViewportScrollMetrics(scrollMetrics: ViewportScrollMetrics) {
-    if (
-      scrollMetrics.scrollTop !== this.state.viewportMetrics.scrollTop ||
-      scrollMetrics.scrollLeft !== this.state.viewportMetrics.scrollLeft
-    ) {
-      this.dispatch(setViewportScrollMetrics(scrollMetrics));
-      this.bumpScrollActivity();
-      this.scrollMetrics$.emit({
-        scrollTop: scrollMetrics.scrollTop,
-        scrollLeft: scrollMetrics.scrollLeft,
+  // ─────────────────────────────────────────────────────────
+  // Viewport Registration (Public API for components)
+  // ─────────────────────────────────────────────────────────
+
+  public registerViewport(documentId: string): void {
+    // Check if state exists (document must be opened first)
+    if (!this.state.documents[documentId]) {
+      throw new Error(
+        `Cannot register viewport for ${documentId}: document state not found. ` +
+          `Document must be opened before registering viewport.`,
+      );
+    }
+
+    // Mark as active/mounted
+    if (!this.state.activeViewports.has(documentId)) {
+      this.dispatch(registerViewport(documentId));
+
+      this.logger.debug(
+        'ViewportPlugin',
+        'RegisterViewport',
+        `Registered viewport (DOM mounted) for document: ${documentId}`,
+      );
+    }
+  }
+
+  public unregisterViewport(documentId: string): void {
+    // Mark as inactive/unmounted (but preserve state!)
+    if (this.state.activeViewports.has(documentId)) {
+      this.dispatch(unregisterViewport(documentId));
+
+      // Remove rect provider (DOM no longer exists)
+      this.rectProviders.delete(documentId);
+
+      this.logger.debug(
+        'ViewportPlugin',
+        'UnregisterViewport',
+        `Unregistered viewport (DOM unmounted) for document: ${documentId}. State preserved.`,
+      );
+    }
+  }
+
+  // ─────────────────────────────────────────────────────────
+  // Per-Document Operations
+  // ─────────────────────────────────────────────────────────
+
+  public setViewportResizeMetrics(documentId: string, metrics: ViewportInputMetrics): void {
+    this.dispatch(setViewportMetrics(documentId, metrics));
+
+    const viewport = this.state.documents[documentId];
+    if (viewport) {
+      this.viewportResize$.emit({
+        documentId,
+        metrics: viewport.viewportMetrics,
       });
     }
   }
 
-  public onScrollRequest(listener: Listener<ScrollToPayload>) {
-    return this.scrollReq$.on(listener);
+  public setViewportScrollMetrics(documentId: string, scrollMetrics: ViewportScrollMetrics): void {
+    const viewport = this.state.documents[documentId];
+    if (!viewport) return;
+
+    if (
+      scrollMetrics.scrollTop !== viewport.viewportMetrics.scrollTop ||
+      scrollMetrics.scrollLeft !== viewport.viewportMetrics.scrollLeft
+    ) {
+      this.dispatch(setViewportScrollMetrics(documentId, scrollMetrics));
+      this.bumpScrollActivity(documentId);
+
+      this.scrollMetrics$.emit({
+        documentId,
+        scrollMetrics,
+      });
+    }
   }
 
-  public registerBoundingRectProvider(provider: (() => Rect) | null) {
-    this.rectProvider = provider;
+  public onScrollRequest(documentId: string, listener: Listener<ScrollToPayload>) {
+    const emitter = this.scrollRequests$.get(documentId);
+    if (!emitter) {
+      throw new Error(
+        `Cannot subscribe to scroll requests for ${documentId}: ` +
+          `document state not initialized`,
+      );
+    }
+    return emitter.on(listener);
   }
 
-  private bumpScrollActivity() {
-    this.debouncedDispatch(setScrollActivity(false), this.scrollEndDelay);
-    this.debouncedDispatch(setSmoothScrollActivity(false), this.scrollEndDelay);
+  public registerBoundingRectProvider(documentId: string, provider: (() => Rect) | null): void {
+    if (provider) {
+      this.rectProviders.set(documentId, provider);
+    } else {
+      this.rectProviders.delete(documentId);
+    }
   }
 
-  private scrollTo(pos: ScrollToPayload) {
+  // ─────────────────────────────────────────────────────────
+  // Helper Methods
+  // ─────────────────────────────────────────────────────────
+
+  private getActiveDocumentId(): string {
+    const id = this.state.activeDocumentId ?? this.coreState.core.activeDocumentId;
+    if (!id) throw new Error('No active document');
+    return id;
+  }
+
+  private getViewportState(documentId?: string) {
+    const id = documentId ?? this.getActiveDocumentId();
+    const viewport = this.state.documents[id];
+    if (!viewport) {
+      throw new Error(`Viewport state not found for document: ${id}`);
+    }
+    return viewport;
+  }
+
+  private getMetrics(documentId?: string): ViewportMetrics {
+    return this.getViewportState(documentId).viewportMetrics;
+  }
+
+  private isScrolling(documentId?: string): boolean {
+    return this.getViewportState(documentId).isScrolling;
+  }
+
+  private isSmoothScrolling(documentId?: string): boolean {
+    return this.getViewportState(documentId).isSmoothScrolling;
+  }
+
+  private getBoundingRect(documentId?: string): Rect {
+    const id = documentId ?? this.getActiveDocumentId();
+    const provider = this.rectProviders.get(id);
+
+    return (
+      provider?.() ?? {
+        origin: { x: 0, y: 0 },
+        size: { width: 0, height: 0 },
+      }
+    );
+  }
+
+  private scrollTo(pos: ScrollToPayload, documentId?: string): void {
+    const id = documentId ?? this.getActiveDocumentId();
+    const viewport = this.getViewportState(id);
     const { x, y, center, behavior = 'auto' } = pos;
 
     if (behavior === 'smooth') {
-      this.dispatch(setSmoothScrollActivity(true));
+      this.dispatch(setSmoothScrollActivity(id, true));
     }
+
+    let finalX = x;
+    let finalY = y;
 
     if (center) {
-      const metrics = this.state.viewportMetrics;
-      // Calculate the centered position by adding half the viewport dimensions
-      const centeredX = x - metrics.clientWidth / 2;
-      const centeredY = y - metrics.clientHeight / 2;
+      const metrics = viewport.viewportMetrics;
+      finalX = x - metrics.clientWidth / 2;
+      finalY = y - metrics.clientHeight / 2;
+    }
 
-      this.scrollReq$.emit({
-        x: centeredX,
-        y: centeredY,
-        behavior,
-      });
-    } else {
-      this.scrollReq$.emit({
-        x,
-        y,
-        behavior,
-      });
+    const emitter = this.scrollRequests$.get(id);
+    if (emitter) {
+      emitter.emit({ x: finalX, y: finalY, behavior });
     }
   }
 
-  private emitScrollActivity() {
-    const scrollActivity: ScrollActivity = {
-      isSmoothScrolling: this.state.isSmoothScrolling,
-      isScrolling: this.state.isScrolling,
-    };
-
-    this.scrollActivity$.emit(scrollActivity);
+  private bumpScrollActivity(documentId: string): void {
+    this.debouncedDispatch(setScrollActivity(documentId, false), this.scrollEndDelay);
+    this.debouncedDispatch(setSmoothScrollActivity(documentId, false), this.scrollEndDelay);
   }
 
-  // Subscribe to store changes to notify onViewportChange
-  override onStoreUpdated(prevState: ViewportState, newState: ViewportState): void {
-    if (prevState !== newState) {
-      this.viewportMetrics$.emit(newState.viewportMetrics);
+  // ─────────────────────────────────────────────────────────
+  // State Change Handling
+  // ─────────────────────────────────────────────────────────
 
-      // Emit scroll activity when scrolling state changes
-      if (
-        prevState.isScrolling !== newState.isScrolling ||
-        prevState.isSmoothScrolling !== newState.isSmoothScrolling
-      ) {
-        this.emitScrollActivity();
+  override onStoreUpdated(prevState: ViewportState, newState: ViewportState): void {
+    // Emit viewport change events for each changed document
+    for (const documentId in newState.documents) {
+      const prevViewport = prevState.documents[documentId];
+      const newViewport = newState.documents[documentId];
+
+      if (prevViewport !== newViewport) {
+        this.viewportMetrics$.emit({
+          documentId,
+          metrics: newViewport.viewportMetrics,
+        });
+
+        // Emit scroll activity when scrolling state changes
+        if (
+          prevViewport &&
+          (prevViewport.isScrolling !== newViewport.isScrolling ||
+            prevViewport.isSmoothScrolling !== newViewport.isSmoothScrolling)
+        ) {
+          this.scrollActivity$.emit({
+            documentId,
+            activity: {
+              isScrolling: newViewport.isScrolling,
+              isSmoothScrolling: newViewport.isSmoothScrolling,
+            },
+          });
+        }
       }
     }
   }
 
+  // ─────────────────────────────────────────────────────────
+  // Lifecycle
+  // ─────────────────────────────────────────────────────────
+
   async initialize(_config: ViewportPluginConfig) {
-    // No initialization needed
+    this.logger.info('ViewportPlugin', 'Initialize', 'Viewport plugin initialized');
   }
 
   async destroy(): Promise<void> {
-    super.destroy();
-    // Clear out any handlers
+    // Clear all emitters
     this.viewportMetrics$.clear();
     this.viewportResize$.clear();
     this.scrollMetrics$.clear();
-    this.scrollReq$.clear();
     this.scrollActivity$.clear();
-    this.rectProvider = null;
+
+    this.scrollRequests$.forEach((emitter) => emitter.clear());
+    this.scrollRequests$.clear();
+    this.rectProviders.clear();
+
+    super.destroy();
   }
 }

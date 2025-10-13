@@ -2471,6 +2471,10 @@ export interface PdfOpenDocumentUrlOptions {
    * Loading mode
    */
   mode?: 'auto' | 'range-request' | 'full-fetch';
+  /**
+   * Optional custom headers to send with fetch
+   */
+  headers?: Record<string, string>;
 }
 
 export interface PdfRenderOptions {

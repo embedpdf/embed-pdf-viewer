@@ -1,12 +1,19 @@
 <script setup lang="ts">
 import { ref, watch, useAttrs } from 'vue';
-
 import { useViewportCapability, useViewportRef } from '../hooks';
 
 /* -------------------------------------------------- */
 /* props & attrs                                      */
 /* -------------------------------------------------- */
-const attrs = useAttrs(); // forward class/id/… to <div>
+interface Props {
+  /**
+   * The ID of the document that this viewport displays
+   */
+  documentId: string;
+}
+
+const props = defineProps<Props>();
+const attrs = useAttrs();
 
 /* -------------------------------------------------- */
 /* plugin + reactive viewport gap                     */
@@ -25,7 +32,7 @@ watch(
 /* -------------------------------------------------- */
 /* element ref that wires up scroll / resize logic    */
 /* -------------------------------------------------- */
-const viewportRef = useViewportRef();
+const viewportRef = useViewportRef(props.documentId);
 </script>
 
 <template>

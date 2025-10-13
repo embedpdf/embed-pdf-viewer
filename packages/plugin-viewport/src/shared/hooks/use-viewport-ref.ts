@@ -1,9 +1,8 @@
 import { Rect } from '@embedpdf/models';
 import { useLayoutEffect, useRef } from '@framework';
-
 import { useViewportPlugin } from './use-viewport';
 
-export function useViewportRef() {
+export function useViewportRef(documentId: string) {
   const { plugin: viewportPlugin } = useViewportPlugin();
   const containerRef = useRef<HTMLDivElement>(null);
 
@@ -13,7 +12,15 @@ export function useViewportRef() {
     const container = containerRef.current;
     if (!container) return;
 
-    /* ---------- live rect provider --------------------------------- */
+    // Register this viewport for the document
+    try {
+      viewportPlugin.registerViewport(documentId);
+    } catch (error) {
+      console.error(`Failed to register viewport for document ${documentId}:`, error);
+      return;
+    }
+
+    // Provide rect calculator
     const provideRect = (): Rect => {
       const r = container.getBoundingClientRect();
       return {
@@ -21,20 +28,30 @@ export function useViewportRef() {
         size: { width: r.width, height: r.height },
       };
     };
-    viewportPlugin.registerBoundingRectProvider(provideRect);
+    viewportPlugin.registerBoundingRectProvider(documentId, provideRect);
 
-    // Example: On scroll, call setMetrics
+    // Get saved viewport state and restore scroll position
+    const savedMetrics = viewportPlugin.provides().forDocument(documentId).getMetrics();
+    if (savedMetrics && (savedMetrics.scrollTop > 0 || savedMetrics.scrollLeft > 0)) {
+      // Restore scroll position on next frame
+      requestAnimationFrame(() => {
+        container.scrollTop = savedMetrics.scrollTop;
+        container.scrollLeft = savedMetrics.scrollLeft;
+      });
+    }
+
+    // On scroll
     const onScroll = () => {
-      viewportPlugin.setViewportScrollMetrics({
+      viewportPlugin.setViewportScrollMetrics(documentId, {
         scrollTop: container.scrollTop,
         scrollLeft: container.scrollLeft,
       });
     };
     container.addEventListener('scroll', onScroll);
 
-    // Example: On resize, call setMetrics
+    // On resize
     const resizeObserver = new ResizeObserver(() => {
-      viewportPlugin.setViewportResizeMetrics({
+      viewportPlugin.setViewportResizeMetrics(documentId, {
         width: container.offsetWidth,
         height: container.offsetHeight,
         clientWidth: container.clientWidth,
@@ -47,7 +64,9 @@ export function useViewportRef() {
     });
     resizeObserver.observe(container);
 
+    // Subscribe to scroll requests for this document
     const unsubscribeScrollRequest = viewportPlugin.onScrollRequest(
+      documentId,
       ({ x, y, behavior = 'auto' }) => {
         requestAnimationFrame(() => {
           container.scrollTo({ left: x, top: y, behavior });
@@ -57,13 +76,13 @@ export function useViewportRef() {
 
     // Cleanup
     return () => {
-      viewportPlugin.registerBoundingRectProvider(null);
+      viewportPlugin.unregisterViewport(documentId);
+      viewportPlugin.registerBoundingRectProvider(documentId, null);
       container.removeEventListener('scroll', onScroll);
       resizeObserver.disconnect();
       unsubscribeScrollRequest();
     };
-  }, [viewportPlugin]);
+  }, [viewportPlugin, documentId]);
 
-  // Return the ref so your React code can attach it to a div
   return containerRef;
 }
