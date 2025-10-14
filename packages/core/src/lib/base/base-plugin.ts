@@ -68,8 +68,11 @@ export abstract class BasePlugin<
     });
     this.unsubscribeFromStartLoadingDocument = this.coreStore.onAction(
       START_LOADING_DOCUMENT,
-      (action) => {
+      (action, state, oldState) => {
         this.onDocumentLoadingStarted(action.payload.documentId);
+        if (state.core.activeDocumentId !== oldState.core.activeDocumentId) {
+          this.onActiveDocumentChanged(oldState.core.activeDocumentId, state.core.activeDocumentId);
+        }
       },
     );
     this.unsubscribeFromSetDocumentLoaded = this.coreStore.onAction(

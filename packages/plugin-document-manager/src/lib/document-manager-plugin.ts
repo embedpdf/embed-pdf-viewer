@@ -11,6 +11,7 @@ import {
   DocumentState,
   Unsubscribe,
   Listener,
+  createEmitter,
 } from '@embedpdf/core';
 import {
   PdfDocumentObject,
@@ -52,7 +53,7 @@ export class DocumentManagerPlugin extends BasePlugin<
   private readonly activeDocumentChanged$ = createBehaviorEmitter<DocumentChangeEvent>();
   private readonly documentError$ = createBehaviorEmitter<DocumentErrorEvent>();
   private readonly documentOrderChanged$ = createBehaviorEmitter<DocumentOrderChangeEvent>();
-  private readonly openFileRequest$ = createBehaviorEmitter<'open'>();
+  private readonly openFileRequest$ = createEmitter<'open'>();
 
   private maxDocuments?: number;
 

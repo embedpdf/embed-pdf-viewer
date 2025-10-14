@@ -33,7 +33,7 @@ export function useViewportRef(documentId: string) {
 
     // Get saved viewport state and restore scroll position
     const savedMetrics = viewportPlugin.provides().forDocument(documentId).getMetrics();
-    if (savedMetrics && (savedMetrics.scrollTop > 0 || savedMetrics.scrollLeft > 0)) {
+    if (savedMetrics) {
       // Restore scroll position on next frame
       requestAnimationFrame(() => {
         container.scrollTop = savedMetrics.scrollTop;

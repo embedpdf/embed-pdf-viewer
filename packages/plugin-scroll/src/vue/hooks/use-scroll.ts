@@ -1,74 +1,48 @@
-import { ref, watchEffect, computed } from 'vue';
+import { ref, watchEffect, computed, ComputedRef } from 'vue';
 import { useCapability, usePlugin } from '@embedpdf/core/vue';
-import { ScrollPlugin } from '@embedpdf/plugin-scroll';
+import { ScrollPlugin, ScrollScope } from '@embedpdf/plugin-scroll';
 
 export const useScrollPlugin = () => usePlugin<ScrollPlugin>(ScrollPlugin.id);
 export const useScrollCapability = () => useCapability<ScrollPlugin>(ScrollPlugin.id);
 
-export function useScroll() {
+// Define the return type explicitly to maintain type safety
+interface UseScrollReturn {
+  provides: ScrollScope | null;
+  state: ComputedRef<{
+    currentPage: number;
+    totalPages: number;
+  }>;
+}
+
+export function useScroll(documentId: string): UseScrollReturn {
   const { provides } = useScrollCapability();
 
   const currentPage = ref(1);
   const totalPages = ref(1);
 
   watchEffect((onCleanup) => {
-    if (!provides.value) return;
+    if (!provides.value || !documentId) return;
 
-    const unsubscribe = provides.value.onPageChange(({ pageNumber, totalPages: tp }) => {
-      currentPage.value = pageNumber;
-      totalPages.value = tp;
+    const scope = provides.value.forDocument(documentId);
+    currentPage.value = scope.getCurrentPage();
+    totalPages.value = scope.getTotalPages();
+
+    const unsubscribe = provides.value.onPageChange((event) => {
+      if (event.documentId === documentId) {
+        currentPage.value = event.pageNumber;
+        totalPages.value = event.totalPages;
+      }
     });
     onCleanup(unsubscribe);
   });
 
-  // New format
   const state = computed(() => ({
     currentPage: currentPage.value,
     totalPages: totalPages.value,
   }));
 
-  // Create deprecated properties with warnings
-  const deprecatedCurrentPage = computed({
-    get() {
-      console.warn(
-        `Accessing 'currentPage' directly on useScroll() is deprecated. Use useScroll().state.currentPage instead.`,
-      );
-      return currentPage.value;
-    },
-    set(value) {
-      currentPage.value = value;
-    },
-  });
-
-  const deprecatedTotalPages = computed({
-    get() {
-      console.warn(
-        `Accessing 'totalPages' directly on useScroll() is deprecated. Use useScroll().state.totalPages instead.`,
-      );
-      return totalPages.value;
-    },
-    set(value) {
-      totalPages.value = value;
-    },
-  });
-
-  const deprecatedScroll = computed(() => {
-    if (provides.value) {
-      console.warn(
-        `Accessing 'scroll' directly on useScroll() is deprecated. Use useScroll().provides instead.`,
-      );
-    }
-    return provides.value;
-  });
-
   return {
-    // New format (preferred)
-    provides,
+    provides: provides.value?.forDocument(documentId) ?? null,
     state,
-
-    // Deprecated properties (for backward compatibility)
-    currentPage: deprecatedCurrentPage,
-    totalPages: deprecatedTotalPages,
-    scroll: deprecatedScroll,
   };
 }

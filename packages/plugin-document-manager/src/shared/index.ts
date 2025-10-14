@@ -7,6 +7,6 @@ export * from './components';
 export * from '@embedpdf/plugin-document-manager';
 
 // A convenience package that auto-registers our utilities
-export const DocumentManagerPackage = createPluginPackage(BaseDocumentManagerPackage)
+export const DocumentManagerPluginPackage = createPluginPackage(BaseDocumentManagerPackage)
   .addUtility(FilePicker) // headless utility consumers can mount once and call cap.openFileDialog()
   .build();

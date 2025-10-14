@@ -2,6 +2,7 @@ import { ReactNode, useEffect, useState, HTMLAttributes } from '@framework';
 import { ScrollStrategy, ScrollerLayout, PageLayout } from '@embedpdf/plugin-scroll';
 import { useRegistry } from '@embedpdf/core/@framework';
 import { PdfDocumentObject, Rotation } from '@embedpdf/models';
+import { getScrollerLayout } from '@embedpdf/plugin-scroll';
 
 import { useScrollPlugin } from '../hooks';
 
@@ -12,33 +13,37 @@ export interface RenderPageProps extends PageLayout {
 }
 
 type ScrollerProps = HTMLAttributes<HTMLDivElement> & {
+  documentId: string;
   renderPage: (props: RenderPageProps) => ReactNode;
-  overlayElements?: ReactNode[];
 };
 
-export function Scroller({ renderPage, overlayElements, ...props }: ScrollerProps) {
+export function Scroller({ documentId, renderPage, ...props }: ScrollerProps) {
   const { plugin: scrollPlugin } = useScrollPlugin();
   const { registry } = useRegistry();
-  const [scrollerLayout, setScrollerLayout] = useState<ScrollerLayout | null>(
-    () => scrollPlugin?.getScrollerLayout() ?? null,
-  );
+  const [scrollerLayout, setScrollerLayout] = useState<ScrollerLayout | null>(null);
+
+  const targetDocId = documentId;
 
   useEffect(() => {
-    if (!scrollPlugin) return;
+    if (!scrollPlugin || !targetDocId) return;
 
-    return scrollPlugin.onScrollerData(setScrollerLayout);
-  }, [scrollPlugin]);
+    // Subscribe to scroller layout updates for this document
+    return scrollPlugin.onScrollerData(targetDocId, setScrollerLayout);
+  }, [scrollPlugin, targetDocId]);
 
   useEffect(() => {
-    if (!scrollPlugin) return;
+    if (!scrollPlugin || !targetDocId) return;
 
-    scrollPlugin.setLayoutReady();
-  }, [scrollPlugin]);
+    scrollPlugin.setLayoutReady(targetDocId);
+  }, [scrollPlugin, targetDocId]);
 
   if (!scrollerLayout) return null;
   if (!registry) return null;
 
   const coreState = registry.getStore().getState();
+  const coreDoc = coreState.core.documents[targetDocId];
+
+  if (!coreDoc) return null;
 
   return (
     <div
@@ -106,9 +111,9 @@ export function Scroller({ renderPage, overlayElements, ...props }: ScrollerProp
               >
                 {renderPage({
                   ...layout,
-                  rotation: coreState.core.rotation,
-                  scale: coreState.core.scale,
-                  document: coreState.core.document,
+                  rotation: coreDoc.rotation,
+                  scale: coreDoc.scale,
+                  document: coreDoc.document,
                 })}
               </div>
             ))}
@@ -129,7 +134,6 @@ export function Scroller({ renderPage, overlayElements, ...props }: ScrollerProp
               }),
         }}
       />
-      {overlayElements}
     </div>
   );
 }

@@ -7,9 +7,9 @@ export const useViewportCapability = () => useCapability<ViewportPlugin>(Viewpor
 
 /**
  * Hook to get scroll activity for a specific document
- * @param documentId Optional document ID. If not provided, uses active document.
+ * @param documentId Document ID.
  */
-export const useViewportScrollActivity = (documentId?: string) => {
+export const useViewportScrollActivity = (documentId: string) => {
   const { provides } = useViewportCapability();
   const [scrollActivity, setScrollActivity] = useState<ScrollActivity>({
     isScrolling: false,
@@ -22,7 +22,7 @@ export const useViewportScrollActivity = (documentId?: string) => {
     // Subscribe to scroll activity events
     return provides.onScrollActivity((event) => {
       // Filter by documentId if provided
-      if (!documentId || event.documentId === documentId) {
+      if (event.documentId === documentId) {
         setScrollActivity(event.activity);
       }
     });

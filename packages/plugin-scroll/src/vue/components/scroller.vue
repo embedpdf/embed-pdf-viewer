@@ -1,8 +1,5 @@
 <script setup lang="ts">
-/* ------------------------------------------------------------------ */
-/* imports                                                            */
-/* ------------------------------------------------------------------ */
-import { computed, onMounted, ref, watchEffect, useAttrs } from 'vue';
+import { computed, onMounted, ref, watchEffect } from 'vue';
 import type { StyleValue } from 'vue';
 
 import { useScrollPlugin } from '../hooks';
@@ -10,64 +7,55 @@ import { ScrollStrategy, type ScrollerLayout, type PageLayout } from '@embedpdf/
 import { useRegistry } from '@embedpdf/core/vue';
 import type { PdfDocumentObject, Rotation } from '@embedpdf/models';
 
-/* ------------------------------------------------------------------ */
-/* props – pure layout; page content comes from the *slot*            */
-/* ------------------------------------------------------------------ */
-const props = withDefaults(
-  defineProps<{
-    style?: StyleValue;
-    overlayElements?: any[];
-  }>(),
-  { overlayElements: () => [] },
-);
+interface Props {
+  documentId?: string;
+  style?: StyleValue;
+}
 
-const attrs = useAttrs();
+const props = defineProps<Props>();
 
-/* ------------------------------------------------------------------ */
-/* plugin + reactive state                                            */
-/* ------------------------------------------------------------------ */
 const { plugin: scrollPlugin } = useScrollPlugin();
-const { registry } = useRegistry(); // shallowRef<PluginRegistry|null>
+const { registry } = useRegistry();
 
 const layout = ref<ScrollerLayout | null>(null);
 
-/* subscribe to scroller‑layout updates */
-watchEffect((onCleanup) => {
-  if (!scrollPlugin.value) return;
+const targetDocId = computed(() => props.documentId);
 
-  layout.value = scrollPlugin.value.getScrollerLayout();
-  const off = scrollPlugin.value.onScrollerData((l) => (layout.value = l));
+watchEffect((onCleanup) => {
+  if (!scrollPlugin.value || !targetDocId.value) return;
+
+  // Subscribe to scroller layout updates for this document
+  const off = scrollPlugin.value.onScrollerData(targetDocId.value, (scrollerLayout) => {
+    layout.value = scrollerLayout;
+  });
+
   onCleanup(off);
 });
 
-/* inform plugin once the DOM is ready */
 onMounted(() => {
-  scrollPlugin.value?.setLayoutReady();
+  if (scrollPlugin.value && targetDocId.value) {
+    scrollPlugin.value.setLayoutReady(targetDocId.value);
+  }
 });
 
-/* ------------------------------------------------------------------ */
-/* helpers                                                            */
-/* ------------------------------------------------------------------ */
 interface PageSlotProps extends PageLayout {
   rotation: Rotation;
   scale: number;
   document: PdfDocumentObject | null;
 }
 
-/** Build the prop object that we’ll forward into the default slot */
 function pageSlotProps(pl: PageLayout): PageSlotProps {
   const core = registry.value!.getStore().getState().core;
+  const coreDoc = core.documents[targetDocId.value!];
+
   return {
     ...pl,
-    rotation: core.rotation,
-    scale: core.scale,
-    document: core.document,
+    rotation: coreDoc.rotation,
+    scale: coreDoc.scale,
+    document: coreDoc.document,
   };
 }
 
-/* ------------------------------------------------------------------ */
-/* computed root style                                                */
-/* ------------------------------------------------------------------ */
 const rootStyle = computed<StyleValue>(() => {
   if (!layout.value) return props.style;
 
@@ -94,8 +82,7 @@ const rootStyle = computed<StyleValue>(() => {
 </script>
 
 <template>
-  <!-- render nothing until both layout + registry exist -->
-  <div v-if="layout && registry" :style="rootStyle" v-bind="attrs">
+  <div v-if="layout && registry" :style="rootStyle">
     <!-- leading spacer -->
     <div
       v-if="layout.strategy === 'horizontal'"
@@ -103,7 +90,7 @@ const rootStyle = computed<StyleValue>(() => {
     />
     <div v-else :style="{ height: layout.startSpacing + 'px', width: '100%' }" />
 
-    <!-- actual page grid -->
+    <!-- page grid -->
     <div
       :style="{
         gap: layout.pageGap + 'px',
@@ -123,7 +110,6 @@ const rootStyle = computed<StyleValue>(() => {
             :key="pl.pageNumber"
             :style="{ width: pl.rotatedWidth + 'px', height: pl.rotatedHeight + 'px' }"
           >
-            <!-- 🔑 give the host app full control over page content -->
             <slot :page="pageSlotProps(pl)" />
           </div>
         </div>
@@ -136,8 +122,5 @@ const rootStyle = computed<StyleValue>(() => {
       :style="{ width: layout.endSpacing + 'px', height: '100%', flexShrink: 0 }"
     />
     <div v-else :style="{ height: layout.endSpacing + 'px', width: '100%' }" />
-
-    <!-- optional overlay components -->
-    <component v-for="(el, i) in props.overlayElements" :is="el" :key="i" />
   </div>
 </template>

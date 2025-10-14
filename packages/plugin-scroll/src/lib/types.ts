@@ -1,4 +1,4 @@
-import { BasePluginConfig, Emitter, EventHook } from '@embedpdf/core';
+import { BasePluginConfig, EventHook } from '@embedpdf/core';
 import { PdfPageObject, Rect, Rotation } from '@embedpdf/models';
 import { ViewportMetrics } from '@embedpdf/plugin-viewport';
 import { VirtualItem } from './types/virtual-item';
@@ -12,15 +12,35 @@ export interface PageChangeState {
   startTime: number;
 }
 
-export interface ScrollState extends ScrollMetrics {
+// Per-document scroll state
+export interface ScrollDocumentState {
   virtualItems: VirtualItem[];
   totalPages: number;
+  currentPage: number;
   totalContentSize: { width: number; height: number };
-  desiredScrollPosition: { x: number; y: number };
   strategy: ScrollStrategy;
   pageGap: number;
   scale: number;
+
+  // Scroll metrics
+  visiblePages: number[];
+  pageVisibilityMetrics: PageVisibilityMetrics[];
+  renderedPageIndexes: number[];
+  scrollOffset: { x: number; y: number };
+  startSpacing: number;
+  endSpacing: number;
   pageChangeState: PageChangeState;
+}
+
+// Plugin state
+export interface ScrollState {
+  // Global defaults (applied to new documents)
+  defaultStrategy: ScrollStrategy;
+  defaultPageGap: number;
+  defaultBufferSize: number;
+
+  // Per-document states
+  documents: Record<string, ScrollDocumentState>;
 }
 
 export interface ScrollerLayout {
@@ -29,7 +49,7 @@ export interface ScrollerLayout {
   totalWidth: number;
   totalHeight: number;
   pageGap: number;
-  strategy: ScrollState['strategy'];
+  strategy: ScrollStrategy;
   items: VirtualItem[];
 }
 
@@ -69,24 +89,14 @@ export interface ScrollMetrics {
   endSpacing: number;
 }
 
-export interface ScrollStrategyInterface {
-  initialize(container: HTMLElement, innerDiv: HTMLElement): void;
-  destroy(): void;
-  updateLayout(viewport: ViewportMetrics, pdfPageObject: PdfPageObject[][]): void;
-  handleScroll(viewport: ViewportMetrics): void;
-  getVirtualItems(): VirtualItem[];
-  scrollToPage(pageNumber: number, behavior?: ScrollBehavior): void;
-  calculateDimensions(pdfPageObject: PdfPageObject[][]): void;
-}
-
 export interface ScrollPluginConfig extends BasePluginConfig {
-  strategy?: ScrollStrategy;
+  defaultStrategy?: ScrollStrategy;
+  defaultPageGap?: number;
+  defaultBufferSize?: number;
   initialPage?: number;
-  bufferSize?: number;
-  pageGap?: number;
 }
 
-export type LayoutChangePayload = Pick<ScrollState, 'virtualItems' | 'totalContentSize'>;
+export type LayoutChangePayload = Pick<ScrollDocumentState, 'virtualItems' | 'totalContentSize'>;
 
 export interface ScrollToPageOptions {
   pageNumber: number;
@@ -95,21 +105,37 @@ export interface ScrollToPageOptions {
   center?: boolean;
 }
 
-export interface PageChangePayload {
+// Events include documentId
+export interface PageChangeEvent {
+  documentId: string;
   pageNumber: number;
   totalPages: number;
 }
 
-export interface ScrollCapability {
-  onStateChange: EventHook<ScrollState>;
-  onScroll: EventHook<ScrollMetrics>;
+export interface ScrollEvent {
+  documentId: string;
+  metrics: ScrollMetrics;
+}
+
+export interface LayoutChangeEvent {
+  documentId: string;
+  layout: LayoutChangePayload;
+}
+
+export interface PageChangeStateEvent {
+  documentId: string;
+  state: PageChangeState;
+}
+
+export interface LayoutReadyEvent {
+  documentId: string;
+}
+
+// Scoped scroll capability
+export interface ScrollScope {
   getCurrentPage(): number;
   getTotalPages(): number;
   getPageChangeState(): PageChangeState;
-  onPageChange: EventHook<PageChangePayload>;
-  onLayoutChange: EventHook<LayoutChangePayload>;
-  onPageChangeState: EventHook<PageChangeState>;
-  onLayoutReady: EventHook<boolean>;
   scrollToPage(options: ScrollToPageOptions): void;
   scrollToNextPage(behavior?: ScrollBehavior): void;
   scrollToPreviousPage(behavior?: ScrollBehavior): void;
@@ -121,7 +147,40 @@ export interface ScrollCapability {
     scale?: number,
     rotation?: Rotation,
   ): Rect | null;
-  setScrollStrategy(strategy: ScrollStrategy): void;
+  onPageChange: EventHook<PageChangeEvent>;
+  onScroll: EventHook<ScrollMetrics>;
+  onLayoutChange: EventHook<LayoutChangePayload>;
+}
+
+export interface ScrollCapability {
+  // Active document operations (defaults to active document)
+  getCurrentPage(): number;
+  getTotalPages(): number;
+  getPageChangeState(): PageChangeState;
+  scrollToPage(options: ScrollToPageOptions): void;
+  scrollToNextPage(behavior?: ScrollBehavior): void;
+  scrollToPreviousPage(behavior?: ScrollBehavior): void;
+  getMetrics(viewport?: ViewportMetrics): ScrollMetrics;
+  getLayout(): LayoutChangePayload;
+  getRectPositionForPage(
+    page: number,
+    rect: Rect,
+    scale?: number,
+    rotation?: Rotation,
+  ): Rect | null;
+
+  // Document-scoped operations
+  forDocument(documentId: string): ScrollScope;
+
+  // Global settings
+  setScrollStrategy(strategy: ScrollStrategy, documentId?: string): void;
   getPageGap(): number;
-  getPageChangeState: () => PageChangeState;
+
+  // Events (all include documentId)
+  onPageChange: EventHook<PageChangeEvent>;
+  onScroll: EventHook<ScrollEvent>;
+  onLayoutChange: EventHook<LayoutChangeEvent>;
+  onLayoutReady: EventHook<LayoutReadyEvent>;
+  onPageChangeState: EventHook<PageChangeStateEvent>;
+  onStateChange: EventHook<ScrollDocumentState>;
 }
