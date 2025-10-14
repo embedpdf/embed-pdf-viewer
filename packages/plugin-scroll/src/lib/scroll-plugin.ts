@@ -1,5 +1,3 @@
-// packages/plugin-scroll/src/lib/scroll-plugin.ts
-
 import {
   BasePlugin,
   PluginRegistry,
@@ -68,6 +66,7 @@ export class ScrollPlugin extends BasePlugin<
   >();
 
   private initialPage?: number;
+  private initialPageUsed = false;
 
   // Event emitters (include documentId)
   private readonly pageChange$ = createBehaviorEmitter<PageChangeEvent>();
@@ -100,7 +99,23 @@ export class ScrollPlugin extends BasePlugin<
       const docState = this.getDocumentState(event.documentId);
       if (!docState) return;
 
-      this.commitMetrics(event.documentId, this.computeMetrics(event.documentId, event.metrics));
+      // Compute the metrics based on the incoming event
+      const computedMetrics = this.computeMetrics(event.documentId, event.metrics);
+
+      // THE GUARD: Only update the scrollOffset if the layout is already "ready".
+      if (this.layoutReady.has(event.documentId)) {
+        // Layout is ready, so this is a real scroll event from the user.
+        // Commit all metrics, including the new scrollOffset.
+        this.commitMetrics(event.documentId, computedMetrics);
+      } else {
+        // Layout is NOT ready. This is the initial, premature event.
+        // We must commit the other metrics (like visible pages for rendering)
+        // but EXCLUDE the incorrect scrollOffset to protect our persisted state.
+        this.commitMetrics(event.documentId, {
+          ...computedMetrics,
+          scrollOffset: docState.scrollOffset,
+        });
+      }
     });
   }
 
@@ -191,14 +206,31 @@ export class ScrollPlugin extends BasePlugin<
   }
 
   public setLayoutReady(documentId: string): void {
-    if (this.layoutReady.has(documentId)) return;
+    // This guard logic is now reliable because the flag gets reset correctly.
+    if (this.layoutReady.has(documentId)) {
+      return;
+    }
+
+    const docState = this.getDocumentState(documentId);
+    if (!docState) return;
 
     this.layoutReady.add(documentId);
-    this.layoutReady$.emit({ documentId });
 
-    if (this.initialPage) {
+    // Only run initialPage logic once on the first document
+    if (this.initialPage && !this.initialPageUsed) {
+      this.initialPageUsed = true;
       this.scrollToPage({ pageNumber: this.initialPage, behavior: 'instant' }, documentId);
+    } else {
+      // For subsequent documents or when no initialPage is set, restore the persisted scroll position
+      const viewport = this.viewport.forDocument(documentId);
+      viewport.scrollTo({ ...docState.scrollOffset, behavior: 'instant' });
     }
+
+    this.layoutReady$.emit({ documentId });
+  }
+
+  public clearLayoutReady(documentId: string): void {
+    this.layoutReady.delete(documentId);
   }
 
   // ─────────────────────────────────────────────────────────

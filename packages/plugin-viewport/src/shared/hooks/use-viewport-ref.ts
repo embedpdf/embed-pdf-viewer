@@ -30,14 +30,6 @@ export function useViewportRef(documentId: string) {
     };
     viewportPlugin.registerBoundingRectProvider(documentId, provideRect);
 
-    // Get saved viewport state and restore scroll position
-    const savedMetrics = viewportPlugin.provides().forDocument(documentId).getMetrics();
-    if (savedMetrics) {
-      // Restore scroll position synchronously before the browser paints
-      container.scrollTop = savedMetrics.scrollTop;
-      container.scrollLeft = savedMetrics.scrollLeft;
-    }
-
     // On scroll
     const onScroll = () => {
       viewportPlugin.setViewportScrollMetrics(documentId, {

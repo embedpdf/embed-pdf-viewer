@@ -1,8 +1,7 @@
-import { ReactNode, useEffect, useState, HTMLAttributes } from '@framework';
+import { ReactNode, useEffect, useState, HTMLAttributes, useLayoutEffect } from '@framework';
 import { ScrollStrategy, ScrollerLayout, PageLayout } from '@embedpdf/plugin-scroll';
 import { useRegistry } from '@embedpdf/core/@framework';
 import { PdfDocumentObject, Rotation } from '@embedpdf/models';
-import { getScrollerLayout } from '@embedpdf/plugin-scroll';
 
 import { useScrollPlugin } from '../hooks';
 
@@ -20,22 +19,36 @@ type ScrollerProps = HTMLAttributes<HTMLDivElement> & {
 export function Scroller({ documentId, renderPage, ...props }: ScrollerProps) {
   const { plugin: scrollPlugin } = useScrollPlugin();
   const { registry } = useRegistry();
-  const [scrollerLayout, setScrollerLayout] = useState<ScrollerLayout | null>(null);
+  const [layoutData, setLayoutData] = useState<{
+    layout: ScrollerLayout | null;
+    docId: string | null;
+  }>({ layout: null, docId: null });
 
   const targetDocId = documentId;
 
   useEffect(() => {
-    if (!scrollPlugin || !targetDocId) return;
+    if (!scrollPlugin || !documentId) return;
 
-    // Subscribe to scroller layout updates for this document
-    return scrollPlugin.onScrollerData(targetDocId, setScrollerLayout);
-  }, [scrollPlugin, targetDocId]);
+    // When we get new data, store it along with the current documentId
+    const unsubscribe = scrollPlugin.onScrollerData(documentId, (newLayout) => {
+      setLayoutData({ layout: newLayout, docId: documentId });
+    });
 
-  useEffect(() => {
-    if (!scrollPlugin || !targetDocId) return;
+    // When the component unmounts or documentId changes, clear the state
+    return () => {
+      unsubscribe();
+      setLayoutData({ layout: null, docId: null });
+      scrollPlugin.clearLayoutReady(documentId);
+    };
+  }, [scrollPlugin, documentId]);
 
-    scrollPlugin.setLayoutReady(targetDocId);
-  }, [scrollPlugin, targetDocId]);
+  const scrollerLayout = layoutData.docId === documentId ? layoutData.layout : null;
+
+  useLayoutEffect(() => {
+    if (!scrollPlugin || !documentId || !scrollerLayout) return;
+
+    scrollPlugin.setLayoutReady(documentId);
+  }, [scrollPlugin, documentId, scrollerLayout]);
 
   if (!scrollerLayout) return null;
   if (!registry) return null;
