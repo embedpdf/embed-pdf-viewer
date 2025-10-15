@@ -16,6 +16,8 @@ export const SET_VIEWPORT_GAP = 'SET_VIEWPORT_GAP';
 export const SET_SCROLL_ACTIVITY = 'SET_SCROLL_ACTIVITY';
 export const SET_SMOOTH_SCROLL_ACTIVITY = 'SET_SMOOTH_SCROLL_ACTIVITY';
 export const SET_ACTIVE_VIEWPORT_DOCUMENT = 'SET_ACTIVE_VIEWPORT_DOCUMENT';
+export const GATE_VIEWPORT = 'GATE_VIEWPORT';
+export const RELEASE_VIEWPORT_GATE = 'RELEASE_VIEWPORT_GATE';
 
 // State persistence actions
 export interface InitViewportStateAction extends Action {
@@ -89,6 +91,20 @@ export interface SetSmoothScrollActivityAction extends Action {
   };
 }
 
+export interface GateViewportAction extends Action {
+  type: typeof GATE_VIEWPORT;
+  payload: {
+    documentId: string;
+  };
+}
+
+export interface ReleaseViewportGateAction extends Action {
+  type: typeof RELEASE_VIEWPORT_GATE;
+  payload: {
+    documentId: string;
+  };
+}
+
 export type ViewportAction =
   | InitViewportStateAction
   | CleanupViewportStateAction
@@ -99,7 +115,9 @@ export type ViewportAction =
   | SetViewportScrollMetricsAction
   | SetViewportGapAction
   | SetScrollActivityAction
-  | SetSmoothScrollActivityAction;
+  | SetSmoothScrollActivityAction
+  | GateViewportAction
+  | ReleaseViewportGateAction;
 
 // Action Creators
 
@@ -155,4 +173,12 @@ export function setSmoothScrollActivity(
   isSmoothScrolling: boolean,
 ): SetSmoothScrollActivityAction {
   return { type: SET_SMOOTH_SCROLL_ACTIVITY, payload: { documentId, isSmoothScrolling } };
+}
+
+export function gateViewport(documentId: string): GateViewportAction {
+  return { type: GATE_VIEWPORT, payload: { documentId } };
+}
+
+export function releaseViewportGate(documentId: string): ReleaseViewportGateAction {
+  return { type: RELEASE_VIEWPORT_GATE, payload: { documentId } };
 }

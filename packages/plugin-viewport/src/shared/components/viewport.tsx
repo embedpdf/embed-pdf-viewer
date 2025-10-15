@@ -1,5 +1,5 @@
 import { ReactNode, useEffect, useState, HTMLAttributes } from '@framework';
-import { useViewportCapability } from '../hooks';
+import { useIsViewportGated, useViewportCapability } from '../hooks';
 import { useViewportRef } from '../hooks/use-viewport-ref';
 
 type ViewportProps = HTMLAttributes<HTMLDivElement> & {
@@ -14,6 +14,7 @@ export function Viewport({ children, documentId, ...props }: ViewportProps) {
   const [viewportGap, setViewportGap] = useState(0);
   const viewportRef = useViewportRef(documentId);
   const { provides: viewportProvides } = useViewportCapability();
+  const isGated = useIsViewportGated(documentId);
 
   useEffect(() => {
     if (viewportProvides) {
@@ -34,7 +35,7 @@ export function Viewport({ children, documentId, ...props }: ViewportProps) {
         padding: `${viewportGap}px`,
       }}
     >
-      {children}
+      {!isGated && children}
     </div>
   );
 }

@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ref, watch, useAttrs } from 'vue';
-import { useViewportCapability, useViewportRef } from '../hooks';
+import { useIsViewportGated, useViewportCapability, useViewportRef } from '../hooks';
 
 /* -------------------------------------------------- */
 /* props & attrs                                      */
@@ -30,6 +30,11 @@ watch(
 );
 
 /* -------------------------------------------------- */
+/* Gating logic                                    */
+/* -------------------------------------------------- */
+const isGated = useIsViewportGated(props.documentId);
+
+/* -------------------------------------------------- */
 /* element ref that wires up scroll / resize logic    */
 /* -------------------------------------------------- */
 const viewportRef = useViewportRef(props.documentId);
@@ -41,6 +46,6 @@ const viewportRef = useViewportRef(props.documentId);
     v-bind="attrs"
     :style="{ padding: `${viewportGap}px`, width: '100%', height: '100%', overflow: 'auto' }"
   >
-    <slot />
+    <slot v-if="!isGated" />
   </div>
 </template>

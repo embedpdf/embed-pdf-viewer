@@ -20,6 +20,8 @@ import {
   setViewportGap,
   setScrollActivity,
   setSmoothScrollActivity,
+  gateViewport,
+  releaseViewportGate,
 } from './actions';
 import {
   ViewportPluginConfig,
@@ -34,6 +36,7 @@ import {
   ViewportEvent,
   ScrollActivityEvent,
   ScrollChangeEvent,
+  GateChangeEvent,
 } from './types';
 
 export class ViewportPlugin extends BasePlugin<
@@ -48,6 +51,7 @@ export class ViewportPlugin extends BasePlugin<
   private readonly viewportMetrics$ = createBehaviorEmitter<ViewportEvent>();
   private readonly scrollMetrics$ = createBehaviorEmitter<ScrollChangeEvent>();
   private readonly scrollActivity$ = createBehaviorEmitter<ScrollActivityEvent>();
+  private readonly gateState$ = createBehaviorEmitter<GateChangeEvent>();
 
   // Scroll request emitters per document (persisted with state)
   private readonly scrollRequests$ = new Map<
@@ -124,10 +128,13 @@ export class ViewportPlugin extends BasePlugin<
       scrollTo: (pos: ScrollToPayload) => this.scrollTo(pos),
       isScrolling: () => this.isScrolling(),
       isSmoothScrolling: () => this.isSmoothScrolling(),
+      isGated: (documentId?: string) => this.isGated(documentId),
       getBoundingRect: () => this.getBoundingRect(),
 
       // Document-scoped operations
       forDocument: (documentId: string) => this.createViewportScope(documentId),
+      gate: (documentId: string) => this.gate(documentId),
+      releaseGate: (documentId: string) => this.releaseGate(documentId),
 
       // Check if viewport is currently mounted
       isViewportMounted: (documentId: string) => this.state.activeViewports.has(documentId),
@@ -137,6 +144,7 @@ export class ViewportPlugin extends BasePlugin<
       onViewportResize: this.viewportResize$.on,
       onScrollChange: this.scrollMetrics$.on,
       onScrollActivity: this.scrollActivity$.on,
+      onGateChange: this.gateState$.on,
     };
   }
 
@@ -150,6 +158,9 @@ export class ViewportPlugin extends BasePlugin<
       scrollTo: (pos: ScrollToPayload) => this.scrollTo(pos, documentId),
       isScrolling: () => this.isScrolling(documentId),
       isSmoothScrolling: () => this.isSmoothScrolling(documentId),
+      isGated: () => this.isGated(documentId),
+      gate: () => this.gate(documentId),
+      releaseGate: () => this.releaseGate(documentId),
       getBoundingRect: () => this.getBoundingRect(documentId),
       onViewportChange: (listener: Listener<ViewportMetrics>) =>
         this.viewportMetrics$.on((event) => {
@@ -162,6 +173,10 @@ export class ViewportPlugin extends BasePlugin<
       onScrollActivity: (listener: Listener<ScrollActivity>) =>
         this.scrollActivity$.on((event) => {
           if (event.documentId === documentId) listener(event.activity);
+        }),
+      onGateChange: (listener: Listener<boolean>) =>
+        this.gateState$.on((event) => {
+          if (event?.documentId === documentId) listener(event.isGated);
         }),
     };
   }
@@ -261,6 +276,18 @@ export class ViewportPlugin extends BasePlugin<
   }
 
   // ─────────────────────────────────────────────────────────
+  // Public Gating API
+  // ─────────────────────────────────────────────────────────
+
+  public gate(documentId: string): void {
+    this.dispatch(gateViewport(documentId));
+  }
+
+  public releaseGate(documentId: string): void {
+    this.dispatch(releaseViewportGate(documentId));
+  }
+
+  // ─────────────────────────────────────────────────────────
   // Helper Methods
   // ─────────────────────────────────────────────────────────
 
@@ -289,6 +316,10 @@ export class ViewportPlugin extends BasePlugin<
 
   private isSmoothScrolling(documentId?: string): boolean {
     return this.getViewportState(documentId).isSmoothScrolling;
+  }
+
+  private isGated(documentId?: string): boolean {
+    return this.getViewportState(documentId).isGated;
   }
 
   private getBoundingRect(documentId?: string): Rect {
@@ -362,6 +393,14 @@ export class ViewportPlugin extends BasePlugin<
             },
           });
         }
+
+        // Emit gate state change
+        if (prevViewport && prevViewport.isGated !== newViewport.isGated) {
+          this.gateState$.emit({
+            documentId,
+            isGated: newViewport.isGated,
+          });
+        }
       }
     }
   }
@@ -380,6 +419,7 @@ export class ViewportPlugin extends BasePlugin<
     this.viewportResize$.clear();
     this.scrollMetrics$.clear();
     this.scrollActivity$.clear();
+    this.gateState$.clear();
 
     this.scrollRequests$.forEach((emitter) => emitter.clear());
     this.scrollRequests$.clear();

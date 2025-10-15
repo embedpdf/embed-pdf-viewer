@@ -14,6 +14,7 @@ export interface ViewportDocumentState {
   viewportMetrics: ViewportMetrics;
   isScrolling: boolean;
   isSmoothScrolling: boolean;
+  isGated: boolean;
 }
 
 export interface ViewportPluginConfig extends BasePluginConfig {
@@ -67,6 +68,11 @@ export interface ScrollActivityEvent {
   activity: ScrollActivity;
 }
 
+export interface GateChangeEvent {
+  documentId: string;
+  isGated: boolean;
+}
+
 export interface ScrollChangeEvent {
   documentId: string;
   scrollMetrics: ViewportScrollMetrics;
@@ -78,10 +84,14 @@ export interface ViewportScope {
   scrollTo(position: ScrollToPayload): void;
   isScrolling(): boolean;
   isSmoothScrolling(): boolean;
+  isGated(): boolean;
+  gate(): void;
+  releaseGate(): void;
   getBoundingRect(): Rect;
   onViewportChange: EventHook<ViewportMetrics>;
   onScrollChange: EventHook<ViewportScrollMetrics>;
   onScrollActivity: EventHook<ScrollActivity>;
+  onGateChange: EventHook<boolean>;
 }
 
 export interface ViewportCapability {
@@ -93,10 +103,13 @@ export interface ViewportCapability {
   scrollTo(position: ScrollToPayload): void;
   isScrolling(): boolean;
   isSmoothScrolling(): boolean;
+  isGated(documentId?: string): boolean;
   getBoundingRect(): Rect;
 
   // Document-scoped operations
   forDocument(documentId: string): ViewportScope;
+  gate(documentId: string): void;
+  releaseGate(documentId: string): void;
 
   // Check if viewport is mounted
   isViewportMounted(documentId: string): boolean;
@@ -106,4 +119,5 @@ export interface ViewportCapability {
   onViewportResize: EventHook<ViewportEvent>;
   onScrollChange: EventHook<ScrollChangeEvent>;
   onScrollActivity: EventHook<ScrollActivityEvent>;
+  onGateChange: EventHook<GateChangeEvent>;
 }

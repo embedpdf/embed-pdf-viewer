@@ -11,6 +11,8 @@ import {
   SET_VIEWPORT_GAP,
   SET_SCROLL_ACTIVITY,
   SET_SMOOTH_SCROLL_ACTIVITY,
+  GATE_VIEWPORT,
+  RELEASE_VIEWPORT_GATE,
 } from './actions';
 import { ViewportState, ViewportDocumentState } from './types';
 
@@ -28,6 +30,7 @@ const initialViewportDocumentState: ViewportDocumentState = {
   },
   isScrolling: false,
   isSmoothScrolling: false,
+  isGated: false,
 };
 
 export const initialState: ViewportState = {
@@ -206,6 +209,40 @@ export const viewportReducer: Reducer<ViewportState, ViewportAction> = (
           [documentId]: {
             ...viewport,
             isSmoothScrolling,
+          },
+        },
+      };
+    }
+
+    case GATE_VIEWPORT: {
+      const { documentId } = action.payload;
+      const viewport = state.documents[documentId];
+      if (!viewport) return state;
+
+      return {
+        ...state,
+        documents: {
+          ...state.documents,
+          [documentId]: {
+            ...viewport,
+            isGated: true,
+          },
+        },
+      };
+    }
+
+    case RELEASE_VIEWPORT_GATE: {
+      const { documentId } = action.payload;
+      const viewport = state.documents[documentId];
+      if (!viewport) return state;
+
+      return {
+        ...state,
+        documents: {
+          ...state.documents,
+          [documentId]: {
+            ...viewport,
+            isGated: false,
           },
         },
       };
