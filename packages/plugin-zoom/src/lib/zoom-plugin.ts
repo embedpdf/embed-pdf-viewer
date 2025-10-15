@@ -124,11 +124,6 @@ export class ZoomPlugin extends BasePlugin<
     );
   }
 
-  protected override onScaleChanged(documentId: string): void {
-    // Recalculate auto modes when scale changes
-    this.recalcAuto(documentId, VerticalZoomFocus.Top);
-  }
-
   protected override onRotationChanged(documentId: string): void {
     // Recalculate auto modes when rotation changes
     this.recalcAuto(documentId, VerticalZoomFocus.Top);
@@ -594,7 +589,12 @@ export class ZoomPlugin extends BasePlugin<
       const prevDoc = prevState.documents[documentId];
       const newDoc = newState.documents[documentId];
 
-      if (prevDoc !== newDoc) {
+      if (
+        prevDoc &&
+        newDoc &&
+        (prevDoc.currentZoomLevel !== newDoc.currentZoomLevel ||
+          prevDoc.zoomLevel !== newDoc.zoomLevel)
+      ) {
         this.state$.emit({
           documentId,
           state: newDoc,
