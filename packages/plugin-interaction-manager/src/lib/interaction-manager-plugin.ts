@@ -236,12 +236,6 @@ export class InteractionManagerPlugin extends BasePlugin<
   // State Helpers
   // ─────────────────────────────────────────────────────────
 
-  private getActiveDocumentId(): string {
-    const id = this.state.activeDocumentId ?? this.coreState.core.activeDocumentId;
-    if (!id) throw new Error('No active document');
-    return id;
-  }
-
   private getDocumentState(documentId?: string): InteractionDocumentState | null {
     const id = documentId ?? this.getActiveDocumentId();
     return this.state.documents[id] ?? null;

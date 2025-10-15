@@ -81,7 +81,7 @@ export class DocumentManagerPlugin extends BasePlugin<
 
       // Active document control
       setActiveDocument: (documentId) => this.setActiveDocument(documentId),
-      getActiveDocumentId: () => this.getActiveDocumentId(),
+      getActiveDocumentId: () => this.getActiveDocumentIdOrNull(),
       getActiveDocument: () => this.getActiveDocument(),
 
       // Tab order management
@@ -517,10 +517,6 @@ export class DocumentManagerPlugin extends BasePlugin<
     }
 
     this.dispatchCoreAction(setActiveDocumentAction(documentId));
-  }
-
-  private getActiveDocumentId(): string | null {
-    return this.coreState.core.activeDocumentId;
   }
 
   private getActiveDocument(): PdfDocumentObject | null {

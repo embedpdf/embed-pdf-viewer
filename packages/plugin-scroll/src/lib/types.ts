@@ -20,7 +20,6 @@ export interface ScrollDocumentState {
   totalContentSize: { width: number; height: number };
   strategy: ScrollStrategy;
   pageGap: number;
-  scale: number;
 
   // Scroll metrics
   visiblePages: number[];

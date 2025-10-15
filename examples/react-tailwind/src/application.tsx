@@ -225,8 +225,17 @@ export default function DocumentViewer() {
                                                   height,
                                                   position: 'relative',
                                                   backgroundColor: 'red',
+                                                  display: 'flex',
+                                                  alignItems: 'center',
+                                                  justifyContent: 'center',
+                                                  fontSize: `${72 * scale}px`,
+                                                  color: 'rgba(255, 255, 255, 0.5)',
+                                                  fontWeight: 'bold',
+                                                  userSelect: 'none',
                                                 }}
-                                              ></div>
+                                              >
+                                                {pageIndex + 1}
+                                              </div>
                                             </PagePointerProvider>
                                           )}
                                         />

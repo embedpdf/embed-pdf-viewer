@@ -15,6 +15,7 @@ import {
   StoreState,
 } from '../store';
 import { Logger, PdfEngine } from '@embedpdf/models';
+import { DocumentState } from '../store/initial-state';
 
 export interface StateChangeHandler<TState> {
   (state: TState): void;
@@ -378,5 +379,48 @@ export abstract class BasePlugin<
     this.readyPromise = new Promise((resolve) => {
       this.readyResolve = resolve;
     });
+  }
+
+  /**
+   * Get the active document ID
+   * @throws Error if no active document exists
+   */
+  protected getActiveDocumentId(): string {
+    const id = this.coreState.core.activeDocumentId;
+    if (!id) {
+      throw new Error('No active document');
+    }
+    return id;
+  }
+
+  /**
+   * Get the active document ID or null if none exists
+   */
+  protected getActiveDocumentIdOrNull(): string | null {
+    return this.coreState.core.activeDocumentId;
+  }
+
+  /**
+   * Get core document state for a specific document
+   * @param documentId Document ID (optional, defaults to active document)
+   * @returns Document state or null if not found
+   */
+  protected getCoreDocument(documentId?: string): DocumentState | null {
+    const id = documentId ?? this.getActiveDocumentIdOrNull();
+    if (!id) return null;
+    return this.coreState.core.documents[id] ?? null;
+  }
+
+  /**
+   * Get core document state for a specific document
+   * @param documentId Document ID (optional, defaults to active document)
+   * @throws Error if document not found
+   */
+  protected getCoreDocumentOrThrow(documentId?: string): DocumentState {
+    const doc = this.getCoreDocument(documentId);
+    if (!doc) {
+      throw new Error(`Document not found: ${documentId ?? 'active'}`);
+    }
+    return doc;
   }
 }

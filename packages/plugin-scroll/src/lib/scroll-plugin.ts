@@ -204,7 +204,7 @@ export class ScrollPlugin extends BasePlugin<
    */
   public getScrollerLayout(documentId: string): ScrollerLayout {
     const docState = this.getDocumentState(documentId);
-    const coreDoc = this.coreState.core.documents[documentId];
+    const coreDoc = this.getCoreDocumentOrThrow(documentId);
 
     if (!docState || !coreDoc) {
       throw new Error(`Cannot get scroller layout for document: ${documentId}`);
@@ -311,13 +311,6 @@ export class ScrollPlugin extends BasePlugin<
   // ─────────────────────────────────────────────────────────
   // State Helpers
   // ─────────────────────────────────────────────────────────
-
-  private getActiveDocumentId(): string {
-    const id = this.coreState.core.activeDocumentId;
-    if (!id) throw new Error('No active document');
-    return id;
-  }
-
   private getDocumentState(documentId?: string): ScrollDocumentState | null {
     const id = documentId ?? this.getActiveDocumentId();
     return this.state.documents[id] ?? null;
@@ -360,7 +353,6 @@ export class ScrollPlugin extends BasePlugin<
       totalContentSize: { width: 0, height: 0 },
       strategy: this.state.defaultStrategy,
       pageGap: this.state.defaultPageGap,
-      scale: coreDoc.scale,
       visiblePages: [],
       pageVisibilityMetrics: [],
       renderedPageIndexes: [],
@@ -429,11 +421,12 @@ export class ScrollPlugin extends BasePlugin<
   }
 
   private computeMetrics(documentId: string, vp: ViewportMetrics): ScrollMetrics {
+    const coreDocState = this.getCoreDocumentOrThrow(documentId);
     const docState = this.getDocumentState(documentId);
     const strategy = this.getStrategy(documentId);
     if (!docState) throw new Error(`Document state not found: ${documentId}`);
 
-    return strategy.handleScroll(vp, docState.virtualItems, docState.scale);
+    return strategy.handleScroll(vp, docState.virtualItems, coreDocState.scale);
   }
 
   // ─────────────────────────────────────────────────────────
@@ -523,7 +516,7 @@ export class ScrollPlugin extends BasePlugin<
     const id = documentId ?? this.getActiveDocumentId();
     const docState = this.getDocumentStateOrThrow(id);
     const strategy = this.getStrategy(id);
-    const coreDoc = this.coreState.core.documents[id];
+    const coreDoc = this.getCoreDocumentOrThrow(id);
 
     const { pageNumber, behavior = 'smooth', pageCoordinates, center = false } = options;
 
@@ -532,7 +525,7 @@ export class ScrollPlugin extends BasePlugin<
     const position = strategy.getScrollPositionForPage(
       pageNumber,
       docState.virtualItems,
-      docState.scale,
+      coreDoc.scale,
       coreDoc.rotation,
       pageCoordinates,
     );
@@ -549,7 +542,7 @@ export class ScrollPlugin extends BasePlugin<
     const id = documentId ?? this.getActiveDocumentId();
     const docState = this.getDocumentStateOrThrow(id);
     const strategy = this.getStrategy(id);
-    const coreDoc = this.coreState.core.documents[id];
+    const coreDoc = this.getCoreDocumentOrThrow(id);
 
     const currentItemIndex = docState.virtualItems.findIndex((item) =>
       item.pageNumbers.includes(docState.currentPage),
@@ -564,7 +557,7 @@ export class ScrollPlugin extends BasePlugin<
       const position = strategy.getScrollPositionForPage(
         targetPage,
         docState.virtualItems,
-        docState.scale,
+        coreDoc.scale,
         coreDoc.rotation,
       );
 
@@ -596,7 +589,7 @@ export class ScrollPlugin extends BasePlugin<
       const position = strategy.getScrollPositionForPage(
         targetPage,
         docState.virtualItems,
-        docState.scale,
+        coreDoc.scale,
         coreDoc.rotation,
       );
 
@@ -638,12 +631,12 @@ export class ScrollPlugin extends BasePlugin<
     const id = documentId ?? this.getActiveDocumentId();
     const docState = this.getDocumentStateOrThrow(id);
     const strategy = this.getStrategy(id);
-    const coreDoc = this.coreState.core.documents[id];
+    const coreDoc = this.getCoreDocumentOrThrow(id);
 
     return strategy.getRectPositionForPage(
       pageIndex + 1,
       docState.virtualItems,
-      scale ?? docState.scale,
+      scale ?? coreDoc.scale,
       rotation ?? coreDoc.rotation,
       rect,
     );

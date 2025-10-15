@@ -329,12 +329,6 @@ export class ViewportPlugin extends BasePlugin<
   // Helper Methods
   // ─────────────────────────────────────────────────────────
 
-  private getActiveDocumentId(): string {
-    const id = this.state.activeDocumentId ?? this.coreState.core.activeDocumentId;
-    if (!id) throw new Error('No active document');
-    return id;
-  }
-
   private getViewportState(documentId?: string) {
     const id = documentId ?? this.getActiveDocumentId();
     const viewport = this.state.documents[id];
