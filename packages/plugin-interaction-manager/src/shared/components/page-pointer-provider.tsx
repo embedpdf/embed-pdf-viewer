@@ -13,6 +13,7 @@ import { useInteractionManagerCapability, useIsPageExclusive } from '../hooks';
 
 interface PagePointerProviderProps extends HTMLAttributes<HTMLDivElement> {
   children: ReactNode;
+  documentId: string;
   pageIndex: number;
   pageWidth: number;
   pageHeight: number;
@@ -23,6 +24,7 @@ interface PagePointerProviderProps extends HTMLAttributes<HTMLDivElement> {
 }
 
 export const PagePointerProvider = ({
+  documentId,
   pageIndex,
   children,
   pageWidth,
@@ -35,7 +37,7 @@ export const PagePointerProvider = ({
 }: PagePointerProviderProps) => {
   const ref = useRef<HTMLDivElement>(null);
   const { provides: cap } = useInteractionManagerCapability();
-  const isPageExclusive = useIsPageExclusive();
+  const isPageExclusive = useIsPageExclusive(documentId);
 
   // Memoize the default conversion function
   const defaultConvertEventToPoint = useCallback(
@@ -62,11 +64,11 @@ export const PagePointerProvider = ({
 
     return createPointerProvider(
       cap,
-      { type: 'page', pageIndex },
+      { type: 'page', documentId, pageIndex },
       ref.current,
       convertEventToPoint || defaultConvertEventToPoint,
     );
-  }, [cap, pageIndex, convertEventToPoint, defaultConvertEventToPoint]);
+  }, [cap, documentId, pageIndex, convertEventToPoint, defaultConvertEventToPoint]);
 
   return (
     <div

@@ -5,6 +5,7 @@ import { createPointerProvider } from '../../shared/utils';
 import { useInteractionManagerCapability, useIsPageExclusive } from '../hooks';
 
 interface Props {
+  documentId: string;
   pageIndex: number;
   pageWidth: number;
   pageHeight: number;
@@ -17,7 +18,7 @@ const props = defineProps<Props>();
 
 const divRef = ref<HTMLDivElement | null>(null);
 const { provides: cap } = useInteractionManagerCapability();
-const isPageExclusive = useIsPageExclusive();
+const isPageExclusive = useIsPageExclusive(props.documentId);
 
 const defaultConvertEventToPoint = computed(() => {
   return (event: PointerEvent, element: HTMLElement): Position => {
@@ -41,7 +42,7 @@ watchEffect((onCleanup) => {
   if (cap.value && divRef.value) {
     const cleanup = createPointerProvider(
       cap.value,
-      { type: 'page', pageIndex: props.pageIndex },
+      { type: 'page', documentId: props.documentId, pageIndex: props.pageIndex },
       divRef.value,
       props.convertEventToPoint || defaultConvertEventToPoint.value,
     );
