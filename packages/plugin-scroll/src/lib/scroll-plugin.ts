@@ -172,6 +172,14 @@ export class ScrollPlugin extends BasePlugin<
     );
   }
 
+  protected override onScaleChanged(documentId: string, scale: number): void {
+    this.refreshDocumentLayout(documentId);
+  }
+
+  protected override onRotationChanged(documentId: string, rotation: number): void {
+    this.refreshDocumentLayout(documentId);
+  }
+
   // ─────────────────────────────────────────────────────────
   // Public API for Components (Scroller Layout)
   // ─────────────────────────────────────────────────────────

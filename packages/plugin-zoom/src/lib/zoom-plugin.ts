@@ -124,7 +124,6 @@ export class ZoomPlugin extends BasePlugin<
     );
   }
 
-  /*
   protected override onScaleChanged(documentId: string): void {
     // Recalculate auto modes when scale changes
     this.recalcAuto(documentId, VerticalZoomFocus.Top);
@@ -135,11 +134,11 @@ export class ZoomPlugin extends BasePlugin<
     this.recalcAuto(documentId, VerticalZoomFocus.Top);
   }
 
+  /*
   protected override onPagesChanged(documentId: string): void {
     // Recalculate auto modes when pages change
     this.recalcAuto(documentId, VerticalZoomFocus.Top);
-  }
-  */
+  }*/
 
   // ─────────────────────────────────────────────────────────
   // Capability

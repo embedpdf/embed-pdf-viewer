@@ -8,6 +8,8 @@ import {
   PluginStore,
   SET_ACTIVE_DOCUMENT,
   SET_DOCUMENT_LOADED,
+  SET_ROTATION,
+  SET_SCALE,
   START_LOADING_DOCUMENT,
   Store,
   StoreState,
@@ -41,6 +43,8 @@ export abstract class BasePlugin<
   private unsubscribeFromSetDocumentLoaded: (() => void) | null = null;
   private unsubscribeFromCloseDocument: (() => void) | null = null;
   private unsubscribeFromSetActiveDocument: (() => void) | null = null;
+  private unsubscribeFromSetScale: (() => void) | null = null;
+  private unsubscribeFromSetRotation: (() => void) | null = null;
 
   private _capability?: Readonly<TCapability>;
 
@@ -90,6 +94,18 @@ export abstract class BasePlugin<
         this.onActiveDocumentChanged(oldState.core.activeDocumentId, action.payload);
       },
     );
+    this.unsubscribeFromSetScale = this.coreStore.onAction(SET_SCALE, (action, state) => {
+      const targetId = action.payload.documentId ?? state.core.activeDocumentId;
+      if (targetId) {
+        this.onScaleChanged(targetId, action.payload.scale);
+      }
+    });
+    this.unsubscribeFromSetRotation = this.coreStore.onAction(SET_ROTATION, (action, state) => {
+      const targetId = action.payload.documentId ?? state.core.activeDocumentId;
+      if (targetId) {
+        this.onRotationChanged(targetId, action.payload.rotation);
+      }
+    });
 
     // Initialize ready state
     this.readyPromise = new Promise((resolve) => {
@@ -289,6 +305,14 @@ export abstract class BasePlugin<
     // Default: no-op
   }
 
+  protected onScaleChanged(documentId: string, scale: number): void {
+    // Default: no-op
+  }
+
+  protected onRotationChanged(documentId: string, rotation: number): void {
+    // Default: no-op
+  }
+
   /**
    * Cleanup method to be called when plugin is being destroyed
    */
@@ -322,6 +346,14 @@ export abstract class BasePlugin<
     if (this.unsubscribeFromSetActiveDocument) {
       this.unsubscribeFromSetActiveDocument();
       this.unsubscribeFromSetActiveDocument = null;
+    }
+    if (this.unsubscribeFromSetScale) {
+      this.unsubscribeFromSetScale();
+      this.unsubscribeFromSetScale = null;
+    }
+    if (this.unsubscribeFromSetRotation) {
+      this.unsubscribeFromSetRotation();
+      this.unsubscribeFromSetRotation = null;
     }
   }
 

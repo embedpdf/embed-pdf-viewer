@@ -10,6 +10,13 @@ import {
   DocumentTabs,
   DocumentManagerPlugin,
 } from '@embedpdf/plugin-document-manager/react';
+import {
+  InteractionManagerPluginPackage,
+  GlobalPointerProvider,
+  PagePointerProvider,
+} from '@embedpdf/plugin-interaction-manager/react';
+import { ZoomMode, ZoomPluginPackage } from '@embedpdf/plugin-zoom/react';
+import { ZoomToolbar } from './components/zoom-toolbar';
 
 export default function DocumentViewer() {
   const containerRef = useRef<HTMLDivElement>(null);
@@ -36,6 +43,10 @@ export default function DocumentViewer() {
               defaultStrategy: ScrollStrategy.Vertical,
             }),
             createPluginRegistration(DocumentManagerPluginPackage),
+            createPluginRegistration(InteractionManagerPluginPackage),
+            createPluginRegistration(ZoomPluginPackage, {
+              defaultZoomLevel: ZoomMode.FitPage,
+            }),
           ]}
         >
           {({ pluginsReady, registry }) => (
@@ -114,6 +125,13 @@ export default function DocumentViewer() {
                           ))}
                         </div>
 
+                        {/* Zoom Controls - add this before the Open File button */}
+                        {activeDocumentId && (
+                          <div className="border-l border-gray-200 px-3 py-2">
+                            <ZoomToolbar documentId={activeDocumentId} />
+                          </div>
+                        )}
+
                         {/* Open File Button */}
                         <button
                           onClick={() =>
@@ -179,21 +197,41 @@ export default function DocumentViewer() {
                                 )}
                                 {isLoaded && (
                                   <div className="h-full w-full">
-                                    <Viewport className="bg-gray-100" documentId={activeDocumentId}>
-                                      <Scroller
+                                    <GlobalPointerProvider documentId={activeDocumentId}>
+                                      <Viewport
+                                        className="bg-gray-100"
                                         documentId={activeDocumentId}
-                                        renderPage={({ width, height }) => (
-                                          <div
-                                            style={{
-                                              width,
-                                              height,
-                                              position: 'relative',
-                                              backgroundColor: 'red',
-                                            }}
-                                          ></div>
-                                        )}
-                                      />
-                                    </Viewport>
+                                      >
+                                        <Scroller
+                                          documentId={activeDocumentId}
+                                          renderPage={({
+                                            width,
+                                            height,
+                                            scale,
+                                            rotation,
+                                            pageIndex,
+                                          }) => (
+                                            <PagePointerProvider
+                                              documentId={activeDocumentId}
+                                              pageIndex={pageIndex}
+                                              pageWidth={width}
+                                              pageHeight={height}
+                                              rotation={rotation}
+                                              scale={scale}
+                                            >
+                                              <div
+                                                style={{
+                                                  width,
+                                                  height,
+                                                  position: 'relative',
+                                                  backgroundColor: 'red',
+                                                }}
+                                              ></div>
+                                            </PagePointerProvider>
+                                          )}
+                                        />
+                                      </Viewport>
+                                    </GlobalPointerProvider>
                                   </div>
                                 )}
                               </div>
