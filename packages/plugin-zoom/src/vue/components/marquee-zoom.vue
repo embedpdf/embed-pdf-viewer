@@ -22,6 +22,8 @@ import type { Rect } from '@embedpdf/models';
 import { useZoomCapability } from '../hooks';
 
 interface MarqueeZoomProps {
+  /** The ID of the document */
+  documentId: string;
   /** Index of the page this layer lives on */
   pageIndex: number;
   /** Scale of the page */
@@ -47,6 +49,7 @@ onMounted(() => {
   if (!zoomPlugin.value) return;
 
   unregister = zoomPlugin.value.registerMarqueeOnPage({
+    documentId: props.documentId,
     pageIndex: props.pageIndex,
     scale: props.scale,
     callback: {

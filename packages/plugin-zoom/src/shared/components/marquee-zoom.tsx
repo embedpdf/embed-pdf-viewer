@@ -1,21 +1,18 @@
 import { useEffect, useState } from '@framework';
 import { Rect } from '@embedpdf/models';
-
 import { useZoomCapability } from '../hooks/use-zoom';
 
 interface MarqueeZoomProps {
-  /** Index of the page this layer lives on */
+  documentId: string;
   pageIndex: number;
-  /** Scale of the page */
   scale: number;
-  /** Optional CSS class applied to the marquee rectangle */
   className?: string;
-  /** Stroke / fill colours (defaults below) */
   stroke?: string;
   fill?: string;
 }
 
 export const MarqueeZoom = ({
+  documentId,
   pageIndex,
   scale,
   className,
@@ -28,13 +25,14 @@ export const MarqueeZoom = ({
   useEffect(() => {
     if (!zoomPlugin) return;
     return zoomPlugin.registerMarqueeOnPage({
+      documentId,
       pageIndex,
       scale,
       callback: {
         onPreview: setRect,
       },
     });
-  }, [zoomPlugin, pageIndex, scale]);
+  }, [zoomPlugin, documentId, pageIndex, scale]);
 
   if (!rect) return null;
 

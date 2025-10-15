@@ -17,5 +17,11 @@
 <script setup lang="ts">
 import { usePinch } from '../hooks/use-pinch-zoom';
 
-const { elementRef } = usePinch();
+interface Props {
+  documentId: string;
+}
+
+const props = defineProps<Props>();
+
+const { elementRef } = usePinch(props.documentId);
 </script>
