@@ -16,8 +16,10 @@ export const SET_VIEWPORT_GAP = 'SET_VIEWPORT_GAP';
 export const SET_SCROLL_ACTIVITY = 'SET_SCROLL_ACTIVITY';
 export const SET_SMOOTH_SCROLL_ACTIVITY = 'SET_SMOOTH_SCROLL_ACTIVITY';
 export const SET_ACTIVE_VIEWPORT_DOCUMENT = 'SET_ACTIVE_VIEWPORT_DOCUMENT';
-export const GATE_VIEWPORT = 'GATE_VIEWPORT';
-export const RELEASE_VIEWPORT_GATE = 'RELEASE_VIEWPORT_GATE';
+
+// NEW: Named gate actions
+export const ADD_VIEWPORT_GATE = 'ADD_VIEWPORT_GATE';
+export const REMOVE_VIEWPORT_GATE = 'REMOVE_VIEWPORT_GATE';
 
 // State persistence actions
 export interface InitViewportStateAction extends Action {
@@ -91,17 +93,20 @@ export interface SetSmoothScrollActivityAction extends Action {
   };
 }
 
-export interface GateViewportAction extends Action {
-  type: typeof GATE_VIEWPORT;
+// NEW: Named gate actions
+export interface AddViewportGateAction extends Action {
+  type: typeof ADD_VIEWPORT_GATE;
   payload: {
     documentId: string;
+    key: string;
   };
 }
 
-export interface ReleaseViewportGateAction extends Action {
-  type: typeof RELEASE_VIEWPORT_GATE;
+export interface RemoveViewportGateAction extends Action {
+  type: typeof REMOVE_VIEWPORT_GATE;
   payload: {
     documentId: string;
+    key: string;
   };
 }
 
@@ -116,8 +121,8 @@ export type ViewportAction =
   | SetViewportGapAction
   | SetScrollActivityAction
   | SetSmoothScrollActivityAction
-  | GateViewportAction
-  | ReleaseViewportGateAction;
+  | AddViewportGateAction
+  | RemoveViewportGateAction;
 
 // Action Creators
 
@@ -175,10 +180,10 @@ export function setSmoothScrollActivity(
   return { type: SET_SMOOTH_SCROLL_ACTIVITY, payload: { documentId, isSmoothScrolling } };
 }
 
-export function gateViewport(documentId: string): GateViewportAction {
-  return { type: GATE_VIEWPORT, payload: { documentId } };
+export function addViewportGate(documentId: string, key: string): AddViewportGateAction {
+  return { type: ADD_VIEWPORT_GATE, payload: { documentId, key } };
 }
 
-export function releaseViewportGate(documentId: string): ReleaseViewportGateAction {
-  return { type: RELEASE_VIEWPORT_GATE, payload: { documentId } };
+export function removeViewportGate(documentId: string, key: string): RemoveViewportGateAction {
+  return { type: REMOVE_VIEWPORT_GATE, payload: { documentId, key } };
 }

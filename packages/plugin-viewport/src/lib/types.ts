@@ -14,7 +14,7 @@ export interface ViewportDocumentState {
   viewportMetrics: ViewportMetrics;
   isScrolling: boolean;
   isSmoothScrolling: boolean;
-  isGated: boolean;
+  gates: Set<string>;
 }
 
 export interface ViewportPluginConfig extends BasePluginConfig {
@@ -71,6 +71,9 @@ export interface ScrollActivityEvent {
 export interface GateChangeEvent {
   documentId: string;
   isGated: boolean;
+  gates: string[]; // All active gate keys
+  addedGate?: string; // The gate that was just added
+  removedGate?: string; // The gate that was just removed
 }
 
 export interface ScrollChangeEvent {
@@ -85,13 +88,15 @@ export interface ViewportScope {
   isScrolling(): boolean;
   isSmoothScrolling(): boolean;
   isGated(): boolean;
-  gate(): void;
-  releaseGate(): void;
+  hasGate(key: string): boolean;
+  getGates(): string[];
+  gate(key: string): void;
+  releaseGate(key: string): void;
   getBoundingRect(): Rect;
   onViewportChange: EventHook<ViewportMetrics>;
   onScrollChange: EventHook<ViewportScrollMetrics>;
   onScrollActivity: EventHook<ScrollActivity>;
-  onGateChange: EventHook<boolean>;
+  onGateChange: EventHook<GateChangeEvent>;
 }
 
 export interface ViewportCapability {
@@ -104,12 +109,14 @@ export interface ViewportCapability {
   isScrolling(): boolean;
   isSmoothScrolling(): boolean;
   isGated(documentId?: string): boolean;
+  hasGate(key: string, documentId?: string): boolean;
+  getGates(documentId?: string): string[];
   getBoundingRect(): Rect;
 
   // Document-scoped operations
   forDocument(documentId: string): ViewportScope;
-  gate(documentId: string): void;
-  releaseGate(documentId: string): void;
+  gate(key: string, documentId: string): void;
+  releaseGate(key: string, documentId: string): void;
 
   // Check if viewport is mounted
   isViewportMounted(documentId: string): boolean;

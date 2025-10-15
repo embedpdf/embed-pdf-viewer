@@ -1,5 +1,3 @@
-// packages/plugin-viewport/src/lib/viewport-plugin.ts
-
 import {
   BasePlugin,
   PluginRegistry,
@@ -20,8 +18,8 @@ import {
   setViewportGap,
   setScrollActivity,
   setSmoothScrollActivity,
-  gateViewport,
-  releaseViewportGate,
+  addViewportGate,
+  removeViewportGate,
 } from './actions';
 import {
   ViewportPluginConfig,
@@ -129,12 +127,14 @@ export class ViewportPlugin extends BasePlugin<
       isScrolling: () => this.isScrolling(),
       isSmoothScrolling: () => this.isSmoothScrolling(),
       isGated: (documentId?: string) => this.isGated(documentId),
+      hasGate: (key: string, documentId?: string) => this.hasGate(key, documentId),
+      getGates: (documentId?: string) => this.getGates(documentId),
       getBoundingRect: () => this.getBoundingRect(),
 
       // Document-scoped operations
       forDocument: (documentId: string) => this.createViewportScope(documentId),
-      gate: (documentId: string) => this.gate(documentId),
-      releaseGate: (documentId: string) => this.releaseGate(documentId),
+      gate: (key: string, documentId: string) => this.gate(key, documentId),
+      releaseGate: (key: string, documentId: string) => this.releaseGate(key, documentId),
 
       // Check if viewport is currently mounted
       isViewportMounted: (documentId: string) => this.state.activeViewports.has(documentId),
@@ -159,8 +159,10 @@ export class ViewportPlugin extends BasePlugin<
       isScrolling: () => this.isScrolling(documentId),
       isSmoothScrolling: () => this.isSmoothScrolling(documentId),
       isGated: () => this.isGated(documentId),
-      gate: () => this.gate(documentId),
-      releaseGate: () => this.releaseGate(documentId),
+      hasGate: (key: string) => this.hasGate(key, documentId),
+      getGates: () => this.getGates(documentId),
+      gate: (key: string) => this.gate(key, documentId),
+      releaseGate: (key: string) => this.releaseGate(key, documentId),
       getBoundingRect: () => this.getBoundingRect(documentId),
       onViewportChange: (listener: Listener<ViewportMetrics>) =>
         this.viewportMetrics$.on((event) => {
@@ -174,9 +176,9 @@ export class ViewportPlugin extends BasePlugin<
         this.scrollActivity$.on((event) => {
           if (event.documentId === documentId) listener(event.activity);
         }),
-      onGateChange: (listener: Listener<boolean>) =>
+      onGateChange: (listener: Listener<GateChangeEvent>) =>
         this.gateState$.on((event) => {
-          if (event?.documentId === documentId) listener(event.isGated);
+          if (event?.documentId === documentId) listener(event);
         }),
     };
   }
@@ -279,12 +281,48 @@ export class ViewportPlugin extends BasePlugin<
   // Public Gating API
   // ─────────────────────────────────────────────────────────
 
-  public gate(documentId: string): void {
-    this.dispatch(gateViewport(documentId));
+  public gate(key: string, documentId: string): void {
+    const viewport = this.state.documents[documentId];
+    if (!viewport) {
+      this.logger.warn(
+        'ViewportPlugin',
+        'GateViewport',
+        `Cannot gate viewport for ${documentId}: document not found`,
+      );
+      return;
+    }
+
+    // Only dispatch if gate doesn't already exist
+    if (!viewport.gates.has(key)) {
+      this.dispatch(addViewportGate(documentId, key));
+      this.logger.debug(
+        'ViewportPlugin',
+        'GateAdded',
+        `Added gate '${key}' for document: ${documentId}. Total gates: ${viewport.gates.size + 1}`,
+      );
+    }
   }
 
-  public releaseGate(documentId: string): void {
-    this.dispatch(releaseViewportGate(documentId));
+  public releaseGate(key: string, documentId: string): void {
+    const viewport = this.state.documents[documentId];
+    if (!viewport) {
+      this.logger.warn(
+        'ViewportPlugin',
+        'ReleaseGate',
+        `Cannot release gate for ${documentId}: document not found`,
+      );
+      return;
+    }
+
+    // Only dispatch if gate exists
+    if (viewport.gates.has(key)) {
+      this.dispatch(removeViewportGate(documentId, key));
+      this.logger.debug(
+        'ViewportPlugin',
+        'GateReleased',
+        `Released gate '${key}' for document: ${documentId}. Remaining gates: ${viewport.gates.size - 1}`,
+      );
+    }
   }
 
   // ─────────────────────────────────────────────────────────
@@ -319,7 +357,18 @@ export class ViewportPlugin extends BasePlugin<
   }
 
   private isGated(documentId?: string): boolean {
-    return this.getViewportState(documentId).isGated;
+    const viewport = this.getViewportState(documentId);
+    return viewport.gates.size > 0;
+  }
+
+  private hasGate(key: string, documentId?: string): boolean {
+    const viewport = this.getViewportState(documentId);
+    return viewport.gates.has(key);
+  }
+
+  private getGates(documentId?: string): string[] {
+    const viewport = this.getViewportState(documentId);
+    return Array.from(viewport.gates);
   }
 
   private getBoundingRect(documentId?: string): Rect {
@@ -394,12 +443,29 @@ export class ViewportPlugin extends BasePlugin<
           });
         }
 
-        // Emit gate state change
-        if (prevViewport && prevViewport.isGated !== newViewport.isGated) {
+        // Emit gate state change when gates change
+        if (prevViewport && prevViewport.gates !== newViewport.gates) {
+          const prevGates = Array.from(prevViewport.gates);
+          const newGates = Array.from(newViewport.gates);
+
+          // Determine what changed
+          const addedGate = newGates.find((g) => !prevGates.includes(g));
+          const removedGate = prevGates.find((g) => !newGates.includes(g));
+
           this.gateState$.emit({
             documentId,
-            isGated: newViewport.isGated,
+            isGated: newViewport.gates.size > 0,
+            gates: newGates,
+            addedGate,
+            removedGate,
           });
+
+          this.logger.debug(
+            'ViewportPlugin',
+            'GateStateChanged',
+            `Gate state changed for document ${documentId}. ` +
+              `Gates: [${newGates.join(', ')}], Gated: ${newViewport.gates.size > 0}`,
+          );
         }
       }
     }

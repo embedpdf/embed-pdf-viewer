@@ -94,6 +94,7 @@ export class ZoomPlugin extends BasePlugin<
   // ─────────────────────────────────────────────────────────
 
   protected override onDocumentLoadingStarted(documentId: string): void {
+    this.viewport.gate('zoom', documentId);
     // Initialize zoom state for this document
     const docState: ZoomDocumentState = {
       ...initialDocumentState,
@@ -331,6 +332,9 @@ export class ZoomPlugin extends BasePlugin<
 
     this.dispatch(setZoomLevel(id, typeof level === 'number' ? newZoom : level, newZoom));
     this.dispatchCoreAction(setScale(newZoom, id));
+    if (this.viewport.isGated(id)) {
+      this.viewport.releaseGate('zoom', id);
+    }
 
     viewport.scrollTo({
       x: desiredScrollLeft,

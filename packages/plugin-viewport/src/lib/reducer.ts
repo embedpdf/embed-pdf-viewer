@@ -11,8 +11,8 @@ import {
   SET_VIEWPORT_GAP,
   SET_SCROLL_ACTIVITY,
   SET_SMOOTH_SCROLL_ACTIVITY,
-  GATE_VIEWPORT,
-  RELEASE_VIEWPORT_GATE,
+  ADD_VIEWPORT_GATE,
+  REMOVE_VIEWPORT_GATE,
 } from './actions';
 import { ViewportState, ViewportDocumentState } from './types';
 
@@ -30,7 +30,7 @@ const initialViewportDocumentState: ViewportDocumentState = {
   },
   isScrolling: false,
   isSmoothScrolling: false,
-  isGated: false,
+  gates: new Set<string>(),
 };
 
 export const initialState: ViewportState = {
@@ -55,7 +55,7 @@ export const viewportReducer: Reducer<ViewportState, ViewportAction> = (
         ...state,
         documents: {
           ...state.documents,
-          [documentId]: initialViewportDocumentState,
+          [documentId]: { ...initialViewportDocumentState, gates: new Set() },
         },
       };
     }
@@ -214,10 +214,18 @@ export const viewportReducer: Reducer<ViewportState, ViewportAction> = (
       };
     }
 
-    case GATE_VIEWPORT: {
-      const { documentId } = action.payload;
+    // ─────────────────────────────────────────────────────────
+    // Named Gate Operations
+    // ─────────────────────────────────────────────────────────
+
+    case ADD_VIEWPORT_GATE: {
+      const { documentId, key } = action.payload;
       const viewport = state.documents[documentId];
       if (!viewport) return state;
+
+      // Create new Set with the added gate
+      const newGates = new Set(viewport.gates);
+      newGates.add(key);
 
       return {
         ...state,
@@ -225,16 +233,20 @@ export const viewportReducer: Reducer<ViewportState, ViewportAction> = (
           ...state.documents,
           [documentId]: {
             ...viewport,
-            isGated: true,
+            gates: newGates,
           },
         },
       };
     }
 
-    case RELEASE_VIEWPORT_GATE: {
-      const { documentId } = action.payload;
+    case REMOVE_VIEWPORT_GATE: {
+      const { documentId, key } = action.payload;
       const viewport = state.documents[documentId];
       if (!viewport) return state;
+
+      // Create new Set without the removed gate
+      const newGates = new Set(viewport.gates);
+      newGates.delete(key);
 
       return {
         ...state,
@@ -242,7 +254,7 @@ export const viewportReducer: Reducer<ViewportState, ViewportAction> = (
           ...state.documents,
           [documentId]: {
             ...viewport,
-            isGated: false,
+            gates: newGates,
           },
         },
       };
