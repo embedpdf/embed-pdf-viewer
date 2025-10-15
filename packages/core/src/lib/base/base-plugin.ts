@@ -43,7 +43,6 @@ export abstract class BasePlugin<
   private unsubscribeFromStartLoadingDocument: (() => void) | null = null;
   private unsubscribeFromSetDocumentLoaded: (() => void) | null = null;
   private unsubscribeFromCloseDocument: (() => void) | null = null;
-  private unsubscribeFromSetActiveDocument: (() => void) | null = null;
   private unsubscribeFromSetScale: (() => void) | null = null;
   private unsubscribeFromSetRotation: (() => void) | null = null;
 
@@ -70,14 +69,17 @@ export abstract class BasePlugin<
     });
     this.unsubscribeFromCoreStore = this.coreStore.subscribe((action, newState, oldState) => {
       this.onCoreStoreUpdated(oldState, newState);
+      if (newState.core.activeDocumentId !== oldState.core.activeDocumentId) {
+        this.onActiveDocumentChanged(
+          oldState.core.activeDocumentId,
+          newState.core.activeDocumentId,
+        );
+      }
     });
     this.unsubscribeFromStartLoadingDocument = this.coreStore.onAction(
       START_LOADING_DOCUMENT,
-      (action, state, oldState) => {
+      (action) => {
         this.onDocumentLoadingStarted(action.payload.documentId);
-        if (state.core.activeDocumentId !== oldState.core.activeDocumentId) {
-          this.onActiveDocumentChanged(oldState.core.activeDocumentId, state.core.activeDocumentId);
-        }
       },
     );
     this.unsubscribeFromSetDocumentLoaded = this.coreStore.onAction(
@@ -89,12 +91,6 @@ export abstract class BasePlugin<
     this.unsubscribeFromCloseDocument = this.coreStore.onAction(CLOSE_DOCUMENT, (action) => {
       this.onDocumentClosed(action.payload.documentId);
     });
-    this.unsubscribeFromSetActiveDocument = this.coreStore.onAction(
-      SET_ACTIVE_DOCUMENT,
-      (action, _state, oldState) => {
-        this.onActiveDocumentChanged(oldState.core.activeDocumentId, action.payload);
-      },
-    );
     this.unsubscribeFromSetScale = this.coreStore.onAction(SET_SCALE, (action, state) => {
       const targetId = action.payload.documentId ?? state.core.activeDocumentId;
       if (targetId) {
@@ -343,10 +339,6 @@ export abstract class BasePlugin<
     if (this.unsubscribeFromCloseDocument) {
       this.unsubscribeFromCloseDocument();
       this.unsubscribeFromCloseDocument = null;
-    }
-    if (this.unsubscribeFromSetActiveDocument) {
-      this.unsubscribeFromSetActiveDocument();
-      this.unsubscribeFromSetActiveDocument = null;
     }
     if (this.unsubscribeFromSetScale) {
       this.unsubscribeFromSetScale();

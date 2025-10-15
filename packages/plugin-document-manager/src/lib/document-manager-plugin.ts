@@ -475,9 +475,35 @@ export class DocumentManagerPlugin extends BasePlugin<
       return task;
     }
 
+    // Determine next active document before closing
+    let nextActiveDocumentId: string | null | undefined = undefined;
+    const currentActiveId = this.coreState.core.activeDocumentId;
+
+    // Only calculate if we're closing the currently active document
+    if (currentActiveId === documentId) {
+      const documentOrder = this.state.documentOrder;
+      const closingIndex = documentOrder.indexOf(documentId);
+
+      if (closingIndex !== -1) {
+        // Try to activate the document to the left (previous in array)
+        if (closingIndex > 0) {
+          nextActiveDocumentId = documentOrder[closingIndex - 1];
+        }
+        // If no document on the left, try the right (next in array)
+        else if (closingIndex < documentOrder.length - 1) {
+          nextActiveDocumentId = documentOrder[closingIndex + 1];
+        }
+        // If no other documents, set to null
+        else {
+          nextActiveDocumentId = null;
+        }
+      }
+    }
+
     this.engine.closeDocument(document).wait(
       () => {
-        this.dispatchCoreAction(closeDocumentAction(documentId));
+        // Single action with next active document
+        this.dispatchCoreAction(closeDocumentAction(documentId, nextActiveDocumentId));
         task.resolve();
       },
       (error) => {

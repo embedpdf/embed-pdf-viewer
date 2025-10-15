@@ -122,11 +122,9 @@ export class ScrollPlugin extends BasePlugin<
   // ─────────────────────────────────────────────────────────
   // Document Lifecycle Hooks (from BasePlugin)
   // ─────────────────────────────────────────────────────────
-
-  protected override onDocumentLoaded(documentId: string): void {
-    const coreDoc = this.coreState.core.documents[documentId];
-    if (!coreDoc || coreDoc.status !== 'loaded') return;
-
+  protected override onDocumentLoadingStarted(documentId: string): void {
+    const coreDoc = this.getCoreDocument(documentId);
+    if (!coreDoc) return;
     // Initialize scroll state for this document
     const docState = this.createDocumentState(coreDoc);
     this.dispatch(initScrollState(documentId, docState));
@@ -137,7 +135,9 @@ export class ScrollPlugin extends BasePlugin<
 
     // Create scroller layout emitter for this document
     this.scrollerLayoutEmitters.set(documentId, createBehaviorEmitter<ScrollerLayout>());
+  }
 
+  protected override onDocumentLoaded(documentId: string): void {
     // Initial layout computation
     this.refreshDocumentLayout(documentId);
 

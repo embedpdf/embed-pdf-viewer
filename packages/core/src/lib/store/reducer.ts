@@ -38,7 +38,7 @@ export const coreReducer: Reducer<CoreState, CoreAction> = (state, action): Core
           [documentId]: newDocState,
         },
         // Set as active if no active document
-        activeDocumentId: state.activeDocumentId ?? documentId,
+        activeDocumentId: documentId,
       };
     }
 
@@ -129,13 +129,33 @@ export const coreReducer: Reducer<CoreState, CoreAction> = (state, action): Core
     }
 
     case CLOSE_DOCUMENT: {
-      const { documentId } = action.payload;
+      const { documentId, nextActiveDocumentId } = action.payload;
       const { [documentId]: removed, ...remainingDocs } = state.documents;
+
+      // Determine the new active document ID
+      let newActiveDocumentId = state.activeDocumentId;
+
+      if (state.activeDocumentId === documentId) {
+        // If nextActiveDocumentId was explicitly provided in the action
+        if (nextActiveDocumentId !== undefined) {
+          // Validate that the next active document actually exists in remaining docs
+          if (nextActiveDocumentId === null || remainingDocs[nextActiveDocumentId]) {
+            newActiveDocumentId = nextActiveDocumentId;
+          } else {
+            // Invalid document ID provided - fall back to null
+            // This protects against bugs in calling code
+            newActiveDocumentId = null;
+          }
+        } else {
+          // No next active document specified - default to null
+          newActiveDocumentId = null;
+        }
+      }
 
       return {
         ...state,
         documents: remainingDocs,
-        activeDocumentId: state.activeDocumentId === documentId ? null : state.activeDocumentId,
+        activeDocumentId: newActiveDocumentId,
       };
     }
 

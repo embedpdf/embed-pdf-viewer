@@ -87,6 +87,7 @@ export interface CloseDocumentAction {
   type: typeof CLOSE_DOCUMENT;
   payload: {
     documentId: string;
+    nextActiveDocumentId?: string | null; // Optional: what to activate next
   };
 }
 
@@ -212,9 +213,12 @@ export const retryLoadingDocument = (documentId: string): CoreAction => ({
   payload: { documentId },
 });
 
-export const closeDocument = (documentId: string): CoreAction => ({
+export const closeDocument = (
+  documentId: string,
+  nextActiveDocumentId?: string | null,
+): CoreAction => ({
   type: CLOSE_DOCUMENT,
-  payload: { documentId },
+  payload: { documentId, nextActiveDocumentId },
 });
 
 export const setActiveDocument = (documentId: string | null): CoreAction => ({
