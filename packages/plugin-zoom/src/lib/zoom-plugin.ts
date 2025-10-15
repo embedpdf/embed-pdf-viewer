@@ -11,7 +11,13 @@ import {
 import { ScrollPlugin, ScrollCapability } from '@embedpdf/plugin-scroll';
 import { ViewportPlugin, ViewportCapability, ViewportMetrics } from '@embedpdf/plugin-viewport';
 
-import { initZoomState, cleanupZoomState, setZoomLevel, ZoomAction } from './actions';
+import {
+  initZoomState,
+  cleanupZoomState,
+  setZoomLevel,
+  ZoomAction,
+  setMarqueeZoomActive,
+} from './actions';
 import {
   ZoomPluginConfig,
   ZoomState,
@@ -86,6 +92,17 @@ export class ZoomPlugin extends BasePlugin<
       scope: 'page',
       exclusive: true,
       cursor: 'zoom-in',
+    });
+
+    this.interactionManager?.onModeChange((state) => {
+      // Track marquee zoom state changes for this document
+      const isMarqueeActive = state.activeMode === 'marqueeZoom';
+      const docState = this.getDocumentState(state.documentId);
+
+      // Only dispatch if state actually changed
+      if (docState && docState.isMarqueeZoomActive !== isMarqueeActive) {
+        this.dispatch(setMarqueeZoomActive(state.documentId, isMarqueeActive));
+      }
     });
   }
 
@@ -197,12 +214,6 @@ export class ZoomPlugin extends BasePlugin<
   // ─────────────────────────────────────────────────────────
   // State Helpers
   // ─────────────────────────────────────────────────────────
-
-  private getActiveDocumentId(): string {
-    const id = this.state.activeDocumentId ?? this.coreState.core.activeDocumentId;
-    if (!id) throw new Error('No active document');
-    return id;
-  }
 
   private getDocumentState(documentId?: string): ZoomDocumentState | null {
     const id = documentId ?? this.getActiveDocumentId();
@@ -597,7 +608,8 @@ export class ZoomPlugin extends BasePlugin<
         prevDoc &&
         newDoc &&
         (prevDoc.currentZoomLevel !== newDoc.currentZoomLevel ||
-          prevDoc.zoomLevel !== newDoc.zoomLevel)
+          prevDoc.zoomLevel !== newDoc.zoomLevel ||
+          prevDoc.isMarqueeZoomActive !== newDoc.isMarqueeZoomActive)
       ) {
         this.state$.emit({
           documentId,

@@ -33,14 +33,11 @@ const ZOOM_MODES: ZoomModeItem[] = [
 
 export function ZoomToolbar({ documentId }: ZoomToolbarProps) {
   const { state, provides } = useZoom(documentId);
-  const { provides: interactionManager } = useInteractionManagerCapability();
   const [isMenuOpen, setIsMenuOpen] = useState(false);
 
   if (!provides) return null;
 
   const zoomPercentage = Math.round(state.currentZoomLevel * 100);
-  const isMarqueeActive =
-    interactionManager?.forDocument(documentId).getActiveMode() === 'marqueeZoom';
 
   const handleZoomIn = () => {
     provides.zoomIn();
@@ -212,7 +209,7 @@ export function ZoomToolbar({ documentId }: ZoomToolbarProps) {
             <button
               onClick={handleToggleMarquee}
               className={`flex w-full items-center gap-3 px-4 py-2 text-sm hover:bg-gray-100 ${
-                isMarqueeActive ? 'bg-blue-50 text-blue-600' : 'text-gray-700'
+                state.isMarqueeZoomActive ? 'bg-blue-50 text-blue-600' : 'text-gray-700'
               }`}
             >
               <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">

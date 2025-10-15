@@ -5,12 +5,14 @@ import {
   CLEANUP_ZOOM_STATE,
   SET_ACTIVE_DOCUMENT,
   SET_ZOOM_LEVEL,
+  SET_MARQUEE_ZOOM_ACTIVE,
 } from './actions';
 import { ZoomState, ZoomDocumentState, ZoomMode } from './types';
 
 export const initialDocumentState: ZoomDocumentState = {
   zoomLevel: ZoomMode.Automatic,
   currentZoomLevel: 1,
+  isMarqueeZoomActive: false,
 };
 
 export const initialState: ZoomState = {
@@ -63,6 +65,23 @@ export const zoomReducer: Reducer<ZoomState, ZoomAction> = (state = initialState
             ...docState,
             zoomLevel,
             currentZoomLevel,
+          },
+        },
+      };
+    }
+
+    case SET_MARQUEE_ZOOM_ACTIVE: {
+      const { documentId, isActive } = action.payload;
+      const docState = state.documents[documentId];
+      if (!docState) return state;
+
+      return {
+        ...state,
+        documents: {
+          ...state.documents,
+          [documentId]: {
+            ...docState,
+            isMarqueeZoomActive: isActive,
           },
         },
       };

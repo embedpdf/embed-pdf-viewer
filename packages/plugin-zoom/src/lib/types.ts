@@ -57,6 +57,7 @@ export interface RegisterMarqueeOnPageOptions {
 export interface ZoomDocumentState {
   zoomLevel: ZoomLevel; // last **requested** level
   currentZoomLevel: number; // actual numeric factor
+  isMarqueeZoomActive: boolean; // whether marquee zoom mode is active
 }
 
 // Scoped zoom capability

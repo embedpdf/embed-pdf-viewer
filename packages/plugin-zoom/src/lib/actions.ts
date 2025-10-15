@@ -8,6 +8,7 @@ export const SET_ACTIVE_DOCUMENT = 'ZOOM/SET_ACTIVE_DOCUMENT';
 
 // Per-document actions
 export const SET_ZOOM_LEVEL = 'ZOOM/SET_ZOOM_LEVEL';
+export const SET_MARQUEE_ZOOM_ACTIVE = 'ZOOM/SET_MARQUEE_ZOOM_ACTIVE';
 
 // Document lifecycle actions
 export interface InitZoomStateAction extends Action {
@@ -37,11 +38,20 @@ export interface SetZoomLevelAction extends Action {
   };
 }
 
+export interface SetMarqueeZoomActiveAction extends Action {
+  type: typeof SET_MARQUEE_ZOOM_ACTIVE;
+  payload: {
+    documentId: string;
+    isActive: boolean;
+  };
+}
+
 export type ZoomAction =
   | InitZoomStateAction
   | CleanupZoomStateAction
   | SetActiveDocumentAction
-  | SetZoomLevelAction;
+  | SetZoomLevelAction
+  | SetMarqueeZoomActiveAction;
 
 // Action Creators
 export function initZoomState(documentId: string, state: ZoomDocumentState): InitZoomStateAction {
@@ -62,4 +72,11 @@ export function setZoomLevel(
   currentZoomLevel: number,
 ): SetZoomLevelAction {
   return { type: SET_ZOOM_LEVEL, payload: { documentId, zoomLevel, currentZoomLevel } };
+}
+
+export function setMarqueeZoomActive(
+  documentId: string,
+  isActive: boolean,
+): SetMarqueeZoomActiveAction {
+  return { type: SET_MARQUEE_ZOOM_ACTIVE, payload: { documentId, isActive } };
 }
