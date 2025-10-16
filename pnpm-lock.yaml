@@ -233,6 +233,9 @@ importers:
       '@embedpdf/plugin-pan':
         specifier: workspace:*
         version: link:../../packages/plugin-pan
+      '@embedpdf/plugin-print':
+        specifier: workspace:*
+        version: link:../../packages/plugin-print
       '@embedpdf/plugin-render':
         specifier: workspace:*
         version: link:../../packages/plugin-render

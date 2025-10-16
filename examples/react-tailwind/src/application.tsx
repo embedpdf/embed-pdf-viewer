@@ -19,6 +19,8 @@ import { ZoomMode, ZoomPluginPackage, MarqueeZoom } from '@embedpdf/plugin-zoom/
 import { PanPluginPackage } from '@embedpdf/plugin-pan/react';
 import { SpreadMode, SpreadPluginPackage } from '@embedpdf/plugin-spread/react';
 import { Rotate, RotatePluginPackage } from '@embedpdf/plugin-rotate/react';
+import { ExportPluginPackage } from '@embedpdf/plugin-export/react';
+import { PrintPluginPackage } from '@embedpdf/plugin-print/react';
 import { TabBar } from './components/tab-bar';
 import { ViewerToolbar } from './components/viewer-toolbar';
 
@@ -56,6 +58,8 @@ export default function DocumentViewer() {
               defaultSpreadMode: SpreadMode.Odd,
             }),
             createPluginRegistration(RotatePluginPackage),
+            createPluginRegistration(ExportPluginPackage),
+            createPluginRegistration(PrintPluginPackage),
           ]}
         >
           {({ pluginsReady, registry }) => (
@@ -65,7 +69,7 @@ export default function DocumentViewer() {
                   {({ documentStates, activeDocumentId, actions }) => (
                     <div className="flex h-full flex-col">
                       <TabBar
-                        documentStates={documentStates as any}
+                        documentStates={documentStates}
                         activeDocumentId={activeDocumentId}
                         onSelect={actions.select}
                         onClose={actions.close}

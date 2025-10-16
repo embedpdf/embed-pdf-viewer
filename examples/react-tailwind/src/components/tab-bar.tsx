@@ -1,7 +1,8 @@
+import { DocumentState } from '@embedpdf/core';
 import { CloseIcon, DocumentIcon, PlusIcon } from './icons';
-import { useEffect, useRef, useState } from 'react';
+
 type TabBarProps = {
-  documentStates: any[];
+  documentStates: DocumentState[];
   activeDocumentId: string | null;
   onSelect: (id: string) => void;
   onClose: (id: string) => void;
