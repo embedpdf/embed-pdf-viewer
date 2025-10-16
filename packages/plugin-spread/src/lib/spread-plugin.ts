@@ -1,15 +1,21 @@
 import {
   BasePlugin,
   createBehaviorEmitter,
-  createEmitter,
+  Listener,
   PluginRegistry,
   setPages,
 } from '@embedpdf/core';
-import { PdfDocumentObject, PdfPageObject } from '@embedpdf/models';
-import { LoaderPlugin } from '@embedpdf/plugin-loader';
-import { SpreadCapability, SpreadMode, SpreadPluginConfig, SpreadState } from './types';
-import { setSpreadMode } from './actions';
-import { SpreadAction } from './actions';
+import { PdfPageObject } from '@embedpdf/models';
+import {
+  SpreadCapability,
+  SpreadMode,
+  SpreadPluginConfig,
+  SpreadState,
+  SpreadScope,
+  SpreadChangeEvent,
+  SpreadDocumentState,
+} from './types';
+import { setSpreadMode, initSpreadState, cleanupSpreadState, SpreadAction } from './actions';
 
 export class SpreadPlugin extends BasePlugin<
   SpreadPluginConfig,
@@ -19,31 +25,141 @@ export class SpreadPlugin extends BasePlugin<
 > {
   static readonly id = 'spread' as const;
 
-  private readonly spreadEmitter$ = createBehaviorEmitter<SpreadMode>();
+  private readonly spreadEmitter$ = createBehaviorEmitter<SpreadChangeEvent>();
+  private readonly defaultSpreadMode: SpreadMode;
 
   constructor(id: string, registry: PluginRegistry, cfg: SpreadPluginConfig) {
     super(id, registry);
-    this.resetReady();
-    this.dispatch(setSpreadMode(cfg.defaultSpreadMode ?? SpreadMode.None));
-    const loaderPlugin = registry.getPlugin<LoaderPlugin>('loader');
-    loaderPlugin!.provides().onDocumentLoaded((document) => this.documentLoaded(document));
+    this.defaultSpreadMode = cfg.defaultSpreadMode ?? SpreadMode.None;
   }
 
-  async initialize(config: SpreadPluginConfig): Promise<void> {
-    if (config.defaultSpreadMode) {
-      this.dispatch(setSpreadMode(config.defaultSpreadMode));
+  // ─────────────────────────────────────────────────────────
+  // Document Lifecycle Hooks (from BasePlugin)
+  // ─────────────────────────────────────────────────────────
+
+  protected override onDocumentLoadingStarted(documentId: string): void {
+    // Initialize spread state for this document
+    const docState: SpreadDocumentState = {
+      spreadMode: this.defaultSpreadMode,
+    };
+
+    this.dispatch(initSpreadState(documentId, docState));
+
+    this.logger.debug(
+      'SpreadPlugin',
+      'DocumentOpened',
+      `Initialized spread state for document: ${documentId}`,
+    );
+  }
+
+  protected override onDocumentLoaded(documentId: string): void {
+    // Apply spread mode to pages after document is loaded
+    const coreDoc = this.coreState.core.documents[documentId];
+    if (coreDoc?.document) {
+      const spreadPages = this.getSpreadPagesObjects(documentId, coreDoc.document.pages);
+      this.dispatchCoreAction(setPages(documentId, spreadPages));
     }
   }
 
-  private documentLoaded(document: PdfDocumentObject): void {
-    this.dispatchCoreAction(setPages(this.getSpreadPagesObjects(document.pages)));
-    this.markReady();
+  protected override onDocumentClosed(documentId: string): void {
+    this.dispatch(cleanupSpreadState(documentId));
+
+    this.logger.debug(
+      'SpreadPlugin',
+      'DocumentClosed',
+      `Cleaned up spread state for document: ${documentId}`,
+    );
   }
 
-  getSpreadPagesObjects(pages: PdfPageObject[]): PdfPageObject[][] {
+  // ─────────────────────────────────────────────────────────
+  // Capability
+  // ─────────────────────────────────────────────────────────
+
+  protected buildCapability(): SpreadCapability {
+    return {
+      // Active document operations
+      setSpreadMode: (mode: SpreadMode) => this.setSpreadModeForDocument(mode),
+      getSpreadMode: () => this.getSpreadModeForDocument(),
+
+      // Document-scoped operations
+      forDocument: (documentId: string) => this.createSpreadScope(documentId),
+
+      // Events
+      onSpreadChange: this.spreadEmitter$.on,
+    };
+  }
+
+  // ─────────────────────────────────────────────────────────
+  // Document Scoping
+  // ─────────────────────────────────────────────────────────
+
+  private createSpreadScope(documentId: string): SpreadScope {
+    return {
+      setSpreadMode: (mode: SpreadMode) => this.setSpreadModeForDocument(mode, documentId),
+      getSpreadMode: () => this.getSpreadModeForDocument(documentId),
+      onSpreadChange: (listener: Listener<SpreadMode>) =>
+        this.spreadEmitter$.on((event) => {
+          if (event.documentId === documentId) listener(event.spreadMode);
+        }),
+    };
+  }
+
+  // ─────────────────────────────────────────────────────────
+  // State Helpers
+  // ─────────────────────────────────────────────────────────
+  private getDocumentState(documentId?: string): SpreadDocumentState | null {
+    const id = documentId ?? this.getActiveDocumentId();
+    return this.state.documents[id] ?? null;
+  }
+
+  private getDocumentStateOrThrow(documentId?: string): SpreadDocumentState {
+    const state = this.getDocumentState(documentId);
+    if (!state) {
+      throw new Error(`Spread state not found for document: ${documentId ?? 'active'}`);
+    }
+    return state;
+  }
+
+  // ─────────────────────────────────────────────────────────
+  // Core Operations
+  // ─────────────────────────────────────────────────────────
+
+  private setSpreadModeForDocument(mode: SpreadMode, documentId?: string): void {
+    const id = documentId ?? this.getActiveDocumentId();
+    const currentState = this.getDocumentStateOrThrow(id);
+    const coreDoc = this.coreState.core.documents[id];
+
+    if (!coreDoc?.document) {
+      throw new Error(`Document ${id} not loaded`);
+    }
+
+    if (currentState.spreadMode !== mode) {
+      // Update plugin state
+      this.dispatch(setSpreadMode(id, mode));
+
+      // Update core state with new spread pages
+      const spreadPages = this.getSpreadPagesObjects(id, coreDoc.document.pages);
+      this.dispatchCoreAction(setPages(id, spreadPages));
+
+      // Emit event
+      this.spreadEmitter$.emit({
+        documentId: id,
+        spreadMode: mode,
+      });
+    }
+  }
+
+  private getSpreadModeForDocument(documentId?: string): SpreadMode {
+    return this.getDocumentStateOrThrow(documentId).spreadMode;
+  }
+
+  private getSpreadPagesObjects(documentId: string, pages: PdfPageObject[]): PdfPageObject[][] {
     if (!pages.length) return [];
 
-    switch (this.state.spreadMode) {
+    const docState = this.getDocumentStateOrThrow(documentId);
+    const spreadMode = docState.spreadMode;
+
+    switch (spreadMode) {
       case SpreadMode.None:
         return pages.map((page) => [page]);
 
@@ -65,32 +181,36 @@ export class SpreadPlugin extends BasePlugin<
     }
   }
 
-  setSpreadMode(mode: SpreadMode): void {
-    const currentMode = this.state.spreadMode;
-    const document = this.coreState.core.document;
-    if (!document) {
-      throw new Error('Document not loaded');
-    }
-    if (currentMode !== mode) {
-      this.dispatch(setSpreadMode(mode));
-      this.dispatchCoreAction(setPages(this.getSpreadPagesObjects(document.pages)));
-      this.notifySpreadChange(mode);
+  // ─────────────────────────────────────────────────────────
+  // Store Update Handlers
+  // ─────────────────────────────────────────────────────────
+
+  override onStoreUpdated(prevState: SpreadState, newState: SpreadState): void {
+    // Emit spread change events for each changed document
+    for (const documentId in newState.documents) {
+      const prevDoc = prevState.documents[documentId];
+      const newDoc = newState.documents[documentId];
+
+      if (prevDoc?.spreadMode !== newDoc.spreadMode) {
+        this.logger.debug(
+          'SpreadPlugin',
+          'SpreadModeChanged',
+          `Spread mode changed for document ${documentId}: ${prevDoc?.spreadMode ?? SpreadMode.None} -> ${newDoc.spreadMode}`,
+        );
+      }
     }
   }
 
-  private notifySpreadChange(spreadMode: SpreadMode): void {
-    this.spreadEmitter$.emit(spreadMode);
-  }
+  // ─────────────────────────────────────────────────────────
+  // Lifecycle
+  // ─────────────────────────────────────────────────────────
 
-  protected buildCapability(): SpreadCapability {
-    return {
-      onSpreadChange: this.spreadEmitter$.on,
-      setSpreadMode: (mode) => this.setSpreadMode(mode),
-      getSpreadMode: () => this.state.spreadMode,
-    };
+  async initialize(_config: SpreadPluginConfig): Promise<void> {
+    this.logger.info('SpreadPlugin', 'Initialize', 'Spread plugin initialized');
   }
 
   async destroy(): Promise<void> {
     this.spreadEmitter$.clear();
+    super.destroy();
   }
 }
