@@ -1,7 +1,14 @@
 import { useZoom } from '@embedpdf/plugin-zoom/react';
-import { useInteractionManagerCapability } from '@embedpdf/plugin-interaction-manager/react';
 import { ZoomMode } from '@embedpdf/plugin-zoom';
 import { useState } from 'react';
+import {
+  ChevronDownIcon,
+  FitPageIcon,
+  FitWidthIcon,
+  SearchMinusIcon,
+  SearchPlusIcon,
+  MarqueeIcon,
+} from './icons';
 
 interface ZoomToolbarProps {
   documentId: string;
@@ -68,14 +75,7 @@ export function ZoomToolbar({ documentId }: ZoomToolbarProps) {
           className="rounded p-1 text-gray-600 transition-colors hover:bg-gray-100 hover:text-gray-900"
           aria-label="Zoom out"
         >
-          <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              strokeWidth={2}
-              d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0zM13 10H7"
-            />
-          </svg>
+          <SearchMinusIcon className="h-4 w-4" title="Zoom Out" />
         </button>
 
         {/* Zoom Percentage Display */}
@@ -84,14 +84,9 @@ export function ZoomToolbar({ documentId }: ZoomToolbarProps) {
           className="flex items-center gap-1 rounded px-2 py-0.5 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-100"
         >
           <span>{zoomPercentage}%</span>
-          <svg
+          <ChevronDownIcon
             className={`h-3 w-3 transition-transform ${isMenuOpen ? 'rotate-180' : ''}`}
-            fill="none"
-            stroke="currentColor"
-            viewBox="0 0 24 24"
-          >
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-          </svg>
+          />
         </button>
 
         {/* Zoom In Button */}
@@ -100,14 +95,7 @@ export function ZoomToolbar({ documentId }: ZoomToolbarProps) {
           className="rounded p-1 text-gray-600 transition-colors hover:bg-gray-100 hover:text-gray-900"
           aria-label="Zoom in"
         >
-          <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              strokeWidth={2}
-              d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0zM10 7v3m0 0v3m0-3h3m-3 0H7"
-            />
-          </svg>
+          <SearchPlusIcon className="h-4 w-4" title="Zoom In" />
         </button>
       </div>
 
@@ -124,28 +112,14 @@ export function ZoomToolbar({ documentId }: ZoomToolbarProps) {
               onClick={handleZoomIn}
               className="flex w-full items-center gap-3 px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
             >
-              <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0zM10 7v3m0 0v3m0-3h3m-3 0H7"
-                />
-              </svg>
+              <SearchPlusIcon className="h-4 w-4" title="Zoom In" />
               <span>Zoom In</span>
             </button>
             <button
               onClick={handleZoomOut}
               className="flex w-full items-center gap-3 px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
             >
-              <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0zM13 10H7"
-                />
-              </svg>
+              <SearchMinusIcon className="h-4 w-4" title="Zoom Out" />
               <span>Zoom Out</span>
             </button>
 
@@ -180,23 +154,9 @@ export function ZoomToolbar({ documentId }: ZoomToolbarProps) {
                 }`}
               >
                 {value === ZoomMode.FitPage ? (
-                  <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={2}
-                      d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
-                    />
-                  </svg>
+                  <FitPageIcon className="h-4 w-4" title="Fit to Page" />
                 ) : (
-                  <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={2}
-                      d="M4 8h16M4 16h16"
-                    />
-                  </svg>
+                  <FitWidthIcon className="h-4 w-4" title="Fit to Width" />
                 )}
                 <span>{label}</span>
               </button>
@@ -212,14 +172,7 @@ export function ZoomToolbar({ documentId }: ZoomToolbarProps) {
                 state.isMarqueeZoomActive ? 'bg-blue-50 text-blue-600' : 'text-gray-700'
               }`}
             >
-              <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M15 15l-2 5L9 9l11 4-5 2zm0 0l5 5M7.188 2.239l.777 2.897M5.136 7.965l-2.898-.777M13.95 4.05l-2.122 2.122m-5.657 5.656l-2.12 2.122"
-                />
-              </svg>
+              <MarqueeIcon className="h-4 w-4" title="Marquee Zoom" />
               <span>Marquee Zoom</span>
             </button>
           </div>

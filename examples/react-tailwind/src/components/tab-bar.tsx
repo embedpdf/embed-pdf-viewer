@@ -1,3 +1,5 @@
+import { CloseIcon, DocumentIcon, PlusIcon } from './icons';
+import { useEffect, useRef, useState } from 'react';
 type TabBarProps = {
   documentStates: any[];
   activeDocumentId: string | null;
@@ -14,9 +16,9 @@ export function TabBar({
   onOpenFile,
 }: TabBarProps) {
   return (
-    <div className="flex items-center border-b border-gray-200 bg-gray-50">
+    <div className="flex items-end gap-0.5 bg-gray-100 px-2 pt-2">
       {/* Document Tabs */}
-      <div className="flex flex-1 overflow-x-auto">
+      <div className="flex flex-1 items-end gap-0.5 overflow-x-auto">
         {documentStates.map((document) => (
           <div
             key={document.id}
@@ -30,24 +32,17 @@ export function TabBar({
                 onSelect(document.id);
               }
             }}
-            className={`group relative flex cursor-pointer items-center gap-2 border-b-2 px-4 py-2.5 text-sm font-medium transition-colors ${
+            className={`group relative flex min-w-[120px] max-w-[240px] cursor-pointer items-center gap-2 rounded-t-md px-3 py-2.5 text-sm font-medium transition-all ${
               activeDocumentId === document.id
-                ? 'border-blue-500 bg-white text-blue-600'
-                : 'border-transparent text-gray-600 hover:border-gray-300 hover:text-gray-800'
+                ? 'bg-white text-gray-900 shadow-[0_2px_4px_-1px_rgba(0,0,0,0.06)]'
+                : 'bg-gray-200/60 text-gray-600 hover:bg-gray-200 hover:text-gray-800'
             } `}
           >
             {/* Document Icon */}
-            <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z"
-              />
-            </svg>
+            <DocumentIcon className="h-4 w-4 flex-shrink-0" title="Document" />
 
             {/* Document Name */}
-            <span className="max-w-[150px] truncate">
+            <span className="min-w-0 flex-1 truncate">
               {(() => {
                 const doc = document.document as unknown;
                 const hasName = !!doc && typeof doc === 'object' && 'name' in (doc as object);
@@ -67,31 +62,28 @@ export function TabBar({
                 const hasName = !!doc && typeof doc === 'object' && 'name' in (doc as object);
                 return hasName ? ((doc as { name?: string }).name ?? 'document') : 'document';
               })()}`}
-              className="ml-2 rounded p-0.5 opacity-0 transition-opacity hover:bg-gray-200 group-hover:opacity-100"
+              className={`flex-shrink-0 cursor-pointer rounded-full p-1 transition-all hover:bg-gray-300/50 ${
+                // Show close always unless the tab is compact and not active
+                activeDocumentId === document.id
+                  ? 'opacity-100'
+                  : 'opacity-0 group-hover:opacity-100'
+              }`}
             >
-              <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M6 18L18 6M6 6l12 12"
-                />
-              </svg>
+              <CloseIcon className="h-3.5 w-3.5" title="Close" />
             </button>
           </div>
         ))}
-      </div>
 
-      {/* Open File Button */}
-      <button
-        onClick={onOpenFile}
-        className="flex items-center gap-2 border-l border-gray-200 px-4 py-2.5 text-sm font-medium text-gray-600 transition-colors hover:bg-gray-100 hover:text-gray-800"
-      >
-        <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-        </svg>
-        <span>Open File</span>
-      </button>
+        {/* Add Tab (Open File) - placed directly after tabs like Chrome */}
+        <button
+          onClick={onOpenFile}
+          className="mb-2 ml-1 flex-shrink-0 cursor-pointer rounded p-1.5 text-gray-600 transition-colors hover:bg-gray-200/80 hover:text-gray-800"
+          aria-label="Open File"
+          title="Open File"
+        >
+          <PlusIcon className="h-3.5 w-3.5" title="Open File" />
+        </button>
+      </div>
     </div>
   );
 }
