@@ -1,20 +1,30 @@
-import { ref, watch } from 'vue';
+import { ref, watch, computed, readonly } from 'vue';
 import { useCapability, usePlugin } from '@embedpdf/core/vue';
-import { PanPlugin } from '@embedpdf/plugin-pan';
+import { PanPlugin, initialDocumentState } from '@embedpdf/plugin-pan';
 
 export const usePanPlugin = () => usePlugin<PanPlugin>(PanPlugin.id);
 export const usePanCapability = () => useCapability<PanPlugin>(PanPlugin.id);
 
-export const usePan = () => {
+/**
+ * Hook for pan state for a specific document
+ * @param documentId Document ID
+ */
+export const usePan = (documentId: string) => {
   const { provides } = usePanCapability();
-  const isPanning = ref(false);
+  const isPanning = ref(initialDocumentState.isPanMode);
 
   watch(
     provides,
     (providesValue, _, onCleanup) => {
       if (providesValue) {
-        const unsubscribe = providesValue.onPanModeChange((panning) => {
-          isPanning.value = panning;
+        const scope = providesValue.forDocument(documentId);
+
+        // Set initial state
+        isPanning.value = scope.isPanMode();
+
+        // Subscribe to pan mode changes
+        const unsubscribe = scope.onPanModeChange((isPan) => {
+          isPanning.value = isPan;
         });
         onCleanup(unsubscribe);
       }
@@ -22,8 +32,11 @@ export const usePan = () => {
     { immediate: true },
   );
 
+  // Return a computed ref for the scoped capability
+  const scopedProvides = computed(() => provides.value?.forDocument(documentId) ?? null);
+
   return {
-    provides,
-    isPanning,
+    provides: scopedProvides,
+    isPanning: readonly(isPanning),
   };
 };
