@@ -1,6 +1,6 @@
+import { ref, watchEffect, readonly, computed } from 'vue';
 import { useCapability, usePlugin } from '@embedpdf/core/vue';
-import { RotatePlugin } from '@embedpdf/plugin-rotate';
-import { ref, watchEffect } from 'vue';
+import { RotatePlugin, initialDocumentState } from '@embedpdf/plugin-rotate';
 import { Rotation } from '@embedpdf/models';
 
 /**
@@ -15,23 +15,33 @@ export const useRotatePlugin = () => usePlugin<RotatePlugin>(RotatePlugin.id);
 export const useRotateCapability = () => useCapability<RotatePlugin>(RotatePlugin.id);
 
 /**
- * Hook that provides reactive rotation state and methods.
+ * Hook that provides reactive rotation state and methods for a specific document.
+ * @param documentId Document ID
  */
-export const useRotate = () => {
+export const useRotate = (documentId: string) => {
   const { provides } = useRotateCapability();
-  const rotation = ref<Rotation>(0);
+  const rotation = ref<Rotation>(initialDocumentState.rotation);
 
   watchEffect((onCleanup) => {
-    if (!provides.value) return;
+    if (provides.value) {
+      const scope = provides.value.forDocument(documentId);
 
-    const unsubscribe = provides.value.onRotateChange((newRotation) => {
-      rotation.value = newRotation;
-    });
-    onCleanup(unsubscribe);
+      // Get initial state
+      rotation.value = scope.getRotation();
+
+      // Subscribe to rotation changes
+      const unsubscribe = scope.onRotateChange((newRotation) => {
+        rotation.value = newRotation;
+      });
+      onCleanup(unsubscribe);
+    }
   });
 
+  // Return a computed ref for the scoped capability
+  const scopedProvides = computed(() => provides.value?.forDocument(documentId) ?? null);
+
   return {
-    rotation,
-    provides,
+    rotation: readonly(rotation),
+    provides: scopedProvides,
   };
 };

@@ -1,4 +1,4 @@
-import { ref, watchEffect, readonly } from 'vue';
+import { ref, watchEffect, readonly, computed } from 'vue';
 import { useCapability, usePlugin } from '@embedpdf/core/vue';
 import { initialDocumentState, ZoomPlugin, ZoomDocumentState } from '@embedpdf/plugin-zoom';
 
@@ -28,8 +28,11 @@ export const useZoom = (documentId: string) => {
     }
   });
 
+  // Return a computed ref for the scoped capability
+  const scopedProvides = computed(() => provides.value?.forDocument(documentId) ?? null);
+
   return {
     state: readonly(state),
-    provides: provides.value?.forDocument(documentId) ?? null,
+    provides: scopedProvides,
   };
 };

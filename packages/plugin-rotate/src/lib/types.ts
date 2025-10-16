@@ -10,14 +10,43 @@ export interface GetMatrixOptions {
   h: number;
 }
 
-export interface RotateCapability {
-  onRotateChange: EventHook<Rotation>;
+// Per-document rotation state
+export interface RotateDocumentState {
+  rotation: Rotation;
+}
+
+export interface RotateState {
+  documents: Record<string, RotateDocumentState>;
+  activeDocumentId: string | null;
+}
+
+// Events include documentId
+export interface RotationChangeEvent {
+  documentId: string;
+  rotation: Rotation;
+}
+
+// Scoped rotate capability
+export interface RotateScope {
   setRotation(rotation: Rotation): void;
   getRotation(): Rotation;
   rotateForward(): void;
   rotateBackward(): void;
+  getMatrixAsString(options: GetMatrixOptions): string;
+  onRotateChange: EventHook<Rotation>;
 }
 
-export interface RotateState {
-  rotation: Rotation;
+export interface RotateCapability {
+  // Active document operations
+  setRotation(rotation: Rotation): void;
+  getRotation(): Rotation;
+  rotateForward(): void;
+  rotateBackward(): void;
+  getMatrixAsString(options: GetMatrixOptions): string;
+
+  // Document-scoped operations
+  forDocument(documentId: string): RotateScope;
+
+  // Events
+  onRotateChange: EventHook<RotationChangeEvent>;
 }

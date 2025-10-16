@@ -15,7 +15,7 @@ import {
   GlobalPointerProvider,
   PagePointerProvider,
 } from '@embedpdf/plugin-interaction-manager/react';
-import { ZoomMode, ZoomPluginPackage } from '@embedpdf/plugin-zoom/react';
+import { ZoomMode, ZoomPluginPackage, MarqueeZoom } from '@embedpdf/plugin-zoom/react';
 import { ZoomToolbar } from './components/zoom-toolbar';
 
 export default function DocumentViewer() {
@@ -228,7 +228,7 @@ export default function DocumentViewer() {
                                                   display: 'flex',
                                                   alignItems: 'center',
                                                   justifyContent: 'center',
-                                                  fontSize: `${72 * scale}px`,
+                                                  fontSize: `${150 * scale}px`,
                                                   color: 'rgba(255, 255, 255, 0.5)',
                                                   fontWeight: 'bold',
                                                   userSelect: 'none',
@@ -236,6 +236,11 @@ export default function DocumentViewer() {
                                               >
                                                 {pageIndex + 1}
                                               </div>
+                                              <MarqueeZoom
+                                                documentId={activeDocumentId}
+                                                pageIndex={pageIndex}
+                                                scale={scale}
+                                              />
                                             </PagePointerProvider>
                                           )}
                                         />

@@ -5,7 +5,7 @@ import {
   InteractionManagerPlugin,
   PointerEventHandlersWithLifecycle,
 } from '@embedpdf/plugin-interaction-manager';
-import { ref, watchEffect, readonly } from 'vue';
+import { ref, watchEffect, readonly, computed } from 'vue';
 
 export const useInteractionManagerPlugin = () =>
   usePlugin<InteractionManagerPlugin>(InteractionManagerPlugin.id);
@@ -39,8 +39,11 @@ export function useInteractionManager(documentId: string) {
     }
   });
 
+  // Return a computed ref for the scoped capability
+  const scopedProvides = computed(() => provides.value?.forDocument(documentId) ?? null);
+
   return {
-    provides: provides.value?.forDocument(documentId) ?? null,
+    provides: scopedProvides,
     state: readonly(state),
   };
 }

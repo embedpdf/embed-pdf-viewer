@@ -7,7 +7,7 @@ export const useScrollCapability = () => useCapability<ScrollPlugin>(ScrollPlugi
 
 // Define the return type explicitly to maintain type safety
 interface UseScrollReturn {
-  provides: ScrollScope | null;
+  provides: ComputedRef<ScrollScope | null>;
   state: ComputedRef<{
     currentPage: number;
     totalPages: number;
@@ -41,8 +41,11 @@ export function useScroll(documentId: string): UseScrollReturn {
     totalPages: totalPages.value,
   }));
 
+  // Return a computed ref for the scoped capability
+  const scopedProvides = computed(() => provides.value?.forDocument(documentId) ?? null);
+
   return {
-    provides: provides.value?.forDocument(documentId) ?? null,
+    provides: scopedProvides,
     state,
   };
 }
