@@ -17,6 +17,8 @@ import {
 } from '@embedpdf/plugin-interaction-manager/react';
 import { ZoomMode, ZoomPluginPackage, MarqueeZoom } from '@embedpdf/plugin-zoom/react';
 import { PanPluginPackage } from '@embedpdf/plugin-pan/react';
+import { SpreadMode, SpreadPluginPackage } from '@embedpdf/plugin-spread/react';
+import { Rotate, RotatePluginPackage } from '@embedpdf/plugin-rotate/react';
 import { TabBar } from './components/tab-bar';
 import { ViewerToolbar } from './components/viewer-toolbar';
 
@@ -50,6 +52,10 @@ export default function DocumentViewer() {
               defaultZoomLevel: ZoomMode.FitPage,
             }),
             createPluginRegistration(PanPluginPackage),
+            createPluginRegistration(SpreadPluginPackage, {
+              defaultSpreadMode: SpreadMode.Odd,
+            }),
+            createPluginRegistration(RotatePluginPackage),
           ]}
         >
           {({ pluginsReady, registry }) => (
@@ -125,37 +131,42 @@ export default function DocumentViewer() {
                                             rotation,
                                             pageIndex,
                                           }) => (
-                                            <PagePointerProvider
+                                            <Rotate
                                               documentId={activeDocumentId}
-                                              pageIndex={pageIndex}
-                                              pageWidth={width}
-                                              pageHeight={height}
-                                              rotation={rotation}
-                                              scale={scale}
+                                              pageSize={{ width, height }}
                                             >
-                                              <div
-                                                style={{
-                                                  width,
-                                                  height,
-                                                  position: 'relative',
-                                                  backgroundColor: 'red',
-                                                  display: 'flex',
-                                                  alignItems: 'center',
-                                                  justifyContent: 'center',
-                                                  fontSize: `${150 * scale}px`,
-                                                  color: 'rgba(255, 255, 255, 0.5)',
-                                                  fontWeight: 'bold',
-                                                  userSelect: 'none',
-                                                }}
-                                              >
-                                                {pageIndex + 1}
-                                              </div>
-                                              <MarqueeZoom
+                                              <PagePointerProvider
                                                 documentId={activeDocumentId}
                                                 pageIndex={pageIndex}
+                                                pageWidth={width}
+                                                pageHeight={height}
+                                                rotation={rotation}
                                                 scale={scale}
-                                              />
-                                            </PagePointerProvider>
+                                              >
+                                                <div
+                                                  style={{
+                                                    width,
+                                                    height,
+                                                    position: 'relative',
+                                                    backgroundColor: 'red',
+                                                    display: 'flex',
+                                                    alignItems: 'center',
+                                                    justifyContent: 'center',
+                                                    fontSize: `${150 * scale}px`,
+                                                    color: 'rgba(255, 255, 255, 0.5)',
+                                                    fontWeight: 'bold',
+                                                    userSelect: 'none',
+                                                  }}
+                                                >
+                                                  {pageIndex + 1}
+                                                </div>
+                                                <MarqueeZoom
+                                                  documentId={activeDocumentId}
+                                                  pageIndex={pageIndex}
+                                                  scale={scale}
+                                                />
+                                              </PagePointerProvider>
+                                            </Rotate>
                                           )}
                                         />
                                       </Viewport>

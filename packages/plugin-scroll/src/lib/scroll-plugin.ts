@@ -6,6 +6,7 @@ import {
   DocumentState,
   Unsubscribe,
   Listener,
+  SET_PAGES,
 } from '@embedpdf/core';
 import { PdfPageObjectWithRotatedSize, Rect, Rotation } from '@embedpdf/models';
 import { ViewportCapability, ViewportMetrics, ViewportPlugin } from '@embedpdf/plugin-viewport';
@@ -94,6 +95,10 @@ export class ScrollPlugin extends BasePlugin<
       }
     });
 
+    this.coreStore.onAction(SET_PAGES, (action) => {
+      this.refreshDocumentLayout(action.payload.documentId);
+    });
+
     // Subscribe to viewport changes (per document) with throttling
     this.viewport.onViewportChange((event) => {
       const docState = this.getDocumentState(event.documentId);
@@ -172,11 +177,11 @@ export class ScrollPlugin extends BasePlugin<
     );
   }
 
-  protected override onScaleChanged(documentId: string, scale: number): void {
+  protected override onScaleChanged(documentId: string): void {
     this.refreshDocumentLayout(documentId);
   }
 
-  protected override onRotationChanged(documentId: string, rotation: number): void {
+  protected override onRotationChanged(documentId: string): void {
     this.refreshDocumentLayout(documentId);
   }
 
@@ -420,13 +425,17 @@ export class ScrollPlugin extends BasePlugin<
     return { virtualItems, totalContentSize };
   }
 
-  private computeMetrics(documentId: string, vp: ViewportMetrics): ScrollMetrics {
+  private computeMetrics(
+    documentId: string,
+    vp: ViewportMetrics,
+    items?: VirtualItem[],
+  ): ScrollMetrics {
     const coreDocState = this.getCoreDocumentOrThrow(documentId);
     const docState = this.getDocumentState(documentId);
     const strategy = this.getStrategy(documentId);
     if (!docState) throw new Error(`Document state not found: ${documentId}`);
 
-    return strategy.handleScroll(vp, docState.virtualItems, coreDocState.scale);
+    return strategy.handleScroll(vp, items ?? docState.virtualItems, coreDocState.scale);
   }
 
   // ─────────────────────────────────────────────────────────
@@ -479,7 +488,7 @@ export class ScrollPlugin extends BasePlugin<
 
     // Get viewport metrics for this document
     const viewport = this.viewport.forDocument(documentId);
-    const metrics = this.computeMetrics(documentId, viewport.getMetrics());
+    const metrics = this.computeMetrics(documentId, viewport.getMetrics(), layout.virtualItems);
 
     // Update state with layout + metrics
     this.dispatch(
@@ -488,7 +497,6 @@ export class ScrollPlugin extends BasePlugin<
         ...metrics,
       }),
     );
-
     // Emit layout change event
     this.layoutChange$.emit({ documentId, layout });
 

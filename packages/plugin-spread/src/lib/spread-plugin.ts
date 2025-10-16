@@ -16,6 +16,7 @@ import {
   SpreadDocumentState,
 } from './types';
 import { setSpreadMode, initSpreadState, cleanupSpreadState, SpreadAction } from './actions';
+import { ViewportCapability, ViewportPlugin } from '@embedpdf/plugin-viewport';
 
 export class SpreadPlugin extends BasePlugin<
   SpreadPluginConfig,
@@ -27,10 +28,13 @@ export class SpreadPlugin extends BasePlugin<
 
   private readonly spreadEmitter$ = createBehaviorEmitter<SpreadChangeEvent>();
   private readonly defaultSpreadMode: SpreadMode;
+  private readonly viewport: ViewportCapability | null;
 
   constructor(id: string, registry: PluginRegistry, cfg: SpreadPluginConfig) {
     super(id, registry);
     this.defaultSpreadMode = cfg.defaultSpreadMode ?? SpreadMode.None;
+
+    this.viewport = registry.getPlugin<ViewportPlugin>('viewport')?.provides() ?? null;
   }
 
   // ─────────────────────────────────────────────────────────
@@ -44,7 +48,7 @@ export class SpreadPlugin extends BasePlugin<
     };
 
     this.dispatch(initSpreadState(documentId, docState));
-
+    this.viewport?.gate('spread', documentId);
     this.logger.debug(
       'SpreadPlugin',
       'DocumentOpened',
@@ -59,6 +63,7 @@ export class SpreadPlugin extends BasePlugin<
       const spreadPages = this.getSpreadPagesObjects(documentId, coreDoc.document.pages);
       this.dispatchCoreAction(setPages(documentId, spreadPages));
     }
+    this.viewport?.releaseGate('spread', documentId);
   }
 
   protected override onDocumentClosed(documentId: string): void {

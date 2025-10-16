@@ -1323,9 +1323,9 @@ importers:
       '@embedpdf/core':
         specifier: workspace:*
         version: link:../core
-      '@embedpdf/plugin-loader':
+      '@embedpdf/plugin-viewport':
         specifier: workspace:*
-        version: link:../plugin-loader
+        version: link:../plugin-viewport
       '@types/react':
         specifier: ^18.2.0
         version: 18.3.18
