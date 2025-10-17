@@ -1,0 +1,10 @@
+{
+  "extends": "../../tsconfig.json",
+  "compilerOptions": {
+    "baseUrl": "../..",
+    "paths": {
+      "@embedpdf/plugin-viewport": ["src/lib/index.ts"]
+    }
+  },
+  "include": ["./**/*.ts", "./**/*.svelte"]
+}

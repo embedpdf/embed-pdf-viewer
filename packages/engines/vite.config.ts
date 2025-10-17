@@ -70,7 +70,7 @@ export default defineConfig((env) => {
     return createConfig({
       tsconfigPath: './tsconfig.json',
       entryPath: baseEntries,
-      dtsExclude: ['**/react/**', '**/preact/**', '**/vue/**', '**/shared/**'],
+      dtsExclude: ['**/react/**', '**/preact/**', '**/vue/**', '**/svelte/**', '**/shared/**'],
       additionalPlugins: [workerReplacer(), versionReplacer()],
     });
   }

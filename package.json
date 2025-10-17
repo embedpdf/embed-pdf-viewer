@@ -40,6 +40,7 @@
     "lint-staged": "^16.0.0",
     "prettier": "^3.5.3",
     "prettier-plugin-tailwindcss": "^0.6.11",
+    "prettier-plugin-svelte": "^3.4.0",
     "rimraf": "latest",
     "turbo": "latest",
     "turbowatch": "^2.29.4",
@@ -47,7 +48,7 @@
     "vite": "^6.3.5"
   },
   "lint-staged": {
-    "**/*.{ts,tsx,js,jsx,json,css,md,vue}": "prettier --write"
+    "**/*.{ts,tsx,js,jsx,json,css,md,vue,svelte}": "prettier --write"
   },
   "pnpm": {
     "overrides": {

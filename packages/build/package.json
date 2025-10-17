@@ -8,17 +8,22 @@
     "./vite": {
       "types": "./dist/vite/index.d.ts",
       "import": "./dist/vite/index.js"
-    }
+    },
+    "./scripts/post-svelte-build": "./src/scripts/post-svelte-build.js"
   },
   "scripts": {
     "build": "tsc -p tsconfig.json"
   },
   "dependencies": {
+    "@sveltejs/package": "^2.5.4",
+    "@sveltejs/vite-plugin-svelte": "^6.0.0",
     "@vitejs/plugin-vue": "^6.0.0",
+    "glob": "^11.0.1",
     "unplugin-dts": "1.0.0-beta.6",
     "vite": "^6.3.5"
   },
   "peerDependencies": {
+    "@sveltejs/vite-plugin-svelte": ">=6.0.0",
     "@vitejs/plugin-vue": ">=6.0.0",
     "unplugin-dts": ">=1.0.0-beta.6",
     "vite": ">=6.0.0"

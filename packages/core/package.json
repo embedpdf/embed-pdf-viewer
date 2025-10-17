@@ -26,6 +26,12 @@
       "types": "./dist/vue/index.d.ts",
       "import": "./dist/vue/index.js",
       "require": "./dist/vue/index.cjs"
+    },
+    "./svelte": {
+      "types": "./dist/svelte/index.d.ts",
+      "import": "./dist/svelte/index.js",
+      "svelte": "./dist/svelte/index.js",
+      "require": "./dist/svelte/index.cjs"
     }
   },
   "scripts": {
@@ -33,13 +39,16 @@
     "build:react": "vite build --mode react",
     "build:preact": "vite build --mode preact",
     "build:vue": "vite build --mode vue",
-    "build": "pnpm run clean && concurrently -c auto -n base,react,preact,vue \"vite build --mode base\" \"vite build --mode react\" \"vite build --mode preact\" \"vite build --mode vue\"",
+    "build:svelte": "svelte-package -i src/svelte -o dist/svelte -t && find src -name '*.d.ts' -type f -delete",
+    "build": "pnpm run clean && concurrently -c auto -n base,react,preact,vue,svelte \"vite build --mode base\" \"vite build --mode react\" \"vite build --mode preact\" \"vite build --mode vue\" \"pnpm run build:svelte\"",
     "clean": "rimraf dist",
     "lint": "eslint src --color",
     "lint:fix": "eslint src --color --fix"
   },
   "devDependencies": {
     "@embedpdf/build": "workspace:*",
+    "@sveltejs/package": "^2.5.4",
+    "@sveltejs/vite-plugin-svelte": "^6.0.0",
     "@types/react": "^18.2.0",
     "typescript": "^5.0.0"
   },
@@ -51,6 +60,7 @@
     "preact": "^10.26.4",
     "react": ">=16.8.0",
     "react-dom": ">=16.8.0",
+    "svelte": ">=5.39.11",
     "vue": ">=3.2.0"
   },
   "files": [

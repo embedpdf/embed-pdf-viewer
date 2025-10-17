@@ -1,6 +1,6 @@
 import fs from 'node:fs';
 import path from 'node:path';
-import { defineConfig, type UserConfig, Plugin } from 'vite';
+import { defineConfig, type UserConfig } from 'vite';
 import vue from '@vitejs/plugin-vue';
 import dts from 'unplugin-dts/vite';
 
@@ -169,11 +169,13 @@ export function defineLibrary() {
           dtsOptions: { processor: 'vue' },
         });
 
+
+
       default: // base
         return createConfig({
           tsconfigPath: './tsconfig.json',
           entryPath: 'index.ts',
-          dtsExclude: ['**/react/**', '**/preact/**', '**/vue/**', '**/shared/**'], // exclude framework dirs for base build
+          dtsExclude: ['**/react/**', '**/preact/**', '**/vue/**', '**/svelte/**', '**/shared/**'], // exclude framework dirs for base build
         });
     }
   });

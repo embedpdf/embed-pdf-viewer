@@ -143,7 +143,9 @@ export class ZoomPlugin extends BasePlugin<
   /* plugin life‑cycle                                                   */
   /* ------------------------------------------------------------------ */
   async initialize(): Promise<void> {
-    /* apply the initial zoom                                              */
+    /* apply the initial zoom
+    /* Mark plugin as ready - zoom will be calculated when viewport has dimensions */
+    this.markReady();
   }
 
   async destroy() {
