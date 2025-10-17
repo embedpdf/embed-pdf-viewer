@@ -44,6 +44,8 @@ import {
   SelectionRectsCallback,
 } from './types';
 import { sliceBounds, rectsWithinSlice, glyphAt } from './utils';
+import { ScrollCapability, ScrollPlugin } from "@embedpdf/plugin-scroll";
+import { ViewportCapability, ViewportPlugin } from '@embedpdf/plugin-viewport';
 
 export class SelectionPlugin extends BasePlugin<
   SelectionPluginConfig,
@@ -60,6 +62,15 @@ export class SelectionPlugin extends BasePlugin<
   private selecting = false;
   private anchor?: { page: number; index: number };
 
+  /* auto-scroll state */
+  private autoScrollTimer: number | null = null;
+  private lastPointerPosition: { x: number; y: number } | null = null;
+  private readonly AUTO_SCROLL_TOP_THRESHOLD = 100;
+  private readonly AUTO_SCROLL_BOTTOM_THRESHOLD = 50;
+  private readonly AUTO_SCROLL_LEFT_THRESHOLD = 50;
+  private readonly AUTO_SCROLL_RIGHT_THRESHOLD = 50;
+  private readonly AUTO_SCROLL_SPEED = 10;
+
   /** Page callbacks for rect updates */
   private pageCallbacks = new Map<number, (data: SelectionRectsCallback) => void>();
 
@@ -70,12 +81,22 @@ export class SelectionPlugin extends BasePlugin<
   private readonly endSelection$ = createEmitter<void>();
 
   private interactionManagerCapability: InteractionManagerCapability | undefined;
+  private scrollCapability: ScrollCapability | undefined;
+  private viewportCapability: ViewportCapability | undefined;
 
   constructor(id: string, registry: PluginRegistry) {
     super(id, registry);
 
     this.interactionManagerCapability = this.registry
       .getPlugin<InteractionManagerPlugin>('interaction-manager')
+      ?.provides();
+
+    this.scrollCapability = this.registry
+      .getPlugin<ScrollPlugin>('scroll')
+      ?.provides();
+
+    this.viewportCapability = this.registry
+      .getPlugin<ViewportPlugin>('viewport')
       ?.provides();
 
     this.coreStore.onAction(SET_DOCUMENT, (_action) => {
@@ -97,6 +118,7 @@ export class SelectionPlugin extends BasePlugin<
   /* ── life-cycle ────────────────────────────────────────── */
   async initialize() {}
   async destroy() {
+    this.stopAutoScroll();
     this.selChange$.clear();
   }
 
@@ -133,6 +155,8 @@ export class SelectionPlugin extends BasePlugin<
       return () => {};
     }
 
+    // TODO: Check scroll, viewport
+
     const { pageIndex, onRectsChange } = opts;
 
     // Track this callback for the page
@@ -162,8 +186,11 @@ export class SelectionPlugin extends BasePlugin<
           }
         }
       },
-      onPointerMove: (point: Position, _evt, modeId) => {
+      onPointerMove: (point: Position, evt, modeId) => {
         if (!this.enabledModes.has(modeId)) return;
+
+        // Store last pointer position for auto-scroll
+        this.lastPointerPosition = { x: evt.clientX, y: evt.clientY };
 
         // Get cached geometry (should be instant if already loaded)
         const cached = this.state.geometry[pageIndex];
@@ -180,15 +207,23 @@ export class SelectionPlugin extends BasePlugin<
           // Update selection if we're selecting
           if (this.selecting && g !== -1) {
             this.updateSelection(pageIndex, g);
+
+
+            // START AUTO-SCROLL if near viewport edge
+            this.checkAndStartAutoScroll(evt.clientX, evt.clientY);
           }
         }
       },
       onPointerUp: (_point: Position, _evt, modeId) => {
         if (!this.enabledModes.has(modeId)) return;
+        // STOP AUTO-SCROLL
+        this.stopAutoScroll();
         this.endSelection();
       },
       onHandlerActiveEnd: (modeId) => {
         if (!this.enabledModes.has(modeId)) return;
+        // STOP AUTO-SCROLL
+        this.stopAutoScroll();
         this.clearSelection();
       },
     };
@@ -340,5 +375,88 @@ export class SelectionPlugin extends BasePlugin<
     text.wait((text) => {
       this.copyToClipboard$.emit(text.join('\n'));
     }, ignore);
+  }
+
+  private checkAndStartAutoScroll(clientX: number, clientY: number) {
+    if (!this.viewportCapability || !this.scrollCapability) return;
+
+    const { clientWidth, clientHeight } = this.viewportCapability.getMetrics();
+
+    // Calculate distance from edges
+    const distanceFromTop = clientY;
+    const distanceFromBottom = clientHeight - clientY;
+    const distanceFromLeft = clientX;
+    const distanceFromRight = clientWidth - clientX;
+
+    // Determine scroll direction
+    let scrollX = 0;
+    let scrollY = 0;
+
+    if (distanceFromTop < this.AUTO_SCROLL_TOP_THRESHOLD) {
+      scrollY = -this.AUTO_SCROLL_SPEED; // Scroll up
+    } else if (distanceFromBottom < this.AUTO_SCROLL_BOTTOM_THRESHOLD) {
+      scrollY = this.AUTO_SCROLL_SPEED; // Scroll down
+    }
+
+    if (distanceFromLeft < this.AUTO_SCROLL_LEFT_THRESHOLD) {
+      scrollX = -this.AUTO_SCROLL_SPEED; // Scroll left
+    } else if (distanceFromRight < this.AUTO_SCROLL_RIGHT_THRESHOLD) {
+      scrollX = this.AUTO_SCROLL_SPEED; // Scroll right
+    }
+
+    // Start auto-scroll if needed
+    if (scrollX !== 0 || scrollY !== 0) {
+      if (!this.autoScrollTimer) {
+        this.startAutoScroll(scrollX, scrollY);
+      }
+    } else {
+      // Stop auto-scroll if mouse moved away from edge
+      this.stopAutoScroll();
+    }
+  }
+
+  private startAutoScroll(scrollX: number, scrollY: number) {
+    if (!this.viewportCapability) return;
+
+    // Clear existing timer
+    this.stopAutoScroll();
+
+    // Start animation loop
+    const scroll = () => {
+      if (!this.selecting) {
+        this.stopAutoScroll();
+        return;
+      }
+
+      // Perform scroll
+      const currentMetrics = this.viewportCapability!.getMetrics();
+      this.viewportCapability!.scrollTo({
+        x: currentMetrics.scrollLeft + scrollX,
+        y: currentMetrics.scrollTop + scrollY,
+        behavior: 'instant', // No smooth scrolling for auto-scroll
+      });
+
+      // Re-check pointer position for continued selection
+      if (this.lastPointerPosition && this.selecting) {
+        // Find which page contains the current pointer position
+        // This is a simplified version - you may need to adjust based on your layout
+        this.checkAndStartAutoScroll(
+          this.lastPointerPosition.x,
+          this.lastPointerPosition.y
+        );
+      }
+
+      // Continue animation
+      this.autoScrollTimer = requestAnimationFrame(scroll);
+    };
+
+    this.autoScrollTimer = requestAnimationFrame(scroll);
+  }
+
+  private stopAutoScroll() {
+    if (this.autoScrollTimer !== null) {
+      cancelAnimationFrame(this.autoScrollTimer);
+      this.autoScrollTimer = null;
+    }
   }
 }
