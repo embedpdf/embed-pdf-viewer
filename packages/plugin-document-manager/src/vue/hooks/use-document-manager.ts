@@ -98,9 +98,15 @@ export function useDocumentState(documentIdRef: () => string | null) {
         if (id === documentId) documentState.value = null;
       });
 
+      // Add this subscription to handle error events
+      const unsubError = providesValue.onDocumentError((errorEvent) => {
+        if (errorEvent.documentId === documentId) updateState();
+      });
+
       onCleanup(() => {
         unsubOpen();
         unsubClose();
+        unsubError(); // Don't forget to unsubscribe
       });
     },
     { immediate: true },

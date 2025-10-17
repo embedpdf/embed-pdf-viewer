@@ -110,15 +110,17 @@ export class DocumentManagerPlugin extends BasePlugin<
   // Document Lifecycle Hooks (from BasePlugin)
   // ─────────────────────────────────────────────────────────
 
+  protected override onDocumentLoadingStarted(documentId: string): void {
+    // Add to document order
+    this.dispatch(addToDocumentOrder(documentId));
+  }
+
   protected override onDocumentLoaded(documentId: string): void {
     const docState = this.coreState.core.documents[documentId];
     if (!docState) return;
 
     // Only emit event when document is successfully loaded
     if (docState.status === 'loaded') {
-      // Add to document order
-      this.dispatch(addToDocumentOrder(documentId));
-
       // Clean up load options to free memory
       this.loadOptions.delete(documentId);
 
