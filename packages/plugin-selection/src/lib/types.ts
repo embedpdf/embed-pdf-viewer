@@ -1,5 +1,6 @@
 import { BasePluginConfig, EventHook } from '@embedpdf/core';
 import { PdfPageGeometry, PdfTask, Rect } from '@embedpdf/models';
+import { GlyphAccelerationModel } from './utils';
 
 export interface SelectionPluginConfig extends BasePluginConfig {}
 
@@ -16,7 +17,7 @@ export interface SelectionRangeX {
 
 export interface SelectionState {
   /** page → geometry cache */
-  geometry: Record<number, PdfPageGeometry>;
+  geometry: Record<number, GlyphAccelerationModel>;
   /** current selection or null */
   rects: Record<number, Rect[]>;
   selection: SelectionRangeX | null;
