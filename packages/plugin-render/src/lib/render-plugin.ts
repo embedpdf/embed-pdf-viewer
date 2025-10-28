@@ -16,6 +16,7 @@ export class RenderPlugin extends BasePlugin<RenderPluginConfig, RenderCapabilit
   static readonly id = 'render' as const;
 
   private readonly refreshPages$ = createEmitter<number[]>();
+  private initForms = false;
 
   constructor(id: string, registry: PluginRegistry) {
     super(id, registry);
@@ -25,7 +26,9 @@ export class RenderPlugin extends BasePlugin<RenderPluginConfig, RenderCapabilit
     });
   }
 
-  async initialize(_config: RenderPluginConfig): Promise<void> {}
+  async initialize(config: RenderPluginConfig): Promise<void> {
+    this.initForms = config.initForms ?? false;
+  }
 
   protected buildCapability(): RenderCapability {
     return {
@@ -50,7 +53,12 @@ export class RenderPlugin extends BasePlugin<RenderPluginConfig, RenderCapabilit
       throw new Error('page does not exist');
     }
 
-    return this.engine.renderPage(coreState.document, page, options);
+    const mergedOptions = {
+      ...(options ?? {}),
+      renderForms: options?.renderForms ?? this.initForms,
+    };
+
+    return this.engine.renderPage(coreState.document, page, mergedOptions);
   }
 
   private renderPageRect({ pageIndex, rect, options }: RenderPageRectOptions) {
@@ -65,6 +73,11 @@ export class RenderPlugin extends BasePlugin<RenderPluginConfig, RenderCapabilit
       throw new Error('page does not exist');
     }
 
-    return this.engine.renderPageRect(coreState.document, page, rect, options);
+    const mergedOptions = {
+      ...(options ?? {}),
+      renderForms: options?.renderForms ?? this.initForms,
+    };
+
+    return this.engine.renderPageRect(coreState.document, page, rect, mergedOptions);
   }
 }

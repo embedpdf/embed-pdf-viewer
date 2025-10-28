@@ -24,6 +24,7 @@ import {
   PdfWidgetAnnoOption,
   PdfFileAttachmentAnnoObject,
   Rect,
+  Size,
   PdfAttachmentObject,
   PdfUnsupportedAnnoObject,
   PdfTextAnnoObject,
@@ -114,6 +115,7 @@ import {
   PdfAnnotationsProgress,
   ConvertToBlobOptions,
   buildUserToDeviceMatrix,
+  Matrix,
   PdfMetadataObject,
   PdfPrintOptions,
   PdfTrappedStatus,
@@ -151,6 +153,63 @@ export enum RenderFlag {
   RENDER_FORCEHALFTONE = 0x400, // Always use halftone for image stretching.
   PRINTING = 0x800, // Render for printing.
   REVERSE_BYTE_ORDER = 0x10, // Set whether render in a reverse Byte order, this flag only.
+}
+
+interface FormDrawParams {
+  startX: number;
+  startY: number;
+  formsWidth: number;
+  formsHeight: number;
+  scaleX: number;
+  scaleY: number;
+}
+
+function computeFormDrawParams(matrix: Matrix, rect: Rect, pageSize: Size, rotation: Rotation): FormDrawParams {
+  const rectLeft = rect.origin.x;
+  const rectBottom = rect.origin.y;
+  const rectRight = rectLeft + rect.size.width;
+  const rectTop = rectBottom + rect.size.height;
+  const pageWidth = pageSize.width;
+  const pageHeight = pageSize.height;
+
+  // Extract the per-axis scale that the render matrix applies.
+  const scaleX = Math.hypot(matrix.a, matrix.b);
+  const scaleY = Math.hypot(matrix.c, matrix.d);
+  const swap = (rotation & 1) === 1;
+
+  const formsWidth = swap
+    ? Math.max(1, Math.round(pageHeight * scaleX))
+    : Math.max(1, Math.round(pageWidth * scaleX));
+  const formsHeight = swap
+    ? Math.max(1, Math.round(pageWidth * scaleY))
+    : Math.max(1, Math.round(pageHeight * scaleY));
+
+  let startX: number;
+  let startY: number;
+  switch (rotation) {
+    case Rotation.Degree0:
+      startX = -Math.round(rectLeft * scaleX);
+      startY = -Math.round(rectBottom * scaleY);
+      break;
+    case Rotation.Degree90:
+      startX = Math.round((rectTop - pageHeight) * scaleX);
+      startY = -Math.round(rectLeft * scaleY);
+      break;
+    case Rotation.Degree180:
+      startX = Math.round((rectRight - pageWidth) * scaleX);
+      startY = Math.round((rectTop - pageHeight) * scaleY);
+      break;
+    case Rotation.Degree270:
+      startX = -Math.round(rectBottom * scaleX);
+      startY = Math.round((rectRight - pageWidth) * scaleY);
+      break;
+    default:
+      startX = -Math.round(rectLeft * scaleX);
+      startY = -Math.round(rectBottom * scaleY);
+      break;
+  }
+
+  return { startX, startY, formsWidth, formsHeight, scaleX, scaleY };
 }
 
 const LOG_SOURCE = 'PDFiumEngine';
@@ -211,8 +270,8 @@ export const browserImageDataToBlobConverter: ImageDataConverter<Blob> = (
     return Promise.reject(
       new OffscreenCanvasError(
         'OffscreenCanvas is not available in this environment. ' +
-          'This converter is intended for browser use only. ' +
-          'Falling back to WASM-based image encoding.',
+        'This converter is intended for browser use only. ' +
+        'Falling back to WASM-based image encoding.',
       ),
     );
   }
@@ -838,9 +897,9 @@ export class PdfiumEngine<T = Blob> implements PdfEngine<T> {
     return ok
       ? PdfTaskHelper.resolve(true)
       : PdfTaskHelper.reject({
-          code: PdfErrorCode.Unknown,
-          message: 'one or more metadata fields could not be written',
-        });
+        code: PdfErrorCode.Unknown,
+        message: 'one or more metadata fields could not be written',
+      });
   }
 
   /**
@@ -1084,9 +1143,9 @@ export class PdfiumEngine<T = Blob> implements PdfEngine<T> {
     return ok
       ? PdfTaskHelper.resolve(true)
       : PdfTaskHelper.reject({
-          code: PdfErrorCode.Unknown,
-          message: 'failed to clear bookmarks',
-        });
+        code: PdfErrorCode.Unknown,
+        message: 'failed to clear bookmarks',
+      });
   }
 
   /**
@@ -1584,9 +1643,9 @@ export class PdfiumEngine<T = Blob> implements PdfEngine<T> {
     return ok
       ? PdfTaskHelper.resolve<boolean>(true)
       : PdfTaskHelper.reject<boolean>({
-          code: PdfErrorCode.CantSetAnnotContent,
-          message: 'failed to update annotation',
-        });
+        code: PdfErrorCode.CantSetAnnotContent,
+        message: 'failed to update annotation',
+      });
   }
 
   /**
@@ -6956,6 +7015,8 @@ export class PdfiumEngine<T = Blob> implements PdfEngine<T> {
     const bytes = stride * hDev;
 
     const pageCtx = ctx.acquirePage(page.index);
+    const shouldRenderForms = options?.renderForms ?? false;
+    const formHandle = shouldRenderForms ? pageCtx.getFormHandle() : undefined;
 
     // ---- 2) allocate a BGRA bitmap in WASM
     const heapPtr = this.memoryManager.malloc(bytes);
@@ -6992,6 +7053,24 @@ export class PdfiumEngine<T = Blob> implements PdfEngine<T> {
         clipPtr,
         flags,
       );
+
+      if (formHandle !== undefined) {
+        const formParams = computeFormDrawParams(M, rect, page.size, rotation);
+        const { startX, startY, formsWidth, formsHeight, scaleX, scaleY } = formParams;
+
+        // Draw form elements using the same effective transform as the page bitmap.
+        this.pdfiumModule.FPDF_FFLDraw(
+          formHandle,
+          bitmapPtr,
+          pageCtx.pagePtr,
+          startX,
+          startY,
+          formsWidth,
+          formsHeight,
+          rotation,
+          flags,
+        );
+      }
     } finally {
       pageCtx.release();
       this.memoryManager.free(mPtr);
@@ -7763,7 +7842,7 @@ export class PdfiumEngine<T = Blob> implements PdfEngine<T> {
 
     let cancelled = false;
     task.wait(
-      () => {},
+      () => { },
       (err) => {
         if (err.type === 'abort') cancelled = true;
       },
@@ -7816,12 +7895,12 @@ export class PdfiumEngine<T = Blob> implements PdfEngine<T> {
 
     // Ensure buffer is freed if caller aborts mid-flight
     task.wait(
-      () => {},
+      () => { },
       (err) => {
         if (err.type === 'abort') {
           try {
             this.memoryManager.free(keywordPtr);
-          } catch {}
+          } catch { }
         }
       },
     );

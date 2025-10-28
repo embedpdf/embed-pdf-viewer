@@ -2512,6 +2512,10 @@ export interface PdfRenderPageOptions extends PdfRenderOptions {
    * Whether to render annotations
    */
   withAnnotations?: boolean;
+  /**
+   * Whether to render interactive form widgets
+   */
+  renderForms?: boolean;
 }
 
 export interface PdfRenderPageAnnotationOptions extends PdfRenderOptions {
