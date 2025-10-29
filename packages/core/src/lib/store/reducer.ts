@@ -11,6 +11,7 @@ import {
   SET_ACTIVE_DOCUMENT,
   SET_ROTATION,
   SET_SCALE,
+  REFRESH_PAGES,
 } from './actions';
 
 export const coreReducer: Reducer<CoreState, CoreAction> = (state, action): CoreState => {
@@ -28,6 +29,7 @@ export const coreReducer: Reducer<CoreState, CoreAction> = (state, action): Core
         scale: scale ?? state.defaultScale,
         rotation: rotation ?? state.defaultRotation,
         passwordProvided: passwordProvided ?? false,
+        pageRefreshVersions: {},
         loadStartedAt: Date.now(),
       };
 
@@ -203,6 +205,31 @@ export const coreReducer: Reducer<CoreState, CoreAction> = (state, action): Core
           [targetId]: {
             ...docState,
             rotation,
+          },
+        },
+      };
+    }
+
+    case REFRESH_PAGES: {
+      const { documentId, pageNumbers } = action.payload;
+      const docState = state.documents[documentId];
+
+      if (!docState) return state;
+
+      // Convert 1-based page numbers to 0-based indices and increment versions
+      const newVersions = { ...docState.pageRefreshVersions };
+      for (const pageNumber of pageNumbers) {
+        const pageIndex = pageNumber - 1; // Convert to 0-based
+        newVersions[pageIndex] = (newVersions[pageIndex] || 0) + 1;
+      }
+
+      return {
+        ...state,
+        documents: {
+          ...state.documents,
+          [documentId]: {
+            ...docState,
+            pageRefreshVersions: newVersions,
           },
         },
       };

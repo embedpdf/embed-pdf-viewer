@@ -1,17 +1,50 @@
 import { Reducer } from '@embedpdf/core';
 
-import { UPDATE_VISIBLE_TILES, MARK_TILE_STATUS, TilingAction } from './actions';
-import { Tile, TilingState } from './types';
+import {
+  UPDATE_VISIBLE_TILES,
+  MARK_TILE_STATUS,
+  TilingAction,
+  INIT_TILING_STATE,
+  CLEANUP_TILING_STATE,
+} from './actions';
+import { Tile, TilingDocumentState, TilingState } from './types';
+
+export const initialTilingDocumentState: TilingDocumentState = {
+  visibleTiles: {},
+};
 
 export const initialState: TilingState = {
-  visibleTiles: {},
+  documents: {},
 };
 
 export const tilingReducer: Reducer<TilingState, TilingAction> = (state, action) => {
   switch (action.type) {
+    case INIT_TILING_STATE: {
+      const { documentId, state: docState } = action.payload;
+      return {
+        ...state,
+        documents: {
+          ...state.documents,
+          [documentId]: docState,
+        },
+      };
+    }
+
+    case CLEANUP_TILING_STATE: {
+      const documentId = action.payload;
+      const { [documentId]: removed, ...remaining } = state.documents;
+      return {
+        ...state,
+        documents: remaining,
+      };
+    }
+
     case UPDATE_VISIBLE_TILES: {
-      const incoming = action.payload; // Record<number, Tile[]>
-      const nextPages = { ...state.visibleTiles };
+      const { documentId, tiles: incoming } = action.payload; // Record<number, Tile[]>
+      const docState = state.documents[documentId];
+      if (!docState) return state;
+
+      const nextPages = { ...docState.visibleTiles };
 
       for (const key in incoming) {
         const pageIndex = Number(key);
@@ -19,7 +52,7 @@ export const tilingReducer: Reducer<TilingState, TilingAction> = (state, action)
         const prevTiles = nextPages[pageIndex] ?? [];
 
         const prevScale = prevTiles.find((t) => !t.isFallback)?.srcScale;
-        const newScale = newTiles[0].srcScale;
+        const newScale = newTiles.length > 0 ? newTiles[0].srcScale : prevScale;
         const zoomChanged = prevScale !== undefined && prevScale !== newScale;
 
         if (zoomChanged) {
@@ -60,23 +93,41 @@ export const tilingReducer: Reducer<TilingState, TilingAction> = (state, action)
         }
       }
 
-      return { ...state, visibleTiles: nextPages };
+      return {
+        ...state,
+        documents: {
+          ...state.documents,
+          [documentId]: {
+            ...docState,
+            visibleTiles: nextPages,
+          },
+        },
+      };
     }
 
     case MARK_TILE_STATUS: {
-      const { pageIndex, tileId, status } = action.payload;
+      const { documentId, pageIndex, tileId, status } = action.payload;
+      const docState = state.documents[documentId];
+      if (!docState) return state;
+
       const tiles =
-        state.visibleTiles[pageIndex]?.map((t) =>
+        docState.visibleTiles[pageIndex]?.map((t) =>
           t.id === tileId ? ({ ...t, status } as Tile) : t,
         ) ?? [];
 
       const newTiles = tiles.filter((t) => !t.isFallback);
-      const allReady = newTiles.every((t) => t.status === 'ready');
+      const allReady = newTiles.length > 0 && newTiles.every((t) => t.status === 'ready');
       const finalTiles = allReady ? newTiles : tiles;
 
       return {
         ...state,
-        visibleTiles: { ...state.visibleTiles, [pageIndex]: finalTiles },
+        documents: {
+          ...state.documents,
+          [documentId]: {
+            ...docState,
+            visibleTiles: { ...docState.visibleTiles, [pageIndex]: finalTiles },
+          },
+        },
       };
     }
 

@@ -19,8 +19,11 @@ import { ZoomMode, ZoomPluginPackage, MarqueeZoom } from '@embedpdf/plugin-zoom/
 import { PanPluginPackage } from '@embedpdf/plugin-pan/react';
 import { SpreadMode, SpreadPluginPackage } from '@embedpdf/plugin-spread/react';
 import { Rotate, RotatePluginPackage } from '@embedpdf/plugin-rotate/react';
+import { RenderLayer, RenderPluginPackage } from '@embedpdf/plugin-render/react';
+import { TilingLayer, TilingPluginPackage } from '@embedpdf/plugin-tiling/react';
 import { ExportPluginPackage } from '@embedpdf/plugin-export/react';
 import { PrintPluginPackage } from '@embedpdf/plugin-print/react';
+import { SelectionLayer, SelectionPluginPackage } from '@embedpdf/plugin-selection/react';
 import { TabBar } from './components/tab-bar';
 import { ViewerToolbar } from './components/viewer-toolbar';
 import { LoadingSpinner } from './components/loading-spinner';
@@ -72,6 +75,13 @@ export default function DocumentViewer() {
             createPluginRegistration(RotatePluginPackage),
             createPluginRegistration(ExportPluginPackage),
             createPluginRegistration(PrintPluginPackage),
+            createPluginRegistration(RenderPluginPackage),
+            createPluginRegistration(TilingPluginPackage, {
+              tileSize: 768,
+              overlapPx: 2.5,
+              extraRings: 0,
+            }),
+            createPluginRegistration(SelectionPluginPackage),
           ]}
         >
           {({ pluginsReady, registry }) => (
@@ -137,27 +147,25 @@ export default function DocumentViewer() {
                                                 rotation={rotation}
                                                 scale={scale}
                                               >
-                                                <div
-                                                  style={{
-                                                    width,
-                                                    height,
-                                                    position: 'relative',
-                                                    backgroundColor: 'red',
-                                                    display: 'flex',
-                                                    alignItems: 'center',
-                                                    justifyContent: 'center',
-                                                    fontSize: `${150 * scale}px`,
-                                                    color: 'rgba(255, 255, 255, 0.5)',
-                                                    fontWeight: 'bold',
-                                                    userSelect: 'none',
-                                                  }}
-                                                >
-                                                  {pageIndex + 1}
-                                                </div>
+                                                <RenderLayer
+                                                  documentId={activeDocumentId}
+                                                  pageIndex={pageIndex}
+                                                  scale={1}
+                                                  style={{ pointerEvents: 'none' }}
+                                                />
+                                                <TilingLayer
+                                                  documentId={activeDocumentId}
+                                                  pageIndex={pageIndex}
+                                                  style={{ pointerEvents: 'none' }}
+                                                />
                                                 <MarqueeZoom
                                                   documentId={activeDocumentId}
                                                   pageIndex={pageIndex}
                                                   scale={scale}
+                                                />
+                                                <SelectionLayer
+                                                  documentId={activeDocumentId}
+                                                  pageIndex={pageIndex}
                                                 />
                                               </PagePointerProvider>
                                             </Rotate>

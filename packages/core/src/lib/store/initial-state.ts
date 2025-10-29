@@ -27,6 +27,10 @@ export interface DocumentState {
   scale: number;
   rotation: Rotation;
 
+  // Maps page index (0-based) to refresh version number
+  // When a page is refreshed, its version is incremented
+  pageRefreshVersions: Record<number, number>;
+
   // Metadata
   loadStartedAt: number;
   loadedAt?: number;

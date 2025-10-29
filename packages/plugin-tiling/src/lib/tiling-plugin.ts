@@ -1,30 +1,38 @@
 import {
   BasePlugin,
-  CoreState,
   createBehaviorEmitter,
+  Listener,
   PluginRegistry,
   REFRESH_PAGES,
-  StoreState,
+  RefreshPagesAction,
 } from '@embedpdf/core';
 import { ignore } from '@embedpdf/models';
 import { RenderCapability, RenderPlugin } from '@embedpdf/plugin-render';
-import { ScrollCapability, ScrollMetrics, ScrollPlugin } from '@embedpdf/plugin-scroll';
+import {
+  ScrollCapability,
+  ScrollMetrics,
+  ScrollPlugin,
+  ScrollEvent,
+} from '@embedpdf/plugin-scroll';
 import { ViewportCapability, ViewportPlugin } from '@embedpdf/plugin-viewport';
 
-import { markTileStatus, updateVisibleTiles } from './actions';
+import { initTilingState, cleanupTilingState, markTileStatus, updateVisibleTiles } from './actions';
+import { initialTilingDocumentState } from './reducer';
 import {
   TilingPluginConfig,
   TilingCapability,
   Tile,
   RenderTileOptions,
   TilingState,
+  TilingEvent,
+  TilingScope,
 } from './types';
 import { calculateTilesForPage } from './utils';
 
-export class TilingPlugin extends BasePlugin<TilingPluginConfig, TilingCapability> {
+export class TilingPlugin extends BasePlugin<TilingPluginConfig, TilingCapability, TilingState> {
   static readonly id = 'tiling' as const;
 
-  private readonly tileRendering$ = createBehaviorEmitter<Record<number, Tile[]>>();
+  private readonly tileRendering$ = createBehaviorEmitter<TilingEvent>();
 
   private config: TilingPluginConfig;
   private renderCapability: RenderCapability;
@@ -40,36 +48,71 @@ export class TilingPlugin extends BasePlugin<TilingPluginConfig, TilingCapabilit
     this.scrollCapability = this.registry.getPlugin<ScrollPlugin>('scroll')!.provides();
     this.viewportCapability = this.registry.getPlugin<ViewportPlugin>('viewport')!.provides();
 
-    this.scrollCapability.onScroll((scrollMetrics) => this.calculateVisibleTiles(scrollMetrics), {
-      mode: 'throttle',
-      wait: 50,
-      throttleMode: 'trailing',
-    });
+    this.scrollCapability.onScroll(
+      (event: ScrollEvent) => this.calculateVisibleTiles(event.documentId, event.metrics),
+      {
+        mode: 'throttle',
+        wait: 50,
+        throttleMode: 'trailing',
+      },
+    );
 
     this.coreStore.onAction(REFRESH_PAGES, (action) => this.recalculateTiles(action.payload));
   }
 
-  async recalculateTiles(pagesToRefresh: number[]): Promise<void> {
-    const currentMetrics = this.scrollCapability.getMetrics(this.viewportCapability.getMetrics());
+  protected override onDocumentLoadingStarted(documentId: string): void {
+    this.dispatch(initTilingState(documentId, initialTilingDocumentState));
+  }
+
+  protected override onDocumentClosed(documentId: string): void {
+    this.dispatch(cleanupTilingState(documentId));
+  }
+
+  protected override onScaleChanged(documentId: string): void {
+    this.recalculateTilesForDocument(documentId);
+  }
+
+  protected override onRotationChanged(documentId: string): void {
+    this.recalculateTilesForDocument(documentId);
+  }
+
+  private recalculateTilesForDocument(documentId: string): void {
+    const scrollScope = this.scrollCapability.forDocument(documentId);
+    const viewportScope = this.viewportCapability.forDocument(documentId);
+    const metrics = scrollScope.getMetrics(viewportScope.getMetrics());
+    this.calculateVisibleTiles(documentId, metrics);
+  }
+
+  async recalculateTiles(payload: RefreshPagesAction['payload']): Promise<void> {
+    const { documentId, pageNumbers } = payload;
+    const coreDoc = this.getCoreDocument(documentId);
+    if (!coreDoc || !coreDoc.document) return;
+
+    const scrollScope = this.scrollCapability.forDocument(documentId);
+    const viewportScope = this.viewportCapability.forDocument(documentId);
+    const currentMetrics = scrollScope.getMetrics(viewportScope.getMetrics());
 
     // Recalculate tiles for refreshed pages with a new timestamp
     const refreshedTiles: Record<number, Tile[]> = {};
     const refreshTimestamp = Date.now();
+    const scale = coreDoc.scale;
+    const rotation = coreDoc.rotation;
 
-    for (const pageIndex of pagesToRefresh) {
+    for (const pageNumber of pageNumbers) {
+      const pageIndex = pageNumber - 1;
       const metric = currentMetrics.pageVisibilityMetrics.find(
         (m) => m.pageNumber === pageIndex + 1,
       );
       if (!metric) continue;
 
-      const page = this.coreState.core.document?.pages[pageIndex];
+      const page = coreDoc.document.pages[pageIndex];
       if (!page) continue;
 
       refreshedTiles[pageIndex] = calculateTilesForPage({
         page,
         metric,
-        scale: this.coreState.core.scale,
-        rotation: this.coreState.core.rotation,
+        scale,
+        rotation,
         tileSize: this.config.tileSize,
         overlapPx: this.config.overlapPx,
         extraRings: this.config.extraRings,
@@ -80,7 +123,7 @@ export class TilingPlugin extends BasePlugin<TilingPluginConfig, TilingCapabilit
     }
 
     if (Object.keys(refreshedTiles).length > 0) {
-      this.dispatch(updateVisibleTiles(refreshedTiles));
+      this.dispatch(updateVisibleTiles(documentId, refreshedTiles));
     }
   }
 
@@ -88,30 +131,22 @@ export class TilingPlugin extends BasePlugin<TilingPluginConfig, TilingCapabilit
     // Fetch dependencies from the registry if needed
   }
 
-  protected onCoreStoreUpdated(
-    oldState: StoreState<CoreState>,
-    newState: StoreState<CoreState>,
-  ): void {
-    if (oldState.core.scale !== newState.core.scale) {
-      this.calculateVisibleTiles(
-        this.scrollCapability.getMetrics(this.viewportCapability.getMetrics()),
-      );
-    }
-  }
-
-  private calculateVisibleTiles(scrollMetrics: ScrollMetrics): void {
+  private calculateVisibleTiles(documentId: string, scrollMetrics: ScrollMetrics): void {
     if (!this.config.enabled) {
-      this.dispatch(updateVisibleTiles([]));
+      this.dispatch(updateVisibleTiles(documentId, {}));
       return;
     }
 
-    const scale = this.coreState.core.scale;
-    const rotation = this.coreState.core.rotation;
+    const coreDoc = this.getCoreDocument(documentId);
+    if (!coreDoc || !coreDoc.document) return;
+
+    const scale = coreDoc.scale;
+    const rotation = coreDoc.rotation;
     const visibleTiles: { [pageIndex: number]: Tile[] } = {};
 
     for (const scrollMetric of scrollMetrics.pageVisibilityMetrics) {
       const pageIndex = scrollMetric.pageNumber - 1; // Convert to 0-based index
-      const page = this.coreState.core.document?.pages[pageIndex];
+      const page = coreDoc.document.pages[pageIndex];
       if (!page) continue;
 
       // Calculate tiles for the page using the utility function
@@ -128,28 +163,46 @@ export class TilingPlugin extends BasePlugin<TilingPluginConfig, TilingCapabilit
       visibleTiles[pageIndex] = tiles;
     }
 
-    this.dispatch(updateVisibleTiles(visibleTiles));
+    this.dispatch(updateVisibleTiles(documentId, visibleTiles));
   }
 
-  override onStoreUpdated(_prevState: TilingState, newState: TilingState): void {
-    this.tileRendering$.emit(newState.visibleTiles);
+  override onStoreUpdated(prevState: TilingState, newState: TilingState): void {
+    for (const documentId in newState.documents) {
+      const prevDoc = prevState.documents[documentId];
+      const newDoc = newState.documents[documentId];
+      if (prevDoc !== newDoc) {
+        this.tileRendering$.emit({ documentId, tiles: newDoc.visibleTiles });
+      }
+    }
   }
 
   protected buildCapability(): TilingCapability {
     return {
       renderTile: this.renderTile.bind(this),
+      forDocument: this.createTilingScope.bind(this),
       onTileRendering: this.tileRendering$.on,
     };
   }
 
-  private renderTile(options: RenderTileOptions) {
+  private createTilingScope(documentId: string): TilingScope {
+    return {
+      renderTile: (options) => this.renderTile(options, documentId),
+      onTileRendering: (listener: Listener<Record<number, Tile[]>>) =>
+        this.tileRendering$.on((event) => {
+          if (event.documentId === documentId) listener(event.tiles);
+        }),
+    };
+  }
+
+  private renderTile(options: RenderTileOptions, documentId?: string) {
+    const id = documentId ?? this.getActiveDocumentId();
     if (!this.renderCapability) {
       throw new Error('Render capability not available.');
     }
 
-    this.dispatch(markTileStatus(options.pageIndex, options.tile.id, 'rendering'));
+    this.dispatch(markTileStatus(id, options.pageIndex, options.tile.id, 'rendering'));
 
-    const task = this.renderCapability.renderPageRect({
+    const task = this.renderCapability.forDocument(id).renderPageRect({
       pageIndex: options.pageIndex,
       rect: options.tile.pageRect,
       options: {
@@ -159,7 +212,7 @@ export class TilingPlugin extends BasePlugin<TilingPluginConfig, TilingCapabilit
     });
 
     task.wait(() => {
-      this.dispatch(markTileStatus(options.pageIndex, options.tile.id, 'ready'));
+      this.dispatch(markTileStatus(id, options.pageIndex, options.tile.id, 'ready'));
     }, ignore);
 
     return task;
