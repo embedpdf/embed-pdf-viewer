@@ -2,14 +2,14 @@ import {
   BasePlugin,
   PluginRegistry,
   createBehaviorEmitter,
-  getPagesWithRotatedSize,
   DocumentState,
   Unsubscribe,
   Listener,
   SET_PAGES,
 } from '@embedpdf/core';
-import { PdfPageObjectWithRotatedSize, Rect, Rotation } from '@embedpdf/models';
+import { PdfPageObjectWithRotatedSize, Rect, Rotation, transformSize } from '@embedpdf/models';
 import { ViewportCapability, ViewportMetrics, ViewportPlugin } from '@embedpdf/plugin-viewport';
+import { SpreadCapability, SpreadPlugin } from '@embedpdf/plugin-spread';
 
 import {
   ScrollCapability,
@@ -53,6 +53,7 @@ export class ScrollPlugin extends BasePlugin<
   static readonly id = 'scroll' as const;
 
   private viewport: ViewportCapability;
+  private spread: SpreadCapability | null;
 
   // Strategies per document
   private strategies = new Map<string, BaseScrollStrategy>();
@@ -85,6 +86,7 @@ export class ScrollPlugin extends BasePlugin<
     super(id, registry);
 
     this.viewport = this.registry.getPlugin<ViewportPlugin>('viewport')!.provides();
+    this.spread = this.registry.getPlugin<SpreadPlugin>('spread')?.provides() ?? null;
     this.initialPage = this.config?.initialPage;
 
     // Subscribe to viewport scroll activity (per document)
@@ -95,8 +97,8 @@ export class ScrollPlugin extends BasePlugin<
       }
     });
 
-    this.coreStore.onAction(SET_PAGES, (action) => {
-      this.refreshDocumentLayout(action.payload.documentId);
+    this.spread?.onSpreadChange((event) => {
+      this.refreshDocumentLayout(event.documentId);
     });
 
     // Subscribe to viewport changes (per document) with throttling
@@ -294,6 +296,7 @@ export class ScrollPlugin extends BasePlugin<
       scrollToPage: (options) => this.scrollToPage(options, documentId),
       scrollToNextPage: (behavior) => this.scrollToNextPage(behavior, documentId),
       scrollToPreviousPage: (behavior) => this.scrollToPreviousPage(behavior, documentId),
+      getSpreadPagesWithRotatedSize: () => this.getSpreadPagesWithRotatedSize(documentId),
       getMetrics: (viewport) => this.getMetrics(viewport, documentId),
       getLayout: () => this.getLayout(documentId),
       getRectPositionForPage: (page, rect, scale, rotation) =>
@@ -483,7 +486,7 @@ export class ScrollPlugin extends BasePlugin<
 
     if (!coreDoc || !docState || coreDoc.status !== 'loaded') return;
 
-    const pages = getPagesWithRotatedSize(coreDoc);
+    const pages = this.getSpreadPagesWithRotatedSize(documentId);
     const layout = this.computeLayout(documentId, pages);
 
     // Get viewport metrics for this document
@@ -502,6 +505,21 @@ export class ScrollPlugin extends BasePlugin<
 
     // Push updated scroller layout
     this.pushScrollerLayout(documentId);
+  }
+
+  private getSpreadPagesWithRotatedSize(documentId?: string): PdfPageObjectWithRotatedSize[][] {
+    const id = documentId ?? this.getActiveDocumentId();
+    const coreDoc = this.coreState.core.documents[id];
+    if (!coreDoc) throw new Error(`Document ${id} not loaded`);
+
+    const spreadPages =
+      this.spread?.getSpreadPages(id) || coreDoc.document?.pages.map((page) => [page]) || [];
+    return spreadPages.map((spread) =>
+      spread.map((page) => ({
+        ...page,
+        rotatedSize: transformSize(page.size, coreDoc.rotation, 1),
+      })),
+    );
   }
 
   // ─────────────────────────────────────────────────────────

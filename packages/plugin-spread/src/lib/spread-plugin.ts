@@ -1,10 +1,4 @@
-import {
-  BasePlugin,
-  createBehaviorEmitter,
-  Listener,
-  PluginRegistry,
-  setPages,
-} from '@embedpdf/core';
+import { BasePlugin, createBehaviorEmitter, Listener, PluginRegistry } from '@embedpdf/core';
 import { PdfPageObject } from '@embedpdf/models';
 import {
   SpreadCapability,
@@ -15,7 +9,13 @@ import {
   SpreadChangeEvent,
   SpreadDocumentState,
 } from './types';
-import { setSpreadMode, initSpreadState, cleanupSpreadState, SpreadAction } from './actions';
+import {
+  setSpreadMode,
+  initSpreadState,
+  cleanupSpreadState,
+  SpreadAction,
+  setPageGrouping,
+} from './actions';
 import { ViewportCapability, ViewportPlugin } from '@embedpdf/plugin-viewport';
 
 export class SpreadPlugin extends BasePlugin<
@@ -57,11 +57,13 @@ export class SpreadPlugin extends BasePlugin<
   }
 
   protected override onDocumentLoaded(documentId: string): void {
-    // Apply spread mode to pages after document is loaded
+    // Calculate grouping indices and store in plugin state
     const coreDoc = this.coreState.core.documents[documentId];
     if (coreDoc?.document) {
-      const spreadPages = this.getSpreadPagesObjects(documentId, coreDoc.document.pages);
-      this.dispatchCoreAction(setPages(documentId, spreadPages));
+      const grouping = this.calculatePageGrouping(documentId, coreDoc.document.pages.length);
+
+      // Store grouping in plugin state
+      this.dispatch(setPageGrouping(documentId, grouping));
     }
     this.viewport?.releaseGate('spread', documentId);
   }
@@ -85,7 +87,7 @@ export class SpreadPlugin extends BasePlugin<
       // Active document operations
       setSpreadMode: (mode: SpreadMode) => this.setSpreadModeForDocument(mode),
       getSpreadMode: () => this.getSpreadModeForDocument(),
-
+      getSpreadPages: () => this.getSpreadPages(),
       // Document-scoped operations
       forDocument: (documentId: string) => this.createSpreadScope(documentId),
 
@@ -102,6 +104,7 @@ export class SpreadPlugin extends BasePlugin<
     return {
       setSpreadMode: (mode: SpreadMode) => this.setSpreadModeForDocument(mode, documentId),
       getSpreadMode: () => this.getSpreadModeForDocument(documentId),
+      getSpreadPages: () => this.getSpreadPages(documentId),
       onSpreadChange: (listener: Listener<SpreadMode>) =>
         this.spreadEmitter$.on((event) => {
           if (event.documentId === documentId) listener(event.spreadMode);
@@ -142,9 +145,9 @@ export class SpreadPlugin extends BasePlugin<
       // Update plugin state
       this.dispatch(setSpreadMode(id, mode));
 
-      // Update core state with new spread pages
-      const spreadPages = this.getSpreadPagesObjects(id, coreDoc.document.pages);
-      this.dispatchCoreAction(setPages(id, spreadPages));
+      // Calculate new grouping
+      const grouping = this.calculatePageGrouping(id, coreDoc.document.pages.length);
+      this.dispatch(setPageGrouping(id, grouping));
 
       // Emit event
       this.spreadEmitter$.emit({
@@ -158,32 +161,61 @@ export class SpreadPlugin extends BasePlugin<
     return this.getDocumentStateOrThrow(documentId).spreadMode;
   }
 
-  private getSpreadPagesObjects(documentId: string, pages: PdfPageObject[]): PdfPageObject[][] {
-    if (!pages.length) return [];
-
+  /**
+   * Calculate page grouping indices based on spread mode
+   * Returns indices, not actual page objects
+   */
+  private calculatePageGrouping(documentId: string, pageCount: number): number[][] {
     const docState = this.getDocumentStateOrThrow(documentId);
     const spreadMode = docState.spreadMode;
 
     switch (spreadMode) {
       case SpreadMode.None:
-        return pages.map((page) => [page]);
+        // [[0], [1], [2], [3], ...]
+        return Array.from({ length: pageCount }, (_, i) => [i]);
 
       case SpreadMode.Odd:
-        return Array.from({ length: Math.ceil(pages.length / 2) }, (_, i) =>
-          pages.slice(i * 2, i * 2 + 2),
-        );
+        // [[0, 1], [2, 3], [4, 5], ...]
+        return Array.from({ length: Math.ceil(pageCount / 2) }, (_, i) => {
+          const indices = [i * 2];
+          if (i * 2 + 1 < pageCount) indices.push(i * 2 + 1);
+          return indices;
+        });
 
       case SpreadMode.Even:
+        // [[0], [1, 2], [3, 4], [5, 6], ...]
         return [
-          [pages[0]],
-          ...Array.from({ length: Math.ceil((pages.length - 1) / 2) }, (_, i) =>
-            pages.slice(1 + i * 2, 1 + i * 2 + 2),
-          ),
+          [0],
+          ...Array.from({ length: Math.ceil((pageCount - 1) / 2) }, (_, i) => {
+            const indices = [1 + i * 2];
+            if (1 + i * 2 + 1 < pageCount) indices.push(1 + i * 2 + 1);
+            return indices;
+          }),
         ];
 
       default:
-        return pages.map((page) => [page]);
+        return Array.from({ length: pageCount }, (_, i) => [i]);
     }
+  }
+
+  /**
+   * Get the actual page objects grouped according to spread mode
+   * This is computed on-demand, not stored
+   */
+  private getSpreadPages(documentId?: string): PdfPageObject[][] {
+    const id = documentId ?? this.getActiveDocumentId();
+    const coreDoc = this.coreState.core.documents[id];
+    const spreadState = this.getDocumentStateOrThrow(id);
+
+    if (!coreDoc?.document) {
+      throw new Error(`Document ${id} not loaded`);
+    }
+
+    const grouping = spreadState.pageGrouping ?? [];
+    const pages = coreDoc.document.pages;
+
+    // Map indices to actual page objects
+    return grouping.map((indices) => indices.map((idx) => pages[idx]).filter(Boolean));
   }
 
   // ─────────────────────────────────────────────────────────

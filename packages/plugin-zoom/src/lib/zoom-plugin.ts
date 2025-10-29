@@ -4,7 +4,6 @@ import {
   createEmitter,
   clamp,
   setScale,
-  getPagesWithRotatedSize,
   createBehaviorEmitter,
   Listener,
 } from '@embedpdf/core';
@@ -375,12 +374,12 @@ export class ZoomPlugin extends BasePlugin<
     const coreDoc = this.coreState.core.documents[documentId];
     if (!coreDoc) return false;
 
-    const spreads = getPagesWithRotatedSize(coreDoc);
-    if (!spreads.length) return false;
-
     const scrollScope = this.scroll.forDocument(documentId);
     const pgGap = scrollScope ? this.scroll.getPageGap() : 0;
     const vpGap = this.viewport.getViewportGap();
+
+    const spreads = scrollScope.getSpreadPagesWithRotatedSize();
+    if (!spreads.length) return false;
 
     if (vp.clientWidth === 0 || vp.clientHeight === 0) return false;
 

@@ -9,11 +9,9 @@ import {
   RETRY_LOADING_DOCUMENT,
   CLOSE_DOCUMENT,
   SET_ACTIVE_DOCUMENT,
-  SET_PAGES,
   SET_ROTATION,
   SET_SCALE,
 } from './actions';
-import { PdfErrorCode } from '@embedpdf/models';
 
 export const coreReducer: Reducer<CoreState, CoreAction> = (state, action): CoreState => {
   switch (action.type) {
@@ -27,7 +25,6 @@ export const coreReducer: Reducer<CoreState, CoreAction> = (state, action): Core
         loadingProgress: 0,
         error: null,
         document: null,
-        pages: [],
         scale: scale ?? state.defaultScale,
         rotation: rotation ?? state.defaultRotation,
         passwordProvided: passwordProvided ?? false,
@@ -76,7 +73,6 @@ export const coreReducer: Reducer<CoreState, CoreAction> = (state, action): Core
             ...docState,
             status: 'loaded',
             document,
-            pages: document.pages.map((page) => [page]),
             error: null,
             errorCode: undefined,
             errorDetails: undefined,
@@ -167,24 +163,6 @@ export const coreReducer: Reducer<CoreState, CoreAction> = (state, action): Core
       return {
         ...state,
         activeDocumentId: action.payload,
-      };
-    }
-
-    case SET_PAGES: {
-      const { documentId, pages } = action.payload;
-      const docState = state.documents[documentId];
-
-      if (!docState) return state;
-
-      return {
-        ...state,
-        documents: {
-          ...state.documents,
-          [documentId]: {
-            ...docState,
-            pages,
-          },
-        },
       };
     }
 

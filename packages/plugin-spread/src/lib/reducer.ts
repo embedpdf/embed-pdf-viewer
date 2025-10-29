@@ -5,6 +5,7 @@ import {
   CLEANUP_SPREAD_STATE,
   SET_ACTIVE_SPREAD_DOCUMENT,
   SET_SPREAD_MODE,
+  SET_PAGE_GROUPING,
 } from './actions';
 import { SpreadState, SpreadDocumentState, SpreadMode } from './types';
 
@@ -61,6 +62,23 @@ export const spreadReducer: Reducer<SpreadState, SpreadAction> = (state = initia
           [documentId]: {
             ...docState,
             spreadMode,
+          },
+        },
+      };
+    }
+
+    case SET_PAGE_GROUPING: {
+      const { documentId, grouping } = action.payload;
+      const docState = state.documents[documentId];
+      if (!docState) return state;
+
+      return {
+        ...state,
+        documents: {
+          ...state.documents,
+          [documentId]: {
+            ...docState,
+            pageGrouping: grouping,
           },
         },
       };

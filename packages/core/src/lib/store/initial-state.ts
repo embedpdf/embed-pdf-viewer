@@ -1,4 +1,4 @@
-import { PdfDocumentObject, PdfErrorCode, PdfPageObject, Rotation } from '@embedpdf/models';
+import { PdfDocumentObject, PdfErrorCode, Rotation } from '@embedpdf/models';
 import { PluginRegistryConfig } from '../types/plugin';
 
 export type DocumentStatus = 'loading' | 'loaded' | 'error';
@@ -22,7 +22,6 @@ export interface DocumentState {
 
   // Document data (null when loading or error)
   document: PdfDocumentObject | null;
-  pages: PdfPageObject[][];
 
   // View settings (set even during loading for when it succeeds)
   scale: number;

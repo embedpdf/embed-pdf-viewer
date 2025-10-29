@@ -8,6 +8,7 @@ export const SET_ACTIVE_SPREAD_DOCUMENT = 'SPREAD/SET_ACTIVE_DOCUMENT';
 
 // Spread operations
 export const SET_SPREAD_MODE = 'SPREAD/SET_SPREAD_MODE';
+export const SET_PAGE_GROUPING = 'SPREAD/SET_PAGE_GROUPING';
 
 // Document lifecycle actions
 export interface InitSpreadStateAction extends Action {
@@ -36,11 +37,20 @@ export interface SetSpreadModeAction extends Action {
   };
 }
 
+export interface SetPageGroupingAction extends Action {
+  type: typeof SET_PAGE_GROUPING;
+  payload: {
+    documentId: string;
+    grouping: number[][];
+  };
+}
+
 export type SpreadAction =
   | InitSpreadStateAction
   | CleanupSpreadStateAction
   | SetActiveSpreadDocumentAction
-  | SetSpreadModeAction;
+  | SetSpreadModeAction
+  | SetPageGroupingAction;
 
 // Action Creators
 export function initSpreadState(
@@ -60,4 +70,8 @@ export function setActiveSpreadDocument(documentId: string | null): SetActiveSpr
 
 export function setSpreadMode(documentId: string, spreadMode: SpreadMode): SetSpreadModeAction {
   return { type: SET_SPREAD_MODE, payload: { documentId, spreadMode } };
+}
+
+export function setPageGrouping(documentId: string, grouping: number[][]): SetPageGroupingAction {
+  return { type: SET_PAGE_GROUPING, payload: { documentId, grouping } };
 }

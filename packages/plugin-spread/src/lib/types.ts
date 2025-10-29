@@ -1,4 +1,5 @@
 import { BasePluginConfig, EventHook } from '@embedpdf/core';
+import { PdfPageObject } from '@embedpdf/models';
 
 export interface SpreadPluginConfig extends BasePluginConfig {
   defaultSpreadMode?: SpreadMode;
@@ -13,6 +14,7 @@ export enum SpreadMode {
 // Per-document spread state
 export interface SpreadDocumentState {
   spreadMode: SpreadMode;
+  pageGrouping?: number[][]; // [[0], [1,2], [3,4], ...]
 }
 
 export interface SpreadState {
@@ -30,6 +32,7 @@ export interface SpreadChangeEvent {
 export interface SpreadScope {
   setSpreadMode(mode: SpreadMode): void;
   getSpreadMode(): SpreadMode;
+  getSpreadPages(): PdfPageObject[][];
   onSpreadChange: EventHook<SpreadMode>;
 }
 
@@ -37,6 +40,7 @@ export interface SpreadCapability {
   // Active document operations
   setSpreadMode(mode: SpreadMode): void;
   getSpreadMode(): SpreadMode;
+  getSpreadPages(documentId?: string): PdfPageObject[][];
 
   // Document-scoped operations
   forDocument(documentId: string): SpreadScope;

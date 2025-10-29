@@ -1,5 +1,5 @@
 import { BasePluginConfig, EventHook } from '@embedpdf/core';
-import { PdfPageObject, Rect, Rotation } from '@embedpdf/models';
+import { PdfPageObject, PdfPageObjectWithRotatedSize, Rect, Rotation } from '@embedpdf/models';
 import { ViewportMetrics } from '@embedpdf/plugin-viewport';
 import { VirtualItem } from './types/virtual-item';
 
@@ -138,6 +138,7 @@ export interface ScrollScope {
   scrollToPage(options: ScrollToPageOptions): void;
   scrollToNextPage(behavior?: ScrollBehavior): void;
   scrollToPreviousPage(behavior?: ScrollBehavior): void;
+  getSpreadPagesWithRotatedSize(): PdfPageObjectWithRotatedSize[][];
   getMetrics(viewport?: ViewportMetrics): ScrollMetrics;
   getLayout(): LayoutChangePayload;
   getRectPositionForPage(
