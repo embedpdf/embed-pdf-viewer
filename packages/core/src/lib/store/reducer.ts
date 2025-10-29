@@ -13,14 +13,16 @@ import {
   SET_ROTATION,
   SET_SCALE,
 } from './actions';
+import { PdfErrorCode } from '@embedpdf/models';
 
 export const coreReducer: Reducer<CoreState, CoreAction> = (state, action): CoreState => {
   switch (action.type) {
     case START_LOADING_DOCUMENT: {
-      const { documentId, scale, rotation } = action.payload;
+      const { documentId, name, scale, rotation, passwordProvided } = action.payload;
 
       const newDocState: DocumentState = {
         id: documentId,
+        name,
         status: 'loading',
         loadingProgress: 0,
         error: null,
@@ -28,6 +30,7 @@ export const coreReducer: Reducer<CoreState, CoreAction> = (state, action): Core
         pages: [],
         scale: scale ?? state.defaultScale,
         rotation: rotation ?? state.defaultRotation,
+        passwordProvided: passwordProvided ?? false,
         loadStartedAt: Date.now(),
       };
 
@@ -37,7 +40,6 @@ export const coreReducer: Reducer<CoreState, CoreAction> = (state, action): Core
           ...state.documents,
           [documentId]: newDocState,
         },
-        // Set as active if no active document
         activeDocumentId: documentId,
       };
     }
@@ -78,6 +80,7 @@ export const coreReducer: Reducer<CoreState, CoreAction> = (state, action): Core
             error: null,
             errorCode: undefined,
             errorDetails: undefined,
+            passwordProvided: undefined,
             loadedAt: Date.now(),
           },
         },
@@ -106,7 +109,7 @@ export const coreReducer: Reducer<CoreState, CoreAction> = (state, action): Core
     }
 
     case RETRY_LOADING_DOCUMENT: {
-      const { documentId } = action.payload;
+      const { documentId, passwordProvided } = action.payload;
       const docState = state.documents[documentId];
 
       if (!docState || docState.status !== 'error') return state;
@@ -122,6 +125,7 @@ export const coreReducer: Reducer<CoreState, CoreAction> = (state, action): Core
             error: null,
             errorCode: undefined,
             errorDetails: undefined,
+            passwordProvided: passwordProvided ?? false,
             loadStartedAt: Date.now(),
           },
         },

@@ -24,6 +24,7 @@ import { PrintPluginPackage } from '@embedpdf/plugin-print/react';
 import { TabBar } from './components/tab-bar';
 import { ViewerToolbar } from './components/viewer-toolbar';
 import { LoadingSpinner } from './components/loading-spinner';
+import { DocumentPasswordPrompt } from './components/document-password-prompt';
 import { ConsoleLogger } from '@embedpdf/models';
 
 const logger = new ConsoleLogger();
@@ -99,13 +100,14 @@ export default function DocumentViewer() {
                         <div className="flex-1 overflow-hidden bg-white">
                           <DocumentContent documentId={activeDocumentId}>
                             {({ documentState, isLoading, isError, isLoaded }) => (
-                              <div className="flex h-full items-center justify-center">
-                                {isLoading && <LoadingSpinner message="Loading document..." />}
-                                {isError && (
-                                  <div className="rounded-lg bg-red-50 p-4 text-red-800">
-                                    <p className="font-medium">Error loading document</p>
-                                    <p className="mt-1 text-sm">{documentState.error}</p>
+                              <>
+                                {isLoading && (
+                                  <div className="flex h-full items-center justify-center">
+                                    <LoadingSpinner message="Loading document..." />
                                   </div>
+                                )}
+                                {isError && (
+                                  <DocumentPasswordPrompt documentState={documentState} />
                                 )}
                                 {isLoaded && (
                                   <div className="h-full w-full">
@@ -165,7 +167,7 @@ export default function DocumentViewer() {
                                     </GlobalPointerProvider>
                                   </div>
                                 )}
-                              </div>
+                              </>
                             )}
                           </DocumentContent>
                         </div>

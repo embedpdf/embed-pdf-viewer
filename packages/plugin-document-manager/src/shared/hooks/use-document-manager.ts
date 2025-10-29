@@ -1,5 +1,5 @@
-import { useEffect, useState } from '@framework';
-import { useCapability, usePlugin } from '@embedpdf/core/@framework';
+import { useEffect, useState, useMemo } from '@framework';
+import { useCapability, useCoreState, usePlugin } from '@embedpdf/core/@framework';
 import { DocumentManagerPlugin } from '@embedpdf/plugin-document-manager';
 import { DocumentState } from '@embedpdf/core';
 
@@ -42,70 +42,30 @@ export const useActiveDocument = () => {
  * Hook for all open documents (in order)
  */
 export const useOpenDocuments = () => {
+  const coreState = useCoreState();
   const { provides } = useDocumentManagerCapability();
-  const [documents, setDocuments] = useState<DocumentState[]>([]);
+  const [documentOrder, setDocumentOrder] = useState<string[]>([]);
 
   useEffect(() => {
     if (!provides) return;
 
-    const updateDocuments = () => {
-      setDocuments(provides.getOpenDocuments());
-    };
+    // Get initial order
+    setDocumentOrder(provides.getDocumentOrder());
 
-    updateDocuments();
-
-    const unsubOpen = provides.onDocumentOpened(updateDocuments);
-    const unsubClose = provides.onDocumentClosed(updateDocuments);
-    const unsubOrder = provides.onDocumentOrderChanged(updateDocuments);
-
-    return () => {
-      unsubOpen();
-      unsubClose();
-      unsubOrder();
-    };
+    // Subscribe ONLY to order changes - much cleaner!
+    return provides.onDocumentOrderChanged((event) => {
+      setDocumentOrder(event.order);
+    });
   }, [provides]);
 
+  // Map the order to actual document states from core
+  const documents = useMemo(() => {
+    if (!coreState) return [];
+
+    return documentOrder
+      .map((docId) => coreState.documents[docId])
+      .filter((doc): doc is DocumentState => doc !== null && doc !== undefined);
+  }, [coreState, documentOrder]);
+
   return documents;
-};
-
-/**
- * Hook for a specific document's info
- */
-export const useDocumentState = (documentId: string | null) => {
-  const { provides } = useDocumentManagerCapability();
-  const [documentState, setDocumentState] = useState<DocumentState | null>(null);
-
-  useEffect(() => {
-    if (!provides || !documentId) {
-      setDocumentState(null);
-      return;
-    }
-
-    const updateState = () => {
-      setDocumentState(provides.getDocumentState(documentId));
-    };
-
-    updateState();
-
-    const unsubOpen = provides.onDocumentOpened((info) => {
-      if (info.id === documentId) updateState();
-    });
-
-    const unsubClose = provides.onDocumentClosed((id) => {
-      if (id === documentId) setDocumentState(null);
-    });
-
-    // Add this subscription to handle error events
-    const unsubError = provides.onDocumentError((errorEvent) => {
-      if (errorEvent.documentId === documentId) updateState();
-    });
-
-    return () => {
-      unsubOpen();
-      unsubClose();
-      unsubError(); // Don't forget to unsubscribe
-    };
-  }, [provides, documentId]);
-
-  return documentState;
 };

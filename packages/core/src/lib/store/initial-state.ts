@@ -5,6 +5,7 @@ export type DocumentStatus = 'loading' | 'loaded' | 'error';
 
 export interface DocumentState {
   id: string;
+  name?: string;
   // Lifecycle status
   status: DocumentStatus;
 
@@ -15,6 +16,9 @@ export interface DocumentState {
   error: string | null;
   errorCode?: PdfErrorCode;
   errorDetails?: any;
+
+  // Track if this load attempt included a password
+  passwordProvided?: boolean;
 
   // Document data (null when loading or error)
   document: PdfDocumentObject | null;

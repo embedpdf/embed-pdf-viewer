@@ -1,5 +1,5 @@
 import { ReactNode } from '@framework';
-import { useDocumentState } from '../hooks';
+import { useDocumentState } from '@embedpdf/core/@framework';
 import { DocumentState } from '@embedpdf/core';
 
 export interface DocumentContentRenderProps {

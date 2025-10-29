@@ -45,8 +45,10 @@ export interface StartLoadingDocumentAction {
   type: typeof START_LOADING_DOCUMENT;
   payload: {
     documentId: string;
+    name?: string;
     scale?: number;
     rotation?: Rotation;
+    passwordProvided?: boolean;
   };
 }
 
@@ -80,6 +82,7 @@ export interface RetryLoadingDocumentAction {
   type: typeof RETRY_LOADING_DOCUMENT;
   payload: {
     documentId: string;
+    passwordProvided?: boolean;
   };
 }
 
@@ -178,11 +181,13 @@ export type CoreAction = DocumentAction;
 // ─────────────────────────────────────────────────────────
 export const startLoadingDocument = (
   documentId: string,
+  name?: string,
   scale?: number,
   rotation?: Rotation,
+  passwordProvided?: boolean,
 ): CoreAction => ({
   type: START_LOADING_DOCUMENT,
-  payload: { documentId, scale, rotation },
+  payload: { documentId, name, scale, rotation, passwordProvided },
 });
 
 export const updateDocumentLoadingProgress = (
@@ -208,9 +213,12 @@ export const setDocumentError = (
   payload: { documentId, error, errorCode, errorDetails },
 });
 
-export const retryLoadingDocument = (documentId: string): CoreAction => ({
+export const retryLoadingDocument = (
+  documentId: string,
+  passwordProvided?: boolean,
+): CoreAction => ({
   type: RETRY_LOADING_DOCUMENT,
-  payload: { documentId },
+  payload: { documentId, passwordProvided },
 });
 
 export const closeDocument = (

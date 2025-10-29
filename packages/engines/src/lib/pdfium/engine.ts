@@ -451,7 +451,6 @@ export class PdfiumEngine<T = Blob> implements PdfEngine<T> {
     // 2. create a PdfFile object
     const pdfFile: PdfFile = {
       id: file.id,
-      name: file.name,
       content: arrayBuf,
     };
 
@@ -601,7 +600,6 @@ export class PdfiumEngine<T = Blob> implements PdfEngine<T> {
 
     const pdfDoc: PdfDocumentObject = {
       id: file.id,
-      name: file.name,
       pageCount,
       pages,
     };
@@ -716,7 +714,6 @@ export class PdfiumEngine<T = Blob> implements PdfEngine<T> {
 
     const pdfDoc: PdfDocumentObject = {
       id: file.id,
-      name: file.name,
       pageCount,
       pages,
     };

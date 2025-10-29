@@ -111,34 +111,39 @@ export class DocumentManagerPlugin extends BasePlugin<
   // ─────────────────────────────────────────────────────────
 
   protected override onDocumentLoadingStarted(documentId: string): void {
-    // Add to document order
     this.dispatch(addToDocumentOrder(documentId));
+
+    // Emit order change event so hooks can update
+    this.documentOrderChanged$.emit({
+      order: this.state.documentOrder,
+    });
   }
 
   protected override onDocumentLoaded(documentId: string): void {
     const docState = this.coreState.core.documents[documentId];
-    if (!docState) return;
+    if (!docState || docState.status !== 'loaded') return;
 
-    // Only emit event when document is successfully loaded
-    if (docState.status === 'loaded') {
-      // Clean up load options to free memory
-      this.loadOptions.delete(documentId);
+    // Clean up load options to free memory
+    this.loadOptions.delete(documentId);
 
-      // Emit opened event with DocumentState directly
-      this.documentOpened$.emit(docState);
+    // Emit opened event with DocumentState directly
+    this.documentOpened$.emit(docState);
 
-      this.logger.info(
-        'DocumentManagerPlugin',
-        'DocumentOpened',
-        `Document ${documentId} opened successfully`,
-        { name: docState.document?.name },
-      );
-    }
+    this.logger.info(
+      'DocumentManagerPlugin',
+      'DocumentOpened',
+      `Document ${documentId} opened successfully`,
+      { name: docState.name },
+    );
   }
 
   protected override onDocumentClosed(documentId: string): void {
-    // Remove from order
     this.dispatch(removeFromDocumentOrder(documentId));
+
+    // Emit order change event so hooks can update
+    this.documentOrderChanged$.emit({
+      order: this.state.documentOrder,
+    });
 
     // Clean up load options
     this.loadOptions.delete(documentId);
@@ -152,12 +157,10 @@ export class DocumentManagerPlugin extends BasePlugin<
     previousId: string | null,
     currentId: string | null,
   ): void {
-    const event: DocumentChangeEvent = {
+    this.activeDocumentChanged$.emit({
       previousDocumentId: previousId,
       currentDocumentId: currentId,
-    };
-
-    this.activeDocumentChanged$.emit(event);
+    });
 
     this.logger.info(
       'DocumentManagerPlugin',
@@ -177,38 +180,41 @@ export class DocumentManagerPlugin extends BasePlugin<
   private openDocumentUrl(options: LoadDocumentUrlOptions): Task<string, PdfErrorReason> {
     const task = new Task<string, PdfErrorReason>();
 
-    // Check document limit
-    if (this.maxDocuments && this.getDocumentCount() >= this.maxDocuments) {
-      task.reject({
-        code: PdfErrorCode.Unknown,
-        message: `Maximum number of documents (${this.maxDocuments}) reached`,
-      });
+    const limitError = this.checkDocumentLimit();
+    if (limitError) {
+      task.reject(limitError);
       return task;
     }
 
     const documentId = options.documentId || this.generateDocumentId();
+    const documentName = this.extractNameFromUrl(options.url);
 
     // Store options for potential retry (will be cleared on success)
     this.loadOptions.set(documentId, options);
 
     // Immediately create loading state
-    this.dispatchCoreAction(startLoadingDocument(documentId, options.scale, options.rotation));
+    this.dispatchCoreAction(
+      startLoadingDocument(
+        documentId,
+        documentName,
+        options.scale,
+        options.rotation,
+        !!options.password,
+      ),
+    );
 
     this.logger.info(
       'DocumentManagerPlugin',
       'OpenDocumentUrl',
       `Starting to load document from URL: ${options.url}`,
-      { documentId },
+      { documentId, passwordProvided: !!options.password },
     );
 
-    // Create file object for engine
+    // Create file object and call engine
     const file: PdfFileUrl = {
       id: documentId,
-      name: this.extractNameFromUrl(options.url),
       url: options.url,
     };
-
-    // Call engine to load document
     const engineTask = this.engine.openDocumentUrl(file, {
       password: options.password,
       mode: options.mode,
@@ -216,41 +222,7 @@ export class DocumentManagerPlugin extends BasePlugin<
     });
 
     // Handle result
-    engineTask.wait(
-      (pdfDocument) => {
-        // Update to loaded state
-        this.dispatchCoreAction(setDocumentLoaded(documentId, pdfDocument));
-
-        task.resolve(documentId);
-      },
-      (error) => {
-        this.logger.error(
-          'DocumentManagerPlugin',
-          'OpenDocumentUrl',
-          'Failed to load document',
-          error,
-        );
-
-        // Update to error state (keep loadOptions for retry)
-        this.dispatchCoreAction(
-          setDocumentError(
-            documentId,
-            error.reason?.message || 'Failed to load document',
-            error.reason?.code,
-            error.reason,
-          ),
-        );
-
-        this.documentError$.emit({
-          documentId,
-          message: error.reason?.message || 'Failed to load document',
-          code: error.reason?.code,
-          reason: error.reason,
-        });
-
-        task.fail(error);
-      },
-    );
+    this.handleLoadTask(documentId, engineTask, task, 'OpenDocumentUrl');
 
     return task;
   }
@@ -258,11 +230,9 @@ export class DocumentManagerPlugin extends BasePlugin<
   private openDocumentBuffer(options: LoadDocumentBufferOptions): Task<string, PdfErrorReason> {
     const task = new Task<string, PdfErrorReason>();
 
-    if (this.maxDocuments && this.getDocumentCount() >= this.maxDocuments) {
-      task.reject({
-        code: PdfErrorCode.Unknown,
-        message: `Maximum number of documents (${this.maxDocuments}) reached`,
-      });
+    const limitError = this.checkDocumentLimit();
+    if (limitError) {
+      task.reject(limitError);
       return task;
     }
 
@@ -272,57 +242,34 @@ export class DocumentManagerPlugin extends BasePlugin<
     this.loadOptions.set(documentId, options);
 
     // Immediately create loading state
-    this.dispatchCoreAction(startLoadingDocument(documentId, options.scale, options.rotation));
+    this.dispatchCoreAction(
+      startLoadingDocument(
+        documentId,
+        options.name,
+        options.scale,
+        options.rotation,
+        !!options.password,
+      ),
+    );
 
     this.logger.info(
       'DocumentManagerPlugin',
       'OpenDocumentBuffer',
       `Starting to load document from buffer: ${options.name}`,
-      { documentId },
+      { documentId, passwordProvided: !!options.password },
     );
 
+    // Create file object and call engine
     const file: PdfFile = {
       id: documentId,
-      name: options.name,
       content: options.buffer,
     };
-
     const engineTask = this.engine.openDocumentBuffer(file, {
       password: options.password,
     });
 
-    engineTask.wait(
-      (pdfDocument) => {
-        this.dispatchCoreAction(setDocumentLoaded(documentId, pdfDocument));
-        task.resolve(documentId);
-      },
-      (error) => {
-        this.logger.error(
-          'DocumentManagerPlugin',
-          'OpenDocumentBuffer',
-          'Failed to load document',
-          error,
-        );
-
-        this.dispatchCoreAction(
-          setDocumentError(
-            documentId,
-            error.reason?.message || 'Failed to load document',
-            error.reason?.code,
-            error.reason,
-          ),
-        );
-
-        this.documentError$.emit({
-          documentId,
-          message: error.reason?.message || 'Failed to load document',
-          code: error.reason?.code,
-          reason: error.reason,
-        });
-
-        task.fail(error);
-      },
-    );
+    // Handle result
+    this.handleLoadTask(documentId, engineTask, task, 'OpenDocumentBuffer');
 
     return task;
   }
@@ -333,40 +280,14 @@ export class DocumentManagerPlugin extends BasePlugin<
   ): Task<string, PdfErrorReason> {
     const task = new Task<string, PdfErrorReason>();
 
-    const docState = this.coreState.core.documents[documentId];
-    if (!docState) {
-      task.reject({
-        code: PdfErrorCode.NotFound,
-        message: `Document ${documentId} not found`,
-      });
+    // Validate retry
+    const validation = this.validateRetry(documentId);
+    if (!validation.valid) {
+      task.reject(validation.error!);
       return task;
     }
 
-    // Check if document is already loaded successfully
-    if (docState.status === 'loaded') {
-      task.reject({
-        code: PdfErrorCode.Unknown,
-        message: `Document ${documentId} is already loaded successfully`,
-      });
-      return task;
-    }
-
-    if (docState.status !== 'error') {
-      task.reject({
-        code: PdfErrorCode.Unknown,
-        message: `Document ${documentId} is not in error state (current state: ${docState.status})`,
-      });
-      return task;
-    }
-
-    const originalOptions = this.loadOptions.get(documentId);
-    if (!originalOptions) {
-      task.reject({
-        code: PdfErrorCode.Unknown,
-        message: `No retry information available for document ${documentId}`,
-      });
-      return task;
-    }
+    const originalOptions = this.loadOptions.get(documentId)!;
 
     // Merge retry options (e.g., new password)
     const mergedOptions = {
@@ -378,87 +299,23 @@ export class DocumentManagerPlugin extends BasePlugin<
     this.loadOptions.set(documentId, mergedOptions);
 
     // Set back to loading state
-    this.dispatchCoreAction(retryLoadingDocument(documentId));
+    this.dispatchCoreAction(retryLoadingDocument(documentId, !!retryOptions?.password));
 
     this.logger.info(
       'DocumentManagerPlugin',
       'RetryDocument',
       `Retrying to load document ${documentId}`,
+      { passwordProvided: !!retryOptions?.password },
     );
 
-    // Retry the load
-    if ('url' in mergedOptions) {
-      const file: PdfFileUrl = {
-        id: documentId,
-        name: this.extractNameFromUrl(mergedOptions.url),
-        url: mergedOptions.url,
-      };
+    // Execute retry based on type
+    const engineTask =
+      'url' in mergedOptions
+        ? this.retryUrlDocument(documentId, mergedOptions)
+        : this.retryBufferDocument(documentId, mergedOptions);
 
-      const engineTask = this.engine.openDocumentUrl(file, {
-        password: mergedOptions.password,
-        mode: mergedOptions.mode,
-        headers: mergedOptions.headers,
-      });
-
-      engineTask.wait(
-        (pdfDocument) => {
-          this.dispatchCoreAction(setDocumentLoaded(documentId, pdfDocument));
-          task.resolve(documentId);
-        },
-        (error) => {
-          this.dispatchCoreAction(
-            setDocumentError(
-              documentId,
-              error.reason?.message || 'Failed to load document',
-              error.reason?.code,
-              error.reason,
-            ),
-          );
-          this.documentError$.emit({
-            documentId,
-            message: error.reason?.message || 'Failed to load document',
-            code: error.reason?.code,
-            reason: error.reason,
-          });
-          task.fail(error);
-        },
-      );
-    } else {
-      // Buffer retry
-      const file: PdfFile = {
-        id: documentId,
-        name: mergedOptions.name,
-        content: mergedOptions.buffer,
-      };
-
-      const engineTask = this.engine.openDocumentBuffer(file, {
-        password: mergedOptions.password,
-      });
-
-      engineTask.wait(
-        (pdfDocument) => {
-          this.dispatchCoreAction(setDocumentLoaded(documentId, pdfDocument));
-          task.resolve(documentId);
-        },
-        (error) => {
-          this.dispatchCoreAction(
-            setDocumentError(
-              documentId,
-              error.reason?.message || 'Failed to load document',
-              error.reason?.code,
-              error.reason,
-            ),
-          );
-          this.documentError$.emit({
-            documentId,
-            message: error.reason?.message || 'Failed to load document',
-            code: error.reason?.code,
-            reason: error.reason,
-          });
-          task.fail(error);
-        },
-      );
-    }
+    // Handle result
+    this.handleLoadTask(documentId, engineTask, task, 'RetryDocument');
 
     return task;
   }
@@ -466,58 +323,47 @@ export class DocumentManagerPlugin extends BasePlugin<
   private closeDocument(documentId: string): Task<void, PdfErrorReason> {
     const task = new Task<void, PdfErrorReason>();
 
-    const document = this.getDocument(documentId);
-    if (!document) {
+    const docState = this.getDocumentState(documentId);
+    if (!docState) {
       this.logger.warn(
         'DocumentManagerPlugin',
         'CloseDocument',
-        `Cannot close document ${documentId}: not open`,
+        `Cannot close document ${documentId}: not found in state`,
       );
       task.resolve();
       return task;
     }
 
-    // Determine next active document before closing
-    let nextActiveDocumentId: string | null | undefined = undefined;
-    const currentActiveId = this.coreState.core.activeDocumentId;
+    const nextActiveDocumentId = this.calculateNextActiveDocument(documentId);
 
-    // Only calculate if we're closing the currently active document
-    if (currentActiveId === documentId) {
-      const documentOrder = this.state.documentOrder;
-      const closingIndex = documentOrder.indexOf(documentId);
-
-      if (closingIndex !== -1) {
-        // Try to activate the document to the left (previous in array)
-        if (closingIndex > 0) {
-          nextActiveDocumentId = documentOrder[closingIndex - 1];
-        }
-        // If no document on the left, try the right (next in array)
-        else if (closingIndex < documentOrder.length - 1) {
-          nextActiveDocumentId = documentOrder[closingIndex + 1];
-        }
-        // If no other documents, set to null
-        else {
-          nextActiveDocumentId = null;
-        }
-      }
+    // Only call engine.closeDocument if the document is actually loaded
+    // For documents in error/loading state, just clean up the core state
+    if (docState.status === 'loaded' && docState.document) {
+      this.engine.closeDocument(docState.document).wait(
+        () => {
+          this.dispatchCoreAction(closeDocumentAction(documentId, nextActiveDocumentId));
+          task.resolve();
+        },
+        (error) => {
+          this.logger.error(
+            'DocumentManagerPlugin',
+            'CloseDocument',
+            `Failed to close document ${documentId}`,
+            error,
+          );
+          task.fail(error);
+        },
+      );
+    } else {
+      // Document is not loaded (error, loading, etc.), just clean up state
+      this.logger.info(
+        'DocumentManagerPlugin',
+        'CloseDocument',
+        `Closing document ${documentId} in ${docState.status} state (skipping engine close)`,
+      );
+      this.dispatchCoreAction(closeDocumentAction(documentId, nextActiveDocumentId));
+      task.resolve();
     }
-
-    this.engine.closeDocument(document).wait(
-      () => {
-        // Single action with next active document
-        this.dispatchCoreAction(closeDocumentAction(documentId, nextActiveDocumentId));
-        task.resolve();
-      },
-      (error) => {
-        this.logger.error(
-          'DocumentManagerPlugin',
-          'CloseDocument',
-          `Failed to close document ${documentId}`,
-          error,
-        );
-        task.fail(error);
-      },
-    );
 
     return task;
   }
@@ -620,7 +466,6 @@ export class DocumentManagerPlugin extends BasePlugin<
   }
 
   private getOpenDocuments(): DocumentState[] {
-    // Return in order
     return this.state.documentOrder
       .map((documentId) => this.getDocumentState(documentId))
       .filter((state): state is DocumentState => state !== null);
@@ -639,13 +484,187 @@ export class DocumentManagerPlugin extends BasePlugin<
   }
 
   // ─────────────────────────────────────────────────────────
-  // Helpers
+  // Helper Methods
   // ─────────────────────────────────────────────────────────
 
+  /**
+   * Check if the document limit has been reached
+   */
+  private checkDocumentLimit(): PdfErrorReason | null {
+    if (this.maxDocuments && this.getDocumentCount() >= this.maxDocuments) {
+      return {
+        code: PdfErrorCode.Unknown,
+        message: `Maximum number of documents (${this.maxDocuments}) reached`,
+      };
+    }
+    return null;
+  }
+
+  /**
+   * Validate if a document can be retried
+   */
+  private validateRetry(documentId: string): {
+    valid: boolean;
+    error?: PdfErrorReason;
+  } {
+    const docState = this.coreState.core.documents[documentId];
+
+    if (!docState) {
+      return {
+        valid: false,
+        error: {
+          code: PdfErrorCode.NotFound,
+          message: `Document ${documentId} not found`,
+        },
+      };
+    }
+
+    if (docState.status === 'loaded') {
+      return {
+        valid: false,
+        error: {
+          code: PdfErrorCode.Unknown,
+          message: `Document ${documentId} is already loaded successfully`,
+        },
+      };
+    }
+
+    if (docState.status !== 'error') {
+      return {
+        valid: false,
+        error: {
+          code: PdfErrorCode.Unknown,
+          message: `Document ${documentId} is not in error state (current state: ${docState.status})`,
+        },
+      };
+    }
+
+    if (!this.loadOptions.has(documentId)) {
+      return {
+        valid: false,
+        error: {
+          code: PdfErrorCode.Unknown,
+          message: `No retry information available for document ${documentId}`,
+        },
+      };
+    }
+
+    return { valid: true };
+  }
+
+  /**
+   * Retry loading a URL-based document
+   */
+  private retryUrlDocument(
+    documentId: string,
+    options: LoadDocumentUrlOptions,
+  ): Task<PdfDocumentObject, PdfErrorReason> {
+    const file: PdfFileUrl = {
+      id: documentId,
+      url: options.url,
+    };
+
+    return this.engine.openDocumentUrl(file, {
+      password: options.password,
+      mode: options.mode,
+      headers: options.headers,
+    });
+  }
+
+  /**
+   * Retry loading a buffer-based document
+   */
+  private retryBufferDocument(
+    documentId: string,
+    options: LoadDocumentBufferOptions,
+  ): Task<PdfDocumentObject, PdfErrorReason> {
+    const file: PdfFile = {
+      id: documentId,
+      content: options.buffer,
+    };
+
+    return this.engine.openDocumentBuffer(file, {
+      password: options.password,
+    });
+  }
+
+  /**
+   * Handle the result of a document load task
+   */
+  private handleLoadTask(
+    documentId: string,
+    engineTask: Task<PdfDocumentObject, PdfErrorReason>,
+    parentTask: Task<string, PdfErrorReason>,
+    context: string,
+  ): void {
+    engineTask.wait(
+      (pdfDocument) => {
+        this.dispatchCoreAction(setDocumentLoaded(documentId, pdfDocument));
+        parentTask.resolve(documentId);
+      },
+      (error) => {
+        this.handleLoadError(documentId, error, context);
+        parentTask.fail(error);
+      },
+    );
+  }
+
+  /**
+   * Handle document loading errors consistently
+   */
+  private handleLoadError(documentId: string, error: any, context: string): void {
+    const errorMessage = error.reason?.message || 'Failed to load document';
+
+    this.logger.error('DocumentManagerPlugin', context, 'Failed to load document', error);
+
+    this.dispatchCoreAction(
+      setDocumentError(documentId, errorMessage, error.reason?.code, error.reason),
+    );
+
+    this.documentError$.emit({
+      documentId,
+      message: errorMessage,
+      code: error.reason?.code,
+      reason: error.reason,
+    });
+  }
+
+  /**
+   * Calculate the next active document when closing a document
+   */
+  private calculateNextActiveDocument(closingDocumentId: string): string | null | undefined {
+    const currentActiveId = this.coreState.core.activeDocumentId;
+
+    // Only calculate if we're closing the active document
+    if (currentActiveId !== closingDocumentId) {
+      return undefined;
+    }
+
+    const documentOrder = this.state.documentOrder;
+    const closingIndex = documentOrder.indexOf(closingDocumentId);
+
+    if (closingIndex === -1) return undefined;
+
+    // Try left first, then right, then null
+    if (closingIndex > 0) {
+      return documentOrder[closingIndex - 1];
+    } else if (closingIndex < documentOrder.length - 1) {
+      return documentOrder[closingIndex + 1];
+    } else {
+      return null;
+    }
+  }
+
+  /**
+   * Generate a unique document ID
+   */
   private generateDocumentId(): string {
     return `doc-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
   }
 
+  /**
+   * Extract filename from URL
+   */
   private extractNameFromUrl(url: string): string {
     try {
       const urlObj = new URL(url);

@@ -44,12 +44,7 @@ export function TabBar({
 
             {/* Document Name */}
             <span className="min-w-0 flex-1 truncate">
-              {(() => {
-                const doc = document.document as unknown;
-                const hasName = !!doc && typeof doc === 'object' && 'name' in (doc as object);
-                const name = hasName ? (doc as { name?: string }).name : undefined;
-                return name ?? `Document ${document.id.slice(0, 8)}`;
-              })()}
+              {document.name ?? `Document ${document.id.slice(0, 8)}`}
             </span>
 
             {/* Close Button */}
@@ -58,11 +53,7 @@ export function TabBar({
                 e.stopPropagation();
                 onClose(document.id);
               }}
-              aria-label={`Close ${(() => {
-                const doc = document.document as unknown;
-                const hasName = !!doc && typeof doc === 'object' && 'name' in (doc as object);
-                return hasName ? ((doc as { name?: string }).name ?? 'document') : 'document';
-              })()}`}
+              aria-label={`Close ${document.name ?? 'document'}`}
               className={`flex-shrink-0 cursor-pointer rounded-full p-1 transition-all hover:bg-gray-300/50 ${
                 // Show close always unless the tab is compact and not active
                 activeDocumentId === document.id

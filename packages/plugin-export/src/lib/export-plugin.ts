@@ -84,7 +84,7 @@ export class ExportPlugin extends BasePlugin<ExportPluginConfig, ExportCapabilit
       (result) => {
         task.resolve({
           buffer: result,
-          name: coreDoc.document!.name ?? this.config.defaultFileName,
+          name: coreDoc.name ?? this.config.defaultFileName,
         });
       },
       (error) => task.fail(error),
