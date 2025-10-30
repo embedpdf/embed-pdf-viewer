@@ -10,7 +10,7 @@ export const manifest: PluginManifest<ZoomPluginConfig> = {
   version: '1.0.0',
   provides: ['zoom'],
   requires: ['viewport', 'scroll'],
-  optional: ['interaction-manager'],
+  optional: ['interaction-manager', 'spread'],
   defaultConfig: {
     enabled: true,
     defaultZoomLevel: ZoomMode.Automatic,

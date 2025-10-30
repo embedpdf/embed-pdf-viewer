@@ -1258,9 +1258,6 @@ importers:
       '@embedpdf/core':
         specifier: workspace:*
         version: link:../core
-      '@embedpdf/plugin-loader':
-        specifier: workspace:*
-        version: link:../plugin-loader
       '@types/react':
         specifier: ^18.2.0
         version: 18.3.26
@@ -1508,6 +1505,9 @@ importers:
       '@embedpdf/plugin-scroll':
         specifier: workspace:*
         version: link:../plugin-scroll
+      '@embedpdf/plugin-spread':
+        specifier: workspace:*
+        version: link:../plugin-spread
       '@embedpdf/plugin-viewport':
         specifier: workspace:*
         version: link:../plugin-viewport

@@ -37,6 +37,7 @@ import {
   InteractionManagerCapability,
   InteractionManagerPlugin,
 } from '@embedpdf/plugin-interaction-manager';
+import { SpreadCapability, SpreadPlugin } from '@embedpdf/plugin-spread';
 import { Rect, rotateRect } from '@embedpdf/models';
 import { createMarqueeHandler } from './handlers';
 import { initialDocumentState } from './reducer';
@@ -55,6 +56,7 @@ export class ZoomPlugin extends BasePlugin<
   private readonly viewportPlugin: ViewportPlugin;
   private readonly scroll: ScrollCapability;
   private readonly interactionManager: InteractionManagerCapability | null;
+  private readonly spread: SpreadCapability | null;
   private readonly presets: ZoomPreset[];
   private readonly zoomRanges: ZoomRangeStep[];
   private readonly defaultZoomLevel: ZoomMode | number;
@@ -71,6 +73,8 @@ export class ZoomPlugin extends BasePlugin<
     this.scroll = registry.getPlugin<ScrollPlugin>('scroll')!.provides();
     const interactionManager = registry.getPlugin<InteractionManagerPlugin>('interaction-manager');
     this.interactionManager = interactionManager?.provides() ?? null;
+    const spread = registry.getPlugin<SpreadPlugin>('spread');
+    this.spread = spread?.provides() ?? null;
 
     this.minZoom = cfg.minZoom ?? 0.25;
     this.maxZoom = cfg.maxZoom ?? 10;
@@ -84,6 +88,11 @@ export class ZoomPlugin extends BasePlugin<
       (event) => this.recalcAuto(event.documentId, VerticalZoomFocus.Top),
       { mode: 'debounce', wait: 150 },
     );
+
+    // Subscribe to spread changes
+    this.spread?.onSpreadChange((event) => {
+      this.recalcAuto(event.documentId, VerticalZoomFocus.Top);
+    });
 
     // Register marquee zoom mode
     this.interactionManager?.registerMode({
