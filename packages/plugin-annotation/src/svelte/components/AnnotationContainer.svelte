@@ -67,7 +67,7 @@
     let annotationCapability = useAnnotationCapability();
     let gestureBaseRef = $state<T | null>(null);
 
-    const currentObject = preview ? { ...trackedAnnotation.object, ...preview } : trackedAnnotation.object
+    const currentObject = $derived(preview ? { ...trackedAnnotation.object, ...preview } : trackedAnnotation.object);
 
     // Defaults retain current behavior
     const HANDLE_COLOR = $derived(resizeUI?.color ?? '#007ACC');
@@ -75,7 +75,7 @@
     const HANDLE_SIZE = $derived(resizeUI?.size ?? 12);
     const VERTEX_SIZE = $derived(vertexUI?.size ?? 12);
 
-    const interactionHandles = useInteractionHandles({
+    const interactionHandles = $derived(useInteractionHandles({
         controller: {
             element: currentObject.rect,
             vertices: vertexConfig?.extractVertices(currentObject),
@@ -133,7 +133,7 @@
             zIndex: zIndex + 2,
         },
         includeVertices: vertexConfig ? true : false,
-    });
+    }));
 
 
 

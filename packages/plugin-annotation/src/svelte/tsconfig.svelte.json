@@ -4,7 +4,7 @@
     "baseUrl": "../..",
     "types": ["svelte"],
     "paths": {
-      "@embedpdf/plugin-zoom": ["src/lib/index.ts"]
+      "@embedpdf/plugin-annotation": ["src/lib/index.ts"]
     }
   },
   "include": ["./**/*.ts", "./**/*.svelte"]

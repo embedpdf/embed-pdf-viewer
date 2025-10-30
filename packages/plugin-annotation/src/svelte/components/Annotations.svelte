@@ -19,7 +19,7 @@
     type TrackedAnnotation,
   } from '@embedpdf/plugin-annotation';
 
-  import {PointerEventHandlers, PointerEventHandlersWithLifecycle} from '@embedpdf/plugin-interaction-manager';
+  import { type PointerEventHandlersWithLifecycle } from '@embedpdf/plugin-interaction-manager';
   import { usePointerHandlers } from '@embedpdf/plugin-interaction-manager/svelte';
   import { useSelectionCapability } from '@embedpdf/plugin-selection/svelte';
 
@@ -129,12 +129,7 @@
       {...annotationsProps}
     >
       {#snippet children(obj)}
-        <Ink
-          {...obj}
-          {isSelected}
-          {scale}
-          onClick={(e) => handleClick(e, annotation)}
-        />
+        <Ink {...obj} {isSelected} {scale} onClick={(e) => handleClick(e, annotation)} />
       {/snippet}
     </AnnotationContainer>
   {:else if isSquare(annotation)}
