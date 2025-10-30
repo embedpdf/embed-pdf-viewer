@@ -34,7 +34,7 @@ export function useInteractionHandles(opts: {
     vertexAttrs,
   } = opts;
 
-  const { dragProps, createResizeProps, createVertexProps } = $derived(useDragResize(controller));
+  const dragResize = useDragResize(controller);
 
   // Resize handles: computed from controller config
   const resize = $derived.by((): HandleElementProps[] => {
@@ -42,7 +42,7 @@ export function useInteractionHandles(opts: {
     return desc.map((d) => ({
       key: d.attrs?.['data-epdf-handle'] as string,
       style: d.style as Record<string, any>,
-      ...createResizeProps(d.handle),
+      ...dragResize.createResizeProps(d.handle),
       ...(d.attrs ?? {}),
       ...(handleAttrs?.(d.handle) ?? {}),
     }));
@@ -55,7 +55,7 @@ export function useInteractionHandles(opts: {
     return desc.map((d, i) => ({
       key: i,
       style: d.style as Record<string, any>,
-      ...createVertexProps(i),
+      ...dragResize.createVertexProps(i),
       ...(d.attrs ?? {}),
       ...(vertexAttrs?.(i) ?? {}),
     }));
@@ -63,7 +63,7 @@ export function useInteractionHandles(opts: {
 
   return {
     get dragProps() {
-      return dragProps;
+      return dragResize.dragProps;
     },
     get resize() {
       return resize;

@@ -21,12 +21,11 @@ export function useDragResize(options: UseDragResizeOptions) {
   const { onUpdate, enabled = true, ...config } = options;
 
   let controller = $state<DragResizeController | null>(null);
-  let currentOnUpdate = $derived<typeof onUpdate>(onUpdate);
 
   // Initialize or update controller
   $effect(() => {
     if (!controller) {
-      controller = new DragResizeController(config, (event) => currentOnUpdate?.(event));
+      controller = new DragResizeController(config, (event) => onUpdate?.(event));
     } else {
       controller.updateConfig(config);
     }

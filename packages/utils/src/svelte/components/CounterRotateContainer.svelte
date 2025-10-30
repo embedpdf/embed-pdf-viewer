@@ -23,7 +23,7 @@ interface $$Props extends CounterRotateProps {
 
 
 let { rect, rotation, children } = $props();
-const { matrix, width, height } = getCounterRotation(rect, rotation);
+const counterRotation = $derived(getCounterRotation(rect, rotation));  
 let elementRef = $state<HTMLDivElement | null>(null);
 
 // Use native event listeners with capture phase to prevent event propagation
@@ -57,34 +57,34 @@ $effect(() => {
     };
 });
 
-const menuWrapperStyle = {
+const menuWrapperStyle = $derived({
     position: 'absolute',
     left: rect.origin.x,
     top: rect.origin.y,
-    transform: matrix,
+    transform: counterRotation.matrix,
     transformOrigin: '0 0',
-    width: width,
-    height: height,
+    width: counterRotation.width,
+    height:counterRotation.height,
     pointerEvents: 'none',
     zIndex: 3,
-};
+});
 
-const menuWrapperProps: MenuWrapperProps = {
+const menuWrapperProps: MenuWrapperProps = $derived({
     style: menuWrapperStyle,
     ref: (el: HTMLDivElement | null) => {
         elementRef = el;
     },
-};
+});
 
 </script>
 
 
     {@render children({
     menuWrapperProps,
-    matrix,
+    matrix : counterRotation.matrix,
     rect: {
     origin: { x: rect.origin.x, y: rect.origin.y },
-    size: { width: width, height: height },
+    size: { width: counterRotation.width, height: counterRotation.height },
 },
 })}
 
