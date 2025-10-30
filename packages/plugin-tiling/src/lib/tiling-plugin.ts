@@ -84,7 +84,7 @@ export class TilingPlugin extends BasePlugin<TilingPluginConfig, TilingCapabilit
   }
 
   async recalculateTiles(payload: RefreshPagesAction['payload']): Promise<void> {
-    const { documentId, pageNumbers } = payload;
+    const { documentId, pageIndexes } = payload;
     const coreDoc = this.getCoreDocument(documentId);
     if (!coreDoc || !coreDoc.document) return;
 
@@ -98,8 +98,7 @@ export class TilingPlugin extends BasePlugin<TilingPluginConfig, TilingCapabilit
     const scale = coreDoc.scale;
     const rotation = coreDoc.rotation;
 
-    for (const pageNumber of pageNumbers) {
-      const pageIndex = pageNumber - 1;
+    for (const pageIndex of pageIndexes) {
       const metric = currentMetrics.pageVisibilityMetrics.find(
         (m) => m.pageNumber === pageIndex + 1,
       );

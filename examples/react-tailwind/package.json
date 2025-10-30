@@ -29,6 +29,7 @@
     "@embedpdf/plugin-thumbnail": "workspace:*",
     "@embedpdf/plugin-selection": "workspace:*",
     "@embedpdf/plugin-print": "workspace:*",
+    "@embedpdf/plugin-redaction": "workspace:*",
     "@embedpdf/models": "workspace:*",
     "@embedpdf/pdfium": "workspace:*",
     "@embedpdf/engines": "workspace:*",

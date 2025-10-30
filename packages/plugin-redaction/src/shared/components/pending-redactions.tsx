@@ -7,6 +7,7 @@ import { SelectionMenuProps } from './types';
 import { Rotation } from '@embedpdf/models';
 
 interface PendingRedactionsProps {
+  documentId: string;
   pageIndex: number;
   scale: number;
   rotation: Rotation;
@@ -15,6 +16,7 @@ interface PendingRedactionsProps {
 }
 
 export function PendingRedactions({
+  documentId,
   pageIndex,
   scale,
   bboxStroke = 'rgba(0,0,0,0.8)',
@@ -27,23 +29,38 @@ export function PendingRedactions({
 
   useEffect(() => {
     if (!redaction) return;
-    const off1 = redaction.onPendingChange((map) => setItems(map[pageIndex] ?? []));
-    const off2 = redaction.onSelectedChange((sel) => {
+
+    // Use document-scoped hooks so we only receive events for this document
+    const scoped = redaction.forDocument(documentId);
+
+    // Initialize with current state
+    const currentState = scoped.getState();
+    setItems(currentState.pending[pageIndex] ?? []);
+    setSelectedId(
+      currentState.selected && currentState.selected.page === pageIndex
+        ? currentState.selected.id
+        : null,
+    );
+
+    // Subscribe to future changes
+    const off1 = scoped.onPendingChange((map) => setItems(map[pageIndex] ?? []));
+    const off2 = scoped.onSelectedChange((sel) => {
       setSelectedId(sel && sel.page === pageIndex ? sel.id : null);
     });
+
     return () => {
       off1?.();
       off2?.();
     };
-  }, [redaction, pageIndex]);
+  }, [redaction, documentId, pageIndex]);
 
   const select = useCallback(
     (e: MouseEvent | TouchEvent, id: string) => {
       e.stopPropagation();
       if (!redaction) return;
-      redaction.selectPending(pageIndex, id);
+      redaction.forDocument(documentId).selectPending(pageIndex, id);
     },
-    [redaction, pageIndex],
+    [redaction, documentId, pageIndex],
   );
 
   if (!items.length) return null;
@@ -93,7 +110,7 @@ export function PendingRedactions({
             </Fragment>
           );
         }
-        // kind === 'text' → draw bounding box; inner rects are not drawn here to avoid clutter.
+
         const b = it.rect;
         return (
           <Fragment key={it.id}>

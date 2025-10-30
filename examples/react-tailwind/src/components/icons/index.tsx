@@ -408,6 +408,22 @@ export function RefreshIcon({ className, title }: IconProps) {
   );
 }
 
+export function CheckIcon({ className, title }: IconProps) {
+  return (
+    <svg
+      className={className}
+      fill="none"
+      stroke="currentColor"
+      viewBox="0 0 24 24"
+      aria-hidden={!title}
+      role={title ? 'img' : 'presentation'}
+    >
+      {title ? <title>{title}</title> : null}
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+    </svg>
+  );
+}
+
 export function SearchIcon({ className, title }: IconProps) {
   return (
     <svg

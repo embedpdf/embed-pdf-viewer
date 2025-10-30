@@ -236,6 +236,9 @@ importers:
       '@embedpdf/plugin-print':
         specifier: workspace:*
         version: link:../../packages/plugin-print
+      '@embedpdf/plugin-redaction':
+        specifier: workspace:*
+        version: link:../../packages/plugin-redaction
       '@embedpdf/plugin-render':
         specifier: workspace:*
         version: link:../../packages/plugin-render

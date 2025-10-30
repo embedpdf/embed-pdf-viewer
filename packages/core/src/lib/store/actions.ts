@@ -115,7 +115,7 @@ export interface RefreshPagesAction {
   type: typeof REFRESH_PAGES;
   payload: {
     documentId: string;
-    pageNumbers: number[];
+    pageIndexes: number[];
   };
 }
 
@@ -239,9 +239,9 @@ export const refreshDocument = (documentId: string, document: PdfDocumentObject)
   payload: { documentId, document },
 });
 
-export const refreshPages = (documentId: string, pageNumbers: number[]): CoreAction => ({
+export const refreshPages = (documentId: string, pageIndexes: number[]): CoreAction => ({
   type: REFRESH_PAGES,
-  payload: { documentId, pageNumbers },
+  payload: { documentId, pageIndexes },
 });
 
 export const setPages = (documentId: string, pages: PdfPageObject[][]): CoreAction => ({

@@ -21,6 +21,7 @@ import { SpreadMode, SpreadPluginPackage } from '@embedpdf/plugin-spread/react';
 import { Rotate, RotatePluginPackage } from '@embedpdf/plugin-rotate/react';
 import { RenderLayer, RenderPluginPackage } from '@embedpdf/plugin-render/react';
 import { TilingLayer, TilingPluginPackage } from '@embedpdf/plugin-tiling/react';
+import { RedactionLayer, RedactionPluginPackage } from '@embedpdf/plugin-redaction/react';
 import { ExportPluginPackage } from '@embedpdf/plugin-export/react';
 import { PrintPluginPackage } from '@embedpdf/plugin-print/react';
 import { SelectionLayer, SelectionPluginPackage } from '@embedpdf/plugin-selection/react';
@@ -43,6 +44,9 @@ type SidebarState = {
   thumbnails: boolean;
 };
 
+// Type for tracking toolbar mode per document
+type ViewMode = 'view' | 'redact';
+
 export default function DocumentViewer() {
   const containerRef = useRef<HTMLDivElement>(null);
   const { engine, isLoading, error } = usePdfiumEngine({
@@ -51,6 +55,9 @@ export default function DocumentViewer() {
 
   // Track sidebar state per document
   const [sidebarStates, setSidebarStates] = useState<Record<string, SidebarState>>({});
+
+  // Track toolbar mode per document
+  const [toolbarModes, setToolbarModes] = useState<Record<string, ViewMode>>({});
 
   const plugins = useMemo(
     () => [
@@ -80,6 +87,7 @@ export default function DocumentViewer() {
       }),
       createPluginRegistration(SelectionPluginPackage),
       createPluginRegistration(SearchPluginPackage),
+      createPluginRegistration(RedactionPluginPackage),
       createPluginRegistration(ThumbnailPluginPackage, {
         width: 120,
         paddingY: 10,
@@ -100,6 +108,17 @@ export default function DocumentViewer() {
 
   const getSidebarState = (documentId: string): SidebarState => {
     return sidebarStates[documentId] || { search: false, thumbnails: false };
+  };
+
+  const getToolbarMode = (documentId: string): ViewMode => {
+    return toolbarModes[documentId] || 'view';
+  };
+
+  const setToolbarMode = (documentId: string, mode: ViewMode) => {
+    setToolbarModes((prev) => ({
+      ...prev,
+      [documentId]: mode,
+    }));
   };
 
   if (error) {
@@ -144,6 +163,8 @@ export default function DocumentViewer() {
                           onToggleThumbnails={() => toggleSidebar(activeDocumentId, 'thumbnails')}
                           isSearchOpen={getSidebarState(activeDocumentId).search}
                           isThumbnailsOpen={getSidebarState(activeDocumentId).thumbnails}
+                          mode={getToolbarMode(activeDocumentId)}
+                          onModeChange={(mode) => setToolbarMode(activeDocumentId, mode)}
                         />
                       )}
 
@@ -210,6 +231,10 @@ export default function DocumentViewer() {
                                                     pageIndex={pageIndex}
                                                   />
                                                   <SelectionLayer
+                                                    documentId={activeDocumentId}
+                                                    pageIndex={pageIndex}
+                                                  />
+                                                  <RedactionLayer
                                                     documentId={activeDocumentId}
                                                     pageIndex={pageIndex}
                                                   />

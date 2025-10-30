@@ -90,14 +90,14 @@ export class SelectionPlugin extends BasePlugin<
     this.interactionManagerCapability = imPlugin.provides();
 
     this.coreStore.onAction(REFRESH_PAGES, (action) => {
-      const { documentId, pageNumbers } = action.payload;
-      const tasks = pageNumbers.map((pageNumber) =>
-        this.getNewPageGeometryAndCache(documentId, pageNumber - 1),
+      const { documentId, pageIndexes } = action.payload;
+      const tasks = pageIndexes.map((pageIndex) =>
+        this.getNewPageGeometryAndCache(documentId, pageIndex),
       );
       Task.all(tasks).wait(() => {
         // Notify affected pages about geometry updates
-        pageNumbers.forEach((pageNumber) => {
-          this.notifyPage(documentId, pageNumber - 1);
+        pageIndexes.forEach((pageIndex) => {
+          this.notifyPage(documentId, pageIndex);
         });
       }, ignore);
     });
@@ -311,9 +311,7 @@ export class SelectionPlugin extends BasePlugin<
     if (callback) {
       const docState = this.getDocumentState(documentId);
       const mode = this.interactionManagerCapability.forDocument(documentId).getActiveMode();
-      const enabledModes = this.enabledModesPerDoc.get(documentId);
-
-      if (enabledModes?.has(mode)) {
+      if (mode === 'pointerMode') {
         callback({
           rects: selector.selectRectsForPage(docState, pageIndex),
           boundingRect: selector.selectBoundingRectForPage(docState, pageIndex),

@@ -211,15 +211,14 @@ export const coreReducer: Reducer<CoreState, CoreAction> = (state, action): Core
     }
 
     case REFRESH_PAGES: {
-      const { documentId, pageNumbers } = action.payload;
+      const { documentId, pageIndexes } = action.payload;
       const docState = state.documents[documentId];
 
       if (!docState) return state;
 
       // Convert 1-based page numbers to 0-based indices and increment versions
       const newVersions = { ...docState.pageRefreshVersions };
-      for (const pageNumber of pageNumbers) {
-        const pageIndex = pageNumber - 1; // Convert to 0-based
+      for (const pageIndex of pageIndexes) {
         newVersions[pageIndex] = (newVersions[pageIndex] || 0) + 1;
       }
 

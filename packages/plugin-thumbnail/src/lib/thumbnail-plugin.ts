@@ -64,14 +64,14 @@ export class ThumbnailPlugin extends BasePlugin<
 
     this.coreStore.onAction(REFRESH_PAGES, (action) => {
       const documentId = action.payload.documentId ?? this.getActiveDocumentId();
-      const pages = action.payload.pageNumbers;
+      const pages = action.payload.pageIndexes;
 
       this.refreshPages$.emit({ documentId, pages });
 
       const taskCache = this.taskCaches.get(documentId);
       if (taskCache) {
-        for (const pageIdx of pages) {
-          taskCache.delete(pageIdx);
+        for (const pageIndex of pages) {
+          taskCache.delete(pageIndex);
         }
       }
     });
