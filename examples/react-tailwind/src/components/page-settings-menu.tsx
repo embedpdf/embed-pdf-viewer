@@ -9,6 +9,7 @@ import {
   SinglePageIcon,
   BookOpenIcon,
 } from './icons';
+import { ToolbarButton } from './toolbar-button';
 
 type PageSettingsMenuProps = {
   documentId: string;
@@ -23,19 +24,14 @@ export function PageSettingsMenu({ documentId }: PageSettingsMenuProps) {
 
   return (
     <div className="relative">
-      <button
+      <ToolbarButton
         onClick={() => setIsOpen(!isOpen)}
-        className={`flex h-8 w-8 items-center justify-center rounded border transition-colors ${
-          isOpen
-            ? 'border-gray-400 bg-gray-100 text-gray-800'
-            : 'border-gray-300 bg-white text-gray-700 hover:border-gray-400 hover:bg-gray-50'
-        }`}
-        aria-pressed={isOpen}
+        isActive={isOpen}
         aria-label="Page Settings"
         title="Page Settings"
       >
         <SettingsIcon className="h-4 w-4" />
-      </button>
+      </ToolbarButton>
 
       {/* Dropdown Menu */}
       {isOpen && (

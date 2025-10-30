@@ -1,4 +1,4 @@
-import { BasePluginConfig } from '@embedpdf/core';
+import { BasePluginConfig, EventHook } from '@embedpdf/core';
 import { PdfErrorReason, Task } from '@embedpdf/models';
 import type { ScrollBehavior } from '@embedpdf/plugin-scroll';
 
@@ -54,8 +54,59 @@ export interface WindowState {
   totalHeight: number; // full scroll height
 }
 
-export interface ThumbnailCapability {
+// Per-document thumbnail state
+export interface ThumbnailDocumentState {
+  thumbs: ThumbMeta[];
+  window: WindowState | null;
+  viewportH: number;
+  scrollY: number;
+}
+
+// Plugin state
+export interface ThumbnailState {
+  documents: Record<string, ThumbnailDocumentState>;
+  activeDocumentId: string | null;
+}
+
+// Events include documentId
+export interface WindowChangeEvent {
+  documentId: string;
+  window: WindowState | null;
+}
+
+export interface ScrollToEvent {
+  documentId: string;
+  options: ScrollToOptions;
+}
+
+export interface RefreshPagesEvent {
+  documentId: string;
+  pages: number[];
+}
+
+// Scoped thumbnail capability
+export interface ThumbnailScope {
   scrollToThumb(pageIdx: number): void;
-  /** lazily render one thumb */
   renderThumb(pageIdx: number, dpr: number): Task<Blob, PdfErrorReason>;
+  updateWindow(scrollY: number, viewportH: number): void;
+  getWindow(): WindowState | null;
+  onWindow: EventHook<WindowState | null>;
+  onScrollTo: EventHook<ScrollToOptions>;
+  onRefreshPages: EventHook<number[]>;
+}
+
+export interface ThumbnailCapability {
+  // Active document operations
+  scrollToThumb(pageIdx: number): void;
+  renderThumb(pageIdx: number, dpr: number): Task<Blob, PdfErrorReason>;
+  updateWindow(scrollY: number, viewportH: number): void;
+  getWindow(): WindowState | null;
+
+  // Document-scoped operations
+  forDocument(documentId: string): ThumbnailScope;
+
+  // Events (include documentId)
+  onWindow: EventHook<WindowChangeEvent>;
+  onScrollTo: EventHook<ScrollToEvent>;
+  onRefreshPages: EventHook<RefreshPagesEvent>;
 }

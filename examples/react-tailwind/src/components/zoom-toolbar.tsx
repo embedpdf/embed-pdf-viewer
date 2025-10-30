@@ -68,11 +68,11 @@ export function ZoomToolbar({ documentId }: ZoomToolbarProps) {
 
   return (
     <div className="relative">
-      <div className="flex items-center gap-1 rounded border border-gray-300 bg-white px-2 py-1">
+      <div className="flex items-center gap-1 rounded bg-gray-100 px-2 py-1">
         {/* Zoom Out Button */}
         <button
           onClick={handleZoomOut}
-          className="rounded p-1 text-gray-600 transition-colors hover:bg-gray-100 hover:text-gray-900"
+          className="rounded p-1 text-gray-600 transition-colors hover:bg-gray-200 hover:text-gray-900"
           aria-label="Zoom out"
         >
           <SearchMinusIcon className="h-4 w-4" title="Zoom Out" />
@@ -81,7 +81,7 @@ export function ZoomToolbar({ documentId }: ZoomToolbarProps) {
         {/* Zoom Percentage Display */}
         <button
           onClick={() => setIsMenuOpen(!isMenuOpen)}
-          className="flex items-center gap-1 rounded px-2 py-0.5 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-100"
+          className="flex items-center gap-1 rounded px-2 py-0.5 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-200"
         >
           <span>{zoomPercentage}%</span>
           <ChevronDownIcon
@@ -92,7 +92,7 @@ export function ZoomToolbar({ documentId }: ZoomToolbarProps) {
         {/* Zoom In Button */}
         <button
           onClick={handleZoomIn}
-          className="rounded p-1 text-gray-600 transition-colors hover:bg-gray-100 hover:text-gray-900"
+          className="rounded p-1 text-gray-600 transition-colors hover:bg-gray-200 hover:text-gray-900"
           aria-label="Zoom in"
         >
           <SearchPlusIcon className="h-4 w-4" title="Zoom In" />

@@ -69,8 +69,6 @@ export const PagePointerProvider = ({
     [naturalPageSize, rotation, scale],
   );
 
-  console.log('scale', scale);
-
   useEffect(() => {
     if (!cap || !ref.current) return;
 

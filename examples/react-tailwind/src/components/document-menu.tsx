@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useExport } from '@embedpdf/plugin-export/react';
 import { MenuDotsIcon, PrintIcon, DownloadIcon } from './icons';
 import { PrintDialog } from './print-dialog';
+import { ToolbarButton } from './toolbar-button';
 
 type DocumentMenuProps = {
   documentId: string;
@@ -27,19 +28,14 @@ export function DocumentMenu({ documentId }: DocumentMenuProps) {
   return (
     <>
       <div className="relative">
-        <button
+        <ToolbarButton
           onClick={() => setIsMenuOpen(!isMenuOpen)}
-          className={`flex h-8 w-8 items-center justify-center rounded border transition-colors ${
-            isMenuOpen
-              ? 'border-gray-400 bg-gray-100 text-gray-800'
-              : 'border-gray-300 bg-white text-gray-700 hover:border-gray-400 hover:bg-gray-50'
-          }`}
-          aria-pressed={isMenuOpen}
+          isActive={isMenuOpen}
           aria-label="Document Menu"
           title="Document Menu"
         >
           <MenuDotsIcon className="h-4 w-4" />
-        </button>
+        </ToolbarButton>
 
         {/* Dropdown Menu */}
         {isMenuOpen && (
