@@ -24,10 +24,6 @@ type RenderLayerProps = Omit<HTMLAttributes<HTMLImageElement>, 'style'> & {
    */
   dpr?: number;
   /**
-   * Optional rotation override. If not provided, uses document's current rotation.
-   */
-  rotation?: Rotation;
-  /**
    * Additional styles for the image element
    */
   style?: CSSProperties;
@@ -48,7 +44,6 @@ export function RenderLayer({
   pageIndex,
   scale: scaleOverride,
   dpr: dprOverride,
-  rotation: rotationOverride,
   style,
   ...props
 }: RenderLayerProps) {
@@ -75,11 +70,6 @@ export function RenderLayer({
     return window.devicePixelRatio;
   }, [dprOverride]);
 
-  const actualRotation = useMemo(() => {
-    if (rotationOverride !== undefined) return rotationOverride;
-    return documentState?.rotation ?? Rotation.Degree0;
-  }, [rotationOverride, documentState?.rotation]);
-
   useEffect(() => {
     if (!renderProvides || !documentState) return;
 
@@ -88,7 +78,6 @@ export function RenderLayer({
       options: {
         scaleFactor: actualScale,
         dpr: actualDpr,
-        rotation: actualRotation,
       },
     });
 
@@ -114,7 +103,6 @@ export function RenderLayer({
     pageIndex,
     actualScale,
     actualDpr,
-    actualRotation,
     renderProvides,
     documentState,
     refreshVersion,

@@ -128,24 +128,14 @@ export default function DocumentViewer() {
                                       >
                                         <Scroller
                                           documentId={activeDocumentId}
-                                          renderPage={({
-                                            width,
-                                            height,
-                                            scale,
-                                            rotation,
-                                            pageIndex,
-                                          }) => (
+                                          renderPage={({ pageIndex }) => (
                                             <Rotate
                                               documentId={activeDocumentId}
-                                              pageSize={{ width, height }}
+                                              pageIndex={pageIndex}
                                             >
                                               <PagePointerProvider
                                                 documentId={activeDocumentId}
                                                 pageIndex={pageIndex}
-                                                pageWidth={width}
-                                                pageHeight={height}
-                                                rotation={rotation}
-                                                scale={scale}
                                               >
                                                 <RenderLayer
                                                   documentId={activeDocumentId}
@@ -161,7 +151,6 @@ export default function DocumentViewer() {
                                                 <MarqueeZoom
                                                   documentId={activeDocumentId}
                                                   pageIndex={pageIndex}
-                                                  scale={scale}
                                                 />
                                                 <SelectionLayer
                                                   documentId={activeDocumentId}

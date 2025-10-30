@@ -6,8 +6,9 @@ export interface RotatePluginConfig extends BasePluginConfig {
 }
 
 export interface GetMatrixOptions {
-  w: number;
-  h: number;
+  width: number;
+  height: number;
+  rotation: Rotation;
 }
 
 // Per-document rotation state
@@ -32,7 +33,6 @@ export interface RotateScope {
   getRotation(): Rotation;
   rotateForward(): void;
   rotateBackward(): void;
-  getMatrixAsString(options: GetMatrixOptions): string;
   onRotateChange: EventHook<Rotation>;
 }
 
@@ -42,7 +42,6 @@ export interface RotateCapability {
   getRotation(): Rotation;
   rotateForward(): void;
   rotateBackward(): void;
-  getMatrixAsString(options: GetMatrixOptions): string;
 
   // Document-scoped operations
   forDocument(documentId: string): RotateScope;

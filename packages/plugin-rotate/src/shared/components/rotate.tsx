@@ -1,23 +1,44 @@
 import { ReactNode, HTMLAttributes, CSSProperties } from '@framework';
-import { Size } from '@embedpdf/models';
+import { useDocumentState } from '@embedpdf/core/@framework';
+import { Rotation } from '@embedpdf/models';
 
-import { useRotate } from '../hooks';
+import { useRotatePlugin } from '../hooks';
 
 type RotateProps = Omit<HTMLAttributes<HTMLDivElement>, 'style'> & {
   children: ReactNode;
   documentId: string;
-  pageSize: Size;
+  pageIndex: number;
+  rotation?: Rotation;
+  scale?: number;
   style?: CSSProperties;
 };
 
-export function Rotate({ children, documentId, pageSize, style, ...props }: RotateProps) {
-  const { provides: rotateScope } = useRotate(documentId);
+export function Rotate({
+  children,
+  documentId,
+  pageIndex,
+  rotation: rotationOverride,
+  scale: scaleOverride,
+  style,
+  ...props
+}: RotateProps) {
+  const { plugin: rotatePlugin } = useRotatePlugin();
+  const documentState = useDocumentState(documentId);
+
+  const page = documentState?.document?.pages?.[pageIndex];
+  const width = page?.size?.width ?? 0;
+  const height = page?.size?.height ?? 0;
+  const rotation = rotationOverride ?? documentState?.rotation ?? 0;
+  const scale = scaleOverride ?? documentState?.scale ?? 1;
 
   const matrix =
-    rotateScope?.getMatrixAsString({
-      w: pageSize.width,
-      h: pageSize.height,
+    rotatePlugin?.getMatrixAsString({
+      width: width * scale,
+      height: height * scale,
+      rotation: rotation,
     }) ?? 'matrix(1, 0, 0, 1, 0, 0)';
+
+  if (!page) return null;
 
   return (
     <div

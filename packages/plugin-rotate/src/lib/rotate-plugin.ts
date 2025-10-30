@@ -77,7 +77,6 @@ export class RotatePlugin extends BasePlugin<
       getRotation: () => this.getRotationForDocument(),
       rotateForward: () => this.rotateForward(),
       rotateBackward: () => this.rotateBackward(),
-      getMatrixAsString: (options: GetMatrixOptions) => this.getMatrixAsString(options),
 
       // Document-scoped operations
       forDocument: (documentId: string) => this.createRotateScope(documentId),
@@ -97,7 +96,6 @@ export class RotatePlugin extends BasePlugin<
       getRotation: () => this.getRotationForDocument(documentId),
       rotateForward: () => this.rotateForward(documentId),
       rotateBackward: () => this.rotateBackward(documentId),
-      getMatrixAsString: (options: GetMatrixOptions) => this.getMatrixAsString(options, documentId),
       onRotateChange: (listener: Listener<Rotation>) =>
         this.rotate$.on((event) => {
           if (event.documentId === documentId) listener(event.rotation);
@@ -164,9 +162,8 @@ export class RotatePlugin extends BasePlugin<
     this.setRotationForDocument(prevRotation, id);
   }
 
-  public getMatrixAsString(options: GetMatrixOptions, documentId?: string): string {
-    const rotation = this.getRotationForDocument(documentId);
-    return getRotationMatrixString(rotation, options.w, options.h);
+  public getMatrixAsString(options: GetMatrixOptions): string {
+    return getRotationMatrixString(options.rotation, options.width, options.height);
   }
 
   // ─────────────────────────────────────────────────────────
