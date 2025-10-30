@@ -333,6 +333,9 @@ importers:
       '@embedpdf/plugin-fullscreen':
         specifier: workspace:*
         version: link:../../packages/plugin-fullscreen
+      '@embedpdf/plugin-history':
+        specifier: workspace:*
+        version: link:../../packages/plugin-history
       '@embedpdf/plugin-interaction-manager':
         specifier: workspace:*
         version: link:../../packages/plugin-interaction-manager
@@ -1049,6 +1052,9 @@ importers:
       react-dom:
         specifier: '>=16.8.0'
         version: 18.3.1(react@18.3.1)
+      svelte:
+        specifier: '>=5 <6'
+        version: 5.39.11
       vue:
         specifier: '>=3.2.0'
         version: 3.5.17(typescript@5.8.3)

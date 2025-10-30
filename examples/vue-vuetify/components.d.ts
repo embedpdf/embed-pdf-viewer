@@ -14,7 +14,6 @@ declare module 'vue' {
     Drawer: typeof import('./src/components/drawer-system/Drawer.vue')['default']
     DrawerProvider: typeof import('./src/components/drawer-system/DrawerProvider.vue')['default']
     DrawerToggleButton: typeof import('./src/components/drawer-system/DrawerToggleButton.vue')['default']
-    HelloWorld: typeof import('./src/components/HelloWorld.vue')['default']
     PageControls: typeof import('./src/components/PageControls.vue')['default']
     PrintDialog: typeof import('./src/components/PrintDialog.vue')['default']
     RedactionSelectionMenu: typeof import('./src/components/RedactionSelectionMenu.vue')['default']

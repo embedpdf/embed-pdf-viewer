@@ -36,6 +36,7 @@
     "@embedpdf/plugin-capture": "workspace:*",
     "@embedpdf/plugin-export": "workspace:*",
     "@embedpdf/plugin-fullscreen": "workspace:*",
+    "@embedpdf/plugin-history": "workspace:*",
     "@embedpdf/plugin-interaction-manager": "workspace:*",
     "@embedpdf/plugin-loader": "workspace:*",
     "@embedpdf/plugin-pan": "workspace:*",

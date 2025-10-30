@@ -13,7 +13,7 @@
     } from '@embedpdf/plugin-annotation/svelte';
     import { InteractionManagerPluginPackage } from '@embedpdf/plugin-interaction-manager/svelte';
     import { SelectionPluginPackage } from '@embedpdf/plugin-selection/svelte';
-    // import { HistoryPluginPackage } from '@embedpdf/plugin-history/svelte';
+    import { HistoryPluginPackage } from '@embedpdf/plugin-history/svelte';
     import { PdfAnnotationSubtype, type PdfStampAnnoObject } from '@embedpdf/models';
     import AnnotationExampleContent from '../../examples/annotation-example-content.svelte';
 
@@ -34,7 +34,7 @@
         createPluginRegistration(RenderPluginPackage),
         createPluginRegistration(InteractionManagerPluginPackage),
         createPluginRegistration(SelectionPluginPackage),
-        // createPluginRegistration(HistoryPluginPackage),
+        createPluginRegistration(HistoryPluginPackage),
         createPluginRegistration(AnnotationPluginPackage, {
             annotationAuthor: 'EmbedPDF User',
         }),
