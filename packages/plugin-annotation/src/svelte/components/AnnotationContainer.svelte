@@ -63,13 +63,11 @@
         ...restProps
     }: AnnotationContainerProps = $props();
 
-    let preview = $derived<T>(trackedAnnotation.object);
+    let preview = $state<T>(trackedAnnotation.object);
     let annotationCapability = useAnnotationCapability();
     let gestureBaseRef = $state<T | null>(null);
 
-    const currentObject = $derived(
-        preview ? { ...trackedAnnotation.object, ...preview } : trackedAnnotation.object
-    );
+    const currentObject = preview ? { ...trackedAnnotation.object, ...preview } : trackedAnnotation.object
 
     // Defaults retain current behavior
     const HANDLE_COLOR = $derived(resizeUI?.color ?? '#007ACC');
@@ -77,7 +75,7 @@
     const HANDLE_SIZE = $derived(resizeUI?.size ?? 12);
     const VERTEX_SIZE = $derived(vertexUI?.size ?? 12);
 
-    const { dragProps, vertices, resize } = $derived(useInteractionHandles({
+    const interactionHandles = useInteractionHandles({
         controller: {
             element: currentObject.rect,
             vertices: vertexConfig?.extractVertices(currentObject),
@@ -135,25 +133,16 @@
             zIndex: zIndex + 2,
         },
         includeVertices: vertexConfig ? true : false,
-    }));
-
-
-
-    const counterRotateRect = $derived({
-        origin: {
-            x: currentObject.rect.origin.x * scale,
-            y: currentObject.rect.origin.y * scale,
-        },
-        size: {
-            width: currentObject.rect.size.width * scale,
-            height: currentObject.rect.size.height * scale,
-        },
     });
+
+
+
+   
 </script>
 
 <div data-no-interaction>
     <div
-            {...(isDraggable && isSelected ? dragProps : {})}
+            {...(isDraggable && isSelected ? interactionHandles.dragProps : {})}
             use:doublePress={{onDouble: onDoubleClick}}
             style:position="absolute"
             style:left="{currentObject.rect.origin.x * scale}px"
@@ -187,7 +176,7 @@
         {/if}
 
         {#if isSelected && isResizable}
-            {#each resize as { key, ...hProps } (key)}
+            {#each interactionHandles.resize as { key, ...hProps } (key)}
                 {#if resizeUI?.component}
                     {@const Component = resizeUI.component}
                     <Component {...hProps} backgroundColor={HANDLE_COLOR} />
@@ -201,7 +190,7 @@
         {/if}
 
         {#if isSelected}
-            {#each vertices as { key, ...vProps } (key)}
+            {#each interactionHandles.vertices as { key, ...vProps } (key)}
                 {#if vertexUI?.component}
                     {@const Component = vertexUI.component}
                     <Component {...vProps} backgroundColor={VERTEX_COLOR} />
@@ -215,7 +204,16 @@
         {/if}
     </div>
 
-    <CounterRotate rect={counterRotateRect} {rotation}>
+    <CounterRotate    rect={{
+          origin: {
+            x: currentObject.rect.origin.x * scale,
+            y: currentObject.rect.origin.y * scale,
+          },
+          size: {
+            width: currentObject.rect.size.width * scale,
+            height: currentObject.rect.size.height * scale,
+          },
+        }} {rotation}>
         {#snippet children({ rect, menuWrapperProps })}
             {#if selectionMenu}
                 {@render selectionMenu({
