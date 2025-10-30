@@ -1,6 +1,6 @@
 import { usePan } from '@embedpdf/plugin-pan/react';
 import { HandIcon } from './icons';
-import { ToolbarButton } from './toolbar-button';
+import { ToolbarButton } from './ui';
 
 type PanToggleButtonProps = {
   documentId: string;

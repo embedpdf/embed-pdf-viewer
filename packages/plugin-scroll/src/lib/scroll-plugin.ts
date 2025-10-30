@@ -145,6 +145,12 @@ export class ScrollPlugin extends BasePlugin<
   }
 
   protected override onDocumentLoaded(documentId: string): void {
+    const coreDoc = this.getCoreDocument(documentId);
+    if (!coreDoc) return;
+
+    this.dispatch(
+      updateDocumentScrollState(documentId, { totalPages: coreDoc.document?.pageCount ?? 0 }),
+    );
     // Initial layout computation
     this.refreshDocumentLayout(documentId);
 

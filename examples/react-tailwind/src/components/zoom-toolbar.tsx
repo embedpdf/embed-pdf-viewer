@@ -9,6 +9,7 @@ import {
   SearchPlusIcon,
   MarqueeIcon,
 } from './icons';
+import { DropdownMenu, DropdownItem, DropdownDivider } from './ui';
 
 interface ZoomToolbarProps {
   documentId: string;
@@ -99,85 +100,63 @@ export function ZoomToolbar({ documentId }: ZoomToolbarProps) {
         </button>
       </div>
 
-      {/* Dropdown Menu */}
-      {isMenuOpen && (
-        <>
-          {/* Backdrop */}
-          <div className="fixed inset-0 z-10" onClick={() => setIsMenuOpen(false)} />
+      <DropdownMenu isOpen={isMenuOpen} onClose={() => setIsMenuOpen(false)} className="w-48">
+        <DropdownItem
+          onClick={handleZoomIn}
+          icon={<SearchPlusIcon className="h-4 w-4" title="Zoom In" />}
+        >
+          Zoom In
+        </DropdownItem>
+        <DropdownItem
+          onClick={handleZoomOut}
+          icon={<SearchMinusIcon className="h-4 w-4" title="Zoom Out" />}
+        >
+          Zoom Out
+        </DropdownItem>
 
-          {/* Menu */}
-          <div className="absolute left-0 top-full z-20 mt-1 w-48 rounded-lg border border-gray-200 bg-white py-1 shadow-lg">
-            {/* Zoom In/Out */}
-            <button
-              onClick={handleZoomIn}
-              className="flex w-full items-center gap-3 px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
-            >
-              <SearchPlusIcon className="h-4 w-4" title="Zoom In" />
-              <span>Zoom In</span>
-            </button>
-            <button
-              onClick={handleZoomOut}
-              className="flex w-full items-center gap-3 px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
-            >
-              <SearchMinusIcon className="h-4 w-4" title="Zoom Out" />
-              <span>Zoom Out</span>
-            </button>
+        <DropdownDivider />
 
-            {/* Divider */}
-            <div className="my-1 border-t border-gray-200" />
+        {/* Zoom Presets */}
+        {ZOOM_PRESETS.map(({ value, label }) => (
+          <DropdownItem
+            key={value}
+            onClick={() => handleSelectZoom(value)}
+            isActive={Math.abs(state.currentZoomLevel - value) < 0.01}
+          >
+            {label}
+          </DropdownItem>
+        ))}
 
-            {/* Zoom Presets */}
-            {ZOOM_PRESETS.map(({ value, label }) => (
-              <button
-                key={value}
-                onClick={() => handleSelectZoom(value)}
-                className={`flex w-full items-center px-4 py-2 text-sm hover:bg-gray-100 ${
-                  Math.abs(state.currentZoomLevel - value) < 0.01
-                    ? 'bg-blue-50 text-blue-600'
-                    : 'text-gray-700'
-                }`}
-              >
-                {label}
-              </button>
-            ))}
+        <DropdownDivider />
 
-            {/* Divider */}
-            <div className="my-1 border-t border-gray-200" />
+        {/* Zoom Modes */}
+        {ZOOM_MODES.map(({ value, label }) => (
+          <DropdownItem
+            key={value}
+            onClick={() => handleSelectZoom(value)}
+            icon={
+              value === ZoomMode.FitPage ? (
+                <FitPageIcon className="h-4 w-4" title="Fit to Page" />
+              ) : (
+                <FitWidthIcon className="h-4 w-4" title="Fit to Width" />
+              )
+            }
+            isActive={state.zoomLevel === value}
+          >
+            {label}
+          </DropdownItem>
+        ))}
 
-            {/* Zoom Modes */}
-            {ZOOM_MODES.map(({ value, label }) => (
-              <button
-                key={value}
-                onClick={() => handleSelectZoom(value)}
-                className={`flex w-full items-center gap-3 px-4 py-2 text-sm hover:bg-gray-100 ${
-                  state.zoomLevel === value ? 'bg-blue-50 text-blue-600' : 'text-gray-700'
-                }`}
-              >
-                {value === ZoomMode.FitPage ? (
-                  <FitPageIcon className="h-4 w-4" title="Fit to Page" />
-                ) : (
-                  <FitWidthIcon className="h-4 w-4" title="Fit to Width" />
-                )}
-                <span>{label}</span>
-              </button>
-            ))}
+        <DropdownDivider />
 
-            {/* Divider */}
-            <div className="my-1 border-t border-gray-200" />
-
-            {/* Marquee Zoom */}
-            <button
-              onClick={handleToggleMarquee}
-              className={`flex w-full items-center gap-3 px-4 py-2 text-sm hover:bg-gray-100 ${
-                state.isMarqueeZoomActive ? 'bg-blue-50 text-blue-600' : 'text-gray-700'
-              }`}
-            >
-              <MarqueeIcon className="h-4 w-4" title="Marquee Zoom" />
-              <span>Marquee Zoom</span>
-            </button>
-          </div>
-        </>
-      )}
+        <DropdownItem
+          onClick={handleToggleMarquee}
+          icon={<MarqueeIcon className="h-4 w-4" title="Marquee Zoom" />}
+          isActive={state.isMarqueeZoomActive}
+        >
+          Marquee Zoom
+        </DropdownItem>
+      </DropdownMenu>
     </div>
   );
 }

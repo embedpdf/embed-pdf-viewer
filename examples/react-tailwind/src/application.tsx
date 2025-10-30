@@ -32,6 +32,7 @@ import { LoadingSpinner } from './components/loading-spinner';
 import { DocumentPasswordPrompt } from './components/document-password-prompt';
 import { SearchSidebar } from './components/search-sidebar';
 import { ThumbnailsSidebar } from './components/thumbnails-sidebar';
+import { PageControls } from './components/page-controls';
 import { ConsoleLogger } from '@embedpdf/models';
 
 const logger = new ConsoleLogger();
@@ -171,7 +172,7 @@ export default function DocumentViewer() {
                                     <DocumentPasswordPrompt documentState={documentState} />
                                   )}
                                   {isLoaded && (
-                                    <div className="h-full w-full">
+                                    <div className="relative h-full w-full">
                                       <GlobalPointerProvider documentId={activeDocumentId}>
                                         <Viewport
                                           className="bg-gray-100"
@@ -216,6 +217,8 @@ export default function DocumentViewer() {
                                               </Rotate>
                                             )}
                                           />
+                                          {/* Page Controls */}
+                                          <PageControls documentId={activeDocumentId} />
                                         </Viewport>
                                       </GlobalPointerProvider>
                                     </div>

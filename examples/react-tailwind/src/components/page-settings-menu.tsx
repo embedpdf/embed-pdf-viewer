@@ -9,7 +9,7 @@ import {
   SinglePageIcon,
   BookOpenIcon,
 } from './icons';
-import { ToolbarButton } from './toolbar-button';
+import { ToolbarButton, DropdownMenu, DropdownSection, DropdownItem, DropdownDivider } from './ui';
 
 type PageSettingsMenuProps = {
   documentId: string;
@@ -33,90 +33,63 @@ export function PageSettingsMenu({ documentId }: PageSettingsMenuProps) {
         <SettingsIcon className="h-4 w-4" />
       </ToolbarButton>
 
-      {/* Dropdown Menu */}
-      {isOpen && (
-        <>
-          {/* Backdrop */}
-          <div className="fixed inset-0 z-10" onClick={() => setIsOpen(false)} />
+      <DropdownMenu isOpen={isOpen} onClose={() => setIsOpen(false)} className="w-56">
+        <DropdownSection title="Page Orientation">
+          <DropdownItem
+            onClick={() => {
+              rotate.rotateForward();
+              setIsOpen(false);
+            }}
+            icon={<RotateRightIcon className="h-4 w-4" title="Rotate Clockwise" />}
+          >
+            Rotate Clockwise
+          </DropdownItem>
+          <DropdownItem
+            onClick={() => {
+              rotate.rotateBackward();
+              setIsOpen(false);
+            }}
+            icon={<RotateLeftIcon className="h-4 w-4" title="Rotate Counter-clockwise" />}
+          >
+            Rotate Counter-clockwise
+          </DropdownItem>
+        </DropdownSection>
 
-          {/* Menu */}
-          <div className="absolute left-0 top-full z-20 mt-1 w-56 rounded-lg border border-gray-200 bg-white py-1 shadow-lg">
-            {/* Page Orientation Section */}
-            <div className="px-3 py-2 text-xs font-semibold uppercase tracking-wide text-gray-500">
-              Page Orientation
-            </div>
+        <DropdownDivider />
 
-            <button
-              onClick={() => {
-                rotate.rotateForward();
-                setIsOpen(false);
-              }}
-              className="flex w-full items-center gap-3 px-4 py-2 text-left text-sm text-gray-700 hover:bg-gray-100"
-            >
-              <RotateRightIcon className="h-4 w-4 flex-shrink-0" title="Rotate Clockwise" />
-              <span>Rotate Clockwise</span>
-            </button>
-
-            <button
-              onClick={() => {
-                rotate.rotateBackward();
-                setIsOpen(false);
-              }}
-              className="flex w-full items-center gap-3 px-4 py-2 text-left text-sm text-gray-700 hover:bg-gray-100"
-            >
-              <RotateLeftIcon className="h-4 w-4 flex-shrink-0" title="Rotate Counter-clockwise" />
-              <span>Rotate Counter-clockwise</span>
-            </button>
-
-            {/* Divider */}
-            <div className="my-1 border-t border-gray-200" />
-
-            {/* Page Layout Section */}
-            <div className="px-3 py-2 text-xs font-semibold uppercase tracking-wide text-gray-500">
-              Page Layout
-            </div>
-
-            <button
-              onClick={() => {
-                spread.setSpreadMode(SpreadMode.None);
-                setIsOpen(false);
-              }}
-              className={`flex w-full items-center gap-3 px-4 py-2 text-left text-sm hover:bg-gray-100 ${
-                spreadMode === SpreadMode.None ? 'bg-blue-50 text-blue-600' : 'text-gray-700'
-              }`}
-            >
-              <SinglePageIcon className="h-4 w-4 flex-shrink-0" title="Single Page" />
-              <span>Single Page</span>
-            </button>
-
-            <button
-              onClick={() => {
-                spread.setSpreadMode(SpreadMode.Odd);
-                setIsOpen(false);
-              }}
-              className={`flex w-full items-center gap-3 px-4 py-2 text-left text-sm hover:bg-gray-100 ${
-                spreadMode === SpreadMode.Odd ? 'bg-blue-50 text-blue-600' : 'text-gray-700'
-              }`}
-            >
-              <BookOpenIcon className="h-4 w-4 flex-shrink-0" title="Odd Pages" />
-              <span>Odd Pages</span>
-            </button>
-
-            <button
-              onClick={() => {
-                spread.setSpreadMode(SpreadMode.Even);
-                setIsOpen(false);
-              }}
-              className={`flex w-full items-center gap-3 px-4 py-2 text-left text-sm hover:bg-gray-100 ${
-                spreadMode === SpreadMode.Even ? 'bg-blue-50 text-blue-600' : 'text-gray-700'
-              }`}
-            >
-              <BookOpenIcon className="h-4 w-4 flex-shrink-0" title="Even Pages" />
-              <span>Even Pages</span>
-            </button>
-          </div>
-        </>
-      )}
+        <DropdownSection title="Page Layout">
+          <DropdownItem
+            onClick={() => {
+              spread.setSpreadMode(SpreadMode.None);
+              setIsOpen(false);
+            }}
+            icon={<SinglePageIcon className="h-4 w-4" title="Single Page" />}
+            isActive={spreadMode === SpreadMode.None}
+          >
+            Single Page
+          </DropdownItem>
+          <DropdownItem
+            onClick={() => {
+              spread.setSpreadMode(SpreadMode.Odd);
+              setIsOpen(false);
+            }}
+            icon={<BookOpenIcon className="h-4 w-4" title="Odd Pages" />}
+            isActive={spreadMode === SpreadMode.Odd}
+          >
+            Odd Pages
+          </DropdownItem>
+          <DropdownItem
+            onClick={() => {
+              spread.setSpreadMode(SpreadMode.Even);
+              setIsOpen(false);
+            }}
+            icon={<BookOpenIcon className="h-4 w-4" title="Even Pages" />}
+            isActive={spreadMode === SpreadMode.Even}
+          >
+            Even Pages
+          </DropdownItem>
+        </DropdownSection>
+      </DropdownMenu>
     </div>
   );
 }

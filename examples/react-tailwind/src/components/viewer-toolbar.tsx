@@ -3,7 +3,7 @@ import { PanToggleButton } from './pan-toggle';
 import { PageSettingsMenu } from './page-settings-menu';
 import { DocumentMenu } from './document-menu';
 import { SearchIcon, ThumbnailsIcon } from './icons';
-import { ToolbarButton } from './toolbar-button';
+import { ToolbarButton } from './ui';
 
 type ViewerToolbarProps = {
   documentId: string;
