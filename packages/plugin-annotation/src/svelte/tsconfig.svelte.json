@@ -1,0 +1,11 @@
+{
+  "extends": "../../tsconfig.json",
+  "compilerOptions": {
+    "baseUrl": "../..",
+    "types": ["svelte"],
+    "paths": {
+      "@embedpdf/plugin-zoom": ["src/lib/index.ts"]
+    }
+  },
+  "include": ["./**/*.ts", "./**/*.svelte"]
+}
