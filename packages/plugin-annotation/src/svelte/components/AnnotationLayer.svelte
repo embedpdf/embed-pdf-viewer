@@ -47,6 +47,7 @@
 </script>
 
 <div
+  id="annotation-layer"
   {...style ? Object.fromEntries(Object.entries(style).map(([k, v]) => [`style:${k}`, v])) : {}}
   {...restProps}
 >
