@@ -28,6 +28,7 @@ import { SelectionLayer, SelectionPluginPackage } from '@embedpdf/plugin-selecti
 import { SearchLayer, SearchPluginPackage } from '@embedpdf/plugin-search/react';
 import { ThumbnailPluginPackage } from '@embedpdf/plugin-thumbnail/react';
 import { CapturePluginPackage, MarqueeCapture } from '@embedpdf/plugin-capture/react';
+import { FullscreenPluginPackage } from '@embedpdf/plugin-fullscreen/react';
 import { TabBar } from './components/tab-bar';
 import { ViewerToolbar } from './components/viewer-toolbar';
 import { LoadingSpinner } from './components/loading-spinner';
@@ -90,6 +91,9 @@ export default function DocumentViewer() {
       createPluginRegistration(SearchPluginPackage),
       createPluginRegistration(RedactionPluginPackage),
       createPluginRegistration(CapturePluginPackage),
+      createPluginRegistration(FullscreenPluginPackage, {
+        targetElement: '#document-content',
+      }),
       createPluginRegistration(ThumbnailPluginPackage, {
         width: 120,
         paddingY: 10,
@@ -172,7 +176,7 @@ export default function DocumentViewer() {
 
                       {/* Document Content Area */}
                       {activeDocumentId && (
-                        <div className="flex flex-1 overflow-hidden bg-white">
+                        <div id="document-content" className="flex flex-1 overflow-hidden bg-white">
                           {/* Thumbnails Sidebar - Left */}
                           {getSidebarState(activeDocumentId).thumbnails && (
                             <ThumbnailsSidebar

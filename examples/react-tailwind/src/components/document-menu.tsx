@@ -1,7 +1,15 @@
 import { useState } from 'react';
 import { useExport } from '@embedpdf/plugin-export/react';
 import { useCapture } from '@embedpdf/plugin-capture/react';
-import { MenuDotsIcon, PrintIcon, DownloadIcon, ScreenshotIcon } from './icons';
+import { useFullscreen } from '@embedpdf/plugin-fullscreen/react';
+import {
+  MenuDotsIcon,
+  PrintIcon,
+  DownloadIcon,
+  ScreenshotIcon,
+  FullscreenIcon,
+  FullscreenExitIcon,
+} from './icons';
 import { PrintDialog } from './print-dialog';
 import { CaptureDialog } from './capture-dialog';
 import { ToolbarButton, DropdownMenu, DropdownItem } from './ui';
@@ -13,6 +21,7 @@ type DocumentMenuProps = {
 export function DocumentMenu({ documentId }: DocumentMenuProps) {
   const { provides: exportProvider } = useExport(documentId);
   const { provides: captureProvider } = useCapture(documentId);
+  const { provides: fullscreenProvider, state: fullscreenState } = useFullscreen();
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [isPrintDialogOpen, setIsPrintDialogOpen] = useState(false);
 
@@ -32,6 +41,11 @@ export function DocumentMenu({ documentId }: DocumentMenuProps) {
     if (captureProvider) {
       captureProvider.toggleMarqueeCapture();
     }
+    setIsMenuOpen(false);
+  };
+
+  const handleFullscreen = () => {
+    fullscreenProvider?.toggleFullscreen();
     setIsMenuOpen(false);
   };
 
@@ -65,6 +79,18 @@ export function DocumentMenu({ documentId }: DocumentMenuProps) {
             icon={<DownloadIcon className="h-4 w-4" title="Download" />}
           >
             Download
+          </DropdownItem>
+          <DropdownItem
+            onClick={handleFullscreen}
+            icon={
+              fullscreenState.isFullscreen ? (
+                <FullscreenExitIcon className="h-4 w-4" title="Exit Fullscreen" />
+              ) : (
+                <FullscreenIcon className="h-4 w-4" title="Fullscreen" />
+              )
+            }
+          >
+            {fullscreenState.isFullscreen ? 'Exit Fullscreen' : 'Fullscreen'}
           </DropdownItem>
         </DropdownMenu>
       </div>

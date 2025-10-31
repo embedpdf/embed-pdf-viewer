@@ -12,9 +12,11 @@ export class FullscreenPlugin extends BasePlugin<
 
   private readonly onStateChange$ = createBehaviorEmitter<FullscreenState>();
   private readonly fullscreenRequest$ = createEmitter<'enter' | 'exit'>();
+  private config: FullscreenPluginConfig;
 
-  constructor(id: string, registry: PluginRegistry) {
+  constructor(id: string, registry: PluginRegistry, config: FullscreenPluginConfig) {
     super(id, registry);
+    this.config = config;
   }
 
   async initialize(_: FullscreenPluginConfig): Promise<void> {}
@@ -28,6 +30,10 @@ export class FullscreenPlugin extends BasePlugin<
       onRequest: this.fullscreenRequest$.on,
       onStateChange: this.onStateChange$.on,
     };
+  }
+
+  public getTargetSelector(): string | undefined {
+    return this.config.targetElement;
   }
 
   private toggleFullscreen(): void {
