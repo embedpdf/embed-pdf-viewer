@@ -49,6 +49,7 @@
         isDraggable,
         isResizable,
         lockAspectRatio = false,
+        style,
         class: propsClass = '',
         vertexConfig,
         selectionMenu,
@@ -67,7 +68,7 @@
     let annotationCapability = useAnnotationCapability();
     let gestureBaseRef = $state<T | null>(null);
 
-    const currentObject = $derived(preview ? { ...trackedAnnotation.object, ...preview } : trackedAnnotation.object);
+    let currentObject = $derived<T>(preview ? { ...trackedAnnotation.object, ...preview } : trackedAnnotation.object);
 
     // Defaults retain current behavior
     const HANDLE_COLOR = $derived(resizeUI?.color ?? '#007ACC');
@@ -75,7 +76,7 @@
     const HANDLE_SIZE = $derived(resizeUI?.size ?? 12);
     const VERTEX_SIZE = $derived(vertexUI?.size ?? 12);
 
-    const interactionHandles = $derived(useInteractionHandles({
+    const interactionHandles = useInteractionHandles({
         controller: {
             element: currentObject.rect,
             vertices: vertexConfig?.extractVertices(currentObject),
@@ -102,7 +103,8 @@
                     ? vertexConfig?.transformAnnotation(base, event.transformData.changes.vertices)
                     : { rect: event.transformData.changes.rect };
 
-                const patched = annotationCapability.provides.transformAnnotation<T>(base, {
+
+                const patched = annotationCapability.provides?.transformAnnotation<T>(base, {
                     type: transformType,
                     changes: changes as Partial<T>,
                     metadata: event.transformData.metadata,
@@ -114,11 +116,14 @@
                         ...patched,
                     };
                 }
-
                 if (event.state === 'end' && patched) {
                     gestureBaseRef = null;
-                    annotationCapability.provides.updateAnnotation(pageIndex, trackedAnnotation.object.id, patched);
+                    // Sanitize to remove Svelte reactive properties before updating
+                    // Use JSON roundtrip to ensure only plain serializable data
+                    const sanitized = JSON.parse(JSON.stringify(patched));
+                    annotationCapability.provides?.updateAnnotation(pageIndex, trackedAnnotation.object.id, sanitized);
                 }
+
             },
         },
         resizeUI: {
@@ -133,11 +138,11 @@
             zIndex: zIndex + 2,
         },
         includeVertices: vertexConfig ? true : false,
-    }));
-
-
-
-   
+    });
+    
+    // Derived accessors for template
+    const resizeHandles = $derived(interactionHandles.resize);
+    const vertexHandles = $derived(interactionHandles.vertices);
 </script>
 
 <div data-no-interaction>
@@ -155,6 +160,7 @@
             style:touch-action="none"
             style:cursor={isSelected && isDraggable ? 'move' : 'default'}
             style:z-index={zIndex}
+            {...style ? Object.fromEntries(Object.entries(style).map(([k, v]) => [`style:${k}`, v])) : {}}
             class={propsClass}
             {...restProps}
     >
@@ -176,7 +182,7 @@
         {/if}
 
         {#if isSelected && isResizable}
-            {#each interactionHandles.resize as { key, ...hProps } (key)}
+            {#each resizeHandles as { key, ...hProps } (key)}
                 {#if resizeUI?.component}
                     {@const Component = resizeUI.component}
                     <Component {...hProps} backgroundColor={HANDLE_COLOR} />
@@ -190,7 +196,7 @@
         {/if}
 
         {#if isSelected}
-            {#each interactionHandles.vertices as { key, ...vProps } (key)}
+            {#each vertexHandles as { key, ...vProps } (key)}
                 {#if vertexUI?.component}
                     {@const Component = vertexUI.component}
                     <Component {...vProps} backgroundColor={VERTEX_COLOR} />
