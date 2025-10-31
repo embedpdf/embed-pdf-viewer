@@ -3,7 +3,7 @@ import { PanToggleButton } from './pan-toggle';
 import { PageSettingsMenu } from './page-settings-menu';
 import { DocumentMenu } from './document-menu';
 import { SearchIcon, ThumbnailsIcon } from './icons';
-import { ToolbarButton } from './ui';
+import { ToolbarButton, ToolbarDivider } from './ui';
 import { RedactionToolbar } from './redaction-toolbar';
 
 export type ViewMode = 'view' | 'redact';
@@ -31,7 +31,9 @@ export function ViewerToolbar({
     <>
       {/* Main Toolbar */}
       <div className="flex items-center gap-2 border-b border-gray-300 bg-white px-3 py-2">
-        {/* Left side - Thumbnails toggle */}
+        {/* Left side - Document menu and Thumbnails toggle */}
+        <DocumentMenu documentId={documentId} />
+        <ToolbarDivider />
         <ToolbarButton
           onClick={onToggleThumbnails}
           isActive={isThumbnailsOpen}
@@ -40,12 +42,14 @@ export function ViewerToolbar({
         >
           <ThumbnailsIcon className="h-4 w-4" />
         </ToolbarButton>
-
-        {/* Center - existing toolbar items */}
-        <DocumentMenu documentId={documentId} />
-        <PanToggleButton documentId={documentId} />
         <PageSettingsMenu documentId={documentId} />
+
+        {/* Center - Zoom toolbar */}
+        <ToolbarDivider />
         <ZoomToolbar documentId={documentId} />
+        <ToolbarDivider />
+
+        <PanToggleButton documentId={documentId} />
 
         {/* Mode Tabs */}
         <div className="mx-4 flex flex-1 items-center justify-center">

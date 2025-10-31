@@ -456,6 +456,27 @@ export function FullscreenExitIcon({ className, title }: IconProps) {
   );
 }
 
+export function MenuIcon({ className, title }: IconProps) {
+  return (
+    <svg
+      className={className}
+      fill="none"
+      stroke="currentColor"
+      viewBox="0 0 24 24"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      strokeWidth={2}
+      aria-hidden={!title}
+      role={title ? 'img' : 'presentation'}
+    >
+      {title ? <title>{title}</title> : null}
+      <path stroke="none" d="M0 0h24v24H0z" fill="none" />
+      <path d="M4 8l16 0" />
+      <path d="M4 16l16 0" />
+    </svg>
+  );
+}
+
 export function MenuDotsIcon({ className, title }: IconProps) {
   return (
     <svg

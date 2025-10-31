@@ -3,7 +3,7 @@ import { useExport } from '@embedpdf/plugin-export/react';
 import { useCapture } from '@embedpdf/plugin-capture/react';
 import { useFullscreen } from '@embedpdf/plugin-fullscreen/react';
 import {
-  MenuDotsIcon,
+  MenuIcon,
   PrintIcon,
   DownloadIcon,
   ScreenshotIcon,
@@ -20,7 +20,7 @@ type DocumentMenuProps = {
 
 export function DocumentMenu({ documentId }: DocumentMenuProps) {
   const { provides: exportProvider } = useExport(documentId);
-  const { provides: captureProvider } = useCapture(documentId);
+  const { provides: captureProvider, state: captureState } = useCapture(documentId);
   const { provides: fullscreenProvider, state: fullscreenState } = useFullscreen();
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [isPrintDialogOpen, setIsPrintDialogOpen] = useState(false);
@@ -58,11 +58,12 @@ export function DocumentMenu({ documentId }: DocumentMenuProps) {
           aria-label="Document Menu"
           title="Document Menu"
         >
-          <MenuDotsIcon className="h-4 w-4" />
+          <MenuIcon className="h-4 w-4" />
         </ToolbarButton>
 
         <DropdownMenu isOpen={isMenuOpen} onClose={() => setIsMenuOpen(false)} className="w-48">
           <DropdownItem
+            isActive={captureState.isMarqueeCaptureActive}
             onClick={handleScreenshot}
             icon={<ScreenshotIcon className="h-4 w-4" title="Capture Area" />}
           >
