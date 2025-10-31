@@ -205,16 +205,15 @@ export function RotateRightIcon({ className, title }: IconProps) {
       fill="none"
       stroke="currentColor"
       viewBox="0 0 24 24"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      strokeWidth={2}
       aria-hidden={!title}
       role={title ? 'img' : 'presentation'}
     >
       {title ? <title>{title}</title> : null}
-      <path
-        strokeLinecap="round"
-        strokeLinejoin="round"
-        strokeWidth={2}
-        d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"
-      />
+      <path stroke="none" d="M0 0h24v24H0z" fill="none" />
+      <path d="M4.05 11a8 8 0 1 1 .5 4m-.5 5v-5h5" />
     </svg>
   );
 }
@@ -226,16 +225,15 @@ export function RotateLeftIcon({ className, title }: IconProps) {
       fill="none"
       stroke="currentColor"
       viewBox="0 0 24 24"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      strokeWidth={2}
       aria-hidden={!title}
       role={title ? 'img' : 'presentation'}
     >
       {title ? <title>{title}</title> : null}
-      <path
-        strokeLinecap="round"
-        strokeLinejoin="round"
-        strokeWidth={2}
-        d="M4 4v5h.582m-.582 0a8.001 8.001 0 0115.356 2m-15.356-2H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"
-      />
+      <path stroke="none" d="M0 0h24v24H0z" fill="none" />
+      <path d="M19.95 11a8 8 0 1 0 -.5 4m.5 5v-5h-5" />
     </svg>
   );
 }
@@ -289,16 +287,23 @@ export function SettingsIcon({ className, title }: IconProps) {
       fill="none"
       stroke="currentColor"
       viewBox="0 0 24 24"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      strokeWidth={2}
       aria-hidden={!title}
       role={title ? 'img' : 'presentation'}
     >
       {title ? <title>{title}</title> : null}
-      <path
-        strokeLinecap="round"
-        strokeLinejoin="round"
-        strokeWidth={2}
-        d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4"
-      />
+      <path stroke="none" d="M0 0h24v24H0z" fill="none" />
+      <path d="M12 14m-2 0a2 2 0 1 0 4 0a2 2 0 1 0 -4 0" />
+      <path d="M12 10.5v1.5" />
+      <path d="M12 16v1.5" />
+      <path d="M15.031 12.25l-1.299 .75" />
+      <path d="M10.268 15l-1.3 .75" />
+      <path d="M15 15.803l-1.285 -.773" />
+      <path d="M10.285 12.97l-1.285 -.773" />
+      <path d="M14 3v4a1 1 0 0 0 1 1h4" />
+      <path d="M17 21h-10a2 2 0 0 1 -2 -2v-14a2 2 0 0 1 2 -2h7l5 5v11a2 2 0 0 1 -2 2z" />
     </svg>
   );
 }
@@ -341,6 +346,31 @@ export function DownloadIcon({ className, title }: IconProps) {
         strokeWidth={2}
         d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"
       />
+    </svg>
+  );
+}
+
+export function ScreenshotIcon({ className, title }: IconProps) {
+  return (
+    <svg
+      className={className}
+      fill="none"
+      stroke="currentColor"
+      viewBox="0 0 24 24"
+      aria-hidden={!title}
+      role={title ? 'img' : 'presentation'}
+    >
+      {title ? <title>{title}</title> : null}
+      <path stroke="none" d="M0 0h24v24H0z" fill="none" />
+      <path d="M7 19a2 2 0 0 1 -2 -2" />
+      <path d="M5 13v-2" />
+      <path d="M5 7a2 2 0 0 1 2 -2" />
+      <path d="M11 5h2" />
+      <path d="M17 5a2 2 0 0 1 2 2" />
+      <path d="M19 11v2" />
+      <path d="M19 17v4" />
+      <path d="M21 19h-4" />
+      <path d="M13 19h-2" />
     </svg>
   );
 }

@@ -27,6 +27,7 @@ import { PrintPluginPackage } from '@embedpdf/plugin-print/react';
 import { SelectionLayer, SelectionPluginPackage } from '@embedpdf/plugin-selection/react';
 import { SearchLayer, SearchPluginPackage } from '@embedpdf/plugin-search/react';
 import { ThumbnailPluginPackage } from '@embedpdf/plugin-thumbnail/react';
+import { CapturePluginPackage, MarqueeCapture } from '@embedpdf/plugin-capture/react';
 import { TabBar } from './components/tab-bar';
 import { ViewerToolbar } from './components/viewer-toolbar';
 import { LoadingSpinner } from './components/loading-spinner';
@@ -88,6 +89,7 @@ export default function DocumentViewer() {
       createPluginRegistration(SelectionPluginPackage),
       createPluginRegistration(SearchPluginPackage),
       createPluginRegistration(RedactionPluginPackage),
+      createPluginRegistration(CapturePluginPackage),
       createPluginRegistration(ThumbnailPluginPackage, {
         width: 120,
         paddingY: 10,
@@ -135,7 +137,7 @@ export default function DocumentViewer() {
 
   return (
     <div className="flex h-screen flex-1 flex-col overflow-hidden" ref={containerRef}>
-      <div className="flex flex-1 flex-col overflow-hidden">
+      <div className="flex flex-1 select-none flex-col overflow-hidden">
         <EmbedPDF engine={engine} logger={logger} plugins={plugins}>
           {({ pluginsReady, registry }) => (
             <>
@@ -227,6 +229,10 @@ export default function DocumentViewer() {
                                                     pageIndex={pageIndex}
                                                   />
                                                   <MarqueeZoom
+                                                    documentId={activeDocumentId}
+                                                    pageIndex={pageIndex}
+                                                  />
+                                                  <MarqueeCapture
                                                     documentId={activeDocumentId}
                                                     pageIndex={pageIndex}
                                                   />

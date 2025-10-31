@@ -215,6 +215,9 @@ importers:
       '@embedpdf/pdfium':
         specifier: workspace:*
         version: link:../../packages/pdfium
+      '@embedpdf/plugin-capture':
+        specifier: workspace:*
+        version: link:../../packages/plugin-capture
       '@embedpdf/plugin-document-manager':
         specifier: workspace:*
         version: link:../../packages/plugin-document-manager

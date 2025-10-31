@@ -1,7 +1,9 @@
 import { useState } from 'react';
 import { useExport } from '@embedpdf/plugin-export/react';
-import { MenuDotsIcon, PrintIcon, DownloadIcon } from './icons';
+import { useCapture } from '@embedpdf/plugin-capture/react';
+import { MenuDotsIcon, PrintIcon, DownloadIcon, ScreenshotIcon } from './icons';
 import { PrintDialog } from './print-dialog';
+import { CaptureDialog } from './capture-dialog';
 import { ToolbarButton, DropdownMenu, DropdownItem } from './ui';
 
 type DocumentMenuProps = {
@@ -10,6 +12,7 @@ type DocumentMenuProps = {
 
 export function DocumentMenu({ documentId }: DocumentMenuProps) {
   const { provides: exportProvider } = useExport(documentId);
+  const { provides: captureProvider } = useCapture(documentId);
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [isPrintDialogOpen, setIsPrintDialogOpen] = useState(false);
 
@@ -25,6 +28,13 @@ export function DocumentMenu({ documentId }: DocumentMenuProps) {
     setIsPrintDialogOpen(true);
   };
 
+  const handleScreenshot = () => {
+    if (captureProvider) {
+      captureProvider.toggleMarqueeCapture();
+    }
+    setIsMenuOpen(false);
+  };
+
   return (
     <>
       <div className="relative">
@@ -38,6 +48,12 @@ export function DocumentMenu({ documentId }: DocumentMenuProps) {
         </ToolbarButton>
 
         <DropdownMenu isOpen={isMenuOpen} onClose={() => setIsMenuOpen(false)} className="w-48">
+          <DropdownItem
+            onClick={handleScreenshot}
+            icon={<ScreenshotIcon className="h-4 w-4" title="Capture Area" />}
+          >
+            Capture Area
+          </DropdownItem>
           <DropdownItem
             onClick={handlePrint}
             icon={<PrintIcon className="h-4 w-4" title="Print" />}
@@ -59,6 +75,9 @@ export function DocumentMenu({ documentId }: DocumentMenuProps) {
         isOpen={isPrintDialogOpen}
         onClose={() => setIsPrintDialogOpen(false)}
       />
+
+      {/* Capture Dialog */}
+      <CaptureDialog documentId={documentId} />
     </>
   );
 }

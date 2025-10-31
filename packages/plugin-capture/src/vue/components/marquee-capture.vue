@@ -22,6 +22,8 @@ import type { Rect } from '@embedpdf/models';
 import { useCaptureCapability } from '../hooks/use-capture';
 
 interface MarqueeCaptureProps {
+  /** Document ID */
+  documentId: string;
   /** Index of the page this layer lives on */
   pageIndex: number;
   /** Scale of the page */
@@ -47,6 +49,7 @@ onMounted(() => {
   if (!capturePlugin.value) return;
 
   unregister = capturePlugin.value.registerMarqueeOnPage({
+    documentId: props.documentId,
     pageIndex: props.pageIndex,
     scale: props.scale,
     callback: {
