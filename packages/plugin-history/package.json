@@ -40,7 +40,7 @@
     "build:preact": "vite build --mode preact",
     "build:vue": "vite build --mode vue",
     "build:svelte": "vite build --mode svelte",
-    "build": "pnpm run clean && concurrently -c auto -n base,react,preact,vue \"vite build --mode base\" \"vite build --mode react\" \"vite build --mode preact\" \"vite build --mode vue\" \"vite build --mode svelte\"",
+    "build": "pnpm run clean && concurrently -c auto -n base,react,preact,vue,svelte \"vite build --mode base\" \"vite build --mode react\" \"vite build --mode preact\" \"vite build --mode vue\" \"vite build --mode svelte\"",
     "clean": "rimraf dist",
     "lint": "eslint src --color",
     "lint:fix": "eslint src --color --fix"
