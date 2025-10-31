@@ -29,8 +29,10 @@ import { SearchLayer, SearchPluginPackage } from '@embedpdf/plugin-search/react'
 import { ThumbnailPluginPackage } from '@embedpdf/plugin-thumbnail/react';
 import { CapturePluginPackage, MarqueeCapture } from '@embedpdf/plugin-capture/react';
 import { FullscreenPluginPackage } from '@embedpdf/plugin-fullscreen/react';
+import { HistoryPluginPackage } from '@embedpdf/plugin-history/react';
+import { AnnotationPluginPackage, AnnotationLayer } from '@embedpdf/plugin-annotation/react';
 import { TabBar } from './components/tab-bar';
-import { ViewerToolbar } from './components/viewer-toolbar';
+import { ViewerToolbar, ViewMode } from './components/viewer-toolbar';
 import { LoadingSpinner } from './components/loading-spinner';
 import { DocumentPasswordPrompt } from './components/document-password-prompt';
 import { SearchSidebar } from './components/search-sidebar';
@@ -45,9 +47,6 @@ type SidebarState = {
   search: boolean;
   thumbnails: boolean;
 };
-
-// Type for tracking toolbar mode per document
-type ViewMode = 'view' | 'redact';
 
 export default function DocumentViewer() {
   const containerRef = useRef<HTMLDivElement>(null);
@@ -91,6 +90,8 @@ export default function DocumentViewer() {
       createPluginRegistration(SearchPluginPackage),
       createPluginRegistration(RedactionPluginPackage),
       createPluginRegistration(CapturePluginPackage),
+      createPluginRegistration(HistoryPluginPackage),
+      createPluginRegistration(AnnotationPluginPackage),
       createPluginRegistration(FullscreenPluginPackage, {
         targetElement: '#document-content',
       }),
@@ -245,6 +246,10 @@ export default function DocumentViewer() {
                                                     pageIndex={pageIndex}
                                                   />
                                                   <RedactionLayer
+                                                    documentId={activeDocumentId}
+                                                    pageIndex={pageIndex}
+                                                  />
+                                                  <AnnotationLayer
                                                     documentId={activeDocumentId}
                                                     pageIndex={pageIndex}
                                                   />

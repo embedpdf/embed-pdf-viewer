@@ -51,6 +51,7 @@ import Strikeout from './text-markup/strikeout.vue';
 import Squiggly from './text-markup/squiggly.vue';
 
 const props = defineProps<{
+  documentId: string;
   pageIndex: number;
   scale: number;
 }>();
@@ -75,7 +76,7 @@ watchEffect((onCleanup) => {
 
   if (annotationProvides.value) {
     const provides = annotationProvides.value;
-    const off = provides.onActiveToolChange((tool) => (activeTool.value = tool));
+    const off = provides.onActiveToolChange((event) => (activeTool.value = event.tool));
     unsubscribers.push(off);
   }
 

@@ -11,8 +11,8 @@
         <slot name="vertex-handle" v-bind="slotProps"></slot>
       </template>
     </Annotations>
-    <TextMarkup :pageIndex="pageIndex" :scale="scale" />
-    <AnnotationPaintLayer :pageIndex="pageIndex" :scale="scale" />
+    <TextMarkup :documentId="documentId" :pageIndex="pageIndex" :scale="scale" />
+    <AnnotationPaintLayer :documentId="documentId" :pageIndex="pageIndex" :scale="scale" />
   </div>
 </template>
 
@@ -23,6 +23,7 @@ import AnnotationPaintLayer from './annotation-paint-layer.vue';
 import { ResizeHandleUI, VertexHandleUI } from '../types';
 
 const props = defineProps<{
+  documentId: string;
   pageIndex: number;
   scale: number;
   pageWidth: number;

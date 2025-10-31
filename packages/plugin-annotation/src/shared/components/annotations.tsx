@@ -46,6 +46,7 @@ import { FreeText } from './annotations/free-text';
 import { Stamp } from './annotations/stamp';
 
 interface AnnotationsProps {
+  documentId: string;
   pageIndex: number;
   scale: number;
   rotation: number;
@@ -59,22 +60,34 @@ interface AnnotationsProps {
 }
 
 export function Annotations(annotationsProps: AnnotationsProps) {
-  const { pageIndex, scale, selectionMenu } = annotationsProps;
-  const { provides: annotationProvides } = useAnnotationCapability();
+  const { documentId, pageIndex, scale, selectionMenu } = annotationsProps;
+  const { provides: annotationCapability } = useAnnotationCapability();
   const { provides: selectionProvides } = useSelectionCapability();
   const [annotations, setAnnotations] = useState<TrackedAnnotation[]>([]);
-  const { register } = usePointerHandlers({ pageIndex });
+  const { register } = usePointerHandlers({ documentId, pageIndex });
   const [selectionState, setSelectionState] = useState<TrackedAnnotation | null>(null);
   const [editingId, setEditingId] = useState<string | null>(null);
 
+  // Get scoped API for this document (memoized to prevent infinite loops)
+  const annotationProvides = useMemo(
+    () => (annotationCapability ? annotationCapability.forDocument(documentId) : null),
+    [annotationCapability, documentId],
+  );
+
   useEffect(() => {
     if (annotationProvides) {
-      annotationProvides.onStateChange((state) => {
+      // Initialize with current state immediately
+      const currentState = annotationProvides.getState();
+      setAnnotations(getAnnotationsByPageIndex(currentState, pageIndex));
+      setSelectionState(getSelectedAnnotationByPageIndex(currentState, pageIndex));
+
+      // Then subscribe to changes
+      return annotationProvides.onStateChange((state) => {
         setAnnotations(getAnnotationsByPageIndex(state, pageIndex));
         setSelectionState(getSelectedAnnotationByPageIndex(state, pageIndex));
       });
     }
-  }, [annotationProvides]);
+  }, [annotationProvides, pageIndex]);
 
   const handlers = useMemo(
     (): PointerEventHandlers<MouseEvent> => ({
@@ -104,7 +117,9 @@ export function Annotations(annotationsProps: AnnotationsProps) {
   );
 
   useEffect(() => {
-    return register(handlers);
+    return register(handlers, {
+      documentId,
+    });
   }, [register, handlers]);
 
   return (
@@ -474,6 +489,7 @@ export function Annotations(annotationsProps: AnnotationsProps) {
                 <Stamp
                   isSelected={isSelected}
                   annotation={annotation}
+                  documentId={documentId}
                   pageIndex={pageIndex}
                   scale={scale}
                   onClick={(e) => handleClick(e, annotation)}

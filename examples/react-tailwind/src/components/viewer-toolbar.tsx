@@ -5,8 +5,9 @@ import { DocumentMenu } from './document-menu';
 import { SearchIcon, ThumbnailsIcon } from './icons';
 import { ToolbarButton, ToolbarDivider } from './ui';
 import { RedactionToolbar } from './redaction-toolbar';
+import { AnnotationToolbar } from './annotation-toolbar';
 
-export type ViewMode = 'view' | 'redact';
+export type ViewMode = 'view' | 'annotate' | 'redact';
 
 type ViewerToolbarProps = {
   documentId: string;
@@ -65,6 +66,16 @@ export function ViewerToolbar({
               View
             </button>
             <button
+              onClick={() => onModeChange('annotate')}
+              className={`rounded px-4 py-1 text-sm font-medium transition-colors ${
+                mode === 'annotate'
+                  ? 'bg-white text-gray-900 shadow-sm'
+                  : 'text-gray-600 hover:text-gray-900'
+              }`}
+            >
+              Annotate
+            </button>
+            <button
               onClick={() => onModeChange('redact')}
               className={`rounded px-4 py-1 text-sm font-medium transition-colors ${
                 mode === 'redact'
@@ -90,6 +101,7 @@ export function ViewerToolbar({
 
       {/* Redaction Toolbar */}
       {mode === 'redact' && <RedactionToolbar documentId={documentId} />}
+      {mode === 'annotate' && <AnnotationToolbar documentId={documentId} />}
     </>
   );
 }

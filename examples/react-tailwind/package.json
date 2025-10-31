@@ -31,6 +31,8 @@
     "@embedpdf/plugin-print": "workspace:*",
     "@embedpdf/plugin-redaction": "workspace:*",
     "@embedpdf/plugin-capture": "workspace:*",
+    "@embedpdf/plugin-history": "workspace:*",
+    "@embedpdf/plugin-annotation": "workspace:*",
     "@embedpdf/models": "workspace:*",
     "@embedpdf/pdfium": "workspace:*",
     "@embedpdf/engines": "workspace:*",

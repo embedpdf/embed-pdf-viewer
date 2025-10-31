@@ -215,6 +215,9 @@ importers:
       '@embedpdf/pdfium':
         specifier: workspace:*
         version: link:../../packages/pdfium
+      '@embedpdf/plugin-annotation':
+        specifier: workspace:*
+        version: link:../../packages/plugin-annotation
       '@embedpdf/plugin-capture':
         specifier: workspace:*
         version: link:../../packages/plugin-capture
@@ -227,6 +230,9 @@ importers:
       '@embedpdf/plugin-fullscreen':
         specifier: workspace:*
         version: link:../../packages/plugin-fullscreen
+      '@embedpdf/plugin-history':
+        specifier: workspace:*
+        version: link:../../packages/plugin-history
       '@embedpdf/plugin-interaction-manager':
         specifier: workspace:*
         version: link:../../packages/plugin-interaction-manager

@@ -13,6 +13,7 @@ import { AnnotationTool } from './tools/types';
 export type AnnotationEvent =
   | {
       type: 'create';
+      documentId: string;
       annotation: PdfAnnotationObject;
       pageIndex: number;
       ctx?: AnnotationCreateContext<any>;
@@ -20,13 +21,20 @@ export type AnnotationEvent =
     }
   | {
       type: 'update';
+      documentId: string;
       annotation: PdfAnnotationObject;
       pageIndex: number;
       patch: Partial<PdfAnnotationObject>;
       committed: boolean;
     }
-  | { type: 'delete'; annotation: PdfAnnotationObject; pageIndex: number; committed: boolean }
-  | { type: 'loaded'; total: number };
+  | {
+      type: 'delete';
+      documentId: string;
+      annotation: PdfAnnotationObject;
+      pageIndex: number;
+      committed: boolean;
+    }
+  | { type: 'loaded'; documentId: string; total: number };
 
 export type CommitState = 'new' | 'dirty' | 'deleted' | 'synced' | 'ignored';
 
@@ -41,17 +49,24 @@ export interface RenderAnnotationOptions {
   options?: PdfRenderPageAnnotationOptions;
 }
 
-export interface AnnotationState {
+// Per-document annotation state
+export interface AnnotationDocumentState {
   pages: Record<number, string[]>;
   byUid: Record<string, TrackedAnnotation>;
   selectedUid: string | null;
   activeToolId: string | null;
+  hasPendingChanges: boolean;
+}
 
+export interface AnnotationState {
+  // Per-document annotation state
+  documents: Record<string, AnnotationDocumentState>;
+  activeDocumentId: string | null;
+
+  // Global state (shared across all documents)
   /** The complete list of available tools, including any user modifications. */
   tools: AnnotationTool[];
-
   colorPresets: string[];
-  hasPendingChanges: boolean;
 }
 
 export interface AnnotationPluginConfig extends BasePluginConfig {
@@ -98,25 +113,56 @@ export type ImportAnnotationItem<T extends PdfAnnotationObject = PdfAnnotationOb
   ctx?: AnnotationCreateContext<T>;
 };
 
+export interface AnnotationStateChangeEvent {
+  documentId: string;
+  state: AnnotationDocumentState;
+}
+
+export interface AnnotationActiveToolChangeEvent {
+  documentId: string;
+  tool: AnnotationTool | null;
+}
+
+// Scoped annotation capability for a specific document
+export interface AnnotationScope {
+  getState(): AnnotationDocumentState;
+  getPageAnnotations(
+    options: GetPageAnnotationsOptions,
+  ): Task<PdfAnnotationObject[], PdfErrorReason>;
+  getSelectedAnnotation(): TrackedAnnotation | null;
+  selectAnnotation(pageIndex: number, annotationId: string): void;
+  deselectAnnotation(): void;
+  getActiveTool(): AnnotationTool | null;
+  setActiveTool(toolId: string | null): void;
+  findToolForAnnotation(annotation: PdfAnnotationObject): AnnotationTool | null;
+  importAnnotations(items: ImportAnnotationItem<PdfAnnotationObject>[]): void;
+  createAnnotation<A extends PdfAnnotationObject>(
+    pageIndex: number,
+    annotation: A,
+    context?: AnnotationCreateContext<A>,
+  ): void;
+  updateAnnotation(
+    pageIndex: number,
+    annotationId: string,
+    patch: Partial<PdfAnnotationObject>,
+  ): void;
+  deleteAnnotation(pageIndex: number, annotationId: string): void;
+  renderAnnotation(options: RenderAnnotationOptions): Task<Blob, PdfErrorReason>;
+  commit(): Task<boolean, PdfErrorReason>;
+  onStateChange: EventHook<AnnotationDocumentState>;
+  onAnnotationEvent: EventHook<AnnotationEvent>;
+  onActiveToolChange: EventHook<AnnotationTool | null>;
+}
+
 export interface AnnotationCapability {
+  // Active document operations
+  getState: () => AnnotationDocumentState;
   getPageAnnotations: (
     options: GetPageAnnotationsOptions,
   ) => Task<PdfAnnotationObject[], PdfErrorReason>;
   getSelectedAnnotation: () => TrackedAnnotation | null;
   selectAnnotation: (pageIndex: number, annotationId: string) => void;
   deselectAnnotation: () => void;
-
-  getActiveTool: () => AnnotationTool | null;
-  setActiveTool: (toolId: string | null) => void;
-  getTools: () => AnnotationTool[];
-  getTool: <T extends AnnotationTool>(toolId: string) => T | undefined;
-  addTool: <T extends AnnotationTool>(tool: T) => void;
-  findToolForAnnotation: (annotation: PdfAnnotationObject) => AnnotationTool | null;
-  setToolDefaults: (toolId: string, patch: Partial<any>) => void;
-
-  getColorPresets: () => string[];
-  addColorPreset: (color: string) => void;
-
   importAnnotations: (items: ImportAnnotationItem<PdfAnnotationObject>[]) => void;
   createAnnotation: <A extends PdfAnnotationObject>(
     pageIndex: number,
@@ -129,6 +175,23 @@ export interface AnnotationCapability {
     patch: Partial<PdfAnnotationObject>,
   ) => void;
   deleteAnnotation: (pageIndex: number, annotationId: string) => void;
+  renderAnnotation: (options: RenderAnnotationOptions) => Task<Blob, PdfErrorReason>;
+  commit: () => Task<boolean, PdfErrorReason>;
+
+  // Document-scoped operations
+  forDocument: (documentId: string) => AnnotationScope;
+
+  // Global operations (shared across documents)
+  getActiveTool: () => AnnotationTool | null;
+  setActiveTool: (toolId: string | null) => void;
+  getTools: () => AnnotationTool[];
+  getTool: <T extends AnnotationTool>(toolId: string) => T | undefined;
+  addTool: <T extends AnnotationTool>(tool: T) => void;
+  findToolForAnnotation: (annotation: PdfAnnotationObject) => AnnotationTool | null;
+  setToolDefaults: (toolId: string, patch: Partial<any>) => void;
+
+  getColorPresets: () => string[];
+  addColorPreset: (color: string) => void;
 
   /**
    * Transform an annotation based on interaction (move, resize, etc.)
@@ -147,12 +210,10 @@ export interface AnnotationCapability {
     patchFn: PatchFunction<T>,
   ) => void;
 
-  renderAnnotation: (options: RenderAnnotationOptions) => Task<Blob, PdfErrorReason>;
-
-  onStateChange: EventHook<AnnotationState>;
-  onActiveToolChange: EventHook<AnnotationTool | null>;
+  // Events (include documentId)
+  onStateChange: EventHook<AnnotationStateChangeEvent>;
+  onActiveToolChange: EventHook<AnnotationActiveToolChangeEvent>;
   onAnnotationEvent: EventHook<AnnotationEvent>;
-  commit: () => Task<boolean, PdfErrorReason>;
 }
 
 export interface GetPageAnnotationsOptions {

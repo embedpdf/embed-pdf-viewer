@@ -629,3 +629,121 @@ export function ChevronRightIcon({ className, title }: IconProps) {
     </svg>
   );
 }
+
+export function TextIcon({ className, title }: IconProps) {
+  return (
+    <svg
+      className={className}
+      fill="none"
+      stroke="currentColor"
+      viewBox="0 0 24 24"
+      strokeWidth={2}
+      aria-hidden={!title}
+      role={title ? 'img' : 'presentation'}
+    >
+      {title ? <title>{title}</title> : null}
+      <path d="M4 7V4h16v3M9 20h6M12 4v16" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  );
+}
+
+export function PenIcon({ className, title }: IconProps) {
+  return (
+    <svg
+      className={className}
+      fill="none"
+      stroke="currentColor"
+      viewBox="0 0 24 24"
+      strokeWidth={2}
+      aria-hidden={!title}
+      role={title ? 'img' : 'presentation'}
+    >
+      {title ? <title>{title}</title> : null}
+      <path
+        d="M12 19l7-7 3 3-7 7-3-3z M18 13l-1.5-7.5L2 2l3.5 14.5L13 18l5-5z M2 2l7.586 7.586"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
+  );
+}
+
+export function CircleIcon({ className, title }: IconProps) {
+  return (
+    <svg
+      className={className}
+      fill="none"
+      stroke="currentColor"
+      viewBox="0 0 24 24"
+      strokeWidth={2}
+      aria-hidden={!title}
+      role={title ? 'img' : 'presentation'}
+    >
+      {title ? <title>{title}</title> : null}
+      <circle cx="12" cy="12" r="9" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  );
+}
+
+export function SquareIcon({ className, title }: IconProps) {
+  return (
+    <svg
+      className={className}
+      fill="none"
+      stroke="currentColor"
+      viewBox="0 0 24 24"
+      strokeWidth={2}
+      aria-hidden={!title}
+      role={title ? 'img' : 'presentation'}
+    >
+      {title ? <title>{title}</title> : null}
+      <rect
+        x="4"
+        y="4"
+        width="16"
+        height="16"
+        rx="2"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
+  );
+}
+
+export function ArrowIcon({ className, title }: IconProps) {
+  return (
+    <svg
+      className={className}
+      fill="none"
+      stroke="currentColor"
+      viewBox="0 0 24 24"
+      strokeWidth={2}
+      aria-hidden={!title}
+      role={title ? 'img' : 'presentation'}
+    >
+      {title ? <title>{title}</title> : null}
+      <path d="M7 17L17 7M17 7H7M17 7v10" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  );
+}
+
+export function HighlightIcon({ className, title }: IconProps) {
+  return (
+    <svg
+      className={className}
+      fill="none"
+      stroke="currentColor"
+      viewBox="0 0 24 24"
+      strokeWidth={2}
+      aria-hidden={!title}
+      role={title ? 'img' : 'presentation'}
+    >
+      {title ? <title>{title}</title> : null}
+      <path
+        d="M9 11l-6 6v3h9l3-3M22 2l-4.89 4.89M14.5 9.5l-1-1M17 6l-1.5-1.5M9.5 12.5l-1 1M4 20h3v-3"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
+  );
+}
