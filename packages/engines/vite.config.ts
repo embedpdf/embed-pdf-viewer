@@ -11,6 +11,10 @@ import { dirname, resolve } from 'node:path';
 let workerCodeCache: string | null = null;
 let workerBuildPromise: Promise<string> | null = null;
 
+// Cache for the encoder worker code
+let encoderWorkerCodeCache: string | null = null;
+let encoderWorkerBuildPromise: Promise<string> | null = null;
+
 const workerReplacer = (): Plugin => {
   return {
     name: 'worker-replacer',
@@ -28,6 +32,28 @@ const workerReplacer = (): Plugin => {
       if (!code.includes('__WEBWORKER_BODY__') || !workerCodeCache) return null;
       const escaped = JSON.stringify(workerCodeCache);
       return code.replace('__WEBWORKER_BODY__', escaped);
+    },
+  };
+};
+
+const encoderWorkerReplacer = (): Plugin => {
+  return {
+    name: 'encoder-worker-replacer',
+    async buildStart() {
+      // Build the encoder worker at most once across all plugin instances
+      if (!encoderWorkerBuildPromise) {
+        const { bundleEncoderWorker } = await import('./tools/build-encoder-worker');
+        encoderWorkerBuildPromise = bundleEncoderWorker().then((code) => {
+          encoderWorkerCodeCache = code;
+          return code;
+        });
+      }
+      await encoderWorkerBuildPromise;
+    },
+    transform(code) {
+      if (!code.includes('__ENCODER_WORKER_BODY__') || !encoderWorkerCodeCache) return null;
+      const escaped = JSON.stringify(encoderWorkerCodeCache);
+      return code.replace(/__ENCODER_WORKER_BODY__/g, escaped);
     },
   };
 };
@@ -71,7 +97,7 @@ export default defineConfig((env) => {
       tsconfigPath: './tsconfig.json',
       entryPath: baseEntries,
       dtsExclude: ['**/react/**', '**/preact/**', '**/vue/**', '**/svelte/**', '**/shared/**'],
-      additionalPlugins: [workerReplacer(), versionReplacer()],
+      additionalPlugins: [workerReplacer(), encoderWorkerReplacer(), versionReplacer()],
     });
   }
 

@@ -10,12 +10,9 @@ import {
   Logger,
   NoopLogger,
   SearchResult,
-  SearchTarget,
-  MatchFlag,
   PdfDestinationObject,
   PdfBookmarkObject,
   PdfDocumentObject,
-  PdfEngine,
   PdfPageObject,
   PdfActionType,
   Rotation,
@@ -59,12 +56,8 @@ import {
   PdfPageFlattenFlag,
   PdfPageFlattenResult,
   PdfTask,
-  PdfFileLoader,
   transformRect,
-  SearchAllPagesResult,
-  PdfOpenDocumentUrlOptions,
   PdfOpenDocumentBufferOptions,
-  PdfFileUrl,
   Task,
   PdfErrorReason,
   TextContext,
@@ -76,7 +69,6 @@ import {
   PdfAnnotationState,
   PdfAnnotationStateModel,
   quadToRect,
-  ImageConversionTypes,
   PageTextSlice,
   stripPdfUnwantedMarkers,
   rectToQuad,
@@ -100,19 +92,14 @@ import {
   PdfTextAlignment,
   PdfVerticalAlignment,
   AnnotationCreateContext,
-  ignore,
   isUuidV4,
   uuidV4,
   PdfAnnotationIcon,
-  PdfPageSearchProgress,
-  PdfSearchAllPagesOptions,
   PdfRenderPageAnnotationOptions,
   PdfRedactTextOptions,
   PdfFlattenPageOptions,
   PdfRenderThumbnailOptions,
   PdfRenderPageOptions,
-  PdfAnnotationsProgress,
-  ConvertToBlobOptions,
   buildUserToDeviceMatrix,
   PdfMetadataObject,
   PdfPrintOptions,
@@ -123,7 +110,6 @@ import {
 import { isValidCustomKey, readArrayBuffer, readString } from './helper';
 import { WrappedPdfiumModule } from '@embedpdf/pdfium';
 import { DocumentContext, PageContext, PdfCache } from './cache';
-import { ImageDataConverter, LazyImageData } from '../converters/types';
 import { MemoryManager } from './core/memory-manager';
 import { WasmPointer } from './types/branded';
 
@@ -157,24 +143,6 @@ const LOG_SOURCE = 'PDFiumEngine';
 const LOG_CATEGORY = 'Engine';
 
 /**
- * Context used for searching
- */
-export interface SearchContext {
-  /**
-   * search target
-   */
-  target: SearchTarget;
-  /**
-   * current page index
-   */
-  currPageIndex: number;
-  /**
-   * index of text in the current pdf page,  -1 means reach the end
-   */
-  startIndex: number;
-}
-
-/**
  * Error code of pdfium library
  */
 export enum PdfiumErrorCode {
@@ -189,45 +157,14 @@ export enum PdfiumErrorCode {
   XFALayout = 8,
 }
 
-interface PdfiumEngineOptions<T> {
+interface PdfiumEngineOptions {
   logger?: Logger;
-  imageDataConverter?: ImageDataConverter<T>;
 }
-
-export class OffscreenCanvasError extends Error {
-  constructor(message: string) {
-    super(message);
-    this.name = 'OffscreenCanvasError';
-  }
-}
-
-export const browserImageDataToBlobConverter: ImageDataConverter<Blob> = (
-  getImageData: LazyImageData,
-  imageType: ImageConversionTypes = 'image/webp',
-  quality?: number,
-): Promise<Blob> => {
-  // Check if we're in a browser environment
-  if (typeof OffscreenCanvas === 'undefined') {
-    return Promise.reject(
-      new OffscreenCanvasError(
-        'OffscreenCanvas is not available in this environment. ' +
-          'This converter is intended for browser use only. ' +
-          'Falling back to WASM-based image encoding.',
-      ),
-    );
-  }
-
-  const pdfImage = getImageData();
-  const imageData = new ImageData(pdfImage.data, pdfImage.width, pdfImage.height);
-  const off = new OffscreenCanvas(imageData.width, imageData.height);
-  off.getContext('2d')!.putImageData(imageData, 0, 0);
-  return off.convertToBlob({ type: imageType, quality });
-};
 
 /**
  * Pdf engine that based on pdfium wasm
  */
-export class PdfiumEngine<T = Blob> implements PdfEngine<T> {
+export class PdfiumNative {
   /**
    * pdf documents that opened
    */
@@ -249,11 +186,6 @@ export class PdfiumEngine<T = Blob> implements PdfEngine<T> {
   private logger: Logger;
 
   /**
-   * function to convert ImageData to Blob
-   */
-  private readonly imageDataConverter: ImageDataConverter<T>;
-
-  /**
    * Create an instance of PdfiumEngine
    * @param wasmModule - pdfium wasm module
    * @param logger - logger instance
@@ -261,16 +193,12 @@ export class PdfiumEngine<T = Blob> implements PdfEngine<T> {
    */
   constructor(
     private pdfiumModule: WrappedPdfiumModule,
-    options: PdfiumEngineOptions<T> = {},
+    options: PdfiumEngineOptions = {},
   ) {
-    const {
-      logger = new NoopLogger(),
-      imageDataConverter = browserImageDataToBlobConverter as ImageDataConverter<T>,
-    } = options;
+    const { logger = new NoopLogger() } = options;
 
     this.cache = new PdfCache(this.pdfiumModule);
     this.logger = logger;
-    this.imageDataConverter = imageDataConverter;
     this.memoryManager = new MemoryManager(this.pdfiumModule, this.logger);
 
     if (this.logger.isEnabled('debug')) {
@@ -341,192 +269,6 @@ export class PdfiumEngine<T = Blob> implements PdfEngine<T> {
     } finally {
       if (bytes) this.memoryManager.free(ptr);
     }
-  }
-
-  /**
-   * {@inheritDoc @embedpdf/models!PdfEngine.openDocumentUrl}
-   *
-   * @public
-   */
-  public openDocumentUrl(file: PdfFileUrl, options?: PdfOpenDocumentUrlOptions) {
-    const mode = options?.mode ?? 'auto';
-    const password = options?.password ?? '';
-
-    this.logger.debug(LOG_SOURCE, LOG_CATEGORY, 'openDocumentUrl called', file.url, mode);
-
-    // We'll create a task to wrap asynchronous steps
-    const task = PdfTaskHelper.create<PdfDocumentObject>();
-
-    // Start an async procedure
-    (async () => {
-      try {
-        const fetchFullTask = await this.fetchFullAndOpen(file, password);
-        fetchFullTask.wait(
-          (doc) => task.resolve(doc),
-          (err) => task.reject(err.reason),
-        );
-      } catch (err) {
-        this.logger.error(LOG_SOURCE, LOG_CATEGORY, 'openDocumentUrl error', err);
-        task.reject({
-          code: PdfErrorCode.Unknown,
-          message: String(err),
-        });
-      }
-    })();
-
-    return task;
-  }
-
-  /**
-   * Check if the server supports range requests:
-   * Sends a HEAD request and sees if 'Accept-Ranges: bytes'.
-   */
-  private async checkRangeSupport(
-    url: string,
-  ): Promise<{ supportsRanges: boolean; fileLength: number; content: ArrayBuffer | null }> {
-    try {
-      this.logger.debug(LOG_SOURCE, LOG_CATEGORY, 'checkRangeSupport', url);
-
-      // First try HEAD request
-      const headResponse = await fetch(url, { method: 'HEAD' });
-      const fileLength = headResponse.headers.get('Content-Length');
-      const acceptRanges = headResponse.headers.get('Accept-Ranges');
-
-      // If server explicitly supports ranges, we're done
-      if (acceptRanges === 'bytes') {
-        return {
-          supportsRanges: true,
-          fileLength: parseInt(fileLength ?? '0'),
-          content: null,
-        };
-      }
-
-      // Test actual range request support
-      const testResponse = await fetch(url, {
-        headers: { Range: 'bytes=0-1' },
-      });
-
-      // If we get 200 instead of 206, server doesn't support ranges
-      // Return the full content since we'll need it anyway
-      if (testResponse.status === 200) {
-        const content = await testResponse.arrayBuffer();
-        return {
-          supportsRanges: false,
-          fileLength: parseInt(fileLength ?? '0'),
-          content: content,
-        };
-      }
-
-      // 206 Partial Content indicates range support
-      return {
-        supportsRanges: testResponse.status === 206,
-        fileLength: parseInt(fileLength ?? '0'),
-        content: null,
-      };
-    } catch (e) {
-      this.logger.error(LOG_SOURCE, LOG_CATEGORY, 'checkRangeSupport failed', e);
-      throw new Error('Failed to check range support: ' + e);
-    }
-  }
-
-  /**
-   * Fully fetch the file (using fetch) into an ArrayBuffer,
-   * then call openDocumentFromBuffer.
-   */
-  private async fetchFullAndOpen(file: PdfFileUrl, password: string) {
-    this.logger.debug(LOG_SOURCE, LOG_CATEGORY, 'fetchFullAndOpen', file.url);
-
-    // 1. fetch entire PDF as array buffer
-    const response = await fetch(file.url);
-    if (!response.ok) {
-      throw new Error(`Could not fetch PDF: ${response.statusText}`);
-    }
-    const arrayBuf = await response.arrayBuffer();
-
-    // 2. create a PdfFile object
-    const pdfFile: PdfFile = {
-      id: file.id,
-      name: file.name,
-      content: arrayBuf,
-    };
-
-    // 3. call openDocumentFromBuffer (the method you already have)
-    //    that returns a PdfTask, but let's wrap it in a Promise
-    return this.openDocumentBuffer(pdfFile, { password });
-  }
-
-  /**
-   * Use your synchronous partial-loading approach:
-   * - In your snippet, it's done via `openDocumentFromLoader`.
-   * - We'll do a synchronous XHR read callback that pulls
-   *   the desired byte ranges.
-   */
-  private async openDocumentWithRangeRequest(
-    file: PdfFileUrl,
-    password: string,
-    knownFileLength?: number,
-  ) {
-    this.logger.debug(LOG_SOURCE, LOG_CATEGORY, 'openDocumentWithRangeRequest', file.url);
-
-    // We first do a HEAD or a partial fetch to get the fileLength:
-    const fileLength = knownFileLength ?? (await this.retrieveFileLength(file.url)).fileLength;
-
-    // 2. define the callback function used by openDocumentFromLoader
-    const callback = (offset: number, length: number) => {
-      // Perform synchronous XHR:
-      const xhr = new XMLHttpRequest();
-      xhr.open('GET', file.url, false); // note: block in the Worker
-      xhr.overrideMimeType('text/plain; charset=x-user-defined');
-      xhr.setRequestHeader('Range', `bytes=${offset}-${offset + length - 1}`);
-      xhr.send(null);
-
-      if (xhr.status === 206 || xhr.status === 200) {
-        return this.convertResponseToUint8Array(xhr.responseText);
-      }
-      throw new Error(`Range request failed with status ${xhr.status}`);
-    };
-
-    // 3. call `openDocumentFromLoader`
-    return this.openDocumentFromLoader(
-      {
-        id: file.id,
-        fileLength,
-        callback,
-      },
-      password,
-    );
-  }
-
-  /**
-   * Helper to do a HEAD request or partial GET to find file length.
-   */
-  private async retrieveFileLength(url: string): Promise<{ fileLength: number }> {
-    this.logger.debug(LOG_SOURCE, LOG_CATEGORY, 'retrieveFileLength', url);
-
-    // We'll do a HEAD request to get Content-Length
-    const resp = await fetch(url, { method: 'HEAD' });
-    if (!resp.ok) {
-      throw new Error(`Failed HEAD request for file length: ${resp.statusText}`);
-    }
-    const lenStr = resp.headers.get('Content-Length') || '0';
-    const fileLength = parseInt(lenStr, 10) || 0;
-    if (!fileLength) {
-      throw new Error(`Content-Length not found or zero.`);
-    }
-    return { fileLength };
-  }
-
-  /**
-   * Convert response text (x-user-defined) to a Uint8Array
-   * for partial data.
-   */
-  private convertResponseToUint8Array(text: string): Uint8Array {
-    const array = new Uint8Array(text.length);
-    for (let i = 0; i < text.length; i++) {
-      // & 0xff ensures we only get the lower 8 bits
-      array[i] = text.charCodeAt(i) & 0xff;
-    }
-    return array;
   }
 
   /**
@@ -608,126 +350,12 @@ export class PdfiumEngine<T = Blob> implements PdfEngine<T> {
     return PdfTaskHelper.resolve(pdfDoc);
   }
 
-  openDocumentFromLoader(fileLoader: PdfFileLoader, password: string = '') {
-    const { fileLength, callback, ...file } = fileLoader;
-    this.logger.debug(LOG_SOURCE, LOG_CATEGORY, 'openDocumentFromLoader', file, password);
-    this.logger.perf(LOG_SOURCE, LOG_CATEGORY, `OpenDocumentFromLoader`, 'Begin', file.id);
-
-    const readBlock = (
-      _pThis: number, // Pointer to the FPDF_FILEACCESS structure
-      offset: number, // Pointer to a buffer to receive the data
-      pBuf: number, // Offset position from the beginning of the file
-      length: number, // Number of bytes to read
-    ): number => {
-      try {
-        this.logger.debug(LOG_SOURCE, LOG_CATEGORY, 'readBlock', offset, length, pBuf);
-
-        if (offset < 0 || offset >= fileLength) {
-          this.logger.error(LOG_SOURCE, LOG_CATEGORY, 'Offset out of bounds:', offset);
-          return 0;
-        }
-
-        // Get data chunk using the callback
-        const data = callback(offset, length);
-
-        // Copy the data to PDFium's buffer
-        const dest = new Uint8Array(this.pdfiumModule.pdfium.HEAPU8.buffer, pBuf, data.length);
-        dest.set(data);
-
-        return data.length;
-      } catch (error) {
-        this.logger.error(LOG_SOURCE, LOG_CATEGORY, 'ReadBlock error:', error);
-        return 0;
-      }
-    };
-
-    const callbackPtr = this.pdfiumModule.pdfium.addFunction(readBlock, 'iiiii');
-
-    // Create FPDF_FILEACCESS struct
-    const structSize = 12;
-    const fileAccessPtr = this.memoryManager.malloc(structSize);
-
-    // Set up struct fields
-    this.pdfiumModule.pdfium.setValue(fileAccessPtr, fileLength, 'i32');
-    this.pdfiumModule.pdfium.setValue(fileAccessPtr + 4, callbackPtr, 'i32');
-    this.pdfiumModule.pdfium.setValue(fileAccessPtr + 8, 0, 'i32');
-
-    // Load document
-    const docPtr = this.pdfiumModule.FPDF_LoadCustomDocument(fileAccessPtr, password);
-
-    if (!docPtr) {
-      const lastError = this.pdfiumModule.FPDF_GetLastError();
-      this.logger.error(
-        LOG_SOURCE,
-        LOG_CATEGORY,
-        `FPDF_LoadCustomDocument failed with ${lastError}`,
-      );
-      this.memoryManager.free(fileAccessPtr);
-      this.logger.perf(LOG_SOURCE, LOG_CATEGORY, `OpenDocumentFromLoader`, 'End', file.id);
-
-      return PdfTaskHelper.reject<PdfDocumentObject>({
-        code: lastError,
-        message: `FPDF_LoadCustomDocument failed`,
-      });
-    }
-
-    const pageCount = this.pdfiumModule.FPDF_GetPageCount(docPtr);
-
-    const pages: PdfPageObject[] = [];
-    const sizePtr = this.memoryManager.malloc(8);
-    for (let index = 0; index < pageCount; index++) {
-      const result = this.pdfiumModule.FPDF_GetPageSizeByIndexF(docPtr, index, sizePtr);
-      if (!result) {
-        const lastError = this.pdfiumModule.FPDF_GetLastError();
-        this.logger.error(
-          LOG_SOURCE,
-          LOG_CATEGORY,
-          `FPDF_GetPageSizeByIndexF failed with ${lastError}`,
-        );
-        this.memoryManager.free(sizePtr);
-        this.pdfiumModule.FPDF_CloseDocument(docPtr);
-        this.memoryManager.free(fileAccessPtr);
-        this.logger.perf(LOG_SOURCE, LOG_CATEGORY, `OpenDocumentFromLoader`, 'End', file.id);
-        return PdfTaskHelper.reject<PdfDocumentObject>({
-          code: lastError,
-          message: `FPDF_GetPageSizeByIndexF failed`,
-        });
-      }
-
-      const rotation = this.pdfiumModule.EPDF_GetPageRotationByIndex(docPtr, index) as Rotation;
-
-      const page = {
-        index,
-        size: {
-          width: this.pdfiumModule.pdfium.getValue(sizePtr, 'float'),
-          height: this.pdfiumModule.pdfium.getValue(sizePtr + 4, 'float'),
-        },
-        rotation,
-      };
-
-      pages.push(page);
-    }
-    this.memoryManager.free(sizePtr);
-
-    const pdfDoc: PdfDocumentObject = {
-      id: file.id,
-      name: file.name,
-      pageCount,
-      pages,
-    };
-    this.cache.setDocument(file.id, fileAccessPtr, docPtr);
-
-    this.logger.perf(LOG_SOURCE, LOG_CATEGORY, `OpenDocumentFromLoader`, 'End', file.id);
-
-    return PdfTaskHelper.resolve(pdfDoc);
-  }
-
   /**
    * {@inheritDoc @embedpdf/models!PdfEngine.getMetadata}
    *
    * @public
    */
-  getMetadata(doc: PdfDocumentObject): PdfTask<PdfMetadataObject, PdfErrorReason> {
+  getMetadata(doc: PdfDocumentObject): PdfTask<PdfMetadataObject> {
     this.logger.debug(LOG_SOURCE, LOG_CATEGORY, 'getMetadata', doc);
     this.logger.perf(LOG_SOURCE, LOG_CATEGORY, `GetMetadata`, 'Begin', doc.id);
 
@@ -1094,11 +722,11 @@ export class PdfiumEngine<T = Blob> implements PdfEngine<T> {
    *
    * @public
    */
-  renderPage(
+  renderPageRaw(
     doc: PdfDocumentObject,
     page: PdfPageObject,
     options?: PdfRenderPageOptions,
-  ): PdfTask<T> {
+  ): PdfTask<ImageData> {
     this.logger.debug(LOG_SOURCE, LOG_CATEGORY, 'renderPage', doc, page, options);
     this.logger.perf(LOG_SOURCE, LOG_CATEGORY, `RenderPage`, 'Begin', `${doc.id}-${page.index}`);
 
@@ -1119,7 +747,7 @@ export class PdfiumEngine<T = Blob> implements PdfEngine<T> {
     page: PdfPageObject,
     rect: Rect,
     options?: PdfRenderPageOptions,
-  ): PdfTask<T> {
+  ): PdfTask<ImageData> {
     this.logger.debug(LOG_SOURCE, LOG_CATEGORY, 'renderPageRect', doc, page, rect, options);
     this.logger.perf(
       LOG_SOURCE,
@@ -1133,86 +761,6 @@ export class PdfiumEngine<T = Blob> implements PdfEngine<T> {
     this.logger.perf(LOG_SOURCE, LOG_CATEGORY, `RenderPageRect`, 'End', `${doc.id}-${page.index}`);
 
     return task;
-  }
-
-  /**
-   * {@inheritDoc @embedpdf/models!PdfEngine.getAllAnnotations}
-   *
-   * @public
-   */
-  getAllAnnotations(
-    doc: PdfDocumentObject,
-  ): PdfTask<Record<number, PdfAnnotationObject[]>, PdfAnnotationsProgress> {
-    this.logger.debug(LOG_SOURCE, LOG_CATEGORY, 'getAllAnnotations-with-progress', doc);
-    this.logger.perf(LOG_SOURCE, LOG_CATEGORY, 'GetAllAnnotations', 'Begin', doc.id);
-
-    /* 1 ── create an async task wrapper ─────────────────────────────── */
-    const task = PdfTaskHelper.create<
-      Record<number, PdfAnnotationObject[]>,
-      PdfAnnotationsProgress
-    >();
-
-    let cancelled = false;
-    task.wait(ignore, (err) => {
-      if (err.type === 'abort') cancelled = true;
-    });
-
-    /* 2 ── sanity-check: document must be open ──────────────────────── */
-    const ctx = this.cache.getContext(doc.id);
-    if (!ctx) {
-      this.logger.perf(LOG_SOURCE, LOG_CATEGORY, 'GetAllAnnotations', 'End', doc.id);
-      task.reject({ code: PdfErrorCode.DocNotOpen, message: 'document does not open' });
-      return task;
-    }
-
-    /* 3 ── chunked walk so we yield less often, but still breathe ───── */
-    const CHUNK_SIZE = 100; // ← tweak here
-    const out: Record<number, PdfAnnotationObject[]> = {};
-
-    const processChunk = (startIdx: number): void => {
-      if (cancelled) return;
-
-      const endIdx = Math.min(startIdx + CHUNK_SIZE, doc.pageCount);
-      for (let pageIdx = startIdx; pageIdx < endIdx && !cancelled; ++pageIdx) {
-        this.logger.debug(LOG_SOURCE, LOG_CATEGORY, 'GetAllAnnotations', 'Begin', doc.id, pageIdx);
-
-        /* read this page’s annotations */
-        const annots = this.readPageAnnotationsRaw(ctx, doc.pages[pageIdx]);
-        out[pageIdx] = annots;
-
-        this.logger.debug(LOG_SOURCE, LOG_CATEGORY, 'GetAllAnnotations', 'End', doc.id, pageIdx);
-        task.progress({ page: pageIdx, annotations: annots });
-      }
-
-      /* all done? */
-      if (cancelled) return;
-      if (endIdx >= doc.pageCount) {
-        this.logger.perf(LOG_SOURCE, LOG_CATEGORY, 'GetAllAnnotations', 'End', doc.id);
-        task.resolve(out);
-        return;
-      }
-
-      /* let the browser breathe, then continue with next chunk */
-      setTimeout(() => processChunk(endIdx), 0);
-    };
-
-    /* kick-off */
-    processChunk(0);
-    return task;
-  }
-
-  private readAllAnnotations(
-    doc: PdfDocumentObject,
-    ctx: DocumentContext,
-  ): Record<number, PdfAnnotationObject[]> {
-    const annotationsByPage: Record<number, PdfAnnotationObject[]> = {};
-
-    for (let i = 0; i < doc.pageCount; i++) {
-      const pageAnnotations = this.readPageAnnotations(ctx, doc.pages[i]);
-      annotationsByPage[i] = pageAnnotations;
-    }
-
-    return annotationsByPage;
   }
 
   /**
@@ -1712,11 +1260,11 @@ export class PdfiumEngine<T = Blob> implements PdfEngine<T> {
    *
    * @public
    */
-  renderThumbnail(
+  renderThumbnailRaw(
     doc: PdfDocumentObject,
     page: PdfPageObject,
     options?: PdfRenderThumbnailOptions,
-  ): PdfTask<T> {
+  ): PdfTask<ImageData> {
     const { scaleFactor = 1, ...rest } = options ?? {};
     this.logger.debug(LOG_SOURCE, LOG_CATEGORY, 'renderThumbnail', doc, page, options);
     this.logger.perf(
@@ -1743,7 +1291,7 @@ export class PdfiumEngine<T = Blob> implements PdfEngine<T> {
       });
     }
 
-    const result = this.renderPage(doc, page, {
+    const result = this.renderPageRaw(doc, page, {
       scaleFactor: Math.max(scaleFactor, 0.5),
       ...rest,
     });
@@ -4038,9 +3586,27 @@ export class PdfiumEngine<T = Blob> implements PdfEngine<T> {
    *
    * @private
    */
-  private readPageAnnotationsRaw(ctx: DocumentContext, page: PdfPageObject): PdfAnnotationObject[] {
+  readPageAnnotationsRaw(
+    doc: PdfDocumentObject,
+    page: PdfPageObject,
+  ): PdfTask<PdfAnnotationObject[]> {
+    this.logger.debug(LOG_SOURCE, LOG_CATEGORY, 'readPageAnnotationsRaw', doc, page);
+    this.logger.perf(
+      LOG_SOURCE,
+      LOG_CATEGORY,
+      `ReadPageAnnotationsRaw`,
+      'Begin',
+      `${doc.id}-${page.index}`,
+    );
+    const ctx = this.cache.getContext(doc.id);
+    if (!ctx) {
+      return PdfTaskHelper.reject({
+        code: PdfErrorCode.DocNotOpen,
+        message: 'document does not open',
+      });
+    }
     const count = this.pdfiumModule.EPDFPage_GetAnnotCountRaw(ctx.docPtr, page.index);
-    if (count <= 0) return [];
+    if (count <= 0) return PdfTaskHelper.resolve([] as PdfAnnotationObject[]);
 
     const out: PdfAnnotationObject[] = [];
 
@@ -4055,7 +3621,21 @@ export class PdfiumEngine<T = Blob> implements PdfEngine<T> {
         this.pdfiumModule.FPDFPage_CloseAnnot(annotPtr);
       }
     }
-    return out;
+    this.logger.perf(
+      LOG_SOURCE,
+      LOG_CATEGORY,
+      `ReadPageAnnotationsRaw`,
+      'End',
+      `${doc.id}-${page.index}`,
+    );
+    this.logger.debug(
+      LOG_SOURCE,
+      LOG_CATEGORY,
+      'readPageAnnotationsRaw',
+      `${doc.id}-${page.index}`,
+      out,
+    );
+    return PdfTaskHelper.resolve(out);
   }
 
   /**
@@ -6680,19 +6260,17 @@ export class PdfiumEngine<T = Blob> implements PdfEngine<T> {
    *
    * @public
    */
-  renderPageAnnotation(
+  renderPageAnnotationRaw(
     doc: PdfDocumentObject,
     page: PdfPageObject,
     annotation: PdfAnnotationObject,
     options?: PdfRenderPageAnnotationOptions,
-  ): PdfTask<T> {
+  ): PdfTask<ImageData> {
     const {
       scaleFactor = 1,
       rotation = Rotation.Degree0,
       dpr = 1,
       mode = AppearanceMode.Normal,
-      imageType = 'image/webp',
-      imageQuality,
     } = options ?? {};
 
     this.logger.debug(
@@ -6712,7 +6290,7 @@ export class PdfiumEngine<T = Blob> implements PdfEngine<T> {
       `${doc.id}-${page.index}-${annotation.id}`,
     );
 
-    const task = new Task<T, PdfErrorReason>();
+    const task = new Task<ImageData, PdfErrorReason>();
     const ctx = this.cache.getContext(doc.id);
     if (!ctx) {
       this.logger.perf(
@@ -6810,115 +6388,11 @@ export class PdfiumEngine<T = Blob> implements PdfEngine<T> {
       });
     }
 
-    // 6) encode
-    const dispose = () => this.memoryManager.free(heapPtr);
-
-    this.imageDataConverter(
-      () => {
-        const rgba = new Uint8ClampedArray(
-          this.pdfiumModule.pdfium.HEAPU8.subarray(heapPtr, heapPtr + bytes),
-        );
-        return {
-          width: wDev,
-          height: hDev,
-          data: rgba,
-        };
-      },
-      imageType,
-      imageQuality,
-    )
-      .then((out) => task.resolve(out))
-      .catch((e) => {
-        // Check if it's an OffscreenCanvas error and we haven't copied data yet
-        if (e instanceof OffscreenCanvasError) {
-          // Fallback to WASM encoding without wasting the copy
-          try {
-            const blob = this.encodeViaWasm(
-              { ptr: heapPtr, width: wDev, height: hDev, stride },
-              { type: imageType, quality: imageQuality },
-            );
-            task.resolve(blob as T);
-          } catch (wasmError) {
-            task.reject({ code: PdfErrorCode.Unknown, message: String(wasmError) });
-          }
-        } else {
-          task.reject({ code: PdfErrorCode.Unknown, message: String(e) });
-        }
-      })
-      .finally(dispose);
-
+    const data = this.pdfiumModule.pdfium.HEAPU8.subarray(heapPtr, heapPtr + bytes);
+    const imageData = new ImageData(new Uint8ClampedArray(data), wDev, hDev);
+    task.resolve(imageData);
+    this.memoryManager.free(heapPtr);
     return task;
-  }
-
-  private encodeViaWasm(
-    buf: { ptr: number; width: number; height: number; stride: number },
-    opts: ConvertToBlobOptions,
-  ): Blob {
-    const pdf = this.pdfiumModule.pdfium;
-
-    // Helper to copy out and free a payload allocated in WASM
-    const blobFrom = (outPtr: WasmPointer, size: number, mime: string) => {
-      const view = pdf.HEAPU8.subarray(outPtr, outPtr + size);
-      const copy = new Uint8Array(view); // detach from WASM before free
-      this.memoryManager.free(outPtr);
-      return new Blob([copy], { type: mime });
-    };
-
-    // Map OffscreenCanvas "quality 0..1" to encoders:
-    //  • WebP: 0..100 (float), default ~0.82 → 82
-    //  • JPEG: 1..100 (int),   default ~0.92 → 92
-    //const q = opts.quality;
-    //const webpQ = q == null ? 82 : Math.round(q * 100);
-    //const jpegQ = q == null ? 92 : Math.max(1, Math.round(q * 100));
-    // PNG ignores quality (same as OffscreenCanvas). Use libpng default (6).
-    const pngLevel = 6;
-
-    const outPtrPtr = this.memoryManager.malloc(4);
-    try {
-      switch (opts.type) {
-        /*
-        case 'image/webp': {
-          const size = this.pdfiumModule.EPDF_WebP_EncodeRGBA(
-            buf.ptr,
-            buf.width,
-            buf.height,
-            buf.stride,
-            webpQ,
-            outPtrPtr,
-          );
-          const outPtr = pdf.getValue(outPtrPtr, 'i32');
-          return blobFrom(outPtr, size, 'image/webp');
-        }
-        case 'image/jpeg': {
-          const size = this.pdfiumModule.EPDF_JPEG_EncodeRGBA(
-            buf.ptr,
-            buf.width,
-            buf.height,
-            buf.stride,
-            jpegQ,
-            outPtrPtr,
-          );
-          const outPtr = pdf.getValue(outPtrPtr, 'i32');
-          return blobFrom(outPtr, size, 'image/jpeg');
-        }
-        */
-        case 'image/png':
-        default: {
-          const size = this.pdfiumModule.EPDF_PNG_EncodeRGBA(
-            buf.ptr,
-            buf.width,
-            buf.height,
-            buf.stride,
-            pngLevel,
-            outPtrPtr,
-          );
-          const outPtr = pdf.getValue(outPtrPtr, 'i32');
-          return blobFrom(WasmPointer(outPtr), size, 'image/png');
-        }
-      }
-    } finally {
-      this.memoryManager.free(outPtrPtr);
-    }
   }
 
   private renderRectEncoded(
@@ -6926,11 +6400,8 @@ export class PdfiumEngine<T = Blob> implements PdfEngine<T> {
     page: PdfPageObject,
     rect: Rect,
     options?: PdfRenderPageOptions,
-  ): PdfTask<T> {
-    const task = new Task<T, PdfErrorReason>();
-
-    const imageType: ImageConversionTypes = options?.imageType ?? 'image/webp';
-    const quality = options?.imageQuality;
+  ): PdfTask<ImageData> {
+    const task = new Task<ImageData, PdfErrorReason>();
     const rotation: Rotation = options?.rotation ?? Rotation.Degree0;
 
     const ctx = this.cache.getContext(doc.id);
@@ -6998,45 +6469,41 @@ export class PdfiumEngine<T = Blob> implements PdfEngine<T> {
       this.memoryManager.free(clipPtr);
     }
 
-    const dispose = () => {
-      this.pdfiumModule.FPDFBitmap_Destroy(bitmapPtr);
-      this.memoryManager.free(heapPtr);
-    };
+    this.logger.perf(
+      LOG_SOURCE,
+      LOG_CATEGORY,
+      `RenderRectEncodedData`,
+      'Begin',
+      `${doc.id}-${page.index}`,
+    );
+    const data = this.pdfiumModule.pdfium.HEAPU8.subarray(heapPtr, heapPtr + bytes);
+    this.logger.perf(
+      LOG_SOURCE,
+      LOG_CATEGORY,
+      `RenderRectEncodedData`,
+      'End',
+      `${doc.id}-${page.index}`,
+    );
 
-    this.imageDataConverter(
-      () => {
-        const heapBuf = this.pdfiumModule.pdfium.HEAPU8.buffer as unknown as ArrayBuffer;
-        const data = new Uint8ClampedArray(heapBuf, heapPtr, bytes);
-        return {
-          width: wDev,
-          height: hDev,
-          data,
-        };
-      },
-      imageType,
-      quality,
-    )
-      .then((out) => task.resolve(out))
-      .catch((e) => {
-        this.logger.error(LOG_SOURCE, LOG_CATEGORY, 'Error', e);
-        // Check if it's an OffscreenCanvas error and we haven't copied data yet
-        if (e instanceof OffscreenCanvasError) {
-          // Fallback to WASM encoding without wasting the copy
-          this.logger.info(LOG_SOURCE, LOG_CATEGORY, 'Fallback to WASM encoding');
-          try {
-            const blob = this.encodeViaWasm(
-              { ptr: heapPtr, width: wDev, height: hDev, stride },
-              { type: imageType, quality },
-            );
-            task.resolve(blob as T);
-          } catch (wasmError) {
-            task.reject({ code: PdfErrorCode.Unknown, message: String(wasmError) });
-          }
-        } else {
-          task.reject({ code: PdfErrorCode.Unknown, message: String(e) });
-        }
-      })
-      .finally(dispose);
+    this.logger.perf(
+      LOG_SOURCE,
+      LOG_CATEGORY,
+      `RenderRectEncodedImageData`,
+      'Begin',
+      `${doc.id}-${page.index}`,
+    );
+    const imageData = new ImageData(new Uint8ClampedArray(data), wDev, hDev);
+    this.logger.perf(
+      LOG_SOURCE,
+      LOG_CATEGORY,
+      `RenderRectEncodedImageData`,
+      'End',
+      `${doc.id}-${page.index}`,
+    );
+    task.resolve(imageData);
+
+    this.pdfiumModule.FPDFBitmap_Destroy(bitmapPtr);
+    this.memoryManager.free(heapPtr);
 
     return task;
   }
@@ -7730,103 +7197,33 @@ export class PdfiumEngine<T = Blob> implements PdfEngine<T> {
    *
    * @public
    */
-  searchAllPages(
+  searchInPage(
     doc: PdfDocumentObject,
+    page: PdfPageObject,
     keyword: string,
-    options?: PdfSearchAllPagesOptions,
-  ): PdfTask<SearchAllPagesResult, PdfPageSearchProgress> {
-    this.logger.debug(LOG_SOURCE, LOG_CATEGORY, 'searchAllPages', doc, keyword, options);
-    this.logger.perf(LOG_SOURCE, LOG_CATEGORY, 'SearchAllPages', 'Begin', doc.id);
-
-    // Resolve early if doc not open
+    flags: number,
+  ): PdfTask<SearchResult[]> {
+    this.logger.debug(LOG_SOURCE, LOG_CATEGORY, 'searchInPage', doc, page, keyword, flags);
+    this.logger.perf(LOG_SOURCE, LOG_CATEGORY, `SearchInPage`, 'Begin', `${doc.id}-${page.index}`);
+    // Move keyword allocation inside here
     const ctx = this.cache.getContext(doc.id);
     if (!ctx) {
-      this.logger.perf(LOG_SOURCE, LOG_CATEGORY, 'SearchAllPages', 'End', doc.id);
-      return PdfTaskHelper.resolve<SearchAllPagesResult, PdfPageSearchProgress>({
-        results: [],
-        total: 0,
+      this.logger.perf(LOG_SOURCE, LOG_CATEGORY, `PreparePrintDocument`, 'End', doc.id);
+      return PdfTaskHelper.reject({
+        code: PdfErrorCode.DocNotOpen,
+        message: 'Document is not open',
       });
     }
-
-    // Build UTF-16 keyword buffer
     const length = 2 * (keyword.length + 1);
     const keywordPtr = this.memoryManager.malloc(length);
     this.pdfiumModule.pdfium.stringToUTF16(keyword, keywordPtr, length);
 
-    // Fold flags
-    const flag =
-      options?.flags?.reduce((acc: MatchFlag, f: MatchFlag) => acc | f, MatchFlag.None) ??
-      MatchFlag.None;
-
-    // Create task with progress payload
-    const task = PdfTaskHelper.create<SearchAllPagesResult, PdfPageSearchProgress>();
-
-    let cancelled = false;
-    task.wait(
-      () => {},
-      (err) => {
-        if (err.type === 'abort') cancelled = true;
-      },
-    );
-
-    const CHUNK_SIZE = 100; // tune as needed
-    const allResults: SearchResult[] = [];
-
-    const processChunk = (startIdx: number): void => {
-      if (cancelled) return;
-
-      const endIdx = Math.min(startIdx + CHUNK_SIZE, doc.pageCount);
-
-      try {
-        for (let pageIndex = startIdx; pageIndex < endIdx && !cancelled; pageIndex++) {
-          // Search this page once
-          const pageResults = this.searchAllInPage(ctx, doc.pages[pageIndex], keywordPtr, flag);
-
-          // Accumulate and emit progress
-          allResults.push(...pageResults);
-          task.progress({ page: pageIndex, results: pageResults });
-        }
-      } catch (e) {
-        if (!cancelled) {
-          this.memoryManager.free(keywordPtr);
-          this.logger.perf(LOG_SOURCE, LOG_CATEGORY, 'SearchAllPages', 'End', doc.id);
-          task.reject({
-            code: PdfErrorCode.Unknown,
-            message: `Error searching document: ${e}`,
-          });
-        }
-        return;
-      }
-
-      if (cancelled) return;
-
-      if (endIdx >= doc.pageCount) {
-        this.memoryManager.free(keywordPtr);
-        this.logger.perf(LOG_SOURCE, LOG_CATEGORY, 'SearchAllPages', 'End', doc.id);
-        task.resolve({ results: allResults, total: allResults.length });
-        return;
-      }
-
-      // yield to event loop
-      setTimeout(() => processChunk(endIdx), 0);
-    };
-
-    // kick off
-    setTimeout(() => processChunk(0), 0);
-
-    // Ensure buffer is freed if caller aborts mid-flight
-    task.wait(
-      () => {},
-      (err) => {
-        if (err.type === 'abort') {
-          try {
-            this.memoryManager.free(keywordPtr);
-          } catch {}
-        }
-      },
-    );
-
-    return task;
+    try {
+      const results = this.searchAllInPage(ctx, page, keywordPtr, flags);
+      return PdfTaskHelper.resolve(results);
+    } finally {
+      this.memoryManager.free(keywordPtr);
+    }
   }
 
   /**

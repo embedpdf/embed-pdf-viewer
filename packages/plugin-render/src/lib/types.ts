@@ -1,7 +1,16 @@
 import { BasePluginConfig } from '@embedpdf/core';
-import { PdfErrorReason, PdfRenderPageOptions, Rect, Task } from '@embedpdf/models';
+import {
+  ImageConversionTypes,
+  PdfErrorReason,
+  PdfRenderPageOptions,
+  Rect,
+  Task,
+} from '@embedpdf/models';
 
-export interface RenderPluginConfig extends BasePluginConfig {}
+export interface RenderPluginConfig extends BasePluginConfig {
+  defaultImageType?: ImageConversionTypes;
+  defaultImageQuality?: number;
+}
 
 export interface RenderPageRectOptions {
   pageIndex: number;
