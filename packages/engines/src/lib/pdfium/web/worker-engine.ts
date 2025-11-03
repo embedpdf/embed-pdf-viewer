@@ -2,6 +2,7 @@ import { Logger, serializeLogger } from '@embedpdf/models';
 import { PdfEngine } from '../../orchestrator/pdf-engine';
 import { RemoteExecutor } from '../../orchestrator/remote-executor';
 import { ImageEncoderWorkerPool } from '../../image-encoder';
+import { createWorkerPoolImageConverter } from '../image-converter';
 
 /* eslint-disable @typescript-eslint/ban-ts-comment */
 // @ts-ignore injected at build time
@@ -19,11 +20,6 @@ export interface CreatePdfiumEngineOptions {
    * Set to 2-4 for optimal performance with parallel encoding
    */
   encoderPoolSize?: number;
-  /**
-   * URL to the image encoder worker script (optional - uses built-in worker if not provided)
-   * If not provided, the encoder worker code is automatically injected at build time
-   */
-  encoderWorkerUrl?: string;
 }
 
 /**
@@ -65,7 +61,7 @@ export function createPdfiumEngine(
       ? { logger: options as Logger }
       : (options as CreatePdfiumEngineOptions) || {};
 
-  const { logger, encoderPoolSize, encoderWorkerUrl } = config;
+  const { logger, encoderPoolSize } = config;
 
   // Create PDFium worker
   const worker = new Worker(
@@ -86,27 +82,18 @@ export function createPdfiumEngine(
   // Create RemoteExecutor (proxy to worker)
   const remoteExecutor = new RemoteExecutor(worker, logger);
 
-  // Create encoder pool if requested
-  let encoderPool: ImageEncoderWorkerPool | undefined;
-  if (encoderPoolSize && encoderPoolSize > 0) {
-    // If no URL provided, create one from the injected code
-    const finalEncoderWorkerUrl =
-      encoderWorkerUrl ??
-      URL.createObjectURL(new Blob([__ENCODER_WORKER_BODY__], { type: 'application/javascript' }));
-
-    encoderPool = new ImageEncoderWorkerPool(encoderPoolSize, finalEncoderWorkerUrl, logger);
-  }
+  const finalEncoderWorkerUrl = URL.createObjectURL(
+    new Blob([__ENCODER_WORKER_BODY__], { type: 'application/javascript' }),
+  );
+  const encoderPool = new ImageEncoderWorkerPool(
+    encoderPoolSize ?? 2,
+    finalEncoderWorkerUrl,
+    logger,
+  );
 
   // Create the "smart" orchestrator
   return new PdfEngine<Blob>(remoteExecutor, {
-    imageConverter: encoderPool
-      ? (getImageData, imageType, quality) => {
-          const imageData = getImageData();
-          return encoderPool!.encode(imageData, imageType, quality);
-        }
-      : undefined, // Will use worker's encoding if no pool
-    fetcher: fetch,
+    imageConverter: createWorkerPoolImageConverter(encoderPool),
     logger,
-    encoderPool,
   });
 }

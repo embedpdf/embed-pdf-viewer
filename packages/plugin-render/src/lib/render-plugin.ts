@@ -28,8 +28,6 @@ export class RenderPlugin extends BasePlugin<RenderPluginConfig, RenderCapabilit
     this.config = config;
   }
 
-  async initialize(_config: RenderPluginConfig): Promise<void> {}
-
   protected buildCapability(): RenderCapability {
     return {
       renderPage: this.renderPage.bind(this),

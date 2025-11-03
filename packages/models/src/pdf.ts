@@ -2341,7 +2341,7 @@ export interface PdfFileLoader extends PdfFileWithoutContent {
 
 export interface PdfAnnotationsProgress {
   page: number;
-  annotations: PdfAnnotationObject[];
+  result: PdfAnnotationObject[];
 }
 
 /**

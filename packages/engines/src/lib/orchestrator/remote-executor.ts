@@ -47,7 +47,6 @@ type MessageType =
   | 'initialize'
   | 'destroy'
   | 'openDocumentBuffer'
-  | 'openDocumentFromLoader'
   | 'getMetadata'
   | 'setMetadata'
   | 'getDocPermissions'
@@ -224,10 +223,6 @@ export class RemoteExecutor implements IPdfExecutor {
     options?: PdfOpenDocumentBufferOptions,
   ): PdfTask<PdfDocumentObject> {
     return this.send<PdfDocumentObject>('openDocumentBuffer', [file, options]);
-  }
-
-  openDocumentFromLoader(fileLoader: any, password?: string): PdfTask<PdfDocumentObject> {
-    return this.send<PdfDocumentObject>('openDocumentFromLoader', [fileLoader, password]);
   }
 
   getMetadata(doc: PdfDocumentObject): PdfTask<PdfMetadataObject> {
