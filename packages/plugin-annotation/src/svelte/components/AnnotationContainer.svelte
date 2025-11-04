@@ -9,7 +9,7 @@
         SelectionMenuProps,
         VertexHandleUI
     } from "../types";
-    import {useInteractionHandles, doublePress, CounterRotate} from "@embedpdf/utils/svelte";
+    import {useInteractionHandles, doublePress, CounterRotate, deepToRaw} from "@embedpdf/utils/svelte";
 
     interface AnnotationContainerProps {
         scale: number;
@@ -119,8 +119,8 @@
                 if (event.state === 'end' && patched) {
                     gestureBaseRef = null;
                     // Sanitize to remove Svelte reactive properties before updating
-                    // Use JSON roundtrip to ensure only plain serializable data
-                    const sanitized = JSON.parse(JSON.stringify(patched));
+                    // Use deepToRaw to recursively strip proxies while preserving complex objects
+                    const sanitized = deepToRaw(patched);
                     annotationCapability.provides?.updateAnnotation(pageIndex, trackedAnnotation.object.id, sanitized);
                 }
 
