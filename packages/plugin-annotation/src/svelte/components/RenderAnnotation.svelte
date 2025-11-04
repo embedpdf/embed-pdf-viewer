@@ -2,6 +2,7 @@
   import { ignore, type PdfAnnotationObject, PdfErrorCode } from '@embedpdf/models';
   import type { HTMLImgAttributes } from 'svelte/elements';
   import { useAnnotationCapability } from '../hooks';
+  import { deepToRaw } from '@embedpdf/utils/svelte';
 
   interface RenderAnnotationProps extends Omit<HTMLImgAttributes, 'style'> {
     pageIndex: number;
@@ -26,18 +27,12 @@
 
   const { width, height } = $derived(annotation.rect.size);
 
-  // Clone to avoid reactive proxies that Web Workers cannot clone
-  const createPlainAnnotation = (anno: PdfAnnotationObject): PdfAnnotationObject => {
-    return JSON.parse(JSON.stringify(anno));
-  };
-
   // Effect to render annotation
   $effect(() => {
     if (annotationCapability.provides) {
-      const plainAnnotation = createPlainAnnotation(annotation);
       const task = annotationCapability.provides.renderAnnotation({
         pageIndex,
-        annotation: plainAnnotation,
+        annotation: deepToRaw(annotation),
         options: {
           scaleFactor,
           dpr: window.devicePixelRatio,
