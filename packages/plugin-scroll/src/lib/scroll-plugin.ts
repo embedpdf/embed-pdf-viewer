@@ -494,7 +494,6 @@ export class ScrollPlugin extends BasePlugin<
 
     const pages = this.getSpreadPagesWithRotatedSize(documentId);
     const layout = this.computeLayout(documentId, pages);
-
     // Get viewport metrics for this document
     const viewport = this.viewport.forDocument(documentId);
     const metrics = this.computeMetrics(documentId, viewport.getMetrics(), layout.virtualItems);
@@ -519,7 +518,9 @@ export class ScrollPlugin extends BasePlugin<
     if (!coreDoc) throw new Error(`Document ${id} not loaded`);
 
     const spreadPages =
-      this.spread?.getSpreadPages(id) || coreDoc.document?.pages.map((page) => [page]) || [];
+      this.spread?.forDocument(id).getSpreadPages() ||
+      coreDoc.document?.pages.map((page) => [page]) ||
+      [];
     return spreadPages.map((spread) =>
       spread.map((page) => ({
         ...page,

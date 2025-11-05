@@ -53,12 +53,22 @@ export interface RetryOptions {
   password?: string;
 }
 
+export interface OpenDocumentResponse {
+  documentId: string;
+  task: Task<PdfDocumentObject, PdfErrorReason>;
+}
+
 export interface DocumentManagerCapability {
   // Document lifecycle
-  openFileDialog: () => void;
-  openDocumentUrl(options: LoadDocumentUrlOptions): Task<string, PdfErrorReason>;
-  openDocumentBuffer(options: LoadDocumentBufferOptions): Task<string, PdfErrorReason>;
-  retryDocument(documentId: string, options?: RetryOptions): Task<string, PdfErrorReason>;
+  openFileDialog: () => Task<OpenDocumentResponse, PdfErrorReason>;
+  openDocumentUrl(options: LoadDocumentUrlOptions): Task<OpenDocumentResponse, PdfErrorReason>;
+  openDocumentBuffer(
+    options: LoadDocumentBufferOptions,
+  ): Task<OpenDocumentResponse, PdfErrorReason>;
+  retryDocument(
+    documentId: string,
+    options?: RetryOptions,
+  ): Task<OpenDocumentResponse, PdfErrorReason>;
   closeDocument(documentId: string): Task<void, PdfErrorReason>;
   closeAllDocuments(): Task<void[], PdfErrorReason>;
 

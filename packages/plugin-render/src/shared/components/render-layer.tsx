@@ -71,7 +71,7 @@ export function RenderLayer({
   }, [dprOverride]);
 
   useEffect(() => {
-    if (!renderProvides || !documentState) return;
+    if (!renderProvides) return;
 
     const task = renderProvides.forDocument(documentId).renderPage({
       pageIndex,
@@ -98,15 +98,7 @@ export function RenderLayer({
         });
       }
     };
-  }, [
-    documentId,
-    pageIndex,
-    actualScale,
-    actualDpr,
-    renderProvides,
-    documentState,
-    refreshVersion,
-  ]);
+  }, [documentId, pageIndex, actualScale, actualDpr, renderProvides, refreshVersion]);
 
   const handleImageLoad = () => {
     if (urlRef.current) {

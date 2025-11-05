@@ -37,7 +37,7 @@ export function PageControls({ documentId }: PageControlsProps) {
     if (!viewport) return;
 
     return viewport.onScrollActivity((activity) => {
-      if (activity) {
+      if (activity.documentId === documentId) {
         setIsVisible(true);
         startHideTimer();
       }

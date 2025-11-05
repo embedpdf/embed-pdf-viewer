@@ -41,7 +41,7 @@ export const useActiveDocument = () => {
 /**
  * Hook for all open documents (in order)
  */
-export const useOpenDocuments = () => {
+export const useOpenDocuments = (documentIds?: string[]) => {
   const coreState = useCoreState();
   const { provides } = useDocumentManagerCapability();
   const [documentOrder, setDocumentOrder] = useState<string[]>([]);
@@ -64,8 +64,9 @@ export const useOpenDocuments = () => {
 
     return documentOrder
       .map((docId) => coreState.documents[docId])
-      .filter((doc): doc is DocumentState => doc !== null && doc !== undefined);
-  }, [coreState, documentOrder]);
+      .filter((doc): doc is DocumentState => doc !== null && doc !== undefined)
+      .filter((doc) => !documentIds || documentIds.length === 0 || documentIds.includes(doc.id));
+  }, [coreState, documentOrder, documentIds]);
 
   return documents;
 };

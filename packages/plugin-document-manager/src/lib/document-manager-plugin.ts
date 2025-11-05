@@ -32,6 +32,7 @@ import {
   LoadDocumentBufferOptions,
   RetryOptions,
   DocumentErrorEvent,
+  OpenDocumentResponse,
 } from './types';
 import {
   DocumentManagerAction,
@@ -53,7 +54,7 @@ export class DocumentManagerPlugin extends BasePlugin<
   private readonly activeDocumentChanged$ = createBehaviorEmitter<DocumentChangeEvent>();
   private readonly documentError$ = createBehaviorEmitter<DocumentErrorEvent>();
   private readonly documentOrderChanged$ = createBehaviorEmitter<DocumentOrderChangeEvent>();
-  private readonly openFileRequest$ = createEmitter<'open'>();
+  private readonly openFileRequest$ = createEmitter<Task<OpenDocumentResponse, PdfErrorReason>>();
 
   private maxDocuments?: number;
 
@@ -72,7 +73,7 @@ export class DocumentManagerPlugin extends BasePlugin<
   protected buildCapability(): DocumentManagerCapability {
     return {
       // Document lifecycle
-      openFileDialog: () => this.openFileRequest$.emit('open'),
+      openFileDialog: () => this.openFileDialog(),
       openDocumentUrl: (options) => this.openDocumentUrl(options),
       openDocumentBuffer: (options) => this.openDocumentBuffer(options),
       retryDocument: (documentId, options) => this.retryDocument(documentId, options),
@@ -169,7 +170,9 @@ export class DocumentManagerPlugin extends BasePlugin<
     );
   }
 
-  public onOpenFileRequest(handler: Listener<'open'>): Unsubscribe {
+  public onOpenFileRequest(
+    handler: Listener<Task<OpenDocumentResponse, PdfErrorReason>>,
+  ): Unsubscribe {
     return this.openFileRequest$.on(handler);
   }
 
@@ -177,8 +180,12 @@ export class DocumentManagerPlugin extends BasePlugin<
   // Document Loading
   // ─────────────────────────────────────────────────────────
 
-  private openDocumentUrl(options: LoadDocumentUrlOptions): Task<string, PdfErrorReason> {
-    const task = new Task<string, PdfErrorReason>();
+  private openDocumentUrl(
+    options: LoadDocumentUrlOptions,
+  ): Task<OpenDocumentResponse, PdfErrorReason> {
+    const task = new Task<OpenDocumentResponse, PdfErrorReason>();
+
+    const documentId = options.documentId || this.generateDocumentId();
 
     const limitError = this.checkDocumentLimit();
     if (limitError) {
@@ -186,7 +193,6 @@ export class DocumentManagerPlugin extends BasePlugin<
       return task;
     }
 
-    const documentId = options.documentId || this.generateDocumentId();
     const documentName = this.extractNameFromUrl(options.url);
 
     // Store options for potential retry (will be cleared on success)
@@ -221,14 +227,21 @@ export class DocumentManagerPlugin extends BasePlugin<
       headers: options.headers,
     });
 
+    task.resolve({
+      documentId,
+      task: engineTask,
+    });
+
     // Handle result
-    this.handleLoadTask(documentId, engineTask, task, 'OpenDocumentUrl');
+    this.handleLoadTask(documentId, engineTask, 'OpenDocumentUrl');
 
     return task;
   }
 
-  private openDocumentBuffer(options: LoadDocumentBufferOptions): Task<string, PdfErrorReason> {
-    const task = new Task<string, PdfErrorReason>();
+  private openDocumentBuffer(
+    options: LoadDocumentBufferOptions,
+  ): Task<OpenDocumentResponse, PdfErrorReason> {
+    const task = new Task<OpenDocumentResponse, PdfErrorReason>();
 
     const limitError = this.checkDocumentLimit();
     if (limitError) {
@@ -268,8 +281,13 @@ export class DocumentManagerPlugin extends BasePlugin<
       password: options.password,
     });
 
+    task.resolve({
+      documentId,
+      task: engineTask,
+    });
+
     // Handle result
-    this.handleLoadTask(documentId, engineTask, task, 'OpenDocumentBuffer');
+    this.handleLoadTask(documentId, engineTask, 'OpenDocumentBuffer');
 
     return task;
   }
@@ -277,8 +295,8 @@ export class DocumentManagerPlugin extends BasePlugin<
   private retryDocument(
     documentId: string,
     retryOptions?: RetryOptions,
-  ): Task<string, PdfErrorReason> {
-    const task = new Task<string, PdfErrorReason>();
+  ): Task<OpenDocumentResponse, PdfErrorReason> {
+    const task = new Task<OpenDocumentResponse, PdfErrorReason>();
 
     // Validate retry
     const validation = this.validateRetry(documentId);
@@ -314,9 +332,20 @@ export class DocumentManagerPlugin extends BasePlugin<
         ? this.retryUrlDocument(documentId, mergedOptions)
         : this.retryBufferDocument(documentId, mergedOptions);
 
-    // Handle result
-    this.handleLoadTask(documentId, engineTask, task, 'RetryDocument');
+    task.resolve({
+      documentId,
+      task: engineTask,
+    });
 
+    // Handle result
+    this.handleLoadTask(documentId, engineTask, 'RetryDocument');
+
+    return task;
+  }
+
+  private openFileDialog(): Task<OpenDocumentResponse, PdfErrorReason> {
+    const task = new Task<OpenDocumentResponse, PdfErrorReason>();
+    this.openFileRequest$.emit(task);
     return task;
   }
 
@@ -594,17 +623,14 @@ export class DocumentManagerPlugin extends BasePlugin<
   private handleLoadTask(
     documentId: string,
     engineTask: Task<PdfDocumentObject, PdfErrorReason>,
-    parentTask: Task<string, PdfErrorReason>,
     context: string,
   ): void {
     engineTask.wait(
       (pdfDocument) => {
         this.dispatchCoreAction(setDocumentLoaded(documentId, pdfDocument));
-        parentTask.resolve(documentId);
       },
       (error) => {
         this.handleLoadError(documentId, error, context);
-        parentTask.fail(error);
       },
     );
   }

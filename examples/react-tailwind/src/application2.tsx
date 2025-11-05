@@ -21,7 +21,6 @@ import { SpreadMode, SpreadPluginPackage } from '@embedpdf/plugin-spread/react';
 import { Rotate, RotatePluginPackage } from '@embedpdf/plugin-rotate/react';
 import { RenderLayer, RenderPluginPackage } from '@embedpdf/plugin-render/react';
 import { TilingLayer, TilingPluginPackage } from '@embedpdf/plugin-tiling/react';
-import { ViewManagerPluginPackage } from '@embedpdf/plugin-view-manager/react';
 import { RedactionLayer, RedactionPluginPackage } from '@embedpdf/plugin-redaction/react';
 import { ExportPluginPackage } from '@embedpdf/plugin-export/react';
 import { PrintPluginPackage } from '@embedpdf/plugin-print/react';
@@ -32,7 +31,7 @@ import { CapturePluginPackage, MarqueeCapture } from '@embedpdf/plugin-capture/r
 import { FullscreenPluginPackage } from '@embedpdf/plugin-fullscreen/react';
 import { HistoryPluginPackage } from '@embedpdf/plugin-history/react';
 import { AnnotationPluginPackage, AnnotationLayer } from '@embedpdf/plugin-annotation/react';
-import { TabBar } from './components/tab-bar';
+import { TabBar } from './components/tab-bar-2';
 import { ViewerToolbar, ViewMode } from './components/viewer-toolbar';
 import { LoadingSpinner } from './components/loading-spinner';
 import { DocumentPasswordPrompt } from './components/document-password-prompt';
@@ -40,7 +39,6 @@ import { SearchSidebar } from './components/search-sidebar';
 import { ThumbnailsSidebar } from './components/thumbnails-sidebar';
 import { PageControls } from './components/page-controls';
 import { ConsoleLogger } from '@embedpdf/models';
-import { SplitViewLayout } from './components/split-view-layout';
 
 const logger = new ConsoleLogger();
 
@@ -101,9 +99,6 @@ export default function DocumentViewer() {
         width: 120,
         paddingY: 10,
       }),
-      createPluginRegistration(ViewManagerPluginPackage, {
-        defaultViewCount: 1,
-      }),
     ],
     [], // Empty dependency array since these never change
   );
@@ -152,66 +147,48 @@ export default function DocumentViewer() {
           {({ pluginsReady, registry }) => (
             <>
               {pluginsReady ? (
-                <SplitViewLayout
-                  renderView={({
-                    view,
-                    activeDocumentId: documentId,
-                    addDocument,
-                    setActiveDocument,
-                  }) => (
+                <DocumentTabs>
+                  {({ documentStates, activeDocumentId, actions }) => (
                     <div className="flex h-full flex-col">
                       <TabBar
-                        currentView={view}
-                        onSelect={(documentId) => setActiveDocument(documentId)}
-                        onClose={(docId) =>
+                        documentStates={documentStates}
+                        activeDocumentId={activeDocumentId}
+                        onSelect={actions.select}
+                        onClose={actions.close}
+                        onOpenFile={() =>
                           registry
                             ?.getPlugin<DocumentManagerPlugin>(DocumentManagerPlugin.id)
                             ?.provides()
-                            ?.closeDocument(docId)
+                            ?.openFileDialog()
                         }
-                        onOpenFile={() => {
-                          const openTask = registry
-                            ?.getPlugin<DocumentManagerPlugin>(DocumentManagerPlugin.id)
-                            ?.provides()
-                            ?.openFileDialog();
-                          openTask?.wait(
-                            (result) => {
-                              addDocument(result.documentId);
-                              setActiveDocument(result.documentId);
-                            },
-                            (error) => {
-                              console.error('Open file failed:', error);
-                            },
-                          );
-                        }}
                       />
 
-                      {documentId && (
+                      {activeDocumentId && (
                         <ViewerToolbar
-                          documentId={documentId}
-                          onToggleSearch={() => toggleSidebar(documentId, 'search')}
-                          onToggleThumbnails={() => toggleSidebar(documentId, 'thumbnails')}
-                          isSearchOpen={getSidebarState(documentId).search}
-                          isThumbnailsOpen={getSidebarState(documentId).thumbnails}
-                          mode={getToolbarMode(documentId)}
-                          onModeChange={(mode) => setToolbarMode(documentId, mode)}
+                          documentId={activeDocumentId}
+                          onToggleSearch={() => toggleSidebar(activeDocumentId, 'search')}
+                          onToggleThumbnails={() => toggleSidebar(activeDocumentId, 'thumbnails')}
+                          isSearchOpen={getSidebarState(activeDocumentId).search}
+                          isThumbnailsOpen={getSidebarState(activeDocumentId).thumbnails}
+                          mode={getToolbarMode(activeDocumentId)}
+                          onModeChange={(mode) => setToolbarMode(activeDocumentId, mode)}
                         />
                       )}
 
                       {/* Document Content Area */}
-                      {documentId && (
+                      {activeDocumentId && (
                         <div id="document-content" className="flex flex-1 overflow-hidden bg-white">
                           {/* Thumbnails Sidebar - Left */}
-                          {getSidebarState(documentId).thumbnails && (
+                          {getSidebarState(activeDocumentId).thumbnails && (
                             <ThumbnailsSidebar
-                              documentId={documentId}
-                              onClose={() => toggleSidebar(documentId, 'thumbnails')}
+                              documentId={activeDocumentId}
+                              onClose={() => toggleSidebar(activeDocumentId, 'thumbnails')}
                             />
                           )}
 
                           {/* Main Viewer */}
                           <div className="flex-1 overflow-hidden">
-                            <DocumentContent documentId={documentId}>
+                            <DocumentContent documentId={activeDocumentId}>
                               {({ documentState, isLoading, isError, isLoaded }) => (
                                 <>
                                   {isLoading && (
@@ -224,53 +201,56 @@ export default function DocumentViewer() {
                                   )}
                                   {isLoaded && (
                                     <div className="relative h-full w-full">
-                                      <GlobalPointerProvider documentId={documentId}>
-                                        <Viewport className="bg-gray-100" documentId={documentId}>
+                                      <GlobalPointerProvider documentId={activeDocumentId}>
+                                        <Viewport
+                                          className="bg-gray-100"
+                                          documentId={activeDocumentId}
+                                        >
                                           <Scroller
-                                            documentId={documentId}
+                                            documentId={activeDocumentId}
                                             renderPage={({ pageIndex }) => (
                                               <Rotate
-                                                documentId={documentId}
+                                                documentId={activeDocumentId}
                                                 pageIndex={pageIndex}
                                                 style={{ backgroundColor: '#fff' }}
                                               >
                                                 <PagePointerProvider
-                                                  documentId={documentId}
+                                                  documentId={activeDocumentId}
                                                   pageIndex={pageIndex}
                                                 >
                                                   <RenderLayer
-                                                    documentId={documentId}
+                                                    documentId={activeDocumentId}
                                                     pageIndex={pageIndex}
                                                     scale={1}
                                                     style={{ pointerEvents: 'none' }}
                                                   />
-                                                  {/*<TilingLayer
+                                                  <TilingLayer
                                                     documentId={activeDocumentId}
                                                     pageIndex={pageIndex}
                                                     style={{ pointerEvents: 'none' }}
-                                                  />*/}
+                                                  />
                                                   <SearchLayer
-                                                    documentId={documentId}
+                                                    documentId={activeDocumentId}
                                                     pageIndex={pageIndex}
                                                   />
                                                   <MarqueeZoom
-                                                    documentId={documentId}
+                                                    documentId={activeDocumentId}
                                                     pageIndex={pageIndex}
                                                   />
                                                   <MarqueeCapture
-                                                    documentId={documentId}
+                                                    documentId={activeDocumentId}
                                                     pageIndex={pageIndex}
                                                   />
                                                   <SelectionLayer
-                                                    documentId={documentId}
+                                                    documentId={activeDocumentId}
                                                     pageIndex={pageIndex}
                                                   />
                                                   <RedactionLayer
-                                                    documentId={documentId}
+                                                    documentId={activeDocumentId}
                                                     pageIndex={pageIndex}
                                                   />
                                                   <AnnotationLayer
-                                                    documentId={documentId}
+                                                    documentId={activeDocumentId}
                                                     pageIndex={pageIndex}
                                                   />
                                                 </PagePointerProvider>
@@ -278,7 +258,7 @@ export default function DocumentViewer() {
                                             )}
                                           />
                                           {/* Page Controls */}
-                                          <PageControls documentId={documentId} />
+                                          <PageControls documentId={activeDocumentId} />
                                         </Viewport>
                                       </GlobalPointerProvider>
                                     </div>
@@ -289,17 +269,17 @@ export default function DocumentViewer() {
                           </div>
 
                           {/* Search Sidebar - Right */}
-                          {getSidebarState(documentId).search && (
+                          {getSidebarState(activeDocumentId).search && (
                             <SearchSidebar
-                              documentId={documentId}
-                              onClose={() => toggleSidebar(documentId, 'search')}
+                              documentId={activeDocumentId}
+                              onClose={() => toggleSidebar(activeDocumentId, 'search')}
                             />
                           )}
                         </div>
                       )}
                     </div>
                   )}
-                />
+                </DocumentTabs>
               ) : (
                 <div className="flex h-full items-center justify-center">
                   <LoadingSpinner message="Initializing plugins..." />

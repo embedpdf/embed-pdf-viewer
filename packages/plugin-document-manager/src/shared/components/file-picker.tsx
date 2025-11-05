@@ -1,15 +1,19 @@
 import { ChangeEvent, useEffect, useRef } from '@framework';
 import { useDocumentManagerCapability, useDocumentManagerPlugin } from '../hooks';
+import { PdfErrorReason, Task } from '@embedpdf/models';
+import { OpenDocumentResponse } from '@embedpdf/plugin-document-manager';
 
 export function FilePicker() {
   const { plugin } = useDocumentManagerPlugin();
   const { provides } = useDocumentManagerCapability();
   const inputRef = useRef<HTMLInputElement>(null);
+  const taskRef = useRef<Task<OpenDocumentResponse, PdfErrorReason> | null>(null);
 
   useEffect(() => {
     if (!plugin?.onOpenFileRequest) return;
-    const unsub = plugin.onOpenFileRequest((req) => {
-      if (req === 'open') inputRef.current?.click();
+    const unsub = plugin.onOpenFileRequest((task) => {
+      taskRef.current = task;
+      inputRef.current?.click();
     });
     return unsub;
   }, [plugin]);
@@ -18,10 +22,18 @@ export function FilePicker() {
     const file = (e.currentTarget as HTMLInputElement).files?.[0];
     if (!file || !provides) return;
     const buffer = await file.arrayBuffer();
-    provides.openDocumentBuffer({
+    const openTask = provides.openDocumentBuffer({
       name: file.name,
       buffer,
     });
+    openTask.wait(
+      (result) => {
+        taskRef.current?.resolve(result);
+      },
+      (error) => {
+        taskRef.current?.fail(error);
+      },
+    );
   };
 
   return (
