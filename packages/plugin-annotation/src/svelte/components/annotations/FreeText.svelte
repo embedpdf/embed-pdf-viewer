@@ -110,7 +110,7 @@
     <!-- Editable span -->
     <span
             bind:this={editorRef}
-            tabindex="-1"
+            tabindex="0"
             contenteditable={isEditing}
             onblur={handleBlur}
             style:display="flex"
