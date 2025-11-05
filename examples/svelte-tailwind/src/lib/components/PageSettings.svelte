@@ -35,7 +35,7 @@
 
 <div class="relative flex items-center" use:clickOutside={closeMenu}>
   <button
-    class="flex h-8 w-8 items-center justify-center text-gray-600 transition-colors {isOpen
+    class="flex h-8 w-8 items-center justify-center text-gray-100 rounded-full transition-colors {isOpen
       ? 'bg-gray-200 text-gray-900'
       : 'hover:bg-gray-100 hover:text-gray-900'}"
     onclick={toggleMenu}

@@ -72,7 +72,7 @@
 <div class="flex items-center gap-2">
   <!-- Zoom Out Button -->
   <button
-    class="flex h-8 w-8 items-center justify-center text-gray-600 transition-colors hover:bg-gray-100 hover:text-gray-900"
+    class="flex h-8 w-8 items-center justify-center text-gray-100 rounded-full transition-colors hover:bg-gray-100 hover:text-gray-900"
     onclick={handleZoomOut}
     title="Zoom Out"
   >
@@ -95,7 +95,7 @@
   </button>
   <!-- Zoom In Button -->
   <button
-    class="flex h-8 w-8 items-center justify-center text-gray-600 transition-colors hover:bg-gray-100 hover:text-gray-900"
+    class="flex h-8 w-8 items-center justify-center text-gray-100 rounded-full transition-colors hover:bg-gray-100 hover:text-gray-900"
     onclick={handleZoomIn}
     title="Zoom In"
   >
@@ -121,7 +121,7 @@
   <!-- Zoom Level Display with Dropdown -->
   <div class="relative flex items-center" use:clickOutside={closeMenu}>
     <button
-      class="flex min-w-[70px] items-center justify-center gap-1 px-2 py-1 text-sm text-gray-700 transition-colors hover:bg-gray-100"
+      class="flex min-w-[70px] items-center justify-center gap-1 px-2 py-1 text-sm text-gray-100 rounded-full transition-colors "
       onclick={toggleMenu}
       title="Zoom Options"
     >
@@ -136,7 +136,7 @@
         stroke-width="2"
         stroke-linecap="round"
         stroke-linejoin="round"
-        class="text-gray-400 transition-transform duration-200 {isMenuOpen ? 'rotate-180' : ''}"
+        class="text-gray-100 transition-transform duration-200 {isMenuOpen ? 'rotate-180' : ''}"
       >
         <path stroke="none" d="M0 0h24v24H0z" fill="none" />
         <path d="M6 9l6 6l6 -6" />
@@ -185,7 +185,7 @@
 
   <!-- Marquee Zoom Toggle -->
   <button
-    class="flex h-8 w-8 items-center justify-center text-gray-600 transition-colors {isMarqueeActive
+    class="flex h-8 w-8 items-center justify-center text-gray-100 rounded-full transition-colors {isMarqueeActive
       ? 'bg-gray-200 text-gray-900'
       : 'hover:bg-gray-100 hover:text-gray-900'}"
     onclick={handleToggleMarqueeZoom}
