@@ -36,6 +36,10 @@ export type AnnotationEvent =
     }
   | { type: 'loaded'; documentId: string; total: number };
 
+export type AnnotationToolsChangeEvent = {
+  tools: AnnotationTool[];
+};
+
 export type CommitState = 'new' | 'dirty' | 'deleted' | 'synced' | 'ignored';
 
 export interface TrackedAnnotation<T extends PdfAnnotationObject = PdfAnnotationObject> {
@@ -214,6 +218,7 @@ export interface AnnotationCapability {
   onStateChange: EventHook<AnnotationStateChangeEvent>;
   onActiveToolChange: EventHook<AnnotationActiveToolChangeEvent>;
   onAnnotationEvent: EventHook<AnnotationEvent>;
+  onToolsChange: EventHook<AnnotationToolsChangeEvent>;
 }
 
 export interface GetPageAnnotationsOptions {

@@ -1,6 +1,7 @@
 type IconProps = {
   className?: string;
   title?: string;
+  style?: React.CSSProperties;
 };
 
 export function DocumentIcon({ className, title }: IconProps) {
@@ -630,10 +631,11 @@ export function ChevronRightIcon({ className, title }: IconProps) {
   );
 }
 
-export function TextIcon({ className, title }: IconProps) {
+export function TextIcon({ className, title, style }: IconProps) {
   return (
     <svg
       className={className}
+      style={style}
       fill="none"
       stroke="currentColor"
       viewBox="0 0 24 24"
@@ -642,36 +644,49 @@ export function TextIcon({ className, title }: IconProps) {
       role={title ? 'img' : 'presentation'}
     >
       {title ? <title>{title}</title> : null}
-      <path d="M4 7V4h16v3M9 20h6M12 4v16" strokeLinecap="round" strokeLinejoin="round" />
+      <path stroke="none" d="M0 0h24v24H0z" fill="none" />
+      <path d="M6.5 15.5m-3.5 0a3.5 3.5 0 1 0 7 0a3.5 3.5 0 1 0 -7 0" />
+      <path d="M14 19v-10.5a3.5 3.5 0 0 1 7 0v10.5" />
+      <path d="M14 13h7" />
+      <path d="M10 12v7" />
     </svg>
   );
 }
 
-export function PenIcon({ className, title }: IconProps) {
+export function PenIcon({ className, title, style }: IconProps) {
   return (
     <svg
       className={className}
+      style={style}
       fill="none"
-      stroke="currentColor"
       viewBox="0 0 24 24"
       strokeWidth={2}
+      strokeLinecap="round"
+      strokeLinejoin="round"
       aria-hidden={!title}
       role={title ? 'img' : 'presentation'}
     >
       {title ? <title>{title}</title> : null}
+      <g transform="rotate(47.565 12.1875 10.75)">
+        <path
+          stroke="#000000"
+          d="m14.18752,16.75l0,-12c0,-1.1 -0.9,-2 -2,-2s-2,0.9 -2,2l0,12l2,2l2,-2z"
+        />
+        <path stroke="#000000" d="m10.18752,6.75l4,0" />
+      </g>
       <path
-        d="M12 19l7-7 3 3-7 7-3-3z M18 13l-1.5-7.5L2 2l3.5 14.5L13 18l5-5z M2 2l7.586 7.586"
-        strokeLinecap="round"
-        strokeLinejoin="round"
+        stroke="currentColor"
+        d="m19.37499,20.125c0.56874,0.0625 -4.04999,-0.5625 -6.41249,-0.4375c-2.3625,0.125 -4.75833,1.22916 -6.85624,1.625c-1.76458,0.6875 -3.40416,-0.9375 -1.98125,-2.49999"
       />
     </svg>
   );
 }
 
-export function CircleIcon({ className, title }: IconProps) {
+export function CircleIcon({ className, title, style }: IconProps) {
   return (
     <svg
       className={className}
+      style={style}
       fill="none"
       stroke="currentColor"
       viewBox="0 0 24 24"
@@ -685,10 +700,11 @@ export function CircleIcon({ className, title }: IconProps) {
   );
 }
 
-export function SquareIcon({ className, title }: IconProps) {
+export function SquareIcon({ className, title, style }: IconProps) {
   return (
     <svg
       className={className}
+      style={style}
       fill="none"
       stroke="currentColor"
       viewBox="0 0 24 24"
@@ -710,10 +726,74 @@ export function SquareIcon({ className, title }: IconProps) {
   );
 }
 
-export function ArrowIcon({ className, title }: IconProps) {
+export function ArrowIcon({ className, title, style }: IconProps) {
   return (
     <svg
       className={className}
+      style={style}
+      fill="none"
+      stroke="currentColor"
+      viewBox="0 0 24 24"
+      strokeWidth={2.2}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden={!title}
+      role={title ? 'img' : 'presentation'}
+    >
+      {title ? <title>{title}</title> : null}
+      <path stroke="none" d="M0 0h24v24H0z" fill="none" />
+      <path d="M20 4l-16 16" />
+      <path d="M16 3h5v5" />
+    </svg>
+  );
+}
+
+export function HighlightIcon({ className, title, style }: IconProps) {
+  return (
+    <svg
+      className={className}
+      style={style}
+      fill="none"
+      viewBox="0 0 24 24"
+      strokeWidth={2}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden={!title}
+      role={title ? 'img' : 'presentation'}
+    >
+      {title ? <title>{title}</title> : null}
+      <path stroke="none" d="M0 0h24v24H0z" fill="none" />
+      <rect x="2" y="6" width="20" height="16" rx="2" fill="currentColor" stroke="none" />
+      <path d="M8 16v-8a4 4 0 1 1 8 0v8" stroke="#000000" />
+      <path d="M8 10h8" stroke="#000000" />
+    </svg>
+  );
+}
+
+export function LineIcon({ className, title, style }: IconProps) {
+  return (
+    <svg
+      className={className}
+      style={style}
+      fill="none"
+      stroke="currentColor"
+      viewBox="0 0 24 24"
+      strokeWidth={2.2}
+      aria-hidden={!title}
+      role={title ? 'img' : 'presentation'}
+    >
+      {title ? <title>{title}</title> : null}
+      <path stroke="none" d="M0 0h24v24H0z" fill="none" />
+      <path d="M20 4l-16 16" />
+    </svg>
+  );
+}
+
+export function PolygonIcon({ className, title, style }: IconProps) {
+  return (
+    <svg
+      className={className}
+      style={style}
       fill="none"
       stroke="currentColor"
       viewBox="0 0 24 24"
@@ -722,15 +802,83 @@ export function ArrowIcon({ className, title }: IconProps) {
       role={title ? 'img' : 'presentation'}
     >
       {title ? <title>{title}</title> : null}
-      <path d="M7 17L17 7M17 7H7M17 7v10" strokeLinecap="round" strokeLinejoin="round" />
+      <path stroke="none" d="M0 0h24v24H0z" fill="none" />
+      <path d="M13.163 2.168l8.021 5.828c.694 .504 .984 1.397 .719 2.212l-3.064 9.43a1.978 1.978 0 0 1 -1.881 1.367h-9.916a1.978 1.978 0 0 1 -1.881 -1.367l-3.064 -9.43a1.978 1.978 0 0 1 .719 -2.212l8.021 -5.828a1.978 1.978 0 0 1 2.326 0z" />
     </svg>
   );
 }
 
-export function HighlightIcon({ className, title }: IconProps) {
+export function SquigglyIcon({ className, title, style }: IconProps) {
   return (
     <svg
       className={className}
+      style={style}
+      fill="none"
+      stroke="currentColor"
+      viewBox="0 0 24 24"
+      strokeWidth={2}
+      aria-hidden={!title}
+      role={title ? 'img' : 'presentation'}
+    >
+      {title ? <title>{title}</title> : null}
+      <path stroke="none" d="M0 0h24v24H0z" fill="none" />
+      <path d="M8 16v-8a4 4 0 1 1 8 0v8" stroke="#000000" />
+      <path d="M8 10h8" stroke="#000000" />
+      <path
+        d="M4 20c1.5 -1.5 3.5 -1.5 5 0s3.5 1.5 5 0 3.5 -1.5 5 0"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
+  );
+}
+
+export function StrikethroughIcon({ className, title, style }: IconProps) {
+  return (
+    <svg
+      className={className}
+      style={style}
+      fill="none"
+      stroke="currentColor"
+      viewBox="0 0 24 24"
+      strokeWidth={2}
+      aria-hidden={!title}
+      role={title ? 'img' : 'presentation'}
+    >
+      {title ? <title>{title}</title> : null}
+      <path stroke="none" d="M0 0h24v24H0z" fill="none" />
+      <path d="M8 16v-8a4 4 0 1 1 8 0v8" stroke="#000000" />
+      <path d="M4 10h16" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  );
+}
+
+export function UnderlineIcon({ className, title, style }: IconProps) {
+  return (
+    <svg
+      className={className}
+      style={style}
+      fill="none"
+      stroke="currentColor"
+      viewBox="0 0 24 24"
+      strokeWidth={2}
+      aria-hidden={!title}
+      role={title ? 'img' : 'presentation'}
+    >
+      {title ? <title>{title}</title> : null}
+      <path stroke="none" d="M0 0h24v24H0z" fill="none" />
+      <path d="M4 20h16" strokeLinecap="round" strokeLinejoin="round" />
+      <path d="M8 16v-8a4 4 0 1 1 8 0v8" stroke="#000000" />
+      <path d="M8 10h8" stroke="#000000" />
+    </svg>
+  );
+}
+
+export function ZigzagIcon({ className, title, style }: IconProps) {
+  return (
+    <svg
+      className={className}
+      style={style}
       fill="none"
       stroke="currentColor"
       viewBox="0 0 24 24"
@@ -740,10 +888,53 @@ export function HighlightIcon({ className, title }: IconProps) {
     >
       {title ? <title>{title}</title> : null}
       <path
-        d="M9 11l-6 6v3h9l3-3M22 2l-4.89 4.89M14.5 9.5l-1-1M17 6l-1.5-1.5M9.5 12.5l-1 1M4 20h3v-3"
+        d="M12 2.4L21.36 11.76L2.64 12.24L12 21.6"
         strokeLinecap="round"
         strokeLinejoin="round"
       />
+    </svg>
+  );
+}
+
+export function PolylineIcon({ className, title, style }: IconProps) {
+  return <ZigzagIcon className={className} title={title} style={style} />;
+}
+
+export function ItalicIcon({ className, title }: IconProps) {
+  return (
+    <svg
+      className={className}
+      fill="none"
+      stroke="currentColor"
+      viewBox="0 0 24 24"
+      strokeWidth={2}
+      aria-hidden={!title}
+      role={title ? 'img' : 'presentation'}
+    >
+      {title ? <title>{title}</title> : null}
+      <path stroke="none" d="M0 0h24v24H0z" fill="none" />
+      <path d="M11 5l6 0" />
+      <path d="M7 19l6 0" />
+      <path d="M14 5l-4 14" />
+    </svg>
+  );
+}
+
+export function SquaresIcon({ className, title }: IconProps) {
+  return (
+    <svg
+      className={className}
+      fill="none"
+      stroke="currentColor"
+      viewBox="0 0 24 24"
+      strokeWidth={2}
+      aria-hidden={!title}
+      role={title ? 'img' : 'presentation'}
+    >
+      {title ? <title>{title}</title> : null}
+      <path stroke="none" d="M0 0h24v24H0z" fill="none" />
+      <path d="M8 10a2 2 0 0 1 2 -2h9a2 2 0 0 1 2 2v9a2 2 0 0 1 -2 2h-9a2 2 0 0 1 -2 -2z" />
+      <path d="M16 8v-3a2 2 0 0 0 -2 -2h-9a2 2 0 0 0 -2 2v9a2 2 0 0 0 2 2h3" />
     </svg>
   );
 }

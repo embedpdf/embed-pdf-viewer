@@ -20,6 +20,7 @@ import {
   AnnotationScope,
   AnnotationStateChangeEvent,
   AnnotationActiveToolChangeEvent,
+  AnnotationToolsChangeEvent,
   GetPageAnnotationsOptions,
   ImportAnnotationItem,
   RenderAnnotationOptions,
@@ -89,6 +90,7 @@ export class AnnotationPlugin extends BasePlugin<
   private handlerFactories = new Map<PdfAnnotationSubtype, HandlerFactory<any>>();
   private readonly activeTool$ = createBehaviorEmitter<AnnotationActiveToolChangeEvent>();
   private readonly events$ = createBehaviorEmitter<AnnotationEvent>();
+  private readonly toolsChange$ = createBehaviorEmitter<AnnotationToolsChangeEvent>();
   private readonly patchRegistry = new PatchRegistry();
 
   constructor(id: string, registry: PluginRegistry, config: AnnotationPluginConfig) {
@@ -286,6 +288,7 @@ export class AnnotationPlugin extends BasePlugin<
       onStateChange: this.state$.on,
       onActiveToolChange: this.activeTool$.on,
       onAnnotationEvent: this.events$.on,
+      onToolsChange: this.toolsChange$.on,
     };
   }
 
@@ -348,7 +351,7 @@ export class AnnotationPlugin extends BasePlugin<
       }
     }
 
-    // If the tools array itself changes, emit active tool for all documents
+    // If the tools array itself changes, emit active tool for all documents and tools change event
     if (prev.tools !== next.tools) {
       for (const documentId in next.documents) {
         this.activeTool$.emit({
@@ -356,6 +359,11 @@ export class AnnotationPlugin extends BasePlugin<
           tool: this.getActiveTool(documentId),
         });
       }
+
+      // Emit tools change event for UI components that only care about tool defaults
+      this.toolsChange$.emit({
+        tools: next.tools,
+      });
     }
   }
 
