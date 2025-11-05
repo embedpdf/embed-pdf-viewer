@@ -61,7 +61,7 @@ export function useInteractionHandles(getOpts: () => {
     }));
   });
 
-  // Use getter function to maintain reactivity
+  // Return getters to maintain reactivity when accessed from outside
   return {
     get dragProps() {
       return dragResize.dragProps;

@@ -14,6 +14,7 @@
     doublePress,
     CounterRotate,
     deepToRaw,
+    stylesToString,
   } from '@embedpdf/utils/svelte';
 
   interface AnnotationContainerProps {
@@ -175,7 +176,7 @@
     style:touch-action="none"
     style:cursor={isSelected && isDraggable ? 'move' : 'default'}
     style:z-index={zIndex}
-    {...style ? Object.fromEntries(Object.entries(style).map(([k, v]) => [`style:${k}`, v])) : {}}
+    style={style ? stylesToString(style) : ''}
     class={propsClass}
     {...restProps}
   >
@@ -196,23 +197,29 @@
     {/if}
 
     {#if isSelected && isResizable}
-      {#each resizeHandles as { key, ...hProps } (key)}
+      {#each resizeHandles as { key, style: handleStyle, ...hProps } (key)}
         {#if resizeUI?.component}
           {@const Component = resizeUI.component}
           <Component {...hProps} backgroundColor={HANDLE_COLOR} />
         {:else}
-          <div {...hProps} style:background-color={HANDLE_COLOR}></div>
+          <div
+            {...hProps}
+            style="{stylesToString(handleStyle)}; background-color: {HANDLE_COLOR};"
+          ></div>
         {/if}
       {/each}
     {/if}
 
     {#if isSelected}
-      {#each vertexHandles as { key, ...vProps } (key)}
+      {#each vertexHandles as { key, style: vertexStyle, ...vProps } (key)}
         {#if vertexUI?.component}
           {@const Component = vertexUI.component}
           <Component {...vProps} backgroundColor={VERTEX_COLOR} />
         {:else}
-          <div {...vProps} style:background-color={VERTEX_COLOR}></div>
+          <div
+            {...vProps}
+            style="{stylesToString(vertexStyle)}; background-color: {VERTEX_COLOR};"
+          ></div>
         {/if}
       {/each}
     {/if}
