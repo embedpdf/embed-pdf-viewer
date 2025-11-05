@@ -1,7 +1,7 @@
 <script lang="ts">
   import type { TrackedAnnotation } from '@embedpdf/plugin-annotation';
   import { useAnnotationCapability } from '@embedpdf/plugin-annotation/svelte';
-  import {type MenuWrapperProps, stylesToString} from '@embedpdf/utils/svelte';
+  import { type MenuWrapperProps, stylesToString } from '@embedpdf/utils/svelte';
   import type { Rect } from '@embedpdf/models';
 
   interface AnnotationSelectionMenuProps {
@@ -20,13 +20,13 @@
     if (menuWrapperProps.ref && spanElement) {
       menuWrapperProps.ref(spanElement);
     }
-    
+
     // Debug logging
     if (spanElement) {
       console.log('AnnotationSelectionMenu rendered', {
         rect,
         style: menuWrapperProps.style,
-        boundingRect: spanElement.getBoundingClientRect()
+        boundingRect: spanElement.getBoundingClientRect(),
       });
     }
   });
@@ -43,7 +43,8 @@
     class="pointer-events-auto flex items-center gap-1 rounded-lg border border-gray-200 bg-white px-2 py-1 shadow-lg"
     style:position="absolute"
     style:top="{rect.size.height + 8}px"
-    style:left="{rect.size.width - 100}px"
+    style:left="50%"
+    style:transform="translateX(-50%)"
     style:z-index="1000"
     style:cursor="default"
   >
