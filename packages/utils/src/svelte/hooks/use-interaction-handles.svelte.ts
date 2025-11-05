@@ -35,9 +35,6 @@ export function useInteractionHandles(getOpts: () => {
 
   const dragResize = useDragResize(() => controller);
 
-  $effect(() => {
-    console.log('controller in use interaction handles', controller);
-  });
 
   // Resize handles: computed from controller config
   const resize = $derived.by((): HandleElementProps[] => {
@@ -64,6 +61,7 @@ export function useInteractionHandles(getOpts: () => {
     }));
   });
 
+  // Use getter function to maintain reactivity
   return {
     get dragProps() {
       return dragResize.dragProps;

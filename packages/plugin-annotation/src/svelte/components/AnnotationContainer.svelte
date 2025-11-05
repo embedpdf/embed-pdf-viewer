@@ -142,9 +142,6 @@
   })
 
 
-
-// CONFIRMED - controller is reactive and updating here
-
   const interactionHandles = useInteractionHandles(() => ({
     controller,
     resizeUI: {

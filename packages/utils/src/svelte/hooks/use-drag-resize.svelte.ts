@@ -30,10 +30,6 @@ export function useDragResize(getOptions: () => UseDragResizeOptions) {
 
   let controller = $state<DragResizeController | null>(null);
 
-  $effect(() => {
-    console.log('config in use drag resize', config);
-  });
-
   // Initialize or update controller
   $effect(() => {
     if (!controller) {
