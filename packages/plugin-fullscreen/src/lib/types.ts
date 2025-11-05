@@ -16,9 +16,14 @@ export interface FullscreenPluginConfig extends BasePluginConfig {
 
 export interface FullscreenCapability {
   isFullscreen: () => boolean;
-  enableFullscreen: () => void;
+  enableFullscreen: (targetElement?: string) => void;
   exitFullscreen: () => void;
-  toggleFullscreen: () => void;
-  onRequest: EventHook<'enter' | 'exit'>;
+  toggleFullscreen: (targetElement?: string) => void;
+  onRequest: EventHook<FullscreenRequestEvent>;
   onStateChange: EventHook<FullscreenState>;
+}
+
+export interface FullscreenRequestEvent {
+  action: 'enter' | 'exit';
+  targetElement?: string;
 }

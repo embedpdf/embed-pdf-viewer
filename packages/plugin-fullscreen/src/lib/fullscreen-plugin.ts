@@ -1,5 +1,10 @@
 import { BasePlugin, createBehaviorEmitter, createEmitter, PluginRegistry } from '@embedpdf/core';
-import { FullscreenCapability, FullscreenPluginConfig, FullscreenState } from './types';
+import {
+  FullscreenCapability,
+  FullscreenPluginConfig,
+  FullscreenState,
+  FullscreenRequestEvent,
+} from './types';
 import { FullscreenAction, setFullscreen } from './actions';
 
 export class FullscreenPlugin extends BasePlugin<
@@ -11,8 +16,9 @@ export class FullscreenPlugin extends BasePlugin<
   static readonly id = 'fullscreen' as const;
 
   private readonly onStateChange$ = createBehaviorEmitter<FullscreenState>();
-  private readonly fullscreenRequest$ = createEmitter<'enter' | 'exit'>();
+  private readonly fullscreenRequest$ = createEmitter<FullscreenRequestEvent>();
   private config: FullscreenPluginConfig;
+  private currentTargetElement?: string;
 
   constructor(id: string, registry: PluginRegistry, config: FullscreenPluginConfig) {
     super(id, registry);
@@ -24,32 +30,44 @@ export class FullscreenPlugin extends BasePlugin<
   protected buildCapability(): FullscreenCapability {
     return {
       isFullscreen: () => this.state.isFullscreen,
-      enableFullscreen: () => this.enableFullscreen(),
+      enableFullscreen: (targetElement?: string) => this.enableFullscreen(targetElement),
       exitFullscreen: () => this.exitFullscreen(),
-      toggleFullscreen: () => this.toggleFullscreen(),
+      toggleFullscreen: (targetElement?: string) => this.toggleFullscreen(targetElement),
       onRequest: this.fullscreenRequest$.on,
       onStateChange: this.onStateChange$.on,
     };
   }
 
   public getTargetSelector(): string | undefined {
-    return this.config.targetElement;
+    // Return the current target (from last request) or fall back to config default
+    return this.currentTargetElement ?? this.config.targetElement;
   }
 
-  private toggleFullscreen(): void {
+  private toggleFullscreen(targetElement?: string): void {
     if (this.state.isFullscreen) {
       this.exitFullscreen();
     } else {
-      this.enableFullscreen();
+      this.enableFullscreen(targetElement);
     }
   }
 
-  private enableFullscreen(): void {
-    this.fullscreenRequest$.emit('enter');
+  private enableFullscreen(targetElement?: string): void {
+    // Store the target element for this request
+    this.currentTargetElement = targetElement ?? this.config.targetElement;
+
+    this.fullscreenRequest$.emit({
+      action: 'enter',
+      targetElement: this.currentTargetElement,
+    });
   }
 
   private exitFullscreen(): void {
-    this.fullscreenRequest$.emit('exit');
+    this.fullscreenRequest$.emit({
+      action: 'exit',
+    });
+
+    // Clear the current target when exiting
+    this.currentTargetElement = undefined;
   }
 
   override onStoreUpdated(_: FullscreenState, newState: FullscreenState): void {

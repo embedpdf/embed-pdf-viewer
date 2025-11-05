@@ -45,7 +45,7 @@ export function DocumentMenu({ documentId }: DocumentMenuProps) {
   };
 
   const handleFullscreen = () => {
-    fullscreenProvider?.toggleFullscreen();
+    fullscreenProvider?.toggleFullscreen(`#${documentId}`);
     setIsMenuOpen(false);
   };
 

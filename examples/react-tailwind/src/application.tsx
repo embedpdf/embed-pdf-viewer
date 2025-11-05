@@ -199,7 +199,7 @@ export default function DocumentViewer() {
 
                       {/* Document Content Area */}
                       {documentId && (
-                        <div id="document-content" className="flex flex-1 overflow-hidden bg-white">
+                        <div id={documentId} className="flex flex-1 overflow-hidden bg-white">
                           {/* Thumbnails Sidebar - Left */}
                           {getSidebarState(documentId).thumbnails && (
                             <ThumbnailsSidebar

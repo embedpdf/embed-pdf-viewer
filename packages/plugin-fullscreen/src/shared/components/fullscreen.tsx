@@ -16,8 +16,8 @@ export function FullscreenProvider({ children, ...props }: FullscreenProviderPro
   useEffect(() => {
     if (!fullscreenCapability || !fullscreenPlugin) return;
 
-    const unsub = fullscreenCapability.onRequest(async (action) => {
-      if (action === 'enter') {
+    const unsub = fullscreenCapability.onRequest(async (event) => {
+      if (event.action === 'enter') {
         // Check if a target element selector is configured
         const targetSelector = fullscreenPlugin.getTargetSelector();
         let elementToFullscreen: HTMLElement | null = null;
