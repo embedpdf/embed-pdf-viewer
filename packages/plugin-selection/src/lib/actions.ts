@@ -1,6 +1,7 @@
 import { Action } from '@embedpdf/core';
 import { PdfPageGeometry, Rect } from '@embedpdf/models';
 import { SelectionRangeX } from './types';
+import { GlyphAccelerationModel } from './utils';
 
 export const CACHE_PAGE_GEOMETRY = 'CACHE_PAGE_GEOMETRY';
 export const SET_SELECTION = 'SET_SELECTION';
@@ -13,7 +14,7 @@ export const RESET = 'RESET';
 
 export interface CachePageGeometryAction extends Action {
   type: typeof CACHE_PAGE_GEOMETRY;
-  payload: { page: number; geo: PdfPageGeometry };
+  payload: { page: number; geo: GlyphAccelerationModel };
 }
 export interface SetSelectionAction extends Action {
   type: typeof SET_SELECTION;
@@ -56,7 +57,7 @@ export type SelectionAction =
   | SetSlicesAction
   | ResetAction;
 
-export const cachePageGeometry = (page: number, geo: PdfPageGeometry): CachePageGeometryAction => ({
+export const cachePageGeometry = (page: number, geo: GlyphAccelerationModel): CachePageGeometryAction => ({
   type: CACHE_PAGE_GEOMETRY,
   payload: { page, geo },
 });
