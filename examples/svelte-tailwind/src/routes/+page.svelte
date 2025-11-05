@@ -1,7 +1,7 @@
 <script lang="ts">
   import { usePdfiumEngine } from '@embedpdf/engines/svelte';
-  import { createPluginRegistration, type PluginBatchRegistrations } from '@embedpdf/core';
-  import type { Rotation } from '@embedpdf/models';
+  import {createPluginRegistration, type PluginBatchRegistrations, type PluginRegistry} from '@embedpdf/core';
+  import {PdfAnnotationSubtype, type PdfStampAnnoObject, type Rotation} from '@embedpdf/models';
   import { EmbedPDF } from '@embedpdf/core/svelte';
   import { LoaderPluginPackage } from '@embedpdf/plugin-loader/svelte';
   import { ViewportPluginPackage } from '@embedpdf/plugin-viewport/svelte';
@@ -26,11 +26,15 @@
   import { ThumbnailPluginPackage } from '@embedpdf/plugin-thumbnail/svelte';
   import { SearchPluginPackage, SearchLayer } from '@embedpdf/plugin-search/svelte';
   import { PrintPluginPackage } from '@embedpdf/plugin-print/svelte';
+  import {HistoryPluginPackage} from "@embedpdf/plugin-history/svelte";
+  import {AnnotationLayer, AnnotationPluginPackage, type AnnotationTool} from "@embedpdf/plugin-annotation/svelte";
+  import {AnnotationPlugin} from "@embedpdf/plugin-annotation";
   import Toolbar from '$lib/components/Toolbar.svelte';
   import PageControls from '$lib/components/PageControls.svelte';
   import Sidebar from '$lib/components/Sidebar.svelte';
   import Search from '$lib/components/Search.svelte';
   import PrintDialog from '$lib/components/PrintDialog.svelte';
+  import AnnotationSelectionMenu from '$lib/components/AnnotationSelectionMenu.svelte';
 
   type RenderPageProps = {
     width: number;
@@ -62,6 +66,25 @@
     isPrintDialogOpen = false;
   };
 
+  const handleInitialized = async (registry: PluginRegistry) => {
+    const annotation = registry.getPlugin<AnnotationPlugin>('annotation')?.provides();
+    annotation?.addTool<AnnotationTool<PdfStampAnnoObject>>({
+      id: 'stampApproved',
+      name: 'Stamp Approved',
+      interaction: {
+        exclusive: false,
+        cursor: 'crosshair',
+      },
+      matchScore: () => 0,
+      defaults: {
+        type: PdfAnnotationSubtype.STAMP,
+        imageSrc:
+          'https://upload.wikimedia.org/wikipedia/commons/thumb/3/3b/Eo_circle_green_checkmark.svg/512px-Eo_circle_green_checkmark.svg.png',
+        imageSize: { width: 20, height: 20 },
+      },
+    });
+  };
+
   let plugins = $derived.by(() => {
     const basePlugins: PluginBatchRegistrations = [
       createPluginRegistration(LoaderPluginPackage, {
@@ -91,17 +114,36 @@
         imagePadding: 10,
         labelHeight: 25,
       }),
+        createPluginRegistration(InteractionManagerPluginPackage),
+        createPluginRegistration(SelectionPluginPackage),
+        createPluginRegistration(HistoryPluginPackage),
+        createPluginRegistration(AnnotationPluginPackage, {
+            annotationAuthor: 'EmbedPDF User',
+        }),
     ];
     return basePlugins;
   });
 </script>
 
-{#snippet RenderLayers({ pageIndex, scale }: RenderPageProps)}
+{#snippet RenderLayers({ pageIndex, height, width, rotation, scale }: RenderPageProps)}
   <RenderLayer {pageIndex} scale={1} />
   <TilingLayer {pageIndex} {scale} />
   <SelectionLayer {pageIndex} {scale} />
   <SearchLayer {pageIndex} {scale} />
   <MarqueeZoom {pageIndex} {scale} />
+  <AnnotationLayer
+    pageIndex={pageIndex}
+    scale={scale}
+    pageWidth={width}
+    pageHeight={height}
+    rotation={rotation}
+  >
+    {#snippet selectionMenu({ annotation, selected, menuWrapperProps })}
+      {#if selected}
+        <AnnotationSelectionMenu {menuWrapperProps} {annotation} />
+      {/if}
+    {/snippet}
+  </AnnotationLayer>
 {/snippet}
 
 {#snippet RenderPageSnippet(props: RenderPageProps)}
@@ -142,7 +184,7 @@
   </div>
 {:else}
   <div id="view-page" class="flex h-screen flex-1 flex-col overflow-hidden">
-    <EmbedPDF engine={pdfEngine.engine} logger={undefined} {plugins}>
+    <EmbedPDF engine={pdfEngine.engine} logger={undefined} {plugins} onInitialized={handleInitialized}>
       <div class="flex h-full flex-col">
         <Toolbar
           {isSidebarOpen}
