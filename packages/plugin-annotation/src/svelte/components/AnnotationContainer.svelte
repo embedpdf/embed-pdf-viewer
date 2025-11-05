@@ -89,58 +89,64 @@
     }
   });
 
-  const interactionHandles = useInteractionHandles({
-    controller: {
+  const controller = $derived({
       element: currentObject.rect,
       vertices: vertexConfig?.extractVertices(currentObject),
       constraints: {
-        minWidth: 10,
-        minHeight: 10,
-        boundingBox: { width: pageWidth / scale, height: pageHeight / scale },
+          minWidth: 10,
+          minHeight: 10,
+          boundingBox: { width: pageWidth / scale, height: pageHeight / scale },
       },
       maintainAspectRatio: lockAspectRatio,
       pageRotation: rotation,
       scale: scale,
       enabled: isSelected,
       onUpdate: (event) => {
-        if (!event.transformData?.type) return;
+          if (!event.transformData?.type) return;
 
-        if (event.state === 'start') {
-          gestureBaseRef = currentObject;
-        }
+          if (event.state === 'start') {
+              gestureBaseRef = currentObject;
+          }
 
-        const transformType = event.transformData.type;
-        const base = gestureBaseRef ?? currentObject;
+          const transformType = event.transformData.type;
+          const base = gestureBaseRef ?? currentObject;
 
-        const changes = event.transformData.changes.vertices
-          ? vertexConfig?.transformAnnotation(base, event.transformData.changes.vertices)
-          : { rect: event.transformData.changes.rect };
+          const changes = event.transformData.changes.vertices
+              ? vertexConfig?.transformAnnotation(base, event.transformData.changes.vertices)
+              : { rect: event.transformData.changes.rect };
 
-        const patched = annotationCapability.provides?.transformAnnotation<T>(base, {
-          type: transformType,
-          changes: changes as Partial<T>,
-          metadata: event.transformData.metadata,
-        });
+          const patched = annotationCapability.provides?.transformAnnotation<T>(base, {
+              type: transformType,
+              changes: changes as Partial<T>,
+              metadata: event.transformData.metadata,
+          });
 
-        if (patched) {
-          preview = {
-            ...preview,
-            ...patched,
-          };
-        }
-        if (event.state === 'end' && patched) {
-          gestureBaseRef = null;
-          // Sanitize to remove Svelte reactive properties before updating
-          // Use deepToRaw to recursively strip proxies while preserving complex objects
-          const sanitized = deepToRaw(patched);
-          annotationCapability.provides?.updateAnnotation(
-            pageIndex,
-            trackedAnnotation.object.id,
-            sanitized,
-          );
-        }
+          if (patched) {
+              preview = {
+                  ...preview,
+                  ...patched,
+              };
+          }
+          if (event.state === 'end' && patched) {
+              gestureBaseRef = null;
+              // Sanitize to remove Svelte reactive properties before updating
+              // Use deepToRaw to recursively strip proxies while preserving complex objects
+              const sanitized = deepToRaw(patched);
+              annotationCapability.provides?.updateAnnotation(
+                  pageIndex,
+                  trackedAnnotation.object.id,
+                  sanitized,
+              );
+          }
       },
-    },
+  })
+
+
+
+// CONFIRMED - controller is reactive and updating here
+
+  const interactionHandles = useInteractionHandles(() => ({
+    controller,
     resizeUI: {
       handleSize: HANDLE_SIZE,
       spacing: outlineOffset,
@@ -153,7 +159,7 @@
       zIndex: zIndex + 2,
     },
     includeVertices: vertexConfig ? true : false,
-  });
+  }));
 
   // Derived accessors for template
   const resizeHandles = $derived(interactionHandles.resize);

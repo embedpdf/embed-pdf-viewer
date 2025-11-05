@@ -17,10 +17,22 @@ export interface ResizeHandleEventProps {
   onpointercancel: (e: PointerEvent) => void;
 }
 
-export function useDragResize(options: UseDragResizeOptions) {
-  const { onUpdate, enabled = true, ...config } = options;
+export function useDragResize(getOptions: () => UseDragResizeOptions) {
+  // Use getter function to maintain reactivity
+  const config = $derived.by(() => {
+    const opts = getOptions();
+    const { onUpdate, enabled, ...rest } = opts;
+    return rest;
+  });
+
+  const enabled = $derived(getOptions().enabled ?? true);
+  const onUpdate = $derived(getOptions().onUpdate);
 
   let controller = $state<DragResizeController | null>(null);
+
+  $effect(() => {
+    console.log('config in use drag resize', config);
+  });
 
   // Initialize or update controller
   $effect(() => {

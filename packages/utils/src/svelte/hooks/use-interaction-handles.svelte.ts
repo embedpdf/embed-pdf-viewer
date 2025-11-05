@@ -15,7 +15,7 @@ export type HandleElementProps = {
   onpointercancel: (e: PointerEvent) => void;
 } & Record<string, any>;
 
-export function useInteractionHandles(opts: {
+export function useInteractionHandles(getOpts: () => {
   controller: UseDragResizeOptions;
   resizeUI?: ResizeUI;
   vertexUI?: VertexUI;
@@ -25,16 +25,19 @@ export function useInteractionHandles(opts: {
   ) => Record<string, any> | void;
   vertexAttrs?: (i: number) => Record<string, any> | void;
 }) {
-  const {
-    controller,
-    resizeUI,
-    vertexUI,
-    includeVertices = false,
-    handleAttrs,
-    vertexAttrs,
-  } = opts;
+  // Use getter function and $derived to maintain reactivity
+  const controller = $derived(getOpts().controller);
+  const resizeUI = $derived(getOpts().resizeUI);
+  const vertexUI = $derived(getOpts().vertexUI);
+  const includeVertices = $derived(getOpts().includeVertices ?? false);
+  const handleAttrs = $derived(getOpts().handleAttrs);
+  const vertexAttrs = $derived(getOpts().vertexAttrs);
 
-  const dragResize = useDragResize(controller);
+  const dragResize = useDragResize(() => controller);
+
+  $effect(() => {
+    console.log('controller in use interaction handles', controller);
+  });
 
   // Resize handles: computed from controller config
   const resize = $derived.by((): HandleElementProps[] => {
