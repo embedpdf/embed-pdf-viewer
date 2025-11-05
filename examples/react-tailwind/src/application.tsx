@@ -7,7 +7,6 @@ import { ScrollPluginPackage, ScrollStrategy, Scroller } from '@embedpdf/plugin-
 import {
   DocumentManagerPluginPackage,
   DocumentContent,
-  DocumentTabs,
   DocumentManagerPlugin,
 } from '@embedpdf/plugin-document-manager/react';
 import {

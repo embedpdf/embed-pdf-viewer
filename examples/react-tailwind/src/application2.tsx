@@ -7,7 +7,7 @@ import { ScrollPluginPackage, ScrollStrategy, Scroller } from '@embedpdf/plugin-
 import {
   DocumentManagerPluginPackage,
   DocumentContent,
-  DocumentTabs,
+  DocumentContext,
   DocumentManagerPlugin,
 } from '@embedpdf/plugin-document-manager/react';
 import {
@@ -147,7 +147,7 @@ export default function DocumentViewer() {
           {({ pluginsReady, registry }) => (
             <>
               {pluginsReady ? (
-                <DocumentTabs>
+                <DocumentContext>
                   {({ documentStates, activeDocumentId, actions }) => (
                     <div className="flex h-full flex-col">
                       <TabBar
@@ -279,7 +279,7 @@ export default function DocumentViewer() {
                       )}
                     </div>
                   )}
-                </DocumentTabs>
+                </DocumentContext>
               ) : (
                 <div className="flex h-full items-center justify-center">
                   <LoadingSpinner message="Initializing plugins..." />

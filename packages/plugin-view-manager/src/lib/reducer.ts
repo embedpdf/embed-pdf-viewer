@@ -76,13 +76,7 @@ export const viewManagerReducer: Reducer<ViewManagerState, ViewManagerAction> = 
           updatedViews[vid] = {
             ...updatedViews[vid],
             documentIds: updatedViews[vid].documentIds.filter((id) => id !== documentId),
-            // If we removed the active document, clear it
-            activeDocumentId:
-              updatedViews[vid].activeDocumentId === documentId
-                ? updatedViews[vid].documentIds.length > 1
-                  ? updatedViews[vid].documentIds.find((id) => id !== documentId) || null
-                  : null
-                : updatedViews[vid].activeDocumentId,
+            // Don't modify activeDocumentId here - let the plugin handle it explicitly
           };
         }
       }
@@ -116,12 +110,7 @@ export const viewManagerReducer: Reducer<ViewManagerState, ViewManagerAction> = 
 
       const newDocumentIds = view.documentIds.filter((id) => id !== documentId);
 
-      // Calculate new active document
-      let newActiveDocumentId = view.activeDocumentId;
-      if (view.activeDocumentId === documentId) {
-        newActiveDocumentId = newDocumentIds.length > 0 ? newDocumentIds[0] : null;
-      }
-
+      // Don't modify activeDocumentId here - let the plugin handle it explicitly
       return {
         ...state,
         views: {
@@ -129,7 +118,6 @@ export const viewManagerReducer: Reducer<ViewManagerState, ViewManagerAction> = 
           [viewId]: {
             ...view,
             documentIds: newDocumentIds,
-            activeDocumentId: newActiveDocumentId,
           },
         },
       };

@@ -43,6 +43,7 @@ export function TabContextMenu({
     if (!viewManager) return;
     viewManager.moveDocumentBetweenViews(currentViewId, targetViewId, documentState.id);
     viewManager.setFocusedView(targetViewId);
+    viewManager.setViewActiveDocument(targetViewId, documentState.id);
     onClose();
   };
 

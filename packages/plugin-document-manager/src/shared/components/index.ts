@@ -1,3 +1,3 @@
 export * from './document-content';
-export * from './document-tabs';
+export * from './document-context';
 export * from './file-picker';

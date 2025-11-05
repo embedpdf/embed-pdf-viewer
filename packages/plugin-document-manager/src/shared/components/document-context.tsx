@@ -8,14 +8,14 @@ export interface TabActions {
   move: (documentId: string, toIndex: number) => void;
 }
 
-export interface DocumentTabsRenderProps {
+export interface DocumentContextRenderProps {
   documentStates: DocumentState[];
   activeDocumentId: string | null;
   actions: TabActions;
 }
 
-interface DocumentTabsProps {
-  children: (props: DocumentTabsRenderProps) => ReactNode;
+interface DocumentContextProps {
+  children: (props: DocumentContextRenderProps) => ReactNode;
 }
 
 /**
@@ -23,7 +23,7 @@ interface DocumentTabsProps {
  * Provides all state and actions, completely UI-agnostic
  *
  * @example
- * <DocumentTabs>
+ * <DocumentContext>
  *   {({ documents, activeDocumentId, actions }) => (
  *     <div className="tabs">
  *       {documents.map((doc) => (
@@ -41,9 +41,9 @@ interface DocumentTabsProps {
  *       ))}
  *     </div>
  *   )}
- * </DocumentTabs>
+ * </DocumentContext>
  */
-export function DocumentTabs({ children }: DocumentTabsProps) {
+export function DocumentContext({ children }: DocumentContextProps) {
   const documentStates = useOpenDocuments();
   const { activeDocumentId } = useActiveDocument();
   const { provides } = useDocumentManagerCapability();

@@ -62,10 +62,17 @@ export const useOpenDocuments = (documentIds?: string[]) => {
   const documents = useMemo(() => {
     if (!coreState) return [];
 
+    // If specific documentIds are provided, use THEIR order, not the global documentOrder
+    if (documentIds && documentIds.length > 0) {
+      return documentIds
+        .map((docId) => coreState.documents[docId])
+        .filter((doc): doc is DocumentState => doc !== null && doc !== undefined);
+    }
+
+    // Otherwise use the global document order
     return documentOrder
       .map((docId) => coreState.documents[docId])
-      .filter((doc): doc is DocumentState => doc !== null && doc !== undefined)
-      .filter((doc) => !documentIds || documentIds.length === 0 || documentIds.includes(doc.id));
+      .filter((doc): doc is DocumentState => doc !== null && doc !== undefined);
   }, [coreState, documentOrder, documentIds]);
 
   return documents;

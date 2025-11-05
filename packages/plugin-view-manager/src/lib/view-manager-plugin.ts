@@ -202,12 +202,48 @@ export class ViewManagerPlugin extends BasePlugin<
     // Check if document is already in another view (before state update)
     const previousViewId = this.getDocumentView(documentId);
 
+    // Calculate next active document for the previous view if needed
+    let nextActiveDocumentIdForPreviousView: string | null | undefined;
+    if (previousViewId && previousViewId !== viewId) {
+      nextActiveDocumentIdForPreviousView = this.calculateNextActiveDocumentInView(
+        previousViewId,
+        documentId,
+      );
+    }
+
+    // Calculate the actual index - must account for the document being removed from this view
+    // if it was already here (though we checked above, the reducer also handles this)
     const actualIndex = index ?? view.documentIds.length;
+
+    this.logger.info(
+      'ViewManagerPlugin',
+      'AddDocumentToView',
+      `Adding document ${documentId} to view ${viewId}`,
+      {
+        requestedIndex: index,
+        calculatedIndex: actualIndex,
+        currentDocumentIds: view.documentIds,
+        previousViewId,
+      },
+    );
 
     this.dispatch(addDocumentToView(viewId, documentId, actualIndex));
 
-    // Emit removal event if document was moved from another view
+    // Handle the previous view if document was moved
     if (previousViewId && previousViewId !== viewId) {
+      // Set the next active document in the previous view if needed
+      if (nextActiveDocumentIdForPreviousView !== undefined) {
+        this.dispatch(setViewActiveDocument(previousViewId, nextActiveDocumentIdForPreviousView));
+
+        // Emit active document changed event for the previous view
+        this.viewActiveDocumentChanged$.emit({
+          viewId: previousViewId,
+          previousDocumentId: documentId,
+          currentDocumentId: nextActiveDocumentIdForPreviousView,
+        });
+      }
+
+      // Emit removal event
       this.documentRemovedFromView$.emit({
         viewId: previousViewId,
         documentId,
@@ -216,7 +252,7 @@ export class ViewManagerPlugin extends BasePlugin<
       this.logger.info(
         'ViewManagerPlugin',
         'AddDocumentToView',
-        `Document ${documentId} moved from view ${previousViewId}`,
+        `Document ${documentId} moved from view ${previousViewId} to ${viewId}`,
       );
     }
 
@@ -249,7 +285,22 @@ export class ViewManagerPlugin extends BasePlugin<
       return;
     }
 
+    // Calculate next active document if we're removing the currently active one
+    const nextActiveDocumentId = this.calculateNextActiveDocumentInView(viewId, documentId);
+
     this.dispatch(removeDocumentFromView(viewId, documentId));
+
+    // Set the next active document if needed
+    if (nextActiveDocumentId !== undefined) {
+      this.dispatch(setViewActiveDocument(viewId, nextActiveDocumentId));
+
+      // Emit active document changed event
+      this.viewActiveDocumentChanged$.emit({
+        viewId,
+        previousDocumentId: documentId,
+        currentDocumentId: nextActiveDocumentId,
+      });
+    }
 
     this.documentRemovedFromView$.emit({
       viewId,
@@ -294,10 +345,8 @@ export class ViewManagerPlugin extends BasePlugin<
     documentId: string,
     toIndex?: number,
   ): void {
-    // Remove from source view
-    this.removeDocumentFromView(fromViewId, documentId);
-
-    // Add to target view
+    // Just use addDocumentToView - it handles removing from the source view
+    // and all the next active document calculations
     this.addDocumentToView(toViewId, documentId, toIndex);
   }
 
@@ -407,6 +456,40 @@ export class ViewManagerPlugin extends BasePlugin<
   // ─────────────────────────────────────────────────────────
   // Helper Methods
   // ─────────────────────────────────────────────────────────
+
+  /**
+   * Calculate the next active document when removing a document from a view
+   * Returns undefined if the document being removed is not the active document
+   * Returns the next document ID (left first, then right) or null if no documents remain
+   */
+  private calculateNextActiveDocumentInView(
+    viewId: string,
+    removingDocumentId: string,
+  ): string | null | undefined {
+    const view = this.state.views[viewId];
+    if (!view) return undefined;
+
+    const currentActiveId = view.activeDocumentId;
+
+    // Only calculate if we're removing the active document
+    if (currentActiveId !== removingDocumentId) {
+      return undefined;
+    }
+
+    const documentIds = view.documentIds;
+    const removingIndex = documentIds.indexOf(removingDocumentId);
+
+    if (removingIndex === -1) return undefined;
+
+    // Try left first, then right, then null
+    if (removingIndex > 0) {
+      return documentIds[removingIndex - 1];
+    } else if (removingIndex < documentIds.length - 1) {
+      return documentIds[removingIndex + 1];
+    } else {
+      return null;
+    }
+  }
 
   private generateViewId(): string {
     return `view-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;

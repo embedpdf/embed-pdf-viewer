@@ -51,7 +51,6 @@ export function ViewContext({ viewId, autoCreate = true, children }: ViewContext
     });
 
     const unsubRemoved = provides.onDocumentRemovedFromView((event) => {
-      console.log('document removed from view', event);
       if (event.viewId === viewId) {
         setView(provides.getView(viewId));
       }
