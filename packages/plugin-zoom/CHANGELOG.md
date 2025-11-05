@@ -1,5 +1,11 @@
 # @embedpdf/plugin-zoom
 
+## 1.5.0
+
+### Patch Changes
+
+- [#236](https://github.com/embedpdf/embed-pdf-viewer/pull/236) by [@eposha](https://github.com/eposha) – Increase zoom precision from two decimals to three (changed rounding from `/100` to `/1000`) to improve smoother zoom granularity and reduce jumpy transitions.
+
 ## 1.4.1
 
 ### Patch Changes

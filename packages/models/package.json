@@ -1,6 +1,6 @@
 {
   "name": "@embedpdf/models",
-  "version": "1.4.1",
+  "version": "1.5.0",
   "private": false,
   "description": "Shared type definitions, data models, and utility helpers (geometry, tasks, logging, PDF primitives) that underpin every package in the EmbedPDF ecosystem.",
   "type": "module",
