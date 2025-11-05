@@ -1,18 +1,35 @@
 <script lang="ts">
   import type { TrackedAnnotation } from '@embedpdf/plugin-annotation';
   import { useAnnotationCapability } from '@embedpdf/plugin-annotation/svelte';
-  import type { MenuWrapperProps } from '@embedpdf/utils/svelte';
+  import {type MenuWrapperProps, stylesToString} from '@embedpdf/utils/svelte';
+  import type { Rect } from '@embedpdf/models';
 
   interface AnnotationSelectionMenuProps {
     menuWrapperProps: MenuWrapperProps;
     annotation: TrackedAnnotation;
+    rect: Rect;
   }
 
-  let { menuWrapperProps, annotation }: AnnotationSelectionMenuProps = $props();
+  let { menuWrapperProps, annotation, rect }: AnnotationSelectionMenuProps = $props();
 
   const annotationCapability = useAnnotationCapability();
 
-  let anchorEl = $state<HTMLSpanElement | null>(null);
+  let spanElement = $state<HTMLSpanElement | null>(null);
+
+  $effect(() => {
+    if (menuWrapperProps.ref && spanElement) {
+      menuWrapperProps.ref(spanElement);
+    }
+    
+    // Debug logging
+    if (spanElement) {
+      console.log('AnnotationSelectionMenu rendered', {
+        rect,
+        style: menuWrapperProps.style,
+        boundingRect: spanElement.getBoundingClientRect()
+      });
+    }
+  });
 
   function handleDelete() {
     if (!annotationCapability.provides) return;
@@ -21,13 +38,14 @@
   }
 </script>
 
-<span {...menuWrapperProps} bind:this={anchorEl}></span>
-
-{#if anchorEl}
+<span bind:this={spanElement} style={stylesToString(menuWrapperProps.style)}>
   <div
-    class="pointer-events-auto absolute z-50 flex items-center gap-1 rounded-lg border border-gray-200 bg-white px-2 py-1 shadow-lg"
-    style:top="{anchorEl.offsetTop + anchorEl.offsetHeight + 8}px"
-    style:left="{anchorEl.offsetLeft}px"
+    class="pointer-events-auto flex items-center gap-1 rounded-lg border border-gray-200 bg-white px-2 py-1 shadow-lg"
+    style:position="absolute"
+    style:top="{rect.size.height + 8}px"
+    style:left="{rect.size.width - 100}px"
+    style:z-index="1000"
+    style:cursor="default"
   >
     <button
       onclick={handleDelete}
@@ -46,4 +64,4 @@
       >
     </button>
   </div>
-{/if}
+</span>

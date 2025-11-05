@@ -2,15 +2,11 @@
 import type { Snippet } from "svelte";
 import {getCounterRotation} from "@embedpdf/utils";
 import type {Rect, Rotation} from "@embedpdf/models";
+import type { MenuWrapperProps } from "./types";
 
 interface CounterRotateProps {
     rect: Rect;
     rotation: Rotation;
-}
-
-interface MenuWrapperProps {
-    style: Record<string, string | number>;
-    ref: (el: HTMLDivElement | null) => void;
 }
 
 interface $$Props extends CounterRotateProps {
@@ -24,7 +20,7 @@ interface $$Props extends CounterRotateProps {
 
 let { rect, rotation, children } = $props();
 const counterRotation = $derived(getCounterRotation(rect, rotation));  
-let elementRef = $state<HTMLDivElement | null>(null);
+let elementRef = $state<HTMLElement | null>(null);
 
 // Use native event listeners with capture phase to prevent event propagation
 $effect(() => {
@@ -59,26 +55,26 @@ $effect(() => {
 
 const menuWrapperStyle = $derived({
     position: 'absolute',
-    left: rect.origin.x,
-    top: rect.origin.y,
+    left: `${rect.origin.x}px`,
+    top: `${rect.origin.y}px`,
     transform: counterRotation.matrix,
     transformOrigin: '0 0',
-    width: counterRotation.width,
-    height:counterRotation.height,
+    width: `${counterRotation.width}px`,
+    height: `${counterRotation.height}px`,
     pointerEvents: 'none',
-    zIndex: 3,
+    zIndex: '3',
 });
 
 const menuWrapperProps: MenuWrapperProps = $derived({
     style: menuWrapperStyle,
-    ref: (el: HTMLDivElement | null) => {
+    ref: (el: HTMLElement | null) => {
         elementRef = el;
     },
 });
 
 </script>
 
-
+{#if children}
     {@render children({
     menuWrapperProps,
     matrix : counterRotation.matrix,
@@ -87,6 +83,7 @@ const menuWrapperProps: MenuWrapperProps = $derived({
     size: { width: counterRotation.width, height: counterRotation.height },
 },
 })}
+{/if}
 
 
 

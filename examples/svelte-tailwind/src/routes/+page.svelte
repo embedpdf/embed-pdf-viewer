@@ -138,9 +138,9 @@
     pageHeight={height}
     rotation={rotation}
   >
-    {#snippet selectionMenu({ annotation, selected, menuWrapperProps })}
+    {#snippet selectionMenu({ annotation, selected, menuWrapperProps, rect })}
       {#if selected}
-        <AnnotationSelectionMenu {menuWrapperProps} {annotation} />
+        <AnnotationSelectionMenu {menuWrapperProps} {annotation} {rect} />
       {/if}
     {/snippet}
   </AnnotationLayer>
