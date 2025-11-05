@@ -740,9 +740,9 @@ export class AnnotationPlugin extends BasePlugin<
 
     const tool = this.state.tools.find((t) => t.id === toolId);
     if (tool) {
-      this.interactionManager?.activate(tool.interaction.mode ?? tool.id);
+      this.interactionManager?.forDocument(docId).activate(tool.interaction.mode ?? tool.id);
     } else {
-      this.interactionManager?.activateDefaultMode();
+      this.interactionManager?.forDocument(docId).activateDefaultMode();
     }
   }
 
