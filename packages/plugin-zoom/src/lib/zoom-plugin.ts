@@ -86,7 +86,11 @@ export class ZoomPlugin extends BasePlugin<
     // Keep automatic modes up to date per document
     this.viewport.onViewportResize(
       (event) => this.recalcAuto(event.documentId, VerticalZoomFocus.Top),
-      { mode: 'debounce', wait: 150 },
+      {
+        mode: 'debounce',
+        wait: 150,
+        keyExtractor: (event) => event.documentId,
+      },
     );
 
     // Subscribe to spread changes
