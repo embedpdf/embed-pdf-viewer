@@ -8,16 +8,21 @@ import { useState } from 'react';
 interface AnnotationSelectionMenuProps {
   menuWrapperProps: MenuWrapperProps;
   selected: TrackedAnnotation;
+  documentId: string;
   container?: HTMLElement | null;
 }
 
 export function AnnotationSelectionMenu({
   selected,
+  documentId,
   container,
   menuWrapperProps,
 }: AnnotationSelectionMenuProps) {
-  const { provides: annotation } = useAnnotationCapability();
+  const { provides: annotationCapability } = useAnnotationCapability();
   const [anchorEl, setAnchorEl] = useState<HTMLSpanElement | null>(null);
+
+  // Get document-scoped API
+  const annotation = annotationCapability?.forDocument(documentId);
 
   const handleDelete = () => {
     if (!annotation) return;

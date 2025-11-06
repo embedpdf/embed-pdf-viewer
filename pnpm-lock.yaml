@@ -100,21 +100,30 @@ importers:
       '@embedpdf/plugin-annotation':
         specifier: workspace:*
         version: link:../../packages/plugin-annotation
+      '@embedpdf/plugin-capture':
+        specifier: workspace:*
+        version: link:../../packages/plugin-capture
+      '@embedpdf/plugin-document-manager':
+        specifier: workspace:*
+        version: link:../../packages/plugin-document-manager
       '@embedpdf/plugin-export':
         specifier: workspace:*
         version: link:../../packages/plugin-export
       '@embedpdf/plugin-fullscreen':
         specifier: workspace:*
         version: link:../../packages/plugin-fullscreen
+      '@embedpdf/plugin-history':
+        specifier: workspace:*
+        version: link:../../packages/plugin-history
       '@embedpdf/plugin-interaction-manager':
         specifier: workspace:*
         version: link:../../packages/plugin-interaction-manager
-      '@embedpdf/plugin-loader':
-        specifier: workspace:*
-        version: link:../../packages/plugin-loader
       '@embedpdf/plugin-pan':
         specifier: workspace:*
         version: link:../../packages/plugin-pan
+      '@embedpdf/plugin-print':
+        specifier: workspace:*
+        version: link:../../packages/plugin-print
       '@embedpdf/plugin-redaction':
         specifier: workspace:*
         version: link:../../packages/plugin-redaction
@@ -142,6 +151,9 @@ importers:
       '@embedpdf/plugin-tiling':
         specifier: workspace:*
         version: link:../../packages/plugin-tiling
+      '@embedpdf/plugin-view-manager':
+        specifier: workspace:*
+        version: link:../../packages/plugin-view-manager
       '@embedpdf/plugin-viewport':
         specifier: workspace:*
         version: link:../../packages/plugin-viewport

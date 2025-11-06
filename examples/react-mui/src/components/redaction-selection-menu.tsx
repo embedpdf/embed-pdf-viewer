@@ -8,16 +8,21 @@ import { RedactionItem, useRedactionCapability } from '@embedpdf/plugin-redactio
 interface RedactionSelectionMenuProps {
   menuWrapperProps: MenuWrapperProps;
   selected: RedactionItem;
+  documentId: string;
   container?: HTMLElement | null;
 }
 
 export function RedactionSelectionMenu({
   selected,
+  documentId,
   container,
   menuWrapperProps,
 }: RedactionSelectionMenuProps) {
-  const { provides: redaction } = useRedactionCapability();
+  const { provides: redactionCapability } = useRedactionCapability();
   const [anchorEl, setAnchorEl] = useState<HTMLSpanElement | null>(null);
+
+  // Get document-scoped API
+  const redaction = redactionCapability?.forDocument(documentId);
 
   const handleDelete = () => {
     if (!redaction) return;
