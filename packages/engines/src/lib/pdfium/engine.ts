@@ -268,10 +268,10 @@ export class PdfiumEngine<T = Blob> implements PdfEngine<T> {
       imageDataConverter = browserImageDataToBlobConverter as ImageDataConverter<T>,
     } = options;
 
-    this.cache = new PdfCache(this.pdfiumModule);
     this.logger = logger;
     this.imageDataConverter = imageDataConverter;
     this.memoryManager = new MemoryManager(this.pdfiumModule, this.logger);
+    this.cache = new PdfCache(this.pdfiumModule, this.memoryManager);
 
     if (this.logger.isEnabled('debug')) {
       this.memoryLeakCheckInterval = setInterval(() => {
@@ -2573,13 +2573,7 @@ export class PdfiumEngine<T = Blob> implements PdfEngine<T> {
 
     const ctx = this.cache.getContext(doc.id);
 
-    if (!ctx) {
-      this.logger.perf(LOG_SOURCE, LOG_CATEGORY, `CloseDocument`, 'End', doc.id);
-      return PdfTaskHelper.reject({
-        code: PdfErrorCode.DocNotOpen,
-        message: 'document does not open',
-      });
-    }
+    if (!ctx) return PdfTaskHelper.resolve(true);
 
     ctx.dispose();
     this.logger.perf(LOG_SOURCE, LOG_CATEGORY, `CloseDocument`, 'End', doc.id);
