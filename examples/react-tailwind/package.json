@@ -34,6 +34,7 @@
     "@embedpdf/plugin-history": "workspace:*",
     "@embedpdf/plugin-annotation": "workspace:*",
     "@embedpdf/plugin-view-manager": "workspace:*",
+    "@embedpdf/utils": "workspace:*",
     "@embedpdf/models": "workspace:*",
     "@embedpdf/pdfium": "workspace:*",
     "@embedpdf/engines": "workspace:*",

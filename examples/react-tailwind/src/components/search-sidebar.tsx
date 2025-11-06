@@ -111,7 +111,7 @@ export function SearchSidebar({ documentId, onClose }: SearchSidebarProps) {
       { x: Infinity, y: Infinity },
     );
 
-    scroll?.scrollToPage({
+    scroll?.forDocument(documentId).scrollToPage({
       pageNumber: item.pageIndex + 1,
       pageCoordinates: minCoordinates,
       center: true,

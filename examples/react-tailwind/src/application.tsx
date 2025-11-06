@@ -40,6 +40,7 @@ import { ThumbnailsSidebar } from './components/thumbnails-sidebar';
 import { PageControls } from './components/page-controls';
 import { ConsoleLogger } from '@embedpdf/models';
 import { SplitViewLayout } from './components/split-view-layout';
+import { AnnotationSelectionMenu } from './components/annotation-selection-menu';
 
 const logger = new ConsoleLogger();
 
@@ -271,6 +272,23 @@ export default function DocumentViewer() {
                                                   <AnnotationLayer
                                                     documentId={documentId}
                                                     pageIndex={pageIndex}
+                                                    selectionMenu={({
+                                                      menuWrapperProps,
+                                                      selected,
+                                                      annotation,
+                                                      rect,
+                                                    }) => (
+                                                      <>
+                                                        {selected ? (
+                                                          <AnnotationSelectionMenu
+                                                            menuWrapperProps={menuWrapperProps}
+                                                            rect={rect}
+                                                            selected={annotation}
+                                                            documentId={documentId}
+                                                          />
+                                                        ) : null}
+                                                      </>
+                                                    )}
                                                   />
                                                 </PagePointerProvider>
                                               </Rotate>

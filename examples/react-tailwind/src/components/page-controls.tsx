@@ -79,9 +79,7 @@ export function PageControls({ documentId }: PageControlsProps) {
     e.preventDefault();
     e.currentTarget.blur();
     if (currentPage > 1) {
-      scroll?.scrollToPage?.({
-        pageNumber: currentPage - 1,
-      });
+      scroll?.scrollToPreviousPage();
     }
   };
 
@@ -89,9 +87,7 @@ export function PageControls({ documentId }: PageControlsProps) {
     e.preventDefault();
     e.currentTarget.blur();
     if (currentPage < totalPages) {
-      scroll?.scrollToPage?.({
-        pageNumber: currentPage + 1,
-      });
+      scroll?.scrollToNextPage();
     }
   };
 
