@@ -31,14 +31,15 @@ import { CapturePluginPackage, MarqueeCapture } from '@embedpdf/plugin-capture/r
 import { FullscreenPluginPackage } from '@embedpdf/plugin-fullscreen/react';
 import { HistoryPluginPackage } from '@embedpdf/plugin-history/react';
 import { AnnotationPluginPackage, AnnotationLayer } from '@embedpdf/plugin-annotation/react';
-import { TabBar } from './components/tab-bar-2';
-import { ViewerToolbar, ViewMode } from './components/viewer-toolbar';
-import { LoadingSpinner } from './components/loading-spinner';
-import { DocumentPasswordPrompt } from './components/document-password-prompt';
-import { SearchSidebar } from './components/search-sidebar';
-import { ThumbnailsSidebar } from './components/thumbnails-sidebar';
-import { PageControls } from './components/page-controls';
+import { TabBar } from '../components/tab-bar-2';
+import { ViewerToolbar, ViewMode } from '../components/viewer-toolbar';
+import { LoadingSpinner } from '../components/loading-spinner';
+import { DocumentPasswordPrompt } from '../components/document-password-prompt';
+import { SearchSidebar } from '../components/search-sidebar';
+import { ThumbnailsSidebar } from '../components/thumbnails-sidebar';
+import { PageControls } from '../components/page-controls';
 import { ConsoleLogger } from '@embedpdf/models';
+import { NavigationBar } from '../components/navigation-bar';
 
 const logger = new ConsoleLogger();
 
@@ -48,7 +49,7 @@ type SidebarState = {
   thumbnails: boolean;
 };
 
-export default function DocumentViewer() {
+export function ViewerSimplePage() {
   const containerRef = useRef<HTMLDivElement>(null);
   const { engine, isLoading, error } = usePdfiumEngine({
     logger,
@@ -142,8 +143,21 @@ export default function DocumentViewer() {
 
   return (
     <div className="flex h-screen flex-1 flex-col overflow-hidden" ref={containerRef}>
+      <NavigationBar />
+
       <div className="flex flex-1 select-none flex-col overflow-hidden">
-        <EmbedPDF engine={engine} logger={logger} plugins={plugins}>
+        <EmbedPDF
+          engine={engine}
+          logger={logger}
+          plugins={plugins}
+          onInitialized={async (registry) => {
+            registry
+              ?.getPlugin<DocumentManagerPlugin>(DocumentManagerPlugin.id)
+              ?.provides()
+              ?.openDocumentUrl({ url: 'https://snippet.embedpdf.com/ebook.pdf' })
+              .toPromise();
+          }}
+        >
           {({ pluginsReady, registry }) => (
             <>
               {pluginsReady ? (

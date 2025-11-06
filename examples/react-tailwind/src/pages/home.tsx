@@ -28,7 +28,14 @@ export function HomePage() {
             href="#/viewer"
             className="block rounded-lg bg-indigo-600 px-6 py-3 text-center font-semibold text-white transition-colors hover:bg-indigo-700"
           >
-            Go to PDF Viewer
+            Go to PDF Viewer (with ViewManager)
+          </a>
+
+          <a
+            href="#/viewer-simple"
+            className="block rounded-lg bg-purple-600 px-6 py-3 text-center font-semibold text-white transition-colors hover:bg-purple-700"
+          >
+            Go to Simple PDF Viewer (DocumentManager only)
           </a>
 
           <a
@@ -41,8 +48,8 @@ export function HomePage() {
 
         <div className="mt-8 rounded-lg bg-indigo-50 p-4">
           <p className="text-sm text-indigo-900">
-            <strong>Getting Started:</strong> Click "Go to PDF Viewer" to open the viewer and load
-            your PDF documents.
+            <strong>Getting Started:</strong> Choose a viewer to open and load your PDF documents.
+            The ViewManager version supports split views, while the simple version uses tabs.
           </p>
         </div>
       </div>

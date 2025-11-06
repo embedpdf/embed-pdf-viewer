@@ -20,7 +20,7 @@ import { SpreadMode, SpreadPluginPackage } from '@embedpdf/plugin-spread/react';
 import { Rotate, RotatePluginPackage } from '@embedpdf/plugin-rotate/react';
 import { RenderLayer, RenderPluginPackage } from '@embedpdf/plugin-render/react';
 import { TilingLayer, TilingPluginPackage } from '@embedpdf/plugin-tiling/react';
-import { ViewManagerPluginPackage } from '@embedpdf/plugin-view-manager/react';
+import { ViewManagerPlugin, ViewManagerPluginPackage } from '@embedpdf/plugin-view-manager/react';
 import { RedactionLayer, RedactionPluginPackage } from '@embedpdf/plugin-redaction/react';
 import { ExportPluginPackage } from '@embedpdf/plugin-export/react';
 import { PrintPluginPackage } from '@embedpdf/plugin-print/react';
@@ -41,6 +41,7 @@ import { PageControls } from '../components/page-controls';
 import { ConsoleLogger } from '@embedpdf/models';
 import { SplitViewLayout } from '../components/split-view-layout';
 import { AnnotationSelectionMenu } from '../components/annotation-selection-menu';
+import { NavigationBar } from '../components/navigation-bar';
 
 const logger = new ConsoleLogger();
 
@@ -147,23 +148,36 @@ export function ViewerPage() {
 
   return (
     <div className="flex h-screen flex-1 flex-col overflow-hidden" ref={containerRef}>
-      {/* Navigation Bar */}
-      <div className="flex items-center justify-between border-b bg-gray-800 px-4 py-2 text-white">
-        <div className="flex items-center gap-4">
-          <a
-            href="#/"
-            className="rounded px-3 py-1 text-sm font-medium transition-colors hover:bg-gray-700"
-          >
-            ← Home
-          </a>
-          <span className="text-gray-400">|</span>
-          <span className="text-sm font-semibold">PDF Viewer</span>
-        </div>
-        <div className="text-xs text-gray-400">EmbedPDF React Example</div>
-      </div>
+      <NavigationBar />
 
       <div className="flex flex-1 select-none flex-col overflow-hidden">
-        <EmbedPDF engine={engine} logger={logger} plugins={plugins}>
+        <EmbedPDF
+          engine={engine}
+          logger={logger}
+          plugins={plugins}
+          onInitialized={async (registry) => {
+            // Load default PDF URL on initialization
+            const document = await registry
+              ?.getPlugin<DocumentManagerPlugin>(DocumentManagerPlugin.id)
+              ?.provides()
+              ?.openDocumentUrl({ url: 'https://snippet.embedpdf.com/ebook.pdf' })
+              .toPromise();
+
+            if (!document) return;
+
+            const viewManager = registry
+              ?.getPlugin<ViewManagerPlugin>(ViewManagerPlugin.id)
+              ?.provides();
+            if (!viewManager) return;
+
+            const views = viewManager.getAllViews();
+            if (views.length > 0 && views[0]) {
+              const firstViewId = views[0].id;
+              viewManager.addDocumentToView(firstViewId, document.documentId);
+              viewManager.setViewActiveDocument(firstViewId, document.documentId);
+            }
+          }}
+        >
           {({ pluginsReady, registry }) => (
             <>
               {pluginsReady ? (
