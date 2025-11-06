@@ -938,3 +938,45 @@ export function SquaresIcon({ className, title }: IconProps) {
     </svg>
   );
 }
+
+export function UndoIcon({ className, title }: IconProps) {
+  return (
+    <svg
+      className={className}
+      fill="none"
+      stroke="currentColor"
+      viewBox="0 0 24 24"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      strokeWidth={2}
+      aria-hidden={!title}
+      role={title ? 'img' : 'presentation'}
+    >
+      {title ? <title>{title}</title> : null}
+      <path stroke="none" d="M0 0h24v24H0z" fill="none" />
+      <path d="M9 14l-4 -4l4 -4" />
+      <path d="M5 10h11a4 4 0 1 1 0 8h-1" />
+    </svg>
+  );
+}
+
+export function RedoIcon({ className, title }: IconProps) {
+  return (
+    <svg
+      className={className}
+      fill="none"
+      stroke="currentColor"
+      viewBox="0 0 24 24"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      strokeWidth={2}
+      aria-hidden={!title}
+      role={title ? 'img' : 'presentation'}
+    >
+      {title ? <title>{title}</title> : null}
+      <path stroke="none" d="M0 0h24v24H0z" fill="none" />
+      <path d="M15 14l4 -4l-4 -4" />
+      <path d="M19 10h-11a4 4 0 1 0 0 8h1" />
+    </svg>
+  );
+}

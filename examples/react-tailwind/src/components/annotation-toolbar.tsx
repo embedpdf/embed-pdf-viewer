@@ -1,4 +1,5 @@
 import { AnnotationTool, useAnnotationCapability } from '@embedpdf/plugin-annotation/react';
+import { useHistoryCapability } from '@embedpdf/plugin-history/react';
 import { useEffect, useState, useMemo } from 'react';
 import { ToolbarButton } from './ui';
 import {
@@ -14,6 +15,8 @@ import {
   PolylineIcon,
   LineIcon,
   ArrowIcon,
+  UndoIcon,
+  RedoIcon,
 } from './icons';
 
 type AnnotationToolbarProps = {
@@ -38,7 +41,10 @@ function extractToolColors(tools: AnnotationTool[]): ToolColors {
 
 export function AnnotationToolbar({ documentId }: AnnotationToolbarProps) {
   const { provides: annotationCapability } = useAnnotationCapability();
+  const { provides: historyCapability } = useHistoryCapability();
   const [activeTool, setActiveTool] = useState<AnnotationTool | null>(null);
+  const [canUndo, setCanUndo] = useState(false);
+  const [canRedo, setCanRedo] = useState(false);
 
   // Initialize tool colors synchronously to avoid flash
   const [toolColors, setToolColors] = useState<ToolColors>(() =>
@@ -49,6 +55,12 @@ export function AnnotationToolbar({ documentId }: AnnotationToolbarProps) {
   const annotationProvides = useMemo(
     () => (annotationCapability ? annotationCapability.forDocument(documentId) : null),
     [annotationCapability, documentId],
+  );
+
+  // Get scoped history for this document
+  const historyProvides = useMemo(
+    () => (historyCapability ? historyCapability.forDocument(documentId) : null),
+    [historyCapability, documentId],
   );
 
   useEffect(() => {
@@ -73,11 +85,40 @@ export function AnnotationToolbar({ documentId }: AnnotationToolbarProps) {
     });
   }, [annotationCapability]);
 
+  // Subscribe to history state changes for this document
+  useEffect(() => {
+    if (!historyProvides) return;
+
+    // Initialize with current state
+    const state = historyProvides.getHistoryState();
+    setCanUndo(state.global.canUndo);
+    setCanRedo(state.global.canRedo);
+
+    // Subscribe to history changes
+    return historyProvides.onHistoryChange(() => {
+      const newState = historyProvides.getHistoryState();
+      setCanUndo(newState.global.canUndo);
+      setCanRedo(newState.global.canRedo);
+    });
+  }, [historyProvides]);
+
   if (!annotationProvides) return null;
 
   const toggleTool = (toolId: string) => {
     const currentId = activeTool?.id ?? null;
     annotationProvides.setActiveTool(currentId === toolId ? null : toolId);
+  };
+
+  const handleUndo = () => {
+    if (historyProvides) {
+      historyProvides.undo();
+    }
+  };
+
+  const handleRedo = () => {
+    if (historyProvides) {
+      historyProvides.redo();
+    }
   };
 
   return (
@@ -191,6 +232,18 @@ export function AnnotationToolbar({ documentId }: AnnotationToolbarProps) {
         title="Draw Arrow"
       >
         <ArrowIcon className="h-4 w-4" style={{ color: toolColors.lineArrow?.primaryColor }} />
+      </ToolbarButton>
+
+      {/* Divider */}
+      <div className="mx-1 h-6 w-px bg-gray-300" />
+
+      {/* Undo/Redo buttons */}
+      <ToolbarButton onClick={handleUndo} disabled={!canUndo} aria-label="Undo" title="Undo">
+        <UndoIcon className="h-4 w-4" />
+      </ToolbarButton>
+
+      <ToolbarButton onClick={handleRedo} disabled={!canRedo} aria-label="Redo" title="Redo">
+        <RedoIcon className="h-4 w-4" />
       </ToolbarButton>
     </div>
   );
