@@ -171,6 +171,7 @@ export class InteractionManagerPlugin extends BasePlugin<
       pause: () => this.pause(),
       resume: () => this.resume(),
       isPaused: () => this.isPaused(),
+      getState: () => this.getDocumentStateOrThrow(),
 
       // Document-scoped operations
       forDocument: (documentId: string) => this.createInteractionScope(documentId),
@@ -217,6 +218,7 @@ export class InteractionManagerPlugin extends BasePlugin<
       pause: () => this.pause(documentId),
       resume: () => this.resume(documentId),
       isPaused: () => this.isPaused(documentId),
+      getState: () => this.getDocumentStateOrThrow(documentId),
       onModeChange: (listener: Listener<string>) =>
         this.onModeChange$.on((event) => {
           if (event.documentId === documentId) listener(event.activeMode);

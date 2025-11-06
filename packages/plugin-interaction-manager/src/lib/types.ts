@@ -142,6 +142,7 @@ export interface InteractionManagerScope {
   pause(): void;
   resume(): void;
   isPaused(): boolean;
+  getState(): InteractionDocumentState;
   onModeChange: EventHook<string>;
   onCursorChange: EventHook<string>;
   onStateChange: EventHook<InteractionDocumentState>;
@@ -161,6 +162,7 @@ export interface InteractionManagerCapability {
   pause(): void;
   resume(): void;
   isPaused(): boolean;
+  getState(): InteractionDocumentState;
 
   // Document-scoped operations
   forDocument(documentId: string): InteractionManagerScope;

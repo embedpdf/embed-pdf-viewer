@@ -1,25 +1,34 @@
 <script setup lang="ts">
-import { ref, watchEffect, computed } from 'vue';
-import { Position, restorePosition, Size, transformSize } from '@embedpdf/models';
+import { ref, watch, computed, toValue } from 'vue';
+import { useDocumentState } from '@embedpdf/core/vue';
+import { Position, restorePosition, transformSize } from '@embedpdf/models';
 import { createPointerProvider } from '../../shared/utils';
 import { useInteractionManagerCapability, useIsPageExclusive } from '../hooks';
 
-interface Props {
+interface PagePointerProviderProps {
   documentId: string;
   pageIndex: number;
-  pageWidth: number;
-  pageHeight: number;
-  rotation: number;
-  scale: number;
+  rotation?: number;
+  scale?: number;
   convertEventToPoint?: (event: PointerEvent, element: HTMLElement) => Position;
 }
 
-const props = defineProps<Props>();
+const props = defineProps<PagePointerProviderProps>();
 
 const divRef = ref<HTMLDivElement | null>(null);
 const { provides: cap } = useInteractionManagerCapability();
 const isPageExclusive = useIsPageExclusive(props.documentId);
+const documentState = useDocumentState(props.documentId);
 
+// Get page dimensions and transformations from document state
+// Calculate inline - this is cheap and memoization isn't necessary
+const page = computed(() => documentState.value?.document?.pages?.[props.pageIndex]);
+const naturalPageSize = computed(() => page.value?.size ?? { width: 0, height: 0 });
+const rotation = computed(() => props.rotation ?? documentState.value?.rotation ?? 0);
+const scale = computed(() => props.scale ?? documentState.value?.scale ?? 1);
+const displaySize = computed(() => transformSize(naturalPageSize.value, 0, scale.value));
+
+// Simplified conversion function
 const defaultConvertEventToPoint = computed(() => {
   return (event: PointerEvent, element: HTMLElement): Position => {
     const rect = element.getBoundingClientRect();
@@ -28,33 +37,53 @@ const defaultConvertEventToPoint = computed(() => {
       y: event.clientY - rect.top,
     };
 
-    const displaySize: Size = transformSize(
-      { width: props.pageWidth, height: props.pageHeight },
-      props.rotation,
+    // Get the rotated natural size (width/height may be swapped, but not scaled)
+    const rotatedNaturalSize = transformSize(
+      {
+        width: displaySize.value.width,
+        height: displaySize.value.height,
+      },
+      rotation.value,
       1,
     );
 
-    return restorePosition(displaySize, displayPoint, props.rotation, props.scale);
+    return restorePosition(rotatedNaturalSize, displayPoint, rotation.value, scale.value);
   };
 });
 
-watchEffect((onCleanup) => {
-  if (cap.value && divRef.value) {
+watch(
+  [
+    cap,
+    () => toValue(props.documentId),
+    () => props.pageIndex,
+    () => props.convertEventToPoint,
+    defaultConvertEventToPoint,
+  ],
+  ([capValue, docId, pageIdx, customConvert, defaultConvert], _, onCleanup) => {
+    if (!capValue || !divRef.value) return;
+
     const cleanup = createPointerProvider(
-      cap.value,
-      { type: 'page', documentId: props.documentId, pageIndex: props.pageIndex },
+      capValue,
+      { type: 'page', documentId: docId, pageIndex: pageIdx },
       divRef.value,
-      props.convertEventToPoint || defaultConvertEventToPoint.value,
+      customConvert || defaultConvert,
     );
+
     onCleanup(cleanup);
-  }
-});
+  },
+  { immediate: true },
+);
 </script>
 
 <template>
   <div
     ref="divRef"
-    :style="{ position: 'relative', width: pageWidth + 'px', height: pageHeight + 'px' }"
+    :style="{
+      position: 'relative',
+      width: displaySize.width + 'px',
+      height: displaySize.height + 'px',
+    }"
+    v-bind="$attrs"
   >
     <slot />
     <div

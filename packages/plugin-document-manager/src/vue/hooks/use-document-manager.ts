@@ -1,13 +1,17 @@
 import { DocumentState } from '@embedpdf/core';
-import { useCapability, usePlugin } from '@embedpdf/core/vue';
+import { useCapability, usePlugin, useCoreState } from '@embedpdf/core/vue';
 import { DocumentManagerPlugin } from '@embedpdf/plugin-document-manager';
-import { ref, watch } from 'vue';
+import { ref, watch, computed, type MaybeRefOrGetter } from 'vue';
+import { toValue } from 'vue';
 
 export const useDocumentManagerPlugin = () =>
   usePlugin<DocumentManagerPlugin>(DocumentManagerPlugin.id);
 export const useDocumentManagerCapability = () =>
   useCapability<DocumentManagerPlugin>(DocumentManagerPlugin.id);
 
+/**
+ * Hook for active document state
+ */
 export function useActiveDocument() {
   const { provides } = useDocumentManagerCapability();
   const activeDocumentId = ref<string | null>(null);
@@ -16,7 +20,11 @@ export function useActiveDocument() {
   watch(
     provides,
     (providesValue, _, onCleanup) => {
-      if (!providesValue) return;
+      if (!providesValue) {
+        activeDocumentId.value = null;
+        activeDocument.value = null;
+        return;
+      }
 
       const updateActive = () => {
         const id = providesValue.getActiveDocumentId();
@@ -41,76 +49,55 @@ export function useActiveDocument() {
   };
 }
 
-export function useOpenDocuments() {
+/**
+ * Hook for all open documents (in order)
+ * @param documentIds Optional specific document IDs to filter/order by
+ */
+export function useOpenDocuments(documentIds?: MaybeRefOrGetter<string[] | undefined>) {
+  const coreState = useCoreState();
   const { provides } = useDocumentManagerCapability();
-  const documents = ref<DocumentState[]>([]);
+  const documentOrder = ref<string[]>([]);
 
   watch(
     provides,
     (providesValue, _, onCleanup) => {
-      if (!providesValue) return;
-
-      const updateDocuments = () => {
-        documents.value = providesValue.getOpenDocuments();
-      };
-
-      updateDocuments();
-
-      const unsubOpen = providesValue.onDocumentOpened(updateDocuments);
-      const unsubClose = providesValue.onDocumentClosed(updateDocuments);
-      const unsubOrder = providesValue.onDocumentOrderChanged(updateDocuments);
-
-      onCleanup(() => {
-        unsubOpen();
-        unsubClose();
-        unsubOrder();
-      });
-    },
-    { immediate: true },
-  );
-
-  return documents;
-}
-
-export function useDocumentState(documentIdRef: () => string | null) {
-  const { provides } = useDocumentManagerCapability();
-  const documentState = ref<DocumentState | null>(null);
-
-  watch(
-    [provides, documentIdRef],
-    ([providesValue, documentId], _, onCleanup) => {
-      if (!providesValue || !documentId) {
-        documentState.value = null;
+      if (!providesValue) {
+        documentOrder.value = [];
         return;
       }
 
-      const updateState = () => {
-        documentState.value = providesValue.getDocumentState(documentId);
-      };
+      // Get initial order
+      documentOrder.value = providesValue.getDocumentOrder();
 
-      updateState();
-
-      const unsubOpen = providesValue.onDocumentOpened((info) => {
-        if (info.id === documentId) updateState();
+      // Subscribe ONLY to order changes - much cleaner!
+      const unsubscribe = providesValue.onDocumentOrderChanged((event) => {
+        documentOrder.value = event.order;
       });
 
-      const unsubClose = providesValue.onDocumentClosed((id) => {
-        if (id === documentId) documentState.value = null;
-      });
-
-      // Add this subscription to handle error events
-      const unsubError = providesValue.onDocumentError((errorEvent) => {
-        if (errorEvent.documentId === documentId) updateState();
-      });
-
-      onCleanup(() => {
-        unsubOpen();
-        unsubClose();
-        unsubError(); // Don't forget to unsubscribe
-      });
+      onCleanup(unsubscribe);
     },
     { immediate: true },
   );
 
-  return documentState;
+  // Map the order to actual document states from core
+  const documents = computed(() => {
+    const core = coreState.value;
+    if (!core) return [];
+
+    const ids = toValue(documentIds);
+
+    // If specific documentIds are provided, use THEIR order, not the global documentOrder
+    if (ids && ids.length > 0) {
+      return ids
+        .map((docId) => core.documents[docId])
+        .filter((doc): doc is DocumentState => doc !== null && doc !== undefined);
+    }
+
+    // Otherwise use the global document order
+    return documentOrder.value
+      .map((docId) => core.documents[docId])
+      .filter((doc): doc is DocumentState => doc !== null && doc !== undefined);
+  });
+
+  return documents;
 }

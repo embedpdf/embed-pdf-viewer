@@ -1,6 +1,6 @@
-import { BasePlugin, createEmitter, PluginRegistry } from '@embedpdf/core';
+import { BasePlugin, PluginRegistry } from '@embedpdf/core';
 
-import { AttachmentCapability, AttachmentPluginConfig } from './types';
+import { AttachmentCapability, AttachmentPluginConfig, AttachmentScope } from './types';
 import {
   PdfAttachmentObject,
   PdfErrorCode,
@@ -18,30 +18,64 @@ export class AttachmentPlugin extends BasePlugin<AttachmentPluginConfig, Attachm
 
   async initialize(_: AttachmentPluginConfig): Promise<void> {}
 
+  // ─────────────────────────────────────────────────────────
+  // Capability
+  // ─────────────────────────────────────────────────────────
+
   protected buildCapability(): AttachmentCapability {
     return {
-      getAttachments: this.getAttachments.bind(this),
-      downloadAttachment: this.downloadAttachment.bind(this),
+      // Active document operations
+      getAttachments: () => this.getAttachments(),
+      downloadAttachment: (attachment) => this.downloadAttachment(attachment),
+
+      // Document-scoped operations
+      forDocument: (documentId: string) => this.createAttachmentScope(documentId),
     };
   }
 
-  private downloadAttachment(attachment: PdfAttachmentObject): Task<ArrayBuffer, PdfErrorReason> {
-    const doc = this.coreState.core.document;
+  // ─────────────────────────────────────────────────────────
+  // Document Scoping
+  // ─────────────────────────────────────────────────────────
 
-    if (!doc) {
-      return PdfTaskHelper.reject({ code: PdfErrorCode.NotFound, message: 'Document not found' });
-    }
-
-    return this.engine.readAttachmentContent(doc, attachment);
+  private createAttachmentScope(documentId: string): AttachmentScope {
+    return {
+      getAttachments: () => this.getAttachments(documentId),
+      downloadAttachment: (attachment) => this.downloadAttachment(attachment, documentId),
+    };
   }
 
-  private getAttachments(): Task<PdfAttachmentObject[], PdfErrorReason> {
-    const doc = this.coreState.core.document;
+  // ─────────────────────────────────────────────────────────
+  // Core Operations
+  // ─────────────────────────────────────────────────────────
 
-    if (!doc) {
-      return PdfTaskHelper.reject({ code: PdfErrorCode.NotFound, message: 'Document not found' });
+  private downloadAttachment(
+    attachment: PdfAttachmentObject,
+    documentId?: string,
+  ): Task<ArrayBuffer, PdfErrorReason> {
+    const id = documentId ?? this.getActiveDocumentId();
+    const coreDoc = this.coreState.core.documents[id];
+
+    if (!coreDoc?.document) {
+      return PdfTaskHelper.reject({
+        code: PdfErrorCode.NotFound,
+        message: `Document ${id} not found`,
+      });
     }
 
-    return this.engine.getAttachments(doc);
+    return this.engine.readAttachmentContent(coreDoc.document, attachment);
+  }
+
+  private getAttachments(documentId?: string): Task<PdfAttachmentObject[], PdfErrorReason> {
+    const id = documentId ?? this.getActiveDocumentId();
+    const coreDoc = this.coreState.core.documents[id];
+
+    if (!coreDoc?.document) {
+      return PdfTaskHelper.reject({
+        code: PdfErrorCode.NotFound,
+        message: `Document ${id} not found`,
+      });
+    }
+
+    return this.engine.getAttachments(coreDoc.document);
   }
 }

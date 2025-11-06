@@ -1,27 +1,50 @@
 <script setup lang="ts">
-import { ref, onMounted, onUnmounted } from 'vue';
+import { ref, watch } from 'vue';
 import { useDocumentManagerCapability, useDocumentManagerPlugin } from '../hooks';
+import type { Task } from '@embedpdf/models';
+import type { PdfErrorReason } from '@embedpdf/models';
+import type { OpenDocumentResponse } from '@embedpdf/plugin-document-manager';
 
-const { provides } = useDocumentManagerCapability();
 const { plugin } = useDocumentManagerPlugin();
+const { provides } = useDocumentManagerCapability();
 const inputRef = ref<HTMLInputElement | null>(null);
-let unsub: (() => void) | undefined;
+const taskRef = ref<Task<OpenDocumentResponse, PdfErrorReason> | null>(null);
 
-onMounted(() => {
-  if (!plugin?.value?.onOpenFileRequest) return;
-  unsub = plugin.value.onOpenFileRequest((req) => {
-    if (req === 'open') inputRef.value?.click();
-  });
-});
-onUnmounted(() => unsub?.());
+watch(
+  plugin,
+  (pluginValue, _, onCleanup) => {
+    if (!pluginValue?.onOpenFileRequest) return;
+
+    const unsubscribe = pluginValue.onOpenFileRequest((task) => {
+      taskRef.value = task;
+      inputRef.value?.click();
+    });
+
+    onCleanup(unsubscribe);
+  },
+  { immediate: true },
+);
 
 const onChange = async (event: Event) => {
   const target = event.target as HTMLInputElement;
   const file = target.files?.[0];
   const cap = provides.value;
   if (!file || !cap) return;
+
   const buffer = await file.arrayBuffer();
-  cap.openDocumentBuffer({ name: file.name, buffer });
+  const openTask = cap.openDocumentBuffer({
+    name: file.name,
+    buffer,
+  });
+
+  openTask.wait(
+    (result) => {
+      taskRef.value?.resolve(result);
+    },
+    (error) => {
+      taskRef.value?.fail(error);
+    },
+  );
 };
 </script>
 

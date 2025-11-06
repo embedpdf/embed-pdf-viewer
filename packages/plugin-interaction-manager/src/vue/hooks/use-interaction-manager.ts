@@ -1,3 +1,4 @@
+import { ref, watch, computed, toValue, type MaybeRefOrGetter } from 'vue';
 import { useCapability, usePlugin } from '@embedpdf/core/vue';
 import {
   initialDocumentState,
@@ -5,135 +6,100 @@ import {
   InteractionManagerPlugin,
   PointerEventHandlersWithLifecycle,
 } from '@embedpdf/plugin-interaction-manager';
-import { ref, watchEffect, readonly, computed } from 'vue';
 
 export const useInteractionManagerPlugin = () =>
   usePlugin<InteractionManagerPlugin>(InteractionManagerPlugin.id);
 export const useInteractionManagerCapability = () =>
   useCapability<InteractionManagerPlugin>(InteractionManagerPlugin.id);
 
-/**
- * Hook for interaction manager state for a specific document
- * @param documentId Document ID
- */
-export function useInteractionManager(documentId: string) {
+export function useInteractionManager(documentId: MaybeRefOrGetter<string>) {
   const { provides } = useInteractionManagerCapability();
   const state = ref<InteractionDocumentState>(initialDocumentState);
 
-  watchEffect((onCleanup) => {
-    if (provides.value) {
-      const scope = provides.value.forDocument(documentId);
+  watch(
+    [provides, () => toValue(documentId)],
+    ([providesValue, docId], _, onCleanup) => {
+      if (!providesValue) {
+        state.value = initialDocumentState;
+        return;
+      }
+
+      const scope = providesValue.forDocument(docId);
 
       // Get initial state
-      state.value = {
-        activeMode: scope.getActiveMode(),
-        cursor: scope.getCurrentCursor(),
-        paused: scope.isPaused(),
-      };
+      state.value = scope.getState();
 
-      // Subscribe to state changes
       const unsubscribe = scope.onStateChange((newState) => {
         state.value = newState;
       });
-      onCleanup(unsubscribe);
-    }
-  });
 
-  // Return a computed ref for the scoped capability
-  const scopedProvides = computed(() => provides.value?.forDocument(documentId) ?? null);
+      onCleanup(unsubscribe);
+    },
+    { immediate: true },
+  );
 
   return {
-    provides: scopedProvides,
-    state: readonly(state),
+    provides: computed(() => {
+      const docId = toValue(documentId);
+      return provides.value?.forDocument(docId) ?? null;
+    }),
+    state,
   };
 }
 
-/**
- * Hook to check if page is exclusive for a specific document
- * @param documentId Document ID
- */
-export function useIsPageExclusive(documentId: string) {
-  const { provides: cap } = useInteractionManagerCapability();
-  const isPageExclusive = ref<boolean>(false);
-
-  watchEffect((onCleanup) => {
-    if (cap.value) {
-      const scope = cap.value.forDocument(documentId);
-
-      // Set initial state
-      const mode = scope.getActiveInteractionMode();
-      isPageExclusive.value = mode?.scope === 'page' && !!mode?.exclusive;
-
-      // Subscribe to mode changes
-      const unsubscribe = scope.onModeChange(() => {
-        const newMode = scope.getActiveInteractionMode();
-        isPageExclusive.value = newMode?.scope === 'page' && !!newMode?.exclusive;
-      });
-      onCleanup(unsubscribe);
-    }
-  });
-
-  return readonly(isPageExclusive);
-}
-
-/**
- * Hook for cursor management for a specific document
- * @param documentId Document ID
- */
-export function useCursor(documentId: string) {
+export function useCursor(documentId: MaybeRefOrGetter<string>) {
   const { provides } = useInteractionManagerCapability();
 
   return {
-    setCursor: (token: string, cursorValue: string, prio = 0) => {
-      if (!provides.value) return;
-      const scope = provides.value.forDocument(documentId);
-      scope.setCursor(token, cursorValue, prio);
+    setCursor: (token: string, cursor: string, prio = 0) => {
+      const providesValue = provides.value;
+      if (!providesValue) return;
+      const docId = toValue(documentId);
+      const scope = providesValue.forDocument(docId);
+      scope.setCursor(token, cursor, prio);
     },
     removeCursor: (token: string) => {
-      if (!provides.value) return;
-      const scope = provides.value.forDocument(documentId);
+      const providesValue = provides.value;
+      if (!providesValue) return;
+      const docId = toValue(documentId);
+      const scope = providesValue.forDocument(docId);
       scope.removeCursor(token);
     },
   };
 }
 
 interface UsePointerHandlersOptions {
-  documentId: string;
   modeId?: string | string[];
-  pageIndex?: number;
+  pageIndex?: MaybeRefOrGetter<number>;
+  documentId: MaybeRefOrGetter<string>;
 }
 
-/**
- * Hook for registering pointer handlers
- * @param options Options including documentId, modeId, and pageIndex
- */
-export function usePointerHandlers({ documentId, modeId, pageIndex }: UsePointerHandlersOptions) {
+export function usePointerHandlers({ modeId, pageIndex, documentId }: UsePointerHandlersOptions) {
   const { provides } = useInteractionManagerCapability();
 
   return {
     register: (
       handlers: PointerEventHandlersWithLifecycle,
-      options?: { documentId?: string; modeId?: string | string[]; pageIndex?: number },
+      options?: {
+        modeId?: string | string[];
+        pageIndex?: number;
+        documentId?: MaybeRefOrGetter<string>;
+      },
     ) => {
-      if (!provides.value) return;
-
       // Use provided options or fall back to hook-level options
-      const finalDocumentId = options?.documentId ?? documentId;
       const finalModeId = options?.modeId ?? modeId;
-      const finalPageIndex = options?.pageIndex ?? pageIndex;
-
-      if (!finalDocumentId) {
-        throw new Error('documentId is required for registering handlers');
-      }
+      const finalPageIndex = toValue(options?.pageIndex ?? pageIndex);
+      const finalDocumentId = toValue(options?.documentId ?? documentId);
+      const providesValue = provides.value;
 
       return finalModeId
-        ? provides.value.registerHandlers({
-            documentId: finalDocumentId,
+        ? providesValue?.registerHandlers({
             modeId: finalModeId,
             handlers,
             pageIndex: finalPageIndex,
+            documentId: finalDocumentId,
           })
-        : provides.value.registerAlways({
+        : providesValue?.registerAlways({
             scope:
               finalPageIndex !== undefined
                 ? { type: 'page', documentId: finalDocumentId, pageIndex: finalPageIndex }
@@ -144,28 +110,33 @@ export function usePointerHandlers({ documentId, modeId, pageIndex }: UsePointer
   };
 }
 
-/**
- * Hook to get the active mode for a specific document
- * @param documentId Document ID
- */
-export function useActiveMode(documentId: string) {
-  const { provides } = useInteractionManagerCapability();
-  const activeMode = ref<string>('pointerMode');
+export function useIsPageExclusive(documentId: MaybeRefOrGetter<string>) {
+  const { provides: cap } = useInteractionManagerCapability();
+  const isPageExclusive = ref<boolean>(false);
 
-  watchEffect((onCleanup) => {
-    if (provides.value) {
-      const scope = provides.value.forDocument(documentId);
+  watch(
+    [cap, () => toValue(documentId)],
+    ([capValue, docId], _, onCleanup) => {
+      if (!capValue) {
+        isPageExclusive.value = false;
+        return;
+      }
 
-      // Set initial mode
-      activeMode.value = scope.getActiveMode();
+      const scope = capValue.forDocument(docId);
 
-      // Subscribe to mode changes
-      const unsubscribe = scope.onModeChange((mode) => {
-        activeMode.value = mode;
+      // Get initial state
+      const m = scope.getActiveInteractionMode();
+      isPageExclusive.value = m?.scope === 'page' && !!m.exclusive;
+
+      const unsubscribe = scope.onModeChange(() => {
+        const mode = scope.getActiveInteractionMode();
+        isPageExclusive.value = mode?.scope === 'page' && !!mode?.exclusive;
       });
-      onCleanup(unsubscribe);
-    }
-  });
 
-  return readonly(activeMode);
+      onCleanup(unsubscribe);
+    },
+    { immediate: true },
+  );
+
+  return isPageExclusive;
 }
