@@ -223,7 +223,7 @@ const handleInitialized = async (registry: PluginRegistry) => {
                         >
                           <v-alert type="error" variant="tonal" class="ma-4">
                             <v-alert-title>Error loading document</v-alert-title>
-                            {{ documentState.error?.message ?? 'Unknown error' }}
+                            {{ documentState.error ?? 'Unknown error' }}
                           </v-alert>
                         </div>
 
