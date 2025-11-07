@@ -104,7 +104,7 @@ watch(
 
 // Setup scrollTo subscription
 watch(
-  [viewportRef, () => thumbnailPlugin.value, () => props.documentId, windowState],
+  [viewportRef, () => thumbnailPlugin.value, () => props.documentId, () => !!windowState.value],
   ([vp, plugin, docId, window], _, onCleanup) => {
     if (!vp || !plugin || !window) return;
 
