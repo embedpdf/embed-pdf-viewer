@@ -1,13 +1,19 @@
 import { Rect } from '@embedpdf/models';
-import { onBeforeUnmount, ref, watch } from 'vue';
+import { onBeforeUnmount, ref, watch, toValue, type MaybeRefOrGetter } from 'vue';
 import { useViewportPlugin } from './use-viewport';
 
-export function useViewportRef(documentId: string) {
+/**
+ * Hook to get a ref for the viewport container element with automatic setup/teardown
+ * @param documentId Document ID (can be ref, computed, getter, or plain value).
+ */
+export function useViewportRef(documentId: MaybeRefOrGetter<string>) {
   const { plugin: pluginRef } = useViewportPlugin();
   const containerRef = ref<HTMLDivElement | null>(null);
 
+  let cleanup: (() => void) | null = null;
+
   // Setup function that runs when both plugin and container are available
-  const setupViewport = () => {
+  const setupViewport = (docId: string) => {
     const viewportPlugin = pluginRef.value;
     const container = containerRef.value;
 
@@ -15,9 +21,9 @@ export function useViewportRef(documentId: string) {
 
     // Register this viewport for the document
     try {
-      viewportPlugin.registerViewport(documentId);
+      viewportPlugin.registerViewport(docId);
     } catch (error) {
-      console.error(`Failed to register viewport for document ${documentId}:`, error);
+      console.error(`Failed to register viewport for document ${docId}:`, error);
       return;
     }
 
@@ -29,11 +35,11 @@ export function useViewportRef(documentId: string) {
         size: { width: r.width, height: r.height },
       };
     };
-    viewportPlugin.registerBoundingRectProvider(documentId, provideRect);
+    viewportPlugin.registerBoundingRectProvider(docId, provideRect);
 
     // On scroll
     const onScroll = () => {
-      viewportPlugin.setViewportScrollMetrics(documentId, {
+      viewportPlugin.setViewportScrollMetrics(docId, {
         scrollTop: container.scrollTop,
         scrollLeft: container.scrollLeft,
       });
@@ -42,7 +48,7 @@ export function useViewportRef(documentId: string) {
 
     // On resize
     const resizeObserver = new ResizeObserver(() => {
-      viewportPlugin.setViewportResizeMetrics(documentId, {
+      viewportPlugin.setViewportResizeMetrics(docId, {
         width: container.offsetWidth,
         height: container.offsetHeight,
         clientWidth: container.clientWidth,
@@ -57,7 +63,7 @@ export function useViewportRef(documentId: string) {
 
     // Subscribe to scroll requests for this document
     const unsubscribeScrollRequest = viewportPlugin.onScrollRequest(
-      documentId,
+      docId,
       ({ x, y, behavior = 'auto' }) => {
         requestAnimationFrame(() => {
           container.scrollTo({ left: x, top: y, behavior });
@@ -67,38 +73,26 @@ export function useViewportRef(documentId: string) {
 
     // Return cleanup function
     return () => {
-      viewportPlugin.unregisterViewport(documentId);
-      viewportPlugin.registerBoundingRectProvider(documentId, null);
+      viewportPlugin.unregisterViewport(docId);
+      viewportPlugin.registerBoundingRectProvider(docId, null);
       container.removeEventListener('scroll', onScroll);
       resizeObserver.disconnect();
       unsubscribeScrollRequest();
     };
   };
 
-  let cleanup: (() => void) | null = null;
-
-  // Watch for changes in the plugin
+  // Watch for changes in plugin, container, or documentId
   watch(
-    pluginRef,
-    () => {
+    [pluginRef, containerRef, () => toValue(documentId)],
+    ([, , docId]) => {
+      // Clean up previous setup
       if (cleanup) {
         cleanup();
         cleanup = null;
       }
-      cleanup = setupViewport() || null;
-    },
-    { immediate: true },
-  );
 
-  // Watch for container changes
-  watch(
-    containerRef,
-    () => {
-      if (cleanup) {
-        cleanup();
-        cleanup = null;
-      }
-      cleanup = setupViewport() || null;
+      // Setup new viewport
+      cleanup = setupViewport(docId) || null;
     },
     { immediate: true },
   );
@@ -106,6 +100,7 @@ export function useViewportRef(documentId: string) {
   onBeforeUnmount(() => {
     if (cleanup) {
       cleanup();
+      cleanup = null;
     }
   });
 

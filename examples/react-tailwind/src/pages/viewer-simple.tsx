@@ -93,9 +93,7 @@ export function ViewerSimplePage() {
       createPluginRegistration(CapturePluginPackage),
       createPluginRegistration(HistoryPluginPackage),
       createPluginRegistration(AnnotationPluginPackage),
-      createPluginRegistration(FullscreenPluginPackage, {
-        targetElement: '#document-content',
-      }),
+      createPluginRegistration(FullscreenPluginPackage),
       createPluginRegistration(ThumbnailPluginPackage, {
         width: 120,
         paddingY: 10,

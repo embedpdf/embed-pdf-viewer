@@ -12,7 +12,6 @@
   },
   "dependencies": {
     "@embedpdf/core": "workspace:*",
-    "@embedpdf/plugin-loader": "workspace:*",
     "@embedpdf/plugin-document-manager": "workspace:*",
     "@embedpdf/plugin-viewport": "workspace:*",
     "@embedpdf/plugin-scroll": "workspace:*",

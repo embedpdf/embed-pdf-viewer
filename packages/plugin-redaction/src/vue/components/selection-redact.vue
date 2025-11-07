@@ -19,12 +19,13 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, onUnmounted } from 'vue';
+import { ref, watch } from 'vue';
 import type { Rect } from '@embedpdf/models';
 import { useRedactionPlugin } from '../hooks/use-redaction';
 import Highlight from './highlight.vue';
 
 interface SelectionRedactProps {
+  documentId: string;
   pageIndex: number;
   scale: number;
 }
@@ -35,19 +36,23 @@ const { plugin: redactionPlugin } = useRedactionPlugin();
 const rects = ref<Rect[]>([]);
 const boundingRect = ref<Rect | null>(null);
 
-let unsubscribe: (() => void) | undefined;
+watch(
+  [redactionPlugin, () => props.documentId, () => props.pageIndex],
+  ([plugin, docId, pageIdx], _, onCleanup) => {
+    if (!plugin) {
+      rects.value = [];
+      boundingRect.value = null;
+      return;
+    }
 
-onMounted(() => {
-  if (!redactionPlugin.value) return;
+    const unsubscribe = plugin.onRedactionSelectionChange(docId, (formattedSelection) => {
+      const selection = formattedSelection.find((s) => s.pageIndex === pageIdx);
+      rects.value = selection?.segmentRects ?? [];
+      boundingRect.value = selection?.rect ?? null;
+    });
 
-  unsubscribe = redactionPlugin.value.onRedactionSelectionChange((formattedSelection) => {
-    const selection = formattedSelection.find((s) => s.pageIndex === props.pageIndex);
-    rects.value = selection?.segmentRects ?? [];
-    boundingRect.value = selection?.rect ?? null;
-  });
-});
-
-onUnmounted(() => {
-  unsubscribe?.();
-});
+    onCleanup(unsubscribe);
+  },
+  { immediate: true },
+);
 </script>

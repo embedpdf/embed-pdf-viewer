@@ -1,4 +1,4 @@
-import { ref, watchEffect, computed, ComputedRef } from 'vue';
+import { ref, watch, computed, toValue, type MaybeRefOrGetter, type ComputedRef } from 'vue';
 import { useCapability, usePlugin } from '@embedpdf/core/vue';
 import { ScrollPlugin, ScrollScope } from '@embedpdf/plugin-scroll';
 
@@ -14,27 +14,42 @@ interface UseScrollReturn {
   }>;
 }
 
-export function useScroll(documentId: string): UseScrollReturn {
+/**
+ * Hook for scroll state for a specific document
+ * @param documentId Document ID (can be ref, computed, getter, or plain value)
+ */
+export function useScroll(documentId: MaybeRefOrGetter<string>): UseScrollReturn {
   const { provides } = useScrollCapability();
 
   const currentPage = ref(1);
   const totalPages = ref(1);
 
-  watchEffect((onCleanup) => {
-    if (!provides.value || !documentId) return;
-
-    const scope = provides.value.forDocument(documentId);
-    currentPage.value = scope.getCurrentPage();
-    totalPages.value = scope.getTotalPages();
-
-    const unsubscribe = provides.value.onPageChange((event) => {
-      if (event.documentId === documentId) {
-        currentPage.value = event.pageNumber;
-        totalPages.value = event.totalPages;
+  watch(
+    [provides, () => toValue(documentId)],
+    ([providesValue, docId], _, onCleanup) => {
+      if (!providesValue || !docId) {
+        currentPage.value = 1;
+        totalPages.value = 1;
+        return;
       }
-    });
-    onCleanup(unsubscribe);
-  });
+
+      const scope = providesValue.forDocument(docId);
+
+      // Get initial state
+      currentPage.value = scope.getCurrentPage();
+      totalPages.value = scope.getTotalPages();
+
+      const unsubscribe = providesValue.onPageChange((event) => {
+        if (event.documentId === docId) {
+          currentPage.value = event.pageNumber;
+          totalPages.value = event.totalPages;
+        }
+      });
+
+      onCleanup(unsubscribe);
+    },
+    { immediate: true },
+  );
 
   const state = computed(() => ({
     currentPage: currentPage.value,
@@ -42,7 +57,10 @@ export function useScroll(documentId: string): UseScrollReturn {
   }));
 
   // Return a computed ref for the scoped capability
-  const scopedProvides = computed(() => provides.value?.forDocument(documentId) ?? null);
+  const scopedProvides = computed(() => {
+    const docId = toValue(documentId);
+    return provides.value?.forDocument(docId) ?? null;
+  });
 
   return {
     provides: scopedProvides,

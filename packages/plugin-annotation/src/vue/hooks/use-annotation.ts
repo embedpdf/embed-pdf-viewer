@@ -1,4 +1,4 @@
-import { readonly, ref, watchEffect, computed, Ref } from 'vue';
+import { ref, watch, computed, toValue, type MaybeRefOrGetter } from 'vue';
 import { useCapability, usePlugin } from '@embedpdf/core/vue';
 import {
   AnnotationPlugin,
@@ -11,35 +11,30 @@ export const useAnnotationCapability = () => useCapability<AnnotationPlugin>(Ann
 
 /**
  * Hook for annotation state for a specific document
- * @param documentId Document ID (can be a ref or plain string)
+ * @param documentId Document ID (can be ref, computed, getter, or plain value)
  */
-export const useAnnotation = (documentId: Ref<string> | string) => {
+export const useAnnotation = (documentId: MaybeRefOrGetter<string>) => {
   const { provides } = useAnnotationCapability();
   const state = ref<AnnotationDocumentState>(initialDocumentState());
 
-  const docId = computed(() => (typeof documentId === 'string' ? documentId : documentId.value));
+  watch(
+    [provides, () => toValue(documentId)],
+    ([providesValue, docId], _, onCleanup) => {
+      if (providesValue && docId) {
+        const scope = providesValue.forDocument(docId);
+        state.value = scope.getState();
 
-  watchEffect((onCleanup) => {
-    if (provides.value && docId.value) {
-      const scope = provides.value.forDocument(docId.value);
-
-      // Get initial state
-      state.value = scope.getState();
-
-      // Subscribe to state changes
-      const unsubscribe = scope.onStateChange((newState) => {
-        state.value = newState;
-      });
-      onCleanup(unsubscribe);
-    }
-  });
-
-  const scopedProvides = computed(() =>
-    provides.value && docId.value ? provides.value.forDocument(docId.value) : null,
+        const unsubscribe = scope.onStateChange((newState) => {
+          state.value = newState;
+        });
+        onCleanup(unsubscribe);
+      }
+    },
+    { immediate: true },
   );
 
   return {
-    state: readonly(state),
-    provides: scopedProvides,
+    state,
+    provides: computed(() => provides.value?.forDocument(toValue(documentId)) ?? null),
   };
 };

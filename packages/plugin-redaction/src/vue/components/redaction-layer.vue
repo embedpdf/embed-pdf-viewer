@@ -1,33 +1,53 @@
 <template>
   <PendingRedactions
+    :document-id="documentId"
     :page-index="pageIndex"
-    :scale="scale"
-    :rotation="rotation"
+    :scale="actualScale"
+    :rotation="actualRotation"
     :bbox-stroke="bboxStroke"
   >
     <template #selection-menu="slotProps">
       <slot name="selection-menu" v-bind="slotProps" />
     </template>
   </PendingRedactions>
-  <MarqueeRedact :page-index="pageIndex" :scale="scale" />
-  <SelectionRedact :page-index="pageIndex" :scale="scale" />
+  <MarqueeRedact :document-id="documentId" :page-index="pageIndex" :scale="actualScale" />
+  <SelectionRedact :document-id="documentId" :page-index="pageIndex" :scale="actualScale" />
 </template>
 
 <script setup lang="ts">
-import type { Rotation } from '@embedpdf/models';
+import { computed } from 'vue';
+import { useDocumentState } from '@embedpdf/core/vue';
+import { Rotation } from '@embedpdf/models';
 import PendingRedactions from './pending-redactions.vue';
 import MarqueeRedact from './marquee-redact.vue';
 import SelectionRedact from './selection-redact.vue';
 
 interface RedactionLayerProps {
+  /** The ID of the document this layer belongs to */
+  documentId: string;
+  /** Index of the page this layer lives on */
   pageIndex: number;
-  scale: number;
+  /** Current render scale for this page */
+  scale?: number;
+  /** Page rotation (for counter-rotating menus, etc.) */
   rotation?: Rotation;
+  /** Optional bbox stroke color */
   bboxStroke?: string;
 }
 
-withDefaults(defineProps<RedactionLayerProps>(), {
-  rotation: 0,
+const props = withDefaults(defineProps<RedactionLayerProps>(), {
   bboxStroke: 'rgba(0,0,0,0.8)',
+});
+
+const documentState = useDocumentState(() => props.documentId);
+
+const actualScale = computed(() => {
+  if (props.scale !== undefined) return props.scale;
+  return documentState.value?.scale ?? 1;
+});
+
+const actualRotation = computed(() => {
+  if (props.rotation !== undefined) return props.rotation;
+  return documentState.value?.rotation ?? Rotation.Degree0;
 });
 </script>

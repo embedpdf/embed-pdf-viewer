@@ -1,126 +1,151 @@
 <script setup lang="ts">
-import { computed, onMounted, ref, watchEffect } from 'vue';
-import type { StyleValue } from 'vue';
-
+import { ref, watch, computed, onMounted, nextTick } from 'vue';
 import { useScrollPlugin } from '../hooks';
 import { ScrollStrategy, type ScrollerLayout, type PageLayout } from '@embedpdf/plugin-scroll';
-import { useRegistry } from '@embedpdf/core/vue';
-import type { PdfDocumentObject, Rotation } from '@embedpdf/models';
 
-interface Props {
-  documentId?: string;
-  style?: StyleValue;
+interface ScrollerProps {
+  documentId: string;
 }
 
-const props = defineProps<Props>();
+const props = defineProps<ScrollerProps>();
 
 const { plugin: scrollPlugin } = useScrollPlugin();
-const { registry } = useRegistry();
 
-const layout = ref<ScrollerLayout | null>(null);
+const layoutData = ref<{
+  layout: ScrollerLayout | null;
+  docId: string | null;
+}>({ layout: null, docId: null });
 
-const targetDocId = computed(() => props.documentId);
+watch(
+  [scrollPlugin, () => props.documentId],
+  ([plugin, docId], _, onCleanup) => {
+    if (!plugin || !docId) {
+      layoutData.value = { layout: null, docId: null };
+      return;
+    }
 
-watchEffect((onCleanup) => {
-  if (!scrollPlugin.value || !targetDocId.value) return;
+    // When we get new data, store it along with the current documentId
+    const unsubscribe = plugin.onScrollerData(docId, (newLayout) => {
+      layoutData.value = { layout: newLayout, docId };
+    });
 
-  // Subscribe to scroller layout updates for this document
-  const off = scrollPlugin.value.onScrollerData(targetDocId.value, (scrollerLayout) => {
-    layout.value = scrollerLayout;
-  });
+    // When the component unmounts or documentId changes, clear the state
+    onCleanup(() => {
+      unsubscribe();
+      layoutData.value = { layout: null, docId: null };
+      plugin.clearLayoutReady(docId);
+    });
+  },
+  { immediate: true },
+);
 
-  onCleanup(off);
+// Only use layout if it matches the current documentId (prevents stale data)
+const scrollerLayout = computed(() => {
+  return layoutData.value.docId === props.documentId ? layoutData.value.layout : null;
 });
 
-onMounted(() => {
-  if (scrollPlugin.value && targetDocId.value) {
-    scrollPlugin.value.setLayoutReady(targetDocId.value);
-  }
-});
+// Call setLayoutReady after layout is rendered (Vue's equivalent to useLayoutEffect)
+watch(
+  [scrollPlugin, () => props.documentId, scrollerLayout],
+  ([plugin, docId, layout]) => {
+    if (!plugin || !docId || !layout) return;
 
-interface PageSlotProps extends PageLayout {
-  rotation: Rotation;
-  scale: number;
-  document: PdfDocumentObject | null;
-}
-
-function pageSlotProps(pl: PageLayout): PageSlotProps {
-  const core = registry.value!.getStore().getState().core;
-  const coreDoc = core.documents[targetDocId.value!];
-
-  return {
-    ...pl,
-    rotation: coreDoc.rotation,
-    scale: coreDoc.scale,
-    document: coreDoc.document,
-  };
-}
-
-const rootStyle = computed<StyleValue>(() => {
-  if (!layout.value) return props.style;
-
-  const base =
-    typeof props.style === 'object' && !Array.isArray(props.style)
-      ? { ...props.style }
-      : (props.style ?? {});
-
-  return [
-    base,
-    {
-      width: `${layout.value.totalWidth}px`,
-      height: `${layout.value.totalHeight}px`,
-      position: 'relative',
-      boxSizing: 'border-box',
-      margin: '0 auto',
-      ...(layout.value.strategy === ScrollStrategy.Horizontal && {
-        display: 'flex',
-        flexDirection: 'row',
-      }),
-    },
-  ];
-});
+    // Use nextTick to ensure DOM is updated before calling setLayoutReady
+    nextTick(() => {
+      plugin.setLayoutReady(docId);
+    });
+  },
+  { immediate: true },
+);
 </script>
 
 <template>
-  <div v-if="layout && registry" :style="rootStyle">
-    <!-- leading spacer -->
+  <div
+    v-if="scrollerLayout"
+    :style="{
+      width: `${scrollerLayout.totalWidth}px`,
+      height: `${scrollerLayout.totalHeight}px`,
+      position: 'relative',
+      boxSizing: 'border-box',
+      margin: '0 auto',
+      ...(scrollerLayout.strategy === ScrollStrategy.Horizontal && {
+        display: 'flex',
+        flexDirection: 'row',
+      }),
+    }"
+    v-bind="$attrs"
+  >
+    <!-- Leading spacer -->
     <div
-      v-if="layout.strategy === 'horizontal'"
-      :style="{ width: layout.startSpacing + 'px', height: '100%', flexShrink: 0 }"
+      :style="
+        scrollerLayout.strategy === ScrollStrategy.Horizontal
+          ? {
+              width: `${scrollerLayout.startSpacing}px`,
+              height: '100%',
+              flexShrink: 0,
+            }
+          : {
+              height: `${scrollerLayout.startSpacing}px`,
+              width: '100%',
+            }
+      "
     />
-    <div v-else :style="{ height: layout.startSpacing + 'px', width: '100%' }" />
 
-    <!-- page grid -->
+    <!-- Page grid -->
     <div
       :style="{
-        gap: layout.pageGap + 'px',
+        gap: `${scrollerLayout.pageGap}px`,
         display: 'flex',
         alignItems: 'center',
         position: 'relative',
         boxSizing: 'border-box',
-        flexDirection: layout.strategy === 'horizontal' ? 'row' : 'column',
-        minHeight: layout.strategy === 'horizontal' ? '100%' : undefined,
-        minWidth: layout.strategy === 'vertical' ? 'fit-content' : undefined,
+        ...(scrollerLayout.strategy === ScrollStrategy.Horizontal
+          ? {
+              flexDirection: 'row',
+              minHeight: '100%',
+            }
+          : {
+              flexDirection: 'column',
+              minWidth: 'fit-content',
+            }),
       }"
     >
-      <template v-for="item in layout.items" :key="item.pageNumbers[0]">
-        <div :style="{ display: 'flex', justifyContent: 'center', gap: layout.pageGap + 'px' }">
-          <div
-            v-for="pl in item.pageLayouts"
-            :key="pl.pageNumber"
-            :style="{ width: pl.rotatedWidth + 'px', height: pl.rotatedHeight + 'px' }"
-          >
-            <slot :page="pageSlotProps(pl)" />
-          </div>
+      <div
+        v-for="item in scrollerLayout.items"
+        :key="item.pageNumbers[0]"
+        :style="{
+          display: 'flex',
+          justifyContent: 'center',
+          gap: `${scrollerLayout.pageGap}px`,
+        }"
+      >
+        <div
+          v-for="layout in item.pageLayouts"
+          :key="layout.pageNumber"
+          :style="{
+            width: `${layout.rotatedWidth}px`,
+            height: `${layout.rotatedHeight}px`,
+          }"
+        >
+          <slot :page="layout" />
         </div>
-      </template>
+      </div>
     </div>
 
-    <!-- trailing spacer -->
+    <!-- Trailing spacer -->
     <div
-      v-if="layout.strategy === 'horizontal'"
-      :style="{ width: layout.endSpacing + 'px', height: '100%', flexShrink: 0 }"
+      :style="
+        scrollerLayout.strategy === ScrollStrategy.Horizontal
+          ? {
+              width: `${scrollerLayout.endSpacing}px`,
+              height: '100%',
+              flexShrink: 0,
+            }
+          : {
+              height: `${scrollerLayout.endSpacing}px`,
+              width: '100%',
+            }
+      "
     />
-    <div v-else :style="{ height: layout.endSpacing + 'px', width: '100%' }" />
   </div>
 </template>

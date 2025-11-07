@@ -20,7 +20,7 @@
     "@embedpdf/engines": "workspace:*",
     "@embedpdf/models": "workspace:*",
     "@embedpdf/pdfium": "workspace:*",
-    "@embedpdf/plugin-loader": "workspace:*",
+    "@embedpdf/plugin-document-manager": "workspace:*",
     "@embedpdf/plugin-scroll": "workspace:*",
     "@embedpdf/plugin-search": "workspace:*",
     "@embedpdf/plugin-spread": "workspace:*",

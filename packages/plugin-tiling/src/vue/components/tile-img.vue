@@ -6,6 +6,7 @@ import type { Tile } from '@embedpdf/plugin-tiling';
 import { useTilingCapability } from '../hooks';
 
 interface Props {
+  documentId: string;
   pageIndex: number;
   tile: Tile;
   scale: number;
@@ -25,9 +26,11 @@ let lastRenderedId: string | undefined;
 let currentTask: any = null;
 
 watch(
-  [() => props.tile.id, tilingCapability],
-  ([tileId, capability]) => {
+  [() => props.tile.id, () => props.documentId, tilingCapability],
+  ([tileId, docId, capability]) => {
     if (!capability) return;
+
+    const scope = capability.forDocument(docId);
 
     // Already rendered this exact tile
     if (lastRenderedId === tileId) return;
@@ -46,7 +49,7 @@ watch(
 
     lastRenderedId = tileId;
 
-    currentTask = capability.renderTile({
+    currentTask = scope.renderTile({
       pageIndex: props.pageIndex,
       tile: toRaw(props.tile),
       dpr: props.dpr,

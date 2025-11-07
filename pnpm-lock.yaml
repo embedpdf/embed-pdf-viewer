@@ -245,9 +245,6 @@ importers:
       '@embedpdf/plugin-interaction-manager':
         specifier: workspace:*
         version: link:../../packages/plugin-interaction-manager
-      '@embedpdf/plugin-loader':
-        specifier: workspace:*
-        version: link:../../packages/plugin-loader
       '@embedpdf/plugin-pan':
         specifier: workspace:*
         version: link:../../packages/plugin-pan
@@ -354,6 +351,9 @@ importers:
       '@embedpdf/plugin-capture':
         specifier: workspace:*
         version: link:../../packages/plugin-capture
+      '@embedpdf/plugin-document-manager':
+        specifier: workspace:*
+        version: link:../../packages/plugin-document-manager
       '@embedpdf/plugin-export':
         specifier: workspace:*
         version: link:../../packages/plugin-export
@@ -366,9 +366,6 @@ importers:
       '@embedpdf/plugin-interaction-manager':
         specifier: workspace:*
         version: link:../../packages/plugin-interaction-manager
-      '@embedpdf/plugin-loader':
-        specifier: workspace:*
-        version: link:../../packages/plugin-loader
       '@embedpdf/plugin-pan':
         specifier: workspace:*
         version: link:../../packages/plugin-pan
@@ -463,18 +460,24 @@ importers:
       '@embedpdf/plugin-annotation':
         specifier: workspace:*
         version: link:../../packages/plugin-annotation
+      '@embedpdf/plugin-capture':
+        specifier: workspace:*
+        version: link:../../packages/plugin-capture
+      '@embedpdf/plugin-document-manager':
+        specifier: workspace:*
+        version: link:../../packages/plugin-document-manager
       '@embedpdf/plugin-export':
         specifier: workspace:*
         version: link:../../packages/plugin-export
       '@embedpdf/plugin-fullscreen':
         specifier: workspace:*
         version: link:../../packages/plugin-fullscreen
+      '@embedpdf/plugin-history':
+        specifier: workspace:*
+        version: link:../../packages/plugin-history
       '@embedpdf/plugin-interaction-manager':
         specifier: workspace:*
         version: link:../../packages/plugin-interaction-manager
-      '@embedpdf/plugin-loader':
-        specifier: workspace:*
-        version: link:../../packages/plugin-loader
       '@embedpdf/plugin-pan':
         specifier: workspace:*
         version: link:../../packages/plugin-pan
@@ -993,37 +996,6 @@ importers:
         version: 5.9.3
 
   packages/plugin-interaction-manager:
-    dependencies:
-      '@embedpdf/models':
-        specifier: workspace:*
-        version: link:../models
-      preact:
-        specifier: ^10.26.4
-        version: 10.27.2
-      react:
-        specifier: '>=16.8.0'
-        version: 18.3.1
-      react-dom:
-        specifier: '>=16.8.0'
-        version: 18.3.1(react@18.3.1)
-      vue:
-        specifier: '>=3.2.0'
-        version: 3.5.22(typescript@5.9.3)
-    devDependencies:
-      '@embedpdf/build':
-        specifier: workspace:*
-        version: link:../build
-      '@embedpdf/core':
-        specifier: workspace:*
-        version: link:../core
-      '@types/react':
-        specifier: ^18.2.0
-        version: 18.3.26
-      typescript:
-        specifier: ^5.0.0
-        version: 5.9.3
-
-  packages/plugin-loader:
     dependencies:
       '@embedpdf/models':
         specifier: workspace:*
@@ -1639,6 +1611,9 @@ importers:
       '@embedpdf/plugin-capture':
         specifier: workspace:*
         version: link:../packages/plugin-capture
+      '@embedpdf/plugin-document-manager':
+        specifier: workspace:*
+        version: link:../packages/plugin-document-manager
       '@embedpdf/plugin-export':
         specifier: workspace:*
         version: link:../packages/plugin-export
@@ -1651,9 +1626,6 @@ importers:
       '@embedpdf/plugin-interaction-manager':
         specifier: workspace:*
         version: link:../packages/plugin-interaction-manager
-      '@embedpdf/plugin-loader':
-        specifier: workspace:*
-        version: link:../packages/plugin-loader
       '@embedpdf/plugin-pan':
         specifier: workspace:*
         version: link:../packages/plugin-pan
@@ -1829,6 +1801,9 @@ importers:
       '@embedpdf/plugin-capture':
         specifier: workspace:*
         version: link:../packages/plugin-capture
+      '@embedpdf/plugin-document-manager':
+        specifier: workspace:*
+        version: link:../packages/plugin-document-manager
       '@embedpdf/plugin-export':
         specifier: workspace:*
         version: link:../packages/plugin-export
@@ -1838,9 +1813,6 @@ importers:
       '@embedpdf/plugin-interaction-manager':
         specifier: workspace:*
         version: link:../packages/plugin-interaction-manager
-      '@embedpdf/plugin-loader':
-        specifier: workspace:*
-        version: link:../packages/plugin-loader
       '@embedpdf/plugin-pan':
         specifier: workspace:*
         version: link:../packages/plugin-pan

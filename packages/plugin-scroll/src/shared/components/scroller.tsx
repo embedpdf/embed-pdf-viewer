@@ -1,30 +1,19 @@
 import { ReactNode, useEffect, useState, HTMLAttributes, useLayoutEffect } from '@framework';
 import { ScrollStrategy, ScrollerLayout, PageLayout } from '@embedpdf/plugin-scroll';
-import { useRegistry } from '@embedpdf/core/@framework';
-import { PdfDocumentObject, Rotation } from '@embedpdf/models';
 
 import { useScrollPlugin } from '../hooks';
 
-export interface RenderPageProps extends PageLayout {
-  rotation: Rotation;
-  scale: number;
-  document: PdfDocumentObject | null;
-}
-
 type ScrollerProps = HTMLAttributes<HTMLDivElement> & {
   documentId: string;
-  renderPage: (props: RenderPageProps) => ReactNode;
+  renderPage: (props: PageLayout) => ReactNode;
 };
 
 export function Scroller({ documentId, renderPage, ...props }: ScrollerProps) {
   const { plugin: scrollPlugin } = useScrollPlugin();
-  const { registry } = useRegistry();
   const [layoutData, setLayoutData] = useState<{
     layout: ScrollerLayout | null;
     docId: string | null;
   }>({ layout: null, docId: null });
-
-  const targetDocId = documentId;
 
   useEffect(() => {
     if (!scrollPlugin || !documentId) return;
@@ -51,12 +40,6 @@ export function Scroller({ documentId, renderPage, ...props }: ScrollerProps) {
   }, [scrollPlugin, documentId, scrollerLayout]);
 
   if (!scrollerLayout) return null;
-  if (!registry) return null;
-
-  const coreState = registry.getStore().getState();
-  const coreDoc = coreState.core.documents[targetDocId];
-
-  if (!coreDoc) return null;
 
   return (
     <div
@@ -124,9 +107,6 @@ export function Scroller({ documentId, renderPage, ...props }: ScrollerProps) {
               >
                 {renderPage({
                   ...layout,
-                  rotation: coreDoc.rotation,
-                  scale: coreDoc.scale,
-                  document: coreDoc.document,
                 })}
               </div>
             ))}
