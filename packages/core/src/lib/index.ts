@@ -10,6 +10,7 @@ export * from './store/initial-state';
 export * from './store/selectors';
 export * from './utils/event-control';
 export * from './utils/eventing';
+export * from './utils/scoped-eventing';
 export * from './utils/math';
 export * from './utils/typed-object';
 export * from './plugin/builder';

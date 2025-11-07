@@ -2,6 +2,7 @@ import {
   BasePlugin,
   createBehaviorEmitter,
   createEmitter,
+  createScopedEmitter,
   Listener,
   PluginRegistry,
   REFRESH_PAGES,
@@ -48,9 +49,13 @@ export class ThumbnailPlugin extends BasePlugin<
   // Per-document auto-scroll tracking
   private readonly canAutoScroll = new Map<string, boolean>();
 
-  private readonly window$ = createBehaviorEmitter<WindowChangeEvent>();
+  private readonly window$ = createScopedEmitter<WindowState, WindowChangeEvent, string>(
+    (documentId, window) => ({ documentId, window }),
+  );
+  private readonly scrollTo$ = createScopedEmitter<ScrollToOptions, ScrollToEvent, string>(
+    (documentId, options) => ({ documentId, options }),
+  );
   private readonly refreshPages$ = createEmitter<RefreshPagesEvent>();
-  private readonly scrollTo$ = createBehaviorEmitter<ScrollToEvent>();
 
   constructor(
     id: string,
@@ -138,7 +143,8 @@ export class ThumbnailPlugin extends BasePlugin<
     }
 
     this.canAutoScroll.delete(documentId);
-
+    this.window$.clearScope(documentId);
+    this.scrollTo$.clearScope(documentId);
     this.logger.debug(
       'ThumbnailPlugin',
       'DocumentClosed',
@@ -167,8 +173,8 @@ export class ThumbnailPlugin extends BasePlugin<
       forDocument: (documentId: string) => this.createThumbnailScope(documentId),
 
       // Events
-      onWindow: this.window$.on,
-      onScrollTo: this.scrollTo$.on,
+      onWindow: this.window$.onGlobal,
+      onScrollTo: this.scrollTo$.onGlobal,
       onRefreshPages: this.refreshPages$.on,
     };
   }
@@ -183,14 +189,8 @@ export class ThumbnailPlugin extends BasePlugin<
       renderThumb: (idx, dpr) => this.renderThumb(idx, dpr, documentId),
       updateWindow: (scrollY, viewportH) => this.updateWindow(scrollY, viewportH, documentId),
       getWindow: () => this.getWindow(documentId),
-      onWindow: (listener: Listener<WindowState | null>) =>
-        this.window$.on((event) => {
-          if (event.documentId === documentId) listener(event.window);
-        }),
-      onScrollTo: (listener: Listener<ScrollToOptions>) =>
-        this.scrollTo$.on((event) => {
-          if (event.documentId === documentId) listener(event.options);
-        }),
+      onWindow: this.window$.forScope(documentId),
+      onScrollTo: this.scrollTo$.forScope(documentId),
       onRefreshPages: (listener: Listener<number[]>) =>
         this.refreshPages$.on((event) => {
           if (event.documentId === documentId) listener(event.pages);
@@ -266,7 +266,7 @@ export class ThumbnailPlugin extends BasePlugin<
     if (docState.viewportH > 0) {
       this.updateWindow(docState.scrollY, docState.viewportH, documentId);
     } else {
-      this.window$.emit({ documentId, window });
+      this.window$.emit(documentId, window);
     }
   }
 
@@ -311,7 +311,7 @@ export class ThumbnailPlugin extends BasePlugin<
     };
 
     this.dispatch(setWindowState(id, newWindow));
-    this.window$.emit({ documentId: id, window: newWindow });
+    this.window$.emit(id, newWindow);
   }
 
   private getWindow(documentId?: string): WindowState | null {
@@ -333,7 +333,7 @@ export class ThumbnailPlugin extends BasePlugin<
     if (docState.viewportH <= 0) {
       // Center the thumbnail in the viewport
       const top = Math.max(PADDING_Y, item.top - item.wrapperHeight);
-      this.scrollTo$.emit({ documentId: id, options: { top, behavior } });
+      this.scrollTo$.emit(id, { top, behavior });
       return;
     }
 
@@ -345,14 +345,14 @@ export class ThumbnailPlugin extends BasePlugin<
     const needsDown = bottom > docState.scrollY + docState.viewportH - margin;
 
     if (needsUp) {
-      this.scrollTo$.emit({
-        documentId: id,
-        options: { top: Math.max(0, top - PADDING_Y), behavior },
+      this.scrollTo$.emit(id, {
+        top: Math.max(0, top - PADDING_Y),
+        behavior,
       });
     } else if (needsDown) {
-      this.scrollTo$.emit({
-        documentId: id,
-        options: { top: Math.max(0, bottom - docState.viewportH + PADDING_Y), behavior },
+      this.scrollTo$.emit(id, {
+        top: Math.max(0, bottom - docState.viewportH + PADDING_Y),
+        behavior,
       });
     }
   }
