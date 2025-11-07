@@ -50,6 +50,7 @@ import Sidebar from './Sidebar.vue';
 import RedactionSelectionMenu from './RedactionSelectionMenu.vue';
 import AnnotationSelectionMenu from './AnnotationSelectionMenu.vue';
 import PageControls from './PageControls.vue';
+import DocumentPasswordPrompt from './DocumentPasswordPrompt.vue';
 
 // Function to get drawer components with current documentId
 const getDrawerComponents = (documentId: string | null) => [
@@ -209,15 +210,10 @@ const handleInitialized = async (registry: PluginRegistry) => {
                         </div>
 
                         <!-- Error State -->
-                        <div
+                        <DocumentPasswordPrompt
                           v-else-if="isError"
-                          class="d-flex fill-height align-center justify-center"
-                        >
-                          <v-alert type="error" variant="tonal" class="ma-4">
-                            <v-alert-title>Error loading document</v-alert-title>
-                            {{ documentState.error ?? 'Unknown error' }}
-                          </v-alert>
-                        </div>
+                          :documentState="documentState"
+                        />
 
                         <!-- Loaded State -->
                         <div v-else-if="isLoaded" class="fill-height position-relative">

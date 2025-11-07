@@ -14,6 +14,7 @@ declare module 'vue' {
     AnnotationSelectionMenu: typeof import('./src/components/AnnotationSelectionMenu.vue')['default']
     AnnotationToolbar: typeof import('./src/components/AnnotationToolbar.vue')['default']
     Application: typeof import('./src/components/Application.vue')['default']
+    DocumentPasswordPrompt: typeof import('./src/components/DocumentPasswordPrompt.vue')['default']
     Drawer: typeof import('./src/components/drawer-system/Drawer.vue')['default']
     DrawerProvider: typeof import('./src/components/drawer-system/DrawerProvider.vue')['default']
     DrawerToggleButton: typeof import('./src/components/drawer-system/DrawerToggleButton.vue')['default']
