@@ -93,7 +93,7 @@ const handleInitialized = async (registry: PluginRegistry) => {
 
   // Open initial document
   registry
-    ?.getPlugin<DocumentManagerPlugin>(DocumentManagerPlugin.id)
+    .getPlugin<DocumentManagerPlugin>(DocumentManagerPlugin.id)
     ?.provides()
     ?.openDocumentUrl({ url: 'https://snippet.embedpdf.com/ebook.pdf' })
     .toPromise();
@@ -180,8 +180,9 @@ const handleInitialized = async (registry: PluginRegistry) => {
                   :onClose="actions.close"
                   :onOpenFile="
                     () => {
+                      if (!registry) return;
                       registry
-                        ?.getPlugin<DocumentManagerPlugin>(DocumentManagerPlugin.id)
+                        .getPlugin<DocumentManagerPlugin>(DocumentManagerPlugin.id)
                         ?.provides()
                         ?.openFileDialog();
                     }
