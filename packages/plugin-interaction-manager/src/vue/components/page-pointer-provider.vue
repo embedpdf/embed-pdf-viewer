@@ -17,9 +17,8 @@ const props = defineProps<PagePointerProviderProps>();
 
 const divRef = ref<HTMLDivElement | null>(null);
 const { provides: cap } = useInteractionManagerCapability();
-const isPageExclusive = useIsPageExclusive(props.documentId);
-const documentState = useDocumentState(props.documentId);
-
+const isPageExclusive = useIsPageExclusive(() => props.documentId);
+const documentState = useDocumentState(() => props.documentId);
 // Get page dimensions and transformations from document state
 // Calculate inline - this is cheap and memoization isn't necessary
 const page = computed(() => documentState.value?.document?.pages?.[props.pageIndex]);

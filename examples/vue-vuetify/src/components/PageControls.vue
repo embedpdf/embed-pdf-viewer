@@ -3,8 +3,14 @@ import { useViewportCapability } from '@embedpdf/plugin-viewport/vue';
 import { useScroll } from '@embedpdf/plugin-scroll/vue';
 import { ref, computed, watch, onUnmounted } from 'vue';
 
+interface PageControlsProps {
+  documentId: string;
+}
+
+const props = defineProps<PageControlsProps>();
+
 const { provides: viewport } = useViewportCapability();
-const { provides: scroll, state } = useScroll();
+const { provides: scroll, state } = useScroll(() => props.documentId);
 
 const isVisible = ref(false);
 const isHovering = ref(false);
@@ -38,7 +44,8 @@ watch(
     if (!newViewport) return;
 
     return newViewport.onScrollActivity((activity) => {
-      if (activity) {
+      const currentDocId = props.documentId;
+      if (activity && activity.documentId === currentDocId) {
         isVisible.value = true;
         startHideTimer();
       }

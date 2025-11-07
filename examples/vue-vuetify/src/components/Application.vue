@@ -1,8 +1,14 @@
 <script setup lang="ts">
+import { ref } from 'vue';
 import { usePdfiumEngine } from '@embedpdf/engines/vue';
 import { EmbedPDF } from '@embedpdf/core/vue';
 import { createPluginRegistration, PluginRegistry } from '@embedpdf/core';
-import { LoaderPluginPackage } from '@embedpdf/plugin-loader/vue';
+import {
+  DocumentManagerPluginPackage,
+  DocumentContext,
+  DocumentContent,
+  DocumentManagerPlugin,
+} from '@embedpdf/plugin-document-manager/vue';
 import { Viewport, ViewportPluginPackage } from '@embedpdf/plugin-viewport/vue';
 import { Scroller, ScrollPluginPackage, ScrollStrategy } from '@embedpdf/plugin-scroll/vue';
 import { RenderLayer, RenderPluginPackage } from '@embedpdf/plugin-render/vue';
@@ -19,11 +25,13 @@ import { FullscreenPluginPackage } from '@embedpdf/plugin-fullscreen/vue';
 import { ZoomMode, ZoomPluginPackage, MarqueeZoom } from '@embedpdf/plugin-zoom/vue';
 import { PanPluginPackage } from '@embedpdf/plugin-pan/vue';
 import { ExportPluginPackage } from '@embedpdf/plugin-export/vue';
-import { SpreadPluginPackage } from '@embedpdf/plugin-spread/vue';
+import { SpreadPluginPackage, SpreadMode } from '@embedpdf/plugin-spread/vue';
 import { PrintPluginPackage } from '@embedpdf/plugin-print/vue';
 import { SearchPluginPackage, SearchLayer } from '@embedpdf/plugin-search/vue';
 import { ThumbnailPluginPackage } from '@embedpdf/plugin-thumbnail/vue';
 import { RedactionPluginPackage, RedactionLayer } from '@embedpdf/plugin-redaction/vue';
+import { HistoryPluginPackage } from '@embedpdf/plugin-history/vue';
+import { CapturePluginPackage, MarqueeCapture } from '@embedpdf/plugin-capture/vue';
 import {
   AnnotationPluginPackage,
   AnnotationLayer,
@@ -33,6 +41,7 @@ import type { AnnotationTool } from '@embedpdf/plugin-annotation/vue';
 import { PdfAnnotationSubtype } from '@embedpdf/models';
 import type { PdfStampAnnoObject } from '@embedpdf/models';
 
+import TabBar from './TabBar.vue';
 import Toolbar from './Toolbar.vue';
 import DrawerProvider from './drawer-system/DrawerProvider.vue';
 import Drawer from './drawer-system/Drawer.vue';
@@ -40,15 +49,17 @@ import Search from './Search.vue';
 import Sidebar from './Sidebar.vue';
 import RedactionSelectionMenu from './RedactionSelectionMenu.vue';
 import AnnotationSelectionMenu from './AnnotationSelectionMenu.vue';
-import { AllLogger, ConsoleLogger } from '@embedpdf/models';
-// Define drawer components
-const drawerComponents = [
+import PageControls from './PageControls.vue';
+
+// Function to get drawer components with current documentId
+const getDrawerComponents = (documentId: string | null) => [
   {
     id: 'search',
     component: Search,
     icon: 'mdi-magnify',
     label: 'Search',
     position: 'right' as const,
+    props: documentId ? { documentId } : {},
   },
   {
     id: 'sidebar',
@@ -56,6 +67,7 @@ const drawerComponents = [
     icon: 'mdi-dock-left',
     label: 'Sidebar',
     position: 'left' as const,
+    props: documentId ? { documentId } : {},
   },
 ];
 
@@ -78,6 +90,13 @@ const handleInitialized = async (registry: PluginRegistry) => {
       imageSize: { width: 20, height: 20 },
     },
   });
+
+  // Open initial document
+  registry
+    ?.getPlugin<DocumentManagerPlugin>(DocumentManagerPlugin.id)
+    ?.provides()
+    ?.openDocumentUrl({ url: 'https://snippet.embedpdf.com/ebook.pdf' })
+    .toPromise();
 };
 </script>
 
@@ -104,154 +123,217 @@ const handleInitialized = async (registry: PluginRegistry) => {
       :engine="engine"
       :on-initialized="handleInitialized"
       :plugins="[
-        createPluginRegistration(LoaderPluginPackage, {
-          loadingOptions: {
-            type: 'url',
-            pdfFile: {
-              id: 'sample-pdf',
-              name: 'embedpdf-ebook.pdf',
-              url: 'https://snippet.embedpdf.com/ebook.pdf',
-            },
-          },
-        }),
+        createPluginRegistration(DocumentManagerPluginPackage),
         createPluginRegistration(ViewportPluginPackage, {
           viewportGap: 10,
         }),
         createPluginRegistration(ScrollPluginPackage, {
-          strategy: ScrollStrategy.Vertical,
-          pageGap: 10,
+          defaultStrategy: ScrollStrategy.Vertical,
         }),
+        createPluginRegistration(InteractionManagerPluginPackage),
+        createPluginRegistration(ZoomPluginPackage, {
+          defaultZoomLevel: ZoomMode.FitPage,
+        }),
+        createPluginRegistration(PanPluginPackage),
+        createPluginRegistration(SpreadPluginPackage, {
+          defaultSpreadMode: SpreadMode.None,
+        }),
+        createPluginRegistration(RotatePluginPackage),
+        createPluginRegistration(ExportPluginPackage),
+        createPluginRegistration(PrintPluginPackage),
         createPluginRegistration(RenderPluginPackage),
         createPluginRegistration(TilingPluginPackage, {
           tileSize: 768,
           overlapPx: 2.5,
           extraRings: 0,
         }),
-        createPluginRegistration(InteractionManagerPluginPackage),
         createPluginRegistration(SelectionPluginPackage),
-        createPluginRegistration(RotatePluginPackage),
+        createPluginRegistration(SearchPluginPackage),
+        createPluginRegistration(RedactionPluginPackage),
+        createPluginRegistration(CapturePluginPackage),
+        createPluginRegistration(HistoryPluginPackage),
+        createPluginRegistration(AnnotationPluginPackage),
         createPluginRegistration(FullscreenPluginPackage),
-        createPluginRegistration(ZoomPluginPackage, {
-          defaultZoomLevel: ZoomMode.FitPage,
-        }),
-        createPluginRegistration(PanPluginPackage),
-        createPluginRegistration(ExportPluginPackage),
-        createPluginRegistration(SpreadPluginPackage),
-        createPluginRegistration(PrintPluginPackage),
         createPluginRegistration(ThumbnailPluginPackage, {
           imagePadding: 10,
           labelHeight: 25,
         }),
-        createPluginRegistration(SearchPluginPackage, {
-          flags: [],
-          showAllResults: true,
-        }),
-        createPluginRegistration(RedactionPluginPackage),
-        createPluginRegistration(AnnotationPluginPackage),
       ]"
     >
-      <template #default="{ pluginsReady }">
-        <DrawerProvider :components="drawerComponents">
-          <v-layout class="fill-height" id="pdf-app-layout">
-            <!-- Toolbar -->
-            <Toolbar />
+      <template #default="{ pluginsReady, registry }">
+        <div v-if="!pluginsReady" class="d-flex fill-height align-center justify-center">
+          <div class="text-center">
+            <v-progress-circular indeterminate color="primary" size="48"></v-progress-circular>
+            <div class="text-body-1 text-medium-emphasis mt-4">Loading plugins...</div>
+          </div>
+        </div>
 
-            <!-- Left Drawer -->
-            <Drawer position="left" />
+        <DocumentContext v-else>
+          <template #default="{ documentStates, activeDocumentId, actions }">
+            <DrawerProvider :components="getDrawerComponents(activeDocumentId)">
+              <div class="fill-height d-flex flex-column" id="pdf-app-layout">
+                <!-- Tab Bar -->
+                <TabBar
+                  :documentStates="documentStates"
+                  :activeDocumentId="activeDocumentId"
+                  :onSelect="actions.select"
+                  :onClose="actions.close"
+                  :onOpenFile="
+                    () => {
+                      registry
+                        ?.getPlugin<DocumentManagerPlugin>(DocumentManagerPlugin.id)
+                        ?.provides()
+                        ?.openFileDialog();
+                    }
+                  "
+                />
 
-            <!-- Main content -->
-            <v-main class="fill-height">
-              <div class="fill-height position-relative">
-                <GlobalPointerProvider>
-                  <Viewport class="fill-height" style="background-color: #f5f5f5; overflow: auto">
-                    <div
-                      v-if="!pluginsReady"
-                      class="d-flex fill-height align-center justify-center"
-                    >
-                      <div class="text-center">
-                        <v-progress-circular
-                          indeterminate
-                          color="primary"
-                          size="48"
-                        ></v-progress-circular>
-                        <div class="text-body-1 text-medium-emphasis mt-4">Loading plugins...</div>
-                      </div>
-                    </div>
-                    <Scroller v-else>
-                      <template #default="{ page }">
-                        <Rotate
-                          :key="page.document?.id"
-                          :page-size="{ width: page.width, height: page.height }"
+                <v-layout class="fill-height" style="flex: 1">
+                  <!-- Toolbar -->
+                  <Toolbar v-if="activeDocumentId" :documentId="activeDocumentId" />
+
+                  <!-- Left Drawer -->
+                  <Drawer position="left" />
+
+                  <!-- Main content -->
+                  <v-main v-if="activeDocumentId" class="fill-height">
+                    <DocumentContent :documentId="activeDocumentId">
+                      <template #default="{ documentState, isLoading, isError, isLoaded }">
+                        <!-- Loading State -->
+                        <div
+                          v-if="isLoading"
+                          class="d-flex fill-height align-center justify-center"
                         >
-                          <PagePointerProvider
-                            :page-index="page.pageIndex"
-                            :page-width="page.width"
-                            :page-height="page.height"
-                            :rotation="page.rotation"
-                            :scale="page.scale"
-                            class="position-absolute"
-                          >
-                            <RenderLayer
-                              :page-index="page.pageIndex"
-                              style="pointer-events: none"
-                            />
-                            <TilingLayer
-                              :page-index="page.pageIndex"
-                              :scale="page.scale"
-                              style="pointer-events: none"
-                            />
-                            <MarqueeZoom :page-index="page.pageIndex" :scale="page.scale" />
-                            <SearchLayer :page-index="page.pageIndex" :scale="page.scale" />
-                            <AnnotationLayer
-                              :page-index="page.pageIndex"
-                              :scale="page.scale"
-                              :page-width="page.width"
-                              :page-height="page.height"
-                              :rotation="page.rotation"
-                            >
-                              <template
-                                #selection-menu="{ annotation, selected, menuWrapperProps, rect }"
-                              >
-                                <AnnotationSelectionMenu
-                                  v-if="selected"
-                                  :annotation="annotation"
-                                  :menu-wrapper-props="menuWrapperProps"
-                                  :rect="rect"
-                                />
-                              </template>
-                            </AnnotationLayer>
-                            <RedactionLayer
-                              :page-index="page.pageIndex"
-                              :scale="page.scale"
-                              :rotation="page.rotation"
-                            >
-                              <template
-                                #selection-menu="{ item, selected, menuWrapperProps, rect }"
-                              >
-                                <RedactionSelectionMenu
-                                  v-if="selected"
-                                  :item="item"
-                                  :menu-wrapper-props="menuWrapperProps"
-                                  :rect="rect"
-                                />
-                              </template>
-                            </RedactionLayer>
-                            <SelectionLayer :page-index="page.pageIndex" :scale="page.scale" />
-                          </PagePointerProvider>
-                        </Rotate>
-                      </template>
-                    </Scroller>
-                    <!-- Page Controls Overlay -->
-                    <PageControls />
-                  </Viewport>
-                </GlobalPointerProvider>
-              </div>
-            </v-main>
+                          <div class="text-center">
+                            <v-progress-circular
+                              indeterminate
+                              color="primary"
+                              size="48"
+                            ></v-progress-circular>
+                            <div class="text-body-1 text-medium-emphasis mt-4">
+                              Loading document...
+                            </div>
+                          </div>
+                        </div>
 
-            <!-- Right Drawer -->
-            <Drawer position="right" />
-          </v-layout>
-        </DrawerProvider>
+                        <!-- Error State -->
+                        <div
+                          v-else-if="isError"
+                          class="d-flex fill-height align-center justify-center"
+                        >
+                          <v-alert type="error" variant="tonal" class="ma-4">
+                            <v-alert-title>Error loading document</v-alert-title>
+                            {{ documentState.error?.message ?? 'Unknown error' }}
+                          </v-alert>
+                        </div>
+
+                        <!-- Loaded State -->
+                        <div v-else-if="isLoaded" class="fill-height position-relative">
+                          <GlobalPointerProvider :documentId="activeDocumentId">
+                            <Viewport
+                              :documentId="activeDocumentId"
+                              class="fill-height"
+                              style="background-color: #f5f5f5; overflow: auto"
+                            >
+                              <Scroller :documentId="activeDocumentId">
+                                <template #default="{ page }">
+                                  <Rotate
+                                    :documentId="activeDocumentId"
+                                    :page-index="page.pageIndex"
+                                    style="background-color: white"
+                                  >
+                                    <PagePointerProvider
+                                      :documentId="activeDocumentId"
+                                      :page-index="page.pageIndex"
+                                      class="position-absolute"
+                                    >
+                                      <RenderLayer
+                                        :documentId="activeDocumentId"
+                                        :page-index="page.pageIndex"
+                                        :scale="1"
+                                        style="pointer-events: none"
+                                      />
+                                      <!--<TilingLayer
+                                        :documentId="activeDocumentId"
+                                        :page-index="page.pageIndex"
+                                        style="pointer-events: none"
+                                      />-->
+                                      <SearchLayer
+                                        :documentId="activeDocumentId"
+                                        :page-index="page.pageIndex"
+                                      />
+                                      <MarqueeZoom
+                                        :documentId="activeDocumentId"
+                                        :page-index="page.pageIndex"
+                                      />
+                                      <MarqueeCapture
+                                        :documentId="activeDocumentId"
+                                        :page-index="page.pageIndex"
+                                      />
+                                      <SelectionLayer
+                                        :documentId="activeDocumentId"
+                                        :page-index="page.pageIndex"
+                                      />
+                                      <RedactionLayer
+                                        :documentId="activeDocumentId"
+                                        :page-index="page.pageIndex"
+                                      >
+                                        <template
+                                          #selection-menu="{
+                                            item,
+                                            selected,
+                                            menuWrapperProps,
+                                            rect,
+                                          }"
+                                        >
+                                          <RedactionSelectionMenu
+                                            v-if="selected"
+                                            :item="item"
+                                            :menu-wrapper-props="menuWrapperProps"
+                                            :rect="rect"
+                                          />
+                                        </template>
+                                      </RedactionLayer>
+                                      <AnnotationLayer
+                                        :documentId="activeDocumentId"
+                                        :page-index="page.pageIndex"
+                                      >
+                                        <template
+                                          #selection-menu="{
+                                            annotation,
+                                            selected,
+                                            menuWrapperProps,
+                                            rect,
+                                          }"
+                                        >
+                                          <AnnotationSelectionMenu
+                                            v-if="selected"
+                                            :annotation="annotation"
+                                            :menu-wrapper-props="menuWrapperProps"
+                                            :rect="rect"
+                                          />
+                                        </template>
+                                      </AnnotationLayer>
+                                    </PagePointerProvider>
+                                  </Rotate>
+                                </template>
+                              </Scroller>
+                              <!-- Page Controls Overlay -->
+                              <PageControls :documentId="activeDocumentId" />
+                            </Viewport>
+                          </GlobalPointerProvider>
+                        </div>
+                      </template>
+                    </DocumentContent>
+                  </v-main>
+
+                  <!-- Right Drawer -->
+                  <Drawer position="right" />
+                </v-layout>
+              </div>
+            </DrawerProvider>
+          </template>
+        </DocumentContext>
       </template>
     </EmbedPDF>
   </div>

@@ -242,6 +242,7 @@
     >
       <template #default>
         <AnnoComponents.Stamp
+          :documentId="documentId"
           :isSelected="selectionState?.object.id === annotation.object.id"
           :annotation="annotation"
           :pageIndex="pageIndex"

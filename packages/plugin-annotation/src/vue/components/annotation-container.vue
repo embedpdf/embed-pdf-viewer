@@ -69,6 +69,7 @@ import { useAnnotationCapability } from '../hooks';
 const props = withDefaults(
   defineProps<{
     scale: number;
+    documentId: string;
     pageIndex: number;
     rotation: number;
     pageWidth: number;
@@ -99,8 +100,13 @@ const HANDLE_SIZE = 12;
 const VERTEX_SIZE = 12;
 
 const preview = shallowRef<Partial<T>>(toRaw(props.trackedAnnotation.object));
-const { provides: annotationProvides } = useAnnotationCapability();
+const { provides: annotationCapability } = useAnnotationCapability();
 const gestureBaseRef = ref<T | null>(null);
+
+// Get scoped API for this document (similar to React's useMemo)
+const annotationProvides = computed(() =>
+  annotationCapability.value ? annotationCapability.value.forDocument(props.documentId) : null,
+);
 
 const currentObject = computed<T>(
   () => ({ ...toRaw(props.trackedAnnotation.object), ...toRaw(preview.value) }) as T,
@@ -120,8 +126,8 @@ const constraintsSnapshot = computed(() => ({
   minWidth: 10,
   minHeight: 10,
   boundingBox: {
-    width: props.pageWidth / props.scale,
-    height: props.pageHeight / props.scale,
+    width: props.pageWidth,
+    height: props.pageHeight,
   },
 }));
 
@@ -147,7 +153,7 @@ const { dragProps, vertices, resize } = useInteractionHandles({
         ? props.vertexConfig?.transformAnnotation(toRaw(base), event.transformData.changes.vertices)
         : { rect: event.transformData.changes.rect };
 
-      const patched = annotationProvides.value?.transformAnnotation<T>(base, {
+      const patched = annotationCapability.value?.transformAnnotation<T>(base, {
         type: event.transformData.type,
         changes: changes as Partial<T>,
         metadata: event.transformData.metadata,

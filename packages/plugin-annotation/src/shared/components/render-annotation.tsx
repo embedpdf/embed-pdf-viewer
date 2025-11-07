@@ -54,7 +54,7 @@ export function RenderAnnotation({
         }
       };
     }
-  }, [pageIndex, scaleFactor, annotationProvides, annotation.id, width, height]);
+  }, [pageIndex, scaleFactor, annotationProvides, documentId, annotation.id, width, height]);
 
   const handleImageLoad = () => {
     if (urlRef.current) {
