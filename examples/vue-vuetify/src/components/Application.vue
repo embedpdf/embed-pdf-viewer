@@ -178,15 +178,6 @@ const handleInitialized = async (registry: PluginRegistry) => {
                   :activeDocumentId="activeDocumentId"
                   :onSelect="actions.select"
                   :onClose="actions.close"
-                  :onOpenFile="
-                    () => {
-                      if (!registry) return;
-                      registry
-                        .getPlugin<DocumentManagerPlugin>(DocumentManagerPlugin.id)
-                        ?.provides()
-                        ?.openFileDialog();
-                    }
-                  "
                 />
 
                 <v-layout class="fill-height" style="flex: 1">

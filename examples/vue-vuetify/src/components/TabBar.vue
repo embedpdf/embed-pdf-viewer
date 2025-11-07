@@ -1,13 +1,15 @@
 <script setup lang="ts">
 import type { DocumentState } from '@embedpdf/core';
+import { useDocumentManagerCapability } from '@embedpdf/plugin-document-manager/vue';
 
 interface TabBarProps {
   documentStates: DocumentState[];
   activeDocumentId: string | null;
   onSelect: (id: string) => void;
   onClose: (id: string) => void;
-  onOpenFile: () => void;
 }
+
+const { provides } = useDocumentManagerCapability();
 
 const props = defineProps<TabBarProps>();
 </script>
@@ -52,7 +54,7 @@ const props = defineProps<TabBarProps>();
         size="small"
         variant="text"
         class="add-tab-btn"
-        @click="props.onOpenFile"
+        @click="provides?.openFileDialog()"
         aria-label="Open File"
         title="Open File"
       />
