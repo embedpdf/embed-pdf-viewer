@@ -61,26 +61,24 @@ export interface ScopedEmitter<
 }
 
 /**
- * Creates a scoped behavior emitter with global event support.
+ * Creates a scoped emitter with optional caching behavior.
  *
  * @param toGlobalEvent - Transform function to convert (key, data) into a global event
- * @param equality - Optional equality function for per-scope caching (default: arePropsEqual)
+ * @param options - Configuration options
+ * @param options.cache - Whether to cache values per scope (default: true)
+ * @param options.equality - Equality function for cached values (default: arePropsEqual)
  *
  * @example
  * ```typescript
- * // Document-scoped (string keys)
+ * // With caching (stateful) - default behavior
  * const window$ = createScopedEmitter<WindowState, WindowChangeEvent, string>(
  *   (documentId, window) => ({ documentId, window })
  * );
  *
- * // User-scoped (number keys)
- * const presence$ = createScopedEmitter<UserPresence, PresenceEvent, number>(
- *   (userId, presence) => ({ userId, presence })
- * );
- *
- * // Flexible (string or number)
- * const data$ = createScopedEmitter<Data, DataEvent>(
- *   (id, data) => ({ id, data })
+ * // Without caching (transient events)
+ * const refreshPages$ = createScopedEmitter<number[], RefreshPagesEvent, string>(
+ *   (documentId, pages) => ({ documentId, pages }),
+ *   { cache: false }
  * );
  * ```
  */
@@ -90,9 +88,15 @@ export function createScopedEmitter<
   TKey extends string | number = string | number,
 >(
   toGlobalEvent: (key: TKey, data: TData) => TGlobalEvent,
-  equality: (a: TData, b: TData) => boolean = arePropsEqual,
+  options?: {
+    cache?: boolean;
+    equality?: (a: TData, b: TData) => boolean;
+  },
 ): ScopedEmitter<TData, TGlobalEvent, TKey> {
-  // Per-scope state (normalized keys as strings)
+  const shouldCache = options?.cache ?? true;
+  const equality = options?.equality ?? arePropsEqual;
+
+  // Per-scope state
   const scopeCaches = new Map<string, TData>();
   const scopeListeners = new Map<string, Set<Listener<TData>>>();
   const scopeProxyMaps = new Map<
@@ -100,7 +104,7 @@ export function createScopedEmitter<
     Map<Listener<TData>, { wrapped: Listener<TData>; destroy: () => void }>
   >();
 
-  // Global listeners (no caching - only for new emissions)
+  // Global listeners
   const globalListeners = new Set<Listener<TGlobalEvent>>();
   const globalProxyMap = new Map<
     Listener<TGlobalEvent>,
@@ -161,22 +165,25 @@ export function createScopedEmitter<
   return {
     emit(key: TKey, data: TData) {
       const normalizedKey = normalizeKey(key);
-      const cached = scopeCaches.get(normalizedKey);
 
-      // Only process if changed or first emission
-      if (cached === undefined || !equality(cached, data)) {
-        scopeCaches.set(normalizedKey, data);
-
-        // Notify per-scope listeners
-        const listeners = scopeListeners.get(normalizedKey);
-        if (listeners) {
-          listeners.forEach((l) => l(data));
+      if (shouldCache) {
+        // Behavior mode: check equality before emitting
+        const cached = scopeCaches.get(normalizedKey);
+        if (cached !== undefined && equality(cached, data)) {
+          return; // Skip emission if value hasn't changed
         }
-
-        // Notify global listeners with key context
-        const globalEvent = toGlobalEvent(key, data);
-        globalListeners.forEach((l) => l(globalEvent));
+        scopeCaches.set(normalizedKey, data);
       }
+
+      // Notify per-scope listeners
+      const listeners = scopeListeners.get(normalizedKey);
+      if (listeners) {
+        listeners.forEach((l) => l(data));
+      }
+
+      // Notify global listeners
+      const globalEvent = toGlobalEvent(key, data);
+      globalListeners.forEach((l) => l(globalEvent));
     },
 
     forScope(key: TKey): EventHook<TData> {
@@ -202,10 +209,12 @@ export function createScopedEmitter<
           proxyMap.set(listener, { wrapped: realListener, destroy });
         }
 
-        // Replay cached value for this scope
-        const cached = scopeCaches.get(normalizedKey);
-        if (cached !== undefined) {
-          realListener(cached);
+        // Replay cached value ONLY if caching is enabled
+        if (shouldCache) {
+          const cached = scopeCaches.get(normalizedKey);
+          if (cached !== undefined) {
+            realListener(cached);
+          }
         }
 
         listeners.add(realListener);
@@ -215,7 +224,6 @@ export function createScopedEmitter<
           destroy();
           proxyMap.delete(listener);
 
-          // Cleanup empty collections
           if (listeners.size === 0) {
             scopeListeners.delete(normalizedKey);
           }
@@ -229,18 +237,23 @@ export function createScopedEmitter<
     onGlobal,
 
     getValue(key: TKey): TData | undefined {
-      return scopeCaches.get(normalizeKey(key));
+      return shouldCache ? scopeCaches.get(normalizeKey(key)) : undefined;
     },
 
     getScopes(): TKey[] {
-      // Cast back to TKey array (safe because we only store what was emitted)
-      return Array.from(scopeCaches.keys()) as TKey[];
+      if (shouldCache) {
+        return Array.from(scopeCaches.keys()) as TKey[];
+      }
+      // Without cache, return all scopes that have active listeners
+      return Array.from(scopeListeners.keys()) as TKey[];
     },
 
     clearScope(key: TKey): void {
       const normalizedKey = normalizeKey(key);
 
-      scopeCaches.delete(normalizedKey);
+      if (shouldCache) {
+        scopeCaches.delete(normalizedKey);
+      }
 
       const listeners = scopeListeners.get(normalizedKey);
       if (listeners) {
@@ -257,7 +270,9 @@ export function createScopedEmitter<
     },
 
     clear(): void {
-      scopeCaches.clear();
+      if (shouldCache) {
+        scopeCaches.clear();
+      }
       scopeListeners.forEach((set) => set.clear());
       scopeListeners.clear();
       scopeProxyMaps.forEach((map) => {

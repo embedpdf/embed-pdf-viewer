@@ -55,7 +55,10 @@ export class ThumbnailPlugin extends BasePlugin<
   private readonly scrollTo$ = createScopedEmitter<ScrollToOptions, ScrollToEvent, string>(
     (documentId, options) => ({ documentId, options }),
   );
-  private readonly refreshPages$ = createEmitter<RefreshPagesEvent>();
+  private readonly refreshPages$ = createScopedEmitter<number[], RefreshPagesEvent, string>(
+    (documentId, pages) => ({ documentId, pages }),
+    { cache: false },
+  );
 
   constructor(
     id: string,
@@ -71,7 +74,7 @@ export class ThumbnailPlugin extends BasePlugin<
       const documentId = action.payload.documentId ?? this.getActiveDocumentId();
       const pages = action.payload.pageIndexes;
 
-      this.refreshPages$.emit({ documentId, pages });
+      this.refreshPages$.emit(documentId, pages);
 
       const taskCache = this.taskCaches.get(documentId);
       if (taskCache) {
@@ -145,6 +148,7 @@ export class ThumbnailPlugin extends BasePlugin<
     this.canAutoScroll.delete(documentId);
     this.window$.clearScope(documentId);
     this.scrollTo$.clearScope(documentId);
+    this.refreshPages$.clearScope(documentId);
     this.logger.debug(
       'ThumbnailPlugin',
       'DocumentClosed',
@@ -175,7 +179,7 @@ export class ThumbnailPlugin extends BasePlugin<
       // Events
       onWindow: this.window$.onGlobal,
       onScrollTo: this.scrollTo$.onGlobal,
-      onRefreshPages: this.refreshPages$.on,
+      onRefreshPages: this.refreshPages$.onGlobal,
     };
   }
 
@@ -191,10 +195,7 @@ export class ThumbnailPlugin extends BasePlugin<
       getWindow: () => this.getWindow(documentId),
       onWindow: this.window$.forScope(documentId),
       onScrollTo: this.scrollTo$.forScope(documentId),
-      onRefreshPages: (listener: Listener<number[]>) =>
-        this.refreshPages$.on((event) => {
-          if (event.documentId === documentId) listener(event.pages);
-        }),
+      onRefreshPages: this.refreshPages$.forScope(documentId),
     };
   }
 
