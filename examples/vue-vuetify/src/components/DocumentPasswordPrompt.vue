@@ -63,9 +63,9 @@ const handleKeydown = (event: KeyboardEvent) => {
       <div v-if="documentState.errorCode" class="text-caption mt-1">
         Error Code: {{ documentState.errorCode }}
       </div>
-      <template #actions>
+      <div class="mt-4">
         <v-btn color="error" variant="text" @click="handleClose"> Close Document </v-btn>
-      </template>
+      </div>
     </v-alert>
   </div>
 
