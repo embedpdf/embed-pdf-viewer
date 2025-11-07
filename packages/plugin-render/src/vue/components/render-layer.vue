@@ -59,14 +59,24 @@ watch(
     renderProvides,
     refreshVersion,
   ],
-  ([docId, pageIdx, scale, dpr, capability], _, onCleanup) => {
+  ([docId, pageIdx, scale, dpr, capability], [prevDocId], onCleanup) => {
     if (!capability) {
       imageUrl.value = null;
       return;
     }
 
+    // CRITICAL: Clear image immediately when documentId changes (not for zoom/scale)
+    if (prevDocId !== undefined && prevDocId !== docId) {
+      imageUrl.value = null;
+      if (urlRef && hasLoaded) {
+        URL.revokeObjectURL(urlRef);
+        urlRef = null;
+        hasLoaded = false;
+      }
+    }
+
     // Revoke old URL before creating new one (if it's been loaded)
-    if (urlRef && hasLoaded) {
+    if (urlRef && hasLoaded && prevDocId === docId) {
       URL.revokeObjectURL(urlRef);
       urlRef = null;
       hasLoaded = false;

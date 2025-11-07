@@ -32,12 +32,12 @@ watch(
 /* -------------------------------------------------- */
 /* Gating logic                                    */
 /* -------------------------------------------------- */
-const isGated = useIsViewportGated(props.documentId);
+const isGated = useIsViewportGated(() => props.documentId);
 
 /* -------------------------------------------------- */
 /* element ref that wires up scroll / resize logic    */
 /* -------------------------------------------------- */
-const viewportRef = useViewportRef(props.documentId);
+const viewportRef = useViewportRef(() => props.documentId);
 </script>
 
 <template>

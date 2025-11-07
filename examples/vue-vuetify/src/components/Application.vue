@@ -253,11 +253,11 @@ const handleInitialized = async (registry: PluginRegistry) => {
                                         :scale="1"
                                         style="pointer-events: none"
                                       />
-                                      <!--<TilingLayer
+                                      <TilingLayer
                                         :documentId="activeDocumentId"
                                         :page-index="page.pageIndex"
                                         style="pointer-events: none"
-                                      />-->
+                                      />
                                       <SearchLayer
                                         :documentId="activeDocumentId"
                                         :page-index="page.pageIndex"

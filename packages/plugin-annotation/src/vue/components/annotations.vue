@@ -411,7 +411,7 @@ const { provides: annotationCapability } = useAnnotationCapability();
 const { provides: selectionProvides } = useSelectionCapability();
 const annotations = ref<TrackedAnnotation[]>([]);
 const { register } = usePointerHandlers({
-  documentId: props.documentId,
+  documentId: () => props.documentId,
   pageIndex: props.pageIndex,
 });
 const selectionState = ref<TrackedAnnotation | null>(null);
@@ -424,6 +424,12 @@ const annotationProvides = computed(() =>
 
 watchEffect((onCleanup) => {
   if (annotationProvides.value) {
+    // Initialize with current state immediately (like React)
+    const currentState = annotationProvides.value.getState();
+    annotations.value = getAnnotationsByPageIndex(currentState, props.pageIndex);
+    selectionState.value = getSelectedAnnotationByPageIndex(currentState, props.pageIndex);
+
+    // Then subscribe to changes
     const off = annotationProvides.value.onStateChange((state) => {
       annotations.value = getAnnotationsByPageIndex(state, props.pageIndex);
       selectionState.value = getSelectedAnnotationByPageIndex(state, props.pageIndex);

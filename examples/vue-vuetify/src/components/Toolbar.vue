@@ -257,7 +257,11 @@ const handlePrintDialogClose = () => {
   <AnnotationToolbar v-if="mode === 'annotate'" :documentId="props.documentId" />
 
   <!-- Print Dialog -->
-  <PrintDialog :open="printDialogOpen" @close="handlePrintDialogClose" />
+  <PrintDialog
+    :open="printDialogOpen"
+    :documentId="props.documentId"
+    @close="handlePrintDialogClose"
+  />
 </template>
 
 <style scoped>

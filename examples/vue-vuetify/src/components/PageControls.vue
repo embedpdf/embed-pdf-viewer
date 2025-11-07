@@ -82,17 +82,13 @@ const handlePageSubmit = () => {
 
 const handlePreviousPage = () => {
   if (state.value.currentPage > 1 && scroll.value) {
-    scroll.value.scrollToPage({
-      pageNumber: state.value.currentPage - 1,
-    });
+    scroll.value.scrollToPreviousPage();
   }
 };
 
 const handleNextPage = () => {
   if (state.value.currentPage < state.value.totalPages && scroll.value) {
-    scroll.value.scrollToPage({
-      pageNumber: state.value.currentPage + 1,
-    });
+    scroll.value.scrollToNextPage();
   }
 };
 

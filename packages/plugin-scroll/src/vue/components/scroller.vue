@@ -1,7 +1,7 @@
 <script setup lang="ts">
-import { ref, watch, computed, onMounted, nextTick } from 'vue';
+import { ref, watch, computed } from 'vue';
 import { useScrollPlugin } from '../hooks';
-import { ScrollStrategy, type ScrollerLayout, type PageLayout } from '@embedpdf/plugin-scroll';
+import { ScrollStrategy, type ScrollerLayout } from '@embedpdf/plugin-scroll';
 
 interface ScrollerProps {
   documentId: string;
@@ -24,19 +24,20 @@ watch(
       return;
     }
 
-    // When we get new data, store it along with the current documentId
+    // Subscribe to the new document
     const unsubscribe = plugin.onScrollerData(docId, (newLayout) => {
       layoutData.value = { layout: newLayout, docId };
     });
 
-    // When the component unmounts or documentId changes, clear the state
     onCleanup(() => {
       unsubscribe();
       layoutData.value = { layout: null, docId: null };
       plugin.clearLayoutReady(docId);
     });
   },
-  { immediate: true },
+  {
+    immediate: true,
+  },
 );
 
 // Only use layout if it matches the current documentId (prevents stale data)
@@ -50,10 +51,7 @@ watch(
   ([plugin, docId, layout]) => {
     if (!plugin || !docId || !layout) return;
 
-    // Use nextTick to ensure DOM is updated before calling setLayoutReady
-    nextTick(() => {
-      plugin.setLayoutReady(docId);
-    });
+    plugin.setLayoutReady(docId);
   },
   { immediate: true },
 );
