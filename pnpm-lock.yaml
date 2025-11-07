@@ -345,6 +345,9 @@ importers:
       '@embedpdf/models':
         specifier: workspace:*
         version: link:../../packages/models
+      '@embedpdf/pdfium':
+        specifier: workspace:*
+        version: link:../../packages/pdfium
       '@embedpdf/plugin-annotation':
         specifier: workspace:*
         version: link:../../packages/plugin-annotation
@@ -399,12 +402,18 @@ importers:
       '@embedpdf/plugin-tiling':
         specifier: workspace:*
         version: link:../../packages/plugin-tiling
+      '@embedpdf/plugin-view-manager':
+        specifier: workspace:*
+        version: link:../../packages/plugin-view-manager
       '@embedpdf/plugin-viewport':
         specifier: workspace:*
         version: link:../../packages/plugin-viewport
       '@embedpdf/plugin-zoom':
         specifier: workspace:*
         version: link:../../packages/plugin-zoom
+      '@embedpdf/utils':
+        specifier: workspace:*
+        version: link:../../packages/utils
       vue:
         specifier: ^3.5.0
         version: 3.5.22(typescript@5.9.3)

@@ -1,6 +1,7 @@
 import { useEffect, useRef, HTMLAttributes, CSSProperties, ReactNode } from '@framework';
 
 import { useFullscreenPlugin, useFullscreenCapability } from '../hooks';
+import { handleFullscreenRequest } from '../utils/fullscreen-utils';
 
 type FullscreenProviderProps = Omit<HTMLAttributes<HTMLDivElement>, 'style'> & {
   children: ReactNode;
@@ -17,32 +18,8 @@ export function FullscreenProvider({ children, ...props }: FullscreenProviderPro
     if (!fullscreenCapability || !fullscreenPlugin) return;
 
     const unsub = fullscreenCapability.onRequest(async (event) => {
-      if (event.action === 'enter') {
-        // Check if a target element selector is configured
-        const targetSelector = fullscreenPlugin.getTargetSelector();
-        let elementToFullscreen: HTMLElement | null = null;
-
-        if (targetSelector && ref.current) {
-          // Try to find the element within the wrapper element
-          elementToFullscreen = ref.current.querySelector(targetSelector);
-          if (!elementToFullscreen) {
-            console.warn(
-              `Fullscreen: Could not find element with selector "${targetSelector}" within the wrapper. Falling back to wrapper element.`,
-            );
-          }
-        }
-
-        // Fall back to the wrapper element if no selector or element not found
-        if (!elementToFullscreen) {
-          elementToFullscreen = ref.current;
-        }
-
-        if (elementToFullscreen && !document.fullscreenElement) {
-          await elementToFullscreen.requestFullscreen();
-        }
-      } else {
-        if (document.fullscreenElement) await document.exitFullscreen();
-      }
+      const targetSelector = fullscreenPlugin.getTargetSelector();
+      await handleFullscreenRequest(event, ref.current, targetSelector);
     });
 
     return unsub;

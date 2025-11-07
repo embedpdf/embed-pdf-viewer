@@ -90,16 +90,16 @@ export function SearchMinusIcon({ className, title }: IconProps) {
       fill="none"
       stroke="currentColor"
       viewBox="0 0 24 24"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      strokeWidth={2}
       aria-hidden={!title}
       role={title ? 'img' : 'presentation'}
     >
       {title ? <title>{title}</title> : null}
-      <path
-        strokeLinecap="round"
-        strokeLinejoin="round"
-        strokeWidth={2}
-        d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0zM13 10H7"
-      />
+      <path stroke="none" d="M0 0h24v24H0z" fill="none" />
+      <path d="M12 12m-9 0a9 9 0 1 0 18 0a9 9 0 1 0 -18 0" />
+      <path d="M9 12l6 0" />
     </svg>
   );
 }
@@ -111,16 +111,17 @@ export function SearchPlusIcon({ className, title }: IconProps) {
       fill="none"
       stroke="currentColor"
       viewBox="0 0 24 24"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      strokeWidth={2}
       aria-hidden={!title}
       role={title ? 'img' : 'presentation'}
     >
       {title ? <title>{title}</title> : null}
-      <path
-        strokeLinecap="round"
-        strokeLinejoin="round"
-        strokeWidth={2}
-        d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0zM10 7v3m0 0v3m0-3h3m-3 0H7"
-      />
+      <path stroke="none" d="M0 0h24v24H0z" fill="none" />
+      <path d="M3 12a9 9 0 1 0 18 0a9 9 0 0 0 -18 0" />
+      <path d="M9 12h6" />
+      <path d="M12 9v6" />
     </svg>
   );
 }
@@ -148,16 +149,19 @@ export function FitPageIcon({ className, title }: IconProps) {
       fill="none"
       stroke="currentColor"
       viewBox="0 0 24 24"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      strokeWidth={2}
       aria-hidden={!title}
       role={title ? 'img' : 'presentation'}
     >
       {title ? <title>{title}</title> : null}
-      <path
-        strokeLinecap="round"
-        strokeLinejoin="round"
-        strokeWidth={2}
-        d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
-      />
+      <path stroke="none" d="M0 0h24v24H0z" fill="none" />
+      <path d="M12 20h-6a2 2 0 0 1 -2 -2v-12a2 2 0 0 1 2 -2h6" />
+      <path d="M18 14v7" />
+      <path d="M18 3v7" />
+      <path d="M15 18l3 3l3 -3" />
+      <path d="M15 6l3 -3l3 3" />
     </svg>
   );
 }
@@ -169,11 +173,19 @@ export function FitWidthIcon({ className, title }: IconProps) {
       fill="none"
       stroke="currentColor"
       viewBox="0 0 24 24"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      strokeWidth={2}
       aria-hidden={!title}
       role={title ? 'img' : 'presentation'}
     >
       {title ? <title>{title}</title> : null}
-      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 8h16M4 16h16" />
+      <path stroke="none" d="M0 0h24v24H0z" fill="none" />
+      <path d="M4 12v-6a2 2 0 0 1 2 -2h12a2 2 0 0 1 2 2v6" />
+      <path d="M10 18h-7" />
+      <path d="M21 18h-7" />
+      <path d="M6 15l-3 3l3 3" />
+      <path d="M18 15l3 3l-3 3" />
     </svg>
   );
 }
@@ -185,16 +197,23 @@ export function MarqueeIcon({ className, title }: IconProps) {
       fill="none"
       stroke="currentColor"
       viewBox="0 0 24 24"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      strokeWidth={2}
       aria-hidden={!title}
       role={title ? 'img' : 'presentation'}
     >
       {title ? <title>{title}</title> : null}
-      <path
-        strokeLinecap="round"
-        strokeLinejoin="round"
-        strokeWidth={2}
-        d="M15 15l-2 5L9 9l11 4-5 2zm0 0l5 5M7.188 2.239l.777 2.897M5.136 7.965l-2.898-.777M13.95 4.05l-2.122 2.122m-5.657 5.656l-2.12 2.122"
-      />
+      <path stroke="none" d="M0 0h24v24H0z" fill="none" />
+      <path d="M15 13v4" />
+      <path d="M13 15h4" />
+      <path d="M15 15m-5 0a5 5 0 1 0 10 0a5 5 0 1 0 -10 0" />
+      <path d="M22 22l-3 -3" />
+      <path d="M6 18h-1a2 2 0 0 1 -2 -2v-1" />
+      <path d="M3 11v-1" />
+      <path d="M3 6v-1a2 2 0 0 1 2 -2h1" />
+      <path d="M10 3h1" />
+      <path d="M15 3h1a2 2 0 0 1 2 2v1" />
     </svg>
   );
 }
@@ -1001,6 +1020,82 @@ export function RedoIcon({ className, title }: IconProps) {
       <path stroke="none" d="M0 0h24v24H0z" fill="none" />
       <path d="M15 14l4 -4l-4 -4" />
       <path d="M19 10h-11a4 4 0 1 0 0 8h1" />
+    </svg>
+  );
+}
+
+export function RedactTextIcon({ className, title }: IconProps) {
+  return (
+    <svg
+      className={className}
+      fill="none"
+      stroke="currentColor"
+      viewBox="0 0 24 24"
+      strokeWidth={2}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden={!title}
+      role={title ? 'img' : 'presentation'}
+    >
+      {title ? <title>{title}</title> : null}
+      <path stroke="none" d="M0 0h24v24H0z" fill="none" />
+      <path d="M7 4h10" />
+      <path d="M12 4v8" />
+      <defs>
+        <clipPath id="stripeClip">
+          <rect x="2" y="12" width="20" height="10" rx="2" />
+        </clipPath>
+      </defs>
+      <rect x="2" y="12" width="20" height="10" rx="2" fill="none" />
+      <g clipPath="url(#stripeClip)">
+        <path d="M-7 24l12 -12" />
+        <path d="M-3 24l12 -12" />
+        <path d="M1 24l12 -12" />
+        <path d="M5 24l12 -12" />
+        <path d="M9 24l12 -12" />
+        <path d="M13 24l12 -12" />
+        <path d="M17 24l12 -12" />
+        <path d="M21 24l12 -12" />
+        <path d="M25 24l12 -12" />
+      </g>
+    </svg>
+  );
+}
+
+export function RedactAreaIcon({ className, title }: IconProps) {
+  return (
+    <svg
+      className={className}
+      fill="none"
+      stroke="currentColor"
+      viewBox="0 0 24 24"
+      strokeWidth={2}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden={!title}
+      role={title ? 'img' : 'presentation'}
+    >
+      {title ? <title>{title}</title> : null}
+      <path stroke="none" d="M0 0h24v24H0z" fill="none" />
+      <path d="M6 20h-1a2 2 0 0 1 -2 -2v-1" />
+      <path d="M3 13v-3" />
+      <path d="M3 6v-1a2 2 0 0 1 2 -2h1" />
+      <path d="M10 3h3" />
+      <path d="M17 3h1a2 2 0 0 1 2 2v1" />
+      <defs>
+        <clipPath id="redactClip">
+          <rect x="10" y="10" width="12" height="12" rx="2" />
+        </clipPath>
+      </defs>
+      <rect x="10" y="10" width="12" height="12" rx="2" fill="none" />
+      <g clipPath="url(#redactClip)">
+        <path d="M-2 24l14 -14" />
+        <path d="M2 24l14 -14" />
+        <path d="M6 24l14 -14" />
+        <path d="M10 24l15 -15" />
+        <path d="M14 24l15 -15" />
+        <path d="M18 24l15 -15" />
+      </g>
     </svg>
   );
 }

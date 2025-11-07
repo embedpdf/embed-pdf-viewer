@@ -1,4 +1,4 @@
-import { computed } from 'vue';
+import { computed, MaybeRefOrGetter, toValue } from 'vue';
 import { useCapability, usePlugin } from '@embedpdf/core/vue';
 import { ExportPlugin } from '@embedpdf/plugin-export';
 
@@ -7,15 +7,12 @@ export const useExportCapability = () => useCapability<ExportPlugin>(ExportPlugi
 
 /**
  * Hook for export capability for a specific document
- * @param documentId Document ID
+ * @param documentId Document ID (can be ref, computed, getter, or plain value)
  */
-export const useExport = (documentId: string) => {
+export const useExport = (documentId: MaybeRefOrGetter<string>) => {
   const { provides } = useExportCapability();
 
-  // Return a computed ref for the scoped capability
-  const scopedProvides = computed(() => provides.value?.forDocument(documentId) ?? null);
-
   return {
-    provides: scopedProvides,
+    provides: computed(() => provides.value?.forDocument(toValue(documentId)) ?? null),
   };
 };
