@@ -36,6 +36,7 @@
     "@embedpdf/plugin-capture": "workspace:*",
     "@embedpdf/plugin-redaction": "workspace:*",
     "@embedpdf/example-vue-tailwind": "workspace:*",
+    "@embedpdf/example-svelte-tailwind": "workspace:*",
     "@headlessui/react": "^2.2.0",
     "@mdx-js/loader": "^3.0.0",
     "@mdx-js/react": "^3.0.0",
@@ -58,6 +59,7 @@
     "unist-util-visit": "^5.0.0",
     "vue": "^3.5.6",
     "vue-loader": "^17.4.2",
+    "svelte": "^5.0.0",
     "webpack": "^5.98.0",
     "zustand": "^5.0.3"
   },

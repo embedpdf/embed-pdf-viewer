@@ -6,6 +6,7 @@ import {
   PluginStatus,
   PluginPackage,
   PluginRegistryConfig,
+  PluginBatchRegistrations,
 } from '../types/plugin';
 import {
   PluginRegistrationError,
@@ -391,7 +392,7 @@ export class PluginRegistry {
   /**
    * Register multiple plugins at once
    */
-  registerPluginBatch(registrations: PluginBatchRegistration<IPlugin<any>, any, any, any>[]): void {
+  registerPluginBatch(registrations: PluginBatchRegistrations): void {
     for (const reg of registrations) {
       this.registerPlugin(reg.package, reg.config);
     }

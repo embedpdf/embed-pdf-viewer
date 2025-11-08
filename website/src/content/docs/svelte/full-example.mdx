@@ -1,0 +1,128 @@
+---
+title: Full Example - Svelte & Tailwind PDF Viewer
+description: Explore a complete, production-ready PDF viewer built with EmbedPDF, Svelte, and Tailwind CSS.
+searchable: true
+---
+
+import { Callout } from '@/components/callout'
+
+# Full Example: Svelte & Tailwind PDF Viewer
+
+While the previous guides show how to use individual plugins, it's often helpful to see how they all come together in a complete application. This page showcases a feature-rich, responsive PDF viewer built with EmbedPDF, **Svelte**, and the **Tailwind CSS** utility framework.
+
+This example serves as a practical blueprint, demonstrating how to build a polished and cohesive user experience by combining EmbedPDF's headless components with a popular styling solution.
+
+- **Live Demo:** [**svelte-tailwind.embedpdf.com**](https://svelte-tailwind.embedpdf.com/)
+- **Source Code:** [**View on GitHub**](https://github.com/embedpdf/embed-pdf-viewer/tree/main/examples/svelte-tailwind)
+
+<Callout type="info">
+This example is a great starting point for your own project. Feel free to fork the repository and adapt the code to fit your needs.
+</Callout>
+
+## Features Showcase
+
+The Svelte example integrates numerous plugins to create a comprehensive viewing experience.
+
+| Feature                                                    | Plugin(s) Used                                                                    |
+| ---------------------------------------------------------- | --------------------------------------------------------------------------------- |
+| Virtualized scrolling with smooth page rendering           | `@embedpdf/plugin-scroll` + `@embedpdf/plugin-render` + `@embedpdf/plugin-tiling` |
+| Advanced zoom controls (presets, fit-to-page, marquee)     | `@embedpdf/plugin-zoom`                                                           |
+| Pan/hand tool for easy navigation                          | `@embedpdf/plugin-pan`                                                            |
+| Page rotation in 90-degree increments                      | `@embedpdf/plugin-rotate`                                                         |
+| Single and two-page spread layouts                         | `@embedpdf/plugin-spread`                                                         |
+| Thumbnail sidebar for quick page jumping                   | `@embedpdf/plugin-thumbnail`                                                      |
+| In-document text search with result highlighting           | `@embedpdf/plugin-search`                                                         |
+| File opening, downloading, and printing                    | `@embedpdf/plugin-loader`, `@embedpdf/plugin-export`, `@embedpdf/plugin-print`    |
+| Fullscreen mode                                            | `@embedpdf/plugin-fullscreen`                                                     |
+| Text selection and copy-to-clipboard                       | `@embedpdf/plugin-selection`                                                      |
+
+## Core Concepts Illustrated
+
+### 1. Centralized Plugin Registration
+
+All features are enabled and configured in a single `plugins` array within the main `Application.svelte` component. This makes it easy to see what capabilities the viewer has and to add or remove features.
+
+```svelte filename="src/lib/components/Application.svelte"
+<script lang="ts">
+// ...
+const plugins = [
+  createPluginRegistration(LoaderPluginPackage, { /* ... */ }),
+  createPluginRegistration(ViewportPluginPackage, { /* ... */ }),
+  createPluginRegistration(ScrollPluginPackage, { /* ... */ }),
+  createPluginRegistration(RenderPluginPackage),
+  createPluginRegistration(TilingPluginPackage, { /* ... */ }),
+  createPluginRegistration(ZoomPluginPackage, { /* ... */ }),
+  createPluginRegistration(SearchPluginPackage),
+  createPluginRegistration(InteractionManagerPluginPackage),
+  createPluginRegistration(PanPluginPackage),
+  createPluginRegistration(RotatePluginPackage),
+  createPluginRegistration(SpreadPluginPackage),
+  createPluginRegistration(FullscreenPluginPackage),
+  createPluginRegistration(ExportPluginPackage),
+  createPluginRegistration(ThumbnailPluginPackage),
+  createPluginRegistration(SelectionPluginPackage),
+  // ... and more
+];
+</script>
+````
+
+### 2. Reusable Svelte Components
+
+The UI is broken down into logical, reusable Svelte components, each leveraging Tailwind CSS for styling (e.g., `<Toolbar.svelte>`, `<Sidebar.svelte>`, `<Search.svelte>`). Each component is responsible for a specific piece of the UI and uses EmbedPDF stores to interact with the relevant plugins.
+
+For example, the `<ZoomControls.svelte>` component uses the `useZoom` store to manage zoom functionality.
+
+```svelte filename="src/lib/components/ZoomControls.svelte"
+<script lang="ts">
+import { useZoom, ZoomMode } from '@embedpdf/plugin-zoom/svelte';
+
+const zoom = useZoom();
+
+const handleZoomIn = () => {
+  zoom.provides?.zoomIn();
+};
+</script>
+
+<button onclick={handleZoomIn}>
+  Zoom In
+</button>
+```
+
+### 3. Responsive Design
+
+The example uses standard CSS media queries and Tailwind's responsive prefixes (`md:`, `lg:`) to adapt the layout for smaller screens. On mobile, sidebars automatically collapse, and some toolbar icons are hidden to save space, providing a more native-like experience.
+
+## Running the Example Locally
+
+You can run the full Svelte example on your machine to experiment with the code.
+
+> **Prerequisites:** You'll need Node.js 18+ and pnpm.
+
+### 1. Clone the repository:
+
+```bash
+git clone https://github.com/embedpdf/embed-pdf-viewer.git
+cd embed-pdf-viewer
+```
+
+### 2. Install dependencies:
+
+```bash
+pnpm install
+```
+
+### 3. Build the core packages
+
+The example imports the core EmbedPDF packages from the local workspace. You need to build them once.
+
+```bash
+pnpm run build --filter "./packages/*"
+```
+
+### 4. Run the example's dev server:
+
+```bash
+pnpm --filter @embedpdf/example-svelte-tailwind run dev
+```
+
+Vite will start the development server, and you can access the viewer at `http://localhost:3000`.

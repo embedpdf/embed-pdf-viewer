@@ -1,6 +1,6 @@
 {
   "name": "@embedpdf/plugin-history",
-  "version": "1.3.14",
+  "version": "1.4.1",
   "type": "module",
   "license": "MIT",
   "main": "./dist/index.cjs",

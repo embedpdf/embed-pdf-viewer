@@ -13,3 +13,5 @@ config/tsup.frameworks.config.bundled*
 .cipd
 .idea
 publish-summary.json
+**/.svelte-kit
+**/*/*.tgz

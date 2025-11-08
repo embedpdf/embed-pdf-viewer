@@ -1,5 +1,21 @@
 # @embedpdf/plugin-rotate
 
+## 1.4.1
+
+### Patch Changes
+
+- [#234](https://github.com/embedpdf/embed-pdf-viewer/pull/234) by [@bobsingor](https://github.com/bobsingor) – refactor(svelte): Update `Rotate.svelte` component and `useRotate` hook to work with the refactored Svelte core hooks and return a reactive state object.
+
+## 1.4.0
+
+### Minor Changes
+
+- [#222](https://github.com/embedpdf/embed-pdf-viewer/pull/222) by [@andrewrisse](https://github.com/andrewrisse) – feat: Add Svelte 5 adapter (`/svelte` export) with Rune-based hooks (`useRotate`, etc.) and `Rotate.svelte` component.
+
+## 1.3.16
+
+## 1.3.15
+
 ## 1.3.14
 
 ## 1.3.13
@@ -45,7 +61,6 @@
 ### Minor Changes
 
 - [#141](https://github.com/embedpdf/embed-pdf-viewer/pull/141) by [@bobsingor](https://github.com/bobsingor) – Refactored rotate plugin API and utilities:
-
   - Moved `getNextRotation`, `getPreviousRotation`, and rotation matrix helpers into `utils`.
   - Split matrix helpers into:
     - **`getRotationMatrix`** → returns the numeric 6-tuple.

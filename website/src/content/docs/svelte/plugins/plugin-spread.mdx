@@ -1,0 +1,121 @@
+---
+title: Spread Plugin
+description: Configure the PDF viewer to display pages individually or in a two-page, book-like spread layout in Svelte.
+searchable: true
+---
+
+# Spread Plugin
+
+The Spread Plugin controls the page layout, allowing you to switch between a single-page view and a two-page "spread" view, similar to an open book. This plugin is purely logical; it changes how pages are grouped before being rendered, without providing any UI components itself.
+
+## Installation
+
+The plugin is available as a separate NPM package.
+
+```sh npm2yarn
+npm install @embedpdf/plugin-spread
+````
+
+## Registration
+
+Import `SpreadPluginPackage` and add it to the `plugins` array. You can configure the default layout mode when the viewer loads.
+
+```typescript {3, 13-15}
+import { createPluginRegistration } from '@embedpdf/core'
+// ... other imports
+import { SpreadPluginPackage, SpreadMode } from '@embedpdf/plugin-spread/svelte'
+
+const plugins = [
+  // ... other essential plugins
+  createPluginRegistration(LoaderPluginPackage, { /* ... */ }),
+  createPluginRegistration(ViewportPluginPackage),
+  createPluginRegistration(ScrollPluginPackage),
+  createPluginRegistration(RenderPluginPackage),
+
+  // Register and configure the spread plugin
+  createPluginRegistration(SpreadPluginPackage, {
+    defaultSpreadMode: SpreadMode.None,
+  }),
+]
+```
+
+## Usage
+
+The plugin provides the `useSpread` composable to control the layout mode. When you change the mode, the plugin recalculates the page groupings, and the `<Scroller>` component automatically updates to reflect the new layout.
+
+### Building a Spread Mode Toolbar
+
+Use the `useSpread` composable to get the current `spreadMode` and the `provides` object for changing it. You can then build a UI, like a set of buttons, to allow users to switch between layouts.
+
+```svelte
+<script lang="ts">
+import { SpreadMode } from '@embedpdf/plugin-spread/svelte';
+import { useSpread } from '@embedpdf/plugin-spread/svelte';
+
+const spread = useSpread();
+
+const modes = [
+  { label: 'Single Page', value: SpreadMode.None },
+  { label: 'Two-Page (Odd)', value: SpreadMode.Odd },
+  { label: 'Two-Page (Even)', value: SpreadMode.Even },
+];
+</script>
+
+{#if spread.provides}
+  <div class="toolbar">
+    {#each modes as mode}
+      <button
+        onclick={() => spread.provides?.setSpreadMode(mode.value)}
+        class:active={spread.spreadMode === mode.value}
+      >
+        {mode.label}
+      </button>
+    {/each}
+  </div>
+{/if}
+```
+
+## Live Example
+
+This example shows a viewer with a toolbar that lets you dynamically change the page layout.
+
+import { SpreadExample } from '../code-examples/spread-example';
+
+<SpreadExample />
+
+## API Reference
+
+### Configuration (`SpreadPluginConfig`)
+
+| Option | Type | Description |
+| :--- | :--- | :--- |
+| **`defaultSpreadMode`** | `SpreadMode` | Sets the initial page layout when a document is loaded. <br />**Default**: `SpreadMode.None` |
+
+### Composable: `useSpread()`
+
+Connects your component to the spread plugin's state and functions.
+
+#### Returns
+
+| Property | Type | Description |
+| :--- | :--- | :--- |
+| **`spreadMode`** | `SpreadMode` | The current reactive spread mode (`'none'`, `'odd'`, or `'even'`). |
+| **`provides`** | `SpreadCapability \| null` | An object with methods to control the layout, or `null` if the plugin is not ready. |
+
+#### `SpreadCapability` Methods
+
+| Method | Description |
+| :--- | :--- |
+| **`setSpreadMode(mode)`** | Sets the layout to the specified `SpreadMode`. This will cause the viewer to re-render with the new page groupings. |
+| **`getSpreadMode()`** | Returns the current `SpreadMode`. |
+
+### `SpreadMode` Enum
+
+The `SpreadMode` determines how pages are grouped together.
+
+| Mode | Description | Page Grouping Example |
+| :--- | :--- | :--- |
+| **`None`** | The default view. Each page is displayed individually. | `[[p1], [p2], [p3], ...]` |
+| **`Odd`** | Pages are paired up, starting from the first page. Ideal for documents where page 1 is on the right-hand side of a spread (like a magazine). | `[[p1, p2], [p3, p4], ...]` |
+| **`Even`** | The first page is shown by itself, and subsequent pages are paired. Ideal for books where the cover (page 1) is a standalone page. | `[[p1], [p2, p3], [p4, p5], ...]` |
+

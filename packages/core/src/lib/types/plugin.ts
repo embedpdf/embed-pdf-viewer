@@ -99,6 +99,8 @@ export interface PluginBatchRegistration<
   config?: Partial<TConfig>;
 }
 
+export type PluginBatchRegistrations = PluginBatchRegistration<IPlugin<any>, any>[];
+
 export interface GlobalStoreState<TPlugins extends Record<string, any> = {}> {
   core: CoreState;
   plugins: TPlugins;

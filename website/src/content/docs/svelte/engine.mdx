@@ -1,0 +1,100 @@
+---
+title: PDFium Engine for Svelte
+description: How to use the usePdfiumEngine store to power your Svelte PDF viewer.
+searchable: true
+---
+
+# PDFium Engine for Svelte
+
+The `usePdfiumEngine` store is the bridge between the core PDF processing engine and your Svelte application. Its **primary purpose is to provide a managed engine instance for the main `<EmbedPDF>` component**, which then orchestrates all the plugins and UI components.
+
+## Installation
+
+The store is included in the `@embedpdf/engines` package, which should be installed alongside `@embedpdf/core`.
+
+```sh npm2yarn
+npm install @embedpdf/core @embedpdf/engines
+````
+
+## Primary Use Case: Powering the `<EmbedPDF>` Component
+
+Most of the time, you will simply get the engine store and pass its properties to the `<EmbedPDF>` provider. The provider and its plugins will handle the rest.
+
+This pattern allows you to build your entire viewer without ever calling `engine.openDocument()` or `engine.renderPage()` yourself.
+
+```svelte filename="MyViewer.svelte"
+<script lang="ts">
+import { usePdfiumEngine } from '@embedpdf/engines/svelte';
+import { EmbedPDF } from '@embedpdf/core/svelte';
+// ... import your desired plugins and components
+
+// The function returns a readable Svelte store
+const pdfEngine = usePdfiumEngine();
+</script>
+
+{#if pdfEngine.isLoading}
+  <div>Loading PDF Engine...</div>
+{:else if pdfEngine.error}
+  <div>Error loading engine: {pdfEngine.error.message}</div>
+{:else if pdfEngine.engine}
+  <EmbedPDF engine={pdfEngine.engine} plugins={[/* ... your plugins ... */]}>
+  </EmbedPDF>
+{/if}
+```
+
+## Advanced Use Case: Direct Engine Interaction
+
+For tasks that fall outside the plugin system—such as exporting a page image on a button click or performing a one-off text extraction—you can use the `engine` object directly. The `engine` is a property on the store, so you'll access it via `$pdfEngine.engine`.
+
+```svelte
+<script lang="ts">
+import { usePdfiumEngine } from '@embedpdf/engines/svelte';
+import { ignore } from '@embedpdf/models';
+
+const pdfEngine = usePdfiumEngine();
+
+const handleDirectOperation = () => {
+  if (!pdfEngine.engine) {
+    console.error('Engine not available');
+    return;
+  }
+  // Example: You can now use engine methods directly
+  console.log('Engine is ready for direct operations', pdfEngine.engine);
+};
+</script>
+
+{#if pdfEngine.isLoading}
+  <div>Loading...</div>
+{:else if pdfEngine.error}
+  <div class="error-message">
+    Failed to initialize PDF engine: {pdfEngine.error.message}
+  </div>
+{:else}
+  <div class="success-message">
+    <p>Engine loaded successfully!</p>
+    <button onclick={handleDirectOperation}>Perform Direct Operation</button>
+  </div>
+{/if}
+```
+
+## Store API Reference
+
+The `usePdfiumEngine` function accepts an optional configuration object and returns a readable Svelte store with the engine's state.
+
+#### **Configuration Options**
+
+| Option | Type | Default | Description |
+| :--- | :--- | :--- | :--- |
+| **`wasmUrl`** | `string` | CDN URL | Custom WebAssembly file URL |
+| **`worker`** | `boolean` | `true` | Whether to run the engine in a Web Worker |
+| **`logger`** | `Logger` | `undefined` | Custom logger instance |
+
+#### **Store Properties**
+
+The returned store has the following reactive properties:
+
+- **`engine`**: `PdfEngine | null` - The `PdfEngine` instance (already initialized), or `null` while loading.
+- **`isLoading`**: `boolean` - A boolean that is `true` while the engine's WebAssembly is being downloaded and instantiated.
+- **`error`**: `Error | null` - An `Error` object if loading or initialization fails, otherwise `null`.
+
+For complete documentation of all available engine methods, see the **[@embedpdf/engines package documentation](/docs/engines/introduction)**.

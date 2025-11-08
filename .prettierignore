@@ -7,3 +7,5 @@ coverage
 *.pdf
 *.wasm
 public
+.svelte-kit/
+/static/

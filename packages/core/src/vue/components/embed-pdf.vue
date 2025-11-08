@@ -1,15 +1,17 @@
 <script setup lang="ts">
 import { ref, provide, onMounted, onBeforeUnmount, shallowRef } from 'vue';
-import { PluginRegistry, PluginBatchRegistration } from '@embedpdf/core';
+import { PluginRegistry, PluginBatchRegistrations } from '@embedpdf/core';
 import { Logger, PdfEngine } from '@embedpdf/models';
 import { pdfKey, PDFContextState } from '../context';
 import AutoMount from './auto-mount.vue';
+
+export type { PluginBatchRegistrations };
 
 const props = withDefaults(
   defineProps<{
     engine: PdfEngine;
     logger?: Logger;
-    plugins: PluginBatchRegistration<any, any>[];
+    plugins: PluginBatchRegistrations;
     onInitialized?: (registry: PluginRegistry) => Promise<void>;
     autoMountDomElements?: boolean;
   }>(),

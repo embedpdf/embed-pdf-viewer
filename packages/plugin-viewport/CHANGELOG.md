@@ -1,5 +1,29 @@
 # @embedpdf/plugin-viewport
 
+## 1.4.1
+
+### Patch Changes
+
+- [#234](https://github.com/embedpdf/embed-pdf-viewer/pull/234) by [@bobsingor](https://github.com/bobsingor) – refactor(svelte): Update `Viewport.svelte` component and `useViewportRef` hook to use refactored core hooks. Introduced `useViewportScrollActivity` hook returning reactive state. Renamed internal hook file.
+
+## 1.4.0
+
+### Minor Changes
+
+- [#222](https://github.com/embedpdf/embed-pdf-viewer/pull/222) by [@andrewrisse](https://github.com/andrewrisse) – feat: Add Svelte 5 adapter (`/svelte` export) with Rune-based hooks (`useViewportPlugin`, `useViewportCapability`, `useViewportRef`) and `Viewport.svelte` component. Thanks to @andrewrisse for the Svelte integration!
+
+## 1.3.16
+
+### Patch Changes
+
+- [`fa0e3a8`](https://github.com/embedpdf/embed-pdf-viewer/commit/fa0e3a87977dfdd2e040a2612bcc4779a286db03) by [@bobsingor](https://github.com/bobsingor) – Guard against late callbacks after registry teardown
+
+## 1.3.15
+
+### Patch Changes
+
+- [`d64672d`](https://github.com/embedpdf/embed-pdf-viewer/commit/d64672df3ba1e5b1d0c0d94c25677158aac85fb9) by [@bobsingor](https://github.com/bobsingor) – Prevent resize handling after cleanup in useViewportRef
+
 ## 1.3.14
 
 ## 1.3.13
@@ -47,7 +71,6 @@
 - [#141](https://github.com/embedpdf/embed-pdf-viewer/pull/141) by [@bobsingor](https://github.com/bobsingor) – Change `onScrollActivity` payload from `boolean` to structured object and add convenience hooks.
 
   ### What changed
-
   - `ViewportCapability.onScrollActivity` now emits a **`ScrollActivity`** object:
     ```ts
     export interface ScrollActivity {

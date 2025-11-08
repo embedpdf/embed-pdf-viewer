@@ -16,16 +16,17 @@ import {
 export class RenderPlugin extends BasePlugin<RenderPluginConfig, RenderCapability> {
   static readonly id = 'render' as const;
 
-  constructor(id: string, registry: PluginRegistry) {
+  private withForms = false;
+  private withAnnotations = false;
+
+  constructor(id: string, registry: PluginRegistry, config?: RenderPluginConfig) {
     super(id, registry);
+
+    this.withForms = config?.withForms ?? false;
+    this.withAnnotations = config?.withAnnotations ?? false;
   }
 
   // No onDocumentLoadingStarted or onDocumentClosed needed!
-  // Core handles pageRefreshVersions initialization and cleanup
-
-  // ─────────────────────────────────────────────────────────
-  // Capability
-  // ─────────────────────────────────────────────────────────
 
   protected buildCapability(): RenderCapability {
     return {
@@ -66,7 +67,13 @@ export class RenderPlugin extends BasePlugin<RenderPluginConfig, RenderCapabilit
       throw new Error(`Page ${pageIndex} not found in document ${id}`);
     }
 
-    return this.engine.renderPage(coreDoc.document, page, options);
+    const mergedOptions = {
+      ...(options ?? {}),
+      withForms: options?.withForms ?? this.withForms,
+      withAnnotations: options?.withAnnotations ?? this.withAnnotations,
+    };
+
+    return this.engine.renderPage(coreDoc.document, page, mergedOptions);
   }
 
   private renderPageRect({ pageIndex, rect, options }: RenderPageRectOptions, documentId?: string) {
@@ -82,7 +89,13 @@ export class RenderPlugin extends BasePlugin<RenderPluginConfig, RenderCapabilit
       throw new Error(`Page ${pageIndex} not found in document ${id}`);
     }
 
-    return this.engine.renderPageRect(coreDoc.document, page, rect, options);
+    const mergedOptions = {
+      ...(options ?? {}),
+      withForms: options?.withForms ?? this.withForms,
+      withAnnotations: options?.withAnnotations ?? this.withAnnotations,
+    };
+
+    return this.engine.renderPageRect(coreDoc.document, page, rect, mergedOptions);
   }
 
   // ─────────────────────────────────────────────────────────

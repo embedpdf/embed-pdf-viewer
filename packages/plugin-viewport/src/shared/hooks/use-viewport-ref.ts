@@ -69,7 +69,6 @@ export function useViewportRef(documentId: string) {
       viewportPlugin.unregisterViewport(documentId);
       viewportPlugin.registerBoundingRectProvider(documentId, null);
       container.removeEventListener('scroll', onScroll);
-      resizeObserver.disconnect();
       unsubscribeScrollRequest();
     };
   }, [viewportPlugin, documentId]);

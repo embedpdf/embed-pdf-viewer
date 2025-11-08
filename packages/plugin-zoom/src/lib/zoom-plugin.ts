@@ -327,7 +327,7 @@ export class ZoomPlugin extends BasePlugin<
     if (base === false) return;
 
     const exactZoom = clamp(base + delta, this.minZoom, this.maxZoom);
-    const newZoom = Math.floor(exactZoom * 100) / 100;
+    const newZoom = Math.floor(exactZoom * 1000) / 1000;
 
     // Step 2: Figure out viewport point to keep under focus
     const focusPoint: Point = center ?? {

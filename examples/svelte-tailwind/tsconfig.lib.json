@@ -1,0 +1,24 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "ESNext",
+    "moduleResolution": "Bundler",
+    "lib": ["ES2022", "DOM"],
+    "allowJs": true,
+    "checkJs": true,
+    "esModuleInterop": true,
+    "forceConsistentCasingInFileNames": true,
+    "resolveJsonModule": true,
+    "skipLibCheck": true,
+    "sourceMap": true,
+    "strict": true,
+    "outDir": "./dist/examples",
+    "rootDir": "./src/examples",
+    "declaration": true,
+    "declarationMap": true,
+    "emitDeclarationOnly": false,
+    "types": ["svelte", "vite/client"]
+  },
+  "include": ["src/examples/**/*.ts", "src/examples/**/*.svelte"],
+  "exclude": ["node_modules", "dist"]
+}

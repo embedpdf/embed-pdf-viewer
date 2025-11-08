@@ -10,12 +10,18 @@ module.exports = {
   arrowParens: 'always',
   jsxSingleQuote: false,
   endOfLine: 'lf',
-  plugins: ['prettier-plugin-tailwindcss'],
+  plugins: ['prettier-plugin-tailwindcss', 'prettier-plugin-svelte'],
   overrides: [
     {
       files: '*.md',
       options: {
         printWidth: 80,
+      },
+    },
+    {
+      files: '*.svelte',
+      options: {
+        parser: 'svelte',
       },
     },
   ],

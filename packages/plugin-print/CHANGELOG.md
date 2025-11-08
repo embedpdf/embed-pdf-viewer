@@ -1,5 +1,17 @@
 # @embedpdf/plugin-print
 
+## 1.4.1
+
+## 1.4.0
+
+### Minor Changes
+
+- [#222](https://github.com/embedpdf/embed-pdf-viewer/pull/222) by [@andrewrisse](https://github.com/andrewrisse) – feat: Add Svelte 5 adapter (`/svelte` export) with Rune-based hooks (`usePrintPlugin`, `usePrintCapability`) and `PrintFrame.svelte` utility component.
+
+## 1.3.16
+
+## 1.3.15
+
 ## 1.3.14
 
 ## 1.3.13
@@ -45,7 +57,6 @@
 ### Patch Changes
 
 - [#141](https://github.com/embedpdf/embed-pdf-viewer/pull/141) by [@bobsingor](https://github.com/bobsingor) – Improved `PrintPlugin` flexibility:
-
   - `print` method now accepts **optional** `PdfPrintOptions`. If none are provided, it falls back to default options.
   - Updated `PrintCapability` type accordingly (`print(options?: PdfPrintOptions)`).
   - Removed the hard requirement on `"render"` from the plugin manifest, simplifying dependency setup.

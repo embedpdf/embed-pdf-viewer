@@ -5,6 +5,8 @@
     "moduleResolution": "bundler",
     "strict": true,
     "declaration": true,
+    "declarationDir": "dist",
+    "emitDeclarationOnly": false,
     "esModuleInterop": true,
     "skipLibCheck": true,
     "outDir": "dist",

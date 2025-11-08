@@ -19,6 +19,10 @@ export default {
     title: 'Vue',
     type: 'page',
   },
+  svelte: {
+    title: 'Svelte',
+    type: 'page',
+  },
   index: {
     title: 'Introduction',
     type: 'page',

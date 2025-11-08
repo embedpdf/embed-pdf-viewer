@@ -1,5 +1,17 @@
 # @embedpdf/plugin-capture
 
+## 1.4.1
+
+### Patch Changes
+
+- [#234](https://github.com/embedpdf/embed-pdf-viewer/pull/234) by [@bobsingor](https://github.com/bobsingor) – feat: Add Svelte 5 adapter (`/svelte` export) for the Capture plugin. Includes Rune-based hooks (`useCapture`, `useCaptureCapability`, `useCapturePlugin`) and the `MarqueeCapture.svelte` component.
+
+## 1.4.0
+
+## 1.3.16
+
+## 1.3.15
+
 ## 1.3.14
 
 ### Patch Changes

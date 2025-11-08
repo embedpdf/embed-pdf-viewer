@@ -1,5 +1,21 @@
 # @embedpdf/plugin-pan
 
+## 1.4.1
+
+### Patch Changes
+
+- [#234](https://github.com/embedpdf/embed-pdf-viewer/pull/234) by [@bobsingor](https://github.com/bobsingor) – refactor(svelte): Update `usePan` hook to return a reactive state object, aligning with the core hook refactoring.
+
+## 1.4.0
+
+### Minor Changes
+
+- [#222](https://github.com/embedpdf/embed-pdf-viewer/pull/222) by [@andrewrisse](https://github.com/andrewrisse) – feat: Add Svelte 5 adapter (`/svelte` export) with Rune-based hooks (`usePan`, etc.) and `PanMode.svelte` utility component.
+
+## 1.3.16
+
+## 1.3.15
+
 ## 1.3.14
 
 ## 1.3.13

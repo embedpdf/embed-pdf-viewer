@@ -1,10 +1,12 @@
 import { useState, useEffect, useRef, ReactNode } from '@framework';
 import { Logger, PdfEngine } from '@embedpdf/models';
 import { PluginRegistry } from '@embedpdf/core';
-import type { IPlugin, PluginBatchRegistration } from '@embedpdf/core';
+import type { PluginBatchRegistrations } from '@embedpdf/core';
 
 import { PDFContext, PDFContextState } from '../context';
 import { AutoMount } from './auto-mount';
+
+export type { PluginBatchRegistrations };
 
 interface EmbedPDFProps {
   /**
@@ -22,7 +24,7 @@ interface EmbedPDFProps {
   /**
    * The plugins to use for the PDF viewer.
    */
-  plugins: PluginBatchRegistration<IPlugin<any>, any>[];
+  plugins: PluginBatchRegistrations;
   /**
    * The children to render for the PDF viewer.
    */

@@ -1,0 +1,138 @@
+---
+title: Selection Plugin
+description: Enables text selection in Svelte, providing visual highlighting and an API to copy or process the selected text.
+searchable: true
+---
+
+# Selection Plugin
+
+The Selection Plugin enables users to select text within the PDF document, just like on a standard webpage. It provides the `<SelectionLayer />` to visually highlight the selected text and a rich API to get the selected content.
+
+## Installation
+
+This plugin depends on the `Interaction Manager` plugin. You must install both packages.
+
+```sh npm2yarn
+npm install @embedpdf/plugin-selection @embedpdf/plugin-interaction-manager
+````
+
+## Registration
+
+Import `SelectionPluginPackage` and its `InteractionManager` dependency, and add them to the `plugins` array. The Selection plugin should be registered after its dependency.
+
+```typescript {4, 14}
+import { createPluginRegistration } from '@embedpdf/core'
+// ... other imports
+import { InteractionManagerPluginPackage } from '@embedpdf/plugin-interaction-manager/svelte'
+import { SelectionPluginPackage } from '@embedpdf/plugin-selection/svelte'
+
+const plugins = [
+  // ... other essential plugins
+  createPluginRegistration(LoaderPluginPackage, { /* ... */ }),
+
+  // Register dependency first
+  createPluginRegistration(InteractionManagerPluginPackage),
+
+  // Register the selection plugin
+  createPluginRegistration(SelectionPluginPackage),
+]
+```
+
+## Usage
+
+The plugin has two main parts: the `<SelectionLayer />` component for the UI, and the `useSelectionCapability` composable for interacting with the selection data.
+
+### 1\. Displaying the Selection
+
+To show the highlighted text, place the `<SelectionLayer />` component inside the `RenderPageSnippet` of your `<Scroller />`. For text selection to work correctly, it must be a child of the `PagePointerProvider`.
+
+```svelte {3, 14}
+<script lang="ts">
+import { PagePointerProvider } from '@embedpdf/plugin-interaction-manager/svelte';
+import { SelectionLayer } from '@embedpdf/plugin-selection/svelte';
+import type { RenderPageProps } from '@embedpdf/plugin-scroll/svelte';
+</script>
+
+{#snippet RenderPageSnippet(page: RenderPageProps)}
+  <PagePointerProvider
+    pageIndex={page.pageIndex}
+    pageWidth={page.width}
+    pageHeight={page.height}
+  >
+    <RenderLayer pageIndex={page.pageIndex} scale={page.scale} />
+    <SelectionLayer pageIndex={page.pageIndex} scale={page.scale} />
+  </PagePointerProvider>
+{/snippet}
+
+<Scroller {RenderPageSnippet} />
+```
+
+### 2\. Interacting with the Selection
+
+The `useSelectionCapability` composable allows you to work with the selected text. You can create a toolbar to copy the text or perform other actions. The plugin automatically handles the clipboard logic when you call `provides.copyToClipboard()`.
+
+You can use the `onSelectionChange` event to know when a selection exists, which is useful for enabling or disabling UI elements like a "Copy" button.
+
+```svelte
+<script lang="ts">
+import { useSelectionCapability, type SelectionRangeX } from '@embedpdf/plugin-selection/svelte';
+
+const selection = useSelectionCapability();
+let hasSelection = $state(false);
+
+$effect(() => {
+  if (!selection.provides) return;
+  
+  const unsubscribe = selection.provides.onSelectionChange((sel: SelectionRangeX | null) => {
+    hasSelection = !!sel;
+  });
+  
+  return () => unsubscribe?.();
+});
+</script>
+
+<button onclick={() => selection.provides?.copyToClipboard()} disabled={!hasSelection}>
+  Copy
+</button>
+```
+
+## Live Example
+
+Try selecting text in the viewer below. A "Copy Text" button will become active, allowing you to copy the selected content to your clipboard.
+
+import { SelectionExample } from '../code-examples/selection-example';
+
+<SelectionExample />
+
+## API Reference
+
+### Component: `<SelectionLayer />`
+
+The component that renders the blue rectangles over the selected text.
+
+| Prop | Type | Description |
+| :--- | :--- | :--- |
+| **`pageIndex`** | `number` | **(Required)** The index of the page this layer is on. |
+| **`scale`** | `number` | **(Required)** The current scale of the page. |
+| **`background`** | `string` | (Optional) The color of the selection highlight. <br />**Default**: `'rgba(33,150,243)'` |
+
+### Composable: `useSelectionCapability()`
+
+Connects your component to the selection plugin's state and functions.
+
+#### Returns
+
+| Property | Type | Description |
+| :--- | :--- | :--- |
+| **`provides`** | `SelectionCapability \| null` | An object with methods to interact with the selection, or `null` if the plugin is not ready. |
+
+#### `SelectionCapability` Methods
+
+| Method | Description |
+| :--- | :--- |
+| **`copyToClipboard()`** | Triggers the process to copy the currently selected text to the user's clipboard. |
+| **`getSelectedText()`** | Returns a `Task<string[]>` that resolves with the selected text content. Each string in the array is a line. |
+| **`getFormattedSelection()`** | Returns an array of objects describing the selection on each page, including its bounding box and the individual highlight rectangles. |
+| **`onSelectionChange(cb)`** | Subscribes to when the text selection is created, updated, or cleared. Returns an `unsubscribe` function. |
+| **`onEndSelection(cb)`** | Subscribes to when the user finishes selecting text (on mouse up). This is ideal for fetching the selected text content. Returns an `unsubscribe` function. |
+

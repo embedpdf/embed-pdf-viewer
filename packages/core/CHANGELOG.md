@@ -1,5 +1,21 @@
 # @embedpdf/core
 
+## 1.4.1
+
+### Patch Changes
+
+- [#234](https://github.com/embedpdf/embed-pdf-viewer/pull/234) by [@bobsingor](https://github.com/bobsingor) – refactor(svelte): Update Svelte hooks (`useCapability`, `useCoreState`, `usePlugin`) to return reactive `$state` objects instead of computed getters for better integration with Svelte 5's reactivity model.
+
+## 1.4.0
+
+### Minor Changes
+
+- [#222](https://github.com/embedpdf/embed-pdf-viewer/pull/222) by [@andrewrisse](https://github.com/andrewrisse) – feat: Add Svelte 5 adapter (`/svelte` export) with Rune-based hooks (`useRegistry`, `usePlugin`, `useCapability`, `useCoreState`) and components (`EmbedPDF`, `AutoMount`, `NestedWrapper`). Enhanced core `Store` to prevent dispatches within reducers. Thanks to @andrewrisse for the Svelte integration work!
+
+## 1.3.16
+
+## 1.3.15
+
 ## 1.3.14
 
 ## 1.3.13
@@ -45,7 +61,6 @@
 ### Minor Changes
 
 - [#141](https://github.com/embedpdf/embed-pdf-viewer/pull/141) by [@bobsingor](https://github.com/bobsingor) – Refactored action dispatch handling in `BasePlugin`:
-
   - Renamed `debouncedDispatch` to **`cooldownDispatch`**, which now executes immediately if the cooldown has expired and blocks rapid repeated calls.
   - Introduced a new **`debouncedDispatch`** method that provides true debouncing: waits until no calls occur for the specified time before dispatching.
   - Added **`cancelDebouncedDispatch`** to cancel pending debounced actions.

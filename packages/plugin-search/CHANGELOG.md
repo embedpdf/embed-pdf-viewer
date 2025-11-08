@@ -1,5 +1,25 @@
 # @embedpdf/plugin-search
 
+## 1.4.1
+
+### Patch Changes
+
+- [#234](https://github.com/embedpdf/embed-pdf-viewer/pull/234) by [@bobsingor](https://github.com/bobsingor) – refactor(svelte): Update `SearchLayer.svelte` component and `useSearch` hook to use refactored core hooks and return a reactive state object.
+
+## 1.4.0
+
+### Minor Changes
+
+- [#222](https://github.com/embedpdf/embed-pdf-viewer/pull/222) by [@andrewrisse](https://github.com/andrewrisse) – feat: Add Svelte 5 adapter (`/svelte` export) with Rune-based hooks (`useSearch`, etc.) and `SearchLayer.svelte` component. Fixed initial state in shared hook.
+
+## 1.3.16
+
+## 1.3.15
+
+### Patch Changes
+
+- [#218](https://github.com/embedpdf/embed-pdf-viewer/pull/218) by [@odedindi](https://github.com/odedindi) – Use unique key prop in search layer component results mapping
+
 ## 1.3.14
 
 ## 1.3.13

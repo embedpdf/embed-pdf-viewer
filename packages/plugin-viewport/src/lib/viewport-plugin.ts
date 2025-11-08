@@ -229,6 +229,13 @@ export class ViewportPlugin extends BasePlugin<
   // ─────────────────────────────────────────────────────────
 
   public setViewportResizeMetrics(documentId: string, metrics: ViewportInputMetrics): void {
+    /**
+     * Guard against late ResizeObserver/scroll callbacks during teardown.
+     * On unmount the Registry may be destroyed before pending browser callbacks
+     * run—short-circuit so we don’t dispatch into a torn-down store.
+     */
+    if (this.registry.isDestroyed()) return;
+
     this.dispatch(setViewportMetrics(documentId, metrics));
 
     const viewport = this.state.documents[documentId];
@@ -241,6 +248,13 @@ export class ViewportPlugin extends BasePlugin<
   }
 
   public setViewportScrollMetrics(documentId: string, scrollMetrics: ViewportScrollMetrics): void {
+    /**
+     * Guard against late ResizeObserver/scroll callbacks during teardown.
+     * On unmount the Registry may be destroyed before pending browser callbacks
+     * run—short-circuit so we don’t dispatch into a torn-down store.
+     */
+    if (this.registry.isDestroyed()) return;
+
     const viewport = this.state.documents[documentId];
     if (!viewport) return;
 

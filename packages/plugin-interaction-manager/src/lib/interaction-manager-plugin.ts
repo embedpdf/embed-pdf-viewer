@@ -170,7 +170,8 @@ export class InteractionManagerPlugin extends BasePlugin<
       activeModeIsExclusive: () => this.activeModeIsExclusive(),
       pause: () => this.pause(),
       resume: () => this.resume(),
-      isPaused: () => this.isPaused(),
+      // Treat a destroyed registry as "paused" so late DOM events are ignored during teardown.
+      isPaused: () => this.registry.isDestroyed() || this.isPaused(),
       getState: () => this.getDocumentStateOrThrow(),
 
       // Document-scoped operations

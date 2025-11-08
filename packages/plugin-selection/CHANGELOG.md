@@ -1,5 +1,21 @@
 # @embedpdf/plugin-selection
 
+## 1.4.1
+
+### Patch Changes
+
+- [#234](https://github.com/embedpdf/embed-pdf-viewer/pull/234) by [@bobsingor](https://github.com/bobsingor) – refactor(svelte): Update `CopyToClipboard.svelte` and `SelectionLayer.svelte` components to correctly access plugin/capability instances from refactored hooks.
+
+## 1.4.0
+
+### Minor Changes
+
+- [#222](https://github.com/embedpdf/embed-pdf-viewer/pull/222) by [@andrewrisse](https://github.com/andrewrisse) – feat: Add Svelte 5 adapter (`/svelte` export) with Rune-based hooks (`useSelectionPlugin`, `useSelectionCapability`), `SelectionLayer.svelte` component, and `CopyToClipboard.svelte` utility.
+
+## 1.3.16
+
+## 1.3.15
+
 ## 1.3.14
 
 ## 1.3.13
@@ -49,7 +65,6 @@
 ### Minor Changes
 
 - [#141](https://github.com/embedpdf/embed-pdf-viewer/pull/141) by [@bobsingor](https://github.com/bobsingor) – Break out imperative selection APIs from **capability** to **plugin**, and slim the capability surface.
-
   - **Removed from `SelectionCapability`:**
     - `getGeometry(page)`
     - `begin(page, glyphIdx)`

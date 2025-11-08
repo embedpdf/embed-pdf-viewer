@@ -20,6 +20,7 @@ import Link from 'next/link'
 import { Scribble3 } from './icons/scribble3'
 import DiscordIcon from './icons/discord'
 import NeedHelp from './need-help'
+import { ReactIcon, VueIcon, SvelteIcon } from './framework-icons'
 
 // Mock documentation packages data
 const packages = [
@@ -254,51 +255,6 @@ const PackageCard = ({
 }
 
 // Framework Getting Started Card
-// React and Vue SVG Icons
-const ReactIcon = ({ className }: { className?: string }) => (
-  <svg
-    xmlns="http://www.w3.org/2000/svg"
-    width="24"
-    height="24"
-    viewBox="0 0 24 24"
-    fill="none"
-    stroke="currentColor"
-    strokeWidth="2"
-    strokeLinecap="round"
-    strokeLinejoin="round"
-    className={className}
-  >
-    <path stroke="none" d="M0 0h24v24H0z" fill="none" />
-    <path d="M6.306 8.711c-2.602 .723 -4.306 1.926 -4.306 3.289c0 2.21 4.477 4 10 4c.773 0 1.526 -.035 2.248 -.102" />
-    <path d="M17.692 15.289c2.603 -.722 4.308 -1.926 4.308 -3.289c0 -2.21 -4.477 -4 -10 -4c-.773 0 -1.526 .035 -2.25 .102" />
-    <path d="M6.305 15.287c-.676 2.615 -.485 4.693 .695 5.373c1.913 1.105 5.703 -1.877 8.464 -6.66c.387 -.67 .733 -1.339 1.036 -2" />
-    <path d="M17.694 8.716c.677 -2.616 .487 -4.696 -.694 -5.376c-1.913 -1.105 -5.703 1.877 -8.464 6.66c-.387 .67 -.733 1.34 -1.037 2" />
-    <path d="M12 5.424c-1.925 -1.892 -3.82 -2.766 -5 -2.084c-1.913 1.104 -1.226 5.877 1.536 10.66c.386 .67 .793 1.304 1.212 1.896" />
-    <path d="M12 18.574c1.926 1.893 3.821 2.768 5 2.086c1.913 -1.104 1.226 -5.877 -1.536 -10.66c-.375 -.65 -.78 -1.283 -1.212 -1.897" />
-    <path d="M11.5 12.866a1 1 0 1 0 1 -1.732a1 1 0 0 0 -1 1.732z" />
-  </svg>
-)
-
-const VueIcon = ({ className }: { className?: string }) => (
-  <svg
-    xmlns="http://www.w3.org/2000/svg"
-    width="24"
-    height="24"
-    viewBox="0 0 24 24"
-    fill="none"
-    stroke="currentColor"
-    strokeWidth="2"
-    strokeLinecap="round"
-    strokeLinejoin="round"
-    className={className}
-  >
-    <path stroke="none" d="M0 0h24v24H0z" fill="none" />
-    <path d="M16.5 4l-4.5 8l-4.5 -8" />
-    <path d="M3 4l9 16l9 -16" />
-  </svg>
-)
-
-// Framework Getting Started Card
 const FrameworkGettingStartedCard = () => {
   return (
     <div className="relative mb-16 overflow-hidden rounded-3xl bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900 text-white shadow-2xl">
@@ -327,11 +283,11 @@ const FrameworkGettingStartedCard = () => {
           </p>
         </div>
 
-        <div className="grid grid-cols-1 gap-8 lg:grid-cols-2">
+        <div className="grid grid-cols-1 gap-8 lg:grid-cols-3">
           {/* React Card */}
-          <div className="group relative">
-            <div className="absolute -inset-1 rounded-2xl bg-gradient-to-r from-cyan-500 to-blue-500 opacity-25 blur transition duration-300 group-hover:opacity-40"></div>
-            <div className="relative overflow-hidden rounded-2xl border border-slate-700/50 bg-slate-800/80 backdrop-blur-sm">
+          <div className="group relative flex">
+            <div className="absolute -inset-1 rounded-2xl bg-gradient-to-r from-cyan-500 to-blue-500 opacity-15 blur transition duration-300 group-hover:opacity-25"></div>
+            <div className="relative flex w-full flex-col overflow-hidden rounded-2xl border border-slate-700/50 bg-slate-800/80 backdrop-blur-sm">
               {/* Header */}
               <div className="border-b border-slate-700/50 bg-slate-800/50 px-8 py-6">
                 <div className="flex items-center space-x-4">
@@ -346,26 +302,26 @@ const FrameworkGettingStartedCard = () => {
               </div>
 
               {/* Content */}
-              <div className="p-8">
-                <div className="mb-8">
+              <div className="flex flex-1 flex-col p-8">
+                <div className="mb-8 flex-1">
                   <h4 className="mb-4 text-lg font-bold text-white">
                     What you&apos;ll get:
                   </h4>
                   <ul className="space-y-3">
                     <li className="flex items-center text-slate-300">
-                      <div className="mr-3 h-2 w-2 rounded-full bg-cyan-400"></div>
+                      <div className="mr-3 h-2 w-2 flex-shrink-0 rounded-full bg-cyan-400"></div>
                       Pre-built PDF viewer components
                     </li>
                     <li className="flex items-center text-slate-300">
-                      <div className="mr-3 h-2 w-2 rounded-full bg-blue-400"></div>
+                      <div className="mr-3 h-2 w-2 flex-shrink-0 rounded-full bg-blue-400"></div>
                       Custom hooks for PDF interactions
                     </li>
                     <li className="flex items-center text-slate-300">
-                      <div className="mr-3 h-2 w-2 rounded-full bg-purple-400"></div>
+                      <div className="mr-3 h-2 w-2 flex-shrink-0 rounded-full bg-purple-400"></div>
                       TypeScript support out of the box
                     </li>
                     <li className="flex items-center text-slate-300">
-                      <div className="mr-3 h-2 w-2 rounded-full bg-cyan-400"></div>
+                      <div className="mr-3 h-2 w-2 flex-shrink-0 rounded-full bg-cyan-400"></div>
                       Seamless React lifecycle integration
                     </li>
                   </ul>
@@ -383,9 +339,9 @@ const FrameworkGettingStartedCard = () => {
           </div>
 
           {/* Vue Card */}
-          <div className="group relative">
-            <div className="absolute -inset-1 rounded-2xl bg-gradient-to-r from-emerald-500 to-teal-500 opacity-25 blur transition duration-300 group-hover:opacity-40"></div>
-            <div className="relative overflow-hidden rounded-2xl border border-slate-700/50 bg-slate-800/80 backdrop-blur-sm">
+          <div className="group relative flex">
+            <div className="absolute -inset-1 rounded-2xl bg-gradient-to-r from-emerald-500 to-teal-500 opacity-15 blur transition duration-300 group-hover:opacity-25"></div>
+            <div className="relative flex w-full flex-col overflow-hidden rounded-2xl border border-slate-700/50 bg-slate-800/80 backdrop-blur-sm">
               {/* Header */}
               <div className="border-b border-slate-700/50 bg-slate-800/50 px-8 py-6">
                 <div className="flex items-center space-x-4">
@@ -400,26 +356,26 @@ const FrameworkGettingStartedCard = () => {
               </div>
 
               {/* Content */}
-              <div className="p-8">
-                <div className="mb-8">
+              <div className="flex flex-1 flex-col p-8">
+                <div className="mb-8 flex-1">
                   <h4 className="mb-4 text-lg font-bold text-white">
                     What you&apos;ll get:
                   </h4>
                   <ul className="space-y-3">
                     <li className="flex items-center text-slate-300">
-                      <div className="mr-3 h-2 w-2 rounded-full bg-emerald-400"></div>
+                      <div className="mr-3 h-2 w-2 flex-shrink-0 rounded-full bg-emerald-400"></div>
                       Vue 3 compatible components
                     </li>
                     <li className="flex items-center text-slate-300">
-                      <div className="mr-3 h-2 w-2 rounded-full bg-teal-400"></div>
+                      <div className="mr-3 h-2 w-2 flex-shrink-0 rounded-full bg-teal-400"></div>
                       Composition API composables
                     </li>
                     <li className="flex items-center text-slate-300">
-                      <div className="mr-3 h-2 w-2 rounded-full bg-green-400"></div>
+                      <div className="mr-3 h-2 w-2 flex-shrink-0 rounded-full bg-green-400"></div>
                       Reactive PDF state management
                     </li>
                     <li className="flex items-center text-slate-300">
-                      <div className="mr-3 h-2 w-2 rounded-full bg-emerald-400"></div>
+                      <div className="mr-3 h-2 w-2 flex-shrink-0 rounded-full bg-emerald-400"></div>
                       TypeScript support with Vue types
                     </li>
                   </ul>
@@ -430,6 +386,60 @@ const FrameworkGettingStartedCard = () => {
                   className="flex w-full items-center justify-center rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 px-8 py-4 text-lg font-bold text-white shadow-lg transition-all hover:scale-105 hover:from-emerald-500 hover:to-teal-500 hover:shadow-xl"
                 >
                   <span>Start with Vue.js</span>
+                  <ArrowRight className="ml-3 h-6 w-6" />
+                </Link>
+              </div>
+            </div>
+          </div>
+
+          {/* Svelte Card */}
+          <div className="group relative flex">
+            <div className="absolute -inset-1 rounded-2xl bg-gradient-to-r from-orange-500 to-red-500 opacity-10 blur transition duration-300 group-hover:opacity-20"></div>
+            <div className="relative flex w-full flex-col overflow-hidden rounded-2xl border border-slate-700/50 bg-slate-800/80 backdrop-blur-sm">
+              {/* Header */}
+              <div className="border-b border-slate-700/50 bg-slate-800/50 px-8 py-6">
+                <div className="flex items-center space-x-4">
+                  <div className="flex h-14 w-14 items-center justify-center rounded-xl bg-gradient-to-br from-orange-500 to-red-600">
+                    <SvelteIcon className="h-8 w-8 text-white" />
+                  </div>
+                  <div>
+                    <h3 className="text-2xl font-bold text-white">Svelte</h3>
+                    <p className="text-slate-400">Runes & Reactivity</p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Content */}
+              <div className="flex flex-1 flex-col p-8">
+                <div className="mb-8 flex-1">
+                  <h4 className="mb-4 text-lg font-bold text-white">
+                    What you&apos;ll get:
+                  </h4>
+                  <ul className="space-y-3">
+                    <li className="flex items-center text-slate-300">
+                      <div className="mr-3 h-2 w-2 flex-shrink-0 rounded-full bg-orange-400"></div>
+                      Svelte 5 compatible components
+                    </li>
+                    <li className="flex items-center text-slate-300">
+                      <div className="mr-3 h-2 w-2 flex-shrink-0 rounded-full bg-red-400"></div>
+                      Modern runes API ($state, $effect)
+                    </li>
+                    <li className="flex items-center text-slate-300">
+                      <div className="mr-3 h-2 w-2 flex-shrink-0 rounded-full bg-amber-400"></div>
+                      Truly reactive PDF state
+                    </li>
+                    <li className="flex items-center text-slate-300">
+                      <div className="mr-3 h-2 w-2 flex-shrink-0 rounded-full bg-orange-400"></div>
+                      TypeScript support with snippets
+                    </li>
+                  </ul>
+                </div>
+
+                <Link
+                  href="/docs/svelte/introduction"
+                  className="flex w-full items-center justify-center rounded-xl bg-gradient-to-r from-orange-600 to-red-600 px-8 py-4 text-lg font-bold text-white shadow-lg transition-all hover:scale-105 hover:from-orange-500 hover:to-red-500 hover:shadow-xl"
+                >
+                  <span>Start with Svelte</span>
                   <ArrowRight className="ml-3 h-6 w-6" />
                 </Link>
               </div>

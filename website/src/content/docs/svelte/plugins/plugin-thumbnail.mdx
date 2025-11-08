@@ -1,0 +1,153 @@
+---
+title: Thumbnail Plugin
+description: Adds a sidebar with thumbnail images for quick page navigation in Svelte, with built-in virtualization for high performance.
+searchable: true
+---
+
+# Thumbnail Plugin
+
+The Thumbnail Plugin adds a classic sidebar view with small, clickable previews of each page. It's an intuitive way for users to get an overview of the document and quickly jump to a specific page.
+
+For optimal performance with long documents, the plugin uses virtualization, rendering only the thumbnail images that are currently visible in the sidebar's viewport.
+
+## Installation
+
+This plugin needs the **Render plugin** to work. The **Scroll plugin** is optional but required for the auto-scroll feature.
+
+```sh npm2yarn
+npm install @embedpdf/plugin-thumbnail @embedpdf/plugin-render @embedpdf/plugin-scroll
+```
+
+## Registration
+
+Import `ThumbnailPluginPackage` and its dependencies, then add them to the `plugins` array. The dependencies should be registered before the thumbnail plugin.
+
+```typescript {5, 17-19}
+import { createPluginRegistration } from '@embedpdf/core'
+// ... other imports
+import { RenderPluginPackage } from '@embedpdf/plugin-render/svelte'
+import { ScrollPluginPackage } from '@embedpdf/plugin-scroll/svelte'
+import { ThumbnailPluginPackage } from '@embedpdf/plugin-thumbnail/svelte'
+
+const plugins = [
+  // ... other essential plugins
+  createPluginRegistration(LoaderPluginPackage, { /* ... */ }),
+  createPluginRegistration(ViewportPluginPackage),
+
+  // Register dependencies first
+  createPluginRegistration(RenderPluginPackage),
+  createPluginRegistration(ScrollPluginPackage),
+
+  // Register and configure the thumbnail plugin
+  createPluginRegistration(ThumbnailPluginPackage, {
+    width: 120, // Sets the width of thumbnail images
+  }),
+]
+```
+
+## Usage
+
+The plugin features two main components: `<ThumbnailsPane />` (the virtualized container) and `<ThumbImg />` (for rendering the page image).
+
+### Building a Thumbnail Sidebar
+
+You'll typically place `<ThumbnailsPane />` in a sidebar. It uses a **named snippet** pattern where you define a `children` snippet that receives metadata about each visible thumbnail's dimensions and position. You then use this metadata to style your thumbnail container and render the `<ThumbImg meta={meta} />` component inside.
+
+To handle navigation, you can use the `useScroll` composable to get the `scrollToPage` function and the `currentPage` for highlighting the active thumbnail.
+
+### Using the `meta` Object
+
+The `meta` object passed to your snippet contains pre-calculated values crucial for virtualization:
+
+  - `meta.top`: The absolute vertical position. **Apply this to your wrapper element's `top` style.**
+  - `meta.wrapperHeight`: The total height of the thumbnail's container. **Apply this to your wrapper element's `height` style.**
+  - `meta.width` & `meta.height`: The dimensions of the thumbnail image itself.
+  - `meta.labelHeight`: The height reserved for the page label.
+
+```svelte
+<script lang="ts">
+import { useScroll } from '@embedpdf/plugin-scroll/svelte';
+import { ThumbnailsPane, ThumbImg, type ThumbMeta } from '@embedpdf/plugin-thumbnail/svelte';
+
+const scroll = useScroll();
+</script>
+
+<ThumbnailsPane>
+  {#snippet children(meta: ThumbMeta)}
+    <div
+      style:position="absolute"
+      style:top={`${meta.top}px`}
+      style:height={`${meta.wrapperHeight}px`}
+      onclick={() => scroll.provides?.scrollToPage({ pageNumber: meta.pageIndex + 1 })}
+    >
+      <div 
+        style:border={`2px solid ${scroll.state.currentPage === meta.pageIndex + 1 ? 'blue' : 'grey'}`}
+        style:width={`${meta.width}px`}
+        style:height={`${meta.height}px`}
+      >
+        <ThumbImg {meta} />
+      </div>
+      <span style:height={`${meta.labelHeight}px`}>
+        {meta.pageIndex + 1}
+      </span>
+    </div>
+  {/snippet}
+</ThumbnailsPane>
+```
+
+## Live Example
+
+This example shows a complete PDF viewer with a thumbnail sidebar. Clicking a thumbnail will navigate the main document, and the active thumbnail is highlighted.
+
+import { ThumbnailExample } from '../code-examples/thumbnail-example';
+
+<ThumbnailExample />
+
+## API Reference
+
+### Configuration (`ThumbnailPluginConfig`)
+
+| Option | Type | Description |
+| :--- | :--- | :--- |
+| **`width`** | `number` | The width of the thumbnail image in CSS pixels. **Default**: `120` |
+| **`gap`** | `number` | The vertical space between each thumbnail in CSS pixels. **Default**: `8` |
+| **`autoScroll`** | `boolean` | If `true`, the sidebar automatically scrolls to keep the current page's thumbnail in view. **Default**: `true` |
+| **`scrollBehavior`**| `string` | The scroll animation (`'smooth'` or `'auto'`). **Default**: `'smooth'` |
+
+### Component: `<ThumbnailsPane />`
+
+The virtualized scroll container for the thumbnails.
+
+#### Children Snippet
+
+| Parameter | Type | Description |
+| :--- | :--- | :--- |
+| **`meta`** | `ThumbMeta` | Metadata object for the thumbnail, containing position, size, and page index. Received as parameter in the `children` snippet. |
+
+### Component: `<ThumbImg />`
+
+Renders the rasterized image for a single thumbnail.
+
+| Prop | Type | Description |
+| :--- | :--- | :--- |
+| **`meta`** | `ThumbMeta` | **(Required)** The metadata object for the thumbnail, provided by the `<ThumbnailsPane />` slot prop. |
+
+### Composable: `useThumbnailCapability()`
+
+Provides access to the plugin's methods, though direct interaction is rarely needed.
+
+#### Returns
+
+An object with the following property:
+
+| Property | Type | Description |
+| :--- | :--- | :--- |
+| **`provides`**| `ThumbnailCapability \| null` | An object with methods to interact with the plugin, or `null` if not ready. |
+
+#### `ThumbnailCapability` Methods
+
+| Method | Description |
+| :--- | :--- |
+| **`scrollToThumb(pageIndex)`** | Programmatically scrolls the thumbnail sidebar to make the specified page thumbnail visible. |
+| **`renderThumb(pageIndex, dpr)`**| A low-level method to manually render a specific thumbnail. Returns a `Task<Blob>`. |
+

@@ -1,33 +1,28 @@
 import fs from 'node:fs';
 import path from 'node:path';
-import { defineConfig, type UserConfig, Plugin } from 'vite';
+import { defineConfig, type UserConfig } from 'vite';
 import vue from '@vitejs/plugin-vue';
+import { svelte } from '@sveltejs/vite-plugin-svelte';
 import dts from 'unplugin-dts/vite';
+import { SvelteDtsResolver } from './svelte-dts-resolver.js';
 
 const sharedExternal = [/^@embedpdf\/(?!.*\/@framework$)/];
 
-// ⚠️ rename shared directory for framework builds to avoid conflicts
+// ⚠️ keep your helper AS-IS
 const beforeWriteFile = (outputPrefix: string) => (filePath: string, content: string) => {
-  if (!outputPrefix) return;           // base build → leave untouched
-  
-  // If this file IS in the shared directory, rename the directory
+  if (!outputPrefix) return; // no-op if empty
+
   if (filePath.includes(`${path.sep}dist${path.sep}shared${path.sep}`)) {
     const modifiedPath = filePath.replace(
       `${path.sep}shared${path.sep}`,
       `${path.sep}shared-${outputPrefix}${path.sep}`
     );
-
     return { filePath: modifiedPath, content };
   }
-  
-  // If this file is NOT in shared directory, update its imports to shared
-  const modifiedContent = content.replace(
-    /\.\.\/shared/g,
-    `../shared-${outputPrefix}`
-  );
 
+  const modifiedContent = content.replace(/\.\.\/shared/g, `../shared-${outputPrefix}`);
   return { filePath, content: modifiedContent };
-}
+};
 
 /* ───── helpers ───────────────────────────────────────────────────── */
 export function aliasFromTsconfig(tsconfigFile: string) {
@@ -49,14 +44,16 @@ const exists = (rel: string) =>
 /* ───── preset core ───────────────────────────────────────────────── */
 export interface ConfigOptions {
   tsconfigPath: string;
-  entryPath: string | Record<string, string>;  // ⚠️ Support both single and multiple entries
-  outputPrefix?: string;
-  external?: string[];
+  entryPath: string | Record<string, string>;
+  outputPrefix?: string;           
+  external?: (string | RegExp)[];
   additionalPlugins?: any[];
   esbuildOptions?: UserConfig['esbuild'];
   dtsExclude?: string[];
   dtsOptions?: Record<string, any>;
-
+  globals?: Record<string, string>;
+  optimizeDeps?: UserConfig['optimizeDeps'];
+  dtsEnabled?: boolean;
 }
 
 export function createConfig(opts: ConfigOptions): UserConfig {
@@ -69,6 +66,8 @@ export function createConfig(opts: ConfigOptions): UserConfig {
     esbuildOptions = {},
     dtsExclude = [],
     dtsOptions = {},
+    optimizeDeps,
+    dtsEnabled = true,
   } = opts;
 
   const pkgRoot = process.cwd();
@@ -76,14 +75,12 @@ export function createConfig(opts: ConfigOptions): UserConfig {
     pkgRoot,
     tsconfigPath.startsWith('.') ? tsconfigPath : path.join('src', tsconfigPath),
   );
-  
-  // ⚠️ Handle both single and multiple entries
-  const entry = typeof entryPath === 'string' 
+
+  const entry = typeof entryPath === 'string'
     ? path.resolve(pkgRoot, 'src', entryPath)
     : Object.fromEntries(
-        Object.entries(entryPath).map(([name, entryPath]) => [
-          name, 
-          path.resolve(pkgRoot, 'src', entryPath)
+        Object.entries(entryPath).map(([name, p]) => [
+          name, path.resolve(pkgRoot, 'src', p)
         ])
       );
 
@@ -92,14 +89,18 @@ export function createConfig(opts: ConfigOptions): UserConfig {
   return {
     resolve: { alias: aliasFromTsconfig(tsconfigAbs) },
     esbuild: esbuildOptions,
+    optimizeDeps,
     plugins: [
-      ...additionalPlugins, 
-      dts({ 
-        tsconfigPath: tsconfigAbs,
-        exclude: dtsExclude,
-        beforeWriteFile: beforeWriteFile(outputPrefix),
-        ...dtsOptions,
-      })
+      ...additionalPlugins,
+      ...(dtsEnabled
+        ? [dts({
+            tsconfigPath: tsconfigAbs,
+            exclude: dtsExclude,
+            beforeWriteFile: beforeWriteFile(outputPrefix),
+            resolvers: [SvelteDtsResolver()],
+            ...dtsOptions,
+          })]
+        : []),
     ],
     build: {
       emptyOutDir: false,
@@ -108,7 +109,6 @@ export function createConfig(opts: ConfigOptions): UserConfig {
         entry,
         formats: ['es', 'cjs'],
         fileName: (fmt, entryName) => {
-          // ⚠️ Handle multiple entries in fileName
           if (typeof entryPath === 'object') {
             return `${filePrefix}${entryName}.${fmt === 'es' ? 'js' : 'cjs'}`;
           }
@@ -124,7 +124,7 @@ export function createConfig(opts: ConfigOptions): UserConfig {
   };
 }
 
-/* ───── one‑liner for leaf packages ──────────────────────────────── */
+/* ───── one-liner for leaf packages ──────────────────────────────── */
 export function defineLibrary() {
   return defineConfig(({ mode }) => {
     switch (mode) {
@@ -135,7 +135,6 @@ export function defineLibrary() {
           entryPath: 'react/index.ts',
           outputPrefix: 'react',
           external: ['react', 'react/jsx-runtime', 'react-dom'],
-          // React build needs no extra esbuild tweaks
         });
 
       case 'preact':
@@ -148,14 +147,10 @@ export function defineLibrary() {
             'preact',
             'preact/hooks',
             'preact/jsx-runtime',
-            // keep these so a stray import can’t bundle React
             'react',
             'react/jsx-runtime',
           ],
-          esbuildOptions: {                // ⚠️ tell esbuild the runtime
-            jsx: 'automatic',
-            jsxImportSource: 'preact'
-          },
+          esbuildOptions: { jsx: 'automatic', jsxImportSource: 'preact' },
         });
 
       case 'vue':
@@ -167,13 +162,26 @@ export function defineLibrary() {
           external: ['vue'],
           additionalPlugins: [vue()],
           dtsOptions: { processor: 'vue' },
+          optimizeDeps: {
+            exclude: ['@embedpdf/plugin-interaction-manager']
+          }
+        });
+
+      case 'svelte':
+        if (!exists('svelte/index.ts')) throw new Error('No Svelte adapter');
+        return createConfig({
+          tsconfigPath: 'svelte/tsconfig.svelte.json',
+          entryPath: 'svelte/index.ts',
+          outputPrefix: 'svelte',
+          external: [/^svelte($|\/)/],
+          additionalPlugins: [svelte()]
         });
 
       default: // base
         return createConfig({
           tsconfigPath: './tsconfig.json',
           entryPath: 'index.ts',
-          dtsExclude: ['**/react/**', '**/preact/**', '**/vue/**', '**/shared/**'], // exclude framework dirs for base build
+          dtsExclude: ['**/react/**', '**/preact/**', '**/vue/**', '**/svelte/**'],
         });
     }
   });

@@ -12,6 +12,7 @@
     "build": "turbo run build",
     "build:react-mui": "turbo run build --filter=\"./packages/*\" --filter=\"./examples/react-mui\"",
     "build:vue-vuetify": "turbo run build --filter=\"./packages/*\" --filter=\"./examples/vue-vuetify\"",
+    "build:svelte-tailwind": "turbo run build --filter=\"./packages/*\" --filter=\"./examples/svelte-tailwind\"",
     "build:packages": "turbo run build --filter=\"./packages/*\"",
     "build:snippet": "turbo run build --filter=\"./packages/*\" --filter=\"./snippet\"",
     "build:watch": "ROARR_LOG=true turbowatch ./config/turbowatch.config.ts | roarr",
@@ -39,6 +40,7 @@
     "husky": "^9.1.7",
     "lint-staged": "^16.0.0",
     "prettier": "^3.5.3",
+    "prettier-plugin-svelte": "^3.4.0",
     "prettier-plugin-tailwindcss": "^0.6.11",
     "rimraf": "latest",
     "turbo": "latest",
@@ -47,7 +49,7 @@
     "vite": "^6.3.5"
   },
   "lint-staged": {
-    "**/*.{ts,tsx,js,jsx,json,css,md,vue}": "prettier --write"
+    "**/*.{ts,tsx,js,jsx,json,css,md,vue,svelte}": "prettier --write"
   },
   "pnpm": {
     "overrides": {
