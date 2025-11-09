@@ -95,7 +95,7 @@
   const isWholeWordChecked = $derived(search.state.flags.includes(MatchFlag.MatchWholeWord));
 </script>
 
-<div class="flex h-full flex-col bg-white">
+<div class="flex h-full flex-col bg-white p-1">
   <!-- Search Input -->
   <div class="p-3">
     <div class="relative">

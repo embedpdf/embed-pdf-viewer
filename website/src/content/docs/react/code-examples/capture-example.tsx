@@ -8,7 +8,12 @@ import {
   ViewportPluginPackage,
 } from '@embedpdf/plugin-viewport/react'
 import { Scroller, ScrollPluginPackage } from '@embedpdf/plugin-scroll/react'
-import { LoaderPluginPackage } from '@embedpdf/plugin-loader/react'
+import {
+  DocumentContext,
+  DocumentContent,
+  DocumentManagerPlugin,
+  DocumentManagerPluginPackage,
+} from '@embedpdf/plugin-document-manager/react'
 import { RenderLayer, RenderPluginPackage } from '@embedpdf/plugin-render/react'
 import {
   InteractionManagerPluginPackage,
@@ -24,15 +29,7 @@ import { useEffect, useState } from 'react'
 
 // 1. Register plugins, including Capture and its dependencies
 const plugins = [
-  createPluginRegistration(LoaderPluginPackage, {
-    loadingOptions: {
-      type: 'url',
-      pdfFile: {
-        id: 'example-pdf',
-        url: 'https://snippet.embedpdf.com/ebook.pdf',
-      },
-    },
-  }),
+  createPluginRegistration(DocumentManagerPluginPackage),
   createPluginRegistration(ViewportPluginPackage),
   createPluginRegistration(ScrollPluginPackage),
   createPluginRegistration(RenderPluginPackage),
@@ -44,28 +41,28 @@ const plugins = [
 ]
 
 // 2. Create a toolbar to activate capture mode
-const CaptureToolbar = () => {
-  const { provides: capture, isMarqueeCaptureActive } = useCapture()
+const CaptureToolbar = ({ documentId }: { documentId: string }) => {
+  const { provides: capture, state } = useCapture(documentId)
 
   return (
     <div className="mb-4 mt-4 flex items-center gap-2 rounded-lg border border-gray-200 bg-white p-2 shadow-sm">
       <button
         onClick={() => capture?.toggleMarqueeCapture()}
         className={`rounded-md px-3 py-1 text-sm font-medium transition-colors ${
-          isMarqueeCaptureActive
+          state.isMarqueeCaptureActive
             ? 'bg-blue-500 text-white'
             : 'bg-gray-100 hover:bg-gray-200'
         }`}
       >
-        {isMarqueeCaptureActive ? 'Cancel Capture' : 'Capture Area'}
+        {state.isMarqueeCaptureActive ? 'Cancel Capture' : 'Capture Area'}
       </button>
     </div>
   )
 }
 
 // 3. Create a component to display the captured image
-const CaptureResult = () => {
-  const { provides: capture } = useCapture()
+const CaptureResult = ({ documentId }: { documentId: string }) => {
+  const { provides: capture } = useCapture(documentId)
   const [captureResult, setCaptureResult] = useState<CaptureAreaEvent | null>(
     null,
   )
@@ -144,43 +141,73 @@ export const PDFViewer = () => {
   }
 
   return (
-    <EmbedPDF engine={engine} plugins={plugins}>
-      <div
-        style={{ height: '500px', display: 'flex', flexDirection: 'column' }}
-      >
-        <CaptureToolbar />
-        <div
-          className="flex-grow"
-          style={{ position: 'relative', overflow: 'hidden' }}
-        >
-          <Viewport
-            style={{
-              position: 'absolute',
-              top: 0,
-              left: 0,
-              right: 0,
-              bottom: 0,
-              backgroundColor: '#f1f3f5',
-            }}
-          >
-            <Scroller
-              renderPage={({ width, height, pageIndex, scale, rotation }) => (
-                <PagePointerProvider
-                  pageIndex={pageIndex}
-                  pageWidth={width}
-                  pageHeight={height}
-                  rotation={rotation}
-                  scale={scale}
-                >
-                  <RenderLayer pageIndex={pageIndex} />
-                  <MarqueeCapture pageIndex={pageIndex} scale={scale} />
-                </PagePointerProvider>
-              )}
-            />
-          </Viewport>
-        </div>
-      </div>
-      <CaptureResult />
+    <EmbedPDF
+      engine={engine}
+      plugins={plugins}
+      onInitialized={async (registry) => {
+        registry
+          .getPlugin<DocumentManagerPlugin>(DocumentManagerPlugin.id)
+          ?.provides()
+          ?.openDocumentUrl({ url: 'https://snippet.embedpdf.com/ebook.pdf' })
+      }}
+    >
+      <DocumentContext>
+        {({ activeDocumentId }) =>
+          activeDocumentId && (
+            <DocumentContent documentId={activeDocumentId}>
+              {({ isLoaded }) =>
+                isLoaded && (
+                  <div
+                    style={{
+                      height: '500px',
+                      display: 'flex',
+                      flexDirection: 'column',
+                    }}
+                  >
+                    <CaptureToolbar documentId={activeDocumentId} />
+                    <div
+                      className="flex-grow"
+                      style={{ position: 'relative', overflow: 'hidden' }}
+                    >
+                      <Viewport
+                        documentId={activeDocumentId}
+                        style={{
+                          position: 'absolute',
+                          top: 0,
+                          left: 0,
+                          right: 0,
+                          bottom: 0,
+                          backgroundColor: '#f1f3f5',
+                        }}
+                      >
+                        <Scroller
+                          documentId={activeDocumentId}
+                          renderPage={({ pageIndex }) => (
+                            <PagePointerProvider
+                              documentId={activeDocumentId}
+                              pageIndex={pageIndex}
+                            >
+                              <RenderLayer
+                                documentId={activeDocumentId}
+                                pageIndex={pageIndex}
+                              />
+                              <MarqueeCapture
+                                documentId={activeDocumentId}
+                                pageIndex={pageIndex}
+                              />
+                            </PagePointerProvider>
+                          )}
+                        />
+                      </Viewport>
+                    </div>
+                    <CaptureResult documentId={activeDocumentId} />
+                  </div>
+                )
+              }
+            </DocumentContent>
+          )
+        }
+      </DocumentContext>
     </EmbedPDF>
   )
 }

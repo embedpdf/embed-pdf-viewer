@@ -15,20 +15,17 @@ import {
   ScrollPluginPackage,
   useScroll,
 } from '@embedpdf/plugin-scroll/react'
-import { LoaderPluginPackage } from '@embedpdf/plugin-loader/react'
+import {
+  DocumentContext,
+  DocumentContent,
+  DocumentManagerPlugin,
+  DocumentManagerPluginPackage,
+} from '@embedpdf/plugin-document-manager/react'
 import { RenderLayer, RenderPluginPackage } from '@embedpdf/plugin-render/react'
 
 // 1. Register the plugins you need
 const plugins = [
-  createPluginRegistration(LoaderPluginPackage, {
-    loadingOptions: {
-      type: 'url',
-      pdfFile: {
-        id: 'example-pdf',
-        url: 'https://snippet.embedpdf.com/ebook.pdf',
-      },
-    },
-  }),
+  createPluginRegistration(DocumentManagerPluginPackage),
   createPluginRegistration(ViewportPluginPackage),
   createPluginRegistration(ScrollPluginPackage, {
     // Optional: Set the page to open to
@@ -38,8 +35,8 @@ const plugins = [
 ]
 
 // 2. Create a page navigation component using the new hook structure
-export const PageNavigation = () => {
-  const { provides: scroll, state } = useScroll()
+export const PageNavigation = ({ documentId }: { documentId: string }) => {
+  const { provides: scroll, state } = useScroll(documentId)
   const [pageInput, setPageInput] = useState(String(state.currentPage))
 
   useEffect(() => {
@@ -119,21 +116,47 @@ export const PDFViewer = () => {
 
   return (
     <div style={{ height: '500px' }}>
-      <EmbedPDF engine={engine} plugins={plugins}>
-        <div className="flex h-full flex-col">
-          <PageNavigation />
-          <div className="relative flex w-full flex-1 overflow-hidden">
-            <Viewport className="flex-grow bg-gray-100">
-              <Scroller
-                renderPage={({ width, height, pageIndex, scale }) => (
-                  <div style={{ width, height, position: 'relative' }}>
-                    <RenderLayer pageIndex={pageIndex} scale={scale} />
-                  </div>
-                )}
-              />
-            </Viewport>
-          </div>
-        </div>
+      <EmbedPDF
+        engine={engine}
+        plugins={plugins}
+        onInitialized={async (registry) => {
+          registry
+            .getPlugin<DocumentManagerPlugin>(DocumentManagerPlugin.id)
+            ?.provides()
+            ?.openDocumentUrl({ url: 'https://snippet.embedpdf.com/ebook.pdf' })
+        }}
+      >
+        <DocumentContext>
+          {({ activeDocumentId }) =>
+            activeDocumentId && (
+              <DocumentContent documentId={activeDocumentId}>
+                {({ isLoaded }) =>
+                  isLoaded && (
+                    <div className="flex h-full flex-col">
+                      <PageNavigation documentId={activeDocumentId} />
+                      <div className="relative flex w-full flex-1 overflow-hidden">
+                        <Viewport
+                          documentId={activeDocumentId}
+                          className="flex-grow bg-gray-100"
+                        >
+                          <Scroller
+                            documentId={activeDocumentId}
+                            renderPage={({ pageIndex }) => (
+                              <RenderLayer
+                                documentId={activeDocumentId}
+                                pageIndex={pageIndex}
+                              />
+                            )}
+                          />
+                        </Viewport>
+                      </div>
+                    </div>
+                  )
+                }
+              </DocumentContent>
+            )
+          }
+        </DocumentContext>
       </EmbedPDF>
     </div>
   )

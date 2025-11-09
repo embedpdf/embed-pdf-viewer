@@ -24,7 +24,7 @@
   </div>
 
   <!-- Search Content -->
-  <div class="flex-1 overflow-hidden p-4">
+  <div class="flex-1 overflow-hidden">
     <Search {documentId} />
   </div>
 </div>

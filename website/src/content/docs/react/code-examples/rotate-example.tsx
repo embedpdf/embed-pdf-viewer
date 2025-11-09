@@ -11,7 +11,12 @@ import {
   ViewportPluginPackage,
 } from '@embedpdf/plugin-viewport/react'
 import { Scroller, ScrollPluginPackage } from '@embedpdf/plugin-scroll/react'
-import { LoaderPluginPackage } from '@embedpdf/plugin-loader/react'
+import {
+  DocumentContext,
+  DocumentContent,
+  DocumentManagerPlugin,
+  DocumentManagerPluginPackage,
+} from '@embedpdf/plugin-document-manager/react'
 import { RenderLayer, RenderPluginPackage } from '@embedpdf/plugin-render/react'
 import {
   PagePointerProvider,
@@ -27,15 +32,7 @@ import {
 
 // 1. Register the plugins you need
 const plugins = [
-  createPluginRegistration(LoaderPluginPackage, {
-    loadingOptions: {
-      type: 'url',
-      pdfFile: {
-        id: 'example-pdf',
-        url: 'https://snippet.embedpdf.com/ebook.pdf',
-      },
-    },
-  }),
+  createPluginRegistration(DocumentManagerPluginPackage),
   createPluginRegistration(ViewportPluginPackage),
   createPluginRegistration(ScrollPluginPackage),
   createPluginRegistration(RenderPluginPackage),
@@ -46,8 +43,8 @@ const plugins = [
 ]
 
 // 2. Create a toolbar to control rotation
-export const RotateToolbar = () => {
-  const { rotation, provides: rotate } = useRotate()
+export const RotateToolbar = ({ documentId }: { documentId: string }) => {
+  const { rotation, provides: rotate } = useRotate(documentId)
 
   if (!rotate) {
     return null
@@ -118,38 +115,67 @@ export const PDFViewer = () => {
 
   return (
     <div style={{ height: '500px' }}>
-      <EmbedPDF engine={engine} plugins={plugins}>
-        <div className="flex h-full flex-col">
-          <RotateToolbar />
-          <div className="flex-grow" style={{ position: 'relative' }}>
-            <Viewport
-              style={{
-                backgroundColor: '#f1f3f5',
-                position: 'absolute',
-                top: 0,
-                left: 0,
-                right: 0,
-                bottom: 0,
-              }}
-            >
-              <Scroller
-                renderPage={({ width, height, pageIndex, scale, rotation }) => (
-                  <Rotate pageSize={{ width, height }}>
-                    <PagePointerProvider
-                      pageIndex={pageIndex}
-                      pageWidth={width}
-                      pageHeight={height}
-                      rotation={rotation}
-                      scale={scale}
-                    >
-                      <RenderLayer pageIndex={pageIndex} scale={scale} />
-                    </PagePointerProvider>
-                  </Rotate>
-                )}
-              />
-            </Viewport>
-          </div>
-        </div>
+      <EmbedPDF
+        engine={engine}
+        plugins={plugins}
+        onInitialized={async (registry) => {
+          registry
+            .getPlugin<DocumentManagerPlugin>(DocumentManagerPlugin.id)
+            ?.provides()
+            ?.openDocumentUrl({ url: 'https://snippet.embedpdf.com/ebook.pdf' })
+        }}
+      >
+        <DocumentContext>
+          {({ activeDocumentId }) =>
+            activeDocumentId && (
+              <DocumentContent documentId={activeDocumentId}>
+                {({ isLoaded }) =>
+                  isLoaded && (
+                    <div className="flex h-full flex-col">
+                      <RotateToolbar documentId={activeDocumentId} />
+                      <div
+                        className="flex-grow"
+                        style={{ position: 'relative' }}
+                      >
+                        <Viewport
+                          documentId={activeDocumentId}
+                          style={{
+                            backgroundColor: '#f1f3f5',
+                            position: 'absolute',
+                            top: 0,
+                            left: 0,
+                            right: 0,
+                            bottom: 0,
+                          }}
+                        >
+                          <Scroller
+                            documentId={activeDocumentId}
+                            renderPage={({ pageIndex }) => (
+                              <Rotate
+                                documentId={activeDocumentId}
+                                pageIndex={pageIndex}
+                              >
+                                <PagePointerProvider
+                                  documentId={activeDocumentId}
+                                  pageIndex={pageIndex}
+                                >
+                                  <RenderLayer
+                                    documentId={activeDocumentId}
+                                    pageIndex={pageIndex}
+                                  />
+                                </PagePointerProvider>
+                              </Rotate>
+                            )}
+                          />
+                        </Viewport>
+                      </div>
+                    </div>
+                  )
+                }
+              </DocumentContent>
+            )
+          }
+        </DocumentContext>
       </EmbedPDF>
     </div>
   )

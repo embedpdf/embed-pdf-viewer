@@ -7,7 +7,12 @@ import {
   InteractionManagerPluginPackage,
   PagePointerProvider,
 } from '@embedpdf/plugin-interaction-manager/react'
-import { LoaderPluginPackage } from '@embedpdf/plugin-loader/react'
+import {
+  DocumentContext,
+  DocumentContent,
+  DocumentManagerPlugin,
+  DocumentManagerPluginPackage,
+} from '@embedpdf/plugin-document-manager/react'
 import {
   RedactionLayer,
   RedactionMode,
@@ -29,15 +34,7 @@ import { useState } from 'react'
 
 // 1. Register plugins, including Redaction and its dependencies
 const plugins = [
-  createPluginRegistration(LoaderPluginPackage, {
-    loadingOptions: {
-      type: 'url',
-      pdfFile: {
-        id: 'example-pdf',
-        url: 'https://snippet.embedpdf.com/ebook.pdf',
-      },
-    },
-  }),
+  createPluginRegistration(DocumentManagerPluginPackage),
   createPluginRegistration(ViewportPluginPackage),
   createPluginRegistration(ScrollPluginPackage),
   createPluginRegistration(RenderPluginPackage),
@@ -49,8 +46,8 @@ const plugins = [
 ]
 
 // 2. Create a toolbar to manage redaction
-const RedactionToolbar = () => {
-  const { state, provides } = useRedaction()
+const RedactionToolbar = ({ documentId }: { documentId: string }) => {
+  const { state, provides } = useRedaction(documentId)
   const [isCommitting, setIsCommitting] = useState(false)
 
   const handleApplyAll = () => {
@@ -103,12 +100,13 @@ const RedactionToolbar = () => {
 
 // 3. Define a custom menu for selected redaction marks
 const RedactionMenu = ({
+  documentId,
   item,
   selected,
   menuWrapperProps,
   rect,
-}: SelectionMenuProps) => {
-  const { provides } = useRedaction()
+}: SelectionMenuProps & { documentId: string }) => {
+  const { provides } = useRedaction(documentId)
   if (!selected) return null
 
   return (
@@ -156,44 +154,80 @@ export const PDFViewer = () => {
         userSelect: 'none',
       }}
     >
-      <EmbedPDF engine={engine} plugins={plugins}>
-        <RedactionToolbar />
-        <div style={{ flex: 1, overflow: 'hidden', position: 'relative' }}>
-          <Viewport
-            style={{
-              position: 'absolute',
-              top: 0,
-              left: 0,
-              right: 0,
-              bottom: 0,
-              backgroundColor: '#f1f3f5',
-            }}
-          >
-            <Scroller
-              renderPage={({ width, height, pageIndex, scale, rotation }) => (
-                <PagePointerProvider
-                  pageIndex={pageIndex}
-                  pageWidth={width}
-                  pageHeight={height}
-                  rotation={rotation}
-                  scale={scale}
-                >
-                  <RenderLayer
-                    pageIndex={pageIndex}
-                    style={{ pointerEvents: 'none' }}
-                  />
-                  <SelectionLayer pageIndex={pageIndex} scale={scale} />
-                  <RedactionLayer
-                    pageIndex={pageIndex}
-                    scale={scale}
-                    rotation={rotation}
-                    selectionMenu={(props) => <RedactionMenu {...props} />}
-                  />
-                </PagePointerProvider>
-              )}
-            />
-          </Viewport>
-        </div>
+      <EmbedPDF
+        engine={engine}
+        plugins={plugins}
+        onInitialized={async (registry) => {
+          registry
+            .getPlugin<DocumentManagerPlugin>(DocumentManagerPlugin.id)
+            ?.provides()
+            ?.openDocumentUrl({ url: 'https://snippet.embedpdf.com/ebook.pdf' })
+        }}
+      >
+        <DocumentContext>
+          {({ activeDocumentId }) =>
+            activeDocumentId && (
+              <DocumentContent documentId={activeDocumentId}>
+                {({ isLoaded }) =>
+                  isLoaded && (
+                    <>
+                      <RedactionToolbar documentId={activeDocumentId} />
+                      <div
+                        style={{
+                          flex: 1,
+                          overflow: 'hidden',
+                          position: 'relative',
+                        }}
+                      >
+                        <Viewport
+                          documentId={activeDocumentId}
+                          style={{
+                            position: 'absolute',
+                            top: 0,
+                            left: 0,
+                            right: 0,
+                            bottom: 0,
+                            backgroundColor: '#f1f3f5',
+                          }}
+                        >
+                          <Scroller
+                            documentId={activeDocumentId}
+                            renderPage={({ width, height, pageIndex }) => (
+                              <PagePointerProvider
+                                documentId={activeDocumentId}
+                                pageIndex={pageIndex}
+                              >
+                                <RenderLayer
+                                  documentId={activeDocumentId}
+                                  pageIndex={pageIndex}
+                                  style={{ pointerEvents: 'none' }}
+                                />
+                                <SelectionLayer
+                                  documentId={activeDocumentId}
+                                  pageIndex={pageIndex}
+                                />
+                                <RedactionLayer
+                                  documentId={activeDocumentId}
+                                  pageIndex={pageIndex}
+                                  selectionMenu={(props) => (
+                                    <RedactionMenu
+                                      documentId={activeDocumentId}
+                                      {...props}
+                                    />
+                                  )}
+                                />
+                              </PagePointerProvider>
+                            )}
+                          />
+                        </Viewport>
+                      </div>
+                    </>
+                  )
+                }
+              </DocumentContent>
+            )
+          }
+        </DocumentContext>
       </EmbedPDF>
     </div>
   )
