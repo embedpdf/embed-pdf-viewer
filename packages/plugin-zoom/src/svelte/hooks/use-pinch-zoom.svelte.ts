@@ -1,28 +1,56 @@
-import type { ViewportPlugin } from '@embedpdf/plugin-viewport';
-import { useZoomCapability } from './use-zoom.svelte';
 import { useCapability } from '@embedpdf/core/svelte';
+import type { ViewportPlugin } from '@embedpdf/plugin-viewport';
 import { setupPinchZoom } from '../../shared/utils/pinch-zoom-logic';
+import { useZoomCapability } from './use-zoom.svelte';
 
-export function usePinch() {
+/**
+ * Hook for setting up pinch-to-zoom functionality on an element
+ * @param documentId Document ID
+ */
+export function usePinch(documentId: string) {
   const viewportCapability = useCapability<ViewportPlugin>('viewport');
   const zoomCapability = useZoomCapability();
 
-  const state = $state({
-    elementRef: null as HTMLDivElement | null,
-  });
+  let elementRef = $state<HTMLDivElement | null>(null);
+  let cleanup: (() => void) | undefined;
 
   $effect(() => {
-    const element = state.elementRef;
-    if (!element || !viewportCapability.provides || !zoomCapability.provides) {
+    const element = elementRef;
+    const viewport = viewportCapability.provides;
+    const zoom = zoomCapability.provides;
+
+    // Clean up previous setup
+    if (cleanup) {
+      cleanup();
+      cleanup = undefined;
+    }
+
+    // Setup new pinch zoom if all dependencies are available
+    if (!element || !viewport || !zoom) {
       return;
     }
 
-    return setupPinchZoom({
+    cleanup = setupPinchZoom({
       element,
-      viewportProvides: viewportCapability.provides,
-      zoomProvides: zoomCapability.provides,
+      documentId,
+      viewportProvides: viewport,
+      zoomProvides: zoom,
     });
+
+    return () => {
+      if (cleanup) {
+        cleanup();
+        cleanup = undefined;
+      }
+    };
   });
 
-  return state;
+  return {
+    get elementRef() {
+      return elementRef;
+    },
+    set elementRef(value: HTMLDivElement | null) {
+      elementRef = value;
+    },
+  };
 }

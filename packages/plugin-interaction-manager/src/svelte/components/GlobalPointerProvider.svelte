@@ -1,23 +1,29 @@
 <script lang="ts">
   import type { Snippet } from 'svelte';
+  import type { HTMLAttributes } from 'svelte/elements';
   import { useInteractionManagerCapability } from '../hooks';
   import { createPointerProvider } from '../../shared/utils';
-  import type { HTMLAttributes } from 'svelte/elements';
 
   interface GlobalPointerProviderProps extends HTMLAttributes<HTMLDivElement> {
+    documentId: string;
     children: Snippet;
     class?: string;
   }
 
-  let { children, class: propsClass, ...restProps }: GlobalPointerProviderProps = $props();
+  let {
+    documentId,
+    children,
+    class: propsClass,
+    ...restProps
+  }: GlobalPointerProviderProps = $props();
 
   let ref = $state<HTMLDivElement | null>(null);
-  const interactionManagerCapability = useInteractionManagerCapability();
+  const { provides: cap } = useInteractionManagerCapability();
 
   $effect(() => {
-    if (!interactionManagerCapability.provides || !ref) return;
+    if (!cap || !ref) return;
 
-    return createPointerProvider(interactionManagerCapability.provides, { type: 'global' }, ref);
+    return createPointerProvider(cap, { type: 'global', documentId }, ref);
   });
 </script>
 

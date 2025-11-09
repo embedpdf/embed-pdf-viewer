@@ -1,6 +1,6 @@
 import { useCapability, usePlugin } from '@embedpdf/core/svelte';
 import { Rotation } from '@embedpdf/models';
-import { RotatePlugin } from '@embedpdf/plugin-rotate';
+import { RotatePlugin, initialDocumentState } from '@embedpdf/plugin-rotate';
 
 /**
  * Hook to get the raw rotate plugin instance.
@@ -14,27 +14,40 @@ export const useRotatePlugin = () => usePlugin<RotatePlugin>(RotatePlugin.id);
 export const useRotateCapability = () => useCapability<RotatePlugin>(RotatePlugin.id);
 
 /**
- * Hook that provides reactive rotation state and methods.
+ * Hook that provides reactive rotation state and methods for a specific document.
+ * @param documentId Document ID
  */
-export const useRotate = () => {
+export const useRotate = (documentId: string) => {
   const capability = useRotateCapability();
 
-  const state = $state({
-    get provides() {
-      return capability.provides;
-    },
-    rotation: 0 as Rotation,
-  });
+  let rotation = $state<Rotation>(initialDocumentState.rotation);
+
+  // Derived scoped capability for the specific document
+  const scopedProvides = $derived(capability.provides?.forDocument(documentId) ?? null);
 
   $effect(() => {
-    if (!capability.provides) return;
+    if (!capability.provides) {
+      rotation = initialDocumentState.rotation;
+      return;
+    }
 
-    const unsubscribe = capability.provides.onRotateChange((newRotation) => {
-      state.rotation = newRotation;
+    const scope = capability.provides.forDocument(documentId);
+
+    // Get initial state
+    rotation = scope.getRotation();
+
+    // Subscribe to rotation changes for this document
+    return scope.onRotateChange((newRotation) => {
+      rotation = newRotation;
     });
-
-    return unsubscribe;
   });
 
-  return state;
+  return {
+    get rotation() {
+      return rotation;
+    },
+    get provides() {
+      return scopedProvides;
+    },
+  };
 };

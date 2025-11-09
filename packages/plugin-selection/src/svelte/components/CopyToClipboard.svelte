@@ -6,7 +6,7 @@
   $effect(() => {
     if (!selectionCapability.provides) return;
 
-    return selectionCapability.provides.onCopyToClipboard((text) => {
+    return selectionCapability.provides.onCopyToClipboard(({ text }) => {
       navigator.clipboard.writeText(text).catch((err) => {
         console.error('Failed to copy text to clipboard:', err);
       });

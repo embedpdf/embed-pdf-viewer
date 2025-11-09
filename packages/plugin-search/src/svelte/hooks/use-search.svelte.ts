@@ -1,25 +1,52 @@
 import { useCapability, usePlugin } from '@embedpdf/core/svelte';
-import { initialState, SearchPlugin, SearchState } from '@embedpdf/plugin-search';
+import {
+  SearchPlugin,
+  SearchDocumentState,
+  SearchScope,
+  initialSearchDocumentState,
+} from '@embedpdf/plugin-search';
 
 export const useSearchPlugin = () => usePlugin<SearchPlugin>(SearchPlugin.id);
 export const useSearchCapability = () => useCapability<SearchPlugin>(SearchPlugin.id);
 
-export const useSearch = () => {
+/**
+ * Hook for search state for a specific document
+ * @param documentId Document ID
+ */
+export const useSearch = (
+  documentId: string,
+): {
+  state: SearchDocumentState;
+  provides: SearchScope | null;
+} => {
   const capability = useSearchCapability();
 
-  const state = $state({
-    get provides() {
-      return capability.provides;
-    },
-    state: initialState as SearchState,
-  });
+  let searchState = $state<SearchDocumentState>(initialSearchDocumentState);
+
+  // Derived scoped provides for the specific document
+  const scopedProvides = $derived(capability.provides?.forDocument(documentId) ?? null);
 
   $effect(() => {
-    if (!capability.provides) return;
-    return capability.provides.onStateChange((newState) => {
-      state.state = newState;
+    if (!scopedProvides) {
+      searchState = initialSearchDocumentState;
+      return;
+    }
+
+    // Set initial state
+    searchState = scopedProvides.getState();
+
+    // Subscribe to changes
+    return scopedProvides.onStateChange((state) => {
+      searchState = state;
     });
   });
 
-  return state;
+  return {
+    get state() {
+      return searchState;
+    },
+    get provides() {
+      return scopedProvides;
+    },
+  };
 };

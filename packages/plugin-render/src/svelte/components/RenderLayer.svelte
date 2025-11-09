@@ -1,56 +1,68 @@
 <script lang="ts">
   import type { HTMLImgAttributes } from 'svelte/elements';
-  import { ignore, type PdfDocumentObject, PdfErrorCode } from '@embedpdf/models';
-  import { useRenderCapability, useRenderPlugin } from '../hooks';
+  import { ignore, PdfErrorCode } from '@embedpdf/models';
+  import { useDocumentState } from '@embedpdf/core/svelte';
+  import { useRenderCapability } from '../hooks';
 
   interface RenderLayerProps extends Omit<HTMLImgAttributes, 'style'> {
+    /**
+     * The ID of the document to render from
+     */
+    documentId: string;
+    /**
+     * The page index to render (0-based)
+     */
     pageIndex: number;
+    /**
+     * Optional scale override. If not provided, uses document's current scale.
+     */
     scale?: number;
+    /**
+     * Optional device pixel ratio override. If not provided, uses window.devicePixelRatio.
+     */
     dpr?: number;
     class?: string;
   }
 
-  let { pageIndex, scale, dpr, class: propsClass, ...props }: RenderLayerProps = $props();
+  let {
+    documentId,
+    pageIndex,
+    scale: scaleOverride,
+    dpr: dprOverride,
+    class: propsClass,
+    ...props
+  }: RenderLayerProps = $props();
 
-  const renderCapability = useRenderCapability();
-  const renderPlugin = useRenderPlugin();
-
-  const actualScale = $derived(scale ?? 1);
+  const { provides: renderProvides } = useRenderCapability();
+  const documentState = useDocumentState(documentId);
 
   let imageUrl = $state<string | null>(null);
   let urlRef: string | null = null;
-  let refreshTick = $state(0);
 
-  // Subscribe/unsubscribe whenever the plugin instance changes (not just on mount)
+  // Get refresh version from core state
+  const refreshVersion = $derived(documentState.current?.pageRefreshVersions?.[pageIndex] ?? 0);
+
+  // Determine actual render options: use overrides if provided, otherwise fall back to document state
+  const actualScale = $derived(
+    scaleOverride !== undefined ? scaleOverride : (documentState.current?.scale ?? 1),
+  );
+
+  const actualDpr = $derived(dprOverride !== undefined ? dprOverride : window.devicePixelRatio);
+
+  // Render whenever inputs change (documentId, pageIndex, actualScale, actualDpr, renderProvides, refreshVersion)
   $effect(() => {
-    if (!renderPlugin.plugin) return; // nothing yet; try again when it appears
-    return renderPlugin.plugin.onRefreshPages((pages) => {
-      if (pages.includes(pageIndex)) {
-        refreshTick++; // trigger a re-render
-      }
-    });
-  });
+    if (!renderProvides) return;
 
-  // Render whenever inputs change (pageIndex, scale, dpr, provides, refreshTick)
-  $effect(() => {
-    // Explicitly read refreshTick so the effect tracks it
-    const _tick = refreshTick;
-
-    const provides = renderCapability.provides;
-    if (!provides) return;
-
-    const task = provides.renderPage({
+    const task = renderProvides.forDocument(documentId).renderPage({
       pageIndex,
-      options: { scaleFactor: actualScale, dpr: dpr || window.devicePixelRatio },
+      options: {
+        scaleFactor: actualScale,
+        dpr: actualDpr,
+      },
     });
 
     task.wait((blob) => {
       const url = URL.createObjectURL(blob);
-      // revoke any previous URL before swapping to avoid leaks
-      if (urlRef) {
-        URL.revokeObjectURL(urlRef);
-      }
-
       imageUrl = url;
       urlRef = url;
     }, ignore);
@@ -69,7 +81,6 @@
   });
 
   function handleImageLoad() {
-    // Additional safety: once the image has loaded, revoke the last ref if still present
     if (urlRef) {
       URL.revokeObjectURL(urlRef);
       urlRef = null;

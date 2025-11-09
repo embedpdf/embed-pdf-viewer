@@ -1,25 +1,44 @@
 import { useCapability, usePlugin } from '@embedpdf/core/svelte';
-import { PanPlugin } from '@embedpdf/plugin-pan';
+import { PanPlugin, initialDocumentState } from '@embedpdf/plugin-pan';
 
 export const usePanPlugin = () => usePlugin<PanPlugin>(PanPlugin.id);
 export const usePanCapability = () => useCapability<PanPlugin>(PanPlugin.id);
 
-export const usePan = () => {
+/**
+ * Hook for pan state for a specific document
+ * @param documentId Document ID
+ */
+export const usePan = (documentId: string) => {
   const capability = usePanCapability();
 
-  const state = $state({
-    get provides() {
-      return capability.provides;
-    },
-    isPanning: false,
-  });
+  let isPanning = $state(initialDocumentState.isPanMode);
+
+  // Derived scoped capability for the specific document
+  const scopedProvides = $derived(capability.provides?.forDocument(documentId) ?? null);
 
   $effect(() => {
-    if (!capability.provides) return;
-    return capability.provides.onPanModeChange((isPanningState) => {
-      state.isPanning = isPanningState;
+    if (!capability.provides) {
+      isPanning = initialDocumentState.isPanMode;
+      return;
+    }
+
+    const scope = capability.provides.forDocument(documentId);
+
+    // Set initial state
+    isPanning = scope.isPanMode();
+
+    // Subscribe to pan mode changes for this document
+    return scope.onPanModeChange((isPan) => {
+      isPanning = isPan;
     });
   });
 
-  return state;
+  return {
+    get provides() {
+      return scopedProvides;
+    },
+    get isPanning() {
+      return isPanning;
+    },
+  };
 };

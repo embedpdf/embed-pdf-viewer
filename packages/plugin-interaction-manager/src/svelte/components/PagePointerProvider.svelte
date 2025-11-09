@@ -1,28 +1,27 @@
 <script lang="ts">
-  import { type Position, restorePosition, type Size, transformSize } from '@embedpdf/models';
+  import { type Position, restorePosition, transformSize } from '@embedpdf/models';
+  import { useDocumentState } from '@embedpdf/core/svelte';
   import type { Snippet } from 'svelte';
   import type { HTMLAttributes } from 'svelte/elements';
   import { createPointerProvider } from '../../shared/utils';
   import { useInteractionManagerCapability, useIsPageExclusive } from '../hooks';
 
   interface PagePointerProviderProps extends HTMLAttributes<HTMLDivElement> {
-    children: Snippet;
+    documentId: string;
     pageIndex: number;
-    pageWidth: number;
-    pageHeight: number;
-    rotation: number;
-    scale: number;
+    rotation?: number;
+    scale?: number;
+    children: Snippet;
     class?: string;
     convertEventToPoint?: (event: PointerEvent, element: HTMLElement) => Position;
   }
 
   let {
+    documentId,
     pageIndex,
     children,
-    pageWidth,
-    pageHeight,
-    rotation,
-    scale,
+    rotation: rotationOverride,
+    scale: scaleOverride,
     convertEventToPoint,
     class: propsClass,
     ...restProps
@@ -30,10 +29,18 @@
 
   let ref = $state<HTMLDivElement | null>(null);
 
-  const interactionManagerCapability = useInteractionManagerCapability();
-  const isPageExclusive = useIsPageExclusive();
+  const { provides: cap } = useInteractionManagerCapability();
+  const isPageExclusive = useIsPageExclusive(documentId);
+  const documentState = useDocumentState(documentId);
 
-  // Memoize the default conversion function
+  // Get page dimensions and transformations from document state
+  const page = $derived(documentState.current?.document?.pages?.[pageIndex]);
+  const naturalPageSize = $derived(page?.size ?? { width: 0, height: 0 });
+  const rotation = $derived(rotationOverride ?? documentState.current?.rotation ?? 0);
+  const scale = $derived(scaleOverride ?? documentState.current?.scale ?? 1);
+  const displaySize = $derived(transformSize(naturalPageSize, 0, scale));
+
+  // Default conversion function
   const defaultConvertEventToPoint = $derived.by(() => {
     return (event: PointerEvent, element: HTMLElement): Position => {
       const rect = element.getBoundingClientRect();
@@ -42,22 +49,26 @@
         y: event.clientY - rect.top,
       };
 
-      const displaySize: Size = transformSize(
-        { width: pageWidth, height: pageHeight },
+      // Get the rotated natural size (width/height may be swapped, but not scaled)
+      const rotatedNaturalSize = transformSize(
+        {
+          width: displaySize.width,
+          height: displaySize.height,
+        },
         rotation,
         1,
       );
 
-      return restorePosition(displaySize, displayPoint, rotation, scale);
+      return restorePosition(rotatedNaturalSize, displayPoint, rotation, scale);
     };
   });
 
   $effect(() => {
-    if (!interactionManagerCapability.provides || !ref) return;
+    if (!cap || !ref) return;
 
     return createPointerProvider(
-      interactionManagerCapability.provides,
-      { type: 'page', pageIndex },
+      cap,
+      { type: 'page', documentId, pageIndex },
       ref,
       convertEventToPoint || defaultConvertEventToPoint,
     );
@@ -67,13 +78,13 @@
 <div
   bind:this={ref}
   style:position="relative"
-  style:width={`${pageWidth}px`}
-  style:height={`${pageHeight}px`}
+  style:width={`${displaySize.width}px`}
+  style:height={`${displaySize.height}px`}
   class={propsClass}
   {...restProps}
 >
   {@render children()}
-  {#if isPageExclusive}
+  {#if isPageExclusive.current}
     <div
       style:position="absolute"
       style:top="0"
