@@ -4,7 +4,11 @@ import { Scroller, useScroll } from '@embedpdf/plugin-scroll/vue';
 import { RenderLayer } from '@embedpdf/plugin-render/vue';
 import { ThumbnailsPane, ThumbImg } from '@embedpdf/plugin-thumbnail/vue';
 
-const { state, provides } = useScroll();
+const props = defineProps<{
+  documentId: string;
+}>();
+
+const { state, provides } = useScroll(() => props.documentId);
 </script>
 
 <template>
@@ -18,7 +22,7 @@ const { state, provides } = useScroll();
           border-right: 1px solid #dee2e6;
         "
       >
-        <ThumbnailsPane>
+        <ThumbnailsPane :document-id="documentId">
           <template #default="{ meta }">
             <div
               :key="meta.pageIndex"
@@ -49,6 +53,7 @@ const { state, provides } = useScroll();
                 }"
               >
                 <ThumbImg
+                  :document-id="documentId"
                   :meta="meta"
                   :style="{ width: '100%', height: '100%', objectFit: 'contain' }"
                 />
@@ -70,6 +75,7 @@ const { state, provides } = useScroll();
       </div>
       <div style="flex: 1; overflow: hidden; position: relative">
         <Viewport
+          :document-id="documentId"
           style="
             position: absolute;
             top: 0;
@@ -79,7 +85,7 @@ const { state, provides } = useScroll();
             background-color: #f1f3f5;
           "
         >
-          <Scroller>
+          <Scroller :document-id="documentId">
             <template #default="{ page }">
               <div
                 :style="{
@@ -88,7 +94,7 @@ const { state, provides } = useScroll();
                   position: 'relative',
                 }"
               >
-                <RenderLayer :page-index="page.pageIndex" :scale="page.scale" />
+                <RenderLayer :document-id="documentId" :page-index="page.pageIndex" />
               </div>
             </template>
           </Scroller>

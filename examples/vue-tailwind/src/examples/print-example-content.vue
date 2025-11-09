@@ -3,9 +3,13 @@ import { ref } from 'vue';
 import { Viewport } from '@embedpdf/plugin-viewport/vue';
 import { Scroller } from '@embedpdf/plugin-scroll/vue';
 import { RenderLayer } from '@embedpdf/plugin-render/vue';
-import { usePrintCapability } from '@embedpdf/plugin-print/vue';
+import { usePrint } from '@embedpdf/plugin-print/vue';
 
-const { provides: print } = usePrintCapability();
+const props = defineProps<{
+  documentId: string;
+}>();
+
+const { provides: print } = usePrint(() => props.documentId);
 const isPrinting = ref(false);
 
 const handlePrint = () => {
@@ -77,6 +81,7 @@ const handlePrint = () => {
       </div>
       <div class="flex-grow" style="position: relative">
         <Viewport
+          :document-id="documentId"
           style="
             background-color: #f1f3f5;
             position: absolute;
@@ -86,7 +91,7 @@ const handlePrint = () => {
             bottom: 0;
           "
         >
-          <Scroller>
+          <Scroller :document-id="documentId">
             <template #default="{ page }">
               <div
                 :style="{
@@ -95,7 +100,7 @@ const handlePrint = () => {
                   position: 'relative',
                 }"
               >
-                <RenderLayer :page-index="page.pageIndex" :scale="page.scale" />
+                <RenderLayer :document-id="documentId" :page-index="page.pageIndex" />
               </div>
             </template>
           </Scroller>

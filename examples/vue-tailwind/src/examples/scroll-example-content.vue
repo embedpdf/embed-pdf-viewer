@@ -4,7 +4,11 @@ import { Viewport } from '@embedpdf/plugin-viewport/vue';
 import { Scroller, useScroll } from '@embedpdf/plugin-scroll/vue';
 import { RenderLayer } from '@embedpdf/plugin-render/vue';
 
-const { provides: scroll, state } = useScroll();
+const props = defineProps<{
+  documentId: string;
+}>();
+
+const { provides: scroll, state } = useScroll(() => props.documentId);
 const pageInput = ref(String(state.value.currentPage));
 
 watch(
@@ -76,8 +80,8 @@ const handleGoToPage = (e: Event) => {
         </button>
       </div>
       <div class="relative flex w-full flex-1 overflow-hidden">
-        <Viewport class="flex-grow bg-gray-100">
-          <Scroller>
+        <Viewport :document-id="documentId" class="flex-grow bg-gray-100">
+          <Scroller :document-id="documentId">
             <template #default="{ page }">
               <div
                 :style="{
@@ -86,7 +90,7 @@ const handleGoToPage = (e: Event) => {
                   position: 'relative',
                 }"
               >
-                <RenderLayer :page-index="page.pageIndex" :scale="page.scale" />
+                <RenderLayer :document-id="documentId" :page-index="page.pageIndex" />
               </div>
             </template>
           </Scroller>

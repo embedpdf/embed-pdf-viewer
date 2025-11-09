@@ -6,7 +6,11 @@ import { useZoom, MarqueeZoom, ZoomMode } from '@embedpdf/plugin-zoom/vue';
 import { PagePointerProvider } from '@embedpdf/plugin-interaction-manager/vue';
 import { TilingLayer } from '@embedpdf/plugin-tiling/vue';
 
-const { provides: zoom, state } = useZoom();
+const props = defineProps<{
+  documentId: string;
+}>();
+
+const { provides: zoom, state } = useZoom(() => props.documentId);
 </script>
 
 <template>
@@ -103,6 +107,7 @@ const { provides: zoom, state } = useZoom();
       </div>
       <div class="flex-grow" style="position: relative">
         <Viewport
+          :document-id="documentId"
           style="
             background-color: #f1f3f5;
             position: absolute;
@@ -112,18 +117,12 @@ const { provides: zoom, state } = useZoom();
             bottom: 0;
           "
         >
-          <Scroller>
+          <Scroller :document-id="documentId">
             <template #default="{ page }">
-              <PagePointerProvider
-                :page-index="page.pageIndex"
-                :page-width="page.width"
-                :page-height="page.height"
-                :rotation="page.rotation"
-                :scale="page.scale"
-              >
-                <RenderLayer :page-index="page.pageIndex" />
-                <TilingLayer :page-index="page.pageIndex" :scale="page.scale" />
-                <MarqueeZoom :page-index="page.pageIndex" :scale="page.scale" />
+              <PagePointerProvider :document-id="documentId" :page-index="page.pageIndex">
+                <RenderLayer :document-id="documentId" :page-index="page.pageIndex" :scale="1" />
+                <TilingLayer :document-id="documentId" :page-index="page.pageIndex" />
+                <MarqueeZoom :document-id="documentId" :page-index="page.pageIndex" />
               </PagePointerProvider>
             </template>
           </Scroller>

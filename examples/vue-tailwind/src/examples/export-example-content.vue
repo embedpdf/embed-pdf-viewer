@@ -2,9 +2,13 @@
 import { Viewport } from '@embedpdf/plugin-viewport/vue';
 import { Scroller } from '@embedpdf/plugin-scroll/vue';
 import { RenderLayer } from '@embedpdf/plugin-render/vue';
-import { useExportCapability } from '@embedpdf/plugin-export/vue';
+import { useExport } from '@embedpdf/plugin-export/vue';
 
-const { provides: exportApi } = useExportCapability();
+const props = defineProps<{
+  documentId: string;
+}>();
+
+const { provides: exportApi } = useExport(() => props.documentId);
 </script>
 
 <template>
@@ -35,6 +39,7 @@ const { provides: exportApi } = useExportCapability();
       </div>
       <div class="flex-grow" style="position: relative">
         <Viewport
+          :document-id="documentId"
           style="
             background-color: #f1f3f5;
             position: absolute;
@@ -44,7 +49,7 @@ const { provides: exportApi } = useExportCapability();
             bottom: 0;
           "
         >
-          <Scroller>
+          <Scroller :document-id="documentId">
             <template #default="{ page }">
               <div
                 :style="{
@@ -53,7 +58,7 @@ const { provides: exportApi } = useExportCapability();
                   position: 'relative',
                 }"
               >
-                <RenderLayer :page-index="page.pageIndex" :scale="page.scale" />
+                <RenderLayer :document-id="documentId" :page-index="page.pageIndex" :scale="1" />
               </div>
             </template>
           </Scroller>

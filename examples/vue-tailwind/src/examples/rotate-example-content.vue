@@ -5,7 +5,11 @@ import { RenderLayer } from '@embedpdf/plugin-render/vue';
 import { PagePointerProvider } from '@embedpdf/plugin-interaction-manager/vue';
 import { useRotate, Rotate } from '@embedpdf/plugin-rotate/vue';
 
-const { rotation, provides: rotate } = useRotate();
+const props = defineProps<{
+  documentId: string;
+}>();
+
+const { rotation, provides: rotate } = useRotate(() => props.documentId);
 </script>
 
 <template>
@@ -61,6 +65,7 @@ const { rotation, provides: rotate } = useRotate();
       </div>
       <div class="flex-grow" style="position: relative">
         <Viewport
+          :document-id="documentId"
           style="
             background-color: #f1f3f5;
             position: absolute;
@@ -70,17 +75,11 @@ const { rotation, provides: rotate } = useRotate();
             bottom: 0;
           "
         >
-          <Scroller>
+          <Scroller :document-id="documentId">
             <template #default="{ page }">
-              <Rotate :page-size="{ width: page.width, height: page.height }">
-                <PagePointerProvider
-                  :page-index="page.pageIndex"
-                  :page-width="page.width"
-                  :page-height="page.height"
-                  :rotation="page.rotation"
-                  :scale="page.scale"
-                >
-                  <RenderLayer :page-index="page.pageIndex" :scale="page.scale" />
+              <Rotate :document-id="documentId" :page-index="page.pageIndex">
+                <PagePointerProvider :document-id="documentId" :page-index="page.pageIndex">
+                  <RenderLayer :document-id="documentId" :page-index="page.pageIndex" />
                 </PagePointerProvider>
               </Rotate>
             </template>

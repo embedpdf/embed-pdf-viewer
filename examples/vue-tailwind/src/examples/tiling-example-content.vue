@@ -5,7 +5,11 @@ import { RenderLayer } from '@embedpdf/plugin-render/vue';
 import { useZoom } from '@embedpdf/plugin-zoom/vue';
 import { TilingLayer } from '@embedpdf/plugin-tiling/vue';
 
-const { provides: zoom } = useZoom();
+const props = defineProps<{
+  documentId: string;
+}>();
+
+const { provides: zoom } = useZoom(() => props.documentId);
 </script>
 
 <template>
@@ -49,8 +53,8 @@ const { provides: zoom } = useZoom();
         </button>
       </div>
       <div class="relative flex w-full flex-1 overflow-hidden">
-        <Viewport class="flex-grow bg-gray-100">
-          <Scroller>
+        <Viewport :document-id="documentId" class="flex-grow bg-gray-100">
+          <Scroller :document-id="documentId">
             <template #default="{ page }">
               <div
                 :style="{
@@ -59,8 +63,8 @@ const { provides: zoom } = useZoom();
                   position: 'relative',
                 }"
               >
-                <RenderLayer :page-index="page.pageIndex" :scale="1" />
-                <TilingLayer :page-index="page.pageIndex" :scale="page.scale" />
+                <RenderLayer :document-id="documentId" :page-index="page.pageIndex" :scale="1" />
+                <TilingLayer :document-id="documentId" :page-index="page.pageIndex" />
               </div>
             </template>
           </Scroller>

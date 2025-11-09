@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, onMounted, onUnmounted } from 'vue';
+import { ref, onMounted, onUnmounted, computed } from 'vue';
 import { Viewport } from '@embedpdf/plugin-viewport/vue';
 import { Scroller } from '@embedpdf/plugin-scroll/vue';
 import { RenderLayer } from '@embedpdf/plugin-render/vue';
@@ -7,10 +7,15 @@ import { AnnotationLayer, useAnnotationCapability } from '@embedpdf/plugin-annot
 import { PagePointerProvider } from '@embedpdf/plugin-interaction-manager/vue';
 import { SelectionLayer } from '@embedpdf/plugin-selection/vue';
 
+const props = defineProps<{
+  documentId: string;
+}>();
+
 const activeTool = ref<string | null>(null);
 const canDelete = ref(false);
 
-const { provides: annotationApi } = useAnnotationCapability();
+const { provides: annotationCapability } = useAnnotationCapability();
+const annotationApi = computed(() => annotationCapability.value?.forDocument(props.documentId));
 
 const tools = [
   { id: 'stampCheckmark', name: 'Checkmark (stamp)' },
@@ -78,25 +83,21 @@ const handleDelete = () => {
       </button>
     </div>
     <div class="flex-grow" style="position: relative">
-      <Viewport style="width: 100%; height: 100%; position: absolute; background-color: #f1f3f5">
-        <Scroller>
+      <Viewport
+        :document-id="documentId"
+        style="width: 100%; height: 100%; position: absolute; background-color: #f1f3f5"
+      >
+        <Scroller :document-id="documentId">
           <template #default="{ page }">
-            <PagePointerProvider
-              :page-index="page.pageIndex"
-              :page-width="page.width"
-              :page-height="page.height"
-              :rotation="page.rotation"
-              :scale="page.scale"
-            >
-              <RenderLayer :page-index="page.pageIndex" style="pointer-events: none" />
-              <SelectionLayer :page-index="page.pageIndex" :scale="page.scale" />
-              <AnnotationLayer
+            <PagePointerProvider :document-id="documentId" :page-index="page.pageIndex">
+              <RenderLayer
+                :document-id="documentId"
                 :page-index="page.pageIndex"
-                :scale="page.scale"
-                :page-width="page.width"
-                :page-height="page.height"
-                :rotation="page.rotation"
+                :scale="1"
+                style="pointer-events: none"
               />
+              <SelectionLayer :document-id="documentId" :page-index="page.pageIndex" />
+              <AnnotationLayer :document-id="documentId" :page-index="page.pageIndex" />
             </PagePointerProvider>
           </template>
         </Scroller>

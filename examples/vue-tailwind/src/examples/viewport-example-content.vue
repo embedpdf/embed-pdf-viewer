@@ -6,9 +6,16 @@ import {
 } from '@embedpdf/plugin-viewport/vue';
 import { Scroller } from '@embedpdf/plugin-scroll/vue';
 import { RenderLayer } from '@embedpdf/plugin-render/vue';
+import { computed } from 'vue';
 
-const { provides: viewport } = useViewportCapability();
-const scrollActivity = useViewportScrollActivity();
+const props = defineProps<{
+  documentId: string;
+}>();
+
+const { provides: viewportCapability } = useViewportCapability();
+const scrollActivity = useViewportScrollActivity(() => props.documentId);
+
+const viewport = computed(() => viewportCapability.value?.forDocument(props.documentId));
 
 const scrollToTop = () => {
   viewport.value?.scrollTo({ x: 0, y: 0, behavior: 'smooth' });
@@ -75,8 +82,8 @@ const scrollToBottom = () => {
         </div>
       </div>
       <div class="relative flex w-full flex-1 overflow-hidden">
-        <Viewport class="flex-grow bg-gray-100">
-          <Scroller>
+        <Viewport :document-id="documentId" class="flex-grow bg-gray-100">
+          <Scroller :document-id="documentId">
             <template #default="{ page }">
               <div
                 :style="{
@@ -85,7 +92,7 @@ const scrollToBottom = () => {
                   position: 'relative',
                 }"
               >
-                <RenderLayer :page-index="page.pageIndex" :scale="page.scale" />
+                <RenderLayer :document-id="documentId" :page-index="page.pageIndex" :scale="1" />
               </div>
             </template>
           </Scroller>
