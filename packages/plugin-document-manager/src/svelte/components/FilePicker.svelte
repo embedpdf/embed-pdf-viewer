@@ -4,16 +4,16 @@
   import type { PdfErrorReason } from '@embedpdf/models';
   import type { OpenDocumentResponse } from '@embedpdf/plugin-document-manager';
 
-  const { plugin } = useDocumentManagerPlugin();
-  const { provides } = useDocumentManagerCapability();
+  const documentManagerPlugin = useDocumentManagerPlugin();
+  const documentManagerCapability = useDocumentManagerCapability();
 
   let inputRef = $state<HTMLInputElement | null>(null);
   let taskRef = $state<Task<OpenDocumentResponse, PdfErrorReason> | null>(null);
 
   $effect(() => {
-    if (!plugin?.onOpenFileRequest) return;
+    if (!documentManagerPlugin.plugin?.onOpenFileRequest) return;
 
-    const unsubscribe = plugin.onOpenFileRequest((task) => {
+    const unsubscribe = documentManagerPlugin.plugin.onOpenFileRequest((task) => {
       taskRef = task;
       inputRef?.click();
     });
@@ -24,10 +24,10 @@
   const onChange = async (event: Event) => {
     const target = event.target as HTMLInputElement;
     const file = target.files?.[0];
-    if (!file || !provides) return;
+    if (!file || !documentManagerCapability.provides) return;
 
     const buffer = await file.arrayBuffer();
-    const openTask = provides.openDocumentBuffer({
+    const openTask = documentManagerCapability.provides.openDocumentBuffer({
       name: file.name,
       buffer,
     });
@@ -48,5 +48,5 @@
   type="file"
   accept="application/pdf"
   style:display="none"
-  onchange={onChange}
+  on:change={onChange}
 />

@@ -27,7 +27,7 @@
   }: MarqueeCaptureProps = $props();
 
   const captureCapability = useCaptureCapability();
-  const documentState = useDocumentState(documentId);
+  const documentState = useDocumentState(() => documentId);
 
   let rect = $state<Rect | null>(null);
 

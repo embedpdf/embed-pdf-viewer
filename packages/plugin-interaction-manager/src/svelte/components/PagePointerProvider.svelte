@@ -31,7 +31,7 @@
 
   const interactionManagerCapability = useInteractionManagerCapability();
   const isPageExclusive = useIsPageExclusive(documentId);
-  const documentState = useDocumentState(documentId);
+  const documentState = useDocumentState(() => documentId);
 
   // Get page dimensions and transformations from document state
   const page = $derived(documentState.current?.document?.pages?.[pageIndex]);

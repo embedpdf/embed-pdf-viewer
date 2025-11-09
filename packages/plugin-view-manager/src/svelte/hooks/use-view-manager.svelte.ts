@@ -7,44 +7,50 @@ export const useViewManagerCapability = () =>
 
 /**
  * Hook for a specific view's state
- * @param viewId View ID
+ * @param getViewId Function that returns the view ID
  */
-export const useView = (viewId: string) => {
+export const useView = (getViewId: () => string | null) => {
   const capability = useViewManagerCapability();
 
   let view = $state<View | null>(null);
 
+  // Reactive viewId
+  const viewId = $derived(getViewId());
+
   $effect(() => {
-    if (!capability.provides) {
+    const provides = capability.provides;
+    const currentViewId = viewId;
+
+    if (!provides || !currentViewId) {
       view = null;
       return;
     }
 
     // Get initial view
-    view = capability.provides.getView(viewId);
+    view = provides.getView(currentViewId);
 
     // Subscribe to all document events for this view
-    const unsubAdded = capability.provides.onDocumentAddedToView((event) => {
-      if (event.viewId === viewId) {
-        view = capability.provides!.getView(viewId);
+    const unsubAdded = provides.onDocumentAddedToView((event) => {
+      if (event.viewId === currentViewId) {
+        view = provides.getView(currentViewId);
       }
     });
 
-    const unsubRemoved = capability.provides.onDocumentRemovedFromView((event) => {
-      if (event.viewId === viewId) {
-        view = capability.provides!.getView(viewId);
+    const unsubRemoved = provides.onDocumentRemovedFromView((event) => {
+      if (event.viewId === currentViewId) {
+        view = provides.getView(currentViewId);
       }
     });
 
-    const unsubReordered = capability.provides.onDocumentReordered((event) => {
-      if (event.viewId === viewId) {
-        view = capability.provides!.getView(viewId);
+    const unsubReordered = provides.onDocumentReordered((event) => {
+      if (event.viewId === currentViewId) {
+        view = provides.getView(currentViewId);
       }
     });
 
-    const unsubActiveChanged = capability.provides.onViewActiveDocumentChanged((event) => {
-      if (event.viewId === viewId) {
-        view = capability.provides!.getView(viewId);
+    const unsubActiveChanged = provides.onViewActiveDocumentChanged((event) => {
+      if (event.viewId === currentViewId) {
+        view = provides.getView(currentViewId);
       }
     });
 

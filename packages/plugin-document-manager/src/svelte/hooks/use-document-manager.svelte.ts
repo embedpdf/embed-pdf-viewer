@@ -48,13 +48,16 @@ export function useActiveDocument() {
 
 /**
  * Hook for all open documents (in order)
- * @param documentIds Optional specific document IDs to filter/order by
+ * @param getDocumentIds Optional function that returns specific document IDs to filter/order by
  */
-export function useOpenDocuments(documentIds?: string[]) {
+export function useOpenDocuments(getDocumentIds?: () => string[] | undefined) {
   const coreState = useCoreState();
   const capability = useDocumentManagerCapability();
 
   let documentOrder = $state<string[]>([]);
+
+  // Reactive documentIds
+  const documentIds = $derived(getDocumentIds?.());
 
   $effect(() => {
     if (!capability.provides) {

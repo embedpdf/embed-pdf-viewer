@@ -1,5 +1,10 @@
 import { useCapability, usePlugin } from '@embedpdf/core/svelte';
-import { SpreadMode, SpreadPlugin, initialDocumentState } from '@embedpdf/plugin-spread';
+import {
+  SpreadMode,
+  SpreadPlugin,
+  initialDocumentState,
+  SpreadScope,
+} from '@embedpdf/plugin-spread';
 
 /**
  * Hook to get the raw spread plugin instance.
@@ -13,25 +18,39 @@ export const useSpreadPlugin = () => usePlugin<SpreadPlugin>(SpreadPlugin.id);
  */
 export const useSpreadCapability = () => useCapability<SpreadPlugin>(SpreadPlugin.id);
 
+// Define the return type explicitly to maintain type safety
+interface UseSpreadReturn {
+  provides: SpreadScope | null;
+  spreadMode: SpreadMode;
+}
+
 /**
  * Hook for spread state for a specific document
- * @param documentId Document ID
+ * @param getDocumentId Function that returns the document ID
  */
-export const useSpread = (documentId: string) => {
+export const useSpread = (getDocumentId: () => string | null): UseSpreadReturn => {
   const capability = useSpreadCapability();
 
   let spreadMode = $state<SpreadMode>(initialDocumentState.spreadMode);
 
-  // Derived scoped capability for the specific document
-  const scopedProvides = $derived(capability.provides?.forDocument(documentId) ?? null);
+  // Reactive documentId
+  const documentId = $derived(getDocumentId());
+
+  // Scoped capability for current docId
+  const scopedProvides = $derived(
+    capability.provides && documentId ? capability.provides.forDocument(documentId) : null,
+  );
 
   $effect(() => {
-    if (!capability.provides) {
+    const provides = capability.provides;
+    const docId = documentId;
+
+    if (!provides || !docId) {
       spreadMode = initialDocumentState.spreadMode;
       return;
     }
 
-    const scope = capability.provides.forDocument(documentId);
+    const scope = provides.forDocument(docId);
 
     // Set initial spread mode
     spreadMode = scope.getSpreadMode();
@@ -43,11 +62,11 @@ export const useSpread = (documentId: string) => {
   });
 
   return {
-    get spreadMode() {
-      return spreadMode;
-    },
     get provides() {
       return scopedProvides;
+    },
+    get spreadMode() {
+      return spreadMode;
     },
   };
 };

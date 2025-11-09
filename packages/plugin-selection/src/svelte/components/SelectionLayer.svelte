@@ -22,7 +22,7 @@
   }: SelectionLayerProps = $props();
 
   const selectionPlugin = useSelectionPlugin();
-  const documentState = useDocumentState(documentId);
+  const documentState = useDocumentState(() => documentId);
 
   let rects = $state<Rect[]>([]);
   let boundingRect = $state<Rect | null>(null);

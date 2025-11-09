@@ -1,28 +1,47 @@
 import { useCapability, usePlugin } from '@embedpdf/core/svelte';
-import { initialDocumentState, ZoomDocumentState, ZoomPlugin } from '@embedpdf/plugin-zoom';
+import {
+  initialDocumentState,
+  ZoomDocumentState,
+  ZoomPlugin,
+  ZoomScope,
+} from '@embedpdf/plugin-zoom';
 
 export const useZoomCapability = () => useCapability<ZoomPlugin>(ZoomPlugin.id);
 export const useZoomPlugin = () => usePlugin<ZoomPlugin>(ZoomPlugin.id);
 
+// Define the return type explicitly to maintain type safety
+interface UseZoomReturn {
+  provides: ZoomScope | null;
+  state: ZoomDocumentState;
+}
+
 /**
  * Hook for zoom state for a specific document
- * @param documentId Document ID
+ * @param getDocumentId Function that returns the document ID
  */
-export const useZoom = (documentId: string) => {
+export const useZoom = (getDocumentId: () => string | null): UseZoomReturn => {
   const capability = useZoomCapability();
 
   let state = $state<ZoomDocumentState>(initialDocumentState);
 
-  // Derived scoped capability for the specific document
-  const scopedProvides = $derived(capability.provides?.forDocument(documentId) ?? null);
+  // Reactive documentId
+  const documentId = $derived(getDocumentId());
+
+  // Scoped capability for current docId
+  const scopedProvides = $derived(
+    capability.provides && documentId ? capability.provides.forDocument(documentId) : null,
+  );
 
   $effect(() => {
-    if (!capability.provides) {
+    const provides = capability.provides;
+    const docId = documentId;
+
+    if (!provides || !docId) {
       state = initialDocumentState;
       return;
     }
 
-    const scope = capability.provides.forDocument(documentId);
+    const scope = provides.forDocument(docId);
 
     // Get initial state
     state = scope.getState();
@@ -34,11 +53,11 @@ export const useZoom = (documentId: string) => {
   });
 
   return {
-    get state() {
-      return state;
-    },
     get provides() {
       return scopedProvides;
+    },
+    get state() {
+      return state;
     },
   };
 };

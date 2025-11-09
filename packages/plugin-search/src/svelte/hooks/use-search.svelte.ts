@@ -9,44 +9,55 @@ import {
 export const useSearchPlugin = () => usePlugin<SearchPlugin>(SearchPlugin.id);
 export const useSearchCapability = () => useCapability<SearchPlugin>(SearchPlugin.id);
 
+// Define the return type explicitly to maintain type safety
+interface UseSearchReturn {
+  provides: SearchScope | null;
+  state: SearchDocumentState;
+}
+
 /**
  * Hook for search state for a specific document
- * @param documentId Document ID
+ * @param getDocumentId Function that returns the document ID
  */
-export const useSearch = (
-  documentId: string,
-): {
-  state: SearchDocumentState;
-  provides: SearchScope | null;
-} => {
+export const useSearch = (getDocumentId: () => string | null): UseSearchReturn => {
   const capability = useSearchCapability();
 
   let searchState = $state<SearchDocumentState>(initialSearchDocumentState);
 
-  // Derived scoped provides for the specific document
-  const scopedProvides = $derived(capability.provides?.forDocument(documentId) ?? null);
+  // Reactive documentId
+  const documentId = $derived(getDocumentId());
+
+  // Scoped capability for current docId
+  const scopedProvides = $derived(
+    capability.provides && documentId ? capability.provides.forDocument(documentId) : null,
+  );
 
   $effect(() => {
-    if (!scopedProvides) {
+    const provides = capability.provides;
+    const docId = documentId;
+
+    if (!provides || !docId) {
       searchState = initialSearchDocumentState;
       return;
     }
 
+    const scope = provides.forDocument(docId);
+
     // Set initial state
-    searchState = scopedProvides.getState();
+    searchState = scope.getState();
 
     // Subscribe to changes
-    return scopedProvides.onStateChange((state) => {
+    return scope.onStateChange((state) => {
       searchState = state;
     });
   });
 
   return {
-    get state() {
-      return searchState;
-    },
     get provides() {
       return scopedProvides;
+    },
+    get state() {
+      return searchState;
     },
   };
 };

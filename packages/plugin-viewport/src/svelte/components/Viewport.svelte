@@ -16,9 +16,9 @@
 
   let viewportGap = $state(0);
 
-  const viewportRef = useViewportRef(documentId);
+  const viewportRef = useViewportRef(() => documentId);
   const viewportCapability = useViewportCapability();
-  const isGated = useIsViewportGated(documentId);
+  const isGated = useIsViewportGated(() => documentId);
 
   $effect(() => {
     if (viewportCapability.provides) {

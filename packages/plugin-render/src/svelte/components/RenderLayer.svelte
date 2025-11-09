@@ -52,7 +52,7 @@
   const renderCapability = useRenderCapability();
 
   // Make document state follow the (reactive) documentId
-  const documentState = useDocumentState(documentId);
+  const documentState = useDocumentState(() => documentId);
 
   let imageUrl = $state<string | null>(null);
   let urlRef: string | null = null;

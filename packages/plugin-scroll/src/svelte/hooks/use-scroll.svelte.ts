@@ -15,9 +15,9 @@ interface UseScrollReturn {
 
 /**
  * Hook for scroll state for a specific document
- * @param documentId Document ID
+ * @param documentId Document ID.
  */
-export const useScroll = (documentId: string): UseScrollReturn => {
+export const useScroll = (getDocumentId: () => string | null): UseScrollReturn => {
   const capability = useScrollCapability();
 
   let state = $state({
@@ -25,24 +25,33 @@ export const useScroll = (documentId: string): UseScrollReturn => {
     totalPages: 1,
   });
 
-  // Derived scoped capability for the specific document
-  const scopedProvides = $derived(capability.provides?.forDocument(documentId) ?? null);
+  // Reactive documentId
+  const documentId = $derived(getDocumentId());
+
+  // Scoped capability for current docId
+  const scopedProvides = $derived(
+    capability.provides && documentId ? capability.provides.forDocument(documentId) : null,
+  );
 
   $effect(() => {
-    if (!capability.provides || !documentId) {
+    const provides = capability.provides;
+    const docId = documentId;
+
+    if (!provides || !docId) {
       state.currentPage = 1;
       state.totalPages = 1;
       return;
     }
 
-    const scope = capability.provides.forDocument(documentId);
+    const scope = provides.forDocument(docId);
 
-    // Get initial state
+    // Initial values
     state.currentPage = scope.getCurrentPage();
     state.totalPages = scope.getTotalPages();
 
-    return capability.provides.onPageChange((event) => {
-      if (event.documentId === documentId) {
+    // Subscribe to page changes for THIS docId
+    return provides.onPageChange((event) => {
+      if (event.documentId === docId) {
         state.currentPage = event.pageNumber;
         state.totalPages = event.totalPages;
       }

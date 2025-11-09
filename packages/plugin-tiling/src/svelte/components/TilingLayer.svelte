@@ -21,7 +21,7 @@
   }: TilingLayoutProps = $props();
 
   const tilingCapability = useTilingCapability();
-  const documentState = useDocumentState(documentId);
+  const documentState = useDocumentState(() => documentId);
 
   let tiles = $state<Tile[]>([]);
 

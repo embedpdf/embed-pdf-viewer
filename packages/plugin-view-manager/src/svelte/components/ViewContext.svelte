@@ -104,5 +104,5 @@
   </ViewContext>
 -->
 {#if slotProps}
-  {@render children(slotProps)}
+  {@render children?.(slotProps)}
 {/if}

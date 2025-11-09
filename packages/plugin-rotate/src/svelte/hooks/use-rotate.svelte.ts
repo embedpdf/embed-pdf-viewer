@@ -1,6 +1,6 @@
 import { useCapability, usePlugin } from '@embedpdf/core/svelte';
 import { Rotation } from '@embedpdf/models';
-import { RotatePlugin, initialDocumentState } from '@embedpdf/plugin-rotate';
+import { RotatePlugin, initialDocumentState, RotateScope } from '@embedpdf/plugin-rotate';
 
 /**
  * Hook to get the raw rotate plugin instance.
@@ -13,25 +13,39 @@ export const useRotatePlugin = () => usePlugin<RotatePlugin>(RotatePlugin.id);
  */
 export const useRotateCapability = () => useCapability<RotatePlugin>(RotatePlugin.id);
 
+// Define the return type explicitly to maintain type safety
+interface UseRotateReturn {
+  provides: RotateScope | null;
+  rotation: Rotation;
+}
+
 /**
  * Hook that provides reactive rotation state and methods for a specific document.
- * @param documentId Document ID
+ * @param getDocumentId Function that returns the document ID
  */
-export const useRotate = (documentId: string) => {
+export const useRotate = (getDocumentId: () => string | null): UseRotateReturn => {
   const capability = useRotateCapability();
 
   let rotation = $state<Rotation>(initialDocumentState.rotation);
 
-  // Derived scoped capability for the specific document
-  const scopedProvides = $derived(capability.provides?.forDocument(documentId) ?? null);
+  // Reactive documentId
+  const documentId = $derived(getDocumentId());
+
+  // Scoped capability for current docId
+  const scopedProvides = $derived(
+    capability.provides && documentId ? capability.provides.forDocument(documentId) : null,
+  );
 
   $effect(() => {
-    if (!capability.provides) {
+    const provides = capability.provides;
+    const docId = documentId;
+
+    if (!provides || !docId) {
       rotation = initialDocumentState.rotation;
       return;
     }
 
-    const scope = capability.provides.forDocument(documentId);
+    const scope = provides.forDocument(docId);
 
     // Get initial state
     rotation = scope.getRotation();
@@ -43,11 +57,11 @@ export const useRotate = (documentId: string) => {
   });
 
   return {
-    get rotation() {
-      return rotation;
-    },
     get provides() {
       return scopedProvides;
+    },
+    get rotation() {
+      return rotation;
     },
   };
 };

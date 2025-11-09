@@ -17,7 +17,7 @@
 
   let { documentId, children }: DocumentContentProps = $props();
 
-  const docState = useDocumentState(documentId);
+  const docState = useDocumentState(() => documentId);
 
   const isLoading = $derived(docState.current?.status === 'loading');
   const isError = $derived(docState.current?.status === 'error');

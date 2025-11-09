@@ -27,7 +27,7 @@
   }: RotateProps = $props();
 
   const rotatePlugin = useRotatePlugin();
-  const documentState = useDocumentState(documentId);
+  const documentState = useDocumentState(() => documentId);
 
   const page = $derived(documentState.current?.document?.pages?.[pageIndex]);
   const width = $derived(page?.size?.width ?? 0);

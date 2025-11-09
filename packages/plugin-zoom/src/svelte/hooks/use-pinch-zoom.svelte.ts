@@ -5,19 +5,23 @@ import { useZoomCapability } from './use-zoom.svelte';
 
 /**
  * Hook for setting up pinch-to-zoom functionality on an element
- * @param documentId Document ID
+ * @param getDocumentId Function that returns the document ID
  */
-export function usePinch(documentId: string) {
+export function usePinch(getDocumentId: () => string | null) {
   const viewportCapability = useCapability<ViewportPlugin>('viewport');
   const zoomCapability = useZoomCapability();
 
   let elementRef = $state<HTMLDivElement | null>(null);
   let cleanup: (() => void) | undefined;
 
+  // Reactive documentId
+  const documentId = $derived(getDocumentId());
+
   $effect(() => {
     const element = elementRef;
     const viewport = viewportCapability.provides;
     const zoom = zoomCapability.provides;
+    const docId = documentId;
 
     // Clean up previous setup
     if (cleanup) {
@@ -26,13 +30,13 @@ export function usePinch(documentId: string) {
     }
 
     // Setup new pinch zoom if all dependencies are available
-    if (!element || !viewport || !zoom) {
+    if (!element || !viewport || !zoom || !docId) {
       return;
     }
 
     cleanup = setupPinchZoom({
       element,
-      documentId,
+      documentId: docId,
       viewportProvides: viewport,
       zoomProvides: zoom,
     });

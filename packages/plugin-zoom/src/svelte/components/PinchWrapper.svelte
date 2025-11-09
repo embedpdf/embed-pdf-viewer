@@ -10,7 +10,7 @@
   };
 
   let { documentId, children, class: propsClass, ...restProps }: PinchWrapperProps = $props();
-  const pinch = usePinch(documentId);
+  const pinch = usePinch(() => documentId);
 </script>
 
 <div

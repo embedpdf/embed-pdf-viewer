@@ -7,25 +7,31 @@ export const useViewportCapability = () => useCapability<ViewportPlugin>(Viewpor
 /**
  * Hook to get the gated state of the viewport for a specific document.
  * The viewport children are not rendered when gated.
- * @param documentId Document ID.
+ * @param getDocumentId Function that returns the document ID
  */
-export const useIsViewportGated = (documentId: string) => {
+export const useIsViewportGated = (getDocumentId: () => string | null) => {
   const capability = useViewportCapability();
 
   let isGated = $state(false);
 
+  // Reactive documentId
+  const documentId = $derived(getDocumentId());
+
   $effect(() => {
-    if (!capability.provides) {
+    const provides = capability.provides;
+    const docId = documentId;
+
+    if (!provides || !docId) {
       isGated = false;
       return;
     }
 
     // Set initial state
-    isGated = capability.provides.isGated(documentId);
+    isGated = provides.isGated(docId);
 
     // Subscribe to gate state changes
-    return capability.provides.onGateChange((event: GateChangeEvent) => {
-      if (event.documentId === documentId) {
+    return provides.onGateChange((event: GateChangeEvent) => {
+      if (event.documentId === docId) {
         isGated = event.isGated;
       }
     });
@@ -40,9 +46,9 @@ export const useIsViewportGated = (documentId: string) => {
 
 /**
  * Hook to get scroll activity for a specific document
- * @param documentId Document ID.
+ * @param getDocumentId Function that returns the document ID
  */
-export const useViewportScrollActivity = (documentId: string) => {
+export const useViewportScrollActivity = (getDocumentId: () => string | null) => {
   const capability = useViewportCapability();
 
   let scrollActivity = $state<ScrollActivity>({
@@ -50,8 +56,14 @@ export const useViewportScrollActivity = (documentId: string) => {
     isSmoothScrolling: false,
   });
 
+  // Reactive documentId
+  const documentId = $derived(getDocumentId());
+
   $effect(() => {
-    if (!capability.provides) {
+    const provides = capability.provides;
+    const docId = documentId;
+
+    if (!provides || !docId) {
       scrollActivity = {
         isScrolling: false,
         isSmoothScrolling: false,
@@ -60,9 +72,9 @@ export const useViewportScrollActivity = (documentId: string) => {
     }
 
     // Subscribe to scroll activity events
-    return capability.provides.onScrollActivity((event) => {
+    return provides.onScrollActivity((event) => {
       // Filter by documentId
-      if (event.documentId === documentId) {
+      if (event.documentId === docId) {
         scrollActivity = event.activity;
       }
     });

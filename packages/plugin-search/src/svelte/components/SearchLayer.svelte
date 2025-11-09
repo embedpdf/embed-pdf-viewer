@@ -22,7 +22,7 @@
   }: SearchLayerProps = $props();
 
   const searchCapability = useSearchCapability();
-  const documentState = useDocumentState(documentId);
+  const documentState = useDocumentState(() => documentId);
 
   let searchResultState = $state<SearchResultState | null>(null);
 

@@ -27,7 +27,7 @@
   }: MarqueeZoomProps = $props();
 
   const zoomCapability = useZoomCapability();
-  const documentState = useDocumentState(documentId);
+  const documentState = useDocumentState(() => documentId);
 
   let rect = $state<Rect | null>(null);
 

@@ -3,24 +3,28 @@ import { useViewportPlugin } from './use-viewport.svelte';
 
 /**
  * Hook to get a ref for the viewport container element with automatic setup/teardown
- * @param documentId Document ID
+ * @param getDocumentId Function that returns the document ID
  */
-export function useViewportRef(documentId: string) {
+export function useViewportRef(getDocumentId: () => string | null) {
   const { plugin } = useViewportPlugin();
 
   let containerRef = $state<HTMLDivElement | null>(null);
+
+  // Reactive documentId
+  const documentId = $derived(getDocumentId());
 
   $effect.pre(() => {
     if (!plugin) return;
 
     const container = containerRef;
-    if (!container) return;
+    const docId = documentId;
+    if (!container || !docId) return;
 
     // Register this viewport for the document
     try {
-      plugin.registerViewport(documentId);
+      plugin.registerViewport(docId);
     } catch (error) {
-      console.error(`Failed to register viewport for document ${documentId}:`, error);
+      console.error(`Failed to register viewport for document ${docId}:`, error);
       return;
     }
 
@@ -32,11 +36,11 @@ export function useViewportRef(documentId: string) {
         size: { width: r.width, height: r.height },
       };
     };
-    plugin.registerBoundingRectProvider(documentId, provideRect);
+    plugin.registerBoundingRectProvider(docId, provideRect);
 
     // On scroll
     const onScroll = () => {
-      plugin.setViewportScrollMetrics(documentId, {
+      plugin.setViewportScrollMetrics(docId, {
         scrollTop: container.scrollTop,
         scrollLeft: container.scrollLeft,
       });
@@ -45,7 +49,7 @@ export function useViewportRef(documentId: string) {
 
     // On resize
     const resizeObserver = new ResizeObserver(() => {
-      plugin.setViewportResizeMetrics(documentId, {
+      plugin.setViewportResizeMetrics(docId, {
         width: container.offsetWidth,
         height: container.offsetHeight,
         clientWidth: container.clientWidth,
@@ -60,7 +64,7 @@ export function useViewportRef(documentId: string) {
 
     // Subscribe to scroll requests for this document
     const unsubscribeScrollRequest = plugin.onScrollRequest(
-      documentId,
+      docId,
       ({ x, y, behavior = 'auto' }) => {
         requestAnimationFrame(() => {
           container.scrollTo({ left: x, top: y, behavior });
@@ -70,8 +74,8 @@ export function useViewportRef(documentId: string) {
 
     // Store cleanup function
     return () => {
-      plugin.unregisterViewport(documentId);
-      plugin.registerBoundingRectProvider(documentId, null);
+      plugin.unregisterViewport(docId);
+      plugin.registerBoundingRectProvider(docId, null);
       container.removeEventListener('scroll', onScroll);
       resizeObserver.disconnect();
       unsubscribeScrollRequest();
