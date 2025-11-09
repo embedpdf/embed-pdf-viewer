@@ -5,12 +5,14 @@
   import { GlobalPointerProvider } from '@embedpdf/plugin-interaction-manager/svelte';
   import { usePan } from '@embedpdf/plugin-pan/svelte';
 
-  const pan = usePan();
+  let { documentId }: { documentId: string } = $props();
+
+  const pan = usePan(() => documentId);
 </script>
 
-{#snippet RenderPageSnippet(page: RenderPageProps)}
+{#snippet renderPage(page: RenderPageProps)}
   <div style:width={`${page.width}px`} style:height={`${page.height}px`} style:position="relative">
-    <RenderLayer pageIndex={page.pageIndex} scale={page.scale} class="pointer-events-none" />
+    <RenderLayer {documentId} pageIndex={page.pageIndex} class="pointer-events-none" />
   </div>
 {/snippet}
 
@@ -53,9 +55,9 @@
       </div>
     {/if}
     <div class="relative flex w-full flex-1 overflow-hidden">
-      <GlobalPointerProvider>
-        <Viewport class="flex-grow bg-gray-100">
-          <Scroller {RenderPageSnippet} />
+      <GlobalPointerProvider {documentId}>
+        <Viewport {documentId} class="flex-grow bg-gray-100">
+          <Scroller {documentId} {renderPage} />
         </Viewport>
       </GlobalPointerProvider>
     </div>

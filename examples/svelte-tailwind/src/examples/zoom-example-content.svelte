@@ -6,20 +6,16 @@
   import { PagePointerProvider } from '@embedpdf/plugin-interaction-manager/svelte';
   import { TilingLayer } from '@embedpdf/plugin-tiling/svelte';
 
-  const zoom = useZoom();
+  let { documentId }: { documentId: string } = $props();
+
+  const zoom = useZoom(() => documentId);
 </script>
 
-{#snippet RenderPageSnippet(page: RenderPageProps)}
-  <PagePointerProvider
-    pageIndex={page.pageIndex}
-    pageWidth={page.width}
-    pageHeight={page.height}
-    rotation={page.rotation}
-    scale={page.scale}
-  >
-    <RenderLayer pageIndex={page.pageIndex} />
-    <TilingLayer pageIndex={page.pageIndex} scale={page.scale} />
-    <MarqueeZoom pageIndex={page.pageIndex} scale={page.scale} />
+{#snippet renderPage(page: RenderPageProps)}
+  <PagePointerProvider {documentId} pageIndex={page.pageIndex}>
+    <RenderLayer {documentId} pageIndex={page.pageIndex} scale={1} />
+    <TilingLayer {documentId} pageIndex={page.pageIndex} />
+    <MarqueeZoom {documentId} pageIndex={page.pageIndex} />
   </PagePointerProvider>
 {/snippet}
 
@@ -114,6 +110,7 @@
     </div>
     <div class="flex-grow" style="position: relative">
       <Viewport
+        {documentId}
         style="
           background-color: #f1f3f5;
           position: absolute;
@@ -123,7 +120,7 @@
           bottom: 0;
         "
       >
-        <Scroller {RenderPageSnippet} />
+        <Scroller {documentId} {renderPage} />
       </Viewport>
     </div>
   </div>

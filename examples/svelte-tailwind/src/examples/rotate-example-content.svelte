@@ -5,19 +5,15 @@
   import { PagePointerProvider } from '@embedpdf/plugin-interaction-manager/svelte';
   import { useRotate, Rotate } from '@embedpdf/plugin-rotate/svelte';
 
-  const rotate = useRotate();
+  let { documentId }: { documentId: string } = $props();
+
+  const rotate = useRotate(() => documentId);
 </script>
 
-{#snippet RenderPageSnippet(page: RenderPageProps)}
-  <Rotate pageSize={{ width: page.width, height: page.height }}>
-    <PagePointerProvider
-      pageIndex={page.pageIndex}
-      pageWidth={page.width}
-      pageHeight={page.height}
-      rotation={page.rotation}
-      scale={page.scale}
-    >
-      <RenderLayer pageIndex={page.pageIndex} scale={page.scale} />
+{#snippet renderPage(page: RenderPageProps)}
+  <Rotate {documentId} pageIndex={page.pageIndex}>
+    <PagePointerProvider {documentId} pageIndex={page.pageIndex}>
+      <RenderLayer {documentId} pageIndex={page.pageIndex} />
     </PagePointerProvider>
   </Rotate>
 {/snippet}
@@ -75,6 +71,7 @@
     {/if}
     <div class="flex-grow" style="position: relative">
       <Viewport
+        {documentId}
         style="
           background-color: #f1f3f5;
           position: absolute;
@@ -84,7 +81,7 @@
           bottom: 0;
         "
       >
-        <Scroller {RenderPageSnippet} />
+        <Scroller {documentId} {renderPage} />
       </Viewport>
     </div>
   </div>

@@ -4,7 +4,9 @@
   import { RenderLayer } from '@embedpdf/plugin-render/svelte';
   import { useSpread, SpreadMode } from '@embedpdf/plugin-spread/svelte';
 
-  const spread = useSpread();
+  let { documentId }: { documentId: string } = $props();
+
+  const spread = useSpread(() => documentId);
 
   const modes = [
     { label: 'Single Page', value: SpreadMode.None },
@@ -13,9 +15,9 @@
   ];
 </script>
 
-{#snippet RenderPageSnippet(page: RenderPageProps)}
+{#snippet renderPage(page: RenderPageProps)}
   <div style:width={`${page.width}px`} style:height={`${page.height}px`} style:position="relative">
-    <RenderLayer pageIndex={page.pageIndex} scale={page.scale} />
+    <RenderLayer {documentId} pageIndex={page.pageIndex} scale={1} />
   </div>
 {/snippet}
 
@@ -46,6 +48,7 @@
     {/if}
     <div class="flex-grow" style="position: relative">
       <Viewport
+        {documentId}
         style="
           background-color: #f1f3f5;
           position: absolute;
@@ -55,7 +58,7 @@
           bottom: 0;
         "
       >
-        <Scroller {RenderPageSnippet} />
+        <Scroller {documentId} {renderPage} />
       </Viewport>
     </div>
   </div>
