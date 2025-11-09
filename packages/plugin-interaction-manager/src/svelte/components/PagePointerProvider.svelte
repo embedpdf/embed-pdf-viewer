@@ -29,7 +29,7 @@
 
   let ref = $state<HTMLDivElement | null>(null);
 
-  const { provides: cap } = useInteractionManagerCapability();
+  const interactionManagerCapability = useInteractionManagerCapability();
   const isPageExclusive = useIsPageExclusive(documentId);
   const documentState = useDocumentState(documentId);
 
@@ -64,10 +64,10 @@
   });
 
   $effect(() => {
-    if (!cap || !ref) return;
+    if (!interactionManagerCapability.provides || !ref) return;
 
     return createPointerProvider(
-      cap,
+      interactionManagerCapability.provides,
       { type: 'page', documentId, pageIndex },
       ref,
       convertEventToPoint || defaultConvertEventToPoint,

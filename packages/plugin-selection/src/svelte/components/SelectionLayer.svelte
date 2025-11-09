@@ -21,7 +21,7 @@
     background = 'rgba(33,150,243)',
   }: SelectionLayerProps = $props();
 
-  const { plugin: selPlugin } = useSelectionPlugin();
+  const selectionPlugin = useSelectionPlugin();
   const documentState = useDocumentState(documentId);
 
   let rects = $state<Rect[]>([]);
@@ -32,13 +32,13 @@
   );
 
   $effect(() => {
-    if (!selPlugin || !documentId) {
+    if (!selectionPlugin.plugin || !documentId) {
       rects = [];
       boundingRect = null;
       return;
     }
 
-    return selPlugin.registerSelectionOnPage({
+    return selectionPlugin.plugin.registerSelectionOnPage({
       documentId,
       pageIndex,
       onRectsChange: ({ rects: newRects, boundingRect: newBoundingRect }) => {

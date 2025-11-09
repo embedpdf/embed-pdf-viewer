@@ -22,56 +22,106 @@
      */
     dpr?: number;
     class?: string;
+    style?: string;
   }
 
+  // Single allowed $props() call
+  const allProps: RenderLayerProps = $props();
+
+  // Keep the rest reactive (Svelte will wire these to prop updates)
   let {
     documentId,
-    pageIndex,
     scale: scaleOverride,
     dpr: dprOverride,
     class: propsClass,
-    ...props
-  }: RenderLayerProps = $props();
+    style: propsStyle,
+    pageIndex,
+    ...attrs
+  } = allProps;
 
-  const { provides: renderProvides } = useRenderCapability();
+  // Local non-reactive page index that only updates on actual change
+  let localPageIndex = $state(pageIndex);
+
+  // Watcher effect: only update localPageIndex if prop actually changes
+  $effect(() => {
+    if (pageIndex !== localPageIndex) {
+      localPageIndex = pageIndex;
+    }
+  });
+
+  const renderCapability = useRenderCapability();
+
+  // Make document state follow the (reactive) documentId
   const documentState = useDocumentState(documentId);
 
   let imageUrl = $state<string | null>(null);
   let urlRef: string | null = null;
 
-  // Get refresh version from core state
+  // Track page refreshes from core
   const refreshVersion = $derived(documentState.current?.pageRefreshVersions?.[pageIndex] ?? 0);
 
-  // Determine actual render options: use overrides if provided, otherwise fall back to document state
+  // Resolve actual scale / dpr (overrides win, otherwise follow document state)
   const actualScale = $derived(
     scaleOverride !== undefined ? scaleOverride : (documentState.current?.scale ?? 1),
   );
 
   const actualDpr = $derived(dprOverride !== undefined ? dprOverride : window.devicePixelRatio);
 
-  // Render whenever inputs change (documentId, pageIndex, actualScale, actualDpr, renderProvides, refreshVersion)
+  // Effect: reruns when:
+  // - documentId changes
+  // - actualScale changes
+  // - actualDpr changes
+  // - refreshVersion changes
+  // - renderCapability.provides changes
+  // It does NOT track pageIndex reactively.
   $effect(() => {
-    if (!renderProvides) return;
+    const capability = renderCapability.provides;
+    const docId = documentId;
+    const scale = actualScale;
+    const dpr = actualDpr;
+    const refresh = refreshVersion;
+    const page = localPageIndex;
 
-    const task = renderProvides.forDocument(documentId).renderPage({
-      pageIndex,
+    if (!capability || !docId) {
+      // Cleanup if no capability/doc
+      if (urlRef) {
+        URL.revokeObjectURL(urlRef);
+        urlRef = null;
+      }
+      imageUrl = null;
+      return;
+    }
+
+    const scoped = capability.forDocument(docId);
+
+    const task = scoped.renderPage({
+      pageIndex: page,
       options: {
-        scaleFactor: actualScale,
-        dpr: actualDpr,
+        scaleFactor: scale,
+        dpr,
       },
     });
 
     task.wait((blob) => {
       const url = URL.createObjectURL(blob);
-      imageUrl = url;
+
+      // Revoke previous URL if it existed
+      if (urlRef) {
+        URL.revokeObjectURL(urlRef);
+      }
+
       urlRef = url;
+      imageUrl = url;
     }, ignore);
 
     return () => {
+      // Cleanup for this render run
       if (urlRef) {
         URL.revokeObjectURL(urlRef);
         urlRef = null;
+        imageUrl = null;
       } else {
+        // If render not finished, abort task
         task.abort({
           code: PdfErrorCode.Cancelled,
           message: 'canceled render task',
@@ -81,6 +131,7 @@
   });
 
   function handleImageLoad() {
+    // Once image is loaded, we can drop the objectURL reference
     if (urlRef) {
       URL.revokeObjectURL(urlRef);
       urlRef = null;
@@ -92,8 +143,8 @@
   <img
     src={imageUrl}
     onload={handleImageLoad}
-    {...props}
-    style="width: 100%; height: 100%;"
+    style={`width: 100%; height: 100%; ${propsStyle ?? ''}`}
+    {...attrs}
     class={propsClass}
     alt=""
   />

@@ -1,16 +1,19 @@
 <script lang="ts">
   import type { Rotation } from '@embedpdf/models';
   import type { Snippet } from 'svelte';
+  import type { HTMLAttributes } from 'svelte/elements';
   import { useDocumentState } from '@embedpdf/core/svelte';
   import { useRotatePlugin } from '../hooks';
 
-  interface RotateProps {
+  type RotateProps = HTMLAttributes<HTMLDivElement> & {
     documentId: string;
     pageIndex: number;
     rotation?: Rotation;
     scale?: number;
     children?: Snippet;
-  }
+    class?: string;
+    style?: string;
+  };
 
   let {
     documentId,
@@ -18,9 +21,12 @@
     rotation: rotationOverride,
     scale: scaleOverride,
     children,
+    class: propsClass,
+    style: propsStyle,
+    ...restProps
   }: RotateProps = $props();
 
-  const { plugin: rotatePlugin } = useRotatePlugin();
+  const rotatePlugin = useRotatePlugin();
   const documentState = useDocumentState(documentId);
 
   const page = $derived(documentState.current?.document?.pages?.[pageIndex]);
@@ -36,8 +42,8 @@
   );
 
   const matrix = $derived(
-    rotatePlugin
-      ? rotatePlugin.getMatrixAsString({
+    rotatePlugin.plugin
+      ? rotatePlugin.plugin.getMatrixAsString({
           width: width * scale,
           height: height * scale,
           rotation: rotation,
@@ -47,7 +53,14 @@
 </script>
 
 {#if page}
-  <div style:position="absolute" style:transform-origin="0 0" style:transform={matrix}>
+  <div
+    class={propsClass}
+    style:position="absolute"
+    style:transform-origin="0 0"
+    style:transform={matrix}
+    style={propsStyle}
+    {...restProps}
+  >
     {@render children?.()}
   </div>
 {/if}

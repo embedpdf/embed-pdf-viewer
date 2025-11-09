@@ -26,7 +26,7 @@
     fill = 'rgba(33,150,243,0.15)',
   }: MarqueeCaptureProps = $props();
 
-  const { provides: capturePlugin } = useCaptureCapability();
+  const captureCapability = useCaptureCapability();
   const documentState = useDocumentState(documentId);
 
   let rect = $state<Rect | null>(null);
@@ -38,11 +38,11 @@
   $effect(() => {
     rect = null;
 
-    if (!capturePlugin) {
+    if (!captureCapability.provides) {
       return;
     }
 
-    return capturePlugin.registerMarqueeOnPage({
+    return captureCapability.provides.registerMarqueeOnPage({
       documentId,
       pageIndex,
       scale: actualScale,

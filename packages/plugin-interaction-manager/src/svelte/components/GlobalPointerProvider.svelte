@@ -18,12 +18,16 @@
   }: GlobalPointerProviderProps = $props();
 
   let ref = $state<HTMLDivElement | null>(null);
-  const { provides: cap } = useInteractionManagerCapability();
+  const interactionManagerCapability = useInteractionManagerCapability();
 
   $effect(() => {
-    if (!cap || !ref) return;
+    if (!interactionManagerCapability.provides || !ref) return;
 
-    return createPointerProvider(cap, { type: 'global', documentId }, ref);
+    return createPointerProvider(
+      interactionManagerCapability.provides,
+      { type: 'global', documentId },
+      ref,
+    );
   });
 </script>
 

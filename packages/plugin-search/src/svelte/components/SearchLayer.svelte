@@ -21,12 +21,12 @@
     ...divProps
   }: SearchLayerProps = $props();
 
-  const { provides: searchProvides } = useSearchCapability();
+  const searchCapability = useSearchCapability();
   const documentState = useDocumentState(documentId);
 
   let searchResultState = $state<SearchResultState | null>(null);
 
-  const scope = $derived(searchProvides?.forDocument(documentId) ?? null);
+  const scope = $derived(searchCapability.provides?.forDocument(documentId) ?? null);
 
   const actualScale = $derived(
     scaleOverride !== undefined ? scaleOverride : (documentState.current?.scale ?? 1),
