@@ -38,6 +38,7 @@
   import PageControls from '$lib/components/PageControls.svelte';
   import NavigationBar from '$lib/components/NavigationBar.svelte';
   import { ConsoleLogger } from '@embedpdf/models';
+  import EmptyState from '$lib/components/EmptyState.svelte';
 
   const logger = new ConsoleLogger();
 
@@ -154,6 +155,10 @@
                     />
                   {/if}
 
+                  {#if !activeDocumentId}
+                    <EmptyState />
+                  {/if}
+
                   <!-- Document Content Area -->
                   {#if activeDocumentId}
                     <div id="document-content" class="flex flex-1 overflow-hidden bg-white">
@@ -180,7 +185,7 @@
                                 <GlobalPointerProvider documentId={activeDocumentId}>
                                   <Viewport class="bg-gray-100" documentId={activeDocumentId}>
                                     <Scroller documentId={activeDocumentId}>
-                                      {#snippet children(page)}
+                                      {#snippet renderPage(page)}
                                         <Rotate
                                           documentId={activeDocumentId}
                                           pageIndex={page.pageIndex}

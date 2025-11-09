@@ -42,6 +42,7 @@
   import NavigationBar from '$lib/components/NavigationBar.svelte';
   import SplitViewLayout from '$lib/components/SplitViewLayout.svelte';
   import { ConsoleLogger } from '@embedpdf/models';
+  import EmptyState from '$lib/components/EmptyState.svelte';
 
   const logger = new ConsoleLogger();
 
@@ -137,11 +138,11 @@
       ?.provides()
       ?.openFileDialog();
     openTask?.wait(
-      (result: any) => {
+      (result) => {
         context.addDocument(result.documentId);
         context.setActiveDocument(result.documentId);
       },
-      (error: any) => {
+      (error) => {
         console.error('Open file failed:', error);
       },
     );
@@ -179,86 +180,39 @@
                         ?.getPlugin<DocumentManagerPlugin>(DocumentManagerPlugin.id)
                         ?.provides()
                         ?.closeDocument(docId)}
-                    onOpenFile={() => openFileDialog(registry, context)}
+                    onOpenFile={() => (registry ? openFileDialog(registry, context) : undefined)}
                   />
 
                   {#if context.activeDocumentId}
+                    {@const documentId = context.activeDocumentId}
                     <ViewerToolbar
-                      documentId={context.activeDocumentId}
-                      onToggleSearch={() => toggleSidebar(context.activeDocumentId, 'search')}
-                      onToggleThumbnails={() =>
-                        toggleSidebar(context.activeDocumentId, 'thumbnails')}
-                      isSearchOpen={getSidebarState(context.activeDocumentId).search}
-                      isThumbnailsOpen={getSidebarState(context.activeDocumentId).thumbnails}
+                      {documentId}
+                      onToggleSearch={() => toggleSidebar(documentId, 'search')}
+                      onToggleThumbnails={() => toggleSidebar(documentId, 'thumbnails')}
+                      isSearchOpen={getSidebarState(documentId).search}
+                      isThumbnailsOpen={getSidebarState(documentId).thumbnails}
                     />
                   {/if}
 
                   <!-- Empty State - No Documents -->
                   {#if !context.activeDocumentId}
-                    <div
-                      class="flex flex-1 items-center justify-center bg-gradient-to-br from-gray-50 to-gray-100"
-                    >
-                      <div class="max-w-md text-center">
-                        <div class="mb-6 flex justify-center">
-                          <div class="rounded-full bg-indigo-100 p-6">
-                            <svg
-                              class="h-16 w-16 text-indigo-600"
-                              fill="none"
-                              stroke="currentColor"
-                              viewBox="0 0 24 24"
-                            >
-                              <path
-                                stroke-linecap="round"
-                                stroke-linejoin="round"
-                                stroke-width="1.5"
-                                d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z"
-                              />
-                              <path
-                                stroke-linecap="round"
-                                stroke-linejoin="round"
-                                stroke-width="1.5"
-                                d="M9 13h6m-6 4h6"
-                              />
-                            </svg>
-                          </div>
-                        </div>
-                        <h2 class="mb-3 text-2xl font-bold text-gray-900">No Documents Open</h2>
-                        <p class="mb-8 text-gray-600">
-                          Get started by opening a PDF document. You can view multiple documents at
-                          once using tabs and split views.
-                        </p>
-                        <button
-                          onclick={() => openFileDialog(registry, context)}
-                          class="inline-flex items-center gap-2 rounded-lg bg-indigo-600 px-6 py-3 font-semibold text-white shadow-lg transition-all hover:bg-indigo-700 hover:shadow-xl"
-                        >
-                          <svg
-                            class="h-5 w-5"
-                            fill="none"
-                            stroke="currentColor"
-                            viewBox="0 0 24 24"
-                          >
-                            <path
-                              stroke-linecap="round"
-                              stroke-linejoin="round"
-                              stroke-width="2"
-                              d="M12 4v16m8-8H4"
-                            />
-                          </svg>
-                          Open PDF Document
-                        </button>
-                        <div class="mt-6 text-sm text-gray-500">Supported format: PDF</div>
-                      </div>
-                    </div>
+                    <EmptyState
+                      onDocumentOpened={(documentId) => {
+                        context.addDocument(documentId);
+                        context.setActiveDocument(documentId);
+                      }}
+                    />
                   {/if}
 
                   <!-- Document Content Area -->
                   {#if context.activeDocumentId}
+                    {@const documentId = context.activeDocumentId}
                     <div id="document-content" class="flex flex-1 overflow-hidden bg-white">
                       <!-- Thumbnails Sidebar - Left -->
-                      {#if getSidebarState(context.activeDocumentId).thumbnails}
+                      {#if getSidebarState(documentId).thumbnails}
                         <ThumbnailsSidebar
-                          documentId={context.activeDocumentId}
-                          onClose={() => toggleSidebar(context.activeDocumentId, 'thumbnails')}
+                          {documentId}
+                          onClose={() => toggleSidebar(documentId, 'thumbnails')}
                         />
                       {/if}
 
@@ -274,42 +228,33 @@
                               <DocumentPasswordPrompt {documentState} />
                             {:else if isLoaded}
                               <div class="relative h-full w-full">
-                                <GlobalPointerProvider documentId={context.activeDocumentId}>
-                                  <Viewport
-                                    class="bg-gray-100"
-                                    documentId={context.activeDocumentId}
-                                  >
-                                    <Scroller documentId={context.activeDocumentId}>
-                                      {#snippet children(page)}
+                                <GlobalPointerProvider {documentId}>
+                                  <Viewport class="bg-gray-100" {documentId}>
+                                    <Scroller {documentId}>
+                                      {#snippet renderPage(page)}
                                         <Rotate
-                                          documentId={context.activeDocumentId}
+                                          {documentId}
                                           pageIndex={page.pageIndex}
                                           style="background-color: #fff"
                                         >
                                           <PagePointerProvider
-                                            documentId={context.activeDocumentId}
+                                            {documentId}
                                             pageIndex={page.pageIndex}
                                           >
                                             <RenderLayer
-                                              documentId={context.activeDocumentId}
+                                              {documentId}
                                               pageIndex={page.pageIndex}
                                               scale={1}
                                               style="pointer-events: none"
                                             />
-                                            <SearchLayer
-                                              documentId={context.activeDocumentId}
-                                              pageIndex={page.pageIndex}
-                                            />
-                                            <MarqueeZoom
-                                              documentId={context.activeDocumentId}
-                                              pageIndex={page.pageIndex}
-                                            />
+                                            <SearchLayer {documentId} pageIndex={page.pageIndex} />
+                                            <MarqueeZoom {documentId} pageIndex={page.pageIndex} />
                                             <MarqueeCapture
-                                              documentId={context.activeDocumentId}
+                                              {documentId}
                                               pageIndex={page.pageIndex}
                                             />
                                             <SelectionLayer
-                                              documentId={context.activeDocumentId}
+                                              {documentId}
                                               pageIndex={page.pageIndex}
                                             />
                                           </PagePointerProvider>
@@ -317,7 +262,7 @@
                                       {/snippet}
                                     </Scroller>
                                     <!-- Page Controls -->
-                                    <PageControls documentId={context.activeDocumentId} />
+                                    <PageControls {documentId} />
                                   </Viewport>
                                 </GlobalPointerProvider>
                               </div>
@@ -329,8 +274,8 @@
                       <!-- Search Sidebar - Right -->
                       {#if getSidebarState(context.activeDocumentId).search}
                         <SearchSidebar
-                          documentId={context.activeDocumentId}
-                          onClose={() => toggleSidebar(context.activeDocumentId, 'search')}
+                          {documentId}
+                          onClose={() => toggleSidebar(documentId, 'search')}
                         />
                       {/if}
                     </div>

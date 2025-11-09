@@ -7,10 +7,10 @@
 
   type ScrollerProps = HTMLAttributes<HTMLDivElement> & {
     documentId: string;
-    children: Snippet<[PageLayout]>;
+    renderPage: Snippet<[PageLayout]>;
   };
 
-  let { documentId, children, ...restProps }: ScrollerProps = $props();
+  let { documentId, renderPage, ...restProps }: ScrollerProps = $props();
 
   const { plugin: scrollPlugin } = useScrollPlugin();
 
@@ -97,7 +97,7 @@
               style:width={`${layout.rotatedWidth}px`}
               style:height={`${layout.rotatedHeight}px`}
             >
-              {@render children(layout)}
+              {@render renderPage(layout)}
             </div>
           {/each}
         </div>

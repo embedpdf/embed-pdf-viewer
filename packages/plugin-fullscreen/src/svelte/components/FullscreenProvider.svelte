@@ -17,17 +17,20 @@
     ...restProps
   }: FullscreenProviderProps = $props();
 
-  const { provides: fullscreenCapability } = useFullscreenCapability();
-  const { plugin: fullscreenPlugin } = useFullscreenPlugin();
+  const fullscreenCapabilityState = useFullscreenCapability();
+  const fullscreenPluginState = useFullscreenPlugin();
 
   let containerRef = $state<HTMLDivElement | null>(null);
 
   // Handle fullscreen requests
   $effect(() => {
-    if (!fullscreenCapability || !fullscreenPlugin) return;
+    const capability = fullscreenCapabilityState.provides;
+    const plugin = fullscreenPluginState.plugin;
 
-    const unsub = fullscreenCapability.onRequest(async (event) => {
-      const targetSelector = fullscreenPlugin.getTargetSelector();
+    if (!capability || !plugin) return;
+
+    const unsub = capability.onRequest(async (event) => {
+      const targetSelector = plugin.getTargetSelector();
       await handleFullscreenRequest(event, containerRef, targetSelector);
     });
 
@@ -36,10 +39,12 @@
 
   // Listen for fullscreen changes
   $effect(() => {
-    if (!fullscreenPlugin) return;
+    const plugin = fullscreenPluginState.plugin;
+
+    if (!plugin) return;
 
     const handler = () => {
-      fullscreenPlugin.setFullscreenState(!!document.fullscreenElement);
+      plugin.setFullscreenState(!!document.fullscreenElement);
     };
 
     document.addEventListener('fullscreenchange', handler);

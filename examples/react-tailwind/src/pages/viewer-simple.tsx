@@ -40,6 +40,7 @@ import { ThumbnailsSidebar } from '../components/thumbnails-sidebar';
 import { PageControls } from '../components/page-controls';
 import { ConsoleLogger } from '@embedpdf/models';
 import { NavigationBar } from '../components/navigation-bar';
+import { EmptyState } from '../components/empty-state';
 
 const logger = new ConsoleLogger();
 
@@ -186,6 +187,8 @@ export function ViewerSimplePage() {
                           onModeChange={(mode) => setToolbarMode(activeDocumentId, mode)}
                         />
                       )}
+
+                      {!activeDocumentId && <EmptyState />}
 
                       {/* Document Content Area */}
                       {activeDocumentId && (
