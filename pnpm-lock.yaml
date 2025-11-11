@@ -1707,6 +1707,12 @@ importers:
       react-dom:
         specifier: '>=16.8.0'
         version: 18.3.1(react@18.3.1)
+      svelte:
+        specifier: '>=5 <6'
+        version: 5.43.5
+      vue:
+        specifier: '>=3.2.0'
+        version: 3.5.22(typescript@5.9.3)
     devDependencies:
       '@embedpdf/build':
         specifier: workspace:*
@@ -1714,6 +1720,15 @@ importers:
       '@embedpdf/core':
         specifier: workspace:*
         version: link:../core
+      '@embedpdf/plugin-render':
+        specifier: workspace:*
+        version: link:../plugin-render
+      '@embedpdf/plugin-scroll':
+        specifier: workspace:*
+        version: link:../plugin-scroll
+      '@embedpdf/plugin-viewport':
+        specifier: workspace:*
+        version: link:../plugin-viewport
       '@types/react':
         specifier: ^18.2.0
         version: 18.3.26
