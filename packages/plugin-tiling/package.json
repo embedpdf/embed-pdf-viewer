@@ -68,6 +68,23 @@
     "vue": ">=3.2.0",
     "svelte": ">=5 <6"
   },
+  "peerDependenciesMeta": {
+    "preact": {
+      "optional": true
+    },
+    "react": {
+      "optional": true
+    },
+    "react-dom": {
+      "optional": true
+    },
+    "svelte": {
+      "optional": true
+    },
+    "vue": {
+      "optional": true
+    }
+  },
   "files": [
     "dist",
     "README.md"

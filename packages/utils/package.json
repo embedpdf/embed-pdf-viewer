@@ -66,6 +66,20 @@
     "preact": "^10.26.4",
     "vue": ">=3.2.0"
   },
+  "peerDependenciesMeta": {
+    "preact": {
+      "optional": true
+    },
+    "react": {
+      "optional": true
+    },
+    "react-dom": {
+      "optional": true
+    },
+    "vue": {
+      "optional": true
+    }
+  },
   "publishConfig": {
     "access": "public"
   }
