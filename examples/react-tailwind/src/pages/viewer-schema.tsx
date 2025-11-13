@@ -156,7 +156,7 @@ export function ViewerSchemaPage() {
                 ?.openDocumentUrl({ url: 'https://snippet.embedpdf.com/ebook.pdf' });
             }}
           >
-            {({ pluginsReady }) => (
+            {({ pluginsReady, registry }) => (
               <>
                 {pluginsReady ? (
                   <DocumentContext>
@@ -167,7 +167,12 @@ export function ViewerSchemaPage() {
                           activeDocumentId={activeDocumentId}
                           onSelect={actions.select}
                           onClose={actions.close}
-                          onOpenFile={actions.openFileDialog}
+                          onOpenFile={() => {
+                            registry
+                              ?.getPlugin<DocumentManagerPlugin>(DocumentManagerPlugin.id)
+                              ?.provides()
+                              ?.openFileDialog();
+                          }}
                         />
 
                         {/* Schema-driven Toolbar and Content - only when document is active */}

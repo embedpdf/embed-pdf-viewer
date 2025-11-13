@@ -159,7 +159,7 @@ export function ViewerSimplePage() {
               ?.openDocumentUrl({ url: 'https://snippet.embedpdf.com/ebook.pdf' });
           }}
         >
-          {({ pluginsReady }) => (
+          {({ pluginsReady, registry }) => (
             <>
               {pluginsReady ? (
                 <DocumentContext>
@@ -170,7 +170,12 @@ export function ViewerSimplePage() {
                         activeDocumentId={activeDocumentId}
                         onSelect={actions.select}
                         onClose={actions.close}
-                        onOpenFile={actions.openFileDialog}
+                        onOpenFile={() => {
+                          registry
+                            ?.getPlugin<DocumentManagerPlugin>(DocumentManagerPlugin.id)
+                            ?.provides()
+                            ?.openFileDialog();
+                        }}
                       />
 
                       {activeDocumentId && (
