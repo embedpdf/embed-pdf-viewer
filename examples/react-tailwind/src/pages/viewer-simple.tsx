@@ -27,10 +27,12 @@ import { PrintPluginPackage } from '@embedpdf/plugin-print/react';
 import { SelectionLayer, SelectionPluginPackage } from '@embedpdf/plugin-selection/react';
 import { SearchLayer, SearchPluginPackage } from '@embedpdf/plugin-search/react';
 import { ThumbnailPluginPackage } from '@embedpdf/plugin-thumbnail/react';
-import { CapturePluginPackage, MarqueeCapture } from '@embedpdf/plugin-capture/react';
+import { MarqueeCapture, CapturePluginPackage } from '@embedpdf/plugin-capture/react';
 import { FullscreenPluginPackage } from '@embedpdf/plugin-fullscreen/react';
 import { HistoryPluginPackage } from '@embedpdf/plugin-history/react';
 import { AnnotationPluginPackage, AnnotationLayer } from '@embedpdf/plugin-annotation/react';
+import { CommandsPluginPackage } from '@embedpdf/plugin-commands/react';
+import { I18nPluginPackage } from '@embedpdf/plugin-i18n/react';
 import { TabBar } from '../components/tab-bar-2';
 import { ViewerToolbar, ViewMode } from '../components/viewer-toolbar';
 import { LoadingSpinner } from '../components/loading-spinner';
@@ -41,14 +43,11 @@ import { PageControls } from '../components/page-controls';
 import { ConsoleLogger } from '@embedpdf/models';
 import { NavigationBar } from '../components/navigation-bar';
 import { EmptyState } from '../components/empty-state';
+import { CommandButton } from '../components/command-button';
+import { commands } from '../config/commands';
+import { SidebarState } from '../config/types';
 
 const logger = new ConsoleLogger();
-
-// Type for tracking sidebar state per document
-type SidebarState = {
-  search: boolean;
-  thumbnails: boolean;
-};
 
 export function ViewerSimplePage() {
   const containerRef = useRef<HTMLDivElement>(null);
@@ -99,8 +98,12 @@ export function ViewerSimplePage() {
         width: 120,
         paddingY: 10,
       }),
+      createPluginRegistration(CommandsPluginPackage, {
+        commands,
+      }),
+      createPluginRegistration(I18nPluginPackage),
     ],
-    [], // Empty dependency array since these never change
+    [],
   );
 
   const toggleSidebar = (documentId: string, sidebar: keyof SidebarState) => {
@@ -153,11 +156,10 @@ export function ViewerSimplePage() {
             registry
               ?.getPlugin<DocumentManagerPlugin>(DocumentManagerPlugin.id)
               ?.provides()
-              ?.openDocumentUrl({ url: 'https://snippet.embedpdf.com/ebook.pdf' })
-              .toPromise();
+              ?.openDocumentUrl({ url: 'https://snippet.embedpdf.com/ebook.pdf' });
           }}
         >
-          {({ pluginsReady, registry }) => (
+          {({ pluginsReady }) => (
             <>
               {pluginsReady ? (
                 <DocumentContext>
@@ -168,24 +170,21 @@ export function ViewerSimplePage() {
                         activeDocumentId={activeDocumentId}
                         onSelect={actions.select}
                         onClose={actions.close}
-                        onOpenFile={() =>
-                          registry
-                            ?.getPlugin<DocumentManagerPlugin>(DocumentManagerPlugin.id)
-                            ?.provides()
-                            ?.openFileDialog()
-                        }
+                        onOpenFile={actions.openFileDialog}
                       />
 
                       {activeDocumentId && (
-                        <ViewerToolbar
-                          documentId={activeDocumentId}
-                          onToggleSearch={() => toggleSidebar(activeDocumentId, 'search')}
-                          onToggleThumbnails={() => toggleSidebar(activeDocumentId, 'thumbnails')}
-                          isSearchOpen={getSidebarState(activeDocumentId).search}
-                          isThumbnailsOpen={getSidebarState(activeDocumentId).thumbnails}
-                          mode={getToolbarMode(activeDocumentId)}
-                          onModeChange={(mode) => setToolbarMode(activeDocumentId, mode)}
-                        />
+                        <>
+                          <ViewerToolbar
+                            documentId={activeDocumentId}
+                            onToggleSearch={() => toggleSidebar(activeDocumentId, 'search')}
+                            onToggleThumbnails={() => toggleSidebar(activeDocumentId, 'thumbnails')}
+                            isSearchOpen={getSidebarState(activeDocumentId).search}
+                            isThumbnailsOpen={getSidebarState(activeDocumentId).thumbnails}
+                            mode={getToolbarMode(activeDocumentId)}
+                            onModeChange={(mode) => setToolbarMode(activeDocumentId, mode)}
+                          />
+                        </>
                       )}
 
                       {!activeDocumentId && <EmptyState />}

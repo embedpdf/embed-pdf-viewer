@@ -147,6 +147,7 @@ export interface ScrollScope {
     scale?: number,
     rotation?: Rotation,
   ): Rect | null;
+  setScrollStrategy(strategy: ScrollStrategy): void;
   onPageChange: EventHook<PageChangeEvent>;
   onScroll: EventHook<ScrollMetrics>;
   onLayoutChange: EventHook<LayoutChangePayload>;

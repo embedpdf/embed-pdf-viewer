@@ -236,7 +236,6 @@ export class ScrollPlugin extends BasePlugin<
     if (!docState) return;
 
     this.layoutReady.add(documentId);
-
     // Only run initialPage logic once on the first document
     if (this.initialPage && !this.initialPageUsed) {
       this.initialPageUsed = true;
@@ -307,6 +306,7 @@ export class ScrollPlugin extends BasePlugin<
       getLayout: () => this.getLayout(documentId),
       getRectPositionForPage: (page, rect, scale, rotation) =>
         this.getRectPositionForPage(page, rect, scale, rotation, documentId),
+      setScrollStrategy: (strategy) => this.setScrollStrategyForDocument(strategy, documentId),
       onPageChange: (listener: Listener<PageChangeEvent>) =>
         this.pageChange$.on((event) => {
           if (event.documentId === documentId) listener(event);

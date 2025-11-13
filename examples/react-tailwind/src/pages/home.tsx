@@ -39,6 +39,13 @@ export function HomePage() {
           </a>
 
           <a
+            href="#/viewer-schema"
+            className="block rounded-lg bg-emerald-600 px-6 py-3 text-center font-semibold text-white transition-colors hover:bg-emerald-700"
+          >
+            🚀 Schema-Driven Viewer (NEW!)
+          </a>
+
+          <a
             href="#/about"
             className="block rounded-lg border-2 border-gray-300 px-6 py-3 text-center font-semibold text-gray-700 transition-colors hover:border-indigo-600 hover:text-indigo-600"
           >

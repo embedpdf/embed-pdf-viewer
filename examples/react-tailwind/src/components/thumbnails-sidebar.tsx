@@ -4,26 +4,14 @@ import { CloseIcon } from './icons';
 
 type ThumbnailsSidebarProps = {
   documentId: string;
-  onClose: () => void;
+  onClose?: () => void;
 };
 
 export function ThumbnailsSidebar({ documentId, onClose }: ThumbnailsSidebarProps) {
   const { state, provides } = useScroll(documentId);
 
   return (
-    <div className="flex h-full w-56 flex-col border-r border-gray-300 bg-gray-50">
-      {/* Header */}
-      <div className="flex items-center justify-between border-b border-gray-300 bg-white px-4 py-3">
-        <h2 className="text-lg font-semibold text-gray-800">Thumbnails</h2>
-        <button
-          onClick={onClose}
-          className="rounded p-1 text-gray-500 transition-colors hover:bg-gray-100 hover:text-gray-700"
-          aria-label="Close thumbnails"
-        >
-          <CloseIcon className="h-5 w-5" />
-        </button>
-      </div>
-
+    <div className="flex h-full flex-col bg-gray-50">
       {/* Thumbnails */}
       <div className="flex-1 overflow-hidden">
         <ThumbnailsPane documentId={documentId} style={{ width: '100%', height: '100%' }}>

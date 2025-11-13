@@ -16,4 +16,4 @@ export * from './ui-plugin';
 export * from './types';
 export * from './schema';
 export * from './manifest';
-export * from './utils/schema-merger';
+export * from './utils';

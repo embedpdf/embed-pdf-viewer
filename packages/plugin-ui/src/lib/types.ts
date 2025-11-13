@@ -29,6 +29,38 @@ export interface UIDocumentState {
   panelTabs: Record<string, string>; // panelId -> activeTabId
 }
 
+/**
+ * Responsive visibility rule for a single item at a specific breakpoint
+ */
+export interface ResponsiveVisibilityRule {
+  breakpointId: string;
+  minWidth?: number;
+  maxWidth?: number;
+  visible: boolean;
+  priority: number; // Higher priority wins in conflicts
+}
+
+/**
+ * Computed responsive metadata for an item
+ */
+export interface ResponsiveItemMetadata {
+  itemId: string;
+  /** Always true for SSR/hydration - actual visibility controlled by CSS/styles */
+  shouldRender: boolean;
+  /** Ordered rules from lowest to highest breakpoint */
+  visibilityRules: ResponsiveVisibilityRule[];
+  /** Quick lookup: is visible at default/base size? */
+  defaultVisible: boolean;
+}
+
+/**
+ * Result of processing all responsive rules
+ */
+export interface ResponsiveMetadata {
+  items: Map<string, ResponsiveItemMetadata>;
+  breakpoints: Map<string, { minWidth?: number; maxWidth?: number }>;
+}
+
 // ─────────────────────────────────────────────────────────
 // Events
 // ─────────────────────────────────────────────────────────
@@ -89,6 +121,7 @@ export interface UIScope {
   setActivePanel(placement: string, slot: string, panelId: string, activeTab?: string): void;
   getActivePanel(placement: string, slot: string): string | null;
   closePanelSlot(placement: string, slot: string): void;
+  togglePanel(placement: string, slot: string, panelId: string, activeTab?: string): void;
   setPanelTab(panelId: string, tabId: string): void;
   getPanelTab(panelId: string): string | null;
 
@@ -100,6 +133,7 @@ export interface UIScope {
   // Menus
   openMenu(menuId: string, triggeredByCommandId: string, triggeredByItemId: string): void;
   closeMenu(menuId: string): void;
+  toggleMenu(menuId: string, triggeredByCommandId: string, triggeredByItemId: string): void;
   closeAllMenus(): void;
   isMenuOpen(menuId: string): boolean;
   getOpenMenus(): OpenMenuState[];
@@ -127,8 +161,21 @@ export interface UICapability {
     documentId?: string,
     activeTab?: string,
   ): void;
+  togglePanel(
+    placement: string,
+    slot: string,
+    panelId: string,
+    documentId?: string,
+    activeTab?: string,
+  ): void;
   openModal(modalId: string, documentId?: string): void;
   openMenu(
+    menuId: string,
+    triggeredByCommandId: string,
+    triggeredByItemId: string,
+    documentId?: string,
+  ): void;
+  toggleMenu(
     menuId: string,
     triggeredByCommandId: string,
     triggeredByItemId: string,

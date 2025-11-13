@@ -45,7 +45,7 @@ const HitLine = ({
 
 type SearchSidebarProps = {
   documentId: string;
-  onClose: () => void;
+  onClose?: () => void;
 };
 
 export function SearchSidebar({ documentId, onClose }: SearchSidebarProps) {
@@ -133,7 +133,7 @@ export function SearchSidebar({ documentId, onClose }: SearchSidebarProps) {
   const grouped = groupByPage(state.results);
 
   return (
-    <div className="flex h-full w-80 flex-col border-l border-gray-300 bg-white">
+    <div className="flex h-full flex-col bg-white">
       {/* Header */}
       <div className="flex items-center justify-between border-b border-gray-300 px-4 py-3">
         <h2 className="text-lg font-semibold text-gray-800">Search</h2>

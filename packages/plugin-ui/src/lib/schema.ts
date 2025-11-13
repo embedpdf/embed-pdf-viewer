@@ -33,6 +33,7 @@ export interface CustomComponentItem {
  */
 export type ToolbarItem =
   | CommandButtonItem
+  | TabGroupItem
   | DividerItem
   | SpacerItem
   | GroupItem
@@ -53,6 +54,23 @@ export interface ToolbarSchema {
 
   // Responsive behavior
   responsive?: ResponsiveRules;
+}
+
+export interface TabGroupItem {
+  type: 'tab-group';
+  id: string;
+  tabs: TabItem[];
+  defaultTab?: string;
+  variant?: 'pills' | 'underline' | 'enclosed';
+  alignment?: 'start' | 'center' | 'end';
+}
+
+export interface TabItem {
+  id: string;
+  labelKey?: string; // i18n key
+  label?: string; // Fallback label
+  commandId?: string; // Optional: command executed when tab selected
+  variant?: 'icon' | 'text' | 'icon-text';
 }
 
 export interface CommandButtonItem {
@@ -91,6 +109,9 @@ export interface MenuSchema {
 
   // Menu structure
   items: MenuItem[];
+
+  // Responsive behavior
+  responsive?: ResponsiveRules;
 }
 
 /**
@@ -105,11 +126,13 @@ export type MenuItem =
 
 export interface MenuCommandItem {
   type: 'command';
+  id: string;
   commandId: string;
 }
 
 export interface MenuSectionItem {
   type: 'section';
+  id: string;
   labelKey?: string; // i18n key
   label?: string; // Fallback label
   items: MenuItem[];
@@ -126,6 +149,7 @@ export interface MenuSubmenuItem {
 
 export interface MenuDividerItem {
   type: 'divider';
+  id: string;
 }
 
 export interface MenuCustomItem {

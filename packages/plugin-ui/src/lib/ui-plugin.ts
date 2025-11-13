@@ -107,6 +107,22 @@ export class UIPlugin extends BasePlugin<UIPluginConfig, UICapability, UIState, 
         this.panelChanged$.emit(docId, { placement, slot, panelId });
       },
 
+      togglePanel: (placement, slot, panelId, documentId, activeTab) => {
+        const docId = documentId ?? this.getActiveDocumentId();
+        const slotKey = `${placement}-${slot}`;
+        const currentPanelId = this.state.documents[docId]?.activePanels[slotKey];
+
+        if (currentPanelId === panelId) {
+          // Panel is open, close it
+          this.dispatch(closePanelSlot(docId, placement, slot));
+          this.panelChanged$.emit(docId, { placement, slot, panelId: '' });
+        } else {
+          // Panel is closed or different panel is open, open it
+          this.dispatch(setActivePanel(docId, placement, slot, panelId, activeTab));
+          this.panelChanged$.emit(docId, { placement, slot, panelId });
+        }
+      },
+
       openModal: (modalId, documentId) => {
         const docId = documentId ?? this.getActiveDocumentId();
         this.dispatch(openModal(docId, modalId));
@@ -117,6 +133,19 @@ export class UIPlugin extends BasePlugin<UIPluginConfig, UICapability, UIState, 
         const docId = documentId ?? this.getActiveDocumentId();
         this.dispatch(openMenu(docId, { menuId, triggeredByCommandId, triggeredByItemId }));
         this.menuChanged$.emit(docId, { menuId, isOpen: true });
+      },
+
+      toggleMenu: (menuId, triggeredByCommandId, triggeredByItemId, documentId) => {
+        const docId = documentId ?? this.getActiveDocumentId();
+        const isOpen = !!this.state.documents[docId]?.openMenus[menuId];
+
+        if (isOpen) {
+          this.dispatch(closeMenu(docId, menuId));
+          this.menuChanged$.emit(docId, { menuId, isOpen: false });
+        } else {
+          this.dispatch(openMenu(docId, { menuId, triggeredByCommandId, triggeredByItemId }));
+          this.menuChanged$.emit(docId, { menuId, isOpen: true });
+        }
       },
 
       forDocument: (documentId) => this.createUIScope(documentId),
@@ -165,6 +194,21 @@ export class UIPlugin extends BasePlugin<UIPluginConfig, UICapability, UIState, 
         this.panelChanged$.emit(documentId, { placement, slot, panelId: '' });
       },
 
+      togglePanel: (placement, slot, panelId, activeTab) => {
+        const slotKey = `${placement}-${slot}`;
+        const currentPanelId = this.getDocumentState(documentId).activePanels[slotKey];
+
+        if (currentPanelId === panelId) {
+          // Panel is open, close it
+          this.dispatch(closePanelSlot(documentId, placement, slot));
+          this.panelChanged$.emit(documentId, { placement, slot, panelId: '' });
+        } else {
+          // Panel is closed or different panel is open, open it
+          this.dispatch(setActivePanel(documentId, placement, slot, panelId, activeTab));
+          this.panelChanged$.emit(documentId, { placement, slot, panelId });
+        }
+      },
+
       setPanelTab: (panelId, tabId) => {
         this.dispatch(setPanelTab(documentId, panelId, tabId));
       },
@@ -195,6 +239,18 @@ export class UIPlugin extends BasePlugin<UIPluginConfig, UICapability, UIState, 
       closeMenu: (menuId) => {
         this.dispatch(closeMenu(documentId, menuId));
         this.menuChanged$.emit(documentId, { menuId, isOpen: false });
+      },
+
+      toggleMenu: (menuId, triggeredByCommandId, triggeredByItemId) => {
+        const isOpen = !!this.getDocumentState(documentId).openMenus[menuId];
+
+        if (isOpen) {
+          this.dispatch(closeMenu(documentId, menuId));
+          this.menuChanged$.emit(documentId, { menuId, isOpen: false });
+        } else {
+          this.dispatch(openMenu(documentId, { menuId, triggeredByCommandId, triggeredByItemId }));
+          this.menuChanged$.emit(documentId, { menuId, isOpen: true });
+        }
       },
 
       closeAllMenus: () => {

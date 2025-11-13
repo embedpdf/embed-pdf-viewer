@@ -41,6 +41,7 @@ export function useViewportRef(documentId: string) {
 
     // On resize
     const resizeObserver = new ResizeObserver(() => {
+      console.log('[viewport] resizeObserver', documentId);
       viewportPlugin.setViewportResizeMetrics(documentId, {
         width: container.offsetWidth,
         height: container.offsetHeight,
@@ -68,6 +69,7 @@ export function useViewportRef(documentId: string) {
     return () => {
       viewportPlugin.unregisterViewport(documentId);
       viewportPlugin.registerBoundingRectProvider(documentId, null);
+      resizeObserver.disconnect();
       container.removeEventListener('scroll', onScroll);
       unsubscribeScrollRequest();
     };
