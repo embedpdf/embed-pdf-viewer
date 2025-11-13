@@ -1,5 +1,5 @@
 import { Action } from '@embedpdf/core';
-import { OpenMenuState } from './types';
+import { OpenMenuState, UISchema } from './types';
 
 export const INIT_UI_STATE = 'UI/INIT_STATE';
 export const CLEANUP_UI_STATE = 'UI/CLEANUP_STATE';
@@ -16,7 +16,7 @@ export const CLOSE_ALL_MENUS = 'UI/CLOSE_ALL_MENUS';
 
 export interface InitUIStateAction extends Action {
   type: typeof INIT_UI_STATE;
-  payload: { documentId: string };
+  payload: { documentId: string; schema: UISchema };
 }
 
 export interface CleanupUIStateAction extends Action {
@@ -95,9 +95,9 @@ export type UIAction =
   | CloseAllMenusAction;
 
 // Action creators
-export const initUIState = (documentId: string): InitUIStateAction => ({
+export const initUIState = (documentId: string, schema: UISchema): InitUIStateAction => ({
   type: INIT_UI_STATE,
-  payload: { documentId },
+  payload: { documentId, schema },
 });
 
 export const cleanupUIState = (documentId: string): CleanupUIStateAction => ({

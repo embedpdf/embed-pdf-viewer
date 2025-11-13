@@ -1,12 +1,13 @@
 import { useEffect, useRef, useState, useMemo } from 'react';
 import {
-  MenuSchema,
+  MenuRendererProps,
   MenuItem,
   resolveResponsiveMetadata,
   ResponsiveMetadata,
-} from '@embedpdf/plugin-ui';
+  useUISchema,
+  MenuSchema,
+} from '@embedpdf/plugin-ui/react';
 import { useCommand } from '@embedpdf/plugin-commands/react';
-import { useUISchema } from '@embedpdf/plugin-ui/react';
 import * as Icons from '../components/icons';
 import { resolveResponsiveClasses } from './responsive-utils';
 import { twMerge } from 'tailwind-merge';
@@ -17,6 +18,8 @@ import { twMerge } from 'tailwind-merge';
  * Renders menus defined in the UI schema with responsive behavior:
  * - Desktop: Anchored dropdown menu
  * - Mobile: Bottom sheet modal with submenu navigation
+ *
+ * This is the app's custom menu renderer, passed to UIProvider.
  */
 
 interface MenuStackItem {
@@ -25,15 +28,8 @@ interface MenuStackItem {
   title?: string;
 }
 
-interface SchemaMenuProps {
-  schema: MenuSchema;
-  documentId: string;
-  anchorEl: HTMLElement | null;
-  onClose: () => void;
-  isOpen: boolean;
-}
-
-export function SchemaMenu({ schema, documentId, anchorEl, onClose, isOpen }: SchemaMenuProps) {
+export function SchemaMenu({ schema, documentId, anchorEl, onClose }: MenuRendererProps) {
+  const isOpen = true; // Menu is always open when rendered
   const menuRef = useRef<HTMLDivElement>(null);
   const [isMobile, setIsMobile] = useState(false);
   const [position, setPosition] = useState<{ top: number; left: number } | null>(null);

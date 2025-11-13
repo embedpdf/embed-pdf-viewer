@@ -30,12 +30,29 @@ export const initialState: UIState = {
 export const uiReducer = (state = initialState, action: UIAction): UIState => {
   switch (action.type) {
     case INIT_UI_STATE: {
-      const { documentId } = action.payload;
+      const { documentId, schema } = action.payload;
+
+      // Initialize permanent toolbars from schema
+      const activeToolbars: Record<string, { toolbarId: string; isOpen: boolean }> = {};
+
+      Object.values(schema.toolbars).forEach((toolbar) => {
+        if (toolbar.permanent && toolbar.position) {
+          const slotKey = `${toolbar.position.placement}-${toolbar.position.slot}`;
+          activeToolbars[slotKey] = {
+            toolbarId: toolbar.id,
+            isOpen: true, // Permanent toolbars are always open
+          };
+        }
+      });
+
       return {
         ...state,
         documents: {
           ...state.documents,
-          [documentId]: initialDocumentState,
+          [documentId]: {
+            ...initialDocumentState,
+            activeToolbars, // Initialize with permanent toolbars
+          },
         },
       };
     }

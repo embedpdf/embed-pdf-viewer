@@ -1,4 +1,4 @@
-import { useUICapability } from './use-ui';
+import { useUICapability, useUIState } from './use-ui';
 import { useRenderers } from '../registries/renderers-registry';
 
 /**
@@ -6,11 +6,14 @@ import { useRenderers } from '../registries/renderers-registry';
  *
  * Provides simple functions to render toolbars and panels by placement+slot.
  * Always passes isOpen state to renderers so they can control animations.
+ *
+ * Automatically subscribes to UI state changes for the given document.
  */
-export function useSchemaRenderer() {
+export function useSchemaRenderer(documentId: string) {
   const renderers = useRenderers();
   const { provides } = useUICapability();
   const schema = provides?.getSchema();
+  const uiState = useUIState(documentId); // Subscribe to state changes
 
   return {
     /**
@@ -20,23 +23,16 @@ export function useSchemaRenderer() {
      *
      * @param placement - 'top' | 'bottom' | 'left' | 'right'
      * @param slot - Slot name (e.g. 'main', 'secondary')
-     * @param documentId - Document ID
      *
      * @example
      * ```tsx
-     * {renderToolbar('top', 'main', documentId)}
-     * {renderToolbar('top', 'secondary', documentId)}
+     * {renderToolbar('top', 'main')}
+     * {renderToolbar('top', 'secondary')}
      * ```
      */
-    renderToolbar: (
-      placement: 'top' | 'bottom' | 'left' | 'right',
-      slot: string,
-      documentId: string,
-    ) => {
-      if (!schema || !provides) return null;
+    renderToolbar: (placement: 'top' | 'bottom' | 'left' | 'right', slot: string) => {
+      if (!schema || !provides || !uiState) return null;
 
-      // Get toolbar slot state
-      const uiState = provides.forDocument(documentId).getState();
       const slotKey = `${placement}-${slot}`;
       const toolbarSlot = uiState.activeToolbars[slotKey];
 
@@ -80,23 +76,15 @@ export function useSchemaRenderer() {
      *
      * @param placement - 'left' | 'right' | 'top' | 'bottom'
      * @param slot - Slot name (e.g. 'main', 'secondary', 'inspector')
-     * @param documentId - Document ID
      *
      * @example
      * ```tsx
-     * {renderPanel('left', 'main', documentId)}
-     * {renderPanel('right', 'main', documentId)}
+     * {renderPanel('left', 'main')}
+     * {renderPanel('right', 'main')}
      * ```
      */
-    renderPanel: (
-      placement: 'left' | 'right' | 'top' | 'bottom',
-      slot: string,
-      documentId: string,
-    ) => {
-      if (!schema || !provides) return null;
-
-      // Get panel slot state
-      const uiState = provides.forDocument(documentId).getState();
+    renderPanel: (placement: 'left' | 'right' | 'top' | 'bottom', slot: string) => {
+      if (!schema || !provides || !uiState) return null;
       const slotKey = `${placement}-${slot}`;
       const panelSlot = uiState.activePanels[slotKey];
 
@@ -129,12 +117,11 @@ export function useSchemaRenderer() {
     },
 
     /**
-     * Helper: Get all active toolbars for a document
+     * Helper: Get all active toolbars for this document
      * Useful for batch rendering or debugging
      */
-    getActiveToolbars: (documentId: string) => {
-      if (!provides) return [];
-      const uiState = provides.forDocument(documentId).getState();
+    getActiveToolbars: () => {
+      if (!uiState) return [];
       return Object.entries(uiState.activeToolbars).map(([slotKey, toolbarSlot]) => {
         const [placement, slot] = slotKey.split('-');
         return {
@@ -147,12 +134,11 @@ export function useSchemaRenderer() {
     },
 
     /**
-     * Helper: Get all active panels for a document
+     * Helper: Get all active panels for this document
      * Useful for batch rendering or debugging
      */
-    getActivePanels: (documentId: string) => {
-      if (!provides) return [];
-      const uiState = provides.forDocument(documentId).getState();
+    getActivePanels: () => {
+      if (!uiState) return [];
       return Object.entries(uiState.activePanels).map(([slotKey, panelSlot]) => {
         const [placement, slot] = slotKey.split('-');
         return {

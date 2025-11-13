@@ -1,4 +1,4 @@
-import { useMemo, useRef, useEffect } from 'react';
+import { useMemo, useRef } from 'react';
 import { EmbedPDF } from '@embedpdf/core/react';
 import { usePdfiumEngine } from '@embedpdf/engines/react';
 import { createPluginRegistration } from '@embedpdf/core';
@@ -33,7 +33,7 @@ import { HistoryPluginPackage } from '@embedpdf/plugin-history/react';
 import { AnnotationPluginPackage, AnnotationLayer } from '@embedpdf/plugin-annotation/react';
 import { CommandsPluginPackage } from '@embedpdf/plugin-commands/react';
 import { I18nPluginPackage } from '@embedpdf/plugin-i18n/react';
-import { UIPluginPackage } from '@embedpdf/plugin-ui/react';
+import { UIPluginPackage, UIProvider, useSchemaRenderer } from '@embedpdf/plugin-ui/react';
 import { TabBar } from '../components/tab-bar-2';
 import { LoadingSpinner } from '../components/loading-spinner';
 import { DocumentPasswordPrompt } from '../components/document-password-prompt';
@@ -45,10 +45,11 @@ import { commands } from '../config/commands';
 import { viewerUISchema } from '../config/ui-schema';
 import { SchemaToolbar } from '../ui/schema-toolbar';
 import { SchemaPanel } from '../ui/schema-panel';
-import { MenuManagerProvider } from '../ui/menu-manager';
-import { AnchorRegistryProvider } from '../ui/anchor-registry';
-import { registerAllComponents } from '../ui/register-components';
-import { useUIState, useUICapability } from '@embedpdf/plugin-ui/react';
+import { SchemaMenu } from '../ui/schema-menu';
+import { CustomZoomToolbar } from '../components/custom-zoom-toolbar';
+import { ThumbnailsSidebar } from '../components/thumbnails-sidebar';
+import { SearchSidebar } from '../components/search-sidebar';
+import { OutlineSidebar } from '../components/outline-sidebar';
 
 const logger = new ConsoleLogger();
 
@@ -72,10 +73,25 @@ export function ViewerSchemaPage() {
     logger,
   });
 
-  // Register all custom components on mount
-  useEffect(() => {
-    registerAllComponents();
-  }, []);
+  // Memoize UIProvider props to prevent unnecessary remounts
+  const uiComponents = useMemo(
+    () => ({
+      'zoom-toolbar': CustomZoomToolbar,
+      'thumbnails-sidebar': ThumbnailsSidebar,
+      'search-sidebar': SearchSidebar,
+      'outline-sidebar': OutlineSidebar,
+    }),
+    [],
+  );
+
+  const uiRenderers = useMemo(
+    () => ({
+      toolbar: SchemaToolbar,
+      panel: SchemaPanel,
+      menu: SchemaMenu,
+    }),
+    [],
+  );
 
   const plugins = useMemo(
     () => [
@@ -140,228 +156,149 @@ export function ViewerSchemaPage() {
   }
 
   return (
-    <AnchorRegistryProvider>
-      <div className="flex h-screen flex-1 flex-col overflow-hidden" ref={containerRef}>
-        <NavigationBar />
+    <div className="flex h-screen flex-1 flex-col overflow-hidden" ref={containerRef}>
+      <NavigationBar />
 
-        <div className="flex flex-1 select-none flex-col overflow-hidden">
-          <EmbedPDF
-            engine={engine}
-            logger={logger}
-            plugins={plugins}
-            onInitialized={async (registry) => {
-              registry
-                ?.getPlugin<DocumentManagerPlugin>(DocumentManagerPlugin.id)
-                ?.provides()
-                ?.openDocumentUrl({ url: 'https://snippet.embedpdf.com/ebook.pdf' });
-            }}
-          >
-            {({ pluginsReady, registry }) => (
-              <>
-                {pluginsReady ? (
-                  <DocumentContext>
-                    {({ documentStates, activeDocumentId, actions }) => (
-                      <div className="flex h-full flex-col">
-                        <TabBar
-                          documentStates={documentStates}
-                          activeDocumentId={activeDocumentId}
-                          onSelect={actions.select}
-                          onClose={actions.close}
-                          onOpenFile={() => {
-                            registry
-                              ?.getPlugin<DocumentManagerPlugin>(DocumentManagerPlugin.id)
-                              ?.provides()
-                              ?.openFileDialog();
-                          }}
-                        />
+      <div className="flex flex-1 select-none flex-col overflow-hidden">
+        <EmbedPDF
+          engine={engine}
+          logger={logger}
+          plugins={plugins}
+          onInitialized={async (registry) => {
+            registry
+              ?.getPlugin<DocumentManagerPlugin>(DocumentManagerPlugin.id)
+              ?.provides()
+              ?.openDocumentUrl({ url: 'https://snippet.embedpdf.com/ebook.pdf' });
+          }}
+        >
+          {({ pluginsReady, registry }) => (
+            <>
+              {pluginsReady ? (
+                <DocumentContext>
+                  {({ documentStates, activeDocumentId, actions }) => (
+                    <div className="flex h-full flex-col">
+                      <TabBar
+                        documentStates={documentStates}
+                        activeDocumentId={activeDocumentId}
+                        onSelect={actions.select}
+                        onClose={actions.close}
+                        onOpenFile={() => {
+                          registry
+                            ?.getPlugin<DocumentManagerPlugin>(DocumentManagerPlugin.id)
+                            ?.provides()
+                            ?.openFileDialog();
+                        }}
+                      />
 
-                        {/* Schema-driven Toolbar and Content - only when document is active */}
-                        {activeDocumentId ? (
-                          <MenuManagerProvider documentId={activeDocumentId}>
-                            <SchemaToolbarRenderer documentId={activeDocumentId} />
-
-                            {/* Document Content Area */}
-                            <div
-                              id="document-content"
-                              className="flex flex-1 overflow-hidden bg-white"
-                            >
-                              {/* Left Panels */}
-                              <SchemaPanelRenderer documentId={activeDocumentId} placement="left" />
-
-                              {/* Main Viewer */}
-                              <div className="flex-1 overflow-hidden">
-                                <DocumentContent documentId={activeDocumentId}>
-                                  {({ documentState, isLoading, isError, isLoaded }) => (
-                                    <>
-                                      {isLoading && (
-                                        <div className="flex h-full items-center justify-center">
-                                          <LoadingSpinner message="Loading document..." />
-                                        </div>
-                                      )}
-                                      {isError && (
-                                        <DocumentPasswordPrompt documentState={documentState} />
-                                      )}
-                                      {isLoaded && (
-                                        <div className="relative h-full w-full">
-                                          <GlobalPointerProvider documentId={activeDocumentId}>
-                                            <Viewport
-                                              className="bg-gray-100"
-                                              documentId={activeDocumentId}
-                                            >
-                                              <Scroller
-                                                documentId={activeDocumentId}
-                                                renderPage={({ pageIndex }) => (
-                                                  <Rotate
-                                                    documentId={activeDocumentId}
-                                                    pageIndex={pageIndex}
-                                                    style={{ backgroundColor: '#fff' }}
-                                                  >
-                                                    <PagePointerProvider
-                                                      documentId={activeDocumentId}
-                                                      pageIndex={pageIndex}
-                                                    >
-                                                      <RenderLayer
-                                                        documentId={activeDocumentId}
-                                                        pageIndex={pageIndex}
-                                                        scale={1}
-                                                        style={{ pointerEvents: 'none' }}
-                                                      />
-                                                      <TilingLayer
-                                                        documentId={activeDocumentId}
-                                                        pageIndex={pageIndex}
-                                                        style={{ pointerEvents: 'none' }}
-                                                      />
-                                                      <SearchLayer
-                                                        documentId={activeDocumentId}
-                                                        pageIndex={pageIndex}
-                                                      />
-                                                      <MarqueeZoom
-                                                        documentId={activeDocumentId}
-                                                        pageIndex={pageIndex}
-                                                      />
-                                                      <MarqueeCapture
-                                                        documentId={activeDocumentId}
-                                                        pageIndex={pageIndex}
-                                                      />
-                                                      <SelectionLayer
-                                                        documentId={activeDocumentId}
-                                                        pageIndex={pageIndex}
-                                                      />
-                                                      <RedactionLayer
-                                                        documentId={activeDocumentId}
-                                                        pageIndex={pageIndex}
-                                                      />
-                                                      <AnnotationLayer
-                                                        documentId={activeDocumentId}
-                                                        pageIndex={pageIndex}
-                                                      />
-                                                    </PagePointerProvider>
-                                                  </Rotate>
-                                                )}
-                                              />
-                                              {/* Page Controls */}
-                                              <PageControls documentId={activeDocumentId} />
-                                            </Viewport>
-                                          </GlobalPointerProvider>
-                                        </div>
-                                      )}
-                                    </>
-                                  )}
-                                </DocumentContent>
-                              </div>
-
-                              {/* Right Panels */}
-                              <SchemaPanelRenderer
-                                documentId={activeDocumentId}
-                                placement="right"
-                              />
-                            </div>
-                          </MenuManagerProvider>
-                        ) : (
-                          <EmptyState />
-                        )}
-                      </div>
-                    )}
-                  </DocumentContext>
-                ) : (
-                  <div className="flex h-full items-center justify-center">
-                    <LoadingSpinner message="Initializing plugins..." />
-                  </div>
-                )}
-              </>
-            )}
-          </EmbedPDF>
-        </div>
+                      {/* Schema-driven UI with UIProvider */}
+                      {activeDocumentId ? (
+                        <UIProvider
+                          documentId={activeDocumentId}
+                          components={uiComponents}
+                          renderers={uiRenderers}
+                        >
+                          <ViewerLayout documentId={activeDocumentId} />
+                        </UIProvider>
+                      ) : (
+                        <EmptyState />
+                      )}
+                    </div>
+                  )}
+                </DocumentContext>
+              ) : (
+                <div className="flex h-full items-center justify-center">
+                  <LoadingSpinner message="Initializing plugins..." />
+                </div>
+              )}
+            </>
+          )}
+        </EmbedPDF>
       </div>
-    </AnchorRegistryProvider>
+    </div>
   );
 }
 
 /**
- * Schema Toolbar Renderer
+ * Viewer Layout
  *
- * Renders toolbars based on the UI schema from the UI plugin.
- * This renders both the main toolbar and any active secondary toolbars.
+ * Main layout component that uses useSchemaRenderer to render toolbars and panels.
+ * This component replaces the old SchemaToolbarRenderer and SchemaPanelRenderer.
  */
-function SchemaToolbarRenderer({ documentId }: { documentId: string }) {
-  const { provides } = useUICapability();
-  const uiState = useUIState(documentId);
-
-  if (!provides || !uiState) return null;
-
-  const schema = provides.getSchema();
-
-  // Get the main toolbar
-  const mainToolbar = schema.toolbars['main-toolbar'];
-
-  // Get the active secondary toolbar from UI state
-  const secondaryToolbarId = uiState.activeToolbars['top-secondary'];
-  const secondaryToolbar = secondaryToolbarId ? schema.toolbars[secondaryToolbarId] : null;
+function ViewerLayout({ documentId }: { documentId: string }) {
+  const { renderToolbar, renderPanel } = useSchemaRenderer(documentId);
 
   return (
     <>
       {/* Main Toolbar */}
-      {mainToolbar && <SchemaToolbar schema={mainToolbar} documentId={documentId} />}
+      {renderToolbar('top', 'main')}
 
-      {/* Secondary Toolbar (annotation/redaction) - shown when active */}
-      {secondaryToolbar && <SchemaToolbar schema={secondaryToolbar} documentId={documentId} />}
+      {/* Secondary Toolbar (annotation/redaction/shapes) */}
+      {renderToolbar('top', 'secondary')}
+
+      {/* Document Content Area */}
+      <div id="document-content" className="flex flex-1 overflow-hidden bg-white">
+        {/* Left Panels */}
+        {renderPanel('left', 'main')}
+
+        {/* Main Viewer */}
+        <div className="flex-1 overflow-hidden">
+          <DocumentContent documentId={documentId}>
+            {({ documentState, isLoading, isError, isLoaded }) => (
+              <>
+                {isLoading && (
+                  <div className="flex h-full items-center justify-center">
+                    <LoadingSpinner message="Loading document..." />
+                  </div>
+                )}
+                {isError && <DocumentPasswordPrompt documentState={documentState} />}
+                {isLoaded && (
+                  <div className="relative h-full w-full">
+                    <GlobalPointerProvider documentId={documentId}>
+                      <Viewport className="bg-gray-100" documentId={documentId}>
+                        <Scroller
+                          documentId={documentId}
+                          renderPage={({ pageIndex }) => (
+                            <Rotate
+                              documentId={documentId}
+                              pageIndex={pageIndex}
+                              style={{ backgroundColor: '#fff' }}
+                            >
+                              <PagePointerProvider documentId={documentId} pageIndex={pageIndex}>
+                                <RenderLayer
+                                  documentId={documentId}
+                                  pageIndex={pageIndex}
+                                  scale={1}
+                                  style={{ pointerEvents: 'none' }}
+                                />
+                                <TilingLayer
+                                  documentId={documentId}
+                                  pageIndex={pageIndex}
+                                  style={{ pointerEvents: 'none' }}
+                                />
+                                <SearchLayer documentId={documentId} pageIndex={pageIndex} />
+                                <MarqueeZoom documentId={documentId} pageIndex={pageIndex} />
+                                <MarqueeCapture documentId={documentId} pageIndex={pageIndex} />
+                                <SelectionLayer documentId={documentId} pageIndex={pageIndex} />
+                                <RedactionLayer documentId={documentId} pageIndex={pageIndex} />
+                                <AnnotationLayer documentId={documentId} pageIndex={pageIndex} />
+                              </PagePointerProvider>
+                            </Rotate>
+                          )}
+                        />
+                        {/* Page Controls */}
+                        <PageControls documentId={documentId} />
+                      </Viewport>
+                    </GlobalPointerProvider>
+                  </div>
+                )}
+              </>
+            )}
+          </DocumentContent>
+        </div>
+
+        {/* Right Panels */}
+        {renderPanel('right', 'main')}
+      </div>
     </>
   );
-}
-
-/**
- * Schema Panel Renderer
- *
- * Renders panels (sidebars) based on the UI state and schema.
- * Only renders panels that are active for the given placement.
- */
-function SchemaPanelRenderer({
-  documentId,
-  placement,
-}: {
-  documentId: string;
-  placement: 'left' | 'right';
-}) {
-  const { provides } = useUICapability();
-  const uiState = useUIState(documentId);
-
-  if (!provides || !uiState) return null;
-
-  const schema = provides.getSchema();
-  const slotKey = `${placement}-main`;
-  const activePanelId = uiState.activePanels[slotKey];
-
-  if (!activePanelId) return null;
-
-  const panelSchema = schema.panels[activePanelId];
-  if (!panelSchema) {
-    console.warn(`Panel schema not found for: ${activePanelId}`);
-    return null;
-  }
-
-  const handleClose = () => {
-    provides.forDocument(documentId).closePanelSlot(placement, 'main');
-  };
-
-  return <SchemaPanel schema={panelSchema} documentId={documentId} onClose={handleClose} />;
 }

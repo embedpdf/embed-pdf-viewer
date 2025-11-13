@@ -77,7 +77,7 @@ export class UIPlugin extends BasePlugin<UIPluginConfig, UICapability, UIState, 
   }
 
   protected override onDocumentLoadingStarted(documentId: string): void {
-    this.dispatch(initUIState(documentId));
+    this.dispatch(initUIState(documentId, this.schema));
   }
 
   protected override onDocumentClosed(documentId: string): void {

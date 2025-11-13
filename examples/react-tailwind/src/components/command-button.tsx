@@ -1,8 +1,7 @@
 import { useCommand } from '@embedpdf/plugin-commands/react';
-import { useEffect, useRef } from 'react';
+import { useRegisterAnchor } from '@embedpdf/plugin-ui/react';
 import { ToolbarButton } from './ui';
 import * as Icons from './icons';
-import { useAnchorRegistry } from '../ui/anchor-registry';
 
 type CommandButtonProps = {
   commandId: string;
@@ -27,18 +26,10 @@ export function CommandButton({
   className,
 }: CommandButtonProps) {
   const command = useCommand(commandId, documentId);
-  const buttonRef = useRef<HTMLButtonElement>(null);
-  const anchorRegistry = useAnchorRegistry();
-
-  // Register this button with the anchor registry
+  // Register this button with the anchor registry if itemId is provided
   // This allows menus to anchor to it when opened via UI state changes
-  // Scoped by documentId to support multiple documents
-  useEffect(() => {
-    if (itemId && buttonRef.current) {
-      anchorRegistry.register(documentId, itemId, buttonRef.current);
-      return () => anchorRegistry.unregister(documentId, itemId);
-    }
-  }, [documentId, itemId, anchorRegistry]);
+  const finalItemId = itemId || commandId;
+  const anchorRef = useRegisterAnchor(documentId, finalItemId);
 
   if (!command) return null;
 
@@ -52,7 +43,7 @@ export function CommandButton({
 
   return (
     <ToolbarButton
-      ref={buttonRef}
+      ref={anchorRef}
       onClick={() => command.execute()}
       isActive={command.active}
       disabled={command.disabled || !command.visible}

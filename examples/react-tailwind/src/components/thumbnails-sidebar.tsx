@@ -1,6 +1,5 @@
 import { ThumbnailsPane, ThumbImg } from '@embedpdf/plugin-thumbnail/react';
 import { useScroll } from '@embedpdf/plugin-scroll/react';
-import { CloseIcon } from './icons';
 
 type ThumbnailsSidebarProps = {
   documentId: string;

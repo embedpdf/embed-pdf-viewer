@@ -1,7 +1,10 @@
-import { PanelSchema } from '@embedpdf/plugin-ui';
-import { useUICapability, useUIState } from '@embedpdf/plugin-ui/react';
+import {
+  PanelRendererProps,
+  useUICapability,
+  useUIState,
+  useItemRenderer,
+} from '@embedpdf/plugin-ui/react';
 import { useEffect, useMemo, useState, useRef } from 'react';
-import { renderRegisteredComponent } from './component-registry';
 import * as Icons from '../components/icons';
 
 /**
@@ -10,20 +13,19 @@ import * as Icons from '../components/icons';
  * Renders panels (sidebars) defined in the UI schema.
  * - Desktop: Side panel (left/right)
  * - Mobile: Bottom sheet with swipe gestures
+ *
+ * This is the app's custom panel renderer, passed to UIProvider.
  */
 
 type BottomSheetHeight = 'half' | 'full';
 
-interface SchemaPanelProps {
-  schema: PanelSchema;
-  documentId: string;
-  onClose?: () => void;
-}
-
-export function SchemaPanel({ schema, documentId, onClose }: SchemaPanelProps) {
+export function SchemaPanel({ schema, documentId, isOpen, onClose }: PanelRendererProps) {
+  // Only render if open (allows for animation in the future)
+  if (!isOpen) return null;
   const { position, content, width, type } = schema;
   const { provides } = useUICapability();
   const uiState = useUIState(documentId);
+  const { renderCustomComponent } = useItemRenderer();
 
   // Mobile detection - initialize immediately to prevent flash
   const [isMobile, setIsMobile] = useState(() => {
@@ -248,8 +250,7 @@ export function SchemaPanel({ schema, documentId, onClose }: SchemaPanelProps) {
 
             {/* Content */}
             <div className="flex-1 overflow-auto">
-              {renderRegisteredComponent(activeTab.componentId, {
-                documentId,
+              {renderCustomComponent(activeTab.componentId, documentId, {
                 tabId: activeTab.id,
                 onClose,
               })}
@@ -300,8 +301,7 @@ export function SchemaPanel({ schema, documentId, onClose }: SchemaPanelProps) {
 
             {/* Content */}
             <div className="flex-1 overflow-auto">
-              {renderRegisteredComponent(content.componentId, {
-                documentId,
+              {renderCustomComponent(content.componentId, documentId, {
                 onClose,
               })}
             </div>
@@ -379,8 +379,7 @@ export function SchemaPanel({ schema, documentId, onClose }: SchemaPanelProps) {
         </div>
 
         <div className="flex-1 overflow-auto">
-          {renderRegisteredComponent(activeTab.componentId, {
-            documentId,
+          {renderCustomComponent(activeTab.componentId, documentId, {
             tabId: activeTab.id,
             onClose,
           })}
@@ -392,8 +391,7 @@ export function SchemaPanel({ schema, documentId, onClose }: SchemaPanelProps) {
   if (content.type === 'component') {
     return (
       <div className={`${positionClasses} h-full`} style={widthStyle} data-panel-id={schema.id}>
-        {renderRegisteredComponent(content.componentId, {
-          documentId,
+        {renderCustomComponent(content.componentId, documentId, {
           onClose,
         })}
       </div>

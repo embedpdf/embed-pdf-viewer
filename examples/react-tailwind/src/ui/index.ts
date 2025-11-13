@@ -2,12 +2,10 @@
  * UI Module
  *
  * This module provides schema-driven UI rendering capabilities for the PDF viewer.
+ *
+ * Components in this module are the app's custom renderers that are passed to UIProvider.
  */
 
-export * from './component-registry';
 export * from './schema-toolbar';
 export * from './schema-menu';
 export * from './schema-panel';
-export * from './menu-manager';
-export * from './register-components';
-export * from './anchor-registry';

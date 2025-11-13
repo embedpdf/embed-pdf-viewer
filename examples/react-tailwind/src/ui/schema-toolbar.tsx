@@ -2,11 +2,11 @@ import {
   resolveResponsiveMetadata,
   ResponsiveMetadata,
   ToolbarItem,
-  ToolbarSchema,
-} from '@embedpdf/plugin-ui';
+  ToolbarRendererProps,
+} from '@embedpdf/plugin-ui/react';
 import { CommandButton } from '../components/command-button';
 import { ToolbarDivider } from '../components/ui';
-import { renderRegisteredComponent } from './component-registry';
+import { useItemRenderer } from '@embedpdf/plugin-ui/react';
 import { useMemo } from 'react';
 import { resolveResponsiveClasses } from './responsive-utils';
 import { twMerge } from 'tailwind-merge';
@@ -16,18 +16,24 @@ import { twMerge } from 'tailwind-merge';
  *
  * Renders a toolbar based on a ToolbarSchema definition from the UI plugin.
  * This component interprets the schema and renders the appropriate UI elements.
+ *
+ * This is the app's custom toolbar renderer, passed to UIProvider.
  */
-
-interface SchemaToolbarProps {
-  schema: ToolbarSchema;
-  documentId: string;
-  className?: string;
-}
 
 /**
  * Main toolbar renderer
  */
-export function SchemaToolbar({ schema, documentId, className = '' }: SchemaToolbarProps) {
+export function SchemaToolbar({
+  schema,
+  documentId,
+  isOpen,
+  className = '',
+}: ToolbarRendererProps) {
+  // Only render if open (for animation support in the future)
+  if (!isOpen) {
+    return null;
+  }
+
   const responsiveMetadata = useMemo(() => resolveResponsiveMetadata(schema), [schema]);
 
   return (
@@ -255,12 +261,11 @@ function CustomComponentRenderer({
   documentId: string;
   responsiveClasses: string;
 }) {
+  const { renderCustomComponent } = useItemRenderer();
+
   return (
     <div className={twMerge(responsiveClasses)} data-item-id={item.id}>
-      {renderRegisteredComponent(item.componentId, {
-        documentId,
-        ...item.props,
-      })}
+      {renderCustomComponent(item.componentId, documentId, item.props)}
     </div>
   );
 }

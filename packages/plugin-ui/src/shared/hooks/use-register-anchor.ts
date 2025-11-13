@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef } from '@framework';
+import { useCallback, useRef } from '@framework';
 import { useAnchorRegistry } from '../registries/anchor-registry';
 
 /**
@@ -23,30 +23,33 @@ export function useRegisterAnchor(
 ): (element: HTMLElement | null) => void {
   const registry = useAnchorRegistry();
   const elementRef = useRef<HTMLElement | null>(null);
+  const documentIdRef = useRef(documentId);
+  const itemIdRef = useRef(itemId);
 
-  // Cleanup on unmount or when IDs change
-  useEffect(() => {
-    return () => {
-      if (elementRef.current) {
-        registry.unregister(documentId, itemId);
-      }
-    };
-  }, [registry, documentId, itemId]);
+  // Keep refs in sync
+  documentIdRef.current = documentId;
+  itemIdRef.current = itemId;
 
+  // Return stable callback that uses refs
   return useCallback(
     (element: HTMLElement | null) => {
-      // Unregister previous element if any
-      if (elementRef.current) {
-        registry.unregister(documentId, itemId);
-      }
+      // Store previous element
+      const previousElement = elementRef.current;
 
+      // Update ref
       elementRef.current = element;
 
-      // Register new element
+      // Handle registration/unregistration
       if (element) {
-        registry.register(documentId, itemId, element);
+        // Register new element
+        if (element !== previousElement) {
+          registry.register(documentIdRef.current, itemIdRef.current, element);
+        }
+      } else if (previousElement) {
+        // Element is now null, but we had one before - unregister
+        registry.unregister(documentIdRef.current, itemIdRef.current);
       }
     },
-    [registry, documentId, itemId],
+    [registry], // Only depend on registry!
   );
 }
