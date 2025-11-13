@@ -12,12 +12,30 @@ export interface UIState {
   documents: Record<string, UIDocumentState>;
 }
 
+/**
+ * Toolbar slot state
+ */
+export interface ToolbarSlotState {
+  toolbarId: string;
+  isOpen: boolean;
+}
+
+/**
+ * Panel slot state
+ */
+export interface PanelSlotState {
+  panelId: string;
+  isOpen: boolean;
+}
+
 export interface UIDocumentState {
   // Active toolbar per slot
-  activeToolbars: Record<string, string>; // `${placement}-${slot}` -> toolbarId
+  // `${placement}-${slot}` -> { toolbarId, isOpen }
+  activeToolbars: Record<string, ToolbarSlotState>;
 
   // Active panel per slot
-  activePanels: Record<string, string>; // `${placement}-${slot}` -> panelId
+  // `${placement}-${slot}` -> { panelId, isOpen }
+  activePanels: Record<string, PanelSlotState>;
 
   // Active modal (only one globally)
   activeModal: string | null;
@@ -116,6 +134,8 @@ export interface UIScope {
   // Toolbars
   setActiveToolbar(placement: string, slot: string, toolbarId: string): void;
   getActiveToolbar(placement: string, slot: string): string | null;
+  closeToolbarSlot(placement: string, slot: string): void;
+  isToolbarOpen(placement: string, slot: string, toolbarId?: string): boolean;
 
   // Panels
   setActivePanel(placement: string, slot: string, panelId: string, activeTab?: string): void;
@@ -124,6 +144,7 @@ export interface UIScope {
   togglePanel(placement: string, slot: string, panelId: string, activeTab?: string): void;
   setPanelTab(panelId: string, tabId: string): void;
   getPanelTab(panelId: string): string | null;
+  isPanelOpen(placement: string, slot: string, panelId?: string): boolean;
 
   // Modals
   openModal(modalId: string): void;

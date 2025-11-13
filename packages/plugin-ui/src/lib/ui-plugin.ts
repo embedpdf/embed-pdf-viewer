@@ -20,6 +20,7 @@ import {
   initUIState,
   cleanupUIState,
   setActiveToolbar,
+  closeToolbarSlot,
   setActivePanel,
   closePanelSlot,
   setPanelTab,
@@ -36,7 +37,7 @@ export class UIPlugin extends BasePlugin<UIPluginConfig, UICapability, UIState, 
 
   private schema: UISchema;
 
-  // Events with scoped emitters
+  // Events
   private readonly toolbarChanged$ = createScopedEmitter<
     ToolbarChangedData,
     ToolbarChangedEvent,
@@ -110,14 +111,12 @@ export class UIPlugin extends BasePlugin<UIPluginConfig, UICapability, UIState, 
       togglePanel: (placement, slot, panelId, documentId, activeTab) => {
         const docId = documentId ?? this.getActiveDocumentId();
         const slotKey = `${placement}-${slot}`;
-        const currentPanelId = this.state.documents[docId]?.activePanels[slotKey];
+        const panelSlot = this.state.documents[docId]?.activePanels[slotKey];
 
-        if (currentPanelId === panelId) {
-          // Panel is open, close it
+        if (panelSlot?.panelId === panelId && panelSlot?.isOpen) {
           this.dispatch(closePanelSlot(docId, placement, slot));
           this.panelChanged$.emit(docId, { placement, slot, panelId: '' });
         } else {
-          // Panel is closed or different panel is open, open it
           this.dispatch(setActivePanel(docId, placement, slot, panelId, activeTab));
           this.panelChanged$.emit(docId, { placement, slot, panelId });
         }
@@ -169,6 +168,7 @@ export class UIPlugin extends BasePlugin<UIPluginConfig, UICapability, UIState, 
 
   private createUIScope(documentId: string): UIScope {
     return {
+      // ───── Toolbars ─────
       setActiveToolbar: (placement, slot, toolbarId) => {
         this.dispatch(setActiveToolbar(documentId, placement, slot, toolbarId));
         this.toolbarChanged$.emit(documentId, { placement, slot, toolbarId });
@@ -176,9 +176,23 @@ export class UIPlugin extends BasePlugin<UIPluginConfig, UICapability, UIState, 
 
       getActiveToolbar: (placement, slot) => {
         const slotKey = `${placement}-${slot}`;
-        return this.getDocumentState(documentId).activeToolbars[slotKey] ?? null;
+        const toolbarSlot = this.getDocumentState(documentId).activeToolbars[slotKey];
+        return toolbarSlot?.isOpen ? toolbarSlot.toolbarId : null;
       },
 
+      closeToolbarSlot: (placement, slot) => {
+        this.dispatch(closeToolbarSlot(documentId, placement, slot));
+        this.toolbarChanged$.emit(documentId, { placement, slot, toolbarId: '' });
+      },
+
+      isToolbarOpen: (placement, slot, toolbarId) => {
+        const slotKey = `${placement}-${slot}`;
+        const toolbarSlot = this.getDocumentState(documentId).activeToolbars[slotKey];
+        if (!toolbarSlot || !toolbarSlot.isOpen) return false;
+        return toolbarId ? toolbarSlot.toolbarId === toolbarId : true;
+      },
+
+      // ───── Panels ─────
       setActivePanel: (placement, slot, panelId, activeTab) => {
         this.dispatch(setActivePanel(documentId, placement, slot, panelId, activeTab));
         this.panelChanged$.emit(documentId, { placement, slot, panelId });
@@ -186,7 +200,8 @@ export class UIPlugin extends BasePlugin<UIPluginConfig, UICapability, UIState, 
 
       getActivePanel: (placement, slot) => {
         const slotKey = `${placement}-${slot}`;
-        return this.getDocumentState(documentId).activePanels[slotKey] ?? null;
+        const panelSlot = this.getDocumentState(documentId).activePanels[slotKey];
+        return panelSlot?.isOpen ? panelSlot.panelId : null;
       },
 
       closePanelSlot: (placement, slot) => {
@@ -196,19 +211,25 @@ export class UIPlugin extends BasePlugin<UIPluginConfig, UICapability, UIState, 
 
       togglePanel: (placement, slot, panelId, activeTab) => {
         const slotKey = `${placement}-${slot}`;
-        const currentPanelId = this.getDocumentState(documentId).activePanels[slotKey];
+        const panelSlot = this.getDocumentState(documentId).activePanels[slotKey];
 
-        if (currentPanelId === panelId) {
-          // Panel is open, close it
+        if (panelSlot?.panelId === panelId && panelSlot?.isOpen) {
           this.dispatch(closePanelSlot(documentId, placement, slot));
           this.panelChanged$.emit(documentId, { placement, slot, panelId: '' });
         } else {
-          // Panel is closed or different panel is open, open it
           this.dispatch(setActivePanel(documentId, placement, slot, panelId, activeTab));
           this.panelChanged$.emit(documentId, { placement, slot, panelId });
         }
       },
 
+      isPanelOpen: (placement, slot, panelId) => {
+        const slotKey = `${placement}-${slot}`;
+        const panelSlot = this.getDocumentState(documentId).activePanels[slotKey];
+        if (!panelSlot || !panelSlot.isOpen) return false;
+        return panelId ? panelSlot.panelId === panelId : true;
+      },
+
+      // ───── Panel tabs ─────
       setPanelTab: (panelId, tabId) => {
         this.dispatch(setPanelTab(documentId, panelId, tabId));
       },
@@ -217,6 +238,7 @@ export class UIPlugin extends BasePlugin<UIPluginConfig, UICapability, UIState, 
         return this.getDocumentState(documentId).panelTabs[panelId] ?? null;
       },
 
+      // ───── Modals ─────
       openModal: (modalId) => {
         this.dispatch(openModal(documentId, modalId));
         this.modalChanged$.emit(documentId, { modalId });
@@ -231,6 +253,7 @@ export class UIPlugin extends BasePlugin<UIPluginConfig, UICapability, UIState, 
         return this.getDocumentState(documentId).activeModal;
       },
 
+      // ───── Menus ─────
       openMenu: (menuId, triggeredByCommandId, triggeredByItemId) => {
         this.dispatch(openMenu(documentId, { menuId, triggeredByCommandId, triggeredByItemId }));
         this.menuChanged$.emit(documentId, { menuId, isOpen: true });
@@ -265,10 +288,12 @@ export class UIPlugin extends BasePlugin<UIPluginConfig, UICapability, UIState, 
         return Object.values(this.getDocumentState(documentId).openMenus);
       },
 
+      // ───── Schema & state ─────
       getSchema: () => this.schema,
 
       getState: () => this.getDocumentState(documentId),
 
+      // ───── Scoped events ─────
       onToolbarChanged: this.toolbarChanged$.forScope(documentId),
       onPanelChanged: this.panelChanged$.forScope(documentId),
       onModalChanged: this.modalChanged$.forScope(documentId),

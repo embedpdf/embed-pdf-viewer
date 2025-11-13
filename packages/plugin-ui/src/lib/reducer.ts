@@ -6,6 +6,7 @@ import {
   SET_ACTIVE_TOOLBAR,
   SET_ACTIVE_PANEL,
   CLOSE_PANEL_SLOT,
+  CLOSE_TOOLBAR_SLOT,
   SET_PANEL_TAB,
   OPEN_MODAL,
   CLOSE_MODAL,
@@ -61,7 +62,10 @@ export const uiReducer = (state = initialState, action: UIAction): UIState => {
             ...docState,
             activeToolbars: {
               ...docState.activeToolbars,
-              [slotKey]: toolbarId,
+              [slotKey]: {
+                toolbarId,
+                isOpen: true,
+              },
             },
           },
         },
@@ -81,7 +85,10 @@ export const uiReducer = (state = initialState, action: UIAction): UIState => {
             ...docState,
             activePanels: {
               ...docState.activePanels,
-              [slotKey]: panelId,
+              [slotKey]: {
+                panelId,
+                isOpen: true,
+              },
             },
             ...(activeTab && {
               panelTabs: {
@@ -100,7 +107,10 @@ export const uiReducer = (state = initialState, action: UIAction): UIState => {
       if (!docState) return state;
 
       const slotKey = `${placement}-${slot}`;
-      const { [slotKey]: removed, ...remainingPanels } = docState.activePanels;
+      const panelSlot = docState.activePanels[slotKey];
+
+      // If no panel in this slot, nothing to close
+      if (!panelSlot) return state;
 
       return {
         ...state,
@@ -108,7 +118,42 @@ export const uiReducer = (state = initialState, action: UIAction): UIState => {
           ...state.documents,
           [documentId]: {
             ...docState,
-            activePanels: remainingPanels,
+            activePanels: {
+              ...docState.activePanels,
+              [slotKey]: {
+                ...panelSlot,
+                isOpen: false, // Keep panel, just close it
+              },
+            },
+          },
+        },
+      };
+    }
+
+    case CLOSE_TOOLBAR_SLOT: {
+      const { documentId, placement, slot } = action.payload;
+      const docState = state.documents[documentId];
+      if (!docState) return state;
+
+      const slotKey = `${placement}-${slot}`;
+      const toolbarSlot = docState.activeToolbars[slotKey];
+
+      // If no toolbar in this slot, nothing to close
+      if (!toolbarSlot) return state;
+
+      return {
+        ...state,
+        documents: {
+          ...state.documents,
+          [documentId]: {
+            ...docState,
+            activeToolbars: {
+              ...docState.activeToolbars,
+              [slotKey]: {
+                ...toolbarSlot,
+                isOpen: false, // Keep toolbar, just close it
+              },
+            },
           },
         },
       };

@@ -4,6 +4,7 @@ import { OpenMenuState } from './types';
 export const INIT_UI_STATE = 'UI/INIT_STATE';
 export const CLEANUP_UI_STATE = 'UI/CLEANUP_STATE';
 export const SET_ACTIVE_TOOLBAR = 'UI/SET_ACTIVE_TOOLBAR';
+export const CLOSE_TOOLBAR_SLOT = 'UI/CLOSE_TOOLBAR_SLOT';
 export const SET_ACTIVE_PANEL = 'UI/SET_ACTIVE_PANEL';
 export const CLOSE_PANEL_SLOT = 'UI/CLOSE_PANEL_SLOT';
 export const SET_PANEL_TAB = 'UI/SET_PANEL_TAB';
@@ -26,6 +27,11 @@ export interface CleanupUIStateAction extends Action {
 export interface SetActiveToolbarAction extends Action {
   type: typeof SET_ACTIVE_TOOLBAR;
   payload: { documentId: string; placement: string; slot: string; toolbarId: string };
+}
+
+export interface CloseToolbarSlotAction extends Action {
+  type: typeof CLOSE_TOOLBAR_SLOT;
+  payload: { documentId: string; placement: string; slot: string };
 }
 
 export interface SetActivePanelAction extends Action {
@@ -78,6 +84,7 @@ export type UIAction =
   | InitUIStateAction
   | CleanupUIStateAction
   | SetActiveToolbarAction
+  | CloseToolbarSlotAction
   | SetActivePanelAction
   | ClosePanelSlotAction
   | SetPanelTabAction
@@ -106,6 +113,15 @@ export const setActiveToolbar = (
 ): SetActiveToolbarAction => ({
   type: SET_ACTIVE_TOOLBAR,
   payload: { documentId, placement, slot, toolbarId },
+});
+
+export const closeToolbarSlot = (
+  documentId: string,
+  placement: string,
+  slot: string,
+): CloseToolbarSlotAction => ({
+  type: CLOSE_TOOLBAR_SLOT,
+  payload: { documentId, placement, slot },
 });
 
 export const setActivePanel = (

@@ -19,7 +19,7 @@ import { ExportPlugin } from '@embedpdf/plugin-export/react';
 import { DocumentManagerPlugin } from '@embedpdf/plugin-document-manager/react';
 import { HISTORY_PLUGIN_ID, HistoryPlugin } from '@embedpdf/plugin-history/react';
 import { State } from './types';
-import { UI_PLUGIN_ID, UIPlugin } from '@embedpdf/plugin-ui';
+import { isToolbarOpen, UI_PLUGIN_ID, UIPlugin } from '@embedpdf/plugin-ui';
 import { ScrollPlugin, ScrollStrategy } from '@embedpdf/plugin-scroll/react';
 import { InteractionManagerPlugin } from '@embedpdf/plugin-interaction-manager';
 
@@ -426,7 +426,10 @@ export const commands: Record<string, Command<State>> = {
     },
     active: ({ state, documentId }) => {
       const uiState = state.plugins['ui']?.documents[documentId];
-      return uiState?.activePanels['left-main'] === 'thumbnails-panel';
+      return (
+        uiState?.activePanels['left-main']?.panelId === 'thumbnails-panel' &&
+        uiState?.activePanels['left-main']?.isOpen
+      );
     },
   },
 
@@ -449,7 +452,10 @@ export const commands: Record<string, Command<State>> = {
     },
     active: ({ state, documentId }) => {
       const uiState = state.plugins['ui']?.documents[documentId];
-      return uiState?.activePanels['right-main'] === 'search-panel';
+      return (
+        uiState?.activePanels['right-main']?.panelId === 'search-panel' &&
+        uiState?.activePanels['right-main']?.isOpen
+      );
     },
   },
 
@@ -576,15 +582,11 @@ export const commands: Record<string, Command<State>> = {
     action: ({ registry, documentId }) => {
       const ui = registry.getPlugin<UIPlugin>('ui')?.provides();
       if (!ui) return;
-
-      // Clear the secondary toolbar (hide annotation/redaction toolbars)
-      const uiScope = ui.forDocument(documentId);
-      uiScope.setActiveToolbar('top', 'secondary', '');
+      ui.forDocument(documentId).closeToolbarSlot('top', 'secondary');
     },
     active: ({ state, documentId }) => {
       // Active if no secondary toolbar is shown
-      const ui = state.plugins['ui']?.documents[documentId];
-      return !ui?.activeToolbars['top-secondary'];
+      return !isToolbarOpen(state.plugins, documentId, 'top', 'secondary');
     },
   },
 
@@ -600,9 +602,7 @@ export const commands: Record<string, Command<State>> = {
       ui.setActiveToolbar('top', 'secondary', 'annotation-toolbar', documentId);
     },
     active: ({ state, documentId }) => {
-      // Active when annotation toolbar is shown
-      const ui = state.plugins['ui']?.documents[documentId];
-      return ui?.activeToolbars['top-secondary'] === 'annotation-toolbar';
+      return isToolbarOpen(state.plugins, documentId, 'top', 'secondary', 'annotation-toolbar');
     },
   },
 
@@ -618,9 +618,7 @@ export const commands: Record<string, Command<State>> = {
       ui.setActiveToolbar('top', 'secondary', 'shapes-toolbar', documentId);
     },
     active: ({ state, documentId }) => {
-      // Active when annotation toolbar is shown
-      const ui = state.plugins['ui']?.documents[documentId];
-      return ui?.activeToolbars['top-secondary'] === 'shapes-toolbar';
+      return isToolbarOpen(state.plugins, documentId, 'top', 'secondary', 'shapes-toolbar');
     },
   },
 
@@ -637,8 +635,7 @@ export const commands: Record<string, Command<State>> = {
     },
     active: ({ state, documentId }) => {
       // Active when redaction toolbar is shown
-      const ui = state.plugins['ui']?.documents[documentId];
-      return ui?.activeToolbars['top-secondary'] === 'redaction-toolbar';
+      return isToolbarOpen(state.plugins, documentId, 'top', 'secondary', 'redaction-toolbar');
     },
   },
 

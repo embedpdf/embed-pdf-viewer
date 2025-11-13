@@ -67,9 +67,7 @@ export interface TabGroupItem {
 
 export interface TabItem {
   id: string;
-  labelKey?: string; // i18n key
-  label?: string; // Fallback label
-  commandId?: string; // Optional: command executed when tab selected
+  commandId: string; // Optional: command executed when tab selected
   variant?: 'icon' | 'text' | 'icon-text';
 }
 
