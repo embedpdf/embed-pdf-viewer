@@ -122,8 +122,8 @@ export interface MenuChangedEvent extends MenuChangedData {
 
 export interface OpenMenuState {
   menuId: string;
-  triggeredByCommandId: string; // Which command opened it
-  triggeredByItemId: string; // Which toolbar/menu item triggered it
+  triggeredByCommandId?: string; // Which command opened it
+  triggeredByItemId?: string; // Which toolbar/menu item triggered it
 }
 
 // ─────────────────────────────────────────────────────────

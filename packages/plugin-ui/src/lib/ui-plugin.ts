@@ -96,65 +96,29 @@ export class UIPlugin extends BasePlugin<UIPluginConfig, UICapability, UIState, 
 
   protected buildCapability(): UICapability {
     return {
-      setActiveToolbar: (placement, slot, toolbarId, documentId) => {
-        const docId = documentId ?? this.getActiveDocumentId();
-        this.dispatch(setActiveToolbar(docId, placement, slot, toolbarId));
-        this.toolbarChanged$.emit(docId, { placement, slot, toolbarId });
-      },
+      // Active document operations
+      setActiveToolbar: (placement, slot, toolbarId, documentId) =>
+        this.setToolbarForDocument(placement, slot, toolbarId, documentId),
+      setActivePanel: (placement, slot, panelId, documentId, activeTab) =>
+        this.setPanelForDocument(placement, slot, panelId, documentId, activeTab),
+      togglePanel: (placement, slot, panelId, documentId, activeTab) =>
+        this.togglePanelForDocument(placement, slot, panelId, documentId, activeTab),
+      openModal: (modalId, documentId) => this.openModalForDocument(modalId, documentId),
+      openMenu: (menuId, triggeredByCommandId, triggeredByItemId, documentId) =>
+        this.openMenuForDocument(menuId, triggeredByCommandId, triggeredByItemId, documentId),
+      toggleMenu: (menuId, triggeredByCommandId, triggeredByItemId, documentId) =>
+        this.toggleMenuForDocument(menuId, triggeredByCommandId, triggeredByItemId, documentId),
 
-      setActivePanel: (placement, slot, panelId, documentId, activeTab) => {
-        const docId = documentId ?? this.getActiveDocumentId();
-        this.dispatch(setActivePanel(docId, placement, slot, panelId, activeTab));
-        this.panelChanged$.emit(docId, { placement, slot, panelId });
-      },
-
-      togglePanel: (placement, slot, panelId, documentId, activeTab) => {
-        const docId = documentId ?? this.getActiveDocumentId();
-        const slotKey = `${placement}-${slot}`;
-        const panelSlot = this.state.documents[docId]?.activePanels[slotKey];
-
-        if (panelSlot?.panelId === panelId && panelSlot?.isOpen) {
-          this.dispatch(closePanelSlot(docId, placement, slot));
-          this.panelChanged$.emit(docId, { placement, slot, panelId: '' });
-        } else {
-          this.dispatch(setActivePanel(docId, placement, slot, panelId, activeTab));
-          this.panelChanged$.emit(docId, { placement, slot, panelId });
-        }
-      },
-
-      openModal: (modalId, documentId) => {
-        const docId = documentId ?? this.getActiveDocumentId();
-        this.dispatch(openModal(docId, modalId));
-        this.modalChanged$.emit(docId, { modalId });
-      },
-
-      openMenu: (menuId, triggeredByCommandId, triggeredByItemId, documentId) => {
-        const docId = documentId ?? this.getActiveDocumentId();
-        this.dispatch(openMenu(docId, { menuId, triggeredByCommandId, triggeredByItemId }));
-        this.menuChanged$.emit(docId, { menuId, isOpen: true });
-      },
-
-      toggleMenu: (menuId, triggeredByCommandId, triggeredByItemId, documentId) => {
-        const docId = documentId ?? this.getActiveDocumentId();
-        const isOpen = !!this.state.documents[docId]?.openMenus[menuId];
-
-        if (isOpen) {
-          this.dispatch(closeMenu(docId, menuId));
-          this.menuChanged$.emit(docId, { menuId, isOpen: false });
-        } else {
-          this.dispatch(openMenu(docId, { menuId, triggeredByCommandId, triggeredByItemId }));
-          this.menuChanged$.emit(docId, { menuId, isOpen: true });
-        }
-      },
-
+      // Document-scoped operations
       forDocument: (documentId) => this.createUIScope(documentId),
 
+      // Schema
       getSchema: () => this.schema,
-
       mergeSchema: (partial) => {
         this.schema = mergeUISchema(this.schema, partial);
       },
 
+      // Events
       onToolbarChanged: this.toolbarChanged$.onGlobal,
       onPanelChanged: this.panelChanged$.onGlobal,
       onModalChanged: this.modalChanged$.onGlobal,
@@ -163,135 +127,53 @@ export class UIPlugin extends BasePlugin<UIPluginConfig, UICapability, UIState, 
   }
 
   // ─────────────────────────────────────────────────────────
-  // Document Scope
+  // Document Scoping
   // ─────────────────────────────────────────────────────────
 
   private createUIScope(documentId: string): UIScope {
     return {
       // ───── Toolbars ─────
-      setActiveToolbar: (placement, slot, toolbarId) => {
-        this.dispatch(setActiveToolbar(documentId, placement, slot, toolbarId));
-        this.toolbarChanged$.emit(documentId, { placement, slot, toolbarId });
-      },
-
-      getActiveToolbar: (placement, slot) => {
-        const slotKey = `${placement}-${slot}`;
-        const toolbarSlot = this.getDocumentState(documentId).activeToolbars[slotKey];
-        return toolbarSlot?.isOpen ? toolbarSlot.toolbarId : null;
-      },
-
-      closeToolbarSlot: (placement, slot) => {
-        this.dispatch(closeToolbarSlot(documentId, placement, slot));
-        this.toolbarChanged$.emit(documentId, { placement, slot, toolbarId: '' });
-      },
-
-      isToolbarOpen: (placement, slot, toolbarId) => {
-        const slotKey = `${placement}-${slot}`;
-        const toolbarSlot = this.getDocumentState(documentId).activeToolbars[slotKey];
-        if (!toolbarSlot || !toolbarSlot.isOpen) return false;
-        return toolbarId ? toolbarSlot.toolbarId === toolbarId : true;
-      },
+      setActiveToolbar: (placement, slot, toolbarId) =>
+        this.setToolbarForDocument(placement, slot, toolbarId, documentId),
+      getActiveToolbar: (placement, slot) =>
+        this.getToolbarForDocument(placement, slot, documentId),
+      closeToolbarSlot: (placement, slot) =>
+        this.closeToolbarForDocument(placement, slot, documentId),
+      isToolbarOpen: (placement, slot, toolbarId) =>
+        this.isToolbarOpenForDocument(placement, slot, toolbarId, documentId),
 
       // ───── Panels ─────
-      setActivePanel: (placement, slot, panelId, activeTab) => {
-        this.dispatch(setActivePanel(documentId, placement, slot, panelId, activeTab));
-        this.panelChanged$.emit(documentId, { placement, slot, panelId });
-      },
-
-      getActivePanel: (placement, slot) => {
-        const slotKey = `${placement}-${slot}`;
-        const panelSlot = this.getDocumentState(documentId).activePanels[slotKey];
-        return panelSlot?.isOpen ? panelSlot.panelId : null;
-      },
-
-      closePanelSlot: (placement, slot) => {
-        this.dispatch(closePanelSlot(documentId, placement, slot));
-        this.panelChanged$.emit(documentId, { placement, slot, panelId: '' });
-      },
-
-      togglePanel: (placement, slot, panelId, activeTab) => {
-        const slotKey = `${placement}-${slot}`;
-        const panelSlot = this.getDocumentState(documentId).activePanels[slotKey];
-
-        if (panelSlot?.panelId === panelId && panelSlot?.isOpen) {
-          this.dispatch(closePanelSlot(documentId, placement, slot));
-          this.panelChanged$.emit(documentId, { placement, slot, panelId: '' });
-        } else {
-          this.dispatch(setActivePanel(documentId, placement, slot, panelId, activeTab));
-          this.panelChanged$.emit(documentId, { placement, slot, panelId });
-        }
-      },
-
-      isPanelOpen: (placement, slot, panelId) => {
-        const slotKey = `${placement}-${slot}`;
-        const panelSlot = this.getDocumentState(documentId).activePanels[slotKey];
-        if (!panelSlot || !panelSlot.isOpen) return false;
-        return panelId ? panelSlot.panelId === panelId : true;
-      },
+      setActivePanel: (placement, slot, panelId, activeTab) =>
+        this.setPanelForDocument(placement, slot, panelId, documentId, activeTab),
+      getActivePanel: (placement, slot) => this.getPanelForDocument(placement, slot, documentId),
+      closePanelSlot: (placement, slot) => this.closePanelForDocument(placement, slot, documentId),
+      togglePanel: (placement, slot, panelId, activeTab) =>
+        this.togglePanelForDocument(placement, slot, panelId, documentId, activeTab),
+      isPanelOpen: (placement, slot, panelId) =>
+        this.isPanelOpenForDocument(placement, slot, panelId, documentId),
 
       // ───── Panel tabs ─────
-      setPanelTab: (panelId, tabId) => {
-        this.dispatch(setPanelTab(documentId, panelId, tabId));
-      },
-
-      getPanelTab: (panelId) => {
-        return this.getDocumentState(documentId).panelTabs[panelId] ?? null;
-      },
+      setPanelTab: (panelId, tabId) => this.setPanelTabForDocument(panelId, tabId, documentId),
+      getPanelTab: (panelId) => this.getPanelTabForDocument(panelId, documentId),
 
       // ───── Modals ─────
-      openModal: (modalId) => {
-        this.dispatch(openModal(documentId, modalId));
-        this.modalChanged$.emit(documentId, { modalId });
-      },
-
-      closeModal: () => {
-        this.dispatch(closeModal(documentId));
-        this.modalChanged$.emit(documentId, { modalId: null });
-      },
-
-      getActiveModal: () => {
-        return this.getDocumentState(documentId).activeModal;
-      },
+      openModal: (modalId) => this.openModalForDocument(modalId, documentId),
+      closeModal: () => this.closeModalForDocument(documentId),
+      getActiveModal: () => this.getActiveModalForDocument(documentId),
 
       // ───── Menus ─────
-      openMenu: (menuId, triggeredByCommandId, triggeredByItemId) => {
-        this.dispatch(openMenu(documentId, { menuId, triggeredByCommandId, triggeredByItemId }));
-        this.menuChanged$.emit(documentId, { menuId, isOpen: true });
-      },
-
-      closeMenu: (menuId) => {
-        this.dispatch(closeMenu(documentId, menuId));
-        this.menuChanged$.emit(documentId, { menuId, isOpen: false });
-      },
-
-      toggleMenu: (menuId, triggeredByCommandId, triggeredByItemId) => {
-        const isOpen = !!this.getDocumentState(documentId).openMenus[menuId];
-
-        if (isOpen) {
-          this.dispatch(closeMenu(documentId, menuId));
-          this.menuChanged$.emit(documentId, { menuId, isOpen: false });
-        } else {
-          this.dispatch(openMenu(documentId, { menuId, triggeredByCommandId, triggeredByItemId }));
-          this.menuChanged$.emit(documentId, { menuId, isOpen: true });
-        }
-      },
-
-      closeAllMenus: () => {
-        this.dispatch(closeAllMenus(documentId));
-      },
-
-      isMenuOpen: (menuId) => {
-        return !!this.getDocumentState(documentId).openMenus[menuId];
-      },
-
-      getOpenMenus: () => {
-        return Object.values(this.getDocumentState(documentId).openMenus);
-      },
+      openMenu: (menuId, triggeredByCommandId, triggeredByItemId) =>
+        this.openMenuForDocument(menuId, triggeredByCommandId, triggeredByItemId, documentId),
+      closeMenu: (menuId) => this.closeMenuForDocument(menuId, documentId),
+      toggleMenu: (menuId, triggeredByCommandId, triggeredByItemId) =>
+        this.toggleMenuForDocument(menuId, triggeredByCommandId, triggeredByItemId, documentId),
+      closeAllMenus: () => this.closeAllMenusForDocument(documentId),
+      isMenuOpen: (menuId) => this.isMenuOpenForDocument(menuId, documentId),
+      getOpenMenus: () => this.getOpenMenusForDocument(documentId),
 
       // ───── Schema & state ─────
       getSchema: () => this.schema,
-
-      getState: () => this.getDocumentState(documentId),
+      getState: () => this.getDocumentStateOrThrow(documentId),
 
       // ───── Scoped events ─────
       onToolbarChanged: this.toolbarChanged$.forScope(documentId),
@@ -301,11 +183,212 @@ export class UIPlugin extends BasePlugin<UIPluginConfig, UICapability, UIState, 
     };
   }
 
-  private getDocumentState(documentId: string): UIDocumentState {
-    const state = this.state.documents[documentId];
+  // ─────────────────────────────────────────────────────────
+  // State Helpers
+  // ─────────────────────────────────────────────────────────
+
+  private getDocumentState(documentId?: string): UIDocumentState | null {
+    const id = documentId ?? this.getActiveDocumentId();
+    return this.state.documents[id] ?? null;
+  }
+
+  private getDocumentStateOrThrow(documentId?: string): UIDocumentState {
+    const state = this.getDocumentState(documentId);
     if (!state) {
-      throw new Error(`UI state not found for document: ${documentId}`);
+      throw new Error(`UI state not found for document: ${documentId ?? 'active'}`);
     }
     return state;
+  }
+
+  // ─────────────────────────────────────────────────────────
+  // Core Operations - Toolbars
+  // ─────────────────────────────────────────────────────────
+
+  private setToolbarForDocument(
+    placement: string,
+    slot: string,
+    toolbarId: string,
+    documentId?: string,
+  ): void {
+    const id = documentId ?? this.getActiveDocumentId();
+    this.dispatch(setActiveToolbar(id, placement, slot, toolbarId));
+    this.toolbarChanged$.emit(id, { placement, slot, toolbarId });
+  }
+
+  private getToolbarForDocument(
+    placement: string,
+    slot: string,
+    documentId?: string,
+  ): string | null {
+    const slotKey = `${placement}-${slot}`;
+    const toolbarSlot = this.getDocumentStateOrThrow(documentId).activeToolbars[slotKey];
+    return toolbarSlot?.isOpen ? toolbarSlot.toolbarId : null;
+  }
+
+  private closeToolbarForDocument(placement: string, slot: string, documentId?: string): void {
+    const id = documentId ?? this.getActiveDocumentId();
+    this.dispatch(closeToolbarSlot(id, placement, slot));
+    this.toolbarChanged$.emit(id, { placement, slot, toolbarId: '' });
+  }
+
+  private isToolbarOpenForDocument(
+    placement: string,
+    slot: string,
+    toolbarId?: string,
+    documentId?: string,
+  ): boolean {
+    const slotKey = `${placement}-${slot}`;
+    const toolbarSlot = this.getDocumentStateOrThrow(documentId).activeToolbars[slotKey];
+    if (!toolbarSlot || !toolbarSlot.isOpen) return false;
+    return toolbarId ? toolbarSlot.toolbarId === toolbarId : true;
+  }
+
+  // ─────────────────────────────────────────────────────────
+  // Core Operations - Panels
+  // ─────────────────────────────────────────────────────────
+
+  private setPanelForDocument(
+    placement: string,
+    slot: string,
+    panelId: string,
+    documentId?: string,
+    activeTab?: string,
+  ): void {
+    const id = documentId ?? this.getActiveDocumentId();
+    this.dispatch(setActivePanel(id, placement, slot, panelId, activeTab));
+    this.panelChanged$.emit(id, { placement, slot, panelId });
+  }
+
+  private getPanelForDocument(placement: string, slot: string, documentId?: string): string | null {
+    const slotKey = `${placement}-${slot}`;
+    const panelSlot = this.getDocumentStateOrThrow(documentId).activePanels[slotKey];
+    return panelSlot?.isOpen ? panelSlot.panelId : null;
+  }
+
+  private closePanelForDocument(placement: string, slot: string, documentId?: string): void {
+    const id = documentId ?? this.getActiveDocumentId();
+    this.dispatch(closePanelSlot(id, placement, slot));
+    this.panelChanged$.emit(id, { placement, slot, panelId: '' });
+  }
+
+  private togglePanelForDocument(
+    placement: string,
+    slot: string,
+    panelId: string,
+    documentId?: string,
+    activeTab?: string,
+  ): void {
+    const id = documentId ?? this.getActiveDocumentId();
+    const slotKey = `${placement}-${slot}`;
+    const panelSlot = this.getDocumentStateOrThrow(id).activePanels[slotKey];
+
+    if (panelSlot?.panelId === panelId && panelSlot?.isOpen) {
+      this.dispatch(closePanelSlot(id, placement, slot));
+      this.panelChanged$.emit(id, { placement, slot, panelId: '' });
+    } else {
+      this.dispatch(setActivePanel(id, placement, slot, panelId, activeTab));
+      this.panelChanged$.emit(id, { placement, slot, panelId });
+    }
+  }
+
+  private isPanelOpenForDocument(
+    placement: string,
+    slot: string,
+    panelId?: string,
+    documentId?: string,
+  ): boolean {
+    const slotKey = `${placement}-${slot}`;
+    const panelSlot = this.getDocumentStateOrThrow(documentId).activePanels[slotKey];
+    if (!panelSlot || !panelSlot.isOpen) return false;
+    return panelId ? panelSlot.panelId === panelId : true;
+  }
+
+  // ─────────────────────────────────────────────────────────
+  // Core Operations - Panel Tabs
+  // ─────────────────────────────────────────────────────────
+
+  private setPanelTabForDocument(panelId: string, tabId: string, documentId?: string): void {
+    const id = documentId ?? this.getActiveDocumentId();
+    this.dispatch(setPanelTab(id, panelId, tabId));
+  }
+
+  private getPanelTabForDocument(panelId: string, documentId?: string): string | null {
+    return this.getDocumentStateOrThrow(documentId).panelTabs[panelId] ?? null;
+  }
+
+  // ─────────────────────────────────────────────────────────
+  // Core Operations - Modals
+  // ─────────────────────────────────────────────────────────
+
+  private openModalForDocument(modalId: string, documentId?: string): void {
+    const id = documentId ?? this.getActiveDocumentId();
+    this.dispatch(openModal(id, modalId));
+    this.modalChanged$.emit(id, { modalId });
+  }
+
+  private closeModalForDocument(documentId?: string): void {
+    const id = documentId ?? this.getActiveDocumentId();
+    this.dispatch(closeModal(id));
+    this.modalChanged$.emit(id, { modalId: null });
+  }
+
+  private getActiveModalForDocument(documentId?: string): string | null {
+    return this.getDocumentStateOrThrow(documentId).activeModal;
+  }
+
+  // ─────────────────────────────────────────────────────────
+  // Core Operations - Menus
+  // ─────────────────────────────────────────────────────────
+
+  private openMenuForDocument(
+    menuId: string,
+    triggeredByCommandId?: string,
+    triggeredByItemId?: string,
+    documentId?: string,
+  ): void {
+    const id = documentId ?? this.getActiveDocumentId();
+    this.dispatch(openMenu(id, { menuId, triggeredByCommandId, triggeredByItemId }));
+    this.menuChanged$.emit(id, { menuId, isOpen: true });
+  }
+
+  private closeMenuForDocument(menuId: string, documentId?: string): void {
+    const id = documentId ?? this.getActiveDocumentId();
+    this.dispatch(closeMenu(id, menuId));
+    this.menuChanged$.emit(id, { menuId, isOpen: false });
+  }
+
+  private toggleMenuForDocument(
+    menuId: string,
+    triggeredByCommandId?: string,
+    triggeredByItemId?: string,
+    documentId?: string,
+  ): void {
+    const id = documentId ?? this.getActiveDocumentId();
+    const isOpen = !!this.getDocumentStateOrThrow(id).openMenus[menuId];
+
+    if (isOpen) {
+      this.dispatch(closeMenu(id, menuId));
+      this.menuChanged$.emit(id, { menuId, isOpen: false });
+    } else {
+      this.dispatch(openMenu(id, { menuId, triggeredByCommandId, triggeredByItemId }));
+      this.menuChanged$.emit(id, { menuId, isOpen: true });
+    }
+  }
+
+  private closeAllMenusForDocument(documentId?: string): void {
+    const id = documentId ?? this.getActiveDocumentId();
+    this.dispatch(closeAllMenus(id));
+  }
+
+  private isMenuOpenForDocument(menuId: string, documentId?: string): boolean {
+    return !!this.getDocumentStateOrThrow(documentId).openMenus[menuId];
+  }
+
+  private getOpenMenusForDocument(documentId?: string): Array<{
+    menuId: string;
+    triggeredByCommandId?: string;
+    triggeredByItemId?: string;
+  }> {
+    return Object.values(this.getDocumentStateOrThrow(documentId).openMenus);
   }
 }

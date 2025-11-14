@@ -29,7 +29,6 @@ interface MenuStackItem {
 }
 
 export function SchemaMenu({ schema, documentId, anchorEl, onClose }: MenuRendererProps) {
-  const isOpen = true; // Menu is always open when rendered
   const menuRef = useRef<HTMLDivElement>(null);
   const [isMobile, setIsMobile] = useState(false);
   const [position, setPosition] = useState<{ top: number; left: number } | null>(null);
@@ -40,12 +39,10 @@ export function SchemaMenu({ schema, documentId, anchorEl, onClose }: MenuRender
     { menuId: schema.id, schema, title: undefined },
   ]);
 
-  // Reset stack when menu opens/closes or schema changes
+  // Reset stack when schema changes
   useEffect(() => {
-    if (isOpen) {
-      setMenuStack([{ menuId: schema.id, schema, title: undefined }]);
-    }
-  }, [isOpen, schema]);
+    setMenuStack([{ menuId: schema.id, schema, title: undefined }]);
+  }, [schema]);
 
   const currentMenu = menuStack[menuStack.length - 1];
 
@@ -81,23 +78,23 @@ export function SchemaMenu({ schema, documentId, anchorEl, onClose }: MenuRender
 
   // Calculate menu position relative to anchor
   useEffect(() => {
-    if (!isOpen || !anchorEl || isMobile) return;
+    if (!anchorEl || isMobile) return;
 
     const updatePosition = () => {
       const rect = anchorEl.getBoundingClientRect();
-      const menuHeight = menuRef.current?.offsetHeight || 0;
       const menuWidth = menuRef.current?.offsetWidth || 200;
 
-      // Try to position below the anchor
+      // Always position below the anchor (prefer scrolling over going off-screen)
       let top = rect.bottom + 4;
       let left = rect.left;
 
-      // Adjust if menu goes off-screen
-      if (top + menuHeight > window.innerHeight) {
-        top = rect.top - menuHeight - 4;
-      }
+      // Only adjust horizontal position if it goes off-screen
       if (left + menuWidth > window.innerWidth) {
         left = window.innerWidth - menuWidth - 8;
+      }
+      // Ensure it doesn't go off the left edge
+      if (left < 8) {
+        left = 8;
       }
 
       setPosition({ top, left });
@@ -111,12 +108,10 @@ export function SchemaMenu({ schema, documentId, anchorEl, onClose }: MenuRender
       window.removeEventListener('scroll', updatePosition);
       window.removeEventListener('resize', updatePosition);
     };
-  }, [isOpen, anchorEl, isMobile]);
+  }, [anchorEl, isMobile]);
 
   // Close on outside click
   useEffect(() => {
-    if (!isOpen) return;
-
     const handleClickOutside = (event: MouseEvent) => {
       if (
         menuRef.current &&
@@ -135,12 +130,10 @@ export function SchemaMenu({ schema, documentId, anchorEl, onClose }: MenuRender
     return () => {
       document.removeEventListener('mousedown', handleClickOutside);
     };
-  }, [isOpen, onClose, anchorEl]);
+  }, [onClose, anchorEl]);
 
   // Close on escape key
   useEffect(() => {
-    if (!isOpen) return;
-
     const handleEscape = (event: KeyboardEvent) => {
       if (event.key === 'Escape') {
         onClose();
@@ -149,9 +142,9 @@ export function SchemaMenu({ schema, documentId, anchorEl, onClose }: MenuRender
 
     document.addEventListener('keydown', handleEscape);
     return () => document.removeEventListener('keydown', handleEscape);
-  }, [isOpen, onClose]);
+  }, [onClose]);
 
-  if (!isOpen || !currentMenu) return null;
+  if (!currentMenu) return null;
 
   if (isMobile) {
     return (
