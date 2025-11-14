@@ -1,8 +1,8 @@
 import { useCapability, usePlugin } from '@embedpdf/core/@framework';
 import {
-  initialState,
+  initialDocumentState,
+  InteractionDocumentState,
   InteractionManagerPlugin,
-  InteractionManagerState,
   PointerEventHandlersWithLifecycle,
 } from '@embedpdf/plugin-interaction-manager';
 import { useState, useEffect } from '@framework';
@@ -12,31 +12,36 @@ export const useInteractionManagerPlugin = () =>
 export const useInteractionManagerCapability = () =>
   useCapability<InteractionManagerPlugin>(InteractionManagerPlugin.id);
 
-export function useInteractionManager() {
+export function useInteractionManager(documentId: string) {
   const { provides } = useInteractionManagerCapability();
-  const [state, setState] = useState<InteractionManagerState>(initialState);
+  const [state, setState] = useState<InteractionDocumentState>(initialDocumentState);
 
   useEffect(() => {
     if (!provides) return;
-    return provides.onStateChange((state) => {
+    const scope = provides.forDocument(documentId);
+    return scope.onStateChange((state) => {
       setState(state);
     });
   }, [provides]);
 
   return {
-    provides,
+    provides: provides?.forDocument(documentId) ?? null,
     state,
   };
 }
 
-export function useCursor() {
+export function useCursor(documentId: string) {
   const { provides } = useInteractionManagerCapability();
   return {
     setCursor: (token: string, cursor: string, prio = 0) => {
-      provides?.setCursor(token, cursor, prio);
+      if (!provides) return;
+      const scope = provides.forDocument(documentId);
+      scope.setCursor(token, cursor, prio);
     },
     removeCursor: (token: string) => {
-      provides?.removeCursor(token);
+      if (!provides) return;
+      const scope = provides.forDocument(documentId);
+      scope.removeCursor(token);
     },
   };
 }
@@ -44,52 +49,59 @@ export function useCursor() {
 interface UsePointerHandlersOptions {
   modeId?: string | string[];
   pageIndex?: number;
+  documentId: string;
 }
 
-export function usePointerHandlers({ modeId, pageIndex }: UsePointerHandlersOptions) {
+export function usePointerHandlers({ modeId, pageIndex, documentId }: UsePointerHandlersOptions) {
   const { provides } = useInteractionManagerCapability();
   return {
     register: (
       handlers: PointerEventHandlersWithLifecycle,
-      options?: { modeId?: string | string[]; pageIndex?: number },
+      options?: { modeId?: string | string[]; pageIndex?: number; documentId?: string },
     ) => {
       // Use provided options or fall back to hook-level options
       const finalModeId = options?.modeId ?? modeId;
       const finalPageIndex = options?.pageIndex ?? pageIndex;
+      const finalDocumentId = options?.documentId ?? documentId;
 
       return finalModeId
         ? provides?.registerHandlers({
             modeId: finalModeId,
             handlers,
             pageIndex: finalPageIndex,
+            documentId: finalDocumentId,
           })
         : provides?.registerAlways({
             scope:
               finalPageIndex !== undefined
-                ? { type: 'page', pageIndex: finalPageIndex }
-                : { type: 'global' },
+                ? { type: 'page', documentId: finalDocumentId, pageIndex: finalPageIndex }
+                : { type: 'global', documentId: finalDocumentId },
             handlers,
           });
     },
   };
 }
 
-export function useIsPageExclusive() {
+export function useIsPageExclusive(documentId: string) {
   const { provides: cap } = useInteractionManagerCapability();
 
   const [isPageExclusive, setIsPageExclusive] = useState<boolean>(() => {
-    const m = cap?.getActiveInteractionMode();
+    if (!cap) return false;
+    const scope = cap.forDocument(documentId);
+    const m = scope.getActiveInteractionMode();
     return m?.scope === 'page' && !!m.exclusive;
   });
 
   useEffect(() => {
     if (!cap) return;
 
-    return cap.onModeChange(() => {
-      const mode = cap.getActiveInteractionMode();
+    const scope = cap.forDocument(documentId);
+
+    return scope.onModeChange(() => {
+      const mode = scope.getActiveInteractionMode();
       setIsPageExclusive(mode?.scope === 'page' && !!mode?.exclusive);
     });
-  }, [cap]);
+  }, [cap, documentId]);
 
   return isPageExclusive;
 }

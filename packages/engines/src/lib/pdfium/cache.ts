@@ -1,4 +1,6 @@
 import { WrappedPdfiumModule } from '@embedpdf/pdfium';
+import { MemoryManager } from './core/memory-manager';
+import { WasmPointer } from './types/branded';
 
 export interface CacheConfig {
   /** Time-to-live for pages in milliseconds (default: 5000ms) */
@@ -18,6 +20,7 @@ export class PdfCache {
 
   constructor(
     private readonly pdfium: WrappedPdfiumModule,
+    private readonly memoryManager: MemoryManager,
     config: CacheConfig = {},
   ) {
     this.config = { ...DEFAULT_CONFIG, ...config };
@@ -27,7 +30,7 @@ export class PdfCache {
   setDocument(id: string, filePtr: number, docPtr: number) {
     let ctx = this.docs.get(id);
     if (!ctx) {
-      ctx = new DocumentContext(filePtr, docPtr, this.pdfium, this.config);
+      ctx = new DocumentContext(filePtr, docPtr, this.pdfium, this.memoryManager, this.config);
       this.docs.set(id, ctx);
     }
   }
@@ -93,6 +96,7 @@ export class DocumentContext {
     public readonly filePtr: number,
     public readonly docPtr: number,
     pdfium: WrappedPdfiumModule,
+    private readonly memoryManager: MemoryManager,
     config: Required<CacheConfig>,
   ) {
     this.pageCache = new PageCache(pdfium, docPtr, config);
@@ -126,8 +130,8 @@ export class DocumentContext {
     // 2️⃣ close the PDFium document
     this.pageCache.pdf.FPDF_CloseDocument(this.docPtr);
 
-    // 3️⃣ free the file handle
-    this.pageCache.pdf.pdfium.wasmExports.free(this.filePtr);
+    // 3️⃣ free the file handle through memory manager for proper tracking
+    this.memoryManager.free(WasmPointer(this.filePtr));
   }
 }
 

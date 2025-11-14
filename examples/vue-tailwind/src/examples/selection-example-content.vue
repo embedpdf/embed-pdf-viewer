@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, onMounted, onUnmounted } from 'vue';
+import { ref, onMounted, onUnmounted, computed } from 'vue';
 import { Viewport } from '@embedpdf/plugin-viewport/vue';
 import { Scroller } from '@embedpdf/plugin-scroll/vue';
 import { RenderLayer } from '@embedpdf/plugin-render/vue';
@@ -11,7 +11,12 @@ import {
 import { PagePointerProvider } from '@embedpdf/plugin-interaction-manager/vue';
 import { ignore } from '@embedpdf/models';
 
-const { provides: selection } = useSelectionCapability();
+const props = defineProps<{
+  documentId: string;
+}>();
+
+const { provides: selectionCapability } = useSelectionCapability();
+const selection = computed(() => selectionCapability.value?.forDocument(props.documentId));
 const hasSelection = ref(false);
 const selectedText = ref('');
 
@@ -72,22 +77,17 @@ onUnmounted(() => {
           </button>
         </div>
         <div class="relative flex w-full flex-1 overflow-hidden">
-          <Viewport class="flex-grow bg-gray-100">
-            <Scroller>
+          <Viewport :document-id="documentId" class="flex-grow bg-gray-100">
+            <Scroller :document-id="documentId">
               <template #default="{ page }">
-                <PagePointerProvider
-                  :page-index="page.pageIndex"
-                  :page-width="page.width"
-                  :page-height="page.height"
-                  :rotation="page.rotation"
-                  :scale="page.scale"
-                >
+                <PagePointerProvider :document-id="documentId" :page-index="page.pageIndex">
                   <RenderLayer
+                    :document-id="documentId"
                     :page-index="page.pageIndex"
                     :scale="1"
                     class="pointer-events-none"
                   />
-                  <SelectionLayer :page-index="page.pageIndex" :scale="page.scale" />
+                  <SelectionLayer :document-id="documentId" :page-index="page.pageIndex" />
                 </PagePointerProvider>
               </template>
             </Scroller>

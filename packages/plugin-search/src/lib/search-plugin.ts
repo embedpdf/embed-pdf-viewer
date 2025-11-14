@@ -1,15 +1,27 @@
-import { BasePlugin, createBehaviorEmitter, PluginRegistry } from '@embedpdf/core';
+import { BasePlugin, createBehaviorEmitter, Listener, PluginRegistry } from '@embedpdf/core';
 import {
   MatchFlag,
-  PdfDocumentObject,
   SearchAllPagesResult,
   PdfEngine,
   PdfTask,
   PdfPageSearchProgress,
   PdfTaskHelper,
+  PdfErrorCode,
 } from '@embedpdf/models';
-import { SearchPluginConfig, SearchCapability, SearchState, SearchResultState } from './types';
-import { LoaderCapability, LoaderEvent, LoaderPlugin } from '@embedpdf/plugin-loader';
+import {
+  SearchPluginConfig,
+  SearchCapability,
+  SearchState,
+  SearchResultState,
+  SearchScope,
+  SearchResultEvent,
+  SearchStartEvent,
+  SearchStopEvent,
+  ActiveResultChangeEvent,
+  SearchResultStateEvent,
+  SearchStateEvent,
+  SearchDocumentState,
+} from './types';
 import {
   startSearchSession,
   stopSearchSession,
@@ -20,7 +32,10 @@ import {
   setActiveResultIndex,
   appendSearchResults,
   SearchAction,
+  initSearchState,
+  cleanupSearchState,
 } from './actions';
+import { initialSearchDocumentState } from './reducer';
 
 export class SearchPlugin extends BasePlugin<
   SearchPluginConfig,
@@ -29,223 +44,328 @@ export class SearchPlugin extends BasePlugin<
   SearchAction
 > {
   static readonly id = 'search' as const;
-  private loader: LoaderCapability;
-  private currentDocument?: PdfDocumentObject;
 
-  private readonly searchStop$ = createBehaviorEmitter();
-  private readonly searchStart$ = createBehaviorEmitter();
-  private readonly searchResult$ = createBehaviorEmitter<SearchAllPagesResult>();
-  private readonly searchActiveResultChange$ = createBehaviorEmitter<number>();
-  private readonly searchResultState$ = createBehaviorEmitter<SearchResultState>();
-  private readonly searchState$ = createBehaviorEmitter<SearchState>();
+  // Event emitters are now global and include documentId
+  private readonly searchStop$ = createBehaviorEmitter<SearchStopEvent>();
+  private readonly searchStart$ = createBehaviorEmitter<SearchStartEvent>();
+  private readonly searchResult$ = createBehaviorEmitter<SearchResultEvent>();
+  private readonly searchActiveResultChange$ = createBehaviorEmitter<ActiveResultChangeEvent>();
+  private readonly searchResultState$ = createBehaviorEmitter<SearchResultStateEvent>();
+  private readonly searchState$ = createBehaviorEmitter<SearchStateEvent>();
 
-  // keep reference to current running task (optional abort handling if your PdfTask supports it)
-  private currentTask?: ReturnType<PdfEngine['searchAllPages']>;
+  // Keep reference to current running tasks per document
+  private currentTask = new Map<string, ReturnType<PdfEngine['searchAllPages']>>();
+  private pluginConfig: SearchPluginConfig;
 
-  constructor(id: string, registry: PluginRegistry) {
+  constructor(id: string, registry: PluginRegistry, config: SearchPluginConfig) {
     super(id, registry);
-    this.loader = this.registry.getPlugin<LoaderPlugin>('loader')!.provides();
-
-    this.loader.onDocumentLoaded(this.handleDocumentLoaded.bind(this));
-    this.loader.onLoaderEvent(this.handleLoaderEvent.bind(this));
+    this.pluginConfig = config;
+    // We no longer need to listen to the loader.
+    // Document lifecycle is handled by BasePlugin hooks.
   }
 
-  private handleDocumentLoaded(doc: PdfDocumentObject): void {
-    this.currentDocument = doc;
-    if (this.state.active) {
-      this.startSearchSession();
-    }
+  protected override onDocumentLoadingStarted(documentId: string): void {
+    const initialState = {
+      ...initialSearchDocumentState,
+      flags: this.pluginConfig.flags || [],
+      showAllResults: this.pluginConfig.showAllResults ?? true,
+    };
+    this.dispatch(initSearchState(documentId, initialState));
   }
 
-  private handleLoaderEvent(event: LoaderEvent): void {
-    if (event.type === 'error' || (event.type === 'start' && this.currentDocument)) {
-      if (this.state.active) {
-        this.stopSearchSession();
+  protected override onDocumentClosed(documentId: string): void {
+    this.stopSearchSession(documentId); // Ensure any running search is stopped
+    this.dispatch(cleanupSearchState(documentId));
+    this.currentTask.delete(documentId);
+  }
+
+  async initialize(): Promise<void> {
+    // Config is now handled in onDocumentLoadingStarted
+  }
+
+  override onStoreUpdated(prevState: SearchState, newState: SearchState): void {
+    for (const documentId in newState.documents) {
+      const prevDocState = prevState.documents[documentId];
+      const newDocState = newState.documents[documentId];
+
+      if (prevDocState !== newDocState) {
+        // Emit per-document state
+        this.searchState$.emit({ documentId, state: newDocState });
+
+        // Emit reactive result state
+        if (
+          !prevDocState ||
+          prevDocState.results !== newDocState.results ||
+          prevDocState.activeResultIndex !== newDocState.activeResultIndex ||
+          prevDocState.showAllResults !== newDocState.showAllResults ||
+          prevDocState.active !== newDocState.active
+        ) {
+          this.searchResultState$.emit({
+            documentId,
+            state: {
+              results: newDocState.results,
+              activeResultIndex: newDocState.activeResultIndex,
+              showAllResults: newDocState.showAllResults,
+              active: newDocState.active,
+            },
+          });
+        }
       }
-      this.currentDocument = undefined;
     }
-  }
-
-  async initialize(config: SearchPluginConfig): Promise<void> {
-    this.dispatch(setSearchFlags(config.flags || []));
-    this.dispatch(
-      setShowAllResults(config.showAllResults !== undefined ? config.showAllResults : true),
-    );
-  }
-
-  override onStoreUpdated(_prevState: SearchState, newState: SearchState): void {
-    this.searchResultState$.emit({
-      results: newState.results,
-      activeResultIndex: newState.activeResultIndex,
-      showAllResults: newState.showAllResults,
-      active: newState.active,
-    });
-    this.searchState$.emit(newState);
   }
 
   protected buildCapability(): SearchCapability {
+    const getDocId = (documentId?: string) => documentId ?? this.getActiveDocumentId();
+    const getDocState = (docId?: string) => {
+      const id = getDocId(docId);
+      const state = this.state.documents[id];
+      if (!state) throw new Error(`Search state not found for document ${id}`);
+      return state;
+    };
+
     return {
-      startSearch: this.startSearchSession.bind(this),
-      stopSearch: this.stopSearchSession.bind(this),
-      searchAllPages: this.searchAllPages.bind(this),
-      nextResult: this.nextResult.bind(this),
-      previousResult: this.previousResult.bind(this),
-      goToResult: this.goToResult.bind(this),
-      setShowAllResults: (showAll) => this.dispatch(setShowAllResults(showAll)),
-      getShowAllResults: () => this.state.showAllResults,
+      startSearch: (docId) => this.startSearchSession(getDocId(docId)),
+      stopSearch: (docId) => this.stopSearchSession(getDocId(docId)),
+      searchAllPages: (keyword, docId) => this.searchAllPages(keyword, getDocId(docId)),
+      nextResult: (docId) => this.nextResult(getDocId(docId)),
+      previousResult: (docId) => this.previousResult(getDocId(docId)),
+      goToResult: (index, docId) => this.goToResult(index, getDocId(docId)),
+      setShowAllResults: (showAll, docId) =>
+        this.dispatch(setShowAllResults(getDocId(docId), showAll)),
+      getShowAllResults: (docId) => getDocState(docId).showAllResults,
+      getFlags: (docId) => getDocState(docId).flags,
+      setFlags: (flags, docId) => this.setFlags(flags, getDocId(docId)),
+      getState: (docId) => getDocState(docId),
+      forDocument: this.createSearchScope.bind(this),
       onSearchResult: this.searchResult$.on,
       onSearchStart: this.searchStart$.on,
       onSearchStop: this.searchStop$.on,
       onActiveResultChange: this.searchActiveResultChange$.on,
       onSearchResultStateChange: this.searchResultState$.on,
       onStateChange: this.searchState$.on,
-      getFlags: () => this.state.flags,
-      setFlags: (flags) => this.setFlags(flags),
-      getState: () => this.state,
     };
   }
 
-  private setFlags(flags: MatchFlag[]): void {
-    this.dispatch(setSearchFlags(flags));
-    if (this.state.active) {
-      this.searchAllPages(this.state.query, true);
+  private createSearchScope(documentId: string): SearchScope {
+    const getDocState = () => {
+      const state = this.state.documents[documentId];
+      if (!state) throw new Error(`Search state not found for document ${documentId}`);
+      return state;
+    };
+
+    return {
+      startSearch: () => this.startSearchSession(documentId),
+      stopSearch: () => this.stopSearchSession(documentId),
+      searchAllPages: (keyword) => this.searchAllPages(keyword, documentId),
+      nextResult: () => this.nextResult(documentId),
+      previousResult: () => this.previousResult(documentId),
+      goToResult: (index) => this.goToResult(index, documentId),
+      setShowAllResults: (showAll) => this.dispatch(setShowAllResults(documentId, showAll)),
+      getShowAllResults: () => getDocState().showAllResults,
+      getFlags: () => getDocState().flags,
+      setFlags: (flags) => this.setFlags(flags, documentId),
+      getState: getDocState,
+      onSearchResult: (listener: Listener<SearchAllPagesResult>) =>
+        this.searchResult$.on((event) => {
+          if (event.documentId === documentId) listener(event.results);
+        }),
+      onSearchStart: (listener: Listener<void>) =>
+        this.searchStart$.on((event) => {
+          if (event.documentId === documentId) listener();
+        }),
+      onSearchStop: (listener: Listener<void>) =>
+        this.searchStop$.on((event) => {
+          if (event.documentId === documentId) listener();
+        }),
+      onActiveResultChange: (listener: Listener<number>) =>
+        this.searchActiveResultChange$.on((event) => {
+          if (event.documentId === documentId) listener(event.index);
+        }),
+      onSearchResultStateChange: (listener: Listener<SearchResultState>) =>
+        this.searchResultState$.on((event) => {
+          if (event.documentId === documentId) listener(event.state);
+        }),
+      onStateChange: (listener: Listener<SearchDocumentState>) =>
+        this.searchState$.on((event) => {
+          if (event.documentId === documentId) listener(event.state);
+        }),
+    };
+  }
+
+  private setFlags(flags: MatchFlag[], documentId: string): void {
+    this.dispatch(setSearchFlags(documentId, flags));
+    const docState = this.state.documents[documentId];
+    if (docState?.active) {
+      this.searchAllPages(docState.query, documentId, true);
     }
   }
 
-  private notifySearchStart(): void {
-    this.searchStart$.emit();
+  private notifySearchStart(documentId: string): void {
+    this.searchStart$.emit({ documentId });
   }
 
-  private notifySearchStop(): void {
-    this.searchStop$.emit();
+  private notifySearchStop(documentId: string): void {
+    this.searchStop$.emit({ documentId });
   }
 
-  private notifyActiveResultChange(index: number): void {
-    this.searchActiveResultChange$.emit(index);
+  private notifyActiveResultChange(documentId: string, index: number): void {
+    this.searchActiveResultChange$.emit({ documentId, index });
   }
 
-  private startSearchSession(): void {
-    if (!this.currentDocument) return;
-    this.dispatch(startSearchSession());
-    this.notifySearchStart();
+  private startSearchSession(documentId: string): void {
+    const coreDoc = this.getCoreDocument(documentId);
+    if (!coreDoc) return;
+    this.dispatch(startSearchSession(documentId));
+    this.notifySearchStart(documentId);
   }
 
-  private stopSearchSession(): void {
-    if (!this.currentDocument || !this.state.active) return;
-    // optional: abort current task if PdfTask supports it
-    try {
-      // @ts-expect-error: optional abort if available
-      this.currentTask?.abort?.({ type: 'abort', code: 'cancelled', message: 'search stopped' });
-    } catch {}
-    this.currentTask = undefined;
+  private stopSearchSession(documentId: string): void {
+    const docState = this.state.documents[documentId];
+    if (!docState?.active) return;
 
-    this.dispatch(stopSearchSession());
-    this.notifySearchStop();
+    const task = this.currentTask.get(documentId);
+    if (task) {
+      try {
+        task.abort?.({ code: PdfErrorCode.Cancelled, message: 'search stopped' });
+      } catch {}
+      this.currentTask.delete(documentId);
+    }
+
+    this.dispatch(stopSearchSession(documentId));
+    this.notifySearchStop(documentId);
   }
 
   private searchAllPages(
     keyword: string,
+    documentId: string,
     force: boolean = false,
   ): PdfTask<SearchAllPagesResult, PdfPageSearchProgress> {
+    const docState = this.state.documents[documentId];
+    if (!docState) {
+      return PdfTaskHelper.reject({
+        code: PdfErrorCode.NotFound,
+        message: 'Search state not initialized',
+      });
+    }
+    const coreDoc = this.getCoreDocument(documentId);
+    if (!coreDoc?.document) {
+      return PdfTaskHelper.reject({ code: PdfErrorCode.NotFound, message: 'Document not loaded' });
+    }
+
     const trimmedKeyword = keyword.trim();
 
-    if (this.state.query === trimmedKeyword && !force) {
+    if (docState.query === trimmedKeyword && !force) {
       return PdfTaskHelper.resolve<SearchAllPagesResult, PdfPageSearchProgress>({
-        results: this.state.results,
-        total: this.state.total,
+        results: docState.results,
+        total: docState.total,
       });
     }
 
     // stop previous task if still running
-    if (this.currentTask) {
+    const oldTask = this.currentTask.get(documentId);
+    if (oldTask) {
       try {
-        // @ts-expect-error: optional abort if available
-        this.currentTask.abort?.({ type: 'abort', code: 'superseded', message: 'new search' });
+        oldTask.abort?.({ code: PdfErrorCode.Cancelled, message: 'new search' });
       } catch {}
-      this.currentTask = undefined;
+      this.currentTask.delete(documentId);
     }
 
-    this.dispatch(startSearch(trimmedKeyword));
+    this.dispatch(startSearch(documentId, trimmedKeyword));
 
-    if (!trimmedKeyword || !this.currentDocument) {
-      this.dispatch(setSearchResults([], 0, -1));
+    if (!trimmedKeyword) {
+      this.dispatch(setSearchResults(documentId, [], 0, -1));
       return PdfTaskHelper.resolve<SearchAllPagesResult, PdfPageSearchProgress>({
         results: [],
         total: 0,
       });
     }
 
-    if (!this.state.active) {
-      this.startSearchSession();
+    if (!docState.active) {
+      this.startSearchSession(documentId);
     }
 
-    const task = (this.currentTask = this.engine.searchAllPages(
-      this.currentDocument!,
-      trimmedKeyword,
-      { flags: this.state.flags },
-    ));
+    const task = this.engine.searchAllPages(coreDoc.document, trimmedKeyword, {
+      flags: docState.flags,
+    });
+    this.currentTask.set(documentId, task);
 
     task.onProgress((p) => {
       if (p?.results?.length) {
-        this.dispatch(appendSearchResults(p.results));
-        // set first active result as soon as we have something
-        if (this.state.activeResultIndex === -1) {
-          this.dispatch(setActiveResultIndex(0));
-          this.notifyActiveResultChange(0);
+        // Check if the task is still the current one before dispatching
+        if (this.currentTask.get(documentId) === task) {
+          this.dispatch(appendSearchResults(documentId, p.results));
+          // set first active result as soon as we have something
+          if (this.state.documents[documentId].activeResultIndex === -1) {
+            this.dispatch(setActiveResultIndex(documentId, 0));
+            this.notifyActiveResultChange(documentId, 0);
+          }
         }
       }
     });
 
     task.wait(
       (results) => {
-        this.currentTask = undefined;
+        this.currentTask.delete(documentId);
         const activeResultIndex = results.total > 0 ? 0 : -1;
-        this.dispatch(setSearchResults(results.results, results.total, activeResultIndex));
-        this.searchResult$.emit(results);
+        this.dispatch(
+          setSearchResults(documentId, results.results, results.total, activeResultIndex),
+        );
+        this.searchResult$.emit({ documentId, results });
         if (results.total > 0) {
-          this.notifyActiveResultChange(0);
+          this.notifyActiveResultChange(documentId, 0);
         }
       },
       (error) => {
-        this.currentTask = undefined;
-        console.error('Error during search:', error);
-        this.dispatch(setSearchResults([], 0, -1));
+        // Only clear results if the error wasn't an abort
+        if (error?.reason?.code !== PdfErrorCode.Cancelled) {
+          console.error('Error during search:', error);
+          this.dispatch(setSearchResults(documentId, [], 0, -1));
+        }
+        this.currentTask.delete(documentId);
       },
     );
 
     return task;
   }
 
-  private nextResult(): number {
-    if (this.state.results.length === 0) return -1;
+  private nextResult(documentId: string): number {
+    const docState = this.state.documents[documentId];
+    if (!docState || docState.results.length === 0) return -1;
     const nextIndex =
-      this.state.activeResultIndex >= this.state.results.length - 1
+      docState.activeResultIndex >= docState.results.length - 1
         ? 0
-        : this.state.activeResultIndex + 1;
-    return this.goToResult(nextIndex);
+        : docState.activeResultIndex + 1;
+    return this.goToResult(nextIndex, documentId);
   }
 
-  private previousResult(): number {
-    if (this.state.results.length === 0) return -1;
+  private previousResult(documentId: string): number {
+    const docState = this.state.documents[documentId];
+    if (!docState || docState.results.length === 0) return -1;
     const prevIndex =
-      this.state.activeResultIndex <= 0
-        ? this.state.results.length - 1
-        : this.state.activeResultIndex - 1;
-    return this.goToResult(prevIndex);
+      docState.activeResultIndex <= 0
+        ? docState.results.length - 1
+        : docState.activeResultIndex - 1;
+    return this.goToResult(prevIndex, documentId);
   }
 
-  private goToResult(index: number): number {
-    if (this.state.results.length === 0 || index < 0 || index >= this.state.results.length) {
+  private goToResult(index: number, documentId: string): number {
+    const docState = this.state.documents[documentId];
+    if (
+      !docState ||
+      docState.results.length === 0 ||
+      index < 0 ||
+      index >= docState.results.length
+    ) {
       return -1;
     }
-    this.dispatch(setActiveResultIndex(index));
-    this.notifyActiveResultChange(index);
+    this.dispatch(setActiveResultIndex(documentId, index));
+    this.notifyActiveResultChange(documentId, index);
     return index;
   }
 
   async destroy(): Promise<void> {
-    if (this.state.active && this.currentDocument) {
-      this.stopSearchSession();
+    for (const documentId of Object.keys(this.state.documents)) {
+      this.stopSearchSession(documentId);
     }
     this.searchResult$.clear();
     this.searchStart$.clear();
@@ -253,5 +373,6 @@ export class SearchPlugin extends BasePlugin<
     this.searchActiveResultChange$.clear();
     this.searchResultState$.clear();
     this.searchState$.clear();
+    super.destroy();
   }
 }

@@ -7,7 +7,7 @@ export function CopyToClipboard() {
 
   useEffect(() => {
     if (!sel) return;
-    return sel.onCopyToClipboard((text) => {
+    return sel.onCopyToClipboard(({ text }) => {
       navigator.clipboard.writeText(text);
     });
   }, [sel]);

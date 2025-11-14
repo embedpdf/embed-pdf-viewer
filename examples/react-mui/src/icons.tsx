@@ -8,13 +8,13 @@ export const PageSettingsIcon = (props: SvgIconProps) => (
   </SvgIcon>
 );
 
-/** Same icon, rotated 180 deg so it “points” the other way. */
+/** Same icon, rotated 180 deg so it "points" the other way. */
 export const ViewSidebarReverseIcon = forwardRef<SVGSVGElement, SvgIconProps>((props, ref) => (
   <ViewSidebarOutlinedIcon
     ref={ref}
     {...props}
     sx={{
-      transform: 'rotate(180deg)',
+      transform: 'rotate(180deg)' as const,
       // keep any sx the caller passes:
       ...props.sx,
     }}

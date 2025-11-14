@@ -5,7 +5,13 @@
   import type { SearchResult } from '@embedpdf/models';
   import { tick } from 'svelte';
 
-  const search = useSearch();
+  interface SearchProps {
+    documentId: string;
+  }
+
+  let { documentId }: SearchProps = $props();
+
+  const search = useSearch(() => documentId);
   const scrollCapability = useScrollCapability();
 
   let inputValue = $state(search.state.query || '');
@@ -89,7 +95,7 @@
   const isWholeWordChecked = $derived(search.state.flags.includes(MatchFlag.MatchWholeWord));
 </script>
 
-<div class="flex h-full flex-col bg-white">
+<div class="flex h-full flex-col bg-white p-1">
   <!-- Search Input -->
   <div class="p-3">
     <div class="relative">
@@ -117,6 +123,7 @@
         <button
           onclick={clearInput}
           class="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+          aria-label="Clear search"
         >
           <svg
             class="h-4 w-4"

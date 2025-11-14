@@ -5,7 +5,7 @@ import {
   useInteractionHandles,
 } from '@embedpdf/utils/@framework';
 import { TrackedAnnotation } from '@embedpdf/plugin-annotation';
-import { useState, JSX, CSSProperties, useRef, useEffect } from '@framework';
+import { useState, JSX, CSSProperties, useRef, useEffect, useMemo } from '@framework';
 
 import { useAnnotationCapability } from '../hooks';
 import {
@@ -18,6 +18,7 @@ import { VertexConfig } from '../types';
 
 interface AnnotationContainerProps<T extends PdfAnnotationObject> {
   scale: number;
+  documentId: string;
   pageIndex: number;
   rotation: number;
   pageWidth: number;
@@ -44,6 +45,7 @@ interface AnnotationContainerProps<T extends PdfAnnotationObject> {
 // Simplified AnnotationContainer
 export function AnnotationContainer<T extends PdfAnnotationObject>({
   scale,
+  documentId,
   pageIndex,
   rotation,
   pageWidth,
@@ -68,8 +70,14 @@ export function AnnotationContainer<T extends PdfAnnotationObject>({
   ...props
 }: AnnotationContainerProps<T>): JSX.Element {
   const [preview, setPreview] = useState<T>(trackedAnnotation.object);
-  const { provides: annotationProvides } = useAnnotationCapability();
+  const { provides: annotationCapability } = useAnnotationCapability();
   const gestureBaseRef = useRef<T | null>(null);
+
+  // Get scoped API for this document (memoized to prevent infinite loops)
+  const annotationProvides = useMemo(
+    () => (annotationCapability ? annotationCapability.forDocument(documentId) : null),
+    [annotationCapability, documentId],
+  );
 
   const currentObject = preview
     ? { ...trackedAnnotation.object, ...preview }
@@ -88,7 +96,7 @@ export function AnnotationContainer<T extends PdfAnnotationObject>({
       constraints: {
         minWidth: 10,
         minHeight: 10,
-        boundingBox: { width: pageWidth / scale, height: pageHeight / scale },
+        boundingBox: { width: pageWidth, height: pageHeight },
       },
       maintainAspectRatio: lockAspectRatio,
       pageRotation: rotation,
@@ -108,7 +116,7 @@ export function AnnotationContainer<T extends PdfAnnotationObject>({
           ? vertexConfig?.transformAnnotation(base, event.transformData.changes.vertices)
           : { rect: event.transformData.changes.rect };
 
-        const patched = annotationProvides?.transformAnnotation<T>(base, {
+        const patched = annotationCapability?.transformAnnotation<T>(base, {
           type: transformType,
           changes: changes as Partial<T>,
           metadata: event.transformData.metadata,

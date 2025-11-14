@@ -1,60 +1,158 @@
 import { Reducer } from '@embedpdf/core';
 import {
-  ACTIVATE_MODE,
-  SET_DEFAULT_MODE,
   InteractionManagerAction,
+  INIT_INTERACTION_STATE,
+  CLEANUP_INTERACTION_STATE,
+  SET_ACTIVE_DOCUMENT,
+  ACTIVATE_MODE,
   PAUSE_INTERACTION,
   RESUME_INTERACTION,
   SET_CURSOR,
+  SET_DEFAULT_MODE,
   SET_EXCLUSION_RULES,
   ADD_EXCLUSION_CLASS,
   REMOVE_EXCLUSION_CLASS,
   ADD_EXCLUSION_ATTRIBUTE,
   REMOVE_EXCLUSION_ATTRIBUTE,
 } from './actions';
-import { InteractionManagerState } from './types';
+import { InteractionManagerState, InteractionDocumentState } from './types';
 
-export const initialState: InteractionManagerState = {
-  activeMode: 'pointerMode',
-  defaultMode: 'pointerMode',
+const INITIAL_MODE = 'pointerMode';
+
+export const initialDocumentState: InteractionDocumentState = {
+  activeMode: INITIAL_MODE,
   cursor: 'auto',
   paused: false,
+};
+
+export const initialState: InteractionManagerState = {
+  defaultMode: INITIAL_MODE,
   exclusionRules: {
     classes: [],
-    dataAttributes: [],
+    dataAttributes: ['data-no-interaction'],
   },
+  documents: {},
+  activeDocumentId: null,
 };
 
 export const reducer: Reducer<InteractionManagerState, InteractionManagerAction> = (
-  state,
+  state = initialState,
   action,
 ) => {
   switch (action.type) {
-    case ACTIVATE_MODE:
+    // ─────────────────────────────────────────────────────────
+    // Document Lifecycle
+    // ─────────────────────────────────────────────────────────
+    case INIT_INTERACTION_STATE: {
+      const { documentId, state: docState } = action.payload;
       return {
         ...state,
-        activeMode: action.payload.mode,
+        documents: {
+          ...state.documents,
+          [documentId]: docState,
+        },
+        // Set as active if no active document
+        activeDocumentId: state.activeDocumentId ?? documentId,
       };
-    case SET_CURSOR:
+    }
+
+    case CLEANUP_INTERACTION_STATE: {
+      const documentId = action.payload;
+      const { [documentId]: removed, ...remainingDocs } = state.documents;
       return {
         ...state,
-        cursor: action.payload.cursor,
+        documents: remainingDocs,
+        activeDocumentId: state.activeDocumentId === documentId ? null : state.activeDocumentId,
       };
-    case PAUSE_INTERACTION:
+    }
+
+    case SET_ACTIVE_DOCUMENT: {
       return {
         ...state,
-        paused: true,
+        activeDocumentId: action.payload,
       };
-    case RESUME_INTERACTION:
+    }
+
+    // ─────────────────────────────────────────────────────────
+    // Per-Document Actions
+    // ─────────────────────────────────────────────────────────
+    case ACTIVATE_MODE: {
+      const { documentId, mode } = action.payload;
+      const docState = state.documents[documentId];
+      if (!docState) return state;
+
       return {
         ...state,
-        paused: false,
+        documents: {
+          ...state.documents,
+          [documentId]: {
+            ...docState,
+            activeMode: mode,
+          },
+        },
       };
+    }
+
+    case SET_CURSOR: {
+      const { documentId, cursor } = action.payload;
+      const docState = state.documents[documentId];
+      if (!docState) return state;
+
+      return {
+        ...state,
+        documents: {
+          ...state.documents,
+          [documentId]: {
+            ...docState,
+            cursor,
+          },
+        },
+      };
+    }
+
+    case PAUSE_INTERACTION: {
+      const documentId = action.payload;
+      const docState = state.documents[documentId];
+      if (!docState) return state;
+
+      return {
+        ...state,
+        documents: {
+          ...state.documents,
+          [documentId]: {
+            ...docState,
+            paused: true,
+          },
+        },
+      };
+    }
+
+    case RESUME_INTERACTION: {
+      const documentId = action.payload;
+      const docState = state.documents[documentId];
+      if (!docState) return state;
+
+      return {
+        ...state,
+        documents: {
+          ...state.documents,
+          [documentId]: {
+            ...docState,
+            paused: false,
+          },
+        },
+      };
+    }
+
+    // ─────────────────────────────────────────────────────────
+    // Global Actions
+    // ─────────────────────────────────────────────────────────
     case SET_DEFAULT_MODE:
       return {
         ...state,
         defaultMode: action.payload.mode,
       };
+
     case SET_EXCLUSION_RULES:
       return {
         ...state,
@@ -68,7 +166,7 @@ export const reducer: Reducer<InteractionManagerState, InteractionManagerAction>
           ...state.exclusionRules,
           classes: [...(state.exclusionRules.classes || []), action.payload.className].filter(
             (v, i, a) => a.indexOf(v) === i,
-          ), // Remove duplicates
+          ),
         },
       };
 
@@ -105,6 +203,7 @@ export const reducer: Reducer<InteractionManagerState, InteractionManagerAction>
           ),
         },
       };
+
     default:
       return state;
   }

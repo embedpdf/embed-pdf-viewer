@@ -95,22 +95,23 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, onUnmounted } from 'vue';
+import { ref, watch } from 'vue';
 import { CounterRotate } from '@embedpdf/utils/vue';
-import type { Rotation } from '@embedpdf/models';
+import { Rotation } from '@embedpdf/models';
 import type { RedactionItem } from '@embedpdf/plugin-redaction';
 import { useRedactionCapability } from '../hooks/use-redaction';
 import Highlight from './highlight.vue';
 
 interface PendingRedactionsProps {
+  documentId: string;
   pageIndex: number;
   scale: number;
-  rotation?: Rotation;
+  rotation: Rotation;
   bboxStroke?: string;
 }
 
 const props = withDefaults(defineProps<PendingRedactionsProps>(), {
-  rotation: 0,
+  rotation: Rotation.Degree0,
   bboxStroke: 'rgba(0,0,0,0.8)',
 });
 
@@ -118,29 +119,47 @@ const { provides: redaction } = useRedactionCapability();
 const items = ref<RedactionItem[]>([]);
 const selectedId = ref<string | null>(null);
 
+watch(
+  [redaction, () => props.documentId, () => props.pageIndex],
+  ([redactionValue, docId, pageIdx], _, onCleanup) => {
+    if (!redactionValue) {
+      items.value = [];
+      selectedId.value = null;
+      return;
+    }
+
+    // Use document-scoped hooks so we only receive events for this document
+    const scoped = redactionValue.forDocument(docId);
+
+    // Initialize with current state
+    const currentState = scoped.getState();
+    items.value = currentState.pending[pageIdx] ?? [];
+    selectedId.value =
+      currentState.selected && currentState.selected.page === pageIdx
+        ? currentState.selected.id
+        : null;
+
+    // Subscribe to future changes
+    const off1 = scoped.onPendingChange((map) => {
+      items.value = map[pageIdx] ?? [];
+    });
+
+    const off2 = scoped.onSelectedChange((sel) => {
+      selectedId.value = sel && sel.page === pageIdx ? sel.id : null;
+    });
+
+    onCleanup(() => {
+      off1?.();
+      off2?.();
+    });
+  },
+  { immediate: true },
+);
+
 const select = (e: PointerEvent | TouchEvent, id: string) => {
   e.stopPropagation();
-  if (!redaction.value) return;
-  redaction.value.selectPending(props.pageIndex, id);
+  const redactionValue = redaction.value;
+  if (!redactionValue) return;
+  redactionValue.forDocument(props.documentId).selectPending(props.pageIndex, id);
 };
-
-let unsubscribePending: (() => void) | undefined;
-let unsubscribeSelection: (() => void) | undefined;
-
-onMounted(() => {
-  if (!redaction.value) return;
-
-  unsubscribePending = redaction.value.onPendingChange((map) => {
-    items.value = map[props.pageIndex] ?? [];
-  });
-
-  unsubscribeSelection = redaction.value.onSelectedChange((sel) => {
-    selectedId.value = sel && sel.page === props.pageIndex ? sel.id : null;
-  });
-});
-
-onUnmounted(() => {
-  unsubscribePending?.();
-  unsubscribeSelection?.();
-});
 </script>

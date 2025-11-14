@@ -6,17 +6,24 @@ export interface InteractionManagerPluginConfig extends BasePluginConfig {
   exclusionRules?: InteractionExclusionRules;
 }
 
-export interface InteractionManagerState {
-  /** Mode-id that is currently active (e.g. `"default"` or `"annotationCreation"`). */
+// Per-document interaction state
+export interface InteractionDocumentState {
+  /** Mode-id that is currently active for this document */
   activeMode: string;
-  /** Cursor that is currently active (e.g. `"auto"` or `"pointer"`). */
+  /** Cursor that is currently active for this document */
   cursor: string;
-  /** Whether the interaction is paused */
+  /** Whether interaction is paused for this document */
   paused: boolean;
-  /** Mode-id that is treated as the resolver’s fall-back (“finish → …”). */
+}
+
+export interface InteractionManagerState {
+  // Global settings (shared across all documents)
   defaultMode: string;
-  /** Exclusion rules for interaction */
   exclusionRules: InteractionExclusionRules;
+
+  // Per-document state
+  documents: Record<string, InteractionDocumentState>;
+  activeDocumentId: string | null;
 }
 
 export interface InteractionExclusionRules {
@@ -31,13 +38,11 @@ export interface InteractionMode {
   id: string;
   /** where the handlers should listen for events */
   scope: 'global' | 'page';
-  /** if true the page will receive events through a transparent overlay and no other page‑level
-   *  listener gets invoked until the mode finishes. */
+  /** if true the page will receive events through a transparent overlay */
   exclusive: boolean;
-  /** baseline cursor while the mode is active (before any handler overrides it). */
+  /** baseline cursor while the mode is active */
   cursor?: string;
-  /** Set to `false` when this tool wants to disable raw touch events.
-   *  Defaults to `true`. */
+  /** Set to `false` when this tool wants to disable raw touch events */
   wantsRawTouch?: boolean;
 }
 
@@ -79,21 +84,25 @@ export interface PointerEventHandlersWithLifecycle<T = EmbedPdfPointerEvent>
 
 interface GlobalInteractionScope {
   type: 'global';
+  documentId: string;
 }
 
 interface PageInteractionScope {
   type: 'page';
+  documentId: string;
   pageIndex: number;
 }
 
 export type InteractionScope = GlobalInteractionScope | PageInteractionScope;
 
 export interface RegisterHandlersOptions {
-  /** the mode the handlers belong to                     */
+  /** the document these handlers belong to */
+  documentId: string;
+  /** the mode the handlers belong to */
   modeId: string | string[];
-  /** callbacks                                            */
+  /** callbacks */
   handlers: PointerEventHandlersWithLifecycle;
-  /** if omitted ⇒ handlers listen on the *global* layer   */
+  /** if omitted ⇒ handlers listen on the *global* layer */
   pageIndex?: number;
 }
 
@@ -102,61 +111,78 @@ export interface RegisterAlwaysOptions {
   handlers: PointerEventHandlersWithLifecycle;
 }
 
-export interface InteractionManagerCapability {
-  /** returns the active mode id */
+// Events include documentId
+export interface ModeChangeEvent {
+  documentId: string;
+  activeMode: string;
+  previousMode: string;
+}
+
+export interface CursorChangeEvent {
+  documentId: string;
+  cursor: string;
+}
+
+export interface StateChangeEvent {
+  documentId: string;
+  state: InteractionDocumentState;
+}
+
+// Scoped interaction capability
+export interface InteractionManagerScope {
   getActiveMode(): string;
-  /** returns the active interaction mode */
   getActiveInteractionMode(): InteractionMode | null;
-  /** programmatically switch to a mode */
   activate(modeId: string): void;
-  /** set default mode */
   activateDefaultMode(): void;
-  /** register a mode (should be called at start‑up by each plugin/tool). */
-  registerMode(mode: InteractionMode): void;
-  /** register pointer handlers that run *only* while the given mode is active. */
-  registerHandlers(options: RegisterHandlersOptions): () => void;
-  /** register pointer handlers that run *always* (even if no mode is active). */
-  registerAlways(options: RegisterAlwaysOptions): () => void;
-  /** low‑level cursor API. Handlers can claim the cursor with a priority (larger wins). */
   setCursor(token: string, cursor: string, priority?: number): void;
-  /** Returns the current cursor */
   getCurrentCursor(): string;
-  /** remove a cursor */
   removeCursor(token: string): void;
-  /** subscribe to mode changes (so framework layers can raise overlays, etc.) */
-  onModeChange: EventHook<InteractionManagerState>;
-  /** subscribe to cursor changes */
-  onCursorChange: EventHook<string>;
-  /** subscribe to handler changes */
-  onHandlerChange: EventHook<InteractionManagerState>;
-  /** subscribe to state changes */
-  onStateChange: EventHook<InteractionManagerState>;
-  /** framework helpers -------------------------------------------------------------- */
-  /** Returns the *merged* handler set for the current mode + given scope.
-   *  Used by the PointerInteractionProvider inside each page / at the root. */
   getHandlersForScope(scope: InteractionScope): PointerEventHandlers | null;
-  /** Returns whether the current active mode demands an overlay */
   activeModeIsExclusive(): boolean;
-  /** Pause the interaction */
   pause(): void;
-  /** Resume the interaction */
   resume(): void;
-  /** Returns whether the interaction is paused */
   isPaused(): boolean;
-  /** Set the default mode */
+  getState(): InteractionDocumentState;
+  onModeChange: EventHook<string>;
+  onCursorChange: EventHook<string>;
+  onStateChange: EventHook<InteractionDocumentState>;
+}
+
+export interface InteractionManagerCapability {
+  // Active document operations
+  getActiveMode(): string;
+  getActiveInteractionMode(): InteractionMode | null;
+  activate(modeId: string): void;
+  activateDefaultMode(): void;
+  setCursor(token: string, cursor: string, priority?: number): void;
+  getCurrentCursor(): string;
+  removeCursor(token: string): void;
+  getHandlersForScope(scope: InteractionScope): PointerEventHandlers | null;
+  activeModeIsExclusive(): boolean;
+  pause(): void;
+  resume(): void;
+  isPaused(): boolean;
+  getState(): InteractionDocumentState;
+
+  // Document-scoped operations
+  forDocument(documentId: string): InteractionManagerScope;
+
+  // Global mode & exclusion management
+  registerMode(mode: InteractionMode): void;
+  registerHandlers(options: RegisterHandlersOptions): () => void;
+  registerAlways(options: RegisterAlwaysOptions): () => void;
   setDefaultMode(id: string): void;
-  /** Get the default mode */
   getDefaultMode(): string;
-  /** Get current exclusion rules */
   getExclusionRules(): InteractionExclusionRules;
-  /** Update exclusion rules */
   setExclusionRules(rules: InteractionExclusionRules): void;
-  /** Add a class to exclusion */
   addExclusionClass(className: string): void;
-  /** Remove a class from exclusion */
   removeExclusionClass(className: string): void;
-  /** Add a data attribute to exclusion */
   addExclusionAttribute(attribute: string): void;
-  /** Remove a data attribute from exclusion */
   removeExclusionAttribute(attribute: string): void;
+
+  // Events (all include documentId)
+  onModeChange: EventHook<ModeChangeEvent>;
+  onCursorChange: EventHook<CursorChangeEvent>;
+  onHandlerChange: EventHook<InteractionManagerState>;
+  onStateChange: EventHook<StateChangeEvent>;
 }

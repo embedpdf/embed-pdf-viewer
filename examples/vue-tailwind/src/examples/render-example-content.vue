@@ -1,10 +1,15 @@
 <script setup lang="ts">
-import { ref } from 'vue';
+import { ref, computed } from 'vue';
 import { Viewport } from '@embedpdf/plugin-viewport/vue';
 import { Scroller } from '@embedpdf/plugin-scroll/vue';
 import { RenderLayer, useRenderCapability } from '@embedpdf/plugin-render/vue';
 
-const { provides: render } = useRenderCapability();
+const props = defineProps<{
+  documentId: string;
+}>();
+
+const { provides: renderCapability } = useRenderCapability();
+const render = computed(() => renderCapability.value?.forDocument(props.documentId));
 const isExporting = ref(false);
 
 const exportPageAsPng = () => {
@@ -50,8 +55,8 @@ const exportPageAsPng = () => {
         </button>
       </div>
       <div class="relative flex w-full flex-1 overflow-hidden">
-        <Viewport class="flex-grow bg-gray-100">
-          <Scroller>
+        <Viewport :document-id="documentId" class="flex-grow bg-gray-100">
+          <Scroller :document-id="documentId">
             <template #default="{ page }">
               <div
                 :style="{
@@ -60,7 +65,7 @@ const exportPageAsPng = () => {
                   position: 'relative',
                 }"
               >
-                <RenderLayer :page-index="page.pageIndex" :scale="page.scale" />
+                <RenderLayer :document-id="documentId" :page-index="page.pageIndex" />
               </div>
             </template>
           </Scroller>

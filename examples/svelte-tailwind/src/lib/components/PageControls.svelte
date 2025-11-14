@@ -2,8 +2,14 @@
   import { useViewportCapability } from '@embedpdf/plugin-viewport/svelte';
   import { useScroll } from '@embedpdf/plugin-scroll/svelte';
 
+  interface PageControlsProps {
+    documentId: string;
+  }
+
+  let { documentId }: PageControlsProps = $props();
+
   const viewport = useViewportCapability();
-  const scroll = useScroll();
+  const scroll = useScroll(() => documentId);
 
   let isVisible = $state(false);
   let isHovering = $state(false);

@@ -5,7 +5,7 @@ import { manifest, RENDER_PLUGIN_ID } from './manifest';
 
 export const RenderPluginPackage: PluginPackage<RenderPlugin, RenderPluginConfig> = {
   manifest,
-  create: (registry) => new RenderPlugin(RENDER_PLUGIN_ID, registry),
+  create: (registry, config) => new RenderPlugin(RENDER_PLUGIN_ID, registry, config),
   reducer: () => {},
   initialState: {},
 };

@@ -4,12 +4,15 @@
   import { RenderLayer } from '@embedpdf/plugin-render/svelte';
   import { useExportCapability } from '@embedpdf/plugin-export/svelte';
 
-  const exportApi = useExportCapability();
+  let { documentId }: { documentId: string } = $props();
+
+  const exportCapability = useExportCapability();
+  const exportApi = $derived(exportCapability.provides?.forDocument(documentId));
 </script>
 
-{#snippet RenderPageSnippet(page: RenderPageProps)}
+{#snippet renderPage(page: RenderPageProps)}
   <div style:width={`${page.width}px`} style:height={`${page.height}px`} style:position="relative">
-    <RenderLayer pageIndex={page.pageIndex} scale={page.scale} />
+    <RenderLayer {documentId} pageIndex={page.pageIndex} />
   </div>
 {/snippet}
 
@@ -19,8 +22,8 @@
       class="mb-4 mt-4 flex items-center gap-3 rounded-lg border border-gray-200 bg-white p-3 shadow-sm"
     >
       <button
-        onclick={() => exportApi.provides?.download()}
-        disabled={!exportApi.provides}
+        onclick={() => exportApi?.download()}
+        disabled={!exportApi}
         class="flex h-8 w-8 items-center justify-center rounded-md border border-gray-300 bg-white text-gray-700 transition-colors duration-150 hover:border-gray-400 hover:bg-gray-50 hover:text-gray-900 active:bg-gray-100 disabled:cursor-not-allowed disabled:opacity-50"
         title="Download PDF"
       >
@@ -40,6 +43,7 @@
     </div>
     <div class="flex-grow" style="position: relative">
       <Viewport
+        {documentId}
         style="
           background-color: #f1f3f5;
           position: absolute;
@@ -49,7 +53,7 @@
           bottom: 0;
         "
       >
-        <Scroller {RenderPageSnippet} />
+        <Scroller {documentId} {renderPage} />
       </Viewport>
     </div>
   </div>

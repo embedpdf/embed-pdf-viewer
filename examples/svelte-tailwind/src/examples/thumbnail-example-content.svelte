@@ -4,12 +4,14 @@
   import { RenderLayer } from '@embedpdf/plugin-render/svelte';
   import { ThumbnailsPane, ThumbImg, type ThumbMeta } from '@embedpdf/plugin-thumbnail/svelte';
 
-  const scroll = useScroll();
+  let { documentId }: { documentId: string } = $props();
+
+  const scroll = useScroll(() => documentId);
 </script>
 
-{#snippet RenderPageSnippet(page: RenderPageProps)}
+{#snippet renderPage(page: RenderPageProps)}
   <div style:width={`${page.width}px`} style:height={`${page.height}px`} style:position="relative">
-    <RenderLayer pageIndex={page.pageIndex} scale={page.scale} />
+    <RenderLayer {documentId} pageIndex={page.pageIndex} scale={1} />
   </div>
 {/snippet}
 
@@ -23,7 +25,7 @@
         border-right: 1px solid #dee2e6;
       "
     >
-      <ThumbnailsPane>
+      <ThumbnailsPane {documentId}>
         {#snippet children(meta: ThumbMeta)}
           <div
             role="button"
@@ -55,7 +57,11 @@
                 ? '0 0 5px rgba(13, 110, 253, 0.5)'
                 : 'none'}
             >
-              <ThumbImg {meta} style="width: 100%; height: 100%; object-fit: contain" />
+              <ThumbImg
+                {documentId}
+                {meta}
+                style="width: 100%; height: 100%; object-fit: contain"
+              />
             </div>
             <div
               style:height={`${meta.labelHeight}px`}
@@ -72,6 +78,7 @@
     </div>
     <div style="flex: 1; overflow: hidden; position: relative">
       <Viewport
+        {documentId}
         style="
           position: absolute;
           top: 0;
@@ -81,7 +88,7 @@
           background-color: #f1f3f5;
         "
       >
-        <Scroller {RenderPageSnippet} />
+        <Scroller {documentId} {renderPage} />
       </Viewport>
     </div>
   </div>

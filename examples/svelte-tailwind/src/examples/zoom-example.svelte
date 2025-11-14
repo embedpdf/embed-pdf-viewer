@@ -1,8 +1,13 @@
 <script lang="ts">
   import { usePdfiumEngine } from '@embedpdf/engines/svelte';
   import { EmbedPDF } from '@embedpdf/core/svelte';
-  import { createPluginRegistration } from '@embedpdf/core';
-  import { LoaderPluginPackage } from '@embedpdf/plugin-loader/svelte';
+  import { createPluginRegistration, type PluginRegistry } from '@embedpdf/core';
+  import {
+    DocumentManagerPluginPackage,
+    DocumentManagerPlugin,
+    DocumentContext,
+    DocumentContent,
+  } from '@embedpdf/plugin-document-manager/svelte';
   import { ViewportPluginPackage } from '@embedpdf/plugin-viewport/svelte';
   import { ScrollPluginPackage } from '@embedpdf/plugin-scroll/svelte';
   import { RenderPluginPackage } from '@embedpdf/plugin-render/svelte';
@@ -14,15 +19,7 @@
   const pdfEngine = usePdfiumEngine();
 
   const plugins = [
-    createPluginRegistration(LoaderPluginPackage, {
-      loadingOptions: {
-        type: 'url',
-        pdfFile: {
-          id: 'example-pdf',
-          url: 'https://snippet.embedpdf.com/ebook.pdf',
-        },
-      },
-    }),
+    createPluginRegistration(DocumentManagerPluginPackage),
     createPluginRegistration(ViewportPluginPackage),
     createPluginRegistration(ScrollPluginPackage),
     createPluginRegistration(RenderPluginPackage),
@@ -32,12 +29,32 @@
       defaultZoomLevel: ZoomMode.FitPage,
     }),
   ];
+
+  const onInitialized = async (registry: PluginRegistry) => {
+    registry
+      .getPlugin<DocumentManagerPlugin>(DocumentManagerPlugin.id)
+      ?.provides()
+      ?.openDocumentUrl({ url: 'https://snippet.embedpdf.com/ebook.pdf' });
+  };
 </script>
 
 {#if pdfEngine.isLoading || !pdfEngine.engine}
   <div>Loading PDF Engine...</div>
 {:else}
-  <EmbedPDF engine={pdfEngine.engine} {plugins}>
-    <ZoomExampleContent />
+  <EmbedPDF engine={pdfEngine.engine} {plugins} {onInitialized}>
+    <DocumentContext>
+      {#snippet children(context)}
+        {#if context.activeDocumentId}
+          {@const documentId = context.activeDocumentId}
+          <DocumentContent {documentId}>
+            {#snippet children(documentContent)}
+              {#if documentContent.isLoaded}
+                <ZoomExampleContent {documentId} />
+              {/if}
+            {/snippet}
+          </DocumentContent>
+        {/if}
+      {/snippet}
+    </DocumentContext>
   </EmbedPDF>
 {/if}

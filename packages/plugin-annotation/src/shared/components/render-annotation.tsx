@@ -4,6 +4,7 @@ import { AppearanceMode, ignore, PdfAnnotationObject, PdfErrorCode } from '@embe
 import { useAnnotationCapability } from '../hooks/use-annotation';
 
 type RenderAnnotationProps = Omit<HTMLAttributes<HTMLImageElement>, 'style'> & {
+  documentId: string;
   pageIndex: number;
   annotation: PdfAnnotationObject;
   scaleFactor?: number;
@@ -12,6 +13,7 @@ type RenderAnnotationProps = Omit<HTMLAttributes<HTMLImageElement>, 'style'> & {
 };
 
 export function RenderAnnotation({
+  documentId,
   pageIndex,
   annotation,
   scaleFactor = 1,
@@ -26,7 +28,7 @@ export function RenderAnnotation({
 
   useEffect(() => {
     if (annotationProvides) {
-      const task = annotationProvides.renderAnnotation({
+      const task = annotationProvides.forDocument(documentId).renderAnnotation({
         pageIndex,
         annotation,
         options: {
@@ -52,7 +54,7 @@ export function RenderAnnotation({
         }
       };
     }
-  }, [pageIndex, scaleFactor, annotationProvides, annotation.id, width, height]);
+  }, [pageIndex, scaleFactor, annotationProvides, documentId, annotation.id, width, height]);
 
   const handleImageLoad = () => {
     if (urlRef.current) {

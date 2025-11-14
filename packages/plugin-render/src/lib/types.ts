@@ -25,7 +25,17 @@ export interface RenderPageOptions {
   options: PdfRenderPageOptions;
 }
 
+// Scoped render capability for a specific document
+export interface RenderScope {
+  renderPage(options: RenderPageOptions): Task<Blob, PdfErrorReason>;
+  renderPageRect(options: RenderPageRectOptions): Task<Blob, PdfErrorReason>;
+}
+
 export interface RenderCapability {
-  renderPage: (options: RenderPageOptions) => Task<Blob, PdfErrorReason>;
-  renderPageRect: (options: RenderPageRectOptions) => Task<Blob, PdfErrorReason>;
+  // Active document operations
+  renderPage(options: RenderPageOptions): Task<Blob, PdfErrorReason>;
+  renderPageRect(options: RenderPageRectOptions): Task<Blob, PdfErrorReason>;
+
+  // Document-scoped operations
+  forDocument(documentId: string): RenderScope;
 }

@@ -4,12 +4,13 @@
   import type { HTMLAttributes } from 'svelte/elements';
 
   type PinchWrapperProps = Omit<HTMLAttributes<HTMLDivElement>, 'style'> & {
+    documentId: string;
     children: Snippet;
     class?: string;
   };
 
-  let { children, class: propsClass, ...restProps }: PinchWrapperProps = $props();
-  const pinch = usePinch();
+  let { documentId, children, class: propsClass, ...restProps }: PinchWrapperProps = $props();
+  const pinch = usePinch(() => documentId);
 </script>
 
 <div
@@ -22,5 +23,5 @@
   style:margin="0px auto"
   class={propsClass}
 >
-  {children}
+  {@render children()}
 </div>

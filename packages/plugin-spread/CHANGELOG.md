@@ -61,7 +61,6 @@
 ### Minor Changes
 
 - [#141](https://github.com/embedpdf/embed-pdf-viewer/pull/141) by [@bobsingor](https://github.com/bobsingor) – Streamlined `SpreadCapability` and simplified Vue hook behavior.
-
   - Removed `getSpreadPagesObjects(pages: PdfPageObject[]): PdfPageObject[][]` from `SpreadCapability`.
     - Spread grouping is now an internal concern of the spread plugin/strategies.
   - Vue `useSpread` hook refactor:

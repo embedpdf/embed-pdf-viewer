@@ -7,7 +7,11 @@ import { PagePointerProvider } from '@embedpdf/plugin-interaction-manager/vue';
 import { SelectionLayer } from '@embedpdf/plugin-selection/vue';
 import { RedactionLayer, RedactionMode, useRedaction } from '@embedpdf/plugin-redaction/vue';
 
-const { state, provides } = useRedaction();
+const props = defineProps<{
+  documentId: string;
+}>();
+
+const { state, provides } = useRedaction(() => props.documentId);
 const isCommitting = ref(false);
 
 const handleApplyAll = () => {
@@ -67,24 +71,20 @@ const handleApplyAll = () => {
     </div>
     <div style="flex: 1; overflow: hidden; position: relative">
       <Viewport
+        :document-id="documentId"
         style="position: absolute; top: 0; left: 0; right: 0; bottom: 0; background-color: #f1f3f5"
       >
-        <Scroller>
+        <Scroller :document-id="documentId">
           <template #default="{ page }">
-            <PagePointerProvider
-              :page-index="page.pageIndex"
-              :page-width="page.width"
-              :page-height="page.height"
-              :rotation="page.rotation"
-              :scale="page.scale"
-            >
-              <RenderLayer :page-index="page.pageIndex" style="pointer-events: none" />
-              <SelectionLayer :page-index="page.pageIndex" :scale="page.scale" />
-              <RedactionLayer
+            <PagePointerProvider :document-id="documentId" :page-index="page.pageIndex">
+              <RenderLayer
+                :document-id="documentId"
                 :page-index="page.pageIndex"
-                :scale="page.scale"
-                :rotation="page.rotation"
-              >
+                :scale="1"
+                style="pointer-events: none"
+              />
+              <SelectionLayer :document-id="documentId" :page-index="page.pageIndex" />
+              <RedactionLayer :document-id="documentId" :page-index="page.pageIndex">
                 <template #selection-menu="props">
                   <div v-if="props.selected" v-bind="props.menuWrapperProps">
                     <div

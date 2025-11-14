@@ -2,7 +2,7 @@ import { PluginPackage } from '@embedpdf/core';
 import { SearchPlugin } from './search-plugin';
 import { manifest, SEARCH_PLUGIN_ID } from './manifest';
 import { SearchPluginConfig, SearchState } from './types';
-import { searchReducer, initialState } from './reducer';
+import { searchReducer, initialState, initialSearchDocumentState } from './reducer';
 import { SearchAction } from './actions';
 
 export const SearchPluginPackage: PluginPackage<
@@ -12,7 +12,7 @@ export const SearchPluginPackage: PluginPackage<
   SearchAction
 > = {
   manifest,
-  create: (registry) => new SearchPlugin(SEARCH_PLUGIN_ID, registry),
+  create: (registry, config) => new SearchPlugin(SEARCH_PLUGIN_ID, registry, config),
   reducer: searchReducer,
   initialState,
 };
@@ -20,4 +20,4 @@ export const SearchPluginPackage: PluginPackage<
 export * from './search-plugin';
 export * from './types';
 export * from './manifest';
-export { initialState };
+export { initialState, initialSearchDocumentState };

@@ -10,10 +10,42 @@ export interface PanPluginConfig extends BasePluginConfig {
   defaultMode?: PanDefaultMode;
 }
 
-export interface PanCapability {
+// Per-document pan state
+export interface PanDocumentState {
+  isPanMode: boolean;
+}
+
+export interface PanState {
+  documents: Record<string, PanDocumentState>;
+  activeDocumentId: string | null;
+}
+
+// Events include documentId
+export interface PanModeChangeEvent {
+  documentId: string;
+  isPanMode: boolean;
+}
+
+// Scoped pan capability
+export interface PanScope {
+  enablePan: () => void;
+  disablePan: () => void;
+  togglePan: () => void;
+  isPanMode: () => boolean;
   onPanModeChange: EventHook<boolean>;
+}
+
+export interface PanCapability {
+  // Active document operations
   enablePan: () => void;
   disablePan: () => void;
   togglePan: () => void;
   makePanDefault: (autoActivate?: boolean) => void;
+  isPanMode: () => boolean;
+
+  // Document-scoped operations
+  forDocument(documentId: string): PanScope;
+
+  // Events
+  onPanModeChange: EventHook<PanModeChangeEvent>;
 }

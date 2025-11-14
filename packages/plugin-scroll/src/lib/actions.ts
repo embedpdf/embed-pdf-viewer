@@ -1,52 +1,68 @@
 import { Action } from '@embedpdf/core';
-import { PageChangeState, ScrollState } from './types';
+import { ScrollDocumentState, ScrollStrategy } from './types';
 
-export const UPDATE_SCROLL_STATE = 'UPDATE_SCROLL_STATE';
-export const SET_DESIRED_SCROLL_POSITION = 'SET_DESIRED_SCROLL_POSITION';
-export const UPDATE_TOTAL_PAGES = 'UPDATE_TOTAL_PAGES';
-export const SET_PAGE_CHANGE_STATE = 'SET_PAGE_CHANGE_STATE';
+// Document lifecycle
+export const INIT_SCROLL_STATE = 'INIT_SCROLL_STATE';
+export const CLEANUP_SCROLL_STATE = 'CLEANUP_SCROLL_STATE';
+export const UPDATE_DOCUMENT_SCROLL_STATE = 'UPDATE_DOCUMENT_SCROLL_STATE';
+export const SET_SCROLL_STRATEGY = 'SET_SCROLL_STRATEGY';
 
-export interface UpdateScrollStateAction extends Action {
-  type: typeof UPDATE_SCROLL_STATE;
-  payload: Partial<ScrollState>;
+export interface InitScrollStateAction extends Action {
+  type: typeof INIT_SCROLL_STATE;
+  payload: {
+    documentId: string;
+    state: ScrollDocumentState;
+  };
 }
 
-export interface SetDesiredScrollPositionAction extends Action {
-  type: typeof SET_DESIRED_SCROLL_POSITION;
-  payload: { x: number; y: number };
+export interface CleanupScrollStateAction extends Action {
+  type: typeof CLEANUP_SCROLL_STATE;
+  payload: string; // documentId
 }
 
-export interface UpdateTotalPagesAction extends Action {
-  type: typeof UPDATE_TOTAL_PAGES;
-  payload: number;
+export interface UpdateDocumentScrollStateAction extends Action {
+  type: typeof UPDATE_DOCUMENT_SCROLL_STATE;
+  payload: {
+    documentId: string;
+    state: Partial<ScrollDocumentState>;
+  };
 }
 
-export interface SetPageChangeStateAction extends Action {
-  type: typeof SET_PAGE_CHANGE_STATE;
-  payload: PageChangeState;
+export interface SetScrollStrategyAction extends Action {
+  type: typeof SET_SCROLL_STRATEGY;
+  payload: {
+    documentId: string;
+    strategy: ScrollStrategy;
+  };
 }
 
 export type ScrollAction =
-  | UpdateScrollStateAction
-  | SetDesiredScrollPositionAction
-  | UpdateTotalPagesAction
-  | SetPageChangeStateAction;
+  | InitScrollStateAction
+  | CleanupScrollStateAction
+  | UpdateDocumentScrollStateAction
+  | SetScrollStrategyAction;
 
-export function updateScrollState(payload: Partial<ScrollState>): UpdateScrollStateAction {
-  return { type: UPDATE_SCROLL_STATE, payload };
+export function initScrollState(
+  documentId: string,
+  state: ScrollDocumentState,
+): InitScrollStateAction {
+  return { type: INIT_SCROLL_STATE, payload: { documentId, state } };
 }
 
-export function setDesiredScrollPosition(payload: {
-  x: number;
-  y: number;
-}): SetDesiredScrollPositionAction {
-  return { type: SET_DESIRED_SCROLL_POSITION, payload };
+export function cleanupScrollState(documentId: string): CleanupScrollStateAction {
+  return { type: CLEANUP_SCROLL_STATE, payload: documentId };
 }
 
-export function updateTotalPages(payload: number): UpdateTotalPagesAction {
-  return { type: UPDATE_TOTAL_PAGES, payload };
+export function updateDocumentScrollState(
+  documentId: string,
+  state: Partial<ScrollDocumentState>,
+): UpdateDocumentScrollStateAction {
+  return { type: UPDATE_DOCUMENT_SCROLL_STATE, payload: { documentId, state } };
 }
 
-export function setPageChangeState(payload: PageChangeState): SetPageChangeStateAction {
-  return { type: SET_PAGE_CHANGE_STATE, payload };
+export function setScrollStrategy(
+  documentId: string,
+  strategy: ScrollStrategy,
+): SetScrollStrategyAction {
+  return { type: SET_SCROLL_STRATEGY, payload: { documentId, strategy } };
 }

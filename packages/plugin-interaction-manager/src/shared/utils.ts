@@ -114,11 +114,12 @@ export function createPointerProvider(
   element: HTMLElement,
   convertEventToPoint?: (evt: PointerEvent, host: HTMLElement) => Position,
 ) {
+  const capScope = cap.forDocument(scope.documentId);
   /* ---------- live handler set --------------------------------------------------- */
   let active: PointerEventHandlers | null = cap.getHandlersForScope(scope);
 
   /* ---------- helper to compute current wantsRawTouch (defaults to true) --------- */
-  const wantsRawTouchNow = () => cap.getActiveInteractionMode()?.wantsRawTouch !== false; // default → true
+  const wantsRawTouchNow = () => capScope.getActiveInteractionMode()?.wantsRawTouch !== false; // default → true
 
   /* ---------- dynamic listener (re)attachment ------------------------------------ */
   const listeners: Record<string, (evt: Event) => void> = {};
@@ -142,10 +143,10 @@ export function createPointerProvider(
   element.style.touchAction = attachedWithRawTouch ? 'none' : '';
 
   /* ---------- mode & handler change hooks --------------------------------------- */
-  const stopMode = cap.onModeChange(() => {
+  const stopMode = capScope.onModeChange(() => {
     /* cursor baseline update for global wrapper */
     if (scope.type === 'global') {
-      const mode = cap.getActiveInteractionMode();
+      const mode = capScope.getActiveInteractionMode();
       element.style.cursor = mode?.scope === 'global' ? (mode.cursor ?? 'auto') : 'auto';
     }
 
@@ -166,13 +167,13 @@ export function createPointerProvider(
   });
 
   /* ---------- cursor sync -------------------------------------------------------- */
-  const initialMode = cap.getActiveInteractionMode();
-  const initialCursor = cap.getCurrentCursor();
+  const initialMode = capScope.getActiveInteractionMode();
+  const initialCursor = capScope.getCurrentCursor();
   element.style.cursor =
     scope.type === 'global' && initialMode?.scope !== 'global' ? 'auto' : initialCursor;
 
-  const stopCursor = cap.onCursorChange((c) => {
-    if (scope.type === 'global' && cap.getActiveInteractionMode()?.scope !== 'global') return;
+  const stopCursor = capScope.onCursorChange((c) => {
+    if (scope.type === 'global' && capScope.getActiveInteractionMode()?.scope !== 'global') return;
     element.style.cursor = c;
   });
 
@@ -253,7 +254,7 @@ export function createPointerProvider(
       };
     }
 
-    active[handlerKey]?.(pos, normEvt, cap.getActiveMode());
+    active[handlerKey]?.(pos, normEvt, capScope.getActiveMode());
   }
 
   /* ---------- teardown ----------------------------------------------------------- */

@@ -4,7 +4,11 @@ import { Scroller } from '@embedpdf/plugin-scroll/vue';
 import { RenderLayer } from '@embedpdf/plugin-render/vue';
 import { useSpread, SpreadMode } from '@embedpdf/plugin-spread/vue';
 
-const { provides: spread, spreadMode } = useSpread();
+const props = defineProps<{
+  documentId: string;
+}>();
+
+const { provides: spread, spreadMode } = useSpread(() => props.documentId);
 
 const modes = [
   { label: 'Single Page', value: SpreadMode.None },
@@ -40,6 +44,7 @@ const modes = [
       </div>
       <div class="flex-grow" style="position: relative">
         <Viewport
+          :document-id="documentId"
           style="
             background-color: #f1f3f5;
             position: absolute;
@@ -49,7 +54,7 @@ const modes = [
             bottom: 0;
           "
         >
-          <Scroller>
+          <Scroller :document-id="documentId">
             <template #default="{ page }">
               <div
                 :style="{
@@ -58,7 +63,7 @@ const modes = [
                   position: 'relative',
                 }"
               >
-                <RenderLayer :page-index="page.pageIndex" :scale="page.scale" />
+                <RenderLayer :document-id="documentId" :page-index="page.pageIndex" />
               </div>
             </template>
           </Scroller>

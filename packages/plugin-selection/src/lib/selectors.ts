@@ -1,22 +1,22 @@
 import { Rect, boundingRect } from '@embedpdf/models';
-import { FormattedSelection, SelectionState } from './types';
+import { FormattedSelection, SelectionDocumentState } from './types';
 
-export function selectRectsForPage(state: SelectionState, page: number) {
+export function selectRectsForPage(state: SelectionDocumentState, page: number) {
   return state.rects[page] ?? [];
 }
 
-export function selectBoundingRectForPage(state: SelectionState, page: number) {
+export function selectBoundingRectForPage(state: SelectionDocumentState, page: number) {
   return boundingRect(selectRectsForPage(state, page));
 }
 
-export function selectRectsAndBoundingRectForPage(state: SelectionState, page: number) {
+export function selectRectsAndBoundingRectForPage(state: SelectionDocumentState, page: number) {
   return {
     rects: selectRectsForPage(state, page),
     boundingRect: selectBoundingRectForPage(state, page),
   };
 }
 
-export function selectBoundingRectsForAllPages(state: SelectionState) {
+export function selectBoundingRectsForAllPages(state: SelectionDocumentState) {
   const out: { page: number; rect: Rect }[] = [];
   const rectMap = state.rects;
 
@@ -29,7 +29,7 @@ export function selectBoundingRectsForAllPages(state: SelectionState) {
 }
 
 export function getFormattedSelectionForPage(
-  state: SelectionState,
+  state: SelectionDocumentState,
   page: number,
 ): FormattedSelection | null {
   const segmentRects = state.rects[page] || [];
@@ -39,7 +39,7 @@ export function getFormattedSelectionForPage(
   return { pageIndex: page, rect: boundingRect, segmentRects };
 }
 
-export function getFormattedSelection(state: SelectionState) {
+export function getFormattedSelection(state: SelectionDocumentState) {
   const result: FormattedSelection[] = [];
 
   // Get all pages that have rects

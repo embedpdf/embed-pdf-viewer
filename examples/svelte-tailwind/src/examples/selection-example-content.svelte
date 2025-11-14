@@ -10,24 +10,25 @@
   import { PagePointerProvider } from '@embedpdf/plugin-interaction-manager/svelte';
   import { ignore } from '@embedpdf/models';
 
-  const selection = useSelectionCapability();
+  let { documentId }: { documentId: string } = $props();
+
+  const selectionCapability = useSelectionCapability();
+  const selection = $derived(selectionCapability.provides?.forDocument(documentId));
   let hasSelection = $state(false);
   let selectedText = $state('');
 
   $effect(() => {
-    if (!selection.provides) return;
+    if (!selection) return;
 
-    const unsubscribe1 = selection.provides.onSelectionChange(
-      (selectionRange: SelectionRangeX | null) => {
-        hasSelection = !!selectionRange;
-        if (!selectionRange) {
-          selectedText = '';
-        }
-      },
-    );
+    const unsubscribe1 = selection.onSelectionChange((selectionRange: SelectionRangeX | null) => {
+      hasSelection = !!selectionRange;
+      if (!selectionRange) {
+        selectedText = '';
+      }
+    });
 
-    const unsubscribe2 = selection.provides.onEndSelection(() => {
-      const textTask = selection.provides!.getSelectedText();
+    const unsubscribe2 = selection.onEndSelection(() => {
+      const textTask = selection!.getSelectedText();
       textTask.wait((textLines) => {
         selectedText = textLines.join('\n');
       }, ignore);
@@ -40,16 +41,10 @@
   });
 </script>
 
-{#snippet RenderPageSnippet(page: RenderPageProps)}
-  <PagePointerProvider
-    pageIndex={page.pageIndex}
-    pageWidth={page.width}
-    pageHeight={page.height}
-    rotation={page.rotation}
-    scale={page.scale}
-  >
-    <RenderLayer pageIndex={page.pageIndex} scale={1} class="pointer-events-none" />
-    <SelectionLayer pageIndex={page.pageIndex} scale={page.scale} />
+{#snippet renderPage(page: RenderPageProps)}
+  <PagePointerProvider {documentId} pageIndex={page.pageIndex}>
+    <RenderLayer {documentId} pageIndex={page.pageIndex} scale={1} class="pointer-events-none" />
+    <SelectionLayer {documentId} pageIndex={page.pageIndex} />
   </PagePointerProvider>
 {/snippet}
 
@@ -58,7 +53,7 @@
     <div class="flex h-full flex-col gap-4">
       <div class="flex items-center gap-3 rounded-lg border border-gray-200 bg-white p-3 shadow-sm">
         <button
-          onclick={() => selection.provides?.copyToClipboard()}
+          onclick={() => selection?.copyToClipboard()}
           disabled={!hasSelection}
           class="flex h-8 items-center justify-center gap-2 rounded-md border border-gray-300 bg-white px-3 text-sm font-medium text-gray-700 transition-colors duration-150 hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50"
           title="Copy Selected Text"
@@ -78,8 +73,8 @@
         </button>
       </div>
       <div class="relative flex w-full flex-1 overflow-hidden">
-        <Viewport class="flex-grow bg-gray-100">
-          <Scroller {RenderPageSnippet} />
+        <Viewport {documentId} class="flex-grow bg-gray-100">
+          <Scroller {documentId} {renderPage} />
         </Viewport>
       </div>
     </div>

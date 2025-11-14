@@ -1,29 +1,43 @@
-import { useEffect, useState } from '@framework';
+import { useEffect, useMemo, useState } from '@framework';
 import { Rect } from '@embedpdf/models';
-import { useSelectionCapability, useSelectionPlugin } from '../hooks';
+import { useSelectionPlugin } from '../hooks';
+import { useDocumentState } from '@embedpdf/core/@framework';
 
 type Props = {
+  documentId: string;
   pageIndex: number;
-  scale: number;
+  scale?: number;
   background?: string;
 };
 
-export function SelectionLayer({ pageIndex, scale, background = 'rgba(33,150,243)' }: Props) {
+export function SelectionLayer({
+  documentId,
+  pageIndex,
+  scale: scaleOverride,
+  background = 'rgba(33,150,243)',
+}: Props) {
   const { plugin: selPlugin } = useSelectionPlugin();
+  const documentState = useDocumentState(documentId);
   const [rects, setRects] = useState<Rect[]>([]);
   const [boundingRect, setBoundingRect] = useState<Rect | null>(null);
 
   useEffect(() => {
-    if (!selPlugin) return;
+    if (!selPlugin || !documentId) return;
 
     return selPlugin.registerSelectionOnPage({
+      documentId,
       pageIndex,
       onRectsChange: ({ rects, boundingRect }) => {
         setRects(rects);
         setBoundingRect(boundingRect);
       },
     });
-  }, [selPlugin, pageIndex]);
+  }, [selPlugin, documentId, pageIndex]);
+
+  const actualScale = useMemo(() => {
+    if (scaleOverride !== undefined) return scaleOverride;
+    return documentState?.scale ?? 1;
+  }, [scaleOverride, documentState?.scale]);
 
   if (!boundingRect) return null;
 
@@ -31,12 +45,13 @@ export function SelectionLayer({ pageIndex, scale, background = 'rgba(33,150,243
     <div
       style={{
         position: 'absolute',
-        left: boundingRect.origin.x * scale,
-        top: boundingRect.origin.y * scale,
-        width: boundingRect.size.width * scale,
-        height: boundingRect.size.height * scale,
+        left: boundingRect.origin.x * actualScale,
+        top: boundingRect.origin.y * actualScale,
+        width: boundingRect.size.width * actualScale,
+        height: boundingRect.size.height * actualScale,
         mixBlendMode: 'multiply',
         isolation: 'isolate',
+        pointerEvents: 'none',
       }}
     >
       {rects.map((b, i) => (
@@ -44,12 +59,11 @@ export function SelectionLayer({ pageIndex, scale, background = 'rgba(33,150,243
           key={i}
           style={{
             position: 'absolute',
-            left: (b.origin.x - boundingRect.origin.x) * scale,
-            top: (b.origin.y - boundingRect.origin.y) * scale,
-            width: b.size.width * scale,
-            height: b.size.height * scale,
+            left: (b.origin.x - boundingRect.origin.x) * actualScale,
+            top: (b.origin.y - boundingRect.origin.y) * actualScale,
+            width: b.size.width * actualScale,
+            height: b.size.height * actualScale,
             background,
-            pointerEvents: 'none',
           }}
         />
       ))}

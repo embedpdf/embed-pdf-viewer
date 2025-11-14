@@ -6,8 +6,11 @@ import { RenderLayer } from '@embedpdf/plugin-render/vue';
 import { PagePointerProvider } from '@embedpdf/plugin-interaction-manager/vue';
 import { MarqueeCapture, useCapture, type CaptureAreaEvent } from '@embedpdf/plugin-capture/vue';
 
-// Now this is safe because we're guaranteed to be inside <EmbedPDF>
-const { provides: capture, isMarqueeCaptureActive } = useCapture();
+const props = defineProps<{
+  documentId: string;
+}>();
+
+const { provides: capture, state } = useCapture(() => props.documentId);
 const captureResult = ref<CaptureAreaEvent | null>(null);
 const imageUrl = ref<string | null>(null);
 
@@ -47,27 +50,22 @@ const downloadImage = () => {
         @click="capture?.toggleMarqueeCapture()"
         :class="[
           'rounded-md px-3 py-1 text-sm font-medium transition-colors',
-          isMarqueeCaptureActive ? 'bg-blue-500 text-white' : 'bg-gray-100 hover:bg-gray-200',
+          state.isMarqueeCaptureActive ? 'bg-blue-500 text-white' : 'bg-gray-100 hover:bg-gray-200',
         ]"
       >
-        {{ isMarqueeCaptureActive ? 'Cancel Capture' : 'Capture Area' }}
+        {{ state.isMarqueeCaptureActive ? 'Cancel Capture' : 'Capture Area' }}
       </button>
     </div>
     <div class="flex-grow" style="position: relative; overflow: hidden">
       <Viewport
+        :document-id="documentId"
         style="position: absolute; top: 0; left: 0; right: 0; bottom: 0; background-color: #f1f3f5"
       >
-        <Scroller>
+        <Scroller :document-id="documentId">
           <template #default="{ page }">
-            <PagePointerProvider
-              :page-index="page.pageIndex"
-              :page-width="page.width"
-              :page-height="page.height"
-              :rotation="page.rotation"
-              :scale="page.scale"
-            >
-              <RenderLayer :page-index="page.pageIndex" />
-              <MarqueeCapture :page-index="page.pageIndex" :scale="page.scale" />
+            <PagePointerProvider :document-id="documentId" :page-index="page.pageIndex">
+              <RenderLayer :document-id="documentId" :page-index="page.pageIndex" :scale="1" />
+              <MarqueeCapture :document-id="documentId" :page-index="page.pageIndex" />
             </PagePointerProvider>
           </template>
         </Scroller>
