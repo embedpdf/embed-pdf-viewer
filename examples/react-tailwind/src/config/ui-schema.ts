@@ -52,8 +52,13 @@ export const viewerUISchema: UISchema = {
           },
           md: {
             minWidth: 768,
-            show: ['annotate-mode', 'shapes-mode', 'redact-mode', 'zoom-toolbar'],
-            hide: ['overflow-tabs-button', 'zoom-menu-button'],
+            show: ['annotate-mode', 'shapes-mode', 'zoom-toolbar'],
+            hide: ['zoom-menu-button'],
+          },
+          lg: {
+            minWidth: 1024,
+            show: ['redact-mode'],
+            hide: ['overflow-tabs-button'],
           },
         },
       },
@@ -166,14 +171,12 @@ export const viewerUISchema: UISchema = {
               commandId: 'mode:redact',
               variant: 'text',
             },
+            {
+              id: 'overflow-tabs-button',
+              commandId: 'tabs:overflow-menu',
+              variant: 'icon',
+            },
           ],
-        },
-        // Overflow menu button (shown on small screens)
-        {
-          type: 'command-button',
-          id: 'overflow-tabs-button',
-          commandId: 'tabs:overflow-menu',
-          variant: 'icon',
         },
 
         // ───────── Spacer: Flexible space ─────────
@@ -517,8 +520,8 @@ export const viewerUISchema: UISchema = {
         {
           type: 'submenu',
           id: 'zoom-levels-submenu',
-          label: 'Zoom Levels',
           labelKey: 'zoom.level',
+          label: 'Zoom Levels',
           menuId: 'zoom-levels-menu',
         },
         {
@@ -685,6 +688,7 @@ export const viewerUISchema: UISchema = {
         {
           type: 'section',
           id: 'spread-mode-section',
+          labelKey: 'page.spreadMode',
           label: 'Spread Mode',
           items: [
             {
@@ -708,6 +712,7 @@ export const viewerUISchema: UISchema = {
         {
           type: 'section',
           id: 'scroll-layout-section',
+          labelKey: 'page.scrollLayout',
           label: 'Scroll Layout',
           items: [
             {
@@ -729,6 +734,7 @@ export const viewerUISchema: UISchema = {
         {
           type: 'section',
           id: 'page-rotation-section',
+          labelKey: 'page.rotation',
           label: 'Page Rotation',
           items: [
             {
@@ -764,17 +770,19 @@ export const viewerUISchema: UISchema = {
         tabs: [
           {
             id: 'thumbnails',
+            labelKey: 'panel.thumbnails',
             label: 'Thumbnails',
             componentId: 'thumbnails-sidebar',
           },
           {
             id: 'outline',
+            labelKey: 'panel.outline',
             label: 'Outline',
             componentId: 'outline-sidebar',
           },
         ],
       },
-      width: '200px',
+      width: '250px',
       collapsible: true,
       defaultOpen: false,
     },

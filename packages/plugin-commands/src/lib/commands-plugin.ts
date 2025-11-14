@@ -163,7 +163,7 @@ export class CommandsPlugin extends BasePlugin<
     // Priority: labelKey (with i18n) > label (plain string) > id (fallback)
     if (command.labelKey && this.i18n) {
       const params = this.resolveDynamic(command.labelParams, state, documentId);
-      return this.i18n.t(command.labelKey, params);
+      return this.i18n.t(command.labelKey, { params, documentId });
     }
 
     if (command.label) {

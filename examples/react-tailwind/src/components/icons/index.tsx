@@ -527,16 +527,17 @@ export function MenuDotsIcon({ className, title }: IconProps) {
       fill="none"
       stroke="currentColor"
       viewBox="0 0 24 24"
+      strokeWidth={2}
+      strokeLinecap="round"
+      strokeLinejoin="round"
       aria-hidden={!title}
       role={title ? 'img' : 'presentation'}
     >
       {title ? <title>{title}</title> : null}
-      <path
-        strokeLinecap="round"
-        strokeLinejoin="round"
-        strokeWidth={2}
-        d="M12 5v.01M12 12v.01M12 19v.01M12 6a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2z"
-      />
+      <path stroke="none" d="M0 0h24v24H0z" fill="none" />
+      <path d="M5 12m-1 0a1 1 0 1 0 2 0a1 1 0 1 0 -2 0" />
+      <path d="M12 12m-1 0a1 1 0 1 0 2 0a1 1 0 1 0 -2 0" />
+      <path d="M19 12m-1 0a1 1 0 1 0 2 0a1 1 0 1 0 -2 0" />
     </svg>
   );
 }

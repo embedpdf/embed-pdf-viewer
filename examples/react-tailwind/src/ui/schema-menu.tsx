@@ -477,9 +477,11 @@ function MenuSection({
   onNavigateToSubmenu?: (submenuId: string, title: string) => void;
   responsiveMetadata: ResponsiveMetadata | null;
 }) {
+  const { translate } = useTranslations(documentId);
+
   return (
     <div className={isMobile ? 'py-2' : 'py-1'}>
-      {item.label && (
+      {(item.labelKey || item.label) && (
         <div
           className={
             isMobile
@@ -487,7 +489,7 @@ function MenuSection({
               : 'px-3 py-1.5 text-xs font-semibold uppercase tracking-wider text-gray-500'
           }
         >
-          {item.label}
+          {translate(item.labelKey || item.id, { fallback: item.label || item.id })}
         </div>
       )}
       {item.items.map((subItem, index) => (

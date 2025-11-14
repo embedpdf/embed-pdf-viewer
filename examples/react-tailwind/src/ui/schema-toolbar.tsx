@@ -5,6 +5,7 @@ import {
   ToolbarRendererProps,
 } from '@embedpdf/plugin-ui/react';
 import { CommandButton } from '../components/command-button';
+import { CommandTabButton } from '../components/command-tab-button';
 import { ToolbarDivider } from '../components/ui';
 import { useItemRenderer } from '@embedpdf/plugin-ui/react';
 import { useMemo } from 'react';
@@ -163,30 +164,32 @@ function TabGroupRenderer({
 
   return (
     <div
-      className={twMerge('flex items-center gap-1', alignmentClass, responsiveClasses)}
+      className={twMerge('flex items-center', alignmentClass, responsiveClasses)}
       data-item-id={item.id}
       role="tablist"
     >
-      {item.tabs.map((tab) => {
-        // Get responsive metadata for each tab
-        const tabMetadata = responsiveMetadata?.items.get(tab.id) ?? null;
-        const tabResponsiveClasses = resolveResponsiveClasses(tabMetadata);
+      <div className="flex rounded-lg bg-gray-100 p-1">
+        {item.tabs.map((tab) => {
+          // Get responsive metadata for each tab
+          const tabMetadata = responsiveMetadata?.items.get(tab.id) ?? null;
+          const tabResponsiveClasses = resolveResponsiveClasses(tabMetadata);
 
-        if (!tab.commandId) {
-          return null;
-        }
+          if (!tab.commandId) {
+            return null;
+          }
 
-        return (
-          <div key={tab.id} className={twMerge(tabResponsiveClasses)} data-tab-id={tab.id}>
-            <CommandButton
-              commandId={tab.commandId}
-              documentId={documentId}
-              variant={tab.variant || 'text'}
-              itemId={tab.id}
-            />
-          </div>
-        );
-      })}
+          return (
+            <div key={tab.id} className={twMerge(tabResponsiveClasses)} data-tab-id={tab.id}>
+              <CommandTabButton
+                commandId={tab.commandId}
+                documentId={documentId}
+                itemId={tab.id}
+                variant={tab.variant === 'icon' ? 'icon' : 'text'}
+              />
+            </div>
+          );
+        })}
+      </div>
     </div>
   );
 }

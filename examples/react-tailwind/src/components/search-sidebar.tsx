@@ -4,6 +4,7 @@ import { useState, useRef, useEffect } from 'react';
 import { MatchFlag } from '@embedpdf/models';
 import { SearchResult } from '@embedpdf/models';
 import { SearchIcon, CloseIcon, ChevronRightIcon, ChevronLeftIcon } from './icons';
+import { useTranslations } from '@embedpdf/plugin-i18n/react';
 
 const HitLine = ({
   hit,
@@ -51,6 +52,7 @@ type SearchSidebarProps = {
 export function SearchSidebar({ documentId, onClose }: SearchSidebarProps) {
   const { state, provides } = useSearch(documentId);
   const { provides: scroll } = useScrollCapability();
+  const { translate } = useTranslations(documentId);
   const inputRef = useRef<HTMLInputElement>(null);
   const [inputValue, setInputValue] = useState('');
 
@@ -136,11 +138,11 @@ export function SearchSidebar({ documentId, onClose }: SearchSidebarProps) {
     <div className="flex h-full flex-col bg-white">
       {/* Header */}
       <div className="flex items-center justify-between border-b border-gray-300 px-4 py-3">
-        <h2 className="text-lg font-semibold text-gray-800">Search</h2>
+        <h2 className="text-lg font-semibold text-gray-800">{translate('search.title')}</h2>
         <button
           onClick={onClose}
           className="rounded p-1 text-gray-500 transition-colors hover:bg-gray-100 hover:text-gray-700"
-          aria-label="Close search"
+          aria-label={translate('search.close')}
         >
           <CloseIcon className="h-5 w-5" />
         </button>
@@ -155,7 +157,7 @@ export function SearchSidebar({ documentId, onClose }: SearchSidebarProps) {
           <input
             ref={inputRef}
             type="text"
-            placeholder="Search"
+            placeholder={translate('search.placeholder')}
             value={inputValue}
             onChange={handleInputChange}
             className="w-full rounded-lg border border-gray-300 py-2 pl-10 pr-10 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
@@ -179,7 +181,7 @@ export function SearchSidebar({ documentId, onClose }: SearchSidebarProps) {
               onChange={(e) => handleFlagChange(MatchFlag.MatchCase, e.target.checked)}
               className="mr-2 h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
             />
-            Case sensitive
+            {translate('search.caseSensitive')}
           </label>
           <label className="flex items-center text-sm text-gray-700">
             <input
@@ -188,27 +190,29 @@ export function SearchSidebar({ documentId, onClose }: SearchSidebarProps) {
               onChange={(e) => handleFlagChange(MatchFlag.MatchWholeWord, e.target.checked)}
               className="mr-2 h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
             />
-            Whole word
+            {translate('search.wholeWord')}
           </label>
         </div>
 
         {/* Results count and navigation */}
         {state.active && !state.loading && state.total > 0 && (
           <div className="mt-3 flex items-center justify-between">
-            <span className="text-sm text-gray-600">{state.total} results found</span>
+            <span className="text-sm text-gray-600">
+              {translate('search.resultsFound', { params: { count: state.total } })}
+            </span>
             {state.total > 1 && (
               <div className="flex gap-1">
                 <button
                   onClick={() => provides.previousResult()}
                   className="rounded p-1 text-gray-600 hover:bg-gray-100"
-                  aria-label="Previous result"
+                  aria-label={translate('search.previousResult')}
                 >
                   <ChevronLeftIcon className="h-4 w-4" />
                 </button>
                 <button
                   onClick={() => provides.nextResult()}
                   className="rounded p-1 text-gray-600 hover:bg-gray-100"
-                  aria-label="Next result"
+                  aria-label={translate('search.nextResult')}
                 >
                   <ChevronRightIcon className="h-4 w-4" />
                 </button>
@@ -229,7 +233,7 @@ export function SearchSidebar({ documentId, onClose }: SearchSidebarProps) {
             {Object.entries(grouped).map(([page, hits]) => (
               <div key={page}>
                 <div className="mb-2 text-xs font-semibold text-gray-500">
-                  Page {Number(page) + 1}
+                  {translate('search.page', { params: { number: Number(page) + 1 } })}
                 </div>
                 <div className="space-y-2">
                   {hits.map(({ hit, index }) => (

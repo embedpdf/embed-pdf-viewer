@@ -29,7 +29,7 @@ export const commands: Record<string, Command<State>> = {
   // ─────────────────────────────────────────────────────────
   'zoom:in': {
     id: 'zoom:in',
-    label: 'Zoom In',
+    labelKey: 'zoom.in',
     icon: 'SearchPlus',
     shortcuts: ['Ctrl+=', 'Meta+=', 'Ctrl+NumpadAdd', 'Meta+NumpadAdd'],
     category: 'view',
@@ -44,7 +44,7 @@ export const commands: Record<string, Command<State>> = {
 
   'zoom:out': {
     id: 'zoom:out',
-    label: 'Zoom Out',
+    labelKey: 'zoom.out',
     icon: 'SearchMinus',
     shortcuts: ['Ctrl+-', 'Meta+-', 'Ctrl+NumpadSubtract', 'Meta+NumpadSubtract'],
     category: 'view',
@@ -59,7 +59,7 @@ export const commands: Record<string, Command<State>> = {
 
   'zoom:fit-page': {
     id: 'zoom:fit-page',
-    label: 'Fit to Page',
+    labelKey: 'zoom.fitPage',
     icon: 'FitPage',
     shortcuts: ['Ctrl+0', 'Meta+0'],
     category: 'tools',
@@ -76,7 +76,7 @@ export const commands: Record<string, Command<State>> = {
 
   'zoom:fit-width': {
     id: 'zoom:fit-width',
-    label: 'Fit to Width',
+    labelKey: 'zoom.fitWidth',
     icon: 'FitWidth',
     shortcuts: ['Ctrl+1', 'Meta+1'],
     category: 'tools',
@@ -93,7 +93,7 @@ export const commands: Record<string, Command<State>> = {
 
   'zoom:marquee': {
     id: 'zoom:marquee',
-    label: 'Marquee Zoom',
+    labelKey: 'zoom.marquee',
     icon: 'Marquee',
     shortcuts: ['Ctrl+M', 'Meta+M'],
     category: 'tools',
@@ -236,7 +236,7 @@ export const commands: Record<string, Command<State>> = {
 
   'zoom:toggle-menu': {
     id: 'zoom:toggle-menu',
-    label: 'Zoom Menu',
+    labelKey: 'zoom.menu',
     icon: 'ZoomChevronDown',
     iconProps: {
       className: 'h-3.5 w-3.5',
@@ -257,7 +257,7 @@ export const commands: Record<string, Command<State>> = {
 
   'zoom:toggle-menu-mobile': {
     id: 'zoom:toggle-menu-mobile',
-    label: 'Zoom Menu',
+    labelKey: 'zoom.menu',
     icon: 'SearchPlus',
     category: 'tools',
     action: ({ registry, documentId }) => {
@@ -278,7 +278,7 @@ export const commands: Record<string, Command<State>> = {
   // ─────────────────────────────────────────────────────────
   'pan:toggle': {
     id: 'pan:toggle',
-    label: 'Toggle Pan Mode',
+    labelKey: 'pan.toggle',
     icon: 'Hand',
     shortcuts: ['h'],
     category: 'tools',
@@ -298,7 +298,7 @@ export const commands: Record<string, Command<State>> = {
   // ─────────────────────────────────────────────────────────
   'pointer:toggle': {
     id: 'pointer:toggle',
-    label: 'Toggle Pointer Mode',
+    labelKey: 'pointer.toggle',
     icon: 'Pointer',
     shortcuts: ['p'],
     category: 'tools',
@@ -320,8 +320,7 @@ export const commands: Record<string, Command<State>> = {
   // ─────────────────────────────────────────────────────────
   'capture:screenshot': {
     id: 'capture:screenshot',
-    label: 'Screenshot',
-    labelKey: 'commands.screenshot',
+    labelKey: 'capture.screenshot',
     icon: 'Screenshot',
     shortcuts: ['Ctrl+Shift+S', 'Meta+Shift+S'],
     category: 'tools',
@@ -345,7 +344,7 @@ export const commands: Record<string, Command<State>> = {
   // ─────────────────────────────────────────────────────────
   'document:menu': {
     id: 'document:menu',
-    label: 'Document Menu',
+    labelKey: 'document.menu',
     icon: 'Menu',
     category: 'document',
     action: ({ registry, documentId }) => {
@@ -371,7 +370,7 @@ export const commands: Record<string, Command<State>> = {
 
   'document:open': {
     id: 'document:open',
-    label: 'Open',
+    labelKey: 'document.open',
     icon: 'Document',
     shortcuts: ['Ctrl+O', 'Meta+O'],
     category: 'document',
@@ -383,7 +382,7 @@ export const commands: Record<string, Command<State>> = {
 
   'document:close': {
     id: 'document:close',
-    label: 'Close',
+    labelKey: 'document.close',
     icon: 'Close',
     shortcuts: ['Ctrl+W', 'Meta+W'],
     category: 'document',
@@ -395,7 +394,7 @@ export const commands: Record<string, Command<State>> = {
 
   'document:print': {
     id: 'document:print',
-    label: 'Print',
+    labelKey: 'document.print',
     icon: 'Print',
     shortcuts: ['Ctrl+P', 'Meta+P'],
     category: 'document',
@@ -407,7 +406,7 @@ export const commands: Record<string, Command<State>> = {
 
   'document:export': {
     id: 'document:export',
-    label: 'Export',
+    labelKey: 'document.export',
     icon: 'Download',
     category: 'document',
     action: ({ registry, documentId }) => {
@@ -418,7 +417,7 @@ export const commands: Record<string, Command<State>> = {
 
   'document:properties': {
     id: 'document:properties',
-    label: 'Properties',
+    labelKey: 'document.properties',
     icon: 'Alert',
     category: 'document',
     action: () => {
@@ -431,7 +430,7 @@ export const commands: Record<string, Command<State>> = {
   // ─────────────────────────────────────────────────────────
   'panel:toggle-sidebar': {
     id: 'panel:toggle-sidebar',
-    label: 'Sidebar',
+    labelKey: 'panel.sidebar',
     icon: 'Sidebar',
     category: 'panels',
     action: ({ registry, documentId }) => {
@@ -452,7 +451,7 @@ export const commands: Record<string, Command<State>> = {
 
   'panel:toggle-search': {
     id: 'panel:toggle-search',
-    label: 'Search',
+    labelKey: 'panel.search',
     icon: 'Search',
     shortcuts: ['Ctrl+F', 'Meta+F'],
     category: 'panels',
@@ -474,7 +473,7 @@ export const commands: Record<string, Command<State>> = {
 
   'panel:toggle-comment': {
     id: 'panel:toggle-comment',
-    label: 'Comment',
+    labelKey: 'panel.comment',
     icon: 'Comment',
     category: 'panels',
     action: ({ registry, documentId }) => {
@@ -497,7 +496,7 @@ export const commands: Record<string, Command<State>> = {
   // ─────────────────────────────────────────────────────────
   'page:settings': {
     id: 'page:settings',
-    label: 'Page Settings',
+    labelKey: 'page.settings',
     icon: 'Settings',
     category: 'page',
     action: ({ registry, documentId }) => {
@@ -523,7 +522,7 @@ export const commands: Record<string, Command<State>> = {
 
   'spread:none': {
     id: 'spread:none',
-    label: 'Single Page',
+    labelKey: 'page.single',
     category: 'page',
     action: ({ registry, documentId }) => {
       const spread = registry.getPlugin<SpreadPlugin>('spread')?.provides();
@@ -535,7 +534,7 @@ export const commands: Record<string, Command<State>> = {
 
   'spread:odd': {
     id: 'spread:odd',
-    label: 'Two Page (Odd)',
+    labelKey: 'page.twoOdd',
     category: 'page',
     action: ({ registry, documentId }) => {
       const spread = registry.getPlugin<SpreadPlugin>('spread')?.provides();
@@ -547,7 +546,7 @@ export const commands: Record<string, Command<State>> = {
 
   'spread:even': {
     id: 'spread:even',
-    label: 'Two Page (Even)',
+    labelKey: 'page.twoEven',
     category: 'page',
     action: ({ registry, documentId }) => {
       const spread = registry.getPlugin<SpreadPlugin>('spread')?.provides();
@@ -559,7 +558,7 @@ export const commands: Record<string, Command<State>> = {
 
   'rotate:clockwise': {
     id: 'rotate:clockwise',
-    label: 'Rotate Clockwise',
+    labelKey: 'rotate.clockwise',
     icon: 'RotateRight',
     shortcuts: ['Ctrl+]', 'Meta+]'],
     category: 'page',
@@ -571,7 +570,7 @@ export const commands: Record<string, Command<State>> = {
 
   'rotate:counter-clockwise': {
     id: 'rotate:counter-clockwise',
-    label: 'Rotate Counter-Clockwise',
+    labelKey: 'rotate.counterClockwise',
     icon: 'RotateLeft',
     shortcuts: ['Ctrl+[', 'Meta+['],
     category: 'page',
@@ -583,7 +582,7 @@ export const commands: Record<string, Command<State>> = {
 
   'scroll:vertical': {
     id: 'scroll:vertical',
-    label: 'Vertical',
+    labelKey: 'page.vertical',
     category: 'page',
     action: ({ registry, documentId }) => {
       const scroll = registry.getPlugin<ScrollPlugin>('scroll')?.provides();
@@ -595,7 +594,7 @@ export const commands: Record<string, Command<State>> = {
 
   'scroll:horizontal': {
     id: 'scroll:horizontal',
-    label: 'Horizontal',
+    labelKey: 'page.horizontal',
     category: 'page',
     action: ({ registry, documentId }) => {
       const scroll = registry.getPlugin<ScrollPlugin>('scroll')?.provides();
@@ -610,7 +609,7 @@ export const commands: Record<string, Command<State>> = {
   // ─────────────────────────────────────────────────────────
   'mode:view': {
     id: 'mode:view',
-    label: 'View',
+    labelKey: 'mode.view',
     category: 'mode',
     action: ({ registry, documentId }) => {
       const ui = registry.getPlugin<UIPlugin>('ui')?.provides();
@@ -625,7 +624,7 @@ export const commands: Record<string, Command<State>> = {
 
   'mode:annotate': {
     id: 'mode:annotate',
-    label: 'Annotate',
+    labelKey: 'mode.annotate',
     category: 'mode',
     action: ({ registry, documentId }) => {
       const ui = registry.getPlugin<UIPlugin>('ui')?.provides();
@@ -641,7 +640,7 @@ export const commands: Record<string, Command<State>> = {
 
   'mode:shapes': {
     id: 'mode:shapes',
-    label: 'Shapes',
+    labelKey: 'mode.shapes',
     category: 'mode',
     action: ({ registry, documentId }) => {
       const ui = registry.getPlugin<UIPlugin>('ui')?.provides();
@@ -657,7 +656,7 @@ export const commands: Record<string, Command<State>> = {
 
   'mode:redact': {
     id: 'mode:redact',
-    label: 'Redact',
+    labelKey: 'mode.redact',
     category: 'mode',
     action: ({ registry, documentId }) => {
       const ui = registry.getPlugin<UIPlugin>('ui')?.provides();
@@ -674,7 +673,7 @@ export const commands: Record<string, Command<State>> = {
 
   'tabs:overflow-menu': {
     id: 'tabs:overflow-menu',
-    label: 'More tabs',
+    labelKey: 'tabs.overflowMenu',
     icon: 'MenuDots',
     category: 'ui',
     action: ({ registry, documentId }) => {
@@ -696,7 +695,7 @@ export const commands: Record<string, Command<State>> = {
   // ─────────────────────────────────────────────────────────
   'annotation:add-text': {
     id: 'annotation:add-text',
-    label: 'Text',
+    labelKey: 'annotation.text',
     icon: 'Text',
     iconProps: ({ state }) => ({
       primaryColor: getToolDefaultsById(state.plugins.annotation, 'freeText')?.fontColor,
@@ -721,7 +720,7 @@ export const commands: Record<string, Command<State>> = {
 
   'annotation:add-highlight': {
     id: 'annotation:add-highlight',
-    label: 'Highlight',
+    labelKey: 'annotation.highlight',
     icon: 'Highlight',
     iconProps: ({ state }) => ({
       primaryColor: getToolDefaultsById(state.plugins.annotation, 'highlight')?.color,
@@ -746,7 +745,7 @@ export const commands: Record<string, Command<State>> = {
 
   'annotation:add-strikeout': {
     id: 'annotation:add-strikeout',
-    label: 'Strikeout',
+    labelKey: 'annotation.strikeout',
     icon: 'Strikethrough',
     iconProps: ({ state }) => ({
       primaryColor: getToolDefaultsById(state.plugins.annotation, 'strikeout')?.color,
@@ -771,7 +770,7 @@ export const commands: Record<string, Command<State>> = {
 
   'annotation:add-underline': {
     id: 'annotation:add-underline',
-    label: 'Underline',
+    labelKey: 'annotation.underline',
     icon: 'Underline',
     iconProps: ({ state }) => ({
       primaryColor: getToolDefaultsById(state.plugins.annotation, 'underline')?.color,
@@ -796,7 +795,7 @@ export const commands: Record<string, Command<State>> = {
 
   'annotation:add-rectangle': {
     id: 'annotation:add-rectangle',
-    label: 'Rectangle',
+    labelKey: 'annotation.rectangle',
     icon: 'Square',
     iconProps: ({ state }) => ({
       primaryColor: getToolDefaultsById(state.plugins.annotation, 'square')?.strokeColor,
@@ -822,7 +821,7 @@ export const commands: Record<string, Command<State>> = {
 
   'annotation:add-circle': {
     id: 'annotation:add-circle',
-    label: 'Circle',
+    labelKey: 'annotation.circle',
     icon: 'Circle',
     iconProps: ({ state }) => ({
       primaryColor: getToolDefaultsById(state.plugins.annotation, 'circle')?.strokeColor,
@@ -848,7 +847,7 @@ export const commands: Record<string, Command<State>> = {
 
   'annotation:add-line': {
     id: 'annotation:add-line',
-    label: 'Line',
+    labelKey: 'annotation.line',
     icon: 'Line',
     iconProps: ({ state }) => ({
       primaryColor: getToolDefaultsById(state.plugins.annotation, 'line')?.strokeColor,
@@ -873,7 +872,7 @@ export const commands: Record<string, Command<State>> = {
 
   'annotation:add-arrow': {
     id: 'annotation:add-arrow',
-    label: 'Arrow',
+    labelKey: 'annotation.arrow',
     icon: 'Arrow',
     iconProps: ({ state }) => ({
       primaryColor: getToolDefaultsById(state.plugins.annotation, 'line')?.strokeColor,
@@ -898,7 +897,7 @@ export const commands: Record<string, Command<State>> = {
 
   'annotation:add-polygon': {
     id: 'annotation:add-polygon',
-    label: 'Polygon',
+    labelKey: 'annotation.polygon',
     icon: 'Polygon',
     iconProps: ({ state }) => ({
       primaryColor: getToolDefaultsById(state.plugins.annotation, 'polygon')?.strokeColor,
@@ -924,7 +923,7 @@ export const commands: Record<string, Command<State>> = {
 
   'annotation:add-polyline': {
     id: 'annotation:add-polyline',
-    label: 'Polyline',
+    labelKey: 'annotation.polyline',
     icon: 'Polyline',
     iconProps: ({ state }) => ({
       primaryColor: getToolDefaultsById(state.plugins.annotation, 'polyline')?.strokeColor,
@@ -949,7 +948,7 @@ export const commands: Record<string, Command<State>> = {
 
   'annotation:add-ink': {
     id: 'annotation:add-ink',
-    label: 'Ink',
+    labelKey: 'annotation.ink',
     icon: 'Pen',
     iconProps: ({ state }) => ({
       primaryColor: getToolDefaultsById(state.plugins.annotation, 'ink')?.color,
@@ -974,7 +973,7 @@ export const commands: Record<string, Command<State>> = {
 
   'annotation:add-stamp': {
     id: 'annotation:add-stamp',
-    label: 'Stamp',
+    labelKey: 'annotation.stamp',
     icon: 'Photo',
     category: 'annotation',
     action: ({ registry, documentId }) => {
@@ -999,7 +998,7 @@ export const commands: Record<string, Command<State>> = {
   // ─────────────────────────────────────────────────────────
   'redaction:redact-area': {
     id: 'redaction:redact-area',
-    label: 'Redact Area',
+    labelKey: 'redaction.area',
     icon: 'RedactArea',
     category: 'redaction',
     action: ({ registry, documentId }) => {
@@ -1014,7 +1013,7 @@ export const commands: Record<string, Command<State>> = {
 
   'redaction:redact-text': {
     id: 'redaction:redact-text',
-    label: 'Redact Text',
+    labelKey: 'redaction.text',
     icon: 'RedactText',
     category: 'redaction',
     action: ({ registry, documentId }) => {
@@ -1029,7 +1028,7 @@ export const commands: Record<string, Command<State>> = {
 
   'redaction:apply-all': {
     id: 'redaction:apply-all',
-    label: 'Apply All',
+    labelKey: 'redaction.applyAll',
     icon: 'Check',
     category: 'redaction',
     action: ({ registry, documentId }) => {
@@ -1040,7 +1039,7 @@ export const commands: Record<string, Command<State>> = {
 
   'redaction:clear-all': {
     id: 'redaction:clear-all',
-    label: 'Clear All',
+    labelKey: 'redaction.clearAll',
     icon: 'Close',
     category: 'redaction',
     action: ({ registry, documentId }) => {
@@ -1054,7 +1053,7 @@ export const commands: Record<string, Command<State>> = {
   // ─────────────────────────────────────────────────────────
   'history:undo': {
     id: 'history:undo',
-    label: 'Undo',
+    labelKey: 'history.undo',
     icon: 'ArrowBackUp',
     shortcuts: ['Ctrl+Z', 'Meta+Z'],
     category: 'edit',
@@ -1073,7 +1072,7 @@ export const commands: Record<string, Command<State>> = {
 
   'history:redo': {
     id: 'history:redo',
-    label: 'Redo',
+    labelKey: 'history.redo',
     icon: 'ArrowForwardUp',
     shortcuts: ['Ctrl+Y', 'Meta+Shift+Z'],
     category: 'edit',
@@ -1092,7 +1091,7 @@ export const commands: Record<string, Command<State>> = {
 
   'annotation:overflow-tools': {
     id: 'annotation:overflow-tools',
-    label: 'Overflow Tools',
+    labelKey: 'annotation.overflowTools',
     icon: 'MenuDots',
     category: 'annotation',
     action: ({ registry, documentId }) => {

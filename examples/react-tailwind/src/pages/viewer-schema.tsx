@@ -50,7 +50,13 @@ import { CustomZoomToolbar } from '../components/custom-zoom-toolbar';
 import { ThumbnailsSidebar } from '../components/thumbnails-sidebar';
 import { SearchSidebar } from '../components/search-sidebar';
 import { OutlineSidebar } from '../components/outline-sidebar';
-import { englishTranslations, paramResolvers } from '../config';
+import {
+  dutchTranslations,
+  englishTranslations,
+  germanTranslations,
+  paramResolvers,
+  spanishTranslations,
+} from '../config';
 
 const logger = new ConsoleLogger();
 
@@ -136,8 +142,8 @@ export function ViewerSchemaPage() {
         commands,
       }),
       createPluginRegistration(I18nPluginPackage, {
-        defaultLocale: 'en',
-        locales: [englishTranslations],
+        defaultLocale: 'nl',
+        locales: [englishTranslations, germanTranslations, spanishTranslations, dutchTranslations],
         paramResolvers,
       }),
       // UI plugin - provides schema-driven UI rendering
@@ -155,7 +161,7 @@ export function ViewerSchemaPage() {
   if (isLoading || !engine) {
     return (
       <div className="flex h-screen items-center justify-center">
-        <LoadingSpinner message="Loading PDF engine..." />
+        <LoadingSpinner />
       </div>
     );
   }

@@ -6,6 +6,7 @@ import {
 } from '@embedpdf/plugin-ui/react';
 import { useEffect, useMemo, useState, useRef } from 'react';
 import * as Icons from '../components/icons';
+import { useTranslations } from '@embedpdf/plugin-i18n/react';
 
 /**
  * Schema-driven Panel Renderer
@@ -34,6 +35,8 @@ export function SchemaPanel({ schema, documentId, isOpen, onClose }: PanelRender
     }
     return false;
   });
+
+  const { translate } = useTranslations(documentId);
 
   useEffect(() => {
     const checkMobile = () => setIsMobile(window.innerWidth < 768);
@@ -228,21 +231,23 @@ export function SchemaPanel({ schema, documentId, isOpen, onClose }: PanelRender
             </div>
 
             {/* Tabs */}
-            <div className="flex border-b border-gray-200 bg-gray-50">
+            <div className="flex gap-2 border-b border-gray-200 bg-gray-50 p-2">
               {availableTabs.map((tab) => {
                 const isActive = tab.id === (activeTab?.id ?? activeTabId);
                 return (
                   <button
                     key={tab.id}
                     type="button"
-                    className={`flex-1 px-3 py-2 text-sm font-medium transition-colors ${
+                    className={`flex-1 rounded px-3 py-1.5 text-sm font-medium transition-colors ${
                       isActive
-                        ? 'border-b-2 border-blue-500 bg-white text-blue-600'
-                        : 'text-gray-600 hover:bg-white hover:text-gray-800'
+                        ? 'bg-white text-gray-900 shadow-sm'
+                        : 'text-gray-600 hover:text-gray-900'
                     }`}
                     onClick={() => handleTabSelect(tab.id)}
+                    role="tab"
+                    aria-selected={isActive}
                   >
-                    {tab.label ?? tab.id}
+                    {translate(tab.labelKey || tab.id, { fallback: tab.label || tab.id })}
                   </button>
                 );
               })}
@@ -358,21 +363,23 @@ export function SchemaPanel({ schema, documentId, isOpen, onClose }: PanelRender
         style={widthStyle}
         data-panel-id={schema.id}
       >
-        <div className="flex border-b border-gray-200 bg-gray-50">
+        <div className="flex gap-2 border-b border-gray-200 bg-gray-50 p-2">
           {availableTabs.map((tab) => {
             const isActive = tab.id === (activeTab?.id ?? activeTabId);
             return (
               <button
                 key={tab.id}
                 type="button"
-                className={`flex-1 px-3 py-2 text-sm font-medium transition-colors ${
+                className={`flex-1 rounded px-3 py-1.5 text-sm font-medium transition-colors ${
                   isActive
-                    ? 'border-b-2 border-blue-500 bg-white text-blue-600'
-                    : 'text-gray-600 hover:bg-white hover:text-gray-800'
+                    ? 'bg-white text-gray-900 shadow-sm'
+                    : 'text-gray-600 hover:text-gray-900'
                 }`}
                 onClick={() => handleTabSelect(tab.id)}
+                role="tab"
+                aria-selected={isActive}
               >
-                {tab.label ?? tab.id}
+                {translate(tab.labelKey || tab.id, { fallback: tab.label || tab.id })}
               </button>
             );
           })}
