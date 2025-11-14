@@ -1,16 +1,6 @@
 import { useZoom } from '@embedpdf/plugin-zoom/react';
-import { ZoomMode } from '@embedpdf/plugin-zoom';
-import { useState } from 'react';
-import {
-  ChevronDownIcon,
-  FitPageIcon,
-  FitWidthIcon,
-  SearchMinusIcon,
-  SearchPlusIcon,
-  MarqueeIcon,
-} from './icons';
-import { DropdownMenu, DropdownItem, DropdownDivider } from './ui';
 import { CommandButton } from './command-button';
+import { useState, useEffect } from 'react';
 
 /**
  * Custom Zoom Toolbar Component
@@ -25,71 +15,68 @@ interface CustomZoomToolbarProps {
   documentId: string;
 }
 
-interface ZoomPreset {
-  value: number;
-  label: string;
-}
-
-interface ZoomModeItem {
-  value: ZoomMode;
-  label: string;
-}
-
-const ZOOM_PRESETS: ZoomPreset[] = [
-  { value: 0.5, label: '50%' },
-  { value: 1, label: '100%' },
-  { value: 1.5, label: '150%' },
-  { value: 2, label: '200%' },
-  { value: 4, label: '400%' },
-  { value: 8, label: '800%' },
-];
-
-const ZOOM_MODES: ZoomModeItem[] = [
-  { value: ZoomMode.FitPage, label: 'Fit to Page' },
-  { value: ZoomMode.FitWidth, label: 'Fit to Width' },
-];
-
 /**
  * Custom Zoom Toolbar
  *
  * A comprehensive zoom control with:
  * - Zoom in/out buttons
- * - Current zoom percentage display
- * - Dropdown menu with presets, modes, and marquee zoom
+ * - Editable zoom percentage input
+ * - Dropdown menu with zoom presets
  */
 export function CustomZoomToolbar({ documentId }: CustomZoomToolbarProps) {
   const { state, provides } = useZoom(documentId);
-  const [isMenuOpen, setIsMenuOpen] = useState(false);
+  const [inputValue, setInputValue] = useState('');
 
   if (!provides) return null;
 
   const zoomPercentage = Math.round(state.currentZoomLevel * 100);
 
-  const handleZoomIn = () => {
-    provides.zoomIn();
-    setIsMenuOpen(false);
+  // Sync input value with zoom state when it changes externally
+  useEffect(() => {
+    setInputValue(zoomPercentage.toString());
+  }, [zoomPercentage]);
+
+  const handleZoomChange = (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    const value = parseFloat(inputValue);
+
+    if (!isNaN(value) && value > 0) {
+      provides.requestZoom(value / 100);
+    }
   };
 
-  const handleZoomOut = () => {
-    provides.zoomOut();
-    setIsMenuOpen(false);
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    // Only allow numbers
+    const value = e.target.value.replace(/[^0-9]/g, '');
+    setInputValue(value);
   };
 
-  const handleSelectZoom = (value: number | ZoomMode) => {
-    provides.requestZoom(value);
-    setIsMenuOpen(false);
-  };
-
-  const handleToggleMarquee = () => {
-    provides.toggleMarqueeZoom();
-    setIsMenuOpen(false);
+  const handleBlur = () => {
+    // Reset to actual zoom if input is invalid
+    if (!inputValue || parseFloat(inputValue) <= 0) {
+      setInputValue(zoomPercentage.toString());
+    }
   };
 
   return (
     <div className="relative">
-      <div className="flex items-center rounded bg-gray-100 pl-2">
-        {/* Zoom Percentage Display */}
-        <span className="text-sm">{zoomPercentage}%</span>
+      <div className="flex items-center rounded bg-gray-100">
+        {/* Editable Zoom Percentage Input */}
+        <form onSubmit={handleZoomChange} className="block">
+          <input
+            name="zoom"
+            type="text"
+            inputMode="numeric"
+            pattern="\d*"
+            className="h-6 w-8 border-0 bg-transparent p-0 text-right text-sm outline-none focus:outline-none"
+            aria-label="Set zoom"
+            autoFocus={false}
+            value={inputValue}
+            onChange={handleInputChange}
+            onBlur={handleBlur}
+          />
+          <span className="text-sm">%</span>
+        </form>
         <CommandButton
           commandId="zoom:toggle-menu"
           documentId={documentId}

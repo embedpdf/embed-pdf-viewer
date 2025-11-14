@@ -24,6 +24,19 @@ export const viewerUISchema: UISchema = {
       },
       permanent: true,
       responsive: {
+        localeOverrides: {
+          groups: [
+            {
+              id: 'germanic-languages',
+              locales: ['de', 'nl'],
+              breakpoints: {
+                md: {
+                  replaceShow: ['annotate-mode', 'zoom-toolbar'],
+                },
+              },
+            },
+          ],
+        },
         breakpoints: {
           xs: {
             maxWidth: 640,
@@ -57,7 +70,7 @@ export const viewerUISchema: UISchema = {
           },
           lg: {
             minWidth: 1024,
-            show: ['redact-mode'],
+            show: ['shapes-mode', 'redact-mode'],
             hide: ['overflow-tabs-button'],
           },
         },
@@ -234,6 +247,7 @@ export const viewerUISchema: UISchema = {
       },
       permanent: false,
       items: [
+        { type: 'spacer', id: 'spacer-3', flex: true },
         {
           type: 'group',
           id: 'annotation-tools',
@@ -301,6 +315,7 @@ export const viewerUISchema: UISchema = {
             },
           ],
         },
+        { type: 'spacer', id: 'spacer-4', flex: true },
       ],
     },
 
@@ -313,6 +328,7 @@ export const viewerUISchema: UISchema = {
       },
       permanent: false,
       items: [
+        { type: 'spacer', id: 'spacer-5', flex: true },
         {
           type: 'group',
           id: 'shapes-tools',
@@ -374,6 +390,7 @@ export const viewerUISchema: UISchema = {
             },
           ],
         },
+        { type: 'spacer', id: 'spacer-6', flex: true },
       ],
     },
 
@@ -387,6 +404,7 @@ export const viewerUISchema: UISchema = {
       },
       permanent: false,
       items: [
+        { type: 'spacer', id: 'spacer-7', flex: true },
         {
           type: 'group',
           id: 'redaction-tools',
@@ -424,6 +442,7 @@ export const viewerUISchema: UISchema = {
             },
           ],
         },
+        { type: 'spacer', id: 'spacer-8', flex: true },
       ],
     },
   },

@@ -4,6 +4,8 @@ import {
   ResponsiveMetadata,
   ResponsiveItemMetadata,
   ResponsiveVisibilityRule,
+  BreakpointRule,
+  LocaleOverrides,
 } from '../types';
 
 /**
@@ -12,16 +14,24 @@ import {
  */
 export function resolveResponsiveMetadata(
   schema: ToolbarSchema | MenuSchema,
+  currentLocale?: string,
 ): ResponsiveMetadata | null {
   if (!schema.responsive?.breakpoints) {
     return null;
   }
 
+  // Apply locale overrides to get effective breakpoints
+  const effectiveBreakpoints = applyLocaleOverrides(
+    schema.responsive.breakpoints,
+    schema.responsive.localeOverrides,
+    currentLocale,
+  );
+
   const items = new Map<string, ResponsiveItemMetadata>();
   const breakpoints = new Map<string, { minWidth?: number; maxWidth?: number }>();
 
-  // Extract breakpoint definitions
-  for (const [breakpointId, config] of Object.entries(schema.responsive.breakpoints)) {
+  // Extract breakpoint definitions (widths never change!)
+  for (const [breakpointId, config] of Object.entries(effectiveBreakpoints)) {
     breakpoints.set(breakpointId, {
       minWidth: config.minWidth,
       maxWidth: config.maxWidth,
@@ -52,13 +62,11 @@ export function resolveResponsiveMetadata(
     let defaultVisible = true; // Assume visible by default
 
     // Sort breakpoints by width for proper cascade
-    const sortedBreakpoints = Array.from(Object.entries(schema.responsive.breakpoints)).sort(
-      (a, b) => {
-        const aMin = a[1].minWidth ?? 0;
-        const bMin = b[1].minWidth ?? 0;
-        return aMin - bMin;
-      },
-    );
+    const sortedBreakpoints = Array.from(Object.entries(effectiveBreakpoints)).sort((a, b) => {
+      const aMin = a[1].minWidth ?? 0;
+      const bMin = b[1].minWidth ?? 0;
+      return aMin - bMin;
+    });
 
     sortedBreakpoints.forEach(([breakpointId, config], index) => {
       const isHidden = config.hide?.includes(itemId);
@@ -98,12 +106,70 @@ export function resolveResponsiveMetadata(
 }
 
 /**
+ * Apply locale-specific overrides to breakpoints
+ * Merges locale-specific show/hide rules with base breakpoints
+ */
+function applyLocaleOverrides(
+  baseBreakpoints: Record<string, BreakpointRule>,
+  localeOverrides: LocaleOverrides | undefined,
+  currentLocale: string | undefined,
+): Record<string, BreakpointRule> {
+  // No locale or no overrides - return base breakpoints
+  if (!currentLocale || !localeOverrides?.groups) {
+    return baseBreakpoints;
+  }
+
+  // Find matching locale group
+  const matchingGroup = localeOverrides.groups.find((group) =>
+    group.locales.includes(currentLocale),
+  );
+
+  // No matching group - return base breakpoints
+  if (!matchingGroup) {
+    return baseBreakpoints;
+  }
+
+  // Clone and merge show/hide rules
+  const effective: Record<string, BreakpointRule> = {};
+
+  for (const [breakpointId, baseRule] of Object.entries(baseBreakpoints)) {
+    const override = matchingGroup.breakpoints[breakpointId];
+
+    if (!override) {
+      // No override for this breakpoint - use base as-is
+      effective[breakpointId] = baseRule;
+      continue;
+    }
+
+    // Merge the rules
+    effective[breakpointId] = {
+      // Width constraints never change!
+      minWidth: baseRule.minWidth,
+      maxWidth: baseRule.maxWidth,
+
+      // Merge hide lists (base + additional) or use replacement
+      hide: override.replaceHide
+        ? override.replaceHide
+        : [...(baseRule.hide || []), ...(override.hide || [])],
+
+      // Merge show lists (base + additional) or use replacement
+      show: override.replaceShow
+        ? override.replaceShow
+        : [...(baseRule.show || []), ...(override.show || [])],
+    };
+  }
+
+  return effective;
+}
+
+/**
  * Get responsive metadata for a specific item
  */
 export function getItemResponsiveMetadata(
   itemId: string,
   schema: ToolbarSchema | MenuSchema,
+  currentLocale?: string,
 ): ResponsiveItemMetadata | null {
-  const metadata = resolveResponsiveMetadata(schema);
+  const metadata = resolveResponsiveMetadata(schema, currentLocale);
   return metadata?.items.get(itemId) ?? null;
 }

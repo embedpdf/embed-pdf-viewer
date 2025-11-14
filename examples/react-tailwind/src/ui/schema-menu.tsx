@@ -11,7 +11,7 @@ import { useCommand } from '@embedpdf/plugin-commands/react';
 import * as Icons from '../components/icons';
 import { resolveResponsiveClasses } from './responsive-utils';
 import { twMerge } from 'tailwind-merge';
-import { useTranslations } from '@embedpdf/plugin-i18n/react';
+import { useTranslations, useLocale } from '@embedpdf/plugin-i18n/react';
 
 /**
  * Schema-driven Menu Renderer
@@ -47,10 +47,12 @@ export function SchemaMenu({ schema, documentId, anchorEl, onClose }: MenuRender
 
   const currentMenu = menuStack[menuStack.length - 1];
 
+  const locale = useLocale();
+
   // Resolve responsive metadata for the current menu
   const responsiveMetadata = useMemo(
-    () => (currentMenu ? resolveResponsiveMetadata(currentMenu.schema) : null),
-    [currentMenu],
+    () => (currentMenu ? resolveResponsiveMetadata(currentMenu.schema, locale) : null),
+    [currentMenu, locale],
   );
 
   const navigateToSubmenu = (submenuId: string, title: string) => {

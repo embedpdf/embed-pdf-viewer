@@ -224,6 +224,9 @@ export interface ComponentPanelContent {
 export interface ResponsiveRules {
   // User defines their own breakpoint names
   breakpoints: Record<string, BreakpointRule>;
+
+  // Locale-based visibility overrides
+  localeOverrides?: LocaleOverrides;
 }
 
 export interface BreakpointRule {
@@ -234,4 +237,33 @@ export interface BreakpointRule {
   // Control visibility
   hide?: string[]; // Item IDs to hide
   show?: string[]; // Item IDs to show
+}
+
+/**
+ * Locale-based responsive overrides
+ * Allows grouping languages and adjusting show/hide rules per breakpoint
+ */
+export interface LocaleOverrides {
+  groups: LocaleVisibilityGroup[];
+}
+
+export interface LocaleVisibilityGroup {
+  id: string; // e.g., 'germanic-languages'
+  locales: string[]; // e.g., ['de', 'nl', 'da', 'sv']
+  description?: string; // Documentation/reasoning
+
+  // Override show/hide at specific breakpoints
+  breakpoints: Record<string, LocaleBreakpointOverride>;
+}
+
+export interface LocaleBreakpointOverride {
+  // Additional items to hide (merged with base hide)
+  hide?: string[];
+
+  // Additional items to show (merged with base show)
+  show?: string[];
+
+  // Complete replacement (if needed instead of merge)
+  replaceHide?: string[];
+  replaceShow?: string[];
 }

@@ -11,6 +11,7 @@ import { useItemRenderer } from '@embedpdf/plugin-ui/react';
 import { useMemo } from 'react';
 import { resolveResponsiveClasses } from './responsive-utils';
 import { twMerge } from 'tailwind-merge';
+import { useLocale } from '@embedpdf/plugin-i18n/react';
 
 /**
  * Schema-driven Toolbar Renderer
@@ -35,11 +36,20 @@ export function SchemaToolbar({
     return null;
   }
 
-  const responsiveMetadata = useMemo(() => resolveResponsiveMetadata(schema), [schema]);
+  const locale = useLocale();
+
+  const responsiveMetadata = useMemo(
+    () => resolveResponsiveMetadata(schema, locale),
+    [schema, locale],
+  );
+
+  const isSecondarySlot = schema.position.slot === 'secondary';
+  const placementClasses = getPlacementClasses(schema.position.placement);
+  const slotClasses = isSecondarySlot ? 'bg-[#f1f3f5]' : '';
 
   return (
     <div
-      className={`flex items-center gap-2 ${getPlacementClasses(schema.position.placement)} ${className}`}
+      className={twMerge('flex items-center gap-2', placementClasses, slotClasses, className)}
       data-toolbar-id={schema.id}
     >
       {schema.items.map((item) => (
