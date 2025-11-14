@@ -11,6 +11,7 @@ import { useCommand } from '@embedpdf/plugin-commands/react';
 import * as Icons from '../components/icons';
 import { resolveResponsiveClasses } from './responsive-utils';
 import { twMerge } from 'tailwind-merge';
+import { useTranslations } from '@embedpdf/plugin-i18n/react';
 
 /**
  * Schema-driven Menu Renderer
@@ -287,6 +288,7 @@ function MenuItemRenderer({
       return (
         <SubmenuItem
           item={item}
+          documentId={documentId}
           isMobile={isMobile}
           onNavigateToSubmenu={onNavigateToSubmenu}
           responsiveClasses={responsiveClasses}
@@ -294,7 +296,7 @@ function MenuItemRenderer({
       );
 
     case 'divider':
-      return <MenuDivider isMobile={isMobile} />;
+      return <MenuDivider isMobile={isMobile} responsiveClasses={responsiveClasses} />;
 
     case 'section':
       return (
@@ -388,15 +390,18 @@ function CommandMenuItem({
 
 function SubmenuItem({
   item,
+  documentId,
   isMobile,
   onNavigateToSubmenu,
   responsiveClasses,
 }: {
   item: Extract<MenuItem, { type: 'submenu' }>;
+  documentId: string;
   isMobile: boolean;
   onNavigateToSubmenu?: (submenuId: string, title: string) => void;
   responsiveClasses: string;
 }) {
+  const { translate } = useTranslations(documentId);
   const iconName = item.icon ? `${item.icon}Icon` : null;
   const IconComponent = iconName ? Icons[iconName as keyof typeof Icons] : null;
 
@@ -406,7 +411,10 @@ function SubmenuItem({
 
   const handleClick = () => {
     if (onNavigateToSubmenu) {
-      onNavigateToSubmenu(item.menuId, item.label || item.id);
+      onNavigateToSubmenu(
+        item.menuId,
+        translate(item.labelKey || item.id, { fallback: item.label || item.id }),
+      );
     }
   };
 
@@ -421,7 +429,9 @@ function SubmenuItem({
       role="menuitem"
     >
       {IconComponent && <IconComponent className={isMobile ? 'h-5 w-5' : 'h-4 w-4'} />}
-      <span className="flex-1">{item.label || item.id}</span>
+      <span className="flex-1">
+        {translate(item.labelKey || item.id, { fallback: item.label || item.id })}
+      </span>
       <Icons.ChevronRightIcon className={isMobile ? 'h-5 w-5' : 'h-4 w-4'} />
     </button>
   );
@@ -431,9 +441,20 @@ function SubmenuItem({
 // Menu Divider
 // ─────────────────────────────────────────────────────────
 
-function MenuDivider({ isMobile }: { isMobile: boolean }) {
+function MenuDivider({
+  isMobile,
+  responsiveClasses,
+}: {
+  isMobile: boolean;
+  responsiveClasses: string;
+}) {
   return (
-    <div className={isMobile ? 'my-2 border-t border-gray-200' : 'my-1 border-t border-gray-200'} />
+    <div
+      className={twMerge(
+        isMobile ? 'my-2 border-t border-gray-200' : 'my-1 border-t border-gray-200',
+        responsiveClasses,
+      )}
+    />
   );
 }
 

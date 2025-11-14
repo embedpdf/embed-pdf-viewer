@@ -142,6 +142,29 @@ export function ChevronDownIcon({ className, title }: IconProps) {
   );
 }
 
+export function ZoomChevronDownIcon({ className, title }: IconProps) {
+  return (
+    <svg
+      xmlns="http://www.w3.org/2000/svg"
+      width="14"
+      height="14"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      className={className}
+      aria-hidden={!title}
+      role={title ? 'img' : 'presentation'}
+    >
+      {title ? <title>{title}</title> : null}
+      <path stroke="none" d="M0 0h24v24H0z" fill="none" />
+      <path d="M6 9l6 6l6 -6" />
+    </svg>
+  );
+}
+
 export function FitPageIcon({ className, title }: IconProps) {
   return (
     <svg
@@ -1181,6 +1204,51 @@ export function PointerIcon({ className, title }: IconProps) {
       {title ? <title>{title}</title> : null}
       <path stroke="none" d="M0 0h24v24H0z" fill="none" />
       <path d="M7.904 17.563a1.2 1.2 0 0 0 2.228 .308l2.09 -3.093l4.907 4.907a1.067 1.067 0 0 0 1.509 0l1.047 -1.047a1.067 1.067 0 0 0 0 -1.509l-4.907 -4.907l3.113 -2.09a1.2 1.2 0 0 0 -.309 -2.228l-13.582 -3.904l3.904 13.563z" />
+    </svg>
+  );
+}
+
+export function SidebarIcon({ className, title }: IconProps) {
+  return (
+    <svg
+      className={className}
+      fill="none"
+      stroke="currentColor"
+      viewBox="0 0 24 24"
+      strokeWidth={2}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden={!title}
+      role={title ? 'img' : 'presentation'}
+      style={{ transform: 'scaleX(-1)' }}
+    >
+      {title ? <title>{title}</title> : null}
+      <path stroke="none" d="M0 0h24v24H0z" fill="none" />
+      <path d="M4 18v-12a2 2 0 0 1 2 -2h12a2 2 0 0 1 2 2v12a2 2 0 0 1 -2 2h-12a2 2 0 0 1 -2 -2z" />
+      <path d="M14 18v-12a2 2 0 0 0 -2 -2h-6a2 2 0 0 0 -2 2v12a2 2 0 0 0 2 2h6a2 2 0 0 0 2 -2z" />
+    </svg>
+  );
+}
+
+export function CommentIcon({ className, title }: IconProps) {
+  return (
+    <svg
+      className={className}
+      fill="none"
+      stroke="currentColor"
+      viewBox="0 0 24 24"
+      strokeWidth={2}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden={!title}
+      role={title ? 'img' : 'presentation'}
+    >
+      {title ? <title>{title}</title> : null}
+      <path stroke="none" d="M0 0h24v24H0z" fill="none" />
+      <path d="M12 11v.01" />
+      <path d="M8 11v.01" />
+      <path d="M16 11v.01" />
+      <path d="M18 4a3 3 0 0 1 3 3v8a3 3 0 0 1 -3 3h-5l-5 3v-3h-2a3 3 0 0 1 -3 -3v-8a3 3 0 0 1 3 -3z" />
     </svg>
   );
 }

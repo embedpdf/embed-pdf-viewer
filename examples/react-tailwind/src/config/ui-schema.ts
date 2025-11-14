@@ -53,7 +53,7 @@ export const viewerUISchema: UISchema = {
           md: {
             minWidth: 768,
             show: ['annotate-mode', 'shapes-mode', 'redact-mode', 'zoom-toolbar'],
-            hide: ['overflow-tabs-button'],
+            hide: ['overflow-tabs-button', 'zoom-menu-button'],
           },
         },
       },
@@ -78,8 +78,8 @@ export const viewerUISchema: UISchema = {
             },
             {
               type: 'command-button',
-              id: 'thumbnails-button',
-              commandId: 'panel:toggle-thumbnails',
+              id: 'sidebar-button',
+              commandId: 'panel:toggle-sidebar',
               variant: 'icon',
             },
             {
@@ -103,7 +103,12 @@ export const viewerUISchema: UISchema = {
           alignment: 'center',
           gap: 2,
           items: [
-            // Custom zoom component
+            {
+              type: 'command-button',
+              id: 'zoom-menu-button',
+              commandId: 'zoom:toggle-menu-mobile',
+              variant: 'icon',
+            },
             {
               type: 'custom',
               id: 'zoom-toolbar',
@@ -189,6 +194,12 @@ export const viewerUISchema: UISchema = {
               type: 'command-button',
               id: 'search-button',
               commandId: 'panel:toggle-search',
+              variant: 'icon',
+            },
+            {
+              type: 'command-button',
+              id: 'comment-button',
+              commandId: 'panel:toggle-comment',
               variant: 'icon',
             },
           ],
@@ -423,6 +434,11 @@ export const viewerUISchema: UISchema = {
       items: [
         {
           type: 'command',
+          id: 'mode:annotate',
+          commandId: 'mode:annotate',
+        },
+        {
+          type: 'command',
           id: 'mode:shapes',
           commandId: 'mode:shapes',
         },
@@ -432,6 +448,18 @@ export const viewerUISchema: UISchema = {
           commandId: 'mode:redact',
         },
       ],
+      responsive: {
+        breakpoints: {
+          xs: {
+            maxWidth: 640,
+            show: ['mode:annotate', 'mode:shapes', 'mode:redact'],
+          },
+          md: {
+            minWidth: 640,
+            hide: ['mode:annotate'],
+          },
+        },
+      },
     },
     'zoom-levels-menu': {
       id: 'zoom-levels-menu',
@@ -490,7 +518,12 @@ export const viewerUISchema: UISchema = {
           type: 'submenu',
           id: 'zoom-levels-submenu',
           label: 'Zoom Levels',
+          labelKey: 'zoom.level',
           menuId: 'zoom-levels-menu',
+        },
+        {
+          type: 'divider',
+          id: 'divider-zoom-in-out',
         },
         {
           type: 'command',
@@ -530,13 +563,11 @@ export const viewerUISchema: UISchema = {
         breakpoints: {
           xs: {
             maxWidth: 640,
-            hide: ['zoom:in', 'zoom:out'],
-            show: ['zoom-levels-submenu'],
+            show: ['zoom-levels-submenu', 'divider-zoom-in-out'],
           },
           md: {
             minWidth: 768,
-            show: ['zoom:in', 'zoom:out'],
-            hide: ['zoom-levels-submenu'],
+            hide: ['zoom-levels-submenu', 'divider-zoom-in-out'],
           },
         },
       },
@@ -720,8 +751,8 @@ export const viewerUISchema: UISchema = {
   // Panels (Sidebars)
   // ─────────────────────────────────────────────────────────
   panels: {
-    'thumbnails-panel': {
-      id: 'thumbnails-panel',
+    'sidebar-panel': {
+      id: 'sidebar-panel',
       type: 'sidebar',
       position: {
         placement: 'left',
@@ -759,6 +790,23 @@ export const viewerUISchema: UISchema = {
       content: {
         type: 'component',
         componentId: 'search-sidebar',
+      },
+      width: '250px',
+      collapsible: true,
+      defaultOpen: false,
+    },
+
+    'comment-panel': {
+      id: 'comment-panel',
+      type: 'sidebar',
+      position: {
+        placement: 'right',
+        slot: 'main',
+        order: 0,
+      },
+      content: {
+        type: 'component',
+        componentId: 'comment-sidebar',
       },
       width: '250px',
       collapsible: true,

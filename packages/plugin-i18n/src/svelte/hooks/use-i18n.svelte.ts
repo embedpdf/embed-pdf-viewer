@@ -4,34 +4,100 @@ import { I18nPlugin } from '@embedpdf/plugin-i18n';
 export const useI18nCapability = () => useCapability<I18nPlugin>(I18nPlugin.id);
 export const useI18nPlugin = () => usePlugin<I18nPlugin>(I18nPlugin.id);
 
-export const useTranslation = (
-  getKey: () => string,
-  getParams?: () => Record<string, string | number> | undefined,
-) => {
+/**
+ * Hook to get a translate function for a component
+ * Automatically updates all translations on locale or param changes
+ *
+ * @param getDocumentId - Function that returns the document ID for document-scoped translations
+ * @returns translate function and current locale
+ *
+ * @example
+ * const { translate, locale } = useTranslations(() => documentId);
+ * // In template:
+ * {translate('page.title')}
+ * {translate('page.count', { params: { count: 5 } })}
+ * {translate('unknown.key', { fallback: 'Default Text' })}
+ */
+export const useTranslations = (getDocumentId?: () => string | undefined) => {
   const capability = useI18nCapability();
 
-  let translation = $state<string>('');
+  let forceUpdateCounter = $state(0);
+
+  // Reactive documentId
+  const documentId = $derived(getDocumentId?.());
 
   $effect(() => {
     const provides = capability.provides;
-    const key = getKey();
-    const params = getParams?.();
+    const docId = documentId;
 
-    if (!provides) {
-      translation = key;
-      return;
-    }
+    if (!provides) return;
 
-    translation = provides.t(key, params);
-
-    return provides.onLocaleChange(() => {
-      translation = provides.t(key, params);
+    // Subscribe to locale changes
+    const unsubscribeLocale = provides.onLocaleChange(() => {
+      forceUpdateCounter++;
     });
+
+    // Subscribe to params changes
+    const unsubscribeParams = docId
+      ? provides.forDocument(docId).onParamsChanged(() => {
+          forceUpdateCounter++;
+        })
+      : provides.onParamsChanged(() => {
+          forceUpdateCounter++;
+        });
+
+    return () => {
+      unsubscribeLocale();
+      unsubscribeParams();
+    };
   });
+
+  // Create translate function
+  const translate = (
+    key: string,
+    options?: {
+      params?: Record<string, string | number>;
+      fallback?: string;
+    },
+  ): string => {
+    // Access forceUpdateCounter to trigger reactivity
+    forceUpdateCounter;
+
+    const provides = capability.provides;
+    if (!provides) return options?.fallback ?? key;
+
+    const docId = getDocumentId?.();
+    return provides.t(key, {
+      documentId: docId,
+      params: options?.params,
+      fallback: options?.fallback,
+    });
+  };
+
+  return {
+    translate,
+    get locale() {
+      return capability.provides?.getLocale() ?? 'en';
+    },
+  };
+};
+
+// Keep the old hook for single-key translations (useful for derived state)
+export const useTranslation = (
+  getKey: () => string,
+  getOptions?: () =>
+    | {
+        params?: Record<string, string | number>;
+        fallback?: string;
+      }
+    | undefined,
+  getDocumentId?: () => string | undefined,
+) => {
+  const { translate } = useTranslations(getDocumentId);
 
   return {
     get current() {
-      return translation;
+      return translate(getKey(), getOptions?.());
     },
   };
 };

@@ -1,7 +1,25 @@
-import { BasePluginConfig, EventHook } from '@embedpdf/core';
+import { BasePluginConfig, EventHook, StoreState } from '@embedpdf/core';
 
 export type TranslationKey = string;
-export type LocaleCode = string; // 'en', 'es', 'fr', etc.
+export type LocaleCode = string;
+
+// Param resolver function - receives optional documentId and state
+export type ParamResolver<TStore = any> = (context: {
+  state: TStore; // Direct use, no wrapper
+  documentId?: string;
+}) => Record<string, string | number>;
+
+// Options for translation
+export interface TranslateOptions {
+  documentId?: string;
+  params?: Record<string, string | number>;
+  fallback?: string; // Fallback string if translation not found (will be interpolated)
+}
+
+// Options for scoped translation (without documentId)
+export type ScopedTranslateOptions = Omit<TranslateOptions, 'documentId'>;
+
+export type ParamResolvers<TStore = any> = Record<TranslationKey, ParamResolver<TStore>>;
 
 export interface TranslationDictionary {
   [key: string]: string | TranslationDictionary;
@@ -17,6 +35,7 @@ export interface I18nPluginConfig extends BasePluginConfig {
   defaultLocale: LocaleCode;
   fallbackLocale?: LocaleCode;
   locales: Locale[];
+  paramResolvers?: ParamResolvers;
 }
 
 export interface I18nState {
@@ -29,45 +48,83 @@ export interface LocaleChangeEvent {
   currentLocale: LocaleCode;
 }
 
+// NEW: Event when translation params change for a document
+export interface TranslationParamsChangedData {
+  changedKeys: TranslationKey[];
+}
+
+export interface TranslationParamsChangedEvent {
+  documentId: string;
+  changedKeys: TranslationKey[];
+}
+
+// NEW: Document-scoped API
+export interface I18nScope {
+  /**
+   * Translate a key for this document
+   * @param key - Translation key
+   * @param options - Optional translation options (params, fallback)
+   *
+   * @example
+   * const scoped = i18n.forDocument(documentId);
+   * scoped.t('page.title')
+   * scoped.t('page.count', { params: { count: 5 } })
+   * scoped.t('unknown.key', { fallback: 'Default Text' })
+   */
+  t(key: TranslationKey, options?: ScopedTranslateOptions): string;
+
+  /**
+   * Event when translation params change for this document
+   */
+  onParamsChanged: EventHook<TranslationParamsChangedData>;
+}
+
 export interface I18nCapability {
   /**
-   * Translate a key with optional parameters
-   * @example t('commands.zoom.level', { level: 150 }) => "Zoom Level (150%)"
+   * Translate a key with optional context
+   * If a param resolver is registered for this key, it will be called automatically
+   *
+   * @param key - Translation key
+   * @param options - Optional translation options (documentId, params)
+   *
+   * @example
+   * // Simple global translation
+   * i18n.t('loading.viewer')
+   *
+   * // Global translation with params
+   * i18n.t('document.total', { params: { amount: 5 } })
+   *
+   * // Document-scoped with param resolver
+   * i18n.t('page.current', { documentId })
+   *
+   * // Document-scoped with explicit params
+   * i18n.t('welcome', { documentId, params: { name: 'User' } })
    */
-  t(key: TranslationKey, params?: Record<string, string | number>): string;
+  t(key: TranslationKey, options?: TranslateOptions): string;
 
   /**
-   * Set the current locale
+   * Get document-scoped API
    */
+  forDocument(documentId: string): I18nScope;
+
+  /**
+   * Register a param resolver dynamically
+   */
+  registerParamResolver(key: TranslationKey, resolver: ParamResolver): void;
+
+  /**
+   * Unregister a param resolver
+   */
+  unregisterParamResolver(key: TranslationKey): void;
+
   setLocale(locale: LocaleCode): void;
-
-  /**
-   * Get the current locale code
-   */
   getLocale(): LocaleCode;
-
-  /**
-   * Get all available locale codes
-   */
   getAvailableLocales(): LocaleCode[];
-
-  /**
-   * Get locale info by code
-   */
   getLocaleInfo(code: LocaleCode): Locale | null;
-
-  /**
-   * Register a new locale (useful for plugins or user extensions)
-   */
   registerLocale(locale: Locale): void;
-
-  /**
-   * Check if a locale is available
-   */
   hasLocale(code: LocaleCode): boolean;
 
-  /**
-   * Event fired when locale changes
-   */
+  // Events
   onLocaleChange: EventHook<LocaleChangeEvent>;
+  onParamsChanged: EventHook<TranslationParamsChangedEvent>;
 }

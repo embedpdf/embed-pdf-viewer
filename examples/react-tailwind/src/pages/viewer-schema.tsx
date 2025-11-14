@@ -50,6 +50,7 @@ import { CustomZoomToolbar } from '../components/custom-zoom-toolbar';
 import { ThumbnailsSidebar } from '../components/thumbnails-sidebar';
 import { SearchSidebar } from '../components/search-sidebar';
 import { OutlineSidebar } from '../components/outline-sidebar';
+import { englishTranslations, paramResolvers } from '../config';
 
 const logger = new ConsoleLogger();
 
@@ -134,7 +135,11 @@ export function ViewerSchemaPage() {
       createPluginRegistration(CommandsPluginPackage, {
         commands,
       }),
-      createPluginRegistration(I18nPluginPackage),
+      createPluginRegistration(I18nPluginPackage, {
+        defaultLocale: 'en',
+        locales: [englishTranslations],
+        paramResolvers,
+      }),
       // UI plugin - provides schema-driven UI rendering
       createPluginRegistration(UIPluginPackage, {
         schema: viewerUISchema,

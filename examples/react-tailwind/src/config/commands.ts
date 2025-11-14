@@ -19,7 +19,7 @@ import { ExportPlugin } from '@embedpdf/plugin-export/react';
 import { DocumentManagerPlugin } from '@embedpdf/plugin-document-manager/react';
 import { HISTORY_PLUGIN_ID, HistoryPlugin } from '@embedpdf/plugin-history/react';
 import { State } from './types';
-import { isToolbarOpen, UI_PLUGIN_ID, UIPlugin } from '@embedpdf/plugin-ui';
+import { isPanelOpen, isToolbarOpen, UI_PLUGIN_ID, UIPlugin } from '@embedpdf/plugin-ui';
 import { ScrollPlugin, ScrollStrategy } from '@embedpdf/plugin-scroll/react';
 import { InteractionManagerPlugin } from '@embedpdf/plugin-interaction-manager';
 
@@ -237,7 +237,10 @@ export const commands: Record<string, Command<State>> = {
   'zoom:toggle-menu': {
     id: 'zoom:toggle-menu',
     label: 'Zoom Menu',
-    icon: 'ChevronDown',
+    icon: 'ZoomChevronDown',
+    iconProps: {
+      className: 'h-3.5 w-3.5',
+    },
     category: 'tools',
     action: ({ registry, documentId }) => {
       const ui = registry.getPlugin<UIPlugin>('ui')?.provides();
@@ -245,6 +248,24 @@ export const commands: Record<string, Command<State>> = {
 
       const scope = ui.forDocument(documentId);
       scope.toggleMenu('zoom-menu', 'zoom:toggle-menu', 'zoom-menu-button');
+    },
+    active: ({ state, documentId }) => {
+      const uiState = state.plugins['ui']?.documents[documentId];
+      return uiState?.openMenus['zoom-menu'] !== undefined;
+    },
+  },
+
+  'zoom:toggle-menu-mobile': {
+    id: 'zoom:toggle-menu-mobile',
+    label: 'Zoom Menu',
+    icon: 'SearchPlus',
+    category: 'tools',
+    action: ({ registry, documentId }) => {
+      const ui = registry.getPlugin<UIPlugin>('ui')?.provides();
+      if (!ui) return;
+
+      const scope = ui.forDocument(documentId);
+      scope.toggleMenu('zoom-menu', 'zoom:toggle-menu-mobile', 'zoom-menu-button');
     },
     active: ({ state, documentId }) => {
       const uiState = state.plugins['ui']?.documents[documentId];
@@ -408,10 +429,10 @@ export const commands: Record<string, Command<State>> = {
   // ─────────────────────────────────────────────────────────
   // Panel Commands
   // ─────────────────────────────────────────────────────────
-  'panel:toggle-thumbnails': {
-    id: 'panel:toggle-thumbnails',
-    label: 'Thumbnails',
-    icon: 'Thumbnails',
+  'panel:toggle-sidebar': {
+    id: 'panel:toggle-sidebar',
+    label: 'Sidebar',
+    icon: 'Sidebar',
     category: 'panels',
     action: ({ registry, documentId }) => {
       // Toggle the thumbnails panel via UI plugin
@@ -422,14 +443,10 @@ export const commands: Record<string, Command<State>> = {
       if (!uiCapability) return;
 
       const scope = uiCapability.forDocument(documentId);
-      scope.togglePanel('left', 'main', 'thumbnails-panel');
+      scope.togglePanel('left', 'main', 'sidebar-panel');
     },
     active: ({ state, documentId }) => {
-      const uiState = state.plugins['ui']?.documents[documentId];
-      return (
-        uiState?.activePanels['left-main']?.panelId === 'thumbnails-panel' &&
-        uiState?.activePanels['left-main']?.isOpen
-      );
+      return isPanelOpen(state.plugins, documentId, 'left', 'main', 'sidebar-panel');
     },
   },
 
@@ -451,11 +468,27 @@ export const commands: Record<string, Command<State>> = {
       scope.togglePanel('right', 'main', 'search-panel');
     },
     active: ({ state, documentId }) => {
-      const uiState = state.plugins['ui']?.documents[documentId];
-      return (
-        uiState?.activePanels['right-main']?.panelId === 'search-panel' &&
-        uiState?.activePanels['right-main']?.isOpen
-      );
+      return isPanelOpen(state.plugins, documentId, 'right', 'main', 'search-panel');
+    },
+  },
+
+  'panel:toggle-comment': {
+    id: 'panel:toggle-comment',
+    label: 'Comment',
+    icon: 'Comment',
+    category: 'panels',
+    action: ({ registry, documentId }) => {
+      const uiPlugin = registry.getPlugin<UIPlugin>(UI_PLUGIN_ID);
+      if (!uiPlugin || !uiPlugin.provides) return;
+
+      const uiCapability = uiPlugin.provides();
+      if (!uiCapability) return;
+
+      const scope = uiCapability.forDocument(documentId);
+      scope.togglePanel('right', 'main', 'comment-panel');
+    },
+    active: ({ state, documentId }) => {
+      return isPanelOpen(state.plugins, documentId, 'right', 'main', 'comment-panel');
     },
   },
 

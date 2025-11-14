@@ -4,13 +4,16 @@
   interface TranslateProps {
     k: string;
     params?: Record<string, string | number>;
+    fallback?: string;
+    documentId?: string;
   }
 
-  let { k, params }: TranslateProps = $props();
+  let { k, params, fallback, documentId }: TranslateProps = $props();
 
   const translation = useTranslation(
     () => k,
-    () => params,
+    () => ({ params, fallback }),
+    () => documentId,
   );
 </script>
 

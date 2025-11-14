@@ -43,7 +43,7 @@ export function AutoMenuRenderer({ container, documentId }: AutoMenuRendererProp
       }
 
       const menuState = openMenus[menuId];
-      if (menuState) {
+      if (menuState && menuState.triggeredByItemId) {
         // Look up anchor with documentId scope
         const anchor = anchorRegistry.getAnchor(documentId, menuState.triggeredByItemId);
         setActiveMenu({ menuId, anchorEl: anchor });

@@ -149,6 +149,9 @@ function removeCommandsFromToolbars(
             child.type === 'command-button' ? !commandIds.includes(child.commandId) : true,
           );
         }
+        if (item.type === 'tab-group') {
+          return item.tabs.some((tab) => !commandIds.includes(tab.commandId));
+        }
         return true;
       }),
     };

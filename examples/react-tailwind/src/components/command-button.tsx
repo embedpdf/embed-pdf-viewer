@@ -1,5 +1,6 @@
 import { useCommand } from '@embedpdf/plugin-commands/react';
 import { useRegisterAnchor } from '@embedpdf/plugin-ui/react';
+import { twMerge } from 'tailwind-merge';
 import { ToolbarButton } from './ui';
 import * as Icons from './icons';
 
@@ -57,7 +58,7 @@ export function CommandButton({
         <>
           {IconComponent && (
             <IconComponent
-              className="mr-2 h-5 w-5"
+              className={twMerge('mr-2 h-5 w-5', iconProps.className)}
               title={command.label}
               style={{ color: iconProps.primaryColor }}
             />
@@ -69,7 +70,7 @@ export function CommandButton({
       ) : // Default: icon only
       IconComponent ? (
         <IconComponent
-          className="h-5 w-5"
+          className={twMerge('h-5 w-5', iconProps.className)}
           title={command.label}
           style={{
             color: iconProps.primaryColor,
