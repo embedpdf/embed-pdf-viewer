@@ -186,7 +186,15 @@ export class ScrollPlugin extends BasePlugin<
   }
 
   protected override onScaleChanged(documentId: string): void {
-    this.refreshDocumentLayout(documentId);
+    const coreDoc = this.coreState.core.documents[documentId];
+    if (!coreDoc || coreDoc.status !== 'loaded') return;
+
+    const viewportScope = this.viewport.forDocument(documentId);
+    const metrics = this.computeMetrics(documentId, viewportScope.getMetrics());
+
+    // Use the canonical path so scroll/pageChange events and scroller layout
+    // updates all flow through the same place.
+    this.commitMetrics(documentId, metrics);
   }
 
   protected override onRotationChanged(documentId: string): void {
