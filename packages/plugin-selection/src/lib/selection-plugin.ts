@@ -3,8 +3,7 @@ import {
   Listener,
   PluginRegistry,
   REFRESH_PAGES,
-  createBehaviorEmitter,
-  createEmitter,
+  createScopedEmitter,
 } from '@embedpdf/core';
 import {
   PdfPageGeometry,
@@ -72,11 +71,27 @@ export class SelectionPlugin extends BasePlugin<
   /** Page callbacks for rect updates, per document */
   private pageCallbacks = new Map<string, Map<number, (data: SelectionRectsCallback) => void>>();
 
-  private readonly selChange$ = createBehaviorEmitter<SelectionChangeEvent>();
-  private readonly textRetrieved$ = createBehaviorEmitter<TextRetrievedEvent>();
-  private readonly copyToClipboard$ = createEmitter<CopyToClipboardEvent>();
-  private readonly beginSelection$ = createEmitter<BeginSelectionEvent>();
-  private readonly endSelection$ = createEmitter<EndSelectionEvent>();
+  private readonly selChange$ = createScopedEmitter<
+    SelectionRangeX | null,
+    SelectionChangeEvent,
+    string
+  >((documentId, selection) => ({ documentId, selection }));
+  private readonly textRetrieved$ = createScopedEmitter<string[], TextRetrievedEvent, string>(
+    (documentId, text) => ({ documentId, text }),
+  );
+  private readonly copyToClipboard$ = createScopedEmitter<string, CopyToClipboardEvent, string>(
+    (documentId, text) => ({ documentId, text }),
+    { cache: false },
+  );
+  private readonly beginSelection$ = createScopedEmitter<
+    { page: number; index: number },
+    BeginSelectionEvent,
+    string
+  >((documentId, data) => ({ documentId, page: data.page, index: data.index }), { cache: false });
+  private readonly endSelection$ = createScopedEmitter<void, EndSelectionEvent, string>(
+    (documentId) => ({ documentId }),
+    { cache: false },
+  );
 
   private interactionManagerCapability: InteractionManagerCapability;
 
@@ -118,6 +133,11 @@ export class SelectionPlugin extends BasePlugin<
     this.pageCallbacks.delete(documentId);
     this.selecting.delete(documentId);
     this.anchor.delete(documentId);
+    this.selChange$.clearScope(documentId);
+    this.textRetrieved$.clearScope(documentId);
+    this.copyToClipboard$.clearScope(documentId);
+    this.beginSelection$.clearScope(documentId);
+    this.endSelection$.clearScope(documentId);
   }
 
   async initialize() {}
@@ -159,11 +179,11 @@ export class SelectionPlugin extends BasePlugin<
       forDocument: this.createSelectionScope.bind(this),
 
       // Global events
-      onCopyToClipboard: this.copyToClipboard$.on,
-      onSelectionChange: this.selChange$.on,
-      onTextRetrieved: this.textRetrieved$.on,
-      onBeginSelection: this.beginSelection$.on,
-      onEndSelection: this.endSelection$.on,
+      onCopyToClipboard: this.copyToClipboard$.onGlobal,
+      onSelectionChange: this.selChange$.onGlobal,
+      onTextRetrieved: this.textRetrieved$.onGlobal,
+      onBeginSelection: this.beginSelection$.onGlobal,
+      onEndSelection: this.endSelection$.onGlobal,
     };
   }
 
@@ -184,26 +204,11 @@ export class SelectionPlugin extends BasePlugin<
       clear: () => this.clearSelection(documentId),
       copyToClipboard: () => this.copyToClipboard(documentId),
       getState: () => this.getDocumentState(documentId),
-      onSelectionChange: (listener: Listener<SelectionRangeX | null>) =>
-        this.selChange$.on((event) => {
-          if (event.documentId === documentId) listener(event.selection);
-        }),
-      onTextRetrieved: (listener: Listener<string[]>) =>
-        this.textRetrieved$.on((event) => {
-          if (event.documentId === documentId) listener(event.text);
-        }),
-      onCopyToClipboard: (listener: Listener<string>) =>
-        this.copyToClipboard$.on((event) => {
-          if (event.documentId === documentId) listener(event.text);
-        }),
-      onBeginSelection: (listener: Listener<{ page: number; index: number }>) =>
-        this.beginSelection$.on((event) => {
-          if (event.documentId === documentId) listener({ page: event.page, index: event.index });
-        }),
-      onEndSelection: (listener: Listener<void>) =>
-        this.endSelection$.on((event) => {
-          if (event.documentId === documentId) listener();
-        }),
+      onSelectionChange: this.selChange$.forScope(documentId),
+      onTextRetrieved: this.textRetrieved$.forScope(documentId),
+      onCopyToClipboard: this.copyToClipboard$.forScope(documentId),
+      onBeginSelection: this.beginSelection$.forScope(documentId),
+      onEndSelection: this.endSelection$.forScope(documentId),
     };
   }
 
@@ -357,21 +362,21 @@ export class SelectionPlugin extends BasePlugin<
     this.selecting.set(documentId, true);
     this.anchor.set(documentId, { page, index });
     this.dispatch(startSelection(documentId));
-    this.beginSelection$.emit({ documentId, page, index });
+    this.beginSelection$.emit(documentId, { page, index });
   }
 
   private endSelection(documentId: string) {
     this.selecting.set(documentId, false);
     this.anchor.set(documentId, undefined);
     this.dispatch(endSelection(documentId));
-    this.endSelection$.emit({ documentId });
+    this.endSelection$.emit(documentId);
   }
 
   private clearSelection(documentId: string) {
     this.selecting.set(documentId, false);
     this.anchor.set(documentId, undefined);
     this.dispatch(clearSelection(documentId));
-    this.selChange$.emit({ documentId, selection: null });
+    this.selChange$.emit(documentId, null);
     this.notifyAllPages(documentId);
   }
 
@@ -387,7 +392,7 @@ export class SelectionPlugin extends BasePlugin<
     const range = { start, end };
     this.dispatch(setSelection(documentId, range));
     this.updateRectsAndSlices(documentId, range);
-    this.selChange$.emit({ documentId, selection: range });
+    this.selChange$.emit(documentId, range);
 
     // Notify affected pages
     for (let p = range.start.page; p <= range.end.page; p++) {
@@ -438,7 +443,7 @@ export class SelectionPlugin extends BasePlugin<
 
     // Emit the text when it's retrieved
     task.wait((text) => {
-      this.textRetrieved$.emit({ documentId, text });
+      this.textRetrieved$.emit(documentId, text);
     }, ignore);
 
     return task;
@@ -447,7 +452,7 @@ export class SelectionPlugin extends BasePlugin<
   private copyToClipboard(documentId: string) {
     const text = this.getSelectedText(documentId);
     text.wait((text) => {
-      this.copyToClipboard$.emit({ documentId, text: text.join('\n') });
+      this.copyToClipboard$.emit(documentId, text.join('\n'));
     }, ignore);
   }
 }
