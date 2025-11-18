@@ -21,6 +21,8 @@ import {
   InteractionManagerPlugin,
   PointerEventHandlersWithLifecycle,
 } from '@embedpdf/plugin-interaction-manager';
+import { ViewportCapability, ViewportMetrics, ViewportPlugin } from '@embedpdf/plugin-viewport';
+import { ScrollCapability, ScrollPlugin } from '@embedpdf/plugin-scroll';
 
 import {
   cachePageGeometry,
@@ -50,6 +52,8 @@ import {
   BeginSelectionEvent,
   EndSelectionEvent,
   SelectionDocumentState,
+  SelectionMenuPlacement,
+  SelectionMenuPlacementEvent,
 } from './types';
 import { sliceBounds, rectsWithinSlice, glyphAt } from './utils';
 
@@ -71,6 +75,11 @@ export class SelectionPlugin extends BasePlugin<
   /** Page callbacks for rect updates, per document */
   private pageCallbacks = new Map<string, Map<number, (data: SelectionRectsCallback) => void>>();
 
+  private readonly menuPlacement$ = createScopedEmitter<
+    SelectionMenuPlacement | null,
+    SelectionMenuPlacementEvent,
+    string
+  >((documentId, placement) => ({ documentId, placement }));
   private readonly selChange$ = createScopedEmitter<
     SelectionRangeX | null,
     SelectionChangeEvent,
@@ -94,6 +103,8 @@ export class SelectionPlugin extends BasePlugin<
   );
 
   private interactionManagerCapability: InteractionManagerCapability;
+  private viewportCapability: ViewportCapability | null = null;
+  private scrollCapability: ScrollCapability | null = null;
 
   constructor(id: string, registry: PluginRegistry) {
     super(id, registry);
@@ -103,6 +114,8 @@ export class SelectionPlugin extends BasePlugin<
       throw new Error('SelectionPlugin: InteractionManagerPlugin is required.');
     }
     this.interactionManagerCapability = imPlugin.provides();
+    this.viewportCapability = registry.getPlugin<ViewportPlugin>('viewport')?.provides() ?? null;
+    this.scrollCapability = registry.getPlugin<ScrollPlugin>('scroll')?.provides() ?? null;
 
     this.coreStore.onAction(REFRESH_PAGES, (action) => {
       const { documentId, pageIndexes } = action.payload;
@@ -116,6 +129,13 @@ export class SelectionPlugin extends BasePlugin<
         });
       }, ignore);
     });
+
+    this.viewportCapability?.onViewportChange(
+      (event) => {
+        this.recalculateMenuPlacement(event.documentId);
+      },
+      { mode: 'throttle', wait: 100 },
+    );
   }
 
   /* ── life-cycle ────────────────────────────────────────── */
@@ -138,6 +158,7 @@ export class SelectionPlugin extends BasePlugin<
     this.copyToClipboard$.clearScope(documentId);
     this.beginSelection$.clearScope(documentId);
     this.endSelection$.clearScope(documentId);
+    this.menuPlacement$.clearScope(documentId);
   }
 
   async initialize() {}
@@ -147,6 +168,7 @@ export class SelectionPlugin extends BasePlugin<
     this.copyToClipboard$.clear();
     this.beginSelection$.clear();
     this.endSelection$.clear();
+    this.menuPlacement$.clear();
     super.destroy();
   }
 
@@ -218,6 +240,19 @@ export class SelectionPlugin extends BasePlugin<
       throw new Error(`Selection state not found for document: ${documentId}`);
     }
     return state;
+  }
+
+  /**
+   * Subscribe to menu placement changes for a specific document
+   * @param documentId - The document ID to subscribe to
+   * @param listener - Callback function that receives placement updates
+   * @returns Unsubscribe function
+   */
+  public onMenuPlacement(
+    documentId: string,
+    listener: (placement: SelectionMenuPlacement | null) => void,
+  ) {
+    return this.menuPlacement$.forScope(documentId)(listener);
   }
 
   public registerSelectionOnPage(opts: RegisterSelectionOnPageOptions) {
@@ -311,6 +346,112 @@ export class SelectionPlugin extends BasePlugin<
     };
   }
 
+  /**
+   * Helper to calculate viewport relative metrics for a page rect.
+   * Returns null if the rect cannot be converted to viewport space.
+   */
+  private getPlacementMetrics(pageIndex: number, rect: Rect, vpMetrics: ViewportMetrics) {
+    // 1. Convert Page Coordinate -> Viewport Coordinate
+    // We use the scroll capability to handle rotation, scale, and scroll offset automatically
+    const viewportRect = this.scrollCapability?.getRectPositionForPage(pageIndex, rect);
+
+    if (!viewportRect) return null;
+
+    // 2. Calculate relative positions
+    const rectTopInView = viewportRect.origin.y - vpMetrics.scrollTop;
+    const rectBottomInView = viewportRect.origin.y + viewportRect.size.height - vpMetrics.scrollTop;
+
+    return {
+      pageIndex,
+      rect, // Original Page Rect
+      spaceAbove: rectTopInView,
+      spaceBelow: vpMetrics.clientHeight - rectBottomInView,
+      isBottomVisible: rectBottomInView > 0 && rectBottomInView <= vpMetrics.clientHeight,
+      isTopVisible: rectTopInView >= 0 && rectTopInView < vpMetrics.clientHeight,
+    };
+  }
+
+  private recalculateMenuPlacement(documentId: string) {
+    const docState = this.state.documents[documentId];
+    if (!docState) return;
+
+    // 1. Get Bounding Rects for all pages involved in selection.
+    // These are implicitly sorted by pageIndex because updateRectsAndSlices
+    // populates the map in ascending page order.
+    const bounds = selector.selectBoundingRectsForAllPages(docState);
+
+    if (bounds.length === 0) {
+      this.menuPlacement$.emit(documentId, null);
+      return;
+    }
+
+    const tail = bounds[bounds.length - 1];
+
+    // Fallback: If viewport/scroll plugins are missing, always default to bottom of the last rect
+    if (!this.viewportCapability || !this.scrollCapability) {
+      this.menuPlacement$.emit(documentId, {
+        pageIndex: tail.page,
+        rect: tail.rect,
+        spaceAbove: 0,
+        spaceBelow: Infinity, // Pretend we have infinite space below to prevent auto-flipping
+        suggestTop: false,
+        isVisible: true, // Assume visible
+      });
+      return;
+    }
+
+    const vpMetrics = this.viewportCapability.getMetrics();
+    const MENU_HEIGHT_GUESS = 40;
+
+    // 2. Calculate metrics for Head (Start) and Tail (End)
+    const head = bounds[0];
+
+    const tailMetrics = this.getPlacementMetrics(tail.page, tail.rect, vpMetrics);
+    const headMetrics = this.getPlacementMetrics(head.page, head.rect, vpMetrics);
+
+    // 3. Apply Heuristic Logic
+
+    // Priority A: Bottom of Tail (Standard selection end)
+    // If the bottom of the selection is visible and we have space below.
+    if (tailMetrics) {
+      if (tailMetrics.isBottomVisible && tailMetrics.spaceBelow > MENU_HEIGHT_GUESS) {
+        this.menuPlacement$.emit(documentId, {
+          ...tailMetrics,
+          suggestTop: false,
+          isVisible: true,
+        });
+        return;
+      }
+    }
+
+    // Priority B: Top of Head (Selection start, if user scrolled up)
+    // If the top of the start selection is visible, put the menu there.
+    if (headMetrics) {
+      if (headMetrics.isTopVisible) {
+        this.menuPlacement$.emit(documentId, {
+          ...headMetrics,
+          suggestTop: true,
+          isVisible: true,
+        });
+        return;
+      }
+    }
+
+    // Priority C: Fallback to Tail Bottom if visible (even if tight space)
+    // It's better to stick to the cursor end than jump to the top if space is tight.
+    if (tailMetrics && tailMetrics.isBottomVisible) {
+      this.menuPlacement$.emit(documentId, {
+        ...tailMetrics,
+        suggestTop: false,
+        isVisible: true,
+      });
+      return;
+    }
+
+    // If completely off screen
+    this.menuPlacement$.emit(documentId, null);
+  }
+
   private notifyPage(documentId: string, pageIndex: number) {
     const callback = this.pageCallbacks.get(documentId)?.get(pageIndex);
     if (callback) {
@@ -377,6 +518,7 @@ export class SelectionPlugin extends BasePlugin<
     this.anchor.set(documentId, undefined);
     this.dispatch(clearSelection(documentId));
     this.selChange$.emit(documentId, null);
+    this.menuPlacement$.emit(documentId, null);
     this.notifyAllPages(documentId);
   }
 
@@ -393,6 +535,8 @@ export class SelectionPlugin extends BasePlugin<
     this.dispatch(setSelection(documentId, range));
     this.updateRectsAndSlices(documentId, range);
     this.selChange$.emit(documentId, range);
+
+    this.recalculateMenuPlacement(documentId);
 
     // Notify affected pages
     for (let p = range.start.page; p <= range.end.page; p++) {

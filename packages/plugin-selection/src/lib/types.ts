@@ -3,6 +3,15 @@ import { PdfPageGeometry, PdfTask, Rect } from '@embedpdf/models';
 
 export interface SelectionPluginConfig extends BasePluginConfig {}
 
+export interface SelectionMenuPlacement {
+  pageIndex: number; // The page the menu is anchored to
+  rect: Rect; // The viewport-relative rect to position against
+  spaceAbove: number;
+  spaceBelow: number;
+  suggestTop: boolean; // The plugin's suggestion
+  isVisible: boolean; // Is the anchor rect even in the viewport?
+}
+
 /* ---- user-selection cross-page -------------------------------------- */
 export interface GlyphPointer {
   page: number;
@@ -49,6 +58,11 @@ export interface RegisterSelectionOnPageOptions {
 // ─────────────────────────────────────────────────────────
 // Events
 // ─────────────────────────────────────────────────────────
+
+export interface SelectionMenuPlacementEvent {
+  documentId: string;
+  placement: SelectionMenuPlacement | null;
+}
 
 export interface SelectionChangeEvent {
   documentId: string;
