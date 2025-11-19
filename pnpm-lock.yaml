@@ -1544,6 +1544,9 @@ importers:
       '@embedpdf/models':
         specifier: workspace:*
         version: link:../models
+      '@embedpdf/utils':
+        specifier: workspace:*
+        version: link:../utils
       preact:
         specifier: ^10.26.4
         version: 10.27.2
@@ -1569,6 +1572,9 @@ importers:
       '@embedpdf/plugin-interaction-manager':
         specifier: workspace:*
         version: link:../plugin-interaction-manager
+      '@embedpdf/plugin-scroll':
+        specifier: workspace:*
+        version: link:../plugin-scroll
       '@embedpdf/plugin-viewport':
         specifier: workspace:*
         version: link:../plugin-viewport

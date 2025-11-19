@@ -41,6 +41,7 @@ import { PageControls } from '../components/page-controls';
 import { ConsoleLogger } from '@embedpdf/models';
 import { SplitViewLayout } from '../components/split-view-layout';
 import { AnnotationSelectionMenu } from '../components/annotation-selection-menu';
+import { SelectionSelectionMenu } from '../components/selection-selection-menu';
 import { NavigationBar } from '../components/navigation-bar';
 import { EmptyState } from '../components/empty-state';
 
@@ -304,6 +305,12 @@ export function ViewerPage() {
                                                   <SelectionLayer
                                                     documentId={documentId}
                                                     pageIndex={pageIndex}
+                                                    selectionMenu={(props) => (
+                                                      <SelectionSelectionMenu
+                                                        {...props}
+                                                        documentId={documentId}
+                                                      />
+                                                    )}
                                                   />
                                                   <RedactionLayer
                                                     documentId={documentId}

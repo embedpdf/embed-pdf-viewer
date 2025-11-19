@@ -375,6 +375,12 @@ export class SelectionPlugin extends BasePlugin<
     const docState = this.state.documents[documentId];
     if (!docState) return;
 
+    // Only show menu when not actively selecting
+    if (docState.selecting || docState.selection === null) {
+      this.menuPlacement$.emit(documentId, null);
+      return;
+    }
+
     // 1. Get Bounding Rects for all pages involved in selection.
     // These are implicitly sorted by pageIndex because updateRectsAndSlices
     // populates the map in ascending page order.
@@ -504,6 +510,7 @@ export class SelectionPlugin extends BasePlugin<
     this.anchor.set(documentId, { page, index });
     this.dispatch(startSelection(documentId));
     this.beginSelection$.emit(documentId, { page, index });
+    this.recalculateMenuPlacement(documentId);
   }
 
   private endSelection(documentId: string) {
@@ -511,6 +518,7 @@ export class SelectionPlugin extends BasePlugin<
     this.anchor.set(documentId, undefined);
     this.dispatch(endSelection(documentId));
     this.endSelection$.emit(documentId);
+    this.recalculateMenuPlacement(documentId);
   }
 
   private clearSelection(documentId: string) {
@@ -535,8 +543,6 @@ export class SelectionPlugin extends BasePlugin<
     this.dispatch(setSelection(documentId, range));
     this.updateRectsAndSlices(documentId, range);
     this.selChange$.emit(documentId, range);
-
-    this.recalculateMenuPlacement(documentId);
 
     // Notify affected pages
     for (let p = range.start.page; p <= range.end.page; p++) {
