@@ -8,7 +8,7 @@ export const manifest: PluginManifest<SelectionPluginConfig> = {
   name: 'Selection Plugin',
   version: '1.0.0',
   provides: ['selection'],
-  requires: ['interaction-manager'],
+  requires: ['interaction-manager', 'viewport', 'scroll'],
   optional: [],
   defaultConfig: {
     enabled: true,
