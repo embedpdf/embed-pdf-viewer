@@ -42,6 +42,22 @@ export interface PdfOpenDocumentUrlOptions {
    * behavior is implemented regardless of the selected mode.
    */
   mode?: 'auto' | 'range-request' | 'full-fetch';
+  /**
+   * HTTP request options for fetching the PDF
+   */
+  requestOptions?: {
+    /**
+     * Custom HTTP headers to include in all requests
+     */
+    headers?: Record<string, string>;
+    /**
+     * Controls whether cookies are sent with requests
+     * - 'omit': Never send cookies (default)
+     * - 'same-origin': Send cookies for same-origin requests
+     * - 'include': Always send cookies (requires CORS)
+     */
+    credentials?: RequestCredentials;
+  };
 }
 ```
 
@@ -75,6 +91,48 @@ try {
   console.error('Failed to open document:', error);
 }
 ```
+
+### Using Custom Headers for Authentication
+
+```typescript
+// Load a PDF that requires authentication
+const fileUrl = { id: 'secure-doc', url: 'https://api.example.com/documents/123.pdf' };
+
+const document = await engine.openDocumentUrl(fileUrl, {
+  requestOptions: {
+    headers: {
+      'Authorization': 'Bearer your-access-token-here',
+      'X-Custom-Header': 'custom-value'
+    }
+  }
+}).toPromise();
+```
+
+### Using Cookies for Authentication
+
+```typescript
+// Load a PDF using cookie-based authentication
+const fileUrl = { id: 'session-doc', url: 'https://example.com/documents/secure.pdf' };
+
+const document = await engine.openDocumentUrl(fileUrl, {
+  requestOptions: {
+    credentials: 'include' // Sends cookies with the request
+  }
+}).toPromise();
+
+console.log(`Opened document with ${document.pageCount} pages using session cookies.`);
+```
+
+<Callout type="warning">
+**CORS and Credentials**
+
+When using `credentials: 'include'` to send cookies with cross-origin requests, the server must:
+- Include `Access-Control-Allow-Credentials: true` in the response headers
+- Specify the exact origin in `Access-Control-Allow-Origin` (wildcards are not allowed)
+- Properly handle preflight OPTIONS requests for CORS
+
+For same-origin requests, use `credentials: 'same-origin'` which is more restrictive and secure.
+</Callout>
 
 ## See Also
 
