@@ -5,7 +5,7 @@
     "types": ["vue"],
     "baseUrl": "../..",
     "paths": {
-      "@embedpdf/plugin-ui": ["src/lib/index.ts"]
+      "@embedpdf/plugin-ui": ["src/lib"]
     }
   },
   "include": ["./**/*.ts", "./**/*.vue"]

@@ -1,17 +1,5 @@
 <template>
-  <div class="flex h-full w-80 flex-col border-l border-gray-300 bg-white">
-    <!-- Header -->
-    <div class="flex items-center justify-between border-b border-gray-300 px-4 py-3">
-      <h2 class="text-lg font-semibold text-gray-800">Search</h2>
-      <button
-        @click="onClose"
-        class="rounded p-1 text-gray-500 transition-colors hover:bg-gray-100 hover:text-gray-700"
-        aria-label="Close search"
-      >
-        <CloseIcon class="h-5 w-5" />
-      </button>
-    </div>
-
+  <div class="flex h-full flex-col bg-white">
     <!-- Search Input -->
     <div class="border-b border-gray-200 p-4">
       <div class="relative">
@@ -126,7 +114,7 @@ import { ref, watch, computed, onMounted, nextTick } from 'vue';
 import { useSearch } from '@embedpdf/plugin-search/vue';
 import { useScrollCapability } from '@embedpdf/plugin-scroll/vue';
 import { MatchFlag } from '@embedpdf/models';
-import { SearchIcon, CloseIcon, ChevronRightIcon, ChevronLeftIcon } from './Icons.vue';
+import { SearchIcon, CloseIcon, ChevronRightIcon, ChevronLeftIcon } from './icons';
 
 const props = defineProps<{
   documentId: string;

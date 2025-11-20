@@ -99,7 +99,7 @@ import {
   RotateLeftIcon,
   SinglePageIcon,
   BookOpenIcon,
-} from './Icons.vue';
+} from './icons';
 import { ToolbarButton, DropdownMenu, DropdownSection, DropdownItem, DropdownDivider } from './ui';
 
 const props = defineProps<{

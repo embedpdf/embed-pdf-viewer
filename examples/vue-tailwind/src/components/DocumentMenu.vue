@@ -65,7 +65,7 @@ import {
   ScreenshotIcon,
   FullscreenIcon,
   FullscreenExitIcon,
-} from './Icons.vue';
+} from './icons';
 import { ToolbarButton, DropdownMenu, DropdownItem } from './ui';
 import PrintDialog from './PrintDialog.vue';
 import CaptureDialog from './CaptureDialog.vue';

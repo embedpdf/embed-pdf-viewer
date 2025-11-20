@@ -72,7 +72,7 @@ import { ref, onMounted } from 'vue';
 import type { DocumentState } from '@embedpdf/core';
 import { useDocumentManagerCapability } from '@embedpdf/plugin-document-manager/vue';
 import LoadingSpinner from './LoadingSpinner.vue';
-import { AlertIcon } from './Icons.vue';
+import { AlertIcon } from './icons';
 
 const props = defineProps<{
   documentState: DocumentState;

@@ -28,7 +28,7 @@ import type { Rect } from '@embedpdf/models';
 import type { TrackedAnnotation } from '@embedpdf/plugin-annotation';
 import { useAnnotation, useAnnotationCapability } from '@embedpdf/plugin-annotation/vue';
 import type { MenuWrapperProps } from '@embedpdf/utils/vue';
-import { TrashIcon } from './Icons.vue';
+import { TrashIcon } from './icons';
 
 const props = defineProps<{
   menuWrapperProps: MenuWrapperProps;

@@ -47,7 +47,7 @@
 import { ref, watch, onUnmounted } from 'vue';
 import { useViewportCapability } from '@embedpdf/plugin-viewport/vue';
 import { useScroll } from '@embedpdf/plugin-scroll/vue';
-import { ChevronLeftIcon, ChevronRightIcon } from './Icons.vue';
+import { ChevronLeftIcon, ChevronRightIcon } from './icons';
 
 const props = defineProps<{
   documentId: string;

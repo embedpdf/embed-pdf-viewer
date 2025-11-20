@@ -3,6 +3,7 @@
   <AboutPage v-else-if="route === '/about'" />
   <ViewerPage v-else-if="route === '/viewer'" />
   <ViewerSimplePage v-else-if="route === '/viewer-simple'" />
+  <ViewerSchemaPage v-else-if="route === '/viewer-schema'" />
   <HomePage v-else />
 </template>
 
@@ -12,6 +13,7 @@ import HomePage from './pages/home.vue';
 import AboutPage from './pages/about.vue';
 import ViewerPage from './pages/viewer.vue';
 import ViewerSimplePage from './pages/viewer-simple.vue';
+import ViewerSchemaPage from './pages/viewer-schema.vue';
 
 const { route } = useHashRoute();
 </script>

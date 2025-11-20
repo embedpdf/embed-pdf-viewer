@@ -68,7 +68,7 @@
 <script setup lang="ts">
 import { ref } from 'vue';
 import type { DocumentState } from '@embedpdf/core';
-import { DocumentIcon, CloseIcon, PlusIcon } from './Icons.vue';
+import { DocumentIcon, CloseIcon, PlusIcon } from './icons';
 import { useOpenDocuments } from '@embedpdf/plugin-document-manager/vue';
 import { View } from '@embedpdf/plugin-view-manager/vue';
 import TabContextMenu from './TabContextMenu.vue';

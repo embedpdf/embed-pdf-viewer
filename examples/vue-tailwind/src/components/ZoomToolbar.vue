@@ -96,7 +96,7 @@ import {
   SearchMinusIcon,
   SearchPlusIcon,
   MarqueeIcon,
-} from './Icons.vue';
+} from './icons';
 import { DropdownMenu, DropdownItem, DropdownDivider } from './ui';
 
 interface ZoomPreset {

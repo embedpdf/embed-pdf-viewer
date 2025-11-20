@@ -52,7 +52,7 @@
 <script setup lang="ts">
 import { RedactionMode, useRedaction } from '@embedpdf/plugin-redaction/vue';
 import { ToolbarButton } from './ui';
-import { CheckIcon, CloseIcon, RedactTextIcon, RedactAreaIcon } from './Icons.vue';
+import { CheckIcon, CloseIcon, RedactTextIcon, RedactAreaIcon } from './icons';
 
 const props = defineProps<{
   documentId: string;

@@ -80,7 +80,7 @@
 </template>
 
 <script setup lang="ts">
-import { SearchIcon, ThumbnailsIcon } from './Icons.vue';
+import { SearchIcon, ThumbnailsIcon } from './icons';
 import { ToolbarButton, ToolbarDivider } from './ui';
 import ZoomToolbar from './ZoomToolbar.vue';
 import PanToggleButton from './PanToggleButton.vue';

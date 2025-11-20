@@ -12,7 +12,7 @@
 
 <script setup lang="ts">
 import { usePan } from '@embedpdf/plugin-pan/vue';
-import { HandIcon } from './Icons.vue';
+import { HandIcon } from './icons';
 import { ToolbarButton } from './ui';
 
 const props = defineProps<{

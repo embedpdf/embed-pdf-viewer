@@ -146,7 +146,7 @@ import {
   ArrowIcon,
   UndoIcon,
   RedoIcon,
-} from './Icons.vue';
+} from './icons';
 
 const props = defineProps<{
   documentId: string;

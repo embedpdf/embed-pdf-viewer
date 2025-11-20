@@ -39,7 +39,7 @@
 
 <script setup lang="ts">
 import { ref, watch, onMounted, onUnmounted } from 'vue';
-import { CloseIcon } from '../Icons.vue';
+import { CloseIcon } from '../icons';
 
 const props = withDefaults(
   defineProps<{

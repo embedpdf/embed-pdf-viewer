@@ -53,7 +53,7 @@
 
 <script setup lang="ts">
 import type { DocumentState } from '@embedpdf/core';
-import { DocumentIcon, CloseIcon, PlusIcon } from './Icons.vue';
+import { DocumentIcon, CloseIcon, PlusIcon } from './icons';
 import { useDocumentManagerCapability } from '@embedpdf/plugin-document-manager/vue';
 
 const props = defineProps<{
