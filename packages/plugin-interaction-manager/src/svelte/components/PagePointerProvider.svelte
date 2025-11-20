@@ -81,6 +81,7 @@
       style:right="0"
       style:bottom="0"
       style:z-index="10"
+      style:pointer-events="none"
     ></div>
   {/if}
 </div>
