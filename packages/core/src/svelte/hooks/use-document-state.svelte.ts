@@ -7,13 +7,15 @@ import { useCoreState } from './use-core-state.svelte';
  * @returns The reactive DocumentState object or null if not found.
  */
 export function useDocumentState(getDocumentId: () => string | null) {
-  const coreState = useCoreState();
+  const coreStateRef = useCoreState();
 
   // Reactive documentId
   const documentId = $derived(getDocumentId());
 
   const documentState = $derived(
-    coreState.current && documentId ? (coreState.current.documents[documentId] ?? null) : null,
+    coreStateRef.current && documentId
+      ? (coreStateRef.current.documents[documentId] ?? null)
+      : null,
   );
 
   return {

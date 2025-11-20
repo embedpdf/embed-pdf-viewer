@@ -12,7 +12,10 @@ import {
   SET_ROTATION,
   SET_SCALE,
   REFRESH_PAGES,
+  REORDER_DOCUMENTS,
+  MOVE_DOCUMENT,
 } from './actions';
+import { calculateNextActiveDocument, moveDocumentInOrder } from './reducer-helpers';
 
 export const coreReducer: Reducer<CoreState, CoreAction> = (state, action): CoreState => {
   switch (action.type) {
@@ -39,6 +42,7 @@ export const coreReducer: Reducer<CoreState, CoreAction> = (state, action): Core
           ...state.documents,
           [documentId]: newDocState,
         },
+        documentOrder: [...state.documentOrder, documentId],
         activeDocumentId: documentId,
       };
     }
@@ -134,30 +138,31 @@ export const coreReducer: Reducer<CoreState, CoreAction> = (state, action): Core
       const { documentId, nextActiveDocumentId } = action.payload;
       const { [documentId]: removed, ...remainingDocs } = state.documents;
 
-      // Determine the new active document ID
-      let newActiveDocumentId = state.activeDocumentId;
-
-      if (state.activeDocumentId === documentId) {
-        // If nextActiveDocumentId was explicitly provided in the action
-        if (nextActiveDocumentId !== undefined) {
-          // Validate that the next active document actually exists in remaining docs
-          if (nextActiveDocumentId === null || remainingDocs[nextActiveDocumentId]) {
-            newActiveDocumentId = nextActiveDocumentId;
-          } else {
-            // Invalid document ID provided - fall back to null
-            // This protects against bugs in calling code
-            newActiveDocumentId = null;
-          }
-        } else {
-          // No next active document specified - default to null
-          newActiveDocumentId = null;
-        }
-      }
-
       return {
         ...state,
         documents: remainingDocs,
-        activeDocumentId: newActiveDocumentId,
+        documentOrder: state.documentOrder.filter((id) => id !== documentId),
+        activeDocumentId: calculateNextActiveDocument(state, documentId, nextActiveDocumentId),
+      };
+    }
+
+    case MOVE_DOCUMENT: {
+      const { documentId, toIndex } = action.payload;
+      const newOrder = moveDocumentInOrder(state.documentOrder, documentId, toIndex);
+
+      // If invalid, return unchanged state
+      if (!newOrder) return state;
+
+      return {
+        ...state,
+        documentOrder: newOrder,
+      };
+    }
+
+    case REORDER_DOCUMENTS: {
+      return {
+        ...state,
+        documentOrder: action.payload,
       };
     }
 

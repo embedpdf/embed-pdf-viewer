@@ -8,6 +8,8 @@ import {
   retryLoadingDocument,
   closeDocument as closeDocumentAction,
   setActiveDocument as setActiveDocumentAction,
+  moveDocument as moveDocumentAction,
+  reorderDocuments as reorderDocumentsAction,
   DocumentState,
   Unsubscribe,
   Listener,
@@ -24,7 +26,6 @@ import {
 
 import {
   DocumentManagerPluginConfig,
-  DocumentManagerState,
   DocumentManagerCapability,
   DocumentChangeEvent,
   DocumentOrderChangeEvent,
@@ -34,18 +35,10 @@ import {
   DocumentErrorEvent,
   OpenDocumentResponse,
 } from './types';
-import {
-  DocumentManagerAction,
-  setDocumentOrder,
-  addToDocumentOrder,
-  removeFromDocumentOrder,
-} from './actions';
 
 export class DocumentManagerPlugin extends BasePlugin<
   DocumentManagerPluginConfig,
-  DocumentManagerCapability,
-  DocumentManagerState,
-  DocumentManagerAction
+  DocumentManagerCapability
 > {
   static readonly id = 'document-manager' as const;
 
@@ -53,12 +46,13 @@ export class DocumentManagerPlugin extends BasePlugin<
   private readonly documentClosed$ = createBehaviorEmitter<string>();
   private readonly activeDocumentChanged$ = createBehaviorEmitter<DocumentChangeEvent>();
   private readonly documentError$ = createBehaviorEmitter<DocumentErrorEvent>();
+
   private readonly documentOrderChanged$ = createBehaviorEmitter<DocumentOrderChangeEvent>();
+
   private readonly openFileRequest$ = createEmitter<Task<OpenDocumentResponse, PdfErrorReason>>();
 
   private maxDocuments?: number;
 
-  // Store original load options ONLY for documents in error state (for retry)
   private loadOptions = new Map<string, LoadDocumentUrlOptions | LoadDocumentBufferOptions>();
 
   constructor(
@@ -72,7 +66,7 @@ export class DocumentManagerPlugin extends BasePlugin<
 
   protected buildCapability(): DocumentManagerCapability {
     return {
-      // Document lifecycle
+      // Document lifecycle - orchestration only
       openFileDialog: () => this.openFileDialog(),
       openDocumentUrl: (options) => this.openDocumentUrl(options),
       openDocumentBuffer: (options) => this.openDocumentBuffer(options),
@@ -80,23 +74,64 @@ export class DocumentManagerPlugin extends BasePlugin<
       closeDocument: (documentId) => this.closeDocument(documentId),
       closeAllDocuments: () => this.closeAllDocuments(),
 
-      // Active document control
-      setActiveDocument: (documentId) => this.setActiveDocument(documentId),
-      getActiveDocumentId: () => this.getActiveDocumentIdOrNull(),
-      getActiveDocument: () => this.getActiveDocument(),
+      setActiveDocument: (documentId) => {
+        if (!this.isDocumentOpen(documentId)) {
+          throw new Error(`Cannot set active document: ${documentId} is not open`);
+        }
+        this.dispatchCoreAction(setActiveDocumentAction(documentId));
+      },
 
-      // Tab order management
-      getDocumentOrder: () => this.state.documentOrder,
-      moveDocument: (documentId, toIndex) => this.moveDocument(documentId, toIndex),
-      swapDocuments: (id1, id2) => this.swapDocuments(id1, id2),
+      getActiveDocumentId: () => this.coreState.core.activeDocumentId,
+      getActiveDocument: () => {
+        const activeId = this.coreState.core.activeDocumentId;
+        if (!activeId) return null;
+        return this.coreState.core.documents[activeId]?.document ?? null;
+      },
 
-      // Queries
-      getDocument: (documentId) => this.getDocument(documentId),
-      getDocumentState: (documentId) => this.getDocumentState(documentId),
-      getOpenDocuments: () => this.getOpenDocuments(),
+      getDocumentOrder: () => this.coreState.core.documentOrder,
+
+      moveDocument: (documentId, toIndex) => {
+        this.dispatchCoreAction(moveDocumentAction(documentId, toIndex));
+      },
+
+      swapDocuments: (id1, id2) => {
+        const order = this.coreState.core.documentOrder;
+        const index1 = order.indexOf(id1);
+        const index2 = order.indexOf(id2);
+
+        if (index1 === -1 || index2 === -1) {
+          throw new Error('One or both documents not found in order');
+        }
+
+        const newOrder = [...order];
+        [newOrder[index1], newOrder[index2]] = [newOrder[index2], newOrder[index1]];
+
+        this.dispatchCoreAction(reorderDocumentsAction(newOrder));
+      },
+
+      getDocument: (documentId) => {
+        return this.coreState.core.documents[documentId]?.document ?? null;
+      },
+
+      getDocumentState: (documentId) => {
+        return this.coreState.core.documents[documentId] ?? null;
+      },
+
+      getOpenDocuments: () => {
+        return this.coreState.core.documentOrder
+          .map((documentId) => this.coreState.core.documents[documentId])
+          .filter((state): state is DocumentState => state !== null);
+      },
+
       isDocumentOpen: (documentId) => this.isDocumentOpen(documentId),
-      getDocumentCount: () => this.getDocumentCount(),
-      getDocumentIndex: (documentId) => this.getDocumentIndex(documentId),
+
+      getDocumentCount: () => {
+        return Object.keys(this.coreState.core.documents).length;
+      },
+
+      getDocumentIndex: (documentId) => {
+        return this.coreState.core.documentOrder.indexOf(documentId);
+      },
 
       // Events
       onDocumentOpened: this.documentOpened$.on,
@@ -107,18 +142,16 @@ export class DocumentManagerPlugin extends BasePlugin<
     };
   }
 
+  /**
+   * Check if a document is currently open
+   */
+  private isDocumentOpen(documentId: string): boolean {
+    return !!this.coreState.core.documents[documentId];
+  }
+
   // ─────────────────────────────────────────────────────────
   // Document Lifecycle Hooks (from BasePlugin)
   // ─────────────────────────────────────────────────────────
-
-  protected override onDocumentLoadingStarted(documentId: string): void {
-    this.dispatch(addToDocumentOrder(documentId));
-
-    // Emit order change event so hooks can update
-    this.documentOrderChanged$.emit({
-      order: this.state.documentOrder,
-    });
-  }
 
   protected override onDocumentLoaded(documentId: string): void {
     const docState = this.coreState.core.documents[documentId];
@@ -127,7 +160,7 @@ export class DocumentManagerPlugin extends BasePlugin<
     // Clean up load options to free memory
     this.loadOptions.delete(documentId);
 
-    // Emit opened event with DocumentState directly
+    // Emit opened event
     this.documentOpened$.emit(docState);
 
     this.logger.info(
@@ -139,16 +172,10 @@ export class DocumentManagerPlugin extends BasePlugin<
   }
 
   protected override onDocumentClosed(documentId: string): void {
-    this.dispatch(removeFromDocumentOrder(documentId));
-
-    // Emit order change event so hooks can update
-    this.documentOrderChanged$.emit({
-      order: this.state.documentOrder,
-    });
-
     // Clean up load options
     this.loadOptions.delete(documentId);
 
+    // Emit closed event
     this.documentClosed$.emit(documentId);
 
     this.logger.info('DocumentManagerPlugin', 'DocumentClosed', `Document ${documentId} closed`);
@@ -170,6 +197,15 @@ export class DocumentManagerPlugin extends BasePlugin<
     );
   }
 
+  protected override onCoreStoreUpdated(oldState: any, newState: any): void {
+    // Emit order change event if order changed
+    if (oldState.core.documentOrder !== newState.core.documentOrder) {
+      this.documentOrderChanged$.emit({
+        order: newState.core.documentOrder,
+      });
+    }
+  }
+
   public onOpenFileRequest(
     handler: Listener<Task<OpenDocumentResponse, PdfErrorReason>>,
   ): Unsubscribe {
@@ -177,7 +213,7 @@ export class DocumentManagerPlugin extends BasePlugin<
   }
 
   // ─────────────────────────────────────────────────────────
-  // Document Loading
+  // Document Loading (orchestration only - no state management)
   // ─────────────────────────────────────────────────────────
 
   private openDocumentUrl(
@@ -187,6 +223,7 @@ export class DocumentManagerPlugin extends BasePlugin<
 
     const documentId = options.documentId || this.generateDocumentId();
 
+    // Check limit
     const limitError = this.checkDocumentLimit();
     if (limitError) {
       task.reject(limitError);
@@ -195,10 +232,9 @@ export class DocumentManagerPlugin extends BasePlugin<
 
     const documentName = this.extractNameFromUrl(options.url);
 
-    // Store options for potential retry (will be cleared on success)
+    // Store options for potential retry
     this.loadOptions.set(documentId, options);
 
-    // Immediately create loading state
     this.dispatchCoreAction(
       startLoadingDocument(
         documentId,
@@ -251,10 +287,9 @@ export class DocumentManagerPlugin extends BasePlugin<
 
     const documentId = options.documentId || this.generateDocumentId();
 
-    // Store options for potential retry (will be cleared on success)
+    // Store options for potential retry
     this.loadOptions.set(documentId, options);
 
-    // Immediately create loading state
     this.dispatchCoreAction(
       startLoadingDocument(
         documentId,
@@ -352,7 +387,7 @@ export class DocumentManagerPlugin extends BasePlugin<
   private closeDocument(documentId: string): Task<void, PdfErrorReason> {
     const task = new Task<void, PdfErrorReason>();
 
-    const docState = this.getDocumentState(documentId);
+    const docState = this.coreState.core.documents[documentId];
     if (!docState) {
       this.logger.warn(
         'DocumentManagerPlugin',
@@ -363,14 +398,11 @@ export class DocumentManagerPlugin extends BasePlugin<
       return task;
     }
 
-    const nextActiveDocumentId = this.calculateNextActiveDocument(documentId);
-
-    // Only call engine.closeDocument if the document is actually loaded
-    // For documents in error/loading state, just clean up the core state
+    // ✅ SIMPLIFIED: Just dispatch - reducer calculates next active!
     if (docState.status === 'loaded' && docState.document) {
       this.engine.closeDocument(docState.document).wait(
         () => {
-          this.dispatchCoreAction(closeDocumentAction(documentId, nextActiveDocumentId));
+          this.dispatchCoreAction(closeDocumentAction(documentId));
           task.resolve();
         },
         (error) => {
@@ -390,7 +422,7 @@ export class DocumentManagerPlugin extends BasePlugin<
         'CloseDocument',
         `Closing document ${documentId} in ${docState.status} state (skipping engine close)`,
       );
-      this.dispatchCoreAction(closeDocumentAction(documentId, nextActiveDocumentId));
+      this.dispatchCoreAction(closeDocumentAction(documentId));
       task.resolve();
     }
 
@@ -411,116 +443,14 @@ export class DocumentManagerPlugin extends BasePlugin<
   }
 
   // ─────────────────────────────────────────────────────────
-  // Active Document Control
-  // ─────────────────────────────────────────────────────────
-
-  private setActiveDocument(documentId: string): void {
-    if (!this.isDocumentOpen(documentId)) {
-      throw new Error(`Cannot set active document: ${documentId} is not open`);
-    }
-
-    this.dispatchCoreAction(setActiveDocumentAction(documentId));
-  }
-
-  private getActiveDocument(): PdfDocumentObject | null {
-    const activeId = this.coreState.core.activeDocumentId;
-    if (!activeId) return null;
-
-    const docState = this.coreState.core.documents[activeId];
-    return docState?.document ?? null;
-  }
-
-  // ─────────────────────────────────────────────────────────
-  // Tab Order Management
-  // ─────────────────────────────────────────────────────────
-
-  private moveDocument(documentId: string, toIndex: number): void {
-    const currentOrder = this.state.documentOrder;
-    const fromIndex = currentOrder.indexOf(documentId);
-
-    if (fromIndex === -1) {
-      throw new Error(`Document ${documentId} not found in order`);
-    }
-
-    if (toIndex < 0 || toIndex >= currentOrder.length) {
-      throw new Error(`Invalid index ${toIndex}`);
-    }
-
-    if (fromIndex === toIndex) return;
-
-    const newOrder = [...currentOrder];
-    newOrder.splice(fromIndex, 1);
-    newOrder.splice(toIndex, 0, documentId);
-
-    this.dispatch(setDocumentOrder(newOrder));
-
-    this.documentOrderChanged$.emit({
-      order: newOrder,
-      movedDocumentId: documentId,
-      fromIndex,
-      toIndex,
-    });
-  }
-
-  private swapDocuments(documentId1: string, documentId2: string): void {
-    const currentOrder = this.state.documentOrder;
-    const index1 = currentOrder.indexOf(documentId1);
-    const index2 = currentOrder.indexOf(documentId2);
-
-    if (index1 === -1 || index2 === -1) {
-      throw new Error('One or both documents not found in order');
-    }
-
-    const newOrder = [...currentOrder];
-    [newOrder[index1], newOrder[index2]] = [newOrder[index2], newOrder[index1]];
-
-    this.dispatch(setDocumentOrder(newOrder));
-
-    this.documentOrderChanged$.emit({
-      order: newOrder,
-    });
-  }
-
-  // ─────────────────────────────────────────────────────────
-  // Queries
-  // ─────────────────────────────────────────────────────────
-
-  private getDocument(documentId: string): PdfDocumentObject | null {
-    const docState = this.coreState.core.documents[documentId];
-    return docState?.document ?? null;
-  }
-
-  private getDocumentState(documentId: string): DocumentState | null {
-    return this.coreState.core.documents[documentId] ?? null;
-  }
-
-  private getOpenDocuments(): DocumentState[] {
-    return this.state.documentOrder
-      .map((documentId) => this.getDocumentState(documentId))
-      .filter((state): state is DocumentState => state !== null);
-  }
-
-  private isDocumentOpen(documentId: string): boolean {
-    return !!this.coreState.core.documents[documentId];
-  }
-
-  private getDocumentCount(): number {
-    return Object.keys(this.coreState.core.documents).length;
-  }
-
-  private getDocumentIndex(documentId: string): number {
-    return this.state.documentOrder.indexOf(documentId);
-  }
-
-  // ─────────────────────────────────────────────────────────
   // Helper Methods
   // ─────────────────────────────────────────────────────────
 
-  /**
-   * Check if the document limit has been reached
-   */
   private checkDocumentLimit(): PdfErrorReason | null {
-    if (this.maxDocuments && this.getDocumentCount() >= this.maxDocuments) {
+    if (
+      this.maxDocuments &&
+      Object.keys(this.coreState.core.documents).length >= this.maxDocuments
+    ) {
       return {
         code: PdfErrorCode.Unknown,
         message: `Maximum number of documents (${this.maxDocuments}) reached`,
@@ -529,9 +459,6 @@ export class DocumentManagerPlugin extends BasePlugin<
     return null;
   }
 
-  /**
-   * Validate if a document can be retried
-   */
   private validateRetry(documentId: string): {
     valid: boolean;
     error?: PdfErrorReason;
@@ -581,9 +508,6 @@ export class DocumentManagerPlugin extends BasePlugin<
     return { valid: true };
   }
 
-  /**
-   * Retry loading a URL-based document
-   */
   private retryUrlDocument(
     documentId: string,
     options: LoadDocumentUrlOptions,
@@ -600,9 +524,6 @@ export class DocumentManagerPlugin extends BasePlugin<
     });
   }
 
-  /**
-   * Retry loading a buffer-based document
-   */
   private retryBufferDocument(
     documentId: string,
     options: LoadDocumentBufferOptions,
@@ -617,9 +538,6 @@ export class DocumentManagerPlugin extends BasePlugin<
     });
   }
 
-  /**
-   * Handle the result of a document load task
-   */
   private handleLoadTask(
     documentId: string,
     engineTask: Task<PdfDocumentObject, PdfErrorReason>,
@@ -635,9 +553,6 @@ export class DocumentManagerPlugin extends BasePlugin<
     );
   }
 
-  /**
-   * Handle document loading errors consistently
-   */
   private handleLoadError(documentId: string, error: any, context: string): void {
     const errorMessage = error.reason?.message || 'Failed to load document';
 
@@ -655,42 +570,10 @@ export class DocumentManagerPlugin extends BasePlugin<
     });
   }
 
-  /**
-   * Calculate the next active document when closing a document
-   */
-  private calculateNextActiveDocument(closingDocumentId: string): string | null | undefined {
-    const currentActiveId = this.coreState.core.activeDocumentId;
-
-    // Only calculate if we're closing the active document
-    if (currentActiveId !== closingDocumentId) {
-      return undefined;
-    }
-
-    const documentOrder = this.state.documentOrder;
-    const closingIndex = documentOrder.indexOf(closingDocumentId);
-
-    if (closingIndex === -1) return undefined;
-
-    // Try left first, then right, then null
-    if (closingIndex > 0) {
-      return documentOrder[closingIndex - 1];
-    } else if (closingIndex < documentOrder.length - 1) {
-      return documentOrder[closingIndex + 1];
-    } else {
-      return null;
-    }
-  }
-
-  /**
-   * Generate a unique document ID
-   */
   private generateDocumentId(): string {
     return `doc-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
   }
 
-  /**
-   * Extract filename from URL
-   */
   private extractNameFromUrl(url: string): string {
     try {
       const urlObj = new URL(url);
@@ -724,6 +607,7 @@ export class DocumentManagerPlugin extends BasePlugin<
     this.documentClosed$.clear();
     this.activeDocumentChanged$.clear();
     this.documentOrderChanged$.clear();
+    this.documentError$.clear();
 
     super.destroy();
   }

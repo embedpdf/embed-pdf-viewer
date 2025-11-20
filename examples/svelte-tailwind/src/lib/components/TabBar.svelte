@@ -1,5 +1,6 @@
 <script lang="ts">
   import type { DocumentState } from '@embedpdf/core';
+  import { useDocumentManagerCapability } from '@embedpdf/plugin-document-manager/svelte';
   import DocumentIcon from './icons/DocumentIcon.svelte';
   import CloseIcon from './icons/CloseIcon.svelte';
   import PlusIcon from './icons/PlusIcon.svelte';
@@ -7,12 +8,23 @@
   interface TabBarProps {
     documentStates: DocumentState[];
     activeDocumentId: string | null;
-    onSelect: (id: string) => void;
-    onClose: (id: string) => void;
-    onOpenFile: () => void;
   }
 
-  let { documentStates, activeDocumentId, onSelect, onClose, onOpenFile }: TabBarProps = $props();
+  let { documentStates, activeDocumentId }: TabBarProps = $props();
+
+  const documentManagerCapability = useDocumentManagerCapability();
+
+  const onSelect = (id: string) => {
+    documentManagerCapability.provides?.setActiveDocument(id);
+  };
+
+  const onClose = (id: string) => {
+    documentManagerCapability.provides?.closeDocument(id);
+  };
+
+  const onOpenFile = () => {
+    documentManagerCapability.provides?.openFileDialog();
+  };
 
   const handleKeyDown = (e: KeyboardEvent, documentId: string) => {
     if (e.key === 'Enter' || e.key === ' ') {

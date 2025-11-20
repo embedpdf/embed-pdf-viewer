@@ -1,21 +1,34 @@
 import { DocumentState } from '@embedpdf/core';
 import { CloseIcon, DocumentIcon, PlusIcon } from './icons';
+import { useDocumentManagerCapability } from '@embedpdf/plugin-document-manager/react';
+import { useCallback } from 'react';
 
 type TabBarProps = {
   documentStates: DocumentState[];
   activeDocumentId: string | null;
-  onSelect: (id: string) => void;
-  onClose: (id: string) => void;
-  onOpenFile: () => void;
 };
 
-export function TabBar({
-  documentStates,
-  activeDocumentId,
-  onSelect,
-  onClose,
-  onOpenFile,
-}: TabBarProps) {
+export function TabBar({ documentStates, activeDocumentId }: TabBarProps) {
+  const { provides } = useDocumentManagerCapability();
+
+  const onSelect = useCallback(
+    (id: string) => {
+      provides?.setActiveDocument(id);
+    },
+    [provides],
+  );
+
+  const onClose = useCallback(
+    (id: string) => {
+      provides?.closeDocument(id);
+    },
+    [provides],
+  );
+
+  const onOpenFile = useCallback(() => {
+    provides?.openFileDialog();
+  }, [provides]);
+
   return (
     <div className="flex items-end gap-0.5 bg-gray-100 px-2 pt-2">
       {/* Document Tabs */}

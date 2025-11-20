@@ -44,6 +44,7 @@ import { AnnotationSelectionMenu } from '../components/annotation-selection-menu
 import { SelectionSelectionMenu } from '../components/selection-selection-menu';
 import { NavigationBar } from '../components/navigation-bar';
 import { EmptyState } from '../components/empty-state';
+import { I18nPluginPackage } from '@embedpdf/plugin-i18n/react';
 
 const logger = new ConsoleLogger();
 
@@ -107,6 +108,7 @@ export function ViewerPage() {
       createPluginRegistration(ViewManagerPluginPackage, {
         defaultViewCount: 1,
       }),
+      createPluginRegistration(I18nPluginPackage),
     ],
     [], // Empty dependency array since these never change
   );
@@ -285,11 +287,11 @@ export function ViewerPage() {
                                                     scale={1}
                                                     style={{ pointerEvents: 'none' }}
                                                   />
-                                                  {/*<TilingLayer
-                                                    documentId={activeDocumentId}
+                                                  <TilingLayer
+                                                    documentId={documentId}
                                                     pageIndex={pageIndex}
                                                     style={{ pointerEvents: 'none' }}
-                                                  />*/}
+                                                  />
                                                   <SearchLayer
                                                     documentId={documentId}
                                                     pageIndex={pageIndex}

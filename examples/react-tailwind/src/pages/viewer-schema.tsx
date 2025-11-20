@@ -7,7 +7,6 @@ import { ScrollPluginPackage, ScrollStrategy, Scroller } from '@embedpdf/plugin-
 import {
   DocumentManagerPluginPackage,
   DocumentContent,
-  DocumentContext,
   DocumentManagerPlugin,
 } from '@embedpdf/plugin-document-manager/react';
 import {
@@ -182,40 +181,25 @@ export function ViewerSchemaPage() {
               ?.openDocumentUrl({ url: 'https://snippet.embedpdf.com/ebook.pdf' });
           }}
         >
-          {({ pluginsReady, registry }) => (
+          {({ pluginsReady, activeDocumentId, documentStates }) => (
             <>
               {pluginsReady ? (
-                <DocumentContext>
-                  {({ documentStates, activeDocumentId, actions }) => (
-                    <div className="flex h-full flex-col">
-                      <TabBar
-                        documentStates={documentStates}
-                        activeDocumentId={activeDocumentId}
-                        onSelect={actions.select}
-                        onClose={actions.close}
-                        onOpenFile={() => {
-                          registry
-                            ?.getPlugin<DocumentManagerPlugin>(DocumentManagerPlugin.id)
-                            ?.provides()
-                            ?.openFileDialog();
-                        }}
-                      />
+                <div className="flex h-full flex-col">
+                  <TabBar documentStates={documentStates} activeDocumentId={activeDocumentId} />
 
-                      {/* Schema-driven UI with UIProvider */}
-                      {activeDocumentId ? (
-                        <UIProvider
-                          documentId={activeDocumentId}
-                          components={uiComponents}
-                          renderers={uiRenderers}
-                        >
-                          <ViewerLayout documentId={activeDocumentId} />
-                        </UIProvider>
-                      ) : (
-                        <EmptyState />
-                      )}
-                    </div>
+                  {/* Schema-driven UI with UIProvider */}
+                  {activeDocumentId ? (
+                    <UIProvider
+                      documentId={activeDocumentId}
+                      components={uiComponents}
+                      renderers={uiRenderers}
+                    >
+                      <ViewerLayout documentId={activeDocumentId} />
+                    </UIProvider>
+                  ) : (
+                    <EmptyState />
                   )}
-                </DocumentContext>
+                </div>
               ) : (
                 <div className="flex h-full items-center justify-center">
                   <LoadingSpinner message="Initializing plugins..." />

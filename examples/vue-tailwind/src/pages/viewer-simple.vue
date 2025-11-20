@@ -18,123 +18,115 @@
         :plugins="plugins"
         :onInitialized="handleInitialized"
       >
-        <template #default="{ pluginsReady, registry }">
+        <template #default="{ pluginsReady, activeDocumentId, documentStates }">
           <div v-if="!pluginsReady" class="flex h-full items-center justify-center">
             <LoadingSpinner message="Initializing plugins..." />
           </div>
 
-          <DocumentContext v-else v-slot="{ documentStates, activeDocumentId, actions }">
-            <div class="flex h-full flex-col">
-              <TabBar
-                :documentStates="documentStates"
-                :activeDocumentId="activeDocumentId"
-                :onSelect="actions.select"
-                :onClose="actions.close"
-                :onOpenFile="() => openFileDialog(registry)"
-              />
+          <div v-else class="flex h-full flex-col">
+            <TabBar :documentStates="documentStates" :activeDocumentId="activeDocumentId" />
 
-              <ViewerToolbar
-                v-if="activeDocumentId"
+            <ViewerToolbar
+              v-if="activeDocumentId"
+              :documentId="activeDocumentId"
+              :onToggleSearch="() => toggleSidebar(activeDocumentId, 'search')"
+              :onToggleThumbnails="() => toggleSidebar(activeDocumentId, 'thumbnails')"
+              :isSearchOpen="getSidebarState(activeDocumentId).search"
+              :isThumbnailsOpen="getSidebarState(activeDocumentId).thumbnails"
+              :mode="getToolbarMode(activeDocumentId)"
+              :onModeChange="(mode: ViewMode) => setToolbarMode(activeDocumentId, mode)"
+            />
+
+            <!-- Document Content Area -->
+            <div
+              v-if="activeDocumentId"
+              id="document-content"
+              class="flex flex-1 overflow-hidden bg-white"
+            >
+              <!-- Thumbnails Sidebar - Left -->
+              <ThumbnailsSidebar
+                v-if="getSidebarState(activeDocumentId).thumbnails"
                 :documentId="activeDocumentId"
-                :onToggleSearch="() => toggleSidebar(activeDocumentId, 'search')"
-                :onToggleThumbnails="() => toggleSidebar(activeDocumentId, 'thumbnails')"
-                :isSearchOpen="getSidebarState(activeDocumentId).search"
-                :isThumbnailsOpen="getSidebarState(activeDocumentId).thumbnails"
-                :mode="getToolbarMode(activeDocumentId)"
-                :onModeChange="(mode: ViewMode) => setToolbarMode(activeDocumentId, mode)"
+                :onClose="() => toggleSidebar(activeDocumentId, 'thumbnails')"
               />
 
-              <!-- Document Content Area -->
-              <div
-                v-if="activeDocumentId"
-                id="document-content"
-                class="flex flex-1 overflow-hidden bg-white"
-              >
-                <!-- Thumbnails Sidebar - Left -->
-                <ThumbnailsSidebar
-                  v-if="getSidebarState(activeDocumentId).thumbnails"
+              <!-- Main Viewer -->
+              <div class="flex-1 overflow-hidden">
+                <DocumentContent
                   :documentId="activeDocumentId"
-                  :onClose="() => toggleSidebar(activeDocumentId, 'thumbnails')"
-                />
-
-                <!-- Main Viewer -->
-                <div class="flex-1 overflow-hidden">
-                  <DocumentContent
-                    :documentId="activeDocumentId"
-                    v-slot="{ documentState, isLoading, isError, isLoaded }"
-                  >
-                    <div v-if="isLoading" class="flex h-full items-center justify-center">
-                      <LoadingSpinner message="Loading document..." />
-                    </div>
-                    <DocumentPasswordPrompt v-else-if="isError" :documentState="documentState" />
-                    <div v-else-if="isLoaded" class="relative h-full w-full">
-                      <GlobalPointerProvider :documentId="activeDocumentId">
-                        <Viewport class="bg-gray-100" :documentId="activeDocumentId">
-                          <Scroller :documentId="activeDocumentId" v-slot="{ page }">
-                            <Rotate
+                  v-slot="{ documentState, isLoading, isError, isLoaded }"
+                >
+                  <div v-if="isLoading" class="flex h-full items-center justify-center">
+                    <LoadingSpinner message="Loading document..." />
+                  </div>
+                  <DocumentPasswordPrompt v-else-if="isError" :documentState="documentState" />
+                  <div v-else-if="isLoaded" class="relative h-full w-full">
+                    <GlobalPointerProvider :documentId="activeDocumentId">
+                      <Viewport class="bg-gray-100" :documentId="activeDocumentId">
+                        <Scroller :documentId="activeDocumentId" v-slot="{ page }">
+                          <Rotate
+                            :documentId="activeDocumentId"
+                            :pageIndex="page.pageIndex"
+                            style="background-color: #fff"
+                          >
+                            <PagePointerProvider
                               :documentId="activeDocumentId"
                               :pageIndex="page.pageIndex"
-                              style="background-color: #fff"
                             >
-                              <PagePointerProvider
+                              <RenderLayer
                                 :documentId="activeDocumentId"
                                 :pageIndex="page.pageIndex"
-                              >
-                                <RenderLayer
-                                  :documentId="activeDocumentId"
-                                  :pageIndex="page.pageIndex"
-                                  :scale="1"
-                                  style="pointer-events: none"
-                                />
-                                <TilingLayer
-                                  :documentId="activeDocumentId"
-                                  :pageIndex="page.pageIndex"
-                                  style="pointer-events: none"
-                                />
-                                <SearchLayer
-                                  :documentId="activeDocumentId"
-                                  :pageIndex="page.pageIndex"
-                                />
-                                <MarqueeZoom
-                                  :documentId="activeDocumentId"
-                                  :pageIndex="page.pageIndex"
-                                />
-                                <MarqueeCapture
-                                  :documentId="activeDocumentId"
-                                  :pageIndex="page.pageIndex"
-                                />
-                                <SelectionLayer
-                                  :documentId="activeDocumentId"
-                                  :pageIndex="page.pageIndex"
-                                />
-                                <RedactionLayer
-                                  :documentId="activeDocumentId"
-                                  :pageIndex="page.pageIndex"
-                                />
-                                <AnnotationLayer
-                                  :documentId="activeDocumentId"
-                                  :pageIndex="page.pageIndex"
-                                />
-                              </PagePointerProvider>
-                            </Rotate>
-                          </Scroller>
-                          <!-- Page Controls -->
-                          <PageControls :documentId="activeDocumentId" />
-                        </Viewport>
-                      </GlobalPointerProvider>
-                    </div>
-                  </DocumentContent>
-                </div>
-
-                <!-- Search Sidebar - Right -->
-                <SearchSidebar
-                  v-if="getSidebarState(activeDocumentId).search"
-                  :documentId="activeDocumentId"
-                  :onClose="() => toggleSidebar(activeDocumentId, 'search')"
-                />
+                                :scale="1"
+                                style="pointer-events: none"
+                              />
+                              <TilingLayer
+                                :documentId="activeDocumentId"
+                                :pageIndex="page.pageIndex"
+                                style="pointer-events: none"
+                              />
+                              <SearchLayer
+                                :documentId="activeDocumentId"
+                                :pageIndex="page.pageIndex"
+                              />
+                              <MarqueeZoom
+                                :documentId="activeDocumentId"
+                                :pageIndex="page.pageIndex"
+                              />
+                              <MarqueeCapture
+                                :documentId="activeDocumentId"
+                                :pageIndex="page.pageIndex"
+                              />
+                              <SelectionLayer
+                                :documentId="activeDocumentId"
+                                :pageIndex="page.pageIndex"
+                              />
+                              <RedactionLayer
+                                :documentId="activeDocumentId"
+                                :pageIndex="page.pageIndex"
+                              />
+                              <AnnotationLayer
+                                :documentId="activeDocumentId"
+                                :pageIndex="page.pageIndex"
+                              />
+                            </PagePointerProvider>
+                          </Rotate>
+                        </Scroller>
+                        <!-- Page Controls -->
+                        <PageControls :documentId="activeDocumentId" />
+                      </Viewport>
+                    </GlobalPointerProvider>
+                  </div>
+                </DocumentContent>
               </div>
+
+              <!-- Search Sidebar - Right -->
+              <SearchSidebar
+                v-if="getSidebarState(activeDocumentId).search"
+                :documentId="activeDocumentId"
+                :onClose="() => toggleSidebar(activeDocumentId, 'search')"
+              />
             </div>
-          </DocumentContext>
+          </div>
         </template>
       </EmbedPDF>
     </div>
@@ -151,7 +143,6 @@ import { ScrollPluginPackage, ScrollStrategy, Scroller } from '@embedpdf/plugin-
 import {
   DocumentManagerPluginPackage,
   DocumentContent,
-  DocumentContext,
   DocumentManagerPlugin,
 } from '@embedpdf/plugin-document-manager/vue';
 import {
@@ -271,12 +262,5 @@ const handleInitialized = async (registry: PluginRegistry) => {
     ?.provides()
     ?.openDocumentUrl({ url: 'https://snippet.embedpdf.com/ebook.pdf' })
     .toPromise();
-};
-
-const openFileDialog = (registry: PluginRegistry | null) => {
-  registry
-    ?.getPlugin<DocumentManagerPlugin>(DocumentManagerPlugin.id)
-    ?.provides()
-    ?.openFileDialog();
 };
 </script>

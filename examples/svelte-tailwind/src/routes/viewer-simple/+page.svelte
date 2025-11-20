@@ -7,7 +7,6 @@
   import {
     DocumentManagerPluginPackage,
     DocumentContent,
-    DocumentContext,
     DocumentManagerPlugin,
   } from '@embedpdf/plugin-document-manager/svelte';
   import {
@@ -125,129 +124,116 @@
 
     <div class="flex flex-1 select-none flex-col overflow-hidden">
       <EmbedPDF engine={pdfEngine.engine} {logger} {plugins} onInitialized={handleInitialized}>
-        {#snippet children({ pluginsReady, registry })}
+        {#snippet children({ pluginsReady, activeDocumentId, documentStates })}
           {#if !pluginsReady}
             <div class="flex h-full items-center justify-center">
               <LoadingSpinner message="Initializing plugins..." />
             </div>
           {:else}
-            <DocumentContext>
-              {#snippet children({ documentStates, activeDocumentId, actions })}
-                <div class="flex h-full flex-col">
-                  <TabBar
-                    {documentStates}
-                    {activeDocumentId}
-                    onSelect={actions.select}
-                    onClose={actions.close}
-                    onOpenFile={() =>
-                      registry
-                        ?.getPlugin<DocumentManagerPlugin>(DocumentManagerPlugin.id)
-                        ?.provides()
-                        ?.openFileDialog()}
-                  />
-                  {#if activeDocumentId}
-                    <ViewerToolbar
+            <div class="flex h-full flex-col">
+              <TabBar {documentStates} {activeDocumentId} />
+
+              {#if activeDocumentId}
+                <ViewerToolbar
+                  documentId={activeDocumentId}
+                  onToggleSearch={() => toggleSidebar(activeDocumentId, 'search')}
+                  onToggleThumbnails={() => toggleSidebar(activeDocumentId, 'thumbnails')}
+                  isSearchOpen={getSidebarState(activeDocumentId).search}
+                  isThumbnailsOpen={getSidebarState(activeDocumentId).thumbnails}
+                />
+              {/if}
+
+              {#if !activeDocumentId}
+                <EmptyState />
+              {/if}
+
+              <!-- Document Content Area -->
+              {#if activeDocumentId}
+                <div id="document-content" class="flex flex-1 overflow-hidden bg-white">
+                  <!-- Thumbnails Sidebar - Left -->
+                  {#if getSidebarState(activeDocumentId).thumbnails}
+                    <ThumbnailsSidebar
                       documentId={activeDocumentId}
-                      onToggleSearch={() => toggleSidebar(activeDocumentId, 'search')}
-                      onToggleThumbnails={() => toggleSidebar(activeDocumentId, 'thumbnails')}
-                      isSearchOpen={getSidebarState(activeDocumentId).search}
-                      isThumbnailsOpen={getSidebarState(activeDocumentId).thumbnails}
+                      onClose={() => toggleSidebar(activeDocumentId, 'thumbnails')}
                     />
                   {/if}
 
-                  {#if !activeDocumentId}
-                    <EmptyState />
-                  {/if}
-
-                  <!-- Document Content Area -->
-                  {#if activeDocumentId}
-                    <div id="document-content" class="flex flex-1 overflow-hidden bg-white">
-                      <!-- Thumbnails Sidebar - Left -->
-                      {#if getSidebarState(activeDocumentId).thumbnails}
-                        <ThumbnailsSidebar
-                          documentId={activeDocumentId}
-                          onClose={() => toggleSidebar(activeDocumentId, 'thumbnails')}
-                        />
-                      {/if}
-
-                      <!-- Main Viewer -->
-                      <div class="flex-1 overflow-hidden">
-                        <DocumentContent documentId={activeDocumentId}>
-                          {#snippet children({ documentState, isLoading, isError, isLoaded })}
-                            {#if isLoading}
-                              <div class="flex h-full items-center justify-center">
-                                <LoadingSpinner message="Loading document..." />
-                              </div>
-                            {:else if isError}
-                              <DocumentPasswordPrompt {documentState} />
-                            {:else if isLoaded}
-                              <div class="relative h-full w-full">
-                                <GlobalPointerProvider documentId={activeDocumentId}>
-                                  <Viewport class="bg-gray-100" documentId={activeDocumentId}>
-                                    <Scroller documentId={activeDocumentId}>
-                                      {#snippet renderPage(page)}
-                                        <Rotate
+                  <!-- Main Viewer -->
+                  <div class="flex-1 overflow-hidden">
+                    <DocumentContent documentId={activeDocumentId}>
+                      {#snippet children({ documentState, isLoading, isError, isLoaded })}
+                        {#if isLoading}
+                          <div class="flex h-full items-center justify-center">
+                            <LoadingSpinner message="Loading document..." />
+                          </div>
+                        {:else if isError}
+                          <DocumentPasswordPrompt {documentState} />
+                        {:else if isLoaded}
+                          <div class="relative h-full w-full">
+                            <GlobalPointerProvider documentId={activeDocumentId}>
+                              <Viewport class="bg-gray-100" documentId={activeDocumentId}>
+                                <Scroller documentId={activeDocumentId}>
+                                  {#snippet renderPage(page)}
+                                    <Rotate
+                                      documentId={activeDocumentId}
+                                      pageIndex={page.pageIndex}
+                                      style="background-color: #fff"
+                                    >
+                                      <PagePointerProvider
+                                        documentId={activeDocumentId}
+                                        pageIndex={page.pageIndex}
+                                      >
+                                        <RenderLayer
                                           documentId={activeDocumentId}
                                           pageIndex={page.pageIndex}
-                                          style="background-color: #fff"
-                                        >
-                                          <PagePointerProvider
-                                            documentId={activeDocumentId}
-                                            pageIndex={page.pageIndex}
-                                          >
-                                            <RenderLayer
-                                              documentId={activeDocumentId}
-                                              pageIndex={page.pageIndex}
-                                              scale={1}
-                                              style="pointer-events: none"
-                                            />
-                                            <TilingLayer
-                                              documentId={activeDocumentId}
-                                              pageIndex={page.pageIndex}
-                                              style="pointer-events: none"
-                                            />
-                                            <SearchLayer
-                                              documentId={activeDocumentId}
-                                              pageIndex={page.pageIndex}
-                                            />
-                                            <MarqueeZoom
-                                              documentId={activeDocumentId}
-                                              pageIndex={page.pageIndex}
-                                            />
-                                            <MarqueeCapture
-                                              documentId={activeDocumentId}
-                                              pageIndex={page.pageIndex}
-                                            />
-                                            <SelectionLayer
-                                              documentId={activeDocumentId}
-                                              pageIndex={page.pageIndex}
-                                            />
-                                          </PagePointerProvider>
-                                        </Rotate>
-                                      {/snippet}
-                                    </Scroller>
-                                    <!-- Page Controls -->
-                                    <PageControls documentId={activeDocumentId} />
-                                  </Viewport>
-                                </GlobalPointerProvider>
-                              </div>
-                            {/if}
-                          {/snippet}
-                        </DocumentContent>
-                      </div>
+                                          scale={1}
+                                          style="pointer-events: none"
+                                        />
+                                        <TilingLayer
+                                          documentId={activeDocumentId}
+                                          pageIndex={page.pageIndex}
+                                          style="pointer-events: none"
+                                        />
+                                        <SearchLayer
+                                          documentId={activeDocumentId}
+                                          pageIndex={page.pageIndex}
+                                        />
+                                        <MarqueeZoom
+                                          documentId={activeDocumentId}
+                                          pageIndex={page.pageIndex}
+                                        />
+                                        <MarqueeCapture
+                                          documentId={activeDocumentId}
+                                          pageIndex={page.pageIndex}
+                                        />
+                                        <SelectionLayer
+                                          documentId={activeDocumentId}
+                                          pageIndex={page.pageIndex}
+                                        />
+                                      </PagePointerProvider>
+                                    </Rotate>
+                                  {/snippet}
+                                </Scroller>
+                                <!-- Page Controls -->
+                                <PageControls documentId={activeDocumentId} />
+                              </Viewport>
+                            </GlobalPointerProvider>
+                          </div>
+                        {/if}
+                      {/snippet}
+                    </DocumentContent>
+                  </div>
 
-                      <!-- Search Sidebar - Right -->
-                      {#if getSidebarState(activeDocumentId).search}
-                        <SearchSidebar
-                          documentId={activeDocumentId}
-                          onClose={() => toggleSidebar(activeDocumentId, 'search')}
-                        />
-                      {/if}
-                    </div>
+                  <!-- Search Sidebar - Right -->
+                  {#if getSidebarState(activeDocumentId).search}
+                    <SearchSidebar
+                      documentId={activeDocumentId}
+                      onClose={() => toggleSidebar(activeDocumentId, 'search')}
+                    />
                   {/if}
                 </div>
-              {/snippet}
-            </DocumentContext>
+              {/if}
+            </div>
           {/if}
         {/snippet}
       </EmbedPDF>

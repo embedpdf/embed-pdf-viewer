@@ -1,33 +1,14 @@
-import { useState, useEffect } from '@framework';
+import { useContext } from '@framework';
 import { CoreState } from '@embedpdf/core';
-import { useRegistry } from './use-registry';
+import { PDFContext } from '../context';
 
 /**
- * Hook that provides access to the current core state
- * and re-renders the component only when the core state changes
+ * Hook that provides access to the current core state.
+ *
+ * Note: This reads from the context which is already subscribed to core state changes
+ * in the EmbedPDF component, so there's no additional subscription overhead.
  */
 export function useCoreState(): CoreState | null {
-  const { registry } = useRegistry();
-  const [coreState, setCoreState] = useState<CoreState | null>(null);
-
-  useEffect(() => {
-    if (!registry) return;
-
-    const store = registry.getStore();
-
-    // Get initial core state
-    setCoreState(store.getState().core);
-
-    // Create a single subscription that handles all core actions
-    const unsubscribe = store.subscribe((action, newState, oldState) => {
-      // Only update if it's a core action and the core state changed
-      if (store.isCoreAction(action) && newState.core !== oldState.core) {
-        setCoreState(newState.core);
-      }
-    });
-
-    return () => unsubscribe();
-  }, [registry]);
-
+  const { coreState } = useContext(PDFContext);
   return coreState;
 }

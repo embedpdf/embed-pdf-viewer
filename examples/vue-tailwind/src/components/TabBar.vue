@@ -54,19 +54,31 @@
 <script setup lang="ts">
 import type { DocumentState } from '@embedpdf/core';
 import { DocumentIcon, CloseIcon, PlusIcon } from './Icons.vue';
+import { useDocumentManagerCapability } from '@embedpdf/plugin-document-manager/vue';
 
 const props = defineProps<{
   documentStates: DocumentState[];
   activeDocumentId: string | null;
-  onSelect: (id: string) => void;
-  onClose: (id: string) => void;
-  onOpenFile: () => void;
 }>();
+
+const { provides } = useDocumentManagerCapability();
+
+const onSelect = (id: string) => {
+  provides.value?.setActiveDocument(id);
+};
+
+const onClose = (id: string) => {
+  provides.value?.closeDocument(id);
+};
+
+const onOpenFile = () => {
+  provides.value?.openFileDialog();
+};
 
 const handleKeyDown = (e: KeyboardEvent, documentId: string) => {
   if (e.key === 'Enter' || e.key === ' ') {
     e.preventDefault();
-    props.onSelect(documentId);
+    onSelect(documentId);
   }
 };
 </script>

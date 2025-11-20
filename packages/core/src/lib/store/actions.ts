@@ -9,6 +9,10 @@ export const RETRY_LOADING_DOCUMENT = 'RETRY_LOADING_DOCUMENT';
 export const CLOSE_DOCUMENT = 'CLOSE_DOCUMENT';
 export const SET_ACTIVE_DOCUMENT = 'SET_ACTIVE_DOCUMENT';
 
+// Reorder document actions
+export const REORDER_DOCUMENTS = 'REORDER_DOCUMENTS';
+export const MOVE_DOCUMENT = 'MOVE_DOCUMENT';
+
 // Document-specific actions
 export const REFRESH_DOCUMENT = 'REFRESH_DOCUMENT';
 export const REFRESH_PAGES = 'REFRESH_PAGES';
@@ -35,6 +39,8 @@ export const CORE_ACTION_TYPES = [
   SET_ROTATION,
   SET_DEFAULT_SCALE,
   SET_DEFAULT_ROTATION,
+  REORDER_DOCUMENTS,
+  MOVE_DOCUMENT,
 ] as const;
 
 // ─────────────────────────────────────────────────────────
@@ -97,6 +103,19 @@ export interface CloseDocumentAction {
 export interface SetActiveDocumentAction {
   type: typeof SET_ACTIVE_DOCUMENT;
   payload: string | null; // documentId or null
+}
+
+export interface ReorderDocumentsAction {
+  type: typeof REORDER_DOCUMENTS;
+  payload: string[]; // New order
+}
+
+export interface MoveDocumentAction {
+  type: typeof MOVE_DOCUMENT;
+  payload: {
+    documentId: string;
+    toIndex: number;
+  };
 }
 
 // ─────────────────────────────────────────────────────────
@@ -171,7 +190,9 @@ export type DocumentAction =
   | SetScaleAction
   | SetRotationAction
   | SetDefaultScaleAction
-  | SetDefaultRotationAction;
+  | SetDefaultRotationAction
+  | ReorderDocumentsAction
+  | MoveDocumentAction;
 
 // Core actions
 export type CoreAction = DocumentAction;
@@ -267,4 +288,14 @@ export const setDefaultScale = (scale: number): CoreAction => ({
 export const setDefaultRotation = (rotation: Rotation): CoreAction => ({
   type: SET_DEFAULT_ROTATION,
   payload: rotation,
+});
+
+export const reorderDocuments = (order: string[]): CoreAction => ({
+  type: REORDER_DOCUMENTS,
+  payload: order,
+});
+
+export const moveDocument = (documentId: string, toIndex: number): CoreAction => ({
+  type: MOVE_DOCUMENT,
+  payload: { documentId, toIndex },
 });

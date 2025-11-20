@@ -1,8 +1,7 @@
 import { DocumentState } from '@embedpdf/core';
 import { useCapability, usePlugin, useCoreState } from '@embedpdf/core/vue';
 import { DocumentManagerPlugin } from '@embedpdf/plugin-document-manager';
-import { ref, watch, computed, type MaybeRefOrGetter } from 'vue';
-import { toValue } from 'vue';
+import { computed } from 'vue';
 
 export const useDocumentManagerPlugin = () =>
   usePlugin<DocumentManagerPlugin>(DocumentManagerPlugin.id);
@@ -13,35 +12,19 @@ export const useDocumentManagerCapability = () =>
  * Hook for active document state
  */
 export function useActiveDocument() {
-  const { provides } = useDocumentManagerCapability();
-  const activeDocumentId = ref<string | null>(null);
-  const activeDocument = ref<DocumentState | null>(null);
+  const coreState = useCoreState();
 
-  watch(
-    provides,
-    (providesValue, _, onCleanup) => {
-      if (!providesValue) {
-        activeDocumentId.value = null;
-        activeDocument.value = null;
-        return;
-      }
+  const activeDocumentId = computed(() => {
+    return coreState.value?.activeDocumentId ?? null;
+  });
 
-      const updateActive = () => {
-        const id = providesValue.getActiveDocumentId();
-        activeDocumentId.value = id;
-        activeDocument.value = id ? providesValue.getDocumentState(id) : null;
-      };
+  const activeDocument = computed(() => {
+    const core = coreState.value;
+    if (!core) return null;
 
-      updateActive();
-
-      const unsubscribe = providesValue.onActiveDocumentChanged(() => {
-        updateActive();
-      });
-
-      onCleanup(unsubscribe);
-    },
-    { immediate: true },
-  );
+    const docId = core.activeDocumentId;
+    return docId ? (core.documents[docId] ?? null) : null;
+  });
 
   return {
     activeDocumentId,
@@ -51,50 +34,24 @@ export function useActiveDocument() {
 
 /**
  * Hook for all open documents (in order)
- * @param documentIds Optional specific document IDs to filter/order by
+ * @param documentIds Optional array of specific document IDs to filter/order by
  */
-export function useOpenDocuments(documentIds?: MaybeRefOrGetter<string[] | undefined>) {
+export function useOpenDocuments(documentIds?: string[]) {
   const coreState = useCoreState();
-  const { provides } = useDocumentManagerCapability();
-  const documentOrder = ref<string[]>([]);
 
-  watch(
-    provides,
-    (providesValue, _, onCleanup) => {
-      if (!providesValue) {
-        documentOrder.value = [];
-        return;
-      }
-
-      // Get initial order
-      documentOrder.value = providesValue.getDocumentOrder();
-
-      // Subscribe ONLY to order changes - much cleaner!
-      const unsubscribe = providesValue.onDocumentOrderChanged((event) => {
-        documentOrder.value = event.order;
-      });
-
-      onCleanup(unsubscribe);
-    },
-    { immediate: true },
-  );
-
-  // Map the order to actual document states from core
   const documents = computed(() => {
     const core = coreState.value;
     if (!core) return [];
 
-    const ids = toValue(documentIds);
-
-    // If specific documentIds are provided, use THEIR order, not the global documentOrder
-    if (ids && ids.length > 0) {
-      return ids
+    // If specific documentIds are provided, use THEIR order
+    if (documentIds && documentIds.length > 0) {
+      return documentIds
         .map((docId) => core.documents[docId])
         .filter((doc): doc is DocumentState => doc !== null && doc !== undefined);
     }
 
     // Otherwise use the global document order
-    return documentOrder.value
+    return core.documentOrder
       .map((docId) => core.documents[docId])
       .filter((doc): doc is DocumentState => doc !== null && doc !== undefined);
   });

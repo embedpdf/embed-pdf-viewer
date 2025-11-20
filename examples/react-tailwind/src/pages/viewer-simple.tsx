@@ -7,7 +7,6 @@ import { ScrollPluginPackage, ScrollStrategy, Scroller } from '@embedpdf/plugin-
 import {
   DocumentManagerPluginPackage,
   DocumentContent,
-  DocumentContext,
   DocumentManagerPlugin,
 } from '@embedpdf/plugin-document-manager/react';
 import {
@@ -43,7 +42,6 @@ import { PageControls } from '../components/page-controls';
 import { ConsoleLogger } from '@embedpdf/models';
 import { NavigationBar } from '../components/navigation-bar';
 import { EmptyState } from '../components/empty-state';
-import { CommandButton } from '../components/command-button';
 import { commands } from '../config/commands';
 import { SidebarState } from '../config/types';
 
@@ -159,146 +157,133 @@ export function ViewerSimplePage() {
               ?.openDocumentUrl({ url: 'https://snippet.embedpdf.com/ebook.pdf' });
           }}
         >
-          {({ pluginsReady, registry }) => (
+          {({ pluginsReady, activeDocumentId, documentStates }) => (
             <>
               {pluginsReady ? (
-                <DocumentContext>
-                  {({ documentStates, activeDocumentId, actions }) => (
-                    <div className="flex h-full flex-col">
-                      <TabBar
-                        documentStates={documentStates}
-                        activeDocumentId={activeDocumentId}
-                        onSelect={actions.select}
-                        onClose={actions.close}
-                        onOpenFile={() => {
-                          registry
-                            ?.getPlugin<DocumentManagerPlugin>(DocumentManagerPlugin.id)
-                            ?.provides()
-                            ?.openFileDialog();
-                        }}
-                      />
+                <>
+                  <div className="flex h-full flex-col">
+                    <TabBar documentStates={documentStates} activeDocumentId={activeDocumentId} />
 
-                      {activeDocumentId && (
-                        <>
-                          <ViewerToolbar
+                    {activeDocumentId && (
+                      <>
+                        <ViewerToolbar
+                          documentId={activeDocumentId}
+                          onToggleSearch={() => toggleSidebar(activeDocumentId, 'search')}
+                          onToggleThumbnails={() => toggleSidebar(activeDocumentId, 'thumbnails')}
+                          isSearchOpen={getSidebarState(activeDocumentId).search}
+                          isThumbnailsOpen={getSidebarState(activeDocumentId).thumbnails}
+                          mode={getToolbarMode(activeDocumentId)}
+                          onModeChange={(mode) => setToolbarMode(activeDocumentId, mode)}
+                        />
+                      </>
+                    )}
+
+                    {!activeDocumentId && <EmptyState />}
+
+                    {/* Document Content Area */}
+                    {activeDocumentId && (
+                      <div id="document-content" className="flex flex-1 overflow-hidden bg-white">
+                        {/* Thumbnails Sidebar - Left */}
+                        {getSidebarState(activeDocumentId).thumbnails && (
+                          <ThumbnailsSidebar
                             documentId={activeDocumentId}
-                            onToggleSearch={() => toggleSidebar(activeDocumentId, 'search')}
-                            onToggleThumbnails={() => toggleSidebar(activeDocumentId, 'thumbnails')}
-                            isSearchOpen={getSidebarState(activeDocumentId).search}
-                            isThumbnailsOpen={getSidebarState(activeDocumentId).thumbnails}
-                            mode={getToolbarMode(activeDocumentId)}
-                            onModeChange={(mode) => setToolbarMode(activeDocumentId, mode)}
+                            onClose={() => toggleSidebar(activeDocumentId, 'thumbnails')}
                           />
-                        </>
-                      )}
+                        )}
 
-                      {!activeDocumentId && <EmptyState />}
-
-                      {/* Document Content Area */}
-                      {activeDocumentId && (
-                        <div id="document-content" className="flex flex-1 overflow-hidden bg-white">
-                          {/* Thumbnails Sidebar - Left */}
-                          {getSidebarState(activeDocumentId).thumbnails && (
-                            <ThumbnailsSidebar
-                              documentId={activeDocumentId}
-                              onClose={() => toggleSidebar(activeDocumentId, 'thumbnails')}
-                            />
-                          )}
-
-                          {/* Main Viewer */}
-                          <div className="flex-1 overflow-hidden">
-                            <DocumentContent documentId={activeDocumentId}>
-                              {({ documentState, isLoading, isError, isLoaded }) => (
-                                <>
-                                  {isLoading && (
-                                    <div className="flex h-full items-center justify-center">
-                                      <LoadingSpinner message="Loading document..." />
-                                    </div>
-                                  )}
-                                  {isError && (
-                                    <DocumentPasswordPrompt documentState={documentState} />
-                                  )}
-                                  {isLoaded && (
-                                    <div className="relative h-full w-full">
-                                      <GlobalPointerProvider documentId={activeDocumentId}>
-                                        <Viewport
-                                          className="bg-gray-100"
+                        {/* Main Viewer */}
+                        <div className="flex-1 overflow-hidden">
+                          <DocumentContent documentId={activeDocumentId}>
+                            {({ documentState, isLoading, isError, isLoaded }) => (
+                              <>
+                                {isLoading && (
+                                  <div className="flex h-full items-center justify-center">
+                                    <LoadingSpinner message="Loading document..." />
+                                  </div>
+                                )}
+                                {isError && (
+                                  <DocumentPasswordPrompt documentState={documentState} />
+                                )}
+                                {isLoaded && (
+                                  <div className="relative h-full w-full">
+                                    <GlobalPointerProvider documentId={activeDocumentId}>
+                                      <Viewport
+                                        className="bg-gray-100"
+                                        documentId={activeDocumentId}
+                                      >
+                                        <Scroller
                                           documentId={activeDocumentId}
-                                        >
-                                          <Scroller
-                                            documentId={activeDocumentId}
-                                            renderPage={({ pageIndex }) => (
-                                              <Rotate
+                                          renderPage={({ pageIndex }) => (
+                                            <Rotate
+                                              documentId={activeDocumentId}
+                                              pageIndex={pageIndex}
+                                              style={{ backgroundColor: '#fff' }}
+                                            >
+                                              <PagePointerProvider
                                                 documentId={activeDocumentId}
                                                 pageIndex={pageIndex}
-                                                style={{ backgroundColor: '#fff' }}
                                               >
-                                                <PagePointerProvider
+                                                <RenderLayer
                                                   documentId={activeDocumentId}
                                                   pageIndex={pageIndex}
-                                                >
-                                                  <RenderLayer
-                                                    documentId={activeDocumentId}
-                                                    pageIndex={pageIndex}
-                                                    scale={1}
-                                                    style={{ pointerEvents: 'none' }}
-                                                  />
-                                                  <TilingLayer
-                                                    documentId={activeDocumentId}
-                                                    pageIndex={pageIndex}
-                                                    style={{ pointerEvents: 'none' }}
-                                                  />
-                                                  <SearchLayer
-                                                    documentId={activeDocumentId}
-                                                    pageIndex={pageIndex}
-                                                  />
-                                                  <MarqueeZoom
-                                                    documentId={activeDocumentId}
-                                                    pageIndex={pageIndex}
-                                                  />
-                                                  <MarqueeCapture
-                                                    documentId={activeDocumentId}
-                                                    pageIndex={pageIndex}
-                                                  />
-                                                  <SelectionLayer
-                                                    documentId={activeDocumentId}
-                                                    pageIndex={pageIndex}
-                                                  />
-                                                  <RedactionLayer
-                                                    documentId={activeDocumentId}
-                                                    pageIndex={pageIndex}
-                                                  />
-                                                  <AnnotationLayer
-                                                    documentId={activeDocumentId}
-                                                    pageIndex={pageIndex}
-                                                  />
-                                                </PagePointerProvider>
-                                              </Rotate>
-                                            )}
-                                          />
-                                          {/* Page Controls */}
-                                          <PageControls documentId={activeDocumentId} />
-                                        </Viewport>
-                                      </GlobalPointerProvider>
-                                    </div>
-                                  )}
-                                </>
-                              )}
-                            </DocumentContent>
-                          </div>
-
-                          {/* Search Sidebar - Right */}
-                          {getSidebarState(activeDocumentId).search && (
-                            <SearchSidebar
-                              documentId={activeDocumentId}
-                              onClose={() => toggleSidebar(activeDocumentId, 'search')}
-                            />
-                          )}
+                                                  scale={1}
+                                                  style={{ pointerEvents: 'none' }}
+                                                />
+                                                <TilingLayer
+                                                  documentId={activeDocumentId}
+                                                  pageIndex={pageIndex}
+                                                  style={{ pointerEvents: 'none' }}
+                                                />
+                                                <SearchLayer
+                                                  documentId={activeDocumentId}
+                                                  pageIndex={pageIndex}
+                                                />
+                                                <MarqueeZoom
+                                                  documentId={activeDocumentId}
+                                                  pageIndex={pageIndex}
+                                                />
+                                                <MarqueeCapture
+                                                  documentId={activeDocumentId}
+                                                  pageIndex={pageIndex}
+                                                />
+                                                <SelectionLayer
+                                                  documentId={activeDocumentId}
+                                                  pageIndex={pageIndex}
+                                                />
+                                                <RedactionLayer
+                                                  documentId={activeDocumentId}
+                                                  pageIndex={pageIndex}
+                                                />
+                                                <AnnotationLayer
+                                                  documentId={activeDocumentId}
+                                                  pageIndex={pageIndex}
+                                                />
+                                              </PagePointerProvider>
+                                            </Rotate>
+                                          )}
+                                        />
+                                        {/* Page Controls */}
+                                        <PageControls documentId={activeDocumentId} />
+                                      </Viewport>
+                                    </GlobalPointerProvider>
+                                  </div>
+                                )}
+                              </>
+                            )}
+                          </DocumentContent>
                         </div>
-                      )}
-                    </div>
-                  )}
-                </DocumentContext>
+
+                        {/* Search Sidebar - Right */}
+                        {getSidebarState(activeDocumentId).search && (
+                          <SearchSidebar
+                            documentId={activeDocumentId}
+                            onClose={() => toggleSidebar(activeDocumentId, 'search')}
+                          />
+                        )}
+                      </div>
+                    )}
+                  </div>
+                </>
               ) : (
                 <div className="flex h-full items-center justify-center">
                   <LoadingSpinner message="Initializing plugins..." />

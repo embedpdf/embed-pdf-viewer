@@ -37,7 +37,7 @@
     if (!viewport.provides) return;
 
     const unsubscribe = viewport.provides.onScrollActivity((activity) => {
-      if (activity) {
+      if (activity.documentId === documentId) {
         isVisible = true;
         startHideTimer();
       }
@@ -99,7 +99,7 @@
   role="toolbar"
   aria-label="Page navigation"
   tabindex="-1"
-  class="pointer-events-auto fixed bottom-4 left-1/2 z-[1000] -translate-x-1/2 transition-opacity duration-200 ease-in-out"
+  class="pointer-events-auto absolute bottom-4 left-1/2 z-[1000] -translate-x-1/2 transition-opacity duration-200 ease-in-out"
   style="opacity: {isVisible ? 1 : 0}"
   onmouseenter={handleMouseEnter}
   onmouseleave={handleMouseLeave}

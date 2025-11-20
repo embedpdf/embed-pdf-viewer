@@ -350,10 +350,16 @@ export class SelectionPlugin extends BasePlugin<
    * Helper to calculate viewport relative metrics for a page rect.
    * Returns null if the rect cannot be converted to viewport space.
    */
-  private getPlacementMetrics(pageIndex: number, rect: Rect, vpMetrics: ViewportMetrics) {
+  private getPlacementMetrics(
+    documentId: string,
+    pageIndex: number,
+    rect: Rect,
+    vpMetrics: ViewportMetrics,
+  ) {
     // 1. Convert Page Coordinate -> Viewport Coordinate
     // We use the scroll capability to handle rotation, scale, and scroll offset automatically
-    const viewportRect = this.scrollCapability?.getRectPositionForPage(pageIndex, rect);
+    const scrollScope = this.scrollCapability?.forDocument(documentId);
+    const viewportRect = scrollScope?.getRectPositionForPage(pageIndex, rect);
 
     if (!viewportRect) return null;
 
@@ -406,14 +412,16 @@ export class SelectionPlugin extends BasePlugin<
       return;
     }
 
-    const vpMetrics = this.viewportCapability.getMetrics();
+    // Use document-scoped viewport to get metrics for this specific document
+    const viewportScope = this.viewportCapability.forDocument(documentId);
+    const vpMetrics = viewportScope.getMetrics();
     const MENU_HEIGHT_GUESS = 40;
 
     // 2. Calculate metrics for Head (Start) and Tail (End)
     const head = bounds[0];
 
-    const tailMetrics = this.getPlacementMetrics(tail.page, tail.rect, vpMetrics);
-    const headMetrics = this.getPlacementMetrics(head.page, head.rect, vpMetrics);
+    const tailMetrics = this.getPlacementMetrics(documentId, tail.page, tail.rect, vpMetrics);
+    const headMetrics = this.getPlacementMetrics(documentId, head.page, head.rect, vpMetrics);
 
     // 3. Apply Heuristic Logic
 

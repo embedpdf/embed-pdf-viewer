@@ -11,29 +11,20 @@ export const useDocumentManagerCapability = () =>
  * Hook for active document state
  */
 export function useActiveDocument() {
-  const capability = useDocumentManagerCapability();
+  // Keep reference to avoid destructuring - maintains reactivity
+  const coreStateRef = useCoreState();
 
-  let activeDocumentId = $state<string | null>(null);
-  let activeDocument = $state<DocumentState | null>(null);
+  // Use $derived.by for computed values that depend on the reactive coreState
+  const activeDocumentId = $derived.by(() => {
+    return coreStateRef.current?.activeDocumentId ?? null;
+  });
 
-  $effect(() => {
-    if (!capability.provides) {
-      activeDocumentId = null;
-      activeDocument = null;
-      return;
-    }
+  const activeDocument = $derived.by(() => {
+    const core = coreStateRef.current;
+    if (!core) return null;
 
-    const updateActive = () => {
-      const id = capability.provides!.getActiveDocumentId();
-      activeDocumentId = id;
-      activeDocument = id ? capability.provides!.getDocumentState(id) : null;
-    };
-
-    updateActive();
-
-    return capability.provides.onActiveDocumentChanged(() => {
-      updateActive();
-    });
+    const docId = core.activeDocumentId;
+    return docId ? (core.documents[docId] ?? null) : null;
   });
 
   return {
@@ -48,38 +39,18 @@ export function useActiveDocument() {
 
 /**
  * Hook for all open documents (in order)
- * @param getDocumentIds Optional function that returns specific document IDs to filter/order by
+ * @param documentIds Optional array of specific document IDs to filter/order by
  */
-export function useOpenDocuments(getDocumentIds?: () => string[] | undefined) {
-  const coreState = useCoreState();
-  const capability = useDocumentManagerCapability();
+export function useOpenDocuments(documentIds?: string[]) {
+  // Keep reference to avoid destructuring - maintains reactivity
+  const coreStateRef = useCoreState();
 
-  let documentOrder = $state<string[]>([]);
-
-  // Reactive documentIds
-  const documentIds = $derived(getDocumentIds?.());
-
-  $effect(() => {
-    if (!capability.provides) {
-      documentOrder = [];
-      return;
-    }
-
-    // Get initial order
-    documentOrder = capability.provides.getDocumentOrder();
-
-    // Subscribe ONLY to order changes - much cleaner!
-    return capability.provides.onDocumentOrderChanged((event) => {
-      documentOrder = event.order;
-    });
-  });
-
-  // Map the order to actual document states from core
+  // Use $derived.by for computed array of documents
   const documents = $derived.by(() => {
-    const core = coreState.current;
+    const core = coreStateRef.current;
     if (!core) return [];
 
-    // If specific documentIds are provided, use THEIR order, not the global documentOrder
+    // If specific documentIds are provided, use THEIR order
     if (documentIds && documentIds.length > 0) {
       return documentIds
         .map((docId) => core.documents[docId])
@@ -87,7 +58,7 @@ export function useOpenDocuments(getDocumentIds?: () => string[] | undefined) {
     }
 
     // Otherwise use the global document order
-    return documentOrder
+    return core.documentOrder
       .map((docId) => core.documents[docId])
       .filter((doc): doc is DocumentState => doc !== null && doc !== undefined);
   });

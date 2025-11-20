@@ -38,6 +38,7 @@ export interface DocumentState {
 
 export interface CoreState {
   documents: Record<string, DocumentState>;
+  documentOrder: string[];
   activeDocumentId: string | null;
   defaultScale: number;
   defaultRotation: Rotation;
@@ -45,6 +46,7 @@ export interface CoreState {
 
 export const initialCoreState: (config?: PluginRegistryConfig) => CoreState = (config) => ({
   documents: {},
+  documentOrder: [],
   activeDocumentId: null,
   defaultScale: config?.defaultScale ?? 1,
   defaultRotation: config?.defaultRotation ?? Rotation.Degree0,

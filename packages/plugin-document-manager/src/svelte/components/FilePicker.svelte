@@ -48,5 +48,5 @@
   type="file"
   accept="application/pdf"
   style:display="none"
-  on:change={onChange}
+  onchange={onChange}
 />

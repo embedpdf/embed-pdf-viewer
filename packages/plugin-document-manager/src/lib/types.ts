@@ -5,11 +5,6 @@ export interface DocumentManagerPluginConfig extends BasePluginConfig {
   maxDocuments?: number;
 }
 
-export interface DocumentManagerState {
-  // Track document order (for tabs)
-  documentOrder: string[];
-}
-
 export interface DocumentChangeEvent {
   previousDocumentId: string | null;
   currentDocumentId: string | null;
