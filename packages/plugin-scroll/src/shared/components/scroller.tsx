@@ -1,38 +1,45 @@
-import { ReactNode, useEffect, useState, HTMLAttributes } from '@framework';
-import { ScrollStrategy, ScrollerLayout } from '@embedpdf/plugin-scroll';
-import { useRegistry } from '@embedpdf/core/@framework';
+import { ReactNode, useEffect, useState, HTMLAttributes, useLayoutEffect } from '@framework';
+import { ScrollStrategy, ScrollerLayout, PageLayout } from '@embedpdf/plugin-scroll';
 
 import { useScrollPlugin } from '../hooks';
-import { RenderPageProps } from '../types';
 
 type ScrollerProps = HTMLAttributes<HTMLDivElement> & {
-  renderPage: (props: RenderPageProps) => ReactNode;
-  overlayElements?: ReactNode[];
+  documentId: string;
+  renderPage: (props: PageLayout) => ReactNode;
 };
 
-export function Scroller({ renderPage, overlayElements, ...props }: ScrollerProps) {
+export function Scroller({ documentId, renderPage, ...props }: ScrollerProps) {
   const { plugin: scrollPlugin } = useScrollPlugin();
-  const { registry } = useRegistry();
-  const [scrollerLayout, setScrollerLayout] = useState<ScrollerLayout | null>(
-    () => scrollPlugin?.getScrollerLayout() ?? null,
-  );
+  const [layoutData, setLayoutData] = useState<{
+    layout: ScrollerLayout | null;
+    docId: string | null;
+  }>({ layout: null, docId: null });
 
   useEffect(() => {
-    if (!scrollPlugin) return;
+    if (!scrollPlugin || !documentId) return;
 
-    return scrollPlugin.onScrollerData(setScrollerLayout);
-  }, [scrollPlugin]);
+    // When we get new data, store it along with the current documentId
+    const unsubscribe = scrollPlugin.onScrollerData(documentId, (newLayout) => {
+      setLayoutData({ layout: newLayout, docId: documentId });
+    });
 
-  useEffect(() => {
-    if (!scrollPlugin) return;
+    // When the component unmounts or documentId changes, clear the state
+    return () => {
+      unsubscribe();
+      setLayoutData({ layout: null, docId: null });
+      scrollPlugin.clearLayoutReady(documentId);
+    };
+  }, [scrollPlugin, documentId]);
 
-    scrollPlugin.setLayoutReady();
-  }, [scrollPlugin]);
+  const scrollerLayout = layoutData.docId === documentId ? layoutData.layout : null;
+
+  useLayoutEffect(() => {
+    if (!scrollPlugin || !documentId || !scrollerLayout) return;
+
+    scrollPlugin.setLayoutReady(documentId);
+  }, [scrollPlugin, documentId, scrollerLayout]);
 
   if (!scrollerLayout) return null;
-  if (!registry) return null;
-
-  const coreState = registry.getStore().getState();
 
   return (
     <div
@@ -100,9 +107,6 @@ export function Scroller({ renderPage, overlayElements, ...props }: ScrollerProp
               >
                 {renderPage({
                   ...layout,
-                  rotation: coreState.core.rotation,
-                  scale: coreState.core.scale,
-                  document: coreState.core.document,
                 })}
               </div>
             ))}
@@ -123,7 +127,6 @@ export function Scroller({ renderPage, overlayElements, ...props }: ScrollerProp
               }),
         }}
       />
-      {overlayElements}
     </div>
   );
 }

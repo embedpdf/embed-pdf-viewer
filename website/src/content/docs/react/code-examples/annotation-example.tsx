@@ -8,13 +8,18 @@ import {
   AnnotationPlugin,
   AnnotationPluginPackage,
   AnnotationTool,
-  useAnnotationCapability,
+  useAnnotation,
 } from '@embedpdf/plugin-annotation/react'
 import {
   InteractionManagerPluginPackage,
   PagePointerProvider,
 } from '@embedpdf/plugin-interaction-manager/react'
-import { LoaderPluginPackage } from '@embedpdf/plugin-loader/react'
+import {
+  DocumentContext,
+  DocumentContent,
+  DocumentManagerPlugin,
+  DocumentManagerPluginPackage,
+} from '@embedpdf/plugin-document-manager/react'
 import { RenderLayer, RenderPluginPackage } from '@embedpdf/plugin-render/react'
 import { Scroller, ScrollPluginPackage } from '@embedpdf/plugin-scroll/react'
 import {
@@ -26,20 +31,11 @@ import {
   ViewportPluginPackage,
 } from '@embedpdf/plugin-viewport/react'
 import { HistoryPluginPackage } from '@embedpdf/plugin-history/react'
-import { useEffect, useState } from 'react'
 import { PdfAnnotationSubtype, PdfStampAnnoObject } from '@embedpdf/models'
 
 // 1. Register plugins, including Annotation and its dependencies
 const plugins = [
-  createPluginRegistration(LoaderPluginPackage, {
-    loadingOptions: {
-      type: 'url',
-      pdfFile: {
-        id: 'example-pdf',
-        url: 'https://snippet.embedpdf.com/ebook.pdf',
-      },
-    },
-  }),
+  createPluginRegistration(DocumentManagerPluginPackage),
   createPluginRegistration(ViewportPluginPackage),
   createPluginRegistration(ScrollPluginPackage),
   createPluginRegistration(RenderPluginPackage),
@@ -54,26 +50,8 @@ const plugins = [
 ]
 
 // 2. Create a toolbar to control annotation tools
-export const AnnotationToolbar = () => {
-  const { provides: annotationApi } = useAnnotationCapability()
-  const [activeTool, setActiveTool] = useState<string | null>(null)
-  const [canDelete, setCanDelete] = useState(false)
-
-  useEffect(() => {
-    if (!annotationApi) return
-
-    const unsub1 = annotationApi.onActiveToolChange((tool) => {
-      setActiveTool(tool?.id ?? null)
-    })
-    const unsub2 = annotationApi.onStateChange((state) => {
-      setCanDelete(!!state.selectedUid)
-    })
-
-    return () => {
-      unsub1()
-      unsub2()
-    }
-  }, [annotationApi])
+export const AnnotationToolbar = ({ documentId }: { documentId: string }) => {
+  const { provides: annotationApi, state } = useAnnotation(documentId)
 
   const handleDelete = () => {
     const selection = annotationApi?.getSelectedAnnotation()
@@ -100,11 +78,11 @@ export const AnnotationToolbar = () => {
           key={tool.id}
           onClick={() =>
             annotationApi?.setActiveTool(
-              activeTool === tool.id ? null : tool.id,
+              state.activeToolId === tool.id ? null : tool.id,
             )
           }
           className={`rounded-md px-3 py-1 text-sm font-medium transition-colors ${
-            activeTool === tool.id
+            state.activeToolId === tool.id
               ? 'bg-blue-500 text-white'
               : 'bg-gray-100 hover:bg-gray-200'
           }`}
@@ -115,7 +93,7 @@ export const AnnotationToolbar = () => {
       <div className="h-6 w-px bg-gray-200"></div>
       <button
         onClick={handleDelete}
-        disabled={!canDelete}
+        disabled={!state.selectedUid}
         className="rounded-md bg-red-500 px-3 py-1 text-sm font-medium text-white transition-colors hover:bg-red-600 disabled:cursor-not-allowed disabled:bg-red-300"
       >
         Delete Selected
@@ -145,8 +123,13 @@ export const PDFViewer = () => {
         engine={engine}
         plugins={plugins}
         onInitialized={async (registry) => {
+          registry
+            .getPlugin<DocumentManagerPlugin>(DocumentManagerPlugin.id)
+            ?.provides()
+            ?.openDocumentUrl({ url: 'https://snippet.embedpdf.com/ebook.pdf' })
+
           const annotation = registry
-            .getPlugin<AnnotationPlugin>('annotation')
+            .getPlugin<AnnotationPlugin>(AnnotationPlugin.id)
             ?.provides()
           annotation?.addTool<AnnotationTool<PdfStampAnnoObject>>({
             id: 'stampCheckmark',
@@ -179,45 +162,62 @@ export const PDFViewer = () => {
           })
         }}
       >
-        <AnnotationToolbar />
-        <div className="flex-grow" style={{ position: 'relative' }}>
-          <Viewport
-            style={{
-              width: '100%',
-              height: '100%',
-              position: 'absolute',
-              backgroundColor: '#f1f3f5',
-            }}
-          >
-            <Scroller
-              renderPage={({ width, height, pageIndex, scale, rotation }) => (
-                <PagePointerProvider
-                  pageIndex={pageIndex}
-                  pageWidth={width}
-                  pageHeight={height}
-                  rotation={rotation}
-                  scale={scale}
-                >
-                  {/* Base layers */}
-                  <RenderLayer
-                    pageIndex={pageIndex}
-                    style={{ pointerEvents: 'none' }}
-                  />
-                  <SelectionLayer pageIndex={pageIndex} scale={scale} />
+        <DocumentContext>
+          {({ activeDocumentId }) =>
+            activeDocumentId && (
+              <DocumentContent documentId={activeDocumentId}>
+                {({ isLoaded }) =>
+                  isLoaded && (
+                    <>
+                      <AnnotationToolbar documentId={activeDocumentId} />
+                      <div
+                        className="flex-grow"
+                        style={{ position: 'relative' }}
+                      >
+                        <Viewport
+                          documentId={activeDocumentId}
+                          style={{
+                            width: '100%',
+                            height: '100%',
+                            position: 'absolute',
+                            backgroundColor: '#f1f3f5',
+                          }}
+                        >
+                          <Scroller
+                            documentId={activeDocumentId}
+                            renderPage={({ pageIndex }) => (
+                              <PagePointerProvider
+                                documentId={activeDocumentId}
+                                pageIndex={pageIndex}
+                              >
+                                {/* Base layers */}
+                                <RenderLayer
+                                  documentId={activeDocumentId}
+                                  pageIndex={pageIndex}
+                                  style={{ pointerEvents: 'none' }}
+                                />
+                                <SelectionLayer
+                                  documentId={activeDocumentId}
+                                  pageIndex={pageIndex}
+                                />
 
-                  {/* Annotation Layer on top */}
-                  <AnnotationLayer
-                    pageIndex={pageIndex}
-                    scale={scale}
-                    pageWidth={width}
-                    pageHeight={height}
-                    rotation={rotation}
-                  />
-                </PagePointerProvider>
-              )}
-            />
-          </Viewport>
-        </div>
+                                {/* Annotation Layer on top */}
+                                <AnnotationLayer
+                                  documentId={activeDocumentId}
+                                  pageIndex={pageIndex}
+                                />
+                              </PagePointerProvider>
+                            )}
+                          />
+                        </Viewport>
+                      </div>
+                    </>
+                  )
+                }
+              </DocumentContent>
+            )
+          }
+        </DocumentContext>
       </EmbedPDF>
     </div>
   )

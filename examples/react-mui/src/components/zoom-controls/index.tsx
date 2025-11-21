@@ -25,6 +25,10 @@ import { useInteractionManager } from '@embedpdf/plugin-interaction-manager/reac
 import { ToggleIconButton } from '../toggle-icon-button';
 import { useIsMobile } from '../../hooks/use-is-mobile';
 
+interface ZoomControlsProps {
+  documentId: string;
+}
+
 interface ZoomModeItem {
   value: ZoomLevel;
   label: string;
@@ -53,9 +57,9 @@ const ZOOM_MODES: ZoomModeItem[] = [
   { value: ZoomMode.FitWidth, label: 'Fit to Width', icon: WidthFullIcon },
 ] as const;
 
-export const ZoomControls = () => {
-  const { state, provides } = useZoom();
-  const { state: interactionManagerState } = useInteractionManager();
+export const ZoomControls = ({ documentId }: ZoomControlsProps) => {
+  const { state, provides } = useZoom(documentId);
+  const { state: interactionManagerState } = useInteractionManager(documentId);
   const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null);
   const open = Boolean(anchorEl);
   const isMobile = useIsMobile();

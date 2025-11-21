@@ -2,7 +2,6 @@ import { BasePluginConfig, EventHook } from '@embedpdf/core';
 import {
   MatchFlag,
   SearchResult,
-  SearchTarget,
   SearchAllPagesResult,
   PdfTask,
   PdfPageSearchProgress,
@@ -17,26 +16,10 @@ export interface SearchPluginConfig extends BasePluginConfig {
   showAllResults?: boolean;
 }
 
-export interface SearchResultState {
-  /**
-   * Current search results from last search operation
-   */
-  results: SearchResult[];
-  /**
-   * Current active result index (0-based)
-   */
-  activeResultIndex: number;
-  /**
-   * Whether to show all search results or only the active one
-   */
-  showAllResults: boolean;
-  /**
-   * Whether search is currently active
-   */
-  active: boolean;
-}
-
-export interface SearchState {
+/**
+ * This is the state for a *single* document
+ */
+export interface SearchDocumentState {
   flags: MatchFlag[];
   /**
    * Current search results from last search operation
@@ -68,7 +51,72 @@ export interface SearchState {
   active: boolean;
 }
 
-export interface SearchCapability {
+/**
+ * This is the combined state for the plugin
+ */
+export interface SearchState {
+  documents: Record<string, SearchDocumentState>;
+}
+
+/**
+ * This is the payload for the reactive result state
+ */
+export interface SearchResultState {
+  /**
+   * Current search results from last search operation
+   */
+  results: SearchResult[];
+  /**
+   * Current active result index (0-based)
+   */
+  activeResultIndex: number;
+  /**
+   * Whether to show all search results or only the active one
+   */
+  showAllResults: boolean;
+  /**
+   * Whether search is currently active
+   */
+  active: boolean;
+}
+
+// ─────────────────────────────────────────────────────────
+// Events (all payloads must include documentId)
+// ─────────────────────────────────────────────────────────
+
+export interface SearchResultEvent {
+  documentId: string;
+  results: SearchAllPagesResult;
+}
+
+export interface SearchStartEvent {
+  documentId: string;
+}
+
+export interface SearchStopEvent {
+  documentId: string;
+}
+
+export interface ActiveResultChangeEvent {
+  documentId: string;
+  index: number;
+}
+
+export interface SearchResultStateEvent {
+  documentId: string;
+  state: SearchResultState;
+}
+
+export interface SearchStateEvent {
+  documentId: string;
+  state: SearchDocumentState;
+}
+
+// ─────────────────────────────────────────────────────────
+// Capability
+// ─────────────────────────────────────────────────────────
+
+export interface SearchScope {
   /**
    * Start a search session
    */
@@ -81,99 +129,83 @@ export interface SearchCapability {
 
   /**
    * Search for all occurrences of the keyword throughout the document
-   * @param keyword - Text to search for
-   * @returns Promise that resolves to all search results or empty result if none found
    */
   searchAllPages: (keyword: string) => PdfTask<SearchAllPagesResult, PdfPageSearchProgress>;
 
   /**
    * Navigate to the next search result
-   * @returns The new active result index
    */
   nextResult: () => number;
 
   /**
    * Navigate to the previous search result
-   * @returns The new active result index
    */
   previousResult: () => number;
 
   /**
    * Go to a specific search result by index
-   * @param index - The index of the result to go to
-   * @returns The new active result index
    */
   goToResult: (index: number) => number;
 
   /**
    * Toggle visibility of all search results
-   * @param showAll - Whether to show all results or only the active one
    */
   setShowAllResults: (showAll: boolean) => void;
 
   /**
    * Get current state of search results visibility
-   * @returns Whether all results are visible
    */
   getShowAllResults: () => boolean;
 
   /**
-   * Subscribe to search results
-   * @param handler - Handler function to receive search results
-   * @returns Function to unsubscribe the handler
-   */
-  onSearchResult: EventHook<SearchAllPagesResult>;
-
-  /**
-   * Subscribe to search session start events
-   * @param handler - Handler function called when search session starts
-   * @returns Function to unsubscribe the handler
-   */
-  onSearchStart: EventHook;
-
-  /**
-   * Subscribe to search session stop events
-   * @param handler - Handler function called when search session stops
-   * @returns Function to unsubscribe the handler
-   */
-  onSearchStop: EventHook;
-
-  /**
-   * Subscribe to active result change events
-   * @param handler - Handler function called when active result changes
-   * @returns Function to unsubscribe the handler
-   */
-  onActiveResultChange: EventHook<number>;
-
-  /**
-   * Subscribe to search result state change events
-   * @param handler - Handler function called when search state changes
-   * @returns Function to unsubscribe the handler
-   */
-  onSearchResultStateChange: EventHook<SearchResultState>;
-
-  /**
    * Get the current search flags
-   * @returns Array of active search flags
    */
   getFlags: () => MatchFlag[];
 
   /**
    * Set the search flags
-   * @param flags - Array of search flags to use
    */
   setFlags: (flags: MatchFlag[]) => void;
 
   /**
-   * Subscribe to state change events
-   * @param handler - Handler function called when state changes
-   * @returns Function to unsubscribe the handler
-   */
-  onStateChange: EventHook<SearchState>;
-
-  /**
    * Get the current search state
-   * @returns The current search state
    */
-  getState: () => SearchState;
+  getState: () => SearchDocumentState;
+
+  // Scoped Events (do not include documentId in payload)
+  onSearchResult: EventHook<SearchAllPagesResult>;
+  onSearchStart: EventHook<void>;
+  onSearchStop: EventHook<void>;
+  onActiveResultChange: EventHook<number>;
+  onSearchResultStateChange: EventHook<SearchResultState>;
+  onStateChange: EventHook<SearchDocumentState>;
+}
+
+export interface SearchCapability {
+  // Active document operations
+  startSearch: (documentId?: string) => void;
+  stopSearch: (documentId?: string) => void;
+  searchAllPages: (
+    keyword: string,
+    documentId?: string,
+  ) => PdfTask<SearchAllPagesResult, PdfPageSearchProgress>;
+  nextResult: (documentId?: string) => number;
+  previousResult: (documentId?: string) => number;
+  goToResult: (index: number, documentId?: string) => number;
+  setShowAllResults: (showAll: boolean, documentId?: string) => void;
+  getShowAllResults: (documentId?: string) => boolean;
+  getFlags: (documentId?: string) => MatchFlag[];
+  setFlags: (flags: MatchFlag[], documentId?: string) => void;
+  getState: (documentId?: string) => SearchDocumentState;
+
+  // Document-scoped operations
+  forDocument(documentId: string): SearchScope;
+
+  // Global Events (include documentId in payload)
+  onSearchResult: EventHook<SearchResultEvent>;
+  onSearchStart: EventHook<SearchStartEvent>;
+  onSearchStop: EventHook<SearchStopEvent>;
+  onActiveResultChange: EventHook<ActiveResultChangeEvent>;
+  onSearchResultStateChange: EventHook<SearchResultStateEvent>;
+  onStateChange: EventHook<SearchStateEvent>;
 }

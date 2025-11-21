@@ -3,7 +3,9 @@
   import { Scroller, useScroll, type RenderPageProps } from '@embedpdf/plugin-scroll/svelte';
   import { RenderLayer } from '@embedpdf/plugin-render/svelte';
 
-  const scroll = useScroll();
+  let { documentId }: { documentId: string } = $props();
+
+  const scroll = useScroll(() => documentId);
   let pageInput = $state(String(scroll.state.currentPage));
 
   $effect(() => {
@@ -19,9 +21,9 @@
   };
 </script>
 
-{#snippet RenderPageSnippet(page: RenderPageProps)}
+{#snippet renderPage(page: RenderPageProps)}
   <div style:width={`${page.width}px`} style:height={`${page.height}px`} style:position="relative">
-    <RenderLayer pageIndex={page.pageIndex} scale={page.scale} />
+    <RenderLayer {documentId} pageIndex={page.pageIndex} scale={1} />
   </div>
 {/snippet}
 
@@ -77,8 +79,8 @@
       </button>
     </div>
     <div class="relative flex w-full flex-1 overflow-hidden">
-      <Viewport class="flex-grow bg-gray-100">
-        <Scroller {RenderPageSnippet} />
+      <Viewport {documentId} class="flex-grow bg-gray-100">
+        <Scroller {documentId} {renderPage} />
       </Viewport>
     </div>
   </div>

@@ -1,20 +1,24 @@
 <script lang="ts">
-  import { useViewportCapability, useViewportRef } from '../hooks';
+  import { useIsViewportGated, useViewportCapability, useViewportRef } from '../hooks';
   import type { HTMLAttributes } from 'svelte/elements';
   import type { Snippet } from 'svelte';
 
   type ViewportProps = HTMLAttributes<HTMLDivElement> & {
+    /**
+     * The ID of the document that this viewport displays
+     */
+    documentId: string;
     children: Snippet;
     class?: string;
   };
 
-  let { children, class: propsClass, ...restProps }: ViewportProps = $props();
+  let { documentId, children, class: propsClass, ...restProps }: ViewportProps = $props();
 
   let viewportGap = $state(0);
 
-  let viewportRef = useViewportRef();
-
+  const viewportRef = useViewportRef(() => documentId);
   const viewportCapability = useViewportCapability();
+  const isGated = useIsViewportGated(() => documentId);
 
   $effect(() => {
     if (viewportCapability.provides) {
@@ -32,5 +36,7 @@
   style:padding={`${viewportGap}px`}
   class={propsClass}
 >
-  {@render children()}
+  {#if !isGated.current}
+    {@render children()}
+  {/if}
 </div>

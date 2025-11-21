@@ -1,5 +1,5 @@
 import { Reducer } from '@embedpdf/core';
-import { SearchState } from './types';
+import { SearchDocumentState, SearchState } from './types';
 import {
   START_SEARCH_SESSION,
   STOP_SEARCH_SESSION,
@@ -10,10 +10,13 @@ import {
   APPEND_SEARCH_RESULTS,
   SET_ACTIVE_RESULT_INDEX,
   SearchAction,
+  INIT_SEARCH_STATE,
+  CLEANUP_SEARCH_STATE,
 } from './actions';
+import { MatchFlag } from '@embedpdf/models';
 
-export const initialState: SearchState = {
-  flags: [],
+export const initialSearchDocumentState: SearchDocumentState = {
+  flags: [] as MatchFlag[],
   results: [],
   total: 0,
   activeResultIndex: -1,
@@ -23,64 +26,110 @@ export const initialState: SearchState = {
   active: false,
 };
 
+export const initialState: SearchState = {
+  documents: {},
+};
+
+const updateDocState = (
+  state: SearchState,
+  documentId: string,
+  newDocState: Partial<SearchDocumentState>,
+): SearchState => {
+  const oldDocState = state.documents[documentId] || initialSearchDocumentState;
+  return {
+    ...state,
+    documents: {
+      ...state.documents,
+      [documentId]: {
+        ...oldDocState,
+        ...newDocState,
+      },
+    },
+  };
+};
+
 export const searchReducer: Reducer<SearchState, SearchAction> = (state = initialState, action) => {
   switch (action.type) {
-    case START_SEARCH_SESSION:
-      return { ...state, active: true };
-
-    case STOP_SEARCH_SESSION:
+    case INIT_SEARCH_STATE:
       return {
         ...state,
+        documents: {
+          ...state.documents,
+          [action.payload.documentId]: action.payload.state,
+        },
+      };
+
+    case CLEANUP_SEARCH_STATE: {
+      const documentId = action.payload;
+      const { [documentId]: removed, ...remaining } = state.documents;
+      return {
+        ...state,
+        documents: remaining,
+      };
+    }
+
+    case START_SEARCH_SESSION:
+      return updateDocState(state, action.payload.documentId, { active: true });
+
+    case STOP_SEARCH_SESSION:
+      return updateDocState(state, action.payload.documentId, {
         results: [],
         total: 0,
         activeResultIndex: -1,
         query: '',
         loading: false,
         active: false,
-      };
+      });
 
     case SET_SEARCH_FLAGS:
-      return { ...state, flags: action.payload };
+      return updateDocState(state, action.payload.documentId, { flags: action.payload.flags });
 
     case SET_SHOW_ALL_RESULTS:
-      return { ...state, showAllResults: action.payload };
+      return updateDocState(state, action.payload.documentId, {
+        showAllResults: action.payload.showAll,
+      });
 
     case START_SEARCH:
-      return {
-        ...state,
+      return updateDocState(state, action.payload.documentId, {
         loading: true,
-        query: action.payload,
+        query: action.payload.query,
         // clear old results on new search start
         results: [],
         total: 0,
         activeResultIndex: -1,
-      };
+      });
 
     case APPEND_SEARCH_RESULTS: {
-      const newResults = [...state.results, ...action.payload.results];
+      const { documentId, results } = action.payload;
+      const docState = state.documents[documentId];
+      if (!docState) return state;
+
+      const newResults = [...docState.results, ...results];
       const firstHitIndex =
-        state.activeResultIndex === -1 && newResults.length > 0 ? 0 : state.activeResultIndex;
-      return {
-        ...state,
+        docState.activeResultIndex === -1 && newResults.length > 0 ? 0 : docState.activeResultIndex;
+      return updateDocState(state, documentId, {
         results: newResults,
         total: newResults.length, // total-so-far
         activeResultIndex: firstHitIndex,
         // keep loading true until final SET_SEARCH_RESULTS
         loading: true,
-      };
+      });
     }
 
-    case SET_SEARCH_RESULTS:
-      return {
-        ...state,
-        results: action.payload.results,
-        total: action.payload.total,
-        activeResultIndex: action.payload.activeResultIndex,
+    case SET_SEARCH_RESULTS: {
+      const { documentId, results, total, activeResultIndex } = action.payload;
+      return updateDocState(state, documentId, {
+        results,
+        total,
+        activeResultIndex,
         loading: false,
-      };
+      });
+    }
 
     case SET_ACTIVE_RESULT_INDEX:
-      return { ...state, activeResultIndex: action.payload };
+      return updateDocState(state, action.payload.documentId, {
+        activeResultIndex: action.payload.index,
+      });
 
     default:
       return state;

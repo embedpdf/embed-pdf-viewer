@@ -1,7 +1,13 @@
-import { RedactionState } from './types';
+import { RedactionState, RedactionDocumentState } from './types';
 
-export const getPendingRedactionsCount = (s: RedactionState) =>
-  Object.values(s.pending).reduce((sum, list) => sum + (list?.length ?? 0), 0);
+export const getPendingRedactionsCount = (s: RedactionDocumentState) => s.pendingCount;
 
-export const hasPendingRedactions = (s: RedactionState) =>
-  Object.values(s.pending).some((list) => (list?.length ?? 0) > 0);
+export const hasPendingRedactions = (s: RedactionDocumentState) => s.pendingCount > 0;
+
+export const getDocumentPendingCount = (state: RedactionState, documentId: string): number => {
+  return state.documents[documentId]?.pendingCount ?? 0;
+};
+
+export const getTotalPendingCount = (state: RedactionState): number => {
+  return Object.values(state.documents).reduce((sum, doc) => sum + doc.pendingCount, 0);
+};

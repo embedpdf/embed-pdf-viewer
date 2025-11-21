@@ -8,7 +8,7 @@ export const manifest: PluginManifest<SearchPluginConfig> = {
   name: 'Search Plugin',
   version: '1.0.0',
   provides: ['search'],
-  requires: ['loader'],
+  requires: [],
   optional: [],
   defaultConfig: {
     enabled: true,

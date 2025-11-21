@@ -1,33 +1,17 @@
-import { type CoreState, arePropsEqual } from '@embedpdf/core';
 import { useRegistry } from './use-registry.svelte';
 
 /**
- * Hook that provides access to the current core state
- * and re-renders the component only when the core state changes
+ * Hook that provides access to the current core state.
+ *
+ * Note: This reads from the context which is already subscribed to core state changes
+ * in the EmbedPDF component, so there's no additional subscription overhead.
  */
 export function useCoreState() {
-  const { registry } = useRegistry();
+  const context = useRegistry();
 
-  const state = $state({
-    coreState: null as CoreState | null,
-  });
-
-  $effect(() => {
-    if (!registry) return;
-
-    const store = registry.getStore();
-
-    // Get initial core state
-    state.coreState = store.getState().core;
-
-    // Create a single subscription that handles all core actions
-    return store.subscribe((action, newState, oldState) => {
-      // Only update if it's a core action and the core state changed
-      if (store.isCoreAction(action) && !arePropsEqual(newState.core, oldState.core)) {
-        state.coreState = newState.core;
-      }
-    });
-  });
-
-  return state;
+  return {
+    get current() {
+      return context.coreState;
+    },
+  };
 }

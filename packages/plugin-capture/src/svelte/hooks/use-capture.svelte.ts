@@ -1,24 +1,63 @@
-import { CapturePlugin } from '@embedpdf/plugin-capture';
 import { useCapability, usePlugin } from '@embedpdf/core/svelte';
+import {
+  CapturePlugin,
+  CaptureDocumentState,
+  initialDocumentState,
+  CaptureScope,
+} from '@embedpdf/plugin-capture';
 
 export const useCaptureCapability = () => useCapability<CapturePlugin>(CapturePlugin.id);
 export const useCapturePlugin = () => usePlugin<CapturePlugin>(CapturePlugin.id);
 
-export const useCapture = () => {
+// Define the return type explicitly to maintain type safety
+interface UseCaptureReturn {
+  provides: CaptureScope | null;
+  state: CaptureDocumentState;
+}
+
+/**
+ * Hook for capture state for a specific document
+ * @param getDocumentId Function that returns the document ID
+ */
+export const useCapture = (getDocumentId: () => string | null): UseCaptureReturn => {
   const capability = useCaptureCapability();
 
-  const state = $state({
-    get provides() {
-      return capability.provides;
-    },
-    isMarqueeCaptureActive: false,
-  });
+  let state = $state<CaptureDocumentState>(initialDocumentState);
+
+  // Reactive documentId
+  const documentId = $derived(getDocumentId());
+
+  // Scoped capability for current docId
+  const scopedProvides = $derived(
+    capability.provides && documentId ? capability.provides.forDocument(documentId) : null,
+  );
 
   $effect(() => {
-    return capability.provides?.onMarqueeCaptureActiveChange((active) => {
-      state.isMarqueeCaptureActive = active;
+    const provides = capability.provides;
+    const docId = documentId;
+
+    if (!provides || !docId) {
+      state = initialDocumentState;
+      return;
+    }
+
+    const scope = provides.forDocument(docId);
+
+    // Get initial state
+    state = scope.getState();
+
+    // Subscribe to state changes for this document
+    return scope.onStateChange((newState) => {
+      state = newState;
     });
   });
 
-  return state;
+  return {
+    get provides() {
+      return scopedProvides;
+    },
+    get state() {
+      return state;
+    },
+  };
 };

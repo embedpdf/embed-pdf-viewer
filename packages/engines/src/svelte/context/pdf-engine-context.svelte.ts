@@ -7,7 +7,6 @@ export interface PdfEngineContextState {
   error: Error | null;
 }
 
-
 const PDF_ENGINE_CONTEXT_KEY = Symbol('pdfEngineContext');
 
 /**
@@ -23,10 +22,10 @@ export function setPdfEngineContext(value: PdfEngineContextState) {
  */
 export function getPdfEngineContext(): PdfEngineContextState {
   const context = getContext<PdfEngineContextState | undefined>(PDF_ENGINE_CONTEXT_KEY);
-  
+
   if (context === undefined) {
     throw new Error('getPdfEngineContext must be used within a PdfEngineProvider');
   }
-  
+
   return context;
 }

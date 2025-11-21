@@ -5,7 +5,11 @@ import { RenderLayer } from '@embedpdf/plugin-render/vue';
 import { GlobalPointerProvider } from '@embedpdf/plugin-interaction-manager/vue';
 import { usePan } from '@embedpdf/plugin-pan/vue';
 
-const { provides: pan, isPanning } = usePan();
+const props = defineProps<{
+  documentId: string;
+}>();
+
+const { provides: pan, isPanning } = usePan(() => props.documentId);
 </script>
 
 <template>
@@ -44,9 +48,9 @@ const { provides: pan, isPanning } = usePan();
         </button>
       </div>
       <div class="relative flex w-full flex-1 overflow-hidden">
-        <GlobalPointerProvider>
-          <Viewport class="flex-grow bg-gray-100">
-            <Scroller>
+        <GlobalPointerProvider :document-id="documentId">
+          <Viewport :document-id="documentId" class="flex-grow bg-gray-100">
+            <Scroller :document-id="documentId">
               <template #default="{ page }">
                 <div
                   :style="{
@@ -56,8 +60,9 @@ const { provides: pan, isPanning } = usePan();
                   }"
                 >
                   <RenderLayer
+                    :document-id="documentId"
                     :page-index="page.pageIndex"
-                    :scale="page.scale"
+                    :scale="1"
                     class="pointer-events-none"
                   />
                 </div>

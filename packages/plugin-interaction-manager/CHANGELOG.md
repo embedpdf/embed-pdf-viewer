@@ -65,7 +65,6 @@
 ### Minor Changes
 
 - [#141](https://github.com/embedpdf/embed-pdf-viewer/pull/141) by [@bobsingor](https://github.com/bobsingor) – Simplified usage of `PagePointerProvider`:
-
   - Added default `position: relative`, `width`, and `height` styles to the React and Vue implementations of `PagePointerProvider`. Consumers no longer need to manually set these.
   - Ensures consistent sizing based on `pageWidth` and `pageHeight`.
 

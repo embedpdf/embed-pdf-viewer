@@ -20,6 +20,7 @@ import { deepToRaw } from '@embedpdf/utils/vue';
 
 const props = withDefaults(
   defineProps<{
+    documentId: string;
     pageIndex: number;
     annotation: PdfAnnotationObject;
     scaleFactor?: number;
@@ -44,6 +45,7 @@ watch(
   () => [
     props.pageIndex,
     props.scaleFactor,
+    props.documentId,
     annotationId.value,
     rectWidth.value,
     rectHeight.value,
@@ -56,7 +58,7 @@ watch(
         urlRef.value = null;
       }
 
-      const task = annotationProvides.value.renderAnnotation({
+      const task = annotationProvides.value.forDocument(props.documentId).renderAnnotation({
         pageIndex: props.pageIndex,
         annotation: deepToRaw(props.annotation),
         options: {

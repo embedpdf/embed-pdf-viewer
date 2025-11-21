@@ -10,7 +10,12 @@ import {
   ViewportPluginPackage,
 } from '@embedpdf/plugin-viewport/react'
 import { Scroller, ScrollPluginPackage } from '@embedpdf/plugin-scroll/react'
-import { LoaderPluginPackage } from '@embedpdf/plugin-loader/react'
+import {
+  DocumentContext,
+  DocumentContent,
+  DocumentManagerPlugin,
+  DocumentManagerPluginPackage,
+} from '@embedpdf/plugin-document-manager/react'
 import { RenderLayer, RenderPluginPackage } from '@embedpdf/plugin-render/react' // A dependency for Tiling
 import {
   useZoom,
@@ -23,15 +28,7 @@ import { TilingLayer, TilingPluginPackage } from '@embedpdf/plugin-tiling/react'
 
 // 1. Register the plugins you need
 const plugins = [
-  createPluginRegistration(LoaderPluginPackage, {
-    loadingOptions: {
-      type: 'url',
-      pdfFile: {
-        id: 'example-pdf',
-        url: 'https://snippet.embedpdf.com/ebook.pdf',
-      },
-    },
-  }),
+  createPluginRegistration(DocumentManagerPluginPackage),
   createPluginRegistration(ViewportPluginPackage),
   createPluginRegistration(ScrollPluginPackage),
   createPluginRegistration(RenderPluginPackage), // Required for Tiling
@@ -45,8 +42,8 @@ const plugins = [
 ]
 
 // A simple zoom toolbar to demonstrate the tiling effect at high zoom
-export const ZoomToolbar = () => {
-  const { provides: zoom } = useZoom()
+export const ZoomToolbar = ({ documentId }: { documentId: string }) => {
+  const { provides: zoom } = useZoom(documentId)
   if (!zoom) return null
   return (
     <div className="mb-4 mt-4 flex items-center gap-2 rounded-lg border border-gray-200 bg-white p-3 shadow-sm">
@@ -96,24 +93,58 @@ export const PDFViewer = () => {
 
   return (
     <div style={{ height: '500px' }}>
-      <EmbedPDF engine={engine} plugins={plugins}>
-        <div className="flex h-full flex-col">
-          <ZoomToolbar />
-          <div className="relative flex w-full flex-1 overflow-hidden">
-            <Viewport className="flex-grow bg-gray-100">
-              <Scroller
-                renderPage={({ width, height, pageIndex, scale }) => (
-                  <div style={{ width, height, position: 'relative' }}>
-                    {/* Use the RenderLayer for immediate display */}
-                    <RenderLayer pageIndex={pageIndex} scale={1} />
-                    {/* Use the TilingLayer for optimized rendering */}
-                    <TilingLayer pageIndex={pageIndex} scale={scale} />
-                  </div>
-                )}
-              />
-            </Viewport>
-          </div>
-        </div>
+      <EmbedPDF
+        engine={engine}
+        plugins={plugins}
+        onInitialized={async (registry) => {
+          registry
+            .getPlugin<DocumentManagerPlugin>(DocumentManagerPlugin.id)
+            ?.provides()
+            ?.openDocumentUrl({ url: 'https://snippet.embedpdf.com/ebook.pdf' })
+        }}
+      >
+        <DocumentContext>
+          {({ activeDocumentId }) =>
+            activeDocumentId && (
+              <DocumentContent documentId={activeDocumentId}>
+                {({ isLoaded }) =>
+                  isLoaded && (
+                    <div className="flex h-full flex-col">
+                      <ZoomToolbar documentId={activeDocumentId} />
+                      <div className="relative flex w-full flex-1 overflow-hidden">
+                        <Viewport
+                          documentId={activeDocumentId}
+                          className="flex-grow bg-gray-100"
+                        >
+                          <Scroller
+                            documentId={activeDocumentId}
+                            renderPage={({ width, height, pageIndex }) => (
+                              <div
+                                style={{ width, height, position: 'relative' }}
+                              >
+                                {/* Use the RenderLayer for immediate display */}
+                                <RenderLayer
+                                  documentId={activeDocumentId}
+                                  pageIndex={pageIndex}
+                                  scale={1}
+                                />
+                                {/* Use the TilingLayer for optimized rendering */}
+                                <TilingLayer
+                                  documentId={activeDocumentId}
+                                  pageIndex={pageIndex}
+                                />
+                              </div>
+                            )}
+                          />
+                        </Viewport>
+                      </div>
+                    </div>
+                  )
+                }
+              </DocumentContent>
+            )
+          }
+        </DocumentContext>
       </EmbedPDF>
     </div>
   )

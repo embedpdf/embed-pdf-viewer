@@ -1,6 +1,6 @@
 import { useCapability, usePlugin } from '@embedpdf/core/svelte';
 import { Rotation } from '@embedpdf/models';
-import { RotatePlugin } from '@embedpdf/plugin-rotate';
+import { RotatePlugin, initialDocumentState, RotateScope } from '@embedpdf/plugin-rotate';
 
 /**
  * Hook to get the raw rotate plugin instance.
@@ -13,28 +13,55 @@ export const useRotatePlugin = () => usePlugin<RotatePlugin>(RotatePlugin.id);
  */
 export const useRotateCapability = () => useCapability<RotatePlugin>(RotatePlugin.id);
 
+// Define the return type explicitly to maintain type safety
+interface UseRotateReturn {
+  provides: RotateScope | null;
+  rotation: Rotation;
+}
+
 /**
- * Hook that provides reactive rotation state and methods.
+ * Hook that provides reactive rotation state and methods for a specific document.
+ * @param getDocumentId Function that returns the document ID
  */
-export const useRotate = () => {
+export const useRotate = (getDocumentId: () => string | null): UseRotateReturn => {
   const capability = useRotateCapability();
 
-  const state = $state({
-    get provides() {
-      return capability.provides;
-    },
-    rotation: 0 as Rotation,
-  });
+  let rotation = $state<Rotation>(initialDocumentState.rotation);
+
+  // Reactive documentId
+  const documentId = $derived(getDocumentId());
+
+  // Scoped capability for current docId
+  const scopedProvides = $derived(
+    capability.provides && documentId ? capability.provides.forDocument(documentId) : null,
+  );
 
   $effect(() => {
-    if (!capability.provides) return;
+    const provides = capability.provides;
+    const docId = documentId;
 
-    const unsubscribe = capability.provides.onRotateChange((newRotation) => {
-      state.rotation = newRotation;
+    if (!provides || !docId) {
+      rotation = initialDocumentState.rotation;
+      return;
+    }
+
+    const scope = provides.forDocument(docId);
+
+    // Get initial state
+    rotation = scope.getRotation();
+
+    // Subscribe to rotation changes for this document
+    return scope.onRotateChange((newRotation) => {
+      rotation = newRotation;
     });
-
-    return unsubscribe;
   });
 
-  return state;
+  return {
+    get provides() {
+      return scopedProvides;
+    },
+    get rotation() {
+      return rotation;
+    },
+  };
 };

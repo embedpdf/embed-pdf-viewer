@@ -4,11 +4,12 @@ import { AnyPreviewState, HandlerServices } from '@embedpdf/plugin-annotation';
 import { PreviewRenderer } from './preview-renderer';
 
 interface Props {
+  documentId: string;
   pageIndex: number;
   scale: number;
 }
 
-export function AnnotationPaintLayer({ pageIndex, scale }: Props) {
+export function AnnotationPaintLayer({ documentId, pageIndex, scale }: Props) {
   const { plugin: annotationPlugin } = useAnnotationPlugin();
   const [previews, setPreviews] = useState<Map<string, AnyPreviewState>>(new Map());
 
@@ -68,7 +69,7 @@ export function AnnotationPaintLayer({ pageIndex, scale }: Props) {
   useEffect(() => {
     if (!annotationPlugin) return;
 
-    return annotationPlugin.registerPageHandlers(pageIndex, scale, {
+    return annotationPlugin.registerPageHandlers(documentId, pageIndex, scale, {
       services,
       onPreview: (toolId, state) => {
         setPreviews((prev) => {
@@ -82,7 +83,7 @@ export function AnnotationPaintLayer({ pageIndex, scale }: Props) {
         });
       },
     });
-  }, [pageIndex, scale, annotationPlugin, services]);
+  }, [documentId, pageIndex, scale, annotationPlugin, services]);
 
   return (
     <>

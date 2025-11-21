@@ -8,7 +8,7 @@ const { provides: sel } = useSelectionCapability();
 // It automatically handles unsubscribing when the component is unmounted.
 watchEffect((onCleanup) => {
   if (sel.value) {
-    const unsubscribe = sel.value.onCopyToClipboard((text) => {
+    const unsubscribe = sel.value.onCopyToClipboard(({ text }) => {
       // Use the Clipboard API to write the text
       navigator.clipboard.writeText(text).catch((err) => {
         console.error('Failed to copy text to clipboard:', err);

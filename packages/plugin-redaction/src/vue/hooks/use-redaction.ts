@@ -1,25 +1,63 @@
-import { ref, watchEffect, readonly } from 'vue';
+import { ref, watch, computed, toValue, type MaybeRefOrGetter, ComputedRef, Ref } from 'vue';
 import { useCapability, usePlugin } from '@embedpdf/core/vue';
-import { RedactionPlugin, initialState, RedactionState } from '@embedpdf/plugin-redaction';
+import {
+  RedactionPlugin,
+  initialDocumentState,
+  RedactionDocumentState,
+  RedactionScope,
+} from '@embedpdf/plugin-redaction';
 
 export const useRedactionPlugin = () => usePlugin<RedactionPlugin>(RedactionPlugin.id);
 export const useRedactionCapability = () => useCapability<RedactionPlugin>(RedactionPlugin.id);
 
-export const useRedaction = () => {
+/**
+ * Hook for redaction state for a specific document
+ * @param documentId Document ID (can be ref, computed, getter, or plain value)
+ */
+export const useRedaction = (
+  documentId: MaybeRefOrGetter<string>,
+): {
+  state: Readonly<Ref<RedactionDocumentState>>;
+  provides: ComputedRef<RedactionScope | null>;
+} => {
   const { provides } = useRedactionCapability();
-  const state = ref<RedactionState>(initialState);
+  const state = ref<RedactionDocumentState>(initialDocumentState);
 
-  watchEffect((onCleanup) => {
-    if (!provides.value) return;
+  watch(
+    [provides, () => toValue(documentId)],
+    ([providesValue, docId], _, onCleanup) => {
+      if (!providesValue) {
+        state.value = initialDocumentState;
+        return;
+      }
 
-    const unsubscribe = provides.value.onStateChange((newState) => {
-      state.value = newState;
-    });
-    onCleanup(unsubscribe);
+      const scope = providesValue.forDocument(docId);
+
+      // Set initial state
+      try {
+        state.value = scope.getState();
+      } catch (e) {
+        // Handle case where state might not be ready
+        state.value = initialDocumentState;
+      }
+
+      // Subscribe to changes
+      const unsubscribe = scope.onStateChange((newState) => {
+        state.value = newState;
+      });
+
+      onCleanup(unsubscribe);
+    },
+    { immediate: true },
+  );
+
+  const scopedProvides = computed(() => {
+    const docId = toValue(documentId);
+    return provides.value?.forDocument(docId) ?? null;
   });
 
   return {
-    state: readonly(state),
-    provides,
+    state,
+    provides: scopedProvides,
   };
 };

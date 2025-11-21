@@ -3,14 +3,17 @@
   import { Scroller, type RenderPageProps } from '@embedpdf/plugin-scroll/svelte';
   import { RenderLayer, useRenderCapability } from '@embedpdf/plugin-render/svelte';
 
-  const render = useRenderCapability();
+  let { documentId }: { documentId: string } = $props();
+
+  const renderCapability = useRenderCapability();
+  const render = $derived(renderCapability.provides?.forDocument(documentId));
   let isExporting = $state(false);
 
   const exportPageAsPng = () => {
-    if (!render.provides || isExporting) return;
+    if (!render || isExporting) return;
     isExporting = true;
 
-    const renderTask = render.provides.renderPage({
+    const renderTask = render.renderPage({
       pageIndex: 0,
       options: { scaleFactor: 2.0, withAnnotations: true, imageType: 'image/png' },
     });
@@ -34,9 +37,9 @@
   };
 </script>
 
-{#snippet RenderPageSnippet(page: RenderPageProps)}
+{#snippet renderPage(page: RenderPageProps)}
   <div style:width={`${page.width}px`} style:height={`${page.height}px`} style:position="relative">
-    <RenderLayer pageIndex={page.pageIndex} scale={page.scale} />
+    <RenderLayer {documentId} pageIndex={page.pageIndex} />
   </div>
 {/snippet}
 
@@ -47,15 +50,15 @@
     >
       <button
         onclick={exportPageAsPng}
-        disabled={!render.provides || isExporting}
+        disabled={!render || isExporting}
         class="rounded-md bg-blue-500 px-3 py-1 text-sm font-medium text-white transition-colors duration-150 hover:bg-blue-600 disabled:cursor-not-allowed disabled:bg-blue-300"
       >
         {isExporting ? 'Exporting...' : 'Export Page 1 as PNG (2x Res)'}
       </button>
     </div>
     <div class="relative flex w-full flex-1 overflow-hidden">
-      <Viewport class="flex-grow bg-gray-100">
-        <Scroller {RenderPageSnippet} />
+      <Viewport {documentId} class="flex-grow bg-gray-100">
+        <Scroller {documentId} {renderPage} />
       </Viewport>
     </div>
   </div>

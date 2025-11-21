@@ -11,26 +11,20 @@ import {
   ViewportPluginPackage,
 } from '@embedpdf/plugin-viewport/react'
 import { Scroller, ScrollPluginPackage } from '@embedpdf/plugin-scroll/react'
-import { LoaderPluginPackage } from '@embedpdf/plugin-loader/react'
+import {
+  DocumentContext,
+  DocumentContent,
+  DocumentManagerPlugin,
+  DocumentManagerPluginPackage,
+} from '@embedpdf/plugin-document-manager/react'
 import { RenderLayer, RenderPluginPackage } from '@embedpdf/plugin-render/react'
 
 // Import Print plugin
-import {
-  usePrintCapability,
-  PrintPluginPackage,
-} from '@embedpdf/plugin-print/react'
+import { usePrint, PrintPluginPackage } from '@embedpdf/plugin-print/react'
 
 // 1. Register the plugins you need
 const plugins = [
-  createPluginRegistration(LoaderPluginPackage, {
-    loadingOptions: {
-      type: 'url',
-      pdfFile: {
-        id: 'example-pdf',
-        url: 'https://snippet.embedpdf.com/ebook.pdf',
-      },
-    },
-  }),
+  createPluginRegistration(DocumentManagerPluginPackage),
   createPluginRegistration(ViewportPluginPackage),
   createPluginRegistration(ScrollPluginPackage),
   createPluginRegistration(RenderPluginPackage),
@@ -38,8 +32,8 @@ const plugins = [
 ]
 
 // 2. Create a toolbar with a Print button
-export const PrintToolbar = () => {
-  const { provides: print } = usePrintCapability()
+export const PrintToolbar = ({ documentId }: { documentId: string }) => {
+  const { provides: print } = usePrint(documentId)
   const [isPrinting, setIsPrinting] = useState(false)
 
   const handlePrint = () => {
@@ -123,30 +117,57 @@ export const PDFViewer = () => {
 
   return (
     <div style={{ height: '500px' }}>
-      <EmbedPDF engine={engine} plugins={plugins}>
-        <div className="flex h-full flex-col">
-          <PrintToolbar />
-          <div className="flex-grow" style={{ position: 'relative' }}>
-            <Viewport
-              style={{
-                backgroundColor: '#f1f3f5',
-                position: 'absolute',
-                top: 0,
-                left: 0,
-                right: 0,
-                bottom: 0,
-              }}
-            >
-              <Scroller
-                renderPage={({ width, height, pageIndex, scale }) => (
-                  <div style={{ width, height, position: 'relative' }}>
-                    <RenderLayer pageIndex={pageIndex} scale={scale} />
-                  </div>
-                )}
-              />
-            </Viewport>
-          </div>
-        </div>
+      <EmbedPDF
+        engine={engine}
+        plugins={plugins}
+        onInitialized={async (registry) => {
+          registry
+            .getPlugin<DocumentManagerPlugin>(DocumentManagerPlugin.id)
+            ?.provides()
+            ?.openDocumentUrl({ url: 'https://snippet.embedpdf.com/ebook.pdf' })
+        }}
+      >
+        <DocumentContext>
+          {({ activeDocumentId }) =>
+            activeDocumentId && (
+              <DocumentContent documentId={activeDocumentId}>
+                {({ isLoaded }) =>
+                  isLoaded && (
+                    <div className="flex h-full flex-col">
+                      <PrintToolbar documentId={activeDocumentId} />
+                      <div
+                        className="flex-grow"
+                        style={{ position: 'relative' }}
+                      >
+                        <Viewport
+                          documentId={activeDocumentId}
+                          style={{
+                            backgroundColor: '#f1f3f5',
+                            position: 'absolute',
+                            top: 0,
+                            left: 0,
+                            right: 0,
+                            bottom: 0,
+                          }}
+                        >
+                          <Scroller
+                            documentId={activeDocumentId}
+                            renderPage={({ pageIndex }) => (
+                              <RenderLayer
+                                documentId={activeDocumentId}
+                                pageIndex={pageIndex}
+                              />
+                            )}
+                          />
+                        </Viewport>
+                      </div>
+                    </div>
+                  )
+                }
+              </DocumentContent>
+            )
+          }
+        </DocumentContext>
       </EmbedPDF>
     </div>
   )

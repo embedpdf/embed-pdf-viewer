@@ -1,22 +1,14 @@
-import { ref, onMounted, onBeforeUnmount } from 'vue';
-import { arePropsEqual, type CoreState } from '@embedpdf/core';
+import { Ref } from 'vue';
+import { type CoreState } from '@embedpdf/core';
 import { useRegistry } from './use-registry';
 
-export function useCoreState() {
-  const { registry } = useRegistry();
-  const core = ref<CoreState>();
-
-  onMounted(() => {
-    const store = registry.value!.getStore();
-    core.value = store.getState().core;
-
-    const unsub = store.subscribe((action, newSt, oldSt) => {
-      if (store.isCoreAction(action) && !arePropsEqual(newSt.core, oldSt.core)) {
-        core.value = newSt.core;
-      }
-    });
-    onBeforeUnmount(unsub);
-  });
-
-  return core;
+/**
+ * Hook that provides access to the current core state.
+ *
+ * Note: This reads from the context which is already subscribed to core state changes
+ * in the EmbedPDF component, so there's no additional subscription overhead.
+ */
+export function useCoreState(): Ref<CoreState | null> {
+  const { coreState } = useRegistry();
+  return coreState;
 }

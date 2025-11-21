@@ -28,13 +28,28 @@ export interface Tile {
   id: string;
 }
 
-export interface TilingState {
+export interface TilingDocumentState {
   visibleTiles: Record<number, Tile[]>;
 }
 
-export interface TilingCapability {
+export interface TilingState {
+  documents: Record<string, TilingDocumentState>;
+}
+
+export interface TilingEvent {
+  documentId: string;
+  tiles: Record<number, Tile[]>;
+}
+
+export interface TilingScope {
   renderTile: (options: RenderTileOptions) => Task<Blob, PdfErrorReason>;
   onTileRendering: EventHook<Record<number, Tile[]>>;
+}
+
+export interface TilingCapability {
+  renderTile: (options: RenderTileOptions, documentId?: string) => Task<Blob, PdfErrorReason>;
+  forDocument(documentId: string): TilingScope;
+  onTileRendering: EventHook<TilingEvent>;
 }
 
 export interface CalculateTilesForPageOptions {

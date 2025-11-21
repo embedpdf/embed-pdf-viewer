@@ -6,12 +6,20 @@ import { RenderAnnotation } from '../render-annotation';
 interface StampProps {
   isSelected: boolean;
   annotation: TrackedAnnotation<PdfStampAnnoObject>;
+  documentId: string;
   pageIndex: number;
   scale: number;
   onClick: (e: MouseEvent<HTMLDivElement> | TouchEvent<HTMLDivElement>) => void;
 }
 
-export function Stamp({ isSelected, annotation, pageIndex, scale, onClick }: StampProps) {
+export function Stamp({
+  isSelected,
+  annotation,
+  documentId,
+  pageIndex,
+  scale,
+  onClick,
+}: StampProps) {
   return (
     <div
       style={{
@@ -26,6 +34,7 @@ export function Stamp({ isSelected, annotation, pageIndex, scale, onClick }: Sta
       onTouchStart={onClick}
     >
       <RenderAnnotation
+        documentId={documentId}
         pageIndex={pageIndex}
         annotation={{ ...annotation.object, id: annotation.object.id }}
         scaleFactor={scale}

@@ -6,8 +6,12 @@ import ClearIcon from '@mui/icons-material/Clear';
 import { ToggleIconButton } from '../toggle-icon-button';
 import { RedactIcon, RedactAreaIcon } from '../../icons';
 
-export const RedactToolbar = () => {
-  const { provides, state } = useRedaction();
+interface RedactToolbarProps {
+  documentId: string;
+}
+
+export const RedactToolbar = ({ documentId }: RedactToolbarProps) => {
+  const { provides, state } = useRedaction(documentId);
 
   const handleTextRedact = () => {
     provides?.toggleRedactSelection();

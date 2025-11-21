@@ -5,13 +5,15 @@
   import { useZoom } from '@embedpdf/plugin-zoom/svelte';
   import { TilingLayer } from '@embedpdf/plugin-tiling/svelte';
 
-  const zoom = useZoom();
+  let { documentId }: { documentId: string } = $props();
+
+  const zoom = useZoom(() => documentId);
 </script>
 
-{#snippet RenderPageSnippet(page: RenderPageProps)}
+{#snippet renderPage(page: RenderPageProps)}
   <div style:width={`${page.width}px`} style:height={`${page.height}px`} style:position="relative">
-    <RenderLayer pageIndex={page.pageIndex} scale={1} />
-    <TilingLayer pageIndex={page.pageIndex} scale={page.scale} />
+    <RenderLayer {documentId} pageIndex={page.pageIndex} scale={1} />
+    <TilingLayer {documentId} pageIndex={page.pageIndex} />
   </div>
 {/snippet}
 
@@ -56,8 +58,8 @@
       </div>
     {/if}
     <div class="relative flex w-full flex-1 overflow-hidden">
-      <Viewport class="flex-grow bg-gray-100">
-        <Scroller {RenderPageSnippet} />
+      <Viewport {documentId} class="flex-grow bg-gray-100">
+        <Scroller {documentId} {renderPage} />
       </Viewport>
     </div>
   </div>

@@ -1,7 +1,13 @@
 <script setup lang="ts">
 import { RedactionMode, useRedaction } from '@embedpdf/plugin-redaction/vue';
 
-const { provides, state } = useRedaction();
+interface RedactToolbarProps {
+  documentId: string;
+}
+
+const props = defineProps<RedactToolbarProps>();
+
+const { provides, state } = useRedaction(() => props.documentId);
 
 const handleTextRedact = () => {
   provides?.value?.toggleRedactSelection();

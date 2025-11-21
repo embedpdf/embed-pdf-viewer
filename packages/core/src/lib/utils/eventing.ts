@@ -1,4 +1,9 @@
-import { EventControl, EventControlOptions } from './event-control';
+import {
+  EventControl,
+  EventControlOptions,
+  KeyedEventControl,
+  isKeyedOptions,
+} from './event-control';
 import { arePropsEqual } from './math';
 
 /* ------------------------------------------------------------------ */
@@ -12,14 +17,15 @@ export type Unsubscribe = () => void;
 /* ------------------------------------------------------------------ */
 export type EventListener<T> =
   | ((listener: Listener<T>) => Unsubscribe)
-  | ((listener: Listener<T>, options?: EventControlOptions) => Unsubscribe);
+  | ((listener: Listener<T>, options?: EventControlOptions<T>) => Unsubscribe);
 
 /* ------------------------------------------------------------ */
 /* helpers for typing `.on()` with an optional second argument  */
 /* ------------------------------------------------------------ */
 export type EventHook<T = any> = EventListener<T>;
+
 /* ------------------------------------------------------------------ */
-/* minimal “dumb” emitter (no value cache, no equality)               */
+/* minimal "dumb" emitter (no value cache, no equality)               */
 /* ------------------------------------------------------------------ */
 export interface Emitter<T = any> {
   emit(value?: T): void;
@@ -68,15 +74,22 @@ export function createBehaviorEmitter<T = any>(
   /* -------------- helpers ----------------------------------- */
   const notify = (v: T) => listeners.forEach((l) => l(v));
 
-  const baseOn: EventHook<T> = (listener: Listener<T>, options?: EventControlOptions) => {
+  const baseOn: EventHook<T> = (listener: Listener<T>, options?: EventControlOptions<T>) => {
     /* wrap & remember if we have control options ------------------ */
     let realListener = listener;
     let destroy = () => {};
 
     if (options) {
-      const ctl = new EventControl(listener, options);
-      realListener = ctl.handle as Listener<T>;
-      destroy = () => ctl.destroy();
+      // Check if it's keyed options
+      if (isKeyedOptions(options)) {
+        const ctl = new KeyedEventControl(listener, options);
+        realListener = ctl.handle as Listener<T>;
+        destroy = () => ctl.destroy();
+      } else {
+        const ctl = new EventControl(listener, options);
+        realListener = ctl.handle as Listener<T>;
+        destroy = () => ctl.destroy();
+      }
       proxyMap.set(listener, { wrapped: realListener, destroy });
     }
 
@@ -127,7 +140,7 @@ export function createBehaviorEmitter<T = any>(
 
     /* derived hook --------------------------------------------- */
     select<U>(selector: (v: T) => U, eq: (a: U, b: U) => boolean = arePropsEqual): EventHook<U> {
-      return (listener: Listener<U>, options?: EventControlOptions) => {
+      return (listener: Listener<U>, options?: EventControlOptions<U>) => {
         let prev: U | undefined;
 
         /* replay */
@@ -146,7 +159,7 @@ export function createBehaviorEmitter<T = any>(
               listener(mapped);
             }
           },
-          options as EventControlOptions | undefined,
+          options as EventControlOptions<T> | undefined,
         ); // pass control opts straight through
       };
     },

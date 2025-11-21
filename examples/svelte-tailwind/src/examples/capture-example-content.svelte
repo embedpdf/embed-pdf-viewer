@@ -10,7 +10,9 @@
     type CaptureAreaEvent,
   } from '@embedpdf/plugin-capture/svelte';
 
-  const capture = useCapture();
+  let { documentId }: { documentId: string } = $props();
+
+  const capture = useCapture(() => documentId);
 
   let captureResult = $state<CaptureAreaEvent | null>(null);
   let imageUrl = $state<string | null>(null);
@@ -41,16 +43,10 @@
   };
 </script>
 
-{#snippet RenderPageSnippet(page: RenderPageProps)}
-  <PagePointerProvider
-    pageIndex={page.pageIndex}
-    pageWidth={page.width}
-    pageHeight={page.height}
-    rotation={page.rotation}
-    scale={page.scale}
-  >
-    <RenderLayer pageIndex={page.pageIndex} />
-    <MarqueeCapture pageIndex={page.pageIndex} scale={page.scale} />
+{#snippet renderPage(page: RenderPageProps)}
+  <PagePointerProvider {documentId} pageIndex={page.pageIndex}>
+    <RenderLayer {documentId} pageIndex={page.pageIndex} scale={1} />
+    <MarqueeCapture {documentId} pageIndex={page.pageIndex} />
   </PagePointerProvider>
 {/snippet}
 
@@ -61,17 +57,20 @@
     <button
       onclick={() => capture.provides?.toggleMarqueeCapture()}
       class={`rounded-md px-3 py-1 text-sm font-medium transition-colors ${
-        capture.isMarqueeCaptureActive ? 'bg-blue-500 text-white' : 'bg-gray-100 hover:bg-gray-200'
+        capture.state.isMarqueeCaptureActive
+          ? 'bg-blue-500 text-white'
+          : 'bg-gray-100 hover:bg-gray-200'
       }`}
     >
-      {capture.isMarqueeCaptureActive ? 'Cancel Capture' : 'Capture Area'}
+      {capture.state.isMarqueeCaptureActive ? 'Cancel Capture' : 'Capture Area'}
     </button>
   </div>
   <div class="flex-grow" style="position: relative; overflow: hidden">
     <Viewport
+      {documentId}
       style="position: absolute; top: 0; left: 0; right: 0; bottom: 0; background-color: #f1f3f5"
     >
-      <Scroller {RenderPageSnippet} />
+      <Scroller {documentId} {renderPage} />
     </Viewport>
   </div>
 </div>

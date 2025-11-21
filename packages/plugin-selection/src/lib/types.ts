@@ -3,6 +3,15 @@ import { PdfPageGeometry, PdfTask, Rect } from '@embedpdf/models';
 
 export interface SelectionPluginConfig extends BasePluginConfig {}
 
+export interface SelectionMenuPlacement {
+  pageIndex: number; // The page the menu is anchored to
+  rect: Rect; // The viewport-relative rect to position against
+  spaceAbove: number;
+  spaceBelow: number;
+  suggestTop: boolean; // The plugin's suggestion
+  isVisible: boolean; // Is the anchor rect even in the viewport?
+}
+
 /* ---- user-selection cross-page -------------------------------------- */
 export interface GlyphPointer {
   page: number;
@@ -14,7 +23,7 @@ export interface SelectionRangeX {
   end: GlyphPointer; // inclusive
 }
 
-export interface SelectionState {
+export interface SelectionDocumentState {
   /** page → geometry cache */
   geometry: Record<number, PdfPageGeometry>;
   /** current selection or null */
@@ -23,6 +32,10 @@ export interface SelectionState {
   slices: Record<number, { start: number; count: number }>;
   active: boolean;
   selecting: boolean;
+}
+
+export interface SelectionState {
+  documents: Record<string, SelectionDocumentState>;
 }
 
 export interface FormattedSelection {
@@ -37,38 +50,89 @@ export interface SelectionRectsCallback {
 }
 
 export interface RegisterSelectionOnPageOptions {
+  documentId: string;
   pageIndex: number;
   onRectsChange: (data: SelectionRectsCallback) => void;
 }
 
-export interface SelectionCapability {
-  /* formatted selection for all pages */
+// ─────────────────────────────────────────────────────────
+// Events
+// ─────────────────────────────────────────────────────────
+
+export interface SelectionMenuPlacementEvent {
+  documentId: string;
+  placement: SelectionMenuPlacement | null;
+}
+
+export interface SelectionChangeEvent {
+  documentId: string;
+  selection: SelectionRangeX | null;
+}
+
+export interface TextRetrievedEvent {
+  documentId: string;
+  text: string[];
+}
+
+export interface CopyToClipboardEvent {
+  documentId: string;
+  text: string;
+}
+
+export interface BeginSelectionEvent {
+  documentId: string;
+  page: number;
+  index: number;
+}
+
+export interface EndSelectionEvent {
+  documentId: string;
+}
+
+// ─────────────────────────────────────────────────────────
+// Capability
+// ─────────────────────────────────────────────────────────
+
+export interface SelectionScope {
   getFormattedSelection(): FormattedSelection[];
-  /* formatted selection for one page */
   getFormattedSelectionForPage(page: number): FormattedSelection | null;
-  /* highlight rectangles for one page */
   getHighlightRectsForPage(page: number): Rect[];
-  /* highlight rectangles for all pages */
   getHighlightRects(): Record<number, Rect[]>;
-  /* bounding rectangles for all pages */
   getBoundingRectForPage(page: number): Rect | null;
-  /* bounding rectangles for all pages */
   getBoundingRects(): { page: number; rect: Rect }[];
-  /* get selected text */
   getSelectedText(): PdfTask<string[]>;
-  /* copy selected text to clipboard */
   clear(): void;
   copyToClipboard(): void;
+  getState(): SelectionDocumentState;
   onSelectionChange: EventHook<SelectionRangeX | null>;
   onTextRetrieved: EventHook<string[]>;
   onCopyToClipboard: EventHook<string>;
   onBeginSelection: EventHook<{ page: number; index: number }>;
   onEndSelection: EventHook<void>;
-  /** Tell the selection plugin that text selection should stay
-      enabled while <modeId> is active.                    */
-  enableForMode(modeId: string): void;
-  /** Quick check used by SelectionLayer during pointer events. */
-  isEnabledForMode(modeId: string): boolean;
-  /** Get the current state of the selection plugin. */
-  getState(): SelectionState;
+}
+
+export interface SelectionCapability {
+  // Active document operations
+  getFormattedSelection(documentId?: string): FormattedSelection[];
+  getFormattedSelectionForPage(page: number, documentId?: string): FormattedSelection | null;
+  getHighlightRectsForPage(page: number, documentId?: string): Rect[];
+  getHighlightRects(documentId?: string): Record<number, Rect[]>;
+  getBoundingRectForPage(page: number, documentId?: string): Rect | null;
+  getBoundingRects(documentId?: string): { page: number; rect: Rect }[];
+  getSelectedText(documentId?: string): PdfTask<string[]>;
+  clear(documentId?: string): void;
+  copyToClipboard(documentId?: string): void;
+  getState(documentId?: string): SelectionDocumentState;
+  enableForMode(modeId: string, documentId?: string): void;
+  isEnabledForMode(modeId: string, documentId?: string): boolean;
+
+  // Document-scoped operations
+  forDocument(documentId: string): SelectionScope;
+
+  // Global events (include documentId)
+  onSelectionChange: EventHook<SelectionChangeEvent>;
+  onTextRetrieved: EventHook<TextRetrievedEvent>;
+  onCopyToClipboard: EventHook<CopyToClipboardEvent>;
+  onBeginSelection: EventHook<BeginSelectionEvent>;
+  onEndSelection: EventHook<EndSelectionEvent>;
 }

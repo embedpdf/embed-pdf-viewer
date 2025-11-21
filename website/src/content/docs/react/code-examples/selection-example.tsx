@@ -11,7 +11,12 @@ import {
   ViewportPluginPackage,
 } from '@embedpdf/plugin-viewport/react'
 import { Scroller, ScrollPluginPackage } from '@embedpdf/plugin-scroll/react'
-import { LoaderPluginPackage } from '@embedpdf/plugin-loader/react'
+import {
+  DocumentContext,
+  DocumentContent,
+  DocumentManagerPlugin,
+  DocumentManagerPluginPackage,
+} from '@embedpdf/plugin-document-manager/react'
 import { RenderLayer, RenderPluginPackage } from '@embedpdf/plugin-render/react'
 import {
   PagePointerProvider,
@@ -29,15 +34,7 @@ import { ignore } from '@embedpdf/models'
 
 // 1. Register the plugins you need
 const plugins = [
-  createPluginRegistration(LoaderPluginPackage, {
-    loadingOptions: {
-      type: 'url',
-      pdfFile: {
-        id: 'example-pdf',
-        url: 'https://snippet.embedpdf.com/ebook.pdf',
-      },
-    },
-  }),
+  createPluginRegistration(DocumentManagerPluginPackage),
   createPluginRegistration(ViewportPluginPackage),
   createPluginRegistration(ScrollPluginPackage),
   createPluginRegistration(RenderPluginPackage),
@@ -46,24 +43,31 @@ const plugins = [
 ]
 
 // 2. Create a toolbar to interact with the selection
-export const SelectionToolbar = () => {
-  const { provides: selection } = useSelectionCapability()
+export const SelectionToolbar = ({ documentId }: { documentId: string }) => {
+  const { provides: selectionCapability } = useSelectionCapability()
   const [hasSelection, setHasSelection] = useState(false)
 
   useEffect(() => {
-    if (!selection) return
+    if (!selectionCapability) return
+    const selection = selectionCapability.forDocument(documentId)
     const unsubscribe = selection.onSelectionChange(
       (selectionRange: SelectionRangeX | null) => {
         setHasSelection(!!selectionRange)
       },
     )
     return unsubscribe
-  }, [selection])
+  }, [selectionCapability, documentId])
+
+  const handleCopy = () => {
+    if (selectionCapability) {
+      selectionCapability.forDocument(documentId).copyToClipboard()
+    }
+  }
 
   return (
     <div className="flex items-center gap-3 rounded-lg border border-gray-200 bg-white p-3 shadow-sm">
       <button
-        onClick={() => selection?.copyToClipboard()}
+        onClick={handleCopy}
         disabled={!hasSelection}
         className="flex h-8 items-center justify-center gap-2 rounded-md border border-gray-300 bg-white px-3 text-sm font-medium text-gray-700 transition-colors duration-150 hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50"
         title="Copy Selected Text"
@@ -86,14 +90,15 @@ export const SelectionToolbar = () => {
 }
 
 // 3. Create the selected text display panel
-export const SelectedTextPanel = () => {
-  const { provides: selection } = useSelectionCapability()
+export const SelectedTextPanel = ({ documentId }: { documentId: string }) => {
+  const { provides: selectionCapability } = useSelectionCapability()
   const [hasSelection, setHasSelection] = useState(false)
   const [selectedText, setSelectedText] = useState('')
 
   // This effect updates the UI state
   useEffect(() => {
-    if (!selection) return
+    if (!selectionCapability) return
+    const selection = selectionCapability.forDocument(documentId)
     const unsubscribe = selection.onSelectionChange(
       (selectionRange: SelectionRangeX | null) => {
         setHasSelection(!!selectionRange)
@@ -104,11 +109,12 @@ export const SelectedTextPanel = () => {
       },
     )
     return unsubscribe
-  }, [selection])
+  }, [selectionCapability, documentId])
 
   // This effect fetches the text content only when the selection is finished
   useEffect(() => {
-    if (!selection) return
+    if (!selectionCapability) return
+    const selection = selectionCapability.forDocument(documentId)
     const unsubscribe = selection.onEndSelection(() => {
       const textTask = selection.getSelectedText()
       textTask.wait((textLines) => {
@@ -116,7 +122,7 @@ export const SelectedTextPanel = () => {
       }, ignore)
     })
     return unsubscribe
-  }, [selection])
+  }, [selectionCapability, documentId])
 
   return (
     <div className="mt-4 rounded-lg border border-gray-200 bg-gray-50 p-3">
@@ -147,35 +153,63 @@ export const PDFViewer = () => {
   }
 
   return (
-    <EmbedPDF engine={engine} plugins={plugins}>
-      <div style={{ height: '500px', userSelect: 'none' }}>
-        <div className="flex h-full flex-col gap-4">
-          <SelectionToolbar />
-          <div className="relative flex w-full flex-1 overflow-hidden">
-            <Viewport className="flex-grow bg-gray-100">
-              <Scroller
-                renderPage={({ width, height, pageIndex, scale, rotation }) => (
-                  <PagePointerProvider
-                    pageIndex={pageIndex}
-                    pageWidth={width}
-                    pageHeight={height}
-                    rotation={rotation}
-                    scale={scale}
-                  >
-                    <RenderLayer
-                      pageIndex={pageIndex}
-                      scale={1}
-                      className="pointer-events-none"
-                    />
-                    <SelectionLayer pageIndex={pageIndex} scale={scale} />
-                  </PagePointerProvider>
-                )}
-              />
-            </Viewport>
-          </div>
-        </div>
-      </div>
-      <SelectedTextPanel />
+    <EmbedPDF
+      engine={engine}
+      plugins={plugins}
+      onInitialized={async (registry) => {
+        registry
+          .getPlugin<DocumentManagerPlugin>(DocumentManagerPlugin.id)
+          ?.provides()
+          ?.openDocumentUrl({ url: 'https://snippet.embedpdf.com/ebook.pdf' })
+      }}
+    >
+      <DocumentContext>
+        {({ activeDocumentId }) =>
+          activeDocumentId && (
+            <DocumentContent documentId={activeDocumentId}>
+              {({ isLoaded }) =>
+                isLoaded && (
+                  <>
+                    <div style={{ height: '500px', userSelect: 'none' }}>
+                      <div className="flex h-full flex-col gap-4">
+                        <SelectionToolbar documentId={activeDocumentId} />
+                        <div className="relative flex w-full flex-1 overflow-hidden">
+                          <Viewport
+                            documentId={activeDocumentId}
+                            className="flex-grow bg-gray-100"
+                          >
+                            <Scroller
+                              documentId={activeDocumentId}
+                              renderPage={({ pageIndex }) => (
+                                <PagePointerProvider
+                                  documentId={activeDocumentId}
+                                  pageIndex={pageIndex}
+                                >
+                                  <RenderLayer
+                                    documentId={activeDocumentId}
+                                    pageIndex={pageIndex}
+                                    scale={1}
+                                    className="pointer-events-none"
+                                  />
+                                  <SelectionLayer
+                                    documentId={activeDocumentId}
+                                    pageIndex={pageIndex}
+                                  />
+                                </PagePointerProvider>
+                              )}
+                            />
+                          </Viewport>
+                        </div>
+                      </div>
+                    </div>
+                    <SelectedTextPanel documentId={activeDocumentId} />
+                  </>
+                )
+              }
+            </DocumentContent>
+          )
+        }
+      </DocumentContext>
     </EmbedPDF>
   )
 }

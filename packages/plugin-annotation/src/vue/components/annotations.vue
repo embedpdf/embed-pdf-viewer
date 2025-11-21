@@ -242,6 +242,7 @@
     >
       <template #default>
         <AnnoComponents.Stamp
+          :documentId="documentId"
           :isSelected="selectionState?.object.id === annotation.object.id"
           :annotation="annotation"
           :pageIndex="pageIndex"
@@ -366,7 +367,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, watchEffect } from 'vue';
+import { ref, watchEffect, computed } from 'vue';
 import { blendModeToCss, PdfBlendMode, Position } from '@embedpdf/models';
 import {
   getAnnotationsByPageIndex,
@@ -395,6 +396,7 @@ import { VertexConfig } from '../../shared/types';
 import { ResizeHandleUI, VertexHandleUI } from '../types';
 
 const props = defineProps<{
+  documentId: string;
   pageIndex: number;
   scale: number;
   rotation: number;
@@ -405,15 +407,29 @@ const props = defineProps<{
   selectionOutlineColor?: string;
 }>();
 
-const { provides: annotationProvides } = useAnnotationCapability();
+const { provides: annotationCapability } = useAnnotationCapability();
 const { provides: selectionProvides } = useSelectionCapability();
 const annotations = ref<TrackedAnnotation[]>([]);
-const { register } = usePointerHandlers({ pageIndex: props.pageIndex });
+const { register } = usePointerHandlers({
+  documentId: () => props.documentId,
+  pageIndex: props.pageIndex,
+});
 const selectionState = ref<TrackedAnnotation | null>(null);
 const editingId = ref<string | null>(null);
 
+// Get scoped API for this document
+const annotationProvides = computed(() =>
+  annotationCapability.value ? annotationCapability.value.forDocument(props.documentId) : null,
+);
+
 watchEffect((onCleanup) => {
   if (annotationProvides.value) {
+    // Initialize with current state immediately (like React)
+    const currentState = annotationProvides.value.getState();
+    annotations.value = getAnnotationsByPageIndex(currentState, props.pageIndex);
+    selectionState.value = getSelectedAnnotationByPageIndex(currentState, props.pageIndex);
+
+    // Then subscribe to changes
     const off = annotationProvides.value.onStateChange((state) => {
       annotations.value = getAnnotationsByPageIndex(state, props.pageIndex);
       selectionState.value = getSelectedAnnotationByPageIndex(state, props.pageIndex);

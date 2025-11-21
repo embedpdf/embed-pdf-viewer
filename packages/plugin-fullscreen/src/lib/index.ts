@@ -13,7 +13,7 @@ export const FullscreenPluginPackage: PluginPackage<
   FullscreenAction
 > = {
   manifest,
-  create: (registry) => new FullscreenPlugin(FULLSCREEN_PLUGIN_ID, registry),
+  create: (registry, config) => new FullscreenPlugin(FULLSCREEN_PLUGIN_ID, registry, config),
   reducer,
   initialState,
 };

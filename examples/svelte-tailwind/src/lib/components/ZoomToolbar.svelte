@@ -1,8 +1,21 @@
 <script lang="ts">
   import { useZoom } from '@embedpdf/plugin-zoom/svelte';
-  import { useInteractionManager } from '@embedpdf/plugin-interaction-manager/svelte';
   import { ZoomMode } from '@embedpdf/plugin-zoom';
-  import { clickOutside } from '../actions/click-outside';
+  import {
+    SearchMinusIcon,
+    SearchPlusIcon,
+    ChevronDownIcon,
+    FitPageIcon,
+    FitWidthIcon,
+    MarqueeIcon,
+  } from './icons';
+  import { DropdownMenu, DropdownItem, DropdownDivider } from './ui';
+
+  interface ZoomToolbarProps {
+    documentId: string;
+  }
+
+  let { documentId }: ZoomToolbarProps = $props();
 
   interface ZoomPreset {
     value: number;
@@ -21,7 +34,6 @@
     { value: 2, label: '200%' },
     { value: 4, label: '400%' },
     { value: 8, label: '800%' },
-    { value: 16, label: '1600%' },
   ];
 
   const ZOOM_MODES: ZoomModeItem[] = [
@@ -29,189 +41,117 @@
     { value: ZoomMode.FitWidth, label: 'Fit to Width' },
   ];
 
-  const zoom = useZoom();
-  const interaction = useInteractionManager();
+  const zoom = useZoom(() => documentId);
 
   let isMenuOpen = $state(false);
 
-  const toggleMenu = () => {
-    isMenuOpen = !isMenuOpen;
-  };
-
-  const closeMenu = () => {
-    isMenuOpen = false;
-  };
-
-  const handleZoomPreset = (value: number) => {
-    zoom.provides?.requestZoom(value);
-    closeMenu();
-  };
-
-  const handleZoomMode = (mode: ZoomMode) => {
-    zoom.provides?.requestZoom(mode);
-    closeMenu();
-  };
+  const zoomPercentage = $derived(Math.round(zoom.state.currentZoomLevel * 100));
 
   const handleZoomIn = () => {
     zoom.provides?.zoomIn();
+    isMenuOpen = false;
   };
 
   const handleZoomOut = () => {
     zoom.provides?.zoomOut();
+    isMenuOpen = false;
   };
 
-  const handleToggleMarqueeZoom = () => {
+  const handleSelectZoom = (value: number | ZoomMode) => {
+    zoom.provides?.requestZoom(value);
+    isMenuOpen = false;
+  };
+
+  const handleToggleMarquee = () => {
     zoom.provides?.toggleMarqueeZoom();
-    closeMenu();
+    isMenuOpen = false;
   };
-
-  const zoomPercentage = $derived(Math.round(zoom.state.currentZoomLevel * 100));
-  const isMarqueeActive = $derived(interaction.state.activeMode === 'marqueeZoom');
 </script>
 
-<div class="flex items-center gap-2">
-  <!-- Zoom Out Button -->
-  <button
-    class="flex h-8 w-8 items-center justify-center text-gray-600 transition-colors hover:bg-gray-100 hover:text-gray-900"
-    onclick={handleZoomOut}
-    title="Zoom Out"
-  >
-    <svg
-      xmlns="http://www.w3.org/2000/svg"
-      width="18"
-      height="18"
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      stroke-width="2"
-      stroke-linecap="round"
-      stroke-linejoin="round"
-    >
-      <path stroke="none" d="M0 0h24v24H0z" fill="none" />
-      <path d="M10 10m-7 0a7 7 0 1 0 14 0a7 7 0 1 0 -14 0" />
-      <path d="M7 10l6 0" />
-      <path d="M21 21l-6 -6" />
-    </svg>
-  </button>
-  <!-- Zoom In Button -->
-  <button
-    class="flex h-8 w-8 items-center justify-center text-gray-600 transition-colors hover:bg-gray-100 hover:text-gray-900"
-    onclick={handleZoomIn}
-    title="Zoom In"
-  >
-    <svg
-      xmlns="http://www.w3.org/2000/svg"
-      width="18"
-      height="18"
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      stroke-width="2"
-      stroke-linecap="round"
-      stroke-linejoin="round"
-    >
-      <path stroke="none" d="M0 0h24v24H0z" fill="none" />
-      <path d="M10 10m-7 0a7 7 0 1 0 14 0a7 7 0 1 0 -14 0" />
-      <path d="M7 10l6 0" />
-      <path d="M10 7l0 6" />
-      <path d="M21 21l-6 -6" />
-    </svg>
-  </button>
-
-  <!-- Zoom Level Display with Dropdown -->
-  <div class="relative flex items-center" use:clickOutside={closeMenu}>
-    <button
-      class="flex min-w-[70px] items-center justify-center gap-1 px-2 py-1 text-sm text-gray-700 transition-colors hover:bg-gray-100"
-      onclick={toggleMenu}
-      title="Zoom Options"
-    >
-      <span class="font-medium">{zoomPercentage}%</span>
-      <svg
-        xmlns="http://www.w3.org/2000/svg"
-        width="12"
-        height="12"
-        viewBox="0 0 24 24"
-        fill="none"
-        stroke="currentColor"
-        stroke-width="2"
-        stroke-linecap="round"
-        stroke-linejoin="round"
-        class="text-gray-400 transition-transform duration-200 {isMenuOpen ? 'rotate-180' : ''}"
+{#if zoom.provides}
+  <div class="relative">
+    <div class="flex items-center gap-1 rounded bg-gray-100 px-2 py-1">
+      <!-- Zoom Out Button -->
+      <button
+        onclick={handleZoomOut}
+        class="rounded p-1 text-gray-600 transition-colors hover:bg-gray-200 hover:text-gray-900"
+        aria-label="Zoom out"
       >
-        <path stroke="none" d="M0 0h24v24H0z" fill="none" />
-        <path d="M6 9l6 6l6 -6" />
-      </svg>
-    </button>
+        <SearchMinusIcon class="h-4 w-4" title="Zoom Out" />
+      </button>
 
-    {#if isMenuOpen}
-      <div
-        class="absolute left-0 top-full z-50 mt-2 w-48 origin-top-left rounded border border-gray-200 bg-white shadow-lg"
+      <!-- Zoom Percentage Display -->
+      <button
+        onclick={() => (isMenuOpen = !isMenuOpen)}
+        class="flex items-center gap-1 rounded px-2 py-0.5 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-200"
       >
-        <!-- Preset Zoom Levels -->
-        <div class="p-1">
-          {#each ZOOM_PRESETS as preset}
-            <button
-              class="flex w-full items-center justify-between px-3 py-1.5 text-sm transition-colors {Math.abs(
-                zoom.state.currentZoomLevel - preset.value,
-              ) < 0.01
-                ? 'bg-gray-100 text-gray-900'
-                : 'text-gray-700 hover:bg-gray-50'}"
-              onclick={() => handleZoomPreset(preset.value)}
-            >
-              <span>{preset.label}</span>
-            </button>
-          {/each}
-        </div>
+        <span>{zoomPercentage}%</span>
+        <ChevronDownIcon class="h-3 w-3 transition-transform {isMenuOpen ? 'rotate-180' : ''}" />
+      </button>
 
-        <div class="my-1 h-px bg-gray-200"></div>
+      <!-- Zoom In Button -->
+      <button
+        onclick={handleZoomIn}
+        class="rounded p-1 text-gray-600 transition-colors hover:bg-gray-200 hover:text-gray-900"
+        aria-label="Zoom in"
+      >
+        <SearchPlusIcon class="h-4 w-4" title="Zoom In" />
+      </button>
+    </div>
 
-        <!-- Zoom Modes -->
-        <div class="p-1">
-          {#each ZOOM_MODES as mode}
-            <button
-              class="flex w-full items-center justify-between px-3 py-1.5 text-sm transition-colors {zoom
-                .state.zoomLevel === mode.value
-                ? 'bg-gray-100 text-gray-900'
-                : 'text-gray-700 hover:bg-gray-50'}"
-              onclick={() => handleZoomMode(mode.value)}
-            >
-              <span>{mode.label}</span>
-            </button>
-          {/each}
-        </div>
-      </div>
-    {/if}
+    <DropdownMenu isOpen={isMenuOpen} onClose={() => (isMenuOpen = false)} className="w-48">
+      <DropdownItem onclick={handleZoomIn}>
+        {#snippet icon()}
+          <SearchPlusIcon class="h-4 w-4" title="Zoom In" />
+        {/snippet}
+        Zoom In
+      </DropdownItem>
+      <DropdownItem onclick={handleZoomOut}>
+        {#snippet icon()}
+          <SearchMinusIcon class="h-4 w-4" title="Zoom Out" />
+        {/snippet}
+        Zoom Out
+      </DropdownItem>
+
+      <DropdownDivider />
+
+      <!-- Zoom Presets -->
+      {#each ZOOM_PRESETS as { value, label }}
+        <DropdownItem
+          onclick={() => handleSelectZoom(value)}
+          isActive={Math.abs(zoom.state.currentZoomLevel - value) < 0.01}
+        >
+          {label}
+        </DropdownItem>
+      {/each}
+
+      <DropdownDivider />
+
+      <!-- Zoom Modes -->
+      {#each ZOOM_MODES as { value, label }}
+        <DropdownItem
+          onclick={() => handleSelectZoom(value)}
+          isActive={zoom.state.zoomLevel === value}
+        >
+          {#snippet icon()}
+            {#if value === ZoomMode.FitPage}
+              <FitPageIcon class="h-4 w-4" title="Fit to Page" />
+            {:else}
+              <FitWidthIcon class="h-4 w-4" title="Fit to Width" />
+            {/if}
+          {/snippet}
+          {label}
+        </DropdownItem>
+      {/each}
+
+      <DropdownDivider />
+
+      <DropdownItem onclick={handleToggleMarquee} isActive={zoom.state.isMarqueeZoomActive}>
+        {#snippet icon()}
+          <MarqueeIcon class="h-4 w-4" title="Marquee Zoom" />
+        {/snippet}
+        Marquee Zoom
+      </DropdownItem>
+    </DropdownMenu>
   </div>
-
-  <!-- Marquee Zoom Toggle -->
-  <button
-    class="flex h-8 w-8 items-center justify-center text-gray-600 transition-colors {isMarqueeActive
-      ? 'bg-gray-200 text-gray-900'
-      : 'hover:bg-gray-100 hover:text-gray-900'}"
-    onclick={handleToggleMarqueeZoom}
-    title="{isMarqueeActive ? 'Disable' : 'Enable'} Area Zoom"
-  >
-    <svg
-      xmlns="http://www.w3.org/2000/svg"
-      width="18"
-      height="18"
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      stroke-width="2"
-      stroke-linecap="round"
-      stroke-linejoin="round"
-    >
-      <path stroke="none" d="M0 0h24v24H0z" fill="none" />
-      <path d="M15 13v4" />
-      <path d="M13 15h4" />
-      <path d="M15 15m-5 0a5 5 0 1 0 10 0a5 5 0 1 0 -10 0" />
-      <path d="M22 22l-3 -3" />
-      <path d="M6 18h-1a2 2 0 0 1 -2 -2v-1" />
-      <path d="M3 11v-1" />
-      <path d="M3 6v-1a2 2 0 0 1 2 -2h1" />
-      <path d="M10 3h1" />
-      <path d="M15 3h1a2 2 0 0 1 2 2v1" />
-    </svg>
-  </button>
-</div>
+{/if}

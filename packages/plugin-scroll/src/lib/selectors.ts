@@ -1,17 +1,20 @@
-import { ScrollerLayout, ScrollState } from './types';
+import { ScrollerLayout, ScrollDocumentState } from './types';
 
-export const getScrollerLayout = (state: ScrollState, scale: number): ScrollerLayout => {
+export const getScrollerLayout = (
+  documentState: ScrollDocumentState,
+  scale: number,
+): ScrollerLayout => {
   return {
-    startSpacing: state.startSpacing,
-    endSpacing: state.endSpacing,
-    totalWidth: state.totalContentSize.width * scale,
-    totalHeight: state.totalContentSize.height * scale,
-    pageGap: state.pageGap * scale,
-    strategy: state.strategy,
-    items: state.renderedPageIndexes.map((idx) => {
+    startSpacing: documentState.startSpacing,
+    endSpacing: documentState.endSpacing,
+    totalWidth: documentState.totalContentSize.width * scale,
+    totalHeight: documentState.totalContentSize.height * scale,
+    pageGap: documentState.pageGap * scale,
+    strategy: documentState.strategy,
+    items: documentState.renderedPageIndexes.map((idx) => {
       return {
-        ...state.virtualItems[idx],
-        pageLayouts: state.virtualItems[idx].pageLayouts.map((layout) => {
+        ...documentState.virtualItems[idx],
+        pageLayouts: documentState.virtualItems[idx].pageLayouts.map((layout) => {
           return {
             ...layout,
             rotatedWidth: layout.rotatedWidth * scale,
