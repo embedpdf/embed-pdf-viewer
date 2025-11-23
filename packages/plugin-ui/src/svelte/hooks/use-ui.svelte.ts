@@ -82,11 +82,14 @@ export const useUIState = (getDocumentId: () => string | null): UseUIStateReturn
 
 /**
  * Hook to get UI schema
+ * Returns an object with a reactive getter for the schema
  */
-export const useUISchema = (): UISchema | null => {
+export const useUISchema = () => {
   const capability = useUICapability();
 
-  const schema = $derived(capability.provides?.getSchema() ?? null);
-
-  return schema;
+  return {
+    get schema() {
+      return capability.provides?.getSchema() ?? null;
+    },
+  };
 };

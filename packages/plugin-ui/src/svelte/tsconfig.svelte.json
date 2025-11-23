@@ -4,7 +4,7 @@
     "baseUrl": "../..",
     "types": ["svelte"],
     "paths": {
-      "@embedpdf/plugin-ui": ["src/lib/index.ts"]
+      "@embedpdf/plugin-ui": ["src/lib"]
     }
   },
   "include": ["./**/*.ts", "./**/*.svelte"]

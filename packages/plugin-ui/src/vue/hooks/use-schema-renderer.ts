@@ -1,4 +1,4 @@
-import { h, type VNode } from 'vue';
+import { h, toValue, type VNode, type MaybeRefOrGetter } from 'vue';
 import { useUICapability, useUIState } from './use-ui';
 import { useRenderers } from '../registries/renderers-registry';
 
@@ -9,8 +9,9 @@ import { useRenderers } from '../registries/renderers-registry';
  * Always passes isOpen state to renderers so they can control animations.
  *
  * Automatically subscribes to UI state changes for the given document.
+ * @param documentId Document ID (can be ref, computed, getter, or plain value)
  */
-export function useSchemaRenderer(documentId: string) {
+export function useSchemaRenderer(documentId: MaybeRefOrGetter<string>) {
   const renderers = useRenderers();
   const { provides } = useUICapability();
   const { state: uiState } = useUIState(documentId);
@@ -52,7 +53,7 @@ export function useSchemaRenderer(documentId: string) {
 
       const handleClose = isClosable
         ? () => {
-            provides.value?.forDocument(documentId).closeToolbarSlot(placement, slot);
+            provides.value?.forDocument(toValue(documentId)).closeToolbarSlot(placement, slot);
           }
         : undefined;
 
@@ -62,7 +63,7 @@ export function useSchemaRenderer(documentId: string) {
       return h(ToolbarRenderer, {
         key: toolbarSlot.toolbarId,
         schema: toolbarSchema,
-        documentId,
+        documentId: toValue(documentId),
         isOpen: toolbarSlot.isOpen,
         onClose: handleClose,
       });
@@ -101,7 +102,7 @@ export function useSchemaRenderer(documentId: string) {
       }
 
       const handleClose = () => {
-        provides.value?.forDocument(documentId).closePanelSlot(placement, slot);
+        provides.value?.forDocument(toValue(documentId)).closePanelSlot(placement, slot);
       };
 
       const PanelRenderer = renderers.panel;
@@ -111,7 +112,7 @@ export function useSchemaRenderer(documentId: string) {
       return h(PanelRenderer, {
         key: panelSlot.panelId,
         schema: panelSchema,
-        documentId,
+        documentId: toValue(documentId),
         isOpen: panelSlot.isOpen,
         onClose: handleClose,
       });

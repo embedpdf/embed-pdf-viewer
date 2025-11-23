@@ -1,26 +1,38 @@
-<script lang="ts" context="module">
-  export interface IconProps {
-    class?: string;
-    title?: string;
-  }
-</script>
-
 <script lang="ts">
-  let { class: className, title, children }: IconProps & { children?: any } = $props();
+  import { iconRegistry, type IconName, type IconProps } from './icons/registry';
+
+  interface Props extends IconProps {
+    name: string;
+    /**
+     * Maps to CSS 'color' -> SVG 'currentColor' (stroke)
+     */
+    primaryColor?: string;
+    /**
+     * Maps to CSS 'fill'
+     */
+    secondaryColor?: string;
+
+    class?: string;
+  }
+
+  // We capture the specific color props here so they don't leak into ...rest
+  let { name, primaryColor, secondaryColor, style, ...rest }: Props = $props();
+
+  const IconComponent = $derived(iconRegistry[name as IconName]);
+
+  // We inject the colors as native CSS styles.
+  // This is cleaner than modifying 50+ icon files to accept new props.
+  const mergedStyle = $derived.by(() => {
+    let s = style || '';
+    // Use semicolon to ensure we don't break existing style strings
+    if (primaryColor) s += `; color: ${primaryColor}`;
+    if (secondaryColor) s += `; fill: ${secondaryColor}`;
+    return s;
+  });
 </script>
 
-<svg
-  class={className}
-  fill="none"
-  stroke="currentColor"
-  viewBox="0 0 24 24"
-  aria-hidden={!title}
-  role={title ? 'img' : 'presentation'}
->
-  {#if title}
-    <title>{title}</title>
-  {/if}
-  {@render children?.()}
-</svg>
-
-<!-- Specific Icons as separate files would be better, but for now let's create them inline -->
+{#if IconComponent}
+  <IconComponent {...rest} style={mergedStyle} />
+{:else}
+  <span class="text-xs text-red-500" title={`Icon '${name}' not found`}>?</span>
+{/if}

@@ -6,10 +6,9 @@
 
   interface ThumbnailsSidebarProps {
     documentId: string;
-    onClose: () => void;
   }
 
-  let { documentId, onClose }: ThumbnailsSidebarProps = $props();
+  let { documentId }: ThumbnailsSidebarProps = $props();
 
   const scroll = useScroll(() => documentId);
 
@@ -22,18 +21,6 @@
 </script>
 
 <div class="flex h-full w-56 flex-col border-r border-gray-300 bg-gray-50">
-  <!-- Header -->
-  <div class="flex items-center justify-between border-b border-gray-300 bg-white px-4 py-3">
-    <h2 class="text-lg font-semibold text-gray-800">Thumbnails</h2>
-    <button
-      onclick={onClose}
-      class="rounded p-1 text-gray-500 transition-colors hover:bg-gray-100 hover:text-gray-700"
-      aria-label="Close thumbnails"
-    >
-      <CloseIcon class="h-5 w-5" />
-    </button>
-  </div>
-
   <!-- Thumbnails -->
   <div class="flex-1 overflow-hidden">
     <ThumbnailsPane {documentId} style="width: 100%; height: 100%;">

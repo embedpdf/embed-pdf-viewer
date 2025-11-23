@@ -42,6 +42,13 @@
       </a>
 
       <a
+        href="/viewer-schema"
+        class="block rounded-lg bg-emerald-600 px-6 py-3 text-center font-semibold text-white transition-colors hover:bg-emerald-700"
+      >
+        🚀 Schema-Driven Viewer (NEW!)
+      </a>
+
+      <a
         href="/about"
         class="block rounded-lg border-2 border-gray-300 px-6 py-3 text-center font-semibold text-gray-700 transition-colors hover:border-indigo-600 hover:text-indigo-600"
       >
@@ -52,7 +59,8 @@
     <div class="mt-8 rounded-lg bg-indigo-50 p-4">
       <p class="text-sm text-indigo-900">
         <strong>Getting Started:</strong> Choose a viewer to open and load your PDF documents. The ViewManager
-        version supports split views, while the simple version uses tabs.
+        version supports split views, the simple version uses tabs, and the schema-driven viewer demonstrates
+        the powerful declarative UI system.
       </p>
     </div>
   </div>
