@@ -15,6 +15,7 @@
     PagePointerProvider,
   } from '@embedpdf/plugin-interaction-manager/svelte';
   import { ZoomMode, ZoomPluginPackage, MarqueeZoom } from '@embedpdf/plugin-zoom/svelte';
+  import { RedactionLayer, RedactionPluginPackage } from '@embedpdf/plugin-redaction/svelte';
   import { PanPluginPackage } from '@embedpdf/plugin-pan/svelte';
   import { SpreadMode, SpreadPluginPackage } from '@embedpdf/plugin-spread/svelte';
   import { Rotate, RotatePluginPackage } from '@embedpdf/plugin-rotate/svelte';
@@ -114,6 +115,7 @@
     createPluginRegistration(HistoryPluginPackage),
     createPluginRegistration(AnnotationPluginPackage),
     createPluginRegistration(FullscreenPluginPackage),
+    createPluginRegistration(RedactionPluginPackage),
     createPluginRegistration(ThumbnailPluginPackage, {
       width: 120,
       paddingY: 10,
@@ -274,6 +276,7 @@
                           <SearchLayer {documentId} pageIndex={page.pageIndex} />
                           <MarqueeZoom {documentId} pageIndex={page.pageIndex} />
                           <MarqueeCapture {documentId} pageIndex={page.pageIndex} />
+                          <RedactionLayer {documentId} pageIndex={page.pageIndex} />
                           <SelectionLayer {documentId} pageIndex={page.pageIndex}>
                             {#snippet selectionMenu(props)}
                               <SelectionSelectionMenu {...props} {documentId} />
