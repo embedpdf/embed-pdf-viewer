@@ -39,11 +39,14 @@ export function useActiveDocument() {
 
 /**
  * Hook for all open documents (in order)
- * @param documentIds Optional array of specific document IDs to filter/order by
+ * @param getDocumentIds Optional getter function for specific document IDs to filter/order by
  */
-export function useOpenDocuments(documentIds?: string[]) {
+export function useOpenDocuments(getDocumentIds?: () => string[] | undefined) {
   // Keep reference to avoid destructuring - maintains reactivity
   const coreStateRef = useCoreState();
+
+  // Derive documentIds reactively if getter is provided
+  const documentIds = $derived(getDocumentIds ? getDocumentIds() : undefined);
 
   // Use $derived.by for computed array of documents
   const documents = $derived.by(() => {

@@ -1,7 +1,7 @@
 import { DocumentState } from '@embedpdf/core';
 import { useCapability, usePlugin, useCoreState } from '@embedpdf/core/vue';
 import { DocumentManagerPlugin } from '@embedpdf/plugin-document-manager';
-import { computed } from 'vue';
+import { computed, toValue, type MaybeRefOrGetter } from 'vue';
 
 export const useDocumentManagerPlugin = () =>
   usePlugin<DocumentManagerPlugin>(DocumentManagerPlugin.id);
@@ -34,14 +34,17 @@ export function useActiveDocument() {
 
 /**
  * Hook for all open documents (in order)
- * @param documentIds Optional array of specific document IDs to filter/order by
+ * @param getDocumentIds Optional getter function, ref, or array of specific document IDs to filter/order by
  */
-export function useOpenDocuments(documentIds?: string[]) {
+export function useOpenDocuments(getDocumentIds?: MaybeRefOrGetter<string[] | undefined>) {
   const coreState = useCoreState();
 
   const documents = computed(() => {
     const core = coreState.value;
     if (!core) return [];
+
+    // Get documentIds reactively if provided
+    const documentIds = getDocumentIds ? toValue(getDocumentIds) : undefined;
 
     // If specific documentIds are provided, use THEIR order
     if (documentIds && documentIds.length > 0) {
