@@ -1,0 +1,37 @@
+import { Snippet } from 'svelte';
+import {
+  CustomAnnotationRenderer,
+  ResizeHandleUI,
+  VertexHandleUI,
+  SelectionMenuProps,
+} from '../types';
+import { VertexConfig } from '../../shared/types';
+import { PdfAnnotationObject } from '@embedpdf/models';
+import { TrackedAnnotation } from '@embedpdf/plugin-annotation';
+
+export interface AnnotationContainerProps<T extends PdfAnnotationObject> {
+  documentId: string;
+  scale: number;
+  pageIndex: number;
+  rotation: number;
+  pageWidth: number;
+  pageHeight: number;
+  trackedAnnotation: TrackedAnnotation<T>;
+  children: Snippet<[T]>;
+  isSelected: boolean;
+  isDraggable: boolean;
+  isResizable: boolean;
+  lockAspectRatio?: boolean;
+  class?: string;
+  style?: string;
+  vertexConfig?: VertexConfig<T>;
+  selectionMenu?: Snippet<[SelectionMenuProps]>;
+  outlineOffset?: number;
+  onDoubleClick?: (event: any) => void;
+  onSelect: (event: any) => void;
+  zIndex?: number;
+  resizeUI?: ResizeHandleUI;
+  vertexUI?: VertexHandleUI;
+  selectionOutlineColor?: string;
+  customAnnotationRenderer?: CustomAnnotationRenderer<T>;
+}

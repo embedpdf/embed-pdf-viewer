@@ -141,7 +141,7 @@
       lockAspectRatio={tool?.interaction.lockAspectRatio ?? false}
       selectionMenu={annotationsProps.selectionMenu}
       onSelect={(e) => handleClick(e, annotation)}
-      style={{ mixBlendMode }}
+      style="mix-blend-mode: {mixBlendMode}"
       {...annotationsProps}
     >
       {#snippet children(obj)}
@@ -162,7 +162,7 @@
       lockAspectRatio={tool?.interaction.lockAspectRatio ?? false}
       selectionMenu={annotationsProps.selectionMenu}
       onSelect={(e: MouseEvent | TouchEvent) => handleClick(e, annotation)}
-      style={{ mixBlendMode }}
+      style="mix-blend-mode: {mixBlendMode}"
       {...annotationsProps}
     >
       {#snippet children(obj)}
@@ -183,7 +183,7 @@
       lockAspectRatio={tool?.interaction.lockAspectRatio ?? false}
       selectionMenu={annotationsProps.selectionMenu}
       onSelect={(e: MouseEvent | TouchEvent) => handleClick(e, annotation)}
-      style={{ mixBlendMode }}
+      style="mix-blend-mode: {mixBlendMode}"
       {...annotationsProps}
     >
       {#snippet children(obj)}
@@ -205,7 +205,7 @@
       selectionMenu={annotationsProps.selectionMenu}
       onSelect={(e: MouseEvent | TouchEvent) => handleClick(e, annotation)}
       zIndex={0}
-      style={{ mixBlendMode }}
+      style="mix-blend-mode: {mixBlendMode}"
       {...annotationsProps}
     >
       {#snippet children(obj)}
@@ -226,7 +226,7 @@
       selectionMenu={annotationsProps.selectionMenu}
       onSelect={(e: MouseEvent | TouchEvent) => handleClick(e, annotation)}
       zIndex={0}
-      style={{ mixBlendMode }}
+      style="mix-blend-mode: {mixBlendMode}"
       {...annotationsProps}
     >
       {#snippet children(obj)}
@@ -247,7 +247,7 @@
       selectionMenu={annotationsProps.selectionMenu}
       onSelect={(e: MouseEvent | TouchEvent) => handleClick(e, annotation)}
       zIndex={0}
-      style={{ mixBlendMode }}
+      style="mix-blend-mode: {mixBlendMode}"
       {...annotationsProps}
     >
       {#snippet children(obj)}
@@ -268,7 +268,7 @@
       onSelect={(e: MouseEvent | TouchEvent) => handleClick(e, annotation)}
       zIndex={0}
       selectionMenu={annotationsProps.selectionMenu}
-      style={{ mixBlendMode: blendModeToCss(annotation.object.blendMode ?? PdfBlendMode.Multiply) }}
+      style="mix-blend-mode: {blendModeToCss(annotation.object.blendMode ?? PdfBlendMode.Multiply)}"
       {...annotationsProps}
     >
       {#snippet children(obj)}
@@ -295,7 +295,7 @@
           linePoints: { start: vertices[0], end: vertices[1] },
         }),
       }}
-      style={{ mixBlendMode }}
+      style="mix-blend-mode: {mixBlendMode}"
       {...annotationsProps}
     >
       {#snippet children(obj)}
@@ -320,7 +320,7 @@
         extractVertices: (a) => a.vertices,
         transformAnnotation: (a, vertices) => ({ ...a, vertices }),
       }}
-      style={{ mixBlendMode }}
+      style="mix-blend-mode: {mixBlendMode}"
       {...annotationsProps}
     >
       {#snippet children(obj)}
@@ -345,7 +345,7 @@
         extractVertices: (a) => a.vertices,
         transformAnnotation: (a, vertices) => ({ ...a, vertices }),
       }}
-      style={{ mixBlendMode }}
+      style="mix-blend-mode: {mixBlendMode}"
       {...annotationsProps}
     >
       {#snippet children(obj)}
@@ -366,9 +366,7 @@
       lockAspectRatio={tool?.interaction.lockAspectRatio ?? false}
       selectionMenu={annotationsProps.selectionMenu}
       onSelect={(e) => handleClick(e, annotation)}
-      style={{
-        mixBlendMode: blendModeToCss(annotation.object.blendMode ?? PdfBlendMode.Normal),
-      }}
+      style="mix-blend-mode: {blendModeToCss(annotation.object.blendMode ?? PdfBlendMode.Normal)}"
       onDoubleClick={(e) => {
         e.stopPropagation();
         editingId = annotation.object.id;
@@ -396,7 +394,7 @@
       lockAspectRatio={tool?.interaction.lockAspectRatio ?? false}
       selectionMenu={annotationsProps.selectionMenu}
       onSelect={(e: MouseEvent | TouchEvent) => handleClick(e, annotation)}
-      style={{ mixBlendMode }}
+      style="mix-blend-mode: {mixBlendMode}"
       {...annotationsProps}
     >
       {#snippet children(_object)}

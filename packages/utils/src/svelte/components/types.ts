@@ -1,4 +1,4 @@
 export interface MenuWrapperProps {
-  style: Record<string, string>;
+  style: string;
   ref: (el: HTMLElement | null) => void;
 }

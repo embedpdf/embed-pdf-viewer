@@ -54,17 +54,17 @@
     };
   });
 
-  const menuWrapperStyle = $derived({
-    position: 'absolute',
-    left: `${rect.origin.x}px`,
-    top: `${rect.origin.y}px`,
-    transform: counterRotation.matrix,
-    transformOrigin: '0 0',
-    width: `${counterRotation.width}px`,
-    height: `${counterRotation.height}px`,
-    pointerEvents: 'none',
-    zIndex: '3',
-  });
+  const menuWrapperStyle = $derived(
+    `position: absolute; ` +
+      `left: ${rect.origin.x}px; ` +
+      `top: ${rect.origin.y}px; ` +
+      `transform: ${counterRotation.matrix}; ` +
+      `transform-origin: 0 0; ` +
+      `width: ${counterRotation.width}px; ` +
+      `height: ${counterRotation.height}px; ` +
+      `pointer-events: none; ` +
+      `z-index: 3`,
+  );
 
   const menuWrapperProps: MenuWrapperProps = $derived({
     style: menuWrapperStyle,

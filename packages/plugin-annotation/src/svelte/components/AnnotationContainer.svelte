@@ -1,48 +1,14 @@
 <script lang="ts" generics="T extends PdfAnnotationObject">
-  import { type TrackedAnnotation } from '@embedpdf/plugin-annotation';
-  import { type Snippet } from 'svelte';
+  import type { PdfAnnotationObject } from '@embedpdf/models';
   import { useAnnotationCapability } from '../hooks';
-  import type { VertexConfig } from '../../shared/types';
-  import type {
-    CustomAnnotationRenderer,
-    ResizeHandleUI,
-    SelectionMenuProps,
-    VertexHandleUI,
-  } from '../types';
+  import type { AnnotationContainerProps } from './types';
   import {
     useInteractionHandles,
     doublePress,
     CounterRotate,
     deepToRaw,
-    stylesToString,
   } from '@embedpdf/utils/svelte';
-
-  interface AnnotationContainerProps {
-    documentId: string;
-    scale: number;
-    pageIndex: number;
-    rotation: number;
-    pageWidth: number;
-    pageHeight: number;
-    trackedAnnotation: TrackedAnnotation<T>;
-    children: Snippet<[T]>;
-    isSelected: boolean;
-    isDraggable: boolean;
-    isResizable: boolean;
-    lockAspectRatio?: boolean;
-    class?: string;
-    style?: Record<string, string | number | undefined>;
-    vertexConfig?: VertexConfig<T>;
-    selectionMenu?: Snippet<[SelectionMenuProps]>;
-    outlineOffset?: number;
-    onDoubleClick?: (event: any) => void;
-    onSelect: (event: any) => void;
-    zIndex?: number;
-    resizeUI?: ResizeHandleUI;
-    vertexUI?: VertexHandleUI;
-    selectionOutlineColor?: string;
-    customAnnotationRenderer?: CustomAnnotationRenderer<T>;
-  }
+  import { Snippet } from 'svelte';
 
   let {
     documentId,
@@ -70,7 +36,7 @@
     selectionOutlineColor = '#007ACC',
     customAnnotationRenderer,
     ...restProps
-  }: AnnotationContainerProps = $props();
+  }: AnnotationContainerProps<T> = $props();
 
   let preview = $state<T>(trackedAnnotation.object);
   let annotationCapability = useAnnotationCapability();
@@ -179,14 +145,14 @@
     style:touch-action="none"
     style:cursor={isSelected && isDraggable ? 'move' : 'default'}
     style:z-index={zIndex}
-    style={style ? stylesToString(style) : ''}
+    style={style || ''}
     class={propsClass}
     {...restProps}
   >
     {#if customAnnotationRenderer}
       {@render customAnnotationRenderer?.({
         annotation: currentObject,
-        children,
+        children: children as Snippet,
         isSelected,
         scale,
         rotation,
@@ -205,10 +171,7 @@
           {@const Component = resizeUI.component}
           <Component {...hProps} backgroundColor={HANDLE_COLOR} />
         {:else}
-          <div
-            {...hProps}
-            style="{stylesToString(handleStyle)}; background-color: {HANDLE_COLOR};"
-          ></div>
+          <div {...hProps} style="{handleStyle}; background-color: {HANDLE_COLOR};"></div>
         {/if}
       {/each}
     {/if}
@@ -219,10 +182,7 @@
           {@const Component = vertexUI.component}
           <Component {...vProps} backgroundColor={VERTEX_COLOR} />
         {:else}
-          <div
-            {...vProps}
-            style="{stylesToString(vertexStyle)}; background-color: {VERTEX_COLOR};"
-          ></div>
+          <div {...vProps} style="{vertexStyle}; background-color: {VERTEX_COLOR};"></div>
         {/if}
       {/each}
     {/if}

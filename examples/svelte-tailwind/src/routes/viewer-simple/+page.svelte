@@ -152,10 +152,7 @@
                 <div id="document-content" class="flex flex-1 overflow-hidden bg-white">
                   <!-- Thumbnails Sidebar - Left -->
                   {#if getSidebarState(activeDocumentId).thumbnails}
-                    <ThumbnailsSidebar
-                      documentId={activeDocumentId}
-                      onClose={() => toggleSidebar(activeDocumentId, 'thumbnails')}
-                    />
+                    <ThumbnailsSidebar documentId={activeDocumentId} />
                   {/if}
 
                   <!-- Main Viewer -->
@@ -226,10 +223,7 @@
 
                   <!-- Search Sidebar - Right -->
                   {#if getSidebarState(activeDocumentId).search}
-                    <SearchSidebar
-                      documentId={activeDocumentId}
-                      onClose={() => toggleSidebar(activeDocumentId, 'search')}
-                    />
+                    <SearchSidebar documentId={activeDocumentId} />
                   {/if}
                 </div>
               {/if}

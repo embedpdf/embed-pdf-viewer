@@ -5,10 +5,11 @@ import {
   type ResizeUI,
   type VertexUI,
 } from '../../shared/plugin-interaction-primitives';
+import { stylesToString } from '../utils/styles-to-string';
 
 export type HandleElementProps = {
   key: string | number;
-  style: Record<string, any>;
+  style: string;
   onpointerdown: (e: PointerEvent) => void;
   onpointermove: (e: PointerEvent) => void;
   onpointerup: (e: PointerEvent) => void;
@@ -42,7 +43,7 @@ export function useInteractionHandles(
     const desc = describeResizeFromConfig(controller, resizeUI);
     return desc.map((d) => ({
       key: d.attrs?.['data-epdf-handle'] as string,
-      style: d.style as Record<string, any>,
+      style: stylesToString(d.style),
       ...dragResize.createResizeProps(d.handle),
       ...(d.attrs ?? {}),
       ...(handleAttrs?.(d.handle) ?? {}),
@@ -55,7 +56,7 @@ export function useInteractionHandles(
     const desc = describeVerticesFromConfig(controller, vertexUI, controller.vertices);
     return desc.map((d, i) => ({
       key: i,
-      style: d.style as Record<string, any>,
+      style: stylesToString(d.style),
       ...dragResize.createVertexProps(i),
       ...(d.attrs ?? {}),
       ...(vertexAttrs?.(i) ?? {}),
