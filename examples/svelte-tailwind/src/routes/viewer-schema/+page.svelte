@@ -57,7 +57,7 @@
     dutchTranslations,
     paramResolvers,
   } from '$lib/config';
-  import { AnnotationSelectionMenu } from '$lib/components';
+  import { AnnotationSelectionMenu, SelectionSelectionMenu } from '$lib/components';
 
   const logger = new ConsoleLogger();
 
@@ -274,7 +274,11 @@
                           <SearchLayer {documentId} pageIndex={page.pageIndex} />
                           <MarqueeZoom {documentId} pageIndex={page.pageIndex} />
                           <MarqueeCapture {documentId} pageIndex={page.pageIndex} />
-                          <SelectionLayer {documentId} pageIndex={page.pageIndex} />
+                          <SelectionLayer {documentId} pageIndex={page.pageIndex}>
+                            {#snippet selectionMenu(props)}
+                              <SelectionSelectionMenu {...props} {documentId} />
+                            {/snippet}
+                          </SelectionLayer>
                           <AnnotationLayer {documentId} pageIndex={page.pageIndex}>
                             {#snippet selectionMenu(props)}
                               <AnnotationSelectionMenu {...props} />

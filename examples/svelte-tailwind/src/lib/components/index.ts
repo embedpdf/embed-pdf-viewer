@@ -5,3 +5,4 @@ export { default as Sidebar } from './Sidebar.svelte';
 export { default as Search } from './Search.svelte';
 export { default as PrintDialog } from './PrintDialog.svelte';
 export { default as AnnotationSelectionMenu } from './AnnotationSelectionMenu.svelte';
+export { default as SelectionSelectionMenu } from './SelectionSelectionMenu.svelte';
