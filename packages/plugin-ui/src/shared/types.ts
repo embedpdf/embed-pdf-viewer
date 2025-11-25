@@ -1,6 +1,8 @@
 import type { ComponentType } from '@framework';
 import { ToolbarSchema, PanelSchema, MenuSchema } from '@embedpdf/plugin-ui';
 
+export type UIComponents = Record<string, ComponentType<BaseComponentProps>>;
+
 /**
  * Base props that all custom components must accept
  */

@@ -1,4 +1,3 @@
-import { IconProps } from '@embedpdf/plugin-ui';
 import { h, ComponentChildren, Ref, JSX } from 'preact';
 
 type ButtonProps = JSX.ButtonHTMLAttributes<HTMLButtonElement> & {
@@ -9,7 +8,7 @@ type ButtonProps = JSX.ButtonHTMLAttributes<HTMLButtonElement> & {
   disabled?: boolean;
   className?: string;
   tooltip?: string;
-  ref?: Ref<HTMLButtonElement>;
+  elementRef?: (el: HTMLButtonElement | null) => void;
 };
 
 export function Button({
@@ -20,13 +19,13 @@ export function Button({
   disabled = false,
   className = '',
   tooltip,
-  ref,
+  elementRef,
   ...props
 }: ButtonProps) {
   return (
     <button
       id={id}
-      ref={ref}
+      ref={elementRef}
       onClick={onClick}
       className={`flex h-[32px] w-auto min-w-[32px] items-center justify-center rounded-md p-[5px] transition-colors ${
         active

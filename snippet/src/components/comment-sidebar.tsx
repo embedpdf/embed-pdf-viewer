@@ -1,22 +1,32 @@
 import { h } from 'preact';
 import { useRef, useEffect } from 'preact/hooks';
-import { useAnnotationCapability } from '@embedpdf/plugin-annotation/preact';
+import {
+  getAnnotationByUid,
+  getSidebarAnnotationsWithRepliesGroupedByPage,
+  useAnnotation,
+  useAnnotationCapability,
+} from '@embedpdf/plugin-annotation/preact';
 import { useScrollCapability } from '@embedpdf/plugin-scroll/preact';
-import { SidebarAnnotationEntry, TrackedAnnotation } from '@embedpdf/plugin-annotation';
+import { TrackedAnnotation } from '@embedpdf/plugin-annotation';
 import { uuidV4, PdfAnnotationSubtype, PdfAnnotationIcon } from '@embedpdf/models';
 import { AnnotationCard } from './comment-sidebar/annotation-card';
 import { EmptyState } from './comment-sidebar/empty-state';
 
 export interface CommentSidebarProps {
-  sidebarAnnotations: Record<number, SidebarAnnotationEntry[]>;
-  selectedAnnotation: TrackedAnnotation | null;
+  documentId: string;
 }
 
-export const commentRender = ({ sidebarAnnotations, selectedAnnotation }: CommentSidebarProps) => {
+export const CommentSidebar = ({ documentId }: CommentSidebarProps) => {
   const { provides: annotationApi } = useAnnotationCapability();
+  const { provides: annotation, state } = useAnnotation(documentId);
   const { provides: scrollApi } = useScrollCapability();
   const annotationRefs = useRef<Record<string, HTMLDivElement | null>>({});
   const scrollContainerRef = useRef<HTMLDivElement>(null);
+
+  const selectedAnnotation = state.selectedUid
+    ? getAnnotationByUid(state, state.selectedUid)
+    : null;
+  const sidebarAnnotations = getSidebarAnnotationsWithRepliesGroupedByPage(state);
 
   // Effect to scroll to the selected annotation
   useEffect(() => {
@@ -118,7 +128,11 @@ export const commentRender = ({ sidebarAnnotations, selectedAnnotation }: Commen
               {sidebarAnnotations[pageNumber].map((entry) => (
                 <div
                   key={entry.annotation.object.id}
-                  ref={(el) => (annotationRefs.current[entry.annotation.object.id] = el)}
+                  ref={(el) => {
+                    if (el) {
+                      annotationRefs.current[entry.annotation.object.id] = el;
+                    }
+                  }}
                 >
                   <AnnotationCard
                     entry={entry}

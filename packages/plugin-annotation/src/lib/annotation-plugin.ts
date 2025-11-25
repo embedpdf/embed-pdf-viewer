@@ -50,7 +50,7 @@ import {
 } from '@embedpdf/plugin-interaction-manager';
 import { SelectionPlugin, SelectionCapability } from '@embedpdf/plugin-selection';
 import { HistoryPlugin, HistoryCapability, Command } from '@embedpdf/plugin-history';
-import { getSelectedAnnotation } from './selectors';
+import { getAnnotationByUid, getSelectedAnnotation } from './selectors';
 import { initialDocumentState } from './reducer';
 import { AnnotationTool } from './tools/types';
 import { AnyPreviewState, HandlerContext, HandlerFactory, HandlerServices } from './handlers/types';
@@ -258,6 +258,7 @@ export class AnnotationPlugin extends BasePlugin<
       getState: () => this.getDocumentState(),
       getPageAnnotations: (options) => this.getPageAnnotations(options),
       getSelectedAnnotation: () => this.getSelectedAnnotation(),
+      getAnnotationById: (id) => this.getAnnotationById(id),
       selectAnnotation: (pageIndex, id) => this.selectAnnotation(pageIndex, id),
       deselectAnnotation: () => this.deselectAnnotation(),
       importAnnotations: (items) => this.importAnnotations(items),
@@ -301,6 +302,7 @@ export class AnnotationPlugin extends BasePlugin<
       getState: () => this.getDocumentState(documentId),
       getPageAnnotations: (options) => this.getPageAnnotations(options, documentId),
       getSelectedAnnotation: () => this.getSelectedAnnotation(documentId),
+      getAnnotationById: (id) => this.getAnnotationById(id, documentId),
       selectAnnotation: (pageIndex, id) => this.selectAnnotation(pageIndex, id, documentId),
       deselectAnnotation: () => this.deselectAnnotation(documentId),
       getActiveTool: () => this.getActiveTool(documentId),
@@ -500,6 +502,11 @@ export class AnnotationPlugin extends BasePlugin<
 
   private getSelectedAnnotation(documentId?: string): TrackedAnnotation | null {
     return getSelectedAnnotation(this.getDocumentState(documentId));
+  }
+
+  private getAnnotationById(id: string, documentId?: string): TrackedAnnotation | null {
+    const docState = this.getDocumentState(documentId);
+    return getAnnotationByUid(docState, id);
   }
 
   private renderAnnotation(

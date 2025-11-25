@@ -134,6 +134,7 @@ export interface AnnotationScope {
     options: GetPageAnnotationsOptions,
   ): Task<PdfAnnotationObject[], PdfErrorReason>;
   getSelectedAnnotation(): TrackedAnnotation | null;
+  getAnnotationById(id: string): TrackedAnnotation | null;
   selectAnnotation(pageIndex: number, annotationId: string): void;
   deselectAnnotation(): void;
   getActiveTool(): AnnotationTool | null;
@@ -165,6 +166,7 @@ export interface AnnotationCapability {
     options: GetPageAnnotationsOptions,
   ) => Task<PdfAnnotationObject[], PdfErrorReason>;
   getSelectedAnnotation: () => TrackedAnnotation | null;
+  getAnnotationById(id: string): TrackedAnnotation | null;
   selectAnnotation: (pageIndex: number, annotationId: string) => void;
   deselectAnnotation: () => void;
   importAnnotations: (items: ImportAnnotationItem<PdfAnnotationObject>[]) => void;

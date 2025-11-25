@@ -1,4 +1,11 @@
-import { BasePlugin, PluginRegistry, StoreState, createEmitter, Listener } from '@embedpdf/core';
+import {
+  BasePlugin,
+  PluginRegistry,
+  StoreState,
+  createEmitter,
+  Listener,
+  arePropsEqual,
+} from '@embedpdf/core';
 import { I18nCapability, I18nPlugin } from '@embedpdf/plugin-i18n';
 import {
   CommandsCapability,
@@ -360,6 +367,9 @@ export class CommandsPlugin extends BasePlugin<
       }
       if (prevResolved.label !== newResolved.label) {
         changes.label = newResolved.label;
+      }
+      if (!arePropsEqual(prevResolved.iconProps, newResolved.iconProps)) {
+        changes.iconProps = newResolved.iconProps;
       }
 
       if (Object.keys(changes).length > 0) {

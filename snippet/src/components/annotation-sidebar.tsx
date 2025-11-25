@@ -1,43 +1,44 @@
 /** @jsxImportSource preact */
 import { h } from 'preact';
-import { useAnnotationCapability, AnnotationTool } from '@embedpdf/plugin-annotation/preact';
-import { PdfAnnotationSubtype, PdfAnnotationObject } from '@embedpdf/models';
-import { TrackedAnnotation } from '@embedpdf/plugin-annotation';
+import {
+  useAnnotationCapability,
+  AnnotationTool,
+  useAnnotation,
+} from '@embedpdf/plugin-annotation/preact';
+import { PdfAnnotationSubtype } from '@embedpdf/models';
+import { getAnnotationByUid } from '@embedpdf/plugin-annotation';
 
 import { SidebarPropsBase } from './annotation-sidebar/common';
-import { SIDEbars } from './annotation-sidebar/registry';
+import { SidebarRegistry } from './annotation-sidebar/registry';
 import { EmptyState } from './annotation-sidebar/empty-state';
 
-export function leftPanelAnnotationStyleRenderer({
-  selectedAnnotation,
-  activeToolId,
-  colorPresets,
-}: {
-  selectedAnnotation: TrackedAnnotation | null;
-  activeToolId: string | null;
-  colorPresets: string[];
-}) {
-  const { provides: annotation } = useAnnotationCapability();
-  if (!annotation) return null;
+export function AnnotationSidebar({ documentId }: { documentId: string }) {
+  const { provides: annotationCapability } = useAnnotationCapability();
+  const { provides: annotation, state } = useAnnotation(documentId);
+  if (!annotationCapability || !annotation) return null;
+
+  const colorPresets = annotationCapability?.getColorPresets() ?? [];
 
   let tool: AnnotationTool | null = null;
   let subtype: PdfAnnotationSubtype | null = null;
-
+  const selectedAnnotation = state.selectedUid
+    ? getAnnotationByUid(state, state.selectedUid)
+    : null;
   // 1. Determine which tool and subtype we are working with
   if (selectedAnnotation) {
     // If an annotation is selected, find the best tool that matches it
     tool = annotation.findToolForAnnotation(selectedAnnotation.object);
     subtype = selectedAnnotation.object.type;
-  } else if (activeToolId) {
+  } else if (state.activeToolId) {
     // If no annotation is selected, use the active tool from the toolbar
-    tool = annotation.getTool(activeToolId) ?? null;
+    tool = annotation.getActiveTool() ?? null;
     subtype = tool?.defaults.type ?? null;
   }
 
   // 2. If we couldn't determine a subtype, show the empty state
   if (subtype === null) return <EmptyState />;
 
-  const entry = SIDEbars[subtype];
+  const entry = SidebarRegistry[subtype];
   if (!entry) return <EmptyState />;
 
   const { component: Sidebar, title } = entry;

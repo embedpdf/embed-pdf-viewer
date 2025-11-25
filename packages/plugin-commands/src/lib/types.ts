@@ -84,6 +84,7 @@ export interface CommandStateChangedEvent {
     disabled?: boolean;
     visible?: boolean;
     label?: string;
+    iconProps?: IconProps;
   };
 }
 

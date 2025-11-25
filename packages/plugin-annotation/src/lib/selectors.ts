@@ -25,6 +25,9 @@ export const getAnnotations = (s: AnnotationDocumentState) => {
 export const getSelectedAnnotation = (s: AnnotationDocumentState) =>
   s.selectedUid ? s.byUid[s.selectedUid] : null;
 
+/** Get a tracked annotation by its ID */
+export const getAnnotationByUid = (s: AnnotationDocumentState, uid: string) => s.byUid[uid] ?? null;
+
 export const getSelectedAnnotationByPageIndex = (s: AnnotationDocumentState, pageIndex: number) => {
   if (!s.selectedUid) return null;
 

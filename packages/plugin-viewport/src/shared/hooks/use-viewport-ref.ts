@@ -41,7 +41,6 @@ export function useViewportRef(documentId: string) {
 
     // On resize
     const resizeObserver = new ResizeObserver(() => {
-      console.log('[viewport] resizeObserver', documentId);
       viewportPlugin.setViewportResizeMetrics(documentId, {
         width: container.offsetWidth,
         height: container.offsetHeight,

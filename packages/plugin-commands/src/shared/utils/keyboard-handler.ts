@@ -29,7 +29,6 @@ export function buildShortcutString(event: KeyboardEvent): string | null {
  */
 export function createKeyDownHandler(commands: CommandsCapability) {
   return (event: KeyboardEvent) => {
-    console.log('event', event);
     // Don't handle shortcuts if target is an input, textarea, or contentEditable
     const target = event.target as HTMLElement;
     if (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable) {
@@ -38,8 +37,6 @@ export function createKeyDownHandler(commands: CommandsCapability) {
 
     const shortcut = buildShortcutString(event);
     if (!shortcut) return;
-
-    console.log('shortcut', shortcut);
 
     const command = commands.getCommandByShortcut(shortcut);
     if (!command) return;
