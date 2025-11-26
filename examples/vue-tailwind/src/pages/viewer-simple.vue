@@ -96,18 +96,46 @@
                                 :documentId="activeDocumentId"
                                 :pageIndex="page.pageIndex"
                               />
+                              <!-- Selection Layer with slot-based menu -->
                               <SelectionLayer
                                 :documentId="activeDocumentId"
                                 :pageIndex="page.pageIndex"
-                              />
+                              >
+                                <template #selection-menu="menuProps">
+                                  <SelectionSelectionMenu
+                                    v-bind="menuProps"
+                                    :documentId="activeDocumentId"
+                                  />
+                                </template>
+                              </SelectionLayer>
+
+                              <!-- Redaction Layer with slot-based menu -->
                               <RedactionLayer
                                 :documentId="activeDocumentId"
                                 :pageIndex="page.pageIndex"
-                              />
+                              >
+                                <template #selection-menu="menuProps">
+                                  <RedactionSelectionMenu
+                                    v-if="menuProps.selected"
+                                    v-bind="menuProps"
+                                    :documentId="activeDocumentId"
+                                  />
+                                </template>
+                              </RedactionLayer>
+
+                              <!-- Annotation Layer with slot-based menu -->
                               <AnnotationLayer
                                 :documentId="activeDocumentId"
                                 :pageIndex="page.pageIndex"
-                              />
+                              >
+                                <template #selection-menu="menuProps">
+                                  <AnnotationSelectionMenu
+                                    v-if="menuProps.selected"
+                                    v-bind="menuProps"
+                                    :documentId="activeDocumentId"
+                                  />
+                                </template>
+                              </AnnotationLayer>
                             </PagePointerProvider>
                           </Rotate>
                         </Scroller>
@@ -176,6 +204,9 @@ import ThumbnailsSidebar from '../components/ThumbnailsSidebar.vue';
 import PageControls from '../components/PageControls.vue';
 import NavigationBar from '../components/NavigationBar.vue';
 import { ConsoleLogger } from '@embedpdf/models';
+import SelectionSelectionMenu from '../components/SelectionSelectionMenu.vue';
+import RedactionSelectionMenu from '../components/RedactionSelectionMenu.vue';
+import AnnotationSelectionMenu from '../components/AnnotationSelectionMenu.vue';
 
 const logger = new ConsoleLogger();
 

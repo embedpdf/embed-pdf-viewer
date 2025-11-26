@@ -3,7 +3,8 @@ import {
   CustomAnnotationRenderer,
   ResizeHandleUI,
   VertexHandleUI,
-  SelectionMenuProps,
+  AnnotationSelectionMenuRenderFn,
+  AnnotationSelectionMenuProps,
 } from '../types';
 import { VertexConfig } from '../../shared/types';
 import { PdfAnnotationObject } from '@embedpdf/models';
@@ -25,7 +26,8 @@ export interface AnnotationContainerProps<T extends PdfAnnotationObject> {
   class?: string;
   style?: string;
   vertexConfig?: VertexConfig<T>;
-  selectionMenu?: Snippet<[SelectionMenuProps]>;
+  selectionMenu?: AnnotationSelectionMenuRenderFn;
+  selectionMenuSnippet?: Snippet<[AnnotationSelectionMenuProps]>;
   outlineOffset?: number;
   onDoubleClick?: (event: any) => void;
   onSelect: (event: any) => void;

@@ -10,7 +10,9 @@
       :resizeUI="resizeUI"
       :vertexUI="vertexUI"
       :selectionOutlineColor="selectionOutlineColor"
+      :selectionMenu="selectionMenu"
     >
+      <!-- Forward slots for manual customization (only used if selectionMenu prop not provided) -->
       <template #selection-menu="slotProps">
         <slot name="selection-menu" v-bind="slotProps"></slot>
       </template>
@@ -33,7 +35,7 @@ import { Rotation } from '@embedpdf/models';
 import Annotations from './annotations.vue';
 import TextMarkup from './text-markup.vue';
 import AnnotationPaintLayer from './annotation-paint-layer.vue';
-import { ResizeHandleUI, VertexHandleUI } from '../types';
+import { AnnotationSelectionMenuRenderFn, ResizeHandleUI, VertexHandleUI } from '../types';
 
 const props = defineProps<{
   /** The ID of the document that this layer displays annotations for */
@@ -47,6 +49,8 @@ const props = defineProps<{
   vertexUI?: VertexHandleUI;
   /** Customize selection outline color */
   selectionOutlineColor?: string;
+  /** Customize selection menu */
+  selectionMenu?: AnnotationSelectionMenuRenderFn;
 }>();
 
 const documentState = useDocumentState(() => props.documentId);

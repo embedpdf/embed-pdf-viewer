@@ -3,7 +3,7 @@ import { CounterRotate } from '@embedpdf/utils/@framework';
 import { useRedactionCapability } from '../hooks';
 import { RedactionItem } from '@embedpdf/plugin-redaction';
 import { Highlight } from './highlight';
-import { SelectionMenuProps } from './types';
+import { RedactionSelectionMenuRenderFn } from './types';
 import { Rotation } from '@embedpdf/models';
 
 interface PendingRedactionsProps {
@@ -12,7 +12,7 @@ interface PendingRedactionsProps {
   scale: number;
   rotation: Rotation;
   bboxStroke?: string;
-  selectionMenu?: (props: SelectionMenuProps) => JSX.Element;
+  selectionMenu?: RedactionSelectionMenuRenderFn;
 }
 
 export function PendingRedactions({
@@ -89,24 +89,30 @@ export function PendingRedactions({
                 onPointerDown={(e) => select(e, it.id)}
                 onTouchStart={(e) => select(e, it.id)}
               />
-              <CounterRotate
-                rect={{
-                  origin: { x: r.origin.x * scale, y: r.origin.y * scale },
-                  size: { width: r.size.width * scale, height: r.size.height * scale },
-                }}
-                rotation={rotation}
-              >
-                {({ rect, menuWrapperProps }) =>
-                  selectionMenu &&
-                  selectionMenu({
-                    item: it,
-                    selected: selectedId === it.id,
-                    pageIndex,
-                    menuWrapperProps,
-                    rect,
-                  })
-                }
-              </CounterRotate>
+              {selectionMenu && (
+                <CounterRotate
+                  rect={{
+                    origin: { x: r.origin.x * scale, y: r.origin.y * scale },
+                    size: { width: r.size.width * scale, height: r.size.height * scale },
+                  }}
+                  rotation={rotation}
+                >
+                  {(props) =>
+                    selectionMenu({
+                      ...props,
+                      context: {
+                        type: 'redaction',
+                        item: it,
+                        pageIndex,
+                      },
+                      selected: selectedId === it.id,
+                      placement: {
+                        suggestTop: false,
+                      },
+                    })
+                  }
+                </CounterRotate>
+              )}
             </Fragment>
           );
         }
@@ -137,24 +143,30 @@ export function PendingRedactions({
                 onClick={(e) => select(e, it.id)}
               />
             </div>
-            <CounterRotate
-              rect={{
-                origin: { x: b.origin.x * scale, y: b.origin.y * scale },
-                size: { width: b.size.width * scale, height: b.size.height * scale },
-              }}
-              rotation={rotation}
-            >
-              {({ rect, menuWrapperProps }) =>
-                selectionMenu &&
-                selectionMenu({
-                  item: it,
-                  selected: selectedId === it.id,
-                  pageIndex,
-                  menuWrapperProps,
-                  rect,
-                })
-              }
-            </CounterRotate>
+            {selectionMenu && (
+              <CounterRotate
+                rect={{
+                  origin: { x: b.origin.x * scale, y: b.origin.y * scale },
+                  size: { width: b.size.width * scale, height: b.size.height * scale },
+                }}
+                rotation={rotation}
+              >
+                {(props) =>
+                  selectionMenu({
+                    ...props,
+                    context: {
+                      type: 'redaction',
+                      item: it,
+                      pageIndex,
+                    },
+                    selected: selectedId === it.id,
+                    placement: {
+                      suggestTop: false,
+                    },
+                  })
+                }
+              </CounterRotate>
+            )}
           </Fragment>
         );
       })}

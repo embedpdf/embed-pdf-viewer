@@ -1,9 +1,9 @@
-import { Rect } from '@embedpdf/models';
-import { MenuWrapperProps } from '@embedpdf/utils/@framework';
-import { SelectionMenuPlacement } from '@embedpdf/plugin-selection';
+import { SelectionMenuRenderFn, SelectionMenuPropsBase } from '@embedpdf/utils/@framework';
 
-export interface SelectionMenuProps {
-  rect: Rect;
-  menuWrapperProps: MenuWrapperProps;
-  placement: SelectionMenuPlacement;
+export interface SelectionSelectionContext {
+  type: 'selection';
+  pageIndex: number;
 }
+
+export type SelectionSelectionMenuRenderFn = SelectionMenuRenderFn<SelectionSelectionContext>;
+export type SelectionSelectionMenuProps = SelectionMenuPropsBase<SelectionSelectionContext>;

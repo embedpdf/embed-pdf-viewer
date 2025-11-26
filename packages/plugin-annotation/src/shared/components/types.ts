@@ -1,18 +1,22 @@
-import { PdfAnnotationObject, Position, Rect } from '@embedpdf/models';
+import { PdfAnnotationObject } from '@embedpdf/models';
 import { TrackedAnnotation } from '@embedpdf/plugin-annotation';
-import { HandleElementProps, MenuWrapperProps } from '@embedpdf/utils/@framework';
+import {
+  HandleElementProps,
+  SelectionMenuPropsBase,
+  SelectionMenuRenderFn,
+} from '@embedpdf/utils/@framework';
 import { JSX } from '@framework';
 
 export type ResizeDirection = 'top-left' | 'top-right' | 'bottom-left' | 'bottom-right' | 'none';
 
-export interface SelectionMenuProps {
+export interface AnnotationSelectionContext {
+  type: 'annotation';
   annotation: TrackedAnnotation;
-  selected: boolean;
-  rect: Rect;
-  menuWrapperProps: MenuWrapperProps;
+  pageIndex: number;
 }
 
-export type SelectionMenu = (props: SelectionMenuProps) => JSX.Element;
+export type AnnotationSelectionMenuProps = SelectionMenuPropsBase<AnnotationSelectionContext>;
+export type AnnotationSelectionMenuRenderFn = SelectionMenuRenderFn<AnnotationSelectionContext>;
 
 export type HandleProps = HandleElementProps & {
   backgroundColor?: string;

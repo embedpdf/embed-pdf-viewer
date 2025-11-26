@@ -53,3 +53,4 @@ export { default as ArrowForwardUpIcon } from './ArrowForwardUpIcon.vue';
 export { default as PointerIcon } from './PointerIcon.vue';
 export { default as SidebarIcon } from './SidebarIcon.vue';
 export { default as CommentIcon } from './CommentIcon.vue';
+export { default as CopyIcon } from './CopyIcon.vue';

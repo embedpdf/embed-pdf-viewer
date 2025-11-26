@@ -44,6 +44,9 @@ import { NavigationBar } from '../components/navigation-bar';
 import { EmptyState } from '../components/empty-state';
 import { commands } from '../config/commands';
 import { SidebarState } from '../config/types';
+import { SelectionSelectionMenu } from '../components/selection-selection-menu';
+import { RedactionSelectionMenu } from '../components/redaction-selection-menu';
+import { AnnotationSelectionMenu } from '../components/annotation-selection-menu';
 
 const logger = new ConsoleLogger();
 
@@ -249,14 +252,32 @@ export function ViewerSimplePage() {
                                                 <SelectionLayer
                                                   documentId={activeDocumentId}
                                                   pageIndex={pageIndex}
+                                                  selectionMenu={(props) => (
+                                                    <SelectionSelectionMenu
+                                                      {...props}
+                                                      documentId={activeDocumentId}
+                                                    />
+                                                  )}
                                                 />
                                                 <RedactionLayer
                                                   documentId={activeDocumentId}
                                                   pageIndex={pageIndex}
+                                                  selectionMenu={(props) => (
+                                                    <RedactionSelectionMenu
+                                                      {...props}
+                                                      documentId={activeDocumentId}
+                                                    />
+                                                  )}
                                                 />
                                                 <AnnotationLayer
                                                   documentId={activeDocumentId}
                                                   pageIndex={pageIndex}
+                                                  selectionMenu={(props) => (
+                                                    <AnnotationSelectionMenu
+                                                      {...props}
+                                                      documentId={activeDocumentId}
+                                                    />
+                                                  )}
                                                 />
                                               </PagePointerProvider>
                                             </Rotate>

@@ -3,14 +3,16 @@
   import { useDocumentState } from '@embedpdf/core/svelte';
   import type { HTMLAttributes } from 'svelte/elements';
   import type {
+    AnnotationSelectionMenuProps,
+    AnnotationSelectionMenuRenderFn,
     CustomAnnotationRenderer,
     ResizeHandleUI,
-    SelectionMenu,
     VertexHandleUI,
   } from '../types';
   import Annotations from './Annotations.svelte';
   import TextMarkup from './TextMarkup.svelte';
   import AnnotationPaintLayer from './AnnotationPaintLayer.svelte';
+  import type { Snippet } from 'svelte';
 
   type AnnotationLayerProps = Omit<HTMLAttributes<HTMLDivElement>, 'style'> & {
     /** The ID of the document that this layer displays annotations for */
@@ -18,8 +20,10 @@
     pageIndex: number;
     scale?: number;
     rotation?: number;
-    /** Customize selection menu across all annotations on this layer */
-    selectionMenu?: SelectionMenu;
+    /** Render function for selection menu (schema-driven approach) */
+    selectionMenu?: AnnotationSelectionMenuRenderFn;
+    /** Snippet for custom selection menu (slot-based approach) */
+    selectionMenuSnippet?: Snippet<[AnnotationSelectionMenuProps]>;
     style?: Record<string, string | number | undefined>;
     /** Customize resize handles */
     resizeUI?: ResizeHandleUI;
@@ -38,6 +42,7 @@
     scale: overrideScale,
     rotation: overrideRotation,
     selectionMenu,
+    selectionMenuSnippet,
     resizeUI,
     vertexUI,
     selectionOutlineColor,
@@ -70,6 +75,7 @@
   <Annotations
     {documentId}
     {selectionMenu}
+    {selectionMenuSnippet}
     {pageIndex}
     scale={actualScale}
     rotation={actualRotation}

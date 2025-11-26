@@ -1,18 +1,13 @@
-import { SelectionMenuProps } from '@embedpdf/plugin-selection/react';
+import { SelectionSelectionMenuProps } from '@embedpdf/plugin-selection/react';
 import { useSelectionCapability } from '@embedpdf/plugin-selection/react';
 import { useState, useEffect } from 'react';
 import { SquaresIcon, CheckIcon } from './icons';
 
-export interface SelectionSelectionMenuProps extends SelectionMenuProps {
+export interface Props extends SelectionSelectionMenuProps {
   documentId: string;
 }
 
-export function SelectionSelectionMenu({
-  rect,
-  menuWrapperProps,
-  placement,
-  documentId,
-}: SelectionSelectionMenuProps) {
+export function SelectionSelectionMenu({ rect, menuWrapperProps, placement, documentId }: Props) {
   const { provides: selectionCapability } = useSelectionCapability();
   const [copied, setCopied] = useState(false);
 

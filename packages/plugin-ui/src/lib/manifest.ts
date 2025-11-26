@@ -18,6 +18,7 @@ export const manifest: PluginManifest<UIPluginConfig> = {
       toolbars: {},
       menus: {},
       panels: {},
+      selectionMenus: {},
     },
   },
 };

@@ -5,6 +5,7 @@
     :scale="actualScale"
     :rotation="actualRotation"
     :bbox-stroke="bboxStroke"
+    :selection-menu="selectionMenu"
   >
     <template #selection-menu="slotProps">
       <slot name="selection-menu" v-bind="slotProps" />
@@ -21,6 +22,7 @@ import { Rotation } from '@embedpdf/models';
 import PendingRedactions from './pending-redactions.vue';
 import MarqueeRedact from './marquee-redact.vue';
 import SelectionRedact from './selection-redact.vue';
+import { RedactionSelectionMenuRenderFn } from './types';
 
 interface RedactionLayerProps {
   /** The ID of the document this layer belongs to */
@@ -33,6 +35,8 @@ interface RedactionLayerProps {
   rotation?: Rotation;
   /** Optional bbox stroke color */
   bboxStroke?: string;
+  /** Optional menu renderer for a selected redaction */
+  selectionMenu?: RedactionSelectionMenuRenderFn;
 }
 
 const props = withDefaults(defineProps<RedactionLayerProps>(), {

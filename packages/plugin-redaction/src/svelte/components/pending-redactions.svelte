@@ -1,58 +1,62 @@
 <script lang="ts">
   import type { Snippet } from 'svelte';
-  import { CounterRotate } from '@embedpdf/utils/svelte';
-  import { useRedactionCapability } from '../hooks/use-redaction.svelte';
-  import type { RedactionItem } from '@embedpdf/plugin-redaction';
+  import type { Rect } from '@embedpdf/models';
   import { Rotation } from '@embedpdf/models';
+  import { CounterRotate } from '@embedpdf/utils/svelte';
+  import type { MenuWrapperProps, SelectionMenuPlacement } from '@embedpdf/utils/svelte';
+  import type { RedactionItem } from '@embedpdf/plugin-redaction';
+  import { useRedactionCapability } from '../hooks/use-redaction.svelte';
   import Highlight from './highlight.svelte';
-  import type { SelectionMenuProps } from '../types';
+  import type {
+    RedactionSelectionContext,
+    RedactionSelectionMenuRenderFn,
+    RedactionSelectionMenuProps,
+  } from '../types';
 
-  interface PendingRedactionsProps {
+  interface Props {
     documentId: string;
     pageIndex: number;
     scale: number;
-    rotation: Rotation;
+    rotation?: Rotation;
     bboxStroke?: string;
-    selectionMenu?: Snippet<[SelectionMenuProps]>;
+    selectionMenu?: RedactionSelectionMenuRenderFn;
+    selectionMenuSnippet?: Snippet<[RedactionSelectionMenuProps]>;
   }
 
   let {
     documentId,
     pageIndex,
     scale,
-    bboxStroke = 'rgba(0,0,0,0.8)',
     rotation = Rotation.Degree0,
+    bboxStroke = 'rgba(0,0,0,0.8)',
     selectionMenu,
-  }: PendingRedactionsProps = $props();
+    selectionMenuSnippet,
+  }: Props = $props();
 
-  const redaction = useRedactionCapability();
+  const redactionCapability = useRedactionCapability();
+
   let items = $state<RedactionItem[]>([]);
   let selectedId = $state<string | null>(null);
 
   $effect(() => {
-    if (!redaction.provides) {
+    const redactionValue = redactionCapability.provides;
+    if (!redactionValue) {
       items = [];
       selectedId = null;
       return;
     }
 
-    // Use document-scoped hooks so we only receive events for this document
-    const scoped = redaction.provides.forDocument(documentId);
-
-    // Initialize with current state
+    const scoped = redactionValue.forDocument(documentId);
     const currentState = scoped.getState();
     items = currentState.pending[pageIndex] ?? [];
-    selectedId =
-      currentState.selected && currentState.selected.page === pageIndex
-        ? currentState.selected.id
-        : null;
+    selectedId = currentState.selected?.page === pageIndex ? currentState.selected.id : null;
 
-    // Subscribe to future changes
     const off1 = scoped.onPendingChange((map) => {
       items = map[pageIndex] ?? [];
     });
+
     const off2 = scoped.onSelectedChange((sel) => {
-      selectedId = sel && sel.page === pageIndex ? sel.id : null;
+      selectedId = sel?.page === pageIndex ? sel.id : null;
     });
 
     return () => {
@@ -63,92 +67,129 @@
 
   function select(e: MouseEvent | TouchEvent, id: string) {
     e.stopPropagation();
-    if (!redaction.provides) return;
-    redaction.provides.forDocument(documentId).selectPending(pageIndex, id);
+    if (!redactionCapability.provides) return;
+    redactionCapability.provides.forDocument(documentId).selectPending(pageIndex, id);
+  }
+
+  function shouldShowMenu(itemId: string): boolean {
+    const isSelected = selectedId === itemId;
+    return isSelected && (!!selectionMenu || !!selectionMenuSnippet);
+  }
+
+  function buildContext(item: RedactionItem): RedactionSelectionContext {
+    return { type: 'redaction', item, pageIndex };
+  }
+
+  const menuPlacement: SelectionMenuPlacement = {
+    suggestTop: false,
+    spaceAbove: 0,
+    spaceBelow: 0,
+  };
+
+  function buildMenuProps(
+    item: RedactionItem,
+    rect: Rect,
+    menuWrapperProps: MenuWrapperProps,
+  ): RedactionSelectionMenuProps {
+    return {
+      context: buildContext(item),
+      selected: selectedId === item.id,
+      rect,
+      placement: menuPlacement,
+      menuWrapperProps,
+    };
   }
 </script>
 
 {#if items.length}
-  <div style:position="absolute" style:inset="0" style:pointer-events="none">
-    {#each items as it (it.id)}
-      {#if it.kind === 'area'}
-        {@const r = it.rect}
+  <div style="position: absolute; inset: 0; pointer-events: none;">
+    {#each items as item (item.id)}
+      {#if item.kind === 'area'}
         <div
-          style:position="absolute"
-          style:left={`${r.origin.x * scale}px`}
-          style:top={`${r.origin.y * scale}px`}
-          style:width={`${r.size.width * scale}px`}
-          style:height={`${r.size.height * scale}px`}
-          style:background="transparent"
-          style:outline={selectedId === it.id ? `1px solid ${bboxStroke}` : 'none'}
-          style:outline-offset="2px"
-          style:border="1px solid red"
-          style:pointer-events="auto"
-          style:cursor="pointer"
-          onpointerdown={(e) => select(e, it.id)}
-          ontouchstart={(e) => select(e, it.id)}
+          style="
+            position: absolute;
+            left: {item.rect.origin.x * scale}px;
+            top: {item.rect.origin.y * scale}px;
+            width: {item.rect.size.width * scale}px;
+            height: {item.rect.size.height * scale}px;
+            background: transparent;
+            outline: {selectedId === item.id ? `1px solid ${bboxStroke}` : 'none'};
+            outline-offset: 2px;
+            border: 1px solid red;
+            pointer-events: auto;
+            cursor: pointer;
+          "
+          onpointerdown={(e) => select(e, item.id)}
+          ontouchstart={(e) => select(e, item.id)}
         ></div>
-        <CounterRotate
-          rect={{
-            origin: { x: r.origin.x * scale, y: r.origin.y * scale },
-            size: { width: r.size.width * scale, height: r.size.height * scale },
-          }}
-          {rotation}
-        >
-          {#snippet children({ rect, menuWrapperProps })}
-            {#if selectionMenu}
-              {@render selectionMenu({
-                item: it,
-                selected: selectedId === it.id,
-                pageIndex,
-                menuWrapperProps,
-                rect,
-              })}
-            {/if}
-          {/snippet}
-        </CounterRotate>
+
+        {#if shouldShowMenu(item.id)}
+          <CounterRotate
+            rect={{
+              origin: { x: item.rect.origin.x * scale, y: item.rect.origin.y * scale },
+              size: { width: item.rect.size.width * scale, height: item.rect.size.height * scale },
+            }}
+            {rotation}
+          >
+            {#snippet children({ rect, menuWrapperProps })}
+              {@const menuProps = buildMenuProps(item, rect, menuWrapperProps)}
+              {#if selectionMenu}
+                {@const result = selectionMenu(menuProps)}
+                {#if result}
+                  <result.component {...result.props} />
+                {/if}
+              {:else if selectionMenuSnippet}
+                {@render selectionMenuSnippet(menuProps)}
+              {/if}
+            {/snippet}
+          </CounterRotate>
+        {/if}
       {:else}
-        {@const b = it.rect}
         <div
-          style:position="absolute"
-          style:left={`${b.origin.x * scale}px`}
-          style:top={`${b.origin.y * scale}px`}
-          style:width={`${b.size.width * scale}px`}
-          style:height={`${b.size.height * scale}px`}
-          style:background="transparent"
-          style:outline={selectedId === it.id ? `1px solid ${bboxStroke}` : 'none'}
-          style:outline-offset="2px"
-          style:pointer-events="auto"
-          style:cursor={selectedId === it.id ? 'pointer' : 'default'}
+          style="
+            position: absolute;
+            left: {item.rect.origin.x * scale}px;
+            top: {item.rect.origin.y * scale}px;
+            width: {item.rect.size.width * scale}px;
+            height: {item.rect.size.height * scale}px;
+            background: transparent;
+            outline: {selectedId === item.id ? `1px solid ${bboxStroke}` : 'none'};
+            outline-offset: 2px;
+            pointer-events: auto;
+            cursor: {selectedId === item.id ? 'pointer' : 'default'};
+          "
         >
           <Highlight
-            rect={b}
-            rects={it.rects}
+            rect={item.rect}
+            rects={item.rects}
             color="transparent"
             border="1px solid red"
             {scale}
-            onClick={(e) => select(e, it.id)}
+            onClick={(e) => select(e, item.id)}
           />
         </div>
-        <CounterRotate
-          rect={{
-            origin: { x: b.origin.x * scale, y: b.origin.y * scale },
-            size: { width: b.size.width * scale, height: b.size.height * scale },
-          }}
-          {rotation}
-        >
-          {#snippet children({ rect, menuWrapperProps })}
-            {#if selectionMenu}
-              {@render selectionMenu({
-                item: it,
-                selected: selectedId === it.id,
-                pageIndex,
-                menuWrapperProps,
-                rect,
-              })}
-            {/if}
-          {/snippet}
-        </CounterRotate>
+
+        {#if shouldShowMenu(item.id)}
+          <CounterRotate
+            rect={{
+              origin: { x: item.rect.origin.x * scale, y: item.rect.origin.y * scale },
+              size: { width: item.rect.size.width * scale, height: item.rect.size.height * scale },
+            }}
+            {rotation}
+          >
+            {#snippet children({ rect, menuWrapperProps })}
+              {@const menuProps = buildMenuProps(item, rect, menuWrapperProps)}
+              {#if selectionMenu}
+                {@const result = selectionMenu(menuProps)}
+                {#if result}
+                  <result.component {...result.props} />
+                {/if}
+              {:else if selectionMenuSnippet}
+                {@render selectionMenuSnippet(menuProps)}
+              {/if}
+            {/snippet}
+          </CounterRotate>
+        {/if}
       {/if}
     {/each}
   </div>

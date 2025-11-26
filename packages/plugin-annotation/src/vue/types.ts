@@ -1,7 +1,15 @@
-/**
- * Vue-specific types for annotation plugin
- * These types are separate from React types to avoid JSX dependencies
- */
+import type { SelectionMenuPropsBase, SelectionMenuRenderFn } from '@embedpdf/utils/vue';
+import { TrackedAnnotation } from '@embedpdf/plugin-annotation';
+
+export interface AnnotationSelectionContext {
+  type: 'annotation';
+  annotation: TrackedAnnotation;
+  pageIndex: number;
+}
+
+// For manual component props
+export type AnnotationSelectionMenuProps = SelectionMenuPropsBase<AnnotationSelectionContext>;
+export type AnnotationSelectionMenuRenderFn = SelectionMenuRenderFn<AnnotationSelectionContext>;
 
 /** UI customization for resize handles (Vue) */
 export interface ResizeHandleUI {

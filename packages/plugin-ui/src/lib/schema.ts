@@ -9,6 +9,7 @@ export interface UISchema {
   toolbars: Record<string, ToolbarSchema>;
   menus: Record<string, MenuSchema>;
   panels: Record<string, PanelSchema>;
+  selectionMenus: Record<string, SelectionMenuSchema>;
 }
 
 export interface ToolbarPosition {
@@ -266,4 +267,34 @@ export interface LocaleBreakpointOverride {
   // Complete replacement (if needed instead of merge)
   replaceHide?: string[];
   replaceShow?: string[];
+}
+
+export type SelectionMenuItem =
+  | SelectionMenuCommandItem
+  | SelectionMenuDividerItem
+  | SelectionMenuGroupItem;
+
+export interface SelectionMenuCommandItem {
+  type: 'command-button';
+  id: string;
+  commandId: string;
+  variant?: 'icon' | 'text' | 'icon-text';
+}
+
+export interface SelectionMenuDividerItem {
+  type: 'divider';
+  id: string;
+}
+
+export interface SelectionMenuGroupItem {
+  type: 'group';
+  id: string;
+  items: SelectionMenuItem[];
+  gap?: number;
+}
+
+export interface SelectionMenuSchema {
+  id: string;
+  items: SelectionMenuItem[];
+  responsive?: ResponsiveRules;
 }

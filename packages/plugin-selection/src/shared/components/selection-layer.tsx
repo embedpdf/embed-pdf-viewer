@@ -3,7 +3,7 @@ import { Rect, Rotation } from '@embedpdf/models';
 import { useSelectionPlugin } from '../hooks';
 import { useDocumentState } from '@embedpdf/core/@framework';
 import { SelectionMenuPlacement } from '@embedpdf/plugin-selection';
-import { SelectionMenuProps } from '../types';
+import { SelectionSelectionMenuRenderFn } from '../types';
 import { CounterRotate } from '@embedpdf/utils/@framework';
 
 type Props = {
@@ -12,7 +12,7 @@ type Props = {
   scale?: number;
   rotation?: Rotation;
   background?: string;
-  selectionMenu?: (props: SelectionMenuProps) => JSX.Element;
+  selectionMenu?: SelectionSelectionMenuRenderFn;
 };
 
 export function SelectionLayer({
@@ -112,11 +112,15 @@ export function SelectionLayer({
           }}
           rotation={actualRotation}
         >
-          {({ rect, menuWrapperProps }) =>
+          {(props) =>
             selectionMenu({
-              rect,
-              menuWrapperProps,
-              placement, // Pass the full placement so the UI knows about spaceAbove/Below
+              ...props,
+              context: {
+                type: 'selection',
+                pageIndex,
+              },
+              selected: true,
+              placement,
             })
           }
         </CounterRotate>

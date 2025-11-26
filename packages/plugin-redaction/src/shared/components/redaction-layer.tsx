@@ -4,7 +4,7 @@ import { MarqueeRedact } from './marquee-redact';
 import { SelectionRedact } from './selection-redact';
 import { PendingRedactions } from './pending-redactions';
 import { Rotation } from '@embedpdf/models';
-import { SelectionMenuProps } from './types';
+import { RedactionSelectionMenuRenderFn } from './types';
 
 interface RedactionLayerProps {
   /** The ID of the document this layer belongs to */
@@ -16,7 +16,7 @@ interface RedactionLayerProps {
   /** Page rotation (for counter-rotating menus, etc.) */
   rotation?: Rotation;
   /** Optional menu renderer for a selected redaction */
-  selectionMenu?: (props: SelectionMenuProps) => JSX.Element;
+  selectionMenu?: RedactionSelectionMenuRenderFn;
 }
 
 export const RedactionLayer = ({

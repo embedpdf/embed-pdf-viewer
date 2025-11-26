@@ -92,6 +92,7 @@ import {
   spanishTranslations,
 } from '../config';
 import ViewerLayout from '../components/ViewerSchemaLayout.vue';
+import SchemaSelectionMenu from '../ui/SchemaSelectionMenu.vue';
 
 /**
  * Schema-Driven Viewer Page
@@ -127,6 +128,7 @@ const uiRenderers = computed(() => ({
   toolbar: SchemaToolbar,
   panel: SchemaPanel,
   menu: SchemaMenu,
+  selectionMenu: SchemaSelectionMenu,
 }));
 
 const plugins = computed(() => [

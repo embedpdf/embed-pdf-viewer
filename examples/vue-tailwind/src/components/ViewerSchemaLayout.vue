@@ -42,9 +42,21 @@
                       <SearchLayer :documentId="documentId" :pageIndex="page.pageIndex" />
                       <MarqueeZoom :documentId="documentId" :pageIndex="page.pageIndex" />
                       <MarqueeCapture :documentId="documentId" :pageIndex="page.pageIndex" />
-                      <SelectionLayer :documentId="documentId" :pageIndex="page.pageIndex" />
-                      <RedactionLayer :documentId="documentId" :pageIndex="page.pageIndex" />
-                      <AnnotationLayer :documentId="documentId" :pageIndex="page.pageIndex" />
+                      <SelectionLayer
+                        :documentId="documentId"
+                        :pageIndex="page.pageIndex"
+                        :selectionMenu="selectionMenu"
+                      />
+                      <RedactionLayer
+                        :documentId="documentId"
+                        :pageIndex="page.pageIndex"
+                        :selectionMenu="redactionMenu"
+                      />
+                      <AnnotationLayer
+                        :documentId="documentId"
+                        :pageIndex="page.pageIndex"
+                        :selectionMenu="annotationMenu"
+                      />
                     </PagePointerProvider>
                   </Rotate>
                 </Scroller>
@@ -63,7 +75,7 @@
 </template>
 
 <script setup lang="ts">
-import { useSchemaRenderer } from '@embedpdf/plugin-ui/vue';
+import { useSchemaRenderer, useSelectionMenu } from '@embedpdf/plugin-ui/vue';
 import { DocumentContent } from '@embedpdf/plugin-document-manager/vue';
 import {
   GlobalPointerProvider,
@@ -97,5 +109,9 @@ interface Props {
 
 const props = defineProps<Props>();
 
-const { renderToolbar, renderPanel } = useSchemaRenderer(props.documentId);
+const { renderToolbar, renderPanel } = useSchemaRenderer(() => props.documentId);
+
+const annotationMenu = useSelectionMenu('annotation', () => props.documentId);
+const redactionMenu = useSelectionMenu('redaction', () => props.documentId);
+const selectionMenu = useSelectionMenu('selection', () => props.documentId);
 </script>

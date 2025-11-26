@@ -2,7 +2,12 @@ import { HTMLAttributes, CSSProperties, useMemo } from '@framework';
 import { useDocumentState } from '@embedpdf/core/@framework';
 import { Annotations } from './annotations';
 import { TextMarkup } from './text-markup';
-import { SelectionMenu, ResizeHandleUI, VertexHandleUI, CustomAnnotationRenderer } from './types';
+import {
+  ResizeHandleUI,
+  VertexHandleUI,
+  CustomAnnotationRenderer,
+  AnnotationSelectionMenuRenderFn,
+} from './types';
 import { AnnotationPaintLayer } from './annotation-paint-layer';
 import { PdfAnnotationObject, Rotation } from '@embedpdf/models';
 
@@ -13,7 +18,7 @@ type AnnotationLayerProps = Omit<HTMLAttributes<HTMLDivElement>, 'style'> & {
   scale?: number;
   rotation?: number;
   /** Customize selection menu across all annotations on this layer */
-  selectionMenu?: SelectionMenu;
+  selectionMenu?: AnnotationSelectionMenuRenderFn;
   style?: CSSProperties;
   /** Customize resize handles */
   resizeUI?: ResizeHandleUI;

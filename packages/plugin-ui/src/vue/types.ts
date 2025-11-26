@@ -1,5 +1,7 @@
 import type { Component } from 'vue';
-import { ToolbarSchema, PanelSchema, MenuSchema } from '@embedpdf/plugin-ui';
+import { ToolbarSchema, PanelSchema, MenuSchema, SelectionMenuSchema } from '@embedpdf/plugin-ui';
+import { SelectionMenuPropsBase } from '@embedpdf/utils/vue';
+export type { SelectionMenuPropsBase };
 
 export type UIComponents = Record<string, Component<BaseComponentProps>>;
 
@@ -54,10 +56,23 @@ export interface MenuRendererProps {
 export type MenuRenderer = Component<MenuRendererProps>;
 
 /**
+ * Props for the selection menu renderer component
+ */
+export interface SelectionMenuRendererProps {
+  schema: SelectionMenuSchema;
+  documentId: string;
+  /** Full props from the layer including context */
+  props: SelectionMenuPropsBase;
+}
+
+export type SelectionMenuRenderer = Component<SelectionMenuRendererProps>;
+
+/**
  * All renderers the app must provide
  */
 export interface UIRenderers {
   toolbar: ToolbarRenderer;
   panel: PanelRenderer;
   menu: MenuRenderer;
+  selectionMenu: SelectionMenuRenderer;
 }

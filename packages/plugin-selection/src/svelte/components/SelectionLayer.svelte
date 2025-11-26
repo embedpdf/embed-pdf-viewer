@@ -3,10 +3,14 @@
   import type { Rect } from '@embedpdf/models';
   import { Rotation } from '@embedpdf/models';
   import { useDocumentState } from '@embedpdf/core/svelte';
-  import { CounterRotate } from '@embedpdf/utils/svelte';
-  import type { SelectionMenuPlacement } from '@embedpdf/plugin-selection';
+  import { CounterRotate, MenuWrapperProps, SelectionMenuPlacement } from '@embedpdf/utils/svelte';
   import { useSelectionPlugin } from '../hooks/use-selection.svelte';
-  import type { SelectionMenuProps } from '../types';
+  import type {
+    SelectionSelectionMenuRenderFn,
+    SelectionSelectionMenuProps,
+    SelectionSelectionContext,
+  } from '../types';
+  import type { SelectionMenuPlacement as UtilsSelectionMenuPlacement } from '@embedpdf/plugin-selection';
 
   interface SelectionLayerProps {
     /** Document ID */
@@ -19,8 +23,10 @@
     rotation?: Rotation;
     /** Background color for selection rectangles */
     background?: string;
-    /** Optional selection menu render function */
-    selectionMenu?: Snippet<[SelectionMenuProps]>;
+    /** Render function for selection menu (schema-driven approach) */
+    selectionMenu?: SelectionSelectionMenuRenderFn;
+    /** Snippet for custom selection menu (slot-based approach) */
+    selectionMenuSnippet?: Snippet<[SelectionSelectionMenuProps]>;
   }
 
   let {
@@ -30,6 +36,7 @@
     rotation: rotationOverride,
     background = 'rgba(33,150,243)',
     selectionMenu,
+    selectionMenuSnippet,
   }: SelectionLayerProps = $props();
 
   const selectionPlugin = useSelectionPlugin();
@@ -37,7 +44,7 @@
 
   let rects = $state<Rect[]>([]);
   let boundingRect = $state<Rect | null>(null);
-  let placement = $state<SelectionMenuPlacement | null>(null);
+  let placement = $state<UtilsSelectionMenuPlacement | null>(null);
 
   const actualScale = $derived(
     scaleOverride !== undefined ? scaleOverride : (documentState.current?.scale ?? 1),
@@ -49,8 +56,14 @@
       : (documentState.current?.rotation ?? Rotation.Degree0),
   );
 
+  // Check if menu should render: placement is valid AND (render fn OR snippet exists)
   const shouldRenderMenu = $derived(
-    Boolean(selectionMenu && placement && placement.pageIndex === pageIndex && placement.isVisible),
+    Boolean(
+      placement &&
+        placement.pageIndex === pageIndex &&
+        placement.isVisible &&
+        (selectionMenu || selectionMenuSnippet),
+    ),
   );
 
   // Track selection rectangles on this page
@@ -82,6 +95,39 @@
       placement = newPlacement;
     });
   });
+
+  // --- Selection Menu Logic ---
+
+  // Build context object for selection menu
+  function buildContext(): SelectionSelectionContext {
+    return {
+      type: 'selection',
+      pageIndex,
+    };
+  }
+
+  // Build placement hints from plugin placement data
+  function buildMenuPlacement(): SelectionMenuPlacement {
+    return {
+      suggestTop: placement?.suggestTop ?? false,
+      spaceAbove: placement?.spaceAbove ?? 0,
+      spaceBelow: placement?.spaceBelow ?? 0,
+    };
+  }
+
+  // Build menu props
+  function buildMenuProps(
+    rect: Rect,
+    menuWrapperProps: MenuWrapperProps,
+  ): SelectionSelectionMenuProps {
+    return {
+      context: buildContext(),
+      selected: true, // Selection is always "selected" when visible
+      rect,
+      placement: buildMenuPlacement(),
+      menuWrapperProps,
+    };
+  }
 </script>
 
 {#if boundingRect}
@@ -125,12 +171,16 @@
       rotation={actualRotation}
     >
       {#snippet children({ rect, menuWrapperProps })}
-        {#if selectionMenu && placement}
-          {@render selectionMenu({
-            rect,
-            menuWrapperProps,
-            placement,
-          })}
+        {@const menuProps = buildMenuProps(rect, menuWrapperProps)}
+        {#if selectionMenu}
+          <!-- Priority 1: Render function (schema-driven) -->
+          {@const result = selectionMenu(menuProps)}
+          {#if result}
+            <result.component {...result.props} />
+          {/if}
+        {:else if selectionMenuSnippet}
+          <!-- Priority 2: Snippet (manual customization) -->
+          {@render selectionMenuSnippet(menuProps)}
         {/if}
       {/snippet}
     </CounterRotate>

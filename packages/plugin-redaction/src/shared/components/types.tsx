@@ -1,11 +1,11 @@
-import { MenuWrapperProps } from '@embedpdf/utils/@framework';
-import { Rect } from '@embedpdf/models';
+import { SelectionMenuPropsBase, SelectionMenuRenderFn } from '@embedpdf/utils/@framework';
 import { RedactionItem } from '@embedpdf/plugin-redaction';
 
-export interface SelectionMenuProps {
-  menuWrapperProps: MenuWrapperProps;
-  pageIndex: number;
+export interface RedactionSelectionContext {
+  type: 'redaction';
   item: RedactionItem;
-  selected: boolean;
-  rect: Rect;
+  pageIndex: number;
 }
+
+export type RedactionSelectionMenuProps = SelectionMenuPropsBase<RedactionSelectionContext>;
+export type RedactionSelectionMenuRenderFn = SelectionMenuRenderFn<RedactionSelectionContext>;

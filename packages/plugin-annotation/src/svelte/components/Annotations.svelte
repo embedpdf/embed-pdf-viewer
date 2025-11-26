@@ -38,12 +38,14 @@
   import FreeText from './annotations/FreeText.svelte';
   import Stamp from './annotations/Stamp.svelte';
   import type {
+    AnnotationSelectionMenuProps,
+    AnnotationSelectionMenuRenderFn,
     CustomAnnotationRenderer,
     ResizeHandleUI,
-    SelectionMenu,
     VertexHandleUI,
   } from '../types';
   import AnnotationContainer from './AnnotationContainer.svelte';
+  import type { Snippet } from 'svelte';
 
   // ---------- props ----------
   interface AnnotationsProps {
@@ -53,7 +55,10 @@
     rotation: number;
     pageWidth: number;
     pageHeight: number;
-    selectionMenu?: SelectionMenu;
+    /** Render function for selection menu (schema-driven approach) */
+    selectionMenu?: AnnotationSelectionMenuRenderFn;
+    /** Snippet for custom selection menu (slot-based approach) */
+    selectionMenuSnippet?: Snippet<[AnnotationSelectionMenuProps]>;
     resizeUI?: ResizeHandleUI;
     vertexUI?: VertexHandleUI;
     selectionOutlineColor?: string;
@@ -140,6 +145,7 @@
       isResizable={tool?.interaction.isResizable ?? true}
       lockAspectRatio={tool?.interaction.lockAspectRatio ?? false}
       selectionMenu={annotationsProps.selectionMenu}
+      selectionMenuSnippet={annotationsProps.selectionMenuSnippet}
       onSelect={(e) => handleClick(e, annotation)}
       style="mix-blend-mode: {mixBlendMode}"
       {...annotationsProps}
@@ -161,6 +167,7 @@
       isResizable={tool?.interaction.isResizable ?? true}
       lockAspectRatio={tool?.interaction.lockAspectRatio ?? false}
       selectionMenu={annotationsProps.selectionMenu}
+      selectionMenuSnippet={annotationsProps.selectionMenuSnippet}
       onSelect={(e: MouseEvent | TouchEvent) => handleClick(e, annotation)}
       style="mix-blend-mode: {mixBlendMode}"
       {...annotationsProps}
@@ -182,6 +189,7 @@
       isResizable={tool?.interaction.isResizable ?? true}
       lockAspectRatio={tool?.interaction.lockAspectRatio ?? false}
       selectionMenu={annotationsProps.selectionMenu}
+      selectionMenuSnippet={annotationsProps.selectionMenuSnippet}
       onSelect={(e: MouseEvent | TouchEvent) => handleClick(e, annotation)}
       style="mix-blend-mode: {mixBlendMode}"
       {...annotationsProps}
@@ -203,6 +211,7 @@
       isResizable={tool?.interaction.isResizable ?? false}
       lockAspectRatio={tool?.interaction.lockAspectRatio ?? false}
       selectionMenu={annotationsProps.selectionMenu}
+      selectionMenuSnippet={annotationsProps.selectionMenuSnippet}
       onSelect={(e: MouseEvent | TouchEvent) => handleClick(e, annotation)}
       zIndex={0}
       style="mix-blend-mode: {mixBlendMode}"
@@ -224,6 +233,7 @@
       isResizable={tool?.interaction.isResizable ?? false}
       lockAspectRatio={tool?.interaction.lockAspectRatio ?? false}
       selectionMenu={annotationsProps.selectionMenu}
+      selectionMenuSnippet={annotationsProps.selectionMenuSnippet}
       onSelect={(e: MouseEvent | TouchEvent) => handleClick(e, annotation)}
       zIndex={0}
       style="mix-blend-mode: {mixBlendMode}"
@@ -245,6 +255,7 @@
       isResizable={tool?.interaction.isResizable ?? false}
       lockAspectRatio={tool?.interaction.lockAspectRatio ?? false}
       selectionMenu={annotationsProps.selectionMenu}
+      selectionMenuSnippet={annotationsProps.selectionMenuSnippet}
       onSelect={(e: MouseEvent | TouchEvent) => handleClick(e, annotation)}
       zIndex={0}
       style="mix-blend-mode: {mixBlendMode}"
@@ -268,6 +279,7 @@
       onSelect={(e: MouseEvent | TouchEvent) => handleClick(e, annotation)}
       zIndex={0}
       selectionMenu={annotationsProps.selectionMenu}
+      selectionMenuSnippet={annotationsProps.selectionMenuSnippet}
       style="mix-blend-mode: {blendModeToCss(annotation.object.blendMode ?? PdfBlendMode.Multiply)}"
       {...annotationsProps}
     >
@@ -287,6 +299,7 @@
       isResizable={tool?.interaction.isResizable ?? false}
       lockAspectRatio={tool?.interaction.lockAspectRatio ?? false}
       selectionMenu={annotationsProps.selectionMenu}
+      selectionMenuSnippet={annotationsProps.selectionMenuSnippet}
       onSelect={(e: MouseEvent | TouchEvent) => handleClick(e, annotation)}
       vertexConfig={{
         extractVertices: (a) => [a.linePoints.start, a.linePoints.end],
@@ -311,6 +324,7 @@
     <AnnotationContainer
       trackedAnnotation={annotation}
       selectionMenu={annotationsProps.selectionMenu}
+      selectionMenuSnippet={annotationsProps.selectionMenuSnippet}
       isDraggable={tool?.interaction.isDraggable ?? true}
       isResizable={tool?.interaction.isResizable ?? false}
       lockAspectRatio={tool?.interaction.lockAspectRatio ?? false}
@@ -340,6 +354,7 @@
       isResizable={tool?.interaction.isResizable ?? false}
       lockAspectRatio={tool?.interaction.lockAspectRatio ?? false}
       selectionMenu={annotationsProps.selectionMenu}
+      selectionMenuSnippet={annotationsProps.selectionMenuSnippet}
       onSelect={(e: MouseEvent | TouchEvent) => handleClick(e, annotation)}
       vertexConfig={{
         extractVertices: (a) => a.vertices,
@@ -365,6 +380,7 @@
       isResizable={tool?.interaction.isResizable ?? true}
       lockAspectRatio={tool?.interaction.lockAspectRatio ?? false}
       selectionMenu={annotationsProps.selectionMenu}
+      selectionMenuSnippet={annotationsProps.selectionMenuSnippet}
       onSelect={(e) => handleClick(e, annotation)}
       style="mix-blend-mode: {blendModeToCss(annotation.object.blendMode ?? PdfBlendMode.Normal)}"
       onDoubleClick={(e) => {
@@ -393,6 +409,7 @@
       isResizable={tool?.interaction.isResizable ?? true}
       lockAspectRatio={tool?.interaction.lockAspectRatio ?? false}
       selectionMenu={annotationsProps.selectionMenu}
+      selectionMenuSnippet={annotationsProps.selectionMenuSnippet}
       onSelect={(e: MouseEvent | TouchEvent) => handleClick(e, annotation)}
       style="mix-blend-mode: {mixBlendMode}"
       {...annotationsProps}

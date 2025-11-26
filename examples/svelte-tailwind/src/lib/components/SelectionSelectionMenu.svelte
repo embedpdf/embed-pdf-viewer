@@ -1,13 +1,13 @@
 <script lang="ts">
   import { useSelectionCapability } from '@embedpdf/plugin-selection/svelte';
-  import type { SelectionMenuProps } from '@embedpdf/plugin-selection/svelte';
+  import type { SelectionSelectionMenuProps } from '@embedpdf/plugin-selection/svelte';
   import Icons from './Icons.svelte';
 
-  interface SelectionSelectionMenuProps extends SelectionMenuProps {
+  interface Props extends SelectionSelectionMenuProps {
     documentId: string;
   }
 
-  let { rect, menuWrapperProps, placement, documentId }: SelectionSelectionMenuProps = $props();
+  let { rect, menuWrapperProps, placement, documentId }: Props = $props();
 
   const selectionCapability = useSelectionCapability();
   let copied = $state(false);

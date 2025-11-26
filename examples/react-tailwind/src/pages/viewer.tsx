@@ -45,6 +45,7 @@ import { SelectionSelectionMenu } from '../components/selection-selection-menu';
 import { NavigationBar } from '../components/navigation-bar';
 import { EmptyState } from '../components/empty-state';
 import { I18nPluginPackage } from '@embedpdf/plugin-i18n/react';
+import { RedactionSelectionMenu } from '../components/redaction-selection-menu';
 
 const logger = new ConsoleLogger();
 
@@ -317,26 +318,21 @@ export function ViewerPage() {
                                                   <RedactionLayer
                                                     documentId={documentId}
                                                     pageIndex={pageIndex}
+                                                    selectionMenu={(props) => (
+                                                      <RedactionSelectionMenu
+                                                        {...props}
+                                                        documentId={documentId}
+                                                      />
+                                                    )}
                                                   />
                                                   <AnnotationLayer
                                                     documentId={documentId}
                                                     pageIndex={pageIndex}
-                                                    selectionMenu={({
-                                                      menuWrapperProps,
-                                                      selected,
-                                                      annotation,
-                                                      rect,
-                                                    }) => (
-                                                      <>
-                                                        {selected ? (
-                                                          <AnnotationSelectionMenu
-                                                            menuWrapperProps={menuWrapperProps}
-                                                            rect={rect}
-                                                            selected={annotation}
-                                                            documentId={documentId}
-                                                          />
-                                                        ) : null}
-                                                      </>
+                                                    selectionMenu={(props) => (
+                                                      <AnnotationSelectionMenu
+                                                        {...props}
+                                                        documentId={documentId}
+                                                      />
                                                     )}
                                                   />
                                                 </PagePointerProvider>

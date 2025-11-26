@@ -32,7 +32,12 @@
   import { AnnotationPluginPackage, AnnotationLayer } from '@embedpdf/plugin-annotation/svelte';
   import { CommandsPluginPackage } from '@embedpdf/plugin-commands/svelte';
   import { I18nPluginPackage } from '@embedpdf/plugin-i18n/svelte';
-  import { UIPluginPackage, UIProvider, useSchemaRenderer } from '@embedpdf/plugin-ui/svelte';
+  import {
+    UIPluginPackage,
+    UIProvider,
+    useSchemaRenderer,
+    useSelectionMenu,
+  } from '@embedpdf/plugin-ui/svelte';
   import type { UIComponents } from '@embedpdf/plugin-ui/svelte';
   import { ConsoleLogger } from '@embedpdf/models';
   import NavigationBar from '$lib/components/NavigationBar.svelte';
@@ -59,6 +64,7 @@
     paramResolvers,
   } from '$lib/config';
   import { AnnotationSelectionMenu, SelectionSelectionMenu } from '$lib/components';
+  import SchemaSelectionMenu from '$lib/ui/SchemaSelectionMenu.svelte';
 
   const logger = new ConsoleLogger();
 
@@ -81,6 +87,7 @@
     toolbar: SchemaToolbar,
     panel: SchemaPanel,
     menu: SchemaMenu,
+    selectionMenu: SchemaSelectionMenu,
   };
 
   // Plugin configurations
@@ -198,6 +205,11 @@
      ───────────────────────────────────────────────────────── -->
 {#snippet ViewerLayout({ documentId }: { documentId: string })}
   {@const schemaRenderer = useSchemaRenderer(() => documentId)}
+
+  {@const redactionMenu = useSelectionMenu('redaction', () => documentId)}
+  {@const selectionMenu = useSelectionMenu('selection', () => documentId)}
+  {@const annotationMenu = useSelectionMenu('annotation', () => documentId)}
+
   {@const topMainToolbar = schemaRenderer.getToolbarInfo('top', 'main')}
   {@const topSecondaryToolbar = schemaRenderer.getToolbarInfo('top', 'secondary')}
   {@const leftMainPanel = schemaRenderer.getPanelInfo('left', 'main')}
@@ -276,17 +288,21 @@
                           <SearchLayer {documentId} pageIndex={page.pageIndex} />
                           <MarqueeZoom {documentId} pageIndex={page.pageIndex} />
                           <MarqueeCapture {documentId} pageIndex={page.pageIndex} />
-                          <RedactionLayer {documentId} pageIndex={page.pageIndex} />
-                          <SelectionLayer {documentId} pageIndex={page.pageIndex}>
-                            {#snippet selectionMenu(props)}
-                              <SelectionSelectionMenu {...props} {documentId} />
-                            {/snippet}
-                          </SelectionLayer>
-                          <AnnotationLayer {documentId} pageIndex={page.pageIndex}>
-                            {#snippet selectionMenu(props)}
-                              <AnnotationSelectionMenu {...props} />
-                            {/snippet}
-                          </AnnotationLayer>
+                          <RedactionLayer
+                            {documentId}
+                            pageIndex={page.pageIndex}
+                            selectionMenu={redactionMenu.renderFn}
+                          />
+                          <SelectionLayer
+                            {documentId}
+                            pageIndex={page.pageIndex}
+                            selectionMenu={selectionMenu.renderFn}
+                          />
+                          <AnnotationLayer
+                            {documentId}
+                            pageIndex={page.pageIndex}
+                            selectionMenu={annotationMenu.renderFn}
+                          />
                         </PagePointerProvider>
                       </Rotate>
                     {/snippet}

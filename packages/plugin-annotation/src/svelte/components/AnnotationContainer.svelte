@@ -1,5 +1,5 @@
 <script lang="ts" generics="T extends PdfAnnotationObject">
-  import type { PdfAnnotationObject } from '@embedpdf/models';
+  import type { PdfAnnotationObject, Rect } from '@embedpdf/models';
   import { useAnnotationCapability } from '../hooks';
   import type { AnnotationContainerProps } from './types';
   import {
@@ -7,8 +7,11 @@
     doublePress,
     CounterRotate,
     deepToRaw,
+    type SelectionMenuPlacement,
+    type MenuWrapperProps,
   } from '@embedpdf/utils/svelte';
-  import { Snippet } from 'svelte';
+  import type { Snippet } from 'svelte';
+  import { type AnnotationSelectionContext, type AnnotationSelectionMenuProps } from '../types';
 
   let {
     documentId,
@@ -27,6 +30,7 @@
     class: propsClass = '',
     vertexConfig,
     selectionMenu,
+    selectionMenuSnippet,
     outlineOffset = 1,
     onDoubleClick,
     onSelect,
@@ -128,6 +132,41 @@
   // Derived accessors for template
   const resizeHandles = $derived(interactionHandles.resize);
   const vertexHandles = $derived(interactionHandles.vertices);
+
+  // --- Selection Menu Logic ---
+
+  // Check if we should show menu
+  const shouldShowMenu = $derived(isSelected && (!!selectionMenu || !!selectionMenuSnippet));
+
+  // Build context object for selection menu
+  function buildContext(): AnnotationSelectionContext {
+    return {
+      type: 'annotation',
+      annotation: trackedAnnotation,
+      pageIndex,
+    };
+  }
+
+  // Placement hints
+  const menuPlacement: SelectionMenuPlacement = {
+    suggestTop: false,
+    spaceAbove: 0,
+    spaceBelow: 0,
+  };
+
+  // Build menu props
+  function buildMenuProps(
+    rect: Rect,
+    menuWrapperProps: MenuWrapperProps,
+  ): AnnotationSelectionMenuProps {
+    return {
+      context: buildContext(),
+      selected: isSelected,
+      rect,
+      placement: menuPlacement,
+      menuWrapperProps,
+    };
+  }
 </script>
 
 <div data-no-interaction>
@@ -188,28 +227,34 @@
     {/if}
   </div>
 
-  <CounterRotate
-    rect={{
-      origin: {
-        x: currentObject.rect.origin.x * scale,
-        y: currentObject.rect.origin.y * scale,
-      },
-      size: {
-        width: currentObject.rect.size.width * scale,
-        height: currentObject.rect.size.height * scale,
-      },
-    }}
-    {rotation}
-  >
-    {#snippet children({ rect, menuWrapperProps })}
-      {#if selectionMenu}
-        {@render selectionMenu({
-          annotation: trackedAnnotation,
-          selected: isSelected,
-          rect,
-          menuWrapperProps,
-        })}
-      {/if}
-    {/snippet}
-  </CounterRotate>
+  <!-- Selection Menu: Supports BOTH render function and snippet -->
+  {#if shouldShowMenu}
+    <CounterRotate
+      rect={{
+        origin: {
+          x: currentObject.rect.origin.x * scale,
+          y: currentObject.rect.origin.y * scale,
+        },
+        size: {
+          width: currentObject.rect.size.width * scale,
+          height: currentObject.rect.size.height * scale,
+        },
+      }}
+      {rotation}
+    >
+      {#snippet children({ rect, menuWrapperProps })}
+        {@const menuProps = buildMenuProps(rect, menuWrapperProps)}
+        {#if selectionMenu}
+          <!-- Priority 1: Render function (schema-driven) -->
+          {@const result = selectionMenu(menuProps)}
+          {#if result}
+            <result.component {...result.props} />
+          {/if}
+        {:else if selectionMenuSnippet}
+          <!-- Priority 2: Snippet (manual customization) -->
+          {@render selectionMenuSnippet(menuProps)}
+        {/if}
+      {/snippet}
+    </CounterRotate>
+  {/if}
 </div>

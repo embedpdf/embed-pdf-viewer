@@ -1,5 +1,8 @@
 import type { ComponentType } from '@framework';
-import { ToolbarSchema, PanelSchema, MenuSchema } from '@embedpdf/plugin-ui';
+import { ToolbarSchema, PanelSchema, MenuSchema, SelectionMenuSchema } from '@embedpdf/plugin-ui';
+import type { SelectionMenuPropsBase } from '@embedpdf/utils/@framework';
+
+export type { SelectionMenuPropsBase };
 
 export type UIComponents = Record<string, ComponentType<BaseComponentProps>>;
 
@@ -54,10 +57,23 @@ export interface MenuRendererProps {
 export type MenuRenderer = ComponentType<MenuRendererProps>;
 
 /**
+ * Props for the selection menu renderer component
+ */
+export interface SelectionMenuRendererProps {
+  schema: SelectionMenuSchema;
+  documentId: string;
+  /** Full props from the layer including context */
+  props: SelectionMenuPropsBase;
+}
+
+export type SelectionMenuRenderer = ComponentType<SelectionMenuRendererProps>;
+
+/**
  * All renderers the app must provide
  */
 export interface UIRenderers {
   toolbar: ToolbarRenderer;
   panel: PanelRenderer;
   menu: MenuRenderer;
+  selectionMenu: SelectionMenuRenderer;
 }

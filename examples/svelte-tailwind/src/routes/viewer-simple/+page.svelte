@@ -38,6 +38,7 @@
   import NavigationBar from '$lib/components/NavigationBar.svelte';
   import { ConsoleLogger } from '@embedpdf/models';
   import EmptyState from '$lib/components/EmptyState.svelte';
+  import SelectionSelectionMenu from '$lib/components/SelectionSelectionMenu.svelte';
 
   const logger = new ConsoleLogger();
 
@@ -206,7 +207,14 @@
                                         <SelectionLayer
                                           documentId={activeDocumentId}
                                           pageIndex={page.pageIndex}
-                                        />
+                                        >
+                                          {#snippet selectionMenuSnippet(props)}
+                                            <SelectionSelectionMenu
+                                              {...props}
+                                              documentId={activeDocumentId}
+                                            />
+                                          {/snippet}
+                                        </SelectionLayer>
                                       </PagePointerProvider>
                                     </Rotate>
                                   {/snippet}

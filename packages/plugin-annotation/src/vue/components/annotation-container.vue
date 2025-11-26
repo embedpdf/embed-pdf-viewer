@@ -32,26 +32,21 @@
       </template>
     </div>
 
-    <CounterRotate
-      :rect="{
-        origin: {
-          x: currentObject.rect.origin.x * scale,
-          y: currentObject.rect.origin.y * scale,
-        },
-        size: {
-          width: currentObject.rect.size.width * scale,
-          height: currentObject.rect.size.height * scale,
-        },
-      }"
-      :rotation="rotation"
-    >
+    <!-- Selection Menu: Supports BOTH render function and slot -->
+    <CounterRotate v-if="shouldShowMenu" :rect="menuRect" :rotation="rotation">
       <template #default="{ rect, menuWrapperProps }">
+        <!-- Priority 1: Render function prop (schema-driven) -->
+        <component v-if="selectionMenu" :is="renderSelectionMenu(rect, menuWrapperProps)" />
+
+        <!-- Priority 2: Slot (manual customization) -->
         <slot
+          v-else
           name="selection-menu"
-          :annotation="trackedAnnotation"
+          :context="menuContext"
           :selected="isSelected"
           :rect="rect"
-          :menu-wrapper-props="menuWrapperProps"
+          :placement="menuPlacement"
+          :menuWrapperProps="menuWrapperProps"
         />
       </template>
     </CounterRotate>
@@ -59,12 +54,19 @@
 </template>
 
 <script setup lang="ts" generic="T extends PdfAnnotationObject">
-import { ref, computed, watch, useSlots, toRaw, shallowRef } from 'vue';
-import { PdfAnnotationObject } from '@embedpdf/models';
-import { CounterRotate, useDoublePressProps, useInteractionHandles } from '@embedpdf/utils/vue';
+import { ref, computed, watch, useSlots, toRaw, shallowRef, VNode } from 'vue';
+import { PdfAnnotationObject, Rect } from '@embedpdf/models';
+import {
+  CounterRotate,
+  MenuWrapperProps,
+  SelectionMenuPlacement,
+  useDoublePressProps,
+  useInteractionHandles,
+} from '@embedpdf/utils/vue';
 import { TrackedAnnotation } from '@embedpdf/plugin-annotation';
 import { VertexConfig } from '../../shared/types';
 import { useAnnotationCapability } from '../hooks';
+import { AnnotationSelectionContext, AnnotationSelectionMenuRenderFn } from '../types';
 
 const props = withDefaults(
   defineProps<{
@@ -80,6 +82,7 @@ const props = withDefaults(
     isResizable: boolean;
     lockAspectRatio?: boolean;
     vertexConfig?: VertexConfig<T>;
+    selectionMenu?: AnnotationSelectionMenuRenderFn;
     outlineOffset?: number;
     onDoubleClick?: (event: PointerEvent | MouseEvent) => void;
     onSelect: (event: TouchEvent | MouseEvent) => void;
@@ -111,6 +114,52 @@ const annotationProvides = computed(() =>
 const currentObject = computed<T>(
   () => ({ ...toRaw(props.trackedAnnotation.object), ...toRaw(preview.value) }) as T,
 );
+
+// --- Selection Menu Logic ---
+
+// Check if we should show any menu at all
+const shouldShowMenu = computed(() => {
+  return props.isSelected && (props.selectionMenu || slots['selection-menu']);
+});
+
+// Computed rect for menu positioning
+const menuRect = computed<Rect>(() => ({
+  origin: {
+    x: currentObject.value.rect.origin.x * props.scale,
+    y: currentObject.value.rect.origin.y * props.scale,
+  },
+  size: {
+    width: currentObject.value.rect.size.width * props.scale,
+    height: currentObject.value.rect.size.height * props.scale,
+  },
+}));
+
+// Build the context object for selection menu
+const menuContext = computed<AnnotationSelectionContext>(() => ({
+  type: 'annotation',
+  annotation: props.trackedAnnotation,
+  pageIndex: props.pageIndex,
+}));
+
+// Placement hints
+const menuPlacement = computed<SelectionMenuPlacement>(() => ({
+  suggestTop: false, // Could calculate based on position in viewport
+  spaceAbove: 0,
+  spaceBelow: 0,
+}));
+
+// Render via function (for schema-driven approach)
+const renderSelectionMenu = (rect: Rect, menuWrapperProps: MenuWrapperProps): VNode | null => {
+  if (!props.selectionMenu) return null;
+
+  return props.selectionMenu({
+    rect,
+    menuWrapperProps,
+    selected: props.isSelected,
+    placement: menuPlacement.value,
+    context: menuContext.value,
+  });
+};
 
 const elementSnapshot = computed(() => {
   const obj = toRaw(currentObject.value);

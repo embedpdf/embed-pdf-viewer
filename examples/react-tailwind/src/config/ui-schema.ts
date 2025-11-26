@@ -840,4 +840,49 @@ export const viewerUISchema: UISchema = {
       defaultOpen: false,
     },
   },
+
+  // ─────────────────────────────────────────────────────────
+  // Selection Menus
+  // ─────────────────────────────────────────────────────────
+  selectionMenus: {
+    annotation: {
+      id: 'annotation',
+      items: [
+        {
+          type: 'command-button',
+          id: 'delete-annotation',
+          commandId: 'annotation:delete-selected',
+          variant: 'icon',
+        },
+      ],
+    },
+    redaction: {
+      id: 'redaction',
+      items: [
+        {
+          type: 'command-button',
+          id: 'delete-redaction',
+          commandId: 'redaction:delete-selected',
+          variant: 'icon',
+        },
+        {
+          type: 'command-button',
+          id: 'commit-redaction',
+          commandId: 'redaction:commit-selected',
+          variant: 'icon',
+        },
+      ],
+    },
+    selection: {
+      id: 'selection',
+      items: [
+        {
+          type: 'command-button',
+          id: 'copy-selection',
+          commandId: 'selection:copy',
+          variant: 'icon',
+        },
+      ],
+    },
+  },
 };

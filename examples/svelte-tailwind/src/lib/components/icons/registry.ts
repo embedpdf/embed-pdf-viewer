@@ -14,6 +14,7 @@ import ChevronRightIcon from './ChevronRightIcon.svelte';
 import CircleIcon from './CircleIcon.svelte';
 import CloseIcon from './CloseIcon.svelte';
 import CommentIcon from './CommentIcon.svelte';
+import CopyIcon from './CopyIcon.svelte';
 import DocumentIcon from './DocumentIcon.svelte';
 import DownloadIcon from './DownloadIcon.svelte';
 import FitPageIcon from './FitPageIcon.svelte';
@@ -78,6 +79,7 @@ export const iconRegistry = {
   circle: CircleIcon,
   close: CloseIcon,
   comment: CommentIcon,
+  copy: CopyIcon,
   document: DocumentIcon,
   download: DownloadIcon,
   'fit-page': FitPageIcon,

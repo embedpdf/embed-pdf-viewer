@@ -20,7 +20,10 @@
           @pointerdown="(e: PointerEvent) => select(e, item.id)"
           @touchstart="(e: TouchEvent) => select(e, item.id)"
         />
+
+        <!-- Selection Menu: Supports BOTH render function and slot -->
         <CounterRotate
+          v-if="shouldShowMenu(item.id)"
           :rect="{
             origin: { x: item.rect.origin.x * scale, y: item.rect.origin.y * scale },
             size: { width: item.rect.size.width * scale, height: item.rect.size.height * scale },
@@ -28,13 +31,21 @@
           :rotation="rotation"
         >
           <template #default="{ rect, menuWrapperProps }">
+            <!-- Priority 1: Render function prop (schema-driven) -->
+            <component
+              v-if="selectionMenu"
+              :is="renderSelectionMenu(item, rect, menuWrapperProps)"
+            />
+
+            <!-- Priority 2: Slot (manual customization) -->
             <slot
+              v-else
               name="selection-menu"
-              :item="item"
+              :context="buildContext(item)"
               :selected="selectedId === item.id"
-              :page-index="pageIndex"
-              :menu-wrapper-props="menuWrapperProps"
               :rect="rect"
+              :placement="menuPlacement"
+              :menuWrapperProps="menuWrapperProps"
             />
           </template>
         </CounterRotate>
@@ -65,7 +76,10 @@
             :on-click="(e: PointerEvent | TouchEvent) => select(e, item.id)"
           />
         </div>
+
+        <!-- Selection Menu: Supports BOTH render function and slot -->
         <CounterRotate
+          v-if="shouldShowMenu(item.id)"
           :rect="{
             origin: {
               x: item.rect.origin.x * scale,
@@ -79,13 +93,21 @@
           :rotation="rotation"
         >
           <template #default="{ rect, menuWrapperProps }">
+            <!-- Priority 1: Render function prop (schema-driven) -->
+            <component
+              v-if="selectionMenu"
+              :is="renderSelectionMenu(item, rect, menuWrapperProps)"
+            />
+
+            <!-- Priority 2: Slot (manual customization) -->
             <slot
+              v-else
               name="selection-menu"
-              :item="item"
+              :context="buildContext(item)"
               :selected="selectedId === item.id"
-              :page-index="pageIndex"
-              :menu-wrapper-props="menuWrapperProps"
               :rect="rect"
+              :placement="menuPlacement"
+              :menuWrapperProps="menuWrapperProps"
             />
           </template>
         </CounterRotate>
@@ -95,12 +117,15 @@
 </template>
 
 <script setup lang="ts">
-import { ref, watch } from 'vue';
-import { CounterRotate } from '@embedpdf/utils/vue';
+import { ref, watch, useSlots, type VNode } from 'vue';
+import type { Rect } from '@embedpdf/models';
 import { Rotation } from '@embedpdf/models';
+import { CounterRotate } from '@embedpdf/utils/vue';
+import type { MenuWrapperProps, SelectionMenuPlacement } from '@embedpdf/utils/vue';
 import type { RedactionItem } from '@embedpdf/plugin-redaction';
 import { useRedactionCapability } from '../hooks/use-redaction';
 import Highlight from './highlight.vue';
+import type { RedactionSelectionContext, RedactionSelectionMenuRenderFn } from './types';
 
 interface PendingRedactionsProps {
   documentId: string;
@@ -108,6 +133,8 @@ interface PendingRedactionsProps {
   scale: number;
   rotation: Rotation;
   bboxStroke?: string;
+  /** Render function for selection menu (schema-driven approach) */
+  selectionMenu?: RedactionSelectionMenuRenderFn;
 }
 
 const props = withDefaults(defineProps<PendingRedactionsProps>(), {
@@ -115,6 +142,7 @@ const props = withDefaults(defineProps<PendingRedactionsProps>(), {
   bboxStroke: 'rgba(0,0,0,0.8)',
 });
 
+const slots = useSlots();
 const { provides: redaction } = useRedactionCapability();
 const items = ref<RedactionItem[]>([]);
 const selectedId = ref<string | null>(null);
@@ -128,7 +156,6 @@ watch(
       return;
     }
 
-    // Use document-scoped hooks so we only receive events for this document
     const scoped = redactionValue.forDocument(docId);
 
     // Initialize with current state
@@ -161,5 +188,44 @@ const select = (e: PointerEvent | TouchEvent, id: string) => {
   const redactionValue = redaction.value;
   if (!redactionValue) return;
   redactionValue.forDocument(props.documentId).selectPending(props.pageIndex, id);
+};
+
+// --- Selection Menu Logic ---
+
+// Check if we should show menu for this item
+const shouldShowMenu = (itemId: string): boolean => {
+  const isSelected = selectedId.value === itemId;
+  return isSelected && (!!props.selectionMenu || !!slots['selection-menu']);
+};
+
+// Build context object for selection menu
+const buildContext = (item: RedactionItem): RedactionSelectionContext => ({
+  type: 'redaction',
+  item,
+  pageIndex: props.pageIndex,
+});
+
+// Placement hints (could be computed based on position)
+const menuPlacement: SelectionMenuPlacement = {
+  suggestTop: false,
+  spaceAbove: 0,
+  spaceBelow: 0,
+};
+
+// Render via function (for schema-driven approach)
+const renderSelectionMenu = (
+  item: RedactionItem,
+  rect: Rect,
+  menuWrapperProps: MenuWrapperProps,
+): VNode | null => {
+  if (!props.selectionMenu) return null;
+
+  return props.selectionMenu({
+    rect,
+    menuWrapperProps,
+    selected: selectedId.value === item.id,
+    placement: menuPlacement,
+    context: buildContext(item),
+  });
 };
 </script>

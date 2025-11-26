@@ -55,6 +55,7 @@
     "@embedpdf/plugin-scroll": "workspace:*",
     "@embedpdf/plugin-viewport": "workspace:*",
     "@embedpdf/plugin-i18n": "workspace:*",
+    "@embedpdf/utils": "workspace:*",
     "@types/react": "^18.2.0",
     "typescript": "^5.0.0"
   },

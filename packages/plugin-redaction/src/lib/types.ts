@@ -9,7 +9,7 @@ export enum RedactionMode {
 
 export interface SelectedRedaction {
   page: number;
-  id: string | null;
+  id: string;
 }
 
 // Per-document redaction state
@@ -119,6 +119,7 @@ export interface RedactionScope {
   startRedaction(): void;
 
   selectPending(page: number, id: string): void;
+  getSelectedPending(): SelectedRedaction | null;
   deselectPending(): void;
 
   getState(): RedactionDocumentState;
@@ -151,6 +152,7 @@ export interface RedactionCapability {
   startRedaction(): void;
 
   selectPending(page: number, id: string): void;
+  getSelectedPending(): SelectedRedaction | null;
   deselectPending(): void;
 
   getState(): RedactionDocumentState;

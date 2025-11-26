@@ -5,7 +5,7 @@
   import PendingRedactions from './pending-redactions.svelte';
   import MarqueeRedact from './marquee-redact.svelte';
   import SelectionRedact from './selection-redact.svelte';
-  import type { SelectionMenuProps } from '../types';
+  import type { RedactionSelectionMenuRenderFn, RedactionSelectionMenuProps } from '../types';
 
   interface RedactionLayerProps {
     /** The ID of the document this layer belongs to */
@@ -16,11 +16,20 @@
     scale?: number;
     /** Page rotation (for counter-rotating menus, etc.) */
     rotation?: Rotation;
-    /** Optional menu renderer for a selected redaction */
-    selectionMenu?: Snippet<[SelectionMenuProps]>;
+    /** Render function for selection menu (schema-driven approach) */
+    selectionMenu?: RedactionSelectionMenuRenderFn;
+    /** Snippet for custom selection menu (slot-based approach) */
+    selectionMenuSnippet?: Snippet<[RedactionSelectionMenuProps]>;
   }
 
-  let { documentId, pageIndex, scale, rotation, selectionMenu }: RedactionLayerProps = $props();
+  let {
+    documentId,
+    pageIndex,
+    scale,
+    rotation,
+    selectionMenu,
+    selectionMenuSnippet,
+  }: RedactionLayerProps = $props();
 
   const documentState = useDocumentState(() => documentId);
 
@@ -37,6 +46,7 @@
   scale={actualScale}
   rotation={actualRotation}
   {selectionMenu}
+  {selectionMenuSnippet}
 />
 <MarqueeRedact {documentId} {pageIndex} scale={actualScale} />
 <SelectionRedact {documentId} {pageIndex} scale={actualScale} />

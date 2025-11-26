@@ -393,7 +393,7 @@ import AnnotationContainer from './annotation-container.vue';
 import * as AnnoComponents from './annotations';
 import * as TextMarkupComponents from './text-markup';
 import { VertexConfig } from '../../shared/types';
-import { ResizeHandleUI, VertexHandleUI } from '../types';
+import { AnnotationSelectionMenuRenderFn, ResizeHandleUI, VertexHandleUI } from '../types';
 
 const props = defineProps<{
   documentId: string;
@@ -405,6 +405,8 @@ const props = defineProps<{
   resizeUI?: ResizeHandleUI;
   vertexUI?: VertexHandleUI;
   selectionOutlineColor?: string;
+  /** Render function for selection menu (schema-driven approach) */
+  selectionMenu?: AnnotationSelectionMenuRenderFn;
 }>();
 
 const { provides: annotationCapability } = useAnnotationCapability();

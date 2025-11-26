@@ -43,6 +43,7 @@
   import SplitViewLayout from '$lib/components/SplitViewLayout.svelte';
   import { ConsoleLogger } from '@embedpdf/models';
   import EmptyState from '$lib/components/EmptyState.svelte';
+  import SelectionSelectionMenu from '$lib/components/SelectionSelectionMenu.svelte';
 
   const logger = new ConsoleLogger();
 
@@ -210,10 +211,7 @@
                     <div id="document-content" class="flex flex-1 overflow-hidden bg-white">
                       <!-- Thumbnails Sidebar - Left -->
                       {#if getSidebarState(documentId).thumbnails}
-                        <ThumbnailsSidebar
-                          {documentId}
-                          onClose={() => toggleSidebar(documentId, 'thumbnails')}
-                        />
+                        <ThumbnailsSidebar {documentId} />
                       {/if}
 
                       <!-- Main Viewer -->
@@ -253,10 +251,11 @@
                                               {documentId}
                                               pageIndex={page.pageIndex}
                                             />
-                                            <SelectionLayer
-                                              {documentId}
-                                              pageIndex={page.pageIndex}
-                                            />
+                                            <SelectionLayer {documentId} pageIndex={page.pageIndex}>
+                                              {#snippet selectionMenuSnippet(props)}
+                                                <SelectionSelectionMenu {...props} {documentId} />
+                                              {/snippet}
+                                            </SelectionLayer>
                                           </PagePointerProvider>
                                         </Rotate>
                                       {/snippet}
@@ -273,10 +272,7 @@
 
                       <!-- Search Sidebar - Right -->
                       {#if getSidebarState(context.activeDocumentId).search}
-                        <SearchSidebar
-                          {documentId}
-                          onClose={() => toggleSidebar(documentId, 'search')}
-                        />
+                        <SearchSidebar {documentId} />
                       {/if}
                     </div>
                   {/if}

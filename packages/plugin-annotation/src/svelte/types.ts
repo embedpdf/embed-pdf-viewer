@@ -5,18 +5,20 @@
 
 import type { PdfAnnotationObject, Rect } from '@embedpdf/models';
 import type { TrackedAnnotation } from '@embedpdf/plugin-annotation';
+import { SelectionMenuPropsBase, SelectionMenuRenderFn } from '@embedpdf/utils/svelte';
 import type { Snippet } from 'svelte';
 
 export type ResizeDirection = 'top-left' | 'top-right' | 'bottom-left' | 'bottom-right' | 'none';
 
-export interface SelectionMenuProps {
+export interface AnnotationSelectionContext {
+  type: 'annotation';
   annotation: TrackedAnnotation;
-  selected: boolean;
-  rect: Rect;
-  menuWrapperProps: any; // MenuWrapperProps would need Svelte equivalent
+  pageIndex: number;
 }
 
-export type SelectionMenu = Snippet<[SelectionMenuProps]>;
+// For manual component props
+export type AnnotationSelectionMenuProps = SelectionMenuPropsBase<AnnotationSelectionContext>;
+export type AnnotationSelectionMenuRenderFn = SelectionMenuRenderFn<AnnotationSelectionContext>;
 
 export interface HandleProps {
   backgroundColor?: string;

@@ -54,3 +54,4 @@ export { default as ArrowForwardUpIcon } from './ArrowForwardUpIcon.svelte';
 export { default as PointerIcon } from './PointerIcon.svelte';
 export { default as SidebarIcon } from './SidebarIcon.svelte';
 export { default as CommentIcon } from './CommentIcon.svelte';
+export { default as CopyIcon } from './CopyIcon.svelte';

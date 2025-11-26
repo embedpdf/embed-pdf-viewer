@@ -122,7 +122,7 @@ export function PageControls({ documentId }: PageControlsProps) {
             }}
             className="h-7 w-10 rounded border border-gray-300 bg-white px-1 text-center text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
           />
-          <span className="text-sm text-gray-600">/ {totalPages}</span>
+          <span className="text-sm text-gray-600">{totalPages}</span>
         </form>
 
         {/* Next Button */}

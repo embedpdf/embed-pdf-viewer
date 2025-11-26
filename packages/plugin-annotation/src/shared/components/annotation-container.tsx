@@ -11,7 +11,7 @@ import { useAnnotationCapability } from '../hooks';
 import {
   CustomAnnotationRenderer,
   ResizeHandleUI,
-  SelectionMenuProps,
+  AnnotationSelectionMenuRenderFn,
   VertexHandleUI,
 } from './types';
 import { VertexConfig } from '../types';
@@ -31,7 +31,7 @@ interface AnnotationContainerProps<T extends PdfAnnotationObject> {
   lockAspectRatio?: boolean;
   style?: CSSProperties;
   vertexConfig?: VertexConfig<T>;
-  selectionMenu?: (props: SelectionMenuProps) => JSX.Element;
+  selectionMenu?: AnnotationSelectionMenuRenderFn;
   outlineOffset?: number;
   onDoubleClick?: (event: any) => void; // You'll need to import proper MouseEvent type
   onSelect: (event: any) => void;
@@ -235,29 +235,36 @@ export function AnnotationContainer<T extends PdfAnnotationObject>({
           )}
       </div>
       {/* CounterRotate remains unchanged */}
-      <CounterRotate
-        rect={{
-          origin: {
-            x: currentObject.rect.origin.x * scale,
-            y: currentObject.rect.origin.y * scale,
-          },
-          size: {
-            width: currentObject.rect.size.width * scale,
-            height: currentObject.rect.size.height * scale,
-          },
-        }}
-        rotation={rotation}
-      >
-        {({ rect, menuWrapperProps }) =>
-          selectionMenu &&
-          selectionMenu({
-            annotation: trackedAnnotation,
-            selected: isSelected,
-            rect,
-            menuWrapperProps,
-          })
-        }
-      </CounterRotate>
+      {selectionMenu && (
+        <CounterRotate
+          rect={{
+            origin: {
+              x: currentObject.rect.origin.x * scale,
+              y: currentObject.rect.origin.y * scale,
+            },
+            size: {
+              width: currentObject.rect.size.width * scale,
+              height: currentObject.rect.size.height * scale,
+            },
+          }}
+          rotation={rotation}
+        >
+          {(props) =>
+            selectionMenu({
+              ...props,
+              context: {
+                type: 'annotation',
+                annotation: trackedAnnotation,
+                pageIndex,
+              },
+              selected: isSelected,
+              placement: {
+                suggestTop: false,
+              },
+            })
+          }
+        </CounterRotate>
+      )}
     </div>
   );
 }

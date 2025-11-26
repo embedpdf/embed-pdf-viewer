@@ -22,6 +22,7 @@ import type { State } from './types';
 import { isPanelOpen, isToolbarOpen, UI_PLUGIN_ID, type UIPlugin } from '@embedpdf/plugin-ui';
 import { ScrollStrategy, type ScrollPlugin } from '@embedpdf/plugin-scroll';
 import type { InteractionManagerPlugin } from '@embedpdf/plugin-interaction-manager';
+import type { SelectionPlugin } from '@embedpdf/plugin-selection';
 
 export const commands: Record<string, Command<State>> = {
   // ─────────────────────────────────────────────────────────
@@ -993,6 +994,27 @@ export const commands: Record<string, Command<State>> = {
     },
   },
 
+  'annotation:delete-selected': {
+    id: 'annotation:delete-selected',
+    labelKey: 'annotation.deleteSelected',
+    icon: 'trash',
+    category: 'annotation',
+    action: ({ registry, documentId }) => {
+      const annotation = registry.getPlugin<AnnotationPlugin>(ANNOTATION_PLUGIN_ID)?.provides();
+
+      const annotationScope = annotation?.forDocument(documentId);
+      if (!annotationScope) return;
+
+      const selectedAnnotation = annotationScope.getSelectedAnnotation();
+      if (!selectedAnnotation) return;
+
+      annotationScope.deleteAnnotation(
+        selectedAnnotation.object.pageIndex,
+        selectedAnnotation.object.id,
+      );
+    },
+  },
+
   // ─────────────────────────────────────────────────────────
   // Redaction Commands
   // ─────────────────────────────────────────────────────────
@@ -1045,6 +1067,49 @@ export const commands: Record<string, Command<State>> = {
     action: ({ registry, documentId }) => {
       const redaction = registry.getPlugin<RedactionPlugin>('redaction')?.provides();
       redaction?.forDocument(documentId).clearPending();
+    },
+  },
+
+  'redaction:delete-selected': {
+    id: 'redaction:delete-selected',
+    labelKey: 'redaction.deleteSelected',
+    icon: 'trash',
+    category: 'redaction',
+    action: ({ registry, documentId }) => {
+      const redaction = registry.getPlugin<RedactionPlugin>('redaction')?.provides();
+      const selectedRedaction = redaction?.forDocument(documentId).getSelectedPending();
+      if (!selectedRedaction) return;
+      redaction
+        ?.forDocument(documentId)
+        .removePending(selectedRedaction.page, selectedRedaction.id);
+    },
+  },
+
+  'redaction:commit-selected': {
+    id: 'redaction:commit-selected',
+    labelKey: 'redaction.commitSelected',
+    icon: 'check',
+    category: 'redaction',
+    action: ({ registry, documentId }) => {
+      const redaction = registry.getPlugin<RedactionPlugin>('redaction')?.provides();
+      const selectedRedaction = redaction?.forDocument(documentId).getSelectedPending();
+      if (!selectedRedaction) return;
+      redaction
+        ?.forDocument(documentId)
+        .commitPending(selectedRedaction.page, selectedRedaction.id);
+    },
+  },
+
+  'selection:copy': {
+    id: 'selection:copy',
+    labelKey: 'selection.copy',
+    icon: 'copy',
+    category: 'selection',
+    action: ({ registry, documentId }) => {
+      const plugin = registry.getPlugin<SelectionPlugin>('selection');
+      const scope = plugin?.provides().forDocument(documentId);
+      scope?.copyToClipboard();
+      scope?.clear();
     },
   },
 

@@ -1,50 +1,45 @@
-import { Rect } from '@embedpdf/models';
-import { TrackedAnnotation } from '@embedpdf/plugin-annotation';
-import { useAnnotationCapability } from '@embedpdf/plugin-annotation/react';
-import { MenuWrapperProps } from '@embedpdf/utils/react';
-import { useState, useRef } from 'react';
+import {
+  useAnnotationCapability,
+  type AnnotationSelectionMenuProps,
+} from '@embedpdf/plugin-annotation/react';
 import { TrashIcon } from './icons';
 
-interface AnnotationSelectionMenuProps {
-  menuWrapperProps: MenuWrapperProps;
-  selected: TrackedAnnotation;
-  rect: Rect;
+interface Props extends AnnotationSelectionMenuProps {
   documentId: string;
 }
 
 export function AnnotationSelectionMenu({
   selected,
+  context,
   documentId,
   menuWrapperProps,
   rect,
-}: AnnotationSelectionMenuProps) {
+}: Props) {
   const { provides: annotationCapability } = useAnnotationCapability();
-  const [anchorEl, setAnchorEl] = useState<HTMLSpanElement | null>(null);
-  const popperRef = useRef<HTMLDivElement>(null);
 
   // Get document-scoped annotation API
-  const annotation = annotationCapability?.forDocument(documentId);
+  const annotationScope = annotationCapability?.forDocument(documentId);
 
   const handleDelete = () => {
-    if (!annotation) return;
-    const { pageIndex, id } = selected.object;
-    annotation.deleteAnnotation(pageIndex, id);
+    if (!annotationScope) return;
+    const { pageIndex, id } = context.annotation.object;
+    annotationScope.deleteAnnotation(pageIndex, id);
+  };
+
+  if (!selected) return null;
+
+  // Calculate position - position below the annotation by default
+  const menuStyle: React.CSSProperties = {
+    position: 'absolute',
+    pointerEvents: 'auto',
+    cursor: 'default',
+    top: rect.size.height + 8,
   };
 
   return (
-    <>
-      <span {...menuWrapperProps} ref={setAnchorEl} />
-      {anchorEl && (
-        <div
-          ref={popperRef}
-          style={{
-            position: 'fixed',
-            left: rect.origin.x,
-            top: rect.origin.y + rect.size.height + 8,
-            zIndex: 1000,
-          }}
-          className="rounded-lg border border-gray-200 bg-white px-2 py-1 shadow-lg"
-        >
+    <div {...menuWrapperProps}>
+      <div style={menuStyle} className="rounded-lg border border-gray-200 bg-white shadow-lg">
+        <div className="flex items-center gap-1 px-2 py-1">
           <button
             onClick={handleDelete}
             className="flex items-center justify-center rounded p-1.5 text-gray-600 transition-colors hover:bg-gray-100 hover:text-red-600"
@@ -54,7 +49,7 @@ export function AnnotationSelectionMenu({
             <TrashIcon className="h-4 w-4" />
           </button>
         </div>
-      )}
-    </>
+      </div>
+    </div>
   );
 }

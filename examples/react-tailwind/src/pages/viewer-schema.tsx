@@ -32,7 +32,13 @@ import { HistoryPluginPackage } from '@embedpdf/plugin-history/react';
 import { AnnotationPluginPackage, AnnotationLayer } from '@embedpdf/plugin-annotation/react';
 import { CommandsPluginPackage } from '@embedpdf/plugin-commands/react';
 import { I18nPluginPackage } from '@embedpdf/plugin-i18n/react';
-import { UIPluginPackage, UIProvider, useSchemaRenderer } from '@embedpdf/plugin-ui/react';
+import {
+  UIPluginPackage,
+  UIProvider,
+  UIRenderers,
+  useSchemaRenderer,
+  useSelectionMenu,
+} from '@embedpdf/plugin-ui/react';
 import { TabBar } from '../components/tab-bar-2';
 import { LoadingSpinner } from '../components/loading-spinner';
 import { DocumentPasswordPrompt } from '../components/document-password-prompt';
@@ -56,6 +62,7 @@ import {
   paramResolvers,
   spanishTranslations,
 } from '../config';
+import { SchemaSelectionMenu } from '../ui/schema-selection-menu';
 
 const logger = new ConsoleLogger();
 
@@ -90,11 +97,12 @@ export function ViewerSchemaPage() {
     [],
   );
 
-  const uiRenderers = useMemo(
+  const uiRenderers: UIRenderers = useMemo(
     () => ({
       toolbar: SchemaToolbar,
       panel: SchemaPanel,
       menu: SchemaMenu,
+      selectionMenu: SchemaSelectionMenu,
     }),
     [],
   );
@@ -222,6 +230,10 @@ export function ViewerSchemaPage() {
 function ViewerLayout({ documentId }: { documentId: string }) {
   const { renderToolbar, renderPanel } = useSchemaRenderer(documentId);
 
+  const annotationMenu = useSelectionMenu('annotation', documentId);
+  const redactionMenu = useSelectionMenu('redaction', documentId);
+  const selectionMenu = useSelectionMenu('selection', documentId);
+
   return (
     <>
       {/* Main Toolbar */}
@@ -273,9 +285,21 @@ function ViewerLayout({ documentId }: { documentId: string }) {
                                 <SearchLayer documentId={documentId} pageIndex={pageIndex} />
                                 <MarqueeZoom documentId={documentId} pageIndex={pageIndex} />
                                 <MarqueeCapture documentId={documentId} pageIndex={pageIndex} />
-                                <SelectionLayer documentId={documentId} pageIndex={pageIndex} />
-                                <RedactionLayer documentId={documentId} pageIndex={pageIndex} />
-                                <AnnotationLayer documentId={documentId} pageIndex={pageIndex} />
+                                <SelectionLayer
+                                  documentId={documentId}
+                                  pageIndex={pageIndex}
+                                  selectionMenu={selectionMenu}
+                                />
+                                <RedactionLayer
+                                  documentId={documentId}
+                                  pageIndex={pageIndex}
+                                  selectionMenu={redactionMenu}
+                                />
+                                <AnnotationLayer
+                                  documentId={documentId}
+                                  pageIndex={pageIndex}
+                                  selectionMenu={annotationMenu}
+                                />
                               </PagePointerProvider>
                             </Rotate>
                           )}

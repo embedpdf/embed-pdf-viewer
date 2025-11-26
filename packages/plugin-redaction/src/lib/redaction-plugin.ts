@@ -247,6 +247,7 @@ export class RedactionPlugin extends BasePlugin<
       startRedaction: () => this.startRedactionMode(),
 
       selectPending: (page, id) => this.selectPending(page, id),
+      getSelectedPending: () => this.getSelectedPending(),
       deselectPending: () => this.deselectPending(),
 
       getState: () => this.getDocumentStateOrThrow(),
@@ -288,6 +289,7 @@ export class RedactionPlugin extends BasePlugin<
       startRedaction: () => this.startRedactionMode(documentId),
 
       selectPending: (page, id) => this.selectPending(page, id, documentId),
+      getSelectedPending: () => this.getSelectedPending(documentId),
       deselectPending: () => this.deselectPending(documentId),
 
       getState: () => this.getDocumentStateOrThrow(documentId),
@@ -358,6 +360,11 @@ export class RedactionPlugin extends BasePlugin<
     this.dispatch(selectPending(id, page, itemId));
     this.selectionCapability?.forDocument(id).clear();
     this.emitSelectedChange(id);
+  }
+
+  private getSelectedPending(documentId?: string): SelectedRedaction | null {
+    const id = documentId ?? this.getActiveDocumentId();
+    return this.getDocumentState(id)?.selected ?? null;
   }
 
   private deselectPending(documentId?: string) {
