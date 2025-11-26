@@ -15,7 +15,9 @@ export const useAnnotationCapability = () => useCapability<AnnotationPlugin>(Ann
  */
 export const useAnnotation = (documentId: string) => {
   const { provides } = useAnnotationCapability();
-  const [state, setState] = useState<AnnotationDocumentState>(initialDocumentState());
+  const [state, setState] = useState<AnnotationDocumentState>(
+    provides?.forDocument(documentId)?.getState() ?? initialDocumentState(),
+  );
 
   useEffect(() => {
     if (!provides) return;
