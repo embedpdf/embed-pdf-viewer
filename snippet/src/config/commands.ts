@@ -624,7 +624,15 @@ export const commands: Record<string, Command<State>> = {
     category: 'mode',
     action: ({ registry, documentId }) => {
       const ui = registry.getPlugin<UIPlugin>('ui')?.provides();
-      if (!ui) return;
+      const interactionManager = registry
+        .getPlugin<InteractionManagerPlugin>('interaction-manager')
+        ?.provides();
+      if (!ui || !interactionManager) return;
+
+      const interactionScope = interactionManager.forDocument(documentId);
+      if (!interactionScope) return;
+
+      interactionScope.activate('pointerMode');
       ui.forDocument(documentId).closeToolbarSlot('top', 'secondary');
     },
     active: ({ state, documentId }) => {

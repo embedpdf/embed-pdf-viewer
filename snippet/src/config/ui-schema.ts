@@ -756,6 +756,18 @@ export const viewerUISchema: UISchema = {
           commandId: 'annotation:delete-selected',
           variant: 'icon',
         },
+        {
+          type: 'command-button',
+          id: 'toggle-annotation-style',
+          commandId: 'panel:toggle-annotation-style',
+          variant: 'icon',
+        },
+        {
+          type: 'command-button',
+          id: 'comment-button',
+          commandId: 'panel:toggle-comment',
+          variant: 'icon',
+        },
       ],
     },
     redaction: {
