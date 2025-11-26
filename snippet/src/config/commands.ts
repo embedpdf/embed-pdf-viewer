@@ -8,6 +8,10 @@ import {
   ANNOTATION_PLUGIN_ID,
   AnnotationPlugin,
   getToolDefaultsById,
+  isHighlightTool,
+  isSquigglyTool,
+  isStrikeoutTool,
+  isUnderlineTool,
 } from '@embedpdf/plugin-annotation/preact';
 import {
   REDACTION_PLUGIN_ID,
@@ -23,6 +27,8 @@ import { isPanelOpen, isToolbarOpen, UI_PLUGIN_ID, UIPlugin } from '@embedpdf/pl
 import { ScrollPlugin, ScrollStrategy } from '@embedpdf/plugin-scroll/preact';
 import { InteractionManagerPlugin } from '@embedpdf/plugin-interaction-manager/preact';
 import { FullscreenPlugin } from '@embedpdf/plugin-fullscreen/preact';
+import { SELECTION_PLUGIN_ID, SelectionPlugin } from '@embedpdf/plugin-selection/preact';
+import { ignore, PdfAnnotationSubtype, PdfBlendMode, uuidV4 } from '@embedpdf/models';
 
 export const commands: Record<string, Command<State>> = {
   // ─────────────────────────────────────────────────────────
@@ -684,13 +690,59 @@ export const commands: Record<string, Command<State>> = {
     category: 'annotation',
     action: ({ registry, documentId }) => {
       const annotation = registry.getPlugin<AnnotationPlugin>(ANNOTATION_PLUGIN_ID)?.provides();
-      const annotationScope = annotation?.forDocument(documentId);
-      if (!annotationScope) return;
+      const selection = registry.getPlugin<SelectionPlugin>(SELECTION_PLUGIN_ID)?.provides();
+      const ui = registry.getPlugin<UIPlugin>('ui')?.provides();
 
-      if (annotationScope.getActiveTool()?.id === 'highlight') {
-        annotationScope.setActiveTool(null);
-      } else {
+      if (!selection || !annotation || !ui) return;
+
+      const annotationScope = annotation?.forDocument(documentId);
+      const selectionScope = selection?.forDocument(documentId);
+
+      if (!annotationScope || !selectionScope) return;
+
+      const tool = annotation.getTool('highlight');
+      if (!tool) return;
+
+      if (!isHighlightTool(tool)) return;
+
+      const defaultSettings = tool.defaults;
+      const formattedSelection = selectionScope.getFormattedSelection();
+      const selectionText = selectionScope.getSelectedText();
+
+      // If there's a selection, create highlights for it
+      if (formattedSelection.length > 0) {
+        for (const sel of formattedSelection) {
+          selectionText.wait((text) => {
+            const annotationId = uuidV4();
+            annotationScope.createAnnotation(sel.pageIndex, {
+              id: annotationId,
+              created: new Date(),
+              flags: ['print'],
+              type: PdfAnnotationSubtype.HIGHLIGHT,
+              blendMode: PdfBlendMode.Multiply,
+              color: defaultSettings.color,
+              opacity: defaultSettings.opacity,
+              pageIndex: sel.pageIndex,
+              rect: sel.rect,
+              segmentRects: sel.segmentRects,
+              custom: {
+                text: text.join('\n'),
+              },
+            });
+
+            annotationScope.selectAnnotation(sel.pageIndex, annotationId);
+          }, ignore);
+        }
+        selectionScope.clear();
         annotationScope.setActiveTool('highlight');
+        ui.setActiveToolbar('top', 'secondary', 'annotation-toolbar', documentId);
+      } else {
+        // No selection - toggle the highlight tool
+        if (annotationScope.getActiveTool()?.id === 'highlight') {
+          annotationScope.setActiveTool(null);
+        } else {
+          annotationScope.setActiveTool('highlight');
+        }
       }
     },
     active: ({ state, documentId }) => {
@@ -709,13 +761,58 @@ export const commands: Record<string, Command<State>> = {
     category: 'annotation',
     action: ({ registry, documentId }) => {
       const annotation = registry.getPlugin<AnnotationPlugin>(ANNOTATION_PLUGIN_ID)?.provides();
-      const annotationScope = annotation?.forDocument(documentId);
-      if (!annotationScope) return;
+      const selection = registry.getPlugin<SelectionPlugin>(SELECTION_PLUGIN_ID)?.provides();
+      const ui = registry.getPlugin<UIPlugin>('ui')?.provides();
 
-      if (annotationScope.getActiveTool()?.id === 'underline') {
-        annotationScope.setActiveTool(null);
-      } else {
+      if (!selection || !annotation || !ui) return;
+
+      const annotationScope = annotation?.forDocument(documentId);
+      const selectionScope = selection?.forDocument(documentId);
+
+      if (!annotationScope || !selectionScope) return;
+
+      const tool = annotation.getTool('underline');
+      if (!tool) return;
+
+      if (!isUnderlineTool(tool)) return;
+
+      const defaultSettings = tool.defaults;
+      const formattedSelection = selectionScope.getFormattedSelection();
+      const selectionText = selectionScope.getSelectedText();
+
+      // If there's a selection, create underlines for it
+      if (formattedSelection.length > 0) {
+        for (const sel of formattedSelection) {
+          selectionText.wait((text) => {
+            const annotationId = uuidV4();
+            annotationScope.createAnnotation(sel.pageIndex, {
+              id: annotationId,
+              created: new Date(),
+              flags: ['print'],
+              type: PdfAnnotationSubtype.UNDERLINE,
+              color: defaultSettings.color,
+              opacity: defaultSettings.opacity,
+              pageIndex: sel.pageIndex,
+              rect: sel.rect,
+              segmentRects: sel.segmentRects,
+              custom: {
+                text: text.join('\n'),
+              },
+            });
+
+            annotationScope.selectAnnotation(sel.pageIndex, annotationId);
+          }, ignore);
+        }
+        selectionScope.clear();
         annotationScope.setActiveTool('underline');
+        ui.setActiveToolbar('top', 'secondary', 'annotation-toolbar', documentId);
+      } else {
+        // No selection - toggle the underline tool
+        if (annotationScope.getActiveTool()?.id === 'underline') {
+          annotationScope.setActiveTool(null);
+        } else {
+          annotationScope.setActiveTool('underline');
+        }
       }
     },
     active: ({ state, documentId }) => {
@@ -734,13 +831,58 @@ export const commands: Record<string, Command<State>> = {
     category: 'annotation',
     action: ({ registry, documentId }) => {
       const annotation = registry.getPlugin<AnnotationPlugin>(ANNOTATION_PLUGIN_ID)?.provides();
-      const annotationScope = annotation?.forDocument(documentId);
-      if (!annotationScope) return;
+      const selection = registry.getPlugin<SelectionPlugin>(SELECTION_PLUGIN_ID)?.provides();
+      const ui = registry.getPlugin<UIPlugin>('ui')?.provides();
 
-      if (annotationScope.getActiveTool()?.id === 'strikeout') {
-        annotationScope.setActiveTool(null);
-      } else {
+      if (!selection || !annotation || !ui) return;
+
+      const annotationScope = annotation?.forDocument(documentId);
+      const selectionScope = selection?.forDocument(documentId);
+
+      if (!annotationScope || !selectionScope) return;
+
+      const tool = annotation.getTool('strikeout');
+      if (!tool) return;
+
+      if (!isStrikeoutTool(tool)) return;
+
+      const defaultSettings = tool.defaults;
+      const formattedSelection = selectionScope.getFormattedSelection();
+      const selectionText = selectionScope.getSelectedText();
+
+      // If there's a selection, create strikeouts for it
+      if (formattedSelection.length > 0) {
+        for (const sel of formattedSelection) {
+          selectionText.wait((text) => {
+            const annotationId = uuidV4();
+            annotationScope.createAnnotation(sel.pageIndex, {
+              id: annotationId,
+              created: new Date(),
+              flags: ['print'],
+              type: PdfAnnotationSubtype.STRIKEOUT,
+              color: defaultSettings.color,
+              opacity: defaultSettings.opacity,
+              pageIndex: sel.pageIndex,
+              rect: sel.rect,
+              segmentRects: sel.segmentRects,
+              custom: {
+                text: text.join('\n'),
+              },
+            });
+
+            annotationScope.selectAnnotation(sel.pageIndex, annotationId);
+          }, ignore);
+        }
+        selectionScope.clear();
         annotationScope.setActiveTool('strikeout');
+        ui.setActiveToolbar('top', 'secondary', 'annotation-toolbar', documentId);
+      } else {
+        // No selection - toggle the strikeout tool
+        if (annotationScope.getActiveTool()?.id === 'strikeout') {
+          annotationScope.setActiveTool(null);
+        } else {
+          annotationScope.setActiveTool('strikeout');
+        }
       }
     },
     active: ({ state, documentId }) => {
@@ -759,13 +901,58 @@ export const commands: Record<string, Command<State>> = {
     category: 'annotation',
     action: ({ registry, documentId }) => {
       const annotation = registry.getPlugin<AnnotationPlugin>(ANNOTATION_PLUGIN_ID)?.provides();
-      const annotationScope = annotation?.forDocument(documentId);
-      if (!annotationScope) return;
+      const selection = registry.getPlugin<SelectionPlugin>(SELECTION_PLUGIN_ID)?.provides();
+      const ui = registry.getPlugin<UIPlugin>('ui')?.provides();
 
-      if (annotationScope.getActiveTool()?.id === 'squiggly') {
-        annotationScope.setActiveTool(null);
-      } else {
+      if (!selection || !annotation || !ui) return;
+
+      const annotationScope = annotation?.forDocument(documentId);
+      const selectionScope = selection?.forDocument(documentId);
+
+      if (!annotationScope || !selectionScope) return;
+
+      const tool = annotation.getTool('squiggly');
+      if (!tool) return;
+
+      if (!isSquigglyTool(tool)) return;
+
+      const defaultSettings = tool.defaults;
+      const formattedSelection = selectionScope.getFormattedSelection();
+      const selectionText = selectionScope.getSelectedText();
+
+      // If there's a selection, create squiggly annotations for it
+      if (formattedSelection.length > 0) {
+        for (const sel of formattedSelection) {
+          selectionText.wait((text) => {
+            const annotationId = uuidV4();
+            annotationScope.createAnnotation(sel.pageIndex, {
+              id: annotationId,
+              created: new Date(),
+              flags: ['print'],
+              type: PdfAnnotationSubtype.SQUIGGLY,
+              color: defaultSettings.color,
+              opacity: defaultSettings.opacity,
+              pageIndex: sel.pageIndex,
+              rect: sel.rect,
+              segmentRects: sel.segmentRects,
+              custom: {
+                text: text.join('\n'),
+              },
+            });
+
+            annotationScope.selectAnnotation(sel.pageIndex, annotationId);
+          }, ignore);
+        }
+        selectionScope.clear();
         annotationScope.setActiveTool('squiggly');
+        ui.setActiveToolbar('top', 'secondary', 'annotation-toolbar', documentId);
+      } else {
+        // No selection - toggle the squiggly tool
+        if (annotationScope.getActiveTool()?.id === 'squiggly') {
+          annotationScope.setActiveTool(null);
+        } else {
+          annotationScope.setActiveTool('squiggly');
+        }
       }
     },
     active: ({ state, documentId }) => {
@@ -999,6 +1186,27 @@ export const commands: Record<string, Command<State>> = {
     },
   },
 
+  'annotation:delete-selected': {
+    id: 'annotation:delete-selected',
+    labelKey: 'annotation.deleteSelected',
+    icon: 'trash',
+    category: 'annotation',
+    action: ({ registry, documentId }) => {
+      const annotation = registry.getPlugin<AnnotationPlugin>(ANNOTATION_PLUGIN_ID)?.provides();
+
+      const annotationScope = annotation?.forDocument(documentId);
+      if (!annotationScope) return;
+
+      const selectedAnnotation = annotationScope.getSelectedAnnotation();
+      if (!selectedAnnotation) return;
+
+      annotationScope.deleteAnnotation(
+        selectedAnnotation.object.pageIndex,
+        selectedAnnotation.object.id,
+      );
+    },
+  },
+
   // ─────────────────────────────────────────────────────────
   // Redaction Commands
   // ─────────────────────────────────────────────────────────
@@ -1059,6 +1267,49 @@ export const commands: Record<string, Command<State>> = {
     disabled: ({ state, documentId }) => {
       const redaction = state.plugins[REDACTION_PLUGIN_ID]?.documents[documentId];
       return redaction?.pendingCount === 0;
+    },
+  },
+
+  'redaction:delete-selected': {
+    id: 'redaction:delete-selected',
+    labelKey: 'redaction.deleteSelected',
+    icon: 'trash',
+    category: 'redaction',
+    action: ({ registry, documentId }) => {
+      const redaction = registry.getPlugin<RedactionPlugin>('redaction')?.provides();
+      const selectedRedaction = redaction?.forDocument(documentId).getSelectedPending();
+      if (!selectedRedaction) return;
+      redaction
+        ?.forDocument(documentId)
+        .removePending(selectedRedaction.page, selectedRedaction.id);
+    },
+  },
+
+  'redaction:commit-selected': {
+    id: 'redaction:commit-selected',
+    labelKey: 'redaction.commitSelected',
+    icon: 'check',
+    category: 'redaction',
+    action: ({ registry, documentId }) => {
+      const redaction = registry.getPlugin<RedactionPlugin>('redaction')?.provides();
+      const selectedRedaction = redaction?.forDocument(documentId).getSelectedPending();
+      if (!selectedRedaction) return;
+      redaction
+        ?.forDocument(documentId)
+        .commitPending(selectedRedaction.page, selectedRedaction.id);
+    },
+  },
+
+  'selection:copy': {
+    id: 'selection:copy',
+    labelKey: 'selection.copy',
+    icon: 'copy',
+    category: 'selection',
+    action: ({ registry, documentId }) => {
+      const plugin = registry.getPlugin<SelectionPlugin>('selection');
+      const scope = plugin?.provides().forDocument(documentId);
+      scope?.copyToClipboard();
+      scope?.clear();
     },
   },
 

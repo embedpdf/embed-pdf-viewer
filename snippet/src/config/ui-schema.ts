@@ -742,4 +742,73 @@ export const viewerUISchema: UISchema = {
       defaultOpen: false,
     },
   },
+
+  // ─────────────────────────────────────────────────────────
+  // Selection Menus
+  // ─────────────────────────────────────────────────────────
+  selectionMenus: {
+    annotation: {
+      id: 'annotation',
+      items: [
+        {
+          type: 'command-button',
+          id: 'delete-annotation',
+          commandId: 'annotation:delete-selected',
+          variant: 'icon',
+        },
+      ],
+    },
+    redaction: {
+      id: 'redaction',
+      items: [
+        {
+          type: 'command-button',
+          id: 'delete-redaction',
+          commandId: 'redaction:delete-selected',
+          variant: 'icon',
+        },
+        {
+          type: 'command-button',
+          id: 'commit-redaction',
+          commandId: 'redaction:commit-selected',
+          variant: 'icon',
+        },
+      ],
+    },
+    selection: {
+      id: 'selection',
+      items: [
+        {
+          type: 'command-button',
+          id: 'copy-selection',
+          commandId: 'selection:copy',
+          variant: 'icon',
+        },
+        {
+          type: 'command-button',
+          id: 'add-highlight',
+          commandId: 'annotation:add-highlight',
+          variant: 'icon',
+        },
+        {
+          type: 'command-button',
+          id: 'add-strikeout',
+          commandId: 'annotation:add-strikeout',
+          variant: 'icon',
+        },
+        {
+          type: 'command-button',
+          id: 'add-underline',
+          commandId: 'annotation:add-underline',
+          variant: 'icon',
+        },
+        {
+          type: 'command-button',
+          id: 'add-squiggly',
+          commandId: 'annotation:add-squiggly',
+          variant: 'icon',
+        },
+      ],
+    },
+  },
 };

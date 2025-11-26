@@ -26,6 +26,7 @@ import {
   useSchemaRenderer,
   UIPluginPackage,
   UIComponents,
+  useSelectionMenu,
 } from '@embedpdf/plugin-ui/preact';
 import {
   DocumentManagerPluginPackage,
@@ -81,6 +82,7 @@ import { CommentSidebar } from './comment-sidebar';
 import { RedactionMenu } from './redaction-menu';
 import { CustomZoomToolbar } from './custom-zoom-toolbar';
 import { AnnotationSidebar } from './annotation-sidebar';
+import { SchemaSelectionMenu } from '@/ui/schema-selection-menu';
 
 export { ScrollStrategy, ZoomMode, SpreadMode, Rotation };
 
@@ -158,6 +160,10 @@ interface PDFViewerProps {
 function ViewerLayout({ documentId }: { documentId: string }) {
   const { renderToolbar, renderPanel } = useSchemaRenderer(documentId);
 
+  const selectionMenu = useSelectionMenu('selection', documentId);
+  const annotationMenu = useSelectionMenu('annotation', documentId);
+  const redactionMenu = useSelectionMenu('redaction', documentId);
+
   return (
     <div className="@container relative flex h-full w-full select-none flex-col">
       {/* Main Toolbar */}
@@ -213,9 +219,21 @@ function ViewerLayout({ documentId }: { documentId: string }) {
                                 <SearchLayer documentId={documentId} pageIndex={pageIndex} />
                                 <MarqueeZoom documentId={documentId} pageIndex={pageIndex} />
                                 <MarqueeCapture documentId={documentId} pageIndex={pageIndex} />
-                                <SelectionLayer documentId={documentId} pageIndex={pageIndex} />
-                                <RedactionLayer documentId={documentId} pageIndex={pageIndex} />
-                                <AnnotationLayer documentId={documentId} pageIndex={pageIndex} />
+                                <SelectionLayer
+                                  documentId={documentId}
+                                  pageIndex={pageIndex}
+                                  selectionMenu={selectionMenu}
+                                />
+                                <RedactionLayer
+                                  documentId={documentId}
+                                  pageIndex={pageIndex}
+                                  selectionMenu={redactionMenu}
+                                />
+                                <AnnotationLayer
+                                  documentId={documentId}
+                                  pageIndex={pageIndex}
+                                  selectionMenu={annotationMenu}
+                                />
                                 <HintLayer />
                               </PagePointerProvider>
                             </Rotate>
@@ -270,6 +288,7 @@ export function PDFViewer({ config }: PDFViewerProps) {
       toolbar: SchemaToolbar,
       panel: SchemaPanel,
       menu: SchemaMenu,
+      selectionMenu: SchemaSelectionMenu,
     }),
     [],
   );
