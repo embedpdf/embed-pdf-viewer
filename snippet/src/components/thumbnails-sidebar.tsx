@@ -11,7 +11,7 @@ export function ThumbnailsSidebar({ documentId, onClose }: ThumbnailsSidebarProp
   const { state, provides } = useScroll(documentId);
 
   return (
-    <div className="flex h-full flex-col bg-gray-50">
+    <div className="flex h-full flex-col">
       {/* Thumbnails */}
       <div className="flex-1 overflow-hidden">
         <ThumbnailsPane documentId={documentId} style={{ width: '100%', height: '100%' }}>
@@ -27,7 +27,6 @@ export function ThumbnailsSidebar({ documentId, onClose }: ThumbnailsSidebarProp
                 flexDirection: 'column',
                 alignItems: 'center',
                 cursor: 'pointer',
-                padding: '8px',
               }}
               onClick={() => {
                 provides?.scrollToPage?.({
@@ -54,7 +53,6 @@ export function ThumbnailsSidebar({ documentId, onClose }: ThumbnailsSidebarProp
                   style={{
                     width: '100%',
                     height: '100%',
-                    objectFit: 'contain',
                   }}
                 />
               </div>

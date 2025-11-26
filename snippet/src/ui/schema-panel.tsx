@@ -2,6 +2,7 @@ import { h, Fragment } from 'preact';
 import { useState } from 'preact/hooks';
 import { PanelRendererProps, useItemRenderer } from '@embedpdf/plugin-ui/preact';
 import { useTranslations } from '@embedpdf/plugin-i18n/preact';
+import { Icon } from '@/components/ui/icon';
 
 /**
  * Schema-driven Panel Renderer for Preact
@@ -59,24 +60,36 @@ function TabsContent({
   renderCustomComponent: (componentId: string, documentId: string, props: any) => any;
 }) {
   const [activeTab, setActiveTab] = useState(content.tabs[0]?.id || '');
+  const { translate } = useTranslations(documentId);
 
   return (
     <div className="flex h-full flex-col">
       {/* Tab Buttons */}
-      <div className="flex flex-shrink-0 border-b border-gray-300">
-        {content.tabs.map((tab) => (
-          <button
-            key={tab.id}
-            onClick={() => setActiveTab(tab.id)}
-            className={`flex-1 border-b-2 px-4 py-2 text-sm font-medium transition-colors ${
-              activeTab === tab.id
-                ? 'border-blue-500 text-blue-600'
-                : 'border-transparent text-gray-600 hover:text-gray-900'
-            }`}
-          >
-            {tab.label}
-          </button>
-        ))}
+      <div role="tablist" className="mx-4 my-4 flex flex-shrink-0 overflow-hidden bg-white">
+        {content.tabs.map((tab, idx, array) => {
+          const isActive = activeTab === tab.id;
+          const isFirst = idx === 0;
+          const isLast = idx === array.length - 1;
+
+          return (
+            <button
+              key={tab.id}
+              role="tab"
+              aria-selected={isActive}
+              tabIndex={isActive ? 0 : -1}
+              onClick={() => setActiveTab(tab.id)}
+              className={`relative flex h-7 flex-1 cursor-pointer items-center justify-center border outline-none transition-colors ${
+                isFirst ? 'rounded-l-md' : ''
+              } ${isLast ? 'rounded-r-md' : ''} ${!isLast ? 'border-r-0' : ''} ${
+                isActive
+                  ? 'border-blue-600 bg-blue-600 text-white'
+                  : 'border-gray-300 text-gray-600 hover:bg-gray-50'
+              }`}
+            >
+              {tab.icon && <Icon icon={tab.icon} className="h-5 w-5" />}
+            </button>
+          );
+        })}
       </div>
 
       {/* Tab Content */}
