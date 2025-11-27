@@ -7,6 +7,7 @@ type TabButtonProps = JSX.ButtonHTMLAttributes<HTMLButtonElement> & {
   active?: boolean;
   disabled?: boolean;
   className?: string;
+  anchorRef?: (el: HTMLButtonElement | null) => void;
 };
 
 export function TabButton({
@@ -15,6 +16,7 @@ export function TabButton({
   active = false,
   disabled = false,
   className = '',
+  anchorRef,
   ...props
 }: TabButtonProps) {
   // Base classes - twMerge will handle conflicts (rounded-md vs rounded-none, p-[5px] vs px-2 py-1)
@@ -29,6 +31,7 @@ export function TabButton({
 
   return (
     <button
+      ref={anchorRef}
       onClick={onClick}
       disabled={disabled}
       className={twMerge(baseClasses, activeClasses, disabledClasses, className)}

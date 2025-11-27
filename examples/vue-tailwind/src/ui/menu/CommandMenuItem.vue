@@ -1,11 +1,10 @@
 <template>
   <button
     v-if="command && command.visible"
+    v-bind="getUIItemProps(item)"
     @click="handleClick"
     :disabled="command.disabled"
-    :class="
-      twMerge(baseClasses, disabledClasses, activeClasses, responsiveClasses, 'w-full text-left')
-    "
+    :class="twMerge(baseClasses, disabledClasses, activeClasses, 'w-full text-left')"
     role="menuitem"
   >
     <component
@@ -29,21 +28,17 @@
 <script setup lang="ts">
 import { computed } from 'vue';
 import type { MenuItem } from '@embedpdf/plugin-ui/vue';
+import { getUIItemProps } from '@embedpdf/plugin-ui/vue';
 import { useCommand } from '@embedpdf/plugin-commands/vue';
 import { twMerge } from 'tailwind-merge';
 import * as Icons from '../../components/icons';
 import { CheckIcon } from '../../components/icons';
-
-/**
- * Renders a command menu item
- */
 
 interface Props {
   item: Extract<MenuItem, { type: 'command' }>;
   documentId: string;
   onClose: () => void;
   isMobile: boolean;
-  responsiveClasses: string;
 }
 
 const props = defineProps<Props>();

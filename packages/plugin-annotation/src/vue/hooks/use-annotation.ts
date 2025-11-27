@@ -15,7 +15,9 @@ export const useAnnotationCapability = () => useCapability<AnnotationPlugin>(Ann
  */
 export const useAnnotation = (documentId: MaybeRefOrGetter<string>) => {
   const { provides } = useAnnotationCapability();
-  const state = ref<AnnotationDocumentState>(initialDocumentState());
+  const state = ref<AnnotationDocumentState>(
+    provides?.value?.forDocument(toValue(documentId))?.getState() ?? initialDocumentState(),
+  );
 
   watch(
     [provides, () => toValue(documentId)],

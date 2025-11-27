@@ -1,15 +1,26 @@
 import { BasePluginConfig, EventHook } from '@embedpdf/core';
 import { UISchema } from './schema';
+import { StylesheetConfig } from './utils';
 
 // Re-export schema types
 export * from './schema';
 
 export interface UIPluginConfig extends BasePluginConfig {
+  /** UI schema */
   schema: UISchema;
+
+  /** Categories to disable at initialization */
+  disabledCategories?: string[];
+
+  /** Config for stylesheet generation */
+  stylesheetConfig?: StylesheetConfig;
 }
 
 export interface UIState {
   documents: Record<string, UIDocumentState>;
+
+  /** Globally disabled categories */
+  disabledCategories: string[];
 }
 
 /**
@@ -210,6 +221,14 @@ export interface UICapability {
   getSchema(): UISchema;
   mergeSchema(partial: Partial<UISchema>): void;
 
+  // Category management
+  disableCategory(category: string): void;
+  enableCategory(category: string): void;
+  toggleCategory(category: string): void;
+  setDisabledCategories(categories: string[]): void;
+  getDisabledCategories(): string[];
+  isCategoryDisabled(category: string): boolean;
+
   // Global events
   onToolbarChanged: EventHook<{
     documentId: string;
@@ -225,4 +244,5 @@ export interface UICapability {
   }>;
   onModalChanged: EventHook<{ documentId: string; modalId: string | null }>;
   onMenuChanged: EventHook<{ documentId: string; menuId: string; isOpen: boolean }>;
+  onCategoryChanged: EventHook<{ disabledCategories: string[] }>;
 }

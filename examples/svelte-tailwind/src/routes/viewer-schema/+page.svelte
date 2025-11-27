@@ -51,9 +51,7 @@
   import CustomZoomToolbar from '$lib/components/CustomZoomToolbar.svelte';
   import OutlineSidebar from '$lib/components/OutlineSidebar.svelte';
   import CommentSidebar from '$lib/components/CommentSidebar.svelte';
-  import SchemaToolbar from '$lib/ui/SchemaToolbar.svelte';
-  import SchemaPanel from '$lib/ui/SchemaPanel.svelte';
-  import SchemaMenu from '$lib/ui/SchemaMenu.svelte';
+  import { SchemaToolbar, SchemaPanel, SchemaMenu, SchemaSelectionMenu } from '$lib/ui';
   import {
     commands,
     viewerUISchema,
@@ -63,8 +61,6 @@
     dutchTranslations,
     paramResolvers,
   } from '$lib/config';
-  import { AnnotationSelectionMenu, SelectionSelectionMenu } from '$lib/components';
-  import SchemaSelectionMenu from '$lib/ui/SchemaSelectionMenu.svelte';
 
   const logger = new ConsoleLogger();
 
@@ -181,6 +177,7 @@
                   documentId={activeDocumentId}
                   components={uiComponents}
                   renderers={uiRenderers}
+                  class="flex flex-col flex-1 min-h-0 overflow-hidden"
                 >
                   {@render ViewerLayout({ documentId: activeDocumentId })}
                 </UIProvider>

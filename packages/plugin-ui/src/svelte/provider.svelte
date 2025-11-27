@@ -3,13 +3,15 @@
   import { provideAnchorRegistry } from './registries/anchor-registry.svelte';
   import { provideComponentRegistry } from './registries/component-registry.svelte';
   import { provideRenderers } from './registries/renderers-registry.svelte';
-  import type { BaseComponentProps, UIComponents, UIRenderers } from './types';
+  import type { UIComponents, UIRenderers } from './types';
   import AutoMenuRenderer from './auto-menu-renderer.svelte';
+  import UIRoot from './root.svelte';
+  import type { HTMLAttributes } from 'svelte/elements';
 
   /**
    * UIProvider Props
    */
-  interface Props {
+  type ProviderProps = HTMLAttributes<HTMLDivElement> & {
     children: Snippet;
 
     /**
@@ -35,9 +37,19 @@
      * Defaults to document.body
      */
     menuContainer?: HTMLElement | null;
-  }
 
-  let { children, documentId, components = {}, renderers, menuContainer = null }: Props = $props();
+    class?: string;
+  };
+
+  let {
+    children,
+    documentId,
+    components = {},
+    renderers,
+    menuContainer = null,
+    class: className,
+    ...restProps
+  }: ProviderProps = $props();
 
   /**
    * UIProvider - Single provider for all UI plugin functionality
@@ -81,7 +93,7 @@
   provideRenderers(renderers);
 </script>
 
-{@render children()}
-
-<!-- Automatically render menus for this document -->
-<AutoMenuRenderer {documentId} container={menuContainer} />
+<UIRoot class={className} {...restProps}>
+  {@render children()}
+  <AutoMenuRenderer {documentId} container={menuContainer} />
+</UIRoot>

@@ -18,3 +18,12 @@ export * from './schema';
 export * from './manifest';
 export * from './utils';
 export * from './selectors';
+export * from './actions';
+
+// Explicit exports for stylesheet generation (useful for SSR/build-time generation)
+export {
+  generateUIStylesheet,
+  extractCategories,
+  getStylesheetConfig,
+  type StylesheetConfig,
+} from './utils/stylesheet-generator';

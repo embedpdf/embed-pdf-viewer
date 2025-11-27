@@ -1,14 +1,15 @@
-import type { ReactNode, ComponentType } from '@framework';
+import type { ReactNode, ComponentType, HTMLAttributes } from '@framework';
 import { AnchorRegistryProvider } from './registries/anchor-registry';
 import { ComponentRegistryProvider } from './registries/component-registry';
 import { RenderersProvider } from './registries/renderers-registry';
 import { BaseComponentProps, UIRenderers } from './types';
 import { AutoMenuRenderer } from './auto-menu-renderer';
+import { UIRoot } from './root';
 
 /**
  * UIProvider Props
  */
-export interface UIProviderProps {
+export interface UIProviderProps extends HTMLAttributes<HTMLDivElement> {
   children: ReactNode;
 
   /**
@@ -81,14 +82,17 @@ export function UIProvider({
   components = {},
   renderers,
   menuContainer,
+  ...restProps
 }: UIProviderProps) {
   return (
     <AnchorRegistryProvider>
       <ComponentRegistryProvider initialComponents={components}>
         <RenderersProvider renderers={renderers}>
-          {children}
-          {/* Automatically render menus for this document */}
-          <AutoMenuRenderer documentId={documentId} container={menuContainer} />
+          <UIRoot {...restProps}>
+            {children}
+            {/* Automatically render menus for this document */}
+            <AutoMenuRenderer documentId={documentId} container={menuContainer} />
+          </UIRoot>
         </RenderersProvider>
       </ComponentRegistryProvider>
     </AnchorRegistryProvider>

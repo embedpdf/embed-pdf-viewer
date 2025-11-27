@@ -262,6 +262,23 @@ export const commands: Record<string, Command<State>> = {
     },
   },
 
+  'zoom:toggle-menu-mobile': {
+    id: 'zoom:toggle-menu-mobile',
+    labelKey: 'zoom.menu',
+    icon: 'zoomIn',
+    category: 'tools',
+    action: ({ registry, documentId }) => {
+      const ui = registry.getPlugin<UIPlugin>('ui')?.provides();
+      if (!ui) return;
+
+      const scope = ui.forDocument(documentId);
+      scope.toggleMenu('zoom-menu', 'zoom:toggle-menu-mobile', 'zoom-menu-button');
+    },
+    active: ({ state, documentId }) => {
+      const uiState = state.plugins['ui']?.documents[documentId];
+      return uiState?.openMenus['zoom-menu'] !== undefined;
+    },
+  },
   // ─────────────────────────────────────────────────────────
   // Pan Command
   // ─────────────────────────────────────────────────────────
@@ -302,6 +319,25 @@ export const commands: Record<string, Command<State>> = {
     },
     active: ({ state, documentId }) =>
       state.plugins['interaction-manager']?.documents[documentId]?.activeMode === 'pointerMode',
+  },
+
+  'left-action-menu:overflow-menu': {
+    id: 'left-action-menu:overflow-menu',
+    labelKey: 'left-action-menu.overflowMenu',
+    icon: 'dots',
+    category: 'ui',
+    action: ({ registry, documentId }) => {
+      const ui = registry.getPlugin<UIPlugin>('ui')?.provides();
+      if (!ui) return;
+
+      // Toggle the overflow tabs menu
+      ui.toggleMenu(
+        'left-action-menu',
+        'left-action-menu:overflow-menu',
+        'overflow-left-action-menu-button',
+        documentId,
+      );
+    },
   },
 
   // ─────────────────────────────────────────────────────────
@@ -682,6 +718,25 @@ export const commands: Record<string, Command<State>> = {
     },
     active: ({ state, documentId }) => {
       return isToolbarOpen(state.plugins, documentId, 'top', 'secondary', 'redaction-toolbar');
+    },
+  },
+
+  'tabs:overflow-menu': {
+    id: 'tabs:overflow-menu',
+    labelKey: 'tabs.overflowMenu',
+    icon: 'dots',
+    category: 'ui',
+    action: ({ registry, documentId }) => {
+      const ui = registry.getPlugin<UIPlugin>('ui')?.provides();
+      if (!ui) return;
+
+      // Toggle the overflow tabs menu
+      ui.toggleMenu(
+        'mode-tabs-overflow-menu',
+        'tabs:overflow-menu',
+        'overflow-tabs-button',
+        documentId,
+      );
     },
   },
 
@@ -1212,6 +1267,30 @@ export const commands: Record<string, Command<State>> = {
         selectedAnnotation.object.pageIndex,
         selectedAnnotation.object.id,
       );
+    },
+  },
+
+  'annotation:overflow-tools': {
+    id: 'annotation:overflow-tools',
+    labelKey: 'annotation.overflowTools',
+    icon: 'dots',
+    category: 'annotation',
+    action: ({ registry, documentId }) => {
+      const uiCapability = registry.getPlugin<UIPlugin>('ui')?.provides();
+      if (!uiCapability) return;
+
+      const scope = uiCapability.forDocument(documentId);
+      if (!scope) return;
+
+      scope.toggleMenu(
+        'annotation-tools-menu',
+        'annotation:overflow-tools',
+        'overflow-annotation-tools',
+      );
+    },
+    active: ({ state, documentId }) => {
+      const ui = state.plugins['ui']?.documents[documentId];
+      return ui?.openMenus['annotation-tools-menu'] !== undefined;
     },
   },
 

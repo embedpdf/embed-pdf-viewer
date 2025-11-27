@@ -135,9 +135,9 @@
         name="page"
         value={inputValue}
         oninput={handleInputChange}
-        class="h-7 w-12 rounded border border-gray-300 bg-white px-1 text-center text-sm focus:border-gray-400 focus:outline-none"
+        class="h-7 w-10 rounded border border-gray-300 bg-white px-1 text-center text-sm focus:border-gray-400 focus:outline-none"
       />
-      <span class="text-sm text-gray-600">/ {scroll.state.totalPages}</span>
+      <span class="text-sm text-gray-600">{scroll.state.totalPages}</span>
     </form>
 
     <!-- Next Page Button -->

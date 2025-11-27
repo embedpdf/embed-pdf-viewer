@@ -1,15 +1,14 @@
 import { h, Fragment } from 'preact';
-import { useEffect, useRef, useState, useMemo } from 'preact/hooks';
+import { useEffect, useRef, useState } from 'preact/hooks';
 import {
   MenuRendererProps,
   MenuItem,
-  resolveResponsiveMetadata,
-  ResponsiveMetadata,
   useUISchema,
   MenuSchema,
+  getUIItemProps,
 } from '@embedpdf/plugin-ui/preact';
 import { useCommand } from '@embedpdf/plugin-commands/preact';
-import { useTranslations, useLocale } from '@embedpdf/plugin-i18n/preact';
+import { useTranslations } from '@embedpdf/plugin-i18n/preact';
 import { ChevronLeftIcon } from '@/components/icons/chevron-left';
 import { icons } from '@/components/icons';
 import { ChevronRightIcon } from '@/components/icons/chevron-right';
@@ -18,6 +17,7 @@ import { ChevronRightIcon } from '@/components/icons/chevron-right';
  * Schema-driven Menu Renderer for Preact
  *
  * Renders menus defined in the UI schema.
+ * Visibility is controlled entirely by CSS via data attributes.
  */
 interface MenuStackItem {
   menuId: string;
@@ -42,14 +42,6 @@ export function SchemaMenu({ schema, documentId, anchorEl, onClose }: MenuRender
   }, [schema]);
 
   const currentMenu = menuStack[menuStack.length - 1];
-
-  const locale = useLocale();
-
-  // Resolve responsive metadata for the current menu
-  const responsiveMetadata = useMemo(
-    () => (currentMenu ? resolveResponsiveMetadata(currentMenu.schema, locale) : null),
-    [currentMenu, locale],
-  );
 
   const navigateToSubmenu = (submenuId: string, title: string) => {
     if (!uiSchema) return;
@@ -109,14 +101,11 @@ export function SchemaMenu({ schema, documentId, anchorEl, onClose }: MenuRender
   // Close on outside click
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
-      // Always use current values from refs, not closure values
       const currentMenuEl = menuRef.current;
 
-      if (!currentMenuEl) return; // Menu not rendered yet
+      if (!currentMenuEl) return;
 
-      // Use composedPath() to handle Shadow DOM
       const path = event.composedPath();
-
       const clickedInMenu = path.includes(currentMenuEl);
       const clickedInAnchor = anchorEl && path.includes(anchorEl);
 
@@ -170,6 +159,7 @@ export function SchemaMenu({ schema, documentId, anchorEl, onClose }: MenuRender
       {/* Menu */}
       <div
         ref={menuRef}
+        {...getUIItemProps(currentMenu.schema)}
         className={`min-w-[200px] rounded-lg border border-gray-300 bg-white shadow-lg ${
           isMobile ? 'fixed bottom-0 left-0 right-0 z-[1000] max-h-[80vh] rounded-b-none' : ''
         }`}
@@ -195,7 +185,6 @@ export function SchemaMenu({ schema, documentId, anchorEl, onClose }: MenuRender
               onClose={onClose}
               isMobile={isMobile}
               onNavigateToSubmenu={navigateToSubmenu}
-              responsiveMetadata={responsiveMetadata}
             />
           ))}
         </div>
@@ -213,18 +202,13 @@ function MenuItemRenderer({
   onClose,
   isMobile,
   onNavigateToSubmenu,
-  responsiveMetadata,
 }: {
   item: MenuItem;
   documentId: string;
   onClose: () => void;
   isMobile: boolean;
   onNavigateToSubmenu: (submenuId: string, title: string) => void;
-  responsiveMetadata: ResponsiveMetadata | null;
 }) {
-  const itemMetadata = responsiveMetadata?.items.get(item.id) ?? null;
-  const responsiveClasses = resolveResponsiveClasses(itemMetadata);
-
   switch (item.type) {
     case 'command':
       return (
@@ -233,7 +217,6 @@ function MenuItemRenderer({
           documentId={documentId}
           onClose={onClose}
           isMobile={isMobile}
-          responsiveClasses={responsiveClasses}
         />
       );
 
@@ -244,12 +227,15 @@ function MenuItemRenderer({
           documentId={documentId}
           isMobile={isMobile}
           onNavigateToSubmenu={onNavigateToSubmenu}
-          responsiveClasses={responsiveClasses}
         />
       );
 
     case 'divider':
-      return <hr className="my-2 border-gray-200" />;
+      return (
+        <div {...getUIItemProps(item)}>
+          <hr className="my-2 border-gray-200" />
+        </div>
+      );
 
     case 'section':
       return (
@@ -259,8 +245,6 @@ function MenuItemRenderer({
           onClose={onClose}
           isMobile={isMobile}
           onNavigateToSubmenu={onNavigateToSubmenu}
-          responsiveMetadata={responsiveMetadata}
-          responsiveClasses={responsiveClasses}
         />
       );
 
@@ -277,13 +261,11 @@ function CommandMenuItem({
   documentId,
   onClose,
   isMobile,
-  responsiveClasses,
 }: {
   item: Extract<MenuItem, { type: 'command' }>;
   documentId: string;
   onClose: () => void;
   isMobile: boolean;
-  responsiveClasses: string;
 }) {
   const command = useCommand(item.commandId, documentId);
 
@@ -291,25 +273,26 @@ function CommandMenuItem({
 
   const IconComponent = command.icon ? icons[command.icon] : null;
 
-  // Mobile styling (keep original)
+  const handleClick = () => {
+    if (!command.disabled) {
+      command.execute();
+      onClose();
+    }
+  };
+
+  // Mobile styling
   if (isMobile) {
     const baseClasses =
       'flex items-center gap-3 px-4 py-3 text-base transition-colors active:bg-gray-100';
     const disabledClasses = command.disabled ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer';
     const activeClasses = command.active ? 'bg-blue-50 text-blue-600' : 'text-gray-700';
 
-    const handleClick = () => {
-      if (!command.disabled) {
-        command.execute();
-        onClose();
-      }
-    };
-
     return (
       <button
+        {...getUIItemProps(item)}
         onClick={handleClick}
         disabled={command.disabled}
-        className={`${baseClasses} ${disabledClasses} ${activeClasses} ${responsiveClasses} w-full text-left`}
+        className={`${baseClasses} ${disabledClasses} ${activeClasses} w-full text-left`}
         role="menuitem"
       >
         {IconComponent && (
@@ -324,7 +307,7 @@ function CommandMenuItem({
     );
   }
 
-  // Desktop styling (match renderer style)
+  // Desktop styling
   const baseClasses = 'flex flex-row items-center justify-between gap-2 px-4 py-1 w-full text-left';
   const disabledClasses = command.disabled
     ? 'pointer-events-none cursor-not-allowed opacity-50'
@@ -334,18 +317,12 @@ function CommandMenuItem({
       ? 'bg-blue-500 text-white'
       : 'text-gray-500 hover:bg-blue-900 hover:text-white';
 
-  const handleClick = () => {
-    if (!command.disabled) {
-      command.execute();
-      onClose();
-    }
-  };
-
   return (
     <button
+      {...getUIItemProps(item)}
       onClick={handleClick}
       disabled={command.disabled}
-      className={`${baseClasses} ${disabledClasses} ${activeClasses} ${responsiveClasses}`}
+      className={`${baseClasses} ${disabledClasses} ${activeClasses}`}
       role="menuitem"
     >
       <div className="flex flex-row items-center gap-2">
@@ -372,30 +349,29 @@ function SubmenuItem({
   documentId,
   isMobile,
   onNavigateToSubmenu,
-  responsiveClasses,
 }: {
   item: Extract<MenuItem, { type: 'submenu' }>;
   documentId: string;
   isMobile: boolean;
   onNavigateToSubmenu: (submenuId: string, title: string) => void;
-  responsiveClasses: string;
 }) {
   const { translate } = useTranslations(documentId);
   const label = item.labelKey ? translate(item.labelKey) : item.label || '';
 
-  // Mobile styling (keep original)
+  const handleClick = () => {
+    onNavigateToSubmenu(item.menuId, label);
+  };
+
+  // Mobile styling
   if (isMobile) {
     const baseClasses =
       'flex items-center gap-3 px-4 py-3 text-base transition-colors active:bg-gray-100';
 
-    const handleClick = () => {
-      onNavigateToSubmenu(item.menuId, label);
-    };
-
     return (
       <button
+        {...getUIItemProps(item)}
         onClick={handleClick}
-        className={`${baseClasses} w-full cursor-pointer text-left text-gray-700 ${responsiveClasses}`}
+        className={`${baseClasses} w-full cursor-pointer text-left text-gray-700`}
         role="menuitem"
       >
         <span className="flex-1">{label}</span>
@@ -404,18 +380,15 @@ function SubmenuItem({
     );
   }
 
-  // Desktop styling (match renderer style)
+  // Desktop styling
   const baseClasses = 'flex flex-row items-center justify-between gap-2 px-4 py-1 w-full text-left';
   const hoverClasses = 'cursor-pointer text-gray-500 hover:bg-blue-900 hover:text-white';
 
-  const handleClick = () => {
-    onNavigateToSubmenu(item.menuId, label);
-  };
-
   return (
     <button
+      {...getUIItemProps(item)}
       onClick={handleClick}
-      className={`${baseClasses} ${hoverClasses} ${responsiveClasses}`}
+      className={`${baseClasses} ${hoverClasses}`}
       role="menuitem"
     >
       <div className="flex flex-row items-center gap-2">
@@ -435,22 +408,18 @@ function SectionItem({
   onClose,
   isMobile,
   onNavigateToSubmenu,
-  responsiveMetadata,
-  responsiveClasses,
 }: {
   item: Extract<MenuItem, { type: 'section' }>;
   documentId: string;
   onClose: () => void;
   isMobile: boolean;
   onNavigateToSubmenu: (submenuId: string, title: string) => void;
-  responsiveMetadata: ResponsiveMetadata | null;
-  responsiveClasses: string;
 }) {
   const { translate } = useTranslations(documentId);
   const label = item.labelKey ? translate(item.labelKey) : item.label || '';
 
   return (
-    <div className={responsiveClasses}>
+    <div {...getUIItemProps(item)}>
       <div className="px-4 py-3 text-xs font-medium uppercase text-gray-600">{label}</div>
       {item.items.map((childItem) => (
         <MenuItemRenderer
@@ -460,18 +429,8 @@ function SectionItem({
           onClose={onClose}
           isMobile={isMobile}
           onNavigateToSubmenu={onNavigateToSubmenu}
-          responsiveMetadata={responsiveMetadata}
         />
       ))}
     </div>
   );
-}
-
-/**
- * Resolve responsive classes from metadata
- */
-function resolveResponsiveClasses(itemMetadata: any): string {
-  if (!itemMetadata) return '';
-  if (itemMetadata.hidden) return 'hidden';
-  return '';
 }

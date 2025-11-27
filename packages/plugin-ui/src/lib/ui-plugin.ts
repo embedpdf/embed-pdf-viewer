@@ -1,4 +1,13 @@
-import { BasePlugin, PluginRegistry, createScopedEmitter } from '@embedpdf/core';
+import {
+  BasePlugin,
+  Listener,
+  PluginRegistry,
+  Unsubscribe,
+  createBehaviorEmitter,
+  createEmitter,
+  createScopedEmitter,
+} from '@embedpdf/core';
+import { I18nCapability, I18nPlugin } from '@embedpdf/plugin-i18n';
 import {
   UICapability,
   UIPluginConfig,
@@ -29,15 +38,29 @@ import {
   openMenu,
   closeMenu,
   closeAllMenus,
+  setDisabledCategories,
 } from './actions';
 import { mergeUISchema } from './utils/schema-merger';
+import { generateUIStylesheet, StylesheetConfig } from './utils';
 
 export class UIPlugin extends BasePlugin<UIPluginConfig, UICapability, UIState, UIAction> {
   static readonly id = 'ui' as const;
 
   private schema: UISchema;
+  private stylesheetConfig: StylesheetConfig;
+
+  // Stylesheet caching with locale awareness
+  private cachedStylesheet: string | null = null;
+  private cachedLocale: string | null = null;
+
+  // Optional i18n integration
+  private i18n: I18nCapability | null = null;
+  private i18nCleanup: (() => void) | null = null;
 
   // Events
+  private readonly categoryChanged$ = createBehaviorEmitter<{ disabledCategories: string[] }>();
+  private readonly stylesheetInvalidated$ = createEmitter<void>();
+
   private readonly toolbarChanged$ = createScopedEmitter<
     ToolbarChangedData,
     ToolbarChangedEvent,
@@ -62,6 +85,23 @@ export class UIPlugin extends BasePlugin<UIPluginConfig, UICapability, UIState, 
   constructor(id: string, registry: PluginRegistry, config: UIPluginConfig) {
     super(id, registry);
     this.schema = config.schema;
+    this.stylesheetConfig = config.stylesheetConfig || {};
+
+    // Initialize disabled categories from config
+    if (config.disabledCategories?.length) {
+      this.dispatch(setDisabledCategories(config.disabledCategories));
+    }
+
+    this.i18n = registry.getPlugin<I18nPlugin>('i18n')?.provides() ?? null;
+
+    if (this.i18n) {
+      this.i18nCleanup = this.i18n.onLocaleChange(({ currentLocale }) => {
+        this.handleLocaleChange(currentLocale);
+      });
+
+      // Initialize cached locale
+      this.cachedLocale = this.i18n.getLocale();
+    }
   }
 
   async initialize(): Promise<void> {
@@ -69,10 +109,16 @@ export class UIPlugin extends BasePlugin<UIPluginConfig, UICapability, UIState, 
   }
 
   async destroy(): Promise<void> {
+    if (this.i18nCleanup) {
+      this.i18nCleanup();
+      this.i18nCleanup = null;
+    }
+
     this.toolbarChanged$.clear();
     this.panelChanged$.clear();
     this.modalChanged$.clear();
     this.menuChanged$.clear();
+    this.stylesheetInvalidated$.clear();
     super.destroy();
   }
 
@@ -88,6 +134,100 @@ export class UIPlugin extends BasePlugin<UIPluginConfig, UICapability, UIState, 
     this.panelChanged$.clearScope(documentId);
     this.modalChanged$.clearScope(documentId);
     this.menuChanged$.clearScope(documentId);
+  }
+
+  /**
+   * Handle locale changes from i18n plugin.
+   * Invalidates stylesheet and emits change event.
+   */
+  private handleLocaleChange(newLocale: string): void {
+    if (this.cachedLocale === newLocale) return;
+
+    this.logger.debug(
+      'UIPlugin',
+      'LocaleChange',
+      `Locale changed: ${this.cachedLocale} -> ${newLocale}`,
+    );
+
+    this.cachedLocale = newLocale;
+    this.invalidateStylesheet();
+    this.stylesheetInvalidated$.emit();
+  }
+
+  /**
+   * Get the generated CSS stylesheet.
+   * Automatically regenerates if locale has changed.
+   * This is pure logic - DOM injection is handled by framework layer.
+   */
+  public getStylesheet(): string {
+    const currentLocale = this.i18n?.getLocale() ?? null;
+
+    // Check if we need to regenerate
+    if (this.cachedStylesheet && this.cachedLocale === currentLocale) {
+      return this.cachedStylesheet;
+    }
+
+    // Generate new stylesheet
+    this.cachedStylesheet = generateUIStylesheet(this.schema, {
+      config: this.stylesheetConfig,
+      locale: currentLocale ?? undefined,
+    });
+    this.cachedLocale = currentLocale;
+
+    return this.cachedStylesheet;
+  }
+
+  /**
+   * Get the current locale (if i18n is available)
+   */
+  public getLocale(): string | null {
+    return this.i18n?.getLocale() ?? null;
+  }
+
+  /**
+   * Regenerate stylesheet (call after schema changes)
+   */
+  public invalidateStylesheet(): void {
+    this.cachedStylesheet = null;
+  }
+
+  public onStylesheetInvalidated(listener: Listener<void>): Unsubscribe {
+    return this.stylesheetInvalidated$.on(listener);
+  }
+
+  // ─────────────────────────────────────────────────────────
+  // Category Management
+  // ─────────────────────────────────────────────────────────
+
+  private disableCategoryImpl(category: string): void {
+    const current = new Set(this.state.disabledCategories);
+    if (!current.has(category)) {
+      current.add(category);
+      this.dispatch(setDisabledCategories(Array.from(current)));
+      this.categoryChanged$.emit({ disabledCategories: Array.from(current) });
+    }
+  }
+
+  private enableCategoryImpl(category: string): void {
+    const current = new Set(this.state.disabledCategories);
+    if (current.has(category)) {
+      current.delete(category);
+      this.dispatch(setDisabledCategories(Array.from(current)));
+      this.categoryChanged$.emit({ disabledCategories: Array.from(current) });
+    }
+  }
+
+  private toggleCategoryImpl(category: string): void {
+    if (this.state.disabledCategories.includes(category)) {
+      this.enableCategoryImpl(category);
+    } else {
+      this.disableCategoryImpl(category);
+    }
+  }
+
+  private setDisabledCategoriesImpl(categories: string[]): void {
+    this.dispatch(setDisabledCategories(categories));
+    this.categoryChanged$.emit({ disabledCategories: categories });
   }
 
   // ─────────────────────────────────────────────────────────
@@ -118,11 +258,20 @@ export class UIPlugin extends BasePlugin<UIPluginConfig, UICapability, UIState, 
         this.schema = mergeUISchema(this.schema, partial);
       },
 
+      // Category management
+      disableCategory: (category) => this.disableCategoryImpl(category),
+      enableCategory: (category) => this.enableCategoryImpl(category),
+      toggleCategory: (category) => this.toggleCategoryImpl(category),
+      setDisabledCategories: (categories) => this.setDisabledCategoriesImpl(categories),
+      getDisabledCategories: () => this.state.disabledCategories,
+      isCategoryDisabled: (category) => this.state.disabledCategories.includes(category),
+
       // Events
       onToolbarChanged: this.toolbarChanged$.onGlobal,
       onPanelChanged: this.panelChanged$.onGlobal,
       onModalChanged: this.modalChanged$.onGlobal,
       onMenuChanged: this.menuChanged$.onGlobal,
+      onCategoryChanged: this.categoryChanged$.on,
     };
   }
 

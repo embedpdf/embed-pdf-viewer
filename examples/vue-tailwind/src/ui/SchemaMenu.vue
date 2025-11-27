@@ -3,6 +3,7 @@
     <!-- Desktop dropdown -->
     <div
       ref="menuRef"
+      v-bind="getUIItemProps(currentMenu.schema)"
       class="animate-fade-in fixed z-50 min-w-[200px] rounded-lg border border-gray-200 bg-white shadow-lg"
       :style="position ? { top: `${position.top}px`, left: `${position.left}px` } : undefined"
       role="menu"
@@ -35,7 +36,6 @@
           :onClose="onClose"
           :isMobile="false"
           :onNavigateToSubmenu="navigateToSubmenu"
-          :responsiveMetadata="responsiveMetadata"
         />
       </div>
     </div>
@@ -51,6 +51,7 @@
     <!-- Bottom Sheet -->
     <div
       ref="menuRef"
+      v-bind="getUIItemProps(currentMenu.schema)"
       class="animate-slide-up fixed bottom-0 left-0 right-0 z-50 max-h-[80vh] overflow-y-auto rounded-t-2xl bg-white shadow-2xl"
       role="menu"
     >
@@ -81,7 +82,6 @@
           :onClose="onClose"
           :isMobile="true"
           :onNavigateToSubmenu="navigateToSubmenu"
-          :responsiveMetadata="responsiveMetadata"
         />
       </div>
     </div>
@@ -91,18 +91,9 @@
 <script setup lang="ts">
 import { ref, computed, watch, onMounted, onUnmounted } from 'vue';
 import type { MenuRendererProps, MenuSchema } from '@embedpdf/plugin-ui/vue';
-import { resolveResponsiveMetadata, useUISchema } from '@embedpdf/plugin-ui/vue';
-import { useLocale } from '@embedpdf/plugin-i18n/vue';
+import { useUISchema, getUIItemProps } from '@embedpdf/plugin-ui/vue';
 import { ChevronLeftIcon } from '../components/icons';
 import MenuItemRenderer from './menu/MenuItemRenderer.vue';
-
-/**
- * Schema-driven Menu Renderer
- *
- * Renders menus defined in the UI schema with responsive behavior:
- * - Desktop: Anchored dropdown menu
- * - Mobile: Bottom sheet modal with submenu navigation
- */
 
 const props = defineProps<MenuRendererProps>();
 
@@ -110,7 +101,6 @@ const menuRef = ref<HTMLDivElement | null>(null);
 const isMobile = ref(false);
 const position = ref<{ top: number; left: number } | null>(null);
 const uiSchema = useUISchema();
-const locale = useLocale();
 
 interface MenuStackItem {
   menuId: string;
@@ -132,11 +122,6 @@ watch(
 );
 
 const currentMenu = computed(() => menuStack.value[menuStack.value.length - 1]);
-
-// Resolve responsive metadata for the current menu
-const responsiveMetadata = computed(() =>
-  currentMenu.value ? resolveResponsiveMetadata(currentMenu.value.schema, locale.value) : null,
-);
 
 const navigateToSubmenu = (submenuId: string, title: string) => {
   if (!uiSchema.value) return;
@@ -182,7 +167,6 @@ watch(
       let top = rect.bottom + 4;
       let left = rect.left;
 
-      // Adjust if going off-screen
       if (left + menuWidth > window.innerWidth) {
         left = window.innerWidth - menuWidth - 8;
       }

@@ -35,7 +35,15 @@ import {
 } from '@embedpdf/plugin-document-manager/preact';
 import { CommandsPluginPackage } from '@embedpdf/plugin-commands/preact';
 import { I18nPluginPackage } from '@embedpdf/plugin-i18n/preact';
-import { commands, viewerUISchema, englishTranslations, paramResolvers } from '../config';
+import {
+  commands,
+  viewerUISchema,
+  englishTranslations,
+  paramResolvers,
+  dutchTranslations,
+  germanTranslations,
+  frenchTranslations,
+} from '../config';
 import { SchemaToolbar } from '../ui/schema-toolbar';
 import { SchemaPanel } from '../ui/schema-panel';
 import { SchemaMenu } from '../ui/schema-menu';
@@ -83,6 +91,7 @@ import { RedactionMenu } from './redaction-menu';
 import { CustomZoomToolbar } from './custom-zoom-toolbar';
 import { AnnotationSidebar } from './annotation-sidebar';
 import { SchemaSelectionMenu } from '@/ui/schema-selection-menu';
+import { LocaleSwitcher } from './locale-switcher';
 
 export { ScrollStrategy, ZoomMode, SpreadMode, Rotation };
 
@@ -165,7 +174,7 @@ function ViewerLayout({ documentId }: { documentId: string }) {
   const redactionMenu = useSelectionMenu('redaction', documentId);
 
   return (
-    <div className="@container relative flex h-full w-full select-none flex-col">
+    <>
       {/* Main Toolbar */}
       {renderToolbar('top', 'main')}
 
@@ -251,7 +260,7 @@ function ViewerLayout({ documentId }: { documentId: string }) {
         {/* Right Panels */}
         {renderPanel('right', 'main')}
       </div>
-    </div>
+    </>
   );
 }
 
@@ -320,11 +329,17 @@ export function PDFViewer({ config }: PDFViewerProps) {
           createPluginRegistration(CommandsPluginPackage, { commands }),
           createPluginRegistration(I18nPluginPackage, {
             defaultLocale: 'en',
-            locales: [englishTranslations],
+            locales: [
+              englishTranslations,
+              dutchTranslations,
+              germanTranslations,
+              frenchTranslations,
+            ],
             paramResolvers,
           }),
           createPluginRegistration(UIPluginPackage, {
             schema: viewerUISchema,
+            //disabledCategories: ['annotation', 'redaction'],
           }),
           createPluginRegistration(ViewportPluginPackage, pluginConfigs.viewport),
           createPluginRegistration(ScrollPluginPackage, pluginConfigs.scroll),
@@ -363,6 +378,7 @@ export function PDFViewer({ config }: PDFViewerProps) {
                     documentId={activeDocumentId}
                     components={uiComponents}
                     renderers={uiRenderers}
+                    className="relative flex h-full w-full select-none flex-col"
                   >
                     <ViewerLayout documentId={activeDocumentId} />
                   </UIProvider>

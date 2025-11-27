@@ -149,7 +149,7 @@ export function ViewerSchemaPage() {
         commands,
       }),
       createPluginRegistration(I18nPluginPackage, {
-        defaultLocale: 'nl',
+        defaultLocale: 'en',
         locales: [englishTranslations, germanTranslations, spanishTranslations, dutchTranslations],
         paramResolvers,
       }),
@@ -201,6 +201,7 @@ export function ViewerSchemaPage() {
                       documentId={activeDocumentId}
                       components={uiComponents}
                       renderers={uiRenderers}
+                      className="flex min-h-0 flex-1 flex-col overflow-hidden"
                     >
                       <ViewerLayout documentId={activeDocumentId} />
                     </UIProvider>

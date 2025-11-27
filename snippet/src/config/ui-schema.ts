@@ -23,6 +23,84 @@ export const viewerUISchema: UISchema = {
         order: 0,
       },
       permanent: true,
+      responsive: {
+        localeOverrides: {
+          groups: [
+            {
+              id: 'germanic-languages',
+              locales: ['de', 'nl'],
+              breakpoints: {
+                md: {
+                  replaceShow: [
+                    'annotate-mode',
+                    'zoom-toolbar',
+                    'pan-button',
+                    'pointer-button',
+                    'divider-3',
+                  ],
+                },
+              },
+            },
+          ],
+        },
+        breakpoints: {
+          xxxs: {
+            maxWidth: 400,
+            hide: [
+              'annotate-mode',
+              'shapes-mode',
+              'redact-mode',
+              'zoom-toolbar',
+              'pan-button',
+              'pointer-button',
+              'divider-3',
+              'page-settings-button',
+              'zoom-menu-button',
+              'divider-2',
+            ],
+            show: ['overflow-tabs-button'],
+          },
+          xxs: {
+            minWidth: 400,
+            show: ['page-settings-button', 'zoom-menu-button', 'divider-2'],
+            hide: ['overflow-left-action-menu-button'],
+          },
+          xs: {
+            minWidth: 500,
+            maxWidth: 640,
+            show: ['pan-button', 'pointer-button', 'divider-3'],
+          },
+          sm: {
+            minWidth: 640,
+            maxWidth: 768,
+            hide: ['shapes-mode', 'redact-mode', 'zoom-toolbar'],
+            show: [
+              'annotate-mode',
+              'overflow-tabs-button',
+              'pan-button',
+              'pointer-button',
+              'divider-3',
+            ],
+          },
+          md: {
+            minWidth: 768,
+            show: [
+              'annotate-mode',
+              'shapes-mode',
+              'zoom-toolbar',
+              'pan-button',
+              'pointer-button',
+              'divider-3',
+            ],
+            hide: ['zoom-menu-button'],
+          },
+          lg: {
+            minWidth: 1024,
+            show: ['shapes-mode', 'redact-mode'],
+            hide: ['overflow-tabs-button'],
+          },
+        },
+      },
       items: [
         // ───────── Left Section: Document & Navigation ─────────
         {
@@ -50,6 +128,12 @@ export const viewerUISchema: UISchema = {
             },
             {
               type: 'command-button',
+              id: 'overflow-left-action-menu-button',
+              commandId: 'left-action-menu:overflow-menu',
+              variant: 'icon',
+            },
+            {
+              type: 'command-button',
               id: 'page-settings-button',
               commandId: 'page:settings',
               variant: 'icon',
@@ -69,6 +153,12 @@ export const viewerUISchema: UISchema = {
           alignment: 'center',
           gap: 2,
           items: [
+            {
+              type: 'command-button',
+              id: 'zoom-menu-button',
+              commandId: 'zoom:toggle-menu-mobile',
+              variant: 'icon',
+            },
             {
               type: 'custom',
               id: 'zoom-toolbar',
@@ -110,21 +200,35 @@ export const viewerUISchema: UISchema = {
               id: 'view-mode',
               commandId: 'mode:view',
               variant: 'text',
+              visibilityDependsOn: {
+                itemIds: ['annotate-mode', 'shapes-mode', 'redact-mode'],
+              },
             },
             {
               id: 'annotate-mode',
               commandId: 'mode:annotate',
               variant: 'text',
+              categories: ['annotation'],
             },
             {
               id: 'shapes-mode',
               commandId: 'mode:shapes',
               variant: 'text',
+              categories: ['annotation'],
             },
             {
               id: 'redact-mode',
               commandId: 'mode:redact',
               variant: 'text',
+              categories: ['redaction'],
+            },
+            {
+              id: 'overflow-tabs-button',
+              commandId: 'tabs:overflow-menu',
+              variant: 'icon',
+              visibilityDependsOn: {
+                menuId: 'mode-tabs-overflow-menu',
+              },
             },
           ],
         },
@@ -168,6 +272,20 @@ export const viewerUISchema: UISchema = {
         slot: 'secondary',
         order: 0,
       },
+      responsive: {
+        breakpoints: {
+          sm: {
+            maxWidth: 640,
+            hide: ['redo-button', 'undo-button'],
+            show: ['overflow-annotation-tools'],
+          },
+          md: {
+            minWidth: 640,
+            show: ['redo-button', 'undo-button'],
+            hide: ['overflow-annotation-tools'],
+          },
+        },
+      },
       permanent: false,
       items: [
         { type: 'spacer', id: 'spacer-3', flex: true },
@@ -193,12 +311,6 @@ export const viewerUISchema: UISchema = {
               type: 'command-button',
               id: 'add-underline',
               commandId: 'annotation:add-underline',
-              variant: 'icon',
-            },
-            {
-              type: 'command-button',
-              id: 'add-squiggly',
-              commandId: 'annotation:add-squiggly',
               variant: 'icon',
             },
             {
@@ -245,6 +357,12 @@ export const viewerUISchema: UISchema = {
               type: 'command-button',
               id: 'redo-button',
               commandId: 'history:redo',
+              variant: 'icon',
+            },
+            {
+              type: 'command-button',
+              id: 'overflow-annotation-tools',
+              commandId: 'annotation:overflow-tools',
               variant: 'icon',
             },
           ],
@@ -396,6 +514,81 @@ export const viewerUISchema: UISchema = {
   // Menus
   // ─────────────────────────────────────────────────────────
   menus: {
+    'left-action-menu': {
+      id: 'left-action-menu',
+      items: [
+        {
+          type: 'submenu',
+          id: 'page-settings-submenu',
+          labelKey: 'view-controls',
+          label: 'View Controls',
+          icon: 'viewSettings',
+          menuId: 'page-settings-menu',
+        },
+        {
+          type: 'submenu',
+          id: 'zoom-submenu',
+          labelKey: 'zoom-controls',
+          label: 'Zoom Controls',
+          icon: 'zoomIn',
+          menuId: 'zoom-menu',
+        },
+        {
+          type: 'divider',
+          id: 'divider-15',
+        },
+        {
+          type: 'command',
+          id: 'pan-button',
+          commandId: 'pan:toggle',
+        },
+        {
+          type: 'command',
+          id: 'pointer-button',
+          commandId: 'pointer:toggle',
+        },
+      ],
+    },
+    'mode-tabs-overflow-menu': {
+      id: 'mode-tabs-overflow-menu',
+      items: [
+        {
+          type: 'command',
+          id: 'mode:annotate',
+          commandId: 'mode:annotate',
+          categories: ['annotation'],
+        },
+        {
+          type: 'command',
+          id: 'mode:shapes',
+          commandId: 'mode:shapes',
+          categories: ['annotation'],
+        },
+        {
+          type: 'command',
+          id: 'mode:redact',
+          commandId: 'mode:redact',
+          categories: ['redaction'],
+        },
+      ],
+      responsive: {
+        breakpoints: {
+          xs: {
+            maxWidth: 640,
+            show: ['mode:annotate', 'mode:shapes', 'mode:redact'],
+          },
+          sm: {
+            minWidth: 640,
+            maxWidth: 768,
+            hide: ['mode:annotate'],
+          },
+          md: {
+            minWidth: 768,
+            hide: ['mode:annotate', 'mode:shapes'],
+          },
+        },
+      },
+    },
     'zoom-levels-menu': {
       id: 'zoom-levels-menu',
       items: [
@@ -450,51 +643,6 @@ export const viewerUISchema: UISchema = {
       id: 'zoom-menu',
       items: [
         {
-          type: 'command',
-          id: 'zoom:25',
-          commandId: 'zoom:25',
-        },
-        {
-          type: 'command',
-          id: 'zoom:50',
-          commandId: 'zoom:50',
-        },
-        {
-          type: 'command',
-          id: 'zoom:100',
-          commandId: 'zoom:100',
-        },
-        {
-          type: 'command',
-          id: 'zoom:125',
-          commandId: 'zoom:125',
-        },
-        {
-          type: 'command',
-          id: 'zoom:150',
-          commandId: 'zoom:150',
-        },
-        {
-          type: 'command',
-          id: 'zoom:200',
-          commandId: 'zoom:200',
-        },
-        {
-          type: 'command',
-          id: 'zoom:400',
-          commandId: 'zoom:400',
-        },
-        {
-          type: 'command',
-          id: 'zoom:800',
-          commandId: 'zoom:800',
-        },
-        {
-          type: 'command',
-          id: 'zoom:1600',
-          commandId: 'zoom:1600',
-        },
-        {
           type: 'submenu',
           id: 'zoom-levels-submenu',
           labelKey: 'zoom.level',
@@ -539,6 +687,18 @@ export const viewerUISchema: UISchema = {
           commandId: 'zoom:marquee',
         },
       ],
+      responsive: {
+        breakpoints: {
+          xs: {
+            maxWidth: 640,
+            show: ['zoom-levels-submenu', 'divider-zoom-in-out'],
+          },
+          md: {
+            minWidth: 768,
+            hide: ['zoom-levels-submenu', 'divider-zoom-in-out'],
+          },
+        },
+      },
     },
     'document-menu': {
       id: 'document-menu',
@@ -575,6 +735,75 @@ export const viewerUISchema: UISchema = {
           type: 'command',
           id: 'document:fullscreen',
           commandId: 'document:fullscreen',
+        },
+      ],
+    },
+    'annotation-tools-menu': {
+      id: 'annotation-tools-menu',
+      items: [
+        {
+          type: 'command',
+          id: 'annotation:add-text',
+          commandId: 'annotation:add-text',
+        },
+        {
+          type: 'command',
+          id: 'annotation:add-highlight',
+          commandId: 'annotation:add-highlight',
+        },
+        {
+          type: 'command',
+          id: 'annotation:add-strikeout',
+          commandId: 'annotation:add-strikeout',
+        },
+        {
+          type: 'command',
+          id: 'annotation:add-underline',
+          commandId: 'annotation:add-underline',
+        },
+        {
+          type: 'divider',
+          id: 'divider-12',
+        },
+        {
+          type: 'command',
+          id: 'annotation:add-rectangle',
+          commandId: 'annotation:add-rectangle',
+        },
+        {
+          type: 'command',
+          id: 'annotation:add-circle',
+          commandId: 'annotation:add-circle',
+        },
+        {
+          type: 'command',
+          id: 'annotation:add-line',
+          commandId: 'annotation:add-line',
+        },
+        {
+          type: 'command',
+          id: 'annotation:add-arrow',
+          commandId: 'annotation:add-arrow',
+        },
+        {
+          type: 'command',
+          id: 'annotation:add-polygon',
+          commandId: 'annotation:add-polygon',
+        },
+        {
+          type: 'command',
+          id: 'annotation:add-polyline',
+          commandId: 'annotation:add-polyline',
+        },
+        {
+          type: 'command',
+          id: 'annotation:add-ink',
+          commandId: 'annotation:add-ink',
+        },
+        {
+          type: 'command',
+          id: 'annotation:add-stamp',
+          commandId: 'annotation:add-stamp',
         },
       ],
     },
@@ -710,6 +939,7 @@ export const viewerUISchema: UISchema = {
       collapsible: true,
       defaultOpen: false,
     },
+
     'search-panel': {
       id: 'search-panel',
       type: 'sidebar',
@@ -803,24 +1033,28 @@ export const viewerUISchema: UISchema = {
           id: 'add-highlight',
           commandId: 'annotation:add-highlight',
           variant: 'icon',
+          categories: ['annotation'],
         },
         {
           type: 'command-button',
           id: 'add-strikeout',
           commandId: 'annotation:add-strikeout',
           variant: 'icon',
+          categories: ['annotation'],
         },
         {
           type: 'command-button',
           id: 'add-underline',
           commandId: 'annotation:add-underline',
           variant: 'icon',
+          categories: ['annotation'],
         },
         {
           type: 'command-button',
           id: 'add-squiggly',
           commandId: 'annotation:add-squiggly',
           variant: 'icon',
+          categories: ['annotation'],
         },
       ],
     },

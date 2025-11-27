@@ -2,15 +2,13 @@
   import {
     type MenuRendererProps,
     type MenuItem,
-    resolveResponsiveMetadata,
-    type ResponsiveMetadata,
     useUISchema,
     type MenuSchema,
+    getUIItemProps,
   } from '@embedpdf/plugin-ui/svelte';
   import { useCommand } from '@embedpdf/plugin-commands/svelte';
-  import { useTranslations, useLocale } from '@embedpdf/plugin-i18n/svelte';
+  import { useTranslations } from '@embedpdf/plugin-i18n/svelte';
   import { onMount } from 'svelte';
-  import { resolveResponsiveClasses } from './responsive-utils';
   import Icons from '../components/Icons.svelte';
   import { ChevronLeftIcon, ChevronRightIcon, CheckIcon } from '../components/icons';
 
@@ -19,7 +17,6 @@
   let { schema, documentId, anchorEl, onClose }: Props = $props();
 
   const uiSchema = useUISchema();
-  const locale = useLocale();
   const translations = useTranslations(() => documentId);
 
   interface MenuStackItem {
@@ -37,13 +34,6 @@
   });
 
   const currentMenu = $derived(menuStack[menuStack.length - 1]);
-
-  // Resolve responsive metadata for the current menu
-  const responsiveMetadata = $derived(
-    currentMenu
-      ? (resolveResponsiveMetadata(currentMenu.schema, locale.current) as ResponsiveMetadata | null)
-      : null,
-  );
 
   function navigateToSubmenu(submenuId: string, title: string) {
     if (!uiSchema?.schema) return;
@@ -84,11 +74,9 @@
       const rect = anchorEl.getBoundingClientRect();
       const menuWidth = menuRef?.offsetWidth || 200;
 
-      // Always position below the anchor
       let top = rect.bottom + 4;
       let left = rect.left;
 
-      // Only adjust horizontal position if it goes off-screen
       if (left + menuWidth > window.innerWidth) {
         left = window.innerWidth - menuWidth - 8;
       }
@@ -157,6 +145,7 @@
     <!-- Bottom Sheet -->
     <div
       bind:this={menuRef}
+      {...getUIItemProps(currentMenu.schema)}
       class="animate-slide-up fixed bottom-0 left-0 right-0 z-50 max-h-[80vh] overflow-y-auto rounded-t-2xl bg-white shadow-2xl"
       role="menu"
     >
@@ -193,7 +182,6 @@
             onClose,
             isMobile,
             onNavigateToSubmenu: navigateToSubmenu,
-            responsiveMetadata,
           })}
         {/each}
       </div>
@@ -202,6 +190,7 @@
     <!-- Desktop dropdown -->
     <div
       bind:this={menuRef}
+      {...getUIItemProps(currentMenu.schema)}
       class="animate-fade-in fixed z-50 min-w-[200px] rounded-lg border border-gray-200 bg-white shadow-lg"
       style:top={position ? `${position.top}px` : undefined}
       style:left={position ? `${position.left}px` : undefined}
@@ -233,7 +222,6 @@
             onClose,
             isMobile: false,
             onNavigateToSubmenu: navigateToSubmenu,
-            responsiveMetadata,
           })}
         {/each}
       </div>
@@ -250,24 +238,19 @@
   onClose,
   isMobile,
   onNavigateToSubmenu,
-  responsiveMetadata,
 }: {
   item: MenuItem;
   documentId: string;
   onClose: () => void;
   isMobile: boolean;
   onNavigateToSubmenu?: (submenuId: string, title: string) => void;
-  responsiveMetadata: ResponsiveMetadata | null;
 })}
-  {@const itemMetadata = responsiveMetadata?.items.get(item.id) ?? null}
-  {@const responsiveClasses = resolveResponsiveClasses(itemMetadata)}
-
   {#if item.type === 'command'}
-    {@render CommandMenuItem({ item, documentId, onClose, isMobile, responsiveClasses })}
+    {@render CommandMenuItem({ item, documentId, onClose, isMobile })}
   {:else if item.type === 'submenu'}
-    {@render SubmenuItem({ item, documentId, isMobile, onNavigateToSubmenu, responsiveClasses })}
+    {@render SubmenuItem({ item, documentId, isMobile, onNavigateToSubmenu })}
   {:else if item.type === 'divider'}
-    {@render MenuDivider({ isMobile, responsiveClasses })}
+    {@render MenuDivider({ item, isMobile })}
   {:else if item.type === 'section'}
     {@render MenuSection({
       item,
@@ -275,7 +258,6 @@
       onClose,
       isMobile,
       onNavigateToSubmenu,
-      responsiveMetadata,
     })}
   {/if}
 {/snippet}
@@ -288,13 +270,11 @@
   documentId,
   onClose,
   isMobile,
-  responsiveClasses,
 }: {
   item: Extract<MenuItem, { type: 'command' }>;
   documentId: string;
   onClose: () => void;
   isMobile: boolean;
-  responsiveClasses: string;
 })}
   {@const command = useCommand(
     () => item.commandId,
@@ -312,6 +292,7 @@
     {@const iconProps = command.command?.iconProps || {}}
 
     <button
+      {...getUIItemProps(item)}
       onclick={() => {
         if (!command.command?.disabled) {
           command.command?.execute();
@@ -319,7 +300,7 @@
         }
       }}
       disabled={command.command?.disabled}
-      class={`${baseClasses} ${disabledClasses} ${activeClasses} ${responsiveClasses} w-full text-left`}
+      class={`${baseClasses} ${disabledClasses} ${activeClasses} w-full text-left`}
       role="menuitem"
     >
       {#if command.command?.icon}
@@ -349,19 +330,18 @@
   documentId,
   isMobile,
   onNavigateToSubmenu,
-  responsiveClasses,
 }: {
   item: Extract<MenuItem, { type: 'submenu' }>;
   documentId: string;
   isMobile: boolean;
   onNavigateToSubmenu?: (submenuId: string, title: string) => void;
-  responsiveClasses: string;
 })}
   {@const baseClasses = isMobile
     ? 'flex items-center gap-3 px-4 py-3 text-base transition-colors active:bg-gray-100'
     : 'flex items-center gap-2 px-3 py-2 text-sm transition-colors hover:bg-gray-100'}
 
   <button
+    {...getUIItemProps(item)}
     onclick={() => {
       if (onNavigateToSubmenu) {
         onNavigateToSubmenu(
@@ -370,7 +350,7 @@
         );
       }
     }}
-    class={`${baseClasses} ${responsiveClasses} w-full cursor-pointer text-left text-gray-700`}
+    class={`${baseClasses} w-full cursor-pointer text-left text-gray-700`}
     role="menuitem"
   >
     {#if item.icon}
@@ -387,14 +367,15 @@
      Menu Divider Component
      ───────────────────────────────────────────────────────── -->
 {#snippet MenuDivider({
+  item,
   isMobile,
-  responsiveClasses,
 }: {
+  item: Extract<MenuItem, { type: 'divider' }>;
   isMobile: boolean;
-  responsiveClasses: string;
 })}
   <div
-    class={`${isMobile ? 'my-2 border-t border-gray-200' : 'my-1 border-t border-gray-200'} ${responsiveClasses}`}
+    {...getUIItemProps(item)}
+    class={isMobile ? 'my-2 border-t border-gray-200' : 'my-1 border-t border-gray-200'}
   ></div>
 {/snippet}
 
@@ -407,16 +388,14 @@
   onClose,
   isMobile,
   onNavigateToSubmenu,
-  responsiveMetadata,
 }: {
   item: Extract<MenuItem, { type: 'section' }>;
   documentId: string;
   onClose: () => void;
   isMobile: boolean;
   onNavigateToSubmenu?: (submenuId: string, title: string) => void;
-  responsiveMetadata: ResponsiveMetadata | null;
 })}
-  <div class={isMobile ? 'py-2' : 'py-1'}>
+  <div {...getUIItemProps(item)} class={isMobile ? 'py-2' : 'py-1'}>
     {#if item.labelKey || item.label}
       <div
         class={isMobile
@@ -433,7 +412,6 @@
         onClose,
         isMobile,
         onNavigateToSubmenu,
-        responsiveMetadata,
       })}
     {/each}
   </div>

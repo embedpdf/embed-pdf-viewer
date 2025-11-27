@@ -13,6 +13,7 @@ export const CLOSE_MODAL = 'UI/CLOSE_MODAL';
 export const OPEN_MENU = 'UI/OPEN_MENU';
 export const CLOSE_MENU = 'UI/CLOSE_MENU';
 export const CLOSE_ALL_MENUS = 'UI/CLOSE_ALL_MENUS';
+export const SET_DISABLED_CATEGORIES = 'UI/SET_DISABLED_CATEGORIES';
 
 export interface InitUIStateAction extends Action {
   type: typeof INIT_UI_STATE;
@@ -80,6 +81,11 @@ export interface CloseAllMenusAction extends Action {
   payload: { documentId: string };
 }
 
+export interface SetDisabledCategoriesAction extends Action {
+  type: typeof SET_DISABLED_CATEGORIES;
+  payload: { categories: string[] };
+}
+
 export type UIAction =
   | InitUIStateAction
   | CleanupUIStateAction
@@ -92,7 +98,8 @@ export type UIAction =
   | CloseModalAction
   | OpenMenuAction
   | CloseMenuAction
-  | CloseAllMenusAction;
+  | CloseAllMenusAction
+  | SetDisabledCategoriesAction;
 
 // Action creators
 export const initUIState = (documentId: string, schema: UISchema): InitUIStateAction => ({
@@ -176,4 +183,9 @@ export const closeMenu = (documentId: string, menuId: string): CloseMenuAction =
 export const closeAllMenus = (documentId: string): CloseAllMenusAction => ({
   type: CLOSE_ALL_MENUS,
   payload: { documentId },
+});
+
+export const setDisabledCategories = (categories: string[]): SetDisabledCategoriesAction => ({
+  type: SET_DISABLED_CATEGORIES,
+  payload: { categories },
 });

@@ -1,5 +1,5 @@
 <template>
-  <div v-bind="props.menuWrapperProps">
+  <div v-bind="{ ...props.menuWrapperProps, ...getUIItemProps(schema) }">
     <div :style="menuStyle" class="rounded-lg border border-gray-200 bg-white shadow-lg">
       <div class="flex items-center gap-1 px-2 py-1">
         <template v-for="item in schema.items" :key="item.id">
@@ -13,6 +13,7 @@
 <script setup lang="ts">
 import { computed, type CSSProperties } from 'vue';
 import type { SelectionMenuRendererProps } from '@embedpdf/plugin-ui/vue';
+import { getUIItemProps } from '@embedpdf/plugin-ui/vue';
 import SelectionMenuItemRenderer from './SelectionMenuItemRenderer.vue';
 
 const componentProps = defineProps<SelectionMenuRendererProps>();
@@ -22,10 +23,12 @@ const menuStyle = computed<CSSProperties>(() => {
     position: 'absolute',
     pointerEvents: 'auto',
     cursor: 'default',
+    left: '50%',
+    transform: 'translateX(-50%)',
   };
 
   if (componentProps.props.placement?.suggestTop) {
-    style.top = '-48px'; // -40 - 8
+    style.top = '-48px';
   } else {
     style.top = `${componentProps.props.rect.size.height + 8}px`;
   }

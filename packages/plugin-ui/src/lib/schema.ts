@@ -22,11 +22,20 @@ export interface ToolbarPosition {
   order?: number;
 }
 
+export interface VisibilityDependency {
+  /** Menu whose visible items determine this element's visibility */
+  menuId?: string;
+  /** Direct item IDs this element depends on */
+  itemIds?: string[];
+}
+
 export interface CustomComponentItem {
   type: 'custom';
   id: string;
   componentId: string; // Registered custom component
   props?: Record<string, any>;
+  categories?: string[];
+  visibilityDependsOn?: VisibilityDependency;
 }
 
 /**
@@ -55,6 +64,8 @@ export interface ToolbarSchema {
 
   // Responsive behavior
   responsive?: ResponsiveRules;
+  categories?: string[];
+  visibilityDependsOn?: VisibilityDependency;
 }
 
 export interface TabGroupItem {
@@ -64,12 +75,17 @@ export interface TabGroupItem {
   defaultTab?: string;
   variant?: 'pills' | 'underline' | 'enclosed';
   alignment?: 'start' | 'center' | 'end';
+  categories?: string[];
+  visibilityDependsOn?: VisibilityDependency;
 }
 
 export interface TabItem {
   id: string;
   commandId: string; // Optional: command executed when tab selected
   variant?: 'icon' | 'text' | 'icon-text';
+
+  categories?: string[];
+  visibilityDependsOn?: VisibilityDependency;
 }
 
 export interface CommandButtonItem {
@@ -78,18 +94,26 @@ export interface CommandButtonItem {
   commandId: string;
   variant?: 'icon' | 'text' | 'icon-text' | 'tab';
   size?: 'sm' | 'md' | 'lg';
+
+  /** Categories this item belongs to (hidden when ANY category is disabled) */
+  categories?: string[];
+  visibilityDependsOn?: VisibilityDependency;
 }
 
 export interface DividerItem {
   type: 'divider';
   id: string;
   orientation?: 'vertical' | 'horizontal';
+  categories?: string[];
+  visibilityDependsOn?: VisibilityDependency;
 }
 
 export interface SpacerItem {
   type: 'spacer';
   id: string;
   flex?: boolean;
+  categories?: string[];
+  visibilityDependsOn?: VisibilityDependency;
 }
 
 export interface GroupItem {
@@ -98,6 +122,8 @@ export interface GroupItem {
   items: ToolbarItem[];
   gap?: number;
   alignment?: 'start' | 'center' | 'end';
+  categories?: string[];
+  visibilityDependsOn?: VisibilityDependency;
 }
 
 /**
@@ -111,6 +137,8 @@ export interface MenuSchema {
 
   // Responsive behavior
   responsive?: ResponsiveRules;
+  categories?: string[];
+  visibilityDependsOn?: VisibilityDependency;
 }
 
 /**
@@ -127,6 +155,8 @@ export interface MenuCommandItem {
   type: 'command';
   id: string;
   commandId: string;
+  categories?: string[];
+  visibilityDependsOn?: VisibilityDependency;
 }
 
 export interface MenuSectionItem {
@@ -135,6 +165,8 @@ export interface MenuSectionItem {
   labelKey?: string; // i18n key
   label?: string; // Fallback label
   items: MenuItem[];
+  categories?: string[];
+  visibilityDependsOn?: VisibilityDependency;
 }
 
 export interface MenuSubmenuItem {
@@ -144,11 +176,15 @@ export interface MenuSubmenuItem {
   label?: string;
   icon?: string;
   menuId: string; // References another MenuSchema
+  categories?: string[];
+  visibilityDependsOn?: VisibilityDependency;
 }
 
 export interface MenuDividerItem {
   type: 'divider';
   id: string;
+  categories?: string[];
+  visibilityDependsOn?: VisibilityDependency;
 }
 
 export interface MenuCustomItem {
@@ -156,6 +192,8 @@ export interface MenuCustomItem {
   id: string;
   componentId: string;
   props?: Record<string, any>;
+  categories?: string[];
+  visibilityDependsOn?: VisibilityDependency;
 }
 
 /**
@@ -185,6 +223,9 @@ export interface PanelSchema {
   minHeight?: string;
   maxWidth?: string;
   maxHeight?: string;
+
+  categories?: string[];
+  visibilityDependsOn?: VisibilityDependency;
 }
 
 export interface PanelPosition {
@@ -214,6 +255,8 @@ export interface PanelTab {
   label?: string;
   icon?: string;
   componentId: string; // Which component to render for this tab
+  categories?: string[];
+  visibilityDependsOn?: VisibilityDependency;
 }
 
 export interface ComponentPanelContent {
@@ -279,11 +322,15 @@ export interface SelectionMenuCommandItem {
   id: string;
   commandId: string;
   variant?: 'icon' | 'text' | 'icon-text';
+  categories?: string[];
+  visibilityDependsOn?: VisibilityDependency;
 }
 
 export interface SelectionMenuDividerItem {
   type: 'divider';
   id: string;
+  categories?: string[];
+  visibilityDependsOn?: VisibilityDependency;
 }
 
 export interface SelectionMenuGroupItem {
@@ -291,10 +338,14 @@ export interface SelectionMenuGroupItem {
   id: string;
   items: SelectionMenuItem[];
   gap?: number;
+  categories?: string[];
+  visibilityDependsOn?: VisibilityDependency;
 }
 
 export interface SelectionMenuSchema {
   id: string;
   items: SelectionMenuItem[];
+  categories?: string[];
+  visibilityDependsOn?: VisibilityDependency;
   responsive?: ResponsiveRules;
 }

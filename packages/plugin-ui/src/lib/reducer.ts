@@ -13,6 +13,7 @@ import {
   OPEN_MENU,
   CLOSE_MENU,
   CLOSE_ALL_MENUS,
+  SET_DISABLED_CATEGORIES,
 } from './actions';
 
 export const initialDocumentState: UIDocumentState = {
@@ -25,6 +26,7 @@ export const initialDocumentState: UIDocumentState = {
 
 export const initialState: UIState = {
   documents: {},
+  disabledCategories: [],
 };
 
 export const uiReducer = (state = initialState, action: UIAction): UIState => {
@@ -281,6 +283,13 @@ export const uiReducer = (state = initialState, action: UIAction): UIState => {
             openMenus: {},
           },
         },
+      };
+    }
+
+    case SET_DISABLED_CATEGORIES: {
+      return {
+        ...state,
+        disabledCategories: action.payload.categories,
       };
     }
 

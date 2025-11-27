@@ -14,7 +14,6 @@
               flexDirection: 'column',
               alignItems: 'center',
               cursor: 'pointer',
-              padding: '8px',
             }"
             @click="handleClick(meta.pageIndex)"
           >

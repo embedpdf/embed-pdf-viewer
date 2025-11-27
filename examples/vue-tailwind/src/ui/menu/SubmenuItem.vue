@@ -1,9 +1,8 @@
 <template>
   <button
+    v-bind="getUIItemProps(item)"
     @click="handleClick"
-    :class="
-      twMerge(baseClasses, responsiveClasses, 'w-full cursor-pointer text-left text-gray-700')
-    "
+    :class="twMerge(baseClasses, 'w-full cursor-pointer text-left text-gray-700')"
     role="menuitem"
   >
     <component v-if="IconComponent" :is="IconComponent" :class="isMobile ? 'h-5 w-5' : 'h-4 w-4'" />
@@ -17,21 +16,17 @@
 <script setup lang="ts">
 import { computed } from 'vue';
 import type { MenuItem } from '@embedpdf/plugin-ui/vue';
+import { getUIItemProps } from '@embedpdf/plugin-ui/vue';
 import { useTranslations } from '@embedpdf/plugin-i18n/vue';
 import { twMerge } from 'tailwind-merge';
 import * as Icons from '../../components/icons';
 import { ChevronRightIcon } from '../../components/icons';
-
-/**
- * Renders a submenu item
- */
 
 interface Props {
   item: Extract<MenuItem, { type: 'submenu' }>;
   documentId: string;
   isMobile: boolean;
   onNavigateToSubmenu?: (submenuId: string, title: string) => void;
-  responsiveClasses: string;
 }
 
 const props = defineProps<Props>();

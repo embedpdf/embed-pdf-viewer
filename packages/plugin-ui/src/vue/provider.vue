@@ -1,16 +1,27 @@
 <template>
-  <slot />
-  <!-- Automatically render menus for this document -->
-  <AutoMenuRenderer :documentId="documentId" :container="menuContainer" />
+  <UIRoot v-bind="attrs">
+    <slot />
+    <!-- Automatically render menus for this document -->
+    <AutoMenuRenderer :documentId="documentId" :container="menuContainer" />
+  </UIRoot>
 </template>
 
 <script setup lang="ts">
 import type { Component } from 'vue';
+import { useAttrs } from 'vue';
 import { provideAnchorRegistry } from './registries/anchor-registry';
 import { provideComponentRegistry } from './registries/component-registry';
 import { provideRenderers } from './registries/renderers-registry';
 import type { BaseComponentProps, UIRenderers } from './types';
 import AutoMenuRenderer from './auto-menu-renderer.vue';
+import UIRoot from './root.vue';
+
+// Disable automatic attribute inheritance since we pass them to UIRoot
+defineOptions({
+  inheritAttrs: false,
+});
+
+const attrs = useAttrs();
 
 /**
  * UIProvider Props
@@ -71,6 +82,7 @@ const props = withDefaults(defineProps<Props>(), {
  *         panel: PanelRenderer,
  *         menu: MenuRenderer,
  *       }"
+ *       class="relative flex h-full w-full"
  *     >
  *       <ViewerLayout />
  *     </UIProvider>

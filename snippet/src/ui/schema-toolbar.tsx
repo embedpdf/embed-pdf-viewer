@@ -1,23 +1,28 @@
-import { h } from 'preact';
-import { useMemo } from 'preact/hooks';
+import { h, Fragment } from 'preact';
 import {
-  resolveResponsiveMetadata,
-  ResponsiveMetadata,
   ToolbarItem,
   ToolbarRendererProps,
   useItemRenderer,
+  useRegisterAnchor,
+  getUIItemProps,
 } from '@embedpdf/plugin-ui/preact';
-import { useLocale } from '@embedpdf/plugin-i18n/preact';
 import { useCommand } from '@embedpdf/plugin-commands/preact';
 import { twMerge } from 'tailwind-merge';
 import { TabButton } from '@/components/ui/TabButton';
 import { icons } from '@/components/icons';
 import { CommandButton } from '@/components/command-button';
 
+// No more responsive-utils import needed!
+// CSS handles all responsive and category visibility
+
 /**
  * Schema-driven Toolbar Renderer for Preact
  *
  * Renders a toolbar based on a ToolbarSchema definition from the UI plugin.
+ *
+ * Visibility is controlled entirely by CSS:
+ * - Responsive: Container queries based on data-ui-item attribute
+ * - Categories: data-categories attribute matched against data-disabled-categories on root
  */
 export function SchemaToolbar({
   schema,
@@ -29,13 +34,6 @@ export function SchemaToolbar({
     return null;
   }
 
-  const locale = useLocale();
-
-  const responsiveMetadata = useMemo(
-    () => resolveResponsiveMetadata(schema, locale),
-    [schema, locale],
-  );
-
   const isSecondarySlot = schema.position.slot === 'secondary';
   const placementClasses = getPlacementClasses(schema.position.placement);
   const slotClasses = isSecondarySlot ? 'bg-[#f1f3f5]' : '';
@@ -43,15 +41,10 @@ export function SchemaToolbar({
   return (
     <div
       className={twMerge('flex items-center gap-2', placementClasses, slotClasses, className)}
-      data-toolbar-id={schema.id}
+      {...getUIItemProps(schema)}
     >
       {schema.items.map((item) => (
-        <ToolbarItemRenderer
-          key={item.id}
-          item={item}
-          documentId={documentId}
-          responsiveMetadata={responsiveMetadata}
-        />
+        <ToolbarItemRenderer key={item.id} item={item} documentId={documentId} />
       ))}
     </div>
   );
@@ -60,62 +53,25 @@ export function SchemaToolbar({
 /**
  * Renders a single toolbar item
  */
-function ToolbarItemRenderer({
-  item,
-  documentId,
-  responsiveMetadata,
-}: {
-  item: ToolbarItem;
-  documentId: string;
-  responsiveMetadata: ResponsiveMetadata | null;
-}) {
-  const itemMetadata = responsiveMetadata?.items.get(item.id) ?? null;
-  const responsiveClasses = resolveResponsiveClasses(itemMetadata);
-
+function ToolbarItemRenderer({ item, documentId }: { item: ToolbarItem; documentId: string }) {
   switch (item.type) {
     case 'command-button':
-      return (
-        <CommandButtonRenderer
-          item={item}
-          documentId={documentId}
-          responsiveClasses={responsiveClasses}
-        />
-      );
+      return <CommandButtonRenderer item={item} documentId={documentId} />;
 
     case 'tab-group':
-      return (
-        <TabGroupRenderer
-          item={item}
-          documentId={documentId}
-          responsiveMetadata={responsiveMetadata}
-          responsiveClasses={responsiveClasses}
-        />
-      );
+      return <TabGroupRenderer item={item} documentId={documentId} />;
 
     case 'divider':
-      return <DividerRenderer item={item} responsiveClasses={responsiveClasses} />;
+      return <DividerRenderer item={item} />;
 
     case 'spacer':
       return <SpacerRenderer item={item} />;
 
     case 'group':
-      return (
-        <GroupRenderer
-          item={item}
-          documentId={documentId}
-          responsiveMetadata={responsiveMetadata}
-          responsiveClasses={responsiveClasses}
-        />
-      );
+      return <GroupRenderer item={item} documentId={documentId} />;
 
     case 'custom':
-      return (
-        <CustomComponentRenderer
-          item={item}
-          documentId={documentId}
-          responsiveClasses={responsiveClasses}
-        />
-      );
+      return <CustomComponentRenderer item={item} documentId={documentId} />;
 
     default:
       console.warn(`Unknown toolbar item type:`, item);
@@ -129,14 +85,12 @@ function ToolbarItemRenderer({
 function CommandButtonRenderer({
   item,
   documentId,
-  responsiveClasses,
 }: {
   item: Extract<ToolbarItem, { type: 'command-button' }>;
   documentId: string;
-  responsiveClasses: string;
 }) {
   return (
-    <div className={responsiveClasses} data-item-id={item.id}>
+    <div {...getUIItemProps(item)}>
       <CommandButton
         commandId={item.commandId}
         documentId={documentId}
@@ -153,78 +107,99 @@ function CommandButtonRenderer({
 function TabGroupRenderer({
   item,
   documentId,
-  responsiveClasses,
-  responsiveMetadata,
 }: {
   item: Extract<ToolbarItem, { type: 'tab-group' }>;
   documentId: string;
-  responsiveClasses: string;
-  responsiveMetadata: ResponsiveMetadata | null;
 }) {
   return (
-    <div
-      className={twMerge('flex items-center gap-2', responsiveClasses)}
-      data-item-id={item.id}
-      role="tablist"
-    >
-      {item.tabs.map((tab) => {
-        const tabMetadata = responsiveMetadata?.items.get(tab.id) ?? null;
-        const tabResponsiveClasses = resolveResponsiveClasses(tabMetadata);
-
-        if (!tab.commandId) {
-          return null;
-        }
-
-        const command = useCommand(tab.commandId, documentId);
-        if (!command || !command.visible) return null;
-
-        const handleClick = () => {
-          if (!command.disabled) {
-            command.execute();
-          }
-        };
-
-        return (
-          <div key={tab.id} className={tabResponsiveClasses} data-tab-id={tab.id}>
-            <TabButton active={command.active} onClick={handleClick} disabled={command.disabled}>
-              {tab.variant === 'text' ? command.label : null}
-              {tab.variant === 'icon' && command.icon
-                ? (() => {
-                    const TabIconComponent = icons[command.icon];
-                    return TabIconComponent ? (
-                      <TabIconComponent
-                        className="h-5 w-5"
-                        primaryColor={command.iconProps?.primaryColor}
-                        secondaryColor={command.iconProps?.secondaryColor}
-                      />
-                    ) : null;
-                  })()
-                : null}
-            </TabButton>
-          </div>
-        );
-      })}
+    <div className="flex items-center gap-2" {...getUIItemProps(item)} role="tablist">
+      {item.tabs.map((tab) => (
+        <TabRenderer key={tab.id} tab={tab} documentId={documentId} />
+      ))}
     </div>
+  );
+}
+
+/**
+ * Renders a single tab within a tab group
+ */
+function TabRenderer({
+  tab,
+  documentId,
+}: {
+  tab: Extract<ToolbarItem, { type: 'tab-group' }>['tabs'][number];
+  documentId: string;
+}) {
+  const command = useCommand(tab.commandId, documentId);
+  const anchorRef = useRegisterAnchor(documentId, tab.id);
+
+  // Don't render if command doesn't exist or isn't visible
+  if (!command || !command.visible) {
+    return null;
+  }
+
+  const handleClick = () => {
+    if (!command.disabled) {
+      command.execute();
+    }
+  };
+
+  return (
+    <div {...getUIItemProps(tab)}>
+      <TabButton
+        anchorRef={anchorRef}
+        active={command.active}
+        onClick={handleClick}
+        disabled={command.disabled}
+      >
+        {tab.variant === 'text' && command.label}
+        {tab.variant === 'icon' && command.icon && (
+          <TabIcon icon={command.icon} iconProps={command.iconProps} />
+        )}
+        {tab.variant === 'icon-text' && (
+          <>
+            {command.icon && <TabIcon icon={command.icon} iconProps={command.iconProps} />}
+            {command.label}
+          </>
+        )}
+      </TabButton>
+    </div>
+  );
+}
+
+/**
+ * Renders a tab icon
+ */
+function TabIcon({
+  icon,
+  iconProps,
+}: {
+  icon: string;
+  iconProps?: { primaryColor?: string; secondaryColor?: string };
+}) {
+  const IconComponent = icons[icon];
+  if (!IconComponent) return null;
+
+  return (
+    <IconComponent
+      className="h-5 w-5"
+      primaryColor={iconProps?.primaryColor}
+      secondaryColor={iconProps?.secondaryColor}
+    />
   );
 }
 
 /**
  * Renders a divider
  */
-function DividerRenderer({
-  item,
-  responsiveClasses,
-}: {
-  item: Extract<ToolbarItem, { type: 'divider' }>;
-  responsiveClasses: string;
-}) {
+function DividerRenderer({ item }: { item: Extract<ToolbarItem, { type: 'divider' }> }) {
   return (
-    <div className={responsiveClasses} data-item-id={item.id}>
+    <div {...getUIItemProps(item)}>
       <div
         className={
           item.orientation === 'vertical' ? 'h-6 w-px bg-gray-300' : 'h-px w-6 bg-gray-300'
         }
-        data-item-id={item.id}
+        aria-hidden="true"
       />
     </div>
   );
@@ -234,7 +209,9 @@ function DividerRenderer({
  * Renders a spacer
  */
 function SpacerRenderer({ item }: { item: Extract<ToolbarItem, { type: 'spacer' }> }) {
-  return <div className={item.flex ? 'flex-1' : 'w-4'} data-item-id={item.id} aria-hidden="true" />;
+  return (
+    <div className={item.flex ? 'flex-1' : 'w-4'} {...getUIItemProps(item)} aria-hidden="true" />
+  );
 }
 
 /**
@@ -243,29 +220,20 @@ function SpacerRenderer({ item }: { item: Extract<ToolbarItem, { type: 'spacer' 
 function GroupRenderer({
   item,
   documentId,
-  responsiveClasses,
-  responsiveMetadata,
 }: {
   item: Extract<ToolbarItem, { type: 'group' }>;
   documentId: string;
-  responsiveClasses: string;
-  responsiveMetadata: ResponsiveMetadata | null;
 }) {
   const gapClass = item.gap ? `gap-${item.gap}` : 'gap-2';
   const alignmentClass = getAlignmentClass(item.alignment);
 
   return (
     <div
-      className={`flex items-center ${gapClass} ${alignmentClass} ${responsiveClasses}`}
-      data-item-id={item.id}
+      className={twMerge('flex items-center', gapClass, alignmentClass)}
+      {...getUIItemProps(item)}
     >
       {item.items.map((childItem) => (
-        <ToolbarItemRenderer
-          key={childItem.id}
-          item={childItem}
-          documentId={documentId}
-          responsiveMetadata={responsiveMetadata}
-        />
+        <ToolbarItemRenderer key={childItem.id} item={childItem} documentId={documentId} />
       ))}
     </div>
   );
@@ -277,16 +245,14 @@ function GroupRenderer({
 function CustomComponentRenderer({
   item,
   documentId,
-  responsiveClasses,
 }: {
   item: Extract<ToolbarItem, { type: 'custom' }>;
   documentId: string;
-  responsiveClasses: string;
 }) {
   const { renderCustomComponent } = useItemRenderer();
 
   return (
-    <div className={responsiveClasses} data-item-id={item.id}>
+    <div {...getUIItemProps(item)}>
       {renderCustomComponent(item.componentId, documentId, item.props)}
     </div>
   );
@@ -326,13 +292,4 @@ function getAlignmentClass(alignment?: 'start' | 'center' | 'end'): string {
     default:
       return 'justify-start';
   }
-}
-
-/**
- * Resolve responsive classes from metadata
- */
-function resolveResponsiveClasses(itemMetadata: any): string {
-  if (!itemMetadata) return '';
-  if (itemMetadata.hidden) return 'hidden';
-  return '';
 }

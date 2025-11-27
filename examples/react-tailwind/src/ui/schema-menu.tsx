@@ -1,17 +1,15 @@
-import { useEffect, useRef, useState, useMemo } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import {
   MenuRendererProps,
   MenuItem,
-  resolveResponsiveMetadata,
-  ResponsiveMetadata,
   useUISchema,
   MenuSchema,
+  getUIItemProps,
 } from '@embedpdf/plugin-ui/react';
 import { useCommand } from '@embedpdf/plugin-commands/react';
 import * as Icons from '../components/icons';
-import { resolveResponsiveClasses } from './responsive-utils';
 import { twMerge } from 'tailwind-merge';
-import { useTranslations, useLocale } from '@embedpdf/plugin-i18n/react';
+import { useTranslations } from '@embedpdf/plugin-i18n/react';
 
 /**
  * Schema-driven Menu Renderer
@@ -20,7 +18,7 @@ import { useTranslations, useLocale } from '@embedpdf/plugin-i18n/react';
  * - Desktop: Anchored dropdown menu
  * - Mobile: Bottom sheet modal with submenu navigation
  *
- * This is the app's custom menu renderer, passed to UIProvider.
+ * Visibility is controlled entirely by CSS via data attributes.
  */
 
 interface MenuStackItem {
@@ -46,14 +44,6 @@ export function SchemaMenu({ schema, documentId, anchorEl, onClose }: MenuRender
   }, [schema]);
 
   const currentMenu = menuStack[menuStack.length - 1];
-
-  const locale = useLocale();
-
-  // Resolve responsive metadata for the current menu
-  const responsiveMetadata = useMemo(
-    () => (currentMenu ? resolveResponsiveMetadata(currentMenu.schema, locale) : null),
-    [currentMenu, locale],
-  );
 
   const navigateToSubmenu = (submenuId: string, title: string) => {
     if (!uiSchema) return;
@@ -87,15 +77,12 @@ export function SchemaMenu({ schema, documentId, anchorEl, onClose }: MenuRender
       const rect = anchorEl.getBoundingClientRect();
       const menuWidth = menuRef.current?.offsetWidth || 200;
 
-      // Always position below the anchor (prefer scrolling over going off-screen)
       let top = rect.bottom + 4;
       let left = rect.left;
 
-      // Only adjust horizontal position if it goes off-screen
       if (left + menuWidth > window.innerWidth) {
         left = window.innerWidth - menuWidth - 8;
       }
-      // Ensure it doesn't go off the left edge
       if (left < 8) {
         left = 8;
       }
@@ -162,11 +149,11 @@ export function SchemaMenu({ schema, documentId, anchorEl, onClose }: MenuRender
         <div
           ref={menuRef}
           className="animate-slide-up fixed bottom-0 left-0 right-0 z-50 max-h-[80vh] overflow-y-auto rounded-t-2xl bg-white shadow-2xl"
+          {...getUIItemProps(currentMenu.schema)}
           role="menu"
         >
           {/* Header */}
           {menuStack.length > 1 ? (
-            // Submenu header with back button
             <div className="flex items-center border-b border-gray-200 px-4 py-3">
               <button
                 onClick={navigateBack}
@@ -183,7 +170,6 @@ export function SchemaMenu({ schema, documentId, anchorEl, onClose }: MenuRender
               )}
             </div>
           ) : (
-            // Main menu handle bar
             <div className="flex justify-center py-3">
               <div className="h-1.5 w-12 rounded-full bg-gray-300" />
             </div>
@@ -198,7 +184,6 @@ export function SchemaMenu({ schema, documentId, anchorEl, onClose }: MenuRender
                 onClose={onClose}
                 isMobile={isMobile}
                 onNavigateToSubmenu={navigateToSubmenu}
-                responsiveMetadata={responsiveMetadata}
               />
             ))}
           </div>
@@ -213,6 +198,7 @@ export function SchemaMenu({ schema, documentId, anchorEl, onClose }: MenuRender
       ref={menuRef}
       className="animate-fade-in fixed z-50 min-w-[200px] rounded-lg border border-gray-200 bg-white shadow-lg"
       style={position ? { top: position.top, left: position.left } : undefined}
+      {...getUIItemProps(currentMenu.schema)}
       role="menu"
     >
       {/* Header for submenus */}
@@ -242,7 +228,6 @@ export function SchemaMenu({ schema, documentId, anchorEl, onClose }: MenuRender
             onClose={onClose}
             isMobile={false}
             onNavigateToSubmenu={navigateToSubmenu}
-            responsiveMetadata={responsiveMetadata}
           />
         ))}
       </div>
@@ -260,7 +245,6 @@ interface MenuItemRendererProps {
   onClose: () => void;
   isMobile: boolean;
   onNavigateToSubmenu?: (submenuId: string, title: string) => void;
-  responsiveMetadata: ResponsiveMetadata | null;
 }
 
 function MenuItemRenderer({
@@ -269,11 +253,7 @@ function MenuItemRenderer({
   onClose,
   isMobile,
   onNavigateToSubmenu,
-  responsiveMetadata,
 }: MenuItemRendererProps) {
-  const itemMetadata = responsiveMetadata?.items.get(item.id) ?? null;
-  const responsiveClasses = resolveResponsiveClasses(itemMetadata);
-
   switch (item.type) {
     case 'command':
       return (
@@ -282,7 +262,6 @@ function MenuItemRenderer({
           documentId={documentId}
           onClose={onClose}
           isMobile={isMobile}
-          responsiveClasses={responsiveClasses}
         />
       );
 
@@ -293,12 +272,17 @@ function MenuItemRenderer({
           documentId={documentId}
           isMobile={isMobile}
           onNavigateToSubmenu={onNavigateToSubmenu}
-          responsiveClasses={responsiveClasses}
         />
       );
 
     case 'divider':
-      return <MenuDivider isMobile={isMobile} responsiveClasses={responsiveClasses} />;
+      return (
+        <div {...getUIItemProps(item)}>
+          <div
+            className={isMobile ? 'my-2 border-t border-gray-200' : 'my-1 border-t border-gray-200'}
+          />
+        </div>
+      );
 
     case 'section':
       return (
@@ -308,7 +292,6 @@ function MenuItemRenderer({
           onClose={onClose}
           isMobile={isMobile}
           onNavigateToSubmenu={onNavigateToSubmenu}
-          responsiveMetadata={responsiveMetadata}
         />
       );
 
@@ -326,13 +309,11 @@ function CommandMenuItem({
   documentId,
   onClose,
   isMobile,
-  responsiveClasses,
 }: {
   item: Extract<MenuItem, { type: 'command' }>;
   documentId: string;
   onClose: () => void;
   isMobile: boolean;
-  responsiveClasses: string;
 }) {
   const command = useCommand(item.commandId, documentId);
 
@@ -359,15 +340,10 @@ function CommandMenuItem({
 
   return (
     <button
+      {...getUIItemProps(item)}
       onClick={handleClick}
       disabled={command.disabled}
-      className={twMerge(
-        baseClasses,
-        disabledClasses,
-        activeClasses,
-        responsiveClasses,
-        'w-full text-left',
-      )}
+      className={twMerge(baseClasses, disabledClasses, activeClasses, 'w-full text-left')}
       role="menuitem"
     >
       {IconComponent && (
@@ -395,13 +371,11 @@ function SubmenuItem({
   documentId,
   isMobile,
   onNavigateToSubmenu,
-  responsiveClasses,
 }: {
   item: Extract<MenuItem, { type: 'submenu' }>;
   documentId: string;
   isMobile: boolean;
   onNavigateToSubmenu?: (submenuId: string, title: string) => void;
-  responsiveClasses: string;
 }) {
   const { translate } = useTranslations(documentId);
   const iconName = item.icon ? `${item.icon}Icon` : null;
@@ -422,12 +396,9 @@ function SubmenuItem({
 
   return (
     <button
+      {...getUIItemProps(item)}
       onClick={handleClick}
-      className={twMerge(
-        baseClasses,
-        responsiveClasses,
-        'w-full cursor-pointer text-left text-gray-700',
-      )}
+      className={twMerge(baseClasses, 'w-full cursor-pointer text-left text-gray-700')}
       role="menuitem"
     >
       {IconComponent && <IconComponent className={isMobile ? 'h-5 w-5' : 'h-4 w-4'} />}
@@ -436,27 +407,6 @@ function SubmenuItem({
       </span>
       <Icons.ChevronRightIcon className={isMobile ? 'h-5 w-5' : 'h-4 w-4'} />
     </button>
-  );
-}
-
-// ─────────────────────────────────────────────────────────
-// Menu Divider
-// ─────────────────────────────────────────────────────────
-
-function MenuDivider({
-  isMobile,
-  responsiveClasses,
-}: {
-  isMobile: boolean;
-  responsiveClasses: string;
-}) {
-  return (
-    <div
-      className={twMerge(
-        isMobile ? 'my-2 border-t border-gray-200' : 'my-1 border-t border-gray-200',
-        responsiveClasses,
-      )}
-    />
   );
 }
 
@@ -470,19 +420,17 @@ function MenuSection({
   onClose,
   isMobile,
   onNavigateToSubmenu,
-  responsiveMetadata,
 }: {
   item: Extract<MenuItem, { type: 'section' }>;
   documentId: string;
   onClose: () => void;
   isMobile: boolean;
   onNavigateToSubmenu?: (submenuId: string, title: string) => void;
-  responsiveMetadata: ResponsiveMetadata | null;
 }) {
   const { translate } = useTranslations(documentId);
 
   return (
-    <div className={isMobile ? 'py-2' : 'py-1'}>
+    <div {...getUIItemProps(item)} className={isMobile ? 'py-2' : 'py-1'}>
       {(item.labelKey || item.label) && (
         <div
           className={
@@ -502,11 +450,8 @@ function MenuSection({
           onClose={onClose}
           isMobile={isMobile}
           onNavigateToSubmenu={onNavigateToSubmenu}
-          responsiveMetadata={responsiveMetadata}
         />
       ))}
     </div>
   );
 }
-
-// No helper functions needed - shortcuts are already formatted by the command plugin

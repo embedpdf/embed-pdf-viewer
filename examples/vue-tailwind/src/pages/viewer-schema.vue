@@ -27,6 +27,7 @@
               :documentId="activeDocumentId"
               :components="uiComponents"
               :renderers="uiRenderers"
+              class="flex min-h-0 flex-1 flex-col overflow-hidden"
             >
               <ViewerLayout :documentId="activeDocumentId" />
             </UIProvider>
@@ -165,6 +166,7 @@ const plugins = computed(() => [
   createPluginRegistration(FullscreenPluginPackage),
   createPluginRegistration(ThumbnailPluginPackage, {
     width: 120,
+    labelHeight: 30,
     paddingY: 10,
   }),
   // Commands plugin - provides command execution and state management

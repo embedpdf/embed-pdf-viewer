@@ -43,7 +43,12 @@ export function CommandButton({
   };
 
   return (
-    <Tooltip content={command.label} position="bottom" delay={500}>
+    <Tooltip
+      content={command.label}
+      position="bottom"
+      delay={500}
+      trigger={command.active ? 'none' : 'hover'}
+    >
       <Button
         elementRef={anchorRef}
         onClick={handleClick}

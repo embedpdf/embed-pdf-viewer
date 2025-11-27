@@ -6,6 +6,7 @@ import {
   ResponsiveVisibilityRule,
   BreakpointRule,
   LocaleOverrides,
+  SelectionMenuSchema,
 } from '../types';
 
 /**
@@ -13,7 +14,7 @@ import {
  * This is framework-agnostic and lives in plugin-ui
  */
 export function resolveResponsiveMetadata(
-  schema: ToolbarSchema | MenuSchema,
+  schema: ToolbarSchema | MenuSchema | SelectionMenuSchema,
   currentLocale?: string,
 ): ResponsiveMetadata | null {
   if (!schema.responsive?.breakpoints) {

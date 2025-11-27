@@ -1,5 +1,5 @@
 <template>
-  <div :class="isMobile ? 'py-2' : 'py-1'">
+  <div v-bind="getUIItemProps(item)" :class="isMobile ? 'py-2' : 'py-1'">
     <div
       v-if="item.labelKey || item.label"
       :class="
@@ -18,19 +18,15 @@
       :onClose="onClose"
       :isMobile="isMobile"
       :onNavigateToSubmenu="onNavigateToSubmenu"
-      :responsiveMetadata="responsiveMetadata"
     />
   </div>
 </template>
 
 <script setup lang="ts">
-import type { MenuItem, ResponsiveMetadata } from '@embedpdf/plugin-ui/vue';
+import type { MenuItem } from '@embedpdf/plugin-ui/vue';
+import { getUIItemProps } from '@embedpdf/plugin-ui/vue';
 import { useTranslations } from '@embedpdf/plugin-i18n/vue';
 import MenuItemRenderer from './MenuItemRenderer.vue';
-
-/**
- * Renders a menu section with optional label and nested items
- */
 
 interface Props {
   item: Extract<MenuItem, { type: 'section' }>;
@@ -38,7 +34,6 @@ interface Props {
   onClose: () => void;
   isMobile: boolean;
   onNavigateToSubmenu?: (submenuId: string, title: string) => void;
-  responsiveMetadata: ResponsiveMetadata | null;
 }
 
 const props = defineProps<Props>();

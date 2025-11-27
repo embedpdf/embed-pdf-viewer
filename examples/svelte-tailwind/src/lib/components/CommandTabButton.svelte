@@ -1,6 +1,7 @@
 <script lang="ts">
   import { useCommand } from '@embedpdf/plugin-commands/svelte';
   import Icons from './Icons.svelte';
+  import { useRegisterAnchor } from '@embedpdf/plugin-ui/svelte';
 
   interface Props {
     commandId: string;
@@ -14,6 +15,14 @@
   const command = useCommand(
     () => commandId,
     () => documentId,
+  );
+
+  // Register this button with the anchor registry if itemId is provided
+  // This allows menus to anchor to it when opened via UI state changes
+  const finalItemId = itemId || commandId;
+  const registerAnchor = useRegisterAnchor(
+    () => documentId,
+    () => finalItemId,
   );
 
   function handleClick() {
@@ -41,6 +50,7 @@
 
 {#if command?.command?.visible}
   <button
+    use:registerAnchor
     type="button"
     class={className}
     onclick={handleClick}

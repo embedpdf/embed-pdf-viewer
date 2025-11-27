@@ -81,7 +81,7 @@ export const viewerUISchema: UISchema = {
           type: 'group',
           id: 'left-group',
           alignment: 'start',
-          gap: 1,
+          gap: 2,
           items: [
             {
               type: 'command-button',
