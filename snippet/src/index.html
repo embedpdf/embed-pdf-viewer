@@ -17,7 +17,7 @@
   <script async type="module">
     import EmbedPDF from './embedpdf.js';
 
-    const EPDFinstance = EmbedPDF.init({
+    EmbedPDF.init({
       type: 'container',
       target: document.getElementById('pdf-viewer'),
       src: 'https://snippet.embedpdf.com/ebook.pdf',

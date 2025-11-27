@@ -2,7 +2,7 @@ import { h, Fragment } from 'preact';
 import { useMemo } from 'preact/hooks';
 import styles from '../styles/index.css';
 import { EmbedPDF } from '@embedpdf/core/preact';
-import { createPluginRegistration } from '@embedpdf/core';
+import { createPluginRegistration, PluginRegistry } from '@embedpdf/core';
 import { usePdfiumEngine } from '@embedpdf/engines/preact';
 import { AllLogger, ConsoleLogger, PerfLogger, Rotation } from '@embedpdf/models';
 import {
@@ -160,6 +160,7 @@ function mergePluginConfigs(userConfigs: PluginConfigs = {}): Required<PluginCon
 // **Props for the PDFViewer Component**
 interface PDFViewerProps {
   config: PDFViewerConfig;
+  onRegistryReady?: (registry: PluginRegistry) => void;
 }
 
 // Removed: menuItems and components are now in config files
@@ -264,12 +265,9 @@ function ViewerLayout({ documentId }: { documentId: string }) {
   );
 }
 
-// Legacy menuItems removed - now in config/commands.ts
-// Legacy components removed - now in config/ui-schema.ts
-
 const logger = new AllLogger([new ConsoleLogger(), new PerfLogger()]);
 
-export function PDFViewer({ config }: PDFViewerProps) {
+export function PDFViewer({ config, onRegistryReady }: PDFViewerProps) {
   const { engine, isLoading } = usePdfiumEngine({
     ...(config.wasmUrl && { wasmUrl: config.wasmUrl }),
     worker: config.worker,
@@ -318,6 +316,11 @@ export function PDFViewer({ config }: PDFViewerProps) {
       <EmbedPDF
         logger={config.log ? logger : undefined}
         onInitialized={async (registry) => {
+          // Call the callback if provided
+          if (onRegistryReady && registry) {
+            onRegistryReady(registry);
+          }
+
           registry
             ?.getPlugin<DocumentManagerPlugin>(DocumentManagerPlugin.id)
             ?.provides()
