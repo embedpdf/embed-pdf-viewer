@@ -1,23 +1,23 @@
 import { Paper, IconButton, Popper } from '@mui/material';
 import DeleteOutlineOutlinedIcon from '@mui/icons-material/DeleteOutlineOutlined';
-import { TrackedAnnotation } from '@embedpdf/plugin-annotation';
-import { useAnnotationCapability } from '@embedpdf/plugin-annotation/react';
-import { MenuWrapperProps } from '@embedpdf/utils/react';
+import {
+  AnnotationSelectionMenuProps,
+  useAnnotationCapability,
+} from '@embedpdf/plugin-annotation/react';
 import { useState } from 'react';
 
-interface AnnotationSelectionMenuProps {
-  menuWrapperProps: MenuWrapperProps;
-  selected: TrackedAnnotation;
+interface Props extends AnnotationSelectionMenuProps {
   documentId: string;
   container?: HTMLElement | null;
 }
 
 export function AnnotationSelectionMenu({
-  selected,
+  context,
   documentId,
+  selected,
   container,
   menuWrapperProps,
-}: AnnotationSelectionMenuProps) {
+}: Props) {
   const { provides: annotationCapability } = useAnnotationCapability();
   const [anchorEl, setAnchorEl] = useState<HTMLSpanElement | null>(null);
 
@@ -26,7 +26,7 @@ export function AnnotationSelectionMenu({
 
   const handleDelete = () => {
     if (!annotation) return;
-    const { pageIndex, id } = selected.object;
+    const { pageIndex, id } = context.annotation.object;
     annotation.deleteAnnotation(pageIndex, id);
   };
 
@@ -34,7 +34,7 @@ export function AnnotationSelectionMenu({
     <>
       <span {...menuWrapperProps} ref={setAnchorEl} />
       <Popper
-        open={Boolean(anchorEl)}
+        open={Boolean(anchorEl) && selected}
         anchorEl={anchorEl}
         placement="bottom"
         modifiers={[{ name: 'offset', options: { offset: [0, 8] } }]}

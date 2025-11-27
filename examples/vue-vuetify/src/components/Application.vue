@@ -266,19 +266,11 @@ const handleInitialized = async (registry: PluginRegistry) => {
                                         :documentId="activeDocumentId"
                                         :page-index="page.pageIndex"
                                       >
-                                        <template
-                                          #selection-menu="{
-                                            item,
-                                            selected,
-                                            menuWrapperProps,
-                                            rect,
-                                          }"
-                                        >
+                                        <template #selection-menu="menuProps">
                                           <RedactionSelectionMenu
-                                            v-if="selected"
-                                            :item="item"
-                                            :menu-wrapper-props="menuWrapperProps"
-                                            :rect="rect"
+                                            v-if="menuProps.selected"
+                                            v-bind="menuProps"
+                                            :documentId="activeDocumentId"
                                           />
                                         </template>
                                       </RedactionLayer>
@@ -286,19 +278,11 @@ const handleInitialized = async (registry: PluginRegistry) => {
                                         :documentId="activeDocumentId"
                                         :page-index="page.pageIndex"
                                       >
-                                        <template
-                                          #selection-menu="{
-                                            annotation,
-                                            selected,
-                                            menuWrapperProps,
-                                            rect,
-                                          }"
-                                        >
+                                        <template #selection-menu="menuProps">
                                           <AnnotationSelectionMenu
-                                            v-if="selected"
-                                            :annotation="annotation"
-                                            :menu-wrapper-props="menuWrapperProps"
-                                            :rect="rect"
+                                            v-if="menuProps.selected"
+                                            v-bind="menuProps"
+                                            :documentId="activeDocumentId"
                                           />
                                         </template>
                                       </AnnotationLayer>

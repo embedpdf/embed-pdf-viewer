@@ -292,41 +292,23 @@ function App() {
                                                 <RedactionLayer
                                                   documentId={activeDocumentId}
                                                   pageIndex={pageIndex}
-                                                  selectionMenu={({
-                                                    menuWrapperProps,
-                                                    selected,
-                                                    item,
-                                                  }) => (
-                                                    <>
-                                                      {selected ? (
-                                                        <RedactionSelectionMenu
-                                                          menuWrapperProps={menuWrapperProps}
-                                                          selected={item}
-                                                          documentId={activeDocumentId}
-                                                          container={popperContainerRef.current}
-                                                        />
-                                                      ) : null}
-                                                    </>
+                                                  selectionMenu={(props) => (
+                                                    <RedactionSelectionMenu
+                                                      {...props}
+                                                      documentId={activeDocumentId}
+                                                      container={popperContainerRef.current}
+                                                    />
                                                   )}
                                                 />
                                                 <AnnotationLayer
                                                   documentId={activeDocumentId}
                                                   pageIndex={pageIndex}
-                                                  selectionMenu={({
-                                                    menuWrapperProps,
-                                                    selected,
-                                                    annotation,
-                                                  }) => (
-                                                    <>
-                                                      {selected ? (
-                                                        <AnnotationSelectionMenu
-                                                          menuWrapperProps={menuWrapperProps}
-                                                          selected={annotation}
-                                                          documentId={activeDocumentId}
-                                                          container={popperContainerRef.current}
-                                                        />
-                                                      ) : null}
-                                                    </>
+                                                  selectionMenu={(props) => (
+                                                    <AnnotationSelectionMenu
+                                                      {...props}
+                                                      documentId={activeDocumentId}
+                                                      container={popperContainerRef.current}
+                                                    />
                                                   )}
                                                 />
                                               </PagePointerProvider>
