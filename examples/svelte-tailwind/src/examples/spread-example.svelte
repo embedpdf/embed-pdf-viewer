@@ -1,11 +1,9 @@
 <script lang="ts">
   import { usePdfiumEngine } from '@embedpdf/engines/svelte';
   import { EmbedPDF } from '@embedpdf/core/svelte';
-  import { createPluginRegistration, type PluginRegistry } from '@embedpdf/core';
+  import { createPluginRegistration } from '@embedpdf/core';
   import {
     DocumentManagerPluginPackage,
-    DocumentManagerPlugin,
-    DocumentContext,
     DocumentContent,
   } from '@embedpdf/plugin-document-manager/svelte';
   import { ViewportPluginPackage } from '@embedpdf/plugin-viewport/svelte';
@@ -18,39 +16,31 @@
   const pdfEngine = usePdfiumEngine();
 
   const plugins = [
-    createPluginRegistration(DocumentManagerPluginPackage),
+    createPluginRegistration(DocumentManagerPluginPackage, {
+      initialDocuments: [{ url: 'https://snippet.embedpdf.com/ebook.pdf' }],
+    }),
     createPluginRegistration(ViewportPluginPackage),
     createPluginRegistration(ScrollPluginPackage),
     createPluginRegistration(RenderPluginPackage),
     createPluginRegistration(ZoomPluginPackage, { defaultZoomLevel: ZoomMode.FitPage }),
     createPluginRegistration(SpreadPluginPackage, { defaultSpreadMode: SpreadMode.None }),
   ];
-
-  const onInitialized = async (registry: PluginRegistry) => {
-    registry
-      .getPlugin<DocumentManagerPlugin>(DocumentManagerPlugin.id)
-      ?.provides()
-      ?.openDocumentUrl({ url: 'https://snippet.embedpdf.com/ebook.pdf' });
-  };
 </script>
 
 {#if pdfEngine.isLoading || !pdfEngine.engine}
   <div>Loading PDF Engine...</div>
 {:else}
-  <EmbedPDF engine={pdfEngine.engine} {plugins} {onInitialized}>
-    <DocumentContext>
-      {#snippet children(context)}
-        {#if context.activeDocumentId}
-          {@const documentId = context.activeDocumentId}
-          <DocumentContent {documentId}>
-            {#snippet children(documentContent)}
-              {#if documentContent.isLoaded}
-                <SpreadExampleContent {documentId} />
-              {/if}
-            {/snippet}
-          </DocumentContent>
-        {/if}
-      {/snippet}
-    </DocumentContext>
+  <EmbedPDF engine={pdfEngine.engine} {plugins}>
+    {#snippet children({ activeDocumentId })}
+      {#if activeDocumentId}
+        <DocumentContent documentId={activeDocumentId}>
+          {#snippet children(documentContent)}
+            {#if documentContent.isLoaded}
+              <SpreadExampleContent documentId={activeDocumentId} />
+            {/if}
+          {/snippet}
+        </DocumentContent>
+      {/if}
+    {/snippet}
   </EmbedPDF>
 {/if}

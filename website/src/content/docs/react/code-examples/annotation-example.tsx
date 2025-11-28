@@ -34,7 +34,9 @@ import { PdfAnnotationSubtype, PdfStampAnnoObject } from '@embedpdf/models'
 
 // 1. Register plugins, including Annotation and its dependencies
 const plugins = [
-  createPluginRegistration(DocumentManagerPluginPackage),
+  createPluginRegistration(DocumentManagerPluginPackage, {
+    initialDocuments: [{ url: 'https://snippet.embedpdf.com/ebook.pdf' }],
+  }),
   createPluginRegistration(ViewportPluginPackage),
   createPluginRegistration(ScrollPluginPackage),
   createPluginRegistration(RenderPluginPackage),
@@ -122,11 +124,6 @@ export const PDFViewer = () => {
         engine={engine}
         plugins={plugins}
         onInitialized={async (registry) => {
-          registry
-            .getPlugin<DocumentManagerPlugin>(DocumentManagerPlugin.id)
-            ?.provides()
-            ?.openDocumentUrl({ url: 'https://snippet.embedpdf.com/ebook.pdf' })
-
           const annotation = registry
             .getPlugin<AnnotationPlugin>(AnnotationPlugin.id)
             ?.provides()

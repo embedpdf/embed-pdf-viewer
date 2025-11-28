@@ -589,10 +589,33 @@ export class DocumentManagerPlugin extends BasePlugin<
   // Plugin Lifecycle
   // ─────────────────────────────────────────────────────────
 
-  async initialize(_config: DocumentManagerPluginConfig): Promise<void> {
+  async initialize(config: DocumentManagerPluginConfig): Promise<void> {
     this.logger.info('DocumentManagerPlugin', 'Initialize', 'Document Manager Plugin initialized', {
       maxDocuments: this.maxDocuments,
+      initialDocumentsCount: config.initialDocuments?.length ?? 0,
     });
+
+    // Handle initial documents from config
+    if (config.initialDocuments && config.initialDocuments.length > 0) {
+      // Process strictly in order
+      for (const docConfig of config.initialDocuments) {
+        try {
+          // Type guard to distinguish between URL and Buffer options
+          if ('buffer' in docConfig) {
+            this.openDocumentBuffer(docConfig);
+          } else if ('url' in docConfig) {
+            this.openDocumentUrl(docConfig);
+          }
+        } catch (error) {
+          this.logger.error(
+            'DocumentManagerPlugin',
+            'Initialize',
+            'Failed to initiate initial document load',
+            error,
+          );
+        }
+      }
+    }
   }
 
   async destroy(): Promise<void> {

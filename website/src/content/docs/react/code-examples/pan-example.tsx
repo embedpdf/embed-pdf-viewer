@@ -12,7 +12,6 @@ import {
 import { Scroller, ScrollPluginPackage } from '@embedpdf/plugin-scroll/react'
 import {
   DocumentContent,
-  DocumentManagerPlugin,
   DocumentManagerPluginPackage,
 } from '@embedpdf/plugin-document-manager/react'
 import { RenderLayer, RenderPluginPackage } from '@embedpdf/plugin-render/react'
@@ -26,7 +25,9 @@ import { usePan, PanPluginPackage } from '@embedpdf/plugin-pan/react'
 
 // 1. Register the plugins you need, including dependencies for Pan
 const plugins = [
-  createPluginRegistration(DocumentManagerPluginPackage),
+  createPluginRegistration(DocumentManagerPluginPackage, {
+    initialDocuments: [{ url: 'https://snippet.embedpdf.com/ebook.pdf' }],
+  }),
   createPluginRegistration(ViewportPluginPackage),
   createPluginRegistration(ScrollPluginPackage),
   createPluginRegistration(RenderPluginPackage),
@@ -89,16 +90,7 @@ export const PDFViewer = () => {
 
   return (
     <div style={{ height: '500px' }} className="select-none">
-      <EmbedPDF
-        engine={engine}
-        plugins={plugins}
-        onInitialized={async (registry) => {
-          registry
-            .getPlugin<DocumentManagerPlugin>(DocumentManagerPlugin.id)
-            ?.provides()
-            ?.openDocumentUrl({ url: 'https://snippet.embedpdf.com/ebook.pdf' })
-        }}
-      >
+      <EmbedPDF engine={engine} plugins={plugins}>
         {({ activeDocumentId }) =>
           activeDocumentId && (
             <DocumentContent documentId={activeDocumentId}>

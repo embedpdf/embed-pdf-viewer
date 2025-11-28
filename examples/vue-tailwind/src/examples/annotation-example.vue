@@ -4,7 +4,6 @@ import { EmbedPDF } from '@embedpdf/core/vue';
 import { createPluginRegistration } from '@embedpdf/core';
 import {
   DocumentManagerPluginPackage,
-  DocumentManagerPlugin,
   DocumentContent,
 } from '@embedpdf/plugin-document-manager/vue';
 import { ViewportPluginPackage } from '@embedpdf/plugin-viewport/vue';
@@ -25,7 +24,9 @@ import { PdfAnnotationSubtype, PdfStampAnnoObject } from '@embedpdf/models';
 const { engine, isLoading } = usePdfiumEngine();
 
 const plugins = [
-  createPluginRegistration(DocumentManagerPluginPackage),
+  createPluginRegistration(DocumentManagerPluginPackage, {
+    initialDocuments: [{ url: 'https://snippet.embedpdf.com/ebook.pdf' }],
+  }),
   createPluginRegistration(ViewportPluginPackage),
   createPluginRegistration(ScrollPluginPackage),
   createPluginRegistration(RenderPluginPackage),
@@ -69,11 +70,6 @@ const handleInitialized = async (registry: PluginRegistry) => {
       imageSize: { width: 30, height: 30 },
     },
   });
-
-  registry
-    .getPlugin<DocumentManagerPlugin>(DocumentManagerPlugin.id)
-    ?.provides()
-    ?.openDocumentUrl({ url: 'https://snippet.embedpdf.com/ebook.pdf' });
 };
 </script>
 

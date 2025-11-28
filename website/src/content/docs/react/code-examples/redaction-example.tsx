@@ -9,7 +9,6 @@ import {
 } from '@embedpdf/plugin-interaction-manager/react'
 import {
   DocumentContent,
-  DocumentManagerPlugin,
   DocumentManagerPluginPackage,
 } from '@embedpdf/plugin-document-manager/react'
 import {
@@ -33,7 +32,9 @@ import { useState } from 'react'
 
 // 1. Register plugins, including Redaction and its dependencies
 const plugins = [
-  createPluginRegistration(DocumentManagerPluginPackage),
+  createPluginRegistration(DocumentManagerPluginPackage, {
+    initialDocuments: [{ url: 'https://snippet.embedpdf.com/ebook.pdf' }],
+  }),
   createPluginRegistration(ViewportPluginPackage),
   createPluginRegistration(ScrollPluginPackage),
   createPluginRegistration(RenderPluginPackage),
@@ -157,16 +158,7 @@ export const PDFViewer = () => {
         userSelect: 'none',
       }}
     >
-      <EmbedPDF
-        engine={engine}
-        plugins={plugins}
-        onInitialized={async (registry) => {
-          registry
-            .getPlugin<DocumentManagerPlugin>(DocumentManagerPlugin.id)
-            ?.provides()
-            ?.openDocumentUrl({ url: 'https://snippet.embedpdf.com/ebook.pdf' })
-        }}
-      >
+      <EmbedPDF engine={engine} plugins={plugins}>
         {({ activeDocumentId }) =>
           activeDocumentId && (
             <DocumentContent documentId={activeDocumentId}>

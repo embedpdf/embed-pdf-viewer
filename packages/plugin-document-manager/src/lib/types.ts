@@ -7,8 +7,11 @@ import {
   PdfRequestOptions,
 } from '@embedpdf/models';
 
+export type InitialDocumentOptions = LoadDocumentUrlOptions | LoadDocumentBufferOptions;
+
 export interface DocumentManagerPluginConfig extends BasePluginConfig {
   maxDocuments?: number;
+  initialDocuments?: InitialDocumentOptions[];
 }
 
 export interface DocumentChangeEvent {

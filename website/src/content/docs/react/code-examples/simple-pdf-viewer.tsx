@@ -11,14 +11,15 @@ import { ScrollPluginPackage } from '@embedpdf/plugin-scroll/react'
 import { Scroller } from '@embedpdf/plugin-scroll/react'
 import {
   DocumentContent,
-  DocumentManagerPlugin,
   DocumentManagerPluginPackage,
 } from '@embedpdf/plugin-document-manager/react'
 import { RenderLayer, RenderPluginPackage } from '@embedpdf/plugin-render/react'
 
 // 1. Register the plugins you need
 const plugins = [
-  createPluginRegistration(DocumentManagerPluginPackage),
+  createPluginRegistration(DocumentManagerPluginPackage, {
+    initialDocuments: [{ url: 'https://snippet.embedpdf.com/ebook.pdf' }],
+  }),
   createPluginRegistration(ViewportPluginPackage),
   createPluginRegistration(ScrollPluginPackage),
   createPluginRegistration(RenderPluginPackage),
@@ -35,16 +36,7 @@ export const PDFViewer = () => {
   // 3. Wrap your UI with the <EmbedPDF> provider
   return (
     <div style={{ height: '500px' }}>
-      <EmbedPDF
-        engine={engine}
-        plugins={plugins}
-        onInitialized={async (registry) => {
-          registry
-            .getPlugin<DocumentManagerPlugin>(DocumentManagerPlugin.id)
-            ?.provides()
-            ?.openDocumentUrl({ url: 'https://snippet.embedpdf.com/ebook.pdf' })
-        }}
-      >
+      <EmbedPDF engine={engine} plugins={plugins}>
         {({ activeDocumentId }) =>
           activeDocumentId && (
             <DocumentContent documentId={activeDocumentId}>
