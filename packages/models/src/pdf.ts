@@ -2459,6 +2459,21 @@ export interface PdfOpenDocumentBufferOptions {
   password?: string;
 }
 
+export interface PdfRequestOptions {
+  /**
+   * Custom HTTP headers to include in all requests (HEAD, GET, range requests)
+   * Example: { 'Authorization': 'Bearer token', 'X-Custom-Header': 'value' }
+   */
+  headers?: Record<string, string>;
+  /**
+   * Controls whether cookies are sent with requests
+   * - 'omit': Never send cookies (default)
+   * - 'same-origin': Send cookies for same-origin requests
+   * - 'include': Always send cookies (requires CORS)
+   */
+  credentials?: RequestCredentials;
+}
+
 export interface PdfOpenDocumentUrlOptions {
   /**
    * Password for the document
@@ -2471,20 +2486,7 @@ export interface PdfOpenDocumentUrlOptions {
   /**
    * HTTP request options for fetching the PDF
    */
-  requestOptions?: {
-    /**
-     * Custom HTTP headers to include in all requests (HEAD, GET, range requests)
-     * Example: { 'Authorization': 'Bearer token', 'X-Custom-Header': 'value' }
-     */
-    headers?: Record<string, string>;
-    /**
-     * Controls whether cookies are sent with requests
-     * - 'omit': Never send cookies (default)
-     * - 'same-origin': Send cookies for same-origin requests
-     * - 'include': Always send cookies (requires CORS)
-     */
-    credentials?: RequestCredentials;
-  };
+  requestOptions?: PdfRequestOptions;
 }
 
 export interface PdfRenderOptions {

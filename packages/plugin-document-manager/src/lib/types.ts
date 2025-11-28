@@ -1,5 +1,11 @@
 import { BasePluginConfig, EventHook, DocumentState } from '@embedpdf/core';
-import { PdfDocumentObject, Rotation, Task, PdfErrorReason } from '@embedpdf/models';
+import {
+  PdfDocumentObject,
+  Rotation,
+  Task,
+  PdfErrorReason,
+  PdfRequestOptions,
+} from '@embedpdf/models';
 
 export interface DocumentManagerPluginConfig extends BasePluginConfig {
   maxDocuments?: number;
@@ -30,7 +36,7 @@ export interface LoadDocumentUrlOptions {
   documentId?: string;
   password?: string;
   mode?: 'auto' | 'range-request' | 'full-fetch';
-  headers?: Record<string, string>;
+  requestOptions?: PdfRequestOptions;
   scale?: number;
   rotation?: Rotation;
 }

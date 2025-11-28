@@ -260,7 +260,7 @@ export class DocumentManagerPlugin extends BasePlugin<
     const engineTask = this.engine.openDocumentUrl(file, {
       password: options.password,
       mode: options.mode,
-      headers: options.headers,
+      requestOptions: options.requestOptions,
     });
 
     task.resolve({
@@ -520,7 +520,7 @@ export class DocumentManagerPlugin extends BasePlugin<
     return this.engine.openDocumentUrl(file, {
       password: options.password,
       mode: options.mode,
-      headers: options.headers,
+      requestOptions: options.requestOptions,
     });
   }
 
