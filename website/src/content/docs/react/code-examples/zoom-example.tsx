@@ -16,7 +16,6 @@ import {
 } from '@embedpdf/plugin-viewport/react'
 import { Scroller, ScrollPluginPackage } from '@embedpdf/plugin-scroll/react'
 import {
-  DocumentContext,
   DocumentContent,
   DocumentManagerPlugin,
   DocumentManagerPluginPackage,
@@ -205,87 +204,82 @@ export const PDFViewer = ({ withMarqueeZoom = false }: PDFViewerProps) => {
             ?.openDocumentUrl({ url: 'https://snippet.embedpdf.com/ebook.pdf' })
         }}
       >
-        <DocumentContext>
-          {({ activeDocumentId }) =>
-            activeDocumentId && (
-              <DocumentContent documentId={activeDocumentId}>
-                {({ isLoaded }) =>
-                  isLoaded && (
-                    <div className="flex h-full flex-col">
-                      <ZoomToolbar
+        {({ activeDocumentId }) =>
+          activeDocumentId && (
+            <DocumentContent documentId={activeDocumentId}>
+              {({ isLoaded }) =>
+                isLoaded && (
+                  <div className="flex h-full flex-col">
+                    <ZoomToolbar
+                      documentId={activeDocumentId}
+                      withMarqueeZoom={withMarqueeZoom}
+                    />
+                    <div className="flex-grow" style={{ position: 'relative' }}>
+                      <Viewport
                         documentId={activeDocumentId}
-                        withMarqueeZoom={withMarqueeZoom}
-                      />
-                      <div
-                        className="flex-grow"
-                        style={{ position: 'relative' }}
+                        style={{
+                          backgroundColor: '#f1f3f5',
+                          position: 'absolute',
+                          top: 0,
+                          left: 0,
+                          right: 0,
+                          bottom: 0,
+                        }}
                       >
-                        <Viewport
+                        <Scroller
                           documentId={activeDocumentId}
-                          style={{
-                            backgroundColor: '#f1f3f5',
-                            position: 'absolute',
-                            top: 0,
-                            left: 0,
-                            right: 0,
-                            bottom: 0,
-                          }}
-                        >
-                          <Scroller
-                            documentId={activeDocumentId}
-                            renderPage={({ width, height, pageIndex }) => {
-                              const pageLayers = (
-                                <>
-                                  <RenderLayer
+                          renderPage={({ width, height, pageIndex }) => {
+                            const pageLayers = (
+                              <>
+                                <RenderLayer
+                                  documentId={activeDocumentId}
+                                  pageIndex={pageIndex}
+                                />
+                                <TilingLayer
+                                  documentId={activeDocumentId}
+                                  pageIndex={pageIndex}
+                                />
+                                {withMarqueeZoom && (
+                                  <MarqueeZoom
                                     documentId={activeDocumentId}
                                     pageIndex={pageIndex}
                                   />
-                                  <TilingLayer
-                                    documentId={activeDocumentId}
-                                    pageIndex={pageIndex}
-                                  />
-                                  {withMarqueeZoom && (
-                                    <MarqueeZoom
-                                      documentId={activeDocumentId}
-                                      pageIndex={pageIndex}
-                                    />
-                                  )}
-                                </>
-                              )
+                                )}
+                              </>
+                            )
 
-                              if (withMarqueeZoom) {
-                                return (
-                                  <PagePointerProvider
-                                    documentId={activeDocumentId}
-                                    pageIndex={pageIndex}
-                                  >
-                                    {pageLayers}
-                                  </PagePointerProvider>
-                                )
-                              }
-
+                            if (withMarqueeZoom) {
                               return (
-                                <div
-                                  style={{
-                                    width,
-                                    height,
-                                    position: 'relative',
-                                  }}
+                                <PagePointerProvider
+                                  documentId={activeDocumentId}
+                                  pageIndex={pageIndex}
                                 >
                                   {pageLayers}
-                                </div>
+                                </PagePointerProvider>
                               )
-                            }}
-                          />
-                        </Viewport>
-                      </div>
+                            }
+
+                            return (
+                              <div
+                                style={{
+                                  width,
+                                  height,
+                                  position: 'relative',
+                                }}
+                              >
+                                {pageLayers}
+                              </div>
+                            )
+                          }}
+                        />
+                      </Viewport>
                     </div>
-                  )
-                }
-              </DocumentContent>
-            )
-          }
-        </DocumentContext>
+                  </div>
+                )
+              }
+            </DocumentContent>
+          )
+        }
       </EmbedPDF>
     </div>
   )

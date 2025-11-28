@@ -13,7 +13,6 @@ import {
 } from '@embedpdf/plugin-viewport/react'
 import { Scroller, ScrollPluginPackage } from '@embedpdf/plugin-scroll/react'
 import {
-  DocumentContext,
   DocumentContent,
   DocumentManagerPlugin,
   DocumentManagerPluginPackage,

@@ -31,7 +31,7 @@ export function SchemaPanel({ schema, documentId, isOpen, onClose }: PanelRender
       data-panel-id={schema.id}
     >
       {/* Panel Content */}
-      <div className="flex-1 overflow-auto">
+      <div className="min-h-0 flex-1">
         {content.type === 'tabs' && (
           <TabsContent
             content={content}
@@ -40,7 +40,7 @@ export function SchemaPanel({ schema, documentId, isOpen, onClose }: PanelRender
           />
         )}
         {content.type === 'component' && (
-          <div>{renderCustomComponent(content.componentId, documentId, {})}</div>
+          <>{renderCustomComponent(content.componentId, documentId, {})}</>
         )}
       </div>
     </div>
@@ -63,7 +63,7 @@ function TabsContent({
   const { translate } = useTranslations(documentId);
 
   return (
-    <div className="flex h-full flex-col">
+    <div className="flex h-full flex-1 flex-col">
       {/* Tab Buttons */}
       <div role="tablist" className="mx-4 my-4 flex flex-shrink-0 overflow-hidden bg-white">
         {content.tabs.map((tab, idx, array) => {
@@ -93,7 +93,7 @@ function TabsContent({
       </div>
 
       {/* Tab Content */}
-      <div className="min-h-0 flex-1 overflow-auto">
+      <div className="min-h-0 flex-1">
         {content.tabs
           .filter((tab) => tab.id === activeTab)
           .map((tab) => (

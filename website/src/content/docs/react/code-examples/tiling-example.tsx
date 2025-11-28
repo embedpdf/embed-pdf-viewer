@@ -11,7 +11,6 @@ import {
 } from '@embedpdf/plugin-viewport/react'
 import { Scroller, ScrollPluginPackage } from '@embedpdf/plugin-scroll/react'
 import {
-  DocumentContext,
   DocumentContent,
   DocumentManagerPlugin,
   DocumentManagerPluginPackage,
@@ -103,48 +102,46 @@ export const PDFViewer = () => {
             ?.openDocumentUrl({ url: 'https://snippet.embedpdf.com/ebook.pdf' })
         }}
       >
-        <DocumentContext>
-          {({ activeDocumentId }) =>
-            activeDocumentId && (
-              <DocumentContent documentId={activeDocumentId}>
-                {({ isLoaded }) =>
-                  isLoaded && (
-                    <div className="flex h-full flex-col">
-                      <ZoomToolbar documentId={activeDocumentId} />
-                      <div className="relative flex w-full flex-1 overflow-hidden">
-                        <Viewport
+        {({ activeDocumentId }) =>
+          activeDocumentId && (
+            <DocumentContent documentId={activeDocumentId}>
+              {({ isLoaded }) =>
+                isLoaded && (
+                  <div className="flex h-full flex-col">
+                    <ZoomToolbar documentId={activeDocumentId} />
+                    <div className="relative flex w-full flex-1 overflow-hidden">
+                      <Viewport
+                        documentId={activeDocumentId}
+                        className="flex-grow bg-gray-100"
+                      >
+                        <Scroller
                           documentId={activeDocumentId}
-                          className="flex-grow bg-gray-100"
-                        >
-                          <Scroller
-                            documentId={activeDocumentId}
-                            renderPage={({ width, height, pageIndex }) => (
-                              <div
-                                style={{ width, height, position: 'relative' }}
-                              >
-                                {/* Use the RenderLayer for immediate display */}
-                                <RenderLayer
-                                  documentId={activeDocumentId}
-                                  pageIndex={pageIndex}
-                                  scale={1}
-                                />
-                                {/* Use the TilingLayer for optimized rendering */}
-                                <TilingLayer
-                                  documentId={activeDocumentId}
-                                  pageIndex={pageIndex}
-                                />
-                              </div>
-                            )}
-                          />
-                        </Viewport>
-                      </div>
+                          renderPage={({ width, height, pageIndex }) => (
+                            <div
+                              style={{ width, height, position: 'relative' }}
+                            >
+                              {/* Use the RenderLayer for immediate display */}
+                              <RenderLayer
+                                documentId={activeDocumentId}
+                                pageIndex={pageIndex}
+                                scale={1}
+                              />
+                              {/* Use the TilingLayer for optimized rendering */}
+                              <TilingLayer
+                                documentId={activeDocumentId}
+                                pageIndex={pageIndex}
+                              />
+                            </div>
+                          )}
+                        />
+                      </Viewport>
                     </div>
-                  )
-                }
-              </DocumentContent>
-            )
-          }
-        </DocumentContext>
+                  </div>
+                )
+              }
+            </DocumentContent>
+          )
+        }
       </EmbedPDF>
     </div>
   )

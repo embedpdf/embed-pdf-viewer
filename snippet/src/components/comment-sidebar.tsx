@@ -32,7 +32,24 @@ export const CommentSidebar = ({ documentId }: CommentSidebarProps) => {
   useEffect(() => {
     if (selectedAnnotation && scrollContainerRef.current) {
       const element = annotationRefs.current[selectedAnnotation.object.id];
-      element?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+
+      if (element && scrollContainerRef.current) {
+        const container = scrollContainerRef.current;
+        const containerRect = container.getBoundingClientRect();
+        const elementRect = element.getBoundingClientRect();
+
+        // Calculate element's position relative to container's scrollable content
+        const elementTopInScrollContent = elementRect.top - containerRect.top + container.scrollTop;
+
+        // Calculate centered scroll position
+        const targetScroll =
+          elementTopInScrollContent - container.clientHeight / 2 + elementRect.height / 2;
+
+        container.scrollTo({
+          top: targetScroll,
+          behavior: 'smooth',
+        });
+      }
     }
   }, [selectedAnnotation]);
 
@@ -108,7 +125,7 @@ export const CommentSidebar = ({ documentId }: CommentSidebarProps) => {
   }
 
   return (
-    <div ref={scrollContainerRef} className="h-full overflow-auto">
+    <div ref={scrollContainerRef} className="h-full overflow-y-auto">
       <div className="space-y-6 p-3">
         {sortedPages.map((pageNumber) => (
           <div key={pageNumber} className="space-y-3">

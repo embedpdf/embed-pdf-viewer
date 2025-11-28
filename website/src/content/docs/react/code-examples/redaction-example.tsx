@@ -8,7 +8,6 @@ import {
   PagePointerProvider,
 } from '@embedpdf/plugin-interaction-manager/react'
 import {
-  DocumentContext,
   DocumentContent,
   DocumentManagerPlugin,
   DocumentManagerPluginPackage,
@@ -168,70 +167,68 @@ export const PDFViewer = () => {
             ?.openDocumentUrl({ url: 'https://snippet.embedpdf.com/ebook.pdf' })
         }}
       >
-        <DocumentContext>
-          {({ activeDocumentId }) =>
-            activeDocumentId && (
-              <DocumentContent documentId={activeDocumentId}>
-                {({ isLoaded }) =>
-                  isLoaded && (
-                    <>
-                      <RedactionToolbar documentId={activeDocumentId} />
-                      <div
+        {({ activeDocumentId }) =>
+          activeDocumentId && (
+            <DocumentContent documentId={activeDocumentId}>
+              {({ isLoaded }) =>
+                isLoaded && (
+                  <>
+                    <RedactionToolbar documentId={activeDocumentId} />
+                    <div
+                      style={{
+                        flex: 1,
+                        overflow: 'hidden',
+                        position: 'relative',
+                      }}
+                    >
+                      <Viewport
+                        documentId={activeDocumentId}
                         style={{
-                          flex: 1,
-                          overflow: 'hidden',
-                          position: 'relative',
+                          position: 'absolute',
+                          top: 0,
+                          left: 0,
+                          right: 0,
+                          bottom: 0,
+                          backgroundColor: '#f1f3f5',
                         }}
                       >
-                        <Viewport
+                        <Scroller
                           documentId={activeDocumentId}
-                          style={{
-                            position: 'absolute',
-                            top: 0,
-                            left: 0,
-                            right: 0,
-                            bottom: 0,
-                            backgroundColor: '#f1f3f5',
-                          }}
-                        >
-                          <Scroller
-                            documentId={activeDocumentId}
-                            renderPage={({ width, height, pageIndex }) => (
-                              <PagePointerProvider
+                          renderPage={({ width, height, pageIndex }) => (
+                            <PagePointerProvider
+                              documentId={activeDocumentId}
+                              pageIndex={pageIndex}
+                            >
+                              <RenderLayer
                                 documentId={activeDocumentId}
                                 pageIndex={pageIndex}
-                              >
-                                <RenderLayer
-                                  documentId={activeDocumentId}
-                                  pageIndex={pageIndex}
-                                  style={{ pointerEvents: 'none' }}
-                                />
-                                <SelectionLayer
-                                  documentId={activeDocumentId}
-                                  pageIndex={pageIndex}
-                                />
-                                <RedactionLayer
-                                  documentId={activeDocumentId}
-                                  pageIndex={pageIndex}
-                                  selectionMenu={(props) => (
-                                    <RedactionMenu
-                                      documentId={activeDocumentId}
-                                      {...props}
-                                    />
-                                  )}
-                                />
-                              </PagePointerProvider>
-                            )}
-                          />
-                        </Viewport>
-                      </div>
-                    </>
-                  )
-                }
-              </DocumentContent>
-            )
-          }
-        </DocumentContext>
+                                style={{ pointerEvents: 'none' }}
+                              />
+                              <SelectionLayer
+                                documentId={activeDocumentId}
+                                pageIndex={pageIndex}
+                              />
+                              <RedactionLayer
+                                documentId={activeDocumentId}
+                                pageIndex={pageIndex}
+                                selectionMenu={(props) => (
+                                  <RedactionMenu
+                                    documentId={activeDocumentId}
+                                    {...props}
+                                  />
+                                )}
+                              />
+                            </PagePointerProvider>
+                          )}
+                        />
+                      </Viewport>
+                    </div>
+                  </>
+                )
+              }
+            </DocumentContent>
+          )
+        }
       </EmbedPDF>
     </div>
   )

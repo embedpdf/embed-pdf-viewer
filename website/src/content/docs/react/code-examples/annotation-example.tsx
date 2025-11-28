@@ -15,7 +15,6 @@ import {
   PagePointerProvider,
 } from '@embedpdf/plugin-interaction-manager/react'
 import {
-  DocumentContext,
   DocumentContent,
   DocumentManagerPlugin,
   DocumentManagerPluginPackage,
@@ -162,62 +161,57 @@ export const PDFViewer = () => {
           })
         }}
       >
-        <DocumentContext>
-          {({ activeDocumentId }) =>
-            activeDocumentId && (
-              <DocumentContent documentId={activeDocumentId}>
-                {({ isLoaded }) =>
-                  isLoaded && (
-                    <>
-                      <AnnotationToolbar documentId={activeDocumentId} />
-                      <div
-                        className="flex-grow"
-                        style={{ position: 'relative' }}
+        {({ activeDocumentId }) =>
+          activeDocumentId && (
+            <DocumentContent documentId={activeDocumentId}>
+              {({ isLoaded }) =>
+                isLoaded && (
+                  <>
+                    <AnnotationToolbar documentId={activeDocumentId} />
+                    <div className="flex-grow" style={{ position: 'relative' }}>
+                      <Viewport
+                        documentId={activeDocumentId}
+                        style={{
+                          width: '100%',
+                          height: '100%',
+                          position: 'absolute',
+                          backgroundColor: '#f1f3f5',
+                        }}
                       >
-                        <Viewport
+                        <Scroller
                           documentId={activeDocumentId}
-                          style={{
-                            width: '100%',
-                            height: '100%',
-                            position: 'absolute',
-                            backgroundColor: '#f1f3f5',
-                          }}
-                        >
-                          <Scroller
-                            documentId={activeDocumentId}
-                            renderPage={({ pageIndex }) => (
-                              <PagePointerProvider
+                          renderPage={({ pageIndex }) => (
+                            <PagePointerProvider
+                              documentId={activeDocumentId}
+                              pageIndex={pageIndex}
+                            >
+                              {/* Base layers */}
+                              <RenderLayer
                                 documentId={activeDocumentId}
                                 pageIndex={pageIndex}
-                              >
-                                {/* Base layers */}
-                                <RenderLayer
-                                  documentId={activeDocumentId}
-                                  pageIndex={pageIndex}
-                                  style={{ pointerEvents: 'none' }}
-                                />
-                                <SelectionLayer
-                                  documentId={activeDocumentId}
-                                  pageIndex={pageIndex}
-                                />
+                                style={{ pointerEvents: 'none' }}
+                              />
+                              <SelectionLayer
+                                documentId={activeDocumentId}
+                                pageIndex={pageIndex}
+                              />
 
-                                {/* Annotation Layer on top */}
-                                <AnnotationLayer
-                                  documentId={activeDocumentId}
-                                  pageIndex={pageIndex}
-                                />
-                              </PagePointerProvider>
-                            )}
-                          />
-                        </Viewport>
-                      </div>
-                    </>
-                  )
-                }
-              </DocumentContent>
-            )
-          }
-        </DocumentContext>
+                              {/* Annotation Layer on top */}
+                              <AnnotationLayer
+                                documentId={activeDocumentId}
+                                pageIndex={pageIndex}
+                              />
+                            </PagePointerProvider>
+                          )}
+                        />
+                      </Viewport>
+                    </div>
+                  </>
+                )
+              }
+            </DocumentContent>
+          )
+        }
       </EmbedPDF>
     </div>
   )

@@ -9,7 +9,6 @@ import {
 } from '@embedpdf/plugin-viewport/react'
 import { Scroller, ScrollPluginPackage } from '@embedpdf/plugin-scroll/react'
 import {
-  DocumentContext,
   DocumentContent,
   DocumentManagerPlugin,
   DocumentManagerPluginPackage,
@@ -151,63 +150,61 @@ export const PDFViewer = () => {
           ?.openDocumentUrl({ url: 'https://snippet.embedpdf.com/ebook.pdf' })
       }}
     >
-      <DocumentContext>
-        {({ activeDocumentId }) =>
-          activeDocumentId && (
-            <DocumentContent documentId={activeDocumentId}>
-              {({ isLoaded }) =>
-                isLoaded && (
+      {({ activeDocumentId }) =>
+        activeDocumentId && (
+          <DocumentContent documentId={activeDocumentId}>
+            {({ isLoaded }) =>
+              isLoaded && (
+                <div
+                  style={{
+                    height: '500px',
+                    display: 'flex',
+                    flexDirection: 'column',
+                  }}
+                >
+                  <CaptureToolbar documentId={activeDocumentId} />
                   <div
-                    style={{
-                      height: '500px',
-                      display: 'flex',
-                      flexDirection: 'column',
-                    }}
+                    className="flex-grow"
+                    style={{ position: 'relative', overflow: 'hidden' }}
                   >
-                    <CaptureToolbar documentId={activeDocumentId} />
-                    <div
-                      className="flex-grow"
-                      style={{ position: 'relative', overflow: 'hidden' }}
+                    <Viewport
+                      documentId={activeDocumentId}
+                      style={{
+                        position: 'absolute',
+                        top: 0,
+                        left: 0,
+                        right: 0,
+                        bottom: 0,
+                        backgroundColor: '#f1f3f5',
+                      }}
                     >
-                      <Viewport
+                      <Scroller
                         documentId={activeDocumentId}
-                        style={{
-                          position: 'absolute',
-                          top: 0,
-                          left: 0,
-                          right: 0,
-                          bottom: 0,
-                          backgroundColor: '#f1f3f5',
-                        }}
-                      >
-                        <Scroller
-                          documentId={activeDocumentId}
-                          renderPage={({ pageIndex }) => (
-                            <PagePointerProvider
+                        renderPage={({ pageIndex }) => (
+                          <PagePointerProvider
+                            documentId={activeDocumentId}
+                            pageIndex={pageIndex}
+                          >
+                            <RenderLayer
                               documentId={activeDocumentId}
                               pageIndex={pageIndex}
-                            >
-                              <RenderLayer
-                                documentId={activeDocumentId}
-                                pageIndex={pageIndex}
-                              />
-                              <MarqueeCapture
-                                documentId={activeDocumentId}
-                                pageIndex={pageIndex}
-                              />
-                            </PagePointerProvider>
-                          )}
-                        />
-                      </Viewport>
-                    </div>
-                    <CaptureResult documentId={activeDocumentId} />
+                            />
+                            <MarqueeCapture
+                              documentId={activeDocumentId}
+                              pageIndex={pageIndex}
+                            />
+                          </PagePointerProvider>
+                        )}
+                      />
+                    </Viewport>
                   </div>
-                )
-              }
-            </DocumentContent>
-          )
-        }
-      </DocumentContext>
+                  <CaptureResult documentId={activeDocumentId} />
+                </div>
+              )
+            }
+          </DocumentContent>
+        )
+      }
     </EmbedPDF>
   )
 }

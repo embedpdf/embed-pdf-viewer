@@ -11,7 +11,6 @@ import {
 } from '@embedpdf/plugin-viewport/react'
 import { Scroller, ScrollPluginPackage } from '@embedpdf/plugin-scroll/react'
 import {
-  DocumentContext,
   DocumentContent,
   DocumentManagerPlugin,
   DocumentManagerPluginPackage,
@@ -100,48 +99,43 @@ export const PDFViewer = () => {
             ?.openDocumentUrl({ url: 'https://snippet.embedpdf.com/ebook.pdf' })
         }}
       >
-        <DocumentContext>
-          {({ activeDocumentId }) =>
-            activeDocumentId && (
-              <DocumentContent documentId={activeDocumentId}>
-                {({ isLoaded }) =>
-                  isLoaded && (
-                    <div className="flex h-full flex-col">
-                      <SpreadToolbar documentId={activeDocumentId} />
-                      <div
-                        className="flex-grow"
-                        style={{ position: 'relative' }}
+        {({ activeDocumentId }) =>
+          activeDocumentId && (
+            <DocumentContent documentId={activeDocumentId}>
+              {({ isLoaded }) =>
+                isLoaded && (
+                  <div className="flex h-full flex-col">
+                    <SpreadToolbar documentId={activeDocumentId} />
+                    <div className="flex-grow" style={{ position: 'relative' }}>
+                      <Viewport
+                        documentId={activeDocumentId}
+                        style={{
+                          backgroundColor: '#f1f3f5',
+                          position: 'absolute',
+                          top: 0,
+                          left: 0,
+                          right: 0,
+                          bottom: 0,
+                        }}
                       >
-                        <Viewport
+                        {/* The Scroller component automatically adapts to the spread mode */}
+                        <Scroller
                           documentId={activeDocumentId}
-                          style={{
-                            backgroundColor: '#f1f3f5',
-                            position: 'absolute',
-                            top: 0,
-                            left: 0,
-                            right: 0,
-                            bottom: 0,
-                          }}
-                        >
-                          {/* The Scroller component automatically adapts to the spread mode */}
-                          <Scroller
-                            documentId={activeDocumentId}
-                            renderPage={({ pageIndex }) => (
-                              <RenderLayer
-                                documentId={activeDocumentId}
-                                pageIndex={pageIndex}
-                              />
-                            )}
-                          />
-                        </Viewport>
-                      </div>
+                          renderPage={({ pageIndex }) => (
+                            <RenderLayer
+                              documentId={activeDocumentId}
+                              pageIndex={pageIndex}
+                            />
+                          )}
+                        />
+                      </Viewport>
                     </div>
-                  )
-                }
-              </DocumentContent>
-            )
-          }
-        </DocumentContext>
+                  </div>
+                )
+              }
+            </DocumentContent>
+          )
+        }
       </EmbedPDF>
     </div>
   )

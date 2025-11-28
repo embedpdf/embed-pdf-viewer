@@ -40,7 +40,7 @@ export const AnnotationCard = ({
 
   useEffect(() => {
     if (isSelected) {
-      inputRef.current?.focus();
+      inputRef.current?.focus({ preventScroll: true });
     }
   }, [isSelected, entry]);
 

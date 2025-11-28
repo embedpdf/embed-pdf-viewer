@@ -13,7 +13,6 @@ import {
   useScroll,
 } from '@embedpdf/plugin-scroll/react'
 import {
-  DocumentContext,
   DocumentContent,
   DocumentManagerPlugin,
   DocumentManagerPluginPackage,
@@ -138,50 +137,48 @@ export const PDFViewer = () => {
             ?.openDocumentUrl({ url: 'https://snippet.embedpdf.com/ebook.pdf' })
         }}
       >
-        <DocumentContext>
-          {({ activeDocumentId }) =>
-            activeDocumentId && (
-              <DocumentContent documentId={activeDocumentId}>
-                {({ isLoaded }) =>
-                  isLoaded && (
-                    <div style={{ display: 'flex', height: '100%' }}>
-                      <ThumbnailSidebar documentId={activeDocumentId} />
-                      <div
+        {({ activeDocumentId }) =>
+          activeDocumentId && (
+            <DocumentContent documentId={activeDocumentId}>
+              {({ isLoaded }) =>
+                isLoaded && (
+                  <div style={{ display: 'flex', height: '100%' }}>
+                    <ThumbnailSidebar documentId={activeDocumentId} />
+                    <div
+                      style={{
+                        flex: 1,
+                        overflow: 'hidden',
+                        position: 'relative',
+                      }}
+                    >
+                      <Viewport
+                        documentId={activeDocumentId}
                         style={{
-                          flex: 1,
-                          overflow: 'hidden',
-                          position: 'relative',
+                          position: 'absolute',
+                          top: 0,
+                          left: 0,
+                          right: 0,
+                          bottom: 0,
+                          backgroundColor: '#f1f3f5',
                         }}
                       >
-                        <Viewport
+                        <Scroller
                           documentId={activeDocumentId}
-                          style={{
-                            position: 'absolute',
-                            top: 0,
-                            left: 0,
-                            right: 0,
-                            bottom: 0,
-                            backgroundColor: '#f1f3f5',
-                          }}
-                        >
-                          <Scroller
-                            documentId={activeDocumentId}
-                            renderPage={({ pageIndex }) => (
-                              <RenderLayer
-                                documentId={activeDocumentId}
-                                pageIndex={pageIndex}
-                              />
-                            )}
-                          />
-                        </Viewport>
-                      </div>
+                          renderPage={({ pageIndex }) => (
+                            <RenderLayer
+                              documentId={activeDocumentId}
+                              pageIndex={pageIndex}
+                            />
+                          )}
+                        />
+                      </Viewport>
                     </div>
-                  )
-                }
-              </DocumentContent>
-            )
-          }
-        </DocumentContext>
+                  </div>
+                )
+              }
+            </DocumentContent>
+          )
+        }
       </EmbedPDF>
     </div>
   )

@@ -12,7 +12,6 @@ import {
 } from '@embedpdf/plugin-viewport/react'
 import { Scroller, ScrollPluginPackage } from '@embedpdf/plugin-scroll/react'
 import {
-  DocumentContext,
   DocumentContent,
   DocumentManagerPlugin,
   DocumentManagerPluginPackage,
@@ -163,53 +162,51 @@ export const PDFViewer = () => {
           ?.openDocumentUrl({ url: 'https://snippet.embedpdf.com/ebook.pdf' })
       }}
     >
-      <DocumentContext>
-        {({ activeDocumentId }) =>
-          activeDocumentId && (
-            <DocumentContent documentId={activeDocumentId}>
-              {({ isLoaded }) =>
-                isLoaded && (
-                  <>
-                    <div style={{ height: '500px', userSelect: 'none' }}>
-                      <div className="flex h-full flex-col gap-4">
-                        <SelectionToolbar documentId={activeDocumentId} />
-                        <div className="relative flex w-full flex-1 overflow-hidden">
-                          <Viewport
+      {({ activeDocumentId }) =>
+        activeDocumentId && (
+          <DocumentContent documentId={activeDocumentId}>
+            {({ isLoaded }) =>
+              isLoaded && (
+                <>
+                  <div style={{ height: '500px', userSelect: 'none' }}>
+                    <div className="flex h-full flex-col gap-4">
+                      <SelectionToolbar documentId={activeDocumentId} />
+                      <div className="relative flex w-full flex-1 overflow-hidden">
+                        <Viewport
+                          documentId={activeDocumentId}
+                          className="flex-grow bg-gray-100"
+                        >
+                          <Scroller
                             documentId={activeDocumentId}
-                            className="flex-grow bg-gray-100"
-                          >
-                            <Scroller
-                              documentId={activeDocumentId}
-                              renderPage={({ pageIndex }) => (
-                                <PagePointerProvider
+                            renderPage={({ pageIndex }) => (
+                              <PagePointerProvider
+                                documentId={activeDocumentId}
+                                pageIndex={pageIndex}
+                              >
+                                <RenderLayer
                                   documentId={activeDocumentId}
                                   pageIndex={pageIndex}
-                                >
-                                  <RenderLayer
-                                    documentId={activeDocumentId}
-                                    pageIndex={pageIndex}
-                                    scale={1}
-                                    className="pointer-events-none"
-                                  />
-                                  <SelectionLayer
-                                    documentId={activeDocumentId}
-                                    pageIndex={pageIndex}
-                                  />
-                                </PagePointerProvider>
-                              )}
-                            />
-                          </Viewport>
-                        </div>
+                                  scale={1}
+                                  className="pointer-events-none"
+                                />
+                                <SelectionLayer
+                                  documentId={activeDocumentId}
+                                  pageIndex={pageIndex}
+                                />
+                              </PagePointerProvider>
+                            )}
+                          />
+                        </Viewport>
                       </div>
                     </div>
-                    <SelectedTextPanel documentId={activeDocumentId} />
-                  </>
-                )
-              }
-            </DocumentContent>
-          )
-        }
-      </DocumentContext>
+                  </div>
+                  <SelectedTextPanel documentId={activeDocumentId} />
+                </>
+              )
+            }
+          </DocumentContent>
+        )
+      }
     </EmbedPDF>
   )
 }

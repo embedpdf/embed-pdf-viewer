@@ -5,7 +5,6 @@ import { createPluginRegistration, PluginRegistry } from '@embedpdf/core';
 import {
   DocumentManagerPluginPackage,
   DocumentManagerPlugin,
-  DocumentContext,
   DocumentContent,
 } from '@embedpdf/plugin-document-manager/vue';
 import { ViewportPluginPackage } from '@embedpdf/plugin-viewport/vue';
@@ -34,15 +33,15 @@ const onInitialized = async (registry: PluginRegistry) => {
 
 <template>
   <div v-if="isLoading || !engine">Loading PDF Engine...</div>
-  <EmbedPDF v-else :engine="engine" :plugins="plugins" :on-initialized="onInitialized">
-    <DocumentContext v-slot="{ activeDocumentId }">
-      <DocumentContent
-        v-if="activeDocumentId"
-        :document-id="activeDocumentId"
-        v-slot="{ isLoaded }"
-      >
-        <ExportExampleContent v-if="isLoaded" :document-id="activeDocumentId" />
-      </DocumentContent>
-    </DocumentContext>
+  <EmbedPDF
+    v-else
+    :engine="engine"
+    :plugins="plugins"
+    :on-initialized="onInitialized"
+    v-slot="{ activeDocumentId }"
+  >
+    <DocumentContent v-if="activeDocumentId" :document-id="activeDocumentId" v-slot="{ isLoaded }">
+      <ExportExampleContent v-if="isLoaded" :document-id="activeDocumentId" />
+    </DocumentContent>
   </EmbedPDF>
 </template>
