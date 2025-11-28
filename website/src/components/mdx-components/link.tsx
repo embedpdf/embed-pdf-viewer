@@ -1,7 +1,11 @@
 import cn from 'clsx'
+import NextLink from 'next/link'
 import { Anchor } from './anchor'
+import type { ComponentPropsWithoutRef, FC } from 'react'
 
-export const Link: typeof Anchor = ({ className, ...props }) => {
+type LinkProps = ComponentPropsWithoutRef<typeof NextLink>
+
+export const Link: FC<LinkProps> = ({ className, ...props }) => {
   return (
     <Anchor
       className={cn(

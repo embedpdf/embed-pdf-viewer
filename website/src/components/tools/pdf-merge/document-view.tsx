@@ -66,7 +66,7 @@ export const DocumentView: React.FC<DocumentViewProps> = ({
 
   return (
     <div className="space-y-6">
-      {Object.entries(documents).map(([docId, { doc, pages }]) => (
+      {Object.entries(documents).map(([docId, { doc, pages, fileName }]) => (
         <div key={docId} className="group relative">
           <div className="absolute -inset-0.5 rounded-2xl bg-gradient-to-r from-purple-600 to-blue-700 opacity-10 blur transition duration-300 group-hover:opacity-20"></div>
           <div className="relative overflow-hidden rounded-2xl bg-white shadow-md">
@@ -88,7 +88,7 @@ export const DocumentView: React.FC<DocumentViewProps> = ({
                   </div>
                   <div className="min-w-0 flex-1">
                     <h3 className="truncate text-lg font-bold text-gray-900">
-                      {doc.name || `Document ${docId.substring(0, 6)}`}
+                      {fileName || `Document ${docId.substring(0, 6)}`}
                     </h3>
                     <p className="text-sm text-gray-600">
                       {pages.length} page{pages.length !== 1 ? 's' : ''}

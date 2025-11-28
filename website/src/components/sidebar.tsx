@@ -205,7 +205,9 @@ const File: FC<{
   const activeSlug = useActiveAnchor()
 
   if (item.type === 'separator') {
-    return <Separator title={item.title} />
+    return (
+      <Separator title={typeof item.title === 'string' ? item.title : ''} />
+    )
   }
 
   return (

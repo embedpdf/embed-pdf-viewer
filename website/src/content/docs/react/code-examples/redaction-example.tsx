@@ -18,7 +18,7 @@ import {
   RedactionMode,
   RedactionPluginPackage,
   useRedaction,
-  SelectionMenuProps,
+  RedactionSelectionMenuProps,
 } from '@embedpdf/plugin-redaction/react'
 import { RenderLayer, RenderPluginPackage } from '@embedpdf/plugin-render/react'
 import { Scroller, ScrollPluginPackage } from '@embedpdf/plugin-scroll/react'
@@ -101,11 +101,11 @@ const RedactionToolbar = ({ documentId }: { documentId: string }) => {
 // 3. Define a custom menu for selected redaction marks
 const RedactionMenu = ({
   documentId,
-  item,
+  context,
   selected,
   menuWrapperProps,
   rect,
-}: SelectionMenuProps & { documentId: string }) => {
+}: RedactionSelectionMenuProps & { documentId: string }) => {
   const { provides } = useRedaction(documentId)
   if (!selected) return null
 
@@ -121,13 +121,17 @@ const RedactionMenu = ({
         }}
       >
         <button
-          onClick={() => provides?.commitPending(item.page, item.id)}
+          onClick={() =>
+            provides?.commitPending(context.item.page, context.item.id)
+          }
           className="rounded-md bg-red-500 px-3 py-1.5 text-sm font-medium text-white transition-colors hover:bg-red-600 active:bg-red-700"
         >
           Apply
         </button>
         <button
-          onClick={() => provides?.removePending(item.page, item.id)}
+          onClick={() =>
+            provides?.removePending(context.item.page, context.item.id)
+          }
           className="rounded-md bg-gray-100 px-3 py-1.5 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-200 active:bg-gray-300"
         >
           Remove

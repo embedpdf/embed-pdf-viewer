@@ -51,7 +51,7 @@ export const PdfMergeTool = () => {
         // Add the document to state
         setDocs((prevDocs) => ({
           ...prevDocs,
-          [doc.id]: { doc: { ...doc, name: fileName }, pages },
+          [doc.id]: { doc, pages, fileName },
         }))
       } catch (error) {
         console.error('Error processing document:', error)

@@ -38,7 +38,7 @@ export const Pagination: FC = () => {
       {prev && (
         <NextLink
           href={prev.route}
-          title={prev.title}
+          title={typeof prev.title === 'string' ? prev.title : undefined}
           className={cn(classes.link, 'pe-4')}
         >
           <ArrowRightIcon
@@ -51,7 +51,7 @@ export const Pagination: FC = () => {
       {next && (
         <NextLink
           href={next.route}
-          title={next.title}
+          title={typeof next.title === 'string' ? next.title : undefined}
           className={cn(classes.link, 'ms-auto ps-4 text-end')}
         >
           {next.title}

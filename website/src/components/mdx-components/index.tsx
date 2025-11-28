@@ -33,6 +33,7 @@ const WrapperComponent = ({
   children,
   metadata,
   bottomContent,
+  sourceCode,
   ...props
 }: WrapperComponentProps): ReactNode => {
   // Fix the type issue by properly typing the toc transformation
@@ -49,6 +50,7 @@ const WrapperComponent = ({
         toc={processedToc}
         metadata={metadata}
         bottomContent={bottomContent}
+        sourceCode={sourceCode}
       >
         <main
           data-pagefind-body={
@@ -63,7 +65,7 @@ const WrapperComponent = ({
 }
 
 const DEFAULT_COMPONENTS = getNextraMDXComponents({
-  a: Link,
+  a: (anchorProps) => <Link {...anchorProps} href={anchorProps.href || ''} />,
   code: Code,
   blockquote: Blockquote,
   h1: H1,
