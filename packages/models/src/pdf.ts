@@ -2469,9 +2469,22 @@ export interface PdfOpenDocumentUrlOptions {
    */
   mode?: 'auto' | 'range-request' | 'full-fetch';
   /**
-   * Optional custom headers to send with fetch
+   * HTTP request options for fetching the PDF
    */
-  headers?: Record<string, string>;
+  requestOptions?: {
+    /**
+     * Custom HTTP headers to include in all requests (HEAD, GET, range requests)
+     * Example: { 'Authorization': 'Bearer token', 'X-Custom-Header': 'value' }
+     */
+    headers?: Record<string, string>;
+    /**
+     * Controls whether cookies are sent with requests
+     * - 'omit': Never send cookies (default)
+     * - 'same-origin': Send cookies for same-origin requests
+     * - 'include': Always send cookies (requires CORS)
+     */
+    credentials?: RequestCredentials;
+  };
 }
 
 export interface PdfRenderOptions {
