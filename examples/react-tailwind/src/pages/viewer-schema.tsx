@@ -7,7 +7,6 @@ import { ScrollPluginPackage, ScrollStrategy, Scroller } from '@embedpdf/plugin-
 import {
   DocumentManagerPluginPackage,
   DocumentContent,
-  DocumentManagerPlugin,
 } from '@embedpdf/plugin-document-manager/react';
 import {
   InteractionManagerPluginPackage,
@@ -109,13 +108,15 @@ export function ViewerSchemaPage() {
 
   const plugins = useMemo(
     () => [
+      createPluginRegistration(DocumentManagerPluginPackage, {
+        initialDocuments: [{ url: 'https://snippet.embedpdf.com/ebook.pdf' }],
+      }),
       createPluginRegistration(ViewportPluginPackage, {
         viewportGap: 10,
       }),
       createPluginRegistration(ScrollPluginPackage, {
         defaultStrategy: ScrollStrategy.Vertical,
       }),
-      createPluginRegistration(DocumentManagerPluginPackage),
       createPluginRegistration(InteractionManagerPluginPackage),
       createPluginRegistration(ZoomPluginPackage, {
         defaultZoomLevel: ZoomMode.FitPage,
@@ -178,17 +179,7 @@ export function ViewerSchemaPage() {
       <NavigationBar />
 
       <div className="flex flex-1 select-none flex-col overflow-hidden">
-        <EmbedPDF
-          engine={engine}
-          logger={logger}
-          plugins={plugins}
-          onInitialized={async (registry) => {
-            registry
-              ?.getPlugin<DocumentManagerPlugin>(DocumentManagerPlugin.id)
-              ?.provides()
-              ?.openDocumentUrl({ url: 'https://snippet.embedpdf.com/ebook.pdf' });
-          }}
-        >
+        <EmbedPDF engine={engine} logger={logger} plugins={plugins}>
           {({ pluginsReady, activeDocumentId, documentStates }) => (
             <>
               {pluginsReady ? (

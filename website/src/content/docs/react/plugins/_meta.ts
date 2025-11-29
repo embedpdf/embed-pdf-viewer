@@ -1,4 +1,5 @@
 export default {
+  'plugin-document-manager': 'Document Manager',
   'plugin-viewport': 'Viewport',
   'plugin-scroll': 'Scroll',
   'plugin-render': 'Render',
@@ -14,4 +15,5 @@ export default {
   'plugin-pan': 'Pan',
   'plugin-capture': 'Capture',
   'plugin-redaction': 'Redaction',
+  'plugin-i18n': 'Internationalization',
 }

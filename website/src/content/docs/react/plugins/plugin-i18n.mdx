@@ -1,0 +1,383 @@
+---
+title: I18n Plugin
+description: Add internationalization support to your PDF viewer with multi-language translations, dynamic parameter resolution, and document-scoped translations.
+searchable: true
+---
+
+import { Callout } from '@/components/callout'
+
+# I18n Plugin
+
+The I18n Plugin provides comprehensive internationalization (i18n) support for your PDF viewer. It enables you to translate all UI text into multiple languages, handle dynamic parameters in translations, and manage locale changes across your application.
+
+This plugin is essential for building PDF viewers that need to support users in different languages and regions.
+
+## Installation
+
+The plugin is available as a separate NPM package.
+
+```sh npm2yarn
+npm install @embedpdf/plugin-i18n
+````
+
+## Registration
+
+Import `I18nPluginPackage` and add it to the `plugins` array. You must provide at least one locale and specify a default locale.
+
+```tsx {4, 40-45}
+import { createPluginRegistration } from '@embedpdf/core'
+import { EmbedPDF } from '@embedpdf/core/react'
+// ... other imports
+import { I18nPluginPackage, Locale } from '@embedpdf/plugin-i18n/react'
+
+const englishLocale: Locale = {
+  code: 'en',
+  name: 'English',
+  translations: {
+    zoom: {
+      in: 'Zoom In',
+      out: 'Zoom Out',
+      fitPage: 'Fit to Page',
+    },
+    document: {
+      open: 'Open',
+      close: 'Close',
+    },
+  },
+}
+
+const spanishLocale: Locale = {
+  code: 'es',
+  name: 'Español',
+  translations: {
+    zoom: {
+      in: 'Acercar',
+      out: 'Alejar',
+      fitPage: 'Ajustar a la página',
+    },
+    document: {
+      open: 'Abrir',
+      close: 'Cerrar',
+    },
+  },
+}
+
+const plugins = [
+  // ... other plugins
+  createPluginRegistration(I18nPluginPackage, {
+    defaultLocale: 'en',
+    locales: [englishLocale, spanishLocale],
+    // Optional: Specify a fallback locale if translation is missing
+    fallbackLocale: 'en',
+  }),
+]
+```
+
+## Usage
+
+The plugin provides hooks for translating text and components for inline translations.
+
+### Using the `useTranslations` Hook
+
+The `useTranslations` hook is the primary way to translate text in your components. It automatically updates when the locale changes or when translation parameters change.
+
+```tsx
+import { useTranslations } from '@embedpdf/plugin-i18n/react'
+
+export const ZoomToolbar = ({ documentId }: { documentId: string }) => {
+  const { translate, locale } = useTranslations(documentId)
+
+  return (
+    <div>
+      <button>{translate('zoom.in')}</button>
+      <button>{translate('zoom.out')}</button>
+      <button>{translate('zoom.fitPage')}</button>
+      <span>Current locale: {locale}</span>
+    </div>
+  )
+}
+```
+
+### Using the `<Translate />` Component
+
+For simple inline translations, you can use the `<Translate />` component.
+
+```tsx
+import { Translate } from '@embedpdf/plugin-i18n/react'
+
+export const Toolbar = () => {
+  return (
+    <div>
+      <button>
+        <Translate k="zoom.in" />
+      </button>
+      <button>
+        <Translate k="zoom.out" />
+      </button>
+    </div>
+  )
+}
+```
+
+### Translation with Parameters
+
+You can include dynamic parameters in your translations using `{paramName}` syntax.
+
+```tsx
+// In your locale definition
+const locale: Locale = {
+  code: 'en',
+  name: 'English',
+  translations: {
+    zoom: {
+      level: 'Zoom Level ({level}%)',
+    },
+    search: {
+      resultsFound: '{count} results found',
+    },
+  },
+}
+
+// In your component
+const { translate } = useTranslations()
+
+translate('zoom.level', { params: { level: 150 } })
+// Returns: "Zoom Level (150%)"
+
+translate('search.resultsFound', { params: { count: 42 } })
+// Returns: "42 results found"
+```
+
+### Param Resolvers
+
+For translations that depend on plugin state (like current zoom level or search results), you can register param resolvers. These automatically resolve parameters based on the current state.
+
+```tsx
+import { ParamResolvers } from '@embedpdf/plugin-i18n/react'
+import { ZOOM_PLUGIN_ID } from '@embedpdf/plugin-zoom'
+
+const paramResolvers: ParamResolvers = {
+  'zoom.level': ({ state, documentId }) => {
+    const zoomState = documentId
+      ? state.plugins[ZOOM_PLUGIN_ID]?.documents[documentId]
+      : null
+    const zoomLevel = zoomState?.currentZoomLevel ?? 1
+    return {
+      level: Math.round(zoomLevel * 100),
+    }
+  },
+  'search.resultsFound': ({ state, documentId }) => {
+    const searchState = documentId
+      ? state.plugins['search']?.documents[documentId]
+      : null
+    return {
+      count: searchState?.total ?? 0,
+    }
+  },
+}
+
+// Register when creating plugins
+createPluginRegistration(I18nPluginPackage, {
+  defaultLocale: 'en',
+  locales: [englishLocale, spanishLocale],
+  paramResolvers,
+})
+```
+
+When you use a translation key with a registered param resolver, the parameters are automatically resolved:
+
+```tsx
+// No need to pass params - they're resolved automatically
+const { translate } = useTranslations(documentId)
+translate('zoom.level') // Automatically uses current zoom level
+translate('search.resultsFound') // Automatically uses current search result count
+```
+
+### Changing Locale
+
+Use the `useI18nCapability` hook to change the locale programmatically.
+
+```tsx
+import { useI18nCapability } from '@embedpdf/plugin-i18n/react'
+
+export const LanguageSwitcher = () => {
+  const { provides } = useI18nCapability()
+  const currentLocale = provides?.getLocale() ?? 'en'
+  const availableLocales = provides?.getAvailableLocales() ?? []
+
+  return (
+    <select
+      value={currentLocale}
+      onChange={(e) => provides?.setLocale(e.target.value)}
+    >
+      {availableLocales.map((code) => {
+        const localeInfo = provides?.getLocaleInfo(code)
+        return (
+          <option key={code} value={code}>
+            {localeInfo?.name ?? code}
+          </option>
+        )
+      })}
+    </select>
+  )
+}
+```
+
+### Document-Scoped Translations
+
+When working with multiple documents, translations can be document-scoped. This is especially useful for param resolvers that depend on document-specific state.
+
+```tsx
+// Global translation (no document context)
+const { translate } = useTranslations()
+translate('document.open') // "Open"
+
+// Document-scoped translation (uses document-specific param resolvers)
+const { translate } = useTranslations(documentId)
+translate('zoom.level') // Uses zoom level for this specific document
+translate('search.resultsFound') // Uses search results for this specific document
+```
+
+### Fallback Translations
+
+If a translation key is not found, you can provide a fallback string:
+
+```tsx
+const { translate } = useTranslations()
+
+translate('unknown.key', { fallback: 'Default Text' })
+// Returns: "Default Text" if translation not found
+```
+
+## Live Example
+
+This example demonstrates a PDF viewer with internationalization support. You can switch between English, Spanish, German, and Dutch, and see all UI text update automatically.
+
+import { PDFViewer } from '../code-examples/i18n-example'
+
+<PDFViewer />
+
+## API Reference
+
+### Configuration (`I18nPluginConfig`)
+
+You can pass these options when registering the plugin with `createPluginRegistration`:
+
+| Option | Type | Description |
+| :--- | :--- | :--- |
+| **`defaultLocale`** | `LocaleCode` | **(Required)** The locale code to use by default (e.g., `'en'`, `'es'`). |
+| **`locales`** | `Locale[]` | **(Required)** An array of locale objects containing translations. |
+| **`fallbackLocale`** | `LocaleCode` | **(Optional)** A locale to use as fallback when a translation is missing in the current locale. |
+| **`paramResolvers`** | `ParamResolvers` | **(Optional)** An object mapping translation keys to parameter resolver functions. |
+
+### Locale Object
+
+| Property | Type | Description |
+| :--- | :--- | :--- |
+| **`code`** | `string` | The locale code (e.g., `'en'`, `'es'`, `'de'`). |
+| **`name`** | `string` | The display name of the locale (e.g., `'English'`, `'Español'`). |
+| **`translations`** | `TranslationDictionary` | A nested object containing all translations. Use dot notation to access (e.g., `'zoom.in'`). |
+
+### Hook: `useTranslations(documentId?)`
+
+The primary hook for translating text in components. Automatically updates when locale or parameters change.
+
+#### Parameters
+
+| Parameter | Type | Description |
+| :--- | :--- | :--- |
+| **`documentId`** | `string \| undefined` | **(Optional)** Document ID for document-scoped translations. |
+
+#### Returns
+
+| Property | Type | Description |
+| :--- | :--- | :--- |
+| **`translate`** | `(key: string, options?: TranslateOptions) => string` | Function to translate a key. |
+| **`locale`** | `string` | The current locale code. |
+
+#### `TranslateOptions`
+
+| Property | Type | Description |
+| :--- | :--- | :--- |
+| **`params`** | `Record<string, string \| number>` | Parameters to interpolate into the translation (e.g., `{ level: 150 }`). |
+| **`fallback`** | `string` | Fallback text if translation is not found. |
+
+### Hook: `useTranslation(key, options?, documentId?)`
+
+A convenience hook for translating a single key. Useful for derived state or simple translations.
+
+```tsx
+const zoomLabel = useTranslation('zoom.in', undefined, documentId)
+```
+
+### Hook: `useLocale()`
+
+Returns the current locale code. Updates automatically when locale changes.
+
+```tsx
+const locale = useLocale() // 'en' | 'es' | 'de' | etc.
+```
+
+### Hook: `useI18nCapability()`
+
+Provides access to all i18n operations.
+
+#### Returns
+
+| Property | Type | Description |
+| :--- | :--- | :--- |
+| **`provides`** | `I18nCapability \| null` | An object with methods to manage i18n, or `null` if the plugin is not ready. |
+
+#### `I18nCapability` Methods
+
+| Method | Description |
+| :--- | :--- |
+| **`t(key, options?)`** | Translate a key. Supports `documentId`, `params`, and `fallback` in options. |
+| **`forDocument(documentId)`** | Get a document-scoped translation API. Returns an `I18nScope` object. |
+| **`setLocale(locale)`** | Change the current locale. |
+| **`getLocale()`** | Get the current locale code. |
+| **`getAvailableLocales()`** | Get an array of all available locale codes. |
+| **`getLocaleInfo(code)`** | Get the locale object for a specific code, or `null` if not found. |
+| **`registerLocale(locale)`** | Dynamically register a new locale. |
+| **`hasLocale(code)`** | Check if a locale is registered. |
+| **`registerParamResolver(key, resolver)`** | Register a parameter resolver for a translation key. |
+| **`unregisterParamResolver(key)`** | Unregister a parameter resolver. |
+
+### Component: `<Translate />`
+
+A component for inline translations.
+
+#### Props
+
+| Prop | Type | Description |
+| :--- | :--- | :--- |
+| **`k`** | `string` | **(Required)** The translation key. |
+| **`params`** | `Record<string, string \| number>` | **(Optional)** Parameters to interpolate. |
+| **`fallback`** | `string` | **(Optional)** Fallback text if translation not found. |
+| **`documentId`** | `string` | **(Optional)** Document ID for document-scoped translations. |
+| **`children`** | `(translation: string) => ReactNode` | **(Optional)** Render prop for custom rendering. |
+
+### Param Resolver
+
+A function that resolves dynamic parameters for a translation key based on the current state.
+
+```tsx
+type ParamResolver = (context: {
+  state: StoreState;
+  documentId?: string;
+}) => Record<string, string | number>;
+```
+
+### Events
+
+The plugin emits events that you can subscribe to:
+
+| Event | Type | Description |
+| :--- | :--- | :--- |
+| **`onLocaleChange`** | `EventHook<LocaleChangeEvent>` | Emitted when the locale changes. |
+| **`onParamsChanged`** | `EventHook<TranslationParamsChangedEvent>` | Emitted when translation parameters change for a document. |
+
+<Callout type="info">
+Translation keys use dot notation to access nested translation objects. For example, `'zoom.in'` accesses `translations.zoom.in` in your locale definition.
+</Callout>
+

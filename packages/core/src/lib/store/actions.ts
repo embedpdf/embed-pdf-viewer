@@ -55,6 +55,7 @@ export interface StartLoadingDocumentAction {
     scale?: number;
     rotation?: Rotation;
     passwordProvided?: boolean;
+    autoActivate?: boolean; // If true, this document becomes active when opened. Default: true
   };
 }
 
@@ -206,9 +207,10 @@ export const startLoadingDocument = (
   scale?: number,
   rotation?: Rotation,
   passwordProvided?: boolean,
+  autoActivate?: boolean,
 ): CoreAction => ({
   type: START_LOADING_DOCUMENT,
-  payload: { documentId, name, scale, rotation, passwordProvided },
+  payload: { documentId, name, scale, rotation, passwordProvided, autoActivate },
 });
 
 export const updateDocumentLoadingProgress = (

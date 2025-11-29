@@ -20,7 +20,14 @@ import { calculateNextActiveDocument, moveDocumentInOrder } from './reducer-help
 export const coreReducer: Reducer<CoreState, CoreAction> = (state, action): CoreState => {
   switch (action.type) {
     case START_LOADING_DOCUMENT: {
-      const { documentId, name, scale, rotation, passwordProvided } = action.payload;
+      const {
+        documentId,
+        name,
+        scale,
+        rotation,
+        passwordProvided,
+        autoActivate = true,
+      } = action.payload;
 
       const newDocState: DocumentState = {
         id: documentId,
@@ -43,7 +50,9 @@ export const coreReducer: Reducer<CoreState, CoreAction> = (state, action): Core
           [documentId]: newDocState,
         },
         documentOrder: [...state.documentOrder, documentId],
-        activeDocumentId: documentId,
+        // Only activate if autoActivate is true (default), or if no document is currently active
+        activeDocumentId:
+          autoActivate || !state.activeDocumentId ? documentId : state.activeDocumentId,
       };
     }
 

@@ -42,6 +42,7 @@ export interface LoadDocumentUrlOptions {
   requestOptions?: PdfRequestOptions;
   scale?: number;
   rotation?: Rotation;
+  autoActivate?: boolean; // If true, this document becomes active when opened. Default: true
 }
 
 export interface LoadDocumentBufferOptions {
@@ -51,6 +52,7 @@ export interface LoadDocumentBufferOptions {
   password?: string;
   scale?: number;
   rotation?: Rotation;
+  autoActivate?: boolean; // If true, this document becomes active when opened. Default: true
 }
 
 export interface RetryOptions {

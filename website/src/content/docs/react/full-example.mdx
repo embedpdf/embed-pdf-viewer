@@ -32,7 +32,7 @@ The MUI example integrates numerous plugins to create a comprehensive viewing ex
 | Single and two-page spread layouts                         | `@embedpdf/plugin-spread`                             |
 | Thumbnail sidebar for quick page jumping                   | `@embedpdf/plugin-thumbnail`                          |
 | In-document text search with result highlighting           | `@embedpdf/plugin-search`                             |
-| File opening and downloading                               | `@embedpdf/plugin-loader` & `@embedpdf/plugin-export` |
+| File opening and downloading                               | `@embedpdf/plugin-document-manager` & `@embedpdf/plugin-export` |
 | Fullscreen mode                                            | `@embedpdf/plugin-fullscreen`                         |
 | Text selection and copy-to-clipboard                       | `@embedpdf/plugin-selection`                          |
 
@@ -42,9 +42,11 @@ The MUI example integrates numerous plugins to create a comprehensive viewing ex
 
 All features are enabled and configured in a single `plugins` array. This makes it easy to see what capabilities the viewer has and to add or remove features.
 
-```tsx filename="src/application.tsx" {2-16}
+```tsx filename="src/application.tsx" {2-18}
 const plugins = [
-  createPluginRegistration(LoaderPluginPackage, { /* ... */ }),
+  createPluginRegistration(DocumentManagerPluginPackage, {
+    initialDocuments: [{ url: 'https://snippet.embedpdf.com/ebook.pdf' }],
+  }),
   createPluginRegistration(ViewportPluginPackage, { /* ... */ }),
   createPluginRegistration(ScrollPluginPackage, { /* ... */ }),
   createPluginRegistration(RenderPluginPackage),
@@ -65,7 +67,22 @@ function App() {
   // ...
   return (
     <EmbedPDF engine={engine} plugins={plugins}>
-      {/* Viewer UI */}
+      {({ activeDocumentId }) =>
+        activeDocumentId && (
+          <DocumentContent documentId={activeDocumentId}>
+            {({ isLoaded }) =>
+              isLoaded && (
+                <>
+                  <Toolbar documentId={activeDocumentId} />
+                  <Viewport documentId={activeDocumentId}>
+                    {/* Viewer UI with documentId passed to components */}
+                  </Viewport>
+                </>
+              )
+            }
+          </DocumentContent>
+        )
+      }
     </EmbedPDF>
   );
 }
@@ -79,14 +96,18 @@ For example, the `<Toolbar />` component uses multiple hooks to manage different
 
 ```tsx filename="src/components/toolbar/index.tsx"
 import { usePan } from '@embedpdf/plugin-pan/react';
-import { useRotateCapability } from '@embedpdf/plugin-rotate/react';
+import { useRotate } from '@embedpdf/plugin-rotate/react';
 import { useSpread } from '@embedpdf/plugin-spread/react';
 // ... other imports
 
-export const Toolbar = () => {
-  const { provides: panProvider, isPanning } = usePan();
-  const { provides: rotateProvider } = useRotateCapability();
-  const { spreadMode, provides: spreadProvider } = useSpread();
+interface ToolbarProps {
+  documentId: string;
+}
+
+export const Toolbar = ({ documentId }: ToolbarProps) => {
+  const { provides: panProvider, isPanning } = usePan(documentId);
+  const { provides: rotateProvider } = useRotate(documentId);
+  const { spreadMode, provides: spreadProvider } = useSpread(documentId);
   // ...
 
   return (

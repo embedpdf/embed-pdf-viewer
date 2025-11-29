@@ -2,8 +2,7 @@
 
 import {
   createPluginRegistration,
-  IPlugin,
-  PluginBatchRegistration,
+  PluginBatchRegistrations,
 } from '@embedpdf/core'
 import { EmbedPDF } from '@embedpdf/core/react'
 import { usePdfiumEngine } from '@embedpdf/engines/react'
@@ -165,7 +164,7 @@ export const PDFViewer = ({ withMarqueeZoom = false }: PDFViewerProps) => {
   const { engine, isLoading } = usePdfiumEngine()
 
   const plugins = useMemo(() => {
-    const basePlugins: PluginBatchRegistration<IPlugin<any>, any>[] = [
+    const basePlugins: PluginBatchRegistrations = [
       createPluginRegistration(DocumentManagerPluginPackage, {
         initialDocuments: [{ url: 'https://snippet.embedpdf.com/ebook.pdf' }],
       }),
@@ -179,9 +178,7 @@ export const PDFViewer = ({ withMarqueeZoom = false }: PDFViewerProps) => {
     ]
 
     if (withMarqueeZoom) {
-      basePlugins.splice(
-        4,
-        0,
+      basePlugins.push(
         createPluginRegistration(InteractionManagerPluginPackage),
       )
     }

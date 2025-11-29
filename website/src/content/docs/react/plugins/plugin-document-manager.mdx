@@ -1,0 +1,388 @@
+---
+title: Document Manager Plugin
+description: Manage PDF documents, open files from URLs or local files, track document state, and control which document is active. Required for all PDF viewers.
+searchable: true
+---
+
+import { Callout } from '@/components/callout'
+
+# Document Manager Plugin
+
+The Document Manager Plugin is responsible for managing PDF documents in your viewer. It handles opening documents from URLs or local files, tracking document state (loading, loaded, error), and controlling which document is currently active.
+
+This plugin is required for any PDF viewer, whether you're displaying a single document or multiple documents. It provides the foundation for document lifecycle management and enables features like tab interfaces for multi-document applications.
+
+## Installation
+
+The plugin is available as a separate NPM package.
+
+```sh npm2yarn
+npm install @embedpdf/plugin-document-manager
+````
+
+## Registration
+
+Import `DocumentManagerPluginPackage` and add it to the `plugins` array. You can configure initial documents to load automatically when the plugin initializes.
+
+```tsx {4, 7-16}
+import { createPluginRegistration } from '@embedpdf/core'
+import { EmbedPDF } from '@embedpdf/core/react'
+// ... other imports
+import { DocumentManagerPluginPackage } from '@embedpdf/plugin-document-manager/react'
+
+const plugins = [
+  // Register the document manager plugin first
+  createPluginRegistration(DocumentManagerPluginPackage, {
+    // Optional: Load documents automatically on initialization
+    initialDocuments: [
+      { url: 'https://example.com/document1.pdf' },
+      { url: 'https://example.com/document2.pdf' },
+    ],
+    // Optional: Limit the maximum number of open documents
+    maxDocuments: 10,
+  }),
+  // ... other plugins like Viewport, Scroll, Render, etc.
+  createPluginRegistration(ViewportPluginPackage),
+  createPluginRegistration(ScrollPluginPackage),
+  createPluginRegistration(RenderPluginPackage),
+]
+```
+
+## Usage
+
+The plugin provides hooks for managing documents and components for rendering document content and building tab interfaces.
+
+### Getting the Active Document
+
+The `<EmbedPDF>` component's children function provides `activeDocumentId` which you can use to determine which document is currently active.
+
+```tsx
+<EmbedPDF engine={engine} plugins={plugins}>
+  {({ activeDocumentId }) =>
+    activeDocumentId && (
+      <DocumentContent documentId={activeDocumentId}>
+        {({ isLoaded }) => isLoaded && <Viewer documentId={activeDocumentId} />}
+      </DocumentContent>
+    )
+  }
+</EmbedPDF>
+```
+
+### Using DocumentContent Component
+
+The `<DocumentContent />` component provides a convenient way to handle document loading states. It wraps your document viewer and provides loading, error, and loaded states.
+
+```tsx
+import { DocumentContent } from '@embedpdf/plugin-document-manager/react'
+
+<DocumentContent documentId={activeDocumentId}>
+  {({ documentState, isLoading, isError, isLoaded }) => {
+    if (isLoading) {
+      return <div>Loading document...</div>
+    }
+    if (isError) {
+      return <div>Error: {documentState.errorMessage}</div>
+    }
+    if (isLoaded) {
+      return <Viewport documentId={activeDocumentId}>...</Viewport>
+    }
+    return null
+  }}
+</DocumentContent>
+```
+
+### Handling Password-Protected Documents
+
+When a document requires a password, it will fail to load and enter an error state. You can detect password errors by checking the `errorCode` property in the `DocumentState`. Use the `retryDocument` method to retry loading the document with a password.
+
+```tsx
+import { DocumentContent } from '@embedpdf/plugin-document-manager/react'
+import { useDocumentManagerCapability } from '@embedpdf/plugin-document-manager/react'
+import { PdfErrorCode } from '@embedpdf/models'
+
+function PasswordPrompt({ documentState }) {
+  const { provides } = useDocumentManagerCapability()
+  const [password, setPassword] = useState('')
+  const [isRetrying, setIsRetrying] = useState(false)
+
+  const isPasswordError = documentState.errorCode === PdfErrorCode.Password
+  const isPasswordRequired = isPasswordError && !documentState.passwordProvided
+  const isPasswordIncorrect = isPasswordError && documentState.passwordProvided
+
+  if (!isPasswordError) {
+    // Handle other errors
+    return <div>Error: {documentState.error}</div>
+  }
+
+  const handleRetry = () => {
+    if (!provides || !password.trim()) return
+    setIsRetrying(true)
+
+    const task = provides.retryDocument(documentState.id, { password })
+    task.wait(
+      () => {
+        setPassword('')
+        setIsRetrying(false)
+      },
+      (error) => {
+        console.error('Retry failed:', error)
+        setIsRetrying(false)
+      },
+    )
+  }
+
+  return (
+    <div className="password-prompt">
+      <h3>Password Required</h3>
+      <p>
+        {isPasswordRequired && 'This document is password protected. Please enter the password.'}
+        {isPasswordIncorrect && 'The password you entered was incorrect. Please try again.'}
+      </p>
+      <input
+        type="password"
+        value={password}
+        onChange={(e) => setPassword(e.target.value)}
+        onKeyDown={(e) => e.key === 'Enter' && !isRetrying && handleRetry()}
+        disabled={isRetrying}
+        placeholder="Enter document password"
+        autoFocus
+      />
+      <button onClick={handleRetry} disabled={isRetrying || !password.trim()}>
+        {isRetrying ? 'Opening...' : 'Open'}
+      </button>
+    </div>
+  )
+}
+
+// In your viewer component
+<DocumentContent documentId={activeDocumentId}>
+  {({ documentState, isLoading, isError, isLoaded }) => {
+    if (isLoading) return <div>Loading...</div>
+    if (isError) return <PasswordPrompt documentState={documentState} />
+    if (isLoaded) return <Viewport documentId={activeDocumentId}>...</Viewport>
+    return null
+  }}
+</DocumentContent>
+```
+
+<Callout type="info">
+When opening a document with a known password, you can provide it directly in the `openDocumentUrl` or `openDocumentBuffer` options: `{ url: '...', password: 'your-password' }`. This avoids the need for a password prompt if you already have the password.
+</Callout>
+
+### Opening Documents
+
+Use the `useDocumentManagerCapability` hook to access methods for opening documents from URLs or local files.
+
+```tsx
+import { useDocumentManagerCapability } from '@embedpdf/plugin-document-manager/react'
+
+export const OpenFileButton = () => {
+  const { provides } = useDocumentManagerCapability()
+
+  const handleOpenUrl = () => {
+    provides?.openDocumentUrl({
+      url: 'https://example.com/document.pdf',
+      // Optional: Provide password if known
+      password: 'my-password',
+    })
+  }
+
+  const handleOpenFile = () => {
+    provides?.openFileDialog()
+  }
+
+  return (
+    <div>
+      <button onClick={handleOpenUrl}>Open from URL</button>
+      <button onClick={handleOpenFile}>Open File</button>
+    </div>
+  )
+}
+```
+
+When opening a document with a known password, you can provide it directly in the options. If the password is incorrect or not provided, the document will enter an error state and you can use `retryDocument` to try again with a different password.
+
+### Building a Tab Bar
+
+The plugin provides hooks and components to build a tab interface for managing multiple documents. You can use `useOpenDocuments` and `useActiveDocument` hooks.
+
+Here's an example using the hooks directly:
+
+```tsx
+import { useOpenDocuments, useActiveDocument, useDocumentManagerCapability } from '@embedpdf/plugin-document-manager/react'
+
+export const TabBar = () => {
+  const documentStates = useOpenDocuments()
+  const { activeDocumentId } = useActiveDocument()
+  const { provides } = useDocumentManagerCapability()
+
+  const handleSelect = (documentId: string) => {
+    provides?.setActiveDocument(documentId)
+  }
+
+  const handleClose = (documentId: string) => {
+    provides?.closeDocument(documentId)
+  }
+
+  const handleOpenFile = () => {
+    provides?.openFileDialog()
+  }
+
+  return (
+    <div className="flex gap-2 border-b">
+      {documentStates.map((doc) => (
+        <button
+          key={doc.id}
+          onClick={() => handleSelect(doc.id)}
+          className={activeDocumentId === doc.id ? 'active' : ''}
+        >
+          {doc.name}
+          <button
+            onClick={(e) => {
+              e.stopPropagation()
+              handleClose(doc.id)
+            }}
+          >
+            ×
+          </button>
+        </button>
+      ))}
+      <button onClick={handleOpenFile}>+</button>
+    </div>
+  )
+}
+```
+
+### Managing Document Order
+
+You can reorder documents in the tab bar by moving them to different positions.
+
+```tsx
+const { provides } = useDocumentManagerCapability()
+
+// Move a document to a specific index
+provides?.moveDocument(documentId, 2)
+
+// Swap two documents
+provides?.swapDocuments(documentId1, documentId2)
+```
+
+## Live Examples
+
+### Multi-Document Viewer with Tabs
+
+This example demonstrates a complete PDF viewer with a tab bar for managing multiple documents. You can open multiple PDFs, switch between them using tabs, and close documents.
+
+import { PDFViewer } from '../code-examples/document-manager-example'
+
+<PDFViewer />
+
+### Password-Protected Document
+
+This example shows how to handle password-protected documents. When you open a protected PDF, you'll be prompted to enter the password. The example demonstrates detecting password errors, retrying with a password, and handling incorrect password attempts.
+
+<Callout type="info">
+Try entering an incorrect password first to see the error handling, then enter the correct password to open the document.
+</Callout>
+
+import { PDFViewer as PasswordPDFViewer } from '../code-examples/password-example'
+
+<PasswordPDFViewer />
+
+## API Reference
+
+### Configuration (`DocumentManagerPluginConfig`)
+
+You can pass these options when registering the plugin with `createPluginRegistration`:
+
+| Option | Type | Description |
+| :--- | :--- | :--- |
+| **`initialDocuments`** | `InitialDocumentOptions[]` | An array of documents to load automatically when the plugin initializes. Each item can be either `{ url: string, documentId?: string, ... }` or `{ buffer: ArrayBuffer, name: string, documentId?: string, ... }`. |
+| **`maxDocuments`** | `number` | The maximum number of documents that can be open simultaneously. If not specified, there is no limit. |
+
+### Hook: `useDocumentManagerCapability()`
+
+This hook provides access to all document management operations.
+
+#### Returns
+
+| Property | Type | Description |
+| :--- | :--- | :--- |
+| **`provides`** | `DocumentManagerCapability \| null` | An object with methods to manage documents, or `null` if the plugin is not ready. |
+
+#### `DocumentManagerCapability` Methods
+
+| Method | Description |
+| :--- | :--- |
+| **`openDocumentUrl(options)`** | Opens a document from a URL. Returns a `Task<OpenDocumentResponse, PdfErrorReason>`. |
+| **`openDocumentBuffer(options)`** | Opens a document from an `ArrayBuffer`. Returns a `Task<OpenDocumentResponse, PdfErrorReason>`. |
+| **`openFileDialog()`** | Opens the browser's native file picker. Returns a `Task<OpenDocumentResponse, PdfErrorReason>`. |
+| **`closeDocument(documentId)`** | Closes a specific document. Returns a `Task<void, PdfErrorReason>`. |
+| **`closeAllDocuments()`** | Closes all open documents. Returns a `Task<void[], PdfErrorReason>`. |
+| **`setActiveDocument(documentId)`** | Sets the active document. Throws an error if the document is not open. |
+| **`getActiveDocumentId()`** | Returns the ID of the currently active document, or `null` if none. |
+| **`getActiveDocument()`** | Returns the `PdfDocumentObject` of the active document, or `null` if none. |
+| **`getDocumentOrder()`** | Returns an array of document IDs in their current tab order. |
+| **`moveDocument(documentId, toIndex)`** | Moves a document to a specific position in the tab order. |
+| **`swapDocuments(documentId1, documentId2)`** | Swaps the positions of two documents in the tab order. |
+| **`getDocument(documentId)`** | Returns the `PdfDocumentObject` for a specific document, or `null` if not found. |
+| **`getDocumentState(documentId)`** | Returns the `DocumentState` for a specific document, or `null` if not found. |
+| **`getOpenDocuments()`** | Returns an array of all open `DocumentState` objects in tab order. |
+| **`isDocumentOpen(documentId)`** | Returns `true` if the document is currently open. |
+| **`getDocumentCount()`** | Returns the number of currently open documents. |
+| **`getDocumentIndex(documentId)`** | Returns the index of a document in the tab order, or `-1` if not found. |
+| **`retryDocument(documentId, options?)`** | Retries loading a document that failed to load (e.g., with a new password). Returns a `Task<OpenDocumentResponse, PdfErrorReason>`. |
+
+### Hook: `useActiveDocument()`
+
+A convenience hook for accessing the active document.
+
+#### Returns
+
+| Property | Type | Description |
+| :--- | :--- | :--- |
+| **`activeDocumentId`** | `string \| null` | The ID of the currently active document. |
+| **`activeDocument`** | `DocumentState \| null` | The state of the currently active document. |
+
+### Hook: `useOpenDocuments(documentIds?)`
+
+A hook for accessing all open documents.
+
+#### Returns
+
+| Property | Type | Description |
+| :--- | :--- | :--- |
+| **`documentStates`** | `DocumentState[]` | An array of all open documents in tab order. If `documentIds` is provided, returns only those documents in the specified order. |
+
+### Component: `<DocumentContent />`
+
+A headless component that provides loading, error, and loaded states for a specific document.
+
+#### Props
+
+| Prop | Type | Description |
+| :--- | :--- | :--- |
+| **`documentId`** | `string \| null` | **(Required)** The ID of the document to render content for. |
+| **`children`** | `(props: DocumentContentRenderProps) => ReactNode` | **(Required)** A render prop function that receives document state information. |
+
+#### `DocumentContentRenderProps`
+
+| Property | Type | Description |
+| :--- | :--- | :--- |
+| **`documentState`** | `DocumentState` | The full state object for the document. |
+| **`isLoading`** | `boolean` | `true` if the document is currently loading. |
+| **`isError`** | `boolean` | `true` if the document failed to load. |
+| **`isLoaded`** | `boolean` | `true` if the document has loaded successfully. |
+
+### Events
+
+The plugin emits events that you can subscribe to for reacting to document lifecycle changes:
+
+| Event | Type | Description |
+| :--- | :--- | :--- |
+| **`onDocumentOpened`** | `EventHook<DocumentState>` | Emitted when a document is successfully loaded. |
+| **`onDocumentClosed`** | `EventHook<string>` | Emitted when a document is closed. The payload is the document ID. |
+| **`onActiveDocumentChanged`** | `EventHook<DocumentChangeEvent>` | Emitted when the active document changes. |
+| **`onDocumentOrderChanged`** | `EventHook<DocumentOrderChangeEvent>` | Emitted when documents are reordered. |
+| **`onDocumentError`** | `EventHook<DocumentErrorEvent>` | Emitted when a document fails to load. |
+

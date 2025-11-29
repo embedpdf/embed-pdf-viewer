@@ -35,7 +35,7 @@ export const PDFViewer = () => {
 
   // 3. Wrap your UI with the <EmbedPDF> provider
   return (
-    <div style={{ height: '500px' }}>
+    <div style={{ height: '500px', marginTop: '10px' }}>
       <EmbedPDF engine={engine} plugins={plugins}>
         {({ activeDocumentId }) =>
           activeDocumentId && (
