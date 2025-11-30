@@ -13,6 +13,7 @@ import { Code } from './code'
 import { Pre } from './pre'
 import { PdfMergeTool } from '../tools/pdf-merge'
 import ToolsOverview from '../tools-overview'
+import { CodeExample } from '../code-example'
 import { Heading, MDXWrapper } from 'nextra'
 
 const Blockquote: FC<ComponentProps<'blockquote'>> = (props) => (
@@ -102,6 +103,7 @@ const DEFAULT_COMPONENTS = getNextraMDXComponents({
   wrapper: WrapperComponent,
   PdfMergeTool,
   ToolsOverview,
+  CodeExample,
 })
 
 export const useMDXComponents = (components?: Readonly<MDXComponents>) => {
