@@ -4,6 +4,7 @@
   import { RenderLayer } from '@embedpdf/plugin-render/svelte';
   import { PagePointerProvider } from '@embedpdf/plugin-interaction-manager/svelte';
   import { useRotate, Rotate } from '@embedpdf/plugin-rotate/svelte';
+  import { RotateCcw, RotateCw } from 'lucide-svelte';
 
   let { documentId }: { documentId: string } = $props();
 
@@ -18,71 +19,62 @@
   </Rotate>
 {/snippet}
 
-<div style="height: 500px">
-  <div class="flex h-full flex-col">
-    {#if rotate.provides}
-      <div
-        class="mb-4 mt-4 flex items-center gap-3 rounded-lg border border-gray-200 bg-white p-3 shadow-sm"
-      >
-        <div class="flex items-center gap-2">
-          <span class="text-xs font-medium uppercase tracking-wide text-gray-600">Rotation</span>
-          <div
-            class="min-w-[60px] rounded border border-gray-200 bg-gray-50 px-2 py-1 text-center font-mono text-sm text-gray-800"
-          >
+<div
+  class="overflow-hidden rounded-lg border border-gray-200 bg-white shadow-sm dark:border-gray-700 dark:bg-gray-900"
+>
+  {#if rotate.provides}
+    <!-- Toolbar -->
+    <div
+      class="flex items-center gap-3 border-b border-gray-200 bg-white px-3 py-2 dark:border-gray-700 dark:bg-gray-900"
+    >
+      <span class="text-xs font-medium uppercase tracking-wide text-gray-500 dark:text-gray-400">
+        Rotation
+      </span>
+      <div class="h-4 w-px bg-gray-200 dark:bg-gray-700"></div>
+
+      <!-- Rotation controls -->
+      <div class="flex items-center gap-1.5">
+        <button
+          onclick={() => rotate.provides?.rotateBackward()}
+          class="inline-flex h-8 w-8 items-center justify-center rounded-md bg-gray-100 text-gray-600 transition-all hover:bg-gray-200 hover:text-gray-900 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700 dark:hover:text-gray-100"
+          title="Rotate Counter-Clockwise"
+        >
+          <RotateCcw size={16} />
+        </button>
+
+        <!-- Degree indicator -->
+        <div class="min-w-[56px] rounded-md bg-gray-100 px-2 py-1 text-center dark:bg-gray-800">
+          <span class="font-mono text-sm font-medium text-gray-700 dark:text-gray-300">
             {rotate.rotation * 90}°
-          </div>
+          </span>
         </div>
-        <div class="h-6 w-px bg-gray-200"></div>
-        <div class="flex items-center gap-1">
-          <button
-            onclick={() => rotate.provides?.rotateBackward()}
-            class="flex h-8 w-8 items-center justify-center rounded-md border border-gray-300 bg-white text-gray-700 transition-colors duration-150 hover:border-gray-400 hover:bg-gray-50 hover:text-gray-900 active:bg-gray-100"
-            title="Rotate Counter-Clockwise"
-          >
-            <svg
-              width="16"
-              height="16"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              stroke-width="2"
-            >
-              <path d="M19.95 11a8 8 0 1 0 -.5 4m.5 5v-5h-5" />
-            </svg>
-          </button>
-          <button
-            onclick={() => rotate.provides?.rotateForward()}
-            class="flex h-8 w-8 items-center justify-center rounded-md border border-gray-300 bg-white text-gray-700 transition-colors duration-150 hover:border-gray-400 hover:bg-gray-50 hover:text-gray-900 active:bg-gray-100"
-            title="Rotate Clockwise"
-          >
-            <svg
-              width="16"
-              height="16"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              stroke-width="2"
-            >
-              <path d="M4.05 11a8 8 0 1 1 .5 4m-.5 5v-5h5" />
-            </svg>
-          </button>
-        </div>
+
+        <button
+          onclick={() => rotate.provides?.rotateForward()}
+          class="inline-flex h-8 w-8 items-center justify-center rounded-md bg-gray-100 text-gray-600 transition-all hover:bg-gray-200 hover:text-gray-900 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700 dark:hover:text-gray-100"
+          title="Rotate Clockwise"
+        >
+          <RotateCw size={16} />
+        </button>
       </div>
-    {/if}
-    <div class="flex-grow" style="position: relative">
-      <Viewport
-        {documentId}
-        style="
-          background-color: #f1f3f5;
-          position: absolute;
-          top: 0;
-          left: 0;
-          right: 0;
-          bottom: 0;
-        "
-      >
-        <Scroller {documentId} {renderPage} />
-      </Viewport>
+
+      <span class="hidden text-xs text-gray-400 sm:inline dark:text-gray-500">
+        Click to rotate all pages
+      </span>
     </div>
+  {/if}
+
+  <!-- PDF Viewer Area -->
+  <div class="relative h-[400px] sm:h-[500px]">
+    <Viewport
+      {documentId}
+      style="
+        position: absolute;
+        inset: 0;
+        background-color: #e5e7eb;
+      "
+    >
+      <Scroller {documentId} {renderPage} />
+    </Viewport>
   </div>
 </div>

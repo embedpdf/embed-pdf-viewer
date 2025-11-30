@@ -13,6 +13,7 @@
   import { RotatePluginPackage } from '@embedpdf/plugin-rotate/svelte';
   import { Rotation } from '@embedpdf/models';
   import RotateExampleContent from './rotate-example-content.svelte';
+  import { Loader2 } from 'lucide-svelte';
 
   const pdfEngine = usePdfiumEngine();
 
@@ -29,7 +30,16 @@
 </script>
 
 {#if pdfEngine.isLoading || !pdfEngine.engine}
-  <div>Loading PDF Engine...</div>
+  <div
+    class="overflow-hidden rounded-lg border border-gray-200 bg-white dark:border-gray-700 dark:bg-gray-900"
+  >
+    <div class="flex h-[400px] items-center justify-center">
+      <div class="flex items-center gap-2 text-gray-500">
+        <Loader2 size={20} class="animate-spin" />
+        <span class="text-sm">Loading PDF Engine...</span>
+      </div>
+    </div>
+  </div>
 {:else}
   <EmbedPDF engine={pdfEngine.engine} {plugins}>
     {#snippet children({ activeDocumentId })}
