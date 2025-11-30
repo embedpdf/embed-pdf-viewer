@@ -4,8 +4,6 @@ import { createPluginRegistration } from '@embedpdf/core'
 import { EmbedPDF } from '@embedpdf/core/react'
 import { usePdfiumEngine } from '@embedpdf/engines/react'
 import { useEffect, useState } from 'react'
-
-// Import essential plugins
 import {
   Viewport,
   ViewportPluginPackage,
@@ -20,8 +18,6 @@ import {
   PagePointerProvider,
   InteractionManagerPluginPackage,
 } from '@embedpdf/plugin-interaction-manager/react'
-
-// Import Selection plugin
 import {
   SelectionLayer,
   SelectionPluginPackage,
@@ -29,8 +25,8 @@ import {
   SelectionRangeX,
 } from '@embedpdf/plugin-selection/react'
 import { ignore } from '@embedpdf/models'
+import { Loader2, Copy, Check, Type } from 'lucide-react'
 
-// 1. Register the plugins you need
 const plugins = [
   createPluginRegistration(DocumentManagerPluginPackage, {
     initialDocuments: [{ url: 'https://snippet.embedpdf.com/ebook.pdf' }],
@@ -38,14 +34,14 @@ const plugins = [
   createPluginRegistration(ViewportPluginPackage),
   createPluginRegistration(ScrollPluginPackage),
   createPluginRegistration(RenderPluginPackage),
-  createPluginRegistration(InteractionManagerPluginPackage), // Required for Selection
+  createPluginRegistration(InteractionManagerPluginPackage),
   createPluginRegistration(SelectionPluginPackage),
 ]
 
-// 2. Create a toolbar to interact with the selection
-export const SelectionToolbar = ({ documentId }: { documentId: string }) => {
+const SelectionToolbar = ({ documentId }: { documentId: string }) => {
   const { provides: selectionCapability } = useSelectionCapability()
   const [hasSelection, setHasSelection] = useState(false)
+  const [copied, setCopied] = useState(false)
 
   useEffect(() => {
     if (!selectionCapability) return
@@ -61,48 +57,56 @@ export const SelectionToolbar = ({ documentId }: { documentId: string }) => {
   const handleCopy = () => {
     if (selectionCapability) {
       selectionCapability.forDocument(documentId).copyToClipboard()
+      setCopied(true)
+      setTimeout(() => setCopied(false), 2000)
     }
   }
 
   return (
-    <div className="flex items-center gap-3 rounded-lg border border-gray-200 bg-white p-3 shadow-sm">
+    <div className="flex items-center gap-3 border-b border-gray-200 bg-white px-3 py-2 dark:border-gray-700 dark:bg-gray-900">
       <button
         onClick={handleCopy}
         disabled={!hasSelection}
-        className="flex h-8 items-center justify-center gap-2 rounded-md border border-gray-300 bg-white px-3 text-sm font-medium text-gray-700 transition-colors duration-150 hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50"
+        className={`inline-flex items-center gap-2 rounded-md px-3 py-1.5 text-sm font-medium transition-all ${
+          hasSelection
+            ? 'bg-blue-500 text-white shadow-sm hover:bg-blue-600'
+            : 'cursor-not-allowed bg-gray-100 text-gray-400 dark:bg-gray-800 dark:text-gray-500'
+        } `}
         title="Copy Selected Text"
       >
-        <svg
-          width="14"
-          height="14"
-          viewBox="0 0 24 24"
-          fill="none"
-          stroke="currentColor"
-          strokeWidth="2"
-        >
-          <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
-          <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
-        </svg>
-        Copy Text
+        {copied ? (
+          <>
+            <Check size={14} className="text-white" />
+            Copied!
+          </>
+        ) : (
+          <>
+            <Copy size={14} />
+            Copy Text
+          </>
+        )}
       </button>
+
+      <span className="text-xs text-gray-500 dark:text-gray-400">
+        {hasSelection
+          ? 'Text selected — click to copy'
+          : 'Click and drag to select text'}
+      </span>
     </div>
   )
 }
 
-// 3. Create the selected text display panel
-export const SelectedTextPanel = ({ documentId }: { documentId: string }) => {
+const SelectedTextPanel = ({ documentId }: { documentId: string }) => {
   const { provides: selectionCapability } = useSelectionCapability()
   const [hasSelection, setHasSelection] = useState(false)
   const [selectedText, setSelectedText] = useState('')
 
-  // This effect updates the UI state
   useEffect(() => {
     if (!selectionCapability) return
     const selection = selectionCapability.forDocument(documentId)
     const unsubscribe = selection.onSelectionChange(
       (selectionRange: SelectionRangeX | null) => {
         setHasSelection(!!selectionRange)
-        // If the selection is cleared, also clear the displayed text
         if (!selectionRange) {
           setSelectedText('')
         }
@@ -111,7 +115,6 @@ export const SelectedTextPanel = ({ documentId }: { documentId: string }) => {
     return unsubscribe
   }, [selectionCapability, documentId])
 
-  // This effect fetches the text content only when the selection is finished
   useEffect(() => {
     if (!selectionCapability) return
     const selection = selectionCapability.forDocument(documentId)
@@ -125,31 +128,52 @@ export const SelectedTextPanel = ({ documentId }: { documentId: string }) => {
   }, [selectionCapability, documentId])
 
   return (
-    <div className="mt-4 rounded-lg border border-gray-200 bg-gray-50 p-3">
-      <p className="m-0 text-xs font-medium uppercase text-gray-500">
-        Selected Text:
-      </p>
-      <div className="mt-2">
-        {hasSelection ? (
-          <div className="m-0 w-full whitespace-pre-line break-words text-sm text-gray-800">
-            {selectedText || 'Loading...'}
+    <div className="border-t border-gray-200 bg-gray-50 p-4 dark:border-gray-700 dark:bg-gray-900/50">
+      <div className="mb-2 flex items-center gap-2">
+        <Type size={14} className="text-gray-400" />
+        <span className="tracking-wide text-xs font-medium uppercase text-gray-500 dark:text-gray-400">
+          Selected Text
+        </span>
+      </div>
+
+      {hasSelection ? (
+        <div className="rounded-md border border-gray-200 bg-white p-3 dark:border-gray-700 dark:bg-gray-950">
+          <p className="m-0 whitespace-pre-line break-words text-sm text-gray-800 dark:text-gray-200">
+            {selectedText || (
+              <span className="italic text-gray-400 dark:text-gray-500">
+                Loading...
+              </span>
+            )}
+          </p>
+        </div>
+      ) : (
+        <div className="flex flex-col items-center justify-center py-6 text-center">
+          <div className="mb-3 flex h-10 w-10 items-center justify-center rounded-full bg-gray-100 dark:bg-gray-800">
+            <Type size={20} className="text-gray-400" />
           </div>
-        ) : (
-          <p className="m-0 text-sm italic text-gray-400">
+          <p className="text-sm text-gray-500 dark:text-gray-400">
             Select text in the PDF to see it here
           </p>
-        )}
-      </div>
+        </div>
+      )}
     </div>
   )
 }
 
-// 4. Create the main viewer component
 export const PDFViewer = () => {
   const { engine, isLoading } = usePdfiumEngine()
 
   if (isLoading || !engine) {
-    return <div>Loading PDF Engine...</div>
+    return (
+      <div className="overflow-hidden rounded-lg border border-gray-200 bg-white dark:border-gray-700 dark:bg-gray-900">
+        <div className="flex h-[400px] items-center justify-center">
+          <div className="flex items-center gap-2 text-gray-500">
+            <Loader2 size={20} className="animate-spin" />
+            <span className="text-sm">Loading PDF Engine...</span>
+          </div>
+        </div>
+      </div>
+    )
   }
 
   return (
@@ -159,41 +183,49 @@ export const PDFViewer = () => {
           <DocumentContent documentId={activeDocumentId}>
             {({ isLoaded }) =>
               isLoaded && (
-                <>
-                  <div style={{ height: '500px', userSelect: 'none' }}>
-                    <div className="flex h-full flex-col gap-4">
-                      <SelectionToolbar documentId={activeDocumentId} />
-                      <div className="relative flex w-full flex-1 overflow-hidden">
-                        <Viewport
-                          documentId={activeDocumentId}
-                          className="flex-grow bg-gray-100"
-                        >
-                          <Scroller
+                <div className="overflow-hidden rounded-lg border border-gray-200 bg-white shadow-sm dark:border-gray-700 dark:bg-gray-900">
+                  {/* Toolbar */}
+                  <SelectionToolbar documentId={activeDocumentId} />
+
+                  {/* PDF Viewer Area */}
+                  <div
+                    className="relative h-[400px] sm:h-[500px]"
+                    style={{ userSelect: 'none' }}
+                  >
+                    <Viewport
+                      documentId={activeDocumentId}
+                      style={{
+                        position: 'absolute',
+                        inset: 0,
+                        backgroundColor: '#e5e7eb',
+                      }}
+                    >
+                      <Scroller
+                        documentId={activeDocumentId}
+                        renderPage={({ pageIndex }) => (
+                          <PagePointerProvider
                             documentId={activeDocumentId}
-                            renderPage={({ pageIndex }) => (
-                              <PagePointerProvider
-                                documentId={activeDocumentId}
-                                pageIndex={pageIndex}
-                              >
-                                <RenderLayer
-                                  documentId={activeDocumentId}
-                                  pageIndex={pageIndex}
-                                  scale={1}
-                                  className="pointer-events-none"
-                                />
-                                <SelectionLayer
-                                  documentId={activeDocumentId}
-                                  pageIndex={pageIndex}
-                                />
-                              </PagePointerProvider>
-                            )}
-                          />
-                        </Viewport>
-                      </div>
-                    </div>
+                            pageIndex={pageIndex}
+                          >
+                            <RenderLayer
+                              documentId={activeDocumentId}
+                              pageIndex={pageIndex}
+                              scale={1}
+                              className="pointer-events-none"
+                            />
+                            <SelectionLayer
+                              documentId={activeDocumentId}
+                              pageIndex={pageIndex}
+                            />
+                          </PagePointerProvider>
+                        )}
+                      />
+                    </Viewport>
                   </div>
+
+                  {/* Selected Text Panel */}
                   <SelectedTextPanel documentId={activeDocumentId} />
-                </>
+                </div>
               )
             }
           </DocumentContent>

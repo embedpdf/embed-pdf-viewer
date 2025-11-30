@@ -125,7 +125,7 @@ const CaptureResult = ({ documentId }: { documentId: string }) => {
             <Camera size={20} className="text-gray-400" />
           </div>
           <p className="text-sm text-gray-500 dark:text-gray-400">
-            Click "Capture Area" and drag to select a region
+            Click &quot;Capture Area&quot; and drag to select a region
           </p>
         </div>
       </div>
