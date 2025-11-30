@@ -14,6 +14,7 @@ import {
   DocumentManagerPluginPackage,
 } from '@embedpdf/plugin-document-manager/react'
 import { RenderLayer, RenderPluginPackage } from '@embedpdf/plugin-render/react'
+import { Loader2 } from 'lucide-react'
 
 // 1. Register the plugins you need
 const plugins = [
@@ -30,7 +31,16 @@ export const PDFViewer = () => {
   const { engine, isLoading } = usePdfiumEngine()
 
   if (isLoading || !engine) {
-    return <div>Loading PDF Engine...</div>
+    return (
+      <div className="overflow-hidden rounded-lg border border-gray-200 bg-white dark:border-gray-700 dark:bg-gray-900">
+        <div className="flex h-[400px] items-center justify-center">
+          <div className="flex items-center gap-2 text-gray-500">
+            <Loader2 size={20} className="animate-spin" />
+            <span className="text-sm">Loading PDF Engine...</span>
+          </div>
+        </div>
+      </div>
+    )
   }
 
   // 3. Wrap your UI with the <EmbedPDF> provider

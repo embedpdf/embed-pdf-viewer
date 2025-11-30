@@ -3,8 +3,6 @@
 import { createPluginRegistration } from '@embedpdf/core'
 import { EmbedPDF } from '@embedpdf/core/react'
 import { usePdfiumEngine } from '@embedpdf/engines/react'
-
-// Import essential plugins
 import {
   Viewport,
   ViewportPluginPackage,
@@ -14,24 +12,22 @@ import {
   DocumentContent,
   DocumentManagerPluginPackage,
 } from '@embedpdf/plugin-document-manager/react'
-import { RenderLayer, RenderPluginPackage } from '@embedpdf/plugin-render/react' // A dependency for Tiling
+import { RenderLayer, RenderPluginPackage } from '@embedpdf/plugin-render/react'
 import {
   useZoom,
   ZoomPluginPackage,
   ZoomMode,
-} from '@embedpdf/plugin-zoom/react' // To demonstrate tiling
-
-// Import Tiling plugin
+} from '@embedpdf/plugin-zoom/react'
 import { TilingLayer, TilingPluginPackage } from '@embedpdf/plugin-tiling/react'
+import { Loader2, ZoomIn, ZoomOut, RotateCcw, Grid3X3 } from 'lucide-react'
 
-// 1. Register the plugins you need
 const plugins = [
   createPluginRegistration(DocumentManagerPluginPackage, {
     initialDocuments: [{ url: 'https://snippet.embedpdf.com/ebook.pdf' }],
   }),
   createPluginRegistration(ViewportPluginPackage),
   createPluginRegistration(ScrollPluginPackage),
-  createPluginRegistration(RenderPluginPackage), // Required for Tiling
+  createPluginRegistration(RenderPluginPackage),
   createPluginRegistration(ZoomPluginPackage, {
     defaultZoomLevel: ZoomMode.FitPage,
   }),
@@ -41,100 +37,125 @@ const plugins = [
   }),
 ]
 
-// A simple zoom toolbar to demonstrate the tiling effect at high zoom
-export const ZoomToolbar = ({ documentId }: { documentId: string }) => {
-  const { provides: zoom } = useZoom(documentId)
+const ZoomToolbar = ({ documentId }: { documentId: string }) => {
+  const { provides: zoom, state } = useZoom(documentId)
+
   if (!zoom) return null
+
+  const zoomPercentage = Math.round((state?.currentZoomLevel ?? 1) * 100)
+
   return (
-    <div className="mb-4 mt-4 flex items-center gap-2 rounded-lg border border-gray-200 bg-white p-3 shadow-sm">
-      <button
-        onClick={zoom.zoomOut}
-        title="Zoom Out"
-        className="flex h-8 w-8 items-center justify-center rounded-md border border-gray-300 bg-white text-gray-700 transition-colors duration-150 hover:bg-gray-50"
-      >
-        <svg
-          width="16"
-          height="16"
-          viewBox="0 0 24 24"
-          fill="none"
-          stroke="currentColor"
-          strokeWidth="2"
+    <div className="flex flex-wrap items-center gap-3 border-b border-gray-200 bg-white px-3 py-2 dark:border-gray-700 dark:bg-gray-900">
+      <div className="flex items-center gap-1.5 text-xs font-medium text-gray-500 dark:text-gray-400">
+        <Grid3X3 size={14} />
+        <span className="tracking-wide hidden uppercase sm:inline">
+          Tiling Demo
+        </span>
+      </div>
+      <div className="h-4 w-px bg-gray-200 dark:bg-gray-700" />
+
+      {/* Zoom controls */}
+      <div className="flex items-center gap-1.5">
+        <button
+          onClick={zoom.zoomOut}
+          className="inline-flex h-8 w-8 items-center justify-center rounded-md bg-gray-100 text-gray-600 transition-all hover:bg-gray-200 hover:text-gray-900 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700 dark:hover:text-gray-100"
+          title="Zoom Out"
         >
-          <path d="M5 12h14" />
-        </svg>
-      </button>
-      <button
-        onClick={zoom.zoomIn}
-        title="Zoom In"
-        className="flex h-8 w-8 items-center justify-center rounded-md border border-gray-300 bg-white text-gray-700 transition-colors duration-150 hover:bg-gray-50"
-      >
-        <svg
-          width="16"
-          height="16"
-          viewBox="0 0 24 24"
-          fill="none"
-          stroke="currentColor"
-          strokeWidth="2"
+          <ZoomOut size={16} />
+        </button>
+
+        <div className="min-w-[56px] rounded-md bg-gray-100 px-2 py-1 text-center dark:bg-gray-800">
+          <span className="font-mono text-sm font-medium text-gray-700 dark:text-gray-300">
+            {zoomPercentage}%
+          </span>
+        </div>
+
+        <button
+          onClick={zoom.zoomIn}
+          className="inline-flex h-8 w-8 items-center justify-center rounded-md bg-gray-100 text-gray-600 transition-all hover:bg-gray-200 hover:text-gray-900 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700 dark:hover:text-gray-100"
+          title="Zoom In"
         >
-          <path d="M12 5v14M5 12h14" />
-        </svg>
-      </button>
+          <ZoomIn size={16} />
+        </button>
+
+        <button
+          onClick={() => zoom.requestZoom(ZoomMode.FitPage)}
+          className="ml-1 inline-flex items-center gap-1.5 rounded-md bg-gray-100 px-2.5 py-1.5 text-xs font-medium text-gray-600 transition-all hover:bg-gray-200 hover:text-gray-900 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700 dark:hover:text-gray-100"
+          title="Reset Zoom"
+        >
+          <RotateCcw size={14} />
+          <span className="hidden sm:inline">Reset</span>
+        </button>
+      </div>
+
+      <span className="hidden text-xs text-gray-400 lg:inline dark:text-gray-500">
+        Zoom in to see tiling in action — renders high-res tiles on demand
+      </span>
     </div>
   )
 }
 
-// 2. Create the main viewer component
 export const PDFViewer = () => {
   const { engine, isLoading } = usePdfiumEngine()
 
   if (isLoading || !engine) {
-    return <div>Loading PDF Engine...</div>
+    return (
+      <div className="overflow-hidden rounded-lg border border-gray-200 bg-white dark:border-gray-700 dark:bg-gray-900">
+        <div className="flex h-[400px] items-center justify-center">
+          <div className="flex items-center gap-2 text-gray-500">
+            <Loader2 size={20} className="animate-spin" />
+            <span className="text-sm">Loading PDF Engine...</span>
+          </div>
+        </div>
+      </div>
+    )
   }
 
   return (
-    <div style={{ height: '500px' }}>
-      <EmbedPDF engine={engine} plugins={plugins}>
-        {({ activeDocumentId }) =>
-          activeDocumentId && (
-            <DocumentContent documentId={activeDocumentId}>
-              {({ isLoaded }) =>
-                isLoaded && (
-                  <div className="flex h-full flex-col">
-                    <ZoomToolbar documentId={activeDocumentId} />
-                    <div className="relative flex w-full flex-1 overflow-hidden">
-                      <Viewport
+    <EmbedPDF engine={engine} plugins={plugins}>
+      {({ activeDocumentId }) =>
+        activeDocumentId && (
+          <DocumentContent documentId={activeDocumentId}>
+            {({ isLoaded }) =>
+              isLoaded && (
+                <div className="overflow-hidden rounded-lg border border-gray-200 bg-white shadow-sm dark:border-gray-700 dark:bg-gray-900">
+                  {/* Toolbar */}
+                  <ZoomToolbar documentId={activeDocumentId} />
+
+                  {/* PDF Viewer Area */}
+                  <div className="relative h-[400px] sm:h-[500px]">
+                    <Viewport
+                      documentId={activeDocumentId}
+                      style={{
+                        position: 'absolute',
+                        inset: 0,
+                        backgroundColor: '#e5e7eb',
+                      }}
+                    >
+                      <Scroller
                         documentId={activeDocumentId}
-                        className="flex-grow bg-gray-100"
-                      >
-                        <Scroller
-                          documentId={activeDocumentId}
-                          renderPage={({ width, height, pageIndex }) => (
-                            <div
-                              style={{ width, height, position: 'relative' }}
-                            >
-                              {/* Use the RenderLayer for immediate display */}
-                              <RenderLayer
-                                documentId={activeDocumentId}
-                                pageIndex={pageIndex}
-                                scale={1}
-                              />
-                              {/* Use the TilingLayer for optimized rendering */}
-                              <TilingLayer
-                                documentId={activeDocumentId}
-                                pageIndex={pageIndex}
-                              />
-                            </div>
-                          )}
-                        />
-                      </Viewport>
-                    </div>
+                        renderPage={({ width, height, pageIndex }) => (
+                          <div style={{ width, height, position: 'relative' }}>
+                            <RenderLayer
+                              documentId={activeDocumentId}
+                              pageIndex={pageIndex}
+                              scale={1}
+                            />
+                            <TilingLayer
+                              documentId={activeDocumentId}
+                              pageIndex={pageIndex}
+                            />
+                          </div>
+                        )}
+                      />
+                    </Viewport>
                   </div>
-                )
-              }
-            </DocumentContent>
-          )
-        }
-      </EmbedPDF>
-    </div>
+                </div>
+              )
+            }
+          </DocumentContent>
+        )
+      }
+    </EmbedPDF>
   )
 }

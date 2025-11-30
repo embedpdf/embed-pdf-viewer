@@ -8,6 +8,7 @@ interface FileInfo {
   code: string
   language: string
   fullPath: string
+  githubUrl?: string
   highlightedCode?: string
 }
 
@@ -79,6 +80,19 @@ function createFilesAttribute(files: FileInfo[]) {
         method: false,
         shorthand: false,
         computed: false,
+        key: { type: 'Identifier', name: 'githubUrl' },
+        value: {
+          type: 'Literal',
+          value: file.githubUrl || '',
+          raw: JSON.stringify(file.githubUrl || ''),
+        },
+        kind: 'init',
+      },
+      {
+        type: 'Property',
+        method: false,
+        shorthand: false,
+        computed: false,
         key: { type: 'Identifier', name: 'highlightedCode' },
         value: {
           type: 'Literal',
@@ -118,7 +132,7 @@ function createFilesAttribute(files: FileInfo[]) {
 
 /**
  * Rehype plugin that highlights code in CodeExample components using shiki.
- * Supports multiple files with individual highlighting.
+ * Supports multiple files with individual highlighting and GitHub URLs.
  */
 export const rehypeCodeExample: Plugin<[], Root> = () => {
   return async (tree) => {

@@ -4,8 +4,6 @@ import { createPluginRegistration } from '@embedpdf/core'
 import { EmbedPDF } from '@embedpdf/core/react'
 import { usePdfiumEngine } from '@embedpdf/engines/react'
 import { useEffect, useState } from 'react'
-
-// Import essential plugins
 import {
   Viewport,
   ViewportPluginPackage,
@@ -20,22 +18,20 @@ import {
   DocumentManagerPluginPackage,
 } from '@embedpdf/plugin-document-manager/react'
 import { RenderLayer, RenderPluginPackage } from '@embedpdf/plugin-render/react'
+import { Loader2, ChevronLeft, ChevronRight } from 'lucide-react'
 
-// 1. Register the plugins you need
 const plugins = [
   createPluginRegistration(DocumentManagerPluginPackage, {
     initialDocuments: [{ url: 'https://snippet.embedpdf.com/ebook.pdf' }],
   }),
   createPluginRegistration(ViewportPluginPackage),
   createPluginRegistration(ScrollPluginPackage, {
-    // Optional: Set the page to open to
     initialPage: 10,
   }),
   createPluginRegistration(RenderPluginPackage),
 ]
 
-// 2. Create a page navigation component using the new hook structure
-export const PageNavigation = ({ documentId }: { documentId: string }) => {
+const PageNavigation = ({ documentId }: { documentId: string }) => {
   const { provides: scroll, state } = useScroll(documentId)
   const [pageInput, setPageInput] = useState(String(state.currentPage))
 
@@ -52,101 +48,102 @@ export const PageNavigation = ({ documentId }: { documentId: string }) => {
   }
 
   return (
-    <div className="mb-4 mt-4 flex items-center justify-center gap-3 rounded-lg border border-gray-200 bg-white p-3 shadow-sm">
+    <div className="flex items-center justify-center gap-2 border-b border-gray-200 bg-white px-3 py-2 dark:border-gray-700 dark:bg-gray-900">
+      {/* Previous button */}
       <button
         onClick={() => scroll?.scrollToPreviousPage()}
         disabled={state.currentPage <= 1}
-        className="flex h-8 w-8 items-center justify-center rounded-md border border-gray-300 bg-white text-gray-700 transition-colors duration-150 hover:bg-gray-50 disabled:opacity-50"
+        className="inline-flex h-8 w-8 items-center justify-center rounded-md bg-gray-100 text-gray-600 transition-all hover:bg-gray-200 hover:text-gray-900 disabled:cursor-not-allowed disabled:opacity-50 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700 dark:hover:text-gray-100"
         title="Previous Page"
       >
-        <svg
-          width="16"
-          height="16"
-          viewBox="0 0 24 24"
-          fill="none"
-          stroke="currentColor"
-          strokeWidth="2"
-        >
-          <path d="M15 18l-6-6 6-6" />
-        </svg>
+        <ChevronLeft size={18} />
       </button>
 
+      {/* Page input */}
       <form onSubmit={handleGoToPage} className="flex items-center gap-2">
-        <span className="text-sm font-medium text-gray-600">Page</span>
+        <span className="tracking-wide text-xs font-medium uppercase text-gray-500 dark:text-gray-400">
+          Page
+        </span>
         <input
           type="number"
           value={pageInput}
           onChange={(e) => setPageInput(e.target.value)}
           min={1}
           max={state.totalPages}
-          className="h-8 w-16 rounded-md border-gray-300 text-center text-sm shadow-sm"
+          className="h-8 w-14 rounded-md border-0 bg-gray-100 px-2 text-center font-mono text-sm font-medium text-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-800 dark:text-gray-300"
         />
-        <span className="text-sm font-medium text-gray-600">
+        <span className="text-xs font-medium text-gray-500 dark:text-gray-400">
           of {state.totalPages}
         </span>
       </form>
+
+      {/* Next button */}
       <button
         onClick={() => scroll?.scrollToNextPage()}
         disabled={state.currentPage >= state.totalPages}
-        className="flex h-8 w-8 items-center justify-center rounded-md border border-gray-300 bg-white text-gray-700 transition-colors duration-150 hover:bg-gray-50 disabled:opacity-50"
+        className="inline-flex h-8 w-8 items-center justify-center rounded-md bg-gray-100 text-gray-600 transition-all hover:bg-gray-200 hover:text-gray-900 disabled:cursor-not-allowed disabled:opacity-50 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700 dark:hover:text-gray-100"
         title="Next Page"
       >
-        <svg
-          width="16"
-          height="16"
-          viewBox="0 0 24 24"
-          fill="none"
-          stroke="currentColor"
-          strokeWidth="2"
-        >
-          <path d="M9 18l6-6-6-6" />
-        </svg>
+        <ChevronRight size={18} />
       </button>
     </div>
   )
 }
 
-// 3. Create the main viewer component
 export const PDFViewer = () => {
   const { engine, isLoading } = usePdfiumEngine()
 
   if (isLoading || !engine) {
-    return <div>Loading PDF Engine...</div>
+    return (
+      <div className="overflow-hidden rounded-lg border border-gray-200 bg-white dark:border-gray-700 dark:bg-gray-900">
+        <div className="flex h-[400px] items-center justify-center">
+          <div className="flex items-center gap-2 text-gray-500">
+            <Loader2 size={20} className="animate-spin" />
+            <span className="text-sm">Loading PDF Engine...</span>
+          </div>
+        </div>
+      </div>
+    )
   }
 
   return (
-    <div style={{ height: '500px' }}>
-      <EmbedPDF engine={engine} plugins={plugins}>
-        {({ activeDocumentId }) =>
-          activeDocumentId && (
-            <DocumentContent documentId={activeDocumentId}>
-              {({ isLoaded }) =>
-                isLoaded && (
-                  <div className="flex h-full flex-col">
-                    <PageNavigation documentId={activeDocumentId} />
-                    <div className="relative flex w-full flex-1 overflow-hidden">
-                      <Viewport
+    <EmbedPDF engine={engine} plugins={plugins}>
+      {({ activeDocumentId }) =>
+        activeDocumentId && (
+          <DocumentContent documentId={activeDocumentId}>
+            {({ isLoaded }) =>
+              isLoaded && (
+                <div className="overflow-hidden rounded-lg border border-gray-200 bg-white shadow-sm dark:border-gray-700 dark:bg-gray-900">
+                  {/* Navigation Toolbar */}
+                  <PageNavigation documentId={activeDocumentId} />
+
+                  {/* PDF Viewer Area */}
+                  <div className="relative h-[400px] sm:h-[500px]">
+                    <Viewport
+                      documentId={activeDocumentId}
+                      style={{
+                        position: 'absolute',
+                        inset: 0,
+                        backgroundColor: '#e5e7eb',
+                      }}
+                    >
+                      <Scroller
                         documentId={activeDocumentId}
-                        className="flex-grow bg-gray-100"
-                      >
-                        <Scroller
-                          documentId={activeDocumentId}
-                          renderPage={({ pageIndex }) => (
-                            <RenderLayer
-                              documentId={activeDocumentId}
-                              pageIndex={pageIndex}
-                            />
-                          )}
-                        />
-                      </Viewport>
-                    </div>
+                        renderPage={({ pageIndex }) => (
+                          <RenderLayer
+                            documentId={activeDocumentId}
+                            pageIndex={pageIndex}
+                          />
+                        )}
+                      />
+                    </Viewport>
                   </div>
-                )
-              }
-            </DocumentContent>
-          )
-        }
-      </EmbedPDF>
-    </div>
+                </div>
+              )
+            }
+          </DocumentContent>
+        )
+      }
+    </EmbedPDF>
   )
 }

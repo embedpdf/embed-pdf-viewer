@@ -3,8 +3,6 @@
 import { createPluginRegistration } from '@embedpdf/core'
 import { EmbedPDF } from '@embedpdf/core/react'
 import { usePdfiumEngine } from '@embedpdf/engines/react'
-
-// Import essential plugins
 import {
   Viewport,
   ViewportPluginPackage,
@@ -17,22 +15,25 @@ import {
   DocumentManagerPluginPackage,
 } from '@embedpdf/plugin-document-manager/react'
 import { RenderLayer, RenderPluginPackage } from '@embedpdf/plugin-render/react'
+import {
+  Loader2,
+  ChevronsUp,
+  ChevronsDown,
+  AlignCenterVertical,
+} from 'lucide-react'
 
-// 1. Register the plugins you need
 const plugins = [
   createPluginRegistration(DocumentManagerPluginPackage, {
     initialDocuments: [{ url: 'https://snippet.embedpdf.com/ebook.pdf' }],
   }),
   createPluginRegistration(ViewportPluginPackage, {
-    // Optional: Add some padding around the content
     viewportGap: 20,
   }),
   createPluginRegistration(ScrollPluginPackage),
   createPluginRegistration(RenderPluginPackage),
 ]
 
-// 2. Create a toolbar for programmatic scrolling
-export const ScrollToolbar = ({ documentId }: { documentId: string }) => {
+const ScrollToolbar = ({ documentId }: { documentId: string }) => {
   const { provides: viewportCapability } = useViewportCapability()
   const scrollActivity = useViewportScrollActivity(documentId)
 
@@ -49,7 +50,7 @@ export const ScrollToolbar = ({ documentId }: { documentId: string }) => {
       y: metrics.scrollHeight / 2,
       x: 0,
       behavior: 'smooth',
-      center: true, // This will center the y-coordinate in the viewport
+      center: true,
     })
   }
 
@@ -60,38 +61,52 @@ export const ScrollToolbar = ({ documentId }: { documentId: string }) => {
   }
 
   return (
-    <div className="mb-4 mt-4 flex flex-wrap items-center gap-3 rounded-lg border border-gray-200 bg-white p-3 shadow-sm">
-      <div className="flex items-center gap-2">
+    <div className="flex flex-wrap items-center gap-3 border-b border-gray-200 bg-white px-3 py-2 dark:border-gray-700 dark:bg-gray-900">
+      <span className="tracking-wide text-xs font-medium uppercase text-gray-500 dark:text-gray-400">
+        Scroll
+      </span>
+      <div className="h-4 w-px bg-gray-200 dark:bg-gray-700" />
+
+      {/* Scroll buttons */}
+      <div className="flex items-center gap-1.5">
         <button
-          className="rounded-md bg-gray-100 px-3 py-1 text-sm font-medium text-gray-700 transition-colors duration-150 hover:bg-gray-200 disabled:opacity-50"
           onClick={scrollToTop}
           disabled={!viewport}
+          className="inline-flex items-center gap-1.5 rounded-md bg-gray-100 px-2.5 py-1.5 text-xs font-medium text-gray-600 transition-all hover:bg-gray-200 disabled:cursor-not-allowed disabled:opacity-50 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700"
         >
-          Scroll to Top
+          <ChevronsUp size={14} />
+          <span className="hidden sm:inline">Top</span>
         </button>
         <button
-          className="rounded-md bg-gray-100 px-3 py-1 text-sm font-medium text-gray-700 transition-colors duration-150 hover:bg-gray-200 disabled:opacity-50"
           onClick={scrollToMiddle}
           disabled={!viewport}
+          className="inline-flex items-center gap-1.5 rounded-md bg-gray-100 px-2.5 py-1.5 text-xs font-medium text-gray-600 transition-all hover:bg-gray-200 disabled:cursor-not-allowed disabled:opacity-50 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700"
         >
-          Scroll to Middle
+          <AlignCenterVertical size={14} />
+          <span className="hidden sm:inline">Middle</span>
         </button>
         <button
-          className="rounded-md bg-gray-100 px-3 py-1 text-sm font-medium text-gray-700 transition-colors duration-150 hover:bg-gray-200 disabled:opacity-50"
           onClick={scrollToBottom}
           disabled={!viewport}
+          className="inline-flex items-center gap-1.5 rounded-md bg-gray-100 px-2.5 py-1.5 text-xs font-medium text-gray-600 transition-all hover:bg-gray-200 disabled:cursor-not-allowed disabled:opacity-50 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700"
         >
-          Scroll to Bottom
+          <ChevronsDown size={14} />
+          <span className="hidden sm:inline">Bottom</span>
         </button>
       </div>
-      <div className="h-6 w-px bg-gray-200"></div>
-      <div className="flex items-center">
+
+      <div className="h-4 w-px bg-gray-200 dark:bg-gray-700" />
+
+      {/* Scroll activity indicator */}
+      <div className="flex items-center gap-2">
         <div
-          className={`h-3 w-3 rounded-full transition-colors duration-200 ${
-            scrollActivity.isScrolling ? 'bg-green-500' : 'bg-gray-300'
-          }`}
-        ></div>
-        <span className="ml-2 min-w-[100px] text-sm font-medium text-gray-600">
+          className={`h-2 w-2 rounded-full transition-colors duration-200 ${
+            scrollActivity.isScrolling
+              ? 'animate-pulse bg-green-500'
+              : 'bg-gray-300 dark:bg-gray-600'
+          } `}
+        />
+        <span className="text-xs text-gray-500 dark:text-gray-400">
           {scrollActivity.isScrolling ? 'Scrolling...' : 'Idle'}
         </span>
       </div>
@@ -99,51 +114,62 @@ export const ScrollToolbar = ({ documentId }: { documentId: string }) => {
   )
 }
 
-// 3. Create the main viewer component
 export const PDFViewer = () => {
   const { engine, isLoading } = usePdfiumEngine()
 
   if (isLoading || !engine) {
-    return <div>Loading PDF Engine...</div>
+    return (
+      <div className="overflow-hidden rounded-lg border border-gray-200 bg-white dark:border-gray-700 dark:bg-gray-900">
+        <div className="flex h-[400px] items-center justify-center">
+          <div className="flex items-center gap-2 text-gray-500">
+            <Loader2 size={20} className="animate-spin" />
+            <span className="text-sm">Loading PDF Engine...</span>
+          </div>
+        </div>
+      </div>
+    )
   }
 
   return (
-    <div style={{ height: '500px' }}>
-      <EmbedPDF engine={engine} plugins={plugins}>
-        {({ activeDocumentId }) =>
-          activeDocumentId && (
-            <DocumentContent documentId={activeDocumentId}>
-              {({ isLoaded }) =>
-                isLoaded && (
-                  <div className="flex h-full flex-col">
-                    <ScrollToolbar documentId={activeDocumentId} />
-                    <div className="relative flex w-full flex-1 overflow-hidden">
-                      <Viewport
+    <EmbedPDF engine={engine} plugins={plugins}>
+      {({ activeDocumentId }) =>
+        activeDocumentId && (
+          <DocumentContent documentId={activeDocumentId}>
+            {({ isLoaded }) =>
+              isLoaded && (
+                <div className="overflow-hidden rounded-lg border border-gray-200 bg-white shadow-sm dark:border-gray-700 dark:bg-gray-900">
+                  {/* Toolbar */}
+                  <ScrollToolbar documentId={activeDocumentId} />
+
+                  {/* PDF Viewer Area */}
+                  <div className="relative h-[400px] sm:h-[500px]">
+                    <Viewport
+                      documentId={activeDocumentId}
+                      style={{
+                        position: 'absolute',
+                        inset: 0,
+                        backgroundColor: '#e5e7eb',
+                      }}
+                    >
+                      <Scroller
                         documentId={activeDocumentId}
-                        className="flex-grow bg-gray-100"
-                      >
-                        <Scroller
-                          documentId={activeDocumentId}
-                          renderPage={({ width, height, pageIndex }) => (
-                            <div
-                              style={{ width, height, position: 'relative' }}
-                            >
-                              <RenderLayer
-                                documentId={activeDocumentId}
-                                pageIndex={pageIndex}
-                              />
-                            </div>
-                          )}
-                        />
-                      </Viewport>
-                    </div>
+                        renderPage={({ width, height, pageIndex }) => (
+                          <div style={{ width, height, position: 'relative' }}>
+                            <RenderLayer
+                              documentId={activeDocumentId}
+                              pageIndex={pageIndex}
+                            />
+                          </div>
+                        )}
+                      />
+                    </Viewport>
                   </div>
-                )
-              }
-            </DocumentContent>
-          )
-        }
-      </EmbedPDF>
-    </div>
+                </div>
+              )
+            }
+          </DocumentContent>
+        )
+      }
+    </EmbedPDF>
   )
 }

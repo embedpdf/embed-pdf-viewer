@@ -48,7 +48,14 @@ const withNextra = nextra({
         },
       ] satisfies Pluggable,
       overrideNpm2YarnImports,
-      remarkCodeExample, // Re-enabled with debugging
+      [
+        remarkCodeExample,
+        {
+          // Base GitHub URL for your repository
+          githubBaseUrl:
+            'https://github.com/embedpdf/embed-pdf-viewer/blob/main/website/',
+        },
+      ],
     ],
     rehypePlugins: [rehypeCodeExample], // Re-enabled with debugging
   },

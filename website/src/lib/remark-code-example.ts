@@ -9,6 +9,15 @@ interface FileInfo {
   code: string
   language: string
   fullPath: string
+  githubUrl?: string
+}
+
+interface RemarkCodeExampleOptions {
+  /**
+   * Base GitHub URL for the repository.
+   * Example: 'https://github.com/embedpdf/embed-pdf-viewer/blob/main/'
+   */
+  githubBaseUrl?: string
 }
 
 const languageMap: Record<string, string> = {
@@ -25,7 +34,10 @@ const languageMap: Record<string, string> = {
   mdx: 'mdx',
 }
 
-function readCodeFile(codePath: string): FileInfo | null {
+function readCodeFile(
+  codePath: string,
+  githubBaseUrl?: string,
+): FileInfo | null {
   const absolutePath = path.resolve(process.cwd(), 'src', codePath)
 
   try {
@@ -33,11 +45,19 @@ function readCodeFile(codePath: string): FileInfo | null {
     const ext = path.extname(codePath).slice(1)
     const filename = path.basename(codePath)
 
+    // Calculate repo-relative path for GitHub URL
+    const repoRelativePath = path.relative(process.cwd(), absolutePath)
+    // Normalize to forward slashes for URLs
+    const normalizedPath = repoRelativePath.split(path.sep).join('/')
+
     return {
       filename,
       code,
       language: languageMap[ext] || ext,
       fullPath: codePath,
+      githubUrl: githubBaseUrl
+        ? `${githubBaseUrl}${normalizedPath}`
+        : undefined,
     }
   } catch (err) {
     console.warn(`[remark-code-example] Could not read file: ${absolutePath}`)
@@ -46,72 +66,28 @@ function readCodeFile(codePath: string): FileInfo | null {
 }
 
 /**
- * Create an MDX expression attribute for complex values (arrays, objects)
- */
-function createMdxJsxExpressionAttribute(name: string, value: any) {
-  const jsonValue = JSON.stringify(value)
-  return {
-    type: 'mdxJsxAttribute',
-    name,
-    value: {
-      type: 'mdxJsxAttributeValueExpression',
-      value: jsonValue,
-      data: {
-        estree: {
-          type: 'Program',
-          body: [
-            {
-              type: 'ExpressionStatement',
-              expression: JSON.parse(jsonValue) // Will be re-serialized by the estree generator
-                ? {
-                    type: 'ArrayExpression',
-                    elements: value.map((item: any) => ({
-                      type: 'ObjectExpression',
-                      properties: Object.entries(item).map(([key, val]) => ({
-                        type: 'Property',
-                        method: false,
-                        shorthand: false,
-                        computed: false,
-                        key: { type: 'Identifier', name: key },
-                        value: {
-                          type: 'Literal',
-                          value: val,
-                          raw: JSON.stringify(val),
-                        },
-                        kind: 'init',
-                      })),
-                    })),
-                  }
-                : { type: 'Literal', value: null },
-            },
-          ],
-          sourceType: 'module',
-          comments: [],
-        },
-      },
-    },
-  }
-}
-
-/**
  * Remark plugin that processes CodeExample components.
  *
- * Supports both single and multiple files:
+ * Automatically generates GitHub URLs for each file based on the githubBaseUrl option.
  *
- * Single file:
- * <CodeExample codePath="path/to/file.tsx" githubUrl="...">
+ * Usage:
+ * ```tsx
+ * // Single file
+ * <CodeExample codePath="content/docs/react/code-examples/example.tsx">
  *   <Demo />
  * </CodeExample>
  *
- * Multiple files (use JSX expression):
- * <CodeExample
- *   codePaths={["path/to/file1.tsx", "path/to/file2.css"]}
- *   githubUrl="..."
- * >
+ * // Multiple files
+ * <CodeExample codePaths={["path/to/file1.tsx", "path/to/file2.css"]}>
  *   <Demo />
  * </CodeExample>
+ * ```
  */
-export const remarkCodeExample: Plugin<[], Root> = () => {
+export const remarkCodeExample: Plugin<[RemarkCodeExampleOptions?], Root> = (
+  options = {},
+) => {
+  const { githubBaseUrl } = options
+
   return (tree, file) => {
     visit(tree, 'mdxJsxFlowElement', (node: any) => {
       if (node.name !== 'CodeExample') return
@@ -161,16 +137,21 @@ export const remarkCodeExample: Plugin<[], Root> = () => {
 
       if (paths.length === 0) return
 
-      // Read all files
+      // Read all files (with GitHub URLs)
       const files: FileInfo[] = paths
-        .map((p) => readCodeFile(p))
+        .map((p) => readCodeFile(p, githubBaseUrl))
         .filter((f): f is FileInfo => f !== null)
 
       if (files.length === 0) return
 
-      // Remove codePath/codePaths attributes
+      // Remove codePath/codePaths attributes (no longer needed)
       node.attributes = node.attributes.filter(
         (attr: any) => attr.name !== 'codePath' && attr.name !== 'codePaths',
+      )
+
+      // Also remove any manually specified githubUrl (we generate it now)
+      node.attributes = node.attributes.filter(
+        (attr: any) => attr.name !== 'githubUrl',
       )
 
       // Add files data as JSON string (will be parsed by rehype plugin)

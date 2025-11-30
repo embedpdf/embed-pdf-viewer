@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useState } from 'react'
+import React, { useState, useRef, useEffect } from 'react'
 import {
   Code,
   Github,
@@ -10,18 +10,19 @@ import {
   Copy,
   Check,
 } from 'lucide-react'
+import { ReactIcon, VueIcon, SvelteIcon } from './framework-icons'
 
 interface CodeFile {
   filename: string
   code: string
   language: string
+  githubUrl?: string
   highlightedCode?: string
 }
 
 interface CodeExampleProps {
   children: React.ReactNode
   files?: CodeFile[]
-  githubUrl?: string
   /** Add a border frame around the demo content */
   framed?: boolean
   /** Background variant for the preview area */
@@ -30,29 +31,40 @@ interface CodeExampleProps {
   code?: string
   language?: string
   highlightedCode?: string
+  githubUrl?: string
 }
 
 export const CodeExample = ({
   children,
   files = [],
-  githubUrl,
   framed = false,
   background = 'dots',
   // Legacy props
   code,
   language = 'tsx',
   highlightedCode,
+  githubUrl: legacyGithubUrl,
 }: CodeExampleProps) => {
   const [showCode, setShowCode] = useState(false)
   const [activeTab, setActiveTab] = useState(0)
   const [copied, setCopied] = useState(false)
+  const [showGithubMenu, setShowGithubMenu] = useState(false)
+  const githubMenuRef = useRef<HTMLDivElement>(null)
 
   // Handle legacy single-file format
   const allFiles: CodeFile[] =
     files.length > 0
       ? files
       : code
-        ? [{ filename: 'Example.tsx', code, language, highlightedCode }]
+        ? [
+            {
+              filename: 'Example.tsx',
+              code,
+              language,
+              highlightedCode,
+              githubUrl: legacyGithubUrl,
+            },
+          ]
         : []
 
   const activeFile = allFiles[activeTab]
@@ -62,6 +74,24 @@ export const CodeExample = ({
     (sum, f) => sum + f.code.trim().split('\n').length,
     0,
   )
+
+  // Get files with GitHub URLs
+  const filesWithGithub = allFiles.filter((f) => f.githubUrl)
+  const hasGithubUrls = filesWithGithub.length > 0
+
+  // Close dropdown when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (
+        githubMenuRef.current &&
+        !githubMenuRef.current.contains(event.target as Node)
+      ) {
+        setShowGithubMenu(false)
+      }
+    }
+    document.addEventListener('mousedown', handleClickOutside)
+    return () => document.removeEventListener('mousedown', handleClickOutside)
+  }, [])
 
   const copyToClipboard = async () => {
     if (!activeFile) return
@@ -80,9 +110,11 @@ export const CodeExample = ({
   }
 
   return (
-    <div className="not-prose my-8 overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm dark:border-gray-800 dark:bg-gray-950">
-      {/* Live Preview */}
-      <div className={`relative p-4 sm:p-8 ${backgroundStyles[background]}`}>
+    <div className="not-prose my-8 rounded-xl border border-gray-200 bg-white shadow-sm dark:border-gray-800 dark:bg-gray-950">
+      {/* Live Preview - overflow-hidden here for rounded corners */}
+      <div
+        className={`relative overflow-hidden rounded-t-xl p-4 sm:p-8 ${backgroundStyles[background]}`}
+      >
         {/* Demo content wrapper */}
         <div
           className={`relative w-full ${framed ? 'overflow-hidden rounded-lg border border-gray-200 bg-white shadow-sm dark:border-gray-700 dark:bg-gray-950' : ''} `}
@@ -91,8 +123,10 @@ export const CodeExample = ({
         </div>
       </div>
 
-      {/* Toolbar */}
-      <div className="flex items-center justify-between border-t border-gray-200 bg-gray-50/80 px-4 py-2 backdrop-blur-sm dark:border-gray-800 dark:bg-gray-900/80">
+      {/* Toolbar - overflow-visible to allow dropdown to escape */}
+      <div
+        className={`relative flex items-center justify-between overflow-visible border-t border-gray-200 bg-gray-50/80 px-4 py-2 backdrop-blur-sm dark:border-gray-800 dark:bg-gray-900/80 ${!showCode ? 'rounded-b-xl' : ''}`}
+      >
         <button
           onClick={() => setShowCode(!showCode)}
           className="-ml-2.5 inline-flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-[13px] font-medium text-gray-600 transition-colors hover:bg-gray-200/60 hover:text-gray-900 dark:text-gray-400 dark:hover:bg-gray-700/60 dark:hover:text-gray-100"
@@ -113,6 +147,7 @@ export const CodeExample = ({
         </button>
 
         <div className="flex items-center gap-0.5">
+          {/* Copy button - only when code is shown */}
           {showCode && (
             <button
               onClick={copyToClipboard}
@@ -126,17 +161,75 @@ export const CodeExample = ({
               )}
             </button>
           )}
-          {githubUrl && (
-            <a
-              href={githubUrl}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="inline-flex items-center gap-1.5 rounded-md p-2 text-[13px] font-medium text-gray-500 transition-colors hover:bg-gray-200/60 hover:text-gray-900 dark:text-gray-400 dark:hover:bg-gray-700/60 dark:hover:text-gray-100"
-              title="View on GitHub"
-            >
-              <Github size={15} />
-              <ExternalLink size={11} className="opacity-50" />
-            </a>
+
+          {/* GitHub button/dropdown */}
+          {hasGithubUrls && (
+            <div className="relative" ref={githubMenuRef}>
+              {filesWithGithub.length === 1 ? (
+                // Single file with GitHub - direct link
+                <a
+                  href={filesWithGithub[0].githubUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center gap-1.5 rounded-md p-2 text-[13px] font-medium text-gray-500 transition-colors hover:bg-gray-200/60 hover:text-gray-900 dark:text-gray-400 dark:hover:bg-gray-700/60 dark:hover:text-gray-100"
+                  title="View on GitHub"
+                >
+                  <Github size={15} />
+                  <ExternalLink size={11} className="opacity-50" />
+                </a>
+              ) : (
+                // Multiple files - dropdown
+                <>
+                  <button
+                    onClick={() => setShowGithubMenu(!showGithubMenu)}
+                    className={`inline-flex items-center gap-1 rounded-md p-2 text-[13px] font-medium transition-colors ${
+                      showGithubMenu
+                        ? 'bg-gray-200/60 text-gray-900 dark:bg-gray-700/60 dark:text-gray-100'
+                        : 'text-gray-500 hover:bg-gray-200/60 hover:text-gray-900 dark:text-gray-400 dark:hover:bg-gray-700/60 dark:hover:text-gray-100'
+                    }`}
+                    title="View on GitHub"
+                  >
+                    <Github size={15} />
+                    <ChevronDown
+                      size={12}
+                      className={`transition-transform ${showGithubMenu ? 'rotate-180' : ''}`}
+                    />
+                  </button>
+
+                  {/* Dropdown menu */}
+                  {showGithubMenu && (
+                    <div className="absolute right-0 top-full z-50 mt-1 min-w-[220px] overflow-hidden rounded-lg border border-gray-200 bg-white shadow-lg dark:border-gray-700 dark:bg-gray-900">
+                      <div className="border-b border-gray-100 px-3 py-2 dark:border-gray-800">
+                        <span className="tracking-wider text-[11px] font-medium uppercase text-gray-400 dark:text-gray-500">
+                          View on GitHub
+                        </span>
+                      </div>
+                      {filesWithGithub.map((file) => (
+                        <a
+                          key={file.filename}
+                          href={file.githubUrl}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="flex items-center gap-2.5 px-3 py-2.5 text-[13px] text-gray-700 transition-colors hover:bg-gray-50 dark:text-gray-300 dark:hover:bg-gray-800"
+                          onClick={() => setShowGithubMenu(false)}
+                        >
+                          {getFrameworkIcon(file.language) || (
+                            <FileIcon language={file.language} />
+                          )}
+                          <span className="flex-1 truncate">
+                            {file.filename}
+                          </span>
+                          <ExternalLink
+                            size={12}
+                            className="flex-shrink-0 text-gray-400"
+                          />
+                        </a>
+                      ))}
+                    </div>
+                  )}
+                </>
+              )}
+            </div>
           )}
         </div>
       </div>
@@ -161,7 +254,9 @@ export const CodeExample = ({
                     <span className="absolute inset-x-0 -bottom-px h-0.5 rounded-full bg-blue-500" />
                   )}
                   <span className="flex items-center gap-2">
-                    <FileIcon language={file.language} />
+                    {getFrameworkIcon(file.language) || (
+                      <FileIcon language={file.language} />
+                    )}
                     {file.filename}
                   </span>
                 </button>
@@ -173,7 +268,9 @@ export const CodeExample = ({
           {!hasMultipleFiles && (
             <div className="flex items-center justify-between bg-gray-50 px-4 py-2 dark:bg-gray-900/50">
               <span className="flex items-center gap-2 text-[13px] font-medium text-gray-500 dark:text-gray-400">
-                <FileIcon language={activeFile.language} />
+                {getFrameworkIcon(activeFile.language) || (
+                  <FileIcon language={activeFile.language} />
+                )}
                 {activeFile.filename}
               </span>
               <span className="text-[12px] text-gray-400 dark:text-gray-500">
@@ -183,7 +280,7 @@ export const CodeExample = ({
           )}
 
           {/* Code Content */}
-          <div className="overflow-x-auto bg-white dark:bg-gray-950">
+          <div className="overflow-x-auto rounded-b-xl bg-white dark:bg-gray-950">
             {activeFile.highlightedCode ? (
               <pre className="p-4 text-[13px] leading-[1.7]">
                 <code
@@ -207,7 +304,29 @@ export const CodeExample = ({
   )
 }
 
-// File icon with language-specific colors
+// Get framework icon based on language, or null if not a framework
+function getFrameworkIcon(language: string) {
+  const normalizedLang = language.toLowerCase()
+
+  // React (tsx, jsx)
+  if (normalizedLang === 'tsx' || normalizedLang === 'jsx') {
+    return <ReactIcon className="h-4 w-4 flex-shrink-0 text-blue-500" />
+  }
+
+  // Vue
+  if (normalizedLang === 'vue') {
+    return <VueIcon className="h-4 w-4 flex-shrink-0 text-emerald-500" />
+  }
+
+  // Svelte
+  if (normalizedLang === 'svelte') {
+    return <SvelteIcon className="h-4 w-4 flex-shrink-0 text-orange-600" />
+  }
+
+  return null
+}
+
+// File icon with language-specific colors (fallback)
 function FileIcon({ language }: { language: string }) {
   const colors: Record<string, string> = {
     tsx: 'text-blue-500',
@@ -226,7 +345,7 @@ function FileIcon({ language }: { language: string }) {
   return (
     <svg
       viewBox="0 0 16 16"
-      className={`h-4 w-4 ${colors[language] || 'text-gray-400'}`}
+      className={`h-4 w-4 flex-shrink-0 ${colors[language] || 'text-gray-400'}`}
       fill="currentColor"
     >
       <path
