@@ -2215,6 +2215,9 @@ importers:
       '@embedpdf/plugin-tiling':
         specifier: workspace:*
         version: link:../packages/plugin-tiling
+      '@embedpdf/plugin-view-manager':
+        specifier: workspace:*
+        version: link:../packages/plugin-view-manager
       '@embedpdf/plugin-viewport':
         specifier: workspace:*
         version: link:../packages/plugin-viewport

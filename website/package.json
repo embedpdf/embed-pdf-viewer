@@ -36,6 +36,7 @@
     "@embedpdf/plugin-thumbnail": "workspace:*",
     "@embedpdf/plugin-tiling": "workspace:*",
     "@embedpdf/plugin-viewport": "workspace:*",
+    "@embedpdf/plugin-view-manager": "workspace:*",
     "@embedpdf/plugin-zoom": "workspace:*",
     "@embedpdf/snippet": "workspace:*",
     "@headlessui/react": "^2.2.0",
