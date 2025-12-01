@@ -1,7 +1,7 @@
 'use client'
 
 import { useMemo } from 'react'
-import { createPluginRegistration } from '@embedpdf/core'
+import { createPluginRegistration, DocumentState } from '@embedpdf/core'
 import { EmbedPDF } from '@embedpdf/core/react'
 import { usePdfiumEngine } from '@embedpdf/engines/react'
 import {
@@ -9,6 +9,7 @@ import {
   DocumentContent,
   DocumentContext,
   useDocumentManagerCapability,
+  TabActions,
 } from '@embedpdf/plugin-document-manager/react'
 import {
   ViewportPluginPackage,
@@ -18,14 +19,12 @@ import { ScrollPluginPackage, Scroller } from '@embedpdf/plugin-scroll/react'
 import { RenderPluginPackage, RenderLayer } from '@embedpdf/plugin-render/react'
 import { TilingPluginPackage, TilingLayer } from '@embedpdf/plugin-tiling/react'
 import { ZoomPluginPackage, ZoomMode } from '@embedpdf/plugin-zoom/react'
+import { Loader2, FileText, X, Plus, FolderOpen } from 'lucide-react'
 
 interface TabBarProps {
-  documentStates: any[]
+  documentStates: DocumentState[]
   activeDocumentId: string | null
-  actions: {
-    select: (id: string) => void
-    close: (id: string) => void
-  }
+  actions: TabActions
 }
 
 function TabBar({ documentStates, activeDocumentId, actions }: TabBarProps) {
@@ -36,92 +35,83 @@ function TabBar({ documentStates, activeDocumentId, actions }: TabBarProps) {
   }
 
   return (
-    <div className="flex items-end gap-0.5 border-b border-gray-200 bg-gray-100 px-2 pt-2">
-      <div className="flex flex-1 items-end gap-0.5 overflow-x-auto">
-        {documentStates.map((doc) => (
-          <div
-            key={doc.id}
-            onClick={() => actions.select(doc.id)}
-            role="tab"
-            tabIndex={0}
-            aria-selected={activeDocumentId === doc.id}
-            onKeyDown={(e) => {
-              if (e.key === 'Enter' || e.key === ' ') {
-                e.preventDefault()
-                actions.select(doc.id)
-              }
-            }}
-            className={`group relative flex min-w-[120px] max-w-[240px] cursor-pointer items-center gap-2 rounded-t-md px-3 py-2.5 text-sm font-medium transition-all ${
-              activeDocumentId === doc.id
-                ? 'bg-white text-gray-900 shadow-[0_2px_4px_-1px_rgba(0,0,0,0.06)]'
-                : 'bg-gray-200/60 text-gray-600 hover:bg-gray-200 hover:text-gray-800'
-            }`}
-          >
-            <svg
-              className="h-4 w-4 flex-shrink-0"
-              fill="none"
-              stroke="currentColor"
-              viewBox="0 0 24 24"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
-              />
-            </svg>
-            <span className="min-w-0 flex-1 truncate">
-              {doc.name ?? `Document ${doc.id.slice(0, 8)}`}
-            </span>
-            <button
-              onClick={(e) => {
-                e.stopPropagation()
-                actions.close(doc.id)
+    <div className="flex items-center gap-1 border-b border-gray-200 bg-gray-50 px-2 py-1.5 dark:border-gray-700 dark:bg-gray-900">
+      {/* Tabs */}
+      <div className="flex flex-1 items-center gap-1 overflow-x-auto">
+        {documentStates.map((doc) => {
+          const isActive = activeDocumentId === doc.id
+          return (
+            <div
+              key={doc.id}
+              onClick={() => actions.select(doc.id)}
+              role="tab"
+              tabIndex={0}
+              aria-selected={isActive}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' || e.key === ' ') {
+                  e.preventDefault()
+                  actions.select(doc.id)
+                }
               }}
-              aria-label={`Close ${doc.name ?? 'document'}`}
-              className={`flex-shrink-0 cursor-pointer rounded-full p-1 transition-all hover:bg-gray-300/50 ${
-                activeDocumentId === doc.id
-                  ? 'opacity-100'
-                  : 'opacity-0 group-hover:opacity-100'
-              }`}
+              className={`group relative flex min-w-[100px] max-w-[180px] cursor-pointer items-center gap-2 rounded-md px-2.5 py-1.5 text-xs font-medium transition-all ${
+                isActive
+                  ? 'bg-white text-gray-900 shadow-sm ring-1 ring-gray-200 dark:bg-gray-800 dark:text-gray-100 dark:ring-gray-700'
+                  : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900 dark:text-gray-400 dark:hover:bg-gray-800 dark:hover:text-gray-200'
+              } `}
             >
-              <svg
-                className="h-3.5 w-3.5"
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
+              <FileText size={14} className="flex-shrink-0" />
+              <span className="min-w-0 flex-1 truncate">
+                {doc.name ?? `Document ${doc.id.slice(0, 6)}`}
+              </span>
+              <button
+                onClick={(e) => {
+                  e.stopPropagation()
+                  actions.close(doc.id)
+                }}
+                aria-label={`Close ${doc.name ?? 'document'}`}
+                className={`flex-shrink-0 rounded p-0.5 transition-all hover:bg-gray-200 dark:hover:bg-gray-600 ${isActive ? 'opacity-60 hover:opacity-100' : 'opacity-0 hover:!opacity-100 group-hover:opacity-60'} `}
               >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M6 18L18 6M6 6l12 12"
-                />
-              </svg>
-            </button>
-          </div>
-        ))}
-        <button
-          onClick={handleOpenFile}
-          className="mb-2 ml-1 flex-shrink-0 cursor-pointer rounded p-1.5 text-gray-600 transition-colors hover:bg-gray-200/80 hover:text-gray-800"
-          aria-label="Open File"
-          title="Open File"
-        >
-          <svg
-            className="h-3.5 w-3.5"
-            fill="none"
-            stroke="currentColor"
-            viewBox="0 0 24 24"
-          >
-            <path
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              strokeWidth={2}
-              d="M12 4v16m8-8H4"
-            />
-          </svg>
-        </button>
+                <X size={12} />
+              </button>
+            </div>
+          )
+        })}
       </div>
+
+      {/* Add button */}
+      <button
+        onClick={handleOpenFile}
+        className="inline-flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-md text-gray-500 transition-colors hover:bg-gray-200 hover:text-gray-700 dark:text-gray-400 dark:hover:bg-gray-700 dark:hover:text-gray-200"
+        aria-label="Open File"
+        title="Open File"
+      >
+        <Plus size={16} />
+      </button>
+    </div>
+  )
+}
+
+function EmptyState() {
+  const { provides } = useDocumentManagerCapability()
+
+  return (
+    <div className="flex h-full flex-col items-center justify-center gap-3 text-gray-400 dark:text-gray-500">
+      <FolderOpen size={40} strokeWidth={1.5} />
+      <div className="text-center">
+        <p className="text-sm font-medium text-gray-500 dark:text-gray-400">
+          No document open
+        </p>
+        <p className="mt-1 text-xs">
+          Click the + button or drop a file to open
+        </p>
+      </div>
+      <button
+        onClick={() => provides?.openFileDialog()}
+        className="mt-2 inline-flex items-center gap-2 rounded-md bg-blue-500 px-3 py-1.5 text-xs font-medium text-white shadow-sm transition-colors hover:bg-blue-600"
+      >
+        <Plus size={14} />
+        Open File
+      </button>
     </div>
   )
 }
@@ -152,45 +142,57 @@ export const PDFViewer = () => {
   )
 
   if (isLoading || !engine) {
-    return <div>Loading PDF Engine...</div>
+    return (
+      <div className="overflow-hidden rounded-lg border border-gray-200 bg-white dark:border-gray-700 dark:bg-gray-900">
+        <div className="flex h-[400px] items-center justify-center">
+          <div className="flex items-center gap-2 text-gray-500">
+            <Loader2 size={20} className="animate-spin" />
+            <span className="text-sm">Loading PDF Engine...</span>
+          </div>
+        </div>
+      </div>
+    )
   }
 
   return (
-    <div
-      style={{
-        height: '500px',
-        display: 'flex',
-        flexDirection: 'column',
-        marginTop: '10px',
-      }}
-    >
-      <EmbedPDF engine={engine} plugins={plugins}>
-        {({ pluginsReady, activeDocumentId }) => (
-          <>
-            {pluginsReady ? (
-              <div className="flex h-full flex-col">
-                <DocumentContext>
-                  {({
-                    documentStates,
-                    activeDocumentId: activeId,
-                    actions,
-                  }) => (
-                    <>
-                      <TabBar
-                        documentStates={documentStates}
-                        activeDocumentId={activeId}
-                        actions={actions}
-                      />
-                      {activeId && (
-                        <DocumentContent documentId={activeId}>
-                          {({ isLoaded }) =>
-                            isLoaded && (
-                              <div className="flex-1 overflow-hidden">
+    <EmbedPDF engine={engine} plugins={plugins}>
+      {({ pluginsReady, activeDocumentId }) => (
+        <>
+          {pluginsReady ? (
+            <div className="overflow-hidden rounded-lg border border-gray-200 bg-white shadow-sm dark:border-gray-700 dark:bg-gray-900">
+              <DocumentContext>
+                {({ documentStates, activeDocumentId: activeId, actions }) => (
+                  <>
+                    {/* Tab Bar */}
+                    <TabBar
+                      documentStates={documentStates}
+                      activeDocumentId={activeId}
+                      actions={actions}
+                    />
+
+                    {/* Document Content */}
+                    {activeId ? (
+                      <DocumentContent documentId={activeId}>
+                        {({ isLoading: docLoading, isLoaded }) => (
+                          <>
+                            {docLoading && (
+                              <div className="flex h-[400px] items-center justify-center sm:h-[500px]">
+                                <div className="flex items-center gap-2 text-gray-500">
+                                  <Loader2 size={20} className="animate-spin" />
+                                  <span className="text-sm">
+                                    Loading document...
+                                  </span>
+                                </div>
+                              </div>
+                            )}
+                            {isLoaded && (
+                              <div className="relative h-[400px] sm:h-[500px]">
                                 <Viewport
                                   documentId={activeId}
                                   style={{
-                                    backgroundColor: '#f1f3f5',
-                                    height: '100%',
+                                    position: 'absolute',
+                                    inset: 0,
+                                    backgroundColor: '#e5e7eb',
                                   }}
                                 >
                                   <Scroller
@@ -220,27 +222,31 @@ export const PDFViewer = () => {
                                   />
                                 </Viewport>
                               </div>
-                            )
-                          }
-                        </DocumentContent>
-                      )}
-                      {!activeId && (
-                        <div className="flex flex-1 items-center justify-center text-gray-500">
-                          No document open. Click the + button to open a file.
-                        </div>
-                      )}
-                    </>
-                  )}
-                </DocumentContext>
+                            )}
+                          </>
+                        )}
+                      </DocumentContent>
+                    ) : (
+                      <div className="h-[400px] sm:h-[500px]">
+                        <EmptyState />
+                      </div>
+                    )}
+                  </>
+                )}
+              </DocumentContext>
+            </div>
+          ) : (
+            <div className="overflow-hidden rounded-lg border border-gray-200 bg-white dark:border-gray-700 dark:bg-gray-900">
+              <div className="flex h-[400px] items-center justify-center">
+                <div className="flex items-center gap-2 text-gray-500">
+                  <Loader2 size={20} className="animate-spin" />
+                  <span className="text-sm">Initializing plugins...</span>
+                </div>
               </div>
-            ) : (
-              <div className="flex h-full items-center justify-center">
-                <div>Initializing plugins...</div>
-              </div>
-            )}
-          </>
-        )}
-      </EmbedPDF>
-    </div>
+            </div>
+          )}
+        </>
+      )}
+    </EmbedPDF>
   )
 }

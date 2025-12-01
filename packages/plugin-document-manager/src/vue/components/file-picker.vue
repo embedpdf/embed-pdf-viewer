@@ -3,20 +3,25 @@ import { ref, watch } from 'vue';
 import { useDocumentManagerCapability, useDocumentManagerPlugin } from '../hooks';
 import type { Task } from '@embedpdf/models';
 import type { PdfErrorReason } from '@embedpdf/models';
-import type { OpenDocumentResponse } from '@embedpdf/plugin-document-manager';
+import type {
+  OpenDocumentResponse,
+  OpenFileDialogOptions,
+} from '@embedpdf/plugin-document-manager';
 
 const { plugin } = useDocumentManagerPlugin();
 const { provides } = useDocumentManagerCapability();
 const inputRef = ref<HTMLInputElement | null>(null);
 const taskRef = ref<Task<OpenDocumentResponse, PdfErrorReason> | null>(null);
+const optionsRef = ref<OpenFileDialogOptions | undefined>(undefined);
 
 watch(
   plugin,
   (pluginValue, _, onCleanup) => {
     if (!pluginValue?.onOpenFileRequest) return;
 
-    const unsubscribe = pluginValue.onOpenFileRequest((task) => {
+    const unsubscribe = pluginValue.onOpenFileRequest(({ task, options }) => {
       taskRef.value = task;
+      optionsRef.value = options;
       inputRef.value?.click();
     });
 
@@ -35,6 +40,10 @@ const onChange = async (event: Event) => {
   const openTask = cap.openDocumentBuffer({
     name: file.name,
     buffer,
+    documentId: optionsRef.value?.documentId,
+    scale: optionsRef.value?.scale,
+    rotation: optionsRef.value?.rotation,
+    autoActivate: optionsRef.value?.autoActivate,
   });
 
   openTask.wait(

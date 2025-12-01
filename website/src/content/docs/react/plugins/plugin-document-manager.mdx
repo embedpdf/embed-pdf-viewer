@@ -91,181 +91,155 @@ import { DocumentContent } from '@embedpdf/plugin-document-manager/react'
 </DocumentContent>
 ```
 
-### Handling Password-Protected Documents
-
-When a document requires a password, it will fail to load and enter an error state. You can detect password errors by checking the `errorCode` property in the `DocumentState`. Use the `retryDocument` method to retry loading the document with a password.
-
-```tsx
-import { DocumentContent } from '@embedpdf/plugin-document-manager/react'
-import { useDocumentManagerCapability } from '@embedpdf/plugin-document-manager/react'
-import { PdfErrorCode } from '@embedpdf/models'
-
-function PasswordPrompt({ documentState }) {
-  const { provides } = useDocumentManagerCapability()
-  const [password, setPassword] = useState('')
-  const [isRetrying, setIsRetrying] = useState(false)
-
-  const isPasswordError = documentState.errorCode === PdfErrorCode.Password
-  const isPasswordRequired = isPasswordError && !documentState.passwordProvided
-  const isPasswordIncorrect = isPasswordError && documentState.passwordProvided
-
-  if (!isPasswordError) {
-    // Handle other errors
-    return <div>Error: {documentState.error}</div>
-  }
-
-  const handleRetry = () => {
-    if (!provides || !password.trim()) return
-    setIsRetrying(true)
-
-    const task = provides.retryDocument(documentState.id, { password })
-    task.wait(
-      () => {
-        setPassword('')
-        setIsRetrying(false)
-      },
-      (error) => {
-        console.error('Retry failed:', error)
-        setIsRetrying(false)
-      },
-    )
-  }
-
-  return (
-    <div className="password-prompt">
-      <h3>Password Required</h3>
-      <p>
-        {isPasswordRequired && 'This document is password protected. Please enter the password.'}
-        {isPasswordIncorrect && 'The password you entered was incorrect. Please try again.'}
-      </p>
-      <input
-        type="password"
-        value={password}
-        onChange={(e) => setPassword(e.target.value)}
-        onKeyDown={(e) => e.key === 'Enter' && !isRetrying && handleRetry()}
-        disabled={isRetrying}
-        placeholder="Enter document password"
-        autoFocus
-      />
-      <button onClick={handleRetry} disabled={isRetrying || !password.trim()}>
-        {isRetrying ? 'Opening...' : 'Open'}
-      </button>
-    </div>
-  )
-}
-
-// In your viewer component
-<DocumentContent documentId={activeDocumentId}>
-  {({ documentState, isLoading, isError, isLoaded }) => {
-    if (isLoading) return <div>Loading...</div>
-    if (isError) return <PasswordPrompt documentState={documentState} />
-    if (isLoaded) return <Viewport documentId={activeDocumentId}>...</Viewport>
-    return null
-  }}
-</DocumentContent>
-```
-
-<Callout type="info">
-When opening a document with a known password, you can provide it directly in the `openDocumentUrl` or `openDocumentBuffer` options: `{ url: '...', password: 'your-password' }`. This avoids the need for a password prompt if you already have the password.
-</Callout>
-
 ### Opening Documents
 
-Use the `useDocumentManagerCapability` hook to access methods for opening documents from URLs or local files.
+Use the `useDocumentManagerCapability` hook to access methods for opening documents from URLs, buffers, or local files.
+
+#### Opening from URL
 
 ```tsx
 import { useDocumentManagerCapability } from '@embedpdf/plugin-document-manager/react'
+import { Rotation } from '@embedpdf/models'
 
-export const OpenFileButton = () => {
+export const OpenUrlButton = () => {
   const { provides } = useDocumentManagerCapability()
 
   const handleOpenUrl = () => {
     provides?.openDocumentUrl({
       url: 'https://example.com/document.pdf',
-      // Optional: Provide password if known
-      password: 'my-password',
+      // Optional options:
+      documentId: 'custom-doc-id', // Custom document ID (auto-generated if not provided)
+      password: 'my-password', // Password if document is protected
+      mode: 'auto', // 'auto' | 'range-request' | 'full-fetch'
+      scale: 1.0, // Initial scale factor
+      rotation: Rotation.Degree0, // Initial rotation
+      autoActivate: true, // Whether to activate this document when opened (default: true)
+      requestOptions: {
+        // Custom fetch options
+        headers: { 'Authorization': 'Bearer token' },
+      },
     })
   }
 
-  const handleOpenFile = () => {
-    provides?.openFileDialog()
-  }
-
-  return (
-    <div>
-      <button onClick={handleOpenUrl}>Open from URL</button>
-      <button onClick={handleOpenFile}>Open File</button>
-    </div>
-  )
+  return <button onClick={handleOpenUrl}>Open from URL</button>
 }
 ```
 
-When opening a document with a known password, you can provide it directly in the options. If the password is incorrect or not provided, the document will enter an error state and you can use `retryDocument` to try again with a different password.
-
-### Building a Tab Bar
-
-The plugin provides hooks and components to build a tab interface for managing multiple documents. You can use `useOpenDocuments` and `useActiveDocument` hooks.
-
-Here's an example using the hooks directly:
+#### Opening from Buffer
 
 ```tsx
-import { useOpenDocuments, useActiveDocument, useDocumentManagerCapability } from '@embedpdf/plugin-document-manager/react'
+import { useDocumentManagerCapability } from '@embedpdf/plugin-document-manager/react'
+import { Rotation } from '@embedpdf/models'
 
-export const TabBar = () => {
-  const documentStates = useOpenDocuments()
-  const { activeDocumentId } = useActiveDocument()
+export const OpenBufferButton = () => {
   const { provides } = useDocumentManagerCapability()
 
-  const handleSelect = (documentId: string) => {
-    provides?.setActiveDocument(documentId)
+  const handleOpenBuffer = async () => {
+    // Example: Load a file from input
+    const fileInput = document.createElement('input')
+    fileInput.type = 'file'
+    fileInput.accept = '.pdf'
+    
+    fileInput.onchange = async (e) => {
+      const file = (e.target as HTMLInputElement).files?.[0]
+      if (!file) return
+
+      // Read file as ArrayBuffer
+      const arrayBuffer = await file.arrayBuffer()
+
+      provides?.openDocumentBuffer({
+        buffer: arrayBuffer,
+        name: file.name,
+        // Optional options:
+        documentId: 'custom-doc-id', // Custom document ID (auto-generated if not provided)
+        password: 'my-password', // Password if document is protected
+        scale: 1.0, // Initial scale factor
+        rotation: Rotation.Degree0, // Initial rotation
+        autoActivate: true, // Whether to activate this document when opened (default: true)
+      })
+    }
+
+    fileInput.click()
   }
 
-  const handleClose = (documentId: string) => {
-    provides?.closeDocument(documentId)
-  }
-
-  const handleOpenFile = () => {
-    provides?.openFileDialog()
-  }
-
-  return (
-    <div className="flex gap-2 border-b">
-      {documentStates.map((doc) => (
-        <button
-          key={doc.id}
-          onClick={() => handleSelect(doc.id)}
-          className={activeDocumentId === doc.id ? 'active' : ''}
-        >
-          {doc.name}
-          <button
-            onClick={(e) => {
-              e.stopPropagation()
-              handleClose(doc.id)
-            }}
-          >
-            ×
-          </button>
-        </button>
-      ))}
-      <button onClick={handleOpenFile}>+</button>
-    </div>
-  )
+  return <button onClick={handleOpenBuffer}>Open File</button>
 }
 ```
 
-### Managing Document Order
+#### Opening from File Dialog
 
-You can reorder documents in the tab bar by moving them to different positions.
+The `openFileDialog` method opens the browser's native file picker:
 
 ```tsx
-const { provides } = useDocumentManagerCapability()
+import { useDocumentManagerCapability } from '@embedpdf/plugin-document-manager/react'
+import { Rotation } from '@embedpdf/models'
 
-// Move a document to a specific index
-provides?.moveDocument(documentId, 2)
+export const OpenFileDialogButton = () => {
+  const { provides } = useDocumentManagerCapability()
 
-// Swap two documents
-provides?.swapDocuments(documentId1, documentId2)
+  const handleOpenFile = () => {
+    const task = provides?.openFileDialog({
+      // Optional options:
+      documentId: 'custom-doc-id', // Custom document ID (auto-generated if not provided)
+      scale: 1.0, // Initial scale factor
+      rotation: Rotation.Degree0, // Initial rotation
+      autoActivate: true, // Whether to activate this document when opened (default: true)
+    })
+    
+    // Optional: Handle the task result
+    task?.wait(
+      (response) => {
+        console.log('Document opened:', response.documentId)
+      },
+      (error) => {
+        console.error('Failed to open document:', error)
+      },
+    )
+  }
+
+  return <button onClick={handleOpenFile}>Open File</button>
+}
 ```
+
+#### Options Reference
+
+**`openDocumentUrl` Options:**
+
+| Option | Type | Description |
+| :--- | :--- | :--- |
+| **`url`** | `string` | **(Required)** The URL of the PDF document to load. |
+| **`documentId`** | `string` | Optional custom document ID. If not provided, a unique ID will be generated. |
+| **`password`** | `string` | Password for password-protected documents. |
+| **`mode`** | `'auto' \| 'range-request' \| 'full-fetch'` | Loading mode. `'auto'` lets the engine decide, `'range-request'` uses HTTP range requests, `'full-fetch'` downloads the entire file first. |
+| **`requestOptions`** | `PdfRequestOptions` | Custom fetch options (headers, credentials, etc.). |
+| **`scale`** | `number` | Initial scale factor for the document. |
+| **`rotation`** | `Rotation` | Initial rotation for the document. |
+| **`autoActivate`** | `boolean` | Whether to make this document active when opened. Default: `true`. |
+
+**`openDocumentBuffer` Options:**
+
+| Option | Type | Description |
+| :--- | :--- | :--- |
+| **`buffer`** | `ArrayBuffer` | **(Required)** The PDF file content as an ArrayBuffer. |
+| **`name`** | `string` | **(Required)** The name of the document (used for display). |
+| **`documentId`** | `string` | Optional custom document ID. If not provided, a unique ID will be generated. |
+| **`password`** | `string` | Password for password-protected documents. |
+| **`scale`** | `number` | Initial scale factor for the document. |
+| **`rotation`** | `Rotation` | Initial rotation for the document. |
+| **`autoActivate`** | `boolean` | Whether to make this document active when opened. Default: `true`. |
+
+**`OpenFileDialogOptions`:**
+
+| Option | Type | Description |
+| :--- | :--- | :--- |
+| **`documentId`** | `string` | Optional custom document ID. If not provided, a unique ID will be generated. |
+| **`scale`** | `number` | Initial scale factor for the document. |
+| **`rotation`** | `Rotation` | Initial rotation for the document. |
+| **`autoActivate`** | `boolean` | Whether to make this document active when opened. Default: `true`. |
+
+<Callout type="info">
+When opening a document with a known password, you can provide it directly in the options. If the password is incorrect or not provided, the document will enter an error state and you can use `retryDocument` to try again with a different password.
+</Callout>
 
 ## Live Examples
 
@@ -275,7 +249,13 @@ This example demonstrates a complete PDF viewer with a tab bar for managing mult
 
 import { PDFViewer } from '../code-examples/document-manager-example'
 
-<PDFViewer />
+<CodeExample 
+  codePaths={[
+    "content/docs/react/code-examples/document-manager-example.tsx"
+  ]}
+>
+  <PDFViewer />
+</CodeExample>
 
 ### Password-Protected Document
 
@@ -287,7 +267,13 @@ Try entering an incorrect password first to see the error handling, then enter t
 
 import { PDFViewer as PasswordPDFViewer } from '../code-examples/password-example'
 
-<PasswordPDFViewer />
+<CodeExample 
+  codePaths={[
+    "content/docs/react/code-examples/document-manager-example.tsx"
+  ]}
+>
+  <PasswordPDFViewer />
+</CodeExample>
 
 ## API Reference
 
@@ -316,7 +302,7 @@ This hook provides access to all document management operations.
 | :--- | :--- |
 | **`openDocumentUrl(options)`** | Opens a document from a URL. Returns a `Task<OpenDocumentResponse, PdfErrorReason>`. |
 | **`openDocumentBuffer(options)`** | Opens a document from an `ArrayBuffer`. Returns a `Task<OpenDocumentResponse, PdfErrorReason>`. |
-| **`openFileDialog()`** | Opens the browser's native file picker. Returns a `Task<OpenDocumentResponse, PdfErrorReason>`. |
+| **`openFileDialog(options?)`** | Opens the browser's native file picker. Returns a `Task<OpenDocumentResponse, PdfErrorReason>`. |
 | **`closeDocument(documentId)`** | Closes a specific document. Returns a `Task<void, PdfErrorReason>`. |
 | **`closeAllDocuments()`** | Closes all open documents. Returns a `Task<void[], PdfErrorReason>`. |
 | **`setActiveDocument(documentId)`** | Sets the active document. Throws an error if the document is not open. |

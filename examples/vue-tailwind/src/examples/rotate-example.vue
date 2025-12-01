@@ -13,6 +13,7 @@ import { InteractionManagerPluginPackage } from '@embedpdf/plugin-interaction-ma
 import { RotatePluginPackage } from '@embedpdf/plugin-rotate/vue';
 import { Rotation } from '@embedpdf/models';
 import RotateExampleContent from './rotate-example-content.vue';
+import { Loader2 } from 'lucide-vue-next';
 
 const { engine, isLoading } = usePdfiumEngine();
 
@@ -29,7 +30,17 @@ const plugins = [
 </script>
 
 <template>
-  <div v-if="isLoading || !engine">Loading PDF Engine...</div>
+  <div
+    v-if="isLoading || !engine"
+    class="overflow-hidden rounded-lg border border-gray-200 bg-white dark:border-gray-700 dark:bg-gray-900"
+  >
+    <div class="flex h-[400px] items-center justify-center">
+      <div class="flex items-center gap-2 text-gray-500">
+        <Loader2 :size="20" class="animate-spin" />
+        <span class="text-sm">Loading PDF Engine...</span>
+      </div>
+    </div>
+  </div>
   <EmbedPDF v-else :engine="engine" :plugins="plugins" v-slot="{ activeDocumentId }">
     <DocumentContent v-if="activeDocumentId" :document-id="activeDocumentId" v-slot="{ isLoaded }">
       <RotateExampleContent v-if="isLoaded" :document-id="activeDocumentId" />

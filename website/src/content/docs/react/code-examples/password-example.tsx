@@ -19,6 +19,15 @@ import { TilingPluginPackage, TilingLayer } from '@embedpdf/plugin-tiling/react'
 import { ZoomPluginPackage, ZoomMode } from '@embedpdf/plugin-zoom/react'
 import { PdfErrorCode } from '@embedpdf/models'
 import { DocumentState } from '@embedpdf/core'
+import {
+  Loader2,
+  Lock,
+  AlertCircle,
+  X,
+  Eye,
+  EyeOff,
+  FileText,
+} from 'lucide-react'
 
 interface PasswordPromptProps {
   documentState: DocumentState
@@ -27,6 +36,7 @@ interface PasswordPromptProps {
 function PasswordPrompt({ documentState }: PasswordPromptProps) {
   const { provides } = useDocumentManagerCapability()
   const [password, setPassword] = useState('')
+  const [showPassword, setShowPassword] = useState(false)
   const [isRetrying, setIsRetrying] = useState(false)
 
   if (!documentState) return null
@@ -37,35 +47,28 @@ function PasswordPrompt({ documentState }: PasswordPromptProps) {
   const isPasswordRequired = isPasswordError && !passwordProvided
   const isPasswordIncorrect = isPasswordError && passwordProvided
 
+  // Generic error state
   if (!isPasswordError) {
     return (
       <div className="flex h-full items-center justify-center p-8">
-        <div className="max-w-md rounded-lg bg-red-50 p-6 text-center">
-          <svg
-            className="mx-auto h-12 w-12 text-red-600"
-            fill="none"
-            stroke="currentColor"
-            viewBox="0 0 24 24"
-          >
-            <path
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              strokeWidth={2}
-              d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
-            />
-          </svg>
-          <h3 className="mt-4 text-lg font-medium text-red-900">
+        <div className="w-full max-w-sm text-center">
+          <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-red-100 dark:bg-red-900/30">
+            <AlertCircle className="h-6 w-6 text-red-600 dark:text-red-400" />
+          </div>
+          <h3 className="mt-4 text-base font-semibold text-gray-900 dark:text-gray-100">
             Error loading document
           </h3>
-          <p className="mt-2 text-sm text-red-700">
+          <p className="mt-2 text-sm text-gray-600 dark:text-gray-400">
             {documentState.error || 'An unknown error occurred'}
           </p>
           {errorCode && (
-            <p className="mt-1 text-xs text-red-600">Error Code: {errorCode}</p>
+            <p className="mt-1 text-xs text-gray-500 dark:text-gray-500">
+              Error code: {errorCode}
+            </p>
           )}
           <button
             onClick={() => provides?.closeDocument(documentState.id)}
-            className="mt-4 rounded-md bg-red-100 px-4 py-2 text-sm font-medium text-red-700 hover:bg-red-200"
+            className="mt-4 inline-flex items-center gap-2 rounded-md bg-gray-100 px-4 py-2 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-200 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700"
           >
             Close Document
           </button>
@@ -92,73 +95,108 @@ function PasswordPrompt({ documentState }: PasswordPromptProps) {
   }
 
   return (
-    <div className="flex h-full items-center justify-center p-8">
-      <div className="w-full max-w-md rounded-lg border border-amber-200 bg-amber-50 p-6">
-        <div className="flex items-start justify-between">
-          <div>
-            <h3 className="text-lg font-semibold text-gray-900">
-              Password Required
-            </h3>
-            {name && <p className="mt-1 text-sm text-gray-600">{name}</p>}
+    <div className="flex h-full items-center justify-center p-4 sm:p-8">
+      <div className="w-full max-w-sm overflow-hidden rounded-lg border border-gray-200 bg-white shadow-lg dark:border-gray-700 dark:bg-gray-900">
+        {/* Header */}
+        <div className="flex items-start justify-between gap-4 border-b border-gray-100 p-4 dark:border-gray-800">
+          <div className="flex items-center gap-3">
+            <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full bg-amber-100 dark:bg-amber-900/30">
+              <Lock className="h-5 w-5 text-amber-600 dark:text-amber-400" />
+            </div>
+            <div className="min-w-0">
+              <h3 className="text-sm font-semibold text-gray-900 dark:text-gray-100">
+                Password Required
+              </h3>
+              {name && (
+                <p className="mt-0.5 flex items-center gap-1 truncate text-xs text-gray-500 dark:text-gray-400">
+                  <FileText size={12} />
+                  {name}
+                </p>
+              )}
+            </div>
           </div>
           <button
             onClick={() => provides?.closeDocument(documentState.id)}
             disabled={isRetrying}
-            className="text-gray-400 hover:text-gray-600"
+            className="rounded p-1 text-gray-400 transition-colors hover:bg-gray-100 hover:text-gray-600 disabled:opacity-50 dark:hover:bg-gray-800 dark:hover:text-gray-300"
           >
-            ✕
+            <X size={16} />
           </button>
         </div>
 
-        <p className="mt-4 text-sm text-amber-800">
-          {isPasswordRequired &&
-            'This document is password protected. Please enter the password to open it.'}
-          {isPasswordIncorrect &&
-            'The password you entered was incorrect. Please try again.'}
-        </p>
+        {/* Content */}
+        <div className="p-4">
+          <p className="text-sm text-gray-600 dark:text-gray-400">
+            {isPasswordRequired &&
+              'This document is protected. Enter the password to view it.'}
+            {isPasswordIncorrect && 'Incorrect password. Please try again.'}
+          </p>
 
-        <div className="mt-4">
-          <label className="block text-sm font-medium text-gray-700">
-            Password
-          </label>
-          <input
-            type="password"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            onKeyDown={(e) =>
-              e.key === 'Enter' &&
-              !isRetrying &&
-              password.trim() &&
-              handleRetry()
-            }
-            disabled={isRetrying}
-            placeholder="Enter document password"
-            className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-blue-500"
-          />
+          {/* Password Input */}
+          <div className="mt-4">
+            <label className="mb-1.5 block text-xs font-medium text-gray-700 dark:text-gray-300">
+              Password
+            </label>
+            <div className="relative">
+              <input
+                type={showPassword ? 'text' : 'password'}
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                onKeyDown={(e) =>
+                  e.key === 'Enter' &&
+                  !isRetrying &&
+                  password.trim() &&
+                  handleRetry()
+                }
+                disabled={isRetrying}
+                placeholder="Enter password"
+                className={`block w-full rounded-md border bg-white px-3 py-2 pr-10 text-sm text-gray-900 placeholder-gray-400 focus:border-transparent focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:cursor-not-allowed disabled:opacity-50 dark:bg-gray-800 dark:text-gray-100 dark:placeholder-gray-500 ${
+                  isPasswordIncorrect
+                    ? 'border-red-300 dark:border-red-700'
+                    : 'border-gray-300 dark:border-gray-600'
+                } `}
+              />
+              <button
+                type="button"
+                onClick={() => setShowPassword(!showPassword)}
+                className="absolute right-2 top-1/2 -translate-y-1/2 p-1 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
+              >
+                {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+              </button>
+            </div>
+          </div>
+
+          {/* Error message */}
+          {isPasswordIncorrect && (
+            <div className="mt-3 flex items-center gap-2 text-xs text-red-600 dark:text-red-400">
+              <AlertCircle size={14} />
+              <span>The password you entered is incorrect</span>
+            </div>
+          )}
         </div>
 
-        {isPasswordIncorrect && (
-          <div className="mt-3 rounded-md bg-amber-800 p-3">
-            <p className="text-sm text-white">
-              Incorrect password. Please check and try again.
-            </p>
-          </div>
-        )}
-
-        <div className="mt-4 flex justify-end gap-3">
+        {/* Footer */}
+        <div className="flex justify-end gap-2 border-t border-gray-100 bg-gray-50 px-4 py-3 dark:border-gray-800 dark:bg-gray-800/50">
           <button
             onClick={() => provides?.closeDocument(documentState.id)}
             disabled={isRetrying}
-            className="rounded-md px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
+            className="rounded-md px-3 py-1.5 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-200 disabled:opacity-50 dark:text-gray-300 dark:hover:bg-gray-700"
           >
             Cancel
           </button>
           <button
             onClick={handleRetry}
             disabled={isRetrying || !password.trim()}
-            className="rounded-md bg-blue-600 px-4 py-2 text-sm text-white hover:bg-blue-700 disabled:bg-gray-400"
+            className="inline-flex items-center gap-2 rounded-md bg-blue-500 px-3 py-1.5 text-sm font-medium text-white shadow-sm transition-colors hover:bg-blue-600 disabled:cursor-not-allowed disabled:opacity-50"
           >
-            {isRetrying ? 'Opening...' : 'Open'}
+            {isRetrying ? (
+              <>
+                <Loader2 size={14} className="animate-spin" />
+                Opening...
+              </>
+            ) : (
+              'Unlock'
+            )}
           </button>
         </div>
       </div>
@@ -188,23 +226,25 @@ export const PDFViewer = () => {
   )
 
   if (isLoading || !engine) {
-    return <div>Loading PDF Engine...</div>
+    return (
+      <div className="overflow-hidden rounded-lg border border-gray-200 bg-white dark:border-gray-700 dark:bg-gray-900">
+        <div className="flex h-[400px] items-center justify-center">
+          <div className="flex items-center gap-2 text-gray-500">
+            <Loader2 size={20} className="animate-spin" />
+            <span className="text-sm">Loading PDF Engine...</span>
+          </div>
+        </div>
+      </div>
+    )
   }
 
   return (
-    <div
-      style={{
-        height: '500px',
-        display: 'flex',
-        flexDirection: 'column',
-        marginTop: '10px',
-      }}
-    >
-      <EmbedPDF engine={engine} plugins={plugins}>
-        {({ pluginsReady, activeDocumentId }) => (
-          <>
-            {pluginsReady ? (
-              activeDocumentId && (
+    <EmbedPDF engine={engine} plugins={plugins}>
+      {({ pluginsReady, activeDocumentId }) => (
+        <>
+          {pluginsReady ? (
+            activeDocumentId && (
+              <div className="overflow-hidden rounded-lg border border-gray-200 bg-white shadow-sm dark:border-gray-700 dark:bg-gray-900">
                 <DocumentContent documentId={activeDocumentId}>
                   {({
                     documentState,
@@ -214,20 +254,26 @@ export const PDFViewer = () => {
                   }) => (
                     <>
                       {docLoading && (
-                        <div className="flex h-full items-center justify-center">
-                          <div>Loading document...</div>
+                        <div className="flex h-[400px] items-center justify-center sm:h-[500px]">
+                          <div className="flex items-center gap-2 text-gray-500">
+                            <Loader2 size={20} className="animate-spin" />
+                            <span className="text-sm">Loading document...</span>
+                          </div>
                         </div>
                       )}
                       {isError && (
-                        <PasswordPrompt documentState={documentState} />
+                        <div className="h-[400px] bg-gray-50 sm:h-[500px] dark:bg-gray-900/50">
+                          <PasswordPrompt documentState={documentState} />
+                        </div>
                       )}
                       {isLoaded && (
-                        <div className="flex-1 overflow-hidden">
+                        <div className="relative h-[400px] sm:h-[500px]">
                           <Viewport
                             documentId={activeDocumentId}
                             style={{
-                              backgroundColor: '#f1f3f5',
-                              height: '100%',
+                              position: 'absolute',
+                              inset: 0,
+                              backgroundColor: '#e5e7eb',
                             }}
                           >
                             <Scroller
@@ -257,15 +303,20 @@ export const PDFViewer = () => {
                     </>
                   )}
                 </DocumentContent>
-              )
-            ) : (
-              <div className="flex h-full items-center justify-center">
-                <div>Initializing plugins...</div>
               </div>
-            )}
-          </>
-        )}
-      </EmbedPDF>
-    </div>
+            )
+          ) : (
+            <div className="overflow-hidden rounded-lg border border-gray-200 bg-white dark:border-gray-700 dark:bg-gray-900">
+              <div className="flex h-[400px] items-center justify-center">
+                <div className="flex items-center gap-2 text-gray-500">
+                  <Loader2 size={20} className="animate-spin" />
+                  <span className="text-sm">Initializing plugins...</span>
+                </div>
+              </div>
+            </div>
+          )}
+        </>
+      )}
+    </EmbedPDF>
   )
 }

@@ -34,6 +34,7 @@ import {
   RetryOptions,
   DocumentErrorEvent,
   OpenDocumentResponse,
+  OpenFileDialogOptions,
 } from './types';
 
 export class DocumentManagerPlugin extends BasePlugin<
@@ -49,7 +50,10 @@ export class DocumentManagerPlugin extends BasePlugin<
 
   private readonly documentOrderChanged$ = createBehaviorEmitter<DocumentOrderChangeEvent>();
 
-  private readonly openFileRequest$ = createEmitter<Task<OpenDocumentResponse, PdfErrorReason>>();
+  private readonly openFileRequest$ = createEmitter<{
+    task: Task<OpenDocumentResponse, PdfErrorReason>;
+    options?: OpenFileDialogOptions;
+  }>();
 
   private maxDocuments?: number;
 
@@ -67,7 +71,7 @@ export class DocumentManagerPlugin extends BasePlugin<
   protected buildCapability(): DocumentManagerCapability {
     return {
       // Document lifecycle - orchestration only
-      openFileDialog: () => this.openFileDialog(),
+      openFileDialog: (options) => this.openFileDialog(options),
       openDocumentUrl: (options) => this.openDocumentUrl(options),
       openDocumentBuffer: (options) => this.openDocumentBuffer(options),
       retryDocument: (documentId, options) => this.retryDocument(documentId, options),
@@ -207,7 +211,10 @@ export class DocumentManagerPlugin extends BasePlugin<
   }
 
   public onOpenFileRequest(
-    handler: Listener<Task<OpenDocumentResponse, PdfErrorReason>>,
+    handler: Listener<{
+      task: Task<OpenDocumentResponse, PdfErrorReason>;
+      options?: OpenFileDialogOptions;
+    }>,
   ): Unsubscribe {
     return this.openFileRequest$.on(handler);
   }
@@ -380,9 +387,11 @@ export class DocumentManagerPlugin extends BasePlugin<
     return task;
   }
 
-  private openFileDialog(): Task<OpenDocumentResponse, PdfErrorReason> {
+  private openFileDialog(
+    options?: OpenFileDialogOptions,
+  ): Task<OpenDocumentResponse, PdfErrorReason> {
     const task = new Task<OpenDocumentResponse, PdfErrorReason>();
-    this.openFileRequest$.emit(task);
+    this.openFileRequest$.emit({ task, options });
     return task;
   }
 

@@ -59,6 +59,13 @@ export interface RetryOptions {
   password?: string;
 }
 
+export interface OpenFileDialogOptions {
+  documentId?: string;
+  scale?: number;
+  rotation?: Rotation;
+  autoActivate?: boolean;
+}
+
 export interface OpenDocumentResponse {
   documentId: string;
   task: Task<PdfDocumentObject, PdfErrorReason>;
@@ -66,7 +73,7 @@ export interface OpenDocumentResponse {
 
 export interface DocumentManagerCapability {
   // Document lifecycle
-  openFileDialog: () => Task<OpenDocumentResponse, PdfErrorReason>;
+  openFileDialog: (options?: OpenFileDialogOptions) => Task<OpenDocumentResponse, PdfErrorReason>;
   openDocumentUrl(options: LoadDocumentUrlOptions): Task<OpenDocumentResponse, PdfErrorReason>;
   openDocumentBuffer(
     options: LoadDocumentBufferOptions,
