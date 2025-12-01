@@ -209,6 +209,8 @@ export class ViewportPlugin extends BasePlugin<
   }
 
   public unregisterViewport(documentId: string): void {
+    if (this.registry.isDestroyed()) return;
+
     // Mark as inactive/unmounted (but preserve state!)
     if (this.state.activeViewports.has(documentId)) {
       this.dispatch(unregisterViewport(documentId));
