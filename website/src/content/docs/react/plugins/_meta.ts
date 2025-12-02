@@ -17,4 +17,5 @@ export default {
   'plugin-redaction': 'Redaction',
   'plugin-i18n': 'Internationalization',
   'plugin-view-manager': 'View Manager',
+  'plugin-commands': 'Commands',
 }

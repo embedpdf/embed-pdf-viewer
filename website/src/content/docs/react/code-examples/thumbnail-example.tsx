@@ -132,11 +132,7 @@ export const PDFViewer = () => {
                     <div className="relative flex-1">
                       <Viewport
                         documentId={activeDocumentId}
-                        style={{
-                          position: 'absolute',
-                          inset: 0,
-                          backgroundColor: '#e5e7eb',
-                        }}
+                        className="absolute inset-0 bg-[#e5e7eb]"
                       >
                         <Scroller
                           documentId={activeDocumentId}

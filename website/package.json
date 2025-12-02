@@ -20,6 +20,7 @@
     "@embedpdf/pdfium": "workspace:*",
     "@embedpdf/plugin-annotation": "workspace:*",
     "@embedpdf/plugin-capture": "workspace:*",
+    "@embedpdf/plugin-commands": "workspace:*",
     "@embedpdf/plugin-document-manager": "workspace:*",
     "@embedpdf/plugin-export": "workspace:*",
     "@embedpdf/plugin-history": "workspace:*",

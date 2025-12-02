@@ -2170,6 +2170,9 @@ importers:
       '@embedpdf/plugin-capture':
         specifier: workspace:*
         version: link:../packages/plugin-capture
+      '@embedpdf/plugin-commands':
+        specifier: workspace:*
+        version: link:../packages/plugin-commands
       '@embedpdf/plugin-document-manager':
         specifier: workspace:*
         version: link:../packages/plugin-document-manager
