@@ -253,7 +253,9 @@ export const PdfMergeTool = () => {
         <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
           {/* Source documents */}
           <div>
-            <h2 className="mb-2 text-xl font-semibold">Source Documents</h2>
+            <h2 className="mb-2 text-xl font-semibold dark:text-white">
+              Source Documents
+            </h2>
             <DocumentView
               documents={docs}
               onUpdatePages={handleUpdatePages}
@@ -265,7 +267,9 @@ export const PdfMergeTool = () => {
 
           {/* Target document */}
           <div>
-            <h2 className="mb-2 text-xl font-semibold">New Document</h2>
+            <h2 className="mb-2 text-xl font-semibold dark:text-white">
+              New Document
+            </h2>
             <MergeView
               pages={mergePages}
               onDragEnd={handleDragEnd}

@@ -132,12 +132,12 @@ export const PdfMetadataEditorTool = () => {
         <LoadingState borderColor="border-pink-500" />
       ) : error ? (
         <div className="mb-12 text-center">
-          <div className="mx-auto max-w-md rounded-lg bg-red-50 p-4 text-red-700">
+          <div className="mx-auto max-w-md rounded-lg bg-red-50 p-4 text-red-700 dark:bg-red-900/20 dark:text-red-300">
             {error}
           </div>
           <button
             onClick={() => setError(null)}
-            className="mt-4 text-blue-600 hover:text-blue-800"
+            className="mt-4 text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300"
           >
             Try again
           </button>

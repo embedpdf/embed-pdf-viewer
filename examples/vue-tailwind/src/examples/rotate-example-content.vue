@@ -15,30 +15,32 @@ const { rotation, provides: rotate } = useRotate(() => props.documentId);
 
 <template>
   <div
-    class="overflow-hidden rounded-lg border border-gray-200 bg-white shadow-sm dark:border-gray-700 dark:bg-gray-900"
+    class="overflow-hidden rounded-lg border border-gray-300 bg-white shadow-sm dark:border-gray-700 dark:bg-gray-900"
   >
     <!-- Toolbar -->
     <div
       v-if="rotate"
-      class="flex items-center gap-3 border-b border-gray-200 bg-white px-3 py-2 dark:border-gray-700 dark:bg-gray-900"
+      class="flex items-center gap-3 border-b border-gray-300 bg-gray-100 px-3 py-2 dark:border-gray-700 dark:bg-gray-800"
     >
-      <span class="text-xs font-medium uppercase tracking-wide text-gray-500 dark:text-gray-400">
+      <span class="text-xs font-medium uppercase tracking-wide text-gray-600 dark:text-gray-300">
         Rotation
       </span>
-      <div class="h-4 w-px bg-gray-200 dark:bg-gray-700"></div>
+      <div class="h-4 w-px bg-gray-300 dark:bg-gray-600"></div>
 
       <!-- Rotation controls -->
       <div class="flex items-center gap-1.5">
         <button
           @click="rotate.rotateBackward"
-          class="inline-flex h-8 w-8 items-center justify-center rounded-md bg-gray-100 text-gray-600 transition-all hover:bg-gray-200 hover:text-gray-900 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700 dark:hover:text-gray-100"
+          class="inline-flex h-8 w-8 items-center justify-center rounded-md bg-white text-gray-600 shadow-sm ring-1 ring-gray-300 transition-all hover:bg-gray-50 hover:text-gray-900 dark:bg-gray-700 dark:text-gray-300 dark:ring-gray-600 dark:hover:bg-gray-600 dark:hover:text-gray-100"
           title="Rotate Counter-Clockwise"
         >
           <RotateCcw :size="16" />
         </button>
 
         <!-- Degree indicator -->
-        <div class="min-w-[56px] rounded-md bg-gray-100 px-2 py-1 text-center dark:bg-gray-800">
+        <div
+          class="min-w-[56px] rounded-md bg-white px-2 py-1 text-center shadow-sm ring-1 ring-gray-300 dark:bg-gray-700 dark:ring-gray-600"
+        >
           <span class="font-mono text-sm font-medium text-gray-700 dark:text-gray-300">
             {{ rotation * 90 }}°
           </span>
@@ -46,28 +48,21 @@ const { rotation, provides: rotate } = useRotate(() => props.documentId);
 
         <button
           @click="rotate.rotateForward"
-          class="inline-flex h-8 w-8 items-center justify-center rounded-md bg-gray-100 text-gray-600 transition-all hover:bg-gray-200 hover:text-gray-900 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700 dark:hover:text-gray-100"
+          class="inline-flex h-8 w-8 items-center justify-center rounded-md bg-white text-gray-600 shadow-sm ring-1 ring-gray-300 transition-all hover:bg-gray-50 hover:text-gray-900 dark:bg-gray-700 dark:text-gray-300 dark:ring-gray-600 dark:hover:bg-gray-600 dark:hover:text-gray-100"
           title="Rotate Clockwise"
         >
           <RotateCw :size="16" />
         </button>
       </div>
 
-      <span class="hidden text-xs text-gray-400 sm:inline dark:text-gray-500">
+      <span class="hidden text-xs text-gray-600 sm:inline dark:text-gray-300">
         Click to rotate all pages
       </span>
     </div>
 
     <!-- PDF Viewer Area -->
     <div class="relative h-[400px] sm:h-[500px]">
-      <Viewport
-        :document-id="documentId"
-        :style="{
-          position: 'absolute',
-          inset: 0,
-          backgroundColor: '#e5e7eb',
-        }"
-      >
+      <Viewport :document-id="documentId" class="absolute inset-0 bg-gray-200 dark:bg-gray-800">
         <Scroller :document-id="documentId">
           <template #default="{ page }">
             <Rotate :document-id="documentId" :page-index="page.pageIndex">

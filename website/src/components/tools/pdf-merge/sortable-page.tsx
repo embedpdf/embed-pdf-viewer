@@ -41,7 +41,7 @@ export const SortablePage: React.FC<SortablePageProps> = ({
     <div
       ref={setNodeRef}
       style={style}
-      className="group relative cursor-move rounded-lg border-2 border-gray-200 bg-white p-3 hover:border-gray-300 hover:shadow-md"
+      className="group relative cursor-move rounded-lg border-2 border-gray-200 bg-white p-3 hover:border-gray-300 hover:shadow-md dark:border-gray-700 dark:bg-gray-800 dark:hover:border-gray-600"
       {...attributes}
       {...listeners}
     >
@@ -55,13 +55,13 @@ export const SortablePage: React.FC<SortablePageProps> = ({
               e.stopPropagation()
               onRemove(page.id)
             }}
-            className="flex h-6 w-6 items-center justify-center rounded-full bg-red-500 text-white opacity-0 transition-opacity hover:bg-red-600 group-hover:opacity-100"
+            className="flex h-6 w-6 items-center justify-center rounded-full bg-red-500 text-white opacity-0 transition-opacity hover:bg-red-600 group-hover:opacity-100 dark:bg-red-600 dark:hover:bg-red-700"
             style={{ touchAction: 'none' }}
           >
             <X className="h-3 w-3" />
           </Button>
         )}
-        <span className="flex h-6 w-6 items-center justify-center rounded-full bg-gray-200 text-xs font-medium text-gray-600">
+        <span className="flex h-6 w-6 items-center justify-center rounded-full bg-gray-200 text-xs font-medium text-gray-600 dark:bg-gray-700 dark:text-gray-300">
           {index + 1}
         </span>
       </div>
@@ -69,14 +69,14 @@ export const SortablePage: React.FC<SortablePageProps> = ({
         <img
           src={page.thumbnail}
           alt={`Page ${index + 1}`}
-          className="h-full w-full rounded-md object-contain p-2"
+          className="h-full w-full rounded-md object-contain p-2 dark:opacity-90"
           style={{
             aspectRatio: '1/1.414',
           }}
         />
       ) : (
         <div
-          className="flex w-full animate-pulse items-center justify-center rounded-md bg-gray-100 text-sm text-gray-400"
+          className="flex w-full animate-pulse items-center justify-center rounded-md bg-gray-100 text-sm text-gray-400 dark:bg-gray-700/50 dark:text-gray-500"
           style={{
             aspectRatio: '1/1.414',
           }}

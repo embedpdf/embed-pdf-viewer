@@ -6,6 +6,7 @@ import { RenderLayer } from '@embedpdf/plugin-render/vue';
 import { AnnotationLayer, useAnnotationCapability } from '@embedpdf/plugin-annotation/vue';
 import { PagePointerProvider } from '@embedpdf/plugin-interaction-manager/vue';
 import { SelectionLayer } from '@embedpdf/plugin-selection/vue';
+import { Check, X, Pencil, Square, Highlighter, Trash2 } from 'lucide-vue-next';
 
 const props = defineProps<{
   documentId: string;
@@ -18,11 +19,11 @@ const { provides: annotationCapability } = useAnnotationCapability();
 const annotationApi = computed(() => annotationCapability.value?.forDocument(props.documentId));
 
 const tools = [
-  { id: 'stampCheckmark', name: 'Checkmark (stamp)' },
-  { id: 'stampCross', name: 'Cross (stamp)' },
-  { id: 'ink', name: 'Pen' },
-  { id: 'square', name: 'Square' },
-  { id: 'highlight', name: 'Highlight' },
+  { id: 'stampCheckmark', name: 'Checkmark', icon: Check },
+  { id: 'stampCross', name: 'Cross', icon: X },
+  { id: 'ink', name: 'Pen', icon: Pencil },
+  { id: 'square', name: 'Square', icon: Square },
+  { id: 'highlight', name: 'Highlight', icon: Highlighter },
 ];
 
 let unsubscribeToolChange: (() => void) | undefined;
@@ -58,35 +59,49 @@ const handleDelete = () => {
 </script>
 
 <template>
-  <div style="height: 600px; display: flex; flex-direction: column; user-select: none">
+  <div
+    class="overflow-hidden rounded-lg border border-gray-300 bg-white shadow-sm dark:border-gray-700 dark:bg-gray-900"
+    style="user-select: none"
+  >
+    <!-- Toolbar -->
     <div
-      class="mb-4 mt-4 flex flex-wrap items-center gap-2 rounded-lg border border-gray-200 bg-white p-2 shadow-sm"
+      class="flex flex-wrap items-center gap-3 border-b border-gray-300 bg-gray-100 px-3 py-2 dark:border-gray-700 dark:bg-gray-800"
     >
-      <button
-        v-for="tool in tools"
-        :key="tool.id"
-        @click="handleToolClick(tool.id)"
-        :class="[
-          'rounded-md px-3 py-1 text-sm font-medium transition-colors',
-          activeTool === tool.id ? 'bg-blue-500 text-white' : 'bg-gray-100 hover:bg-gray-200',
-        ]"
-      >
-        {{ tool.name }}
-      </button>
-      <div class="h-6 w-px bg-gray-200"></div>
+      <span class="text-xs font-medium uppercase tracking-wide text-gray-600 dark:text-gray-300">
+        Tools
+      </span>
+      <div class="h-4 w-px bg-gray-300 dark:bg-gray-600"></div>
+      <div class="flex items-center gap-1.5">
+        <button
+          v-for="tool in tools"
+          :key="tool.id"
+          @click="handleToolClick(tool.id)"
+          :class="[
+            'inline-flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-xs font-medium shadow-sm transition-all',
+            activeTool === tool.id
+              ? 'bg-blue-500 text-white ring-1 ring-blue-600'
+              : 'bg-white text-gray-600 ring-1 ring-gray-300 hover:bg-gray-50 hover:text-gray-900 dark:bg-gray-700 dark:text-gray-300 dark:ring-gray-600 dark:hover:bg-gray-600 dark:hover:text-gray-100',
+          ]"
+          :title="tool.name"
+        >
+          <component :is="tool.icon" :size="14" />
+          <span class="hidden sm:inline">{{ tool.name }}</span>
+        </button>
+      </div>
+      <div class="h-4 w-px bg-gray-300 dark:bg-gray-600"></div>
       <button
         @click="handleDelete"
         :disabled="!canDelete"
-        class="rounded-md bg-red-500 px-3 py-1 text-sm font-medium text-white transition-colors hover:bg-red-600 disabled:cursor-not-allowed disabled:bg-red-300"
+        class="inline-flex items-center gap-1.5 rounded-md bg-red-500 px-2.5 py-1.5 text-xs font-medium text-white shadow-sm transition-all hover:bg-red-600 disabled:cursor-not-allowed disabled:opacity-50"
       >
-        Delete Selected
+        <Trash2 :size="14" />
+        <span class="hidden sm:inline">Delete</span>
       </button>
     </div>
-    <div class="flex-grow" style="position: relative">
-      <Viewport
-        :document-id="documentId"
-        style="width: 100%; height: 100%; position: absolute; background-color: #f1f3f5"
-      >
+
+    <!-- PDF Viewer Area -->
+    <div class="relative h-[450px] sm:h-[550px]">
+      <Viewport :document-id="documentId" class="absolute inset-0 bg-gray-200 dark:bg-gray-800">
         <Scroller :document-id="documentId">
           <template #default="{ page }">
             <PagePointerProvider :document-id="documentId" :page-index="page.pageIndex">

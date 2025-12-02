@@ -3,6 +3,7 @@ import { Viewport } from '@embedpdf/plugin-viewport/vue';
 import { Scroller } from '@embedpdf/plugin-scroll/vue';
 import { RenderLayer } from '@embedpdf/plugin-render/vue';
 import { useExport } from '@embedpdf/plugin-export/vue';
+import { Download } from 'lucide-vue-next';
 
 const props = defineProps<{
   documentId: string;
@@ -12,58 +13,43 @@ const { provides: exportApi } = useExport(() => props.documentId);
 </script>
 
 <template>
-  <div style="height: 500px">
-    <div class="flex h-full flex-col">
-      <div
-        class="mb-4 mt-4 flex items-center gap-3 rounded-lg border border-gray-200 bg-white p-3 shadow-sm"
+  <div
+    class="overflow-hidden rounded-lg border border-gray-300 bg-white shadow-sm dark:border-gray-700 dark:bg-gray-900"
+  >
+    <!-- Toolbar -->
+    <div
+      class="flex items-center gap-3 border-b border-gray-300 bg-gray-100 px-3 py-2 dark:border-gray-700 dark:bg-gray-800"
+    >
+      <button
+        @click="exportApi?.download()"
+        :disabled="!exportApi"
+        class="inline-flex items-center gap-2 rounded-md bg-blue-500 px-3 py-1.5 text-sm font-medium text-white shadow-sm transition-all hover:bg-blue-600 disabled:cursor-not-allowed disabled:opacity-50"
       >
-        <button
-          @click="exportApi?.download()"
-          :disabled="!exportApi"
-          class="flex h-8 w-8 items-center justify-center rounded-md border border-gray-300 bg-white text-gray-700 transition-colors duration-150 hover:border-gray-400 hover:bg-gray-50 hover:text-gray-900 active:bg-gray-100 disabled:cursor-not-allowed disabled:opacity-50"
-          title="Download PDF"
-        >
-          <svg
-            width="16"
-            height="16"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="2"
-          >
-            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
-            <polyline points="7 10 12 15 17 10" />
-            <line x1="12" y1="15" x2="12" y2="3" />
-          </svg>
-        </button>
-      </div>
-      <div class="flex-grow" style="position: relative">
-        <Viewport
-          :document-id="documentId"
-          style="
-            background-color: #f1f3f5;
-            position: absolute;
-            top: 0;
-            left: 0;
-            right: 0;
-            bottom: 0;
-          "
-        >
-          <Scroller :document-id="documentId">
-            <template #default="{ page }">
-              <div
-                :style="{
-                  width: page.width + 'px',
-                  height: page.height + 'px',
-                  position: 'relative',
-                }"
-              >
-                <RenderLayer :document-id="documentId" :page-index="page.pageIndex" :scale="1" />
-              </div>
-            </template>
-          </Scroller>
-        </Viewport>
-      </div>
+        <Download :size="16" />
+        Download PDF
+      </button>
+      <span class="text-xs text-gray-600 dark:text-gray-300">
+        Click to save the document to your device
+      </span>
+    </div>
+
+    <!-- PDF Viewer Area -->
+    <div class="relative h-[400px] sm:h-[500px]">
+      <Viewport :document-id="documentId" class="absolute inset-0 bg-gray-200 dark:bg-gray-800">
+        <Scroller :document-id="documentId">
+          <template #default="{ page }">
+            <div
+              :style="{
+                width: page.width + 'px',
+                height: page.height + 'px',
+                position: 'relative',
+              }"
+            >
+              <RenderLayer :document-id="documentId" :page-index="page.pageIndex" :scale="1" />
+            </div>
+          </template>
+        </Scroller>
+      </Viewport>
     </div>
   </div>
 </template>
