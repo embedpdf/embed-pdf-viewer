@@ -19,7 +19,7 @@ import { Heading, MDXWrapper } from 'nextra'
 const Blockquote: FC<ComponentProps<'blockquote'>> = (props) => (
   <blockquote
     className={cn(
-      'not-first:mt-6 border-gray-300 italic text-gray-700',
+      'not-first:mt-6 border-gray-300 italic text-gray-700 dark:border-gray-700 dark:text-gray-300',
       'border-s-2 ps-6',
     )}
     {...props}
@@ -75,7 +75,9 @@ const DEFAULT_COMPONENTS = getNextraMDXComponents({
   h4: H4,
   h5: H5,
   h6: H6,
-  hr: (props) => <hr className="nextra-border my-8" {...props} />,
+  hr: (props) => (
+    <hr className="nextra-border my-8 dark:border-gray-800" {...props} />
+  ),
   li: (props) => <li className="my-2" {...props} />,
   ol: (props) => (
     <ol

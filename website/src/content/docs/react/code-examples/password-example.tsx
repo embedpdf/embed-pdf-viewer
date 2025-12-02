@@ -68,7 +68,7 @@ function PasswordPrompt({ documentState }: PasswordPromptProps) {
           )}
           <button
             onClick={() => provides?.closeDocument(documentState.id)}
-            className="mt-4 inline-flex items-center gap-2 rounded-md bg-gray-100 px-4 py-2 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-200 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700"
+            className="mt-4 inline-flex items-center gap-2 rounded-md bg-white px-4 py-2 text-sm font-medium text-gray-700 shadow-sm ring-1 ring-gray-300 transition-colors hover:bg-gray-50 dark:bg-gray-700 dark:text-gray-300 dark:ring-gray-600 dark:hover:bg-gray-600"
           >
             Close Document
           </button>
@@ -96,9 +96,9 @@ function PasswordPrompt({ documentState }: PasswordPromptProps) {
 
   return (
     <div className="flex h-full items-center justify-center p-4 sm:p-8">
-      <div className="w-full max-w-sm overflow-hidden rounded-lg border border-gray-200 bg-white shadow-lg dark:border-gray-700 dark:bg-gray-900">
+      <div className="w-full max-w-sm overflow-hidden rounded-lg border border-gray-300 bg-white shadow-lg dark:border-gray-700 dark:bg-gray-900">
         {/* Header */}
-        <div className="flex items-start justify-between gap-4 border-b border-gray-100 p-4 dark:border-gray-800">
+        <div className="flex items-start justify-between gap-4 border-b border-gray-200 p-4 dark:border-gray-700">
           <div className="flex items-center gap-3">
             <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full bg-amber-100 dark:bg-amber-900/30">
               <Lock className="h-5 w-5 text-amber-600 dark:text-amber-400" />
@@ -176,11 +176,11 @@ function PasswordPrompt({ documentState }: PasswordPromptProps) {
         </div>
 
         {/* Footer */}
-        <div className="flex justify-end gap-2 border-t border-gray-100 bg-gray-50 px-4 py-3 dark:border-gray-800 dark:bg-gray-800/50">
+        <div className="flex justify-end gap-2 border-t border-gray-200 bg-gray-50 px-4 py-3 dark:border-gray-700 dark:bg-gray-800/50">
           <button
             onClick={() => provides?.closeDocument(documentState.id)}
             disabled={isRetrying}
-            className="rounded-md px-3 py-1.5 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-200 disabled:opacity-50 dark:text-gray-300 dark:hover:bg-gray-700"
+            className="rounded-md px-3 py-1.5 text-sm font-medium text-gray-700 shadow-sm ring-1 ring-gray-300 transition-colors hover:bg-gray-50 disabled:opacity-50 dark:text-gray-300 dark:ring-gray-600 dark:hover:bg-gray-700"
           >
             Cancel
           </button>
@@ -227,9 +227,9 @@ export const PDFViewer = () => {
 
   if (isLoading || !engine) {
     return (
-      <div className="overflow-hidden rounded-lg border border-gray-200 bg-white dark:border-gray-700 dark:bg-gray-900">
+      <div className="overflow-hidden rounded-lg border border-gray-300 bg-white dark:border-gray-700 dark:bg-gray-900">
         <div className="flex h-[400px] items-center justify-center">
-          <div className="flex items-center gap-2 text-gray-500">
+          <div className="flex items-center gap-2 text-gray-500 dark:text-gray-400">
             <Loader2 size={20} className="animate-spin" />
             <span className="text-sm">Loading PDF Engine...</span>
           </div>
@@ -244,7 +244,7 @@ export const PDFViewer = () => {
         <>
           {pluginsReady ? (
             activeDocumentId && (
-              <div className="overflow-hidden rounded-lg border border-gray-200 bg-white shadow-sm dark:border-gray-700 dark:bg-gray-900">
+              <div className="overflow-hidden rounded-lg border border-gray-300 bg-white shadow-sm dark:border-gray-700 dark:bg-gray-900">
                 <DocumentContent documentId={activeDocumentId}>
                   {({
                     documentState,
@@ -255,14 +255,14 @@ export const PDFViewer = () => {
                     <>
                       {docLoading && (
                         <div className="flex h-[400px] items-center justify-center sm:h-[500px]">
-                          <div className="flex items-center gap-2 text-gray-500">
+                          <div className="flex items-center gap-2 text-gray-500 dark:text-gray-400">
                             <Loader2 size={20} className="animate-spin" />
                             <span className="text-sm">Loading document...</span>
                           </div>
                         </div>
                       )}
                       {isError && (
-                        <div className="h-[400px] bg-gray-50 sm:h-[500px] dark:bg-gray-900/50">
+                        <div className="h-[400px] bg-gray-50 dark:bg-gray-900/50 sm:h-[500px]">
                           <PasswordPrompt documentState={documentState} />
                         </div>
                       )}
@@ -270,7 +270,7 @@ export const PDFViewer = () => {
                         <div className="relative h-[400px] sm:h-[500px]">
                           <Viewport
                             documentId={activeDocumentId}
-                            className="absolute inset-0 bg-[#e5e7eb]"
+                            className="absolute inset-0 bg-gray-200 dark:bg-gray-800"
                           >
                             <Scroller
                               documentId={activeDocumentId}
@@ -302,9 +302,9 @@ export const PDFViewer = () => {
               </div>
             )
           ) : (
-            <div className="overflow-hidden rounded-lg border border-gray-200 bg-white dark:border-gray-700 dark:bg-gray-900">
+            <div className="overflow-hidden rounded-lg border border-gray-300 bg-white dark:border-gray-700 dark:bg-gray-900">
               <div className="flex h-[400px] items-center justify-center">
-                <div className="flex items-center gap-2 text-gray-500">
+                <div className="flex items-center gap-2 text-gray-500 dark:text-gray-400">
                   <Loader2 size={20} className="animate-spin" />
                   <span className="text-sm">Initializing plugins...</span>
                 </div>

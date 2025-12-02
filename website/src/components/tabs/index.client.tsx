@@ -125,7 +125,7 @@ export const Tabs: FC<
         className={(args) =>
           cn(
             'nextra-scrollbar overflow-x-auto overflow-y-hidden overscroll-x-contain',
-            'mt-4 flex w-full gap-2 border-b border-gray-200 pb-px',
+            'mt-4 flex w-full gap-2 border-b border-gray-200 pb-px dark:border-gray-800',
             'focus-visible:nextra-focus',
             typeof className === 'function' ? className(args) : className,
           )
@@ -145,15 +145,15 @@ export const Tabs: FC<
                 selected
                   ? 'border-current outline-none'
                   : hover
-                    ? 'border-gray-200'
+                    ? 'border-gray-200 dark:border-gray-800'
                     : 'border-transparent',
                 selected
-                  ? 'text-primary-600'
+                  ? 'text-primary-600 dark:text-primary-400'
                   : disabled
-                    ? 'pointer-events-none text-gray-400'
+                    ? 'pointer-events-none text-gray-400 dark:text-gray-600'
                     : hover
-                      ? 'text-black'
-                      : 'text-gray-600',
+                      ? 'text-black dark:text-gray-100'
+                      : 'text-gray-600 dark:text-gray-400',
                 typeof tabClassName === 'function'
                   ? tabClassName(args)
                   : tabClassName,

@@ -124,15 +124,15 @@ function LanguageSwitcher() {
 
   return (
     <div className="flex items-center gap-2">
-      <Globe size={14} className="text-gray-500 dark:text-gray-400" />
-      <span className="tracking-wide hidden text-xs font-medium uppercase text-gray-500 sm:inline dark:text-gray-400">
+      <Globe size={14} className="text-gray-600 dark:text-gray-300" />
+      <span className="tracking-wide hidden text-xs font-medium uppercase text-gray-600 dark:text-gray-300 sm:inline">
         {translate('toolbar.language')}
       </span>
       <div className="relative">
         <select
           value={currentLocale}
           onChange={(e) => provides?.setLocale(e.target.value)}
-          className="cursor-pointer appearance-none rounded-md border-0 bg-gray-100 py-1.5 pl-3 pr-8 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-200 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700"
+          className="cursor-pointer appearance-none rounded-md border-0 bg-white py-1.5 pl-3 pr-8 text-sm font-medium text-gray-700 shadow-sm ring-1 ring-gray-300 transition-colors hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-gray-300 dark:ring-gray-600 dark:hover:bg-gray-600"
         >
           {availableLocales.map((code) => {
             const localeInfo = provides?.getLocaleInfo(code)
@@ -145,7 +145,7 @@ function LanguageSwitcher() {
         </select>
         <ChevronDown
           size={14}
-          className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 text-gray-500"
+          className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 text-gray-600 dark:text-gray-300"
         />
       </div>
     </div>
@@ -164,13 +164,13 @@ function ZoomToolbar({ documentId }: { documentId: string }) {
     <div className="flex items-center gap-1.5">
       <button
         onClick={zoom.zoomOut}
-        className="inline-flex h-8 w-8 items-center justify-center rounded-md bg-gray-100 text-gray-600 transition-all hover:bg-gray-200 hover:text-gray-900 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700 dark:hover:text-gray-100"
+        className="inline-flex h-8 w-8 items-center justify-center rounded-md bg-white text-gray-600 shadow-sm ring-1 ring-gray-300 transition-all hover:bg-gray-50 hover:text-gray-900 dark:bg-gray-700 dark:text-gray-300 dark:ring-gray-600 dark:hover:bg-gray-600 dark:hover:text-gray-100"
         title={translate('zoom.out')}
       >
         <ZoomOut size={16} />
       </button>
 
-      <div className="min-w-[56px] rounded-md bg-gray-100 px-2 py-1 text-center dark:bg-gray-800">
+      <div className="min-w-[56px] rounded-md bg-white px-2 py-1 text-center shadow-sm ring-1 ring-gray-300 dark:bg-gray-700 dark:ring-gray-600">
         <span className="font-mono text-sm font-medium text-gray-700 dark:text-gray-300">
           {zoomPercentage}%
         </span>
@@ -178,7 +178,7 @@ function ZoomToolbar({ documentId }: { documentId: string }) {
 
       <button
         onClick={zoom.zoomIn}
-        className="inline-flex h-8 w-8 items-center justify-center rounded-md bg-gray-100 text-gray-600 transition-all hover:bg-gray-200 hover:text-gray-900 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700 dark:hover:text-gray-100"
+        className="inline-flex h-8 w-8 items-center justify-center rounded-md bg-white text-gray-600 shadow-sm ring-1 ring-gray-300 transition-all hover:bg-gray-50 hover:text-gray-900 dark:bg-gray-700 dark:text-gray-300 dark:ring-gray-600 dark:hover:bg-gray-600 dark:hover:text-gray-100"
         title={translate('zoom.in')}
       >
         <ZoomIn size={16} />
@@ -186,7 +186,7 @@ function ZoomToolbar({ documentId }: { documentId: string }) {
 
       <button
         onClick={() => zoom.requestZoom(ZoomMode.FitPage)}
-        className="ml-1 inline-flex items-center gap-1.5 rounded-md bg-gray-100 px-2.5 py-1.5 text-xs font-medium text-gray-600 transition-all hover:bg-gray-200 hover:text-gray-900 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700 dark:hover:text-gray-100"
+        className="ml-1 inline-flex items-center gap-1.5 rounded-md bg-white px-2.5 py-1.5 text-xs font-medium text-gray-600 shadow-sm ring-1 ring-gray-300 transition-all hover:bg-gray-50 hover:text-gray-900 dark:bg-gray-700 dark:text-gray-300 dark:ring-gray-600 dark:hover:bg-gray-600 dark:hover:text-gray-100"
         title={translate('zoom.fitPage')}
       >
         <RotateCcw size={14} />
@@ -200,7 +200,7 @@ function LoadingMessage({ documentId }: { documentId: string }) {
   const { translate } = useTranslations(documentId)
   return (
     <div className="flex h-full items-center justify-center">
-      <div className="flex items-center gap-2 text-gray-500">
+      <div className="flex items-center gap-2 text-gray-500 dark:text-gray-400">
         <Loader2 size={20} className="animate-spin" />
         <span className="text-sm">{translate('document.loading')}</span>
       </div>
@@ -234,7 +234,7 @@ export const PDFViewer = () => {
 
   if (isLoading || !engine) {
     return (
-      <div className="overflow-hidden rounded-lg border border-gray-200 bg-white dark:border-gray-700 dark:bg-gray-900">
+      <div className="overflow-hidden rounded-lg border border-gray-300 bg-white dark:border-gray-700 dark:bg-gray-900">
         <div className="flex h-[400px] items-center justify-center">
           <div className="flex items-center gap-2 text-gray-500">
             <Loader2 size={20} className="animate-spin" />
@@ -251,9 +251,9 @@ export const PDFViewer = () => {
         <>
           {pluginsReady ? (
             activeDocumentId && (
-              <div className="overflow-hidden rounded-lg border border-gray-200 bg-white shadow-sm dark:border-gray-700 dark:bg-gray-900">
+              <div className="overflow-hidden rounded-lg border border-gray-300 bg-white shadow-sm dark:border-gray-700 dark:bg-gray-900">
                 {/* Toolbar */}
-                <div className="flex flex-wrap items-center justify-between gap-3 border-b border-gray-200 bg-white px-3 py-2 dark:border-gray-700 dark:bg-gray-900">
+                <div className="flex flex-wrap items-center justify-between gap-3 border-b border-gray-300 bg-gray-100 px-3 py-2 dark:border-gray-700 dark:bg-gray-800">
                   <LanguageSwitcher />
                   <ZoomToolbar documentId={activeDocumentId} />
                 </div>
@@ -271,7 +271,7 @@ export const PDFViewer = () => {
                         <div className="relative h-[400px] sm:h-[500px]">
                           <Viewport
                             documentId={activeDocumentId}
-                            className="absolute inset-0 bg-[#e5e7eb]"
+                            className="absolute inset-0 bg-gray-200 dark:bg-gray-800"
                           >
                             <Scroller
                               documentId={activeDocumentId}
@@ -303,7 +303,7 @@ export const PDFViewer = () => {
               </div>
             )
           ) : (
-            <div className="overflow-hidden rounded-lg border border-gray-200 bg-white dark:border-gray-700 dark:bg-gray-900">
+            <div className="overflow-hidden rounded-lg border border-gray-300 bg-white dark:border-gray-700 dark:bg-gray-900">
               <div className="flex h-[400px] items-center justify-center">
                 <div className="flex items-center gap-2 text-gray-500">
                   <Loader2 size={20} className="animate-spin" />

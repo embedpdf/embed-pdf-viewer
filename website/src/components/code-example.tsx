@@ -110,10 +110,10 @@ export const CodeExample = ({
   }
 
   return (
-    <div className="not-prose my-8 rounded-xl border border-gray-200 bg-white shadow-sm dark:border-gray-800 dark:bg-gray-950">
+    <div className="not-prose my-8 overflow-hidden rounded-xl border border-gray-300 bg-white shadow-sm dark:border-gray-700 dark:bg-gray-950">
       {/* Live Preview - overflow-hidden here for rounded corners */}
       <div
-        className={`relative overflow-hidden rounded-t-xl p-4 sm:p-8 ${backgroundStyles[background]}`}
+        className={`relative overflow-hidden p-4 sm:p-8 ${backgroundStyles[background]}`}
       >
         {/* Demo content wrapper */}
         <div
@@ -123,13 +123,13 @@ export const CodeExample = ({
         </div>
       </div>
 
-      {/* Toolbar - overflow-visible to allow dropdown to escape */}
+      {/* Toolbar */}
       <div
-        className={`relative flex items-center justify-between overflow-visible border-t border-gray-200 bg-gray-50/80 px-4 py-2 backdrop-blur-sm dark:border-gray-800 dark:bg-gray-900/80 ${!showCode ? 'rounded-b-xl' : ''}`}
+        className={`relative flex items-center justify-between overflow-visible border-t border-gray-300 bg-gray-100 px-4 py-2 dark:border-gray-700 dark:bg-gray-800`}
       >
         <button
           onClick={() => setShowCode(!showCode)}
-          className="-ml-2.5 inline-flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-[13px] font-medium text-gray-600 transition-colors hover:bg-gray-200/60 hover:text-gray-900 dark:text-gray-400 dark:hover:bg-gray-700/60 dark:hover:text-gray-100"
+          className="-ml-2.5 inline-flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-[13px] font-medium text-gray-700 transition-colors hover:bg-gray-200 hover:text-gray-900 dark:text-gray-200 dark:hover:bg-gray-700 dark:hover:text-gray-100"
         >
           <Code size={14} />
           <span>{showCode ? 'Hide Code' : 'View Code'}</span>
@@ -139,7 +139,7 @@ export const CodeExample = ({
             <ChevronDown size={14} className="ml-0.5" />
           )}
           {!showCode && (
-            <span className="ml-1.5 hidden text-gray-400 sm:inline dark:text-gray-500">
+            <span className="ml-1.5 hidden text-gray-500 dark:text-gray-400 sm:inline">
               {totalLines} lines
               {hasMultipleFiles && ` · ${allFiles.length} files`}
             </span>
@@ -151,7 +151,7 @@ export const CodeExample = ({
           {showCode && (
             <button
               onClick={copyToClipboard}
-              className="inline-flex items-center gap-1.5 rounded-md p-2 text-[13px] font-medium text-gray-500 transition-colors hover:bg-gray-200/60 hover:text-gray-900 dark:text-gray-400 dark:hover:bg-gray-700/60 dark:hover:text-gray-100"
+              className="inline-flex items-center gap-1.5 rounded-md p-2 text-[13px] font-medium text-gray-600 transition-colors hover:bg-gray-200 hover:text-gray-900 dark:text-gray-300 dark:hover:bg-gray-700 dark:hover:text-gray-100"
               title="Copy code"
             >
               {copied ? (
@@ -171,7 +171,7 @@ export const CodeExample = ({
                   href={filesWithGithub[0].githubUrl}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="inline-flex items-center gap-1.5 rounded-md p-2 text-[13px] font-medium text-gray-500 transition-colors hover:bg-gray-200/60 hover:text-gray-900 dark:text-gray-400 dark:hover:bg-gray-700/60 dark:hover:text-gray-100"
+                  className="inline-flex items-center gap-1.5 rounded-md p-2 text-[13px] font-medium text-gray-600 transition-colors hover:bg-gray-200 hover:text-gray-900 dark:text-gray-300 dark:hover:bg-gray-700 dark:hover:text-gray-100"
                   title="View on GitHub"
                 >
                   <Github size={15} />
@@ -184,8 +184,8 @@ export const CodeExample = ({
                     onClick={() => setShowGithubMenu(!showGithubMenu)}
                     className={`inline-flex items-center gap-1 rounded-md p-2 text-[13px] font-medium transition-colors ${
                       showGithubMenu
-                        ? 'bg-gray-200/60 text-gray-900 dark:bg-gray-700/60 dark:text-gray-100'
-                        : 'text-gray-500 hover:bg-gray-200/60 hover:text-gray-900 dark:text-gray-400 dark:hover:bg-gray-700/60 dark:hover:text-gray-100'
+                        ? 'bg-gray-200 text-gray-900 dark:bg-gray-700 dark:text-gray-100'
+                        : 'text-gray-600 hover:bg-gray-200 hover:text-gray-900 dark:text-gray-300 dark:hover:bg-gray-700 dark:hover:text-gray-100'
                     }`}
                     title="View on GitHub"
                   >
@@ -198,9 +198,9 @@ export const CodeExample = ({
 
                   {/* Dropdown menu */}
                   {showGithubMenu && (
-                    <div className="absolute right-0 top-full z-50 mt-1 min-w-[220px] overflow-hidden rounded-lg border border-gray-200 bg-white shadow-lg dark:border-gray-700 dark:bg-gray-900">
-                      <div className="border-b border-gray-100 px-3 py-2 dark:border-gray-800">
-                        <span className="tracking-wider text-[11px] font-medium uppercase text-gray-400 dark:text-gray-500">
+                    <div className="absolute right-0 top-full z-50 mt-1 min-w-[220px] overflow-hidden rounded-lg border border-gray-300 bg-white shadow-lg dark:border-gray-700 dark:bg-gray-800">
+                      <div className="border-b border-gray-200 px-3 py-2 dark:border-gray-700">
+                        <span className="tracking-wider text-[11px] font-medium uppercase text-gray-500 dark:text-gray-400">
                           View on GitHub
                         </span>
                       </div>
@@ -210,7 +210,7 @@ export const CodeExample = ({
                           href={file.githubUrl}
                           target="_blank"
                           rel="noopener noreferrer"
-                          className="flex items-center gap-2.5 px-3 py-2.5 text-[13px] text-gray-700 transition-colors hover:bg-gray-50 dark:text-gray-300 dark:hover:bg-gray-800"
+                          className="flex items-center gap-2.5 px-3 py-2.5 text-[13px] text-gray-700 transition-colors hover:bg-gray-100 dark:text-gray-200 dark:hover:bg-gray-700"
                           onClick={() => setShowGithubMenu(false)}
                         >
                           {getFrameworkIcon(file.language) || (
@@ -236,18 +236,18 @@ export const CodeExample = ({
 
       {/* Code Panel */}
       {showCode && activeFile && (
-        <div className="animate-in fade-in slide-in-from-top-1 border-t border-gray-200 duration-200 dark:border-gray-800">
+        <div className="animate-in fade-in slide-in-from-top-1 duration-200">
           {/* File Tabs */}
           {hasMultipleFiles && (
-            <div className="flex overflow-x-auto border-b border-gray-200 bg-gray-50 dark:border-gray-800 dark:bg-gray-900/50">
+            <div className="flex overflow-x-auto border-t border-gray-300 bg-gray-100 dark:border-gray-700 dark:bg-gray-800">
               {allFiles.map((file, index) => (
                 <button
                   key={file.filename}
                   onClick={() => setActiveTab(index)}
                   className={`relative whitespace-nowrap px-4 py-2.5 text-[13px] font-medium transition-colors ${
                     activeTab === index
-                      ? 'bg-white text-gray-900 dark:bg-gray-950 dark:text-gray-100'
-                      : 'text-gray-500 hover:bg-gray-100 hover:text-gray-700 dark:text-gray-400 dark:hover:bg-gray-800/50 dark:hover:text-gray-300'
+                      ? 'bg-white text-gray-900 dark:bg-gray-900 dark:text-gray-100'
+                      : 'text-gray-600 hover:bg-gray-200 hover:text-gray-800 dark:text-gray-300 dark:hover:bg-gray-700 dark:hover:text-gray-100'
                   } `}
                 >
                   {activeTab === index && (
@@ -266,32 +266,33 @@ export const CodeExample = ({
 
           {/* Single file header (when only one file) */}
           {!hasMultipleFiles && (
-            <div className="flex items-center justify-between bg-gray-50 px-4 py-2 dark:bg-gray-900/50">
-              <span className="flex items-center gap-2 text-[13px] font-medium text-gray-500 dark:text-gray-400">
+            <div className="flex items-center justify-between border-t border-gray-300 bg-gray-100 px-4 py-2 dark:border-gray-700 dark:bg-gray-800">
+              <span className="flex items-center gap-2 text-[13px] font-medium text-gray-700 dark:text-gray-200">
                 {getFrameworkIcon(activeFile.language) || (
                   <FileIcon language={activeFile.language} />
                 )}
                 {activeFile.filename}
               </span>
-              <span className="text-[12px] text-gray-400 dark:text-gray-500">
+              <span className="text-[12px] text-gray-500 dark:text-gray-400">
                 {activeFile.code.trim().split('\n').length} lines
               </span>
             </div>
           )}
 
-          {/* Code Content */}
-          <div className="overflow-x-auto rounded-b-xl bg-white dark:bg-gray-950">
+          {/* Code Content - matching Nextra's styling */}
+          <div className="overflow-x-auto bg-white dark:bg-gray-900">
             {activeFile.highlightedCode ? (
-              <pre className="p-4 text-[13px] leading-[1.7]">
+              <pre className="py-4 text-[.9em] leading-[1.7]">
                 <code
-                  className="shiki-code"
+                  className="nextra-code"
+                  dir="ltr"
                   dangerouslySetInnerHTML={{
                     __html: activeFile.highlightedCode,
                   }}
                 />
               </pre>
             ) : (
-              <pre className="p-4 text-[13px] leading-[1.7]">
+              <pre className="p-4 text-[.9em] leading-[1.7]">
                 <code className="text-gray-800 dark:text-gray-200">
                   {activeFile.code.trim()}
                 </code>

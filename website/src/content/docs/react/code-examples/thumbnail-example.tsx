@@ -41,7 +41,7 @@ const ThumbnailSidebar = ({ documentId }: { documentId: string }) => {
   const { state, provides } = useScroll(documentId)
 
   return (
-    <div className="h-full w-[140px] flex-shrink-0 border-r border-gray-200 bg-gray-50 dark:border-gray-700 dark:bg-gray-900">
+    <div className="h-full w-[140px] flex-shrink-0 border-r border-gray-300 bg-gray-50 dark:border-gray-700 dark:bg-gray-900">
       <ThumbnailsPane documentId={documentId}>
         {(m) => {
           const isActive = state.currentPage === m.pageIndex + 1
@@ -64,7 +64,7 @@ const ThumbnailSidebar = ({ documentId }: { documentId: string }) => {
                 className={`overflow-hidden rounded-md transition-all ${
                   isActive
                     ? 'ring-2 ring-blue-500 ring-offset-2 ring-offset-gray-50 dark:ring-offset-gray-900'
-                    : 'ring-1 ring-gray-200 hover:ring-gray-300 dark:ring-gray-700 dark:hover:ring-gray-600'
+                    : 'ring-1 ring-gray-300 hover:ring-gray-400 dark:ring-gray-700 dark:hover:ring-gray-600'
                 } `}
                 style={{
                   width: m.width,
@@ -86,7 +86,7 @@ const ThumbnailSidebar = ({ documentId }: { documentId: string }) => {
                   className={`text-xs font-medium ${
                     isActive
                       ? 'text-blue-600 dark:text-blue-400'
-                      : 'text-gray-500 dark:text-gray-400'
+                      : 'text-gray-600 dark:text-gray-300'
                   } `}
                 >
                   {m.pageIndex + 1}
@@ -105,9 +105,9 @@ export const PDFViewer = () => {
 
   if (isLoading || !engine) {
     return (
-      <div className="overflow-hidden rounded-lg border border-gray-200 bg-white dark:border-gray-700 dark:bg-gray-900">
+      <div className="overflow-hidden rounded-lg border border-gray-300 bg-white dark:border-gray-700 dark:bg-gray-900">
         <div className="flex h-[400px] items-center justify-center">
-          <div className="flex items-center gap-2 text-gray-500">
+          <div className="flex items-center gap-2 text-gray-500 dark:text-gray-400">
             <Loader2 size={20} className="animate-spin" />
             <span className="text-sm">Loading PDF Engine...</span>
           </div>
@@ -123,7 +123,7 @@ export const PDFViewer = () => {
           <DocumentContent documentId={activeDocumentId}>
             {({ isLoaded }) =>
               isLoaded && (
-                <div className="overflow-hidden rounded-lg border border-gray-200 bg-white shadow-sm dark:border-gray-700 dark:bg-gray-900">
+                <div className="overflow-hidden rounded-lg border border-gray-300 bg-white shadow-sm dark:border-gray-700 dark:bg-gray-900">
                   <div className="flex h-[400px] sm:h-[500px]">
                     {/* Thumbnail Sidebar */}
                     <ThumbnailSidebar documentId={activeDocumentId} />
@@ -132,7 +132,7 @@ export const PDFViewer = () => {
                     <div className="relative flex-1">
                       <Viewport
                         documentId={activeDocumentId}
-                        className="absolute inset-0 bg-[#e5e7eb]"
+                        className="absolute inset-0 bg-gray-200 dark:bg-gray-800"
                       >
                         <Scroller
                           documentId={activeDocumentId}

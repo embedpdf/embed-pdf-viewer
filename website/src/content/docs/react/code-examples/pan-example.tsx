@@ -39,13 +39,13 @@ const PanToolbar = ({ documentId }: { documentId: string }) => {
   if (!pan) return null
 
   return (
-    <div className="flex items-center gap-3 border-b border-gray-200 bg-white px-3 py-2 dark:border-gray-700 dark:bg-gray-900">
+    <div className="flex items-center gap-3 border-b border-gray-300 bg-gray-100 px-3 py-2 dark:border-gray-700 dark:bg-gray-800">
       <button
         onClick={pan.togglePan}
-        className={`inline-flex items-center gap-2 rounded-md px-3 py-1.5 text-sm font-medium transition-all ${
+        className={`inline-flex items-center gap-2 rounded-md px-3 py-1.5 text-sm font-medium shadow-sm transition-all ${
           isPanning
-            ? 'bg-blue-500 text-white shadow-sm'
-            : 'bg-gray-100 text-gray-600 hover:bg-gray-200 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700'
+            ? 'bg-blue-500 text-white ring-1 ring-blue-600'
+            : 'bg-white text-gray-600 ring-1 ring-gray-300 hover:bg-gray-50 hover:text-gray-900 dark:bg-gray-700 dark:text-gray-300 dark:ring-gray-600 dark:hover:bg-gray-600 dark:hover:text-gray-100'
         } `}
         title="Toggle Pan Tool"
       >
@@ -53,7 +53,7 @@ const PanToolbar = ({ documentId }: { documentId: string }) => {
         {isPanning ? 'Pan Mode On' : 'Pan Mode'}
       </button>
 
-      <span className="text-xs text-gray-500 dark:text-gray-400">
+      <span className="text-xs text-gray-600 dark:text-gray-300">
         {isPanning
           ? 'Click and drag to pan the document'
           : 'Click to enable pan mode'}
@@ -67,9 +67,9 @@ export const PDFViewer = () => {
 
   if (isLoading || !engine) {
     return (
-      <div className="overflow-hidden rounded-lg border border-gray-200 bg-white dark:border-gray-700 dark:bg-gray-900">
+      <div className="overflow-hidden rounded-lg border border-gray-300 bg-white dark:border-gray-700 dark:bg-gray-900">
         <div className="flex h-[400px] items-center justify-center">
-          <div className="flex items-center gap-2 text-gray-500">
+          <div className="flex items-center gap-2 text-gray-500 dark:text-gray-400">
             <Loader2 size={20} className="animate-spin" />
             <span className="text-sm">Loading PDF Engine...</span>
           </div>
@@ -85,7 +85,7 @@ export const PDFViewer = () => {
           <DocumentContent documentId={activeDocumentId}>
             {({ isLoaded }) =>
               isLoaded && (
-                <div className="select-none overflow-hidden rounded-lg border border-gray-200 bg-white shadow-sm dark:border-gray-700 dark:bg-gray-900">
+                <div className="select-none overflow-hidden rounded-lg border border-gray-300 bg-white shadow-sm dark:border-gray-700 dark:bg-gray-900">
                   {/* Toolbar */}
                   <PanToolbar documentId={activeDocumentId} />
 
@@ -94,7 +94,7 @@ export const PDFViewer = () => {
                     <GlobalPointerProvider documentId={activeDocumentId}>
                       <Viewport
                         documentId={activeDocumentId}
-                        className="absolute inset-0 bg-[#e5e7eb]"
+                        className="absolute inset-0 bg-gray-200 dark:bg-gray-800"
                       >
                         <Scroller
                           documentId={activeDocumentId}

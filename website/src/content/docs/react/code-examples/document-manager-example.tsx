@@ -35,7 +35,7 @@ function TabBar({ documentStates, activeDocumentId, actions }: TabBarProps) {
   }
 
   return (
-    <div className="flex items-center gap-1 border-b border-gray-200 bg-gray-50 px-2 py-1.5 dark:border-gray-700 dark:bg-gray-900">
+    <div className="flex items-center gap-1 border-b border-gray-300 bg-gray-50 px-2 py-1.5 dark:border-gray-700 dark:bg-gray-800">
       {/* Tabs */}
       <div className="flex flex-1 items-center gap-1 overflow-x-auto">
         {documentStates.map((doc) => {
@@ -55,8 +55,8 @@ function TabBar({ documentStates, activeDocumentId, actions }: TabBarProps) {
               }}
               className={`group relative flex min-w-[100px] max-w-[180px] cursor-pointer items-center gap-2 rounded-md px-2.5 py-1.5 text-xs font-medium transition-all ${
                 isActive
-                  ? 'bg-white text-gray-900 shadow-sm ring-1 ring-gray-200 dark:bg-gray-800 dark:text-gray-100 dark:ring-gray-700'
-                  : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900 dark:text-gray-400 dark:hover:bg-gray-800 dark:hover:text-gray-200'
+                  ? 'bg-white text-gray-900 shadow-sm ring-1 ring-gray-300 dark:bg-gray-700 dark:text-gray-100 dark:ring-gray-600'
+                  : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900 dark:text-gray-400 dark:hover:bg-gray-700 dark:hover:text-gray-200'
               } `}
             >
               <FileText size={14} className="flex-shrink-0" />
@@ -81,7 +81,7 @@ function TabBar({ documentStates, activeDocumentId, actions }: TabBarProps) {
       {/* Add button */}
       <button
         onClick={handleOpenFile}
-        className="inline-flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-md text-gray-500 transition-colors hover:bg-gray-200 hover:text-gray-700 dark:text-gray-400 dark:hover:bg-gray-700 dark:hover:text-gray-200"
+        className="inline-flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-md text-gray-600 transition-colors hover:bg-gray-200 hover:text-gray-700 dark:text-gray-300 dark:hover:bg-gray-700 dark:hover:text-gray-200"
         aria-label="Open File"
         title="Open File"
       >
@@ -143,9 +143,9 @@ export const PDFViewer = () => {
 
   if (isLoading || !engine) {
     return (
-      <div className="overflow-hidden rounded-lg border border-gray-200 bg-white dark:border-gray-700 dark:bg-gray-900">
+      <div className="overflow-hidden rounded-lg border border-gray-300 bg-white dark:border-gray-700 dark:bg-gray-900">
         <div className="flex h-[400px] items-center justify-center">
-          <div className="flex items-center gap-2 text-gray-500">
+          <div className="flex items-center gap-2 text-gray-500 dark:text-gray-400">
             <Loader2 size={20} className="animate-spin" />
             <span className="text-sm">Loading PDF Engine...</span>
           </div>
@@ -159,7 +159,7 @@ export const PDFViewer = () => {
       {({ pluginsReady, activeDocumentId }) => (
         <>
           {pluginsReady ? (
-            <div className="overflow-hidden rounded-lg border border-gray-200 bg-white shadow-sm dark:border-gray-700 dark:bg-gray-900">
+            <div className="overflow-hidden rounded-lg border border-gray-300 bg-white shadow-sm dark:border-gray-700 dark:bg-gray-900">
               <DocumentContext>
                 {({ documentStates, activeDocumentId: activeId, actions }) => (
                   <>
@@ -177,7 +177,7 @@ export const PDFViewer = () => {
                           <>
                             {docLoading && (
                               <div className="flex h-[400px] items-center justify-center sm:h-[500px]">
-                                <div className="flex items-center gap-2 text-gray-500">
+                                <div className="flex items-center gap-2 text-gray-500 dark:text-gray-400">
                                   <Loader2 size={20} className="animate-spin" />
                                   <span className="text-sm">
                                     Loading document...
@@ -189,7 +189,7 @@ export const PDFViewer = () => {
                               <div className="relative h-[400px] sm:h-[500px]">
                                 <Viewport
                                   documentId={activeId}
-                                  className="absolute inset-0 bg-[#e5e7eb]"
+                                  className="absolute inset-0 bg-gray-200 dark:bg-gray-800"
                                 >
                                   <Scroller
                                     documentId={activeId}
@@ -232,9 +232,9 @@ export const PDFViewer = () => {
               </DocumentContext>
             </div>
           ) : (
-            <div className="overflow-hidden rounded-lg border border-gray-200 bg-white dark:border-gray-700 dark:bg-gray-900">
+            <div className="overflow-hidden rounded-lg border border-gray-300 bg-white dark:border-gray-700 dark:bg-gray-900">
               <div className="flex h-[400px] items-center justify-center">
-                <div className="flex items-center gap-2 text-gray-500">
+                <div className="flex items-center gap-2 text-gray-500 dark:text-gray-400">
                   <Loader2 size={20} className="animate-spin" />
                   <span className="text-sm">Initializing plugins...</span>
                 </div>

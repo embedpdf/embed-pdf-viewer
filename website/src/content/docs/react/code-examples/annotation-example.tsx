@@ -77,11 +77,11 @@ const AnnotationToolbar = ({ documentId }: { documentId: string }) => {
   ]
 
   return (
-    <div className="flex flex-wrap items-center gap-3 border-b border-gray-200 bg-white px-3 py-2 dark:border-gray-700 dark:bg-gray-900">
-      <span className="tracking-wide text-xs font-medium uppercase text-gray-500 dark:text-gray-400">
+    <div className="flex flex-wrap items-center gap-3 border-b border-gray-300 bg-gray-100 px-3 py-2 dark:border-gray-700 dark:bg-gray-800">
+      <span className="tracking-wide text-xs font-medium uppercase text-gray-600 dark:text-gray-300">
         Tools
       </span>
-      <div className="h-4 w-px bg-gray-200 dark:bg-gray-700" />
+      <div className="h-4 w-px bg-gray-300 dark:bg-gray-600" />
 
       {/* Tool buttons */}
       <div className="flex items-center gap-1.5">
@@ -94,10 +94,10 @@ const AnnotationToolbar = ({ documentId }: { documentId: string }) => {
               onClick={() =>
                 annotationApi?.setActiveTool(isActive ? null : tool.id)
               }
-              className={`inline-flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-xs font-medium transition-all ${
+              className={`inline-flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-xs font-medium shadow-sm transition-all ${
                 isActive
-                  ? 'bg-blue-500 text-white shadow-sm'
-                  : 'bg-gray-100 text-gray-600 hover:bg-gray-200 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700'
+                  ? 'bg-blue-500 text-white ring-1 ring-blue-600'
+                  : 'bg-white text-gray-600 ring-1 ring-gray-300 hover:bg-gray-50 hover:text-gray-900 dark:bg-gray-700 dark:text-gray-300 dark:ring-gray-600 dark:hover:bg-gray-600 dark:hover:text-gray-100'
               } `}
               title={tool.name}
             >
@@ -108,7 +108,7 @@ const AnnotationToolbar = ({ documentId }: { documentId: string }) => {
         })}
       </div>
 
-      <div className="h-4 w-px bg-gray-200 dark:bg-gray-700" />
+      <div className="h-4 w-px bg-gray-300 dark:bg-gray-600" />
 
       {/* Delete button */}
       <button
@@ -122,12 +122,12 @@ const AnnotationToolbar = ({ documentId }: { documentId: string }) => {
 
       {/* Status hint */}
       {state.activeToolId && (
-        <span className="hidden animate-pulse text-xs text-blue-600 lg:inline dark:text-blue-400">
+        <span className="hidden animate-pulse text-xs text-blue-600 dark:text-blue-400 lg:inline">
           Click on the PDF to add annotation
         </span>
       )}
       {state.selectedUid && !state.activeToolId && (
-        <span className="hidden text-xs text-gray-500 lg:inline dark:text-gray-400">
+        <span className="hidden text-xs text-gray-500 dark:text-gray-400 lg:inline">
           Annotation selected — drag to move or click Delete
         </span>
       )}
@@ -140,9 +140,9 @@ export const PDFViewer = () => {
 
   if (isLoading || !engine) {
     return (
-      <div className="overflow-hidden rounded-lg border border-gray-200 bg-white dark:border-gray-700 dark:bg-gray-900">
+      <div className="overflow-hidden rounded-lg border border-gray-300 bg-white dark:border-gray-700 dark:bg-gray-900">
         <div className="flex h-[400px] items-center justify-center">
-          <div className="flex items-center gap-2 text-gray-500">
+          <div className="flex items-center gap-2 text-gray-500 dark:text-gray-400">
             <Loader2 size={20} className="animate-spin" />
             <span className="text-sm">Loading PDF Engine...</span>
           </div>
@@ -196,7 +196,7 @@ export const PDFViewer = () => {
             {({ isLoaded }) =>
               isLoaded && (
                 <div
-                  className="overflow-hidden rounded-lg border border-gray-200 bg-white shadow-sm dark:border-gray-700 dark:bg-gray-900"
+                  className="overflow-hidden rounded-lg border border-gray-300 bg-white shadow-sm dark:border-gray-700 dark:bg-gray-900"
                   style={{ userSelect: 'none' }}
                 >
                   {/* Toolbar */}
@@ -206,7 +206,7 @@ export const PDFViewer = () => {
                   <div className="relative h-[450px] sm:h-[550px]">
                     <Viewport
                       documentId={activeDocumentId}
-                      className="absolute inset-0 bg-[#e5e7eb]"
+                      className="absolute inset-0 bg-gray-200 dark:bg-gray-800"
                     >
                       <Scroller
                         documentId={activeDocumentId}

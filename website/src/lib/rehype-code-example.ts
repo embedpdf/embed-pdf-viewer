@@ -175,6 +175,7 @@ export const rehypeCodeExample: Plugin<[], Root> = () => {
               light: 'github-light',
               dark: 'github-dark',
             },
+            defaultColor: false,
           })
 
           // Extract inner HTML from <code>...</code>

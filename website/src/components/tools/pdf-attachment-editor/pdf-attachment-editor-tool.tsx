@@ -250,7 +250,7 @@ export const PdfAttachmentEditorTool = () => {
       subtitle="right in your browser"
       description="View, add, and remove file attachments in your PDF documents"
       badgeText="PDF Attachment Editor"
-      badgeColor="border-orange-200 bg-orange-50 text-orange-800"
+      badgeColor="border-orange-200 bg-orange-50 text-orange-800 dark:border-orange-800/30 dark:bg-orange-900/20 dark:text-orange-300"
       gradientColor="from-orange-600 to-amber-600"
     >
       {!engine ? (

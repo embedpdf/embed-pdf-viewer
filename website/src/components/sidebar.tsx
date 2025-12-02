@@ -15,6 +15,7 @@ import { ArrowRightIcon } from 'nextra/icons'
 import { Collapse } from './collapse'
 import { setFocusedRoute, useFocusedRoute } from './stores/focused-route'
 import { setMenu, useMenu } from './stores/menu'
+
 const TreeState: Record<string, boolean> = Object.create(null)
 
 const classes = {
@@ -24,17 +25,19 @@ const classes = {
   ),
   inactive: cn(
     'text-gray-500 hover:bg-gray-100 hover:text-gray-900',
+    'dark:text-gray-400 dark:hover:bg-gray-800 dark:hover:text-gray-50', // Dark mode
     'contrast-more:text-gray-900',
     'contrast-more:border-transparent contrast-more:hover:border-gray-900',
   ),
   active: cn(
     'bg-primary-100 font-semibold text-primary-800',
+    'dark:bg-primary-400/30 dark:text-primary-200', // Dark mode
     'contrast-more:border-primary-500!',
   ),
   list: cn('grid gap-1'),
   border: cn(
     'relative before:absolute before:inset-y-1',
-    'before:w-px before:bg-gray-200 before:content-[""]',
+    'before:w-px before:bg-gray-200 dark:before:bg-gray-800 before:content-[""]', // Dark mode border
     'ps-3 before:start-0 pt-1 ms-3',
   ),
   wrapper: cn('x:p-4 x:overflow-y-auto nextra-scrollbar nextra-mask'),
@@ -145,7 +148,7 @@ const Folder: FC<FolderProps> = ({ item: _item, anchors, onFocus, level }) => {
           height="18"
           className={cn(
             'shrink-0',
-            'rounded-sm p-0.5 hover:bg-gray-800/5',
+            'rounded-sm p-0.5 hover:bg-gray-800/5 dark:hover:bg-gray-100/10', // Dark mode hover
             'origin-center transition-transform motion-reduce:*:transition-none rtl:-rotate-180',
             open && 'rtl:-rotate-270 ltr:rotate-90',
           )}
@@ -181,11 +184,13 @@ const Separator: FC<{ title: string }> = ({ title }) => {
       className={cn(
         '[word-break:break-word]',
         title
-          ? 'not-first:mt-5 mb-2 px-2 py-1.5 text-sm font-semibold text-gray-900'
+          ? 'not-first:mt-5 mb-2 px-2 py-1.5 text-sm font-semibold text-gray-900 dark:text-gray-100' // Dark mode text
           : 'my-4',
       )}
     >
-      {title || <hr className="nextra-border mx-2 border-t" />}
+      {title || (
+        <hr className="nextra-border mx-2 border-t dark:border-gray-800" />
+      )}
     </li>
   )
 }
@@ -348,7 +353,7 @@ export const MobileNav: FC<MobileNavProps> = ({
         'flex flex-col',
         '[contain:layout_style]',
         'md:hidden',
-        'bg-nextra-bg',
+        'bg-white dark:bg-gray-900', // Dark mode background
       )}
     >
       <Menu

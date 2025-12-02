@@ -50,32 +50,32 @@ const ZoomToolbar = ({
   const zoomPercentage = Math.round(state.currentZoomLevel * 100)
 
   return (
-    <div className="flex flex-wrap items-center gap-3 border-b border-gray-200 bg-white px-3 py-2 dark:border-gray-700 dark:bg-gray-900">
-      <span className="tracking-wide text-xs font-medium uppercase text-gray-500 dark:text-gray-400">
+    <div className="flex flex-wrap items-center gap-3 border-b border-gray-300 bg-gray-100 px-3 py-2 dark:border-gray-700 dark:bg-gray-800">
+      <span className="tracking-wide text-xs font-medium uppercase text-gray-600 dark:text-gray-300">
         Zoom
       </span>
-      <div className="h-4 w-px bg-gray-200 dark:bg-gray-700" />
+      <div className="h-4 w-px bg-gray-300 dark:bg-gray-600" />
 
       {/* Zoom controls */}
       <div className="flex items-center gap-1.5">
         <button
           onClick={zoom.zoomOut}
-          className="inline-flex h-8 w-8 items-center justify-center rounded-md bg-gray-100 text-gray-600 transition-all hover:bg-gray-200 hover:text-gray-900 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700 dark:hover:text-gray-100"
+          className="inline-flex h-8 w-8 items-center justify-center rounded-md bg-white text-gray-600 shadow-sm ring-1 ring-gray-300 transition-all hover:bg-gray-50 hover:text-gray-900 dark:bg-gray-700 dark:text-gray-300 dark:ring-gray-600 dark:hover:bg-gray-600 dark:hover:text-gray-100"
           title="Zoom Out"
         >
           <ZoomOut size={16} />
         </button>
 
         {/* Zoom level indicator */}
-        <div className="min-w-[56px] rounded-md bg-gray-100 px-2 py-1 text-center dark:bg-gray-800">
-          <span className="font-mono text-sm font-medium text-gray-700 dark:text-gray-300">
+        <div className="min-w-[56px] rounded-md bg-white px-2 py-1 text-center shadow-sm ring-1 ring-gray-300 dark:bg-gray-700 dark:ring-gray-600">
+          <span className="font-mono text-sm font-medium text-gray-700 dark:text-gray-200">
             {zoomPercentage}%
           </span>
         </div>
 
         <button
           onClick={zoom.zoomIn}
-          className="inline-flex h-8 w-8 items-center justify-center rounded-md bg-gray-100 text-gray-600 transition-all hover:bg-gray-200 hover:text-gray-900 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700 dark:hover:text-gray-100"
+          className="inline-flex h-8 w-8 items-center justify-center rounded-md bg-white text-gray-600 shadow-sm ring-1 ring-gray-300 transition-all hover:bg-gray-50 hover:text-gray-900 dark:bg-gray-700 dark:text-gray-300 dark:ring-gray-600 dark:hover:bg-gray-600 dark:hover:text-gray-100"
           title="Zoom In"
         >
           <ZoomIn size={16} />
@@ -83,7 +83,7 @@ const ZoomToolbar = ({
 
         <button
           onClick={() => zoom.requestZoom(ZoomMode.FitPage)}
-          className="ml-1 inline-flex items-center gap-1.5 rounded-md bg-gray-100 px-2.5 py-1.5 text-xs font-medium text-gray-600 transition-all hover:bg-gray-200 hover:text-gray-900 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700 dark:hover:text-gray-100"
+          className="ml-1 inline-flex items-center gap-1.5 rounded-md bg-white px-2.5 py-1.5 text-xs font-medium text-gray-600 shadow-sm ring-1 ring-gray-300 transition-all hover:bg-gray-50 hover:text-gray-900 dark:bg-gray-700 dark:text-gray-300 dark:ring-gray-600 dark:hover:bg-gray-600 dark:hover:text-gray-100"
           title="Reset Zoom to Fit Page"
         >
           <RotateCcw size={14} />
@@ -94,13 +94,13 @@ const ZoomToolbar = ({
       {/* Marquee Zoom toggle */}
       {withMarqueeZoom && (
         <>
-          <div className="h-4 w-px bg-gray-200 dark:bg-gray-700" />
+          <div className="h-4 w-px bg-gray-300 dark:bg-gray-600" />
           <button
             onClick={zoom.toggleMarqueeZoom}
-            className={`inline-flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-xs font-medium transition-all ${
+            className={`inline-flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-xs font-medium shadow-sm transition-all ${
               state.isMarqueeZoomActive
-                ? 'bg-blue-500 text-white shadow-sm'
-                : 'bg-gray-100 text-gray-600 hover:bg-gray-200 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700'
+                ? 'bg-blue-500 text-white ring-1 ring-blue-600'
+                : 'bg-white text-gray-600 ring-1 ring-gray-300 hover:bg-gray-50 dark:bg-gray-700 dark:text-gray-300 dark:ring-gray-600 dark:hover:bg-gray-600'
             } `}
             title="Toggle Area Zoom"
           >
@@ -111,7 +111,7 @@ const ZoomToolbar = ({
       )}
 
       {withMarqueeZoom && state.isMarqueeZoomActive && (
-        <span className="hidden animate-pulse text-xs text-blue-600 sm:inline dark:text-blue-400">
+        <span className="hidden animate-pulse text-xs text-blue-600 dark:text-blue-400 sm:inline">
           Click and drag to zoom into area
         </span>
       )}
@@ -147,9 +147,9 @@ export const PDFViewer = ({ withMarqueeZoom = false }: PDFViewerProps) => {
 
   if (isLoading || !engine) {
     return (
-      <div className="overflow-hidden rounded-lg border border-gray-200 bg-white dark:border-gray-700 dark:bg-gray-900">
+      <div className="overflow-hidden rounded-lg border border-gray-300 bg-white dark:border-gray-700 dark:bg-gray-900">
         <div className="flex h-[400px] items-center justify-center">
-          <div className="flex items-center gap-2 text-gray-500">
+          <div className="flex items-center gap-2 text-gray-500 dark:text-gray-400">
             <Loader2 size={20} className="animate-spin" />
             <span className="text-sm">Loading PDF Engine...</span>
           </div>
@@ -165,7 +165,7 @@ export const PDFViewer = ({ withMarqueeZoom = false }: PDFViewerProps) => {
           <DocumentContent documentId={activeDocumentId}>
             {({ isLoaded }) =>
               isLoaded && (
-                <div className="overflow-hidden rounded-lg border border-gray-200 bg-white shadow-sm dark:border-gray-700 dark:bg-gray-900">
+                <div className="overflow-hidden rounded-lg border border-gray-300 bg-white shadow-sm dark:border-gray-700 dark:bg-gray-900">
                   {/* Toolbar */}
                   <ZoomToolbar
                     documentId={activeDocumentId}
@@ -176,7 +176,7 @@ export const PDFViewer = ({ withMarqueeZoom = false }: PDFViewerProps) => {
                   <div className="relative h-[400px] sm:h-[500px]">
                     <Viewport
                       documentId={activeDocumentId}
-                      className="absolute inset-0 bg-[#e5e7eb]"
+                      className="absolute inset-0 bg-gray-200 dark:bg-gray-800"
                     >
                       <Scroller
                         documentId={activeDocumentId}

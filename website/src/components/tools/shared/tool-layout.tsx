@@ -19,7 +19,8 @@ export const ToolLayout = ({
   subtitle,
   description,
   badgeText,
-  badgeColor = 'border-blue-200 bg-blue-50 text-blue-800',
+  // Updated default to include dark mode variants
+  badgeColor = 'border-blue-200 bg-blue-50 text-blue-800 dark:border-blue-800/30 dark:bg-blue-900/20 dark:text-blue-300',
   gradientColor = 'from-blue-600 to-teal-500', // Default gradient
   showPrivacyStatement = true,
   children,
@@ -34,7 +35,7 @@ export const ToolLayout = ({
           >
             {badgeText}
           </div>
-          <h1 className="mb-6 text-4xl font-black leading-tight tracking-tight text-gray-900 md:text-5xl">
+          <h1 className="mb-6 text-4xl font-black leading-tight tracking-tight text-gray-900 dark:text-white md:text-5xl">
             {title}
             <span
               className={`block bg-gradient-to-r ${gradientColor} bg-clip-text text-transparent`}
@@ -43,7 +44,9 @@ export const ToolLayout = ({
             </span>
           </h1>
           <div className="mx-auto max-w-4xl">
-            <p className="mb-4 text-xl text-gray-600">{description}</p>
+            <p className="mb-4 text-xl text-gray-600 dark:text-gray-400">
+              {description}
+            </p>
             {showPrivacyStatement && (
               <PrivacyStatement
                 className="mt-6"

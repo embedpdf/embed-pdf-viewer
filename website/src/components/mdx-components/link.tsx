@@ -9,7 +9,7 @@ export const Link: FC<LinkProps> = ({ className, ...props }) => {
   return (
     <Anchor
       className={cn(
-        'text-primary-600 underline decoration-from-font [text-underline-position:from-font] hover:no-underline',
+        'text-primary-600 underline decoration-from-font [text-underline-position:from-font] hover:no-underline dark:text-primary-400',
         className,
       )}
       {...props}

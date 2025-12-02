@@ -195,7 +195,7 @@ export const PdfOutlineEditorTool = () => {
       subtitle="right in your browser"
       description="Manage bookmarks and navigation in your PDF documents"
       badgeText="PDF Outline Editor"
-      badgeColor="border-indigo-200 bg-indigo-50 text-indigo-800"
+      badgeColor="border-indigo-200 bg-indigo-50 text-indigo-800 dark:border-indigo-800/30 dark:bg-indigo-900/20 dark:text-indigo-300"
       gradientColor="from-teal-600 to-green-700"
     >
       {!engine ? (

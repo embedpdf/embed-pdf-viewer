@@ -125,7 +125,7 @@ export const PdfMetadataEditorTool = () => {
       subtitle="right in your browser"
       description="Securely edit PDF document properties and metadata"
       badgeText="PDF Metadata Editor"
-      badgeColor="border-purple-200 bg-purple-50 text-purple-800"
+      badgeColor="border-purple-200 bg-purple-50 text-purple-800 dark:border-purple-800/30 dark:bg-purple-900/20 dark:text-purple-300"
       gradientColor="from-purple-600 to-pink-700"
     >
       {!engine ? (

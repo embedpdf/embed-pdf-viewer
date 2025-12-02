@@ -52,14 +52,14 @@ const Toolbar = () => {
   const canRemoveView = views.length > 1
 
   return (
-    <div className="flex items-center justify-between gap-3 border-b border-gray-200 bg-white px-3 py-2 dark:border-gray-700 dark:bg-gray-900">
+    <div className="flex items-center justify-between gap-3 border-b border-gray-300 bg-gray-100 px-3 py-2 dark:border-gray-700 dark:bg-gray-800">
       <div className="flex items-center gap-2">
-        <Columns2 size={14} className="text-gray-400" />
-        <span className="tracking-wide text-xs font-medium uppercase text-gray-500 dark:text-gray-400">
+        <Columns2 size={14} className="text-gray-500 dark:text-gray-400" />
+        <span className="tracking-wide text-xs font-medium uppercase text-gray-600 dark:text-gray-300">
           Split View
         </span>
-        <div className="mx-1 h-4 w-px bg-gray-200 dark:bg-gray-700" />
-        <span className="text-xs text-gray-400 dark:text-gray-500">
+        <div className="mx-1 h-4 w-px bg-gray-300 dark:bg-gray-600" />
+        <span className="text-xs text-gray-600 dark:text-gray-300">
           {views.length} {views.length === 1 ? 'pane' : 'panes'}
         </span>
       </div>
@@ -91,7 +91,7 @@ const Layout = () => {
 
   return (
     <div
-      className={`grid h-full ${gridClass} gap-1 bg-gray-200 p-1 dark:bg-gray-800`}
+      className={`grid h-full ${gridClass} gap-1 bg-gray-100 p-1 dark:bg-gray-800`}
     >
       {views.map((view) => (
         <ViewPane key={view.id} viewId={view.id} />
@@ -107,7 +107,7 @@ const EmptyViewState = ({ onOpenFile }: { onOpenFile: () => void }) => (
     <p className="text-center text-xs">No document</p>
     <button
       onClick={onOpenFile}
-      className="mt-1 inline-flex items-center gap-1.5 rounded-md bg-gray-100 px-2.5 py-1.5 text-xs font-medium text-gray-600 transition-colors hover:bg-gray-200 dark:bg-gray-700 dark:text-gray-300 dark:hover:bg-gray-600"
+      className="mt-1 inline-flex items-center gap-1.5 rounded-md bg-white px-2.5 py-1.5 text-xs font-medium text-gray-600 shadow-sm ring-1 ring-gray-300 transition-colors hover:bg-gray-50 dark:bg-gray-700 dark:text-gray-300 dark:ring-gray-600 dark:hover:bg-gray-600 dark:hover:text-gray-100"
     >
       <Plus size={12} />
       Open File
@@ -159,14 +159,10 @@ const ViewPane = ({ viewId }: { viewId: string }) => {
       }) => (
         <div
           onClick={focus}
-          className={`flex flex-col overflow-hidden bg-white transition-all dark:bg-gray-900 ${
-            isFocused
-              ? 'ring-2 ring-inset ring-blue-500'
-              : 'ring-1 ring-inset ring-gray-200 dark:ring-gray-700'
-          } `}
+          className={`flex flex-col overflow-hidden bg-white ring-1 ring-inset ring-gray-300 transition-all dark:bg-gray-900 dark:ring-gray-700`}
         >
           {/* Tab Bar */}
-          <div className="flex min-h-[36px] items-center gap-1 border-b border-gray-200 bg-gray-50 px-1 py-1 dark:border-gray-700 dark:bg-gray-800/50">
+          <div className="flex min-h-[36px] items-center gap-1 border-b border-gray-300 bg-gray-50 px-1 py-1 dark:border-gray-700 dark:bg-gray-800/50">
             {/* Document Tabs */}
             <div className="flex flex-1 items-center gap-0.5 overflow-x-auto">
               {documentIds.map((docId) => {
@@ -180,8 +176,8 @@ const ViewPane = ({ viewId }: { viewId: string }) => {
                     }}
                     className={`group flex min-w-0 max-w-[120px] cursor-pointer items-center gap-1.5 rounded px-2 py-1 text-[11px] font-medium transition-all ${
                       isActive
-                        ? 'bg-white text-gray-900 shadow-sm dark:bg-gray-700 dark:text-gray-100'
-                        : 'text-gray-500 hover:bg-gray-100 hover:text-gray-700 dark:text-gray-400 dark:hover:bg-gray-700/50 dark:hover:text-gray-300'
+                        ? 'bg-white text-gray-900 shadow-sm ring-1 ring-gray-300 dark:bg-gray-700 dark:text-gray-100 dark:ring-gray-600'
+                        : 'text-gray-600 hover:bg-gray-100 hover:text-gray-700 dark:text-gray-400 dark:hover:bg-gray-700/50 dark:hover:text-gray-300'
                     } `}
                   >
                     <FileText size={12} className="flex-shrink-0" />
@@ -200,7 +196,7 @@ const ViewPane = ({ viewId }: { viewId: string }) => {
               })}
 
               {documentIds.length === 0 && (
-                <span className="px-2 py-1 text-[11px] italic text-gray-400 dark:text-gray-500">
+                <span className="px-2 py-1 text-[11px] italic text-gray-500 dark:text-gray-400">
                   Empty pane
                 </span>
               )}
@@ -213,7 +209,7 @@ const ViewPane = ({ viewId }: { viewId: string }) => {
                   e.stopPropagation()
                   handleOpenFile(false)
                 }}
-                className="rounded p-1 text-gray-400 transition-colors hover:bg-gray-200 hover:text-gray-600 dark:hover:bg-gray-700 dark:hover:text-gray-300"
+                className="rounded p-1 text-gray-500 transition-colors hover:bg-gray-200 hover:text-gray-600 dark:text-gray-400 dark:hover:bg-gray-700 dark:hover:text-gray-300"
                 title="Open file in this pane"
               >
                 <Plus size={14} />
@@ -224,7 +220,7 @@ const ViewPane = ({ viewId }: { viewId: string }) => {
                     e.stopPropagation()
                     handleRemoveView()
                   }}
-                  className="rounded p-1 text-gray-400 transition-colors hover:bg-red-100 hover:text-red-600 dark:hover:bg-red-900/30 dark:hover:text-red-400"
+                  className="rounded p-1 text-gray-500 transition-colors hover:bg-red-100 hover:text-red-600 dark:text-gray-400 dark:hover:bg-red-900/30 dark:hover:text-red-400"
                   title="Close this pane"
                 >
                   <X size={14} />
@@ -234,11 +230,11 @@ const ViewPane = ({ viewId }: { viewId: string }) => {
           </div>
 
           {/* Content Area */}
-          <div className="relative flex-1 bg-gray-100 dark:bg-gray-800">
+          <div className="relative flex-1 bg-gray-50 dark:bg-gray-800">
             {activeDocumentId ? (
               <Viewport
                 documentId={activeDocumentId}
-                className="absolute inset-0 bg-[#e5e7eb]"
+                className="absolute inset-0 bg-gray-200 dark:bg-gray-800"
               >
                 <Scroller
                   documentId={activeDocumentId}
@@ -267,9 +263,9 @@ export const PDFViewer = () => {
 
   if (isLoading || !engine) {
     return (
-      <div className="overflow-hidden rounded-lg border border-gray-200 bg-white dark:border-gray-700 dark:bg-gray-900">
+      <div className="overflow-hidden rounded-lg border border-gray-300 bg-white dark:border-gray-700 dark:bg-gray-900">
         <div className="flex h-[400px] items-center justify-center">
-          <div className="flex items-center gap-2 text-gray-500">
+          <div className="flex items-center gap-2 text-gray-500 dark:text-gray-400">
             <Loader2 size={20} className="animate-spin" />
             <span className="text-sm">Loading PDF Engine...</span>
           </div>
@@ -319,7 +315,7 @@ export const PDFViewer = () => {
         }
       }}
     >
-      <div className="overflow-hidden rounded-lg border border-gray-200 bg-white shadow-sm dark:border-gray-700 dark:bg-gray-900">
+      <div className="overflow-hidden rounded-lg border border-gray-300 bg-white shadow-sm dark:border-gray-700 dark:bg-gray-900">
         <Toolbar />
         <div className="h-[400px] sm:h-[500px]">
           <Layout />

@@ -32,9 +32,9 @@ export const PDFViewer = () => {
 
   if (isLoading || !engine) {
     return (
-      <div className="overflow-hidden rounded-lg border border-gray-200 bg-white dark:border-gray-700 dark:bg-gray-900">
+      <div className="overflow-hidden rounded-lg border border-gray-300 bg-white dark:border-gray-700 dark:bg-gray-900">
         <div className="flex h-[400px] items-center justify-center">
-          <div className="flex items-center gap-2 text-gray-500">
+          <div className="flex items-center gap-2 text-gray-500 dark:text-gray-400">
             <Loader2 size={20} className="animate-spin" />
             <span className="text-sm">Loading PDF Engine...</span>
           </div>
@@ -54,9 +54,7 @@ export const PDFViewer = () => {
                 isLoaded && (
                   <Viewport
                     documentId={activeDocumentId}
-                    style={{
-                      backgroundColor: '#f1f3f5',
-                    }}
+                    className="bg-gray-200 dark:bg-gray-800"
                   >
                     <Scroller
                       documentId={activeDocumentId}

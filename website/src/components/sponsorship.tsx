@@ -78,34 +78,36 @@ const Sponsorship2: React.FC = () => {
       {/* Hero Section - The Story */}
       <section className="relative">
         {/* Animated background */}
-        <div className="absolute inset-0 -z-10">
-          <div className="top-70 animate-blob absolute left-8 h-64 w-64 rounded-full bg-purple-500 opacity-10 mix-blend-multiply blur-3xl filter"></div>
-          <div className="animate-blob animation-delay-2000 absolute -right-8 top-32 h-80 w-80 rounded-full bg-blue-500 opacity-10 mix-blend-multiply blur-3xl filter"></div>
-          <div className="animate-blob animation-delay-4000 absolute bottom-24 left-20 h-72 w-72 rounded-full bg-orange-400 opacity-10 mix-blend-multiply blur-3xl filter"></div>
-          <div className="bg-grid-pattern absolute inset-0 opacity-5"></div>
+        <div className="pointer-events-none absolute inset-0 -z-10 overflow-hidden">
+          <div className="top-70 animate-blob absolute left-8 h-64 w-64 rounded-full bg-purple-500 opacity-10 mix-blend-multiply blur-3xl filter dark:opacity-20 dark:mix-blend-normal"></div>
+          <div className="animate-blob animation-delay-2000 absolute -right-8 top-32 h-80 w-80 rounded-full bg-blue-500 opacity-10 mix-blend-multiply blur-3xl filter dark:opacity-20 dark:mix-blend-normal"></div>
+          <div className="animate-blob animation-delay-4000 absolute bottom-24 left-20 h-72 w-72 rounded-full bg-orange-400 opacity-10 mix-blend-multiply blur-3xl filter dark:opacity-20 dark:mix-blend-normal"></div>
+          <div className="bg-grid-pattern absolute inset-0 opacity-5 dark:opacity-[0.03]"></div>
         </div>
         <div className="relative mx-auto max-w-4xl px-6 py-20">
           {/* Personal Badge */}
           <div className="mb-8 text-center">
-            <span className="inline-block rounded-full border border-purple-200 bg-purple-50 px-6 py-2 text-sm font-medium text-purple-800">
+            <span className="inline-block rounded-full border border-purple-200 bg-purple-50 px-6 py-2 text-sm font-medium text-purple-800 dark:border-purple-800/30 dark:bg-purple-900/20 dark:text-purple-300">
               💜 A message from Bob Singor, Founder of EmbedPDF
             </span>
           </div>
 
-          <h1 className="mb-12 text-center text-4xl font-black leading-tight md:text-5xl lg:text-6xl">
+          <h1 className="mb-12 text-center text-4xl font-black leading-tight text-gray-900 dark:text-white md:text-5xl lg:text-6xl">
             I Did Not Want to Pay{' '}
-            <span className="text-red-600">$180,000/year</span>
+            <span className="text-red-600 dark:text-red-500">
+              $180,000/year
+            </span>
             <br /> For a PDF SDK. <br />
             <span className="gradient-text">So I Built My Own.</span>
           </h1>
 
-          <div className="prose prose-xl mb-12 max-w-none text-gray-700">
+          <div className="prose prose-xl mb-12 max-w-none text-gray-700 dark:text-gray-300">
             <p className="mb-8 text-xl leading-relaxed">
               When I needed a PDF SDK for my project, what I discovered about
               the industry shocked me:
             </p>
 
-            <div className="relative mb-10 overflow-hidden rounded-2xl bg-gradient-to-r from-slate-900 via-gray-900 to-slate-900 p-8 shadow-2xl">
+            <div className="relative mb-10 overflow-hidden rounded-2xl bg-gradient-to-r from-slate-900 via-gray-900 to-slate-900 p-8 shadow-2xl dark:border dark:border-gray-800">
               {/* Background effects */}
               <div className="absolute right-0 top-0 h-32 w-32 -translate-y-1/2 translate-x-1/2 transform rounded-full bg-gradient-to-br from-red-400 to-orange-500 opacity-20 blur-2xl"></div>
               <div className="absolute bottom-0 left-0 h-24 w-24 -translate-x-1/2 translate-y-1/2 transform rounded-full bg-gradient-to-br from-blue-400 to-purple-500 opacity-20 blur-2xl"></div>
@@ -140,14 +142,16 @@ const Sponsorship2: React.FC = () => {
 
             <p className="mb-6 text-xl leading-relaxed">
               These weren&apos;t just expensive licenses. They were{' '}
-              <strong>&quot;black boxes&quot;</strong> — closed source code you
-              can&apos;t inspect, modify, or truly own. Your entire product
-              depends on software you can&apos;t see, from vendors who can
-              change pricing at any time.
+              <strong className="text-gray-900 dark:text-white">
+                &quot;black boxes&quot;
+              </strong>{' '}
+              — closed source code you can&apos;t inspect, modify, or truly own.
+              Your entire product depends on software you can&apos;t see, from
+              vendors who can change pricing at any time.
             </p>
 
             <p className="text-xl font-semibold leading-relaxed">
-              <span className="text-blue-600">
+              <span className="text-blue-600 dark:text-blue-400">
                 So I started building an open-source alternative.
               </span>{' '}
               No vendor lock-in. No black boxes. Just great PDF technology that
@@ -158,7 +162,7 @@ const Sponsorship2: React.FC = () => {
           <div className="flex flex-col gap-4 lg:flex-row lg:items-center">
             <a
               href="#join-movement"
-              className="group relative inline-flex w-full items-center justify-center overflow-hidden rounded-full bg-gray-900 px-8 py-4 text-base font-medium text-white shadow-xl lg:w-auto"
+              className="group relative inline-flex w-full items-center justify-center overflow-hidden rounded-full bg-gray-900 px-8 py-4 text-base font-medium text-white shadow-xl dark:bg-white dark:text-gray-900 lg:w-auto"
             >
               <span className="absolute left-0 top-0 h-full w-full bg-gradient-to-r from-purple-600 via-blue-500 to-orange-400 opacity-0 transition-opacity group-hover:opacity-100"></span>
               <span className="relative z-10 flex items-center">
@@ -209,9 +213,9 @@ const Sponsorship2: React.FC = () => {
               href="https://github.com/embedpdf/embed-pdf-viewer"
               target="_blank"
               rel="noopener noreferrer"
-              className="group inline-flex w-full items-center justify-center px-5 py-3 text-base font-medium text-gray-700 transition-all hover:text-gray-900 lg:w-auto"
+              className="group inline-flex w-full items-center justify-center px-5 py-3 text-base font-medium text-gray-700 transition-all hover:text-gray-900 dark:text-gray-300 dark:hover:text-white lg:w-auto"
             >
-              <div className="flex items-center space-x-2 border-b border-dashed border-gray-300 group-hover:border-gray-600">
+              <div className="flex items-center space-x-2 border-b border-dashed border-gray-300 group-hover:border-gray-600 dark:border-gray-600 dark:group-hover:border-gray-400">
                 <svg
                   className="h-5 w-5"
                   fill="currentColor"
@@ -227,40 +231,48 @@ const Sponsorship2: React.FC = () => {
       </section>
 
       {/* Our Progress in 7 Months */}
-      <section className="bg-gray-50 py-20">
+      <section className="bg-gray-50 py-20 dark:bg-gray-900">
         <div className="mx-auto max-w-5xl px-6">
           <div className="text-center">
-            <h2 className="mb-6 text-3xl font-bold text-gray-900 md:text-4xl">
+            <h2 className="mb-6 text-3xl font-bold text-gray-900 dark:text-white md:text-4xl">
               What We Built in 8 Months{' '}
-              <span className="text-gray-500">(With Zero Funding)</span>
+              <span className="text-gray-500 dark:text-gray-400">
+                (With Zero Funding)
+              </span>
             </h2>
 
-            <div className="mb-12 rounded-xl border border-gray-100 bg-white p-6 shadow-sm">
+            <div className="mb-12 rounded-xl border border-gray-100 bg-white p-6 shadow-sm dark:border-gray-700 dark:bg-gray-800">
               <div className="grid gap-6 text-center md:grid-cols-3">
                 <div>
-                  <div className="mb-1 text-3xl font-black text-blue-600">
+                  <div className="mb-1 text-3xl font-black text-blue-600 dark:text-blue-400">
                     2,000+
                   </div>
-                  <div className="text-lg font-semibold">GitHub Stars</div>
-                  <div className="text-sm text-gray-500">
+                  <div className="text-lg font-semibold text-gray-900 dark:text-white">
+                    GitHub Stars
+                  </div>
+                  <div className="text-sm text-gray-500 dark:text-gray-400">
                     Organic developer interest
                   </div>
                 </div>
                 <div>
-                  <div className="mb-1 text-3xl font-black text-green-600">
+                  <div className="mb-1 text-3xl font-black text-green-600 dark:text-green-400">
                     Web SDK
                   </div>
-                  <div className="text-lg font-semibold">Production Ready</div>
-                  <div className="text-sm text-gray-500">
+                  <div className="text-lg font-semibold text-gray-900 dark:text-white">
+                    Production Ready
+                  </div>
+                  <div className="text-sm text-gray-500 dark:text-gray-400">
                     Used by real companies
                   </div>
                 </div>
                 <div>
-                  <div className="mb-1 text-3xl font-black text-purple-600">
+                  <div className="mb-1 text-3xl font-black text-purple-600 dark:text-purple-400">
                     100%
                   </div>
-                  <div className="text-lg font-semibold">Open Source</div>
-                  <div className="text-sm text-gray-500">
+                  <div className="text-lg font-semibold text-gray-900 dark:text-white">
+                    Open Source
+                  </div>
+                  <div className="text-sm text-gray-500 dark:text-gray-400">
                     MIT licensed forever
                   </div>
                 </div>
@@ -268,12 +280,12 @@ const Sponsorship2: React.FC = () => {
             </div>
 
             <div className="text-center">
-              <h3 className="mb-6 text-2xl font-bold text-gray-900">
+              <h3 className="mb-6 text-2xl font-bold text-gray-900 dark:text-white">
                 Our Vision: A Complete Multi-Platform PDF SDK
               </h3>
 
               <div className="mx-auto max-w-3xl text-center">
-                <p className="text-lg leading-relaxed text-gray-600">
+                <p className="text-lg leading-relaxed text-gray-600 dark:text-gray-300">
                   Universal platform support, enterprise-grade performance,
                   sponsor-driven development, and 100% open source forever —
                   building the PDF SDK developers deserve.
@@ -287,53 +299,59 @@ const Sponsorship2: React.FC = () => {
       {/* The Problem Section */}
       <section className="py-20">
         <div className="mx-auto max-w-6xl px-6">
-          <h2 className="mb-12 text-center text-4xl font-black">
+          <h2 className="mb-12 text-center text-4xl font-black text-gray-900 dark:text-white">
             Real Conversations from This Week
           </h2>
 
           <div className="mb-12 grid gap-8 md:grid-cols-3">
-            <div className="rounded-xl bg-white p-6 shadow-lg">
-              <div className="mb-3 font-bold text-red-600">SaaS Founder</div>
-              <p className="mb-3 text-gray-700">
+            <div className="rounded-xl bg-white p-6 shadow-lg dark:border dark:border-gray-800 dark:bg-gray-900">
+              <div className="mb-3 font-bold text-red-600 dark:text-red-400">
+                SaaS Founder
+              </div>
+              <p className="mb-3 text-gray-700 dark:text-gray-300">
                 &quot;We&apos;re using Nutrient and I&apos;m terrified they
                 might double the price. We couldn&apos;t afford it and our whole
                 business depends on their software.&quot;
               </p>
-              <div className="text-sm text-gray-500">— CEO, phone call</div>
+              <div className="text-sm text-gray-500 dark:text-gray-400">
+                — CEO, phone call
+              </div>
             </div>
 
-            <div className="rounded-xl bg-white p-6 shadow-lg">
-              <div className="mb-3 font-bold text-orange-600">
+            <div className="rounded-xl bg-white p-6 shadow-lg dark:border dark:border-gray-800 dark:bg-gray-900">
+              <div className="mb-3 font-bold text-orange-600 dark:text-orange-400">
                 Small Startup
               </div>
-              <p className="mb-3 text-gray-700">
+              <p className="mb-3 text-gray-700 dark:text-gray-300">
                 &quot;They told us $25,000/year is their minimum. That&apos;s
                 our entire tools budget for the year.&quot;
               </p>
-              <div className="text-sm text-gray-500">
+              <div className="text-sm text-gray-500 dark:text-gray-400">
                 — Startup founder, phone call
               </div>
             </div>
 
-            <div className="rounded-xl bg-white p-6 shadow-lg">
-              <div className="mb-3 font-bold text-blue-600">
+            <div className="rounded-xl bg-white p-6 shadow-lg dark:border dark:border-gray-800 dark:bg-gray-900">
+              <div className="mb-3 font-bold text-blue-600 dark:text-blue-400">
                 Construction Software
               </div>
-              <p className="mb-3 text-gray-700">
+              <p className="mb-3 text-gray-700 dark:text-gray-300">
                 &quot;We need multi-platform support and would much rather
                 invest in open-source than pay Apryse or Nutrient tens of
                 thousands for a black box.&quot;
               </p>
-              <div className="text-sm text-gray-500">— Founder, phone call</div>
+              <div className="text-sm text-gray-500 dark:text-gray-400">
+                — Founder, phone call
+              </div>
             </div>
           </div>
 
           <div className="mt-12 text-center">
-            <p className="mb-4 text-2xl font-bold text-gray-900">
+            <p className="mb-4 text-2xl font-bold text-gray-900 dark:text-white">
               Every story is the same: trapped by expensive, closed-source
               vendors.
             </p>
-            <p className="text-xl text-gray-600">
+            <p className="text-xl text-gray-600 dark:text-gray-400">
               It&apos;s time for an open-source alternative that companies can
               actually own.
             </p>
@@ -344,7 +362,7 @@ const Sponsorship2: React.FC = () => {
       {/* The Ask */}
       <section className="py-20" id="join-movement">
         <div className="mx-auto max-w-6xl">
-          <div className="rounded-3xl bg-gradient-to-br from-gray-900 to-blue-900 px-6 py-20 md:px-10">
+          <div className="rounded-3xl border bg-gradient-to-br from-gray-900 to-blue-900 px-6 py-20 dark:border-gray-700 md:px-10">
             <div className="text-center text-white">
               <h2 className="mb-6 text-4xl font-black md:text-5xl">
                 Let&apos;s Build the Alternative Together
@@ -544,27 +562,34 @@ const Sponsorship2: React.FC = () => {
       </section>
 
       {/* Sponsorship Tiers */}
-      <section className="bg-white py-20" id="sponsorship-tiers">
+      <section
+        className="bg-white py-20 dark:bg-gray-950"
+        id="sponsorship-tiers"
+      >
         <div className="mx-auto max-w-6xl px-6">
-          <h2 className="mb-6 text-center text-4xl font-black">
+          <h2 className="mb-6 text-center text-4xl font-black text-gray-900 dark:text-white">
             Become a Founding Sponsor
           </h2>
-          <p className="mx-auto mb-20 max-w-3xl text-center text-xl text-gray-600">
+          <p className="mx-auto mb-20 max-w-3xl text-center text-xl text-gray-600 dark:text-gray-400">
             The first 10 sponsors that commit to one of the plans below for 1
             year will be permanently recognized as founding sponsors who made
             this project possible.
           </p>
           <div className="grid gap-8 md:grid-cols-3">
             {/* Bronze */}
-            <div className="rounded-2xl border-2 border-gray-200 p-8 transition hover:scale-105 hover:transform hover:border-blue-500">
+            <div className="rounded-2xl border-2 border-gray-200 p-8 transition hover:scale-105 hover:transform hover:border-blue-500 dark:border-gray-700 dark:bg-gray-900 dark:hover:border-blue-400">
               <div className="mb-6 text-center">
-                <h3 className="mb-2 text-2xl font-bold">Bronze</h3>
-                <div className="text-4xl font-black text-gray-600">
+                <h3 className="mb-2 text-2xl font-bold text-gray-900 dark:text-white">
+                  Bronze
+                </h3>
+                <div className="text-4xl font-black text-gray-600 dark:text-gray-300">
                   $500-1,500
                 </div>
-                <div className="text-gray-500">per month</div>
+                <div className="text-gray-500 dark:text-gray-400">
+                  per month
+                </div>
               </div>
-              <ul className="mb-8 space-y-3">
+              <ul className="mb-8 space-y-3 text-gray-700 dark:text-gray-300">
                 <li className="flex items-start">
                   <svg
                     className="mr-2 mt-0.5 h-5 w-5 text-green-500"
@@ -639,7 +664,7 @@ const Sponsorship2: React.FC = () => {
               <div className="text-center">
                 <a
                   href="#contact"
-                  className="inline-flex w-full items-center justify-center rounded-full bg-gray-100 py-3 font-semibold transition hover:bg-gray-200"
+                  className="inline-flex w-full items-center justify-center rounded-full bg-gray-100 py-3 font-semibold text-gray-900 transition hover:bg-gray-200 dark:bg-gray-800 dark:text-white dark:hover:bg-gray-700"
                 >
                   Get Started
                 </a>
@@ -647,18 +672,24 @@ const Sponsorship2: React.FC = () => {
             </div>
 
             {/* Silver - Most Popular */}
-            <div className="relative scale-105 transform rounded-2xl border-2 border-blue-500 p-8 shadow-xl">
+            <div className="relative scale-105 transform rounded-2xl border-2 border-blue-500 p-8 shadow-xl dark:bg-gray-900">
               <div className="absolute -top-4 left-1/2 -translate-x-1/2 transform">
                 <span className="rounded-full bg-blue-500 px-4 py-1 text-sm font-bold text-white">
                   SWEET SPOT
                 </span>
               </div>
               <div className="mb-6 text-center">
-                <h3 className="mb-2 text-2xl font-bold">Silver</h3>
-                <div className="text-4xl font-black text-blue-600">$2,500</div>
-                <div className="text-gray-500">per month</div>
+                <h3 className="mb-2 text-2xl font-bold text-gray-900 dark:text-white">
+                  Silver
+                </h3>
+                <div className="text-4xl font-black text-blue-600 dark:text-blue-400">
+                  $2,500
+                </div>
+                <div className="text-gray-500 dark:text-gray-400">
+                  per month
+                </div>
               </div>
-              <ul className="mb-8 space-y-3">
+              <ul className="mb-8 space-y-3 text-gray-700 dark:text-gray-300">
                 <li className="flex items-start">
                   <svg
                     className="mr-2 mt-0.5 h-5 w-5 text-green-500"
@@ -741,15 +772,19 @@ const Sponsorship2: React.FC = () => {
             </div>
 
             {/* Gold */}
-            <div className="rounded-2xl border-2 border-gray-200 p-8 transition hover:scale-105 hover:transform hover:border-yellow-500">
+            <div className="rounded-2xl border-2 border-gray-200 p-8 transition hover:scale-105 hover:transform hover:border-yellow-500 dark:border-gray-700 dark:bg-gray-900 dark:hover:border-yellow-400">
               <div className="mb-6 text-center">
-                <h3 className="mb-2 text-2xl font-bold">Gold</h3>
-                <div className="text-4xl font-black text-yellow-600">
+                <h3 className="mb-2 text-2xl font-bold text-gray-900 dark:text-white">
+                  Gold
+                </h3>
+                <div className="text-4xl font-black text-yellow-600 dark:text-yellow-400">
                   $5,000+
                 </div>
-                <div className="text-gray-500">per month</div>
+                <div className="text-gray-500 dark:text-gray-400">
+                  per month
+                </div>
               </div>
-              <ul className="mb-8 space-y-3">
+              <ul className="mb-8 space-y-3 text-gray-700 dark:text-gray-300">
                 <li className="flex items-start">
                   <svg
                     className="mr-2 mt-0.5 h-5 w-5 text-green-500"
@@ -824,7 +859,7 @@ const Sponsorship2: React.FC = () => {
               <div className="text-center">
                 <a
                   href="#contact"
-                  className="inline-flex w-full items-center justify-center rounded-full bg-yellow-100 py-3 font-semibold transition hover:bg-yellow-200"
+                  className="inline-flex w-full items-center justify-center rounded-full bg-yellow-100 py-3 font-semibold text-gray-900 transition hover:bg-yellow-200 dark:bg-yellow-500/20 dark:text-yellow-300 dark:hover:bg-yellow-500/30"
                 >
                   Discuss Gold Sponsorship
                 </a>
@@ -832,30 +867,30 @@ const Sponsorship2: React.FC = () => {
             </div>
           </div>
 
-          <div className="mt-20 rounded-xl border border-blue-200 bg-gradient-to-r from-blue-50 to-purple-50 p-8 text-center">
-            <p className="mb-4 text-2xl font-bold text-blue-600">
+          <div className="mt-20 rounded-xl border border-blue-200 bg-gradient-to-r from-blue-50 to-purple-50 p-8 text-center dark:border-blue-800 dark:from-blue-900/20 dark:to-purple-900/20">
+            <p className="mb-4 text-2xl font-bold text-blue-600 dark:text-blue-400">
               🔓 Own Your Code Forever
             </p>
-            <p className="text-lg leading-relaxed text-gray-700">
+            <p className="text-lg leading-relaxed text-gray-700 dark:text-gray-300">
               Stop paying endless licensing fees for software black boxes.
               <br />
-              <span className="font-semibold text-blue-600">
+              <span className="font-semibold text-blue-600 dark:text-blue-400">
                 Sponsor open-source development once, own the technology
                 forever.
               </span>
               <br />
-              <span className="mt-2 block text-base text-gray-600">
+              <span className="mt-2 block text-base text-gray-600 dark:text-gray-400">
                 No vendor lock-in. No surprise price hikes. No limitations.
               </span>
             </p>
           </div>
 
           {/* Community Support Section */}
-          <div className="mt-8 rounded-xl bg-gray-100 p-6 text-center">
-            <h3 className="mb-3 text-xl font-bold text-gray-800">
+          <div className="mt-8 rounded-xl bg-gray-100 p-6 text-center dark:bg-gray-900">
+            <h3 className="mb-3 text-xl font-bold text-gray-800 dark:text-white">
               Can&apos;t commit to a big sponsorship?
             </h3>
-            <p className="mb-4 text-gray-600">
+            <p className="mb-4 text-gray-600 dark:text-gray-400">
               Every contribution helps! Support with any amount starting from
               $5/month.
             </p>
@@ -863,7 +898,7 @@ const Sponsorship2: React.FC = () => {
               href="https://github.com/sponsors/embedpdf"
               target="_blank"
               rel="noopener noreferrer"
-              className="inline-flex items-center justify-center rounded-lg bg-gray-800 px-6 py-3 font-semibold text-white transition hover:bg-gray-900"
+              className="inline-flex items-center justify-center rounded-lg bg-gray-800 px-6 py-3 font-semibold text-white transition hover:bg-gray-900 dark:bg-white dark:text-gray-900 dark:hover:bg-gray-100"
             >
               <svg
                 className="mr-2 h-5 w-5"
@@ -879,18 +914,18 @@ const Sponsorship2: React.FC = () => {
       </section>
 
       {/* FAQ Section */}
-      <section className="py-20">
+      <section className="py-20 dark:bg-gray-900">
         <div className="mx-auto max-w-4xl px-6">
-          <h2 className="mb-12 text-center text-4xl font-black">
+          <h2 className="mb-12 text-center text-4xl font-black text-gray-900 dark:text-white">
             Questions I&apos;m Hearing
           </h2>
 
           <div className="space-y-6">
-            <div className="rounded-xl bg-white p-6 shadow-lg">
-              <h3 className="mb-3 text-xl font-bold">
+            <div className="rounded-xl bg-white p-6 shadow-lg dark:border dark:border-gray-700 dark:bg-gray-800">
+              <h3 className="mb-3 text-xl font-bold text-gray-900 dark:text-white">
                 Why should I trust this will succeed?
               </h3>
-              <p className="text-gray-700">
+              <p className="text-gray-700 dark:text-gray-300">
                 Fair question. Look at our track record: 2,000+ GitHub stars and
                 a working Web SDK in just 8 months with zero funding. I&apos;ve
                 been building PDF technology for years and understand the
@@ -899,20 +934,22 @@ const Sponsorship2: React.FC = () => {
               </p>
             </div>
 
-            <div className="rounded-xl bg-white p-6 shadow-lg">
-              <h3 className="mb-3 text-xl font-bold">
+            <div className="rounded-xl bg-white p-6 shadow-lg dark:border dark:border-gray-700 dark:bg-gray-800">
+              <h3 className="mb-3 text-xl font-bold text-gray-900 dark:text-white">
                 What happens to my sponsorship if you get acquired?
               </h3>
-              <p className="text-gray-700">
+              <p className="text-gray-700 dark:text-gray-300">
                 The code is MIT licensed forever. The community owns the code.
                 That&apos;s the beauty of open source—no single entity can take
                 it away.
               </p>
             </div>
 
-            <div className="rounded-xl bg-white p-6 shadow-lg">
-              <h3 className="mb-3 text-xl font-bold">Why $30,000/month?</h3>
-              <p className="text-gray-700">
+            <div className="rounded-xl bg-white p-6 shadow-lg dark:border dark:border-gray-700 dark:bg-gray-800">
+              <h3 className="mb-3 text-xl font-bold text-gray-900 dark:text-white">
+                Why $30,000/month?
+              </h3>
+              <p className="text-gray-700 dark:text-gray-300">
                 Transparency: This covers my salary as lead developer
                 ($15-18K/month) and hiring a senior mobile developer
                 ($12-15K/month). Two experienced developers working full-time
@@ -921,11 +958,11 @@ const Sponsorship2: React.FC = () => {
               </p>
             </div>
 
-            <div className="rounded-xl bg-white p-6 shadow-lg">
-              <h3 className="mb-3 text-xl font-bold">
+            <div className="rounded-xl bg-white p-6 shadow-lg dark:border dark:border-gray-700 dark:bg-gray-800">
+              <h3 className="mb-3 text-xl font-bold text-gray-900 dark:text-white">
                 What if we need features you haven&apos;t built yet?
               </h3>
-              <p className="text-gray-700">
+              <p className="text-gray-700 dark:text-gray-300">
                 That&apos;s the beauty of open source with active development.
                 Gold sponsors get custom feature development. Silver sponsors
                 influence the roadmap. And since it&apos;s MIT licensed, you can
@@ -934,11 +971,11 @@ const Sponsorship2: React.FC = () => {
               </p>
             </div>
 
-            <div className="rounded-xl bg-white p-6 shadow-lg">
-              <h3 className="mb-3 text-xl font-bold">
+            <div className="rounded-xl bg-white p-6 shadow-lg dark:border dark:border-gray-700 dark:bg-gray-800">
+              <h3 className="mb-3 text-xl font-bold text-gray-900 dark:text-white">
                 How do I justify this to my CFO?
               </h3>
-              <p className="text-gray-700">
+              <p className="text-gray-700 dark:text-gray-300">
                 Simple ROI: If you&apos;re paying $150K+/year for a PDF SDK,
                 sponsoring at $30K/year saves you $120K annually. Plus you
                 eliminate vendor risk, gain code ownership, and can customize
@@ -948,15 +985,17 @@ const Sponsorship2: React.FC = () => {
               </p>
             </div>
 
-            <div className="rounded-xl bg-white p-6 shadow-lg">
-              <h3 className="mb-3 text-xl font-bold">Can we try it first?</h3>
-              <p className="text-gray-700">
+            <div className="rounded-xl bg-white p-6 shadow-lg dark:border dark:border-gray-700 dark:bg-gray-800">
+              <h3 className="mb-3 text-xl font-bold text-gray-900 dark:text-white">
+                Can we try it first?
+              </h3>
+              <p className="text-gray-700 dark:text-gray-300">
                 Absolutely! Try it right now: &nbsp;
                 <a
                   href="https://app.embedpdf.com/"
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="font-semibold text-blue-600 hover:text-blue-800"
+                  className="font-semibold text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300"
                 >
                   Live demo →
                 </a>{' '}
@@ -965,7 +1004,7 @@ const Sponsorship2: React.FC = () => {
                   href="https://github.com/embedpdf/embed-pdf-viewer"
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="font-semibold text-blue-600 hover:text-blue-800"
+                  className="font-semibold text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300"
                 >
                   browse the code →
                 </a>{' '}
@@ -981,25 +1020,25 @@ const Sponsorship2: React.FC = () => {
       {/* Final CTA */}
       <section className="py-20" id="contact">
         <div className="mx-auto max-w-6xl">
-          <div className="rounded-3xl bg-gradient-to-br from-gray-900 to-blue-900 px-6 py-20 text-center text-white md:px-10">
+          <div className="rounded-3xl border bg-gradient-to-br from-gray-900 to-blue-900 px-6 py-20 text-center text-white dark:border-gray-700 md:px-10">
             <h2 className="mb-6 text-4xl font-black md:text-5xl">
               Ready to Own Your PDF Technology?
             </h2>
 
-            <p className="mb-8 text-xl leading-relaxed">
+            <p className="mb-8 text-xl leading-relaxed text-gray-200">
               Let&apos;s have a real conversation about breaking free from
               vendor lock-in. I personally respond to every message.
             </p>
 
-            <div className="mx-auto max-w-2xl rounded-2xl bg-white/10 p-6 backdrop-blur md:p-8">
-              <h3 className="mb-6 text-2xl font-bold">
+            <div className="mx-auto max-w-2xl rounded-2xl border border-white/10 bg-white/10 p-6 backdrop-blur md:p-8">
+              <h3 className="mb-6 text-2xl font-bold text-white">
                 Direct Line to the Founder
               </h3>
 
               <div className="space-y-4 text-lg">
                 <a
                   href="mailto:bob.singor@embedpdf.com"
-                  className="flex items-center justify-center hover:text-blue-300"
+                  className="flex items-center justify-center text-gray-200 transition-colors hover:text-white"
                 >
                   <svg
                     className="mr-3 h-6 w-6"
@@ -1016,7 +1055,7 @@ const Sponsorship2: React.FC = () => {
                   href="https://cal.com/embedpdf/30min"
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="flex items-center justify-center rounded-lg bg-blue-600 py-3 font-bold hover:bg-blue-700"
+                  className="flex items-center justify-center rounded-lg bg-blue-600 py-3 font-bold text-white transition-colors hover:bg-blue-700"
                 >
                   <svg
                     className="mr-3 h-6 w-6"
@@ -1038,7 +1077,7 @@ const Sponsorship2: React.FC = () => {
                   href="https://discord.gg/mHHABmmuVU"
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="flex items-center justify-center hover:text-purple-300"
+                  className="flex items-center justify-center text-purple-300 transition-colors hover:text-purple-200"
                 >
                   <svg
                     className="mr-3 h-6 w-6"
@@ -1062,7 +1101,7 @@ const Sponsorship2: React.FC = () => {
               <p className="mb-4 text-2xl font-bold">
                 Join the open-source PDF revolution.
               </p>
-              <p className="text-xl">
+              <p className="text-xl text-gray-200">
                 Let&apos;s build technology that nobody can take away.
               </p>
             </div>

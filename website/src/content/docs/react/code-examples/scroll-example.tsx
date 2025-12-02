@@ -48,12 +48,12 @@ const PageNavigation = ({ documentId }: { documentId: string }) => {
   }
 
   return (
-    <div className="flex items-center justify-center gap-2 border-b border-gray-200 bg-white px-3 py-2 dark:border-gray-700 dark:bg-gray-900">
+    <div className="flex items-center justify-center gap-2 border-b border-gray-300 bg-gray-100 px-3 py-2 dark:border-gray-700 dark:bg-gray-800">
       {/* Previous button */}
       <button
         onClick={() => scroll?.scrollToPreviousPage()}
         disabled={state.currentPage <= 1}
-        className="inline-flex h-8 w-8 items-center justify-center rounded-md bg-gray-100 text-gray-600 transition-all hover:bg-gray-200 hover:text-gray-900 disabled:cursor-not-allowed disabled:opacity-50 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700 dark:hover:text-gray-100"
+        className="inline-flex h-8 w-8 items-center justify-center rounded-md bg-white text-gray-600 shadow-sm ring-1 ring-gray-300 transition-all hover:bg-gray-50 hover:text-gray-900 disabled:cursor-not-allowed disabled:opacity-50 dark:bg-gray-700 dark:text-gray-300 dark:ring-gray-600 dark:hover:bg-gray-600 dark:hover:text-gray-100"
         title="Previous Page"
       >
         <ChevronLeft size={18} />
@@ -61,7 +61,7 @@ const PageNavigation = ({ documentId }: { documentId: string }) => {
 
       {/* Page input */}
       <form onSubmit={handleGoToPage} className="flex items-center gap-2">
-        <span className="tracking-wide text-xs font-medium uppercase text-gray-500 dark:text-gray-400">
+        <span className="tracking-wide text-xs font-medium uppercase text-gray-600 dark:text-gray-300">
           Page
         </span>
         <input
@@ -70,9 +70,9 @@ const PageNavigation = ({ documentId }: { documentId: string }) => {
           onChange={(e) => setPageInput(e.target.value)}
           min={1}
           max={state.totalPages}
-          className="h-8 w-14 rounded-md border-0 bg-gray-100 px-2 text-center font-mono text-sm font-medium text-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-800 dark:text-gray-300"
+          className="h-8 w-14 rounded-md border-0 bg-white px-2 text-center font-mono text-sm font-medium text-gray-700 shadow-sm ring-1 ring-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-gray-300 dark:ring-gray-600"
         />
-        <span className="text-xs font-medium text-gray-500 dark:text-gray-400">
+        <span className="text-xs font-medium text-gray-600 dark:text-gray-300">
           of {state.totalPages}
         </span>
       </form>
@@ -81,7 +81,7 @@ const PageNavigation = ({ documentId }: { documentId: string }) => {
       <button
         onClick={() => scroll?.scrollToNextPage()}
         disabled={state.currentPage >= state.totalPages}
-        className="inline-flex h-8 w-8 items-center justify-center rounded-md bg-gray-100 text-gray-600 transition-all hover:bg-gray-200 hover:text-gray-900 disabled:cursor-not-allowed disabled:opacity-50 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700 dark:hover:text-gray-100"
+        className="inline-flex h-8 w-8 items-center justify-center rounded-md bg-white text-gray-600 shadow-sm ring-1 ring-gray-300 transition-all hover:bg-gray-50 hover:text-gray-900 disabled:cursor-not-allowed disabled:opacity-50 dark:bg-gray-700 dark:text-gray-300 dark:ring-gray-600 dark:hover:bg-gray-600 dark:hover:text-gray-100"
         title="Next Page"
       >
         <ChevronRight size={18} />
@@ -95,9 +95,9 @@ export const PDFViewer = () => {
 
   if (isLoading || !engine) {
     return (
-      <div className="overflow-hidden rounded-lg border border-gray-200 bg-white dark:border-gray-700 dark:bg-gray-900">
+      <div className="overflow-hidden rounded-lg border border-gray-300 bg-white dark:border-gray-700 dark:bg-gray-900">
         <div className="flex h-[400px] items-center justify-center">
-          <div className="flex items-center gap-2 text-gray-500">
+          <div className="flex items-center gap-2 text-gray-500 dark:text-gray-400">
             <Loader2 size={20} className="animate-spin" />
             <span className="text-sm">Loading PDF Engine...</span>
           </div>
@@ -113,7 +113,7 @@ export const PDFViewer = () => {
           <DocumentContent documentId={activeDocumentId}>
             {({ isLoaded }) =>
               isLoaded && (
-                <div className="overflow-hidden rounded-lg border border-gray-200 bg-white shadow-sm dark:border-gray-700 dark:bg-gray-900">
+                <div className="overflow-hidden rounded-lg border border-gray-300 bg-white shadow-sm dark:border-gray-700 dark:bg-gray-900">
                   {/* Navigation Toolbar */}
                   <PageNavigation documentId={activeDocumentId} />
 
@@ -121,7 +121,7 @@ export const PDFViewer = () => {
                   <div className="relative h-[400px] sm:h-[500px]">
                     <Viewport
                       documentId={activeDocumentId}
-                      className="absolute inset-0 bg-[#e5e7eb]"
+                      className="absolute inset-0 bg-gray-200 dark:bg-gray-800"
                     >
                       <Scroller
                         documentId={activeDocumentId}

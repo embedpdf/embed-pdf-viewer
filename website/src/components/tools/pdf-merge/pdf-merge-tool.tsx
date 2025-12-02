@@ -218,7 +218,7 @@ export const PdfMergeTool = () => {
       subtitle="right in your browser"
       description="Securely combine PDFs with complete privacy"
       badgeText="PDF Merge Tool"
-      badgeColor="border-purple-200 bg-purple-50 text-purple-800"
+      badgeColor="border-purple-200 bg-purple-50 text-purple-800 dark:border-purple-800/30 dark:bg-purple-900/20 dark:text-purple-300"
       gradientColor="from-purple-600 to-blue-700"
     >
       {!engine ? (

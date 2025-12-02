@@ -62,20 +62,20 @@ const RedactionToolbar = ({ documentId }: { documentId: string }) => {
   const isMarkAreaActive = state.activeType === RedactionMode.MarqueeRedact
 
   return (
-    <div className="flex flex-wrap items-center gap-3 border-b border-gray-200 bg-white px-3 py-2 dark:border-gray-700 dark:bg-gray-900">
-      <span className="tracking-wide text-xs font-medium uppercase text-gray-500 dark:text-gray-400">
+    <div className="flex flex-wrap items-center gap-3 border-b border-gray-300 bg-gray-100 px-3 py-2 dark:border-gray-700 dark:bg-gray-800">
+      <span className="tracking-wide text-xs font-medium uppercase text-gray-600 dark:text-gray-300">
         Redact
       </span>
-      <div className="h-4 w-px bg-gray-200 dark:bg-gray-700" />
+      <div className="h-4 w-px bg-gray-300 dark:bg-gray-600" />
 
       {/* Mode buttons */}
       <div className="flex items-center gap-1.5">
         <button
           onClick={() => provides?.toggleRedactSelection()}
-          className={`inline-flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-xs font-medium transition-all ${
+          className={`inline-flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-xs font-medium shadow-sm transition-all ${
             isMarkTextActive
-              ? 'bg-blue-500 text-white shadow-sm'
-              : 'bg-gray-100 text-gray-600 hover:bg-gray-200 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700'
+              ? 'bg-blue-500 text-white ring-1 ring-blue-600'
+              : 'bg-white text-gray-600 ring-1 ring-gray-300 hover:bg-gray-50 hover:text-gray-900 dark:bg-gray-700 dark:text-gray-300 dark:ring-gray-600 dark:hover:bg-gray-600 dark:hover:text-gray-100'
           } `}
         >
           <Type size={14} />
@@ -83,10 +83,10 @@ const RedactionToolbar = ({ documentId }: { documentId: string }) => {
         </button>
         <button
           onClick={() => provides?.toggleMarqueeRedact()}
-          className={`inline-flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-xs font-medium transition-all ${
+          className={`inline-flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-xs font-medium shadow-sm transition-all ${
             isMarkAreaActive
-              ? 'bg-blue-500 text-white shadow-sm'
-              : 'bg-gray-100 text-gray-600 hover:bg-gray-200 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700'
+              ? 'bg-blue-500 text-white ring-1 ring-blue-600'
+              : 'bg-white text-gray-600 ring-1 ring-gray-300 hover:bg-gray-50 hover:text-gray-900 dark:bg-gray-700 dark:text-gray-300 dark:ring-gray-600 dark:hover:bg-gray-600 dark:hover:text-gray-100'
           } `}
         >
           <Square size={14} />
@@ -94,7 +94,7 @@ const RedactionToolbar = ({ documentId }: { documentId: string }) => {
         </button>
       </div>
 
-      <div className="h-4 w-px bg-gray-200 dark:bg-gray-700" />
+      <div className="h-4 w-px bg-gray-300 dark:bg-gray-600" />
 
       {/* Pending count and apply */}
       <div className="flex items-center gap-2">
@@ -104,14 +104,14 @@ const RedactionToolbar = ({ documentId }: { documentId: string }) => {
             {state.pendingCount} pending
           </span>
         ) : (
-          <span className="text-xs text-gray-400 dark:text-gray-500">
+          <span className="text-xs text-gray-500 dark:text-gray-400">
             No marks pending
           </span>
         )}
         <button
           onClick={handleApplyAll}
           disabled={state.pendingCount === 0 || isCommitting}
-          className="inline-flex items-center gap-1.5 rounded-md bg-red-500 px-2.5 py-1.5 text-xs font-medium text-white shadow-sm transition-all hover:bg-red-600 disabled:cursor-not-allowed disabled:opacity-50"
+          className="inline-flex items-center gap-1.5 rounded-md bg-red-500 px-2.5 py-1.5 text-xs font-medium text-white shadow-sm ring-1 ring-red-600 transition-all hover:bg-red-600 disabled:cursor-not-allowed disabled:opacity-50"
         >
           {isCommitting ? (
             <>
@@ -129,7 +129,7 @@ const RedactionToolbar = ({ documentId }: { documentId: string }) => {
 
       {/* Hint text */}
       {(isMarkTextActive || isMarkAreaActive) && (
-        <span className="hidden animate-pulse text-xs text-blue-600 lg:inline dark:text-blue-400">
+        <span className="hidden animate-pulse text-xs text-blue-600 dark:text-blue-400 lg:inline">
           {isMarkTextActive
             ? 'Select text to mark for redaction'
             : 'Draw a rectangle to mark for redaction'}
@@ -152,7 +152,7 @@ const RedactionMenu = ({
   return (
     <div {...menuWrapperProps}>
       <div
-        className="flex gap-1 rounded-lg border border-gray-200 bg-white p-1 shadow-lg dark:border-gray-700 dark:bg-gray-900"
+        className="flex gap-1 rounded-lg border border-gray-300 bg-white p-1 shadow-lg dark:border-gray-600 dark:bg-gray-800"
         style={{
           position: 'absolute',
           top: rect.size.height + 8,
@@ -164,7 +164,7 @@ const RedactionMenu = ({
           onClick={() =>
             provides?.commitPending(context.item.page, context.item.id)
           }
-          className="inline-flex items-center gap-1.5 rounded-md bg-red-500 px-2.5 py-1.5 text-xs font-medium text-white transition-colors hover:bg-red-600"
+          className="inline-flex items-center gap-1.5 rounded-md bg-red-500 px-2.5 py-1.5 text-xs font-medium text-white ring-1 ring-red-600 transition-colors hover:bg-red-600"
         >
           <Check size={12} />
           Apply
@@ -173,7 +173,7 @@ const RedactionMenu = ({
           onClick={() =>
             provides?.removePending(context.item.page, context.item.id)
           }
-          className="inline-flex items-center gap-1.5 rounded-md bg-gray-100 px-2.5 py-1.5 text-xs font-medium text-gray-700 transition-colors hover:bg-gray-200 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700"
+          className="inline-flex items-center gap-1.5 rounded-md bg-white px-2.5 py-1.5 text-xs font-medium text-gray-700 ring-1 ring-gray-300 transition-colors hover:bg-gray-50 dark:bg-gray-700 dark:text-gray-200 dark:ring-gray-600 dark:hover:bg-gray-600"
         >
           <Trash2 size={12} />
           Remove
@@ -188,9 +188,9 @@ export const PDFViewer = () => {
 
   if (isLoading || !engine) {
     return (
-      <div className="overflow-hidden rounded-lg border border-gray-200 bg-white dark:border-gray-700 dark:bg-gray-900">
+      <div className="overflow-hidden rounded-lg border border-gray-300 bg-white dark:border-gray-700 dark:bg-gray-900">
         <div className="flex h-[400px] items-center justify-center">
-          <div className="flex items-center gap-2 text-gray-500">
+          <div className="flex items-center gap-2 text-gray-500 dark:text-gray-400">
             <Loader2 size={20} className="animate-spin" />
             <span className="text-sm">Loading PDF Engine...</span>
           </div>
@@ -207,7 +207,7 @@ export const PDFViewer = () => {
             {({ isLoaded }) =>
               isLoaded && (
                 <div
-                  className="overflow-hidden rounded-lg border border-gray-200 bg-white shadow-sm dark:border-gray-700 dark:bg-gray-900"
+                  className="overflow-hidden rounded-lg border border-gray-300 bg-white shadow-sm dark:border-gray-700 dark:bg-gray-900"
                   style={{ userSelect: 'none' }}
                 >
                   {/* Toolbar */}
@@ -217,7 +217,7 @@ export const PDFViewer = () => {
                   <div className="relative h-[450px] sm:h-[550px]">
                     <Viewport
                       documentId={activeDocumentId}
-                      className="absolute inset-0 bg-[#e5e7eb]"
+                      className="absolute inset-0 bg-gray-200 dark:bg-gray-800"
                     >
                       <Scroller
                         documentId={activeDocumentId}

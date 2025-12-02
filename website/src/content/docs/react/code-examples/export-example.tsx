@@ -32,7 +32,7 @@ const ExportToolbar = ({ documentId }: { documentId: string }) => {
   const { provides: exportApi } = useExport(documentId)
 
   return (
-    <div className="flex items-center gap-3 border-b border-gray-200 bg-white px-3 py-2 dark:border-gray-700 dark:bg-gray-900">
+    <div className="flex items-center gap-3 border-b border-gray-300 bg-gray-100 px-3 py-2 dark:border-gray-700 dark:bg-gray-800">
       <button
         onClick={() => exportApi?.download()}
         disabled={!exportApi}
@@ -41,7 +41,7 @@ const ExportToolbar = ({ documentId }: { documentId: string }) => {
         <Download size={16} />
         Download PDF
       </button>
-      <span className="text-xs text-gray-500 dark:text-gray-400">
+      <span className="text-xs text-gray-600 dark:text-gray-300">
         Click to save the document to your device
       </span>
     </div>
@@ -53,9 +53,9 @@ export const PDFViewer = () => {
 
   if (isLoading || !engine) {
     return (
-      <div className="overflow-hidden rounded-lg border border-gray-200 bg-white dark:border-gray-700 dark:bg-gray-900">
+      <div className="overflow-hidden rounded-lg border border-gray-300 bg-white dark:border-gray-700 dark:bg-gray-900">
         <div className="flex h-[400px] items-center justify-center">
-          <div className="flex items-center gap-2 text-gray-500">
+          <div className="flex items-center gap-2 text-gray-500 dark:text-gray-400">
             <Loader2 size={20} className="animate-spin" />
             <span className="text-sm">Loading PDF Engine...</span>
           </div>
@@ -71,7 +71,7 @@ export const PDFViewer = () => {
           <DocumentContent documentId={activeDocumentId}>
             {({ isLoaded }) =>
               isLoaded && (
-                <div className="overflow-hidden rounded-lg border border-gray-200 bg-white shadow-sm dark:border-gray-700 dark:bg-gray-900">
+                <div className="overflow-hidden rounded-lg border border-gray-300 bg-white shadow-sm dark:border-gray-700 dark:bg-gray-900">
                   {/* Toolbar */}
                   <ExportToolbar documentId={activeDocumentId} />
 
@@ -79,7 +79,7 @@ export const PDFViewer = () => {
                   <div className="relative h-[400px] sm:h-[500px]">
                     <Viewport
                       documentId={activeDocumentId}
-                      className="absolute inset-0 bg-[#e5e7eb]"
+                      className="absolute inset-0 bg-gray-200 dark:bg-gray-800"
                     >
                       <Scroller
                         documentId={activeDocumentId}
