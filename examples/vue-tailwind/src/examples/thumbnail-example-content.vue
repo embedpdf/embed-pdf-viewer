@@ -12,8 +12,11 @@ const { state, provides } = useScroll(() => props.documentId);
 </script>
 
 <template>
-  <div style="height: 500px; margin-top: 10px">
-    <div style="display: flex; height: 100%">
+  <div
+    class="overflow-hidden rounded-lg border border-gray-300 bg-white shadow-sm dark:border-gray-700 dark:bg-gray-900"
+  >
+    <div class="flex h-[400px] sm:h-[500px]">
+      <!-- Thumbnail Sidebar -->
       <div
         class="h-full w-[140px] flex-shrink-0 border-r border-gray-300 bg-gray-50 dark:border-gray-700 dark:bg-gray-900"
       >
@@ -21,16 +24,10 @@ const { state, provides } = useScroll(() => props.documentId);
           <template #default="{ meta }">
             <div
               :key="meta.pageIndex"
+              class="absolute flex w-full cursor-pointer flex-col items-center px-2"
               :style="{
-                position: 'absolute',
-                width: '100%',
                 height: meta.wrapperHeight + 'px',
                 top: meta.top + 'px',
-                display: 'flex',
-                flexDirection: 'column',
-                alignItems: 'center',
-                cursor: 'pointer',
-                padding: '4px',
               }"
               @click="provides?.scrollToPage?.({ pageNumber: meta.pageIndex + 1 })"
             >
@@ -53,13 +50,8 @@ const { state, provides } = useScroll(() => props.documentId);
                 />
               </div>
               <div
-                :style="{
-                  height: meta.labelHeight + 'px',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  marginTop: '4px',
-                }"
+                class="mt-1 flex items-center justify-center"
+                :style="{ height: meta.labelHeight + 'px' }"
               >
                 <span
                   :class="[
@@ -76,19 +68,13 @@ const { state, provides } = useScroll(() => props.documentId);
           </template>
         </ThumbnailsPane>
       </div>
-      <div style="flex: 1; overflow: hidden; position: relative">
+
+      <!-- PDF Viewer Area -->
+      <div class="relative flex-1">
         <Viewport :document-id="documentId" class="absolute inset-0 bg-gray-200 dark:bg-gray-800">
           <Scroller :document-id="documentId">
             <template #default="{ page }">
-              <div
-                :style="{
-                  width: page.width + 'px',
-                  height: page.height + 'px',
-                  position: 'relative',
-                }"
-              >
-                <RenderLayer :document-id="documentId" :page-index="page.pageIndex" />
-              </div>
+              <RenderLayer :document-id="documentId" :page-index="page.pageIndex" />
             </template>
           </Scroller>
         </Viewport>

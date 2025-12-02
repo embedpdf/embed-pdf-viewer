@@ -23,11 +23,8 @@ interface CodeFile {
 interface CodeExampleProps {
   children: React.ReactNode
   files?: CodeFile[]
-  /** Add a border frame around the demo content */
   framed?: boolean
-  /** Background variant for the preview area */
   background?: 'grid' | 'dots' | 'gradient' | 'solid' | 'none'
-  // Legacy single-file props (for backward compatibility)
   code?: string
   language?: string
   highlightedCode?: string
@@ -39,7 +36,6 @@ export const CodeExample = ({
   files = [],
   framed = false,
   background = 'dots',
-  // Legacy props
   code,
   language = 'tsx',
   highlightedCode,
@@ -51,7 +47,6 @@ export const CodeExample = ({
   const [showGithubMenu, setShowGithubMenu] = useState(false)
   const githubMenuRef = useRef<HTMLDivElement>(null)
 
-  // Handle legacy single-file format
   const allFiles: CodeFile[] =
     files.length > 0
       ? files
@@ -75,11 +70,9 @@ export const CodeExample = ({
     0,
   )
 
-  // Get files with GitHub URLs
   const filesWithGithub = allFiles.filter((f) => f.githubUrl)
   const hasGithubUrls = filesWithGithub.length > 0
 
-  // Close dropdown when clicking outside
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
       if (
@@ -110,12 +103,11 @@ export const CodeExample = ({
   }
 
   return (
-    <div className="not-prose my-8 overflow-hidden rounded-xl border border-gray-300 bg-white shadow-sm dark:border-gray-700 dark:bg-gray-950">
-      {/* Live Preview - overflow-hidden here for rounded corners */}
+    <div className="not-prose my-8 rounded-xl border border-gray-300 bg-white shadow-sm dark:border-gray-700 dark:bg-gray-950">
+      {/* Live Preview */}
       <div
-        className={`relative overflow-hidden p-4 sm:p-8 ${backgroundStyles[background]}`}
+        className={`relative overflow-hidden rounded-t-xl p-4 sm:p-8 ${backgroundStyles[background]}`}
       >
-        {/* Demo content wrapper */}
         <div
           className={`relative w-full ${framed ? 'overflow-hidden rounded-lg border border-gray-200 bg-white shadow-sm dark:border-gray-700 dark:bg-gray-950' : ''} `}
         >
@@ -125,7 +117,9 @@ export const CodeExample = ({
 
       {/* Toolbar */}
       <div
-        className={`relative flex items-center justify-between overflow-visible border-t border-gray-300 bg-gray-100 px-4 py-2 dark:border-gray-700 dark:bg-gray-800`}
+        className={`relative z-10 flex items-center justify-between border-t border-gray-300 bg-gray-100 px-4 py-2 dark:border-gray-700 dark:bg-gray-800 ${
+          !showCode ? 'rounded-b-xl' : ''
+        }`}
       >
         <button
           onClick={() => setShowCode(!showCode)}
@@ -147,7 +141,6 @@ export const CodeExample = ({
         </button>
 
         <div className="flex items-center gap-0.5">
-          {/* Copy button - only when code is shown */}
           {showCode && (
             <button
               onClick={copyToClipboard}
@@ -162,11 +155,9 @@ export const CodeExample = ({
             </button>
           )}
 
-          {/* GitHub button/dropdown */}
           {hasGithubUrls && (
             <div className="relative" ref={githubMenuRef}>
               {filesWithGithub.length === 1 ? (
-                // Single file with GitHub - direct link
                 <a
                   href={filesWithGithub[0].githubUrl}
                   target="_blank"
@@ -178,7 +169,6 @@ export const CodeExample = ({
                   <ExternalLink size={11} className="opacity-50" />
                 </a>
               ) : (
-                // Multiple files - dropdown
                 <>
                   <button
                     onClick={() => setShowGithubMenu(!showGithubMenu)}
@@ -196,7 +186,6 @@ export const CodeExample = ({
                     />
                   </button>
 
-                  {/* Dropdown menu */}
                   {showGithubMenu && (
                     <div className="absolute right-0 top-full z-50 mt-1 min-w-[220px] overflow-hidden rounded-lg border border-gray-300 bg-white shadow-lg dark:border-gray-700 dark:bg-gray-800">
                       <div className="border-b border-gray-200 px-3 py-2 dark:border-gray-700">
@@ -236,8 +225,7 @@ export const CodeExample = ({
 
       {/* Code Panel */}
       {showCode && activeFile && (
-        <div className="animate-in fade-in slide-in-from-top-1 duration-200">
-          {/* File Tabs */}
+        <div className="animate-in fade-in slide-in-from-top-1 overflow-hidden rounded-b-xl duration-200">
           {hasMultipleFiles && (
             <div className="flex overflow-x-auto border-t border-gray-300 bg-gray-100 dark:border-gray-700 dark:bg-gray-800">
               {allFiles.map((file, index) => (
@@ -264,7 +252,6 @@ export const CodeExample = ({
             </div>
           )}
 
-          {/* Single file header (when only one file) */}
           {!hasMultipleFiles && (
             <div className="flex items-center justify-between border-t border-gray-300 bg-gray-100 px-4 py-2 dark:border-gray-700 dark:bg-gray-800">
               <span className="flex items-center gap-2 text-[13px] font-medium text-gray-700 dark:text-gray-200">
@@ -279,7 +266,6 @@ export const CodeExample = ({
             </div>
           )}
 
-          {/* Code Content - matching Nextra's styling */}
           <div className="overflow-x-auto bg-white dark:bg-gray-900">
             {activeFile.highlightedCode ? (
               <pre className="py-4 text-[.9em] leading-[1.7]">
@@ -305,29 +291,20 @@ export const CodeExample = ({
   )
 }
 
-// Get framework icon based on language, or null if not a framework
 function getFrameworkIcon(language: string) {
   const normalizedLang = language.toLowerCase()
-
-  // React (tsx, jsx)
   if (normalizedLang === 'tsx' || normalizedLang === 'jsx') {
     return <ReactIcon className="h-4 w-4 flex-shrink-0 text-blue-500" />
   }
-
-  // Vue
   if (normalizedLang === 'vue') {
     return <VueIcon className="h-4 w-4 flex-shrink-0 text-emerald-500" />
   }
-
-  // Svelte
   if (normalizedLang === 'svelte') {
     return <SvelteIcon className="h-4 w-4 flex-shrink-0 text-orange-600" />
   }
-
   return null
 }
 
-// File icon with language-specific colors (fallback)
 function FileIcon({ language }: { language: string }) {
   const colors: Record<string, string> = {
     tsx: 'text-blue-500',
