@@ -5,7 +5,10 @@ import { CopyToClipboard } from './copy-to-clipboard'
 import { ToggleWordWrapButton } from './toggle-word-wrap-button'
 
 export const classes = {
-  border: cn('border border-gray-300', 'contrast-more:border-gray-900'),
+  border: cn(
+    'border border-gray-300 dark:border-gray-700',
+    'contrast-more:border-gray-900',
+  ),
 }
 
 export type PreProps = ComponentProps<'pre'> & {
@@ -40,8 +43,8 @@ export const Pre: FC<PreProps> = ({
       {filename && (
         <div
           className={cn(
-            'px-4 text-xs text-gray-700',
-            'bg-gray-100',
+            'px-4 text-xs text-gray-700 dark:text-gray-200',
+            'bg-gray-100 dark:bg-gray-800',
             'flex h-12 items-center gap-2 rounded-t-md',
             classes.border,
             'border-b-0',
@@ -57,8 +60,8 @@ export const Pre: FC<PreProps> = ({
           'group',
           'focus-visible:nextra-focus',
           'overflow-x-auto text-[.9em] subpixel-antialiased',
-          'bg-white py-4',
-          'ring-1 ring-inset ring-gray-300',
+          'bg-white py-4 dark:bg-gray-900',
+          'ring-1 ring-inset ring-gray-300 dark:ring-gray-700',
           'contrast-more:ring-gray-900',
           'contrast-more:contrast-150',
           filename ? 'rounded-b-md' : 'rounded-md',

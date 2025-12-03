@@ -1,351 +1,543 @@
-import { BasePlugin, CoreState, PluginRegistry, StoreState, arePropsEqual } from '@embedpdf/core';
 import {
-  childrenFunctionOptions,
-  CommandMenuComponent,
-  CustomComponent,
-  FloatingComponent,
-  GroupedItemsComponent,
-  HeaderComponent,
-  PanelComponent,
+  BasePlugin,
+  Listener,
+  PluginRegistry,
+  Unsubscribe,
+  createBehaviorEmitter,
+  createEmitter,
+  createScopedEmitter,
+} from '@embedpdf/core';
+import { I18nCapability, I18nPlugin } from '@embedpdf/plugin-i18n';
+import {
   UICapability,
-  UIComponentType,
   UIPluginConfig,
-  UIPluginState,
+  UIState,
+  UIScope,
+  UISchema,
+  UIDocumentState,
+  ToolbarChangedData,
+  ToolbarChangedEvent,
+  PanelChangedData,
+  PanelChangedEvent,
+  ModalChangedData,
+  ModalChangedEvent,
+  MenuChangedData,
+  MenuChangedEvent,
 } from './types';
-import { UIComponent } from './ui-component';
-import { initialState } from './reducer';
 import {
-  uiInitComponents,
-  UIPluginAction,
-  uiSetHeaderVisible,
-  uiShowCommandMenu,
-  uiTogglePanel,
-  uiHideCommandMenu,
-  TogglePanelPayload,
-  SetHeaderVisiblePayload,
-  uiUpdateComponentState,
-  UpdateComponentStatePayload,
+  UIAction,
+  initUIState,
+  cleanupUIState,
+  setActiveToolbar,
+  closeToolbarSlot,
+  setActivePanel,
+  closePanelSlot,
+  setPanelTab,
+  openModal,
+  closeModal,
+  openMenu,
+  closeMenu,
+  closeAllMenus,
+  setDisabledCategories,
 } from './actions';
-import { MenuManager } from './menu/menu-manager';
+import { mergeUISchema } from './utils/schema-merger';
+import { generateUIStylesheet, StylesheetConfig } from './utils';
 
-export class UIPlugin extends BasePlugin<
-  UIPluginConfig,
-  UICapability,
-  UIPluginState,
-  UIPluginAction
-> {
+export class UIPlugin extends BasePlugin<UIPluginConfig, UICapability, UIState, UIAction> {
   static readonly id = 'ui' as const;
-  private componentRenderers: Record<
-    string,
-    (
-      props: any,
-      children: (options?: childrenFunctionOptions) => any[],
-      context?: Record<string, any>,
-    ) => any
-  > = {};
-  private components: Record<string, UIComponent<UIComponentType<any>>> = {};
-  private config: UIPluginConfig;
-  private mapStateCallbacks: {
-    [componentId: string]: (storeState: any, ownProps: any) => any;
-  } = {};
-  private globalStoreSubscription: () => void = () => {};
-  private menuManager: MenuManager; // Add this
+
+  private schema: UISchema;
+  private stylesheetConfig: StylesheetConfig;
+
+  // Stylesheet caching with locale awareness
+  private cachedStylesheet: string | null = null;
+  private cachedLocale: string | null = null;
+
+  // Optional i18n integration
+  private i18n: I18nCapability | null = null;
+  private i18nCleanup: (() => void) | null = null;
+
+  // Events
+  private readonly categoryChanged$ = createBehaviorEmitter<{ disabledCategories: string[] }>();
+  private readonly stylesheetInvalidated$ = createEmitter<void>();
+
+  private readonly toolbarChanged$ = createScopedEmitter<
+    ToolbarChangedData,
+    ToolbarChangedEvent,
+    string
+  >((documentId, data) => ({ documentId, ...data }), { cache: false });
+
+  private readonly panelChanged$ = createScopedEmitter<PanelChangedData, PanelChangedEvent, string>(
+    (documentId, data) => ({ documentId, ...data }),
+    { cache: false },
+  );
+
+  private readonly modalChanged$ = createScopedEmitter<ModalChangedData, ModalChangedEvent, string>(
+    (documentId, data) => ({ documentId, ...data }),
+    { cache: false },
+  );
+
+  private readonly menuChanged$ = createScopedEmitter<MenuChangedData, MenuChangedEvent, string>(
+    (documentId, data) => ({ documentId, ...data }),
+    { cache: false },
+  );
 
   constructor(id: string, registry: PluginRegistry, config: UIPluginConfig) {
     super(id, registry);
-    this.config = config;
+    this.schema = config.schema;
+    this.stylesheetConfig = config.stylesheetConfig || {};
 
-    // Initialize command center
-    this.menuManager = new MenuManager(config.menuItems || {}, this.registry);
+    // Initialize disabled categories from config
+    if (config.disabledCategories?.length) {
+      this.dispatch(setDisabledCategories(config.disabledCategories));
+    }
 
-    // Subscribe to command events
-    this.setupCommandEventHandlers();
+    this.i18n = registry.getPlugin<I18nPlugin>('i18n')?.provides() ?? null;
 
-    // Subscribe exactly once to the global store
-    this.globalStoreSubscription = this.registry.getStore().subscribe((_action, newState) => {
-      this.onGlobalStoreChange(newState);
-    });
+    if (this.i18n) {
+      this.i18nCleanup = this.i18n.onLocaleChange(({ currentLocale }) => {
+        this.handleLocaleChange(currentLocale);
+      });
+
+      // Initialize cached locale
+      this.cachedLocale = this.i18n.getLocale();
+    }
   }
 
   async initialize(): Promise<void> {
-    // Step 1: Build all individual components
-    this.buildComponents();
-
-    // Step 2: Link children for grouped items
-    this.linkGroupedItems();
-
-    // Step 3: Set initial state for UI components
-    this.setInitialStateUIComponents();
-  }
-
-  // Set up handlers for command events
-  private setupCommandEventHandlers(): void {
-    // Handle command menu requests
-    this.menuManager.on(MenuManager.EVENTS.MENU_REQUESTED, (data) => {
-      const { menuId, triggerElement, position, flatten } = data;
-
-      const isOpen = this.state.commandMenu.commandMenu?.activeCommand === menuId;
-      if (isOpen) {
-        return this.dispatch(uiHideCommandMenu({ id: 'commandMenu' }));
-      }
-
-      this.dispatch(
-        uiShowCommandMenu({
-          id: 'commandMenu',
-          commandId: menuId,
-          triggerElement,
-          position,
-          flatten,
-        }),
-      );
-    });
-
-    // Optional: Track command execution for analytics or other purposes
-    this.menuManager.on(MenuManager.EVENTS.COMMAND_EXECUTED, (data) => {
-      this.logger.debug('UIPlugin', 'CommandExecuted', `Command executed: ${data.command.id}`, {
-        commandId: data.command.id,
-        source: data.source,
-      });
-    });
-  }
-
-  private addComponent(id: string, componentConfig: UIComponentType<any>) {
-    if (this.components[id]) {
-      this.logger.warn(
-        'UIPlugin',
-        'ComponentAlreadyExists',
-        `Component with ID ${id} already exists and will be overwritten`,
-      );
-    }
-    // Step 1: Build the UIComponent
-    const component = new UIComponent(componentConfig, this.componentRenderers);
-    this.components[id] = component;
-
-    // Step 2: Store mapStateToProps if present
-    if (typeof componentConfig.mapStateToProps === 'function') {
-      this.mapStateCallbacks[id] = componentConfig.mapStateToProps;
-    }
-
-    return component;
-  }
-
-  private buildComponents() {
-    Object.entries(this.config.components).forEach(([id, componentConfig]) => {
-      this.addComponent(id, componentConfig);
-    });
-  }
-
-  private linkGroupedItems() {
-    Object.values(this.components).forEach((component) => {
-      if (isItemWithSlots(component)) {
-        const props = component.componentConfig;
-        props.slots?.forEach((slot) => {
-          const child = this.components[slot.componentId];
-          if (child) {
-            component.addChild(slot.componentId, child, slot.priority, slot.className);
-          } else {
-            this.logger.warn(
-              'UIPlugin',
-              'ChildComponentNotFound',
-              `Child component ${slot.componentId} not found for GroupedItems ${props.id}`,
-            );
-          }
-        });
-      }
-    });
-  }
-
-  private setInitialStateUIComponents() {
-    const defaultState: UIPluginState = initialState;
-
-    Object.entries(this.config.components).forEach(([componentId, definition]) => {
-      if (definition.initialState) {
-        // store the initialState object, e.g. { open: false } or { active: true }
-        defaultState[definition.type][componentId] = definition.initialState;
-      } else {
-        defaultState[definition.type][componentId] = {};
-      }
-    });
-
-    this.dispatch(uiInitComponents(defaultState));
-  }
-
-  private onGlobalStoreChange(state: StoreState<CoreState>) {
-    for (const [id, uiComponent] of Object.entries(this.components)) {
-      const mapFn = this.mapStateCallbacks[id];
-      if (!mapFn) continue; // no mapping
-
-      // ownProps is the UIComponent's current props
-      const { id: _id, ...ownProps } = uiComponent.props;
-
-      const partial = mapFn(state, ownProps);
-      // If partial is non-empty or changes from old, do update
-      const merged = { ...ownProps, ...partial };
-
-      if (!arePropsEqual(ownProps, merged)) {
-        uiComponent.update(partial);
-      }
-    }
-  }
-
-  private addSlot(parentId: string, slotId: string, priority?: number, className?: string) {
-    // 1. Get the parent component
-    const parentComponent = this.components[parentId];
-
-    if (!parentComponent) {
-      this.logger.error(
-        'UIPlugin',
-        'ParentComponentNotFound',
-        `Parent component ${parentId} not found`,
-      );
-      return;
-    }
-
-    // 2. Check if parent has slots (is a container type)
-    if (!isItemWithSlots(parentComponent)) {
-      this.logger.error(
-        'UIPlugin',
-        'ParentComponentDoesNotSupportSlots',
-        `Parent component ${parentId} does not support slots`,
-      );
-      return;
-    }
-
-    // 3. Get the component to add to the slot
-    const childComponent = this.components[slotId];
-
-    if (!childComponent) {
-      this.logger.error(
-        'UIPlugin',
-        'ChildComponentNotFound',
-        `Child component ${slotId} not found`,
-      );
-      return;
-    }
-
-    const parentChildren = parentComponent.getChildren();
-
-    // 4. Determine priority for the new slot
-    let slotPriority = priority;
-
-    if (slotPriority === undefined) {
-      // If no priority is specified, add it at the end with a reasonable gap
-      const maxPriority =
-        parentChildren.length > 0 ? Math.max(...parentChildren.map((child) => child.priority)) : 0;
-      slotPriority = maxPriority + 10; // Add a gap of 10
-    }
-
-    // 6. Add the child to the parent component with the appropriate priority
-    // The UIComponent will handle sorting and avoid duplicates
-    parentComponent.addChild(slotId, childComponent, slotPriority, className);
-  }
-
-  protected buildCapability(): UICapability {
-    return {
-      registerComponentRenderer: (
-        type: string,
-        renderer: (
-          props: any,
-          children: (options?: childrenFunctionOptions) => any[],
-          context?: Record<string, any>,
-        ) => any,
-      ) => {
-        this.componentRenderers[type] = renderer;
-      },
-      getComponent: <T>(id: string): T | undefined => {
-        return this.components[id] as T | undefined;
-      },
-      registerComponent: this.addComponent.bind(this),
-      getCommandMenu: () =>
-        Object.values(this.components).find((component) => isCommandMenuComponent(component)),
-      hideCommandMenu: () => this.cooldownDispatch(uiHideCommandMenu({ id: 'commandMenu' }), 100),
-      getFloatingComponents: (scrollerPosition?: 'inside' | 'outside') =>
-        Object.values(this.components)
-          .filter((component) => isFloatingComponent(component))
-          .filter(
-            (component) =>
-              !scrollerPosition || component.props.scrollerPosition === scrollerPosition,
-          ),
-      getHeadersByPlacement: (placement: 'top' | 'bottom' | 'left' | 'right') =>
-        Object.values(this.components)
-          .filter((component) => isHeaderComponent(component))
-          .filter((component) => component.props.placement === placement),
-      getPanelsByLocation: (location: 'left' | 'right') =>
-        Object.values(this.components)
-          .filter((component) => isPanelComponent(component))
-          .filter((component) => component.props.location === location),
-      addSlot: this.addSlot.bind(this),
-      togglePanel: (payload: TogglePanelPayload) => {
-        this.dispatch(uiTogglePanel(payload));
-      },
-      setHeaderVisible: (payload: SetHeaderVisiblePayload) => {
-        this.dispatch(uiSetHeaderVisible(payload));
-      },
-      updateComponentState: (payload: UpdateComponentStatePayload) => {
-        this.dispatch(uiUpdateComponentState(payload));
-      },
-      ...this.menuManager.capabilities(),
-    };
+    this.logger.info('UIPlugin', 'Initialize', 'UI plugin initialized');
   }
 
   async destroy(): Promise<void> {
-    this.globalStoreSubscription();
-    this.components = {};
-    this.componentRenderers = {};
-    this.mapStateCallbacks = {};
+    if (this.i18nCleanup) {
+      this.i18nCleanup();
+      this.i18nCleanup = null;
+    }
+
+    this.toolbarChanged$.clear();
+    this.panelChanged$.clear();
+    this.modalChanged$.clear();
+    this.menuChanged$.clear();
+    this.stylesheetInvalidated$.clear();
+    super.destroy();
   }
-}
 
-function isItemWithSlots(
-  component: UIComponent<UIComponentType<any>>,
-): component is
-  | UIComponent<GroupedItemsComponent>
-  | UIComponent<HeaderComponent>
-  | UIComponent<PanelComponent>
-  | UIComponent<FloatingComponent>
-  | UIComponent<CustomComponent> {
-  return (
-    isGroupedItemsComponent(component) ||
-    isHeaderComponent(component) ||
-    isPanelComponent(component) ||
-    isFloatingComponent(component) ||
-    isCustomComponent(component)
-  );
-}
+  protected override onDocumentLoadingStarted(documentId: string): void {
+    this.dispatch(initUIState(documentId, this.schema));
+  }
 
-// Type guard function
-function isGroupedItemsComponent(
-  component: UIComponent<UIComponentType>,
-): component is UIComponent<GroupedItemsComponent> {
-  return component.type === 'groupedItems';
-}
+  protected override onDocumentClosed(documentId: string): void {
+    this.dispatch(cleanupUIState(documentId));
 
-function isHeaderComponent(
-  component: UIComponent<UIComponentType>,
-): component is UIComponent<HeaderComponent> {
-  return component.type === 'header';
-}
+    // Clear scoped emitters
+    this.toolbarChanged$.clearScope(documentId);
+    this.panelChanged$.clearScope(documentId);
+    this.modalChanged$.clearScope(documentId);
+    this.menuChanged$.clearScope(documentId);
+  }
 
-function isPanelComponent(
-  component: UIComponent<UIComponentType>,
-): component is UIComponent<PanelComponent> {
-  return component.type === 'panel';
-}
+  /**
+   * Handle locale changes from i18n plugin.
+   * Invalidates stylesheet and emits change event.
+   */
+  private handleLocaleChange(newLocale: string): void {
+    if (this.cachedLocale === newLocale) return;
 
-function isFloatingComponent(
-  component: UIComponent<UIComponentType>,
-): component is UIComponent<FloatingComponent> {
-  return component.type === 'floating';
-}
+    this.logger.debug(
+      'UIPlugin',
+      'LocaleChange',
+      `Locale changed: ${this.cachedLocale} -> ${newLocale}`,
+    );
 
-function isCommandMenuComponent(
-  component: UIComponent<UIComponentType>,
-): component is UIComponent<CommandMenuComponent> {
-  return component.type === 'commandMenu';
-}
+    this.cachedLocale = newLocale;
+    this.invalidateStylesheet();
+    this.stylesheetInvalidated$.emit();
+  }
 
-function isCustomComponent(
-  component: UIComponent<UIComponentType>,
-): component is UIComponent<CustomComponent> {
-  return component.type === 'custom';
+  /**
+   * Get the generated CSS stylesheet.
+   * Automatically regenerates if locale has changed.
+   * This is pure logic - DOM injection is handled by framework layer.
+   */
+  public getStylesheet(): string {
+    const currentLocale = this.i18n?.getLocale() ?? null;
+
+    // Check if we need to regenerate
+    if (this.cachedStylesheet && this.cachedLocale === currentLocale) {
+      return this.cachedStylesheet;
+    }
+
+    // Generate new stylesheet
+    this.cachedStylesheet = generateUIStylesheet(this.schema, {
+      config: this.stylesheetConfig,
+      locale: currentLocale ?? undefined,
+    });
+    this.cachedLocale = currentLocale;
+
+    return this.cachedStylesheet;
+  }
+
+  /**
+   * Get the current locale (if i18n is available)
+   */
+  public getLocale(): string | null {
+    return this.i18n?.getLocale() ?? null;
+  }
+
+  /**
+   * Regenerate stylesheet (call after schema changes)
+   */
+  public invalidateStylesheet(): void {
+    this.cachedStylesheet = null;
+  }
+
+  public onStylesheetInvalidated(listener: Listener<void>): Unsubscribe {
+    return this.stylesheetInvalidated$.on(listener);
+  }
+
+  // ─────────────────────────────────────────────────────────
+  // Category Management
+  // ─────────────────────────────────────────────────────────
+
+  private disableCategoryImpl(category: string): void {
+    const current = new Set(this.state.disabledCategories);
+    if (!current.has(category)) {
+      current.add(category);
+      this.dispatch(setDisabledCategories(Array.from(current)));
+      this.categoryChanged$.emit({ disabledCategories: Array.from(current) });
+    }
+  }
+
+  private enableCategoryImpl(category: string): void {
+    const current = new Set(this.state.disabledCategories);
+    if (current.has(category)) {
+      current.delete(category);
+      this.dispatch(setDisabledCategories(Array.from(current)));
+      this.categoryChanged$.emit({ disabledCategories: Array.from(current) });
+    }
+  }
+
+  private toggleCategoryImpl(category: string): void {
+    if (this.state.disabledCategories.includes(category)) {
+      this.enableCategoryImpl(category);
+    } else {
+      this.disableCategoryImpl(category);
+    }
+  }
+
+  private setDisabledCategoriesImpl(categories: string[]): void {
+    this.dispatch(setDisabledCategories(categories));
+    this.categoryChanged$.emit({ disabledCategories: categories });
+  }
+
+  // ─────────────────────────────────────────────────────────
+  // Capability
+  // ─────────────────────────────────────────────────────────
+
+  protected buildCapability(): UICapability {
+    return {
+      // Active document operations
+      setActiveToolbar: (placement, slot, toolbarId, documentId) =>
+        this.setToolbarForDocument(placement, slot, toolbarId, documentId),
+      setActivePanel: (placement, slot, panelId, documentId, activeTab) =>
+        this.setPanelForDocument(placement, slot, panelId, documentId, activeTab),
+      togglePanel: (placement, slot, panelId, documentId, activeTab) =>
+        this.togglePanelForDocument(placement, slot, panelId, documentId, activeTab),
+      openModal: (modalId, documentId) => this.openModalForDocument(modalId, documentId),
+      openMenu: (menuId, triggeredByCommandId, triggeredByItemId, documentId) =>
+        this.openMenuForDocument(menuId, triggeredByCommandId, triggeredByItemId, documentId),
+      toggleMenu: (menuId, triggeredByCommandId, triggeredByItemId, documentId) =>
+        this.toggleMenuForDocument(menuId, triggeredByCommandId, triggeredByItemId, documentId),
+
+      // Document-scoped operations
+      forDocument: (documentId) => this.createUIScope(documentId),
+
+      // Schema
+      getSchema: () => this.schema,
+      mergeSchema: (partial) => {
+        this.schema = mergeUISchema(this.schema, partial);
+      },
+
+      // Category management
+      disableCategory: (category) => this.disableCategoryImpl(category),
+      enableCategory: (category) => this.enableCategoryImpl(category),
+      toggleCategory: (category) => this.toggleCategoryImpl(category),
+      setDisabledCategories: (categories) => this.setDisabledCategoriesImpl(categories),
+      getDisabledCategories: () => this.state.disabledCategories,
+      isCategoryDisabled: (category) => this.state.disabledCategories.includes(category),
+
+      // Events
+      onToolbarChanged: this.toolbarChanged$.onGlobal,
+      onPanelChanged: this.panelChanged$.onGlobal,
+      onModalChanged: this.modalChanged$.onGlobal,
+      onMenuChanged: this.menuChanged$.onGlobal,
+      onCategoryChanged: this.categoryChanged$.on,
+    };
+  }
+
+  // ─────────────────────────────────────────────────────────
+  // Document Scoping
+  // ─────────────────────────────────────────────────────────
+
+  private createUIScope(documentId: string): UIScope {
+    return {
+      // ───── Toolbars ─────
+      setActiveToolbar: (placement, slot, toolbarId) =>
+        this.setToolbarForDocument(placement, slot, toolbarId, documentId),
+      getActiveToolbar: (placement, slot) =>
+        this.getToolbarForDocument(placement, slot, documentId),
+      closeToolbarSlot: (placement, slot) =>
+        this.closeToolbarForDocument(placement, slot, documentId),
+      isToolbarOpen: (placement, slot, toolbarId) =>
+        this.isToolbarOpenForDocument(placement, slot, toolbarId, documentId),
+
+      // ───── Panels ─────
+      setActivePanel: (placement, slot, panelId, activeTab) =>
+        this.setPanelForDocument(placement, slot, panelId, documentId, activeTab),
+      getActivePanel: (placement, slot) => this.getPanelForDocument(placement, slot, documentId),
+      closePanelSlot: (placement, slot) => this.closePanelForDocument(placement, slot, documentId),
+      togglePanel: (placement, slot, panelId, activeTab) =>
+        this.togglePanelForDocument(placement, slot, panelId, documentId, activeTab),
+      isPanelOpen: (placement, slot, panelId) =>
+        this.isPanelOpenForDocument(placement, slot, panelId, documentId),
+
+      // ───── Panel tabs ─────
+      setPanelTab: (panelId, tabId) => this.setPanelTabForDocument(panelId, tabId, documentId),
+      getPanelTab: (panelId) => this.getPanelTabForDocument(panelId, documentId),
+
+      // ───── Modals ─────
+      openModal: (modalId) => this.openModalForDocument(modalId, documentId),
+      closeModal: () => this.closeModalForDocument(documentId),
+      getActiveModal: () => this.getActiveModalForDocument(documentId),
+
+      // ───── Menus ─────
+      openMenu: (menuId, triggeredByCommandId, triggeredByItemId) =>
+        this.openMenuForDocument(menuId, triggeredByCommandId, triggeredByItemId, documentId),
+      closeMenu: (menuId) => this.closeMenuForDocument(menuId, documentId),
+      toggleMenu: (menuId, triggeredByCommandId, triggeredByItemId) =>
+        this.toggleMenuForDocument(menuId, triggeredByCommandId, triggeredByItemId, documentId),
+      closeAllMenus: () => this.closeAllMenusForDocument(documentId),
+      isMenuOpen: (menuId) => this.isMenuOpenForDocument(menuId, documentId),
+      getOpenMenus: () => this.getOpenMenusForDocument(documentId),
+
+      // ───── Schema & state ─────
+      getSchema: () => this.schema,
+      getState: () => this.getDocumentStateOrThrow(documentId),
+
+      // ───── Scoped events ─────
+      onToolbarChanged: this.toolbarChanged$.forScope(documentId),
+      onPanelChanged: this.panelChanged$.forScope(documentId),
+      onModalChanged: this.modalChanged$.forScope(documentId),
+      onMenuChanged: this.menuChanged$.forScope(documentId),
+    };
+  }
+
+  // ─────────────────────────────────────────────────────────
+  // State Helpers
+  // ─────────────────────────────────────────────────────────
+
+  private getDocumentState(documentId?: string): UIDocumentState | null {
+    const id = documentId ?? this.getActiveDocumentId();
+    return this.state.documents[id] ?? null;
+  }
+
+  private getDocumentStateOrThrow(documentId?: string): UIDocumentState {
+    const state = this.getDocumentState(documentId);
+    if (!state) {
+      throw new Error(`UI state not found for document: ${documentId ?? 'active'}`);
+    }
+    return state;
+  }
+
+  // ─────────────────────────────────────────────────────────
+  // Core Operations - Toolbars
+  // ─────────────────────────────────────────────────────────
+
+  private setToolbarForDocument(
+    placement: string,
+    slot: string,
+    toolbarId: string,
+    documentId?: string,
+  ): void {
+    const id = documentId ?? this.getActiveDocumentId();
+    this.dispatch(setActiveToolbar(id, placement, slot, toolbarId));
+    this.toolbarChanged$.emit(id, { placement, slot, toolbarId });
+  }
+
+  private getToolbarForDocument(
+    placement: string,
+    slot: string,
+    documentId?: string,
+  ): string | null {
+    const slotKey = `${placement}-${slot}`;
+    const toolbarSlot = this.getDocumentStateOrThrow(documentId).activeToolbars[slotKey];
+    return toolbarSlot?.isOpen ? toolbarSlot.toolbarId : null;
+  }
+
+  private closeToolbarForDocument(placement: string, slot: string, documentId?: string): void {
+    const id = documentId ?? this.getActiveDocumentId();
+    this.dispatch(closeToolbarSlot(id, placement, slot));
+    this.toolbarChanged$.emit(id, { placement, slot, toolbarId: '' });
+  }
+
+  private isToolbarOpenForDocument(
+    placement: string,
+    slot: string,
+    toolbarId?: string,
+    documentId?: string,
+  ): boolean {
+    const slotKey = `${placement}-${slot}`;
+    const toolbarSlot = this.getDocumentStateOrThrow(documentId).activeToolbars[slotKey];
+    if (!toolbarSlot || !toolbarSlot.isOpen) return false;
+    return toolbarId ? toolbarSlot.toolbarId === toolbarId : true;
+  }
+
+  // ─────────────────────────────────────────────────────────
+  // Core Operations - Panels
+  // ─────────────────────────────────────────────────────────
+
+  private setPanelForDocument(
+    placement: string,
+    slot: string,
+    panelId: string,
+    documentId?: string,
+    activeTab?: string,
+  ): void {
+    const id = documentId ?? this.getActiveDocumentId();
+    this.dispatch(setActivePanel(id, placement, slot, panelId, activeTab));
+    this.panelChanged$.emit(id, { placement, slot, panelId });
+  }
+
+  private getPanelForDocument(placement: string, slot: string, documentId?: string): string | null {
+    const slotKey = `${placement}-${slot}`;
+    const panelSlot = this.getDocumentStateOrThrow(documentId).activePanels[slotKey];
+    return panelSlot?.isOpen ? panelSlot.panelId : null;
+  }
+
+  private closePanelForDocument(placement: string, slot: string, documentId?: string): void {
+    const id = documentId ?? this.getActiveDocumentId();
+    this.dispatch(closePanelSlot(id, placement, slot));
+    this.panelChanged$.emit(id, { placement, slot, panelId: '' });
+  }
+
+  private togglePanelForDocument(
+    placement: string,
+    slot: string,
+    panelId: string,
+    documentId?: string,
+    activeTab?: string,
+  ): void {
+    const id = documentId ?? this.getActiveDocumentId();
+    const slotKey = `${placement}-${slot}`;
+    const panelSlot = this.getDocumentStateOrThrow(id).activePanels[slotKey];
+
+    if (panelSlot?.panelId === panelId && panelSlot?.isOpen) {
+      this.dispatch(closePanelSlot(id, placement, slot));
+      this.panelChanged$.emit(id, { placement, slot, panelId: '' });
+    } else {
+      this.dispatch(setActivePanel(id, placement, slot, panelId, activeTab));
+      this.panelChanged$.emit(id, { placement, slot, panelId });
+    }
+  }
+
+  private isPanelOpenForDocument(
+    placement: string,
+    slot: string,
+    panelId?: string,
+    documentId?: string,
+  ): boolean {
+    const slotKey = `${placement}-${slot}`;
+    const panelSlot = this.getDocumentStateOrThrow(documentId).activePanels[slotKey];
+    if (!panelSlot || !panelSlot.isOpen) return false;
+    return panelId ? panelSlot.panelId === panelId : true;
+  }
+
+  // ─────────────────────────────────────────────────────────
+  // Core Operations - Panel Tabs
+  // ─────────────────────────────────────────────────────────
+
+  private setPanelTabForDocument(panelId: string, tabId: string, documentId?: string): void {
+    const id = documentId ?? this.getActiveDocumentId();
+    this.dispatch(setPanelTab(id, panelId, tabId));
+  }
+
+  private getPanelTabForDocument(panelId: string, documentId?: string): string | null {
+    return this.getDocumentStateOrThrow(documentId).panelTabs[panelId] ?? null;
+  }
+
+  // ─────────────────────────────────────────────────────────
+  // Core Operations - Modals
+  // ─────────────────────────────────────────────────────────
+
+  private openModalForDocument(modalId: string, documentId?: string): void {
+    const id = documentId ?? this.getActiveDocumentId();
+    this.dispatch(openModal(id, modalId));
+    this.modalChanged$.emit(id, { modalId });
+  }
+
+  private closeModalForDocument(documentId?: string): void {
+    const id = documentId ?? this.getActiveDocumentId();
+    this.dispatch(closeModal(id));
+    this.modalChanged$.emit(id, { modalId: null });
+  }
+
+  private getActiveModalForDocument(documentId?: string): string | null {
+    return this.getDocumentStateOrThrow(documentId).activeModal;
+  }
+
+  // ─────────────────────────────────────────────────────────
+  // Core Operations - Menus
+  // ─────────────────────────────────────────────────────────
+
+  private openMenuForDocument(
+    menuId: string,
+    triggeredByCommandId?: string,
+    triggeredByItemId?: string,
+    documentId?: string,
+  ): void {
+    const id = documentId ?? this.getActiveDocumentId();
+    this.dispatch(openMenu(id, { menuId, triggeredByCommandId, triggeredByItemId }));
+    this.menuChanged$.emit(id, { menuId, isOpen: true });
+  }
+
+  private closeMenuForDocument(menuId: string, documentId?: string): void {
+    const id = documentId ?? this.getActiveDocumentId();
+    this.dispatch(closeMenu(id, menuId));
+    this.menuChanged$.emit(id, { menuId, isOpen: false });
+  }
+
+  private toggleMenuForDocument(
+    menuId: string,
+    triggeredByCommandId?: string,
+    triggeredByItemId?: string,
+    documentId?: string,
+  ): void {
+    const id = documentId ?? this.getActiveDocumentId();
+    const isOpen = !!this.getDocumentStateOrThrow(id).openMenus[menuId];
+
+    if (isOpen) {
+      this.dispatch(closeMenu(id, menuId));
+      this.menuChanged$.emit(id, { menuId, isOpen: false });
+    } else {
+      this.dispatch(openMenu(id, { menuId, triggeredByCommandId, triggeredByItemId }));
+      this.menuChanged$.emit(id, { menuId, isOpen: true });
+    }
+  }
+
+  private closeAllMenusForDocument(documentId?: string): void {
+    const id = documentId ?? this.getActiveDocumentId();
+    this.dispatch(closeAllMenus(id));
+  }
+
+  private isMenuOpenForDocument(menuId: string, documentId?: string): boolean {
+    return !!this.getDocumentStateOrThrow(documentId).openMenus[menuId];
+  }
+
+  private getOpenMenusForDocument(documentId?: string): Array<{
+    menuId: string;
+    triggeredByCommandId?: string;
+    triggeredByItemId?: string;
+  }> {
+    return Object.values(this.getDocumentStateOrThrow(documentId).openMenus);
+  }
 }

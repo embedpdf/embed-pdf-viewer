@@ -8,6 +8,7 @@
       "@framework": ["src/preact/adapter.ts"],
       "@embedpdf/core/@framework": ["src/preact/core.ts"],
       "@embedpdf/plugin-interaction-manager/@framework": ["src/preact/interaction-manager.ts"],
+      "@embedpdf/utils/@framework": ["src/preact/utils.ts"],
       "@embedpdf/plugin-selection": ["src/lib/index.ts"]
     }
   },

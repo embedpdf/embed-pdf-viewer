@@ -19,10 +19,10 @@ module.exports = {
       },
     },
     {
-      "files": "*.svelte",
-      "options": {
-        "parser": "svelte"
-      }
-    }
+      files: '*.svelte',
+      options: {
+        parser: 'svelte',
+      },
+    },
   ],
 };

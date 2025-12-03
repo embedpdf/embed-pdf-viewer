@@ -5,10 +5,14 @@
   import type { HTMLImgAttributes } from 'svelte/elements';
 
   interface Props extends HTMLImgAttributes {
+    /**
+     * The ID of the document that this thumbnail belongs to
+     */
+    documentId: string;
     meta: ThumbMeta;
   }
 
-  const { meta, ...imgProps }: Props = $props();
+  const { documentId, meta, ...imgProps }: Props = $props();
 
   const thumbnailCapability = useThumbnailCapability();
   const thumbnailPlugin = useThumbnailPlugin();
@@ -17,20 +21,28 @@
   let urlRef: string | null = null;
   let refreshTick = $state(0);
 
-  // Listen for refresh events
+  // Listen for refresh events for this specific document
   $effect(() => {
     if (!thumbnailPlugin.plugin) return;
-    return thumbnailPlugin.plugin.onRefreshPages((pages) => {
+    const scope = thumbnailPlugin.plugin.provides().forDocument(documentId);
+    return scope.onRefreshPages((pages) => {
       if (pages.includes(meta.pageIndex)) {
         refreshTick = refreshTick + 1;
       }
     });
   });
 
-  // Render thumbnail
+  // Render thumbnail for this specific document
   $effect(() => {
-    const task = thumbnailCapability.provides?.renderThumb(meta.pageIndex, window.devicePixelRatio);
-    task?.wait((blob) => {
+    // Track refreshTick so effect re-runs on refresh
+    const _tick = refreshTick;
+
+    if (!thumbnailCapability.provides) return;
+
+    const scope = thumbnailCapability.provides.forDocument(documentId);
+    const task = scope.renderThumb(meta.pageIndex, window.devicePixelRatio);
+
+    task.wait((blob) => {
       const objectUrl = URL.createObjectURL(blob);
       urlRef = objectUrl;
       url = objectUrl;
@@ -41,7 +53,7 @@
         URL.revokeObjectURL(urlRef);
         urlRef = null;
       } else {
-        task?.abort({
+        task.abort({
           code: PdfErrorCode.Cancelled,
           message: 'canceled render task',
         });

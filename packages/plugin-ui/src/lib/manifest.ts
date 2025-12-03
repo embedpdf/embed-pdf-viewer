@@ -8,10 +8,17 @@ export const manifest: PluginManifest<UIPluginConfig> = {
   name: 'UI Plugin',
   version: '1.0.0',
   provides: ['ui'],
-  requires: [],
-  optional: [],
+  requires: ['commands'], // Depends on commands
+  optional: ['i18n'],
   defaultConfig: {
     enabled: true,
-    components: {},
+    schema: {
+      id: 'empty',
+      version: '1.0.0',
+      toolbars: {},
+      menus: {},
+      panels: {},
+      selectionMenus: {},
+    },
   },
 };

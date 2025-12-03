@@ -8,7 +8,10 @@ import {
   ViewportPluginPackage,
 } from '@embedpdf/plugin-viewport/react'
 import { Scroller, ScrollPluginPackage } from '@embedpdf/plugin-scroll/react'
-import { LoaderPluginPackage } from '@embedpdf/plugin-loader/react'
+import {
+  DocumentContent,
+  DocumentManagerPluginPackage,
+} from '@embedpdf/plugin-document-manager/react'
 import { RenderLayer, RenderPluginPackage } from '@embedpdf/plugin-render/react'
 import {
   InteractionManagerPluginPackage,
@@ -21,51 +24,79 @@ import {
   useCapture,
 } from '@embedpdf/plugin-capture/react'
 import { useEffect, useState } from 'react'
+import { Camera, Download, Loader2 } from 'lucide-react'
 
-// 1. Register plugins, including Capture and its dependencies
 const plugins = [
-  createPluginRegistration(LoaderPluginPackage, {
-    loadingOptions: {
-      type: 'url',
-      pdfFile: {
-        id: 'example-pdf',
-        url: 'https://snippet.embedpdf.com/ebook.pdf',
-      },
-    },
+  createPluginRegistration(DocumentManagerPluginPackage, {
+    initialDocuments: [{ url: 'https://snippet.embedpdf.com/ebook.pdf' }],
   }),
   createPluginRegistration(ViewportPluginPackage),
   createPluginRegistration(ScrollPluginPackage),
   createPluginRegistration(RenderPluginPackage),
-  createPluginRegistration(InteractionManagerPluginPackage), // Required for marquee selection
+  createPluginRegistration(InteractionManagerPluginPackage),
   createPluginRegistration(CapturePluginPackage, {
-    scale: 2.0, // Render captured image at 2x resolution
+    scale: 2.0,
     imageType: 'image/png',
   }),
 ]
 
-// 2. Create a toolbar to activate capture mode
-const CaptureToolbar = () => {
-  const { provides: capture, isMarqueeCaptureActive } = useCapture()
+const CaptureToolbar = ({ documentId }: { documentId: string }) => {
+  const { provides: capture, state } = useCapture(documentId)
 
   return (
-    <div className="mb-4 mt-4 flex items-center gap-2 rounded-lg border border-gray-200 bg-white p-2 shadow-sm">
+    <div className="flex items-center gap-2 border-b border-gray-300 bg-gray-100 px-3 py-2 dark:border-gray-700 dark:bg-gray-800">
       <button
         onClick={() => capture?.toggleMarqueeCapture()}
-        className={`rounded-md px-3 py-1 text-sm font-medium transition-colors ${
-          isMarqueeCaptureActive
-            ? 'bg-blue-500 text-white'
-            : 'bg-gray-100 hover:bg-gray-200'
-        }`}
+        className={`inline-flex items-center gap-2 rounded-md px-3 py-1.5 text-sm font-medium shadow-sm transition-all ${
+          state.isMarqueeCaptureActive
+            ? 'bg-blue-500 text-white ring-1 ring-blue-600'
+            : 'bg-white text-gray-600 ring-1 ring-gray-300 hover:bg-gray-50 hover:text-gray-900 dark:bg-gray-700 dark:text-gray-300 dark:ring-gray-600 dark:hover:bg-gray-600 dark:hover:text-gray-100'
+        } `}
       >
-        {isMarqueeCaptureActive ? 'Cancel Capture' : 'Capture Area'}
+        <Camera size={16} />
+        {state.isMarqueeCaptureActive ? 'Cancel' : 'Capture Area'}
       </button>
+
+      {state.isMarqueeCaptureActive && (
+        <span className="text-xs text-gray-600 dark:text-gray-300">
+          Click and drag to select an area
+        </span>
+      )}
     </div>
   )
 }
 
-// 3. Create a component to display the captured image
-const CaptureResult = () => {
-  const { provides: capture } = useCapture()
+/**
+ * Transparency grid component - like Photoshop's transparency background
+ */
+const TransparencyGrid = ({
+  children,
+  className = '',
+}: {
+  children: React.ReactNode
+  className?: string
+}) => (
+  <div
+    className={`relative ${className}`}
+    style={{
+      // Checkerboard pattern using CSS
+      backgroundImage: `
+        linear-gradient(45deg, #e5e7eb 25%, transparent 25%),
+        linear-gradient(-45deg, #e5e7eb 25%, transparent 25%),
+        linear-gradient(45deg, transparent 75%, #e5e7eb 75%),
+        linear-gradient(-45deg, transparent 75%, #e5e7eb 75%)
+      `,
+      backgroundSize: '16px 16px',
+      backgroundPosition: '0 0, 0 8px, 8px -8px, -8px 0px',
+      backgroundColor: '#f3f4f6',
+    }}
+  >
+    {children}
+  </div>
+)
+
+const CaptureResult = ({ documentId }: { documentId: string }) => {
+  const { provides: capture } = useCapture(documentId)
   const [captureResult, setCaptureResult] = useState<CaptureAreaEvent | null>(
     null,
   )
@@ -76,30 +107,27 @@ const CaptureResult = () => {
 
     const unsubscribe = capture.onCaptureArea((result) => {
       setCaptureResult(result)
-      // If there's a previous image, revoke its URL to free up memory
-      if (imageUrl) {
-        URL.revokeObjectURL(imageUrl)
-      }
-      const newUrl = URL.createObjectURL(result.blob)
-      setImageUrl(newUrl)
+      if (imageUrl) URL.revokeObjectURL(imageUrl)
+      setImageUrl(URL.createObjectURL(result.blob))
     })
 
     return () => {
       unsubscribe()
-      // Revoke the URL when the component unmounts
-      if (imageUrl) {
-        URL.revokeObjectURL(imageUrl)
-      }
+      if (imageUrl) URL.revokeObjectURL(imageUrl)
     }
   }, [capture, imageUrl])
 
   if (!captureResult || !imageUrl) {
     return (
-      <div className="mt-4 rounded-lg border border-dashed border-gray-300 bg-gray-50 p-4 text-center">
-        <p className="text-sm text-gray-500">
-          Click &quot;Capture Area&quot; and drag a rectangle on the PDF to
-          create a snapshot.
-        </p>
+      <div className="border-t border-gray-300 bg-gray-50 px-4 py-6 dark:border-gray-700 dark:bg-gray-900/50">
+        <div className="flex flex-col items-center justify-center text-center">
+          <div className="mb-3 flex h-10 w-10 items-center justify-center rounded-full bg-gray-100 dark:bg-gray-800">
+            <Camera size={20} className="text-gray-400" />
+          </div>
+          <p className="text-sm text-gray-500 dark:text-gray-400">
+            Click &quot;Capture Area&quot; and drag to select a region
+          </p>
+        </div>
       </div>
     )
   }
@@ -114,73 +142,108 @@ const CaptureResult = () => {
   }
 
   return (
-    <div className="mt-4 rounded-lg border border-gray-300 bg-white p-4 shadow-sm">
-      <h3 className="text-md font-medium text-gray-800">Capture Result</h3>
-      <p className="text-sm text-gray-500">
-        Captured from page {captureResult.pageIndex + 1} at{' '}
-        {captureResult.scale}x resolution.
-      </p>
-      <img
-        src={imageUrl}
-        alt="Captured area from PDF"
-        className="mt-2 max-w-full rounded border border-gray-200"
-      />
-      <button
-        onClick={downloadImage}
-        className="mt-3 rounded-md bg-blue-500 px-3 py-1 text-sm font-medium text-white transition-colors hover:bg-blue-600"
-      >
-        Download Image
-      </button>
+    <div className="border-t border-gray-300 bg-gray-50 p-4 dark:border-gray-700 dark:bg-gray-900/50">
+      {/* Header */}
+      <div className="mb-3 flex items-start justify-between">
+        <div>
+          <h4 className="text-sm font-medium text-gray-900 dark:text-gray-100">
+            Captured Image
+          </h4>
+          <p className="text-xs text-gray-500 dark:text-gray-400">
+            Page {captureResult.pageIndex + 1} · {captureResult.scale}x
+            resolution
+          </p>
+        </div>
+        <button
+          onClick={downloadImage}
+          className="inline-flex items-center gap-1.5 rounded-md border border-gray-300 bg-white px-2.5 py-1.5 text-xs font-medium shadow-sm ring-1 ring-gray-300 transition-colors hover:bg-gray-50 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-300 dark:ring-gray-600 dark:hover:bg-gray-600 dark:hover:text-gray-100"
+        >
+          <Download size={14} />
+          Download
+        </button>
+      </div>
+
+      {/* Image with transparency grid background */}
+      <div className="overflow-hidden rounded-lg border border-gray-300 dark:border-gray-700">
+        <TransparencyGrid className="flex items-center justify-center p-4">
+          <img
+            src={imageUrl}
+            alt="Captured area"
+            className="h-auto max-w-full rounded shadow-lg"
+            style={{
+              // Add a subtle shadow to make the image "pop" off the grid
+              boxShadow:
+                '0 4px 12px rgba(0, 0, 0, 0.15), 0 0 0 1px rgba(0, 0, 0, 0.05)',
+            }}
+          />
+        </TransparencyGrid>
+      </div>
     </div>
   )
 }
 
-// 4. Create the main viewer component
+/**
+ * PDFViewer Demo for Capture Plugin
+ */
 export const PDFViewer = () => {
   const { engine, isLoading } = usePdfiumEngine()
 
   if (isLoading || !engine) {
-    return <div>Loading PDF Engine...</div>
+    return (
+      <div className="overflow-hidden rounded-lg border border-gray-300 bg-white dark:border-gray-700 dark:bg-gray-900">
+        <div className="flex h-[400px] items-center justify-center">
+          <div className="flex items-center gap-2 text-gray-500 dark:text-gray-400">
+            <Loader2 size={20} className="animate-spin" />
+            <span className="text-sm">Loading PDF Engine...</span>
+          </div>
+        </div>
+      </div>
+    )
   }
 
   return (
     <EmbedPDF engine={engine} plugins={plugins}>
-      <div
-        style={{ height: '500px', display: 'flex', flexDirection: 'column' }}
-      >
-        <CaptureToolbar />
-        <div
-          className="flex-grow"
-          style={{ position: 'relative', overflow: 'hidden' }}
-        >
-          <Viewport
-            style={{
-              position: 'absolute',
-              top: 0,
-              left: 0,
-              right: 0,
-              bottom: 0,
-              backgroundColor: '#f1f3f5',
-            }}
-          >
-            <Scroller
-              renderPage={({ width, height, pageIndex, scale, rotation }) => (
-                <PagePointerProvider
-                  pageIndex={pageIndex}
-                  pageWidth={width}
-                  pageHeight={height}
-                  rotation={rotation}
-                  scale={scale}
-                >
-                  <RenderLayer pageIndex={pageIndex} />
-                  <MarqueeCapture pageIndex={pageIndex} scale={scale} />
-                </PagePointerProvider>
-              )}
-            />
-          </Viewport>
-        </div>
-      </div>
-      <CaptureResult />
+      {({ activeDocumentId }) =>
+        activeDocumentId && (
+          <DocumentContent documentId={activeDocumentId}>
+            {({ isLoaded }) =>
+              isLoaded && (
+                <div className="overflow-hidden rounded-lg border border-gray-300 bg-white shadow-sm dark:border-gray-700 dark:bg-gray-900">
+                  <CaptureToolbar documentId={activeDocumentId} />
+
+                  <div className="relative h-[400px] sm:h-[500px]">
+                    <Viewport
+                      documentId={activeDocumentId}
+                      className="absolute inset-0 bg-gray-200 dark:bg-gray-800"
+                    >
+                      <Scroller
+                        documentId={activeDocumentId}
+                        renderPage={({ pageIndex }) => (
+                          <PagePointerProvider
+                            documentId={activeDocumentId}
+                            pageIndex={pageIndex}
+                          >
+                            <RenderLayer
+                              documentId={activeDocumentId}
+                              pageIndex={pageIndex}
+                            />
+                            <MarqueeCapture
+                              documentId={activeDocumentId}
+                              pageIndex={pageIndex}
+                            />
+                          </PagePointerProvider>
+                        )}
+                      />
+                    </Viewport>
+                  </div>
+
+                  <CaptureResult documentId={activeDocumentId} />
+                </div>
+              )
+            }
+          </DocumentContent>
+        )
+      }
     </EmbedPDF>
   )
 }

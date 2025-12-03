@@ -52,6 +52,7 @@
     "@embedpdf/build": "workspace:*",
     "@embedpdf/core": "workspace:*",
     "@embedpdf/plugin-viewport": "workspace:*",
+    "@embedpdf/plugin-spread": "workspace:*",
     "@types/react": "^18.2.0",
     "typescript": "^5.0.0"
   },

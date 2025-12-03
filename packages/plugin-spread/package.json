@@ -50,13 +50,12 @@
   "devDependencies": {
     "@embedpdf/build": "workspace:*",
     "@embedpdf/core": "workspace:*",
-    "@embedpdf/plugin-loader": "workspace:*",
+    "@embedpdf/plugin-viewport": "workspace:*",
     "@types/react": "^18.2.0",
     "typescript": "^5.0.0"
   },
   "peerDependencies": {
     "@embedpdf/core": "workspace:*",
-    "@embedpdf/plugin-loader": "workspace:*",
     "react": ">=16.8.0",
     "react-dom": ">=16.8.0",
     "preact": "^10.26.4",

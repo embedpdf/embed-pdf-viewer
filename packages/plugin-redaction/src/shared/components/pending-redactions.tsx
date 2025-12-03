@@ -3,18 +3,20 @@ import { CounterRotate } from '@embedpdf/utils/@framework';
 import { useRedactionCapability } from '../hooks';
 import { RedactionItem } from '@embedpdf/plugin-redaction';
 import { Highlight } from './highlight';
-import { SelectionMenuProps } from './types';
+import { RedactionSelectionMenuRenderFn } from './types';
 import { Rotation } from '@embedpdf/models';
 
 interface PendingRedactionsProps {
+  documentId: string;
   pageIndex: number;
   scale: number;
   rotation: Rotation;
   bboxStroke?: string;
-  selectionMenu?: (props: SelectionMenuProps) => JSX.Element;
+  selectionMenu?: RedactionSelectionMenuRenderFn;
 }
 
 export function PendingRedactions({
+  documentId,
   pageIndex,
   scale,
   bboxStroke = 'rgba(0,0,0,0.8)',
@@ -27,23 +29,38 @@ export function PendingRedactions({
 
   useEffect(() => {
     if (!redaction) return;
-    const off1 = redaction.onPendingChange((map) => setItems(map[pageIndex] ?? []));
-    const off2 = redaction.onSelectedChange((sel) => {
+
+    // Use document-scoped hooks so we only receive events for this document
+    const scoped = redaction.forDocument(documentId);
+
+    // Initialize with current state
+    const currentState = scoped.getState();
+    setItems(currentState.pending[pageIndex] ?? []);
+    setSelectedId(
+      currentState.selected && currentState.selected.page === pageIndex
+        ? currentState.selected.id
+        : null,
+    );
+
+    // Subscribe to future changes
+    const off1 = scoped.onPendingChange((map) => setItems(map[pageIndex] ?? []));
+    const off2 = scoped.onSelectedChange((sel) => {
       setSelectedId(sel && sel.page === pageIndex ? sel.id : null);
     });
+
     return () => {
       off1?.();
       off2?.();
     };
-  }, [redaction, pageIndex]);
+  }, [redaction, documentId, pageIndex]);
 
   const select = useCallback(
     (e: MouseEvent | TouchEvent, id: string) => {
       e.stopPropagation();
       if (!redaction) return;
-      redaction.selectPending(pageIndex, id);
+      redaction.forDocument(documentId).selectPending(pageIndex, id);
     },
-    [redaction, pageIndex],
+    [redaction, documentId, pageIndex],
   );
 
   if (!items.length) return null;
@@ -72,28 +89,34 @@ export function PendingRedactions({
                 onPointerDown={(e) => select(e, it.id)}
                 onTouchStart={(e) => select(e, it.id)}
               />
-              <CounterRotate
-                rect={{
-                  origin: { x: r.origin.x * scale, y: r.origin.y * scale },
-                  size: { width: r.size.width * scale, height: r.size.height * scale },
-                }}
-                rotation={rotation}
-              >
-                {({ rect, menuWrapperProps }) =>
-                  selectionMenu &&
-                  selectionMenu({
-                    item: it,
-                    selected: selectedId === it.id,
-                    pageIndex,
-                    menuWrapperProps,
-                    rect,
-                  })
-                }
-              </CounterRotate>
+              {selectionMenu && (
+                <CounterRotate
+                  rect={{
+                    origin: { x: r.origin.x * scale, y: r.origin.y * scale },
+                    size: { width: r.size.width * scale, height: r.size.height * scale },
+                  }}
+                  rotation={rotation}
+                >
+                  {(props) =>
+                    selectionMenu({
+                      ...props,
+                      context: {
+                        type: 'redaction',
+                        item: it,
+                        pageIndex,
+                      },
+                      selected: selectedId === it.id,
+                      placement: {
+                        suggestTop: false,
+                      },
+                    })
+                  }
+                </CounterRotate>
+              )}
             </Fragment>
           );
         }
-        // kind === 'text' → draw bounding box; inner rects are not drawn here to avoid clutter.
+
         const b = it.rect;
         return (
           <Fragment key={it.id}>
@@ -120,24 +143,30 @@ export function PendingRedactions({
                 onClick={(e) => select(e, it.id)}
               />
             </div>
-            <CounterRotate
-              rect={{
-                origin: { x: b.origin.x * scale, y: b.origin.y * scale },
-                size: { width: b.size.width * scale, height: b.size.height * scale },
-              }}
-              rotation={rotation}
-            >
-              {({ rect, menuWrapperProps }) =>
-                selectionMenu &&
-                selectionMenu({
-                  item: it,
-                  selected: selectedId === it.id,
-                  pageIndex,
-                  menuWrapperProps,
-                  rect,
-                })
-              }
-            </CounterRotate>
+            {selectionMenu && (
+              <CounterRotate
+                rect={{
+                  origin: { x: b.origin.x * scale, y: b.origin.y * scale },
+                  size: { width: b.size.width * scale, height: b.size.height * scale },
+                }}
+                rotation={rotation}
+              >
+                {(props) =>
+                  selectionMenu({
+                    ...props,
+                    context: {
+                      type: 'redaction',
+                      item: it,
+                      pageIndex,
+                    },
+                    selected: selectedId === it.id,
+                    placement: {
+                      suggestTop: false,
+                    },
+                  })
+                }
+              </CounterRotate>
+            )}
           </Fragment>
         );
       })}

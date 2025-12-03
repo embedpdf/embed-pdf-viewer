@@ -1,3 +1,4 @@
+import { ThemeProvider } from '@/components/theme-provider'
 import '@/styles/tailwind.css'
 import { getPageMap } from 'nextra/page-map'
 
@@ -21,8 +22,18 @@ export default async function RootLayout({
   let pageMap = await getPageMap()
 
   return (
-    <html lang="en">
-      <body>{children}</body>
+    // Add suppressHydrationWarning to html
+    <html lang="en" suppressHydrationWarning>
+      <body className="bg-white text-gray-900 dark:bg-gray-950 dark:text-gray-100">
+        <ThemeProvider
+          attribute="class"
+          defaultTheme="system"
+          enableSystem
+          disableTransitionOnChange
+        >
+          {children}
+        </ThemeProvider>
+      </body>
     </html>
   )
 }

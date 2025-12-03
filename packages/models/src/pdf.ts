@@ -47,11 +47,6 @@ export interface PdfDocumentObject {
   id: string;
 
   /**
-   * Name of the document
-   */
-  name?: string;
-
-  /**
    * Count of pages in this document
    */
   pageCount: number;
@@ -2318,11 +2313,6 @@ export interface PdfFileWithoutContent {
    * id of file
    */
   id: string;
-
-  /**
-   * Name of the file
-   */
-  name?: string;
 }
 
 export interface PdfFileLoader extends PdfFileWithoutContent {
@@ -2368,36 +2358,43 @@ export interface PdfFileUrl extends PdfFileWithoutContent {
 }
 
 export enum PdfErrorCode {
-  Ok, //  #define FPDF_ERR_SUCCESS 0    // No error.
-  Unknown, // #define FPDF_ERR_UNKNOWN 1    // Unknown error.
-  NotFound, // #define FPDF_ERR_FILE 2       // File not found or could not be opened.
-  WrongFormat, // #define FPDF_ERR_FORMAT 3     // File not in PDF format or corrupted.
-  Password, // #define FPDF_ERR_PASSWORD 4   // Password required or incorrect password.
-  Security, // #define FPDF_ERR_SECURITY 5   // Unsupported security scheme.
-  PageError, // #define FPDF_ERR_PAGE 6       // Page not found or content error.
-  XFALoad, // #ifdef PDF_ENABLE_XFA
-  XFALayout, //
-  Cancelled,
-  Initialization,
-  NotReady,
-  NotSupport,
-  LoadDoc,
-  DocNotOpen,
-  CantCloseDoc,
-  CantCreateNewDoc,
-  CantImportPages,
-  CantCreateAnnot,
-  CantSetAnnotRect,
-  CantSetAnnotContent,
-  CantRemoveInkList,
-  CantAddInkStoke,
-  CantReadAttachmentSize,
-  CantReadAttachmentContent,
-  CantFocusAnnot,
-  CantSelectText,
-  CantSelectOption,
-  CantCheckField,
-  CantSetAnnotString,
+  // ═══════════════════════════════════════════════════════
+  // PDFium Error Codes (MUST NOT CHANGE ORDER - maps to C defines)
+  // ═══════════════════════════════════════════════════════
+  Ok = 0, // #define FPDF_ERR_SUCCESS 0
+  Unknown = 1, // #define FPDF_ERR_UNKNOWN 1
+  NotFound = 2, // #define FPDF_ERR_FILE 2
+  WrongFormat = 3, // #define FPDF_ERR_FORMAT 3
+  Password = 4, // #define FPDF_ERR_PASSWORD 4 - Password required or incorrect
+  Security = 5, // #define FPDF_ERR_SECURITY 5
+  PageError = 6, // #define FPDF_ERR_PAGE 6
+  XFALoad = 7, // #define FPDF_ERR_XFALOAD 7
+  XFALayout = 8, // #define FPDF_ERR_XFALAYOUT 8
+
+  // ═══════════════════════════════════════════════════════
+  // Custom Error Codes (Can add/modify freely)
+  // ═══════════════════════════════════════════════════════
+  Cancelled = 9,
+  Initialization = 10,
+  NotReady = 11,
+  NotSupport = 12,
+  LoadDoc = 13,
+  DocNotOpen = 14,
+  CantCloseDoc = 15,
+  CantCreateNewDoc = 16,
+  CantImportPages = 17,
+  CantCreateAnnot = 18,
+  CantSetAnnotRect = 19,
+  CantSetAnnotContent = 20,
+  CantRemoveInkList = 21,
+  CantAddInkStoke = 22,
+  CantReadAttachmentSize = 23,
+  CantReadAttachmentContent = 24,
+  CantFocusAnnot = 25,
+  CantSelectText = 26,
+  CantSelectOption = 27,
+  CantCheckField = 28,
+  CantSetAnnotString = 29,
 }
 
 export interface PdfErrorReason {
@@ -2462,6 +2459,21 @@ export interface PdfOpenDocumentBufferOptions {
   password?: string;
 }
 
+export interface PdfRequestOptions {
+  /**
+   * Custom HTTP headers to include in all requests (HEAD, GET, range requests)
+   * Example: { 'Authorization': 'Bearer token', 'X-Custom-Header': 'value' }
+   */
+  headers?: Record<string, string>;
+  /**
+   * Controls whether cookies are sent with requests
+   * - 'omit': Never send cookies (default)
+   * - 'same-origin': Send cookies for same-origin requests
+   * - 'include': Always send cookies (requires CORS)
+   */
+  credentials?: RequestCredentials;
+}
+
 export interface PdfOpenDocumentUrlOptions {
   /**
    * Password for the document
@@ -2471,6 +2483,10 @@ export interface PdfOpenDocumentUrlOptions {
    * Loading mode
    */
   mode?: 'auto' | 'range-request' | 'full-fetch';
+  /**
+   * HTTP request options for fetching the PDF
+   */
+  requestOptions?: PdfRequestOptions;
 }
 
 export interface PdfRenderOptions {

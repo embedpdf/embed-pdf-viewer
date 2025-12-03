@@ -73,7 +73,6 @@
 - [#141](https://github.com/embedpdf/embed-pdf-viewer/pull/141) by [@bobsingor](https://github.com/bobsingor) – Change `onScrollActivity` payload from `boolean` to structured object and add convenience hooks.
 
   ### What changed
-
   - `ViewportCapability.onScrollActivity` now emits a **`ScrollActivity`** object:
     ```ts
     export interface ScrollActivity {

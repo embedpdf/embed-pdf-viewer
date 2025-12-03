@@ -1,28 +1,23 @@
 <script setup lang="ts">
-import { ref, onMounted, onUnmounted, CSSProperties } from 'vue';
+import { ref, onMounted, onUnmounted } from 'vue';
 import { useFullscreenPlugin, useFullscreenCapability } from '../hooks';
+import { handleFullscreenRequest } from '../../shared/utils/fullscreen-utils';
 
 const { provides: fullscreenCapabilityRef } = useFullscreenCapability();
 const { plugin: fullscreenPluginRef } = useFullscreenPlugin();
 const containerRef = ref<HTMLDivElement | null>(null);
 
 let unsubscribe: (() => void) | null = null;
+let fullscreenChangeUnsubscribe: (() => void) | null = null;
 
 onMounted(() => {
   const fullscreenCapability = fullscreenCapabilityRef.value;
+  const fullscreenPlugin = fullscreenPluginRef.value;
 
-  if (fullscreenCapability) {
-    unsubscribe = fullscreenCapability.onRequest(async (action) => {
-      const el = containerRef.value;
-      if (action === 'enter') {
-        if (el && !document.fullscreenElement) {
-          await el.requestFullscreen();
-        }
-      } else {
-        if (document.fullscreenElement) {
-          await document.exitFullscreen();
-        }
-      }
+  if (fullscreenCapability && fullscreenPlugin) {
+    unsubscribe = fullscreenCapability.onRequest(async (event) => {
+      const targetSelector = fullscreenPlugin.getTargetSelector();
+      await handleFullscreenRequest(event, containerRef.value, targetSelector);
     });
   }
 
@@ -34,15 +29,18 @@ onMounted(() => {
     };
     document.addEventListener('fullscreenchange', handler);
 
-    onUnmounted(() => {
+    fullscreenChangeUnsubscribe = () => {
       document.removeEventListener('fullscreenchange', handler);
-    });
+    };
   }
 });
 
 onUnmounted(() => {
   if (unsubscribe) {
     unsubscribe();
+  }
+  if (fullscreenChangeUnsubscribe) {
+    fullscreenChangeUnsubscribe();
   }
 });
 </script>

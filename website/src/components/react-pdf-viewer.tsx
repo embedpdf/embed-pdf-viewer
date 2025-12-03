@@ -36,11 +36,11 @@ const CheckCircle = ({ className }: { className?: string }) => {
 // Animated background component
 const AnimatedBackground = () => {
   return (
-    <div className="absolute inset-0 -z-10">
-      <div className="animate-blob absolute left-10 top-20 h-64 w-64 rounded-full bg-purple-500 opacity-10 mix-blend-multiply blur-3xl filter"></div>
-      <div className="animate-blob animation-delay-2000 absolute right-10 top-40 h-72 w-72 rounded-full bg-blue-500 opacity-10 mix-blend-multiply blur-3xl filter"></div>
-      <div className="animate-blob animation-delay-4000 absolute bottom-32 left-20 h-80 w-80 rounded-full bg-teal-500 opacity-10 mix-blend-multiply blur-3xl filter"></div>
-      <div className="bg-grid-pattern absolute inset-0 opacity-5"></div>
+    <div className="pointer-events-none absolute inset-0 -z-10 overflow-hidden">
+      <div className="animate-blob absolute left-10 top-20 h-64 w-64 rounded-full bg-purple-500 opacity-10 mix-blend-multiply blur-3xl filter dark:opacity-20 dark:mix-blend-normal"></div>
+      <div className="animate-blob animation-delay-2000 absolute right-10 top-40 h-72 w-72 rounded-full bg-blue-500 opacity-10 mix-blend-multiply blur-3xl filter dark:opacity-20 dark:mix-blend-normal"></div>
+      <div className="animate-blob animation-delay-4000 absolute bottom-32 left-20 h-80 w-80 rounded-full bg-teal-500 opacity-10 mix-blend-multiply blur-3xl filter dark:opacity-20 dark:mix-blend-normal"></div>
+      <div className="bg-grid-pattern absolute inset-0 opacity-5 dark:opacity-[0.03]"></div>
     </div>
   )
 }
@@ -51,7 +51,7 @@ const Scribble = () => (
     viewBox="0 0 286 73"
     fill="none"
     xmlns="http://www.w3.org/2000/svg"
-    className="absolute bottom-0 left-0 right-0 -z-10 h-4 w-full"
+    className="absolute bottom-0 left-0 right-0 -z-10 h-4 w-full text-purple-200 dark:text-purple-800/40"
   >
     <path
       d="M142.293 71.0029C94.8159 71.0029 47.339 71.0029 0.862305 71.0029C0.862305 71.0029 71.0766 23.5254 142.293 1.00293C213.509 23.5254 283.724 71.0029 283.724 71.0029C237.247 71.0029 189.77 71.0029 142.293 71.0029Z"
@@ -81,18 +81,20 @@ const FAQItem = ({
   const [isOpen, setIsOpen] = useState(false)
 
   return (
-    <div className="border-b border-gray-200 py-4">
+    <div className="border-b border-gray-200 py-4 dark:border-gray-800">
       <button
         onClick={() => setIsOpen(!isOpen)}
-        className="flex w-full items-center justify-between text-left transition-colors hover:text-purple-600"
+        className="flex w-full items-center justify-between text-left transition-colors hover:text-purple-600 dark:hover:text-purple-400"
       >
-        <h3 className="text-lg font-semibold text-gray-900">{question}</h3>
-        <div className="ml-4 text-gray-500">
+        <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100">
+          {question}
+        </h3>
+        <div className="ml-4 text-gray-500 dark:text-gray-400">
           {isOpen ? <ChevronUp /> : <ChevronDown />}
         </div>
       </button>
       {isOpen && (
-        <div className="mt-3 leading-relaxed text-gray-600">
+        <div className="mt-3 leading-relaxed text-gray-600 dark:text-gray-400">
           <p>{answer}</p>
         </div>
       )}
@@ -102,7 +104,7 @@ const FAQItem = ({
 
 export default function ReactPDFViewerPage() {
   return (
-    <div className="relative min-h-screen bg-white">
+    <div className="relative min-h-screen bg-white transition-colors duration-300 dark:bg-gray-950">
       <style jsx>{`
         @keyframes blob {
           0% {
@@ -149,17 +151,15 @@ export default function ReactPDFViewerPage() {
       <section className="pb-20 pt-20 sm:pt-32">
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
           <div className="text-center">
-            <div className="mb-6 inline-block rounded-full border border-purple-200 bg-purple-50 px-6 py-2 text-sm font-medium text-purple-800">
+            <div className="mb-6 inline-block rounded-full border border-purple-200 bg-purple-50 px-6 py-2 text-sm font-medium text-purple-800 dark:border-purple-800/30 dark:bg-purple-900/20 dark:text-purple-300">
               Open Source • Powered by PDFium
             </div>
 
-            <h1 className="md:text-7xl mb-6 text-5xl font-black leading-tight tracking-tight text-gray-900">
+            <h1 className="md:text-7xl mb-6 text-5xl font-black leading-tight tracking-tight text-gray-900 dark:text-white">
               Build your{' '}
               <span className="relative inline-block">
                 <span className="relative z-10">React PDF Viewer</span>
-                <div className="absolute bottom-1 left-0 right-0 -z-10 h-4 -rotate-1 transform text-purple-200 opacity-50">
-                  <Scribble />
-                </div>
+                <Scribble />
               </span>
               <br />
               <span className="bg-gradient-to-r from-purple-600 via-blue-500 to-teal-500 bg-clip-text text-transparent">
@@ -167,7 +167,7 @@ export default function ReactPDFViewerPage() {
               </span>
             </h1>
 
-            <p className="mx-auto max-w-3xl text-xl leading-relaxed text-gray-600">
+            <p className="mx-auto max-w-3xl text-xl leading-relaxed text-gray-600 dark:text-gray-400">
               Choose between a complete viewer with built-in UI or composable,
               headless components for total control. Open source and powered by
               PDFium.
@@ -176,10 +176,10 @@ export default function ReactPDFViewerPage() {
             <div className="mt-10 flex flex-col items-center justify-center gap-4 sm:flex-row">
               <Link
                 href="/docs/react/introduction"
-                className="group relative inline-flex items-center justify-center overflow-hidden rounded-full bg-gray-900 px-8 py-4 text-base font-medium text-white shadow-xl transition-all hover:scale-105"
+                className="group relative inline-flex items-center justify-center overflow-hidden rounded-full bg-gray-900 px-8 py-4 text-base font-medium text-white shadow-xl transition-all hover:scale-105 dark:bg-white dark:text-gray-900"
               >
                 <span className="absolute left-0 top-0 h-full w-full bg-gradient-to-r from-purple-600 via-blue-500 to-teal-400 opacity-0 transition-opacity group-hover:opacity-100"></span>
-                <span className="relative z-10 flex items-center gap-2">
+                <span className="relative z-10 flex items-center gap-2 group-hover:text-white">
                   View Documentation
                   <ArrowRight />
                 </span>
@@ -189,7 +189,7 @@ export default function ReactPDFViewerPage() {
                 href="https://mui.embedpdf.com"
                 target="_blank"
                 rel="noreferrer"
-                className="inline-flex items-center justify-center gap-2 rounded-full border-2 border-gray-900 bg-transparent px-8 py-4 text-base font-medium text-gray-900 transition-all hover:bg-gray-900 hover:text-white"
+                className="inline-flex items-center justify-center gap-2 rounded-full border-2 border-gray-900 bg-transparent px-8 py-4 text-base font-medium text-gray-900 transition-all hover:bg-gray-900 hover:text-white dark:border-gray-100 dark:text-gray-100 dark:hover:bg-gray-100 dark:hover:text-gray-900"
               >
                 <ExternalLink />
                 Live Demo
@@ -199,25 +199,25 @@ export default function ReactPDFViewerPage() {
 
           {/* Framework Badges */}
           <div className="mt-20">
-            <p className="tracking-wider mb-8 text-center text-sm font-medium uppercase text-gray-500">
+            <p className="tracking-wider mb-8 text-center text-sm font-medium uppercase text-gray-500 dark:text-gray-400">
               Works Seamlessly With Your Favorite UI Framework
             </p>
             <div className="mx-auto grid max-w-5xl grid-cols-2 gap-6 sm:grid-cols-3 lg:grid-cols-6">
               {frameworks.map((fw) => (
                 <div
                   key={fw.name}
-                  className="group relative flex flex-col items-center justify-center rounded-2xl border border-gray-200 bg-white p-6 shadow-sm transition-all hover:border-purple-300 hover:shadow-lg"
+                  className="group relative flex flex-col items-center justify-center rounded-2xl border border-gray-200 bg-white p-6 shadow-sm transition-all hover:border-purple-300 hover:shadow-lg dark:border-gray-800 dark:bg-gray-900 dark:hover:border-purple-500/50"
                 >
-                  <div className="mb-3 text-gray-400 transition-all duration-300 group-hover:scale-110 group-hover:text-purple-600">
+                  <div className="mb-3 text-gray-400 transition-all duration-300 group-hover:scale-110 group-hover:text-purple-600 dark:text-gray-500 dark:group-hover:text-purple-400">
                     {fw.logo}
                   </div>
-                  <span className="text-center text-sm font-medium text-gray-600 transition-colors group-hover:text-gray-900">
+                  <span className="text-center text-sm font-medium text-gray-600 transition-colors group-hover:text-gray-900 dark:text-gray-400 dark:group-hover:text-gray-200">
                     {fw.name}
                   </span>
                 </div>
               ))}
             </div>
-            <p className="mt-6 text-center text-sm text-gray-500">
+            <p className="mt-6 text-center text-sm text-gray-500 dark:text-gray-400">
               ...and any other React UI library or CSS framework
             </p>
           </div>
@@ -225,7 +225,7 @@ export default function ReactPDFViewerPage() {
       </section>
 
       {/* Two Paths Section */}
-      <section className="relative overflow-hidden bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900 py-24">
+      <section className="relative overflow-hidden border-y border-white/10 bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900 py-24 dark:border-gray-800">
         {/* Animated background orbs */}
         <div className="absolute right-0 top-0 h-80 w-80 -translate-y-1/3 translate-x-1/3 transform animate-pulse rounded-full bg-gradient-to-br from-cyan-400 to-blue-500 opacity-20 blur-3xl"></div>
         <div className="animation-delay-2000 absolute bottom-0 left-0 h-72 w-72 -translate-x-1/3 translate-y-1/3 transform animate-pulse rounded-full bg-gradient-to-br from-emerald-400 to-teal-500 opacity-25 blur-3xl"></div>
@@ -236,7 +236,7 @@ export default function ReactPDFViewerPage() {
             <div className="mb-6 inline-block rounded-full border border-cyan-400/30 bg-cyan-400/10 px-6 py-2 text-sm font-bold text-slate-300 backdrop-blur-sm">
               Choose Your Integration Path
             </div>
-            <h2 className="mb-6 text-4xl font-black leading-tight tracking-tight md:text-5xl">
+            <h2 className="mb-6 text-4xl font-black leading-tight tracking-tight text-white md:text-5xl">
               <span className="bg-gradient-to-r from-cyan-300 via-blue-300 to-purple-300 bg-clip-text text-transparent">
                 Build it your way
               </span>
@@ -254,7 +254,7 @@ export default function ReactPDFViewerPage() {
               <div className="relative flex h-full flex-col overflow-hidden rounded-2xl border border-slate-700/50 bg-slate-800/80 backdrop-blur-sm">
                 {/* Header */}
                 <div className="border-b border-slate-700/50 bg-slate-800/50 px-8 py-8">
-                  <div className="mb-4 flex h-14 w-14 items-center justify-center rounded-xl bg-gradient-to-br from-cyan-500 to-blue-600">
+                  <div className="mb-4 flex h-14 w-14 items-center justify-center rounded-xl bg-gradient-to-br from-cyan-500 to-blue-600 shadow-lg">
                     <Layout className="h-8 w-8 text-white" />
                   </div>
                   <h3 className="mb-3 text-2xl font-bold text-white">
@@ -331,7 +331,7 @@ export default function ReactPDFViewerPage() {
               <div className="relative flex h-full flex-col overflow-hidden rounded-2xl border border-slate-700/50 bg-slate-800/80 backdrop-blur-sm">
                 {/* Header */}
                 <div className="border-b border-slate-700/50 bg-slate-800/50 px-8 py-8">
-                  <div className="mb-4 flex h-14 w-14 items-center justify-center rounded-xl bg-gradient-to-br from-emerald-500 to-teal-600">
+                  <div className="mb-4 flex h-14 w-14 items-center justify-center rounded-xl bg-gradient-to-br from-emerald-500 to-teal-600 shadow-lg">
                     <Layers className="h-8 w-8 text-white" />
                   </div>
                   <h3 className="mb-3 text-2xl font-bold text-white">
@@ -409,106 +409,106 @@ export default function ReactPDFViewerPage() {
       <section className="py-24">
         <div className="mx-auto max-w-6xl px-4 sm:px-6 lg:px-8">
           <div className="mb-16 text-center">
-            <h2 className="mb-4 text-4xl font-black text-gray-900">
+            <h2 className="mb-4 text-4xl font-black text-gray-900 dark:text-white">
               EmbedPDF vs Traditional PDF Viewers
             </h2>
-            <p className="mx-auto max-w-2xl text-lg text-gray-600">
+            <p className="mx-auto max-w-2xl text-lg text-gray-600 dark:text-gray-400">
               See how our headless approach compares to traditional solutions
             </p>
           </div>
 
-          <div className="overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-xl">
+          <div className="overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-xl dark:border-gray-800 dark:bg-gray-900">
             <div className="overflow-x-auto">
               <table className="w-full">
-                <thead className="bg-gradient-to-r from-purple-50 to-blue-50">
+                <thead className="bg-gradient-to-r from-purple-50 to-blue-50 dark:from-gray-800 dark:to-gray-800">
                   <tr>
-                    <th className="tracking-wider px-6 py-4 text-left text-sm font-bold uppercase text-gray-900">
+                    <th className="tracking-wider px-6 py-4 text-left text-sm font-bold uppercase text-gray-900 dark:text-white">
                       Feature
                     </th>
-                    <th className="tracking-wider px-6 py-4 text-center text-sm font-bold uppercase text-purple-600">
+                    <th className="tracking-wider px-6 py-4 text-center text-sm font-bold uppercase text-purple-600 dark:text-purple-400">
                       EmbedPDF
                     </th>
-                    <th className="tracking-wider px-6 py-4 text-center text-sm font-bold uppercase text-gray-500">
+                    <th className="tracking-wider px-6 py-4 text-center text-sm font-bold uppercase text-gray-500 dark:text-gray-400">
                       Traditional Viewers
                     </th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-gray-200">
-                  <tr className="transition-colors hover:bg-gray-50">
-                    <td className="px-6 py-4 font-medium text-gray-900">
+                <tbody className="divide-y divide-gray-200 dark:divide-gray-800">
+                  <tr className="transition-colors hover:bg-gray-50 dark:hover:bg-gray-800/50">
+                    <td className="px-6 py-4 font-medium text-gray-900 dark:text-gray-100">
                       Custom UI Design
                     </td>
                     <td className="px-6 py-4 text-center">
                       <div className="mx-auto flex justify-center">
-                        <CheckCircle className="bg-green-600" />
+                        <CheckCircle className="bg-green-600 dark:bg-green-500" />
                       </div>
                     </td>
-                    <td className="px-6 py-4 text-center text-sm text-gray-400">
+                    <td className="px-6 py-4 text-center text-sm text-gray-400 dark:text-gray-500">
                       Limited
                     </td>
                   </tr>
-                  <tr className="transition-colors hover:bg-gray-50">
-                    <td className="px-6 py-4 font-medium text-gray-900">
+                  <tr className="transition-colors hover:bg-gray-50 dark:hover:bg-gray-800/50">
+                    <td className="px-6 py-4 font-medium text-gray-900 dark:text-gray-100">
                       UI Framework Support
                     </td>
                     <td className="px-6 py-4 text-center">
                       <div className="mx-auto flex justify-center">
-                        <CheckCircle className="bg-green-600" />
+                        <CheckCircle className="bg-green-600 dark:bg-green-500" />
                       </div>
                     </td>
-                    <td className="px-6 py-4 text-center text-sm text-gray-400">
+                    <td className="px-6 py-4 text-center text-sm text-gray-400 dark:text-gray-500">
                       None
                     </td>
                   </tr>
-                  <tr className="transition-colors hover:bg-gray-50">
-                    <td className="px-6 py-4 font-medium text-gray-900">
+                  <tr className="transition-colors hover:bg-gray-50 dark:hover:bg-gray-800/50">
+                    <td className="px-6 py-4 font-medium text-gray-900 dark:text-gray-100">
                       TypeScript Support
                     </td>
                     <td className="px-6 py-4 text-center">
                       <div className="mx-auto flex justify-center">
-                        <CheckCircle className="bg-green-600" />
+                        <CheckCircle className="bg-green-600 dark:bg-green-500" />
                       </div>
                     </td>
                     <td className="px-6 py-4 text-center">
                       <div className="mx-auto flex justify-center">
-                        <CheckCircle className="bg-gray-400" />
+                        <CheckCircle className="bg-gray-400 dark:bg-gray-600" />
                       </div>
                     </td>
                   </tr>
-                  <tr className="transition-colors hover:bg-gray-50">
-                    <td className="px-6 py-4 font-medium text-gray-900">
+                  <tr className="transition-colors hover:bg-gray-50 dark:hover:bg-gray-800/50">
+                    <td className="px-6 py-4 font-medium text-gray-900 dark:text-gray-100">
                       Modular Features
                     </td>
                     <td className="px-6 py-4 text-center">
                       <div className="mx-auto flex justify-center">
-                        <CheckCircle className="bg-green-600" />
+                        <CheckCircle className="bg-green-600 dark:bg-green-500" />
                       </div>
                     </td>
-                    <td className="px-6 py-4 text-center text-sm text-gray-400">
+                    <td className="px-6 py-4 text-center text-sm text-gray-400 dark:text-gray-500">
                       Monolithic
                     </td>
                   </tr>
-                  <tr className="transition-colors hover:bg-gray-50">
-                    <td className="px-6 py-4 font-medium text-gray-900">
+                  <tr className="transition-colors hover:bg-gray-50 dark:hover:bg-gray-800/50">
+                    <td className="px-6 py-4 font-medium text-gray-900 dark:text-gray-100">
                       Bundle Size
                     </td>
-                    <td className="px-6 py-4 text-center font-semibold text-green-600">
+                    <td className="px-6 py-4 text-center font-semibold text-green-600 dark:text-green-400">
                       Minimal
                     </td>
-                    <td className="px-6 py-4 text-center font-semibold text-gray-400">
+                    <td className="px-6 py-4 text-center font-semibold text-gray-400 dark:text-gray-500">
                       Large
                     </td>
                   </tr>
-                  <tr className="transition-colors hover:bg-gray-50">
-                    <td className="px-6 py-4 font-medium text-gray-900">
+                  <tr className="transition-colors hover:bg-gray-50 dark:hover:bg-gray-800/50">
+                    <td className="px-6 py-4 font-medium text-gray-900 dark:text-gray-100">
                       Open Source
                     </td>
                     <td className="px-6 py-4 text-center">
                       <div className="mx-auto flex justify-center">
-                        <CheckCircle className="bg-green-600" />
+                        <CheckCircle className="bg-green-600 dark:bg-green-500" />
                       </div>
                     </td>
-                    <td className="px-6 py-4 text-center text-sm text-gray-400">
+                    <td className="px-6 py-4 text-center text-sm text-gray-400 dark:text-gray-500">
                       Often Paid
                     </td>
                   </tr>
@@ -520,7 +520,7 @@ export default function ReactPDFViewerPage() {
       </section>
 
       {/* Code Example Section */}
-      <section className="bg-gradient-to-br from-gray-900 to-gray-800 py-24 text-white">
+      <section className="border-y border-white/10 bg-gradient-to-br from-gray-900 to-gray-800 py-24 text-white dark:border-gray-800 dark:from-black dark:to-gray-900">
         <div className="mx-auto max-w-5xl px-4 sm:px-6 lg:px-8">
           <div className="mb-12 text-center">
             <h2 className="mb-4 text-4xl font-black">
@@ -532,8 +532,8 @@ export default function ReactPDFViewerPage() {
             </p>
           </div>
 
-          <div className="overflow-hidden rounded-2xl bg-gray-950 shadow-2xl">
-            <div className="flex items-center justify-between border-b border-gray-800 px-6 py-4">
+          <div className="overflow-hidden rounded-2xl border border-gray-800 bg-gray-950 shadow-2xl">
+            <div className="flex items-center justify-between border-b border-gray-800 bg-gray-900 px-6 py-4">
               <div className="flex items-center space-x-2">
                 <div className="h-3 w-3 rounded-full bg-red-500"></div>
                 <div className="h-3 w-3 rounded-full bg-yellow-500"></div>
@@ -541,7 +541,7 @@ export default function ReactPDFViewerPage() {
               </div>
               <span className="text-sm text-gray-400">PDFViewer.tsx</span>
             </div>
-            <pre className="overflow-x-auto p-6 text-sm leading-relaxed">
+            <pre className="overflow-x-auto bg-gray-950 p-6 text-sm leading-relaxed">
               <code className="text-gray-300">
                 <span className="text-purple-400">import</span>{' '}
                 <span className="text-blue-300">{'{ EmbedPDF }'}</span>{' '}
@@ -609,10 +609,10 @@ export default function ReactPDFViewerPage() {
       <section className="py-24">
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
           <div className="mb-16 text-center">
-            <h2 className="mb-4 text-4xl font-black text-gray-900">
+            <h2 className="mb-4 text-4xl font-black text-gray-900 dark:text-white">
               Everything You Need for Modern PDF Viewing
             </h2>
-            <p className="mx-auto max-w-2xl text-lg text-gray-600">
+            <p className="mx-auto max-w-2xl text-lg text-gray-600 dark:text-gray-400">
               A complete toolkit with all the features your users expect
             </p>
           </div>
@@ -658,15 +658,17 @@ export default function ReactPDFViewerPage() {
             ].map((feature, idx) => (
               <div
                 key={idx}
-                className="group rounded-2xl border border-gray-200 bg-white p-6 shadow-sm transition-all hover:border-purple-200 hover:shadow-lg"
+                className="group rounded-2xl border border-gray-200 bg-white p-6 shadow-sm transition-all hover:border-purple-200 hover:shadow-lg dark:border-gray-800 dark:bg-gray-900 dark:hover:border-purple-500/50"
               >
-                <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-xl bg-gradient-to-br from-purple-500 to-blue-600 text-2xl transition-transform group-hover:scale-110">
+                <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-xl bg-gradient-to-br from-purple-500 to-blue-600 text-2xl shadow-lg transition-transform group-hover:scale-110">
                   {feature.icon}
                 </div>
-                <h3 className="mb-2 text-xl font-bold text-gray-900">
+                <h3 className="mb-2 text-xl font-bold text-gray-900 dark:text-white">
                   {feature.title}
                 </h3>
-                <p className="text-gray-600">{feature.description}</p>
+                <p className="text-gray-600 dark:text-gray-400">
+                  {feature.description}
+                </p>
               </div>
             ))}
           </div>
@@ -674,18 +676,18 @@ export default function ReactPDFViewerPage() {
       </section>
 
       {/* FAQ Section */}
-      <section className="bg-gradient-to-br from-blue-50 to-purple-50 py-24">
+      <section className="bg-gradient-to-br from-blue-50 to-purple-50 py-24 dark:from-gray-900 dark:to-gray-900">
         <div className="mx-auto max-w-4xl px-4 sm:px-6 lg:px-8">
           <div className="mb-12 text-center">
-            <h2 className="mb-4 text-4xl font-black text-gray-900">
+            <h2 className="mb-4 text-4xl font-black text-gray-900 dark:text-white">
               Frequently Asked Questions
             </h2>
-            <p className="text-lg text-gray-600">
+            <p className="text-lg text-gray-600 dark:text-gray-400">
               Everything you need to know about our React PDF Viewer
             </p>
           </div>
 
-          <div className="rounded-2xl bg-white p-8 shadow-lg">
+          <div className="rounded-2xl bg-white p-8 shadow-lg dark:border dark:border-gray-700 dark:bg-gray-800 dark:shadow-xl">
             <FAQItem
               question="What makes EmbedPDF different from other React PDF viewers?"
               answer="EmbedPDF is headless and framework-agnostic. Unlike traditional PDF viewers with fixed UIs, you get complete control over the design and can use any UI framework like Material UI, Chakra UI, or Tailwind CSS. You only load the features you need, keeping your bundle size minimal."
@@ -725,7 +727,7 @@ export default function ReactPDFViewerPage() {
               <h2 className="mb-4 text-4xl font-black">
                 Ready to Build Your React PDF Viewer?
               </h2>
-              <p className="mx-auto mb-8 max-w-2xl text-xl">
+              <p className="mx-auto mb-8 max-w-2xl text-xl text-blue-50">
                 Join thousands of developers using EmbedPDF to create amazing
                 PDF experiences
               </p>

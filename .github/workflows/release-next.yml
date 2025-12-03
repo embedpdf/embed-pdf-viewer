@@ -1,0 +1,118 @@
+name: Release Next
+
+on:
+  push:
+    branches: [next]
+    paths:
+      - "packages/**"
+      - ".changeset/**"
+      - "pnpm-lock.yaml"
+  workflow_dispatch: {}
+
+concurrency:
+  group: release-next
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+  id-token: write
+  pull-requests: write
+
+env:
+  CI: true
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    env:
+      GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      NPM_TOKEN:    ${{ secrets.NPM_TOKEN }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup PNPM
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10.4.0
+          run_install: false
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+          registry-url: "https://registry.npmjs.org"
+
+      - name: Install deps
+        run: pnpm install --frozen-lockfile
+
+      - name: Build packages
+        run: pnpm run build:packages
+
+      - name: Version / Publish via Changesets
+        id: changesets
+        uses: changesets/action@v1
+        with:
+          commit: "chore: version packages (next)"
+          title:  "chore: version packages (next)"
+          publish: pnpm ci:publish
+          createGithubReleases: false
+
+      - name: Detect publish summary
+        id: published
+        run: |
+          if [ -f "pnpm-publish-summary.json" ]; then
+            COUNT=$(jq '.publishedPackages | length' pnpm-publish-summary.json 2>/dev/null || echo 0)
+            if [ "$COUNT" -gt 0 ]; then
+              echo "did_publish=true" >> $GITHUB_OUTPUT
+              echo "published=$(jq -c '.publishedPackages' pnpm-publish-summary.json)" >> $GITHUB_OUTPUT
+              echo "version=$(jq -r '.publishedPackages[0].version' pnpm-publish-summary.json)" >> $GITHUB_OUTPUT
+            else
+              echo "did_publish=false" >> $GITHUB_OUTPUT
+            fi
+          else
+            echo "did_publish=false" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Prepare release notes
+        if: steps.published.outputs.did_publish == 'true'
+        run: |
+          echo "Pre-release for next branch." > release-notes.md
+          echo "Packages:" >> release-notes.md
+          echo "${{ steps.published.outputs.published }}" >> release-notes.md
+          cat release-notes.md
+
+      - name: Package published dists
+        if: steps.published.outputs.did_publish == 'true'
+        env:
+          PUBLISHED_JSON: ${{ steps.published.outputs.published }}
+        run: |
+          mkdir -p release-assets
+          echo "$PUBLISHED_JSON" | jq -r '.[].name' | while read name; do
+            short=$(echo "$name" | sed 's!.*/!!')
+            dir="packages/$short"
+            if [ -d "$dir/dist" ]; then
+              echo "Packaging $short"
+              (cd "$dir" && zip -r "../../release-assets/${short}-dist.zip" dist >/dev/null)
+              tar -czf "release-assets/${short}-dist.tar.gz" -C "$dir" dist
+            else
+              echo "No dist for $short"
+            fi
+          done
+          ls -lh release-assets || true
+
+      - name: Create GitHub pre-release
+        if: steps.published.outputs.did_publish == 'true'
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v${{ steps.published.outputs.version }}
+          name: "Releaste Next v${{ steps.published.outputs.version }}"
+          body_path: release-notes.md
+          files: release-assets/*
+          draft: false
+          prerelease: true
+          make_latest: false

@@ -5,12 +5,18 @@ import { useEffect, useRef, useState, useCallback } from 'react';
 import NavigateNextIcon from '@mui/icons-material/NavigateNext';
 import NavigateBeforeIcon from '@mui/icons-material/NavigateBefore';
 
-export const PageControls = () => {
-  const { provides: viewport } = useViewportCapability();
-  const {
-    provides: scroll,
-    state: { currentPage, totalPages },
-  } = useScroll();
+interface PageControlsProps {
+  documentId: string;
+}
+
+export const PageControls = ({ documentId }: PageControlsProps) => {
+  const { provides: viewportCapability } = useViewportCapability();
+  const { provides: scrollCapability } = useScroll(documentId);
+
+  // Get document-scoped APIs
+  const viewport = viewportCapability?.forDocument(documentId);
+  const currentPage = scrollCapability?.getCurrentPage() ?? 1;
+  const totalPages = scrollCapability?.getTotalPages() ?? 0;
   const [isVisible, setIsVisible] = useState(false);
   const [isHovering, setIsHovering] = useState(false);
   const hideTimeoutRef = useRef<NodeJS.Timeout | null>(null);
@@ -67,7 +73,7 @@ export const PageControls = () => {
     const page = parseInt(pageStr);
 
     if (!isNaN(page) && page >= 1 && page <= totalPages) {
-      scroll?.scrollToPage?.({
+      scrollCapability?.scrollToPage?.({
         pageNumber: page,
       });
     }
@@ -77,9 +83,7 @@ export const PageControls = () => {
     e.preventDefault();
     e.currentTarget.blur();
     if (currentPage > 1) {
-      scroll?.scrollToPage?.({
-        pageNumber: currentPage - 1,
-      });
+      scrollCapability?.scrollToPreviousPage?.();
     }
   };
 
@@ -87,9 +91,7 @@ export const PageControls = () => {
     e.preventDefault();
     e.currentTarget.blur();
     if (currentPage < totalPages) {
-      scroll?.scrollToPage?.({
-        pageNumber: currentPage + 1,
-      });
+      scrollCapability?.scrollToNextPage?.();
     }
   };
 

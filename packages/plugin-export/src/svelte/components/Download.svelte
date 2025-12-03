@@ -11,20 +11,18 @@
     if (!exportCapability.provides) return;
     if (!exportPlugin.plugin) return;
 
-    const unsub = exportPlugin.plugin.onRequest((action) => {
-      if (action === 'download') {
-        const el = anchorElement;
-        if (!el) return;
+    const unsub = exportPlugin.plugin.onRequest((event) => {
+      const el = anchorElement;
+      if (!el) return;
 
-        const task = exportPlugin.plugin?.saveAsCopyAndGetBufferAndName();
-        task?.wait(({ buffer, name }) => {
-          const url = URL.createObjectURL(new Blob([buffer]));
-          el.href = url;
-          el.download = name;
-          el.click();
-          URL.revokeObjectURL(url);
-        }, ignore);
-      }
+      const task = exportPlugin.plugin?.saveAsCopyAndGetBufferAndName(event.documentId);
+      task?.wait(({ buffer, name }) => {
+        const url = URL.createObjectURL(new Blob([buffer]));
+        el.href = url;
+        el.download = name;
+        el.click();
+        URL.revokeObjectURL(url);
+      }, ignore);
     });
 
     return unsub;

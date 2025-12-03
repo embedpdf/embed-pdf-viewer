@@ -1,1 +1,1 @@
-export { default as RenderLayer} from './RenderLayer.svelte';
+export { default as RenderLayer } from './RenderLayer.svelte';

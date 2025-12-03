@@ -1,23 +1,34 @@
 import { useCapability, usePlugin } from '@embedpdf/core/@framework';
-import { PanPlugin } from '@embedpdf/plugin-pan';
+import { PanPlugin, initialDocumentState } from '@embedpdf/plugin-pan';
 import { useEffect, useState } from '@framework';
 
 export const usePanPlugin = () => usePlugin<PanPlugin>(PanPlugin.id);
 export const usePanCapability = () => useCapability<PanPlugin>(PanPlugin.id);
 
-export const usePan = () => {
+/**
+ * Hook for pan state for a specific document
+ * @param documentId Document ID
+ */
+export const usePan = (documentId: string) => {
   const { provides } = usePanCapability();
-  const [isPanning, setIsPanning] = useState(false);
+  const [isPanning, setIsPanning] = useState(initialDocumentState.isPanMode);
 
   useEffect(() => {
     if (!provides) return;
-    return provides.onPanModeChange((isPanning) => {
-      setIsPanning(isPanning);
+
+    const scope = provides.forDocument(documentId);
+
+    // Get initial state
+    setIsPanning(scope.isPanMode());
+
+    // Subscribe to pan mode changes
+    return scope.onPanModeChange((isPan) => {
+      setIsPanning(isPan);
     });
-  }, [provides]);
+  }, [provides, documentId]);
 
   return {
-    provides,
+    provides: provides?.forDocument(documentId) ?? null,
     isPanning,
   };
 };

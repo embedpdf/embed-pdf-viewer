@@ -67,7 +67,6 @@
 ### Minor Changes
 
 - [#141](https://github.com/embedpdf/embed-pdf-viewer/pull/141) by [@bobsingor](https://github.com/bobsingor) – Break out imperative selection APIs from **capability** to **plugin**, and slim the capability surface.
-
   - **Removed from `SelectionCapability`:**
     - `getGeometry(page)`
     - `begin(page, glyphIdx)`

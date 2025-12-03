@@ -67,7 +67,6 @@
 ### Minor Changes
 
 - [#141](https://github.com/embedpdf/embed-pdf-viewer/pull/141) by [@bobsingor](https://github.com/bobsingor) – Refactor scroller layout API and scroll helpers.
-
   - **Moved scroller layout APIs from capability → plugin instance**
     - Removed from `ScrollCapability`:
       - `onScrollerData`

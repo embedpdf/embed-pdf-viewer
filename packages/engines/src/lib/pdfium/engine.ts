@@ -270,10 +270,10 @@ export class PdfiumEngine<T = Blob> implements PdfEngine<T> {
       imageDataConverter = browserImageDataToBlobConverter as ImageDataConverter<T>,
     } = options;
 
-    this.cache = new PdfCache(this.pdfiumModule);
     this.logger = logger;
     this.imageDataConverter = imageDataConverter;
     this.memoryManager = new MemoryManager(this.pdfiumModule, this.logger);
+    this.cache = new PdfCache(this.pdfiumModule, this.memoryManager);
 
     if (this.logger.isEnabled('debug')) {
       this.memoryLeakCheckInterval = setInterval(() => {
@@ -353,6 +353,7 @@ export class PdfiumEngine<T = Blob> implements PdfEngine<T> {
   public openDocumentUrl(file: PdfFileUrl, options?: PdfOpenDocumentUrlOptions) {
     const mode = options?.mode ?? 'auto';
     const password = options?.password ?? '';
+    const requestOptions = options?.requestOptions;
 
     this.logger.debug(LOG_SOURCE, LOG_CATEGORY, 'openDocumentUrl called', file.url, mode);
 
@@ -362,7 +363,7 @@ export class PdfiumEngine<T = Blob> implements PdfEngine<T> {
     // Start an async procedure
     (async () => {
       try {
-        const fetchFullTask = await this.fetchFullAndOpen(file, password);
+        const fetchFullTask = await this.fetchFullAndOpen(file, password, requestOptions);
         fetchFullTask.wait(
           (doc) => task.resolve(doc),
           (err) => task.reject(err.reason),
@@ -385,12 +386,17 @@ export class PdfiumEngine<T = Blob> implements PdfEngine<T> {
    */
   private async checkRangeSupport(
     url: string,
+    requestOptions?: { headers?: Record<string, string>; credentials?: RequestCredentials },
   ): Promise<{ supportsRanges: boolean; fileLength: number; content: ArrayBuffer | null }> {
     try {
       this.logger.debug(LOG_SOURCE, LOG_CATEGORY, 'checkRangeSupport', url);
 
       // First try HEAD request
-      const headResponse = await fetch(url, { method: 'HEAD' });
+      const headResponse = await fetch(url, {
+        method: 'HEAD',
+        headers: requestOptions?.headers,
+        credentials: requestOptions?.credentials,
+      });
       const fileLength = headResponse.headers.get('Content-Length');
       const acceptRanges = headResponse.headers.get('Accept-Ranges');
 
@@ -405,7 +411,8 @@ export class PdfiumEngine<T = Blob> implements PdfEngine<T> {
 
       // Test actual range request support
       const testResponse = await fetch(url, {
-        headers: { Range: 'bytes=0-1' },
+        headers: { ...requestOptions?.headers, Range: 'bytes=0-1' },
+        credentials: requestOptions?.credentials,
       });
 
       // If we get 200 instead of 206, server doesn't support ranges
@@ -435,11 +442,18 @@ export class PdfiumEngine<T = Blob> implements PdfEngine<T> {
    * Fully fetch the file (using fetch) into an ArrayBuffer,
    * then call openDocumentFromBuffer.
    */
-  private async fetchFullAndOpen(file: PdfFileUrl, password: string) {
+  private async fetchFullAndOpen(
+    file: PdfFileUrl,
+    password: string,
+    requestOptions?: { headers?: Record<string, string>; credentials?: RequestCredentials },
+  ) {
     this.logger.debug(LOG_SOURCE, LOG_CATEGORY, 'fetchFullAndOpen', file.url);
 
     // 1. fetch entire PDF as array buffer
-    const response = await fetch(file.url);
+    const response = await fetch(file.url, {
+      headers: requestOptions?.headers,
+      credentials: requestOptions?.credentials,
+    });
     if (!response.ok) {
       throw new Error(`Could not fetch PDF: ${response.statusText}`);
     }
@@ -448,7 +462,6 @@ export class PdfiumEngine<T = Blob> implements PdfEngine<T> {
     // 2. create a PdfFile object
     const pdfFile: PdfFile = {
       id: file.id,
-      name: file.name,
       content: arrayBuf,
     };
 
@@ -467,11 +480,13 @@ export class PdfiumEngine<T = Blob> implements PdfEngine<T> {
     file: PdfFileUrl,
     password: string,
     knownFileLength?: number,
+    requestOptions?: { headers?: Record<string, string>; credentials?: RequestCredentials },
   ) {
     this.logger.debug(LOG_SOURCE, LOG_CATEGORY, 'openDocumentWithRangeRequest', file.url);
 
     // We first do a HEAD or a partial fetch to get the fileLength:
-    const fileLength = knownFileLength ?? (await this.retrieveFileLength(file.url)).fileLength;
+    const fileLength =
+      knownFileLength ?? (await this.retrieveFileLength(file.url, requestOptions)).fileLength;
 
     // 2. define the callback function used by openDocumentFromLoader
     const callback = (offset: number, length: number) => {
@@ -479,7 +494,22 @@ export class PdfiumEngine<T = Blob> implements PdfEngine<T> {
       const xhr = new XMLHttpRequest();
       xhr.open('GET', file.url, false); // note: block in the Worker
       xhr.overrideMimeType('text/plain; charset=x-user-defined');
+
+      // Set Range header
       xhr.setRequestHeader('Range', `bytes=${offset}-${offset + length - 1}`);
+
+      // Set custom headers if provided
+      if (requestOptions?.headers) {
+        Object.entries(requestOptions.headers).forEach(([key, value]) => {
+          xhr.setRequestHeader(key, value);
+        });
+      }
+
+      // Set credentials for cookies
+      if (requestOptions?.credentials) {
+        xhr.withCredentials = requestOptions.credentials === 'include';
+      }
+
       xhr.send(null);
 
       if (xhr.status === 206 || xhr.status === 200) {
@@ -502,11 +532,18 @@ export class PdfiumEngine<T = Blob> implements PdfEngine<T> {
   /**
    * Helper to do a HEAD request or partial GET to find file length.
    */
-  private async retrieveFileLength(url: string): Promise<{ fileLength: number }> {
+  private async retrieveFileLength(
+    url: string,
+    requestOptions?: { headers?: Record<string, string>; credentials?: RequestCredentials },
+  ): Promise<{ fileLength: number }> {
     this.logger.debug(LOG_SOURCE, LOG_CATEGORY, 'retrieveFileLength', url);
 
     // We'll do a HEAD request to get Content-Length
-    const resp = await fetch(url, { method: 'HEAD' });
+    const resp = await fetch(url, {
+      method: 'HEAD',
+      headers: requestOptions?.headers,
+      credentials: requestOptions?.credentials,
+    });
     if (!resp.ok) {
       throw new Error(`Failed HEAD request for file length: ${resp.statusText}`);
     }
@@ -598,7 +635,6 @@ export class PdfiumEngine<T = Blob> implements PdfEngine<T> {
 
     const pdfDoc: PdfDocumentObject = {
       id: file.id,
-      name: file.name,
       pageCount,
       pages,
     };
@@ -713,7 +749,6 @@ export class PdfiumEngine<T = Blob> implements PdfEngine<T> {
 
     const pdfDoc: PdfDocumentObject = {
       id: file.id,
-      name: file.name,
       pageCount,
       pages,
     };
@@ -2573,13 +2608,7 @@ export class PdfiumEngine<T = Blob> implements PdfEngine<T> {
 
     const ctx = this.cache.getContext(doc.id);
 
-    if (!ctx) {
-      this.logger.perf(LOG_SOURCE, LOG_CATEGORY, `CloseDocument`, 'End', doc.id);
-      return PdfTaskHelper.reject({
-        code: PdfErrorCode.DocNotOpen,
-        message: 'document does not open',
-      });
-    }
+    if (!ctx) return PdfTaskHelper.resolve(true);
 
     ctx.dispose();
     this.logger.perf(LOG_SOURCE, LOG_CATEGORY, `CloseDocument`, 'End', doc.id);

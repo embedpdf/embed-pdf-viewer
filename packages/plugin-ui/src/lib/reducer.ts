@@ -1,130 +1,298 @@
-import { Reducer } from '@embedpdf/core';
-import { UIPluginState } from './types';
+import { UIState, UIDocumentState } from './types';
 import {
-  UI_HIDE_COMMAND_MENU,
-  UI_INIT_COMPONENTS,
-  UI_SET_HEADER_VISIBLE,
-  UI_SHOW_COMMAND_MENU,
-  UI_TOGGLE_PANEL,
-  UI_UPDATE_COMPONENT_STATE,
-  UIPluginAction,
+  UIAction,
+  INIT_UI_STATE,
+  CLEANUP_UI_STATE,
+  SET_ACTIVE_TOOLBAR,
+  SET_ACTIVE_PANEL,
+  CLOSE_PANEL_SLOT,
+  CLOSE_TOOLBAR_SLOT,
+  SET_PANEL_TAB,
+  OPEN_MODAL,
+  CLOSE_MODAL,
+  OPEN_MENU,
+  CLOSE_MENU,
+  CLOSE_ALL_MENUS,
+  SET_DISABLED_CATEGORIES,
 } from './actions';
 
-export const initialState: UIPluginState = {
-  panel: {},
-  header: {},
-  groupedItems: {},
-  divider: {},
-  iconButton: {},
-  tabButton: {},
-  selectButton: {},
-  custom: {},
-  floating: {},
-  commandMenu: {},
+export const initialDocumentState: UIDocumentState = {
+  activeToolbars: {},
+  activePanels: {},
+  activeModal: null,
+  openMenus: {},
+  panelTabs: {},
 };
 
-export const uiReducer: Reducer<UIPluginState, UIPluginAction> = (state = initialState, action) => {
+export const initialState: UIState = {
+  documents: {},
+  disabledCategories: [],
+};
+
+export const uiReducer = (state = initialState, action: UIAction): UIState => {
   switch (action.type) {
-    case UI_INIT_COMPONENTS:
-      return {
-        ...state,
-        ...action.payload,
-      };
-    case UI_TOGGLE_PANEL: {
-      const prevPanel = state.panel[action.payload.id] || {};
-      const { open: nextOpen, visibleChild: nextVisibleChild } = action.payload;
-      const prevVisibleChild = prevPanel.visibleChild;
+    case INIT_UI_STATE: {
+      const { documentId, schema } = action.payload;
 
-      let open = prevPanel.open;
-      let visibleChild = prevPanel.visibleChild;
+      // Initialize permanent toolbars from schema
+      const activeToolbars: Record<string, { toolbarId: string; isOpen: boolean }> = {};
 
-      if (nextVisibleChild === prevVisibleChild) {
-        // Toggle open if visibleChild is the same
-        open = nextOpen !== undefined ? nextOpen : !prevPanel.open;
-      } else {
-        // Only change visibleChild, keep open as is
-        visibleChild = nextVisibleChild;
-        open = true;
-      }
+      Object.values(schema.toolbars).forEach((toolbar) => {
+        if (toolbar.permanent && toolbar.position) {
+          const slotKey = `${toolbar.position.placement}-${toolbar.position.slot}`;
+          activeToolbars[slotKey] = {
+            toolbarId: toolbar.id,
+            isOpen: true, // Permanent toolbars are always open
+          };
+        }
+      });
 
       return {
         ...state,
-        panel: {
-          ...state.panel,
-          [action.payload.id]: {
-            ...prevPanel,
-            open,
-            visibleChild,
+        documents: {
+          ...state.documents,
+          [documentId]: {
+            ...initialDocumentState,
+            activeToolbars, // Initialize with permanent toolbars
           },
         },
       };
     }
-    case UI_SET_HEADER_VISIBLE:
+
+    case CLEANUP_UI_STATE: {
+      const { documentId } = action.payload;
+      const { [documentId]: removed, ...remaining } = state.documents;
       return {
         ...state,
-        header: {
-          ...state.header,
-          [action.payload.id]: {
-            ...state.header[action.payload.id],
-            visible: action.payload.visible,
-            visibleChild: action.payload.visibleChild,
-          },
-        },
+        documents: remaining,
       };
-    case UI_SHOW_COMMAND_MENU:
-      return {
-        ...state,
-        commandMenu: {
-          ...state.commandMenu,
-          [action.payload.id]: {
-            activeCommand: action.payload.commandId,
-            triggerElement: action.payload.triggerElement,
-            position: action.payload.position,
-            open: true,
-            flatten: action.payload.flatten,
-          },
-        },
-      };
-    case UI_HIDE_COMMAND_MENU:
-      return {
-        ...state,
-        commandMenu: {
-          ...state.commandMenu,
-          [action.payload.id]: {
-            ...state.commandMenu[action.payload.id],
-            open: false,
-            activeCommand: null,
-            triggerElement: undefined,
-            position: undefined,
-            flatten: false,
-          },
-        },
-      };
-    case UI_UPDATE_COMPONENT_STATE: {
-      const { componentType, componentId, patch } = action.payload;
+    }
 
-      // if the slice or the component is unknown → ignore
-      if (!state[componentType] || !state[componentType][componentId]) return state;
-
-      const current = state[componentType][componentId] as Record<string, any>;
-
-      // keep only keys that already exist
-      const filteredPatch = Object.fromEntries(Object.entries(patch).filter(([k]) => k in current));
-
-      // no allowed keys? -> no-op
-      if (Object.keys(filteredPatch).length === 0) return state;
+    case SET_ACTIVE_TOOLBAR: {
+      const { documentId, placement, slot, toolbarId } = action.payload;
+      const docState = state.documents[documentId] || initialDocumentState;
+      const slotKey = `${placement}-${slot}`;
 
       return {
         ...state,
-        [componentType]: {
-          ...state[componentType],
-          [componentId]: {
-            ...current,
-            ...filteredPatch,
+        documents: {
+          ...state.documents,
+          [documentId]: {
+            ...docState,
+            activeToolbars: {
+              ...docState.activeToolbars,
+              [slotKey]: {
+                toolbarId,
+                isOpen: true,
+              },
+            },
           },
         },
       };
     }
+
+    case SET_ACTIVE_PANEL: {
+      const { documentId, placement, slot, panelId, activeTab } = action.payload;
+      const docState = state.documents[documentId] || initialDocumentState;
+      const slotKey = `${placement}-${slot}`;
+
+      return {
+        ...state,
+        documents: {
+          ...state.documents,
+          [documentId]: {
+            ...docState,
+            activePanels: {
+              ...docState.activePanels,
+              [slotKey]: {
+                panelId,
+                isOpen: true,
+              },
+            },
+            ...(activeTab && {
+              panelTabs: {
+                ...docState.panelTabs,
+                [panelId]: activeTab,
+              },
+            }),
+          },
+        },
+      };
+    }
+
+    case CLOSE_PANEL_SLOT: {
+      const { documentId, placement, slot } = action.payload;
+      const docState = state.documents[documentId];
+      if (!docState) return state;
+
+      const slotKey = `${placement}-${slot}`;
+      const panelSlot = docState.activePanels[slotKey];
+
+      // If no panel in this slot, nothing to close
+      if (!panelSlot) return state;
+
+      return {
+        ...state,
+        documents: {
+          ...state.documents,
+          [documentId]: {
+            ...docState,
+            activePanels: {
+              ...docState.activePanels,
+              [slotKey]: {
+                ...panelSlot,
+                isOpen: false, // Keep panel, just close it
+              },
+            },
+          },
+        },
+      };
+    }
+
+    case CLOSE_TOOLBAR_SLOT: {
+      const { documentId, placement, slot } = action.payload;
+      const docState = state.documents[documentId];
+      if (!docState) return state;
+
+      const slotKey = `${placement}-${slot}`;
+      const toolbarSlot = docState.activeToolbars[slotKey];
+
+      // If no toolbar in this slot, nothing to close
+      if (!toolbarSlot) return state;
+
+      return {
+        ...state,
+        documents: {
+          ...state.documents,
+          [documentId]: {
+            ...docState,
+            activeToolbars: {
+              ...docState.activeToolbars,
+              [slotKey]: {
+                ...toolbarSlot,
+                isOpen: false, // Keep toolbar, just close it
+              },
+            },
+          },
+        },
+      };
+    }
+
+    case SET_PANEL_TAB: {
+      const { documentId, panelId, tabId } = action.payload;
+      const docState = state.documents[documentId] || initialDocumentState;
+
+      return {
+        ...state,
+        documents: {
+          ...state.documents,
+          [documentId]: {
+            ...docState,
+            panelTabs: {
+              ...docState.panelTabs,
+              [panelId]: tabId,
+            },
+          },
+        },
+      };
+    }
+
+    case OPEN_MODAL: {
+      const { documentId, modalId } = action.payload;
+      const docState = state.documents[documentId] || initialDocumentState;
+
+      return {
+        ...state,
+        documents: {
+          ...state.documents,
+          [documentId]: {
+            ...docState,
+            activeModal: modalId,
+            openMenus: {}, // Close all menus when opening modal
+          },
+        },
+      };
+    }
+
+    case CLOSE_MODAL: {
+      const { documentId } = action.payload;
+      const docState = state.documents[documentId];
+      if (!docState) return state;
+
+      return {
+        ...state,
+        documents: {
+          ...state.documents,
+          [documentId]: {
+            ...docState,
+            activeModal: null,
+          },
+        },
+      };
+    }
+
+    case OPEN_MENU: {
+      const { documentId, menuState } = action.payload;
+      const docState = state.documents[documentId] || initialDocumentState;
+
+      return {
+        ...state,
+        documents: {
+          ...state.documents,
+          [documentId]: {
+            ...docState,
+            openMenus: {
+              // Close other menus, open this one
+              [menuState.menuId]: menuState,
+            },
+          },
+        },
+      };
+    }
+
+    case CLOSE_MENU: {
+      const { documentId, menuId } = action.payload;
+      const docState = state.documents[documentId];
+      if (!docState) return state;
+
+      const { [menuId]: removed, ...remainingMenus } = docState.openMenus;
+
+      return {
+        ...state,
+        documents: {
+          ...state.documents,
+          [documentId]: {
+            ...docState,
+            openMenus: remainingMenus,
+          },
+        },
+      };
+    }
+
+    case CLOSE_ALL_MENUS: {
+      const { documentId } = action.payload;
+      const docState = state.documents[documentId];
+      if (!docState) return state;
+
+      return {
+        ...state,
+        documents: {
+          ...state.documents,
+          [documentId]: {
+            ...docState,
+            openMenus: {},
+          },
+        },
+      };
+    }
+
+    case SET_DISABLED_CATEGORIES: {
+      return {
+        ...state,
+        disabledCategories: action.payload.categories,
+      };
+    }
+
     default:
       return state;
   }

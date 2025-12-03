@@ -55,6 +55,7 @@
     "@embedpdf/plugin-viewport": "workspace:*",
     "@embedpdf/plugin-scroll": "workspace:*",
     "@embedpdf/plugin-interaction-manager": "workspace:*",
+    "@embedpdf/plugin-spread": "workspace:*",
     "@types/hammerjs": "^2.0.46",
     "@types/react": "^18.2.0",
     "typescript": "^5.0.0"
@@ -63,7 +64,6 @@
     "@embedpdf/core": "workspace:*",
     "@embedpdf/plugin-viewport": "workspace:*",
     "@embedpdf/plugin-scroll": "workspace:*",
-    "@embedpdf/plugin-interaction-manager": "workspace:*",
     "react": ">=16.8.0",
     "react-dom": ">=16.8.0",
     "preact": "^10.26.4",

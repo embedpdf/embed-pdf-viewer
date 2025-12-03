@@ -1,107 +1,121 @@
 <script setup lang="ts">
-import { ref, onBeforeUnmount, computed, watchEffect } from 'vue';
+import { ref, computed, watch } from 'vue';
 import { ignore, PdfErrorCode } from '@embedpdf/models';
+import { useDocumentState } from '@embedpdf/core/vue';
+import { useRenderCapability } from '../hooks';
 
-import { useRenderCapability, useRenderPlugin } from '../hooks';
-
-interface Props {
+interface RenderLayerProps {
+  /**
+   * The ID of the document to render from
+   */
+  documentId: string;
+  /**
+   * The page index to render (0-based)
+   */
   pageIndex: number;
   /**
-   * The scale factor for rendering the page.
+   * Optional scale override. If not provided, uses document's current scale.
    */
   scale?: number;
   /**
-   * @deprecated Use `scale` instead. Will be removed in the next major release.
+   * Optional device pixel ratio override. If not provided, uses window.devicePixelRatio.
    */
-  scaleFactor?: number;
   dpr?: number;
 }
 
-const props = defineProps<Props>();
-
-// Handle deprecation: prefer scale over scaleFactor, but fall back to scaleFactor if scale is not provided
-const actualScale = computed(() => props.scale ?? props.scaleFactor ?? 1);
-const actualDpr = computed(() => props.dpr ?? window.devicePixelRatio);
+const props = defineProps<RenderLayerProps>();
 
 const { provides: renderProvides } = useRenderCapability();
-const { plugin: renderPlugin } = useRenderPlugin();
+const documentState = useDocumentState(() => props.documentId);
 
 const imageUrl = ref<string | null>(null);
-const refreshTick = ref(0);
-
 let urlRef: string | null = null;
 let hasLoaded = false;
 
-// Listen for external page refresh events
-watchEffect((onCleanup) => {
-  if (!renderPlugin.value) return;
+// Get refresh version from core state
+const refreshVersion = computed(() => {
+  if (!documentState.value) return 0;
+  return documentState.value.pageRefreshVersions[props.pageIndex] || 0;
+});
 
-  const unsubscribe = renderPlugin.value.onRefreshPages((pages: number[]) => {
-    if (pages.includes(props.pageIndex)) {
-      refreshTick.value++;
-    }
-  });
+// Determine actual render options: use overrides if provided, otherwise fall back to document state
+const actualScale = computed(() => {
+  if (props.scale !== undefined) return props.scale;
+  return documentState.value?.scale ?? 1;
+});
 
-  onCleanup(unsubscribe);
+const actualDpr = computed(() => {
+  if (props.dpr !== undefined) return props.dpr;
+  return window.devicePixelRatio;
 });
 
 // Render page when dependencies change
-watchEffect((onCleanup) => {
-  // Capture reactive dependencies
-  const pageIndex = props.pageIndex;
-  const scale = actualScale.value;
-  const dpr = actualDpr.value;
-  const tick = refreshTick.value;
-  const capability = renderProvides.value;
+watch(
+  [
+    () => props.documentId,
+    () => props.pageIndex,
+    actualScale,
+    actualDpr,
+    renderProvides,
+    refreshVersion,
+  ],
+  ([docId, pageIdx, scale, dpr, capability], [prevDocId], onCleanup) => {
+    if (!capability) {
+      imageUrl.value = null;
+      return;
+    }
 
-  if (!capability) return;
-
-  // Revoke old URL before creating new one (if it's been loaded)
-  if (urlRef && hasLoaded) {
-    URL.revokeObjectURL(urlRef);
-    urlRef = null;
-    hasLoaded = false;
-  }
-
-  const task = capability.renderPage({
-    pageIndex,
-    options: {
-      scaleFactor: scale,
-      dpr,
-    },
-  });
-
-  task.wait((blob) => {
-    const objectUrl = URL.createObjectURL(blob);
-    urlRef = objectUrl;
-    imageUrl.value = objectUrl;
-    hasLoaded = false;
-  }, ignore);
-
-  onCleanup(() => {
-    if (urlRef) {
-      // Only revoke if image has loaded
-      if (hasLoaded) {
+    // CRITICAL: Clear image immediately when documentId changes (not for zoom/scale)
+    if (prevDocId !== undefined && prevDocId !== docId) {
+      imageUrl.value = null;
+      if (urlRef && hasLoaded) {
         URL.revokeObjectURL(urlRef);
         urlRef = null;
         hasLoaded = false;
       }
-    } else {
-      // Task still in progress, abort it
-      task.abort({
-        code: PdfErrorCode.Cancelled,
-        message: 'canceled render task',
-      });
     }
-  });
-});
 
-onBeforeUnmount(() => {
-  if (urlRef) {
-    URL.revokeObjectURL(urlRef);
-    urlRef = null;
-  }
-});
+    // Revoke old URL before creating new one (if it's been loaded)
+    if (urlRef && hasLoaded && prevDocId === docId) {
+      URL.revokeObjectURL(urlRef);
+      urlRef = null;
+      hasLoaded = false;
+    }
+
+    const task = capability.forDocument(docId).renderPage({
+      pageIndex: pageIdx,
+      options: {
+        scaleFactor: scale,
+        dpr,
+      },
+    });
+
+    task.wait((blob) => {
+      const objectUrl = URL.createObjectURL(blob);
+      urlRef = objectUrl;
+      imageUrl.value = objectUrl;
+      hasLoaded = false;
+    }, ignore);
+
+    onCleanup(() => {
+      if (urlRef) {
+        // Only revoke if image has loaded
+        if (hasLoaded) {
+          URL.revokeObjectURL(urlRef);
+          urlRef = null;
+          hasLoaded = false;
+        }
+      } else {
+        // Task still in progress, abort it
+        task.abort({
+          code: PdfErrorCode.Cancelled,
+          message: 'canceled render task',
+        });
+      }
+    });
+  },
+  { immediate: true },
+);
 
 function handleImageLoad() {
   hasLoaded = true;
@@ -114,5 +128,6 @@ function handleImageLoad() {
     :src="imageUrl"
     :style="{ width: '100%', height: '100%' }"
     @load="handleImageLoad"
+    v-bind="$attrs"
   />
 </template>

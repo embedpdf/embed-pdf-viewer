@@ -1,30 +1,33 @@
 <script setup lang="ts">
-import { useRedactionCapability } from '@embedpdf/plugin-redaction/vue';
-import type { RedactionItem } from '@embedpdf/plugin-redaction';
-import type { MenuWrapperProps } from '@embedpdf/utils/vue';
+import {
+  useRedactionCapability,
+  type RedactionSelectionContext,
+  type RedactionSelectionMenuProps,
+} from '@embedpdf/plugin-redaction/vue';
 import type { Rect } from '@embedpdf/models';
 
-interface RedactionSelectionMenuProps {
-  menuWrapperProps: MenuWrapperProps;
-  item: RedactionItem;
+const props = defineProps<{
+  documentId: string;
+  context: RedactionSelectionContext;
+  selected: boolean;
   rect: Rect;
-}
-
-const props = defineProps<RedactionSelectionMenuProps>();
+  placement: RedactionSelectionMenuProps['placement'];
+  menuWrapperProps: RedactionSelectionMenuProps['menuWrapperProps'];
+}>();
 
 const { provides: redaction } = useRedactionCapability();
 
 const handleDelete = (e: Event) => {
   e.stopPropagation();
   if (!redaction.value) return;
-  const { page, id } = props.item;
+  const { page, id } = props.context.item;
   redaction.value.removePending(page, id);
 };
 
 const handleCommit = (e: Event) => {
   e.stopPropagation();
   if (!redaction.value) return;
-  const { page, id } = props.item;
+  const { page, id } = props.context.item;
   redaction.value.commitPending(page, id);
 };
 </script>

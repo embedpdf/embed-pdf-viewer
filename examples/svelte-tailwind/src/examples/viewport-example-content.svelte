@@ -7,17 +7,20 @@
   import { Scroller, type RenderPageProps } from '@embedpdf/plugin-scroll/svelte';
   import { RenderLayer } from '@embedpdf/plugin-render/svelte';
 
+  let { documentId }: { documentId: string } = $props();
+
   const viewportCapability = useViewportCapability();
-  const scrollActivity = useViewportScrollActivity();
+  const viewport = $derived(viewportCapability.provides?.forDocument(documentId));
+  const scrollActivity = useViewportScrollActivity(() => documentId);
 
   const scrollToTop = () => {
-    viewportCapability.provides?.scrollTo({ x: 0, y: 0, behavior: 'smooth' });
+    viewport?.scrollTo({ x: 0, y: 0, behavior: 'smooth' });
   };
 
   const scrollToMiddle = () => {
-    if (!viewportCapability.provides) return;
-    const metrics = viewportCapability.provides?.getMetrics();
-    viewportCapability.provides?.scrollTo({
+    if (!viewport) return;
+    const metrics = viewport?.getMetrics();
+    viewport?.scrollTo({
       y: metrics.scrollHeight / 2,
       x: 0,
       behavior: 'smooth',
@@ -26,15 +29,15 @@
   };
 
   const scrollToBottom = () => {
-    if (!viewportCapability.provides) return;
-    const metrics = viewportCapability.provides?.getMetrics();
-    viewportCapability.provides?.scrollTo({ y: metrics.scrollHeight, x: 0, behavior: 'smooth' });
+    if (!viewport) return;
+    const metrics = viewport?.getMetrics();
+    viewport?.scrollTo({ y: metrics.scrollHeight, x: 0, behavior: 'smooth' });
   };
 </script>
 
-{#snippet RenderPageSnippet(page: RenderPageProps)}
+{#snippet renderPage(page: RenderPageProps)}
   <div style:width={`${page.width}px`} style:height={`${page.height}px`} style:position="relative">
-    <RenderLayer pageIndex={page.pageIndex} scale={page.scale} />
+    <RenderLayer {documentId} pageIndex={page.pageIndex} scale={1} />
   </div>
 {/snippet}
 
@@ -46,21 +49,21 @@
       <div class="flex items-center gap-2">
         <button
           onclick={scrollToTop}
-          disabled={!viewportCapability.provides}
+          disabled={!viewport}
           class="rounded-md bg-gray-100 px-3 py-1 text-sm font-medium text-gray-700 transition-colors duration-150 hover:bg-gray-200 disabled:opacity-50"
         >
           Scroll to Top
         </button>
         <button
           onclick={scrollToMiddle}
-          disabled={!viewportCapability.provides}
+          disabled={!viewport}
           class="rounded-md bg-gray-100 px-3 py-1 text-sm font-medium text-gray-700 transition-colors duration-150 hover:bg-gray-200 disabled:opacity-50"
         >
           Scroll to Middle
         </button>
         <button
           onclick={scrollToBottom}
-          disabled={!viewportCapability.provides}
+          disabled={!viewport}
           class="rounded-md bg-gray-100 px-3 py-1 text-sm font-medium text-gray-700 transition-colors duration-150 hover:bg-gray-200 disabled:opacity-50"
         >
           Scroll to Bottom
@@ -70,17 +73,17 @@
       <div class="flex items-center">
         <div
           class={`h-3 w-3 rounded-full transition-colors duration-200 ${
-            scrollActivity.isScrolling ? 'bg-green-500' : 'bg-gray-300'
+            scrollActivity.current.isScrolling ? 'bg-green-500' : 'bg-gray-300'
           }`}
         ></div>
         <span class="ml-2 min-w-[100px] text-sm font-medium text-gray-600">
-          {scrollActivity.isScrolling ? 'Scrolling...' : 'Idle'}
+          {scrollActivity.current.isScrolling ? 'Scrolling...' : 'Idle'}
         </span>
       </div>
     </div>
     <div class="relative flex w-full flex-1 overflow-hidden">
-      <Viewport class="flex-grow bg-gray-100">
-        <Scroller {RenderPageSnippet} />
+      <Viewport {documentId} class="flex-grow bg-gray-100">
+        <Scroller {documentId} {renderPage} />
       </Viewport>
     </div>
   </div>

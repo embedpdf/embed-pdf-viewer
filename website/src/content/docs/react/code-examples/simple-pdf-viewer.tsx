@@ -9,19 +9,17 @@ import { ViewportPluginPackage } from '@embedpdf/plugin-viewport/react'
 import { Viewport } from '@embedpdf/plugin-viewport/react'
 import { ScrollPluginPackage } from '@embedpdf/plugin-scroll/react'
 import { Scroller } from '@embedpdf/plugin-scroll/react'
-import { LoaderPluginPackage } from '@embedpdf/plugin-loader/react'
+import {
+  DocumentContent,
+  DocumentManagerPluginPackage,
+} from '@embedpdf/plugin-document-manager/react'
 import { RenderLayer, RenderPluginPackage } from '@embedpdf/plugin-render/react'
+import { Loader2 } from 'lucide-react'
 
 // 1. Register the plugins you need
 const plugins = [
-  createPluginRegistration(LoaderPluginPackage, {
-    loadingOptions: {
-      type: 'url',
-      pdfFile: {
-        id: 'example-pdf',
-        url: 'https://snippet.embedpdf.com/ebook.pdf',
-      },
-    },
+  createPluginRegistration(DocumentManagerPluginPackage, {
+    initialDocuments: [{ url: 'https://snippet.embedpdf.com/ebook.pdf' }],
   }),
   createPluginRegistration(ViewportPluginPackage),
   createPluginRegistration(ScrollPluginPackage),
@@ -33,27 +31,49 @@ export const PDFViewer = () => {
   const { engine, isLoading } = usePdfiumEngine()
 
   if (isLoading || !engine) {
-    return <div>Loading PDF Engine...</div>
+    return (
+      <div className="overflow-hidden rounded-lg border border-gray-300 bg-white dark:border-gray-700 dark:bg-gray-900">
+        <div className="flex h-[400px] items-center justify-center">
+          <div className="flex items-center gap-2 text-gray-500 dark:text-gray-400">
+            <Loader2 size={20} className="animate-spin" />
+            <span className="text-sm">Loading PDF Engine...</span>
+          </div>
+        </div>
+      </div>
+    )
   }
 
   // 3. Wrap your UI with the <EmbedPDF> provider
   return (
-    <div style={{ height: '500px' }}>
+    <div style={{ height: '500px', marginTop: '10px' }}>
       <EmbedPDF engine={engine} plugins={plugins}>
-        <Viewport
-          style={{
-            backgroundColor: '#f1f3f5',
-          }}
-        >
-          <Scroller
-            renderPage={({ width, height, pageIndex }) => (
-              <div style={{ width, height }}>
-                {/* The RenderLayer is responsible for drawing the page */}
-                <RenderLayer pageIndex={pageIndex} />
-              </div>
-            )}
-          />
-        </Viewport>
+        {({ activeDocumentId }) =>
+          activeDocumentId && (
+            <DocumentContent documentId={activeDocumentId}>
+              {({ isLoaded }) =>
+                isLoaded && (
+                  <Viewport
+                    documentId={activeDocumentId}
+                    className="bg-gray-200 dark:bg-gray-800"
+                  >
+                    <Scroller
+                      documentId={activeDocumentId}
+                      renderPage={({ width, height, pageIndex }) => (
+                        <div style={{ width, height }}>
+                          {/* The RenderLayer is responsible for drawing the page */}
+                          <RenderLayer
+                            documentId={activeDocumentId}
+                            pageIndex={pageIndex}
+                          />
+                        </div>
+                      )}
+                    />
+                  </Viewport>
+                )
+              }
+            </DocumentContent>
+          )
+        }
       </EmbedPDF>
     </div>
   )

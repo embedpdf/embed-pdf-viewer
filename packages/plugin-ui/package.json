@@ -12,22 +12,35 @@
       "import": "./dist/index.js",
       "require": "./dist/index.cjs"
     },
+    "./preact": {
+      "types": "./dist/preact/index.d.ts",
+      "import": "./dist/preact/index.js",
+      "require": "./dist/preact/index.cjs"
+    },
     "./react": {
       "types": "./dist/react/index.d.ts",
       "import": "./dist/react/index.js",
       "require": "./dist/react/index.cjs"
     },
-    "./preact": {
-      "types": "./dist/preact/index.d.ts",
-      "import": "./dist/preact/index.js",
-      "require": "./dist/preact/index.cjs"
+    "./vue": {
+      "types": "./dist/vue/index.d.ts",
+      "import": "./dist/vue/index.js",
+      "require": "./dist/vue/index.cjs"
+    },
+    "./svelte": {
+      "types": "./dist/svelte/index.d.ts",
+      "svelte": "./dist/svelte/index.js",
+      "import": "./dist/svelte/index.js",
+      "require": "./dist/svelte/index.cjs"
     }
   },
   "scripts": {
     "build:base": "vite build --mode base",
     "build:react": "vite build --mode react",
     "build:preact": "vite build --mode preact",
-    "build": "pnpm run clean && concurrently -c auto -n base,react,preact \"vite build --mode base\" \"vite build --mode react\" \"vite build --mode preact\"",
+    "build:vue": "vite build --mode vue",
+    "build:svelte": "vite build --mode svelte",
+    "build": "pnpm run clean && concurrently -c auto -n base,react,preact,vue,svelte \"vite build --mode base\" \"vite build --mode react\" \"vite build --mode preact\" \"vite build --mode vue\" \"vite build --mode svelte\"",
     "clean": "rimraf dist",
     "lint": "eslint src --color",
     "lint:fix": "eslint src --color --fix"
@@ -36,16 +49,26 @@
     "@embedpdf/models": "workspace:*"
   },
   "devDependencies": {
-    "@embedpdf/build": "workspace:*",
     "@embedpdf/core": "workspace:*",
+    "@embedpdf/build": "workspace:*",
+    "@embedpdf/plugin-render": "workspace:*",
+    "@embedpdf/plugin-scroll": "workspace:*",
+    "@embedpdf/plugin-viewport": "workspace:*",
+    "@embedpdf/plugin-i18n": "workspace:*",
+    "@embedpdf/utils": "workspace:*",
     "@types/react": "^18.2.0",
     "typescript": "^5.0.0"
   },
   "peerDependencies": {
     "@embedpdf/core": "workspace:*",
+    "@embedpdf/plugin-render": "workspace:*",
+    "@embedpdf/plugin-scroll": "workspace:*",
+    "@embedpdf/plugin-viewport": "workspace:*",
     "react": ">=16.8.0",
     "react-dom": ">=16.8.0",
-    "preact": "^10.26.4"
+    "preact": "^10.26.4",
+    "vue": ">=3.2.0",
+    "svelte": ">=5 <6"
   },
   "files": [
     "dist",

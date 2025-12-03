@@ -3,7 +3,13 @@ import { computed } from 'vue';
 import { ThumbnailsPane, ThumbImg } from '@embedpdf/plugin-thumbnail/vue';
 import { useScroll } from '@embedpdf/plugin-scroll/vue';
 
-const { provides: scroll, state } = useScroll();
+interface SidebarProps {
+  documentId: string;
+}
+
+const props = defineProps<SidebarProps>();
+
+const { provides: scroll, state } = useScroll(() => props.documentId);
 
 const getIsActive = (pageIndex: number) =>
   computed(() => state.value.currentPage === pageIndex + 1);
@@ -18,7 +24,11 @@ const handleClick = (pageIndex: number) => {
 
 <template>
   <div class="sidebar">
-    <ThumbnailsPane :style="{ width: '100%', height: '100%' }" class="thumbs-viewport">
+    <ThumbnailsPane
+      :documentId="props.documentId"
+      :style="{ width: '100%', height: '100%' }"
+      class="thumbs-viewport"
+    >
       <template #default="{ meta }">
         <!-- absolute-positioned row inside the virtualized pane -->
         <div
@@ -42,6 +52,7 @@ const handleClick = (pageIndex: number) => {
             }"
           >
             <ThumbImg
+              :documentId="props.documentId"
               class="thumb-img"
               :meta="meta"
               :style="{

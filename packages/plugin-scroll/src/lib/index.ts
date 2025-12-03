@@ -21,3 +21,4 @@ export * from './scroll-plugin';
 export * from './types';
 export * from './manifest';
 export * from './types/virtual-item';
+export * from './selectors';

@@ -4,16 +4,19 @@ import {
   createEmitter,
   clamp,
   setScale,
-  SET_PAGES,
-  SET_DOCUMENT,
-  getPagesWithRotatedSize,
-  SET_ROTATION,
   createBehaviorEmitter,
+  Listener,
 } from '@embedpdf/core';
 import { ScrollPlugin, ScrollCapability } from '@embedpdf/plugin-scroll';
 import { ViewportPlugin, ViewportCapability, ViewportMetrics } from '@embedpdf/plugin-viewport';
 
-import { setInitialZoomLevel, setZoomLevel, ZoomAction } from './actions';
+import {
+  initZoomState,
+  cleanupZoomState,
+  setZoomLevel,
+  ZoomAction,
+  setMarqueeZoomActive,
+} from './actions';
 import {
   ZoomPluginConfig,
   ZoomState,
@@ -26,13 +29,18 @@ import {
   VerticalZoomFocus,
   ZoomRequest,
   RegisterMarqueeOnPageOptions,
+  ZoomScope,
+  StateChangeEvent,
+  ZoomDocumentState,
 } from './types';
 import {
   InteractionManagerCapability,
   InteractionManagerPlugin,
 } from '@embedpdf/plugin-interaction-manager';
+import { SpreadCapability, SpreadPlugin } from '@embedpdf/plugin-spread';
 import { Rect, rotateRect } from '@embedpdf/models';
 import { createMarqueeHandler } from './handlers';
+import { initialDocumentState } from './reducer';
 
 export class ZoomPlugin extends BasePlugin<
   ZoomPluginConfig,
@@ -41,23 +49,22 @@ export class ZoomPlugin extends BasePlugin<
   ZoomAction
 > {
   static readonly id = 'zoom' as const;
-  /* ------------------------------------------------------------------ */
-  /* internals                                                           */
-  /* ------------------------------------------------------------------ */
+
   private readonly zoom$ = createEmitter<ZoomChangeEvent>();
-  private readonly state$ = createBehaviorEmitter<ZoomState>();
+  private readonly state$ = createBehaviorEmitter<StateChangeEvent>();
   private readonly viewport: ViewportCapability;
   private readonly viewportPlugin: ViewportPlugin;
   private readonly scroll: ScrollCapability;
   private readonly interactionManager: InteractionManagerCapability | null;
+  private readonly spread: SpreadCapability | null;
   private readonly presets: ZoomPreset[];
   private readonly zoomRanges: ZoomRangeStep[];
+  private readonly defaultZoomLevel: ZoomMode | number;
 
   private readonly minZoom: number;
   private readonly maxZoom: number;
   private readonly zoomStep: number;
 
-  /* ------------------------------------------------------------------ */
   constructor(id: string, registry: PluginRegistry, cfg: ZoomPluginConfig) {
     super(id, registry);
 
@@ -66,152 +73,271 @@ export class ZoomPlugin extends BasePlugin<
     this.scroll = registry.getPlugin<ScrollPlugin>('scroll')!.provides();
     const interactionManager = registry.getPlugin<InteractionManagerPlugin>('interaction-manager');
     this.interactionManager = interactionManager?.provides() ?? null;
+    const spread = registry.getPlugin<SpreadPlugin>('spread');
+    this.spread = spread?.provides() ?? null;
+
     this.minZoom = cfg.minZoom ?? 0.25;
     this.maxZoom = cfg.maxZoom ?? 10;
     this.zoomStep = cfg.zoomStep ?? 0.1;
+    this.defaultZoomLevel = cfg.defaultZoomLevel;
     this.presets = cfg.presets ?? [];
     this.zoomRanges = this.normalizeRanges(cfg.zoomRanges ?? []);
-    this.dispatch(setInitialZoomLevel(cfg.defaultZoomLevel));
-    /* keep "automatic" modes up to date -------------------------------- */
-    this.viewport.onViewportResize(() => this.recalcAuto(VerticalZoomFocus.Top), {
-      mode: 'debounce',
-      wait: 150,
+
+    // Keep automatic modes up to date per document
+    this.viewport.onViewportResize(
+      (event) => this.recalcAuto(event.documentId, VerticalZoomFocus.Top),
+      {
+        mode: 'debounce',
+        wait: 150,
+        keyExtractor: (event) => event.documentId,
+      },
+    );
+
+    // Subscribe to spread changes
+    this.spread?.onSpreadChange((event) => {
+      this.recalcAuto(event.documentId, VerticalZoomFocus.Top);
     });
-    this.coreStore.onAction(SET_ROTATION, () => this.recalcAuto(VerticalZoomFocus.Top));
-    this.coreStore.onAction(SET_PAGES, () => this.recalcAuto(VerticalZoomFocus.Top));
-    this.coreStore.onAction(SET_DOCUMENT, () => this.recalcAuto(VerticalZoomFocus.Top));
+
+    // Register marquee zoom mode
     this.interactionManager?.registerMode({
       id: 'marqueeZoom',
       scope: 'page',
       exclusive: true,
       cursor: 'zoom-in',
     });
-    this.resetReady();
+
+    this.interactionManager?.onModeChange((state) => {
+      // Track marquee zoom state changes for this document
+      const isMarqueeActive = state.activeMode === 'marqueeZoom';
+      const docState = this.getDocumentState(state.documentId);
+
+      // Only dispatch if state actually changed
+      if (docState && docState.isMarqueeZoomActive !== isMarqueeActive) {
+        this.dispatch(setMarqueeZoomActive(state.documentId, isMarqueeActive));
+      }
+    });
   }
 
-  /* ------------------------------------------------------------------ */
-  /* capability                                                          */
-  /* ------------------------------------------------------------------ */
+  // ─────────────────────────────────────────────────────────
+  // Document Lifecycle Hooks (from BasePlugin)
+  // ─────────────────────────────────────────────────────────
+
+  protected override onDocumentLoadingStarted(documentId: string): void {
+    this.viewport.gate('zoom', documentId);
+    // Initialize zoom state for this document
+    const docState: ZoomDocumentState = {
+      ...initialDocumentState,
+      zoomLevel: this.defaultZoomLevel,
+    };
+
+    this.dispatch(initZoomState(documentId, docState));
+
+    this.logger.debug(
+      'ZoomPlugin',
+      'DocumentOpened',
+      `Initialized zoom state for document: ${documentId}`,
+    );
+  }
+
+  protected override onDocumentLoaded(documentId: string): void {
+    // Apply initial zoom after document is fully loaded
+    this.recalcAuto(documentId, VerticalZoomFocus.Top);
+  }
+
+  protected override onDocumentClosed(documentId: string): void {
+    this.dispatch(cleanupZoomState(documentId));
+
+    this.logger.debug(
+      'ZoomPlugin',
+      'DocumentClosed',
+      `Cleaned up zoom state for document: ${documentId}`,
+    );
+  }
+
+  protected override onRotationChanged(documentId: string): void {
+    // Recalculate auto modes when rotation changes
+    this.recalcAuto(documentId, VerticalZoomFocus.Top);
+  }
+
+  /*
+  protected override onPagesChanged(documentId: string): void {
+    // Recalculate auto modes when pages change
+    this.recalcAuto(documentId, VerticalZoomFocus.Top);
+  }*/
+
+  // ─────────────────────────────────────────────────────────
+  // Capability
+  // ─────────────────────────────────────────────────────────
+
   protected buildCapability(): ZoomCapability {
     return {
-      onZoomChange: this.zoom$.on,
-      onStateChange: this.state$.on,
+      // Active document operations
+      requestZoom: (level, c) => this.requestZoom(level, c),
+      requestZoomBy: (d, c) => this.requestZoomBy(d, c),
       zoomIn: () => this.zoomIn(),
       zoomOut: () => this.zoomOut(),
       zoomToArea: (pageIndex, rect) => this.zoomToArea(pageIndex, rect),
-      requestZoom: (level, c) => this.handleRequest({ level, center: c }),
-      requestZoomBy: (d, c) => {
-        const cur = this.state.currentZoomLevel;
-        const target = this.toZoom(cur + d);
-        return this.handleRequest({ level: target, center: c });
-      },
-      enableMarqueeZoom: () => {
-        this.interactionManager?.activate('marqueeZoom');
-      },
-      disableMarqueeZoom: () => {
-        this.interactionManager?.activateDefaultMode();
-      },
-      toggleMarqueeZoom: () => {
-        if (this.interactionManager?.getActiveMode() === 'marqueeZoom') {
-          this.interactionManager?.activateDefaultMode();
-        } else {
-          this.interactionManager?.activate('marqueeZoom');
-        }
-      },
-      isMarqueeZoomActive: () => this.interactionManager?.getActiveMode() === 'marqueeZoom',
+      enableMarqueeZoom: () => this.enableMarqueeZoom(),
+      disableMarqueeZoom: () => this.disableMarqueeZoom(),
+      toggleMarqueeZoom: () => this.toggleMarqueeZoom(),
+      isMarqueeZoomActive: () => this.isMarqueeZoomActive(),
+      getState: () => this.getDocumentStateOrThrow(),
+
+      // Document-scoped operations
+      forDocument: (documentId: string) => this.createZoomScope(documentId),
+
+      // Global
       registerMarqueeOnPage: (opts) => this.registerMarqueeOnPage(opts),
-      getState: () => this.state,
       getPresets: () => this.presets,
+
+      // Events
+      onZoomChange: this.zoom$.on,
+      onStateChange: this.state$.on,
     };
   }
 
-  private zoomOut() {
-    const cur = this.state.currentZoomLevel;
-    return this.handleRequest({ level: cur, delta: -this.stepFor(cur) });
+  // ─────────────────────────────────────────────────────────
+  // Document Scoping
+  // ─────────────────────────────────────────────────────────
+
+  private createZoomScope(documentId: string): ZoomScope {
+    return {
+      requestZoom: (level, c) => this.requestZoom(level, c, documentId),
+      requestZoomBy: (d, c) => this.requestZoomBy(d, c, documentId),
+      zoomIn: () => this.zoomIn(documentId),
+      zoomOut: () => this.zoomOut(documentId),
+      zoomToArea: (pageIndex, rect) => this.zoomToArea(pageIndex, rect, documentId),
+      enableMarqueeZoom: () => this.enableMarqueeZoom(documentId),
+      disableMarqueeZoom: () => this.disableMarqueeZoom(documentId),
+      toggleMarqueeZoom: () => this.toggleMarqueeZoom(documentId),
+      isMarqueeZoomActive: () => this.isMarqueeZoomActive(documentId),
+      getState: () => this.getDocumentStateOrThrow(documentId),
+      onZoomChange: (listener: Listener<ZoomChangeEvent>) =>
+        this.zoom$.on((event) => {
+          if (event.documentId === documentId) listener(event);
+        }),
+      onStateChange: (listener: Listener<ZoomDocumentState>) =>
+        this.state$.on((event) => {
+          if (event.documentId === documentId) listener(event.state);
+        }),
+    };
   }
 
-  private zoomIn() {
-    const cur = this.state.currentZoomLevel;
-    return this.handleRequest({ level: cur, delta: this.stepFor(cur) });
+  // ─────────────────────────────────────────────────────────
+  // State Helpers
+  // ─────────────────────────────────────────────────────────
+
+  private getDocumentState(documentId?: string): ZoomDocumentState | null {
+    const id = documentId ?? this.getActiveDocumentId();
+    return this.state.documents[id] ?? null;
   }
 
-  private zoomToArea(pageIndex: number, rect: Rect) {
-    this.handleZoomToArea(pageIndex, rect);
+  private getDocumentStateOrThrow(documentId?: string): ZoomDocumentState {
+    const state = this.getDocumentState(documentId);
+    if (!state) {
+      throw new Error(`Zoom state not found for document: ${documentId ?? 'active'}`);
+    }
+    return state;
   }
 
-  /* ------------------------------------------------------------------ */
-  /* plugin life‑cycle                                                   */
-  /* ------------------------------------------------------------------ */
-  async initialize(): Promise<void> {
-    /* apply the initial zoom
-    /* Mark plugin as ready - zoom will be calculated when viewport has dimensions */
-    this.markReady();
+  // ─────────────────────────────────────────────────────────
+  // Core Operations
+  // ─────────────────────────────────────────────────────────
+
+  private requestZoom(level: ZoomMode | number, center?: Point, documentId?: string): void {
+    this.handleRequest({ level, center }, documentId);
   }
 
-  async destroy() {
-    this.zoom$.clear();
+  private requestZoomBy(delta: number, center?: Point, documentId?: string): void {
+    const id = documentId ?? this.getActiveDocumentId();
+    const docState = this.getDocumentStateOrThrow(id);
+    const cur = docState.currentZoomLevel;
+    const target = this.toZoom(cur + delta);
+    this.handleRequest({ level: target, center }, id);
   }
 
-  /**
-   * Sort ranges once, make sure they are sane
-   */
-  private normalizeRanges(ranges: ZoomRangeStep[]): ZoomRangeStep[] {
-    return [...ranges]
-      .filter((r) => r.step > 0 && r.max > r.min) // basic sanity
-      .sort((a, b) => a.min - b.min);
+  private zoomIn(documentId?: string): void {
+    const id = documentId ?? this.getActiveDocumentId();
+    const docState = this.getDocumentStateOrThrow(id);
+    const cur = docState.currentZoomLevel;
+    this.handleRequest({ level: cur, delta: this.stepFor(cur) }, id);
   }
 
-  /** pick the step that applies to a given numeric zoom */
-  private stepFor(zoom: number): number {
-    const r = this.zoomRanges.find((r) => zoom >= r.min && zoom < r.max);
-    return r ? r.step : this.zoomStep; // fallback
+  private zoomOut(documentId?: string): void {
+    const id = documentId ?? this.getActiveDocumentId();
+    const docState = this.getDocumentStateOrThrow(id);
+    const cur = docState.currentZoomLevel;
+    this.handleRequest({ level: cur, delta: -this.stepFor(cur) }, id);
   }
 
-  /** clamp + round helper reused later */
-  private toZoom(v: number) {
-    return parseFloat(clamp(v, this.minZoom, this.maxZoom).toFixed(2));
+  private zoomToArea(pageIndex: number, rect: Rect, documentId?: string): void {
+    const id = documentId ?? this.getActiveDocumentId();
+    this.handleZoomToArea(id, pageIndex, rect);
   }
 
-  /* ------------------------------------------------------------------ */
-  /* main entry – handles **every** zoom request                          */
-  /* ------------------------------------------------------------------ */
-  private handleRequest({
-    level,
-    delta = 0,
-    center,
-    focus = VerticalZoomFocus.Center,
-    align = 'keep',
-  }: ZoomRequest) {
-    const metrics = this.viewport.getMetrics();
-    const oldZoom = this.state.currentZoomLevel;
+  private enableMarqueeZoom(documentId?: string): void {
+    const id = documentId ?? this.getActiveDocumentId();
+    this.interactionManager?.forDocument(id).activate('marqueeZoom');
+  }
+
+  private disableMarqueeZoom(documentId?: string): void {
+    const id = documentId ?? this.getActiveDocumentId();
+    this.interactionManager?.forDocument(id).activateDefaultMode();
+  }
+
+  private toggleMarqueeZoom(documentId?: string): void {
+    const id = documentId ?? this.getActiveDocumentId();
+    const scope = this.interactionManager?.forDocument(id);
+    if (scope?.getActiveMode() === 'marqueeZoom') {
+      scope.activateDefaultMode();
+    } else {
+      scope?.activate('marqueeZoom');
+    }
+  }
+
+  private isMarqueeZoomActive(documentId?: string): boolean {
+    const id = documentId ?? this.getActiveDocumentId();
+    return this.interactionManager?.forDocument(id).getActiveMode() === 'marqueeZoom';
+  }
+
+  // ─────────────────────────────────────────────────────────
+  // Main Zoom Logic
+  // ─────────────────────────────────────────────────────────
+
+  private handleRequest(
+    { level, delta = 0, center, focus = VerticalZoomFocus.Center, align = 'keep' }: ZoomRequest,
+    documentId?: string,
+  ) {
+    const id = documentId ?? this.getActiveDocumentId();
+    const docState = this.getDocumentStateOrThrow(id);
+    const coreDoc = this.coreState.core.documents[id];
+    if (!coreDoc) return;
+
+    const viewport = this.viewport.forDocument(id);
+    const metrics = viewport.getMetrics();
+    const oldZoom = docState.currentZoomLevel;
 
     if (metrics.clientWidth === 0 || metrics.clientHeight === 0) {
       return;
     }
 
-    /* ------------------------------------------------------------------ */
-    /* step 1 – resolve the **target numeric zoom**                        */
-    /* ------------------------------------------------------------------ */
-    const base = typeof level === 'number' ? level : this.computeZoomForMode(level, metrics);
+    // Step 1: Resolve target numeric zoom
+    const base = typeof level === 'number' ? level : this.computeZoomForMode(id, level, metrics);
 
-    if (base === false) {
-      return;
-    }
+    if (base === false) return;
+
     const exactZoom = clamp(base + delta, this.minZoom, this.maxZoom);
     const newZoom = Math.floor(exactZoom * 1000) / 1000;
 
-    /* ------------------------------------------------------------------ */
-    /* step 2 – figure out the viewport point we should keep under focus   */
-    /* ------------------------------------------------------------------ */
+    // Step 2: Figure out viewport point to keep under focus
     const focusPoint: Point = center ?? {
       vx: metrics.clientWidth / 2,
       vy: focus === VerticalZoomFocus.Top ? 0 : metrics.clientHeight / 2,
     };
 
-    /* ------------------------------------------------------------------ */
-    /* step 3 – translate that into desired scroll offsets                 */
-    /* ------------------------------------------------------------------ */
+    // Step 3: Compute desired scroll offsets
     const { desiredScrollLeft, desiredScrollTop } = this.computeScrollForZoomChange(
+      id,
       metrics,
       oldZoom,
       newZoom,
@@ -219,28 +345,28 @@ export class ZoomPlugin extends BasePlugin<
       align,
     );
 
-    /* ------------------------------------------------------------------ */
-    /* step 4 – dispatch + notify                                          */
-    /* ------------------------------------------------------------------ */
-
+    // Step 4: Dispatch and notify
     if (!isNaN(desiredScrollLeft) && !isNaN(desiredScrollTop)) {
-      this.viewportPlugin.setViewportScrollMetrics({
+      this.viewportPlugin.setViewportScrollMetrics(id, {
         scrollLeft: desiredScrollLeft,
         scrollTop: desiredScrollTop,
       });
     }
 
-    this.dispatch(setZoomLevel(typeof level === 'number' ? newZoom : level, newZoom));
-    this.dispatchCoreAction(setScale(newZoom));
-    this.markReady();
+    this.dispatch(setZoomLevel(id, typeof level === 'number' ? newZoom : level, newZoom));
+    this.dispatchCoreAction(setScale(newZoom, id));
+    if (this.viewport.isGated(id)) {
+      this.viewport.releaseGate('zoom', id);
+    }
 
-    this.viewport.scrollTo({
+    viewport.scrollTo({
       x: desiredScrollLeft,
       y: desiredScrollTop,
       behavior: 'instant',
     });
 
     const evt: ZoomChangeEvent = {
+      documentId: id,
       oldZoom,
       newZoom,
       level,
@@ -253,35 +379,32 @@ export class ZoomPlugin extends BasePlugin<
     this.zoom$.emit(evt);
   }
 
-  /* ------------------------------------------------------------------ */
-  /* helpers                                                             */
-  /* ------------------------------------------------------------------ */
+  private computeZoomForMode(
+    documentId: string,
+    mode: ZoomMode,
+    vp: ViewportMetrics,
+  ): number | false {
+    const coreDoc = this.coreState.core.documents[documentId];
+    if (!coreDoc) return false;
 
-  /** numeric zoom for Automatic / FitPage / FitWidth */
-  private computeZoomForMode(mode: ZoomMode, vp: ViewportMetrics): number | false {
-    const spreads = getPagesWithRotatedSize(this.coreState.core);
-    if (!spreads.length) return false;
-
-    const pgGap = this.scroll.getPageGap();
+    const scrollScope = this.scroll.forDocument(documentId);
+    const pgGap = scrollScope ? this.scroll.getPageGap() : 0;
     const vpGap = this.viewport.getViewportGap();
 
-    if (vp.clientWidth === 0 || vp.clientHeight === 0) {
-      return false;
-    }
+    const spreads = scrollScope.getSpreadPagesWithRotatedSize();
+    if (!spreads.length) return false;
 
-    // Available space after accounting for fixed viewport gaps
+    if (vp.clientWidth === 0 || vp.clientHeight === 0) return false;
+
     const availableWidth = vp.clientWidth - 2 * vpGap;
     const availableHeight = vp.clientHeight - 2 * vpGap;
 
-    if (availableWidth <= 0 || availableHeight <= 0) {
-      return false;
-    }
+    if (availableWidth <= 0 || availableHeight <= 0) return false;
 
     let maxContentW = 0,
       maxContentH = 0;
 
     spreads.forEach((spread) => {
-      // Only include scalable content (pages + page gaps), not viewport gaps
       const contentW = spread.reduce((s, p, i) => s + p.rotatedSize.width + (i ? pgGap : 0), 0);
       const contentH = Math.max(...spread.map((p) => p.rotatedSize.height));
       maxContentW = Math.max(maxContentW, contentW);
@@ -295,32 +418,29 @@ export class ZoomPlugin extends BasePlugin<
         return Math.min(availableWidth / maxContentW, availableHeight / maxContentH);
       case ZoomMode.Automatic:
         return Math.min(availableWidth / maxContentW, 1);
-      /* istanbul ignore next */
       default:
         return 1;
     }
   }
 
-  /** where to scroll so that *focus* stays stable after scaling          */
   private computeScrollForZoomChange(
+    documentId: string,
     vp: ViewportMetrics,
     oldZoom: number,
     newZoom: number,
     focus: Point,
     align: 'keep' | 'center' = 'keep',
   ) {
-    /* unscaled content size ------------------------------------------- */
-    const layout = this.scroll.getLayout();
+    const scrollScope = this.scroll.forDocument(documentId);
+    const layout = scrollScope.getLayout();
     const vpGap = this.viewport.getViewportGap();
 
     const contentW = layout.totalContentSize.width;
     const contentH = layout.totalContentSize.height;
 
-    // Available space for content (excluding fixed viewport gaps)
     const availableWidth = vp.clientWidth - 2 * vpGap;
     const availableHeight = vp.clientHeight - 2 * vpGap;
 
-    /* helper: offset if content is narrower than available space ------- */
     const off = (availableSpace: number, cw: number, zoom: number) =>
       cw * zoom < availableSpace ? (availableSpace - cw * zoom) / 2 : 0;
 
@@ -330,12 +450,9 @@ export class ZoomPlugin extends BasePlugin<
     const offXnew = off(availableWidth, contentW, newZoom);
     const offYnew = off(availableHeight, contentH, newZoom);
 
-    /* content coords of the focal point -------------------------------- */
-    // Adjust focus point to account for vpGap and centering offset
     const cx = (vp.scrollLeft + focus.vx - vpGap - offXold) / oldZoom;
     const cy = (vp.scrollTop + focus.vy - vpGap - offYold) / oldZoom;
 
-    /* new scroll so that (cx,cy) appears under focus again ------------- */
     const baseLeft = cx * newZoom + vpGap + offXnew;
     const baseTop = cy * newZoom + vpGap + offYnew;
 
@@ -350,64 +467,46 @@ export class ZoomPlugin extends BasePlugin<
     };
   }
 
-  private handleZoomToArea(pageIndex: number, rect: Rect) {
-    /* -------------------------------------------------- */
-    /* 0 – rotation that applies to this page             */
-    /* -------------------------------------------------- */
-    const rotation = this.coreState.core.rotation;
+  private handleZoomToArea(documentId: string, pageIndex: number, rect: Rect) {
+    const coreDoc = this.coreState.core.documents[documentId];
+    if (!coreDoc) return;
 
-    /* -------------------------------------------------- */
-    /* viewport + layout basics                           */
-    /* -------------------------------------------------- */
-    const vp = this.viewport.getMetrics();
+    const rotation = coreDoc.rotation;
+    const viewport = this.viewport.forDocument(documentId);
+    const vp = viewport.getMetrics();
     const vpGap = this.viewport.getViewportGap();
-    const oldZ = this.state.currentZoomLevel;
+    const docState = this.getDocumentStateOrThrow(documentId);
+    const oldZ = docState.currentZoomLevel;
 
     const availableW = vp.clientWidth - 2 * vpGap;
     const availableH = vp.clientHeight - 2 * vpGap;
 
-    const layout = this.scroll.getLayout();
+    const scrollScope = this.scroll.forDocument(documentId);
+    const layout = scrollScope.getLayout();
 
-    /* which virtual item holds the page? */
     const vItem = layout.virtualItems.find((it) =>
       it.pageLayouts.some((p) => p.pageIndex === pageIndex),
     );
     if (!vItem) return;
 
-    /* the page layout inside that virtual item */
     const pageRel = vItem.pageLayouts.find((p) => p.pageIndex === pageIndex)!;
 
-    /* -------------------------------------------------- */
-    /* 1 – rect → rotated‑page space                      */
-    /* -------------------------------------------------- */
     const rotatedRect = rotateRect(
-      {
-        width: pageRel.width,
-        height: pageRel.height,
-      },
+      { width: pageRel.width, height: pageRel.height },
       rect,
       rotation,
     );
 
-    /* -------------------------------------------------- */
-    /* 2 – numeric zoom so the rect fits                  */
-    /* -------------------------------------------------- */
     const targetZoom = this.toZoom(
       Math.min(availableW / rotatedRect.size.width, availableH / rotatedRect.size.height),
     );
 
-    /* -------------------------------------------------- */
-    /* 3 – centre of that rect in *content* coordinates   */
-    /* -------------------------------------------------- */
     const pageAbsX = vItem.x + pageRel.x;
     const pageAbsY = vItem.y + pageRel.y;
 
     const cxContent = pageAbsX + rotatedRect.origin.x + rotatedRect.size.width / 2;
     const cyContent = pageAbsY + rotatedRect.origin.y + rotatedRect.size.height / 2;
 
-    /* -------------------------------------------------- */
-    /* 4 – centre in *viewport* coords before zoom        */
-    /* -------------------------------------------------- */
     const off = (avail: number, cw: number, z: number) =>
       cw * z < avail ? (avail - cw * z) / 2 : 0;
 
@@ -417,30 +516,49 @@ export class ZoomPlugin extends BasePlugin<
     const centerVX = vpGap + offXold + cxContent * oldZ - vp.scrollLeft;
     const centerVY = vpGap + offYold + cyContent * oldZ - vp.scrollTop;
 
-    /* -------------------------------------------------- */
-    /* 5 – hand off to the generic zoom handler           */
-    /* -------------------------------------------------- */
-    this.handleRequest({
-      level: targetZoom,
-      center: { vx: centerVX, vy: centerVY },
-      align: 'center',
-    });
+    this.handleRequest(
+      {
+        level: targetZoom,
+        center: { vx: centerVX, vy: centerVY },
+        align: 'center',
+      },
+      documentId,
+    );
   }
 
-  /** recalculates Automatic / Fit* when viewport or pages change */
-  private recalcAuto(focus?: VerticalZoomFocus) {
-    const s = this.state;
+  private recalcAuto(documentId: string, focus?: VerticalZoomFocus) {
+    const docState = this.getDocumentState(documentId);
+    if (!docState) return;
+
     if (
-      s.zoomLevel === ZoomMode.Automatic ||
-      s.zoomLevel === ZoomMode.FitPage ||
-      s.zoomLevel === ZoomMode.FitWidth
-    )
-      this.handleRequest({ level: s.zoomLevel, focus });
+      docState.zoomLevel === ZoomMode.Automatic ||
+      docState.zoomLevel === ZoomMode.FitPage ||
+      docState.zoomLevel === ZoomMode.FitWidth
+    ) {
+      this.handleRequest({ level: docState.zoomLevel, focus }, documentId);
+    }
   }
 
-  override onStoreUpdated(_prevState: ZoomState, newState: ZoomState): void {
-    this.state$.emit(newState);
+  // ─────────────────────────────────────────────────────────
+  // Helpers
+  // ─────────────────────────────────────────────────────────
+
+  private normalizeRanges(ranges: ZoomRangeStep[]): ZoomRangeStep[] {
+    return [...ranges].filter((r) => r.step > 0 && r.max > r.min).sort((a, b) => a.min - b.min);
   }
+
+  private stepFor(zoom: number): number {
+    const r = this.zoomRanges.find((r) => zoom >= r.min && zoom < r.max);
+    return r ? r.step : this.zoomStep;
+  }
+
+  private toZoom(v: number) {
+    return parseFloat(clamp(v, this.minZoom, this.maxZoom).toFixed(2));
+  }
+
+  // ─────────────────────────────────────────────────────────
+  // Marquee Zoom
+  // ─────────────────────────────────────────────────────────
 
   public registerMarqueeOnPage(opts: RegisterMarqueeOnPageOptions) {
     if (!this.interactionManager) {
@@ -452,13 +570,13 @@ export class ZoomPlugin extends BasePlugin<
       return () => {};
     }
 
-    const document = this.coreState.core.document;
-    if (!document) {
+    const coreDoc = this.coreState.core.documents[opts.documentId];
+    if (!coreDoc || !coreDoc.document) {
       this.logger.warn('ZoomPlugin', 'DocumentNotFound', 'Document not found');
       return () => {};
     }
 
-    const page = document.pages[opts.pageIndex];
+    const page = coreDoc.document.pages[opts.pageIndex];
     if (!page) {
       this.logger.warn('ZoomPlugin', 'PageNotFound', `Page ${opts.pageIndex} not found`);
       return () => {};
@@ -469,23 +587,61 @@ export class ZoomPlugin extends BasePlugin<
       scale: opts.scale,
       onPreview: opts.callback.onPreview,
       onCommit: (rect) => {
-        // Large drag → zoom to the selected area
-        this.zoomToArea(opts.pageIndex, rect);
+        this.zoomToArea(opts.pageIndex, rect, opts.documentId);
         opts.callback.onCommit?.(rect);
       },
       onSmallDrag: () => {
-        // Small drag → simple zoom in
-        this.zoomIn();
+        this.zoomIn(opts.documentId);
         opts.callback.onSmallDrag?.();
       },
     });
 
     const off = this.interactionManager.registerHandlers({
+      documentId: opts.documentId,
       modeId: 'marqueeZoom',
       handlers,
       pageIndex: opts.pageIndex,
     });
 
     return off;
+  }
+
+  // ─────────────────────────────────────────────────────────
+  // Store Update Handlers
+  // ─────────────────────────────────────────────────────────
+
+  override onStoreUpdated(prevState: ZoomState, newState: ZoomState): void {
+    // Emit state changes for each changed document
+    for (const documentId in newState.documents) {
+      const prevDoc = prevState.documents[documentId];
+      const newDoc = newState.documents[documentId];
+
+      if (
+        prevDoc &&
+        newDoc &&
+        (prevDoc.currentZoomLevel !== newDoc.currentZoomLevel ||
+          prevDoc.zoomLevel !== newDoc.zoomLevel ||
+          prevDoc.isMarqueeZoomActive !== newDoc.isMarqueeZoomActive)
+      ) {
+        this.state$.emit({
+          documentId,
+          state: newDoc,
+        });
+      }
+    }
+  }
+
+  // ─────────────────────────────────────────────────────────
+  // Lifecycle
+  // ─────────────────────────────────────────────────────────
+
+  async initialize(): Promise<void> {
+    this.logger.info('ZoomPlugin', 'Initialize', 'Zoom plugin initialized');
+  }
+
+  async destroy() {
+    this.zoom$.clear();
+    this.state$.clear();
+    super.destroy();
   }
 }

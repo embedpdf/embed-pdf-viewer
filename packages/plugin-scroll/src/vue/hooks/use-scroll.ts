@@ -1,74 +1,69 @@
-import { ref, watchEffect, computed } from 'vue';
+import { ref, watch, computed, toValue, type MaybeRefOrGetter, type ComputedRef } from 'vue';
 import { useCapability, usePlugin } from '@embedpdf/core/vue';
-import { ScrollPlugin } from '@embedpdf/plugin-scroll';
+import { ScrollPlugin, ScrollScope } from '@embedpdf/plugin-scroll';
 
 export const useScrollPlugin = () => usePlugin<ScrollPlugin>(ScrollPlugin.id);
 export const useScrollCapability = () => useCapability<ScrollPlugin>(ScrollPlugin.id);
 
-export function useScroll() {
+// Define the return type explicitly to maintain type safety
+interface UseScrollReturn {
+  provides: ComputedRef<ScrollScope | null>;
+  state: ComputedRef<{
+    currentPage: number;
+    totalPages: number;
+  }>;
+}
+
+/**
+ * Hook for scroll state for a specific document
+ * @param documentId Document ID (can be ref, computed, getter, or plain value)
+ */
+export function useScroll(documentId: MaybeRefOrGetter<string>): UseScrollReturn {
   const { provides } = useScrollCapability();
 
   const currentPage = ref(1);
   const totalPages = ref(1);
 
-  watchEffect((onCleanup) => {
-    if (!provides.value) return;
+  watch(
+    [provides, () => toValue(documentId)],
+    ([providesValue, docId], _, onCleanup) => {
+      if (!providesValue || !docId) {
+        currentPage.value = 1;
+        totalPages.value = 1;
+        return;
+      }
 
-    const unsubscribe = provides.value.onPageChange(({ pageNumber, totalPages: tp }) => {
-      currentPage.value = pageNumber;
-      totalPages.value = tp;
-    });
-    onCleanup(unsubscribe);
-  });
+      const scope = providesValue.forDocument(docId);
 
-  // New format
+      // Get initial state
+      currentPage.value = scope.getCurrentPage();
+      totalPages.value = scope.getTotalPages();
+
+      const unsubscribe = providesValue.onPageChange((event) => {
+        if (event.documentId === docId) {
+          currentPage.value = event.pageNumber;
+          totalPages.value = event.totalPages;
+        }
+      });
+
+      onCleanup(unsubscribe);
+    },
+    { immediate: true },
+  );
+
   const state = computed(() => ({
     currentPage: currentPage.value,
     totalPages: totalPages.value,
   }));
 
-  // Create deprecated properties with warnings
-  const deprecatedCurrentPage = computed({
-    get() {
-      console.warn(
-        `Accessing 'currentPage' directly on useScroll() is deprecated. Use useScroll().state.currentPage instead.`,
-      );
-      return currentPage.value;
-    },
-    set(value) {
-      currentPage.value = value;
-    },
-  });
-
-  const deprecatedTotalPages = computed({
-    get() {
-      console.warn(
-        `Accessing 'totalPages' directly on useScroll() is deprecated. Use useScroll().state.totalPages instead.`,
-      );
-      return totalPages.value;
-    },
-    set(value) {
-      totalPages.value = value;
-    },
-  });
-
-  const deprecatedScroll = computed(() => {
-    if (provides.value) {
-      console.warn(
-        `Accessing 'scroll' directly on useScroll() is deprecated. Use useScroll().provides instead.`,
-      );
-    }
-    return provides.value;
+  // Return a computed ref for the scoped capability
+  const scopedProvides = computed(() => {
+    const docId = toValue(documentId);
+    return provides.value?.forDocument(docId) ?? null;
   });
 
   return {
-    // New format (preferred)
-    provides,
+    provides: scopedProvides,
     state,
-
-    // Deprecated properties (for backward compatibility)
-    currentPage: deprecatedCurrentPage,
-    totalPages: deprecatedTotalPages,
-    scroll: deprecatedScroll,
   };
 }

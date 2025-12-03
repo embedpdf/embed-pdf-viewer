@@ -1,26 +1,34 @@
-import { AnnotationState, SidebarAnnotationEntry, TrackedAnnotation } from './types';
+import {
+  AnnotationState,
+  AnnotationDocumentState,
+  SidebarAnnotationEntry,
+  TrackedAnnotation,
+} from './types';
 import { PdfTextAnnoObject } from '@embedpdf/models';
 import { isSidebarAnnotation, isText } from './helpers';
 import { ToolMap } from './tools/tools-utils';
 
-/* ─────────── public selectors ─────────── */
+/* ─────────── document state selectors ─────────── */
 
 /** All annotations _objects_ on a single page (order preserved). */
-export const getAnnotationsByPageIndex = (s: AnnotationState, page: number) =>
+export const getAnnotationsByPageIndex = (s: AnnotationDocumentState, page: number) =>
   (s.pages[page] ?? []).map((uid) => s.byUid[uid]);
 
 /** Shortcut: every page → list of annotation objects. */
-export const getAnnotations = (s: AnnotationState) => {
+export const getAnnotations = (s: AnnotationDocumentState) => {
   const out: Record<number, ReturnType<typeof getAnnotationsByPageIndex>> = {};
   for (const p of Object.keys(s.pages).map(Number)) out[p] = getAnnotationsByPageIndex(s, p);
   return out;
 };
 
 /** The full `TrackedAnnotation` for the current selection. */
-export const getSelectedAnnotation = (s: AnnotationState) =>
+export const getSelectedAnnotation = (s: AnnotationDocumentState) =>
   s.selectedUid ? s.byUid[s.selectedUid] : null;
 
-export const getSelectedAnnotationByPageIndex = (s: AnnotationState, pageIndex: number) => {
+/** Get a tracked annotation by its ID */
+export const getAnnotationByUid = (s: AnnotationDocumentState, uid: string) => s.byUid[uid] ?? null;
+
+export const getSelectedAnnotationByPageIndex = (s: AnnotationDocumentState, pageIndex: number) => {
   if (!s.selectedUid) return null;
 
   const pageUids = s.pages[pageIndex] ?? [];
@@ -34,7 +42,8 @@ export const getSelectedAnnotationByPageIndex = (s: AnnotationState, pageIndex: 
 };
 
 /** Check if a given anno on a page is the current selection. */
-export const isAnnotationSelected = (s: AnnotationState, id: string) => s.selectedUid === id;
+export const isAnnotationSelected = (s: AnnotationDocumentState, id: string) =>
+  s.selectedUid === id;
 
 /**
  * Returns the current defaults for a specific tool by its ID.
@@ -68,7 +77,7 @@ export function getToolDefaultsById<K extends keyof ToolMap>(
  * }
  */
 export const getSidebarAnnotationsWithRepliesGroupedByPage = (
-  s: AnnotationState,
+  s: AnnotationDocumentState,
 ): Record<number, SidebarAnnotationEntry[]> => {
   /* ------------------------------------------------------------
    * 1.  Build an index of TEXT replies keyed by their parent ID
@@ -124,7 +133,9 @@ export const getSidebarAnnotationsWithRepliesGroupedByPage = (
  *   …
  * ]
  */
-export const getSidebarAnnotationsWithReplies = (s: AnnotationState): SidebarAnnotationEntry[] => {
+export const getSidebarAnnotationsWithReplies = (
+  s: AnnotationDocumentState,
+): SidebarAnnotationEntry[] => {
   const grouped = getSidebarAnnotationsWithRepliesGroupedByPage(s);
   const out: SidebarAnnotationEntry[] = [];
 

@@ -1,11 +1,10 @@
 import { useCapability, usePlugin } from '@embedpdf/core/svelte';
-import { SpreadMode, SpreadPlugin } from '@embedpdf/plugin-spread';
-
-/**
- * Hook to get the spread plugin's capability API.
- * This provides methods for controlling spread mode.
- */
-export const useSpreadCapability = () => useCapability<SpreadPlugin>(SpreadPlugin.id);
+import {
+  SpreadMode,
+  SpreadPlugin,
+  initialDocumentState,
+  SpreadScope,
+} from '@embedpdf/plugin-spread';
 
 /**
  * Hook to get the raw spread plugin instance.
@@ -14,32 +13,60 @@ export const useSpreadCapability = () => useCapability<SpreadPlugin>(SpreadPlugi
 export const useSpreadPlugin = () => usePlugin<SpreadPlugin>(SpreadPlugin.id);
 
 /**
- * Hook to manage spread mode state and listen to changes.
- * Returns the capability provider and reactive spread mode.
+ * Hook to get the spread plugin's capability API.
+ * This provides methods for controlling spread mode.
  */
-export const useSpread = () => {
+export const useSpreadCapability = () => useCapability<SpreadPlugin>(SpreadPlugin.id);
+
+// Define the return type explicitly to maintain type safety
+interface UseSpreadReturn {
+  provides: SpreadScope | null;
+  spreadMode: SpreadMode;
+}
+
+/**
+ * Hook for spread state for a specific document
+ * @param getDocumentId Function that returns the document ID
+ */
+export const useSpread = (getDocumentId: () => string | null): UseSpreadReturn => {
   const capability = useSpreadCapability();
 
-  const state = $state({
-    get provides() {
-      return capability.provides;
-    },
-    spreadMode: SpreadMode.None as SpreadMode,
-  });
+  let spreadMode = $state<SpreadMode>(initialDocumentState.spreadMode);
+
+  // Reactive documentId
+  const documentId = $derived(getDocumentId());
+
+  // Scoped capability for current docId
+  const scopedProvides = $derived(
+    capability.provides && documentId ? capability.provides.forDocument(documentId) : null,
+  );
 
   $effect(() => {
-    if (!capability.provides) return;
+    const provides = capability.provides;
+    const docId = documentId;
+
+    if (!provides || !docId) {
+      spreadMode = initialDocumentState.spreadMode;
+      return;
+    }
+
+    const scope = provides.forDocument(docId);
 
     // Set initial spread mode
-    state.spreadMode = capability.provides.getSpreadMode();
+    spreadMode = scope.getSpreadMode();
 
-    // Subscribe to spread mode changes
-    const unsubscribe = capability.provides.onSpreadChange((newSpreadMode) => {
-      state.spreadMode = newSpreadMode;
+    // Subscribe to spread mode changes for this document
+    return scope.onSpreadChange((newSpreadMode) => {
+      spreadMode = newSpreadMode;
     });
-
-    return unsubscribe;
   });
 
-  return state;
+  return {
+    get provides() {
+      return scopedProvides;
+    },
+    get spreadMode() {
+      return spreadMode;
+    },
+  };
 };

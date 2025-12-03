@@ -10,7 +10,10 @@
     ScrollPluginPackage,
     type RenderPageProps,
   } from '@embedpdf/plugin-scroll/svelte';
-  import { LoaderPluginPackage } from '@embedpdf/plugin-loader/svelte';
+  import {
+    DocumentManagerPluginPackage,
+    DocumentContent,
+  } from '@embedpdf/plugin-document-manager/svelte';
   import { RenderLayer, RenderPluginPackage } from '@embedpdf/plugin-render/svelte';
 
   // 1. Initialize the engine with the Svelte store
@@ -18,26 +21,14 @@
 
   // 2. Register the plugins you need
   const plugins = [
-    createPluginRegistration(LoaderPluginPackage, {
-      loadingOptions: {
-        type: 'url',
-        pdfFile: {
-          id: 'example-pdf',
-          url: 'https://snippet.embedpdf.com/ebook.pdf',
-        },
-      },
+    createPluginRegistration(DocumentManagerPluginPackage, {
+      initialDocuments: [{ url: 'https://snippet.embedpdf.com/ebook.pdf' }],
     }),
     createPluginRegistration(ViewportPluginPackage),
     createPluginRegistration(ScrollPluginPackage),
     createPluginRegistration(RenderPluginPackage),
   ];
 </script>
-
-{#snippet RenderPageSnippet(page: RenderPageProps)}
-  <div style:width="{page.width}px" style:height="{page.height}px" style:position="relative">
-    <RenderLayer pageIndex={page.pageIndex} />
-  </div>
-{/snippet}
 
 <div style="height: 500px; border: 1px solid black; margin-top: 10px;">
   {#if pdfEngine.isLoading || !pdfEngine.engine}
@@ -46,9 +37,29 @@
     </div>
   {:else}
     <EmbedPDF engine={pdfEngine.engine} {plugins}>
-      <Viewport style="background-color: #f1f3f5;">
-        <Scroller {RenderPageSnippet} />
-      </Viewport>
+      {#snippet children({ activeDocumentId })}
+        {#if activeDocumentId}
+          {@const documentId = activeDocumentId}
+          <DocumentContent {documentId}>
+            {#snippet children(documentContent)}
+              {#if documentContent.isLoaded}
+                {#snippet renderPage(page: RenderPageProps)}
+                  <div
+                    style:width="{page.width}px"
+                    style:height="{page.height}px"
+                    style:position="relative"
+                  >
+                    <RenderLayer {documentId} pageIndex={page.pageIndex} />
+                  </div>
+                {/snippet}
+                <Viewport {documentId} style="background-color: #f1f3f5;">
+                  <Scroller {documentId} {renderPage} />
+                </Viewport>
+              {/if}
+            {/snippet}
+          </DocumentContent>
+        {/if}
+      {/snippet}
     </EmbedPDF>
   {/if}
 </div>

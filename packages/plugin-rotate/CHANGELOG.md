@@ -63,7 +63,6 @@
 ### Minor Changes
 
 - [#141](https://github.com/embedpdf/embed-pdf-viewer/pull/141) by [@bobsingor](https://github.com/bobsingor) – Refactored rotate plugin API and utilities:
-
   - Moved `getNextRotation`, `getPreviousRotation`, and rotation matrix helpers into `utils`.
   - Split matrix helpers into:
     - **`getRotationMatrix`** → returns the numeric 6-tuple.

@@ -3,34 +3,27 @@
 import { createPluginRegistration } from '@embedpdf/core'
 import { EmbedPDF } from '@embedpdf/core/react'
 import { usePdfiumEngine } from '@embedpdf/engines/react'
-
-// Import essential plugins
 import {
   Viewport,
   ViewportPluginPackage,
 } from '@embedpdf/plugin-viewport/react'
 import { Scroller, ScrollPluginPackage } from '@embedpdf/plugin-scroll/react'
-import { LoaderPluginPackage } from '@embedpdf/plugin-loader/react'
+import {
+  DocumentContent,
+  DocumentManagerPluginPackage,
+} from '@embedpdf/plugin-document-manager/react'
 import { RenderLayer, RenderPluginPackage } from '@embedpdf/plugin-render/react'
-
-// Import Spread plugin
 import {
   useSpread,
   SpreadPluginPackage,
   SpreadMode,
 } from '@embedpdf/plugin-spread/react'
-import { ZoomMode, ZoomPluginPackage } from '@embedpdf/plugin-zoom/preact'
+import { ZoomMode, ZoomPluginPackage } from '@embedpdf/plugin-zoom/react'
+import { Loader2, FileText, BookOpen, Book } from 'lucide-react'
 
-// 1. Register the plugins you need
 const plugins = [
-  createPluginRegistration(LoaderPluginPackage, {
-    loadingOptions: {
-      type: 'url',
-      pdfFile: {
-        id: 'example-pdf',
-        url: 'https://snippet.embedpdf.com/ebook.pdf',
-      },
-    },
+  createPluginRegistration(DocumentManagerPluginPackage, {
+    initialDocuments: [{ url: 'https://snippet.embedpdf.com/ebook.pdf' }],
   }),
   createPluginRegistration(ViewportPluginPackage),
   createPluginRegistration(ScrollPluginPackage),
@@ -39,86 +32,101 @@ const plugins = [
     defaultZoomLevel: ZoomMode.FitPage,
   }),
   createPluginRegistration(SpreadPluginPackage, {
-    // Optional: Set the initial spread mode
     defaultSpreadMode: SpreadMode.None,
   }),
 ]
 
-// 2. Create a toolbar to control the spread mode
-export const SpreadToolbar = () => {
-  const { provides: spread, spreadMode } = useSpread()
+const SpreadToolbar = ({ documentId }: { documentId: string }) => {
+  const { provides: spread, spreadMode } = useSpread(documentId)
 
-  if (!spread) {
-    return null
-  }
+  if (!spread) return null
 
   const modes = [
-    { label: 'Single Page', value: SpreadMode.None },
-    { label: 'Two-Page (Odd)', value: SpreadMode.Odd },
-    { label: 'Two-Page (Even)', value: SpreadMode.Even },
+    { label: 'Single', value: SpreadMode.None, icon: FileText },
+    { label: 'Odd Spread', value: SpreadMode.Odd, icon: BookOpen },
+    { label: 'Even Spread', value: SpreadMode.Even, icon: Book },
   ]
 
   return (
-    <div className="mb-4 mt-4 flex flex-wrap items-center gap-3 rounded-lg border border-gray-200 bg-white p-3 shadow-sm">
-      <span className="tracking-wide text-xs font-medium uppercase text-gray-600">
-        Page Layout
+    <div className="flex items-center gap-3 border-b border-gray-300 bg-gray-100 px-3 py-2 dark:border-gray-700 dark:bg-gray-800">
+      <span className="tracking-wide text-xs font-medium uppercase text-gray-600 dark:text-gray-300">
+        Layout
       </span>
-      <div className="h-6 w-px bg-gray-200"></div>
-      <div className="flex items-center gap-2">
-        {modes.map((mode) => (
-          <button
-            key={mode.value}
-            onClick={() => spread.setSpreadMode(mode.value)}
-            className={`rounded-md px-3 py-1 text-sm font-medium transition-colors duration-150 ${
-              spreadMode === mode.value
-                ? 'bg-blue-500 text-white'
-                : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-            }`}
-          >
-            {mode.label}
-          </button>
-        ))}
+      <div className="h-4 w-px bg-gray-300 dark:bg-gray-600" />
+      <div className="flex items-center gap-1.5">
+        {modes.map((mode) => {
+          const Icon = mode.icon
+          const isActive = spreadMode === mode.value
+          return (
+            <button
+              key={mode.value}
+              onClick={() => spread.setSpreadMode(mode.value)}
+              className={`inline-flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-xs font-medium shadow-sm transition-all ${
+                isActive
+                  ? 'bg-blue-500 text-white ring-1 ring-blue-600'
+                  : 'bg-white text-gray-600 ring-1 ring-gray-300 hover:bg-gray-50 hover:text-gray-900 dark:bg-gray-700 dark:text-gray-300 dark:ring-gray-600 dark:hover:bg-gray-600 dark:hover:text-gray-100'
+              } `}
+            >
+              <Icon size={14} />
+              <span className="hidden sm:inline">{mode.label}</span>
+            </button>
+          )
+        })}
       </div>
     </div>
   )
 }
 
-// 3. Create the main viewer component
 export const PDFViewer = () => {
   const { engine, isLoading } = usePdfiumEngine()
 
   if (isLoading || !engine) {
-    return <div>Loading PDF Engine...</div>
+    return (
+      <div className="overflow-hidden rounded-lg border border-gray-300 bg-white dark:border-gray-700 dark:bg-gray-900">
+        <div className="flex h-[400px] items-center justify-center">
+          <div className="flex items-center gap-2 text-gray-500 dark:text-gray-400">
+            <Loader2 size={20} className="animate-spin" />
+            <span className="text-sm">Loading PDF Engine...</span>
+          </div>
+        </div>
+      </div>
+    )
   }
 
   return (
-    <div style={{ height: '500px' }}>
-      <EmbedPDF engine={engine} plugins={plugins}>
-        <div className="flex h-full flex-col">
-          <SpreadToolbar />
-          <div className="flex-grow" style={{ position: 'relative' }}>
-            <Viewport
-              style={{
-                backgroundColor: '#f1f3f5',
-                position: 'absolute',
-                top: 0,
-                left: 0,
-                right: 0,
-                bottom: 0,
-              }}
-            >
-              {/* The Scroller component automatically adapts to the spread mode */}
-              <Scroller
-                renderPage={({ width, height, pageIndex, scale }) => (
-                  <div style={{ width, height, position: 'relative' }}>
-                    <RenderLayer pageIndex={pageIndex} scale={scale} />
+    <EmbedPDF engine={engine} plugins={plugins}>
+      {({ activeDocumentId }) =>
+        activeDocumentId && (
+          <DocumentContent documentId={activeDocumentId}>
+            {({ isLoaded }) =>
+              isLoaded && (
+                <div className="overflow-hidden rounded-lg border border-gray-300 bg-white shadow-sm dark:border-gray-700 dark:bg-gray-900">
+                  {/* Toolbar */}
+                  <SpreadToolbar documentId={activeDocumentId} />
+
+                  {/* PDF Viewer Area */}
+                  <div className="relative h-[400px] sm:h-[500px]">
+                    <Viewport
+                      documentId={activeDocumentId}
+                      className="absolute inset-0 bg-gray-200 dark:bg-gray-800"
+                    >
+                      <Scroller
+                        documentId={activeDocumentId}
+                        renderPage={({ pageIndex }) => (
+                          <RenderLayer
+                            documentId={activeDocumentId}
+                            pageIndex={pageIndex}
+                          />
+                        )}
+                      />
+                    </Viewport>
                   </div>
-                )}
-              />
-            </Viewport>
-          </div>
-        </div>
-      </EmbedPDF>
-    </div>
+                </div>
+              )
+            }
+          </DocumentContent>
+        )
+      }
+    </EmbedPDF>
   )
 }

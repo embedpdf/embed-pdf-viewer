@@ -8,6 +8,7 @@
       "@framework": ["src/react/adapter.ts"],
       "@embedpdf/core/@framework": ["src/react/core.ts"],
       "@embedpdf/plugin-interaction-manager/@framework": ["src/react/interaction-manager.ts"],
+      "@embedpdf/utils/@framework": ["src/react/utils.ts"],
       "@embedpdf/plugin-selection": ["src/lib/index.ts"]
     }
   },

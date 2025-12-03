@@ -21,6 +21,10 @@ import { MatchFlag } from '@embedpdf/models';
 import { useScrollCapability } from '@embedpdf/plugin-scroll/react';
 import { SearchResult } from '@embedpdf/models';
 
+interface SearchProps {
+  documentId: string;
+}
+
 const HitLine = ({
   hit,
   onClick,
@@ -68,11 +72,14 @@ const HitLine = ({
   );
 };
 
-export const Search = () => {
-  const { state, provides } = useSearch();
-  const { provides: scroll } = useScrollCapability();
+export const Search = ({ documentId }: SearchProps) => {
+  const { state, provides } = useSearch(documentId);
+  const { provides: scrollCapability } = useScrollCapability();
   const inputRef = useRef<HTMLInputElement>(null);
   const [inputValue, setInputValue] = useState(state.query || '');
+
+  // Get document-scoped API
+  const scroll = scrollCapability?.forDocument(documentId);
 
   useEffect(() => {
     if (inputRef.current) {

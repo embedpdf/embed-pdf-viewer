@@ -1,58 +1,130 @@
-import { useEffect, useState } from '@framework';
-import { Rect } from '@embedpdf/models';
-import { useSelectionCapability, useSelectionPlugin } from '../hooks';
+import { useEffect, useMemo, useState } from '@framework';
+import { Rect, Rotation } from '@embedpdf/models';
+import { useSelectionPlugin } from '../hooks';
+import { useDocumentState } from '@embedpdf/core/@framework';
+import { SelectionMenuPlacement } from '@embedpdf/plugin-selection';
+import { SelectionSelectionMenuRenderFn } from '../types';
+import { CounterRotate } from '@embedpdf/utils/@framework';
 
 type Props = {
+  documentId: string;
   pageIndex: number;
-  scale: number;
+  scale?: number;
+  rotation?: Rotation;
   background?: string;
+  selectionMenu?: SelectionSelectionMenuRenderFn;
 };
 
-export function SelectionLayer({ pageIndex, scale, background = 'rgba(33,150,243)' }: Props) {
+export function SelectionLayer({
+  documentId,
+  pageIndex,
+  scale: scaleOverride,
+  rotation: rotationOverride,
+  background = 'rgba(33,150,243)',
+  selectionMenu,
+}: Props) {
   const { plugin: selPlugin } = useSelectionPlugin();
+  const documentState = useDocumentState(documentId);
   const [rects, setRects] = useState<Rect[]>([]);
   const [boundingRect, setBoundingRect] = useState<Rect | null>(null);
 
+  // Store the placement object from the plugin
+  const [placement, setPlacement] = useState<SelectionMenuPlacement | null>(null);
+
   useEffect(() => {
-    if (!selPlugin) return;
+    if (!selPlugin || !documentId) return;
 
     return selPlugin.registerSelectionOnPage({
+      documentId,
       pageIndex,
       onRectsChange: ({ rects, boundingRect }) => {
         setRects(rects);
         setBoundingRect(boundingRect);
       },
     });
-  }, [selPlugin, pageIndex]);
+  }, [selPlugin, documentId, pageIndex]);
+
+  useEffect(() => {
+    if (!selPlugin || !documentId) return;
+
+    // Subscribe to menu placement changes for this specific document
+    return selPlugin.onMenuPlacement(documentId, (newPlacement) => {
+      // Optimization: We could filter here, but React state updates are cheap enough usually.
+      // Ideally, check: if (newPlacement?.pageIndex === pageIndex)
+      setPlacement(newPlacement);
+    });
+  }, [selPlugin, documentId]);
+
+  const actualScale = useMemo(() => {
+    if (scaleOverride !== undefined) return scaleOverride;
+    return documentState?.scale ?? 1;
+  }, [scaleOverride, documentState?.scale]);
+
+  const actualRotation = useMemo(() => {
+    if (rotationOverride !== undefined) return rotationOverride;
+    return documentState?.rotation ?? Rotation.Degree0;
+  }, [rotationOverride, documentState?.rotation]);
+
+  const shouldRenderMenu =
+    selectionMenu && placement && placement.pageIndex === pageIndex && placement.isVisible;
 
   if (!boundingRect) return null;
 
   return (
-    <div
-      style={{
-        position: 'absolute',
-        left: boundingRect.origin.x * scale,
-        top: boundingRect.origin.y * scale,
-        width: boundingRect.size.width * scale,
-        height: boundingRect.size.height * scale,
-        mixBlendMode: 'multiply',
-        isolation: 'isolate',
-      }}
-    >
-      {rects.map((b, i) => (
-        <div
-          key={i}
-          style={{
-            position: 'absolute',
-            left: (b.origin.x - boundingRect.origin.x) * scale,
-            top: (b.origin.y - boundingRect.origin.y) * scale,
-            width: b.size.width * scale,
-            height: b.size.height * scale,
-            background,
-            pointerEvents: 'none',
+    <>
+      <div
+        style={{
+          position: 'absolute',
+          left: boundingRect.origin.x * actualScale,
+          top: boundingRect.origin.y * actualScale,
+          width: boundingRect.size.width * actualScale,
+          height: boundingRect.size.height * actualScale,
+          mixBlendMode: 'multiply',
+          isolation: 'isolate',
+          pointerEvents: 'none',
+        }}
+      >
+        {rects.map((b, i) => (
+          <div
+            key={i}
+            style={{
+              position: 'absolute',
+              left: (b.origin.x - boundingRect.origin.x) * actualScale,
+              top: (b.origin.y - boundingRect.origin.y) * actualScale,
+              width: b.size.width * actualScale,
+              height: b.size.height * actualScale,
+              background,
+            }}
+          />
+        ))}
+      </div>
+      {shouldRenderMenu && (
+        <CounterRotate
+          rect={{
+            origin: {
+              x: placement.rect.origin.x * actualScale,
+              y: placement.rect.origin.y * actualScale,
+            },
+            size: {
+              width: placement.rect.size.width * actualScale,
+              height: placement.rect.size.height * actualScale,
+            },
           }}
-        />
-      ))}
-    </div>
+          rotation={actualRotation}
+        >
+          {(props) =>
+            selectionMenu({
+              ...props,
+              context: {
+                type: 'selection',
+                pageIndex,
+              },
+              selected: true,
+              placement,
+            })
+          }
+        </CounterRotate>
+      )}
+    </>
   );
 }

@@ -5,12 +5,6 @@ import { Unsubscribe } from '@embedpdf/core';
 
 import { useExportCapability, useExportPlugin } from '../hooks';
 
-export interface DownloadProps {
-  fileName?: string;
-}
-
-const props = defineProps<DownloadProps>();
-
 const { provides: exportCapabilityRef } = useExportCapability();
 const { plugin: exportPluginRef } = useExportPlugin();
 const anchorRef = ref<HTMLAnchorElement | null>(null);
@@ -23,20 +17,18 @@ onMounted(() => {
 
   if (!exportCapability || !exportPlugin) return;
 
-  unsubscribe = exportPlugin.onRequest((action) => {
-    if (action === 'download') {
-      const el = anchorRef.value;
-      if (!el) return;
+  unsubscribe = exportPlugin.onRequest((event) => {
+    const el = anchorRef.value;
+    if (!el) return;
 
-      const task = exportPlugin.saveAsCopyAndGetBufferAndName();
-      task.wait(({ buffer, name }) => {
-        const url = URL.createObjectURL(new Blob([buffer]));
-        el.href = url;
-        el.download = props.fileName ?? name;
-        el.click();
-        URL.revokeObjectURL(url);
-      }, ignore);
-    }
+    const task = exportPlugin.saveAsCopyAndGetBufferAndName(event.documentId);
+    task.wait(({ buffer, name }) => {
+      const url = URL.createObjectURL(new Blob([buffer]));
+      el.href = url;
+      el.download = name;
+      el.click();
+      URL.revokeObjectURL(url);
+    }, ignore);
   });
 });
 

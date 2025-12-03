@@ -1,22 +1,25 @@
 import cn from 'clsx'
 import Link from 'next/link'
 import type { ComponentPropsWithoutRef, FC } from 'react'
+import type { Url } from 'next/dist/shared/lib/router/router'
 import { LinkArrowIcon } from 'nextra/icons'
 
 export const EXTERNAL_URL_RE = /^https?:\/\//
 
-export const Anchor: FC<ComponentPropsWithoutRef<'a'>> = ({
-  href = '',
-  ...props
-}) => {
+type AnchorProps = Omit<ComponentPropsWithoutRef<'a'>, 'href'> & {
+  href?: Url
+}
+
+export const Anchor: FC<AnchorProps> = ({ href = '', ...props }) => {
   props = {
     ...props,
     className: cn('focus-visible:nextra-focus', props.className),
   }
-  if (EXTERNAL_URL_RE.test(href)) {
+  const hrefString = typeof href === 'string' ? href : href?.pathname || ''
+  if (EXTERNAL_URL_RE.test(hrefString)) {
     const { children } = props
     return (
-      <a href={href} target="_blank" rel="noreferrer" {...props}>
+      <a href={hrefString} target="_blank" rel="noreferrer" {...props}>
         {children}
         {typeof children === 'string' && (
           <>
@@ -31,6 +34,11 @@ export const Anchor: FC<ComponentPropsWithoutRef<'a'>> = ({
       </a>
     )
   }
-  const ComponentToUse = href.startsWith('#') ? 'a' : Link
-  return <ComponentToUse href={href} {...props} />
+  if (hrefString.startsWith('#')) {
+    return <a href={hrefString} {...props} />
+  }
+  if (!href) {
+    return <a href={hrefString} {...props} />
+  }
+  return <Link href={href} {...props} />
 }

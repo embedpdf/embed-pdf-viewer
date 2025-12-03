@@ -1,5 +1,5 @@
 import { PluginManifest } from '@embedpdf/core';
-import { ScrollPluginConfig } from './types';
+import { ScrollPluginConfig, ScrollStrategy } from './types';
 
 export const SCROLL_PLUGIN_ID = 'scroll';
 
@@ -9,9 +9,11 @@ export const manifest: PluginManifest<ScrollPluginConfig> = {
   version: '1.0.0',
   provides: ['scroll'],
   requires: ['viewport'],
-  optional: [],
+  optional: ['spread'],
   defaultConfig: {
     enabled: true,
-    pageGap: 10,
+    defaultPageGap: 10,
+    defaultBufferSize: 4,
+    defaultStrategy: ScrollStrategy.Vertical,
   },
 };

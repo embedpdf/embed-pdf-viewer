@@ -1,6 +1,7 @@
 import { useEffect, useRef, HTMLAttributes, CSSProperties, ReactNode } from '@framework';
 
 import { useFullscreenPlugin, useFullscreenCapability } from '../hooks';
+import { handleFullscreenRequest } from '../utils/fullscreen-utils';
 
 type FullscreenProviderProps = Omit<HTMLAttributes<HTMLDivElement>, 'style'> & {
   children: ReactNode;
@@ -9,23 +10,20 @@ type FullscreenProviderProps = Omit<HTMLAttributes<HTMLDivElement>, 'style'> & {
 
 export function FullscreenProvider({ children, ...props }: FullscreenProviderProps) {
   const { provides: fullscreenCapability } = useFullscreenCapability();
+  const { plugin: fullscreenPlugin } = useFullscreenPlugin();
   const { plugin } = useFullscreenPlugin();
   const ref = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    if (!fullscreenCapability) return;
+    if (!fullscreenCapability || !fullscreenPlugin) return;
 
-    const unsub = fullscreenCapability.onRequest(async (action) => {
-      if (action === 'enter') {
-        const el = ref.current;
-        if (el && !document.fullscreenElement) await el.requestFullscreen();
-      } else {
-        if (document.fullscreenElement) await document.exitFullscreen();
-      }
+    const unsub = fullscreenCapability.onRequest(async (event) => {
+      const targetSelector = fullscreenPlugin.getTargetSelector();
+      await handleFullscreenRequest(event, ref.current, targetSelector);
     });
 
     return unsub;
-  }, [fullscreenCapability]);
+  }, [fullscreenCapability, fullscreenPlugin]);
 
   useEffect(() => {
     if (!plugin) return;

@@ -4,13 +4,16 @@
   import { RenderLayer } from '@embedpdf/plugin-render/svelte';
   import { usePrintCapability } from '@embedpdf/plugin-print/svelte';
 
-  const print = usePrintCapability();
+  let { documentId }: { documentId: string } = $props();
+
+  const printCapability = usePrintCapability();
+  const print = $derived(printCapability.provides?.forDocument(documentId));
   let isPrinting = $state(false);
 
   const handlePrint = () => {
-    if (!print.provides || isPrinting) return;
+    if (!print || isPrinting) return;
     isPrinting = true;
-    const printTask = print.provides.print();
+    const printTask = print.print();
     printTask.wait(
       () => {
         isPrinting = false;
@@ -22,9 +25,9 @@
   };
 </script>
 
-{#snippet RenderPageSnippet(page: RenderPageProps)}
+{#snippet renderPage(page: RenderPageProps)}
   <div style:width={`${page.width}px`} style:height={`${page.height}px`} style:position="relative">
-    <RenderLayer pageIndex={page.pageIndex} scale={page.scale} />
+    <RenderLayer {documentId} pageIndex={page.pageIndex} />
   </div>
 {/snippet}
 
@@ -35,7 +38,7 @@
     >
       <button
         onclick={handlePrint}
-        disabled={!print.provides || isPrinting}
+        disabled={!print || isPrinting}
         class="flex h-8 w-8 items-center justify-center rounded-md border border-gray-300 bg-white text-gray-700 transition-colors duration-150 hover:border-gray-400 hover:bg-gray-50 hover:text-gray-900 active:bg-gray-100 disabled:cursor-not-allowed disabled:opacity-50"
         title="Print Document"
       >
@@ -76,6 +79,7 @@
     </div>
     <div class="flex-grow" style="position: relative">
       <Viewport
+        {documentId}
         style="
           background-color: #f1f3f5;
           position: absolute;
@@ -85,7 +89,7 @@
           bottom: 0;
         "
       >
-        <Scroller {RenderPageSnippet} />
+        <Scroller {documentId} {renderPage} />
       </Viewport>
     </div>
   </div>

@@ -6,6 +6,7 @@ import type { Tile } from '@embedpdf/plugin-tiling';
 import { useTilingCapability } from '../hooks';
 
 interface Props {
+  documentId: string;
   pageIndex: number;
   tile: Tile;
   scale: number;
@@ -25,12 +26,27 @@ let lastRenderedId: string | undefined;
 let currentTask: any = null;
 
 watch(
-  [() => props.tile.id, tilingCapability],
-  ([tileId, capability]) => {
+  [() => props.tile.id, () => props.documentId, tilingCapability],
+  ([tileId, docId, capability], [prevTileId, prevDocId]) => {
     if (!capability) return;
 
-    // Already rendered this exact tile
-    if (lastRenderedId === tileId) return;
+    const scope = capability.forDocument(docId);
+
+    // CRITICAL: Clear image immediately when documentId changes
+    if (prevDocId !== undefined && prevDocId !== docId) {
+      if (url.value) {
+        URL.revokeObjectURL(url.value);
+        url.value = undefined;
+      }
+      if (currentTask) {
+        currentTask.abort({ code: PdfErrorCode.Cancelled, message: 'switching documents' });
+        currentTask = null;
+      }
+      lastRenderedId = undefined; // Reset so new document tiles render
+    }
+
+    // Already rendered this exact tile (for same document)
+    if (lastRenderedId === tileId && prevDocId === docId) return;
 
     // Cancel previous task if any
     if (currentTask) {
@@ -46,7 +62,7 @@ watch(
 
     lastRenderedId = tileId;
 
-    currentTask = capability.renderTile({
+    currentTask = scope.renderTile({
       pageIndex: props.pageIndex,
       tile: toRaw(props.tile),
       dpr: props.dpr,

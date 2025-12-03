@@ -21,7 +21,7 @@ function initContainer(config: ContainerConfig) {
   embedPdfElement.config = viewerConfig;
   config.target.appendChild(embedPdfElement);
 
-  return embedPdfElement;
+  return embedPdfElement.registry;
 }
 
 export type ReturnContainerType = ReturnType<typeof initContainer>;

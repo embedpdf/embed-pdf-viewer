@@ -23,7 +23,7 @@ type SidebarRegistry = Partial<{
   [K in PdfAnnotationSubtype]: SidebarEntry<K>;
 }>;
 
-export const SIDEbars: SidebarRegistry = {
+export const SidebarRegistry: SidebarRegistry = {
   [PdfAnnotationSubtype.INK]: { component: InkSidebar, title: 'Ink' },
   [PdfAnnotationSubtype.POLYGON]: { component: PolygonSidebar, title: 'Polygon' },
   [PdfAnnotationSubtype.SQUARE]: { component: ShapeSidebar, title: 'Square' },

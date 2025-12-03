@@ -7,9 +7,9 @@ import { useConfig } from './stores'
 
 const classes = {
   link: cn(
-    'focus-visible:nextra-focus text-gray-600',
-    'hover:text-gray-800',
-    'contrast-more:text-gray-700',
+    'focus-visible:nextra-focus text-gray-600 dark:text-gray-400',
+    'hover:text-gray-800 dark:hover:text-gray-200',
+    'contrast-more:text-gray-700 contrast-more:dark:text-gray-100',
     'flex max-w-[50%] items-center gap-1 py-4 text-base font-medium transition-colors [word-break:break-word] md:text-lg',
   ),
   icon: cn('inline shrink-0'),
@@ -38,7 +38,7 @@ export const Pagination: FC = () => {
       {prev && (
         <NextLink
           href={prev.route}
-          title={prev.title}
+          title={typeof prev.title === 'string' ? prev.title : undefined}
           className={cn(classes.link, 'pe-4')}
         >
           <ArrowRightIcon
@@ -51,7 +51,7 @@ export const Pagination: FC = () => {
       {next && (
         <NextLink
           href={next.route}
-          title={next.title}
+          title={typeof next.title === 'string' ? next.title : undefined}
           className={cn(classes.link, 'ms-auto ps-4 text-end')}
         >
           {next.title}

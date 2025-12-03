@@ -5,11 +5,15 @@ import { PdfErrorReason } from '@embedpdf/models';
 
 export interface BookmarkPluginConfig extends BasePluginConfig {}
 
+// Scoped bookmark capability for a specific document
+export interface BookmarkScope {
+  getBookmarks(): Task<{ bookmarks: PdfBookmarkObject[] }, PdfErrorReason>;
+}
+
 export interface BookmarkCapability {
-  getBookmarks: () => Task<
-    {
-      bookmarks: PdfBookmarkObject[];
-    },
-    PdfErrorReason
-  >;
+  // Active document operations
+  getBookmarks: () => Task<{ bookmarks: PdfBookmarkObject[] }, PdfErrorReason>;
+
+  // Document-scoped operations
+  forDocument(documentId: string): BookmarkScope;
 }

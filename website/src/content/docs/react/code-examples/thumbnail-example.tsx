@@ -12,63 +12,46 @@ import {
   ScrollPluginPackage,
   useScroll,
 } from '@embedpdf/plugin-scroll/react'
-import { LoaderPluginPackage } from '@embedpdf/plugin-loader/react'
+import {
+  DocumentContent,
+  DocumentManagerPluginPackage,
+} from '@embedpdf/plugin-document-manager/react'
 import { RenderLayer, RenderPluginPackage } from '@embedpdf/plugin-render/react'
 import {
   ThumbnailsPane,
   ThumbImg,
   ThumbnailPluginPackage,
 } from '@embedpdf/plugin-thumbnail/react'
+import { Loader2 } from 'lucide-react'
 
-// 1. Register plugins, including Thumbnail and its dependencies
 const plugins = [
-  createPluginRegistration(LoaderPluginPackage, {
-    loadingOptions: {
-      type: 'url',
-      pdfFile: {
-        id: 'example-pdf',
-        url: 'https://snippet.embedpdf.com/ebook.pdf',
-      },
-    },
+  createPluginRegistration(DocumentManagerPluginPackage, {
+    initialDocuments: [{ url: 'https://snippet.embedpdf.com/ebook.pdf' }],
   }),
   createPluginRegistration(ViewportPluginPackage),
   createPluginRegistration(ScrollPluginPackage),
   createPluginRegistration(RenderPluginPackage),
   createPluginRegistration(ThumbnailPluginPackage, {
-    width: 120, // Width of the thumbnail images
-    paddingY: 10, // Vertical padding for the sidebar
+    width: 120,
+    paddingY: 10,
   }),
 ]
 
-// 2. Create the Thumbnail Sidebar component
-const ThumbnailSidebar = () => {
-  const { state, provides } = useScroll()
+const ThumbnailSidebar = ({ documentId }: { documentId: string }) => {
+  const { state, provides } = useScroll(documentId)
 
   return (
-    <div
-      style={{
-        width: '150px',
-        height: '100%',
-        backgroundColor: '#f8f9fa',
-        borderRight: '1px solid #dee2e6',
-      }}
-    >
-      <ThumbnailsPane>
+    <div className="h-full w-[140px] flex-shrink-0 border-r border-gray-300 bg-gray-50 dark:border-gray-700 dark:bg-gray-900">
+      <ThumbnailsPane documentId={documentId}>
         {(m) => {
           const isActive = state.currentPage === m.pageIndex + 1
           return (
             <div
               key={m.pageIndex}
+              className="absolute flex w-full cursor-pointer flex-col items-center px-2"
               style={{
-                position: 'absolute',
-                width: '100%',
                 height: m.wrapperHeight,
                 top: m.top,
-                display: 'flex',
-                flexDirection: 'column',
-                alignItems: 'center',
-                cursor: 'pointer',
-                padding: '4px',
               }}
               onClick={() => {
                 provides?.scrollToPage?.({
@@ -78,37 +61,34 @@ const ThumbnailSidebar = () => {
             >
               {/* Thumbnail image container */}
               <div
+                className={`overflow-hidden rounded-md transition-all ${
+                  isActive
+                    ? 'ring-2 ring-blue-500 ring-offset-2 ring-offset-gray-50 dark:ring-offset-gray-900'
+                    : 'ring-1 ring-gray-300 hover:ring-gray-400 dark:ring-gray-700 dark:hover:ring-gray-600'
+                } `}
                 style={{
                   width: m.width,
                   height: m.height,
-                  border: `2px solid ${isActive ? '#0d6efd' : '#ced4da'}`,
-                  borderRadius: '4px',
-                  overflow: 'hidden',
-                  boxShadow: isActive
-                    ? '0 0 5px rgba(13, 110, 253, 0.5)'
-                    : 'none',
                 }}
               >
                 <ThumbImg
+                  documentId={documentId}
                   meta={m}
-                  style={{
-                    width: '100%',
-                    height: '100%',
-                    objectFit: 'contain',
-                  }}
+                  className="h-full w-full object-contain"
                 />
               </div>
               {/* Page number label */}
               <div
-                style={{
-                  height: m.labelHeight,
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  marginTop: '4px',
-                }}
+                className="mt-1 flex items-center justify-center"
+                style={{ height: m.labelHeight }}
               >
-                <span style={{ fontSize: '12px', color: '#6c757d' }}>
+                <span
+                  className={`text-xs font-medium ${
+                    isActive
+                      ? 'text-blue-600 dark:text-blue-400'
+                      : 'text-gray-600 dark:text-gray-300'
+                  } `}
+                >
                   {m.pageIndex + 1}
                 </span>
               </div>
@@ -120,41 +100,58 @@ const ThumbnailSidebar = () => {
   )
 }
 
-// 3. Create the main viewer component
 export const PDFViewer = () => {
   const { engine, isLoading } = usePdfiumEngine()
 
   if (isLoading || !engine) {
-    return <div>Loading PDF Engine...</div>
+    return (
+      <div className="overflow-hidden rounded-lg border border-gray-300 bg-white dark:border-gray-700 dark:bg-gray-900">
+        <div className="flex h-[400px] items-center justify-center">
+          <div className="flex items-center gap-2 text-gray-500 dark:text-gray-400">
+            <Loader2 size={20} className="animate-spin" />
+            <span className="text-sm">Loading PDF Engine...</span>
+          </div>
+        </div>
+      </div>
+    )
   }
 
   return (
-    <div style={{ height: '500px', marginTop: '10px' }}>
-      <EmbedPDF engine={engine} plugins={plugins}>
-        <div style={{ display: 'flex', height: '100%' }}>
-          <ThumbnailSidebar />
-          <div style={{ flex: 1, overflow: 'hidden', position: 'relative' }}>
-            <Viewport
-              style={{
-                position: 'absolute',
-                top: 0,
-                left: 0,
-                right: 0,
-                bottom: 0,
-                backgroundColor: '#f1f3f5',
-              }}
-            >
-              <Scroller
-                renderPage={({ width, height, pageIndex, scale }) => (
-                  <div style={{ width, height, position: 'relative' }}>
-                    <RenderLayer pageIndex={pageIndex} scale={scale} />
+    <EmbedPDF engine={engine} plugins={plugins}>
+      {({ activeDocumentId }) =>
+        activeDocumentId && (
+          <DocumentContent documentId={activeDocumentId}>
+            {({ isLoaded }) =>
+              isLoaded && (
+                <div className="overflow-hidden rounded-lg border border-gray-300 bg-white shadow-sm dark:border-gray-700 dark:bg-gray-900">
+                  <div className="flex h-[400px] sm:h-[500px]">
+                    {/* Thumbnail Sidebar */}
+                    <ThumbnailSidebar documentId={activeDocumentId} />
+
+                    {/* PDF Viewer Area */}
+                    <div className="relative flex-1">
+                      <Viewport
+                        documentId={activeDocumentId}
+                        className="absolute inset-0 bg-gray-200 dark:bg-gray-800"
+                      >
+                        <Scroller
+                          documentId={activeDocumentId}
+                          renderPage={({ pageIndex }) => (
+                            <RenderLayer
+                              documentId={activeDocumentId}
+                              pageIndex={pageIndex}
+                            />
+                          )}
+                        />
+                      </Viewport>
+                    </div>
                   </div>
-                )}
-              />
-            </Viewport>
-          </div>
-        </div>
-      </EmbedPDF>
-    </div>
+                </div>
+              )
+            }
+          </DocumentContent>
+        )
+      }
+    </EmbedPDF>
   )
 }
