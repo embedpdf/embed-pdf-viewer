@@ -24,6 +24,7 @@ import {
   PdfWidgetAnnoOption,
   PdfFileAttachmentAnnoObject,
   Rect,
+  Size,
   PdfAttachmentObject,
   PdfUnsupportedAnnoObject,
   PdfTextAnnoObject,
@@ -114,13 +115,14 @@ import {
   PdfAnnotationsProgress,
   ConvertToBlobOptions,
   buildUserToDeviceMatrix,
+  Matrix,
   PdfMetadataObject,
   PdfPrintOptions,
   PdfTrappedStatus,
   PdfStampFit,
   PdfAddAttachmentParams,
 } from '@embedpdf/models';
-import { isValidCustomKey, readArrayBuffer, readString } from './helper';
+import { computeFormDrawParams, isValidCustomKey, readArrayBuffer, readString } from './helper';
 import { WrappedPdfiumModule } from '@embedpdf/pdfium';
 import { DocumentContext, PageContext, PdfCache } from './cache';
 import { ImageDataConverter, LazyImageData } from '../converters/types';
@@ -6956,6 +6958,8 @@ export class PdfiumEngine<T = Blob> implements PdfEngine<T> {
     const bytes = stride * hDev;
 
     const pageCtx = ctx.acquirePage(page.index);
+    const shouldRenderForms = options?.withForms ?? false;
+    const formHandle = shouldRenderForms ? pageCtx.getFormHandle() : undefined;
 
     // ---- 2) allocate a BGRA bitmap in WASM
     const heapPtr = this.memoryManager.malloc(bytes);
@@ -6992,6 +6996,24 @@ export class PdfiumEngine<T = Blob> implements PdfEngine<T> {
         clipPtr,
         flags,
       );
+
+      if (formHandle !== undefined) {
+        const formParams = computeFormDrawParams(M, rect, page.size, rotation);
+        const { startX, startY, formsWidth, formsHeight, scaleX, scaleY } = formParams;
+
+        // Draw form elements using the same effective transform as the page bitmap.
+        this.pdfiumModule.FPDF_FFLDraw(
+          formHandle,
+          bitmapPtr,
+          pageCtx.pagePtr,
+          startX,
+          startY,
+          formsWidth,
+          formsHeight,
+          rotation,
+          flags,
+        );
+      }
     } finally {
       pageCtx.release();
       this.memoryManager.free(mPtr);

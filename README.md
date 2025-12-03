@@ -7,20 +7,21 @@
 
   <!-- Badges -->
 
-  <a href="https://github.com/embedpdf/embed-pdf-viewer/blob/main/LICENSE"><img alt="License" src="https://img.shields.io/npm/l/@embedpdf/pdfium.svg?style=for-the-badge&labelColor=000000"></a>
-  <a href="https://snippet.embedpdf.com/"><img alt="Live demo" src="https://img.shields.io/badge/Try%20the%20Live%20Demo-ff1493.svg?style=for-the-badge&labelColor=000000"></a>
-  <a href="https://discord.gg/mHHABmmuVU"><img alt="Join our Discord" src="https://img.shields.io/discord/1351694551047475313?logo=discord&style=for-the-badge&labelColor=000000"></a>
+<a href="https://github.com/embedpdf/embed-pdf-viewer/blob/main/LICENSE"><img alt="License" src="https://img.shields.io/npm/l/@embedpdf/pdfium.svg?style=for-the-badge&labelColor=000000"></a>
+<a href="https://snippet.embedpdf.com/"><img alt="Live demo" src="https://img.shields.io/badge/Try%20the%20Live%20Demo-ff1493.svg?style=for-the-badge&labelColor=000000"></a>
+<a href="https://discord.gg/mHHABmmuVU"><img alt="Join our Discord" src="https://img.shields.io/discord/1351694551047475313?logo=discord&style=for-the-badge&labelColor=000000"></a>
+
 </div>
 
 # Open‑Source JavaScript PDF Viewer
 
-**EmbedPDF** is a framework‑agnostic, MIT‑licensed PDF viewer that drops into *any* JavaScript project. Whether you build with **React, Vue, Svelte, Preact,** or vanilla JS, EmbedPDF delivers a smooth, modern reading experience and a clean developer API.
+**EmbedPDF** is a framework‑agnostic, MIT‑licensed PDF viewer that drops into _any_ JavaScript project. Whether you build with **React, Vue, Svelte, Preact,** or vanilla JS, EmbedPDF delivers a smooth, modern reading experience and a clean developer API.
 
 ---
 
 ## 📚 Documentation
 
-Full docs, installation guides, API reference, and examples:  
+Full docs, installation guides, API reference, and examples:
 
 👉 **[https://www.embedpdf.com](https://www.embedpdf.com)**
 
@@ -29,6 +30,19 @@ Full docs, installation guides, API reference, and examples:
 Try it now — load your own PDF or use the sample:
 
 👉 **[https://app.embedpdf.com](https://app.embedpdf.com)**
+
+---
+
+## 💖 Sponsors
+
+We are grateful for the support of our sponsors!
+
+### Bronze Sponsors
+
+<div align="left">
+  <a href="https://www.lefebvre-group.com?utm_source=embedpdf&utm_campaign=oss" target="_blank"><img src=".github/assets/sponsor-lefebvre.png" alt="Lefebvre" height="64"></a>
+  &nbsp;&nbsp;<a href="https://forml.eu?utm_source=embedpdf&utm_campaign=oss" target="_blank"><img src=".github/assets/sponsor-forml.png" alt="forml" height="64"></a>
+</div>
 
 ---
 
@@ -50,4 +64,4 @@ This project is licensed under the MIT License. See the [LICENSE](LICENSE) file 
 
 ## Third-Party Licenses
 
-This project includes PDFium, licensed under the [Apache License, Version 2.0](packages/pdfium/LICENSE.pdfium). 
+This project includes PDFium, licensed under the [Apache License, Version 2.0](packages/pdfium/LICENSE.pdfium).
