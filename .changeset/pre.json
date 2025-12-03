@@ -43,5 +43,36 @@
     "@embedpdf/utils": "1.5.0",
     "@embedpdf/snippet": "1.0.0"
   },
-  "changesets": []
+  "changesets": [
+    "multi-view-core",
+    "multi-view-engines",
+    "multi-view-models",
+    "multi-view-plugin-annotation",
+    "multi-view-plugin-attachment",
+    "multi-view-plugin-bookmark",
+    "multi-view-plugin-capture",
+    "multi-view-plugin-commands",
+    "multi-view-plugin-document-manager",
+    "multi-view-plugin-export",
+    "multi-view-plugin-fullscreen",
+    "multi-view-plugin-history",
+    "multi-view-plugin-i18n",
+    "multi-view-plugin-interaction-manager",
+    "multi-view-plugin-pan",
+    "multi-view-plugin-print",
+    "multi-view-plugin-redaction",
+    "multi-view-plugin-render",
+    "multi-view-plugin-rotate",
+    "multi-view-plugin-scroll",
+    "multi-view-plugin-search",
+    "multi-view-plugin-selection",
+    "multi-view-plugin-spread",
+    "multi-view-plugin-thumbnail",
+    "multi-view-plugin-tiling",
+    "multi-view-plugin-ui",
+    "multi-view-plugin-view-manager",
+    "multi-view-plugin-viewport",
+    "multi-view-plugin-zoom",
+    "multi-view-utils"
+  ]
 }
