@@ -1,4 +1,4 @@
-# @embedpdf/plugin-bookmark
+# @embedpdf/plugin-ui
 
 ## 1.5.0
 
@@ -64,10 +64,6 @@
 
 ## 1.0.21
 
-### Patch Changes
-
-- [#119](https://github.com/embedpdf/embed-pdf-viewer/pull/119) by [@bobsingor](https://github.com/bobsingor) – Add and fix Vue packages!
-
 ## 1.0.20
 
 ## 1.0.19
@@ -75,6 +71,10 @@
 ## 1.0.18
 
 ## 1.0.17
+
+### Patch Changes
+
+- [#63](https://github.com/embedpdf/embed-pdf-viewer/pull/63) by [@bobsingor](https://github.com/bobsingor) – Take the icons out of the plugin-ui for more flexibility
 
 ## 1.0.16
 
@@ -88,7 +88,7 @@
 
 ### Patch Changes
 
-- [#47](https://github.com/embedpdf/embed-pdf-viewer/pull/47) by [@bobsingor](https://github.com/bobsingor) – Update bookmark plugin to have shared code between react and preact to simplify workflow
+- [#47](https://github.com/embedpdf/embed-pdf-viewer/pull/47) by [@bobsingor](https://github.com/bobsingor) – Update UI plugin to have shared code between react and preact to simplify workflow
 
 ## 1.0.11
 
