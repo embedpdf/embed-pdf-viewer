@@ -1,13 +1,2 @@
 #!/usr/bin/env sh
-# Cross-platform pre-commit for GitHub Desktop, macOS, Windows (Git Bash), Linux.
-
-# Make Node visible for GUI apps (harmless elsewhere)
-export PATH="/opt/homebrew/bin:/usr/local/bin:$PATH"
-
-# Load nvm if present (no-op if missing)
-export NVM_DIR="$HOME/.nvm"
-[ -s "$NVM_DIR/nvm.sh" ] && . "$NVM_DIR/nvm.sh"
-
-# Prefer Node's built-in npx so we don't rely on pnpm/yarn on PATH
-# --no-install ensures it uses the local devDependency
-exec npx --no-install lint-staged
+./node_modules/.bin/lint-staged
