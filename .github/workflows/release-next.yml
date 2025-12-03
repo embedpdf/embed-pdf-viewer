@@ -78,12 +78,28 @@ jobs:
             echo "did_publish=false" >> $GITHUB_OUTPUT
           fi
 
+      - name: Get merged PR info
+        if: steps.published.outputs.did_publish == 'true'
+        id: merged_pr
+        uses: actions-ecosystem/action-get-merged-pull-request@v1
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+
       - name: Prepare release notes
         if: steps.published.outputs.did_publish == 'true'
+        env:
+          PR_BODY: ${{ steps.merged_pr.outputs.body }}
         run: |
-          echo "Pre-release for next branch." > release-notes.md
-          echo "Packages:" >> release-notes.md
-          echo "${{ steps.published.outputs.published }}" >> release-notes.md
+          echo "$PR_BODY" | sed -n '/# Releases/,$p' | tail -n +2 > release-notes.md || true
+
+          if [ ! -s release-notes.md ]; then
+            echo "Pre-release for next branch." > release-notes.md
+            echo "" >> release-notes.md
+            echo "Packages published:" >> release-notes.md
+            echo "${{ steps.published.outputs.published }}" >> release-notes.md
+          fi
+
+          echo "Release notes:"
           cat release-notes.md
 
       - name: Package published dists
@@ -110,7 +126,7 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           tag_name: v${{ steps.published.outputs.version }}
-          name: "Releaste Next v${{ steps.published.outputs.version }}"
+          name: "Release Next v${{ steps.published.outputs.version }}"
           body_path: release-notes.md
           files: release-assets/*
           draft: false
