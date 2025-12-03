@@ -51,9 +51,16 @@ type FolderProps = {
   anchors: Heading[]
   onFocus: FocusEventHandler
   level: number
+  defaultCollapseLevel: number
 }
 
-const Folder: FC<FolderProps> = ({ item: _item, anchors, onFocus, level }) => {
+const Folder: FC<FolderProps> = ({
+  item: _item,
+  anchors,
+  onFocus,
+  level,
+  defaultCollapseLevel,
+}) => {
   const routeOriginal = useFSRoute()
   const route = routeOriginal.split('#', 1)[0]!
 
@@ -63,7 +70,7 @@ const Folder: FC<FolderProps> = ({ item: _item, anchors, onFocus, level }) => {
       _item.type === 'menu' ? getMenuChildren(_item as any) : _item.children,
   }
 
-  const hasRoute = !!item.route // for item.type === 'menu' will be ''
+  const hasRoute = !!item.route
   const active = hasRoute && [route, route + '/'].includes(item.route + '/')
   const activeRouteInside =
     active || (hasRoute && route.startsWith(item.route + '/'))
@@ -73,8 +80,10 @@ const Folder: FC<FolderProps> = ({ item: _item, anchors, onFocus, level }) => {
 
   const { theme } = item as Item
 
-  const defaultMenuCollapseLevel = 2
-  const autoCollapse = true
+  // Logic to stop auto-closing other sections
+  const autoCollapse = false
+
+  const prevActiveRouteInside = useRef(activeRouteInside)
 
   const open =
     TreeState[item.route] === undefined
@@ -83,7 +92,7 @@ const Folder: FC<FolderProps> = ({ item: _item, anchors, onFocus, level }) => {
         focusedRouteInside ||
         (theme && 'collapsed' in theme
           ? !theme.collapsed
-          : level < defaultMenuCollapseLevel)
+          : level < defaultCollapseLevel)
       : TreeState[item.route] || focusedRouteInside
 
   const [, rerender] = useState<object>()
@@ -92,9 +101,7 @@ const Folder: FC<FolderProps> = ({ item: _item, anchors, onFocus, level }) => {
     HTMLAnchorElement | HTMLButtonElement
   > = (event) => {
     const el = event.currentTarget
-    const isClickOnIcon =
-      el /* will be always <a> or <button> */ !==
-      event.target /* can be <svg> or <path> */
+    const isClickOnIcon = el !== event.target
     if (isClickOnIcon) {
       event.preventDefault()
     }
@@ -104,25 +111,23 @@ const Folder: FC<FolderProps> = ({ item: _item, anchors, onFocus, level }) => {
   }
 
   useEffect(() => {
-    function updateTreeState() {
-      if (activeRouteInside || focusedRouteInside) {
+    const shouldExpand = activeRouteInside || focusedRouteInside
+
+    if (shouldExpand) {
+      const activeChanged = activeRouteInside !== prevActiveRouteInside.current
+
+      if (activeChanged || TreeState[item.route] === undefined) {
         TreeState[item.route] = true
       }
-    }
-
-    function updateAndPruneTreeState() {
-      if (activeRouteInside && focusedRouteInside) {
-        TreeState[item.route] = true
-      } else {
+    } else {
+      // If no longer active/focused and autoCollapse is on, close it
+      if (autoCollapse) {
         delete TreeState[item.route]
       }
     }
 
-    if (autoCollapse) {
-      updateAndPruneTreeState()
-    } else {
-      updateTreeState()
-    }
+    // Update ref for next render
+    prevActiveRouteInside.current = activeRouteInside
   }, [activeRouteInside, focusedRouteInside, item.route, autoCollapse])
 
   const isLink = 'frontMatter' in item
@@ -161,6 +166,7 @@ const Folder: FC<FolderProps> = ({ item: _item, anchors, onFocus, level }) => {
             directories={item.children}
             anchors={anchors}
             level={level}
+            defaultCollapseLevel={defaultCollapseLevel}
           />
         </Collapse>
       )}
@@ -203,6 +209,7 @@ const File: FC<{
   item: PageItem | Item
   anchors: Heading[]
   onFocus: FocusEventHandler
+  defaultCollapseLevel?: number
 }> = ({ item, anchors, onFocus }) => {
   const route = useFSRoute()
   // It is possible that the item doesn't have any route - for example, an external link.
@@ -253,6 +260,7 @@ interface MenuProps {
   anchors: Heading[]
   className?: string
   level: number
+  defaultCollapseLevel?: number
 }
 
 const handleFocus: FocusEventHandler<HTMLAnchorElement> = (event) => {
@@ -262,7 +270,10 @@ const handleFocus: FocusEventHandler<HTMLAnchorElement> = (event) => {
 }
 
 const Menu = forwardRef<HTMLUListElement, MenuProps>(
-  ({ directories, anchors, className, level }, forwardedRef) => (
+  (
+    { directories, anchors, className, level, defaultCollapseLevel = 2 },
+    forwardedRef,
+  ) => (
     <ul className={cn(classes.list, className)} ref={forwardedRef}>
       {directories.map((item) => {
         const ComponentToUse =
@@ -275,6 +286,7 @@ const Menu = forwardRef<HTMLUListElement, MenuProps>(
             anchors={anchors}
             onFocus={handleFocus}
             level={level + 1}
+            defaultCollapseLevel={defaultCollapseLevel}
           />
         )
       })}
@@ -363,6 +375,7 @@ export const MobileNav: FC<MobileNavProps> = ({
         directories={filteredDirectories}
         anchors={showAnchors ? anchors : []}
         level={0}
+        defaultCollapseLevel={1} // Mobile default: 1
       />
     </aside>
   )
@@ -424,6 +437,7 @@ export const Sidebar: FC<{ toc: Heading[]; floatTOC?: boolean }> = ({
               directories={docsDirectories}
               anchors={anchors}
               level={0}
+              defaultCollapseLevel={2} // Desktop default: 2
             />
           </Collapse>
         )}

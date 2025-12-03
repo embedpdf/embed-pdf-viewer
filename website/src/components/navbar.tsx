@@ -117,7 +117,7 @@ export default function Navbar() {
               onClick={() => setMenu(false)}
             />
 
-            <div className="absolute left-0 right-0 top-0 border-b border-gray-200 bg-white/95 p-4 shadow-xl backdrop-blur-xl dark:border-gray-800 dark:bg-gray-950/95">
+            <div className="absolute left-0 right-0 top-0 max-h-[calc(100vh-4rem)] overflow-y-auto border-b border-gray-200 bg-white/95 p-4 shadow-xl backdrop-blur-xl dark:border-gray-800 dark:bg-gray-950/95">
               <div className="flex flex-col space-y-2">
                 <Link
                   href="/docs"
