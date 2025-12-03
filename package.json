@@ -21,7 +21,8 @@
     "format": "prettier --write \"**/*.{ts,tsx,js,mjs,jsx,json,css,md}\"",
     "format:check": "prettier --check \"**/*.{ts,tsx,js,mjs,jsx,json,css,md}\"",
     "changeset": "changeset",
-    "ci:publish": "pnpm publish -r --access public --report-summary $GITHUB_WORKSPACE/publish-summary.json"
+    "ci:publish": "pnpm publish -r --access public --report-summary $GITHUB_WORKSPACE/publish-summary.json",
+    "ci:publish:next": "pnpm publish -r --access public --tag next --publish-branch next --report-summary $GITHUB_WORKSPACE/publish-summary.json"
   },
   "devDependencies": {
     "@changesets/cli": "^2.29.6",

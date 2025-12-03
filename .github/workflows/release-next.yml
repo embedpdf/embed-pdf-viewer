@@ -59,7 +59,7 @@ jobs:
         with:
           commit: "chore: version packages (next)"
           title:  "chore: version packages (next)"
-          publish: pnpm ci:publish
+          publish: pnpm ci:publish:next
           createGithubReleases: false
 
       - name: Detect publish summary
