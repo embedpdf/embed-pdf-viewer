@@ -144,6 +144,7 @@ import { BookmarkPluginPackage } from '@embedpdf/plugin-bookmark/preact';
 import {
   EXPORT_PLUGIN_ID,
   ExportPlugin,
+  ExportPluginConfig,
   ExportPluginPackage,
 } from '@embedpdf/plugin-export/preact';
 import {
@@ -193,6 +194,7 @@ export interface PluginConfigs {
   rotate?: RotatePluginConfig;
   tiling?: TilingPluginConfig;
   thumbnail?: ThumbnailPluginConfig;
+  export?: ExportPluginConfig;
 }
 
 export interface PDFViewerConfig {
@@ -231,6 +233,9 @@ const DEFAULT_PLUGIN_CONFIGS: Required<PluginConfigs> = {
     buffer: 3,
     labelHeight: 30,
   },
+  export: {
+    defaultFileName: "embedpdf-ebook.pdf"
+  }
 };
 
 // **Utility function to merge configurations**
