@@ -12,12 +12,14 @@ Let's build a basic, scrollable PDF viewer in Vue. This guide will walk you thro
 You'll need a few packages to create a minimal viewer: the core library, the engine, and a few essential plugins.
 
 ```sh npm2yarn
-npm install @embedpdf/core @embedpdf/engines @embedpdf/plugin-loader @embedpdf/plugin-viewport @embedpdf/plugin-scroll @embedpdf/plugin-render
+npm install @embedpdf/core @embedpdf/engines @embedpdf/plugin-document-manager @embedpdf/plugin-viewport @embedpdf/plugin-scroll @embedpdf/plugin-render
 ````
 
 ## 2. Create Your Viewer Component
 
 The core of your viewer will be the `<EmbedPDF>` component, which manages the engine and plugins. This example uses Vue 3's `<script setup>` syntax.
+
+Here is a minimal `PDFViewer` component that loads a document from a URL and renders it in a vertically scrollable viewport.
 
 ```vue copy filename="PDFViewer.vue"
 <script setup lang="ts">
@@ -25,10 +27,13 @@ import { usePdfiumEngine } from '@embedpdf/engines/vue';
 import { EmbedPDF } from '@embedpdf/core/vue';
 import { createPluginRegistration } from '@embedpdf/core';
 
-// Import the essential plugins and their components
+// Import the essential plugins
 import { ViewportPluginPackage, Viewport } from '@embedpdf/plugin-viewport/vue';
-import { Scroller, ScrollPluginPackage } from '@embedpdf/plugin-scroll/vue';
-import { LoaderPluginPackage } from '@embedpdf/plugin-loader/vue';
+import { ScrollPluginPackage, Scroller } from '@embedpdf/plugin-scroll/vue';
+import {
+  DocumentContent,
+  DocumentManagerPluginPackage,
+} from '@embedpdf/plugin-document-manager/vue';
 import { RenderLayer, RenderPluginPackage } from '@embedpdf/plugin-render/vue';
 
 // 1. Initialize the engine with the Vue composable
@@ -36,14 +41,8 @@ const { engine, isLoading } = usePdfiumEngine();
 
 // 2. Register the plugins you need
 const plugins = [
-  createPluginRegistration(LoaderPluginPackage, {
-    loadingOptions: {
-      type: 'url',
-      pdfFile: {
-        id: 'example-pdf',
-        url: 'https://snippet.embedpdf.com/ebook.pdf',
-      },
-    },
+  createPluginRegistration(DocumentManagerPluginPackage, {
+    initialDocuments: [{ url: 'https://snippet.embedpdf.com/ebook.pdf' }],
   }),
   createPluginRegistration(ViewportPluginPackage),
   createPluginRegistration(ScrollPluginPackage),
@@ -52,26 +51,36 @@ const plugins = [
 </script>
 
 <template>
-  <div style="height: 500px; border: 1px solid black;">
-    <div v-if="isLoading || !engine" class="loading-pane">
-      Loading PDF Engine...
-    </div>
-    
-    <EmbedPDF v-else :engine="engine" :plugins="plugins">
-      <Viewport class="viewport-class">
-        <Scroller>
-          <template #default="{ page }">
-            <div
-              :style="{
-                width: `${page.width}px`,
-                height: `${page.height}px`,
-              }"
-            >
-              <RenderLayer :pageIndex="page.pageIndex" />
-            </div>
-          </template>
-        </Scroller>
-      </Viewport>
+  <div v-if="isLoading || !engine" class="loading-pane">
+    Loading PDF Engine...
+  </div>
+
+  <!-- 3. Wrap your UI with the <EmbedPDF> provider -->
+  <div v-else style="height: 500px">
+    <EmbedPDF :engine="engine" :plugins="plugins" v-slot="{ activeDocumentId }">
+      <DocumentContent
+        v-if="activeDocumentId"
+        :document-id="activeDocumentId"
+        v-slot="{ isLoaded }"
+      >
+        <Viewport
+          v-if="isLoaded"
+          :document-id="activeDocumentId"
+          style="background-color: #f1f3f5"
+        >
+          <Scroller :document-id="activeDocumentId">
+            <template #default="{ page }">
+              <div :style="{ width: page.width + 'px', height: page.height + 'px' }">
+                <!-- The RenderLayer is responsible for drawing the page -->
+                <RenderLayer
+                  :document-id="activeDocumentId"
+                  :page-index="page.pageIndex"
+                />
+              </div>
+            </template>
+          </Scroller>
+        </Viewport>
+      </DocumentContent>
     </EmbedPDF>
   </div>
 </template>
@@ -83,13 +92,10 @@ const plugins = [
   align-items: center;
   height: 100%;
 }
-.viewport-class {
-  background-color: #f1f3f5;
-}
 </style>
 ```
 
-## 3\. Render Your Component
+## 3. Render Your Component
 
 Finally, import and use your new `<PDFViewer />` component in your main application file.
 
@@ -102,6 +108,20 @@ import PDFViewer from './PDFViewer.vue';
   <PDFViewer />
 </template>
 ```
+
+### Interactive Example
+
+When you run the code above, it will produce a functional, scrollable PDF viewer like the one shown here:
+
+import { SimplePdfViewer } from './code-examples/simple-pdf-viewer';
+
+<CodeExample 
+  codePaths={[
+    "../../examples/vue-tailwind/src/examples/simple-pdf-viewer.vue"
+  ]}
+>
+  <SimplePdfViewer />
+</CodeExample>
 
 You now have a functional PDF viewer!
 

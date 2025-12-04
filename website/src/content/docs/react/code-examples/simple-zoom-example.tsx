@@ -18,14 +18,9 @@ import { TilingLayer, TilingPluginPackage } from '@embedpdf/plugin-tiling/react'
 import {
   useZoom,
   ZoomPluginPackage,
-  MarqueeZoom,
   ZoomMode,
 } from '@embedpdf/plugin-zoom/react'
-import {
-  InteractionManagerPluginPackage,
-  PagePointerProvider,
-} from '@embedpdf/plugin-interaction-manager/react'
-import { Loader2, ZoomIn, ZoomOut, RotateCcw, Scan } from 'lucide-react'
+import { Loader2, ZoomIn, ZoomOut, RotateCcw } from 'lucide-react'
 
 interface ZoomToolbarProps {
   documentId: string
@@ -79,27 +74,6 @@ const ZoomToolbar = ({ documentId }: ZoomToolbarProps) => {
           <span className="hidden sm:inline">Reset</span>
         </button>
       </div>
-
-      {/* Marquee Zoom toggle */}
-      <div className="h-4 w-px bg-gray-300 dark:bg-gray-600" />
-      <button
-        onClick={zoom.toggleMarqueeZoom}
-        className={`inline-flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-xs font-medium shadow-sm transition-all ${
-          state.isMarqueeZoomActive
-            ? 'bg-blue-500 text-white ring-1 ring-blue-600'
-            : 'bg-white text-gray-600 ring-1 ring-gray-300 hover:bg-gray-50 dark:bg-gray-700 dark:text-gray-300 dark:ring-gray-600 dark:hover:bg-gray-600'
-        } `}
-        title="Toggle Area Zoom"
-      >
-        <Scan size={14} />
-        <span className="hidden sm:inline">Area Zoom</span>
-      </button>
-
-      {state.isMarqueeZoomActive && (
-        <span className="hidden animate-pulse text-xs text-blue-600 dark:text-blue-400 sm:inline">
-          Click and drag to zoom into area
-        </span>
-      )}
     </div>
   )
 }
@@ -116,7 +90,6 @@ export const PDFViewer = () => {
       createPluginRegistration(ScrollPluginPackage),
       createPluginRegistration(RenderPluginPackage),
       createPluginRegistration(TilingPluginPackage),
-      createPluginRegistration(InteractionManagerPluginPackage),
       createPluginRegistration(ZoomPluginPackage, {
         defaultZoomLevel: ZoomMode.FitPage,
       }),
@@ -157,31 +130,22 @@ export const PDFViewer = () => {
                       <Scroller
                         documentId={activeDocumentId}
                         renderPage={({ width, height, pageIndex }) => (
-                          <PagePointerProvider
-                            documentId={activeDocumentId}
-                            pageIndex={pageIndex}
+                          <div
+                            style={{
+                              width,
+                              height,
+                              position: 'relative',
+                            }}
                           >
-                            <div
-                              style={{
-                                width,
-                                height,
-                                position: 'relative',
-                              }}
-                            >
-                              <RenderLayer
-                                documentId={activeDocumentId}
-                                pageIndex={pageIndex}
-                              />
-                              <TilingLayer
-                                documentId={activeDocumentId}
-                                pageIndex={pageIndex}
-                              />
-                              <MarqueeZoom
-                                documentId={activeDocumentId}
-                                pageIndex={pageIndex}
-                              />
-                            </div>
-                          </PagePointerProvider>
+                            <RenderLayer
+                              documentId={activeDocumentId}
+                              pageIndex={pageIndex}
+                            />
+                            <TilingLayer
+                              documentId={activeDocumentId}
+                              pageIndex={pageIndex}
+                            />
+                          </div>
                         )}
                       />
                     </Viewport>
