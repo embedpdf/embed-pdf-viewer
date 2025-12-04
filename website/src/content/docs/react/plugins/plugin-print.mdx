@@ -27,14 +27,14 @@ import { EmbedPDF } from '@embedpdf/core/react'
 import { PrintPluginPackage } from '@embedpdf/plugin-print/react'
 
 const plugins = [
-  // ... other essential plugins
-  createPluginRegistration(LoaderPluginPackage, { /* ... */ }),
-  createPluginRegistration(ViewportPluginPackage),
-  createPluginRegistration(ScrollPluginPackage),
-  createPluginRegistration(RenderPluginPackage),
+  // ... other essential plugins
+  createPluginRegistration(DocumentManagerPluginPackage, { /* ... */ }),
+  createPluginRegistration(ViewportPluginPackage),
+  createPluginRegistration(ScrollPluginPackage),
+  createPluginRegistration(RenderPluginPackage),
 
-  // Register the print plugin
-  createPluginRegistration(PrintPluginPackage),
+  // Register the print plugin
+  createPluginRegistration(PrintPluginPackage),
 ]
 ```
 
@@ -42,36 +42,36 @@ const plugins = [
 
 The plugin works by combining a hook for initiating the print job with a component that handles the browser interaction.
 
-### 1\. Triggering a Print Job
+### 1. Triggering a Print Job
 
-Use the `usePrintCapability` hook to get access to the plugin's `print` method. You can call this method from any component, such as a button in your toolbar.
+Use the `usePrint` hook to get access to the plugin's `print` method for the current document. You can call this method from any component, such as a button in your toolbar.
 
 The `print` method returns a `Task`, which allows you to track the progress and handle success or failure, perfect for showing a loading state to the user.
 
 ```tsx {2, 5, 11-16}
 import { useState } from 'react';
-import { usePrintCapability } from '@embedpdf/plugin-print/react';
+import { usePrint } from '@embedpdf/plugin-print/react';
 
-export const PrintToolbar = () => {
-  const { provides: print } = usePrintCapability();
-  const [isPrinting, setIsPrinting] = useState(false);
+export const PrintToolbar = ({ documentId }) => {
+  const { provides: print } = usePrint(documentId);
+  const [isPrinting, setIsPrinting] = useState(false);
 
-  const handlePrint = () => {
-    if (!print || isPrinting) return;
-    setIsPrinting(true);
-    const printTask = print.print(); // Prints the entire document
+  const handlePrint = () => {
+    if (!print || isPrinting) return;
+    setIsPrinting(true);
+    const printTask = print.print(); // Prints the entire document
 
-    printTask.wait(
-      () => setIsPrinting(false), // On success
-      (error) => setIsPrinting(false), // On failure
-    );
-  };
+    printTask.wait(
+      () => setIsPrinting(false), // On success
+      (error) => setIsPrinting(false), // On failure
+    );
+  };
 
-  return (
-    <button onClick={handlePrint} disabled={isPrinting}>
-      {isPrinting ? 'Preparing...' : 'Print'}
-    </button>
-  );
+  return (
+    <button onClick={handlePrint} disabled={isPrinting}>
+      {isPrinting ? 'Preparing...' : 'Print'}
+    </button>
+  );
 };
 ```
 
@@ -97,9 +97,9 @@ import { PDFViewer } from '../code-examples/print-example';
 
 ## API Reference
 
-### Hook: `usePrintCapability()`
+### Hook: `usePrint(documentId)`
 
-This hook connects your component to the print plugin's functions.
+This hook connects your component to the print plugin's functions for a specific document.
 
 #### Returns
 

@@ -20,25 +20,23 @@ npm install @embedpdf/plugin-rotate
 
 Import `RotatePluginPackage` and add it to the `plugins` array. You can also specify a default rotation to apply when a document is first loaded.
 
-```tsx {4, 16-18}
+```tsx {4, 13-16}
 import { createPluginRegistration } from '@embedpdf/core'
 import { EmbedPDF } from '@embedpdf/core/react'
 import { Rotation } from '@embedpdf/models'
 import { RotatePluginPackage } from '@embedpdf/plugin-rotate/react'
 
 const plugins = [
-  // ... other essential plugins
-  createPluginRegistration(LoaderPluginPackage, {
-    /* ... */
-  }),
-  createPluginRegistration(ViewportPluginPackage),
-  createPluginRegistration(ScrollPluginPackage),
-  createPluginRegistration(RenderPluginPackage),
+  // ... other essential plugins
+  createPluginRegistration(DocumentManagerPluginPackage, { /* ... */ }),
+  createPluginRegistration(ViewportPluginPackage),
+  createPluginRegistration(ScrollPluginPackage),
+  createPluginRegistration(RenderPluginPackage),
 
-  // Register and configure the rotate plugin
-  createPluginRegistration(RotatePluginPackage, {
-    defaultRotation: Rotation.Degree90, // Start documents rotated 90° clockwise
-  }),
+  // Register and configure the rotate plugin
+  createPluginRegistration(RotatePluginPackage, {
+    defaultRotation: Rotation.Degree90, // Start documents rotated 90° clockwise
+  }),
 ]
 
 // ... rest of your component
@@ -55,20 +53,20 @@ Use the `useRotate` hook to get the current `rotation` state and the `provides` 
 ```tsx filename="RotateToolbar.tsx"
 import { useRotate } from '@embedpdf/plugin-rotate/react'
 
-export const RotateToolbar = () => {
-  const { rotation, provides: rotate } = useRotate()
+export const RotateToolbar = ({ documentId }) => {
+  const { rotation, provides: rotate } = useRotate(documentId)
 
-  if (!rotate) {
-    return null
-  }
+  if (!rotate) {
+    return null
+  }
 
-  return (
-    <div className="toolbar">
-      <span>Current Rotation: {rotation * 90}°</span>
-      <button onClick={rotate.rotateBackward}>Rotate Left</button>
-      <button onClick={rotate.rotateForward}>Rotate Right</button>
-    </div>
-  )
+  return (
+    <div className="toolbar">
+      <span>Current Rotation: {rotation * 90}°</span>
+      <button onClick={rotate.rotateBackward}>Rotate Left</button>
+      <button onClick={rotate.rotateForward}>Rotate Right</button>
+    </div>
+  )
 }
 ```
 
@@ -76,19 +74,21 @@ export const RotateToolbar = () => {
 
 For the rotation to be visible, you must wrap your page layers with the `<Rotate />` component inside the `Scroller`'s `renderPage` function. This component calculates and applies the necessary CSS transform. It's important to place it *outside* the `PagePointerProvider` to ensure interactions are correctly mapped to the rotated page.
 
-```tsx {4, 11}
+```tsx {5, 13}
 // Inside your main PDFViewer component
 <Scroller
-  renderPage={({ width, height, pageIndex, scale, rotation }) => (
-    <Rotate pageSize={{ width, height }}>
-      <PagePointerProvider
-        pageIndex={pageIndex}
-        {/* ... other props */}
-      >
-        <RenderLayer pageIndex={pageIndex} scale={scale} />
-      </PagePointerProvider>
-    </Rotate>
-  )}
+  documentId={activeDocumentId}
+  renderPage={({ pageIndex }) => (
+    <Rotate documentId={activeDocumentId} pageIndex={pageIndex}>
+      <PagePointerProvider
+        documentId={activeDocumentId}
+        pageIndex={pageIndex}
+        {/* ... other props */}
+      >
+        <RenderLayer documentId={activeDocumentId} pageIndex={pageIndex} />
+      </PagePointerProvider>
+    </Rotate>
+  )}
 />
 ```
 
@@ -114,9 +114,9 @@ import { PDFViewer } from '../code-examples/rotate-example'
 | :--- | :--- | :--- |
 | **`defaultRotation`** | `Rotation` | Sets the initial rotation for loaded documents. The `Rotation` enum can be imported from `@embedpdf/models`. <br />**Default**: `Rotation.Degree0` |
 
-### Hook: `useRotate()`
+### Hook: `useRotate(documentId)`
 
-Connects your component to the rotate plugin's state and functions.
+Connects your component to the rotate plugin's state and functions for a specific document.
 
 #### Returns
 
@@ -142,5 +142,6 @@ A wrapper component that applies the correct CSS rotation transform to its child
 
 | Prop | Type | Description |
 | :--- | :--- | :--- |
-| **`pageSize`** | `Size` | (Required) An object `{ width: number, height: number }` representing the unrotated dimensions of the page. This is used to calculate the correct transform origin. |
+| **`documentId`** | `string` | (Required) The ID of the document. |
+| **`pageIndex`** | `number` | (Required) The page index. |
 | **`children`** | `ReactNode` | The page layers that should be rotated. |

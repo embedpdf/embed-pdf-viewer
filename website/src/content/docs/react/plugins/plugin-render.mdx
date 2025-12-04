@@ -1,12 +1,14 @@
 ---
 title: Render Plugin
-description: Provides the essential <RenderLayer /> component for visually rendering PDF pages.
+description: Provides the essential <RenderLayer /> component for visually rendering PDF pages, forms, and annotations.
 searchable: true
 ---
 
 # Render Plugin
 
-The Render Plugin is the visual heart of the PDF viewer. It's responsible for taking the PDF data from the core engine and "painting" it onto the screen for the user to see. Its primary feature is the fundamental `<RenderLayer />` component.
+The Render Plugin is the visual heart of the PDF viewer. It is responsible for taking the raw PDF data from the core engine and "painting" it onto the screen. It supports high-fidelity rendering of text, images, vector graphics, and form widgets.
+
+This plugin works seamlessly in multi-document environments, allowing you to render pages from different documents simultaneously using specific `documentId` references.
 
 ## Installation
 
@@ -18,9 +20,9 @@ npm install @embedpdf/plugin-render
 
 ## Registration
 
-Import `RenderPluginPackage` and add it to the `plugins` array. This plugin has no configuration options.
+Import `RenderPluginPackage` and add it to the `plugins` array. You can configure global defaults for form and annotation rendering here.
 
-```tsx {4, 13}
+```tsx {13-19}
 import { createPluginRegistration } from '@embedpdf/core'
 import { EmbedPDF } from '@embedpdf/core/react'
 // ... other imports
@@ -28,62 +30,80 @@ import { RenderPluginPackage } from '@embedpdf/plugin-render/react'
 
 const plugins = [
   // ... other essential plugins
-  createPluginRegistration(LoaderPluginPackage, { /* ... */ }),
+  createPluginRegistration(DocumentManagerPluginPackage, { /* ... */ }),
   createPluginRegistration(ViewportPluginPackage),
   createPluginRegistration(ScrollPluginPackage),
 
   // Register the render plugin
-  createPluginRegistration(RenderPluginPackage),
+  createPluginRegistration(RenderPluginPackage, {
+    // Optional: Draw form widget visuals (checkboxes, text content)
+    // Note: This is for display only, not interaction.
+    withForms: true, 
+    // Optional: Burn annotations into the render (usually handled by AnnotationPlugin instead)
+    withAnnotations: false, 
+  }),
 ]
 ```
 
 ## Usage
 
-The plugin can be used in two ways: the simple `<RenderLayer />` component for displaying pages within the viewer, and the `useRenderCapability` hook for more advanced, on-demand rendering tasks.
+The plugin allows you to render pages declaratively via the `<RenderLayer />` component or imperatively via the `useRenderCapability` hook (e.g., for exporting images).
 
 ### Primary Usage: The `<RenderLayer />` Component
 
-This is the most common and straightforward way to render a PDF page. You should place the `<RenderLayer />` component inside the `renderPage` prop of your `<Scroller />`. It will automatically render the correct page at the correct size and resolution as the user scrolls.
+This is the standard way to display a page. Place the `<RenderLayer />` component inside the `renderPage` prop of your `<Scroller />`.
 
-```tsx {5}
+You must provide the `documentId` to tell the renderer which document the page belongs to. The component automatically detects the current scale and refresh version from the document state.
+
+```tsx {6-9}
 <Scroller
-  renderPage={({ width, height, pageIndex, scale }) => (
-    <div style={{ width, height, position: 'relative' }}>
-      {/* The RenderLayer is responsible for drawing the page */}
-      <RenderLayer pageIndex={pageIndex} scale={scale} />
-    </div>
-  )}
+  documentId={activeDocumentId}
+  renderPage={({ pageIndex }) => (
+    <div style={{ position: 'relative' }}>
+      {/* The RenderLayer is responsible for drawing the page */}
+      <RenderLayer 
+        documentId={activeDocumentId} 
+        pageIndex={pageIndex} 
+      />
+    </div>
+  )}
 />
 ```
 
 ### Advanced Usage: On-Demand Rendering
 
-For custom features that require rendering a page outside the main viewer—such as exporting a page as a high-resolution image—you can use the `useRenderCapability` hook. This gives you direct access to the plugin's rendering functions.
+For tasks like generating thumbnails, creating snapshots, or exporting pages as images, use the `useRenderCapability` hook.
 
-```tsx {2, 5, 10}
-import { useState } from 'react';
+Because multiple documents may be open, you must scope your request using `.forDocument(id)`.
+
+```tsx {1, 4, 8, 11-14}
 import { useRenderCapability } from '@embedpdf/plugin-render/react';
 
-const ExportButton = () => {
-  const { provides: render } = useRenderCapability();
-  const [isExporting, setIsExporting] = useState(false);
+const ExportButton = ({ documentId }) => {
+  const { provides: renderPlugin } = useRenderCapability();
 
-  const exportPage = () => {
-    setIsExporting(true);
-    const task = render.renderPage({ pageIndex: 0, options: { scaleFactor: 3.0 } });
-    task.wait(blob => {
-      // ... trigger download from the blob ...
-      setIsExporting(false);
+  const exportPage = () => {
+    // 1. Scope the renderer to the specific document
+    const renderer = renderPlugin?.forDocument(documentId);
+
+    // 2. Request a render
+    const task = renderer?.renderPage({ 
+      pageIndex: 0, 
+      options: { scaleFactor: 2.0, imageType: 'image/png' } 
     });
-  };
 
-  return <button onClick={exportPage}>{isExporting ? '...' : 'Export Page'}</button>
+    task?.wait(blob => {
+      // ... handle the image blob (e.g., download it)
+    });
+  };
+
+  return <button onClick={exportPage}>Export Page 1</button>
 }
 ```
 
 ## Live Example
 
-This example shows a standard PDF viewer, but with a toolbar button that uses the `useRenderCapability` hook to export the first page as a high-resolution PNG file.
+This example shows a PDF viewer with a custom "Export" toolbar. It uses the `RenderPlugin` to take a high-resolution snapshot of the first page, including annotations, and triggers a download.
 
 import { PDFViewer } from '../code-examples/render-example';
 
@@ -97,40 +117,53 @@ import { PDFViewer } from '../code-examples/render-example';
 
 ## API Reference
 
+### Configuration (`RenderPluginConfig`)
+
+| Option | Type | Description |
+| :--- | :--- | :--- |
+| **`withForms`** | `boolean` | If `true`, the **visual appearance** of form widgets (checkboxes, filled input text) will be drawn onto the page image. This does not create interactive elements. <br />**Default**: `false` |
+| **`withAnnotations`** | `boolean` | If `true`, annotations will be baked into the page image. <br />**Default**: `false` |
+
 ### Component: `<RenderLayer />`
 
-The component that renders a single PDF page as an image.
+The component that renders a single PDF page.
 
 | Prop | Type | Description |
 | :--- | :--- | :--- |
-| **`pageIndex`** | `number` | (Required) The index of the page to render. |
-| **`scale`** | `number` | The scale factor for rendering the page. A higher number results in a higher resolution image. |
-| **`dpr`** | `number` | The device pixel ratio to use for rendering, for crisp text on high-DPI screens. <br/>**Default**: `window.devicePixelRatio` |
+| **`documentId`** | `string` | **(Required)** The ID of the document this page belongs to. |
+| **`pageIndex`** | `number` | **(Required)** The 0-based index of the page to render. |
+| **`scale`** | `number` | Optional scale override. If omitted, uses the document's current zoom level. |
+| **`dpr`** | `number` | The device pixel ratio to use. <br />**Default**: `window.devicePixelRatio` |
 
 ### Hook: `useRenderCapability()`
 
-Connects your component to the render plugin's low-level functions.
+Access the rendering API.
 
 #### Returns
 
 | Property | Type | Description |
 | :--- | :--- | :--- |
-| **`provides`** | `RenderCapability \| null` | An object with methods to render pages, or `null` if the plugin is not ready. |
+| **`provides`** | `RenderCapability \| null` | The render API object. |
 
 #### `RenderCapability` Methods
 
 | Method | Description |
 | :--- | :--- |
-| **`renderPage(options)`** | Renders a full page. The `options` object takes a `pageIndex` and a `PdfRenderPageOptions` object. Returns a `Task<Blob>`. |
-| **`renderPageRect(options)`** | Renders a specific rectangular portion of a page. Useful for creating snapshots. Returns a `Task<Blob>`. |
+| **`forDocument(id)`** | Returns a `RenderScope` for the specified document ID. |
+
+#### `RenderScope` Methods (Returned by `forDocument`)
+
+| Method | Description |
+| :--- | :--- |
+| **`renderPage(options)`** | Renders a full page to a Blob. `options`: `{ pageIndex, options: PdfRenderPageOptions }`. |
+| **`renderPageRect(options)`** | Renders a sub-region of a page. `options`: `{ pageIndex, rect, options: PdfRenderPageOptions }`. |
 
 #### `PdfRenderPageOptions`
 
 | Option | Type | Description |
 | :--- | :--- | :--- |
 | **`scaleFactor`**| `number`| The scale to render at. **Default**: `1.0`. |
-| **`rotation`** | `Rotation` | Applies a rotation to the rendered output. **Default**: `Rotation.Degree0`. |
-| **`dpr`**| `number` | The device pixel ratio. **Default**: `window.devicePixelRatio`. |
-| **`withAnnotations`** | `boolean` | Whether to include annotations in the render. **Default**: `true`. |
-| **`imageType`** | `string` | The image format for the output, e.g., `'image/webp'`, `'image/jpeg'`, or `'image/png'`. **Default**: `'image/webp'`. |
-| **`imageQuality`** | `number` | A value between 0 and 1 indicating the quality for lossy formats like `'image/jpeg'` and `'image/webp'`. |
+| **`withAnnotations`** | `boolean` | Include annotations in render. **Default**: Plugin config value. |
+| **`withForms`** | `boolean` | Include form visuals in render. **Default**: Plugin config value. |
+| **`imageType`** | `string` | Output format: `'image/webp'`, `'image/jpeg'`, `'image/png'`. |
+| **`imageQuality`** | `number` | 0 to 1 quality for lossy formats. |

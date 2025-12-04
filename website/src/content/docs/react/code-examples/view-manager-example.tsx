@@ -7,6 +7,7 @@ import {
   DocumentManagerPlugin,
   DocumentManagerPluginPackage,
   useDocumentManagerCapability,
+  useOpenDocuments,
 } from '@embedpdf/plugin-document-manager/react'
 import { RenderLayer, RenderPluginPackage } from '@embedpdf/plugin-render/react'
 import {
@@ -115,6 +116,96 @@ const EmptyViewState = ({ onOpenFile }: { onOpenFile: () => void }) => (
   </div>
 )
 
+// Tab Bar component that uses hooks at the top level
+const ViewPaneTabBar = ({
+  documentIds,
+  activeDocumentId,
+  setActiveDocument,
+  removeDocument,
+  onOpenFile,
+  onRemoveView,
+  canRemoveView,
+}: {
+  documentIds: string[]
+  activeDocumentId: string | null
+  setActiveDocument: (documentId: string) => void
+  removeDocument: (documentId: string) => void
+  onOpenFile: () => void
+  onRemoveView: () => void
+  canRemoveView: boolean
+}) => {
+  const documentStates = useOpenDocuments(documentIds)
+
+  return (
+    <div className="flex min-h-[36px] items-center gap-1 border-b border-gray-300 bg-gray-50 px-1 py-1 dark:border-gray-700 dark:bg-gray-800/50">
+      {/* Document Tabs */}
+      <div className="flex flex-1 items-center gap-0.5 overflow-x-auto">
+        {documentStates.map((doc) => {
+          const isActive = activeDocumentId === doc.id
+          return (
+            <div
+              key={doc.id}
+              onClick={(e) => {
+                e.stopPropagation()
+                setActiveDocument(doc.id)
+              }}
+              className={`group flex min-w-0 max-w-[120px] cursor-pointer items-center gap-1.5 rounded px-2 py-1 text-[11px] font-medium transition-all ${
+                isActive
+                  ? 'bg-white text-gray-900 shadow-sm ring-1 ring-gray-300 dark:bg-gray-700 dark:text-gray-100 dark:ring-gray-600'
+                  : 'text-gray-600 hover:bg-gray-100 hover:text-gray-700 dark:text-gray-400 dark:hover:bg-gray-700/50 dark:hover:text-gray-300'
+              } `}
+            >
+              <FileText size={12} className="flex-shrink-0" />
+              <span className="truncate">{doc.name || 'Untitled'}</span>
+              <button
+                onClick={(e) => {
+                  e.stopPropagation()
+                  removeDocument(doc.id)
+                }}
+                className={`flex-shrink-0 rounded p-0.5 transition-all hover:bg-gray-200 dark:hover:bg-gray-600 ${isActive ? 'opacity-60 hover:opacity-100' : 'opacity-0 hover:!opacity-100 group-hover:opacity-60'} `}
+              >
+                <X size={10} />
+              </button>
+            </div>
+          )
+        })}
+
+        {documentStates.length === 0 && (
+          <span className="px-2 py-1 text-[11px] italic text-gray-500 dark:text-gray-400">
+            Empty pane
+          </span>
+        )}
+      </div>
+
+      {/* Actions */}
+      <div className="ml-1 flex flex-shrink-0 items-center gap-0.5">
+        <button
+          onClick={(e) => {
+            e.stopPropagation()
+            onOpenFile()
+          }}
+          className="rounded p-1 text-gray-500 transition-colors hover:bg-gray-200 hover:text-gray-600 dark:text-gray-400 dark:hover:bg-gray-700 dark:hover:text-gray-300"
+          title="Open file in this pane"
+        >
+          <Plus size={14} />
+        </button>
+        {canRemoveView && (
+          <button
+            onClick={(e) => {
+              e.stopPropagation()
+              onRemoveView()
+            }}
+            className="rounded p-1 text-gray-500 transition-colors hover:bg-red-100 hover:text-red-600 dark:text-gray-400 dark:hover:bg-red-900/30 dark:hover:text-red-400"
+            title="Close this pane"
+          >
+            <X size={14} />
+          </button>
+        )}
+      </div>
+    </div>
+  )
+}
+
 // Individual View Pane
 const ViewPane = ({ viewId }: { viewId: string }) => {
   const { provides: viewManager } = useViewManagerCapability()
@@ -162,72 +253,15 @@ const ViewPane = ({ viewId }: { viewId: string }) => {
           className={`flex flex-col overflow-hidden bg-white ring-1 ring-inset ring-gray-300 transition-all dark:bg-gray-900 dark:ring-gray-700`}
         >
           {/* Tab Bar */}
-          <div className="flex min-h-[36px] items-center gap-1 border-b border-gray-300 bg-gray-50 px-1 py-1 dark:border-gray-700 dark:bg-gray-800/50">
-            {/* Document Tabs */}
-            <div className="flex flex-1 items-center gap-0.5 overflow-x-auto">
-              {documentIds.map((docId) => {
-                const isActive = activeDocumentId === docId
-                return (
-                  <div
-                    key={docId}
-                    onClick={(e) => {
-                      e.stopPropagation()
-                      setActiveDocument(docId)
-                    }}
-                    className={`group flex min-w-0 max-w-[120px] cursor-pointer items-center gap-1.5 rounded px-2 py-1 text-[11px] font-medium transition-all ${
-                      isActive
-                        ? 'bg-white text-gray-900 shadow-sm ring-1 ring-gray-300 dark:bg-gray-700 dark:text-gray-100 dark:ring-gray-600'
-                        : 'text-gray-600 hover:bg-gray-100 hover:text-gray-700 dark:text-gray-400 dark:hover:bg-gray-700/50 dark:hover:text-gray-300'
-                    } `}
-                  >
-                    <FileText size={12} className="flex-shrink-0" />
-                    <span className="truncate">{docId}</span>
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation()
-                        removeDocument(docId)
-                      }}
-                      className={`flex-shrink-0 rounded p-0.5 transition-all hover:bg-gray-200 dark:hover:bg-gray-600 ${isActive ? 'opacity-60 hover:opacity-100' : 'opacity-0 hover:!opacity-100 group-hover:opacity-60'} `}
-                    >
-                      <X size={10} />
-                    </button>
-                  </div>
-                )
-              })}
-
-              {documentIds.length === 0 && (
-                <span className="px-2 py-1 text-[11px] italic text-gray-500 dark:text-gray-400">
-                  Empty pane
-                </span>
-              )}
-            </div>
-
-            {/* Actions */}
-            <div className="ml-1 flex flex-shrink-0 items-center gap-0.5">
-              <button
-                onClick={(e) => {
-                  e.stopPropagation()
-                  handleOpenFile(false)
-                }}
-                className="rounded p-1 text-gray-500 transition-colors hover:bg-gray-200 hover:text-gray-600 dark:text-gray-400 dark:hover:bg-gray-700 dark:hover:text-gray-300"
-                title="Open file in this pane"
-              >
-                <Plus size={14} />
-              </button>
-              {views.length > 1 && (
-                <button
-                  onClick={(e) => {
-                    e.stopPropagation()
-                    handleRemoveView()
-                  }}
-                  className="rounded p-1 text-gray-500 transition-colors hover:bg-red-100 hover:text-red-600 dark:text-gray-400 dark:hover:bg-red-900/30 dark:hover:text-red-400"
-                  title="Close this pane"
-                >
-                  <X size={14} />
-                </button>
-              )}
-            </div>
-          </div>
+          <ViewPaneTabBar
+            documentIds={documentIds}
+            activeDocumentId={activeDocumentId}
+            setActiveDocument={setActiveDocument}
+            removeDocument={removeDocument}
+            onOpenFile={() => handleOpenFile(false)}
+            onRemoveView={handleRemoveView}
+            canRemoveView={views.length > 1}
+          />
 
           {/* Content Area */}
           <div className="relative flex-1 bg-gray-50 dark:bg-gray-800">

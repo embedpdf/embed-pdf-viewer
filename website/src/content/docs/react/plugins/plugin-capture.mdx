@@ -29,21 +29,21 @@ import { InteractionManagerPluginPackage } from '@embedpdf/plugin-interaction-ma
 import { CapturePluginPackage } from '@embedpdf/plugin-capture/react'
 
 const plugins = [
-  // ... other essential plugins
-  createPluginRegistration(LoaderPluginPackage, { /* ... */ }),
-  createPluginRegistration(ViewportPluginPackage),
-  createPluginRegistration(ScrollPluginPackage),
+  // ... other essential plugins
+  createPluginRegistration(DocumentManagerPluginPackage, { /* ... */ }),
+  createPluginRegistration(ViewportPluginPackage),
+  createPluginRegistration(ScrollPluginPackage),
 
-  // Register dependencies first
-  createPluginRegistration(RenderPluginPackage),
-  createPluginRegistration(InteractionManagerPluginPackage),
+  // Register dependencies first
+  createPluginRegistration(RenderPluginPackage),
+  createPluginRegistration(InteractionManagerPluginPackage),
 
-  // Register and configure the capture plugin
-  createPluginRegistration(CapturePluginPackage, {
-    scale: 2.0, // Render captured image at 2x resolution
-    imageType: 'image/png',
-    withAnnotations: true,
-  }),
+  // Register and configure the capture plugin
+  createPluginRegistration(CapturePluginPackage, {
+    scale: 2.0, // Render captured image at 2x resolution
+    imageType: 'image/png',
+    withAnnotations: true,
+  }),
 ]
 ```
 
@@ -51,73 +51,74 @@ const plugins = [
 
 The plugin works by combining a UI component to draw the selection area, a hook to control the capture mode, and an event listener to handle the final image.
 
-### 1\. Add the `<MarqueeCapture />` Component
+### 1. Add the `<MarqueeCapture />` Component
 
 To enable the visual selection tool, place the `<MarqueeCapture />` component inside the `renderPage` prop of your `<Scroller />`. It must be a child of `<PagePointerProvider>` to correctly handle mouse or touch interactions.
 
-```tsx {2, 9}
+```tsx {2, 10}
 import { PagePointerProvider } from '@embedpdf/plugin-interaction-manager/react';
 import { MarqueeCapture } from '@embedpdf/plugin-capture/react';
 
 // ...
 <Scroller
-  renderPage={({ width, height, pageIndex, scale, rotation }) => (
-    <PagePointerProvider {...{ pageIndex, width, height, scale, rotation }}>
-      <RenderLayer pageIndex={pageIndex} />
-      <MarqueeCapture pageIndex={pageIndex} scale={scale} />
-    </PagePointerProvider>
-  )}
+  documentId={activeDocumentId}
+  renderPage={({ pageIndex }) => (
+    <PagePointerProvider documentId={activeDocumentId} pageIndex={pageIndex}>
+      <RenderLayer documentId={activeDocumentId} pageIndex={pageIndex} />
+      <MarqueeCapture documentId={activeDocumentId} pageIndex={pageIndex} />
+    </PagePointerProvider>
+  )}
 />
 ```
 
-### 2\. Build a Toolbar Button
+### 2. Build a Toolbar Button
 
-Use the `useCaptureCapability` hook to get access to the plugin's methods. The `toggleMarqueeCapture()` method activates and deactivates the selection mode.
+Use the `useCapture` hook to get access to the plugin's methods for a specific document. The `toggleMarqueeCapture()` method activates and deactivates the selection mode.
 
 ```tsx
-import { useCaptureCapability } from '@embedpdf/plugin-capture/react';
+import { useCapture } from '@embedpdf/plugin-capture/react';
 
-const CaptureToolbar = () => {
-  const { provides: capture } = useCaptureCapability();
-  const isActive = capture?.isMarqueeCaptureActive();
+const CaptureToolbar = ({ documentId }) => {
+  const { provides: capture, state } = useCapture(documentId);
+  const isActive = state.isMarqueeCaptureActive;
 
-  return (
-    <button onClick={() => capture?.toggleMarqueeCapture()}>
-      {isActive ? 'Cancel' : 'Capture Area'}
-    </button>
-  );
+  return (
+    <button onClick={() => capture?.toggleMarqueeCapture()}>
+      {isActive ? 'Cancel' : 'Capture Area'}
+    </button>
+  );
 }
 ```
 
-### 3\. Handle the Captured Image
+### 3. Handle the Captured Image
 
 After the user selects an area, the plugin fires an event with the resulting image data. You must listen for this event using the `onCaptureArea` method to receive the `Blob`. From there, you can display the image or trigger a download.
 
 ```tsx
 import { useEffect, useState } from 'react';
-import { useCaptureCapability, CaptureAreaEvent } from '@embedpdf/plugin-capture/react';
+import { useCapture, CaptureAreaEvent } from '@embedpdf/plugin-capture/react';
 
-const CaptureResult = () => {
-  const { provides: capture } = useCaptureCapability();
-  const [imageUrl, setImageUrl] = useState<string | null>(null);
+const CaptureResult = ({ documentId }) => {
+  const { provides: capture } = useCapture(documentId);
+  const [imageUrl, setImageUrl] = useState<string | null>(null);
 
-  useEffect(() => {
-    if (!capture) return;
+  useEffect(() => {
+    if (!capture) return;
 
-    const unsubscribe = capture.onCaptureArea((result: CaptureAreaEvent) => {
-      const newUrl = URL.createObjectURL(result.blob);
-      setImageUrl(newUrl);
-    });
+    const unsubscribe = capture.onCaptureArea((result: CaptureAreaEvent) => {
+      const newUrl = URL.createObjectURL(result.blob);
+      setImageUrl(newUrl);
+    });
 
-    return () => {
-      unsubscribe();
-      if (imageUrl) URL.revokeObjectURL(imageUrl);
-    };
-  }, [capture]);
+    return () => {
+      unsubscribe();
+      if (imageUrl) URL.revokeObjectURL(imageUrl);
+    };
+  }, [capture]);
 
-  if (!imageUrl) return <p>Select an area to capture.</p>;
+  if (!imageUrl) return <p>Select an area to capture.</p>;
 
-  return <img src={imageUrl} alt="Captured PDF area" />;
+  return <img src={imageUrl} alt="Captured PDF area" />;
 };
 ```
 
@@ -151,28 +152,28 @@ The component that renders the visual selection rectangle.
 
 | Prop | Type | Description |
 | :--- | :--- | :--- |
+| **`documentId`** | `string` | **(Required)** The ID of the document. |
 | **`pageIndex`** | `number` | **(Required)** The page index this component is rendered on. |
-| **`scale`** | `number` | **(Required)** The current scale of the page. |
 | **`className`** | `string` | Optional CSS class for custom styling of the marquee. |
 | **`stroke`** | `string` | The color of the marquee's border. |
 | **`fill`** | `string` | The background color of the marquee. |
 
-### Hook: `useCaptureCapability()`
+### Hook: `useCapture(documentId)`
 
-Connects your component to the capture plugin's state and functions.
+Connects your component to the capture plugin's state and functions for a specific document.
 
 #### Returns
 
 | Property | Type | Description |
 | :--- | :--- | :--- |
-| **`provides`**| `CaptureCapability \| null` | An object with methods to interact with the plugin, or `null` if not ready. |
+| **`state`** | `CaptureState` | An object containing the current state, such as `isMarqueeCaptureActive`. |
+| **`provides`**| `CaptureScope \| null` | An object with methods to interact with the plugin, or `null` if not ready. |
 
-#### `CaptureCapability` Methods
+#### `CaptureScope` Methods
 
 | Method | Description |
 | :--- | :--- |
 | **`toggleMarqueeCapture()`** | Toggles the marquee selection mode on or off. |
-| **`isMarqueeCaptureActive()`**| Returns `true` if the marquee selection mode is currently active. |
 | **`onCaptureArea(callback)`** | Subscribes to the capture event. The callback receives a `CaptureAreaEvent` object when an area is successfully captured. |
 | **`captureArea(pageIndex, rect)`** | Programmatically captures a specified rectangular area on a page. |
 

@@ -10,6 +10,7 @@ import {
   DocumentContext,
   useDocumentManagerCapability,
   TabActions,
+  useOpenDocuments,
 } from '@embedpdf/plugin-document-manager/react'
 import {
   ViewportPluginPackage,
@@ -22,16 +23,23 @@ import { ZoomPluginPackage, ZoomMode } from '@embedpdf/plugin-zoom/react'
 import { Loader2, FileText, X, Plus, FolderOpen } from 'lucide-react'
 
 interface TabBarProps {
-  documentStates: DocumentState[]
   activeDocumentId: string | null
-  actions: TabActions
 }
 
-function TabBar({ documentStates, activeDocumentId, actions }: TabBarProps) {
+function TabBar({ activeDocumentId }: TabBarProps) {
   const { provides } = useDocumentManagerCapability()
+  const documentStates = useOpenDocuments()
 
   const handleOpenFile = () => {
     provides?.openFileDialog()
+  }
+
+  const handleSelect = (documentId: string) => {
+    provides?.setActiveDocument(documentId)
+  }
+
+  const handleClose = (documentId: string) => {
+    provides?.closeDocument(documentId)
   }
 
   return (
@@ -43,14 +51,14 @@ function TabBar({ documentStates, activeDocumentId, actions }: TabBarProps) {
           return (
             <div
               key={doc.id}
-              onClick={() => actions.select(doc.id)}
+              onClick={() => handleSelect(doc.id)}
               role="tab"
               tabIndex={0}
               aria-selected={isActive}
               onKeyDown={(e) => {
                 if (e.key === 'Enter' || e.key === ' ') {
                   e.preventDefault()
-                  actions.select(doc.id)
+                  handleSelect(doc.id)
                 }
               }}
               className={`group relative flex min-w-[100px] max-w-[180px] cursor-pointer items-center gap-2 rounded-md px-2.5 py-1.5 text-xs font-medium transition-all ${
@@ -66,7 +74,7 @@ function TabBar({ documentStates, activeDocumentId, actions }: TabBarProps) {
               <button
                 onClick={(e) => {
                   e.stopPropagation()
-                  actions.close(doc.id)
+                  handleClose(doc.id)
                 }}
                 aria-label={`Close ${doc.name ?? 'document'}`}
                 className={`flex-shrink-0 rounded p-0.5 transition-all hover:bg-gray-200 dark:hover:bg-gray-600 ${isActive ? 'opacity-60 hover:opacity-100' : 'opacity-0 hover:!opacity-100 group-hover:opacity-60'} `}
@@ -160,76 +168,60 @@ export const PDFViewer = () => {
         <>
           {pluginsReady ? (
             <div className="overflow-hidden rounded-lg border border-gray-300 bg-white shadow-sm dark:border-gray-700 dark:bg-gray-900">
-              <DocumentContext>
-                {({ documentStates, activeDocumentId: activeId, actions }) => (
-                  <>
-                    {/* Tab Bar */}
-                    <TabBar
-                      documentStates={documentStates}
-                      activeDocumentId={activeId}
-                      actions={actions}
-                    />
+              {/* Tab Bar */}
+              <TabBar activeDocumentId={activeDocumentId} />
 
-                    {/* Document Content */}
-                    {activeId ? (
-                      <DocumentContent documentId={activeId}>
-                        {({ isLoading: docLoading, isLoaded }) => (
-                          <>
-                            {docLoading && (
-                              <div className="flex h-[400px] items-center justify-center sm:h-[500px]">
-                                <div className="flex items-center gap-2 text-gray-500 dark:text-gray-400">
-                                  <Loader2 size={20} className="animate-spin" />
-                                  <span className="text-sm">
-                                    Loading document...
-                                  </span>
-                                </div>
-                              </div>
-                            )}
-                            {isLoaded && (
-                              <div className="relative h-[400px] sm:h-[500px]">
-                                <Viewport
-                                  documentId={activeId}
-                                  className="absolute inset-0 bg-gray-200 dark:bg-gray-800"
+              {/* Document Content */}
+              {activeDocumentId ? (
+                <DocumentContent documentId={activeDocumentId}>
+                  {({ isLoading: docLoading, isLoaded }) => (
+                    <>
+                      {docLoading && (
+                        <div className="flex h-[400px] items-center justify-center sm:h-[500px]">
+                          <div className="flex items-center gap-2 text-gray-500 dark:text-gray-400">
+                            <Loader2 size={20} className="animate-spin" />
+                            <span className="text-sm">Loading document...</span>
+                          </div>
+                        </div>
+                      )}
+                      {isLoaded && (
+                        <div className="relative h-[400px] sm:h-[500px]">
+                          <Viewport
+                            documentId={activeDocumentId}
+                            className="absolute inset-0 bg-gray-200 dark:bg-gray-800"
+                          >
+                            <Scroller
+                              documentId={activeDocumentId}
+                              renderPage={({ width, height, pageIndex }) => (
+                                <div
+                                  style={{
+                                    width,
+                                    height,
+                                    position: 'relative',
+                                  }}
                                 >
-                                  <Scroller
-                                    documentId={activeId}
-                                    renderPage={({
-                                      width,
-                                      height,
-                                      pageIndex,
-                                    }) => (
-                                      <div
-                                        style={{
-                                          width,
-                                          height,
-                                          position: 'relative',
-                                        }}
-                                      >
-                                        <RenderLayer
-                                          documentId={activeId}
-                                          pageIndex={pageIndex}
-                                        />
-                                        <TilingLayer
-                                          documentId={activeId}
-                                          pageIndex={pageIndex}
-                                        />
-                                      </div>
-                                    )}
+                                  <RenderLayer
+                                    documentId={activeDocumentId}
+                                    pageIndex={pageIndex}
                                   />
-                                </Viewport>
-                              </div>
-                            )}
-                          </>
-                        )}
-                      </DocumentContent>
-                    ) : (
-                      <div className="h-[400px] sm:h-[500px]">
-                        <EmptyState />
-                      </div>
-                    )}
-                  </>
-                )}
-              </DocumentContext>
+                                  <TilingLayer
+                                    documentId={activeDocumentId}
+                                    pageIndex={pageIndex}
+                                  />
+                                </div>
+                              )}
+                            />
+                          </Viewport>
+                        </div>
+                      )}
+                    </>
+                  )}
+                </DocumentContent>
+              ) : (
+                <div className="h-[400px] sm:h-[500px]">
+                  <EmptyState />
+                </div>
+              )}
             </div>
           ) : (
             <div className="overflow-hidden rounded-lg border border-gray-300 bg-white dark:border-gray-700 dark:bg-gray-900">

@@ -32,20 +32,20 @@ import { HistoryPluginPackage } from '@embedpdf/plugin-history/react'
 import { AnnotationPluginPackage } from '@embedpdf/plugin-annotation/react'
 
 const plugins = [
-  // ... other essential plugins
-  createPluginRegistration(LoaderPluginPackage, { /* ... */ }),
-  createPluginRegistration(RenderPluginPackage),
+  // ... other essential plugins
+  createPluginRegistration(DocumentManagerPluginPackage, { /* ... */ }),
+  createPluginRegistration(RenderPluginPackage),
 
-  // Register dependencies first
-  createPluginRegistration(InteractionManagerPluginPackage),
-  createPluginRegistration(SelectionPluginPackage),
-  createPluginRegistration(HistoryPluginPackage),
+  // Register dependencies first
+  createPluginRegistration(InteractionManagerPluginPackage),
+  createPluginRegistration(SelectionPluginPackage),
+  createPluginRegistration(HistoryPluginPackage),
 
-  // Register and configure the annotation plugin
-  createPluginRegistration(AnnotationPluginPackage, {
-    // Optional: Set the author name for created annotations
-    annotationAuthor: 'Jane Doe',
-  }),
+  // Register and configure the annotation plugin
+  createPluginRegistration(AnnotationPluginPackage, {
+    // Optional: Set the author name for created annotations
+    annotationAuthor: 'Jane Doe',
+  }),
 ]
 ```
 
@@ -53,90 +53,86 @@ const plugins = [
 
 The plugin works by combining a UI component to render the annotations with a hook to manage the annotation tools and state.
 
-### 1\. The `<AnnotationLayer />` Component
+### 1. The `<AnnotationLayer />` Component
 
 This component is responsible for rendering all annotations and handling user interactions like creating, selecting, moving, and resizing. It must be placed inside the `<Scroller />`'s `renderPage` prop and wrapped by a `<PagePointerProvider>` to correctly process pointer events.
 
-```tsx {2, 10-17}
+Note that `documentId` is required for all components to link them to the correct document state.
+
+```tsx {2, 14-18}
 import { PagePointerProvider } from '@embedpdf/plugin-interaction-manager/react';
 import { AnnotationLayer } from '@embedpdf/plugin-annotation/react';
 
 // ...
 <Scroller
-  renderPage={({ width, height, pageIndex, scale, rotation }) => (
-    <PagePointerProvider {...{ width, height, pageIndex, scale, rotation }}>
-      <RenderLayer pageIndex={pageIndex} scale={scale} />
-      <SelectionLayer pageIndex={pageIndex} scale={scale} />
-      {/* Annotation Layer on top */}
+  documentId={activeDocumentId}
+  renderPage={({ pageIndex }) => (
+    <PagePointerProvider 
+      documentId={activeDocumentId}
+      pageIndex={pageIndex} 
+    >
+      <RenderLayer documentId={activeDocumentId} pageIndex={pageIndex} />
+      <SelectionLayer documentId={activeDocumentId} pageIndex={pageIndex} />
+      {/* Annotation Layer on top */}
       <AnnotationLayer
+        documentId={activeDocumentId}
         pageIndex={pageIndex}
-        scale={scale}
-        pageWidth={width}
-        pageHeight={height}
-        rotation={rotation}
       />
-    </PagePointerProvider>
-  )}
+    </PagePointerProvider>
+  )}
 />
 ```
 
-### 2\. Building an Annotation Toolbar
+### 2. Building an Annotation Toolbar
 
-The `useAnnotationCapability` hook provides all the necessary methods to control the plugin. You can build a toolbar that allows users to select an "active tool" (like a pen or highlighter) and perform actions like deleting a selected annotation.
+The `useAnnotation` hook provides all the necessary methods to control the plugin for a specific document. You can build a toolbar that allows users to select an "active tool" (like a pen or highlighter) and perform actions like deleting a selected annotation.
 
 ```tsx {2, 5}
 import { useState, useEffect } from 'react';
-import { useAnnotationCapability } from '@embedpdf/plugin-annotation/react';
+import { useAnnotation } from '@embedpdf/plugin-annotation/react';
 
-const AnnotationToolbar = () => {
-  const { provides: annotationApi } = useAnnotationCapability();
-  const [selected, setSelected] = useState(false);
+const AnnotationToolbar = ({ documentId }) => {
+  const { provides: annotationApi, state } = useAnnotation(documentId);
 
-  useEffect(() => {
-    if (!annotationApi) return;
-    // Listen for selection changes to enable/disable the delete button
-    return annotationApi.onStateChange((state) => setSelected(!!state.selectedUid));
-  }, [annotationApi]);
+  const deleteSelected = () => {
+    const selection = annotationApi?.getSelectedAnnotation();
+    if (selection) {
+      annotationApi?.deleteAnnotation(selection.object.pageIndex, selection.object.id);
+    }
+  }
 
-  const deleteSelected = () => {
-    const selection = annotationApi?.getSelectedAnnotation();
-    if (selection) {
-      annotationApi?.deleteAnnotation(selection.object.pageIndex, selection.object.id);
-    }
-  }
-
-  return (
-    <div>
-      <button onClick={() => annotationApi?.setActiveTool('highlight')}>Highlighter</button>
-      <button onClick={() => annotationApi?.setActiveTool('ink')}>Pen</button>
-      <button onClick={deleteSelected} disabled={!selected}>Delete</button>
-    </div>
-  );
+  return (
+    <div>
+      <button onClick={() => annotationApi?.setActiveTool('highlight')}>Highlighter</button>
+      <button onClick={() => annotationApi?.setActiveTool('ink')}>Pen</button>
+      <button onClick={deleteSelected} disabled={!state.selectedUid}>Delete</button>
+    </div>
+  );
 };
 ```
 
-### 3\. Creating Custom Tools
+### 3. Creating Custom Tools
 
 You can extend the plugin's functionality by adding your own tools. For example, you could create a custom image stamp. This is done by calling `addTool` on the plugin's capability, often within the `onInitialized` callback of the `<EmbedPDF>` component.
 
 ```tsx {4-14}
 <EmbedPDF
-  // ...
-  onInitialized={(registry) => {
-    const annotationApi = registry.getPlugin('annotation')?.provides();
-    annotationApi?.addTool({
-      id: 'stampApproved',
-      name: 'Approved Stamp',
-      interaction: { exclusive: false, cursor: 'copy' },
-      matchScore: () => 0, // Doesn't match existing annotations
-      defaults: {
-        type: PdfAnnotationSubtype.STAMP,
-        imageSrc: '/images/approved-stamp.png', // URL to your stamp image
-      },
-    });
-  }}
+  // ...
+  onInitialized={(registry) => {
+    const annotationApi = registry.getPlugin('annotation')?.provides();
+    annotationApi?.addTool({
+      id: 'stampApproved',
+      name: 'Approved Stamp',
+      interaction: { exclusive: false, cursor: 'copy' },
+      matchScore: () => 0, // Doesn't match existing annotations
+      defaults: {
+        type: PdfAnnotationSubtype.STAMP,
+        imageSrc: '/images/approved-stamp.png', // URL to your stamp image
+      },
+    });
+  }}
 >
-  {/* ... */}
+  {/* ... */}
 </EmbedPDF>
 ```
 
@@ -144,32 +140,32 @@ You can extend the plugin's functionality by adding your own tools. For example,
 
 For more advanced integrations, such as saving annotation data to a backend or synchronizing state with an external data store, you can subscribe to annotation lifecycle events using `onAnnotationEvent`.
 
-This method allows you to react specifically to when annotations are created, updated, or deleted. Each event provides the annotation object and a `committed` flag, which indicates whether the change has been saved to the underlying PDF document in the engine.
+Each event provides the annotation object and a `committed` flag, which indicates whether the change has been saved to the underlying PDF document in the engine.
 
 ```tsx
 import { useEffect } from 'react';
-import { useAnnotationCapability } from '@embedpdf/plugin-annotation/react';
+import { useAnnotation } from '@embedpdf/plugin-annotation/react';
 
-const AnnotationLogger = () => {
-  const { provides: annotationApi } = useAnnotationCapability();
+const AnnotationLogger = ({ documentId }) => {
+  const { provides: annotationApi } = useAnnotation(documentId);
 
-  useEffect(() => {
-    if (!annotationApi) return;
+  useEffect(() => {
+    if (!annotationApi) return;
 
-    const unsubscribe = annotationApi.onAnnotationEvent((event) => {
-      console.log(`Annotation event: ${event.type}`, { event });
+    const unsubscribe = annotationApi.onAnnotationEvent((event) => {
+      console.log(`Annotation event: ${event.type}`, { event });
 
-      // Example: Save to backend after a change is committed to the engine
-      if (event.type === 'create' && event.committed) {
-        // yourApi.saveAnnotation(event.annotation);
-      }
-    });
+      // Example: Save to backend after a change is committed to the engine
+      if (event.type === 'create' && event.committed) {
+        // yourApi.saveAnnotation(event.annotation);
+      }
+    });
 
-    // Clean up the subscription when the component unmounts
-    return unsubscribe;
-  }, [annotationApi]);
+    // Clean up the subscription when the component unmounts
+    return unsubscribe;
+  }, [annotationApi]);
 
-  return null; // This is a non-visual component
+  return null; // This is a non-visual component
 };
 ```
 
@@ -229,11 +225,10 @@ The primary component for rendering and interacting with annotations.
 
 | Prop | Type | Description |
 | :--- | :--- | :--- |
+| **`documentId`** | `string` | **(Required)** The ID of the document this layer belongs to. |
 | **`pageIndex`** | `number` | **(Required)** The page index this layer corresponds to. |
-| **`scale`** | `number` | **(Required)** The current zoom scale of the page. |
-| **`rotation`** | `number` | **(Required)** The current rotation of the page. |
-| **`pageWidth`** | `number` | **(Required)** The unscaled width of the PDF page. |
-| **`pageHeight`** | `number` | **(Required)** The unscaled height of the PDF page. |
+| **`scale`** | `number` | The zoom scale of the page. |
+| **`rotation`** | `number` | The rotation of the page. |
 | **`selectionMenu`** | `(props) => JSX.Element` | A render prop for a custom menu that appears when an annotation is selected. |
 | **`resizeUI`** / **`vertexUI`** | `object` | Objects to customize the appearance of resize and vertex handles. |
 | **`selectionOutlineColor`**| `string` | The color of the outline around a selected annotation. **Default**: `'#007ACC'` |
@@ -244,28 +239,29 @@ You can customize the visual appearance of the interactive handles for resizing 
 
 ```typescript
 interface HandleUI {
-  /** Handle size in CSS pixels */
-  size?: number; // Default: 12
-  /** Default background color for the handle */
-  color?: string; // Default: '#007ACC'
-  /** Custom component to render for each handle */
-  component?: (props: HandleProps) => JSX.Element;
+  /** Handle size in CSS pixels */
+  size?: number; // Default: 12
+  /** Default background color for the handle */
+  color?: string; // Default: '#007ACC'
+  /** Custom component to render for each handle */
+  component?: (props: HandleProps) => JSX.Element;
 }
 ```
 
 The `HandleProps` passed to a custom `component` include positioning styles and event handlers, which must be applied to your custom element.
 
-### Hook: `useAnnotationCapability()`
+### Hook: `useAnnotation(documentId)`
 
-Connects your components to the annotation plugin's state and methods.
+Connects your components to the annotation plugin's state and methods for a specific document.
 
 #### Returns
 
 | Property | Type | Description |
 | :--- | :--- | :--- |
-| **`provides`** | `AnnotationCapability \| null` | An object with methods to control the plugin, or `null` if not ready. |
+| **`provides`** | `AnnotationScope \| null` | An object with methods to control the plugin, or `null` if not ready. |
+| **`state`** | `AnnotationState` | Reactive state object containing properties like `activeToolId`, `selectedUid`. |
 
-#### `AnnotationCapability` Methods
+#### `AnnotationScope` Methods
 
 A selection of key methods available on the `provides` object:
 

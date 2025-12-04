@@ -27,16 +27,16 @@ import { EmbedPDF } from '@embedpdf/core/react'
 import { SpreadPluginPackage, SpreadMode } from '@embedpdf/plugin-spread/react'
 
 const plugins = [
-  // ... other essential plugins
-  createPluginRegistration(LoaderPluginPackage, { /* ... */ }),
-  createPluginRegistration(ViewportPluginPackage),
-  createPluginRegistration(ScrollPluginPackage),
-  createPluginRegistration(RenderPluginPackage),
+  // ... other essential plugins
+  createPluginRegistration(DocumentManagerPluginPackage, { /* ... */ }),
+  createPluginRegistration(ViewportPluginPackage),
+  createPluginRegistration(ScrollPluginPackage),
+  createPluginRegistration(RenderPluginPackage),
 
-  // Register and configure the spread plugin
-  createPluginRegistration(SpreadPluginPackage, {
-    defaultSpreadMode: SpreadMode.None,
-  }),
+  // Register and configure the spread plugin
+  createPluginRegistration(SpreadPluginPackage, {
+    defaultSpreadMode: SpreadMode.None,
+  }),
 ]
 ```
 
@@ -46,25 +46,25 @@ The plugin provides the `useSpread` hook to control the layout mode. When you ch
 
 ### Building a Spread Mode Toolbar
 
-Use the `useSpread` hook to get the current `spreadMode` and the `provides` object for changing it. You can then build a UI, like a set of buttons, to allow users to switch between layouts.
+Use the `useSpread` hook to get the current `spreadMode` and the `provides` object for changing it for a specific document. You can then build a UI, like a set of buttons, to allow users to switch between layouts.
 
 ```tsx {2, 5}
 import { SpreadMode } from '@embedpdf/plugin-spread';
 import { useSpread } from '@embedpdf/plugin-spread/react';
 
-export const SpreadToolbar = () => {
-  const { provides: spread, spreadMode } = useSpread();
+export const SpreadToolbar = ({ documentId }) => {
+  const { provides: spread, spreadMode } = useSpread(documentId);
 
-  if (!spread) return null;
+  if (!spread) return null;
 
-  return (
-    <div>
-      <span>Current Layout: {spreadMode}</span>
-      <button onClick={() => spread.setSpreadMode(SpreadMode.None)}>Single Page</button>
-      <button onClick={() => spread.setSpreadMode(SpreadMode.Odd)}>Two-Page (Odd)</button>
-      <button onClick={() => spread.setSpreadMode(SpreadMode.Even)}>Two-Page (Even)</button>
-    </div>
-  );
+  return (
+    <div>
+      <span>Current Layout: {spreadMode}</span>
+      <button onClick={() => spread.setSpreadMode(SpreadMode.None)}>Single Page</button>
+      <button onClick={() => spread.setSpreadMode(SpreadMode.Odd)}>Two-Page (Odd)</button>
+      <button onClick={() => spread.setSpreadMode(SpreadMode.Even)}>Two-Page (Even)</button>
+    </div>
+  );
 };
 ```
 
@@ -90,9 +90,9 @@ import { PDFViewer } from '../code-examples/spread-example';
 | :--- | :--- | :--- |
 | **`defaultSpreadMode`** | `SpreadMode` | Sets the initial page layout when a document is loaded. \<br /\>**Default**: `SpreadMode.None` |
 
-### Hook: `useSpread()`
+### Hook: `useSpread(documentId)`
 
-Connects your component to the spread plugin's state and functions.
+Connects your component to the spread plugin's state and functions for a specific document.
 
 #### Returns
 

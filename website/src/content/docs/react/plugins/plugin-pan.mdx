@@ -29,18 +29,18 @@ import { InteractionManagerPluginPackage } from '@embedpdf/plugin-interaction-ma
 import { PanPluginPackage } from '@embedpdf/plugin-pan/react'
 
 const plugins = [
-  // ... other essential plugins
-  createPluginRegistration(LoaderPluginPackage, { /* ... */ }),
-  createPluginRegistration(RenderPluginPackage),
+  // ... other essential plugins
+  createPluginRegistration(DocumentManagerPluginPackage, { /* ... */ }),
+  createPluginRegistration(RenderPluginPackage),
 
-  // Register dependencies first
-  createPluginRegistration(ViewportPluginPackage),
-  createPluginRegistration(InteractionManagerPluginPackage),
+  // Register dependencies first
+  createPluginRegistration(ViewportPluginPackage),
+  createPluginRegistration(InteractionManagerPluginPackage),
 
-  // Register and configure the pan plugin
-  createPluginRegistration(PanPluginPackage, {
-    defaultMode: 'mobile', // Automatically enable pan as default on touch devices
-  }),
+  // Register and configure the pan plugin
+  createPluginRegistration(PanPluginPackage, {
+    defaultMode: 'mobile', // Automatically enable pan as default on touch devices
+  }),
 ]
 ```
 
@@ -50,24 +50,24 @@ The plugin works by registering a "pan" interaction mode. You can build UI to to
 
 ### Building a Pan Tool Button
 
-The `usePan` hook provides the `isPanning` state and a `provides` object with methods to control the pan mode. The `isPanning` boolean is perfect for providing visual feedback in your UI, such as highlighting the tool's button when it is active.
+The `usePan` hook provides the `isPanning` state and a `provides` object with methods to control the pan mode for a specific document. The `isPanning` boolean is perfect for providing visual feedback in your UI, such as highlighting the tool's button when it is active.
 
 ```tsx
 import { usePan } from '@embedpdf/plugin-pan/react';
 
-export const PanToolbar = () => {
-  const { provides: pan, isPanning } = usePan();
+export const PanToolbar = ({ documentId }) => {
+  const { provides: pan, isPanning } = usePan(documentId);
 
-  if (!pan) return null;
+  if (!pan) return null;
 
-  return (
-    <button
-      onClick={pan.togglePan}
-      className={isPanning ? 'active' : ''}
-    >
-      Hand Tool
-    </button>
-  );
+  return (
+    <button
+      onClick={pan.togglePan}
+      className={isPanning ? 'active' : ''}
+    >
+      Hand Tool
+    </button>
+  );
 };
 ```
 
@@ -75,15 +75,17 @@ export const PanToolbar = () => {
 
 For a smooth panning experience, it's crucial that the viewer can track mouse movements even when the cursor moves outside the boundaries of the viewport. The `GlobalPointerProvider` component, exported from the `Interaction Manager` plugin, solves this by capturing events globally.
 
-You should wrap your `<Viewport>` component with `<GlobalPointerProvider>` to enable this behavior.
+You should wrap your `<Viewport>` component with `<GlobalPointerProvider>` and provide the `documentId`.
 
-```tsx {4, 8}
+```tsx {4, 10}
 import { GlobalPointerProvider } from '@embedpdf/plugin-interaction-manager/react';
 // ...
 <div className="viewer-container">
-  <GlobalPointerProvider>
-    <Viewport>
-      <Scroller>{/* ... */}</Scroller>
+  <GlobalPointerProvider documentId={activeDocumentId}>
+    <Viewport documentId={activeDocumentId}>
+      <Scroller documentId={activeDocumentId}>
+        {/* ... */}
+      </Scroller>
     </Viewport>
   </GlobalPointerProvider>
 </div>
@@ -111,9 +113,9 @@ import { PDFViewer } from '../code-examples/pan-example';
 | :--- | :--- | :--- |
 | **`defaultMode`** | `'never' \| 'mobile' \| 'always'` | Determines if pan should be the default interaction mode. <br />- **`never`**: Another mode (like text selection) is default. <br />- **`mobile`**: Pan is the default mode only on touch-enabled devices. <br />- **`always`**: Pan is the default mode on all devices. <br />**Default**: `'mobile'` |
 
-### Hook: `usePan()`
+### Hook: `usePan(documentId)`
 
-Connects your component to the pan plugin's state and functions.
+Connects your component to the pan plugin's state and functions for a specific document.
 
 #### Returns
 
