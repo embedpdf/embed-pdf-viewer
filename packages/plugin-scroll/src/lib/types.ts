@@ -92,7 +92,6 @@ export interface ScrollPluginConfig extends BasePluginConfig {
   defaultStrategy?: ScrollStrategy;
   defaultPageGap?: number;
   defaultBufferSize?: number;
-  initialPage?: number;
 }
 
 export type LayoutChangePayload = Pick<ScrollDocumentState, 'virtualItems' | 'totalContentSize'>;
@@ -128,6 +127,8 @@ export interface PageChangeStateEvent {
 
 export interface LayoutReadyEvent {
   documentId: string;
+  /** True only on the first layout ready after document load, false on subsequent (e.g., tab switches) */
+  isInitial: boolean;
 }
 
 // Scoped scroll capability

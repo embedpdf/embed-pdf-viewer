@@ -1,8 +1,9 @@
 'use client'
 
 import { createPluginRegistration } from '@embedpdf/core'
-import { EmbedPDF } from '@embedpdf/core/react'
+import { EmbedPDF, useCapability } from '@embedpdf/core/react'
 import { usePdfiumEngine } from '@embedpdf/engines/react'
+import { PdfEngine } from '@embedpdf/models'
 import { useEffect, useState } from 'react'
 import {
   Viewport,
@@ -13,12 +14,16 @@ import {
   ScrollPluginPackage,
   useScroll,
 } from '@embedpdf/plugin-scroll/react'
+import type { ScrollPlugin } from '@embedpdf/plugin-scroll'
 import {
   DocumentContent,
   DocumentManagerPluginPackage,
 } from '@embedpdf/plugin-document-manager/react'
 import { RenderLayer, RenderPluginPackage } from '@embedpdf/plugin-render/react'
-import { Loader2, ChevronLeft, ChevronRight } from 'lucide-react'
+import { Loader2, ChevronLeft, ChevronRight, Play } from 'lucide-react'
+
+// The page to scroll to when the document loads
+const INITIAL_PAGE = 3
 
 const plugins = [
   createPluginRegistration(DocumentManagerPluginPackage, {
@@ -28,6 +33,39 @@ const plugins = [
   createPluginRegistration(ScrollPluginPackage),
   createPluginRegistration(RenderPluginPackage),
 ]
+
+/**
+ * This component scrolls to a specific page when the document layout is ready.
+ * It uses the `onLayoutReady` event from the scroll capability.
+ */
+const ScrollToPageOnLoad = ({
+  documentId,
+  initialPage,
+}: {
+  documentId: string
+  initialPage: number
+}) => {
+  const { provides: scrollCapability } = useCapability<ScrollPlugin>('scroll')
+
+  useEffect(() => {
+    if (!scrollCapability) return
+
+    // Subscribe to the layoutReady event
+    const unsubscribe = scrollCapability.onLayoutReady((event) => {
+      // Only scroll on the initial layout (not on tab switches)
+      if (event.documentId === documentId && event.isInitial) {
+        scrollCapability.forDocument(documentId).scrollToPage({
+          pageNumber: initialPage,
+          behavior: 'instant', // Use 'instant' for initial load
+        })
+      }
+    })
+
+    return unsubscribe
+  }, [scrollCapability, documentId, initialPage])
+
+  return null
+}
 
 const PageNavigation = ({ documentId }: { documentId: string }) => {
   const { provides: scroll, state } = useScroll(documentId)
@@ -47,7 +85,6 @@ const PageNavigation = ({ documentId }: { documentId: string }) => {
 
   return (
     <div className="flex items-center justify-center gap-2 border-b border-gray-300 bg-gray-100 px-3 py-2 dark:border-gray-700 dark:bg-gray-800">
-      {/* Previous button */}
       <button
         onClick={() => scroll?.scrollToPreviousPage()}
         disabled={state.currentPage <= 1}
@@ -57,7 +94,6 @@ const PageNavigation = ({ documentId }: { documentId: string }) => {
         <ChevronLeft size={18} />
       </button>
 
-      {/* Page input */}
       <form onSubmit={handleGoToPage} className="flex items-center gap-2">
         <span className="tracking-wide text-xs font-medium uppercase text-gray-600 dark:text-gray-300">
           Page
@@ -75,7 +111,6 @@ const PageNavigation = ({ documentId }: { documentId: string }) => {
         </span>
       </form>
 
-      {/* Next button */}
       <button
         onClick={() => scroll?.scrollToNextPage()}
         disabled={state.currentPage >= state.totalPages}
@@ -88,22 +123,7 @@ const PageNavigation = ({ documentId }: { documentId: string }) => {
   )
 }
 
-export const PDFViewer = () => {
-  const { engine, isLoading } = usePdfiumEngine()
-
-  if (isLoading || !engine) {
-    return (
-      <div className="overflow-hidden rounded-lg border border-gray-300 bg-white dark:border-gray-700 dark:bg-gray-900">
-        <div className="flex h-[400px] items-center justify-center">
-          <div className="flex items-center gap-2 text-gray-500 dark:text-gray-400">
-            <Loader2 size={20} className="animate-spin" />
-            <span className="text-sm">Loading PDF Engine...</span>
-          </div>
-        </div>
-      </div>
-    )
-  }
-
+const ViewerWithInitialPage = ({ engine }: { engine: PdfEngine }) => {
   return (
     <EmbedPDF engine={engine} plugins={plugins}>
       {({ activeDocumentId }) =>
@@ -112,10 +132,14 @@ export const PDFViewer = () => {
             {({ isLoaded }) =>
               isLoaded && (
                 <div className="overflow-hidden rounded-lg border border-gray-300 bg-white shadow-sm dark:border-gray-700 dark:bg-gray-900">
-                  {/* Navigation Toolbar */}
+                  {/* This component handles scrolling to the initial page */}
+                  <ScrollToPageOnLoad
+                    documentId={activeDocumentId}
+                    initialPage={INITIAL_PAGE}
+                  />
+
                   <PageNavigation documentId={activeDocumentId} />
 
-                  {/* PDF Viewer Area */}
                   <div className="relative h-[400px] sm:h-[500px]">
                     <Viewport
                       documentId={activeDocumentId}
@@ -140,4 +164,49 @@ export const PDFViewer = () => {
       }
     </EmbedPDF>
   )
+}
+
+export const PDFViewerWithInitialPage = () => {
+  const { engine, isLoading: isEngineLoading } = usePdfiumEngine()
+  const [showViewer, setShowViewer] = useState(false)
+
+  if (!showViewer) {
+    return (
+      <div className="overflow-hidden rounded-lg border border-gray-300 bg-white dark:border-gray-700 dark:bg-gray-900">
+        <div className="flex h-[400px] flex-col items-center justify-center gap-4">
+          <p className="text-center text-sm text-gray-600 dark:text-gray-400">
+            Click the button below to load the PDF viewer.
+            <br />
+            It will automatically scroll to{' '}
+            <span className="font-semibold text-blue-600 dark:text-blue-400">
+              page {INITIAL_PAGE}
+            </span>{' '}
+            on load.
+          </p>
+          <button
+            onClick={() => setShowViewer(true)}
+            className="inline-flex items-center gap-2 rounded-lg bg-blue-600 px-5 py-2.5 text-sm font-medium text-white shadow-md transition-all hover:bg-blue-700 hover:shadow-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 dark:bg-blue-500 dark:hover:bg-blue-600"
+          >
+            <Play size={16} />
+            Load Viewer & Scroll to Page {INITIAL_PAGE}
+          </button>
+        </div>
+      </div>
+    )
+  }
+
+  if (isEngineLoading || !engine) {
+    return (
+      <div className="overflow-hidden rounded-lg border border-gray-300 bg-white dark:border-gray-700 dark:bg-gray-900">
+        <div className="flex h-[400px] items-center justify-center">
+          <div className="flex items-center gap-2 text-gray-500 dark:text-gray-400">
+            <Loader2 size={20} className="animate-spin" />
+            <span className="text-sm">Loading PDF Engine...</span>
+          </div>
+        </div>
+      </div>
+    )
+  }
+
+  return <ViewerWithInitialPage engine={engine} />
 }

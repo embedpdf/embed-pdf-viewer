@@ -61,14 +61,14 @@ export class ScrollPlugin extends BasePlugin<
   // Layout ready tracking per document
   private layoutReady = new Set<string>();
 
+  // Tracks documents that have had their initial layout ready (cleared only on document close)
+  private initialLayoutFired = new Set<string>();
+
   // Per-document scroller layout emitters (for real-time scroll updates)
   private scrollerLayoutEmitters = new Map<
     string,
     ReturnType<typeof createBehaviorEmitter<ScrollerLayout>>
   >();
-
-  private initialPage?: number;
-  private initialPageUsed = false;
 
   // Event emitters (include documentId)
   private readonly pageChange$ = createBehaviorEmitter<PageChangeEvent>();
@@ -87,7 +87,6 @@ export class ScrollPlugin extends BasePlugin<
 
     this.viewport = this.registry.getPlugin<ViewportPlugin>('viewport')!.provides();
     this.spread = this.registry.getPlugin<SpreadPlugin>('spread')?.provides() ?? null;
-    this.initialPage = this.config?.initialPage;
 
     // Subscribe to viewport scroll activity (per document)
     this.viewport.onScrollActivity((event) => {
@@ -167,6 +166,7 @@ export class ScrollPlugin extends BasePlugin<
 
     // Cleanup layout ready tracking
     this.layoutReady.delete(documentId);
+    this.initialLayoutFired.delete(documentId);
 
     // Cleanup scroller layout emitter
     const emitter = this.scrollerLayoutEmitters.get(documentId);
@@ -244,17 +244,18 @@ export class ScrollPlugin extends BasePlugin<
     if (!docState) return;
 
     this.layoutReady.add(documentId);
-    // Only run initialPage logic once on the first document
-    if (this.initialPage && !this.initialPageUsed) {
-      this.initialPageUsed = true;
-      this.scrollToPage({ pageNumber: this.initialPage, behavior: 'instant' }, documentId);
-    } else {
-      // For subsequent documents or when no initialPage is set, restore the persisted scroll position
-      const viewport = this.viewport.forDocument(documentId);
-      viewport.scrollTo({ ...docState.scrollOffset, behavior: 'instant' });
+
+    // Determine if this is the initial layout for this document
+    const isInitial = !this.initialLayoutFired.has(documentId);
+    if (isInitial) {
+      this.initialLayoutFired.add(documentId);
     }
 
-    this.layoutReady$.emit({ documentId });
+    // Restore the persisted scroll position
+    const viewport = this.viewport.forDocument(documentId);
+    viewport.scrollTo({ ...docState.scrollOffset, behavior: 'instant' });
+
+    this.layoutReady$.emit({ documentId, isInitial });
   }
 
   public clearLayoutReady(documentId: string): void {
@@ -737,6 +738,7 @@ export class ScrollPlugin extends BasePlugin<
   async destroy(): Promise<void> {
     this.strategies.clear();
     this.layoutReady.clear();
+    this.initialLayoutFired.clear();
 
     // Clear all scroller layout emitters
     for (const emitter of this.scrollerLayoutEmitters.values()) {

@@ -37,12 +37,11 @@ const plugins = [
   // Register dependencies first
   createPluginRegistration(ViewportPluginPackage),
 
-  // Register and configure the scroll plugin
-  createPluginRegistration(ScrollPluginPackage, {
-    defaultStrategy: ScrollStrategy.Vertical, // or Horizontal
-    defaultPageGap: 10,
-    initialPage: 1,
-  }),
+  // Register and configure the scroll plugin
+  createPluginRegistration(ScrollPluginPackage, {
+    defaultStrategy: ScrollStrategy.Vertical, // or Horizontal
+    defaultPageGap: 10,
+  }),
 ]
 ```
 
@@ -87,11 +86,14 @@ const PageControls = ({ documentId }) => {
 };
 ```
 
-## Live Example
+## Live Examples
+
+### Page Navigation
 
 This example features a complete page navigation component that allows jumping to a specific page and moving forward or backward.
 
 import { PDFViewer } from '../code-examples/scroll-example';
+import { PDFViewerWithInitialPage } from '../code-examples/scroll-initial-page-example';
 
 <CodeExample 
   codePaths={[
@@ -99,6 +101,18 @@ import { PDFViewer } from '../code-examples/scroll-example';
   ]}
 >
   <PDFViewer />
+</CodeExample>
+
+### Scroll to Page on Load
+
+To scroll to a specific page when a document loads, use the `onLayoutReady` event from the scroll plugin. This event fires once the document layout is fully initialized and ready for navigation.
+
+<CodeExample 
+  codePaths={[
+    "content/docs/react/code-examples/scroll-initial-page-example.tsx"
+  ]}
+>
+  <PDFViewerWithInitialPage />
 </CodeExample>
 
 ## API Reference
@@ -110,7 +124,6 @@ import { PDFViewer } from '../code-examples/scroll-example';
 | **`defaultStrategy`** | `ScrollStrategy` | The default scroll direction (`Vertical` or `Horizontal`). <br />**Default**: `Vertical` |
 | **`defaultPageGap`** | `number` | Pixel gap between pages. <br />**Default**: `10` |
 | **`defaultBufferSize`** | `number` | Number of pages to render outside the visible viewport. <br />**Default**: `2` |
-| **`initialPage`** | `number` | The page number to scroll to when a document opens. |
 
 ### Component: `<Scroller />`
 
@@ -140,3 +153,13 @@ Returns the scroll state and capability methods for a specific document.
 | **`scrollToNextPage()`** | Scrolls to the next page or spread. |
 | **`scrollToPreviousPage()`** | Scrolls to the previous page or spread. |
 | **`setScrollStrategy(s)`** | Changes the scroll strategy (e.g. to `ScrollStrategy.Horizontal`) for this document. |
+
+### Events (`ScrollCapability`)
+
+Access events via `useCapability<ScrollPlugin>('scroll')`.
+
+| Event | Payload | Description |
+| :--- | :--- | :--- |
+| **`onLayoutReady`** | `{ documentId, isInitial }` | Fires when a document's layout is ready for interaction. `isInitial` is `true` only on the first layout after document load, `false` on subsequent layouts (e.g., when switching tabs). |
+| **`onPageChange`** | `{ documentId, pageNumber, totalPages }` | Fires when the current page changes. |
+| **`onScroll`** | `{ documentId, metrics }` | Fires on scroll with detailed viewport metrics. |
