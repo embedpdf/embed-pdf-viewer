@@ -44,9 +44,7 @@ All features are enabled and configured in a single `plugins` array. This makes 
 
 ```tsx filename="src/application.tsx" {2-18}
 const plugins = [
-  createPluginRegistration(DocumentManagerPluginPackage, {
-    initialDocuments: [{ url: 'https://snippet.embedpdf.com/ebook.pdf' }],
-  }),
+  createPluginRegistration(DocumentManagerPluginPackage, { /* ... */ }),
   createPluginRegistration(ViewportPluginPackage, { /* ... */ }),
   createPluginRegistration(ScrollPluginPackage, { /* ... */ }),
   createPluginRegistration(RenderPluginPackage),
