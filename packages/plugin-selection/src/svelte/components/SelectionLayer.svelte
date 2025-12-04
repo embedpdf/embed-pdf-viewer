@@ -1,9 +1,13 @@
 <script lang="ts">
-  import { Snippet } from 'svelte';
+  import type { Snippet } from 'svelte';
   import type { Rect } from '@embedpdf/models';
   import { Rotation } from '@embedpdf/models';
   import { useDocumentState } from '@embedpdf/core/svelte';
-  import { CounterRotate, MenuWrapperProps, SelectionMenuPlacement } from '@embedpdf/utils/svelte';
+  import {
+    CounterRotate,
+    type MenuWrapperProps,
+    type SelectionMenuPlacement,
+  } from '@embedpdf/utils/svelte';
   import { useSelectionPlugin } from '../hooks/use-selection.svelte';
   import type {
     SelectionSelectionMenuRenderFn,

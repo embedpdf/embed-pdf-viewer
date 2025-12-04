@@ -56,6 +56,10 @@ const handleDelete = () => {
     annotationApi.value?.deleteAnnotation(selection.object.pageIndex, selection.object.id);
   }
 };
+
+const handleDeleteFromMenu = (pageIndex: number, id: string) => {
+  annotationApi.value?.deleteAnnotation(pageIndex, id);
+};
 </script>
 
 <template>
@@ -112,7 +116,37 @@ const handleDelete = () => {
                 style="pointer-events: none"
               />
               <SelectionLayer :document-id="documentId" :page-index="page.pageIndex" />
-              <AnnotationLayer :document-id="documentId" :page-index="page.pageIndex" />
+              <AnnotationLayer :document-id="documentId" :page-index="page.pageIndex">
+                <template #selection-menu="{ selected, context, menuWrapperProps, rect }">
+                  <div v-if="selected" v-bind="menuWrapperProps">
+                    <div
+                      class="rounded-lg border border-gray-200 bg-white shadow-lg dark:border-gray-700 dark:bg-gray-800"
+                      :style="{
+                        position: 'absolute',
+                        top: `${rect.size.height + 8}px`,
+                        pointerEvents: 'auto',
+                        cursor: 'default',
+                      }"
+                    >
+                      <div class="flex items-center gap-1 px-2 py-1">
+                        <button
+                          @click="
+                            handleDeleteFromMenu(
+                              context.annotation.object.pageIndex,
+                              context.annotation.object.id,
+                            )
+                          "
+                          class="flex items-center justify-center rounded p-1.5 text-gray-600 transition-colors hover:bg-gray-100 hover:text-red-600 dark:text-gray-300 dark:hover:bg-gray-700 dark:hover:text-red-400"
+                          aria-label="Delete annotation"
+                          title="Delete annotation"
+                        >
+                          <Trash2 :size="16" />
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                </template>
+              </AnnotationLayer>
             </PagePointerProvider>
           </template>
         </Scroller>

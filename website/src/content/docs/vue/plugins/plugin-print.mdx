@@ -26,14 +26,14 @@ import { createPluginRegistration } from '@embedpdf/core'
 import { PrintPluginPackage } from '@embedpdf/plugin-print/vue'
 
 const plugins = [
-  // ... other essential plugins
-  createPluginRegistration(LoaderPluginPackage, { /* ... */ }),
-  createPluginRegistration(ViewportPluginPackage),
-  createPluginRegistration(ScrollPluginPackage),
-  createPluginRegistration(RenderPluginPackage),
+  // ... other essential plugins
+  createPluginRegistration(DocumentManagerPluginPackage, { /* ... */ }),
+  createPluginRegistration(ViewportPluginPackage),
+  createPluginRegistration(ScrollPluginPackage),
+  createPluginRegistration(RenderPluginPackage),
 
-  // Register the print plugin
-  createPluginRegistration(PrintPluginPackage),
+  // Register the print plugin
+  createPluginRegistration(PrintPluginPackage),
 ]
 ```
 
@@ -41,26 +41,25 @@ const plugins = [
 
 The plugin works by combining a composable for initiating the print job with a component that handles the browser interaction.
 
-### 1\. Triggering a Print Job
+### 1. Triggering a Print Job
 
-Use the `usePrintCapability` composable to get access to the plugin's `print` method. You can call this method from any component, such as a button in your toolbar.
+Use the `usePrint` composable to get access to the plugin's `print` method for the current document. You can call this method from any component, such as a button in your toolbar.
 
 The `print` method returns a `Task`, which allows you to track the progress and handle success or failure, perfect for showing a loading state to the user.
 
-```vue
+```vue {3, 6, 9-18}
 <script setup lang="ts">
 import { ref } from 'vue';
-import { usePrintCapability } from '@embedpdf/plugin-print/vue';
+import { usePrint } from '@embedpdf/plugin-print/vue';
 
-const { provides: print } = usePrintCapability();
+const props = defineProps<{ documentId: string }>();
+const { provides: print } = usePrint(() => props.documentId);
 const isPrinting = ref(false);
 
 const handlePrint = () => {
   if (!print.value || isPrinting.value) return;
   isPrinting.value = true;
-  
-  // Prints the entire document
-  const printTask = print.value.print();
+  const printTask = print.value.print(); // Prints the entire document
 
   printTask.wait(
     () => { isPrinting.value = false; }, // On success
@@ -76,7 +75,7 @@ const handlePrint = () => {
 </template>
 ```
 
-### 2\. Handling the Print Dialog (Behind the Scenes)
+### 2. Handling the Print Dialog (Behind the Scenes)
 
 The plugin automatically adds a hidden `<PrintFrame />` component to your application. You do not need to render this component yourself.
 
@@ -99,17 +98,23 @@ import { PrintExample } from '../code-examples/print-example';
 
 ## API Reference
 
-### Composable: `usePrintCapability()`
+### Composable: `usePrint(documentId)`
 
-This composable connects your component to the print plugin's functions.
+This composable connects your component to the print plugin's functions for a specific document.
+
+#### Parameters
+
+| Parameter | Type | Description |
+| :--- | :--- | :--- |
+| **`documentId`** | `() => string` | A getter function that returns the document ID to track. |
 
 #### Returns
 
 | Property | Type | Description |
 | :--- | :--- | :--- |
-| **`provides`** | `Ref<PrintCapability \| null>` | A ref object with methods to control printing, or `null` if the plugin is not ready. |
+| **`provides`** | `Ref<PrintScope \| null>` | A ref object with methods to control printing, or `null` if the plugin is not ready. |
 
-#### `PrintCapability` Methods
+#### `PrintScope` Methods
 
 | Method | Description |
 | :--- | :--- |

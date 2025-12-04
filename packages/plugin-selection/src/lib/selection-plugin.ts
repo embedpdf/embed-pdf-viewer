@@ -106,8 +106,11 @@ export class SelectionPlugin extends BasePlugin<
   private viewportCapability: ViewportCapability | null = null;
   private scrollCapability: ScrollCapability | null = null;
 
-  constructor(id: string, registry: PluginRegistry) {
+  private readonly menuHeight: number;
+
+  constructor(id: string, registry: PluginRegistry, config: SelectionPluginConfig) {
     super(id, registry);
+    this.menuHeight = config.menuHeight ?? 40;
 
     const imPlugin = registry.getPlugin<InteractionManagerPlugin>('interaction-manager');
     if (!imPlugin) {
@@ -415,7 +418,6 @@ export class SelectionPlugin extends BasePlugin<
     // Use document-scoped viewport to get metrics for this specific document
     const viewportScope = this.viewportCapability.forDocument(documentId);
     const vpMetrics = viewportScope.getMetrics();
-    const MENU_HEIGHT_GUESS = 40;
 
     // 2. Calculate metrics for Head (Start) and Tail (End)
     const head = bounds[0];
@@ -428,7 +430,7 @@ export class SelectionPlugin extends BasePlugin<
     // Priority A: Bottom of Tail (Standard selection end)
     // If the bottom of the selection is visible and we have space below.
     if (tailMetrics) {
-      if (tailMetrics.isBottomVisible && tailMetrics.spaceBelow > MENU_HEIGHT_GUESS) {
+      if (tailMetrics.isBottomVisible && tailMetrics.spaceBelow > this.menuHeight) {
         this.menuPlacement$.emit(documentId, {
           ...tailMetrics,
           suggestTop: false,

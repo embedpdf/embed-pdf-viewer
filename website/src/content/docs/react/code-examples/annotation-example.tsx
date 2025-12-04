@@ -9,6 +9,8 @@ import {
   AnnotationPluginPackage,
   AnnotationTool,
   useAnnotation,
+  useAnnotationCapability,
+  type AnnotationSelectionMenuProps,
 } from '@embedpdf/plugin-annotation/react'
 import {
   InteractionManagerPluginPackage,
@@ -54,6 +56,56 @@ const plugins = [
     annotationAuthor: 'EmbedPDF User',
   }),
 ]
+
+/**
+ * A custom selection menu that appears when an annotation is selected.
+ * Shows a delete button to remove the annotation.
+ */
+const AnnotationSelectionMenu = ({
+  selected,
+  context,
+  documentId,
+  menuWrapperProps,
+  rect,
+}: AnnotationSelectionMenuProps & { documentId: string }) => {
+  const { provides: annotationCapability } = useAnnotationCapability()
+  const annotationScope = annotationCapability?.forDocument(documentId)
+
+  const handleDelete = () => {
+    if (!annotationScope) return
+    const { pageIndex, id } = context.annotation.object
+    annotationScope.deleteAnnotation(pageIndex, id)
+  }
+
+  if (!selected) return null
+
+  const menuStyle: React.CSSProperties = {
+    position: 'absolute',
+    pointerEvents: 'auto',
+    cursor: 'default',
+    top: rect.size.height + 8,
+  }
+
+  return (
+    <div {...menuWrapperProps}>
+      <div
+        style={menuStyle}
+        className="rounded-lg border border-gray-200 bg-white shadow-lg dark:border-gray-700 dark:bg-gray-800"
+      >
+        <div className="flex items-center gap-1 px-2 py-1">
+          <button
+            onClick={handleDelete}
+            className="flex items-center justify-center rounded p-1.5 text-gray-600 transition-colors hover:bg-gray-100 hover:text-red-600 dark:text-gray-300 dark:hover:bg-gray-700 dark:hover:text-red-400"
+            aria-label="Delete annotation"
+            title="Delete annotation"
+          >
+            <Trash2 size={16} />
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
 
 const AnnotationToolbar = ({ documentId }: { documentId: string }) => {
   const { provides: annotationApi, state } = useAnnotation(documentId)
@@ -227,6 +279,12 @@ export const PDFViewer = () => {
                             <AnnotationLayer
                               documentId={activeDocumentId}
                               pageIndex={pageIndex}
+                              selectionMenu={(props) => (
+                                <AnnotationSelectionMenu
+                                  {...props}
+                                  documentId={activeDocumentId}
+                                />
+                              )}
                             />
                           </PagePointerProvider>
                         )}

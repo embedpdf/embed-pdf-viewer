@@ -54,7 +54,7 @@ export function useOpenDocuments(getDocumentIds?: () => string[] | undefined) {
     if (!core) return [];
 
     // If specific documentIds are provided, use THEIR order
-    if (documentIds && documentIds.length > 0) {
+    if (documentIds) {
       return documentIds
         .map((docId) => core.documents[docId])
         .filter((doc): doc is DocumentState => doc !== null && doc !== undefined);

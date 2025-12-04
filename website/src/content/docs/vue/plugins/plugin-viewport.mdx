@@ -1,12 +1,14 @@
 ---
 title: Viewport Plugin
-description: Provides the essential <Viewport /> component, the scrollable container for all PDF content in Vue.
+description: Provides the essential <Viewport /> component, acting as the scrollable container and layout manager for PDF content.
 searchable: true
 ---
 
 # Viewport Plugin
 
-The Viewport Plugin is a foundational element for any viewer. It provides the `<Viewport />` component, which acts as the scrollable "window" through which users see the PDF pages. It is responsible for tracking its own dimensions and scroll position and communicating that information to other plugins.
+The Viewport Plugin is a foundational element for any viewer. It provides the `<Viewport />` component, which acts as the scrollable "window" through which users see the PDF pages.
+
+This plugin is designed for **multi-document layouts**. It manages metrics, scroll state, and dimensions independently for every open document, allowing you to build split-screen views, tabbed interfaces, or multi-window applications easily.
 
 ## Installation
 
@@ -18,7 +20,7 @@ npm install @embedpdf/plugin-viewport
 
 ## Registration
 
-Import `ViewportPluginPackage` and add it to the `plugins` array. It is highly recommended to include this plugin in any viewer build.
+Import `ViewportPluginPackage` and add it to the `plugins` array.
 
 ```typescript {3, 12-14}
 import { createPluginRegistration } from '@embedpdf/core'
@@ -26,46 +28,54 @@ import { createPluginRegistration } from '@embedpdf/core'
 import { ViewportPluginPackage } from '@embedpdf/plugin-viewport/vue'
 
 const plugins = [
-  // ... other essential plugins
-  createPluginRegistration(LoaderPluginPackage, { /* ... */ }),
-  createPluginRegistration(ScrollPluginPackage),
-  createPluginRegistration(RenderPluginPackage),
+  // ... other essential plugins
+  createPluginRegistration(DocumentManagerPluginPackage, { /* ... */ }),
+  createPluginRegistration(ScrollPluginPackage),
+  createPluginRegistration(RenderPluginPackage),
 
-  // Register and configure the viewport plugin
-  createPluginRegistration(ViewportPluginPackage, {
-    viewportGap: 10, // Adds 10px of padding inside the viewport
-  }),
+  // Register and configure the viewport plugin
+  createPluginRegistration(ViewportPluginPackage, {
+    viewportGap: 20, // Adds 20px of padding inside the viewport
+  }),
 ]
 ```
 
 ## Usage
 
-The plugin provides the `<Viewport />` component, which you use to wrap your `<Scroller />`, and composables to interact with it programmatically.
+The plugin provides the `<Viewport />` component for the UI and composables for programmatic control.
 
 ### The `<Viewport />` Component
 
-The `<Viewport />` component is the main scrollable container for your PDF. You should place it in your layout and ensure it has a defined size (e.g., `height: '500px'` or a flex class). It automatically handles listening for scroll and resize events.
+The `<Viewport />` component is the main scrollable container. You must provide a `documentId` to link the scroll container to the specific document state managed by the engine.
 
 ```vue
 <template>
-  <div style="height: 500px; display: flex;">
-    <Viewport style="flex-grow: 1;">
-      <Scroller>
-      </Scroller>
-    </Viewport>
-  </div>
+  <Viewport
+    :document-id="activeDocumentId"
+    class="h-full w-full bg-gray-100"
+  >
+    <Scroller :document-id="activeDocumentId">
+      <!-- page content -->
+    </Scroller>
+  </Viewport>
 </template>
 ```
 
 ### Programmatic Scrolling
 
-You can control the viewport's scroll position from any other component using the `useViewportCapability` composable. This is useful for features like a "scroll to top" button or navigating from a table of contents.
+To scroll a specific document programmatically, use `useViewportCapability` to get the API, then use `.forDocument(id)` to target the specific viewport.
 
-```vue
+```vue {3,7}
 <script setup lang="ts">
+import { computed } from 'vue';
 import { useViewportCapability } from '@embedpdf/plugin-viewport/vue';
 
-const { provides: viewport } = useViewportCapability();
+const props = defineProps<{ documentId: string }>();
+
+const { provides: viewportCapability } = useViewportCapability();
+
+// Get the API scoped to this specific document
+const viewport = computed(() => viewportCapability.value?.forDocument(props.documentId));
 
 const scrollToTop = () => {
   viewport.value?.scrollTo({ x: 0, y: 0, behavior: 'smooth' });
@@ -73,17 +83,33 @@ const scrollToTop = () => {
 </script>
 
 <template>
-  <button @click="scrollToTop">Scroll to Top</button>
+  <button @click="scrollToTop">Top</button>
 </template>
 ```
 
 ### Monitoring Scroll Activity
 
-The plugin also provides a `useViewportScrollActivity` composable that returns the current scrolling state. This is useful for creating UIs that react to user scrolling, such as auto-hiding toolbars.
+To react to scrolling events (e.g., to show a "Back to Top" button or hide a floating toolbar), use the `useViewportScrollActivity` composable. This composable returns the reactive state for a specific document.
+
+```vue
+<script setup lang="ts">
+import { useViewportScrollActivity } from '@embedpdf/plugin-viewport/vue';
+
+const props = defineProps<{ documentId: string }>();
+
+// Pass a getter that returns the documentId to track
+const scrollActivity = useViewportScrollActivity(() => props.documentId);
+</script>
+
+<template>
+  <span v-if="scrollActivity.isScrolling">Scrolling...</span>
+  <span v-else>Idle</span>
+</template>
+```
 
 ## Live Example
 
-This example demonstrates a viewer with a toolbar that can programmatically scroll the viewport. It also includes an indicator that shows when the viewport is actively scrolling.
+This example demonstrates a complete setup. It loads a document, passes the `documentId` to the components, and creates a toolbar that controls scrolling for that specific document.
 
 import { ViewportExample } from '../code-examples/viewport-example';
 
@@ -102,12 +128,16 @@ import { ViewportExample } from '../code-examples/viewport-example';
 
 | Option | Type | Description |
 | :--- | :--- | :--- |
-| **`viewportGap`** | `number` | The padding (in pixels) to apply around the content inside the viewport. \<br /\>**Default**: `10` |
-| **`scrollEndDelay`** | `number` | The time in milliseconds after the last scroll event before the `isScrolling` state is set to `false`. \<br /\>**Default**: `300` |
+| **`viewportGap`** | `number` | The padding (in pixels) to apply around the content inside the viewport. <br />**Default**: `10` |
+| **`scrollEndDelay`** | `number` | The time in milliseconds after the last scroll event before the `isScrolling` state is set to `false`. <br />**Default**: `300` |
 
 ### Component: `<Viewport />`
 
 A `div`-based component that acts as the scrollable container. It accepts all standard `div` attributes like `style` and `class`.
+
+| Prop | Type | Description |
+| :--- | :--- | :--- |
+| **`documentId`** | `string` | **(Required)** The unique ID of the document this viewport is displaying. |
 
 ### Composable: `useViewportCapability()`
 
@@ -117,23 +147,36 @@ Connects your component to the viewport's functions.
 
 | Property | Type | Description |
 | :--- | :--- | :--- |
-| **`provides`** | `Ref<ViewportCapability \| null>` | A ref object with methods to interact with the viewport, or `null` if the plugin is not ready. |
+| **`provides`** | `Ref<ViewportCapability \| null>` | A ref object with methods to interact with the viewport system. |
 
 #### `ViewportCapability` Methods
 
 | Method | Description |
 | :--- | :--- |
-| **`getMetrics()`** | Returns a `ViewportMetrics` object containing the current dimensions, scroll offsets, and total scrollable area. |
-| **`scrollTo(position)`** | Programmatically scrolls the viewport. The `position` object can include `x`, `y`, `behavior: 'smooth'`, and `center: true`. |
-| **`getBoundingRect()`**| Returns the `Rect` of the viewport element relative to the browser's viewport. |
+| **`forDocument(id)`** | Returns a `ViewportScope` object to control a specific document's viewport. |
+| **`getViewportGap()`** | Returns the configured viewport gap. |
+| **`isViewportMounted(id)`**| Returns true if the viewport for the given document ID is currently mounted in the DOM. |
 
-### Composable: `useViewportScrollActivity()`
+#### `ViewportScope` Methods (Returned by `forDocument`)
 
-A composable for tracking the scroll state of the viewport.
+| Method | Description |
+| :--- | :--- |
+| **`scrollTo(position)`** | Scrolls the viewport. `position`: `{ x, y, behavior?, center? }`. |
+| **`getMetrics()`** | Returns current dimensions (width, height, scrollTop, scrollWidth, etc.). |
+| **`isScrolling()`** | Returns `true` if the user is currently scrolling. |
+| **`getBoundingRect()`**| Returns the `DOMRect` of the viewport container. |
 
-#### Returns
+### Composable: `useViewportScrollActivity(documentId)`
 
-A reactive object with the following properties:
+A composable for tracking the scroll state of a specific document.
+
+#### Parameters
+
+| Parameter | Type | Description |
+| :--- | :--- | :--- |
+| **`documentId`** | `() => string` | A getter function that returns the document ID to track. |
+
+#### Returns (`ScrollActivity`)
 
 | Property | Type | Description |
 | :--- | :--- | :--- |

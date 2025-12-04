@@ -10,7 +10,7 @@ import {
 } from '@embedpdf/plugin-selection/vue';
 import { PagePointerProvider } from '@embedpdf/plugin-interaction-manager/vue';
 import { ignore } from '@embedpdf/models';
-import { Copy, Type } from 'lucide-vue-next';
+import { Copy, Type, Check } from 'lucide-vue-next';
 
 const props = defineProps<{
   documentId: string;
@@ -20,6 +20,8 @@ const { provides: selectionCapability } = useSelectionCapability();
 const selection = computed(() => selectionCapability.value?.forDocument(props.documentId));
 const hasSelection = ref(false);
 const selectedText = ref('');
+const copied = ref(false);
+const menuCopied = ref(false);
 
 let unsubscribeSelectionChange: (() => void) | undefined;
 let unsubscribeEndSelection: (() => void) | undefined;
@@ -48,6 +50,23 @@ onUnmounted(() => {
   unsubscribeSelectionChange?.();
   unsubscribeEndSelection?.();
 });
+
+const handleCopy = () => {
+  selection.value?.copyToClipboard();
+  copied.value = true;
+  setTimeout(() => {
+    copied.value = false;
+  }, 2000);
+};
+
+const handleCopyFromMenu = () => {
+  selection.value?.copyToClipboard();
+  selection.value?.clear();
+  menuCopied.value = true;
+  setTimeout(() => {
+    menuCopied.value = false;
+  }, 1500);
+};
 </script>
 
 <template>
@@ -60,7 +79,7 @@ onUnmounted(() => {
       class="flex items-center gap-3 border-b border-gray-300 bg-gray-100 px-3 py-2 dark:border-gray-700 dark:bg-gray-800"
     >
       <button
-        @click="selection?.copyToClipboard()"
+        @click="handleCopy"
         :disabled="!hasSelection"
         :class="[
           'inline-flex items-center gap-2 rounded-md px-3 py-1.5 text-sm font-medium shadow-sm transition-all',
@@ -70,8 +89,9 @@ onUnmounted(() => {
         ]"
         title="Copy Selected Text"
       >
-        <Copy :size="14" />
-        Copy Text
+        <Check v-if="copied" :size="14" class="text-white" />
+        <Copy v-else :size="14" />
+        {{ copied ? 'Copied!' : 'Copy Text' }}
       </button>
       <span class="text-xs text-gray-600 dark:text-gray-300">
         {{ hasSelection ? 'Text selected — click to copy' : 'Click and drag to select text' }}
@@ -90,7 +110,39 @@ onUnmounted(() => {
                 :scale="1"
                 class="pointer-events-none"
               />
-              <SelectionLayer :document-id="documentId" :page-index="page.pageIndex" />
+              <SelectionLayer :document-id="documentId" :page-index="page.pageIndex">
+                <template #selection-menu="{ rect, menuWrapperProps, placement }">
+                  <div v-bind="menuWrapperProps">
+                    <div
+                      class="rounded-lg border border-gray-200 bg-white shadow-lg dark:border-gray-700 dark:bg-gray-800"
+                      :style="{
+                        position: 'absolute',
+                        top: placement.suggestTop ? '-48px' : `${rect.size.height + 8}px`,
+                        pointerEvents: 'auto',
+                        cursor: 'default',
+                      }"
+                    >
+                      <div class="flex items-center gap-1 px-2 py-1">
+                        <button
+                          @click="handleCopyFromMenu"
+                          class="flex items-center gap-1.5 rounded px-2 py-1.5 text-sm text-gray-700 transition-colors hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-gray-700"
+                          aria-label="Copy selected text"
+                          title="Copy"
+                        >
+                          <template v-if="menuCopied">
+                            <Check :size="16" class="text-green-600 dark:text-green-400" />
+                            <span class="text-green-600 dark:text-green-400">Copied!</span>
+                          </template>
+                          <template v-else>
+                            <Copy :size="16" />
+                            <span>Copy</span>
+                          </template>
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                </template>
+              </SelectionLayer>
             </PagePointerProvider>
           </template>
         </Scroller>

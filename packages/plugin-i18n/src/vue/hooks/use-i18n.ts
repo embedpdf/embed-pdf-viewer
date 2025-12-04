@@ -73,7 +73,11 @@ export const useTranslations = (documentId?: MaybeRefOrGetter<string | undefined
     });
   };
 
-  const locale = computed(() => provides.value?.getLocale() ?? 'en');
+  const locale = computed(() => {
+    // Access forceUpdateCounter to trigger reactivity when locale changes
+    forceUpdateCounter.value;
+    return provides.value?.getLocale() ?? 'en';
+  });
 
   return {
     translate,

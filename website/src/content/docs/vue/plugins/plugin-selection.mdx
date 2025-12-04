@@ -27,14 +27,14 @@ import { InteractionManagerPluginPackage } from '@embedpdf/plugin-interaction-ma
 import { SelectionPluginPackage } from '@embedpdf/plugin-selection/vue'
 
 const plugins = [
-  // ... other essential plugins
-  createPluginRegistration(LoaderPluginPackage, { /* ... */ }),
+  // ... other essential plugins
+  createPluginRegistration(DocumentManagerPluginPackage, { /* ... */ }),
 
-  // Register dependency first
-  createPluginRegistration(InteractionManagerPluginPackage),
+  // Register dependency first
+  createPluginRegistration(InteractionManagerPluginPackage),
 
-  // Register the selection plugin
-  createPluginRegistration(SelectionPluginPackage),
+  // Register the selection plugin
+  createPluginRegistration(SelectionPluginPackage),
 ]
 ```
 
@@ -42,68 +42,106 @@ const plugins = [
 
 The plugin has two main parts: the `<SelectionLayer />` component for the UI, and the `useSelectionCapability` composable for interacting with the selection data.
 
-### 1\. Displaying the Selection
+### 1. Displaying the Selection
 
 To show the highlighted text, place the `<SelectionLayer />` component inside the default slot of your `<Scroller />`. For text selection to work correctly, it must be a child of the `PagePointerProvider`.
 
-```vue {3, 16}
+Both components require the `documentId` to link to the correct document state.
+
+```vue {3, 10}
 <script setup lang="ts">
 import { PagePointerProvider } from '@embedpdf/plugin-interaction-manager/vue';
 import { SelectionLayer } from '@embedpdf/plugin-selection/vue';
 </script>
 <template>
-  <Scroller>
+  <Scroller :document-id="activeDocumentId">
     <template #default="{ page }">
-      <PagePointerProvider
-        :page-index="page.pageIndex"
-        :page-width="page.width"
-        :page-height="page.height"
-        :rotation="page.rotation"
-        :scale="page.scale"
-      >
-        <RenderLayer :page-index="page.pageIndex" :scale="page.scale" />
-        <SelectionLayer :page-index="page.pageIndex" :scale="page.scale" />
+      <PagePointerProvider :document-id="activeDocumentId" :page-index="page.pageIndex">
+        <RenderLayer :document-id="activeDocumentId" :page-index="page.pageIndex" />
+        <SelectionLayer :document-id="activeDocumentId" :page-index="page.pageIndex" />
       </PagePointerProvider>
     </template>
   </Scroller>
 </template>
 ```
 
-### 2\. Interacting with the Selection
+### 2. Interacting with the Selection
 
-The `useSelectionCapability` composable allows you to work with the selected text. You can create a toolbar to copy the text or perform other actions. The plugin automatically handles the clipboard logic when you call `provides.value.copyToClipboard()`.
+The `useSelectionCapability` composable allows you to work with the selected text. You need to scope the capability to the specific document using `.forDocument(id)`.
 
 You can use the `onSelectionChange` event to know when a selection exists, which is useful for enabling or disabling UI elements like a "Copy" button.
 
-```vue
+```vue {3, 6, 9-16}
 <script setup lang="ts">
-import { ref, onMounted, onUnmounted } from 'vue';
+import { ref, onMounted, onUnmounted, computed } from 'vue';
 import { useSelectionCapability, type SelectionRangeX } from '@embedpdf/plugin-selection/vue';
 
-const { provides: selection } = useSelectionCapability();
+const props = defineProps<{ documentId: string }>();
+const { provides: selectionCapability } = useSelectionCapability();
 const hasSelection = ref(false);
-let unsubscribe: (() => void) | undefined;
 
 onMounted(() => {
-  if (!selection.value) return;
-  unsubscribe = selection.value.onSelectionChange((sel: SelectionRangeX | null) => {
+  if (!selectionCapability.value) return;
+  const selection = selectionCapability.value.forDocument(props.documentId);
+  
+  return selection.onSelectionChange((sel: SelectionRangeX | null) => {
     hasSelection.value = !!sel;
   });
 });
 
-onUnmounted(() => {
-  unsubscribe?.();
-});
+const handleCopy = () => {
+  selectionCapability.value?.forDocument(props.documentId).copyToClipboard();
+};
 </script>
 
 <template>
-  <button @click="selection?.copyToClipboard()" :disabled="!hasSelection">Copy</button>
+  <button @click="handleCopy" :disabled="!hasSelection">Copy</button>
 </template>
 ```
 
+### 3. Adding a Selection Menu
+
+You can display a contextual menu near the selected text—perfect for a "Copy" button that appears inline. Use the `selection-menu` scoped slot on `<SelectionLayer />`. The `placement` prop provides hints about whether to position the menu above or below the selection.
+
+```vue
+<script setup lang="ts">
+import { SelectionLayer, useSelectionCapability } from '@embedpdf/plugin-selection/vue';
+
+const props = defineProps<{ documentId: string }>();
+const { provides: selectionCapability } = useSelectionCapability();
+
+const handleCopy = () => {
+  const scope = selectionCapability.value?.forDocument(props.documentId);
+  scope?.copyToClipboard();
+  scope?.clear(); // Clear selection after copying
+};
+</script>
+
+<template>
+  <SelectionLayer :document-id="documentId" :page-index="page.pageIndex">
+    <template #selection-menu="{ rect, menuWrapperProps, placement }">
+      <div v-bind="menuWrapperProps">
+        <div 
+          :style="{ 
+            position: 'absolute', 
+            top: placement.suggestTop ? '-48px' : `${rect.size.height + 8}px`, 
+            pointerEvents: 'auto', 
+            cursor: 'default' 
+          }"
+        >
+          <button @click="handleCopy">Copy</button>
+        </div>
+      </div>
+    </template>
+  </SelectionLayer>
+</template>
+```
+
+The `menuWrapperProps` must be bound to your wrapper element—it handles proper positioning relative to page rotation.
+
 ## Live Example
 
-Try selecting text in the viewer below. A "Copy Text" button will become active, allowing you to copy the selected content to your clipboard.
+Try selecting text in the viewer below. A contextual "Copy" menu will appear near your selection, and the toolbar's "Copy Text" button will become active. This demonstrates both the `selection-menu` scoped slot and the `useSelectionCapability` composable.
 
 import { SelectionExample } from '../code-examples/selection-example';
 
@@ -118,32 +156,53 @@ import { SelectionExample } from '../code-examples/selection-example';
 
 ## API Reference
 
+### Configuration (`SelectionPluginConfig`)
+
+| Option | Type | Description |
+| :--- | :--- | :--- |
+| **`menuHeight`** | `number` | The approximate height of the selection menu in pixels. Used to determine whether to show the menu above or below the selection. <br/>**Default**: `40` |
+
 ### Component: `<SelectionLayer />`
 
 The component that renders the blue rectangles over the selected text.
 
 | Prop | Type | Description |
 | :--- | :--- | :--- |
+| **`documentId`** | `string` | **(Required)** The ID of the document. |
 | **`pageIndex`** | `number` | **(Required)** The index of the page this layer is on. |
-| **`scale`** | `number` | **(Required)** The current scale of the page. |
-| **`background`** | `string` | (Optional) The color of the selection highlight. <br />**Default**: `'rgba(33,150,243)'` |
+| **`background`** | `string` | (Optional) The color of the selection highlight. <br/>**Default**: `'rgba(33,150,243)'` |
+
+### Scoped Slot: `selection-menu`
+
+| Prop | Type | Description |
+| :--- | :--- | :--- |
+| `rect` | `Rect` | The bounding box of the selection. |
+| `menuWrapperProps` | `object` | Vue props to bind to your menu's wrapper element for positioning. |
+| `placement` | `object` | An object with `suggestTop: boolean` to help position the menu above or below the selection. |
 
 ### Composable: `useSelectionCapability()`
 
-Connects your component to the selection plugin's state and functions.
+Connects your component to the selection plugin's API.
 
 #### Returns
 
 | Property | Type | Description |
 | :--- | :--- | :--- |
-| **`provides`** | `Ref<SelectionCapability \| null>` | A ref object with methods to interact with the selection, or `null` if the plugin is not ready. |
+| **`provides`** | `Ref<SelectionCapability \| null>` | The selection API object. |
 
 #### `SelectionCapability` Methods
 
 | Method | Description |
 | :--- | :--- |
+| **`forDocument(id)`** | Returns a `SelectionScope` for the specified document ID. |
+
+#### `SelectionScope` Methods (Returned by `forDocument`)
+
+| Method | Description |
+| :--- | :--- |
 | **`copyToClipboard()`** | Triggers the process to copy the currently selected text to the user's clipboard. |
+| **`clear()`** | Clears the current selection. |
 | **`getSelectedText()`** | Returns a `Task<string[]>` that resolves with the selected text content. Each string in the array is a line. |
 | **`getFormattedSelection()`** | Returns an array of objects describing the selection on each page, including its bounding box and the individual highlight rectangles. |
-| **`onSelectionChange(cb)`** | Subscribes to when the text selection is created, updated, or cleared. Returns an `unsubscribe` function. |
-| **`onEndSelection(cb)`** | Subscribes to when the user finishes selecting text (on mouse up). This is ideal for fetching the selected text content. Returns an `unsubscribe` function. |
+| **`onSelectionChange`** | An event hook that fires when the text selection is created, updated, or cleared. |
+| **`onEndSelection`** | An event hook that fires when the user finishes selecting text (on mouse up). This is ideal for fetching the selected text content. |

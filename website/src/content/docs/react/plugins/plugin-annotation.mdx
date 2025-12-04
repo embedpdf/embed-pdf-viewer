@@ -111,7 +111,56 @@ const AnnotationToolbar = ({ documentId }) => {
 };
 ```
 
-### 3. Creating Custom Tools
+### 3. Adding a Selection Menu
+
+When an annotation is selected, you can display a contextual menu (e.g., for deleting, editing properties). Pass a `selectionMenu` render function to `<AnnotationLayer />`. This function receives props including the `context` object, which contains the selected annotation.
+
+```tsx
+import { 
+  AnnotationLayer, 
+  useAnnotationCapability,
+  type AnnotationSelectionMenuProps 
+} from '@embedpdf/plugin-annotation/react';
+
+// A simple menu with a delete button
+const AnnotationSelectionMenu = ({ 
+  selected, 
+  context, 
+  menuWrapperProps,
+  rect,
+  documentId 
+}: AnnotationSelectionMenuProps & { documentId: string }) => {
+  const { provides: annotationCapability } = useAnnotationCapability();
+
+  const handleDelete = () => {
+    const { pageIndex, id } = context.annotation.object;
+    annotationCapability?.forDocument(documentId).deleteAnnotation(pageIndex, id);
+  };
+
+  if (!selected) return null;
+
+  return (
+    <div {...menuWrapperProps}>
+      <div style={{ position: 'absolute', top: rect.size.height + 8, pointerEvents: 'auto', cursor: 'default' }}>
+        <button onClick={handleDelete}>Delete</button>
+      </div>
+    </div>
+  );
+};
+
+// Pass the menu to the AnnotationLayer
+<AnnotationLayer
+  documentId={activeDocumentId}
+  pageIndex={pageIndex}
+  selectionMenu={(props) => (
+    <AnnotationSelectionMenu {...props} documentId={activeDocumentId} />
+  )}
+/>
+```
+
+The `menuWrapperProps` must be spread onto your wrapper element—it handles proper positioning relative to page rotation.
+
+### 4. Creating Custom Tools
 
 You can extend the plugin's functionality by adding your own tools. For example, you could create a custom image stamp. This is done by calling `addTool` on the plugin's capability, often within the `onInitialized` callback of the `<EmbedPDF>` component.
 
@@ -193,7 +242,7 @@ The plugin comes with a set of pre-configured tools. You can activate any of the
 
 ## Live Example
 
-The example below includes a toolbar for selecting different annotation tools (highlight, ink pen, square) and a delete button that becomes active when an annotation is selected.
+The example below includes a toolbar for selecting different annotation tools (highlight, ink pen, square) and a delete button. When you select an annotation, a contextual menu appears with a delete option—demonstrating the `selectionMenu` prop.
 
 import { PDFViewer } from '../code-examples/annotation-example';
 

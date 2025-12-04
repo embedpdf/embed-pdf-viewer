@@ -96,9 +96,58 @@ const SelectionToolbar = ({ documentId }) => {
 };
 ```
 
+### 3. Adding a Selection Menu
+
+You can display a contextual menu near the selected text—perfect for a "Copy" button that appears inline. Pass a `selectionMenu` render function to `<SelectionLayer />`. The `placement` prop provides hints about whether to position the menu above or below the selection.
+
+```tsx
+import { 
+  SelectionLayer, 
+  useSelectionCapability, 
+  type SelectionSelectionMenuProps 
+} from '@embedpdf/plugin-selection/react';
+
+const TextSelectionMenu = ({ 
+  rect, 
+  menuWrapperProps, 
+  placement, 
+  documentId 
+}: SelectionSelectionMenuProps & { documentId: string }) => {
+  const { provides: selectionCapability } = useSelectionCapability();
+
+  const handleCopy = () => {
+    const scope = selectionCapability?.forDocument(documentId);
+    scope?.copyToClipboard();
+    scope?.clear(); // Clear selection after copying
+  };
+
+  // Position above or below based on available space
+  const top = placement.suggestTop ? -48 : rect.size.height + 8;
+
+  return (
+    <div {...menuWrapperProps}>
+      <div style={{ position: 'absolute', top, pointerEvents: 'auto', cursor: 'default' }}>
+        <button onClick={handleCopy}>Copy</button>
+      </div>
+    </div>
+  );
+};
+
+// Pass the menu to the SelectionLayer
+<SelectionLayer
+  documentId={activeDocumentId}
+  pageIndex={pageIndex}
+  selectionMenu={(props) => (
+    <TextSelectionMenu {...props} documentId={activeDocumentId} />
+  )}
+/>
+```
+
+The `menuWrapperProps` must be spread onto your wrapper element—it handles proper positioning relative to page rotation.
+
 ## Live Example
 
-Try selecting text in the viewer below. A "Copy Text" button will become active, allowing you to copy the selected content to your clipboard.
+Try selecting text in the viewer below. A contextual "Copy" menu will appear near your selection, and the toolbar's "Copy Text" button will become active. This demonstrates both the `selectionMenu` prop and the `useSelectionCapability` hook.
 
 import { PDFViewer } from '../code-examples/selection-example';
 
@@ -112,6 +161,12 @@ import { PDFViewer } from '../code-examples/selection-example';
 
 ## API Reference
 
+### Configuration (`SelectionPluginConfig`)
+
+| Option | Type | Description |
+| :--- | :--- | :--- |
+| **`menuHeight`** | `number` | The approximate height of the selection menu in pixels. Used to determine whether to show the menu above or below the selection. <br/>**Default**: `40` |
+
 ### Component: `<SelectionLayer />`
 
 The component that renders the blue rectangles over the selected text.
@@ -121,6 +176,7 @@ The component that renders the blue rectangles over the selected text.
 | **`documentId`** | `string` | **(Required)** The ID of the document. |
 | **`pageIndex`** | `number` | **(Required)** The index of the page this layer is on. |
 | **`background`** | `string` | (Optional) The color of the selection highlight. <br/>**Default**: `'rgba(33,150,243)'` |
+| **`selectionMenu`** | `(props) => JSX.Element` | A render prop for a custom menu that appears when text is selected. |
 
 ### Hook: `useSelectionCapability()`
 

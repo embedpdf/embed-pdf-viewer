@@ -23,6 +23,7 @@ import {
   SelectionPluginPackage,
   useSelectionCapability,
   SelectionRangeX,
+  type SelectionSelectionMenuProps,
 } from '@embedpdf/plugin-selection/react'
 import { ignore } from '@embedpdf/models'
 import { Loader2, Copy, Check, Type } from 'lucide-react'
@@ -37,6 +38,86 @@ const plugins = [
   createPluginRegistration(InteractionManagerPluginPackage),
   createPluginRegistration(SelectionPluginPackage),
 ]
+
+/**
+ * A custom selection menu that appears when text is selected.
+ * Shows a copy button with visual feedback.
+ */
+const TextSelectionMenu = ({
+  rect,
+  menuWrapperProps,
+  placement,
+  documentId,
+}: SelectionSelectionMenuProps & { documentId: string }) => {
+  const { provides: selectionCapability } = useSelectionCapability()
+  const [copied, setCopied] = useState(false)
+
+  // Reset copied state when placement changes
+  useEffect(() => {
+    setCopied(false)
+  }, [placement])
+
+  const handleCopy = () => {
+    if (!selectionCapability) return
+
+    const scope = selectionCapability.forDocument(documentId)
+    if (!scope) return
+
+    scope.copyToClipboard()
+    scope.clear()
+
+    setCopied(true)
+    setTimeout(() => setCopied(false), 1500)
+  }
+
+  const menuStyle: React.CSSProperties = {
+    position: 'absolute',
+    pointerEvents: 'auto',
+    cursor: 'default',
+  }
+
+  // Position above or below based on available space
+  if (placement.suggestTop) {
+    menuStyle.top = -40 - 8
+  } else {
+    menuStyle.top = rect.size.height + 8
+  }
+
+  return (
+    <div {...menuWrapperProps}>
+      <div
+        style={menuStyle}
+        className="rounded-lg border border-gray-200 bg-white shadow-lg dark:border-gray-700 dark:bg-gray-800"
+      >
+        <div className="flex items-center gap-1 px-2 py-1">
+          <button
+            onClick={handleCopy}
+            className="flex items-center gap-1.5 rounded px-2 py-1.5 text-sm text-gray-700 transition-colors hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-gray-700"
+            aria-label="Copy selected text"
+            title="Copy"
+          >
+            {copied ? (
+              <>
+                <Check
+                  size={16}
+                  className="text-green-600 dark:text-green-400"
+                />
+                <span className="text-green-600 dark:text-green-400">
+                  Copied!
+                </span>
+              </>
+            ) : (
+              <>
+                <Copy size={16} />
+                <span>Copy</span>
+              </>
+            )}
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
 
 const SelectionToolbar = ({ documentId }: { documentId: string }) => {
   const { provides: selectionCapability } = useSelectionCapability()
@@ -212,6 +293,12 @@ export const PDFViewer = () => {
                             <SelectionLayer
                               documentId={activeDocumentId}
                               pageIndex={pageIndex}
+                              selectionMenu={(props) => (
+                                <TextSelectionMenu
+                                  {...props}
+                                  documentId={activeDocumentId}
+                                />
+                              )}
                             />
                           </PagePointerProvider>
                         )}

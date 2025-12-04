@@ -26,16 +26,16 @@ import { createPluginRegistration } from '@embedpdf/core'
 import { SpreadPluginPackage, SpreadMode } from '@embedpdf/plugin-spread/vue'
 
 const plugins = [
-  // ... other essential plugins
-  createPluginRegistration(LoaderPluginPackage, { /* ... */ }),
-  createPluginRegistration(ViewportPluginPackage),
-  createPluginRegistration(ScrollPluginPackage),
-  createPluginRegistration(RenderPluginPackage),
+  // ... other essential plugins
+  createPluginRegistration(DocumentManagerPluginPackage, { /* ... */ }),
+  createPluginRegistration(ViewportPluginPackage),
+  createPluginRegistration(ScrollPluginPackage),
+  createPluginRegistration(RenderPluginPackage),
 
-  // Register and configure the spread plugin
-  createPluginRegistration(SpreadPluginPackage, {
-    defaultSpreadMode: SpreadMode.None,
-  }),
+  // Register and configure the spread plugin
+  createPluginRegistration(SpreadPluginPackage, {
+    defaultSpreadMode: SpreadMode.None,
+  }),
 ]
 ```
 
@@ -45,14 +45,14 @@ The plugin provides the `useSpread` composable to control the layout mode. When 
 
 ### Building a Spread Mode Toolbar
 
-Use the `useSpread` composable to get the current `spreadMode` and the `provides` object for changing it. You can then build a UI, like a set of buttons, to allow users to switch between layouts.
+Use the `useSpread` composable to get the current `spreadMode` and the `provides` object for changing it for a specific document. You can then build a UI, like a set of buttons, to allow users to switch between layouts.
 
-```vue
+```vue {2, 5}
 <script setup lang="ts">
-import { SpreadMode } from '@embedpdf/plugin-spread/vue';
-import { useSpread } from '@embedpdf/plugin-spread/vue';
+import { SpreadMode, useSpread } from '@embedpdf/plugin-spread/vue';
 
-const { provides: spread, spreadMode } = useSpread();
+const props = defineProps<{ documentId: string }>();
+const { provides: spread, spreadMode } = useSpread(() => props.documentId);
 
 const modes = [
   { label: 'Single Page', value: SpreadMode.None },
@@ -98,15 +98,21 @@ import { SpreadExample } from '../code-examples/spread-example';
 | :--- | :--- | :--- |
 | **`defaultSpreadMode`** | `SpreadMode` | Sets the initial page layout when a document is loaded. <br />**Default**: `SpreadMode.None` |
 
-### Composable: `useSpread()`
+### Composable: `useSpread(documentId)`
 
-Connects your component to the spread plugin's state and functions.
+Connects your component to the spread plugin's state and functions for a specific document.
+
+#### Parameters
+
+| Parameter | Type | Description |
+| :--- | :--- | :--- |
+| **`documentId`** | `() => string` | A getter function that returns the document ID to track. |
 
 #### Returns
 
 | Property | Type | Description |
 | :--- | :--- | :--- |
-| **`spreadMode`** | `Ref<SpreadMode>` | The current reactive spread mode (`'none'`, `'odd'`, or `'even'`). |
+| **`spreadMode`** | `SpreadMode` | The current reactive spread mode (`'none'`, `'odd'`, or `'even'`). |
 | **`provides`** | `Ref<SpreadCapability \| null>` | A ref object with methods to control the layout, or `null` if the plugin is not ready. |
 
 #### `SpreadCapability` Methods

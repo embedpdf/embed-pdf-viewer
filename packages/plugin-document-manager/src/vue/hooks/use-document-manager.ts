@@ -47,7 +47,7 @@ export function useOpenDocuments(getDocumentIds?: MaybeRefOrGetter<string[] | un
     const documentIds = getDocumentIds ? toValue(getDocumentIds) : undefined;
 
     // If specific documentIds are provided, use THEIR order
-    if (documentIds && documentIds.length > 0) {
+    if (documentIds) {
       return documentIds
         .map((docId) => core.documents[docId])
         .filter((doc): doc is DocumentState => doc !== null && doc !== undefined);

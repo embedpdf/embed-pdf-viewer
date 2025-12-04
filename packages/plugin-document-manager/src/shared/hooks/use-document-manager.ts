@@ -44,7 +44,7 @@ export const useOpenDocuments = (documentIds?: string[]) => {
     if (!coreState) return [];
 
     // If specific documentIds are provided, use THEIR order
-    if (documentIds && documentIds.length > 0) {
+    if (documentIds) {
       return documentIds
         .map((docId) => coreState.documents[docId])
         .filter((doc): doc is DocumentState => doc !== null && doc !== undefined);

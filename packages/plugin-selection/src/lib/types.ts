@@ -1,7 +1,14 @@
 import { BasePluginConfig, EventHook } from '@embedpdf/core';
 import { PdfPageGeometry, PdfTask, Rect } from '@embedpdf/models';
 
-export interface SelectionPluginConfig extends BasePluginConfig {}
+export interface SelectionPluginConfig extends BasePluginConfig {
+  /**
+   * The approximate height of the selection menu in pixels.
+   * Used to determine whether to show the menu above or below the selection.
+   * @default 40
+   */
+  menuHeight?: number;
+}
 
 export interface SelectionMenuPlacement {
   pageIndex: number; // The page the menu is anchored to

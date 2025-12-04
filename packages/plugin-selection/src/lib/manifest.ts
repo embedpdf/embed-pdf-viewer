@@ -12,5 +12,6 @@ export const manifest: PluginManifest<SelectionPluginConfig> = {
   optional: ['viewport', 'scroll'],
   defaultConfig: {
     enabled: true,
+    menuHeight: 40,
   },
 };

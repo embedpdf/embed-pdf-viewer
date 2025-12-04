@@ -18,7 +18,7 @@ const plugins = [
     initialDocuments: [{ url: 'https://snippet.embedpdf.com/ebook.pdf' }],
   }),
   createPluginRegistration(ViewportPluginPackage),
-  createPluginRegistration(ScrollPluginPackage, { initialPage: 10 }),
+  createPluginRegistration(ScrollPluginPackage),
   createPluginRegistration(RenderPluginPackage),
 ];
 </script>
