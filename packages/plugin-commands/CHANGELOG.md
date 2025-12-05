@@ -1,5 +1,21 @@
 # @embedpdf/plugin-commands
 
+## 2.0.0-next.1
+
+### Patch Changes
+
+- [`caec11d`](https://github.com/embedpdf/embed-pdf-viewer/commit/caec11d7e8b925e641b4834aadf9a126edfb3586) by [@bobsingor](https://github.com/bobsingor) – Updated `useCommand` hook to return `{ current: ResolvedCommand | null }` instead of `{ command: ResolvedCommand | null }` for consistency with other Svelte hooks. Updated `KeyboardShortcuts` component to use the new pattern.
+
+  **Migration:**
+
+  ```svelte
+  <!-- Before -->
+  const cmd = useCommand(() => 'nav.next', () => documentId); // Access: cmd.command?.execute()
+
+  <!-- After -->
+  const cmd = useCommand(() => 'nav.next', () => documentId); // Access: cmd.current?.execute()
+  ```
+
 ## 2.0.0-next.0
 
 ### Major Changes

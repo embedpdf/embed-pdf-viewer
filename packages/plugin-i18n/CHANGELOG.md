@@ -1,5 +1,11 @@
 # @embedpdf/plugin-i18n
 
+## 2.0.0-next.1
+
+### Patch Changes
+
+- [`caec11d`](https://github.com/embedpdf/embed-pdf-viewer/commit/caec11d7e8b925e641b4834aadf9a126edfb3586) by [@bobsingor](https://github.com/bobsingor) – Fixed Vue `useTranslations` hook reactivity for `locale` computed property. The `locale` value now correctly updates when the locale changes.
+
 ## 2.0.0-next.0
 
 ### Major Changes
