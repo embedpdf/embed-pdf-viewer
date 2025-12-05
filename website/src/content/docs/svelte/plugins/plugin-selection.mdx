@@ -48,7 +48,7 @@ To show the highlighted text, place the `<SelectionLayer />` component inside th
 
 Both components require the `documentId` to link to the correct document state.
 
-```svelte {3, 10}
+```svelte {3, 11}
 <script lang="ts">
 import { PagePointerProvider } from '@embedpdf/plugin-interaction-manager/svelte';
 import { SelectionLayer } from '@embedpdf/plugin-selection/svelte';
@@ -72,7 +72,7 @@ The `useSelectionCapability` store allows you to work with the selected text. Yo
 
 You can use the `onSelectionChange` event to know when a selection exists, which is useful for enabling or disabling UI elements like a "Copy" button.
 
-```svelte {3, 6, 9-15}
+```svelte {3, 6, 10-15}
 <script lang="ts">
 import { onMount, onDestroy } from 'svelte';
 import { useSelectionCapability, type SelectionRangeX } from '@embedpdf/plugin-selection/svelte';

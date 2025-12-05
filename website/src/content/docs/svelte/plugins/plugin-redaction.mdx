@@ -61,7 +61,7 @@ The plugin's functionality is primarily managed through the `<RedactionLayer />`
 
 This component is responsible for rendering all redaction-related UI, including the text selection highlights, area selection marquee, and all pending redaction marks. It must be placed inside your `<Scroller />`'s `renderPage` snippet and be a child of the `<PagePointerProvider>`.
 
-```svelte {3, 11}
+```svelte {3, 12}
 <script lang="ts">
 import { PagePointerProvider } from '@embedpdf/plugin-interaction-manager/svelte';
 import { RedactionLayer } from '@embedpdf/plugin-redaction/svelte';

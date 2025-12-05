@@ -54,7 +54,7 @@ This is the standard way to display a page. Place the `<RenderLayer />` componen
 
 You must provide the `documentId` to tell the renderer which document the page belongs to. The component automatically detects the current scale and refresh version from the document state.
 
-```svelte {5-8}
+```svelte {10-13}
 <script lang="ts">
 import { Scroller, type RenderPageProps } from '@embedpdf/plugin-scroll/svelte';
 import { RenderLayer } from '@embedpdf/plugin-render/svelte';

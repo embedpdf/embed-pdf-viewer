@@ -65,7 +65,7 @@ let { documentId }: { documentId: string } = $props();
 
 To scroll a specific document programmatically, use `useViewportCapability` to get the API, then use `.forDocument(id)` to target the specific viewport.
 
-```svelte {3,7}
+```svelte {2,6-7, 10}
 <script lang="ts">
 import { useViewportCapability } from '@embedpdf/plugin-viewport/svelte';
 

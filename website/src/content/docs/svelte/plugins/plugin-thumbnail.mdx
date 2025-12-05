@@ -64,29 +64,33 @@ The `meta` object passed to your snippet contains calculated layout values. **Yo
 ```svelte
 <script lang="ts">
 import { useScroll } from '@embedpdf/plugin-scroll/svelte';
-import { ThumbnailsPane, ThumbImg } from '@embedpdf/plugin-thumbnail/svelte';
+import { ThumbnailsPane, ThumbImg, type ThumbMeta } from '@embedpdf/plugin-thumbnail/svelte';
 
 let { documentId }: { documentId: string } = $props();
 const scroll = useScroll(() => documentId);
 </script>
 
-{#snippet renderThumb(meta)}
-  <div
-    style:position="absolute"
-    style:top="{meta.top}px"
-    style:height="{meta.wrapperHeight}px"
-    style:width="100%"
-    onclick={() => scroll.provides?.scrollToPage({ pageNumber: meta.pageIndex + 1 })}
-  >
-    <div style:width="{meta.width}px" style:height="{meta.height}px">
-      <ThumbImg {documentId} {meta} />
-    </div>
-    <span>{meta.pageIndex + 1}</span>
-  </div>
-{/snippet}
-
 <div class="relative h-full overflow-hidden">
-  <ThumbnailsPane {documentId} {renderThumb} />
+  <ThumbnailsPane {documentId}>
+    {#snippet children(meta: ThumbMeta)}
+      <button
+        type="button"
+        class="absolute flex w-full cursor-pointer flex-col items-center"
+        style:height="{meta.wrapperHeight}px"
+        style:top="{meta.top}px"
+        onclick={() => scroll.provides?.scrollToPage?.({ pageNumber: meta.pageIndex + 1 })}
+      >
+        <div
+          class={scroll.state.currentPage === meta.pageIndex + 1 ? 'ring-2 ring-blue-500' : ''}
+          style:width="{meta.width}px"
+          style:height="{meta.height}px"
+        >
+          <ThumbImg {documentId} {meta} />
+        </div>
+        <span>{meta.pageIndex + 1}</span>
+      </button>
+    {/snippet}
+  </ThumbnailsPane>
 </div>
 ```
 
@@ -125,9 +129,10 @@ The virtualized scroll container.
 | Prop | Type | Description |
 | :--- | :--- | :--- |
 | **`documentId`** | `string` | **(Required)** The ID of the document to display thumbnails for. |
-| **`renderThumb`** | `Snippet<ThumbMeta>` | **(Required)** A snippet that defines how to render each thumbnail. |
 
-#### Snippet Props (`ThumbMeta`)
+#### Snippet: `children(meta: ThumbMeta)`
+
+A snippet that defines how to render each thumbnail. The `meta` object contains:
 
 | Property | Type | Description |
 | :--- | :--- | :--- |
@@ -136,6 +141,7 @@ The virtualized scroll container.
 | **`wrapperHeight`** | `number` | The total height of this thumbnail's container. |
 | **`width`** | `number` | The calculated width of the thumbnail image. |
 | **`height`** | `number` | The calculated height of the thumbnail image. |
+| **`labelHeight`** | `number` | Height reserved for the label below the image. |
 
 ### Component: `<ThumbImg />`
 

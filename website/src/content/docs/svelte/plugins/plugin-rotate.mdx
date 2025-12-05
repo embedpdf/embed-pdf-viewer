@@ -70,7 +70,7 @@ const rotate = useRotate(() => documentId);
 
 For the rotation to be visible, you must wrap your page layers with the `<Rotate />` component inside the `<Scroller>`'s `renderPage` snippet. This component calculates and applies the necessary CSS transform. It's important to place it *outside* the `PagePointerProvider` to ensure interactions are correctly mapped to the rotated page.
 
-```svelte {5, 12}
+```svelte {9, 16}
 <script lang="ts">
 import { Rotate } from '@embedpdf/plugin-rotate/svelte';
 import { PagePointerProvider } from '@embedpdf/plugin-interaction-manager/svelte';
