@@ -1,5 +1,11 @@
 # @embedpdf/plugin-document-manager
 
+## 2.0.0-next.1
+
+### Patch Changes
+
+- [`caec11d`](https://github.com/embedpdf/embed-pdf-viewer/commit/caec11d7e8b925e641b4834aadf9a126edfb3586) by [@bobsingor](https://github.com/bobsingor) – Fixed `useOpenDocuments` hook to correctly handle empty `documentIds` arrays. Previously, passing an empty array would fall through to returning all documents; now it correctly returns an empty array. This fix applies to React, Vue, and Svelte hooks.
+
 ## 2.0.0-next.0
 
 ### Major Changes

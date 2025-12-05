@@ -1,5 +1,22 @@
 # @embedpdf/utils
 
+## 2.0.0-next.1
+
+### Patch Changes
+
+- [`caec11d`](https://github.com/embedpdf/embed-pdf-viewer/commit/caec11d7e8b925e641b4834aadf9a126edfb3586) by [@bobsingor](https://github.com/bobsingor) – Refactored `CounterRotateContainer` to use a Svelte action (`action: Action<HTMLElement>`) instead of a ref callback (`ref: (el: HTMLElement | null) => void`). This is the idiomatic Svelte pattern for attaching lifecycle-managed behavior to DOM elements. Updated `MenuWrapperProps` type accordingly.
+
+  **Migration:**
+
+  ```svelte
+  <!-- Before -->
+  <span bind:this={el} style={menuWrapperProps.style}>
+  $effect(() => { menuWrapperProps.ref(el); });
+
+  <!-- After -->
+  <span use:menuWrapperProps.action style={menuWrapperProps.style}>
+  ```
+
 ## 2.0.0-next.0
 
 ### Minor Changes
