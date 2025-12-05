@@ -20,7 +20,7 @@ npm install @embedpdf/plugin-pan @embedpdf/plugin-viewport @embedpdf/plugin-inte
 
 Import `PanPluginPackage` and its dependencies, and add them to the `plugins` array. The Pan plugin is registered after its dependencies.
 
-```typescript {4-5, 14, 17-19}
+```typescript {5, 14, 17-19}
 import { createPluginRegistration } from '@embedpdf/core'
 // ... other imports
 import { ViewportPluginPackage } from '@embedpdf/plugin-viewport/svelte'
@@ -29,7 +29,7 @@ import { PanPluginPackage } from '@embedpdf/plugin-pan/svelte'
 
 const plugins = [
   // ... other essential plugins
-  createPluginRegistration(LoaderPluginPackage, { /* ... */ }),
+  createPluginRegistration(DocumentManagerPluginPackage, { /* ... */ }),
   createPluginRegistration(RenderPluginPackage),
 
   // Register dependencies first
@@ -45,17 +45,18 @@ const plugins = [
 
 ## Usage
 
-The plugin works by registering a "pan" interaction mode. You can build UI to toggle this mode on and off using the `usePan` composable.
+The plugin works by registering a "pan" interaction mode. You can build UI to toggle this mode on and off using the `usePan` store.
 
 ### Building a Pan Tool Button
 
-The `usePan` composable provides the reactive `isPanning` state and a `provides` object with methods to control the pan mode. The `isPanning` boolean is perfect for providing visual feedback in your UI, such as highlighting the tool's button when it is active.
+The `usePan` store provides the `isPanning` state and a `provides` object with methods to control the pan mode for a specific document. The `isPanning` boolean is perfect for providing visual feedback in your UI, such as highlighting the tool's button when it is active.
 
 ```svelte
 <script lang="ts">
 import { usePan } from '@embedpdf/plugin-pan/svelte';
 
-const pan = usePan();
+let { documentId }: { documentId: string } = $props();
+const pan = usePan(() => documentId);
 </script>
 
 {#if pan.provides}
@@ -72,16 +73,18 @@ const pan = usePan();
 
 For a smooth panning experience, it's crucial that the viewer can track mouse movements even when the cursor moves outside the boundaries of the viewport. The `GlobalPointerProvider` component, exported from the `Interaction Manager` plugin, solves this by capturing events globally.
 
-You should wrap your `<Viewport>` component with `<GlobalPointerProvider>` to enable this behavior.
+You should wrap your `<Viewport>` component with `<GlobalPointerProvider>` and provide the `documentId`.
 
-```svelte {2, 5, 9}
+```svelte {2, 8, 9}
 <script lang="ts">
 import { GlobalPointerProvider } from '@embedpdf/plugin-interaction-manager/svelte';
+
+let { documentId }: { documentId: string } = $props();
 </script>
 
-<GlobalPointerProvider>
-  <Viewport>
-    <Scroller>{/* ... */}</Scroller>
+<GlobalPointerProvider {documentId}>
+  <Viewport {documentId}>
+    <Scroller {documentId} {renderPage} />
   </Viewport>
 </GlobalPointerProvider>
 ```
@@ -92,7 +95,14 @@ This example includes a toolbar button that toggles the pan mode. Click the hand
 
 import { PanExample } from '../code-examples/pan-example';
 
-<PanExample />
+<CodeExample 
+  codePaths={[
+    "../../examples/svelte-tailwind/src/examples/pan-example.svelte",
+    "../../examples/svelte-tailwind/src/examples/pan-example-content.svelte"
+  ]}
+>
+  <PanExample />
+</CodeExample>
 
 ## API Reference
 
@@ -102,9 +112,15 @@ import { PanExample } from '../code-examples/pan-example';
 | :--- | :--- | :--- |
 | **`defaultMode`** | `'never' \| 'mobile' \| 'always'` | Determines if pan should be the default interaction mode. <br />- **`never`**: Another mode (like text selection) is default. <br />- **`mobile`**: Pan is the default mode only on touch-enabled devices. <br />- **`always`**: Pan is the default mode on all devices. <br />**Default**: `'mobile'` |
 
-### Composable: `usePan()`
+### Store: `usePan(documentId)`
 
-Connects your component to the pan plugin's state and functions.
+Connects your component to the pan plugin's state and functions for a specific document.
+
+#### Parameters
+
+| Parameter | Type | Description |
+| :--- | :--- | :--- |
+| **`documentId`** | `() => string` | A getter function that returns the document ID to track. |
 
 #### Returns
 
@@ -121,4 +137,3 @@ Connects your component to the pan plugin's state and functions.
 | **`disablePan()`** | Deactivates pan mode and returns to the default interaction mode. |
 | **`togglePan()`** | Toggles the pan mode on or off. |
 | **`makePanDefault()`** | Sets the pan mode as the new default interaction for the viewer session. |
-

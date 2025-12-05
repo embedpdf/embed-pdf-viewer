@@ -27,7 +27,7 @@ import { SpreadPluginPackage, SpreadMode } from '@embedpdf/plugin-spread/svelte'
 
 const plugins = [
   // ... other essential plugins
-  createPluginRegistration(LoaderPluginPackage, { /* ... */ }),
+  createPluginRegistration(DocumentManagerPluginPackage, { /* ... */ }),
   createPluginRegistration(ViewportPluginPackage),
   createPluginRegistration(ScrollPluginPackage),
   createPluginRegistration(RenderPluginPackage),
@@ -41,18 +41,18 @@ const plugins = [
 
 ## Usage
 
-The plugin provides the `useSpread` composable to control the layout mode. When you change the mode, the plugin recalculates the page groupings, and the `<Scroller>` component automatically updates to reflect the new layout.
+The plugin provides the `useSpread` store to control the layout mode. When you change the mode, the plugin recalculates the page groupings, and the `<Scroller>` component automatically updates to reflect the new layout.
 
 ### Building a Spread Mode Toolbar
 
-Use the `useSpread` composable to get the current `spreadMode` and the `provides` object for changing it. You can then build a UI, like a set of buttons, to allow users to switch between layouts.
+Use the `useSpread` store to get the current `spreadMode` and the `provides` object for changing it for a specific document. You can then build a UI, like a set of buttons, to allow users to switch between layouts.
 
-```svelte
+```svelte {2, 5}
 <script lang="ts">
-import { SpreadMode } from '@embedpdf/plugin-spread/svelte';
-import { useSpread } from '@embedpdf/plugin-spread/svelte';
+import { SpreadMode, useSpread } from '@embedpdf/plugin-spread/svelte';
 
-const spread = useSpread();
+let { documentId }: { documentId: string } = $props();
+const spread = useSpread(() => documentId);
 
 const modes = [
   { label: 'Single Page', value: SpreadMode.None },
@@ -81,7 +81,14 @@ This example shows a viewer with a toolbar that lets you dynamically change the 
 
 import { SpreadExample } from '../code-examples/spread-example';
 
-<SpreadExample />
+<CodeExample 
+  codePaths={[
+    "../../examples/svelte-tailwind/src/examples/spread-example.svelte",
+    "../../examples/svelte-tailwind/src/examples/spread-example-content.svelte"
+  ]}
+>
+  <SpreadExample />
+</CodeExample>
 
 ## API Reference
 
@@ -91,9 +98,15 @@ import { SpreadExample } from '../code-examples/spread-example';
 | :--- | :--- | :--- |
 | **`defaultSpreadMode`** | `SpreadMode` | Sets the initial page layout when a document is loaded. <br />**Default**: `SpreadMode.None` |
 
-### Composable: `useSpread()`
+### Store: `useSpread(documentId)`
 
-Connects your component to the spread plugin's state and functions.
+Connects your component to the spread plugin's state and functions for a specific document.
+
+#### Parameters
+
+| Parameter | Type | Description |
+| :--- | :--- | :--- |
+| **`documentId`** | `() => string` | A getter function that returns the document ID to track. |
 
 #### Returns
 
@@ -118,4 +131,3 @@ The `SpreadMode` determines how pages are grouped together.
 | **`None`** | The default view. Each page is displayed individually. | `[[p1], [p2], [p3], ...]` |
 | **`Odd`** | Pages are paired up, starting from the first page. Ideal for documents where page 1 is on the right-hand side of a spread (like a magazine). | `[[p1, p2], [p3, p4], ...]` |
 | **`Even`** | The first page is shown by itself, and subsequent pages are paired. Ideal for books where the cover (page 1) is a standalone page. | `[[p1], [p2, p3], [p4, p5], ...]` |
-

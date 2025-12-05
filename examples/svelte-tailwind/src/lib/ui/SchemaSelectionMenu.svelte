@@ -25,7 +25,7 @@
 
 <div
   style={props.menuWrapperProps.style}
-  use:props.menuWrapperProps.ref
+  use:props.menuWrapperProps.action
   {...getUIItemProps(schema)}
 >
   <div style={menuStyle} class="rounded-lg border border-gray-200 bg-white shadow-lg">

@@ -23,18 +23,18 @@ This example is a great starting point for your own project. Feel free to fork t
 
 The Svelte example integrates numerous plugins to create a comprehensive viewing experience.
 
-| Feature                                                    | Plugin(s) Used                                                                    |
+| Feature                                                    | Plugin(s) Used                                                                    |
 | ---------------------------------------------------------- | --------------------------------------------------------------------------------- |
-| Virtualized scrolling with smooth page rendering           | `@embedpdf/plugin-scroll` + `@embedpdf/plugin-render` + `@embedpdf/plugin-tiling` |
-| Advanced zoom controls (presets, fit-to-page, marquee)     | `@embedpdf/plugin-zoom`                                                           |
-| Pan/hand tool for easy navigation                          | `@embedpdf/plugin-pan`                                                            |
-| Page rotation in 90-degree increments                      | `@embedpdf/plugin-rotate`                                                         |
-| Single and two-page spread layouts                         | `@embedpdf/plugin-spread`                                                         |
-| Thumbnail sidebar for quick page jumping                   | `@embedpdf/plugin-thumbnail`                                                      |
-| In-document text search with result highlighting           | `@embedpdf/plugin-search`                                                         |
-| File opening, downloading, and printing                    | `@embedpdf/plugin-loader`, `@embedpdf/plugin-export`, `@embedpdf/plugin-print`    |
-| Fullscreen mode                                            | `@embedpdf/plugin-fullscreen`                                                     |
-| Text selection and copy-to-clipboard                       | `@embedpdf/plugin-selection`                                                      |
+| Virtualized scrolling with smooth page rendering           | `@embedpdf/plugin-scroll` + `@embedpdf/plugin-render` + `@embedpdf/plugin-tiling` |
+| Advanced zoom controls (presets, fit-to-page, marquee)     | `@embedpdf/plugin-zoom`                                                           |
+| Pan/hand tool for easy navigation                          | `@embedpdf/plugin-pan`                                                            |
+| Page rotation in 90-degree increments                      | `@embedpdf/plugin-rotate`                                                         |
+| Single and two-page spread layouts                         | `@embedpdf/plugin-spread`                                                         |
+| Thumbnail sidebar for quick page jumping                   | `@embedpdf/plugin-thumbnail`                                                      |
+| In-document text search with result highlighting           | `@embedpdf/plugin-search`                                                         |
+| File opening, downloading, and printing                    | `@embedpdf/plugin-document-manager`, `@embedpdf/plugin-export`, `@embedpdf/plugin-print`    |
+| Fullscreen mode                                            | `@embedpdf/plugin-fullscreen`                                                     |
+| Text selection and copy-to-clipboard                       | `@embedpdf/plugin-selection`                                                      |
 
 ## Core Concepts Illustrated
 
@@ -46,46 +46,80 @@ All features are enabled and configured in a single `plugins` array within the m
 <script lang="ts">
 // ...
 const plugins = [
-  createPluginRegistration(LoaderPluginPackage, { /* ... */ }),
-  createPluginRegistration(ViewportPluginPackage, { /* ... */ }),
-  createPluginRegistration(ScrollPluginPackage, { /* ... */ }),
-  createPluginRegistration(RenderPluginPackage),
-  createPluginRegistration(TilingPluginPackage, { /* ... */ }),
-  createPluginRegistration(ZoomPluginPackage, { /* ... */ }),
-  createPluginRegistration(SearchPluginPackage),
-  createPluginRegistration(InteractionManagerPluginPackage),
-  createPluginRegistration(PanPluginPackage),
-  createPluginRegistration(RotatePluginPackage),
-  createPluginRegistration(SpreadPluginPackage),
-  createPluginRegistration(FullscreenPluginPackage),
-  createPluginRegistration(ExportPluginPackage),
-  createPluginRegistration(ThumbnailPluginPackage),
-  createPluginRegistration(SelectionPluginPackage),
-  // ... and more
+  createPluginRegistration(DocumentManagerPluginPackage, { /* ... */ }),
+  createPluginRegistration(ViewportPluginPackage, { /* ... */ }),
+  createPluginRegistration(ScrollPluginPackage, { /* ... */ }),
+  createPluginRegistration(RenderPluginPackage),
+  createPluginRegistration(TilingPluginPackage, { /* ... */ }),
+  createPluginRegistration(ZoomPluginPackage, { /* ... */ }),
+  createPluginRegistration(SearchPluginPackage),
+  createPluginRegistration(InteractionManagerPluginPackage),
+  createPluginRegistration(PanPluginPackage),
+  createPluginRegistration(RotatePluginPackage),
+  createPluginRegistration(SpreadPluginPackage),
+  createPluginRegistration(FullscreenPluginPackage),
+  createPluginRegistration(ExportPluginPackage),
+  createPluginRegistration(ThumbnailPluginPackage),
+  createPluginRegistration(SelectionPluginPackage),
+  // ... and more
 ];
 </script>
+
+<EmbedPDF engine={pdfEngine.engine} {plugins}>
+  {#snippet children({ activeDocumentId })}
+    {#if activeDocumentId}
+      {@const documentId = activeDocumentId}
+      <DocumentContent {documentId}>
+        {#snippet children(documentContent)}
+          {#if documentContent.isLoaded}
+            <Toolbar {documentId} />
+            <Viewport {documentId}>
+              <!-- Viewer UI with documentId passed to components -->
+            </Viewport>
+          {/if}
+        {/snippet}
+      </DocumentContent>
+    {/if}
+  {/snippet}
+</EmbedPDF>
 ````
 
 ### 2. Reusable Svelte Components
 
 The UI is broken down into logical, reusable Svelte components, each leveraging Tailwind CSS for styling (e.g., `<Toolbar.svelte>`, `<Sidebar.svelte>`, `<Search.svelte>`). Each component is responsible for a specific piece of the UI and uses EmbedPDF stores to interact with the relevant plugins.
 
-For example, the `<ZoomControls.svelte>` component uses the `useZoom` store to manage zoom functionality.
+For example, the `<Toolbar.svelte>` component uses multiple stores to manage different functionalities like panning, rotating, and changing the page layout. Since EmbedPDF supports multiple documents, stores require a `documentId` parameter (as a getter function).
 
-```svelte filename="src/lib/components/ZoomControls.svelte"
+```svelte filename="src/lib/components/Toolbar.svelte"
 <script lang="ts">
-import { useZoom, ZoomMode } from '@embedpdf/plugin-zoom/svelte';
+import { usePan } from '@embedpdf/plugin-pan/svelte';
+import { useRotate } from '@embedpdf/plugin-rotate/svelte';
+import { useSpread } from '@embedpdf/plugin-spread/svelte';
+// ... other imports
 
-const zoom = useZoom();
+interface Props {
+  documentId: string;
+}
 
-const handleZoomIn = () => {
-  zoom.provides?.zoomIn();
-};
+let { documentId }: Props = $props();
+
+// Pass documentId as a getter function to each store
+const pan = usePan(() => documentId);
+const rotate = useRotate(() => documentId);
+const spread = useSpread(() => documentId);
+// ...
 </script>
 
-<button onclick={handleZoomIn}>
-  Zoom In
-</button>
+<div class="toolbar">
+  <!-- ... -->
+  <button
+    class:active={pan.state.isPanning}
+    onclick={() => pan.provides?.togglePan()}
+  >
+    Pan
+  </button>
+  <!-- ... other buttons for rotate, spread, etc. -->
+</div>
 ```
 
 ### 3. Responsive Design

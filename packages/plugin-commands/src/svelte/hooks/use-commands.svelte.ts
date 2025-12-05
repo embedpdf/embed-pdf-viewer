@@ -6,7 +6,7 @@ export const useCommandsPlugin = () => usePlugin<CommandsPlugin>(CommandsPlugin.
 
 // Define the return type explicitly to maintain type safety
 interface UseCommandReturn {
-  command: ResolvedCommand | null;
+  current: ResolvedCommand | null;
 }
 
 /**
@@ -46,7 +46,7 @@ export const useCommand = (
   });
 
   return {
-    get command() {
+    get current() {
       return command;
     },
   };

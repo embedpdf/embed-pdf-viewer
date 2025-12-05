@@ -27,7 +27,7 @@ import { PrintPluginPackage } from '@embedpdf/plugin-print/svelte'
 
 const plugins = [
   // ... other essential plugins
-  createPluginRegistration(LoaderPluginPackage, { /* ... */ }),
+  createPluginRegistration(DocumentManagerPluginPackage, { /* ... */ }),
   createPluginRegistration(ViewportPluginPackage),
   createPluginRegistration(ScrollPluginPackage),
   createPluginRegistration(RenderPluginPackage),
@@ -39,27 +39,26 @@ const plugins = [
 
 ## Usage
 
-The plugin works by combining a composable for initiating the print job with a component that handles the browser interaction.
+The plugin works by combining a store for initiating the print job with a component that handles the browser interaction.
 
-### 1\. Triggering a Print Job
+### Triggering a Print Job
 
-Use the `usePrintCapability` composable to get access to the plugin's `print` method. You can call this method from any component, such as a button in your toolbar.
+Use the `usePrint` store to get access to the plugin's `print` method for the current document. You can call this method from any component, such as a button in your toolbar.
 
 The `print` method returns a `Task`, which allows you to track the progress and handle success or failure, perfect for showing a loading state to the user.
 
-```svelte
+```svelte {3, 6, 9-18}
 <script lang="ts">
-import { usePrintCapability } from '@embedpdf/plugin-print/svelte';
+import { usePrint } from '@embedpdf/plugin-print/svelte';
 
-const print = usePrintCapability();
+let { documentId }: { documentId: string } = $props();
+const print = usePrint(() => documentId);
 let isPrinting = $state(false);
 
 const handlePrint = () => {
   if (!print.provides || isPrinting) return;
   isPrinting = true;
-  
-  // Prints the entire document
-  const printTask = print.provides.print();
+  const printTask = print.provides.print(); // Prints the entire document
 
   printTask.wait(
     () => { isPrinting = false; }, // On success
@@ -73,11 +72,11 @@ const handlePrint = () => {
 </button>
 ```
 
-### 2\. Handling the Print Dialog (Behind the Scenes)
+### Handling the Print Dialog (Behind the Scenes)
 
 The plugin automatically adds a hidden `<PrintFrame />` component to your application. You do not need to render this component yourself.
 
-When you call `provides.print()`, this component listens for the prepared document, loads it into an invisible `<iframe>`, and calls the browser's `window.print()` method to open the print dialog. This entire process is handled for you.
+When you call `print.provides.print()`, this component listens for the prepared document, loads it into an invisible `<iframe>`, and calls the browser's `window.print()` method to open the print dialog. This entire process is handled for you.
 
 ## Live Example
 
@@ -85,21 +84,34 @@ This example shows a viewer with a print button. Clicking it will prepare the do
 
 import { PrintExample } from '../code-examples/print-example';
 
-<PrintExample />
+<CodeExample 
+  codePaths={[
+    "../../examples/svelte-tailwind/src/examples/print-example.svelte",
+    "../../examples/svelte-tailwind/src/examples/print-example-content.svelte"
+  ]}
+>
+  <PrintExample />
+</CodeExample>
 
 ## API Reference
 
-### Composable: `usePrintCapability()`
+### Store: `usePrint(documentId)`
 
-This composable connects your component to the print plugin's functions.
+This store connects your component to the print plugin's functions for a specific document.
+
+#### Parameters
+
+| Parameter | Type | Description |
+| :--- | :--- | :--- |
+| **`documentId`** | `() => string` | A getter function that returns the document ID to track. |
 
 #### Returns
 
 | Property | Type | Description |
 | :--- | :--- | :--- |
-| **`provides`** | `PrintCapability \| null` | An object with methods to control printing, or `null` if the plugin is not ready. |
+| **`provides`** | `PrintScope \| null` | An object with methods to control printing, or `null` if the plugin is not ready. |
 
-#### `PrintCapability` Methods
+#### `PrintScope` Methods
 
 | Method | Description |
 | :--- | :--- |
@@ -113,4 +125,3 @@ The `options` object passed to the `print` method. (Type imported from `@embedpd
 | :--- | :--- | :--- |
 | **`pageRanges`** | `string` | A string specifying which pages to print, e.g., "1-3, 5, 8". If omitted, all pages are printed. |
 | **`includeAnnotations`**| `boolean`| Whether to include annotations in the printed output. <br />**Default**: `true` |
-

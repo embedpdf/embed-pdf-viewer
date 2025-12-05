@@ -11,19 +11,11 @@
 
   const selectionCapability = useSelectionCapability();
   let copied = $state(false);
-  let spanElement = $state<HTMLSpanElement | null>(null);
 
   // Reset copied state when placement changes
   $effect(() => {
     if (placement) {
       copied = false;
-    }
-  });
-
-  // Register the ref callback
-  $effect(() => {
-    if (menuWrapperProps.ref && spanElement) {
-      menuWrapperProps.ref(spanElement);
     }
   });
 
@@ -54,7 +46,7 @@
   );
 </script>
 
-<span bind:this={spanElement} style={menuWrapperProps.style}>
+<span style={menuWrapperProps.style} use:menuWrapperProps.action>
   <div class="rounded-lg border border-gray-200 bg-white shadow-lg" style={menuStyle}>
     <div class="flex items-center gap-1 px-2 py-1">
       <button

@@ -26,8 +26,8 @@
   );
 
   function handleClick() {
-    if (command && !command.command?.disabled) {
-      command.command?.execute();
+    if (command && !command.current?.disabled) {
+      command.current?.execute();
     }
   }
 
@@ -43,7 +43,7 @@
   });
 
   const stateClasses = $derived.by(() => {
-    const cmd = command?.command;
+    const cmd = command?.current;
     if (!cmd || cmd.disabled) return 'opacity-50 cursor-not-allowed';
     if (cmd.active)
       return 'bg-blue-100 text-blue-600 hover:bg-blue-200 dark:bg-blue-900 dark:text-blue-300';
@@ -55,33 +55,33 @@
   );
 
   // Safely access icon props
-  const cmdIconProps = $derived(command?.command?.iconProps || {});
+  const cmdIconProps = $derived(command?.current?.iconProps || {});
 </script>
 
-{#if command?.command?.visible}
+{#if command?.current?.visible}
   <button
     use:registerAnchor
     type="button"
     class={className}
     onclick={handleClick}
-    disabled={command.command?.disabled}
+    disabled={command.current?.disabled}
     data-item-id={itemId}
-    title={command.command?.label}
+    title={command.current?.label}
   >
-    {#if command.command?.icon && (variant === 'icon' || variant === 'icon-text')}
+    {#if command.current?.icon && (variant === 'icon' || variant === 'icon-text')}
       <!-- 
          The 'name' prop triggers the registry lookup.
          The ...spread passes the styles down to the SVG. 
       -->
       <Icons
-        name={command.command.icon}
+        name={command.current.icon}
         class="h-5 w-5"
         primaryColor={cmdIconProps.primaryColor}
         secondaryColor={cmdIconProps.secondaryColor}
       />
     {/if}
     {#if variant === 'text' || variant === 'icon-text'}
-      <span>{command.command?.label}</span>
+      <span>{command.current?.label}</span>
     {/if}
   </button>
 {/if}

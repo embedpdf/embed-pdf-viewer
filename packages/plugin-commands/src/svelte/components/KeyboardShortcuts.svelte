@@ -3,12 +3,12 @@
   import { useCommandsCapability } from '../hooks';
   import { createKeyDownHandler } from '../../shared/utils';
 
-  const { provides: commands } = useCommandsCapability();
+  const commandsCapability = useCommandsCapability();
 
   onMount(() => {
-    if (!commands) return;
+    if (!commandsCapability.provides) return;
 
-    const handleKeyDown = createKeyDownHandler(commands);
+    const handleKeyDown = createKeyDownHandler(commandsCapability.provides);
 
     document.addEventListener('keydown', handleKeyDown);
     return () => document.removeEventListener('keydown', handleKeyDown);

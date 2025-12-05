@@ -1,5 +1,6 @@
 <script lang="ts">
   import type { Snippet } from 'svelte';
+  import type { Action } from 'svelte/action';
   import { getCounterRotation } from '@embedpdf/utils';
   import type { Rect, Rotation } from '@embedpdf/models';
   import type { MenuWrapperProps } from './types';
@@ -21,13 +22,10 @@
 
   let { rect, rotation, children }: Props = $props();
   const counterRotation = $derived(getCounterRotation(rect, rotation));
-  let elementRef = $state<HTMLElement | null>(null);
 
-  // Use native event listeners with capture phase to prevent event propagation
-  $effect(() => {
-    const element = elementRef;
-    if (!element) return;
-
+  // Svelte action for capture-phase event handling
+  // This is the idiomatic way to attach lifecycle-managed behavior to DOM elements
+  const menuWrapperAction: Action<HTMLElement> = (node) => {
     const handlePointerDown = (e: Event) => {
       // Stop propagation to prevent underlying layers from receiving the event
       e.stopPropagation();
@@ -40,19 +38,19 @@
       // Stop propagation to prevent underlying layers from receiving the event
       e.stopPropagation();
       // DO NOT use e.preventDefault() here - it breaks click events on mobile/tablet!
-      // preventDefault() stops the browser from generating click events from touch,
-      // which makes buttons inside this container non-functional on touch devices.
     };
 
     // Use capture phase to intercept before synthetic events
-    element.addEventListener('pointerdown', handlePointerDown, { capture: true });
-    element.addEventListener('touchstart', handleTouchStart, { capture: true });
+    node.addEventListener('pointerdown', handlePointerDown, { capture: true });
+    node.addEventListener('touchstart', handleTouchStart, { capture: true });
 
-    return () => {
-      element.removeEventListener('pointerdown', handlePointerDown, { capture: true });
-      element.removeEventListener('touchstart', handleTouchStart, { capture: true });
+    return {
+      destroy() {
+        node.removeEventListener('pointerdown', handlePointerDown, { capture: true });
+        node.removeEventListener('touchstart', handleTouchStart, { capture: true });
+      },
     };
-  });
+  };
 
   const menuWrapperStyle = $derived(
     `position: absolute; ` +
@@ -68,9 +66,7 @@
 
   const menuWrapperProps: MenuWrapperProps = $derived({
     style: menuWrapperStyle,
-    ref: (el: HTMLElement | null) => {
-      elementRef = el;
-    },
+    action: menuWrapperAction,
   });
 </script>
 
