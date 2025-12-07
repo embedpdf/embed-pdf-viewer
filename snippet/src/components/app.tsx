@@ -36,23 +36,6 @@ import {
 import { CommandsPluginPackage } from '@embedpdf/plugin-commands/preact';
 import { I18nPluginPackage } from '@embedpdf/plugin-i18n/preact';
 import {
-  commands,
-  viewerUISchema,
-  englishTranslations,
-  paramResolvers,
-  dutchTranslations,
-  germanTranslations,
-  frenchTranslations,
-} from '../config';
-import { SchemaToolbar } from '../ui/schema-toolbar';
-import { SchemaPanel } from '../ui/schema-panel';
-import { SchemaMenu } from '../ui/schema-menu';
-import { SchemaModal } from '../ui/schema-modal';
-// Custom components for schema-driven UI
-import { ThumbnailsSidebar } from './thumbnails-sidebar';
-import { SearchSidebar } from './search-sidebar';
-import { OutlineSidebar } from './outline-sidebar';
-import {
   MarqueeZoom,
   ZoomMode,
   ZoomPluginConfig,
@@ -69,7 +52,6 @@ import {
 } from '@embedpdf/plugin-tiling/preact';
 import { ThumbnailPluginConfig, ThumbnailPluginPackage } from '@embedpdf/plugin-thumbnail/preact';
 import { AnnotationLayer, AnnotationPluginPackage } from '@embedpdf/plugin-annotation/preact';
-import { LoadingIndicator } from './ui/loading-indicator';
 import { PrintPluginPackage } from '@embedpdf/plugin-print/preact';
 import { FullscreenPluginPackage } from '@embedpdf/plugin-fullscreen/preact';
 import { BookmarkPluginPackage } from '@embedpdf/plugin-bookmark/preact';
@@ -84,14 +66,35 @@ import { MarqueeCapture, CapturePluginPackage } from '@embedpdf/plugin-capture/p
 import { HistoryPluginPackage } from '@embedpdf/plugin-history/preact';
 import { RedactionLayer, RedactionPluginPackage } from '@embedpdf/plugin-redaction/preact';
 import { AttachmentPluginPackage } from '@embedpdf/plugin-attachment/preact';
-import { HintLayer } from './hint-layer';
-import { CommentSidebar } from './comment-sidebar';
-import { CustomZoomToolbar } from './custom-zoom-toolbar';
-import { AnnotationSidebar } from './annotation-sidebar';
+
+import { SchemaToolbar } from '@/ui/schema-toolbar';
+import { SchemaSidebar } from '@/ui/schema-sidebar';
+import { SchemaMenu } from '@/ui/schema-menu';
+import { SchemaModal } from '@/ui/schema-modal';
+// Custom components for schema-driven UI
+import { ThumbnailsSidebar } from '@/components/thumbnails-sidebar';
+import { SearchSidebar } from '@/components/search-sidebar';
+import { OutlineSidebar } from '@/components/outline-sidebar';
+
+import { LoadingIndicator } from '@/components/ui/loading-indicator';
+import { HintLayer } from '@/components/hint-layer';
+import { CommentSidebar } from '@/components/comment-sidebar';
+import { CustomZoomToolbar } from '@/components/custom-zoom-toolbar';
+import { AnnotationSidebar } from '@/components/annotation-sidebar';
 import { SchemaSelectionMenu } from '@/ui/schema-selection-menu';
 import { SchemaOverlay } from '@/ui/schema-overlay';
-import { PrintModal } from './print-modal';
-import { PageControls } from './page-controls';
+import { PrintModal } from '@/components/print-modal';
+import { PageControls } from '@/components/page-controls';
+
+import {
+  commands,
+  viewerUISchema,
+  englishTranslations,
+  paramResolvers,
+  dutchTranslations,
+  germanTranslations,
+  frenchTranslations,
+} from '@/config';
 
 export { ScrollStrategy, ZoomMode, SpreadMode, Rotation };
 
@@ -303,9 +306,9 @@ export function PDFViewer({ config, onRegistryReady }: PDFViewerProps) {
   const uiRenderers = useMemo(
     () => ({
       toolbar: SchemaToolbar,
-      sidebar: SchemaPanel, // SchemaPanel handles sidebars
+      sidebar: SchemaSidebar,
       modal: SchemaModal,
-      overlay: SchemaOverlay, // SchemaOverlay handles floating overlays
+      overlay: SchemaOverlay,
       menu: SchemaMenu,
       selectionMenu: SchemaSelectionMenu,
     }),

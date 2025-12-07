@@ -64,7 +64,7 @@ export function SearchSidebar({ documentId, onClose }: SearchSidebarProps) {
 
   // Focus input on mount
   useEffect(() => {
-    inputRef.current?.focus();
+    //inputRef.current?.focus();
   }, []);
 
   // Sync inputValue with persisted state.query when state loads

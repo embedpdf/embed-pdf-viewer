@@ -1,6 +1,7 @@
 <script lang="ts">
   import { UI_ATTRIBUTES, UI_SELECTORS } from '@embedpdf/plugin-ui';
   import { useUIPlugin, useUICapability } from './hooks/use-ui.svelte';
+  import { setUIContainerContext } from './hooks/use-ui-container.svelte';
   import type { Snippet } from 'svelte';
   import type { HTMLAttributes } from 'svelte/elements';
 
@@ -17,6 +18,11 @@
   let rootElement: HTMLDivElement | null = $state(null);
   let styleEl: HTMLStyleElement | null = null;
   let styleTarget: HTMLElement | ShadowRoot | null = null;
+
+  // Provide container context for child components
+  setUIContainerContext({
+    getContainer: () => rootElement,
+  });
 
   function getStyleTarget(element: HTMLElement): HTMLElement | ShadowRoot {
     const root = element.getRootNode();

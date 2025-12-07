@@ -1,5 +1,6 @@
 import { UI_ATTRIBUTES, UI_SELECTORS } from '@embedpdf/plugin-ui';
 import { useUICapability, useUIPlugin } from './hooks/use-ui';
+import { UIContainerContext, UIContainerContextValue } from './hooks/use-ui-container';
 import {
   useState,
   useEffect,
@@ -39,6 +40,16 @@ export function UIRoot({ children, style, ...restProps }: UIRootProps) {
   const styleElRef = useRef<HTMLStyleElement | null>(null);
   const styleTargetRef = useRef<HTMLElement | ShadowRoot | null>(null);
   const previousElementRef = useRef<HTMLDivElement | null>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
+
+  // Create container context value (memoized to prevent unnecessary re-renders)
+  const containerContextValue = useMemo<UIContainerContextValue>(
+    () => ({
+      containerRef,
+      getContainer: () => containerRef.current,
+    }),
+    [],
+  );
 
   // Callback ref that handles style injection when element mounts
   // Handles React Strict Mode by tracking previous element
@@ -46,8 +57,9 @@ export function UIRoot({ children, style, ...restProps }: UIRootProps) {
     (element: HTMLDivElement | null) => {
       const previousElement = previousElementRef.current;
 
-      // Update ref
+      // Update refs
       previousElementRef.current = element;
+      (containerRef as any).current = element;
 
       // If element is null (unmount), don't do anything yet
       // React Strict Mode will remount, so we'll handle cleanup in useEffect
@@ -147,8 +159,10 @@ export function UIRoot({ children, style, ...restProps }: UIRootProps) {
   };
 
   return (
-    <div ref={rootRefCallback} {...rootProps} {...restProps} style={combinedStyle}>
-      {children}
-    </div>
+    <UIContainerContext.Provider value={containerContextValue}>
+      <div ref={rootRefCallback} {...rootProps} {...restProps} style={combinedStyle}>
+        {children}
+      </div>
+    </UIContainerContext.Provider>
   );
 }

@@ -9,9 +9,10 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, onUnmounted, watch, useAttrs } from 'vue';
+import { ref, computed, onMounted, onUnmounted, watch, useAttrs, provide } from 'vue';
 import { UI_ATTRIBUTES, UI_SELECTORS } from '@embedpdf/plugin-ui';
 import { useUIPlugin, useUICapability } from './hooks/use-ui';
+import { UI_CONTAINER_KEY, type UIContainerContextValue } from './hooks/use-ui-container';
 
 // Disable automatic attribute inheritance since we handle it manually
 defineOptions({
@@ -25,6 +26,13 @@ const { provides } = useUICapability();
 
 const disabledCategories = ref<string[]>([]);
 const rootRef = ref<HTMLDivElement | null>(null);
+
+// Provide container context for child components
+const containerContext: UIContainerContextValue = {
+  containerRef: rootRef,
+  getContainer: () => rootRef.value,
+};
+provide(UI_CONTAINER_KEY, containerContext);
 
 let styleEl: HTMLStyleElement | null = null;
 let styleTarget: HTMLElement | ShadowRoot | null = null;
