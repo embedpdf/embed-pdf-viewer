@@ -131,7 +131,7 @@ function BottomDrawer({
   const [isVisible, setIsVisible] = useState(false);
 
   const drawerRef = useRef<HTMLDivElement>(null);
-  const dragStartRef = useRef({ y: 0, height: 0, time: 0 });
+  const dragStartRef = useRef({ y: 0, height: 0, time: 0, state: 'half' as DrawerState });
   const lastDragRef = useRef({ y: 0, time: 0 });
 
   // Handle isOpen changes for enter/exit animations
@@ -199,15 +199,34 @@ function BottomDrawer({
       const currentHeight = drawerRef.current.offsetHeight;
       const currentPercent = (currentHeight / containerHeight) * 100;
 
+      // Sync drawerState with actual visual position to prevent desyncs
+      // This handles cases where the animation hasn't completed or state is stale
+      let actualState: DrawerState;
+      if (currentPercent >= 75) {
+        actualState = 'full';
+      } else if (currentPercent <= 25) {
+        actualState = 'closed';
+      } else {
+        actualState = 'half';
+      }
+
       dragStartRef.current = {
         y: clientY,
         height: currentPercent,
         time: Date.now(),
+        // Store the actual state at drag start for consistent calculations
+        state: actualState,
       };
       lastDragRef.current = { y: clientY, time: Date.now() };
+
+      // Reset offset and sync state
+      setDragOffset(0);
+      if (actualState !== drawerState) {
+        setDrawerState(actualState);
+      }
       setIsDragging(true);
     },
-    [rootElement],
+    [rootElement, drawerState],
   );
 
   // Handle drag move
@@ -223,19 +242,27 @@ function BottomDrawer({
       // Store for velocity calculation
       lastDragRef.current = { y: clientY, time: Date.now() };
 
-      // Calculate offset from current state position
-      const statePercent = getHeightFromState(drawerState);
+      // Calculate offset from the state captured at drag start (not from potentially stale closure)
+      const statePercent = getHeightFromState(dragStartRef.current.state);
       setDragOffset(newPercent - statePercent);
     },
-    [isDragging, drawerState, rootElement],
+    [isDragging, rootElement],
   );
 
   // Handle drag end
   const handleDragEnd = useCallback(() => {
     if (!isDragging) return;
 
-    // Calculate final position
-    const statePercent = getHeightFromState(drawerState);
+    // Check if this was just a click (minimal movement) - ignore it
+    const totalMovement = Math.abs(dragStartRef.current.y - lastDragRef.current.y);
+    if (totalMovement < 5) {
+      setIsDragging(false);
+      setDragOffset(0);
+      return;
+    }
+
+    // Calculate final position using state captured at drag start
+    const statePercent = getHeightFromState(dragStartRef.current.state);
     const currentPercent = statePercent + dragOffset;
 
     // Calculate velocity (positive = moving down/closing)
@@ -246,16 +273,19 @@ function BottomDrawer({
     // Determine snap point
     const newState = calculateSnapPoint(currentPercent, velocity);
 
-    setIsDragging(false);
-    setDragOffset(0);
-
     if (newState === 'closed') {
-      // Call onClose which will set isOpen to false, triggering the close animation
+      // Set state to closed BEFORE stopping drag so transition animates from current position to 0%
+      // (otherwise it would jump to baseHeight first, then animate)
+      setDrawerState('closed');
+      setIsDragging(false);
+      setDragOffset(0);
       onClose();
     } else {
+      setIsDragging(false);
+      setDragOffset(0);
       setDrawerState(newState);
     }
-  }, [isDragging, drawerState, dragOffset, onClose]);
+  }, [isDragging, dragOffset, onClose]);
 
   // Touch event handlers
   const handleTouchStart = useCallback(
@@ -313,7 +343,10 @@ function BottomDrawer({
   if (!isVisible) return null;
 
   // Calculate the actual height to display
-  const baseHeight = getHeightFromState(drawerState);
+  // When dragging, use the state captured at drag start for consistency
+  const baseHeight = isDragging
+    ? getHeightFromState(dragStartRef.current.state)
+    : getHeightFromState(drawerState);
   const displayHeight = isDragging
     ? Math.max(0, Math.min(100, baseHeight + dragOffset))
     : baseHeight;
