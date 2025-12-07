@@ -127,7 +127,7 @@ const uiComponents = computed(() => ({
 
 const uiRenderers = computed(() => ({
   toolbar: SchemaToolbar,
-  panel: SchemaPanel,
+  sidebar: SchemaPanel,
   menu: SchemaMenu,
   selectionMenu: SchemaSelectionMenu,
 }));

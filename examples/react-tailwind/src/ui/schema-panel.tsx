@@ -1,5 +1,5 @@
 import {
-  PanelRendererProps,
+  SidebarRendererProps,
   useUICapability,
   useUIState,
   useItemRenderer,
@@ -20,10 +20,10 @@ import { useTranslations } from '@embedpdf/plugin-i18n/react';
 
 type BottomSheetHeight = 'half' | 'full';
 
-export function SchemaPanel({ schema, documentId, isOpen, onClose }: PanelRendererProps) {
+export function SchemaPanel({ schema, documentId, isOpen, onClose }: SidebarRendererProps) {
   // Only render if open (allows for animation in the future)
   if (!isOpen) return null;
-  const { position, content, width, type } = schema;
+  const { position, content, width } = schema;
   const { provides } = useUICapability();
   const uiState = useUIState(documentId);
   const { renderCustomComponent } = useItemRenderer();
@@ -50,11 +50,6 @@ export function SchemaPanel({ schema, documentId, isOpen, onClose }: PanelRender
   const [isDragging, setIsDragging] = useState(false);
   const [startY, setStartY] = useState(0);
   const [currentY, setCurrentY] = useState(0);
-
-  if (type !== 'sidebar') {
-    console.warn(`Unsupported panel type: ${type}`);
-    return null;
-  }
 
   const positionClasses = getPositionClasses(position?.placement ?? 'left');
   const widthStyle = width ? { width } : undefined;
@@ -157,12 +152,12 @@ export function SchemaPanel({ schema, documentId, isOpen, onClose }: PanelRender
       const availableTabs = content.tabs ?? [];
 
       const resolvedActiveTabId = useMemo(() => {
-        const stateActive = uiState?.panelTabs?.[schema.id];
+        const stateActive = uiState?.sidebarTabs?.[schema.id];
         if (stateActive) return stateActive;
-        const scopeActive = scope?.getPanelTab?.(schema.id);
+        const scopeActive = scope?.getSidebarTab?.(schema.id);
         if (scopeActive) return scopeActive;
         return stateActive ?? content.defaultTab ?? availableTabs[0]?.id ?? null;
-      }, [uiState?.panelTabs, scope, schema.id, content.defaultTab, availableTabs]);
+      }, [uiState?.sidebarTabs, scope, schema.id, content.defaultTab, availableTabs]);
 
       const [localActiveTabId, setLocalActiveTabId] = useState<string | null>(null);
 
@@ -179,7 +174,7 @@ export function SchemaPanel({ schema, documentId, isOpen, onClose }: PanelRender
         setLocalActiveTabId(tabId);
 
         if (scope) {
-          scope.setPanelTab(schema.id, tabId);
+          scope.setSidebarTab(schema.id, tabId);
         }
       };
 
@@ -321,12 +316,12 @@ export function SchemaPanel({ schema, documentId, isOpen, onClose }: PanelRender
     const availableTabs = content.tabs ?? [];
 
     const resolvedActiveTabId = useMemo(() => {
-      const stateActive = uiState?.panelTabs?.[schema.id];
+      const stateActive = uiState?.sidebarTabs?.[schema.id];
       if (stateActive) return stateActive;
-      const scopeActive = scope?.getPanelTab?.(schema.id);
+      const scopeActive = scope?.getSidebarTab?.(schema.id);
       if (scopeActive) return scopeActive;
       return stateActive ?? content.defaultTab ?? availableTabs[0]?.id ?? null;
-    }, [uiState?.panelTabs, scope, schema.id, content.defaultTab, availableTabs]);
+    }, [uiState?.sidebarTabs, scope, schema.id, content.defaultTab, availableTabs]);
 
     const [localActiveTabId, setLocalActiveTabId] = useState<string | null>(null);
 
@@ -343,7 +338,7 @@ export function SchemaPanel({ schema, documentId, isOpen, onClose }: PanelRender
       setLocalActiveTabId(tabId);
 
       if (scope) {
-        scope.setPanelTab(schema.id, tabId);
+        scope.setSidebarTab(schema.id, tabId);
       }
     };
 

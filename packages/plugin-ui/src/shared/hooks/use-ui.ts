@@ -21,13 +21,13 @@ export const useUIState = (documentId: string) => {
 
     // Subscribe to changes
     const unsubToolbar = scope.onToolbarChanged(() => setState(scope.getState()));
-    const unsubPanel = scope.onPanelChanged(() => setState(scope.getState()));
+    const unsubSidebar = scope.onSidebarChanged(() => setState(scope.getState()));
     const unsubModal = scope.onModalChanged(() => setState(scope.getState()));
     const unsubMenu = scope.onMenuChanged(() => setState(scope.getState()));
 
     return () => {
       unsubToolbar();
-      unsubPanel();
+      unsubSidebar();
       unsubModal();
       unsubMenu();
     };

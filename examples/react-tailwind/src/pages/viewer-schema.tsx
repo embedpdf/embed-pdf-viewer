@@ -99,7 +99,7 @@ export function ViewerSchemaPage() {
   const uiRenderers: UIRenderers = useMemo(
     () => ({
       toolbar: SchemaToolbar,
-      panel: SchemaPanel,
+      sidebar: SchemaPanel,
       menu: SchemaMenu,
       selectionMenu: SchemaSelectionMenu,
     }),
@@ -220,7 +220,7 @@ export function ViewerSchemaPage() {
  * This component replaces the old SchemaToolbarRenderer and SchemaPanelRenderer.
  */
 function ViewerLayout({ documentId }: { documentId: string }) {
-  const { renderToolbar, renderPanel } = useSchemaRenderer(documentId);
+  const { renderToolbar, renderSidebar } = useSchemaRenderer(documentId);
 
   const annotationMenu = useSelectionMenu('annotation', documentId);
   const redactionMenu = useSelectionMenu('redaction', documentId);
@@ -237,7 +237,7 @@ function ViewerLayout({ documentId }: { documentId: string }) {
       {/* Document Content Area */}
       <div id="document-content" className="flex flex-1 overflow-hidden bg-white">
         {/* Left Panels */}
-        {renderPanel('left', 'main')}
+        {renderSidebar('left', 'main')}
 
         {/* Main Viewer */}
         <div className="flex-1 overflow-hidden">
@@ -308,7 +308,7 @@ function ViewerLayout({ documentId }: { documentId: string }) {
         </div>
 
         {/* Right Panels */}
-        {renderPanel('right', 'main')}
+        {renderSidebar('right', 'main')}
       </div>
     </>
   );

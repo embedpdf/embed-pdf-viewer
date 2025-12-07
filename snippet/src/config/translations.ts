@@ -6,6 +6,13 @@ export const englishTranslations: Locale = {
   code: 'en',
   name: 'English',
   translations: {
+    search: {
+      placeholder: 'Search',
+      caseSensitive: 'Case sensitive',
+      wholeWord: 'Whole word',
+      resultsFound: '{count} results found',
+      page: 'Page {page}',
+    },
     zoom: {
       in: 'Zoom In',
       out: 'Zoom Out',
@@ -92,6 +99,13 @@ export const germanTranslations: Locale = {
   code: 'de',
   name: 'Deutsch',
   translations: {
+    search: {
+      placeholder: 'Suchen',
+      caseSensitive: 'Groß-/Kleinschreibung',
+      wholeWord: 'Ganzes Wort',
+      resultsFound: '{count} Ergebnisse gefunden',
+      page: 'Seite {page}',
+    },
     zoom: {
       in: 'Vergrößern',
       out: 'Verkleinern',
@@ -178,6 +192,13 @@ export const dutchTranslations: Locale = {
   code: 'nl',
   name: 'Nederlands',
   translations: {
+    search: {
+      placeholder: 'Zoeken',
+      caseSensitive: 'Hoofdlettergevoelig',
+      wholeWord: 'Heel woord',
+      resultsFound: '{count} resultaten gevonden',
+      page: 'Pagina {page}',
+    },
     zoom: {
       in: 'Inzoomen',
       out: 'Uitzoomen',
@@ -264,6 +285,13 @@ export const frenchTranslations: Locale = {
   code: 'fr',
   name: 'Français',
   translations: {
+    search: {
+      placeholder: 'Rechercher',
+      caseSensitive: 'Respecter la casse',
+      wholeWord: 'Mot entier',
+      resultsFound: '{count} résultats trouvés',
+      page: 'Page {page}',
+    },
     zoom: {
       in: 'Zoom avant',
       out: 'Zoom arrière',

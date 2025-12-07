@@ -772,13 +772,14 @@ export const viewerUISchema: UISchema = {
     },
   },
 
+  modals: {},
+
   // ─────────────────────────────────────────────────────────
   // Panels (Sidebars)
   // ─────────────────────────────────────────────────────────
-  panels: {
+  sidebars: {
     'sidebar-panel': {
       id: 'sidebar-panel',
-      type: 'sidebar',
       position: {
         placement: 'left',
         slot: 'main',
@@ -808,7 +809,6 @@ export const viewerUISchema: UISchema = {
 
     'search-panel': {
       id: 'search-panel',
-      type: 'sidebar',
       position: {
         placement: 'right',
         slot: 'main',
@@ -825,7 +825,6 @@ export const viewerUISchema: UISchema = {
 
     'comment-panel': {
       id: 'comment-panel',
-      type: 'sidebar',
       position: {
         placement: 'right',
         slot: 'main',

@@ -62,12 +62,23 @@ export function SearchSidebar({ documentId, onClose }: SearchSidebarProps) {
   const inputRef = useRef<HTMLInputElement>(null);
   const [inputValue, setInputValue] = useState('');
 
+  // Focus input on mount
+  useEffect(() => {
+    inputRef.current?.focus();
+  }, []);
+
   // Sync inputValue with persisted state.query when state loads
   useEffect(() => {
     if (state.query && !inputValue) {
       setInputValue(state.query);
     }
   }, [state.query]);
+
+  useEffect(() => {
+    if (state.activeResultIndex !== undefined && state.activeResultIndex >= 0 && !state.loading) {
+      scrollToItem(state.activeResultIndex);
+    }
+  });
 
   const debouncedValue = useDebounce(inputValue, 300);
 
@@ -102,10 +113,11 @@ export function SearchSidebar({ documentId, onClose }: SearchSidebarProps) {
       { x: Infinity, y: Infinity },
     );
 
-    scroll?.scrollToPage({
+    scroll?.forDocument(documentId)?.scrollToPage({
       pageNumber: item.pageIndex + 1,
       pageCoordinates: minCoordinates,
-      center: true,
+      alignX: 50,
+      alignY: 25,
     });
   };
 
@@ -141,8 +153,7 @@ export function SearchSidebar({ documentId, onClose }: SearchSidebarProps) {
           <input
             ref={inputRef}
             type="text"
-            placeholder={translate('search.placeholder') || 'Search'}
-            autoFocus
+            placeholder={translate('search.placeholder')}
             value={inputValue}
             onInput={handleInputChange}
             className="w-full rounded-md border border-gray-300 py-1 pl-8 pr-9 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
@@ -158,12 +169,12 @@ export function SearchSidebar({ documentId, onClose }: SearchSidebarProps) {
         </div>
         <div className="mt-3 flex flex-row gap-4">
           <Checkbox
-            label="Case sensitive"
+            label={translate('search.caseSensitive')}
             checked={state.flags.includes(MatchFlag.MatchCase)}
             onChange={(checked) => handleFlagChange(MatchFlag.MatchCase, checked)}
           />
           <Checkbox
-            label="Whole word"
+            label={translate('search.wholeWord')}
             checked={state.flags.includes(MatchFlag.MatchWholeWord)}
             onChange={(checked) => handleFlagChange(MatchFlag.MatchWholeWord, checked)}
           />
@@ -171,7 +182,9 @@ export function SearchSidebar({ documentId, onClose }: SearchSidebarProps) {
         <hr className="mb-2 mt-5 border-gray-200" />
         {state.active && (
           <div className="flex h-[32px] flex-row items-center justify-between">
-            <div className="text-xs text-gray-500">{state.total} results found</div>
+            <div className="text-xs text-gray-500">
+              {translate('search.resultsFound', { params: { count: state.total } })}
+            </div>
             {state.total > 1 && (
               <div className="flex flex-row">
                 <Button
@@ -197,7 +210,7 @@ export function SearchSidebar({ documentId, onClose }: SearchSidebarProps) {
         {Object.entries(grouped).map(([page, hits]) => (
           <div key={page} className="mt-2 first:mt-0">
             <div className="bg-white/80 py-2 text-xs text-gray-500 backdrop-blur">
-              Page {Number(page) + 1}
+              {translate('search.page', { params: { page: Number(page) + 1 } })}
             </div>
 
             <div className="flex flex-col gap-2">

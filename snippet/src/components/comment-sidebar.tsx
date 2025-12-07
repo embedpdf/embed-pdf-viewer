@@ -61,7 +61,8 @@ export const CommentSidebar = ({ documentId }: CommentSidebarProps) => {
         x: ann.object.rect.origin.x,
         y: ann.object.rect.origin.y,
       },
-      center: true,
+      alignX: 50,
+      alignY: 50,
       behavior: 'smooth',
     });
   };

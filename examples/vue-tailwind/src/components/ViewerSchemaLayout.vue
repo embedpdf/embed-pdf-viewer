@@ -8,7 +8,7 @@
   <!-- Document Content Area -->
   <div id="document-content" class="flex flex-1 overflow-hidden bg-white">
     <!-- Left Panels -->
-    <component :is="renderPanel('left', 'main')" />
+    <component :is="renderSidebar('left', 'main')" />
 
     <!-- Main Viewer -->
     <div class="flex-1 overflow-hidden">
@@ -70,7 +70,7 @@
     </div>
 
     <!-- Right Panels -->
-    <component :is="renderPanel('right', 'main')" />
+    <component :is="renderSidebar('right', 'main')" />
   </div>
 </template>
 
@@ -109,7 +109,7 @@ interface Props {
 
 const props = defineProps<Props>();
 
-const { renderToolbar, renderPanel } = useSchemaRenderer(() => props.documentId);
+const { renderToolbar, renderSidebar } = useSchemaRenderer(() => props.documentId);
 
 const annotationMenu = useSelectionMenu('annotation', () => props.documentId);
 const redactionMenu = useSelectionMenu('redaction', () => props.documentId);

@@ -1,4 +1,4 @@
-import { UISchema, ToolbarSchema, MenuSchema, PanelSchema } from '../types';
+import { UISchema, ToolbarSchema, MenuSchema, SidebarSchema } from '../types';
 
 /**
  * Deep merge UI schemas
@@ -10,7 +10,7 @@ export function mergeUISchema(base: UISchema, override: Partial<UISchema>): UISc
     ...override,
     toolbars: mergeToolbars(base.toolbars, override.toolbars),
     menus: mergeMenus(base.menus, override.menus),
-    panels: mergePanels(base.panels, override.panels),
+    sidebars: mergeSidebars(base.sidebars, override.sidebars),
   };
 }
 
@@ -65,10 +65,10 @@ function mergeMenus(
   return result;
 }
 
-function mergePanels(
-  base: Record<string, PanelSchema>,
-  override?: Record<string, PanelSchema>,
-): Record<string, PanelSchema> {
+function mergeSidebars(
+  base: Record<string, SidebarSchema>,
+  override?: Record<string, SidebarSchema>,
+): Record<string, SidebarSchema> {
   if (!override) return base;
 
   const result = { ...base };
@@ -98,7 +98,7 @@ export function removeFromSchema(
   options: {
     toolbars?: string[];
     menus?: string[];
-    panels?: string[];
+    sidebars?: string[];
     commands?: string[]; // Remove commands from all menus/toolbars
   },
 ): UISchema {
@@ -117,9 +117,9 @@ export function removeFromSchema(
   }
 
   // Remove panels
-  if (options.panels) {
-    result.panels = { ...result.panels };
-    options.panels.forEach((id) => delete result.panels[id]);
+  if (options.sidebars) {
+    result.sidebars = { ...result.sidebars };
+    options.sidebars.forEach((id) => delete result.sidebars[id]);
   }
 
   // Remove commands from all toolbars/menus

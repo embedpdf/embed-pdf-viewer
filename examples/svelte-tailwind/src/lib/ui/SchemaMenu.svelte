@@ -281,42 +281,42 @@
     () => documentId,
   )}
 
-  {#if command?.command?.visible}
+  {#if command?.current?.visible}
     {@const baseClasses = isMobile
       ? 'flex items-center gap-3 px-4 py-3 text-base transition-colors active:bg-gray-100'
       : 'flex items-center gap-2 px-3 py-2 text-sm transition-colors hover:bg-gray-100'}
-    {@const disabledClasses = command.command?.disabled
+    {@const disabledClasses = command.current?.disabled
       ? 'opacity-50 cursor-not-allowed'
       : 'cursor-pointer'}
-    {@const activeClasses = command.command?.active ? 'bg-blue-50 text-blue-600' : 'text-gray-700'}
-    {@const iconProps = command.command?.iconProps || {}}
+    {@const activeClasses = command.current?.active ? 'bg-blue-50 text-blue-600' : 'text-gray-700'}
+    {@const iconProps = command.current?.iconProps || {}}
 
     <button
       {...getUIItemProps(item)}
       onclick={() => {
-        if (!command.command?.disabled) {
-          command.command?.execute();
+        if (!command.current?.disabled) {
+          command.current?.execute();
           onClose();
         }
       }}
-      disabled={command.command?.disabled}
+      disabled={command.current?.disabled}
       class={`${baseClasses} ${disabledClasses} ${activeClasses} w-full text-left`}
       role="menuitem"
     >
-      {#if command.command?.icon}
+      {#if command.current?.icon}
         <Icons
-          name={command.command.icon}
+          name={command.current.icon}
           class={isMobile ? 'h-5 w-5' : 'h-4 w-4'}
           primaryColor={iconProps.primaryColor}
           secondaryColor={iconProps.secondaryColor}
         />
       {/if}
-      <span class="flex-1">{command.command?.label}</span>
-      {#if command.command?.active}
+      <span class="flex-1">{command.current?.label}</span>
+      {#if command.current?.active}
         <CheckIcon class="h-4 w-4" />
       {/if}
-      {#if command.command?.shortcuts && command.command?.shortcuts.length > 0 && !isMobile}
-        <span class="text-xs text-gray-400">{command.command?.shortcuts[0]}</span>
+      {#if command.current?.shortcuts && command.current?.shortcuts.length > 0 && !isMobile}
+        <span class="text-xs text-gray-400">{command.current?.shortcuts[0]}</span>
       {/if}
     </button>
   {/if}

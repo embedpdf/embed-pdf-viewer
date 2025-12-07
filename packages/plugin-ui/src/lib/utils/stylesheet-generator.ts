@@ -5,7 +5,7 @@ import {
   TabItem,
   MenuSchema,
   MenuItem,
-  PanelSchema,
+  SidebarSchema,
   SelectionMenuSchema,
   SelectionMenuItem,
   BreakpointRule,
@@ -170,7 +170,7 @@ function analyzeSchema(schema: UISchema, locale?: string): SchemaAnalysis {
   }
 
   // Analyze panels
-  for (const [panelId, panel] of Object.entries(schema.panels)) {
+  for (const [panelId, panel] of Object.entries(schema.sidebars)) {
     analyzePanel(panelId, panel, categories, itemCategories, dependencies);
   }
 
@@ -429,7 +429,7 @@ function analyzeTabItems(
 
 function analyzePanel(
   panelId: string,
-  panel: PanelSchema,
+  panel: SidebarSchema,
   categories: Set<string>,
   itemCategories: Map<string, string[]>,
   dependencies: DependencyRule[],

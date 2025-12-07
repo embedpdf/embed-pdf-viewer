@@ -17,12 +17,13 @@ import {
   UIDocumentState,
   ToolbarChangedData,
   ToolbarChangedEvent,
-  PanelChangedData,
-  PanelChangedEvent,
+  SidebarChangedData,
+  SidebarChangedEvent,
   ModalChangedData,
   ModalChangedEvent,
   MenuChangedData,
   MenuChangedEvent,
+  ModalSlotState,
 } from './types';
 import {
   UIAction,
@@ -30,11 +31,12 @@ import {
   cleanupUIState,
   setActiveToolbar,
   closeToolbarSlot,
-  setActivePanel,
-  closePanelSlot,
-  setPanelTab,
+  setActiveSidebar,
+  closeSidebarSlot,
+  setSidebarTab,
   openModal,
   closeModal,
+  clearModal,
   openMenu,
   closeMenu,
   closeAllMenus,
@@ -67,10 +69,11 @@ export class UIPlugin extends BasePlugin<UIPluginConfig, UICapability, UIState, 
     string
   >((documentId, data) => ({ documentId, ...data }), { cache: false });
 
-  private readonly panelChanged$ = createScopedEmitter<PanelChangedData, PanelChangedEvent, string>(
-    (documentId, data) => ({ documentId, ...data }),
-    { cache: false },
-  );
+  private readonly sidebarChanged$ = createScopedEmitter<
+    SidebarChangedData,
+    SidebarChangedEvent,
+    string
+  >((documentId, data) => ({ documentId, ...data }), { cache: false });
 
   private readonly modalChanged$ = createScopedEmitter<ModalChangedData, ModalChangedEvent, string>(
     (documentId, data) => ({ documentId, ...data }),
@@ -115,7 +118,7 @@ export class UIPlugin extends BasePlugin<UIPluginConfig, UICapability, UIState, 
     }
 
     this.toolbarChanged$.clear();
-    this.panelChanged$.clear();
+    this.sidebarChanged$.clear();
     this.modalChanged$.clear();
     this.menuChanged$.clear();
     this.stylesheetInvalidated$.clear();
@@ -131,7 +134,7 @@ export class UIPlugin extends BasePlugin<UIPluginConfig, UICapability, UIState, 
 
     // Clear scoped emitters
     this.toolbarChanged$.clearScope(documentId);
-    this.panelChanged$.clearScope(documentId);
+    this.sidebarChanged$.clearScope(documentId);
     this.modalChanged$.clearScope(documentId);
     this.menuChanged$.clearScope(documentId);
   }
@@ -239,10 +242,10 @@ export class UIPlugin extends BasePlugin<UIPluginConfig, UICapability, UIState, 
       // Active document operations
       setActiveToolbar: (placement, slot, toolbarId, documentId) =>
         this.setToolbarForDocument(placement, slot, toolbarId, documentId),
-      setActivePanel: (placement, slot, panelId, documentId, activeTab) =>
-        this.setPanelForDocument(placement, slot, panelId, documentId, activeTab),
-      togglePanel: (placement, slot, panelId, documentId, activeTab) =>
-        this.togglePanelForDocument(placement, slot, panelId, documentId, activeTab),
+      setActiveSidebar: (placement, slot, sidebarId, documentId, activeTab) =>
+        this.setSidebarForDocument(placement, slot, sidebarId, documentId, activeTab),
+      toggleSidebar: (placement, slot, sidebarId, documentId, activeTab) =>
+        this.toggleSidebarForDocument(placement, slot, sidebarId, documentId, activeTab),
       openModal: (modalId, documentId) => this.openModalForDocument(modalId, documentId),
       openMenu: (menuId, triggeredByCommandId, triggeredByItemId, documentId) =>
         this.openMenuForDocument(menuId, triggeredByCommandId, triggeredByItemId, documentId),
@@ -268,7 +271,7 @@ export class UIPlugin extends BasePlugin<UIPluginConfig, UICapability, UIState, 
 
       // Events
       onToolbarChanged: this.toolbarChanged$.onGlobal,
-      onPanelChanged: this.panelChanged$.onGlobal,
+      onSidebarChanged: this.sidebarChanged$.onGlobal,
       onModalChanged: this.modalChanged$.onGlobal,
       onMenuChanged: this.menuChanged$.onGlobal,
       onCategoryChanged: this.categoryChanged$.on,
@@ -291,24 +294,29 @@ export class UIPlugin extends BasePlugin<UIPluginConfig, UICapability, UIState, 
       isToolbarOpen: (placement, slot, toolbarId) =>
         this.isToolbarOpenForDocument(placement, slot, toolbarId, documentId),
 
-      // ───── Panels ─────
-      setActivePanel: (placement, slot, panelId, activeTab) =>
-        this.setPanelForDocument(placement, slot, panelId, documentId, activeTab),
-      getActivePanel: (placement, slot) => this.getPanelForDocument(placement, slot, documentId),
-      closePanelSlot: (placement, slot) => this.closePanelForDocument(placement, slot, documentId),
-      togglePanel: (placement, slot, panelId, activeTab) =>
-        this.togglePanelForDocument(placement, slot, panelId, documentId, activeTab),
-      isPanelOpen: (placement, slot, panelId) =>
-        this.isPanelOpenForDocument(placement, slot, panelId, documentId),
+      // ───── Sidebars ─────
+      setActiveSidebar: (placement, slot, sidebarId, activeTab) =>
+        this.setSidebarForDocument(placement, slot, sidebarId, documentId, activeTab),
+      getActiveSidebar: (placement, slot) =>
+        this.getSidebarForDocument(placement, slot, documentId),
+      closeSidebarSlot: (placement, slot) =>
+        this.closeSidebarForDocument(placement, slot, documentId),
+      toggleSidebar: (placement, slot, sidebarId, activeTab) =>
+        this.toggleSidebarForDocument(placement, slot, sidebarId, documentId, activeTab),
+      isSidebarOpen: (placement, slot, sidebarId) =>
+        this.isSidebarOpenForDocument(placement, slot, sidebarId, documentId),
 
-      // ───── Panel tabs ─────
-      setPanelTab: (panelId, tabId) => this.setPanelTabForDocument(panelId, tabId, documentId),
-      getPanelTab: (panelId) => this.getPanelTabForDocument(panelId, documentId),
+      // ───── Sidebar tabs ─────
+      setSidebarTab: (sidebarId, tabId) =>
+        this.setSidebarTabForDocument(sidebarId, tabId, documentId),
+      getSidebarTab: (sidebarId) => this.getSidebarTabForDocument(sidebarId, documentId),
 
-      // ───── Modals ─────
+      // ───── Modals (with animation lifecycle) ─────
       openModal: (modalId) => this.openModalForDocument(modalId, documentId),
       closeModal: () => this.closeModalForDocument(documentId),
+      clearModal: () => this.clearModalForDocument(documentId),
       getActiveModal: () => this.getActiveModalForDocument(documentId),
+      isModalOpen: () => this.isModalOpenForDocument(documentId),
 
       // ───── Menus ─────
       openMenu: (menuId, triggeredByCommandId, triggeredByItemId) =>
@@ -326,7 +334,7 @@ export class UIPlugin extends BasePlugin<UIPluginConfig, UICapability, UIState, 
 
       // ───── Scoped events ─────
       onToolbarChanged: this.toolbarChanged$.forScope(documentId),
-      onPanelChanged: this.panelChanged$.forScope(documentId),
+      onSidebarChanged: this.sidebarChanged$.forScope(documentId),
       onModalChanged: this.modalChanged$.forScope(documentId),
       onMenuChanged: this.menuChanged$.forScope(documentId),
     };
@@ -393,96 +401,111 @@ export class UIPlugin extends BasePlugin<UIPluginConfig, UICapability, UIState, 
   }
 
   // ─────────────────────────────────────────────────────────
-  // Core Operations - Panels
+  // Core Operations - Sidebars
   // ─────────────────────────────────────────────────────────
 
-  private setPanelForDocument(
+  private setSidebarForDocument(
     placement: string,
     slot: string,
-    panelId: string,
+    sidebarId: string,
     documentId?: string,
     activeTab?: string,
   ): void {
     const id = documentId ?? this.getActiveDocumentId();
-    this.dispatch(setActivePanel(id, placement, slot, panelId, activeTab));
-    this.panelChanged$.emit(id, { placement, slot, panelId });
+    this.dispatch(setActiveSidebar(id, placement, slot, sidebarId, activeTab));
+    this.sidebarChanged$.emit(id, { placement, slot, sidebarId });
   }
 
-  private getPanelForDocument(placement: string, slot: string, documentId?: string): string | null {
-    const slotKey = `${placement}-${slot}`;
-    const panelSlot = this.getDocumentStateOrThrow(documentId).activePanels[slotKey];
-    return panelSlot?.isOpen ? panelSlot.panelId : null;
-  }
-
-  private closePanelForDocument(placement: string, slot: string, documentId?: string): void {
-    const id = documentId ?? this.getActiveDocumentId();
-    this.dispatch(closePanelSlot(id, placement, slot));
-    this.panelChanged$.emit(id, { placement, slot, panelId: '' });
-  }
-
-  private togglePanelForDocument(
+  private getSidebarForDocument(
     placement: string,
     slot: string,
-    panelId: string,
+    documentId?: string,
+  ): string | null {
+    const slotKey = `${placement}-${slot}`;
+    const sidebarSlot = this.getDocumentStateOrThrow(documentId).activeSidebars[slotKey];
+    return sidebarSlot?.isOpen ? sidebarSlot.sidebarId : null;
+  }
+
+  private closeSidebarForDocument(placement: string, slot: string, documentId?: string): void {
+    const id = documentId ?? this.getActiveDocumentId();
+    this.dispatch(closeSidebarSlot(id, placement, slot));
+    this.sidebarChanged$.emit(id, { placement, slot, sidebarId: '' });
+  }
+
+  private toggleSidebarForDocument(
+    placement: string,
+    slot: string,
+    sidebarId: string,
     documentId?: string,
     activeTab?: string,
   ): void {
     const id = documentId ?? this.getActiveDocumentId();
     const slotKey = `${placement}-${slot}`;
-    const panelSlot = this.getDocumentStateOrThrow(id).activePanels[slotKey];
+    const sidebarSlot = this.getDocumentStateOrThrow(id).activeSidebars[slotKey];
 
-    if (panelSlot?.panelId === panelId && panelSlot?.isOpen) {
-      this.dispatch(closePanelSlot(id, placement, slot));
-      this.panelChanged$.emit(id, { placement, slot, panelId: '' });
+    if (sidebarSlot?.sidebarId === sidebarId && sidebarSlot?.isOpen) {
+      this.dispatch(closeSidebarSlot(id, placement, slot));
+      this.sidebarChanged$.emit(id, { placement, slot, sidebarId: '' });
     } else {
-      this.dispatch(setActivePanel(id, placement, slot, panelId, activeTab));
-      this.panelChanged$.emit(id, { placement, slot, panelId });
+      this.dispatch(setActiveSidebar(id, placement, slot, sidebarId, activeTab));
+      this.sidebarChanged$.emit(id, { placement, slot, sidebarId });
     }
   }
 
-  private isPanelOpenForDocument(
+  private isSidebarOpenForDocument(
     placement: string,
     slot: string,
-    panelId?: string,
+    sidebarId?: string,
     documentId?: string,
   ): boolean {
     const slotKey = `${placement}-${slot}`;
-    const panelSlot = this.getDocumentStateOrThrow(documentId).activePanels[slotKey];
-    if (!panelSlot || !panelSlot.isOpen) return false;
-    return panelId ? panelSlot.panelId === panelId : true;
+    const sidebarSlot = this.getDocumentStateOrThrow(documentId).activeSidebars[slotKey];
+    if (!sidebarSlot || !sidebarSlot.isOpen) return false;
+    return sidebarId ? sidebarSlot.sidebarId === sidebarId : true;
   }
 
   // ─────────────────────────────────────────────────────────
-  // Core Operations - Panel Tabs
+  // Core Operations - Sidebar Tabs
   // ─────────────────────────────────────────────────────────
 
-  private setPanelTabForDocument(panelId: string, tabId: string, documentId?: string): void {
+  private setSidebarTabForDocument(sidebarId: string, tabId: string, documentId?: string): void {
     const id = documentId ?? this.getActiveDocumentId();
-    this.dispatch(setPanelTab(id, panelId, tabId));
+    this.dispatch(setSidebarTab(id, sidebarId, tabId));
   }
 
-  private getPanelTabForDocument(panelId: string, documentId?: string): string | null {
-    return this.getDocumentStateOrThrow(documentId).panelTabs[panelId] ?? null;
+  private getSidebarTabForDocument(sidebarId: string, documentId?: string): string | null {
+    return this.getDocumentStateOrThrow(documentId).sidebarTabs[sidebarId] ?? null;
   }
 
   // ─────────────────────────────────────────────────────────
-  // Core Operations - Modals
+  // Core Operations - Modals (with animation lifecycle)
   // ─────────────────────────────────────────────────────────
 
   private openModalForDocument(modalId: string, documentId?: string): void {
     const id = documentId ?? this.getActiveDocumentId();
     this.dispatch(openModal(id, modalId));
-    this.modalChanged$.emit(id, { modalId });
+    this.modalChanged$.emit(id, { modalId, isOpen: true });
   }
 
   private closeModalForDocument(documentId?: string): void {
     const id = documentId ?? this.getActiveDocumentId();
+    const currentModal = this.getDocumentStateOrThrow(id).activeModal;
     this.dispatch(closeModal(id));
-    this.modalChanged$.emit(id, { modalId: null });
+    this.modalChanged$.emit(id, { modalId: currentModal?.modalId ?? null, isOpen: false });
   }
 
-  private getActiveModalForDocument(documentId?: string): string | null {
+  private clearModalForDocument(documentId?: string): void {
+    const id = documentId ?? this.getActiveDocumentId();
+    this.dispatch(clearModal(id));
+  }
+
+  private getActiveModalForDocument(documentId?: string): ModalSlotState | null {
     return this.getDocumentStateOrThrow(documentId).activeModal;
+  }
+
+  private isModalOpenForDocument(documentId?: string): boolean {
+    const modal = this.getDocumentStateOrThrow(documentId).activeModal;
+    return modal?.isOpen ?? false;
   }
 
   // ─────────────────────────────────────────────────────────

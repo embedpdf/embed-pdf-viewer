@@ -29,8 +29,11 @@ export function buildShortcutString(event: KeyboardEvent): string | null {
  */
 export function createKeyDownHandler(commands: CommandsCapability) {
   return (event: KeyboardEvent) => {
+    // Use composedPath to get the actual target element, even inside Shadow DOM
+    const composedPath = event.composedPath();
+    const target = (composedPath[0] || event.target) as HTMLElement;
+
     // Don't handle shortcuts if target is an input, textarea, or contentEditable
-    const target = event.target as HTMLElement;
     if (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable) {
       return;
     }

@@ -23,7 +23,13 @@ import { ExportPlugin } from '@embedpdf/plugin-export/preact';
 import { DocumentManagerPlugin } from '@embedpdf/plugin-document-manager/preact';
 import { HISTORY_PLUGIN_ID, HistoryPlugin } from '@embedpdf/plugin-history/preact';
 import { State } from './types';
-import { isPanelOpen, isToolbarOpen, UI_PLUGIN_ID, UIPlugin } from '@embedpdf/plugin-ui';
+import {
+  isPanelOpen,
+  isSidebarOpen,
+  isToolbarOpen,
+  UI_PLUGIN_ID,
+  UIPlugin,
+} from '@embedpdf/plugin-ui';
 import { ScrollPlugin, ScrollStrategy } from '@embedpdf/plugin-scroll/preact';
 import { InteractionManagerPlugin } from '@embedpdf/plugin-interaction-manager/preact';
 import { FullscreenPlugin } from '@embedpdf/plugin-fullscreen/preact';
@@ -419,8 +425,14 @@ export const commands: Record<string, Command<State>> = {
     shortcuts: ['Ctrl+P', 'Meta+P'],
     category: 'document',
     action: ({ registry, documentId }) => {
-      const print = registry.getPlugin<PrintPlugin>('print')?.provides();
-      print?.forDocument(documentId).print();
+      const uiPlugin = registry.getPlugin<UIPlugin>(UI_PLUGIN_ID);
+      if (!uiPlugin || !uiPlugin.provides) return;
+
+      const uiCapability = uiPlugin.provides();
+      if (!uiCapability) return;
+
+      const scope = uiCapability.forDocument(documentId);
+      scope.openModal('print-modal');
     },
   },
 
@@ -470,10 +482,10 @@ export const commands: Record<string, Command<State>> = {
       if (!uiCapability) return;
 
       const scope = uiCapability.forDocument(documentId);
-      scope.togglePanel('left', 'main', 'sidebar-panel');
+      scope.toggleSidebar('left', 'main', 'sidebar-panel');
     },
     active: ({ state, documentId }) => {
-      return isPanelOpen(state.plugins, documentId, 'left', 'main', 'sidebar-panel');
+      return isSidebarOpen(state.plugins, documentId, 'left', 'main', 'sidebar-panel');
     },
   },
 
@@ -491,10 +503,10 @@ export const commands: Record<string, Command<State>> = {
       if (!uiCapability) return;
 
       const scope = uiCapability.forDocument(documentId);
-      scope.togglePanel('right', 'main', 'search-panel');
+      scope.toggleSidebar('right', 'main', 'search-panel');
     },
     active: ({ state, documentId }) => {
-      return isPanelOpen(state.plugins, documentId, 'right', 'main', 'search-panel');
+      return isSidebarOpen(state.plugins, documentId, 'right', 'main', 'search-panel');
     },
   },
 
@@ -511,10 +523,10 @@ export const commands: Record<string, Command<State>> = {
       if (!uiCapability) return;
 
       const scope = uiCapability.forDocument(documentId);
-      scope.togglePanel('right', 'main', 'comment-panel');
+      scope.toggleSidebar('right', 'main', 'comment-panel');
     },
     active: ({ state, documentId }) => {
-      return isPanelOpen(state.plugins, documentId, 'right', 'main', 'comment-panel');
+      return isSidebarOpen(state.plugins, documentId, 'right', 'main', 'comment-panel');
     },
   },
 
@@ -531,10 +543,10 @@ export const commands: Record<string, Command<State>> = {
       if (!uiCapability) return;
 
       const scope = uiCapability.forDocument(documentId);
-      scope.togglePanel('left', 'main', 'annotation-panel');
+      scope.toggleSidebar('left', 'main', 'annotation-panel');
     },
     active: ({ state, documentId }) => {
-      return isPanelOpen(state.plugins, documentId, 'left', 'main', 'annotation-panel');
+      return isSidebarOpen(state.plugins, documentId, 'left', 'main', 'annotation-panel');
     },
   },
 
@@ -1319,7 +1331,29 @@ export const commands: Record<string, Command<State>> = {
     category: 'redaction',
     action: ({ registry, documentId }) => {
       const redaction = registry.getPlugin<RedactionPlugin>('redaction')?.provides();
-      redaction?.forDocument(documentId).toggleRedactSelection();
+      const selection = registry.getPlugin<SelectionPlugin>(SELECTION_PLUGIN_ID)?.provides();
+      const ui = registry.getPlugin<UIPlugin>('ui')?.provides();
+
+      if (!redaction || !selection || !ui) return;
+
+      const redactionScope = redaction.forDocument(documentId);
+      const selectionScope = selection?.forDocument(documentId);
+
+      // If there's a selection, create pending redaction for it
+      const formattedSelection = selectionScope?.getFormattedSelection() ?? [];
+
+      if (formattedSelection.length > 0) {
+        // queueCurrentSelectionAsPending handles everything:
+        // - Creates pending redaction items from selection
+        // - Enables redact selection mode
+        // - Selects the last pending item
+        // - Clears the text selection
+        redactionScope.queueCurrentSelectionAsPending();
+        ui.setActiveToolbar('top', 'secondary', 'redaction-toolbar', documentId);
+      } else {
+        // No selection - toggle the redact text tool
+        redactionScope.toggleRedactSelection();
+      }
     },
     active: ({ state, documentId }) => {
       const redaction = state.plugins[REDACTION_PLUGIN_ID]?.documents[documentId];

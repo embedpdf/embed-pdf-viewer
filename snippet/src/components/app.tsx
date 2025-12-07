@@ -47,6 +47,7 @@ import {
 import { SchemaToolbar } from '../ui/schema-toolbar';
 import { SchemaPanel } from '../ui/schema-panel';
 import { SchemaMenu } from '../ui/schema-menu';
+import { SchemaModal } from '../ui/schema-modal';
 // Custom components for schema-driven UI
 import { ThumbnailsSidebar } from './thumbnails-sidebar';
 import { SearchSidebar } from './search-sidebar';
@@ -83,15 +84,14 @@ import { MarqueeCapture, CapturePluginPackage } from '@embedpdf/plugin-capture/p
 import { HistoryPluginPackage } from '@embedpdf/plugin-history/preact';
 import { RedactionLayer, RedactionPluginPackage } from '@embedpdf/plugin-redaction/preact';
 import { AttachmentPluginPackage } from '@embedpdf/plugin-attachment/preact';
-import { Capture } from './capture';
 import { HintLayer } from './hint-layer';
-import { AnnotationMenu } from './annotation-menu';
 import { CommentSidebar } from './comment-sidebar';
-import { RedactionMenu } from './redaction-menu';
 import { CustomZoomToolbar } from './custom-zoom-toolbar';
 import { AnnotationSidebar } from './annotation-sidebar';
 import { SchemaSelectionMenu } from '@/ui/schema-selection-menu';
-import { LocaleSwitcher } from './locale-switcher';
+import { SchemaOverlay } from '@/ui/schema-overlay';
+import { PrintModal } from './print-modal';
+import { PageControls } from './page-controls';
 
 export { ScrollStrategy, ZoomMode, SpreadMode, Rotation };
 
@@ -166,9 +166,12 @@ interface PDFViewerProps {
 // Removed: menuItems and components are now in config files
 // See: snippet/src/config/commands.ts and snippet/src/config/ui-schema.ts
 
+// Note: Modal rendering is now handled by renderModal() from useSchemaRenderer
+
 // Viewer Layout Component
 function ViewerLayout({ documentId }: { documentId: string }) {
-  const { renderToolbar, renderPanel } = useSchemaRenderer(documentId);
+  const { renderToolbar, renderSidebar, renderModal, renderOverlays } =
+    useSchemaRenderer(documentId);
 
   const selectionMenu = useSelectionMenu('selection', documentId);
   const annotationMenu = useSelectionMenu('annotation', documentId);
@@ -184,8 +187,8 @@ function ViewerLayout({ documentId }: { documentId: string }) {
 
       {/* Document Content Area */}
       <div id="document-content" className="flex flex-1 overflow-hidden bg-white">
-        {/* Left Panels */}
-        {renderPanel('left', 'main')}
+        {/* Left Sidebars */}
+        {renderSidebar('left', 'main')}
 
         {/* Main Viewer */}
         <div className="flex-1 overflow-hidden">
@@ -251,6 +254,8 @@ function ViewerLayout({ documentId }: { documentId: string }) {
                         />
                       </Viewport>
                     </GlobalPointerProvider>
+                    {/* Overlays (floating components like page controls) */}
+                    {renderOverlays()}
                   </div>
                 )}
               </>
@@ -258,9 +263,12 @@ function ViewerLayout({ documentId }: { documentId: string }) {
           </DocumentContent>
         </div>
 
-        {/* Right Panels */}
-        {renderPanel('right', 'main')}
+        {/* Right Sidebars */}
+        {renderSidebar('right', 'main')}
       </div>
+
+      {/* Modals */}
+      {renderModal()}
     </>
   );
 }
@@ -286,6 +294,8 @@ export function PDFViewer({ config, onRegistryReady }: PDFViewerProps) {
       'search-sidebar': SearchSidebar,
       'outline-sidebar': OutlineSidebar,
       'comment-sidebar': CommentSidebar,
+      'print-modal': PrintModal,
+      'page-controls': PageControls,
     }),
     [],
   );
@@ -293,7 +303,9 @@ export function PDFViewer({ config, onRegistryReady }: PDFViewerProps) {
   const uiRenderers = useMemo(
     () => ({
       toolbar: SchemaToolbar,
-      panel: SchemaPanel,
+      sidebar: SchemaPanel, // SchemaPanel handles sidebars
+      modal: SchemaModal,
+      overlay: SchemaOverlay, // SchemaOverlay handles floating overlays
       menu: SchemaMenu,
       selectionMenu: SchemaSelectionMenu,
     }),
@@ -320,15 +332,12 @@ export function PDFViewer({ config, onRegistryReady }: PDFViewerProps) {
           if (onRegistryReady && registry) {
             onRegistryReady(registry);
           }
-
-          registry
-            ?.getPlugin<DocumentManagerPlugin>(DocumentManagerPlugin.id)
-            ?.provides()
-            ?.openDocumentUrl({ url: 'https://snippet.embedpdf.com/ebook.pdf' });
         }}
         engine={engine}
         plugins={[
-          createPluginRegistration(DocumentManagerPluginPackage),
+          createPluginRegistration(DocumentManagerPluginPackage, {
+            initialDocuments: [{ url: 'https://snippet.embedpdf.com/ebook.pdf' }],
+          }),
           createPluginRegistration(CommandsPluginPackage, { commands }),
           createPluginRegistration(I18nPluginPackage, {
             defaultLocale: 'en',

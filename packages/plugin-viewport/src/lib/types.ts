@@ -49,7 +49,17 @@ export interface ScrollToPayload {
   x: number;
   y: number;
   behavior?: ScrollBehavior;
-  center?: boolean;
+  /**
+   * Horizontal alignment as a percentage (0-100).
+   * 0 = target at left edge, 50 = centered, 100 = target at right edge.
+   */
+  alignX?: number;
+  /**
+   * Vertical alignment as a percentage (0-100).
+   * 0 = target at top edge, 50 = centered, 100 = target at bottom edge.
+   * Useful for mobile where UI overlays may cover part of the screen.
+   */
+  alignY?: number;
 }
 
 export interface ScrollActivity {

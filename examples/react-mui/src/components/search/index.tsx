@@ -135,7 +135,8 @@ export const Search = ({ documentId }: SearchProps) => {
     scroll?.scrollToPage({
       pageNumber: item.pageIndex + 1,
       pageCoordinates: minCoordinates,
-      center: true,
+      alignX: 50,
+      alignY: 50,
     });
   };
 

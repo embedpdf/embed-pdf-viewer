@@ -32,7 +32,7 @@ interface UIRootProps extends HTMLAttributes<HTMLDivElement> {
  * 2. Managing the data-disabled-categories attribute
  * 3. Updating styles on locale changes
  */
-export function UIRoot({ children, ...restProps }: UIRootProps) {
+export function UIRoot({ children, style, ...restProps }: UIRootProps) {
   const { plugin } = useUIPlugin();
   const { provides } = useUICapability();
   const [disabledCategories, setDisabledCategories] = useState<string[]>([]);
@@ -133,18 +133,21 @@ export function UIRoot({ children, ...restProps }: UIRootProps) {
     [disabledCategories],
   );
 
+  const combinedStyle = useMemo(() => {
+    const base = { containerType: 'inline-size' as const };
+    if (style && typeof style === 'object') {
+      return { ...base, ...style };
+    }
+    return base;
+  }, [style]);
+
   const rootProps = {
     [UI_ATTRIBUTES.ROOT]: '',
     [UI_ATTRIBUTES.DISABLED_CATEGORIES]: disabledCategoriesAttr,
   };
 
   return (
-    <div
-      ref={rootRefCallback}
-      {...rootProps}
-      {...restProps}
-      style={{ containerType: 'inline-size', ...restProps.style }}
-    >
+    <div ref={rootRefCallback} {...rootProps} {...restProps} style={combinedStyle}>
       {children}
     </div>
   );

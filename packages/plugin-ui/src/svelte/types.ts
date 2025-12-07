@@ -1,5 +1,12 @@
 import type { Component } from 'svelte';
-import { ToolbarSchema, PanelSchema, MenuSchema, SelectionMenuSchema } from '@embedpdf/plugin-ui';
+import {
+  ToolbarSchema,
+  SidebarSchema,
+  ModalSchema,
+  OverlaySchema,
+  MenuSchema,
+  SelectionMenuSchema,
+} from '@embedpdf/plugin-ui';
 import { SelectionMenuPropsBase } from '@embedpdf/utils/svelte';
 export type { SelectionMenuPropsBase };
 
@@ -28,18 +35,45 @@ export interface ToolbarRendererProps {
 export type ToolbarRenderer = Component<ToolbarRendererProps>;
 
 /**
- * Props for panel renderer
+ * Props for sidebar renderer
  * The app provides a component matching this contract
  */
-export interface PanelRendererProps {
-  schema: PanelSchema;
+export interface SidebarRendererProps {
+  schema: SidebarSchema;
   documentId: string;
   isOpen: boolean;
   onClose: () => void;
   className?: string;
 }
 
-export type PanelRenderer = Component<PanelRendererProps>;
+export type SidebarRenderer = Component<SidebarRendererProps>;
+
+/**
+ * Props for modal renderer (with animation lifecycle support)
+ * The app provides a component matching this contract
+ */
+export interface ModalRendererProps {
+  schema: ModalSchema;
+  documentId: string;
+  isOpen: boolean; // false = animate out, true = visible
+  onClose: () => void; // Triggers closeModal()
+  onExited: () => void; // Triggers clearModal() after animation completes
+  className?: string;
+}
+
+export type ModalRenderer = Component<ModalRendererProps>;
+
+/**
+ * Props for overlay renderer
+ * The app provides a component matching this contract
+ */
+export interface OverlayRendererProps {
+  schema: OverlaySchema;
+  documentId: string;
+  className?: string;
+}
+
+export type OverlayRenderer = Component<OverlayRendererProps>;
 
 /**
  * Props for menu renderer
@@ -72,7 +106,9 @@ export type SelectionMenuRenderer = Component<SelectionMenuRendererProps>;
  */
 export interface UIRenderers {
   toolbar: ToolbarRenderer;
-  panel: PanelRenderer;
+  sidebar: SidebarRenderer;
+  modal?: ModalRenderer; // Optional for backwards compatibility
+  overlay?: OverlayRenderer; // Optional, renders floating overlays
   menu: MenuRenderer;
   selectionMenu: SelectionMenuRenderer;
 }

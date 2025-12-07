@@ -560,7 +560,7 @@ export class ScrollPlugin extends BasePlugin<
     const strategy = this.getStrategy(id);
     const coreDoc = this.getCoreDocumentOrThrow(id);
 
-    const { pageNumber, behavior = 'smooth', pageCoordinates, center = false } = options;
+    const { pageNumber, behavior = 'smooth', pageCoordinates, alignX, alignY } = options;
 
     this.startPageChange(id, pageNumber, behavior);
 
@@ -574,7 +574,7 @@ export class ScrollPlugin extends BasePlugin<
 
     if (position) {
       const viewport = this.viewport.forDocument(id);
-      viewport.scrollTo({ ...position, behavior, center });
+      viewport.scrollTo({ ...position, behavior, alignX, alignY });
     } else {
       this.completePageChange(id);
     }

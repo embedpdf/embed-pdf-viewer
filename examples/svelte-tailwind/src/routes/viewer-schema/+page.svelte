@@ -81,7 +81,7 @@
   // UI Renderers
   const uiRenderers = {
     toolbar: SchemaToolbar,
-    panel: SchemaPanel,
+    sidebar: SchemaPanel,
     menu: SchemaMenu,
     selectionMenu: SchemaSelectionMenu,
   };
@@ -209,8 +209,8 @@
 
   {@const topMainToolbar = schemaRenderer.getToolbarInfo('top', 'main')}
   {@const topSecondaryToolbar = schemaRenderer.getToolbarInfo('top', 'secondary')}
-  {@const leftMainPanel = schemaRenderer.getPanelInfo('left', 'main')}
-  {@const rightMainPanel = schemaRenderer.getPanelInfo('right', 'main')}
+  {@const leftMainSidebar = schemaRenderer.getSidebarInfo('left', 'main')}
+  {@const rightMainSidebar = schemaRenderer.getSidebarInfo('right', 'main')}
 
   <!-- Main Toolbar -->
   {#if topMainToolbar}
@@ -237,13 +237,13 @@
   <!-- Document Content Area -->
   <div id="document-content" class="flex flex-1 overflow-hidden bg-white">
     <!-- Left Panels -->
-    {#if leftMainPanel}
-      {@const PanelRenderer = leftMainPanel.renderer}
-      <PanelRenderer
-        schema={leftMainPanel.schema}
-        documentId={leftMainPanel.documentId}
-        isOpen={leftMainPanel.isOpen}
-        onClose={leftMainPanel.onClose}
+    {#if leftMainSidebar}
+      {@const SidebarRenderer = leftMainSidebar.renderer}
+      <SidebarRenderer
+        schema={leftMainSidebar.schema}
+        documentId={leftMainSidebar.documentId}
+        isOpen={leftMainSidebar.isOpen}
+        onClose={leftMainSidebar.onClose}
       />
     {/if}
 
@@ -315,13 +315,13 @@
     </div>
 
     <!-- Right Panels -->
-    {#if rightMainPanel}
-      {@const PanelRenderer = rightMainPanel.renderer}
-      <PanelRenderer
-        schema={rightMainPanel.schema}
-        documentId={rightMainPanel.documentId}
-        isOpen={rightMainPanel.isOpen}
-        onClose={rightMainPanel.onClose}
+    {#if rightMainSidebar}
+      {@const SidebarRenderer = rightMainSidebar.renderer}
+      <SidebarRenderer
+        schema={rightMainSidebar.schema}
+        documentId={rightMainSidebar.documentId}
+        isOpen={rightMainSidebar.isOpen}
+        onClose={rightMainSidebar.onClose}
       />
     {/if}
   </div>

@@ -1,6 +1,6 @@
 /** @jsxImportSource preact */
 import { h, ComponentChildren } from 'preact';
-import { useEffect, useRef } from 'preact/hooks';
+import { useEffect, useRef, useState } from 'preact/hooks';
 import { Icon } from './icon';
 import { Button } from './button';
 
@@ -13,6 +13,8 @@ export interface DialogProps {
   children: ComponentChildren;
   /** Callback when dialog should close */
   onClose?: () => void;
+  /** Callback when exit animation completes (for cleanup) */
+  onExited?: () => void;
   /** Optional className for the dialog content */
   className?: string;
   /** Whether to show close button */
@@ -26,11 +28,33 @@ export function Dialog({
   title,
   children,
   onClose,
+  onExited,
   className,
   showCloseButton = true,
   maxWidth = '32rem',
 }: DialogProps) {
   const overlayRef = useRef<HTMLDivElement>(null);
+  const [shouldRender, setShouldRender] = useState(open);
+  const [isAnimating, setIsAnimating] = useState(false);
+
+  // Handle mount/unmount with animation
+  useEffect(() => {
+    if (open) {
+      setShouldRender(true);
+      // Small delay to ensure the element is rendered before animation starts
+      requestAnimationFrame(() => {
+        setIsAnimating(true);
+      });
+    } else if (shouldRender) {
+      setIsAnimating(false);
+      // Wait for animation to complete before unmounting
+      const timer = setTimeout(() => {
+        setShouldRender(false);
+        onExited?.();
+      }, 200); // Match the transition duration
+      return () => clearTimeout(timer);
+    }
+  }, [open, shouldRender, onExited]);
 
   // Handle escape key
   useEffect(() => {
@@ -55,7 +79,7 @@ export function Dialog({
 
   // Prevent body scroll when dialog is open
   useEffect(() => {
-    if (open) {
+    if (shouldRender) {
       document.body.style.overflow = 'hidden';
     } else {
       document.body.style.overflow = '';
@@ -64,18 +88,22 @@ export function Dialog({
     return () => {
       document.body.style.overflow = '';
     };
-  }, [open]);
+  }, [shouldRender]);
 
-  if (!open) return null;
+  if (!shouldRender) return null;
 
   return (
     <div
       ref={overlayRef}
-      className="fixed inset-0 z-50 bg-black/50 md:flex md:items-center md:justify-center"
+      className={`fixed inset-0 z-50 transition-opacity duration-200 md:flex md:items-center md:justify-center ${
+        isAnimating && open ? 'bg-black/50' : 'bg-black/0'
+      }`}
       onClick={handleBackdropClick}
     >
       <div
-        className={`relative flex h-full w-full flex-col bg-white md:h-auto md:w-[28rem] md:max-w-[90vw] md:rounded-lg md:border md:border-gray-200 md:shadow-lg ${className}`}
+        className={`relative flex h-full w-full flex-col bg-white transition-all duration-200 md:h-auto md:w-[28rem] md:max-w-[90vw] md:rounded-lg md:border md:border-gray-200 md:shadow-lg ${
+          isAnimating && open ? 'scale-100 opacity-100' : 'scale-95 opacity-0'
+        } ${className}`}
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}

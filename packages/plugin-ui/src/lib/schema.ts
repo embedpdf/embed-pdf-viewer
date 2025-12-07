@@ -8,7 +8,9 @@ export interface UISchema {
   // UI Primitives
   toolbars: Record<string, ToolbarSchema>;
   menus: Record<string, MenuSchema>;
-  panels: Record<string, PanelSchema>;
+  sidebars: Record<string, SidebarSchema>;
+  modals: Record<string, ModalSchema>;
+  overlays?: Record<string, OverlaySchema>;
   selectionMenus: Record<string, SelectionMenuSchema>;
 }
 
@@ -197,16 +199,13 @@ export interface MenuCustomItem {
 }
 
 /**
- * Panel definition (sidebars, overlays, modals)
+ * Sidebar definition - positioned panels with placement/slot
  */
-export interface PanelSchema {
+export interface SidebarSchema {
   id: string;
 
-  // Panel type
-  type: 'sidebar' | 'overlay' | 'modal' | 'popover';
-
-  // Position (for sidebar/overlay)
-  position?: PanelPosition;
+  // Position (required for sidebars)
+  position: SidebarPosition;
 
   // Content
   content: PanelContent;
@@ -214,13 +213,43 @@ export interface PanelSchema {
   // Behavior
   collapsible?: boolean;
   defaultOpen?: boolean;
-  closeOnClickOutside?: boolean;
 
   // Sizing
   width?: string;
   height?: string;
   minWidth?: string;
   minHeight?: string;
+
+  categories?: string[];
+  visibilityDependsOn?: VisibilityDependency;
+}
+
+export interface SidebarPosition {
+  placement: 'left' | 'right' | 'top' | 'bottom';
+
+  // Slot name - sidebars in same slot are mutually exclusive
+  slot: string;
+
+  // Order within slot (if multiple can coexist)
+  order?: number;
+}
+
+/**
+ * Modal definition - global overlays, only one at a time
+ */
+export interface ModalSchema {
+  id: string;
+
+  // Content
+  content: PanelContent;
+
+  // Behavior
+  closeOnClickOutside?: boolean;
+  closeOnEscape?: boolean;
+
+  // Sizing
+  width?: string;
+  height?: string;
   maxWidth?: string;
   maxHeight?: string;
 
@@ -228,14 +257,51 @@ export interface PanelSchema {
   visibilityDependsOn?: VisibilityDependency;
 }
 
-export interface PanelPosition {
-  placement: 'left' | 'right' | 'top' | 'bottom';
+/**
+ * Overlay position anchor
+ */
+export type OverlayAnchor =
+  | 'top-left'
+  | 'top-center'
+  | 'top-right'
+  | 'center-left'
+  | 'center'
+  | 'center-right'
+  | 'bottom-left'
+  | 'bottom-center'
+  | 'bottom-right';
 
-  // Slot name - panels in same slot are mutually exclusive
-  slot?: string;
+/**
+ * Overlay position configuration
+ */
+export interface OverlayPosition {
+  anchor: OverlayAnchor;
+  offset?: {
+    top?: string;
+    right?: string;
+    bottom?: string;
+    left?: string;
+  };
+}
 
-  // Order within slot (if multiple can coexist)
-  order?: number;
+/**
+ * Overlay definition - floating components positioned over document content
+ * Unlike modals, overlays don't block interaction and multiple can be visible
+ */
+export interface OverlaySchema {
+  id: string;
+
+  // Position
+  position: OverlayPosition;
+
+  // Content
+  content: ComponentPanelContent;
+
+  // Behavior
+  defaultEnabled?: boolean; // Can be toggled on/off
+
+  categories?: string[];
+  visibilityDependsOn?: VisibilityDependency;
 }
 
 /**

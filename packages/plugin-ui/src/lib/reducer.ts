@@ -4,12 +4,13 @@ import {
   INIT_UI_STATE,
   CLEANUP_UI_STATE,
   SET_ACTIVE_TOOLBAR,
-  SET_ACTIVE_PANEL,
-  CLOSE_PANEL_SLOT,
+  SET_ACTIVE_SIDEBAR,
+  CLOSE_SIDEBAR_SLOT,
   CLOSE_TOOLBAR_SLOT,
-  SET_PANEL_TAB,
+  SET_SIDEBAR_TAB,
   OPEN_MODAL,
   CLOSE_MODAL,
+  CLEAR_MODAL,
   OPEN_MENU,
   CLOSE_MENU,
   CLOSE_ALL_MENUS,
@@ -18,10 +19,10 @@ import {
 
 export const initialDocumentState: UIDocumentState = {
   activeToolbars: {},
-  activePanels: {},
+  activeSidebars: {},
   activeModal: null,
   openMenus: {},
-  panelTabs: {},
+  sidebarTabs: {},
 };
 
 export const initialState: UIState = {
@@ -91,64 +92,6 @@ export const uiReducer = (state = initialState, action: UIAction): UIState => {
       };
     }
 
-    case SET_ACTIVE_PANEL: {
-      const { documentId, placement, slot, panelId, activeTab } = action.payload;
-      const docState = state.documents[documentId] || initialDocumentState;
-      const slotKey = `${placement}-${slot}`;
-
-      return {
-        ...state,
-        documents: {
-          ...state.documents,
-          [documentId]: {
-            ...docState,
-            activePanels: {
-              ...docState.activePanels,
-              [slotKey]: {
-                panelId,
-                isOpen: true,
-              },
-            },
-            ...(activeTab && {
-              panelTabs: {
-                ...docState.panelTabs,
-                [panelId]: activeTab,
-              },
-            }),
-          },
-        },
-      };
-    }
-
-    case CLOSE_PANEL_SLOT: {
-      const { documentId, placement, slot } = action.payload;
-      const docState = state.documents[documentId];
-      if (!docState) return state;
-
-      const slotKey = `${placement}-${slot}`;
-      const panelSlot = docState.activePanels[slotKey];
-
-      // If no panel in this slot, nothing to close
-      if (!panelSlot) return state;
-
-      return {
-        ...state,
-        documents: {
-          ...state.documents,
-          [documentId]: {
-            ...docState,
-            activePanels: {
-              ...docState.activePanels,
-              [slotKey]: {
-                ...panelSlot,
-                isOpen: false, // Keep panel, just close it
-              },
-            },
-          },
-        },
-      };
-    }
-
     case CLOSE_TOOLBAR_SLOT: {
       const { documentId, placement, slot } = action.payload;
       const docState = state.documents[documentId];
@@ -178,8 +121,70 @@ export const uiReducer = (state = initialState, action: UIAction): UIState => {
       };
     }
 
-    case SET_PANEL_TAB: {
-      const { documentId, panelId, tabId } = action.payload;
+    // ─────────────────────────────────────────────────────────
+    // Sidebar Actions
+    // ─────────────────────────────────────────────────────────
+
+    case SET_ACTIVE_SIDEBAR: {
+      const { documentId, placement, slot, sidebarId, activeTab } = action.payload;
+      const docState = state.documents[documentId] || initialDocumentState;
+      const slotKey = `${placement}-${slot}`;
+
+      return {
+        ...state,
+        documents: {
+          ...state.documents,
+          [documentId]: {
+            ...docState,
+            activeSidebars: {
+              ...docState.activeSidebars,
+              [slotKey]: {
+                sidebarId,
+                isOpen: true,
+              },
+            },
+            ...(activeTab && {
+              sidebarTabs: {
+                ...docState.sidebarTabs,
+                [sidebarId]: activeTab,
+              },
+            }),
+          },
+        },
+      };
+    }
+
+    case CLOSE_SIDEBAR_SLOT: {
+      const { documentId, placement, slot } = action.payload;
+      const docState = state.documents[documentId];
+      if (!docState) return state;
+
+      const slotKey = `${placement}-${slot}`;
+      const sidebarSlot = docState.activeSidebars[slotKey];
+
+      // If no sidebar in this slot, nothing to close
+      if (!sidebarSlot) return state;
+
+      return {
+        ...state,
+        documents: {
+          ...state.documents,
+          [documentId]: {
+            ...docState,
+            activeSidebars: {
+              ...docState.activeSidebars,
+              [slotKey]: {
+                ...sidebarSlot,
+                isOpen: false, // Keep sidebar, just close it
+              },
+            },
+          },
+        },
+      };
+    }
+
+    case SET_SIDEBAR_TAB: {
+      const { documentId, sidebarId, tabId } = action.payload;
       const docState = state.documents[documentId] || initialDocumentState;
 
       return {
@@ -188,14 +193,18 @@ export const uiReducer = (state = initialState, action: UIAction): UIState => {
           ...state.documents,
           [documentId]: {
             ...docState,
-            panelTabs: {
-              ...docState.panelTabs,
-              [panelId]: tabId,
+            sidebarTabs: {
+              ...docState.sidebarTabs,
+              [sidebarId]: tabId,
             },
           },
         },
       };
     }
+
+    // ─────────────────────────────────────────────────────────
+    // Modal Actions (with animation lifecycle)
+    // ─────────────────────────────────────────────────────────
 
     case OPEN_MODAL: {
       const { documentId, modalId } = action.payload;
@@ -207,7 +216,10 @@ export const uiReducer = (state = initialState, action: UIAction): UIState => {
           ...state.documents,
           [documentId]: {
             ...docState,
-            activeModal: modalId,
+            activeModal: {
+              modalId,
+              isOpen: true,
+            },
             openMenus: {}, // Close all menus when opening modal
           },
         },
@@ -217,7 +229,30 @@ export const uiReducer = (state = initialState, action: UIAction): UIState => {
     case CLOSE_MODAL: {
       const { documentId } = action.payload;
       const docState = state.documents[documentId];
+      if (!docState?.activeModal) return state;
+
+      return {
+        ...state,
+        documents: {
+          ...state.documents,
+          [documentId]: {
+            ...docState,
+            activeModal: {
+              ...docState.activeModal,
+              isOpen: false, // Keep modal for exit animation
+            },
+          },
+        },
+      };
+    }
+
+    case CLEAR_MODAL: {
+      const { documentId } = action.payload;
+      const docState = state.documents[documentId];
       if (!docState) return state;
+
+      // Only clear if modal is closed (animation completed)
+      if (docState.activeModal?.isOpen) return state;
 
       return {
         ...state,
@@ -230,6 +265,10 @@ export const uiReducer = (state = initialState, action: UIAction): UIState => {
         },
       };
     }
+
+    // ─────────────────────────────────────────────────────────
+    // Menu Actions
+    // ─────────────────────────────────────────────────────────
 
     case OPEN_MENU: {
       const { documentId, menuState } = action.payload;

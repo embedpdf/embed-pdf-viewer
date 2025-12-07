@@ -19,7 +19,7 @@ import { ExportPlugin } from '@embedpdf/plugin-export/vue';
 import { DocumentManagerPlugin } from '@embedpdf/plugin-document-manager/vue';
 import { HISTORY_PLUGIN_ID, HistoryPlugin } from '@embedpdf/plugin-history/vue';
 import { State } from './types';
-import { isPanelOpen, isToolbarOpen, UI_PLUGIN_ID, UIPlugin } from '@embedpdf/plugin-ui';
+import { isSidebarOpen, isToolbarOpen, UI_PLUGIN_ID, UIPlugin } from '@embedpdf/plugin-ui';
 import { ScrollPlugin, ScrollStrategy } from '@embedpdf/plugin-scroll/vue';
 import { InteractionManagerPlugin } from '@embedpdf/plugin-interaction-manager';
 import { SelectionPlugin } from '@embedpdf/plugin-selection';
@@ -443,10 +443,10 @@ export const commands: Record<string, Command<State>> = {
       if (!uiCapability) return;
 
       const scope = uiCapability.forDocument(documentId);
-      scope.togglePanel('left', 'main', 'sidebar-panel');
+      scope.toggleSidebar('left', 'main', 'sidebar-panel');
     },
     active: ({ state, documentId }) => {
-      return isPanelOpen(state.plugins, documentId, 'left', 'main', 'sidebar-panel');
+      return isSidebarOpen(state.plugins, documentId, 'left', 'main', 'sidebar-panel');
     },
   },
 
@@ -465,10 +465,10 @@ export const commands: Record<string, Command<State>> = {
       if (!uiCapability) return;
 
       const scope = uiCapability.forDocument(documentId);
-      scope.togglePanel('right', 'main', 'search-panel');
+      scope.toggleSidebar('right', 'main', 'search-panel');
     },
     active: ({ state, documentId }) => {
-      return isPanelOpen(state.plugins, documentId, 'right', 'main', 'search-panel');
+      return isSidebarOpen(state.plugins, documentId, 'right', 'main', 'search-panel');
     },
   },
 
@@ -485,10 +485,10 @@ export const commands: Record<string, Command<State>> = {
       if (!uiCapability) return;
 
       const scope = uiCapability.forDocument(documentId);
-      scope.togglePanel('right', 'main', 'comment-panel');
+      scope.toggleSidebar('right', 'main', 'comment-panel');
     },
     active: ({ state, documentId }) => {
-      return isPanelOpen(state.plugins, documentId, 'right', 'main', 'comment-panel');
+      return isSidebarOpen(state.plugins, documentId, 'right', 'main', 'comment-panel');
     },
   },
 

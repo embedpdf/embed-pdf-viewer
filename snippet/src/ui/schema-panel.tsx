@@ -1,36 +1,30 @@
 import { h, Fragment } from 'preact';
 import { useState } from 'preact/hooks';
-import { PanelRendererProps, useItemRenderer } from '@embedpdf/plugin-ui/preact';
+import { SidebarRendererProps, useItemRenderer } from '@embedpdf/plugin-ui/preact';
 import { useTranslations } from '@embedpdf/plugin-i18n/preact';
 import { Icon } from '@/components/ui/icon';
 
 /**
- * Schema-driven Panel Renderer for Preact
+ * Schema-driven Sidebar Renderer for Preact
  *
- * Renders panels (sidebars) defined in the UI schema.
+ * Renders sidebars defined in the UI schema.
  */
-export function SchemaPanel({ schema, documentId, isOpen, onClose }: PanelRendererProps) {
+export function SchemaPanel({ schema, documentId, isOpen, onClose }: SidebarRendererProps) {
   if (!isOpen) return null;
 
-  const { position, content, width, type } = schema;
+  const { position, content, width } = schema;
   const { renderCustomComponent } = useItemRenderer();
-  const { translate } = useTranslations(documentId);
 
-  if (type !== 'sidebar') {
-    console.warn(`Unsupported panel type: ${type}`);
-    return null;
-  }
-
-  const positionClasses = getPositionClasses(position?.placement ?? 'left');
+  const positionClasses = getPositionClasses(position.placement);
   const widthStyle = width ? { width } : undefined;
 
   return (
     <div
       className={`${positionClasses} flex flex-col border-gray-300 bg-white shadow-lg`}
       style={widthStyle}
-      data-panel-id={schema.id}
+      data-sidebar-id={schema.id}
     >
-      {/* Panel Content */}
+      {/* Sidebar Content */}
       <div className="min-h-0 flex-1">
         {content.type === 'tabs' && (
           <TabsContent
@@ -55,12 +49,11 @@ function TabsContent({
   documentId,
   renderCustomComponent,
 }: {
-  content: Extract<PanelRendererProps['schema']['content'], { type: 'tabs' }>;
+  content: Extract<SidebarRendererProps['schema']['content'], { type: 'tabs' }>;
   documentId: string;
   renderCustomComponent: (componentId: string, documentId: string, props: any) => any;
 }) {
   const [activeTab, setActiveTab] = useState(content.tabs[0]?.id || '');
-  const { translate } = useTranslations(documentId);
 
   return (
     <div className="flex h-full flex-1 flex-col">
@@ -107,7 +100,7 @@ function TabsContent({
 }
 
 /**
- * Get position classes for panel positioning
+ * Get position classes for sidebar positioning
  */
 function getPositionClasses(placement: 'left' | 'right' | 'top' | 'bottom'): string {
   switch (placement) {

@@ -4,18 +4,19 @@ import { useRenderers } from '../registries/renderers-registry.svelte';
 /**
  * High-level hook for rendering UI from schema
  *
- * Provides information about active toolbars and panels by placement+slot.
+ * Provides information about active toolbars, sidebars, and modals.
  * Always includes isOpen state so renderers can control animations.
  *
- * Use with Svelte's component binding to render toolbars and panels.
+ * Use with Svelte's component binding to render toolbars and sidebars.
  *
  * @example
  * ```svelte
  * <script lang="ts">
- *   const { getToolbarInfo, getPanelInfo } = useSchemaRenderer(() => documentId);
+ *   const { getToolbarInfo, getSidebarInfo, getModalInfo } = useSchemaRenderer(() => documentId);
  *
  *   const topMainToolbar = $derived(getToolbarInfo('top', 'main'));
- *   const leftMainPanel = $derived(getPanelInfo('left', 'main'));
+ *   const leftMainSidebar = $derived(getSidebarInfo('left', 'main'));
+ *   const modal = $derived(getModalInfo());
  * </script>
  *
  * {#if topMainToolbar}
@@ -79,40 +80,88 @@ export function useSchemaRenderer(getDocumentId: () => string | null) {
     },
 
     /**
-     * Get panel information by placement and slot
+     * Get sidebar information by placement and slot
      *
      * @param placement - 'left' | 'right' | 'top' | 'bottom'
      * @param slot - Slot name (e.g. 'main', 'secondary', 'inspector')
-     * @returns Panel info or null if no panel in slot
+     * @returns Sidebar info or null if no sidebar in slot
      */
-    getPanelInfo: (placement: 'left' | 'right' | 'top' | 'bottom', slot: string) => {
+    getSidebarInfo: (placement: 'left' | 'right' | 'top' | 'bottom', slot: string) => {
       const schema = capability.provides?.getSchema();
       const documentId = getDocumentId();
 
       if (!schema || !uiState.provides || !uiState.state || !documentId) return null;
 
       const slotKey = `${placement}-${slot}`;
-      const panelSlot = uiState.state.activePanels[slotKey];
+      const sidebarSlot = uiState.state.activeSidebars[slotKey];
 
-      // If no panel in this slot, nothing to render
-      if (!panelSlot) return null;
+      // If no sidebar in this slot, nothing to render
+      if (!sidebarSlot) return null;
 
-      const panelSchema = schema.panels[panelSlot.panelId];
-      if (!panelSchema) {
-        console.warn(`Panel "${panelSlot.panelId}" not found in schema`);
+      const sidebarSchema = schema.sidebars?.[sidebarSlot.sidebarId];
+      if (!sidebarSchema) {
+        console.warn(`Sidebar "${sidebarSlot.sidebarId}" not found in schema`);
         return null;
       }
 
       const handleClose = () => {
-        uiState.provides?.closePanelSlot(placement, slot);
+        uiState.provides?.closeSidebarSlot(placement, slot);
       };
 
       return {
-        renderer: renderers.panel,
-        schema: panelSchema,
+        renderer: renderers.sidebar,
+        schema: sidebarSchema,
         documentId,
-        isOpen: panelSlot.isOpen,
+        isOpen: sidebarSlot.isOpen,
         onClose: handleClose,
+      };
+    },
+
+    /**
+     * Get modal information (if active)
+     *
+     * Supports animation lifecycle:
+     * - isOpen: true = visible
+     * - isOpen: false = animate out (modal still rendered)
+     * - onExited called after animation → modal removed
+     *
+     * @returns Modal info or null if no modal active
+     */
+    getModalInfo: () => {
+      const schema = capability.provides?.getSchema();
+      const documentId = getDocumentId();
+
+      if (!schema || !uiState.provides || !uiState.state?.activeModal || !documentId) return null;
+
+      const { modalId, isOpen } = uiState.state.activeModal;
+
+      const modalSchema = schema.modals?.[modalId];
+      if (!modalSchema) {
+        console.warn(`Modal "${modalId}" not found in schema`);
+        return null;
+      }
+
+      const handleClose = () => {
+        uiState.provides?.closeModal();
+      };
+
+      const handleExited = () => {
+        uiState.provides?.clearModal();
+      };
+
+      const ModalRenderer = renderers.modal;
+      if (!ModalRenderer) {
+        console.warn('No modal renderer registered');
+        return null;
+      }
+
+      return {
+        renderer: ModalRenderer,
+        schema: modalSchema,
+        documentId,
+        isOpen,
+        onClose: handleClose,
+        onExited: handleExited,
       };
     },
 
@@ -134,20 +183,57 @@ export function useSchemaRenderer(getDocumentId: () => string | null) {
     },
 
     /**
-     * Helper: Get all active panels for this document
+     * Helper: Get all active sidebars for this document
      * Useful for batch rendering or debugging
      */
-    getActivePanels: () => {
+    getActiveSidebars: () => {
       if (!uiState.state) return [];
-      return Object.entries(uiState.state.activePanels).map(([slotKey, panelSlot]) => {
+      return Object.entries(uiState.state.activeSidebars).map(([slotKey, sidebarSlot]) => {
         const [placement, slot] = slotKey.split('-');
         return {
           placement,
           slot,
-          panelId: panelSlot.panelId,
-          isOpen: panelSlot.isOpen,
+          sidebarId: sidebarSlot.sidebarId,
+          isOpen: sidebarSlot.isOpen,
         };
       });
+    },
+
+    /**
+     * Get overlay information for all enabled overlays
+     *
+     * Overlays are floating components positioned over the document content.
+     * Unlike modals, multiple overlays can be visible and they don't block interaction.
+     *
+     * @example
+     * ```svelte
+     * <script lang="ts">
+     *   const { getOverlaysInfo } = useSchemaRenderer(() => documentId);
+     *   const overlays = $derived(getOverlaysInfo());
+     * </script>
+     *
+     * {#each overlays as overlay (overlay.schema.id)}
+     *   {@const OverlayRenderer = overlay.renderer}
+     *   <OverlayRenderer schema={overlay.schema} documentId={overlay.documentId} />
+     * {/each}
+     * ```
+     */
+    getOverlaysInfo: () => {
+      const schema = capability.provides?.getSchema();
+      const documentId = getDocumentId();
+
+      if (!schema?.overlays || !documentId) return [];
+
+      const OverlayRenderer = renderers.overlay;
+      if (!OverlayRenderer) {
+        return [];
+      }
+
+      return Object.values(schema.overlays).map((overlaySchema) => ({
+        renderer: OverlayRenderer,
+        schema: overlaySchema,
+        documentId,
+      }));
     },
   };
 }

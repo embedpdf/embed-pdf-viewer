@@ -4,7 +4,7 @@ import { useRenderers } from '../registries/renderers-registry';
 /**
  * High-level hook for rendering UI from schema
  *
- * Provides simple functions to render toolbars and panels by placement+slot.
+ * Provides simple functions to render toolbars, sidebars, and modals.
  * Always passes isOpen state to renderers so they can control animations.
  *
  * Automatically subscribes to UI state changes for the given document.
@@ -69,9 +69,9 @@ export function useSchemaRenderer(documentId: string) {
     },
 
     /**
-     * Render a panel by placement and slot
+     * Render a sidebar by placement and slot
      *
-     * ALWAYS renders (when panel exists in slot) with isOpen state.
+     * ALWAYS renders (when sidebar exists in slot) with isOpen state.
      * Your renderer controls whether to display or animate.
      *
      * @param placement - 'left' | 'right' | 'top' | 'bottom'
@@ -79,39 +79,92 @@ export function useSchemaRenderer(documentId: string) {
      *
      * @example
      * ```tsx
-     * {renderPanel('left', 'main')}
-     * {renderPanel('right', 'main')}
+     * {renderSidebar('left', 'main')}
+     * {renderSidebar('right', 'main')}
      * ```
      */
-    renderPanel: (placement: 'left' | 'right' | 'top' | 'bottom', slot: string) => {
+    renderSidebar: (placement: 'left' | 'right' | 'top' | 'bottom', slot: string) => {
       if (!schema || !provides || !uiState) return null;
       const slotKey = `${placement}-${slot}`;
-      const panelSlot = uiState.activePanels[slotKey];
+      const sidebarSlot = uiState.activeSidebars[slotKey];
 
-      // If no panel in this slot, nothing to render
-      if (!panelSlot) return null;
+      // If no sidebar in this slot, nothing to render
+      if (!sidebarSlot) return null;
 
-      const panelSchema = schema.panels[panelSlot.panelId];
-      if (!panelSchema) {
-        console.warn(`Panel "${panelSlot.panelId}" not found in schema`);
+      const sidebarSchema = schema.sidebars?.[sidebarSlot.sidebarId];
+      if (!sidebarSchema) {
+        console.warn(`Sidebar "${sidebarSlot.sidebarId}" not found in schema`);
         return null;
       }
 
       const handleClose = () => {
-        provides.forDocument(documentId).closePanelSlot(placement, slot);
+        provides.forDocument(documentId).closeSidebarSlot(placement, slot);
       };
 
-      const PanelRenderer = renderers.panel;
+      const SidebarRenderer = renderers.sidebar;
 
       // ALWAYS render, pass isOpen state
       // Your renderer decides whether to return null or animate
       return (
-        <PanelRenderer
-          key={panelSlot.panelId}
-          schema={panelSchema}
+        <SidebarRenderer
+          key={sidebarSlot.sidebarId}
+          schema={sidebarSchema}
           documentId={documentId}
-          isOpen={panelSlot.isOpen}
+          isOpen={sidebarSlot.isOpen}
           onClose={handleClose}
+        />
+      );
+    },
+
+    /**
+     * Render the active modal (if any)
+     *
+     * Only one modal can be active at a time.
+     * Modals are defined in schema.modals.
+     *
+     * Supports animation lifecycle:
+     * - isOpen: true = visible
+     * - isOpen: false = animate out (modal still rendered)
+     * - onExited called after animation → modal removed
+     *
+     * @example
+     * ```tsx
+     * {renderModal()}
+     * ```
+     */
+    renderModal: () => {
+      if (!schema || !provides || !uiState?.activeModal) return null;
+
+      const { modalId, isOpen } = uiState.activeModal;
+
+      const modalSchema = schema.modals?.[modalId];
+      if (!modalSchema) {
+        console.warn(`Modal "${modalId}" not found in schema`);
+        return null;
+      }
+
+      const handleClose = () => {
+        provides.forDocument(documentId).closeModal();
+      };
+
+      const handleExited = () => {
+        provides.forDocument(documentId).clearModal();
+      };
+
+      const ModalRenderer = renderers.modal;
+      if (!ModalRenderer) {
+        console.warn('No modal renderer registered');
+        return null;
+      }
+
+      return (
+        <ModalRenderer
+          key={modalId}
+          schema={modalSchema}
+          documentId={documentId}
+          isOpen={isOpen}
+          onClose={handleClose}
+          onExited={handleExited}
         />
       );
     },
@@ -134,20 +187,58 @@ export function useSchemaRenderer(documentId: string) {
     },
 
     /**
-     * Helper: Get all active panels for this document
+     * Helper: Get all active sidebars for this document
      * Useful for batch rendering or debugging
      */
-    getActivePanels: () => {
+    getActiveSidebars: () => {
       if (!uiState) return [];
-      return Object.entries(uiState.activePanels).map(([slotKey, panelSlot]) => {
+      return Object.entries(uiState.activeSidebars).map(([slotKey, sidebarSlot]) => {
         const [placement, slot] = slotKey.split('-');
         return {
           placement,
           slot,
-          panelId: panelSlot.panelId,
-          isOpen: panelSlot.isOpen,
+          sidebarId: sidebarSlot.sidebarId,
+          isOpen: sidebarSlot.isOpen,
         };
       });
+    },
+
+    /**
+     * Render all enabled overlays
+     *
+     * Overlays are floating components positioned over the document content.
+     * Unlike modals, multiple overlays can be visible and they don't block interaction.
+     *
+     * @example
+     * ```tsx
+     * <div className="relative">
+     *   {children}
+     *   {renderOverlays()}
+     * </div>
+     * ```
+     */
+    renderOverlays: () => {
+      if (!schema?.overlays || !provides) return null;
+
+      const OverlayRenderer = renderers.overlay;
+      if (!OverlayRenderer) {
+        return null;
+      }
+
+      const overlays = Object.values(schema.overlays);
+      if (overlays.length === 0) return null;
+
+      return (
+        <>
+          {overlays.map((overlaySchema) => (
+            <OverlayRenderer
+              key={overlaySchema.id}
+              schema={overlaySchema}
+              documentId={documentId}
+            />
+          ))}
+        </>
+      );
     },
   };
 }

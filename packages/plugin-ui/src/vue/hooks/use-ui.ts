@@ -30,7 +30,7 @@ export const useUIState = (documentId: MaybeRefOrGetter<string>) => {
       const unsubToolbar = scope.onToolbarChanged(() => {
         state.value = scope.getState();
       });
-      const unsubPanel = scope.onPanelChanged(() => {
+      const unsubSidebar = scope.onSidebarChanged(() => {
         state.value = scope.getState();
       });
       const unsubModal = scope.onModalChanged(() => {
@@ -42,7 +42,7 @@ export const useUIState = (documentId: MaybeRefOrGetter<string>) => {
 
       onCleanup(() => {
         unsubToolbar();
-        unsubPanel();
+        unsubSidebar();
         unsubModal();
         unsubMenu();
       });

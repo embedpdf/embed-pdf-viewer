@@ -1,4 +1,4 @@
-import { UIState, UIDocumentState, ToolbarSlotState, PanelSlotState } from './types';
+import { UIState, UIDocumentState, ToolbarSlotState, SidebarSlotState } from './types';
 
 // Shape of state.plugins passed into command active()
 export type PluginsSlice = Record<string, any>;
@@ -51,32 +51,32 @@ export function isToolbarOpen(
 }
 
 // ─────────────────────────────────────────────────────────
-// Panels
+// Sidebars
 // ─────────────────────────────────────────────────────────
 
-export function selectPanelSlot(
+export function selectSidebarSlot(
   plugins: PluginsSlice,
   documentId: string,
   placement: string,
   slot: string,
-): PanelSlotState | null {
+): SidebarSlotState | null {
   const doc = selectUIDocumentState(plugins, documentId);
   if (!doc) return null;
-  return doc.activePanels[makeSlotKey(placement, slot)] ?? null;
+  return doc.activeSidebars[makeSlotKey(placement, slot)] ?? null;
 }
 
 /**
- * Is a panel open in this slot?
- * If panelId is provided, also matches that specific panel.
+ * Is a sidebar open in this slot?
+ * If sidebarId is provided, also matches that specific sidebar.
  */
-export function isPanelOpen(
+export function isSidebarOpen(
   plugins: PluginsSlice,
   documentId: string,
   placement: string,
   slot: string,
-  panelId?: string,
+  sidebarId?: string,
 ): boolean {
-  const slotState = selectPanelSlot(plugins, documentId, placement, slot);
+  const slotState = selectSidebarSlot(plugins, documentId, placement, slot);
   if (!slotState || !slotState.isOpen) return false;
-  return panelId ? slotState.panelId === panelId : true;
+  return sidebarId ? slotState.sidebarId === sidebarId : true;
 }

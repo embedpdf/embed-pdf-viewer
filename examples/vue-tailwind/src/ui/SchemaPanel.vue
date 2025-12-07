@@ -122,7 +122,7 @@
 
 <script setup lang="ts">
 import { ref, computed, onMounted, onUnmounted, watch } from 'vue';
-import type { PanelRendererProps } from '@embedpdf/plugin-ui/vue';
+import type { SidebarRendererProps } from '@embedpdf/plugin-ui/vue';
 import { useUICapability, useUIState, useItemRenderer } from '@embedpdf/plugin-ui/vue';
 import { useTranslations } from '@embedpdf/plugin-i18n/vue';
 import { CloseIcon } from '../components/icons';
@@ -135,7 +135,7 @@ import { CloseIcon } from '../components/icons';
  * - Mobile: Bottom sheet with swipe gestures
  */
 
-const props = defineProps<PanelRendererProps>();
+const props = defineProps<SidebarRendererProps>();
 
 const { provides } = useUICapability();
 const { state: uiState } = useUIState(props.documentId);
@@ -182,9 +182,11 @@ const availableTabs = computed(() =>
 
 const resolvedActiveTabId = computed(() => {
   if (content.value.type !== 'tabs') return null;
-  const stateActive = uiState.value?.panelTabs?.[props.schema.id];
+  const stateActive = uiState.value?.sidebarTabs?.[props.schema.id];
   if (stateActive) return stateActive;
-  const scopeActive = provides.value?.forDocument(props.documentId).getPanelTab?.(props.schema.id);
+  const scopeActive = provides.value
+    ?.forDocument(props.documentId)
+    .getSidebarTab?.(props.schema.id);
   if (scopeActive) return scopeActive;
   return content.value.defaultTab ?? availableTabs.value[0]?.id ?? null;
 });
@@ -205,7 +207,7 @@ const activeTab = computed(
 const handleTabSelect = (tabId: string) => {
   if (tabId === activeTabId.value) return;
   localActiveTabId.value = tabId;
-  provides.value?.forDocument(props.documentId).setPanelTab(props.schema.id, tabId);
+  provides.value?.forDocument(props.documentId).setSidebarTab(props.schema.id, tabId);
 };
 
 // Swipe gestures

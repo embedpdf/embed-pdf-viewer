@@ -1,6 +1,6 @@
 <script lang="ts">
   import {
-    type PanelRendererProps,
+    type SidebarRendererProps,
     useUICapability,
     useUIState,
     useItemRenderer,
@@ -11,7 +11,7 @@
 
   type BottomSheetHeight = 'half' | 'full';
 
-  interface Props extends PanelRendererProps {}
+  interface Props extends SidebarRendererProps {}
 
   let { schema, documentId, isOpen, onClose }: Props = $props();
 
@@ -41,9 +41,9 @@
   const resolvedActiveTabId = $derived.by(() => {
     if (schema.content.type !== 'tabs') return null;
     const availableTabs = schema.content.tabs ?? [];
-    const stateActive = uiState?.state?.panelTabs?.[schema.id];
+    const stateActive = uiState?.state?.sidebarTabs?.[schema.id];
     if (stateActive) return stateActive;
-    const scopeActive = scope?.getPanelTab?.(schema.id);
+    const scopeActive = scope?.getSidebarTab?.(schema.id);
     if (scopeActive) return scopeActive;
     return stateActive ?? schema.content.defaultTab ?? availableTabs[0]?.id ?? null;
   });
@@ -72,7 +72,7 @@
     localActiveTabId = tabId;
 
     if (scope) {
-      scope.setPanelTab(schema.id, tabId);
+      scope.setSidebarTab(schema.id, tabId);
     }
   }
 
@@ -195,9 +195,7 @@
 </script>
 
 {#if isOpen}
-  {#if schema.type !== 'sidebar'}
-    <div>Unsupported panel type: {schema.type}</div>
-  {:else if isMobile}
+  {#if isMobile}
     {@const heightClass = sheetHeight === 'full' ? 'h-[100vh]' : 'h-[50vh]'}
     {@const dragOffset = isDragging ? Math.max(0, currentY - startY) : 0}
 

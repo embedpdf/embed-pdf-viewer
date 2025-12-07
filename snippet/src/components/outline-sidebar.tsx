@@ -4,6 +4,9 @@ import { useBookmarkCapability } from '@embedpdf/plugin-bookmark/preact';
 import { useScrollCapability } from '@embedpdf/plugin-scroll/preact';
 import { PdfBookmarkObject, PdfZoomMode, PdfErrorCode, ignore } from '@embedpdf/models';
 import { useDocumentState } from '@embedpdf/core/preact';
+import { Icon } from './ui/icon';
+import { ChevronDownIcon } from './icons/chevron-down';
+import { ChevronRightIcon } from './icons/chevron-right';
 
 type OutlineSidebarProps = {
   documentId: string;
@@ -102,9 +105,9 @@ export function OutlineSidebar({ documentId }: OutlineSidebarProps) {
               className="flex h-4 w-4 items-center justify-center"
             >
               {isExpanded ? (
-                <Icon.chevronDownIcon className="h-3 w-3" />
+                <ChevronDownIcon className="h-3 w-3" />
               ) : (
-                <Icon.chevronRightIcon className="h-3 w-3" />
+                <ChevronRightIcon className="h-3 w-3" />
               )}
             </button>
           )}
@@ -133,17 +136,21 @@ export function OutlineSidebar({ documentId }: OutlineSidebarProps) {
 
   if (bookmarks.length === 0) {
     return (
-      <div className="flex h-full flex-col gap-3 p-4 text-sm text-gray-600">
-        <div className="font-medium text-gray-900">Outline</div>
-        <p>No outline available for this document.</p>
+      <div className="flex h-full items-center justify-center p-6">
+        <div className="text-center text-gray-500">
+          <div className="text-sm">No outline available</div>
+          <div className="mt-1 text-xs">This document doesn't contain bookmarks</div>
+        </div>
       </div>
     );
   }
 
   return (
-    <div className="flex h-full flex-col overflow-y-auto">
-      <div className="p-2">
-        {bookmarks.map((bookmark, index) => renderBookmark(bookmark, index))}
+    <div className="flex h-full flex-col bg-white">
+      <div className="flex-1 overflow-y-auto">
+        <div className="outline-tree">
+          {bookmarks.map((bookmark, index) => renderBookmark(bookmark, index))}
+        </div>
       </div>
     </div>
   );

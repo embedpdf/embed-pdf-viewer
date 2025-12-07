@@ -396,19 +396,24 @@ export class ViewportPlugin extends BasePlugin<
   private scrollTo(pos: ScrollToPayload, documentId?: string): void {
     const id = documentId ?? this.getActiveDocumentId();
     const viewport = this.getViewportState(id);
-    const { x, y, center, behavior = 'auto' } = pos;
+    const { x, y, alignX, alignY, behavior = 'auto' } = pos;
 
     if (behavior === 'smooth') {
       this.dispatch(setSmoothScrollActivity(id, true));
     }
 
+    const metrics = viewport.viewportMetrics;
     let finalX = x;
     let finalY = y;
 
-    if (center) {
-      const metrics = viewport.viewportMetrics;
-      finalX = x - metrics.clientWidth / 2;
-      finalY = y - metrics.clientHeight / 2;
+    // Handle percentage-based alignment (0-100)
+    // alignX/alignY take precedence over deprecated center
+    if (alignX !== undefined) {
+      finalX = x - metrics.clientWidth * (alignX / 100);
+    }
+
+    if (alignY !== undefined) {
+      finalY = y - metrics.clientHeight * (alignY / 100);
     }
 
     const emitter = this.scrollRequests$.get(id);

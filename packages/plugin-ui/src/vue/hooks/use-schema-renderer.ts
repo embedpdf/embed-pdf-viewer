@@ -5,7 +5,7 @@ import { useRenderers } from '../registries/renderers-registry';
 /**
  * High-level composable for rendering UI from schema
  *
- * Provides simple functions to render toolbars and panels by placement+slot.
+ * Provides simple functions to render toolbars, sidebars, and modals.
  * Always passes isOpen state to renderers so they can control animations.
  *
  * Automatically subscribes to UI state changes for the given document.
@@ -70,9 +70,9 @@ export function useSchemaRenderer(documentId: MaybeRefOrGetter<string>) {
     },
 
     /**
-     * Render a panel by placement and slot
+     * Render a sidebar by placement and slot
      *
-     * ALWAYS renders (when panel exists in slot) with isOpen state.
+     * ALWAYS renders (when sidebar exists in slot) with isOpen state.
      * Your renderer controls whether to display or animate.
      *
      * @param placement - 'left' | 'right' | 'top' | 'bottom'
@@ -80,41 +80,93 @@ export function useSchemaRenderer(documentId: MaybeRefOrGetter<string>) {
      *
      * @example
      * ```vue
-     * <component :is="renderPanel('left', 'main')" />
-     * <component :is="renderPanel('right', 'main')" />
+     * <component :is="renderSidebar('left', 'main')" />
+     * <component :is="renderSidebar('right', 'main')" />
      * ```
      */
-    renderPanel: (placement: 'left' | 'right' | 'top' | 'bottom', slot: string): VNode | null => {
+    renderSidebar: (placement: 'left' | 'right' | 'top' | 'bottom', slot: string): VNode | null => {
       const schema = provides.value?.getSchema();
 
       if (!schema || !provides.value || !uiState.value) return null;
 
       const slotKey = `${placement}-${slot}`;
-      const panelSlot = uiState.value.activePanels[slotKey];
+      const sidebarSlot = uiState.value.activeSidebars[slotKey];
 
-      // If no panel in this slot, nothing to render
-      if (!panelSlot) return null;
+      // If no sidebar in this slot, nothing to render
+      if (!sidebarSlot) return null;
 
-      const panelSchema = schema.panels[panelSlot.panelId];
-      if (!panelSchema) {
-        console.warn(`Panel "${panelSlot.panelId}" not found in schema`);
+      const sidebarSchema = schema.sidebars?.[sidebarSlot.sidebarId];
+      if (!sidebarSchema) {
+        console.warn(`Sidebar "${sidebarSlot.sidebarId}" not found in schema`);
         return null;
       }
 
       const handleClose = () => {
-        provides.value?.forDocument(toValue(documentId)).closePanelSlot(placement, slot);
+        provides.value?.forDocument(toValue(documentId)).closeSidebarSlot(placement, slot);
       };
 
-      const PanelRenderer = renderers.panel;
+      const SidebarRenderer = renderers.sidebar;
 
       // ALWAYS render, pass isOpen state
-      // Your renderer decides whether to return null or animate
-      return h(PanelRenderer, {
-        key: panelSlot.panelId,
-        schema: panelSchema,
+      return h(SidebarRenderer, {
+        key: sidebarSlot.sidebarId,
+        schema: sidebarSchema,
         documentId: toValue(documentId),
-        isOpen: panelSlot.isOpen,
+        isOpen: sidebarSlot.isOpen,
         onClose: handleClose,
+      });
+    },
+
+    /**
+     * Render the active modal (if any)
+     *
+     * Only one modal can be active at a time.
+     * Modals are defined in schema.modals.
+     *
+     * Supports animation lifecycle:
+     * - isOpen: true = visible
+     * - isOpen: false = animate out (modal still rendered)
+     * - onExited called after animation → modal removed
+     *
+     * @example
+     * ```vue
+     * <component :is="renderModal()" />
+     * ```
+     */
+    renderModal: (): VNode | null => {
+      const schema = provides.value?.getSchema();
+
+      if (!schema || !provides.value || !uiState.value?.activeModal) return null;
+
+      const { modalId, isOpen } = uiState.value.activeModal;
+
+      const modalSchema = schema.modals?.[modalId];
+      if (!modalSchema) {
+        console.warn(`Modal "${modalId}" not found in schema`);
+        return null;
+      }
+
+      const handleClose = () => {
+        provides.value?.forDocument(toValue(documentId)).closeModal();
+      };
+
+      const handleExited = () => {
+        provides.value?.forDocument(toValue(documentId)).clearModal();
+      };
+
+      const ModalRenderer = renderers.modal;
+      if (!ModalRenderer) {
+        console.warn('No modal renderer registered');
+        return null;
+      }
+
+      return h(ModalRenderer, {
+        key: modalId,
+        schema: modalSchema,
+        documentId: toValue(documentId),
+        isOpen,
+        onClose: handleClose,
+        onExited: handleExited,
       });
     },
 
@@ -136,20 +188,56 @@ export function useSchemaRenderer(documentId: MaybeRefOrGetter<string>) {
     },
 
     /**
-     * Helper: Get all active panels for this document
+     * Helper: Get all active sidebars for this document
      * Useful for batch rendering or debugging
      */
-    getActivePanels: () => {
+    getActiveSidebars: () => {
       if (!uiState.value) return [];
-      return Object.entries(uiState.value.activePanels).map(([slotKey, panelSlot]) => {
+      return Object.entries(uiState.value.activeSidebars).map(([slotKey, sidebarSlot]) => {
         const [placement, slot] = slotKey.split('-');
         return {
           placement,
           slot,
-          panelId: panelSlot.panelId,
-          isOpen: panelSlot.isOpen,
+          sidebarId: sidebarSlot.sidebarId,
+          isOpen: sidebarSlot.isOpen,
         };
       });
+    },
+
+    /**
+     * Render all enabled overlays
+     *
+     * Overlays are floating components positioned over the document content.
+     * Unlike modals, multiple overlays can be visible and they don't block interaction.
+     *
+     * @example
+     * ```vue
+     * <div class="relative">
+     *   <slot />
+     *   <component :is="renderOverlays()" />
+     * </div>
+     * ```
+     */
+    renderOverlays: (): VNode[] | null => {
+      const schema = provides.value?.getSchema();
+
+      if (!schema?.overlays || !provides.value) return null;
+
+      const OverlayRenderer = renderers.overlay;
+      if (!OverlayRenderer) {
+        return null;
+      }
+
+      const overlays = Object.values(schema.overlays);
+      if (overlays.length === 0) return null;
+
+      return overlays.map((overlaySchema) =>
+        h(OverlayRenderer, {
+          key: overlaySchema.id,
+          schema: overlaySchema,
+          documentId: toValue(documentId),
+        }),
+      );
     },
   };
 }

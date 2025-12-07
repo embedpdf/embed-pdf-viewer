@@ -32,11 +32,19 @@ export interface ToolbarSlotState {
 }
 
 /**
- * Panel slot state
+ * Sidebar slot state
  */
-export interface PanelSlotState {
-  panelId: string;
+export interface SidebarSlotState {
+  sidebarId: string;
   isOpen: boolean;
+}
+
+/**
+ * Modal slot state - supports animation lifecycle
+ */
+export interface ModalSlotState {
+  modalId: string;
+  isOpen: boolean; // false = animating out, true = visible
 }
 
 export interface UIDocumentState {
@@ -44,18 +52,18 @@ export interface UIDocumentState {
   // `${placement}-${slot}` -> { toolbarId, isOpen }
   activeToolbars: Record<string, ToolbarSlotState>;
 
-  // Active panel per slot
-  // `${placement}-${slot}` -> { panelId, isOpen }
-  activePanels: Record<string, PanelSlotState>;
+  // Active sidebar per slot
+  // `${placement}-${slot}` -> { sidebarId, isOpen }
+  activeSidebars: Record<string, SidebarSlotState>;
 
-  // Active modal (only one globally)
-  activeModal: string | null;
+  // Active modal (only one globally, supports animation lifecycle)
+  activeModal: ModalSlotState | null;
 
   // Open menus with metadata
   openMenus: Record<string, OpenMenuState>;
 
-  // Active tabs within panels
-  panelTabs: Record<string, string>; // panelId -> activeTabId
+  // Active tabs within sidebars
+  sidebarTabs: Record<string, string>; // sidebarId -> activeTabId
 }
 
 /**
@@ -104,18 +112,19 @@ export interface ToolbarChangedEvent extends ToolbarChangedData {
   documentId: string;
 }
 
-export interface PanelChangedData {
+export interface SidebarChangedData {
   placement: string;
   slot: string;
-  panelId: string;
+  sidebarId: string;
 }
 
-export interface PanelChangedEvent extends PanelChangedData {
+export interface SidebarChangedEvent extends SidebarChangedData {
   documentId: string;
 }
 
 export interface ModalChangedData {
   modalId: string | null;
+  isOpen: boolean;
 }
 
 export interface ModalChangedEvent extends ModalChangedData {
@@ -148,19 +157,21 @@ export interface UIScope {
   closeToolbarSlot(placement: string, slot: string): void;
   isToolbarOpen(placement: string, slot: string, toolbarId?: string): boolean;
 
-  // Panels
-  setActivePanel(placement: string, slot: string, panelId: string, activeTab?: string): void;
-  getActivePanel(placement: string, slot: string): string | null;
-  closePanelSlot(placement: string, slot: string): void;
-  togglePanel(placement: string, slot: string, panelId: string, activeTab?: string): void;
-  setPanelTab(panelId: string, tabId: string): void;
-  getPanelTab(panelId: string): string | null;
-  isPanelOpen(placement: string, slot: string, panelId?: string): boolean;
+  // Sidebars
+  setActiveSidebar(placement: string, slot: string, sidebarId: string, activeTab?: string): void;
+  getActiveSidebar(placement: string, slot: string): string | null;
+  closeSidebarSlot(placement: string, slot: string): void;
+  toggleSidebar(placement: string, slot: string, sidebarId: string, activeTab?: string): void;
+  setSidebarTab(sidebarId: string, tabId: string): void;
+  getSidebarTab(sidebarId: string): string | null;
+  isSidebarOpen(placement: string, slot: string, sidebarId?: string): boolean;
 
-  // Modals
+  // Modals (with animation lifecycle support)
   openModal(modalId: string): void;
   closeModal(): void;
-  getActiveModal(): string | null;
+  clearModal(): void; // Called after exit animation completes
+  getActiveModal(): ModalSlotState | null;
+  isModalOpen(): boolean;
 
   // Menus
   openMenu(menuId: string, triggeredByCommandId: string, triggeredByItemId: string): void;
@@ -178,25 +189,25 @@ export interface UIScope {
 
   // Events
   onToolbarChanged: EventHook<{ placement: string; slot: string; toolbarId: string }>;
-  onPanelChanged: EventHook<{ placement: string; slot: string; panelId: string }>;
-  onModalChanged: EventHook<{ modalId: string | null }>;
+  onSidebarChanged: EventHook<{ placement: string; slot: string; sidebarId: string }>;
+  onModalChanged: EventHook<{ modalId: string | null; isOpen: boolean }>;
   onMenuChanged: EventHook<{ menuId: string; isOpen: boolean }>;
 }
 
 export interface UICapability {
   // Active document operations
   setActiveToolbar(placement: string, slot: string, toolbarId: string, documentId?: string): void;
-  setActivePanel(
+  setActiveSidebar(
     placement: string,
     slot: string,
-    panelId: string,
+    sidebarId: string,
     documentId?: string,
     activeTab?: string,
   ): void;
-  togglePanel(
+  toggleSidebar(
     placement: string,
     slot: string,
-    panelId: string,
+    sidebarId: string,
     documentId?: string,
     activeTab?: string,
   ): void;
@@ -236,13 +247,13 @@ export interface UICapability {
     slot: string;
     toolbarId: string;
   }>;
-  onPanelChanged: EventHook<{
+  onSidebarChanged: EventHook<{
     documentId: string;
     placement: string;
     slot: string;
-    panelId: string;
+    sidebarId: string;
   }>;
-  onModalChanged: EventHook<{ documentId: string; modalId: string | null }>;
+  onModalChanged: EventHook<{ documentId: string; modalId: string | null; isOpen: boolean }>;
   onMenuChanged: EventHook<{ documentId: string; menuId: string; isOpen: boolean }>;
   onCategoryChanged: EventHook<{ disabledCategories: string[] }>;
 }

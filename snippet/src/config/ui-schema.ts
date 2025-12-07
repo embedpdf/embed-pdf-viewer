@@ -888,12 +888,11 @@ export const viewerUISchema: UISchema = {
   },
 
   // ─────────────────────────────────────────────────────────
-  // Panels (Sidebars)
+  // Sidebars
   // ─────────────────────────────────────────────────────────
-  panels: {
+  sidebars: {
     'sidebar-panel': {
       id: 'sidebar-panel',
-      type: 'sidebar',
       position: {
         placement: 'left',
         slot: 'main',
@@ -925,7 +924,6 @@ export const viewerUISchema: UISchema = {
 
     'annotation-panel': {
       id: 'annotation-panel',
-      type: 'sidebar',
       position: {
         placement: 'left',
         slot: 'main',
@@ -942,7 +940,6 @@ export const viewerUISchema: UISchema = {
 
     'search-panel': {
       id: 'search-panel',
-      type: 'sidebar',
       position: {
         placement: 'right',
         slot: 'main',
@@ -959,7 +956,6 @@ export const viewerUISchema: UISchema = {
 
     'comment-panel': {
       id: 'comment-panel',
-      type: 'sidebar',
       position: {
         placement: 'right',
         slot: 'main',
@@ -972,6 +968,42 @@ export const viewerUISchema: UISchema = {
       width: '250px',
       collapsible: true,
       defaultOpen: false,
+    },
+  },
+
+  // ─────────────────────────────────────────────────────────
+  // Modals
+  // ─────────────────────────────────────────────────────────
+  modals: {
+    'print-modal': {
+      id: 'print-modal',
+      content: {
+        type: 'component',
+        componentId: 'print-modal',
+      },
+      maxWidth: '28rem',
+      closeOnClickOutside: true,
+      closeOnEscape: true,
+    },
+  },
+
+  // ─────────────────────────────────────────────────────────
+  // Overlays
+  // ─────────────────────────────────────────────────────────
+  overlays: {
+    'page-controls': {
+      id: 'page-controls',
+      position: {
+        anchor: 'bottom-center',
+        offset: {
+          bottom: '0.5rem',
+        },
+      },
+      content: {
+        type: 'component',
+        componentId: 'page-controls',
+      },
+      defaultEnabled: true,
     },
   },
 
@@ -1055,6 +1087,13 @@ export const viewerUISchema: UISchema = {
           commandId: 'annotation:add-squiggly',
           variant: 'icon',
           categories: ['annotation'],
+        },
+        {
+          type: 'command-button',
+          id: 'redact-text',
+          commandId: 'redaction:redact-text',
+          variant: 'icon',
+          categories: ['redaction'],
         },
       ],
     },

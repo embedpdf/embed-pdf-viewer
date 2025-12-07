@@ -1,5 +1,5 @@
 import { useCapability, usePlugin } from '@embedpdf/core/svelte';
-import { UIPlugin, UIDocumentState, UISchema, UIScope } from '@embedpdf/plugin-ui';
+import { UIPlugin, UIDocumentState, UIScope } from '@embedpdf/plugin-ui';
 
 /**
  * Hook to get the raw UI plugin instance.
@@ -52,7 +52,7 @@ export const useUIState = (getDocumentId: () => string | null): UseUIStateReturn
     const unsubToolbar = scope.onToolbarChanged(() => {
       state = scope.getState();
     });
-    const unsubPanel = scope.onPanelChanged(() => {
+    const unsubSidebar = scope.onSidebarChanged(() => {
       state = scope.getState();
     });
     const unsubModal = scope.onModalChanged(() => {
@@ -64,7 +64,7 @@ export const useUIState = (getDocumentId: () => string | null): UseUIStateReturn
 
     return () => {
       unsubToolbar();
-      unsubPanel();
+      unsubSidebar();
       unsubModal();
       unsubMenu();
     };

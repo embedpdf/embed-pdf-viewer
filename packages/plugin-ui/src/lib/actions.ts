@@ -5,14 +5,23 @@ export const INIT_UI_STATE = 'UI/INIT_STATE';
 export const CLEANUP_UI_STATE = 'UI/CLEANUP_STATE';
 export const SET_ACTIVE_TOOLBAR = 'UI/SET_ACTIVE_TOOLBAR';
 export const CLOSE_TOOLBAR_SLOT = 'UI/CLOSE_TOOLBAR_SLOT';
-export const SET_ACTIVE_PANEL = 'UI/SET_ACTIVE_PANEL';
-export const CLOSE_PANEL_SLOT = 'UI/CLOSE_PANEL_SLOT';
-export const SET_PANEL_TAB = 'UI/SET_PANEL_TAB';
+
+// Sidebar actions
+export const SET_ACTIVE_SIDEBAR = 'UI/SET_ACTIVE_SIDEBAR';
+export const CLOSE_SIDEBAR_SLOT = 'UI/CLOSE_SIDEBAR_SLOT';
+export const SET_SIDEBAR_TAB = 'UI/SET_SIDEBAR_TAB';
+
+// Modal actions (with animation lifecycle)
 export const OPEN_MODAL = 'UI/OPEN_MODAL';
 export const CLOSE_MODAL = 'UI/CLOSE_MODAL';
+export const CLEAR_MODAL = 'UI/CLEAR_MODAL';
+
+// Menu actions
 export const OPEN_MENU = 'UI/OPEN_MENU';
 export const CLOSE_MENU = 'UI/CLOSE_MENU';
 export const CLOSE_ALL_MENUS = 'UI/CLOSE_ALL_MENUS';
+
+// Category actions
 export const SET_DISABLED_CATEGORIES = 'UI/SET_DISABLED_CATEGORIES';
 
 export interface InitUIStateAction extends Action {
@@ -35,27 +44,29 @@ export interface CloseToolbarSlotAction extends Action {
   payload: { documentId: string; placement: string; slot: string };
 }
 
-export interface SetActivePanelAction extends Action {
-  type: typeof SET_ACTIVE_PANEL;
+// Sidebar action types
+export interface SetActiveSidebarAction extends Action {
+  type: typeof SET_ACTIVE_SIDEBAR;
   payload: {
     documentId: string;
     placement: string;
     slot: string;
-    panelId: string;
+    sidebarId: string;
     activeTab?: string;
   };
 }
 
-export interface ClosePanelSlotAction extends Action {
-  type: typeof CLOSE_PANEL_SLOT;
+export interface CloseSidebarSlotAction extends Action {
+  type: typeof CLOSE_SIDEBAR_SLOT;
   payload: { documentId: string; placement: string; slot: string };
 }
 
-export interface SetPanelTabAction extends Action {
-  type: typeof SET_PANEL_TAB;
-  payload: { documentId: string; panelId: string; tabId: string };
+export interface SetSidebarTabAction extends Action {
+  type: typeof SET_SIDEBAR_TAB;
+  payload: { documentId: string; sidebarId: string; tabId: string };
 }
 
+// Modal action types (with animation lifecycle)
 export interface OpenModalAction extends Action {
   type: typeof OPEN_MODAL;
   payload: { documentId: string; modalId: string };
@@ -63,6 +74,11 @@ export interface OpenModalAction extends Action {
 
 export interface CloseModalAction extends Action {
   type: typeof CLOSE_MODAL;
+  payload: { documentId: string };
+}
+
+export interface ClearModalAction extends Action {
+  type: typeof CLEAR_MODAL;
   payload: { documentId: string };
 }
 
@@ -91,11 +107,12 @@ export type UIAction =
   | CleanupUIStateAction
   | SetActiveToolbarAction
   | CloseToolbarSlotAction
-  | SetActivePanelAction
-  | ClosePanelSlotAction
-  | SetPanelTabAction
+  | SetActiveSidebarAction
+  | CloseSidebarSlotAction
+  | SetSidebarTabAction
   | OpenModalAction
   | CloseModalAction
+  | ClearModalAction
   | OpenMenuAction
   | CloseMenuAction
   | CloseAllMenusAction
@@ -131,35 +148,37 @@ export const closeToolbarSlot = (
   payload: { documentId, placement, slot },
 });
 
-export const setActivePanel = (
+// Sidebar action creators
+export const setActiveSidebar = (
   documentId: string,
   placement: string,
   slot: string,
-  panelId: string,
+  sidebarId: string,
   activeTab?: string,
-): SetActivePanelAction => ({
-  type: SET_ACTIVE_PANEL,
-  payload: { documentId, placement, slot, panelId, activeTab },
+): SetActiveSidebarAction => ({
+  type: SET_ACTIVE_SIDEBAR,
+  payload: { documentId, placement, slot, sidebarId, activeTab },
 });
 
-export const closePanelSlot = (
+export const closeSidebarSlot = (
   documentId: string,
   placement: string,
   slot: string,
-): ClosePanelSlotAction => ({
-  type: CLOSE_PANEL_SLOT,
+): CloseSidebarSlotAction => ({
+  type: CLOSE_SIDEBAR_SLOT,
   payload: { documentId, placement, slot },
 });
 
-export const setPanelTab = (
+export const setSidebarTab = (
   documentId: string,
-  panelId: string,
+  sidebarId: string,
   tabId: string,
-): SetPanelTabAction => ({
-  type: SET_PANEL_TAB,
-  payload: { documentId, panelId, tabId },
+): SetSidebarTabAction => ({
+  type: SET_SIDEBAR_TAB,
+  payload: { documentId, sidebarId, tabId },
 });
 
+// Modal action creators (with animation lifecycle)
 export const openModal = (documentId: string, modalId: string): OpenModalAction => ({
   type: OPEN_MODAL,
   payload: { documentId, modalId },
@@ -167,6 +186,11 @@ export const openModal = (documentId: string, modalId: string): OpenModalAction 
 
 export const closeModal = (documentId: string): CloseModalAction => ({
   type: CLOSE_MODAL,
+  payload: { documentId },
+});
+
+export const clearModal = (documentId: string): ClearModalAction => ({
+  type: CLEAR_MODAL,
   payload: { documentId },
 });
 
