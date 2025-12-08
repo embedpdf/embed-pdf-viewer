@@ -50,7 +50,8 @@ const ScrollToolbar = ({ documentId }: { documentId: string }) => {
       y: metrics.scrollHeight / 2,
       x: 0,
       behavior: 'smooth',
-      center: true,
+      alignX: 50,
+      alignY: 50,
     })
   }
 
