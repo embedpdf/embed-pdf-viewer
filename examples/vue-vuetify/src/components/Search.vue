@@ -72,7 +72,8 @@ const scrollToItem = (index: number) => {
   scroll.value?.scrollToPage({
     pageNumber: item.pageIndex + 1,
     pageCoordinates: minCoordinates,
-    center: true,
+    alignX: 50,
+    alignY: 50,
   });
 };
 
