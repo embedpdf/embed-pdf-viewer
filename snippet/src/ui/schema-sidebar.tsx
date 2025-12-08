@@ -30,11 +30,18 @@ type DrawerState = 'closed' | 'half' | 'full';
  * On small containers: Bottom drawer with drag-to-resize
  */
 export function SchemaSidebar({ schema, documentId, isOpen, onClose }: SidebarRendererProps) {
-  // Start with null to indicate "not yet measured" - prevents flickering
-  const [isSmallContainer, setIsSmallContainer] = useState<boolean | null>(null);
   const { getContainer } = useUIContainer();
 
-  // Watch for container size changes
+  // Get initial size synchronously to prevent flicker on mount
+  const getInitialSize = () => {
+    const container = getContainer();
+    if (!container) return false; // Default to desktop if container not ready
+    return container.clientWidth < MOBILE_BREAKPOINT;
+  };
+
+  const [isSmallContainer, setIsSmallContainer] = useState<boolean>(getInitialSize);
+
+  // Watch for container size changes (resize only, not initial)
   useEffect(() => {
     const container = getContainer();
     if (!container) return;
@@ -44,15 +51,10 @@ export function SchemaSidebar({ schema, documentId, isOpen, onClose }: SidebarRe
       setIsSmallContainer(width < MOBILE_BREAKPOINT);
     };
 
-    checkContainerSize();
-
     const observer = new ResizeObserver(checkContainerSize);
     observer.observe(container);
     return () => observer.disconnect();
   }, [getContainer]);
-
-  // Don't render until we know the container size (prevents flickering)
-  if (isSmallContainer === null) return null;
 
   const { position, content, width } = schema;
   const { renderCustomComponent } = useItemRenderer();
@@ -298,7 +300,13 @@ function BottomDrawer({
   const handleTouchMove = useCallback(
     (e: TouchEvent) => {
       if (isDragging) {
-        e.preventDefault();
+        // Fix: Only prevent default if the browser allows it
+        if (e.cancelable) {
+          e.preventDefault();
+        }
+
+        // We still want to handle the drag logic even if we couldn't preventDefault
+        // (though usually touch-action: none prevents us getting here in a scroll state)
         handleDragMove(e.touches[0].clientY);
       }
     },
