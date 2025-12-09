@@ -20,6 +20,9 @@ export {
   createTheme,
 } from './config/theme';
 
+// Export the container class for typing
+export { EmbedPdfContainer };
+
 type ContainerConfig = PDFViewerConfig & {
   type: 'container';
   target: Element;
@@ -27,26 +30,55 @@ type ContainerConfig = PDFViewerConfig & {
 
 customElements.define('embedpdf-container', EmbedPdfContainer);
 
-function initContainer(config: ContainerConfig) {
+/**
+ * Initialize the EmbedPDF viewer
+ *
+ * @returns The EmbedPdfContainer element, which provides:
+ * - `.registry` - Promise that resolves to the PluginRegistry
+ * - `.setTheme(theme)` - Change the theme at runtime
+ * - `.activeTheme` - Get the current theme object
+ * - `.activeColorScheme` - Get 'light' or 'dark'
+ * - `.themePreference` - Get the preference ('light', 'dark', or 'system')
+ * - Event: 'themechange' - Fired when theme changes
+ *
+ * @example
+ * ```ts
+ * const viewer = EmbedPDF.init({
+ *   type: 'container',
+ *   target: document.getElementById('pdf-viewer'),
+ *   src: '/document.pdf',
+ *   theme: { preference: 'system' }
+ * });
+ *
+ * // Access registry
+ * const registry = await viewer.registry;
+ *
+ * // Change theme
+ * viewer.setTheme('dark');
+ * viewer.setTheme({ preference: 'light' });
+ *
+ * // Listen for theme changes
+ * viewer.addEventListener('themechange', (e) => {
+ *   console.log('Theme changed:', e.detail.colorScheme);
+ * });
+ * ```
+ */
+function initContainer(config: ContainerConfig): EmbedPdfContainer {
   const { type, target, ...viewerConfig } = config;
   const embedPdfElement = document.createElement('embedpdf-container') as EmbedPdfContainer;
   embedPdfElement.config = viewerConfig;
   config.target.appendChild(embedPdfElement);
 
-  return embedPdfElement.registry;
+  return embedPdfElement;
 }
-
-export type ReturnContainerType = ReturnType<typeof initContainer>;
 
 // Export types for users
 export type { PluginConfigs, ScrollStrategy, ZoomMode, SpreadMode, Rotation };
 
 export default {
-  init: (
-    config: ContainerConfig,
-  ): ReturnType<typeof initContainer> | ReturnContainerType | undefined => {
+  init: (config: ContainerConfig): EmbedPdfContainer | undefined => {
     if (config.type === 'container') {
-      return initContainer(config as ContainerConfig);
+      return initContainer(config);
     }
   },
 };
