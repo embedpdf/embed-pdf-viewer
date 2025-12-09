@@ -1332,6 +1332,10 @@ export interface PdfWidgetAnnoField {
    * options of field
    */
   options: PdfWidgetAnnoOption[];
+  /**
+   * export value of field, associated with check box or radio button
+   */
+  exportValue?: string;
 }
 
 /**
