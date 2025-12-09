@@ -38,12 +38,12 @@ export function ThumbnailsSidebar({ documentId, onClose }: ThumbnailsSidebarProp
                 style={{
                   width: m.width,
                   height: m.height,
-                  border: `2px solid ${state.currentPage === m.pageIndex + 1 ? '#3b82f6' : '#d1d5db'}`,
+                  border: `2px solid ${state.currentPage === m.pageIndex + 1 ? 'var(--ep-accent-primary)' : 'var(--ep-border-default)'}`,
                   borderRadius: '4px',
                   overflow: 'hidden',
                   boxShadow:
                     state.currentPage === m.pageIndex + 1
-                      ? '0 0 0 2px rgba(59, 130, 246, 0.2)'
+                      ? '0 0 0 2px var(--ep-interactive-focus-ring)'
                       : 'none',
                 }}
               >
@@ -65,7 +65,7 @@ export function ThumbnailsSidebar({ documentId, onClose }: ThumbnailsSidebarProp
                   marginTop: '4px',
                 }}
               >
-                <span className="text-xs text-gray-600">{m.pageIndex + 1}</span>
+                <span className="text-fg-secondary text-xs">{m.pageIndex + 1}</span>
               </div>
             </div>
           )}

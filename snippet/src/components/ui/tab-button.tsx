@@ -21,10 +21,10 @@ export function TabButton({
 }: TabButtonProps) {
   // Base classes - twMerge will handle conflicts (rounded-md vs rounded-none, p-[5px] vs px-2 py-1)
   const baseClasses =
-    'flex h-[32px] w-auto min-w-[32px] items-center justify-center rounded-md p-[5px] transition-colors hover:bg-gray-100 hover:ring hover:ring-[#1a466b] cursor-pointer rounded-none px-2 py-1 text-sm hover:bg-transparent border-b-2 hover:border-b-gray-500 hover:ring-transparent';
+    'flex h-[32px] w-auto min-w-[32px] items-center justify-center rounded-md p-[5px] transition-colors hover:bg-interactive-hover hover:ring hover:ring-accent cursor-pointer rounded-none px-2 py-1 text-sm hover:bg-transparent border-b-2 hover:border-b-fg-muted hover:ring-transparent';
 
   const activeClasses = active
-    ? 'border-b-blue-500 text-blue-500 hover:border-b-blue-500'
+    ? 'border-b-accent text-accent hover:border-b-accent'
     : 'border-b-transparent';
 
   const disabledClasses = disabled ? 'cursor-not-allowed opacity-50' : '';

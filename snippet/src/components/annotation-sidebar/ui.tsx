@@ -1,4 +1,4 @@
-import { Fragment, h } from 'preact';
+import { Fragment, h, ComponentChildren } from 'preact';
 import { useState, useEffect, useRef } from 'preact/hooks';
 
 import {
@@ -78,16 +78,12 @@ const GenericSelect = <T,>({
       {/* Trigger Button */}
       <button
         type="button"
-        class={`flex w-full items-center justify-between gap-2 rounded border border-gray-300 bg-white ${triggerClass}`}
+        class={`border-border-default bg-bg-input flex w-full items-center justify-between gap-2 rounded border ${triggerClass}`}
         onClick={() => setOpen((o) => !o)}
       >
         {renderValue(value)}
         {/* Chevron */}
-        <svg
-          class="h-4 w-4 text-gray-600 dark:text-gray-300"
-          viewBox="0 0 20 20"
-          fill="currentColor"
-        >
+        <svg class="text-fg-secondary h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
           <path
             fillRule="evenodd"
             d="M5.23 7.21a.75.75 0 011.06.02L10 10.94l3.71-3.71a.75.75 0 111.06 1.06l-4.24 4.24a.75.75 0 01-1.06 0L5.21 8.29a.75.75 0 01.02-1.08z"
@@ -98,7 +94,7 @@ const GenericSelect = <T,>({
 
       {/* Dropdown Panel */}
       {open && (
-        <div class="absolute z-10 mt-1 max-h-60 w-full overflow-y-auto rounded border bg-white p-1 shadow-lg">
+        <div class="border-border-default bg-bg-elevated absolute z-10 mt-1 max-h-60 w-full overflow-y-auto rounded border p-1 shadow-lg">
           {options.map((option) => {
             const isSelected = getOptionKey(option) === getOptionKey(value);
             return (
@@ -106,8 +102,8 @@ const GenericSelect = <T,>({
                 // @ts-ignore
                 ref={isSelected ? selectedItemRef : null}
                 key={getOptionKey(option)}
-                class={`block w-full rounded text-left hover:bg-gray-100 ${
-                  isSelected ? 'bg-gray-100 dark:bg-gray-700' : ''
+                class={`hover:bg-interactive-hover block w-full rounded text-left ${
+                  isSelected ? 'bg-interactive-hover' : ''
                 }`}
                 onClick={() => {
                   onChange(option);
@@ -123,6 +119,46 @@ const GenericSelect = <T,>({
     </div>
   );
 };
+
+/* * ==================================================================
+ * Shared Layout Components
+ * ==================================================================
+ */
+
+/**
+ * Section label for annotation property groups
+ */
+export const SectionLabel = ({
+  children,
+  className = '',
+}: {
+  children: ComponentChildren;
+  className?: string;
+}) => (
+  <label class={`text-fg-primary mb-2 block text-sm font-medium ${className}`}>{children}</label>
+);
+
+/**
+ * Value display for showing current values (e.g., "50%", "5px")
+ */
+export const ValueDisplay = ({
+  children,
+  className = '',
+}: {
+  children: ComponentChildren;
+  className?: string;
+}) => <span class={`text-fg-muted text-xs ${className}`}>{children}</span>;
+
+/**
+ * Section wrapper for consistent spacing
+ */
+export const Section = ({
+  children,
+  className = '',
+}: {
+  children: ComponentChildren;
+  className?: string;
+}) => <section class={`mb-6 ${className}`}>{children}</section>;
 
 /* * ==================================================================
  * Original Components (Unchanged)
@@ -145,7 +181,7 @@ export const Slider = ({
 }) => (
   <input
     type="range"
-    class="range-sm mb-2 h-1 w-full cursor-pointer appearance-none rounded-lg bg-gray-200"
+    class="range-sm bg-border-subtle mb-2 h-1 w-full cursor-pointer appearance-none rounded-lg"
     value={value}
     min={min}
     max={max}
@@ -182,8 +218,8 @@ export const ColorSwatch = ({
   return (
     <button
       title={color}
-      class={`h-5 w-5 rounded-full border border-gray-400 ${
-        active ? 'outline outline-2 outline-offset-2 outline-blue-500' : ''
+      class={`border-border-strong h-5 w-5 rounded-full border ${
+        active ? 'outline-accent outline outline-2 outline-offset-2' : ''
       }`}
       style={baseStyle}
       onClick={() => onSelect(color)}
@@ -218,7 +254,7 @@ const renderStrokeSvg = (dash?: number[]) => (
       y2="4"
       style={{
         strokeDasharray: dash?.join(' '),
-        stroke: 'black',
+        stroke: 'currentColor',
         strokeWidth: '2',
       }}
     />
@@ -286,7 +322,7 @@ const LineEndingIcon = ({
   const groupTransform = position === 'start' ? 'rotate(180 40 10)' : '';
 
   return (
-    <svg width="80" height="20" viewBox="0 0 80 20" class="text-black">
+    <svg width="80" height="20" viewBox="0 0 80 20" class="text-fg-primary">
       <g transform={groupTransform}>
         <line x1="4" y1="10" x2={lineEndX} y2="10" stroke="currentColor" stroke-width="1.5" />
         {marker && (
@@ -363,7 +399,7 @@ export const FontSizeInputSelect = ({
       <input
         type="number"
         min="1"
-        class="w-full rounded border border-gray-300 bg-white px-2 py-1 pr-7 text-sm"
+        class="border-border-default bg-bg-input w-full rounded border px-2 py-1 pr-7 text-sm"
         value={value}
         onInput={handleInput}
         onClick={() => setOpen(true)} // Open on click as well
@@ -375,7 +411,7 @@ export const FontSizeInputSelect = ({
         onClick={() => setOpen((o) => !o)}
         tabIndex={-1}
       >
-        <svg class="h-4 w-4 text-gray-600" viewBox="0 0 20 20" fill="currentColor">
+        <svg class="text-fg-secondary h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
           <path
             fill-rule="evenodd"
             d="M5.23 7.21a.75.75 0 011.06.02L10 10.94l3.71-3.71a.75.75 0 111.06 1.06l-4.24 4.24a.75.75 0 01-1.06 0L5.21 8.29a.75.75 0 01.02-1.08z"
@@ -385,7 +421,7 @@ export const FontSizeInputSelect = ({
       </button>
 
       {open && (
-        <div class="absolute z-10 mt-1 max-h-48 w-full overflow-y-auto rounded border bg-white shadow-lg">
+        <div class="border-border-default bg-bg-elevated absolute z-10 mt-1 max-h-48 w-full overflow-y-auto rounded border shadow-lg">
           {options.map((sz) => {
             const isSelected = sz === value;
             return (
@@ -393,8 +429,8 @@ export const FontSizeInputSelect = ({
                 // @ts-ignore
                 ref={isSelected ? selectedItemRef : null}
                 key={sz}
-                class={`block w-full px-2 py-1 text-left text-sm hover:bg-gray-100 ${
-                  isSelected ? 'bg-gray-100' : ''
+                class={`hover:bg-interactive-hover block w-full px-2 py-1 text-left text-sm ${
+                  isSelected ? 'bg-interactive-hover' : ''
                 }`}
                 onClick={() => {
                   onChange(sz);

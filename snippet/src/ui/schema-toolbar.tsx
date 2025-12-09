@@ -8,7 +8,7 @@ import {
 } from '@embedpdf/plugin-ui/preact';
 import { useCommand } from '@embedpdf/plugin-commands/preact';
 import { twMerge } from 'tailwind-merge';
-import { TabButton } from '@/components/ui/TabButton';
+import { TabButton } from '@/components/ui/tab-button';
 import { icons } from '@/components/icons';
 import { CommandButton } from '@/components/command-button';
 
@@ -36,7 +36,7 @@ export function SchemaToolbar({
 
   const isSecondarySlot = schema.position.slot === 'secondary';
   const placementClasses = getPlacementClasses(schema.position.placement);
-  const slotClasses = isSecondarySlot ? 'bg-[#f1f3f5]' : '';
+  const slotClasses = isSecondarySlot ? 'bg-bg-surface-alt' : '';
 
   return (
     <div
@@ -197,7 +197,9 @@ function DividerRenderer({ item }: { item: Extract<ToolbarItem, { type: 'divider
     <div {...getUIItemProps(item)}>
       <div
         className={
-          item.orientation === 'vertical' ? 'h-6 w-px bg-gray-300' : 'h-px w-6 bg-gray-300'
+          item.orientation === 'vertical'
+            ? 'bg-border-default h-6 w-px'
+            : 'bg-border-default h-px w-6'
         }
         aria-hidden="true"
       />
@@ -268,13 +270,13 @@ function CustomComponentRenderer({
 function getPlacementClasses(placement: 'top' | 'bottom' | 'left' | 'right'): string {
   switch (placement) {
     case 'top':
-      return 'border-b border-gray-300 bg-white px-4 py-2';
+      return 'border-b border-border-default bg-bg-surface px-4 py-2';
     case 'bottom':
-      return 'border-t border-gray-300 bg-white px-4 py-2';
+      return 'border-t border-border-default bg-bg-surface px-4 py-2';
     case 'left':
-      return 'border-r border-gray-300 bg-white px-2 py-3 flex-col';
+      return 'border-r border-border-default bg-bg-surface px-2 py-3 flex-col';
     case 'right':
-      return 'border-l border-gray-300 bg-white px-2 py-3 flex-col';
+      return 'border-l border-border-default bg-bg-surface px-2 py-3 flex-col';
   }
 }
 

@@ -138,8 +138,8 @@ export function Tooltip({
         role="tooltip"
         className={`z-100 pointer-events-none absolute select-none whitespace-nowrap rounded-lg px-3 py-2 text-sm shadow-md transition-opacity duration-150 ${
           style === 'dark'
-            ? 'bg-gray-900 text-white'
-            : 'border border-gray-200 bg-white text-gray-900'
+            ? 'bg-tooltip-bg text-tooltip-fg'
+            : 'border-border-subtle bg-bg-elevated text-fg-primary border'
         } ${visible ? 'opacity-100' : 'opacity-0'} ${className} `}
         style={{ visibility: visible ? 'visible' : 'hidden' }}
       >
@@ -147,7 +147,7 @@ export function Tooltip({
         {/* the arrow inherits background so it never mismatches */}
         <div
           ref={arrow}
-          className={`absolute h-2 w-2 rotate-45 bg-inherit ${style === 'light' ? 'border border-gray-200' : ''} `}
+          className={`absolute h-2 w-2 rotate-45 bg-inherit ${style === 'light' ? 'border-border-subtle border' : ''} `}
         />
       </div>
       <RefWrapper ref={reference}>{children}</RefWrapper>

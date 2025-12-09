@@ -21,7 +21,7 @@ export const StrikethroughIcon = ({
     aria-label={title}
   >
     <path stroke="none" d="M0 0h24v24H0z" fill="none" />
-    <path d="M8 16v-8a4 4 0 1 1 8 0v8" stroke="#000000" />
+    <path d="M8 16v-8a4 4 0 1 1 8 0v8" stroke="currentColor" />
     <path d="M4 10h16" stroke={primaryColor} />
   </svg>
 );

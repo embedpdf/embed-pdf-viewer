@@ -288,8 +288,8 @@ function MobileMenu({
     <>
       {/* Backdrop */}
       <div
-        className={`absolute inset-0 z-40 bg-black transition-opacity duration-300 ${
-          isAnimatingIn ? 'opacity-30' : 'opacity-0'
+        className={`bg-bg-overlay absolute inset-0 z-40 transition-opacity duration-300 ${
+          isAnimatingIn ? 'opacity-100' : 'opacity-0'
         }`}
         onClick={closeWithAnimation}
       />
@@ -297,7 +297,7 @@ function MobileMenu({
       {/* Sheet */}
       <div
         ref={sheetRef}
-        className={`absolute inset-x-0 bottom-0 z-50 flex flex-col rounded-t-2xl bg-white shadow-2xl ${
+        className={`bg-bg-surface absolute inset-x-0 bottom-0 z-50 flex flex-col rounded-t-2xl shadow-2xl ${
           !dragState.current.isDragging ? 'transition-transform duration-300 ease-out' : ''
         }`}
         style={{
@@ -314,16 +314,19 @@ function MobileMenu({
           onTouchEnd={handleTouchEnd}
           onMouseDown={handleMouseDown}
         >
-          <div className="h-1.5 w-12 rounded-full bg-gray-300" />
+          <div className="bg-border-default h-1.5 w-12 rounded-full" />
         </div>
 
         {/* Header with back button (for submenus) */}
         {menuStack.length > 1 && (
-          <div className="flex items-center gap-3 border-b border-gray-200 px-4 pb-3">
-            <button onClick={onNavigateBack} className="rounded-full p-1 hover:bg-gray-100">
+          <div className="border-border-subtle flex items-center gap-3 border-b px-4 pb-3">
+            <button
+              onClick={onNavigateBack}
+              className="hover:bg-interactive-hover rounded-full p-1"
+            >
               <ChevronLeftIcon className="h-5 w-5" />
             </button>
-            <h3 className="font-semibold text-gray-900">{currentMenu.title || 'Menu'}</h3>
+            <h3 className="text-fg-primary font-semibold">{currentMenu.title || 'Menu'}</h3>
           </div>
         )}
 
@@ -439,7 +442,7 @@ function DesktopMenu({
     <div
       ref={menuRef}
       {...getUIItemProps(currentMenu.schema)}
-      className="min-w-[200px] rounded-lg border border-gray-300 bg-white py-2 shadow-lg"
+      className="border-border-default bg-bg-elevated min-w-[200px] rounded-lg border py-2 shadow-lg"
       style={menuStyle}
     >
       {currentMenu.schema.items.map((item) => (
@@ -494,7 +497,7 @@ function MenuItemRenderer({
     case 'divider':
       return (
         <div {...getUIItemProps(item)}>
-          <hr className="my-2 border-gray-200" />
+          <hr className="border-border-subtle my-2" />
         </div>
       );
     case 'section':
@@ -545,9 +548,9 @@ function CommandMenuItem({
         {...getUIItemProps(item)}
         onClick={handleClick}
         disabled={command.disabled}
-        className={`flex w-full items-center gap-3 px-4 py-3 text-left text-base transition-colors active:bg-gray-100 ${
+        className={`active:bg-interactive-active flex w-full items-center gap-3 px-4 py-3 text-left text-base transition-colors ${
           command.disabled ? 'cursor-not-allowed opacity-50' : 'cursor-pointer'
-        } ${command.active ? 'bg-blue-50 text-blue-600' : 'text-gray-700'}`}
+        } ${command.active ? 'bg-interactive-selected text-accent' : 'text-fg-secondary'}`}
         role="menuitem"
       >
         {IconComponent && (
@@ -571,8 +574,8 @@ function CommandMenuItem({
         command.disabled ? 'pointer-events-none cursor-not-allowed opacity-50' : 'cursor-pointer'
       } ${
         command.active && !command.disabled
-          ? 'bg-blue-500 text-white'
-          : 'text-gray-500 hover:bg-blue-900 hover:text-white'
+          ? 'bg-accent text-fg-on-accent'
+          : 'text-fg-muted hover:bg-accent hover:text-fg-on-accent'
       }`}
       role="menuitem"
     >
@@ -616,7 +619,7 @@ function SubmenuItem({
       <button
         {...getUIItemProps(item)}
         onClick={handleClick}
-        className="flex w-full cursor-pointer items-center gap-3 px-4 py-3 text-left text-base text-gray-700 transition-colors active:bg-gray-100"
+        className="text-fg-secondary active:bg-interactive-active flex w-full cursor-pointer items-center gap-3 px-4 py-3 text-left text-base transition-colors"
         role="menuitem"
       >
         <span className="flex-1">{label}</span>
@@ -629,7 +632,7 @@ function SubmenuItem({
     <button
       {...getUIItemProps(item)}
       onClick={handleClick}
-      className="flex w-full cursor-pointer items-center justify-between gap-2 px-4 py-1 text-left text-gray-500 hover:bg-blue-900 hover:text-white"
+      className="text-fg-muted hover:bg-accent hover:text-fg-on-accent flex w-full cursor-pointer items-center justify-between gap-2 px-4 py-1 text-left"
       role="menuitem"
     >
       <span className="text-sm">{label}</span>
@@ -659,7 +662,7 @@ function SectionItem({
 
   return (
     <div {...getUIItemProps(item)}>
-      <div className="px-4 py-3 text-xs font-medium uppercase text-gray-600">{label}</div>
+      <div className="text-fg-secondary px-4 py-3 text-xs font-medium uppercase">{label}</div>
       {item.items.map((childItem) => (
         <MenuItemRenderer
           key={childItem.id}

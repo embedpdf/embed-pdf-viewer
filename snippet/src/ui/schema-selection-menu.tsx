@@ -27,7 +27,10 @@ export function SchemaSelectionMenu({ schema, documentId, props }: SelectionMenu
 
   return (
     <div {...menuWrapperProps} {...getUIItemProps(schema)}>
-      <div style={menuStyle} className="rounded-lg border border-gray-200 bg-white shadow-lg">
+      <div
+        style={menuStyle}
+        className="border-border-subtle bg-bg-elevated rounded-lg border shadow-lg"
+      >
         <div className="flex items-center gap-1 p-1">
           {schema.items.map((item) => (
             <SelectionMenuItemRenderer
@@ -67,7 +70,7 @@ function SelectionMenuItemRenderer({
     case 'divider':
       return (
         <div {...getUIItemProps(item)}>
-          <div className="h-6 w-px bg-gray-300" aria-hidden="true" />
+          <div className="bg-border-default h-6 w-px" aria-hidden="true" />
         </div>
       );
 

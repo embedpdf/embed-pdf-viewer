@@ -3,13 +3,13 @@ import { useEffect, useRef, useState } from 'preact/hooks';
 import { computePosition, offset, flip, shift, autoUpdate, Placement } from '@floating-ui/dom';
 
 export interface DropdownProps {
-  /** Controlled visibility — `true` shows, `false` hides */
+  /** Controlled visibility — `true` shows, `false` hides */
   open: boolean;
   /** Reference element that anchors the menu (button, icon, …) */
   trigger?: HTMLElement;
-  /** Menu items / JSX content */
+  /** Menu items / JSX content */
   children: ComponentChildren;
-  /** Preferred placement (Floating‑UI keywords). Default `"bottom-start"` */
+  /** Preferred placement (Floating‑UI keywords). Default `"bottom-start"` */
   placement?: string;
   /** Horizontal offset (skidding) */
   offsetSkidding?: number;
@@ -119,7 +119,7 @@ export function Dropdown({
           top: `${position.y}px`,
         }),
       }}
-      className={`absolute z-50 min-w-[8rem] divide-y divide-gray-100 rounded-lg border border-[#cfd4da] bg-white shadow-sm transition-opacity duration-150 focus:outline-none ${open ? 'opacity-100' : 'opacity-0'} ${!trigger && 'bottom-0 left-0 right-0'} ${className} `}
+      className={`divide-border-subtle border-border-default bg-bg-elevated absolute z-50 min-w-[8rem] divide-y rounded-lg border shadow-sm transition-opacity duration-150 focus:outline-none ${open ? 'opacity-100' : 'opacity-0'} ${!trigger && 'bottom-0 left-0 right-0'} ${className} `}
     >
       <div className="flex flex-col py-2">{children}</div>
     </div>

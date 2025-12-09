@@ -94,12 +94,12 @@ export function PrintModal({ documentId, isOpen, onClose, onExited }: PrintModal
       title="Print Settings"
       onClose={onClose}
       onExited={onExited}
-      maxWidth="28rem"
+      maxWidth="32rem"
     >
       <div className="space-y-6">
         {/* Pages to print */}
         <div>
-          <label className="mb-3 block text-sm font-medium text-gray-700">Pages to print</label>
+          <label className="text-fg-secondary mb-3 block text-sm font-medium">Pages to print</label>
           <div className="space-y-2">
             <label className="flex items-center">
               <input
@@ -109,9 +109,9 @@ export function PrintModal({ documentId, isOpen, onClose, onExited }: PrintModal
                 checked={selection === 'all'}
                 onChange={() => setSelection('all')}
                 disabled={isLoading}
-                className="mr-2"
+                className="accent-accent mr-2"
               />
-              <span className="text-sm">All pages</span>
+              <span className="text-fg-primary text-sm">All pages</span>
             </label>
 
             <label className="flex items-center">
@@ -122,9 +122,9 @@ export function PrintModal({ documentId, isOpen, onClose, onExited }: PrintModal
                 checked={selection === 'current'}
                 onChange={() => setSelection('current')}
                 disabled={isLoading}
-                className="mr-2"
+                className="accent-accent mr-2"
               />
-              <span className="text-sm">Current page ({currentPage})</span>
+              <span className="text-fg-primary text-sm">Current page ({currentPage})</span>
             </label>
 
             <label className="flex items-start">
@@ -135,10 +135,10 @@ export function PrintModal({ documentId, isOpen, onClose, onExited }: PrintModal
                 checked={selection === 'custom'}
                 onChange={() => setSelection('custom')}
                 disabled={isLoading}
-                className="mr-2 mt-0.5"
+                className="accent-accent mr-2 mt-0.5"
               />
               <div className="flex-1">
-                <span className="mb-1 block text-sm">Specify pages</span>
+                <span className="text-fg-primary mb-1 block text-sm">Specify pages</span>
                 <input
                   type="text"
                   placeholder="e.g., 1-3, 5, 8-10"
@@ -147,12 +147,12 @@ export function PrintModal({ documentId, isOpen, onClose, onExited }: PrintModal
                   disabled={selection !== 'custom' || isLoading}
                   className={`w-full rounded-md border px-3 py-1 text-sm ${
                     selection !== 'custom' || isLoading
-                      ? 'bg-gray-100 text-gray-500'
-                      : 'border-gray-300 focus:border-blue-500 focus:ring-blue-500'
+                      ? 'bg-interactive-disabled text-fg-muted'
+                      : 'border-border-default bg-bg-input text-fg-primary focus:border-accent focus:ring-accent'
                   } focus:outline-none focus:ring-1`}
                 />
                 {selection === 'custom' && customPages.trim() && totalPages > 0 && (
-                  <p className="mt-1 text-xs text-gray-500">
+                  <p className="text-fg-muted mt-1 text-xs">
                     Total pages in document: {totalPages}
                   </p>
                 )}
@@ -169,33 +169,33 @@ export function PrintModal({ documentId, isOpen, onClose, onExited }: PrintModal
               checked={includeAnnotations}
               onChange={(e) => setIncludeAnnotations((e.target as HTMLInputElement).checked)}
               disabled={isLoading}
-              className="mr-2"
+              className="accent-accent mr-2"
             />
-            <span className="text-sm font-medium text-gray-700">Include annotations</span>
+            <span className="text-fg-secondary text-sm font-medium">Include annotations</span>
           </label>
         </div>
 
         {/* Loading indicator */}
         {isLoading && (
-          <div className="flex items-center space-x-3 rounded-md bg-blue-50 p-3">
-            <Spinner className="text-blue-500" />
-            <span className="text-sm text-blue-700">{loadingMessage}</span>
+          <div className="bg-state-info-light flex items-center space-x-3 rounded-md p-3">
+            <Spinner className="text-accent" />
+            <span className="text-accent text-sm">{loadingMessage}</span>
           </div>
         )}
 
         {/* Actions */}
-        <div className="flex justify-end space-x-3 border-t border-gray-200 pt-4">
+        <div className="border-border-subtle flex justify-end space-x-3 border-t pt-4">
           <Button
             onClick={onClose}
             disabled={isLoading}
-            className="rounded-md border border-gray-300 bg-white px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50"
+            className="border-border-default bg-bg-surface text-fg-secondary hover:bg-interactive-hover rounded-md border px-4 py-2 text-sm disabled:cursor-not-allowed disabled:opacity-50"
           >
             Cancel
           </Button>
           <Button
             onClick={handlePrint}
             disabled={!canSubmit}
-            className="flex items-center space-x-2 rounded-md border border-transparent bg-blue-600 px-4 py-2 text-sm text-white hover:!bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
+            className="bg-accent text-fg-on-accent hover:!bg-accent-hover flex items-center space-x-2 rounded-md border border-transparent px-4 py-2 text-sm disabled:cursor-not-allowed disabled:opacity-50"
           >
             {isLoading && <Spinner size="sm" />}
             <span>{isLoading ? 'Printing...' : 'Print'}</span>

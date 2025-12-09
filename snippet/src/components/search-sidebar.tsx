@@ -35,14 +35,14 @@ const HitLine = ({
       onClick={onClick}
       className={`w-full rounded border p-2 text-left text-sm transition-colors ${
         active
-          ? 'border-blue-500 bg-blue-50 text-blue-900'
-          : 'border-gray-200 bg-white text-gray-700 hover:bg-gray-50'
+          ? 'border-accent bg-accent-light text-fg-primary'
+          : 'border-border-subtle bg-bg-surface text-fg-secondary hover:bg-interactive-hover'
       }`}
     >
       <span>
         {hit.context.truncatedLeft && '… '}
         {hit.context.before}
-        <span className="font-bold text-blue-600">{hit.context.match}</span>
+        <span className="text-accent font-bold">{hit.context.match}</span>
         {hit.context.after}
         {hit.context.truncatedRight && ' …'}
       </span>
@@ -144,11 +144,11 @@ export function SearchSidebar({ documentId, onClose }: SearchSidebarProps) {
   const grouped = groupByPage(state.results);
 
   return (
-    <div className="flex h-full flex-col bg-white">
+    <div className="bg-bg-surface flex h-full flex-col">
       <div className="p-4">
         <div className="relative">
           <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-2">
-            <SearchIcon className="h-4 w-4 text-gray-500" />
+            <SearchIcon className="text-fg-muted h-4 w-4" />
           </div>
           <input
             ref={inputRef}
@@ -156,14 +156,14 @@ export function SearchSidebar({ documentId, onClose }: SearchSidebarProps) {
             placeholder={translate('search.placeholder')}
             value={inputValue}
             onInput={handleInputChange}
-            className="w-full rounded-md border border-gray-300 py-1 pl-8 pr-9 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+            className="border-border-default bg-bg-input focus:border-accent focus:ring-accent w-full rounded-md border py-1 pl-8 pr-9 text-sm focus:outline-none focus:ring-1"
           />
           {inputValue && (
             <div
               className="absolute inset-y-0 right-0 flex cursor-pointer items-center pr-3"
               onClick={clearInput}
             >
-              <XIcon className="h-4 w-4 text-gray-500 hover:text-gray-700" />
+              <XIcon className="text-fg-muted hover:text-fg-secondary h-4 w-4" />
             </div>
           )}
         </div>
@@ -179,10 +179,10 @@ export function SearchSidebar({ documentId, onClose }: SearchSidebarProps) {
             onChange={(checked) => handleFlagChange(MatchFlag.MatchWholeWord, checked)}
           />
         </div>
-        <hr className="mb-2 mt-5 border-gray-200" />
+        <hr className="border-border-subtle mb-2 mt-5" />
         {state.active && (
           <div className="flex h-[32px] flex-row items-center justify-between">
-            <div className="text-xs text-gray-500">
+            <div className="text-fg-muted text-xs">
               {translate('search.resultsFound', { params: { count: state.total } })}
             </div>
             {state.total > 1 && (
@@ -209,7 +209,7 @@ export function SearchSidebar({ documentId, onClose }: SearchSidebarProps) {
       <div className="flex min-h-0 flex-1 flex-col gap-2 overflow-y-auto px-4">
         {Object.entries(grouped).map(([page, hits]) => (
           <div key={page} className="mt-2 first:mt-0">
-            <div className="bg-white/80 py-2 text-xs text-gray-500 backdrop-blur">
+            <div className="bg-bg-surface/80 text-fg-muted py-2 text-xs backdrop-blur">
               {translate('search.page', { params: { page: Number(page) + 1 } })}
             </div>
 

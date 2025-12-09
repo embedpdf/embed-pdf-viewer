@@ -22,10 +22,10 @@ export const PencilMarkerIcon = ({
   >
     <g transform="rotate(47.565 12.1875 10.75)">
       <path
-        stroke="#000000"
+        stroke="currentColor"
         d="m14.18752,16.75l0,-12c0,-1.1 -0.9,-2 -2,-2s-2,0.9 -2,2l0,12l2,2l2,-2z"
       />
-      <path stroke="#000000" d="m10.18752,6.75l4,0" />
+      <path stroke="currentColor" d="m10.18752,6.75l4,0" />
     </g>
     <path
       stroke={primaryColor}

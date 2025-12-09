@@ -8,6 +8,18 @@ import {
   Rotation,
 } from './components/app';
 
+// Export theme types and utilities for customization
+export {
+  Theme,
+  ThemeConfig,
+  ThemeColors,
+  ThemePreference,
+  DeepPartial,
+  lightTheme,
+  darkTheme,
+  createTheme,
+} from './config/theme';
+
 type ContainerConfig = PDFViewerConfig & {
   type: 'container';
   target: Element;

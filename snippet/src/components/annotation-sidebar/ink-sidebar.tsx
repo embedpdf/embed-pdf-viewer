@@ -3,7 +3,7 @@ import { useState, useEffect } from 'preact/hooks';
 import { useAnnotationCapability } from '@embedpdf/plugin-annotation/preact';
 import { PdfInkAnnoObject } from '@embedpdf/models';
 import { SidebarPropsBase } from './common';
-import { Slider, ColorSwatch } from './ui';
+import { Slider, ColorSwatch, Section, SectionLabel, ValueDisplay } from './ui';
 import { useDebounce } from '../../hooks/use-debounce';
 
 export const InkSidebar = ({
@@ -54,28 +54,28 @@ export const InkSidebar = ({
   return (
     <Fragment>
       {/* color */}
-      <section class="mb-6">
-        <label class="mb-3 block text-sm font-medium text-gray-900">Color</label>
+      <Section>
+        <SectionLabel className="mb-3">Color</SectionLabel>
         <div class="grid grid-cols-6 gap-x-1 gap-y-4">
           {colorPresets.map((c) => (
             <ColorSwatch key={c} color={c} active={c === color} onSelect={changeColor} />
           ))}
         </div>
-      </section>
+      </Section>
 
       {/* opacity */}
-      <section class="mb-6">
-        <label class="mb-1 block text-sm font-medium text-gray-900">Opacity</label>
+      <Section>
+        <SectionLabel>Opacity</SectionLabel>
         <Slider value={opacity} min={0.1} max={1} step={0.05} onChange={setOpacity} />
-        <span class="text-xs text-gray-500">{Math.round(opacity * 100)}%</span>
-      </section>
+        <ValueDisplay>{Math.round(opacity * 100)}%</ValueDisplay>
+      </Section>
 
       {/* stroke-width */}
-      <section class="mb-6">
-        <label class="mb-1 block text-sm font-medium text-gray-900">Stroke width</label>
+      <Section>
+        <SectionLabel>Stroke width</SectionLabel>
         <Slider value={stroke} min={1} max={30} step={1} onChange={setStroke} />
-        <span class="text-xs text-gray-500">{stroke}px</span>
-      </section>
+        <ValueDisplay>{stroke}px</ValueDisplay>
+      </Section>
     </Fragment>
   );
 };

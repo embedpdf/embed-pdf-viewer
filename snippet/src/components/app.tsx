@@ -95,6 +95,7 @@ import {
   germanTranslations,
   frenchTranslations,
 } from '@/config';
+import { ThemeConfig } from '@/config/theme';
 
 export { ScrollStrategy, ZoomMode, SpreadMode, Rotation };
 
@@ -115,6 +116,25 @@ export interface PDFViewerConfig {
   wasmUrl?: string;
   plugins?: PluginConfigs;
   log?: boolean;
+  /**
+   * Theme configuration for the viewer
+   * @example
+   * // Use system preference (auto light/dark)
+   * theme: { preference: 'system' }
+   *
+   * // Force dark mode
+   * theme: { preference: 'dark' }
+   *
+   * // Custom brand colors with system preference
+   * theme: {
+   *   preference: 'system',
+   *   themes: {
+   *     light: { accent: { primary: '#8b5cf6' } },
+   *     dark: { accent: { primary: '#a78bfa' } }
+   *   }
+   * }
+   */
+  theme?: ThemeConfig;
 }
 
 // **Default Plugin Configurations**
@@ -189,7 +209,7 @@ function ViewerLayout({ documentId }: { documentId: string }) {
       {renderToolbar('top', 'secondary')}
 
       {/* Document Content Area */}
-      <div id="document-content" className="flex flex-1 overflow-hidden bg-white">
+      <div id="document-content" className="bg-bg-surface flex flex-1 overflow-hidden">
         {/* Left Sidebars */}
         {renderSidebar('left', 'main')}
 
@@ -205,13 +225,13 @@ function ViewerLayout({ documentId }: { documentId: string }) {
                 )}
                 {isError && (
                   <div className="flex h-full items-center justify-center">
-                    <div className="text-red-500">Error loading document</div>
+                    <div className="text-state-error">Error loading document</div>
                   </div>
                 )}
                 {isLoaded && (
                   <div className="relative h-full w-full">
                     <GlobalPointerProvider documentId={documentId}>
-                      <Viewport className="bg-gray-100" documentId={documentId}>
+                      <Viewport className="bg-bg-app" documentId={documentId}>
                         <Scroller
                           documentId={documentId}
                           renderPage={({ pageIndex }) => (

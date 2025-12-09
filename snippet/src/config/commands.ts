@@ -18,18 +18,11 @@ import {
   RedactionMode,
   RedactionPlugin,
 } from '@embedpdf/plugin-redaction/preact';
-import { PrintPlugin } from '@embedpdf/plugin-print/preact';
 import { ExportPlugin } from '@embedpdf/plugin-export/preact';
 import { DocumentManagerPlugin } from '@embedpdf/plugin-document-manager/preact';
 import { HISTORY_PLUGIN_ID, HistoryPlugin } from '@embedpdf/plugin-history/preact';
 import { State } from './types';
-import {
-  isPanelOpen,
-  isSidebarOpen,
-  isToolbarOpen,
-  UI_PLUGIN_ID,
-  UIPlugin,
-} from '@embedpdf/plugin-ui';
+import { isSidebarOpen, isToolbarOpen, UI_PLUGIN_ID, UIPlugin } from '@embedpdf/plugin-ui';
 import { ScrollPlugin, ScrollStrategy } from '@embedpdf/plugin-scroll/preact';
 import { InteractionManagerPlugin } from '@embedpdf/plugin-interaction-manager/preact';
 import { FullscreenPlugin } from '@embedpdf/plugin-fullscreen/preact';

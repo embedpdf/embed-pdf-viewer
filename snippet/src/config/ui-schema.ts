@@ -996,7 +996,7 @@ export const viewerUISchema: UISchema = {
       position: {
         anchor: 'bottom-center',
         offset: {
-          bottom: '0.5rem',
+          bottom: '1.5rem',
         },
       },
       content: {

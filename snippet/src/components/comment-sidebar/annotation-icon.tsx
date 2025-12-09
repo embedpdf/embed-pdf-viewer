@@ -16,7 +16,7 @@ export const AnnotationIcon = ({
 
   return (
     <div
-      className={`flex items-center justify-center rounded-full bg-gray-100 ${className}`}
+      className={`bg-bg-surface-alt flex items-center justify-center rounded-full ${className}`}
       title={config.label}
     >
       <Icon icon={config.icon} {...iconProps} />

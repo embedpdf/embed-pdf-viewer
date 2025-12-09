@@ -1,13 +1,13 @@
 import { h } from 'preact';
-import { useViewportCapability } from '@embedpdf/plugin-viewport/preact';
+import { useState, useRef, useEffect, useCallback } from 'preact/hooks';
 import { useScroll } from '@embedpdf/plugin-scroll/preact';
-import { useEffect, useRef, useState, useCallback } from 'preact/hooks';
+import { useViewportCapability } from '@embedpdf/plugin-viewport/preact';
 import { ChevronLeftIcon } from './icons/chevron-left';
 import { ChevronRightIcon } from './icons/chevron-right';
 
-type PageControlsProps = {
+interface PageControlsProps {
   documentId: string;
-};
+}
 
 export function PageControls({ documentId }: PageControlsProps) {
   const { provides: viewport } = useViewportCapability();
@@ -19,6 +19,7 @@ export function PageControls({ documentId }: PageControlsProps) {
   const [isHovering, setIsHovering] = useState(false);
   const hideTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [inputValue, setInputValue] = useState<string>(currentPage.toString());
+  const inputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     setInputValue(currentPage.toString());
@@ -57,6 +58,10 @@ export function PageControls({ documentId }: PageControlsProps) {
   const handleMouseEnter = () => {
     setIsHovering(true);
     setIsVisible(true);
+    // Clear any pending hide timer
+    if (hideTimeoutRef.current) {
+      clearTimeout(hideTimeoutRef.current);
+    }
   };
 
   const handleMouseLeave = () => {
@@ -64,75 +69,99 @@ export function PageControls({ documentId }: PageControlsProps) {
     startHideTimer();
   };
 
-  const handlePageChange = (e: Event) => {
-    e.preventDefault();
-    const form = e.currentTarget as HTMLFormElement;
-    const formData = new FormData(form);
-    const pageStr = formData.get('page') as string;
-    const page = parseInt(pageStr);
-
-    if (!isNaN(page) && page >= 1 && page <= totalPages) {
-      scroll?.scrollToPage?.({
-        pageNumber: page,
-      });
-    }
-  };
-
-  const handlePreviousPage = (e: MouseEvent) => {
-    e.preventDefault();
-    (e.currentTarget as HTMLButtonElement).blur();
+  const handlePreviousPage = () => {
     if (currentPage > 1) {
       scroll?.scrollToPreviousPage();
     }
   };
 
-  const handleNextPage = (e: MouseEvent) => {
-    e.preventDefault();
-    (e.currentTarget as HTMLButtonElement).blur();
+  const handleNextPage = () => {
     if (currentPage < totalPages) {
       scroll?.scrollToNextPage();
     }
   };
 
+  const handleInputChange = (e: Event) => {
+    const value = (e.target as HTMLInputElement).value.replace(/[^0-9]/g, '');
+    setInputValue(value);
+  };
+
+  const handleInputFocus = () => {
+    setTimeout(() => inputRef.current?.select(), 0);
+  };
+
+  const handleInputBlur = () => {
+    const page = parseInt(inputValue, 10);
+    if (!isNaN(page) && page >= 1 && page <= totalPages) {
+      scroll?.scrollToPage?.({ pageNumber: page });
+    } else {
+      setInputValue(currentPage.toString());
+    }
+  };
+
+  const handleKeyDown = (e: KeyboardEvent) => {
+    if (e.key === 'Enter') {
+      (e.target as HTMLInputElement).blur();
+    } else if (e.key === 'Escape') {
+      setInputValue(currentPage.toString());
+      (e.target as HTMLInputElement).blur();
+    }
+  };
+
+  if (totalPages <= 1) {
+    return null;
+  }
+
+  // Button styles matching toolbar buttons
+  const buttonBaseClass =
+    'flex h-[32px] w-[32px] items-center justify-center rounded-md transition-colors cursor-pointer';
+  const buttonHoverClass = 'hover:bg-interactive-hover hover:ring hover:ring-accent';
+  const buttonDisabledClass =
+    'disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:bg-transparent disabled:hover:ring-0';
+
   return (
     <div
       onMouseEnter={handleMouseEnter}
       onMouseLeave={handleMouseLeave}
-      className={`absolute bottom-4 left-1/2 z-[1000] -translate-x-1/2 transition-opacity duration-200 ${
-        isVisible ? 'opacity-100' : 'pointer-events-none opacity-0'
-      }`}
+      className="pointer-events-auto"
     >
-      <div className="flex items-center gap-2 rounded-lg border border-gray-300 bg-gray-50 p-1 shadow-lg">
+      <div
+        className={`border-border-default bg-bg-surface flex items-center gap-1 rounded-lg border p-1 shadow-lg transition-opacity duration-300 ${
+          isVisible ? 'opacity-100' : 'opacity-0'
+        }`}
+      >
         {/* Previous Button */}
         <button
           onClick={handlePreviousPage}
-          disabled={currentPage === 1}
-          className="rounded p-1 text-gray-700 transition-colors hover:bg-gray-200 disabled:cursor-not-allowed disabled:text-gray-400 disabled:hover:bg-transparent"
+          disabled={currentPage <= 1}
+          className={`${buttonBaseClass} ${buttonHoverClass} ${buttonDisabledClass} text-fg-secondary`}
           aria-label="Previous page"
         >
           <ChevronLeftIcon className="h-5 w-5" />
         </button>
 
         {/* Page Input */}
-        <form onSubmit={handlePageChange} className="flex items-center gap-2">
+        <div className="flex items-center gap-1 px-1">
           <input
+            ref={inputRef}
             type="text"
-            name="page"
+            inputMode="numeric"
+            pattern="[0-9]*"
             value={inputValue}
-            onInput={(e) => {
-              const value = (e.target as HTMLInputElement).value.replace(/[^0-9]/g, '');
-              setInputValue(value);
-            }}
-            className="h-7 w-10 rounded border border-gray-300 bg-white px-1 text-center text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+            onChange={handleInputChange}
+            onFocus={handleInputFocus}
+            onBlur={handleInputBlur}
+            onKeyDown={handleKeyDown}
+            className="border-border-default bg-bg-input text-fg-primary focus:border-accent focus:ring-accent h-7 w-10 rounded border px-1 text-center text-sm focus:outline-none focus:ring-1"
           />
-          <span className="text-sm text-gray-600">{totalPages}</span>
-        </form>
+          <span className="text-fg-secondary text-sm">&nbsp; {totalPages}</span>
+        </div>
 
         {/* Next Button */}
         <button
           onClick={handleNextPage}
-          disabled={currentPage === totalPages}
-          className="rounded p-1 text-gray-700 transition-colors hover:bg-gray-200 disabled:cursor-not-allowed disabled:text-gray-400 disabled:hover:bg-transparent"
+          disabled={currentPage >= totalPages}
+          className={`${buttonBaseClass} ${buttonHoverClass} ${buttonDisabledClass} text-fg-secondary`}
           aria-label="Next page"
         >
           <ChevronRightIcon className="h-5 w-5" />

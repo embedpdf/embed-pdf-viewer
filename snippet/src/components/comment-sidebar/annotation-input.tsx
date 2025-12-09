@@ -26,7 +26,7 @@ export const AnnotationInput = ({
 
   return (
     <form
-      className="mt-4 flex items-end space-x-2 border-t border-gray-100 pt-4"
+      className="border-border-subtle mt-4 flex items-end space-x-2 border-t pt-4"
       onClick={(e) => e.stopPropagation()}
       onSubmit={handleSubmit}
     >
@@ -36,14 +36,14 @@ export const AnnotationInput = ({
         placeholder={placeholder}
         value={text}
         onInput={(e) => setText(e.currentTarget.value)}
-        className={`w-full rounded-lg border px-3 py-2 text-sm placeholder-gray-500 transition-colors focus:border-transparent focus:outline-none focus:ring-2 ${
-          isFocused ? 'border-blue-300 focus:ring-blue-500' : 'border-gray-300 focus:ring-blue-500'
+        className={`bg-bg-input text-fg-primary placeholder-fg-muted w-full rounded-lg border px-3 py-2 text-sm transition-colors focus:border-transparent focus:outline-none focus:ring-2 ${
+          isFocused ? 'border-accent focus:ring-accent' : 'border-border-default focus:ring-accent'
         }`}
       />
       <button
         type="submit"
         disabled={!text.trim()}
-        className="rounded-lg bg-blue-500 p-2 text-white transition-colors hover:bg-blue-600 disabled:cursor-not-allowed disabled:bg-gray-300"
+        className="bg-accent text-fg-on-accent hover:bg-accent-hover disabled:bg-interactive-disabled rounded-lg p-2 transition-colors disabled:cursor-not-allowed"
       >
         <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path

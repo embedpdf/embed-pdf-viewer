@@ -16,8 +16,17 @@ import { useAnnotationCapability } from '@embedpdf/plugin-annotation/preact';
 
 import { SidebarPropsBase } from './common';
 import { useDebounce } from '@/hooks/use-debounce';
-import { ColorSwatch, Slider, FontFamilySelect, FontSizeInputSelect } from './ui';
+import {
+  ColorSwatch,
+  Slider,
+  FontFamilySelect,
+  FontSizeInputSelect,
+  Section,
+  SectionLabel,
+  ValueDisplay,
+} from './ui';
 import { Icon } from '../ui/icon';
+import { ToggleButton } from '../ui/toggle-button';
 
 export const FreeTextSidebar = ({
   selected,
@@ -110,8 +119,6 @@ export const FreeTextSidebar = ({
     applyPatch({ fontSize: size });
   };
 
-  /* dropdown handled by FontSizeInputSelect */
-
   /* ────────────────────────  Font handlers  ──────────────────────────── */
   const updateFontEnum = (fam: PdfStandardFontFamily, b: boolean, i: boolean) => {
     const id = makeStandardFont(fam, { bold: b, italic: i });
@@ -119,7 +126,6 @@ export const FreeTextSidebar = ({
   };
 
   const onFamilyChange = (fam: PdfStandardFontFamily) => {
-    /* when family changes, keep bold/italic only if supported */
     const supportsBold = standardFontIsBold(makeStandardFont(fam, { bold: true, italic: false }));
     const supportsItalic = standardFontIsItalic(
       makeStandardFont(fam, { bold: false, italic: true }),
@@ -167,8 +173,8 @@ export const FreeTextSidebar = ({
   return (
     <Fragment>
       {/* font family + style */}
-      <section class="mb-6">
-        <label class="mb-2 block text-sm font-medium text-gray-900">Font</label>
+      <Section>
+        <SectionLabel>Font</SectionLabel>
 
         {/* Family + size */}
         <div class="mb-3 flex gap-2">
@@ -180,135 +186,101 @@ export const FreeTextSidebar = ({
 
         {/* Bold / Italic toggles */}
         <div class="flex gap-2">
-          <button
-            type="button"
+          <ToggleButton
             title="Bold"
+            active={bold}
             disabled={
               !standardFontIsBold(makeStandardFont(fontFamily, { bold: true, italic: false }))
             }
             onClick={toggleBold}
-            class={`h-9 w-9 rounded border border-gray-300 px-2 py-1 text-sm font-bold ${
-              bold ? 'bg-blue-600 text-white' : 'bg-white text-gray-900'
-            } disabled:opacity-40`}
+            className="font-bold"
           >
             <Icon icon="bold" size={18} />
-          </button>
+          </ToggleButton>
 
-          <button
-            type="button"
+          <ToggleButton
             title="Italic"
+            active={italic}
             disabled={
               !standardFontIsItalic(makeStandardFont(fontFamily, { bold: false, italic: true }))
             }
             onClick={toggleItalic}
-            class={`h-9 w-9 rounded border border-gray-300 px-2 py-1 text-sm italic ${
-              italic ? 'bg-blue-600 text-white' : 'bg-white text-gray-900'
-            } disabled:opacity-40`}
+            className="italic"
           >
             <Icon icon="italic" size={18} />
-          </button>
+          </ToggleButton>
         </div>
-      </section>
+      </Section>
 
       {/* text alignment */}
-      <section class="mb-6">
-        <label class="mb-2 block text-sm font-medium text-gray-900">Text alignment</label>
+      <Section>
+        <SectionLabel>Text alignment</SectionLabel>
         <div class="flex gap-2">
-          <button
-            type="button"
+          <ToggleButton
             title="Align left"
+            active={textAlign === PdfTextAlignment.Left}
             onClick={() => changeTextAlign(PdfTextAlignment.Left)}
-            class={`h-9 w-9 rounded border border-gray-300 px-2 py-1 text-sm ${
-              textAlign === PdfTextAlignment.Left
-                ? 'bg-blue-600 text-white'
-                : 'bg-white text-gray-900'
-            } disabled:opacity-40`}
           >
             <Icon icon="alignLeft" size={18} />
-          </button>
-          <button
-            type="button"
+          </ToggleButton>
+          <ToggleButton
             title="Align center"
+            active={textAlign === PdfTextAlignment.Center}
             onClick={() => changeTextAlign(PdfTextAlignment.Center)}
-            class={`h-9 w-9 rounded border border-gray-300 px-2 py-1 text-sm ${
-              textAlign === PdfTextAlignment.Center
-                ? 'bg-blue-600 text-white'
-                : 'bg-white text-gray-900'
-            } disabled:opacity-40`}
           >
             <Icon icon="alignCenter" size={18} />
-          </button>
-          <button
-            type="button"
+          </ToggleButton>
+          <ToggleButton
             title="Align right"
+            active={textAlign === PdfTextAlignment.Right}
             onClick={() => changeTextAlign(PdfTextAlignment.Right)}
-            class={`h-9 w-9 rounded border border-gray-300 px-2 py-1 text-sm ${
-              textAlign === PdfTextAlignment.Right
-                ? 'bg-blue-600 text-white'
-                : 'bg-white text-gray-900'
-            } disabled:opacity-40`}
           >
             <Icon icon="alignRight" size={18} />
-          </button>
+          </ToggleButton>
         </div>
-      </section>
+      </Section>
 
       {/* vertical alignment */}
-      <section class="mb-6">
-        <label class="mb-2 block text-sm font-medium text-gray-900">Vertical alignment</label>
+      <Section>
+        <SectionLabel>Vertical alignment</SectionLabel>
         <div class="flex gap-2">
-          <button
-            type="button"
+          <ToggleButton
             title="Align top"
+            active={verticalAlign === PdfVerticalAlignment.Top}
             onClick={() => changeVerticalAlign(PdfVerticalAlignment.Top)}
-            class={`h-9 w-9 rounded border border-gray-300 px-2 py-1 text-sm ${
-              verticalAlign === PdfVerticalAlignment.Top
-                ? 'bg-blue-600 text-white'
-                : 'bg-white text-gray-900'
-            } disabled:opacity-40`}
           >
             <Icon icon="alignTop" size={18} />
-          </button>
-          <button
-            type="button"
+          </ToggleButton>
+          <ToggleButton
             title="Align middle"
+            active={verticalAlign === PdfVerticalAlignment.Middle}
             onClick={() => changeVerticalAlign(PdfVerticalAlignment.Middle)}
-            class={`h-9 w-9 rounded border border-gray-300 px-2 py-1 text-sm ${
-              verticalAlign === PdfVerticalAlignment.Middle
-                ? 'bg-blue-600 text-white'
-                : 'bg-white text-gray-900'
-            } disabled:opacity-40`}
           >
             <Icon icon="alignMiddle" size={18} />
-          </button>
-          <button
-            type="button"
+          </ToggleButton>
+          <ToggleButton
             title="Align bottom"
+            active={verticalAlign === PdfVerticalAlignment.Bottom}
             onClick={() => changeVerticalAlign(PdfVerticalAlignment.Bottom)}
-            class={`h-9 w-9 rounded border border-gray-300 px-2 py-1 text-sm ${
-              verticalAlign === PdfVerticalAlignment.Bottom
-                ? 'bg-blue-600 text-white'
-                : 'bg-white text-gray-900'
-            } disabled:opacity-40`}
           >
             <Icon icon="alignBottom" size={18} />
-          </button>
+          </ToggleButton>
         </div>
-      </section>
+      </Section>
 
       {/* font colour */}
-      <section class="mb-6">
-        <label class="mb-3 block text-sm font-medium text-gray-900">Font colour</label>
+      <Section>
+        <SectionLabel className="mb-3">Font colour</SectionLabel>
         <div class="grid grid-cols-6 gap-x-1 gap-y-4">
           {colorPresets.map((c) => (
             <ColorSwatch key={c} color={c} active={c === fontColor} onSelect={changeFontColor} />
           ))}
         </div>
-      </section>
+      </Section>
 
       {/* background colour */}
-      <section class="mb-6">
-        <label class="mb-3 block text-sm font-medium text-gray-900">Background colour</label>
+      <Section>
+        <SectionLabel className="mb-3">Background colour</SectionLabel>
         <div class="grid grid-cols-6 gap-x-1 gap-y-4">
           {colorPresets.map((c) => (
             <ColorSwatch
@@ -318,21 +290,21 @@ export const FreeTextSidebar = ({
               onSelect={changeBackgroundColor}
             />
           ))}
-          {/* “no fill” swatch */}
+          {/* "no fill" swatch */}
           <ColorSwatch
             color="transparent"
             active={backgroundColor === 'transparent'}
             onSelect={changeBackgroundColor}
           />
         </div>
-      </section>
+      </Section>
 
       {/* opacity */}
-      <section class="mb-6">
-        <label class="mb-1 block text-sm font-medium text-gray-900">Opacity</label>
+      <Section>
+        <SectionLabel>Opacity</SectionLabel>
         <Slider value={opacity} min={0.1} max={1} step={0.05} onChange={setOpacity} />
-        <span class="text-xs text-gray-500">{Math.round(opacity * 100)}%</span>
-      </section>
+        <ValueDisplay>{Math.round(opacity * 100)}%</ValueDisplay>
+      </Section>
     </Fragment>
   );
 };

@@ -10,7 +10,7 @@ import {
   blendModeSelectOptions,
 } from '@embedpdf/models';
 import { SidebarPropsBase } from './common';
-import { Slider, ColorSwatch } from './ui';
+import { Slider, ColorSwatch, Section, SectionLabel, ValueDisplay } from './ui';
 import { useDebounce } from '../../hooks/use-debounce';
 
 export const TextMarkupSidebar = ({
@@ -67,27 +67,27 @@ export const TextMarkupSidebar = ({
   return (
     <Fragment>
       {/* color */}
-      <section class="mb-6">
-        <label class="mb-3 block text-sm font-medium text-gray-900">Color</label>
+      <Section>
+        <SectionLabel className="mb-3">Color</SectionLabel>
         <div class="grid grid-cols-6 gap-x-1 gap-y-4">
           {colorPresets.map((c) => (
             <ColorSwatch key={c} color={c} active={c === color} onSelect={changeColor} />
           ))}
         </div>
-      </section>
+      </Section>
 
       {/* opacity */}
-      <section class="mb-6">
-        <label class="mb-1 block text-sm font-medium text-gray-900">Opacity</label>
+      <Section>
+        <SectionLabel>Opacity</SectionLabel>
         <Slider value={opacity} min={0.1} max={1} step={0.05} onChange={setOpacity} />
-        <span class="text-xs text-gray-500">{Math.round(opacity * 100)}%</span>
-      </section>
+        <ValueDisplay>{Math.round(opacity * 100)}%</ValueDisplay>
+      </Section>
 
       {/* blend mode */}
-      <section class="mb-6">
-        <label class="mb-1 block text-sm font-medium text-gray-900">Blend mode</label>
+      <Section>
+        <SectionLabel>Blend mode</SectionLabel>
         <select
-          class="w-full rounded border border-gray-300 bg-white px-2 py-1 text-sm"
+          class="border-border-default bg-bg-input text-fg-primary w-full rounded border px-2 py-1 text-sm"
           value={blend}
           onChange={(e) => changeBlend(parseInt((e.target as HTMLSelectElement).value, 10))}
         >
@@ -97,7 +97,7 @@ export const TextMarkupSidebar = ({
             </option>
           ))}
         </select>
-      </section>
+      </Section>
     </Fragment>
   );
 };

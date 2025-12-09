@@ -27,7 +27,7 @@ export const TruncatedText = ({ text, maxWords = 16, className = '' }: Truncated
           e.stopPropagation();
           setExpanded(!isExpanded);
         }}
-        className="text-sm font-medium text-blue-500 hover:text-blue-600 focus:outline-none"
+        className="text-accent hover:text-accent-hover text-sm font-medium focus:outline-none"
       >
         {isExpanded ? 'less' : 'more'}
       </button>

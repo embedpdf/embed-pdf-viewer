@@ -41,19 +41,19 @@ export const EditCommentForm = ({
         ref={textareaRef}
         value={text}
         onInput={(e) => setText(e.currentTarget.value)}
-        className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+        className="border-border-default bg-bg-input text-fg-primary focus:border-accent focus:ring-accent w-full rounded-md border px-3 py-2 text-sm focus:outline-none focus:ring-1"
         rows={3}
       />
       <div className="flex space-x-2">
         <button
           onClick={handleSaveClick}
-          className="rounded-md bg-blue-500 px-3 py-1 text-sm text-white hover:bg-blue-600"
+          className="bg-accent text-fg-on-accent hover:bg-accent-hover rounded-md px-3 py-1 text-sm"
         >
           Save
         </button>
         <button
           onClick={handleCancelClick}
-          className="rounded-md bg-gray-300 px-3 py-1 text-sm text-gray-700 hover:bg-gray-400"
+          className="bg-interactive-hover text-fg-secondary hover:bg-border-default rounded-md px-3 py-1 text-sm"
         >
           Cancel
         </button>

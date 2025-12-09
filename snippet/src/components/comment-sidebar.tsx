@@ -131,10 +131,10 @@ export const CommentSidebar = ({ documentId }: CommentSidebarProps) => {
         {sortedPages.map((pageNumber) => (
           <div key={pageNumber} className="space-y-3">
             {/* Page Header */}
-            <div className="sticky top-0 z-10 bg-white px-1">
-              <div className="border-b border-gray-200 py-2">
-                <h3 className="text-md font-semibold text-gray-800">Page {pageNumber + 1}</h3>
-                <p className="text-sm text-gray-500">
+            <div className="bg-bg-surface sticky top-0 z-10 px-1">
+              <div className="border-border-subtle border-b py-2">
+                <h3 className="text-md text-fg-primary font-semibold">Page {pageNumber + 1}</h3>
+                <p className="text-fg-muted text-sm">
                   {sidebarAnnotations[pageNumber].length} comment
                   {sidebarAnnotations[pageNumber].length !== 1 ? 's' : ''}
                 </p>

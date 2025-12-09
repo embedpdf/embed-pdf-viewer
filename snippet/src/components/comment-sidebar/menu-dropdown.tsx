@@ -29,18 +29,18 @@ export const MenuDropdown = ({ onEdit, onDelete, onClose }: MenuDropdownProps) =
   return (
     <div
       ref={dropdownRef}
-      className="absolute right-0 top-6 z-10 w-32 rounded-md bg-white shadow-lg ring-1 ring-black ring-opacity-5"
+      className="bg-bg-elevated ring-border-default absolute right-0 top-6 z-10 w-32 rounded-md shadow-lg ring-1"
     >
       <div className="py-1">
         <button
           onClick={handleEdit}
-          className="block w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-gray-100"
+          className="text-fg-secondary hover:bg-interactive-hover block w-full px-4 py-2 text-left text-sm"
         >
           Edit
         </button>
         <button
           onClick={handleDelete}
-          className="block w-full px-4 py-2 text-left text-sm text-red-600 hover:bg-gray-100"
+          className="text-state-error hover:bg-interactive-hover block w-full px-4 py-2 text-left text-sm"
         >
           Delete
         </button>

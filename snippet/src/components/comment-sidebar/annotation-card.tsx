@@ -58,8 +58,8 @@ export const AnnotationCard = ({
   return (
     <div
       onClick={onSelect}
-      className={`cursor-pointer rounded-lg border bg-white shadow-sm transition-all hover:shadow-md ${
-        isSelected ? 'border-blue-500 ring-2 ring-blue-200' : 'border-gray-200'
+      className={`bg-bg-surface cursor-pointer rounded-lg border shadow-sm transition-all hover:shadow-md ${
+        isSelected ? 'border-accent ring-interactive-focus-ring ring-2' : 'border-border-subtle'
       }`}
     >
       <div className="p-4">
@@ -68,8 +68,8 @@ export const AnnotationCard = ({
           <div className="min-w-0 flex-1">
             <div className="flex items-center justify-between">
               <div className="leading-none">
-                <h4 className="text-sm font-medium text-gray-900">{author}</h4>
-                <span className="text-xs text-gray-400">
+                <h4 className="text-fg-primary text-sm font-medium">{author}</h4>
+                <span className="text-fg-disabled text-xs">
                   {formatDate(annotation.object.modified || annotation.object.created)}
                 </span>
               </div>
@@ -79,7 +79,7 @@ export const AnnotationCard = ({
                     e.stopPropagation();
                     setMenuOpen(true);
                   }}
-                  className="rounded-md p-1 text-gray-400 hover:bg-gray-100 hover:text-gray-600"
+                  className="text-fg-disabled hover:bg-interactive-hover hover:text-fg-secondary rounded-md p-1"
                 >
                   <svg className="h-4 w-4" fill="currentColor" viewBox="0 0 20 20">
                     <path d="M6 10a2 2 0 11-4 0 2 2 0 014 0zM12 10a2 2 0 11-4 0 2 2 0 014 0zM16 12a2 2 0 100-4 2 2 0 000 4z" />
@@ -99,7 +99,7 @@ export const AnnotationCard = ({
               <TruncatedText
                 text={annotation.object.custom.text}
                 maxWords={14}
-                className="mt-2 text-sm text-gray-500"
+                className="text-fg-muted mt-2 text-sm"
               />
             )}
 
@@ -112,14 +112,14 @@ export const AnnotationCard = ({
                   autoFocus
                 />
               ) : hasContent ? (
-                <p className="text-sm text-gray-800">{annotation.object.contents}</p>
+                <p className="text-fg-primary text-sm">{annotation.object.contents}</p>
               ) : null}
             </div>
           </div>
         </div>
 
         {hasReplies && (
-          <div className="mt-4 space-y-4 border-t border-gray-100 pt-4">
+          <div className="border-border-subtle mt-4 space-y-4 border-t pt-4">
             {replies.map((reply) => (
               <Comment
                 key={reply.object.id}

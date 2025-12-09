@@ -5,7 +5,7 @@ import { PdfAnnotationBorderStyle, PdfPolygonAnnoObject } from '@embedpdf/models
 
 import { useDebounce } from '@/hooks/use-debounce';
 import { SidebarPropsBase } from './common';
-import { ColorSwatch, Slider, StrokeStyleSelect } from './ui';
+import { ColorSwatch, Slider, StrokeStyleSelect, Section, SectionLabel, ValueDisplay } from './ui';
 
 export const PolygonSidebar = ({
   selected,
@@ -74,8 +74,8 @@ export const PolygonSidebar = ({
   return (
     <Fragment>
       {/* stroke color */}
-      <section class="mb-6">
-        <label class="mb-3 block text-sm font-medium text-gray-900">Stroke color</label>
+      <Section>
+        <SectionLabel className="mb-3">Stroke color</SectionLabel>
         <div class="grid grid-cols-6 gap-x-1 gap-y-4">
           {colorPresets.map((c) => (
             <ColorSwatch key={c} color={c} active={c === stroke} onSelect={changeStroke} />
@@ -86,38 +86,38 @@ export const PolygonSidebar = ({
             onSelect={changeStroke}
           />
         </div>
-      </section>
+      </Section>
 
       {/* opacity */}
-      <section class="mb-6">
-        <label class="mb-1 block text-sm font-medium text-gray-900">Opacity</label>
+      <Section>
+        <SectionLabel>Opacity</SectionLabel>
         <Slider value={opacity} min={0.1} max={1} step={0.05} onChange={setOpac} />
-        <span class="text-xs text-gray-500">{Math.round(opacity * 100)}%</span>
-      </section>
+        <ValueDisplay>{Math.round(opacity * 100)}%</ValueDisplay>
+      </Section>
 
       {/* stroke style */}
-      <section class="mb-6">
-        <label class="mb-3 block text-sm font-medium text-gray-900">Stroke style</label>
+      <Section>
+        <SectionLabel className="mb-3">Stroke style</SectionLabel>
         <StrokeStyleSelect value={style} onChange={changeStyle} />
-      </section>
+      </Section>
 
       {/* stroke width */}
-      <section class="mb-6">
-        <label class="mb-1 block text-sm font-medium text-gray-900">Stroke width</label>
+      <Section>
+        <SectionLabel>Stroke width</SectionLabel>
         <Slider value={strokeW} min={1} max={10} step={1} onChange={setWidth} />
-        <span class="text-xs text-gray-500">{strokeW}</span>
-      </section>
+        <ValueDisplay>{strokeW}</ValueDisplay>
+      </Section>
 
       {/* fill color */}
-      <section class="mb-6">
-        <label class="mb-3 block text-sm font-medium text-gray-900">Fill color</label>
+      <Section>
+        <SectionLabel className="mb-3">Fill color</SectionLabel>
         <div class="grid grid-cols-6 gap-x-1 gap-y-4">
           {colorPresets.map((c) => (
             <ColorSwatch key={c} color={c} active={c === fill} onSelect={changeFill} />
           ))}
           <ColorSwatch color="transparent" active={fill === 'transparent'} onSelect={changeFill} />
         </div>
-      </section>
+      </Section>
     </Fragment>
   );
 };

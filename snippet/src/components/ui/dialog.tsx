@@ -96,22 +96,22 @@ export function Dialog({
     <div
       ref={overlayRef}
       className={`fixed inset-0 z-50 transition-opacity duration-200 md:flex md:items-center md:justify-center ${
-        isAnimating && open ? 'bg-black/50' : 'bg-black/0'
+        isAnimating && open ? 'bg-bg-overlay' : 'bg-transparent'
       }`}
       onClick={handleBackdropClick}
     >
       <div
-        className={`relative flex h-full w-full flex-col bg-white transition-all duration-200 md:h-auto md:w-[28rem] md:max-w-[90vw] md:rounded-lg md:border md:border-gray-200 md:shadow-lg ${
+        className={`bg-bg-surface md:border-border-subtle relative flex h-full w-full flex-col transition-all duration-200 md:h-auto md:w-[28rem] md:max-w-[90vw] md:rounded-lg md:border md:shadow-lg ${
           isAnimating && open ? 'scale-100 opacity-100' : 'scale-95 opacity-0'
         } ${className}`}
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
         {(title || showCloseButton) && (
-          <div className="flex flex-shrink-0 items-center justify-between border-b border-gray-200 px-6 py-4">
-            {title && <h2 className="text-lg font-semibold text-gray-900">{title}</h2>}
+          <div className="border-border-subtle flex flex-shrink-0 items-center justify-between border-b px-6 py-4">
+            {title && <h2 className="text-fg-primary text-lg font-semibold">{title}</h2>}
             {showCloseButton && (
-              <Button onClick={onClose} className="p-1 hover:bg-gray-100">
+              <Button onClick={onClose} className="hover:bg-interactive-hover p-1">
                 <Icon icon="x" className="h-5 w-5" />
               </Button>
             )}
