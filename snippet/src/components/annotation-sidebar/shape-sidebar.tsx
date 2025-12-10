@@ -1,6 +1,7 @@
 import { Fragment, h } from 'preact';
 import { useState, useEffect } from 'preact/hooks';
 import { useAnnotationCapability } from '@embedpdf/plugin-annotation/preact';
+import { useTranslations } from '@embedpdf/plugin-i18n/preact';
 import { SidebarPropsBase } from './common';
 import { Slider, ColorSwatch, StrokeStyleSelect, Section, SectionLabel, ValueDisplay } from './ui';
 import { useDebounce } from '../../hooks/use-debounce';
@@ -8,11 +9,13 @@ import { PdfCircleAnnoObject, PdfSquareAnnoObject } from '@embedpdf/models';
 import { PdfAnnotationBorderStyle } from '@embedpdf/models';
 
 export const ShapeSidebar = ({
+  documentId,
   selected,
   activeTool,
   colorPresets,
 }: SidebarPropsBase<PdfCircleAnnoObject | PdfSquareAnnoObject>) => {
   const { provides: annotation } = useAnnotationCapability();
+  const { translate } = useTranslations(documentId);
   if (!annotation) return null;
 
   const anno = selected?.object;
@@ -73,7 +76,7 @@ export const ShapeSidebar = ({
     <Fragment>
       {/* fill color */}
       <Section>
-        <SectionLabel className="mb-3">Fill color</SectionLabel>
+        <SectionLabel className="mb-3">{translate('annotation.fillColor')}</SectionLabel>
         <div class="grid grid-cols-6 gap-x-1 gap-y-4">
           {colorPresets.map((c) => (
             <ColorSwatch key={c} color={c} active={c === fill} onSelect={changeFill} />
@@ -84,14 +87,14 @@ export const ShapeSidebar = ({
 
       {/* opacity */}
       <Section>
-        <SectionLabel>Opacity</SectionLabel>
+        <SectionLabel>{translate('annotation.opacity')}</SectionLabel>
         <Slider value={opacity} min={0.1} max={1} step={0.05} onChange={setOpac} />
         <ValueDisplay>{Math.round(opacity * 100)}%</ValueDisplay>
       </Section>
 
       {/* stroke color */}
       <Section>
-        <SectionLabel className="mb-3">Stroke color</SectionLabel>
+        <SectionLabel className="mb-3">{translate('annotation.strokeColor')}</SectionLabel>
         <div class="grid grid-cols-6 gap-x-1 gap-y-4">
           {colorPresets.map((c) => (
             <ColorSwatch key={c} color={c} active={c === stroke} onSelect={changeStroke} />
@@ -101,13 +104,13 @@ export const ShapeSidebar = ({
 
       {/* stroke style */}
       <Section>
-        <SectionLabel className="mb-3">Stroke style</SectionLabel>
+        <SectionLabel className="mb-3">{translate('annotation.borderStyle')}</SectionLabel>
         <StrokeStyleSelect value={style} onChange={changeStyle} />
       </Section>
 
       {/* stroke-width */}
       <Section>
-        <SectionLabel>Stroke width</SectionLabel>
+        <SectionLabel>{translate('annotation.strokeWidth')}</SectionLabel>
         <Slider value={strokeW} min={1} max={30} step={1} onChange={setWidth} />
         <ValueDisplay>{strokeW}px</ValueDisplay>
       </Section>

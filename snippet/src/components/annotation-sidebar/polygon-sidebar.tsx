@@ -1,6 +1,7 @@
 import { Fragment, h } from 'preact';
 import { useEffect, useState } from 'preact/hooks';
 import { useAnnotationCapability } from '@embedpdf/plugin-annotation/preact';
+import { useTranslations } from '@embedpdf/plugin-i18n/preact';
 import { PdfAnnotationBorderStyle, PdfPolygonAnnoObject } from '@embedpdf/models';
 
 import { useDebounce } from '@/hooks/use-debounce';
@@ -8,11 +9,13 @@ import { SidebarPropsBase } from './common';
 import { ColorSwatch, Slider, StrokeStyleSelect, Section, SectionLabel, ValueDisplay } from './ui';
 
 export const PolygonSidebar = ({
+  documentId,
   selected,
   activeTool,
   colorPresets,
 }: SidebarPropsBase<PdfPolygonAnnoObject>) => {
   const { provides: annotation } = useAnnotationCapability();
+  const { translate } = useTranslations(documentId);
   if (!annotation) return null;
 
   const anno = selected?.object;
@@ -75,7 +78,7 @@ export const PolygonSidebar = ({
     <Fragment>
       {/* stroke color */}
       <Section>
-        <SectionLabel className="mb-3">Stroke color</SectionLabel>
+        <SectionLabel className="mb-3">{translate('annotation.strokeColor')}</SectionLabel>
         <div class="grid grid-cols-6 gap-x-1 gap-y-4">
           {colorPresets.map((c) => (
             <ColorSwatch key={c} color={c} active={c === stroke} onSelect={changeStroke} />
@@ -90,27 +93,27 @@ export const PolygonSidebar = ({
 
       {/* opacity */}
       <Section>
-        <SectionLabel>Opacity</SectionLabel>
+        <SectionLabel>{translate('annotation.opacity')}</SectionLabel>
         <Slider value={opacity} min={0.1} max={1} step={0.05} onChange={setOpac} />
         <ValueDisplay>{Math.round(opacity * 100)}%</ValueDisplay>
       </Section>
 
       {/* stroke style */}
       <Section>
-        <SectionLabel className="mb-3">Stroke style</SectionLabel>
+        <SectionLabel className="mb-3">{translate('annotation.borderStyle')}</SectionLabel>
         <StrokeStyleSelect value={style} onChange={changeStyle} />
       </Section>
 
       {/* stroke width */}
       <Section>
-        <SectionLabel>Stroke width</SectionLabel>
+        <SectionLabel>{translate('annotation.strokeWidth')}</SectionLabel>
         <Slider value={strokeW} min={1} max={10} step={1} onChange={setWidth} />
         <ValueDisplay>{strokeW}</ValueDisplay>
       </Section>
 
       {/* fill color */}
       <Section>
-        <SectionLabel className="mb-3">Fill color</SectionLabel>
+        <SectionLabel className="mb-3">{translate('annotation.fillColor')}</SectionLabel>
         <div class="grid grid-cols-6 gap-x-1 gap-y-4">
           {colorPresets.map((c) => (
             <ColorSwatch key={c} color={c} active={c === fill} onSelect={changeFill} />

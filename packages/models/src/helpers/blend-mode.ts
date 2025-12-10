@@ -111,7 +111,8 @@ export function reduceBlendModes(modes: readonly PdfBlendMode[]): UiBlendModeVal
   return modes.every((m) => m === first) ? first : MixedBlendMode;
 }
 
-/** Options for a <select>.
+/** Options for a <select> (with English labels - for quick prototyping).
+ * For i18n, use `blendModeValues` and translate labels in your UI layer.
  *
  * @public
  */
@@ -119,6 +120,14 @@ export const blendModeSelectOptions = BLEND_MODE_INFOS.map((info) => ({
   value: info.id,
   label: info.label,
 }));
+
+/**
+ * All blend mode enum values in canonical order.
+ * Use this to build translated select options in your UI layer.
+ *
+ * @public
+ */
+export const blendModeValues: readonly PdfBlendMode[] = BLEND_MODE_INFOS.map((info) => info.id);
 
 /** Provide a label when Mixed sentinel used (UI convenience).
  *

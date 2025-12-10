@@ -1,5 +1,6 @@
 import { h } from 'preact';
 import { useEffect, useRef, useState } from 'preact/hooks';
+import { useTranslations } from '@embedpdf/plugin-i18n/preact';
 import { SidebarAnnotationEntry, TrackedAnnotation } from '@embedpdf/plugin-annotation';
 import { AnnotationInput } from './annotation-input';
 import { Comment } from './comment';
@@ -17,6 +18,7 @@ interface AnnotationCardProps {
   onUpdate: (id: string, contents: string) => void;
   onDelete: (annotation: TrackedAnnotation) => void;
   onReply: (inReplyToId: string, contents: string) => void;
+  documentId: string;
 }
 
 export const AnnotationCard = ({
@@ -26,10 +28,12 @@ export const AnnotationCard = ({
   onUpdate,
   onDelete,
   onReply,
+  documentId,
 }: AnnotationCardProps) => {
   const { annotation, replies } = entry;
   const [isMenuOpen, setMenuOpen] = useState(false);
   const [isEditing, setEditing] = useState(false);
+  const { translate } = useTranslations(documentId);
 
   const config = getAnnotationConfig(annotation);
   const hasContent = !!annotation.object.contents;
@@ -90,6 +94,7 @@ export const AnnotationCard = ({
                     onEdit={() => setEditing(true)}
                     onDelete={() => onDelete(annotation)}
                     onClose={() => setMenuOpen(false)}
+                    documentId={documentId}
                   />
                 )}
               </div>
@@ -100,6 +105,7 @@ export const AnnotationCard = ({
                 text={annotation.object.custom.text}
                 maxWords={14}
                 className="text-fg-muted mt-2 text-sm"
+                documentId={documentId}
               />
             )}
 
@@ -110,6 +116,7 @@ export const AnnotationCard = ({
                   onSave={handleSaveEdit}
                   onCancel={handleCancelEdit}
                   autoFocus
+                  documentId={documentId}
                 />
               ) : hasContent ? (
                 <p className="text-fg-primary text-sm">{annotation.object.contents}</p>
@@ -127,6 +134,7 @@ export const AnnotationCard = ({
                 onSave={(text) => onUpdate(reply.object.id, text)}
                 onDelete={() => onDelete(reply)}
                 isReply
+                documentId={documentId}
               />
             ))}
           </div>
@@ -136,7 +144,9 @@ export const AnnotationCard = ({
           <AnnotationInput
             inputRef={inputRef}
             isFocused={isSelected}
-            placeholder={showCommentInput ? 'Add comment...' : 'Add reply...'}
+            placeholder={
+              showCommentInput ? translate('comments.addComment') : translate('comments.addReply')
+            }
             onSubmit={(text) => {
               if (showCommentInput) {
                 onUpdate(annotation.object.id, text);

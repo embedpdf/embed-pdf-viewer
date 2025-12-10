@@ -13,6 +13,7 @@ import {
   PdfVerticalAlignment,
 } from '@embedpdf/models';
 import { useAnnotationCapability } from '@embedpdf/plugin-annotation/preact';
+import { useTranslations } from '@embedpdf/plugin-i18n/preact';
 
 import { SidebarPropsBase } from './common';
 import { useDebounce } from '@/hooks/use-debounce';
@@ -29,12 +30,14 @@ import { Icon } from '../ui/icon';
 import { ToggleButton } from '../ui/toggle-button';
 
 export const FreeTextSidebar = ({
+  documentId,
   selected,
   activeTool,
   colorPresets,
 }: SidebarPropsBase<PdfFreeTextAnnoObject>) => {
   /* ────────────────────────  Model / capability  ─────────────────────── */
   const { provides: annotation } = useAnnotationCapability();
+  const { translate } = useTranslations(documentId);
   if (!annotation) return null;
 
   const anno = selected?.object;
@@ -174,7 +177,7 @@ export const FreeTextSidebar = ({
     <Fragment>
       {/* font family + style */}
       <Section>
-        <SectionLabel>Font</SectionLabel>
+        <SectionLabel>{translate('annotation.font')}</SectionLabel>
 
         {/* Family + size */}
         <div class="mb-3 flex gap-2">
@@ -214,7 +217,7 @@ export const FreeTextSidebar = ({
 
       {/* text alignment */}
       <Section>
-        <SectionLabel>Text alignment</SectionLabel>
+        <SectionLabel>{translate('annotation.textAlign')}</SectionLabel>
         <div class="flex gap-2">
           <ToggleButton
             title="Align left"
@@ -242,7 +245,7 @@ export const FreeTextSidebar = ({
 
       {/* vertical alignment */}
       <Section>
-        <SectionLabel>Vertical alignment</SectionLabel>
+        <SectionLabel>{translate('annotation.verticalAlign')}</SectionLabel>
         <div class="flex gap-2">
           <ToggleButton
             title="Align top"
@@ -270,7 +273,7 @@ export const FreeTextSidebar = ({
 
       {/* font colour */}
       <Section>
-        <SectionLabel className="mb-3">Font colour</SectionLabel>
+        <SectionLabel className="mb-3">{translate('annotation.fontColor')}</SectionLabel>
         <div class="grid grid-cols-6 gap-x-1 gap-y-4">
           {colorPresets.map((c) => (
             <ColorSwatch key={c} color={c} active={c === fontColor} onSelect={changeFontColor} />
@@ -280,7 +283,7 @@ export const FreeTextSidebar = ({
 
       {/* background colour */}
       <Section>
-        <SectionLabel className="mb-3">Background colour</SectionLabel>
+        <SectionLabel className="mb-3">{translate('annotation.backgroundColor')}</SectionLabel>
         <div class="grid grid-cols-6 gap-x-1 gap-y-4">
           {colorPresets.map((c) => (
             <ColorSwatch
@@ -301,7 +304,7 @@ export const FreeTextSidebar = ({
 
       {/* opacity */}
       <Section>
-        <SectionLabel>Opacity</SectionLabel>
+        <SectionLabel>{translate('annotation.opacity')}</SectionLabel>
         <Slider value={opacity} min={0.1} max={1} step={0.05} onChange={setOpacity} />
         <ValueDisplay>{Math.round(opacity * 100)}%</ValueDisplay>
       </Section>

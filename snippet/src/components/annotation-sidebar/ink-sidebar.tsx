@@ -1,17 +1,20 @@
 import { Fragment, h } from 'preact';
 import { useState, useEffect } from 'preact/hooks';
 import { useAnnotationCapability } from '@embedpdf/plugin-annotation/preact';
+import { useTranslations } from '@embedpdf/plugin-i18n/preact';
 import { PdfInkAnnoObject } from '@embedpdf/models';
 import { SidebarPropsBase } from './common';
 import { Slider, ColorSwatch, Section, SectionLabel, ValueDisplay } from './ui';
 import { useDebounce } from '../../hooks/use-debounce';
 
 export const InkSidebar = ({
+  documentId,
   selected,
   activeTool,
   colorPresets,
 }: SidebarPropsBase<PdfInkAnnoObject>) => {
   const { provides: annotation } = useAnnotationCapability();
+  const { translate } = useTranslations(documentId);
   if (!annotation) return null;
 
   const anno = selected?.object;
@@ -55,7 +58,7 @@ export const InkSidebar = ({
     <Fragment>
       {/* color */}
       <Section>
-        <SectionLabel className="mb-3">Color</SectionLabel>
+        <SectionLabel className="mb-3">{translate('annotation.color')}</SectionLabel>
         <div class="grid grid-cols-6 gap-x-1 gap-y-4">
           {colorPresets.map((c) => (
             <ColorSwatch key={c} color={c} active={c === color} onSelect={changeColor} />
@@ -65,14 +68,14 @@ export const InkSidebar = ({
 
       {/* opacity */}
       <Section>
-        <SectionLabel>Opacity</SectionLabel>
+        <SectionLabel>{translate('annotation.opacity')}</SectionLabel>
         <Slider value={opacity} min={0.1} max={1} step={0.05} onChange={setOpacity} />
         <ValueDisplay>{Math.round(opacity * 100)}%</ValueDisplay>
       </Section>
 
       {/* stroke-width */}
       <Section>
-        <SectionLabel>Stroke width</SectionLabel>
+        <SectionLabel>{translate('annotation.strokeWidth')}</SectionLabel>
         <Slider value={stroke} min={1} max={30} step={1} onChange={setStroke} />
         <ValueDisplay>{stroke}px</ValueDisplay>
       </Section>

@@ -1,14 +1,22 @@
 import { h, Fragment } from 'preact';
 import { useState } from 'preact/hooks';
+import { useTranslations } from '@embedpdf/plugin-i18n/preact';
 
 interface TruncatedTextProps {
   text: string;
   maxWords?: number;
   className?: string;
+  documentId: string;
 }
 
-export const TruncatedText = ({ text, maxWords = 16, className = '' }: TruncatedTextProps) => {
+export const TruncatedText = ({
+  text,
+  maxWords = 16,
+  className = '',
+  documentId,
+}: TruncatedTextProps) => {
   const [isExpanded, setExpanded] = useState(false);
+  const { translate } = useTranslations(documentId);
 
   const words = text.split(' ');
   const shouldTruncate = words.length > maxWords;
@@ -29,7 +37,7 @@ export const TruncatedText = ({ text, maxWords = 16, className = '' }: Truncated
         }}
         className="text-accent hover:text-accent-hover text-sm font-medium focus:outline-none"
       >
-        {isExpanded ? 'less' : 'more'}
+        {isExpanded ? translate('comments.showLess') : translate('comments.showMore')}
       </button>
     </div>
   );

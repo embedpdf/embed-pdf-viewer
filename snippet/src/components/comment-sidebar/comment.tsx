@@ -1,6 +1,7 @@
 import { h } from 'preact';
 import { useState } from 'preact/hooks';
 import { PdfAnnotationObject } from '@embedpdf/models';
+import { useTranslations } from '@embedpdf/plugin-i18n/preact';
 import { UserAvatar } from './user-avatar';
 import { MenuDropdown } from './menu-dropdown';
 import { EditCommentForm } from './edit-comment-form';
@@ -11,9 +12,16 @@ interface CommentProps {
   onSave: (text: string) => void;
   onDelete: () => void;
   isReply?: boolean;
+  documentId: string;
 }
 
-export const Comment = ({ annotation, onSave, onDelete, isReply = false }: CommentProps) => {
+export const Comment = ({
+  annotation,
+  onSave,
+  onDelete,
+  isReply = false,
+  documentId,
+}: CommentProps) => {
   const [isMenuOpen, setMenuOpen] = useState(false);
   const [isEditing, setEditing] = useState(false);
   const author = annotation.author || 'Guest';
@@ -36,6 +44,7 @@ export const Comment = ({ annotation, onSave, onDelete, isReply = false }: Comme
           onSave={handleSave}
           onCancel={handleCancel}
           autoFocus
+          documentId={documentId}
         />
       </div>
     );
@@ -71,6 +80,7 @@ export const Comment = ({ annotation, onSave, onDelete, isReply = false }: Comme
                   onEdit={() => setEditing(true)}
                   onDelete={onDelete}
                   onClose={() => setMenuOpen(false)}
+                  documentId={documentId}
                 />
               )}
             </div>

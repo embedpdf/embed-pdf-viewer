@@ -36,15 +36,16 @@ export function AnnotationSidebar({ documentId }: { documentId: string }) {
   }
 
   // 2. If we couldn't determine a subtype, show the empty state
-  if (subtype === null) return <EmptyState />;
+  if (subtype === null) return <EmptyState documentId={documentId} />;
 
   const entry = SidebarRegistry[subtype];
-  if (!entry) return <EmptyState />;
+  if (!entry) return <EmptyState documentId={documentId} />;
 
   const { component: Sidebar, title } = entry;
 
   // 3. Prepare the simplified props for the sidebar component
   const commonProps: SidebarPropsBase<any> = {
+    documentId,
     selected: selectedAnnotation,
     activeTool: tool,
     colorPresets,

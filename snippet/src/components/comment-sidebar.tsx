@@ -7,6 +7,7 @@ import {
   useAnnotationCapability,
 } from '@embedpdf/plugin-annotation/preact';
 import { useScrollCapability } from '@embedpdf/plugin-scroll/preact';
+import { useTranslations } from '@embedpdf/plugin-i18n/preact';
 import { TrackedAnnotation } from '@embedpdf/plugin-annotation';
 import { uuidV4, PdfAnnotationSubtype, PdfAnnotationIcon } from '@embedpdf/models';
 import { AnnotationCard } from './comment-sidebar/annotation-card';
@@ -20,6 +21,7 @@ export const CommentSidebar = ({ documentId }: CommentSidebarProps) => {
   const { provides: annotationApi } = useAnnotationCapability();
   const { provides: annotation, state } = useAnnotation(documentId);
   const { provides: scrollApi } = useScrollCapability();
+  const { translate } = useTranslations(documentId);
   const annotationRefs = useRef<Record<string, HTMLDivElement | null>>({});
   const scrollContainerRef = useRef<HTMLDivElement>(null);
 
@@ -122,7 +124,7 @@ export const CommentSidebar = ({ documentId }: CommentSidebarProps) => {
   };
 
   if (sortedPages.length === 0) {
-    return <EmptyState />;
+    return <EmptyState documentId={documentId} />;
   }
 
   return (
@@ -133,10 +135,15 @@ export const CommentSidebar = ({ documentId }: CommentSidebarProps) => {
             {/* Page Header */}
             <div className="bg-bg-surface sticky top-0 z-10 px-1">
               <div className="border-border-subtle border-b py-2">
-                <h3 className="text-md text-fg-primary font-semibold">Page {pageNumber + 1}</h3>
+                <h3 className="text-md text-fg-primary font-semibold">
+                  {translate('comments.page', { params: { page: pageNumber + 1 } })}
+                </h3>
                 <p className="text-fg-muted text-sm">
-                  {sidebarAnnotations[pageNumber].length} comment
-                  {sidebarAnnotations[pageNumber].length !== 1 ? 's' : ''}
+                  {sidebarAnnotations[pageNumber].length === 1
+                    ? translate('comments.commentCount', { params: { count: 1 } })
+                    : translate('comments.commentCountPlural', {
+                        params: { count: sidebarAnnotations[pageNumber].length },
+                      })}
                 </p>
               </div>
             </div>
@@ -159,6 +166,7 @@ export const CommentSidebar = ({ documentId }: CommentSidebarProps) => {
                     onUpdate={handleUpdate}
                     onDelete={handleDelete}
                     onReply={handleReply}
+                    documentId={documentId}
                   />
                 </div>
               ))}

@@ -525,7 +525,7 @@ export const commands: Record<string, Command<State>> = {
 
   'panel:toggle-annotation-style': {
     id: 'panel:toggle-annotation-style',
-    labelKey: 'panel.annotation-style',
+    labelKey: 'panel.annotationStyle',
     icon: 'palette',
     categories: ['panels'],
     action: ({ registry, documentId }) => {
