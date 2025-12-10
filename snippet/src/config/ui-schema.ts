@@ -1013,6 +1013,7 @@ export const viewerUISchema: UISchema = {
   selectionMenus: {
     annotation: {
       id: 'annotation',
+      categories: ['annotation'],
       items: [
         {
           type: 'command-button',
@@ -1036,6 +1037,7 @@ export const viewerUISchema: UISchema = {
     },
     redaction: {
       id: 'redaction',
+      categories: ['redaction'],
       items: [
         {
           type: 'command-button',
@@ -1053,12 +1055,23 @@ export const viewerUISchema: UISchema = {
     },
     selection: {
       id: 'selection',
+      visibilityDependsOn: {
+        itemIds: [
+          'copy-selection',
+          'add-highlight',
+          'add-strikeout',
+          'add-underline',
+          'add-squiggly',
+          'redact-text',
+        ],
+      },
       items: [
         {
           type: 'command-button',
           id: 'copy-selection',
           commandId: 'selection:copy',
           variant: 'icon',
+          categories: ['selection'],
         },
         {
           type: 'command-button',

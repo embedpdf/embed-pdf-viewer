@@ -12,6 +12,12 @@ import {
   onSystemColorSchemeChange,
   generateThemeStylesheet,
 } from '@/config/theme';
+import {
+  IconConfig,
+  IconsConfig,
+  registerIcon as globalRegisterIcon,
+  registerIcons as globalRegisterIcons,
+} from '@/config/icon-registry';
 
 export class EmbedPdfContainer extends HTMLElement {
   private root: ShadowRoot;
@@ -69,6 +75,12 @@ export class EmbedPdfContainer extends HTMLElement {
   // Setter for config
   set config(newConfig: PDFViewerConfig) {
     this._config = newConfig;
+
+    // Register any icons provided in config
+    if (newConfig.icons) {
+      globalRegisterIcons(newConfig.icons);
+    }
+
     if (this.isConnected) {
       this.setupTheme();
       this.renderViewer();
@@ -203,6 +215,23 @@ export class EmbedPdfContainer extends HTMLElement {
         }),
       );
     }
+  }
+
+  /**
+   * Registers a custom icon
+   * @param name - Unique icon name
+   * @param config - Icon configuration
+   */
+  registerIcon(name: string, config: IconConfig) {
+    globalRegisterIcon(name, config);
+  }
+
+  /**
+   * Registers multiple custom icons
+   * @param icons - Map of icon name to configuration
+   */
+  registerIcons(icons: IconsConfig) {
+    globalRegisterIcons(icons);
   }
 
   // Callback to receive registry from PDFViewer

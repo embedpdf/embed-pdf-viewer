@@ -12,7 +12,7 @@ import {
 import { useCommand } from '@embedpdf/plugin-commands/preact';
 import { useTranslations } from '@embedpdf/plugin-i18n/preact';
 import { ChevronLeftIcon } from '@/components/icons/chevron-left';
-import { icons } from '@/components/icons';
+import { Icon } from '@/components/ui/icon';
 import { ChevronRightIcon } from '@/components/icons/chevron-right';
 import { useContainerBreakpoint } from './hooks/use-container-breakpoint';
 
@@ -533,8 +533,6 @@ function CommandMenuItem({
 
   if (!command || !command.visible) return null;
 
-  const IconComponent = command.icon ? icons[command.icon] : null;
-
   const handleClick = () => {
     if (!command.disabled) {
       command.execute();
@@ -553,8 +551,9 @@ function CommandMenuItem({
         } ${command.active ? 'bg-interactive-selected text-accent' : 'text-fg-secondary'}`}
         role="menuitem"
       >
-        {IconComponent && (
-          <IconComponent
+        {command.icon && (
+          <Icon
+            icon={command.icon}
             className="h-5 w-5"
             primaryColor={command.iconProps?.primaryColor}
             secondaryColor={command.iconProps?.secondaryColor}
@@ -581,8 +580,9 @@ function CommandMenuItem({
     >
       <div className="flex items-center gap-2">
         <div className="flex h-6 w-6 items-center justify-center">
-          {IconComponent && (
-            <IconComponent
+          {command.icon && (
+            <Icon
+              icon={command.icon}
               className="h-6 w-6"
               primaryColor={command.iconProps?.primaryColor}
               secondaryColor={command.iconProps?.secondaryColor}

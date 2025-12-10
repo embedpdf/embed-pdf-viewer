@@ -9,7 +9,7 @@ import {
 import { useCommand } from '@embedpdf/plugin-commands/preact';
 import { twMerge } from 'tailwind-merge';
 import { TabButton } from '@/components/ui/tab-button';
-import { icons } from '@/components/icons';
+import { Icon } from '@/components/ui/icon';
 import { CommandButton } from '@/components/command-button';
 
 // No more responsive-utils import needed!
@@ -177,11 +177,9 @@ function TabIcon({
   icon: string;
   iconProps?: { primaryColor?: string; secondaryColor?: string };
 }) {
-  const IconComponent = icons[icon];
-  if (!IconComponent) return null;
-
   return (
-    <IconComponent
+    <Icon
+      icon={icon}
       className="h-5 w-5"
       primaryColor={iconProps?.primaryColor}
       secondaryColor={iconProps?.secondaryColor}

@@ -4,7 +4,7 @@ import { useRegisterAnchor } from '@embedpdf/plugin-ui/preact';
 import { twMerge } from 'tailwind-merge';
 import { Button } from './ui/button';
 import { Tooltip } from './ui/tooltip';
-import { icons } from './icons';
+import { Icon } from './ui/icon';
 
 type CommandButtonProps = {
   commandId: string;
@@ -32,8 +32,6 @@ export function CommandButton({
 
   if (!command || !command.visible) return null;
 
-  // Get the icon component from the icons object
-  const IconComponent = command.icon ? icons[command.icon] : null;
   const iconProps = command.iconProps || {};
 
   const handleClick = () => {
@@ -61,9 +59,10 @@ export function CommandButton({
           <span className="text-sm">{command.label}</span>
         ) : variant === 'icon-text' ? (
           <>
-            {IconComponent && (
-              <IconComponent
-                className={`mr-2 h-5 w-5`}
+            {command.icon && (
+              <Icon
+                icon={command.icon}
+                className="mr-2 h-5 w-5"
                 primaryColor={iconProps.primaryColor}
                 secondaryColor={iconProps.secondaryColor}
               />
@@ -72,8 +71,9 @@ export function CommandButton({
           </>
         ) : variant === 'tab' ? (
           <span className="px-3 py-1">{command.label}</span>
-        ) : IconComponent ? (
-          <IconComponent
+        ) : command.icon ? (
+          <Icon
+            icon={command.icon}
             className={twMerge('h-5 w-5', iconProps.className)}
             primaryColor={iconProps.primaryColor}
             secondaryColor={iconProps.secondaryColor}
