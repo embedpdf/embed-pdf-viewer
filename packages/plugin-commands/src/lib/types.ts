@@ -35,8 +35,8 @@ export interface Command<TStore = any> {
   shortcuts?: string | string[];
   shortcutLabel?: string; // Display label for shortcuts
 
-  // Metadata
-  category?: string;
+  // Metadata - commands can belong to multiple categories
+  categories?: string[];
   description?: string;
 }
 
@@ -50,7 +50,7 @@ export interface ResolvedCommand {
   visible: boolean;
   shortcuts?: string[];
   shortcutLabel?: string;
-  category?: string;
+  categories?: string[];
   description?: string;
   execute: () => void; // Pre-bound to documentId
 }
@@ -62,11 +62,13 @@ export interface GlobalStoreState<TPlugins extends Record<string, any> = {}> {
 
 export interface CommandsPluginConfig extends BasePluginConfig {
   commands: Record<string, Command>;
+  /** Categories to disable at initialization */
+  disabledCategories?: string[];
 }
 
 export interface CommandsState {
-  // Track which commands have changed (for optimization)
-  changedCommands: Set<string>;
+  /** Globally disabled command categories */
+  disabledCategories: string[];
 }
 
 // Events
@@ -92,6 +94,10 @@ export interface ShortcutExecutedEvent {
   shortcut: string;
   commandId: string;
   documentId: string;
+}
+
+export interface CategoryChangedEvent {
+  disabledCategories: string[];
 }
 
 export interface CommandScope {
@@ -120,8 +126,17 @@ export interface CommandsCapability {
   registerCommand(command: Command): void;
   unregisterCommand(commandId: string): void;
 
+  // Category management
+  disableCategory(category: string): void;
+  enableCategory(category: string): void;
+  toggleCategory(category: string): void;
+  setDisabledCategories(categories: string[]): void;
+  getDisabledCategories(): string[];
+  isCategoryDisabled(category: string): boolean;
+
   // Global events
   onCommandExecuted: EventHook<CommandExecutedEvent>;
   onCommandStateChanged: EventHook<CommandStateChangedEvent>;
   onShortcutExecuted: EventHook<ShortcutExecutedEvent>;
+  onCategoryChanged: EventHook<CategoryChangedEvent>;
 }

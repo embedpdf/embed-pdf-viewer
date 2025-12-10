@@ -3,6 +3,7 @@ import {
   PluginRegistry,
   StoreState,
   createEmitter,
+  createBehaviorEmitter,
   Listener,
   arePropsEqual,
 } from '@embedpdf/core';
@@ -16,10 +17,11 @@ import {
   CommandExecutedEvent,
   CommandStateChangedEvent,
   ShortcutExecutedEvent,
+  CategoryChangedEvent,
   CommandScope,
   Dynamic,
 } from './types';
-import { CommandsAction } from './actions';
+import { CommandsAction, setDisabledCategories } from './actions';
 
 export class CommandsPlugin extends BasePlugin<
   CommandsPluginConfig,
@@ -36,6 +38,7 @@ export class CommandsPlugin extends BasePlugin<
   private readonly commandExecuted$ = createEmitter<CommandExecutedEvent>();
   private readonly commandStateChanged$ = createEmitter<CommandStateChangedEvent>();
   private readonly shortcutExecuted$ = createEmitter<ShortcutExecutedEvent>();
+  private readonly categoryChanged$ = createBehaviorEmitter<CategoryChangedEvent>();
 
   // Cache previous resolved states per document to detect changes
   private previousStates = new Map<string, Map<string, ResolvedCommand>>();
@@ -46,6 +49,11 @@ export class CommandsPlugin extends BasePlugin<
     // Check if i18n plugin is available (optional dependency)
     const i18nPlugin = registry.getPlugin<I18nPlugin>('i18n');
     this.i18n = i18nPlugin?.provides() ?? null;
+
+    // Initialize disabled categories from config
+    if (config.disabledCategories?.length) {
+      this.dispatch(setDisabledCategories(config.disabledCategories));
+    }
 
     // Register all commands from config
     Object.values(config.commands).forEach((command) => {
@@ -77,10 +85,54 @@ export class CommandsPlugin extends BasePlugin<
     this.commandExecuted$.clear();
     this.commandStateChanged$.clear();
     this.shortcutExecuted$.clear();
+    this.categoryChanged$.clear();
     this.commands.clear();
     this.shortcutMap.clear();
     this.previousStates.clear();
     super.destroy();
+  }
+
+  // ─────────────────────────────────────────────────────────
+  // Category Management
+  // ─────────────────────────────────────────────────────────
+
+  private disableCategoryImpl(category: string): void {
+    const current = new Set(this.state.disabledCategories);
+    if (!current.has(category)) {
+      current.add(category);
+      this.dispatch(setDisabledCategories(Array.from(current)));
+      this.categoryChanged$.emit({ disabledCategories: Array.from(current) });
+    }
+  }
+
+  private enableCategoryImpl(category: string): void {
+    const current = new Set(this.state.disabledCategories);
+    if (current.has(category)) {
+      current.delete(category);
+      this.dispatch(setDisabledCategories(Array.from(current)));
+      this.categoryChanged$.emit({ disabledCategories: Array.from(current) });
+    }
+  }
+
+  private toggleCategoryImpl(category: string): void {
+    if (this.state.disabledCategories.includes(category)) {
+      this.enableCategoryImpl(category);
+    } else {
+      this.disableCategoryImpl(category);
+    }
+  }
+
+  private setDisabledCategoriesImpl(categories: string[]): void {
+    this.dispatch(setDisabledCategories(categories));
+    this.categoryChanged$.emit({ disabledCategories: categories });
+  }
+
+  /**
+   * Check if command has any disabled category
+   */
+  private isCommandCategoryDisabled(command: Command): boolean {
+    if (!command.categories?.length) return false;
+    return command.categories.some((cat) => this.state.disabledCategories.includes(cat));
   }
 
   // ─────────────────────────────────────────────────────────
@@ -100,9 +152,20 @@ export class CommandsPlugin extends BasePlugin<
       forDocument: (documentId) => this.createCommandScope(documentId),
       registerCommand: (command) => this.registerCommand(command),
       unregisterCommand: (commandId) => this.unregisterCommand(commandId),
+
+      // Category management
+      disableCategory: (category) => this.disableCategoryImpl(category),
+      enableCategory: (category) => this.enableCategoryImpl(category),
+      toggleCategory: (category) => this.toggleCategoryImpl(category),
+      setDisabledCategories: (categories) => this.setDisabledCategoriesImpl(categories),
+      getDisabledCategories: () => this.state.disabledCategories,
+      isCategoryDisabled: (category) => this.state.disabledCategories.includes(category),
+
+      // Events
       onCommandExecuted: this.commandExecuted$.on,
       onCommandStateChanged: this.commandStateChanged$.on,
       onShortcutExecuted: this.shortcutExecuted$.on,
+      onCategoryChanged: this.categoryChanged$.on,
     };
   }
 
@@ -150,17 +213,22 @@ export class CommandsPlugin extends BasePlugin<
         : [command.shortcuts]
       : undefined;
 
+    // Check if disabled via categories OR explicit disabled predicate
+    const explicitDisabled = this.resolveDynamic(command.disabled, state, resolvedDocId) ?? false;
+    const categoryDisabled = this.isCommandCategoryDisabled(command);
+    const isDisabled = explicitDisabled || categoryDisabled;
+
     return {
       id: command.id,
       label,
       icon: this.resolveDynamic(command.icon, state, resolvedDocId),
       iconProps: this.resolveDynamic(command.iconProps, state, resolvedDocId),
       active: this.resolveDynamic(command.active, state, resolvedDocId) ?? false,
-      disabled: this.resolveDynamic(command.disabled, state, resolvedDocId) ?? false,
+      disabled: isDisabled,
       visible: this.resolveDynamic(command.visible, state, resolvedDocId) ?? true,
       shortcuts,
       shortcutLabel: command.shortcutLabel,
-      category: command.category,
+      categories: command.categories,
       description: command.description,
       execute: () => command.action({ registry: this.registry, state, documentId: resolvedDocId }),
     };
@@ -321,7 +389,7 @@ export class CommandsPlugin extends BasePlugin<
   private getCommandsByCategory(category: string, documentId?: string): ResolvedCommand[] {
     const resolvedDocId = documentId ?? this.getActiveDocumentId();
     return Array.from(this.commands.values())
-      .filter((cmd) => cmd.category === category)
+      .filter((cmd) => cmd.categories?.includes(category))
       .map((cmd) => this.resolve(cmd.id, resolvedDocId));
   }
 

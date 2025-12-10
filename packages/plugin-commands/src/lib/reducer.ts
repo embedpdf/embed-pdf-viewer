@@ -1,9 +1,9 @@
 import { Reducer } from '@embedpdf/core';
 import { CommandsState } from './types';
-import { CommandsAction, MARK_COMMANDS_CHANGED, CLEAR_CHANGED_COMMANDS } from './actions';
+import { CommandsAction, SET_DISABLED_CATEGORIES } from './actions';
 
 export const initialState: CommandsState = {
-  changedCommands: new Set(),
+  disabledCategories: [],
 };
 
 export const commandsReducer: Reducer<CommandsState, CommandsAction> = (
@@ -11,21 +11,11 @@ export const commandsReducer: Reducer<CommandsState, CommandsAction> = (
   action,
 ) => {
   switch (action.type) {
-    case MARK_COMMANDS_CHANGED: {
-      const newSet = new Set(state.changedCommands);
-      action.payload.forEach((id) => newSet.add(id));
+    case SET_DISABLED_CATEGORIES:
       return {
         ...state,
-        changedCommands: newSet,
+        disabledCategories: action.payload,
       };
-    }
-
-    case CLEAR_CHANGED_COMMANDS: {
-      return {
-        ...state,
-        changedCommands: new Set(),
-      };
-    }
 
     default:
       return state;

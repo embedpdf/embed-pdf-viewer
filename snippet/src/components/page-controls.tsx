@@ -4,6 +4,7 @@ import { useScroll } from '@embedpdf/plugin-scroll/preact';
 import { useViewportCapability } from '@embedpdf/plugin-viewport/preact';
 import { ChevronLeftIcon } from './icons/chevron-left';
 import { ChevronRightIcon } from './icons/chevron-right';
+import { CommandButton } from './command-button';
 
 interface PageControlsProps {
   documentId: string;
@@ -131,14 +132,7 @@ export function PageControls({ documentId }: PageControlsProps) {
         }`}
       >
         {/* Previous Button */}
-        <button
-          onClick={handlePreviousPage}
-          disabled={currentPage <= 1}
-          className={`${buttonBaseClass} ${buttonHoverClass} ${buttonDisabledClass} text-fg-secondary`}
-          aria-label="Previous page"
-        >
-          <ChevronLeftIcon className="h-5 w-5" />
-        </button>
+        <CommandButton commandId="scroll:previous-page" documentId={documentId} variant="icon" />
 
         {/* Page Input */}
         <div className="flex items-center gap-1 px-1">
@@ -158,14 +152,7 @@ export function PageControls({ documentId }: PageControlsProps) {
         </div>
 
         {/* Next Button */}
-        <button
-          onClick={handleNextPage}
-          disabled={currentPage >= totalPages}
-          className={`${buttonBaseClass} ${buttonHoverClass} ${buttonDisabledClass} text-fg-secondary`}
-          aria-label="Next page"
-        >
-          <ChevronRightIcon className="h-5 w-5" />
-        </button>
+        <CommandButton commandId="scroll:next-page" documentId={documentId} variant="icon" />
       </div>
     </div>
   );
