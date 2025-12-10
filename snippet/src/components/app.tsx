@@ -96,6 +96,7 @@ import {
   frenchTranslations,
 } from '@/config';
 import { ThemeConfig } from '@/config/theme';
+import { IconsConfig } from '@/config/icon-registry';
 
 export { ScrollStrategy, ZoomMode, SpreadMode, Rotation };
 
@@ -135,6 +136,23 @@ export interface PDFViewerConfig {
    * }
    */
   theme?: ThemeConfig;
+  /**
+   * Custom icons configuration
+   * @example
+   * icons: {
+   *   myCustomIcon: {
+   *     path: 'M5 12h14M12 5l7 7-7 7',
+   *     stroke: 'primary'
+   *   },
+   *   twoToneIcon: {
+   *     paths: [
+   *       { d: 'M3 3h18v18H3z', fill: 'secondary' },
+   *       { d: 'M3 3h18v18H3z', stroke: 'primary' }
+   *     ]
+   *   }
+   * }
+   */
+  icons?: IconsConfig;
 }
 
 // **Default Plugin Configurations**
@@ -361,7 +379,10 @@ export function PDFViewer({ config, onRegistryReady }: PDFViewerProps) {
           createPluginRegistration(DocumentManagerPluginPackage, {
             initialDocuments: [{ url: 'https://snippet.embedpdf.com/ebook.pdf' }],
           }),
-          createPluginRegistration(CommandsPluginPackage, { commands }),
+          createPluginRegistration(CommandsPluginPackage, {
+            commands,
+            //disabledCategories: ['annotation', 'navigation'],
+          }),
           createPluginRegistration(I18nPluginPackage, {
             defaultLocale: 'en',
             locales: [
@@ -374,7 +395,7 @@ export function PDFViewer({ config, onRegistryReady }: PDFViewerProps) {
           }),
           createPluginRegistration(UIPluginPackage, {
             schema: viewerUISchema,
-            //disabledCategories: ['annotation', 'redaction'],
+            //disabledCategories: ['selection', 'annotation', 'redaction'],
           }),
           createPluginRegistration(ViewportPluginPackage, pluginConfigs.viewport),
           createPluginRegistration(ScrollPluginPackage, pluginConfigs.scroll),
