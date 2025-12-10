@@ -2,6 +2,7 @@ import { h } from 'preact';
 import { useState, useEffect } from 'preact/hooks';
 import { useBookmarkCapability } from '@embedpdf/plugin-bookmark/preact';
 import { useScrollCapability } from '@embedpdf/plugin-scroll/preact';
+import { useTranslations } from '@embedpdf/plugin-i18n/preact';
 import { PdfBookmarkObject, PdfZoomMode, PdfErrorCode, ignore } from '@embedpdf/models';
 import { useDocumentState } from '@embedpdf/core/preact';
 import { Icon } from './ui/icon';
@@ -15,6 +16,7 @@ type OutlineSidebarProps = {
 export function OutlineSidebar({ documentId }: OutlineSidebarProps) {
   const { provides: bookmark } = useBookmarkCapability();
   const { provides: scroll } = useScrollCapability();
+  const { translate } = useTranslations(documentId);
   const documentState = useDocumentState(documentId);
   const [bookmarks, setBookmarks] = useState<PdfBookmarkObject[]>([]);
   const [expandedItems, setExpandedItems] = useState<Set<string>>(new Set());
@@ -92,7 +94,7 @@ export function OutlineSidebar({ documentId }: OutlineSidebarProps) {
     return (
       <div key={id} className="select-none">
         <div
-          className="flex cursor-pointer items-center gap-1 px-2 py-1 hover:bg-gray-100"
+          className="hover:bg-interactive-hover flex cursor-pointer items-center gap-1 px-2 py-1"
           style={{ paddingLeft: `${level * 16 + 8}px` }}
           onClick={() => handleBookmarkClick(bookmark)}
         >
@@ -112,7 +114,7 @@ export function OutlineSidebar({ documentId }: OutlineSidebarProps) {
             </button>
           )}
           {!hasChildren && <div className="w-4" />}
-          <span className="text-sm text-gray-700">{bookmark.title}</span>
+          <span className="text-fg-secondary text-sm">{bookmark.title}</span>
         </div>
         {hasChildren && isExpanded && (
           <div>
@@ -127,9 +129,9 @@ export function OutlineSidebar({ documentId }: OutlineSidebarProps) {
 
   if (!documentState?.document) {
     return (
-      <div className="flex h-full flex-col gap-3 p-4 text-sm text-gray-600">
-        <div className="font-medium text-gray-900">Outline</div>
-        <p>Loading outline...</p>
+      <div className="text-fg-secondary flex h-full flex-col gap-3 p-4 text-sm">
+        <div className="text-fg-primary font-medium">{translate('outline.title')}</div>
+        <p>{translate('outline.loading')}</p>
       </div>
     );
   }
@@ -137,16 +139,16 @@ export function OutlineSidebar({ documentId }: OutlineSidebarProps) {
   if (bookmarks.length === 0) {
     return (
       <div className="flex h-full items-center justify-center p-6">
-        <div className="text-center text-gray-500">
-          <div className="text-sm">No outline available</div>
-          <div className="mt-1 text-xs">This document doesn't contain bookmarks</div>
+        <div className="text-fg-muted text-center">
+          <div className="text-sm">{translate('outline.noOutline')}</div>
+          <div className="mt-1 text-xs">{translate('outline.noBookmarks')}</div>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="flex h-full flex-col bg-white">
+    <div className="bg-bg-surface flex h-full flex-col">
       <div className="flex-1 overflow-y-auto">
         <div className="outline-tree">
           {bookmarks.map((bookmark, index) => renderBookmark(bookmark, index))}

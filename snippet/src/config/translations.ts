@@ -47,6 +47,12 @@ export const englishTranslations: Locale = {
       outline: 'Outline',
       annotationStyle: 'Annotation Style',
     },
+    outline: {
+      title: 'Outline',
+      loading: 'Loading outline...',
+      noOutline: 'No outline available',
+      noBookmarks: "This document doesn't contain bookmarks",
+    },
     page: {
       settings: 'Page Settings',
       single: 'Single Page',
@@ -106,6 +112,7 @@ export const englishTranslations: Locale = {
       noStyles: 'There are no styles for this annotation.',
       noStylesStamp: 'There are no styles for stamps.',
       selectAnnotation: 'Select an annotation to see styles',
+      deleteSelected: 'Delete selected annotation',
     },
     redaction: {
       area: 'Redact Area',
@@ -197,6 +204,12 @@ export const germanTranslations: Locale = {
       outline: 'Gliederung',
       annotationStyle: 'Anmerkungsstil',
     },
+    outline: {
+      title: 'Gliederung',
+      loading: 'Gliederung wird geladen...',
+      noOutline: 'Keine Gliederung verfügbar',
+      noBookmarks: 'Dieses Dokument enthält keine Lesezeichen',
+    },
     page: {
       settings: 'Seiteneinstellungen',
       single: 'Einzelseite',
@@ -256,6 +269,7 @@ export const germanTranslations: Locale = {
       noStyles: 'Für diese Anmerkung gibt es keine Stile.',
       noStylesStamp: 'Für Stempel gibt es keine Stile.',
       selectAnnotation: 'Wählen Sie eine Anmerkung aus, um Stile anzuzeigen',
+      deleteSelected: 'Ausgewählte Anmerkung löschen',
     },
     redaction: {
       area: 'Bereich schwärzen',
@@ -347,6 +361,12 @@ export const dutchTranslations: Locale = {
       outline: 'Overzicht',
       annotationStyle: 'Annotatiestijl',
     },
+    outline: {
+      title: 'Overzicht',
+      loading: 'Overzicht laden...',
+      noOutline: 'Geen overzicht beschikbaar',
+      noBookmarks: 'Dit document bevat geen bladwijzers',
+    },
     page: {
       settings: 'Pagina-instellingen',
       single: 'Enkele pagina',
@@ -406,6 +426,7 @@ export const dutchTranslations: Locale = {
       noStyles: 'Er zijn geen stijlen voor deze annotatie.',
       noStylesStamp: 'Er zijn geen stijlen voor stempels.',
       selectAnnotation: 'Selecteer een annotatie om stijlen te zien',
+      deleteSelected: 'Geselecteerde annotatie verwijderen',
     },
     redaction: {
       area: 'Gebied redigeren',
@@ -497,6 +518,12 @@ export const frenchTranslations: Locale = {
       outline: 'Plan',
       annotationStyle: "Style d'annotation",
     },
+    outline: {
+      title: 'Plan',
+      loading: 'Chargement du plan...',
+      noOutline: 'Aucun plan disponible',
+      noBookmarks: 'Ce document ne contient pas de signets',
+    },
     page: {
       settings: 'Paramètres de page',
       single: 'Page unique',
@@ -556,6 +583,7 @@ export const frenchTranslations: Locale = {
       noStyles: "Il n'y a pas de styles pour cette annotation.",
       noStylesStamp: "Il n'y a pas de styles pour les tampons.",
       selectAnnotation: 'Sélectionnez une annotation pour voir les styles',
+      deleteSelected: "Supprimer l'annotation sélectionnée",
     },
     redaction: {
       area: 'Caviarder la zone',
