@@ -11,7 +11,6 @@ export const manifest: PluginManifest<UIPluginConfig> = {
   requires: ['commands'], // Depends on commands
   optional: ['i18n'],
   defaultConfig: {
-    enabled: true,
     schema: {
       id: 'empty',
       version: '1.0.0',

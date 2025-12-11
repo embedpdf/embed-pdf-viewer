@@ -7,75 +7,105 @@ import { usePdfiumEngine } from '@embedpdf/engines/preact';
 import { AllLogger, ConsoleLogger, PerfLogger, Rotation } from '@embedpdf/models';
 import {
   Viewport,
-  ViewportPluginConfig,
   ViewportPluginPackage,
+  ViewportPluginConfig,
 } from '@embedpdf/plugin-viewport/preact';
 import {
   Scroller,
-  ScrollPluginConfig,
   ScrollPluginPackage,
+  ScrollPluginConfig,
   ScrollStrategy,
 } from '@embedpdf/plugin-scroll/preact';
 import {
   SpreadMode,
-  SpreadPluginConfig,
   SpreadPluginPackage,
+  SpreadPluginConfig,
 } from '@embedpdf/plugin-spread/preact';
 import {
   UIProvider,
   useSchemaRenderer,
   UIPluginPackage,
+  UIPluginConfig,
   UIComponents,
   useSelectionMenu,
 } from '@embedpdf/plugin-ui/preact';
 import {
   DocumentManagerPluginPackage,
+  DocumentManagerPluginConfig,
   DocumentContent,
-  DocumentManagerPlugin,
 } from '@embedpdf/plugin-document-manager/preact';
-import { CommandsPluginPackage } from '@embedpdf/plugin-commands/preact';
-import { I18nPluginPackage } from '@embedpdf/plugin-i18n/preact';
+import { CommandsPluginPackage, CommandsPluginConfig } from '@embedpdf/plugin-commands/preact';
+import { I18nPluginPackage, I18nPluginConfig } from '@embedpdf/plugin-i18n/preact';
 import {
   MarqueeZoom,
   ZoomMode,
-  ZoomPluginConfig,
   ZoomPluginPackage,
+  ZoomPluginConfig,
 } from '@embedpdf/plugin-zoom/preact';
-import { RenderLayer, RenderPluginPackage } from '@embedpdf/plugin-render/preact';
-import { Rotate, RotatePluginConfig, RotatePluginPackage } from '@embedpdf/plugin-rotate/preact';
-import { SearchLayer, SearchPluginPackage } from '@embedpdf/plugin-search/preact';
-import { SelectionLayer, SelectionPluginPackage } from '@embedpdf/plugin-selection/preact';
+import {
+  RenderLayer,
+  RenderPluginPackage,
+  RenderPluginConfig,
+} from '@embedpdf/plugin-render/preact';
+import { Rotate, RotatePluginPackage, RotatePluginConfig } from '@embedpdf/plugin-rotate/preact';
+import {
+  SearchLayer,
+  SearchPluginPackage,
+  SearchPluginConfig,
+} from '@embedpdf/plugin-search/preact';
+import {
+  SelectionLayer,
+  SelectionPluginPackage,
+  SelectionPluginConfig,
+} from '@embedpdf/plugin-selection/preact';
 import {
   TilingLayer,
-  TilingPluginConfig,
   TilingPluginPackage,
+  TilingPluginConfig,
 } from '@embedpdf/plugin-tiling/preact';
-import { ThumbnailPluginConfig, ThumbnailPluginPackage } from '@embedpdf/plugin-thumbnail/preact';
-import { AnnotationLayer, AnnotationPluginPackage } from '@embedpdf/plugin-annotation/preact';
-import { PrintPluginPackage } from '@embedpdf/plugin-print/preact';
-import { FullscreenPluginPackage } from '@embedpdf/plugin-fullscreen/preact';
-import { BookmarkPluginPackage } from '@embedpdf/plugin-bookmark/preact';
-import { ExportPluginPackage } from '@embedpdf/plugin-export/preact';
+import { ThumbnailPluginPackage, ThumbnailPluginConfig } from '@embedpdf/plugin-thumbnail/preact';
+import {
+  AnnotationLayer,
+  AnnotationPluginPackage,
+  AnnotationPluginConfig,
+} from '@embedpdf/plugin-annotation/preact';
+import { PrintPluginPackage, PrintPluginConfig } from '@embedpdf/plugin-print/preact';
+import {
+  FullscreenPluginPackage,
+  FullscreenPluginConfig,
+} from '@embedpdf/plugin-fullscreen/preact';
+import { BookmarkPluginPackage, BookmarkPluginConfig } from '@embedpdf/plugin-bookmark/preact';
+import { ExportPluginPackage, ExportPluginConfig } from '@embedpdf/plugin-export/preact';
 import {
   GlobalPointerProvider,
   PagePointerProvider,
   InteractionManagerPluginPackage,
+  InteractionManagerPluginConfig,
 } from '@embedpdf/plugin-interaction-manager/preact';
-import { PanPluginPackage } from '@embedpdf/plugin-pan/preact';
-import { MarqueeCapture, CapturePluginPackage } from '@embedpdf/plugin-capture/preact';
-import { HistoryPluginPackage } from '@embedpdf/plugin-history/preact';
-import { RedactionLayer, RedactionPluginPackage } from '@embedpdf/plugin-redaction/preact';
-import { AttachmentPluginPackage } from '@embedpdf/plugin-attachment/preact';
+import { PanPluginPackage, PanPluginConfig } from '@embedpdf/plugin-pan/preact';
+import {
+  MarqueeCapture,
+  CapturePluginPackage,
+  CapturePluginConfig,
+} from '@embedpdf/plugin-capture/preact';
+import { HistoryPluginPackage, HistoryPluginConfig } from '@embedpdf/plugin-history/preact';
+import {
+  RedactionLayer,
+  RedactionPluginPackage,
+  RedactionPluginConfig,
+} from '@embedpdf/plugin-redaction/preact';
+import {
+  AttachmentPluginPackage,
+  AttachmentPluginConfig,
+} from '@embedpdf/plugin-attachment/preact';
 
 import { SchemaToolbar } from '@/ui/schema-toolbar';
 import { SchemaSidebar } from '@/ui/schema-sidebar';
 import { SchemaMenu } from '@/ui/schema-menu';
 import { SchemaModal } from '@/ui/schema-modal';
-// Custom components for schema-driven UI
 import { ThumbnailsSidebar } from '@/components/thumbnails-sidebar';
 import { SearchSidebar } from '@/components/search-sidebar';
 import { OutlineSidebar } from '@/components/outline-sidebar';
-
 import { LoadingIndicator } from '@/components/ui/loading-indicator';
 import { HintLayer } from '@/components/hint-layer';
 import { CommentSidebar } from '@/components/comment-sidebar';
@@ -87,10 +117,10 @@ import { PrintModal } from '@/components/print-modal';
 import { PageControls } from '@/components/page-controls';
 
 import {
-  commands,
-  viewerUISchema,
+  commands as defaultCommands,
+  viewerUISchema as defaultUISchema,
   englishTranslations,
-  paramResolvers,
+  paramResolvers as defaultParamResolvers,
   dutchTranslations,
   germanTranslations,
   frenchTranslations,
@@ -98,107 +128,139 @@ import {
 import { ThemeConfig } from '@/config/theme';
 import { IconsConfig } from '@/config/icon-registry';
 
-export { ScrollStrategy, ZoomMode, SpreadMode, Rotation };
-
-// **Enhanced Configuration Interface**
-export interface PluginConfigs {
-  viewport?: ViewportPluginConfig;
-  scroll?: ScrollPluginConfig;
-  zoom?: ZoomPluginConfig;
-  spread?: SpreadPluginConfig;
-  rotate?: RotatePluginConfig;
-  tiling?: TilingPluginConfig;
-  thumbnail?: ThumbnailPluginConfig;
-}
+// ============================================================================
+// Main Configuration Interface - Uses actual plugin config types directly
+// ============================================================================
 
 export interface PDFViewerConfig {
+  // === Required ===
+  /** URL or path to the PDF document */
   src: string;
+
+  // === Engine Options ===
+  /** Use web worker for PDF processing. Default: true */
   worker?: boolean;
+  /** Custom URL for the WASM file */
   wasmUrl?: string;
-  plugins?: PluginConfigs;
+  /** Enable debug logging. Default: false */
   log?: boolean;
-  /**
-   * Theme configuration for the viewer
-   * @example
-   * // Use system preference (auto light/dark)
-   * theme: { preference: 'system' }
-   *
-   * // Force dark mode
-   * theme: { preference: 'dark' }
-   *
-   * // Custom brand colors with system preference
-   * theme: {
-   *   preference: 'system',
-   *   themes: {
-   *     light: { accent: { primary: '#8b5cf6' } },
-   *     dark: { accent: { primary: '#a78bfa' } }
-   *   }
-   * }
-   */
+
+  // === Appearance ===
+  /** Theme configuration */
   theme?: ThemeConfig;
-  /**
-   * Custom icons configuration
-   * @example
-   * icons: {
-   *   myCustomIcon: {
-   *     path: 'M5 12h14M12 5l7 7-7 7',
-   *     stroke: 'primary'
-   *   },
-   *   twoToneIcon: {
-   *     paths: [
-   *       { d: 'M3 3h18v18H3z', fill: 'secondary' },
-   *       { d: 'M3 3h18v18H3z', stroke: 'primary' }
-   *     ]
-   *   }
-   * }
-   */
+  /** Custom icons */
   icons?: IconsConfig;
+
+  // === Plugin Configurations (uses actual plugin types - no duplication!) ===
+  // Core plugins
+  /** Document manager options (initialDocuments) */
+  documentManager?: DocumentManagerPluginConfig;
+  /** Commands options (commands, disabledCategories) */
+  commands?: CommandsPluginConfig;
+  /** i18n options (defaultLocale, locales, paramResolvers) */
+  i18n?: I18nPluginConfig;
+  /** UI schema options (schema, disabledCategories) */
+  ui?: UIPluginConfig;
+
+  // Viewport & Navigation
+  /** Viewport options (viewportGap, scrollEndDelay) */
+  viewport?: ViewportPluginConfig;
+  /** Scroll options (defaultStrategy, defaultPageGap, defaultBufferSize) */
+  scroll?: ScrollPluginConfig;
+  /** Zoom options (defaultZoomLevel, minZoom, maxZoom, zoomStep) */
+  zoom?: ZoomPluginConfig;
+  /** Spread/layout options (defaultSpreadMode) */
+  spread?: SpreadPluginConfig;
+  /** Rotation options (defaultRotation) */
+  rotation?: RotatePluginConfig;
+  /** Pan mode options (defaultMode: 'never' | 'mobile' | 'always') */
+  pan?: PanPluginConfig;
+
+  // Rendering
+  /** Render options (withForms, withAnnotations) */
+  render?: RenderPluginConfig;
+  /** Tiling options (tileSize, overlapPx, extraRings) */
+  tiling?: TilingPluginConfig;
+  /** Thumbnail options (width, gap, buffer, labelHeight, etc.) */
+  thumbnails?: ThumbnailPluginConfig;
+
+  // Content features
+  /** Annotation options (tools, colorPresets, autoCommit, author, etc.) */
+  annotations?: AnnotationPluginConfig;
+  /** Search options (flags, showAllResults) */
+  search?: SearchPluginConfig;
+  /** Selection options (menuHeight) */
+  selection?: SelectionPluginConfig;
+  /** Bookmark options */
+  bookmarks?: BookmarkPluginConfig;
+  /** Attachment options */
+  attachments?: AttachmentPluginConfig;
+
+  // Tools
+  /** Capture options (scale, imageType, withAnnotations) */
+  capture?: CapturePluginConfig;
+  /** Redaction options (drawBlackBoxes) */
+  redaction?: RedactionPluginConfig;
+  /** Print options */
+  print?: PrintPluginConfig;
+  /** Export options (defaultFileName) */
+  export?: ExportPluginConfig;
+  /** Fullscreen options (targetElement) */
+  fullscreen?: FullscreenPluginConfig;
+
+  // Infrastructure
+  /** History/undo options */
+  history?: HistoryPluginConfig;
+  /** Interaction manager options (exclusionRules) */
+  interactionManager?: InteractionManagerPluginConfig;
 }
 
-// **Default Plugin Configurations**
-const DEFAULT_PLUGIN_CONFIGS: Required<PluginConfigs> = {
-  viewport: {
-    viewportGap: 10,
-  },
-  scroll: {
-    defaultStrategy: ScrollStrategy.Vertical,
-  },
-  zoom: {
-    defaultZoomLevel: ZoomMode.FitPage,
-  },
-  spread: {
-    defaultSpreadMode: SpreadMode.None,
-  },
-  rotate: {
-    defaultRotation: Rotation.Degree0,
-  },
-  tiling: {
-    tileSize: 768,
-    overlapPx: 2.5,
-    extraRings: 0,
-  },
-  thumbnail: {
-    width: 150,
-    gap: 10,
-    buffer: 3,
-    labelHeight: 30,
-  },
+// Default configurations for all plugins
+// Even plugins with no defaults get an empty object for future-proofing
+const DEFAULTS = {
+  // Core plugins
+  documentManager: {} as DocumentManagerPluginConfig,
+  commands: { commands: defaultCommands } as CommandsPluginConfig,
+  i18n: {
+    defaultLocale: 'en',
+    locales: [englishTranslations, dutchTranslations, germanTranslations, frenchTranslations],
+    paramResolvers: defaultParamResolvers,
+  } as I18nPluginConfig,
+  ui: { schema: defaultUISchema } as UIPluginConfig,
+
+  // Viewport & Navigation
+  viewport: { viewportGap: 10 } as ViewportPluginConfig,
+  scroll: { defaultStrategy: ScrollStrategy.Vertical } as ScrollPluginConfig,
+  zoom: { defaultZoomLevel: ZoomMode.FitPage } as ZoomPluginConfig,
+  spread: { defaultSpreadMode: SpreadMode.None } as SpreadPluginConfig,
+  rotation: { defaultRotation: Rotation.Degree0 } as RotatePluginConfig,
+  pan: {} as PanPluginConfig,
+
+  // Rendering
+  render: {} as RenderPluginConfig,
+  tiling: { tileSize: 768, overlapPx: 2.5, extraRings: 0 } as TilingPluginConfig,
+  thumbnails: { width: 150, gap: 10, buffer: 3, labelHeight: 30 } as ThumbnailPluginConfig,
+
+  // Content features
+  annotations: {} as AnnotationPluginConfig,
+  search: {} as SearchPluginConfig,
+  selection: {} as SelectionPluginConfig,
+  bookmarks: {} as BookmarkPluginConfig,
+  attachments: {} as AttachmentPluginConfig,
+
+  // Tools
+  capture: { scale: 2, imageType: 'image/png' } as CapturePluginConfig,
+  redaction: { drawBlackBoxes: true } as RedactionPluginConfig,
+  print: {} as PrintPluginConfig,
+  export: { defaultFileName: 'document.pdf' } as ExportPluginConfig,
+  fullscreen: {} as FullscreenPluginConfig,
+
+  // Infrastructure
+  history: {} as HistoryPluginConfig,
+  interactionManager: {} as InteractionManagerPluginConfig,
 };
 
-// **Utility function to merge configurations**
-function mergePluginConfigs(userConfigs: PluginConfigs = {}): Required<PluginConfigs> {
-  return {
-    viewport: { ...DEFAULT_PLUGIN_CONFIGS.viewport, ...userConfigs.viewport },
-    scroll: { ...DEFAULT_PLUGIN_CONFIGS.scroll, ...userConfigs.scroll },
-    zoom: { ...DEFAULT_PLUGIN_CONFIGS.zoom, ...userConfigs.zoom },
-    spread: { ...DEFAULT_PLUGIN_CONFIGS.spread, ...userConfigs.spread },
-    rotate: { ...DEFAULT_PLUGIN_CONFIGS.rotate, ...userConfigs.rotate },
-    tiling: { ...DEFAULT_PLUGIN_CONFIGS.tiling, ...userConfigs.tiling },
-    thumbnail: { ...DEFAULT_PLUGIN_CONFIGS.thumbnail, ...userConfigs.thumbnail },
-  };
-}
-
-// **Props for the PDFViewer Component**
+// Props for the PDFViewer Component
 interface PDFViewerProps {
   config: PDFViewerConfig;
   onRegistryReady?: (registry: PluginRegistry) => void;
@@ -323,9 +385,6 @@ export function PDFViewer({ config, onRegistryReady }: PDFViewerProps) {
     logger: config.log ? logger : undefined,
   });
 
-  // **Merge user configurations with defaults**
-  const pluginConfigs = mergePluginConfigs(config.plugins);
-
   // Memoize UIProvider props to prevent unnecessary remounts
   const uiComponents: UIComponents = useMemo(
     () => ({
@@ -376,53 +435,85 @@ export function PDFViewer({ config, onRegistryReady }: PDFViewerProps) {
         }}
         engine={engine}
         plugins={[
+          // Core plugins
           createPluginRegistration(DocumentManagerPluginPackage, {
-            initialDocuments: [{ url: 'https://snippet.embedpdf.com/ebook.pdf' }],
+            ...DEFAULTS.documentManager,
+            initialDocuments: [{ url: config.src }],
+            ...config.documentManager,
           }),
           createPluginRegistration(CommandsPluginPackage, {
-            commands,
-            //disabledCategories: ['annotation', 'navigation'],
+            ...DEFAULTS.commands,
+            ...config.commands,
           }),
-          createPluginRegistration(I18nPluginPackage, {
-            defaultLocale: 'en',
-            locales: [
-              englishTranslations,
-              dutchTranslations,
-              germanTranslations,
-              frenchTranslations,
-            ],
-            paramResolvers,
+          createPluginRegistration(I18nPluginPackage, { ...DEFAULTS.i18n, ...config.i18n }),
+          createPluginRegistration(UIPluginPackage, { ...DEFAULTS.ui, ...config.ui }),
+
+          // Viewport & Navigation
+          createPluginRegistration(ViewportPluginPackage, {
+            ...DEFAULTS.viewport,
+            ...config.viewport,
           }),
-          createPluginRegistration(UIPluginPackage, {
-            schema: viewerUISchema,
-            //disabledCategories: ['selection', 'annotation', 'redaction'],
+          createPluginRegistration(ScrollPluginPackage, { ...DEFAULTS.scroll, ...config.scroll }),
+          createPluginRegistration(ZoomPluginPackage, { ...DEFAULTS.zoom, ...config.zoom }),
+          createPluginRegistration(SpreadPluginPackage, { ...DEFAULTS.spread, ...config.spread }),
+          createPluginRegistration(RotatePluginPackage, {
+            ...DEFAULTS.rotation,
+            ...config.rotation,
           }),
-          createPluginRegistration(ViewportPluginPackage, pluginConfigs.viewport),
-          createPluginRegistration(ScrollPluginPackage, pluginConfigs.scroll),
-          createPluginRegistration(ZoomPluginPackage, pluginConfigs.zoom),
-          createPluginRegistration(SpreadPluginPackage, pluginConfigs.spread),
-          createPluginRegistration(RenderPluginPackage),
-          createPluginRegistration(RotatePluginPackage, pluginConfigs.rotate),
-          createPluginRegistration(SearchPluginPackage),
-          createPluginRegistration(SelectionPluginPackage),
-          createPluginRegistration(TilingPluginPackage, pluginConfigs.tiling),
-          createPluginRegistration(ThumbnailPluginPackage, pluginConfigs.thumbnail),
-          createPluginRegistration(AnnotationPluginPackage),
-          createPluginRegistration(PrintPluginPackage),
-          createPluginRegistration(FullscreenPluginPackage),
-          createPluginRegistration(BookmarkPluginPackage),
-          createPluginRegistration(ExportPluginPackage),
-          createPluginRegistration(InteractionManagerPluginPackage),
-          createPluginRegistration(PanPluginPackage),
+          createPluginRegistration(PanPluginPackage, { ...DEFAULTS.pan, ...config.pan }),
+
+          // Rendering
+          createPluginRegistration(RenderPluginPackage, { ...DEFAULTS.render, ...config.render }),
+          createPluginRegistration(TilingPluginPackage, { ...DEFAULTS.tiling, ...config.tiling }),
+          createPluginRegistration(ThumbnailPluginPackage, {
+            ...DEFAULTS.thumbnails,
+            ...config.thumbnails,
+          }),
+
+          // Content features
+          createPluginRegistration(AnnotationPluginPackage, {
+            ...DEFAULTS.annotations,
+            ...config.annotations,
+          }),
+          createPluginRegistration(SearchPluginPackage, { ...DEFAULTS.search, ...config.search }),
+          createPluginRegistration(SelectionPluginPackage, {
+            ...DEFAULTS.selection,
+            ...config.selection,
+          }),
+          createPluginRegistration(BookmarkPluginPackage, {
+            ...DEFAULTS.bookmarks,
+            ...config.bookmarks,
+          }),
+          createPluginRegistration(AttachmentPluginPackage, {
+            ...DEFAULTS.attachments,
+            ...config.attachments,
+          }),
+
+          // Tools
           createPluginRegistration(CapturePluginPackage, {
-            scale: 2,
-            imageType: 'image/png',
+            ...DEFAULTS.capture,
+            ...config.capture,
           }),
-          createPluginRegistration(HistoryPluginPackage),
           createPluginRegistration(RedactionPluginPackage, {
-            drawBlackBoxes: true,
+            ...DEFAULTS.redaction,
+            ...config.redaction,
           }),
-          createPluginRegistration(AttachmentPluginPackage),
+          createPluginRegistration(PrintPluginPackage, { ...DEFAULTS.print, ...config.print }),
+          createPluginRegistration(ExportPluginPackage, { ...DEFAULTS.export, ...config.export }),
+          createPluginRegistration(FullscreenPluginPackage, {
+            ...DEFAULTS.fullscreen,
+            ...config.fullscreen,
+          }),
+
+          // Infrastructure
+          createPluginRegistration(HistoryPluginPackage, {
+            ...DEFAULTS.history,
+            ...config.history,
+          }),
+          createPluginRegistration(InteractionManagerPluginPackage, {
+            ...DEFAULTS.interactionManager,
+            ...config.interactionManager,
+          }),
         ]}
       >
         {({ pluginsReady, activeDocumentId }) => (

@@ -12,7 +12,6 @@ export const manifest: PluginManifest<I18nPluginConfig> = {
   requires: [],
   optional: [],
   defaultConfig: {
-    enabled: true,
     defaultLocale: 'en',
     locales: [enUS, esES],
   },

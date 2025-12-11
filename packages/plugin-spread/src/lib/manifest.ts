@@ -10,7 +10,5 @@ export const manifest: PluginManifest<SpreadPluginConfig> = {
   provides: ['spread'],
   requires: [],
   optional: ['viewport'],
-  defaultConfig: {
-    enabled: true,
-  },
+  defaultConfig: {},
 };

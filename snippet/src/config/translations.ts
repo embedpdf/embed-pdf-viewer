@@ -63,6 +63,8 @@ export const englishTranslations: Locale = {
       spreadMode: 'Spread Mode',
       scrollLayout: 'Scroll Layout',
       rotation: 'Page Rotation',
+      next: 'Next Page',
+      previous: 'Previous Page',
     },
     rotate: {
       clockwise: 'Rotate Clockwise',
@@ -220,6 +222,8 @@ export const germanTranslations: Locale = {
       spreadMode: 'Doppelseiten-Modus',
       scrollLayout: 'Scroll-Layout',
       rotation: 'Seitendrehung',
+      next: 'Nächste Seite',
+      previous: 'Vorherige Seite',
     },
     rotate: {
       clockwise: 'Im Uhrzeigersinn drehen',
@@ -377,6 +381,8 @@ export const dutchTranslations: Locale = {
       spreadMode: 'Spreidingsmodus',
       scrollLayout: 'Scrollindeling',
       rotation: 'Paginarotatie',
+      next: 'Volgende pagina',
+      previous: 'Vorige pagina',
     },
     rotate: {
       clockwise: 'Met de klok mee draaien',
@@ -534,6 +540,8 @@ export const frenchTranslations: Locale = {
       spreadMode: 'Mode double page',
       scrollLayout: 'Disposition de défilement',
       rotation: 'Rotation de page',
+      next: 'Page suivante',
+      previous: 'Page précédente',
     },
     rotate: {
       clockwise: 'Tourner dans le sens horaire',

@@ -11,7 +11,6 @@ export const manifest: PluginManifest<CommandsPluginConfig> = {
   requires: [],
   optional: ['i18n'],
   defaultConfig: {
-    enabled: true,
     commands: {},
   },
 };

@@ -11,7 +11,6 @@ export const manifest: PluginManifest<InteractionManagerPluginConfig> = {
   requires: [],
   optional: [],
   defaultConfig: {
-    enabled: true,
     exclusionRules: {
       classes: [],
       dataAttributes: ['data-no-interaction'],

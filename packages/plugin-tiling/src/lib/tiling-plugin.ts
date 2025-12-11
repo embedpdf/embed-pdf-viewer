@@ -131,11 +131,6 @@ export class TilingPlugin extends BasePlugin<TilingPluginConfig, TilingCapabilit
   }
 
   private calculateVisibleTiles(documentId: string, scrollMetrics: ScrollMetrics): void {
-    if (!this.config.enabled) {
-      this.dispatch(updateVisibleTiles(documentId, {}));
-      return;
-    }
-
     const coreDoc = this.getCoreDocument(documentId);
     if (!coreDoc || !coreDoc.document) return;
 

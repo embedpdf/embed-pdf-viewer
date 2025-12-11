@@ -10,7 +10,5 @@ export const manifest: PluginManifest<PrintPluginConfig> = {
   provides: ['print'],
   requires: [],
   optional: [],
-  defaultConfig: {
-    enabled: true,
-  },
+  defaultConfig: {},
 };

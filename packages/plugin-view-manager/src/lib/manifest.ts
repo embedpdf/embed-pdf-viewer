@@ -11,7 +11,6 @@ export const manifest: PluginManifest<ViewManagerPluginConfig> = {
   requires: [],
   optional: ['document-manager'],
   defaultConfig: {
-    enabled: true,
     defaultViewCount: 1,
   },
 };

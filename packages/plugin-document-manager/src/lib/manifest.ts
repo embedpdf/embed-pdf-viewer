@@ -11,7 +11,6 @@ export const manifest: PluginManifest<DocumentManagerPluginConfig> = {
   requires: [],
   optional: [],
   defaultConfig: {
-    enabled: true,
     maxDocuments: 10,
   },
 };

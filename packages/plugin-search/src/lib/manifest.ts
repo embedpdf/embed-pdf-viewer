@@ -11,7 +11,6 @@ export const manifest: PluginManifest<SearchPluginConfig> = {
   requires: [],
   optional: [],
   defaultConfig: {
-    enabled: true,
     flags: [],
   },
 };

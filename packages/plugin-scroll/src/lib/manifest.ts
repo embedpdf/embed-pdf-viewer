@@ -11,7 +11,6 @@ export const manifest: PluginManifest<ScrollPluginConfig> = {
   requires: ['viewport'],
   optional: ['spread'],
   defaultConfig: {
-    enabled: true,
     defaultPageGap: 10,
     defaultBufferSize: 4,
     defaultStrategy: ScrollStrategy.Vertical,
