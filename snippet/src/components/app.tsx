@@ -33,6 +33,8 @@ import {
   DocumentManagerPluginPackage,
   DocumentManagerPluginConfig,
   DocumentContent,
+  useOpenDocuments,
+  useActiveDocument,
 } from '@embedpdf/plugin-document-manager/preact';
 import { CommandsPluginPackage, CommandsPluginConfig } from '@embedpdf/plugin-commands/preact';
 import { I18nPluginPackage, I18nPluginConfig } from '@embedpdf/plugin-i18n/preact';
@@ -127,6 +129,9 @@ import {
 } from '@/config';
 import { ThemeConfig } from '@/config/theme';
 import { IconsConfig } from '@/config/icon-registry';
+import { TabBar, TabBarVisibility } from '@/components/tab-bar';
+import { EmptyState } from '@/components/empty-state';
+import { DocumentPasswordPrompt } from '@/components/document-password-prompt';
 
 // ============================================================================
 // Main Configuration Interface - Uses actual plugin config types directly
@@ -150,6 +155,13 @@ export interface PDFViewerConfig {
   theme?: ThemeConfig;
   /** Custom icons */
   icons?: IconsConfig;
+  /**
+   * Tab bar visibility for multi-document support
+   * - 'always': Always show the tab bar
+   * - 'multiple': Show only when more than 1 document is open (default)
+   * - 'never': Never show the tab bar
+   */
+  tabBar?: TabBarVisibility;
 
   // === Plugin Configurations (uses actual plugin types - no duplication!) ===
   // Core plugins
@@ -272,7 +284,12 @@ interface PDFViewerProps {
 // Note: Modal rendering is now handled by renderModal() from useSchemaRenderer
 
 // Viewer Layout Component
-function ViewerLayout({ documentId }: { documentId: string }) {
+interface ViewerLayoutProps {
+  documentId: string;
+  tabBarVisibility?: TabBarVisibility;
+}
+
+function ViewerLayout({ documentId, tabBarVisibility = 'multiple' }: ViewerLayoutProps) {
   const { renderToolbar, renderSidebar, renderModal, renderOverlays } =
     useSchemaRenderer(documentId);
 
@@ -280,8 +297,19 @@ function ViewerLayout({ documentId }: { documentId: string }) {
   const annotationMenu = useSelectionMenu('annotation', documentId);
   const redactionMenu = useSelectionMenu('redaction', documentId);
 
+  // Get document states for tab bar
+  const documentStates = useOpenDocuments();
+  const { activeDocumentId } = useActiveDocument();
+
   return (
     <>
+      {/* Tab Bar for multi-document support */}
+      <TabBar
+        documentStates={documentStates}
+        activeDocumentId={activeDocumentId}
+        visibility={tabBarVisibility}
+      />
+
       {/* Main Toolbar */}
       {renderToolbar('top', 'main')}
 
@@ -303,11 +331,7 @@ function ViewerLayout({ documentId }: { documentId: string }) {
                     <LoadingIndicator size="lg" text="Loading document..." />
                   </div>
                 )}
-                {isError && (
-                  <div className="flex h-full items-center justify-center">
-                    <div className="text-state-error">Error loading document</div>
-                  </div>
-                )}
+                {isError && <DocumentPasswordPrompt documentState={documentState} />}
                 {isLoaded && (
                   <div className="relative h-full w-full">
                     <GlobalPointerProvider documentId={documentId}>
@@ -527,12 +551,10 @@ export function PDFViewer({ config, onRegistryReady }: PDFViewerProps) {
                     renderers={uiRenderers}
                     className="relative flex h-full w-full select-none flex-col"
                   >
-                    <ViewerLayout documentId={activeDocumentId} />
+                    <ViewerLayout documentId={activeDocumentId} tabBarVisibility={config.tabBar} />
                   </UIProvider>
                 ) : (
-                  <div className="flex h-full items-center justify-center">
-                    <LoadingIndicator size="lg" text="No document loaded" />
-                  </div>
+                  <EmptyState />
                 )}
               </>
             ) : (

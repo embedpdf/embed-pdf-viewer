@@ -34,6 +34,7 @@ export default function PDFViewer({ style, className }: PDFViewerProps) {
           target: viewerRef.current!,
           src: 'https://snippet.embedpdf.com/ebook.pdf',
           worker: true,
+          tabBar: 'always',
           theme: {
             // Use 'system' to follow OS preference, or sync with Next.js theme
             preference: resolvedTheme === 'dark' ? 'dark' : 'light',

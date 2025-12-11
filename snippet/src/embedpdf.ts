@@ -68,8 +68,9 @@ export { registerIcon, registerIcons } from './config/icon-registry';
 // Export the container class for typing
 export { EmbedPdfContainer };
 
-// Export main config type
+// Export main config type and tab bar visibility
 export type { PDFViewerConfig };
+export type { TabBarVisibility } from './components/tab-bar';
 
 type ContainerConfig = PDFViewerConfig & {
   type: 'container';

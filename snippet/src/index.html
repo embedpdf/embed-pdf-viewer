@@ -17,11 +17,12 @@
   <script async type="module">
     import EmbedPDF from './embedpdf.js';
 
-    EmbedPDF.init({
+    const viewer = EmbedPDF.init({
       type: 'container',
       target: document.getElementById('pdf-viewer'),
       src: 'https://snippet.embedpdf.com/ebook.pdf',
       worker: true,
+      tabBar: 'always',
       theme: {
         preference: 'system'
       }

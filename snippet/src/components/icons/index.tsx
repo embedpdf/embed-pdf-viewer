@@ -65,6 +65,10 @@ import { RedactIcon } from './redact';
 import { IconComponent } from './types';
 import { RedactAreaIcon } from './redact-area';
 import { CheckIcon } from './check';
+import { FileIcon } from './file';
+import { PlusIcon } from './plus';
+import { LockIcon } from './lock';
+import { AlertTriangleIcon } from './alert-triangle';
 
 export type Icons = {
   [key: string]: IconComponent;
@@ -137,4 +141,8 @@ export const icons: Icons = {
   redact: RedactIcon,
   redactArea: RedactAreaIcon,
   check: CheckIcon,
+  file: FileIcon,
+  plus: PlusIcon,
+  lock: LockIcon,
+  alertTriangle: AlertTriangleIcon,
 };

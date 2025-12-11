@@ -402,7 +402,7 @@ export const commands: Record<string, Command<State>> = {
   'document:close': {
     id: 'document:close',
     labelKey: 'document.close',
-    icon: 'close',
+    icon: 'x',
     shortcuts: ['Ctrl+W', 'Meta+W'],
     categories: ['document'],
     action: ({ registry, documentId }) => {
