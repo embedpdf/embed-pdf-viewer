@@ -520,7 +520,7 @@ export const viewerUISchema: UISchema = {
         {
           type: 'submenu',
           id: 'page-settings-submenu',
-          labelKey: 'view-controls',
+          labelKey: 'menu.viewControls',
           label: 'View Controls',
           icon: 'viewSettings',
           menuId: 'page-settings-menu',
@@ -528,7 +528,7 @@ export const viewerUISchema: UISchema = {
         {
           type: 'submenu',
           id: 'zoom-submenu',
-          labelKey: 'zoom-controls',
+          labelKey: 'menu.zoomControls',
           label: 'Zoom Controls',
           icon: 'zoomIn',
           menuId: 'zoom-menu',
@@ -539,12 +539,12 @@ export const viewerUISchema: UISchema = {
         },
         {
           type: 'command',
-          id: 'pan-button',
+          id: 'pan-button-menu',
           commandId: 'pan:toggle',
         },
         {
           type: 'command',
-          id: 'pointer-button',
+          id: 'pointer-button-menu',
           commandId: 'pointer:toggle',
         },
       ],

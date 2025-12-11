@@ -322,7 +322,7 @@ export const commands: Record<string, Command<State>> = {
 
   'left-action-menu:overflow-menu': {
     id: 'left-action-menu:overflow-menu',
-    labelKey: 'left-action-menu.overflowMenu',
+    labelKey: 'menu.moreOptions',
     icon: 'dots',
     categories: ['ui'],
     action: ({ registry, documentId }) => {

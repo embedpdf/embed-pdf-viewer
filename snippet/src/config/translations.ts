@@ -72,6 +72,11 @@ export const englishTranslations: Locale = {
       outline: 'Outline',
       annotationStyle: 'Annotation Style',
     },
+    menu: {
+      viewControls: 'View Controls',
+      zoomControls: 'Zoom Controls',
+      moreOptions: 'More Options',
+    },
     outline: {
       title: 'Outline',
       loading: 'Loading outline...',
@@ -255,6 +260,11 @@ export const germanTranslations: Locale = {
       thumbnails: 'Miniaturansichten',
       outline: 'Gliederung',
       annotationStyle: 'Anmerkungsstil',
+    },
+    menu: {
+      viewControls: 'Ansichtseinstellungen',
+      zoomControls: 'Zoom-Einstellungen',
+      moreOptions: 'Weitere Optionen',
     },
     outline: {
       title: 'Gliederung',
@@ -441,6 +451,11 @@ export const dutchTranslations: Locale = {
       outline: 'Overzicht',
       annotationStyle: 'Annotatiestijl',
     },
+    menu: {
+      viewControls: 'Weergave-instellingen',
+      zoomControls: 'Zoom-instellingen',
+      moreOptions: 'Meer opties',
+    },
     outline: {
       title: 'Overzicht',
       loading: 'Overzicht laden...',
@@ -624,6 +639,11 @@ export const frenchTranslations: Locale = {
       thumbnails: 'Miniatures',
       outline: 'Plan',
       annotationStyle: "Style d'annotation",
+    },
+    menu: {
+      viewControls: "Contrôles d'affichage",
+      zoomControls: 'Contrôles de zoom',
+      moreOptions: "Plus d'options",
     },
     outline: {
       title: 'Plan',
