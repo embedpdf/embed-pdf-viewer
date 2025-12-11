@@ -38,8 +38,8 @@ export default function Navbar() {
     <>
       <header
         className={`nextra-navbar sticky top-0 z-20 w-full transition-all duration-300 ${
-          scrolled && !menu
-            ? 'bg-white/80 shadow-sm backdrop-blur-md dark:border-b dark:border-gray-800 dark:bg-gray-950/80'
+          scrolled || menu
+            ? 'bg-white/95 shadow-sm backdrop-blur-md dark:border-b dark:border-gray-800 dark:bg-gray-950/95'
             : 'border-b border-transparent bg-transparent'
         }`}
       >
@@ -98,7 +98,8 @@ export default function Navbar() {
             </nav>
 
             {/* Mobile menu button */}
-            <div className="flex items-center gap-4 md:hidden">
+            <div className="flex items-center gap-3 md:hidden">
+              <Search />
               <ThemeToggle />
               <button
                 className="flex h-10 w-10 items-center justify-center rounded-full bg-gray-100 text-gray-900 transition-colors hover:bg-gray-200 dark:bg-gray-800 dark:text-gray-100 dark:hover:bg-gray-700"
