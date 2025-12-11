@@ -7,6 +7,7 @@ import { useEffect, useState } from 'react'
 import { MobileNav } from './sidebar'
 import { setMenu, useMenu } from './stores/menu'
 import { ThemeToggle } from './theme-toggle'
+import { Search } from './search'
 
 export default function Navbar() {
   const [scrolled, setScrolled] = useState(false)
@@ -81,6 +82,7 @@ export default function Navbar() {
               </Link>
 
               <div className="ml-4 flex items-center gap-3 border-l border-gray-200 pl-4 dark:border-gray-800">
+                <Search />
                 <ThemeToggle />
 
                 <a
