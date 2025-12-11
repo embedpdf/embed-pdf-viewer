@@ -63,19 +63,20 @@ export const Search: FC<SearchProps> = ({
 
   const deferredSearch = useDeferredValue(search)
   const router = useRouter()
-  const inputRef = useRef<HTMLInputElement>(null!)
+  const mobileInputRef = useRef<HTMLInputElement>(null!)
+  const desktopInputRef = useRef<HTMLInputElement>(null!)
   const containerRef = useRef<HTMLDivElement>(null!)
 
   useEffect(() => {
     setMounted(true)
   }, [])
 
-  // Focus input when expanded
+  // Focus mobile input when expanded
   useEffect(() => {
     if (expanded) {
       // Small delay to allow animation to start
       const timer = setTimeout(() => {
-        inputRef.current?.focus({ preventScroll: true })
+        mobileInputRef.current?.focus({ preventScroll: true })
       }, 50)
       return () => clearTimeout(timer)
     }
@@ -169,6 +170,8 @@ export const Search: FC<SearchProps> = ({
   // Keyboard shortcut handler
   useEffect(() => {
     const INPUTS = new Set(['INPUT', 'SELECT', 'BUTTON', 'TEXTAREA'])
+    // lg breakpoint in Tailwind is 1024px
+    const LG_BREAKPOINT = 1024
 
     function handleKeyDown(event: KeyboardEvent) {
       const el = document.activeElement
@@ -188,7 +191,14 @@ export const Search: FC<SearchProps> = ({
           (navigator.userAgent.includes('Mac') ? event.metaKey : event.ctrlKey))
       ) {
         event.preventDefault()
-        setExpanded(true)
+        // Check if we're on desktop (lg+) or mobile
+        if (window.innerWidth >= LG_BREAKPOINT) {
+          // Desktop: focus the desktop input directly
+          desktopInputRef.current?.focus({ preventScroll: true })
+        } else {
+          // Mobile: expand the overlay
+          setExpanded(true)
+        }
       }
     }
 
@@ -207,7 +217,8 @@ export const Search: FC<SearchProps> = ({
   const handleSelect = (searchResult: PagefindResult | null) => {
     if (!searchResult) return
 
-    inputRef.current?.blur()
+    mobileInputRef.current?.blur()
+    desktopInputRef.current?.blur()
     setExpanded(false)
 
     const [url, hash] = searchResult.url.split('#')
@@ -280,7 +291,7 @@ export const Search: FC<SearchProps> = ({
               spellCheck={false}
               autoComplete="off"
               type="search"
-              ref={inputRef}
+              ref={mobileInputRef}
               className={({ focus }) =>
                 clsx(
                   'w-full rounded-lg py-2.5 pl-10 pr-4 text-base transition-all',
@@ -353,6 +364,7 @@ export const Search: FC<SearchProps> = ({
               spellCheck={false}
               autoComplete="off"
               type="search"
+              ref={desktopInputRef}
               className={({ focus }) =>
                 clsx(
                   'w-72 rounded-lg py-2 pl-9 pr-16 text-sm transition-all',
