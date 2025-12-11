@@ -337,6 +337,10 @@ export const commands: Record<string, Command<State>> = {
         documentId,
       );
     },
+    active: ({ state, documentId }) => {
+      const uiState = state.plugins['ui']?.documents[documentId];
+      return uiState?.openMenus['left-action-menu'] !== undefined;
+    },
   },
 
   // ─────────────────────────────────────────────────────────

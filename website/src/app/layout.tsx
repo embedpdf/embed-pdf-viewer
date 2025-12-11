@@ -12,6 +12,9 @@ export const metadata = {
     apple: '/apple-touch-icon.png',
   },
   manifest: `/site.webmanifest`,
+  // Initial theme color - will be dynamically updated by ThemeProvider
+  // based on user's theme preference (system or manual)
+  themeColor: '#ffffff',
 }
 
 export default async function RootLayout({
