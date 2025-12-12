@@ -6,8 +6,9 @@
   <h1>EmbedPDF Snippet</h1>
   <p>The easiest way to embed PDF files in your website with a complete, ready‑to‑use interface.</p>
 
-  <a href="https://www.embedpdf.com/docs/snippet/introduction"><img alt="Documentation" src="https://img.shields.io/badge/View%20Docs-0af?style=for-the-badge&labelColor=000000"></a>
-  <a href="https://snippet.embedpdf.com/"><img alt="Live Demo" src="https://img.shields.io/badge/Try%20Live%20Demo-ff1493.svg?style=for-the-badge&labelColor=000000"></a>
+<a href="https://www.embedpdf.com/docs/snippet/introduction"><img alt="Documentation" src="https://img.shields.io/badge/View%20Docs-0af?style=for-the-badge&labelColor=000000"></a>
+<a href="https://snippet.embedpdf.com/"><img alt="Live Demo" src="https://img.shields.io/badge/Try%20Live%20Demo-ff1493.svg?style=for-the-badge&labelColor=000000"></a>
+
 </div>
 
 ---
@@ -22,15 +23,15 @@ The full walkthrough, advanced examples, and API reference live in our docs site
 
 ## 🚀 Introduction
 
-**EmbedPDF Snippet** is a *“batteries‑included”* drop‑in that turns any `<div>` into a professional PDF reader. No build step, no framework lock‑in—just copy, paste, and you’re done.
+**EmbedPDF Snippet** is a _“batteries‑included”_ drop‑in that turns any `<div>` into a professional PDF reader. No build step, no framework lock‑in—just copy, paste, and you’re done.
 
 ### Why choose the Snippet?
 
-* **Complete UI out‑of‑the‑box** – toolbar, thumbnails, search, zoom & more
-* **Zero build tooling** – works in plain HTML pages or alongside any JS framework
-* **30‑second setup** – a single `<script type="module">` is all you need
-* **Fully configurable** – tweak behavior with a lightweight options object
-* **Runs everywhere** – modern browsers, frameworks, static sites & CMSes
+- **Complete UI out‑of‑the‑box** – toolbar, thumbnails, search, zoom & more
+- **Zero build tooling** – works in plain HTML pages or alongside any JS framework
+- **30‑second setup** – a single `<script type="module">` is all you need
+- **Fully configurable** – tweak behavior with a lightweight options object
+- **Runs everywhere** – modern browsers, frameworks, static sites & CMSes
 
 ---
 
@@ -44,9 +45,9 @@ Add the CDN module and point it at a container:
   import EmbedPDF from 'https://snippet.embedpdf.com/embedpdf.js';
 
   EmbedPDF.init({
-    type: 'container',           // mount strategy
+    type: 'container', // mount strategy
     target: document.getElementById('pdf-viewer'),
-    src: 'https://snippet.embedpdf.com/ebook.pdf' // your PDF URL
+    src: 'https://snippet.embedpdf.com/ebook.pdf', // your PDF URL
   });
 </script>
 ```
@@ -66,7 +67,9 @@ That’s it—refresh and enjoy a full‑featured viewer.
 ```html filename="basic-example.html" copy
 <!DOCTYPE html>
 <html>
-  <head><title>My PDF Viewer</title></head>
+  <head>
+    <title>My PDF Viewer</title>
+  </head>
   <body>
     <div id="pdf-viewer" style="height: 100vh"></div>
     <script async type="module">
@@ -75,7 +78,7 @@ That’s it—refresh and enjoy a full‑featured viewer.
       EmbedPDF.init({
         type: 'container',
         target: document.getElementById('pdf-viewer'),
-        src: 'https://snippet.embedpdf.com/ebook.pdf'
+        src: 'https://snippet.embedpdf.com/ebook.pdf',
       });
     </script>
   </body>

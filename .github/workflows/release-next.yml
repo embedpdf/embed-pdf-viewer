@@ -5,6 +5,7 @@ on:
     branches: [next]
     paths:
       - "packages/**"
+      - "viewers/**"
       - ".changeset/**"
       - "pnpm-lock.yaml"
   workflow_dispatch: {}
@@ -51,7 +52,7 @@ jobs:
         run: pnpm install --frozen-lockfile
 
       - name: Build packages
-        run: pnpm run build:packages
+        run: pnpm run build:viewers
 
       - name: Version / Publish via Changesets
         id: changesets
@@ -110,10 +111,21 @@ jobs:
           mkdir -p release-assets
           echo "$PUBLISHED_JSON" | jq -r '.[].name' | while read name; do
             short=$(echo "$name" | sed 's!.*/!!')
-            dir="packages/$short"
+            # Handle viewers (snippet, react, vue, svelte) which are in viewers/
+            if [ "$short" = "snippet" ] || [ "$short" = "react-pdf-viewer" ] || [ "$short" = "vue-pdf-viewer" ] || [ "$short" = "svelte-pdf-viewer" ]; then
+              # Map package name to directory name
+              case "$short" in
+                "react-pdf-viewer") dir="viewers/react" ;;
+                "vue-pdf-viewer") dir="viewers/vue" ;;
+                "svelte-pdf-viewer") dir="viewers/svelte" ;;
+                *) dir="viewers/$short" ;;
+              esac
+            else
+              dir="packages/$short"
+            fi
             if [ -d "$dir/dist" ]; then
-              echo "Packaging $short"
-              (cd "$dir" && zip -r "../../release-assets/${short}-dist.zip" dist >/dev/null)
+              echo "Packaging $short from $dir"
+              (cd "$dir" && zip -r "../../release-assets/${short}-dist.zip" dist >/dev/null 2>&1 || zip -r "../release-assets/${short}-dist.zip" dist >/dev/null)
               tar -czf "release-assets/${short}-dist.tar.gz" -C "$dir" dist
             else
               echo "No dist for $short"

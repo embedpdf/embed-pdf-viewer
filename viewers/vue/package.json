@@ -1,0 +1,55 @@
+{
+  "name": "@embedpdf/vue-pdf-viewer",
+  "version": "1.0.0",
+  "description": "Vue component for embedding PDF documents",
+  "main": "dist/index.cjs",
+  "module": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "license": "MIT",
+  "type": "module",
+  "sideEffects": false,
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "require": "./dist/index.cjs"
+    }
+  },
+  "files": [
+    "dist",
+    "README.md"
+  ],
+  "scripts": {
+    "clean": "rimraf dist",
+    "build": "pnpm run clean && vite build"
+  },
+  "dependencies": {
+    "@embedpdf/snippet": "workspace:*"
+  },
+  "devDependencies": {
+    "@vitejs/plugin-vue": "^6.0.0",
+    "rimraf": "^5.0.5",
+    "typescript": "^5.1.6",
+    "unplugin-dts": "1.0.0-beta.6",
+    "vite": "^6.3.5",
+    "vue": "^3.4.0"
+  },
+  "peerDependencies": {
+    "vue": ">=3.0.0"
+  },
+  "keywords": [
+    "vue",
+    "pdf",
+    "viewer",
+    "embed",
+    "document"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/embedpdf/embed-pdf-viewer.git",
+    "directory": "viewers/vue"
+  },
+  "publishConfig": {
+    "access": "public"
+  }
+}
