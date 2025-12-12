@@ -1,6 +1,9 @@
 import dotenv from 'dotenv';
 dotenv.config();
 
+import { readFileSync } from 'fs';
+import { fileURLToPath } from 'url';
+import { dirname, resolve as pathResolve } from 'path';
 import resolve from '@rollup/plugin-node-resolve';
 import commonjs from '@rollup/plugin-commonjs';
 import babel from '@rollup/plugin-babel';
@@ -14,9 +17,24 @@ import url from '@rollup/plugin-url';
 import terser from '@rollup/plugin-terser';
 import copy from 'rollup-plugin-copy';
 import alias from '@rollup/plugin-alias';
+import replace from '@rollup/plugin-replace';
+
+// Read version from package.json
+const __dirname = dirname(fileURLToPath(import.meta.url));
+const { version } = JSON.parse(readFileSync(pathResolve(__dirname, 'package.json'), 'utf8'));
 
 // Check if we are in 'development' mode
 const isDev = process.env.ROLLUP_WATCH;
+
+// Version replacement plugin
+function versionReplacer() {
+  return replace({
+    preventAssignment: true,
+    values: {
+      __EMBEDPDF_VERSION__: version,
+    },
+  });
+}
 
 export default [
   {
@@ -75,6 +93,7 @@ export default [
         plugins: [autoprefixer(), tailwindcss()],
       }),
       typescript(),
+      versionReplacer(),
       babel({
         exclude: 'node_modules/**',
         extensions: ['.js', '.jsx', '.ts', '.tsx'],

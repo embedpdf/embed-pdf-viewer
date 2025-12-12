@@ -2,6 +2,15 @@ import { EmbedPdfContainer } from './web-components/container';
 import { PDFViewerConfig } from './components/app';
 
 // ============================================================================
+// Version
+// ============================================================================
+
+/**
+ * The version of the EmbedPDF snippet package
+ */
+export const version: string = '__EMBEDPDF_VERSION__';
+
+// ============================================================================
 // Plugin Classes - for use with registry.getPlugin<T>()
 // ============================================================================
 export { ViewportPlugin, type ViewportPluginConfig } from '@embedpdf/plugin-viewport/preact';
@@ -135,6 +144,14 @@ function initContainer(config: ContainerConfig): EmbedPdfContainer {
 }
 
 export default {
+  /**
+   * The version of the EmbedPDF snippet package
+   */
+  version,
+
+  /**
+   * Initialize the EmbedPDF viewer
+   */
   init: (config: ContainerConfig): EmbedPdfContainer | undefined => {
     if (config.type === 'container') {
       return initContainer(config);
