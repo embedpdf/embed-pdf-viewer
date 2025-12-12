@@ -1,5 +1,4 @@
 import { useCommand } from '@embedpdf/plugin-commands/preact';
-import { useRegisterAnchor } from '@embedpdf/plugin-ui/preact';
 import { h } from 'preact';
 import { useCallback, useMemo } from 'preact/hooks';
 import { Button } from './ui/button';
@@ -42,10 +41,10 @@ export function ModeSelectButton({ documentId, className }: ModeSelectButtonProp
   return (
     <div style={{ maxWidth: '100px', width: '100px' }} className={className}>
       <Button
-        className={`col-start-1 row-start-1 !w-full appearance-none rounded-md bg-white py-1.5 pl-3 pr-2 text-[13px] text-gray-900 ${
+        className={`bg-bg-surface text-fg-primary col-start-1 row-start-1 !w-full appearance-none rounded-md py-1.5 pl-3 pr-2 text-[13px] ${
           isActive
             ? 'text-accent outline-accent outline outline-2 -outline-offset-2'
-            : 'outline outline-1 -outline-offset-1 outline-gray-300'
+            : 'border-border-default outline-border-default outline outline-1 -outline-offset-1'
         } flex flex-row items-center justify-between gap-2 hover:ring-transparent`}
         onClick={handleClick}
         disabled={commandOverflow.disabled}
@@ -54,7 +53,7 @@ export function ModeSelectButton({ documentId, className }: ModeSelectButtonProp
         }}
       >
         <span className="min-w-0 flex-1 truncate text-left">{activeCommand?.label}</span>
-        <Icon icon="chevronDown" className="h-4 w-4 text-gray-500" />
+        <Icon icon="chevronDown" className="text-fg-secondary h-4 w-4" />
       </Button>
     </div>
   );
