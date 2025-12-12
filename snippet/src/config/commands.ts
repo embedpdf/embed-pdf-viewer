@@ -780,6 +780,12 @@ export const commands: Record<string, Command<State>> = {
         documentId,
       );
     },
+    active: ({ state, documentId }) => {
+      return (
+        state.plugins['ui']?.documents[documentId]?.openMenus['mode-tabs-overflow-menu'] !==
+        undefined
+      );
+    },
   },
 
   // ─────────────────────────────────────────────────────────

@@ -139,9 +139,9 @@ import { ModeSelectButton } from './mode-select-button';
 // ============================================================================
 
 export interface PDFViewerConfig {
-  // === Required ===
-  /** URL or path to the PDF document */
-  src: string;
+  // === Document Source (optional) ===
+  /** URL or path to the PDF document. If not provided, viewer loads with no document. */
+  src?: string;
 
   // === Engine Options ===
   /** Use web worker for PDF processing. Default: true */
@@ -464,7 +464,7 @@ export function PDFViewer({ config, onRegistryReady }: PDFViewerProps) {
           // Core plugins
           createPluginRegistration(DocumentManagerPluginPackage, {
             ...DEFAULTS.documentManager,
-            initialDocuments: [{ url: config.src }],
+            ...(config.src && { initialDocuments: [{ url: config.src }] }),
             ...config.documentManager,
           }),
           createPluginRegistration(CommandsPluginPackage, {

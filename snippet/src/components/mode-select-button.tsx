@@ -41,19 +41,26 @@ export function ModeSelectButton({ documentId, className }: ModeSelectButtonProp
   return (
     <div style={{ maxWidth: '100px', width: '100px' }} className={className}>
       <Button
-        className={`bg-bg-surface text-fg-primary col-start-1 row-start-1 !w-full appearance-none rounded-md py-1.5 pl-3 pr-2 text-[13px] ${
+        className={`bg-bg-surface col-start-1 row-start-1 !w-full appearance-none rounded-md py-1.5 pl-3 pr-2 text-[13px] ${
           isActive
-            ? 'text-accent outline-accent outline outline-2 -outline-offset-2'
-            : 'border-border-default outline-border-default outline outline-1 -outline-offset-1'
-        } flex flex-row items-center justify-between gap-2 hover:ring-transparent`}
+            ? 'bg-interactive-selected ring-accent border-none shadow ring'
+            : 'border-border-default outline-border-default hover:bg-interactive-hover hover:ring-accent outline outline-1 -outline-offset-1 hover:ring'
+        } flex flex-row items-center justify-between gap-2`}
         onClick={handleClick}
         disabled={commandOverflow.disabled}
         style={{
           height: 34,
         }}
       >
-        <span className="min-w-0 flex-1 truncate text-left">{activeCommand?.label}</span>
-        <Icon icon="chevronDown" className="text-fg-secondary h-4 w-4" />
+        <span
+          className={`min-w-0 flex-1 truncate text-left ${isActive ? 'text-accent' : 'text-fg-primary'}`}
+        >
+          {activeCommand?.label}
+        </span>
+        <Icon
+          icon="chevronDown"
+          className={`h-4 w-4 ${isActive ? 'text-accent' : 'text-fg-secondary'}`}
+        />
       </Button>
     </div>
   );
