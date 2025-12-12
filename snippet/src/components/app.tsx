@@ -132,6 +132,7 @@ import { IconsConfig } from '@/config/icon-registry';
 import { TabBar, TabBarVisibility } from '@/components/tab-bar';
 import { EmptyState } from '@/components/empty-state';
 import { DocumentPasswordPrompt } from '@/components/document-password-prompt';
+import { ModeSelectButton } from './mode-select-button';
 
 // ============================================================================
 // Main Configuration Interface - Uses actual plugin config types directly
@@ -420,6 +421,7 @@ export function PDFViewer({ config, onRegistryReady }: PDFViewerProps) {
       'comment-sidebar': CommentSidebar,
       'print-modal': PrintModal,
       'page-controls': PageControls,
+      'mode-select-button': ModeSelectButton,
     }),
     [],
   );

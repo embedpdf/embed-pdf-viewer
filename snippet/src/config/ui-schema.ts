@@ -48,6 +48,7 @@ export const viewerUISchema: UISchema = {
             maxWidth: 400,
             hide: [
               'annotate-mode',
+              'view-mode',
               'shapes-mode',
               'redact-mode',
               'zoom-toolbar',
@@ -57,8 +58,9 @@ export const viewerUISchema: UISchema = {
               'page-settings-button',
               'zoom-menu-button',
               'divider-2',
+              'overflow-tabs-button',
             ],
-            show: ['overflow-tabs-button'],
+            show: ['mode-select-button'],
           },
           xxs: {
             minWidth: 400,
@@ -73,8 +75,9 @@ export const viewerUISchema: UISchema = {
           sm: {
             minWidth: 640,
             maxWidth: 768,
-            hide: ['shapes-mode', 'redact-mode', 'zoom-toolbar'],
+            hide: ['shapes-mode', 'redact-mode', 'zoom-toolbar', 'mode-select-button'],
             show: [
+              'view-mode',
               'annotate-mode',
               'overflow-tabs-button',
               'pan-button',
@@ -85,14 +88,16 @@ export const viewerUISchema: UISchema = {
           md: {
             minWidth: 768,
             show: [
+              'view-mode',
               'annotate-mode',
               'shapes-mode',
               'zoom-toolbar',
               'pan-button',
               'pointer-button',
               'divider-3',
+              'overflow-tabs-button',
             ],
-            hide: ['zoom-menu-button'],
+            hide: ['zoom-menu-button', 'mode-select-button'],
           },
           lg: {
             minWidth: 1024,
@@ -189,6 +194,15 @@ export const viewerUISchema: UISchema = {
           type: 'spacer',
           id: 'spacer-1',
           flex: true,
+        },
+
+        {
+          type: 'custom',
+          id: 'mode-select-button',
+          componentId: 'mode-select-button',
+          visibilityDependsOn: {
+            menuId: 'mode-tabs-overflow-menu',
+          },
         },
 
         // ───────── Mode Tabs ─────────
@@ -554,6 +568,11 @@ export const viewerUISchema: UISchema = {
       items: [
         {
           type: 'command',
+          id: 'mode:view',
+          commandId: 'mode:view',
+        },
+        {
+          type: 'command',
           id: 'mode:annotate',
           commandId: 'mode:annotate',
           categories: ['annotation'],
@@ -575,16 +594,16 @@ export const viewerUISchema: UISchema = {
         breakpoints: {
           xs: {
             maxWidth: 640,
-            show: ['mode:annotate', 'mode:shapes', 'mode:redact'],
+            show: ['mode:view', 'mode:annotate', 'mode:shapes', 'mode:redact'],
           },
           sm: {
             minWidth: 640,
             maxWidth: 768,
-            hide: ['mode:annotate'],
+            hide: ['mode:view', 'mode:annotate'],
           },
           md: {
             minWidth: 768,
-            hide: ['mode:annotate', 'mode:shapes'],
+            hide: ['mode:view', 'mode:annotate', 'mode:shapes'],
           },
         },
       },
