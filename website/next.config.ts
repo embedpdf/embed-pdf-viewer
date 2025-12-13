@@ -7,6 +7,20 @@ import { visit } from 'unist-util-visit'
 import { Plugin } from 'unified'
 import { remarkCodeExample } from './src/lib/remark-code-example'
 import { rehypeCodeExample } from './src/lib/rehype-code-example'
+import { readFileSync } from 'fs'
+import { resolve } from 'path'
+import { fileURLToPath } from 'url'
+import { dirname } from 'path'
+
+// Get __dirname equivalent in ESM
+const __filename = fileURLToPath(import.meta.url)
+const __dirname = dirname(__filename)
+
+// Read snippet version from package.json for use in client components
+const snippetPackageJson = JSON.parse(
+  readFileSync(resolve(__dirname, '../viewers/snippet/package.json'), 'utf8'),
+)
+const SNIPPET_VERSION = snippetPackageJson.version
 
 /**
  * This plugin overrides the import source for the Tabs component to use the custom component
@@ -61,15 +75,18 @@ const withNextra = nextra({
   },
 })
 
-const nextConfigFn = async (phase: string) => {
-  const nextConfig: NextConfig = {}
+// Export a function that handles phase-specific logic and merges with Nextra
+export default async (phase: string) => {
+  // Build config with env
+  const nextConfig: NextConfig = {
+    env: {
+      NEXT_PUBLIC_SNIPPET_VERSION: SNIPPET_VERSION,
+    },
+  }
 
-  // 2. Existing logic for local package transpilation
+  // Add transpilePackages in development
   if (phase === 'phase-development-server') {
     const fs = await import('node:fs')
-
-    // Note: Changed path slightly to ensure it finds them relative to where next.config runs
-    // If your previous glob worked, keep it. Usually glob relative paths depend on CWD.
     const allFiles = globSync('../packages/*/package.json')
 
     const packageNames = allFiles
@@ -86,7 +103,14 @@ const nextConfigFn = async (phase: string) => {
     nextConfig.transpilePackages = packageNames
   }
 
-  return nextConfig
-}
+  // Apply Nextra wrapper
+  const nextraWrapped = withNextra(nextConfig)
 
-export default withNextra(nextConfigFn)
+  // If nextra returns a function, call it with phase
+  const finalConfig =
+    typeof nextraWrapped === 'function'
+      ? await (nextraWrapped as (phase: string) => Promise<NextConfig>)(phase)
+      : nextraWrapped
+
+  return finalConfig
+}
