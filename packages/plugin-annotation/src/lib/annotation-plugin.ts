@@ -10,6 +10,7 @@ import {
   AnnotationCreateContext,
   uuidV4,
   PdfAnnotationSubtype,
+  Rotation,
 } from '@embedpdf/models';
 import {
   AnnotationCapability,
@@ -353,7 +354,30 @@ export class AnnotationPlugin extends BasePlugin<
       return PdfTaskHelper.reject({ code: PdfErrorCode.NotFound, message: 'Page not found' });
     }
 
-    return this.engine.renderPageAnnotation(coreState.document, page, annotation, options);
+    // Ensure Stamp annotations render upright regardless of the PDF page’s internal rotation.
+    // Set options.rotation to override this behavior.
+    let renderOptions = options;
+    if (
+      annotation.type === PdfAnnotationSubtype.STAMP &&
+      (options == null || options.rotation == null)
+    ) {
+      const inverseRotation = (rotation: Rotation): Rotation => {
+        switch (rotation) {
+          case Rotation.Degree90:
+            return Rotation.Degree270;
+          case Rotation.Degree270:
+            return Rotation.Degree90;
+          case Rotation.Degree180:
+            return Rotation.Degree180;
+          case Rotation.Degree0:
+          default:
+            return Rotation.Degree0;
+        }
+      };
+      renderOptions = { ...options, rotation: inverseRotation(page.rotation) };
+    }
+
+    return this.engine.renderPageAnnotation(coreState.document, page, annotation, renderOptions);
   }
 
   private importAnnotations(items: ImportAnnotationItem<PdfAnnotationObject>[]) {
