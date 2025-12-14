@@ -119,11 +119,9 @@ export interface ThemeColors {
 }
 
 /**
- * A complete theme definition
+ * A complete theme definition (internal use)
  */
 export interface Theme {
-  /** Theme identifier */
-  name: string;
   /** Color tokens */
   colors: ThemeColors;
 }
@@ -165,7 +163,6 @@ export interface ThemeConfig {
 // ─────────────────────────────────────────────────────────
 
 export const lightTheme: Theme = {
-  name: 'light',
   colors: {
     background: {
       app: '#f3f4f6', // gray-100
@@ -228,7 +225,6 @@ export const lightTheme: Theme = {
 // ─────────────────────────────────────────────────────────
 
 export const darkTheme: Theme = {
-  name: 'dark',
   colors: {
     background: {
       app: '#111827', // gray-900
@@ -320,13 +316,8 @@ function deepMerge<T extends Record<string, any>>(target: T, source: DeepPartial
 /**
  * Creates a custom theme by extending a base theme with color overrides
  */
-export function createTheme(
-  base: Theme,
-  overrides: DeepPartial<ThemeColors>,
-  name?: string,
-): Theme {
+export function createTheme(base: Theme, overrides: DeepPartial<ThemeColors>): Theme {
   return {
-    name: name || `${base.name}-custom`,
     colors: deepMerge(base.colors, overrides),
   };
 }

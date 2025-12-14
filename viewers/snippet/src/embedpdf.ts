@@ -29,9 +29,72 @@ export { SearchPlugin, type SearchPluginConfig } from '@embedpdf/plugin-search/p
 export { SelectionPlugin, type SelectionPluginConfig } from '@embedpdf/plugin-selection/preact';
 export { CapturePlugin, type CapturePluginConfig } from '@embedpdf/plugin-capture/preact';
 export { RedactionPlugin, type RedactionPluginConfig } from '@embedpdf/plugin-redaction/preact';
-export { UIPlugin, type UIPluginConfig } from '@embedpdf/plugin-ui/preact';
+export { UIPlugin, type UIPluginConfig, type UICapability } from '@embedpdf/plugin-ui/preact';
+
+// UI Schema Types - for customizing toolbars, menus, sidebars, etc.
+export type {
+  // Top-level schema
+  UISchema,
+
+  // Toolbar types
+  ToolbarSchema,
+  ToolbarPosition,
+  ToolbarItem,
+  CommandButtonItem,
+  GroupItem,
+  DividerItem,
+  SpacerItem,
+  TabGroupItem,
+  TabItem,
+  CustomComponentItem,
+
+  // Menu types
+  MenuSchema,
+  MenuItem,
+  MenuCommandItem,
+  MenuDividerItem,
+  MenuSectionItem,
+  MenuSubmenuItem,
+  MenuCustomItem,
+
+  // Sidebar types
+  SidebarSchema,
+  SidebarPosition,
+  PanelContent,
+  TabsPanelContent,
+  ComponentPanelContent,
+  PanelTab,
+
+  // Modal types
+  ModalSchema,
+
+  // Overlay types
+  OverlaySchema,
+  OverlayPosition,
+  OverlayAnchor,
+
+  // Selection menu types
+  SelectionMenuSchema,
+  SelectionMenuItem,
+  SelectionMenuCommandItem,
+  SelectionMenuDividerItem,
+  SelectionMenuGroupItem,
+
+  // Responsive types
+  ResponsiveRules,
+  BreakpointRule,
+
+  // Utility types
+  VisibilityDependency,
+} from '@embedpdf/plugin-ui/preact';
 export { I18nPlugin, type I18nPluginConfig } from '@embedpdf/plugin-i18n/preact';
-export { CommandsPlugin, type CommandsPluginConfig } from '@embedpdf/plugin-commands/preact';
+export {
+  CommandsPlugin,
+  type CommandsPluginConfig,
+  type Command,
+  type ResolvedCommand,
+  type CommandsCapability,
+} from '@embedpdf/plugin-commands/preact';
 export {
   DocumentManagerPlugin,
   type DocumentManagerPluginConfig,
