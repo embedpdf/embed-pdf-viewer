@@ -75,6 +75,15 @@ const withNextra = nextra({
   },
 })
 
+// Pre-built example packages that should NOT be analyzed/transpiled by Next.js.
+// These packages use Vue/Svelte and have their own build process.
+// Next.js has issues with `export *` re-exports across package boundaries,
+// which causes sporadic "Attempted import error" failures.
+const EXTERNAL_EXAMPLE_PACKAGES = [
+  '@embedpdf/example-vue-tailwind',
+  '@embedpdf/example-svelte-tailwind',
+]
+
 // Export a function that handles phase-specific logic and merges with Nextra
 export default async (phase: string) => {
   // Build config with env
@@ -82,9 +91,11 @@ export default async (phase: string) => {
     env: {
       NEXT_PUBLIC_SNIPPET_VERSION: SNIPPET_VERSION,
     },
+    // Mark Vue/Svelte example packages as external for server-side bundling
+    serverExternalPackages: EXTERNAL_EXAMPLE_PACKAGES,
   }
 
-  // Add transpilePackages in development
+  // Add transpilePackages in development (but exclude the pre-built examples)
   if (phase === 'phase-development-server') {
     const fs = await import('node:fs')
     const allFiles = globSync('../packages/*/package.json')
@@ -99,6 +110,8 @@ export default async (phase: string) => {
         }
       })
       .filter((pkg: string) => pkg?.startsWith('@embedpdf'))
+      // Explicitly exclude the example packages from transpilation
+      .filter((pkg: string) => !EXTERNAL_EXAMPLE_PACKAGES.includes(pkg))
 
     nextConfig.transpilePackages = packageNames
   }

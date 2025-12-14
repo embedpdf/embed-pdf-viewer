@@ -78,10 +78,17 @@ export const PDFViewer = forwardRef(function PDFViewer(
   useEffect(() => {
     if (!containerRef.current) return;
 
+    // Track if this effect instance is still active (for Strict Mode)
+    let isActive = true;
+
+    // IMPORTANT: Capture the container reference in a closure
+    // This ensures we can clean up even after React unmounts the component
+    const containerElement = containerRef.current;
+
     // Initialize the viewer with the config prop
     const viewer = EmbedPDF.init({
       type: 'container',
-      target: containerRef.current,
+      target: containerElement,
       ...config,
     });
 
@@ -89,18 +96,27 @@ export const PDFViewer = forwardRef(function PDFViewer(
       viewerRef.current = viewer;
       onInit?.(viewer);
 
-      // Call onReady when registry is available
+      // Call onReady when registry is available, but only if still active
       if (onReady) {
-        viewer.registry.then(onReady);
+        viewer.registry.then((registry) => {
+          // Only call onReady if this effect instance is still active
+          // This prevents stale callbacks in React Strict Mode
+          if (isActive) {
+            onReady(registry);
+          }
+        });
       }
     }
 
     return () => {
-      // Cleanup: remove the viewer element
-      if (viewerRef.current && containerRef.current) {
-        containerRef.current.innerHTML = '';
-        viewerRef.current = null;
-      }
+      // Mark this effect instance as inactive
+      isActive = false;
+
+      // Cleanup: remove the viewer element using captured reference
+      // We use the captured containerElement instead of containerRef.current
+      // because React may have already unmounted and cleared the ref
+      containerElement.innerHTML = '';
+      viewerRef.current = null;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
