@@ -19,7 +19,9 @@ import {
   registerIcons as globalRegisterIcons,
 } from '@/config/icon-registry';
 
-export class EmbedPdfContainer extends HTMLElement {
+const BaseElement = typeof HTMLElement !== 'undefined' ? HTMLElement : class {};
+
+export class EmbedPdfContainer extends (BaseElement as typeof HTMLElement) {
   private root: ShadowRoot;
   private _config?: PDFViewerConfig;
   private _registryPromise: Promise<PluginRegistry>;
@@ -128,9 +130,9 @@ export class EmbedPdfContainer extends HTMLElement {
     // Get base theme
     const baseTheme = colorScheme === 'dark' ? darkTheme : lightTheme;
 
-    // Apply custom overrides if provided
-    const customThemeConfig = themeConfig?.themes?.[colorScheme];
-    return resolveTheme(customThemeConfig, baseTheme);
+    // Apply custom overrides if provided (now directly on themeConfig.light/dark)
+    const colorOverrides = themeConfig?.[colorScheme];
+    return resolveTheme(colorOverrides, baseTheme);
   }
 
   /**
@@ -199,7 +201,11 @@ export class EmbedPdfContainer extends HTMLElement {
       if (typeof theme === 'string') {
         this._config.theme = { ...this._config.theme, preference: theme };
       } else {
-        this._config.theme = theme;
+        // Merge new config with existing, preserving unspecified values
+        this._config.theme = {
+          ...this._config.theme,
+          ...theme,
+        };
       }
       this.setupTheme();
 

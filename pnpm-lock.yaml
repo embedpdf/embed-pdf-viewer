@@ -2305,6 +2305,9 @@ importers:
       '@embedpdf/plugin-zoom':
         specifier: workspace:*
         version: link:../packages/plugin-zoom
+      '@embedpdf/react-pdf-viewer':
+        specifier: workspace:*
+        version: link:../viewers/react
       '@embedpdf/snippet':
         specifier: workspace:*
         version: link:../viewers/snippet

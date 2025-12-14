@@ -146,13 +146,18 @@ export interface ThemeConfig {
   preference?: ThemePreference;
 
   /**
-   * Custom themes to override built-in defaults.
-   * You can provide one or both themes.
+   * Color overrides for light mode.
+   * Only specify the colors you want to change.
+   * @example { accent: { primary: '#9333ea' } }
    */
-  themes?: {
-    light?: Theme | DeepPartial<ThemeColors>;
-    dark?: Theme | DeepPartial<ThemeColors>;
-  };
+  light?: DeepPartial<ThemeColors>;
+
+  /**
+   * Color overrides for dark mode.
+   * Only specify the colors you want to change.
+   * @example { accent: { primary: '#a855f7' } }
+   */
+  dark?: DeepPartial<ThemeColors>;
 }
 
 // ─────────────────────────────────────────────────────────
@@ -327,21 +332,11 @@ export function createTheme(
 }
 
 /**
- * Merges theme configuration, handling both full Theme objects and partial overrides
+ * Applies color overrides to a base theme
  */
-export function resolveTheme(
-  config: Theme | DeepPartial<ThemeColors> | undefined,
-  base: Theme,
-): Theme {
-  if (!config) return base;
-
-  // Check if it's a full Theme object
-  if ('name' in config && 'colors' in config) {
-    return config as Theme;
-  }
-
-  // It's a partial color override
-  return createTheme(base, config as DeepPartial<ThemeColors>);
+export function resolveTheme(overrides: DeepPartial<ThemeColors> | undefined, base: Theme): Theme {
+  if (!overrides) return base;
+  return createTheme(base, overrides);
 }
 
 // ─────────────────────────────────────────────────────────

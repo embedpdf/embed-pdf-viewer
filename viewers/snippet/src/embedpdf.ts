@@ -86,7 +86,9 @@ type ContainerConfig = PDFViewerConfig & {
   target: Element;
 };
 
-customElements.define('embedpdf-container', EmbedPdfContainer);
+if (typeof customElements !== 'undefined' && !customElements.get('embedpdf-container')) {
+  customElements.define('embedpdf-container', EmbedPdfContainer);
+}
 
 /**
  * Initialize the EmbedPDF viewer
