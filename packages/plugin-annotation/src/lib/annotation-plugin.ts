@@ -354,7 +354,7 @@ export class AnnotationPlugin extends BasePlugin<
       return PdfTaskHelper.reject({ code: PdfErrorCode.NotFound, message: 'Page not found' });
     }
 
-    // Ensure Stamp annotations render upright regardless of the PDF page’s internal rotation.
+    // Ensure "Stamp" annotations render upright regardless of the PDF page's internal rotation.
     // Set options.rotation to override this behavior.
     let renderOptions = options;
     if (
