@@ -1,6 +1,6 @@
 {
   "name": "@embedpdf/plugin-annotation",
-  "version": "2.0.0-next.1",
+  "version": "2.0.0-next.2",
   "type": "module",
   "license": "MIT",
   "main": "./dist/index.cjs",
