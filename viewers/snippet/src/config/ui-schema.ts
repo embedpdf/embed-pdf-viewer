@@ -32,11 +32,13 @@ export const viewerUISchema: UISchema = {
               breakpoints: {
                 md: {
                   replaceShow: [
+                    'view-mode',
                     'annotate-mode',
                     'zoom-toolbar',
                     'pan-button',
                     'pointer-button',
                     'divider-3',
+                    'overflow-tabs-button',
                   ],
                 },
               },

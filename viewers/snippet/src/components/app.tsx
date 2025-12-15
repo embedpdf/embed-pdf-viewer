@@ -126,6 +126,7 @@ import {
   dutchTranslations,
   germanTranslations,
   frenchTranslations,
+  spanishTranslations,
 } from '@/config';
 import { ThemeConfig } from '@/config/theme';
 import { IconsConfig } from '@/config/icon-registry';
@@ -187,67 +188,70 @@ export interface PDFViewerConfig {
   disabledCategories?: string[];
 
   // === Plugin Configurations (uses actual plugin types - no duplication!) ===
+  // All plugin configs are Partial<> so users can override just the settings they need.
+  // Defaults are merged in at runtime.
+
   // Core plugins
   /** Document manager options (initialDocuments) */
-  documentManager?: DocumentManagerPluginConfig;
+  documentManager?: Partial<DocumentManagerPluginConfig>;
   /** Commands options (commands, disabledCategories) */
-  commands?: CommandsPluginConfig;
+  commands?: Partial<CommandsPluginConfig>;
   /** i18n options (defaultLocale, locales, paramResolvers) */
-  i18n?: I18nPluginConfig;
+  i18n?: Partial<I18nPluginConfig>;
   /** UI schema options (schema, disabledCategories) */
-  ui?: UIPluginConfig;
+  ui?: Partial<UIPluginConfig>;
 
   // Viewport & Navigation
   /** Viewport options (viewportGap, scrollEndDelay) */
-  viewport?: ViewportPluginConfig;
+  viewport?: Partial<ViewportPluginConfig>;
   /** Scroll options (defaultStrategy, defaultPageGap, defaultBufferSize) */
-  scroll?: ScrollPluginConfig;
+  scroll?: Partial<ScrollPluginConfig>;
   /** Zoom options (defaultZoomLevel, minZoom, maxZoom, zoomStep) */
-  zoom?: ZoomPluginConfig;
+  zoom?: Partial<ZoomPluginConfig>;
   /** Spread/layout options (defaultSpreadMode) */
-  spread?: SpreadPluginConfig;
+  spread?: Partial<SpreadPluginConfig>;
   /** Rotation options (defaultRotation) */
-  rotation?: RotatePluginConfig;
+  rotation?: Partial<RotatePluginConfig>;
   /** Pan mode options (defaultMode: 'never' | 'mobile' | 'always') */
-  pan?: PanPluginConfig;
+  pan?: Partial<PanPluginConfig>;
 
   // Rendering
   /** Render options (withForms, withAnnotations) */
-  render?: RenderPluginConfig;
+  render?: Partial<RenderPluginConfig>;
   /** Tiling options (tileSize, overlapPx, extraRings) */
-  tiling?: TilingPluginConfig;
+  tiling?: Partial<TilingPluginConfig>;
   /** Thumbnail options (width, gap, buffer, labelHeight, etc.) */
-  thumbnails?: ThumbnailPluginConfig;
+  thumbnails?: Partial<ThumbnailPluginConfig>;
 
   // Content features
   /** Annotation options (tools, colorPresets, autoCommit, author, etc.) */
-  annotations?: AnnotationPluginConfig;
+  annotations?: Partial<AnnotationPluginConfig>;
   /** Search options (flags, showAllResults) */
-  search?: SearchPluginConfig;
+  search?: Partial<SearchPluginConfig>;
   /** Selection options (menuHeight) */
-  selection?: SelectionPluginConfig;
+  selection?: Partial<SelectionPluginConfig>;
   /** Bookmark options */
-  bookmarks?: BookmarkPluginConfig;
+  bookmarks?: Partial<BookmarkPluginConfig>;
   /** Attachment options */
-  attachments?: AttachmentPluginConfig;
+  attachments?: Partial<AttachmentPluginConfig>;
 
   // Tools
   /** Capture options (scale, imageType, withAnnotations) */
-  capture?: CapturePluginConfig;
+  capture?: Partial<CapturePluginConfig>;
   /** Redaction options (drawBlackBoxes) */
-  redaction?: RedactionPluginConfig;
+  redaction?: Partial<RedactionPluginConfig>;
   /** Print options */
-  print?: PrintPluginConfig;
+  print?: Partial<PrintPluginConfig>;
   /** Export options (defaultFileName) */
-  export?: ExportPluginConfig;
+  export?: Partial<ExportPluginConfig>;
   /** Fullscreen options (targetElement) */
-  fullscreen?: FullscreenPluginConfig;
+  fullscreen?: Partial<FullscreenPluginConfig>;
 
   // Infrastructure
   /** History/undo options */
-  history?: HistoryPluginConfig;
+  history?: Partial<HistoryPluginConfig>;
   /** Interaction manager options (exclusionRules) */
-  interactionManager?: InteractionManagerPluginConfig;
+  interactionManager?: Partial<InteractionManagerPluginConfig>;
 }
 
 // Default configurations for all plugins
@@ -258,7 +262,13 @@ const DEFAULTS = {
   commands: { commands: defaultCommands } as CommandsPluginConfig,
   i18n: {
     defaultLocale: 'en',
-    locales: [englishTranslations, dutchTranslations, germanTranslations, frenchTranslations],
+    locales: [
+      englishTranslations,
+      dutchTranslations,
+      germanTranslations,
+      frenchTranslations,
+      spanishTranslations,
+    ],
     paramResolvers: defaultParamResolvers,
   } as I18nPluginConfig,
   ui: { schema: defaultUISchema } as UIPluginConfig,
