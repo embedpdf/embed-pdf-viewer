@@ -167,7 +167,7 @@ export function SearchSidebar({ documentId, onClose }: SearchSidebarProps) {
             </div>
           )}
         </div>
-        <div className="mt-3 flex flex-row gap-4">
+        <div className="mt-3 flex flex-col gap-2">
           <Checkbox
             label={translate('search.caseSensitive')}
             checked={state.flags.includes(MatchFlag.MatchCase)}

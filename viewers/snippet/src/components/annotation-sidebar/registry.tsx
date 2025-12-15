@@ -16,7 +16,8 @@ type SidebarComponent<S extends PdfAnnotationSubtype> = (
 
 interface SidebarEntry<S extends PdfAnnotationSubtype> {
   component: SidebarComponent<S>;
-  title?: string | ((p: SidebarPropsBase<Extract<PdfAnnotationObject, { type: S }>>) => string);
+  /** Translation key for the sidebar title (e.g., 'annotation.ink') */
+  titleKey?: string | ((p: SidebarPropsBase<Extract<PdfAnnotationObject, { type: S }>>) => string);
 }
 
 type SidebarRegistry = Partial<{
@@ -24,21 +25,33 @@ type SidebarRegistry = Partial<{
 }>;
 
 export const SidebarRegistry: SidebarRegistry = {
-  [PdfAnnotationSubtype.INK]: { component: InkSidebar, title: 'Ink' },
-  [PdfAnnotationSubtype.POLYGON]: { component: PolygonSidebar, title: 'Polygon' },
-  [PdfAnnotationSubtype.SQUARE]: { component: ShapeSidebar, title: 'Square' },
-  [PdfAnnotationSubtype.CIRCLE]: { component: ShapeSidebar, title: 'Circle' },
+  [PdfAnnotationSubtype.INK]: { component: InkSidebar, titleKey: 'annotation.ink' },
+  [PdfAnnotationSubtype.POLYGON]: { component: PolygonSidebar, titleKey: 'annotation.polygon' },
+  [PdfAnnotationSubtype.SQUARE]: { component: ShapeSidebar, titleKey: 'annotation.square' },
+  [PdfAnnotationSubtype.CIRCLE]: { component: ShapeSidebar, titleKey: 'annotation.circle' },
 
   [PdfAnnotationSubtype.LINE]: {
     component: LineSidebar,
-    title: (p) => (p.activeTool?.id === 'lineArrow' ? 'Arrow' : 'Line'),
+    titleKey: (p) => (p.activeTool?.id === 'lineArrow' ? 'annotation.arrow' : 'annotation.line'),
   },
-  [PdfAnnotationSubtype.POLYLINE]: { component: LineSidebar, title: 'Polyline' },
+  [PdfAnnotationSubtype.POLYLINE]: { component: LineSidebar, titleKey: 'annotation.polyline' },
 
-  [PdfAnnotationSubtype.HIGHLIGHT]: { component: TextMarkupSidebar, title: 'Highlight' },
-  [PdfAnnotationSubtype.UNDERLINE]: { component: TextMarkupSidebar, title: 'Underline' },
-  [PdfAnnotationSubtype.STRIKEOUT]: { component: TextMarkupSidebar, title: 'Strikeout' },
-  [PdfAnnotationSubtype.SQUIGGLY]: { component: TextMarkupSidebar, title: 'Squiggly' },
-  [PdfAnnotationSubtype.FREETEXT]: { component: FreeTextSidebar, title: 'Free text' },
-  [PdfAnnotationSubtype.STAMP]: { component: StampSidebar, title: 'Stamp' },
+  [PdfAnnotationSubtype.HIGHLIGHT]: {
+    component: TextMarkupSidebar,
+    titleKey: 'annotation.highlight',
+  },
+  [PdfAnnotationSubtype.UNDERLINE]: {
+    component: TextMarkupSidebar,
+    titleKey: 'annotation.underline',
+  },
+  [PdfAnnotationSubtype.STRIKEOUT]: {
+    component: TextMarkupSidebar,
+    titleKey: 'annotation.strikeout',
+  },
+  [PdfAnnotationSubtype.SQUIGGLY]: {
+    component: TextMarkupSidebar,
+    titleKey: 'annotation.squiggly',
+  },
+  [PdfAnnotationSubtype.FREETEXT]: { component: FreeTextSidebar, titleKey: 'annotation.freeText' },
+  [PdfAnnotationSubtype.STAMP]: { component: StampSidebar, titleKey: 'annotation.stamp' },
 };

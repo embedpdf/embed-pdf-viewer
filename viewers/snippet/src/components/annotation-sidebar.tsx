@@ -5,6 +5,7 @@ import {
   AnnotationTool,
   useAnnotation,
 } from '@embedpdf/plugin-annotation/preact';
+import { useTranslations } from '@embedpdf/plugin-i18n/preact';
 import { PdfAnnotationSubtype } from '@embedpdf/models';
 import { getAnnotationByUid } from '@embedpdf/plugin-annotation';
 
@@ -15,6 +16,8 @@ import { EmptyState } from './annotation-sidebar/empty-state';
 export function AnnotationSidebar({ documentId }: { documentId: string }) {
   const { provides: annotationCapability } = useAnnotationCapability();
   const { provides: annotation, state } = useAnnotation(documentId);
+  const { translate } = useTranslations(documentId);
+
   if (!annotationCapability || !annotation) return null;
 
   const colorPresets = annotationCapability?.getColorPresets() ?? [];
@@ -41,7 +44,7 @@ export function AnnotationSidebar({ documentId }: { documentId: string }) {
   const entry = SidebarRegistry[subtype];
   if (!entry) return <EmptyState documentId={documentId} />;
 
-  const { component: Sidebar, title } = entry;
+  const { component: Sidebar, titleKey } = entry;
 
   // 3. Prepare the simplified props for the sidebar component
   const commonProps: SidebarPropsBase<any> = {
@@ -51,15 +54,17 @@ export function AnnotationSidebar({ documentId }: { documentId: string }) {
     colorPresets,
   };
 
-  const computedTitle = typeof title === 'function' ? title(commonProps as any) : title;
+  // 4. Get the translated title
+  const resolvedTitleKey = typeof titleKey === 'function' ? titleKey(commonProps as any) : titleKey;
+  const annotationType = resolvedTitleKey ? translate(resolvedTitleKey) : '';
+  const titleSuffixKey = selectedAnnotation ? 'annotation.styles' : 'annotation.defaults';
+  const computedTitle = annotationType
+    ? translate(titleSuffixKey, { params: { type: annotationType } })
+    : '';
 
   return (
     <div class="h-full overflow-y-auto p-4">
-      {computedTitle && (
-        <h2 class="text-md mb-4 font-medium">
-          {computedTitle} {selectedAnnotation ? 'styles' : 'defaults'}
-        </h2>
-      )}
+      {computedTitle && <h2 class="text-md mb-4 font-medium">{computedTitle}</h2>}
       <Sidebar {...(commonProps as any)} />
     </div>
   );

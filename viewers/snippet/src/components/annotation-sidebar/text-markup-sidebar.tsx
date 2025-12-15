@@ -1,5 +1,5 @@
 import { Fragment, h } from 'preact';
-import { useState, useEffect, useMemo } from 'preact/hooks';
+import { useState, useEffect } from 'preact/hooks';
 import { useAnnotationCapability } from '@embedpdf/plugin-annotation/preact';
 import { useTranslations } from '@embedpdf/plugin-i18n/preact';
 import {
@@ -67,16 +67,6 @@ export const TextMarkupSidebar = ({
   const debOpacity = useDebounce(opacity, 300);
   useEffect(() => applyPatch({ opacity: debOpacity }), [debOpacity]);
 
-  // Build translated blend mode options
-  const blendOptions = useMemo(
-    () =>
-      blendModeValues.map((mode) => ({
-        value: mode,
-        label: translate(BLEND_MODE_KEYS[mode]),
-      })),
-    [translate],
-  );
-
   const changeColor = (c: string) => {
     setColor(c);
     applyPatch({ color: c });
@@ -124,9 +114,9 @@ export const TextMarkupSidebar = ({
           value={blend}
           onChange={(e) => changeBlend(parseInt((e.target as HTMLSelectElement).value, 10))}
         >
-          {blendOptions.map((o) => (
-            <option key={o.value} value={o.value}>
-              {o.label}
+          {blendModeValues.map((mode) => (
+            <option key={mode} value={mode}>
+              {translate(BLEND_MODE_KEYS[mode])}
             </option>
           ))}
         </select>
