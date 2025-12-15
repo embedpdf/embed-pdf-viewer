@@ -8,4 +8,4 @@ export {
   useContext,
   createContext,
 } from 'react';
-export type { ReactNode, HTMLAttributes, CSSProperties, ComponentType } from 'react';
+export type { ReactNode, HTMLAttributes, CSSProperties, ComponentType, RefObject } from 'react';

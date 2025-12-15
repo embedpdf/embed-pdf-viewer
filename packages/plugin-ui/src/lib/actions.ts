@@ -23,6 +23,7 @@ export const CLOSE_ALL_MENUS = 'UI/CLOSE_ALL_MENUS';
 
 // Category actions
 export const SET_DISABLED_CATEGORIES = 'UI/SET_DISABLED_CATEGORIES';
+export const SET_HIDDEN_ITEMS = 'UI/SET_HIDDEN_ITEMS';
 
 export interface InitUIStateAction extends Action {
   type: typeof INIT_UI_STATE;
@@ -102,6 +103,11 @@ export interface SetDisabledCategoriesAction extends Action {
   payload: { categories: string[] };
 }
 
+export interface SetHiddenItemsAction extends Action {
+  type: typeof SET_HIDDEN_ITEMS;
+  payload: { hiddenItems: string[] };
+}
+
 export type UIAction =
   | InitUIStateAction
   | CleanupUIStateAction
@@ -116,7 +122,8 @@ export type UIAction =
   | OpenMenuAction
   | CloseMenuAction
   | CloseAllMenusAction
-  | SetDisabledCategoriesAction;
+  | SetDisabledCategoriesAction
+  | SetHiddenItemsAction;
 
 // Action creators
 export const initUIState = (documentId: string, schema: UISchema): InitUIStateAction => ({
@@ -212,4 +219,9 @@ export const closeAllMenus = (documentId: string): CloseAllMenusAction => ({
 export const setDisabledCategories = (categories: string[]): SetDisabledCategoriesAction => ({
   type: SET_DISABLED_CATEGORIES,
   payload: { categories },
+});
+
+export const setHiddenItems = (hiddenItems: string[]): SetHiddenItemsAction => ({
+  type: SET_HIDDEN_ITEMS,
+  payload: { hiddenItems },
 });

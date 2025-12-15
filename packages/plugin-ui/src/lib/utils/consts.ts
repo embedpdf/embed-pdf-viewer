@@ -12,6 +12,8 @@ export const UI_ATTRIBUTES = {
   CATEGORIES: 'data-epdf-cat',
   /** Disabled categories list on root element */
   DISABLED_CATEGORIES: 'data-epdf-dis',
+  /** Hidden item IDs (computed from disabled categories) */
+  HIDDEN_ITEMS: 'data-epdf-hid',
 } as const;
 
 /**
@@ -23,4 +25,5 @@ export const UI_SELECTORS = {
   ITEM: (id: string) => `[${UI_ATTRIBUTES.ITEM}="${id}"]`,
   CATEGORIES: (category: string) => `[${UI_ATTRIBUTES.CATEGORIES}~="${category}"]`,
   DISABLED_CATEGORY: (category: string) => `[${UI_ATTRIBUTES.DISABLED_CATEGORIES}~="${category}"]`,
+  HIDDEN_ITEM: (itemId: string) => `[${UI_ATTRIBUTES.HIDDEN_ITEMS}~="${itemId}"]`,
 } as const;

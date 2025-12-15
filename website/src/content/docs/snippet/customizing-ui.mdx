@@ -10,6 +10,41 @@ The UI system is built on three pillars:
 2. **Icons** - Define *how* it looks (the visuals)  
 3. **Schema** - Define *where* it appears (the layout)
 
+## Disabling Features
+
+You can easily disable entire groups of features using the `disabledCategories` configuration option. This removes the associated toolbar buttons, menu items, and commands.
+
+Categories are hierarchical, allowing you to disable broad groups or specific features:
+
+- `annotation` - Disables all annotation features
+- `annotation-highlight` - Disables only the highlight tool
+- `zoom` - Disables all zoom controls
+- `print` - Disables print functionality
+
+```javascript
+const viewer = EmbedPDF.init({
+  // ...
+  disabledCategories: ['annotation', 'print']
+});
+```
+
+### Interactive Example
+
+Toggle the checkboxes below to see how categories are disabled in real-time:
+
+import DisableCategoriesExample from './code-examples/disable-categories-example';
+import { ExampleWrapper } from '@/components/example-wrapper';
+
+<CodeExample
+  codePaths={[
+    "content/docs/snippet/code-examples/disable-categories-example.tsx"
+  ]}
+>
+  <ExampleWrapper>
+    <DisableCategoriesExample />
+  </ExampleWrapper>
+</CodeExample>
+
 ## Quick Start: Replacing a Toolbar Button
 
 Here's how to replace an existing button with your own:
@@ -78,7 +113,6 @@ ui.mergeSchema({
 In this example, the comment button is **replaced** with a smiley 😊, and a star ⭐ is **added** to the document menu. Click them to see feedback:
 
 import UICustomizationExample from './code-examples/ui-customization-example';
-import { ExampleWrapper } from '@/components/example-wrapper';
 
 <CodeExample 
   codePaths={[
@@ -356,3 +390,4 @@ commands.registerCommand({
   action: () => { /* ... */ }
 });
 ```
+

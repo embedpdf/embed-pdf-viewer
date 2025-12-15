@@ -1,0 +1,147 @@
+---
+title: Getting Started with Snippet
+description: Add a full-featured PDF viewer to your application in minutes using the EmbedPDF Snippet.
+---
+
+import { Tabs } from '@/components/tabs'
+
+# Getting Started
+
+The **EmbedPDF Snippet** is a pre-built, production-ready PDF viewer. Unlike the headless libraries which require you to build your own UI, the snippet comes with a polished interface, toolbars, and sidebars out of the box.
+
+Choose your preferred method of integration below.
+
+## 1. Vanilla HTML/JS (Easiest)
+
+If you aren't using a build tool, or just want to test quickly, you can load the viewer directly from our CDN.
+
+```html copy filename="index.html"
+<div id="pdf-viewer" style="height: 100vh"></div>
+
+<script type="module">
+  import EmbedPDF from '__EMBEDPDF_JS_URL__';
+
+  EmbedPDF.init({
+    type: 'container',
+    target: document.getElementById('pdf-viewer'),
+    src: '__DEMO_PDF_URL__',
+    theme: { preference: 'system' }
+  });
+</script>
+```
+
+## 2\. Framework Components
+
+For modern web applications, we provide native wrappers that handle lifecycle management and type safety for you.
+
+<Tabs items={['React', 'Vue', 'Svelte', 'Vanilla NPM']}>
+<Tabs.Tab>
+### Installation
+```sh npm2yarn
+npm install @embedpdf/react-pdf-viewer  
+````
+
+### Usage
+```tsx copy filename="App.tsx"
+import { PDFViewer } from '@embedpdf/react-pdf-viewer';
+
+export default function App() {
+  return (
+    <div style={{ height: '100vh' }}>
+      <PDFViewer 
+        config={{
+          src: 'https://snippet.embedpdf.com/ebook.pdf',
+          theme: { preference: 'light' }
+        }}
+      />
+    </div>
+  );
+}
+```
+
+
+</Tabs.Tab>
+<Tabs.Tab>
+### Installation
+```sh npm2yarn
+npm install @embedpdf/vue-pdf-viewer  
+````
+
+### Usage
+```vue copy filename="App.vue"
+<script setup>
+import { PDFViewer } from '@embedpdf/vue-pdf-viewer';
+</script>
+
+<template>
+  <div style="height: 100vh">
+    <PDFViewer 
+      :config="{
+        src: 'https://snippet.embedpdf.com/ebook.pdf',
+        theme: { preference: 'light' }
+      }"
+    />
+  </div>
+</template>
+```
+
+</Tabs.Tab>
+<Tabs.Tab>
+### Installation
+```sh npm2yarn
+npm install @embedpdf/svelte-pdf-viewer  
+````
+
+### Usage
+```svelte copy filename="App.svelte"
+<script>
+  import { PDFViewer } from '@embedpdf/svelte-pdf-viewer';
+</script>
+
+<div style="height: 100vh">
+  <PDFViewer 
+    config={{
+      src: 'https://snippet.embedpdf.com/ebook.pdf',
+      theme: { preference: 'light' }
+    }}
+  />
+</div>
+```
+
+</Tabs.Tab>
+<Tabs.Tab>
+### Installation
+```sh npm2yarn
+npm install @embedpdf/snippet 
+````
+### Usage
+```ts copy filename="main.ts"
+import EmbedPDF from '@embedpdf/snippet';
+
+const container = document.getElementById('app');
+
+EmbedPDF.init({
+  type: 'container',
+  target: container,
+  src: 'https://snippet.embedpdf.com/ebook.pdf'
+});
+```
+
+</Tabs.Tab>
+</Tabs>
+
+## Configuration
+
+The `config` object allows you to customize the viewer's behavior and appearance.
+
+| Option | Type | Description |
+| :--- | :--- | :--- |
+| **`src`** | `string` | URL to the PDF document to load on startup. |
+| **`theme`** | `object` | Customize colors or set preference (`light`, `dark`, `system`). |
+| **`worker`** | `boolean` | Enable/disable web workers (default: `true`). |
+| **`zoom`** | `object` | Configure default zoom level and limits. |
+| **`thumbnails`** | `object` | Configure thumbnail sidebar width and behavior. |
+
+## Next Steps
+
+If you need complete control over the UI (e.g., building your own toolbar from scratch), check out our **[Headless Libraries](..)** instead.

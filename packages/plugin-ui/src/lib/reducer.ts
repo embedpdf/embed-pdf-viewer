@@ -15,6 +15,7 @@ import {
   CLOSE_MENU,
   CLOSE_ALL_MENUS,
   SET_DISABLED_CATEGORIES,
+  SET_HIDDEN_ITEMS,
 } from './actions';
 
 export const initialDocumentState: UIDocumentState = {
@@ -28,6 +29,7 @@ export const initialDocumentState: UIDocumentState = {
 export const initialState: UIState = {
   documents: {},
   disabledCategories: [],
+  hiddenItems: [],
 };
 
 export const uiReducer = (state = initialState, action: UIAction): UIState => {
@@ -329,6 +331,13 @@ export const uiReducer = (state = initialState, action: UIAction): UIState => {
       return {
         ...state,
         disabledCategories: action.payload.categories,
+      };
+    }
+
+    case SET_HIDDEN_ITEMS: {
+      return {
+        ...state,
+        hiddenItems: action.payload.hiddenItems,
       };
     }
 

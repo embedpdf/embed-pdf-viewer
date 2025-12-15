@@ -37,6 +37,7 @@ export function UIRoot({ children, style, ...restProps }: UIRootProps) {
   const { plugin } = useUIPlugin();
   const { provides } = useUICapability();
   const [disabledCategories, setDisabledCategories] = useState<string[]>([]);
+  const [hiddenItems, setHiddenItems] = useState<string[]>([]);
   const styleElRef = useRef<HTMLStyleElement | null>(null);
   const styleTargetRef = useRef<HTMLElement | ShadowRoot | null>(null);
   const previousElementRef = useRef<HTMLDivElement | null>(null);
@@ -128,14 +129,16 @@ export function UIRoot({ children, style, ...restProps }: UIRootProps) {
     });
   }, [plugin]);
 
-  // Subscribe to category changes
+  // Subscribe to category and hidden items changes
   useEffect(() => {
     if (!provides) return;
 
     setDisabledCategories(provides.getDisabledCategories());
+    setHiddenItems(provides.getHiddenItems());
 
-    return provides.onCategoryChanged(({ disabledCategories }) => {
+    return provides.onCategoryChanged(({ disabledCategories, hiddenItems }) => {
       setDisabledCategories(disabledCategories);
+      setHiddenItems(hiddenItems);
     });
   }, [provides]);
 
@@ -143,6 +146,12 @@ export function UIRoot({ children, style, ...restProps }: UIRootProps) {
   const disabledCategoriesAttr = useMemo(
     () => (disabledCategories.length > 0 ? disabledCategories.join(' ') : undefined),
     [disabledCategories],
+  );
+
+  // Build the hidden items attribute value
+  const hiddenItemsAttr = useMemo(
+    () => (hiddenItems.length > 0 ? hiddenItems.join(' ') : undefined),
+    [hiddenItems],
   );
 
   const combinedStyle = useMemo(() => {
@@ -156,6 +165,7 @@ export function UIRoot({ children, style, ...restProps }: UIRootProps) {
   const rootProps = {
     [UI_ATTRIBUTES.ROOT]: '',
     [UI_ATTRIBUTES.DISABLED_CATEGORIES]: disabledCategoriesAttr,
+    [UI_ATTRIBUTES.HIDDEN_ITEMS]: hiddenItemsAttr,
   };
 
   return (

@@ -164,6 +164,28 @@ export interface PDFViewerConfig {
    */
   tabBar?: TabBarVisibility;
 
+  // === Global Feature Control ===
+  /**
+   * Globally disable features by category. This applies to both UI and commands.
+   * Can be overridden by plugin-specific disabledCategories (ui.disabledCategories, commands.disabledCategories).
+   *
+   * Categories are hierarchical:
+   * - 'annotation' - disables all annotation features
+   * - 'annotation-highlight' - disables only highlight annotations
+   * - 'annotation-markup' - disables highlight, underline, strikeout, squiggly
+   * - 'redaction' - disables all redaction features
+   * - 'zoom' - disables all zoom features
+   * - 'document-print' - disables only print functionality
+   *
+   * @example
+   * // Disable all annotation and redaction features
+   * disabledCategories: ['annotation', 'redaction']
+   *
+   * // Disable only specific annotation types
+   * disabledCategories: ['annotation-highlight', 'annotation-strikeout']
+   */
+  disabledCategories?: string[];
+
   // === Plugin Configurations (uses actual plugin types - no duplication!) ===
   // Core plugins
   /** Document manager options (initialDocuments) */
@@ -469,10 +491,17 @@ export function PDFViewer({ config, onRegistryReady }: PDFViewerProps) {
           }),
           createPluginRegistration(CommandsPluginPackage, {
             ...DEFAULTS.commands,
+            // Use root disabledCategories as default, but allow plugin-specific override
+            ...(config.disabledCategories && { disabledCategories: config.disabledCategories }),
             ...config.commands,
           }),
           createPluginRegistration(I18nPluginPackage, { ...DEFAULTS.i18n, ...config.i18n }),
-          createPluginRegistration(UIPluginPackage, { ...DEFAULTS.ui, ...config.ui }),
+          createPluginRegistration(UIPluginPackage, {
+            ...DEFAULTS.ui,
+            // Use root disabledCategories as default, but allow plugin-specific override
+            ...(config.disabledCategories && { disabledCategories: config.disabledCategories }),
+            ...config.ui,
+          }),
 
           // Viewport & Navigation
           createPluginRegistration(ViewportPluginPackage, {

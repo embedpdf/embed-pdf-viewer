@@ -25,6 +25,7 @@ const { plugin } = useUIPlugin();
 const { provides } = useUICapability();
 
 const disabledCategories = ref<string[]>([]);
+const hiddenItems = ref<string[]>([]);
 const rootRef = ref<HTMLDivElement | null>(null);
 
 // Provide container context for child components
@@ -105,6 +106,10 @@ const rootAttrs = computed(() => {
     result[UI_ATTRIBUTES.DISABLED_CATEGORIES] = disabledCategories.value.join(' ');
   }
 
+  if (hiddenItems.value.length > 0) {
+    result[UI_ATTRIBUTES.HIDDEN_ITEMS] = hiddenItems.value.join(' ');
+  }
+
   return result;
 });
 
@@ -130,9 +135,11 @@ onMounted(() => {
   // Subscribe to category changes
   if (provides.value) {
     disabledCategories.value = provides.value.getDisabledCategories();
+    hiddenItems.value = provides.value.getHiddenItems();
 
     categoryCleanup = provides.value.onCategoryChanged((event) => {
       disabledCategories.value = event.disabledCategories;
+      hiddenItems.value = event.hiddenItems;
     });
   }
 });

@@ -60,7 +60,9 @@ interface DependencyRule {
 interface BreakpointVisibility {
   minWidth?: number;
   maxWidth?: number;
-  /** Categories that are responsive-visible at this breakpoint */
+  /** Item IDs that are responsive-visible at this breakpoint */
+  visibleItemIds: string[];
+  /** Categories that are responsive-visible at this breakpoint (kept for backwards compat) */
   visibleCategories: Set<string>;
 }
 
@@ -119,6 +121,43 @@ export function generateUIStylesheet(
 export function extractCategories(schema: UISchema): string[] {
   const analysis = analyzeSchema(schema);
   return Array.from(analysis.categories).sort();
+}
+
+/**
+ * Extract a map of item ID -> categories from the schema.
+ * Used to compute which items are hidden based on disabled categories.
+ *
+ * @param schema - The UI schema to extract item categories from
+ * @returns Map of item ID to array of categories
+ */
+export function extractItemCategories(schema: UISchema): Map<string, string[]> {
+  const analysis = analyzeSchema(schema);
+  return analysis.itemCategories;
+}
+
+/**
+ * Compute which items are hidden based on disabled categories.
+ * An item is hidden if ANY of its categories is disabled.
+ *
+ * @param itemCategories - Map of item ID to categories (from extractItemCategories)
+ * @param disabledCategories - Array of currently disabled categories
+ * @returns Array of hidden item IDs
+ */
+export function computeHiddenItems(
+  itemCategories: Map<string, string[]>,
+  disabledCategories: string[],
+): string[] {
+  const disabledSet = new Set(disabledCategories);
+  const hiddenItems: string[] = [];
+
+  itemCategories.forEach((categories, itemId) => {
+    // Item is hidden if ANY of its categories is disabled
+    if (categories.some((cat) => disabledSet.has(cat))) {
+      hiddenItems.push(itemId);
+    }
+  });
+
+  return hiddenItems;
 }
 
 /**
@@ -280,30 +319,34 @@ function computeMenuBreakpointVisibilities(
       breakpointVisibilities.push({
         minWidth: bp.minWidth,
         maxWidth: bp.maxWidth,
+        visibleItemIds: visibleItems,
         visibleCategories: visibleCats,
       });
     }
   } else {
-    // No responsive rules - collect all item categories
+    // No responsive rules - collect all item IDs and categories
+    const allItemIds: string[] = [];
     const allCats = new Set<string>();
-    collectAllMenuItemCategories(menu.items, itemCategories, allCats);
-    breakpointVisibilities.push({ visibleCategories: allCats });
+    collectAllMenuItemInfo(menu.items, itemCategories, allItemIds, allCats);
+    breakpointVisibilities.push({ visibleItemIds: allItemIds, visibleCategories: allCats });
   }
 
   return breakpointVisibilities;
 }
 
-function collectAllMenuItemCategories(
+function collectAllMenuItemInfo(
   items: MenuItem[],
   itemCategories: Map<string, string[]>,
-  result: Set<string>,
+  resultIds: string[],
+  resultCats: Set<string>,
 ): void {
   for (const item of items) {
+    resultIds.push(item.id);
     const cats = itemCategories.get(item.id);
-    if (cats) cats.forEach((c) => result.add(c));
+    if (cats) cats.forEach((c) => resultCats.add(c));
 
     if (item.type === 'section') {
-      collectAllMenuItemCategories(item.items, itemCategories, result);
+      collectAllMenuItemInfo(item.items, itemCategories, resultIds, resultCats);
     }
   }
 }
@@ -692,21 +735,23 @@ function generateSingleDependencyRules(
   const rules: string[] = [];
 
   // Handle menu-based dependencies
+  // Uses data-hidden-items to check if all visible items at each breakpoint are hidden
   if (dep.dependsOnMenuId) {
     const breakpoints = analysis.menuBreakpoints.get(dep.dependsOnMenuId);
     if (breakpoints && breakpoints.length > 0) {
       rules.push(`/* "${dep.itemId}" depends on menu "${dep.dependsOnMenuId}" */`);
 
       for (const bp of breakpoints) {
-        if (bp.visibleCategories.size === 0) continue;
+        if (bp.visibleItemIds.length === 0) continue;
 
-        // Generate selector: hide when ALL visible categories are disabled
-        const categorySelectors = Array.from(bp.visibleCategories)
+        // Generate selector: hide when ALL visible items at this breakpoint are hidden
+        // Uses data-hidden-items which is computed by JavaScript
+        const hiddenItemSelectors = bp.visibleItemIds
           .sort()
-          .map((cat) => UI_SELECTORS.DISABLED_CATEGORY(cat))
+          .map((id) => UI_SELECTORS.HIDDEN_ITEM(id))
           .join('');
 
-        const cssRule = `${UI_SELECTORS.ROOT}${categorySelectors} ${UI_SELECTORS.ITEM(dep.itemId)} {
+        const cssRule = `${UI_SELECTORS.ROOT}${hiddenItemSelectors} ${UI_SELECTORS.ITEM(dep.itemId)} {
   display: none !important;
 }`;
 
@@ -727,24 +772,19 @@ function generateSingleDependencyRules(
   }
 
   // Handle direct item dependencies
+  // Uses data-hidden-items to check if all specified items are hidden
   if (dep.dependsOnItemIds?.length) {
-    const relevantCategories = new Set<string>();
-    for (const itemId of dep.dependsOnItemIds) {
-      const cats = analysis.itemCategories.get(itemId);
-      if (cats) cats.forEach((c) => relevantCategories.add(c));
-    }
+    rules.push(`/* "${dep.itemId}" depends on items: ${dep.dependsOnItemIds.join(', ')} */`);
 
-    if (relevantCategories.size > 0) {
-      const categorySelectors = Array.from(relevantCategories)
-        .sort()
-        .map((cat) => UI_SELECTORS.DISABLED_CATEGORY(cat))
-        .join('');
+    // Generate selector: hide when ALL dependent items are hidden
+    const hiddenItemSelectors = dep.dependsOnItemIds
+      .sort()
+      .map((id) => UI_SELECTORS.HIDDEN_ITEM(id))
+      .join('');
 
-      rules.push(`/* "${dep.itemId}" depends on items: ${dep.dependsOnItemIds.join(', ')} */
-${UI_SELECTORS.ROOT}${categorySelectors} ${UI_SELECTORS.ITEM(dep.itemId)} {
+    rules.push(`${UI_SELECTORS.ROOT}${hiddenItemSelectors} ${UI_SELECTORS.ITEM(dep.itemId)} {
   display: none !important;
 }`);
-    }
   }
 
   return rules;

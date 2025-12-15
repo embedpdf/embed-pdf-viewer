@@ -2,12 +2,7 @@
 
 import React, { useState } from 'react'
 import { ReactIcon, VueIcon, SvelteIcon } from './framework-icons'
-
-// Version is injected at build time from the snippet's package.json via next.config.ts
-const EMBEDPDF_VERSION = process.env.NEXT_PUBLIC_SNIPPET_VERSION ?? '0.0.0'
-
-const EMBEDPDF_JS_URL = `https://cdn.jsdelivr.net/npm/@embedpdf/snippet@${EMBEDPDF_VERSION}/dist/embedpdf.js`
-const DEMO_PDF_URL = 'https://snippet.embedpdf.com/ebook.pdf'
+import { EMBEDPDF_JS_URL, DEMO_PDF_URL } from './cdn-snippet'
 
 type Framework = 'snippet' | 'react' | 'vue' | 'svelte'
 
@@ -407,12 +402,12 @@ export const CodeShowcase = () => {
           </div>
 
           {/* Tabs row */}
-          <div className="flex px-4">
+          <div className="-mb-px flex px-2 sm:px-4">
             {tabs.map((tab) => (
               <button
                 key={tab.id}
                 onClick={() => setActiveTab(tab.id)}
-                className={`group relative flex items-center gap-2 px-4 py-2.5 text-sm font-medium transition-all duration-200 ${
+                className={`group relative flex shrink-0 items-center gap-1.5 px-3 py-2.5 text-sm font-medium transition-all duration-200 sm:gap-2 sm:px-4 ${
                   activeTab === tab.id
                     ? `${tab.color} bg-gray-800/50`
                     : `text-gray-500 hover:text-gray-300`
@@ -437,7 +432,7 @@ export const CodeShowcase = () => {
                 >
                   {tab.icon}
                 </span>
-                <span>{tab.label}</span>
+                <span className="hidden sm:inline">{tab.label}</span>
               </button>
             ))}
           </div>

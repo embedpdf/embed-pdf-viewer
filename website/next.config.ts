@@ -7,6 +7,7 @@ import { visit } from 'unist-util-visit'
 import { Plugin } from 'unified'
 import { remarkCodeExample } from './src/lib/remark-code-example'
 import { rehypeCodeExample } from './src/lib/rehype-code-example'
+import { rehypeCdnUrls } from './src/lib/rehype-cdn-urls'
 import { readFileSync } from 'fs'
 import { resolve } from 'path'
 import { fileURLToPath } from 'url'
@@ -71,7 +72,7 @@ const withNextra = nextra({
         },
       ],
     ],
-    rehypePlugins: [rehypeCodeExample], // Re-enabled with debugging
+    rehypePlugins: [rehypeCodeExample, rehypeCdnUrls],
   },
 })
 

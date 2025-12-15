@@ -21,6 +21,9 @@ export interface UIState {
 
   /** Globally disabled categories */
   disabledCategories: string[];
+
+  /** Item IDs that are hidden (computed from disabled categories) */
+  hiddenItems: string[];
 }
 
 /**
@@ -239,6 +242,7 @@ export interface UICapability {
   setDisabledCategories(categories: string[]): void;
   getDisabledCategories(): string[];
   isCategoryDisabled(category: string): boolean;
+  getHiddenItems(): string[];
 
   // Global events
   onToolbarChanged: EventHook<{
@@ -255,5 +259,5 @@ export interface UICapability {
   }>;
   onModalChanged: EventHook<{ documentId: string; modalId: string | null; isOpen: boolean }>;
   onMenuChanged: EventHook<{ documentId: string; menuId: string; isOpen: boolean }>;
-  onCategoryChanged: EventHook<{ disabledCategories: string[] }>;
+  onCategoryChanged: EventHook<{ disabledCategories: string[]; hiddenItems: string[] }>;
 }

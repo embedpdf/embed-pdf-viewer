@@ -15,6 +15,7 @@
   const { provides } = useUICapability();
 
   let disabledCategories = $state<string[]>([]);
+  let hiddenItems = $state<string[]>([]);
   let rootElement: HTMLDivElement | null = $state(null);
   let styleEl: HTMLStyleElement | null = null;
   let styleTarget: HTMLElement | ShadowRoot | null = null;
@@ -84,15 +85,19 @@
     if (!provides) return;
 
     disabledCategories = provides.getDisabledCategories();
+    hiddenItems = provides.getHiddenItems();
 
     return provides.onCategoryChanged((event) => {
       disabledCategories = event.disabledCategories;
+      hiddenItems = event.hiddenItems;
     });
   });
 
   const disabledCategoriesAttr = $derived(
     disabledCategories.length > 0 ? disabledCategories.join(' ') : undefined,
   );
+
+  const hiddenItemsAttr = $derived(hiddenItems.length > 0 ? hiddenItems.join(' ') : undefined);
 </script>
 
 <div
@@ -100,6 +105,7 @@
   {...restProps}
   {...{ [UI_ATTRIBUTES.ROOT]: '' }}
   {...disabledCategoriesAttr ? { [UI_ATTRIBUTES.DISABLED_CATEGORIES]: disabledCategoriesAttr } : {}}
+  {...hiddenItemsAttr ? { [UI_ATTRIBUTES.HIDDEN_ITEMS]: hiddenItemsAttr } : {}}
   class={className}
   style:container-type="inline-size"
 >

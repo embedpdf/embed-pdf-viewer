@@ -41,15 +41,24 @@ import {
   closeMenu,
   closeAllMenus,
   setDisabledCategories,
+  setHiddenItems,
 } from './actions';
 import { mergeUISchema } from './utils/schema-merger';
-import { generateUIStylesheet, StylesheetConfig } from './utils';
+import {
+  generateUIStylesheet,
+  extractItemCategories,
+  computeHiddenItems,
+  StylesheetConfig,
+} from './utils';
 
 export class UIPlugin extends BasePlugin<UIPluginConfig, UICapability, UIState, UIAction> {
   static readonly id = 'ui' as const;
 
   private schema: UISchema;
   private stylesheetConfig: StylesheetConfig;
+
+  // Item categories mapping for computing hidden items
+  private itemCategories: Map<string, string[]>;
 
   // Stylesheet caching with locale awareness
   private cachedStylesheet: string | null = null;
@@ -60,7 +69,10 @@ export class UIPlugin extends BasePlugin<UIPluginConfig, UICapability, UIState, 
   private i18nCleanup: (() => void) | null = null;
 
   // Events
-  private readonly categoryChanged$ = createBehaviorEmitter<{ disabledCategories: string[] }>();
+  private readonly categoryChanged$ = createBehaviorEmitter<{
+    disabledCategories: string[];
+    hiddenItems: string[];
+  }>();
   private readonly stylesheetInvalidated$ = createEmitter<void>();
 
   private readonly toolbarChanged$ = createScopedEmitter<
@@ -90,9 +102,15 @@ export class UIPlugin extends BasePlugin<UIPluginConfig, UICapability, UIState, 
     this.schema = config.schema;
     this.stylesheetConfig = config.stylesheetConfig || {};
 
+    // Extract item categories for computing hidden items
+    this.itemCategories = extractItemCategories(this.schema);
+
     // Initialize disabled categories from config
     if (config.disabledCategories?.length) {
       this.dispatch(setDisabledCategories(config.disabledCategories));
+      // Also compute and dispatch hidden items
+      const hiddenItems = computeHiddenItems(this.itemCategories, config.disabledCategories);
+      this.dispatch(setHiddenItems(hiddenItems));
     }
 
     this.i18n = registry.getPlugin<I18nPlugin>('i18n')?.provides() ?? null;
@@ -206,8 +224,11 @@ export class UIPlugin extends BasePlugin<UIPluginConfig, UICapability, UIState, 
     const current = new Set(this.state.disabledCategories);
     if (!current.has(category)) {
       current.add(category);
-      this.dispatch(setDisabledCategories(Array.from(current)));
-      this.categoryChanged$.emit({ disabledCategories: Array.from(current) });
+      const categories = Array.from(current);
+      this.dispatch(setDisabledCategories(categories));
+      const hiddenItems = computeHiddenItems(this.itemCategories, categories);
+      this.dispatch(setHiddenItems(hiddenItems));
+      this.categoryChanged$.emit({ disabledCategories: categories, hiddenItems });
     }
   }
 
@@ -215,8 +236,11 @@ export class UIPlugin extends BasePlugin<UIPluginConfig, UICapability, UIState, 
     const current = new Set(this.state.disabledCategories);
     if (current.has(category)) {
       current.delete(category);
-      this.dispatch(setDisabledCategories(Array.from(current)));
-      this.categoryChanged$.emit({ disabledCategories: Array.from(current) });
+      const categories = Array.from(current);
+      this.dispatch(setDisabledCategories(categories));
+      const hiddenItems = computeHiddenItems(this.itemCategories, categories);
+      this.dispatch(setHiddenItems(hiddenItems));
+      this.categoryChanged$.emit({ disabledCategories: categories, hiddenItems });
     }
   }
 
@@ -230,7 +254,10 @@ export class UIPlugin extends BasePlugin<UIPluginConfig, UICapability, UIState, 
 
   private setDisabledCategoriesImpl(categories: string[]): void {
     this.dispatch(setDisabledCategories(categories));
-    this.categoryChanged$.emit({ disabledCategories: categories });
+    // Compute and dispatch hidden items based on disabled categories
+    const hiddenItems = computeHiddenItems(this.itemCategories, categories);
+    this.dispatch(setHiddenItems(hiddenItems));
+    this.categoryChanged$.emit({ disabledCategories: categories, hiddenItems });
   }
 
   // ─────────────────────────────────────────────────────────
@@ -268,6 +295,7 @@ export class UIPlugin extends BasePlugin<UIPluginConfig, UICapability, UIState, 
       setDisabledCategories: (categories) => this.setDisabledCategoriesImpl(categories),
       getDisabledCategories: () => this.state.disabledCategories,
       isCategoryDisabled: (category) => this.state.disabledCategories.includes(category),
+      getHiddenItems: () => this.state.hiddenItems,
 
       // Events
       onToolbarChanged: this.toolbarChanged$.onGlobal,

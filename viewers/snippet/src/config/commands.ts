@@ -38,7 +38,7 @@ export const commands: Record<string, Command<State>> = {
     labelKey: 'zoom.in',
     icon: 'zoomIn',
     shortcuts: ['Ctrl+=', 'Meta+=', 'Ctrl+NumpadAdd', 'Meta+NumpadAdd'],
-    categories: ['view'],
+    categories: ['zoom', 'zoom-in'],
     action: ({ registry, documentId }) => {
       const zoom = registry.getPlugin<ZoomPlugin>('zoom')?.provides();
       if (!zoom) return;
@@ -53,7 +53,7 @@ export const commands: Record<string, Command<State>> = {
     labelKey: 'zoom.out',
     icon: 'zoomOut',
     shortcuts: ['Ctrl+-', 'Meta+-', 'Ctrl+NumpadSubtract', 'Meta+NumpadSubtract'],
-    categories: ['view'],
+    categories: ['zoom', 'zoom-out'],
     action: ({ registry, documentId }) => {
       const zoom = registry.getPlugin<ZoomPlugin>('zoom')?.provides();
       if (!zoom) return;
@@ -68,7 +68,7 @@ export const commands: Record<string, Command<State>> = {
     labelKey: 'zoom.fitPage',
     icon: 'fitToPage',
     shortcuts: ['Ctrl+0', 'Meta+0'],
-    categories: ['tools'],
+    categories: ['zoom', 'zoom-fit-page'],
     action: ({ registry, documentId }) => {
       const zoom = registry.getPlugin<ZoomPlugin>('zoom')?.provides();
       if (!zoom) return;
@@ -85,7 +85,7 @@ export const commands: Record<string, Command<State>> = {
     labelKey: 'zoom.fitWidth',
     icon: 'fitToWidth',
     shortcuts: ['Ctrl+1', 'Meta+1'],
-    categories: ['tools'],
+    categories: ['zoom', 'zoom-fit-width'],
     action: ({ registry, documentId }) => {
       const zoom = registry.getPlugin<ZoomPlugin>('zoom')?.provides();
       if (!zoom) return;
@@ -102,7 +102,7 @@ export const commands: Record<string, Command<State>> = {
     labelKey: 'zoom.marquee',
     icon: 'zoomInArea',
     shortcuts: ['Ctrl+M', 'Meta+M'],
-    categories: ['tools'],
+    categories: ['zoom', 'zoom-marquee'],
     action: ({ registry, documentId }) => {
       const zoom = registry.getPlugin<ZoomPlugin>('zoom')?.provides();
       if (!zoom) return;
@@ -117,6 +117,7 @@ export const commands: Record<string, Command<State>> = {
   'zoom:25': {
     id: 'zoom:25',
     label: '25%',
+    categories: ['zoom', 'zoom-level', 'zoom-level-25'],
     action: ({ registry, documentId }) => {
       const zoom = registry.getPlugin<ZoomPlugin>('zoom')?.provides();
       if (!zoom) return;
@@ -131,6 +132,7 @@ export const commands: Record<string, Command<State>> = {
   'zoom:50': {
     id: 'zoom:50',
     label: '50%',
+    categories: ['zoom', 'zoom-level', 'zoom-level-50'],
     action: ({ registry, documentId }) => {
       const zoom = registry.getPlugin<ZoomPlugin>('zoom')?.provides();
       if (!zoom) return;
@@ -145,6 +147,7 @@ export const commands: Record<string, Command<State>> = {
   'zoom:100': {
     id: 'zoom:100',
     label: '100%',
+    categories: ['zoom', 'zoom-level', 'zoom-level-100'],
     action: ({ registry, documentId }) => {
       const zoom = registry.getPlugin<ZoomPlugin>('zoom')?.provides();
       if (!zoom) return;
@@ -159,6 +162,7 @@ export const commands: Record<string, Command<State>> = {
   'zoom:125': {
     id: 'zoom:125',
     label: '125%',
+    categories: ['zoom', 'zoom-level', 'zoom-level-125'],
     action: ({ registry, documentId }) => {
       const zoom = registry.getPlugin<ZoomPlugin>('zoom')?.provides();
       if (!zoom) return;
@@ -173,6 +177,7 @@ export const commands: Record<string, Command<State>> = {
   'zoom:150': {
     id: 'zoom:150',
     label: '150%',
+    categories: ['zoom', 'zoom-level', 'zoom-level-150'],
     action: ({ registry, documentId }) => {
       const zoom = registry.getPlugin<ZoomPlugin>('zoom')?.provides();
       if (!zoom) return;
@@ -187,6 +192,7 @@ export const commands: Record<string, Command<State>> = {
   'zoom:200': {
     id: 'zoom:200',
     label: '200%',
+    categories: ['zoom', 'zoom-level', 'zoom-level-200'],
     action: ({ registry, documentId }) => {
       const zoom = registry.getPlugin<ZoomPlugin>('zoom')?.provides();
       if (!zoom) return;
@@ -201,6 +207,7 @@ export const commands: Record<string, Command<State>> = {
   'zoom:400': {
     id: 'zoom:400',
     label: '400%',
+    categories: ['zoom', 'zoom-level', 'zoom-level-400'],
     action: ({ registry, documentId }) => {
       const zoom = registry.getPlugin<ZoomPlugin>('zoom')?.provides();
       if (!zoom) return;
@@ -215,6 +222,7 @@ export const commands: Record<string, Command<State>> = {
   'zoom:800': {
     id: 'zoom:800',
     label: '800%',
+    categories: ['zoom', 'zoom-level', 'zoom-level-800'],
     action: ({ registry, documentId }) => {
       const zoom = registry.getPlugin<ZoomPlugin>('zoom')?.provides();
       if (!zoom) return;
@@ -229,6 +237,7 @@ export const commands: Record<string, Command<State>> = {
   'zoom:1600': {
     id: 'zoom:1600',
     label: '1600%',
+    categories: ['zoom', 'zoom-level', 'zoom-level-1600'],
     action: ({ registry, documentId }) => {
       const zoom = registry.getPlugin<ZoomPlugin>('zoom')?.provides();
       if (!zoom) return;
@@ -247,7 +256,7 @@ export const commands: Record<string, Command<State>> = {
     iconProps: {
       className: 'h-3.5 w-3.5',
     },
-    categories: ['tools'],
+    categories: ['zoom', 'zoom-menu'],
     action: ({ registry, documentId }) => {
       const ui = registry.getPlugin<UIPlugin>('ui')?.provides();
       if (!ui) return;
@@ -265,7 +274,7 @@ export const commands: Record<string, Command<State>> = {
     id: 'zoom:toggle-menu-mobile',
     labelKey: 'zoom.menu',
     icon: 'zoomIn',
-    categories: ['tools'],
+    categories: ['zoom', 'zoom-menu'],
     action: ({ registry, documentId }) => {
       const ui = registry.getPlugin<UIPlugin>('ui')?.provides();
       if (!ui) return;
@@ -286,7 +295,7 @@ export const commands: Record<string, Command<State>> = {
     labelKey: 'pan.toggle',
     icon: 'hand',
     shortcuts: ['h'],
-    categories: ['tools'],
+    categories: ['tools', 'pan'],
     action: ({ registry, documentId }) => {
       const pan = registry.getPlugin<PanPlugin>('pan')?.provides();
       if (!pan) return;
@@ -306,7 +315,7 @@ export const commands: Record<string, Command<State>> = {
     labelKey: 'pointer.toggle',
     icon: 'pointer',
     shortcuts: ['p'],
-    categories: ['tools'],
+    categories: ['tools', 'pointer'],
     action: ({ registry, documentId }) => {
       const pointer = registry
         .getPlugin<InteractionManagerPlugin>('interaction-manager')
@@ -324,7 +333,7 @@ export const commands: Record<string, Command<State>> = {
     id: 'left-action-menu:overflow-menu',
     labelKey: 'menu.moreOptions',
     icon: 'dots',
-    categories: ['ui'],
+    categories: ['ui', 'ui-menu'],
     action: ({ registry, documentId }) => {
       const ui = registry.getPlugin<UIPlugin>('ui')?.provides();
       if (!ui) return;
@@ -351,7 +360,7 @@ export const commands: Record<string, Command<State>> = {
     labelKey: 'capture.screenshot',
     icon: 'screenshot',
     shortcuts: ['Ctrl+Shift+S', 'Meta+Shift+S'],
-    categories: ['tools'],
+    categories: ['tools', 'capture', 'capture-screenshot'],
     action: ({ registry, documentId }) => {
       const capture = registry.getPlugin<CapturePlugin>('capture')?.provides();
       if (!capture) return;
@@ -374,7 +383,7 @@ export const commands: Record<string, Command<State>> = {
     id: 'document:menu',
     labelKey: 'document.menu',
     icon: 'menu',
-    categories: ['document'],
+    categories: ['document', 'document-menu'],
     action: ({ registry, documentId }) => {
       const uiPlugin = registry.getPlugin<UIPlugin>(UI_PLUGIN_ID);
       if (!uiPlugin || !uiPlugin.provides) return;
@@ -396,7 +405,7 @@ export const commands: Record<string, Command<State>> = {
     labelKey: 'document.open',
     icon: 'fileImport',
     shortcuts: ['Ctrl+O', 'Meta+O'],
-    categories: ['document'],
+    categories: ['document', 'document-open'],
     action: ({ registry }) => {
       const docManager = registry.getPlugin<DocumentManagerPlugin>('document-manager')?.provides();
       docManager?.openFileDialog();
@@ -408,7 +417,7 @@ export const commands: Record<string, Command<State>> = {
     labelKey: 'document.close',
     icon: 'x',
     shortcuts: ['Ctrl+W', 'Meta+W'],
-    categories: ['document'],
+    categories: ['document', 'document-close'],
     action: ({ registry, documentId }) => {
       const docManager = registry.getPlugin<DocumentManagerPlugin>('document-manager')?.provides();
       docManager?.closeDocument(documentId);
@@ -420,7 +429,7 @@ export const commands: Record<string, Command<State>> = {
     labelKey: 'document.print',
     icon: 'print',
     shortcuts: ['Ctrl+P', 'Meta+P'],
-    categories: ['document'],
+    categories: ['document', 'document-print'],
     action: ({ registry, documentId }) => {
       const uiPlugin = registry.getPlugin<UIPlugin>(UI_PLUGIN_ID);
       if (!uiPlugin || !uiPlugin.provides) return;
@@ -437,7 +446,7 @@ export const commands: Record<string, Command<State>> = {
     id: 'document:export',
     labelKey: 'document.export',
     icon: 'download',
-    categories: ['document'],
+    categories: ['document', 'document-export'],
     action: ({ registry, documentId }) => {
       const exportPlugin = registry.getPlugin<ExportPlugin>('export')?.provides();
       exportPlugin?.forDocument(documentId).download();
@@ -449,7 +458,7 @@ export const commands: Record<string, Command<State>> = {
     labelKey: 'document.fullscreen',
     icon: 'fullscreen',
     shortcuts: ['F11'],
-    categories: ['document'],
+    categories: ['document', 'document-fullscreen'],
     action: ({ registry }) => {
       const fullscreen = registry.getPlugin<FullscreenPlugin>('fullscreen')?.provides();
       if (!fullscreen) return;
@@ -470,7 +479,7 @@ export const commands: Record<string, Command<State>> = {
     id: 'panel:toggle-sidebar',
     labelKey: 'panel.sidebar',
     icon: 'sidebar',
-    categories: ['panels'],
+    categories: ['panel', 'panel-sidebar'],
     action: ({ registry, documentId }) => {
       const uiPlugin = registry.getPlugin<UIPlugin>(UI_PLUGIN_ID);
       if (!uiPlugin || !uiPlugin.provides) return;
@@ -491,7 +500,7 @@ export const commands: Record<string, Command<State>> = {
     labelKey: 'panel.search',
     icon: 'search',
     shortcuts: ['Ctrl+F', 'Meta+F'],
-    categories: ['panels'],
+    categories: ['panel', 'panel-search'],
     action: ({ registry, documentId }) => {
       const uiPlugin = registry.getPlugin<UIPlugin>(UI_PLUGIN_ID);
       if (!uiPlugin || !uiPlugin.provides) return;
@@ -511,7 +520,7 @@ export const commands: Record<string, Command<State>> = {
     id: 'panel:toggle-comment',
     labelKey: 'panel.comment',
     icon: 'comment',
-    categories: ['panels'],
+    categories: ['panel', 'panel-comment'],
     action: ({ registry, documentId }) => {
       const uiPlugin = registry.getPlugin<UIPlugin>(UI_PLUGIN_ID);
       if (!uiPlugin || !uiPlugin.provides) return;
@@ -531,7 +540,7 @@ export const commands: Record<string, Command<State>> = {
     id: 'panel:toggle-annotation-style',
     labelKey: 'panel.annotationStyle',
     icon: 'palette',
-    categories: ['panels'],
+    categories: ['panel', 'panel-annotation-style'],
     action: ({ registry, documentId }) => {
       const uiPlugin = registry.getPlugin<UIPlugin>(UI_PLUGIN_ID);
       if (!uiPlugin || !uiPlugin.provides) return;
@@ -554,7 +563,7 @@ export const commands: Record<string, Command<State>> = {
     id: 'page:settings',
     labelKey: 'page.settings',
     icon: 'viewSettings',
-    categories: ['page'],
+    categories: ['page', 'page-settings'],
     action: ({ registry, documentId }) => {
       const uiPlugin = registry.getPlugin<UIPlugin>(UI_PLUGIN_ID);
       if (!uiPlugin || !uiPlugin.provides) return;
@@ -575,7 +584,7 @@ export const commands: Record<string, Command<State>> = {
     id: 'spread:none',
     labelKey: 'page.single',
     icon: 'singlePage',
-    categories: ['page'],
+    categories: ['page', 'spread', 'spread-none'],
     action: ({ registry, documentId }) => {
       const spread = registry.getPlugin<SpreadPlugin>('spread')?.provides();
       spread?.forDocument(documentId).setSpreadMode(SpreadMode.None);
@@ -588,7 +597,7 @@ export const commands: Record<string, Command<State>> = {
     id: 'spread:odd',
     labelKey: 'page.twoOdd',
     icon: 'doublePage',
-    categories: ['page'],
+    categories: ['page', 'spread', 'spread-odd'],
     action: ({ registry, documentId }) => {
       const spread = registry.getPlugin<SpreadPlugin>('spread')?.provides();
       spread?.forDocument(documentId).setSpreadMode(SpreadMode.Odd);
@@ -601,7 +610,7 @@ export const commands: Record<string, Command<State>> = {
     id: 'spread:even',
     labelKey: 'page.twoEven',
     icon: 'book2',
-    categories: ['page'],
+    categories: ['page', 'spread', 'spread-even'],
     action: ({ registry, documentId }) => {
       const spread = registry.getPlugin<SpreadPlugin>('spread')?.provides();
       spread?.forDocument(documentId).setSpreadMode(SpreadMode.Even);
@@ -615,7 +624,7 @@ export const commands: Record<string, Command<State>> = {
     labelKey: 'rotate.clockwise',
     icon: 'rotateClockwise',
     shortcuts: ['Ctrl+]', 'Meta+]'],
-    categories: ['page'],
+    categories: ['page', 'rotate', 'rotate-clockwise'],
     action: ({ registry, documentId }) => {
       const rotate = registry.getPlugin<RotatePlugin>('rotate')?.provides();
       rotate?.forDocument(documentId).rotateForward();
@@ -627,7 +636,7 @@ export const commands: Record<string, Command<State>> = {
     labelKey: 'rotate.counterClockwise',
     icon: 'rotateCounterClockwise',
     shortcuts: ['Ctrl+[', 'Meta+['],
-    categories: ['page'],
+    categories: ['page', 'rotate', 'rotate-counter-clockwise'],
     action: ({ registry, documentId }) => {
       const rotate = registry.getPlugin<RotatePlugin>('rotate')?.provides();
       rotate?.forDocument(documentId).rotateBackward();
@@ -638,7 +647,7 @@ export const commands: Record<string, Command<State>> = {
     id: 'scroll:vertical',
     labelKey: 'page.vertical',
     icon: 'vertical',
-    categories: ['page'],
+    categories: ['page', 'scroll', 'scroll-vertical'],
     action: ({ registry, documentId }) => {
       const scroll = registry.getPlugin<ScrollPlugin>('scroll')?.provides();
       scroll?.forDocument(documentId).setScrollStrategy(ScrollStrategy.Vertical);
@@ -651,7 +660,7 @@ export const commands: Record<string, Command<State>> = {
     id: 'scroll:horizontal',
     labelKey: 'page.horizontal',
     icon: 'horizontal',
-    categories: ['page'],
+    categories: ['page', 'scroll', 'scroll-horizontal'],
     action: ({ registry, documentId }) => {
       const scroll = registry.getPlugin<ScrollPlugin>('scroll')?.provides();
       scroll?.forDocument(documentId).setScrollStrategy(ScrollStrategy.Horizontal);
@@ -664,7 +673,7 @@ export const commands: Record<string, Command<State>> = {
     id: 'scroll:next-page',
     labelKey: 'page.next',
     icon: 'chevronRight',
-    categories: ['page', 'navigation'],
+    categories: ['page', 'navigation', 'navigation-next'],
     shortcuts: ['Ctrl+]', 'Meta+]', 'ArrowRight'],
     action: ({ registry, documentId }) => {
       const scroll = registry.getPlugin<ScrollPlugin>('scroll')?.provides();
@@ -682,7 +691,7 @@ export const commands: Record<string, Command<State>> = {
     id: 'scroll:previous-page',
     labelKey: 'page.previous',
     icon: 'chevronLeft',
-    categories: ['page', 'navigation'],
+    categories: ['page', 'navigation', 'navigation-previous'],
     shortcuts: ['Ctrl+[', 'Meta+[', 'ArrowLeft'],
     action: ({ registry, documentId }) => {
       const scroll = registry.getPlugin<ScrollPlugin>('scroll')?.provides();
@@ -699,7 +708,7 @@ export const commands: Record<string, Command<State>> = {
   'mode:view': {
     id: 'mode:view',
     labelKey: 'mode.view',
-    categories: ['mode'],
+    categories: ['mode', 'mode-view'],
     action: ({ registry, documentId }) => {
       const ui = registry.getPlugin<UIPlugin>('ui')?.provides();
       const interactionManager = registry
@@ -721,7 +730,7 @@ export const commands: Record<string, Command<State>> = {
   'mode:annotate': {
     id: 'mode:annotate',
     labelKey: 'mode.annotate',
-    categories: ['mode'],
+    categories: ['mode', 'mode-annotate', 'annotation'],
     action: ({ registry, documentId }) => {
       const ui = registry.getPlugin<UIPlugin>('ui')?.provides();
       if (!ui) return;
@@ -736,7 +745,7 @@ export const commands: Record<string, Command<State>> = {
   'mode:shapes': {
     id: 'mode:shapes',
     labelKey: 'mode.shapes',
-    categories: ['mode'],
+    categories: ['mode', 'mode-shapes', 'annotation'],
     action: ({ registry, documentId }) => {
       const ui = registry.getPlugin<UIPlugin>('ui')?.provides();
       if (!ui) return;
@@ -751,7 +760,7 @@ export const commands: Record<string, Command<State>> = {
   'mode:redact': {
     id: 'mode:redact',
     labelKey: 'mode.redact',
-    categories: ['mode'],
+    categories: ['mode', 'mode-redact', 'redaction'],
     action: ({ registry, documentId }) => {
       const ui = registry.getPlugin<UIPlugin>('ui')?.provides();
       if (!ui) return;
@@ -767,7 +776,7 @@ export const commands: Record<string, Command<State>> = {
     id: 'tabs:overflow-menu',
     labelKey: 'tabs.overflowMenu',
     icon: 'dots',
-    categories: ['ui'],
+    categories: ['ui', 'ui-menu'],
     action: ({ registry, documentId }) => {
       const ui = registry.getPlugin<UIPlugin>('ui')?.provides();
       if (!ui) return;
@@ -798,7 +807,7 @@ export const commands: Record<string, Command<State>> = {
     iconProps: ({ state }) => ({
       primaryColor: getToolDefaultsById(state.plugins.annotation, 'highlight')?.color,
     }),
-    categories: ['annotation'],
+    categories: ['annotation', 'annotation-markup', 'annotation-highlight'],
     action: ({ registry, documentId }) => {
       const annotation = registry.getPlugin<AnnotationPlugin>(ANNOTATION_PLUGIN_ID)?.provides();
       const selection = registry.getPlugin<SelectionPlugin>(SELECTION_PLUGIN_ID)?.provides();
@@ -869,7 +878,7 @@ export const commands: Record<string, Command<State>> = {
     iconProps: ({ state }) => ({
       primaryColor: getToolDefaultsById(state.plugins.annotation, 'underline')?.color,
     }),
-    categories: ['annotation'],
+    categories: ['annotation', 'annotation-markup', 'annotation-underline'],
     action: ({ registry, documentId }) => {
       const annotation = registry.getPlugin<AnnotationPlugin>(ANNOTATION_PLUGIN_ID)?.provides();
       const selection = registry.getPlugin<SelectionPlugin>(SELECTION_PLUGIN_ID)?.provides();
@@ -939,7 +948,7 @@ export const commands: Record<string, Command<State>> = {
     iconProps: ({ state }) => ({
       primaryColor: getToolDefaultsById(state.plugins.annotation, 'strikeout')?.color,
     }),
-    categories: ['annotation'],
+    categories: ['annotation', 'annotation-markup', 'annotation-strikeout'],
     action: ({ registry, documentId }) => {
       const annotation = registry.getPlugin<AnnotationPlugin>(ANNOTATION_PLUGIN_ID)?.provides();
       const selection = registry.getPlugin<SelectionPlugin>(SELECTION_PLUGIN_ID)?.provides();
@@ -1009,7 +1018,7 @@ export const commands: Record<string, Command<State>> = {
     iconProps: ({ state }) => ({
       primaryColor: getToolDefaultsById(state.plugins.annotation, 'squiggly')?.color,
     }),
-    categories: ['annotation'],
+    categories: ['annotation', 'annotation-markup', 'annotation-squiggly'],
     action: ({ registry, documentId }) => {
       const annotation = registry.getPlugin<AnnotationPlugin>(ANNOTATION_PLUGIN_ID)?.provides();
       const selection = registry.getPlugin<SelectionPlugin>(SELECTION_PLUGIN_ID)?.provides();
@@ -1079,7 +1088,7 @@ export const commands: Record<string, Command<State>> = {
     iconProps: ({ state }) => ({
       primaryColor: getToolDefaultsById(state.plugins.annotation, 'ink')?.color,
     }),
-    categories: ['annotation'],
+    categories: ['annotation', 'annotation-ink'],
     action: ({ registry, documentId }) => {
       const annotation = registry.getPlugin<AnnotationPlugin>(ANNOTATION_PLUGIN_ID)?.provides();
       const annotationScope = annotation?.forDocument(documentId);
@@ -1104,7 +1113,7 @@ export const commands: Record<string, Command<State>> = {
     iconProps: ({ state }) => ({
       primaryColor: getToolDefaultsById(state.plugins.annotation, 'freeText')?.fontColor,
     }),
-    categories: ['annotation'],
+    categories: ['annotation', 'annotation-text'],
     action: ({ registry, documentId }) => {
       const annotation = registry.getPlugin<AnnotationPlugin>(ANNOTATION_PLUGIN_ID)?.provides();
       const annotationScope = annotation?.forDocument(documentId);
@@ -1126,7 +1135,7 @@ export const commands: Record<string, Command<State>> = {
     id: 'annotation:add-stamp',
     labelKey: 'annotation.stamp',
     icon: 'photo',
-    categories: ['annotation'],
+    categories: ['annotation', 'annotation-stamp'],
     action: ({ registry, documentId }) => {
       const annotation = registry.getPlugin<AnnotationPlugin>(ANNOTATION_PLUGIN_ID)?.provides();
       const annotationScope = annotation?.forDocument(documentId);
@@ -1152,7 +1161,7 @@ export const commands: Record<string, Command<State>> = {
       primaryColor: getToolDefaultsById(state.plugins.annotation, 'square')?.strokeColor,
       secondaryColor: getToolDefaultsById(state.plugins.annotation, 'square')?.color,
     }),
-    categories: ['annotation'],
+    categories: ['annotation', 'annotation-shape', 'annotation-rectangle'],
     action: ({ registry, documentId }) => {
       const annotation = registry.getPlugin<AnnotationPlugin>(ANNOTATION_PLUGIN_ID)?.provides();
       const annotationScope = annotation?.forDocument(documentId);
@@ -1178,7 +1187,7 @@ export const commands: Record<string, Command<State>> = {
       primaryColor: getToolDefaultsById(state.plugins.annotation, 'circle')?.strokeColor,
       secondaryColor: getToolDefaultsById(state.plugins.annotation, 'circle')?.color,
     }),
-    categories: ['annotation'],
+    categories: ['annotation', 'annotation-shape', 'annotation-circle'],
     action: ({ registry, documentId }) => {
       const annotation = registry.getPlugin<AnnotationPlugin>(ANNOTATION_PLUGIN_ID)?.provides();
       const annotationScope = annotation?.forDocument(documentId);
@@ -1203,7 +1212,7 @@ export const commands: Record<string, Command<State>> = {
     iconProps: ({ state }) => ({
       primaryColor: getToolDefaultsById(state.plugins.annotation, 'line')?.strokeColor,
     }),
-    categories: ['annotation'],
+    categories: ['annotation', 'annotation-shape', 'annotation-line'],
     action: ({ registry, documentId }) => {
       const annotation = registry.getPlugin<AnnotationPlugin>(ANNOTATION_PLUGIN_ID)?.provides();
       const annotationScope = annotation?.forDocument(documentId);
@@ -1228,7 +1237,7 @@ export const commands: Record<string, Command<State>> = {
     iconProps: ({ state }) => ({
       primaryColor: getToolDefaultsById(state.plugins.annotation, 'line')?.strokeColor,
     }),
-    categories: ['annotation'],
+    categories: ['annotation', 'annotation-shape', 'annotation-arrow'],
     action: ({ registry, documentId }) => {
       const annotation = registry.getPlugin<AnnotationPlugin>(ANNOTATION_PLUGIN_ID)?.provides();
       const annotationScope = annotation?.forDocument(documentId);
@@ -1254,7 +1263,7 @@ export const commands: Record<string, Command<State>> = {
       primaryColor: getToolDefaultsById(state.plugins.annotation, 'polygon')?.strokeColor,
       secondaryColor: getToolDefaultsById(state.plugins.annotation, 'polygon')?.color,
     }),
-    categories: ['annotation'],
+    categories: ['annotation', 'annotation-shape', 'annotation-polygon'],
     action: ({ registry, documentId }) => {
       const annotation = registry.getPlugin<AnnotationPlugin>(ANNOTATION_PLUGIN_ID)?.provides();
       const annotationScope = annotation?.forDocument(documentId);
@@ -1279,7 +1288,7 @@ export const commands: Record<string, Command<State>> = {
     iconProps: ({ state }) => ({
       primaryColor: getToolDefaultsById(state.plugins.annotation, 'polyline')?.strokeColor,
     }),
-    categories: ['annotation'],
+    categories: ['annotation', 'annotation-shape', 'annotation-polyline'],
     action: ({ registry, documentId }) => {
       const annotation = registry.getPlugin<AnnotationPlugin>(ANNOTATION_PLUGIN_ID)?.provides();
       const annotationScope = annotation?.forDocument(documentId);
@@ -1301,7 +1310,7 @@ export const commands: Record<string, Command<State>> = {
     id: 'annotation:delete-selected',
     labelKey: 'annotation.deleteSelected',
     icon: 'trash',
-    categories: ['annotation'],
+    categories: ['annotation', 'annotation-delete'],
     action: ({ registry, documentId }) => {
       const annotation = registry.getPlugin<AnnotationPlugin>(ANNOTATION_PLUGIN_ID)?.provides();
 
@@ -1322,7 +1331,7 @@ export const commands: Record<string, Command<State>> = {
     id: 'annotation:overflow-tools',
     labelKey: 'annotation.overflowTools',
     icon: 'dots',
-    categories: ['annotation'],
+    categories: ['annotation', 'annotation-overflow'],
     action: ({ registry, documentId }) => {
       const uiCapability = registry.getPlugin<UIPlugin>('ui')?.provides();
       if (!uiCapability) return;
@@ -1349,7 +1358,7 @@ export const commands: Record<string, Command<State>> = {
     id: 'redaction:redact-area',
     labelKey: 'redaction.area',
     icon: 'redactArea',
-    categories: ['redaction'],
+    categories: ['redaction', 'redaction-area'],
     action: ({ registry, documentId }) => {
       const redaction = registry.getPlugin<RedactionPlugin>('redaction')?.provides();
       redaction?.forDocument(documentId).toggleMarqueeRedact();
@@ -1364,7 +1373,7 @@ export const commands: Record<string, Command<State>> = {
     id: 'redaction:redact-text',
     labelKey: 'redaction.text',
     icon: 'redact',
-    categories: ['redaction'],
+    categories: ['redaction', 'redaction-text'],
     action: ({ registry, documentId }) => {
       const redaction = registry.getPlugin<RedactionPlugin>('redaction')?.provides();
       const selection = registry.getPlugin<SelectionPlugin>(SELECTION_PLUGIN_ID)?.provides();
@@ -1401,7 +1410,7 @@ export const commands: Record<string, Command<State>> = {
     id: 'redaction:apply-all',
     labelKey: 'redaction.applyAll',
     icon: 'check',
-    categories: ['redaction'],
+    categories: ['redaction', 'redaction-apply'],
     action: ({ registry, documentId }) => {
       const redaction = registry.getPlugin<RedactionPlugin>('redaction')?.provides();
       redaction?.forDocument(documentId).commitAllPending();
@@ -1416,7 +1425,7 @@ export const commands: Record<string, Command<State>> = {
     id: 'redaction:clear-all',
     labelKey: 'redaction.clearAll',
     icon: 'x',
-    categories: ['redaction'],
+    categories: ['redaction', 'redaction-clear'],
     action: ({ registry, documentId }) => {
       const redaction = registry.getPlugin<RedactionPlugin>('redaction')?.provides();
       redaction?.forDocument(documentId).clearPending();
@@ -1431,7 +1440,7 @@ export const commands: Record<string, Command<State>> = {
     id: 'redaction:delete-selected',
     labelKey: 'redaction.deleteSelected',
     icon: 'trash',
-    categories: ['redaction'],
+    categories: ['redaction', 'redaction-delete'],
     action: ({ registry, documentId }) => {
       const redaction = registry.getPlugin<RedactionPlugin>('redaction')?.provides();
       const selectedRedaction = redaction?.forDocument(documentId).getSelectedPending();
@@ -1446,7 +1455,7 @@ export const commands: Record<string, Command<State>> = {
     id: 'redaction:commit-selected',
     labelKey: 'redaction.commitSelected',
     icon: 'check',
-    categories: ['redaction'],
+    categories: ['redaction', 'redaction-commit'],
     action: ({ registry, documentId }) => {
       const redaction = registry.getPlugin<RedactionPlugin>('redaction')?.provides();
       const selectedRedaction = redaction?.forDocument(documentId).getSelectedPending();
@@ -1461,7 +1470,7 @@ export const commands: Record<string, Command<State>> = {
     id: 'selection:copy',
     labelKey: 'selection.copy',
     icon: 'copy',
-    categories: ['selection'],
+    categories: ['selection', 'selection-copy'],
     action: ({ registry, documentId }) => {
       const plugin = registry.getPlugin<SelectionPlugin>('selection');
       const scope = plugin?.provides().forDocument(documentId);
@@ -1478,7 +1487,7 @@ export const commands: Record<string, Command<State>> = {
     labelKey: 'history.undo',
     icon: 'arrowBackUp',
     shortcuts: ['Ctrl+Z', 'Meta+Z'],
-    categories: ['edit'],
+    categories: ['history', 'history-undo'],
     action: ({ registry, documentId }) => {
       const history = registry.getPlugin<HistoryPlugin>(HISTORY_PLUGIN_ID)?.provides();
       if (!history) return;
@@ -1497,7 +1506,7 @@ export const commands: Record<string, Command<State>> = {
     labelKey: 'history.redo',
     icon: 'arrowForwardUp',
     shortcuts: ['Ctrl+Y', 'Meta+Shift+Z'],
-    categories: ['edit'],
+    categories: ['history', 'history-redo'],
     action: ({ registry, documentId }) => {
       const history = registry.getPlugin<HistoryPlugin>(HISTORY_PLUGIN_ID)?.provides();
       if (!history) return;
