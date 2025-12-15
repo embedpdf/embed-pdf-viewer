@@ -1,5 +1,7 @@
 # @embedpdf/plugin-selection
 
+## 2.0.0-next.2
+
 ## 2.0.0-next.1
 
 ### Patch Changes

@@ -41,12 +41,17 @@
     "@embedpdf/plugin-viewport": "1.5.0",
     "@embedpdf/plugin-zoom": "1.5.0",
     "@embedpdf/utils": "1.5.0",
-    "@embedpdf/snippet": "1.0.0"
+    "@embedpdf/snippet": "1.0.0",
+    "@embedpdf/react-pdf-viewer": "1.0.0",
+    "@embedpdf/svelte-pdf-viewer": "1.0.0",
+    "@embedpdf/vue-pdf-viewer": "1.0.0"
   },
   "changesets": [
     "commands-svelte-use-current",
     "fix-document-manager-empty-array",
     "fix-i18n-vue-locale-reactivity",
+    "hidden-items-dependency-rules",
+    "layout-ready-event-page-info",
     "multi-view-core",
     "multi-view-engines",
     "multi-view-models",
@@ -79,6 +84,9 @@
     "multi-view-utils",
     "scroll-initial-page-removal",
     "selection-menu-height-config",
+    "snippet-capability-scope-type-exports",
+    "snippet-disabled-categories-and-hierarchical-categories",
+    "snippet-spanish-translations-partial-configs",
     "utils-svelte-action-pattern"
   ]
 }

@@ -1,5 +1,11 @@
 # @embedpdf/plugin-scroll
 
+## 2.0.0-next.2
+
+### Minor Changes
+
+- [`89b94a0`](https://github.com/embedpdf/embed-pdf-viewer/commit/89b94a09659ad63eeab6b66fc56f8110a07a8f57) by [@bobsingor](https://github.com/bobsingor) – Added `pageNumber` and `totalPages` properties to `LayoutReadyEvent`. This allows consumers to get the current page information immediately when the layout becomes ready, without needing to subscribe to a separate `onPageChange` event.
+
 ## 2.0.0-next.1
 
 ### Minor Changes
