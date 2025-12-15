@@ -38,6 +38,7 @@ export const englishTranslations: Locale = {
       print: 'Print',
       export: 'Export',
       fullscreen: 'Fullscreen',
+      loading: 'Loading document...',
     },
     emptyState: {
       title: 'No Documents Open',
@@ -149,6 +150,7 @@ export const englishTranslations: Locale = {
       noStylesStamp: 'There are no styles for stamps.',
       selectAnnotation: 'Select an annotation to see styles',
       deleteSelected: 'Delete selected annotation',
+      moreTools: 'More Tools',
     },
     redaction: {
       area: 'Redact Area',
@@ -231,6 +233,7 @@ export const germanTranslations: Locale = {
       print: 'Drucken',
       export: 'Exportieren',
       fullscreen: 'Vollbild',
+      loading: 'Dokument wird geladen...',
     },
     emptyState: {
       title: 'Keine Dokumente geöffnet',
@@ -342,6 +345,7 @@ export const germanTranslations: Locale = {
       noStylesStamp: 'Für Stempel gibt es keine Stile.',
       selectAnnotation: 'Wählen Sie eine Anmerkung aus, um Stile anzuzeigen',
       deleteSelected: 'Ausgewählte Anmerkung löschen',
+      moreTools: 'Weitere Werkzeuge',
     },
     redaction: {
       area: 'Bereich schwärzen',
@@ -424,6 +428,7 @@ export const dutchTranslations: Locale = {
       print: 'Afdrukken',
       export: 'Exporteren',
       fullscreen: 'Volledig scherm',
+      loading: 'Document laden...',
     },
     emptyState: {
       title: 'Geen documenten geopend',
@@ -536,6 +541,7 @@ export const dutchTranslations: Locale = {
       noStylesStamp: 'Er zijn geen stijlen voor stempels.',
       selectAnnotation: 'Selecteer een annotatie om stijlen te zien',
       deleteSelected: 'Geselecteerde annotatie verwijderen',
+      moreTools: 'Meer gereedschappen',
     },
     redaction: {
       area: 'Gebied redigeren',
@@ -618,6 +624,7 @@ export const frenchTranslations: Locale = {
       print: 'Imprimer',
       export: 'Exporter',
       fullscreen: 'Plein écran',
+      loading: 'Chargement du document...',
     },
     emptyState: {
       title: 'Aucun document ouvert',
@@ -729,6 +736,7 @@ export const frenchTranslations: Locale = {
       noStylesStamp: "Il n'y a pas de styles pour les tampons.",
       selectAnnotation: 'Sélectionnez une annotation pour voir les styles',
       deleteSelected: "Supprimer l'annotation sélectionnée",
+      moreTools: "Plus d'outils",
     },
     redaction: {
       area: 'Caviarder la zone',
@@ -811,6 +819,7 @@ export const spanishTranslations: Locale = {
       print: 'Imprimir',
       export: 'Exportar',
       fullscreen: 'Pantalla completa',
+      loading: 'Cargando documento...',
     },
     emptyState: {
       title: 'No hay documentos abiertos',
@@ -923,6 +932,7 @@ export const spanishTranslations: Locale = {
       noStylesStamp: 'No hay estilos para los sellos.',
       selectAnnotation: 'Seleccione una anotación para ver los estilos',
       deleteSelected: 'Eliminar anotación seleccionada',
+      moreTools: 'Más herramientas',
     },
     redaction: {
       area: 'Redactar área',

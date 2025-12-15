@@ -37,7 +37,7 @@ import {
   useActiveDocument,
 } from '@embedpdf/plugin-document-manager/preact';
 import { CommandsPluginPackage, CommandsPluginConfig } from '@embedpdf/plugin-commands/preact';
-import { I18nPluginPackage, I18nPluginConfig } from '@embedpdf/plugin-i18n/preact';
+import { I18nPluginPackage, I18nPluginConfig, useTranslations } from '@embedpdf/plugin-i18n/preact';
 import {
   MarqueeZoom,
   ZoomMode,
@@ -325,6 +325,7 @@ interface ViewerLayoutProps {
 function ViewerLayout({ documentId, tabBarVisibility = 'multiple' }: ViewerLayoutProps) {
   const { renderToolbar, renderSidebar, renderModal, renderOverlays } =
     useSchemaRenderer(documentId);
+  const { translate } = useTranslations(documentId);
 
   const selectionMenu = useSelectionMenu('selection', documentId);
   const annotationMenu = useSelectionMenu('annotation', documentId);
@@ -361,7 +362,7 @@ function ViewerLayout({ documentId, tabBarVisibility = 'multiple' }: ViewerLayou
               <>
                 {isLoading && (
                   <div className="flex h-full items-center justify-center">
-                    <LoadingIndicator size="lg" text="Loading document..." />
+                    <LoadingIndicator size="lg" text={translate('document.loading')} />
                   </div>
                 )}
                 {isError && <DocumentPasswordPrompt documentState={documentState} />}

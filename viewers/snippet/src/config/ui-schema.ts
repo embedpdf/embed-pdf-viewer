@@ -308,13 +308,13 @@ export const viewerUISchema: UISchema = {
         breakpoints: {
           sm: {
             maxWidth: 640,
-            hide: ['redo-button', 'undo-button'],
+            hide: ['add-text', 'add-stamp'],
             show: ['overflow-annotation-tools'],
           },
           md: {
             minWidth: 640,
-            show: ['redo-button', 'undo-button'],
             hide: ['overflow-annotation-tools'],
+            show: ['add-text', 'add-stamp'],
           },
         },
       },
@@ -371,6 +371,13 @@ export const viewerUISchema: UISchema = {
               categories: ['annotation', 'annotation-stamp'],
             },
             {
+              type: 'command-button',
+              id: 'overflow-annotation-tools',
+              commandId: 'annotation:overflow-tools',
+              variant: 'icon',
+              categories: ['annotation', 'annotation-overflow'],
+            },
+            {
               type: 'divider',
               id: 'annotation-tools-divider-1',
               orientation: 'vertical',
@@ -404,13 +411,6 @@ export const viewerUISchema: UISchema = {
               variant: 'icon',
               categories: ['history', 'history-redo'],
             },
-            {
-              type: 'command-button',
-              id: 'overflow-annotation-tools',
-              commandId: 'annotation:overflow-tools',
-              variant: 'icon',
-              categories: ['annotation', 'annotation-overflow'],
-            },
           ],
         },
         { type: 'spacer', id: 'spacer-4', flex: true },
@@ -423,6 +423,20 @@ export const viewerUISchema: UISchema = {
         placement: 'top',
         slot: 'secondary',
         order: 0,
+      },
+      responsive: {
+        breakpoints: {
+          sm: {
+            maxWidth: 640,
+            hide: ['add-polygon', 'add-polyline'],
+            show: ['overflow-shapes-tools'],
+          },
+          md: {
+            minWidth: 640,
+            hide: ['overflow-shapes-tools'],
+            show: ['add-polygon', 'add-polyline'],
+          },
+        },
       },
       permanent: false,
       categories: ['annotation', 'annotation-shape'],
@@ -475,6 +489,13 @@ export const viewerUISchema: UISchema = {
               commandId: 'annotation:add-polyline',
               variant: 'icon',
               categories: ['annotation', 'annotation-shape', 'annotation-polyline'],
+            },
+            {
+              type: 'command-button',
+              id: 'overflow-shapes-tools',
+              commandId: 'annotation:overflow-shapes',
+              variant: 'icon',
+              categories: ['annotation', 'annotation-shape', 'annotation-overflow'],
             },
             {
               type: 'divider',
@@ -661,6 +682,20 @@ export const viewerUISchema: UISchema = {
             minWidth: 768,
             hide: ['mode:view', 'mode:annotate', 'mode:shapes'],
           },
+        },
+        localeOverrides: {
+          groups: [
+            {
+              id: 'germanic-languages',
+              locales: ['de', 'nl'],
+              breakpoints: {
+                md: {
+                  // Germanic languages hide shapes from toolbar at md, so show it in overflow
+                  replaceHide: ['mode:view', 'mode:annotate'],
+                },
+              },
+            },
+          ],
         },
       },
     },
@@ -851,50 +886,16 @@ export const viewerUISchema: UISchema = {
         },
         {
           type: 'command',
-          id: 'annotation:add-highlight',
-          commandId: 'annotation:add-highlight',
-          categories: ['annotation', 'annotation-markup', 'annotation-highlight'],
+          id: 'annotation:add-stamp',
+          commandId: 'annotation:add-stamp',
+          categories: ['annotation', 'annotation-stamp'],
         },
-        {
-          type: 'command',
-          id: 'annotation:add-strikeout',
-          commandId: 'annotation:add-strikeout',
-          categories: ['annotation', 'annotation-markup', 'annotation-strikeout'],
-        },
-        {
-          type: 'command',
-          id: 'annotation:add-underline',
-          commandId: 'annotation:add-underline',
-          categories: ['annotation', 'annotation-markup', 'annotation-underline'],
-        },
-        {
-          type: 'divider',
-          id: 'divider-12',
-        },
-        {
-          type: 'command',
-          id: 'annotation:add-rectangle',
-          commandId: 'annotation:add-rectangle',
-          categories: ['annotation', 'annotation-shape', 'annotation-rectangle'],
-        },
-        {
-          type: 'command',
-          id: 'annotation:add-circle',
-          commandId: 'annotation:add-circle',
-          categories: ['annotation', 'annotation-shape', 'annotation-circle'],
-        },
-        {
-          type: 'command',
-          id: 'annotation:add-line',
-          commandId: 'annotation:add-line',
-          categories: ['annotation', 'annotation-shape', 'annotation-line'],
-        },
-        {
-          type: 'command',
-          id: 'annotation:add-arrow',
-          commandId: 'annotation:add-arrow',
-          categories: ['annotation', 'annotation-shape', 'annotation-arrow'],
-        },
+      ],
+    },
+    'shapes-tools-menu': {
+      id: 'shapes-tools-menu',
+      categories: ['annotation', 'annotation-shape'],
+      items: [
         {
           type: 'command',
           id: 'annotation:add-polygon',
@@ -906,18 +907,6 @@ export const viewerUISchema: UISchema = {
           id: 'annotation:add-polyline',
           commandId: 'annotation:add-polyline',
           categories: ['annotation', 'annotation-shape', 'annotation-polyline'],
-        },
-        {
-          type: 'command',
-          id: 'annotation:add-ink',
-          commandId: 'annotation:add-ink',
-          categories: ['annotation', 'annotation-ink'],
-        },
-        {
-          type: 'command',
-          id: 'annotation:add-stamp',
-          commandId: 'annotation:add-stamp',
-          categories: ['annotation', 'annotation-stamp'],
         },
       ],
     },

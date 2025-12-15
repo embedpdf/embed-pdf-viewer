@@ -1329,7 +1329,7 @@ export const commands: Record<string, Command<State>> = {
 
   'annotation:overflow-tools': {
     id: 'annotation:overflow-tools',
-    labelKey: 'annotation.overflowTools',
+    labelKey: 'annotation.moreTools',
     icon: 'dots',
     categories: ['annotation', 'annotation-overflow'],
     action: ({ registry, documentId }) => {
@@ -1348,6 +1348,26 @@ export const commands: Record<string, Command<State>> = {
     active: ({ state, documentId }) => {
       const ui = state.plugins['ui']?.documents[documentId];
       return ui?.openMenus['annotation-tools-menu'] !== undefined;
+    },
+  },
+
+  'annotation:overflow-shapes': {
+    id: 'annotation:overflow-shapes',
+    labelKey: 'annotation.moreTools',
+    icon: 'dots',
+    categories: ['annotation', 'annotation-shape', 'annotation-overflow'],
+    action: ({ registry, documentId }) => {
+      const uiCapability = registry.getPlugin<UIPlugin>('ui')?.provides();
+      if (!uiCapability) return;
+
+      const scope = uiCapability.forDocument(documentId);
+      if (!scope) return;
+
+      scope.toggleMenu('shapes-tools-menu', 'annotation:overflow-shapes', 'overflow-shapes-tools');
+    },
+    active: ({ state, documentId }) => {
+      const ui = state.plugins['ui']?.documents[documentId];
+      return ui?.openMenus['shapes-tools-menu'] !== undefined;
     },
   },
 
