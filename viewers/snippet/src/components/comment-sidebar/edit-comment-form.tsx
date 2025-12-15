@@ -48,16 +48,16 @@ export const EditCommentForm = ({
         className="border-border-default bg-bg-input text-fg-primary focus:border-accent focus:ring-accent w-full rounded-md border px-3 py-2 text-sm focus:outline-none focus:ring-1"
         rows={3}
       />
-      <div className="flex space-x-2">
+      <div className="flex flex-wrap gap-2">
         <button
           onClick={handleSaveClick}
-          className="bg-accent text-fg-on-accent hover:bg-accent-hover rounded-md px-3 py-1 text-sm"
+          className="bg-accent text-fg-on-accent hover:bg-accent-hover whitespace-nowrap rounded-md px-3 py-1 text-sm"
         >
           {translate('comments.save')}
         </button>
         <button
           onClick={handleCancelClick}
-          className="bg-interactive-hover text-fg-secondary hover:bg-border-default rounded-md px-3 py-1 text-sm"
+          className="bg-interactive-hover text-fg-secondary hover:bg-border-default whitespace-nowrap rounded-md px-3 py-1 text-sm"
         >
           {translate('comments.cancel')}
         </button>
