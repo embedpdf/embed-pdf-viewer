@@ -255,7 +255,12 @@ export class ScrollPlugin extends BasePlugin<
     const viewport = this.viewport.forDocument(documentId);
     viewport.scrollTo({ ...docState.scrollOffset, behavior: 'instant' });
 
-    this.layoutReady$.emit({ documentId, isInitial });
+    this.layoutReady$.emit({
+      documentId,
+      isInitial,
+      pageNumber: docState.currentPage,
+      totalPages: docState.totalPages,
+    });
   }
 
   public clearLayoutReady(documentId: string): void {

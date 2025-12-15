@@ -139,6 +139,8 @@ export interface LayoutReadyEvent {
   documentId: string;
   /** True only on the first layout ready after document load, false on subsequent (e.g., tab switches) */
   isInitial: boolean;
+  pageNumber: number;
+  totalPages: number;
 }
 
 // Scoped scroll capability
