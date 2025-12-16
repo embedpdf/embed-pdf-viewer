@@ -4075,12 +4075,14 @@ export class PdfiumEngine<T = Blob> implements PdfEngine<T> {
 
     const out: PdfAnnotationObject[] = [];
 
+    const pageCtx = ctx.acquirePage(page.index);
+
     for (let i = 0; i < count; ++i) {
       const annotPtr = this.pdfiumModule.EPDFPage_GetAnnotRaw(ctx.docPtr, page.index, i);
       if (!annotPtr) continue;
 
       try {
-        const anno = this.readPageAnnotation(ctx.docPtr, page, annotPtr);
+        const anno = this.readPageAnnotation(ctx.docPtr, page, annotPtr, pageCtx);
         if (anno) out.push(anno);
       } finally {
         this.pdfiumModule.FPDFPage_CloseAnnot(annotPtr);
