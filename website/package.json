@@ -3,9 +3,12 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
+    "dev:clean": "rm -rf .next && next dev",
+    "prebuild": "tsx tools/update-version-marker.ts",
     "build": "next build",
     "postbuild": "pagefind --site .next/server/app --output-path public/_pagefind",
     "start": "next start",
+    "clean": "rm -rf .next node_modules/.cache",
     "copy-wasm": "ts-node tools/copy-wasm.ts"
   },
   "dependencies": {
@@ -84,6 +87,7 @@
     "fs-extra": "^11.3.0",
     "pagefind": "^1.3.0",
     "ts-node": "^10.9.2",
+    "tsx": "^4.21.0",
     "typescript": "^5.0.0",
     "unified": "^11.0.5"
   }
