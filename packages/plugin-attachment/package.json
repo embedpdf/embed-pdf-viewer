@@ -47,6 +47,17 @@
     "react-dom": ">=16.8.0",
     "preact": "^10.26.4"
   },
+  "peerDependenciesMeta": {
+    "preact": {
+      "optional": true
+    },
+    "react": {
+      "optional": true
+    },
+    "react-dom": {
+      "optional": true
+    }
+  },
   "files": [
     "dist",
     "README.md"
