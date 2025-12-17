@@ -1,6 +1,6 @@
-import { PdfImage, ImageConversionTypes } from '@embedpdf/models';
+import type { PdfImage, ImageConversionTypes } from '@embedpdf/models';
 import { toArrayBuffer } from '../utils';
-import { ImageDataConverter, LazyImageData } from './types';
+import type { ImageDataConverter, LazyImageData } from './types';
 
 // ============================================================================
 // Node.js Converters

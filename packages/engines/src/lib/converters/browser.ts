@@ -1,5 +1,5 @@
-import { ImageConversionTypes } from '@embedpdf/models';
-import { ImageDataConverter, LazyImageData } from './types';
+import type { ImageConversionTypes } from '@embedpdf/models';
+import type { ImageDataConverter, LazyImageData } from './types';
 import { ImageEncoderWorkerPool } from '../image-encoder';
 
 // ============================================================================

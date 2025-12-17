@@ -1,7 +1,7 @@
-import { PdfImage, ImageConversionTypes } from '@embedpdf/models';
+import type { PdfImage, ImageConversionTypes } from '@embedpdf/models';
 
 // Re-export from models for convenience
-export { ImageConversionTypes } from '@embedpdf/models';
+export type { ImageConversionTypes } from '@embedpdf/models';
 
 /**
  * Lazy image data getter function
