@@ -3001,6 +3001,123 @@ export interface PdfEngine<T = Blob> {
 export type PdfEngineMethodName = keyof Required<PdfEngine>;
 
 /**
+ * Executor interface for PDFium implementations.
+ * Can be either PdfiumNative (direct) or RemoteExecutor (worker proxy).
+ *
+ * @public
+ */
+export interface IPdfiumExecutor {
+  // Core operations
+  initialize(): void;
+  destroy(): void;
+  openDocumentBuffer(
+    file: PdfFile,
+    options?: PdfOpenDocumentBufferOptions,
+  ): PdfTask<PdfDocumentObject>;
+  getMetadata(doc: PdfDocumentObject): PdfTask<PdfMetadataObject>;
+  setMetadata(doc: PdfDocumentObject, metadata: Partial<PdfMetadataObject>): PdfTask<boolean>;
+  getDocPermissions(doc: PdfDocumentObject): PdfTask<number>;
+  getDocUserPermissions(doc: PdfDocumentObject): PdfTask<number>;
+  getSignatures(doc: PdfDocumentObject): PdfTask<PdfSignatureObject[]>;
+  getBookmarks(doc: PdfDocumentObject): PdfTask<PdfBookmarksObject>;
+  setBookmarks(doc: PdfDocumentObject, bookmarks: PdfBookmarkObject[]): PdfTask<boolean>;
+  deleteBookmarks(doc: PdfDocumentObject): PdfTask<boolean>;
+
+  // Raw rendering (returns ImageDataLike, not Blob)
+  renderPageRaw(
+    doc: PdfDocumentObject,
+    page: PdfPageObject,
+    options?: PdfRenderPageOptions,
+  ): PdfTask<ImageDataLike>;
+  renderPageRect(
+    doc: PdfDocumentObject,
+    page: PdfPageObject,
+    rect: Rect,
+    options?: PdfRenderPageOptions,
+  ): PdfTask<ImageDataLike>;
+  renderThumbnailRaw(
+    doc: PdfDocumentObject,
+    page: PdfPageObject,
+    options?: PdfRenderThumbnailOptions,
+  ): PdfTask<ImageDataLike>;
+  renderPageAnnotationRaw(
+    doc: PdfDocumentObject,
+    page: PdfPageObject,
+    annotation: PdfAnnotationObject,
+    options?: PdfRenderPageAnnotationOptions,
+  ): PdfTask<ImageDataLike>;
+
+  // Single page operations
+  getPageAnnotationsRaw(
+    doc: PdfDocumentObject,
+    page: PdfPageObject,
+  ): PdfTask<PdfAnnotationObject[]>;
+  getPageAnnotations(doc: PdfDocumentObject, page: PdfPageObject): PdfTask<PdfAnnotationObject[]>;
+  createPageAnnotation<A extends PdfAnnotationObject>(
+    doc: PdfDocumentObject,
+    page: PdfPageObject,
+    annotation: A,
+    context?: AnnotationCreateContext<A>,
+  ): PdfTask<string>;
+  updatePageAnnotation(
+    doc: PdfDocumentObject,
+    page: PdfPageObject,
+    annotation: PdfAnnotationObject,
+  ): PdfTask<boolean>;
+  removePageAnnotation(
+    doc: PdfDocumentObject,
+    page: PdfPageObject,
+    annotation: PdfAnnotationObject,
+  ): PdfTask<boolean>;
+  getPageTextRects(doc: PdfDocumentObject, page: PdfPageObject): PdfTask<PdfTextRectObject[]>;
+
+  // Single page search
+  searchInPage(
+    doc: PdfDocumentObject,
+    page: PdfPageObject,
+    keyword: string,
+    flags: number,
+  ): PdfTask<SearchResult[]>;
+
+  // Other operations
+  getAttachments(doc: PdfDocumentObject): PdfTask<PdfAttachmentObject[]>;
+  addAttachment(doc: PdfDocumentObject, params: PdfAddAttachmentParams): PdfTask<boolean>;
+  removeAttachment(doc: PdfDocumentObject, attachment: PdfAttachmentObject): PdfTask<boolean>;
+  readAttachmentContent(
+    doc: PdfDocumentObject,
+    attachment: PdfAttachmentObject,
+  ): PdfTask<ArrayBuffer>;
+  setFormFieldValue(
+    doc: PdfDocumentObject,
+    page: PdfPageObject,
+    annotation: PdfWidgetAnnoObject,
+    value: FormFieldValue,
+  ): PdfTask<boolean>;
+  flattenPage(
+    doc: PdfDocumentObject,
+    page: PdfPageObject,
+    options?: PdfFlattenPageOptions,
+  ): PdfTask<PdfPageFlattenResult>;
+  extractPages(doc: PdfDocumentObject, pageIndexes: number[]): PdfTask<ArrayBuffer>;
+  extractText(doc: PdfDocumentObject, pageIndexes: number[]): PdfTask<string>;
+  redactTextInRects(
+    doc: PdfDocumentObject,
+    page: PdfPageObject,
+    rects: Rect[],
+    options?: PdfRedactTextOptions,
+  ): PdfTask<boolean>;
+  getTextSlices(doc: PdfDocumentObject, slices: PageTextSlice[]): PdfTask<string[]>;
+  getPageGlyphs(doc: PdfDocumentObject, page: PdfPageObject): PdfTask<PdfGlyphObject[]>;
+  getPageGeometry(doc: PdfDocumentObject, page: PdfPageObject): PdfTask<PdfPageGeometry>;
+  merge(files: PdfFile[]): PdfTask<PdfFile>;
+  mergePages(mergeConfigs: Array<{ docId: string; pageIndices: number[] }>): PdfTask<PdfFile>;
+  preparePrintDocument(doc: PdfDocumentObject, options?: PdfPrintOptions): PdfTask<ArrayBuffer>;
+  saveAsCopy(doc: PdfDocumentObject): PdfTask<ArrayBuffer>;
+  closeDocument(doc: PdfDocumentObject): PdfTask<boolean>;
+  closeAllDocuments(): PdfTask<boolean>;
+}
+
+/**
  * Arguments of PdfEngine method
  *
  * @public

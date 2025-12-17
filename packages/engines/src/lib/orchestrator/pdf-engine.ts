@@ -43,126 +43,17 @@ import {
   SearchResult,
   CompoundTask,
   ImageDataLike,
+  IPdfiumExecutor,
 } from '@embedpdf/models';
 import { WorkerTaskQueue, Priority } from './task-queue';
 import type { ImageDataConverter } from '../converters/types';
 
 // Re-export for convenience
 export type { ImageDataConverter } from '../converters/types';
-export type { ImageDataLike } from '@embedpdf/models';
+export type { ImageDataLike, IPdfiumExecutor } from '@embedpdf/models';
 
 const LOG_SOURCE = 'PdfEngine';
 const LOG_CATEGORY = 'Orchestrator';
-
-/**
- * Executor interface that can be either PdfiumNative or RemoteExecutor
- */
-export interface IPdfExecutor {
-  // Core operations (single page, synchronous in nature)
-  initialize(): void;
-  destroy(): void;
-  openDocumentBuffer(
-    file: PdfFile,
-    options?: PdfOpenDocumentBufferOptions,
-  ): PdfTask<PdfDocumentObject>;
-  getMetadata(doc: PdfDocumentObject): PdfTask<PdfMetadataObject>;
-  setMetadata(doc: PdfDocumentObject, metadata: Partial<PdfMetadataObject>): PdfTask<boolean>;
-  getDocPermissions(doc: PdfDocumentObject): PdfTask<number>;
-  getDocUserPermissions(doc: PdfDocumentObject): PdfTask<number>;
-  getSignatures(doc: PdfDocumentObject): PdfTask<PdfSignatureObject[]>;
-  getBookmarks(doc: PdfDocumentObject): PdfTask<PdfBookmarksObject>;
-  setBookmarks(doc: PdfDocumentObject, bookmarks: PdfBookmarkObject[]): PdfTask<boolean>;
-  deleteBookmarks(doc: PdfDocumentObject): PdfTask<boolean>;
-
-  // Raw rendering (returns ImageData-like object, not Blob)
-  renderPageRaw(
-    doc: PdfDocumentObject,
-    page: PdfPageObject,
-    options?: PdfRenderPageOptions,
-  ): PdfTask<ImageDataLike>;
-  renderPageRect(
-    doc: PdfDocumentObject,
-    page: PdfPageObject,
-    rect: Rect,
-    options?: PdfRenderPageOptions,
-  ): PdfTask<ImageDataLike>;
-  renderThumbnailRaw(
-    doc: PdfDocumentObject,
-    page: PdfPageObject,
-    options?: PdfRenderThumbnailOptions,
-  ): PdfTask<ImageDataLike>;
-  renderPageAnnotationRaw(
-    doc: PdfDocumentObject,
-    page: PdfPageObject,
-    annotation: PdfAnnotationObject,
-    options?: PdfRenderPageAnnotationOptions,
-  ): PdfTask<ImageDataLike>;
-
-  // Single page operations
-  getPageAnnotations(doc: PdfDocumentObject, page: PdfPageObject): PdfTask<PdfAnnotationObject[]>;
-  createPageAnnotation<A extends PdfAnnotationObject>(
-    doc: PdfDocumentObject,
-    page: PdfPageObject,
-    annotation: A,
-    context?: AnnotationCreateContext<A>,
-  ): PdfTask<string>;
-  updatePageAnnotation(
-    doc: PdfDocumentObject,
-    page: PdfPageObject,
-    annotation: PdfAnnotationObject,
-  ): PdfTask<boolean>;
-  removePageAnnotation(
-    doc: PdfDocumentObject,
-    page: PdfPageObject,
-    annotation: PdfAnnotationObject,
-  ): PdfTask<boolean>;
-  getPageTextRects(doc: PdfDocumentObject, page: PdfPageObject): PdfTask<PdfTextRectObject[]>;
-
-  // Single page search
-  searchInPage(
-    doc: PdfDocumentObject,
-    page: PdfPageObject,
-    keyword: string,
-    flags: number,
-  ): PdfTask<SearchResult[]>;
-
-  // Other operations
-  getAttachments(doc: PdfDocumentObject): PdfTask<PdfAttachmentObject[]>;
-  addAttachment(doc: PdfDocumentObject, params: PdfAddAttachmentParams): PdfTask<boolean>;
-  removeAttachment(doc: PdfDocumentObject, attachment: PdfAttachmentObject): PdfTask<boolean>;
-  readAttachmentContent(
-    doc: PdfDocumentObject,
-    attachment: PdfAttachmentObject,
-  ): PdfTask<ArrayBuffer>;
-  setFormFieldValue(
-    doc: PdfDocumentObject,
-    page: PdfPageObject,
-    annotation: PdfWidgetAnnoObject,
-    value: FormFieldValue,
-  ): PdfTask<boolean>;
-  flattenPage(
-    doc: PdfDocumentObject,
-    page: PdfPageObject,
-    options?: PdfFlattenPageOptions,
-  ): PdfTask<PdfPageFlattenResult>;
-  extractPages(doc: PdfDocumentObject, pageIndexes: number[]): PdfTask<ArrayBuffer>;
-  extractText(doc: PdfDocumentObject, pageIndexes: number[]): PdfTask<string>;
-  redactTextInRects(
-    doc: PdfDocumentObject,
-    page: PdfPageObject,
-    rects: Rect[],
-    options?: PdfRedactTextOptions,
-  ): PdfTask<boolean>;
-  getTextSlices(doc: PdfDocumentObject, slices: PageTextSlice[]): PdfTask<string[]>;
-  getPageGlyphs(doc: PdfDocumentObject, page: PdfPageObject): PdfTask<PdfGlyphObject[]>;
-  getPageGeometry(doc: PdfDocumentObject, page: PdfPageObject): PdfTask<PdfPageGeometry>;
-  merge(files: PdfFile[]): PdfTask<PdfFile>;
-  mergePages(mergeConfigs: Array<{ docId: string; pageIndices: number[] }>): PdfTask<PdfFile>;
-  preparePrintDocument(doc: PdfDocumentObject, options?: PdfPrintOptions): PdfTask<ArrayBuffer>;
-  saveAsCopy(doc: PdfDocumentObject): PdfTask<ArrayBuffer>;
-  closeDocument(doc: PdfDocumentObject): PdfTask<boolean>;
-  closeAllDocuments(): PdfTask<boolean>;
-}
 
 export interface PdfEngineOptions<T> {
   /**
@@ -190,12 +81,12 @@ export interface PdfEngineOptions<T> {
  * - Manages visibility-based task ranking
  */
 export class PdfEngine<T = Blob> implements IPdfEngine<T> {
-  private executor: IPdfExecutor;
+  private executor: IPdfiumExecutor;
   private workerQueue: WorkerTaskQueue;
   private logger: Logger;
   private options: PdfEngineOptions<T>;
 
-  constructor(executor: IPdfExecutor, options: PdfEngineOptions<T>) {
+  constructor(executor: IPdfiumExecutor, options: PdfEngineOptions<T>) {
     this.executor = executor;
     this.logger = options.logger ?? new NoopLogger();
     this.options = {
@@ -570,7 +461,7 @@ export class PdfEngine<T = Blob> implements IPdfEngine<T> {
     const tasks = doc.pages.map((page, index) =>
       this.workerQueue.enqueue(
         {
-          execute: () => this.executor.getPageAnnotations(doc, page),
+          execute: () => this.executor.getPageAnnotationsRaw(doc, page),
           meta: { docId: doc.id, pageIndex: index, operation: 'getAnnotations' },
         },
         { priority: Priority.LOW },

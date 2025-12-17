@@ -1,5 +1,6 @@
 import {
   ImageDataLike,
+  IPdfiumExecutor,
   PdfActionObject,
   PdfAnnotationObject,
   PdfTextRectObject,
@@ -167,7 +168,7 @@ interface PdfiumEngineOptions {
 /**
  * Pdf engine that based on pdfium wasm
  */
-export class PdfiumNative {
+export class PdfiumNative implements IPdfiumExecutor {
   /**
    * pdf documents that opened
    */
@@ -3582,7 +3583,7 @@ export class PdfiumNative {
    *
    * @private
    */
-  readPageAnnotationsRaw(
+  getPageAnnotationsRaw(
     doc: PdfDocumentObject,
     page: PdfPageObject,
   ): PdfTask<PdfAnnotationObject[]> {

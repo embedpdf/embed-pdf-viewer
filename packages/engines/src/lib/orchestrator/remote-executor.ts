@@ -34,8 +34,9 @@ import {
   PdfErrorCode,
   SearchResult,
   serializeLogger,
+  IPdfiumExecutor,
+  ImageDataLike,
 } from '@embedpdf/models';
-import type { IPdfExecutor, ImageDataLike } from './pdf-engine';
 import type { WorkerRequest, WorkerResponse } from './pdfium-native-runner';
 
 /**
@@ -75,6 +76,7 @@ type MessageType =
   | 'renderThumbnailRaw'
   | 'renderPageAnnotationRaw'
   | 'getPageAnnotations'
+  | 'getPageAnnotationsRaw'
   | 'createPageAnnotation'
   | 'updatePageAnnotation'
   | 'removePageAnnotation'
@@ -109,7 +111,7 @@ type MessageType =
  * - Error handling
  * - Progress tracking
  */
-export class RemoteExecutor implements IPdfExecutor {
+export class RemoteExecutor implements IPdfiumExecutor {
   private static READY_TASK_ID = '0';
   private pendingRequests = new Map<string, Task<any, any>>();
   private requestCounter = 0;
@@ -334,6 +336,13 @@ export class RemoteExecutor implements IPdfExecutor {
     options?: PdfRenderPageAnnotationOptions,
   ): PdfTask<ImageDataLike> {
     return this.send<ImageDataLike>('renderPageAnnotationRaw', [doc, page, annotation, options]);
+  }
+
+  getPageAnnotationsRaw(
+    doc: PdfDocumentObject,
+    page: PdfPageObject,
+  ): PdfTask<PdfAnnotationObject[]> {
+    return this.send<PdfAnnotationObject[]>('getPageAnnotationsRaw', [doc, page]);
   }
 
   getPageAnnotations(doc: PdfDocumentObject, page: PdfPageObject): PdfTask<PdfAnnotationObject[]> {
