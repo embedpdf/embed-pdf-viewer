@@ -119,14 +119,6 @@ export class PdfEngine<T = Blob> implements IPdfEngine<T> {
     return chunks;
   }
 
-  /**
-   * Update visible pages for visibility-based task ranking
-   */
-  setVisiblePages(pages: Array<{ pageIndex: number; visibility: number }>): void {
-    this.workerQueue.setVisiblePages(pages);
-    this.logger.debug(LOG_SOURCE, LOG_CATEGORY, `Updated visible pages: ${pages.length} pages`);
-  }
-
   // ========== IPdfEngine Implementation ==========
 
   isSupport(feature: PdfEngineFeature): PdfTask<PdfEngineOperation[]> {
@@ -217,7 +209,7 @@ export class PdfEngine<T = Blob> implements IPdfEngine<T> {
         execute: () => this.executor.getMetadata(doc),
         meta: { docId: doc.id, operation: 'getMetadata' },
       },
-      { priority: Priority.LOW },
+      { priority: Priority.MEDIUM },
     );
   }
 
@@ -227,7 +219,7 @@ export class PdfEngine<T = Blob> implements IPdfEngine<T> {
         execute: () => this.executor.setMetadata(doc, metadata),
         meta: { docId: doc.id, operation: 'setMetadata' },
       },
-      { priority: Priority.LOW },
+      { priority: Priority.MEDIUM },
     );
   }
 
@@ -237,7 +229,7 @@ export class PdfEngine<T = Blob> implements IPdfEngine<T> {
         execute: () => this.executor.getDocPermissions(doc),
         meta: { docId: doc.id, operation: 'getDocPermissions' },
       },
-      { priority: Priority.LOW },
+      { priority: Priority.MEDIUM },
     );
   }
 
@@ -247,7 +239,7 @@ export class PdfEngine<T = Blob> implements IPdfEngine<T> {
         execute: () => this.executor.getDocUserPermissions(doc),
         meta: { docId: doc.id, operation: 'getDocUserPermissions' },
       },
-      { priority: Priority.LOW },
+      { priority: Priority.MEDIUM },
     );
   }
 
@@ -257,7 +249,7 @@ export class PdfEngine<T = Blob> implements IPdfEngine<T> {
         execute: () => this.executor.getSignatures(doc),
         meta: { docId: doc.id, operation: 'getSignatures' },
       },
-      { priority: Priority.LOW },
+      { priority: Priority.MEDIUM },
     );
   }
 
@@ -267,7 +259,7 @@ export class PdfEngine<T = Blob> implements IPdfEngine<T> {
         execute: () => this.executor.getBookmarks(doc),
         meta: { docId: doc.id, operation: 'getBookmarks' },
       },
-      { priority: Priority.LOW },
+      { priority: Priority.MEDIUM },
     );
   }
 
@@ -277,7 +269,7 @@ export class PdfEngine<T = Blob> implements IPdfEngine<T> {
         execute: () => this.executor.setBookmarks(doc, bookmarks),
         meta: { docId: doc.id, operation: 'setBookmarks' },
       },
-      { priority: Priority.LOW },
+      { priority: Priority.MEDIUM },
     );
   }
 
@@ -287,7 +279,7 @@ export class PdfEngine<T = Blob> implements IPdfEngine<T> {
         execute: () => this.executor.deleteBookmarks(doc),
         meta: { docId: doc.id, operation: 'deleteBookmarks' },
       },
-      { priority: Priority.LOW },
+      { priority: Priority.MEDIUM },
     );
   }
 
@@ -303,7 +295,7 @@ export class PdfEngine<T = Blob> implements IPdfEngine<T> {
       options,
       doc.id,
       page.index,
-      Priority.HIGH,
+      Priority.CRITICAL,
     );
   }
 
@@ -318,7 +310,7 @@ export class PdfEngine<T = Blob> implements IPdfEngine<T> {
       options,
       doc.id,
       page.index,
-      Priority.MEDIUM,
+      Priority.HIGH,
     );
   }
 
@@ -332,7 +324,7 @@ export class PdfEngine<T = Blob> implements IPdfEngine<T> {
       options,
       doc.id,
       page.index,
-      Priority.LOW,
+      Priority.MEDIUM,
     );
   }
 
@@ -347,7 +339,7 @@ export class PdfEngine<T = Blob> implements IPdfEngine<T> {
       options,
       doc.id,
       page.index,
-      Priority.LOW,
+      Priority.MEDIUM,
     );
   }
 
@@ -359,7 +351,7 @@ export class PdfEngine<T = Blob> implements IPdfEngine<T> {
     options?: PdfRenderPageOptions | PdfRenderThumbnailOptions | PdfRenderPageAnnotationOptions,
     docId?: string,
     pageIndex?: number,
-    priority: Priority = Priority.HIGH,
+    priority: Priority = Priority.CRITICAL,
   ): PdfTask<T> {
     const resultTask = new Task<T, PdfErrorReason>();
 
@@ -430,7 +422,7 @@ export class PdfEngine<T = Blob> implements IPdfEngine<T> {
         execute: () => this.executor.getPageAnnotations(doc, page),
         meta: { docId: doc.id, pageIndex: page.index, operation: 'getPageAnnotations' },
       },
-      { priority: Priority.LOW },
+      { priority: Priority.MEDIUM },
     );
   }
 
@@ -445,7 +437,7 @@ export class PdfEngine<T = Blob> implements IPdfEngine<T> {
         execute: () => this.executor.createPageAnnotation(doc, page, annotation, context),
         meta: { docId: doc.id, pageIndex: page.index, operation: 'createPageAnnotation' },
       },
-      { priority: Priority.LOW },
+      { priority: Priority.MEDIUM },
     );
   }
 
@@ -459,7 +451,7 @@ export class PdfEngine<T = Blob> implements IPdfEngine<T> {
         execute: () => this.executor.updatePageAnnotation(doc, page, annotation),
         meta: { docId: doc.id, pageIndex: page.index, operation: 'updatePageAnnotation' },
       },
-      { priority: Priority.LOW },
+      { priority: Priority.MEDIUM },
     );
   }
 
@@ -473,7 +465,7 @@ export class PdfEngine<T = Blob> implements IPdfEngine<T> {
         execute: () => this.executor.removePageAnnotation(doc, page, annotation),
         meta: { docId: doc.id, pageIndex: page.index, operation: 'removePageAnnotation' },
       },
-      { priority: Priority.LOW },
+      { priority: Priority.MEDIUM },
     );
   }
 
@@ -534,7 +526,7 @@ export class PdfEngine<T = Blob> implements IPdfEngine<T> {
         meta: { docId: doc.id, pageIndex: page.index, operation: 'getPageTextRects' },
       },
       {
-        priority: Priority.LOW,
+        priority: Priority.MEDIUM,
       },
     );
   }
@@ -607,7 +599,7 @@ export class PdfEngine<T = Blob> implements IPdfEngine<T> {
         execute: () => this.executor.getAttachments(doc),
         meta: { docId: doc.id, operation: 'getAttachments' },
       },
-      { priority: Priority.LOW },
+      { priority: Priority.MEDIUM },
     );
   }
 
@@ -617,7 +609,7 @@ export class PdfEngine<T = Blob> implements IPdfEngine<T> {
         execute: () => this.executor.addAttachment(doc, params),
         meta: { docId: doc.id, operation: 'addAttachment' },
       },
-      { priority: Priority.LOW },
+      { priority: Priority.MEDIUM },
     );
   }
 
@@ -627,7 +619,7 @@ export class PdfEngine<T = Blob> implements IPdfEngine<T> {
         execute: () => this.executor.removeAttachment(doc, attachment),
         meta: { docId: doc.id, operation: 'removeAttachment' },
       },
-      { priority: Priority.LOW },
+      { priority: Priority.MEDIUM },
     );
   }
 
@@ -640,7 +632,7 @@ export class PdfEngine<T = Blob> implements IPdfEngine<T> {
         execute: () => this.executor.readAttachmentContent(doc, attachment),
         meta: { docId: doc.id, operation: 'readAttachmentContent' },
       },
-      { priority: Priority.LOW },
+      { priority: Priority.MEDIUM },
     );
   }
 
@@ -657,7 +649,7 @@ export class PdfEngine<T = Blob> implements IPdfEngine<T> {
         execute: () => this.executor.setFormFieldValue(doc, page, annotation, value),
         meta: { docId: doc.id, pageIndex: page.index, operation: 'setFormFieldValue' },
       },
-      { priority: Priority.LOW },
+      { priority: Priority.MEDIUM },
     );
   }
 
@@ -671,7 +663,7 @@ export class PdfEngine<T = Blob> implements IPdfEngine<T> {
         execute: () => this.executor.flattenPage(doc, page, options),
         meta: { docId: doc.id, pageIndex: page.index, operation: 'flattenPage' },
       },
-      { priority: Priority.LOW },
+      { priority: Priority.MEDIUM },
     );
   }
 
@@ -683,7 +675,7 @@ export class PdfEngine<T = Blob> implements IPdfEngine<T> {
         execute: () => this.executor.extractPages(doc, pageIndexes),
         meta: { docId: doc.id, pageIndexes: pageIndexes, operation: 'extractPages' },
       },
-      { priority: Priority.LOW },
+      { priority: Priority.MEDIUM },
     );
   }
 
@@ -693,7 +685,7 @@ export class PdfEngine<T = Blob> implements IPdfEngine<T> {
         execute: () => this.executor.extractText(doc, pageIndexes),
         meta: { docId: doc.id, pageIndexes: pageIndexes, operation: 'extractText' },
       },
-      { priority: Priority.LOW },
+      { priority: Priority.MEDIUM },
     );
   }
 
@@ -708,7 +700,7 @@ export class PdfEngine<T = Blob> implements IPdfEngine<T> {
         execute: () => this.executor.redactTextInRects(doc, page, rects, options),
         meta: { docId: doc.id, pageIndex: page.index, operation: 'redactTextInRects' },
       },
-      { priority: Priority.LOW },
+      { priority: Priority.MEDIUM },
     );
   }
 
@@ -718,7 +710,7 @@ export class PdfEngine<T = Blob> implements IPdfEngine<T> {
         execute: () => this.executor.getTextSlices(doc, slices),
         meta: { docId: doc.id, slices: slices, operation: 'getTextSlices' },
       },
-      { priority: Priority.LOW },
+      { priority: Priority.MEDIUM },
     );
   }
 
@@ -728,7 +720,7 @@ export class PdfEngine<T = Blob> implements IPdfEngine<T> {
         execute: () => this.executor.getPageGlyphs(doc, page),
         meta: { docId: doc.id, pageIndex: page.index, operation: 'getPageGlyphs' },
       },
-      { priority: Priority.LOW },
+      { priority: Priority.MEDIUM },
     );
   }
 
@@ -738,7 +730,7 @@ export class PdfEngine<T = Blob> implements IPdfEngine<T> {
         execute: () => this.executor.getPageGeometry(doc, page),
         meta: { docId: doc.id, pageIndex: page.index, operation: 'getPageGeometry' },
       },
-      { priority: Priority.LOW },
+      { priority: Priority.MEDIUM },
     );
   }
 
@@ -750,7 +742,7 @@ export class PdfEngine<T = Blob> implements IPdfEngine<T> {
         execute: () => this.executor.merge(files),
         meta: { docId: files.map((file) => file.id).join(','), operation: 'merge' },
       },
-      { priority: Priority.LOW },
+      { priority: Priority.MEDIUM },
     );
   }
 
@@ -763,7 +755,7 @@ export class PdfEngine<T = Blob> implements IPdfEngine<T> {
           operation: 'mergePages',
         },
       },
-      { priority: Priority.LOW },
+      { priority: Priority.MEDIUM },
     );
   }
 
@@ -773,7 +765,7 @@ export class PdfEngine<T = Blob> implements IPdfEngine<T> {
         execute: () => this.executor.preparePrintDocument(doc, options),
         meta: { docId: doc.id, operation: 'preparePrintDocument' },
       },
-      { priority: Priority.LOW },
+      { priority: Priority.MEDIUM },
     );
   }
 
@@ -783,7 +775,7 @@ export class PdfEngine<T = Blob> implements IPdfEngine<T> {
         execute: () => this.executor.saveAsCopy(doc),
         meta: { docId: doc.id, operation: 'saveAsCopy' },
       },
-      { priority: Priority.LOW },
+      { priority: Priority.MEDIUM },
     );
   }
 
@@ -793,7 +785,7 @@ export class PdfEngine<T = Blob> implements IPdfEngine<T> {
         execute: () => this.executor.closeDocument(doc),
         meta: { docId: doc.id, operation: 'closeDocument' },
       },
-      { priority: Priority.LOW },
+      { priority: Priority.MEDIUM },
     );
   }
 
@@ -803,7 +795,7 @@ export class PdfEngine<T = Blob> implements IPdfEngine<T> {
         execute: () => this.executor.closeAllDocuments(),
         meta: { operation: 'closeAllDocuments' },
       },
-      { priority: Priority.LOW },
+      { priority: Priority.MEDIUM },
     );
   }
 }

@@ -68,7 +68,6 @@ export class WorkerTaskQueue {
   private queue: QueuedTask<any>[] = [];
   private running = 0;
   private resultTasks = new Map<string, Task<any, any, any>>();
-  private visiblePages = new Map<number, number>();
   private logger: Logger;
   private opts: Required<Omit<WorkerTaskQueueOptions, 'comparator' | 'ranker' | 'logger'>> & {
     comparator?: TaskComparator;
@@ -364,22 +363,8 @@ export class WorkerTaskQueue {
     });
   }
 
-  private defaultRank(task: QueuedTask<any>): number {
-    const pageIndex = task.meta?.pageIndex as number | undefined;
-    if (pageIndex === undefined) return 0;
-
-    const visibility = this.visiblePages.get(pageIndex) ?? 0;
-    return visibility * 1000;
-  }
-
-  setVisiblePages(pages: Array<{ pageIndex: number; visibility: number }>): void {
-    this.visiblePages.clear();
-    for (const { pageIndex, visibility } of pages) {
-      this.visiblePages.set(pageIndex, visibility);
-    }
-    if (this.queue.length > 0 && !this.opts.comparator) {
-      this.sortQueue();
-    }
+  private defaultRank(_task: QueuedTask<any>): number {
+    return 0;
   }
 
   private generateId(): string {
