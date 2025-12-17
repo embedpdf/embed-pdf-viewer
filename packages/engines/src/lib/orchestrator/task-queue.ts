@@ -1,4 +1,7 @@
-import { Task, TaskError } from '@embedpdf/models';
+import { Task, TaskError, Logger, NoopLogger } from '@embedpdf/models';
+
+const LOG_SOURCE = 'TaskQueue';
+const LOG_CATEGORY = 'Queue';
 
 export enum Priority {
   CRITICAL = 3,
@@ -54,6 +57,7 @@ export interface WorkerTaskQueueOptions {
   onIdle?: () => void;
   maxQueueSize?: number;
   autoStart?: boolean;
+  logger?: Logger;
 }
 
 // ============================================================================
@@ -65,13 +69,23 @@ export class WorkerTaskQueue {
   private running = 0;
   private resultTasks = new Map<string, Task<any, any, any>>();
   private visiblePages = new Map<number, number>();
-  private opts: Required<Omit<WorkerTaskQueueOptions, 'comparator' | 'ranker'>> & {
+  private logger: Logger;
+  private opts: Required<Omit<WorkerTaskQueueOptions, 'comparator' | 'ranker' | 'logger'>> & {
     comparator?: TaskComparator;
     ranker?: TaskRanker;
   };
 
   constructor(options: WorkerTaskQueueOptions = {}) {
-    const { concurrency = 1, comparator, ranker, onIdle, maxQueueSize, autoStart = true } = options;
+    const {
+      concurrency = 1,
+      comparator,
+      ranker,
+      onIdle,
+      maxQueueSize,
+      autoStart = true,
+      logger,
+    } = options;
+    this.logger = logger ?? new NoopLogger();
     this.opts = {
       concurrency: Math.max(1, concurrency),
       comparator,
@@ -179,22 +193,17 @@ export class WorkerTaskQueue {
 
     this.queue.push(queuedTask);
 
-    console.log(
-      '[TaskQueue] Task enqueued:',
-      id,
-      '| Priority:',
-      priority,
-      '| Running:',
-      this.running,
-      '| Queued:',
-      this.queue.length,
+    this.logger.debug(
+      LOG_SOURCE,
+      LOG_CATEGORY,
+      `Task enqueued: ${id} | Priority: ${priority} | Running: ${this.running} | Queued: ${this.queue.length}`,
     );
 
     // Set up automatic abort handling
     // When result task is aborted externally, remove from queue
     const originalAbort = resultTask.abort.bind(resultTask);
     resultTask.abort = (reason: any) => {
-      console.log('[TaskQueue] Task aborted:', id);
+      this.logger.debug(LOG_SOURCE, LOG_CATEGORY, `Task aborted: ${id}`);
       this.cancel(id);
       originalAbort(reason);
     };
@@ -220,7 +229,7 @@ export class WorkerTaskQueue {
     this.resultTasks.delete(taskId);
 
     if (before !== this.queue.length) {
-      console.log('[TaskQueue] Task cancelled and removed:', taskId);
+      this.logger.debug(LOG_SOURCE, LOG_CATEGORY, `Task cancelled and removed: ${taskId}`);
       this.kick();
     }
   }
@@ -230,28 +239,24 @@ export class WorkerTaskQueue {
   }
 
   private async process(fifo = false): Promise<void> {
-    console.log(
-      '[TaskQueue] process() called | Running:',
-      this.running,
-      '| Concurrency:',
-      this.opts.concurrency,
-      '| Queued:',
-      this.queue.length,
+    this.logger.debug(
+      LOG_SOURCE,
+      LOG_CATEGORY,
+      `process() called | Running: ${this.running} | Concurrency: ${this.opts.concurrency} | Queued: ${this.queue.length}`,
     );
 
     while (this.running < this.opts.concurrency && this.queue.length > 0) {
-      console.log(
-        '[TaskQueue] Starting new task | Running:',
-        this.running,
-        '| Queued:',
-        this.queue.length,
+      this.logger.debug(
+        LOG_SOURCE,
+        LOG_CATEGORY,
+        `Starting new task | Running: ${this.running} | Queued: ${this.queue.length}`,
       );
 
       if (!fifo) this.sortQueue();
 
       const queuedTask = this.queue.shift()!;
       if (queuedTask.cancelled) {
-        console.log('[TaskQueue] Skipping cancelled task:', queuedTask.id);
+        this.logger.debug(LOG_SOURCE, LOG_CATEGORY, `Skipping cancelled task: ${queuedTask.id}`);
         continue;
       }
 
@@ -307,13 +312,10 @@ export class WorkerTaskQueue {
           this.resultTasks.delete(queuedTask.id);
           this.running--;
 
-          console.log(
-            '[TaskQueue] Task completed:',
-            queuedTask.id,
-            '| Running:',
-            this.running,
-            '| Queued:',
-            this.queue.length,
+          this.logger.debug(
+            LOG_SOURCE,
+            LOG_CATEGORY,
+            `Task completed: ${queuedTask.id} | Running: ${this.running} | Queued: ${this.queue.length}`,
           );
 
           if (this.isIdle()) {
@@ -323,7 +325,12 @@ export class WorkerTaskQueue {
           }
         }
       })().catch((error) => {
-        console.error('[TaskQueue] Unhandled error in task execution wrapper:', error);
+        this.logger.error(
+          LOG_SOURCE,
+          LOG_CATEGORY,
+          'Unhandled error in task execution wrapper:',
+          error,
+        );
         this.running = Math.max(0, this.running - 1);
         if (this.isIdle()) {
           this.notifyIdle();

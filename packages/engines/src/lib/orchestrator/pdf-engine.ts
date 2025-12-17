@@ -210,6 +210,7 @@ export class PdfEngine<T = Blob> implements IPdfEngine<T> {
     this.workerQueue = new WorkerTaskQueue({
       concurrency: 1,
       autoStart: true,
+      logger: this.logger,
     });
 
     this.logger.debug(LOG_SOURCE, LOG_CATEGORY, 'PdfEngine orchestrator created');

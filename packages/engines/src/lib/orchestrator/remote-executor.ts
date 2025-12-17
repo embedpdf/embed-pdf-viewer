@@ -110,10 +110,11 @@ type MessageType =
  * - Progress tracking
  */
 export class RemoteExecutor implements IPdfExecutor {
+  private static READY_TASK_ID = '0';
   private pendingRequests = new Map<string, Task<any, any>>();
   private requestCounter = 0;
   private logger: Logger;
-  private initialized = false;
+  private readyTask: Task<boolean, PdfErrorReason>;
 
   constructor(
     private worker: Worker,
@@ -122,9 +123,13 @@ export class RemoteExecutor implements IPdfExecutor {
     this.logger = options.logger ?? new NoopLogger();
     this.worker.addEventListener('message', this.handleMessage);
 
+    // Create ready task - will be resolved when worker sends 'ready'
+    this.readyTask = new Task<boolean, PdfErrorReason>();
+    this.pendingRequests.set(RemoteExecutor.READY_TASK_ID, this.readyTask);
+
     // Send initialization message with WASM URL
     this.worker.postMessage({
-      id: '0',
+      id: RemoteExecutor.READY_TASK_ID,
       type: 'wasmInit',
       wasmUrl: options.wasmUrl,
       logger: options.logger ? serializeLogger(options.logger) : undefined,
@@ -142,12 +147,11 @@ export class RemoteExecutor implements IPdfExecutor {
 
   /**
    * Send a message to the worker and return a Task
+   * Waits for worker to be ready before sending
    */
   private send<T, P = unknown>(method: MessageType, args: any[]): Task<T, PdfErrorReason, P> {
     const id = this.generateId();
     const task = new Task<T, PdfErrorReason, P>();
-
-    this.pendingRequests.set(id, task);
 
     const request: WorkerRequest = {
       id,
@@ -156,8 +160,26 @@ export class RemoteExecutor implements IPdfExecutor {
       args,
     };
 
-    this.logger.debug(LOG_SOURCE, LOG_CATEGORY, `Sending ${method} request:`, id);
-    this.worker.postMessage(request);
+    // Wait for worker to be ready before sending
+    this.readyTask.wait(
+      () => {
+        this.pendingRequests.set(id, task);
+        this.logger.debug(LOG_SOURCE, LOG_CATEGORY, `Sending ${method} request:`, id);
+        this.worker.postMessage(request);
+      },
+      (error) => {
+        this.logger.error(
+          LOG_SOURCE,
+          LOG_CATEGORY,
+          `Worker init failed, rejecting ${method}:`,
+          error,
+        );
+        task.reject({
+          code: PdfErrorCode.Initialization,
+          message: 'Worker initialization failed',
+        });
+      },
+    );
 
     return task;
   }
@@ -168,10 +190,10 @@ export class RemoteExecutor implements IPdfExecutor {
   private handleMessage = (event: MessageEvent<WorkerResponse>) => {
     const response = event.data;
 
-    // Handle ready response separately
+    // Handle ready response - resolve the readyTask
     if (response.type === 'ready') {
-      this.initialized = true;
       this.logger.debug(LOG_SOURCE, LOG_CATEGORY, 'Worker is ready');
+      this.readyTask.resolve(true);
       return;
     }
 
@@ -221,10 +243,12 @@ export class RemoteExecutor implements IPdfExecutor {
   destroy(): void {
     this.worker.removeEventListener('message', this.handleMessage);
 
-    // Reject all pending requests
+    // Reject all pending requests (except readyTask)
     this.pendingRequests.forEach((task, id) => {
-      task.abort('Worker destroyed');
-      this.logger.debug(LOG_SOURCE, LOG_CATEGORY, `Aborted pending request: ${id}`);
+      if (id !== RemoteExecutor.READY_TASK_ID) {
+        task.abort('Worker destroyed');
+        this.logger.debug(LOG_SOURCE, LOG_CATEGORY, `Aborted pending request: ${id}`);
+      }
     });
     this.pendingRequests.clear();
 
@@ -235,10 +259,7 @@ export class RemoteExecutor implements IPdfExecutor {
   // ========== IPdfExecutor Implementation ==========
 
   initialize(): void {
-    if (this.initialized) return;
-    // Initialization is handled by worker creation
-    // We just mark it as initialized here
-    this.initialized = true;
+    // Initialization is handled by worker creation via readyTask
     this.logger.debug(LOG_SOURCE, LOG_CATEGORY, 'RemoteExecutor initialized');
   }
 
