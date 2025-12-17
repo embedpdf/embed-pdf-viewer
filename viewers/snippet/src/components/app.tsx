@@ -282,7 +282,7 @@ const DEFAULTS = {
   pan: {} as PanPluginConfig,
 
   // Rendering
-  render: {} as RenderPluginConfig,
+  render: { defaultImageType: 'image/png' } as RenderPluginConfig,
   tiling: { tileSize: 768, overlapPx: 2.5, extraRings: 0 } as TilingPluginConfig,
   thumbnails: { width: 150, gap: 10, buffer: 3, labelHeight: 30 } as ThumbnailPluginConfig,
 

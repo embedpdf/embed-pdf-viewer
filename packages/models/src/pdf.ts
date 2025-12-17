@@ -3001,6 +3001,23 @@ export interface PdfEngine<T = Blob> {
 export type PdfEngineMethodName = keyof Required<PdfEngine>;
 
 /**
+ * Progress info for batch operations
+ * Emitted per-page as the batch is processed
+ *
+ * @public
+ */
+export interface BatchProgress<T> {
+  /** Index of the page that was just processed */
+  pageIndex: number;
+  /** Result for this page */
+  result: T;
+  /** Number of pages completed so far */
+  completed: number;
+  /** Total number of pages in this batch */
+  total: number;
+}
+
+/**
  * Executor interface for PDFium implementations.
  * Can be either PdfiumNative (direct) or RemoteExecutor (worker proxy).
  *
@@ -3078,6 +3095,19 @@ export interface IPdfiumExecutor {
     keyword: string,
     flags: number,
   ): PdfTask<SearchResult[]>;
+
+  // Batch operations (process multiple pages in one call for performance)
+  getAnnotationsBatch(
+    doc: PdfDocumentObject,
+    pages: PdfPageObject[],
+  ): PdfTask<Record<number, PdfAnnotationObject[]>, BatchProgress<PdfAnnotationObject[]>>;
+
+  searchBatch(
+    doc: PdfDocumentObject,
+    pages: PdfPageObject[],
+    keyword: string,
+    flags: number,
+  ): PdfTask<Record<number, SearchResult[]>, BatchProgress<SearchResult[]>>;
 
   // Other operations
   getAttachments(doc: PdfDocumentObject): PdfTask<PdfAttachmentObject[]>;

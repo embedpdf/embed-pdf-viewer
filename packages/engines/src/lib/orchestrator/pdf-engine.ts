@@ -1,4 +1,5 @@
 import {
+  BatchProgress,
   Logger,
   NoopLogger,
   PdfEngine as IPdfEngine,
@@ -50,7 +51,7 @@ import type { ImageDataConverter } from '../converters/types';
 
 // Re-export for convenience
 export type { ImageDataConverter } from '../converters/types';
-export type { ImageDataLike, IPdfiumExecutor } from '@embedpdf/models';
+export type { ImageDataLike, IPdfiumExecutor, BatchProgress } from '@embedpdf/models';
 
 const LOG_SOURCE = 'PdfEngine';
 const LOG_CATEGORY = 'Orchestrator';
@@ -105,6 +106,17 @@ export class PdfEngine<T = Blob> implements IPdfEngine<T> {
     });
 
     this.logger.debug(LOG_SOURCE, LOG_CATEGORY, 'PdfEngine orchestrator created');
+  }
+
+  /**
+   * Split an array into chunks of a given size
+   */
+  private chunkArray<U>(items: U[], chunkSize: number): U[][] {
+    const chunks: U[][] = [];
+    for (let i = 0; i < items.length; i += chunkSize) {
+      chunks.push(items.slice(i, i + chunkSize));
+    }
+    return chunks;
   }
 
   /**
@@ -453,21 +465,52 @@ export class PdfEngine<T = Blob> implements IPdfEngine<T> {
 
   /**
    * Get all annotations across all pages
-   * Orchestrates LOW priority tasks for each page
+   * Uses batched operations to reduce queue overhead
    */
   getAllAnnotations(
     doc: PdfDocumentObject,
   ): CompoundTask<Record<number, PdfAnnotationObject[]>, PdfErrorReason, PdfAnnotationsProgress> {
-    const tasks = doc.pages.map((page, index) =>
-      this.workerQueue.enqueue(
+    // Chunk pages for batched processing
+    const chunks = this.chunkArray(doc.pages, 500);
+
+    this.logger.debug(
+      LOG_SOURCE,
+      LOG_CATEGORY,
+      `getAllAnnotations: ${doc.pages.length} pages in ${chunks.length} chunks`,
+    );
+
+    // Create compound task for result aggregation
+    const compound = new CompoundTask<
+      Record<number, PdfAnnotationObject[]>,
+      PdfErrorReason,
+      PdfAnnotationsProgress
+    >({
+      aggregate: (results) => Object.assign({}, ...results),
+    });
+
+    // Create one task per chunk and wire up progress forwarding
+    chunks.forEach((chunkPages, chunkIndex) => {
+      const batchTask = this.workerQueue.enqueue(
         {
-          execute: () => this.executor.getPageAnnotationsRaw(doc, page),
-          meta: { docId: doc.id, pageIndex: index, operation: 'getAnnotations' },
+          execute: () => this.executor.getAnnotationsBatch(doc, chunkPages),
+          meta: { docId: doc.id, operation: 'getAnnotationsBatch', chunkSize: chunkPages.length },
         },
         { priority: Priority.LOW },
-      ),
-    );
-    return CompoundTask.gatherIndexed(tasks);
+      );
+
+      // Forward batch progress (per-page) to compound task
+      batchTask.onProgress((batchProgress: BatchProgress<PdfAnnotationObject[]>) => {
+        compound.progress({
+          page: batchProgress.pageIndex,
+          result: batchProgress.result,
+        });
+      });
+
+      compound.addChild(batchTask, chunkIndex);
+    });
+
+    compound.finalize();
+    return compound;
   }
 
   getPageTextRects(doc: PdfDocumentObject, page: PdfPageObject): PdfTask<PdfTextRectObject[]> {
@@ -486,7 +529,7 @@ export class PdfEngine<T = Blob> implements IPdfEngine<T> {
 
   /**
    * Search across all pages
-   * Orchestrates LOW priority tasks for each page
+   * Uses batched operations to reduce queue overhead
    */
   searchAllPages(
     doc: PdfDocumentObject,
@@ -497,26 +540,49 @@ export class PdfEngine<T = Blob> implements IPdfEngine<T> {
       ? options.flags.reduce((acc, flag) => acc | flag, 0)
       : (options?.flags ?? 0);
 
-    const tasks = doc.pages.map((page, index) =>
-      this.workerQueue.enqueue(
-        {
-          execute: () => this.executor.searchInPage(doc, page, keyword, flags),
-          meta: { docId: doc.id, pageIndex: index, operation: 'search' },
-        },
-        { priority: Priority.LOW },
-      ),
+    // Chunk pages for batched processing
+    const chunks = this.chunkArray(doc.pages, 25);
+
+    this.logger.debug(
+      LOG_SOURCE,
+      LOG_CATEGORY,
+      `searchAllPages: ${doc.pages.length} pages in ${chunks.length} chunks`,
     );
 
-    return CompoundTask.gatherFrom(tasks, {
+    // Create compound task for result aggregation
+    const compound = new CompoundTask<SearchAllPagesResult, PdfErrorReason, PdfPageSearchProgress>({
       aggregate: (results) => {
-        const allResults = results.flat();
+        // Merge all batch results into a flat array
+        const allResults = results.flatMap((batchResult: Record<number, SearchResult[]>) =>
+          Object.values(batchResult).flat(),
+        );
         return { results: allResults, total: allResults.length };
       },
-      onChildComplete: (_completed, _total, results, index) => ({
-        page: index,
-        results,
-      }),
     });
+
+    // Create one task per chunk and wire up progress forwarding
+    chunks.forEach((chunkPages, chunkIndex) => {
+      const batchTask = this.workerQueue.enqueue(
+        {
+          execute: () => this.executor.searchBatch(doc, chunkPages, keyword, flags),
+          meta: { docId: doc.id, operation: 'searchBatch', chunkSize: chunkPages.length },
+        },
+        { priority: Priority.LOW },
+      );
+
+      // Forward batch progress (per-page) to compound task
+      batchTask.onProgress((batchProgress: BatchProgress<SearchResult[]>) => {
+        compound.progress({
+          page: batchProgress.pageIndex,
+          results: batchProgress.result,
+        });
+      });
+
+      compound.addChild(batchTask, chunkIndex);
+    });
+
+    compound.finalize();
+    return compound;
   }
 
   // ========== Attachments ==========

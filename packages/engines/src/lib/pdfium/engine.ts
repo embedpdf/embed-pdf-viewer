@@ -1,4 +1,5 @@
 import {
+  BatchProgress,
   ImageDataLike,
   IPdfiumExecutor,
   PdfActionObject,
@@ -3575,7 +3576,7 @@ export class PdfiumNative implements IPdfiumExecutor {
   }
 
   /**
-   * Read page annotations
+   * Read page annotations without loading the page (raw approach)
    *
    * @param ctx - document context
    * @param page - page info
@@ -3583,27 +3584,9 @@ export class PdfiumNative implements IPdfiumExecutor {
    *
    * @private
    */
-  getPageAnnotationsRaw(
-    doc: PdfDocumentObject,
-    page: PdfPageObject,
-  ): PdfTask<PdfAnnotationObject[]> {
-    this.logger.debug(LOG_SOURCE, LOG_CATEGORY, 'readPageAnnotationsRaw', doc, page);
-    this.logger.perf(
-      LOG_SOURCE,
-      LOG_CATEGORY,
-      `ReadPageAnnotationsRaw`,
-      'Begin',
-      `${doc.id}-${page.index}`,
-    );
-    const ctx = this.cache.getContext(doc.id);
-    if (!ctx) {
-      return PdfTaskHelper.reject({
-        code: PdfErrorCode.DocNotOpen,
-        message: 'document does not open',
-      });
-    }
+  private readPageAnnotationsRaw(ctx: DocumentContext, page: PdfPageObject): PdfAnnotationObject[] {
     const count = this.pdfiumModule.EPDFPage_GetAnnotCountRaw(ctx.docPtr, page.index);
-    if (count <= 0) return PdfTaskHelper.resolve([] as PdfAnnotationObject[]);
+    if (count <= 0) return [];
 
     const out: PdfAnnotationObject[] = [];
 
@@ -3618,17 +3601,52 @@ export class PdfiumNative implements IPdfiumExecutor {
         this.pdfiumModule.FPDFPage_CloseAnnot(annotPtr);
       }
     }
+    return out;
+  }
+
+  /**
+   * Get page annotations (public API, returns Task)
+   *
+   * @param doc - pdf document
+   * @param page - page info
+   * @returns task with annotations on the pdf page
+   *
+   * @public
+   */
+  getPageAnnotationsRaw(
+    doc: PdfDocumentObject,
+    page: PdfPageObject,
+  ): PdfTask<PdfAnnotationObject[]> {
+    this.logger.debug(LOG_SOURCE, LOG_CATEGORY, 'getPageAnnotationsRaw', doc, page);
     this.logger.perf(
       LOG_SOURCE,
       LOG_CATEGORY,
-      `ReadPageAnnotationsRaw`,
+      `GetPageAnnotationsRaw`,
+      'Begin',
+      `${doc.id}-${page.index}`,
+    );
+
+    const ctx = this.cache.getContext(doc.id);
+    if (!ctx) {
+      return PdfTaskHelper.reject({
+        code: PdfErrorCode.DocNotOpen,
+        message: 'document does not open',
+      });
+    }
+
+    const out = this.readPageAnnotationsRaw(ctx, page);
+
+    this.logger.perf(
+      LOG_SOURCE,
+      LOG_CATEGORY,
+      `GetPageAnnotationsRaw`,
       'End',
       `${doc.id}-${page.index}`,
     );
     this.logger.debug(
       LOG_SOURCE,
       LOG_CATEGORY,
-      'readPageAnnotationsRaw',
+      'getPageAnnotationsRaw',
       `${doc.id}-${page.index}`,
       out,
     );
@@ -7241,6 +7259,133 @@ export class PdfiumNative implements IPdfiumExecutor {
     } finally {
       this.memoryManager.free(keywordPtr);
     }
+  }
+
+  /**
+   * Get annotations for multiple pages in a single batch.
+   * Emits progress per page for streaming updates.
+   *
+   * @param doc - PDF document
+   * @param pages - Array of pages to process
+   * @returns Task with results keyed by page index, with per-page progress
+   *
+   * @public
+   */
+  getAnnotationsBatch(
+    doc: PdfDocumentObject,
+    pages: PdfPageObject[],
+  ): PdfTask<Record<number, PdfAnnotationObject[]>, BatchProgress<PdfAnnotationObject[]>> {
+    this.logger.debug(LOG_SOURCE, LOG_CATEGORY, 'getAnnotationsBatch', doc.id, pages.length);
+
+    const task = new Task<
+      Record<number, PdfAnnotationObject[]>,
+      PdfErrorReason,
+      BatchProgress<PdfAnnotationObject[]>
+    >();
+
+    // Defer work to next microtask so caller can set up onProgress listener
+    queueMicrotask(() => {
+      this.logger.perf(LOG_SOURCE, LOG_CATEGORY, 'GetAnnotationsBatch', 'Begin', doc.id);
+
+      const ctx = this.cache.getContext(doc.id);
+      if (!ctx) {
+        task.reject({ code: PdfErrorCode.DocNotOpen, message: 'Document is not open' });
+        return;
+      }
+
+      const results: Record<number, PdfAnnotationObject[]> = {};
+      const total = pages.length;
+
+      // Process all pages in a tight loop - no queue overhead!
+      for (let i = 0; i < pages.length; i++) {
+        const page = pages[i];
+        const annotations = this.readPageAnnotationsRaw(ctx, page);
+        results[page.index] = annotations;
+
+        // Stream progress per page
+        task.progress({
+          pageIndex: page.index,
+          result: annotations,
+          completed: i + 1,
+          total,
+        });
+      }
+
+      this.logger.perf(LOG_SOURCE, LOG_CATEGORY, 'GetAnnotationsBatch', 'End', doc.id);
+      task.resolve(results);
+    });
+
+    return task;
+  }
+
+  /**
+   * Search across multiple pages in a single batch.
+   * Emits progress per page for streaming updates.
+   *
+   * @param doc - PDF document
+   * @param pages - Array of pages to search
+   * @param keyword - Search keyword
+   * @param flags - Search flags
+   * @returns Task with results keyed by page index, with per-page progress
+   *
+   * @public
+   */
+  searchBatch(
+    doc: PdfDocumentObject,
+    pages: PdfPageObject[],
+    keyword: string,
+    flags: number,
+  ): PdfTask<Record<number, SearchResult[]>, BatchProgress<SearchResult[]>> {
+    this.logger.debug(LOG_SOURCE, LOG_CATEGORY, 'searchBatch', doc.id, pages.length, keyword);
+
+    const task = new Task<
+      Record<number, SearchResult[]>,
+      PdfErrorReason,
+      BatchProgress<SearchResult[]>
+    >();
+
+    // Defer work to next microtask so caller can set up onProgress listener
+    queueMicrotask(() => {
+      this.logger.perf(LOG_SOURCE, LOG_CATEGORY, 'SearchBatch', 'Begin', doc.id);
+
+      const ctx = this.cache.getContext(doc.id);
+      if (!ctx) {
+        task.reject({ code: PdfErrorCode.DocNotOpen, message: 'Document is not open' });
+        return;
+      }
+
+      // Allocate keyword pointer once for all pages
+      const length = 2 * (keyword.length + 1);
+      const keywordPtr = this.memoryManager.malloc(length);
+      this.pdfiumModule.pdfium.stringToUTF16(keyword, keywordPtr, length);
+
+      try {
+        const results: Record<number, SearchResult[]> = {};
+        const total = pages.length;
+
+        // Process all pages in a tight loop - no queue overhead!
+        for (let i = 0; i < pages.length; i++) {
+          const page = pages[i];
+          const pageResults = this.searchAllInPage(ctx, page, keywordPtr, flags);
+          results[page.index] = pageResults;
+
+          // Stream progress per page
+          task.progress({
+            pageIndex: page.index,
+            result: pageResults,
+            completed: i + 1,
+            total,
+          });
+        }
+
+        this.logger.perf(LOG_SOURCE, LOG_CATEGORY, 'SearchBatch', 'End', doc.id);
+        task.resolve(results);
+      } finally {
+        this.memoryManager.free(keywordPtr);
+      }
+    });
+
+    return task;
   }
 
   /**

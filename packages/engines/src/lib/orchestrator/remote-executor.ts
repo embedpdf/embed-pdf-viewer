@@ -1,4 +1,5 @@
 import {
+  BatchProgress,
   Logger,
   NoopLogger,
   PdfDocumentObject,
@@ -82,6 +83,8 @@ type MessageType =
   | 'removePageAnnotation'
   | 'getPageTextRects'
   | 'searchInPage'
+  | 'getAnnotationsBatch'
+  | 'searchBatch'
   | 'getAttachments'
   | 'addAttachment'
   | 'removeAttachment'
@@ -385,6 +388,30 @@ export class RemoteExecutor implements IPdfiumExecutor {
     flags: number,
   ): PdfTask<SearchResult[]> {
     return this.send<SearchResult[]>('searchInPage', [doc, page, keyword, flags]);
+  }
+
+  getAnnotationsBatch(
+    doc: PdfDocumentObject,
+    pages: PdfPageObject[],
+  ): PdfTask<Record<number, PdfAnnotationObject[]>, BatchProgress<PdfAnnotationObject[]>> {
+    return this.send<Record<number, PdfAnnotationObject[]>, BatchProgress<PdfAnnotationObject[]>>(
+      'getAnnotationsBatch',
+      [doc, pages],
+    );
+  }
+
+  searchBatch(
+    doc: PdfDocumentObject,
+    pages: PdfPageObject[],
+    keyword: string,
+    flags: number,
+  ): PdfTask<Record<number, SearchResult[]>, BatchProgress<SearchResult[]>> {
+    return this.send<Record<number, SearchResult[]>, BatchProgress<SearchResult[]>>('searchBatch', [
+      doc,
+      pages,
+      keyword,
+      flags,
+    ]);
   }
 
   getAttachments(doc: PdfDocumentObject): PdfTask<PdfAttachmentObject[]> {
