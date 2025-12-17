@@ -393,6 +393,19 @@ export type PdfImage = {
 };
 
 /**
+ * Image data type that matches both browser's ImageData and plain objects.
+ * Used for raw rendering output that may include colorSpace from browser APIs.
+ *
+ * @public
+ */
+export type ImageDataLike = {
+  data: Uint8ClampedArray<ArrayBuffer>;
+  width: number;
+  height: number;
+  colorSpace?: PredefinedColorSpace;
+};
+
+/**
  * Representation of pdf action
  *
  * @public

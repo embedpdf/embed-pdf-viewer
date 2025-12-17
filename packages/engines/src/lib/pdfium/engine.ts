@@ -1,4 +1,5 @@
 import {
+  ImageDataLike,
   PdfActionObject,
   PdfAnnotationObject,
   PdfTextRectObject,
@@ -727,7 +728,7 @@ export class PdfiumNative {
     doc: PdfDocumentObject,
     page: PdfPageObject,
     options?: PdfRenderPageOptions,
-  ): PdfTask<ImageData> {
+  ): PdfTask<ImageDataLike> {
     this.logger.debug(LOG_SOURCE, LOG_CATEGORY, 'renderPage', doc, page, options);
     this.logger.perf(LOG_SOURCE, LOG_CATEGORY, `RenderPage`, 'Begin', `${doc.id}-${page.index}`);
 
@@ -748,7 +749,7 @@ export class PdfiumNative {
     page: PdfPageObject,
     rect: Rect,
     options?: PdfRenderPageOptions,
-  ): PdfTask<ImageData> {
+  ): PdfTask<ImageDataLike> {
     this.logger.debug(LOG_SOURCE, LOG_CATEGORY, 'renderPageRect', doc, page, rect, options);
     this.logger.perf(
       LOG_SOURCE,
@@ -1265,7 +1266,7 @@ export class PdfiumNative {
     doc: PdfDocumentObject,
     page: PdfPageObject,
     options?: PdfRenderThumbnailOptions,
-  ): PdfTask<ImageData> {
+  ): PdfTask<ImageDataLike> {
     const { scaleFactor = 1, ...rest } = options ?? {};
     this.logger.debug(LOG_SOURCE, LOG_CATEGORY, 'renderThumbnail', doc, page, options);
     this.logger.perf(
@@ -6260,7 +6261,7 @@ export class PdfiumNative {
     page: PdfPageObject,
     annotation: PdfAnnotationObject,
     options?: PdfRenderPageAnnotationOptions,
-  ): PdfTask<ImageData> {
+  ): PdfTask<ImageDataLike> {
     const {
       scaleFactor = 1,
       rotation = Rotation.Degree0,
@@ -6285,7 +6286,7 @@ export class PdfiumNative {
       `${doc.id}-${page.index}-${annotation.id}`,
     );
 
-    const task = new Task<ImageData, PdfErrorReason>();
+    const task = new Task<ImageDataLike, PdfErrorReason>();
     const ctx = this.cache.getContext(doc.id);
     if (!ctx) {
       this.logger.perf(
@@ -6395,8 +6396,8 @@ export class PdfiumNative {
     page: PdfPageObject,
     rect: Rect,
     options?: PdfRenderPageOptions,
-  ): PdfTask<ImageData> {
-    const task = new Task<ImageData, PdfErrorReason>();
+  ): PdfTask<ImageDataLike> {
+    const task = new Task<ImageDataLike, PdfErrorReason>();
     const rotation: Rotation = options?.rotation ?? Rotation.Degree0;
 
     const ctx = this.cache.getContext(doc.id);

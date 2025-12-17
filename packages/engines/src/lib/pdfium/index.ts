@@ -1,6 +1,7 @@
 export * from './engine';
 export * from './helper';
-export * from './image-converter';
+export * from '../converters/types';
+export * from '../converters/browser';
 
 // Export web factory functions (avoid ambiguous exports)
 export { createPdfiumEngine as createPdfiumDirectEngine } from './web/direct-engine';

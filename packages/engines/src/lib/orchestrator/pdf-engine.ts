@@ -42,31 +42,17 @@ import {
   PdfErrorCode,
   SearchResult,
   CompoundTask,
+  ImageDataLike,
 } from '@embedpdf/models';
-import { ImageEncoderWorkerPool } from '../image-encoder';
 import { WorkerTaskQueue, Priority } from './task-queue';
+import type { ImageDataConverter } from '../converters/types';
+
+// Re-export for convenience
+export type { ImageDataConverter } from '../converters/types';
+export type { ImageDataLike } from '@embedpdf/models';
 
 const LOG_SOURCE = 'PdfEngine';
 const LOG_CATEGORY = 'Orchestrator';
-
-/**
- * Image data type that matches both ImageData and plain objects
- */
-export type ImageDataLike = {
-  data: Uint8ClampedArray;
-  width: number;
-  height: number;
-  colorSpace?: PredefinedColorSpace;
-};
-
-/**
- * Image data converter function type
- */
-export type ImageDataConverter<T> = (
-  imageDataFn: () => { data: Uint8ClampedArray; width: number; height: number },
-  imageType?: 'image/png' | 'image/jpeg' | 'image/webp',
-  quality?: number,
-) => Promise<T>;
 
 /**
  * Executor interface that can be either PdfiumNative or RemoteExecutor
@@ -285,7 +271,8 @@ export class PdfEngine<T = Blob> implements IPdfEngine<T> {
         if (!this.options.fetcher) {
           throw new Error('Fetcher is not set');
         }
-        const response = await this.options.fetcher(file.url);
+
+        const response = await this.options.fetcher(file.url, options?.requestOptions);
         const arrayBuf = await response.arrayBuffer();
 
         const pdfFile: PdfFile = {

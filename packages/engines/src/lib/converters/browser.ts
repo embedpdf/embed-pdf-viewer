@@ -1,19 +1,10 @@
 import { ImageConversionTypes } from '@embedpdf/models';
+import { ImageDataConverter, LazyImageData } from './types';
 import { ImageEncoderWorkerPool } from '../image-encoder';
 
-/**
- * Lazy image data getter function
- */
-export type LazyImageData = () => { data: Uint8ClampedArray; width: number; height: number };
-
-/**
- * Image data converter function type
- */
-export type ImageDataConverter<T> = (
-  getImageData: LazyImageData,
-  imageType?: ImageConversionTypes,
-  quality?: number,
-) => Promise<T>;
+// ============================================================================
+// Error Classes
+// ============================================================================
 
 export class OffscreenCanvasError extends Error {
   constructor(message: string) {
@@ -22,9 +13,13 @@ export class OffscreenCanvasError extends Error {
   }
 }
 
+// ============================================================================
+// Browser Converters
+// ============================================================================
+
 /**
  * Browser-based image converter using OffscreenCanvas in the same thread
- * This is the legacy approach that blocks the PDFium worker
+ * This is the simplest approach but blocks the thread during encoding
  */
 export const browserImageDataToBlobConverter: ImageDataConverter<Blob> = (
   getImageData: LazyImageData,
@@ -51,7 +46,7 @@ export const browserImageDataToBlobConverter: ImageDataConverter<Blob> = (
 
 /**
  * Create an image converter that uses a dedicated worker pool for encoding
- * This prevents blocking the PDFium worker thread
+ * This prevents blocking the main/PDFium worker thread
  *
  * @param workerPool - Instance of ImageEncoderWorkerPool
  * @returns ImageDataConverter function

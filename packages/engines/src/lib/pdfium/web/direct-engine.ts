@@ -2,7 +2,7 @@ import { Logger } from '@embedpdf/models';
 import { init } from '@embedpdf/pdfium';
 import { PdfiumNative } from '../engine';
 import { PdfEngine } from '../../orchestrator/pdf-engine';
-import { browserImageDataToBlobConverter } from '../image-converter';
+import { browserImageDataToBlobConverter } from '../../converters/browser';
 
 export interface CreatePdfiumEngineOptions {
   /**
@@ -49,7 +49,6 @@ export async function createPdfiumEngine(
   native.initialize();
 
   // Create the "smart" orchestrator
-  // Cast native to IPdfExecutor since ImageData is compatible with ImageDataLike
   return new PdfEngine<Blob>(native, {
     imageConverter: browserImageDataToBlobConverter,
     logger: options?.logger,

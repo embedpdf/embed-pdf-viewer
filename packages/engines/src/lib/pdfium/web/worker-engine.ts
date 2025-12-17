@@ -2,7 +2,7 @@ import { Logger, serializeLogger } from '@embedpdf/models';
 import { PdfEngine } from '../../orchestrator/pdf-engine';
 import { RemoteExecutor } from '../../orchestrator/remote-executor';
 import { ImageEncoderWorkerPool } from '../../image-encoder';
-import { createWorkerPoolImageConverter } from '../image-converter';
+import { createWorkerPoolImageConverter } from '../../converters/browser';
 
 /* eslint-disable @typescript-eslint/ban-ts-comment */
 // @ts-ignore injected at build time
