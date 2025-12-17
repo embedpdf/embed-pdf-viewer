@@ -372,12 +372,26 @@ export class PdfEngine<T = Blob> implements IPdfEngine<T> {
       { priority },
     );
 
+    // Wire up abort: when resultTask is aborted, also abort the queue task
+    const originalAbort = resultTask.abort.bind(resultTask);
+    resultTask.abort = (reason) => {
+      renderHandle.abort(reason); // Cancel the queue task!
+      originalAbort(reason);
+    };
+
     renderHandle.wait(
       (rawImageData) => {
+        // Check if resultTask was already aborted before encoding
+        if (resultTask.state.stage !== 0 /* Pending */) {
+          return;
+        }
         this.encodeImage(rawImageData, options, resultTask);
       },
       (error) => {
-        resultTask.fail(error);
+        // Only forward error if resultTask is still pending
+        if (resultTask.state.stage === 0 /* Pending */) {
+          resultTask.fail(error);
+        }
       },
     );
 
