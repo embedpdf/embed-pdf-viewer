@@ -1,5 +1,11 @@
 import { BasePluginConfig } from '@embedpdf/core';
-import { PdfErrorReason, PdfRenderPageOptions, Rect, Task } from '@embedpdf/models';
+import {
+  ImageConversionTypes,
+  PdfErrorReason,
+  PdfRenderPageOptions,
+  Rect,
+  Task,
+} from '@embedpdf/models';
 
 export interface RenderPluginConfig extends BasePluginConfig {
   /**
@@ -12,6 +18,16 @@ export interface RenderPluginConfig extends BasePluginConfig {
    * Defaults to `false`.
    */
   withAnnotations?: boolean;
+  /**
+   * The image type to use for rendering.
+   * Defaults to `'image/webp'`.
+   */
+  defaultImageType?: ImageConversionTypes;
+  /**
+   * The image quality to use for rendering.
+   * Defaults to `0.92`.
+   */
+  defaultImageQuality?: number;
 }
 
 export interface RenderPageRectOptions {

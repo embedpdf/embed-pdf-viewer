@@ -215,6 +215,8 @@ export class LevelLogger implements Logger {
  * @public
  */
 export class PerfLogger implements Logger {
+  private marks: Map<string, number> = new Map();
+
   /**
    * create new PerfLogger
    */
@@ -246,21 +248,27 @@ export class PerfLogger implements Logger {
     identifier: string,
     ...args: any
   ) {
+    const markName = `${source}.${category}.${event}.${phase}.${identifier}`;
+
     switch (phase) {
       case 'Begin':
-        globalThis.performance.mark(`${source}.${category}.${event}.${phase}.${identifier}`, {
-          detail: args,
-        });
+        globalThis.performance.mark(markName, { detail: args });
+        this.marks.set(`${source}.${category}.${event}.${identifier}`, Date.now());
         break;
       case 'End':
-        globalThis.performance.mark(`${source}.${category}.${event}.${phase}.${identifier}`, {
-          detail: args,
-        });
-        globalThis.performance.measure(
-          `${source}.${category}.${event}.Measure.${identifier}`,
-          `${source}.${category}.${event}.Begin.${identifier}`,
-          `${source}.${category}.${event}.End.${identifier}`,
-        );
+        globalThis.performance.mark(markName, { detail: args });
+        const measureName = `${source}.${category}.${event}.Measure.${identifier}`;
+        const beginMark = `${source}.${category}.${event}.Begin.${identifier}`;
+
+        globalThis.performance.measure(measureName, beginMark, markName);
+
+        // Log duration to console
+        const startTime = this.marks.get(`${source}.${category}.${event}.${identifier}`);
+        if (startTime) {
+          const duration = Date.now() - startTime;
+          console.info(`⏱️ ${source}.${category}.${event}.${identifier}: ${duration}ms`);
+          this.marks.delete(`${source}.${category}.${event}.${identifier}`);
+        }
         break;
     }
   }

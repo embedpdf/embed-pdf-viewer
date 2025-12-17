@@ -16,14 +16,11 @@ import {
 export class RenderPlugin extends BasePlugin<RenderPluginConfig, RenderCapability> {
   static readonly id = 'render' as const;
 
-  private withForms = false;
-  private withAnnotations = false;
+  private config: RenderPluginConfig;
 
-  constructor(id: string, registry: PluginRegistry, config?: RenderPluginConfig) {
+  constructor(id: string, registry: PluginRegistry, config: RenderPluginConfig) {
     super(id, registry);
-
-    this.withForms = config?.withForms ?? false;
-    this.withAnnotations = config?.withAnnotations ?? false;
+    this.config = config;
   }
 
   // No onDocumentLoadingStarted or onDocumentClosed needed!
@@ -69,8 +66,10 @@ export class RenderPlugin extends BasePlugin<RenderPluginConfig, RenderCapabilit
 
     const mergedOptions = {
       ...(options ?? {}),
-      withForms: options?.withForms ?? this.withForms,
-      withAnnotations: options?.withAnnotations ?? this.withAnnotations,
+      withForms: options?.withForms ?? this.config.withForms ?? false,
+      withAnnotations: options?.withAnnotations ?? this.config.withAnnotations ?? false,
+      imageType: options?.imageType ?? this.config.defaultImageType ?? 'image/webp',
+      imageQuality: options?.imageQuality ?? this.config.defaultImageQuality ?? 0.92,
     };
 
     return this.engine.renderPage(coreDoc.document, page, mergedOptions);
@@ -91,8 +90,10 @@ export class RenderPlugin extends BasePlugin<RenderPluginConfig, RenderCapabilit
 
     const mergedOptions = {
       ...(options ?? {}),
-      withForms: options?.withForms ?? this.withForms,
-      withAnnotations: options?.withAnnotations ?? this.withAnnotations,
+      withForms: options?.withForms ?? this.config.withForms ?? false,
+      withAnnotations: options?.withAnnotations ?? this.config.withAnnotations ?? false,
+      imageType: options?.imageType ?? this.config.defaultImageType ?? 'image/webp',
+      imageQuality: options?.imageQuality ?? this.config.defaultImageQuality ?? 0.92,
     };
 
     return this.engine.renderPageRect(coreDoc.document, page, rect, mergedOptions);
