@@ -1,5 +1,7 @@
 # @embedpdf/plugin-interaction-manager
 
+## 2.0.0-next.3
+
 ## 2.0.0-next.2
 
 ## 2.0.0-next.1

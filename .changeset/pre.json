@@ -48,6 +48,7 @@
   },
   "changesets": [
     "commands-svelte-use-current",
+    "engine-orchestrator-architecture",
     "fix-document-manager-empty-array",
     "fix-i18n-vue-locale-reactivity",
     "hidden-items-dependency-rules",

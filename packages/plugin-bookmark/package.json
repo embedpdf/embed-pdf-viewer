@@ -1,6 +1,6 @@
 {
   "name": "@embedpdf/plugin-bookmark",
-  "version": "2.0.0-next.2",
+  "version": "2.0.0-next.3",
   "type": "module",
   "license": "MIT",
   "main": "./dist/index.cjs",
