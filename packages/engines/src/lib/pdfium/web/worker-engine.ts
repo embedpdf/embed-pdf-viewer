@@ -1,4 +1,4 @@
-import { Logger, serializeLogger } from '@embedpdf/models';
+import { Logger } from '@embedpdf/models';
 import { PdfEngine } from '../../orchestrator/pdf-engine';
 import { RemoteExecutor } from '../../orchestrator/remote-executor';
 import { ImageEncoderWorkerPool } from '../../image-encoder';
@@ -71,16 +71,8 @@ export function createPdfiumEngine(
     },
   );
 
-  // Send initialization message with WASM URL
-  worker.postMessage({
-    id: '0',
-    type: 'wasmInit',
-    wasmUrl,
-    logger: logger ? serializeLogger(logger) : undefined,
-  });
-
-  // Create RemoteExecutor (proxy to worker)
-  const remoteExecutor = new RemoteExecutor(worker, logger);
+  // Create RemoteExecutor (proxy to worker) - handles wasmInit internally
+  const remoteExecutor = new RemoteExecutor(worker, { wasmUrl, logger });
 
   const finalEncoderWorkerUrl = URL.createObjectURL(
     new Blob([__ENCODER_WORKER_BODY__], { type: 'application/javascript' }),

@@ -33,9 +33,24 @@ import {
   TaskError,
   PdfErrorCode,
   SearchResult,
+  serializeLogger,
 } from '@embedpdf/models';
 import type { IPdfExecutor, ImageDataLike } from './pdf-engine';
 import type { WorkerRequest, WorkerResponse } from './pdfium-native-runner';
+
+/**
+ * Options for creating a RemoteExecutor
+ */
+export interface RemoteExecutorOptions {
+  /**
+   * URL to the pdfium.wasm file (required)
+   */
+  wasmUrl: string;
+  /**
+   * Logger instance for debugging
+   */
+  logger?: Logger;
+}
 
 const LOG_SOURCE = 'RemoteExecutor';
 const LOG_CATEGORY = 'Worker';
@@ -102,10 +117,19 @@ export class RemoteExecutor implements IPdfExecutor {
 
   constructor(
     private worker: Worker,
-    logger?: Logger,
+    options: RemoteExecutorOptions,
   ) {
-    this.logger = logger ?? new NoopLogger();
+    this.logger = options.logger ?? new NoopLogger();
     this.worker.addEventListener('message', this.handleMessage);
+
+    // Send initialization message with WASM URL
+    this.worker.postMessage({
+      id: '0',
+      type: 'wasmInit',
+      wasmUrl: options.wasmUrl,
+      logger: options.logger ? serializeLogger(options.logger) : undefined,
+    });
+
     this.logger.debug(LOG_SOURCE, LOG_CATEGORY, 'RemoteExecutor created');
   }
 
