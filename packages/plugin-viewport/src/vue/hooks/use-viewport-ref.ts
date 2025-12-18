@@ -57,6 +57,8 @@ export function useViewportRef(documentId: MaybeRefOrGetter<string>) {
         scrollLeft: container.scrollLeft,
         scrollWidth: container.scrollWidth,
         scrollHeight: container.scrollHeight,
+        clientLeft: container.clientLeft,
+        clientTop: container.clientTop,
       });
     });
     resizeObserver.observe(container);

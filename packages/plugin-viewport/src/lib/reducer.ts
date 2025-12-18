@@ -26,6 +26,8 @@ const initialViewportDocumentState: ViewportDocumentState = {
     clientHeight: 0,
     scrollWidth: 0,
     scrollHeight: 0,
+    clientLeft: 0,
+    clientTop: 0,
     relativePosition: { x: 0, y: 0 },
   },
   isScrolling: false,
@@ -142,6 +144,8 @@ export const viewportReducer: Reducer<ViewportState, ViewportAction> = (
               clientHeight: metrics.clientHeight,
               scrollWidth: metrics.scrollWidth,
               scrollHeight: metrics.scrollHeight,
+              clientLeft: metrics.clientLeft,
+              clientTop: metrics.clientTop,
               relativePosition: {
                 x:
                   metrics.scrollWidth <= metrics.clientWidth

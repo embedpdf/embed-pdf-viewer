@@ -31,6 +31,8 @@ export interface ViewportInputMetrics {
   clientHeight: number;
   scrollWidth: number;
   scrollHeight: number;
+  clientLeft: number;
+  clientTop: number;
 }
 
 export interface ViewportMetrics extends ViewportInputMetrics {

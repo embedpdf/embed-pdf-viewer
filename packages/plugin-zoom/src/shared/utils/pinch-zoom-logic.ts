@@ -35,19 +35,15 @@ export function setupPinchZoom({
 
   const viewportScope = viewportProvides.forDocument(documentId);
   const zoomScope = zoomProvides.forDocument(documentId);
-
   const getState = () => zoomScope.getState();
 
-  // Shared state for gestures
+  // Shared state
   let initialZoom = 0;
-  let lastCenter = { x: 0, y: 0 };
   let currentScale = 1;
-
-  // Pinch-specific state
   let isPinching = false;
   let initialDistance = 0;
 
-  // Wheel zoom state
+  // Wheel state
   let wheelZoomTimeout: ReturnType<typeof setTimeout> | null = null;
   let accumulatedWheelScale = 1;
 
@@ -56,15 +52,21 @@ export function setupPinchZoom({
   let initialElementHeight = 0;
   let initialElementLeft = 0;
   let initialElementTop = 0;
-  let containerWidth = 0;
-  let containerHeight = 0;
+
+  // Container Dimensions (Bounding Box)
+  let containerRectWidth = 0;
+  let containerRectHeight = 0;
+
+  // Layout Dimensions (Client Box from Metrics)
+  // This is the actual space the CSS uses for centering.
+  let layoutWidth = 0;
+  let layoutCenterX = 0; // Relative to the container Rect origin
+
   let pointerLocalY = 0;
   let pointerContainerX = 0;
   let pointerContainerY = 0;
 
-  // NEW: Simple number for the gap
   let currentGap = 0;
-
   let pivotLocalX = 0;
 
   const clamp = (val: number, min: number, max: number) => Math.min(Math.max(val, min), max);
@@ -73,54 +75,49 @@ export function setupPinchZoom({
     const finalWidth = initialElementWidth * scale;
     const finalHeight = initialElementHeight * scale;
 
-    // --- 1. Unconstrained Transforms ---
     let ty = pointerLocalY * (1 - scale);
 
-    const txCenter = (containerWidth - finalWidth) / 2 - initialElementLeft;
+    // --- 1. Center-based Transform (The "Structural" Center) ---
+    // Instead of using containerRectWidth, we use the layoutCenterX derived from Metrics.
+    // layoutCenterX is the specific pixel where the content center should align.
+
+    // Target X position relative to Container Rect Left:
+    const targetX = layoutCenterX - finalWidth / 2;
+
+    // Convert to translation (tx) relative to initial position:
+    const txCenter = targetX - initialElementLeft;
+
+    // --- 2. Mouse-based Transform ---
     const txMouse = pointerContainerX - pivotLocalX * scale - initialElementLeft;
 
-    const overflow = Math.max(0, finalWidth - containerWidth);
-    const blendRange = containerWidth * 0.3;
+    // --- 3. Blending ---
+    // Compare finalWidth against layoutWidth (actual available space).
+    const overflow = Math.max(0, finalWidth - layoutWidth);
+    const blendRange = layoutWidth * 0.3;
     const blend = Math.min(1, overflow / blendRange);
 
     let tx = txCenter + (txMouse - txCenter) * blend;
 
-    // --- 2. Gap-Aware Clamping ---
-    // If the content is larger than the "Safe Area" (Container - 2 * Gap),
-    // we must clamp it so it doesn't detach from the edges.
-
-    // Vertical Clamp
-    // Safe height is container minus top gap AND bottom gap
-    const safeHeight = containerHeight - currentGap * 2;
-
+    // --- 4. Gap-Aware Clamping ---
+    const safeHeight = containerRectHeight - currentGap * 2;
     if (finalHeight > safeHeight) {
       const currentTop = initialElementTop + ty;
-
-      // The content top cannot be lower than the gap (toolbar)
       const maxTop = currentGap;
-
-      // The content bottom cannot be higher than the container bottom (minus gap)
-      // So: Top position cannot be less than (ContainerBottom - ContentHeight)
-      const minTop = containerHeight - currentGap - finalHeight;
-
+      const minTop = containerRectHeight - currentGap - finalHeight;
       const constrainedTop = clamp(currentTop, minTop, maxTop);
       ty = constrainedTop - initialElementTop;
     }
 
-    // Horizontal Clamp
-    const safeWidth = containerWidth - currentGap * 2;
-
+    const safeWidth = containerRectWidth - currentGap * 2;
     if (finalWidth > safeWidth) {
       const currentLeft = initialElementLeft + tx;
-
       const maxLeft = currentGap;
-      const minLeft = containerWidth - currentGap - finalWidth;
-
+      const minLeft = containerRectWidth - currentGap - finalWidth;
       const constrainedLeft = clamp(currentLeft, minLeft, maxLeft);
       tx = constrainedLeft - initialElementLeft;
     }
 
-    return { tx, ty, blend };
+    return { tx, ty, blend, finalWidth };
   };
 
   const updateTransform = (scale: number) => {
@@ -137,19 +134,25 @@ export function setupPinchZoom({
   };
 
   const commitZoom = () => {
-    const { tx, ty } = calculateTransform(currentScale);
-
-    const scaleDiff = 1 - currentScale;
-    const anchorX =
-      Math.abs(scaleDiff) > 0.001 ? initialElementLeft + tx / scaleDiff : containerWidth / 2;
-
-    lastCenter = {
-      x: anchorX,
-      y: pointerContainerY,
-    };
-
+    const { tx, ty, finalWidth } = calculateTransform(currentScale);
     const delta = (currentScale - 1) * initialZoom;
-    zoomScope.requestZoomBy(delta, { vx: lastCenter.x, vy: lastCenter.y });
+
+    let anchorX: number;
+    let anchorY: number = pointerContainerY;
+
+    // --- CRITICAL FIX ---
+    // If the content fits within the LAYOUT width (not just rect width),
+    // we force the anchor to be the Layout Center.
+    if (finalWidth <= layoutWidth) {
+      // anchorX is relative to the Container Rect Origin (which zoomScope uses)
+      anchorX = layoutCenterX;
+    } else {
+      const scaleDiff = 1 - currentScale;
+      anchorX =
+        Math.abs(scaleDiff) > 0.001 ? initialElementLeft + tx / scaleDiff : pointerContainerX;
+    }
+
+    zoomScope.requestZoomBy(delta, { vx: anchorX, vy: anchorY });
     resetTransform();
     initialZoom = 0;
   };
@@ -158,23 +161,35 @@ export function setupPinchZoom({
     const contRect = viewportScope.getBoundingRect();
     const innerRect = element.getBoundingClientRect();
 
-    // NEW: Fetch the simple gap number
-    currentGap = viewportProvides.getViewportGap() || 0;
+    // FETCH METRICS (Single Source of Truth)
+    const metrics = viewportScope.getMetrics();
 
+    currentGap = viewportProvides.getViewportGap() || 0;
     initialElementWidth = innerRect.width;
     initialElementHeight = innerRect.height;
     initialElementLeft = innerRect.left - contRect.origin.x;
     initialElementTop = innerRect.top - contRect.origin.y;
-    containerWidth = contRect.size.width;
-    containerHeight = contRect.size.height;
+
+    containerRectWidth = contRect.size.width;
+    containerRectHeight = contRect.size.height;
+
+    // --- CLEAN LAYOUT CALCULATION ---
+    // We use the viewport metrics to determine the layout geometry.
+    // clientWidth: The width available for content (excludes scrollbars/borders)
+    // clientLeft: The width of the left border (offset from Rect origin to Content origin)
+    const clientLeft = metrics.clientLeft;
+
+    layoutWidth = metrics.clientWidth;
+    layoutCenterX = clientLeft + layoutWidth / 2;
 
     const rawPointerLocalX = clientX - innerRect.left;
     pointerLocalY = clientY - innerRect.top;
     pointerContainerX = clientX - contRect.origin.x;
     pointerContainerY = clientY - contRect.origin.y;
 
-    if (initialElementWidth < containerWidth) {
-      pivotLocalX = (pointerContainerX * initialElementWidth) / containerWidth;
+    // Pivot Calculation based on Layout Width
+    if (initialElementWidth < layoutWidth) {
+      pivotLocalX = (pointerContainerX * initialElementWidth) / layoutWidth;
     } else {
       pivotLocalX = rawPointerLocalX;
     }
@@ -183,23 +198,18 @@ export function setupPinchZoom({
   // --- Handlers ---
   const handleTouchStart = (e: TouchEvent) => {
     if (e.touches.length !== 2) return;
-
     isPinching = true;
     initialZoom = getState().currentZoomLevel;
     initialDistance = getTouchDistance(e.touches);
-
     const center = getTouchCenter(e.touches);
     initializeGestureState(center.x, center.y);
-
     e.preventDefault();
   };
 
   const handleTouchMove = (e: TouchEvent) => {
     if (!isPinching || e.touches.length !== 2) return;
-
     const currentDistance = getTouchDistance(e.touches);
     const scale = currentDistance / initialDistance;
-
     updateTransform(scale);
     e.preventDefault();
   };
@@ -207,14 +217,12 @@ export function setupPinchZoom({
   const handleTouchEnd = (e: TouchEvent) => {
     if (!isPinching) return;
     if (e.touches.length >= 2) return;
-
     isPinching = false;
     commitZoom();
   };
 
   const handleWheel = (e: WheelEvent) => {
     if (!e.ctrlKey && !e.metaKey) return;
-
     e.preventDefault();
 
     if (wheelZoomTimeout === null) {
@@ -228,7 +236,6 @@ export function setupPinchZoom({
     const zoomFactor = 1 - e.deltaY * 0.01;
     accumulatedWheelScale *= zoomFactor;
     accumulatedWheelScale = Math.max(0.1, Math.min(10, accumulatedWheelScale));
-
     updateTransform(accumulatedWheelScale);
 
     wheelZoomTimeout = setTimeout(() => {
@@ -250,11 +257,9 @@ export function setupPinchZoom({
     element.removeEventListener('touchend', handleTouchEnd);
     element.removeEventListener('touchcancel', handleTouchEnd);
     element.removeEventListener('wheel', handleWheel);
-
     if (wheelZoomTimeout) {
       clearTimeout(wheelZoomTimeout);
     }
-
     resetTransform();
   };
 }
