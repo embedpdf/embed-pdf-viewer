@@ -1,0 +1,92 @@
+---
+title: Export & Save
+description: Configure downloads and learn how to save modified PDFs (with annotations) to your server.
+---
+
+import ExportExample from '../code-examples/export-example';
+import { ExampleWrapper } from '@/components/example-wrapper';
+
+# Export & Save
+
+The Snippet includes built-in functionality to export the current PDF. This isn't just downloading the original file; the export plugin generates a **new PDF file** that includes any changes the user has made, such as:
+* Annotations (Highlights, Ink, Shapes)
+* Redactions (Applied and burned in)
+* Form filled data
+
+## Configuration
+
+You can configure the default filename via the `export` property in your config object.
+
+```javascript
+const viewer = EmbedPDF.init({
+  // ...
+  export: {
+    // Used if the document doesn't have a known filename
+    defaultFileName: 'exported-document.pdf' 
+  }
+});
+
+```
+
+## Programmatic Control
+
+While the default toolbar includes a download button, you often need to trigger these actions from your own UI or handle the file data directly (e.g., to save it to a database).
+
+<CodeExample
+  codePaths={[
+    "content/docs/snippet/code-examples/export-example.tsx"
+  ]}
+>
+  <ExampleWrapper>
+    <ExportExample />
+  </ExampleWrapper>
+</CodeExample>
+
+### Triggering a Download
+
+To programmatically trigger the browser's download dialog for a specific document:
+
+```javascript
+const registry = await viewer.registry;
+const exportPlugin = registry.getPlugin('export').provides();
+
+// Trigger download for the active document
+exportPlugin.download();
+
+// Trigger download for a specific document
+exportPlugin.forDocument(documentId).download();
+```
+
+### Saving to a Server
+
+A common requirement is to save the modified PDF back to your server instead of downloading it to the user's computer.
+
+You can use the `saveAsCopy()` method for this. It returns a `Task` that resolves with an `ArrayBuffer` containing the full PDF binary data.
+
+```javascript
+const handleSave = async () => {
+  const registry = await viewer.registry;
+  const exportPlugin = registry.getPlugin('export').provides();
+
+  // 1. Request the PDF data
+  const task = exportPlugin.saveAsCopy();
+
+  task.wait(async (arrayBuffer) => {
+    // 2. Convert ArrayBuffer to a Blob/File
+    const blob = new Blob([arrayBuffer], { type: 'application/pdf' });
+    const file = new File([blob], 'updated-doc.pdf');
+
+    // 3. Upload to your server
+    const formData = new FormData();
+    formData.append('file', file);
+    formData.append('id', '12345');
+
+    await fetch('/api/documents/save', {
+      method: 'POST',
+      body: formData
+    });
+
+    console.log('Document saved successfully!');
+  });
+};
+```
