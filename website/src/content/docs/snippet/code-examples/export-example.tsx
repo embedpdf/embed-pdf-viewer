@@ -48,27 +48,18 @@ export default function ExportExample({
     setIsSaving(true)
 
     // 1. Get the raw PDF buffer (includes all annotations/changes)
-    const task = scope.saveAsCopy()
+    const arrayBuffer = await scope.saveAsCopy().toPromise()
 
-    task.wait(async (arrayBuffer) => {
-      try {
-        // 2. Convert to Blob/File for upload
-        const blob = new Blob([arrayBuffer], { type: 'application/pdf' })
-        const file = new File([blob], 'saved-document.pdf')
+    const blob = new Blob([arrayBuffer], { type: 'application/pdf' })
+    const file = new File([blob], 'saved-document.pdf')
 
-        // 3. Mock Upload (Replace with your actual API call)
-        // await fetch('/api/documents/upload', { method: 'POST', body: formData })
-        await new Promise((resolve) => setTimeout(resolve, 1500)) // Fake delay
+    // 3. Mock Upload (Replace with your actual API call)
+    // await fetch('/api/documents/upload', { method: 'POST', body: formData })
+    await new Promise((resolve) => setTimeout(resolve, 1500)) // Fake delay
 
-        console.log(`Successfully prepared ${file.size} bytes for upload.`)
-        setSaveStatus('success')
-        setTimeout(() => setSaveStatus('idle'), 3000)
-      } catch (err) {
-        console.error('Upload failed', err)
-      } finally {
-        setIsSaving(false)
-      }
-    }, ignore)
+    console.log(`Successfully prepared ${file.size} bytes for upload.`)
+    setSaveStatus('success')
+    setTimeout(() => setSaveStatus('idle'), 3000)
   }
 
   return (

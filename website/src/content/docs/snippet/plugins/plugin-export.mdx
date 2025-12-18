@@ -61,32 +61,30 @@ exportPlugin.forDocument(documentId).download();
 
 A common requirement is to save the modified PDF back to your server instead of downloading it to the user's computer.
 
-You can use the `saveAsCopy()` method for this. It returns a `Task` that resolves with an `ArrayBuffer` containing the full PDF binary data.
+You can use the `saveAsCopy()` method for this. It returns a `Task` that you can convert to a Promise using `toPromise()`, which resolves with an `ArrayBuffer` containing the full PDF binary data.
 
 ```javascript
 const handleSave = async () => {
   const registry = await viewer.registry;
   const exportPlugin = registry.getPlugin('export').provides();
 
-  // 1. Request the PDF data
-  const task = exportPlugin.saveAsCopy();
+  // 1. Get the PDF data as an ArrayBuffer
+  const arrayBuffer = await exportPlugin.saveAsCopy().toPromise();
 
-  task.wait(async (arrayBuffer) => {
-    // 2. Convert ArrayBuffer to a Blob/File
-    const blob = new Blob([arrayBuffer], { type: 'application/pdf' });
-    const file = new File([blob], 'updated-doc.pdf');
+  // 2. Convert ArrayBuffer to a Blob/File
+  const blob = new Blob([arrayBuffer], { type: 'application/pdf' });
+  const file = new File([blob], 'updated-doc.pdf');
 
-    // 3. Upload to your server
-    const formData = new FormData();
-    formData.append('file', file);
-    formData.append('id', '12345');
+  // 3. Upload to your server
+  const formData = new FormData();
+  formData.append('file', file);
+  formData.append('id', '12345');
 
-    await fetch('/api/documents/save', {
-      method: 'POST',
-      body: formData
-    });
-
-    console.log('Document saved successfully!');
+  await fetch('/api/documents/save', {
+    method: 'POST',
+    body: formData
   });
+
+  console.log('Document saved successfully!');
 };
 ```
