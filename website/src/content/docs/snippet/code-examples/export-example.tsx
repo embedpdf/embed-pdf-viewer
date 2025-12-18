@@ -60,6 +60,7 @@ export default function ExportExample({
     console.log(`Successfully prepared ${file.size} bytes for upload.`)
     setSaveStatus('success')
     setTimeout(() => setSaveStatus('idle'), 3000)
+    setIsSaving(false)
   }
 
   return (
