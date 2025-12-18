@@ -3,7 +3,14 @@ import { useState, useEffect } from 'preact/hooks';
 import { useBookmarkCapability } from '@embedpdf/plugin-bookmark/preact';
 import { useScrollCapability } from '@embedpdf/plugin-scroll/preact';
 import { useTranslations } from '@embedpdf/plugin-i18n/preact';
-import { PdfBookmarkObject, PdfZoomMode, PdfErrorCode, ignore } from '@embedpdf/models';
+import {
+  PdfBookmarkObject,
+  PdfZoomMode,
+  PdfErrorCode,
+  ignore,
+  PdfActionType,
+  PdfDestinationObject,
+} from '@embedpdf/models';
 import { useDocumentState } from '@embedpdf/core/preact';
 import { Icon } from './ui/icon';
 import { ChevronDownIcon } from './icons/chevron-down';
@@ -20,16 +27,25 @@ export function OutlineSidebar({ documentId }: OutlineSidebarProps) {
   const documentState = useDocumentState(documentId);
   const [bookmarks, setBookmarks] = useState<PdfBookmarkObject[]>([]);
   const [expandedItems, setExpandedItems] = useState<Set<string>>(new Set());
+  const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
     if (!bookmark || !documentState?.document) return;
+
+    setIsLoading(true);
     const task = bookmark.getBookmarks();
-    task.wait(({ bookmarks }) => {
-      setBookmarks(bookmarks);
-      // Auto-expand first level items
-      const firstLevelIds = bookmarks.map((_, index) => `bookmark-${index}`);
-      setExpandedItems(new Set(firstLevelIds));
-    }, ignore);
+    task.wait(
+      ({ bookmarks }) => {
+        setBookmarks(bookmarks);
+        // Auto-expand first level items
+        const firstLevelIds = bookmarks.map((_, index) => `bookmark-${index}`);
+        setExpandedItems(new Set(firstLevelIds));
+        setIsLoading(false);
+      },
+      () => {
+        setIsLoading(false);
+      },
+    );
 
     return () => {
       task.abort({
@@ -40,33 +56,47 @@ export function OutlineSidebar({ documentId }: OutlineSidebarProps) {
   }, [bookmark, documentState?.document]);
 
   const handleBookmarkClick = (bookmark: PdfBookmarkObject) => {
-    if (!scroll || !bookmark.target || bookmark.target.type !== 'action') return;
+    if (!scroll || !bookmark.target) return;
 
-    const action = bookmark.target.action;
-    if (action.type === 1 && action.destination) {
-      // Type 1 is "Go to destination"
-      const destination = action.destination;
+    // Extract destination from either action or direct destination target
+    let destination: PdfDestinationObject | undefined;
 
-      if (destination.zoom.mode === PdfZoomMode.XYZ) {
-        const page = documentState?.document?.pages.find((p) => p.index === destination.pageIndex);
-        if (!page) return;
-
-        scroll.scrollToPage({
-          pageNumber: destination.pageIndex + 1,
-          pageCoordinates: destination.zoom.params
-            ? {
-                x: destination.zoom.params.x,
-                y: page.size.height - destination.zoom.params.y,
-              }
-            : undefined,
-          behavior: 'smooth',
-        });
-      } else if (destination.zoom.mode === PdfZoomMode.FitPage) {
-        scroll.scrollToPage({
-          pageNumber: destination.pageIndex + 1,
-          behavior: 'smooth',
-        });
+    if (bookmark.target.type === 'action') {
+      const action = bookmark.target.action;
+      if (action.type === PdfActionType.Goto || action.type === PdfActionType.RemoteGoto) {
+        destination = action.destination;
+      } else if (action.type === PdfActionType.URI) {
+        // Open URI in new tab
+        window.open(action.uri, '_blank');
+        return;
       }
+      // Other action types (Unsupported, LaunchAppOrOpenFile) are not handled
+    } else if (bookmark.target.type === 'destination') {
+      destination = bookmark.target.destination;
+    }
+
+    if (!destination) return;
+
+    if (destination.zoom.mode === PdfZoomMode.XYZ) {
+      const page = documentState?.document?.pages.find((p) => p.index === destination.pageIndex);
+      if (!page) return;
+
+      scroll.scrollToPage({
+        pageNumber: destination.pageIndex + 1,
+        pageCoordinates: destination.zoom.params
+          ? {
+              x: destination.zoom.params.x,
+              y: page.size.height - destination.zoom.params.y,
+            }
+          : undefined,
+        behavior: 'smooth',
+      });
+    } else {
+      // Handle FitPage, FitH, FitV, FitR, FitB, FitBH, FitBV, etc.
+      scroll.scrollToPage({
+        pageNumber: destination.pageIndex + 1,
+        behavior: 'smooth',
+      });
     }
   };
 
@@ -127,7 +157,7 @@ export function OutlineSidebar({ documentId }: OutlineSidebarProps) {
     );
   };
 
-  if (!documentState?.document) {
+  if (!documentState?.document || isLoading) {
     return (
       <div className="text-fg-secondary flex h-full flex-col gap-3 p-4 text-sm">
         <div className="text-fg-primary font-medium">{translate('outline.title')}</div>
