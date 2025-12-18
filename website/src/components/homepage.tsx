@@ -219,61 +219,167 @@ const HeaderAndHero = () => {
             </div>
           </div>
 
-          {/* Testimonial section */}
+          {/* Testimonials section */}
           <div className="relative mt-24 px-4">
-            <div className="absolute left-1/2 top-0 -translate-x-1/2 -translate-y-1/2 transform font-serif text-6xl text-gray-200 dark:text-gray-700">
-              &quot;
-            </div>
-            <div className="relative mx-auto max-w-2xl text-center">
-              <p className="mb-4 text-xl italic text-gray-600 dark:text-gray-300">
-                EmbedPDF saved us countless hours of development time. Our
-                documents now load faster and look better than ever before.
-              </p>
-              <div className="flex items-center justify-center">
-                <div className="h-14 w-14 overflow-hidden rounded-full bg-gray-200 dark:bg-gray-700">
-                  <img
-                    src="/profile.jpeg"
-                    alt="Bob Singor"
-                    className="h-full w-full object-cover"
-                  />
-                </div>
-                <div className="ml-3 text-left">
-                  <div className="font-medium text-gray-900 dark:text-white">
-                    Bob Singor
+            <div className="mx-auto max-w-6xl">
+              {/* Section header */}
+              <div className="mb-12 text-center">
+                <h2 className="text-3xl font-bold text-gray-900 dark:text-white md:text-4xl">
+                  Loved by developers
+                </h2>
+                <p className="mt-4 text-lg text-gray-600 dark:text-gray-400">
+                  See what teams are building with EmbedPDF
+                </p>
+              </div>
+
+              {/* Testimonials grid */}
+              <div className="grid gap-8 md:grid-cols-2">
+                {/* Stirling PDF Testimonial */}
+                <div className="group relative">
+                  <div className="absolute -inset-1 rounded-3xl bg-gradient-to-r from-red-500/20 via-orange-500/20 to-yellow-500/20 opacity-0 blur-xl transition-all duration-500 group-hover:opacity-100"></div>
+                  <div className="relative flex h-full flex-col rounded-2xl border border-gray-200/50 bg-white/80 p-8 shadow-xl backdrop-blur-sm transition-all duration-300 hover:shadow-2xl dark:border-gray-700/50 dark:bg-gray-900/80">
+                    {/* Quote mark */}
+                    <div className="text-7xl absolute -top-4 left-8 font-serif text-red-200 dark:text-red-900/50">
+                      &quot;
+                    </div>
+
+                    {/* Company logo */}
+                    <div className="mb-6 flex items-center justify-between">
+                      <div className="flex h-12 items-center gap-3">
+                        <img
+                          src="/testimonials/stirling-logo.svg"
+                          alt="Stirling PDF"
+                          className="h-10 w-auto"
+                        />
+                        <span className="text-xl font-bold text-gray-900 dark:text-white">
+                          Stirling-PDF
+                        </span>
+                      </div>
+                      <div className="rounded-full bg-gradient-to-r from-red-500/10 to-orange-500/10 px-3 py-1 text-xs font-medium text-red-700 dark:text-red-400">
+                        PDF Tools
+                      </div>
+                    </div>
+
+                    {/* Quote */}
+                    <blockquote className="relative z-10 mb-6 flex-grow text-lg leading-relaxed text-gray-700 dark:text-gray-300">
+                      I love the modular plugin architecture, the flexibility to
+                      integrate and customize however we need has been
+                      invaluable. A great open-source product with an amazing
+                      license and community of developers ready to help.
+                    </blockquote>
+
+                    {/* Author */}
+                    <div className="flex items-center border-t border-gray-100 pt-6 dark:border-gray-800">
+                      <div className="relative">
+                        <div className="absolute -inset-1 rounded-full bg-gradient-to-r from-red-500 to-orange-500 opacity-50 blur"></div>
+                        <img
+                          src="/testimonials/stirling-founder.webp"
+                          alt="Anthony Stirling"
+                          className="relative h-14 w-14 rounded-full border-2 border-white object-cover shadow-lg dark:border-gray-800"
+                        />
+                      </div>
+                      <div className="ml-4">
+                        <div className="font-semibold text-gray-900 dark:text-white">
+                          Anthony Stirling
+                        </div>
+                        <div className="text-sm text-gray-500 dark:text-gray-400">
+                          CTO & Founder
+                        </div>
+                        <div className="mt-0.5 text-xs font-medium text-red-600 dark:text-red-400">
+                          Stirling PDF
+                        </div>
+                      </div>
+                    </div>
                   </div>
-                  <div className="text-sm text-gray-500 dark:text-gray-400">
-                    Lead Developer @ CloudPDF
+                </div>
+
+                {/* Grella Testimonial */}
+                <div className="group relative">
+                  <div className="absolute -inset-1 rounded-3xl bg-gradient-to-r from-purple-500/20 via-violet-500/20 to-indigo-500/20 opacity-0 blur-xl transition-all duration-500 group-hover:opacity-100"></div>
+                  <div className="relative flex h-full flex-col rounded-2xl border border-gray-200/50 bg-white/80 p-8 shadow-xl backdrop-blur-sm transition-all duration-300 hover:shadow-2xl dark:border-gray-700/50 dark:bg-gray-900/80">
+                    {/* Quote mark */}
+                    <div className="text-7xl absolute -top-4 left-8 font-serif text-purple-200 dark:text-purple-900/50">
+                      &quot;
+                    </div>
+
+                    {/* Company logo */}
+                    <div className="mb-6 flex items-center justify-between">
+                      <div className="flex h-12 items-center">
+                        <img
+                          src="/testimonials/grella-logo.svg"
+                          alt="Grella"
+                          className="h-8 w-auto"
+                        />
+                      </div>
+                      <div className="rounded-full bg-gradient-to-r from-purple-500/10 to-violet-500/10 px-3 py-1 text-xs font-medium text-purple-700 dark:text-purple-400">
+                        AI Citations
+                      </div>
+                    </div>
+
+                    {/* Quote */}
+                    <blockquote className="relative z-10 mb-6 flex-grow text-lg leading-relaxed text-gray-700 dark:text-gray-300">
+                      After fighting with PDF.js in the browser, we found
+                      EmbedPDF with its first-class Svelte support. Within
+                      minutes we had something working, its extensible nature
+                      gave us the control we needed to build citation
+                      highlighting on top. Not a single regret.
+                    </blockquote>
+
+                    {/* Author */}
+                    <div className="flex items-center border-t border-gray-100 pt-6 dark:border-gray-800">
+                      <div className="relative">
+                        <div className="absolute -inset-1 rounded-full bg-gradient-to-r from-purple-500 to-violet-500 opacity-50 blur"></div>
+                        <img
+                          src="/testimonials/grella-founder.jpg"
+                          alt="Xander Aguinaldo"
+                          className="relative h-14 w-14 rounded-full border-2 border-white object-cover shadow-lg dark:border-gray-800"
+                        />
+                      </div>
+                      <div className="ml-4">
+                        <div className="font-semibold text-gray-900 dark:text-white">
+                          Xander Aguinaldo
+                        </div>
+                        <div className="text-sm text-gray-500 dark:text-gray-400">
+                          Founder
+                        </div>
+                        <div className="mt-0.5 text-xs font-medium text-purple-600 dark:text-purple-400">
+                          Grella
+                        </div>
+                      </div>
+                    </div>
                   </div>
                 </div>
               </div>
             </div>
           </div>
 
-          <div className="relative mx-auto mt-14 max-w-4xl overflow-hidden px-4">
-            <div className="absolute inset-0 rounded-2xl bg-gradient-to-r from-purple-600/20 via-blue-500/20 to-orange-400/20"></div>
-            <div className="relative rounded-2xl p-8 md:p-12">
-              <h2 className="mx-auto mb-4 max-w-2xl text-center text-2xl font-bold text-gray-900 dark:text-white md:text-3xl">
-                Ready to transform your PDF experience?
-              </h2>
-              <p className="mx-auto mb-8 max-w-2xl text-center text-gray-600 dark:text-gray-300">
-                Join thousands of developers who&apos;ve simplified their PDF
-                integration with EmbedPDF.
-              </p>
-              <div className="flex flex-col items-center justify-center gap-4 sm:flex-row">
-                <Link
-                  href="/docs"
-                  className="inline-flex items-center justify-center rounded-full bg-gray-900 px-6 py-3 font-medium text-white shadow-lg transition-colors hover:bg-gray-800 dark:bg-white dark:text-gray-900 dark:hover:bg-gray-100"
-                >
-                  Get Started Free
-                  <ArrowRight className="ml-2 h-5 w-5" />
-                </Link>
-                <Link
-                  href="/sponsorship"
-                  className="inline-flex items-center justify-center rounded-full border-2 border-purple-600 bg-transparent px-6 py-3 font-medium text-purple-600 shadow-lg transition-all hover:bg-purple-600 hover:text-white dark:border-purple-400 dark:text-purple-400 dark:hover:bg-purple-400 dark:hover:text-gray-900"
-                >
-                  <Heart className="mr-2 h-5 w-5" />
-                  Support Development
-                </Link>
+          <div className="relative mt-20 px-4">
+            <div className="relative mx-auto max-w-4xl overflow-hidden rounded-2xl">
+              <div className="absolute inset-0 bg-gradient-to-r from-purple-600/20 via-blue-500/20 to-orange-400/20"></div>
+              <div className="relative rounded-2xl p-8 md:p-12">
+                <h2 className="mx-auto mb-4 max-w-2xl text-center text-2xl font-bold text-gray-900 dark:text-white md:text-3xl">
+                  Ready to transform your PDF experience?
+                </h2>
+                <p className="mx-auto mb-8 max-w-2xl text-center text-gray-600 dark:text-gray-300">
+                  Join thousands of developers who&apos;ve simplified their PDF
+                  integration with EmbedPDF.
+                </p>
+                <div className="flex flex-col items-center justify-center gap-4 sm:flex-row">
+                  <Link
+                    href="/docs"
+                    className="inline-flex items-center justify-center rounded-full bg-gray-900 px-6 py-3 font-medium text-white shadow-lg transition-colors hover:bg-gray-800 dark:bg-white dark:text-gray-900 dark:hover:bg-gray-100"
+                  >
+                    Get Started Free
+                    <ArrowRight className="ml-2 h-5 w-5" />
+                  </Link>
+                  <Link
+                    href="/sponsorship"
+                    className="inline-flex items-center justify-center rounded-full border-2 border-purple-600 bg-transparent px-6 py-3 font-medium text-purple-600 shadow-lg transition-all hover:bg-purple-600 hover:text-white dark:border-purple-400 dark:text-purple-400 dark:hover:bg-purple-400 dark:hover:text-gray-900"
+                  >
+                    <Heart className="mr-2 h-5 w-5" />
+                    Support Development
+                  </Link>
+                </div>
               </div>
             </div>
           </div>
