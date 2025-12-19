@@ -45,7 +45,7 @@ export const EditCommentForm = ({
         ref={textareaRef}
         value={text}
         onInput={(e) => setText(e.currentTarget.value)}
-        className="border-border-default bg-bg-input text-fg-primary focus:border-accent focus:ring-accent w-full rounded-md border px-3 py-2 text-sm focus:outline-none focus:ring-1"
+        className="border-border-default bg-bg-input text-fg-primary focus:border-accent focus:ring-accent w-full rounded-md border px-3 py-2 text-base focus:outline-none focus:ring-1"
         rows={3}
       />
       <div className="flex flex-wrap gap-2">

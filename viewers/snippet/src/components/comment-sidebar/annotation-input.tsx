@@ -36,7 +36,7 @@ export const AnnotationInput = ({
         placeholder={placeholder}
         value={text}
         onInput={(e) => setText(e.currentTarget.value)}
-        className={`bg-bg-input text-fg-primary placeholder-fg-muted w-full rounded-lg border px-3 py-2 text-sm transition-colors focus:border-transparent focus:outline-none focus:ring-2 ${
+        className={`bg-bg-input text-fg-primary placeholder-fg-muted w-full rounded-lg border px-3 py-1 text-base transition-colors focus:border-transparent focus:outline-none focus:ring-2 ${
           isFocused ? 'border-accent focus:ring-accent' : 'border-border-default focus:ring-accent'
         }`}
       />

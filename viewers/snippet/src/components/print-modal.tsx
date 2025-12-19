@@ -145,7 +145,7 @@ export function PrintModal({ documentId, isOpen, onClose, onExited }: PrintModal
                   value={customPages}
                   onInput={(e) => setCustomPages((e.target as HTMLInputElement).value)}
                   disabled={selection !== 'custom' || isLoading}
-                  className={`w-full rounded-md border px-3 py-1 text-sm ${
+                  className={`w-full rounded-md border px-3 py-1 text-base ${
                     selection !== 'custom' || isLoading
                       ? 'bg-interactive-disabled text-fg-muted'
                       : 'border-border-default bg-bg-input text-fg-primary focus:border-accent focus:ring-accent'
