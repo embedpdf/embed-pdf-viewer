@@ -68,7 +68,7 @@
     "@types/emscripten": "^1.39.13",
     "cpy-cli": "^5.0.0",
     "magic-string": "^0.30.17",
-    "rollup": "^3.28.0",
+    "rollup": "^4.53.5",
     "rollup-plugin-copy": "^3.4.0",
     "rollup-plugin-dts": "^6.2.1",
     "typescript": "^5.0.0"
