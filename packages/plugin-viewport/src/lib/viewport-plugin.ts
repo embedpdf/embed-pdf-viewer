@@ -57,9 +57,6 @@ export class ViewportPlugin extends BasePlugin<
     ReturnType<typeof createEmitter<ScrollToPayload>>
   >();
 
-  // Rect providers per document (only for mounted viewports)
-  private rectProviders = new Map<string, () => Rect>();
-
   private readonly scrollEndDelay: number;
 
   constructor(
@@ -102,9 +99,6 @@ export class ViewportPlugin extends BasePlugin<
     this.scrollRequests$.get(documentId)?.clear();
     this.scrollRequests$.delete(documentId);
 
-    // Cleanup rect provider if exists
-    this.rectProviders.delete(documentId);
-
     this.logger.debug(
       'ViewportPlugin',
       'DocumentClosed',
@@ -129,7 +123,6 @@ export class ViewportPlugin extends BasePlugin<
       isGated: (documentId?: string) => this.isGated(documentId),
       hasGate: (key: string, documentId?: string) => this.hasGate(key, documentId),
       getGates: (documentId?: string) => this.getGates(documentId),
-      getBoundingRect: () => this.getBoundingRect(),
 
       // Document-scoped operations
       forDocument: (documentId: string) => this.createViewportScope(documentId),
@@ -163,7 +156,6 @@ export class ViewportPlugin extends BasePlugin<
       getGates: () => this.getGates(documentId),
       gate: (key: string) => this.gate(key, documentId),
       releaseGate: (key: string) => this.releaseGate(key, documentId),
-      getBoundingRect: () => this.getBoundingRect(documentId),
       onViewportChange: (listener: Listener<ViewportMetrics>) =>
         this.viewportMetrics$.on((event) => {
           if (event.documentId === documentId) listener(event.metrics);
@@ -214,9 +206,6 @@ export class ViewportPlugin extends BasePlugin<
     // Mark as inactive/unmounted (but preserve state!)
     if (this.state.activeViewports.has(documentId)) {
       this.dispatch(unregisterViewport(documentId));
-
-      // Remove rect provider (DOM no longer exists)
-      this.rectProviders.delete(documentId);
 
       this.logger.debug(
         'ViewportPlugin',
@@ -283,14 +272,6 @@ export class ViewportPlugin extends BasePlugin<
       );
     }
     return emitter.on(listener);
-  }
-
-  public registerBoundingRectProvider(documentId: string, provider: (() => Rect) | null): void {
-    if (provider) {
-      this.rectProviders.set(documentId, provider);
-    } else {
-      this.rectProviders.delete(documentId);
-    }
   }
 
   // ─────────────────────────────────────────────────────────
@@ -379,18 +360,6 @@ export class ViewportPlugin extends BasePlugin<
   private getGates(documentId?: string): string[] {
     const viewport = this.getViewportState(documentId);
     return Array.from(viewport.gates);
-  }
-
-  private getBoundingRect(documentId?: string): Rect {
-    const id = documentId ?? this.getActiveDocumentId();
-    const provider = this.rectProviders.get(id);
-
-    return (
-      provider?.() ?? {
-        origin: { x: 0, y: 0 },
-        size: { width: 0, height: 0 },
-      }
-    );
   }
 
   private scrollTo(pos: ScrollToPayload, documentId?: string): void {
@@ -504,7 +473,6 @@ export class ViewportPlugin extends BasePlugin<
 
     this.scrollRequests$.forEach((emitter) => emitter.clear());
     this.scrollRequests$.clear();
-    this.rectProviders.clear();
 
     super.destroy();
   }

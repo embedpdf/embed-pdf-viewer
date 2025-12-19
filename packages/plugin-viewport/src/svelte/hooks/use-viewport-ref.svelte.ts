@@ -28,16 +28,6 @@ export function useViewportRef(getDocumentId: () => string | null) {
       return;
     }
 
-    // Provide rect calculator
-    const provideRect = (): Rect => {
-      const r = container.getBoundingClientRect();
-      return {
-        origin: { x: r.left, y: r.top },
-        size: { width: r.width, height: r.height },
-      };
-    };
-    plugin.registerBoundingRectProvider(docId, provideRect);
-
     // On scroll
     const onScroll = () => {
       plugin.setViewportScrollMetrics(docId, {
@@ -77,7 +67,6 @@ export function useViewportRef(getDocumentId: () => string | null) {
     // Store cleanup function
     return () => {
       plugin.unregisterViewport(docId);
-      plugin.registerBoundingRectProvider(docId, null);
       container.removeEventListener('scroll', onScroll);
       resizeObserver.disconnect();
       unsubscribeScrollRequest();

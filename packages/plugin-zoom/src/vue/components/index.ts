@@ -1,2 +1,2 @@
 export { default as MarqueeZoom } from './marquee-zoom.vue';
-export { default as PinchWrapper } from './pinch-wrapper.vue';
+export { default as ZoomGestureWrapper } from './zoom-gesture-wrapper.vue';

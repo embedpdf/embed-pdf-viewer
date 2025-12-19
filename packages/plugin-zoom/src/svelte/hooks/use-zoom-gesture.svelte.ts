@@ -1,7 +1,7 @@
 import { getContext } from 'svelte';
 import { useCapability } from '@embedpdf/core/svelte';
 import type { ViewportPlugin } from '@embedpdf/plugin-viewport';
-import { setupZoomGestures, type ZoomGestureOptions } from '../../shared/utils/pinch-zoom-logic';
+import { setupZoomGestures, type ZoomGestureOptions } from '../../shared/utils/zoom-gesture-logic';
 import { useZoomCapability } from './use-zoom.svelte';
 
 export type { ZoomGestureOptions };
@@ -53,16 +53,16 @@ export function useZoomGesture(
     }
 
     // Setup new zoom gestures if all dependencies are available
-    if (!element || !viewport || !zoom || !docId) {
+    if (!element || !container || !zoom || !docId) {
       return;
     }
 
     cleanup = setupZoomGestures({
       element,
-      container: container || undefined,
+      container,
       documentId: docId,
-      viewportProvides: viewport,
       zoomProvides: zoom,
+      viewportGap: viewport?.getViewportGap() || 0,
       options: { enablePinch: pinchEnabled, enableWheel: wheelEnabled },
     });
 

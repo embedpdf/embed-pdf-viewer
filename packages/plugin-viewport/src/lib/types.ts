@@ -104,7 +104,6 @@ export interface ViewportScope {
   getGates(): string[];
   gate(key: string): void;
   releaseGate(key: string): void;
-  getBoundingRect(): Rect;
   onViewportChange: EventHook<ViewportMetrics>;
   onScrollChange: EventHook<ViewportScrollMetrics>;
   onScrollActivity: EventHook<ScrollActivity>;
@@ -123,7 +122,6 @@ export interface ViewportCapability {
   isGated(documentId?: string): boolean;
   hasGate(key: string, documentId?: string): boolean;
   getGates(documentId?: string): string[];
-  getBoundingRect(): Rect;
 
   // Document-scoped operations
   forDocument(documentId: string): ViewportScope;

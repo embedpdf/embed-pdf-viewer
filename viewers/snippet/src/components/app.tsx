@@ -43,7 +43,7 @@ import {
   ZoomMode,
   ZoomPluginPackage,
   ZoomPluginConfig,
-  PinchWrapper,
+  ZoomGestureWrapper,
 } from '@embedpdf/plugin-zoom/preact';
 import {
   RenderLayer,
@@ -371,7 +371,7 @@ function ViewerLayout({ documentId, tabBarVisibility = 'multiple' }: ViewerLayou
                   <div className="relative h-full w-full">
                     <GlobalPointerProvider documentId={documentId}>
                       <Viewport className="bg-bg-app" documentId={documentId}>
-                        <PinchWrapper documentId={documentId}>
+                        <ZoomGestureWrapper documentId={documentId}>
                           <Scroller
                             documentId={documentId}
                             renderPage={({ pageIndex }) => (
@@ -415,7 +415,7 @@ function ViewerLayout({ documentId, tabBarVisibility = 'multiple' }: ViewerLayou
                               </Rotate>
                             )}
                           />
-                        </PinchWrapper>
+                        </ZoomGestureWrapper>
                       </Viewport>
                     </GlobalPointerProvider>
                     {/* Overlays (floating components like page controls) */}

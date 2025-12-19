@@ -21,45 +21,47 @@
           <div v-else-if="isLoaded" class="relative h-full w-full">
             <GlobalPointerProvider :documentId="documentId">
               <Viewport class="bg-gray-100" :documentId="documentId">
-                <Scroller :documentId="documentId" v-slot="{ page }">
-                  <Rotate
-                    :documentId="documentId"
-                    :pageIndex="page.pageIndex"
-                    style="background-color: #fff"
-                  >
-                    <PagePointerProvider :documentId="documentId" :pageIndex="page.pageIndex">
-                      <RenderLayer
-                        :documentId="documentId"
-                        :pageIndex="page.pageIndex"
-                        :scale="1"
-                        style="pointer-events: none"
-                      />
-                      <TilingLayer
-                        :documentId="documentId"
-                        :pageIndex="page.pageIndex"
-                        style="pointer-events: none"
-                      />
-                      <SearchLayer :documentId="documentId" :pageIndex="page.pageIndex" />
-                      <MarqueeZoom :documentId="documentId" :pageIndex="page.pageIndex" />
-                      <MarqueeCapture :documentId="documentId" :pageIndex="page.pageIndex" />
-                      <SelectionLayer
-                        :documentId="documentId"
-                        :pageIndex="page.pageIndex"
-                        :selectionMenu="selectionMenu"
-                      />
-                      <RedactionLayer
-                        :documentId="documentId"
-                        :pageIndex="page.pageIndex"
-                        :selectionMenu="redactionMenu"
-                      />
-                      <AnnotationLayer
-                        :documentId="documentId"
-                        :pageIndex="page.pageIndex"
-                        :selectionMenu="annotationMenu"
-                      />
-                    </PagePointerProvider>
-                  </Rotate>
-                </Scroller>
+                <ZoomGestureWrapper :documentId="documentId">
+                  <Scroller :documentId="documentId" v-slot="{ page }">
+                    <Rotate
+                      :documentId="documentId"
+                      :pageIndex="page.pageIndex"
+                      style="background-color: #fff"
+                    >
+                      <PagePointerProvider :documentId="documentId" :pageIndex="page.pageIndex">
+                        <RenderLayer
+                          :documentId="documentId"
+                          :pageIndex="page.pageIndex"
+                          :scale="1"
+                          style="pointer-events: none"
+                        />
+                        <TilingLayer
+                          :documentId="documentId"
+                          :pageIndex="page.pageIndex"
+                          style="pointer-events: none"
+                        />
+                        <SearchLayer :documentId="documentId" :pageIndex="page.pageIndex" />
+                        <MarqueeZoom :documentId="documentId" :pageIndex="page.pageIndex" />
+                        <MarqueeCapture :documentId="documentId" :pageIndex="page.pageIndex" />
+                        <SelectionLayer
+                          :documentId="documentId"
+                          :pageIndex="page.pageIndex"
+                          :selectionMenu="selectionMenu"
+                        />
+                        <RedactionLayer
+                          :documentId="documentId"
+                          :pageIndex="page.pageIndex"
+                          :selectionMenu="redactionMenu"
+                        />
+                        <AnnotationLayer
+                          :documentId="documentId"
+                          :pageIndex="page.pageIndex"
+                          :selectionMenu="annotationMenu"
+                        />
+                      </PagePointerProvider>
+                    </Rotate>
+                  </Scroller>
+                </ZoomGestureWrapper>
                 <!-- Page Controls -->
                 <PageControls :documentId="documentId" />
               </Viewport>
@@ -87,7 +89,7 @@ import { Rotate } from '@embedpdf/plugin-rotate/vue';
 import { RenderLayer } from '@embedpdf/plugin-render/vue';
 import { TilingLayer } from '@embedpdf/plugin-tiling/vue';
 import { SearchLayer } from '@embedpdf/plugin-search/vue';
-import { MarqueeZoom } from '@embedpdf/plugin-zoom/vue';
+import { MarqueeZoom, ZoomGestureWrapper } from '@embedpdf/plugin-zoom/vue';
 import { MarqueeCapture } from '@embedpdf/plugin-capture/vue';
 import { SelectionLayer } from '@embedpdf/plugin-selection/vue';
 import { RedactionLayer } from '@embedpdf/plugin-redaction/vue';

@@ -1,6 +1,7 @@
 import { ReactNode, useEffect, useState, HTMLAttributes } from '@framework';
 import { useIsViewportGated, useViewportCapability } from '../hooks';
 import { useViewportRef } from '../hooks/use-viewport-ref';
+import { ViewportElementContext } from '../context';
 
 type ViewportProps = HTMLAttributes<HTMLDivElement> & {
   children: ReactNode;
@@ -23,19 +24,22 @@ export function Viewport({ children, documentId, ...props }: ViewportProps) {
   }, [viewportProvides]);
 
   const { style, ...restProps } = props;
+
   return (
-    <div
-      {...restProps}
-      ref={viewportRef}
-      style={{
-        width: '100%',
-        height: '100%',
-        overflow: 'auto',
-        ...(typeof style === 'object' ? style : {}),
-        padding: `${viewportGap}px`,
-      }}
-    >
-      {!isGated && children}
-    </div>
+    <ViewportElementContext.Provider value={viewportRef}>
+      <div
+        {...restProps}
+        ref={viewportRef}
+        style={{
+          width: '100%',
+          height: '100%',
+          overflow: 'auto',
+          ...(typeof style === 'object' ? style : {}),
+          padding: `${viewportGap}px`,
+        }}
+      >
+        {!isGated && children}
+      </div>
+    </ViewportElementContext.Provider>
   );
 }

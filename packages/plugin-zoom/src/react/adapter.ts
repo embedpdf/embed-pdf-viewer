@@ -6,5 +6,6 @@ export {
   useCallback,
   useMemo,
   useLayoutEffect,
+  useContext,
 } from 'react';
 export type { ReactNode, HTMLAttributes, CSSProperties } from 'react';

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, watch, useAttrs } from 'vue';
+import { ref, watch, useAttrs, provide } from 'vue';
 import { useIsViewportGated, useViewportCapability, useViewportRef } from '../hooks';
 
 /* -------------------------------------------------- */
@@ -30,7 +30,7 @@ watch(
 );
 
 /* -------------------------------------------------- */
-/* Gating logic                                    */
+/* Gating logic                                    */
 /* -------------------------------------------------- */
 const isGated = useIsViewportGated(() => props.documentId);
 
@@ -38,6 +38,11 @@ const isGated = useIsViewportGated(() => props.documentId);
 /* element ref that wires up scroll / resize logic    */
 /* -------------------------------------------------- */
 const viewportRef = useViewportRef(() => props.documentId);
+
+/* -------------------------------------------------- */
+/* Provide viewport element to child components       */
+/* -------------------------------------------------- */
+provide('viewport-element', viewportRef);
 </script>
 
 <template>
