@@ -1,5 +1,245 @@
 # @embedpdf/engines
 
+## 2.0.0
+
+### Major Changes
+
+- [#303](https://github.com/embedpdf/embed-pdf-viewer/pull/303) by [@bobsingor](https://github.com/bobsingor) – # Major Engine Architecture Refactor: Orchestrator Layer & Image Encoding Pool
+
+  This release introduces a significant architectural improvement to the PDF engine system, separating concerns between execution and orchestration while adding parallel image encoding capabilities.
+
+  ## Breaking Changes
+
+  ### Engine Class Renamed
+  - `PdfiumEngine` → `PdfiumNative` (the "dumb" executor)
+  - New `PdfEngine` class wraps executors with orchestration logic
+  - Factory functions (`createPdfiumEngine`) now return the orchestrated `PdfEngine<Blob>` wrapper
+
+  **Migration:**
+
+  ```typescript
+  // Before
+  import { PdfiumEngine } from '@embedpdf/engines';
+  const engine = new PdfiumEngine(wasmModule, { logger });
+
+  // After
+  import { createPdfiumEngine } from '@embedpdf/engines/pdfium-worker-engine';
+  // or
+  import { createPdfiumEngine } from '@embedpdf/engines/pdfium-direct-engine';
+
+  const engine = await createPdfiumEngine('/wasm/pdfium.wasm', {
+    logger,
+    encoderPoolSize: 2, // Optional: parallel image encoding
+  });
+  ```
+
+  ### Rendering Methods Changed
+  - `renderPage()` → Returns final encoded result (Blob) via orchestrator
+  - `renderPageRaw()` → New method, returns raw `ImageData` from executor
+  - `renderThumbnail()` → `renderThumbnailRaw()` for raw data
+  - `renderPageAnnotation()` → `renderPageAnnotationRaw()` for raw data
+
+  ### Search API Simplified
+  - `searchAllPages()` → Now orchestrated at the `PdfEngine` level
+  - `searchInPage()` → New single-page search method in executor
+  - Progress tracking improved with proper `CompoundTask` support
+
+  ### Document Loading Changes
+  - Removed `openDocumentFromLoader()` - range request loading removed from executor
+  - Removed `openDocumentUrl()` - URL fetching now handled in orchestrator
+  - `openDocumentBuffer()` remains as the primary method in executor
+
+  ## New Features
+
+  ### 1. Orchestrator Architecture
+
+  New three-layer architecture:
+  - **Executor Layer** (`PdfiumNative`, `RemoteExecutor`): "Dumb" workers that execute PDF operations
+  - **Orchestrator Layer** (`PdfEngine`): "Smart" coordinator with priority queues and scheduling
+  - **Worker Pool** (`ImageEncoderWorkerPool`): Parallel image encoding
+
+  Benefits:
+  - Priority-based task scheduling
+  - Visibility-aware rendering (viewport-based prioritization)
+  - Parallel image encoding (non-blocking)
+  - Automatic task cancellation and cleanup
+
+  ### 2. Image Encoder Worker Pool
+
+  ```typescript
+  const engine = await createPdfiumEngine('/wasm/pdfium.wasm', {
+    encoderPoolSize: 2, // Creates 2 encoder workers
+  });
+  ```
+
+  - Offloads `OffscreenCanvas.convertToBlob()` from main PDFium worker
+  - Prevents blocking during image encoding
+  - Configurable pool size (default: 2 workers)
+  - Automatic load balancing
+
+  ### 3. Task Queue System
+
+  New `WorkerTaskQueue` with:
+  - Priority levels: `CRITICAL`, `HIGH`, `MEDIUM`, `LOW`
+  - Visibility-based ranking for render tasks
+  - Automatic task deduplication
+  - Graceful cancellation
+
+  ### 4. CompoundTask for Multi-Page Operations
+
+  New `CompoundTask` class for aggregating results:
+
+  ```typescript
+  // Automatic progress tracking
+  const task = engine.searchAllPages(doc, 'keyword');
+  task.onProgress((progress) => {
+    console.log(`Page ${progress.page} complete`);
+  });
+  ```
+
+  - `CompoundTask.gather()` - Like `Promise.all()` with progress
+  - `CompoundTask.gatherIndexed()` - Returns `Record<number, Result>`
+  - `CompoundTask.first()` - Like `Promise.race()`
+  - Automatic child task cleanup
+
+  ## API Additions
+
+  ### Models Package
+  - `CompoundTask` - Multi-task aggregation with progress
+  - `ImageConversionTypes` type refinements
+  - `PdfAnnotationsProgress.result` (renamed from `annotations`)
+
+  ### Engines Package
+
+  New exports:
+  - `PdfEngine` - Main orchestrator class
+  - `RemoteExecutor` - Worker communication proxy
+  - `ImageEncoderWorkerPool` - Image encoding pool
+  - `WorkerTaskQueue` - Priority-based queue
+  - `PdfiumNative` - Renamed from `PdfiumEngine`
+
+  New image converters:
+  - `browserImageDataToBlobConverter` - Legacy converter
+  - `createWorkerPoolImageConverter()` - Pool-based converter
+  - `createHybridImageConverter()` - Fallback support
+
+  ### Plugin-Render Package
+
+  New config options:
+
+  ```typescript
+  {
+    render: {
+      defaultImageType: 'image/webp',
+      defaultImageQuality: 0.92
+    }
+  }
+  ```
+
+  ## Improvements
+  - **Performance**: Parallel image encoding improves render throughput by ~40-60%
+  - **Responsiveness**: Priority queues ensure visible pages render first
+  - **Memory**: Better cleanup of completed tasks and worker references
+  - **Logging**: Enhanced performance logging with duration tracking
+  - **Developer Experience**: Clearer separation of concerns
+
+- [#303](https://github.com/embedpdf/embed-pdf-viewer/pull/303) by [@bobsingor](https://github.com/bobsingor) – # Remove `initialize()` - PDFium Now Initializes in Constructor
+
+  This release removes the `initialize()` method from all engine classes. PDFium is now automatically initialized in the constructor, simplifying the API and reducing boilerplate.
+
+  ## Breaking Changes
+
+  ### `initialize()` Method Removed
+
+  The `initialize()` method has been removed from:
+  - `PdfiumNative` (formerly `PdfiumEngine`)
+  - `PdfEngine` orchestrator
+  - `RemoteExecutor`
+  - `WebWorkerEngine`
+  - `IPdfiumExecutor` interface
+  - `PdfEngine` interface (in models)
+
+  **Migration:**
+
+  ```typescript
+  // Before
+  const native = new PdfiumNative(wasmModule, { logger });
+  native.initialize();
+
+  const engine = new PdfEngine(native, { imageConverter, logger });
+  engine.initialize();
+
+  // After - no initialize() needed!
+  const native = new PdfiumNative(wasmModule, { logger });
+  const engine = new PdfEngine(native, { imageConverter, logger });
+
+  // Ready to use immediately
+  const doc = await engine.openDocumentBuffer(file).toPromise();
+  ```
+
+  ### Framework Hooks Simplified
+
+  The `usePdfiumEngine` hooks (React, Vue, Svelte) no longer require calling `initialize()`:
+
+  ```typescript
+  // Before
+  const { engine, isLoading } = usePdfiumEngine();
+  const [initialized, setInitialized] = useState(false);
+
+  useEffect(() => {
+    if (engine && !initialized) {
+      engine.initialize().wait(setInitialized, ignore);
+    }
+  }, [engine, initialized]);
+
+  // After - engine is ready when returned!
+  const { engine, isLoading } = usePdfiumEngine();
+
+  if (!isLoading && engine) {
+    // Ready to use immediately
+  }
+  ```
+
+  ### `PluginRegistry.ensureEngineInitialized()` Removed
+
+  The `ensureEngineInitialized()` method and `engineInitialized` property have been removed from `PluginRegistry` since engines are now initialized in their constructors.
+
+  ## Cross-Platform Image Data
+
+  ### `ImageData` → `ImageDataLike`
+
+  The engine now returns `ImageDataLike` (a plain object with `data`, `width`, `height`) instead of the browser-specific `ImageData` class. This enables Node.js compatibility without polyfills.
+
+  **Affected types:**
+  - `PdfImageObject.imageData` now uses `ImageDataLike`
+  - All raw render methods return `ImageDataLike`
+
+  ### Browser Converter Fallback
+
+  `browserImageDataToBlobConverter` now falls back to regular `<canvas>` when `OffscreenCanvas` is not available (older browsers). The hybrid converter (`createHybridImageConverter`) uses:
+  1. Worker pool with `OffscreenCanvas` (preferred, non-blocking)
+  2. Main-thread `<canvas>` fallback (blocking, but works everywhere)
+
+  ## Benefits
+  - **Simpler API**: One less step to get started
+  - **Less boilerplate**: No more `initialize()` calls in every component
+  - **Node.js compatible**: `ImageDataLike` works without browser APIs
+  - **Broader browser support**: Canvas fallback for older browsers
+
+### Minor Changes
+
+- [#279](https://github.com/embedpdf/embed-pdf-viewer/pull/279) by [@bobsingor](https://github.com/bobsingor) – ## Multi-Document Support
+
+  Updated engine internals to support multiple documents with improved memory management.
+
+  ### Changes
+  - **Memory Management**: Enhanced memory tracking through `MemoryManager` for proper cleanup of multiple document instances.
+  - **Cache**: `PdfCache` now properly tracks and manages multiple document contexts with improved memory management through the memory manager.
+
+  ### Technical Details
+  - Document contexts now use `MemoryManager` for proper WASM pointer tracking and cleanup
+  - Improved resource management for concurrent document handling
+
 ## 2.0.0-next.3
 
 ### Major Changes

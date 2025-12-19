@@ -1,5 +1,67 @@
 # @embedpdf/plugin-viewport
 
+## 2.0.0
+
+### Major Changes
+
+- [#279](https://github.com/embedpdf/embed-pdf-viewer/pull/279) by [@bobsingor](https://github.com/bobsingor) – ## Multi-Document Support
+
+  The viewport plugin now supports per-document viewport metrics, scroll state, and viewport registration.
+
+  ### Breaking Changes
+  - **All Actions**: Now require `documentId` parameter:
+    - `setViewportMetrics(documentId, metrics)` - was `setViewportMetrics(metrics)`
+    - `setViewportScrollMetrics(documentId, scrollMetrics)` - was `setViewportScrollMetrics(scrollMetrics)`
+    - `setViewportGap(documentId, gap)` - was `setViewportGap(gap)`
+    - `setScrollActivity(documentId, isActive)` - was `setScrollActivity(isActive)`
+    - `setSmoothScrollActivity(documentId, isActive)` - was `setSmoothScrollActivity(isActive)`
+  - **Viewport Registration**:
+    - `registerViewport(documentId)` - Now requires document ID
+    - `unregisterViewport(documentId)` - Now requires document ID
+  - **State Structure**: Plugin state now uses per-document viewport state tracking including metrics, scroll state, and viewport gates.
+  - **New Actions**: Added viewport gate management actions:
+    - `addViewportGate(documentId, gateName)`
+    - `removeViewportGate(documentId, gateName)`
+
+  ### Framework-Specific Changes (React/Preact, Svelte, Vue)
+  - **Viewport Component**:
+    - Now requires `documentId` prop (React/Preact: `@embedpdf/plugin-viewport/react`, Svelte: `@embedpdf/plugin-viewport/svelte`, Vue: `@embedpdf/plugin-viewport/vue`)
+    - Component now uses `useViewportRef(documentId)` for document-scoped viewport reference
+    - Uses `useIsViewportGated(documentId)` to check if viewport is gated
+    - Children are only rendered when viewport is not gated
+  - **useViewportRef Hook**:
+    - Now requires `documentId` parameter: `useViewportRef(documentId)`
+    - Returns document-scoped viewport reference
+
+  ### New Features
+  - Per-document viewport metrics and scroll tracking
+  - Per-document viewport registration
+  - Viewport gate management for coordinating viewport operations
+  - Document lifecycle management with automatic state initialization and cleanup
+
+### Minor Changes
+
+- [#301](https://github.com/embedpdf/embed-pdf-viewer/pull/301) by [@bobsingor](https://github.com/bobsingor) – ## Viewport Element Context
+
+  Added a React context to share the viewport DOM element reference with child components.
+
+  ### New Features
+  - **ViewportElementContext**: New context that provides access to the viewport container element
+  - **useViewportElement hook**: Hook to consume the viewport element reference from context
+
+  This allows child components (like `ZoomGestureWrapper`) to access the viewport container element without DOM traversal, enabling gesture events to work anywhere within the viewport area.
+
+  ### Usage
+
+  ```tsx
+  import { useViewportElement } from '@embedpdf/plugin-viewport/react';
+
+  function MyComponent() {
+    const viewportRef = useViewportElement();
+    // viewportRef.current is the viewport container element
+  }
+  ```
+
 ## 2.0.0-next.3
 
 ## 2.0.0-next.2
