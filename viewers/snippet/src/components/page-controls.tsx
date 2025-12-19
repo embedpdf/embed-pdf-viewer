@@ -146,7 +146,7 @@ export function PageControls({ documentId }: PageControlsProps) {
             onFocus={handleInputFocus}
             onBlur={handleInputBlur}
             onKeyDown={handleKeyDown}
-            className="border-border-default bg-bg-input text-fg-primary focus:border-accent focus:ring-accent h-7 w-10 rounded border px-1 text-center text-sm focus:outline-none focus:ring-1"
+            className="border-border-default bg-bg-input text-fg-primary focus:border-accent focus:ring-accent h-7 w-10 rounded border px-1 text-center text-base focus:outline-none focus:ring-1"
           />
           <span className="text-fg-secondary text-sm">&nbsp; {totalPages}</span>
         </div>

@@ -456,7 +456,8 @@ export const commands: Record<string, Command<State>> = {
   'document:fullscreen': {
     id: 'document:fullscreen',
     labelKey: 'document.fullscreen',
-    icon: 'fullscreen',
+    icon: ({ state }) =>
+      state.plugins['fullscreen']?.isFullscreen ? 'fullscreenExit' : 'fullscreen',
     shortcuts: ['F11'],
     categories: ['document', 'document-fullscreen'],
     action: ({ registry }) => {

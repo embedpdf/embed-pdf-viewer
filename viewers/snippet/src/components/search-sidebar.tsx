@@ -156,7 +156,7 @@ export function SearchSidebar({ documentId, onClose }: SearchSidebarProps) {
             placeholder={translate('search.placeholder')}
             value={inputValue}
             onInput={handleInputChange}
-            className="border-border-default bg-bg-input focus:border-accent focus:ring-accent w-full rounded-md border py-1 pl-8 pr-9 text-sm focus:outline-none focus:ring-1"
+            className="border-border-default bg-bg-input focus:border-accent focus:ring-accent w-full rounded-md border py-1 pl-8 pr-9 text-base focus:outline-none focus:ring-1"
           />
           {inputValue && (
             <div
