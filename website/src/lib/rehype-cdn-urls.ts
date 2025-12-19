@@ -17,8 +17,10 @@ const snippetPackageJson = JSON.parse(
   ),
 )
 const EMBEDPDF_VERSION = snippetPackageJson.version
+// Extract major version for CDN URL (e.g., "2.0.1" → "2")
+const EMBEDPDF_MAJOR_VERSION = EMBEDPDF_VERSION.split('.')[0]
 
-const EMBEDPDF_JS_URL = `https://cdn.jsdelivr.net/npm/@embedpdf/snippet@${EMBEDPDF_VERSION}/dist/embedpdf.js`
+const EMBEDPDF_JS_URL = `https://cdn.jsdelivr.net/npm/@embedpdf/snippet@${EMBEDPDF_MAJOR_VERSION}/dist/embedpdf.js`
 const DEMO_PDF_URL = 'https://snippet.embedpdf.com/ebook.pdf'
 
 /**
