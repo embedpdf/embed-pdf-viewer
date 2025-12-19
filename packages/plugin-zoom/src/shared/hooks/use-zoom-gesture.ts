@@ -1,7 +1,7 @@
 import { useLayoutEffect, useRef } from '@framework';
 import { useCapability } from '@embedpdf/core/@framework';
 import { ViewportPlugin, useViewportElement } from '@embedpdf/plugin-viewport/@framework';
-import { setupZoomGestures, ZoomGestureOptions } from '../utils/pinch-zoom-logic';
+import { setupZoomGestures, ZoomGestureOptions } from '../utils/zoom-gesture-logic';
 import { useZoomCapability } from './use-zoom';
 
 export type { ZoomGestureOptions };
@@ -18,15 +18,16 @@ export function useZoomGesture(documentId: string, options: ZoomGestureOptions =
     const element = elementRef.current;
     const container = viewportElementRef?.current;
 
-    if (!element || !viewportProvides || !zoomProvides) {
+    if (!element || !container || !zoomProvides) {
       return;
     }
+
     return setupZoomGestures({
       element,
-      container: container || undefined,
+      container,
       documentId,
-      viewportProvides,
       zoomProvides,
+      viewportGap: viewportProvides?.getViewportGap() || 0,
       options,
     });
   }, [

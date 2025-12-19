@@ -1,4 +1,3 @@
-import type { ViewportCapability } from '@embedpdf/plugin-viewport';
 import type { ZoomCapability } from '@embedpdf/plugin-zoom';
 
 export interface ZoomGestureOptions {
@@ -10,11 +9,12 @@ export interface ZoomGestureOptions {
 
 export interface ZoomGestureDeps {
   element: HTMLDivElement;
-  /** Optional viewport container element for attaching events (from context) */
-  container?: HTMLElement;
+  /** Viewport container element for attaching events */
+  container: HTMLElement;
   documentId: string;
-  viewportProvides: ViewportCapability;
   zoomProvides: ZoomCapability;
+  /** Viewport gap in pixels (default: 0) */
+  viewportGap?: number;
   options?: ZoomGestureOptions;
 }
 
@@ -37,8 +37,8 @@ export function setupZoomGestures({
   element,
   container,
   documentId,
-  viewportProvides,
   zoomProvides,
+  viewportGap = 0,
   options = {},
 }: ZoomGestureDeps) {
   const { enablePinch = true, enableWheel = true } = options;
@@ -46,11 +46,6 @@ export function setupZoomGestures({
     return () => {};
   }
 
-  // Use provided container (from context) or fall back to element
-  // When container is provided, events work anywhere in the viewport
-  const eventContainer = container || element;
-
-  const viewportScope = viewportProvides.forDocument(documentId);
   const zoomScope = zoomProvides.forDocument(documentId);
   const getState = () => zoomScope.getState();
 
@@ -87,17 +82,12 @@ export function setupZoomGestures({
 
   const clamp = (val: number, min: number, max: number) => Math.min(Math.max(val, min), max);
 
-  // --- Margin calculation (no scroll plugin needed!) ---
+  // --- Margin calculation ---
   const updateMargin = () => {
-    const metrics = viewportScope.getMetrics();
-    const vpGap = viewportProvides.getViewportGap() || 0;
-    const availableWidth = metrics.clientWidth - 2 * vpGap;
-
-    // Use element's actual rendered width - no need for scroll plugin!
+    const availableWidth = container.clientWidth - 2 * viewportGap;
     const elementWidth = element.offsetWidth;
 
     const newMargin = elementWidth < availableWidth ? (availableWidth - elementWidth) / 2 : 0;
-
     element.style.marginLeft = `${newMargin}px`;
   };
 
@@ -172,32 +162,26 @@ export function setupZoomGestures({
   };
 
   const initializeGestureState = (clientX: number, clientY: number) => {
-    // Get container rect directly from DOM element (no plugin dependency for DOM access)
-    const containerRect = eventContainer.getBoundingClientRect();
-    const contRect = {
-      origin: { x: containerRect.left, y: containerRect.top },
-      size: { width: containerRect.width, height: containerRect.height },
-    };
+    const containerRect = container.getBoundingClientRect();
     const innerRect = element.getBoundingClientRect();
-    const metrics = viewportScope.getMetrics();
 
-    currentGap = viewportProvides.getViewportGap() || 0;
+    currentGap = viewportGap;
     initialElementWidth = innerRect.width;
     initialElementHeight = innerRect.height;
-    initialElementLeft = innerRect.left - contRect.origin.x;
-    initialElementTop = innerRect.top - contRect.origin.y;
+    initialElementLeft = innerRect.left - containerRect.left;
+    initialElementTop = innerRect.top - containerRect.top;
 
-    containerRectWidth = contRect.size.width;
-    containerRectHeight = contRect.size.height;
+    containerRectWidth = containerRect.width;
+    containerRectHeight = containerRect.height;
 
-    const clientLeft = metrics.clientLeft;
-    layoutWidth = metrics.clientWidth;
-    layoutCenterX = clientLeft + layoutWidth / 2;
+    // Layout dimensions from container's client area
+    layoutWidth = container.clientWidth;
+    layoutCenterX = container.clientLeft + layoutWidth / 2;
 
     const rawPointerLocalX = clientX - innerRect.left;
     pointerLocalY = clientY - innerRect.top;
-    pointerContainerX = clientX - contRect.origin.x;
-    pointerContainerY = clientY - contRect.origin.y;
+    pointerContainerX = clientX - containerRect.left;
+    pointerContainerY = clientY - containerRect.top;
 
     if (initialElementWidth < layoutWidth) {
       pivotLocalX = (pointerContainerX * initialElementWidth) / layoutWidth;
@@ -258,11 +242,11 @@ export function setupZoomGestures({
 
   // Subscribe to zoom changes to update margin
   const unsubZoom = zoomScope.onStateChange(() => updateMargin());
-  const unsubViewport = viewportScope.onViewportChange(() => updateMargin());
 
-  // Use ResizeObserver to update margin when element size changes
+  // Use ResizeObserver to update margin when element or container size changes
   const resizeObserver = new ResizeObserver(() => updateMargin());
   resizeObserver.observe(element);
+  resizeObserver.observe(container);
 
   // Initial margin calculation
   updateMargin();
@@ -270,30 +254,29 @@ export function setupZoomGestures({
   // Attach events to the viewport container for better UX
   // (gestures work anywhere in viewport, not just on the PDF)
   if (enablePinch) {
-    eventContainer.addEventListener('touchstart', handleTouchStart, { passive: false });
-    eventContainer.addEventListener('touchmove', handleTouchMove, { passive: false });
-    eventContainer.addEventListener('touchend', handleTouchEnd);
-    eventContainer.addEventListener('touchcancel', handleTouchEnd);
+    container.addEventListener('touchstart', handleTouchStart, { passive: false });
+    container.addEventListener('touchmove', handleTouchMove, { passive: false });
+    container.addEventListener('touchend', handleTouchEnd);
+    container.addEventListener('touchcancel', handleTouchEnd);
   }
   if (enableWheel) {
-    eventContainer.addEventListener('wheel', handleWheel, { passive: false });
+    container.addEventListener('wheel', handleWheel, { passive: false });
   }
 
   return () => {
     if (enablePinch) {
-      eventContainer.removeEventListener('touchstart', handleTouchStart);
-      eventContainer.removeEventListener('touchmove', handleTouchMove);
-      eventContainer.removeEventListener('touchend', handleTouchEnd);
-      eventContainer.removeEventListener('touchcancel', handleTouchEnd);
+      container.removeEventListener('touchstart', handleTouchStart);
+      container.removeEventListener('touchmove', handleTouchMove);
+      container.removeEventListener('touchend', handleTouchEnd);
+      container.removeEventListener('touchcancel', handleTouchEnd);
     }
     if (enableWheel) {
-      eventContainer.removeEventListener('wheel', handleWheel);
+      container.removeEventListener('wheel', handleWheel);
     }
     if (wheelZoomTimeout) {
       clearTimeout(wheelZoomTimeout);
     }
     unsubZoom();
-    unsubViewport();
     resizeObserver.disconnect();
     resetTransform();
     element.style.marginLeft = '';

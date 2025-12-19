@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { setContext } from 'svelte';
   import { useIsViewportGated, useViewportCapability, useViewportRef } from '../hooks';
   import type { HTMLAttributes } from 'svelte/elements';
   import type { Snippet } from 'svelte';
@@ -19,6 +20,13 @@
   const viewportRef = useViewportRef(() => documentId);
   const viewportCapability = useViewportCapability();
   const isGated = useIsViewportGated(() => documentId);
+
+  // Provide the viewport element to child components via context
+  setContext('viewport-element', {
+    get current() {
+      return viewportRef.containerRef;
+    },
+  });
 
   $effect(() => {
     if (viewportCapability.provides) {

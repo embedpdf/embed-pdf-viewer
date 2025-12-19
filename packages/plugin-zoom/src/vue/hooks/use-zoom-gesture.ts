@@ -2,7 +2,7 @@ import { ref, watch, toValue, inject, type MaybeRefOrGetter, type Ref } from 'vu
 import { useCapability } from '@embedpdf/core/vue';
 import type { ViewportPlugin, ViewportCapability } from '@embedpdf/plugin-viewport';
 
-import { setupZoomGestures, type ZoomGestureOptions } from '../../shared/utils/pinch-zoom-logic';
+import { setupZoomGestures, type ZoomGestureOptions } from '../../shared/utils/zoom-gesture-logic';
 import { useZoomCapability } from './use-zoom';
 import type { ZoomCapability } from '../../lib/types';
 
@@ -54,19 +54,19 @@ export function useZoomGesture(
         cleanup = undefined;
       }
 
+      const container = viewportElementRef?.value;
+
       // Setup new zoom gestures if all dependencies are available
-      if (!element || !viewport || !zoom) {
+      if (!element || !container || !zoom) {
         return;
       }
 
-      const container = viewportElementRef?.value;
-
       cleanup = setupZoomGestures({
         element,
-        container: container || undefined,
+        container,
         documentId: docId,
-        viewportProvides: viewport,
         zoomProvides: zoom,
+        viewportGap: viewport?.getViewportGap() || 0,
         options: { enablePinch, enableWheel },
       });
     },

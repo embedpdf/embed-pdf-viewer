@@ -43,6 +43,7 @@ import {
   ZoomMode,
   ZoomPluginPackage,
   ZoomPluginConfig,
+  ZoomGestureWrapper,
 } from '@embedpdf/plugin-zoom/preact';
 import {
   RenderLayer,
@@ -370,49 +371,51 @@ function ViewerLayout({ documentId, tabBarVisibility = 'multiple' }: ViewerLayou
                   <div className="relative h-full w-full">
                     <GlobalPointerProvider documentId={documentId}>
                       <Viewport className="bg-bg-app" documentId={documentId}>
-                        <Scroller
-                          documentId={documentId}
-                          renderPage={({ pageIndex }) => (
-                            <Rotate
-                              documentId={documentId}
-                              pageIndex={pageIndex}
-                              style={{ backgroundColor: '#fff' }}
-                            >
-                              <PagePointerProvider documentId={documentId} pageIndex={pageIndex}>
-                                <RenderLayer
-                                  documentId={documentId}
-                                  pageIndex={pageIndex}
-                                  scale={0.5}
-                                  style={{ pointerEvents: 'none' }}
-                                />
-                                <TilingLayer
-                                  documentId={documentId}
-                                  pageIndex={pageIndex}
-                                  style={{ pointerEvents: 'none' }}
-                                />
-                                <SearchLayer documentId={documentId} pageIndex={pageIndex} />
-                                <MarqueeZoom documentId={documentId} pageIndex={pageIndex} />
-                                <MarqueeCapture documentId={documentId} pageIndex={pageIndex} />
-                                <SelectionLayer
-                                  documentId={documentId}
-                                  pageIndex={pageIndex}
-                                  selectionMenu={selectionMenu}
-                                />
-                                <RedactionLayer
-                                  documentId={documentId}
-                                  pageIndex={pageIndex}
-                                  selectionMenu={redactionMenu}
-                                />
-                                <AnnotationLayer
-                                  documentId={documentId}
-                                  pageIndex={pageIndex}
-                                  selectionMenu={annotationMenu}
-                                />
-                                <HintLayer />
-                              </PagePointerProvider>
-                            </Rotate>
-                          )}
-                        />
+                        <ZoomGestureWrapper documentId={documentId}>
+                          <Scroller
+                            documentId={documentId}
+                            renderPage={({ pageIndex }) => (
+                              <Rotate
+                                documentId={documentId}
+                                pageIndex={pageIndex}
+                                style={{ backgroundColor: '#fff' }}
+                              >
+                                <PagePointerProvider documentId={documentId} pageIndex={pageIndex}>
+                                  <RenderLayer
+                                    documentId={documentId}
+                                    pageIndex={pageIndex}
+                                    scale={0.5}
+                                    style={{ pointerEvents: 'none' }}
+                                  />
+                                  <TilingLayer
+                                    documentId={documentId}
+                                    pageIndex={pageIndex}
+                                    style={{ pointerEvents: 'none' }}
+                                  />
+                                  <SearchLayer documentId={documentId} pageIndex={pageIndex} />
+                                  <MarqueeZoom documentId={documentId} pageIndex={pageIndex} />
+                                  <MarqueeCapture documentId={documentId} pageIndex={pageIndex} />
+                                  <SelectionLayer
+                                    documentId={documentId}
+                                    pageIndex={pageIndex}
+                                    selectionMenu={selectionMenu}
+                                  />
+                                  <RedactionLayer
+                                    documentId={documentId}
+                                    pageIndex={pageIndex}
+                                    selectionMenu={redactionMenu}
+                                  />
+                                  <AnnotationLayer
+                                    documentId={documentId}
+                                    pageIndex={pageIndex}
+                                    selectionMenu={annotationMenu}
+                                  />
+                                  <HintLayer />
+                                </PagePointerProvider>
+                              </Rotate>
+                            )}
+                          />
+                        </ZoomGestureWrapper>
                       </Viewport>
                     </GlobalPointerProvider>
                     {/* Overlays (floating components like page controls) */}

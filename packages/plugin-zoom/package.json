@@ -46,8 +46,7 @@
     "lint:fix": "eslint src --color --fix"
   },
   "dependencies": {
-    "@embedpdf/models": "workspace:*",
-    "hammerjs": "^2.0.8"
+    "@embedpdf/models": "workspace:*"
   },
   "devDependencies": {
     "@embedpdf/core": "workspace:*",
@@ -56,7 +55,6 @@
     "@embedpdf/plugin-scroll": "workspace:*",
     "@embedpdf/plugin-interaction-manager": "workspace:*",
     "@embedpdf/plugin-spread": "workspace:*",
-    "@types/hammerjs": "^2.0.46",
     "@types/react": "^18.2.0",
     "typescript": "^5.0.0"
   },

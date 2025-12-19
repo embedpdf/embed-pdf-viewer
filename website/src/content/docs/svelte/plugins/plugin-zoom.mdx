@@ -119,6 +119,37 @@ let { documentId }: { documentId: string } = $props();
 
 This requires the `interaction-manager` plugin to be registered. When a user clicks the "Area Zoom" button in the toolbar, `toggleMarqueeZoom` activates the mode, and the `<MarqueeZoom />` component handles the user's drag-and-drop interaction.
 
+### Adding Gesture Zoom (Pinch & Wheel)
+
+The `<ZoomGestureWrapper />` component enables pinch-to-zoom on touch devices and ctrl/cmd+wheel zoom on desktop. Wrap your `<Scroller />` with it:
+
+```svelte {3, 9-11}
+<script lang="ts">
+import { Scroller } from '@embedpdf/plugin-scroll/svelte';
+import { ZoomGestureWrapper } from '@embedpdf/plugin-zoom/svelte';
+
+let { documentId }: { documentId: string } = $props();
+</script>
+
+<Viewport {documentId}>
+  <ZoomGestureWrapper {documentId}>
+    <Scroller {documentId} {renderPage} />
+  </ZoomGestureWrapper>
+</Viewport>
+```
+
+You can disable either gesture type:
+
+```svelte
+<ZoomGestureWrapper 
+  {documentId}
+  enablePinch={false}
+  enableWheel={true}
+>
+  <!-- ... -->
+</ZoomGestureWrapper>
+```
+
 ## Live Example
 
 This example combines the toolbar and the marquee zoom component into a complete viewer. Try clicking the area zoom button (the icon with the magnifying glass and crosshairs) and dragging a rectangle over the document.
@@ -195,3 +226,15 @@ Renders the visual rectangle when a user is selecting an area to zoom into.
 | **`class`** | `string` | (Optional) An optional CSS class for custom styling of the marquee rectangle. |
 | **`stroke`** | `string` | (Optional) The color of the rectangle's border. |
 | **`fill`** | `string` | (Optional) The background color of the rectangle. |
+
+### Component: `<ZoomGestureWrapper />`
+
+Enables pinch-to-zoom and ctrl/cmd+wheel zoom gestures.
+
+#### Props
+
+| Prop | Type | Description |
+| :--- | :--- | :--- |
+| **`documentId`** | `string` | (Required) The ID of the document. |
+| **`enablePinch`** | `boolean` | Enable pinch-to-zoom gesture. **Default**: `true` |
+| **`enableWheel`** | `boolean` | Enable ctrl/cmd+wheel zoom. **Default**: `true` |

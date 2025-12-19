@@ -7,6 +7,7 @@
     "paths": {
       "@framework": ["src/preact/adapter.ts"],
       "@embedpdf/core/@framework": ["src/preact/core.ts"],
+      "@embedpdf/plugin-viewport/@framework": ["src/preact/viewport.ts"],
       "@embedpdf/plugin-zoom": ["src/lib/index.ts"]
     }
   },

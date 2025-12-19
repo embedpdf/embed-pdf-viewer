@@ -1,9 +1,18 @@
-import { useEffect, useState } from '@framework';
+import { useEffect, useState, useContext, RefObject } from '@framework';
 import { useCapability, usePlugin } from '@embedpdf/core/@framework';
 import { GateChangeEvent, ScrollActivity, ViewportPlugin } from '@embedpdf/plugin-viewport';
+import { ViewportElementContext } from '../context';
 
 export const useViewportPlugin = () => usePlugin<ViewportPlugin>(ViewportPlugin.id);
 export const useViewportCapability = () => useCapability<ViewportPlugin>(ViewportPlugin.id);
+
+/**
+ * Hook to get the viewport DOM element ref from context.
+ * Must be used within a Viewport component.
+ */
+export const useViewportElement = (): RefObject<HTMLDivElement> | null => {
+  return useContext(ViewportElementContext);
+};
 
 /**
  * Hook to get the gated state of the viewport for a specific document.

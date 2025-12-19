@@ -14,7 +14,12 @@
     GlobalPointerProvider,
     PagePointerProvider,
   } from '@embedpdf/plugin-interaction-manager/svelte';
-  import { ZoomMode, ZoomPluginPackage, MarqueeZoom } from '@embedpdf/plugin-zoom/svelte';
+  import {
+    ZoomMode,
+    ZoomPluginPackage,
+    MarqueeZoom,
+    ZoomGestureWrapper,
+  } from '@embedpdf/plugin-zoom/svelte';
   import { RedactionLayer, RedactionPluginPackage } from '@embedpdf/plugin-redaction/svelte';
   import { PanPluginPackage } from '@embedpdf/plugin-pan/svelte';
   import { SpreadMode, SpreadPluginPackage } from '@embedpdf/plugin-spread/svelte';
@@ -263,47 +268,49 @@
             <div class="relative h-full w-full">
               <GlobalPointerProvider {documentId}>
                 <Viewport class="bg-gray-100" {documentId}>
-                  <Scroller {documentId}>
-                    {#snippet renderPage(page)}
-                      <Rotate
-                        {documentId}
-                        pageIndex={page.pageIndex}
-                        style="background-color: #fff"
-                      >
-                        <PagePointerProvider {documentId} pageIndex={page.pageIndex}>
-                          <RenderLayer
-                            {documentId}
-                            pageIndex={page.pageIndex}
-                            scale={1}
-                            style="pointer-events: none"
-                          />
-                          <TilingLayer
-                            {documentId}
-                            pageIndex={page.pageIndex}
-                            style="pointer-events: none"
-                          />
-                          <SearchLayer {documentId} pageIndex={page.pageIndex} />
-                          <MarqueeZoom {documentId} pageIndex={page.pageIndex} />
-                          <MarqueeCapture {documentId} pageIndex={page.pageIndex} />
-                          <RedactionLayer
-                            {documentId}
-                            pageIndex={page.pageIndex}
-                            selectionMenu={redactionMenu.renderFn}
-                          />
-                          <SelectionLayer
-                            {documentId}
-                            pageIndex={page.pageIndex}
-                            selectionMenu={selectionMenu.renderFn}
-                          />
-                          <AnnotationLayer
-                            {documentId}
-                            pageIndex={page.pageIndex}
-                            selectionMenu={annotationMenu.renderFn}
-                          />
-                        </PagePointerProvider>
-                      </Rotate>
-                    {/snippet}
-                  </Scroller>
+                  <ZoomGestureWrapper {documentId}>
+                    <Scroller {documentId}>
+                      {#snippet renderPage(page)}
+                        <Rotate
+                          {documentId}
+                          pageIndex={page.pageIndex}
+                          style="background-color: #fff"
+                        >
+                          <PagePointerProvider {documentId} pageIndex={page.pageIndex}>
+                            <RenderLayer
+                              {documentId}
+                              pageIndex={page.pageIndex}
+                              scale={1}
+                              style="pointer-events: none"
+                            />
+                            <TilingLayer
+                              {documentId}
+                              pageIndex={page.pageIndex}
+                              style="pointer-events: none"
+                            />
+                            <SearchLayer {documentId} pageIndex={page.pageIndex} />
+                            <MarqueeZoom {documentId} pageIndex={page.pageIndex} />
+                            <MarqueeCapture {documentId} pageIndex={page.pageIndex} />
+                            <RedactionLayer
+                              {documentId}
+                              pageIndex={page.pageIndex}
+                              selectionMenu={redactionMenu.renderFn}
+                            />
+                            <SelectionLayer
+                              {documentId}
+                              pageIndex={page.pageIndex}
+                              selectionMenu={selectionMenu.renderFn}
+                            />
+                            <AnnotationLayer
+                              {documentId}
+                              pageIndex={page.pageIndex}
+                              selectionMenu={annotationMenu.renderFn}
+                            />
+                          </PagePointerProvider>
+                        </Rotate>
+                      {/snippet}
+                    </Scroller>
+                  </ZoomGestureWrapper>
                   <!-- Page Controls -->
                   <PageControls {documentId} />
                 </Viewport>
