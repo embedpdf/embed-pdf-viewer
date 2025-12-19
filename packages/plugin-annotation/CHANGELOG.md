@@ -1,5 +1,11 @@
 # @embedpdf/plugin-annotation
 
+## 2.0.0-next.4
+
+### Patch Changes
+
+- [`7b6dd6d`](https://github.com/embedpdf/embed-pdf-viewer/commit/7b6dd6d0dd227dae147e50881e4a639e06167db6) by [@bobsingor](https://github.com/bobsingor) – Fixed Vue `AnnotationContainer` component where `mixBlendMode` style was incorrectly applied to the selection menu. The style now only applies to the annotation content div, matching the behavior of React and Svelte implementations. This was caused by Vue's attribute inheritance passing the style to the root element which wrapped both the annotation and the selection menu.
+
 ## 2.0.0-next.3
 
 ## 2.0.0-next.2

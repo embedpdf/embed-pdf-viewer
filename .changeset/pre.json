@@ -51,6 +51,7 @@
     "engine-orchestrator-architecture",
     "fix-document-manager-empty-array",
     "fix-i18n-vue-locale-reactivity",
+    "fix-vue-annotation-mixblendmode-inheritance",
     "hidden-items-dependency-rules",
     "layout-ready-event-page-info",
     "multi-view-core",
@@ -83,11 +84,14 @@
     "multi-view-plugin-viewport",
     "multi-view-plugin-zoom",
     "multi-view-utils",
+    "remove-initialize-constructor-init",
     "scroll-initial-page-removal",
     "selection-menu-height-config",
     "snippet-capability-scope-type-exports",
     "snippet-disabled-categories-and-hierarchical-categories",
     "snippet-spanish-translations-partial-configs",
-    "utils-svelte-action-pattern"
+    "utils-svelte-action-pattern",
+    "viewport-element-context",
+    "zoom-gesture-wrapper-improvements"
   ]
 }
