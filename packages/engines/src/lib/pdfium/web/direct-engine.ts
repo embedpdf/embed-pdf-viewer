@@ -44,9 +44,8 @@ export async function createPdfiumEngine(
   const wasmBinary = await response.arrayBuffer();
   const wasmModule = await init({ wasmBinary });
 
-  // Create the "dumb" executor
+  // Create the "dumb" executor (initializes PDFium in constructor)
   const native = new PdfiumNative(wasmModule, { logger: options?.logger });
-  native.initialize();
 
   // Create the "smart" orchestrator
   return new PdfEngine<Blob>(native, {

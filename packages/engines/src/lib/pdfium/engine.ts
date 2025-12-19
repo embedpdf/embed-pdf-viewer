@@ -191,10 +191,9 @@ export class PdfiumNative implements IPdfiumExecutor {
   private logger: Logger;
 
   /**
-   * Create an instance of PdfiumEngine
+   * Create an instance of PdfiumNative and initialize PDFium
    * @param wasmModule - pdfium wasm module
-   * @param logger - logger instance
-   * @param imageDataToBlobConverter - function to convert ImageData to Blob
+   * @param options - configuration options
    */
   constructor(
     private pdfiumModule: WrappedPdfiumModule,
@@ -211,18 +210,12 @@ export class PdfiumNative implements IPdfiumExecutor {
         this.memoryManager.checkLeaks();
       }, 10000) as unknown as number;
     }
-  }
-  /**
-   * {@inheritDoc @embedpdf/models!PdfEngine.initialize}
-   *
-   * @public
-   */
-  initialize() {
+
+    // Initialize PDFium in constructor
     this.logger.debug(LOG_SOURCE, LOG_CATEGORY, 'initialize');
     this.logger.perf(LOG_SOURCE, LOG_CATEGORY, `Initialize`, 'Begin', 'General');
     this.pdfiumModule.PDFiumExt_Init();
     this.logger.perf(LOG_SOURCE, LOG_CATEGORY, `Initialize`, 'End', 'General');
-    return PdfTaskHelper.resolve(true);
   }
 
   /**
@@ -5539,12 +5532,17 @@ export class PdfiumNative implements IPdfiumExecutor {
       }
     }
 
-    const imageData = new ImageData(array, bitmapWidth, bitmapHeight);
+    // Return plain object (ImageDataLike) instead of browser-specific ImageData
+    const imageDataLike: ImageDataLike = {
+      data: array,
+      width: bitmapWidth,
+      height: bitmapHeight,
+    };
     const matrix = this.readPdfPageObjectTransformMatrix(imageObjectPtr);
 
     return {
       type: PdfPageObjectType.IMAGE,
-      imageData,
+      imageData: imageDataLike,
       matrix,
     };
   }
@@ -6404,8 +6402,13 @@ export class PdfiumNative implements IPdfiumExecutor {
     }
 
     const data = this.pdfiumModule.pdfium.HEAPU8.subarray(heapPtr, heapPtr + bytes);
-    const imageData = new ImageData(new Uint8ClampedArray(data), wDev, hDev);
-    task.resolve(imageData);
+    // Return plain object (ImageDataLike) instead of browser-specific ImageData
+    const imageDataLike: ImageDataLike = {
+      data: new Uint8ClampedArray(data),
+      width: wDev,
+      height: hDev,
+    };
+    task.resolve(imageDataLike);
     this.memoryManager.free(heapPtr);
     return task;
   }
@@ -6527,7 +6530,13 @@ export class PdfiumNative implements IPdfiumExecutor {
       'Begin',
       `${doc.id}-${page.index}`,
     );
-    const imageData = new ImageData(new Uint8ClampedArray(data), wDev, hDev);
+    // Return plain object (ImageDataLike) instead of browser-specific ImageData
+    // This ensures compatibility with Node.js and other non-browser environments
+    const imageDataLike: ImageDataLike = {
+      data: new Uint8ClampedArray(data),
+      width: wDev,
+      height: hDev,
+    };
     this.logger.perf(
       LOG_SOURCE,
       LOG_CATEGORY,
@@ -6535,7 +6544,7 @@ export class PdfiumNative implements IPdfiumExecutor {
       'End',
       `${doc.id}-${page.index}`,
     );
-    task.resolve(imageData);
+    task.resolve(imageDataLike);
 
     this.pdfiumModule.FPDFBitmap_Destroy(bitmapPtr);
     this.memoryManager.free(heapPtr);

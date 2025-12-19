@@ -29,16 +29,8 @@ export function usePdfiumEngine(config?: UsePdfiumEngineProps) {
 
         const pdfEngine = await createPdfiumEngine(wasmUrl, { logger, encoderPoolSize });
         engineRef.current = pdfEngine;
-        pdfEngine.initialize().wait(
-          () => {
-            setEngine(pdfEngine);
-            setLoading(false);
-          },
-          (e) => {
-            setError(new Error(e.reason.message));
-            setLoading(false);
-          },
-        );
+        setEngine(pdfEngine);
+        setLoading(false);
       } catch (e) {
         if (!cancelled) {
           setError(e as Error);

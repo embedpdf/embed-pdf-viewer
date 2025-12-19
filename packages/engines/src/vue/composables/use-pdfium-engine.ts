@@ -47,16 +47,7 @@ export function usePdfiumEngine(props: UsePdfiumEngineProps = {}): UsePdfiumEngi
         : await import('@embedpdf/engines/pdfium-direct-engine');
 
       const pdfEngine = await createPdfiumEngine(wasmUrl, { logger });
-      pdfEngine.initialize().wait(
-        () => {
-          isLoading.value = false;
-          engine.value = pdfEngine;
-        },
-        (e) => {
-          error.value = new Error(e.reason.message);
-          isLoading.value = false;
-        },
-      );
+      engine.value = pdfEngine;
       isLoading.value = false;
     } catch (e) {
       error.value = e as Error;

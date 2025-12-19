@@ -2,36 +2,24 @@
 
 import { usePdfiumEngine } from '@embedpdf/engines/react'
 import { ignore, PdfDocumentObject, Rotation } from '@embedpdf/models'
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 
 export default function RenderPageExample() {
   const { isLoading, error, engine } = usePdfiumEngine()
-  const [initialized, setInitialized] = useState(false)
   const [document, setDocument] = useState<PdfDocumentObject | null>(null)
   const [loadingDocument, setLoadingDocument] = useState(false)
   const [imageUrl, setImageUrl] = useState<string | null>(null)
   const [loadingImage, setLoadingImage] = useState(false)
 
-  useEffect(() => {
-    if (engine && !initialized) {
-      if (engine.initialize) {
-        const task = engine.initialize()
-        task.wait(setInitialized, ignore)
-      } else {
-        setInitialized(true)
-      }
-    }
-  }, [engine, initialized])
-
   if (error) {
     return (
       <div className="mt-3 rounded-md border border-red-200 bg-red-50 p-4 text-sm font-medium text-red-800 dark:border-red-800 dark:bg-red-900/20 dark:text-red-400">
-        Failed to initialize PDF engine: {error.message}
+        Failed to load PDF engine: {error.message}
       </div>
     )
   }
 
-  if (isLoading || !engine || !initialized) {
+  if (isLoading || !engine) {
     return (
       <div className="mt-3 rounded-md border border-yellow-200 bg-yellow-50 p-4 text-sm font-medium text-yellow-800 dark:border-yellow-800 dark:bg-yellow-900/20 dark:text-yellow-400">
         Loading PDF engine...

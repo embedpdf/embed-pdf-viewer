@@ -25,9 +25,8 @@ export class PdfiumEngineRunner extends PdfiumNativeRunner {
     const wasmBinary = this.wasmBinary;
     const wasmModule = await init({ wasmBinary });
 
-    // Create the "dumb" executor
+    // Create the "dumb" executor (initializes PDFium in constructor)
     this.native = new PdfiumNative(wasmModule, { logger: this.logger });
-    this.native.initialize();
 
     this.ready();
   }

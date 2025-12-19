@@ -249,9 +249,6 @@ export class EngineRunner {
       case 'isSupport':
         task = this.engine[name]!(...args);
         break;
-      case 'initialize':
-        task = this.engine[name]!(...args);
-        break;
       case 'destroy':
         task = this.engine[name]!(...args);
         break;

@@ -61,7 +61,6 @@ const LOG_CATEGORY = 'Worker';
  * Message types for worker communication
  */
 type MessageType =
-  | 'initialize'
   | 'destroy'
   | 'openDocumentBuffer'
   | 'getMetadata'
@@ -262,11 +261,6 @@ export class RemoteExecutor implements IPdfiumExecutor {
   }
 
   // ========== IPdfExecutor Implementation ==========
-
-  initialize(): void {
-    // Initialization is handled by worker creation via readyTask
-    this.logger.debug(LOG_SOURCE, LOG_CATEGORY, 'RemoteExecutor initialized');
-  }
 
   openDocumentBuffer(
     file: PdfFile,

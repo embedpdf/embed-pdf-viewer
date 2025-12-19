@@ -55,8 +55,8 @@ export class PdfiumNativeRunner {
     try {
       const module = await init({ wasmBinary });
 
+      // PdfiumNative initializes PDFium in its constructor
       this.native = new PdfiumNative(module, { logger: logger ?? this.logger });
-      this.native.initialize();
 
       this.logger.debug(LOG_SOURCE, LOG_CATEGORY, 'PDFium initialized successfully');
     } catch (error) {

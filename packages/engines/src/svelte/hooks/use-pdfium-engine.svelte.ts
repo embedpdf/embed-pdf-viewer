@@ -33,17 +33,8 @@ export function usePdfiumEngine(config?: UsePdfiumEngineProps) {
 
           const pdfEngine = await createPdfiumEngine(wasmUrl, { logger });
           engineRef = pdfEngine;
-
-          pdfEngine.initialize().wait(
-            () => {
-              state.engine = pdfEngine;
-              state.isLoading = false;
-            },
-            (e) => {
-              state.error = new Error(e.reason.message);
-              state.isLoading = false;
-            },
-          );
+          state.engine = pdfEngine;
+          state.isLoading = false;
         } catch (e) {
           if (!cancelled) {
             state.error = e as Error;

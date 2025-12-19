@@ -133,17 +133,6 @@ export class PdfEngine<T = Blob> implements IPdfEngine<T> {
     return task;
   }
 
-  initialize(): PdfTask<boolean> {
-    const task = new Task<boolean, PdfErrorReason>();
-    try {
-      this.executor.initialize();
-      task.resolve(true);
-    } catch (error) {
-      task.reject({ code: PdfErrorCode.Unknown, message: String(error) });
-    }
-    return task;
-  }
-
   destroy(): PdfTask<boolean> {
     const task = new Task<boolean, PdfErrorReason>();
     try {

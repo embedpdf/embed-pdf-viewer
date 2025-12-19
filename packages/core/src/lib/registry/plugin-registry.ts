@@ -34,7 +34,6 @@ export class PluginRegistry {
   private resolver: DependencyResolver;
   private configurations: Map<string, unknown> = new Map();
   private engine: PdfEngine;
-  private engineInitialized = false;
   private store: Store<CoreState, CoreAction>;
   private initPromise: Promise<void> | null = null;
   private logger: Logger;
@@ -60,23 +59,6 @@ export class PluginRegistry {
    */
   getLogger(): Logger {
     return this.logger;
-  }
-
-  /**
-   * Ensure engine is initialized before proceeding
-   */
-  private async ensureEngineInitialized(): Promise<void> {
-    if (this.engineInitialized) {
-      return;
-    }
-
-    if (this.engine.initialize) {
-      const task = this.engine.initialize();
-      await task.toPromise();
-      this.engineInitialized = true;
-    } else {
-      this.engineInitialized = true;
-    }
   }
 
   /**
@@ -181,7 +163,6 @@ export class PluginRegistry {
       this.isInitializing = true;
 
       try {
-        await this.ensureEngineInitialized();
         if (this.destroyed) return;
 
         while (this.pendingRegistrations.length > 0) {

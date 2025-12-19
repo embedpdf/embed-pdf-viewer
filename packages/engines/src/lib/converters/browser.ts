@@ -6,10 +6,10 @@ import { ImageEncoderWorkerPool } from '../image-encoder';
 // Error Classes
 // ============================================================================
 
-export class OffscreenCanvasError extends Error {
+export class ImageConverterError extends Error {
   constructor(message: string) {
     super(message);
-    this.name = 'OffscreenCanvasError';
+    this.name = 'ImageConverterError';
   }
 }
 
@@ -18,35 +18,52 @@ export class OffscreenCanvasError extends Error {
 // ============================================================================
 
 /**
- * Browser-based image converter using OffscreenCanvas in the same thread
- * This is the simplest approach but blocks the thread during encoding
+ * Main-thread Canvas-based image converter
+ * Simple and works everywhere, but blocks the main thread during encoding
+ *
+ * Use this as a fallback when worker-based encoding isn't available
  */
 export const browserImageDataToBlobConverter: ImageDataConverter<Blob> = (
   getImageData: LazyImageData,
   imageType: ImageConversionTypes = 'image/webp',
   quality?: number,
 ): Promise<Blob> => {
-  // Check if we're in a browser environment
-  if (typeof OffscreenCanvas === 'undefined') {
+  if (typeof document === 'undefined') {
     return Promise.reject(
-      new OffscreenCanvasError(
-        'OffscreenCanvas is not available in this environment. ' +
-          'This converter is intended for browser use only. ' +
-          'Falling back to WASM-based image encoding.',
+      new ImageConverterError(
+        'document is not available. This converter requires a browser environment.',
       ),
     );
   }
 
   const pdfImage = getImageData();
   const imageData = new ImageData(pdfImage.data, pdfImage.width, pdfImage.height);
-  const off = new OffscreenCanvas(imageData.width, imageData.height);
-  off.getContext('2d')!.putImageData(imageData, 0, 0);
-  return off.convertToBlob({ type: imageType, quality });
+
+  return new Promise((resolve, reject) => {
+    const canvas = document.createElement('canvas');
+    canvas.width = imageData.width;
+    canvas.height = imageData.height;
+    canvas.getContext('2d')!.putImageData(imageData, 0, 0);
+
+    canvas.toBlob(
+      (blob) => {
+        if (blob) {
+          resolve(blob);
+        } else {
+          reject(new ImageConverterError('Canvas toBlob returned null'));
+        }
+      },
+      imageType,
+      quality,
+    );
+  });
 };
 
 /**
- * Create an image converter that uses a dedicated worker pool for encoding
- * This prevents blocking the main/PDFium worker thread
+ * Worker pool image converter using OffscreenCanvas in dedicated workers
+ * Non-blocking - encoding happens off the main thread
+ *
+ * This is the preferred approach for performance
  *
  * @param workerPool - Instance of ImageEncoderWorkerPool
  * @returns ImageDataConverter function
@@ -77,31 +94,28 @@ export function createWorkerPoolImageConverter(
 }
 
 /**
- * Hybrid converter: tries worker pool first, falls back to WASM encoding
- * This provides the best performance with graceful degradation
+ * Hybrid converter: Worker pool (OffscreenCanvas) → Main thread Canvas fallback
+ *
+ * Best of both worlds:
+ * - Primary: Non-blocking worker-based encoding with OffscreenCanvas
+ * - Fallback: Main-thread Canvas for older browsers without OffscreenCanvas in workers
  *
  * @param workerPool - Instance of ImageEncoderWorkerPool
- * @param wasmFallback - WASM-based encoding function
  * @returns ImageDataConverter function
  */
 export function createHybridImageConverter(
   workerPool: ImageEncoderWorkerPool,
-  wasmFallback: (
-    imageData: { data: Uint8ClampedArray; width: number; height: number },
-    imageType: ImageConversionTypes,
-    quality?: number,
-  ) => Blob,
 ): ImageDataConverter<Blob> {
   return async (
     getImageData: LazyImageData,
     imageType: ImageConversionTypes = 'image/webp',
     quality?: number,
   ): Promise<Blob> => {
-    const pdfImage = getImageData();
-
     try {
-      // Try worker pool encoding first
+      // Try worker pool encoding first (OffscreenCanvas in worker)
+      const pdfImage = getImageData();
       const dataCopy = new Uint8ClampedArray(pdfImage.data);
+
       return await workerPool.encode(
         {
           data: dataCopy,
@@ -112,17 +126,9 @@ export function createHybridImageConverter(
         quality,
       );
     } catch (error) {
-      // Fallback to WASM encoding
-      console.warn('Worker pool encoding failed, falling back to WASM:', error);
-      return wasmFallback(
-        {
-          data: pdfImage.data,
-          width: pdfImage.width,
-          height: pdfImage.height,
-        },
-        imageType,
-        quality,
-      );
+      // Fallback to main-thread Canvas
+      console.warn('Worker encoding failed, falling back to main-thread Canvas:', error);
+      return browserImageDataToBlobConverter(getImageData, imageType, quality);
     }
   };
 }

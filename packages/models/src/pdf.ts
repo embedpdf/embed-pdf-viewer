@@ -1670,9 +1670,9 @@ export interface PdfPathObject {
 export interface PdfImageObject {
   type: PdfPageObjectType.IMAGE;
   /**
-   * data of the image
+   * data of the image (cross-platform compatible, works in Node.js and browsers)
    */
-  imageData: ImageData;
+  imageData: ImageDataLike;
   /**
    * transform matrix
    */
@@ -2640,11 +2640,6 @@ export interface PdfEngine<T = Blob> {
    */
   isSupport?: (feature: PdfEngineFeature) => PdfTask<PdfEngineOperation[]>;
   /**
-   * Initialize the engine
-   * @returns task that indicate whether initialization is successful
-   */
-  initialize?: () => PdfTask<boolean>;
-  /**
    * Destroy the engine
    * @returns task that indicate whether destroy is successful
    */
@@ -3025,7 +3020,6 @@ export interface BatchProgress<T> {
  */
 export interface IPdfiumExecutor {
   // Core operations
-  initialize(): void;
   destroy(): void;
   openDocumentBuffer(
     file: PdfFile,

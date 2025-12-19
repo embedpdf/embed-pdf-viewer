@@ -2,7 +2,7 @@ import { Logger } from '@embedpdf/models';
 import { PdfEngine } from '../../orchestrator/pdf-engine';
 import { RemoteExecutor } from '../../orchestrator/remote-executor';
 import { ImageEncoderWorkerPool } from '../../image-encoder';
-import { createWorkerPoolImageConverter } from '../../converters/browser';
+import { createHybridImageConverter } from '../../converters/browser';
 
 /* eslint-disable @typescript-eslint/ban-ts-comment */
 // @ts-ignore injected at build time
@@ -85,7 +85,7 @@ export function createPdfiumEngine(
 
   // Create the "smart" orchestrator
   return new PdfEngine<Blob>(remoteExecutor, {
-    imageConverter: createWorkerPoolImageConverter(encoderPool),
+    imageConverter: createHybridImageConverter(encoderPool),
     logger,
   });
 }
