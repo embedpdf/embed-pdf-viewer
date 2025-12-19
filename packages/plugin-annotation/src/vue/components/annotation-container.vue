@@ -1,6 +1,6 @@
 <template>
-  <div data-no-interaction>
-    <div v-bind="{ ...dragProps, ...doubleProps }" :style="containerStyle">
+  <div data-no-interaction :style="{ display: 'contents' }">
+    <div v-bind="{ ...dragProps, ...doubleProps }" :style="mergedContainerStyle">
       <slot :annotation="currentObject"></slot>
 
       <template v-if="isSelected && isResizable">
@@ -53,6 +53,13 @@
   </div>
 </template>
 
+<script lang="ts">
+// Disable attribute inheritance so style doesn't fall through to root element
+export default {
+  inheritAttrs: false,
+};
+</script>
+
 <script setup lang="ts" generic="T extends PdfAnnotationObject">
 import { ref, computed, watch, useSlots, toRaw, shallowRef, VNode } from 'vue';
 import { PdfAnnotationObject, Rect } from '@embedpdf/models';
@@ -88,6 +95,7 @@ const props = withDefaults(
     onSelect: (event: TouchEvent | MouseEvent) => void;
     zIndex?: number;
     selectionOutlineColor?: string;
+    style?: Record<string, string | number>;
   }>(),
   {
     lockAspectRatio: false,
@@ -258,6 +266,12 @@ const containerStyle = computed(() => ({
   touchAction: 'none',
   cursor: props.isSelected && props.isDraggable ? 'move' : 'default',
   zIndex: props.zIndex,
+}));
+
+// Merge container style with passed style prop (for mixBlendMode, etc.)
+const mergedContainerStyle = computed(() => ({
+  ...containerStyle.value,
+  ...(props.style ?? {}),
 }));
 
 // Add useSlots to access slot information
