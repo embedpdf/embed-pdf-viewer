@@ -247,128 +247,147 @@ export class EngineRunner {
     let task: PdfEngineMethodReturnType<typeof name>;
     switch (name) {
       case 'isSupport':
-        task = this.engine[name]!(...args);
+        task = engine.isSupport!(...args);
         break;
       case 'destroy':
-        task = this.engine[name]!(...args);
+        task = engine.destroy!(...args);
         break;
       case 'openDocumentUrl':
-        task = this.engine[name]!(...args);
+        task = engine.openDocumentUrl!(...args);
         break;
       case 'openDocumentBuffer':
-        task = this.engine[name]!(...args);
+        task = engine.openDocumentBuffer!(...args);
         break;
       case 'getDocPermissions':
-        task = this.engine[name]!(...args);
+        task = engine.getDocPermissions!(...args);
         break;
       case 'getDocUserPermissions':
-        task = this.engine[name]!(...args);
+        task = engine.getDocUserPermissions!(...args);
         break;
       case 'getMetadata':
-        task = this.engine[name]!(...args);
+        task = engine.getMetadata!(...args);
         break;
       case 'setMetadata':
-        task = this.engine[name]!(...args);
+        task = engine.setMetadata!(...args);
         break;
       case 'getBookmarks':
-        task = this.engine[name]!(...args);
+        task = engine.getBookmarks!(...args);
         break;
       case 'setBookmarks':
-        task = this.engine[name]!(...args);
+        task = engine.setBookmarks!(...args);
         break;
       case 'deleteBookmarks':
-        task = this.engine[name]!(...args);
+        task = engine.deleteBookmarks!(...args);
         break;
       case 'getSignatures':
-        task = this.engine[name]!(...args);
+        task = engine.getSignatures!(...args);
         break;
       case 'renderPage':
-        task = this.engine[name]!(...args);
+        task = engine.renderPage!(...args);
         break;
       case 'renderPageRect':
-        task = this.engine[name]!(...args);
+        task = engine.renderPageRect!(...args);
         break;
       case 'renderPageAnnotation':
-        task = this.engine[name]!(...args);
+        task = engine.renderPageAnnotation!(...args);
         break;
       case 'renderThumbnail':
-        task = this.engine[name]!(...args);
+        task = engine.renderThumbnail!(...args);
         break;
       case 'getAllAnnotations':
-        task = this.engine[name]!(...args);
+        task = engine.getAllAnnotations!(...args);
         break;
       case 'getPageAnnotations':
-        task = this.engine[name]!(...args);
+        task = engine.getPageAnnotations!(...args);
         break;
       case 'createPageAnnotation':
-        task = this.engine[name]!(...args);
+        task = engine.createPageAnnotation!(...args);
         break;
       case 'updatePageAnnotation':
-        task = this.engine[name]!(...args);
+        task = engine.updatePageAnnotation!(...args);
         break;
       case 'removePageAnnotation':
-        task = this.engine[name]!(...args);
+        task = engine.removePageAnnotation!(...args);
         break;
       case 'getPageTextRects':
-        task = this.engine[name]!(...args);
+        task = engine.getPageTextRects!(...args);
         break;
       case 'searchAllPages':
-        task = this.engine[name]!(...args);
+        task = engine.searchAllPages!(...args);
         break;
       case 'closeDocument':
-        task = this.engine[name]!(...args);
+        task = engine.closeDocument!(...args);
         break;
       case 'closeAllDocuments':
-        task = this.engine[name]!(...args);
+        task = engine.closeAllDocuments!(...args);
         break;
       case 'saveAsCopy':
-        task = this.engine[name]!(...args);
+        task = engine.saveAsCopy!(...args);
         break;
       case 'getAttachments':
-        task = this.engine[name]!(...args);
+        task = engine.getAttachments!(...args);
         break;
       case 'addAttachment':
-        task = this.engine[name]!(...args);
+        task = engine.addAttachment!(...args);
         break;
       case 'removeAttachment':
-        task = this.engine[name]!(...args);
+        task = engine.removeAttachment!(...args);
         break;
       case 'readAttachmentContent':
-        task = this.engine[name]!(...args);
+        task = engine.readAttachmentContent!(...args);
         break;
       case 'setFormFieldValue':
-        task = this.engine[name]!(...args);
+        task = engine.setFormFieldValue!(...args);
         break;
       case 'flattenPage':
-        task = this.engine[name]!(...args);
+        task = engine.flattenPage!(...args);
         break;
       case 'extractPages':
-        task = this.engine[name]!(...args);
+        task = engine.extractPages!(...args);
         break;
       case 'extractText':
-        task = this.engine[name]!(...args);
+        task = engine.extractText!(...args);
         break;
       case 'redactTextInRects':
-        task = this.engine[name]!(...args);
+        task = engine.redactTextInRects!(...args);
         break;
       case 'getTextSlices':
-        task = this.engine[name]!(...args);
+        task = engine.getTextSlices!(...args);
         break;
       case 'getPageGlyphs':
-        task = this.engine[name]!(...args);
+        task = engine.getPageGlyphs!(...args);
         break;
       case 'getPageGeometry':
-        task = this.engine[name]!(...args);
+        task = engine.getPageGeometry!(...args);
         break;
       case 'merge':
-        task = this.engine[name]!(...args);
+        task = engine.merge!(...args);
         break;
       case 'mergePages':
-        task = this.engine[name]!(...args);
+        task = engine.mergePages!(...args);
         break;
       case 'preparePrintDocument':
-        task = this.engine[name]!(...args);
+        task = engine.preparePrintDocument!(...args);
         break;
+      default:
+        // This should never be reached due to the earlier check, but provides exhaustiveness
+        const error: PdfEngineError = {
+          type: 'reject',
+          reason: {
+            code: PdfErrorCode.NotSupport,
+            message: `engine method ${name} is not supported`,
+          },
+        };
+        const response: ExecuteResponse = {
+          id: request.id,
+          type: 'ExecuteResponse',
+          data: {
+            type: 'error',
+            value: error,
+          },
+        };
+        this.respond(response);
+        return;
     }
 
     task.onProgress((progress) => {
