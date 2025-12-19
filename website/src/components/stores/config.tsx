@@ -5,6 +5,7 @@ import { normalizePages } from 'nextra/normalize-pages'
 import type { FC, ReactElement, ReactNode } from 'react'
 import { createContext, useContext } from 'react'
 import { usePathname } from 'next/navigation'
+import { Fragment } from 'react'
 
 const ConfigContext = createContext<ReturnType<typeof normalizePages> | null>(
   null,
@@ -38,9 +39,9 @@ export const ConfigProvider: FC<{
 
   return (
     <ConfigContext.Provider value={normalizedPages}>
-      {activeThemeContext.navbar && navbar}
-      {children}
-      {activeThemeContext.footer && footer}
+      {activeThemeContext.navbar && <Fragment key="navbar">{navbar}</Fragment>}
+      <Fragment key="children">{children}</Fragment>
+      {activeThemeContext.footer && <Fragment key="footer">{footer}</Fragment>}
     </ConfigContext.Provider>
   )
 }

@@ -11,7 +11,6 @@ export const manifest: PluginManifest<RedactionPluginConfig> = {
   requires: [],
   optional: ['interaction-manager', 'selection'],
   defaultConfig: {
-    enabled: true,
     drawBlackBoxes: true,
   },
 };

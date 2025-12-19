@@ -1,28 +1,42 @@
-import { readonly, ref, watchEffect } from 'vue';
+import { ref, watch, computed, toValue, type MaybeRefOrGetter } from 'vue';
 import { useCapability, usePlugin } from '@embedpdf/core/vue';
-import { AnnotationPlugin, AnnotationState, initialState } from '@embedpdf/plugin-annotation';
-import { AnnotationPluginConfig } from '../../lib';
+import {
+  AnnotationPlugin,
+  AnnotationDocumentState,
+  initialDocumentState,
+} from '@embedpdf/plugin-annotation';
 
 export const useAnnotationPlugin = () => usePlugin<AnnotationPlugin>(AnnotationPlugin.id);
 export const useAnnotationCapability = () => useCapability<AnnotationPlugin>(AnnotationPlugin.id);
 
-export const useAnnotation = () => {
+/**
+ * Hook for annotation state for a specific document
+ * @param documentId Document ID (can be ref, computed, getter, or plain value)
+ */
+export const useAnnotation = (documentId: MaybeRefOrGetter<string>) => {
   const { provides } = useAnnotationCapability();
-  // We need to provide a dummy config to initialState
-  const dummyConfig: AnnotationPluginConfig = { enabled: true };
-  const state = ref<AnnotationState>(initialState(dummyConfig));
+  const state = ref<AnnotationDocumentState>(
+    provides?.value?.forDocument(toValue(documentId))?.getState() ?? initialDocumentState(),
+  );
 
-  watchEffect((onCleanup) => {
-    if (provides.value) {
-      const unsubscribe = provides.value.onStateChange((newState) => {
-        state.value = newState;
-      });
-      onCleanup(unsubscribe);
-    }
-  });
+  watch(
+    [provides, () => toValue(documentId)],
+    ([providesValue, docId], _, onCleanup) => {
+      if (providesValue && docId) {
+        const scope = providesValue.forDocument(docId);
+        state.value = scope.getState();
+
+        const unsubscribe = scope.onStateChange((newState) => {
+          state.value = newState;
+        });
+        onCleanup(unsubscribe);
+      }
+    },
+    { immediate: true },
+  );
 
   return {
-    state: readonly(state),
-    provides,
+    state,
+    provides: computed(() => provides.value?.forDocument(toValue(documentId)) ?? null),
   };
 };

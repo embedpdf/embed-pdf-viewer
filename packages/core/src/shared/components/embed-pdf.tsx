@@ -1,6 +1,6 @@
-import { useState, useEffect, useRef, ReactNode } from '@framework';
+import { useState, useEffect, useRef, useMemo, ReactNode } from '@framework';
 import { Logger, PdfEngine } from '@embedpdf/models';
-import { PluginRegistry } from '@embedpdf/core';
+import { PluginRegistry, CoreState, DocumentState } from '@embedpdf/core';
 import type { PluginBatchRegistrations } from '@embedpdf/core';
 
 import { PDFContext, PDFContextState } from '../context';
@@ -45,12 +45,13 @@ export function EmbedPDF({
   autoMountDomElements = true,
 }: EmbedPDFProps) {
   const [registry, setRegistry] = useState<PluginRegistry | null>(null);
+  const [coreState, setCoreState] = useState<CoreState | null>(null);
   const [isInitializing, setIsInitializing] = useState<boolean>(true);
   const [pluginsReady, setPluginsReady] = useState<boolean>(false);
   const initRef = useRef<EmbedPDFProps['onInitialized']>(onInitialized);
 
   useEffect(() => {
-    initRef.current = onInitialized; // update without triggering re-runs
+    initRef.current = onInitialized;
   }, [onInitialized]);
 
   useEffect(() => {
@@ -59,16 +60,26 @@ export function EmbedPDF({
 
     const initialize = async () => {
       await pdfViewer.initialize();
-      // if the registry is destroyed, don't do anything
+
       if (pdfViewer.isDestroyed()) {
         return;
       }
 
+      const store = pdfViewer.getStore();
+      setCoreState(store.getState().core);
+
+      const unsubscribe = store.subscribe((action, newState, oldState) => {
+        // Only update if it's a core action and the core state changed
+        if (store.isCoreAction(action) && newState.core !== oldState.core) {
+          setCoreState(newState.core);
+        }
+      });
+
       /* always call the *latest* callback */
       await initRef.current?.(pdfViewer);
 
-      // if the registry is destroyed, don't do anything
       if (pdfViewer.isDestroyed()) {
+        unsubscribe();
         return;
       }
 
@@ -81,25 +92,60 @@ export function EmbedPDF({
       // Provide the registry to children via context
       setRegistry(pdfViewer);
       setIsInitializing(false);
+
+      // Return cleanup function
+      return unsubscribe;
     };
 
-    initialize().catch(console.error);
+    let cleanup: (() => void) | undefined;
+    initialize()
+      .then((unsub) => {
+        cleanup = unsub;
+      })
+      .catch(console.error);
 
     return () => {
+      cleanup?.();
       pdfViewer.destroy();
       setRegistry(null);
+      setCoreState(null);
       setIsInitializing(true);
       setPluginsReady(false);
     };
   }, [engine, plugins]);
 
-  const content =
-    typeof children === 'function'
-      ? children({ registry, isInitializing, pluginsReady })
-      : children;
+  // Compute convenience accessors
+  const contextValue: PDFContextState = useMemo(() => {
+    const activeDocumentId = coreState?.activeDocumentId ?? null;
+    const documents = coreState?.documents ?? {};
+    const documentOrder = coreState?.documentOrder ?? [];
+
+    // Compute active document
+    const activeDocument =
+      activeDocumentId && documents[activeDocumentId] ? documents[activeDocumentId] : null;
+
+    // Compute open documents in order
+    const documentStates = documentOrder
+      .map((docId) => documents[docId])
+      .filter((doc): doc is DocumentState => doc !== null && doc !== undefined);
+
+    return {
+      registry,
+      coreState,
+      isInitializing,
+      pluginsReady,
+      // Convenience accessors (always safe to use)
+      activeDocumentId,
+      activeDocument,
+      documents,
+      documentStates,
+    };
+  }, [registry, coreState, isInitializing, pluginsReady]);
+
+  const content = typeof children === 'function' ? children(contextValue) : children;
 
   return (
-    <PDFContext.Provider value={{ registry, isInitializing, pluginsReady }}>
+    <PDFContext.Provider value={contextValue}>
       {pluginsReady && autoMountDomElements ? (
         <AutoMount plugins={plugins}>{content}</AutoMount>
       ) : (

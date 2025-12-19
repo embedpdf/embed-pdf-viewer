@@ -7,10 +7,11 @@ interface UsePdfiumEngineProps {
   wasmUrl?: string;
   worker?: boolean;
   logger?: Logger;
+  encoderPoolSize?: number;
 }
 
 export function usePdfiumEngine(config?: UsePdfiumEngineProps) {
-  const { wasmUrl = defaultWasmUrl, worker = true, logger } = config ?? {};
+  const { wasmUrl = defaultWasmUrl, worker = true, logger, encoderPoolSize } = config ?? {};
 
   const [engine, setEngine] = useState<PdfEngine | null>(null);
   const [loading, setLoading] = useState(true);
@@ -26,18 +27,10 @@ export function usePdfiumEngine(config?: UsePdfiumEngineProps) {
           ? await import('@embedpdf/engines/pdfium-worker-engine')
           : await import('@embedpdf/engines/pdfium-direct-engine');
 
-        const pdfEngine = await createPdfiumEngine(wasmUrl, logger);
+        const pdfEngine = await createPdfiumEngine(wasmUrl, { logger, encoderPoolSize });
         engineRef.current = pdfEngine;
-        pdfEngine.initialize().wait(
-          () => {
-            setEngine(pdfEngine);
-            setLoading(false);
-          },
-          (e) => {
-            setError(new Error(e.reason.message));
-            setLoading(false);
-          },
-        );
+        setEngine(pdfEngine);
+        setLoading(false);
       } catch (e) {
         if (!cancelled) {
           setError(e as Error);

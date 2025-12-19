@@ -9,9 +9,16 @@ import { AnnotationTool, useAnnotationCapability } from '@embedpdf/plugin-annota
 import { useEffect, useState } from 'react';
 import { ToggleIconButton } from '../toggle-icon-button';
 
-export const AnnotationToolbar = () => {
-  const { provides: annotationProvider } = useAnnotationCapability();
+interface AnnotationToolbarProps {
+  documentId: string;
+}
+
+export const AnnotationToolbar = ({ documentId }: AnnotationToolbarProps) => {
+  const { provides: annotationCapability } = useAnnotationCapability();
   const [activeTool, setActiveTool] = useState<AnnotationTool | null>(null);
+
+  // Get document-scoped API
+  const annotationProvider = annotationCapability?.forDocument(documentId);
 
   useEffect(() => {
     if (!annotationProvider) return;

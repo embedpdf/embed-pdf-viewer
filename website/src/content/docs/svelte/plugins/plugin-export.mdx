@@ -27,7 +27,7 @@ import { ExportPluginPackage } from '@embedpdf/plugin-export/svelte'
 
 const plugins = [
   // ... other essential plugins
-  createPluginRegistration(LoaderPluginPackage, { /* ... */ }),
+  createPluginRegistration(DocumentManagerPluginPackage, { /* ... */ }),
   createPluginRegistration(ViewportPluginPackage),
   createPluginRegistration(ScrollPluginPackage),
   createPluginRegistration(RenderPluginPackage),
@@ -41,17 +41,18 @@ const plugins = [
 
 ## Usage
 
-The plugin works by combining a composable for initiating the download with a component that handles the browser interaction.
+The plugin works by combining a store for initiating the download with a component that handles the browser interaction.
 
 ### Triggering a Download
 
-Use the `useExportCapability` composable to get access to the plugin's `download` method. Call this method from a button in your toolbar to start the download process.
+Use the `useExport` store to get access to the plugin's `download` method for the specific document. Call this method from a button in your toolbar to start the download process.
 
-```svelte
+```svelte {2,5,8}
 <script lang="ts">
-import { useExportCapability } from '@embedpdf/plugin-export/svelte';
+import { useExport } from '@embedpdf/plugin-export/svelte';
 
-const exportApi = useExportCapability();
+let { documentId }: { documentId: string } = $props();
+const exportApi = useExport(() => documentId);
 </script>
 
 <button onclick={() => exportApi.provides?.download()} disabled={!exportApi.provides}>
@@ -65,7 +66,14 @@ This example shows a viewer with a download button. Clicking it will trigger a d
 
 import { ExportExample } from '../code-examples/export-example';
 
-<ExportExample />
+<CodeExample 
+  codePaths={[
+    "../../examples/svelte-tailwind/src/examples/export-example.svelte",
+    "../../examples/svelte-tailwind/src/examples/export-example-content.svelte"
+  ]}
+>
+  <ExportExample />
+</CodeExample>
 
 ## API Reference
 
@@ -75,20 +83,25 @@ import { ExportExample } from '../code-examples/export-example';
 | :--- | :--- | :--- |
 | **`defaultFileName`** | `string` | A fallback filename to use for the downloaded file if the original document does not have a name. <br />**Default**: `document.pdf` |
 
-### Composable: `useExportCapability()`
+### Store: `useExport(documentId)`
 
-This composable connects your component to the export plugin's functions.
+This store connects your component to the export plugin's functions for a specific document.
+
+#### Parameters
+
+| Parameter | Type | Description |
+| :--- | :--- | :--- |
+| **`documentId`** | `() => string` | A getter function that returns the document ID to track. |
 
 #### Returns
 
 | Property | Type | Description |
 | :--- | :--- | :--- |
-| **`provides`** | `ExportCapability \| null` | An object with methods to control exporting, or `null` if the plugin is not ready. |
+| **`provides`** | `ExportScope \| null` | An object with methods to control exporting, or `null` if the plugin is not ready. |
 
-#### `ExportCapability` Methods
+#### `ExportScope` Methods
 
 | Method | Description |
 | :--- | :--- |
 | **`download()`** | The primary method to trigger a download. It signals the auto-mounted `<Download />` component to prepare the file and prompt the user. |
 | **`saveAsCopy()`** | A lower-level method that returns a `Task<ArrayBuffer>`. It retrieves the document's data as an `ArrayBuffer` without triggering a download. Useful for custom export logic. |
-

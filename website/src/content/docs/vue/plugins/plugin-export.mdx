@@ -26,16 +26,16 @@ import { createPluginRegistration } from '@embedpdf/core'
 import { ExportPluginPackage } from '@embedpdf/plugin-export/vue'
 
 const plugins = [
-  // ... other essential plugins
-  createPluginRegistration(LoaderPluginPackage, { /* ... */ }),
-  createPluginRegistration(ViewportPluginPackage),
-  createPluginRegistration(ScrollPluginPackage),
-  createPluginRegistration(RenderPluginPackage),
+  // ... other essential plugins
+  createPluginRegistration(DocumentManagerPluginPackage, { /* ... */ }),
+  createPluginRegistration(ViewportPluginPackage),
+  createPluginRegistration(ScrollPluginPackage),
+  createPluginRegistration(RenderPluginPackage),
 
-  // Register the export plugin
-  createPluginRegistration(ExportPluginPackage, {
-    defaultFileName: 'my-document.pdf',
-  }),
+  // Register the export plugin
+  createPluginRegistration(ExportPluginPackage, {
+    defaultFileName: 'my-document.pdf',
+  }),
 ]
 ```
 
@@ -45,13 +45,14 @@ The plugin works by combining a composable for initiating the download with a co
 
 ### Triggering a Download
 
-Use the `useExportCapability` composable to get access to the plugin's `download` method. Call this method from a button in your toolbar to start the download process.
+Use the `useExport` composable to get access to the plugin's `download` method for the specific document. Call this method from a button in your toolbar to start the download process.
 
-```vue
+```vue {2,5,9}
 <script setup lang="ts">
-import { useExportCapability } from '@embedpdf/plugin-export/vue';
+import { useExport } from '@embedpdf/plugin-export/vue';
 
-const { provides: exportApi } = useExportCapability();
+const props = defineProps<{ documentId: string }>();
+const { provides: exportApi } = useExport(() => props.documentId);
 </script>
 
 <template>
@@ -67,7 +68,14 @@ This example shows a viewer with a download button. Clicking it will trigger a d
 
 import { ExportExample } from '../code-examples/export-example';
 
-<ExportExample />
+<CodeExample 
+  codePaths={[
+    "../../examples/vue-tailwind/src/examples/export-example.vue",
+    "../../examples/vue-tailwind/src/examples/export-example-content.vue"
+  ]}
+>
+  <ExportExample />
+</CodeExample>
 
 ## API Reference
 
@@ -77,17 +85,23 @@ import { ExportExample } from '../code-examples/export-example';
 | :--- | :--- | :--- |
 | **`defaultFileName`** | `string` | A fallback filename to use for the downloaded file if the original document does not have a name. <br />**Default**: `document.pdf` |
 
-### Composable: `useExportCapability()`
+### Composable: `useExport(documentId)`
 
-This composable connects your component to the export plugin's functions.
+This composable connects your component to the export plugin's functions for a specific document.
+
+#### Parameters
+
+| Parameter | Type | Description |
+| :--- | :--- | :--- |
+| **`documentId`** | `() => string` | A getter function that returns the document ID to track. |
 
 #### Returns
 
 | Property | Type | Description |
 | :--- | :--- | :--- |
-| **`provides`** | `Ref<ExportCapability \| null>` | A ref object with methods to control exporting, or `null` if the plugin is not ready. |
+| **`provides`** | `Ref<ExportScope \| null>` | A ref object with methods to control exporting, or `null` if the plugin is not ready. |
 
-#### `ExportCapability` Methods
+#### `ExportScope` Methods
 
 | Method | Description |
 | :--- | :--- |

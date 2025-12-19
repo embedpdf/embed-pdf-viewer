@@ -10,7 +10,5 @@ export const manifest: PluginManifest<FullscreenPluginConfig> = {
   provides: ['fullscreen'],
   requires: [],
   optional: [],
-  defaultConfig: {
-    enabled: true,
-  },
+  defaultConfig: {},
 };

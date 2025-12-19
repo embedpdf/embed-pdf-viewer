@@ -4,20 +4,30 @@ import { useFullscreen } from '@embedpdf/plugin-fullscreen/vue';
 import { usePan } from '@embedpdf/plugin-pan/vue';
 import { useRotateCapability } from '@embedpdf/plugin-rotate/vue';
 import { useExportCapability } from '@embedpdf/plugin-export/vue';
-import { useLoaderCapability } from '@embedpdf/plugin-loader/vue';
+import { useDocumentManagerCapability } from '@embedpdf/plugin-document-manager/vue';
 import { useSpread, SpreadMode } from '@embedpdf/plugin-spread/vue';
 import { useInteractionManager } from '@embedpdf/plugin-interaction-manager/vue';
 import PrintDialog from './PrintDialog.vue';
 import ZoomControls from './ZoomControls.vue';
 import DrawerToggleButton from './drawer-system/DrawerToggleButton.vue';
+import RedactToolbar from './RedactToolbar.vue';
+import AnnotationToolbar from './AnnotationToolbar.vue';
+
+interface ToolbarProps {
+  documentId: string;
+}
+
+const props = defineProps<ToolbarProps>();
 
 const { provides: fullscreenProvider, state: fullscreenState } = useFullscreen();
-const { provides: panProvider, isPanning } = usePan();
+const { provides: panProvider, isPanning } = usePan(() => props.documentId);
 const { provides: rotateProvider } = useRotateCapability();
 const { provides: exportProvider } = useExportCapability();
-const { provides: loaderProvider } = useLoaderCapability();
-const { spreadMode, provides: spreadProvider } = useSpread();
-const { provides: pointerProvider, state: interactionManagerState } = useInteractionManager();
+const { provides: documentManagerProvider } = useDocumentManagerCapability();
+const { spreadMode, provides: spreadProvider } = useSpread(() => props.documentId);
+const { provides: pointerProvider, state: interactionManagerState } = useInteractionManager(
+  () => props.documentId,
+);
 
 // Menu state
 const mainMenuOpen = ref(false);
@@ -57,7 +67,7 @@ const handleDownload = () => {
 };
 
 const handleOpenFilePicker = () => {
-  loaderProvider?.value?.openFileDialog();
+  documentManagerProvider?.value?.openFileDialog();
   mainMenuOpen.value = false;
 };
 
@@ -195,7 +205,7 @@ const handlePrintDialogClose = () => {
     <v-divider vertical class="mx-3 my-3"></v-divider>
 
     <!-- Zoom Controls -->
-    <ZoomControls />
+    <ZoomControls :documentId="props.documentId" />
 
     <v-divider vertical class="mx-3 my-3"></v-divider>
 
@@ -243,11 +253,15 @@ const handlePrintDialogClose = () => {
   </v-app-bar>
 
   <!-- Conditional Toolbars -->
-  <RedactToolbar v-if="mode === 'redact'" />
-  <AnnotationToolbar v-if="mode === 'annotate'" />
+  <RedactToolbar v-if="mode === 'redact'" :documentId="props.documentId" />
+  <AnnotationToolbar v-if="mode === 'annotate'" :documentId="props.documentId" />
 
   <!-- Print Dialog -->
-  <PrintDialog :open="printDialogOpen" @close="handlePrintDialogClose" />
+  <PrintDialog
+    :open="printDialogOpen"
+    :documentId="props.documentId"
+    @close="handlePrintDialogClose"
+  />
 </template>
 
 <style scoped>

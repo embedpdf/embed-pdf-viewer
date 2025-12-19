@@ -32,7 +32,7 @@ The Vuetify example integrates numerous plugins to create a comprehensive viewin
 | Single and two-page spread layouts                         | `@embedpdf/plugin-spread`                                                         |
 | Thumbnail sidebar for quick page jumping                   | `@embedpdf/plugin-thumbnail`                                                      |
 | In-document text search with result highlighting           | `@embedpdf/plugin-search`                                                         |
-| File opening, downloading, and printing                    | `@embedpdf/plugin-loader`, `@embedpdf/plugin-export`, `@embedpdf/plugin-print`    |
+| File opening, downloading, and printing                    | `@embedpdf/plugin-document-manager`, `@embedpdf/plugin-export`, `@embedpdf/plugin-print`    |
 | Fullscreen mode                                            | `@embedpdf/plugin-fullscreen`                                                     |
 | Text selection and copy-to-clipboard                       | `@embedpdf/plugin-selection`                                                      |
 | Annotations (ink, shapes, text, stamps)                    | `@embedpdf/plugin-annotation`                                                     |
@@ -40,7 +40,7 @@ The Vuetify example integrates numerous plugins to create a comprehensive viewin
 
 ## Core Concepts Illustrated
 
-### 1\. Centralized Plugin Registration
+### 1. Centralized Plugin Registration
 
 All features are enabled and configured in a single `plugins` array within the main `Application.vue` component. This makes it easy to see what capabilities the viewer has and to add or remove features.
 
@@ -48,7 +48,7 @@ All features are enabled and configured in a single `plugins` array within the m
 <script setup lang="ts">
 // ...
 const plugins = [
-  createPluginRegistration(LoaderPluginPackage, { /* ... */ }),
+  createPluginRegistration(DocumentManagerPluginPackage, { /* ... */ }),
   createPluginRegistration(ViewportPluginPackage, { /* ... */ }),
   createPluginRegistration(ScrollPluginPackage, { /* ... */ }),
   createPluginRegistration(RenderPluginPackage),
@@ -66,29 +66,61 @@ const plugins = [
   // ... and more
 ];
 </script>
+
+<template>
+  <EmbedPDF :engine="engine" :plugins="plugins" v-slot="{ activeDocumentId }">
+    <DocumentContent
+      v-if="activeDocumentId"
+      :document-id="activeDocumentId"
+      v-slot="{ isLoaded }"
+    >
+      <template v-if="isLoaded">
+        <Toolbar :document-id="activeDocumentId" />
+        <Viewport :document-id="activeDocumentId">
+          <!-- Viewer UI with documentId passed to components -->
+        </Viewport>
+      </template>
+    </DocumentContent>
+  </EmbedPDF>
+</template>
 ```
 
-### 2\. Composable UI Components
+### 2. Composable UI Components
 
 The UI is broken down into logical, reusable Single File Components, each leveraging Vuetify's component library (e.g., `<Toolbar.vue>`, `<Sidebar.vue>`, `<Search.vue>`). Each component is responsible for a specific piece of the UI and uses EmbedPDF composables to interact with the relevant plugins.
 
-For example, the `<ZoomControls.vue>` component uses the `useZoom` composable to manage zoom functionality through `VBtn` and `VMenu`.
+For example, the `<Toolbar.vue>` component uses multiple composables to manage different functionalities like panning, rotating, and changing the page layout. Since EmbedPDF supports multiple documents, composables require a `documentId` parameter (as a getter function).
 
-```vue filename="src/components/ZoomControls.vue"
+```vue filename="src/components/Toolbar.vue"
 <script setup lang="ts">
-import { useZoom, ZoomMode } from '@embedpdf/plugin-zoom/vue';
+import { usePan } from '@embedpdf/plugin-pan/vue';
+import { useRotate } from '@embedpdf/plugin-rotate/vue';
+import { useSpread } from '@embedpdf/plugin-spread/vue';
+// ... other imports
 
-const { state: zoomState, provides: zoomProvider } = useZoom();
+const props = defineProps<{
+  documentId: string;
+}>();
 
-const handleZoomIn = () => {
-  zoomProvider.value?.zoomIn();
-};
+// Pass documentId as a getter function to each composable
+const { provides: panProvider, state: panState } = usePan(() => props.documentId);
+const { provides: rotateProvider } = useRotate(() => props.documentId);
+const { state: spreadState, provides: spreadProvider } = useSpread(() => props.documentId);
+// ...
 </script>
 
 <template>
-  <v-btn @click="handleZoomIn" icon="mdi-plus-circle-outline" />
-  <v-menu>
-    </v-menu>
+  <v-app-bar>
+    <v-toolbar>
+      <!-- ... -->
+      <v-btn 
+        :color="panState.isPanning ? 'primary' : undefined"
+        @click="panProvider?.togglePan()"
+        icon="mdi-hand-back-left-outline"
+      />
+      <!-- ... other buttons for rotate, spread, etc. -->
+    </v-toolbar>
+  </v-app-bar>
 </template>
 ```
 

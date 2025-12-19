@@ -14,12 +14,12 @@ export interface IPlugin<TConfig = unknown> {
 }
 
 export interface BasePluginConfig {
-  enabled?: boolean;
+  // Base interface for plugin configs - extend with plugin-specific options
 }
 
 export interface PluginRegistryConfig {
-  rotation?: Rotation;
-  scale?: number;
+  defaultRotation?: Rotation;
+  defaultScale?: number;
   logger?: Logger;
 }
 

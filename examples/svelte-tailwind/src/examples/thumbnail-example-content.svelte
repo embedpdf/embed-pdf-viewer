@@ -4,84 +4,72 @@
   import { RenderLayer } from '@embedpdf/plugin-render/svelte';
   import { ThumbnailsPane, ThumbImg, type ThumbMeta } from '@embedpdf/plugin-thumbnail/svelte';
 
-  const scroll = useScroll();
+  interface Props {
+    documentId: string;
+  }
+
+  let { documentId }: Props = $props();
+
+  const scroll = useScroll(() => documentId);
 </script>
 
-{#snippet RenderPageSnippet(page: RenderPageProps)}
-  <div style:width={`${page.width}px`} style:height={`${page.height}px`} style:position="relative">
-    <RenderLayer pageIndex={page.pageIndex} scale={page.scale} />
-  </div>
-{/snippet}
-
-<div style="height: 500px; margin-top: 10px">
-  <div style="display: flex; height: 100%">
+<div
+  class="overflow-hidden rounded-lg border border-gray-300 bg-white shadow-sm dark:border-gray-700 dark:bg-gray-900"
+>
+  <div class="flex h-[400px] sm:h-[500px]">
+    <!-- Thumbnail Sidebar -->
     <div
-      style="
-        width: 150px;
-        height: 100%;
-        background-color: #f8f9fa;
-        border-right: 1px solid #dee2e6;
-      "
+      class="h-full w-[140px] flex-shrink-0 border-r border-gray-300 bg-gray-50 dark:border-gray-700 dark:bg-gray-900"
     >
-      <ThumbnailsPane>
+      <ThumbnailsPane {documentId}>
         {#snippet children(meta: ThumbMeta)}
-          <div
-            role="button"
-            tabindex="0"
-            style:position="absolute"
-            style:width="100%"
-            style:height={`${meta.wrapperHeight}px`}
-            style:top={`${meta.top}px`}
-            style:display="flex"
-            style:flex-direction="column"
-            style:align-items="center"
-            style:cursor="pointer"
-            style:padding="4px"
+          <button
+            type="button"
+            class="absolute flex w-full cursor-pointer flex-col items-center px-2 bg-transparent border-0"
+            style:height="{meta.wrapperHeight}px"
+            style:top="{meta.top}px"
             onclick={() => scroll.provides?.scrollToPage?.({ pageNumber: meta.pageIndex + 1 })}
-            onkeydown={(e) => {
-              if (e.key === 'Enter' || e.key === ' ') {
-                e.preventDefault();
-                scroll.provides?.scrollToPage?.({ pageNumber: meta.pageIndex + 1 });
-              }
-            }}
           >
             <div
-              style:width={`${meta.width}px`}
-              style:height={`${meta.height}px`}
-              style:border={`2px solid ${scroll.state.currentPage === meta.pageIndex + 1 ? '#0d6efd' : '#ced4da'}`}
-              style:border-radius="4px"
-              style:overflow="hidden"
-              style:box-shadow={scroll.state.currentPage === meta.pageIndex + 1
-                ? '0 0 5px rgba(13, 110, 253, 0.5)'
-                : 'none'}
+              class={[
+                'overflow-hidden rounded-md transition-all',
+                scroll.state.currentPage === meta.pageIndex + 1
+                  ? 'ring-2 ring-blue-500 ring-offset-2 ring-offset-gray-50 dark:ring-offset-gray-900'
+                  : 'ring-1 ring-gray-300 hover:ring-gray-400 dark:ring-gray-700 dark:hover:ring-gray-600',
+              ].join(' ')}
+              style:width="{meta.width}px"
+              style:height="{meta.height}px"
             >
-              <ThumbImg {meta} style="width: 100%; height: 100%; object-fit: contain" />
+              <ThumbImg
+                {documentId}
+                {meta}
+                style="width: 100%; height: 100%; object-fit: contain;"
+              />
             </div>
-            <div
-              style:height={`${meta.labelHeight}px`}
-              style:display="flex"
-              style:align-items="center"
-              style:justify-content="center"
-              style:margin-top="4px"
-            >
-              <span style="font-size: 12px; color: #6c757d">{meta.pageIndex + 1}</span>
+            <div class="mt-1 flex items-center justify-center" style:height="{meta.labelHeight}px">
+              <span
+                class={[
+                  'text-xs font-medium',
+                  scroll.state.currentPage === meta.pageIndex + 1
+                    ? 'text-blue-600 dark:text-blue-400'
+                    : 'text-gray-600 dark:text-gray-300',
+                ].join(' ')}
+              >
+                {meta.pageIndex + 1}
+              </span>
             </div>
-          </div>
+          </button>
         {/snippet}
       </ThumbnailsPane>
     </div>
-    <div style="flex: 1; overflow: hidden; position: relative">
-      <Viewport
-        style="
-          position: absolute;
-          top: 0;
-          left: 0;
-          right: 0;
-          bottom: 0;
-          background-color: #f1f3f5;
-        "
-      >
-        <Scroller {RenderPageSnippet} />
+
+    <!-- PDF Viewer Area -->
+    <div class="relative flex-1">
+      {#snippet renderPage(page: RenderPageProps)}
+        <RenderLayer {documentId} pageIndex={page.pageIndex} />
+      {/snippet}
+      <Viewport {documentId} class="absolute inset-0 bg-gray-200 dark:bg-gray-800">
+        <Scroller {documentId} {renderPage} />
       </Viewport>
     </div>
   </div>

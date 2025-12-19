@@ -1,4 +1,4 @@
-import { ref, watchEffect, onUnmounted } from 'vue';
+import { ref, watchEffect } from 'vue';
 import { useCapability, usePlugin } from '@embedpdf/core/vue';
 import { FullscreenPlugin, FullscreenState, initialState } from '@embedpdf/plugin-fullscreen';
 
@@ -9,29 +9,17 @@ export const useFullscreen = () => {
   const { provides: fullscreenProviderRef } = useFullscreenCapability();
   const state = ref<FullscreenState>(initialState);
 
-  let unsubscribe: (() => void) | null = null;
-
-  watchEffect(() => {
+  watchEffect((onCleanup) => {
     const fullscreenProvider = fullscreenProviderRef.value;
 
-    // Clean up previous subscription if it exists
-    if (unsubscribe) {
-      unsubscribe();
-      unsubscribe = null;
-    }
-
     if (fullscreenProvider) {
-      // Subscribe to state changes
-      unsubscribe = fullscreenProvider.onStateChange((newState) => {
+      const unsubscribe = fullscreenProvider.onStateChange((newState) => {
         state.value = newState;
       });
-    }
-  });
 
-  // Clean up on unmount
-  onUnmounted(() => {
-    if (unsubscribe) {
-      unsubscribe();
+      onCleanup(() => {
+        unsubscribe();
+      });
     }
   });
 

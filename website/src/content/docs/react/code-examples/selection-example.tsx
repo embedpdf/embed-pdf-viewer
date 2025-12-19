@@ -4,111 +4,201 @@ import { createPluginRegistration } from '@embedpdf/core'
 import { EmbedPDF } from '@embedpdf/core/react'
 import { usePdfiumEngine } from '@embedpdf/engines/react'
 import { useEffect, useState } from 'react'
-
-// Import essential plugins
 import {
   Viewport,
   ViewportPluginPackage,
 } from '@embedpdf/plugin-viewport/react'
 import { Scroller, ScrollPluginPackage } from '@embedpdf/plugin-scroll/react'
-import { LoaderPluginPackage } from '@embedpdf/plugin-loader/react'
+import {
+  DocumentContent,
+  DocumentManagerPluginPackage,
+} from '@embedpdf/plugin-document-manager/react'
 import { RenderLayer, RenderPluginPackage } from '@embedpdf/plugin-render/react'
 import {
   PagePointerProvider,
   InteractionManagerPluginPackage,
 } from '@embedpdf/plugin-interaction-manager/react'
-
-// Import Selection plugin
 import {
   SelectionLayer,
   SelectionPluginPackage,
   useSelectionCapability,
   SelectionRangeX,
+  type SelectionSelectionMenuProps,
 } from '@embedpdf/plugin-selection/react'
 import { ignore } from '@embedpdf/models'
+import { Loader2, Copy, Check, Type } from 'lucide-react'
 
-// 1. Register the plugins you need
 const plugins = [
-  createPluginRegistration(LoaderPluginPackage, {
-    loadingOptions: {
-      type: 'url',
-      pdfFile: {
-        id: 'example-pdf',
-        url: 'https://snippet.embedpdf.com/ebook.pdf',
-      },
-    },
+  createPluginRegistration(DocumentManagerPluginPackage, {
+    initialDocuments: [{ url: 'https://snippet.embedpdf.com/ebook.pdf' }],
   }),
   createPluginRegistration(ViewportPluginPackage),
   createPluginRegistration(ScrollPluginPackage),
   createPluginRegistration(RenderPluginPackage),
-  createPluginRegistration(InteractionManagerPluginPackage), // Required for Selection
+  createPluginRegistration(InteractionManagerPluginPackage),
   createPluginRegistration(SelectionPluginPackage),
 ]
 
-// 2. Create a toolbar to interact with the selection
-export const SelectionToolbar = () => {
-  const { provides: selection } = useSelectionCapability()
+/**
+ * A custom selection menu that appears when text is selected.
+ * Shows a copy button with visual feedback.
+ */
+const TextSelectionMenu = ({
+  rect,
+  menuWrapperProps,
+  placement,
+  documentId,
+}: SelectionSelectionMenuProps & { documentId: string }) => {
+  const { provides: selectionCapability } = useSelectionCapability()
+  const [copied, setCopied] = useState(false)
+
+  // Reset copied state when placement changes
+  useEffect(() => {
+    setCopied(false)
+  }, [placement])
+
+  const handleCopy = () => {
+    if (!selectionCapability) return
+
+    const scope = selectionCapability.forDocument(documentId)
+    if (!scope) return
+
+    scope.copyToClipboard()
+    scope.clear()
+
+    setCopied(true)
+    setTimeout(() => setCopied(false), 1500)
+  }
+
+  const menuStyle: React.CSSProperties = {
+    position: 'absolute',
+    pointerEvents: 'auto',
+    cursor: 'default',
+  }
+
+  // Position above or below based on available space
+  if (placement.suggestTop) {
+    menuStyle.top = -40 - 8
+  } else {
+    menuStyle.top = rect.size.height + 8
+  }
+
+  return (
+    <div {...menuWrapperProps}>
+      <div
+        style={menuStyle}
+        className="rounded-lg border border-gray-200 bg-white shadow-lg dark:border-gray-700 dark:bg-gray-800"
+      >
+        <div className="flex items-center gap-1 px-2 py-1">
+          <button
+            onClick={handleCopy}
+            className="flex items-center gap-1.5 rounded px-2 py-1.5 text-sm text-gray-700 transition-colors hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-gray-700"
+            aria-label="Copy selected text"
+            title="Copy"
+          >
+            {copied ? (
+              <>
+                <Check
+                  size={16}
+                  className="text-green-600 dark:text-green-400"
+                />
+                <span className="text-green-600 dark:text-green-400">
+                  Copied!
+                </span>
+              </>
+            ) : (
+              <>
+                <Copy size={16} />
+                <span>Copy</span>
+              </>
+            )}
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+const SelectionToolbar = ({ documentId }: { documentId: string }) => {
+  const { provides: selectionCapability } = useSelectionCapability()
   const [hasSelection, setHasSelection] = useState(false)
+  const [copied, setCopied] = useState(false)
 
   useEffect(() => {
-    if (!selection) return
+    if (!selectionCapability) return
+    const selection = selectionCapability.forDocument(documentId)
     const unsubscribe = selection.onSelectionChange(
       (selectionRange: SelectionRangeX | null) => {
         setHasSelection(!!selectionRange)
       },
     )
     return unsubscribe
-  }, [selection])
+  }, [selectionCapability, documentId])
+
+  const handleCopy = () => {
+    if (selectionCapability) {
+      selectionCapability.forDocument(documentId).copyToClipboard()
+      setCopied(true)
+      setTimeout(() => setCopied(false), 2000)
+    }
+  }
 
   return (
-    <div className="flex items-center gap-3 rounded-lg border border-gray-200 bg-white p-3 shadow-sm">
+    <div className="flex items-center gap-3 border-b border-gray-300 bg-gray-100 px-3 py-2 dark:border-gray-700 dark:bg-gray-800">
       <button
-        onClick={() => selection?.copyToClipboard()}
+        onClick={handleCopy}
         disabled={!hasSelection}
-        className="flex h-8 items-center justify-center gap-2 rounded-md border border-gray-300 bg-white px-3 text-sm font-medium text-gray-700 transition-colors duration-150 hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50"
+        className={`inline-flex items-center gap-2 rounded-md px-3 py-1.5 text-sm font-medium shadow-sm transition-all ${
+          hasSelection
+            ? 'bg-blue-500 text-white ring-1 ring-blue-600 hover:bg-blue-600'
+            : 'cursor-not-allowed bg-white text-gray-400 ring-1 ring-gray-300 dark:bg-gray-700 dark:text-gray-500 dark:ring-gray-600'
+        } `}
         title="Copy Selected Text"
       >
-        <svg
-          width="14"
-          height="14"
-          viewBox="0 0 24 24"
-          fill="none"
-          stroke="currentColor"
-          strokeWidth="2"
-        >
-          <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
-          <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
-        </svg>
-        Copy Text
+        {copied ? (
+          <>
+            <Check size={14} className="text-white" />
+            Copied!
+          </>
+        ) : (
+          <>
+            <Copy size={14} />
+            Copy Text
+          </>
+        )}
       </button>
+
+      <span className="text-xs text-gray-600 dark:text-gray-300">
+        {hasSelection
+          ? 'Text selected — click to copy'
+          : 'Click and drag to select text'}
+      </span>
     </div>
   )
 }
 
-// 3. Create the selected text display panel
-export const SelectedTextPanel = () => {
-  const { provides: selection } = useSelectionCapability()
+const SelectedTextPanel = ({ documentId }: { documentId: string }) => {
+  const { provides: selectionCapability } = useSelectionCapability()
   const [hasSelection, setHasSelection] = useState(false)
   const [selectedText, setSelectedText] = useState('')
 
-  // This effect updates the UI state
   useEffect(() => {
-    if (!selection) return
+    if (!selectionCapability) return
+    const selection = selectionCapability.forDocument(documentId)
     const unsubscribe = selection.onSelectionChange(
       (selectionRange: SelectionRangeX | null) => {
         setHasSelection(!!selectionRange)
-        // If the selection is cleared, also clear the displayed text
         if (!selectionRange) {
           setSelectedText('')
         }
       },
     )
     return unsubscribe
-  }, [selection])
+  }, [selectionCapability, documentId])
 
-  // This effect fetches the text content only when the selection is finished
   useEffect(() => {
-    if (!selection) return
+    if (!selectionCapability) return
+    const selection = selectionCapability.forDocument(documentId)
     const unsubscribe = selection.onEndSelection(() => {
       const textTask = selection.getSelectedText()
       textTask.wait((textLines) => {
@@ -116,66 +206,114 @@ export const SelectedTextPanel = () => {
       }, ignore)
     })
     return unsubscribe
-  }, [selection])
+  }, [selectionCapability, documentId])
 
   return (
-    <div className="mt-4 rounded-lg border border-gray-200 bg-gray-50 p-3">
-      <p className="m-0 text-xs font-medium uppercase text-gray-500">
-        Selected Text:
-      </p>
-      <div className="mt-2">
-        {hasSelection ? (
-          <div className="m-0 w-full whitespace-pre-line break-words text-sm text-gray-800">
-            {selectedText || 'Loading...'}
+    <div className="border-t border-gray-300 bg-gray-100 p-4 dark:border-gray-700 dark:bg-gray-800">
+      <div className="mb-2 flex items-center gap-2">
+        <Type size={14} className="text-gray-500 dark:text-gray-400" />
+        <span className="tracking-wide text-xs font-medium uppercase text-gray-600 dark:text-gray-300">
+          Selected Text
+        </span>
+      </div>
+
+      {hasSelection ? (
+        <div className="rounded-md border border-gray-300 bg-white p-3 dark:border-gray-600 dark:bg-gray-900">
+          <p className="m-0 whitespace-pre-line break-words text-sm text-gray-800 dark:text-gray-200">
+            {selectedText || (
+              <span className="italic text-gray-400 dark:text-gray-500">
+                Loading...
+              </span>
+            )}
+          </p>
+        </div>
+      ) : (
+        <div className="flex flex-col items-center justify-center py-6 text-center">
+          <div className="mb-3 flex h-10 w-10 items-center justify-center rounded-full bg-white shadow-sm ring-1 ring-gray-300 dark:bg-gray-700 dark:ring-gray-600">
+            <Type size={20} className="text-gray-400 dark:text-gray-500" />
           </div>
-        ) : (
-          <p className="m-0 text-sm italic text-gray-400">
+          <p className="text-sm text-gray-600 dark:text-gray-300">
             Select text in the PDF to see it here
           </p>
-        )}
-      </div>
+        </div>
+      )}
     </div>
   )
 }
 
-// 4. Create the main viewer component
 export const PDFViewer = () => {
   const { engine, isLoading } = usePdfiumEngine()
 
   if (isLoading || !engine) {
-    return <div>Loading PDF Engine...</div>
+    return (
+      <div className="overflow-hidden rounded-lg border border-gray-300 bg-white dark:border-gray-700 dark:bg-gray-900">
+        <div className="flex h-[400px] items-center justify-center">
+          <div className="flex items-center gap-2 text-gray-500 dark:text-gray-400">
+            <Loader2 size={20} className="animate-spin" />
+            <span className="text-sm">Loading PDF Engine...</span>
+          </div>
+        </div>
+      </div>
+    )
   }
 
   return (
     <EmbedPDF engine={engine} plugins={plugins}>
-      <div style={{ height: '500px', userSelect: 'none' }}>
-        <div className="flex h-full flex-col gap-4">
-          <SelectionToolbar />
-          <div className="relative flex w-full flex-1 overflow-hidden">
-            <Viewport className="flex-grow bg-gray-100">
-              <Scroller
-                renderPage={({ width, height, pageIndex, scale, rotation }) => (
-                  <PagePointerProvider
-                    pageIndex={pageIndex}
-                    pageWidth={width}
-                    pageHeight={height}
-                    rotation={rotation}
-                    scale={scale}
+      {({ activeDocumentId }) =>
+        activeDocumentId && (
+          <DocumentContent documentId={activeDocumentId}>
+            {({ isLoaded }) =>
+              isLoaded && (
+                <div className="overflow-hidden rounded-lg border border-gray-300 bg-white shadow-sm dark:border-gray-700 dark:bg-gray-900">
+                  {/* Toolbar */}
+                  <SelectionToolbar documentId={activeDocumentId} />
+
+                  {/* PDF Viewer Area */}
+                  <div
+                    className="relative h-[400px] sm:h-[500px]"
+                    style={{ userSelect: 'none' }}
                   >
-                    <RenderLayer
-                      pageIndex={pageIndex}
-                      scale={1}
-                      className="pointer-events-none"
-                    />
-                    <SelectionLayer pageIndex={pageIndex} scale={scale} />
-                  </PagePointerProvider>
-                )}
-              />
-            </Viewport>
-          </div>
-        </div>
-      </div>
-      <SelectedTextPanel />
+                    <Viewport
+                      documentId={activeDocumentId}
+                      className="absolute inset-0 bg-gray-200 dark:bg-gray-800"
+                    >
+                      <Scroller
+                        documentId={activeDocumentId}
+                        renderPage={({ pageIndex }) => (
+                          <PagePointerProvider
+                            documentId={activeDocumentId}
+                            pageIndex={pageIndex}
+                          >
+                            <RenderLayer
+                              documentId={activeDocumentId}
+                              pageIndex={pageIndex}
+                              scale={1}
+                              className="pointer-events-none"
+                            />
+                            <SelectionLayer
+                              documentId={activeDocumentId}
+                              pageIndex={pageIndex}
+                              selectionMenu={(props) => (
+                                <TextSelectionMenu
+                                  {...props}
+                                  documentId={activeDocumentId}
+                                />
+                              )}
+                            />
+                          </PagePointerProvider>
+                        )}
+                      />
+                    </Viewport>
+                  </div>
+
+                  {/* Selected Text Panel */}
+                  <SelectedTextPanel documentId={activeDocumentId} />
+                </div>
+              )
+            }
+          </DocumentContent>
+        )
+      }
     </EmbedPDF>
   )
 }

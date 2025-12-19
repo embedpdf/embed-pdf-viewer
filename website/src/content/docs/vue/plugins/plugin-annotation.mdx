@@ -32,20 +32,20 @@ import { HistoryPluginPackage } from '@embedpdf/plugin-history/vue'
 import { AnnotationPluginPackage } from '@embedpdf/plugin-annotation/vue'
 
 const plugins = [
-  // ... other essential plugins
-  createPluginRegistration(LoaderPluginPackage, { /* ... */ }),
-  createPluginRegistration(RenderPluginPackage),
+  // ... other essential plugins
+  createPluginRegistration(DocumentManagerPluginPackage, { /* ... */ }),
+  createPluginRegistration(RenderPluginPackage),
 
-  // Register dependencies first
-  createPluginRegistration(InteractionManagerPluginPackage),
-  createPluginRegistration(SelectionPluginPackage),
-  createPluginRegistration(HistoryPluginPackage),
+  // Register dependencies first
+  createPluginRegistration(InteractionManagerPluginPackage),
+  createPluginRegistration(SelectionPluginPackage),
+  createPluginRegistration(HistoryPluginPackage),
 
-  // Register and configure the annotation plugin
-  createPluginRegistration(AnnotationPluginPackage, {
-    // Optional: Set the author name for created annotations
-    annotationAuthor: 'Jane Doe',
-  }),
+  // Register and configure the annotation plugin
+  createPluginRegistration(AnnotationPluginPackage, {
+    // Optional: Set the author name for created annotations
+    annotationAuthor: 'Jane Doe',
+  }),
 ]
 ```
 
@@ -53,33 +53,26 @@ const plugins = [
 
 The plugin works by combining a UI component to render the annotations with a composable to manage the annotation tools and state.
 
-### 1\. The `<AnnotationLayer />` Component
+### 1. The `<AnnotationLayer />` Component
 
 This component is responsible for rendering all annotations and handling user interactions like creating, selecting, moving, and resizing. It must be placed inside the `<Scroller />`'s default slot and wrapped by a `<PagePointerProvider>` to correctly process pointer events.
 
-```vue {3, 17-23}
+Note that `documentId` is required for all components to link them to the correct document state.
+
+```vue {3, 11-13}
 <script setup lang="ts">
 import { PagePointerProvider } from '@embedpdf/plugin-interaction-manager/vue';
 import { AnnotationLayer } from '@embedpdf/plugin-annotation/vue';
 </script>
 <template>
-  <Scroller>
+  <Scroller :document-id="activeDocumentId">
     <template #default="{ page }">
-      <PagePointerProvider
-        :page-index="page.pageIndex"
-        :page-width="page.width"
-        :page-height="page.height"
-        :rotation="page.rotation"
-        :scale="page.scale"
-      >
-        <RenderLayer :page-index="page.pageIndex" :scale="page.scale" style="pointer-events: none" />
-        <SelectionLayer :page-index="page.pageIndex" :scale="page.scale" style="pointer-events: none" />
+      <PagePointerProvider :document-id="activeDocumentId" :page-index="page.pageIndex">
+        <RenderLayer :document-id="activeDocumentId" :page-index="page.pageIndex" />
+        <SelectionLayer :document-id="activeDocumentId" :page-index="page.pageIndex" />
         <AnnotationLayer
+          :document-id="activeDocumentId"
           :page-index="page.pageIndex"
-          :scale="page.scale"
-          :page-width="page.width"
-          :page-height="page.height"
-          :rotation="page.rotation"
         />
       </PagePointerProvider>
     </template>
@@ -87,46 +80,74 @@ import { AnnotationLayer } from '@embedpdf/plugin-annotation/vue';
 </template>
 ```
 
-### 2\. Building an Annotation Toolbar
+### 2. Building an Annotation Toolbar
 
-The `useAnnotationCapability` composable provides all the necessary methods to control the plugin. You can build a toolbar that allows users to select an "active tool" (like a pen or highlighter) and perform actions like deleting a selected annotation.
+The `useAnnotation` composable provides all the necessary methods to control the plugin for a specific document. You can build a toolbar that allows users to select an "active tool" (like a pen or highlighter) and perform actions like deleting a selected annotation.
 
-```vue
+```vue {2, 5}
 <script setup lang="ts">
-import { ref, onMounted, onUnmounted } from 'vue';
-import { useAnnotationCapability } from '@embedpdf/plugin-annotation/vue';
+import { useAnnotation } from '@embedpdf/plugin-annotation/vue';
 
-const { provides: annotationApi } = useAnnotationCapability();
-const activeTool = ref<string | null>(null);
-const canDelete = ref(false);
+const props = defineProps<{ documentId: string }>();
+const { provides: annotationApi, state } = useAnnotation(() => props.documentId);
 
-let unsub1: () => void;
-let unsub2: () => void;
-
-onMounted(() => {
-  if (!annotationApi.value) return;
-  unsub1 = annotationApi.value.onActiveToolChange(tool => (activeTool.value = tool?.id ?? null));
-  unsub2 = annotationApi.value.onStateChange(state => (canDelete.value = !!state.selectedUid));
-});
-
-onUnmounted(() => {
-  unsub1?.();
-  unsub2?.();
-});
-
-const setActiveTool = (toolId: string) => {
-  annotationApi.value?.setActiveTool(activeTool.value === toolId ? null : toolId);
-}
+const deleteSelected = () => {
+  const selection = annotationApi.value?.getSelectedAnnotation();
+  if (selection) {
+    annotationApi.value?.deleteAnnotation(selection.object.pageIndex, selection.object.id);
+  }
+};
 </script>
 <template>
   <div>
-    <button @click="setActiveTool('highlight')">Highlighter</button>
-    <button @click="setActiveTool('ink')">Pen</button>
+    <button @click="annotationApi?.setActiveTool('highlight')">Highlighter</button>
+    <button @click="annotationApi?.setActiveTool('ink')">Pen</button>
+    <button @click="deleteSelected" :disabled="!state.selectedUid">Delete</button>
   </div>
 </template>
 ```
 
-### 3\. Creating Custom Tools
+### 3. Adding a Selection Menu
+
+When an annotation is selected, you can display a contextual menu (e.g., for deleting, editing properties). Use the `selection-menu` scoped slot on `<AnnotationLayer />`. This slot receives props including the `context` object, which contains the selected annotation.
+
+```vue
+<script setup lang="ts">
+import { AnnotationLayer, useAnnotation } from '@embedpdf/plugin-annotation/vue';
+
+const props = defineProps<{ documentId: string }>();
+const { provides: annotationApi } = useAnnotation(() => props.documentId);
+
+const handleDelete = (pageIndex: number, id: number) => {
+  annotationApi.value?.deleteAnnotation(pageIndex, id);
+};
+</script>
+
+<template>
+  <AnnotationLayer :document-id="documentId" :page-index="page.pageIndex">
+    <template #selection-menu="{ selected, context, menuWrapperProps, rect }">
+      <div v-if="selected" v-bind="menuWrapperProps">
+        <div 
+          :style="{ 
+            position: 'absolute', 
+            top: `${rect.size.height + 8}px`, 
+            pointerEvents: 'auto', 
+            cursor: 'default' 
+          }"
+        >
+          <button @click="handleDelete(context.annotation.object.pageIndex, context.annotation.object.id)">
+            Delete
+          </button>
+        </div>
+      </div>
+    </template>
+  </AnnotationLayer>
+</template>
+```
+
+The `menuWrapperProps` must be bound to your wrapper element—it handles proper positioning relative to page rotation.
+
+### 4. Creating Custom Tools
 
 You can extend the plugin's functionality by adding your own tools. For example, you could create a custom image stamp. This is done by calling `addTool` on the plugin's capability, often within the `@initialized` event handler of the `<EmbedPDF>` component.
 
@@ -156,13 +177,76 @@ const handleInitialized = (registry: PluginRegistry) => {
 </template>
 ```
 
+## Listening to Annotation Events
+
+For more advanced integrations, such as saving annotation data to a backend or synchronizing state with an external data store, you can subscribe to annotation lifecycle events using `onAnnotationEvent`.
+
+Each event provides the annotation object and a `committed` flag, which indicates whether the change has been saved to the underlying PDF document in the engine.
+
+```vue
+<script setup lang="ts">
+import { onMounted, onUnmounted } from 'vue';
+import { useAnnotation } from '@embedpdf/plugin-annotation/vue';
+
+const props = defineProps<{ documentId: string }>();
+const { provides: annotationApi } = useAnnotation(() => props.documentId);
+
+let unsubscribe: (() => void) | undefined;
+
+onMounted(() => {
+  if (!annotationApi.value) return;
+  
+  unsubscribe = annotationApi.value.onAnnotationEvent((event) => {
+    console.log(`Annotation event: ${event.type}`, { event });
+    
+    // Example: Save to backend after a change is committed to the engine
+    if (event.type === 'create' && event.committed) {
+      // yourApi.saveAnnotation(event.annotation);
+    }
+  });
+});
+
+onUnmounted(() => {
+  unsubscribe?.();
+});
+</script>
+```
+
+## Default Annotation Tools
+
+The plugin comes with a set of pre-configured tools. You can activate any of these tools by passing its `id` to the `setActiveTool` method. You can also override their default properties by providing a modified `AnnotationTool` object with a matching `id` in the plugin configuration.
+
+| Tool Name | `id` | Description |
+| :--- | :--- | :--- |
+| **Highlight** | `highlight` | Creates text highlight annotations. |
+| **Underline** | `underline` | Creates text underline annotations. |
+| **Strikeout** | `strikeout` | Creates text strikeout annotations. |
+| **Squiggly** | `squiggly` | Creates squiggly text underline annotations. |
+| **Pen** | `ink` | Free-hand drawing tool. |
+| **Ink Highlighter**| `inkHighlighter` | Free-hand highlighter with a multiply blend mode. |
+| **Circle** | `circle` | Draws ellipse annotations. |
+| **Square** | `square` | Draws rectangle annotations. |
+| **Line** | `line` | Draws straight line annotations. |
+| **Arrow** | `lineArrow` | Draws a straight line with an arrowhead. |
+| **Polyline** | `polyline` | Draws multi-segment lines. |
+| **Polygon** | `polygon` | Draws closed, multi-sided shapes. |
+| **Free Text** | `freeText` | Adds a text box annotation. |
+| **Image** | `stamp` | Adds an image stamp. Opens a file picker by default. |
+
 ## Live Example
 
-The example below includes a toolbar for selecting different annotation tools (highlight, ink pen, square) and a delete button that becomes active when an annotation is selected.
+The example below includes a toolbar for selecting different annotation tools (highlight, ink pen, square) and a delete button. When you select an annotation, a contextual menu appears with a delete option—demonstrating the `selection-menu` scoped slot.
 
 import { AnnotationExample } from '../code-examples/annotation-example';
 
-<AnnotationExample />
+<CodeExample 
+  codePaths={[
+    "../../examples/vue-tailwind/src/examples/annotation-example.vue",
+    "../../examples/vue-tailwind/src/examples/annotation-example-content.vue"
+  ]}
+>
+  <AnnotationExample />
+</CodeExample>
 
 ## API Reference
 
@@ -183,12 +267,22 @@ The primary component for rendering and interacting with annotations.
 
 | Prop | Type | Description |
 | :--- | :--- | :--- |
+| **`documentId`** | `string` | **(Required)** The ID of the document this layer belongs to. |
 | **`pageIndex`** | `number` | **(Required)** The page index this layer corresponds to. |
-| **`scale`** | `number` | **(Required)** The current zoom scale of the page. |
-| **`rotation`** | `number` | **(Required)** The current rotation of the page. |
-| **`pageWidth`** | `number` | **(Required)** The unscaled width of the PDF page. |
-| **`pageHeight`** | `number` | **(Required)** The unscaled height of the PDF page. |
 | **`selectionOutlineColor`**| `string` | The color of the outline around a selected annotation. **Default**: `'#007ACC'` |
+
+#### Customizing Handles (`resizeUI` and `vertexUI`)
+
+You can customize the visual appearance of the interactive handles for resizing and editing vertices. Both `resizeUI` and `vertexUI` accept an object with the following shape:
+
+```typescript
+interface HandleUI {
+  /** Handle size in CSS pixels */
+  size?: number; // Default: 12
+  /** Default background color for the handle */
+  color?: string; // Default: '#007ACC'
+}
+```
 
 ### Scoped Slot: `selection-menu`
 
@@ -196,22 +290,29 @@ The `<AnnotationLayer>` provides a scoped slot to render a custom menu when an a
 
 | Prop | Type | Description |
 | :--- | :--- | :--- |
-| `item` | `RedactionItem` | The selected annotation data. |
+| `context` | `object` | The selection context containing the `annotation` object. |
 | `selected` | `boolean` | `true` if an annotation is currently selected. |
 | `menuWrapperProps` | `object` | Vue props to bind to your menu's wrapper element for positioning. |
 | `rect` | `Rect` | The bounding box of the selected annotation. |
 
-### Composable: `useAnnotationCapability()`
+### Composable: `useAnnotation(documentId)`
 
-Connects your components to the annotation plugin's state and methods.
+Connects your components to the annotation plugin's state and methods for a specific document.
+
+#### Parameters
+
+| Parameter | Type | Description |
+| :--- | :--- | :--- |
+| **`documentId`** | `() => string` | A getter function that returns the document ID to track. |
 
 #### Returns
 
 | Property | Type | Description |
 | :--- | :--- | :--- |
-| **`provides`** | `Ref<AnnotationCapability \| null>` | A ref object with methods to control the plugin, or `null` if not ready. |
+| **`provides`** | `Ref<AnnotationScope \| null>` | A ref object with methods to control the plugin, or `null` if not ready. |
+| **`state`** | `AnnotationState` | Reactive state object containing properties like `activeToolId`, `selectedUid`. |
 
-#### `AnnotationCapability` Methods
+#### `AnnotationScope` Methods
 
 A selection of key methods available on the `provides.value` object:
 
@@ -220,7 +321,23 @@ A selection of key methods available on the `provides.value` object:
 | **`setActiveTool(toolId)`** | Activates an annotation tool (e.g., `'ink'`, `'highlight'`). Pass `null` to deactivate. |
 | **`getActiveTool()`** | Returns the currently active `AnnotationTool` object, or `null`. |
 | **`addTool(tool)`** | Registers a new custom `AnnotationTool`. |
+| **`createAnnotation(..)`** | Programmatically creates a new annotation on a page. |
+| **`updateAnnotation(..)`** | Updates the properties of an existing annotation. |
 | **`deleteAnnotation(..)`** | Deletes an annotation from a page. |
+| **`selectAnnotation(..)`** | Programmatically selects an annotation. |
 | **`getSelectedAnnotation()`** | Returns the currently selected `TrackedAnnotation` object, or `null`. |
-| **`onStateChange(cb)`** | Subscribes to any change in the annotation state. Returns an `unsubscribe` function. |
-| **`onAnnotationEvent(cb)`**| Subscribes to events like annotation creation, updates, or deletion. Returns an `unsubscribe` function. |
+| **`importAnnotations(..)`**| Imports an array of annotations into the viewer. |
+| **`commit()`** | Manually saves all pending annotation changes to the PDF document. |
+| **`onStateChange(cb)`** | Subscribes to any change in the annotation state. |
+| **`onAnnotationEvent(cb)`**| Subscribes to events like annotation creation, updates, or deletion. |
+
+### The `AnnotationEvent` Object
+
+The object passed to the `onAnnotationEvent` callback contains details about the lifecycle event. Its shape varies based on the `type` property.
+
+| Event Type | Properties | Description |
+| :--- | :--- | :--- |
+| **`'create'`** | `annotation`, `pageIndex`, `ctx`, `committed` | Fired when an annotation is created. `ctx` may contain extra data like `ImageData` for stamps. `committed` is `true` if the change has been saved to the engine. |
+| **`'update'`** | `annotation`, `pageIndex`, `patch`, `committed` | Fired when an annotation is moved, resized, or its properties change. `annotation` is the original object, and `patch` contains only the changed properties. |
+| **`'delete'`** | `annotation`, `pageIndex`, `committed` | Fired when an annotation is deleted. |
+| **`'loaded'`** | `total` | Fired once when the initial set of annotations is loaded from the document. `total` is the number of annotations loaded. |

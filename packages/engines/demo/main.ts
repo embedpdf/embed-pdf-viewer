@@ -36,8 +36,6 @@ async function run() {
   });
   const engine = new WebWorkerEngine(worker, logger);
 
-  engine.initialize();
-
   const passwordElem = document.getElementById('pdf-password') as HTMLInputElement;
   const inputElem = document.getElementById('pdf-file') as HTMLInputElement;
   const bookmarksElem = document.getElementById('pdf-bookmarks') as HTMLParagraphElement;

@@ -2,38 +2,26 @@
 
 import { usePdfiumEngine } from '@embedpdf/engines/react'
 import { ignore, PdfDocumentObject, Rotation } from '@embedpdf/models'
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 
 export default function RenderPageExample() {
   const { isLoading, error, engine } = usePdfiumEngine()
-  const [initialized, setInitialized] = useState(false)
   const [document, setDocument] = useState<PdfDocumentObject | null>(null)
   const [loadingDocument, setLoadingDocument] = useState(false)
   const [imageUrl, setImageUrl] = useState<string | null>(null)
   const [loadingImage, setLoadingImage] = useState(false)
 
-  useEffect(() => {
-    if (engine && !initialized) {
-      if (engine.initialize) {
-        const task = engine.initialize()
-        task.wait(setInitialized, ignore)
-      } else {
-        setInitialized(true)
-      }
-    }
-  }, [engine, initialized])
-
   if (error) {
     return (
-      <div className="mt-3 rounded-md bg-red-50 p-4 text-sm font-medium text-red-800">
-        Failed to initialize PDF engine: {error.message}
+      <div className="mt-3 rounded-md border border-red-200 bg-red-50 p-4 text-sm font-medium text-red-800 dark:border-red-800 dark:bg-red-900/20 dark:text-red-400">
+        Failed to load PDF engine: {error.message}
       </div>
     )
   }
 
-  if (isLoading || !engine || !initialized) {
+  if (isLoading || !engine) {
     return (
-      <div className="mt-3 rounded-md bg-yellow-50 p-4 text-sm font-medium text-yellow-800">
+      <div className="mt-3 rounded-md border border-yellow-200 bg-yellow-50 p-4 text-sm font-medium text-yellow-800 dark:border-yellow-800 dark:bg-yellow-900/20 dark:text-yellow-400">
         Loading PDF engine...
       </div>
     )
@@ -41,7 +29,7 @@ export default function RenderPageExample() {
 
   if (loadingDocument) {
     return (
-      <div className="mt-3 rounded-md bg-yellow-50 p-4 text-sm font-medium text-yellow-800">
+      <div className="mt-3 rounded-md border border-yellow-200 bg-yellow-50 p-4 text-sm font-medium text-yellow-800 dark:border-yellow-800 dark:bg-yellow-900/20 dark:text-yellow-400">
         Loading document...
       </div>
     )
@@ -49,7 +37,7 @@ export default function RenderPageExample() {
 
   if (loadingImage) {
     return (
-      <div className="mt-3 rounded-md bg-yellow-50 p-4 text-sm font-medium text-yellow-800">
+      <div className="mt-3 rounded-md border border-yellow-200 bg-yellow-50 p-4 text-sm font-medium text-yellow-800 dark:border-yellow-800 dark:bg-yellow-900/20 dark:text-yellow-400">
         Loading image...
       </div>
     )
@@ -101,7 +89,7 @@ export default function RenderPageExample() {
 
   if (document && imageUrl) {
     return (
-      <div className="mt-3 rounded-md bg-green-50 p-4 text-sm font-medium text-green-800">
+      <div className="mt-3 rounded-md border border-green-200 bg-green-50 p-4 text-sm font-medium text-green-800 dark:border-green-800 dark:bg-green-900/20 dark:text-green-400">
         Page rendered successfully!{' '}
         <img
           className="mt-2"
@@ -116,11 +104,11 @@ export default function RenderPageExample() {
 
   if (document) {
     return (
-      <div className="mt-3 rounded-md bg-green-50 p-4 text-sm font-medium text-green-800">
+      <div className="mt-3 rounded-md border border-green-200 bg-green-50 p-4 text-sm font-medium text-green-800 dark:border-green-800 dark:bg-green-900/20 dark:text-green-400">
         Document loaded successfully! The document has {document.pageCount}{' '}
         pages.{' '}
         <button
-          className="ml-2 rounded-md bg-green-200 p-2 text-sm font-medium text-green-800"
+          className="ml-2 rounded-md border border-green-300 bg-green-200 p-2 text-sm font-medium text-green-800 shadow-sm ring-1 ring-green-300 transition-colors hover:bg-green-300 dark:border-green-700 dark:bg-green-800 dark:text-green-200 dark:ring-green-700 dark:hover:bg-green-700"
           onClick={renderPage}
         >
           Click to render first page

@@ -11,7 +11,6 @@ export const manifest: PluginManifest<CapturePluginConfig> = {
   requires: ['render'],
   optional: ['interaction-manager'],
   defaultConfig: {
-    enabled: true,
     scale: 1,
     imageType: 'image/png',
     withAnnotations: false,

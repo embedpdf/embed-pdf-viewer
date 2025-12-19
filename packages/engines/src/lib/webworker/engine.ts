@@ -201,22 +201,6 @@ export class WebWorkerEngine implements PdfEngine {
   }
 
   /**
-   * {@inheritDoc @embedpdf/models!PdfEngine.initialize}
-   *
-   * @public
-   */
-  initialize() {
-    this.logger.debug(LOG_SOURCE, LOG_CATEGORY, 'initialize');
-    const requestId = this.generateRequestId('General');
-    const task = new WorkerTask<boolean>(this.worker, requestId);
-
-    const request: ExecuteRequest = createRequest(requestId, 'initialize', []);
-    this.proxy(task, request);
-
-    return task;
-  }
-
-  /**
    * {@inheritDoc @embedpdf/models!PdfEngine.destroy}
    *
    * @public

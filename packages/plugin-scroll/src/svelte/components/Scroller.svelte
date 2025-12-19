@@ -1,36 +1,55 @@
 <script lang="ts">
-  import { useScrollPlugin } from '../hooks';
+  import type { Snippet } from 'svelte';
   import type { HTMLAttributes } from 'svelte/elements';
+  import { useScrollPlugin } from '../hooks';
   import { type ScrollerLayout, ScrollStrategy } from '@embedpdf/plugin-scroll';
-  import { useCoreState } from '@embedpdf/core/svelte';
-  import { type RenderPageProps } from '../../shared/types';
-  import { type Snippet } from 'svelte';
+  import type { PageLayout } from '@embedpdf/plugin-scroll';
 
   type ScrollerProps = HTMLAttributes<HTMLDivElement> & {
-    RenderPageSnippet: Snippet<RenderPageProps>;
-    overlayElements?: Snippet[];
+    documentId: string;
+    renderPage: Snippet<[PageLayout]>;
   };
 
-  const scrollPlugin = useScrollPlugin();
-  const core = useCoreState();
-  let scrollerLayout = $derived<ScrollerLayout | null>(
-    scrollPlugin.plugin?.getScrollerLayout() ?? null,
-  );
+  let { documentId, renderPage, ...restProps }: ScrollerProps = $props();
 
-  let { RenderPageSnippet, overlayElements, ...restProps }: ScrollerProps = $props();
+  const { plugin: scrollPlugin } = useScrollPlugin();
+
+  let layoutData = $state<{
+    layout: ScrollerLayout | null;
+    docId: string | null;
+  }>({ layout: null, docId: null });
 
   $effect(() => {
-    if (!scrollPlugin.plugin) return;
-    return scrollPlugin.plugin.onScrollerData((layout) => (scrollerLayout = layout));
+    if (!scrollPlugin || !documentId) {
+      layoutData = { layout: null, docId: null };
+      return;
+    }
+
+    // When we get new data, store it along with the current documentId
+    const unsubscribe = scrollPlugin.onScrollerData(documentId, (newLayout) => {
+      layoutData = { layout: newLayout, docId: documentId };
+    });
+
+    // When the effect re-runs or component unmounts, clear the state
+    return () => {
+      unsubscribe();
+      layoutData = { layout: null, docId: null };
+      scrollPlugin.clearLayoutReady(documentId);
+    };
   });
 
-  $effect(() => {
-    if (!scrollPlugin.plugin) return;
-    scrollPlugin.plugin.setLayoutReady();
+  // Only use layout if it matches the current documentId (prevents stale data)
+  const scrollerLayout = $derived(layoutData.docId === documentId ? layoutData.layout : null);
+
+  // Call setLayoutReady after layout is rendered (Svelte's equivalent to useLayoutEffect)
+  $effect.pre(() => {
+    if (!scrollPlugin || !documentId || !scrollerLayout) return;
+
+    scrollPlugin.setLayoutReady(documentId);
   });
 </script>
 
-{#if scrollerLayout && core.coreState}
+{#if scrollerLayout}
   <div
     {...restProps}
     style:width={`${scrollerLayout.totalWidth}px`}
@@ -38,9 +57,10 @@
     style:position="relative"
     style:box-sizing="border-box"
     style:margin="0 auto"
-    style:display={scrollerLayout.strategy === ScrollStrategy.Horizontal ? 'flex' : null}
-    style:flex-direction={scrollerLayout.strategy === ScrollStrategy.Horizontal ? 'row' : null}
+    style:display={scrollerLayout.strategy === ScrollStrategy.Horizontal ? 'flex' : undefined}
+    style:flex-direction={scrollerLayout.strategy === ScrollStrategy.Horizontal ? 'row' : undefined}
   >
+    <!-- Leading spacer -->
     <div
       style:width={scrollerLayout.strategy === ScrollStrategy.Horizontal
         ? `${scrollerLayout.startSpacing}px`
@@ -48,8 +68,10 @@
       style:height={scrollerLayout.strategy === ScrollStrategy.Horizontal
         ? '100%'
         : `${scrollerLayout.startSpacing}px`}
-      style:flex-shrink="0"
+      style:flex-shrink={scrollerLayout.strategy === ScrollStrategy.Horizontal ? '0' : undefined}
     ></div>
+
+    <!-- Page grid -->
     <div
       style:gap={`${scrollerLayout.pageGap}px`}
       style:display="flex"
@@ -59,8 +81,9 @@
       style:flex-direction={scrollerLayout.strategy === ScrollStrategy.Horizontal
         ? 'row'
         : 'column'}
+      style:min-height={scrollerLayout.strategy === ScrollStrategy.Horizontal ? '100%' : undefined}
       style:min-width={scrollerLayout.strategy === ScrollStrategy.Horizontal
-        ? '100%'
+        ? undefined
         : 'fit-content'}
     >
       {#each scrollerLayout.items as item (item.pageNumbers[0])}
@@ -74,17 +97,14 @@
               style:width={`${layout.rotatedWidth}px`}
               style:height={`${layout.rotatedHeight}px`}
             >
-              {@render RenderPageSnippet?.({
-                ...layout,
-                rotation: core.coreState.rotation,
-                scale: core.coreState.scale,
-                document: core.coreState.document,
-              })}
+              {@render renderPage(layout)}
             </div>
           {/each}
         </div>
       {/each}
     </div>
+
+    <!-- Trailing spacer -->
     <div
       style:width={scrollerLayout.strategy === ScrollStrategy.Horizontal
         ? `${scrollerLayout.endSpacing}px`
@@ -92,12 +112,7 @@
       style:height={scrollerLayout.strategy === ScrollStrategy.Horizontal
         ? '100%'
         : `${scrollerLayout.endSpacing}px`}
-      style:flex-shrink="0"
+      style:flex-shrink={scrollerLayout.strategy === ScrollStrategy.Horizontal ? '0' : undefined}
     ></div>
-    {#if overlayElements && overlayElements.length > 0}
-      {#each overlayElements as OverLay}
-        {@render OverLay?.()}
-      {/each}
-    {/if}
   </div>
 {/if}

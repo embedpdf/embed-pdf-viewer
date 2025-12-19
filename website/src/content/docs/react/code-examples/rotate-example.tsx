@@ -4,37 +4,30 @@ import { createPluginRegistration } from '@embedpdf/core'
 import { EmbedPDF } from '@embedpdf/core/react'
 import { usePdfiumEngine } from '@embedpdf/engines/react'
 import { Rotation } from '@embedpdf/models'
-
-// Import essential plugins
 import {
   Viewport,
   ViewportPluginPackage,
 } from '@embedpdf/plugin-viewport/react'
 import { Scroller, ScrollPluginPackage } from '@embedpdf/plugin-scroll/react'
-import { LoaderPluginPackage } from '@embedpdf/plugin-loader/react'
+import {
+  DocumentContent,
+  DocumentManagerPluginPackage,
+} from '@embedpdf/plugin-document-manager/react'
 import { RenderLayer, RenderPluginPackage } from '@embedpdf/plugin-render/react'
 import {
   PagePointerProvider,
   InteractionManagerPluginPackage,
 } from '@embedpdf/plugin-interaction-manager/react'
-
-// Import Rotate plugin
 import {
   useRotate,
   Rotate,
   RotatePluginPackage,
 } from '@embedpdf/plugin-rotate/react'
+import { Loader2, RotateCcw, RotateCw } from 'lucide-react'
 
-// 1. Register the plugins you need
 const plugins = [
-  createPluginRegistration(LoaderPluginPackage, {
-    loadingOptions: {
-      type: 'url',
-      pdfFile: {
-        id: 'example-pdf',
-        url: 'https://snippet.embedpdf.com/ebook.pdf',
-      },
-    },
+  createPluginRegistration(DocumentManagerPluginPackage, {
+    initialDocuments: [{ url: 'https://snippet.embedpdf.com/ebook.pdf' }],
   }),
   createPluginRegistration(ViewportPluginPackage),
   createPluginRegistration(ScrollPluginPackage),
@@ -45,112 +38,113 @@ const plugins = [
   }),
 ]
 
-// 2. Create a toolbar to control rotation
-export const RotateToolbar = () => {
-  const { rotation, provides: rotate } = useRotate()
+const RotateToolbar = ({ documentId }: { documentId: string }) => {
+  const { rotation, provides: rotate } = useRotate(documentId)
 
-  if (!rotate) {
-    return null
-  }
+  if (!rotate) return null
+
+  const degrees = rotation * 90
 
   return (
-    <div className="mb-4 mt-4 flex items-center gap-3 rounded-lg border border-gray-200 bg-white p-3 shadow-sm">
-      <div className="flex items-center gap-2">
-        <span className="tracking-wide text-xs font-medium uppercase text-gray-600">
-          Rotation
-        </span>
-        <div className="min-w-[60px] rounded border border-gray-200 bg-gray-50 px-2 py-1 text-center font-mono text-sm text-gray-800">
-          {rotation * 90}°
-        </div>
-      </div>
-      <div className="h-6 w-px bg-gray-200"></div>
-      <div className="flex items-center gap-1">
+    <div className="flex items-center gap-3 border-b border-gray-300 bg-gray-100 px-3 py-2 dark:border-gray-700 dark:bg-gray-800">
+      <span className="tracking-wide text-xs font-medium uppercase text-gray-600 dark:text-gray-300">
+        Rotation
+      </span>
+      <div className="h-4 w-px bg-gray-300 dark:bg-gray-600" />
+
+      {/* Rotation controls */}
+      <div className="flex items-center gap-1.5">
         <button
-          className="flex h-8 w-8 items-center justify-center rounded-md border border-gray-300 bg-white text-gray-700 transition-colors duration-150 hover:border-gray-400 hover:bg-gray-50 hover:text-gray-900 active:bg-gray-100"
           onClick={rotate.rotateBackward}
+          className="inline-flex h-8 w-8 items-center justify-center rounded-md bg-white text-gray-600 shadow-sm ring-1 ring-gray-300 transition-all hover:bg-gray-50 hover:text-gray-900 dark:bg-gray-700 dark:text-gray-300 dark:ring-gray-600 dark:hover:bg-gray-600 dark:hover:text-gray-100"
           title="Rotate Counter-Clockwise"
         >
-          <svg
-            width="16"
-            height="16"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="2"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          >
-            <path stroke="none" d="M0 0h24v24H0z" fill="none" />
-            <path d="M19.95 11a8 8 0 1 0 -.5 4m.5 5v-5h-5" />
-          </svg>
+          <RotateCcw size={16} />
         </button>
+
+        {/* Degree indicator */}
+        <div className="min-w-[56px] rounded-md bg-white px-2 py-1 text-center shadow-sm ring-1 ring-gray-300 dark:bg-gray-700 dark:ring-gray-600">
+          <span className="font-mono text-sm font-medium text-gray-700 dark:text-gray-300">
+            {degrees}°
+          </span>
+        </div>
+
         <button
-          className="flex h-8 w-8 items-center justify-center rounded-md border border-gray-300 bg-white text-gray-700 transition-colors duration-150 hover:border-gray-400 hover:bg-gray-50 hover:text-gray-900 active:bg-gray-100"
           onClick={rotate.rotateForward}
+          className="inline-flex h-8 w-8 items-center justify-center rounded-md bg-white text-gray-600 shadow-sm ring-1 ring-gray-300 transition-all hover:bg-gray-50 hover:text-gray-900 dark:bg-gray-700 dark:text-gray-300 dark:ring-gray-600 dark:hover:bg-gray-600 dark:hover:text-gray-100"
           title="Rotate Clockwise"
         >
-          <svg
-            width="16"
-            height="16"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="2"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          >
-            <path stroke="none" d="M0 0h24v24H0z" fill="none" />
-            <path d="M4.05 11a8 8 0 1 1 .5 4m-.5 5v-5h5" />
-          </svg>
+          <RotateCw size={16} />
         </button>
       </div>
+
+      <span className="hidden text-xs text-gray-600 dark:text-gray-300 sm:inline">
+        Click to rotate all pages
+      </span>
     </div>
   )
 }
 
-// 3. Create the main viewer component
 export const PDFViewer = () => {
   const { engine, isLoading } = usePdfiumEngine()
 
   if (isLoading || !engine) {
-    return <div>Loading PDF Engine...</div>
+    return (
+      <div className="overflow-hidden rounded-lg border border-gray-300 bg-white dark:border-gray-700 dark:bg-gray-900">
+        <div className="flex h-[400px] items-center justify-center">
+          <div className="flex items-center gap-2 text-gray-500 dark:text-gray-400">
+            <Loader2 size={20} className="animate-spin" />
+            <span className="text-sm">Loading PDF Engine...</span>
+          </div>
+        </div>
+      </div>
+    )
   }
 
   return (
-    <div style={{ height: '500px' }}>
-      <EmbedPDF engine={engine} plugins={plugins}>
-        <div className="flex h-full flex-col">
-          <RotateToolbar />
-          <div className="flex-grow" style={{ position: 'relative' }}>
-            <Viewport
-              style={{
-                backgroundColor: '#f1f3f5',
-                position: 'absolute',
-                top: 0,
-                left: 0,
-                right: 0,
-                bottom: 0,
-              }}
-            >
-              <Scroller
-                renderPage={({ width, height, pageIndex, scale, rotation }) => (
-                  <Rotate pageSize={{ width, height }}>
-                    <PagePointerProvider
-                      pageIndex={pageIndex}
-                      pageWidth={width}
-                      pageHeight={height}
-                      rotation={rotation}
-                      scale={scale}
+    <EmbedPDF engine={engine} plugins={plugins}>
+      {({ activeDocumentId }) =>
+        activeDocumentId && (
+          <DocumentContent documentId={activeDocumentId}>
+            {({ isLoaded }) =>
+              isLoaded && (
+                <div className="overflow-hidden rounded-lg border border-gray-300 bg-white shadow-sm dark:border-gray-700 dark:bg-gray-900">
+                  {/* Toolbar */}
+                  <RotateToolbar documentId={activeDocumentId} />
+
+                  {/* PDF Viewer Area */}
+                  <div className="relative h-[400px] sm:h-[500px]">
+                    <Viewport
+                      documentId={activeDocumentId}
+                      className="absolute inset-0 bg-gray-200 dark:bg-gray-800"
                     >
-                      <RenderLayer pageIndex={pageIndex} scale={scale} />
-                    </PagePointerProvider>
-                  </Rotate>
-                )}
-              />
-            </Viewport>
-          </div>
-        </div>
-      </EmbedPDF>
-    </div>
+                      <Scroller
+                        documentId={activeDocumentId}
+                        renderPage={({ pageIndex }) => (
+                          <Rotate
+                            documentId={activeDocumentId}
+                            pageIndex={pageIndex}
+                          >
+                            <PagePointerProvider
+                              documentId={activeDocumentId}
+                              pageIndex={pageIndex}
+                            >
+                              <RenderLayer
+                                documentId={activeDocumentId}
+                                pageIndex={pageIndex}
+                              />
+                            </PagePointerProvider>
+                          </Rotate>
+                        )}
+                      />
+                    </Viewport>
+                  </div>
+                </div>
+              )
+            }
+          </DocumentContent>
+        )
+      }
+    </EmbedPDF>
   )
 }

@@ -1,5 +1,37 @@
 # @embedpdf/plugin-rotate
 
+## 2.0.0-next.3
+
+## 2.0.0-next.2
+
+## 2.0.0-next.1
+
+## 2.0.0-next.0
+
+### Major Changes
+
+- [#279](https://github.com/embedpdf/embed-pdf-viewer/pull/279) by [@bobsingor](https://github.com/bobsingor) – ## Multi-Document Support
+
+  The rotate plugin now supports per-document rotation state.
+
+  ### Breaking Changes
+  - **Actions**: All actions now require `documentId`:
+    - `setRotation(documentId, rotation)` - was `setRotation(rotation)`
+  - **State Structure**: Plugin state now uses `documents: Record<string, RotateDocumentState>` to track per-document rotation.
+  - **Capability Methods**: Methods now operate on the active document by default, or use `forDocument(id)` for specific documents.
+
+  ### Framework-Specific Changes (React/Preact, Svelte, Vue)
+  - **Rotate Component**:
+    - Now requires `documentId` and `pageIndex` props (React/Preact: `@embedpdf/plugin-rotate/react`, Svelte: `@embedpdf/plugin-rotate/svelte`, Vue: `@embedpdf/plugin-rotate/vue`)
+    - Replaced `pageSize` prop with automatic page size detection from document state
+    - `rotation` and `scale` props are now optional - if not provided, uses document state values
+    - Component now uses `useDocumentState` hook to get document rotation and scale automatically
+
+  ### New Features
+  - Per-document rotation tracking
+  - `forDocument()` method for document-scoped operations
+  - Document lifecycle management with automatic state initialization and cleanup
+
 ## 1.5.0
 
 ## 1.4.1
@@ -63,7 +95,6 @@
 ### Minor Changes
 
 - [#141](https://github.com/embedpdf/embed-pdf-viewer/pull/141) by [@bobsingor](https://github.com/bobsingor) – Refactored rotate plugin API and utilities:
-
   - Moved `getNextRotation`, `getPreviousRotation`, and rotation matrix helpers into `utils`.
   - Split matrix helpers into:
     - **`getRotationMatrix`** → returns the numeric 6-tuple.

@@ -1,6 +1,7 @@
 ---
 title: Understanding Plugins
 description: Learn how plugins add features like zooming, searching, and annotations to your headless PDF viewer.
+searchable: true
 ---
 
 # Understanding Plugins
@@ -25,22 +26,25 @@ npm install @embedpdf/plugin-zoom
 
 Next, you import the plugin's `...PluginPackage` and register it in the `plugins` array that you pass to the `<EmbedPDF>` component. This is done using the `createPluginRegistration` helper function.
 
-```tsx filename="PDFViewer.tsx" {4, 14-16}
+```tsx filename="PDFViewer.tsx" {5, 17-19}
 import { createPluginRegistration } from '@embedpdf/core';
 import { EmbedPDF } from '@embedpdf/core/react';
 // ... other imports
-import { ZoomPluginPackage } from '@embedpdf/plugin-zoom/react';
+import { DocumentManagerPluginPackage } from '@embedpdf/plugin-document-manager/react';
+import { ZoomPluginPackage, ZoomMode } from '@embedpdf/plugin-zoom/react';
 
 const plugins = [
-  // ... other essential plugins like Loader, Viewport, etc.
-  createPluginRegistration(LoaderPluginPackage, { /* ... */ }),
+  // ... other essential plugins like DocumentManager, Viewport, etc.
+  createPluginRegistration(DocumentManagerPluginPackage, {
+    initialDocuments: [{ url: 'https://snippet.embedpdf.com/ebook.pdf' }],
+  }),
   createPluginRegistration(ViewportPluginPackage),
   createPluginRegistration(ScrollPluginPackage),
   createPluginRegistration(RenderPluginPackage),
 
   // Add the zoom plugin to the array
   createPluginRegistration(ZoomPluginPackage, {
-    defaultZoomLevel: 1.5, // You can pass options here!
+    defaultZoomLevel: ZoomMode.FitPage, // You can pass options here!
   }),
 ];
 
@@ -53,11 +57,17 @@ Registering the plugin activates its core logic and makes its features available
 
 Once a plugin is registered, you can use its associated React components and hooks to build your UI. For example, the zoom plugin provides a `<MarqueeZoom />` component for drag-to-zoom functionality and a `useZoom` hook to control zoom levels from a toolbar.
 
+Since EmbedPDF supports multiple documents, hooks and components require a `documentId` parameter to know which document they're working with. You'll get the `activeDocumentId` from the `<EmbedPDF>` component's children function.
+
 ```tsx filename="ZoomToolbar.tsx"
 import { useZoom } from '@embedpdf/plugin-zoom/react';
 
-export const ZoomToolbar = () => {
-  const { provides: zoomProvides, state: zoomState } = useZoom();
+interface ZoomToolbarProps {
+  documentId: string;
+}
+
+export const ZoomToolbar = ({ documentId }: ZoomToolbarProps) => {
+  const { provides: zoomProvides, state: zoomState } = useZoom(documentId);
  
   if (!zoomProvides) {
     return null;
@@ -80,10 +90,18 @@ This clear separation of logic (the plugin) from the view (your components) give
 
 Finally, import and place your new `<ZoomToolbar />` component **inside** the `<EmbedPDF>` provider. This is essential, as it allows the `useZoom` hook to access the context provided by the `ZoomPluginPackage`.
 
-```tsx filename="PDFViewer.tsx" {4, 12-13, 19}
+Since we're working with multiple documents, you'll need to:
+1. Get the `activeDocumentId` from the `<EmbedPDF>` children function
+2. Use `<DocumentContent>` to ensure the document is loaded before rendering
+3. Pass the `documentId` to all components and hooks that need it
+
+```tsx filename="PDFViewer.tsx" {7, 21}
 import { EmbedPDF } from '@embedpdf/core/react';
 // ... other imports
+import { DocumentContent } from '@embedpdf/plugin-document-manager/react';
 import { Viewport } from '@embedpdf/plugin-viewport/react';
+import { Scroller } from '@embedpdf/plugin-scroll/react';
+import { RenderLayer } from '@embedpdf/plugin-render/react';
 import { ZoomToolbar } from './ZoomToolbar'; // 1. Import the toolbar
 
 // ... plugins array and PDFViewer component setup
@@ -92,14 +110,34 @@ export const PDFViewer = () => {
   return (
     <div style={{ height: '500px', border: '1px solid black', display: 'flex', flexDirection: 'column' }}>
       <EmbedPDF engine={engine} plugins={plugins}>
-        <div style={{display: 'flex, height: '100%', flexDirection: 'column'}}>
-          <ZoomToolbar /> {/* 2. Add the component here */}
-          <div style={{ flex: 1, overflow: 'hidden' }}>
-            <Viewport>
-              {/* ... Scroller and RenderLayer ... */}
-            </Viewport>
-          </div>
-        </div>
+        {({ activeDocumentId }) =>
+          activeDocumentId && (
+            <DocumentContent documentId={activeDocumentId}>
+              {({ isLoaded }) =>
+                isLoaded && (
+                  <div style={{display: 'flex', height: '100%', flexDirection: 'column'}}>
+                    <ZoomToolbar documentId={activeDocumentId} /> {/* 2. Add the component here with documentId */}
+                    <div style={{ flex: 1, overflow: 'hidden' }}>
+                      <Viewport documentId={activeDocumentId}>
+                        <Scroller
+                          documentId={activeDocumentId}
+                          renderPage={({ width, height, pageIndex }) => (
+                            <div style={{ width, height }}>
+                              <RenderLayer
+                                documentId={activeDocumentId}
+                                pageIndex={pageIndex}
+                              />
+                            </div>
+                          )}
+                        />
+                      </Viewport>
+                    </div>
+                  </div>
+                )
+              }
+            </DocumentContent>
+          )
+        }
       </EmbedPDF>
     </div>
   );
@@ -109,9 +147,15 @@ export const PDFViewer = () => {
 ### 5. Live Demo
 This is the result of the code above—a fully functional PDF viewer with zoom controls that you built from the ground up.
 
-import { PDFViewer } from './code-examples/zoom-example';
+import { PDFViewer } from './code-examples/simple-zoom-example';
 
-<PDFViewer />
+<CodeExample 
+  codePaths={[
+    "content/docs/react/code-examples/simple-zoom-example.tsx"
+  ]}
+>
+  <PDFViewer />
+</CodeExample>
 
 ## Types of Plugin Features
 
@@ -119,6 +163,6 @@ Plugins can provide several types of tools:
 
   - **Core Logic:** Some plugins work entirely in the background to manage state (e.g., `ScrollPluginPackage`).
   - **React Components:** Most plugins offer functional components that you place in your viewer to add UI features (e.g., `<RenderLayer />`, `<SelectionLayer />`, `<MarqueeZoom />`).
-  - **React Hooks:** Functions like `useZoom()` or `useSearch()` allow your custom components to access plugin data and trigger actions.
+  - **React Hooks:** Functions like `useZoom(documentId)` or `useSearch(documentId)` allow your custom components to access plugin data and trigger actions. Since EmbedPDF supports multiple documents, these hooks require a `documentId` parameter.
 
 By combining plugins, you can compose a feature-rich PDF experience that is perfectly tailored to your application's design and needs.

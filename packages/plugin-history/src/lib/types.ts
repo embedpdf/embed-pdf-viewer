@@ -21,10 +21,9 @@ export interface HistoryEntry {
 }
 
 /**
- * Information about the history state, to be emitted for UI updates.
- * Includes a global state and a record of each topic's state.
+ * Per-document history state
  */
-export interface HistoryState {
+export interface HistoryDocumentState {
   global: {
     canUndo: boolean;
     canRedo: boolean;
@@ -32,7 +31,30 @@ export interface HistoryState {
   topics: Record<string, { canUndo: boolean; canRedo: boolean }>;
 }
 
-export interface HistoryCapability {
+/**
+ * Information about the history state, to be emitted for UI updates.
+ * Includes per-document history states.
+ */
+export interface HistoryState {
+  // Per-document history state (persisted)
+  documents: Record<string, HistoryDocumentState>;
+  // Currently active document
+  activeDocumentId: string | null;
+}
+
+/**
+ * Event payload for history changes
+ */
+export interface HistoryChangeEvent {
+  documentId: string;
+  topic: string | undefined;
+  state: HistoryDocumentState;
+}
+
+/**
+ * Scoped history capability for a specific document
+ */
+export interface HistoryScope {
   /**
    * Registers a command with the history stack.
    * @param command The command to register, with `execute` and `undo` methods.
@@ -67,13 +89,63 @@ export interface HistoryCapability {
   canRedo: (topic?: string) => boolean;
 
   /**
-   * An event hook that fires whenever a history action occurs.
+   * Returns the current undo/redo state for all topics and the global timeline.
+   */
+  getHistoryState: () => HistoryDocumentState;
+
+  /**
+   * An event hook that fires whenever a history action occurs for this document.
    * @param topic The topic string that was affected by the action.
    */
   onHistoryChange: EventHook<string | undefined>;
+}
+
+export interface HistoryCapability {
+  /**
+   * Registers a command with the history stack for the active document.
+   * @param command The command to register, with `execute` and `undo` methods.
+   * @param topic A string identifier for the history scope (e.g., 'annotations').
+   */
+  register: (command: Command, topic: string) => void;
 
   /**
-   * Returns the current undo/redo state for all topics and the global timeline.
+   * Undoes the last command for the active document.
+   * @param topic If provided, undoes the last command for that specific topic.
+   * If omitted, performs a global undo of the very last action.
    */
-  getHistoryState: () => HistoryState;
+  undo: (topic?: string) => void;
+
+  /**
+   * Redoes the last undone command for the active document.
+   * @param topic If provided, redoes the last command for that specific topic.
+   * If omitted, performs a global redo.
+   */
+  redo: (topic?: string) => void;
+
+  /**
+   * Checks if an undo operation is possible for the active document.
+   * @param topic If provided, checks for the specific topic. Otherwise, checks globally.
+   */
+  canUndo: (topic?: string) => boolean;
+
+  /**
+   * Checks if a redo operation is possible for the active document.
+   * @param topic If provided, checks for the specific topic. Otherwise, checks globally.
+   */
+  canRedo: (topic?: string) => boolean;
+
+  /**
+   * Returns the current undo/redo state for the active document.
+   */
+  getHistoryState: () => HistoryDocumentState;
+
+  /**
+   * Get document-scoped history operations
+   */
+  forDocument: (documentId: string) => HistoryScope;
+
+  /**
+   * An event hook that fires whenever a history action occurs.
+   */
+  onHistoryChange: EventHook<HistoryChangeEvent>;
 }

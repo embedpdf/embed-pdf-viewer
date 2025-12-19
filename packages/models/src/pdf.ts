@@ -47,11 +47,6 @@ export interface PdfDocumentObject {
   id: string;
 
   /**
-   * Name of the document
-   */
-  name?: string;
-
-  /**
    * Count of pages in this document
    */
   pageCount: number;
@@ -395,6 +390,19 @@ export type PdfImage = {
   data: Uint8ClampedArray<ArrayBuffer>;
   width: number;
   height: number;
+};
+
+/**
+ * Image data type that matches both browser's ImageData and plain objects.
+ * Used for raw rendering output that may include colorSpace from browser APIs.
+ *
+ * @public
+ */
+export type ImageDataLike = {
+  data: Uint8ClampedArray<ArrayBuffer>;
+  width: number;
+  height: number;
+  colorSpace?: PredefinedColorSpace;
 };
 
 /**
@@ -1662,9 +1670,9 @@ export interface PdfPathObject {
 export interface PdfImageObject {
   type: PdfPageObjectType.IMAGE;
   /**
-   * data of the image
+   * data of the image (cross-platform compatible, works in Node.js and browsers)
    */
-  imageData: ImageData;
+  imageData: ImageDataLike;
   /**
    * transform matrix
    */
@@ -2318,11 +2326,6 @@ export interface PdfFileWithoutContent {
    * id of file
    */
   id: string;
-
-  /**
-   * Name of the file
-   */
-  name?: string;
 }
 
 export interface PdfFileLoader extends PdfFileWithoutContent {
@@ -2341,7 +2344,7 @@ export interface PdfFileLoader extends PdfFileWithoutContent {
 
 export interface PdfAnnotationsProgress {
   page: number;
-  annotations: PdfAnnotationObject[];
+  result: PdfAnnotationObject[];
 }
 
 /**
@@ -2368,36 +2371,43 @@ export interface PdfFileUrl extends PdfFileWithoutContent {
 }
 
 export enum PdfErrorCode {
-  Ok, //  #define FPDF_ERR_SUCCESS 0    // No error.
-  Unknown, // #define FPDF_ERR_UNKNOWN 1    // Unknown error.
-  NotFound, // #define FPDF_ERR_FILE 2       // File not found or could not be opened.
-  WrongFormat, // #define FPDF_ERR_FORMAT 3     // File not in PDF format or corrupted.
-  Password, // #define FPDF_ERR_PASSWORD 4   // Password required or incorrect password.
-  Security, // #define FPDF_ERR_SECURITY 5   // Unsupported security scheme.
-  PageError, // #define FPDF_ERR_PAGE 6       // Page not found or content error.
-  XFALoad, // #ifdef PDF_ENABLE_XFA
-  XFALayout, //
-  Cancelled,
-  Initialization,
-  NotReady,
-  NotSupport,
-  LoadDoc,
-  DocNotOpen,
-  CantCloseDoc,
-  CantCreateNewDoc,
-  CantImportPages,
-  CantCreateAnnot,
-  CantSetAnnotRect,
-  CantSetAnnotContent,
-  CantRemoveInkList,
-  CantAddInkStoke,
-  CantReadAttachmentSize,
-  CantReadAttachmentContent,
-  CantFocusAnnot,
-  CantSelectText,
-  CantSelectOption,
-  CantCheckField,
-  CantSetAnnotString,
+  // ═══════════════════════════════════════════════════════
+  // PDFium Error Codes (MUST NOT CHANGE ORDER - maps to C defines)
+  // ═══════════════════════════════════════════════════════
+  Ok = 0, // #define FPDF_ERR_SUCCESS 0
+  Unknown = 1, // #define FPDF_ERR_UNKNOWN 1
+  NotFound = 2, // #define FPDF_ERR_FILE 2
+  WrongFormat = 3, // #define FPDF_ERR_FORMAT 3
+  Password = 4, // #define FPDF_ERR_PASSWORD 4 - Password required or incorrect
+  Security = 5, // #define FPDF_ERR_SECURITY 5
+  PageError = 6, // #define FPDF_ERR_PAGE 6
+  XFALoad = 7, // #define FPDF_ERR_XFALOAD 7
+  XFALayout = 8, // #define FPDF_ERR_XFALAYOUT 8
+
+  // ═══════════════════════════════════════════════════════
+  // Custom Error Codes (Can add/modify freely)
+  // ═══════════════════════════════════════════════════════
+  Cancelled = 9,
+  Initialization = 10,
+  NotReady = 11,
+  NotSupport = 12,
+  LoadDoc = 13,
+  DocNotOpen = 14,
+  CantCloseDoc = 15,
+  CantCreateNewDoc = 16,
+  CantImportPages = 17,
+  CantCreateAnnot = 18,
+  CantSetAnnotRect = 19,
+  CantSetAnnotContent = 20,
+  CantRemoveInkList = 21,
+  CantAddInkStoke = 22,
+  CantReadAttachmentSize = 23,
+  CantReadAttachmentContent = 24,
+  CantFocusAnnot = 25,
+  CantSelectText = 26,
+  CantSelectOption = 27,
+  CantCheckField = 28,
+  CantSetAnnotString = 29,
 }
 
 export interface PdfErrorReason {
@@ -2462,6 +2472,21 @@ export interface PdfOpenDocumentBufferOptions {
   password?: string;
 }
 
+export interface PdfRequestOptions {
+  /**
+   * Custom HTTP headers to include in all requests (HEAD, GET, range requests)
+   * Example: { 'Authorization': 'Bearer token', 'X-Custom-Header': 'value' }
+   */
+  headers?: Record<string, string>;
+  /**
+   * Controls whether cookies are sent with requests
+   * - 'omit': Never send cookies (default)
+   * - 'same-origin': Send cookies for same-origin requests
+   * - 'include': Always send cookies (requires CORS)
+   */
+  credentials?: RequestCredentials;
+}
+
 export interface PdfOpenDocumentUrlOptions {
   /**
    * Password for the document
@@ -2471,6 +2496,10 @@ export interface PdfOpenDocumentUrlOptions {
    * Loading mode
    */
   mode?: 'auto' | 'range-request' | 'full-fetch';
+  /**
+   * HTTP request options for fetching the PDF
+   */
+  requestOptions?: PdfRequestOptions;
 }
 
 export interface PdfRenderOptions {
@@ -2610,11 +2639,6 @@ export interface PdfEngine<T = Blob> {
    * @returns support or not
    */
   isSupport?: (feature: PdfEngineFeature) => PdfTask<PdfEngineOperation[]>;
-  /**
-   * Initialize the engine
-   * @returns task that indicate whether initialization is successful
-   */
-  initialize?: () => PdfTask<boolean>;
   /**
    * Destroy the engine
    * @returns task that indicate whether destroy is successful
@@ -2970,6 +2994,152 @@ export interface PdfEngine<T = Blob> {
  * @public
  */
 export type PdfEngineMethodName = keyof Required<PdfEngine>;
+
+/**
+ * Progress info for batch operations
+ * Emitted per-page as the batch is processed
+ *
+ * @public
+ */
+export interface BatchProgress<T> {
+  /** Index of the page that was just processed */
+  pageIndex: number;
+  /** Result for this page */
+  result: T;
+  /** Number of pages completed so far */
+  completed: number;
+  /** Total number of pages in this batch */
+  total: number;
+}
+
+/**
+ * Executor interface for PDFium implementations.
+ * Can be either PdfiumNative (direct) or RemoteExecutor (worker proxy).
+ *
+ * @public
+ */
+export interface IPdfiumExecutor {
+  // Core operations
+  destroy(): void;
+  openDocumentBuffer(
+    file: PdfFile,
+    options?: PdfOpenDocumentBufferOptions,
+  ): PdfTask<PdfDocumentObject>;
+  getMetadata(doc: PdfDocumentObject): PdfTask<PdfMetadataObject>;
+  setMetadata(doc: PdfDocumentObject, metadata: Partial<PdfMetadataObject>): PdfTask<boolean>;
+  getDocPermissions(doc: PdfDocumentObject): PdfTask<number>;
+  getDocUserPermissions(doc: PdfDocumentObject): PdfTask<number>;
+  getSignatures(doc: PdfDocumentObject): PdfTask<PdfSignatureObject[]>;
+  getBookmarks(doc: PdfDocumentObject): PdfTask<PdfBookmarksObject>;
+  setBookmarks(doc: PdfDocumentObject, bookmarks: PdfBookmarkObject[]): PdfTask<boolean>;
+  deleteBookmarks(doc: PdfDocumentObject): PdfTask<boolean>;
+
+  // Raw rendering (returns ImageDataLike, not Blob)
+  renderPageRaw(
+    doc: PdfDocumentObject,
+    page: PdfPageObject,
+    options?: PdfRenderPageOptions,
+  ): PdfTask<ImageDataLike>;
+  renderPageRect(
+    doc: PdfDocumentObject,
+    page: PdfPageObject,
+    rect: Rect,
+    options?: PdfRenderPageOptions,
+  ): PdfTask<ImageDataLike>;
+  renderThumbnailRaw(
+    doc: PdfDocumentObject,
+    page: PdfPageObject,
+    options?: PdfRenderThumbnailOptions,
+  ): PdfTask<ImageDataLike>;
+  renderPageAnnotationRaw(
+    doc: PdfDocumentObject,
+    page: PdfPageObject,
+    annotation: PdfAnnotationObject,
+    options?: PdfRenderPageAnnotationOptions,
+  ): PdfTask<ImageDataLike>;
+
+  // Single page operations
+  getPageAnnotationsRaw(
+    doc: PdfDocumentObject,
+    page: PdfPageObject,
+  ): PdfTask<PdfAnnotationObject[]>;
+  getPageAnnotations(doc: PdfDocumentObject, page: PdfPageObject): PdfTask<PdfAnnotationObject[]>;
+  createPageAnnotation<A extends PdfAnnotationObject>(
+    doc: PdfDocumentObject,
+    page: PdfPageObject,
+    annotation: A,
+    context?: AnnotationCreateContext<A>,
+  ): PdfTask<string>;
+  updatePageAnnotation(
+    doc: PdfDocumentObject,
+    page: PdfPageObject,
+    annotation: PdfAnnotationObject,
+  ): PdfTask<boolean>;
+  removePageAnnotation(
+    doc: PdfDocumentObject,
+    page: PdfPageObject,
+    annotation: PdfAnnotationObject,
+  ): PdfTask<boolean>;
+  getPageTextRects(doc: PdfDocumentObject, page: PdfPageObject): PdfTask<PdfTextRectObject[]>;
+
+  // Single page search
+  searchInPage(
+    doc: PdfDocumentObject,
+    page: PdfPageObject,
+    keyword: string,
+    flags: number,
+  ): PdfTask<SearchResult[]>;
+
+  // Batch operations (process multiple pages in one call for performance)
+  getAnnotationsBatch(
+    doc: PdfDocumentObject,
+    pages: PdfPageObject[],
+  ): PdfTask<Record<number, PdfAnnotationObject[]>, BatchProgress<PdfAnnotationObject[]>>;
+
+  searchBatch(
+    doc: PdfDocumentObject,
+    pages: PdfPageObject[],
+    keyword: string,
+    flags: number,
+  ): PdfTask<Record<number, SearchResult[]>, BatchProgress<SearchResult[]>>;
+
+  // Other operations
+  getAttachments(doc: PdfDocumentObject): PdfTask<PdfAttachmentObject[]>;
+  addAttachment(doc: PdfDocumentObject, params: PdfAddAttachmentParams): PdfTask<boolean>;
+  removeAttachment(doc: PdfDocumentObject, attachment: PdfAttachmentObject): PdfTask<boolean>;
+  readAttachmentContent(
+    doc: PdfDocumentObject,
+    attachment: PdfAttachmentObject,
+  ): PdfTask<ArrayBuffer>;
+  setFormFieldValue(
+    doc: PdfDocumentObject,
+    page: PdfPageObject,
+    annotation: PdfWidgetAnnoObject,
+    value: FormFieldValue,
+  ): PdfTask<boolean>;
+  flattenPage(
+    doc: PdfDocumentObject,
+    page: PdfPageObject,
+    options?: PdfFlattenPageOptions,
+  ): PdfTask<PdfPageFlattenResult>;
+  extractPages(doc: PdfDocumentObject, pageIndexes: number[]): PdfTask<ArrayBuffer>;
+  extractText(doc: PdfDocumentObject, pageIndexes: number[]): PdfTask<string>;
+  redactTextInRects(
+    doc: PdfDocumentObject,
+    page: PdfPageObject,
+    rects: Rect[],
+    options?: PdfRedactTextOptions,
+  ): PdfTask<boolean>;
+  getTextSlices(doc: PdfDocumentObject, slices: PageTextSlice[]): PdfTask<string[]>;
+  getPageGlyphs(doc: PdfDocumentObject, page: PdfPageObject): PdfTask<PdfGlyphObject[]>;
+  getPageGeometry(doc: PdfDocumentObject, page: PdfPageObject): PdfTask<PdfPageGeometry>;
+  merge(files: PdfFile[]): PdfTask<PdfFile>;
+  mergePages(mergeConfigs: Array<{ docId: string; pageIndices: number[] }>): PdfTask<PdfFile>;
+  preparePrintDocument(doc: PdfDocumentObject, options?: PdfPrintOptions): PdfTask<ArrayBuffer>;
+  saveAsCopy(doc: PdfDocumentObject): PdfTask<ArrayBuffer>;
+  closeDocument(doc: PdfDocumentObject): PdfTask<boolean>;
+  closeAllDocuments(): PdfTask<boolean>;
+}
 
 /**
  * Arguments of PdfEngine method

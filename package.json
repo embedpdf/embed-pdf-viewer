@@ -14,14 +14,16 @@
     "build:vue-vuetify": "turbo run build --filter=\"./packages/*\" --filter=\"./examples/vue-vuetify\"",
     "build:svelte-tailwind": "turbo run build --filter=\"./packages/*\" --filter=\"./examples/svelte-tailwind\"",
     "build:packages": "turbo run build --filter=\"./packages/*\"",
-    "build:snippet": "turbo run build --filter=\"./packages/*\" --filter=\"./snippet\"",
+    "build:viewers": "turbo run build --filter=\"./packages/*\" --filter=\"./viewers/*\"",
+    "build:snippet": "turbo run build --filter=\"./packages/*\" --filter=\"./viewers/snippet\"",
     "build:watch": "ROARR_LOG=true turbowatch ./config/turbowatch.config.ts | roarr",
     "watch": "turbo watch",
     "watch:packages": "turbo watch build --filter=\"./packages/*\"",
     "format": "prettier --write \"**/*.{ts,tsx,js,mjs,jsx,json,css,md}\"",
     "format:check": "prettier --check \"**/*.{ts,tsx,js,mjs,jsx,json,css,md}\"",
     "changeset": "changeset",
-    "ci:publish": "pnpm publish -r --access public --report-summary $GITHUB_WORKSPACE/publish-summary.json"
+    "ci:publish": "pnpm publish -r --access public --report-summary $GITHUB_WORKSPACE/publish-summary.json",
+    "ci:publish:next": "pnpm publish -r --access public --tag next --publish-branch next --report-summary $GITHUB_WORKSPACE/publish-summary.json"
   },
   "devDependencies": {
     "@changesets/cli": "^2.29.6",

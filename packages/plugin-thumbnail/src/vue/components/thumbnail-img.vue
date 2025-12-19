@@ -1,11 +1,18 @@
 <script setup lang="ts">
-import { onBeforeUnmount, ref, watch, watchEffect, useAttrs } from 'vue';
+import { ref, watch } from 'vue';
 import { useThumbnailCapability, useThumbnailPlugin } from '../hooks';
 import type { ThumbMeta } from '@embedpdf/plugin-thumbnail';
 import { ignore, PdfErrorCode } from '@embedpdf/models';
 
-const props = defineProps<{ meta: ThumbMeta }>();
-const attrs = useAttrs();
+interface ThumbImgProps {
+  /**
+   * The ID of the document that this thumbnail belongs to
+   */
+  documentId: string;
+  meta: ThumbMeta;
+}
+
+const props = defineProps<ThumbImgProps>();
 
 const { provides: thumbs } = useThumbnailCapability();
 const { plugin: thumbnailPlugin } = useThumbnailPlugin();
@@ -14,18 +21,23 @@ const url = ref<string | null>(null);
 let urlToRevoke: string | null = null;
 const refreshTick = ref(0);
 
-let offRefresh: (() => void) | null = null;
+// Watch for refresh events for this specific document
+watch(
+  [() => thumbnailPlugin.value, () => props.documentId, () => props.meta.pageIndex],
+  ([plugin, docId, pageIdx], _, onCleanup) => {
+    if (!plugin) return;
 
-watchEffect((onCleanup) => {
-  if (!thumbnailPlugin.value) return;
-  offRefresh?.();
-  offRefresh = thumbnailPlugin.value.onRefreshPages((pages) => {
-    if (pages.includes(props.meta.pageIndex)) {
-      refreshTick.value++;
-    }
-  });
-  onCleanup(() => offRefresh?.());
-});
+    const scope = plugin.provides().forDocument(docId);
+    const unsubscribe = scope.onRefreshPages((pages) => {
+      if (pages.includes(pageIdx)) {
+        refreshTick.value++;
+      }
+    });
+
+    onCleanup(unsubscribe);
+  },
+  { immediate: true },
+);
 
 function revoke() {
   if (urlToRevoke) {
@@ -36,44 +48,50 @@ function revoke() {
 
 let abortTask: (() => void) | null = null;
 
-function load() {
-  if (!thumbs.value) return; // wait until capability exists
-
-  const task = thumbs.value.renderThumb(props.meta.pageIndex, window.devicePixelRatio);
-  abortTask = () =>
-    task.abort({
-      code: PdfErrorCode.Cancelled,
-      message: 'canceled render task',
-    });
-
-  task.wait((blob) => {
-    revoke();
-    const objectUrl = URL.createObjectURL(blob);
-    urlToRevoke = objectUrl;
-    url.value = objectUrl;
-  }, ignore);
-}
-
-/* 🔧 Re-run when:
-   - page changes,
-   - the plugin tells us to refresh,
-   - OR the capability becomes available later.
-*/
+// Render thumbnail when dependencies change
 watch(
-  () => [props.meta.pageIndex, refreshTick.value, !!thumbs.value],
-  () => {
-    abortTask?.();
-    load();
+  [() => thumbs.value, () => props.documentId, () => props.meta.pageIndex, refreshTick],
+  ([capability, docId, pageIdx], _, onCleanup) => {
+    // Cancel previous task
+    if (abortTask) {
+      abortTask();
+      abortTask = null;
+    }
+
+    if (!capability) {
+      url.value = null;
+      return;
+    }
+
+    const scope = capability.forDocument(docId);
+    const task = scope.renderThumb(pageIdx, window.devicePixelRatio);
+
+    abortTask = () =>
+      task.abort({
+        code: PdfErrorCode.Cancelled,
+        message: 'canceled render task',
+      });
+
+    task.wait((blob) => {
+      revoke();
+      const objectUrl = URL.createObjectURL(blob);
+      urlToRevoke = objectUrl;
+      url.value = objectUrl;
+      abortTask = null;
+    }, ignore);
+
+    onCleanup(() => {
+      if (abortTask) {
+        abortTask();
+        abortTask = null;
+      }
+      revoke();
+    });
   },
   { immediate: true },
 );
-
-onBeforeUnmount(() => {
-  abortTask?.();
-  revoke();
-});
 </script>
 
 <template>
-  <img v-if="url" :src="url" v-bind="attrs" @load="revoke" />
+  <img v-if="url" :src="url" v-bind="$attrs" @load="revoke" />
 </template>

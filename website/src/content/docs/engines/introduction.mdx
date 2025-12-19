@@ -1,6 +1,7 @@
 ---
 title: Introduction
 description: Getting started with @embedpdf/engines - high-level PDF rendering engines for browser and Node.js environments
+searchable: true
 ---
 
 # @embedpdf/engines
@@ -35,8 +36,7 @@ const worker = new Worker(new URL('./webworker.ts', import.meta.url), {
 });
 const engine = new WebWorkerEngine(worker);
 
-// Initialize the engine
-await engine.initialize().toPromise();
+// Engine is ready to use immediately - no initialization needed!
 
 // Open a document and render its first page
 const document = await engine
@@ -91,14 +91,22 @@ For simpler use cases, you can run the engine directly on the main thread.
 
 ```typescript
 import { init, DEFAULT_PDFIUM_WASM_URL } from '@embedpdf/pdfium';
-import { PdfiumEngine } from '@embedpdf/engines/pdfium';
+import { PdfiumNative, PdfEngine } from '@embedpdf/engines/pdfium';
+import { browserImageDataToBlobConverter } from '@embedpdf/engines/converters';
 
 const response = await fetch(DEFAULT_PDFIUM_WASM_URL);
 const wasmBinary = await response.arrayBuffer();
-const pdfium = await init({ wasmBinary });
+const pdfiumModule = await init({ wasmBinary });
 
-const engine = new PdfiumEngine(pdfium);
-await engine.initialize().toPromise();
+// Create the native executor (initializes PDFium automatically)
+const native = new PdfiumNative(pdfiumModule);
+
+// Create the orchestrator with image converter
+const engine = new PdfEngine(native, {
+  imageConverter: browserImageDataToBlobConverter,
+});
+
+// Engine is ready to use immediately!
 // ... use engine methods
 ```
 
@@ -110,16 +118,19 @@ The engine works seamlessly in Node.js. You'll need to provide an image conversi
 import { readFile, writeFile } from 'fs/promises';
 import sharp from 'sharp';
 import { init } from '@embedpdf/pdfium';
-import { PdfiumEngine } from '@embedpdf/engines/pdfium';
+import { PdfiumNative, PdfEngine } from '@embedpdf/engines/pdfium';
 import { createNodeImageDataToBufferConverter } from '@embedpdf/engines/converters';
 
-const imageDataConverter = createNodeImageDataToBufferConverter(sharp);
-const pdfiumInstance = await init();
-const engine = new PdfiumEngine(pdfiumInstance, {
-  imageDataConverter
-});
-await engine.initialize().toPromise();
+const imageConverter = createNodeImageDataToBufferConverter(sharp);
+const pdfiumModule = await init();
 
+// Create the native executor (initializes PDFium automatically)
+const native = new PdfiumNative(pdfiumModule);
+
+// Create the orchestrator with image converter
+const engine = new PdfEngine(native, { imageConverter });
+
+// Engine is ready to use immediately!
 const pdfBuffer = await readFile('document.pdf');
 const document = await engine
   .openDocumentBuffer({ id: 'sample', content: pdfBuffer })

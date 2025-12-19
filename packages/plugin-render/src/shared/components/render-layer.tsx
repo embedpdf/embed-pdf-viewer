@@ -1,76 +1,104 @@
-import { Fragment, useEffect, useRef, useState } from '@framework';
+import { Fragment, useEffect, useRef, useState, useMemo } from '@framework';
 import type { CSSProperties, HTMLAttributes } from '@framework';
 
-import { ignore, PdfErrorCode } from '@embedpdf/models';
+import { ignore, PdfErrorCode, Rotation } from '@embedpdf/models';
 
-import { useRenderCapability, useRenderPlugin } from '../hooks/use-render';
+import { useRenderCapability } from '../hooks/use-render';
+import { useDocumentState } from '@embedpdf/core/@framework';
 
 type RenderLayerProps = Omit<HTMLAttributes<HTMLImageElement>, 'style'> & {
+  /**
+   * The ID of the document to render from
+   */
+  documentId: string;
+  /**
+   * The page index to render (0-based)
+   */
   pageIndex: number;
   /**
-   * The scale factor for rendering the page.
+   * Optional scale override. If not provided, uses document's current scale.
    */
   scale?: number;
   /**
-   * @deprecated Use `scale` instead. Will be removed in the next major release.
+   * Optional device pixel ratio override. If not provided, uses window.devicePixelRatio.
    */
-  scaleFactor?: number;
   dpr?: number;
+  /**
+   * Additional styles for the image element
+   */
   style?: CSSProperties;
 };
 
+/**
+ * RenderLayer Component
+ *
+ * Renders a PDF page with smart prop handling:
+ * - If scale/dpr/rotation props are provided, they override document state
+ * - If not provided, component uses document's current state values
+ * - Automatically re-renders when:
+ *   1. Document state changes (scale, rotation)
+ *   2. Page is refreshed (via REFRESH_PAGES action in core)
+ */
 export function RenderLayer({
+  documentId,
   pageIndex,
-  scale,
-  scaleFactor,
-  dpr,
+  scale: scaleOverride,
+  dpr: dprOverride,
   style,
   ...props
 }: RenderLayerProps) {
   const { provides: renderProvides } = useRenderCapability();
-  const { plugin: renderPlugin } = useRenderPlugin();
-
-  // Handle deprecation: prefer scale over scaleFactor, but fall back to scaleFactor if scale is not provided
-  const actualScale = scale ?? scaleFactor ?? 1;
+  const documentState = useDocumentState(documentId);
 
   const [imageUrl, setImageUrl] = useState<string | null>(null);
   const urlRef = useRef<string | null>(null);
-  const [refreshTick, setRefreshTick] = useState(0);
+
+  // Get refresh version from core state
+  const refreshVersion = useMemo(() => {
+    if (!documentState) return 0;
+    return documentState.pageRefreshVersions[pageIndex] || 0;
+  }, [documentState, pageIndex]);
+
+  // Determine actual render options: use overrides if provided, otherwise fall back to document state
+  const actualScale = useMemo(() => {
+    if (scaleOverride !== undefined) return scaleOverride;
+    return documentState?.scale ?? 1;
+  }, [scaleOverride, documentState?.scale]);
+
+  const actualDpr = useMemo(() => {
+    if (dprOverride !== undefined) return dprOverride;
+    return window.devicePixelRatio;
+  }, [dprOverride]);
 
   useEffect(() => {
-    if (!renderPlugin) return;
-    return renderPlugin.onRefreshPages((pages) => {
-      if (pages.includes(pageIndex)) {
-        setRefreshTick((tick) => tick + 1);
-      }
+    if (!renderProvides) return;
+
+    const task = renderProvides.forDocument(documentId).renderPage({
+      pageIndex,
+      options: {
+        scaleFactor: actualScale,
+        dpr: actualDpr,
+      },
     });
-  }, [renderPlugin]);
 
-  useEffect(() => {
-    if (renderProvides) {
-      const task = renderProvides.renderPage({
-        pageIndex,
-        options: { scaleFactor: actualScale, dpr: dpr || window.devicePixelRatio },
-      });
-      task.wait((blob) => {
-        const url = URL.createObjectURL(blob);
-        setImageUrl(url);
-        urlRef.current = url;
-      }, ignore);
+    task.wait((blob) => {
+      const url = URL.createObjectURL(blob);
+      setImageUrl(url);
+      urlRef.current = url;
+    }, ignore);
 
-      return () => {
-        if (urlRef.current) {
-          URL.revokeObjectURL(urlRef.current);
-          urlRef.current = null;
-        } else {
-          task.abort({
-            code: PdfErrorCode.Cancelled,
-            message: 'canceled render task',
-          });
-        }
-      };
-    }
-  }, [pageIndex, actualScale, dpr, renderProvides, refreshTick]);
+    return () => {
+      if (urlRef.current) {
+        URL.revokeObjectURL(urlRef.current);
+        urlRef.current = null;
+      } else {
+        task.abort({
+          code: PdfErrorCode.Cancelled,
+          message: 'canceled render task',
+        });
+      }
+    };
+  }, [documentId, pageIndex, actualScale, actualDpr, renderProvides, refreshVersion]);
 
   const handleImageLoad = () => {
     if (urlRef.current) {

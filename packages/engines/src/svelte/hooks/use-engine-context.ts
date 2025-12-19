@@ -1,4 +1,7 @@
-import { getPdfEngineContext, type PdfEngineContextState } from '../context/pdf-engine-context.svelte';
+import {
+  getPdfEngineContext,
+  type PdfEngineContextState,
+} from '../context/pdf-engine-context.svelte';
 
 /**
  * Hook to access the PDF engine from context.
@@ -28,4 +31,3 @@ export function useEngine() {
 
   return engine;
 }
-

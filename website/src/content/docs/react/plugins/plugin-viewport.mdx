@@ -1,12 +1,14 @@
 ---
 title: Viewport Plugin
-description: Provides the essential <Viewport /> component, the scrollable container for all PDF content.
+description: Provides the essential <Viewport /> component, acting as the scrollable container and layout manager for PDF content.
 searchable: true
 ---
 
 # Viewport Plugin
 
-The Viewport Plugin is a foundational element for any viewer. It provides the `<Viewport />` component, which acts as the scrollable "window" through which users see the PDF pages. It is responsible for tracking its own dimensions and scroll position and communicating that information to other plugins.
+The Viewport Plugin is a foundational element for any viewer. It provides the `<Viewport />` component, which acts as the scrollable "window" through which users see the PDF pages.
+
+This plugin is designed for **multi-document layouts**. It manages metrics, scroll state, and dimensions independently for every open document, allowing you to build split-screen views, tabbed interfaces, or multi-window applications easily.
 
 ## Installation
 
@@ -18,9 +20,9 @@ npm install @embedpdf/plugin-viewport
 
 ## Registration
 
-Import `ViewportPluginPackage` and add it to the `plugins` array. It is highly recommended to include this plugin in any viewer build.
+Import `ViewportPluginPackage` and add it to the `plugins` array.
 
-```tsx {4, 13-15}
+```tsx {13-15}
 import { createPluginRegistration } from '@embedpdf/core'
 import { EmbedPDF } from '@embedpdf/core/react'
 // ... other imports
@@ -28,63 +30,89 @@ import { ViewportPluginPackage } from '@embedpdf/plugin-viewport/react'
 
 const plugins = [
   // ... other essential plugins
-  createPluginRegistration(LoaderPluginPackage, { /* ... */ }),
+  createPluginRegistration(DocumentManagerPluginPackage, { /* ... */ }),
   createPluginRegistration(ScrollPluginPackage),
   createPluginRegistration(RenderPluginPackage),
 
   // Register and configure the viewport plugin
   createPluginRegistration(ViewportPluginPackage, {
-    viewportGap: 10, // Adds 10px of padding inside the viewport
+    viewportGap: 20, // Adds 20px of padding inside the viewport
   }),
 ]
 ```
 
 ## Usage
 
-The plugin provides the `<Viewport />` component, which you use to wrap your `<Scroller />`, and hooks to interact with it programmatically.
+The plugin provides the `<Viewport />` component for the UI and hooks for programmatic control.
 
 ### The `<Viewport />` Component
 
-The `<Viewport />` component is the main scrollable container for your PDF. You should place it in your layout and ensure it has a defined size (e.g., `height: '500px'` or `flex-grow: 1`). It automatically handles listening for scroll and resize events.
+The `<Viewport />` component is the main scrollable container. You must provide a `documentId` to link the scroll container to the specific document state managed by the engine.
 
 ```tsx
-// Inside your viewer component
-<div style={{ height: '500px', display: 'flex' }}>
-  <Viewport>
-    {/* ... */}
-  </Viewport>
-</div>
+<Viewport
+  documentId={activeDocumentId} // Required: The ID of the document being displayed
+  className="h-full w-full bg-gray-100"
+>
+  <Scroller
+    documentId={activeDocumentId} // Scroller also requires the ID
+    renderPage={...}
+  />
+</Viewport>
 ```
 
 ### Programmatic Scrolling
 
-You can control the viewport's scroll position from any other component using the `useViewportCapability` hook. This is useful for features like a "scroll to top" button or navigating from a table of contents.
+To scroll a specific document programmatically, use `useViewportCapability` to get the API, then use `.forDocument(id)` to target the specific viewport.
 
-```tsx {1,4, 7}
+```tsx {4,7}
 import { useViewportCapability } from '@embedpdf/plugin-viewport/react';
 
-const MyToolbar = () => {
-  const { provides: viewport } = useViewportCapability();
+const ScrollToTopButton = ({ documentId }) => {
+  const { provides: viewportPlugin } = useViewportCapability();
 
-  const scrollToTop = () => {
+  // Get the API scoped to this specific document
+  const viewport = viewportPlugin?.forDocument(documentId);
+
+  const handleClick = () => {
     viewport?.scrollTo({ x: 0, y: 0, behavior: 'smooth' });
   };
 
-  return <button onClick={scrollToTop}>Scroll to Top</button>;
+  return <button onClick={handleClick}>Top</button>;
 };
 ```
 
 ### Monitoring Scroll Activity
 
-The plugin also provides a `useViewportScrollActivity` hook that returns the current scrolling state. This is useful for creating UIs that react to user scrolling, such as auto-hiding toolbars.
+To react to scrolling events (e.g., to show a "Back to Top" button or hide a floating toolbar), use the `useViewportScrollActivity` hook. This hook returns the reactive state for a specific document.
+
+```tsx
+import { useViewportScrollActivity } from '@embedpdf/plugin-viewport/react';
+
+const ScrollIndicator = ({ documentId }) => {
+  // Pass the documentId to track
+  const activity = useViewportScrollActivity(documentId);
+
+  if (activity.isScrolling) {
+    return <span>Scrolling...</span>;
+  }
+  return <span>Idle</span>;
+};
+```
 
 ## Live Example
 
-This example demonstrates a viewer with a toolbar that can programmatically scroll the viewport. It also includes an indicator that shows when the viewport is actively scrolling.
+This example demonstrates a complete setup. It loads a document, passes the `documentId` to the components, and creates a toolbar that controls scrolling for that specific document.
 
 import { PDFViewer } from '../code-examples/viewport-example';
 
-<PDFViewer />
+<CodeExample 
+  codePaths={[
+    "content/docs/react/code-examples/viewport-example.tsx"
+  ]}
+>
+  <PDFViewer />
+</CodeExample>
 
 ## API Reference
 
@@ -99,6 +127,11 @@ import { PDFViewer } from '../code-examples/viewport-example';
 
 A `div`-based component that acts as the scrollable container. It accepts all standard `div` props like `style` and `className`.
 
+| Prop | Type | Description |
+| :--- | :--- | :--- |
+| **`documentId`** | `string` | **(Required)** The unique ID of the document this viewport is displaying. |
+| **`children`** | `ReactNode` | The content to render (usually the `<Scroller />`). |
+
 ### Hook: `useViewportCapability()`
 
 Connects your component to the viewport's functions.
@@ -107,21 +140,30 @@ Connects your component to the viewport's functions.
 
 | Property | Type | Description |
 | :--- | :--- | :--- |
-| **`provides`** | `ViewportCapability \| null` | An object with methods to interact with the viewport, or `null` if the plugin is not ready. |
+| **`provides`** | `ViewportCapability \| null` | An object with methods to interact with the viewport system. |
 
 #### `ViewportCapability` Methods
 
 | Method | Description |
 | :--- | :--- |
-| **`getMetrics()`** | Returns a `ViewportMetrics` object containing the current dimensions, scroll offsets, and total scrollable area. |
-| **`scrollTo(position)`** | Programmatically scrolls the viewport. The `position` object can include `x`, `y`, `behavior: 'smooth'`, and `center: true`. |
-| **`getBoundingRect()`**| Returns the `Rect` of the viewport element relative to the browser's viewport. |
+| **`forDocument(id)`** | Returns a `ViewportScope` object to control a specific document's viewport. |
+| **`getViewportGap()`** | Returns the configured viewport gap. |
+| **`isViewportMounted(id)`**| Returns true if the viewport for the given document ID is currently mounted in the DOM. |
 
-### Hook: `useViewportScrollActivity()`
+#### `ViewportScope` Methods (Returned by `forDocument`)
 
-A hook for tracking the scroll state of the viewport.
+| Method | Description |
+| :--- | :--- |
+| **`scrollTo(position)`** | Scrolls the viewport. `position`: `{ x, y, behavior?, center? }`. |
+| **`getMetrics()`** | Returns current dimensions (width, height, scrollTop, scrollWidth, etc.). |
+| **`isScrolling()`** | Returns `true` if the user is currently scrolling. |
+| **`getBoundingRect()`**| Returns the `DOMRect` of the viewport container. |
 
-#### Returns
+### Hook: `useViewportScrollActivity(documentId)`
+
+A hook for tracking the scroll state of a specific document.
+
+#### Returns (`ScrollActivity`)
 
 | Property | Type | Description |
 | :--- | :--- | :--- |

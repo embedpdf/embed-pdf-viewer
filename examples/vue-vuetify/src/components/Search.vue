@@ -5,7 +5,13 @@ import { useScrollCapability } from '@embedpdf/plugin-scroll/vue';
 import { MatchFlag } from '@embedpdf/models';
 import type { SearchResult } from '@embedpdf/models';
 
-const { state, provides } = useSearch();
+interface SearchProps {
+  documentId: string;
+}
+
+const props = defineProps<SearchProps>();
+
+const { state, provides } = useSearch(() => props.documentId);
 const { provides: scroll } = useScrollCapability();
 
 const inputValue = ref(state.value.query || '');
@@ -66,7 +72,8 @@ const scrollToItem = (index: number) => {
   scroll.value?.scrollToPage({
     pageNumber: item.pageIndex + 1,
     pageCoordinates: minCoordinates,
-    center: true,
+    alignX: 50,
+    alignY: 50,
   });
 };
 

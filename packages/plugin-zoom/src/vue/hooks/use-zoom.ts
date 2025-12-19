@@ -1,28 +1,49 @@
-import { ref, onMounted, onUnmounted } from 'vue';
+import { ref, watch, readonly, computed, toValue, type MaybeRefOrGetter } from 'vue';
 import { useCapability, usePlugin } from '@embedpdf/core/vue';
-import { initialState, ZoomPlugin, ZoomState } from '@embedpdf/plugin-zoom';
+import { initialDocumentState, ZoomPlugin, ZoomDocumentState } from '@embedpdf/plugin-zoom';
 
 export const useZoomCapability = () => useCapability<ZoomPlugin>(ZoomPlugin.id);
 export const useZoomPlugin = () => usePlugin<ZoomPlugin>(ZoomPlugin.id);
 
-export const useZoom = () => {
+/**
+ * Hook for zoom state for a specific document
+ * @param documentId Document ID (can be ref, computed, getter, or plain value)
+ */
+export const useZoom = (documentId: MaybeRefOrGetter<string>) => {
   const { provides } = useZoomCapability();
-  const state = ref<ZoomState>(initialState);
+  const state = ref<ZoomDocumentState>(initialDocumentState);
 
-  onMounted(() => {
-    if (!provides.value) return;
+  watch(
+    [provides, () => toValue(documentId)],
+    ([providesValue, docId], _, onCleanup) => {
+      if (!providesValue) {
+        state.value = initialDocumentState;
+        return;
+      }
 
-    const unsubscribe = provides.value.onStateChange((newState) => {
-      state.value = newState;
-    });
+      const scope = providesValue.forDocument(docId);
 
-    onUnmounted(() => {
-      unsubscribe();
-    });
+      // Get initial state
+      state.value = scope.getState();
+
+      // Subscribe to state changes
+      const unsubscribe = scope.onStateChange((newState) => {
+        state.value = newState;
+      });
+
+      onCleanup(unsubscribe);
+    },
+    { immediate: true },
+  );
+
+  // Return a computed ref for the scoped capability
+  const scopedProvides = computed(() => {
+    const docId = toValue(documentId);
+    return provides.value?.forDocument(docId) ?? null;
   });
 
   return {
-    state,
-    provides,
+    state: readonly(state),
+    provides: scopedProvides,
   };
 };

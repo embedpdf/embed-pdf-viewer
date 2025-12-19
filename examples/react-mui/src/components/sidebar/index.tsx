@@ -3,11 +3,18 @@ import { Box, Typography } from '@mui/material';
 import { useScroll } from '@embedpdf/plugin-scroll/react';
 import { ThumbnailsPane, ThumbImg } from '@embedpdf/plugin-thumbnail/react';
 
-export const Sidebar: React.FC = () => {
-  const { state, provides } = useScroll();
+interface SidebarProps {
+  documentId: string;
+}
+
+export const Sidebar: React.FC<SidebarProps> = ({ documentId }) => {
+  const { provides: scrollCapability } = useScroll(documentId);
+
+  // Get document-scoped API
+  const currentPage = scrollCapability?.getCurrentPage() ?? 1;
 
   return (
-    <ThumbnailsPane>
+    <ThumbnailsPane documentId={documentId}>
       {(m) => (
         <Box
           key={m.pageIndex}
@@ -23,7 +30,7 @@ export const Sidebar: React.FC = () => {
             padding: '8px',
           }}
           onClick={() => {
-            provides?.scrollToPage?.({
+            scrollCapability?.scrollToPage?.({
               pageNumber: m.pageIndex + 1,
             });
           }}
@@ -34,7 +41,7 @@ export const Sidebar: React.FC = () => {
               width: m.width,
               height: m.height,
               border: '2px solid',
-              borderColor: state.currentPage === m.pageIndex + 1 ? 'primary.main' : '#e0e0e0',
+              borderColor: currentPage === m.pageIndex + 1 ? 'primary.main' : '#e0e0e0',
               borderRadius: 1,
               overflow: 'hidden',
               '&:hover': {
@@ -44,6 +51,7 @@ export const Sidebar: React.FC = () => {
             }}
           >
             <ThumbImg
+              documentId={documentId}
               meta={m}
               style={{
                 width: '100%',

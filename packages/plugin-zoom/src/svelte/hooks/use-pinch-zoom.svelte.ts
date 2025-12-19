@@ -1,28 +1,85 @@
-import type { ViewportPlugin } from '@embedpdf/plugin-viewport';
-import { useZoomCapability } from './use-zoom.svelte';
+import { getContext } from 'svelte';
 import { useCapability } from '@embedpdf/core/svelte';
-import { setupPinchZoom } from '../../shared/utils/pinch-zoom-logic';
+import type { ViewportPlugin } from '@embedpdf/plugin-viewport';
+import { setupZoomGestures, type ZoomGestureOptions } from '../../shared/utils/pinch-zoom-logic';
+import { useZoomCapability } from './use-zoom.svelte';
 
-export function usePinch() {
+export type { ZoomGestureOptions };
+
+/** Context type for viewport element */
+type ViewportElementContext = { readonly current: HTMLDivElement | null };
+
+export interface UseZoomGestureOptions {
+  /** Enable pinch-to-zoom gesture (default: true) */
+  enablePinch?: () => boolean;
+  /** Enable wheel zoom with ctrl/cmd key (default: true) */
+  enableWheel?: () => boolean;
+}
+
+/**
+ * Hook for setting up zoom gesture functionality (pinch and wheel zoom) on an element
+ * @param getDocumentId Function that returns the document ID
+ * @param options Optional configuration for enabling/disabling gestures
+ */
+export function useZoomGesture(
+  getDocumentId: () => string | null,
+  options: UseZoomGestureOptions = {},
+) {
   const viewportCapability = useCapability<ViewportPlugin>('viewport');
   const zoomCapability = useZoomCapability();
+  const viewportElementCtx = getContext<ViewportElementContext | undefined>('viewport-element');
 
-  const state = $state({
-    elementRef: null as HTMLDivElement | null,
-  });
+  let elementRef = $state<HTMLDivElement | null>(null);
+  let cleanup: (() => void) | undefined;
+
+  // Reactive documentId and options
+  const documentId = $derived(getDocumentId());
+  const enablePinch = $derived(options.enablePinch?.() ?? true);
+  const enableWheel = $derived(options.enableWheel?.() ?? true);
 
   $effect(() => {
-    const element = state.elementRef;
-    if (!element || !viewportCapability.provides || !zoomCapability.provides) {
+    const element = elementRef;
+    const container = viewportElementCtx?.current;
+    const viewport = viewportCapability.provides;
+    const zoom = zoomCapability.provides;
+    const docId = documentId;
+    const pinchEnabled = enablePinch;
+    const wheelEnabled = enableWheel;
+
+    // Clean up previous setup
+    if (cleanup) {
+      cleanup();
+      cleanup = undefined;
+    }
+
+    // Setup new zoom gestures if all dependencies are available
+    if (!element || !viewport || !zoom || !docId) {
       return;
     }
 
-    return setupPinchZoom({
+    cleanup = setupZoomGestures({
       element,
-      viewportProvides: viewportCapability.provides,
-      zoomProvides: zoomCapability.provides,
+      container: container || undefined,
+      documentId: docId,
+      viewportProvides: viewport,
+      zoomProvides: zoom,
+      options: { enablePinch: pinchEnabled, enableWheel: wheelEnabled },
     });
+
+    return () => {
+      if (cleanup) {
+        cleanup();
+        cleanup = undefined;
+      }
+    };
   });
 
-  return state;
+  return {
+    get elementRef() {
+      return elementRef;
+    },
+    set elementRef(value: HTMLDivElement | null) {
+      elementRef = value;
+    },
+  };
 }

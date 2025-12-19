@@ -1,26 +1,28 @@
 ---
 title: Scroll Plugin
-description: Provides the <Scroller /> component and composables for page layout, virtualization, and navigation in Svelte.
+description: Provides the <Scroller /> component and stores for page layout, virtualization, and navigation in Svelte.
 searchable: true
 ---
 
 # Scroll Plugin
 
-The Scroll Plugin is a foundational plugin responsible for page layout, virtualization, and navigation. It provides the essential `<Scroller />` component, which intelligently renders only the visible pages to ensure high performance, and the `useScroll` composable for building page navigation controls.
+The Scroll Plugin handles page layout, virtualization, and navigation logic. It provides the `<Scroller />` component, which efficiently renders only the visible pages dynamically based on the current viewport position, and the `useScroll` store for programmatic navigation.
+
+This plugin works in tandem with the **Viewport Plugin** and supports multi-document layouts, managing independent scroll states and strategies (vertical/horizontal) for each open document.
 
 ## Installation
 
-This plugin depends on the `Viewport` plugin. You must install both packages.
+This plugin depends on the `Viewport` plugin.
 
 ```sh npm2yarn
 npm install @embedpdf/plugin-scroll @embedpdf/plugin-viewport
-```
+````
 
 ## Registration
 
-Import `ScrollPluginPackage` and its `Viewport` dependency, and add them to the `plugins` array.
+Import `ScrollPluginPackage` and add it to your plugin configuration.
 
-```typescript {4, 15-18}
+```typescript {15-19}
 import { createPluginRegistration } from '@embedpdf/core'
 // ... other imports
 import { ViewportPluginPackage } from '@embedpdf/plugin-viewport/svelte'
@@ -28,7 +30,7 @@ import { ScrollPluginPackage, ScrollStrategy } from '@embedpdf/plugin-scroll/sve
 
 const plugins = [
   // ... other essential plugins
-  createPluginRegistration(LoaderPluginPackage, { /* ... */ }),
+  createPluginRegistration(DocumentManagerPluginPackage, { /* ... */ }),
   createPluginRegistration(RenderPluginPackage),
 
   // Register dependencies first
@@ -36,49 +38,54 @@ const plugins = [
 
   // Register and configure the scroll plugin
   createPluginRegistration(ScrollPluginPackage, {
-    strategy: ScrollStrategy.Vertical, // or Horizontal
-    initialPage: 1,
+    defaultStrategy: ScrollStrategy.Vertical, // or Horizontal
+    defaultPageGap: 10,
   }),
 ]
 ```
 
 ## Usage
 
-The plugin provides the `<Scroller />` component for rendering pages and the `useScroll` composable for navigation.
-
-### The `<Scroller />` and Snippets
+### The `<Scroller />` Component
 
 The `<Scroller />` component is the heart of the layout system. It must be placed inside a `<Viewport />`.
 
-Crucially, the `<Scroller />` does not render pages itself. Instead, it calculates *which* pages should be visible and uses your provided **snippet** to render each one. This gives you complete control over the content of each page placeholder.
+You must provide the `documentId` to link the scroller to the correct document state. The snippet is called for each visible page, receiving layout information, allowing you to render the page content (e.g., using `<RenderLayer />`).
 
-```svelte {3, 7-11, 14}
+```svelte
 <script lang="ts">
-import { RenderLayer } from '@embedpdf/plugin-render/svelte';
-import { Scroller, type RenderPageProps } from '@embedpdf/plugin-scroll/svelte';
 import { Viewport } from '@embedpdf/plugin-viewport/svelte';
+import { Scroller, type RenderPageProps } from '@embedpdf/plugin-scroll/svelte';
+import { RenderLayer } from '@embedpdf/plugin-render/svelte';
+
+let { documentId }: { documentId: string } = $props();
 </script>
 
-{#snippet RenderPageSnippet(page: RenderPageProps)}
-  <div style:width={`${page.width}px`} style:height={`${page.height}px`} style:position="relative">
-    <RenderLayer pageIndex={page.pageIndex} scale={page.scale} />
+{#snippet renderPage(page: RenderPageProps)}
+  <div 
+    style:width="{page.width}px" 
+    style:height="{page.height}px" 
+    style:position="relative"
+  >
+    <RenderLayer {documentId} pageIndex={page.pageIndex} />
   </div>
 {/snippet}
 
-<Viewport>
-  <Scroller {RenderPageSnippet} />
+<Viewport {documentId}>
+  <Scroller {documentId} {renderPage} />
 </Viewport>
 ```
 
 ### Page Navigation
 
-The `useScroll` composable provides everything you need to build a page navigation UI. It returns an object with a `provides` property for action methods and a `state` property with reactive data like the current page number.
+To build navigation controls (like "Next Page" or "Go to Page 5"), use the `useScroll` store. This store requires a getter for the `documentId` of the target document.
 
-```svelte
+```svelte {5}
 <script lang="ts">
 import { useScroll } from '@embedpdf/plugin-scroll/svelte';
 
-const scroll = useScroll();
+let { documentId }: { documentId: string } = $props();
+const scroll = useScroll(() => documentId);
 </script>
 
 {#if scroll.provides}
@@ -89,13 +96,22 @@ const scroll = useScroll();
 {/if}
 ```
 
-## Live Example
+## Live Examples
+
+### Page Navigation
 
 This example features a complete page navigation component that allows jumping to a specific page and moving forward or backward.
 
 import { ScrollExample } from '../code-examples/scroll-example';
 
-<ScrollExample />
+<CodeExample 
+  codePaths={[
+    "../../examples/svelte-tailwind/src/examples/scroll-example.svelte",
+    "../../examples/svelte-tailwind/src/examples/scroll-example-content.svelte"
+  ]}
+>
+  <ScrollExample />
+</CodeExample>
 
 ## API Reference
 
@@ -103,10 +119,9 @@ import { ScrollExample } from '../code-examples/scroll-example';
 
 | Option | Type | Description |
 | :--- | :--- | :--- |
-| **`strategy`** | `ScrollStrategy` | Sets the scroll direction. Can be `ScrollStrategy.Vertical` or `ScrollStrategy.Horizontal`. <br />**Default**: `ScrollStrategy.Vertical` |
-| **`pageGap`** | `number` | The space in pixels between pages or spreads. <br />**Default**: `10` |
-| **`initialPage`** | `number` | The 1-based page number to scroll to when a document first loads. |
-| **`bufferSize`** | `number`| The number of pages to render outside the visible area for a smoother scrolling experience. <br />**Default**: `2` |
+| **`defaultStrategy`** | `ScrollStrategy` | The default scroll direction (`Vertical` or `Horizontal`). <br />**Default**: `Vertical` |
+| **`defaultPageGap`** | `number` | Pixel gap between pages. <br />**Default**: `10` |
+| **`defaultBufferSize`** | `number` | Number of pages to render outside the visible viewport. <br />**Default**: `2` |
 
 ### Component: `<Scroller />`
 
@@ -114,33 +129,51 @@ The virtualized container that lays out pages.
 
 | Prop | Type | Description |
 | :--- | :--- | :--- |
-| **`RenderPageSnippet`** | `Snippet<RenderPageProps>` | **(Required)** A snippet that defines how to render each page. It receives a `RenderPageProps` object with layout data like `pageIndex`, `width`, `height`, and `scale`. |
+| **`documentId`** | `string` | **(Required)** The ID of the document to render. |
+| **`renderPage`** | `Snippet<RenderPageProps>` | **(Required)** A snippet that defines how to render each page. |
 
-### Composable: `useScroll()`
+#### Snippet Props (`RenderPageProps`)
 
-A convenience composable for building page navigation UIs.
+| Property | Type | Description |
+| :--- | :--- | :--- |
+| **`pageIndex`** | `number` | The zero-based index of the page. |
+| **`width`** | `number` | The calculated width of the page in pixels. |
+| **`height`** | `number` | The calculated height of the page in pixels. |
+| **`scale`** | `number` | The current scale factor applied to the page. |
+| **`rotation`** | `number` | The rotation angle in degrees. |
+
+### Store: `useScroll(documentId)`
+
+Returns the scroll state and capability methods for a specific document.
+
+#### Parameters
+
+| Parameter | Type | Description |
+| :--- | :--- | :--- |
+| **`documentId`** | `() => string` | A getter function that returns the document ID to track. |
 
 #### Returns
 
-An object with the following properties:
-
 | Property | Type | Description |
 | :--- | :--- | :--- |
-| **`provides`** | `ScrollCapability \| null` | An object with methods to control scrolling and navigation. `null` if the plugin is not ready. |
-| **`state`** | `object` | A reactive object containing the current scroll state. |
+| **`state`** | `{ currentPage: number, totalPages: number }` | Reactive state object containing the current page info. |
+| **`provides`** | `ScrollScope \| null` | An object with methods to control scrolling and navigation. |
 
-#### `state` Properties
-
-| Property | Type | Description |
-| :--- | :--- | :--- |
-| **`currentPage`** | `number` | The current page number that is most visible in the viewport. |
-| **`totalPages`** | `number` | The total number of pages in the document. |
-
-#### `provides` Methods (`ScrollCapability`)
+#### `provides` Methods (`ScrollScope`)
 
 | Method | Description |
 | :--- | :--- |
-| **`scrollToPage(options)`** | Scrolls to a specific page. The `options` object takes a `pageNumber` and optional `behavior: 'smooth'`. |
+| **`scrollToPage(options)`** | Scrolls to a specific page. `options`: `{ pageNumber, behavior?, center? }`. |
 | **`scrollToNextPage()`** | Scrolls to the next page or spread. |
 | **`scrollToPreviousPage()`** | Scrolls to the previous page or spread. |
+| **`setScrollStrategy(s)`** | Changes the scroll strategy (e.g. to `ScrollStrategy.Horizontal`) for this document. |
 
+### Events (`ScrollCapability`)
+
+Access events via `useScrollCapability()`.
+
+| Event | Payload | Description |
+| :--- | :--- | :--- |
+| **`onLayoutReady`** | `{ documentId, isInitial }` | Fires when a document's layout is ready for interaction. `isInitial` is `true` only on the first layout after document load, `false` on subsequent layouts (e.g., when switching tabs). |
+| **`onPageChange`** | `{ documentId, pageNumber, totalPages }` | Fires when the current page changes. |
+| **`onScroll`** | `{ documentId, metrics }` | Fires on scroll with detailed viewport metrics. |

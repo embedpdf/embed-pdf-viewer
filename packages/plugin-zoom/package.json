@@ -1,6 +1,6 @@
 {
   "name": "@embedpdf/plugin-zoom",
-  "version": "1.5.0",
+  "version": "2.0.0-next.3",
   "type": "module",
   "license": "MIT",
   "main": "./dist/index.cjs",
@@ -46,8 +46,7 @@
     "lint:fix": "eslint src --color --fix"
   },
   "dependencies": {
-    "@embedpdf/models": "workspace:*",
-    "hammerjs": "^2.0.8"
+    "@embedpdf/models": "workspace:*"
   },
   "devDependencies": {
     "@embedpdf/core": "workspace:*",
@@ -55,7 +54,7 @@
     "@embedpdf/plugin-viewport": "workspace:*",
     "@embedpdf/plugin-scroll": "workspace:*",
     "@embedpdf/plugin-interaction-manager": "workspace:*",
-    "@types/hammerjs": "^2.0.46",
+    "@embedpdf/plugin-spread": "workspace:*",
     "@types/react": "^18.2.0",
     "typescript": "^5.0.0"
   },
@@ -63,7 +62,6 @@
     "@embedpdf/core": "workspace:*",
     "@embedpdf/plugin-viewport": "workspace:*",
     "@embedpdf/plugin-scroll": "workspace:*",
-    "@embedpdf/plugin-interaction-manager": "workspace:*",
     "react": ">=16.8.0",
     "react-dom": ">=16.8.0",
     "preact": "^10.26.4",

@@ -6,37 +6,35 @@ searchable: true
 
 # Thumbnail Plugin
 
-The Thumbnail Plugin adds a classic sidebar view with small, clickable previews of each page. It's an intuitive way for users to get an overview of the document and quickly jump to a specific page.
+The Thumbnail Plugin adds a classic sidebar view with small, clickable previews of each page. It helps users orient themselves within a document and navigate quickly.
 
-For optimal performance with long documents, the plugin uses virtualization, rendering only the thumbnail images that are currently visible in the sidebar's viewport.
+To ensure optimal performance with large documents, the plugin implements **virtualization**. It only renders the thumbnail images currently visible in the sidebar, recycling DOM elements as the user scrolls.
+
+This plugin supports **multi-document layouts**, maintaining independent thumbnail lists, scroll positions, and render queues for every open document.
 
 ## Installation
 
-This plugin needs the **Render plugin** to work. The **Scroll plugin** is optional but required for the auto-scroll feature.
+This plugin depends on the **Render plugin** to generate the images.
 
 ```sh npm2yarn
-npm install @embedpdf/plugin-thumbnail @embedpdf/plugin-render @embedpdf/plugin-scroll
-```
+npm install @embedpdf/plugin-thumbnail @embedpdf/plugin-render
+````
 
 ## Registration
 
-Import `ThumbnailPluginPackage` and its dependencies, then add them to the `plugins` array. The dependencies should be registered before the thumbnail plugin.
+Import `ThumbnailPluginPackage` and its dependencies.
 
-```typescript {5, 17-19}
+```typescript {13-15}
 import { createPluginRegistration } from '@embedpdf/core'
 // ... other imports
 import { RenderPluginPackage } from '@embedpdf/plugin-render/svelte'
-import { ScrollPluginPackage } from '@embedpdf/plugin-scroll/svelte'
 import { ThumbnailPluginPackage } from '@embedpdf/plugin-thumbnail/svelte'
 
 const plugins = [
   // ... other essential plugins
-  createPluginRegistration(LoaderPluginPackage, { /* ... */ }),
+  createPluginRegistration(DocumentManagerPluginPackage, { /* ... */ }),
   createPluginRegistration(ViewportPluginPackage),
-
-  // Register dependencies first
-  createPluginRegistration(RenderPluginPackage),
-  createPluginRegistration(ScrollPluginPackage),
+  createPluginRegistration(RenderPluginPackage), // Required dependency
 
   // Register and configure the thumbnail plugin
   createPluginRegistration(ThumbnailPluginPackage, {
@@ -47,61 +45,69 @@ const plugins = [
 
 ## Usage
 
-The plugin features two main components: `<ThumbnailsPane />` (the virtualized container) and `<ThumbImg />` (for rendering the page image).
+The plugin provides two main components: `<ThumbnailsPane />` (the virtualized container) and `<ThumbImg />` (the actual image renderer).
 
-### Building a Thumbnail Sidebar
+### Building a Sidebar
 
-You'll typically place `<ThumbnailsPane />` in a sidebar. It uses a **named snippet** pattern where you define a `children` snippet that receives metadata about each visible thumbnail's dimensions and position. You then use this metadata to style your thumbnail container and render the `<ThumbImg meta={meta} />` component inside.
+You typically place `<ThumbnailsPane />` in a sidebar container. It uses a **snippet** pattern: you provide a template that receives metadata (`meta`) for each visible item, and you return the markup for that thumbnail.
 
-To handle navigation, you can use the `useScroll` composable to get the `scrollToPage` function and the `currentPage` for highlighting the active thumbnail.
+You must provide the `documentId` to both components to link them to the correct document state.
 
-### Using the `meta` Object
+### The `meta` Object
 
-The `meta` object passed to your snippet contains pre-calculated values crucial for virtualization:
+The `meta` object passed to your snippet contains calculated layout values. **You must apply these styles** for virtualization to work:
 
-  - `meta.top`: The absolute vertical position. **Apply this to your wrapper element's `top` style.**
-  - `meta.wrapperHeight`: The total height of the thumbnail's container. **Apply this to your wrapper element's `height` style.**
-  - `meta.width` & `meta.height`: The dimensions of the thumbnail image itself.
-  - `meta.labelHeight`: The height reserved for the page label.
+  * **`meta.top`**: Absolute vertical position. Apply to `top`.
+  * **`meta.wrapperHeight`**: Total height of the item row. Apply to `height`.
+  * **`meta.width` / `meta.height`**: Dimensions of the image itself.
 
 ```svelte
 <script lang="ts">
 import { useScroll } from '@embedpdf/plugin-scroll/svelte';
 import { ThumbnailsPane, ThumbImg, type ThumbMeta } from '@embedpdf/plugin-thumbnail/svelte';
 
-const scroll = useScroll();
+let { documentId }: { documentId: string } = $props();
+const scroll = useScroll(() => documentId);
 </script>
 
-<ThumbnailsPane>
-  {#snippet children(meta: ThumbMeta)}
-    <div
-      style:position="absolute"
-      style:top={`${meta.top}px`}
-      style:height={`${meta.wrapperHeight}px`}
-      onclick={() => scroll.provides?.scrollToPage({ pageNumber: meta.pageIndex + 1 })}
-    >
-      <div 
-        style:border={`2px solid ${scroll.state.currentPage === meta.pageIndex + 1 ? 'blue' : 'grey'}`}
-        style:width={`${meta.width}px`}
-        style:height={`${meta.height}px`}
+<div class="relative h-full overflow-hidden">
+  <ThumbnailsPane {documentId}>
+    {#snippet children(meta: ThumbMeta)}
+      <button
+        type="button"
+        class="absolute flex w-full cursor-pointer flex-col items-center"
+        style:height="{meta.wrapperHeight}px"
+        style:top="{meta.top}px"
+        onclick={() => scroll.provides?.scrollToPage?.({ pageNumber: meta.pageIndex + 1 })}
       >
-        <ThumbImg {meta} />
-      </div>
-      <span style:height={`${meta.labelHeight}px`}>
-        {meta.pageIndex + 1}
-      </span>
-    </div>
-  {/snippet}
-</ThumbnailsPane>
+        <div
+          class={scroll.state.currentPage === meta.pageIndex + 1 ? 'ring-2 ring-blue-500' : ''}
+          style:width="{meta.width}px"
+          style:height="{meta.height}px"
+        >
+          <ThumbImg {documentId} {meta} />
+        </div>
+        <span>{meta.pageIndex + 1}</span>
+      </button>
+    {/snippet}
+  </ThumbnailsPane>
+</div>
 ```
 
 ## Live Example
 
-This example shows a complete PDF viewer with a thumbnail sidebar. Clicking a thumbnail will navigate the main document, and the active thumbnail is highlighted.
+This example shows a complete PDF viewer with a thumbnail sidebar. Notice how the sidebar automatically scrolls to track the current page in the main viewport.
 
 import { ThumbnailExample } from '../code-examples/thumbnail-example';
 
-<ThumbnailExample />
+<CodeExample 
+  codePaths={[
+    "../../examples/svelte-tailwind/src/examples/thumbnail-example.svelte",
+    "../../examples/svelte-tailwind/src/examples/thumbnail-example-content.svelte"
+  ]}
+>
+  <ThumbnailExample />
+</CodeExample>
 
 ## API Reference
 
@@ -109,45 +115,55 @@ import { ThumbnailExample } from '../code-examples/thumbnail-example';
 
 | Option | Type | Description |
 | :--- | :--- | :--- |
-| **`width`** | `number` | The width of the thumbnail image in CSS pixels. **Default**: `120` |
-| **`gap`** | `number` | The vertical space between each thumbnail in CSS pixels. **Default**: `8` |
-| **`autoScroll`** | `boolean` | If `true`, the sidebar automatically scrolls to keep the current page's thumbnail in view. **Default**: `true` |
-| **`scrollBehavior`**| `string` | The scroll animation (`'smooth'` or `'auto'`). **Default**: `'smooth'` |
+| **`width`** | `number` | The width of the thumbnail image in CSS pixels. <br />**Default**: `120` |
+| **`gap`** | `number` | The vertical space between each thumbnail in CSS pixels. <br />**Default**: `8` |
+| **`buffer`** | `number` | The number of off-screen thumbnails to render above/below the viewport. <br />**Default**: `3` |
+| **`labelHeight`** | `number` | Height reserved for the label below the image. <br />**Default**: `16` |
+| **`autoScroll`** | `boolean` | If `true`, the sidebar scrolls to keep the current page in view. <br />**Default**: `true` |
+| **`paddingY`** | `number` | Vertical padding for the thumbnail container. <br />**Default**: `0` |
 
 ### Component: `<ThumbnailsPane />`
 
-The virtualized scroll container for the thumbnails.
-
-#### Children Snippet
-
-| Parameter | Type | Description |
-| :--- | :--- | :--- |
-| **`meta`** | `ThumbMeta` | Metadata object for the thumbnail, containing position, size, and page index. Received as parameter in the `children` snippet. |
-
-### Component: `<ThumbImg />`
-
-Renders the rasterized image for a single thumbnail.
+The virtualized scroll container.
 
 | Prop | Type | Description |
 | :--- | :--- | :--- |
-| **`meta`** | `ThumbMeta` | **(Required)** The metadata object for the thumbnail, provided by the `<ThumbnailsPane />` slot prop. |
+| **`documentId`** | `string` | **(Required)** The ID of the document to display thumbnails for. |
 
-### Composable: `useThumbnailCapability()`
+#### Snippet: `children(meta: ThumbMeta)`
 
-Provides access to the plugin's methods, though direct interaction is rarely needed.
-
-#### Returns
-
-An object with the following property:
+A snippet that defines how to render each thumbnail. The `meta` object contains:
 
 | Property | Type | Description |
 | :--- | :--- | :--- |
-| **`provides`**| `ThumbnailCapability \| null` | An object with methods to interact with the plugin, or `null` if not ready. |
+| **`pageIndex`** | `number` | The zero-based index of the page. |
+| **`top`** | `number` | The absolute vertical position of this thumbnail. |
+| **`wrapperHeight`** | `number` | The total height of this thumbnail's container. |
+| **`width`** | `number` | The calculated width of the thumbnail image. |
+| **`height`** | `number` | The calculated height of the thumbnail image. |
+| **`labelHeight`** | `number` | Height reserved for the label below the image. |
+
+### Component: `<ThumbImg />`
+
+Renders the rasterized image for a thumbnail.
+
+| Prop | Type | Description |
+| :--- | :--- | :--- |
+| **`documentId`** | `string` | **(Required)** The ID of the document. |
+| **`meta`** | `ThumbMeta` | **(Required)** The metadata object from the `ThumbnailsPane` snippet. |
+
+### Store: `useThumbnailCapability()`
+
+Access the plugin API.
 
 #### `ThumbnailCapability` Methods
 
 | Method | Description |
 | :--- | :--- |
-| **`scrollToThumb(pageIndex)`** | Programmatically scrolls the thumbnail sidebar to make the specified page thumbnail visible. |
-| **`renderThumb(pageIndex, dpr)`**| A low-level method to manually render a specific thumbnail. Returns a `Task<Blob>`. |
+| **`forDocument(id)`** | Returns a `ThumbnailScope` for the specified document ID. |
 
+#### `ThumbnailScope` Methods (Returned by `forDocument`)
+
+| Method | Description |
+| :--- | :--- |
+| **`scrollToThumb(pageIndex)`** | Manually scrolls the sidebar to show a specific thumbnail. |

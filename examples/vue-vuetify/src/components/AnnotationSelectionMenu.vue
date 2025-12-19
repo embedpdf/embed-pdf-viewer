@@ -1,23 +1,26 @@
 <script setup lang="ts">
-import { useAnnotationCapability } from '@embedpdf/plugin-annotation/vue';
-import type { TrackedAnnotation } from '@embedpdf/plugin-annotation';
-import type { MenuWrapperProps } from '@embedpdf/utils/vue';
+import {
+  useAnnotationCapability,
+  type AnnotationSelectionContext,
+  type AnnotationSelectionMenuProps,
+} from '@embedpdf/plugin-annotation/vue';
 import type { Rect } from '@embedpdf/models';
 
-interface AnnotationSelectionMenuProps {
-  menuWrapperProps: MenuWrapperProps;
-  annotation: TrackedAnnotation;
+const props = defineProps<{
+  documentId: string;
+  context: AnnotationSelectionContext;
+  selected: boolean;
   rect: Rect;
-}
-
-const props = defineProps<AnnotationSelectionMenuProps>();
+  placement: AnnotationSelectionMenuProps['placement'];
+  menuWrapperProps: AnnotationSelectionMenuProps['menuWrapperProps'];
+}>();
 
 const { provides: annotation } = useAnnotationCapability();
 
 const handleDelete = (e: Event) => {
   e.stopPropagation();
   if (!annotation.value) return;
-  const { pageIndex, id } = props.annotation.object;
+  const { pageIndex, id } = props.context.annotation.object;
   annotation.value.deleteAnnotation(pageIndex, id);
 };
 </script>

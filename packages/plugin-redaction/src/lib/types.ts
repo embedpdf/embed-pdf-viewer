@@ -9,15 +9,22 @@ export enum RedactionMode {
 
 export interface SelectedRedaction {
   page: number;
-  id: string | null;
+  id: string;
 }
 
-export interface RedactionState {
+// Per-document redaction state
+export interface RedactionDocumentState {
   isRedacting: boolean;
   activeType: RedactionMode | null;
   pending: Record<number, RedactionItem[]>;
   pendingCount: number;
   selected: SelectedRedaction | null;
+}
+
+// Plugin state
+export interface RedactionState {
+  documents: Record<string, RedactionDocumentState>;
+  activeDocumentId: string | null;
 }
 
 export type RedactionItem =
@@ -41,6 +48,7 @@ export interface MarqueeRedactCallback {
 }
 
 export interface RegisterMarqueeOnPageOptions {
+  documentId: string;
   pageIndex: number;
   scale: number;
   callback: MarqueeRedactCallback;
@@ -50,52 +58,111 @@ export interface RedactionPluginConfig extends BasePluginConfig {
   drawBlackBoxes: boolean;
 }
 
-// Add event types similar to annotation plugin
+// Events include documentId
 export type RedactionEvent =
   | {
       type: 'add';
+      documentId: string;
       items: RedactionItem[];
     }
   | {
       type: 'remove';
+      documentId: string;
       page: number;
       id: string;
     }
   | {
       type: 'clear';
+      documentId: string;
     }
   | {
       type: 'commit';
+      documentId: string;
       success: boolean;
       error?: PdfErrorReason;
     };
 
-export interface RedactionCapability {
-  queueCurrentSelectionAsPending: () => Task<boolean, PdfErrorReason>;
+export interface PendingChangeEvent {
+  documentId: string;
+  pending: Record<number, RedactionItem[]>;
+}
 
-  enableMarqueeRedact: () => void;
-  toggleMarqueeRedact: () => void;
-  isMarqueeRedactActive: () => boolean;
+export interface SelectedChangeEvent {
+  documentId: string;
+  selected: SelectedRedaction | null;
+}
 
-  enableRedactSelection: () => void;
-  toggleRedactSelection: () => void;
-  isRedactSelectionActive: () => boolean;
+export interface StateChangeEvent {
+  documentId: string;
+  state: RedactionDocumentState;
+}
+
+// Scoped redaction capability
+export interface RedactionScope {
+  queueCurrentSelectionAsPending(): Task<boolean, PdfErrorReason>;
+
+  enableMarqueeRedact(): void;
+  toggleMarqueeRedact(): void;
+  isMarqueeRedactActive(): boolean;
+
+  enableRedactSelection(): void;
+  toggleRedactSelection(): void;
+  isRedactSelectionActive(): boolean;
+
+  addPending(items: RedactionItem[]): void;
+  removePending(page: number, id: string): void;
+  clearPending(): void;
+  commitAllPending(): Task<boolean, PdfErrorReason>;
+  commitPending(page: number, id: string): Task<boolean, PdfErrorReason>;
+
+  endRedaction(): void;
+  startRedaction(): void;
+
+  selectPending(page: number, id: string): void;
+  getSelectedPending(): SelectedRedaction | null;
+  deselectPending(): void;
+
+  getState(): RedactionDocumentState;
 
   onPendingChange: EventHook<Record<number, RedactionItem[]>>;
-  addPending: (items: RedactionItem[]) => void;
-  removePending: (page: number, id: string) => void;
-  clearPending: () => void;
-  commitAllPending: () => Task<boolean, PdfErrorReason>;
-  commitPending: (page: number, id: string) => Task<boolean, PdfErrorReason>;
-
-  endRedaction: () => void;
-  startRedaction: () => void;
-
-  selectPending: (page: number, id: string) => void;
-  deselectPending: () => void;
-
-  // Event hook for redaction events
   onSelectedChange: EventHook<SelectedRedaction | null>;
   onRedactionEvent: EventHook<RedactionEvent>;
-  onStateChange: EventHook<RedactionState>;
+  onStateChange: EventHook<RedactionDocumentState>;
+}
+
+export interface RedactionCapability {
+  // Active document operations
+  queueCurrentSelectionAsPending(): Task<boolean, PdfErrorReason>;
+
+  enableMarqueeRedact(): void;
+  toggleMarqueeRedact(): void;
+  isMarqueeRedactActive(): boolean;
+
+  enableRedactSelection(): void;
+  toggleRedactSelection(): void;
+  isRedactSelectionActive(): boolean;
+
+  addPending(items: RedactionItem[]): void;
+  removePending(page: number, id: string): void;
+  clearPending(): void;
+  commitAllPending(): Task<boolean, PdfErrorReason>;
+  commitPending(page: number, id: string): Task<boolean, PdfErrorReason>;
+
+  endRedaction(): void;
+  startRedaction(): void;
+
+  selectPending(page: number, id: string): void;
+  getSelectedPending(): SelectedRedaction | null;
+  deselectPending(): void;
+
+  getState(): RedactionDocumentState;
+
+  // Document-scoped operations
+  forDocument(documentId: string): RedactionScope;
+
+  // Events (include documentId)
+  onPendingChange: EventHook<PendingChangeEvent>;
+  onSelectedChange: EventHook<SelectedChangeEvent>;
+  onRedactionEvent: EventHook<RedactionEvent>;
+  onStateChange: EventHook<StateChangeEvent>;
 }

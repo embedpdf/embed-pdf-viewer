@@ -10,7 +10,25 @@ export interface BufferAndName {
   name: string;
 }
 
-export interface ExportCapability {
+// Events include documentId
+export interface DownloadRequestEvent {
+  documentId: string;
+}
+
+// Scoped export capability
+export interface ExportScope {
   saveAsCopy: () => Task<ArrayBuffer, PdfErrorReason>;
   download: () => void;
 }
+
+export interface ExportCapability {
+  // Active document operations
+  saveAsCopy: () => Task<ArrayBuffer, PdfErrorReason>;
+  download: () => void;
+
+  // Document-scoped operations
+  forDocument(documentId: string): ExportScope;
+}
+
+// Note: Export plugin doesn't need state/reducer as it's stateless
+export interface ExportState {}

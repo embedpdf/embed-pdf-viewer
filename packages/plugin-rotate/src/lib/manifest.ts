@@ -8,9 +8,7 @@ export const manifest: PluginManifest<RotatePluginConfig> = {
   name: 'Rotate Plugin',
   version: '1.0.0',
   provides: ['rotate'],
-  requires: ['loader'],
-  optional: ['spread'],
-  defaultConfig: {
-    enabled: true,
-  },
+  requires: [],
+  optional: [],
+  defaultConfig: {},
 };

@@ -39,18 +39,18 @@ import { SelectionPluginPackage } from '@embedpdf/plugin-selection/react'
 import { RedactionPluginPackage } from '@embedpdf/plugin-redaction/react'
 
 const plugins = [
-  // ... other essential plugins
-  createPluginRegistration(LoaderPluginPackage, { /* ... */ }),
-  createPluginRegistration(RenderPluginPackage),
+  // ... other essential plugins
+  createPluginRegistration(DocumentManagerPluginPackage, { /* ... */ }),
+  createPluginRegistration(RenderPluginPackage),
 
-  // Register dependencies first
-  createPluginRegistration(InteractionManagerPluginPackage),
-  createPluginRegistration(SelectionPluginPackage),
+  // Register dependencies first
+  createPluginRegistration(InteractionManagerPluginPackage),
+  createPluginRegistration(SelectionPluginPackage),
 
-  // Register and configure the redaction plugin
-  createPluginRegistration(RedactionPluginPackage, {
-    drawBlackBoxes: true, // Draw black boxes over redacted content
-  }),
+  // Register and configure the redaction plugin
+  createPluginRegistration(RedactionPluginPackage, {
+    drawBlackBoxes: true, // Draw black boxes over redacted content
+  }),
 ]
 ```
 
@@ -58,66 +58,73 @@ const plugins = [
 
 The plugin's functionality is primarily managed through the `<RedactionLayer />` component and the `useRedaction` hook.
 
-### 1\. Add the `<RedactionLayer />`
+### 1. Add the `<RedactionLayer />`
 
 This component is responsible for rendering all redaction-related UI, including the text selection highlights, area selection marquee, and all pending redaction marks. It must be placed inside your `Scroller`'s `renderPage` prop and be a child of the `<PagePointerProvider>`.
 
-```tsx {2, 10}
+```tsx {2, 11}
 import { PagePointerProvider } from '@embedpdf/plugin-interaction-manager/react';
 import { RedactionLayer } from '@embedpdf/plugin-redaction/react';
 
 // ...
 <Scroller
-  renderPage={({ width, height, pageIndex, scale, rotation }) => (
-    <PagePointerProvider {...{ pageIndex, width, height, scale, rotation }}>
-      <RenderLayer pageIndex={pageIndex} />
-      <SelectionLayer pageIndex={pageIndex} />
-      <RedactionLayer pageIndex={pageIndex} scale={scale} rotation={rotation} />
-    </PagePointerProvider>
-  )}
+  documentId={activeDocumentId}
+  renderPage={({ pageIndex }) => (
+    <PagePointerProvider documentId={activeDocumentId} pageIndex={pageIndex}>
+      <RenderLayer documentId={activeDocumentId} pageIndex={pageIndex} />
+      <SelectionLayer documentId={activeDocumentId} pageIndex={pageIndex} />
+      <RedactionLayer documentId={activeDocumentId} pageIndex={pageIndex} />
+    </PagePointerProvider>
+  )}
 />
 ```
 
-### 2\. Build a Redaction Toolbar
+### 2. Build a Redaction Toolbar
 
-The `useRedaction` hook provides the `state` of the redaction process (e.g., how many marks are pending) and a `provides` object with methods to control it. You can build a toolbar to allow users to switch between redaction modes and apply their changes.
+The `useRedaction` hook provides the `state` of the redaction process (e.g., how many marks are pending) and a `provides` object with methods to control it for a specific document. You can build a toolbar to allow users to switch between redaction modes and apply their changes.
 
 ```tsx
 import { useRedaction, RedactionMode } from '@embedpdf/plugin-redaction/react';
 
-const RedactionToolbar = () => {
-  const { state, provides } = useRedaction();
+const RedactionToolbar = ({ documentId }) => {
+  const { state, provides } = useRedaction(documentId);
 
-  return (
-    <div>
-      <button onClick={() => provides?.toggleRedactSelection()}>Mark Text</button>
-      <button onClick={() => provides?.toggleMarqueeRedact()}>Mark Area</button>
-      <span>{state.pendingCount} pending marks</span>
-      <button
-        onClick={() => provides?.commitAllPending()}
-        disabled={state.pendingCount === 0}
-      >
-        Apply All Redactions
-      </button>
-    </div>
-  );
+  return (
+    <div>
+      <button onClick={() => provides?.toggleRedactSelection()}>Mark Text</button>
+      <button onClick={() => provides?.toggleMarqueeRedact()}>Mark Area</button>
+      <span>{state.pendingCount} pending marks</span>
+      <button
+        onClick={() => provides?.commitAllPending()}
+        disabled={state.pendingCount === 0}
+      >
+        Apply All Redactions
+      </button>
+    </div>
+  );
 };
 ```
 
-### 3\. Create a Menu for Pending Marks
+### 3. Create a Menu for Pending Marks
 
 You can provide a `selectionMenu` render prop to the `<RedactionLayer />` to display a custom UI when a user clicks on a pending redaction mark. This is useful for allowing users to apply or remove individual marks.
 
 ```tsx
-import { SelectionMenuProps, useRedaction } from '@embedpdf/plugin-redaction/react';
+import { RedactionSelectionMenuProps, useRedaction } from '@embedpdf/plugin-redaction/react';
 
 // A custom menu component
-const RedactionMenu = ({ item, selected, menuWrapperProps }: SelectionMenuProps) => {
-  const { provides } = useRedaction();
-  if (!selected) return null;
+const RedactionMenu = ({ 
+  documentId, // Pass documentId to use the hook
+  context, 
+  selected, 
+  menuWrapperProps,
+  rect
+}: RedactionSelectionMenuProps & { documentId: string }) => {
+  const { provides } = useRedaction(documentId);
+  if (!selected) return null;
 
-  return (
-    <div {...menuWrapperProps}>
+  return (
+    <div {...menuWrapperProps}>
       <div
         style={{ 
           position: 'absolute', 
@@ -126,18 +133,19 @@ const RedactionMenu = ({ item, selected, menuWrapperProps }: SelectionMenuProps)
           pointerEvents: 'auto' 
         }}
       >
-        <button onClick={() => provides?.removePending(item.page, item.id)}>Remove</button>
+      <button onClick={() => provides?.removePending(context.item.page, context.item.id)}>Remove</button>
       </div>
-    </div>
-  );
+    </div>
+  );
 };
 
 // Pass it to the layer
 <RedactionLayer
-  pageIndex={pageIndex}
-  scale={scale}
-  rotation={rotation}
-  selectionMenu={(props) => <RedactionMenu {...props} />}
+  documentId={activeDocumentId}
+  pageIndex={pageIndex}
+  selectionMenu={(props) => (
+    <RedactionMenu documentId={activeDocumentId} {...props} />
+  )}
 />
 ```
 
@@ -147,7 +155,13 @@ This example demonstrates the full redaction workflow. Use the "Mark Text" and "
 
 import { PDFViewer } from '../code-examples/redaction-example';
 
-<PDFViewer />
+<CodeExample 
+  codePaths={[
+    "content/docs/react/code-examples/redaction-example.tsx"
+  ]}
+>
+  <PDFViewer />
+</CodeExample>
 
 ## API Reference
 
@@ -163,21 +177,20 @@ Renders all UI related to marking and managing redactions.
 
 | Prop | Type | Description |
 | :--- | :--- | :--- |
+| **`documentId`** | `string` | **(Required)** The ID of the document. |
 | **`pageIndex`** | `number` | **(Required)** The page index this layer corresponds to. |
-| **`scale`** | `number` | **(Required)** The current zoom scale of the page. |
-| **`rotation`** | `Rotation` | **(Required)** The current rotation of the page. |
-| **`selectionMenu`** | `(props: SelectionMenuProps) => JSX.Element` | A render prop for a custom menu that appears when a pending redaction is selected. |
+| **`selectionMenu`** | `(props: RedactionSelectionMenuProps) => JSX.Element` | A render prop for a custom menu that appears when a pending redaction is selected. |
 
-### Hook: `useRedaction()`
+### Hook: `useRedaction(documentId)`
 
-Connects your components to the redaction plugin's state and methods.
+Connects your components to the redaction plugin's state and methods for a specific document.
 
 #### Returns
 
 | Property | Type | Description |
 | :--- | :--- | :--- |
 | **`state`** | `RedactionState` | An object containing the current state of the redaction process. |
-| **`provides`**| `RedactionCapability \| null` | An object with methods to control the plugin, or `null` if not ready. |
+| **`provides`**| `RedactionScope \| null` | An object with methods to control the plugin, or `null` if not ready. |
 
 #### `RedactionState` Properties
 
@@ -189,7 +202,7 @@ Connects your components to the redaction plugin's state and methods.
 | **`pendingCount`**| `number`| The total number of pending redactions across all pages. |
 | **`selected`**| `object \| null`| The currently selected pending redaction, if any. |
 
-#### `RedactionCapability` Methods
+#### `RedactionScope` Methods
 
 A selection of key methods available on the `provides` object:
 

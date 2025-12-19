@@ -2,8 +2,14 @@
   import { useViewportCapability } from '@embedpdf/plugin-viewport/svelte';
   import { useScroll } from '@embedpdf/plugin-scroll/svelte';
 
+  interface PageControlsProps {
+    documentId: string;
+  }
+
+  let { documentId }: PageControlsProps = $props();
+
   const viewport = useViewportCapability();
-  const scroll = useScroll();
+  const scroll = useScroll(() => documentId);
 
   let isVisible = $state(false);
   let isHovering = $state(false);
@@ -31,7 +37,7 @@
     if (!viewport.provides) return;
 
     const unsubscribe = viewport.provides.onScrollActivity((activity) => {
-      if (activity) {
+      if (activity.documentId === documentId) {
         isVisible = true;
         startHideTimer();
       }
@@ -93,7 +99,7 @@
   role="toolbar"
   aria-label="Page navigation"
   tabindex="-1"
-  class="pointer-events-auto fixed bottom-4 left-1/2 z-[1000] -translate-x-1/2 transition-opacity duration-200 ease-in-out"
+  class="pointer-events-auto absolute bottom-4 left-1/2 z-[1000] -translate-x-1/2 transition-opacity duration-200 ease-in-out"
   style="opacity: {isVisible ? 1 : 0}"
   onmouseenter={handleMouseEnter}
   onmouseleave={handleMouseLeave}
@@ -129,9 +135,9 @@
         name="page"
         value={inputValue}
         oninput={handleInputChange}
-        class="h-7 w-12 rounded border border-gray-300 bg-white px-1 text-center text-sm focus:border-gray-400 focus:outline-none"
+        class="h-7 w-10 rounded border border-gray-300 bg-white px-1 text-center text-sm focus:border-gray-400 focus:outline-none"
       />
-      <span class="text-sm text-gray-600">/ {scroll.state.totalPages}</span>
+      <span class="text-sm text-gray-600">{scroll.state.totalPages}</span>
     </form>
 
     <!-- Next Page Button -->

@@ -1,65 +1,116 @@
-import { BasePlugin, createEmitter, Listener, PluginRegistry, Unsubscribe } from '@embedpdf/core';
+import { BasePlugin, createEmitter, Listener, PluginRegistry } from '@embedpdf/core';
 import { PdfErrorCode, PdfErrorReason, PdfTaskHelper, Task } from '@embedpdf/models';
 
-import { BufferAndName, ExportCapability, ExportPluginConfig } from './types';
+import {
+  BufferAndName,
+  ExportCapability,
+  ExportPluginConfig,
+  ExportScope,
+  DownloadRequestEvent,
+} from './types';
 
 export class ExportPlugin extends BasePlugin<ExportPluginConfig, ExportCapability> {
   static readonly id = 'export' as const;
 
-  private readonly downloadRequest$ = createEmitter<'download'>();
+  private readonly downloadRequest$ = createEmitter<DownloadRequestEvent>();
   private readonly config: ExportPluginConfig;
 
   constructor(id: string, registry: PluginRegistry, config: ExportPluginConfig) {
     super(id, registry);
-
     this.config = config;
   }
 
-  async initialize(_: ExportPluginConfig): Promise<void> {}
+  // ─────────────────────────────────────────────────────────
+  // Capability
+  // ─────────────────────────────────────────────────────────
 
   protected buildCapability(): ExportCapability {
     return {
-      saveAsCopy: this.saveAsCopy.bind(this),
-      download: this.download.bind(this),
+      // Active document operations
+      saveAsCopy: () => this.saveAsCopy(),
+      download: () => this.download(),
+
+      // Document-scoped operations
+      forDocument: (documentId: string) => this.createExportScope(documentId),
     };
   }
 
-  public onRequest(event: Listener<'download'>): Unsubscribe {
-    return this.downloadRequest$.on(event);
+  // ─────────────────────────────────────────────────────────
+  // Document Scoping
+  // ─────────────────────────────────────────────────────────
+
+  private createExportScope(documentId: string): ExportScope {
+    return {
+      saveAsCopy: () => this.saveAsCopy(documentId),
+      download: () => this.download(documentId),
+    };
   }
 
-  private download(): void {
-    this.downloadRequest$.emit('download');
+  // ─────────────────────────────────────────────────────────
+  // Core Operations
+  // ─────────────────────────────────────────────────────────
+
+  private download(documentId?: string): void {
+    const id = documentId ?? this.getActiveDocumentId();
+    this.downloadRequest$.emit({ documentId: id });
   }
 
-  public saveAsCopyAndGetBufferAndName(): Task<BufferAndName, PdfErrorReason> {
-    const task = new Task<BufferAndName, PdfErrorReason>();
-    const document = this.coreState.core.document;
-    if (!document)
+  private saveAsCopy(documentId?: string): Task<ArrayBuffer, PdfErrorReason> {
+    const id = documentId ?? this.getActiveDocumentId();
+    const coreDoc = this.coreState.core.documents[id];
+
+    if (!coreDoc?.document) {
       return PdfTaskHelper.reject({
         code: PdfErrorCode.DocNotOpen,
-        message: 'Document not found',
+        message: `Document ${id} not found`,
       });
+    }
 
-    this.saveAsCopy().wait((result) => {
-      task.resolve({
-        buffer: result,
-        name: document.name ?? this.config.defaultFileName,
+    return this.engine.saveAsCopy(coreDoc.document);
+  }
+
+  public saveAsCopyAndGetBufferAndName(documentId: string): Task<BufferAndName, PdfErrorReason> {
+    const task = new Task<BufferAndName, PdfErrorReason>();
+    const coreDoc = this.coreState.core.documents[documentId];
+
+    if (!coreDoc?.document) {
+      return PdfTaskHelper.reject({
+        code: PdfErrorCode.DocNotOpen,
+        message: `Document ${documentId} not found`,
       });
-    }, task.fail);
+    }
+
+    this.saveAsCopy(documentId).wait(
+      (result) => {
+        task.resolve({
+          buffer: result,
+          name: coreDoc.name ?? this.config.defaultFileName,
+        });
+      },
+      (error) => task.fail(error),
+    );
 
     return task;
   }
 
-  private saveAsCopy(): Task<ArrayBuffer, PdfErrorReason> {
-    const document = this.coreState.core.document;
+  // ─────────────────────────────────────────────────────────
+  // Event Listeners
+  // ─────────────────────────────────────────────────────────
 
-    if (!document)
-      return PdfTaskHelper.reject({
-        code: PdfErrorCode.DocNotOpen,
-        message: 'Document not found',
-      });
+  public onRequest(listener: Listener<DownloadRequestEvent>) {
+    return this.downloadRequest$.on(listener);
+  }
 
-    return this.engine.saveAsCopy(document);
+  // ─────────────────────────────────────────────────────────
+  // Lifecycle
+  // ─────────────────────────────────────────────────────────
+
+  async initialize(_: ExportPluginConfig): Promise<void> {
+    this.logger.info('ExportPlugin', 'Initialize', 'Export plugin initialized');
+  }
+
+  async destroy(): Promise<void> {
+    this.downloadRequest$.clear();
+    await super.destroy();
   }
 }

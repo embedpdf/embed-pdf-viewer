@@ -4,48 +4,41 @@ import { createPluginRegistration } from '@embedpdf/core'
 import { EmbedPDF } from '@embedpdf/core/react'
 import { usePdfiumEngine } from '@embedpdf/engines/react'
 import { useState } from 'react'
-
-// Import essential plugins
 import {
   Viewport,
   ViewportPluginPackage,
 } from '@embedpdf/plugin-viewport/react'
 import { Scroller, ScrollPluginPackage } from '@embedpdf/plugin-scroll/react'
-import { LoaderPluginPackage } from '@embedpdf/plugin-loader/react'
-
-// Import Render plugin
+import {
+  DocumentContent,
+  DocumentManagerPluginPackage,
+} from '@embedpdf/plugin-document-manager/react'
 import {
   RenderLayer,
   RenderPluginPackage,
   useRenderCapability,
 } from '@embedpdf/plugin-render/react'
+import { Loader2, Image, Download } from 'lucide-react'
 
-// 1. Register the plugins you need
 const plugins = [
-  createPluginRegistration(LoaderPluginPackage, {
-    loadingOptions: {
-      type: 'url',
-      pdfFile: {
-        id: 'example-pdf',
-        url: 'https://snippet.embedpdf.com/ebook.pdf',
-      },
-    },
+  createPluginRegistration(DocumentManagerPluginPackage, {
+    initialDocuments: [{ url: 'https://snippet.embedpdf.com/ebook.pdf' }],
   }),
   createPluginRegistration(ViewportPluginPackage),
   createPluginRegistration(ScrollPluginPackage),
-  createPluginRegistration(RenderPluginPackage), // Register the render plugin
+  createPluginRegistration(RenderPluginPackage),
 ]
 
-// 2. Create a toolbar to demonstrate the useRenderCapability hook
-export const ExportToolbar = () => {
-  const { provides: render } = useRenderCapability()
+const ExportToolbar = ({ documentId }: { documentId: string }) => {
+  const { provides: renderCapability } = useRenderCapability()
   const [isExporting, setIsExporting] = useState(false)
 
   const exportPageAsPng = () => {
-    if (!render || isExporting) return
+    if (!renderCapability || isExporting) return
     setIsExporting(true)
 
-    // Use the capability to render page 1 at 2x resolution
+    const render = renderCapability.forDocument(documentId)
+
     const renderTask = render.renderPage({
       pageIndex: 0,
       options: {
@@ -57,7 +50,6 @@ export const ExportToolbar = () => {
 
     renderTask.wait(
       (blob) => {
-        // Create a temporary link to trigger the download
         const url = URL.createObjectURL(blob)
         const a = document.createElement('a')
         a.href = url
@@ -76,44 +68,86 @@ export const ExportToolbar = () => {
   }
 
   return (
-    <div className="mb-4 mt-4 flex items-center gap-3 rounded-lg border border-gray-200 bg-white p-3 shadow-sm">
+    <div className="flex items-center gap-3 border-b border-gray-300 bg-gray-100 px-3 py-2 dark:border-gray-700 dark:bg-gray-800">
       <button
-        className="rounded-md bg-blue-500 px-3 py-1 text-sm font-medium text-white transition-colors duration-150 hover:bg-blue-600 disabled:cursor-not-allowed disabled:bg-blue-300"
         onClick={exportPageAsPng}
-        disabled={!render || isExporting}
+        disabled={!renderCapability || isExporting}
+        className="inline-flex items-center gap-2 rounded-md bg-blue-500 px-3 py-1.5 text-sm font-medium text-white shadow-sm transition-all hover:bg-blue-600 disabled:cursor-not-allowed disabled:opacity-50"
       >
-        {isExporting ? 'Exporting...' : 'Export Page 1 as PNG (2x Res)'}
+        {isExporting ? (
+          <>
+            <Loader2 size={16} className="animate-spin" />
+            Exporting...
+          </>
+        ) : (
+          <>
+            <Image size={16} />
+            Export Page 1 as PNG
+          </>
+        )}
       </button>
+
+      <div className="flex items-center gap-2 text-xs text-gray-600 dark:text-gray-300">
+        <Download size={14} />
+        <span className="hidden sm:inline">
+          Renders at 2x resolution with annotations
+        </span>
+        <span className="sm:hidden">2x resolution</span>
+      </div>
     </div>
   )
 }
 
-// 3. Create the main viewer component
 export const PDFViewer = () => {
   const { engine, isLoading } = usePdfiumEngine()
 
   if (isLoading || !engine) {
-    return <div>Loading PDF Engine...</div>
+    return (
+      <div className="overflow-hidden rounded-lg border border-gray-300 bg-white dark:border-gray-700 dark:bg-gray-900">
+        <div className="flex h-[400px] items-center justify-center">
+          <div className="flex items-center gap-2 text-gray-500 dark:text-gray-400">
+            <Loader2 size={20} className="animate-spin" />
+            <span className="text-sm">Loading PDF Engine...</span>
+          </div>
+        </div>
+      </div>
+    )
   }
 
   return (
-    <div style={{ height: '500px' }}>
-      <EmbedPDF engine={engine} plugins={plugins}>
-        <div className="flex h-full flex-col">
-          <ExportToolbar />
-          <div className="relative flex w-full flex-1 overflow-hidden">
-            <Viewport className="flex-grow bg-gray-100">
-              <Scroller
-                renderPage={({ width, height, pageIndex, scale }) => (
-                  <div style={{ width, height, position: 'relative' }}>
-                    <RenderLayer pageIndex={pageIndex} scale={scale} />
+    <EmbedPDF engine={engine} plugins={plugins}>
+      {({ activeDocumentId }) =>
+        activeDocumentId && (
+          <DocumentContent documentId={activeDocumentId}>
+            {({ isLoaded }) =>
+              isLoaded && (
+                <div className="overflow-hidden rounded-lg border border-gray-300 bg-white shadow-sm dark:border-gray-700 dark:bg-gray-900">
+                  {/* Toolbar */}
+                  <ExportToolbar documentId={activeDocumentId} />
+
+                  {/* PDF Viewer Area */}
+                  <div className="relative h-[400px] sm:h-[500px]">
+                    <Viewport
+                      documentId={activeDocumentId}
+                      className="absolute inset-0 bg-gray-200 dark:bg-gray-800"
+                    >
+                      <Scroller
+                        documentId={activeDocumentId}
+                        renderPage={({ pageIndex }) => (
+                          <RenderLayer
+                            documentId={activeDocumentId}
+                            pageIndex={pageIndex}
+                          />
+                        )}
+                      />
+                    </Viewport>
                   </div>
-                )}
-              />
-            </Viewport>
-          </div>
-        </div>
-      </EmbedPDF>
-    </div>
+                </div>
+              )
+            }
+          </DocumentContent>
+        )
+      }
+    </EmbedPDF>
   )
 }

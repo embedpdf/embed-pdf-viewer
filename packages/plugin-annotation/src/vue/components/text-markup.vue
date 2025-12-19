@@ -51,6 +51,7 @@ import Strikeout from './text-markup/strikeout.vue';
 import Squiggly from './text-markup/squiggly.vue';
 
 const props = defineProps<{
+  documentId: string;
   pageIndex: number;
   scale: number;
 }>();
@@ -65,17 +66,20 @@ watchEffect((onCleanup) => {
   const unsubscribers: (() => void)[] = [];
 
   if (selectionProvides.value) {
-    const provides = selectionProvides.value;
-    const off = provides.onSelectionChange(() => {
-      rects.value = provides.getHighlightRectsForPage(props.pageIndex);
-      boundingRect.value = provides.getBoundingRectForPage(props.pageIndex);
+    const scoped = selectionProvides.value.forDocument(props.documentId);
+    const off = scoped.onSelectionChange(() => {
+      rects.value = scoped.getHighlightRectsForPage(props.pageIndex);
+      boundingRect.value = scoped.getBoundingRectForPage(props.pageIndex);
     });
     unsubscribers.push(off);
   }
 
   if (annotationProvides.value) {
-    const provides = annotationProvides.value;
-    const off = provides.onActiveToolChange((tool) => (activeTool.value = tool));
+    const scoped = annotationProvides.value.forDocument(props.documentId);
+    // Initialize with current active tool
+    activeTool.value = scoped.getActiveTool();
+
+    const off = scoped.onActiveToolChange((event) => (activeTool.value = event));
     unsubscribers.push(off);
   }
 

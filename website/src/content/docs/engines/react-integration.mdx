@@ -22,34 +22,25 @@ npm install @embedpdf/engines
 
 ## The `usePdfiumEngine` Hook
 
-This hook handles the creation of the `WebWorkerEngine`, manages its loading and initialization state, and provides you with a ready-to-use `engine` instance.
+This hook handles the creation of the PDF engine, manages its loading state, and provides you with a ready-to-use `engine` instance. The engine is fully initialized when returned—no additional setup required.
 
 Here's a basic example of how to use it in a component:
 
 ```tsx filename="PDFProcessor.tsx"
 import { usePdfiumEngine } from '@embedpdf/engines/react';
-import { useEffect, useState } from 'react';
 
 export const PDFProcessor = () => {
   const { engine, isLoading, error } = usePdfiumEngine();
-  const [isReady, setIsReady] = useState(false);
-
-  useEffect(() => {
-    // The engine object from the hook needs to be initialized once.
-    if (engine && !isReady) {
-      engine.initialize().toPromise().then(() => setIsReady(true));
-    }
-  }, [engine, isReady]);
 
   if (error) {
     return <div>Error: {error.message}</div>;
   }
 
-  if (isLoading || !isReady) {
-    return <div>Initializing PDF Engine...</div>;
+  if (isLoading || !engine) {
+    return <div>Loading PDF Engine...</div>;
   }
 
-  // Once isLoading is false and isReady is true, the engine is ready!
+  // Engine is ready to use immediately!
   return (
     <div>
       <p>PDF Engine is ready to use!</p>

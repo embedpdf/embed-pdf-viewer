@@ -1,6 +1,7 @@
 ---
 title: Getting Started
 description: Build your first simple PDF viewer with EmbedPDF in just a few steps.
+searchable: true
 ---
 
 # Getting Started
@@ -12,7 +13,7 @@ Let's build a basic, scrollable PDF viewer. This guide will walk you through the
 You'll need a few packages to create a minimal viewer: the core library, the engine, and a few essential plugins.
 
 ```sh npm2yarn
-npm install @embedpdf/core @embedpdf/engines @embedpdf/plugin-loader @embedpdf/plugin-viewport @embedpdf/plugin-scroll @embedpdf/plugin-render
+npm install @embedpdf/core @embedpdf/engines @embedpdf/plugin-document-manager @embedpdf/plugin-viewport @embedpdf/plugin-scroll @embedpdf/plugin-render
 ````
 
 ## 2\. Create Your Viewer Component
@@ -29,19 +30,16 @@ import { usePdfiumEngine } from '@embedpdf/engines/react';
 // Import the essential plugins
 import { Viewport, ViewportPluginPackage } from '@embedpdf/plugin-viewport/react';
 import { Scroller, ScrollPluginPackage } from '@embedpdf/plugin-scroll/react';
-import { LoaderPluginPackage } from '@embedpdf/plugin-loader/react';
+import {
+  DocumentContent,
+  DocumentManagerPluginPackage,
+} from '@embedpdf/plugin-document-manager/react';
 import { RenderLayer, RenderPluginPackage } from '@embedpdf/plugin-render/react';
 
 // 1. Register the plugins you need
 const plugins = [
-  createPluginRegistration(LoaderPluginPackage, {
-    loadingOptions: {
-      type: 'url',
-      pdfFile: {
-        id: 'example-pdf',
-        url: 'https://snippet.embedpdf.com/ebook.pdf',
-      },
-    },
+  createPluginRegistration(DocumentManagerPluginPackage, {
+    initialDocuments: [{ url: 'https://snippet.embedpdf.com/ebook.pdf' }],
   }),
   createPluginRegistration(ViewportPluginPackage),
   createPluginRegistration(ScrollPluginPackage),
@@ -60,20 +58,35 @@ export const PDFViewer = () => {
   return (
     <div style={{ height: '500px' }}>
       <EmbedPDF engine={engine} plugins={plugins}>
-        <Viewport
-          style={{
-            backgroundColor: '#f1f3f5',
-          }}
-        >
-          <Scroller
-            renderPage={({ width, height, pageIndex, scale }) => (
-              <div style={{ width, height }}>
-                {/* The RenderLayer is responsible for drawing the page */}
-                <RenderLayer pageIndex={pageIndex} scale={scale} />
-              </div>
-            )}
-          />
-        </Viewport>
+        {({ activeDocumentId }) =>
+          activeDocumentId && (
+            <DocumentContent documentId={activeDocumentId}>
+              {({ isLoaded }) =>
+                isLoaded && (
+                  <Viewport
+                    documentId={activeDocumentId}
+                    style={{
+                      backgroundColor: '#f1f3f5',
+                    }}
+                  >
+                    <Scroller
+                      documentId={activeDocumentId}
+                      renderPage={({ width, height, pageIndex }) => (
+                        <div style={{ width, height }}>
+                          {/* The RenderLayer is responsible for drawing the page */}
+                          <RenderLayer
+                            documentId={activeDocumentId}
+                            pageIndex={pageIndex}
+                          />
+                        </div>
+                      )}
+                    />
+                  </Viewport>
+                )
+              }
+            </DocumentContent>
+          )
+        }
       </EmbedPDF>
     </div>
   );
@@ -100,7 +113,13 @@ When you run the code above, it will produce a functional, scrollable PDF viewer
 
 import { PDFViewer } from './code-examples/simple-pdf-viewer';
 
-<PDFViewer />
+<CodeExample 
+  codePaths={[
+    "content/docs/react/code-examples/simple-pdf-viewer.tsx"
+  ]}
+>
+  <PDFViewer />
+</CodeExample>
 
 You now have a functional PDF viewer!
 

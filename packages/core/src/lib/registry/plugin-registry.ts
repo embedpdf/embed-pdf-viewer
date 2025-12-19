@@ -34,7 +34,6 @@ export class PluginRegistry {
   private resolver: DependencyResolver;
   private configurations: Map<string, unknown> = new Map();
   private engine: PdfEngine;
-  private engineInitialized = false;
   private store: Store<CoreState, CoreAction>;
   private initPromise: Promise<void> | null = null;
   private logger: Logger;
@@ -60,23 +59,6 @@ export class PluginRegistry {
    */
   getLogger(): Logger {
     return this.logger;
-  }
-
-  /**
-   * Ensure engine is initialized before proceeding
-   */
-  private async ensureEngineInitialized(): Promise<void> {
-    if (this.engineInitialized) {
-      return;
-    }
-
-    if (this.engine.initialize) {
-      const task = this.engine.initialize();
-      await task.toPromise();
-      this.engineInitialized = true;
-    } else {
-      this.engineInitialized = true;
-    }
   }
 
   /**
@@ -169,13 +151,10 @@ export class PluginRegistry {
       throw new PluginRegistrationError('Registry has been destroyed');
     }
 
-    // If an initialisation is already in-flight (or finished)
-    // return the very same promise so callers can await it.
     if (this.initPromise) {
       return this.initPromise;
     }
 
-    // Wrap your existing body in a single promise and cache it
     this.initPromise = (async () => {
       if (this.initialized) {
         throw new PluginRegistrationError('Registry is already initialized');
@@ -184,52 +163,65 @@ export class PluginRegistry {
       this.isInitializing = true;
 
       try {
-        /* ---------------- original body starts ------------------ */
-        await this.ensureEngineInitialized();
-        // Check if destroyed after engine initialization
-        if (this.destroyed) {
-          return;
-        }
+        if (this.destroyed) return;
 
         while (this.pendingRegistrations.length > 0) {
-          // Check if destroyed before processing each batch
-          if (this.destroyed) {
-            return;
-          }
+          if (this.destroyed) return;
+
           this.processingRegistrations = [...this.pendingRegistrations];
           this.pendingRegistrations = [];
 
+          // ------------------------------------------------------------
+          // STEP 1: RESOLVE ORDER (Using Manifests)
+          // ------------------------------------------------------------
+          // We use the static manifests to figure out the graph before creating instances.
           for (const reg of this.processingRegistrations) {
             const dependsOn = new Set<string>();
             const allDeps = [...reg.package.manifest.requires, ...reg.package.manifest.optional];
+
             for (const cap of allDeps) {
+              // Check if provider is in the current batch
               const provider = this.processingRegistrations.find((r) =>
                 r.package.manifest.provides.includes(cap),
               );
-              if (provider) dependsOn.add(provider.package.manifest.id);
+
+              // If the provider is in this batch, we must load after it.
+              // If the provider was in a previous batch, it's already loaded, so no edge needed.
+              if (provider) {
+                dependsOn.add(provider.package.manifest.id);
+              }
             }
             this.resolver.addNode(reg.package.manifest.id, [...dependsOn]);
           }
 
           const loadOrder = this.resolver.resolveLoadOrder();
+
+          // ------------------------------------------------------------
+          // STEP 2: INSTANTIATION (Constructors)
+          // ------------------------------------------------------------
+          // Create all instances and register capabilities.
+          // Now "this.plugins.get('id')" will return an object for everyone in this batch.
           for (const id of loadOrder) {
             const reg = this.processingRegistrations.find((r) => r.package.manifest.id === id)!;
-            await this.initializePlugin(reg.package.manifest, reg.package.create, reg.config);
+            this.instantiatePlugin(reg.package.manifest, reg.package.create, reg.config);
+          }
+
+          // ------------------------------------------------------------
+          // STEP 3: INITIALIZATION (Logic)
+          // ------------------------------------------------------------
+          // Now run the async logic. Since step 2 is done,
+          // Plugin A can safely access Plugin B's instance during initialize.
+          for (const id of loadOrder) {
+            await this.runPluginInitialization(id);
           }
 
           this.processingRegistrations = [];
           this.resolver = new DependencyResolver();
         }
 
-        for (const plugin of this.plugins.values()) {
-          await plugin.postInitialize?.().catch((e) => {
-            console.error(`Error in postInitialize for plugin ${plugin.id}`, e);
-            this.status.set(plugin.id, 'error');
-          });
-        }
+        // postInitialize is removed as requested/agreed!
 
         this.initialized = true;
-        /* ----------------- original body ends ------------------- */
       } catch (err) {
         if (err instanceof Error) {
           throw new CircularDependencyError(
@@ -246,13 +238,13 @@ export class PluginRegistry {
   }
 
   /**
-   * Initialize a single plugin with all necessary checks
+   * Phase 2: Create instance and register capabilities
    */
-  private async initializePlugin<TConfig>(
+  private instantiatePlugin<TConfig>(
     manifest: PluginManifest<TConfig>,
     packageCreator: (registry: PluginRegistry, config?: TConfig) => IPlugin<TConfig>,
     config?: Partial<TConfig>,
-  ): Promise<void> {
+  ): void {
     const finalConfig = {
       ...manifest.defaultConfig,
       ...config,
@@ -260,36 +252,11 @@ export class PluginRegistry {
 
     this.validateConfig(manifest.id, finalConfig, manifest.defaultConfig);
 
-    // Create plugin instance during initialization
+    // Create plugin instance (Constructor runs here)
     const plugin = packageCreator(this, finalConfig);
     this.validatePlugin(plugin);
 
-    // Verify all required capabilities are available
-    for (const capability of manifest.requires) {
-      if (!this.capabilities.has(capability)) {
-        throw new PluginRegistrationError(
-          `Missing required capability: ${capability} for plugin ${manifest.id}`,
-        );
-      }
-    }
-
-    // Optional capabilities can be null, so we don't throw errors for them
-    for (const capability of manifest.optional) {
-      if (this.capabilities.has(capability)) {
-        // Optional capability is available, but we don't require it
-        this.logger.debug(
-          'PluginRegistry',
-          'OptionalCapability',
-          `Optional capability ${capability} is available for plugin ${manifest.id}`,
-        );
-      }
-    }
-
-    this.logger.debug('PluginRegistry', 'InitializePlugin', `Initializing plugin ${manifest.id}`, {
-      provides: manifest.provides,
-    });
-
-    // Register provided capabilities
+    // Check existing capabilities (sanity check)
     for (const capability of manifest.provides) {
       if (this.capabilities.has(capability)) {
         throw new PluginRegistrationError(
@@ -302,31 +269,51 @@ export class PluginRegistry {
     // Store plugin and manifest
     this.plugins.set(manifest.id, plugin);
     this.manifests.set(manifest.id, manifest);
-    this.status.set(manifest.id, 'registered');
+    this.status.set(manifest.id, 'registered'); // Ready for init
     this.configurations.set(manifest.id, finalConfig);
+  }
+
+  /**
+   * Phase 3: Run the initialize method
+   */
+  private async runPluginInitialization(pluginId: string): Promise<void> {
+    const plugin = this.plugins.get(pluginId);
+    if (!plugin) return; // Should not happen given loadOrder logic
+
+    const manifest = this.manifests.get(pluginId)!;
+    const config = this.configurations.get(pluginId);
+
+    // Validate requirements are met (now that everyone is instantiated)
+    for (const capability of manifest.requires) {
+      if (!this.capabilities.has(capability)) {
+        throw new PluginRegistrationError(
+          `Missing required capability: ${capability} for plugin ${pluginId}`,
+        );
+      }
+    }
+
+    this.logger.debug('PluginRegistry', 'InitializePlugin', `Initializing plugin ${pluginId}`);
 
     try {
       if (plugin.initialize) {
-        await plugin.initialize(finalConfig);
+        await plugin.initialize(config);
       }
-      this.status.set(manifest.id, 'active');
+      this.status.set(pluginId, 'active');
 
       this.logger.info(
         'PluginRegistry',
         'PluginInitialized',
-        `Plugin ${manifest.id} initialized successfully`,
+        `Plugin ${pluginId} initialized successfully`,
       );
     } catch (error) {
-      // Cleanup on initialization failure
-      this.plugins.delete(manifest.id);
-      this.manifests.delete(manifest.id);
+      // Rollback logic
+      this.status.set(pluginId, 'error');
       this.logger.error(
         'PluginRegistry',
         'InitializationFailed',
-        `Plugin ${manifest.id} initialization failed`,
-        { provides: manifest.provides, error },
+        `Plugin ${pluginId} initialization failed`,
+        { error },
       );
-      manifest.provides.forEach((cap) => this.capabilities.delete(cap));
       throw error;
     }
   }

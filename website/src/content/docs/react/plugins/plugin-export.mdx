@@ -27,16 +27,16 @@ import { EmbedPDF } from '@embedpdf/core/react'
 import { ExportPluginPackage } from '@embedpdf/plugin-export/react'
 
 const plugins = [
-  // ... other essential plugins
-  createPluginRegistration(LoaderPluginPackage, { /* ... */ }),
-  createPluginRegistration(ViewportPluginPackage),
-  createPluginRegistration(ScrollPluginPackage),
-  createPluginRegistration(RenderPluginPackage),
+  // ... other essential plugins
+  createPluginRegistration(DocumentManagerPluginPackage, { /* ... */ }),
+  createPluginRegistration(ViewportPluginPackage),
+  createPluginRegistration(ScrollPluginPackage),
+  createPluginRegistration(RenderPluginPackage),
 
-  // Register the export plugin
-  createPluginRegistration(ExportPluginPackage, {
-    defaultFileName: 'my-document.pdf',
-  }),
+  // Register the export plugin
+  createPluginRegistration(ExportPluginPackage, {
+    defaultFileName: 'my-document.pdf',
+  }),
 ]
 ```
 
@@ -46,19 +46,19 @@ The plugin works by combining a hook for initiating the download with a componen
 
 ### Triggering a Download
 
-Use the `useExportCapability` hook to get access to the plugin's `download` method. Call this method from a button in your toolbar to start the download process.
+Use the `useExport` hook to get access to the plugin's `download` method for the specific document. Call this method from a button in your toolbar to start the download process.
 
 ```tsx {1,4, 7}
-import { useExportCapability } from '@embedpdf/plugin-export/react';
+import { useExport } from '@embedpdf/plugin-export/react';
 
-export const ExportToolbar = () => {
-  const { provides: exportApi } = useExportCapability();
+export const ExportToolbar = ({ documentId }) => {
+  const { provides: exportApi } = useExport(documentId);
 
-  return (
-    <button onClick={() => exportApi?.download()} disabled={!exportApi}>
-      Download
-    </button>
-  );
+  return (
+    <button onClick={() => exportApi?.download()} disabled={!exportApi}>
+      Download
+    </button>
+  );
 };
 ```
 
@@ -68,7 +68,13 @@ This example shows a viewer with a download button. Clicking it will trigger a d
 
 import { PDFViewer } from '../code-examples/export-example';
 
-<PDFViewer />
+<CodeExample 
+  codePaths={[
+    "content/docs/react/code-examples/export-example.tsx"
+  ]}
+>
+  <PDFViewer />
+</CodeExample>
 
 ## API Reference
 
@@ -78,9 +84,9 @@ import { PDFViewer } from '../code-examples/export-example';
 | :--- | :--- | :--- |
 | **`defaultFileName`** | `string` | A fallback filename to use for the downloaded file if the original document does not have a name. <br />**Default**: `document.pdf` |
 
-### Hook: `useExportCapability()`
+### Hook: `useExport(documentId)`
 
-This hook connects your component to the export plugin's functions.
+This hook connects your component to the export plugin's functions for a specific document.
 
 #### Returns
 

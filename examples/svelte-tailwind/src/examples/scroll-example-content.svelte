@@ -2,8 +2,15 @@
   import { Viewport } from '@embedpdf/plugin-viewport/svelte';
   import { Scroller, useScroll, type RenderPageProps } from '@embedpdf/plugin-scroll/svelte';
   import { RenderLayer } from '@embedpdf/plugin-render/svelte';
+  import { ChevronLeft, ChevronRight } from 'lucide-svelte';
 
-  const scroll = useScroll();
+  interface Props {
+    documentId: string;
+  }
+
+  let { documentId }: Props = $props();
+
+  const scroll = useScroll(() => documentId);
   let pageInput = $state(String(scroll.state.currentPage));
 
   $effect(() => {
@@ -19,67 +26,53 @@
   };
 </script>
 
-{#snippet RenderPageSnippet(page: RenderPageProps)}
-  <div style:width={`${page.width}px`} style:height={`${page.height}px`} style:position="relative">
-    <RenderLayer pageIndex={page.pageIndex} scale={page.scale} />
-  </div>
-{/snippet}
-
-<div style="height: 500px">
-  <div class="flex h-full flex-col">
-    <div
-      class="mb-4 mt-4 flex items-center justify-center gap-3 rounded-lg border border-gray-200 bg-white p-3 shadow-sm"
+<div
+  class="overflow-hidden rounded-lg border border-gray-300 bg-white shadow-sm dark:border-gray-700 dark:bg-gray-900"
+>
+  <!-- Navigation Toolbar -->
+  <div
+    class="flex items-center justify-center gap-2 border-b border-gray-300 bg-gray-100 px-3 py-2 dark:border-gray-700 dark:bg-gray-800"
+  >
+    <button
+      onclick={() => scroll.provides?.scrollToPreviousPage()}
+      disabled={scroll.state.currentPage <= 1}
+      class="inline-flex h-8 w-8 items-center justify-center rounded-md bg-white text-gray-600 shadow-sm ring-1 ring-gray-300 transition-all hover:bg-gray-50 hover:text-gray-900 disabled:cursor-not-allowed disabled:opacity-50 dark:bg-gray-700 dark:text-gray-300 dark:ring-gray-600 dark:hover:bg-gray-600 dark:hover:text-gray-100"
+      title="Previous Page"
     >
-      <button
-        onclick={() => scroll.provides?.scrollToPreviousPage()}
-        disabled={scroll.state.currentPage <= 1}
-        class="flex h-8 w-8 items-center justify-center rounded-md border border-gray-300 bg-white text-gray-700 transition-colors duration-150 hover:bg-gray-50 disabled:opacity-50"
-        title="Previous Page"
-      >
-        <svg
-          width="16"
-          height="16"
-          viewBox="0 0 24 24"
-          fill="none"
-          stroke="currentColor"
-          stroke-width="2"
-        >
-          <path d="M15 18l-6-6 6-6" />
-        </svg>
-      </button>
-      <form onsubmit={handleGoToPage} class="flex items-center gap-2">
-        <span class="text-sm font-medium text-gray-600">Page</span>
-        <input
-          bind:value={pageInput}
-          type="number"
-          min="1"
-          max={scroll.state.totalPages}
-          class="h-8 w-16 rounded-md border-gray-300 text-center text-sm shadow-sm"
-        />
-        <span class="text-sm font-medium text-gray-600">of {scroll.state.totalPages}</span>
-      </form>
-      <button
-        onclick={() => scroll.provides?.scrollToNextPage()}
-        disabled={scroll.state.currentPage >= scroll.state.totalPages}
-        class="flex h-8 w-8 items-center justify-center rounded-md border border-gray-300 bg-white text-gray-700 transition-colors duration-150 hover:bg-gray-50 disabled:opacity-50"
-        title="Next Page"
-      >
-        <svg
-          width="16"
-          height="16"
-          viewBox="0 0 24 24"
-          fill="none"
-          stroke="currentColor"
-          stroke-width="2"
-        >
-          <path d="M9 18l6-6-6-6" />
-        </svg>
-      </button>
-    </div>
-    <div class="relative flex w-full flex-1 overflow-hidden">
-      <Viewport class="flex-grow bg-gray-100">
-        <Scroller {RenderPageSnippet} />
-      </Viewport>
-    </div>
+      <ChevronLeft size={18} />
+    </button>
+    <form onsubmit={handleGoToPage} class="flex items-center gap-2">
+      <span class="text-xs font-medium uppercase tracking-wide text-gray-600 dark:text-gray-300">
+        Page
+      </span>
+      <input
+        bind:value={pageInput}
+        type="number"
+        min="1"
+        max={scroll.state.totalPages}
+        class="h-8 w-14 rounded-md border-0 bg-white px-2 text-center font-mono text-sm font-medium text-gray-700 shadow-sm ring-1 ring-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-gray-300 dark:ring-gray-600"
+      />
+      <span class="text-xs font-medium text-gray-600 dark:text-gray-300">
+        of {scroll.state.totalPages}
+      </span>
+    </form>
+    <button
+      onclick={() => scroll.provides?.scrollToNextPage()}
+      disabled={scroll.state.currentPage >= scroll.state.totalPages}
+      class="inline-flex h-8 w-8 items-center justify-center rounded-md bg-white text-gray-600 shadow-sm ring-1 ring-gray-300 transition-all hover:bg-gray-50 hover:text-gray-900 disabled:cursor-not-allowed disabled:opacity-50 dark:bg-gray-700 dark:text-gray-300 dark:ring-gray-600 dark:hover:bg-gray-600 dark:hover:text-gray-100"
+      title="Next Page"
+    >
+      <ChevronRight size={18} />
+    </button>
+  </div>
+
+  <!-- PDF Viewer Area -->
+  <div class="relative h-[400px] sm:h-[500px]">
+    {#snippet renderPage(page: RenderPageProps)}
+      <RenderLayer {documentId} pageIndex={page.pageIndex} />
+    {/snippet}
+    <Viewport {documentId} class="absolute inset-0 bg-gray-200 dark:bg-gray-800">
+      <Scroller {documentId} {renderPage} />
+    </Viewport>
   </div>
 </div>

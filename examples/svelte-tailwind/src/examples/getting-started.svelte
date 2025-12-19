@@ -10,22 +10,20 @@
     ScrollPluginPackage,
     type RenderPageProps,
   } from '@embedpdf/plugin-scroll/svelte';
-  import { LoaderPluginPackage } from '@embedpdf/plugin-loader/svelte';
+  import {
+    DocumentManagerPluginPackage,
+    DocumentContent,
+  } from '@embedpdf/plugin-document-manager/svelte';
   import { RenderLayer, RenderPluginPackage } from '@embedpdf/plugin-render/svelte';
+  import { Loader2 } from 'lucide-svelte';
 
   // 1. Initialize the engine with the Svelte store
   const pdfEngine = usePdfiumEngine();
 
   // 2. Register the plugins you need
   const plugins = [
-    createPluginRegistration(LoaderPluginPackage, {
-      loadingOptions: {
-        type: 'url',
-        pdfFile: {
-          id: 'example-pdf',
-          url: 'https://snippet.embedpdf.com/ebook.pdf',
-        },
-      },
+    createPluginRegistration(DocumentManagerPluginPackage, {
+      initialDocuments: [{ url: 'https://snippet.embedpdf.com/ebook.pdf' }],
     }),
     createPluginRegistration(ViewportPluginPackage),
     createPluginRegistration(ScrollPluginPackage),
@@ -33,22 +31,56 @@
   ];
 </script>
 
-{#snippet RenderPageSnippet(page: RenderPageProps)}
-  <div style:width="{page.width}px" style:height="{page.height}px" style:position="relative">
-    <RenderLayer pageIndex={page.pageIndex} />
-  </div>
-{/snippet}
-
-<div style="height: 500px; border: 1px solid black; margin-top: 10px;">
-  {#if pdfEngine.isLoading || !pdfEngine.engine}
-    <div style="display: flex; justify-content: center; align-items: center; height: 100%;">
-      Loading PDF Engine...
+{#if pdfEngine.isLoading || !pdfEngine.engine}
+  <div
+    class="overflow-hidden rounded-lg border border-gray-300 bg-white shadow-sm dark:border-gray-700 dark:bg-gray-900"
+  >
+    <div class="flex h-[400px] items-center justify-center sm:h-[500px]">
+      <div class="flex items-center gap-2 text-gray-500 dark:text-gray-400">
+        <Loader2 size={20} class="animate-spin" />
+        <span class="text-sm">Loading PDF Engine...</span>
+      </div>
     </div>
-  {:else}
-    <EmbedPDF engine={pdfEngine.engine} {plugins}>
-      <Viewport style="background-color: #f1f3f5;">
-        <Scroller {RenderPageSnippet} />
-      </Viewport>
-    </EmbedPDF>
-  {/if}
-</div>
+  </div>
+{:else}
+  <!-- 3. Wrap your UI with the <EmbedPDF> provider -->
+  <div
+    class="overflow-hidden rounded-lg border border-gray-300 bg-white shadow-sm dark:border-gray-700 dark:bg-gray-900"
+  >
+    <div class="h-[400px] sm:h-[500px]">
+      <EmbedPDF engine={pdfEngine.engine} {plugins}>
+        {#snippet children({ activeDocumentId })}
+          {#if activeDocumentId}
+            {@const documentId = activeDocumentId}
+            <DocumentContent {documentId}>
+              {#snippet children(documentContent)}
+                {#if documentContent.isLoading}
+                  <div class="flex h-full items-center justify-center bg-gray-200 dark:bg-gray-800">
+                    <div class="flex items-center gap-2 text-gray-500 dark:text-gray-400">
+                      <Loader2 size={20} class="animate-spin" />
+                      <span class="text-sm">Loading document...</span>
+                    </div>
+                  </div>
+                {:else if documentContent.isLoaded}
+                  {#snippet renderPage(page: RenderPageProps)}
+                    <div
+                      style:width="{page.width}px"
+                      style:height="{page.height}px"
+                      style:position="relative"
+                    >
+                      <!-- The RenderLayer is responsible for drawing the page -->
+                      <RenderLayer {documentId} pageIndex={page.pageIndex} />
+                    </div>
+                  {/snippet}
+                  <Viewport {documentId} class="h-full bg-gray-200 dark:bg-gray-800">
+                    <Scroller {documentId} {renderPage} />
+                  </Viewport>
+                {/if}
+              {/snippet}
+            </DocumentContent>
+          {/if}
+        {/snippet}
+      </EmbedPDF>
+    </div>
+  </div>
+{/if}

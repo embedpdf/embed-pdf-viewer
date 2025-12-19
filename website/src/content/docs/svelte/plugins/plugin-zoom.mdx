@@ -22,7 +22,7 @@ npm install @embedpdf/plugin-zoom @embedpdf/plugin-interaction-manager
 
 Import `ZoomPluginPackage` and, if needed, `InteractionManagerPluginPackage`. Add them to the `plugins` array passed to the `<EmbedPDF>` component. You can configure the default zoom behavior upon registration.
 
-```typescript {4-6, 22-25}
+```typescript {4-6, 19-23}
 import { createPluginRegistration } from '@embedpdf/core'
 // ... other imports
 import {
@@ -32,10 +32,8 @@ import {
 import { InteractionManagerPluginPackage } from '@embedpdf/plugin-interaction-manager/svelte'
 
 const plugins = [
-  // ... other essential plugins like Loader, Viewport, etc.
-  createPluginRegistration(LoaderPluginPackage, {
-    /* ... */
-  }),
+  // ... other essential plugins
+  createPluginRegistration(DocumentManagerPluginPackage, { /* ... */ }),
   createPluginRegistration(ViewportPluginPackage),
   createPluginRegistration(ScrollPluginPackage),
   createPluginRegistration(RenderPluginPackage),
@@ -53,17 +51,20 @@ const plugins = [
 
 ## Usage
 
-The plugin exposes the `useZoom` composable to connect your UI components to its logic and state, and the `<MarqueeZoom />` component for area selection.
+The plugin exposes the `useZoom` store to connect your UI components to its logic and state, and the `<MarqueeZoom />` component for area selection.
 
 ### Building a Zoom Toolbar
 
-The `useZoom` composable is the primary way to interact with the plugin. It returns the current reactive zoom `state` and a `provides` object with methods to change the zoom.
+The `useZoom` store is the primary way to interact with the plugin. It accepts a getter for `documentId` and returns the current zoom `state` and a `provides` object with methods to change the zoom for that document.
+
+Here's how you can build a custom toolbar:
 
 ```svelte
 <script lang="ts">
-import { useZoom } from '@embedpdf/plugin-zoom/svelte';
+import { useZoom, ZoomMode } from '@embedpdf/plugin-zoom/svelte';
 
-const zoom = useZoom();
+let { documentId }: { documentId: string } = $props();
+const zoom = useZoom(() => documentId);
 </script>
 
 {#if zoom.provides}
@@ -72,37 +73,81 @@ const zoom = useZoom();
 
     <button onclick={() => zoom.provides?.zoomOut()}>-</button>
     <button onclick={() => zoom.provides?.zoomIn()}>+</button>
-    <button onclick={() => zoom.provides?.requestZoom(1.0)}>Reset</button>
+    <button onclick={() => zoom.provides?.requestZoom(ZoomMode.FitPage)}>Reset</button>
 
     <button onclick={() => zoom.provides?.toggleMarqueeZoom()}>Area Zoom</button>
   </div>
 {/if}
 ```
 
+<Callout type="info">
+To have the "Area Zoom" button visually reflect its active state, you can check `zoom.state.isMarqueeZoomActive`.
+</Callout>
+
 ### Adding Marquee (Area) Zoom
 
-To enable marquee zoom, place the `<MarqueeZoom />` component inside the `RenderPageSnippet` of your `<Scroller />`. This component will automatically render the selection rectangle when the marquee mode is active. It must be a child of `<PagePointerProvider>`.
+The marquee zoom feature allows users to click and drag a rectangle on a page to zoom into that specific area.
 
-```svelte {3, 15}
+To enable this, place the `<MarqueeZoom />` component inside the `renderPage` snippet of your `<Scroller />`. It must be wrapped in a `PagePointerProvider`.
+
+```svelte {3, 17-20}
 <script lang="ts">
 import { PagePointerProvider } from '@embedpdf/plugin-interaction-manager/svelte';
 import { MarqueeZoom } from '@embedpdf/plugin-zoom/svelte';
 import type { RenderPageProps } from '@embedpdf/plugin-scroll/svelte';
+
+let { documentId }: { documentId: string } = $props();
 </script>
 
-{#snippet RenderPageSnippet(page: RenderPageProps)}
+{#snippet renderPage(page: RenderPageProps)}
   <PagePointerProvider
+    {documentId}
     pageIndex={page.pageIndex}
-    pageWidth={page.width}
-    pageHeight={page.height}
   >
-    <RenderLayer pageIndex={page.pageIndex} />
-    <TilingLayer pageIndex={page.pageIndex} scale={page.scale} />
-    <MarqueeZoom pageIndex={page.pageIndex} scale={page.scale} />
+    <RenderLayer {documentId} pageIndex={page.pageIndex} />
+    
+    <!-- Marquee layer for area zoom -->
+    <MarqueeZoom 
+      {documentId} 
+      pageIndex={page.pageIndex} 
+    />
   </PagePointerProvider>
 {/snippet}
 
-<Scroller {RenderPageSnippet} />
+<Scroller {documentId} {renderPage} />
+```
+
+This requires the `interaction-manager` plugin to be registered. When a user clicks the "Area Zoom" button in the toolbar, `toggleMarqueeZoom` activates the mode, and the `<MarqueeZoom />` component handles the user's drag-and-drop interaction.
+
+### Adding Gesture Zoom (Pinch & Wheel)
+
+The `<ZoomGestureWrapper />` component enables pinch-to-zoom on touch devices and ctrl/cmd+wheel zoom on desktop. Wrap your `<Scroller />` with it:
+
+```svelte {3, 9-11}
+<script lang="ts">
+import { Scroller } from '@embedpdf/plugin-scroll/svelte';
+import { ZoomGestureWrapper } from '@embedpdf/plugin-zoom/svelte';
+
+let { documentId }: { documentId: string } = $props();
+</script>
+
+<Viewport {documentId}>
+  <ZoomGestureWrapper {documentId}>
+    <Scroller {documentId} {renderPage} />
+  </ZoomGestureWrapper>
+</Viewport>
+```
+
+You can disable either gesture type:
+
+```svelte
+<ZoomGestureWrapper 
+  {documentId}
+  enablePinch={false}
+  enableWheel={true}
+>
+  <!-- ... -->
+</ZoomGestureWrapper>
 ```
 
 ## Live Example
@@ -111,29 +156,44 @@ This example combines the toolbar and the marquee zoom component into a complete
 
 import { ZoomExample } from '../code-examples/zoom-example';
 
-<ZoomExample />
+<CodeExample 
+  codePaths={[
+    "../../examples/svelte-tailwind/src/examples/zoom-example.svelte",
+    "../../examples/svelte-tailwind/src/examples/zoom-example-content.svelte"
+  ]}
+>
+  <ZoomExample />
+</CodeExample>
 
 ## API Reference
 
 ### Configuration (`ZoomPluginConfig`)
 
+You can pass these options when registering the plugin with `createPluginRegistration`:
+
 | Option | Type | Description |
 | :--- | :--- | :--- |
-| **`defaultZoomLevel`** | `ZoomMode \| number` | The initial zoom level. Can be a numeric scale factor (e.g., `1.5` for 150%) or a `ZoomMode` enum. <br />**Default**: `ZoomMode.Automatic` |
+| **`defaultZoomLevel`** | `ZoomMode \| number` | The initial zoom level. Can be a numeric scale factor (e.g., `1.5` for 150%) or a `ZoomMode` enum (`ZoomMode.Automatic`, `ZoomMode.FitPage`, `ZoomMode.FitWidth`). <br />**Default**: `ZoomMode.Automatic` |
 | **`minZoom`** | `number` | The minimum allowed numeric zoom level. <br />**Default**: `0.2` |
 | **`maxZoom`** | `number` | The maximum allowed numeric zoom level. <br />**Default**: `60` |
-| **`presets`** | `ZoomPreset[]` | An array of objects `{ name: string, value: ZoomMode \| number }` to define options for a zoom dropdown menu. |
+| **`presets`** | `ZoomPreset[]` | An array of objects `{ name: string, value: ZoomMode \| number }` to define options for a zoom dropdown menu in your UI. Use `provides.getPresets()` to retrieve this list. |
 
-### Composable: `useZoom()`
+### Store: `useZoom(documentId)`
 
-This composable connects your component to the zoom plugin's state and functions.
+This store connects your component to the zoom plugin's state and functions for a specific document.
+
+#### Parameters
+
+| Parameter | Type | Description |
+| :--- | :--- | :--- |
+| **`documentId`** | `() => string` | A getter function that returns the document ID to track. |
 
 #### Returns
 
 | Property | Type | Description |
 | :--- | :--- | :--- |
 | **`state`** | `ZoomState` | An object containing the current zoom state. |
-| **`provides`** | `ZoomCapability \| null` | An object with methods to control zooming, or `null` if the plugin is not ready. |
+| **`provides`** | `ZoomScope \| null` | An object with methods to control zooming, or `null` if the plugin is not ready. |
 
 #### `ZoomState` Properties
 
@@ -141,8 +201,9 @@ This composable connects your component to the zoom plugin's state and functions
 | :--- | :--- | :--- |
 | **`currentZoomLevel`** | `number` | The actual, calculated zoom factor applied to the document. |
 | **`zoomLevel`** | `ZoomMode \| number` | The last *requested* zoom level, which might be a mode like `'fit-page'`. |
+| **`isMarqueeZoomActive`** | `boolean` | `true` if area zoom is currently active. |
 
-#### `ZoomCapability` Methods
+#### `ZoomScope` Methods
 
 | Method | Description |
 | :--- | :--- |
@@ -160,9 +221,20 @@ Renders the visual rectangle when a user is selecting an area to zoom into.
 
 | Prop | Type | Description |
 | :--- | :--- | :--- |
+| **`documentId`** | `string` | (Required) The ID of the document. |
 | **`pageIndex`** | `number` | (Required) The index of the page this component is rendered on. |
-| **`scale`** | `number` | (Required) The current scale of the page. |
 | **`class`** | `string` | (Optional) An optional CSS class for custom styling of the marquee rectangle. |
 | **`stroke`** | `string` | (Optional) The color of the rectangle's border. |
 | **`fill`** | `string` | (Optional) The background color of the rectangle. |
 
+### Component: `<ZoomGestureWrapper />`
+
+Enables pinch-to-zoom and ctrl/cmd+wheel zoom gestures.
+
+#### Props
+
+| Prop | Type | Description |
+| :--- | :--- | :--- |
+| **`documentId`** | `string` | (Required) The ID of the document. |
+| **`enablePinch`** | `boolean` | Enable pinch-to-zoom gesture. **Default**: `true` |
+| **`enableWheel`** | `boolean` | Enable ctrl/cmd+wheel zoom. **Default**: `true` |

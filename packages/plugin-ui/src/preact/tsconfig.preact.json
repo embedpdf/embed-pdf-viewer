@@ -7,7 +7,8 @@
     "paths": {
       "@framework": ["src/preact/adapter.ts"],
       "@embedpdf/core/@framework": ["src/preact/core.ts"],
-      "@embedpdf/plugin-ui": ["src/lib/index.ts"]
+      "@embedpdf/plugin-ui": ["src/lib/index.ts"],
+      "@embedpdf/utils/@framework": ["src/preact/utils.ts"]
     }
   },
   "include": ["../shared/**/*.ts", "../shared/**/*.tsx", "./**/*.ts", "./**/*.tsx"]

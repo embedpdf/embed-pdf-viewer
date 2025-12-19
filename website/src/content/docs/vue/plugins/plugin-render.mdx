@@ -1,12 +1,14 @@
 ---
 title: Render Plugin
-description: Provides the essential <RenderLayer /> component for visually rendering PDF pages in Vue.
+description: Provides the essential <RenderLayer /> component for visually rendering PDF pages, forms, and annotations in Vue.
 searchable: true
 ---
 
 # Render Plugin
 
-The Render Plugin is the visual heart of the PDF viewer. It's responsible for taking the PDF data from the core engine and "painting" it onto the screen for the user to see. Its primary feature is the fundamental `<RenderLayer />` component.
+The Render Plugin is the visual heart of the PDF viewer. It is responsible for taking the raw PDF data from the core engine and "painting" it onto the screen. It supports high-fidelity rendering of text, images, vector graphics, and form widgets.
+
+This plugin works seamlessly in multi-document environments, allowing you to render pages from different documents simultaneously using specific `documentId` references.
 
 ## Installation
 
@@ -18,38 +20,49 @@ npm install @embedpdf/plugin-render
 
 ## Registration
 
-Import `RenderPluginPackage` and add it to the `plugins` array. This plugin has no configuration options.
+Import `RenderPluginPackage` and add it to the `plugins` array. You can configure global defaults for form and annotation rendering here.
 
-```typescript {3, 12}
+```typescript {12-18}
 import { createPluginRegistration } from '@embedpdf/core'
 // ... other imports
 import { RenderPluginPackage } from '@embedpdf/plugin-render/vue'
 
 const plugins = [
-  // ... other essential plugins
-  createPluginRegistration(LoaderPluginPackage, { /* ... */ }),
-  createPluginRegistration(ViewportPluginPackage),
-  createPluginRegistration(ScrollPluginPackage),
+  // ... other essential plugins
+  createPluginRegistration(DocumentManagerPluginPackage, { /* ... */ }),
+  createPluginRegistration(ViewportPluginPackage),
+  createPluginRegistration(ScrollPluginPackage),
 
-  // Register the render plugin
-  createPluginRegistration(RenderPluginPackage),
+  // Register the render plugin
+  createPluginRegistration(RenderPluginPackage, {
+    // Optional: Draw form widget visuals (checkboxes, text content)
+    // Note: This is for display only, not interaction.
+    withForms: true, 
+    // Optional: Burn annotations into the render (usually handled by AnnotationPlugin instead)
+    withAnnotations: false, 
+  }),
 ]
 ```
 
 ## Usage
 
-The plugin can be used in two ways: the simple `<RenderLayer />` component for displaying pages within the viewer, and the `useRenderCapability` composable for more advanced, on-demand rendering tasks.
+The plugin allows you to render pages declaratively via the `<RenderLayer />` component or imperatively via the `useRenderCapability` composable (e.g., for exporting images).
 
 ### Primary Usage: The `<RenderLayer />` Component
 
-This is the most common and straightforward way to render a PDF page. You should place the `<RenderLayer />` component inside the default scoped slot of your `<Scroller />`. It will automatically render the correct page at the correct size and resolution as the user scrolls.
+This is the standard way to display a page. Place the `<RenderLayer />` component inside the default scoped slot of your `<Scroller />`.
 
-```vue {5}
+You must provide the `documentId` to tell the renderer which document the page belongs to. The component automatically detects the current scale and refresh version from the document state.
+
+```vue {5-8}
 <template>
-  <Scroller>
+  <Scroller :document-id="activeDocumentId">
     <template #default="{ page }">
-      <div :style="{ width: `${page.width}px`, height: `${page.height}px`, position: 'relative' }">
-        <RenderLayer :page-index="page.pageIndex" :scale="page.scale" />
+      <div :style="{ position: 'relative' }">
+        <RenderLayer 
+          :document-id="activeDocumentId" 
+          :page-index="page.pageIndex" 
+        />
       </div>
     </template>
   </Scroller>
@@ -58,78 +71,102 @@ This is the most common and straightforward way to render a PDF page. You should
 
 ### Advanced Usage: On-Demand Rendering
 
-For custom features that require rendering a page outside the main viewer—such as exporting a page as a high-resolution image—you can use the `useRenderCapability` composable. This gives you direct access to the plugin's rendering functions.
+For tasks like generating thumbnails, creating snapshots, or exporting pages as images, use the `useRenderCapability` composable.
 
-```vue
+Because multiple documents may be open, you must scope your request using `.forDocument(id)`.
+
+```vue {2, 5, 9, 12-15}
 <script setup lang="ts">
-import { ref } from 'vue';
 import { useRenderCapability } from '@embedpdf/plugin-render/vue';
 
-const { provides: render } = useRenderCapability();
-const isExporting = ref(false);
+const props = defineProps<{ documentId: string }>();
+const { provides: renderPlugin } = useRenderCapability();
 
 const exportPage = () => {
-  if (!render.value) return;
-  isExporting.value = true;
-  const task = render.value.renderPage({ pageIndex: 0, options: { scaleFactor: 3.0 } });
-  task.wait(blob => {
-    // ... trigger download from the blob ...
-    isExporting.value = false;
+  // 1. Scope the renderer to the specific document
+  const renderer = renderPlugin.value?.forDocument(props.documentId);
+
+  // 2. Request a render
+  const task = renderer?.renderPage({ 
+    pageIndex: 0, 
+    options: { scaleFactor: 2.0, imageType: 'image/png' } 
+  });
+
+  task?.wait(blob => {
+    // ... handle the image blob (e.g., download it)
   });
 };
 </script>
 
 <template>
-  <button @click="exportPage" :disabled="isExporting">
-    {{ isExporting ? '...' : 'Export Page' }}
-  </button>
+  <button @click="exportPage">Export Page 1</button>
 </template>
 ```
 
 ## Live Example
 
-This example shows a standard PDF viewer, but with a toolbar button that uses the `useRenderCapability` composable to export the first page as a high-resolution PNG file.
+This example shows a PDF viewer with a custom "Export" toolbar. It uses the `RenderPlugin` to take a high-resolution snapshot of the first page, including annotations, and triggers a download.
 
 import { RenderExample } from '../code-examples/render-example';
 
-<RenderExample />
+<CodeExample 
+  codePaths={[
+    "../../examples/vue-tailwind/src/examples/render-example.vue",
+    "../../examples/vue-tailwind/src/examples/render-example-content.vue"
+  ]}
+>
+  <RenderExample />
+</CodeExample>
 
 ## API Reference
 
+### Configuration (`RenderPluginConfig`)
+
+| Option | Type | Description |
+| :--- | :--- | :--- |
+| **`withForms`** | `boolean` | If `true`, the **visual appearance** of form widgets (checkboxes, filled input text) will be drawn onto the page image. This does not create interactive elements. <br />**Default**: `false` |
+| **`withAnnotations`** | `boolean` | If `true`, annotations will be baked into the page image. <br />**Default**: `false` |
+
 ### Component: `<RenderLayer />`
 
-The component that renders a single PDF page as an image.
+The component that renders a single PDF page.
 
 | Prop | Type | Description |
 | :--- | :--- | :--- |
-| **`pageIndex`** | `number` | (Required) The index of the page to render. |
-| **`scale`** | `number` | The scale factor for rendering the page. A higher number results in a higher resolution image. |
-| **`dpr`** | `number` | The device pixel ratio to use for rendering, for crisp text on high-DPI screens. <br />**Default**: `window.devicePixelRatio` |
+| **`documentId`** | `string` | **(Required)** The ID of the document this page belongs to. |
+| **`pageIndex`** | `number` | **(Required)** The 0-based index of the page to render. |
+| **`scale`** | `number` | Optional scale override. If omitted, uses the document's current zoom level. |
+| **`dpr`** | `number` | The device pixel ratio to use. <br />**Default**: `window.devicePixelRatio` |
 
 ### Composable: `useRenderCapability()`
 
-Connects your component to the render plugin's low-level functions.
+Access the rendering API.
 
 #### Returns
 
 | Property | Type | Description |
 | :--- | :--- | :--- |
-| **`provides`** | `Ref<RenderCapability \| null>` | A ref object with methods to render pages, or `null` if the plugin is not ready. |
+| **`provides`** | `Ref<RenderCapability \| null>` | The render API object. |
 
 #### `RenderCapability` Methods
 
 | Method | Description |
 | :--- | :--- |
-| **`renderPage(options)`** | Renders a full page. The `options` object takes a `pageIndex` and a `PdfRenderPageOptions` object. Returns a `Task<Blob>`. |
-| **`renderPageRect(options)`** | Renders a specific rectangular portion of a page. Useful for creating snapshots. Returns a `Task<Blob>`. |
+| **`forDocument(id)`** | Returns a `RenderScope` for the specified document ID. |
+
+#### `RenderScope` Methods (Returned by `forDocument`)
+
+| Method | Description |
+| :--- | :--- |
+| **`renderPage(options)`** | Renders a full page to a Blob. `options`: `{ pageIndex, options: PdfRenderPageOptions }`. |
+| **`renderPageRect(options)`** | Renders a sub-region of a page. `options`: `{ pageIndex, rect, options: PdfRenderPageOptions }`. |
 
 #### `PdfRenderPageOptions`
 
 | Option | Type | Description |
 | :--- | :--- | :--- |
 | **`scaleFactor`**| `number`| The scale to render at. **Default**: `1.0`. |
-| **`rotation`** | `Rotation` | Applies a rotation to the rendered output. **Default**: `Rotation.Degree0`. |
-| **`dpr`**| `number` | The device pixel ratio. **Default**: `window.devicePixelRatio`. |
-| **`withAnnotations`** | `boolean` | Whether to include annotations in the render. **Default**: `true`. |
-| **`imageType`** | `string` | The image format for the output, e.g., `'image/webp'`, `'image/jpeg'`, or `'image/png'`. **Default**: `'image/webp'`. |
-| **`imageQuality`** | `number` | A value between 0 and 1 indicating the quality for lossy formats like `'image/jpeg'` and `'image/webp'`. |
+| **`withAnnotations`** | `boolean` | Include annotations in render. **Default**: Plugin config value. |
+| **`withForms`** | `boolean` | Include form visuals in render. **Default**: Plugin config value. |
+| **`imageType`** | `string` | Output format: `'image/webp'`, `'image/jpeg'`, `'image/png'`. |
+| **`imageQuality`** | `number` | 0 to 1 quality for lossy formats. |
