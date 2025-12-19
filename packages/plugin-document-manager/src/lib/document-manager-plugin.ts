@@ -237,7 +237,7 @@ export class DocumentManagerPlugin extends BasePlugin<
       return task;
     }
 
-    const documentName = this.extractNameFromUrl(options.url);
+    const documentName = options.name ?? this.extractNameFromUrl(options.url);
 
     // Store options for potential retry
     this.loadOptions.set(documentId, options);
@@ -585,14 +585,21 @@ export class DocumentManagerPlugin extends BasePlugin<
     return `doc-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
   }
 
-  private extractNameFromUrl(url: string): string {
+  private extractNameFromUrl(url: string): string | undefined {
     try {
       const urlObj = new URL(url);
       const pathname = urlObj.pathname;
-      const filename = pathname.split('/').pop() || 'document.pdf';
-      return decodeURIComponent(filename);
+      const lastSegment = pathname.split('/').pop();
+      if (!lastSegment) {
+        return undefined;
+      }
+      let filename = decodeURIComponent(lastSegment);
+      if (!filename.toLowerCase().endsWith('.pdf')) {
+        filename += '.pdf';
+      }
+      return filename;
     } catch {
-      return 'document.pdf';
+      return undefined;
     }
   }
 
