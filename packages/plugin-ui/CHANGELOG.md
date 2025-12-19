@@ -1,5 +1,67 @@
 # @embedpdf/plugin-ui
 
+## 2.0.0
+
+### Major Changes
+
+- [#279](https://github.com/embedpdf/embed-pdf-viewer/pull/279) by [@bobsingor](https://github.com/bobsingor) – ## Multi-Document Support
+
+  The UI plugin now supports per-document UI state including toolbars, panels, modals, and menus.
+
+  ### Breaking Changes
+  - **Complete Action Refactoring**: All UI actions have been restructured:
+    - Replaced `UI_INIT_COMPONENTS`, `UI_INIT_FLYOUT`, `UI_TOGGLE_FLYOUT` with new document-scoped actions
+    - Replaced `UI_SET_HEADER_VISIBLE`, `UI_TOGGLE_PANEL` with `SET_ACTIVE_PANEL`, `CLOSE_PANEL_SLOT`
+    - Replaced `UI_SHOW_COMMAND_MENU`, `UI_HIDE_COMMAND_MENU`, `UI_UPDATE_COMMAND_MENU` with `OPEN_MENU`, `CLOSE_MENU`, `CLOSE_ALL_MENUS`
+    - Replaced `UI_UPDATE_COMPONENT_STATE` with document-scoped state management
+  - **All Actions**: Now require `documentId` parameter:
+    - `setActiveToolbar(documentId, placement, slot, toolbarId)`
+    - `closeToolbarSlot(documentId, placement, slot)`
+    - `setActivePanel(documentId, placement, slot, panelId)`
+    - `closePanelSlot(documentId, placement, slot)`
+    - `setPanelTab(documentId, placement, slot, tabId)`
+    - `openModal(documentId, modalId, props)`
+    - `closeModal(documentId, modalId)`
+    - `openMenu(documentId, menuState)`
+    - `closeMenu(documentId, menuId)`
+    - `closeAllMenus(documentId)`
+    - `setDisabledCategories(documentId, categories)`
+  - **State Structure**: Plugin state now uses `documents: Record<string, UIDocumentState>` to track per-document UI state including toolbars, panels, modals, menus, and disabled categories.
+
+  ### Framework-Specific Changes (React/Preact, Svelte, Vue)
+  - **AutoMenuRenderer Component**:
+    - Now requires `documentId` prop (React/Preact: `@embedpdf/plugin-ui/react`, Svelte: `@embedpdf/plugin-ui/svelte`, Vue: `@embedpdf/plugin-ui/vue`)
+    - Renders menus for a specific document
+    - Uses document-scoped anchor registry and menu state
+  - **useUIState Hook**:
+    - Now requires `documentId` parameter: `useUIState(documentId)`
+    - Returns document-specific UI state
+
+  ### New Features
+  - Per-document UI state management
+  - Per-document toolbar, panel, modal, and menu state
+  - Document lifecycle management with automatic state initialization and cleanup
+  - Support for multiple UI schemas per document
+
+### Minor Changes
+
+- [#303](https://github.com/embedpdf/embed-pdf-viewer/pull/303) by [@bobsingor](https://github.com/bobsingor) – Added `data-hidden-items` attribute for efficient CSS dependency rules.
+
+  **Problem**: Visibility dependency rules (e.g., hiding overflow buttons when all menu items are hidden) required exponential CSS rules when using category-based logic, causing stylesheet bloat.
+
+  **Solution**:
+  - Added `hiddenItems` state that tracks which item IDs are hidden based on disabled categories
+  - Dependency rules now use `data-epdf-hid` attribute to check item IDs directly
+  - CSS rules are now O(n) per breakpoint instead of O(m^n)
+
+  **New APIs**:
+  - `getHiddenItems()` - returns array of hidden item IDs
+  - `onCategoryChanged` event now includes `hiddenItems` in payload
+  - `extractItemCategories(schema)` - extracts item→categories mapping
+  - `computeHiddenItems(itemCategories, disabledCategories)` - computes hidden items
+
+  **Breaking Changes**: None - existing `disabledCategories` API unchanged
+
 ## 2.0.0-next.3
 
 ## 2.0.0-next.2
