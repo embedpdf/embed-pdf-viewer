@@ -1486,6 +1486,19 @@ export const commands: Record<string, Command<State>> = {
     },
   },
 
+  'selection:copy-to-clipboard': {
+    id: 'selection:copy-to-clipboard',
+    labelKey: 'selection.copyToClipboard',
+    icon: 'copy',
+    shortcuts: ['Ctrl+C', 'Meta+C'],
+    categories: ['selection', 'selection-copy-to-clipboard'],
+    action: ({ registry, documentId }) => {
+      const plugin = registry.getPlugin<SelectionPlugin>('selection');
+      const scope = plugin?.provides().forDocument(documentId);
+      scope?.copyToClipboard();
+    },
+  },
+
   'selection:copy': {
     id: 'selection:copy',
     labelKey: 'selection.copy',
