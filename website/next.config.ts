@@ -22,6 +22,8 @@ const snippetPackageJson = JSON.parse(
   readFileSync(resolve(__dirname, '../viewers/snippet/package.json'), 'utf8'),
 )
 const SNIPPET_VERSION = snippetPackageJson.version
+// Extract major version for CDN URL (e.g., "2.0.1" → "2")
+const SNIPPET_MAJOR_VERSION = SNIPPET_VERSION.split('.')[0]
 
 /**
  * This plugin overrides the import source for the Tabs component to use the custom component
@@ -91,6 +93,7 @@ export default async (phase: string) => {
   const nextConfig: NextConfig = {
     env: {
       NEXT_PUBLIC_SNIPPET_VERSION: SNIPPET_VERSION,
+      NEXT_PUBLIC_SNIPPET_MAJOR_VERSION: SNIPPET_MAJOR_VERSION,
     },
     // Mark Vue/Svelte example packages as external for server-side bundling
     serverExternalPackages: EXTERNAL_EXAMPLE_PACKAGES,
