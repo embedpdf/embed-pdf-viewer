@@ -589,8 +589,12 @@ export class DocumentManagerPlugin extends BasePlugin<
     try {
       const urlObj = new URL(url);
       const pathname = urlObj.pathname;
-      const filename = pathname.split('/').pop() || 'document.pdf';
-      return decodeURIComponent(filename);
+      let filename = pathname.split('/').pop() || 'document.pdf';
+      filename = decodeURIComponent(filename);
+      if (!filename.toLowerCase().endsWith('.pdf')) {
+        filename += '.pdf';
+      }
+      return filename;
     } catch {
       return 'document.pdf';
     }
