@@ -16,11 +16,9 @@
 <div
   bind:this={pinch.elementRef}
   {...restProps}
-  style:display="block"
-  style:width="fit-content"
+  style:display="inline-block"
   style:overflow="visible"
   style:box-sizing="border-box"
-  style:margin="0px auto"
   class={propsClass}
 >
   {@render children()}

@@ -58,9 +58,8 @@ export function setupPinchZoom({
   let containerRectHeight = 0;
 
   // Layout Dimensions (Client Box from Metrics)
-  // This is the actual space the CSS uses for centering.
   let layoutWidth = 0;
-  let layoutCenterX = 0; // Relative to the container Rect origin
+  let layoutCenterX = 0;
 
   let pointerLocalY = 0;
   let pointerContainerX = 0;
@@ -71,34 +70,36 @@ export function setupPinchZoom({
 
   const clamp = (val: number, min: number, max: number) => Math.min(Math.max(val, min), max);
 
+  // --- Margin calculation (no scroll plugin needed!) ---
+  const updateMargin = () => {
+    const metrics = viewportScope.getMetrics();
+    const vpGap = viewportProvides.getViewportGap() || 0;
+    const availableWidth = metrics.clientWidth - 2 * vpGap;
+
+    // Use element's actual rendered width - no need for scroll plugin!
+    const elementWidth = element.offsetWidth;
+
+    const newMargin = elementWidth < availableWidth ? (availableWidth - elementWidth) / 2 : 0;
+
+    element.style.marginLeft = `${newMargin}px`;
+  };
+
   const calculateTransform = (scale: number) => {
     const finalWidth = initialElementWidth * scale;
     const finalHeight = initialElementHeight * scale;
 
     let ty = pointerLocalY * (1 - scale);
 
-    // --- 1. Center-based Transform (The "Structural" Center) ---
-    // Instead of using containerRectWidth, we use the layoutCenterX derived from Metrics.
-    // layoutCenterX is the specific pixel where the content center should align.
-
-    // Target X position relative to Container Rect Left:
     const targetX = layoutCenterX - finalWidth / 2;
-
-    // Convert to translation (tx) relative to initial position:
     const txCenter = targetX - initialElementLeft;
-
-    // --- 2. Mouse-based Transform ---
     const txMouse = pointerContainerX - pivotLocalX * scale - initialElementLeft;
 
-    // --- 3. Blending ---
-    // Compare finalWidth against layoutWidth (actual available space).
     const overflow = Math.max(0, finalWidth - layoutWidth);
     const blendRange = layoutWidth * 0.3;
     const blend = Math.min(1, overflow / blendRange);
 
     let tx = txCenter + (txMouse - txCenter) * blend;
 
-    // --- 4. Gap-Aware Clamping ---
     const safeHeight = containerRectHeight - currentGap * 2;
     if (finalHeight > safeHeight) {
       const currentTop = initialElementTop + ty;
@@ -134,17 +135,13 @@ export function setupPinchZoom({
   };
 
   const commitZoom = () => {
-    const { tx, ty, finalWidth } = calculateTransform(currentScale);
+    const { tx, finalWidth } = calculateTransform(currentScale);
     const delta = (currentScale - 1) * initialZoom;
 
     let anchorX: number;
     let anchorY: number = pointerContainerY;
 
-    // --- CRITICAL FIX ---
-    // If the content fits within the LAYOUT width (not just rect width),
-    // we force the anchor to be the Layout Center.
     if (finalWidth <= layoutWidth) {
-      // anchorX is relative to the Container Rect Origin (which zoomScope uses)
       anchorX = layoutCenterX;
     } else {
       const scaleDiff = 1 - currentScale;
@@ -160,8 +157,6 @@ export function setupPinchZoom({
   const initializeGestureState = (clientX: number, clientY: number) => {
     const contRect = viewportScope.getBoundingRect();
     const innerRect = element.getBoundingClientRect();
-
-    // FETCH METRICS (Single Source of Truth)
     const metrics = viewportScope.getMetrics();
 
     currentGap = viewportProvides.getViewportGap() || 0;
@@ -173,12 +168,7 @@ export function setupPinchZoom({
     containerRectWidth = contRect.size.width;
     containerRectHeight = contRect.size.height;
 
-    // --- CLEAN LAYOUT CALCULATION ---
-    // We use the viewport metrics to determine the layout geometry.
-    // clientWidth: The width available for content (excludes scrollbars/borders)
-    // clientLeft: The width of the left border (offset from Rect origin to Content origin)
     const clientLeft = metrics.clientLeft;
-
     layoutWidth = metrics.clientWidth;
     layoutCenterX = clientLeft + layoutWidth / 2;
 
@@ -187,7 +177,6 @@ export function setupPinchZoom({
     pointerContainerX = clientX - contRect.origin.x;
     pointerContainerY = clientY - contRect.origin.y;
 
-    // Pivot Calculation based on Layout Width
     if (initialElementWidth < layoutWidth) {
       pivotLocalX = (pointerContainerX * initialElementWidth) / layoutWidth;
     } else {
@@ -245,6 +234,16 @@ export function setupPinchZoom({
     }, 150);
   };
 
+  // Subscribe to zoom changes to update margin
+  const unsubZoom = zoomScope.onStateChange(() => updateMargin());
+
+  // Use ResizeObserver to update margin when element size changes
+  const resizeObserver = new ResizeObserver(() => updateMargin());
+  resizeObserver.observe(element);
+
+  // Initial margin calculation
+  updateMargin();
+
   element.addEventListener('touchstart', handleTouchStart, { passive: false });
   element.addEventListener('touchmove', handleTouchMove, { passive: false });
   element.addEventListener('touchend', handleTouchEnd);
@@ -260,6 +259,9 @@ export function setupPinchZoom({
     if (wheelZoomTimeout) {
       clearTimeout(wheelZoomTimeout);
     }
+    unsubZoom();
+    resizeObserver.disconnect();
     resetTransform();
+    element.style.marginLeft = '';
   };
 }

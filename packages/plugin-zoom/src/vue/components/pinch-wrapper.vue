@@ -2,11 +2,9 @@
   <div
     ref="elementRef"
     :style="{
-      display: 'block',
-      width: 'fit-content',
+      display: 'inline-block',
       overflow: 'visible',
       boxSizing: 'border-box',
-      margin: '0px auto',
     }"
     v-bind="$attrs"
   >

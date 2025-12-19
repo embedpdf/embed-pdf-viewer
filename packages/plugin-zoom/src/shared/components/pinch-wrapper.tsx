@@ -16,11 +16,9 @@ export function PinchWrapper({ children, documentId, style, ...props }: PinchWra
       {...props}
       style={{
         ...style,
-        display: 'block',
-        width: 'fit-content',
+        display: 'inline-block',
         overflow: 'visible',
         boxSizing: 'border-box',
-        margin: '0px auto',
       }}
     >
       {children}
