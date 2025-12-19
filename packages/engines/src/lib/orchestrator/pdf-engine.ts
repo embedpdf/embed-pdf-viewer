@@ -165,13 +165,15 @@ export class PdfEngine<T = Blob> implements IPdfEngine<T> {
           content: arrayBuf,
         };
 
-        // Then open in worker
-        const doc = await this.openDocumentBuffer(pdfFile, {
+        // Then open in worker - use wait() to properly propagate task errors
+        this.openDocumentBuffer(pdfFile, {
           password: options?.password,
-        }).toPromise();
-
-        task.resolve(doc);
+        }).wait(
+          (doc) => task.resolve(doc),
+          (error) => task.fail(error),
+        );
       } catch (error) {
+        // This only catches fetch errors (network issues, etc.)
         task.reject({ code: PdfErrorCode.Unknown, message: String(error) });
       }
     })();

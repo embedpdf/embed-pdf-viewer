@@ -96,7 +96,9 @@ const handleSubmit = async () => {
   errorMessage.value = '';
 
   try {
-    await documentManager.retryLoadDocumentWithPassword(props.documentState.id, password.value);
+    await documentManager.value?.retryDocument(props.documentState.id, {
+      password: password.value,
+    });
   } catch (error) {
     errorMessage.value = 'Incorrect password. Please try again.';
     password.value = '';
@@ -108,6 +110,6 @@ const handleSubmit = async () => {
 
 const handleCancel = () => {
   if (!documentManager) return;
-  documentManager.closeDocument(props.documentState.id);
+  documentManager.value?.closeDocument(props.documentState.id);
 };
 </script>
