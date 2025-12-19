@@ -439,6 +439,9 @@ importers:
       '@embedpdf/plugin-zoom':
         specifier: workspace:*
         version: link:../../packages/plugin-zoom
+      '@embedpdf/svelte-pdf-viewer':
+        specifier: workspace:*
+        version: link:../../viewers/svelte
       '@embedpdf/utils':
         specifier: workspace:*
         version: link:../../packages/utils
@@ -568,6 +571,9 @@ importers:
       '@embedpdf/utils':
         specifier: workspace:*
         version: link:../../packages/utils
+      '@embedpdf/vue-pdf-viewer':
+        specifier: workspace:*
+        version: link:../../viewers/vue
       lucide-vue-next:
         specifier: ^0.555.0
         version: 0.555.0(vue@3.5.22(typescript@5.9.3))

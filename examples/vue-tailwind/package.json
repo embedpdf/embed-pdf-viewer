@@ -54,6 +54,7 @@
     "@embedpdf/plugin-view-manager": "workspace:*",
     "@embedpdf/plugin-viewport": "workspace:*",
     "@embedpdf/plugin-zoom": "workspace:*",
+    "@embedpdf/vue-pdf-viewer": "workspace:*",
     "@embedpdf/utils": "workspace:*",
     "lucide-vue-next": "^0.555.0",
     "tailwind-merge": "^3.4.0",

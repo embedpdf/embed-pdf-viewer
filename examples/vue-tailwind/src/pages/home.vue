@@ -25,6 +25,13 @@
 
       <div class="space-y-4">
         <a
+          href="#/viewer-snippet"
+          class="block rounded-lg bg-gradient-to-r from-rose-500 to-orange-500 px-6 py-3 text-center font-semibold text-white shadow-lg transition-all hover:from-rose-600 hover:to-orange-600 hover:shadow-xl"
+        >
+          ✨ Snippet Viewer (Easiest!)
+        </a>
+
+        <a
           href="#/viewer"
           class="block rounded-lg bg-indigo-600 px-6 py-3 text-center font-semibold text-white transition-colors hover:bg-indigo-700"
         >
@@ -56,7 +63,8 @@
       <div class="mt-8 rounded-lg bg-indigo-50 p-4">
         <p class="text-sm text-indigo-900">
           <strong>Getting Started:</strong> Choose a viewer to open and load your PDF documents. The
-          ViewManager version supports split views, the simple version uses tabs, and the
+          <strong>Snippet Viewer</strong> is the easiest way to get started - just one component!
+          The ViewManager version supports split views, the simple version uses tabs, and the
           schema-driven viewer demonstrates our powerful declarative UI system!
         </p>
       </div>

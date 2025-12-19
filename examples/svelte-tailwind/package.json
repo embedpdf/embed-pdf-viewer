@@ -57,6 +57,7 @@
     "@embedpdf/plugin-viewport": "workspace:*",
     "@embedpdf/plugin-zoom": "workspace:*",
     "@embedpdf/utils": "workspace:*",
+    "@embedpdf/svelte-pdf-viewer": "workspace:*",
     "@sveltejs/adapter-auto": "^6.1.0",
     "@sveltejs/adapter-vercel": "^6.0.0",
     "@sveltejs/kit": "^2.43.2",

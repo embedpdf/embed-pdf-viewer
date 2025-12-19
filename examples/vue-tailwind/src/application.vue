@@ -4,6 +4,7 @@
   <ViewerPage v-else-if="route === '/viewer'" />
   <ViewerSimplePage v-else-if="route === '/viewer-simple'" />
   <ViewerSchemaPage v-else-if="route === '/viewer-schema'" />
+  <ViewerSnippetPage v-else-if="route === '/viewer-snippet'" />
   <HomePage v-else />
 </template>
 
@@ -14,6 +15,7 @@ import AboutPage from './pages/about.vue';
 import ViewerPage from './pages/viewer.vue';
 import ViewerSimplePage from './pages/viewer-simple.vue';
 import ViewerSchemaPage from './pages/viewer-schema.vue';
+import ViewerSnippetPage from './pages/viewer-snippet.vue';
 
 const { route } = useHashRoute();
 </script>
