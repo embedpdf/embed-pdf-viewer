@@ -37,6 +37,7 @@ export interface DocumentErrorEvent {
 export interface LoadDocumentUrlOptions {
   url: string;
   documentId?: string;
+  name?: string; // Optional display name for the document. If not provided, extracted from URL
   password?: string;
   mode?: 'auto' | 'range-request' | 'full-fetch';
   requestOptions?: PdfRequestOptions;
