@@ -38,7 +38,7 @@
     "@embedpdf/utils": "workspace:*",
     "@fontsource/roboto": "5.2.6",
     "@mdi/font": "7.4.47",
-    "vue": "^3.5.0",
+    "vue": "^3.5.26",
     "vuetify": "^3.9.1"
   },
   "devDependencies": {
