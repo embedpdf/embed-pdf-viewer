@@ -7,9 +7,16 @@ import {
   Github,
   Heart,
   Play,
+  Zap,
+  Cpu,
+  Check,
+  Layers,
+  Palette,
+  Settings,
 } from 'lucide-react'
 import { JavaScript } from '@/components/icons/javascript'
 import { Typescript } from '@/components/icons/typescript'
+import { ReactIcon, VueIcon, SvelteIcon } from './framework-icons'
 import { Scribble2 } from '@/components/icons/scribble2'
 import Link from 'next/link'
 import PDFViewer from './pdf-viewer'
@@ -60,8 +67,10 @@ const HeaderAndHero = () => {
               </h1>
 
               <p className="relative mx-auto mt-8 max-w-2xl text-xl text-gray-600 dark:text-gray-400">
-                A lightweight, customizable PDF viewer that works seamlessly
-                with any JavaScript project. No dependencies, no hassle.
+                The ultimate <strong>Open Source PDF viewer</strong> for
+                JavaScript. Choose our drop-in component for instant results, or
+                use our <strong>headless library</strong> to build a completely
+                custom UI.
               </p>
 
               <div className="mt-10 flex flex-col items-center justify-center gap-5 sm:flex-row">
@@ -124,89 +133,270 @@ const HeaderAndHero = () => {
                 </div>
               </div>
 
-              {/* Feature cards */}
-              <div className="mt-24 grid grid-cols-1 gap-6 md:grid-cols-3">
-                <div className="group relative">
-                  <div className="absolute -inset-0.5 rounded-2xl bg-gradient-to-r from-purple-600 to-blue-500 opacity-25 blur transition duration-200 group-hover:opacity-100"></div>
-                  <div className="relative h-full rounded-2xl bg-white p-6 shadow-lg dark:bg-gray-900">
-                    <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-lg bg-[#765ba7]">
-                      <Heart size={24} className="text-white" />
-                    </div>
-                    <h3 className="mb-2 text-xl font-bold text-gray-900 dark:text-white">
-                      Truly Open and Free
-                    </h3>
-                    <p className="text-gray-600 dark:text-gray-400">
-                      MIT licensed, no paywalls, no limits. Skip overpriced SDKs
-                      with full source access.
-                    </p>
-                  </div>
+              {/* Two Paths Section */}
+              <div className="mt-24">
+                <div className="mb-12 text-center">
+                  <h2 className="text-3xl font-bold text-gray-900 dark:text-white md:text-4xl">
+                    Two ways to integrate
+                  </h2>
+                  <p className="mt-4 text-lg text-gray-600 dark:text-gray-400">
+                    Choose the level of control that fits your project
+                  </p>
                 </div>
 
-                <div className="group relative">
-                  <div className="absolute -inset-0.5 rounded-2xl bg-gradient-to-r from-blue-500 to-orange-400 opacity-25 blur transition duration-200 group-hover:opacity-100"></div>
-                  <div className="relative h-full rounded-2xl bg-white p-6 shadow-lg dark:bg-gray-900">
-                    <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-lg bg-[#765ba7]">
-                      <Code size={24} className="text-white" />
+                <div className="grid gap-8 text-left md:grid-cols-2">
+                  {/* Path 1: Snippet / Ready-made */}
+                  <div className="group relative flex h-full flex-col rounded-3xl border border-gray-200 bg-white p-8 shadow-sm transition-all hover:shadow-xl dark:border-gray-800 dark:bg-gray-900">
+                    <div className="absolute right-0 top-0 p-6 text-purple-600 opacity-5 dark:text-purple-400 dark:opacity-10">
+                      <Zap size={120} strokeWidth={1} />
                     </div>
-                    <h3 className="mb-2 text-xl font-bold text-gray-900 dark:text-white">
-                      Customizable
+                    <h3 className="mb-2 text-2xl font-bold text-gray-900 dark:text-white">
+                      Ready-made Viewer
                     </h3>
-                    <p className="text-gray-600 dark:text-gray-400">
-                      Extensive API for complete control. Themes, annotations,
-                      search, and more.
+                    <div className="mb-4 inline-flex w-fit rounded-full bg-green-100 px-2.5 py-0.5 text-xs font-medium text-green-800 dark:bg-green-900/30 dark:text-green-300">
+                      Batteries Included
+                    </div>
+                    <p className="mb-6 min-h-[3rem] text-gray-600 dark:text-gray-400">
+                      A polished, production-ready PDF viewer that drops into
+                      your app in seconds. Perfect for standard use cases.
                     </p>
+                    <ul className="mb-8 flex-grow space-y-3 text-gray-600 dark:text-gray-400">
+                      <li className="flex items-center gap-2">
+                        <Check className="h-5 w-5 text-green-500" /> Beautiful
+                        default UI
+                      </li>
+                      <li className="flex items-center gap-2">
+                        <Check className="h-5 w-5 text-green-500" /> 2 lines of
+                        code
+                      </li>
+                      <li className="flex items-center gap-2">
+                        <Check className="h-5 w-5 text-green-500" /> Fully
+                        responsive & accessible
+                      </li>
+                    </ul>
+                    <div className="mb-6 overflow-x-auto rounded-lg border border-gray-200 bg-gray-100 p-3 font-mono text-xs dark:border-gray-700 dark:bg-gray-800">
+                      npm install @embedpdf/snippet
+                    </div>
+
+                    <div className="mt-auto">
+                      <div className="tracking-wider mb-3 text-sm font-semibold uppercase text-gray-500 dark:text-gray-400">
+                        Get Started
+                      </div>
+                      <div className="flex flex-wrap gap-2">
+                        <Link
+                          href="/docs/snippet/getting-started#1-vanilla-htmljs-easiest"
+                          className="group/btn flex items-center gap-2 rounded-lg bg-gray-100 px-4 py-2 transition-colors hover:bg-gray-200 dark:bg-gray-800 dark:hover:bg-gray-700"
+                        >
+                          <div className="flex h-5 w-5 items-center justify-center overflow-hidden">
+                            <JavaScript />
+                          </div>
+                          <span className="font-medium text-gray-700 dark:text-gray-200">
+                            Vanilla JS
+                          </span>
+                          <ArrowRight className="-ml-1 h-4 w-4 text-gray-400 opacity-0 transition-all group-hover/btn:ml-0 group-hover/btn:text-gray-600 group-hover/btn:opacity-100 dark:text-gray-500 dark:group-hover/btn:text-gray-300" />
+                        </Link>
+                        <Link
+                          href="/docs/snippet/getting-started#2-framework-components"
+                          className="group/btn flex items-center gap-2 rounded-lg bg-gray-100 px-4 py-2 transition-colors hover:bg-gray-200 dark:bg-gray-800 dark:hover:bg-gray-700"
+                        >
+                          <ReactIcon className="h-5 w-5 text-[#61DAFB]" />
+                          <span className="font-medium text-gray-700 dark:text-gray-200">
+                            React
+                          </span>
+                          <ArrowRight className="-ml-1 h-4 w-4 text-gray-400 opacity-0 transition-all group-hover/btn:ml-0 group-hover/btn:text-gray-600 group-hover/btn:opacity-100 dark:text-gray-500 dark:group-hover/btn:text-gray-300" />
+                        </Link>
+                        <Link
+                          href="/docs/snippet/getting-started#2-framework-components"
+                          className="group/btn flex items-center gap-2 rounded-lg bg-gray-100 px-4 py-2 transition-colors hover:bg-gray-200 dark:bg-gray-800 dark:hover:bg-gray-700"
+                        >
+                          <VueIcon className="h-5 w-5 text-[#4FC08D]" />
+                          <span className="font-medium text-gray-700 dark:text-gray-200">
+                            Vue
+                          </span>
+                          <ArrowRight className="-ml-1 h-4 w-4 text-gray-400 opacity-0 transition-all group-hover/btn:ml-0 group-hover/btn:text-gray-600 group-hover/btn:opacity-100 dark:text-gray-500 dark:group-hover/btn:text-gray-300" />
+                        </Link>
+                        <Link
+                          href="/docs/snippet/getting-started#2-framework-components"
+                          className="group/btn flex items-center gap-2 rounded-lg bg-gray-100 px-4 py-2 transition-colors hover:bg-gray-200 dark:bg-gray-800 dark:hover:bg-gray-700"
+                        >
+                          <SvelteIcon className="h-5 w-5 text-[#FF3E00]" />
+                          <span className="font-medium text-gray-700 dark:text-gray-200">
+                            Svelte
+                          </span>
+                          <ArrowRight className="-ml-1 h-4 w-4 text-gray-400 opacity-0 transition-all group-hover/btn:ml-0 group-hover/btn:text-gray-600 group-hover/btn:opacity-100 dark:text-gray-500 dark:group-hover/btn:text-gray-300" />
+                        </Link>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Path 2: Headless */}
+                  <div className="group relative flex h-full flex-col rounded-3xl border border-gray-200 bg-white p-8 shadow-sm transition-all hover:shadow-xl dark:border-gray-800 dark:bg-gray-900">
+                    <div className="absolute right-0 top-0 p-6 text-blue-600 opacity-5 dark:text-blue-400 dark:opacity-10">
+                      <Cpu size={120} strokeWidth={1} />
+                    </div>
+                    <h3 className="mb-2 text-2xl font-bold text-gray-900 dark:text-white">
+                      Headless Components
+                    </h3>
+                    <div className="mb-4 inline-flex w-fit rounded-full bg-blue-100 px-2.5 py-0.5 text-xs font-medium text-blue-800 dark:bg-blue-900/30 dark:text-blue-300">
+                      Full Control
+                    </div>
+                    <p className="mb-6 min-h-[3rem] text-gray-600 dark:text-gray-400">
+                      Build your own custom viewer UI from scratch. We provide
+                      the engine, you control the pixels.
+                    </p>
+                    <ul className="mb-8 flex-grow space-y-3 text-gray-600 dark:text-gray-400">
+                      <li className="flex items-center gap-2">
+                        <Check className="h-5 w-5 text-blue-500" /> 100% UI
+                        Control
+                      </li>
+                      <li className="flex items-center gap-2">
+                        <Check className="h-5 w-5 text-blue-500" /> Tiny bundle
+                        size
+                      </li>
+                      <li className="flex items-center gap-2">
+                        <Check className="h-5 w-5 text-blue-500" /> React, Vue,
+                        Svelte hooks
+                      </li>
+                    </ul>
+                    <div className="mb-6 overflow-x-auto rounded-lg border border-gray-200 bg-gray-100 p-3 font-mono text-xs dark:border-gray-700 dark:bg-gray-800">
+                      npm install @embedpdf/core
+                    </div>
+
+                    <div className="mt-auto">
+                      <div className="tracking-wider mb-3 text-sm font-semibold uppercase text-gray-500 dark:text-gray-400">
+                        Read Documentation
+                      </div>
+                      <div className="flex flex-wrap gap-2">
+                        <Link
+                          href="/docs/react/introduction"
+                          className="group/btn flex items-center gap-2 rounded-lg bg-gray-100 px-4 py-2 transition-colors hover:bg-gray-200 dark:bg-gray-800 dark:hover:bg-gray-700"
+                        >
+                          <ReactIcon className="h-5 w-5 text-[#61DAFB]" />
+                          <span className="font-medium text-gray-700 dark:text-gray-200">
+                            React
+                          </span>
+                          <ArrowRight className="-ml-1 h-4 w-4 text-gray-400 opacity-0 transition-all group-hover/btn:ml-0 group-hover/btn:text-gray-600 group-hover/btn:opacity-100 dark:text-gray-500 dark:group-hover/btn:text-gray-300" />
+                        </Link>
+                        <Link
+                          href="/docs/vue/introduction"
+                          className="group/btn flex items-center gap-2 rounded-lg bg-gray-100 px-4 py-2 transition-colors hover:bg-gray-200 dark:bg-gray-800 dark:hover:bg-gray-700"
+                        >
+                          <VueIcon className="h-5 w-5 text-[#4FC08D]" />
+                          <span className="font-medium text-gray-700 dark:text-gray-200">
+                            Vue
+                          </span>
+                          <ArrowRight className="-ml-1 h-4 w-4 text-gray-400 opacity-0 transition-all group-hover/btn:ml-0 group-hover/btn:text-gray-600 group-hover/btn:opacity-100 dark:text-gray-500 dark:group-hover/btn:text-gray-300" />
+                        </Link>
+                        <Link
+                          href="/docs/svelte/introduction"
+                          className="group/btn flex items-center gap-2 rounded-lg bg-gray-100 px-4 py-2 transition-colors hover:bg-gray-200 dark:bg-gray-800 dark:hover:bg-gray-700"
+                        >
+                          <SvelteIcon className="h-5 w-5 text-[#FF3E00]" />
+                          <span className="font-medium text-gray-700 dark:text-gray-200">
+                            Svelte
+                          </span>
+                          <ArrowRight className="-ml-1 h-4 w-4 text-gray-400 opacity-0 transition-all group-hover/btn:ml-0 group-hover/btn:text-gray-600 group-hover/btn:opacity-100 dark:text-gray-500 dark:group-hover/btn:text-gray-300" />
+                        </Link>
+                      </div>
+                    </div>
                   </div>
                 </div>
+              </div>
 
-                <div className="group relative">
-                  <div className="absolute -inset-0.5 rounded-2xl bg-gradient-to-r from-orange-400 to-red-500 opacity-25 blur transition duration-200 group-hover:opacity-100"></div>
-                  <div className="relative h-full rounded-2xl bg-white p-6 shadow-lg dark:bg-gray-900">
-                    <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-lg bg-[#765ba7]">
-                      <ExternalLink size={24} className="text-white" />
-                    </div>
-                    <h3 className="mb-2 text-xl font-bold text-gray-900 dark:text-white">
-                      Works Everywhere
-                    </h3>
-                    <p className="text-gray-600 dark:text-gray-400">
-                      Works with JavaScript or TypeScript projects. React, Vue,
-                      Svelte, or vanilla.
-                    </p>
+              {/* Feature cards - Updated UI */}
+              <div className="mt-24 grid grid-cols-1 gap-8 md:grid-cols-3">
+                {/* Card 1 */}
+                <div className="group relative flex flex-col items-center rounded-2xl border border-gray-200 bg-white p-8 transition-all hover:shadow-xl dark:border-gray-800 dark:bg-gray-900">
+                  <div className="mb-6 inline-flex h-12 w-12 items-center justify-center rounded-xl bg-purple-100 text-purple-600 dark:bg-purple-900/30 dark:text-purple-400">
+                    <Heart size={24} />
                   </div>
+                  <h3 className="mb-3 text-xl font-bold text-gray-900 dark:text-white">
+                    Truly Open Source
+                  </h3>
+                  <p className="text-base leading-relaxed text-gray-600 dark:text-gray-400">
+                    MIT licensed core. Whether you use the snippet or headless,
+                    you own the code. No black boxes.
+                  </p>
+                </div>
+
+                {/* Card 2 */}
+                <div className="group relative flex flex-col items-center rounded-2xl border border-gray-200 bg-white p-8 transition-all hover:shadow-xl dark:border-gray-800 dark:bg-gray-900">
+                  <div className="mb-6 inline-flex h-12 w-12 items-center justify-center rounded-xl bg-blue-100 text-blue-600 dark:bg-blue-900/30 dark:text-blue-400">
+                    <Settings size={24} />
+                  </div>
+                  <h3 className="mb-3 text-xl font-bold text-gray-900 dark:text-white">
+                    Flexible Architecture
+                  </h3>
+                  <p className="text-base leading-relaxed text-gray-600 dark:text-gray-400">
+                    Configurable theming for the Viewer, or 100% pixel-perfect
+                    control with our Headless libraries.
+                  </p>
+                </div>
+
+                {/* Card 3 */}
+                <div className="group relative flex flex-col items-center rounded-2xl border border-gray-200 bg-white p-8 transition-all hover:shadow-xl dark:border-gray-800 dark:bg-gray-900">
+                  <div className="mb-6 inline-flex h-12 w-12 items-center justify-center rounded-xl bg-orange-100 text-orange-600 dark:bg-orange-900/30 dark:text-orange-400">
+                    <Layers size={24} />
+                  </div>
+                  <h3 className="mb-3 text-xl font-bold text-gray-900 dark:text-white">
+                    Universal Compatibility
+                  </h3>
+                  <p className="text-base leading-relaxed text-gray-600 dark:text-gray-400">
+                    Works with any framework. Drop the snippet in a legacy app,
+                    or build a modern React/Vue/Svelte SPA.
+                  </p>
                 </div>
               </div>
             </div>
           </div>
         </div>
+
         <div className="mt-24">
-          {/* Embed Code Section */}
+          {/* Embed Code Section - Explicitly for Ready-made Viewer */}
           <div className="relative mb-24">
             <div className="mx-auto max-w-4xl px-4">
               {/* Header */}
               <div className="mb-8 text-center">
+                <div className="mb-4 inline-flex items-center gap-2 rounded-full bg-green-100 px-3 py-1 text-xs font-medium text-green-800 dark:bg-green-900/30 dark:text-green-300">
+                  <Zap size={14} /> Ready-made Viewer
+                </div>
                 <h2 className="text-3xl font-bold text-gray-900 dark:text-white md:text-4xl">
-                  Quick Integration
+                  Drop-in Integration
                 </h2>
                 <p className="mt-4 text-lg text-gray-600 dark:text-gray-400">
-                  Get started in seconds with just two lines of code
+                  See how easy it is to add the pre-built viewer to your app.
                 </p>
               </div>
 
               <CodeShowcase />
+
+              <div className="mt-8 flex justify-center">
+                <Link
+                  href="/docs/snippet/introduction"
+                  className="group inline-flex items-center justify-center rounded-full bg-gray-900 px-6 py-3 text-sm font-medium text-white shadow-lg transition-transform hover:scale-105 dark:bg-white dark:text-gray-900"
+                >
+                  Read Snippet Documentation
+                  <ArrowRight className="ml-2 h-4 w-4 transition-transform group-hover:translate-x-1" />
+                </Link>
+              </div>
             </div>
           </div>
 
-          {/* Interactive Demo Section */}
+          {/* Interactive Demo Section - Explicitly for Ready-made Viewer */}
           <div className="relative">
             {/* Header with arrow and call-to-action */}
             <div className="mb-8 text-center">
               <div className="relative inline-block">
                 <h2 className="text-3xl font-bold text-gray-900 dark:text-white md:text-4xl">
-                  See it in action
+                  Try the Ready-made Viewer
                 </h2>
               </div>
-              <p className="mt-4 text-lg text-gray-600 dark:text-gray-400">
-                Interact with our PDF viewer below - zoom, scroll, and navigate
-                through pages
+              <p className="mx-auto mt-4 max-w-2xl text-lg text-gray-600 dark:text-gray-400">
+                This is the default UI you get with our snippet. <br />
+                <span className="text-sm opacity-80">
+                  Don&apos;t like how it looks? Use Headless to build something
+                  completely different.
+                </span>
               </p>
             </div>
 
@@ -215,6 +405,97 @@ const HeaderAndHero = () => {
               {/* Main viewer container */}
               <div className="relative overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-2xl dark:border-gray-700 dark:bg-gray-900">
                 <PDFViewer className="h-[500px] w-full md:h-[700px]" />
+              </div>
+
+              <div className="mt-8 flex justify-center">
+                <Link
+                  href="/docs/snippet/getting-started"
+                  className="group inline-flex items-center justify-center rounded-full bg-gradient-to-r from-purple-600 via-blue-500 to-orange-400 px-8 py-3 text-sm font-medium text-white shadow-lg transition-transform hover:scale-105"
+                >
+                  Get Started with Snippet
+                  <ArrowRight className="ml-2 h-4 w-4 transition-transform group-hover:translate-x-1" />
+                </Link>
+              </div>
+            </div>
+          </div>
+
+          {/* NEW SECTION: Headless Capabilities */}
+          <div className="relative mt-32 px-4">
+            <div className="mx-auto max-w-6xl">
+              <div className="mb-12 text-center">
+                <div className="mb-4 inline-flex items-center gap-2 rounded-full bg-blue-100 px-3 py-1 text-xs font-medium text-blue-800 dark:bg-blue-900/30 dark:text-blue-300">
+                  <Cpu size={14} /> Headless Components
+                </div>
+                <h2 className="text-3xl font-bold text-gray-900 dark:text-white md:text-4xl">
+                  Why go Headless?
+                </h2>
+                <p className="mx-auto mt-4 max-w-2xl text-lg text-gray-600 dark:text-gray-400">
+                  When the standard UI holds you back, our headless libraries
+                  set you free.
+                </p>
+              </div>
+
+              <div className="grid gap-8 md:grid-cols-3">
+                <div className="flex flex-col items-center rounded-2xl bg-gray-50 p-6 text-center dark:bg-gray-800/50">
+                  <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-xl bg-blue-100 text-blue-600 dark:bg-blue-900/30 dark:text-blue-400">
+                    <Palette size={24} />
+                  </div>
+                  <h3 className="mb-2 text-lg font-bold text-gray-900 dark:text-white">
+                    Native Look & Feel
+                  </h3>
+                  <p className="text-gray-600 dark:text-gray-400">
+                    Don&apos;t fight `!important` CSS overrides. Render PDF
+                    pages directly inside your own React/Vue components.
+                  </p>
+                </div>
+                <div className="flex flex-col items-center rounded-2xl bg-gray-50 p-6 text-center dark:bg-gray-800/50">
+                  <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-xl bg-purple-100 text-purple-600 dark:bg-purple-900/30 dark:text-purple-400">
+                    <Layers size={24} />
+                  </div>
+                  <h3 className="mb-2 text-lg font-bold text-gray-900 dark:text-white">
+                    Deep Integration
+                  </h3>
+                  <p className="text-gray-600 dark:text-gray-400">
+                    Overlay custom data, build annotation tools that sync with
+                    your backend, or create AI-powered analysis views.
+                  </p>
+                </div>
+                <div className="flex flex-col items-center rounded-2xl bg-gray-50 p-6 text-center dark:bg-gray-800/50">
+                  <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-xl bg-orange-100 text-orange-600 dark:bg-orange-900/30 dark:text-orange-400">
+                    <Zap size={24} />
+                  </div>
+                  <h3 className="mb-2 text-lg font-bold text-gray-900 dark:text-white">
+                    Performance First
+                  </h3>
+                  <p className="text-gray-600 dark:text-gray-400">
+                    Load only what you need. No bloated UI bundles. Perfect for
+                    mobile apps and high-performance dashboards.
+                  </p>
+                </div>
+              </div>
+
+              <div className="mt-12 flex flex-col items-center justify-center gap-4 sm:flex-row sm:gap-6">
+                <Link
+                  href="/docs/react/introduction"
+                  className="group flex w-full items-center justify-center gap-3 rounded-full border border-gray-200 bg-white px-6 py-3 text-sm font-medium text-gray-700 shadow-sm transition-all hover:border-blue-300 hover:shadow-md dark:border-gray-800 dark:bg-gray-900 dark:text-gray-300 dark:hover:border-blue-700 sm:w-auto"
+                >
+                  <ReactIcon className="h-5 w-5 text-[#61DAFB]" />
+                  <span>React Docs</span>
+                </Link>
+                <Link
+                  href="/docs/vue/introduction"
+                  className="group flex w-full items-center justify-center gap-3 rounded-full border border-gray-200 bg-white px-6 py-3 text-sm font-medium text-gray-700 shadow-sm transition-all hover:border-emerald-300 hover:shadow-md dark:border-gray-800 dark:bg-gray-900 dark:text-gray-300 dark:hover:border-emerald-700 sm:w-auto"
+                >
+                  <VueIcon className="h-5 w-5 text-[#4FC08D]" />
+                  <span>Vue Docs</span>
+                </Link>
+                <Link
+                  href="/docs/svelte/introduction"
+                  className="group flex w-full items-center justify-center gap-3 rounded-full border border-gray-200 bg-white px-6 py-3 text-sm font-medium text-gray-700 shadow-sm transition-all hover:border-orange-300 hover:shadow-md dark:border-gray-800 dark:bg-gray-900 dark:text-gray-300 dark:hover:border-orange-700 sm:w-auto"
+                >
+                  <SvelteIcon className="h-5 w-5 text-[#FF3E00]" />
+                  <span>Svelte Docs</span>
+                </Link>
               </div>
             </div>
           </div>
@@ -353,30 +634,34 @@ const HeaderAndHero = () => {
             </div>
           </div>
 
-          <div className="relative mt-20 px-4">
-            <div className="relative mx-auto max-w-4xl overflow-hidden rounded-2xl">
-              <div className="absolute inset-0 bg-gradient-to-r from-purple-600/20 via-blue-500/20 to-orange-400/20"></div>
-              <div className="relative rounded-2xl p-8 md:p-12">
-                <h2 className="mx-auto mb-4 max-w-2xl text-center text-2xl font-bold text-gray-900 dark:text-white md:text-3xl">
+          <div className="relative mb-20 mt-32 px-4">
+            <div className="relative mx-auto max-w-6xl overflow-hidden rounded-3xl border border-gray-200 bg-white shadow-2xl dark:border-gray-800 dark:bg-gray-900">
+              {/* Background Gradients */}
+              <div className="absolute -left-24 -top-24 h-96 w-96 rounded-full bg-purple-500/20 blur-3xl"></div>
+              <div className="absolute -bottom-24 -right-24 h-96 w-96 rounded-full bg-blue-500/20 blur-3xl"></div>
+              <div className="bg-grid-pattern absolute inset-0 opacity-[0.03]"></div>
+
+              <div className="relative px-6 py-16 text-center md:px-12 md:py-24">
+                <h2 className="mx-auto mb-6 max-w-3xl text-4xl font-black tracking-tight text-gray-900 dark:text-white md:text-5xl">
                   Ready to transform your PDF experience?
                 </h2>
-                <p className="mx-auto mb-8 max-w-2xl text-center text-gray-600 dark:text-gray-300">
-                  Join thousands of developers who&apos;ve simplified their PDF
-                  integration with EmbedPDF.
+                <p className="mx-auto mb-10 max-w-2xl text-xl text-gray-600 dark:text-gray-300">
+                  Join thousands of developers who have chosen the open-source
+                  path. No vendor lock-in, no black boxes, just code.
                 </p>
                 <div className="flex flex-col items-center justify-center gap-4 sm:flex-row">
                   <Link
                     href="/docs"
-                    className="inline-flex items-center justify-center rounded-full bg-gray-900 px-6 py-3 font-medium text-white shadow-lg transition-colors hover:bg-gray-800 dark:bg-white dark:text-gray-900 dark:hover:bg-gray-100"
+                    className="group relative inline-flex items-center justify-center overflow-hidden rounded-full bg-gray-900 px-8 py-4 text-base font-medium text-white shadow-xl transition-all hover:scale-105 hover:bg-gray-800 dark:bg-white dark:text-gray-900 dark:hover:bg-gray-100"
                   >
-                    Get Started Free
-                    <ArrowRight className="ml-2 h-5 w-5" />
+                    Start Building Now
+                    <ArrowRight className="ml-2 h-5 w-5 transition-transform group-hover:translate-x-1" />
                   </Link>
                   <Link
                     href="/sponsorship"
-                    className="inline-flex items-center justify-center rounded-full border-2 border-purple-600 bg-transparent px-6 py-3 font-medium text-purple-600 shadow-lg transition-all hover:bg-purple-600 hover:text-white dark:border-purple-400 dark:text-purple-400 dark:hover:bg-purple-400 dark:hover:text-gray-900"
+                    className="inline-flex items-center justify-center rounded-full border-2 border-transparent bg-gray-100 px-8 py-4 text-base font-medium text-gray-900 transition-all hover:bg-gray-200 dark:bg-gray-800 dark:text-white dark:hover:bg-gray-700"
                   >
-                    <Heart className="mr-2 h-5 w-5" />
+                    <Heart className="mr-2 h-5 w-5 text-red-500" />
                     Support Development
                   </Link>
                 </div>
