@@ -80,7 +80,7 @@
     "@types/mdx": "^2.0.8",
     "@types/node": "^20.0.0",
     "@types/react": "^18.2.0",
-    "eslint": "^9.28.0",
+    "eslint": "^9.39.2",
     "eslint-config-next": "^16.1.0",
     "exports-loader": "^5.0.0",
     "file-loader": "^6.2.0",
