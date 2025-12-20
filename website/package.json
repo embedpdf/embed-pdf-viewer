@@ -51,7 +51,7 @@
     "@next/mdx": "^15.2.1",
     "@tailwindcss/postcss": "^4.0.6",
     "@theguild/remark-npm2yarn": "^0.3.3",
-    "autoprefixer": "^10.4.16",
+    "autoprefixer": "^10.4.23",
     "clsx": "^2.1.1",
     "hast": "^1.0.0",
     "lucide-react": "^0.477.0",

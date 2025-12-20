@@ -66,7 +66,7 @@
     "@types/node": "^20.5.4",
     "@types/react": "^18.2.0",
     "@types/uuid": "^9.0.2",
-    "autoprefixer": "^10.4.15",
+    "autoprefixer": "^10.4.23",
     "babel-plugin-transform-react-jsx": "^6.24.1",
     "dotenv": "^17.2.3",
     "postcss": "^8.5.3",
