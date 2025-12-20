@@ -444,8 +444,8 @@ const HeaderAndHero = () => {
                     Native Look & Feel
                   </h3>
                   <p className="text-gray-600 dark:text-gray-400">
-                    Don&apos;t fight `!important` CSS overrides. Render PDF
-                    pages directly inside your own React/Vue components.
+                    Seamlessly blend the viewer into your app. Render PDF pages
+                    directly inside your own components.
                   </p>
                 </div>
                 <div className="flex flex-col items-center rounded-2xl bg-gray-50 p-6 text-center dark:bg-gray-800/50">
