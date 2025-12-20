@@ -53,7 +53,7 @@
     "@babel/preset-react": "^7.22.5",
     "@babel/preset-typescript": "^7.22.5",
     "@floating-ui/dom": "^1.6.13",
-    "@rollup/plugin-alias": "^5.1.0",
+    "@rollup/plugin-alias": "^6.0.0",
     "@rollup/plugin-babel": "^6.0.3",
     "@rollup/plugin-commonjs": "^25.0.4",
     "@rollup/plugin-node-resolve": "^15.2.1",
