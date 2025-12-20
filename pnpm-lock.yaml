@@ -892,8 +892,8 @@ importers:
         specifier: ^5.0.2
         version: 5.0.7(rollup@4.53.5)
       '@rollup/plugin-typescript':
-        specifier: ^11.1.2
-        version: 11.1.6(rollup@4.53.5)(tslib@2.8.1)(typescript@5.9.3)
+        specifier: ^12.3.0
+        version: 12.3.0(rollup@4.53.5)(tslib@2.8.1)(typescript@5.9.3)
       '@types/emscripten':
         specifier: ^1.39.13
         version: 1.41.5
@@ -2103,8 +2103,8 @@ importers:
         specifier: ^0.4.3
         version: 0.4.4(rollup@4.53.5)
       '@rollup/plugin-typescript':
-        specifier: ^11.1.2
-        version: 11.1.6(rollup@4.53.5)(tslib@2.8.1)(typescript@5.9.3)
+        specifier: ^12.3.0
+        version: 12.3.0(rollup@4.53.5)(tslib@2.8.1)(typescript@5.9.3)
       '@rollup/plugin-url':
         specifier: ^8.0.1
         version: 8.0.2(rollup@4.53.5)
@@ -4549,8 +4549,8 @@ packages:
       rollup:
         optional: true
 
-  '@rollup/plugin-typescript@11.1.6':
-    resolution: {integrity: sha512-R92yOmIACgYdJ7dJ97p4K69I8gg6IEHt8M7dUBxN3W6nrO8uUxX5ixl0yU/N3aZTi8WhPuICvOHXQvF6FaykAA==}
+  '@rollup/plugin-typescript@12.3.0':
+    resolution: {integrity: sha512-7DP0/p7y3t67+NabT9f8oTBFE6gGkto4SA6Np2oudYmZE/m1dt8RB0SjL1msMxFpLo631qjRCcBlAbq1ml/Big==}
     engines: {node: '>=14.0.0'}
     peerDependencies:
       rollup: ^2.14.0||^3.0.0||^4.0.0
@@ -13710,7 +13710,7 @@ snapshots:
     optionalDependencies:
       rollup: 4.53.5
 
-  '@rollup/plugin-typescript@11.1.6(rollup@4.53.5)(tslib@2.8.1)(typescript@5.9.3)':
+  '@rollup/plugin-typescript@12.3.0(rollup@4.53.5)(tslib@2.8.1)(typescript@5.9.3)':
     dependencies:
       '@rollup/pluginutils': 5.3.0(rollup@4.53.5)
       resolve: 1.22.11
