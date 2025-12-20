@@ -39,7 +39,7 @@
     "@fontsource/roboto": "5.2.6",
     "@mdi/font": "7.4.47",
     "vue": "^3.5.26",
-    "vuetify": "^3.9.1"
+    "vuetify": "^3.11.4"
   },
   "devDependencies": {
     "@tsconfig/node22": "^22.0.0",
