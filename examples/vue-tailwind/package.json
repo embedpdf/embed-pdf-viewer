@@ -64,7 +64,7 @@
     "@tailwindcss/vite": "^4.1.18",
     "@typescript-eslint/eslint-plugin": "^8.18.5",
     "@typescript-eslint/parser": "^8.18.5",
-    "@vitejs/plugin-vue": "^5.0.4",
+    "@vitejs/plugin-vue": "^6.0.3",
     "eslint": "^9.17.0",
     "eslint-plugin-vue": "^10.6.2",
     "glob": "^11.1.0",
