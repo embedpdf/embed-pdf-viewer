@@ -64,7 +64,7 @@
     "@rollup/plugin-commonjs": "^25.0.8",
     "@rollup/plugin-node-resolve": "^15.2.1",
     "@rollup/plugin-replace": "^5.0.2",
-    "@rollup/plugin-typescript": "^11.1.2",
+    "@rollup/plugin-typescript": "^12.3.0",
     "@types/emscripten": "^1.39.13",
     "cpy-cli": "^6.0.0",
     "magic-string": "^0.30.17",
