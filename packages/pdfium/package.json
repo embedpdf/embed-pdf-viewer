@@ -70,7 +70,7 @@
     "magic-string": "^0.30.17",
     "rollup": "^4.53.5",
     "rollup-plugin-copy": "^3.4.0",
-    "rollup-plugin-dts": "^6.2.1",
+    "rollup-plugin-dts": "^6.3.0",
     "typescript": "^5.0.0"
   },
   "publishConfig": {
