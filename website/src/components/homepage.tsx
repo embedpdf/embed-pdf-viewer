@@ -306,7 +306,7 @@ const HeaderAndHero = () => {
               {/* Feature cards - Updated UI */}
               <div className="mt-24 grid grid-cols-1 gap-8 md:grid-cols-3">
                 {/* Card 1 */}
-                <div className="group relative flex flex-col items-center rounded-2xl border border-gray-200 bg-white p-8 transition-all hover:shadow-xl dark:border-gray-800 dark:bg-gray-900">
+                <div className="group relative flex h-full flex-col items-center rounded-2xl border border-gray-200 bg-white p-8 transition-all hover:shadow-xl dark:border-gray-800 dark:bg-gray-900">
                   <div className="mb-6 inline-flex h-12 w-12 items-center justify-center rounded-xl bg-purple-100 text-purple-600 dark:bg-purple-900/30 dark:text-purple-400">
                     <Heart size={24} />
                   </div>
@@ -320,7 +320,7 @@ const HeaderAndHero = () => {
                 </div>
 
                 {/* Card 2 */}
-                <div className="group relative flex flex-col items-center rounded-2xl border border-gray-200 bg-white p-8 transition-all hover:shadow-xl dark:border-gray-800 dark:bg-gray-900">
+                <div className="group relative flex h-full flex-col items-center rounded-2xl border border-gray-200 bg-white p-8 transition-all hover:shadow-xl dark:border-gray-800 dark:bg-gray-900">
                   <div className="mb-6 inline-flex h-12 w-12 items-center justify-center rounded-xl bg-blue-100 text-blue-600 dark:bg-blue-900/30 dark:text-blue-400">
                     <Settings size={24} />
                   </div>
@@ -334,7 +334,7 @@ const HeaderAndHero = () => {
                 </div>
 
                 {/* Card 3 */}
-                <div className="group relative flex flex-col items-center rounded-2xl border border-gray-200 bg-white p-8 transition-all hover:shadow-xl dark:border-gray-800 dark:bg-gray-900">
+                <div className="group relative flex h-full flex-col items-center rounded-2xl border border-gray-200 bg-white p-8 transition-all hover:shadow-xl dark:border-gray-800 dark:bg-gray-900">
                   <div className="mb-6 inline-flex h-12 w-12 items-center justify-center rounded-xl bg-orange-100 text-orange-600 dark:bg-orange-900/30 dark:text-orange-400">
                     <Layers size={24} />
                   </div>
@@ -436,7 +436,7 @@ const HeaderAndHero = () => {
               </div>
 
               <div className="grid gap-8 md:grid-cols-3">
-                <div className="flex flex-col items-center rounded-2xl bg-gray-50 p-6 text-center dark:bg-gray-800/50">
+                <div className="flex h-full flex-col items-center rounded-2xl bg-gray-50 p-6 text-center dark:bg-gray-800/50">
                   <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-xl bg-blue-100 text-blue-600 dark:bg-blue-900/30 dark:text-blue-400">
                     <Palette size={24} />
                   </div>
@@ -448,7 +448,7 @@ const HeaderAndHero = () => {
                     directly inside your own components.
                   </p>
                 </div>
-                <div className="flex flex-col items-center rounded-2xl bg-gray-50 p-6 text-center dark:bg-gray-800/50">
+                <div className="flex h-full flex-col items-center rounded-2xl bg-gray-50 p-6 text-center dark:bg-gray-800/50">
                   <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-xl bg-purple-100 text-purple-600 dark:bg-purple-900/30 dark:text-purple-400">
                     <Layers size={24} />
                   </div>
@@ -460,7 +460,7 @@ const HeaderAndHero = () => {
                     your backend, or create AI-powered analysis views.
                   </p>
                 </div>
-                <div className="flex flex-col items-center rounded-2xl bg-gray-50 p-6 text-center dark:bg-gray-800/50">
+                <div className="flex h-full flex-col items-center rounded-2xl bg-gray-50 p-6 text-center dark:bg-gray-800/50">
                   <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-xl bg-orange-100 text-orange-600 dark:bg-orange-900/30 dark:text-orange-400">
                     <Zap size={24} />
                   </div>
