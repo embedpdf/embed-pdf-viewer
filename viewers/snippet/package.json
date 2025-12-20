@@ -61,7 +61,7 @@
     "@rollup/plugin-terser": "^0.4.3",
     "@rollup/plugin-typescript": "^11.1.2",
     "@rollup/plugin-url": "^8.0.1",
-    "@tailwindcss/postcss": "^4.1.17",
+    "@tailwindcss/postcss": "^4.1.18",
     "@types/classnames": "^2.3.1",
     "@types/node": "^20.5.4",
     "@types/react": "^18.2.0",
