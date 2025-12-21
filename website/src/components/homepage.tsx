@@ -55,10 +55,10 @@ const HeaderAndHero = () => {
                 Open Source & Framework Agnostic
               </div>
 
-              <h1 className="md:text-7xl text-5xl font-black leading-tight tracking-tight text-gray-900 dark:text-white sm:text-6xl">
+              <h1 className="md:text-7xl text-4xl font-black leading-tight tracking-tight text-gray-900 dark:text-white sm:text-6xl">
                 <span className="relative inline-block">
                   <span className="relative z-10">Embed PDF files</span>
-                  <div className="absolute bottom-1 left-0 right-0 -z-10 h-4 -rotate-1 transform text-[#765ba7] opacity-50 dark:text-[#a78bfa]">
+                  <div className="absolute bottom-1 left-0 right-0 -z-10 h-3 -rotate-1 transform text-[#765ba7] opacity-50 dark:text-[#a78bfa] md:h-4">
                     <Scribble2 color="currentColor" />
                   </div>
                 </span>
@@ -66,70 +66,78 @@ const HeaderAndHero = () => {
                 <span className="">without the pain</span>
               </h1>
 
-              <p className="relative mx-auto mt-8 max-w-2xl text-xl text-gray-600 dark:text-gray-400">
+              <p className="relative mx-auto mt-6 max-w-2xl text-lg text-gray-600 dark:text-gray-400 md:mt-8 md:text-xl">
                 The ultimate <strong>Open Source PDF viewer</strong> for
                 JavaScript. Choose our drop-in component for instant results, or
                 use our <strong>headless library</strong> to build a completely
                 custom UI.
               </p>
 
-              <div className="mt-10 flex flex-col items-center justify-center gap-5 sm:flex-row">
+              <div className="mt-8 flex flex-col items-center justify-center gap-3 sm:flex-row md:mt-10 md:gap-4">
                 <Link
                   href="/docs"
-                  className="group relative inline-flex items-center justify-center overflow-hidden rounded-full bg-gray-900 px-8 py-4 text-base font-medium text-white shadow-xl transition-transform hover:scale-105 dark:bg-white dark:text-gray-900"
+                  className="group relative inline-flex w-full items-center justify-center overflow-hidden rounded-full bg-gray-900 px-8 py-3.5 text-base font-medium text-white shadow-xl transition-all hover:scale-105 hover:shadow-2xl dark:bg-white dark:text-gray-900 sm:w-auto md:py-4"
                 >
-                  <span className="absolute left-0 top-0 h-full w-full bg-gradient-to-r from-purple-600 via-blue-500 to-orange-400 opacity-0 transition-opacity group-hover:opacity-100"></span>
-                  <span className="relative z-10 flex items-center group-hover:text-white">
+                  <span className="absolute left-0 top-0 h-full w-full bg-gradient-to-r from-purple-600 via-blue-500 to-orange-400 opacity-0 transition-opacity duration-300 group-hover:opacity-100"></span>
+                  <span className="relative z-10 flex items-center">
                     Get Started
                     <ArrowRight className="ml-2 h-5 w-5 transition-transform group-hover:translate-x-1" />
                   </span>
                 </Link>
 
-                {/* Bold Demo Button */}
                 <a
                   href="https://app.embedpdf.com"
                   target="_blank"
                   rel="noreferrer"
-                  className="group relative inline-flex items-center justify-center overflow-hidden rounded-full bg-gradient-to-r from-purple-600 via-blue-500 to-orange-400 px-8 py-4 text-base font-medium text-white shadow-xl transition-all hover:scale-105 hover:shadow-2xl"
+                  className="dark:hover:bg-gray-750 group inline-flex w-full items-center justify-center rounded-full bg-white px-8 py-3.5 text-base font-medium text-gray-700 shadow-md transition-all hover:bg-gray-50 hover:text-gray-900 hover:shadow-lg dark:bg-gray-800 dark:text-gray-200 dark:hover:text-white sm:w-auto md:py-4"
                 >
-                  <span className="absolute left-0 top-0 h-full w-full bg-gradient-to-r from-orange-400 via-red-500 to-pink-500 opacity-0 transition-opacity group-hover:opacity-100"></span>
-                  <span className="relative z-10 flex items-center">
-                    <div className="mr-3 rounded-full bg-white/20 p-1.5 backdrop-blur-sm">
-                      <Play className="h-4 w-4 fill-current transition-transform group-hover:scale-110" />
-                    </div>
-                    Live Demo
-                  </span>
-
-                  {/* Animated ring */}
-                  <div className="absolute inset-0 rounded-full border-2 border-white/30 transition-all group-hover:scale-110 group-hover:border-white/50"></div>
+                  <Play className="mr-2 h-4 w-4 fill-current text-purple-600 transition-transform group-hover:scale-110 dark:text-purple-400" />
+                  Live Demo
                 </a>
 
                 <a
                   href="https://github.com/embedpdf/embed-pdf-viewer"
                   target="_blank"
                   rel="noreferrer"
-                  className="group inline-flex items-center justify-center px-5 py-3 text-base font-medium text-gray-700 transition-all hover:text-gray-900 dark:text-gray-300 dark:hover:text-white"
+                  className="group inline-flex w-full items-center justify-center rounded-full px-5 py-3 text-base font-medium text-gray-500 transition-all hover:bg-gray-100 hover:text-gray-900 dark:text-gray-400 dark:hover:bg-gray-800 dark:hover:text-white sm:w-auto"
                 >
-                  <div className="flex items-center space-x-2 border-b border-dashed border-gray-300 group-hover:border-gray-600 dark:border-gray-600 dark:group-hover:border-white">
-                    <Github />
-                    <span>Source on GitHub</span>
-                  </div>
+                  <Github className="mr-2 h-5 w-5" />
+                  <span>Star on GitHub</span>
                 </a>
               </div>
 
               {/* Technology badges */}
-              <div className="mt-8 flex items-center justify-center gap-8">
-                <div className="flex flex-col items-center text-gray-600 dark:text-gray-400">
-                  <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-white shadow-sm dark:bg-gray-800">
-                    <JavaScript />
+              <div className="mt-10 md:mt-12">
+                <p className="tracking-wider mb-4 text-xs font-semibold uppercase text-gray-500 dark:text-gray-400 md:text-sm">
+                  Works seamlessly with
+                </p>
+                <div className="flex flex-wrap items-center justify-center gap-4 opacity-80 transition-opacity hover:opacity-100 md:gap-8">
+                  <div className="flex flex-col items-center gap-2 transition-transform hover:-translate-y-1">
+                    <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-white shadow-sm ring-1 ring-gray-900/5 dark:bg-gray-800 dark:ring-white/10 md:h-12 md:w-12 md:rounded-2xl">
+                      <JavaScript />
+                    </div>
                   </div>
-                  <div className="mt-2 text-sm font-medium">JavaScript</div>
-                </div>
-                <div className="flex flex-col items-center text-gray-600 dark:text-gray-400">
-                  <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-white shadow-sm dark:bg-gray-800">
-                    <Typescript />
+                  <div className="flex flex-col items-center gap-2 transition-transform hover:-translate-y-1">
+                    <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-white shadow-sm ring-1 ring-gray-900/5 dark:bg-gray-800 dark:ring-white/10 md:h-12 md:w-12 md:rounded-2xl">
+                      <Typescript />
+                    </div>
                   </div>
-                  <div className="mt-2 text-sm font-medium">TypeScript</div>
+                  <div className="h-6 w-px bg-gray-200 dark:bg-gray-700 md:h-8"></div>
+                  <div className="flex flex-col items-center gap-2 transition-transform hover:-translate-y-1">
+                    <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-white shadow-sm ring-1 ring-gray-900/5 dark:bg-gray-800 dark:ring-white/10 md:h-12 md:w-12 md:rounded-2xl">
+                      <ReactIcon className="h-5 w-5 text-[#61DAFB] md:h-6 md:w-6" />
+                    </div>
+                  </div>
+                  <div className="flex flex-col items-center gap-2 transition-transform hover:-translate-y-1">
+                    <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-white shadow-sm ring-1 ring-gray-900/5 dark:bg-gray-800 dark:ring-white/10 md:h-12 md:w-12 md:rounded-2xl">
+                      <VueIcon className="h-5 w-5 text-[#4FC08D] md:h-6 md:w-6" />
+                    </div>
+                  </div>
+                  <div className="flex flex-col items-center gap-2 transition-transform hover:-translate-y-1">
+                    <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-white shadow-sm ring-1 ring-gray-900/5 dark:bg-gray-800 dark:ring-white/10 md:h-12 md:w-12 md:rounded-2xl">
+                      <SvelteIcon className="h-5 w-5 text-[#FF3E00] md:h-6 md:w-6" />
+                    </div>
+                  </div>
                 </div>
               </div>
 
