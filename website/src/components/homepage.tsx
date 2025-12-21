@@ -113,29 +113,49 @@ const HeaderAndHero = () => {
                 </p>
                 <div className="flex flex-wrap items-center justify-center gap-4 opacity-80 transition-opacity hover:opacity-100 md:gap-8">
                   <div className="flex flex-col items-center gap-2 transition-transform hover:-translate-y-1">
-                    <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-white shadow-sm ring-1 ring-gray-900/5 dark:bg-gray-800 dark:ring-white/10 md:h-12 md:w-12 md:rounded-2xl">
+                    <div
+                      className="flex h-10 w-10 items-center justify-center rounded-xl bg-white shadow-sm ring-1 ring-gray-900/5 dark:bg-gray-800 dark:ring-white/10 md:h-12 md:w-12 md:rounded-2xl"
+                      title="JavaScript"
+                    >
                       <JavaScript />
+                      <span className="sr-only">JavaScript</span>
                     </div>
                   </div>
                   <div className="flex flex-col items-center gap-2 transition-transform hover:-translate-y-1">
-                    <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-white shadow-sm ring-1 ring-gray-900/5 dark:bg-gray-800 dark:ring-white/10 md:h-12 md:w-12 md:rounded-2xl">
+                    <div
+                      className="flex h-10 w-10 items-center justify-center rounded-xl bg-white shadow-sm ring-1 ring-gray-900/5 dark:bg-gray-800 dark:ring-white/10 md:h-12 md:w-12 md:rounded-2xl"
+                      title="TypeScript"
+                    >
                       <Typescript />
+                      <span className="sr-only">TypeScript</span>
                     </div>
                   </div>
                   <div className="h-6 w-px bg-gray-200 dark:bg-gray-700 md:h-8"></div>
                   <div className="flex flex-col items-center gap-2 transition-transform hover:-translate-y-1">
-                    <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-white shadow-sm ring-1 ring-gray-900/5 dark:bg-gray-800 dark:ring-white/10 md:h-12 md:w-12 md:rounded-2xl">
+                    <div
+                      className="flex h-10 w-10 items-center justify-center rounded-xl bg-white shadow-sm ring-1 ring-gray-900/5 dark:bg-gray-800 dark:ring-white/10 md:h-12 md:w-12 md:rounded-2xl"
+                      title="React"
+                    >
                       <ReactIcon className="h-5 w-5 text-[#61DAFB] md:h-6 md:w-6" />
+                      <span className="sr-only">React</span>
                     </div>
                   </div>
                   <div className="flex flex-col items-center gap-2 transition-transform hover:-translate-y-1">
-                    <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-white shadow-sm ring-1 ring-gray-900/5 dark:bg-gray-800 dark:ring-white/10 md:h-12 md:w-12 md:rounded-2xl">
+                    <div
+                      className="flex h-10 w-10 items-center justify-center rounded-xl bg-white shadow-sm ring-1 ring-gray-900/5 dark:bg-gray-800 dark:ring-white/10 md:h-12 md:w-12 md:rounded-2xl"
+                      title="Vue"
+                    >
                       <VueIcon className="h-5 w-5 text-[#4FC08D] md:h-6 md:w-6" />
+                      <span className="sr-only">Vue</span>
                     </div>
                   </div>
                   <div className="flex flex-col items-center gap-2 transition-transform hover:-translate-y-1">
-                    <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-white shadow-sm ring-1 ring-gray-900/5 dark:bg-gray-800 dark:ring-white/10 md:h-12 md:w-12 md:rounded-2xl">
+                    <div
+                      className="flex h-10 w-10 items-center justify-center rounded-xl bg-white shadow-sm ring-1 ring-gray-900/5 dark:bg-gray-800 dark:ring-white/10 md:h-12 md:w-12 md:rounded-2xl"
+                      title="Svelte"
+                    >
                       <SvelteIcon className="h-5 w-5 text-[#FF3E00] md:h-6 md:w-6" />
+                      <span className="sr-only">Svelte</span>
                     </div>
                   </div>
                 </div>
