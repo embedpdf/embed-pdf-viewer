@@ -6253,8 +6253,21 @@ export class PdfiumNative implements IPdfiumExecutor {
     }
 
     let isChecked = false;
+    let exportValue = "";
     if (type === PDF_FORM_FIELD_TYPE.CHECKBOX || type === PDF_FORM_FIELD_TYPE.RADIOBUTTON) {
       isChecked = this.pdfiumModule.FPDFAnnot_IsChecked(formHandle, annotationPtr);
+      exportValue = readString(
+          this.pdfiumModule.pdfium,
+          (buffer: number, bufferLength) => {
+            return this.pdfiumModule.FPDFAnnot_GetFormFieldExportValue(
+                formHandle,
+                annotationPtr,
+                buffer,
+                bufferLength,
+            );
+          },
+          this.pdfiumModule.pdfium.UTF16ToString,
+      );
     }
 
     return {
@@ -6265,6 +6278,7 @@ export class PdfiumNative implements IPdfiumExecutor {
       value,
       isChecked,
       options,
+      exportValue,
     };
   }
 
