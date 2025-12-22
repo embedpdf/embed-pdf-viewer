@@ -217,7 +217,7 @@ const IntegrationPaths = () => {
 
             <div className="mt-auto">
               <Link
-                href="/docs/react/viewer/getting-started"
+                href="/docs/react/viewer/introduction"
                 className="group/btn flex items-center justify-center gap-2 rounded-lg bg-gray-900 px-4 py-3 font-medium text-white transition-all hover:bg-gray-800 dark:bg-white dark:text-gray-900"
               >
                 <ReactIcon className="h-5 w-5" />

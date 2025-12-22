@@ -2,7 +2,7 @@
 import { useVueMount } from '../use-vue-mount'
 
 export const PanExample = () => {
-  const containerRef = useVueMount(
+  const { containerRef } = useVueMount(
     () => import('@embedpdf/example-vue-tailwind/headless/pan-example'),
   )
 

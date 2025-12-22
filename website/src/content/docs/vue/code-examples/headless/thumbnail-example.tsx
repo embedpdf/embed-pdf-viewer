@@ -2,7 +2,7 @@
 import { useVueMount } from '../use-vue-mount'
 
 export const ThumbnailExample = () => {
-  const containerRef = useVueMount(
+  const { containerRef } = useVueMount(
     () => import('@embedpdf/example-vue-tailwind/headless/thumbnail-example'),
   )
 
