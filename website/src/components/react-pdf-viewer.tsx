@@ -106,7 +106,7 @@ const Hero = () => {
 
             <div className="mt-8 flex flex-col items-center justify-center gap-3 sm:flex-row md:mt-10 md:gap-4">
               <Link
-                href="/docs"
+                href="/docs/react"
                 className="group relative inline-flex w-full items-center justify-center overflow-hidden rounded-full bg-gray-900 px-8 py-3.5 text-base font-medium text-white shadow-xl transition-all hover:scale-105 hover:shadow-2xl dark:bg-white dark:text-gray-900 sm:w-auto md:py-4"
               >
                 <span className="absolute left-0 top-0 h-full w-full bg-gradient-to-r from-blue-600 via-indigo-500 to-purple-500 opacity-0 transition-opacity duration-300 group-hover:opacity-100"></span>
@@ -217,7 +217,7 @@ const IntegrationPaths = () => {
 
             <div className="mt-auto">
               <Link
-                href="/docs/react/introduction"
+                href="/docs/react/viewer/getting-started"
                 className="group/btn flex items-center justify-center gap-2 rounded-lg bg-gray-900 px-4 py-3 font-medium text-white transition-all hover:bg-gray-800 dark:bg-white dark:text-gray-900"
               >
                 <ReactIcon className="h-5 w-5" />
@@ -260,7 +260,7 @@ const IntegrationPaths = () => {
 
             <div className="mt-auto">
               <Link
-                href="/docs/react/headless"
+                href="/docs/react/headless/introduction"
                 className="group/btn flex items-center justify-center gap-2 rounded-lg border-2 border-gray-200 bg-transparent px-4 py-3 font-medium text-gray-900 transition-all hover:border-gray-900 dark:border-gray-700 dark:text-white dark:hover:border-white"
               >
                 <Code className="h-5 w-5" />
@@ -296,10 +296,10 @@ const FullUiShowcase = () => {
 
         <div className="mt-8 flex justify-center">
           <Link
-            href="/docs/react/introduction"
+            href="/docs/react/viewer/getting-started"
             className="group inline-flex items-center justify-center rounded-full bg-gray-900 px-6 py-3 text-sm font-medium text-white shadow-lg transition-transform hover:scale-105 dark:bg-white dark:text-gray-900"
           >
-            Read Component Documentation
+            View Full Documentation
             <ArrowRight className="ml-2 h-4 w-4 transition-transform group-hover:translate-x-1" />
           </Link>
         </div>
@@ -554,7 +554,7 @@ const HeadlessShowcase = () => {
 
             <div className="mt-6 flex justify-center lg:justify-start">
               <Link
-                href="/docs/react/understanding-plugins"
+                href="/docs/react/headless/understanding-plugins"
                 className="group inline-flex items-center gap-2 text-sm font-medium text-blue-600 hover:text-blue-700 dark:text-blue-400"
               >
                 Explore all {corePlugins.length + featurePlugins.length}+
@@ -816,7 +816,7 @@ const CallToAction = () => {
             </p>
             <div className="flex flex-col items-center justify-center gap-4 sm:flex-row">
               <Link
-                href="/docs/react/introduction"
+                href="/docs/react"
                 className="group relative inline-flex items-center justify-center overflow-hidden rounded-full bg-gray-900 px-8 py-4 text-base font-medium text-white shadow-xl transition-all hover:scale-105 hover:bg-gray-800 dark:bg-white dark:text-gray-900 dark:hover:bg-gray-100"
               >
                 Start Building Now

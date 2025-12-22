@@ -5,12 +5,16 @@
   "type": "module",
   "license": "MIT",
   "exports": {
-    "./*": "./dist/examples/*.js"
+    "./headless/*": "./dist/examples/headless/*.js",
+    "./viewer/*": "./dist/examples/viewer/*.js"
   },
   "typesVersions": {
     "*": {
-      "*": [
-        "./dist/examples/*.d.ts"
+      "headless/*": [
+        "./dist/examples/headless/*.d.ts"
+      ],
+      "viewer/*": [
+        "./dist/examples/viewer/*.d.ts"
       ]
     }
   },

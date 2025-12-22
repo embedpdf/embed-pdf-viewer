@@ -1,0 +1,171 @@
+---
+title: Customizing the UI
+description: Disable features, add custom buttons, and modify the viewer's toolbar.
+searchable: true
+---
+
+# Customizing the UI
+
+The `PDFViewer` component provides ways to customize the user interface—from simple feature toggles to advanced toolbar modifications.
+
+## Disabling Features
+
+The easiest way to customize the UI is to disable features you don't need. Use the `disabledCategories` config option:
+
+```tsx copy filename="App.tsx"
+import { PDFViewer } from '@embedpdf/react-pdf-viewer';
+
+export default function App() {
+  return (
+    <PDFViewer 
+      config={{
+        src: 'https://snippet.embedpdf.com/ebook.pdf',
+        disabledCategories: ['annotation', 'print', 'export']
+      }}
+    />
+  );
+}
+```
+
+### Interactive Example
+
+Toggle the checkboxes below to see how categories are disabled in real-time:
+
+import DisableCategoriesExample from '../code-examples/viewer/disable-categories-example';
+import { ExampleWrapper } from '@/components/example-wrapper';
+
+<CodeExample
+  codePaths={[
+    "content/docs/react/code-examples/viewer/disable-categories-example.tsx"
+  ]}
+>
+  <ExampleWrapper>
+    <DisableCategoriesExample />
+  </ExampleWrapper>
+</CodeExample>
+
+### Available Categories
+
+Categories are hierarchical—disabling a parent category (e.g., `annotation`) disables all its children.
+
+| Group | Categories |
+| :--- | :--- |
+| **Zoom** | `zoom`, `zoom-in`, `zoom-out`, `zoom-fit-page`, `zoom-fit-width`, `zoom-marquee`, `zoom-level` |
+| **Annotation** | `annotation`, `annotation-markup`, `annotation-highlight`, `annotation-underline`, `annotation-strikeout`, `annotation-squiggly`, `annotation-ink`, `annotation-text`, `annotation-stamp` |
+| **Shapes** | `annotation-shape`, `annotation-rectangle`, `annotation-circle`, `annotation-line`, `annotation-arrow`, `annotation-polygon`, `annotation-polyline` |
+| **Redaction** | `redaction`, `redaction-area`, `redaction-text`, `redaction-apply`, `redaction-clear` |
+| **Document** | `document`, `document-open`, `document-close`, `document-print`, `document-export`, `document-fullscreen` |
+| **Page** | `page`, `spread`, `rotate`, `scroll`, `navigation` |
+| **Panel** | `panel`, `panel-sidebar`, `panel-search`, `panel-comment` |
+| **Tools** | `tools`, `pan`, `pointer`, `capture` |
+| **Selection** | `selection`, `selection-copy` |
+| **History** | `history`, `history-undo`, `history-redo` |
+
+## Advanced Customization
+
+For more control over the UI, you can access the viewer instance and modify the toolbar schema directly.
+
+### Accessing the Viewer Registry
+
+```tsx copy filename="CustomViewer.tsx"
+import { PDFViewer, PDFViewerRef } from '@embedpdf/react-pdf-viewer';
+import { useRef, useEffect } from 'react';
+
+export default function CustomViewer() {
+  const viewerRef = useRef<PDFViewerRef>(null);
+
+  useEffect(() => {
+    const setupCustomUI = async () => {
+      const registry = await viewerRef.current?.registry;
+      if (!registry) return;
+
+      const commands = registry.getPlugin('commands').provides();
+      const ui = registry.getPlugin('ui').provides();
+
+      // Register a custom command
+      commands.registerCommand({
+        id: 'custom.hello',
+        label: 'Say Hello',
+        icon: 'smiley',
+        action: () => alert('Hello from my custom button!')
+      });
+
+      // Add it to the toolbar
+      // ... (see below)
+    };
+
+    setupCustomUI();
+  }, []);
+
+  return <PDFViewer ref={viewerRef} config={{ src: '/doc.pdf' }} />;
+}
+```
+
+### Registering Custom Icons
+
+Before using a custom icon, you need to register it:
+
+```tsx
+// Register during setup
+viewerRef.current?.registerIcon('smiley', {
+  viewBox: '0 0 24 24',
+  paths: [
+    { d: 'M3 12a9 9 0 1 0 18 0a9 9 0 1 0 -18 0', stroke: 'currentColor', fill: 'none' },
+    { d: 'M9 10l.01 0', stroke: 'currentColor', fill: 'none' },
+    { d: 'M15 10l.01 0', stroke: 'currentColor', fill: 'none' },
+    { d: 'M9.5 15a3.5 3.5 0 0 0 5 0', stroke: 'currentColor', fill: 'none' }
+  ]
+});
+```
+
+### Modifying the Toolbar
+
+```tsx
+const schema = ui.getSchema();
+const toolbar = schema.toolbars['main-toolbar'];
+
+// Clone and modify the items
+const items = JSON.parse(JSON.stringify(toolbar.items));
+const rightGroup = items.find(item => item.id === 'right-group');
+
+if (rightGroup) {
+  // Add our custom button
+  rightGroup.items.push({
+    type: 'command-button',
+    id: 'smiley-button',
+    commandId: 'custom.hello',
+    variant: 'icon'
+  });
+}
+
+// Apply the changes
+ui.mergeSchema({
+  toolbars: { 'main-toolbar': { ...toolbar, items } }
+});
+```
+
+### Interactive Example
+
+In this example, the comment button is **replaced** with a smiley 😊, and a star ⭐ is **added** to the document menu. Click them to see feedback:
+
+import UICustomizationExample from '../code-examples/viewer/ui-customization-example';
+
+<CodeExample 
+  codePaths={[
+    "content/docs/react/code-examples/viewer/ui-customization-example.tsx"
+  ]}
+>
+  <ExampleWrapper>
+    <UICustomizationExample />
+  </ExampleWrapper>
+</CodeExample>
+
+## Need Complete Control?
+
+If you need to build a completely custom UI from scratch—your own toolbars, layouts, and controls—consider using our [Headless Components](/docs/react/headless/introduction) instead.
+
+The headless approach gives you:
+- Zero pre-built UI
+- Hooks like `useZoom()`, `useSearch()`, `useSelection()`
+- Complete freedom to design your own interface
+

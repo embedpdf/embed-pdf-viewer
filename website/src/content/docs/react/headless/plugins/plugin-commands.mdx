@@ -1,0 +1,177 @@
+---
+title: Commands Plugin
+description: Centralized command registry for managing actions, keyboard shortcuts, and UI state across your PDF viewer.
+searchable: true
+---
+
+# Commands Plugin
+
+The Commands Plugin implements the **Command Pattern** for your PDF viewer. It serves as a central registry where you define actions (like "Zoom In", "Next Page", or "Print") along with their keyboard shortcuts, icons, and dynamic state logic (enabled/disabled/visible).
+
+By decoupling the *logic* of an action from the *UI component* that triggers it, you can build consistent toolbars, menus, and keyboard shortcuts that stay perfectly in sync.
+
+## Installation
+
+```sh npm2yarn
+npm install @embedpdf/plugin-commands
+````
+
+## Registration
+
+Import `CommandsPluginPackage` and add it to your plugin list. You can optionally register your application's commands immediately via the configuration object.
+
+```tsx {10-12}
+import { createPluginRegistration } from '@embedpdf/core';
+import { CommandsPluginPackage } from '@embedpdf/plugin-commands/react';
+
+const plugins = [
+  // ... other plugins
+  createPluginRegistration(ViewportPluginPackage),
+  createPluginRegistration(ScrollPluginPackage),
+  
+  // Register Commands Plugin
+  createPluginRegistration(CommandsPluginPackage, {
+    commands: myCommands, // See "Defining Commands" below
+  }),
+];
+```
+
+## Usage
+
+### 1\. Type-Safe Command Definitions
+
+To get TypeScript support/autocompletion inside your command's `disabled`, `visible`, or `active` functions, you should define your application's state type. This involves combining `GlobalStoreState` with the state interfaces of the plugins you are using.
+
+```tsx
+import { GlobalStoreState } from '@embedpdf/core';
+import { Command } from '@embedpdf/plugin-commands';
+import { SCROLL_PLUGIN_ID, ScrollState } from '@embedpdf/plugin-scroll';
+// ... other plugin imports
+
+// 1. Define the Global State based on enabled plugins
+export type AppState = GlobalStoreState<{
+  [SCROLL_PLUGIN_ID]: ScrollState;
+  // [ZOOM_PLUGIN_ID]: ZoomState; 
+}>;
+
+// 2. Use Command<AppState> to type your definitions
+const myCommands: Record<string, Command<AppState>> = {
+  'nav.next': {
+    id: 'nav.next',
+    label: 'Next Page',
+    shortcuts: ['arrowright', 'j'],
+    action: ({ registry }) => {
+      registry.getPlugin('scroll')?.provides()?.scrollToNextPage();
+    },
+    // The 'state' argument is now typed as AppState
+    disabled: ({ state, documentId }) => {
+      // Access specific document state safely
+      const scrollState = state.plugins.scroll.documents[documentId];
+      return scrollState 
+        ? scrollState.currentPage >= scrollState.totalPages 
+        : true;
+    },
+  },
+};
+```
+
+### 2\. Creating a Command-Aware Button
+
+Instead of manually tracking state in every button, use the `useCommand` hook. It returns the fully resolved command object, which automatically updates whenever the viewer state changes.
+
+```tsx
+import { useCommand } from '@embedpdf/plugin-commands/react';
+
+const CommandButton = ({ commandId, documentId }) => {
+  // Pass the command ID and the current document ID
+  const resolved = useCommand(commandId, documentId);
+
+  if (!resolved || !resolved.visible) return null;
+
+  return (
+    <button
+      onClick={resolved.execute}
+      disabled={resolved.disabled}
+      title={`${resolved.label} (${resolved.shortcuts?.[0] || ''})`}
+    >
+      {resolved.label}
+    </button>
+  );
+};
+```
+
+## Live Example
+
+This example demonstrates a custom toolbar built entirely using the Commands system. Notice how the "Next Page" button automatically disables when you reach the end of the document, and keyboard shortcuts (Left/Right Arrows) work automatically without extra wiring.
+
+import { PDFViewer } from '../../code-examples/headless/commands-example';
+
+<CodeExample 
+  codePaths={[
+    "content/docs/react/code-examples/headless/commands-example.tsx"
+  ]}
+>
+  <PDFViewer />
+</CodeExample>
+
+## API Reference
+
+### Configuration (`CommandsPluginConfig`)
+
+| Option | Type | Description |
+| :--- | :--- | :--- |
+| **`commands`** | `Record<string, Command>` | A map of command definitions to register on initialization. |
+
+### Hook: `useCommand(commandId, documentId)`
+
+Retrieves a command and subscribes to its state changes.
+
+#### Returns (`ResolvedCommand | null`)
+
+| Property | Type | Description |
+| :--- | :--- | :--- |
+| **`execute`** | `() => void` | The function to trigger the command. |
+| **`disabled`** | `boolean` | Whether the command is currently disabled. |
+| **`active`** | `boolean` | Whether the command is currently active/toggled on. |
+| **`visible`** | `boolean` | Whether the command should be visible in the UI. |
+| **`label`** | `string` | The display label (translated if i18n is available). |
+| **`shortcuts`** | `string[]` | Array of assigned keyboard shortcuts. |
+
+### Hook: `useCommandsCapability()`
+
+Access the global commands API.
+
+#### `CommandsCapability` Methods
+
+| Method | Description |
+| :--- | :--- |
+| **`registerCommand(cmd)`** | Dynamically register a new command. |
+| **`execute(id)`** | Execute a command by its ID. |
+| **`getCommandByShortcut(key)`** | Find a command matching a shortcut string. |
+| **`getAllCommands()`** | Returns a list of all registered resolved commands. |
+
+### The `Command` Interface
+
+When defining a command, you implement this interface:
+
+```typescript
+interface Command<TState = any> {
+  id: string;
+  label?: string;
+  icon?: string;
+  shortcuts?: string[]; 
+  
+  // The execution logic
+  action: (context: { 
+    registry: PluginRegistry; 
+    state: TState; 
+    documentId: string 
+  }) => void;
+
+  // Dynamic predicates (can be value or function)
+  // Receives the typed global state and the current documentId
+  disabled?: boolean | ((ctx: { state: TState; documentId: string }) => boolean);
+  visible?: boolean | ((ctx: { state: TState; documentId: string }) => boolean);
+  active?: boolean | ((ctx: { state: TState; documentId: string }) => boolean);
+}
+```

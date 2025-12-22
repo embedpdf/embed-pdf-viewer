@@ -1,0 +1,130 @@
+---
+title: Internationalization
+description: Localize your PDF viewer with built-in multi-language support.
+---
+
+import { I18nExample } from '../../code-examples/viewer/i18n-example';
+
+# Internationalization (i18n)
+
+The PDFViewer comes with built-in support for multiple languages. It allows you to translate the entire user interface—including tooltips, menus, and button labels—to match your application's locale.
+
+## Built-in Locales
+
+We provide out-of-the-box support for several languages, including:
+- English (`en`) - Default
+- Dutch (`nl`)
+- German (`de`)
+- French (`fr`)
+- Spanish (`es`)
+
+## Configuration
+
+You can configure the initial language and available locales via the `i18n` property in your config object.
+
+```svelte
+<PDFViewer
+  config={{
+    i18n: {
+      defaultLocale: 'de', // Start in German
+      fallbackLocale: 'en' // Use English if a translation is missing
+    }
+  }}
+/>
+```
+
+## Changing Language at Runtime
+
+You can switch languages dynamically without reloading the viewer. This is useful for synchronizing the PDF viewer with your application's language picker.
+
+<CodeExample
+  codePaths={[
+    "../../examples/svelte-tailwind/src/examples/viewer/i18n-example.svelte"
+  ]}
+>
+  <I18nExample />
+</CodeExample>
+
+### How to Switch Language
+
+To change the language programmatically, you need to access the `i18n` plugin instance from the viewer's registry.
+
+```svelte
+<script lang="ts">
+  import { PDFViewer, type PluginRegistry } from '@embedpdf/svelte-pdf-viewer';
+
+  let registry = $state<PluginRegistry | null>(null);
+
+  const handleReady = (r: PluginRegistry) => {
+    registry = r;
+  };
+
+  const changeLanguage = (locale: string) => {
+    const i18n = registry?.getPlugin('i18n')?.provides();
+    i18n?.setLocale(locale);
+  };
+</script>
+
+<button onclick={() => changeLanguage('de')}>German</button>
+<button onclick={() => changeLanguage('fr')}>French</button>
+<button onclick={() => changeLanguage('en')}>English</button>
+
+<PDFViewer onready={handleReady} config={{ src: '/doc.pdf' }} />
+```
+
+## Listening for Language Changes
+
+If you need to know when the language changes (for example, to save the user's preference to local storage or sync with another part of your app), you can subscribe to the `onLocaleChange` event.
+
+```svelte
+<script lang="ts">
+  import { PDFViewer, type PluginRegistry } from '@embedpdf/svelte-pdf-viewer';
+
+  const handleReady = (registry: PluginRegistry) => {
+    const i18n = registry.getPlugin('i18n')?.provides();
+
+    // Subscribe to changes
+    i18n?.onLocaleChange(({ previousLocale, currentLocale }) => {
+      console.log(`Language changed from ${previousLocale} to ${currentLocale}`);
+    });
+  };
+</script>
+
+<PDFViewer onready={handleReady} config={{ src: '/doc.pdf' }} />
+```
+
+## Custom Translations
+
+If you need to support a language not included by default, or want to override specific labels, you can provide your own translation objects.
+
+```svelte
+<script lang="ts">
+  import { PDFViewer } from '@embedpdf/svelte-pdf-viewer';
+
+  const customSpanish = {
+    code: 'es',
+    name: 'Español',
+    translations: {
+      zoom: {
+        in: 'Acercar',
+        out: 'Alejar',
+      },
+      document: {
+        open: 'Abrir Documento',
+      }
+      // ... other keys
+    }
+  };
+</script>
+
+<PDFViewer
+  config={{
+    i18n: {
+      defaultLocale: 'es',
+      // Register your custom locale
+      locales: [customSpanish] 
+    }
+  }}
+/>
+```
+

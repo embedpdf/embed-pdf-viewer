@@ -240,7 +240,7 @@ export {
 } from '@embedpdf/plugin-interaction-manager/preact';
 
 // Re-export from models
-export { Rotation } from '@embedpdf/models';
+export { Rotation, ignore } from '@embedpdf/models';
 
 // Re-export PluginRegistry for typing
 export type { PluginRegistry } from '@embedpdf/core';

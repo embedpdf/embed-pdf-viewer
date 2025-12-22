@@ -1,0 +1,91 @@
+---
+title: Spread Layouts
+description: Display pages individually or in a two-page, book-like spread layout.
+---
+
+import SpreadExample from '../../code-examples/viewer/spread-example';
+import { ExampleWrapper } from '@/components/example-wrapper';
+
+# Spread Layouts
+
+The PDFViewer supports switching between single-page view and two-page "spread" views. This is ideal for reading magazines, books, or any content designed to be viewed side-by-side.
+
+## Configuration
+
+You can configure the initial layout mode using the `spread` config object.
+
+```tsx
+import { SpreadMode } from '@embedpdf/react-pdf-viewer';
+
+<PDFViewer
+  config={{
+    spread: {
+      defaultSpreadMode: SpreadMode.Odd
+    }
+  }}
+/>
+```
+
+### Understanding Spread Modes
+
+| Mode | Description | Page Grouping |
+| :--- | :--- | :--- |
+| `SpreadMode.None` | **Default**. Each page is displayed individually in a vertical list. | `[1], [2], [3], [4]` |
+| `SpreadMode.Odd` | Pages are paired starting from page 1. Good for content where page 1 is the left side of a spread. | `[1, 2], [3, 4]` |
+| `SpreadMode.Even` | The first page is standalone (e.g., a cover), and subsequent pages are paired. | `[1], [2, 3], [4, 5]` |
+
+## Programmatic Control
+
+You can dynamically change the layout mode using the plugin API.
+
+<CodeExample
+  codePaths={[
+    "content/docs/react/code-examples/viewer/spread-example.tsx"
+  ]}
+>
+  <ExampleWrapper>
+    <SpreadExample />
+  </ExampleWrapper>
+</CodeExample>
+
+### Changing the Mode
+
+```tsx
+import { SpreadMode, SpreadPlugin } from '@embedpdf/react-pdf-viewer';
+
+const registry = await viewerRef.current?.registry;
+const spreadPlugin = registry.getPlugin<SpreadPlugin>('spread')?.provides();
+const docSpread = spreadPlugin?.forDocument('my-doc-id');
+
+// Switch to book view (cover page separate)
+docSpread?.setSpreadMode(SpreadMode.Even);
+
+// Switch back to single page
+docSpread?.setSpreadMode(SpreadMode.None);
+```
+
+### Reading Current Mode
+
+```tsx
+const currentMode = docSpread?.getSpreadMode();
+```
+
+## Listening for Changes
+
+You can listen for layout changes to keep your external UI in sync.
+
+```tsx
+const registry = await viewerRef.current?.registry;
+const spreadPlugin = registry.getPlugin('spread').provides();
+
+// Subscribe to global spread changes (any document)
+spreadPlugin.onSpreadChange(({ documentId, spreadMode }) => {
+  console.log(`Document ${documentId} layout changed to ${spreadMode}`);
+});
+
+// Or subscribe to a specific document
+const docSpread = spreadPlugin.forDocument('my-doc');
+docSpread.onSpreadChange((spreadMode) => {
+  console.log(`My doc is now in ${spreadMode} mode`);
+});
+```
