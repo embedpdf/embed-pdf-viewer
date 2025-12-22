@@ -27,7 +27,7 @@ export default function PanExample({
 
     const setupListener = async () => {
       const registry = await viewer.registry
-      const panPlugin = registry.getPlugin<PanPlugin>('pan')?.provides()
+      const panPlugin = registry?.getPlugin<PanPlugin>('pan')?.provides()
 
       // Get capability for specific document
       const docPan = panPlugin?.forDocument('pan-doc')
