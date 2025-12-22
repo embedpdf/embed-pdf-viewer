@@ -4,7 +4,13 @@ import { useEffect, useRef, useState } from 'react'
 export function useVueMount(loader: () => Promise<{ default: any }>) {
   const containerRef = useRef<HTMLDivElement>(null)
   const vueAppRef = useRef<any>(null)
+  const loaderRef = useRef(loader)
   const [isMounted, setIsMounted] = useState(false)
+
+  // Keep latest loader without triggering unmount/remount on rerenders
+  useEffect(() => {
+    loaderRef.current = loader
+  }, [loader])
 
   // Ensure we only render on client
   useEffect(() => {
@@ -20,12 +26,19 @@ export function useVueMount(loader: () => Promise<{ default: any }>) {
       if (!containerRef.current || vueAppRef.current) return
 
       try {
-        const mod = await loader()
-        const { createApp } = await import('vue')
+        const [mod, hostMod, vue] = await Promise.all([
+          loaderRef.current(),
+          import('@embedpdf/example-vue-tailwind/viewer/_example-host'),
+          import('vue'),
+        ])
+        const { createApp, h } = vue
 
         if (!mounted) return
 
-        const app = createApp(mod.default)
+        // Create app with host component, passing the actual component as a prop
+        const app = createApp({
+          render: () => h(hostMod.default, { component: mod.default }),
+        })
         app.mount(containerRef.current)
         vueAppRef.current = app
       } catch (error) {
@@ -42,8 +55,7 @@ export function useVueMount(loader: () => Promise<{ default: any }>) {
         vueAppRef.current = null
       }
     }
-  }, [loader, isMounted])
+  }, [isMounted])
 
-  // ALWAYS return the ref, never return null
-  return containerRef
+  return { containerRef }
 }

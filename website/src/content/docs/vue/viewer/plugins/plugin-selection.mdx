@@ -1,0 +1,124 @@
+---
+title: Text Selection
+description: Control text selection programmatically and listen for selection events.
+---
+
+import { SelectionExample } from '../../code-examples/viewer/selection-example';
+
+# Text Selection
+
+The PDFViewer enables users to select text naturally, just like on a webpage. While the viewer provides built-in context menus for selection, you can also interact with the selection state programmatically to build custom features like "Copy to Clipboard" buttons or extract selected text.
+
+## Programmatic Control
+
+You can control selection behavior using the `selection` plugin API.
+
+<CodeExample
+  codePaths={[
+    "../../examples/vue-tailwind/src/examples/viewer/selection-example.vue"
+  ]}
+>
+  <SelectionExample />
+</CodeExample>
+
+### Interacting with Selection
+
+To perform actions on the current text selection:
+
+```vue
+<script setup lang="ts">
+import { ref } from 'vue';
+import { PDFViewer, type PluginRegistry } from '@embedpdf/vue-pdf-viewer';
+
+const registry = ref<PluginRegistry | null>(null);
+
+const handleReady = (r: PluginRegistry) => {
+  registry.value = r;
+};
+
+const copyToClipboard = () => {
+  const selection = registry.value?.getPlugin('selection')?.provides();
+  const scope = selection?.forDocument('my-doc');
+  scope?.copyToClipboard();
+};
+
+const clearSelection = () => {
+  const selection = registry.value?.getPlugin('selection')?.provides();
+  const scope = selection?.forDocument('my-doc');
+  scope?.clear();
+};
+</script>
+
+<template>
+  <PDFViewer @ready="handleReady" :config="{ src: '/doc.pdf' }" />
+</template>
+```
+
+## Reading Selected Text
+
+You can retrieve the actual text content that the user has selected.
+
+```vue
+<script setup lang="ts">
+const getSelectedText = async () => {
+  const selection = registry.value?.getPlugin('selection')?.provides();
+  const scope = selection?.forDocument('my-doc');
+  
+  const text = await scope?.getSelectedText().toPromise();
+  console.log('Selected text:', text?.join(' '));
+};
+</script>
+```
+
+## Listening for Changes
+
+You can listen for selection events to update your UI.
+
+```vue
+<script setup lang="ts">
+import { ref } from 'vue';
+import { PDFViewer, type PluginRegistry } from '@embedpdf/vue-pdf-viewer';
+
+const hasSelection = ref(false);
+
+const handleReady = (registry: PluginRegistry) => {
+  const selection = registry.getPlugin('selection')?.provides();
+  const scope = selection?.forDocument('my-doc');
+
+  scope?.onSelectionChange((selectionRange) => {
+    if (selectionRange) {
+      console.log('Text selected!');
+      hasSelection.value = true;
+    } else {
+      console.log('Selection cleared');
+      hasSelection.value = false;
+    }
+  });
+};
+</script>
+
+<template>
+  <PDFViewer @ready="handleReady" :config="{ src: '/doc.pdf' }" />
+</template>
+```
+
+### Getting Selection Details
+
+The `selectionRange` object provides detailed information about the selection:
+
+```vue
+<script setup lang="ts">
+const getSelectionDetails = () => {
+  const selection = registry.value?.getPlugin('selection')?.provides();
+  const scope = selection?.forDocument('my-doc');
+  const selections = scope?.getFormattedSelection();
+
+  selections?.forEach(sel => {
+    console.log(`Page: ${sel.pageIndex}`);
+    console.log(`Bounding Box:`, sel.rect);
+    console.log(`Text lines:`, sel.textLines);
+  });
+};
+</script>
+```
+

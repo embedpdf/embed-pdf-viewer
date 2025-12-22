@@ -125,7 +125,10 @@ const Hero = () => {
                   </div>
                 </div>
                 <div className="h-6 w-px bg-gray-200 dark:bg-gray-700 md:h-8"></div>
-                <div className="flex flex-col items-center gap-2 transition-transform hover:-translate-y-1">
+                <Link
+                  href="/docs/react"
+                  className="flex flex-col items-center gap-2 transition-transform hover:-translate-y-1"
+                >
                   <div
                     className="flex h-10 w-10 items-center justify-center rounded-xl bg-white shadow-sm ring-1 ring-gray-900/5 dark:bg-gray-800 dark:ring-white/10 md:h-12 md:w-12 md:rounded-2xl"
                     title="React"
@@ -133,8 +136,11 @@ const Hero = () => {
                     <ReactIcon className="h-5 w-5 text-[#61DAFB] md:h-6 md:w-6" />
                     <span className="sr-only">React</span>
                   </div>
-                </div>
-                <div className="flex flex-col items-center gap-2 transition-transform hover:-translate-y-1">
+                </Link>
+                <Link
+                  href="/docs/vue"
+                  className="flex flex-col items-center gap-2 transition-transform hover:-translate-y-1"
+                >
                   <div
                     className="flex h-10 w-10 items-center justify-center rounded-xl bg-white shadow-sm ring-1 ring-gray-900/5 dark:bg-gray-800 dark:ring-white/10 md:h-12 md:w-12 md:rounded-2xl"
                     title="Vue"
@@ -142,8 +148,11 @@ const Hero = () => {
                     <VueIcon className="h-5 w-5 text-[#4FC08D] md:h-6 md:w-6" />
                     <span className="sr-only">Vue</span>
                   </div>
-                </div>
-                <div className="flex flex-col items-center gap-2 transition-transform hover:-translate-y-1">
+                </Link>
+                <Link
+                  href="/docs/svelte"
+                  className="flex flex-col items-center gap-2 transition-transform hover:-translate-y-1"
+                >
                   <div
                     className="flex h-10 w-10 items-center justify-center rounded-xl bg-white shadow-sm ring-1 ring-gray-900/5 dark:bg-gray-800 dark:ring-white/10 md:h-12 md:w-12 md:rounded-2xl"
                     title="Svelte"
@@ -151,7 +160,7 @@ const Hero = () => {
                     <SvelteIcon className="h-5 w-5 text-[#FF3E00] md:h-6 md:w-6" />
                     <span className="sr-only">Svelte</span>
                   </div>
-                </div>
+                </Link>
               </div>
             </div>
           </div>
@@ -190,17 +199,17 @@ const paths = [
         text: 'Vanilla',
       },
       {
-        href: '/docs/snippet/getting-started#2-framework-components',
+        href: '/docs/react/viewer/introduction',
         icon: <ReactIcon className="h-5 w-5 text-[#61DAFB]" />,
         text: 'React',
       },
       {
-        href: '/docs/snippet/getting-started#2-framework-components',
+        href: '/docs/vue/viewer/introduction',
         icon: <VueIcon className="h-5 w-5 text-[#4FC08D]" />,
         text: 'Vue',
       },
       {
-        href: '/docs/snippet/getting-started#2-framework-components',
+        href: '/docs/svelte/viewer/introduction',
         icon: <SvelteIcon className="h-5 w-5 text-[#FF3E00]" />,
         text: 'Svelte',
       },
@@ -225,17 +234,17 @@ const paths = [
     ctaTitle: 'Read Documentation',
     links: [
       {
-        href: '/docs/react/introduction',
+        href: '/docs/react/headless/introduction',
         icon: <ReactIcon className="h-5 w-5 text-[#61DAFB]" />,
         text: 'React',
       },
       {
-        href: '/docs/vue/introduction',
+        href: '/docs/vue/headless/introduction',
         icon: <VueIcon className="h-5 w-5 text-[#4FC08D]" />,
         text: 'Vue',
       },
       {
-        href: '/docs/svelte/introduction',
+        href: '/docs/svelte/headless/introduction',
         icon: <SvelteIcon className="h-5 w-5 text-[#FF3E00]" />,
         text: 'Svelte',
       },
@@ -523,14 +532,14 @@ const HeadlessSection = () => {
             <span>React Docs</span>
           </Link>
           <Link
-            href="/docs/vue/introduction"
+            href="/docs/vue"
             className="group flex w-full items-center justify-center gap-3 rounded-full border border-gray-200 bg-white px-6 py-3 text-sm font-medium text-gray-700 shadow-sm transition-all hover:border-emerald-300 hover:shadow-md dark:border-gray-800 dark:bg-gray-900 dark:text-gray-300 dark:hover:border-emerald-700 sm:w-auto"
           >
             <VueIcon className="h-5 w-5 text-[#4FC08D]" />
             <span>Vue Docs</span>
           </Link>
           <Link
-            href="/docs/svelte/introduction"
+            href="/docs/svelte"
             className="group flex w-full items-center justify-center gap-3 rounded-full border border-gray-200 bg-white px-6 py-3 text-sm font-medium text-gray-700 shadow-sm transition-all hover:border-orange-300 hover:shadow-md dark:border-gray-800 dark:bg-gray-900 dark:text-gray-300 dark:hover:border-orange-700 sm:w-auto"
           >
             <SvelteIcon className="h-5 w-5 text-[#FF3E00]" />

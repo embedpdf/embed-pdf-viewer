@@ -1,0 +1,118 @@
+---
+title: Export & Save
+description: Configure downloads and learn how to save modified PDFs (with annotations) to your server.
+---
+
+import { ExportExample } from '../../code-examples/viewer/export-example';
+
+# Export & Save
+
+The PDFViewer includes built-in functionality to export the current PDF. This isn't just downloading the original file; the export plugin generates a **new PDF file** that includes any changes the user has made, such as:
+* Annotations (Highlights, Ink, Shapes)
+* Redactions (Applied and burned in)
+* Form filled data
+
+## Configuration
+
+You can configure the default filename via the `export` config property.
+
+```vue
+<template>
+  <PDFViewer
+    :config="{
+      export: {
+        defaultFileName: 'exported-document.pdf' 
+      }
+    }"
+  />
+</template>
+```
+
+## Programmatic Control
+
+While the default toolbar includes a download button, you often need to trigger these actions from your own UI or handle the file data directly.
+
+<CodeExample
+  codePaths={[
+    "../../examples/vue-tailwind/src/examples/viewer/export-example.vue"
+  ]}
+>
+  <ExportExample />
+</CodeExample>
+
+### Triggering a Download
+
+To programmatically trigger the browser's download dialog:
+
+```vue
+<script setup lang="ts">
+import { ref } from 'vue';
+import { PDFViewer, type PluginRegistry } from '@embedpdf/vue-pdf-viewer';
+
+const registry = ref<PluginRegistry | null>(null);
+
+const handleReady = (r: PluginRegistry) => {
+  registry.value = r;
+};
+
+const triggerDownload = () => {
+  const exportPlugin = registry.value?.getPlugin('export')?.provides();
+
+  // Trigger download for the active document
+  exportPlugin?.download();
+
+  // Trigger download for a specific document
+  // exportPlugin?.forDocument(documentId).download();
+};
+</script>
+
+<template>
+  <PDFViewer @ready="handleReady" :config="{ src: '/doc.pdf' }" />
+</template>
+```
+
+### Saving to a Server
+
+A common requirement is to save the modified PDF back to your server instead of downloading it.
+
+```vue
+<script setup lang="ts">
+import { ref } from 'vue';
+import { PDFViewer, type PluginRegistry } from '@embedpdf/vue-pdf-viewer';
+
+const registry = ref<PluginRegistry | null>(null);
+
+const handleReady = (r: PluginRegistry) => {
+  registry.value = r;
+};
+
+const handleSave = async () => {
+  const exportPlugin = registry.value?.getPlugin('export')?.provides();
+
+  // 1. Get the PDF data as an ArrayBuffer
+  const arrayBuffer = await exportPlugin?.saveAsCopy().toPromise();
+  if (!arrayBuffer) return;
+
+  // 2. Convert ArrayBuffer to a Blob/File
+  const blob = new Blob([arrayBuffer], { type: 'application/pdf' });
+  const file = new File([blob], 'updated-doc.pdf');
+
+  // 3. Upload to your server
+  const formData = new FormData();
+  formData.append('file', file);
+  formData.append('id', '12345');
+
+  await fetch('/api/documents/save', {
+    method: 'POST',
+    body: formData
+  });
+
+  console.log('Document saved successfully!');
+};
+</script>
+
+<template>
+  <PDFViewer @ready="handleReady" :config="{ src: '/doc.pdf' }" />
+</template>
+```
+
