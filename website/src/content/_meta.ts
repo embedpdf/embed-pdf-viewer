@@ -34,6 +34,20 @@ export default {
       timestamp: false,
     },
   },
+  ['vue-pdf-viewer']: {
+    title: 'Vue PDF Viewer',
+    type: 'page',
+    theme: {
+      timestamp: false,
+    },
+  },
+  ['svelte-pdf-viewer']: {
+    title: 'Svelte PDF Viewer',
+    type: 'page',
+    theme: {
+      timestamp: false,
+    },
+  },
   docs: {
     title: 'Docs',
     type: 'page',
