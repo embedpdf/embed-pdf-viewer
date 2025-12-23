@@ -23,21 +23,23 @@ yarn add @embedpdf/svelte-pdf-viewer
     theme: { preference: 'system' },
   };
 
-  function onReady(event) {
-    console.log('PDF viewer ready', event.detail);
+  function onready(registry) {
+    console.log('PDF viewer ready', registry);
   }
 </script>
 
-<PDFViewer {config} style="width: 100%; height: 100vh;" on:ready={onReady} />
+<PDFViewer {config} style="width: 100%; height: 100vh;" {onready} />
 ```
 
 ## Props
 
-| Prop     | Type              | Description                              |
-| -------- | ----------------- | ---------------------------------------- |
-| `config` | `PDFViewerConfig` | Full configuration object for the viewer |
-| `class`  | `string`          | CSS class name for the container         |
-| `style`  | `string`          | Inline styles for the container          |
+| Prop      | Type              | Description                                |
+| --------- | ----------------- | ------------------------------------------ |
+| `config`  | `PDFViewerConfig` | Full configuration object for the viewer   |
+| `class`   | `string`          | CSS class name for the container           |
+| `style`   | `string`          | Inline styles for the container            |
+| `oninit`  | `function`        | Callback when the viewer is initialized    |
+| `onready` | `function`        | Callback when the plugin registry is ready |
 
 The `config` prop accepts all configuration options from `@embedpdf/snippet`, including:
 
@@ -48,37 +50,32 @@ The `config` prop accepts all configuration options from `@embedpdf/snippet`, in
 - `annotations` - Annotation configuration
 - And more...
 
-## Events
+## Callbacks
 
-| Event   | Detail              | Description                      |
-| ------- | ------------------- | -------------------------------- |
-| `init`  | `EmbedPdfContainer` | Fired when viewer is initialized |
-| `ready` | `PluginRegistry`    | Fired when registry is ready     |
+The component uses Svelte 5 props for callbacks instead of events:
+
+- `oninit(container: EmbedPdfContainer)` - Fired when the viewer container is initialized
+- `onready(registry: PluginRegistry)` - Fired when the plugin registry is ready and plugins are loaded
 
 ## Accessing the Registry
 
-Use bind: directives to access the viewer container and registry:
+You can access the registry via the `onready` callback:
 
 ```svelte
 <script>
   import { PDFViewer } from '@embedpdf/svelte-pdf-viewer';
 
-  let container;
-  let registry;
-
-  async function handleClick() {
-    const reg = await registry;
+  function onready(registry) {
     // Use registry to access plugins
+    const searchPlugin = registry.getPlugin('search');
   }
 </script>
 
 <PDFViewer
-  bind:container
-  bind:registry
   config={{ src: '/document.pdf' }}
   style="width: 100%; height: 100vh;"
+  {onready}
 />
-<button on:click={handleClick}>Get Registry</button>
 ```
 
 ## License

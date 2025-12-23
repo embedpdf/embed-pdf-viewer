@@ -97,6 +97,65 @@ export default async (phase: string) => {
     },
     // Mark Vue/Svelte example packages as external for server-side bundling
     serverExternalPackages: EXTERNAL_EXAMPLE_PACKAGES,
+    // Redirects for moved documentation pages (from /docs/{framework}/* to /docs/{framework}/headless/*)
+    async redirects() {
+      const frameworks = ['react', 'vue', 'svelte']
+      const headlessPages = [
+        'engine',
+        'full-example',
+        'getting-started',
+        'introduction',
+        'understanding-plugins',
+      ]
+      const pluginPages = [
+        'plugin-annotation',
+        'plugin-capture',
+        'plugin-commands',
+        'plugin-document-manager',
+        'plugin-export',
+        'plugin-i18n',
+        'plugin-pan',
+        'plugin-print',
+        'plugin-redaction',
+        'plugin-render',
+        'plugin-rotate',
+        'plugin-scroll',
+        'plugin-selection',
+        'plugin-spread',
+        'plugin-thumbnail',
+        'plugin-tiling',
+        'plugin-view-manager',
+        'plugin-viewport',
+        'plugin-zoom',
+      ]
+
+      const redirects: Array<{
+        source: string
+        destination: string
+        permanent: boolean
+      }> = []
+
+      for (const framework of frameworks) {
+        // Redirect headless pages
+        for (const page of headlessPages) {
+          redirects.push({
+            source: `/docs/${framework}/${page}`,
+            destination: `/docs/${framework}/headless/${page}`,
+            permanent: true,
+          })
+        }
+        // Redirect plugin pages
+        for (const plugin of pluginPages) {
+          redirects.push({
+            source: `/docs/${framework}/plugins/${plugin}`,
+            destination: `/docs/${framework}/headless/plugins/${plugin}`,
+            permanent: true,
+          })
+        }
+      }
+
+      return redirects
+    },
   }
 
   // Add transpilePackages in development (but exclude the pre-built examples)

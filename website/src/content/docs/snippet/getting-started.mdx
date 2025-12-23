@@ -5,14 +5,21 @@ description: Add a full-featured PDF viewer to your application in minutes using
 {/* @embedpdf-version 2.0.0-next.2 */}
 
 import { Tabs } from '@/components/tabs'
+import { FrameworkCards } from '@/components/framework-cards'
 
 # Getting Started
 
 The **EmbedPDF Snippet** is a pre-built, production-ready PDF viewer. Unlike the headless libraries which require you to build your own UI, the snippet comes with a polished interface, toolbars, and sidebars out of the box.
 
-Choose your preferred method of integration below.
+## 1. Using a Framework?
 
-## 1. Vanilla HTML/JS (Easiest)
+If you are building a modern web application with React, Vue, or Svelte, we strongly recommend using our official component wrappers. They handle lifecycle management and type safety for you.
+
+<div className="mb-10 mt-6">
+  <FrameworkCards />
+</div>
+
+## 2. Vanilla HTML/JS (CDN)
 
 If you aren't using a build tool, or just want to test quickly, you can load the viewer directly from our CDN.
 
@@ -31,105 +38,32 @@ If you aren't using a build tool, or just want to test quickly, you can load the
 </script>
 ```
 
-## 2\. Framework Components
+## 3. NPM Package (Vanilla JS)
 
-For modern web applications, we provide native wrappers that handle lifecycle management and type safety for you.
+If you are using a bundler (Vite, Webpack, etc.) but don't need a framework wrapper, you can install the snippet directly from NPM.
 
-<Tabs items={['React', 'Vue', 'Svelte', 'Vanilla NPM']}>
-<Tabs.Tab>
 ### Installation
+
 ```sh npm2yarn
-npm install @embedpdf/react-pdf-viewer  
-````
-
-### Usage
-```tsx copy filename="App.tsx"
-import { PDFViewer } from '@embedpdf/react-pdf-viewer';
-
-export default function App() {
-  return (
-    <div style={{ height: '100vh' }}>
-      <PDFViewer 
-        config={{
-          src: 'https://snippet.embedpdf.com/ebook.pdf',
-          theme: { preference: 'light' }
-        }}
-      />
-    </div>
-  );
-}
+npm install @embedpdf/snippet
 ```
 
-
-</Tabs.Tab>
-<Tabs.Tab>
-### Installation
-```sh npm2yarn
-npm install @embedpdf/vue-pdf-viewer  
-````
-
 ### Usage
-```vue copy filename="App.vue"
-<script setup>
-import { PDFViewer } from '@embedpdf/vue-pdf-viewer';
-</script>
 
-<template>
-  <div style="height: 100vh">
-    <PDFViewer 
-      :config="{
-        src: 'https://snippet.embedpdf.com/ebook.pdf',
-        theme: { preference: 'light' }
-      }"
-    />
-  </div>
-</template>
-```
-
-</Tabs.Tab>
-<Tabs.Tab>
-### Installation
-```sh npm2yarn
-npm install @embedpdf/svelte-pdf-viewer  
-````
-
-### Usage
-```svelte copy filename="App.svelte"
-<script>
-  import { PDFViewer } from '@embedpdf/svelte-pdf-viewer';
-</script>
-
-<div style="height: 100vh">
-  <PDFViewer 
-    config={{
-      src: 'https://snippet.embedpdf.com/ebook.pdf',
-      theme: { preference: 'light' }
-    }}
-  />
-</div>
-```
-
-</Tabs.Tab>
-<Tabs.Tab>
-### Installation
-```sh npm2yarn
-npm install @embedpdf/snippet 
-````
-### Usage
 ```ts copy filename="main.ts"
 import EmbedPDF from '@embedpdf/snippet';
 
-const container = document.getElementById('app');
+const container = document.getElementById('pdf-viewer');
 
-EmbedPDF.init({
-  type: 'container',
-  target: container,
-  src: 'https://snippet.embedpdf.com/ebook.pdf'
-});
+if (container) {
+  EmbedPDF.init({
+    type: 'container',
+    target: container,
+    src: 'https://snippet.embedpdf.com/ebook.pdf',
+    theme: { preference: 'system' }
+  });
+}
 ```
-
-</Tabs.Tab>
-</Tabs>
 
 ## Configuration
 

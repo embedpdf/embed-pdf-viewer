@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { onMount, onDestroy } from 'svelte';
+  import { onMount, onDestroy, createEventDispatcher } from 'svelte';
   import EmbedPDF, {
     type EmbedPdfContainer,
     type PDFViewerConfig,
@@ -23,6 +23,10 @@
 
   let container: EmbedPdfContainer | null = null;
   let containerEl: HTMLDivElement;
+  const dispatch = createEventDispatcher<{
+    init: EmbedPdfContainer;
+    ready: PluginRegistry;
+  }>();
 
   onMount(() => {
     const viewer = EmbedPDF.init({
@@ -34,9 +38,11 @@
     if (viewer) {
       container = viewer;
       oninit?.(viewer);
+      dispatch('init', viewer);
 
       viewer.registry.then((reg) => {
         onready?.(reg);
+        dispatch('ready', reg);
       });
     }
   });

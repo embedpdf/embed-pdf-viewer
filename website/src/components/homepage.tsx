@@ -1,5 +1,5 @@
 'use client'
-import React from 'react'
+import React, { useState } from 'react'
 import {
   ArrowRight,
   Github,
@@ -17,7 +17,7 @@ import { JavaScript } from '@/components/icons/javascript'
 import { Typescript } from '@/components/icons/typescript'
 import { Scribble2 } from '@/components/icons/scribble2'
 import { ReactIcon, VueIcon, SvelteIcon } from './framework-icons'
-import { CodeShowcase } from './code-showcase'
+import { CodeShowcase, type Framework } from './code-showcase'
 import PDFViewer from './pdf-viewer'
 
 // Animated blobs for the background
@@ -190,7 +190,7 @@ const paths = [
     ctaTitle: 'Get Started',
     links: [
       {
-        href: '/docs/snippet/getting-started#1-vanilla-htmljs-easiest',
+        href: '/docs/snippet/getting-started',
         icon: (
           <div className="flex h-5 w-5 items-center justify-center overflow-hidden">
             <JavaScript />
@@ -383,6 +383,36 @@ const FeatureCards = () => {
 }
 
 const SnippetSection = () => {
+  const [activeFramework, setActiveFramework] = useState<Framework>('snippet')
+
+  const getDocumentationLink = (fw: Framework) => {
+    switch (fw) {
+      case 'react':
+        return '/docs/react/viewer/introduction'
+      case 'vue':
+        return '/docs/vue/viewer/introduction'
+      case 'svelte':
+        return '/docs/svelte/viewer/introduction'
+      case 'snippet':
+      default:
+        return '/docs/snippet/introduction'
+    }
+  }
+
+  const getButtonText = (fw: Framework) => {
+    switch (fw) {
+      case 'react':
+        return 'Read React Documentation'
+      case 'vue':
+        return 'Read Vue Documentation'
+      case 'svelte':
+        return 'Read Svelte Documentation'
+      case 'snippet':
+      default:
+        return 'Read Snippet Documentation'
+    }
+  }
+
   return (
     <div className="mt-24">
       {/* Embed Code Section - Explicitly for Ready-made Viewer */}
@@ -400,14 +430,14 @@ const SnippetSection = () => {
           </p>
         </div>
 
-        <CodeShowcase />
+        <CodeShowcase onTabChange={setActiveFramework} />
 
         <div className="mt-8 flex justify-center">
           <Link
-            href="/docs/snippet/introduction"
+            href={getDocumentationLink(activeFramework)}
             className="group inline-flex items-center justify-center rounded-full bg-gray-900 px-6 py-3 text-sm font-medium text-white shadow-lg transition-transform hover:scale-105 dark:bg-white dark:text-gray-900"
           >
-            Read Snippet Documentation
+            {getButtonText(activeFramework)}
             <ArrowRight className="ml-2 h-4 w-4 transition-transform group-hover:translate-x-1" />
           </Link>
         </div>
