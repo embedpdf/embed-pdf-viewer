@@ -133,7 +133,7 @@
       commands,
     }),
     createPluginRegistration(I18nPluginPackage, {
-      defaultLocale: 'nl',
+      defaultLocale: 'en',
       locales: [englishTranslations, germanTranslations, spanishTranslations, dutchTranslations],
       paramResolvers,
     }),
