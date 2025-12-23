@@ -742,9 +742,9 @@ const faqs = [
       "Yes! All components are designed to work seamlessly with SvelteKit. We handle the client-side browser APIs (like Canvas) gracefully, so you don't get hydration mismatches. Just ensure components are only mounted on the client.",
   },
   {
-    question: 'Does it support Svelte 5 runes?',
+    question: 'Does it work with Svelte 5?',
     answer:
-      'Yes, we are Svelte 5 ready! We support both the new runes syntax and legacy event dispatching, ensuring smooth compatibility regardless of your Svelte version.',
+      'Yes! The component is fully compatible with both Svelte 4 and Svelte 5. Use it in any Svelte project regardless of version.',
   },
   {
     question: 'Do I need a server or API key?',

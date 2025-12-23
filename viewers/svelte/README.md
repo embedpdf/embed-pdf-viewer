@@ -35,7 +35,7 @@ It is designed to be the fastest way to get a high-quality PDF viewer into your 
 - **Themable** — Built-in light/dark modes and support for custom brand colors.
 - **Configurable** — Easily disable features you don't need (e.g., printing or downloading).
 - **TypeScript** — Fully typed for a great developer experience.
-- **Svelte 5 Ready** — Supports both modern runes syntax and legacy events.
+- **Svelte 4 & 5** — Works with both Svelte 4 and Svelte 5 projects.
 - **SvelteKit Ready** — Works seamlessly with SSR.
 
 ---
@@ -137,13 +137,12 @@ The `config` prop accepts the following top-level options:
 
 ## 🔌 Callbacks & Registry
 
-We support both modern Svelte 5 callback props and legacy event dispatching.
+Use callback props to access the viewer instance and plugin registry.
 
 ```svelte
 <script>
   import { PDFViewer } from '@embedpdf/svelte-pdf-viewer';
 
-  // Svelte 5 / Modern Way
   function onready(registry) {
     const engine = registry.getEngine();
     console.log('Engine ready:', engine);
@@ -155,8 +154,10 @@ We support both modern Svelte 5 callback props and legacy event dispatching.
 
 ### Available Callbacks
 
-- `oninit(container: EmbedPdfContainer)` - Fired when the viewer container is initialized.
-- `onready(registry: PluginRegistry)` - Fired when the plugin registry is ready and plugins are loaded.
+| Callback  | Payload             | Description                                     |
+| :-------- | :------------------ | :---------------------------------------------- |
+| `oninit`  | `EmbedPdfContainer` | Fired when the viewer container is initialized. |
+| `onready` | `PluginRegistry`    | Fired when the plugin registry is ready.        |
 
 ---
 
