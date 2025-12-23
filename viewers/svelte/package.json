@@ -5,6 +5,7 @@
   "license": "MIT",
   "type": "module",
   "sideEffects": false,
+  "homepage": "https://www.embedpdf.com/svelte-pdf-viewer",
   "svelte": "./dist/index.js",
   "types": "./dist/index.d.ts",
   "exports": {

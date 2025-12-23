@@ -8,6 +8,7 @@
   "license": "MIT",
   "type": "module",
   "sideEffects": false,
+  "homepage": "https://www.embedpdf.com/vue-pdf-viewer",
   "exports": {
     ".": {
       "types": "./dist/index.d.ts",
