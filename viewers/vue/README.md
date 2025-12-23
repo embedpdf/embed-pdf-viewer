@@ -7,7 +7,7 @@
   <p>The easiest way to embed PDF files in your Vue 3 application with a complete, ready‑to‑use interface.</p>
 
 <a href="https://www.embedpdf.com/vue-pdf-viewer"><img alt="Documentation" src="https://img.shields.io/badge/View%20Docs-0af?style=for-the-badge&labelColor=000000"></a>
-<a href="https://quasar.embedpdf.com/"><img alt="Live Demo" src="https://img.shields.io/badge/Try%20Live%20Demo-ff1493.svg?style=for-the-badge&labelColor=000000"></a>
+<a href="https://app.embedpdf.com/"><img alt="Live Demo" src="https://img.shields.io/badge/Try%20Live%20Demo-ff1493.svg?style=for-the-badge&labelColor=000000"></a>
 <a href="https://www.npmjs.com/package/@embedpdf/vue-pdf-viewer"><img alt="NPM Version" src="https://img.shields.io/npm/v/@embedpdf/vue-pdf-viewer?style=for-the-badge&labelColor=000000&color=blue"></a>
 
 </div>
