@@ -126,7 +126,7 @@ const Hero = () => {
                 </div>
                 <div className="h-6 w-px bg-gray-200 dark:bg-gray-700 md:h-8"></div>
                 <Link
-                  href="/docs/react"
+                  href="/react-pdf-viewer"
                   className="flex flex-col items-center gap-2 transition-transform hover:-translate-y-1"
                 >
                   <div
@@ -138,7 +138,7 @@ const Hero = () => {
                   </div>
                 </Link>
                 <Link
-                  href="/docs/vue"
+                  href="/vue-pdf-viewer"
                   className="flex flex-col items-center gap-2 transition-transform hover:-translate-y-1"
                 >
                   <div
@@ -150,7 +150,7 @@ const Hero = () => {
                   </div>
                 </Link>
                 <Link
-                  href="/docs/svelte"
+                  href="/svelte-pdf-viewer"
                   className="flex flex-col items-center gap-2 transition-transform hover:-translate-y-1"
                 >
                   <div
