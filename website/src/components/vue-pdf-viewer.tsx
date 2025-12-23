@@ -112,7 +112,7 @@ const Hero = () => {
               </Link>
 
               <a
-                href="https://quasar.embedpdf.com"
+                href="https://app.embedpdf.com"
                 target="_blank"
                 rel="noreferrer"
                 className="dark:hover:bg-gray-750 group inline-flex w-full items-center justify-center rounded-full bg-white px-8 py-3.5 text-base font-medium text-gray-700 shadow-md transition-all hover:bg-gray-50 hover:text-gray-900 hover:shadow-lg dark:bg-gray-800 dark:text-gray-200 dark:hover:text-white sm:w-auto md:py-4"
