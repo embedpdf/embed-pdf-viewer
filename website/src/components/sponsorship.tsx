@@ -516,17 +516,17 @@ const Sponsorship2: React.FC = () => {
                       Current Progress
                     </div>
                     <div className="text-lg font-bold sm:text-xl">
-                      $2,650 / $30,000 per month
+                      $5,650 / $30,000 per month
                     </div>
                   </div>
                   <div className="h-6 overflow-hidden rounded-full bg-white/20 sm:h-8">
                     <div
                       className="h-full rounded-full bg-gradient-to-r from-green-400 to-emerald-500 transition-all duration-1000 ease-out"
-                      style={{ width: 'max(3%, 8.83%)' }}
+                      style={{ width: 'max(3%, 18.83%)' }}
                     ></div>
                   </div>
                   <div className="mt-2 text-center text-xs text-white/70 sm:text-left sm:text-sm">
-                    8.83% funded
+                    18.83% funded
                   </div>
                 </div>
               </div>
