@@ -1,0 +1,118 @@
+---
+title: Accessing the Engine
+description: Access the underlying PDFium engine for advanced document operations.
+searchable: true
+---
+
+import { Callout } from '@/components/callout'
+
+# Accessing the Engine
+
+The `PDFViewer` component is powered by a high-performance PDFium engine compiled to WebAssembly. For advanced use cases, you can access the engine directly.
+
+<Callout type="warning">
+**The engine is stateless.** Operations performed directly on the engine (like adding annotations) will **not** update the viewer UI. The viewer's state is managed by plugins.
+
+Use the engine only for:
+- **Read-only operations** (metadata, text extraction)
+- **Export/rendering** to external targets (save to file, render to canvas)
+- **Advanced operations** not supported by plugins
+
+For operations that should reflect in the UI (adding annotations, navigating pages, zooming), always use the appropriate **plugin** instead.
+</Callout>
+
+## Getting the Engine Reference
+
+Use the `onready` callback to access the plugin registry, then get the engine:
+
+```svelte copy filename="App.svelte"
+<script lang="ts">
+  import {
+    PDFViewer,
+    type EmbedPdfContainer,
+    type PluginRegistry,
+    type DocumentManagerPlugin,
+  } from '@embedpdf/svelte-pdf-viewer';
+
+  let container = $state<EmbedPdfContainer | null>(null);
+  let registry = $state<PluginRegistry | null>(null);
+
+  const handleInit = (c: EmbedPdfContainer) => {
+    container = c;
+  };
+
+  const handleReady = (r: PluginRegistry) => {
+    registry = r;
+  };
+
+  const getDocumentMetadata = async () => {
+    if (!registry) return;
+
+    // Access the engine
+    const engine = registry.getEngine();
+
+    // Get the active document
+    const documentManager = registry
+      .getPlugin<DocumentManagerPlugin>('document-manager')
+      ?.provides();
+    const document = documentManager?.getActiveDocument();
+
+    if (engine && document) {
+      // Use engine methods directly
+      const metadata = await engine.getMetadata(document).toPromise();
+      console.log('Document metadata:', metadata);
+    }
+  };
+</script>
+
+<button onclick={getDocumentMetadata}>Get Metadata</button>
+<PDFViewer 
+  oninit={handleInit}
+  onready={handleReady}
+  config={{ src: 'https://snippet.embedpdf.com/ebook.pdf' }} 
+/>
+```
+
+## Interactive Example
+
+Click the button to fetch document metadata directly from the PDFium engine:
+
+import { EngineExample } from '../code-examples/viewer/engine-example';
+
+<CodeExample
+  codePaths={[
+    "../../examples/svelte-tailwind/src/examples/viewer/engine-example.svelte"
+  ]}
+>
+  <EngineExample />
+</CodeExample>
+
+## Common Engine Methods
+
+The engine provides methods for low-level PDF operations. These are primarily **read-only** operations that are safe to use without affecting the viewer state:
+
+| Method | Description |
+| :--- | :--- |
+| `getMetadata(document)` | Get document metadata (title, author, dates, etc.) |
+| `renderPage(document, page, options?)` | Render a page to an image (for export, not display) |
+| `getPageText(document, pageIndex)` | Extract text content from a page |
+| `getPageAnnotations(document, pageIndex)` | Read annotations on a page |
+| `saveAsCopy(document)` | Save the document to a new buffer |
+
+All engine methods return an Observable that can be converted to a Promise using `.toPromise()`.
+
+<Callout type="info">
+**Need to modify the document?** Use plugins instead:
+- **Add annotations** → Use the [Annotation Plugin](/docs/svelte/headless/plugins/plugin-annotation)
+- **Change zoom** → Use the [Zoom Plugin](/docs/svelte/headless/plugins/plugin-zoom)
+- **Navigate pages** → Use the [Scroll Plugin](/docs/svelte/headless/plugins/plugin-scroll)
+
+Plugins manage state and ensure the UI stays in sync with your changes.
+</Callout>
+
+## Full Engine Documentation
+
+The engine provides many more capabilities including text extraction, page rendering, and annotation management.
+
+For complete documentation of all available methods and advanced usage patterns, see the **[@embedpdf/engines documentation](/docs/engines/introduction)**.
+

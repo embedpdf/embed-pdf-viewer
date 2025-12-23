@@ -1,0 +1,93 @@
+---
+title: Rotation
+description: Programmatically rotate documents and listen for rotation changes.
+---
+
+import { RotateExample } from '../../code-examples/viewer/rotate-example';
+
+# Rotation
+
+The PDFViewer includes built-in support for rotating documents in 90-degree increments. While the default toolbar includes rotation buttons (in the page settings menu), you may want to build custom controls or trigger rotation programmatically.
+
+## Programmatic Control
+
+You can control rotation using the `rotate` plugin API. This allows you to build custom toolbars or keyboard shortcuts.
+
+<CodeExample
+  codePaths={[
+    "../../examples/svelte-tailwind/src/examples/viewer/rotate-example.svelte"
+  ]}
+>
+  <RotateExample />
+</CodeExample>
+
+### Rotating the Active Document
+
+To rotate whatever document is currently visible:
+
+```svelte
+<script lang="ts">
+  import { PDFViewer, type PluginRegistry } from '@embedpdf/svelte-pdf-viewer';
+
+  let registry = $state<PluginRegistry | null>(null);
+
+  const handleReady = (r: PluginRegistry) => {
+    registry = r;
+  };
+
+  const rotateForward = () => {
+    const rotate = registry?.getPlugin('rotate')?.provides();
+    rotate?.rotateForward();
+  };
+
+  const rotateBackward = () => {
+    const rotate = registry?.getPlugin('rotate')?.provides();
+    rotate?.rotateBackward();
+  };
+</script>
+
+<PDFViewer onready={handleReady} config={{ src: '/doc.pdf' }} />
+```
+
+### Rotating a Specific Document
+
+To target a specific document (e.g., 'invoice-123') regardless of whether it's active:
+
+```svelte
+<script lang="ts">
+  const setRotation = (rotation: number) => {
+    const rotate = registry?.getPlugin('rotate')?.provides();
+    const docRotate = rotate?.forDocument('invoice-123');
+    // Set specific rotation (0 = 0°, 1 = 90°, 2 = 180°, 3 = 270°)
+    docRotate?.setRotation(rotation);
+  };
+</script>
+```
+
+## Listening for Changes
+
+You can listen for rotation changes to keep your external UI in sync.
+
+```svelte
+<script lang="ts">
+  import { PDFViewer, type PluginRegistry } from '@embedpdf/svelte-pdf-viewer';
+
+  const handleReady = (registry: PluginRegistry) => {
+    const rotate = registry.getPlugin('rotate')?.provides();
+
+    // Subscribe to global rotation changes (any document)
+    rotate?.onRotateChange(({ documentId, rotation }) => {
+      console.log(`Document ${documentId} rotated to ${rotation * 90}°`);
+    });
+
+    // Or subscribe to a specific document
+    const docRotate = rotate?.forDocument('my-doc');
+    docRotate?.onRotateChange((rotation) => {
+      console.log(`My doc is now at ${rotation * 90}°`);
+    });
+  };
+</script>
+
+<PDFViewer onready={handleReady} config={{ src: '/doc.pdf' }} />
+```
+

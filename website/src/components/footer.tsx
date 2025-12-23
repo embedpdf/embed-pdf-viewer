@@ -70,7 +70,7 @@ export default function Footer() {
                   <span className="ml-2">React PDF Viewer</span>
                 </Link>
               </li>
-              {/*<li>
+              <li>
                 <Link
                   href="/vue-pdf-viewer"
                   className="group inline-flex items-center text-sm transition-colors hover:text-green-600 dark:hover:text-green-400"
@@ -78,7 +78,16 @@ export default function Footer() {
                   <span className="h-1.5 w-1.5 rounded-full bg-green-500 transition-transform group-hover:scale-150"></span>
                   <span className="ml-2">Vue PDF Viewer</span>
                 </Link>
-              </li>*/}
+              </li>
+              <li>
+                <Link
+                  href="/svelte-pdf-viewer"
+                  className="group inline-flex items-center text-sm transition-colors hover:text-orange-600 dark:hover:text-orange-400"
+                >
+                  <span className="h-1.5 w-1.5 rounded-full bg-orange-500 transition-transform group-hover:scale-150"></span>
+                  <span className="ml-2">Svelte PDF Viewer</span>
+                </Link>
+              </li>
             </ul>
           </div>
 

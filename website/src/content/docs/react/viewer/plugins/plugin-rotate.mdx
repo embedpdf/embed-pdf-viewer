@@ -1,0 +1,73 @@
+---
+title: Rotation
+description: Programmatically rotate documents and listen for rotation changes.
+---
+
+import RotateExample from '../../code-examples/viewer/rotate-example';
+import { ExampleWrapper } from '@/components/example-wrapper';
+
+# Rotation
+
+The PDFViewer includes built-in support for rotating documents in 90-degree increments. While the default toolbar includes rotation buttons (in the page settings menu), you may want to build custom controls or trigger rotation programmatically.
+
+## Programmatic Control
+
+You can control rotation using the `rotate` plugin API. This allows you to build custom toolbars or keyboard shortcuts.
+
+<CodeExample
+  codePaths={[
+    "content/docs/react/code-examples/viewer/rotate-example.tsx"
+  ]}
+>
+  <ExampleWrapper>
+    <RotateExample />
+  </ExampleWrapper>
+</CodeExample>
+
+### Rotating the Active Document
+
+To rotate whatever document is currently visible:
+
+```tsx
+const registry = await viewerRef.current?.registry;
+const rotate = registry.getPlugin('rotate').provides();
+
+// Rotate 90 degrees clockwise
+rotate.rotateForward();
+
+// Rotate 90 degrees counter-clockwise
+rotate.rotateBackward();
+```
+
+### Rotating a Specific Document
+
+To target a specific document (e.g., 'invoice-123') regardless of whether it's active:
+
+```tsx
+const docRotate = rotate.forDocument('invoice-123');
+
+// Set specific rotation (0 = 0°, 1 = 90°, 2 = 180°, 3 = 270°)
+docRotate.setRotation(2); 
+```
+
+## Listening for Changes
+
+You can listen for rotation changes to keep your external UI in sync.
+
+```tsx
+const registry = await viewerRef.current?.registry;
+const rotate = registry.getPlugin('rotate').provides();
+
+// Subscribe to global rotation changes (any document)
+rotate.onRotateChange(({ documentId, rotation }) => {
+  console.log(`Document ${documentId} rotated to ${rotation * 90}°`);
+});
+
+// Or subscribe to a specific document
+const docRotate = rotate.forDocument('my-doc');
+docRotate.onRotateChange((rotation) => {
+  console.log(`My doc is now at ${rotation * 90}°`);
+});
+```
+
+

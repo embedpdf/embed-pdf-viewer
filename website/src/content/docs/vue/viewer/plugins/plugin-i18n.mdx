@@ -1,0 +1,132 @@
+---
+title: Internationalization
+description: Localize your PDF viewer with built-in multi-language support.
+---
+
+import { I18nExample } from '../../code-examples/viewer/i18n-example';
+
+# Internationalization (i18n)
+
+The PDFViewer comes with built-in support for multiple languages. It allows you to translate the entire user interface—including tooltips, menus, and button labels—to match your application's locale.
+
+## Built-in Locales
+
+We provide out-of-the-box support for several languages, including:
+- English (`en`) - Default
+- Dutch (`nl`)
+- German (`de`)
+- French (`fr`)
+- Spanish (`es`)
+
+## Configuration
+
+You can configure the initial language and available locales via the `i18n` property.
+
+```vue
+<template>
+  <PDFViewer
+    :config="{
+      i18n: {
+        defaultLocale: 'de',
+        fallbackLocale: 'en'
+      }
+    }"
+  />
+</template>
+```
+
+## Changing Language at Runtime
+
+You can switch languages dynamically without reloading the viewer.
+
+<CodeExample
+  codePaths={[
+    "../../examples/vue-tailwind/src/examples/viewer/i18n-example.vue"
+  ]}
+>
+  <I18nExample />
+</CodeExample>
+
+### How to Switch Language
+
+```vue
+<script setup lang="ts">
+import { ref } from 'vue';
+import { PDFViewer, type PluginRegistry } from '@embedpdf/vue-pdf-viewer';
+
+const registry = ref<PluginRegistry | null>(null);
+
+const handleReady = (r: PluginRegistry) => {
+  registry.value = r;
+};
+
+const changeLanguage = (locale: string) => {
+  const i18n = registry.value?.getPlugin('i18n')?.provides();
+  i18n?.setLocale(locale);
+};
+</script>
+
+<template>
+  <button @click="changeLanguage('de')">German</button>
+  <button @click="changeLanguage('fr')">French</button>
+  <button @click="changeLanguage('en')">English</button>
+
+  <PDFViewer @ready="handleReady" :config="{ src: '/doc.pdf' }" />
+</template>
+```
+
+## Listening for Language Changes
+
+```vue
+<script setup lang="ts">
+import { PDFViewer, type PluginRegistry } from '@embedpdf/vue-pdf-viewer';
+
+const handleReady = (registry: PluginRegistry) => {
+  const i18n = registry.getPlugin('i18n')?.provides();
+
+  i18n?.onLocaleChange(({ previousLocale, currentLocale }) => {
+    console.log(`Language changed from ${previousLocale} to ${currentLocale}`);
+  });
+};
+</script>
+
+<template>
+  <PDFViewer @ready="handleReady" :config="{ src: '/doc.pdf' }" />
+</template>
+```
+
+## Custom Translations
+
+If you need to support a language not included by default, you can provide your own translation objects.
+
+```vue
+<script setup lang="ts">
+import { PDFViewer } from '@embedpdf/vue-pdf-viewer';
+
+const customSpanish = {
+  code: 'es',
+  name: 'Español',
+  translations: {
+    zoom: {
+      in: 'Acercar',
+      out: 'Alejar',
+    },
+    document: {
+      open: 'Abrir Documento',
+    }
+  }
+};
+</script>
+
+<template>
+  <PDFViewer
+    :config="{
+      i18n: {
+        defaultLocale: 'es',
+        locales: [customSpanish] 
+      }
+    }"
+  />
+</template>
+```
+

@@ -1,0 +1,205 @@
+---
+title: Selection Plugin
+description: Enables text selection, providing visual highlighting and an API to copy or process the selected text.
+searchable: true
+---
+
+# Selection Plugin
+
+The Selection Plugin enables users to select text within the PDF document, just like on a standard webpage. It provides the `<SelectionLayer />` to visually highlight the selected text and a rich API to get the selected content.
+
+## Installation
+
+This plugin depends on the `Interaction Manager` plugin. You must install both packages.
+
+```sh npm2yarn
+npm install @embedpdf/plugin-selection @embedpdf/plugin-interaction-manager
+````
+
+## Registration
+
+Import `SelectionPluginPackage` and its `InteractionManager` dependency, and add them to the `plugins` array. The Selection plugin should be registered after its dependency.
+
+```tsx {5, 15}
+import { createPluginRegistration } from '@embedpdf/core'
+import { EmbedPDF } from '@embedpdf/core/react'
+// ... other imports
+import { InteractionManagerPluginPackage } from '@embedpdf/plugin-interaction-manager/react'
+import { SelectionPluginPackage } from '@embedpdf/plugin-selection/react'
+
+const plugins = [
+  // ... other essential plugins
+  createPluginRegistration(DocumentManagerPluginPackage, { /* ... */ }),
+
+  // Register dependency first
+  createPluginRegistration(InteractionManagerPluginPackage),
+
+  // Register the selection plugin
+  createPluginRegistration(SelectionPluginPackage),
+]
+```
+
+## Usage
+
+The plugin has two main parts: the `<SelectionLayer />` component for the UI, and the `useSelectionCapability` hook for interacting with the selection data.
+
+### 1. Displaying the Selection
+
+To show the highlighted text, place the `<SelectionLayer />` component inside the `renderPage` prop of your `<Scroller />`. For text selection to work correctly, it must be a child of the `PagePointerProvider`.
+
+Both components require the `documentId` to link to the correct document state.
+
+```tsx {2, 10}
+import { PagePointerProvider } from '@embedpdf/plugin-interaction-manager/react';
+import { SelectionLayer } from '@embedpdf/plugin-selection/react';
+
+// ...
+<Scroller
+  documentId={activeDocumentId}
+  renderPage={({ pageIndex }) => (
+    <PagePointerProvider documentId={activeDocumentId} pageIndex={pageIndex}>
+      <RenderLayer documentId={activeDocumentId} pageIndex={pageIndex} />
+      <SelectionLayer documentId={activeDocumentId} pageIndex={pageIndex} />
+    </PagePointerProvider>
+  )}
+/>
+```
+
+### 2. Interacting with the Selection
+
+The `useSelectionCapability` hook allows you to work with the selected text. You need to scope the capability to the specific document using `.forDocument(id)`.
+
+You can use the `onSelectionChange` event to know when a selection exists, which is useful for enabling or disabling UI elements like a "Copy" button.
+
+```tsx {2, 5, 8-15}
+import { useState, useEffect } from 'react';
+import { useSelectionCapability, SelectionRangeX } from '@embedpdf/plugin-selection/react';
+
+const SelectionToolbar = ({ documentId }) => {
+  const { provides: selectionCapability } = useSelectionCapability();
+  const [hasSelection, setHasSelection] = useState(false);
+
+  useEffect(() => {
+    if (!selectionCapability) return;
+    const selection = selectionCapability.forDocument(documentId);
+    
+    return selection.onSelectionChange((sel: SelectionRangeX | null) => {
+      setHasSelection(!!sel);
+    });
+  }, [selectionCapability, documentId]);
+
+  const handleCopy = () => {
+    selectionCapability?.forDocument(documentId).copyToClipboard();
+  };
+
+  return <button onClick={handleCopy} disabled={!hasSelection}>Copy</button>;
+};
+```
+
+### 3. Adding a Selection Menu
+
+You can display a contextual menu near the selected text—perfect for a "Copy" button that appears inline. Pass a `selectionMenu` render function to `<SelectionLayer />`. The `placement` prop provides hints about whether to position the menu above or below the selection.
+
+```tsx
+import { 
+  SelectionLayer, 
+  useSelectionCapability, 
+  type SelectionSelectionMenuProps 
+} from '@embedpdf/plugin-selection/react';
+
+const TextSelectionMenu = ({ 
+  rect, 
+  menuWrapperProps, 
+  placement, 
+  documentId 
+}: SelectionSelectionMenuProps & { documentId: string }) => {
+  const { provides: selectionCapability } = useSelectionCapability();
+
+  const handleCopy = () => {
+    const scope = selectionCapability?.forDocument(documentId);
+    scope?.copyToClipboard();
+    scope?.clear(); // Clear selection after copying
+  };
+
+  // Position above or below based on available space
+  const top = placement.suggestTop ? -48 : rect.size.height + 8;
+
+  return (
+    <div {...menuWrapperProps}>
+      <div style={{ position: 'absolute', top, pointerEvents: 'auto', cursor: 'default' }}>
+        <button onClick={handleCopy}>Copy</button>
+      </div>
+    </div>
+  );
+};
+
+// Pass the menu to the SelectionLayer
+<SelectionLayer
+  documentId={activeDocumentId}
+  pageIndex={pageIndex}
+  selectionMenu={(props) => (
+    <TextSelectionMenu {...props} documentId={activeDocumentId} />
+  )}
+/>
+```
+
+The `menuWrapperProps` must be spread onto your wrapper element—it handles proper positioning relative to page rotation.
+
+## Live Example
+
+Try selecting text in the viewer below. A contextual "Copy" menu will appear near your selection, and the toolbar's "Copy Text" button will become active. This demonstrates both the `selectionMenu` prop and the `useSelectionCapability` hook.
+
+import { PDFViewer } from '../../code-examples/headless/selection-example';
+
+<CodeExample 
+  codePaths={[
+    "content/docs/react/code-examples/headless/selection-example.tsx"
+  ]}
+>
+  <PDFViewer />
+</CodeExample>
+
+## API Reference
+
+### Configuration (`SelectionPluginConfig`)
+
+| Option | Type | Description |
+| :--- | :--- | :--- |
+| **`menuHeight`** | `number` | The approximate height of the selection menu in pixels. Used to determine whether to show the menu above or below the selection. <br/>**Default**: `40` |
+
+### Component: `<SelectionLayer />`
+
+The component that renders the blue rectangles over the selected text.
+
+| Prop | Type | Description |
+| :--- | :--- | :--- |
+| **`documentId`** | `string` | **(Required)** The ID of the document. |
+| **`pageIndex`** | `number` | **(Required)** The index of the page this layer is on. |
+| **`background`** | `string` | (Optional) The color of the selection highlight. <br/>**Default**: `'rgba(33,150,243)'` |
+| **`selectionMenu`** | `(props) => JSX.Element` | A render prop for a custom menu that appears when text is selected. |
+
+### Hook: `useSelectionCapability()`
+
+Connects your component to the selection plugin's API.
+
+#### Returns
+
+| Property | Type | Description |
+| :--- | :--- | :--- |
+| **`provides`** | `SelectionCapability \| null` | The selection API object. |
+
+#### `SelectionCapability` Methods
+
+| Method | Description |
+| :--- | :--- |
+| **`forDocument(id)`** | Returns a `SelectionScope` for the specified document ID. |
+
+#### `SelectionScope` Methods (Returned by `forDocument`)
+
+| Method | Description |
+| :--- | :--- |
+| **`copyToClipboard()`** | Triggers the process to copy the currently selected text to the user's clipboard. |
+| **`getSelectedText()`** | Returns a `Task<string[]>` that resolves with the selected text content. Each string in the array is a line. |
+| **`getFormattedSelection()`** | Returns an array of objects describing the selection on each page, including its bounding box and the individual highlight rectangles. |
+| **`onSelectionChange`** | An event hook that fires when the text selection is created, updated, or cleared. |
+| **`onEndSelection`** | An event hook that fires when the user finishes selecting text (on mouse up). This is ideal for fetching the selected text content. |

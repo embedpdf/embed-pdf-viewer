@@ -5,12 +5,16 @@
   "type": "module",
   "license": "MIT",
   "exports": {
-    "./*": "./dist/examples/*.js"
+    "./headless/*": "./dist/examples/headless/*.js",
+    "./viewer/*": "./dist/examples/viewer/*.js"
   },
   "typesVersions": {
     "*": {
-      "*": [
-        "./dist/examples/*.d.ts"
+      "headless/*": [
+        "./dist/examples/headless/*.d.ts"
+      ],
+      "viewer/*": [
+        "./dist/examples/viewer/*.d.ts"
       ]
     }
   },
@@ -55,6 +59,7 @@
     "@embedpdf/plugin-viewport": "workspace:*",
     "@embedpdf/plugin-zoom": "workspace:*",
     "@embedpdf/vue-pdf-viewer": "workspace:*",
+    "@embedpdf/snippet": "workspace:*",
     "@embedpdf/utils": "workspace:*",
     "lucide-vue-next": "^0.562.0",
     "tailwind-merge": "^3.4.0",

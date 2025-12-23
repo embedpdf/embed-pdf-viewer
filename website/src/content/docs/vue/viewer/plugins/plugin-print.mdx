@@ -1,0 +1,88 @@
+---
+title: Printing
+description: Programmatically trigger high-quality document printing.
+---
+
+import { PrintExample } from '../../code-examples/viewer/print-example';
+
+# Printing
+
+The PDFViewer includes a high-quality print engine that prepares documents for the browser's native print dialog. While a print button is included in the default toolbar, you may want to trigger printing from your own UI.
+
+## Programmatic Control
+
+You can control printing using the `print` plugin API.
+
+<CodeExample
+  codePaths={[
+    "../../examples/vue-tailwind/src/examples/viewer/print-example.vue"
+  ]}
+>
+  <PrintExample />
+</CodeExample>
+
+### Printing the Active Document
+
+To print whatever document is currently visible:
+
+```vue
+<script setup lang="ts">
+import { ref } from 'vue';
+import { PDFViewer, type PluginRegistry } from '@embedpdf/vue-pdf-viewer';
+
+const registry = ref<PluginRegistry | null>(null);
+
+const handleReady = (r: PluginRegistry) => {
+  registry.value = r;
+};
+
+const print = () => {
+  const printPlugin = registry.value?.getPlugin('print')?.provides();
+  printPlugin?.print();
+};
+</script>
+
+<template>
+  <PDFViewer @ready="handleReady" :config="{ src: '/doc.pdf' }" />
+</template>
+```
+
+### Printing a Specific Document
+
+To target a specific document:
+
+```vue
+<script setup lang="ts">
+const printDocument = () => {
+  const printPlugin = registry.value?.getPlugin('print')?.provides();
+  const docPrint = printPlugin?.forDocument('invoice-123');
+
+  docPrint?.print().wait(
+    () => console.log('Print dialog opened'),
+    (error) => console.error('Print failed', error)
+  );
+};
+</script>
+```
+
+### Print Options
+
+You can pass options to the `print` method to control what gets printed:
+
+```vue
+<script setup lang="ts">
+const printWithOptions = () => {
+  const printPlugin = registry.value?.getPlugin('print')?.provides();
+  const docPrint = printPlugin?.forDocument('invoice-123');
+
+  docPrint?.print({
+    // Print specific pages
+    pageRanges: '1-3, 5, 8', 
+    
+    // Include annotations in the print output
+    includeAnnotations: true 
+  });
+};
+</script>
+```
+

@@ -1,0 +1,215 @@
+---
+title: Theme
+description: Customize the PDFViewer's appearance with light, dark, and custom themes.
+searchable: true
+---
+
+# Customizing the Theme
+
+The `PDFViewer` component includes a robust theming system that supports Light, Dark, and System modes. You can customize every color aspect—from backgrounds and borders to brand accents.
+
+## Basic Configuration
+
+Set the initial color mode using the `preference` property:
+
+```vue copy filename="App.vue"
+<script setup lang="ts">
+import { PDFViewer } from '@embedpdf/vue-pdf-viewer';
+</script>
+
+<template>
+  <PDFViewer 
+    :config="{
+      src: 'https://snippet.embedpdf.com/ebook.pdf',
+      theme: {
+        preference: 'dark'  // 'light' | 'dark' | 'system'
+      }
+    }"
+  />
+</template>
+```
+
+## Overriding Colors
+
+You can override specific colors for both light and dark modes. The viewer performs a deep merge, so you only need to specify the values you want to change.
+
+### Example: Custom Brand Color
+
+Change the primary accent to your brand color (e.g., purple):
+
+```vue copy filename="App.vue"
+<script setup lang="ts">
+import { PDFViewer } from '@embedpdf/vue-pdf-viewer';
+</script>
+
+<template>
+  <PDFViewer 
+    :config="{
+      src: '/document.pdf',
+      theme: {
+        preference: 'system',
+        light: {
+          accent: {
+            primary: '#9333ea',        // Main brand color
+            primaryHover: '#7e22ce',   // Hover state
+            primaryActive: '#6b21a8',  // Click state
+            primaryLight: '#f3e8ff',   // Subtle backgrounds
+            primaryForeground: '#fff'  // Text on primary
+          }
+        },
+        dark: {
+          accent: {
+            primary: '#a855f7',        // Lighter purple for dark mode
+            primaryHover: '#9333ea',
+            primaryActive: '#7e22ce',
+            primaryLight: '#581c87',
+            primaryForeground: '#fff'
+          }
+        }
+      }
+    }"
+  />
+</template>
+```
+
+### Interactive Example
+
+Click on a color below to see the viewer update its accent color in real-time. The viewer also syncs with the website's light/dark mode:
+
+import { ThemeExample } from '../code-examples/viewer/theme-example';
+
+<CodeExample 
+  codePaths={[
+    "../../examples/vue-tailwind/src/examples/viewer/theme-example.vue"
+  ]}
+>
+  <ThemeExample />
+</CodeExample>
+
+## Theme Structure
+
+The theme object is divided into semantic categories:
+
+### Accent (Branding)
+
+Controls the main call-to-action buttons, active states, and focus rings.
+
+```typescript
+accent: {
+  primary: string;           // Main brand color
+  primaryHover: string;      // Hover state
+  primaryActive: string;     // Active/Pressed state
+  primaryLight: string;      // Very light tint (used for selections)
+  primaryForeground: string; // Text color on top of primary button
+}
+```
+
+### Backgrounds
+
+Controls the layers of the application.
+
+```typescript
+background: {
+  app: string;         // The main background behind the document
+  surface: string;     // Toolbars, sidebars, panels
+  surfaceAlt: string;  // Secondary toolbars
+  elevated: string;    // Dropdowns, popups
+  overlay: string;     // Modal backdrops (usually transparent rgba)
+  input: string;       // Text inputs and checkboxes
+}
+```
+
+### Foreground (Text)
+
+Controls text colors.
+
+```typescript
+foreground: {
+  primary: string;     // Headings, main body text
+  secondary: string;   // Labels, less important text
+  muted: string;       // Placeholders, disabled-looking text
+  disabled: string;    // Actually disabled elements
+  onAccent: string;    // Text on top of accent colors
+}
+```
+
+### Interactive
+
+Controls generic hover and selection states.
+
+```typescript
+interactive: {
+  hover: string;       // Hover background for standard buttons
+  active: string;      // Click background
+  selected: string;    // Selected item background (e.g. active tool)
+  focus: string;       // Focus ring outline color
+}
+```
+
+### Borders
+
+```typescript
+border: {
+  default: string;     // Standard inputs, dividers
+  subtle: string;      // Very light dividers
+  strong: string;      // Active inputs, emphasis
+}
+```
+
+### Semantic States
+
+Used for alerts, success messages, and warnings.
+
+```typescript
+state: {
+  error: string;
+  errorLight: string;  // Background for error messages
+  warning: string;
+  warningLight: string;
+  success: string;
+  successLight: string;
+  info: string;
+  infoLight: string;
+}
+```
+
+## Syncing with Your App's Theme
+
+If your app already has a dark mode toggle, you can sync it with the viewer:
+
+```vue copy filename="ThemeSync.vue"
+<script setup lang="ts">
+import { ref, watch } from 'vue';
+import { PDFViewer, type EmbedPdfContainer } from '@embedpdf/vue-pdf-viewer';
+
+interface Props {
+  theme: 'light' | 'dark';
+}
+
+const props = defineProps<Props>();
+
+const container = ref<EmbedPdfContainer | null>(null);
+
+const handleInit = (c: EmbedPdfContainer) => {
+  container.value = c;
+};
+
+watch(
+  () => props.theme,
+  (preference) => {
+    container.value?.setTheme({ preference });
+  }
+);
+</script>
+
+<template>
+  <PDFViewer 
+    @init="handleInit"
+    :config="{
+      src: 'https://snippet.embedpdf.com/ebook.pdf',
+      theme: { preference: theme }
+    }"
+  />
+</template>
+```
+

@@ -4,7 +4,7 @@ import React, { useState } from 'react'
 import { ReactIcon, VueIcon, SvelteIcon } from './framework-icons'
 import { EMBEDPDF_JS_URL, DEMO_PDF_URL } from './cdn-snippet'
 
-type Framework = 'snippet' | 'react' | 'vue' | 'svelte'
+export type Framework = 'snippet' | 'react' | 'vue' | 'svelte'
 
 interface Tab {
   id: Framework
@@ -13,6 +13,13 @@ interface Tab {
   icon: React.ReactNode
   color: string
   hoverColor: string
+}
+
+interface CodeShowcaseProps {
+  /** If provided, only shows this specific framework without tabs */
+  framework?: Framework
+  /** Callback to notify parent of active tab changes */
+  onTabChange?: (framework: Framework) => void
 }
 
 const tabs: Tab[] = [
@@ -103,15 +110,15 @@ function onReady(registry) {
   svelte: `<script lang="ts">
   import { PDFViewer } from '@embedpdf/svelte-pdf-viewer';
 
-  function handleReady(event) {
-    console.log('PDF viewer ready!', event.detail);
+  function onready(registry) {
+    console.log('PDF viewer ready!', registry);
   }
 </script>
 
 <PDFViewer
   config={{ src: '${DEMO_PDF_URL}' }}
   style="height: 500px"
-  on:ready={handleReady}
+  {onready}
 />`,
 }
 
@@ -307,15 +314,14 @@ const SvelteCode = () => (
     ;{'\n\n'}
     {'  '}
     <span className="text-purple-400">function</span>{' '}
-    <span className="text-blue-300">handleReady</span>(
-    <span className="text-orange-300">event</span>) {'{'}
+    <span className="text-blue-300">onready</span>(
+    <span className="text-orange-300">registry</span>) {'{'}
     {'\n'}
     {'    '}
     <span className="text-white">console</span>.
     <span className="text-blue-300">log</span>(
     <span className="text-yellow-300">&apos;PDF viewer ready!&apos;</span>,{' '}
-    <span className="text-orange-300">event</span>.
-    <span className="text-white">detail</span>);{'\n'}
+    <span className="text-orange-300">registry</span>);{'\n'}
     {'  '}
     {'}'}
     {'\n'}
@@ -341,10 +347,7 @@ const SvelteCode = () => (
     <span className="text-yellow-300">&quot;height: 500px&quot;</span>
     {'\n'}
     {'  '}
-    <span className="text-green-400">on:ready</span>=
-    <span className="text-cyan-300">
-      {'{'}handleReady{'}'}
-    </span>
+    <span className="text-green-400">{'{onready}'}</span>
     {'\n'}
     <span className="text-blue-400">/&gt;</span>
   </code>
@@ -357,13 +360,17 @@ const codeComponents: Record<Framework, React.FC> = {
   svelte: SvelteCode,
 }
 
-export const CodeShowcase = () => {
-  const [activeTab, setActiveTab] = useState<Framework>('snippet')
+export const CodeShowcase = ({ framework, onTabChange }: CodeShowcaseProps) => {
+  const [activeTab, setActiveTab] = useState<Framework>(framework ?? 'snippet')
   const [isCopied, setIsCopied] = useState(false)
+
+  // If a specific framework is provided, lock to that framework
+  const displayedFramework = framework ?? activeTab
+  const showTabs = !framework
 
   const copyToClipboard = async () => {
     try {
-      await navigator.clipboard.writeText(codeSnippets[activeTab])
+      await navigator.clipboard.writeText(codeSnippets[displayedFramework])
       setIsCopied(true)
       setTimeout(() => setIsCopied(false), 2000)
     } catch (err) {
@@ -371,8 +378,13 @@ export const CodeShowcase = () => {
     }
   }
 
-  const currentTab = tabs.find((t) => t.id === activeTab)!
-  const CodeComponent = codeComponents[activeTab]
+  const handleTabChange = (id: Framework) => {
+    setActiveTab(id)
+    onTabChange?.(id)
+  }
+
+  const currentTab = tabs.find((t) => t.id === displayedFramework)!
+  const CodeComponent = codeComponents[displayedFramework]
 
   return (
     <div className="group relative">
@@ -401,41 +413,45 @@ export const CodeShowcase = () => {
             </button>
           </div>
 
-          {/* Tabs row */}
-          <div className="-mb-px flex px-2 sm:px-4">
-            {tabs.map((tab) => (
-              <button
-                key={tab.id}
-                onClick={() => setActiveTab(tab.id)}
-                className={`group relative flex shrink-0 items-center gap-1.5 px-3 py-2.5 text-sm font-medium transition-all duration-200 sm:gap-2 sm:px-4 ${
-                  activeTab === tab.id
-                    ? `${tab.color} bg-gray-800/50`
-                    : `text-gray-500 hover:text-gray-300`
-                }`}
-              >
-                {/* Active tab indicator */}
-                {activeTab === tab.id && (
-                  <div
-                    className={`absolute bottom-0 left-0 right-0 h-0.5 bg-gradient-to-r ${
-                      tab.id === 'snippet'
-                        ? 'from-orange-500 to-amber-400'
-                        : tab.id === 'react'
-                          ? 'from-cyan-500 to-blue-400'
-                          : tab.id === 'vue'
-                            ? 'from-emerald-500 to-green-400'
-                            : 'from-orange-600 to-red-500'
-                    }`}
-                  />
-                )}
-                <span
-                  className={activeTab === tab.id ? tab.color : tab.hoverColor}
+          {/* Tabs row - only shown when no specific framework is set */}
+          {showTabs && (
+            <div className="-mb-px flex px-2 sm:px-4">
+              {tabs.map((tab) => (
+                <button
+                  key={tab.id}
+                  onClick={() => handleTabChange(tab.id)}
+                  className={`group relative flex shrink-0 items-center gap-1.5 px-3 py-2.5 text-sm font-medium transition-all duration-200 sm:gap-2 sm:px-4 ${
+                    activeTab === tab.id
+                      ? `${tab.color} bg-gray-800/50`
+                      : `text-gray-500 hover:text-gray-300`
+                  }`}
                 >
-                  {tab.icon}
-                </span>
-                <span className="hidden sm:inline">{tab.label}</span>
-              </button>
-            ))}
-          </div>
+                  {/* Active tab indicator */}
+                  {activeTab === tab.id && (
+                    <div
+                      className={`absolute bottom-0 left-0 right-0 h-0.5 bg-gradient-to-r ${
+                        tab.id === 'snippet'
+                          ? 'from-orange-500 to-amber-400'
+                          : tab.id === 'react'
+                            ? 'from-cyan-500 to-blue-400'
+                            : tab.id === 'vue'
+                              ? 'from-emerald-500 to-green-400'
+                              : 'from-orange-600 to-red-500'
+                      }`}
+                    />
+                  )}
+                  <span
+                    className={
+                      activeTab === tab.id ? tab.color : tab.hoverColor
+                    }
+                  >
+                    {tab.icon}
+                  </span>
+                  <span className="hidden sm:inline">{tab.label}</span>
+                </button>
+              ))}
+            </div>
+          )}
         </div>
 
         {/* Code content */}
