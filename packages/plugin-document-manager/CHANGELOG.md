@@ -1,5 +1,13 @@
 # @embedpdf/plugin-document-manager
 
+## 2.0.1
+
+### Patch Changes
+
+- [#305](https://github.com/embedpdf/embed-pdf-viewer/pull/305) by [@bobsingor](https://github.com/bobsingor) – Fixed document name extraction to always include `.pdf` extension when extracting filename from URL.
+
+- [#305](https://github.com/embedpdf/embed-pdf-viewer/pull/305) by [@bobsingor](https://github.com/bobsingor) – Added optional `name` property to `LoadDocumentUrlOptions` to allow specifying a custom document name. When not provided, the name is extracted from the URL. If extraction fails, `undefined` is returned to allow downstream handling of default names.
+
 ## 2.0.0
 
 ### Major Changes

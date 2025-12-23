@@ -1,5 +1,16 @@
 # @embedpdf/snippet
 
+## 2.0.1
+
+### Patch Changes
+
+- [#307](https://github.com/embedpdf/embed-pdf-viewer/pull/307) by [@bobsingor](https://github.com/bobsingor) –
+  - Fixed iOS zoom issue on input focus by changing text size from `text-sm` to `text-base` in form inputs
+  - Fullscreen button icon now dynamically updates to show exit icon when in fullscreen mode
+  - Improved zoom menu UI schema with unique item IDs and better responsive behavior
+
+- [#308](https://github.com/embedpdf/embed-pdf-viewer/pull/308) by [@bobsingor](https://github.com/bobsingor) – Added `selection:copy-to-clipboard` command with keyboard shortcuts (Ctrl+C / Cmd+C) that copies selected text without clearing the selection, providing a better user experience for keyboard-based copying.
+
 ## 2.0.0
 
 ### Minor Changes
