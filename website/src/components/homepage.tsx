@@ -613,7 +613,7 @@ const testimonials = [
     quote:
       'After fighting with PDF.js in the browser, we found EmbedPDF with its first-class Svelte support. Within minutes we had something working, its extensible nature gave us the control we needed to build citation highlighting on top. Not a single regret.',
     authorImageSrc: '/testimonials/grella-founder.jpg',
-    authorName: 'Xander Aguinaldo',
+    authorName: 'Hamza Aitali',
     authorRole: 'Founder',
     companyShortName: 'Grella',
     gradientFrom: 'purple-500',
