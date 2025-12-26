@@ -1,5 +1,13 @@
 # @embedpdf/engines
 
+## 2.0.2
+
+### Patch Changes
+
+- [#358](https://github.com/embedpdf/embed-pdf-viewer/pull/358) by [@bobsingor](https://github.com/bobsingor) – Added support for persisting custom annotation data when creating text, freetext, ink, line, polygon, polyline, shape, and stamp annotations.
+
+- [#359](https://github.com/embedpdf/embed-pdf-viewer/pull/359) by [@bobsingor](https://github.com/bobsingor) – Fixed missing author field when creating stamp annotations.
+
 ## 2.0.1
 
 ## 2.0.0

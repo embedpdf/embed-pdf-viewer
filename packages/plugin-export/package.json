@@ -1,6 +1,6 @@
 {
   "name": "@embedpdf/plugin-export",
-  "version": "2.0.1",
+  "version": "2.0.2",
   "type": "module",
   "license": "MIT",
   "main": "./dist/index.cjs",

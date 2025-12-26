@@ -1,5 +1,11 @@
 # @embedpdf/snippet
 
+## 2.0.2
+
+### Patch Changes
+
+- [#357](https://github.com/embedpdf/embed-pdf-viewer/pull/357) by [@bobsingor](https://github.com/bobsingor) – Fixed search result scrolling not working while search is still in progress on large documents.
+
 ## 2.0.1
 
 ### Patch Changes
