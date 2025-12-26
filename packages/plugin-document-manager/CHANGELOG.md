@@ -1,5 +1,7 @@
 # @embedpdf/plugin-document-manager
 
+## 2.0.2
+
 ## 2.0.1
 
 ### Patch Changes

@@ -1,5 +1,11 @@
 # @embedpdf/utils
 
+## 2.0.2
+
+### Patch Changes
+
+- [#360](https://github.com/embedpdf/embed-pdf-viewer/pull/360) by [@bobsingor](https://github.com/bobsingor) – Fixed aspect ratio being lost when resizing annotations near canvas bounding box edges.
+
 ## 2.0.1
 
 ## 2.0.0

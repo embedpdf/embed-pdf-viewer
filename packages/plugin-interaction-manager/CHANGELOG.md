@@ -1,5 +1,11 @@
 # @embedpdf/plugin-interaction-manager
 
+## 2.0.2
+
+### Patch Changes
+
+- [#355](https://github.com/embedpdf/embed-pdf-viewer/pull/355) by [@bobsingor](https://github.com/bobsingor) – Fixed an error that was thrown when activating the default interaction mode without an active document.
+
 ## 2.0.1
 
 ## 2.0.0
