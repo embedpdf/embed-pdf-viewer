@@ -75,10 +75,10 @@ export function SearchSidebar({ documentId, onClose }: SearchSidebarProps) {
   }, [state.query]);
 
   useEffect(() => {
-    if (state.activeResultIndex !== undefined && state.activeResultIndex >= 0 && !state.loading) {
+    if (state.activeResultIndex !== undefined && state.activeResultIndex >= 0) {
       scrollToItem(state.activeResultIndex);
     }
-  });
+  }, [state.activeResultIndex]);
 
   const debouncedValue = useDebounce(inputValue, 300);
 
