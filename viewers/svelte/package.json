@@ -29,7 +29,7 @@
   "devDependencies": {
     "@sveltejs/package": "^2.3.0",
     "rimraf": "^6.1.2",
-    "svelte": "^5.0.0",
+    "svelte": "^5.46.1",
     "typescript": "^5.1.6"
   },
   "peerDependencies": {
