@@ -291,7 +291,8 @@ export class InteractionManagerPlugin extends BasePlugin<
   }
 
   private activateDefaultMode(documentId?: string) {
-    const id = documentId ?? this.getActiveDocumentId();
+    const id = documentId ?? this.getActiveDocumentIdOrNull();
+    if (!id) return;
     this.activate(this.state.defaultMode, id);
   }
 
