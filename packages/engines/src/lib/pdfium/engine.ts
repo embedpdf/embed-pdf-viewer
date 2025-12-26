@@ -2155,6 +2155,9 @@ export class PdfiumNative implements IPdfiumExecutor {
     if (!this.setAnnotString(annotationPtr, 'Contents', annotation.contents ?? '')) {
       return false;
     }
+    if (annotation.custom && !this.setAnnotCustom(annotationPtr, annotation.custom)) {
+      return false;
+    }
     if (!this.setAnnotString(annotationPtr, 'T', annotation.author || '')) {
       return false;
     }
@@ -2213,6 +2216,9 @@ export class PdfiumNative implements IPdfiumExecutor {
       annotation.created &&
       !this.setAnnotationDate(annotationPtr, 'CreationDate', annotation.created)
     ) {
+      return false;
+    }
+    if (annotation.custom && !this.setAnnotCustom(annotationPtr, annotation.custom)) {
       return false;
     }
     if (annotation.flags && !this.setAnnotationFlags(annotationPtr, annotation.flags)) {
@@ -2290,6 +2296,9 @@ export class PdfiumNative implements IPdfiumExecutor {
     ) {
       return false;
     }
+    if (annotation.custom && !this.setAnnotCustom(annotationPtr, annotation.custom)) {
+      return false;
+    }
     if (annotation.flags && !this.setAnnotationFlags(annotationPtr, annotation.flags)) {
       return false;
     }
@@ -2346,6 +2355,9 @@ export class PdfiumNative implements IPdfiumExecutor {
       annotation.created &&
       !this.setAnnotationDate(annotationPtr, 'CreationDate', annotation.created)
     ) {
+      return false;
+    }
+    if (annotation.custom && !this.setAnnotCustom(annotationPtr, annotation.custom)) {
       return false;
     }
     if (annotation.flags && !this.setAnnotationFlags(annotationPtr, annotation.flags)) {
@@ -2440,6 +2452,9 @@ export class PdfiumNative implements IPdfiumExecutor {
     ) {
       return false;
     }
+    if (annotation.custom && !this.setAnnotCustom(annotationPtr, annotation.custom)) {
+      return false;
+    }
     if (annotation.modified && !this.setAnnotationDate(annotationPtr, 'M', annotation.modified)) {
       return false;
     }
@@ -2525,6 +2540,9 @@ export class PdfiumNative implements IPdfiumExecutor {
       annotation.created &&
       !this.setAnnotationDate(annotationPtr, 'CreationDate', annotation.created)
     ) {
+      return false;
+    }
+    if (annotation.custom && !this.setAnnotCustom(annotationPtr, annotation.custom)) {
       return false;
     }
     if (annotation.modified && !this.setAnnotationDate(annotationPtr, 'M', annotation.modified)) {
@@ -2659,6 +2677,9 @@ export class PdfiumNative implements IPdfiumExecutor {
       annotation.created &&
       !this.setAnnotationDate(annotationPtr, 'CreationDate', annotation.created)
     ) {
+      return false;
+    }
+    if (annotation.custom && !this.setAnnotCustom(annotationPtr, annotation.custom)) {
       return false;
     }
     if (annotation.flags && !this.setAnnotationFlags(annotationPtr, annotation.flags)) {
