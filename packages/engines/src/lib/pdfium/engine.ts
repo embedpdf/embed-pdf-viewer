@@ -2691,6 +2691,9 @@ export class PdfiumNative implements IPdfiumExecutor {
     if (annotation.icon && !this.setAnnotationIcon(annotationPtr, annotation.icon)) {
       return false;
     }
+    if (!this.setAnnotString(annotationPtr, 'T', annotation.author || '')) {
+      return false;
+    }
     if (annotation.subject && !this.setAnnotString(annotationPtr, 'Subj', annotation.subject)) {
       return false;
     }
