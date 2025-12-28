@@ -10,7 +10,6 @@ import {
   AnnotationCreateContext,
   uuidV4,
   PdfAnnotationSubtype,
-  Rotation,
 } from '@embedpdf/models';
 import {
   AnnotationCapability,
@@ -269,9 +268,15 @@ export class AnnotationPlugin extends BasePlugin<
       const factory = this.handlerFactories.get(tool.defaults.type);
       if (!factory) continue;
 
+      const pageSize =
+        page.rotation % 2 !== 0
+          ? { width: page.size.height, height: page.size.width }
+          : page.size;
+
       const context: HandlerContext<PdfAnnotationObject> = {
         pageIndex,
-        pageSize: page.size,
+        pageSize,
+        pageRotation: page.rotation,
         scale,
         services: callbacks.services, // Pass through services
         onPreview: (state) => callbacks.onPreview(tool.id, state),
@@ -354,30 +359,7 @@ export class AnnotationPlugin extends BasePlugin<
       return PdfTaskHelper.reject({ code: PdfErrorCode.NotFound, message: 'Page not found' });
     }
 
-    // Ensure "Stamp" annotations render upright regardless of the PDF page's internal rotation.
-    // Set options.rotation to override this behavior.
-    let renderOptions = options;
-    if (
-      annotation.type === PdfAnnotationSubtype.STAMP &&
-      (options == null || options.rotation == null)
-    ) {
-      const inverseRotation = (rotation: Rotation): Rotation => {
-        switch (rotation) {
-          case Rotation.Degree90:
-            return Rotation.Degree270;
-          case Rotation.Degree270:
-            return Rotation.Degree90;
-          case Rotation.Degree180:
-            return Rotation.Degree180;
-          case Rotation.Degree0:
-          default:
-            return Rotation.Degree0;
-        }
-      };
-      renderOptions = { ...options, rotation: inverseRotation(page.rotation) };
-    }
-
-    return this.engine.renderPageAnnotation(coreState.document, page, annotation, renderOptions);
+    return this.engine.renderPageAnnotation(coreState.document, page, annotation, options);
   }
 
   private importAnnotations(items: ImportAnnotationItem<PdfAnnotationObject>[]) {

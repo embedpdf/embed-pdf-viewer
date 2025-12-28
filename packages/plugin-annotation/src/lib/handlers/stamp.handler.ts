@@ -3,6 +3,7 @@ import {
   PdfAnnotationSubtype,
   PdfStampAnnoObject,
   Rect,
+  Rotation,
   uuidV4,
 } from '@embedpdf/models';
 import { HandlerFactory } from './types';
@@ -11,7 +12,48 @@ import { clamp } from '@embedpdf/core';
 export const stampHandlerFactory: HandlerFactory<PdfStampAnnoObject> = {
   annotationType: PdfAnnotationSubtype.STAMP,
   create(context) {
-    const { services, onCommit, getTool, pageSize } = context;
+    const { services, onCommit, getTool, pageSize, pageRotation } = context;
+
+    /**
+     * Rotates ImageData based on the page rotation to ensure the stamp remains upright.
+     * Note: PDF rotation is clockwise. To compensate, we rotate the image counter-clockwise.
+     */
+    const rotateImageData = (data: ImageData, rotation: Rotation): ImageData => {
+      if (rotation === Rotation.Degree0) return data;
+
+      const canvas = document.createElement('canvas');
+      const ctx = canvas.getContext('2d');
+      if (!ctx) return data;
+
+      const { width, height } = data;
+
+      if (rotation === Rotation.Degree90 || rotation === Rotation.Degree270) {
+        canvas.width = height;
+        canvas.height = width;
+      } else {
+        canvas.width = width;
+        canvas.height = height;
+      }
+
+      // We want to rotate the content so it stays upright relative to the user.
+      // If the page is rotated 90 deg clockwise, we rotate the image 90 deg counter-clockwise.
+      const angle = (rotation * -90 * Math.PI) / 180;
+
+      ctx.translate(canvas.width / 2, canvas.height / 2);
+      ctx.rotate(angle);
+      ctx.translate(-width / 2, -height / 2);
+
+      // Create a temporary canvas to put the original ImageData
+      const tempCanvas = document.createElement('canvas');
+      tempCanvas.width = width;
+      tempCanvas.height = height;
+      const tempCtx = tempCanvas.getContext('2d');
+      if (!tempCtx) return data;
+      tempCtx.putImageData(data, 0, 0);
+
+      ctx.drawImage(tempCanvas, 0, 0);
+      return ctx.getImageData(0, 0, canvas.width, canvas.height);
+    };
 
     return {
       onPointerDown: (pos) => {
@@ -20,12 +62,25 @@ export const stampHandlerFactory: HandlerFactory<PdfStampAnnoObject> = {
 
         const { imageSrc, imageSize } = tool.defaults;
 
-        const placeStamp = (imageData: ImageData, width: number, height: number) => {
+        const placeStamp = (originalData: ImageData, width: number, height: number) => {
+          // Pre-rotate the image data to match page rotation
+          const imageData = rotateImageData(originalData, pageRotation);
+
+          // Calculate effective page dimensions based on rotation
+          const effectivePageWidth =
+            pageRotation === Rotation.Degree90 || pageRotation === Rotation.Degree270
+              ? pageSize.height
+              : pageSize.width;
+          const effectivePageHeight =
+            pageRotation === Rotation.Degree90 || pageRotation === Rotation.Degree270
+              ? pageSize.width
+              : pageSize.height;
+
           // Center the stamp at the click position, then clamp origin to stay fully on-page.
           const originX = pos.x - width / 2;
           const originY = pos.y - height / 2;
-          const finalX = clamp(originX, 0, pageSize.width - width);
-          const finalY = clamp(originY, 0, pageSize.height - height);
+          const finalX = clamp(originX, 0, effectivePageWidth - width);
+          const finalY = clamp(originY, 0, effectivePageHeight - height);
 
           const rect: Rect = {
             origin: { x: finalX, y: finalY },
