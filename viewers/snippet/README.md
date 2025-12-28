@@ -42,9 +42,9 @@ Add the CDN module and point it at a container:
 ```html filename="index.html" copy
 <div id="pdf-viewer" style="height: 500px"></div>
 <script async type="module">
-  import EmbedPDF from 'https://snippet.embedpdf.com/embedpdf.js';
+  import EmbedPDF from 'https://cdn.jsdelivr.net/npm/@embedpdf/snippet@2/dist/embedpdf.js';
 
-  EmbedPDF.init({
+  const viewer = EmbedPDF.init({
     type: 'container', // mount strategy
     target: document.getElementById('pdf-viewer'),
     src: 'https://snippet.embedpdf.com/ebook.pdf', // your PDF URL
@@ -73,9 +73,9 @@ That’s it—refresh and enjoy a full‑featured viewer.
   <body>
     <div id="pdf-viewer" style="height: 100vh"></div>
     <script async type="module">
-      import EmbedPDF from 'https://snippet.embedpdf.com/embedpdf.js';
+      import EmbedPDF from 'https://cdn.jsdelivr.net/npm/@embedpdf/snippet@2/dist/embedpdf.js';
 
-      EmbedPDF.init({
+      const viewer = EmbedPDF.init({
         type: 'container',
         target: document.getElementById('pdf-viewer'),
         src: 'https://snippet.embedpdf.com/ebook.pdf',
