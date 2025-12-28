@@ -1,5 +1,14 @@
 # @embedpdf/models
 
+## 2.1.0
+
+### Minor Changes
+
+- [#361](https://github.com/embedpdf/embed-pdf-viewer/pull/361) by [@bobsingor](https://github.com/bobsingor) – Add font-related type definitions
+  - **FontCharset**: Enum for PDF font charset values (SHIFTJIS, HANGEUL, GB2312, etc.)
+  - **FontFile**: Interface for describing font file metadata (file, weight, italic)
+  - **FontPackageMeta**: Interface for font package metadata used by `@embedpdf/fonts-*` packages
+
 ## 2.0.2
 
 ## 2.0.1
