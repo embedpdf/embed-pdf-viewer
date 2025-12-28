@@ -3,6 +3,7 @@ export * from './helper';
 export * from '../converters/types';
 export * from '../converters/browser';
 export * from '../orchestrator/pdf-engine';
+export * from './font-fallback';
 
 // Export web factory functions (avoid ambiguous exports)
 export { createPdfiumEngine as createPdfiumDirectEngine } from './web/direct-engine';

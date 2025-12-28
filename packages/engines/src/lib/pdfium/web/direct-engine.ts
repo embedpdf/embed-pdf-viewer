@@ -3,6 +3,9 @@ import { init } from '@embedpdf/pdfium';
 import { PdfiumNative } from '../engine';
 import { PdfEngine } from '../../orchestrator/pdf-engine';
 import { browserImageDataToBlobConverter } from '../../converters/browser';
+import type { FontFallbackConfig } from '../font-fallback';
+
+export type { FontFallbackConfig };
 
 export interface CreatePdfiumEngineOptions {
   /**
@@ -14,6 +17,12 @@ export interface CreatePdfiumEngineOptions {
    * Set to 2-4 for optimal performance with parallel encoding
    */
   encoderPoolSize?: number;
+  /**
+   * Font fallback configuration for handling missing fonts in PDFs.
+   * When enabled, PDFium will request fallback fonts from configured URLs
+   * when it encounters text that requires fonts not embedded in the PDF.
+   */
+  fontFallback?: FontFallbackConfig;
 }
 
 /**
@@ -45,7 +54,10 @@ export async function createPdfiumEngine(
   const wasmModule = await init({ wasmBinary });
 
   // Create the "dumb" executor (initializes PDFium in constructor)
-  const native = new PdfiumNative(wasmModule, { logger: options?.logger });
+  const native = new PdfiumNative(wasmModule, {
+    logger: options?.logger,
+    fontFallback: options?.fontFallback,
+  });
 
   // Create the "smart" orchestrator
   return new PdfEngine<Blob>(native, {

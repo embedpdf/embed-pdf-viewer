@@ -3,6 +3,9 @@ import { PdfEngine } from '../../orchestrator/pdf-engine';
 import { RemoteExecutor } from '../../orchestrator/remote-executor';
 import { ImageEncoderWorkerPool } from '../../image-encoder';
 import { createHybridImageConverter } from '../../converters/browser';
+import type { FontFallbackConfig } from '../font-fallback';
+
+export type { FontFallbackConfig };
 
 /* eslint-disable @typescript-eslint/ban-ts-comment */
 // @ts-ignore injected at build time
@@ -20,6 +23,12 @@ export interface CreatePdfiumEngineOptions {
    * Set to 2-4 for optimal performance with parallel encoding
    */
   encoderPoolSize?: number;
+  /**
+   * Font fallback configuration for handling missing fonts in PDFs.
+   * When enabled, PDFium will request fallback fonts from configured URLs
+   * when it encounters text that requires fonts not embedded in the PDF.
+   */
+  fontFallback?: FontFallbackConfig;
 }
 
 /**
@@ -61,7 +70,7 @@ export function createPdfiumEngine(
       ? { logger: options as Logger }
       : (options as CreatePdfiumEngineOptions) || {};
 
-  const { logger, encoderPoolSize } = config;
+  const { logger, encoderPoolSize, fontFallback } = config;
 
   // Create PDFium worker
   const worker = new Worker(
@@ -72,7 +81,7 @@ export function createPdfiumEngine(
   );
 
   // Create RemoteExecutor (proxy to worker) - handles wasmInit internally
-  const remoteExecutor = new RemoteExecutor(worker, { wasmUrl, logger });
+  const remoteExecutor = new RemoteExecutor(worker, { wasmUrl, logger, fontFallback });
 
   const finalEncoderWorkerUrl = URL.createObjectURL(
     new Blob([__ENCODER_WORKER_BODY__], { type: 'application/javascript' }),

@@ -1,11 +1,12 @@
 import { deserializeLogger } from '@embedpdf/models';
 import { PdfiumEngineRunner } from './runner';
+import type { FontFallbackConfig } from './font-fallback';
 
 let runner: PdfiumEngineRunner | null = null;
 
 // Listen for initialization message
 self.onmessage = async (event: MessageEvent) => {
-  const { type, wasmUrl, logger: serializedLogger } = event.data;
+  const { type, wasmUrl, logger: serializedLogger, fontFallback } = event.data;
 
   if (type === 'wasmInit' && wasmUrl && !runner) {
     try {
@@ -15,7 +16,11 @@ self.onmessage = async (event: MessageEvent) => {
       // Deserialize the logger if provided
       const logger = serializedLogger ? deserializeLogger(serializedLogger) : undefined;
 
-      runner = new PdfiumEngineRunner(wasmBinary, logger);
+      runner = new PdfiumEngineRunner(
+        wasmBinary,
+        logger,
+        fontFallback as FontFallbackConfig | undefined,
+      );
       await runner.prepare();
       // runner.prepare() calls ready() which:
       // 1. Sets self.onmessage to runner.handle()

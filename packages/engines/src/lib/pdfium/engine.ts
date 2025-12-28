@@ -117,6 +117,7 @@ import { WrappedPdfiumModule } from '@embedpdf/pdfium';
 import { DocumentContext, PageContext, PdfCache } from './cache';
 import { MemoryManager } from './core/memory-manager';
 import { WasmPointer } from './types/branded';
+import { FontFallbackManager, FontFallbackConfig } from './font-fallback';
 
 /**
  * Format of bitmap
@@ -162,8 +163,14 @@ export enum PdfiumErrorCode {
   XFALayout = 8,
 }
 
-interface PdfiumEngineOptions {
+export interface PdfiumEngineOptions {
   logger?: Logger;
+  /**
+   * Font fallback configuration for handling missing fonts in PDFs.
+   * When enabled, PDFium will request fallback fonts from configured URLs
+   * when it encounters text that requires fonts not embedded in the PDF.
+   */
+  fontFallback?: FontFallbackConfig;
 }
 
 /**
@@ -191,6 +198,11 @@ export class PdfiumNative implements IPdfiumExecutor {
   private logger: Logger;
 
   /**
+   * font fallback manager instance
+   */
+  private fontFallbackManager: FontFallbackManager | null = null;
+
+  /**
    * Create an instance of PdfiumNative and initialize PDFium
    * @param wasmModule - pdfium wasm module
    * @param options - configuration options
@@ -199,7 +211,7 @@ export class PdfiumNative implements IPdfiumExecutor {
     private pdfiumModule: WrappedPdfiumModule,
     options: PdfiumEngineOptions = {},
   ) {
-    const { logger = new NoopLogger() } = options;
+    const { logger = new NoopLogger(), fontFallback } = options;
 
     this.logger = logger;
     this.memoryManager = new MemoryManager(this.pdfiumModule, this.logger);
@@ -216,6 +228,13 @@ export class PdfiumNative implements IPdfiumExecutor {
     this.logger.perf(LOG_SOURCE, LOG_CATEGORY, `Initialize`, 'Begin', 'General');
     this.pdfiumModule.PDFiumExt_Init();
     this.logger.perf(LOG_SOURCE, LOG_CATEGORY, `Initialize`, 'End', 'General');
+
+    // Initialize font fallback system if configured
+    if (fontFallback) {
+      this.fontFallbackManager = new FontFallbackManager(fontFallback, this.logger);
+      this.fontFallbackManager.initialize(this.pdfiumModule);
+      this.logger.info(LOG_SOURCE, LOG_CATEGORY, 'Font fallback system enabled');
+    }
   }
 
   /**
@@ -226,6 +245,13 @@ export class PdfiumNative implements IPdfiumExecutor {
   destroy() {
     this.logger.debug(LOG_SOURCE, LOG_CATEGORY, 'destroy');
     this.logger.perf(LOG_SOURCE, LOG_CATEGORY, `Destroy`, 'Begin', 'General');
+
+    // Disable font fallback before destroying library
+    if (this.fontFallbackManager) {
+      this.fontFallbackManager.disable();
+      this.fontFallbackManager = null;
+    }
+
     this.pdfiumModule.FPDF_DestroyLibrary();
     if (this.memoryLeakCheckInterval) {
       clearInterval(this.memoryLeakCheckInterval);
@@ -233,6 +259,14 @@ export class PdfiumNative implements IPdfiumExecutor {
     }
     this.logger.perf(LOG_SOURCE, LOG_CATEGORY, `Destroy`, 'End', 'General');
     return PdfTaskHelper.resolve(true);
+  }
+
+  /**
+   * Get the font fallback manager instance
+   * Useful for pre-loading fonts or checking stats
+   */
+  getFontFallbackManager(): FontFallbackManager | null {
+    return this.fontFallbackManager;
   }
 
   /** Write a UTF-16LE (WIDESTRING) to wasm, call `fn(ptr)`, then free. */
