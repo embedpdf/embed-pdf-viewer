@@ -162,7 +162,7 @@ function App() {
               type: PdfAnnotationSubtype.STAMP,
               imageSrc:
                 'https://upload.wikimedia.org/wikipedia/commons/thumb/3/3b/Eo_circle_green_checkmark.svg/512px-Eo_circle_green_checkmark.svg.png',
-              imageSize: { width: 300, height: 120 },
+              imageSize: { width: 20, height: 20 },
             },
           });
         }}
