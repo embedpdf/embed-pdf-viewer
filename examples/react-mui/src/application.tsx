@@ -161,10 +161,7 @@ function App() {
             defaults: {
               type: PdfAnnotationSubtype.STAMP,
               imageSrc:
-                'https://8upload.com/image/a712b1abf48ae956/Screenshot_2025-12-19_at_15.11.16.png',
-
-              // 'https://upload.wikimedia.org/wikipedia/commons/thumb/3/3b/Eo_circle_green_checkmark.svg/512px-Eo_circle_green_checkmark.svg.png',
-              imageSize: { width: 300, height: 120 },
+                'https://upload.wikimedia.org/wikipedia/commons/thumb/3/3b/Eo_circle_green_checkmark.svg/512px-Eo_circle_green_checkmark.svg.png',              imageSize: { width: 300, height: 120 },
             },
           });
         }}
