@@ -99,6 +99,13 @@
     "typescript": "^5.0.0"
   },
   "dependencies": {
+    "@embedpdf/fonts-arabic": "workspace:*",
+    "@embedpdf/fonts-hebrew": "workspace:*",
+    "@embedpdf/fonts-jp": "workspace:*",
+    "@embedpdf/fonts-kr": "workspace:*",
+    "@embedpdf/fonts-latin": "workspace:*",
+    "@embedpdf/fonts-sc": "workspace:*",
+    "@embedpdf/fonts-tc": "workspace:*",
     "@embedpdf/models": "workspace:*",
     "@embedpdf/pdfium": "workspace:*"
   },

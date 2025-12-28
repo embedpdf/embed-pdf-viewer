@@ -22,6 +22,15 @@ export interface FontVariant {
 export type FontEntry = string | FontVariant | FontVariant[];
 
 /**
+ * Custom font loader function type
+ * Used to load font data from custom sources (e.g., file system in Node.js)
+ *
+ * @param fontPath - The font path/URL to load
+ * @returns The font data as Uint8Array, or null if loading failed
+ */
+export type FontLoader = (fontPath: string) => Uint8Array | null;
+
+/**
  * Configuration for fallback fonts
  * Maps charset values to font URLs or font variant configurations
  */
@@ -38,9 +47,37 @@ export interface FontFallbackConfig {
   defaultFont?: FontEntry;
 
   /**
-   * Base URL to prepend to relative font URLs
+   * Base URL to prepend to relative font URLs (browser)
    */
   baseUrl?: string;
+
+  /**
+   * Custom font loader function
+   *
+   * When provided, this function is called to load font data instead of
+   * the default XMLHttpRequest-based loader. This is useful for:
+   * - Node.js environments (use fs.readFileSync)
+   * - Custom caching strategies
+   * - Loading from alternative sources
+   *
+   * @example Node.js usage:
+   * ```typescript
+   * import { readFileSync } from 'fs';
+   * import { join } from 'path';
+   *
+   * const fontFallback = {
+   *   fonts: { [FontCharset.SHIFTJIS]: 'NotoSansJP-Regular.otf' },
+   *   fontLoader: (fontPath) => {
+   *     try {
+   *       return new Uint8Array(readFileSync(join('/fonts', fontPath)));
+   *     } catch {
+   *       return null;
+   *     }
+   *   },
+   * };
+   * ```
+   */
+  fontLoader?: FontLoader;
 }
 
 interface FontHandle {
@@ -617,42 +654,88 @@ export class FontFallbackManager {
   }
 
   /**
-   * Fetch font data synchronously using XMLHttpRequest
-   * This is necessary because PDFium's callbacks are synchronous
+   * Fetch font data synchronously
+   * Uses custom fontLoader if provided, otherwise falls back to XMLHttpRequest (browser)
    */
-  private fetchFontSync(url: string): Uint8Array | null {
-    this.logger.debug(LOG_SOURCE, LOG_CATEGORY, `Fetching font synchronously: ${url}`);
+  private fetchFontSync(pathOrUrl: string): Uint8Array | null {
+    this.logger.debug(LOG_SOURCE, LOG_CATEGORY, `Fetching font synchronously: ${pathOrUrl}`);
 
+    // Use custom font loader if provided (e.g., for Node.js file system access)
+    if (this.fontConfig.fontLoader) {
+      try {
+        const data = this.fontConfig.fontLoader(pathOrUrl);
+        if (data) {
+          this.logger.info(
+            LOG_SOURCE,
+            LOG_CATEGORY,
+            `Loaded font via custom loader: ${pathOrUrl} (${data.length} bytes)`,
+          );
+        } else {
+          this.logger.warn(
+            LOG_SOURCE,
+            LOG_CATEGORY,
+            `Custom font loader returned null for: ${pathOrUrl}`,
+          );
+        }
+        return data;
+      } catch (error) {
+        this.logger.error(
+          LOG_SOURCE,
+          LOG_CATEGORY,
+          `Error in custom font loader: ${pathOrUrl}`,
+          error,
+        );
+        return null;
+      }
+    }
+
+    // Default: Browser XMLHttpRequest (synchronous)
     try {
       const xhr = new XMLHttpRequest();
-      xhr.open('GET', url, false); // false = synchronous
+      xhr.open('GET', pathOrUrl, false); // false = synchronous
       xhr.responseType = 'arraybuffer';
       xhr.send();
 
       if (xhr.status === 200) {
         const data = new Uint8Array(xhr.response as ArrayBuffer);
-        this.logger.info(LOG_SOURCE, LOG_CATEGORY, `Loaded font: ${url} (${data.length} bytes)`);
+        this.logger.info(
+          LOG_SOURCE,
+          LOG_CATEGORY,
+          `Loaded font: ${pathOrUrl} (${data.length} bytes)`,
+        );
         return data;
       } else {
         this.logger.error(
           LOG_SOURCE,
           LOG_CATEGORY,
-          `Failed to load font: ${url} (HTTP ${xhr.status})`,
+          `Failed to load font: ${pathOrUrl} (HTTP ${xhr.status})`,
         );
         return null;
       }
     } catch (error) {
-      this.logger.error(LOG_SOURCE, LOG_CATEGORY, `Error fetching font: ${url}`, error);
+      this.logger.error(LOG_SOURCE, LOG_CATEGORY, `Error fetching font: ${pathOrUrl}`, error);
       return null;
     }
   }
 
   /**
    * Fetch font data asynchronously (for preloading)
+   * Uses custom fontLoader if provided, otherwise falls back to fetch API
    */
-  private async fetchFontAsync(url: string): Promise<Uint8Array | null> {
+  private async fetchFontAsync(pathOrUrl: string): Promise<Uint8Array | null> {
+    // Use custom font loader if provided (works for Node.js too)
+    if (this.fontConfig.fontLoader) {
+      try {
+        // fontLoader is synchronous, but we wrap it in async for consistency
+        return this.fontConfig.fontLoader(pathOrUrl);
+      } catch {
+        return null;
+      }
+    }
+
+    // Default: Browser fetch API
     try {
-      const response = await fetch(url);
+      const response = await fetch(pathOrUrl);
       if (response.ok) {
         const buffer = await response.arrayBuffer();
         return new Uint8Array(buffer);
@@ -665,118 +748,53 @@ export class FontFallbackManager {
 }
 
 /**
- * Default font configuration using Google Noto fonts (simple version)
+ * Create a file system font loader for Node.js environments
  *
- * You'll need to host these fonts on your server or use a CDN.
- * Download from: https://fonts.google.com/noto
- */
-export const defaultNotoFontConfig: FontFallbackConfig = {
-  fonts: {
-    [FontCharset.SHIFTJIS]: 'NotoSansJP-Regular.otf',
-    [FontCharset.HANGEUL]: 'NotoSansKR-Regular.otf',
-    [FontCharset.GB2312]: 'NotoSansHans-Regular.otf',
-    [FontCharset.CHINESEBIG5]: 'NotoSansHant-Regular.otf',
-    [FontCharset.ARABIC]: 'NotoNaskhArabic-Regular.ttf',
-    [FontCharset.HEBREW]: 'NotoSansHebrew-Regular.ttf',
-    [FontCharset.THAI]: 'NotoSansThai-Regular.ttf',
-    [FontCharset.CYRILLIC]: 'NotoSans-Regular.ttf',
-    [FontCharset.GREEK]: 'NotoSans-Regular.ttf',
-    [FontCharset.VIETNAMESE]: 'NotoSans-Regular.ttf',
-  },
-  baseUrl: '/fonts',
-};
-
-/**
- * Advanced font configuration with weight variants
+ * This helper creates a FontLoader function that reads fonts from the file system.
+ * It requires Node.js's `fs` and `path` modules to be passed in to avoid
+ * bundling issues in browser environments.
  *
- * Example showing how to configure multiple weights for better rendering.
- * CJK fonts typically don't have italic variants - PDFium will synthesize.
+ * @param fs - Node.js fs module (or compatible)
+ * @param path - Node.js path module (or compatible)
+ * @param basePath - Base directory path where fonts are located
+ * @returns A FontLoader function for use in FontFallbackConfig
+ *
+ * @example
+ * ```typescript
+ * import { readFileSync } from 'fs';
+ * import { join } from 'path';
+ * import { createNodeFontLoader, FontCharset } from '@embedpdf/engines/pdfium';
+ *
+ * const fontLoader = createNodeFontLoader(
+ *   { readFileSync },
+ *   { join },
+ *   '/path/to/fonts'
+ * );
+ *
+ * const fontFallback = {
+ *   fonts: {
+ *     [FontCharset.SHIFTJIS]: 'NotoSansJP-Regular.otf',
+ *   },
+ *   fontLoader,
+ * };
+ * ```
  */
-export const advancedNotoFontConfig: FontFallbackConfig = {
-  fonts: {
-    // Japanese with weight variants
-    [FontCharset.SHIFTJIS]: [
-      { url: 'NotoSansJP-Thin.otf', weight: 100 },
-      { url: 'NotoSansJP-Light.otf', weight: 300 },
-      { url: 'NotoSansJP-DemiLight.otf', weight: 350 },
-      { url: 'NotoSansJP-Regular.otf', weight: 400 },
-      { url: 'NotoSansJP-Medium.otf', weight: 500 },
-      { url: 'NotoSansJP-Bold.otf', weight: 700 },
-      { url: 'NotoSansJP-Black.otf', weight: 900 },
-    ],
-    // Korean with weight variants
-    [FontCharset.HANGEUL]: [
-      { url: 'NotoSansKR-Thin.otf', weight: 100 },
-      { url: 'NotoSansKR-Light.otf', weight: 300 },
-      { url: 'NotoSansKR-DemiLight.otf', weight: 350 },
-      { url: 'NotoSansKR-Regular.otf', weight: 400 },
-      { url: 'NotoSansKR-Medium.otf', weight: 500 },
-      { url: 'NotoSansKR-Bold.otf', weight: 700 },
-      { url: 'NotoSansKR-Black.otf', weight: 900 },
-    ],
-    // Simplified Chinese with weight variants
-    [FontCharset.GB2312]: [
-      { url: 'NotoSansHans-Thin.otf', weight: 100 },
-      { url: 'NotoSansHans-Light.otf', weight: 300 },
-      { url: 'NotoSansHans-DemiLight.otf', weight: 350 },
-      { url: 'NotoSansHans-Regular.otf', weight: 400 },
-      { url: 'NotoSansHans-Medium.otf', weight: 500 },
-      { url: 'NotoSansHans-Bold.otf', weight: 700 },
-      { url: 'NotoSansHans-Black.otf', weight: 900 },
-    ],
-    // Traditional Chinese with weight variants
-    [FontCharset.CHINESEBIG5]: [
-      { url: 'NotoSansHant-Thin.otf', weight: 100 },
-      { url: 'NotoSansHant-Light.otf', weight: 300 },
-      { url: 'NotoSansHant-DemiLight.otf', weight: 350 },
-      { url: 'NotoSansHant-Regular.otf', weight: 400 },
-      { url: 'NotoSansHant-Medium.otf', weight: 500 },
-      { url: 'NotoSansHant-Bold.otf', weight: 700 },
-      { url: 'NotoSansHant-Black.otf', weight: 900 },
-    ],
-    // Arabic
-    [FontCharset.ARABIC]: [
-      { url: 'NotoNaskhArabic-Regular.ttf', weight: 400 },
-      { url: 'NotoNaskhArabic-Bold.ttf', weight: 700 },
-    ],
-    // Hebrew
-    [FontCharset.HEBREW]: [
-      { url: 'NotoSansHebrew-Regular.ttf', weight: 400 },
-      { url: 'NotoSansHebrew-Bold.ttf', weight: 700 },
-    ],
-    // Latin-based with weight and italic variants (for Cyrillic, Greek, Vietnamese)
-    [FontCharset.CYRILLIC]: [
-      { url: 'NotoSans-Thin.ttf', weight: 100 },
-      { url: 'NotoSans-ThinItalic.ttf', weight: 100, italic: true },
-      { url: 'NotoSans-ExtraLight.ttf', weight: 200 },
-      { url: 'NotoSans-ExtraLightItalic.ttf', weight: 200, italic: true },
-      { url: 'NotoSans-Light.ttf', weight: 300 },
-      { url: 'NotoSans-LightItalic.ttf', weight: 300, italic: true },
-      { url: 'NotoSans-Regular.ttf', weight: 400 },
-      { url: 'NotoSans-Italic.ttf', weight: 400, italic: true },
-      { url: 'NotoSans-Medium.ttf', weight: 500 },
-      { url: 'NotoSans-MediumItalic.ttf', weight: 500, italic: true },
-      { url: 'NotoSans-SemiBold.ttf', weight: 600 },
-      { url: 'NotoSans-SemiBoldItalic.ttf', weight: 600, italic: true },
-      { url: 'NotoSans-Bold.ttf', weight: 700 },
-      { url: 'NotoSans-BoldItalic.ttf', weight: 700, italic: true },
-      { url: 'NotoSans-ExtraBold.ttf', weight: 800 },
-      { url: 'NotoSans-ExtraBoldItalic.ttf', weight: 800, italic: true },
-      { url: 'NotoSans-Black.ttf', weight: 900 },
-      { url: 'NotoSans-BlackItalic.ttf', weight: 900, italic: true },
-    ],
-    [FontCharset.GREEK]: [
-      { url: 'NotoSans-Regular.ttf', weight: 400 },
-      { url: 'NotoSans-Italic.ttf', weight: 400, italic: true },
-      { url: 'NotoSans-Bold.ttf', weight: 700 },
-      { url: 'NotoSans-BoldItalic.ttf', weight: 700, italic: true },
-    ],
-    [FontCharset.VIETNAMESE]: [
-      { url: 'NotoSans-Regular.ttf', weight: 400 },
-      { url: 'NotoSans-Italic.ttf', weight: 400, italic: true },
-      { url: 'NotoSans-Bold.ttf', weight: 700 },
-      { url: 'NotoSans-BoldItalic.ttf', weight: 700, italic: true },
-    ],
-  },
-  baseUrl: '/fonts',
-};
+export function createNodeFontLoader(
+  fs: { readFileSync: (path: string) => Uint8Array | ArrayBufferLike },
+  path: { join: (...paths: string[]) => string },
+  basePath: string,
+): FontLoader {
+  return (fontPath: string): Uint8Array | null => {
+    try {
+      const fullPath = path.join(basePath, fontPath);
+      const data = fs.readFileSync(fullPath);
+      // Handle both Uint8Array (Buffer extends this) and ArrayBuffer
+      if (data instanceof Uint8Array) {
+        return data;
+      }
+      return new Uint8Array(data);
+    } catch {
+      return null;
+    }
+  };
+}

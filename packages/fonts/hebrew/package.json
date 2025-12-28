@@ -1,0 +1,54 @@
+{
+  "name": "@embedpdf/fonts-hebrew",
+  "version": "1.0.0",
+  "private": false,
+  "description": "Hebrew fallback fonts for EmbedPDF - Noto Sans Hebrew (Regular and Bold)",
+  "type": "module",
+  "main": "./dist/index.cjs",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "require": "./dist/index.cjs"
+    }
+  },
+  "scripts": {
+    "build": "vite build",
+    "clean": "rimraf dist"
+  },
+  "keywords": [
+    "fonts",
+    "noto",
+    "hebrew",
+    "pdf",
+    "embedpdf"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/embedpdf/embed-pdf-viewer",
+    "directory": "packages/fonts/hebrew"
+  },
+  "homepage": "https://www.embedpdf.com/docs",
+  "bugs": {
+    "url": "https://github.com/embedpdf/embed-pdf-viewer/issues"
+  },
+  "author": "Bob Singor",
+  "license": "OFL-1.1",
+  "files": [
+    "dist",
+    "fonts/*.ttf",
+    "README.md"
+  ],
+  "devDependencies": {
+    "@embedpdf/build": "workspace:*",
+    "typescript": "^5.0.0"
+  },
+  "dependencies": {
+    "@embedpdf/models": "workspace:*"
+  },
+  "publishConfig": {
+    "access": "public"
+  }
+}
