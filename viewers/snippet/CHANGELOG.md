@@ -1,5 +1,13 @@
 # @embedpdf/snippet
 
+## 2.1.0
+
+### Patch Changes
+
+- [`db26b8f`](https://github.com/embedpdf/embed-pdf-viewer/commit/db26b8f1b29fa99549bc7dfd9deef8be604b1a0b) by [@bobsingor](https://github.com/bobsingor) – Update documentation to use jsDelivr CDN
+  - Changed import URL from `https://snippet.embedpdf.com/embedpdf.js` to `https://cdn.jsdelivr.net/npm/@embedpdf/snippet@2/dist/embedpdf.js`
+  - Updated code examples to assign `EmbedPDF.init()` result to a `viewer` variable
+
 ## 2.0.2
 
 ### Patch Changes
