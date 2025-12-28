@@ -2020,6 +2020,43 @@ export interface PdfAttachmentObject {
 }
 
 /**
+ * Font charset constants from PDFium (fpdf_sysfontinfo.h)
+ * Used for font fallback system when PDFs require fonts not embedded in the document.
+ *
+ * @public
+ */
+export enum FontCharset {
+  /** ANSI charset (Western European) */
+  ANSI = 0,
+  /** Default charset */
+  DEFAULT = 1,
+  /** Symbol charset */
+  SYMBOL = 2,
+  /** Japanese (Shift-JIS) */
+  SHIFTJIS = 128,
+  /** Korean (Hangeul) */
+  HANGEUL = 129,
+  /** Simplified Chinese (GB2312) */
+  GB2312 = 134,
+  /** Traditional Chinese (Big5) */
+  CHINESEBIG5 = 136,
+  /** Greek */
+  GREEK = 161,
+  /** Vietnamese */
+  VIETNAMESE = 163,
+  /** Hebrew */
+  HEBREW = 177,
+  /** Arabic */
+  ARABIC = 178,
+  /** Cyrillic (Russian, etc.) */
+  CYRILLIC = 204,
+  /** Thai */
+  THAI = 222,
+  /** Eastern European */
+  EASTERNEUROPEAN = 238,
+}
+
+/**
  * Pdf engine features
  *
  * @public

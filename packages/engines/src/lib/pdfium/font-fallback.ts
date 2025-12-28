@@ -1,27 +1,8 @@
-import { Logger, NoopLogger } from '@embedpdf/models';
+import { FontCharset, Logger, NoopLogger } from '@embedpdf/models';
 import type { WrappedPdfiumModule } from '@embedpdf/pdfium';
 
-/**
- * Font charset constants from PDFium (fpdf_sysfontinfo.h)
- */
-export const FontCharset = {
-  ANSI: 0,
-  DEFAULT: 1,
-  SYMBOL: 2,
-  SHIFTJIS: 128, // Japanese
-  HANGEUL: 129, // Korean
-  GB2312: 134, // Simplified Chinese
-  CHINESEBIG5: 136, // Traditional Chinese
-  GREEK: 161,
-  VIETNAMESE: 163,
-  HEBREW: 177,
-  ARABIC: 178,
-  CYRILLIC: 204, // Russian, etc.
-  THAI: 222,
-  EASTERNEUROPEAN: 238,
-} as const;
-
-export type FontCharsetValue = (typeof FontCharset)[keyof typeof FontCharset];
+// Re-export FontCharset for convenience
+export { FontCharset };
 
 /**
  * A single font variant with weight and italic information
@@ -49,7 +30,7 @@ export interface FontFallbackConfig {
    * Map of charset to font entry
    * Can be a simple URL string, a FontVariant, or an array of FontVariants
    */
-  fonts: Partial<Record<FontCharsetValue, FontEntry>>;
+  fonts: Partial<Record<FontCharset, FontEntry>>;
 
   /**
    * Optional default font entry for unspecified charsets
@@ -359,7 +340,7 @@ export class FontFallbackManager {
    * Pre-load fonts for specific charsets (optional optimization)
    * This can be called to warm the cache before rendering
    */
-  async preloadFonts(charsets: FontCharsetValue[]): Promise<void> {
+  async preloadFonts(charsets: FontCharset[]): Promise<void> {
     const urls = charsets
       .map((charset) => this.getFontUrlForCharset(charset))
       .filter((url): url is string => url !== null);
@@ -528,7 +509,7 @@ export class FontFallbackManager {
   ): { url: string; matchedWeight: number; matchedItalic: boolean } | null {
     const { fonts, defaultFont, baseUrl } = this.fontConfig;
 
-    const entry = fonts[charset as FontCharsetValue] ?? defaultFont;
+    const entry = fonts[charset as FontCharset] ?? defaultFont;
     if (!entry) {
       return null;
     }
