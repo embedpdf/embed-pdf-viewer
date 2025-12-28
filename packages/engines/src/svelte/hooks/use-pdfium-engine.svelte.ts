@@ -1,14 +1,21 @@
 import { ignore, Logger, PdfEngine } from '@embedpdf/models';
-import { DEFAULT_PDFIUM_WASM_URL } from '@embedpdf/engines';
+import type { FontFallbackConfig } from '@embedpdf/engines';
+
+const defaultWasmUrl =
+  'https://cdn.jsdelivr.net/npm/@embedpdf/pdfium@__PDFIUM_VERSION__/dist/pdfium.wasm';
 
 export interface UsePdfiumEngineProps {
   wasmUrl?: string;
   worker?: boolean;
   logger?: Logger;
+  /**
+   * Font fallback configuration for handling missing fonts in PDFs.
+   */
+  fontFallback?: FontFallbackConfig;
 }
 
 export function usePdfiumEngine(config?: UsePdfiumEngineProps) {
-  const { wasmUrl = DEFAULT_PDFIUM_WASM_URL, worker = true, logger } = config ?? {};
+  const { wasmUrl = defaultWasmUrl, worker = true, logger, fontFallback } = config ?? {};
 
   // Create a reactive state object
   const state = $state({
@@ -31,7 +38,7 @@ export function usePdfiumEngine(config?: UsePdfiumEngineProps) {
             ? await import('@embedpdf/engines/pdfium-worker-engine')
             : await import('@embedpdf/engines/pdfium-direct-engine');
 
-          const pdfEngine = await createPdfiumEngine(wasmUrl, { logger });
+          const pdfEngine = await createPdfiumEngine(wasmUrl, { logger, fontFallback });
           engineRef = pdfEngine;
           state.engine = pdfEngine;
           state.isLoading = false;

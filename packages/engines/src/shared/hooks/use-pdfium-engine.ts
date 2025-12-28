@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from '@framework';
 import { ignore, Logger, PdfEngine } from '@embedpdf/models';
+import type { FontFallbackConfig } from '@embedpdf/engines';
 
 const defaultWasmUrl = `https://cdn.jsdelivr.net/npm/@embedpdf/pdfium@__PDFIUM_VERSION__/dist/pdfium.wasm`;
 
@@ -8,10 +9,20 @@ interface UsePdfiumEngineProps {
   worker?: boolean;
   logger?: Logger;
   encoderPoolSize?: number;
+  /**
+   * Font fallback configuration for handling missing fonts in PDFs.
+   */
+  fontFallback?: FontFallbackConfig;
 }
 
 export function usePdfiumEngine(config?: UsePdfiumEngineProps) {
-  const { wasmUrl = defaultWasmUrl, worker = true, logger, encoderPoolSize } = config ?? {};
+  const {
+    wasmUrl = defaultWasmUrl,
+    worker = true,
+    logger,
+    encoderPoolSize,
+    fontFallback,
+  } = config ?? {};
 
   const [engine, setEngine] = useState<PdfEngine | null>(null);
   const [loading, setLoading] = useState(true);
@@ -27,7 +38,11 @@ export function usePdfiumEngine(config?: UsePdfiumEngineProps) {
           ? await import('@embedpdf/engines/pdfium-worker-engine')
           : await import('@embedpdf/engines/pdfium-direct-engine');
 
-        const pdfEngine = await createPdfiumEngine(wasmUrl, { logger, encoderPoolSize });
+        const pdfEngine = await createPdfiumEngine(wasmUrl, {
+          logger,
+          encoderPoolSize,
+          fontFallback,
+        });
         engineRef.current = pdfEngine;
         setEngine(pdfEngine);
         setLoading(false);
@@ -46,7 +61,7 @@ export function usePdfiumEngine(config?: UsePdfiumEngineProps) {
         engineRef.current = null;
       }, ignore);
     };
-  }, [wasmUrl, worker, logger]);
+  }, [wasmUrl, worker, logger, fontFallback]);
 
   return { engine, isLoading: loading, error };
 }

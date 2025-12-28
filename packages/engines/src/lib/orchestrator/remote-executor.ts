@@ -39,6 +39,7 @@ import {
   ImageDataLike,
 } from '@embedpdf/models';
 import type { WorkerRequest, WorkerResponse } from './pdfium-native-runner';
+import type { FontFallbackConfig } from '../pdfium/font-fallback';
 
 /**
  * Options for creating a RemoteExecutor
@@ -52,6 +53,10 @@ export interface RemoteExecutorOptions {
    * Logger instance for debugging
    */
   logger?: Logger;
+  /**
+   * Font fallback configuration for handling missing fonts
+   */
+  fontFallback?: FontFallbackConfig;
 }
 
 const LOG_SOURCE = 'RemoteExecutor';
@@ -131,12 +136,13 @@ export class RemoteExecutor implements IPdfiumExecutor {
     this.readyTask = new Task<boolean, PdfErrorReason>();
     this.pendingRequests.set(RemoteExecutor.READY_TASK_ID, this.readyTask);
 
-    // Send initialization message with WASM URL
+    // Send initialization message with WASM URL and font fallback config
     this.worker.postMessage({
       id: RemoteExecutor.READY_TASK_ID,
       type: 'wasmInit',
       wasmUrl: options.wasmUrl,
       logger: options.logger ? serializeLogger(options.logger) : undefined,
+      fontFallback: options.fontFallback,
     });
 
     this.logger.debug(LOG_SOURCE, LOG_CATEGORY, 'RemoteExecutor created');
