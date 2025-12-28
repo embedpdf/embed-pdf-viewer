@@ -44,10 +44,8 @@
   ],
   "devDependencies": {
     "@embedpdf/build": "workspace:*",
+    "@embedpdf/models": "workspace:*",
     "typescript": "^5.0.0"
-  },
-  "dependencies": {
-    "@embedpdf/models": "workspace:*"
   },
   "publishConfig": {
     "access": "public"

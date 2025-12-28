@@ -893,92 +893,85 @@ importers:
         version: 0.34.5
 
   packages/fonts/arabic:
-    dependencies:
-      '@embedpdf/models':
-        specifier: workspace:*
-        version: link:../../models
     devDependencies:
       '@embedpdf/build':
         specifier: workspace:*
         version: link:../../build
+      '@embedpdf/models':
+        specifier: workspace:*
+        version: link:../../models
       typescript:
         specifier: ^5.0.0
         version: 5.9.3
 
   packages/fonts/hebrew:
-    dependencies:
-      '@embedpdf/models':
-        specifier: workspace:*
-        version: link:../../models
     devDependencies:
       '@embedpdf/build':
         specifier: workspace:*
         version: link:../../build
+      '@embedpdf/models':
+        specifier: workspace:*
+        version: link:../../models
       typescript:
         specifier: ^5.0.0
         version: 5.9.3
 
   packages/fonts/jp:
-    dependencies:
-      '@embedpdf/models':
-        specifier: workspace:*
-        version: link:../../models
     devDependencies:
       '@embedpdf/build':
         specifier: workspace:*
         version: link:../../build
+      '@embedpdf/models':
+        specifier: workspace:*
+        version: link:../../models
       typescript:
         specifier: ^5.0.0
         version: 5.9.3
 
   packages/fonts/kr:
-    dependencies:
-      '@embedpdf/models':
-        specifier: workspace:*
-        version: link:../../models
     devDependencies:
       '@embedpdf/build':
         specifier: workspace:*
         version: link:../../build
+      '@embedpdf/models':
+        specifier: workspace:*
+        version: link:../../models
       typescript:
         specifier: ^5.0.0
         version: 5.9.3
 
   packages/fonts/latin:
-    dependencies:
-      '@embedpdf/models':
-        specifier: workspace:*
-        version: link:../../models
     devDependencies:
       '@embedpdf/build':
         specifier: workspace:*
         version: link:../../build
+      '@embedpdf/models':
+        specifier: workspace:*
+        version: link:../../models
       typescript:
         specifier: ^5.0.0
         version: 5.9.3
 
   packages/fonts/sc:
-    dependencies:
-      '@embedpdf/models':
-        specifier: workspace:*
-        version: link:../../models
     devDependencies:
       '@embedpdf/build':
         specifier: workspace:*
         version: link:../../build
+      '@embedpdf/models':
+        specifier: workspace:*
+        version: link:../../models
       typescript:
         specifier: ^5.0.0
         version: 5.9.3
 
   packages/fonts/tc:
-    dependencies:
-      '@embedpdf/models':
-        specifier: workspace:*
-        version: link:../../models
     devDependencies:
       '@embedpdf/build':
         specifier: workspace:*
         version: link:../../build
+      '@embedpdf/models':
+        specifier: workspace:*
+        version: link:../../models
       typescript:
         specifier: ^5.0.0
         version: 5.9.3
