@@ -1,3 +1,4 @@
+import { Fragment } from '@framework';
 import { useUICapability, useUIState } from './use-ui';
 import { useRenderers } from '../registries/renderers-registry';
 
@@ -31,40 +32,38 @@ export function useSchemaRenderer(documentId: string) {
      * ```
      */
     renderToolbar: (placement: 'top' | 'bottom' | 'left' | 'right', slot: string) => {
-      if (!schema || !provides || !uiState) return null;
-
       const slotKey = `${placement}-${slot}`;
-      const toolbarSlot = uiState.activeToolbars[slotKey];
 
-      // If no toolbar in this slot, nothing to render
-      if (!toolbarSlot) return null;
-
-      const toolbarSchema = schema.toolbars[toolbarSlot.toolbarId];
-      if (!toolbarSchema) {
-        console.warn(`Toolbar "${toolbarSlot.toolbarId}" not found in schema`);
+      if (!schema || !provides || !uiState) {
         return null;
       }
 
-      // Check if toolbar is closable
-      const isClosable = !toolbarSchema.permanent;
+      const toolbarSlot = uiState.activeToolbars[slotKey];
+      const toolbarSchema = toolbarSlot ? schema.toolbars[toolbarSlot.toolbarId] : null;
 
+      if (toolbarSlot && !toolbarSchema) {
+        console.warn(`Toolbar "${toolbarSlot.toolbarId}" not found in schema`);
+      }
+
+      const isClosable = toolbarSchema ? !toolbarSchema.permanent : false;
       const handleClose = isClosable
-        ? () => {
-            provides.forDocument(documentId).closeToolbarSlot(placement, slot);
-          }
+        ? () => provides.forDocument(documentId).closeToolbarSlot(placement, slot)
         : undefined;
 
       const ToolbarRenderer = renderers.toolbar;
 
-      // ALWAYS render, pass isOpen state
+      // Always return the same element type (div) with stable key
       return (
-        <ToolbarRenderer
-          key={toolbarSlot.toolbarId}
-          schema={toolbarSchema}
-          documentId={documentId}
-          isOpen={toolbarSlot.isOpen}
-          onClose={handleClose}
-        />
+        <Fragment key={`toolbar-slot-${slotKey}`}>
+          {toolbarSlot && toolbarSchema && (
+            <ToolbarRenderer
+              schema={toolbarSchema}
+              documentId={documentId}
+              isOpen={toolbarSlot.isOpen}
+              onClose={handleClose}
+            />
+          )}
+        </Fragment>
       );
     },
 
@@ -84,17 +83,17 @@ export function useSchemaRenderer(documentId: string) {
      * ```
      */
     renderSidebar: (placement: 'left' | 'right' | 'top' | 'bottom', slot: string) => {
-      if (!schema || !provides || !uiState) return null;
       const slotKey = `${placement}-${slot}`;
-      const sidebarSlot = uiState.activeSidebars[slotKey];
 
-      // If no sidebar in this slot, nothing to render
-      if (!sidebarSlot) return null;
-
-      const sidebarSchema = schema.sidebars?.[sidebarSlot.sidebarId];
-      if (!sidebarSchema) {
-        console.warn(`Sidebar "${sidebarSlot.sidebarId}" not found in schema`);
+      if (!schema || !provides || !uiState) {
         return null;
+      }
+
+      const sidebarSlot = uiState.activeSidebars[slotKey];
+      const sidebarSchema = sidebarSlot ? schema.sidebars?.[sidebarSlot.sidebarId] : null;
+
+      if (sidebarSlot && !sidebarSchema) {
+        console.warn(`Sidebar "${sidebarSlot.sidebarId}" not found in schema`);
       }
 
       const handleClose = () => {
@@ -103,16 +102,18 @@ export function useSchemaRenderer(documentId: string) {
 
       const SidebarRenderer = renderers.sidebar;
 
-      // ALWAYS render, pass isOpen state
-      // Your renderer decides whether to return null or animate
+      // Always return the same element type (Fragment) with stable key
       return (
-        <SidebarRenderer
-          key={sidebarSlot.sidebarId}
-          schema={sidebarSchema}
-          documentId={documentId}
-          isOpen={sidebarSlot.isOpen}
-          onClose={handleClose}
-        />
+        <Fragment key={`sidebar-slot-${slotKey}`}>
+          {sidebarSlot && sidebarSchema && (
+            <SidebarRenderer
+              schema={sidebarSchema}
+              documentId={documentId}
+              isOpen={sidebarSlot.isOpen}
+              onClose={handleClose}
+            />
+          )}
+        </Fragment>
       );
     },
 
@@ -133,14 +134,20 @@ export function useSchemaRenderer(documentId: string) {
      * ```
      */
     renderModal: () => {
-      if (!schema || !provides || !uiState?.activeModal) return null;
-
-      const { modalId, isOpen } = uiState.activeModal;
-
-      const modalSchema = schema.modals?.[modalId];
-      if (!modalSchema) {
-        console.warn(`Modal "${modalId}" not found in schema`);
+      if (!schema || !provides || !uiState) {
         return null;
+      }
+
+      const ModalRenderer = renderers.modal;
+      if (!ModalRenderer) {
+        return null;
+      }
+
+      const activeModal = uiState.activeModal;
+      const modalSchema = activeModal ? schema.modals?.[activeModal.modalId] : null;
+
+      if (activeModal && !modalSchema) {
+        console.warn(`Modal "${activeModal.modalId}" not found in schema`);
       }
 
       const handleClose = () => {
@@ -151,21 +158,19 @@ export function useSchemaRenderer(documentId: string) {
         provides.forDocument(documentId).clearModal();
       };
 
-      const ModalRenderer = renderers.modal;
-      if (!ModalRenderer) {
-        console.warn('No modal renderer registered');
-        return null;
-      }
-
+      // Always return the same element type (Fragment) with stable key
       return (
-        <ModalRenderer
-          key={modalId}
-          schema={modalSchema}
-          documentId={documentId}
-          isOpen={isOpen}
-          onClose={handleClose}
-          onExited={handleExited}
-        />
+        <Fragment key="modal-slot">
+          {activeModal && modalSchema && (
+            <ModalRenderer
+              schema={modalSchema}
+              documentId={documentId}
+              isOpen={activeModal.isOpen}
+              onClose={handleClose}
+              onExited={handleExited}
+            />
+          )}
+        </Fragment>
       );
     },
 
@@ -218,18 +223,20 @@ export function useSchemaRenderer(documentId: string) {
      * ```
      */
     renderOverlays: () => {
-      if (!schema?.overlays || !provides) return null;
+      if (!schema || !provides) {
+        return null;
+      }
 
       const OverlayRenderer = renderers.overlay;
       if (!OverlayRenderer) {
         return null;
       }
 
-      const overlays = Object.values(schema.overlays);
-      if (overlays.length === 0) return null;
+      const overlays = schema.overlays ? Object.values(schema.overlays) : [];
 
+      // Always return the same element type (Fragment) with stable key
       return (
-        <>
+        <Fragment key="overlays-slot">
           {overlays.map((overlaySchema) => (
             <OverlayRenderer
               key={overlaySchema.id}
@@ -237,7 +244,7 @@ export function useSchemaRenderer(documentId: string) {
               documentId={documentId}
             />
           ))}
-        </>
+        </Fragment>
       );
     },
   };
