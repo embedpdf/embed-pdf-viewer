@@ -37,6 +37,12 @@ Try it now — load your own PDF or use the sample:
 
 We are grateful for the support of our sponsors!
 
+### Silver Sponsors
+
+<div align="left">
+  <a href="https://www.withloveinternet.com?utm_source=embedpdf&utm_campaign=oss" target="_blank"><img src=".github/assets/sponsor-wli.png" alt="With Love Internet" height="80"></a>
+</div>
+
 ### Bronze Sponsors
 
 <div align="left">
