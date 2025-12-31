@@ -1,20 +1,8 @@
 ---
-'@embedpdf/pdfium': minor
+'@embedpdf/pdfium': patch
 ---
 
 Improved PDF editing and redaction capabilities with Form XObject support and enhanced image handling
-
-**Form XObject Content Editing**
-
-- Added proper support for editing content within Form XObjects (embedded forms in PDFs)
-- Form XObject streams are now edited in-place rather than attempting to add/remove separate content streams
-- Added `GetMutableFormStream()` API to CPDF_PageObjectHolder for direct Form XObject access
-
-**Pattern Color Support**
-
-- Added Pattern resource tracking in page content generation
-- Pattern colors are now properly preserved and emitted during content regeneration
-- Added fill/stroke pattern resource name tracking in color state
 
 **Text Redaction Improvements**
 
@@ -29,3 +17,15 @@ Improved PDF editing and redaction capabilities with Form XObject support and en
 - Added JPEG SMask (soft mask) decoding for proper transparency handling in WASM
 - Inline images (BI...ID...EI format) are now converted to XObject images for editing
 - Improved handling of paletted/indexed images with alpha transparency
+
+**Form XObject Content Editing**
+
+- Added proper support for editing content within Form XObjects (embedded forms in PDFs)
+- Form XObject streams are now edited in-place rather than attempting to add/remove separate content streams
+- Added `GetMutableFormStream()` API to CPDF_PageObjectHolder for direct Form XObject access
+
+**Pattern Color Support**
+
+- Added Pattern resource tracking in page content generation
+- Pattern colors are now properly preserved and emitted during content regeneration
+- Added fill/stroke pattern resource name tracking in color state
