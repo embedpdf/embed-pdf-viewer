@@ -1,0 +1,1 @@
+{"version":3,"file":"search-sidebar.d.ts","sourceRoot":"","sources":["../../src/components/search-sidebar.tsx"],"names":[],"mappings":"AAAA,OAAO,EAAE,CAAC,EAAE,MAAM,QAAQ,CAAC;AAoD3B,KAAK,kBAAkB,GAAG;IACxB,UAAU,EAAE,MAAM,CAAC;IACnB,OAAO,CAAC,EAAE,MAAM,IAAI,CAAC;CACtB,CAAC;AAEF,wBAAgB,aAAa,CAAC,EAAE,UAAU,EAAE,OAAO,EAAE,EAAE,kBAAkB,iBAgLxE"}

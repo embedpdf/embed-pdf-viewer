@@ -1,0 +1,1 @@
+{"version":3,"file":"user-avatar.d.ts","sourceRoot":"","sources":["../../../src/components/comment-sidebar/user-avatar.tsx"],"names":[],"mappings":"AAAA,OAAO,EAAE,CAAC,EAAE,MAAM,QAAQ,CAAC;AAE3B,UAAU,eAAe;IACvB,IAAI,CAAC,EAAE,MAAM,CAAC;IACd,SAAS,CAAC,EAAE,MAAM,CAAC;CACpB;AA8BD,eAAO,MAAM,UAAU,GAAI,qBAA0B,eAAe,kBAMnE,CAAC"}

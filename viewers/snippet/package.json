@@ -11,7 +11,7 @@
   ],
   "scripts": {
     "dev": "rollup --watch --config rollup.config.js",
-    "prebuild": "rimraf dist/*",
+    "prebuild": "rimraf --glob dist/*",
     "build": "rollup --config rollup.config.js"
   },
   "dependencies": {

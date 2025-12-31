@@ -1,0 +1,1 @@
+{"version":3,"file":"shape-sidebar.d.ts","sourceRoot":"","sources":["../../../src/components/annotation-sidebar/shape-sidebar.tsx"],"names":[],"mappings":"AAAA,OAAO,EAAY,CAAC,EAAE,MAAM,QAAQ,CAAC;AAIrC,OAAO,EAAE,gBAAgB,EAAE,MAAM,UAAU,CAAC;AAG5C,OAAO,EAAE,mBAAmB,EAAE,mBAAmB,EAAE,MAAM,kBAAkB,CAAC;AAG5E,eAAO,MAAM,YAAY,GAAI,qDAK1B,gBAAgB,CAAC,mBAAmB,GAAG,mBAAmB,CAAC,yBAuG7D,CAAC"}

@@ -1,0 +1,1 @@
+{"version":3,"file":"thumbnails-sidebar.d.ts","sourceRoot":"","sources":["../../src/components/thumbnails-sidebar.tsx"],"names":[],"mappings":"AAAA,OAAO,EAAE,CAAC,EAAE,MAAM,QAAQ,CAAC;AAI3B,KAAK,sBAAsB,GAAG;IAC5B,UAAU,EAAE,MAAM,CAAC;IACnB,OAAO,CAAC,EAAE,MAAM,IAAI,CAAC;CACtB,CAAC;AAEF,wBAAgB,iBAAiB,CAAC,EAAE,UAAU,EAAE,OAAO,EAAE,EAAE,sBAAsB,iBAkEhF"}
