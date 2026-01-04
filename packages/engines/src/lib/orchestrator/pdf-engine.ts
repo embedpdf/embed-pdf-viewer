@@ -461,6 +461,27 @@ export class PdfEngine<T = Blob> implements IPdfEngine<T> {
   }
 
   /**
+   * Update only the position/rect of an annotation.
+   * Optimized for interactive move/resize controls.
+   */
+  updateAnnotationPosition(
+    doc: PdfDocumentObject,
+    page: PdfPageObject,
+    annotationId: string,
+    rect: Rect,
+    unrotatedRect?: Rect,
+  ): PdfTask<boolean> {
+    return this.workerQueue.enqueue(
+      {
+        execute: () =>
+          this.executor.updateAnnotationPosition(doc, page, annotationId, rect, unrotatedRect),
+        meta: { docId: doc.id, pageIndex: page.index, operation: 'updateAnnotationPosition' },
+      },
+      { priority: Priority.HIGH }, // High priority for interactive controls
+    );
+  }
+
+  /**
    * Get all annotations across all pages
    * Uses batched operations to reduce queue overhead
    */

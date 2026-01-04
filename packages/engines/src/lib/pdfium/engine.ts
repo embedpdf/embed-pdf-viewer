@@ -1169,6 +1169,91 @@ export class PdfiumNative implements IPdfiumExecutor {
   }
 
   /**
+   * Update only the position/rect of an annotation.
+   * This is optimized for interactive move/resize controls.
+   *
+   * When the annotation has rotation, the unrotatedRect in custom data
+   * is also updated to reflect the new geometry.
+   *
+   * @param doc - Document object
+   * @param page - Page object
+   * @param annotationId - The annotation's unique id (NM field)
+   * @param rect - New bounding rectangle
+   * @param unrotatedRect - Optional: the new unrotated rect (for rotated annotations)
+   * @returns Task resolving to true on success
+   *
+   * @public
+   */
+  updateAnnotationPosition(
+    doc: PdfDocumentObject,
+    page: PdfPageObject,
+    annotationId: string,
+    rect: Rect,
+    unrotatedRect?: Rect,
+  ): PdfTask<boolean> {
+    this.logger.debug(
+      LOG_SOURCE,
+      LOG_CATEGORY,
+      'updateAnnotationPosition',
+      doc,
+      page,
+      annotationId,
+      rect,
+    );
+
+    const ctx = this.cache.getContext(doc.id);
+    if (!ctx) {
+      return PdfTaskHelper.reject({
+        code: PdfErrorCode.DocNotOpen,
+        message: 'document does not open',
+      });
+    }
+
+    const pageCtx = ctx.acquirePage(page.index);
+    const annotPtr = this.getAnnotationByName(pageCtx.pagePtr, annotationId);
+    if (!annotPtr) {
+      pageCtx.release();
+      return PdfTaskHelper.reject({
+        code: PdfErrorCode.NotFound,
+        message: 'annotation not found',
+      });
+    }
+
+    // Set the new rect
+    if (!this.setPageAnnoRect(page, annotPtr, rect)) {
+      this.pdfiumModule.FPDFPage_CloseAnnot(annotPtr);
+      pageCtx.release();
+      return PdfTaskHelper.reject({
+        code: PdfErrorCode.CantSetAnnotRect,
+        message: 'failed to set annotation rect',
+      });
+    }
+
+    // If unrotatedRect is provided, update it in custom data
+    if (unrotatedRect) {
+      const existingCustom = this.getAnnotCustom(annotPtr) ?? {};
+      const newCustom = { ...existingCustom, unrotatedRect };
+      if (!this.setAnnotCustom(annotPtr, newCustom)) {
+        this.pdfiumModule.FPDFPage_CloseAnnot(annotPtr);
+        pageCtx.release();
+        return PdfTaskHelper.reject({
+          code: PdfErrorCode.CantSetAnnotContent,
+          message: 'failed to update unrotatedRect in custom data',
+        });
+      }
+    }
+
+    // Regenerate appearance
+    this.pdfiumModule.EPDFAnnot_GenerateAppearance(annotPtr);
+    this.pdfiumModule.FPDFPage_GenerateContent(pageCtx.pagePtr);
+
+    this.pdfiumModule.FPDFPage_CloseAnnot(annotPtr);
+    pageCtx.release();
+
+    return PdfTaskHelper.resolve(true);
+  }
+
+  /**
    * {@inheritDoc @embedpdf/models!PdfEngine.removePageAnnotation}
    *
    * @public
@@ -2252,9 +2337,30 @@ export class PdfiumNative implements IPdfiumExecutor {
     ) {
       return false;
     }
-    if (annotation.custom && !this.setAnnotCustom(annotationPtr, annotation.custom)) {
-      return false;
+
+    // Handle rotation: store unrotatedRect in custom data (like Apryse's trn-unrotated-rect)
+    const customData = { ...(annotation.custom ?? {}) };
+    if (annotation.unrotatedRect) {
+      customData.unrotatedRect = annotation.unrotatedRect;
+    } else if (annotation.rotation && annotation.rotation !== 0 && !customData.unrotatedRect) {
+      // If rotation is set but no unrotatedRect provided, store current rect as unrotated
+      customData.unrotatedRect = annotation.rect;
     }
+
+    // Store custom data with unrotatedRect merged in
+    if (Object.keys(customData).length > 0) {
+      if (!this.setAnnotCustom(annotationPtr, customData)) {
+        return false;
+      }
+    }
+
+    // Set rotation in /Rotate entry
+    if (annotation.rotation !== undefined) {
+      if (!this.setAnnotationRotation(annotationPtr, annotation.rotation)) {
+        return false;
+      }
+    }
+
     if (annotation.flags && !this.setAnnotationFlags(annotationPtr, annotation.flags)) {
       return false;
     }
@@ -2330,9 +2436,30 @@ export class PdfiumNative implements IPdfiumExecutor {
     ) {
       return false;
     }
-    if (annotation.custom && !this.setAnnotCustom(annotationPtr, annotation.custom)) {
-      return false;
+
+    // Handle rotation: store unrotatedRect in custom data (like Apryse's trn-unrotated-rect)
+    const customData = { ...(annotation.custom ?? {}) };
+    if (annotation.unrotatedRect) {
+      customData.unrotatedRect = annotation.unrotatedRect;
+    } else if (annotation.rotation && annotation.rotation !== 0 && !customData.unrotatedRect) {
+      // If rotation is set but no unrotatedRect provided, store current rect as unrotated
+      customData.unrotatedRect = annotation.rect;
     }
+
+    // Store custom data with unrotatedRect merged in
+    if (Object.keys(customData).length > 0) {
+      if (!this.setAnnotCustom(annotationPtr, customData)) {
+        return false;
+      }
+    }
+
+    // Set rotation in /Rotate entry
+    if (annotation.rotation !== undefined) {
+      if (!this.setAnnotationRotation(annotationPtr, annotation.rotation)) {
+        return false;
+      }
+    }
+
     if (annotation.flags && !this.setAnnotationFlags(annotationPtr, annotation.flags)) {
       return false;
     }
@@ -2576,9 +2703,30 @@ export class PdfiumNative implements IPdfiumExecutor {
     ) {
       return false;
     }
-    if (annotation.custom && !this.setAnnotCustom(annotationPtr, annotation.custom)) {
-      return false;
+
+    // Handle rotation: store unrotatedRect in custom data (like Apryse's trn-unrotated-rect)
+    const customData = { ...(annotation.custom ?? {}) };
+    if (annotation.unrotatedRect) {
+      customData.unrotatedRect = annotation.unrotatedRect;
+    } else if (annotation.rotation && annotation.rotation !== 0 && !customData.unrotatedRect) {
+      // If rotation is set but no unrotatedRect provided, store current rect as unrotated
+      customData.unrotatedRect = annotation.rect;
     }
+
+    // Store custom data with unrotatedRect merged in
+    if (Object.keys(customData).length > 0) {
+      if (!this.setAnnotCustom(annotationPtr, customData)) {
+        return false;
+      }
+    }
+
+    // Set rotation in /Rotate entry
+    if (annotation.rotation !== undefined) {
+      if (!this.setAnnotationRotation(annotationPtr, annotation.rotation)) {
+        return false;
+      }
+    }
+
     if (annotation.modified && !this.setAnnotationDate(annotationPtr, 'M', annotation.modified)) {
       return false;
     }
@@ -2713,9 +2861,30 @@ export class PdfiumNative implements IPdfiumExecutor {
     ) {
       return false;
     }
-    if (annotation.custom && !this.setAnnotCustom(annotationPtr, annotation.custom)) {
-      return false;
+
+    // Handle rotation: store unrotatedRect in custom data (like Apryse's trn-unrotated-rect)
+    const customData = { ...(annotation.custom ?? {}) };
+    if (annotation.unrotatedRect) {
+      customData.unrotatedRect = annotation.unrotatedRect;
+    } else if (annotation.rotation && annotation.rotation !== 0 && !customData.unrotatedRect) {
+      // If rotation is set but no unrotatedRect provided, store current rect as unrotated
+      customData.unrotatedRect = annotation.rect;
     }
+
+    // Store custom data with unrotatedRect merged in
+    if (Object.keys(customData).length > 0) {
+      if (!this.setAnnotCustom(annotationPtr, customData)) {
+        return false;
+      }
+    }
+
+    // Set rotation in /Rotate entry
+    if (annotation.rotation !== undefined) {
+      if (!this.setAnnotationRotation(annotationPtr, annotation.rotation)) {
+        return false;
+      }
+    }
+
     if (annotation.flags && !this.setAnnotationFlags(annotationPtr, annotation.flags)) {
       return false;
     }
@@ -3939,6 +4108,37 @@ export class PdfiumNative implements IPdfiumExecutor {
   }
 
   /**
+   * Get the rotation angle (in degrees) from the annotation's /Rotate entry.
+   * Returns 0 if no rotation is set or on error.
+   *
+   * @param annotationPtr - pointer to the annotation
+   * @returns rotation in degrees (0 if not set)
+   */
+  private getAnnotationRotation(annotationPtr: number): number {
+    const rotationPtr = this.memoryManager.malloc(4);
+    const ok = this.pdfiumModule.EPDFAnnot_GetRotate(annotationPtr, rotationPtr);
+    if (!ok) {
+      this.memoryManager.free(rotationPtr);
+      return 0;
+    }
+    const rotation = this.pdfiumModule.pdfium.getValue(rotationPtr, 'float');
+    this.memoryManager.free(rotationPtr);
+    return rotation;
+  }
+
+  /**
+   * Set the rotation angle (in degrees) on the annotation's /Rotate entry.
+   * A value of 0 removes the /Rotate key.
+   *
+   * @param annotationPtr - pointer to the annotation
+   * @param rotation - rotation in degrees (clockwise)
+   * @returns true on success
+   */
+  private setAnnotationRotation(annotationPtr: number, rotation: number): boolean {
+    return !!this.pdfiumModule.EPDFAnnot_SetRotate(annotationPtr, rotation);
+  }
+
+  /**
    * Fetch the `/Q` text-alignment value from a **FreeText** annotation.
    *
    * @param annotationPtr pointer returned by `FPDFPage_GetAnnot`
@@ -4601,7 +4801,8 @@ export class PdfiumNative implements IPdfiumExecutor {
 
     // pack buffer → native call
     const { ptr, count } = this.allocFSQuadsBufferFromRects(page, clean);
-    let ok = false;
+    let ok = true;
+
     try {
       // If your wrapper exposes FPDFText_RedactInQuads, call that instead.
       ok = !!this.pdfiumModule.EPDFText_RedactInQuads(
@@ -4609,7 +4810,7 @@ export class PdfiumNative implements IPdfiumExecutor {
         ptr,
         count,
         recurseForms ? true : false,
-        drawBlackBoxes ? true : false,
+        false,
       );
     } finally {
       this.memoryManager.free(ptr);
@@ -4823,6 +5024,12 @@ export class PdfiumNative implements IPdfiumExecutor {
     const richContent = this.getAnnotRichContent(annotationPtr);
     const flags = this.getAnnotationFlags(annotationPtr);
 
+    // Read rotation from /Rotate entry
+    const rotation = this.getAnnotationRotation(annotationPtr);
+
+    // Extract unrotatedRect from custom data (like Apryse's trn-unrotated-rect)
+    const unrotatedRect = custom?.unrotatedRect as Rect | undefined;
+
     return {
       pageIndex: page.index,
       custom,
@@ -4843,6 +5050,8 @@ export class PdfiumNative implements IPdfiumExecutor {
       modified,
       created,
       rect,
+      ...(rotation !== 0 && { rotation }),
+      ...(unrotatedRect !== undefined && { unrotatedRect }),
     };
   }
 
@@ -5002,6 +5211,12 @@ export class PdfiumNative implements IPdfiumExecutor {
     const flags = this.getAnnotationFlags(annotationPtr);
     const contents = this.getAnnotString(annotationPtr, 'Contents') || '';
 
+    // Read rotation from /Rotate entry
+    const rotation = this.getAnnotationRotation(annotationPtr);
+
+    // Extract unrotatedRect from custom data (like Apryse's trn-unrotated-rect)
+    const unrotatedRect = custom?.unrotatedRect as Rect | undefined;
+
     return {
       pageIndex: page.index,
       custom,
@@ -5019,6 +5234,8 @@ export class PdfiumNative implements IPdfiumExecutor {
       author,
       modified,
       created,
+      ...(rotation !== 0 && { rotation }),
+      ...(unrotatedRect !== undefined && { unrotatedRect }),
     };
   }
 
@@ -5457,6 +5674,12 @@ export class PdfiumNative implements IPdfiumExecutor {
     const flags = this.getAnnotationFlags(annotationPtr);
     const contents = this.getAnnotString(annotationPtr, 'Contents') || '';
 
+    // Read rotation from /Rotate entry
+    const rotation = this.getAnnotationRotation(annotationPtr);
+
+    // Extract unrotatedRect from custom data (like Apryse's trn-unrotated-rect)
+    const unrotatedRect = custom?.unrotatedRect as Rect | undefined;
+
     return {
       pageIndex: page.index,
       custom,
@@ -5468,6 +5691,8 @@ export class PdfiumNative implements IPdfiumExecutor {
       modified,
       created,
       flags,
+      ...(rotation !== 0 && { rotation }),
+      ...(unrotatedRect !== undefined && { unrotatedRect }),
     };
   }
 
@@ -5762,6 +5987,12 @@ export class PdfiumNative implements IPdfiumExecutor {
       }
     }
 
+    // Read rotation from /Rotate entry
+    const rotation = this.getAnnotationRotation(annotationPtr);
+
+    // Extract unrotatedRect from custom data (like Apryse's trn-unrotated-rect)
+    const unrotatedRect = custom?.unrotatedRect as Rect | undefined;
+
     return {
       pageIndex: page.index,
       custom,
@@ -5779,6 +6010,8 @@ export class PdfiumNative implements IPdfiumExecutor {
       modified,
       created,
       ...(strokeDashArray !== undefined && { strokeDashArray }),
+      ...(rotation !== 0 && { rotation }),
+      ...(unrotatedRect !== undefined && { unrotatedRect }),
     };
   }
 
@@ -5820,6 +6053,12 @@ export class PdfiumNative implements IPdfiumExecutor {
       }
     }
 
+    // Read rotation from /Rotate entry
+    const rotation = this.getAnnotationRotation(annotationPtr);
+
+    // Extract unrotatedRect from custom data (like Apryse's trn-unrotated-rect)
+    const unrotatedRect = custom?.unrotatedRect as Rect | undefined;
+
     return {
       pageIndex: page.index,
       custom,
@@ -5837,6 +6076,8 @@ export class PdfiumNative implements IPdfiumExecutor {
       modified,
       created,
       ...(strokeDashArray !== undefined && { strokeDashArray }),
+      ...(rotation !== 0 && { rotation }),
+      ...(unrotatedRect !== undefined && { unrotatedRect }),
     };
   }
 

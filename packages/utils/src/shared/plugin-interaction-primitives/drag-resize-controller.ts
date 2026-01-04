@@ -15,19 +15,24 @@ export interface DragResizeConfig {
   scale?: number;
 }
 
-export type InteractionState = 'idle' | 'dragging' | 'resizing' | 'vertex-editing';
+export type InteractionState = 'idle' | 'dragging' | 'resizing' | 'vertex-editing' | 'rotating';
 export type ResizeHandle = 'nw' | 'ne' | 'sw' | 'se' | 'n' | 'e' | 's' | 'w';
 
 export interface TransformData {
-  type: 'move' | 'resize' | 'vertex-edit';
+  type: 'move' | 'resize' | 'vertex-edit' | 'rotate';
   changes: {
     rect?: Rect;
     vertices?: Position[];
+    rotation?: number;
   };
   metadata?: {
     handle?: ResizeHandle;
     vertexIndex?: number;
     maintainAspectRatio?: boolean;
+    /** The rotation angle in degrees */
+    rotationAngle?: number;
+    /** The center point used for rotation */
+    rotationCenter?: Position;
   };
 }
 
@@ -55,7 +60,7 @@ function getAnchor(handle: ResizeHandle): Anchor {
 }
 
 /**
- * Pure geometric controller that manages drag/resize/vertex-edit logic.
+ * Pure geometric controller that manages drag/resize/vertex-edit/rotate logic.
  */
 export class DragResizeController {
   private state: InteractionState = 'idle';
@@ -68,6 +73,12 @@ export class DragResizeController {
   private activeVertexIndex: number | null = null;
   private startVertices: Position[] = [];
   private currentVertices: Position[] = [];
+
+  // Rotation state
+  private rotationCenter: Position | null = null;
+  private startAngle: number = 0;
+  private initialRotation: number = 0; // The rotation value when interaction started
+  private lastComputedRotation: number = 0; // The last computed rotation during move
 
   constructor(
     private config: DragResizeConfig,
@@ -144,6 +155,80 @@ export class DragResizeController {
     });
   }
 
+  startRotation(clientX: number, clientY: number, initialRotation: number = 0) {
+    this.state = 'rotating';
+    this.startPoint = { x: clientX, y: clientY };
+    this.startElement = { ...this.config.element };
+
+    // Calculate rotation center in element coordinates
+    this.rotationCenter = {
+      x: this.config.element.origin.x + this.config.element.size.width / 2,
+      y: this.config.element.origin.y + this.config.element.size.height / 2,
+    };
+
+    // Store the starting angle based on the initial rotation (where the handle is)
+    // The handle starts at initialRotation degrees from vertical (0 = top)
+    this.startAngle = initialRotation;
+    this.initialRotation = initialRotation;
+    this.lastComputedRotation = initialRotation;
+
+    // Store the start point so we can calculate angular delta
+    // We'll track mouse movement relative to start and translate to angular change
+
+    this.onUpdate({
+      state: 'start',
+      transformData: {
+        type: 'rotate',
+        changes: {
+          rotation: initialRotation,
+        },
+        metadata: {
+          rotationAngle: initialRotation,
+          rotationCenter: this.rotationCenter,
+        },
+      },
+    });
+  }
+
+  /**
+   * Calculate the angle from the center to a point in screen coordinates.
+   * Uses the start point as a reference to establish the center's screen position.
+   */
+  private calculateAngleFromMouse(clientX: number, clientY: number): number {
+    if (!this.rotationCenter || !this.startPoint) return this.initialRotation;
+
+    const { scale = 1 } = this.config;
+
+    // The handle was positioned at startAngle degrees when the drag started.
+    // Calculate where the center would be in screen space based on the initial handle position.
+    // Handle position relative to center in element coords:
+    const radius =
+      Math.max(this.config.element.size.width, this.config.element.size.height) / 2 + 30 / scale; // Match the default radius calculation from utils
+
+    // Initial handle angle in radians (0 = top, clockwise positive, converted to math coords)
+    const initialAngleRad = ((this.initialRotation - 90) * Math.PI) / 180;
+
+    // Handle position relative to center in element coords
+    const handleOffsetX = radius * Math.cos(initialAngleRad);
+    const handleOffsetY = radius * Math.sin(initialAngleRad);
+
+    // Approximate center position in screen coords
+    // startPoint is where the handle was clicked, which is at the handle position
+    const centerScreenX = this.startPoint.x - handleOffsetX * scale;
+    const centerScreenY = this.startPoint.y - handleOffsetY * scale;
+
+    // Calculate angle from center to current mouse position
+    const dx = clientX - centerScreenX;
+    const dy = clientY - centerScreenY;
+
+    // Convert to degrees (atan2 gives angle from +X axis, we want from top/+Y)
+    let angleDeg = Math.atan2(dy, dx) * (180 / Math.PI);
+    // Adjust so 0 = top (which is -90 in standard math coords)
+    angleDeg = angleDeg + 90;
+
+    return angleDeg;
+  }
+
   move(clientX: number, clientY: number) {
     if (this.state === 'idle' || !this.startPoint) return;
 
@@ -195,6 +280,24 @@ export class DragResizeController {
           },
         },
       });
+    } else if (this.state === 'rotating' && this.rotationCenter) {
+      // Calculate the new rotation angle based on where the mouse is
+      const newRotation = this.calculateAngleFromMouse(clientX, clientY);
+      this.lastComputedRotation = newRotation;
+
+      this.onUpdate({
+        state: 'move',
+        transformData: {
+          type: 'rotate',
+          changes: {
+            rotation: newRotation,
+          },
+          metadata: {
+            rotationAngle: newRotation,
+            rotationCenter: this.rotationCenter,
+          },
+        },
+      });
     }
   }
 
@@ -215,6 +318,20 @@ export class DragResizeController {
           },
           metadata: {
             vertexIndex: vertexIndex || undefined,
+          },
+        },
+      });
+    } else if (wasState === 'rotating') {
+      this.onUpdate({
+        state: 'end',
+        transformData: {
+          type: 'rotate',
+          changes: {
+            rotation: this.lastComputedRotation,
+          },
+          metadata: {
+            rotationAngle: this.lastComputedRotation,
+            rotationCenter: this.rotationCenter || undefined,
           },
         },
       });
@@ -257,6 +374,21 @@ export class DragResizeController {
           },
         },
       });
+    } else if (this.state === 'rotating') {
+      // Cancel rotation - restore original rotation
+      this.onUpdate({
+        state: 'end',
+        transformData: {
+          type: 'rotate',
+          changes: {
+            rotation: this.initialRotation, // Original rotation before interaction
+          },
+          metadata: {
+            rotationAngle: this.initialRotation,
+            rotationCenter: this.rotationCenter || undefined,
+          },
+        },
+      });
     } else if (this.startElement) {
       this.onUpdate({
         state: 'end',
@@ -287,6 +419,11 @@ export class DragResizeController {
     this.currentPosition = null;
     this.activeVertexIndex = null;
     this.startVertices = [];
+    // Reset rotation state
+    this.rotationCenter = null;
+    this.startAngle = 0;
+    this.initialRotation = 0;
+    this.lastComputedRotation = 0;
   }
 
   private getCurrentPosition() {

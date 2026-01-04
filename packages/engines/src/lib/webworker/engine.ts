@@ -541,6 +541,43 @@ export class WebWorkerEngine implements PdfEngine {
   }
 
   /**
+   * {@inheritDoc @embedpdf/models!PdfEngine.updateAnnotationPosition}
+   *
+   * @public
+   */
+  updateAnnotationPosition(
+    doc: PdfDocumentObject,
+    page: PdfPageObject,
+    annotationId: string,
+    rect: Rect,
+    unrotatedRect?: Rect,
+  ) {
+    this.logger.debug(
+      LOG_SOURCE,
+      LOG_CATEGORY,
+      'updateAnnotationPosition',
+      doc,
+      page,
+      annotationId,
+      rect,
+      unrotatedRect,
+    );
+    const requestId = this.generateRequestId(doc.id);
+    const task = new WorkerTask<boolean>(this.worker, requestId);
+
+    const request: ExecuteRequest = createRequest(requestId, 'updateAnnotationPosition', [
+      doc,
+      page,
+      annotationId,
+      rect,
+      unrotatedRect,
+    ]);
+    this.proxy(task, request);
+
+    return task;
+  }
+
+  /**
    * {@inheritDoc @embedpdf/models!PdfEngine.removePageAnnotation}
    *
    * @public

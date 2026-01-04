@@ -1,7 +1,7 @@
 import { PdfLineAnnoObject } from '@embedpdf/models';
 
 import { PatchFunction } from '../patch-registry';
-import { lineRectWithEndings } from '../patch-utils';
+import { lineRectWithEndings, rotatePointAroundCenter, getRectCenter } from '../patch-utils';
 
 export const patchLine: PatchFunction<PdfLineAnnoObject> = (orig, ctx) => {
   // Handle different transformation types
@@ -86,6 +86,29 @@ export const patchLine: PatchFunction<PdfLineAnnoObject> = (orig, ctx) => {
       }
       return ctx.changes;
 
+    case 'rotate':
+      // Rotate line points around the center
+      if (ctx.metadata?.rotationAngle !== undefined) {
+        const center = ctx.metadata.rotationCenter ?? getRectCenter(orig.rect);
+        const angleDegrees = ctx.metadata.rotationAngle;
+
+        const rotatedStart = rotatePointAroundCenter(orig.linePoints.start, center, angleDegrees);
+        const rotatedEnd = rotatePointAroundCenter(orig.linePoints.end, center, angleDegrees);
+
+        // Recalculate the bounding rect from rotated line points
+        const rect = lineRectWithEndings(
+          [rotatedStart, rotatedEnd],
+          orig.strokeWidth,
+          orig.lineEndings,
+        );
+
+        return {
+          rect,
+          linePoints: { start: rotatedStart, end: rotatedEnd },
+        };
+      }
+      return ctx.changes;
+
     case 'property-update':
       // For property updates that might affect the rect
       if (ctx.changes.strokeWidth || ctx.changes.lineEndings) {
@@ -98,6 +121,7 @@ export const patchLine: PatchFunction<PdfLineAnnoObject> = (orig, ctx) => {
         return { ...ctx.changes, rect };
       }
       return ctx.changes;
+
     default:
       // For property updates or unknown types, just return the changes
       return ctx.changes;

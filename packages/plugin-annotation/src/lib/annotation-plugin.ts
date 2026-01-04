@@ -10,6 +10,7 @@ import {
   AnnotationCreateContext,
   uuidV4,
   PdfAnnotationSubtype,
+  Rect,
 } from '@embedpdf/models';
 import {
   AnnotationCapability,
@@ -65,7 +66,14 @@ import {
   freeTextHandlerFactory,
 } from './handlers';
 import { PatchRegistry, TransformContext } from './patching/patch-registry';
-import { patchInk, patchLine, patchPolyline, patchPolygon } from './patching/patches';
+import {
+  patchInk,
+  patchLine,
+  patchPolyline,
+  patchPolygon,
+  patchCircle,
+  patchSquare,
+} from './patching/patches';
 
 export class AnnotationPlugin extends BasePlugin<
   AnnotationPluginConfig,
@@ -174,6 +182,8 @@ export class AnnotationPlugin extends BasePlugin<
     this.patchRegistry.register(PdfAnnotationSubtype.LINE, patchLine);
     this.patchRegistry.register(PdfAnnotationSubtype.POLYLINE, patchPolyline);
     this.patchRegistry.register(PdfAnnotationSubtype.POLYGON, patchPolygon);
+    this.patchRegistry.register(PdfAnnotationSubtype.CIRCLE, patchCircle);
+    this.patchRegistry.register(PdfAnnotationSubtype.SQUARE, patchSquare);
   }
 
   async initialize(): Promise<void> {
@@ -267,6 +277,8 @@ export class AnnotationPlugin extends BasePlugin<
       deleteAnnotation: (pageIndex, id) => this.deleteAnnotation(pageIndex, id),
       renderAnnotation: (options) => this.renderAnnotation(options),
       commit: () => this.commit(),
+      updateAnnotationPosition: (pageIndex, id, rect, unrotatedRect) =>
+        this.updateAnnotationPosition(pageIndex, id, rect, unrotatedRect),
 
       // Document-scoped operations
       forDocument: (documentId) => this.createAnnotationScope(documentId),
@@ -316,6 +328,8 @@ export class AnnotationPlugin extends BasePlugin<
       deleteAnnotation: (pageIndex, id) => this.deleteAnnotation(pageIndex, id, documentId),
       renderAnnotation: (options) => this.renderAnnotation(options, documentId),
       commit: () => this.commit(documentId),
+      updateAnnotationPosition: (pageIndex, id, rect, unrotatedRect) =>
+        this.updateAnnotationPosition(pageIndex, id, rect, unrotatedRect, documentId),
       onStateChange: (listener: Listener<AnnotationDocumentState>) =>
         this.state$.on((event) => {
           if (event.documentId === documentId) listener(event.state);
@@ -728,6 +742,65 @@ export class AnnotationPlugin extends BasePlugin<
     };
     const historyScope = this.history.forDocument(docId);
     historyScope.register(command, this.ANNOTATION_HISTORY_TOPIC);
+  }
+
+  /**
+   * Update only the position/rect of an annotation.
+   * This is optimized for interactive move/resize controls - it bypasses
+   * the full annotation update flow and directly updates the PDF.
+   *
+   * The local state is also updated to reflect the position change.
+   */
+  private updateAnnotationPosition(
+    pageIndex: number,
+    annotationId: string,
+    rect: Rect,
+    unrotatedRect?: Rect,
+    documentId?: string,
+  ): Task<boolean, PdfErrorReason> {
+    const docId = documentId ?? this.getActiveDocumentId();
+    const coreDocState = this.getCoreDocument(docId);
+    const doc = coreDocState?.document;
+
+    if (!doc) {
+      return PdfTaskHelper.reject({
+        code: PdfErrorCode.NotFound,
+        message: 'Document not found',
+      });
+    }
+
+    const page = doc.pages.find((p) => p.index === pageIndex);
+    if (!page) {
+      return PdfTaskHelper.reject({
+        code: PdfErrorCode.NotFound,
+        message: 'Page not found',
+      });
+    }
+
+    // Call the engine method directly
+    const task = this.engine.updateAnnotationPosition(doc, page, annotationId, rect, unrotatedRect);
+
+    // Update local state on success
+    task.wait(() => {
+      // Patch local state with new rect
+      this.dispatch(
+        patchAnnotation(docId, pageIndex, annotationId, {
+          rect,
+          ...(unrotatedRect && { unrotatedRect }),
+        }),
+      );
+
+      this.events$.emit({
+        type: 'update',
+        documentId: docId,
+        annotation: this.getDocumentState(docId).byUid[annotationId]?.object,
+        pageIndex,
+        patch: { rect, ...(unrotatedRect && { unrotatedRect }) },
+        committed: true,
+      });
+    }, ignore);
+
+    return task;
   }
 
   private selectAnnotation(pageIndex: number, id: string, documentId?: string) {

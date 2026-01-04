@@ -1,7 +1,7 @@
 import { PdfPolylineAnnoObject } from '@embedpdf/models';
 
 import { PatchFunction } from '../patch-registry';
-import { lineRectWithEndings } from '../patch-utils';
+import { lineRectWithEndings, rotateVertices, getRectCenter } from '../patch-utils';
 
 export const patchPolyline: PatchFunction<PdfPolylineAnnoObject> = (orig, ctx) => {
   // Handle different transformation types
@@ -75,6 +75,23 @@ export const patchPolyline: PatchFunction<PdfPolylineAnnoObject> = (orig, ctx) =
         };
       }
       return ctx.changes;
+    case 'rotate':
+      // Rotate all vertices around the center
+      if (ctx.metadata?.rotationAngle !== undefined) {
+        const center = ctx.metadata.rotationCenter ?? getRectCenter(orig.rect);
+        const angleDegrees = ctx.metadata.rotationAngle;
+        const rotatedVertices = rotateVertices(orig.vertices, center, angleDegrees);
+
+        // Recalculate the bounding rect from rotated vertices
+        const rect = lineRectWithEndings(rotatedVertices, orig.strokeWidth, orig.lineEndings);
+
+        return {
+          rect,
+          vertices: rotatedVertices,
+        };
+      }
+      return ctx.changes;
+
     case 'property-update':
       // For property updates that might affect the rect (strokeWidth or lineEndings changes)
       if (ctx.changes.strokeWidth !== undefined || ctx.changes.lineEndings !== undefined) {
@@ -84,6 +101,7 @@ export const patchPolyline: PatchFunction<PdfPolylineAnnoObject> = (orig, ctx) =
         return { ...ctx.changes, rect };
       }
       return ctx.changes;
+
     default:
       // For other property updates or unknown types, just return the changes
       return ctx.changes;

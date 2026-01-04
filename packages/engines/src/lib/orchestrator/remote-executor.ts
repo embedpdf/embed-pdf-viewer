@@ -85,6 +85,8 @@ type MessageType =
   | 'createPageAnnotation'
   | 'updatePageAnnotation'
   | 'removePageAnnotation'
+  | 'updateAnnotationRotation'
+  | 'updateAnnotationPosition'
   | 'getPageTextRects'
   | 'searchInPage'
   | 'getAnnotationsBatch'
@@ -375,6 +377,22 @@ export class RemoteExecutor implements IPdfiumExecutor {
     annotation: PdfAnnotationObject,
   ): PdfTask<boolean> {
     return this.send<boolean>('removePageAnnotation', [doc, page, annotation]);
+  }
+
+  updateAnnotationPosition(
+    doc: PdfDocumentObject,
+    page: PdfPageObject,
+    annotationId: string,
+    rect: Rect,
+    unrotatedRect?: Rect,
+  ): PdfTask<boolean> {
+    return this.send<boolean>('updateAnnotationPosition', [
+      doc,
+      page,
+      annotationId,
+      rect,
+      unrotatedRect,
+    ]);
   }
 
   getPageTextRects(doc: PdfDocumentObject, page: PdfPageObject): PdfTask<PdfTextRectObject[]> {

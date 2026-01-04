@@ -1,6 +1,7 @@
 import { expandRect, PdfPolygonAnnoObject, rectFromPoints } from '@embedpdf/models';
 
 import { PatchFunction } from '../patch-registry';
+import { rotateVertices, getRectCenter } from '../patch-utils';
 
 export const patchPolygon: PatchFunction<PdfPolygonAnnoObject> = (orig, ctx) => {
   // Handle different transformation types
@@ -75,6 +76,24 @@ export const patchPolygon: PatchFunction<PdfPolygonAnnoObject> = (orig, ctx) => 
         };
       }
       return ctx.changes;
+    case 'rotate':
+      // Rotate all vertices around the center
+      if (ctx.metadata?.rotationAngle !== undefined) {
+        const center = ctx.metadata.rotationCenter ?? getRectCenter(orig.rect);
+        const angleDegrees = ctx.metadata.rotationAngle;
+        const rotatedVertices = rotateVertices(orig.vertices, center, angleDegrees);
+
+        // Recalculate the bounding rect from rotated vertices
+        const pad = orig.strokeWidth / 2;
+        const rect = expandRect(rectFromPoints(rotatedVertices), pad);
+
+        return {
+          rect,
+          vertices: rotatedVertices,
+        };
+      }
+      return ctx.changes;
+
     case 'property-update':
       // For property updates that might affect the rect (strokeWidth changes)
       if (ctx.changes.strokeWidth !== undefined) {
@@ -85,6 +104,7 @@ export const patchPolygon: PatchFunction<PdfPolygonAnnoObject> = (orig, ctx) => 
         return { ...ctx.changes, rect };
       }
       return ctx.changes;
+
     default:
       // For other property updates or unknown types, just return the changes
       return ctx.changes;

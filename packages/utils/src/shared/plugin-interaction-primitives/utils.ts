@@ -17,9 +17,31 @@ export interface VertexUI {
   zIndex?: number; // default 4
 }
 
+export interface RotationUI {
+  /** Handle size in px (default 16) */
+  handleSize?: number;
+  /** Distance from the center of the bounding box to the handle (default: calculated from rect) */
+  radius?: number;
+  /** z-index of the rotation handle (default 5) */
+  zIndex?: number;
+  /** Whether to show the connector line from center to handle (default true) */
+  showConnector?: boolean;
+  /** Connector line width in px (default 1) */
+  connectorWidth?: number;
+}
+
 export interface HandleDescriptor {
   handle: ResizeHandle;
   style: Record<string, number | string>;
+  attrs?: Record<string, any>;
+}
+
+export interface RotationHandleDescriptor {
+  /** Style for the rotation handle itself */
+  handleStyle: Record<string, number | string>;
+  /** Style for the connector line (if shown) */
+  connectorStyle: Record<string, number | string>;
+  /** Attributes for the handle element */
   attrs?: Record<string, any>;
 }
 
@@ -128,4 +150,76 @@ export function describeVerticesFromConfig(
       attrs: { 'data-epdf-vertex': i },
     };
   });
+}
+
+/**
+ * Describe the rotation handle position and style.
+ * The rotation handle orbits around the center of the bounding box based on the current angle.
+ *
+ * @param cfg - The drag/resize config containing the element rect and scale
+ * @param ui - UI customization options
+ * @param currentAngle - The current rotation angle in degrees (0 = top, clockwise positive)
+ */
+export function describeRotationFromConfig(
+  cfg: DragResizeConfig,
+  ui: RotationUI = {},
+  currentAngle: number = 0,
+): RotationHandleDescriptor {
+  const { handleSize = 16, zIndex = 5, showConnector = true, connectorWidth = 1 } = ui;
+
+  const scale = cfg.scale ?? 1;
+  const rect = cfg.element;
+
+  // Calculate the center of the element (in scaled coordinates, relative to the element's origin)
+  const scaledWidth = rect.size.width * scale;
+  const scaledHeight = rect.size.height * scale;
+  const centerX = scaledWidth / 2;
+  const centerY = scaledHeight / 2;
+
+  // Calculate radius - distance from center to handle
+  // Default: slightly larger than the diagonal to ensure handle is outside the rect
+  const defaultRadius = Math.max(scaledWidth, scaledHeight) / 2 + 30;
+  const radius = ui.radius !== undefined ? ui.radius * scale : defaultRadius;
+
+  // Convert angle to radians (0 degrees = top, positive = clockwise)
+  // In CSS/screen coordinates: 0 deg points up (-Y), 90 deg points right (+X)
+  const angleRad = ((currentAngle - 90) * Math.PI) / 180;
+
+  // Calculate handle position (relative to element's top-left corner)
+  const handleCenterX = centerX + radius * Math.cos(angleRad);
+  const handleCenterY = centerY + radius * Math.sin(angleRad);
+  const handleLeft = handleCenterX - handleSize / 2;
+  const handleTop = handleCenterY - handleSize / 2;
+
+  // Connector line from center to handle
+  // We'll use a rotated line by setting its origin at center and rotating it
+  const connectorLength = radius - handleSize / 2;
+
+  return {
+    handleStyle: {
+      position: 'absolute',
+      left: handleLeft + 'px',
+      top: handleTop + 'px',
+      width: handleSize + 'px',
+      height: handleSize + 'px',
+      borderRadius: '50%',
+      cursor: 'grab',
+      zIndex,
+      touchAction: 'none',
+    },
+    connectorStyle: showConnector
+      ? {
+          position: 'absolute',
+          left: centerX - connectorWidth / 2 + 'px',
+          top: centerY + 'px',
+          width: connectorWidth + 'px',
+          height: connectorLength + 'px',
+          transformOrigin: 'top center',
+          transform: `rotate(${currentAngle}deg)`,
+          zIndex: zIndex - 1,
+          pointerEvents: 'none',
+        }
+      : {},
+    attrs: { 'data-epdf-rotation-handle': true },
+  };
 }

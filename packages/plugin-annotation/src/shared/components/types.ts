@@ -5,7 +5,7 @@ import {
   SelectionMenuPropsBase,
   SelectionMenuRenderFn,
 } from '@embedpdf/utils/@framework';
-import { JSX } from '@framework';
+import { JSX, CSSProperties } from '@framework';
 
 export type ResizeDirection = 'top-left' | 'top-right' | 'bottom-left' | 'bottom-right' | 'none';
 
@@ -40,6 +40,30 @@ export interface VertexHandleUI {
   color?: string;
   /** Custom renderer for each vertex (overrides default) */
   component?: (p: HandleProps) => JSX.Element;
+}
+
+/** Props for the rotation handle component */
+export interface RotationHandleComponentProps extends HandleProps {
+  /** Props for the connector line element */
+  connectorStyle?: CSSProperties;
+  /** Whether to show the connector line */
+  showConnector?: boolean;
+}
+
+/** UI customization for rotation handle */
+export interface RotationHandleUI {
+  /** Handle size in CSS px (default: 16) */
+  size?: number;
+  /** Distance from the center of the bounding box to the handle (default: auto-calculated) */
+  radius?: number;
+  /** Default background color for the handle (used by default renderer) */
+  color?: string;
+  /** Color for the connector line (default: same as color) */
+  connectorColor?: string;
+  /** Whether to show the connector line (default: true) */
+  showConnector?: boolean;
+  /** Custom renderer for the rotation handle (overrides default) */
+  component?: (p: RotationHandleComponentProps) => JSX.Element;
 }
 
 /**

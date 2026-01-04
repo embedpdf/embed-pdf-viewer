@@ -92,7 +92,7 @@ export interface AnnotationPluginConfig extends BasePluginConfig {
  */
 export interface TransformOptions<T extends PdfAnnotationObject = PdfAnnotationObject> {
   /** The type of transformation */
-  type: 'move' | 'resize' | 'vertex-edit' | 'property-update';
+  type: 'move' | 'resize' | 'vertex-edit' | 'rotate' | 'property-update';
 
   /** The changes to apply */
   changes: Partial<T>;
@@ -100,6 +100,10 @@ export interface TransformOptions<T extends PdfAnnotationObject = PdfAnnotationO
   /** Optional metadata */
   metadata?: {
     maintainAspectRatio?: boolean;
+    /** Rotation angle in degrees (for 'rotate' transform type) */
+    rotationAngle?: number;
+    /** Center point for rotation (defaults to rect center) */
+    rotationCenter?: { x: number; y: number };
     [key: string]: any;
   };
 }
@@ -154,6 +158,18 @@ export interface AnnotationScope {
   deleteAnnotation(pageIndex: number, annotationId: string): void;
   renderAnnotation(options: RenderAnnotationOptions): Task<Blob, PdfErrorReason>;
   commit(): Task<boolean, PdfErrorReason>;
+
+  /**
+   * Update only the position/rect of an annotation.
+   * Optimized for interactive move/resize controls - bypasses full annotation update.
+   */
+  updateAnnotationPosition(
+    pageIndex: number,
+    annotationId: string,
+    rect: import('@embedpdf/models').Rect,
+    unrotatedRect?: import('@embedpdf/models').Rect,
+  ): Task<boolean, PdfErrorReason>;
+
   onStateChange: EventHook<AnnotationDocumentState>;
   onAnnotationEvent: EventHook<AnnotationEvent>;
   onActiveToolChange: EventHook<AnnotationTool | null>;
@@ -183,6 +199,17 @@ export interface AnnotationCapability {
   deleteAnnotation: (pageIndex: number, annotationId: string) => void;
   renderAnnotation: (options: RenderAnnotationOptions) => Task<Blob, PdfErrorReason>;
   commit: () => Task<boolean, PdfErrorReason>;
+
+  /**
+   * Update only the position/rect of an annotation.
+   * Optimized for interactive move/resize controls - bypasses full annotation update.
+   */
+  updateAnnotationPosition: (
+    pageIndex: number,
+    annotationId: string,
+    rect: import('@embedpdf/models').Rect,
+    unrotatedRect?: import('@embedpdf/models').Rect,
+  ) => Task<boolean, PdfErrorReason>;
 
   // Document-scoped operations
   forDocument: (documentId: string) => AnnotationScope;

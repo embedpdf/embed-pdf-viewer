@@ -4,8 +4,10 @@ import { useDragResize, UseDragResizeOptions } from './use-drag-resize';
 import {
   describeResizeFromConfig,
   describeVerticesFromConfig,
+  describeRotationFromConfig,
   type ResizeUI,
   type VertexUI,
+  type RotationUI,
 } from '../plugin-interaction-primitives/utils';
 
 export type HandleElementProps = {
@@ -17,26 +19,45 @@ export type HandleElementProps = {
   onPointerCancel: (e: PointerEvent) => void;
 } & Record<string, any>;
 
+export type RotationHandleProps = {
+  /** Props for the rotation handle element */
+  handle: HandleElementProps;
+  /** Props for the connector line element (if shown) */
+  connector: {
+    style: CSSProperties;
+  } & Record<string, any>;
+};
+
 export function useInteractionHandles(opts: {
   controller: UseDragResizeOptions; // SINGLE config (rect/scale/rotation/vertices/…)
   resizeUI?: ResizeUI; // purely visual knobs
   vertexUI?: VertexUI; // purely visual knobs
+  rotationUI?: RotationUI; // purely visual knobs for rotation handle
   includeVertices?: boolean; // default false
+  includeRotation?: boolean; // default false
+  /** Current rotation angle of the annotation (for initializing rotation interaction) */
+  currentRotation?: number;
   handleAttrs?: (
     h: 'nw' | 'ne' | 'sw' | 'se' | 'n' | 'e' | 's' | 'w',
   ) => Record<string, any> | void;
   vertexAttrs?: (i: number) => Record<string, any> | void;
+  rotationAttrs?: () => Record<string, any> | void;
 }) {
   const {
     controller,
     resizeUI,
     vertexUI,
+    rotationUI,
     includeVertices = false,
+    includeRotation = false,
+    currentRotation = 0,
     handleAttrs,
     vertexAttrs,
+    rotationAttrs,
   } = opts;
 
-  const { dragProps, createResizeProps, createVertexProps } = useDragResize(controller);
+  const { dragProps, createResizeProps, createVertexProps, createRotationProps } =
+    useDragResize(controller);
 
   // Resize handles: only uses data from the SAME controller config.
   const resize: HandleElementProps[] = useMemo(() => {
@@ -92,5 +113,40 @@ export function useInteractionHandles(opts: {
     vertexAttrs,
   ]);
 
-  return { dragProps, resize, vertices };
+  // Rotation handle: orbits around the center of the element based on current angle
+  const rotation: RotationHandleProps | null = useMemo(() => {
+    if (!includeRotation) return null;
+    // Pass the current rotation angle so the handle is positioned correctly
+    const desc = describeRotationFromConfig(controller, rotationUI, currentRotation);
+    return {
+      handle: {
+        key: 'rotation',
+        style: desc.handleStyle as CSSProperties,
+        ...createRotationProps(currentRotation),
+        ...(desc.attrs ?? {}),
+        ...(rotationAttrs?.() ?? {}),
+      },
+      connector: {
+        style: desc.connectorStyle as CSSProperties,
+        'data-epdf-rotation-connector': true,
+      },
+    };
+  }, [
+    includeRotation,
+    controller.element.origin.x,
+    controller.element.origin.y,
+    controller.element.size.width,
+    controller.element.size.height,
+    controller.scale,
+    currentRotation,
+    rotationUI?.handleSize,
+    rotationUI?.radius,
+    rotationUI?.zIndex,
+    rotationUI?.showConnector,
+    rotationUI?.connectorWidth,
+    createRotationProps,
+    rotationAttrs,
+  ]);
+
+  return { dragProps, resize, vertices, rotation };
 }

@@ -58,6 +58,7 @@ var createPdfium = (() => {
       '_EPDFAnnot_GetOpacity',
       '_EPDFAnnot_GetRectangleDifferences',
       '_EPDFAnnot_GetRichContent',
+      '_EPDFAnnot_GetRotate',
       '_EPDFAnnot_GetTextAlignment',
       '_EPDFAnnot_GetVerticalAlignment',
       '_EPDFAnnot_SetBorderDashPattern',
@@ -70,6 +71,7 @@ var createPdfium = (() => {
       '_EPDFAnnot_SetLineEndings',
       '_EPDFAnnot_SetLinkedAnnot',
       '_EPDFAnnot_SetOpacity',
+      '_EPDFAnnot_SetRotate',
       '_EPDFAnnot_SetTextAlignment',
       '_EPDFAnnot_SetVerticalAlignment',
       '_EPDFAnnot_SetVertices',
@@ -6214,6 +6216,14 @@ var createPdfium = (() => {
       createExportWrapper('EPDFAnnot_UpdateAppearanceToRect', 2));
     var _EPDFPage_CreateAnnot = (Module['_EPDFPage_CreateAnnot'] = createExportWrapper(
       'EPDFPage_CreateAnnot',
+      2,
+    ));
+    var _EPDFAnnot_SetRotate = (Module['_EPDFAnnot_SetRotate'] = createExportWrapper(
+      'EPDFAnnot_SetRotate',
+      2,
+    ));
+    var _EPDFAnnot_GetRotate = (Module['_EPDFAnnot_GetRotate'] = createExportWrapper(
+      'EPDFAnnot_GetRotate',
       2,
     ));
     var _FPDFDoc_GetAttachmentCount = (Module['_FPDFDoc_GetAttachmentCount'] = createExportWrapper(

@@ -101,6 +101,22 @@ export function useDragResize(options: UseDragResizeOptions) {
     [enabled, handleMove, handleEnd],
   );
 
+  const createRotationHandler = useCallback(
+    (initialRotation: number = 0): ResizeHandleEventProps => ({
+      onPointerDown: (e: PointerEvent) => {
+        if (!enabled) return;
+        e.preventDefault();
+        e.stopPropagation();
+        controllerRef.current?.startRotation(e.clientX, e.clientY, initialRotation);
+        (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
+      },
+      onPointerMove: handleMove,
+      onPointerUp: handleEnd,
+      onPointerCancel: handleEnd,
+    }),
+    [enabled, handleMove, handleEnd],
+  );
+
   return {
     dragProps: enabled
       ? {
@@ -112,5 +128,6 @@ export function useDragResize(options: UseDragResizeOptions) {
       : {},
     createResizeProps: createResizeHandler,
     createVertexProps: createVertexHandler,
+    createRotationProps: createRotationHandler,
   };
 }

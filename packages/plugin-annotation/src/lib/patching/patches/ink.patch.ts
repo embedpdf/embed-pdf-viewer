@@ -1,6 +1,7 @@
 import { expandRect, PdfInkAnnoObject, Rect, rectFromPoints } from '@embedpdf/models';
 
 import { PatchFunction } from '../patch-registry';
+import { rotatePointAroundCenter, getRectCenter } from '../patch-utils';
 
 export const patchInk: PatchFunction<PdfInkAnnoObject> = (original, ctx) => {
   // Handle different transformation types
@@ -99,6 +100,27 @@ export const patchInk: PatchFunction<PdfInkAnnoObject> = (original, ctx) => {
         };
       }
       return ctx.changes;
+    case 'rotate':
+      // Rotate all ink stroke points around the center
+      if (ctx.metadata?.rotationAngle !== undefined) {
+        const center = ctx.metadata.rotationCenter ?? getRectCenter(original.rect);
+        const angleDegrees = ctx.metadata.rotationAngle;
+
+        const rotatedInkList = original.inkList.map((stroke) => ({
+          points: stroke.points.map((p) => rotatePointAroundCenter(p, center, angleDegrees)),
+        }));
+
+        // Recalculate the bounding rect from rotated points
+        const allPoints = rotatedInkList.flatMap((s) => s.points);
+        const rect = expandRect(rectFromPoints(allPoints), original.strokeWidth / 2);
+
+        return {
+          rect,
+          inkList: rotatedInkList,
+        };
+      }
+      return ctx.changes;
+
     case 'property-update':
       // For property updates that might affect the rect (strokeWidth changes)
       if (ctx.changes.strokeWidth !== undefined) {
@@ -109,6 +131,7 @@ export const patchInk: PatchFunction<PdfInkAnnoObject> = (original, ctx) => {
         return { ...ctx.changes, rect };
       }
       return ctx.changes;
+
     default:
       // For other property updates or unknown types, just return the changes
       return ctx.changes;

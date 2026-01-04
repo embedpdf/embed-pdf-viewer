@@ -13,6 +13,7 @@ import {
   ResizeHandleUI,
   AnnotationSelectionMenuRenderFn,
   VertexHandleUI,
+  RotationHandleUI,
 } from './types';
 import { VertexConfig } from '../types';
 
@@ -28,6 +29,7 @@ interface AnnotationContainerProps<T extends PdfAnnotationObject> {
   isSelected: boolean;
   isDraggable: boolean;
   isResizable: boolean;
+  isRotatable?: boolean;
   lockAspectRatio?: boolean;
   style?: CSSProperties;
   vertexConfig?: VertexConfig<T>;
@@ -38,6 +40,7 @@ interface AnnotationContainerProps<T extends PdfAnnotationObject> {
   zIndex?: number;
   resizeUI?: ResizeHandleUI;
   vertexUI?: VertexHandleUI;
+  rotationUI?: RotationHandleUI;
   selectionOutlineColor?: string;
   customAnnotationRenderer?: CustomAnnotationRenderer<T>;
 }
@@ -55,6 +58,7 @@ export function AnnotationContainer<T extends PdfAnnotationObject>({
   isSelected,
   isDraggable,
   isResizable,
+  isRotatable = true,
   lockAspectRatio = false,
   style = {},
   vertexConfig,
@@ -65,11 +69,13 @@ export function AnnotationContainer<T extends PdfAnnotationObject>({
   zIndex = 1,
   resizeUI,
   vertexUI,
+  rotationUI,
   selectionOutlineColor = '#007ACC',
   customAnnotationRenderer,
   ...props
 }: AnnotationContainerProps<T>): JSX.Element {
   const [preview, setPreview] = useState<T>(trackedAnnotation.object);
+  const [liveRotation, setLiveRotation] = useState<number | null>(null); // Track rotation during drag
   const { provides: annotationCapability } = useAnnotationCapability();
   const gestureBaseRef = useRef<T | null>(null);
 
@@ -86,10 +92,24 @@ export function AnnotationContainer<T extends PdfAnnotationObject>({
   // Defaults retain current behavior
   const HANDLE_COLOR = resizeUI?.color ?? '#007ACC';
   const VERTEX_COLOR = vertexUI?.color ?? '#007ACC';
+  const ROTATION_COLOR = rotationUI?.color ?? '#007ACC';
+  const ROTATION_CONNECTOR_COLOR = rotationUI?.connectorColor ?? ROTATION_COLOR;
   const HANDLE_SIZE = resizeUI?.size ?? 12;
   const VERTEX_SIZE = vertexUI?.size ?? 12;
+  const ROTATION_SIZE = rotationUI?.size ?? 16;
+  const ROTATION_RADIUS = rotationUI?.radius; // undefined = auto-calculate
+  const SHOW_CONNECTOR = rotationUI?.showConnector ?? true;
 
-  const { dragProps, vertices, resize } = useInteractionHandles({
+  // Get annotation's current rotation (for simple shapes that store rotation)
+  // During drag, use liveRotation if available; otherwise use the annotation's rotation
+  const annotationRotation = liveRotation ?? (currentObject as any).rotation ?? 0;
+
+  const {
+    dragProps,
+    vertices,
+    resize,
+    rotation: rotationHandle,
+  } = useInteractionHandles({
     controller: {
       element: currentObject.rect,
       vertices: vertexConfig?.extractVertices(currentObject),
@@ -112,13 +132,25 @@ export function AnnotationContainer<T extends PdfAnnotationObject>({
         const transformType = event.transformData.type;
         const base = gestureBaseRef.current ?? currentObject;
 
-        const changes = event.transformData.changes.vertices
-          ? vertexConfig?.transformAnnotation(base, event.transformData.changes.vertices)
-          : { rect: event.transformData.changes.rect };
+        let changes: Partial<T>;
+        if (event.transformData.changes.vertices) {
+          changes = vertexConfig?.transformAnnotation(
+            base,
+            event.transformData.changes.vertices,
+          ) as Partial<T>;
+        } else if (transformType === 'rotate') {
+          // For rotation, pass the rotation through metadata
+          changes = {} as Partial<T>;
+          // Update live rotation so the handle follows the mouse
+          const newRotation = event.transformData.metadata?.rotationAngle ?? 0;
+          setLiveRotation(newRotation);
+        } else {
+          changes = { rect: event.transformData.changes.rect } as Partial<T>;
+        }
 
         const patched = annotationCapability?.transformAnnotation<T>(base, {
           type: transformType,
-          changes: changes as Partial<T>,
+          changes: changes,
           metadata: event.transformData.metadata,
         });
 
@@ -129,9 +161,12 @@ export function AnnotationContainer<T extends PdfAnnotationObject>({
           }));
         }
 
-        if (event.state === 'end' && patched) {
+        if (event.state === 'end') {
           gestureBaseRef.current = null;
-          annotationProvides?.updateAnnotation(pageIndex, trackedAnnotation.object.id, patched);
+          setLiveRotation(null); // Clear live rotation when drag ends
+          if (patched) {
+            annotationProvides?.updateAnnotation(pageIndex, trackedAnnotation.object.id, patched);
+          }
         }
       },
     },
@@ -146,7 +181,15 @@ export function AnnotationContainer<T extends PdfAnnotationObject>({
       vertexSize: VERTEX_SIZE,
       zIndex: zIndex + 2,
     },
+    rotationUI: {
+      handleSize: ROTATION_SIZE,
+      radius: ROTATION_RADIUS,
+      zIndex: zIndex + 3,
+      showConnector: SHOW_CONNECTOR,
+    },
     includeVertices: vertexConfig ? true : false,
+    includeRotation: isRotatable,
+    currentRotation: annotationRotation,
   });
 
   const doubleProps = useDoublePressProps(onDoubleClick);
@@ -233,6 +276,60 @@ export function AnnotationContainer<T extends PdfAnnotationObject>({
               />
             ),
           )}
+
+        {/* Rotation handle */}
+        {isSelected &&
+          isRotatable &&
+          rotationHandle &&
+          (rotationUI?.component ? (
+            rotationUI.component({
+              ...rotationHandle.handle,
+              backgroundColor: ROTATION_COLOR,
+              connectorStyle: {
+                ...rotationHandle.connector.style,
+                backgroundColor: ROTATION_CONNECTOR_COLOR,
+              },
+              showConnector: SHOW_CONNECTOR,
+            })
+          ) : (
+            <>
+              {/* Connector line */}
+              {SHOW_CONNECTOR && (
+                <div
+                  style={{
+                    ...rotationHandle.connector.style,
+                    backgroundColor: ROTATION_CONNECTOR_COLOR,
+                  }}
+                />
+              )}
+              {/* Rotation handle */}
+              <div
+                {...rotationHandle.handle}
+                style={{
+                  ...rotationHandle.handle.style,
+                  backgroundColor: ROTATION_COLOR,
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                }}
+              >
+                {/* Default rotation icon - a curved arrow */}
+                <svg
+                  width="10"
+                  height="10"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="white"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                >
+                  <path d="M21 12a9 9 0 1 1-9-9c2.52 0 4.93 1 6.74 2.74L21 8" />
+                  <path d="M21 3v5h-5" />
+                </svg>
+              </div>
+            </>
+          ))}
       </div>
       {/* CounterRotate remains unchanged */}
       {selectionMenu && (
