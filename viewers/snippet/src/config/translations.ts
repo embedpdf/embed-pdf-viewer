@@ -157,6 +157,8 @@ export const englishTranslations: Locale = {
       text: 'Redact Text',
       applyAll: 'Apply All',
       clearAll: 'Clear All',
+      deleteSelected: 'Delete selected redaction',
+      commitSelected: 'Apply selected redaction',
     },
     history: {
       undo: 'Undo',
@@ -352,6 +354,8 @@ export const germanTranslations: Locale = {
       text: 'Text schwärzen',
       applyAll: 'Alle anwenden',
       clearAll: 'Alle löschen',
+      deleteSelected: 'Ausgewählte Schwärzung löschen',
+      commitSelected: 'Ausgewählte Schwärzung anwenden',
     },
     history: {
       undo: 'Rückgängig',
@@ -548,6 +552,8 @@ export const dutchTranslations: Locale = {
       text: 'Tekst redigeren',
       applyAll: 'Alles toepassen',
       clearAll: 'Alles wissen',
+      deleteSelected: 'Geselecteerde redactie verwijderen',
+      commitSelected: 'Geselecteerde redactie toepassen',
     },
     history: {
       undo: 'Ongedaan maken',
@@ -743,6 +749,8 @@ export const frenchTranslations: Locale = {
       text: 'Caviarder le texte',
       applyAll: 'Tout appliquer',
       clearAll: 'Tout effacer',
+      deleteSelected: 'Supprimer la rédaction sélectionnée',
+      commitSelected: 'Appliquer la rédaction sélectionnée',
     },
     history: {
       undo: 'Annuler',
@@ -939,6 +947,8 @@ export const spanishTranslations: Locale = {
       text: 'Redactar texto',
       applyAll: 'Aplicar todo',
       clearAll: 'Borrar todo',
+      deleteSelected: 'Eliminar redacción seleccionada',
+      commitSelected: 'Aplicar redacción seleccionada',
     },
     history: {
       undo: 'Deshacer',
