@@ -3,4 +3,5 @@ export * from './types';
 export * from './ui-schema';
 export * from './translations';
 export * from './theme';
+export * from './locals/zh-CN';
 //# sourceMappingURL=index.d.ts.map
