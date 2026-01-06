@@ -264,6 +264,20 @@ const SponsorshipPage = () => {
                 </div>
               </div>
             </div>
+
+            <div className="mt-12 text-center">
+              <h3 className="mb-6 text-2xl font-bold text-gray-900 dark:text-white">
+                Our Vision: A Complete Multi-Platform PDF SDK
+              </h3>
+
+              <div className="mx-auto max-w-3xl text-center">
+                <p className="text-lg leading-relaxed text-gray-600 dark:text-gray-300">
+                  Universal platform support, enterprise-grade performance,
+                  sponsor-driven development, and 100% open source forever —
+                  building the PDF SDK developers deserve.
+                </p>
+              </div>
+            </div>
           </div>
         </div>
       </section>
@@ -318,6 +332,17 @@ const SponsorshipPage = () => {
                 </p>
               </div>
             ))}
+          </div>
+
+          <div className="mt-12 text-center">
+            <p className="mb-4 text-2xl font-bold text-gray-900 dark:text-white">
+              Every story is the same: trapped by expensive, closed-source
+              vendors.
+            </p>
+            <p className="text-xl text-gray-600 dark:text-gray-400">
+              It&apos;s time for an open-source alternative that companies can
+              actually own.
+            </p>
           </div>
         </div>
       </section>
@@ -423,8 +448,9 @@ const SponsorshipPage = () => {
               Become a Founding Sponsor
             </h2>
             <p className="mx-auto mt-4 max-w-2xl text-lg text-gray-600 dark:text-gray-400">
-              The first 10 sponsors will be permanently recognized as founding
-              partners.
+              The first 10 sponsors that commit to one of the plans below for 1
+              year will be permanently recognized as founding sponsors who made
+              this project possible.
             </p>
           </div>
 
@@ -577,42 +603,96 @@ const SponsorshipPage = () => {
           </div>
 
           <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-            {[
-              {
-                q: 'Why should I trust this will succeed?',
-                a: 'Look at our track record: 2,000+ GitHub stars and a working Web SDK in just 8 months with zero funding. The project has real momentum.',
-              },
-              {
-                q: 'What happens if you get acquired?',
-                a: "The code is MIT licensed forever. The community owns the code. That's the beauty of open source—no single entity can take it away.",
-              },
-              {
-                q: 'Why $30,000/month?',
-                a: 'Transparency: This covers my salary as lead developer and hiring a senior mobile developer. Two experienced devs can output what 10 corporate devs can.',
-              },
-              {
-                q: "What if we need features you haven't built?",
-                a: "Gold sponsors get custom feature development. Silver sponsors influence the roadmap. Or hire your own devs to add it—it's open source!",
-              },
-              {
-                q: 'ROI for my CFO?',
-                a: "If you're paying $150K+/year now, sponsoring at $30K saves you $120K annually. Plus you eliminate vendor risk and gain code ownership.",
-              },
-              {
-                q: 'Can we try it first?',
-                a: 'Yes! The Web SDK is production ready. Try the live demo or browse the code on GitHub before you spend a dime.',
-              },
-            ].map((faq, i) => (
-              <div
-                key={i}
-                className="rounded-2xl border border-gray-200 bg-white p-6 transition-all hover:border-purple-200 hover:shadow-lg dark:border-gray-800 dark:bg-gray-900 dark:hover:border-purple-900"
-              >
-                <h3 className="mb-3 text-lg font-bold text-gray-900 dark:text-white">
-                  {faq.q}
-                </h3>
-                <p className="text-gray-600 dark:text-gray-400">{faq.a}</p>
-              </div>
-            ))}
+            <div className="rounded-2xl border border-gray-200 bg-white p-6 transition-all hover:border-purple-200 hover:shadow-lg dark:border-gray-800 dark:bg-gray-900 dark:hover:border-purple-900">
+              <h3 className="mb-3 text-lg font-bold text-gray-900 dark:text-white">
+                Why should I trust this will succeed?
+              </h3>
+              <p className="text-gray-600 dark:text-gray-400">
+                Look at our track record: 2,000+ GitHub stars and a working Web
+                SDK in just 8 months with zero funding. The project has real
+                momentum.
+              </p>
+            </div>
+
+            <div className="rounded-2xl border border-gray-200 bg-white p-6 transition-all hover:border-purple-200 hover:shadow-lg dark:border-gray-800 dark:bg-gray-900 dark:hover:border-purple-900">
+              <h3 className="mb-3 text-lg font-bold text-gray-900 dark:text-white">
+                What happens if you get acquired?
+              </h3>
+              <p className="text-gray-600 dark:text-gray-400">
+                The code is MIT licensed forever. The community owns the code.
+                That&apos;s the beauty of open source—no single entity can take
+                it away.
+              </p>
+            </div>
+
+            <div className="rounded-2xl border border-gray-200 bg-white p-6 transition-all hover:border-purple-200 hover:shadow-lg dark:border-gray-800 dark:bg-gray-900 dark:hover:border-purple-900">
+              <h3 className="mb-3 text-lg font-bold text-gray-900 dark:text-white">
+                Why $30,000/month?
+              </h3>
+              <p className="text-gray-600 dark:text-gray-400">
+                Transparency: This covers my salary as lead developer
+                ($15-18K/month) and hiring a senior mobile developer
+                ($12-15K/month). Two experienced developers working full-time
+                can deliver what normally takes a team of 5-10 at a big company.
+                We&apos;re lean, focused, and motivated.
+              </p>
+            </div>
+
+            <div className="rounded-2xl border border-gray-200 bg-white p-6 transition-all hover:border-purple-200 hover:shadow-lg dark:border-gray-800 dark:bg-gray-900 dark:hover:border-purple-900">
+              <h3 className="mb-3 text-lg font-bold text-gray-900 dark:text-white">
+                What if we need features you haven&apos;t built yet?
+              </h3>
+              <p className="text-gray-600 dark:text-gray-400">
+                That&apos;s the beauty of open source with active development.
+                Gold sponsors get custom feature development. Silver sponsors
+                influence the roadmap. And since it&apos;s MIT licensed, you can
+                always hire your own developers to add features. Try doing that
+                with Apryse&apos;s closed source code.
+              </p>
+            </div>
+
+            <div className="rounded-2xl border border-gray-200 bg-white p-6 transition-all hover:border-purple-200 hover:shadow-lg dark:border-gray-800 dark:bg-gray-900 dark:hover:border-purple-900">
+              <h3 className="mb-3 text-lg font-bold text-gray-900 dark:text-white">
+                How do I justify this to my CFO?
+              </h3>
+              <p className="text-gray-600 dark:text-gray-400">
+                Simple ROI: If you&apos;re paying $150K+/year for a PDF SDK,
+                sponsoring at $30K/year saves you $120K annually. Plus you
+                eliminate vendor risk, gain code ownership, and can customize
+                anything. It&apos;s a no-brainer financially. I&apos;m happy to
+                jump on a call with your finance team to walk through the
+                numbers.
+              </p>
+            </div>
+
+            <div className="rounded-2xl border border-gray-200 bg-white p-6 transition-all hover:border-purple-200 hover:shadow-lg dark:border-gray-800 dark:bg-gray-900 dark:hover:border-purple-900">
+              <h3 className="mb-3 text-lg font-bold text-gray-900 dark:text-white">
+                Can we try it first?
+              </h3>
+              <p className="text-gray-600 dark:text-gray-400">
+                Absolutely! Try it right now:{' '}
+                <a
+                  href="https://app.embedpdf.com/"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="font-medium text-blue-600 underline hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300"
+                >
+                  Live demo →
+                </a>{' '}
+                or{' '}
+                <a
+                  href="https://github.com/embedpdf/embed-pdf-viewer"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="font-medium text-blue-600 underline hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300"
+                >
+                  browse the code →
+                </a>{' '}
+                Use it, test it, deploy it in production if you want. See for
+                yourself how it performs before making any sponsorship
+                decisions.
+              </p>
+            </div>
           </div>
         </div>
       </section>
@@ -626,7 +706,7 @@ const SponsorshipPage = () => {
 
             <div className="relative z-10 text-center">
               <h2 className="mb-6 text-4xl font-black text-gray-900 dark:text-white md:text-5xl">
-                Ready to Own Your PDF Tech?
+                Ready to Own Your PDF Technology?
               </h2>
               <p className="mx-auto mb-10 max-w-2xl text-xl text-gray-600 dark:text-gray-300">
                 Let&apos;s have a real conversation about breaking free from
@@ -648,7 +728,7 @@ const SponsorshipPage = () => {
                   className="inline-flex w-full items-center justify-center rounded-full border-2 border-transparent bg-blue-600 px-8 py-4 text-base font-medium text-white transition-all hover:bg-blue-700 sm:w-auto"
                 >
                   <Calendar className="mr-2 h-5 w-5" />
-                  Book 30-min Call
+                  Book a 30-min Call
                 </a>
                 <a
                   href="https://discord.gg/mHHABmmuVU"
@@ -657,26 +737,38 @@ const SponsorshipPage = () => {
                   className="inline-flex w-full items-center justify-center rounded-full border-2 border-gray-200 bg-transparent px-8 py-4 text-base font-medium text-gray-900 transition-all hover:border-gray-300 hover:bg-gray-50 dark:border-gray-700 dark:text-white dark:hover:bg-gray-800 sm:w-auto"
                 >
                   <MessageCircle className="mr-2 h-5 w-5" />
-                  Join Discord
+                  Join our Discord
                 </a>
               </div>
 
-              <div className="mt-8 text-sm text-gray-500">
+              <p className="mx-auto mt-8 max-w-xl text-gray-600 dark:text-gray-400">
                 Or find me on{' '}
                 <a
-                  href="https://twitter.com/bobsingor"
-                  className="underline hover:text-blue-500"
-                >
-                  Twitter
-                </a>{' '}
-                and{' '}
-                <a
                   href="https://linkedin.com/in/bobsingor"
-                  className="underline hover:text-blue-500"
+                  className="font-medium underline hover:text-blue-500"
                 >
                   LinkedIn
                 </a>
-              </div>
+                ,{' '}
+                <a
+                  href="https://twitter.com/bobsingor"
+                  className="font-medium underline hover:text-blue-500"
+                >
+                  Twitter (@bobsingor)
+                </a>
+                <br />
+                <span className="font-medium text-gray-900 dark:text-white">
+                  Let&apos;s discuss how to save your company hundreds of
+                  thousands per year.
+                </span>
+              </p>
+
+              <p className="mt-12 text-2xl font-black text-gray-900 dark:text-white">
+                Join the open-source PDF revolution.
+              </p>
+              <p className="mt-2 text-lg text-gray-500 dark:text-gray-400">
+                Let&apos;s build technology that nobody can take away.
+              </p>
             </div>
           </div>
         </div>
