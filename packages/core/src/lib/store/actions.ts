@@ -56,6 +56,7 @@ export interface StartLoadingDocumentAction {
     rotation?: Rotation;
     passwordProvided?: boolean;
     autoActivate?: boolean; // If true, this document becomes active when opened. Default: true
+    readOnly?: boolean; // If true, the document is opened in read-only mode. Default: false
   };
 }
 
@@ -208,9 +209,10 @@ export const startLoadingDocument = (
   rotation?: Rotation,
   passwordProvided?: boolean,
   autoActivate?: boolean,
+  readOnly?: boolean,
 ): CoreAction => ({
   type: START_LOADING_DOCUMENT,
-  payload: { documentId, name, scale, rotation, passwordProvided, autoActivate },
+  payload: { documentId, name, scale, rotation, passwordProvided, autoActivate, readOnly },
 });
 
 export const updateDocumentLoadingProgress = (

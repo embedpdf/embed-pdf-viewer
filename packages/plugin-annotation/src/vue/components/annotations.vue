@@ -388,6 +388,7 @@ import {
 } from '@embedpdf/plugin-annotation';
 import { usePointerHandlers } from '@embedpdf/plugin-interaction-manager/vue';
 import { useSelectionCapability } from '@embedpdf/plugin-selection/vue';
+import { useCoreState } from '@embedpdf/core/vue';
 import { useAnnotationCapability } from '../hooks';
 import AnnotationContainer from './annotation-container.vue';
 import * as AnnoComponents from './annotations';
@@ -459,6 +460,7 @@ const handleClick = (e: MouseEvent | TouchEvent, annotation: TrackedAnnotation) 
 };
 
 const handleDoubleClick = (_e: MouseEvent | PointerEvent, id: string) => {
+  if (isReadOnly.value) return;
   if (isFreeText(annotations.value.find((a) => a.object.id === id)!)) {
     editingId.value = id;
   }
@@ -474,14 +476,23 @@ watchEffect((onCleanup) => {
 });
 
 // --- Component Logic ---
+const coreState = useCoreState();
+const isReadOnly = computed(
+  () => coreState.value?.documents[props.documentId]?.readOnly === true,
+);
+
 const getTool = (annotation: TrackedAnnotation) =>
   annotationProvides.value?.findToolForAnnotation(annotation.object);
 
 const isDraggable = (anno: TrackedAnnotation) => {
+  if (isReadOnly.value) return false;
   if (isFreeText(anno) && editingId.value === anno.object.id) return false;
   return getTool(anno)?.interaction.isDraggable ?? false;
 };
-const isResizable = (anno: TrackedAnnotation) => getTool(anno)?.interaction.isResizable ?? false;
+const isResizable = (anno: TrackedAnnotation) => {
+  if (isReadOnly.value) return false;
+  return getTool(anno)?.interaction.isResizable ?? false;
+};
 const lockAspectRatio = (anno: TrackedAnnotation) =>
   getTool(anno)?.interaction.lockAspectRatio ?? false;
 

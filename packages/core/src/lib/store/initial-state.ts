@@ -27,6 +27,9 @@ export interface DocumentState {
   scale: number;
   rotation: Rotation;
 
+  // Read-only mode: when true, prevents all modifications to the document
+  readOnly?: boolean;
+
   // Maps page index (0-based) to refresh version number
   // When a page is refreshed, its version is incremented
   pageRefreshVersions: Record<number, number>;

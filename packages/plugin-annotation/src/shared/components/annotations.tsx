@@ -30,6 +30,7 @@ import {
 } from '@framework';
 
 import { useAnnotationCapability } from '../hooks';
+import { useCoreState } from '@embedpdf/core/@framework';
 import { AnnotationContainer } from './annotation-container';
 import { Highlight } from './text-markup/highlight';
 import { Underline } from './text-markup/underline';
@@ -68,10 +69,17 @@ export function Annotations(annotationsProps: AnnotationsProps) {
   const { documentId, pageIndex, scale, selectionMenu } = annotationsProps;
   const { provides: annotationCapability } = useAnnotationCapability();
   const { provides: selectionProvides } = useSelectionCapability();
+  const coreState = useCoreState();
   const [annotations, setAnnotations] = useState<TrackedAnnotation[]>([]);
   const { register } = usePointerHandlers({ documentId, pageIndex });
   const [selectionState, setSelectionState] = useState<TrackedAnnotation | null>(null);
   const [editingId, setEditingId] = useState<string | null>(null);
+
+  // Check if document is read-only
+  const isReadOnly = useMemo(
+    () => coreState?.documents[documentId]?.readOnly === true,
+    [coreState, documentId],
+  );
 
   // Get scoped API for this document (memoized to prevent infinite loops)
   const annotationProvides = useMemo(
@@ -140,8 +148,8 @@ export function Annotations(annotationsProps: AnnotationsProps) {
               key={annotation.object.id}
               trackedAnnotation={annotation}
               isSelected={isSelected}
-              isDraggable={tool?.interaction.isDraggable ?? true}
-              isResizable={tool?.interaction.isResizable ?? true}
+              isDraggable={!isReadOnly && (tool?.interaction.isDraggable ?? true)}
+              isResizable={!isReadOnly && (tool?.interaction.isResizable ?? true)}
               lockAspectRatio={tool?.interaction.lockAspectRatio ?? false}
               selectionMenu={selectionMenu}
               onSelect={(e) => handleClick(e, annotation)}
@@ -168,8 +176,8 @@ export function Annotations(annotationsProps: AnnotationsProps) {
               key={annotation.object.id}
               trackedAnnotation={annotation}
               isSelected={isSelected}
-              isDraggable={tool?.interaction.isDraggable ?? true}
-              isResizable={tool?.interaction.isResizable ?? true}
+              isDraggable={!isReadOnly && (tool?.interaction.isDraggable ?? true)}
+              isResizable={!isReadOnly && (tool?.interaction.isResizable ?? true)}
               lockAspectRatio={tool?.interaction.lockAspectRatio ?? false}
               selectionMenu={selectionMenu}
               onSelect={(e) => handleClick(e, annotation)}
@@ -196,8 +204,8 @@ export function Annotations(annotationsProps: AnnotationsProps) {
               key={annotation.object.id}
               trackedAnnotation={annotation}
               isSelected={isSelected}
-              isDraggable={tool?.interaction.isDraggable ?? true}
-              isResizable={tool?.interaction.isResizable ?? true}
+              isDraggable={!isReadOnly && (tool?.interaction.isDraggable ?? true)}
+              isResizable={!isReadOnly && (tool?.interaction.isResizable ?? true)}
               lockAspectRatio={tool?.interaction.lockAspectRatio ?? false}
               selectionMenu={selectionMenu}
               onSelect={(e) => handleClick(e, annotation)}
@@ -224,8 +232,8 @@ export function Annotations(annotationsProps: AnnotationsProps) {
               key={annotation.object.id}
               trackedAnnotation={annotation}
               isSelected={isSelected}
-              isDraggable={tool?.interaction.isDraggable ?? false}
-              isResizable={tool?.interaction.isResizable ?? false}
+              isDraggable={!isReadOnly && (tool?.interaction.isDraggable ?? false)}
+              isResizable={!isReadOnly && (tool?.interaction.isResizable ?? false)}
               lockAspectRatio={tool?.interaction.lockAspectRatio ?? false}
               selectionMenu={selectionMenu}
               onSelect={(e) => handleClick(e, annotation)}
@@ -248,8 +256,8 @@ export function Annotations(annotationsProps: AnnotationsProps) {
               key={annotation.object.id}
               trackedAnnotation={annotation}
               isSelected={isSelected}
-              isDraggable={tool?.interaction.isDraggable ?? false}
-              isResizable={tool?.interaction.isResizable ?? false}
+              isDraggable={!isReadOnly && (tool?.interaction.isDraggable ?? false)}
+              isResizable={!isReadOnly && (tool?.interaction.isResizable ?? false)}
               lockAspectRatio={tool?.interaction.lockAspectRatio ?? false}
               selectionMenu={selectionMenu}
               onSelect={(e) => handleClick(e, annotation)}
@@ -272,8 +280,8 @@ export function Annotations(annotationsProps: AnnotationsProps) {
               key={annotation.object.id}
               trackedAnnotation={annotation}
               isSelected={isSelected}
-              isDraggable={tool?.interaction.isDraggable ?? false}
-              isResizable={tool?.interaction.isResizable ?? false}
+              isDraggable={!isReadOnly && (tool?.interaction.isDraggable ?? false)}
+              isResizable={!isReadOnly && (tool?.interaction.isResizable ?? false)}
               lockAspectRatio={tool?.interaction.lockAspectRatio ?? false}
               selectionMenu={selectionMenu}
               onSelect={(e) => handleClick(e, annotation)}
@@ -296,8 +304,8 @@ export function Annotations(annotationsProps: AnnotationsProps) {
               key={annotation.object.id}
               trackedAnnotation={annotation}
               isSelected={isSelected}
-              isDraggable={tool?.interaction.isDraggable ?? false}
-              isResizable={tool?.interaction.isResizable ?? false}
+              isDraggable={!isReadOnly && (tool?.interaction.isDraggable ?? false)}
+              isResizable={!isReadOnly && (tool?.interaction.isResizable ?? false)}
               lockAspectRatio={tool?.interaction.lockAspectRatio ?? false}
               selectionMenu={selectionMenu}
               onSelect={(e) => handleClick(e, annotation)}
@@ -320,8 +328,8 @@ export function Annotations(annotationsProps: AnnotationsProps) {
               key={annotation.object.id}
               trackedAnnotation={annotation}
               isSelected={isSelected}
-              isDraggable={tool?.interaction.isDraggable ?? true}
-              isResizable={tool?.interaction.isResizable ?? false}
+              isDraggable={!isReadOnly && (tool?.interaction.isDraggable ?? true)}
+              isResizable={!isReadOnly && (tool?.interaction.isResizable ?? false)}
               lockAspectRatio={tool?.interaction.lockAspectRatio ?? false}
               selectionMenu={selectionMenu}
               onSelect={(e) => handleClick(e, annotation)}
@@ -365,8 +373,8 @@ export function Annotations(annotationsProps: AnnotationsProps) {
               key={annotation.object.id}
               trackedAnnotation={annotation}
               isSelected={isSelected}
-              isDraggable={tool?.interaction.isDraggable ?? true}
-              isResizable={tool?.interaction.isResizable ?? false}
+              isDraggable={!isReadOnly && (tool?.interaction.isDraggable ?? true)}
+              isResizable={!isReadOnly && (tool?.interaction.isResizable ?? false)}
               lockAspectRatio={tool?.interaction.lockAspectRatio ?? false}
               selectionMenu={selectionMenu}
               onSelect={(e) => handleClick(e, annotation)}
@@ -404,8 +412,8 @@ export function Annotations(annotationsProps: AnnotationsProps) {
               key={annotation.object.id}
               trackedAnnotation={annotation}
               isSelected={isSelected}
-              isDraggable={tool?.interaction.isDraggable ?? true}
-              isResizable={tool?.interaction.isResizable ?? false}
+              isDraggable={!isReadOnly && (tool?.interaction.isDraggable ?? true)}
+              isResizable={!isReadOnly && (tool?.interaction.isResizable ?? false)}
               lockAspectRatio={tool?.interaction.lockAspectRatio ?? false}
               selectionMenu={selectionMenu}
               onSelect={(e) => handleClick(e, annotation)}
@@ -443,8 +451,8 @@ export function Annotations(annotationsProps: AnnotationsProps) {
               key={annotation.object.id}
               trackedAnnotation={annotation}
               isSelected={isSelected}
-              isDraggable={(tool?.interaction.isDraggable ?? true) && !isEditing}
-              isResizable={tool?.interaction.isResizable ?? true}
+              isDraggable={!isReadOnly && (tool?.interaction.isDraggable ?? true) && !isEditing}
+              isResizable={!isReadOnly && (tool?.interaction.isResizable ?? true)}
               lockAspectRatio={tool?.interaction.lockAspectRatio ?? false}
               selectionMenu={selectionMenu}
               onSelect={(e) => handleClick(e, annotation)}
@@ -452,6 +460,7 @@ export function Annotations(annotationsProps: AnnotationsProps) {
                 mixBlendMode: blendModeToCss(annotation.object.blendMode ?? PdfBlendMode.Normal),
               }}
               onDoubleClick={(e) => {
+                if (isReadOnly) return;
                 e.stopPropagation();
                 setEditingId(annotation.object.id);
               }}
@@ -480,8 +489,8 @@ export function Annotations(annotationsProps: AnnotationsProps) {
               key={annotation.object.id}
               trackedAnnotation={annotation}
               isSelected={isSelected}
-              isDraggable={tool?.interaction.isDraggable ?? true}
-              isResizable={tool?.interaction.isResizable ?? true}
+              isDraggable={!isReadOnly && (tool?.interaction.isDraggable ?? true)}
+              isResizable={!isReadOnly && (tool?.interaction.isResizable ?? true)}
               lockAspectRatio={tool?.interaction.lockAspectRatio ?? false}
               selectionMenu={selectionMenu}
               onSelect={(e) => handleClick(e, annotation)}

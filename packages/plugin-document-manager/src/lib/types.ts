@@ -44,6 +44,7 @@ export interface LoadDocumentUrlOptions {
   scale?: number;
   rotation?: Rotation;
   autoActivate?: boolean; // If true, this document becomes active when opened. Default: true
+  readOnly?: boolean; // If true, the document is opened in read-only mode. Default: false
 }
 
 export interface LoadDocumentBufferOptions {
@@ -54,6 +55,7 @@ export interface LoadDocumentBufferOptions {
   scale?: number;
   rotation?: Rotation;
   autoActivate?: boolean; // If true, this document becomes active when opened. Default: true
+  readOnly?: boolean; // If true, the document is opened in read-only mode. Default: false
 }
 
 export interface RetryOptions {

@@ -1,5 +1,5 @@
 import { h } from 'preact';
-import { useRef, useEffect } from 'preact/hooks';
+import { useRef, useEffect, useMemo } from 'preact/hooks';
 import {
   getAnnotationByUid,
   getSidebarAnnotationsWithRepliesGroupedByPage,
@@ -8,6 +8,7 @@ import {
 } from '@embedpdf/plugin-annotation/preact';
 import { useScrollCapability } from '@embedpdf/plugin-scroll/preact';
 import { useTranslations } from '@embedpdf/plugin-i18n/preact';
+import { useCoreState } from '@embedpdf/core/preact';
 import { TrackedAnnotation } from '@embedpdf/plugin-annotation';
 import { uuidV4, PdfAnnotationSubtype, PdfAnnotationIcon } from '@embedpdf/models';
 import { AnnotationCard } from './comment-sidebar/annotation-card';
@@ -22,8 +23,15 @@ export const CommentSidebar = ({ documentId }: CommentSidebarProps) => {
   const { provides: annotation, state } = useAnnotation(documentId);
   const { provides: scrollApi } = useScrollCapability();
   const { translate } = useTranslations(documentId);
+  const coreState = useCoreState();
   const annotationRefs = useRef<Record<string, HTMLDivElement | null>>({});
   const scrollContainerRef = useRef<HTMLDivElement>(null);
+
+  // Check if document is read-only
+  const isReadOnly = useMemo(
+    () => coreState?.documents[documentId]?.readOnly === true,
+    [coreState, documentId],
+  );
 
   const selectedAnnotation = state.selectedUid
     ? getAnnotationByUid(state, state.selectedUid)
@@ -167,6 +175,7 @@ export const CommentSidebar = ({ documentId }: CommentSidebarProps) => {
                     onDelete={handleDelete}
                     onReply={handleReply}
                     documentId={documentId}
+                    isReadOnly={isReadOnly}
                   />
                 </div>
               ))}

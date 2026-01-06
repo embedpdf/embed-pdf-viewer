@@ -27,6 +27,7 @@ export const coreReducer: Reducer<CoreState, CoreAction> = (state, action): Core
         rotation,
         passwordProvided,
         autoActivate = true,
+        readOnly = false,
       } = action.payload;
 
       const newDocState: DocumentState = {
@@ -39,6 +40,7 @@ export const coreReducer: Reducer<CoreState, CoreAction> = (state, action): Core
         scale: scale ?? state.defaultScale,
         rotation: rotation ?? state.defaultRotation,
         passwordProvided: passwordProvided ?? false,
+        readOnly: readOnly ?? false,
         pageRefreshVersions: {},
         loadStartedAt: Date.now(),
       };
