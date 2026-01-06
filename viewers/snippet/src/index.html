@@ -163,6 +163,22 @@
       },
       categories: ['toolbar'],
     });
+    commands.registerCommand({
+      id: 'custom.toolbar.capture.ai',
+      label: '截图AI解析',
+      action: async ({registry, documentId}) => {
+        const capture = registry.getPlugin('capture')?.provides();
+        if (!capture) return;
+
+        const scope = capture.forDocument(documentId);
+        if (scope.isMarqueeCaptureActive()) {
+          scope.disableMarqueeCapture();
+        } else {
+          scope.enableMarqueeCapture();
+        }
+      },
+      categories: ['toolbar'],
+    });
     const toolbarItems = JSON.parse(JSON.stringify(toolbar.items));
     const rightGroup = toolbarItems.find(item => item.id === 'right-group');
     const leftGroup = toolbarItems.find(item => item.id === 'left-group');
@@ -174,6 +190,13 @@
         id: 'custom-toolbar-save',
         commandId: 'custom.toolbar.save',
         variant: 'icon',
+        categories: ['toolbar'],
+      },)
+      rightGroup.items.unshift({
+        type: 'command-button',
+        id: 'custom-toolbar-capture-ai',
+        commandId: 'custom.toolbar.capture.ai',
+        variant: 'text',
         categories: ['toolbar'],
       },)
     }
