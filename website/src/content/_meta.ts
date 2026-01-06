@@ -20,7 +20,7 @@ export default {
       timestamp: false,
     },
   },
-  ['our-sponsors']: {
+  ['sponsors']: {
     title: 'Our Sponsors',
     type: 'page',
     theme: {
