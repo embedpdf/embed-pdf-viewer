@@ -25,6 +25,7 @@
       target: document.getElementById('pdf-viewer'),
       src: 'https://snippet.embedpdf.com/ebook.pdf',
       worker: true,
+      annotations: {annotationAuthor: '匿名用户'},
       tabBar: 'always',
       theme: {
         preference: 'light',
@@ -98,7 +99,9 @@
     const selectionItems = schema.selectionMenus['selection'].items;
     ui.mergeSchema({
       selectionMenus: {
+        ...schema.selectionMenus,
         selection: {
+          ...schema.selectionMenus['selection'],
           items: [
             {
               type: 'command-button',
