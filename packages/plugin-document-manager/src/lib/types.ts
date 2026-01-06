@@ -110,4 +110,8 @@ export interface DocumentManagerCapability {
   onDocumentError: EventHook<DocumentErrorEvent>;
   onActiveDocumentChanged: EventHook<DocumentChangeEvent>;
   onDocumentOrderChanged: EventHook<DocumentOrderChangeEvent>;
+  onFileSelected: EventHook<File>;
+
+  // file chosen
+  fileSelected(file: File): void;
 }

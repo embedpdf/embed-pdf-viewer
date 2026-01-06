@@ -23,6 +23,7 @@ export function FilePicker() {
   const onChange = async (e: ChangeEvent<HTMLInputElement>) => {
     const file = (e.currentTarget as HTMLInputElement).files?.[0];
     if (!file || !provides) return;
+    provides.fileSelected(file);
     const buffer = await file.arrayBuffer();
     const openTask = provides.openDocumentBuffer({
       name: file.name,

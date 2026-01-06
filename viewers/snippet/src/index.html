@@ -23,9 +23,15 @@
     const viewer = EmbedPDF.init({
       type: 'container',
       target: document.getElementById('pdf-viewer'),
-      src: 'https://snippet.embedpdf.com/ebook.pdf',
+      //src: 'https://snippet.embedpdf.com/ebook.pdf',
       worker: true,
       annotations: {annotationAuthor: '匿名用户'},
+      documentManager: {
+        maxDocuments: 5,
+        initialDocuments: [{
+          url: 'https://snippet.embedpdf.com/ebook.pdf', documentId: 'pdf-test', name: '测试的文件.pdf'
+        }]
+      },
       tabBar: 'always',
       theme: {
         preference: 'light',
@@ -67,6 +73,7 @@
     });
 
     const registry = await viewer.registry;
+
     const commands = registry.getPlugin('commands').provides();
     const ui = registry.getPlugin('ui').provides();
     commands.registerCommand({
@@ -121,6 +128,16 @@
           ]
         }
       }
+    })
+
+    const docManager = registry.getPlugin('document-manager').provides();
+    docManager.onDocumentOpened(async (doc) => {
+      console.log(doc);
+      const data = await registry?.getPlugin('export')?.saveAsCopyAndGetBufferAndName(doc.id).toPromise()
+      console.log(data)
+    });
+    docManager.onFileSelected((file) => {
+      console.log(file)
     })
   </script>
 </body>

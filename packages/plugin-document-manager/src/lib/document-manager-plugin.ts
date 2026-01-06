@@ -55,6 +55,8 @@ export class DocumentManagerPlugin extends BasePlugin<
     options?: OpenFileDialogOptions;
   }>();
 
+  private readonly fileSelected$ = createBehaviorEmitter<File>();
+
   private maxDocuments?: number;
 
   private loadOptions = new Map<string, LoadDocumentUrlOptions | LoadDocumentBufferOptions>();
@@ -77,6 +79,7 @@ export class DocumentManagerPlugin extends BasePlugin<
       retryDocument: (documentId, options) => this.retryDocument(documentId, options),
       closeDocument: (documentId) => this.closeDocument(documentId),
       closeAllDocuments: () => this.closeAllDocuments(),
+      fileSelected: (file) => this.fileSelected$.emit(file),
 
       setActiveDocument: (documentId) => {
         if (!this.isDocumentOpen(documentId)) {
@@ -143,6 +146,7 @@ export class DocumentManagerPlugin extends BasePlugin<
       onDocumentError: this.documentError$.on,
       onActiveDocumentChanged: this.activeDocumentChanged$.on,
       onDocumentOrderChanged: this.documentOrderChanged$.on,
+      onFileSelected: this.fileSelected$.on,
     };
   }
 
@@ -649,6 +653,7 @@ export class DocumentManagerPlugin extends BasePlugin<
     this.activeDocumentChanged$.clear();
     this.documentOrderChanged$.clear();
     this.documentError$.clear();
+    this.fileSelected$.clear();
 
     super.destroy();
   }
