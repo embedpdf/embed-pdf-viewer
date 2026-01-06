@@ -49,7 +49,7 @@
         defaultLocale: 'zh-CN'
       },
       icons: {
-        ai: {
+        custom_ai: {
           viewBox: '0 0 1024 1024',
           paths: [
             {
@@ -59,11 +59,21 @@
             }
           ]
         },
-        trans: {
+        custom_trans: {
           viewBox: '0 0 1024 1024',
           paths: [
             {
               d: 'M213.333333 682.666667v42.666666a85.333333 85.333333 0 0 0 78.933334 85.12L298.666667 810.666667h85.333333a42.666667 42.666667 0 0 1 0 85.333333H298.666667a170.666667 170.666667 0 0 1-170.666667-170.666667v-42.666666a42.666667 42.666667 0 0 1 85.333333 0z m560.042667-242.602667l170.666667 426.666667a21.333333 21.333333 0 0 1-19.84 29.269333h-45.994667a21.333333 21.333333 0 0 1-19.797333-13.397333L812.544 768h-174.506667l-45.781333 114.602667a21.333333 21.333333 0 0 1-19.84 13.397333H526.506667a21.333333 21.333333 0 0 1-19.797334-29.269333l170.666667-426.666667a21.333333 21.333333 0 0 1 19.797333-13.397333h56.405334a21.333333 21.333333 0 0 1 19.84 13.397333zM725.333333 549.76L672.128 682.666667h106.325333L725.333333 549.76zM341.333333 106.666667V170.666667h149.333334a21.333333 21.333333 0 0 1 21.333333 21.333333v256a21.333333 21.333333 0 0 1-21.333333 21.333333H341.333333v106.666667a21.333333 21.333333 0 0 1-21.333333 21.333333h-42.666667a21.333333 21.333333 0 0 1-21.333333-21.333333V469.333333H106.666667a21.333333 21.333333 0 0 1-21.333334-21.333333v-256a21.333333 21.333333 0 0 1 21.333334-21.333333H256V106.666667a21.333333 21.333333 0 0 1 21.333333-21.333334h42.666667a21.333333 21.333333 0 0 1 21.333333 21.333334z m384 21.333333a170.666667 170.666667 0 0 1 170.666667 170.666667v42.666666a42.666667 42.666667 0 0 1-85.333333 0V298.666667a85.333333 85.333333 0 0 0-85.333334-85.333334h-85.333333a42.666667 42.666667 0 0 1 0-85.333333h85.333333zM256 256H170.666667v128h85.333333V256z m170.666667 0H341.333333v128h85.333334V256z',
+              stroke: 'currentColor',
+              fill: 'currentColor'
+            }
+          ]
+        },
+        custom_arrow_left: {
+          viewBox: '64 64 896 896',
+          paths: [
+            {
+              d: 'M872 474H286.9l350.2-304c5.6-4.9 2.2-14-5.2-14h-88.5c-3.9 0-7.6 1.4-10.5 3.9L155 487.8a31.96 31.96 0 000 48.3L535.1 866c1.5 1.3 3.3 2 5.2 2h91.5c7.4 0 10.8-9.2 5.2-14L286.9 550H872c4.4 0 8-3.6 8-8v-60c0-4.4-3.6-8-8-8z',
               stroke: 'currentColor',
               fill: 'currentColor'
             }
@@ -76,10 +86,13 @@
 
     const commands = registry.getPlugin('commands').provides();
     const ui = registry.getPlugin('ui').provides();
+    const schema = ui.getSchema();
+
+    // custom selection
     commands.registerCommand({
       id: 'custom.selection.ai',
       label: 'AI解读',
-      icon: 'ai',
+      icon: 'custom_ai',
       action: async ({registry, documentId}) => {
         const plugin = registry.getPlugin('selection');
         const scope = plugin?.provides().forDocument(documentId);
@@ -88,11 +101,11 @@
         scope?.clear();
       },
       categories: ['selection'],
-    })
+    });
     commands.registerCommand({
       id: 'custom.selection.trans',
       label: '翻译',
-      icon: 'trans',
+      icon: 'custom_trans',
       action: async ({registry, documentId}) => {
         const plugin = registry.getPlugin('selection');
         const scope = plugin?.provides().forDocument(documentId);
@@ -101,8 +114,7 @@
         scope?.clear();
       },
       categories: ['selection'],
-    })
-    const schema = ui.getSchema();
+    });
     const selectionItems = schema.selectionMenus['selection'].items;
     ui.mergeSchema({
       selectionMenus: {
@@ -130,6 +142,55 @@
       }
     })
 
+    // custom toolbar
+    const toolbar = schema.toolbars['main-toolbar'];
+    commands.registerCommand({
+      id: 'custom.toolbar.back',
+      label: '返回',
+      icon: 'custom_arrow_left',
+      action: async ({registry, documentId}) => {
+        console.log('返回');
+      },
+      categories: ['toolbar'],
+    });
+    commands.registerCommand({
+      id: 'custom.toolbar.save',
+      label: '保存批注',
+      icon: 'save',
+      action: async ({registry, documentId}) => {
+        const data = await registry?.getPlugin('export')?.saveAsCopyAndGetBufferAndName(documentId).toPromise()
+        console.log(data)
+      },
+      categories: ['toolbar'],
+    });
+    const toolbarItems = JSON.parse(JSON.stringify(toolbar.items));
+    const rightGroup = toolbarItems.find(item => item.id === 'right-group');
+    const leftGroup = toolbarItems.find(item => item.id === 'left-group');
+    /*console.log(toolbarItems, rightGroup, leftGroup)*/
+    if (rightGroup) {
+      rightGroup.items = rightGroup.items || []
+      rightGroup.items.unshift({
+        type: 'command-button',
+        id: 'custom-toolbar-save',
+        commandId: 'custom.toolbar.save',
+        variant: 'icon',
+        categories: ['toolbar'],
+      },)
+    }
+    if (leftGroup) {
+      leftGroup.items = leftGroup.items || []
+      leftGroup.items.unshift({
+        type: 'command-button',
+        id: 'custom-toolbar-back',
+        commandId: 'custom.toolbar.back',
+        variant: 'icon',
+        categories: ['toolbar'],
+      },)
+    }
+    ui.mergeSchema({
+      toolbars: {'main-toolbar': {...toolbar, items: toolbarItems}}
+    });
+
     const docManager = registry.getPlugin('document-manager').provides();
     docManager.onDocumentOpened(async (doc) => {
       console.log(doc);
@@ -138,7 +199,7 @@
     });
     docManager.onFileSelected((file) => {
       console.log(file)
-    })
+    });
   </script>
 </body>
 </html>
