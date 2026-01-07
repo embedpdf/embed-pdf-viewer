@@ -20,6 +20,13 @@ export default {
       timestamp: false,
     },
   },
+  ['sponsors']: {
+    title: 'Our Sponsors',
+    type: 'page',
+    theme: {
+      timestamp: false,
+    },
+  },
   ['sponsorship']: {
     title: 'Sponsorship',
     type: 'page',
