@@ -7,19 +7,19 @@ export const AnnotationIcon = ({
   annotation,
   config,
   className = '',
-  translate,
+  title,
 }: {
   annotation: TrackedAnnotation;
   config: AnnotationConfig;
   className?: string;
-  translate: any;
+  title: string;
 }) => {
   const iconProps = config.iconProps(annotation.object);
 
   return (
     <div
       className={`bg-bg-surface-alt flex items-center justify-center rounded-full ${className}`}
-      title={translate(`annotation.${config.label.toLowerCase()}`, {fallback: config.label})}
+      title={title}
     >
       <Icon icon={config.icon} {...iconProps} />
     </div>

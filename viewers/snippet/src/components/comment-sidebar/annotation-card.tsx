@@ -68,7 +68,12 @@ export const AnnotationCard = ({
     >
       <div className="p-4">
         <div className="flex items-start space-x-3">
-          <AnnotationIcon annotation={annotation} config={config} translate={translate} className="h-8 w-8" />
+          <AnnotationIcon
+            annotation={annotation}
+            config={config}
+            title={translate(config.labelKey, { fallback: config.label })}
+            className="h-8 w-8"
+          />
           <div className="min-w-0 flex-1">
             <div className="flex items-center justify-between">
               <div className="leading-none">
