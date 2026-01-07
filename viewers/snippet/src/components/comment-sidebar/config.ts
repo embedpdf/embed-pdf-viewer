@@ -71,7 +71,7 @@ export const annotationConfigs: Record<SidebarSubtype, AnnotationConfig> = {
   },
   [PdfAnnotationSubtype.STRIKEOUT]: {
     label: 'Strikethrough',
-    labelKey: 'annotation.strikethrough',
+    labelKey: 'annotation.strikeout',
     icon: 'strikethrough',
     iconProps: (annotation: any) => ({
       primaryColor: annotation.color || '#000000',
