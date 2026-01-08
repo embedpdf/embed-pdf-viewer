@@ -1,6 +1,7 @@
 /** @jsxImportSource preact */
 import { h, ComponentChildren } from 'preact';
 import { useEffect, useRef, useState } from 'preact/hooks';
+import { twMerge } from 'tailwind-merge';
 import { Icon } from './icon';
 import { Button } from './button';
 
@@ -19,8 +20,6 @@ export interface DialogProps {
   className?: string;
   /** Whether to show close button */
   showCloseButton?: boolean;
-  /** Maximum width of the dialog */
-  maxWidth?: string;
 }
 
 export function Dialog({
@@ -31,7 +30,6 @@ export function Dialog({
   onExited,
   className,
   showCloseButton = true,
-  maxWidth = '32rem',
 }: DialogProps) {
   const overlayRef = useRef<HTMLDivElement>(null);
   const [shouldRender, setShouldRender] = useState(open);
@@ -101,9 +99,11 @@ export function Dialog({
       onClick={handleBackdropClick}
     >
       <div
-        className={`bg-bg-surface md:border-border-subtle relative flex h-full w-full flex-col transition-all duration-200 md:h-auto md:w-[28rem] md:max-w-[90vw] md:rounded-lg md:border md:shadow-lg ${
-          isAnimating && open ? 'scale-100 opacity-100' : 'scale-95 opacity-0'
-        } ${className}`}
+        className={twMerge(
+          'bg-bg-surface md:border-border-subtle relative flex h-full w-full flex-col transition-all duration-200 md:h-auto md:w-[28rem] md:max-w-[90vw] md:rounded-lg md:border md:shadow-lg',
+          isAnimating && open ? 'scale-100 opacity-100' : 'scale-95 opacity-0',
+          className,
+        )}
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}

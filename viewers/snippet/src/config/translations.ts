@@ -21,6 +21,7 @@ export const englishTranslations: Locale = {
       marquee: 'Marquee Zoom',
       menu: 'Zoom Menu',
       level: 'Zoom Level ({level}%)',
+      dragTip: 'Drag to select area to zoom',
     },
     pan: {
       toggle: 'Toggle Pan Mode',
@@ -30,6 +31,10 @@ export const englishTranslations: Locale = {
     },
     capture: {
       screenshot: 'Screenshot',
+      dragTip: 'Drag to select area to capture',
+      title: 'Screenshot Preview',
+      download: 'Download',
+      cancel: 'Cancel',
     },
     document: {
       menu: 'Document Menu',
@@ -196,6 +201,20 @@ export const englishTranslations: Locale = {
       color: 'Color',
       luminosity: 'Luminosity',
     },
+    print: {
+      title: 'Print Settings',
+      loading: 'Preparing document...',
+      pages: 'Pages to print',
+      all: 'All pages',
+      current: 'Current page ({currentPage})',
+      specify: 'Specify pages',
+      specifyEG: 'e.g., 1-3, 5, 8-10',
+      total: 'Total pages in document: {totalPages}',
+      annotation: 'Include annotations',
+      printing: 'Printing...',
+      print: 'Print',
+      cancel: 'Cancel',
+    },
   },
 };
 
@@ -218,6 +237,7 @@ export const germanTranslations: Locale = {
       marquee: 'Laufrahmen-Zoom',
       menu: 'Zoom-Menü',
       level: 'Zoomstufe ({level}%)',
+      dragTip: 'Drag to select area to zoom',
     },
     pan: {
       toggle: 'Verschieben-Modus umschalten',
@@ -227,6 +247,10 @@ export const germanTranslations: Locale = {
     },
     capture: {
       screenshot: 'Screenshot',
+      dragTip: 'Ziehen Sie, um den Bereich zum Erfassen auszuwählen',
+      title: 'Screenshot-Vorschau',
+      download: 'Herunterladen',
+      cancel: 'Abbrechen',
     },
     document: {
       menu: 'Dokument-Menü',
@@ -393,6 +417,20 @@ export const germanTranslations: Locale = {
       color: 'Farbe',
       luminosity: 'Luminanz',
     },
+    print: {
+      title: 'Druckeinstellungen',
+      loading: 'Dokument wird vorbereitet...',
+      pages: 'Zu druckende Seiten',
+      all: 'Alle Seiten',
+      current: 'Aktuelle Seite ({currentPage})',
+      specify: 'Seiten angeben',
+      specifyEG: 'z.B. 1-3, 5, 8-10',
+      total: 'Gesamtseitenzahl im Dokument: {totalPages}',
+      annotation: 'Anmerkungen einbeziehen',
+      printing: 'Drucken...',
+      print: 'Drucken',
+      cancel: 'Abbrechen',
+    },
   },
 };
 
@@ -415,6 +453,7 @@ export const dutchTranslations: Locale = {
       marquee: 'Lijstzoom',
       menu: 'Zoommenu',
       level: 'Zoomniveau ({level}%)',
+      dragTip: 'Drag to select area to zoom',
     },
     pan: {
       toggle: 'Pan-modus wisselen',
@@ -424,6 +463,10 @@ export const dutchTranslations: Locale = {
     },
     capture: {
       screenshot: 'Schermafbeelding',
+      dragTip: 'Sleep om een gebied te selecteren om vast te leggen',
+      title: 'Screenshot voorbeeld',
+      download: 'Downloaden',
+      cancel: 'Annuleren',
     },
     document: {
       menu: 'Documentmenu',
@@ -591,6 +634,20 @@ export const dutchTranslations: Locale = {
       color: 'Kleur',
       luminosity: 'Helderheid',
     },
+    print: {
+      title: 'Afdrukinstellingen',
+      loading: 'Document voorbereiden...',
+      pages: "Af te drukken pagina's",
+      all: "Alle pagina's",
+      current: 'Huidige pagina ({currentPage})',
+      specify: "Pagina's",
+      specifyEG: 'bijv. 1-3, 5, 8-10',
+      total: "Totaal aantal pagina's in document: {totalPages}",
+      annotation: 'Inclusief annotaties',
+      printing: 'Afdrukken...',
+      print: 'Afdrukken',
+      cancel: 'Annuleren',
+    },
   },
 };
 
@@ -613,6 +670,7 @@ export const frenchTranslations: Locale = {
       marquee: 'Zoom de sélection',
       menu: 'Menu Zoom',
       level: 'Niveau de zoom ({level}%)',
+      dragTip: 'Drag to select area to zoom',
     },
     pan: {
       toggle: 'Basculer le mode déplacement',
@@ -622,6 +680,10 @@ export const frenchTranslations: Locale = {
     },
     capture: {
       screenshot: "Capture d'écran",
+      dragTip: 'Faites glisser pour sélectionner la zone à capturer',
+      title: 'Aperçu de la capture',
+      download: 'Télécharger',
+      cancel: 'Annuler',
     },
     document: {
       menu: 'Menu Document',
@@ -788,6 +850,20 @@ export const frenchTranslations: Locale = {
       color: 'Couleur',
       luminosity: 'Luminosité',
     },
+    print: {
+      title: "Paramètres d'impression",
+      loading: 'Préparation du document...',
+      pages: 'Pages à imprimer',
+      all: 'Toutes les pages',
+      current: 'Page actuelle ({currentPage})',
+      specify: 'Spécifier les pages',
+      specifyEG: 'ex : 1-3, 5, 8-10',
+      total: 'Nombre total de pages dans le document : {totalPages}',
+      annotation: 'Inclure les annotations',
+      printing: 'Impression...',
+      print: 'Imprimer',
+      cancel: 'Annuler',
+    },
   },
 };
 
@@ -810,6 +886,7 @@ export const spanishTranslations: Locale = {
       marquee: 'Zoom de selección',
       menu: 'Menú de zoom',
       level: 'Nivel de zoom ({level}%)',
+      dragTip: 'Drag to select area to zoom',
     },
     pan: {
       toggle: 'Alternar modo desplazamiento',
@@ -819,6 +896,10 @@ export const spanishTranslations: Locale = {
     },
     capture: {
       screenshot: 'Captura de pantalla',
+      dragTip: 'Arrastre para seleccionar el área a capturar',
+      title: 'Vista previa de la captura',
+      download: 'Descargar',
+      cancel: 'Cancelar',
     },
     document: {
       menu: 'Menú del documento',
@@ -986,6 +1067,20 @@ export const spanishTranslations: Locale = {
       color: 'Color',
       luminosity: 'Luminosidad',
     },
+    print: {
+      title: 'Configuración de impresión',
+      loading: 'Preparando documento...',
+      pages: 'Páginas a imprimir',
+      all: 'Todas las páginas',
+      current: 'Página actual ({currentPage})',
+      specify: 'Especificar páginas',
+      specifyEG: 'ej: 1-3, 5, 8-10',
+      total: 'Total de páginas en el documento: {totalPages}',
+      annotation: 'Incluir anotaciones',
+      printing: 'Imprimiendo...',
+      print: 'Imprimir',
+      cancel: 'Cancelar',
+    },
   },
 };
 
@@ -1005,9 +1100,10 @@ export const simplifiedChineseTranslations: Locale = {
       out: '缩小',
       fitWidth: '适合宽度',
       fitPage: '适合页面',
-      marquee: '选框缩放',
+      marquee: '框选放大',
       menu: '缩放菜单',
       level: '缩放比例 ({level}%)',
+      dragTip: '拖动鼠标选择要放大的区域',
     },
     pan: {
       toggle: '拖动模式',
@@ -1017,6 +1113,10 @@ export const simplifiedChineseTranslations: Locale = {
     },
     capture: {
       screenshot: '截图',
+      dragTip: '拖动鼠标选择要截取的区域',
+      title: '截取的PDF区域',
+      download: '下载',
+      cancel: '取消',
     },
     document: {
       menu: '文件选项',
@@ -1182,6 +1282,20 @@ export const simplifiedChineseTranslations: Locale = {
       saturation: '饱和度',
       color: '颜色',
       luminosity: '亮度',
+    },
+    print: {
+      title: '打印设置',
+      loading: '正在处理...',
+      pages: '要打印的页码',
+      all: '所有页',
+      current: '当前页（{currentPage}）',
+      specify: '指定页',
+      specifyEG: '例如：1-3, 5, 8-10',
+      total: '文档总页数：{totalPages}',
+      annotation: '包含批注',
+      printing: '打印中...',
+      print: '打印',
+      cancel: '取消',
     },
   },
 };

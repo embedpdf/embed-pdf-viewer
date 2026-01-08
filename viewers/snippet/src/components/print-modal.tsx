@@ -6,6 +6,7 @@ import { PdfPrintOptions } from '@embedpdf/models';
 import { Dialog } from './ui/dialog';
 import { Button } from './ui/button';
 import { Spinner } from './ui/loading-indicator';
+import { useTranslations } from '@embedpdf/plugin-i18n/preact';
 
 type PageSelection = 'all' | 'current' | 'custom';
 
@@ -19,6 +20,7 @@ interface PrintModalProps {
 export function PrintModal({ documentId, isOpen, onClose, onExited }: PrintModalProps) {
   const { provides: scroll } = useScrollCapability();
   const { provides: printCapability } = usePrintCapability();
+  const { translate } = useTranslations(documentId);
 
   const [selection, setSelection] = useState<PageSelection>('all');
   const [customPages, setCustomPages] = useState('');
@@ -57,7 +59,7 @@ export function PrintModal({ documentId, isOpen, onClose, onExited }: PrintModal
 
     try {
       setIsLoading(true);
-      setLoadingMessage('Preparing document...');
+      setLoadingMessage(translate('print.loading'));
 
       const task = printCapability?.forDocument(documentId).print(options);
 
@@ -91,15 +93,17 @@ export function PrintModal({ documentId, isOpen, onClose, onExited }: PrintModal
   return (
     <Dialog
       open={isOpen ?? false}
-      title="Print Settings"
+      title={translate('print.title')}
       onClose={onClose}
       onExited={onExited}
-      maxWidth="32rem"
+      className="md:w-[32rem]"
     >
       <div className="space-y-6">
         {/* Pages to print */}
         <div>
-          <label className="text-fg-secondary mb-3 block text-sm font-medium">Pages to print</label>
+          <label className="text-fg-secondary mb-3 block text-sm font-medium">
+            {translate('print.pages')}
+          </label>
           <div className="space-y-2">
             <label className="flex items-center">
               <input
@@ -111,7 +115,7 @@ export function PrintModal({ documentId, isOpen, onClose, onExited }: PrintModal
                 disabled={isLoading}
                 className="accent-accent mr-2"
               />
-              <span className="text-fg-primary text-sm">All pages</span>
+              <span className="text-fg-primary text-sm">{translate('print.all')}</span>
             </label>
 
             <label className="flex items-center">
@@ -124,7 +128,9 @@ export function PrintModal({ documentId, isOpen, onClose, onExited }: PrintModal
                 disabled={isLoading}
                 className="accent-accent mr-2"
               />
-              <span className="text-fg-primary text-sm">Current page ({currentPage})</span>
+              <span className="text-fg-primary text-sm">
+                {translate('print.current', { params: { currentPage } })}
+              </span>
             </label>
 
             <label className="flex items-start">
@@ -138,10 +144,12 @@ export function PrintModal({ documentId, isOpen, onClose, onExited }: PrintModal
                 className="accent-accent mr-2 mt-0.5"
               />
               <div className="flex-1">
-                <span className="text-fg-primary mb-1 block text-sm">Specify pages</span>
+                <span className="text-fg-primary mb-1 block text-sm">
+                  {translate('print.specify')}
+                </span>
                 <input
                   type="text"
-                  placeholder="e.g., 1-3, 5, 8-10"
+                  placeholder={translate('print.specifyEG')}
                   value={customPages}
                   onInput={(e) => setCustomPages((e.target as HTMLInputElement).value)}
                   disabled={selection !== 'custom' || isLoading}
@@ -153,7 +161,7 @@ export function PrintModal({ documentId, isOpen, onClose, onExited }: PrintModal
                 />
                 {selection === 'custom' && customPages.trim() && totalPages > 0 && (
                   <p className="text-fg-muted mt-1 text-xs">
-                    Total pages in document: {totalPages}
+                    {translate('print.current', { params: { totalPages } })}
                   </p>
                 )}
               </div>
@@ -171,7 +179,9 @@ export function PrintModal({ documentId, isOpen, onClose, onExited }: PrintModal
               disabled={isLoading}
               className="accent-accent mr-2"
             />
-            <span className="text-fg-secondary text-sm font-medium">Include annotations</span>
+            <span className="text-fg-secondary text-sm font-medium">
+              {translate('print.annotation')}
+            </span>
           </label>
         </div>
 
@@ -190,7 +200,7 @@ export function PrintModal({ documentId, isOpen, onClose, onExited }: PrintModal
             disabled={isLoading}
             className="border-border-default bg-bg-surface text-fg-secondary hover:bg-interactive-hover rounded-md border px-4 py-2 text-sm disabled:cursor-not-allowed disabled:opacity-50"
           >
-            Cancel
+            {translate('print.cancel')}
           </Button>
           <Button
             onClick={handlePrint}
@@ -198,7 +208,7 @@ export function PrintModal({ documentId, isOpen, onClose, onExited }: PrintModal
             className="bg-accent text-fg-on-accent hover:!bg-accent-hover flex items-center space-x-2 rounded-md border border-transparent px-4 py-2 text-sm disabled:cursor-not-allowed disabled:opacity-50"
           >
             {isLoading && <Spinner size="sm" />}
-            <span>{isLoading ? 'Printing...' : 'Print'}</span>
+            <span>{isLoading ? translate('print.printing') : translate('print.print')}</span>
           </Button>
         </div>
       </div>

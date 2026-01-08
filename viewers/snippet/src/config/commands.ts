@@ -453,6 +453,22 @@ export const commands: Record<string, Command<State>> = {
     },
   },
 
+  'document:capture': {
+    id: 'document:capture',
+    labelKey: 'capture.screenshot',
+    icon: 'screenshot',
+    categories: ['document', 'document-capture'],
+    action: ({ registry, documentId }) => {
+      const capture = registry.getPlugin<CapturePlugin>('capture')?.provides();
+      capture?.forDocument(documentId).toggleMarqueeCapture();
+    },
+    active: ({ state, documentId }) => {
+      return (
+        state.plugins['interaction-manager']?.documents[documentId]?.activeMode === 'marqueeCapture'
+      );
+    },
+  },
+
   'document:fullscreen': {
     id: 'document:fullscreen',
     labelKey: 'document.fullscreen',
