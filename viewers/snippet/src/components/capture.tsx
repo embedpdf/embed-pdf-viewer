@@ -3,14 +3,26 @@ import { useCaptureCapability } from '@embedpdf/plugin-capture/preact';
 import { useState, useRef, useEffect } from 'preact/hooks';
 import { Dialog } from './ui/dialog';
 import { Button } from './ui/button';
+import { useTranslations } from '@embedpdf/plugin-i18n/preact';
 
-interface CaptureData {
+export interface CaptureData {
   pageIndex: number;
   rect: any;
   blob: Blob;
 }
 
-export function Capture() {
+export interface CaptureExtAction {
+  id?: string;
+  onClick?: (captureData?: CaptureData | null) => void;
+  label?: string;
+}
+
+export interface CaptureProps {
+  documentId: string;
+  captureExtActions?: CaptureExtAction[];
+}
+
+export function Capture({documentId, captureExtActions}: CaptureProps) {
   const { provides: capture } = useCaptureCapability();
   const [open, setOpen] = useState(false);
   const [captureData, setCaptureData] = useState<CaptureData | null>(null);
@@ -18,6 +30,7 @@ export function Capture() {
   const [downloadUrl, setDownloadUrl] = useState<string | null>(null);
   const urlRef = useRef<string | null>(null);
   const downloadLinkRef = useRef<HTMLAnchorElement>(null);
+  const {translate} = useTranslations(documentId);
 
   const handleClose = () => {
     // Clean up object URLs
@@ -73,7 +86,7 @@ export function Capture() {
 
   return (
     <>
-      <Dialog open={open} onClose={handleClose} title="Capture PDF Area">
+      <Dialog open={open} onClose={handleClose} width='48rem' title={translate('capture.title')}>
         <div className="space-y-6">
           <div className="flex justify-center">
             {previewUrl && (
@@ -91,20 +104,33 @@ export function Capture() {
               />
             )}
           </div>
-          <div className="flex justify-end space-x-3 border-t border-gray-200 pt-4">
+          <div className="border-border-subtle flex justify-end space-x-3 border-t pt-4">
             <Button
               onClick={handleClose}
-              className="rounded-md border border-gray-300 bg-white px-4 py-2 text-sm text-gray-700 hover:bg-gray-50"
+              className="border-border-default bg-bg-surface text-fg-secondary hover:bg-interactive-hover rounded-md border px-4 py-2 text-sm disabled:cursor-not-allowed disabled:opacity-50"
             >
-              Cancel
+              {translate('capture.cancel')}
             </Button>
             <Button
               onClick={handleDownload}
               disabled={!captureData}
-              className="rounded-md border border-transparent bg-blue-600 px-4 py-2 text-sm text-white hover:!bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
+              className="bg-accent text-fg-on-accent hover:!bg-accent-hover flex items-center space-x-2 rounded-md border border-transparent px-4 py-2 text-sm disabled:cursor-not-allowed disabled:opacity-50"
             >
-              Download
+              {translate('capture.download')}
             </Button>
+            {
+              captureExtActions?.map((action) => (
+                <Button
+                  onClick={async () => {
+                    action.onClick && (await action.onClick(captureData))
+                    handleClose();
+                  }}
+                  className="border-border-default bg-bg-surface text-fg-secondary hover:bg-interactive-hover rounded-md border px-4 py-2 text-sm disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  {action.label}
+                </Button>
+              ))
+            }
           </div>
         </div>
       </Dialog>

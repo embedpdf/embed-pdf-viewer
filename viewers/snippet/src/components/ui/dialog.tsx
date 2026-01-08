@@ -21,6 +21,8 @@ export interface DialogProps {
   showCloseButton?: boolean;
   /** Maximum width of the dialog */
   maxWidth?: string;
+  /** width of the dialog */
+  width?: string;
 }
 
 export function Dialog({
@@ -32,6 +34,7 @@ export function Dialog({
   className,
   showCloseButton = true,
   maxWidth = '32rem',
+  width,
 }: DialogProps) {
   const overlayRef = useRef<HTMLDivElement>(null);
   const [shouldRender, setShouldRender] = useState(open);
@@ -104,6 +107,7 @@ export function Dialog({
         className={`bg-bg-surface md:border-border-subtle relative flex h-full w-full flex-col transition-all duration-200 md:h-auto md:w-[28rem] md:max-w-[90vw] md:rounded-lg md:border md:shadow-lg ${
           isAnimating && open ? 'scale-100 opacity-100' : 'scale-95 opacity-0'
         } ${className}`}
+        style={`${width ? 'width:' + width : ''}`}
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
