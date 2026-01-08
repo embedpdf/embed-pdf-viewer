@@ -56,6 +56,7 @@ export class DocumentManagerPlugin extends BasePlugin<
   }>();
 
   private maxDocuments?: number;
+  private defaultReadOnly?: boolean;
 
   private loadOptions = new Map<string, LoadDocumentUrlOptions | LoadDocumentBufferOptions>();
 
@@ -66,6 +67,7 @@ export class DocumentManagerPlugin extends BasePlugin<
   ) {
     super(id, registry);
     this.maxDocuments = config?.maxDocuments;
+    this.defaultReadOnly = config?.readOnly;
   }
 
   protected buildCapability(): DocumentManagerCapability {
@@ -238,6 +240,8 @@ export class DocumentManagerPlugin extends BasePlugin<
     }
 
     const documentName = options.name ?? this.extractNameFromUrl(options.url);
+    // Use document-specific readOnly if provided, otherwise fall back to config-level default
+    const readOnly = options.readOnly ?? this.defaultReadOnly;
 
     // Store options for potential retry
     this.loadOptions.set(documentId, options);
@@ -250,7 +254,7 @@ export class DocumentManagerPlugin extends BasePlugin<
         options.rotation,
         !!options.password,
         options.autoActivate,
-        options.readOnly,
+        readOnly,
       ),
     );
 
@@ -295,6 +299,8 @@ export class DocumentManagerPlugin extends BasePlugin<
     }
 
     const documentId = options.documentId || this.generateDocumentId();
+    // Use document-specific readOnly if provided, otherwise fall back to config-level default
+    const readOnly = options.readOnly ?? this.defaultReadOnly;
 
     // Store options for potential retry
     this.loadOptions.set(documentId, options);
@@ -307,7 +313,7 @@ export class DocumentManagerPlugin extends BasePlugin<
         options.rotation,
         !!options.password,
         options.autoActivate,
-        options.readOnly,
+        readOnly,
       ),
     );
 

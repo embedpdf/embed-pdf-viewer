@@ -12,6 +12,7 @@ export type InitialDocumentOptions = LoadDocumentUrlOptions | LoadDocumentBuffer
 export interface DocumentManagerPluginConfig extends BasePluginConfig {
   maxDocuments?: number;
   initialDocuments?: InitialDocumentOptions[];
+  readOnly?: boolean; // If true, all documents are opened in read-only mode by default. Can be overridden per-document.
 }
 
 export interface DocumentChangeEvent {
@@ -67,6 +68,7 @@ export interface OpenFileDialogOptions {
   scale?: number;
   rotation?: Rotation;
   autoActivate?: boolean;
+  readOnly?: boolean; // Override config-level readOnly for this specific file dialog
 }
 
 export interface OpenDocumentResponse {
