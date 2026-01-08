@@ -963,6 +963,12 @@ export const viewerUISchema: UISchema = {
         },
         {
           type: 'command',
+          id: 'document:capture',
+          commandId: 'document:capture',
+          categories: ['document', 'document-capture'],
+        },
+        {
+          type: 'command',
           id: 'document:export',
           commandId: 'document:export',
           categories: ['document', 'document-export'],
@@ -971,7 +977,7 @@ export const viewerUISchema: UISchema = {
           type: 'divider',
           id: 'divider-11',
           visibilityDependsOn: {
-            itemIds: ['document:export', 'document:print'],
+            itemIds: ['document:export', 'document:print', 'document:capture'],
           },
         },
         {

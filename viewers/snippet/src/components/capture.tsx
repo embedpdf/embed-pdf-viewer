@@ -11,18 +11,11 @@ export interface CaptureData {
   blob: Blob;
 }
 
-export interface CaptureExtAction {
-  id?: string;
-  onClick?: (captureData?: CaptureData | null) => void;
-  label?: string;
-}
-
 export interface CaptureProps {
   documentId: string;
-  captureExtActions?: CaptureExtAction[];
 }
 
-export function Capture({documentId, captureExtActions}: CaptureProps) {
+export function Capture({ documentId }: CaptureProps) {
   const { provides: capture } = useCaptureCapability();
   const [open, setOpen] = useState(false);
   const [captureData, setCaptureData] = useState<CaptureData | null>(null);
@@ -30,7 +23,7 @@ export function Capture({documentId, captureExtActions}: CaptureProps) {
   const [downloadUrl, setDownloadUrl] = useState<string | null>(null);
   const urlRef = useRef<string | null>(null);
   const downloadLinkRef = useRef<HTMLAnchorElement>(null);
-  const {translate} = useTranslations(documentId);
+  const { translate } = useTranslations(documentId);
 
   const handleClose = () => {
     // Clean up object URLs
@@ -86,7 +79,7 @@ export function Capture({documentId, captureExtActions}: CaptureProps) {
 
   return (
     <>
-      <Dialog open={open} onClose={handleClose} width='48rem' title={translate('capture.title')}>
+      <Dialog open={open} onClose={handleClose} width="48rem" title={translate('capture.title')}>
         <div className="space-y-6">
           <div className="flex justify-center">
             {previewUrl && (
@@ -118,19 +111,6 @@ export function Capture({documentId, captureExtActions}: CaptureProps) {
             >
               {translate('capture.download')}
             </Button>
-            {
-              captureExtActions?.map((action) => (
-                <Button
-                  onClick={async () => {
-                    action.onClick && (await action.onClick(captureData))
-                    handleClose();
-                  }}
-                  className="border-border-default bg-bg-surface text-fg-secondary hover:bg-interactive-hover rounded-md border px-4 py-2 text-sm disabled:cursor-not-allowed disabled:opacity-50"
-                >
-                  {action.label}
-                </Button>
-              ))
-            }
           </div>
         </div>
       </Dialog>

@@ -136,7 +136,7 @@ import { TabBar, TabBarVisibility } from '@/components/tab-bar';
 import { EmptyState } from '@/components/empty-state';
 import { DocumentPasswordPrompt } from '@/components/document-password-prompt';
 import { ModeSelectButton } from './mode-select-button';
-import { Capture, CaptureExtAction } from '@/components/capture';
+import { Capture } from '@/components/capture';
 
 // ============================================================================
 // Main Configuration Interface - Uses actual plugin config types directly
@@ -255,9 +255,6 @@ export interface PDFViewerConfig {
   history?: Partial<HistoryPluginConfig>;
   /** Interaction manager options (exclusionRules) */
   interactionManager?: Partial<InteractionManagerPluginConfig>;
-
-  /** Capture ext actions */
-  captureExtActions?: CaptureExtAction[];
 }
 
 // Default configurations for all plugins
@@ -310,9 +307,6 @@ const DEFAULTS = {
   // Infrastructure
   history: {} as HistoryPluginConfig,
   interactionManager: {} as InteractionManagerPluginConfig,
-
-  // Capture ext actions
-  captureExtActions: []
 };
 
 // Props for the PDFViewer Component
@@ -605,7 +599,7 @@ export function PDFViewer({ config, onRegistryReady }: PDFViewerProps) {
                     className="relative flex h-full w-full select-none flex-col"
                   >
                     <ViewerLayout documentId={activeDocumentId} tabBarVisibility={config.tabBar} />
-                    <Capture documentId={activeDocumentId} captureExtActions={config.captureExtActions} />
+                    <Capture documentId={activeDocumentId} />
                     <HintLayer documentId={activeDocumentId} />
                   </UIProvider>
                 ) : (
