@@ -79,7 +79,12 @@ export function Capture({ documentId }: CaptureProps) {
 
   return (
     <>
-      <Dialog open={open} onClose={handleClose} width="48rem" title={translate('capture.title')}>
+      <Dialog
+        open={open}
+        onClose={handleClose}
+        title={translate('capture.title')}
+        className="md:w-[48rem]"
+      >
         <div className="space-y-6">
           <div className="flex justify-center">
             {previewUrl && (

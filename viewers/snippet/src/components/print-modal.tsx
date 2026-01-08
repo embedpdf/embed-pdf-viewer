@@ -96,12 +96,14 @@ export function PrintModal({ documentId, isOpen, onClose, onExited }: PrintModal
       title={translate('print.title')}
       onClose={onClose}
       onExited={onExited}
-      maxWidth="32rem"
+      className="md:w-[32rem]"
     >
       <div className="space-y-6">
         {/* Pages to print */}
         <div>
-          <label className="text-fg-secondary mb-3 block text-sm font-medium">{translate('print.pages')}</label>
+          <label className="text-fg-secondary mb-3 block text-sm font-medium">
+            {translate('print.pages')}
+          </label>
           <div className="space-y-2">
             <label className="flex items-center">
               <input
@@ -126,7 +128,9 @@ export function PrintModal({ documentId, isOpen, onClose, onExited }: PrintModal
                 disabled={isLoading}
                 className="accent-accent mr-2"
               />
-              <span className="text-fg-primary text-sm">{translate('print.current', {params: {currentPage}})}</span>
+              <span className="text-fg-primary text-sm">
+                {translate('print.current', { params: { currentPage } })}
+              </span>
             </label>
 
             <label className="flex items-start">
@@ -140,7 +144,9 @@ export function PrintModal({ documentId, isOpen, onClose, onExited }: PrintModal
                 className="accent-accent mr-2 mt-0.5"
               />
               <div className="flex-1">
-                <span className="text-fg-primary mb-1 block text-sm">{translate('print.specify')}</span>
+                <span className="text-fg-primary mb-1 block text-sm">
+                  {translate('print.specify')}
+                </span>
                 <input
                   type="text"
                   placeholder={translate('print.specifyEG')}
@@ -155,7 +161,7 @@ export function PrintModal({ documentId, isOpen, onClose, onExited }: PrintModal
                 />
                 {selection === 'custom' && customPages.trim() && totalPages > 0 && (
                   <p className="text-fg-muted mt-1 text-xs">
-                    {translate('print.current', {params: {totalPages}})}
+                    {translate('print.current', { params: { totalPages } })}
                   </p>
                 )}
               </div>
@@ -173,7 +179,9 @@ export function PrintModal({ documentId, isOpen, onClose, onExited }: PrintModal
               disabled={isLoading}
               className="accent-accent mr-2"
             />
-            <span className="text-fg-secondary text-sm font-medium">{translate('print.annotation')}</span>
+            <span className="text-fg-secondary text-sm font-medium">
+              {translate('print.annotation')}
+            </span>
           </label>
         </div>
 
