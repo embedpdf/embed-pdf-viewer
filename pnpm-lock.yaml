@@ -1258,6 +1258,40 @@ importers:
         specifier: ^5.0.0
         version: 5.9.3
 
+  packages/plugin-edit:
+    dependencies:
+      '@embedpdf/models':
+        specifier: workspace:*
+        version: link:../models
+      preact:
+        specifier: ^10.26.4
+        version: 10.28.0
+      react:
+        specifier: '>=16.8.0'
+        version: 18.3.1
+      react-dom:
+        specifier: '>=16.8.0'
+        version: 18.3.1(react@18.3.1)
+      svelte:
+        specifier: '>=5 <6'
+        version: 5.46.0
+      vue:
+        specifier: '>=3.2.0'
+        version: 3.5.26(typescript@5.9.3)
+    devDependencies:
+      '@embedpdf/build':
+        specifier: workspace:*
+        version: link:../build
+      '@embedpdf/core':
+        specifier: workspace:*
+        version: link:../core
+      '@types/react':
+        specifier: ^18.2.0
+        version: 18.3.27
+      typescript:
+        specifier: ^5.0.0
+        version: 5.9.3
+
   packages/plugin-export:
     dependencies:
       '@embedpdf/models':
@@ -2116,6 +2150,9 @@ importers:
       '@embedpdf/plugin-document-manager':
         specifier: workspace:*
         version: link:../../packages/plugin-document-manager
+      '@embedpdf/plugin-edit':
+        specifier: workspace:*
+        version: link:../../packages/plugin-edit
       '@embedpdf/plugin-export':
         specifier: workspace:*
         version: link:../../packages/plugin-export

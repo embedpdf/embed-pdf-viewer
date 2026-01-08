@@ -37,6 +37,15 @@ import {
   serializeLogger,
   IPdfiumExecutor,
   ImageDataLike,
+  PdfTextBlock,
+  PdfTextBlockDetectionOptions,
+  PdfRenderTextBlockOptions,
+  PdfRenderDebugOverlayOptions,
+  PdfLayoutSummary,
+  PdfWord,
+  PdfLine,
+  PdfColumn,
+  PdfTable,
 } from '@embedpdf/models';
 import type { WorkerRequest, WorkerResponse } from './pdfium-native-runner';
 import type { FontFallbackConfig } from '../pdfium/font-fallback';
@@ -106,7 +115,18 @@ type MessageType =
   | 'preparePrintDocument'
   | 'saveAsCopy'
   | 'closeDocument'
-  | 'closeAllDocuments';
+  | 'closeAllDocuments'
+  | 'detectTextBlocks'
+  | 'invalidateTextBlocks'
+  | 'getTextBlocks'
+  | 'renderPageBackgroundRaw'
+  | 'renderTextBlockRaw'
+  | 'renderLayoutDebugOverlayRaw'
+  | 'getLayoutSummary'
+  | 'getWords'
+  | 'getLines'
+  | 'getColumns'
+  | 'getTables';
 
 /**
  * RemoteExecutor - Proxy for worker communication
@@ -501,5 +521,70 @@ export class RemoteExecutor implements IPdfiumExecutor {
 
   closeAllDocuments(): PdfTask<boolean> {
     return this.send<boolean>('closeAllDocuments', []);
+  }
+
+  // ═══════════════════════════════════════════════════════
+  // Text Block Detection (Content Editing Phase 1)
+  // ═══════════════════════════════════════════════════════
+
+  detectTextBlocks(
+    doc: PdfDocumentObject,
+    page: PdfPageObject,
+    options?: PdfTextBlockDetectionOptions,
+  ): PdfTask<boolean> {
+    return this.send<boolean>('detectTextBlocks', [doc, page, options]);
+  }
+
+  invalidateTextBlocks(doc: PdfDocumentObject, page: PdfPageObject): PdfTask<boolean> {
+    return this.send<boolean>('invalidateTextBlocks', [doc, page]);
+  }
+
+  getTextBlocks(doc: PdfDocumentObject, page: PdfPageObject): PdfTask<PdfTextBlock[]> {
+    return this.send<PdfTextBlock[]>('getTextBlocks', [doc, page]);
+  }
+
+  renderPageBackgroundRaw(
+    doc: PdfDocumentObject,
+    page: PdfPageObject,
+    options?: PdfRenderPageOptions,
+  ): PdfTask<ImageDataLike> {
+    return this.send<ImageDataLike>('renderPageBackgroundRaw', [doc, page, options]);
+  }
+
+  renderTextBlockRaw(
+    doc: PdfDocumentObject,
+    page: PdfPageObject,
+    blockIndex: number,
+    options?: PdfRenderTextBlockOptions,
+  ): PdfTask<ImageDataLike> {
+    return this.send<ImageDataLike>('renderTextBlockRaw', [doc, page, blockIndex, options]);
+  }
+
+  renderLayoutDebugOverlayRaw(
+    doc: PdfDocumentObject,
+    page: PdfPageObject,
+    options?: PdfRenderDebugOverlayOptions,
+  ): PdfTask<ImageDataLike> {
+    return this.send<ImageDataLike>('renderLayoutDebugOverlayRaw', [doc, page, options]);
+  }
+
+  getLayoutSummary(doc: PdfDocumentObject, page: PdfPageObject): PdfTask<PdfLayoutSummary> {
+    return this.send<PdfLayoutSummary>('getLayoutSummary', [doc, page]);
+  }
+
+  getWords(doc: PdfDocumentObject, page: PdfPageObject): PdfTask<PdfWord[]> {
+    return this.send<PdfWord[]>('getWords', [doc, page]);
+  }
+
+  getLines(doc: PdfDocumentObject, page: PdfPageObject): PdfTask<PdfLine[]> {
+    return this.send<PdfLine[]>('getLines', [doc, page]);
+  }
+
+  getColumns(doc: PdfDocumentObject, page: PdfPageObject): PdfTask<PdfColumn[]> {
+    return this.send<PdfColumn[]>('getColumns', [doc, page]);
+  }
+
+  getTables(doc: PdfDocumentObject, page: PdfPageObject): PdfTask<PdfTable[]> {
+    return this.send<PdfTable[]>('getTables', [doc, page]);
   }
 }

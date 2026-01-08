@@ -111,6 +111,17 @@ import {
   PdfTrappedStatus,
   PdfStampFit,
   PdfAddAttachmentParams,
+  PdfTextBlock,
+  PdfTextBlockType,
+  PdfTextBlockDetectionOptions,
+  PdfRenderTextBlockOptions,
+  PdfRenderDebugOverlayOptions,
+  PdfLayoutSummary,
+  PdfAdaptiveParams,
+  PdfWord,
+  PdfLine,
+  PdfColumn,
+  PdfTable,
 } from '@embedpdf/models';
 import { computeFormDrawParams, isValidCustomKey, readArrayBuffer, readString } from './helper';
 import { WrappedPdfiumModule } from '@embedpdf/pdfium';
@@ -7917,6 +7928,914 @@ export class PdfiumNative implements IPdfiumExecutor {
     } catch (error) {
       this.logger.error(LOG_SOURCE, LOG_CATEGORY, `Error sanitizing page range: ${error}`);
       return null; // Fallback to all pages
+    }
+  }
+
+  // ═══════════════════════════════════════════════════════
+  // Text Block Detection (Content Editing Phase 1)
+  // ═══════════════════════════════════════════════════════
+
+  /**
+   * Detect text blocks on a page
+   */
+  detectTextBlocks(
+    doc: PdfDocumentObject,
+    page: PdfPageObject,
+    options?: PdfTextBlockDetectionOptions,
+  ): PdfTask<boolean> {
+    this.logger.debug(LOG_SOURCE, LOG_CATEGORY, 'detectTextBlocks', doc.id, page.index);
+    this.logger.perf(
+      LOG_SOURCE,
+      LOG_CATEGORY,
+      'DetectTextBlocks',
+      'Begin',
+      `${doc.id}-${page.index}`,
+    );
+
+    const ctx = this.cache.getContext(doc.id);
+    if (!ctx) {
+      this.logger.perf(
+        LOG_SOURCE,
+        LOG_CATEGORY,
+        'DetectTextBlocks',
+        'End',
+        `${doc.id}-${page.index}`,
+      );
+      return PdfTaskHelper.reject({
+        code: PdfErrorCode.DocNotOpen,
+        message: 'Document is not open',
+      });
+    }
+
+    const pageCtx = ctx.acquirePage(page.index);
+    try {
+      const flags = options?.flags ?? 0;
+      const result = this.pdfiumModule.EPDFPage_DetectTextBlocks(pageCtx.pagePtr, flags);
+      this.logger.perf(
+        LOG_SOURCE,
+        LOG_CATEGORY,
+        'DetectTextBlocks',
+        'End',
+        `${doc.id}-${page.index}`,
+      );
+      return PdfTaskHelper.resolve(result);
+    } catch (error) {
+      this.logger.perf(
+        LOG_SOURCE,
+        LOG_CATEGORY,
+        'DetectTextBlocks',
+        'End',
+        `${doc.id}-${page.index}`,
+      );
+      return PdfTaskHelper.reject({
+        code: PdfErrorCode.Unknown,
+        message: `Failed to detect text blocks: ${error}`,
+      });
+    } finally {
+      pageCtx.release();
+    }
+  }
+
+  /**
+   * Invalidate cached text block detection results
+   */
+  invalidateTextBlocks(doc: PdfDocumentObject, page: PdfPageObject): PdfTask<boolean> {
+    this.logger.debug(LOG_SOURCE, LOG_CATEGORY, 'invalidateTextBlocks', doc.id, page.index);
+
+    const ctx = this.cache.getContext(doc.id);
+    if (!ctx) {
+      return PdfTaskHelper.reject({
+        code: PdfErrorCode.DocNotOpen,
+        message: 'Document is not open',
+      });
+    }
+
+    const pageCtx = ctx.acquirePage(page.index);
+    try {
+      this.pdfiumModule.EPDFPage_InvalidateTextBlocks(pageCtx.pagePtr);
+      return PdfTaskHelper.resolve(true);
+    } catch (error) {
+      return PdfTaskHelper.reject({
+        code: PdfErrorCode.Unknown,
+        message: `Failed to invalidate text blocks: ${error}`,
+      });
+    } finally {
+      pageCtx.release();
+    }
+  }
+
+  /**
+   * Get all detected text blocks on a page
+   */
+  getTextBlocks(doc: PdfDocumentObject, page: PdfPageObject): PdfTask<PdfTextBlock[]> {
+    this.logger.debug(LOG_SOURCE, LOG_CATEGORY, 'getTextBlocks', doc.id, page.index);
+    this.logger.perf(LOG_SOURCE, LOG_CATEGORY, 'GetTextBlocks', 'Begin', `${doc.id}-${page.index}`);
+
+    const ctx = this.cache.getContext(doc.id);
+    if (!ctx) {
+      this.logger.perf(LOG_SOURCE, LOG_CATEGORY, 'GetTextBlocks', 'End', `${doc.id}-${page.index}`);
+      return PdfTaskHelper.reject({
+        code: PdfErrorCode.DocNotOpen,
+        message: 'Document is not open',
+      });
+    }
+
+    const pageCtx = ctx.acquirePage(page.index);
+
+    // Allocate memory for bounds (FS_RECTF: 4 floats = 16 bytes)
+    const boundsPtr = this.memoryManager.malloc(16);
+
+    try {
+      const count = this.pdfiumModule.EPDFPage_GetTextBlockCount(pageCtx.pagePtr);
+      if (count < 0) {
+        this.memoryManager.free(boundsPtr);
+        this.logger.perf(
+          LOG_SOURCE,
+          LOG_CATEGORY,
+          'GetTextBlocks',
+          'End',
+          `${doc.id}-${page.index}`,
+        );
+        return PdfTaskHelper.reject({
+          code: PdfErrorCode.Unknown,
+          message: 'Text block detection not run. Call detectTextBlocks first.',
+        });
+      }
+
+      const blocks: PdfTextBlock[] = [];
+
+      for (let i = 0; i < count; i++) {
+        const type = this.pdfiumModule.EPDFPage_GetTextBlockType(pageCtx.pagePtr, i);
+
+        // Get ink bounds
+        const hasInkBounds = this.pdfiumModule.EPDFPage_GetTextBlockInkBounds(
+          pageCtx.pagePtr,
+          i,
+          boundsPtr,
+        );
+
+        let inkBounds: Rect = { origin: { x: 0, y: 0 }, size: { width: 0, height: 0 } };
+        if (hasInkBounds) {
+          // FS_RECTF struct layout: { left, top, right, bottom }
+          const left = this.pdfiumModule.pdfium.getValue(boundsPtr, 'float');
+          const top = this.pdfiumModule.pdfium.getValue(boundsPtr + 4, 'float');
+          const right = this.pdfiumModule.pdfium.getValue(boundsPtr + 8, 'float');
+          const bottom = this.pdfiumModule.pdfium.getValue(boundsPtr + 12, 'float');
+          // Convert from PDF page coordinates to device coordinates (same pattern as annotations)
+          inkBounds = this.convertPageRectToDeviceRect(page, { left, top, right, bottom });
+        }
+
+        // Get layout bounds
+        const hasLayoutBounds = this.pdfiumModule.EPDFPage_GetTextBlockLayoutBounds(
+          pageCtx.pagePtr,
+          i,
+          boundsPtr,
+        );
+
+        let layoutBounds: Rect = inkBounds;
+        if (hasLayoutBounds) {
+          // FS_RECTF struct layout: { left, top, right, bottom }
+          const left = this.pdfiumModule.pdfium.getValue(boundsPtr, 'float');
+          const top = this.pdfiumModule.pdfium.getValue(boundsPtr + 4, 'float');
+          const right = this.pdfiumModule.pdfium.getValue(boundsPtr + 8, 'float');
+          const bottom = this.pdfiumModule.pdfium.getValue(boundsPtr + 12, 'float');
+          // Convert from PDF page coordinates to device coordinates (same pattern as annotations)
+          layoutBounds = this.convertPageRectToDeviceRect(page, { left, top, right, bottom });
+        }
+
+        // Get text content - first call with null buffer to get required size
+        const textSize = this.pdfiumModule.EPDFPage_GetTextBlockText(pageCtx.pagePtr, i, 0, 0);
+        let text = '';
+        if (textSize > 0) {
+          // UTF-16: 2 bytes per char
+          const textBufferSize = textSize * 2;
+          const textPtr = this.memoryManager.malloc(textBufferSize);
+          try {
+            this.pdfiumModule.EPDFPage_GetTextBlockText(pageCtx.pagePtr, i, textPtr, textSize);
+            text = this.pdfiumModule.pdfium.UTF16ToString(textPtr);
+          } finally {
+            this.memoryManager.free(textPtr);
+          }
+        }
+
+        blocks.push({
+          index: i,
+          type: type as PdfTextBlockType,
+          inkBounds,
+          layoutBounds,
+          text,
+        });
+      }
+
+      this.logger.perf(LOG_SOURCE, LOG_CATEGORY, 'GetTextBlocks', 'End', `${doc.id}-${page.index}`);
+      return PdfTaskHelper.resolve(blocks);
+    } catch (error) {
+      this.logger.perf(LOG_SOURCE, LOG_CATEGORY, 'GetTextBlocks', 'End', `${doc.id}-${page.index}`);
+      return PdfTaskHelper.reject({
+        code: PdfErrorCode.Unknown,
+        message: `Failed to get text blocks: ${error}`,
+      });
+    } finally {
+      this.memoryManager.free(boundsPtr);
+      pageCtx.release();
+    }
+  }
+
+  /**
+   * Render page background excluding detected text blocks
+   */
+  renderPageBackgroundRaw(
+    doc: PdfDocumentObject,
+    page: PdfPageObject,
+    options?: PdfRenderPageOptions,
+  ): PdfTask<ImageDataLike> {
+    this.logger.debug(LOG_SOURCE, LOG_CATEGORY, 'renderPageBackgroundRaw', doc.id, page.index);
+    this.logger.perf(
+      LOG_SOURCE,
+      LOG_CATEGORY,
+      'RenderPageBackgroundRaw',
+      'Begin',
+      `${doc.id}-${page.index}`,
+    );
+
+    const ctx = this.cache.getContext(doc.id);
+    if (!ctx) {
+      this.logger.perf(
+        LOG_SOURCE,
+        LOG_CATEGORY,
+        'RenderPageBackgroundRaw',
+        'End',
+        `${doc.id}-${page.index}`,
+      );
+      return PdfTaskHelper.reject({
+        code: PdfErrorCode.DocNotOpen,
+        message: 'Document is not open',
+      });
+    }
+
+    const scaleFactor = options?.scaleFactor ?? 1.0;
+    const dpr = options?.dpr ?? 1.0;
+    const scale = scaleFactor * dpr;
+    const rotation = options?.rotation ?? page.rotation;
+
+    // Calculate dimensions based on rotation
+    const isRotated = rotation === 1 || rotation === 3;
+    const pageWidth = isRotated ? page.size.height : page.size.width;
+    const pageHeight = isRotated ? page.size.width : page.size.height;
+
+    const width = Math.ceil(pageWidth * scale);
+    const height = Math.ceil(pageHeight * scale);
+    const stride = width * 4;
+    const bytes = stride * height;
+
+    // Allocate BGRA bitmap buffer in WASM
+    const heapPtr = this.memoryManager.malloc(bytes);
+    const bitmapPtr = this.pdfiumModule.FPDFBitmap_CreateEx(
+      width,
+      height,
+      BitmapFormat.Bitmap_BGRA,
+      heapPtr,
+      stride,
+    );
+
+    if (!bitmapPtr) {
+      this.memoryManager.free(heapPtr);
+      this.logger.perf(
+        LOG_SOURCE,
+        LOG_CATEGORY,
+        'RenderPageBackgroundRaw',
+        'End',
+        `${doc.id}-${page.index}`,
+      );
+      return PdfTaskHelper.reject({
+        code: PdfErrorCode.Unknown,
+        message: 'Failed to create bitmap',
+      });
+    }
+
+    // White background
+    this.pdfiumModule.FPDFBitmap_FillRect(bitmapPtr, 0, 0, width, height, 0xffffffff);
+
+    // Rendering flags
+    const renderFlags =
+      (options?.withAnnotations !== false ? RenderFlag.ANNOT : 0) |
+      RenderFlag.LCD_TEXT |
+      RenderFlag.REVERSE_BYTE_ORDER;
+
+    const pageCtx = ctx.acquirePage(page.index);
+
+    try {
+      const result = this.pdfiumModule.EPDFPage_RenderBackgroundExcludingTextBlocks(
+        bitmapPtr,
+        pageCtx.pagePtr,
+        0,
+        0,
+        width,
+        height,
+        rotation,
+        renderFlags,
+      );
+
+      if (!result) {
+        this.pdfiumModule.FPDFBitmap_Destroy(bitmapPtr);
+        this.memoryManager.free(heapPtr);
+        this.logger.perf(
+          LOG_SOURCE,
+          LOG_CATEGORY,
+          'RenderPageBackgroundRaw',
+          'End',
+          `${doc.id}-${page.index}`,
+        );
+        return PdfTaskHelper.reject({
+          code: PdfErrorCode.Unknown,
+          message: 'Failed to render background. Ensure detectTextBlocks was called first.',
+        });
+      }
+    } finally {
+      pageCtx.release();
+    }
+
+    // Extract bitmap data
+    const data = new Uint8ClampedArray(
+      this.pdfiumModule.pdfium.HEAPU8.subarray(heapPtr, heapPtr + bytes),
+    );
+
+    const imageDataLike: ImageDataLike = {
+      data,
+      width,
+      height,
+    };
+
+    this.pdfiumModule.FPDFBitmap_Destroy(bitmapPtr);
+    this.memoryManager.free(heapPtr);
+
+    this.logger.perf(
+      LOG_SOURCE,
+      LOG_CATEGORY,
+      'RenderPageBackgroundRaw',
+      'End',
+      `${doc.id}-${page.index}`,
+    );
+    return PdfTaskHelper.resolve(imageDataLike);
+  }
+
+  /**
+   * Render a single text block with transparent background
+   */
+  renderTextBlockRaw(
+    doc: PdfDocumentObject,
+    page: PdfPageObject,
+    blockIndex: number,
+    options?: PdfRenderTextBlockOptions,
+  ): PdfTask<ImageDataLike> {
+    this.logger.debug(
+      LOG_SOURCE,
+      LOG_CATEGORY,
+      'renderTextBlockRaw',
+      doc.id,
+      page.index,
+      blockIndex,
+    );
+    this.logger.perf(
+      LOG_SOURCE,
+      LOG_CATEGORY,
+      'RenderTextBlockRaw',
+      'Begin',
+      `${doc.id}-${page.index}-${blockIndex}`,
+    );
+
+    const ctx = this.cache.getContext(doc.id);
+    if (!ctx) {
+      this.logger.perf(
+        LOG_SOURCE,
+        LOG_CATEGORY,
+        'RenderTextBlockRaw',
+        'End',
+        `${doc.id}-${page.index}-${blockIndex}`,
+      );
+      return PdfTaskHelper.reject({
+        code: PdfErrorCode.DocNotOpen,
+        message: 'Document is not open',
+      });
+    }
+
+    const scale = options?.scale ?? 1.0;
+    const rotation = options?.rotation ?? 0;
+    const flags = options?.flags ?? RenderFlag.LCD_TEXT | RenderFlag.REVERSE_BYTE_ORDER;
+
+    // Allocate memory for size output (2 ints = 8 bytes)
+    const sizePtr = this.memoryManager.malloc(8);
+
+    const pageCtx = ctx.acquirePage(page.index);
+
+    try {
+      const hasSize = this.pdfiumModule.EPDFPage_GetTextBlockBitmapSize(
+        pageCtx.pagePtr,
+        blockIndex,
+        scale,
+        sizePtr,
+        sizePtr + 4,
+      );
+
+      if (!hasSize) {
+        this.memoryManager.free(sizePtr);
+        this.logger.perf(
+          LOG_SOURCE,
+          LOG_CATEGORY,
+          'RenderTextBlockRaw',
+          'End',
+          `${doc.id}-${page.index}-${blockIndex}`,
+        );
+        return PdfTaskHelper.reject({
+          code: PdfErrorCode.Unknown,
+          message:
+            'Failed to get text block bitmap size. Invalid block index or detection not run.',
+        });
+      }
+
+      const width = this.pdfiumModule.pdfium.getValue(sizePtr, 'i32');
+      const height = this.pdfiumModule.pdfium.getValue(sizePtr + 4, 'i32');
+
+      this.memoryManager.free(sizePtr);
+
+      if (width <= 0 || height <= 0) {
+        // Empty block - return minimal transparent pixel
+        this.logger.perf(
+          LOG_SOURCE,
+          LOG_CATEGORY,
+          'RenderTextBlockRaw',
+          'End',
+          `${doc.id}-${page.index}-${blockIndex}`,
+        );
+        return PdfTaskHelper.resolve({
+          data: new Uint8ClampedArray(4),
+          width: 1,
+          height: 1,
+        });
+      }
+
+      const stride = width * 4;
+      const bytes = stride * height;
+
+      // Allocate BGRA bitmap buffer in WASM
+      const heapPtr = this.memoryManager.malloc(bytes);
+      const bitmapPtr = this.pdfiumModule.FPDFBitmap_CreateEx(
+        width,
+        height,
+        BitmapFormat.Bitmap_BGRA,
+        heapPtr,
+        stride,
+      );
+
+      if (!bitmapPtr) {
+        this.memoryManager.free(heapPtr);
+        this.logger.perf(
+          LOG_SOURCE,
+          LOG_CATEGORY,
+          'RenderTextBlockRaw',
+          'End',
+          `${doc.id}-${page.index}-${blockIndex}`,
+        );
+        return PdfTaskHelper.reject({
+          code: PdfErrorCode.Unknown,
+          message: 'Failed to create bitmap',
+        });
+      }
+
+      // Fill with transparent (EPDFPage_RenderTextBlockBitmap may also do this, but be safe)
+      this.pdfiumModule.FPDFBitmap_FillRect(bitmapPtr, 0, 0, width, height, 0x00000000);
+
+      const result = this.pdfiumModule.EPDFPage_RenderTextBlockBitmap(
+        bitmapPtr,
+        pageCtx.pagePtr,
+        blockIndex,
+        rotation,
+        flags,
+      );
+
+      if (!result) {
+        this.pdfiumModule.FPDFBitmap_Destroy(bitmapPtr);
+        this.memoryManager.free(heapPtr);
+        this.logger.perf(
+          LOG_SOURCE,
+          LOG_CATEGORY,
+          'RenderTextBlockRaw',
+          'End',
+          `${doc.id}-${page.index}-${blockIndex}`,
+        );
+        return PdfTaskHelper.reject({
+          code: PdfErrorCode.Unknown,
+          message: 'Failed to render text block',
+        });
+      }
+
+      // Extract bitmap data
+      const data = new Uint8ClampedArray(
+        this.pdfiumModule.pdfium.HEAPU8.subarray(heapPtr, heapPtr + bytes),
+      );
+
+      const imageDataLike: ImageDataLike = {
+        data,
+        width,
+        height,
+      };
+
+      this.pdfiumModule.FPDFBitmap_Destroy(bitmapPtr);
+      this.memoryManager.free(heapPtr);
+
+      this.logger.perf(
+        LOG_SOURCE,
+        LOG_CATEGORY,
+        'RenderTextBlockRaw',
+        'End',
+        `${doc.id}-${page.index}-${blockIndex}`,
+      );
+      return PdfTaskHelper.resolve(imageDataLike);
+    } finally {
+      pageCtx.release();
+    }
+  }
+
+  /**
+   * Render debug overlay showing layout detection results
+   */
+  renderLayoutDebugOverlayRaw(
+    doc: PdfDocumentObject,
+    page: PdfPageObject,
+    options?: PdfRenderDebugOverlayOptions,
+  ): PdfTask<ImageDataLike> {
+    this.logger.debug(LOG_SOURCE, LOG_CATEGORY, 'renderLayoutDebugOverlayRaw', doc.id, page.index);
+
+    const ctx = this.cache.getContext(doc.id);
+    if (!ctx) {
+      return PdfTaskHelper.reject({
+        code: PdfErrorCode.DocNotOpen,
+        message: 'Document is not open',
+      });
+    }
+
+    const scaleFactor = options?.scaleFactor ?? 1.0;
+    const dpr = options?.dpr ?? 1.0;
+    const scale = scaleFactor * dpr;
+    const rotation = options?.rotation ?? page.rotation;
+    const debugFlags = options?.debugFlags ?? 0x7f; // All debug elements by default
+
+    // Calculate dimensions based on rotation
+    const isRotated = rotation === 1 || rotation === 3;
+    const pageWidth = isRotated ? page.size.height : page.size.width;
+    const pageHeight = isRotated ? page.size.width : page.size.height;
+
+    const width = Math.ceil(pageWidth * scale);
+    const height = Math.ceil(pageHeight * scale);
+    const stride = width * 4;
+    const bytes = stride * height;
+
+    // Allocate BGRA bitmap buffer in WASM
+    const heapPtr = this.memoryManager.malloc(bytes);
+    const bitmapPtr = this.pdfiumModule.FPDFBitmap_CreateEx(
+      width,
+      height,
+      BitmapFormat.Bitmap_BGRA,
+      heapPtr,
+      stride,
+    );
+
+    if (!bitmapPtr) {
+      this.memoryManager.free(heapPtr);
+      return PdfTaskHelper.reject({
+        code: PdfErrorCode.Unknown,
+        message: 'Failed to create bitmap',
+      });
+    }
+
+    // Transparent background for overlay
+    this.pdfiumModule.FPDFBitmap_FillRect(bitmapPtr, 0, 0, width, height, 0x00000000);
+
+    const pageCtx = ctx.acquirePage(page.index);
+
+    try {
+      const result = this.pdfiumModule.EPDFPage_RenderLayoutDebugOverlay(
+        bitmapPtr,
+        pageCtx.pagePtr,
+        0,
+        0,
+        width,
+        height,
+        rotation,
+        debugFlags,
+      );
+
+      if (!result) {
+        this.pdfiumModule.FPDFBitmap_Destroy(bitmapPtr);
+        this.memoryManager.free(heapPtr);
+        return PdfTaskHelper.reject({
+          code: PdfErrorCode.Unknown,
+          message: 'Failed to render debug overlay. Ensure detectTextBlocks was called first.',
+        });
+      }
+    } finally {
+      pageCtx.release();
+    }
+
+    // Extract bitmap data
+    const data = new Uint8ClampedArray(
+      this.pdfiumModule.pdfium.HEAPU8.subarray(heapPtr, heapPtr + bytes),
+    );
+
+    const imageDataLike: ImageDataLike = {
+      data,
+      width,
+      height,
+    };
+
+    this.pdfiumModule.FPDFBitmap_Destroy(bitmapPtr);
+    this.memoryManager.free(heapPtr);
+
+    return PdfTaskHelper.resolve(imageDataLike);
+  }
+
+  /**
+   * Get layout detection summary for a page
+   */
+  getLayoutSummary(doc: PdfDocumentObject, page: PdfPageObject): PdfTask<PdfLayoutSummary> {
+    this.logger.debug(LOG_SOURCE, LOG_CATEGORY, 'getLayoutSummary', doc.id, page.index);
+
+    const ctx = this.cache.getContext(doc.id);
+    if (!ctx) {
+      return PdfTaskHelper.reject({
+        code: PdfErrorCode.DocNotOpen,
+        message: 'Document is not open',
+      });
+    }
+
+    const pageCtx = ctx.acquirePage(page.index);
+
+    // Allocate memory for adaptive params (3 floats = 12 bytes)
+    const paramsPtr = this.memoryManager.malloc(12);
+
+    try {
+      const wordCount = this.pdfiumModule.EPDFPage_GetWordCount(pageCtx.pagePtr);
+      const lineCount = this.pdfiumModule.EPDFPage_GetLineCount(pageCtx.pagePtr);
+      const columnCount = this.pdfiumModule.EPDFPage_GetColumnCount(pageCtx.pagePtr);
+      const tableCount = this.pdfiumModule.EPDFPage_GetTableCount(pageCtx.pagePtr);
+      const blockCount = this.pdfiumModule.EPDFPage_GetTextBlockCount(pageCtx.pagePtr);
+
+      // Get adaptive params
+      let adaptiveParams: PdfAdaptiveParams = {
+        medianHeight: 0,
+        medianWidth: 0,
+        baselineTolerance: 0,
+      };
+
+      const hasParams = this.pdfiumModule.EPDFPage_GetAdaptiveParams(
+        pageCtx.pagePtr,
+        paramsPtr,
+        paramsPtr + 4,
+        paramsPtr + 8,
+      );
+
+      if (hasParams) {
+        adaptiveParams = {
+          medianHeight: this.pdfiumModule.pdfium.getValue(paramsPtr, 'float'),
+          medianWidth: this.pdfiumModule.pdfium.getValue(paramsPtr + 4, 'float'),
+          baselineTolerance: this.pdfiumModule.pdfium.getValue(paramsPtr + 8, 'float'),
+        };
+      }
+
+      const summary: PdfLayoutSummary = {
+        wordCount: wordCount >= 0 ? wordCount : 0,
+        lineCount: lineCount >= 0 ? lineCount : 0,
+        columnCount: columnCount >= 0 ? columnCount : 0,
+        tableCount: tableCount >= 0 ? tableCount : 0,
+        blockCount: blockCount >= 0 ? blockCount : 0,
+        adaptiveParams,
+      };
+
+      return PdfTaskHelper.resolve(summary);
+    } finally {
+      this.memoryManager.free(paramsPtr);
+      pageCtx.release();
+    }
+  }
+
+  /**
+   * Get all detected words on a page
+   */
+  getWords(doc: PdfDocumentObject, page: PdfPageObject): PdfTask<PdfWord[]> {
+    this.logger.debug(LOG_SOURCE, LOG_CATEGORY, 'getWords', doc.id, page.index);
+
+    const ctx = this.cache.getContext(doc.id);
+    if (!ctx) {
+      return PdfTaskHelper.reject({
+        code: PdfErrorCode.DocNotOpen,
+        message: 'Document is not open',
+      });
+    }
+
+    const pageCtx = ctx.acquirePage(page.index);
+    const boundsPtr = this.memoryManager.malloc(16);
+
+    try {
+      const count = this.pdfiumModule.EPDFPage_GetWordCount(pageCtx.pagePtr);
+      if (count < 0) {
+        this.memoryManager.free(boundsPtr);
+        return PdfTaskHelper.reject({
+          code: PdfErrorCode.Unknown,
+          message: 'Text block detection not run. Call detectTextBlocks first.',
+        });
+      }
+
+      const words: PdfWord[] = [];
+
+      for (let i = 0; i < count; i++) {
+        const hasBounds = this.pdfiumModule.EPDFPage_GetWordBounds(pageCtx.pagePtr, i, boundsPtr);
+
+        if (hasBounds) {
+          const left = this.pdfiumModule.pdfium.getValue(boundsPtr, 'float');
+          const top = this.pdfiumModule.pdfium.getValue(boundsPtr + 4, 'float');
+          const right = this.pdfiumModule.pdfium.getValue(boundsPtr + 8, 'float');
+          const bottom = this.pdfiumModule.pdfium.getValue(boundsPtr + 12, 'float');
+
+          const bounds = this.convertPageRectToDeviceRect(page, { left, top, right, bottom });
+
+          words.push({
+            index: i,
+            bounds,
+          });
+        }
+      }
+
+      return PdfTaskHelper.resolve(words);
+    } finally {
+      this.memoryManager.free(boundsPtr);
+      pageCtx.release();
+    }
+  }
+
+  /**
+   * Get all detected lines on a page
+   */
+  getLines(doc: PdfDocumentObject, page: PdfPageObject): PdfTask<PdfLine[]> {
+    this.logger.debug(LOG_SOURCE, LOG_CATEGORY, 'getLines', doc.id, page.index);
+
+    const ctx = this.cache.getContext(doc.id);
+    if (!ctx) {
+      return PdfTaskHelper.reject({
+        code: PdfErrorCode.DocNotOpen,
+        message: 'Document is not open',
+      });
+    }
+
+    const pageCtx = ctx.acquirePage(page.index);
+    const boundsPtr = this.memoryManager.malloc(16);
+
+    try {
+      const count = this.pdfiumModule.EPDFPage_GetLineCount(pageCtx.pagePtr);
+      if (count < 0) {
+        this.memoryManager.free(boundsPtr);
+        return PdfTaskHelper.reject({
+          code: PdfErrorCode.Unknown,
+          message: 'Text block detection not run. Call detectTextBlocks first.',
+        });
+      }
+
+      const lines: PdfLine[] = [];
+
+      for (let i = 0; i < count; i++) {
+        const hasBounds = this.pdfiumModule.EPDFPage_GetLineBounds(pageCtx.pagePtr, i, boundsPtr);
+
+        if (hasBounds) {
+          const left = this.pdfiumModule.pdfium.getValue(boundsPtr, 'float');
+          const top = this.pdfiumModule.pdfium.getValue(boundsPtr + 4, 'float');
+          const right = this.pdfiumModule.pdfium.getValue(boundsPtr + 8, 'float');
+          const bottom = this.pdfiumModule.pdfium.getValue(boundsPtr + 12, 'float');
+
+          const bounds = this.convertPageRectToDeviceRect(page, { left, top, right, bottom });
+
+          lines.push({
+            index: i,
+            bounds,
+          });
+        }
+      }
+
+      return PdfTaskHelper.resolve(lines);
+    } finally {
+      this.memoryManager.free(boundsPtr);
+      pageCtx.release();
+    }
+  }
+
+  /**
+   * Get all detected columns on a page
+   */
+  getColumns(doc: PdfDocumentObject, page: PdfPageObject): PdfTask<PdfColumn[]> {
+    this.logger.debug(LOG_SOURCE, LOG_CATEGORY, 'getColumns', doc.id, page.index);
+
+    const ctx = this.cache.getContext(doc.id);
+    if (!ctx) {
+      return PdfTaskHelper.reject({
+        code: PdfErrorCode.DocNotOpen,
+        message: 'Document is not open',
+      });
+    }
+
+    const pageCtx = ctx.acquirePage(page.index);
+    const boundsPtr = this.memoryManager.malloc(16);
+
+    try {
+      const count = this.pdfiumModule.EPDFPage_GetColumnCount(pageCtx.pagePtr);
+      if (count < 0) {
+        this.memoryManager.free(boundsPtr);
+        return PdfTaskHelper.reject({
+          code: PdfErrorCode.Unknown,
+          message: 'Text block detection not run. Call detectTextBlocks first.',
+        });
+      }
+
+      const columns: PdfColumn[] = [];
+
+      for (let i = 0; i < count; i++) {
+        const hasBounds = this.pdfiumModule.EPDFPage_GetColumnBounds(pageCtx.pagePtr, i, boundsPtr);
+
+        if (hasBounds) {
+          const left = this.pdfiumModule.pdfium.getValue(boundsPtr, 'float');
+          const top = this.pdfiumModule.pdfium.getValue(boundsPtr + 4, 'float');
+          const right = this.pdfiumModule.pdfium.getValue(boundsPtr + 8, 'float');
+          const bottom = this.pdfiumModule.pdfium.getValue(boundsPtr + 12, 'float');
+
+          const bounds = this.convertPageRectToDeviceRect(page, { left, top, right, bottom });
+
+          columns.push({
+            index: i,
+            bounds,
+          });
+        }
+      }
+
+      return PdfTaskHelper.resolve(columns);
+    } finally {
+      this.memoryManager.free(boundsPtr);
+      pageCtx.release();
+    }
+  }
+
+  /**
+   * Get all detected tables on a page
+   */
+  getTables(doc: PdfDocumentObject, page: PdfPageObject): PdfTask<PdfTable[]> {
+    this.logger.debug(LOG_SOURCE, LOG_CATEGORY, 'getTables', doc.id, page.index);
+
+    const ctx = this.cache.getContext(doc.id);
+    if (!ctx) {
+      return PdfTaskHelper.reject({
+        code: PdfErrorCode.DocNotOpen,
+        message: 'Document is not open',
+      });
+    }
+
+    const pageCtx = ctx.acquirePage(page.index);
+    const boundsPtr = this.memoryManager.malloc(16);
+
+    try {
+      const count = this.pdfiumModule.EPDFPage_GetTableCount(pageCtx.pagePtr);
+      if (count < 0) {
+        this.memoryManager.free(boundsPtr);
+        return PdfTaskHelper.reject({
+          code: PdfErrorCode.Unknown,
+          message: 'Text block detection not run. Call detectTextBlocks first.',
+        });
+      }
+
+      const tables: PdfTable[] = [];
+
+      for (let i = 0; i < count; i++) {
+        const hasBounds = this.pdfiumModule.EPDFPage_GetTableBounds(pageCtx.pagePtr, i, boundsPtr);
+
+        if (hasBounds) {
+          const left = this.pdfiumModule.pdfium.getValue(boundsPtr, 'float');
+          const top = this.pdfiumModule.pdfium.getValue(boundsPtr + 4, 'float');
+          const right = this.pdfiumModule.pdfium.getValue(boundsPtr + 8, 'float');
+          const bottom = this.pdfiumModule.pdfium.getValue(boundsPtr + 12, 'float');
+
+          const bounds = this.convertPageRectToDeviceRect(page, { left, top, right, bottom });
+
+          const cellCount = this.pdfiumModule.EPDFPage_GetTableCellCount(pageCtx.pagePtr, i);
+
+          tables.push({
+            index: i,
+            bounds,
+            rowCount: 0, // TODO: Expose row/col count from C++ API
+            colCount: 0, // TODO: Expose row/col count from C++ API
+            cellCount: cellCount >= 0 ? cellCount : 0,
+          });
+        }
+      }
+
+      return PdfTaskHelper.resolve(tables);
+    } finally {
+      this.memoryManager.free(boundsPtr);
+      pageCtx.release();
     }
   }
 }

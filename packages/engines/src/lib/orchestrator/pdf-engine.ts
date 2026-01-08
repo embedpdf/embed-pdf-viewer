@@ -45,6 +45,15 @@ import {
   CompoundTask,
   ImageDataLike,
   IPdfiumExecutor,
+  PdfTextBlock,
+  PdfTextBlockDetectionOptions,
+  PdfRenderTextBlockOptions,
+  PdfRenderDebugOverlayOptions,
+  PdfLayoutSummary,
+  PdfWord,
+  PdfLine,
+  PdfColumn,
+  PdfTable,
 } from '@embedpdf/models';
 import { WorkerTaskQueue, Priority } from './task-queue';
 import type { ImageDataConverter } from '../converters/types';
@@ -785,6 +794,137 @@ export class PdfEngine<T = Blob> implements IPdfEngine<T> {
       {
         execute: () => this.executor.closeAllDocuments(),
         meta: { operation: 'closeAllDocuments' },
+      },
+      { priority: Priority.MEDIUM },
+    );
+  }
+
+  // ═══════════════════════════════════════════════════════
+  // Text Block Detection (Content Editing Phase 1)
+  // ═══════════════════════════════════════════════════════
+
+  detectTextBlocks(
+    doc: PdfDocumentObject,
+    page: PdfPageObject,
+    options?: PdfTextBlockDetectionOptions,
+  ): PdfTask<boolean> {
+    return this.workerQueue.enqueue(
+      {
+        execute: () => this.executor.detectTextBlocks(doc, page, options),
+        meta: { docId: doc.id, pageIndex: page.index, operation: 'detectTextBlocks' },
+      },
+      { priority: Priority.HIGH },
+    );
+  }
+
+  invalidateTextBlocks(doc: PdfDocumentObject, page: PdfPageObject): PdfTask<boolean> {
+    return this.workerQueue.enqueue(
+      {
+        execute: () => this.executor.invalidateTextBlocks(doc, page),
+        meta: { docId: doc.id, pageIndex: page.index, operation: 'invalidateTextBlocks' },
+      },
+      { priority: Priority.MEDIUM },
+    );
+  }
+
+  getTextBlocks(doc: PdfDocumentObject, page: PdfPageObject): PdfTask<PdfTextBlock[]> {
+    return this.workerQueue.enqueue(
+      {
+        execute: () => this.executor.getTextBlocks(doc, page),
+        meta: { docId: doc.id, pageIndex: page.index, operation: 'getTextBlocks' },
+      },
+      { priority: Priority.HIGH },
+    );
+  }
+
+  renderPageBackground(
+    doc: PdfDocumentObject,
+    page: PdfPageObject,
+    options?: PdfRenderPageOptions,
+  ): PdfTask<T> {
+    return this.renderWithEncoding(
+      () => this.executor.renderPageBackgroundRaw(doc, page, options),
+      options,
+      doc.id,
+      page.index,
+      Priority.CRITICAL,
+    );
+  }
+
+  renderTextBlock(
+    doc: PdfDocumentObject,
+    page: PdfPageObject,
+    blockIndex: number,
+    options?: PdfRenderTextBlockOptions,
+  ): PdfTask<T> {
+    return this.renderWithEncoding(
+      () => this.executor.renderTextBlockRaw(doc, page, blockIndex, options),
+      options,
+      doc.id,
+      page.index,
+      Priority.CRITICAL,
+    );
+  }
+
+  renderLayoutDebugOverlay(
+    doc: PdfDocumentObject,
+    page: PdfPageObject,
+    options?: PdfRenderDebugOverlayOptions,
+  ): PdfTask<T> {
+    return this.renderWithEncoding(
+      () => this.executor.renderLayoutDebugOverlayRaw(doc, page, options),
+      options,
+      doc.id,
+      page.index,
+      Priority.HIGH,
+    );
+  }
+
+  getLayoutSummary(doc: PdfDocumentObject, page: PdfPageObject): PdfTask<PdfLayoutSummary> {
+    return this.workerQueue.enqueue(
+      {
+        execute: () => this.executor.getLayoutSummary(doc, page),
+        meta: { docId: doc.id, pageIndex: page.index, operation: 'getLayoutSummary' },
+      },
+      { priority: Priority.MEDIUM },
+    );
+  }
+
+  getWords(doc: PdfDocumentObject, page: PdfPageObject): PdfTask<PdfWord[]> {
+    return this.workerQueue.enqueue(
+      {
+        execute: () => this.executor.getWords(doc, page),
+        meta: { docId: doc.id, pageIndex: page.index, operation: 'getWords' },
+      },
+      { priority: Priority.MEDIUM },
+    );
+  }
+
+  getLines(doc: PdfDocumentObject, page: PdfPageObject): PdfTask<PdfLine[]> {
+    return this.workerQueue.enqueue(
+      {
+        execute: () => this.executor.getLines(doc, page),
+        meta: { docId: doc.id, pageIndex: page.index, operation: 'getLines' },
+      },
+      { priority: Priority.MEDIUM },
+    );
+  }
+
+  getColumns(doc: PdfDocumentObject, page: PdfPageObject): PdfTask<PdfColumn[]> {
+    return this.workerQueue.enqueue(
+      {
+        execute: () => this.executor.getColumns(doc, page),
+        meta: { docId: doc.id, pageIndex: page.index, operation: 'getColumns' },
+      },
+      { priority: Priority.MEDIUM },
+    );
+  }
+
+  getTables(doc: PdfDocumentObject, page: PdfPageObject): PdfTask<PdfTable[]> {
+    return this.workerQueue.enqueue(
+      {
+        execute: () => this.executor.getTables(doc, page),
+        meta: { docId: doc.id, pageIndex: page.index, operation: 'getTables' },
       },
       { priority: Priority.MEDIUM },
     );

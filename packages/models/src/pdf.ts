@@ -2239,6 +2239,214 @@ export interface PdfGlyphObject {
   isEmpty?: boolean;
 }
 
+// ═══════════════════════════════════════════════════════
+// Text Block Detection Types (Content Editing Phase 1)
+// ═══════════════════════════════════════════════════════
+
+/**
+ * Type of detected text block
+ *
+ * @public
+ */
+export enum PdfTextBlockType {
+  /** Standard paragraph text */
+  Paragraph = 0,
+  /** Table cell (reserved for future) */
+  TableCell = 1,
+}
+
+/**
+ * Detection flags for text block detection
+ *
+ * @public
+ */
+export enum PdfTextBlockDetectionFlag {
+  /** Default detection settings */
+  Default = 0x00,
+  /** Detect ruled tables and treat cells as separate blocks */
+  DetectTables = 0x01,
+  /** More aggressive filtering of RTL/complex scripts */
+  StrictExclusions = 0x02,
+  /** Detect unruled tables (opt-in, higher false-positive risk) */
+  DetectUnruledTables = 0x04,
+  /** Use new hierarchical detection pipeline */
+  UseNewPipeline = 0x08,
+  /** Enable debug logging and merge log */
+  EnableDebug = 0x10,
+}
+
+/**
+ * Debug overlay flags for layout visualization
+ *
+ * @public
+ */
+export enum PdfLayoutDebugFlag {
+  /** Show word boundaries */
+  ShowWords = 0x01,
+  /** Show line boundaries */
+  ShowLines = 0x02,
+  /** Show column boundaries */
+  ShowColumns = 0x04,
+  /** Show gutter positions */
+  ShowGutters = 0x08,
+  /** Show table boundaries */
+  ShowTables = 0x10,
+  /** Show text block boundaries */
+  ShowBlocks = 0x20,
+  /** Show reading order markers */
+  ShowReadingOrder = 0x40,
+}
+
+/**
+ * A detected text block on a PDF page
+ *
+ * @public
+ */
+export interface PdfTextBlock {
+  /** Zero-based index of the text block */
+  index: number;
+  /** Type of the text block */
+  type: PdfTextBlockType;
+  /** Tight bounding box (ink bounds) in page coordinates */
+  inkBounds: Rect;
+  /** Layout bounds in page coordinates */
+  layoutBounds: Rect;
+  /** Text content of the block */
+  text: string;
+}
+
+/**
+ * Options for text block detection
+ *
+ * @public
+ */
+export interface PdfTextBlockDetectionOptions {
+  /** Detection flags */
+  flags?: PdfTextBlockDetectionFlag;
+}
+
+/**
+ * Options for rendering text blocks
+ *
+ * @public
+ */
+export interface PdfRenderTextBlockOptions {
+  /** Scale factor (1.0 = 72 DPI) */
+  scale?: number;
+  /** Page rotation (0, 1, 2, 3 for 0, 90, 180, 270 degrees) */
+  rotation?: Rotation;
+  /** Render flags */
+  flags?: number;
+}
+
+/**
+ * Options for rendering debug overlay
+ *
+ * @public
+ */
+export interface PdfRenderDebugOverlayOptions {
+  /** Scale factor (1.0 = 72 DPI) */
+  scaleFactor?: number;
+  /** Device pixel ratio */
+  dpr?: number;
+  /** Page rotation (0, 1, 2, 3 for 0, 90, 180, 270 degrees) */
+  rotation?: Rotation;
+  /** Debug flags - which elements to show */
+  debugFlags?: PdfLayoutDebugFlag;
+}
+
+/**
+ * A detected word on a PDF page
+ *
+ * @public
+ */
+export interface PdfWord {
+  /** Zero-based index of the word */
+  index: number;
+  /** Bounding box in page coordinates */
+  bounds: Rect;
+  /** Text content */
+  text?: string;
+}
+
+/**
+ * A detected line on a PDF page
+ *
+ * @public
+ */
+export interface PdfLine {
+  /** Zero-based index of the line */
+  index: number;
+  /** Bounding box in page coordinates */
+  bounds: Rect;
+  /** Column ID this line belongs to (-1 for spanning) */
+  columnId?: number;
+}
+
+/**
+ * A detected column on a PDF page
+ *
+ * @public
+ */
+export interface PdfColumn {
+  /** Zero-based index of the column */
+  index: number;
+  /** Bounding box in page coordinates */
+  bounds: Rect;
+}
+
+/**
+ * A detected table on a PDF page
+ *
+ * @public
+ */
+export interface PdfTable {
+  /** Zero-based index of the table */
+  index: number;
+  /** Bounding box in page coordinates */
+  bounds: Rect;
+  /** Number of rows */
+  rowCount: number;
+  /** Number of columns */
+  colCount: number;
+  /** Number of cells */
+  cellCount: number;
+}
+
+/**
+ * Adaptive parameters computed from page statistics
+ *
+ * @public
+ */
+export interface PdfAdaptiveParams {
+  /** Median glyph height in points */
+  medianHeight: number;
+  /** Median glyph width in points */
+  medianWidth: number;
+  /** Baseline tolerance in points */
+  baselineTolerance: number;
+}
+
+/**
+ * Layout detection summary for a page
+ *
+ * @public
+ */
+export interface PdfLayoutSummary {
+  /** Number of detected words */
+  wordCount: number;
+  /** Number of detected lines */
+  lineCount: number;
+  /** Number of detected columns */
+  columnCount: number;
+  /** Number of detected tables */
+  tableCount: number;
+  /** Number of detected text blocks */
+  blockCount: number;
+  /** Adaptive parameters */
+  adaptiveParams: PdfAdaptiveParams;
+}
+
 /**
  * Glyph object
  *
@@ -3023,6 +3231,120 @@ export interface PdfEngine<T = Blob> {
    * @returns task that all documents are closed or not
    */
   closeAllDocuments: () => PdfTask<boolean>;
+
+  // ═══════════════════════════════════════════════════════
+  // Text Block Detection (Content Editing Phase 1)
+  // ═══════════════════════════════════════════════════════
+
+  /**
+   * Detect text blocks on a page
+   * @param doc - PDF document
+   * @param page - PDF page
+   * @param options - Detection options
+   * @returns task that indicates whether detection succeeded
+   */
+  detectTextBlocks: (
+    doc: PdfDocumentObject,
+    page: PdfPageObject,
+    options?: PdfTextBlockDetectionOptions,
+  ) => PdfTask<boolean>;
+
+  /**
+   * Invalidate cached text block detection results
+   * @param doc - PDF document
+   * @param page - PDF page
+   * @returns task that indicates whether invalidation succeeded
+   */
+  invalidateTextBlocks: (doc: PdfDocumentObject, page: PdfPageObject) => PdfTask<boolean>;
+
+  /**
+   * Get all detected text blocks on a page
+   * @param doc - PDF document
+   * @param page - PDF page
+   * @returns task that contains the detected text blocks
+   */
+  getTextBlocks: (doc: PdfDocumentObject, page: PdfPageObject) => PdfTask<PdfTextBlock[]>;
+
+  /**
+   * Render page background excluding detected text blocks
+   * @param doc - PDF document
+   * @param page - PDF page
+   * @param options - Render options
+   * @returns task that contains the rendered image
+   */
+  renderPageBackground: (
+    doc: PdfDocumentObject,
+    page: PdfPageObject,
+    options?: PdfRenderPageOptions,
+  ) => PdfTask<T>;
+
+  /**
+   * Render a single text block with transparent background
+   * @param doc - PDF document
+   * @param page - PDF page
+   * @param blockIndex - Index of the text block to render
+   * @param options - Render options
+   * @returns task that contains the rendered image
+   */
+  renderTextBlock: (
+    doc: PdfDocumentObject,
+    page: PdfPageObject,
+    blockIndex: number,
+    options?: PdfRenderTextBlockOptions,
+  ) => PdfTask<T>;
+
+  /**
+   * Render debug overlay showing layout detection results
+   * @param doc - PDF document
+   * @param page - PDF page
+   * @param options - Render options including debug flags
+   * @returns task that contains the rendered overlay image
+   */
+  renderLayoutDebugOverlay: (
+    doc: PdfDocumentObject,
+    page: PdfPageObject,
+    options?: PdfRenderDebugOverlayOptions,
+  ) => PdfTask<T>;
+
+  /**
+   * Get layout detection summary for a page
+   * @param doc - PDF document
+   * @param page - PDF page
+   * @returns task that contains the layout summary
+   */
+  getLayoutSummary: (doc: PdfDocumentObject, page: PdfPageObject) => PdfTask<PdfLayoutSummary>;
+
+  /**
+   * Get all detected words on a page
+   * @param doc - PDF document
+   * @param page - PDF page
+   * @returns task that contains the detected words
+   */
+  getWords: (doc: PdfDocumentObject, page: PdfPageObject) => PdfTask<PdfWord[]>;
+
+  /**
+   * Get all detected lines on a page
+   * @param doc - PDF document
+   * @param page - PDF page
+   * @returns task that contains the detected lines
+   */
+  getLines: (doc: PdfDocumentObject, page: PdfPageObject) => PdfTask<PdfLine[]>;
+
+  /**
+   * Get all detected columns on a page
+   * @param doc - PDF document
+   * @param page - PDF page
+   * @returns task that contains the detected columns
+   */
+  getColumns: (doc: PdfDocumentObject, page: PdfPageObject) => PdfTask<PdfColumn[]>;
+
+  /**
+   * Get all detected tables on a page
+   * @param doc - PDF document
+   * @param page - PDF page
+   * @returns task that contains the detected tables
+   */
+  getTables: (doc: PdfDocumentObject, page: PdfPageObject) => PdfTask<PdfTable[]>;
 }
 
 /**
@@ -3176,6 +3498,109 @@ export interface IPdfiumExecutor {
   saveAsCopy(doc: PdfDocumentObject): PdfTask<ArrayBuffer>;
   closeDocument(doc: PdfDocumentObject): PdfTask<boolean>;
   closeAllDocuments(): PdfTask<boolean>;
+
+  // ═══════════════════════════════════════════════════════
+  // Text Block Detection (Content Editing Phase 1)
+  // ═══════════════════════════════════════════════════════
+
+  /**
+   * Detect text blocks on a page
+   * @param doc - PDF document
+   * @param page - PDF page
+   * @param options - Detection options
+   */
+  detectTextBlocks(
+    doc: PdfDocumentObject,
+    page: PdfPageObject,
+    options?: PdfTextBlockDetectionOptions,
+  ): PdfTask<boolean>;
+
+  /**
+   * Invalidate cached text block detection results
+   * @param doc - PDF document
+   * @param page - PDF page
+   */
+  invalidateTextBlocks(doc: PdfDocumentObject, page: PdfPageObject): PdfTask<boolean>;
+
+  /**
+   * Get all detected text blocks on a page
+   * @param doc - PDF document
+   * @param page - PDF page
+   */
+  getTextBlocks(doc: PdfDocumentObject, page: PdfPageObject): PdfTask<PdfTextBlock[]>;
+
+  /**
+   * Render page background excluding detected text blocks
+   * @param doc - PDF document
+   * @param page - PDF page
+   * @param options - Render options
+   */
+  renderPageBackgroundRaw(
+    doc: PdfDocumentObject,
+    page: PdfPageObject,
+    options?: PdfRenderPageOptions,
+  ): PdfTask<ImageDataLike>;
+
+  /**
+   * Render a single text block with transparent background
+   * @param doc - PDF document
+   * @param page - PDF page
+   * @param blockIndex - Index of the text block
+   * @param options - Render options
+   */
+  renderTextBlockRaw(
+    doc: PdfDocumentObject,
+    page: PdfPageObject,
+    blockIndex: number,
+    options?: PdfRenderTextBlockOptions,
+  ): PdfTask<ImageDataLike>;
+
+  /**
+   * Render debug overlay showing layout detection results
+   * @param doc - PDF document
+   * @param page - PDF page
+   * @param options - Render options including debug flags
+   */
+  renderLayoutDebugOverlayRaw(
+    doc: PdfDocumentObject,
+    page: PdfPageObject,
+    options?: PdfRenderDebugOverlayOptions,
+  ): PdfTask<ImageDataLike>;
+
+  /**
+   * Get layout detection summary for a page
+   * @param doc - PDF document
+   * @param page - PDF page
+   */
+  getLayoutSummary(doc: PdfDocumentObject, page: PdfPageObject): PdfTask<PdfLayoutSummary>;
+
+  /**
+   * Get all detected words on a page
+   * @param doc - PDF document
+   * @param page - PDF page
+   */
+  getWords(doc: PdfDocumentObject, page: PdfPageObject): PdfTask<PdfWord[]>;
+
+  /**
+   * Get all detected lines on a page
+   * @param doc - PDF document
+   * @param page - PDF page
+   */
+  getLines(doc: PdfDocumentObject, page: PdfPageObject): PdfTask<PdfLine[]>;
+
+  /**
+   * Get all detected columns on a page
+   * @param doc - PDF document
+   * @param page - PDF page
+   */
+  getColumns(doc: PdfDocumentObject, page: PdfPageObject): PdfTask<PdfColumn[]>;
+
+  /**
+   * Get all detected tables on a page
+   * @param doc - PDF document
+   * @param page - PDF page
+   */
+  getTables(doc: PdfDocumentObject, page: PdfPageObject): PdfTask<PdfTable[]>;
 }
 
 /**

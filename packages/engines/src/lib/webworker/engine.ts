@@ -39,6 +39,15 @@ import {
   PdfPrintOptions,
   PdfBookmarkObject,
   PdfAddAttachmentParams,
+  PdfTextBlock,
+  PdfTextBlockDetectionOptions,
+  PdfRenderTextBlockOptions,
+  PdfRenderDebugOverlayOptions,
+  PdfLayoutSummary,
+  PdfWord,
+  PdfLine,
+  PdfColumn,
+  PdfTable,
 } from '@embedpdf/models';
 import { ExecuteRequest, Response, SpecificExecuteRequest } from './runner';
 
@@ -937,6 +946,209 @@ export class WebWorkerEngine implements PdfEngine {
     const requestId = this.generateRequestId('closeAllDocuments');
     const task = new WorkerTask<boolean>(this.worker, requestId);
     const request: ExecuteRequest = createRequest(requestId, 'closeAllDocuments', []);
+    this.proxy(task, request);
+
+    return task;
+  }
+
+  // ═══════════════════════════════════════════════════════
+  // Text Block Detection (Content Editing Phase 1)
+  // ═══════════════════════════════════════════════════════
+
+  /**
+   * {@inheritDoc @embedpdf/models!PdfEngine.detectTextBlocks}
+   *
+   * @public
+   */
+  detectTextBlocks(
+    doc: PdfDocumentObject,
+    page: PdfPageObject,
+    options?: PdfTextBlockDetectionOptions,
+  ) {
+    this.logger.debug(LOG_SOURCE, LOG_CATEGORY, 'detectTextBlocks', doc, page, options);
+    const requestId = this.generateRequestId('detectTextBlocks');
+    const task = new WorkerTask<boolean>(this.worker, requestId);
+    const request: ExecuteRequest = createRequest(requestId, 'detectTextBlocks', [
+      doc,
+      page,
+      options,
+    ]);
+    this.proxy(task, request);
+
+    return task;
+  }
+
+  /**
+   * {@inheritDoc @embedpdf/models!PdfEngine.invalidateTextBlocks}
+   *
+   * @public
+   */
+  invalidateTextBlocks(doc: PdfDocumentObject, page: PdfPageObject) {
+    this.logger.debug(LOG_SOURCE, LOG_CATEGORY, 'invalidateTextBlocks', doc, page);
+    const requestId = this.generateRequestId('invalidateTextBlocks');
+    const task = new WorkerTask<boolean>(this.worker, requestId);
+    const request: ExecuteRequest = createRequest(requestId, 'invalidateTextBlocks', [doc, page]);
+    this.proxy(task, request);
+
+    return task;
+  }
+
+  /**
+   * {@inheritDoc @embedpdf/models!PdfEngine.getTextBlocks}
+   *
+   * @public
+   */
+  getTextBlocks(doc: PdfDocumentObject, page: PdfPageObject) {
+    this.logger.debug(LOG_SOURCE, LOG_CATEGORY, 'getTextBlocks', doc, page);
+    const requestId = this.generateRequestId('getTextBlocks');
+    const task = new WorkerTask<PdfTextBlock[]>(this.worker, requestId);
+    const request: ExecuteRequest = createRequest(requestId, 'getTextBlocks', [doc, page]);
+    this.proxy(task, request);
+
+    return task;
+  }
+
+  /**
+   * {@inheritDoc @embedpdf/models!PdfEngine.renderPageBackground}
+   *
+   * @public
+   */
+  renderPageBackground(
+    doc: PdfDocumentObject,
+    page: PdfPageObject,
+    options?: PdfRenderPageOptions,
+  ) {
+    this.logger.debug(LOG_SOURCE, LOG_CATEGORY, 'renderPageBackground', doc, page, options);
+    const requestId = this.generateRequestId('renderPageBackground');
+    const task = new WorkerTask<Blob>(this.worker, requestId);
+    const request: ExecuteRequest = createRequest(requestId, 'renderPageBackground', [
+      doc,
+      page,
+      options,
+    ]);
+    this.proxy(task, request);
+
+    return task;
+  }
+
+  /**
+   * {@inheritDoc @embedpdf/models!PdfEngine.renderTextBlock}
+   *
+   * @public
+   */
+  renderTextBlock(
+    doc: PdfDocumentObject,
+    page: PdfPageObject,
+    blockIndex: number,
+    options?: PdfRenderTextBlockOptions,
+  ) {
+    this.logger.debug(LOG_SOURCE, LOG_CATEGORY, 'renderTextBlock', doc, page, blockIndex, options);
+    const requestId = this.generateRequestId('renderTextBlock');
+    const task = new WorkerTask<Blob>(this.worker, requestId);
+    const request: ExecuteRequest = createRequest(requestId, 'renderTextBlock', [
+      doc,
+      page,
+      blockIndex,
+      options,
+    ]);
+    this.proxy(task, request);
+
+    return task;
+  }
+
+  /**
+   * {@inheritDoc @embedpdf/models!PdfEngine.renderLayoutDebugOverlay}
+   *
+   * @public
+   */
+  renderLayoutDebugOverlay(
+    doc: PdfDocumentObject,
+    page: PdfPageObject,
+    options?: PdfRenderDebugOverlayOptions,
+  ) {
+    this.logger.debug(LOG_SOURCE, LOG_CATEGORY, 'renderLayoutDebugOverlay', doc, page, options);
+    const requestId = this.generateRequestId('renderLayoutDebugOverlay');
+    const task = new WorkerTask<Blob>(this.worker, requestId);
+    const request: ExecuteRequest = createRequest(requestId, 'renderLayoutDebugOverlay', [
+      doc,
+      page,
+      options,
+    ]);
+    this.proxy(task, request);
+
+    return task;
+  }
+
+  /**
+   * {@inheritDoc @embedpdf/models!PdfEngine.getLayoutSummary}
+   *
+   * @public
+   */
+  getLayoutSummary(doc: PdfDocumentObject, page: PdfPageObject) {
+    this.logger.debug(LOG_SOURCE, LOG_CATEGORY, 'getLayoutSummary', doc, page);
+    const requestId = this.generateRequestId('getLayoutSummary');
+    const task = new WorkerTask<PdfLayoutSummary>(this.worker, requestId);
+    const request: ExecuteRequest = createRequest(requestId, 'getLayoutSummary', [doc, page]);
+    this.proxy(task, request);
+
+    return task;
+  }
+
+  /**
+   * {@inheritDoc @embedpdf/models!PdfEngine.getWords}
+   *
+   * @public
+   */
+  getWords(doc: PdfDocumentObject, page: PdfPageObject) {
+    this.logger.debug(LOG_SOURCE, LOG_CATEGORY, 'getWords', doc, page);
+    const requestId = this.generateRequestId('getWords');
+    const task = new WorkerTask<PdfWord[]>(this.worker, requestId);
+    const request: ExecuteRequest = createRequest(requestId, 'getWords', [doc, page]);
+    this.proxy(task, request);
+
+    return task;
+  }
+
+  /**
+   * {@inheritDoc @embedpdf/models!PdfEngine.getLines}
+   *
+   * @public
+   */
+  getLines(doc: PdfDocumentObject, page: PdfPageObject) {
+    this.logger.debug(LOG_SOURCE, LOG_CATEGORY, 'getLines', doc, page);
+    const requestId = this.generateRequestId('getLines');
+    const task = new WorkerTask<PdfLine[]>(this.worker, requestId);
+    const request: ExecuteRequest = createRequest(requestId, 'getLines', [doc, page]);
+    this.proxy(task, request);
+
+    return task;
+  }
+
+  /**
+   * {@inheritDoc @embedpdf/models!PdfEngine.getColumns}
+   *
+   * @public
+   */
+  getColumns(doc: PdfDocumentObject, page: PdfPageObject) {
+    this.logger.debug(LOG_SOURCE, LOG_CATEGORY, 'getColumns', doc, page);
+    const requestId = this.generateRequestId('getColumns');
+    const task = new WorkerTask<PdfColumn[]>(this.worker, requestId);
+    const request: ExecuteRequest = createRequest(requestId, 'getColumns', [doc, page]);
+    this.proxy(task, request);
+
+    return task;
+  }
+
+  /**
+   * {@inheritDoc @embedpdf/models!PdfEngine.getTables}
+   *
+   * @public
+   */
+  getTables(doc: PdfDocumentObject, page: PdfPageObject) {
+    this.logger.debug(LOG_SOURCE, LOG_CATEGORY, 'getTables', doc, page);
+    const requestId = this.generateRequestId('getTables');
+    const task = new WorkerTask<PdfTable[]>(this.worker, requestId);
+    const request: ExecuteRequest = createRequest(requestId, 'getTables', [doc, page]);
     this.proxy(task, request);
 
     return task;

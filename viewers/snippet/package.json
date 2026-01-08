@@ -44,6 +44,7 @@
     "@embedpdf/plugin-ui": "workspace:*",
     "@embedpdf/plugin-viewport": "workspace:*",
     "@embedpdf/plugin-zoom": "workspace:*",
+    "@embedpdf/plugin-edit": "workspace:*",
     "preact": "^10.17.0",
     "tailwind-merge": "^3.4.0"
   },

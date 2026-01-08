@@ -7,7 +7,9 @@ import {
   PdfEngineMethodName,
   PdfEngineMethodReturnType,
   PdfErrorCode,
-  TaskReturn,
+  PdfErrorReason,
+  PdfTask,
+  TaskError,
 } from '@embedpdf/models';
 
 /**
@@ -35,11 +37,21 @@ export type SpecificExecuteRequest<M extends PdfEngineMethodName> = {
 };
 
 /**
+ * Extracts the result type from any PdfEngine method return type
+ */
+type ExtractTaskResult<T> = T extends PdfTask<infer R, infer _E> ? R : never;
+
+/**
+ * Union of all possible result values from PdfEngine methods
+ */
+type PdfEngineMethodResult = ExtractTaskResult<PdfEngineMethodReturnType<PdfEngineMethodName>>;
+
+/**
  * Response body that represent return value of PdfEngine
  */
-export type PdfEngineMethodResponseBody = {
-  [P in PdfEngineMethodName]: TaskReturn<PdfEngineMethodReturnType<P>>;
-}[PdfEngineMethodName];
+export type PdfEngineMethodResponseBody =
+  | { type: 'result'; value: PdfEngineMethodResult }
+  | { type: 'error'; value: TaskError<PdfErrorReason> };
 
 /**
  * Request that abort the specified task
@@ -253,121 +265,155 @@ export class EngineRunner {
         task = engine.destroy!(...args);
         break;
       case 'openDocumentUrl':
-        task = engine.openDocumentUrl!(...args);
+        task = engine.openDocumentUrl(...args);
         break;
       case 'openDocumentBuffer':
-        task = engine.openDocumentBuffer!(...args);
+        task = engine.openDocumentBuffer(...args);
         break;
       case 'getDocPermissions':
-        task = engine.getDocPermissions!(...args);
+        task = engine.getDocPermissions(...args);
         break;
       case 'getDocUserPermissions':
-        task = engine.getDocUserPermissions!(...args);
+        task = engine.getDocUserPermissions(...args);
         break;
       case 'getMetadata':
-        task = engine.getMetadata!(...args);
+        task = engine.getMetadata(...args);
         break;
       case 'setMetadata':
-        task = engine.setMetadata!(...args);
+        task = engine.setMetadata(...args);
         break;
       case 'getBookmarks':
-        task = engine.getBookmarks!(...args);
+        task = engine.getBookmarks(...args);
         break;
       case 'setBookmarks':
-        task = engine.setBookmarks!(...args);
+        task = engine.setBookmarks(...args);
         break;
       case 'deleteBookmarks':
-        task = engine.deleteBookmarks!(...args);
+        task = engine.deleteBookmarks(...args);
         break;
       case 'getSignatures':
-        task = engine.getSignatures!(...args);
+        task = engine.getSignatures(...args);
         break;
       case 'renderPage':
-        task = engine.renderPage!(...args);
+        task = engine.renderPage(...args);
         break;
       case 'renderPageRect':
-        task = engine.renderPageRect!(...args);
+        task = engine.renderPageRect(...args);
         break;
       case 'renderPageAnnotation':
-        task = engine.renderPageAnnotation!(...args);
+        task = engine.renderPageAnnotation(...args);
         break;
       case 'renderThumbnail':
-        task = engine.renderThumbnail!(...args);
+        task = engine.renderThumbnail(...args);
         break;
       case 'getAllAnnotations':
-        task = engine.getAllAnnotations!(...args);
+        task = engine.getAllAnnotations(...args);
         break;
       case 'getPageAnnotations':
-        task = engine.getPageAnnotations!(...args);
+        task = engine.getPageAnnotations(...args);
         break;
       case 'createPageAnnotation':
-        task = engine.createPageAnnotation!(...args);
+        task = engine.createPageAnnotation(...args);
         break;
       case 'updatePageAnnotation':
-        task = engine.updatePageAnnotation!(...args);
+        task = engine.updatePageAnnotation(...args);
         break;
       case 'removePageAnnotation':
-        task = engine.removePageAnnotation!(...args);
+        task = engine.removePageAnnotation(...args);
         break;
       case 'getPageTextRects':
-        task = engine.getPageTextRects!(...args);
+        task = engine.getPageTextRects(...args);
         break;
       case 'searchAllPages':
-        task = engine.searchAllPages!(...args);
+        task = engine.searchAllPages(...args);
         break;
       case 'closeDocument':
-        task = engine.closeDocument!(...args);
+        task = engine.closeDocument(...args);
         break;
       case 'closeAllDocuments':
-        task = engine.closeAllDocuments!(...args);
+        task = engine.closeAllDocuments(...args);
         break;
       case 'saveAsCopy':
-        task = engine.saveAsCopy!(...args);
+        task = engine.saveAsCopy(...args);
         break;
       case 'getAttachments':
-        task = engine.getAttachments!(...args);
+        task = engine.getAttachments(...args);
         break;
       case 'addAttachment':
-        task = engine.addAttachment!(...args);
+        task = engine.addAttachment(...args);
         break;
       case 'removeAttachment':
-        task = engine.removeAttachment!(...args);
+        task = engine.removeAttachment(...args);
         break;
       case 'readAttachmentContent':
-        task = engine.readAttachmentContent!(...args);
+        task = engine.readAttachmentContent(...args);
         break;
       case 'setFormFieldValue':
-        task = engine.setFormFieldValue!(...args);
+        task = engine.setFormFieldValue(...args);
         break;
       case 'flattenPage':
-        task = engine.flattenPage!(...args);
+        task = engine.flattenPage(...args);
         break;
       case 'extractPages':
-        task = engine.extractPages!(...args);
+        task = engine.extractPages(...args);
         break;
       case 'extractText':
-        task = engine.extractText!(...args);
+        task = engine.extractText(...args);
         break;
       case 'redactTextInRects':
-        task = engine.redactTextInRects!(...args);
+        task = engine.redactTextInRects(...args);
         break;
       case 'getTextSlices':
-        task = engine.getTextSlices!(...args);
+        task = engine.getTextSlices(...args);
         break;
       case 'getPageGlyphs':
-        task = engine.getPageGlyphs!(...args);
+        task = engine.getPageGlyphs(...args);
         break;
       case 'getPageGeometry':
-        task = engine.getPageGeometry!(...args);
+        task = engine.getPageGeometry(...args);
         break;
       case 'merge':
-        task = engine.merge!(...args);
+        task = engine.merge(...args);
         break;
       case 'mergePages':
-        task = engine.mergePages!(...args);
+        task = engine.mergePages(...args);
         break;
       case 'preparePrintDocument':
-        task = engine.preparePrintDocument!(...args);
+        task = engine.preparePrintDocument(...args);
+        break;
+      // Text Block Detection (Content Editing Phase 1)
+      case 'detectTextBlocks':
+        task = engine.detectTextBlocks(...args);
+        break;
+      case 'invalidateTextBlocks':
+        task = engine.invalidateTextBlocks(...args);
+        break;
+      case 'getTextBlocks':
+        task = engine.getTextBlocks(...args);
+        break;
+      case 'renderPageBackground':
+        task = engine.renderPageBackground(...args);
+        break;
+      case 'renderTextBlock':
+        task = engine.renderTextBlock(...args);
+        break;
+      case 'renderLayoutDebugOverlay':
+        task = engine.renderLayoutDebugOverlay(...args);
+        break;
+      case 'getLayoutSummary':
+        task = engine.getLayoutSummary(...args);
+        break;
+      case 'getWords':
+        task = engine.getWords(...args);
+        break;
+      case 'getLines':
+        task = engine.getLines(...args);
+        break;
+      case 'getColumns':
+        task = engine.getColumns(...args);
+        break;
+      case 'getTables':
+        task = engine.getTables(...args);
         break;
       default:
         // This should never be reached due to the earlier check, but provides exhaustiveness

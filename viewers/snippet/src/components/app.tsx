@@ -4,7 +4,13 @@ import styles from '../styles/index.css';
 import { EmbedPDF } from '@embedpdf/core/preact';
 import { createPluginRegistration, PluginRegistry } from '@embedpdf/core';
 import { usePdfiumEngine } from '@embedpdf/engines/preact';
-import { AllLogger, ConsoleLogger, PerfLogger, Rotation } from '@embedpdf/models';
+import {
+  AllLogger,
+  ConsoleLogger,
+  PdfLayoutDebugFlag,
+  PerfLogger,
+  Rotation,
+} from '@embedpdf/models';
 import {
   Viewport,
   ViewportPluginPackage,
@@ -101,6 +107,7 @@ import {
   AttachmentPluginPackage,
   AttachmentPluginConfig,
 } from '@embedpdf/plugin-attachment/preact';
+import { EditLayer, EditPluginPackage, EditPluginConfig } from '@embedpdf/plugin-edit/preact';
 
 import { SchemaToolbar } from '@/ui/schema-toolbar';
 import { SchemaSidebar } from '@/ui/schema-sidebar';
@@ -254,6 +261,10 @@ export interface PDFViewerConfig {
   history?: Partial<HistoryPluginConfig>;
   /** Interaction manager options (exclusionRules) */
   interactionManager?: Partial<InteractionManagerPluginConfig>;
+
+  // Experimental
+  /** Edit plugin options */
+  edit?: Partial<EditPluginConfig>;
 }
 
 // Default configurations for all plugins
@@ -306,6 +317,9 @@ const DEFAULTS = {
   // Infrastructure
   history: {} as HistoryPluginConfig,
   interactionManager: {} as InteractionManagerPluginConfig,
+
+  // Experimental
+  edit: {} as EditPluginConfig,
 };
 
 // Props for the PDFViewer Component
@@ -383,6 +397,7 @@ function ViewerLayout({ documentId, tabBarVisibility = 'multiple' }: ViewerLayou
                                 style={{ backgroundColor: '#fff' }}
                               >
                                 <PagePointerProvider documentId={documentId} pageIndex={pageIndex}>
+                                  {/*
                                   <RenderLayer
                                     documentId={documentId}
                                     pageIndex={pageIndex}
@@ -393,7 +408,7 @@ function ViewerLayout({ documentId, tabBarVisibility = 'multiple' }: ViewerLayou
                                     documentId={documentId}
                                     pageIndex={pageIndex}
                                     style={{ pointerEvents: 'none' }}
-                                  />
+                                  />*/}
                                   <SearchLayer documentId={documentId} pageIndex={pageIndex} />
                                   <MarqueeZoom documentId={documentId} pageIndex={pageIndex} />
                                   <MarqueeCapture documentId={documentId} pageIndex={pageIndex} />
@@ -411,6 +426,13 @@ function ViewerLayout({ documentId, tabBarVisibility = 'multiple' }: ViewerLayou
                                     documentId={documentId}
                                     pageIndex={pageIndex}
                                     selectionMenu={annotationMenu}
+                                  />
+                                  <EditLayer
+                                    documentId={documentId}
+                                    pageIndex={pageIndex}
+                                    showLayoutSummary={true}
+                                    showDebugOverlay={true}
+                                    debugFlags={PdfLayoutDebugFlag.ShowWords}
                                   />
                                   <HintLayer />
                                 </PagePointerProvider>
@@ -584,6 +606,12 @@ export function PDFViewer({ config, onRegistryReady }: PDFViewerProps) {
           createPluginRegistration(InteractionManagerPluginPackage, {
             ...DEFAULTS.interactionManager,
             ...config.interactionManager,
+          }),
+
+          // Experimental
+          createPluginRegistration(EditPluginPackage, {
+            ...DEFAULTS.edit,
+            ...config.edit,
           }),
         ]}
       >
