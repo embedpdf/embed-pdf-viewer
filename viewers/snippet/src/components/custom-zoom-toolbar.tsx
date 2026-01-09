@@ -66,7 +66,7 @@ export function CustomZoomToolbar({ documentId }: CustomZoomToolbarProps) {
     <div className="relative">
       <div className="bg-interactive-hover flex items-center rounded">
         {/* Editable Zoom Percentage Input */}
-        <form onSubmit={handleZoomChange} className="block">
+        <form onSubmit={handleZoomChange} className="block mr-2">
           <input
             name="zoom"
             type="text"
