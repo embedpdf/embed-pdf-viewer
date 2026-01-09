@@ -410,9 +410,15 @@ export class AnnotationPlugin extends BasePlugin<
       const factory = this.handlerFactories.get(tool.defaults.type);
       if (!factory) continue;
 
+      const pageSize =
+        page.rotation % 2 !== 0
+          ? { width: page.size.height, height: page.size.width }
+          : page.size;
+
       const context: HandlerContext<PdfAnnotationObject> = {
         pageIndex,
-        pageSize: page.size,
+        pageSize,
+        pageRotation: page.rotation,
         scale,
         services: callbacks.services, // Pass through services
         onPreview: (state) => callbacks.onPreview(tool.id, state),
