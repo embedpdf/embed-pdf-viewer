@@ -190,7 +190,7 @@ export const FreeTextSidebar = ({
         {/* Bold / Italic toggles */}
         <div class="flex gap-2">
           <ToggleButton
-            title="Bold"
+            title={translate('annotation.fontBold')}
             active={bold}
             disabled={
               !standardFontIsBold(makeStandardFont(fontFamily, { bold: true, italic: false }))
@@ -202,7 +202,7 @@ export const FreeTextSidebar = ({
           </ToggleButton>
 
           <ToggleButton
-            title="Italic"
+            title={translate('annotation.fontItalic')}
             active={italic}
             disabled={
               !standardFontIsItalic(makeStandardFont(fontFamily, { bold: false, italic: true }))
@@ -220,21 +220,21 @@ export const FreeTextSidebar = ({
         <SectionLabel>{translate('annotation.textAlign')}</SectionLabel>
         <div class="flex gap-2">
           <ToggleButton
-            title="Align left"
+            title={translate('annotation.textAlignLeft')}
             active={textAlign === PdfTextAlignment.Left}
             onClick={() => changeTextAlign(PdfTextAlignment.Left)}
           >
             <Icon icon="alignLeft" size={18} />
           </ToggleButton>
           <ToggleButton
-            title="Align center"
+            title={translate('annotation.textAlignCenter')}
             active={textAlign === PdfTextAlignment.Center}
             onClick={() => changeTextAlign(PdfTextAlignment.Center)}
           >
             <Icon icon="alignCenter" size={18} />
           </ToggleButton>
           <ToggleButton
-            title="Align right"
+            title={translate('annotation.textAlignRight')}
             active={textAlign === PdfTextAlignment.Right}
             onClick={() => changeTextAlign(PdfTextAlignment.Right)}
           >
@@ -248,21 +248,21 @@ export const FreeTextSidebar = ({
         <SectionLabel>{translate('annotation.verticalAlign')}</SectionLabel>
         <div class="flex gap-2">
           <ToggleButton
-            title="Align top"
+            title={translate('annotation.verticalAlignTop')}
             active={verticalAlign === PdfVerticalAlignment.Top}
             onClick={() => changeVerticalAlign(PdfVerticalAlignment.Top)}
           >
             <Icon icon="alignTop" size={18} />
           </ToggleButton>
           <ToggleButton
-            title="Align middle"
+            title={translate('annotation.verticalAlignMiddle')}
             active={verticalAlign === PdfVerticalAlignment.Middle}
             onClick={() => changeVerticalAlign(PdfVerticalAlignment.Middle)}
           >
             <Icon icon="alignMiddle" size={18} />
           </ToggleButton>
           <ToggleButton
-            title="Align bottom"
+            title={translate('annotation.verticalAlignBottom')}
             active={verticalAlign === PdfVerticalAlignment.Bottom}
             onClick={() => changeVerticalAlign(PdfVerticalAlignment.Bottom)}
           >
