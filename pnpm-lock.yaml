@@ -997,8 +997,8 @@ importers:
         specifier: ^25.0.8
         version: 25.0.8(rollup@4.54.0)
       '@rollup/plugin-node-resolve':
-        specifier: ^15.2.1
-        version: 15.3.1(rollup@4.54.0)
+        specifier: ^16.0.3
+        version: 16.0.3(rollup@4.54.0)
       '@rollup/plugin-replace':
         specifier: ^5.0.2
         version: 5.0.7(rollup@4.54.0)
@@ -2205,8 +2205,8 @@ importers:
         specifier: ^25.0.4
         version: 25.0.8(rollup@4.54.0)
       '@rollup/plugin-node-resolve':
-        specifier: ^15.2.1
-        version: 15.3.1(rollup@4.54.0)
+        specifier: ^16.0.3
+        version: 16.0.3(rollup@4.54.0)
       '@rollup/plugin-replace':
         specifier: ^5.0.5
         version: 5.0.7(rollup@4.54.0)
@@ -4634,8 +4634,8 @@ packages:
       rollup:
         optional: true
 
-  '@rollup/plugin-node-resolve@15.3.1':
-    resolution: {integrity: sha512-tgg6b91pAybXHJQMAAwW9VuWBO6Thi+q7BCNARLwSqlmsHz0XYURtGvh/AuwSADXSI4h/2uHbs7s4FzlZDGSGA==}
+  '@rollup/plugin-node-resolve@16.0.3':
+    resolution: {integrity: sha512-lUYM3UBGuM93CnMPG1YocWu7X802BrNF3jW2zny5gQyLQgRFJhV1Sq0Zi74+dh/6NBx1DxFC4b4GXg9wUCG5Qg==}
     engines: {node: '>=14.0.0'}
     peerDependencies:
       rollup: ^2.78.0||^3.0.0||^4.0.0
@@ -6916,6 +6916,10 @@ packages:
 
   esquery@1.6.0:
     resolution: {integrity: sha512-ca9pw9fomFcKPvFLXhBKUK90ZvGibiGOvRJNbjljY7s7uq/5YO4BOzcYtJqExdx99rF6aAcnRxHmcUHcz6sQsg==}
+    engines: {node: '>=0.10'}
+
+  esquery@1.7.0:
+    resolution: {integrity: sha512-Ap6G0WQwcU/LHsvLwON1fAQX9Zp0A2Y6Y/cJBl9r/JbW90Zyg4/zbG6zzKa2OTALELarYHmKu0GhpM5EO+7T0g==}
     engines: {node: '>=0.10'}
 
   esrap@2.2.1:
@@ -13437,7 +13441,7 @@ snapshots:
     optionalDependencies:
       rollup: 4.54.0
 
-  '@rollup/plugin-node-resolve@15.3.1(rollup@4.54.0)':
+  '@rollup/plugin-node-resolve@16.0.3(rollup@4.54.0)':
     dependencies:
       '@rollup/pluginutils': 5.3.0(rollup@4.54.0)
       '@types/resolve': 1.20.2
@@ -16103,6 +16107,10 @@ snapshots:
   esprima@4.0.1: {}
 
   esquery@1.6.0:
+    dependencies:
+      estraverse: 5.3.0
+
+  esquery@1.7.0:
     dependencies:
       estraverse: 5.3.0
 
@@ -20953,7 +20961,7 @@ snapshots:
       eslint-scope: 8.4.0
       eslint-visitor-keys: 4.2.1
       espree: 10.4.0
-      esquery: 1.6.0
+      esquery: 1.7.0
       semver: 7.7.3
     transitivePeerDependencies:
       - supports-color
