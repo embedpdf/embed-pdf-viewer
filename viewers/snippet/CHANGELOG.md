@@ -1,5 +1,22 @@
 # @embedpdf/snippet
 
+## 2.1.2
+
+### Patch Changes
+
+- [#369](https://github.com/embedpdf/embed-pdf-viewer/pull/369) by [@bobsingor](https://github.com/bobsingor) – Add missing translations for redaction delete and commit commands (`redaction.deleteSelected` and `redaction.commitSelected`) in all supported languages (English, German, Dutch, French, Spanish).
+
+- [#381](https://github.com/embedpdf/embed-pdf-viewer/pull/381) by [@bobsingor](https://github.com/bobsingor) –
+  - Add i18n support for capture and print dialogs with translations for all supported languages
+  - Add `document:capture` command to toolbar for screenshot functionality
+  - Refactor hint-layer and capture components to use translation hooks
+  - Remove unused `@types/classnames` dependency
+
+- [#378](https://github.com/embedpdf/embed-pdf-viewer/pull/378) by [@bobsingor](https://github.com/bobsingor) –
+  - Add Simplified Chinese (zh-CN) translations for all UI elements
+  - Add i18n support for annotation type labels in comment sidebar with translation keys and fallbacks
+  - Fix rimraf command to use `--glob` flag for compatibility with rimraf v4+
+
 ## 2.1.1
 
 ## 2.1.0
