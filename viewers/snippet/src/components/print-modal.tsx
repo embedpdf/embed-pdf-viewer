@@ -161,7 +161,7 @@ export function PrintModal({ documentId, isOpen, onClose, onExited }: PrintModal
                 />
                 {selection === 'custom' && customPages.trim() && totalPages > 0 && (
                   <p className="text-fg-muted mt-1 text-xs">
-                    {translate('print.current', { params: { totalPages } })}
+                    {translate('print.total', { params: { totalPages } })}
                   </p>
                 )}
               </div>
