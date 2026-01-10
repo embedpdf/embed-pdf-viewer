@@ -199,6 +199,11 @@ export class AnnotationPlugin extends BasePlugin<
     });
 
     this.selection?.onEndSelection(({ documentId }) => {
+      // Prevent creating annotations from text selection in read-only mode
+      if (this.isDocumentReadOnly(documentId)) {
+        return;
+      }
+
       const activeTool = this.getActiveTool(documentId);
       if (!activeTool || !activeTool.interaction.textSelection) return;
 
@@ -417,6 +422,7 @@ export class AnnotationPlugin extends BasePlugin<
         services: callbacks.services, // Pass through services
         onPreview: (state) => callbacks.onPreview(tool.id, state),
         onCommit: (annotation, ctx) => {
+          // Read-only check is handled in createAnnotation method
           this.createAnnotation(pageIndex, annotation, ctx, documentId);
           if (this.getToolBehavior(tool, 'deactivateToolAfterCreate')) {
             this.setActiveTool(null, documentId);
@@ -452,6 +458,12 @@ export class AnnotationPlugin extends BasePlugin<
       throw new Error(`Annotation state not found for document: ${id}`);
     }
     return docState;
+  }
+
+  private isDocumentReadOnly(documentId?: string): boolean {
+    const id = documentId ?? this.getActiveDocumentId();
+    const docState = this.getCoreDocument(id);
+    return docState?.readOnly === true;
   }
 
   private getAllAnnotations(documentId: string, doc: PdfDocumentObject) {
@@ -581,8 +593,19 @@ export class AnnotationPlugin extends BasePlugin<
     ctx?: AnnotationCreateContext<A>,
     documentId?: string,
   ) {
-    const id = annotation.id;
     const docId = documentId ?? this.getActiveDocumentId();
+    
+    // Prevent creating annotations in read-only mode
+    if (this.isDocumentReadOnly(docId)) {
+      this.logger.debug(
+        'AnnotationPlugin',
+        'CreateAnnotation',
+        `Cannot create annotation: document ${docId} is read-only`,
+      );
+      return;
+    }
+
+    const id = annotation.id;
     const contexts = this.pendingContexts.get(docId);
     if (!contexts) return;
 
@@ -643,6 +666,17 @@ export class AnnotationPlugin extends BasePlugin<
     documentId?: string,
   ) {
     const docId = documentId ?? this.getActiveDocumentId();
+    
+    // Prevent updating annotations in read-only mode
+    if (this.isDocumentReadOnly(docId)) {
+      this.logger.debug(
+        'AnnotationPlugin',
+        'UpdateAnnotation',
+        `Cannot update annotation: document ${docId} is read-only`,
+      );
+      return;
+    }
+
     const docState = this.getDocumentState(docId);
     const originalObject = docState.byUid[id].object;
     const finalPatch = this.buildPatch(originalObject, {
@@ -692,6 +726,17 @@ export class AnnotationPlugin extends BasePlugin<
 
   private deleteAnnotation(pageIndex: number, id: string, documentId?: string) {
     const docId = documentId ?? this.getActiveDocumentId();
+    
+    // Prevent deleting annotations in read-only mode
+    if (this.isDocumentReadOnly(docId)) {
+      this.logger.debug(
+        'AnnotationPlugin',
+        'DeleteAnnotation',
+        `Cannot delete annotation: document ${docId} is read-only`,
+      );
+      return;
+    }
+
     const docState = this.getDocumentState(docId);
     const originalAnnotation = docState.byUid[id]?.object;
     if (!originalAnnotation) return;
@@ -748,6 +793,18 @@ export class AnnotationPlugin extends BasePlugin<
 
   public setActiveTool(toolId: string | null, documentId?: string): void {
     const docId = documentId ?? this.getActiveDocumentId();
+    
+    // Prevent activating annotation tools in read-only mode
+    // Allow null (deselect tool) even in read-only mode
+    if (toolId !== null && this.isDocumentReadOnly(docId)) {
+      this.logger.debug(
+        'AnnotationPlugin',
+        'SetActiveTool',
+        `Cannot activate tool: document ${docId} is read-only`,
+      );
+      return;
+    }
+
     const docState = this.getDocumentState(docId);
     if (toolId === docState.activeToolId) return;
 

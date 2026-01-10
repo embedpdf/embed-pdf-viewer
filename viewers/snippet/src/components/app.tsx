@@ -502,7 +502,13 @@ export function PDFViewer({ config, onRegistryReady }: PDFViewerProps) {
           // Core plugins
           createPluginRegistration(DocumentManagerPluginPackage, {
             ...DEFAULTS.documentManager,
-            ...(config.src && { initialDocuments: [{ url: config.src }] }),
+            ...(config.src && {
+              initialDocuments: [
+                {
+                  url: config.src,
+                },
+              ],
+            }),
             ...config.documentManager,
           }),
           createPluginRegistration(CommandsPluginPackage, {

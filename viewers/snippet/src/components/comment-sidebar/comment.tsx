@@ -13,6 +13,7 @@ interface CommentProps {
   onDelete: () => void;
   isReply?: boolean;
   documentId: string;
+  isReadOnly?: boolean;
 }
 
 export const Comment = ({
@@ -21,6 +22,7 @@ export const Comment = ({
   onDelete,
   isReply = false,
   documentId,
+  isReadOnly = false,
 }: CommentProps) => {
   const [isMenuOpen, setMenuOpen] = useState(false);
   const [isEditing, setEditing] = useState(false);
@@ -63,27 +65,29 @@ export const Comment = ({
                 {formatDate(annotation.modified || annotation.created)}
               </span>
             </div>
-            <div className="relative">
-              <button
-                onClick={(e) => {
-                  e.stopPropagation();
-                  setMenuOpen(true);
-                }}
-                className="text-fg-muted hover:bg-interactive-hover rounded-md p-1"
-              >
-                <svg className="h-4 w-4" fill="currentColor" viewBox="0 0 20 20">
-                  <path d="M6 10a2 2 0 11-4 0 2 2 0 014 0zM12 10a2 2 0 11-4 0 2 2 0 014 0zM16 12a2 2 0 100-4 2 2 0 000 4z" />
-                </svg>
-              </button>
-              {isMenuOpen && (
-                <MenuDropdown
-                  onEdit={() => setEditing(true)}
-                  onDelete={onDelete}
-                  onClose={() => setMenuOpen(false)}
-                  documentId={documentId}
-                />
-              )}
-            </div>
+            {!isReadOnly && (
+              <div className="relative">
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setMenuOpen(true);
+                  }}
+                  className="text-fg-muted hover:bg-interactive-hover rounded-md p-1"
+                >
+                  <svg className="h-4 w-4" fill="currentColor" viewBox="0 0 20 20">
+                    <path d="M6 10a2 2 0 11-4 0 2 2 0 014 0zM12 10a2 2 0 11-4 0 2 2 0 014 0zM16 12a2 2 0 100-4 2 2 0 000 4z" />
+                  </svg>
+                </button>
+                {isMenuOpen && (
+                  <MenuDropdown
+                    onEdit={() => setEditing(true)}
+                    onDelete={onDelete}
+                    onClose={() => setMenuOpen(false)}
+                    documentId={documentId}
+                  />
+                )}
+              </div>
+            )}
           </div>
         )}
         <p className="text-fg-primary mt-2 text-sm">{annotation.contents}</p>

@@ -571,6 +571,9 @@ export const commands: Record<string, Command<State>> = {
     active: ({ state, documentId }) => {
       return isSidebarOpen(state.plugins, documentId, 'left', 'main', 'annotation-panel');
     },
+    disabled: ({ state, documentId }) => {
+      return state.core.documents[documentId]?.readOnly ?? false;
+    },
   },
 
   // ─────────────────────────────────────────────────────────
@@ -1341,6 +1344,9 @@ export const commands: Record<string, Command<State>> = {
         selectedAnnotation.object.pageIndex,
         selectedAnnotation.object.id,
       );
+    },
+    disabled: ({ state, documentId }) => {
+      return state.core.documents[documentId]?.readOnly ?? false;
     },
   },
 
