@@ -477,7 +477,6 @@ export class RedactionPlugin extends BasePlugin<
         this.dispatch(addPending(opts.documentId, [item]));
         this.emitPendingChange(opts.documentId);
         opts.callback.onCommit?.(r);
-        this.enableRedactSelection(opts.documentId);
         this.selectPending(opts.pageIndex, item.id, opts.documentId);
       },
     });
