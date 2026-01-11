@@ -55,3 +55,6 @@ export { default as PointerIcon } from './PointerIcon.svelte';
 export { default as SidebarIcon } from './SidebarIcon.svelte';
 export { default as CommentIcon } from './CommentIcon.svelte';
 export { default as CopyIcon } from './CopyIcon.svelte';
+export { default as LockIcon } from './LockIcon.svelte';
+export { default as EyeIcon } from './EyeIcon.svelte';
+export { default as EyeOffIcon } from './EyeOffIcon.svelte';

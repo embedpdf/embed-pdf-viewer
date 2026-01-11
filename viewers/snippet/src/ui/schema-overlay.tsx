@@ -65,7 +65,7 @@ export function SchemaOverlay({ schema, documentId, className }: OverlayRenderer
       style={offsetStyles}
       data-overlay-id={schema.id}
     >
-      {renderCustomComponent(content.componentId, documentId, {})}
+      {renderCustomComponent(content.componentId, documentId)}
     </div>
   );
 }

@@ -1,5 +1,6 @@
 <script lang="ts" generics="T extends PdfAnnotationObject">
   import type { PdfAnnotationObject, Rect } from '@embedpdf/models';
+  import { useDocumentPermissions } from '@embedpdf/core/svelte';
   import { useAnnotationCapability } from '../hooks';
   import type { AnnotationContainerProps } from './types';
   import {
@@ -44,7 +45,17 @@
 
   let preview = $state<T>(trackedAnnotation.object);
   let annotationCapability = useAnnotationCapability();
+  const permissions = useDocumentPermissions(() => documentId);
   let gestureBaseRef = $state<T | null>(null);
+
+  // Override props based on permission
+  const effectiveIsDraggable = $derived(permissions.canModifyAnnotations && isDraggable);
+  const effectiveIsResizable = $derived(permissions.canModifyAnnotations && isResizable);
+
+  // Wrap onDoubleClick to respect permissions
+  const guardedOnDoubleClick = $derived(
+    permissions.canModifyAnnotations && onDoubleClick ? onDoubleClick : undefined,
+  );
 
   // Get scoped API for this document
   const annotationProvides = $derived(
@@ -171,8 +182,8 @@
 
 <div data-no-interaction>
   <div
-    {...isDraggable && isSelected ? interactionHandles.dragProps : {}}
-    use:doublePress={{ onDouble: onDoubleClick }}
+    {...effectiveIsDraggable && isSelected ? interactionHandles.dragProps : {}}
+    use:doublePress={{ onDouble: guardedOnDoubleClick }}
     style:position="absolute"
     style:left="{currentObject.rect.origin.x * scale}px"
     style:top="{currentObject.rect.origin.y * scale}px"
@@ -182,7 +193,7 @@
     style:outline-offset={isSelected ? `${outlineOffset}px` : '0px'}
     style:pointer-events={isSelected ? 'auto' : 'none'}
     style:touch-action="none"
-    style:cursor={isSelected && isDraggable ? 'move' : 'default'}
+    style:cursor={isSelected && effectiveIsDraggable ? 'move' : 'default'}
     style:z-index={zIndex}
     style={style || ''}
     class={propsClass}
@@ -204,7 +215,7 @@
       {@render children(currentObject)}
     {/if}
 
-    {#if isSelected && isResizable}
+    {#if isSelected && effectiveIsResizable}
       {#each resizeHandles as { key, style: handleStyle, ...hProps } (key)}
         {#if resizeUI?.component}
           {@const Component = resizeUI.component}
@@ -215,7 +226,7 @@
       {/each}
     {/if}
 
-    {#if isSelected}
+    {#if isSelected && permissions.canModifyAnnotations}
       {#each vertexHandles as { key, style: vertexStyle, ...vProps } (key)}
         {#if vertexUI?.component}
           {@const Component = vertexUI.component}

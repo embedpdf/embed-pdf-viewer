@@ -68,7 +68,11 @@ import { CheckIcon } from './check';
 import { FileIcon } from './file';
 import { PlusIcon } from './plus';
 import { LockIcon } from './lock';
+import { UnlockIcon } from './unlock';
 import { AlertTriangleIcon } from './alert-triangle';
+import { EyeIcon } from './eye';
+import { EyeOffIcon } from './eye-off';
+import { InfoIcon } from './info';
 
 export type Icons = {
   [key: string]: IconComponent;
@@ -144,5 +148,9 @@ export const icons: Icons = {
   file: FileIcon,
   plus: PlusIcon,
   lock: LockIcon,
+  unlock: UnlockIcon,
   alertTriangle: AlertTriangleIcon,
+  eye: EyeIcon,
+  'eye-off': EyeOffIcon,
+  info: InfoIcon,
 };

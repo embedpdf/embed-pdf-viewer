@@ -101,6 +101,42 @@ export const englishTranslations: Locale = {
       nextResult: 'Next result',
       page: 'Page {number}',
     },
+    security: {
+      protected: {
+        title: 'Protected Document',
+        description: 'This document has restricted permissions. Some features may be limited.',
+        viewPermissions: 'View Permissions',
+      },
+      viewPermissions: {
+        title: 'Document Permissions',
+        description:
+          'This document is protected. Enter the owner password to unlock all permissions.',
+        restrictedActions: 'Document Permissions',
+      },
+      unlock: {
+        label: 'Owner Password',
+        placeholder: 'Enter owner password',
+        button: 'Unlock',
+        success: 'Full permissions unlocked successfully.',
+        invalidPassword: 'Invalid owner password. Please try again.',
+        failed: 'Failed to unlock permissions.',
+      },
+    },
+    protect: {
+      permissions: {
+        print: 'Print',
+        printHighQuality: 'High Quality Print',
+        copy: 'Copy Contents',
+        accessibility: 'Extract for Accessibility',
+        modify: 'Modify Contents',
+        annotations: 'Modify Annotations',
+        fillForms: 'Fill Forms',
+        assemble: 'Assemble Document',
+      },
+    },
+    common: {
+      close: 'Close',
+    },
   },
 };
 
@@ -202,6 +238,43 @@ export const spanishTranslations: Locale = {
       previousResult: 'Resultado anterior',
       nextResult: 'Resultado siguiente',
       page: 'Página {number}',
+    },
+    security: {
+      protected: {
+        title: 'Documento Protegido',
+        description:
+          'Este documento tiene permisos restringidos. Algunas funciones pueden estar limitadas.',
+        viewPermissions: 'Ver Permisos',
+      },
+      viewPermissions: {
+        title: 'Permisos del Documento',
+        description:
+          'Este documento está protegido. Ingrese la contraseña del propietario para desbloquear todos los permisos.',
+        restrictedActions: 'Permisos del Documento',
+      },
+      unlock: {
+        label: 'Contraseña del Propietario',
+        placeholder: 'Ingrese la contraseña del propietario',
+        button: 'Desbloquear',
+        success: 'Permisos completos desbloqueados exitosamente.',
+        invalidPassword: 'Contraseña del propietario inválida. Por favor intente de nuevo.',
+        failed: 'Error al desbloquear permisos.',
+      },
+    },
+    protect: {
+      permissions: {
+        print: 'Imprimir',
+        printHighQuality: 'Impresión de Alta Calidad',
+        copy: 'Copiar Contenido',
+        accessibility: 'Extraer para Accesibilidad',
+        modify: 'Modificar Contenido',
+        annotations: 'Modificar Anotaciones',
+        fillForms: 'Rellenar Formularios',
+        assemble: 'Ensamblar Documento',
+      },
+    },
+    common: {
+      close: 'Cerrar',
     },
   },
 };
@@ -305,6 +378,43 @@ export const germanTranslations: Locale = {
       nextResult: 'Nächstes Ergebnis',
       page: 'Seite {number}',
     },
+    security: {
+      protected: {
+        title: 'Geschütztes Dokument',
+        description:
+          'Dieses Dokument hat eingeschränkte Berechtigungen. Einige Funktionen können begrenzt sein.',
+        viewPermissions: 'Berechtigungen anzeigen',
+      },
+      viewPermissions: {
+        title: 'Dokumentberechtigungen',
+        description:
+          'Dieses Dokument ist geschützt. Geben Sie das Eigentümer-Passwort ein, um alle Berechtigungen freizuschalten.',
+        restrictedActions: 'Dokumentberechtigungen',
+      },
+      unlock: {
+        label: 'Eigentümer-Passwort',
+        placeholder: 'Eigentümer-Passwort eingeben',
+        button: 'Freischalten',
+        success: 'Volle Berechtigungen erfolgreich freigeschaltet.',
+        invalidPassword: 'Ungültiges Eigentümer-Passwort. Bitte versuchen Sie es erneut.',
+        failed: 'Fehler beim Freischalten der Berechtigungen.',
+      },
+    },
+    protect: {
+      permissions: {
+        print: 'Drucken',
+        printHighQuality: 'Hochqualitativer Druck',
+        copy: 'Inhalte kopieren',
+        accessibility: 'Für Barrierefreiheit extrahieren',
+        modify: 'Inhalte ändern',
+        annotations: 'Anmerkungen ändern',
+        fillForms: 'Formulare ausfüllen',
+        assemble: 'Dokument zusammenstellen',
+      },
+    },
+    common: {
+      close: 'Schließen',
+    },
   },
 };
 
@@ -406,6 +516,43 @@ export const dutchTranslations: Locale = {
       previousResult: 'Vorig resultaat',
       nextResult: 'Volgend resultaat',
       page: 'Pagina {number}',
+    },
+    security: {
+      protected: {
+        title: 'Beveiligd Document',
+        description:
+          'Dit document heeft beperkte machtigingen. Sommige functies kunnen beperkt zijn.',
+        viewPermissions: 'Machtigingen bekijken',
+      },
+      viewPermissions: {
+        title: 'Documentmachtigingen',
+        description:
+          'Dit document is beveiligd. Voer het eigenaarswachtwoord in om alle machtigingen te ontgrendelen.',
+        restrictedActions: 'Documentmachtigingen',
+      },
+      unlock: {
+        label: 'Eigenaarswachtwoord',
+        placeholder: 'Voer eigenaarswachtwoord in',
+        button: 'Ontgrendelen',
+        success: 'Volledige machtigingen succesvol ontgrendeld.',
+        invalidPassword: 'Ongeldig eigenaarswachtwoord. Probeer het opnieuw.',
+        failed: 'Ontgrendelen van machtigingen mislukt.',
+      },
+    },
+    protect: {
+      permissions: {
+        print: 'Afdrukken',
+        printHighQuality: 'Hoge Kwaliteit Afdrukken',
+        copy: 'Inhoud kopiëren',
+        accessibility: 'Extraheren voor toegankelijkheid',
+        modify: 'Inhoud wijzigen',
+        annotations: 'Annotaties wijzigen',
+        fillForms: 'Formulieren invullen',
+        assemble: 'Document samenstellen',
+      },
+    },
+    common: {
+      close: 'Sluiten',
     },
   },
 };

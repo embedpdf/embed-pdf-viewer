@@ -13,6 +13,9 @@ export const SET_ACTIVE_DOCUMENT = 'SET_ACTIVE_DOCUMENT';
 export const REORDER_DOCUMENTS = 'REORDER_DOCUMENTS';
 export const MOVE_DOCUMENT = 'MOVE_DOCUMENT';
 
+// Security actions
+export const UPDATE_DOCUMENT_SECURITY = 'UPDATE_DOCUMENT_SECURITY';
+
 // Document-specific actions
 export const REFRESH_DOCUMENT = 'REFRESH_DOCUMENT';
 export const REFRESH_PAGES = 'REFRESH_PAGES';
@@ -41,6 +44,7 @@ export const CORE_ACTION_TYPES = [
   SET_DEFAULT_ROTATION,
   REORDER_DOCUMENTS,
   MOVE_DOCUMENT,
+  UPDATE_DOCUMENT_SECURITY,
 ] as const;
 
 // ─────────────────────────────────────────────────────────
@@ -120,6 +124,19 @@ export interface MoveDocumentAction {
 }
 
 // ─────────────────────────────────────────────────────────
+// Security Actions
+// ─────────────────────────────────────────────────────────
+
+export interface UpdateDocumentSecurityAction {
+  type: typeof UPDATE_DOCUMENT_SECURITY;
+  payload: {
+    documentId: string;
+    permissions: number;
+    isOwnerUnlocked: boolean;
+  };
+}
+
+// ─────────────────────────────────────────────────────────
 // Document-Specific Actions
 // ─────────────────────────────────────────────────────────
 
@@ -193,7 +210,8 @@ export type DocumentAction =
   | SetDefaultScaleAction
   | SetDefaultRotationAction
   | ReorderDocumentsAction
-  | MoveDocumentAction;
+  | MoveDocumentAction
+  | UpdateDocumentSecurityAction;
 
 // Core actions
 export type CoreAction = DocumentAction;
@@ -300,4 +318,13 @@ export const reorderDocuments = (order: string[]): CoreAction => ({
 export const moveDocument = (documentId: string, toIndex: number): CoreAction => ({
   type: MOVE_DOCUMENT,
   payload: { documentId, toIndex },
+});
+
+export const updateDocumentSecurity = (
+  documentId: string,
+  permissions: number,
+  isOwnerUnlocked: boolean,
+): CoreAction => ({
+  type: UPDATE_DOCUMENT_SECURITY,
+  payload: { documentId, permissions, isOwnerUnlocked },
 });

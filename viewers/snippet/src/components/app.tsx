@@ -137,6 +137,9 @@ import { EmptyState } from '@/components/empty-state';
 import { DocumentPasswordPrompt } from '@/components/document-password-prompt';
 import { ModeSelectButton } from './mode-select-button';
 import { Capture } from '@/components/capture';
+import { ProtectModal } from './protect-modal';
+import { UnlockOwnerOverlay } from './unlock-owner-overlay';
+import { ViewPermissionsModal } from './view-permissions-modal';
 
 // ============================================================================
 // Main Configuration Interface - Uses actual plugin config types directly
@@ -458,8 +461,11 @@ export function PDFViewer({ config, onRegistryReady }: PDFViewerProps) {
       'outline-sidebar': OutlineSidebar,
       'comment-sidebar': CommentSidebar,
       'print-modal': PrintModal,
+      'protect-modal': ProtectModal,
+      'unlock-owner-overlay': UnlockOwnerOverlay,
       'page-controls': PageControls,
       'mode-select-button': ModeSelectButton,
+      'view-permissions-modal': ViewPermissionsModal,
     }),
     [],
   );

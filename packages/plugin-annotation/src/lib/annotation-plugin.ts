@@ -10,6 +10,7 @@ import {
   AnnotationCreateContext,
   uuidV4,
   PdfAnnotationSubtype,
+  PdfPermissionFlag,
 } from '@embedpdf/models';
 import {
   AnnotationCapability,
@@ -199,6 +200,11 @@ export class AnnotationPlugin extends BasePlugin<
     });
 
     this.selection?.onEndSelection(({ documentId }) => {
+      // Prevent creating annotations from text selection if no permission
+      if (!this.checkPermission(documentId, PdfPermissionFlag.ModifyAnnotations)) {
+        return;
+      }
+
       const activeTool = this.getActiveTool(documentId);
       if (!activeTool || !activeTool.interaction.textSelection) return;
 
@@ -581,8 +587,19 @@ export class AnnotationPlugin extends BasePlugin<
     ctx?: AnnotationCreateContext<A>,
     documentId?: string,
   ) {
-    const id = annotation.id;
     const docId = documentId ?? this.getActiveDocumentId();
+
+    // Prevent creating annotations without permission
+    if (!this.checkPermission(docId, PdfPermissionFlag.ModifyAnnotations)) {
+      this.logger.debug(
+        'AnnotationPlugin',
+        'CreateAnnotation',
+        `Cannot create annotation: document ${docId} lacks ModifyAnnotations permission`,
+      );
+      return;
+    }
+
+    const id = annotation.id;
     const contexts = this.pendingContexts.get(docId);
     if (!contexts) return;
 
@@ -643,6 +660,17 @@ export class AnnotationPlugin extends BasePlugin<
     documentId?: string,
   ) {
     const docId = documentId ?? this.getActiveDocumentId();
+
+    // Prevent updating annotations without permission
+    if (!this.checkPermission(docId, PdfPermissionFlag.ModifyAnnotations)) {
+      this.logger.debug(
+        'AnnotationPlugin',
+        'UpdateAnnotation',
+        `Cannot update annotation: document ${docId} lacks ModifyAnnotations permission`,
+      );
+      return;
+    }
+
     const docState = this.getDocumentState(docId);
     const originalObject = docState.byUid[id].object;
     const finalPatch = this.buildPatch(originalObject, {
@@ -692,6 +720,17 @@ export class AnnotationPlugin extends BasePlugin<
 
   private deleteAnnotation(pageIndex: number, id: string, documentId?: string) {
     const docId = documentId ?? this.getActiveDocumentId();
+
+    // Prevent deleting annotations without permission
+    if (!this.checkPermission(docId, PdfPermissionFlag.ModifyAnnotations)) {
+      this.logger.debug(
+        'AnnotationPlugin',
+        'DeleteAnnotation',
+        `Cannot delete annotation: document ${docId} lacks ModifyAnnotations permission`,
+      );
+      return;
+    }
+
     const docState = this.getDocumentState(docId);
     const originalAnnotation = docState.byUid[id]?.object;
     if (!originalAnnotation) return;
@@ -748,6 +787,18 @@ export class AnnotationPlugin extends BasePlugin<
 
   public setActiveTool(toolId: string | null, documentId?: string): void {
     const docId = documentId ?? this.getActiveDocumentId();
+
+    // Prevent activating annotation tools without permission
+    // Allow null (deselect tool) even without permission
+    if (toolId !== null && !this.checkPermission(docId, PdfPermissionFlag.ModifyAnnotations)) {
+      this.logger.debug(
+        'AnnotationPlugin',
+        'SetActiveTool',
+        `Cannot activate tool: document ${docId} lacks ModifyAnnotations permission`,
+      );
+      return;
+    }
+
     const docState = this.getDocumentState(docId);
     if (toolId === docState.activeToolId) return;
 

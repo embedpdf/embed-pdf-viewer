@@ -963,6 +963,12 @@ export const viewerUISchema: UISchema = {
         },
         {
           type: 'command',
+          id: 'document:protect',
+          commandId: 'document:protect',
+          categories: ['document', 'document-protect'],
+        },
+        {
+          type: 'command',
           id: 'document:capture',
           commandId: 'document:capture',
           categories: ['document', 'document-capture'],
@@ -977,7 +983,7 @@ export const viewerUISchema: UISchema = {
           type: 'divider',
           id: 'divider-11',
           visibilityDependsOn: {
-            itemIds: ['document:export', 'document:print', 'document:capture'],
+            itemIds: ['document:export', 'document:print', 'document:capture', 'document:protect'],
           },
         },
         {
@@ -1214,6 +1220,26 @@ export const viewerUISchema: UISchema = {
       closeOnClickOutside: true,
       closeOnEscape: true,
     },
+    'protect-modal': {
+      id: 'protect-modal',
+      content: {
+        type: 'component',
+        componentId: 'protect-modal',
+      },
+      maxWidth: '28rem',
+      closeOnClickOutside: true,
+      closeOnEscape: true,
+    },
+    'view-permissions-modal': {
+      id: 'view-permissions-modal',
+      content: {
+        type: 'component',
+        componentId: 'view-permissions-modal',
+      },
+      maxWidth: '28rem',
+      closeOnClickOutside: true,
+      closeOnEscape: true,
+    },
   },
 
   // ─────────────────────────────────────────────────────────
@@ -1231,6 +1257,21 @@ export const viewerUISchema: UISchema = {
       content: {
         type: 'component',
         componentId: 'page-controls',
+      },
+      defaultEnabled: true,
+    },
+    'unlock-owner-overlay': {
+      id: 'unlock-owner-overlay',
+      position: {
+        anchor: 'bottom-right',
+        offset: {
+          bottom: '1.5rem',
+          right: '1.5rem',
+        },
+      },
+      content: {
+        type: 'component',
+        componentId: 'unlock-owner-overlay',
       },
       defaultEnabled: true,
     },

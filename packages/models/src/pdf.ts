@@ -55,6 +55,22 @@ export interface PdfDocumentObject {
    * Pages in this document
    */
   pages: PdfPageObject[];
+
+  /**
+   * Whether the document is encrypted
+   */
+  isEncrypted: boolean;
+
+  /**
+   * Whether owner permissions are currently unlocked
+   */
+  isOwnerUnlocked: boolean;
+
+  /**
+   * Raw permission flags from FPDF_GetDocPermissions.
+   * Use PdfPermissionFlag to check individual permissions.
+   */
+  permissions: number;
 }
 
 /**
@@ -2331,15 +2347,75 @@ export interface PdfAnnotationTransformation {
  */
 export type PdfFileContent = ArrayBuffer;
 
-export enum PdfPermission {
-  PrintDocument = 2 ** 3,
-  ModifyContent = 2 ** 4,
-  CopyOrExtract = 2 ** 5,
-  AddOrModifyTextAnnot = 2 ** 6,
-  FillInExistingForm = 2 ** 9,
-  ExtractTextOrGraphics = 2 ** 10,
-  AssembleDocument = 2 ** 11,
-  PrintHighQuality = 2 ** 12,
+/**
+ * PDF permission flags per ISO 32000-1 Table 22
+ * These are the flags to pass to setDocumentEncryption indicating what actions ARE ALLOWED.
+ * Use buildPermissions() helper to combine flags.
+ *
+ * @public
+ */
+export enum PdfPermissionFlag {
+  /** Bit 3: Print (possibly degraded quality) */
+  Print = 1 << 2,
+  /** Bit 4: Modify document contents */
+  ModifyContents = 1 << 3,
+  /** Bit 5: Copy/extract text and graphics */
+  CopyContents = 1 << 4,
+  /** Bit 6: Add/modify annotations, fill forms */
+  ModifyAnnotations = 1 << 5,
+  /** Bit 9: Fill in existing form fields */
+  FillForms = 1 << 8,
+  /** Bit 10: Extract for accessibility */
+  ExtractForAccessibility = 1 << 9,
+  /** Bit 11: Assemble document (insert, rotate, delete pages) */
+  AssembleDocument = 1 << 10,
+  /** Bit 12: High quality print */
+  PrintHighQuality = 1 << 11,
+
+  /** Common combination: Allow all permissions */
+  AllowAll = Print |
+    ModifyContents |
+    CopyContents |
+    ModifyAnnotations |
+    FillForms |
+    ExtractForAccessibility |
+    AssembleDocument |
+    PrintHighQuality,
+}
+
+/**
+ * Helper function to combine permission flags for setDocumentEncryption.
+ * Note: PrintHighQuality automatically includes Print (enforced in C++ layer as well).
+ *
+ * @param flags - Permission flags to combine
+ * @returns Combined permission flags as a number
+ *
+ * @public
+ */
+export function buildPermissions(...flags: PdfPermissionFlag[]): number {
+  let result = flags.reduce((acc, flag) => acc | flag, 0);
+  // Enforce: PrintHighQuality implies Print
+  if (result & PdfPermissionFlag.PrintHighQuality) {
+    result |= PdfPermissionFlag.Print;
+  }
+  return result;
+}
+
+/**
+ * Error thrown when a permission check fails.
+ *
+ * @public
+ */
+export class PermissionDeniedError extends Error {
+  public readonly name = 'PermissionDeniedError';
+
+  constructor(
+    public readonly requiredFlags: PdfPermissionFlag[],
+    public readonly currentPermissions: number,
+  ) {
+    const flagNames = requiredFlags.map((f) => PdfPermissionFlag[f]).join(', ');
+    super(`Permission denied. Required: ${flagNames}`);
+  }
 }
 
 export enum PdfPageFlattenFlag {
@@ -3023,6 +3099,48 @@ export interface PdfEngine<T = Blob> {
    * @returns task that all documents are closed or not
    */
   closeAllDocuments: () => PdfTask<boolean>;
+  /**
+   * Sets AES-256 encryption on a document.
+   * Must be called before saveAsCopy() for encryption to take effect.
+   * @param doc - pdf document
+   * @param userPassword - Password to open document (empty = no open password)
+   * @param ownerPassword - Password to change permissions (required)
+   * @param allowedFlags - OR'd PdfPermissionFlag values indicating allowed actions
+   * @returns task indicating success or failure
+   */
+  setDocumentEncryption: (
+    doc: PdfDocumentObject,
+    userPassword: string,
+    ownerPassword: string,
+    allowedFlags: number,
+  ) => PdfTask<boolean>;
+  /**
+   * Marks document for encryption removal on save.
+   * Call this to remove password protection when saving.
+   * @param doc - pdf document
+   * @returns task indicating success
+   */
+  removeEncryption: (doc: PdfDocumentObject) => PdfTask<boolean>;
+  /**
+   * Attempt to unlock owner permissions on an encrypted document.
+   * Call this after opening a document with user-level access to gain full permissions.
+   * @param doc - pdf document
+   * @param ownerPassword - the owner password
+   * @returns task that indicates whether unlock succeeded
+   */
+  unlockOwnerPermissions: (doc: PdfDocumentObject, ownerPassword: string) => PdfTask<boolean>;
+  /**
+   * Check if a document is encrypted.
+   * @param doc - pdf document
+   * @returns task that resolves to true if the document is encrypted
+   */
+  isEncrypted: (doc: PdfDocumentObject) => PdfTask<boolean>;
+  /**
+   * Check if owner permissions are currently unlocked.
+   * @param doc - pdf document
+   * @returns task that resolves to true if owner permissions are unlocked
+   */
+  isOwnerUnlocked: (doc: PdfDocumentObject) => PdfTask<boolean>;
 }
 
 /**
@@ -3176,6 +3294,18 @@ export interface IPdfiumExecutor {
   saveAsCopy(doc: PdfDocumentObject): PdfTask<ArrayBuffer>;
   closeDocument(doc: PdfDocumentObject): PdfTask<boolean>;
   closeAllDocuments(): PdfTask<boolean>;
+
+  // Security operations
+  setDocumentEncryption(
+    doc: PdfDocumentObject,
+    userPassword: string,
+    ownerPassword: string,
+    allowedFlags: number,
+  ): PdfTask<boolean>;
+  removeEncryption(doc: PdfDocumentObject): PdfTask<boolean>;
+  unlockOwnerPermissions(doc: PdfDocumentObject, ownerPassword: string): PdfTask<boolean>;
+  isEncrypted(doc: PdfDocumentObject): PdfTask<boolean>;
+  isOwnerUnlocked(doc: PdfDocumentObject): PdfTask<boolean>;
 }
 
 /**

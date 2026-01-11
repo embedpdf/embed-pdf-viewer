@@ -17,7 +17,7 @@
     e.preventDefault();
     if (!documentState?.id || !password) return;
 
-    documentManager.provides?.providePassword(documentState.id, password);
+    documentManager.provides?.retryDocument(documentState.id, { password });
     password = '';
     error = '';
   };

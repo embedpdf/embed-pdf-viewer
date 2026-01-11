@@ -369,6 +369,21 @@ export class EngineRunner {
       case 'preparePrintDocument':
         task = engine.preparePrintDocument!(...args);
         break;
+      case 'setDocumentEncryption':
+        task = engine.setDocumentEncryption(...args);
+        break;
+      case 'removeEncryption':
+        task = engine.removeEncryption(...args);
+        break;
+      case 'unlockOwnerPermissions':
+        task = engine.unlockOwnerPermissions(...args);
+        break;
+      case 'isEncrypted':
+        task = engine.isEncrypted(...args);
+        break;
+      case 'isOwnerUnlocked':
+        task = engine.isOwnerUnlocked(...args);
+        break;
       default:
         // This should never be reached due to the earlier check, but provides exhaustiveness
         const error: PdfEngineError = {

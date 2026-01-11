@@ -39,12 +39,16 @@ export const useUIState = (documentId: MaybeRefOrGetter<string>) => {
       const unsubMenu = scope.onMenuChanged(() => {
         state.value = scope.getState();
       });
+      const unsubOverlay = scope.onOverlayChanged(() => {
+        state.value = scope.getState();
+      });
 
       onCleanup(() => {
         unsubToolbar();
         unsubSidebar();
         unsubModal();
         unsubMenu();
+        unsubOverlay();
       });
     },
     { immediate: true },

@@ -6,3 +6,6 @@ export { default as Search } from './Search.svelte';
 export { default as PrintDialog } from './PrintDialog.svelte';
 export { default as AnnotationSelectionMenu } from './AnnotationSelectionMenu.svelte';
 export { default as SelectionSelectionMenu } from './SelectionSelectionMenu.svelte';
+export { default as PermissionsDisplay } from './PermissionsDisplay.svelte';
+export { default as UnlockOwnerOverlay } from './UnlockOwnerOverlay.svelte';
+export { default as ViewPermissionsModal } from './ViewPermissionsModal.svelte';

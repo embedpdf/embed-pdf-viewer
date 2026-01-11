@@ -45,7 +45,7 @@ export function CommandButton({
       content={command.label}
       position="bottom"
       delay={500}
-      trigger={command.active ? 'none' : 'hover'}
+      trigger={command.active || command.disabled ? 'none' : 'hover'}
     >
       <Button
         elementRef={anchorRef}

@@ -41,6 +41,7 @@ export const englishTranslations: Locale = {
       open: 'Open',
       close: 'Close',
       print: 'Print',
+      protect: 'Security',
       export: 'Export',
       fullscreen: 'Fullscreen',
       loading: 'Loading document...',
@@ -215,6 +216,93 @@ export const englishTranslations: Locale = {
       print: 'Print',
       cancel: 'Cancel',
     },
+    protect: {
+      title: 'Protect Document',
+      cancel: 'Cancel',
+      apply: 'Apply Protection',
+      applying: 'Applying...',
+      applyFailed: 'Failed to apply protection. Please try again.',
+      removeFailed: 'Failed to remove protection. Please try again.',
+      passwordMismatch: 'Passwords do not match',
+      noProtectionSelected: 'Select at least one protection option to apply.',
+      bothPasswordsNote:
+        'Users who open with the document password will have restricted permissions. Use the owner password to unlock full access.',
+      openPassword: {
+        title: 'Require password to open',
+        description: 'Users must enter a password to view this document.',
+        label: 'Document Password',
+        placeholder: 'Enter password',
+        confirm: 'Confirm Password',
+        confirmPlaceholder: 'Confirm password',
+      },
+      ownerPassword: {
+        label: 'Owner Password',
+        placeholder: 'Enter owner password',
+        confirm: 'Confirm Owner Password',
+        confirmPlaceholder: 'Confirm owner password',
+      },
+      permissions: {
+        title: 'Restrict permissions',
+        description: 'Limit what users can do with this document.',
+        allowedActions: 'Allowed actions',
+        print: 'Print',
+        printHighQuality: 'Print high quality',
+        copy: 'Copy content',
+        accessibility: 'Extract for accessibility',
+        modify: 'Modify content',
+        annotations: 'Add/modify annotations & comments',
+        fillForms: 'Fill forms & sign',
+        assemble: 'Assemble & extract pages',
+      },
+      encrypted: {
+        title: 'Document is Protected',
+        description:
+          'This document is protected by the owner. Enter the owner password to modify security settings.',
+        enterOwnerPassword: 'Enter Owner Password to Modify',
+        unlockAndEdit: 'Unlock & Edit',
+      },
+      modifyProtection: {
+        title: 'Modify Protection',
+        description: 'Choose how you want to modify the document protection.',
+        changeOption: 'Change Passwords or Permissions',
+        changeDescription: 'Update the document password or permission settings.',
+        removeOption: 'Remove All Protection',
+        removeDescription: 'Remove password protection from this document.',
+      },
+      removeProtection: {
+        title: 'Remove Protection',
+        warning: 'Are you sure you want to remove protection?',
+        description:
+          'This will remove all password protection from the document. Anyone will be able to open and modify it.',
+        confirm: 'Remove Protection',
+      },
+    },
+    security: {
+      protected: {
+        title: 'This Document is Protected',
+        description:
+          'This file is protected and some features may be disabled. Go to Security in the document menu to view or unlock permissions.',
+        viewPermissions: 'View permissions',
+      },
+      viewPermissions: {
+        title: 'Document Permissions',
+        description:
+          'This file is restricted by the owner and requires a password to unlock certain actions.',
+        restrictedActions: 'Restricted Actions',
+      },
+      unlock: {
+        label: 'Enter Owner Password to Unlock File',
+        placeholder: 'Enter owner password',
+        button: 'Unlock file',
+        invalidPassword: 'Invalid password. Please try again.',
+        failed: 'Failed to unlock. Please try again.',
+        success: 'Owner permissions unlocked! You now have full access.',
+      },
+    },
+    common: {
+      close: 'Close',
+      back: 'Back',
+    },
   },
 };
 
@@ -257,6 +345,7 @@ export const germanTranslations: Locale = {
       open: 'Öffnen',
       close: 'Schließen',
       print: 'Drucken',
+      protect: 'Sicherheit',
       export: 'Exportieren',
       fullscreen: 'Vollbild',
       loading: 'Dokument wird geladen...',
@@ -431,6 +520,94 @@ export const germanTranslations: Locale = {
       print: 'Drucken',
       cancel: 'Abbrechen',
     },
+    protect: {
+      title: 'Dokument schützen',
+      cancel: 'Abbrechen',
+      apply: 'Schutz anwenden',
+      applying: 'Wird angewendet...',
+      applyFailed: 'Schutz konnte nicht angewendet werden. Bitte versuchen Sie es erneut.',
+      removeFailed: 'Schutz konnte nicht entfernt werden. Bitte versuchen Sie es erneut.',
+      passwordMismatch: 'Passwörter stimmen nicht überein',
+      noProtectionSelected: 'Wählen Sie mindestens eine Schutzoption aus.',
+      bothPasswordsNote:
+        'Benutzer, die das Dokumentpasswort eingeben, haben eingeschränkte Berechtigungen. Verwenden Sie das Eigentümerpasswort für vollen Zugriff.',
+      openPassword: {
+        title: 'Passwort zum Öffnen erforderlich',
+        description: 'Benutzer müssen ein Passwort eingeben, um dieses Dokument anzuzeigen.',
+        label: 'Dokumentpasswort',
+        placeholder: 'Passwort eingeben',
+        confirm: 'Passwort bestätigen',
+        confirmPlaceholder: 'Passwort bestätigen',
+      },
+      ownerPassword: {
+        label: 'Eigentümerpasswort',
+        placeholder: 'Eigentümerpasswort eingeben',
+        confirm: 'Eigentümerpasswort bestätigen',
+        confirmPlaceholder: 'Eigentümerpasswort bestätigen',
+      },
+      permissions: {
+        title: 'Berechtigungen einschränken',
+        description: 'Beschränken Sie, was Benutzer mit diesem Dokument tun können.',
+        allowedActions: 'Erlaubte Aktionen',
+        print: 'Drucken',
+        printHighQuality: 'In hoher Qualität drucken',
+        copy: 'Inhalt kopieren',
+        accessibility: 'Für Barrierefreiheit extrahieren',
+        modify: 'Inhalt ändern',
+        annotations: 'Anmerkungen & Kommentare hinzufügen/ändern',
+        fillForms: 'Formulare ausfüllen & unterschreiben',
+        assemble: 'Dokument zusammenstellen & Seiten extrahieren',
+      },
+      encrypted: {
+        title: 'Dokument ist geschützt',
+        description:
+          'Dieses Dokument ist vom Eigentümer geschützt. Geben Sie das Eigentümerpasswort ein, um die Sicherheitseinstellungen zu ändern.',
+        enterOwnerPassword: 'Eigentümerpasswort eingeben zum Ändern',
+        unlockAndEdit: 'Entsperren & Bearbeiten',
+      },
+      modifyProtection: {
+        title: 'Schutz ändern',
+        description: 'Wählen Sie, wie Sie den Dokumentschutz ändern möchten.',
+        changeOption: 'Passwörter oder Berechtigungen ändern',
+        changeDescription:
+          'Aktualisieren Sie das Dokumentpasswort oder die Berechtigungseinstellungen.',
+        removeOption: 'Gesamten Schutz entfernen',
+        removeDescription: 'Passwortschutz von diesem Dokument entfernen.',
+      },
+      removeProtection: {
+        title: 'Schutz entfernen',
+        warning: 'Sind Sie sicher, dass Sie den Schutz entfernen möchten?',
+        description:
+          'Dadurch wird der gesamte Passwortschutz vom Dokument entfernt. Jeder kann es öffnen und bearbeiten.',
+        confirm: 'Schutz entfernen',
+      },
+    },
+    security: {
+      protected: {
+        title: 'Dieses Dokument ist geschützt',
+        description:
+          'Diese Datei ist geschützt und einige Funktionen sind möglicherweise deaktiviert. Gehen Sie zu Sicherheit im Dokumentmenü, um Berechtigungen anzuzeigen oder freizuschalten.',
+        viewPermissions: 'Berechtigungen anzeigen',
+      },
+      viewPermissions: {
+        title: 'Dokumentberechtigungen',
+        description:
+          'Diese Datei ist vom Eigentümer eingeschränkt und erfordert ein Passwort, um bestimmte Aktionen freizuschalten.',
+        restrictedActions: 'Eingeschränkte Aktionen',
+      },
+      unlock: {
+        label: 'Eigentümerpasswort eingeben zum Entsperren',
+        placeholder: 'Eigentümerpasswort eingeben',
+        button: 'Datei entsperren',
+        invalidPassword: 'Ungültiges Passwort. Bitte versuchen Sie es erneut.',
+        failed: 'Entsperren fehlgeschlagen. Bitte versuchen Sie es erneut.',
+        success: 'Eigentümerberechtigungen entsperrt! Sie haben jetzt vollen Zugriff.',
+      },
+    },
+    common: {
+      close: 'Schließen',
+      back: 'Zurück',
+    },
   },
 };
 
@@ -473,6 +650,7 @@ export const dutchTranslations: Locale = {
       open: 'Openen',
       close: 'Sluiten',
       print: 'Afdrukken',
+      protect: 'Beveiliging',
       export: 'Exporteren',
       fullscreen: 'Volledig scherm',
       loading: 'Document laden...',
@@ -648,6 +826,93 @@ export const dutchTranslations: Locale = {
       print: 'Afdrukken',
       cancel: 'Annuleren',
     },
+    protect: {
+      title: 'Document beveiligen',
+      cancel: 'Annuleren',
+      apply: 'Beveiliging toepassen',
+      applying: 'Bezig met toepassen...',
+      applyFailed: 'Beveiliging kon niet worden toegepast. Probeer het opnieuw.',
+      removeFailed: 'Beveiliging kon niet worden verwijderd. Probeer het opnieuw.',
+      passwordMismatch: 'Wachtwoorden komen niet overeen',
+      noProtectionSelected: 'Selecteer minimaal één beveiligingsoptie.',
+      bothPasswordsNote:
+        'Gebruikers die openen met het documentwachtwoord hebben beperkte rechten. Gebruik het eigenaarswachtwoord voor volledige toegang.',
+      openPassword: {
+        title: 'Wachtwoord vereist om te openen',
+        description: 'Gebruikers moeten een wachtwoord invoeren om dit document te bekijken.',
+        label: 'Documentwachtwoord',
+        placeholder: 'Wachtwoord invoeren',
+        confirm: 'Wachtwoord bevestigen',
+        confirmPlaceholder: 'Wachtwoord bevestigen',
+      },
+      ownerPassword: {
+        label: 'Eigenaarswachtwoord',
+        placeholder: 'Eigenaarswachtwoord invoeren',
+        confirm: 'Eigenaarswachtwoord bevestigen',
+        confirmPlaceholder: 'Eigenaarswachtwoord bevestigen',
+      },
+      permissions: {
+        title: 'Rechten beperken',
+        description: 'Beperk wat gebruikers met dit document kunnen doen.',
+        allowedActions: 'Toegestane acties',
+        print: 'Afdrukken',
+        printHighQuality: 'Hoge kwaliteit afdrukken',
+        copy: 'Inhoud kopiëren',
+        accessibility: 'Extraheren voor toegankelijkheid',
+        modify: 'Inhoud wijzigen',
+        annotations: 'Annotaties & opmerkingen toevoegen/wijzigen',
+        fillForms: 'Formulieren invullen & ondertekenen',
+        assemble: "Document samenstellen & pagina's extraheren",
+      },
+      encrypted: {
+        title: 'Document is beveiligd',
+        description:
+          'Dit document is beveiligd door de eigenaar. Voer het eigenaarswachtwoord in om beveiligingsinstellingen te wijzigen.',
+        enterOwnerPassword: 'Voer eigenaarswachtwoord in om te wijzigen',
+        unlockAndEdit: 'Ontgrendelen & Bewerken',
+      },
+      modifyProtection: {
+        title: 'Beveiliging wijzigen',
+        description: 'Kies hoe u de documentbeveiliging wilt wijzigen.',
+        changeOption: 'Wachtwoorden of rechten wijzigen',
+        changeDescription: 'Update het documentwachtwoord of rechtinstellingen.',
+        removeOption: 'Alle beveiliging verwijderen',
+        removeDescription: 'Verwijder wachtwoordbeveiliging van dit document.',
+      },
+      removeProtection: {
+        title: 'Beveiliging verwijderen',
+        warning: 'Weet u zeker dat u de beveiliging wilt verwijderen?',
+        description:
+          'Dit verwijdert alle wachtwoordbeveiliging van het document. Iedereen kan het openen en wijzigen.',
+        confirm: 'Beveiliging verwijderen',
+      },
+    },
+    security: {
+      protected: {
+        title: 'Dit document is beveiligd',
+        description:
+          'Dit bestand is beveiligd en sommige functies zijn mogelijk uitgeschakeld. Ga naar Beveiliging in het documentmenu om rechten te bekijken of te ontgrendelen.',
+        viewPermissions: 'Rechten bekijken',
+      },
+      viewPermissions: {
+        title: 'Documentrechten',
+        description:
+          'Dit bestand is beperkt door de eigenaar en vereist een wachtwoord om bepaalde acties te ontgrendelen.',
+        restrictedActions: 'Beperkte acties',
+      },
+      unlock: {
+        label: 'Voer eigenaarswachtwoord in om te ontgrendelen',
+        placeholder: 'Eigenaarswachtwoord invoeren',
+        button: 'Bestand ontgrendelen',
+        invalidPassword: 'Ongeldig wachtwoord. Probeer het opnieuw.',
+        failed: 'Ontgrendelen mislukt. Probeer het opnieuw.',
+        success: 'Eigenaarrechten ontgrendeld! U heeft nu volledige toegang.',
+      },
+    },
+    common: {
+      close: 'Sluiten',
+      back: 'Terug',
+    },
   },
 };
 
@@ -690,6 +955,7 @@ export const frenchTranslations: Locale = {
       open: 'Ouvrir',
       close: 'Fermer',
       print: 'Imprimer',
+      protect: 'Sécurité',
       export: 'Exporter',
       fullscreen: 'Plein écran',
       loading: 'Chargement du document...',
@@ -864,6 +1130,94 @@ export const frenchTranslations: Locale = {
       print: 'Imprimer',
       cancel: 'Annuler',
     },
+    protect: {
+      title: 'Protéger le document',
+      cancel: 'Annuler',
+      apply: 'Appliquer la protection',
+      applying: 'Application en cours...',
+      applyFailed: "Échec de l'application de la protection. Veuillez réessayer.",
+      removeFailed: 'Échec de la suppression de la protection. Veuillez réessayer.',
+      passwordMismatch: 'Les mots de passe ne correspondent pas',
+      noProtectionSelected: 'Sélectionnez au moins une option de protection.',
+      bothPasswordsNote:
+        'Les utilisateurs qui ouvrent avec le mot de passe du document auront des permissions limitées. Utilisez le mot de passe propriétaire pour un accès complet.',
+      openPassword: {
+        title: "Mot de passe requis pour l'ouverture",
+        description: 'Les utilisateurs doivent entrer un mot de passe pour voir ce document.',
+        label: 'Mot de passe du document',
+        placeholder: 'Entrer le mot de passe',
+        confirm: 'Confirmer le mot de passe',
+        confirmPlaceholder: 'Confirmer le mot de passe',
+      },
+      ownerPassword: {
+        label: 'Mot de passe propriétaire',
+        placeholder: 'Entrer le mot de passe propriétaire',
+        confirm: 'Confirmer le mot de passe propriétaire',
+        confirmPlaceholder: 'Confirmer le mot de passe propriétaire',
+      },
+      permissions: {
+        title: 'Restreindre les permissions',
+        description: 'Limitez ce que les utilisateurs peuvent faire avec ce document.',
+        allowedActions: 'Actions autorisées',
+        print: 'Imprimer',
+        printHighQuality: 'Imprimer en haute qualité',
+        copy: 'Copier le contenu',
+        accessibility: "Extraire pour l'accessibilité",
+        modify: 'Modifier le contenu',
+        annotations: 'Ajouter/modifier les annotations et commentaires',
+        fillForms: 'Remplir les formulaires et signer',
+        assemble: 'Assembler le document et extraire les pages',
+      },
+      encrypted: {
+        title: 'Document protégé',
+        description:
+          'Ce document est protégé par le propriétaire. Entrez le mot de passe propriétaire pour modifier les paramètres de sécurité.',
+        enterOwnerPassword: 'Entrer le mot de passe propriétaire pour modifier',
+        unlockAndEdit: 'Déverrouiller & Modifier',
+      },
+      modifyProtection: {
+        title: 'Modifier la protection',
+        description: 'Choisissez comment vous voulez modifier la protection du document.',
+        changeOption: 'Modifier les mots de passe ou les permissions',
+        changeDescription:
+          'Mettre à jour le mot de passe du document ou les paramètres de permissions.',
+        removeOption: 'Supprimer toute la protection',
+        removeDescription: 'Supprimer la protection par mot de passe de ce document.',
+      },
+      removeProtection: {
+        title: 'Supprimer la protection',
+        warning: 'Êtes-vous sûr de vouloir supprimer la protection ?',
+        description:
+          "Cela supprimera toute la protection par mot de passe du document. Tout le monde pourra l'ouvrir et le modifier.",
+        confirm: 'Supprimer la protection',
+      },
+    },
+    security: {
+      protected: {
+        title: 'Ce document est protégé',
+        description:
+          'Ce fichier est protégé et certaines fonctionnalités peuvent être désactivées. Allez dans Sécurité dans le menu document pour afficher ou déverrouiller les permissions.',
+        viewPermissions: 'Voir les permissions',
+      },
+      viewPermissions: {
+        title: 'Permissions du document',
+        description:
+          'Ce fichier est restreint par le propriétaire et nécessite un mot de passe pour débloquer certaines actions.',
+        restrictedActions: 'Actions restreintes',
+      },
+      unlock: {
+        label: 'Entrer le mot de passe propriétaire pour déverrouiller',
+        placeholder: 'Entrer le mot de passe propriétaire',
+        button: 'Déverrouiller le fichier',
+        invalidPassword: 'Mot de passe invalide. Veuillez réessayer.',
+        failed: 'Échec du déverrouillage. Veuillez réessayer.',
+        success: 'Permissions propriétaire déverrouillées ! Vous avez maintenant un accès complet.',
+      },
+    },
+    common: {
+      close: 'Fermer',
+      back: 'Retour',
+    },
   },
 };
 
@@ -906,6 +1260,7 @@ export const spanishTranslations: Locale = {
       open: 'Abrir',
       close: 'Cerrar',
       print: 'Imprimir',
+      protect: 'Seguridad',
       export: 'Exportar',
       fullscreen: 'Pantalla completa',
       loading: 'Cargando documento...',
@@ -1081,6 +1436,93 @@ export const spanishTranslations: Locale = {
       print: 'Imprimir',
       cancel: 'Cancelar',
     },
+    protect: {
+      title: 'Proteger documento',
+      cancel: 'Cancelar',
+      apply: 'Aplicar protección',
+      applying: 'Aplicando...',
+      applyFailed: 'No se pudo aplicar la protección. Por favor, inténtelo de nuevo.',
+      removeFailed: 'No se pudo eliminar la protección. Por favor, inténtelo de nuevo.',
+      passwordMismatch: 'Las contraseñas no coinciden',
+      noProtectionSelected: 'Seleccione al menos una opción de protección.',
+      bothPasswordsNote:
+        'Los usuarios que abran con la contraseña del documento tendrán permisos restringidos. Use la contraseña de propietario para acceso completo.',
+      openPassword: {
+        title: 'Contraseña requerida para abrir',
+        description: 'Los usuarios deben ingresar una contraseña para ver este documento.',
+        label: 'Contraseña del documento',
+        placeholder: 'Ingresar contraseña',
+        confirm: 'Confirmar contraseña',
+        confirmPlaceholder: 'Confirmar contraseña',
+      },
+      ownerPassword: {
+        label: 'Contraseña de propietario',
+        placeholder: 'Ingresar contraseña de propietario',
+        confirm: 'Confirmar contraseña de propietario',
+        confirmPlaceholder: 'Confirmar contraseña de propietario',
+      },
+      permissions: {
+        title: 'Restringir permisos',
+        description: 'Limite lo que los usuarios pueden hacer con este documento.',
+        allowedActions: 'Acciones permitidas',
+        print: 'Imprimir',
+        printHighQuality: 'Imprimir alta calidad',
+        copy: 'Copiar contenido',
+        accessibility: 'Extraer para accesibilidad',
+        modify: 'Modificar contenido',
+        annotations: 'Añadir/modificar anotaciones y comentarios',
+        fillForms: 'Rellenar formularios y firmar',
+        assemble: 'Ensamblar documento y extraer páginas',
+      },
+      encrypted: {
+        title: 'Documento protegido',
+        description:
+          'Este documento está protegido por el propietario. Ingrese la contraseña de propietario para modificar la configuración de seguridad.',
+        enterOwnerPassword: 'Ingrese la contraseña de propietario para modificar',
+        unlockAndEdit: 'Desbloquear y Editar',
+      },
+      modifyProtection: {
+        title: 'Modificar protección',
+        description: 'Elija cómo desea modificar la protección del documento.',
+        changeOption: 'Cambiar contraseñas o permisos',
+        changeDescription: 'Actualizar la contraseña del documento o la configuración de permisos.',
+        removeOption: 'Eliminar toda la protección',
+        removeDescription: 'Eliminar la protección por contraseña de este documento.',
+      },
+      removeProtection: {
+        title: 'Eliminar protección',
+        warning: '¿Está seguro de que desea eliminar la protección?',
+        description:
+          'Esto eliminará toda la protección por contraseña del documento. Cualquiera podrá abrirlo y modificarlo.',
+        confirm: 'Eliminar protección',
+      },
+    },
+    security: {
+      protected: {
+        title: 'Este documento está protegido',
+        description:
+          'Este archivo está protegido y algunas funciones pueden estar deshabilitadas. Vaya a Seguridad en el menú del documento para ver o desbloquear los permisos.',
+        viewPermissions: 'Ver permisos',
+      },
+      viewPermissions: {
+        title: 'Permisos del documento',
+        description:
+          'Este archivo está restringido por el propietario y requiere una contraseña para desbloquear ciertas acciones.',
+        restrictedActions: 'Acciones restringidas',
+      },
+      unlock: {
+        label: 'Ingrese la contraseña de propietario para desbloquear',
+        placeholder: 'Ingresar contraseña de propietario',
+        button: 'Desbloquear archivo',
+        invalidPassword: 'Contraseña inválida. Por favor, inténtelo de nuevo.',
+        failed: 'Error al desbloquear. Por favor, inténtelo de nuevo.',
+        success: '¡Permisos de propietario desbloqueados! Ahora tiene acceso completo.',
+      },
+    },
+    common: {
+      close: 'Cerrar',
+      back: 'Atrás',
+    },
   },
 };
 
@@ -1123,6 +1565,7 @@ export const simplifiedChineseTranslations: Locale = {
       open: '打开',
       close: '关闭',
       print: '打印',
+      protect: '安全',
       export: '导出',
       fullscreen: '全屏',
       loading: '文件加载中...',
@@ -1296,6 +1739,88 @@ export const simplifiedChineseTranslations: Locale = {
       printing: '打印中...',
       print: '打印',
       cancel: '取消',
+    },
+    protect: {
+      title: '文档保护',
+      cancel: '取消',
+      apply: '应用保护',
+      applying: '正在应用...',
+      applyFailed: '无法应用保护。请重试。',
+      removeFailed: '无法移除保护。请重试。',
+      passwordMismatch: '密码不匹配',
+      noProtectionSelected: '请至少选择一种保护方式。',
+      bothPasswordsNote: '使用文档密码打开的用户将受到权限限制。使用所有者密码可获得完全访问权限。',
+      openPassword: {
+        title: '需要密码才能打开',
+        description: '用户必须输入密码才能查看此文档。',
+        label: '文档密码',
+        placeholder: '输入密码',
+        confirm: '确认密码',
+        confirmPlaceholder: '确认密码',
+      },
+      ownerPassword: {
+        label: '所有者密码',
+        placeholder: '输入所有者密码',
+        confirm: '确认所有者密码',
+        confirmPlaceholder: '确认所有者密码',
+      },
+      permissions: {
+        title: '限制权限',
+        description: '限制用户对此文档的操作。',
+        allowedActions: '允许的操作',
+        print: '打印',
+        printHighQuality: '高质量打印',
+        copy: '复制内容',
+        accessibility: '提取辅助功能',
+        modify: '修改内容',
+        annotations: '添加/修改批注和评论',
+        fillForms: '填写表单和签名',
+        assemble: '组装文档和提取页面',
+      },
+      encrypted: {
+        title: '文档受保护',
+        description: '此文档已被所有者保护。请输入所有者密码以修改安全设置。',
+        enterOwnerPassword: '输入所有者密码以修改',
+        unlockAndEdit: '解锁并编辑',
+      },
+      modifyProtection: {
+        title: '修改保护',
+        description: '选择如何修改文档保护。',
+        changeOption: '更改密码或权限',
+        changeDescription: '更新文档密码或权限设置。',
+        removeOption: '移除所有保护',
+        removeDescription: '移除此文档的密码保护。',
+      },
+      removeProtection: {
+        title: '移除保护',
+        warning: '确定要移除保护吗？',
+        description: '这将移除文档的所有密码保护。任何人都可以打开和修改它。',
+        confirm: '移除保护',
+      },
+    },
+    security: {
+      protected: {
+        title: '此文档受保护',
+        description: '此文件受保护，某些功能可能被禁用。请在文档菜单中点击"安全"以查看或解锁权限。',
+        viewPermissions: '查看权限',
+      },
+      viewPermissions: {
+        title: '文档权限',
+        description: '此文件受所有者限制，需要密码才能解锁某些操作。',
+        restrictedActions: '受限操作',
+      },
+      unlock: {
+        label: '输入所有者密码以解锁文件',
+        placeholder: '输入所有者密码',
+        button: '解锁文件',
+        invalidPassword: '密码无效。请重试。',
+        failed: '解锁失败。请重试。',
+        success: '所有者权限已解锁！您现在拥有完全访问权限。',
+      },
+    },
+    common: {
+      close: '关闭',
+      back: '返回',
     },
   },
 };

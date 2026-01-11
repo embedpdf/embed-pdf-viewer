@@ -28,6 +28,14 @@
   import { CapturePluginPackage, MarqueeCapture } from '@embedpdf/plugin-capture/svelte';
   import { FullscreenPluginPackage } from '@embedpdf/plugin-fullscreen/svelte';
   import { HistoryPluginPackage } from '@embedpdf/plugin-history/svelte';
+  import { I18nPluginPackage } from '@embedpdf/plugin-i18n/svelte';
+  import {
+    englishTranslations,
+    germanTranslations,
+    spanishTranslations,
+    dutchTranslations,
+    paramResolvers,
+  } from '$lib/config/translations';
   import TabBar from '$lib/components/TabBar.svelte';
   import ViewerToolbar from '$lib/components/ViewerToolbar.svelte';
   import LoadingSpinner from '$lib/components/LoadingSpinner.svelte';
@@ -39,6 +47,8 @@
   import { ConsoleLogger } from '@embedpdf/models';
   import EmptyState from '$lib/components/EmptyState.svelte';
   import SelectionSelectionMenu from '$lib/components/SelectionSelectionMenu.svelte';
+  import UnlockOwnerOverlay from '$lib/components/UnlockOwnerOverlay.svelte';
+  import ViewPermissionsModal from '$lib/components/ViewPermissionsModal.svelte';
 
   const logger = new ConsoleLogger();
 
@@ -51,6 +61,9 @@
   };
 
   let sidebarStates = $state<Record<string, SidebarState>>({});
+
+  // Track permissions modal state per document
+  let permissionsModalStates = $state<Record<string, boolean>>({});
 
   const plugins = $derived.by(() => [
     createPluginRegistration(ViewportPluginPackage, {
@@ -86,6 +99,11 @@
       width: 120,
       paddingY: 10,
     }),
+    createPluginRegistration(I18nPluginPackage, {
+      defaultLocale: 'en',
+      locales: [englishTranslations, germanTranslations, spanishTranslations, dutchTranslations],
+      paramResolvers,
+    }),
   ]);
 
   const toggleSidebar = (documentId: string, sidebar: keyof SidebarState) => {
@@ -100,6 +118,18 @@
 
   const getSidebarState = (documentId: string): SidebarState => {
     return sidebarStates[documentId] || { search: false, thumbnails: false };
+  };
+
+  const openPermissionsModal = (documentId: string) => {
+    permissionsModalStates = { ...permissionsModalStates, [documentId]: true };
+  };
+
+  const closePermissionsModal = (documentId: string) => {
+    permissionsModalStates = { ...permissionsModalStates, [documentId]: false };
+  };
+
+  const isPermissionsModalOpen = (documentId: string): boolean => {
+    return permissionsModalStates[documentId] ?? false;
   };
 
   const handleInitialized = async (registry: PluginRegistry) => {
@@ -168,6 +198,21 @@
                           <DocumentPasswordPrompt {documentState} />
                         {:else if isLoaded}
                           <div class="relative h-full w-full">
+                            <!-- Security Overlay - Top Right -->
+                            <div class="pointer-events-none absolute right-4 top-4 z-50">
+                              <UnlockOwnerOverlay
+                                documentId={activeDocumentId}
+                                onViewPermissions={() => openPermissionsModal(activeDocumentId)}
+                              />
+                            </div>
+
+                            <!-- Permissions Modal -->
+                            <ViewPermissionsModal
+                              documentId={activeDocumentId}
+                              isOpen={isPermissionsModalOpen(activeDocumentId)}
+                              onClose={() => closePermissionsModal(activeDocumentId)}
+                            />
+
                             <GlobalPointerProvider documentId={activeDocumentId}>
                               <Viewport class="bg-gray-100" documentId={activeDocumentId}>
                                 <Scroller documentId={activeDocumentId}>

@@ -204,6 +204,7 @@ export function useSchemaRenderer(getDocumentId: () => string | null) {
      *
      * Overlays are floating components positioned over the document content.
      * Unlike modals, multiple overlays can be visible and they don't block interaction.
+     * Overlay visibility is controlled by the enabledOverlays state.
      *
      * @example
      * ```svelte
@@ -222,14 +223,21 @@ export function useSchemaRenderer(getDocumentId: () => string | null) {
       const schema = capability.provides?.getSchema();
       const documentId = getDocumentId();
 
-      if (!schema?.overlays || !documentId) return [];
+      if (!schema?.overlays || !documentId || !uiState.state) return [];
 
       const OverlayRenderer = renderers.overlay;
       if (!OverlayRenderer) {
         return [];
       }
 
-      return Object.values(schema.overlays).map((overlaySchema) => ({
+      const overlays = Object.values(schema.overlays);
+
+      // Filter overlays by enabled state (default to true if not explicitly set)
+      const enabledOverlays = overlays.filter(
+        (overlay) => uiState.state!.enabledOverlays[overlay.id] !== false,
+      );
+
+      return enabledOverlays.map((overlaySchema) => ({
         renderer: OverlayRenderer,
         schema: overlaySchema,
         documentId,

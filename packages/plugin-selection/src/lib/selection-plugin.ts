@@ -11,6 +11,7 @@ import {
   PdfTask,
   PdfTaskHelper,
   PdfErrorCode,
+  PdfPermissionFlag,
   ignore,
   PageTextSlice,
   Task,
@@ -579,6 +580,19 @@ export class SelectionPlugin extends BasePlugin<
   }
 
   private getSelectedText(documentId: string): PdfTask<string[]> {
+    // Prevent extracting text without permission
+    if (!this.checkPermission(documentId, PdfPermissionFlag.CopyContents)) {
+      this.logger.debug(
+        'SelectionPlugin',
+        'GetSelectedText',
+        `Cannot get selected text: document ${documentId} lacks CopyContents permission`,
+      );
+      return PdfTaskHelper.reject({
+        code: PdfErrorCode.Security,
+        message: 'Document lacks CopyContents permission',
+      });
+    }
+
     const coreDoc = this.getCoreDocument(documentId);
     const docState = this.getDocumentState(documentId);
 
@@ -610,6 +624,16 @@ export class SelectionPlugin extends BasePlugin<
   }
 
   private copyToClipboard(documentId: string) {
+    // Prevent copying text without permission
+    if (!this.checkPermission(documentId, PdfPermissionFlag.CopyContents)) {
+      this.logger.debug(
+        'SelectionPlugin',
+        'CopyToClipboard',
+        `Cannot copy to clipboard: document ${documentId} lacks CopyContents permission`,
+      );
+      return;
+    }
+
     const text = this.getSelectedText(documentId);
     text.wait((text) => {
       this.copyToClipboard$.emit(documentId, text.join('\n'));
