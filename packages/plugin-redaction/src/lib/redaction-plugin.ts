@@ -23,6 +23,7 @@ import {
 import {
   PdfErrorCode,
   PdfErrorReason,
+  PdfPermissionFlag,
   PdfTask,
   PdfTaskHelper,
   Rect,
@@ -154,6 +155,11 @@ export class RedactionPlugin extends BasePlugin<
       const unsubEndSelection = selectionScope.onEndSelection(() => {
         const docState = this.getDocumentState(documentId);
         if (!docState?.isRedacting) return;
+
+        // Prevent creating redactions without permission
+        if (!this.checkPermission(documentId, PdfPermissionFlag.ModifyContents)) {
+          return;
+        }
 
         const formattedSelection = selectionScope.getFormattedSelection();
 
@@ -336,6 +342,17 @@ export class RedactionPlugin extends BasePlugin<
 
   private addPendingItems(items: RedactionItem[], documentId?: string) {
     const id = documentId ?? this.getActiveDocumentId();
+
+    // Prevent adding redactions without permission
+    if (!this.checkPermission(id, PdfPermissionFlag.ModifyContents)) {
+      this.logger.debug(
+        'RedactionPlugin',
+        'AddPendingItems',
+        `Cannot add redactions: document ${id} lacks ModifyContents permission`,
+      );
+      return;
+    }
+
     this.dispatch(addPending(id, items));
     this.emitPendingChange(id);
     this.events$.emit({ type: 'add', documentId: id, items });
@@ -375,6 +392,17 @@ export class RedactionPlugin extends BasePlugin<
 
   private enableRedactSelection(documentId?: string) {
     const id = documentId ?? this.getActiveDocumentId();
+
+    // Prevent enabling redact selection without permission
+    if (!this.checkPermission(id, PdfPermissionFlag.ModifyContents)) {
+      this.logger.debug(
+        'RedactionPlugin',
+        'EnableRedactSelection',
+        `Cannot enable redact selection: document ${id} lacks ModifyContents permission`,
+      );
+      return;
+    }
+
     this.interactionManagerCapability?.forDocument(id).activate(RedactionMode.RedactSelection);
   }
 
@@ -398,6 +426,17 @@ export class RedactionPlugin extends BasePlugin<
 
   private enableMarqueeRedact(documentId?: string) {
     const id = documentId ?? this.getActiveDocumentId();
+
+    // Prevent enabling marquee redact without permission
+    if (!this.checkPermission(id, PdfPermissionFlag.ModifyContents)) {
+      this.logger.debug(
+        'RedactionPlugin',
+        'EnableMarqueeRedact',
+        `Cannot enable marquee redact: document ${id} lacks ModifyContents permission`,
+      );
+      return;
+    }
+
     this.interactionManagerCapability?.forDocument(id).activate(RedactionMode.MarqueeRedact);
   }
 
@@ -421,6 +460,17 @@ export class RedactionPlugin extends BasePlugin<
 
   private startRedactionMode(documentId?: string) {
     const id = documentId ?? this.getActiveDocumentId();
+
+    // Prevent starting redaction mode without permission
+    if (!this.checkPermission(id, PdfPermissionFlag.ModifyContents)) {
+      this.logger.debug(
+        'RedactionPlugin',
+        'StartRedactionMode',
+        `Cannot start redaction mode: document ${id} lacks ModifyContents permission`,
+      );
+      return;
+    }
+
     this.interactionManagerCapability?.forDocument(id).activate(RedactionMode.RedactSelection);
   }
 
@@ -559,6 +609,20 @@ export class RedactionPlugin extends BasePlugin<
     documentId?: string,
   ): Task<boolean, PdfErrorReason> {
     const docId = documentId ?? this.getActiveDocumentId();
+
+    // Prevent committing redactions without permission
+    if (!this.checkPermission(docId, PdfPermissionFlag.ModifyContents)) {
+      this.logger.debug(
+        'RedactionPlugin',
+        'CommitPendingOne',
+        `Cannot commit redaction: document ${docId} lacks ModifyContents permission`,
+      );
+      return PdfTaskHelper.reject({
+        code: PdfErrorCode.Security,
+        message: 'Document lacks ModifyContents permission',
+      });
+    }
+
     const coreDoc = this.coreState.core.documents[docId];
 
     if (!coreDoc?.document)
@@ -609,6 +673,20 @@ export class RedactionPlugin extends BasePlugin<
 
   private commitAllPending(documentId?: string): Task<boolean, PdfErrorReason> {
     const docId = documentId ?? this.getActiveDocumentId();
+
+    // Prevent committing redactions without permission
+    if (!this.checkPermission(docId, PdfPermissionFlag.ModifyContents)) {
+      this.logger.debug(
+        'RedactionPlugin',
+        'CommitAllPending',
+        `Cannot commit redactions: document ${docId} lacks ModifyContents permission`,
+      );
+      return PdfTaskHelper.reject({
+        code: PdfErrorCode.Security,
+        message: 'Document lacks ModifyContents permission',
+      });
+    }
+
     const coreDoc = this.coreState.core.documents[docId];
 
     if (!coreDoc?.document)

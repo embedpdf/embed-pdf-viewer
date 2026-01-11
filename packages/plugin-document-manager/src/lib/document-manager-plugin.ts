@@ -10,6 +10,7 @@ import {
   setActiveDocument as setActiveDocumentAction,
   moveDocument as moveDocumentAction,
   reorderDocuments as reorderDocumentsAction,
+  updateDocumentSecurity,
   DocumentState,
   Unsubscribe,
   Listener,
@@ -35,6 +36,7 @@ import {
   DocumentErrorEvent,
   OpenDocumentResponse,
   OpenFileDialogOptions,
+  SetEncryptionOptions,
 } from './types';
 
 export class DocumentManagerPlugin extends BasePlugin<
@@ -136,6 +138,13 @@ export class DocumentManagerPlugin extends BasePlugin<
       getDocumentIndex: (documentId) => {
         return this.coreState.core.documentOrder.indexOf(documentId);
       },
+
+      // Security
+      setDocumentEncryption: (documentId, options) =>
+        this.setDocumentEncryption(documentId, options),
+      unlockOwnerPermissions: (documentId, ownerPassword) =>
+        this.unlockOwnerPermissions(documentId, ownerPassword),
+      removeEncryption: (documentId) => this.removeEncryption(documentId),
 
       // Events
       onDocumentOpened: this.documentOpened$.on,
@@ -451,6 +460,165 @@ export class DocumentManagerPlugin extends BasePlugin<
     );
 
     return Task.all(tasks);
+  }
+
+  // ─────────────────────────────────────────────────────────
+  // Security Methods
+  // ─────────────────────────────────────────────────────────
+
+  private setDocumentEncryption(
+    documentId: string,
+    options: SetEncryptionOptions,
+  ): Task<boolean, PdfErrorReason> {
+    const task = new Task<boolean, PdfErrorReason>();
+
+    const docState = this.coreState.core.documents[documentId];
+    if (!docState?.document) {
+      task.reject({
+        code: PdfErrorCode.DocNotOpen,
+        message: `Document ${documentId} is not open`,
+      });
+      return task;
+    }
+
+    this.logger.info(
+      'DocumentManagerPlugin',
+      'SetDocumentEncryption',
+      `Setting encryption on document ${documentId}`,
+      { hasUserPassword: !!options.userPassword, allowedFlags: options.allowedFlags },
+    );
+
+    const engineTask = this.engine.setDocumentEncryption(
+      docState.document,
+      options.userPassword ?? '',
+      options.ownerPassword,
+      options.allowedFlags,
+    );
+
+    engineTask.wait(
+      (success) => {
+        if (success) {
+          this.logger.info(
+            'DocumentManagerPlugin',
+            'SetDocumentEncryption',
+            `Encryption set successfully on document ${documentId}`,
+          );
+        }
+        task.resolve(success);
+      },
+      (error) => {
+        this.logger.error(
+          'DocumentManagerPlugin',
+          'SetDocumentEncryption',
+          `Failed to set encryption on document ${documentId}`,
+          error,
+        );
+        task.fail(error);
+      },
+    );
+
+    return task;
+  }
+
+  private unlockOwnerPermissions(
+    documentId: string,
+    ownerPassword: string,
+  ): Task<boolean, PdfErrorReason> {
+    const task = new Task<boolean, PdfErrorReason>();
+
+    const docState = this.coreState.core.documents[documentId];
+    if (!docState?.document) {
+      task.reject({
+        code: PdfErrorCode.DocNotOpen,
+        message: `Document ${documentId} is not open`,
+      });
+      return task;
+    }
+
+    // Capture document reference before async operations
+    const document = docState.document;
+
+    this.logger.info(
+      'DocumentManagerPlugin',
+      'UnlockOwnerPermissions',
+      `Attempting to unlock owner permissions on document ${documentId}`,
+    );
+
+    const engineTask = this.engine.unlockOwnerPermissions(document, ownerPassword);
+
+    engineTask.wait(
+      (success) => {
+        if (success) {
+          this.logger.info(
+            'DocumentManagerPlugin',
+            'UnlockOwnerPermissions',
+            `Owner permissions unlocked on document ${documentId}`,
+          );
+
+          // Update the document security state in the store
+          // After owner unlock, permissions are effectively "all"
+          const fullPermissions = 0xffffffff; // All bits set = all permissions
+          this.dispatchCoreAction(updateDocumentSecurity(documentId, fullPermissions, true));
+        }
+        task.resolve(success);
+      },
+      (error) => {
+        this.logger.error(
+          'DocumentManagerPlugin',
+          'UnlockOwnerPermissions',
+          `Failed to unlock owner permissions on document ${documentId}`,
+          error,
+        );
+        task.fail(error);
+      },
+    );
+
+    return task;
+  }
+
+  private removeEncryption(documentId: string): Task<boolean, PdfErrorReason> {
+    const task = new Task<boolean, PdfErrorReason>();
+
+    const docState = this.coreState.core.documents[documentId];
+    if (!docState?.document) {
+      task.reject({
+        code: PdfErrorCode.DocNotOpen,
+        message: `Document ${documentId} is not open`,
+      });
+      return task;
+    }
+
+    this.logger.info(
+      'DocumentManagerPlugin',
+      'RemoveEncryption',
+      `Marking document ${documentId} for encryption removal on save`,
+    );
+
+    const engineTask = this.engine.removeEncryption(docState.document);
+
+    engineTask.wait(
+      (success) => {
+        if (success) {
+          this.logger.info(
+            'DocumentManagerPlugin',
+            'RemoveEncryption',
+            `Document ${documentId} marked for encryption removal`,
+          );
+        }
+        task.resolve(success);
+      },
+      (error) => {
+        this.logger.error(
+          'DocumentManagerPlugin',
+          'RemoveEncryption',
+          `Failed to mark document ${documentId} for encryption removal`,
+          error,
+        );
+        task.fail(error);
+      },
+    );
+
+    return task;
   }
 
   // ─────────────────────────────────────────────────────────

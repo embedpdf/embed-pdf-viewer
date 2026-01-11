@@ -61,12 +61,16 @@ export const useUIState = (getDocumentId: () => string | null): UseUIStateReturn
     const unsubMenu = scope.onMenuChanged(() => {
       state = scope.getState();
     });
+    const unsubOverlay = scope.onOverlayChanged(() => {
+      state = scope.getState();
+    });
 
     return () => {
       unsubToolbar();
       unsubSidebar();
       unsubModal();
       unsubMenu();
+      unsubOverlay();
     };
   });
 

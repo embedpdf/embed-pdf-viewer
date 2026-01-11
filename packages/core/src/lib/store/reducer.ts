@@ -14,6 +14,7 @@ import {
   REFRESH_PAGES,
   REORDER_DOCUMENTS,
   MOVE_DOCUMENT,
+  UPDATE_DOCUMENT_SECURITY,
 } from './actions';
 import { calculateNextActiveDocument, moveDocumentInOrder } from './reducer-helpers';
 
@@ -243,6 +244,28 @@ export const coreReducer: Reducer<CoreState, CoreAction> = (state, action): Core
           [documentId]: {
             ...docState,
             pageRefreshVersions: newVersions,
+          },
+        },
+      };
+    }
+
+    case UPDATE_DOCUMENT_SECURITY: {
+      const { documentId, permissions, isOwnerUnlocked } = action.payload;
+      const docState = state.documents[documentId];
+
+      if (!docState?.document) return state;
+
+      return {
+        ...state,
+        documents: {
+          ...state.documents,
+          [documentId]: {
+            ...docState,
+            document: {
+              ...docState.document,
+              permissions,
+              isOwnerUnlocked,
+            },
           },
         },
       };

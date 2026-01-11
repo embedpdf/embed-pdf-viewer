@@ -368,10 +368,18 @@ export class PdfiumNative implements IPdfiumExecutor {
     }
     this.memoryManager.free(sizePtr);
 
+    // Query security state
+    const isEncrypted = this.pdfiumModule.EPDF_IsEncrypted(docPtr);
+    const isOwnerUnlocked = this.pdfiumModule.EPDF_IsOwnerUnlocked(docPtr);
+    const permissions = this.pdfiumModule.FPDF_GetDocPermissions(docPtr);
+
     const pdfDoc: PdfDocumentObject = {
       id: file.id,
       pageCount,
       pages,
+      isEncrypted,
+      isOwnerUnlocked,
+      permissions,
     };
 
     this.cache.setDocument(file.id, filePtr, docPtr);
@@ -2112,6 +2120,142 @@ export class PdfiumNative implements IPdfiumExecutor {
         this.pdfiumModule.FPDF_CloseDocument(newDocPtr);
       }
     }
+  }
+
+  /**
+   * Sets AES-256 encryption on a document.
+   * Must be called before saveAsCopy() for encryption to take effect.
+   *
+   * @param doc - Document to encrypt
+   * @param userPassword - Password to open document (empty = no open password)
+   * @param ownerPassword - Password to change permissions (required)
+   * @param allowedFlags - OR'd PdfPermissionFlag values indicating allowed actions
+   * @returns true on success, false if already encrypted or invalid params
+   *
+   * @public
+   */
+  setDocumentEncryption(
+    doc: PdfDocumentObject,
+    userPassword: string,
+    ownerPassword: string,
+    allowedFlags: number,
+  ): PdfTask<boolean> {
+    this.logger.debug(LOG_SOURCE, LOG_CATEGORY, 'setDocumentEncryption', doc, allowedFlags);
+
+    const ctx = this.cache.getContext(doc.id);
+
+    if (!ctx) {
+      return PdfTaskHelper.reject({
+        code: PdfErrorCode.DocNotOpen,
+        message: 'document does not open',
+      });
+    }
+
+    const result = this.pdfiumModule.EPDF_SetEncryption(
+      ctx.docPtr,
+      userPassword,
+      ownerPassword,
+      allowedFlags,
+    );
+
+    return PdfTaskHelper.resolve(result);
+  }
+
+  /**
+   * Marks document for encryption removal on save.
+   * When saveAsCopy is called, the document will be saved without encryption.
+   *
+   * @param doc - Document to remove encryption from
+   * @returns true on success
+   *
+   * @public
+   */
+  removeEncryption(doc: PdfDocumentObject): PdfTask<boolean> {
+    this.logger.debug(LOG_SOURCE, LOG_CATEGORY, 'removeEncryption', doc);
+
+    const ctx = this.cache.getContext(doc.id);
+
+    if (!ctx) {
+      return PdfTaskHelper.reject({
+        code: PdfErrorCode.DocNotOpen,
+        message: 'document does not open',
+      });
+    }
+
+    const result = this.pdfiumModule.EPDF_RemoveEncryption(ctx.docPtr);
+
+    return PdfTaskHelper.resolve(result);
+  }
+
+  /**
+   * Attempts to unlock owner permissions for an already-opened encrypted document.
+   *
+   * @param doc - Document to unlock
+   * @param ownerPassword - The owner password
+   * @returns true on success, false on failure
+   *
+   * @public
+   */
+  unlockOwnerPermissions(doc: PdfDocumentObject, ownerPassword: string): PdfTask<boolean> {
+    this.logger.debug(LOG_SOURCE, LOG_CATEGORY, 'unlockOwnerPermissions', doc.id);
+
+    const ctx = this.cache.getContext(doc.id);
+    if (!ctx) {
+      return PdfTaskHelper.reject({
+        code: PdfErrorCode.DocNotOpen,
+        message: 'document does not open',
+      });
+    }
+
+    const success = this.pdfiumModule.EPDF_UnlockOwnerPermissions(ctx.docPtr, ownerPassword);
+
+    return PdfTaskHelper.resolve(success);
+  }
+
+  /**
+   * Check if a document is encrypted.
+   *
+   * @param doc - Document to check
+   * @returns true if the document is encrypted
+   *
+   * @public
+   */
+  isEncrypted(doc: PdfDocumentObject): PdfTask<boolean> {
+    this.logger.debug(LOG_SOURCE, LOG_CATEGORY, 'isEncrypted', doc.id);
+
+    const ctx = this.cache.getContext(doc.id);
+    if (!ctx) {
+      return PdfTaskHelper.reject({
+        code: PdfErrorCode.DocNotOpen,
+        message: 'document does not open',
+      });
+    }
+
+    const result = this.pdfiumModule.EPDF_IsEncrypted(ctx.docPtr);
+    return PdfTaskHelper.resolve(result);
+  }
+
+  /**
+   * Check if owner permissions are currently unlocked.
+   *
+   * @param doc - Document to check
+   * @returns true if owner permissions are unlocked
+   *
+   * @public
+   */
+  isOwnerUnlocked(doc: PdfDocumentObject): PdfTask<boolean> {
+    this.logger.debug(LOG_SOURCE, LOG_CATEGORY, 'isOwnerUnlocked', doc.id);
+
+    const ctx = this.cache.getContext(doc.id);
+    if (!ctx) {
+      return PdfTaskHelper.reject({
+        code: PdfErrorCode.DocNotOpen,
+        message: 'document does not open',
+      });
+    }
+
+    const result = this.pdfiumModule.EPDF_IsOwnerUnlocked(ctx.docPtr);
+    return PdfTaskHelper.resolve(result);
   }
 
   /**

@@ -789,4 +789,75 @@ export class PdfEngine<T = Blob> implements IPdfEngine<T> {
       { priority: Priority.MEDIUM },
     );
   }
+
+  /**
+   * {@inheritDoc @embedpdf/models!PdfEngine.setDocumentEncryption}
+   */
+  setDocumentEncryption(
+    doc: PdfDocumentObject,
+    userPassword: string,
+    ownerPassword: string,
+    allowedFlags: number,
+  ): PdfTask<boolean> {
+    return this.workerQueue.enqueue(
+      {
+        execute: () =>
+          this.executor.setDocumentEncryption(doc, userPassword, ownerPassword, allowedFlags),
+        meta: { docId: doc.id, operation: 'setDocumentEncryption' },
+      },
+      { priority: Priority.MEDIUM },
+    );
+  }
+
+  /**
+   * {@inheritDoc @embedpdf/models!PdfEngine.removeEncryption}
+   */
+  removeEncryption(doc: PdfDocumentObject): PdfTask<boolean> {
+    return this.workerQueue.enqueue(
+      {
+        execute: () => this.executor.removeEncryption(doc),
+        meta: { docId: doc.id, operation: 'removeEncryption' },
+      },
+      { priority: Priority.MEDIUM },
+    );
+  }
+
+  /**
+   * {@inheritDoc @embedpdf/models!PdfEngine.unlockOwnerPermissions}
+   */
+  unlockOwnerPermissions(doc: PdfDocumentObject, ownerPassword: string): PdfTask<boolean> {
+    return this.workerQueue.enqueue(
+      {
+        execute: () => this.executor.unlockOwnerPermissions(doc, ownerPassword),
+        meta: { docId: doc.id, operation: 'unlockOwnerPermissions' },
+      },
+      { priority: Priority.MEDIUM },
+    );
+  }
+
+  /**
+   * {@inheritDoc @embedpdf/models!PdfEngine.isEncrypted}
+   */
+  isEncrypted(doc: PdfDocumentObject): PdfTask<boolean> {
+    return this.workerQueue.enqueue(
+      {
+        execute: () => this.executor.isEncrypted(doc),
+        meta: { docId: doc.id, operation: 'isEncrypted' },
+      },
+      { priority: Priority.MEDIUM },
+    );
+  }
+
+  /**
+   * {@inheritDoc @embedpdf/models!PdfEngine.isOwnerUnlocked}
+   */
+  isOwnerUnlocked(doc: PdfDocumentObject): PdfTask<boolean> {
+    return this.workerQueue.enqueue(
+      {
+        execute: () => this.executor.isOwnerUnlocked(doc),
+        meta: { docId: doc.id, operation: 'isOwnerUnlocked' },
+      },
+      { priority: Priority.MEDIUM },
+    );
+  }
 }

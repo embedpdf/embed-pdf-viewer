@@ -1,9 +1,12 @@
 <template>
   <div data-no-interaction :style="{ display: 'contents' }">
-    <div v-bind="{ ...dragProps, ...doubleProps }" :style="mergedContainerStyle">
+    <div
+      v-bind="{ ...(effectiveIsDraggable && isSelected ? dragProps : {}), ...doubleProps }"
+      :style="mergedContainerStyle"
+    >
       <slot :annotation="currentObject"></slot>
 
-      <template v-if="isSelected && isResizable">
+      <template v-if="isSelected && effectiveIsResizable">
         <template v-for="{ key, style, ...handle } in resize" :key="key">
           <slot
             v-if="slots['resize-handle']"
@@ -17,7 +20,7 @@
         </template>
       </template>
 
-      <template v-if="isSelected && vertices.length > 0">
+      <template v-if="isSelected && permissions.canModifyAnnotations && vertices.length > 0">
         <template v-for="{ key, style, ...vertex } in vertices" :key="key">
           <slot
             v-if="slots['vertex-handle']"
@@ -71,6 +74,7 @@ import {
   useInteractionHandles,
 } from '@embedpdf/utils/vue';
 import { TrackedAnnotation } from '@embedpdf/plugin-annotation';
+import { useDocumentPermissions } from '@embedpdf/core/vue';
 import { VertexConfig } from '../../shared/types';
 import { useAnnotationCapability } from '../hooks';
 import { AnnotationSelectionContext, AnnotationSelectionMenuRenderFn } from '../types';
@@ -112,7 +116,25 @@ const VERTEX_SIZE = 12;
 
 const preview = shallowRef<Partial<T>>(toRaw(props.trackedAnnotation.object));
 const { provides: annotationCapability } = useAnnotationCapability();
+const permissions = useDocumentPermissions(props.documentId);
 const gestureBaseRef = ref<T | null>(null);
+
+// Override props based on permission
+const effectiveIsDraggable = computed(
+  () => permissions.value.canModifyAnnotations && props.isDraggable,
+);
+const effectiveIsResizable = computed(
+  () => permissions.value.canModifyAnnotations && props.isResizable,
+);
+
+// Wrap onDoubleClick to respect permissions - check at call time
+const guardedOnDoubleClick = props.onDoubleClick
+  ? (e: PointerEvent | MouseEvent) => {
+      if (permissions.value.canModifyAnnotations) {
+        props.onDoubleClick?.(e);
+      }
+    }
+  : undefined;
 
 // Get scoped API for this document (similar to React's useMemo)
 const annotationProvides = computed(() =>
@@ -244,7 +266,7 @@ const { dragProps, vertices, resize } = useInteractionHandles({
   includeVertices: !!props.vertexConfig,
 });
 
-const doubleProps = useDoublePressProps(props.onDoubleClick);
+const doubleProps = useDoublePressProps(guardedOnDoubleClick);
 
 watch(
   () => props.trackedAnnotation.object,
@@ -264,7 +286,7 @@ const containerStyle = computed(() => ({
   outlineOffset: props.isSelected ? `${props.outlineOffset}px` : '0px',
   pointerEvents: props.isSelected ? 'auto' : ('none' as 'auto' | 'none'),
   touchAction: 'none',
-  cursor: props.isSelected && props.isDraggable ? 'move' : 'default',
+  cursor: props.isSelected && effectiveIsDraggable.value ? 'move' : 'default',
   zIndex: props.zIndex,
 }));
 

@@ -14,7 +14,7 @@ import {
   Store,
   StoreState,
 } from '../store';
-import { Logger, PdfEngine } from '@embedpdf/models';
+import { Logger, PdfEngine, PdfPermissionFlag, PermissionDeniedError } from '@embedpdf/models';
 import { DocumentState } from '../store/initial-state';
 
 export interface StateChangeHandler<TState> {
@@ -26,8 +26,7 @@ export abstract class BasePlugin<
   TCapability = unknown,
   TState = unknown,
   TAction extends Action = Action,
-> implements IPlugin<TConfig>
-{
+> implements IPlugin<TConfig> {
   static readonly id: string;
 
   protected pluginStore: PluginStore<TState, TAction>;
@@ -414,5 +413,62 @@ export abstract class BasePlugin<
       throw new Error(`Document not found: ${documentId ?? 'active'}`);
     }
     return doc;
+  }
+
+  // ─────────────────────────────────────────────────────────
+  // Permission Helpers
+  // ─────────────────────────────────────────────────────────
+
+  /**
+   * Get the permission flags for a document.
+   * Returns AllowAll if document not found or not loaded.
+   * @param documentId Document ID (optional, defaults to active document)
+   */
+  protected getDocumentPermissions(documentId?: string): number {
+    const docId = documentId ?? this.coreState.core.activeDocumentId;
+    if (!docId) return PdfPermissionFlag.AllowAll;
+
+    const docState = this.coreState.core.documents[docId];
+    return docState?.document?.permissions ?? PdfPermissionFlag.AllowAll;
+  }
+
+  /**
+   * Check if a document has the required permissions (returns boolean).
+   * Useful for conditional UI logic.
+   * @param documentId Document ID (optional, defaults to active document)
+   * @param flags Permission flags to check
+   */
+  protected checkPermission(
+    documentId: string | undefined,
+    ...flags: PdfPermissionFlag[]
+  ): boolean {
+    const permissions = this.getDocumentPermissions(documentId);
+    for (const flag of flags) {
+      if (!(permissions & flag)) {
+        return false;
+      }
+    }
+    return true;
+  }
+
+  /**
+   * Assert that a document has the required permissions.
+   * Throws PermissionDeniedError if any flag is missing.
+   * @param documentId Document ID (optional, defaults to active document)
+   * @param flags Permission flags to require
+   */
+  protected requirePermission(documentId: string | undefined, ...flags: PdfPermissionFlag[]): void {
+    const permissions = this.getDocumentPermissions(documentId);
+    const missingFlags: PdfPermissionFlag[] = [];
+
+    for (const flag of flags) {
+      if (!(permissions & flag)) {
+        missingFlags.push(flag);
+      }
+    }
+
+    if (missingFlags.length > 0) {
+      throw new PermissionDeniedError(missingFlags, permissions);
+    }
   }
 }
