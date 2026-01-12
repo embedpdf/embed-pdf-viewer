@@ -1,6 +1,6 @@
 {
   "name": "@embedpdf/plugin-render",
-  "version": "2.1.2",
+  "version": "2.2.0",
   "type": "module",
   "license": "MIT",
   "main": "./dist/index.cjs",

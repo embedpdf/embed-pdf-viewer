@@ -1,5 +1,16 @@
 # @embedpdf/plugin-redaction
 
+## 2.2.0
+
+### Minor Changes
+
+- [#389](https://github.com/embedpdf/embed-pdf-viewer/pull/389) by [@bobsingor](https://github.com/bobsingor) – Add permission checking for redaction operations:
+  - Check `PdfPermissionFlag.ModifyContents` before adding pending redaction items
+  - Check permission before enabling redact selection or marquee redact modes
+  - Check permission before starting redaction mode
+  - Check permission before committing pending redactions (single or all)
+  - Return `PdfErrorCode.Security` error when permission is denied for commit operations
+
 ## 2.1.2
 
 ## 2.1.1

@@ -1,5 +1,17 @@
 # @embedpdf/engines
 
+## 2.2.0
+
+### Minor Changes
+
+- [#389](https://github.com/embedpdf/embed-pdf-viewer/pull/389) by [@bobsingor](https://github.com/bobsingor) – Add document security/encryption engine methods:
+  - Add `setDocumentEncryption` for setting AES-256 encryption with user/owner passwords and permission flags
+  - Add `removeEncryption` for marking documents for encryption removal on save
+  - Add `unlockOwnerPermissions` for unlocking owner permissions on encrypted documents
+  - Add `isEncrypted` and `isOwnerUnlocked` query methods
+  - Implement security methods in `PdfEngine` orchestrator, `RemoteExecutor`, `PdfiumNative`, `WebWorkerEngine`, and `EngineRunner`
+  - Query and store `isEncrypted`, `isOwnerUnlocked`, and `permissions` when opening documents
+
 ## 2.1.2
 
 ## 2.1.1
