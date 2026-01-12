@@ -1971,6 +1971,22 @@ export interface PdfFreeTextAnnoObject extends PdfAnnotationObjectBase {
    */
   backgroundColor?: string;
   /**
+   * Border/stroke color of the free text annotation
+   */
+  strokeColor?: string;
+  /**
+   * Border/stroke width of the free text annotation
+   */
+  strokeWidth?: number;
+  /**
+   * Border/stroke style of the free text annotation
+   */
+  strokeStyle?: PdfAnnotationBorderStyle;
+  /**
+   * Border/stroke dash pattern of the free text annotation
+   */
+  strokeDashArray?: number[];
+  /**
    * Default style of the free text annotation
    */
   defaultStyle?: string;

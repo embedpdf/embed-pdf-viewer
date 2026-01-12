@@ -8,6 +8,7 @@ import {
   suppressContentEditableWarningProps,
 } from '@framework';
 import {
+  PdfAnnotationBorderStyle,
   PdfFreeTextAnnoObject,
   PdfVerticalAlignment,
   standardFontCss,
@@ -83,6 +84,12 @@ export function FreeText({
   const scaleComp = needsComp ? computedFontPx / MIN_IOS_FOCUS_FONT_PX : 1;
   const invScalePercent = needsComp ? 100 / scaleComp : 100;
 
+  // Border styling
+  const strokeWidth = annotation.object.strokeWidth ?? 0;
+  const strokeColor = annotation.object.strokeColor;
+  const strokeStyle = annotation.object.strokeStyle ?? PdfAnnotationBorderStyle.SOLID;
+  const hasBorder = strokeWidth > 0 && strokeColor;
+
   return (
     <div
       style={{
@@ -123,6 +130,13 @@ export function FreeText({
           outline: 'none',
           transform: needsComp ? `scale(${scaleComp})` : undefined,
           transformOrigin: 'top left',
+          boxSizing: 'border-box',
+          ...(hasBorder && {
+            borderWidth: strokeWidth * scale,
+            borderColor: strokeColor,
+            borderStyle:
+              strokeStyle === PdfAnnotationBorderStyle.DASHED ? 'dashed' : 'solid',
+          }),
         }}
         contentEditable={isEditing}
         {...suppressContentEditableWarningProps}

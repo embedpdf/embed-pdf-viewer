@@ -1,6 +1,7 @@
 <!-- Free-text.svelte -->
 <script lang="ts">
   import {
+    PdfAnnotationBorderStyle,
     type PdfFreeTextAnnoObject,
     PdfVerticalAlignment,
     standardFontCss,
@@ -93,6 +94,20 @@
         ? 'center'
         : 'flex-end',
   );
+
+  // ---------- border styling ----------
+  const strokeWidth = $derived(annotation.object.strokeWidth ?? 0);
+  const strokeColor = $derived(annotation.object.strokeColor);
+  const strokeStyle = $derived(annotation.object.strokeStyle ?? PdfAnnotationBorderStyle.SOLID);
+  const hasBorder = $derived(strokeWidth > 0 && strokeColor);
+  const borderWidthPx = $derived(hasBorder ? `${strokeWidth * scale}px` : undefined);
+  const borderStyleCss = $derived(
+    hasBorder
+      ? strokeStyle === PdfAnnotationBorderStyle.DASHED
+        ? 'dashed'
+        : 'solid'
+      : undefined,
+  );
 </script>
 
 <!-- Outer positioned container -->
@@ -128,6 +143,10 @@
     style:cursor={isEditing ? 'text' : 'pointer'}
     style:outline="none"
     style:transform={needsComp ? `scale(${scaleComp})` : undefined}
-    style:transform-origin="top left">{annotation.object.contents}</span
+    style:transform-origin="top left"
+    style:box-sizing="border-box"
+    style:border-width={borderWidthPx}
+    style:border-color={hasBorder ? strokeColor : undefined}
+    style:border-style={borderStyleCss}>{annotation.object.contents}</span
   >
 </div>
