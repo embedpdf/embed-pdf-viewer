@@ -397,12 +397,6 @@ export const commands: Record<string, Command<State>> = {
     },
     active: ({ state, documentId }) =>
       state.plugins['interaction-manager'].documents[documentId]?.activeMode === 'marqueeCapture',
-    disabled: ({ state, documentId }) => {
-      return (
-        lacksPermission(state, documentId, PdfPermissionFlag.CopyContents) ||
-        lacksPermission(state, documentId, PdfPermissionFlag.Print)
-      );
-    },
   },
 
   // ─────────────────────────────────────────────────────────
