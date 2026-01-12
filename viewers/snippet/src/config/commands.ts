@@ -27,7 +27,30 @@ import { ScrollPlugin, ScrollStrategy } from '@embedpdf/plugin-scroll/preact';
 import { InteractionManagerPlugin } from '@embedpdf/plugin-interaction-manager/preact';
 import { FullscreenPlugin } from '@embedpdf/plugin-fullscreen/preact';
 import { SELECTION_PLUGIN_ID, SelectionPlugin } from '@embedpdf/plugin-selection/preact';
-import { ignore, PdfAnnotationSubtype, PdfBlendMode, uuidV4 } from '@embedpdf/models';
+import {
+  ignore,
+  PdfAnnotationSubtype,
+  PdfBlendMode,
+  PdfPermissionFlag,
+  uuidV4,
+} from '@embedpdf/models';
+import { getEffectivePermission } from '@embedpdf/core';
+
+/**
+ * Helper to check if the document has a specific permission flag (after applying overrides).
+ * Returns true if the permission is ALLOWED, false if denied.
+ */
+const hasPermission = (state: State, documentId: string, flag: PdfPermissionFlag): boolean => {
+  return getEffectivePermission(state.core, documentId, flag);
+};
+
+/**
+ * Helper to check if the document lacks a specific permission (for disabled states).
+ * Returns true if the permission is DENIED, false if allowed.
+ */
+const lacksPermission = (state: State, documentId: string, flag: PdfPermissionFlag): boolean => {
+  return !hasPermission(state, documentId, flag);
+};
 
 export const commands: Record<string, Command<State>> = {
   // ─────────────────────────────────────────────────────────
@@ -440,6 +463,23 @@ export const commands: Record<string, Command<State>> = {
       const scope = uiCapability.forDocument(documentId);
       scope.openModal('print-modal');
     },
+    disabled: ({ state, documentId }) => {
+      return lacksPermission(state, documentId, PdfPermissionFlag.Print);
+    },
+  },
+
+  'document:protect': {
+    id: 'document:protect',
+    labelKey: 'document.protect',
+    icon: 'lock',
+    categories: ['document', 'document-protect'],
+    action: ({ registry, documentId }) => {
+      const ui = registry.getPlugin<UIPlugin>('ui')?.provides();
+      if (!ui) return;
+
+      const scope = ui.forDocument(documentId);
+      scope.openModal('protect-modal');
+    },
   },
 
   'document:export': {
@@ -570,6 +610,9 @@ export const commands: Record<string, Command<State>> = {
     },
     active: ({ state, documentId }) => {
       return isSidebarOpen(state.plugins, documentId, 'left', 'main', 'annotation-panel');
+    },
+    disabled: ({ state, documentId }) => {
+      return lacksPermission(state, documentId, PdfPermissionFlag.ModifyAnnotations);
     },
   },
 
@@ -886,6 +929,9 @@ export const commands: Record<string, Command<State>> = {
       const annotation = state.plugins[ANNOTATION_PLUGIN_ID]?.documents[documentId];
       return annotation?.activeToolId === 'highlight';
     },
+    disabled: ({ state, documentId }) => {
+      return lacksPermission(state, documentId, PdfPermissionFlag.ModifyAnnotations);
+    },
   },
 
   'annotation:add-underline': {
@@ -955,6 +1001,9 @@ export const commands: Record<string, Command<State>> = {
     active: ({ state, documentId }) => {
       const annotation = state.plugins[ANNOTATION_PLUGIN_ID]?.documents[documentId];
       return annotation?.activeToolId === 'underline';
+    },
+    disabled: ({ state, documentId }) => {
+      return lacksPermission(state, documentId, PdfPermissionFlag.ModifyAnnotations);
     },
   },
 
@@ -1026,6 +1075,9 @@ export const commands: Record<string, Command<State>> = {
       const annotation = state.plugins[ANNOTATION_PLUGIN_ID]?.documents[documentId];
       return annotation?.activeToolId === 'strikeout';
     },
+    disabled: ({ state, documentId }) => {
+      return lacksPermission(state, documentId, PdfPermissionFlag.ModifyAnnotations);
+    },
   },
 
   'annotation:add-squiggly': {
@@ -1096,6 +1148,9 @@ export const commands: Record<string, Command<State>> = {
       const annotation = state.plugins[ANNOTATION_PLUGIN_ID]?.documents[documentId];
       return annotation?.activeToolId === 'squiggly';
     },
+    disabled: ({ state, documentId }) => {
+      return lacksPermission(state, documentId, PdfPermissionFlag.ModifyAnnotations);
+    },
   },
 
   'annotation:add-ink': {
@@ -1120,6 +1175,9 @@ export const commands: Record<string, Command<State>> = {
     active: ({ state, documentId }) => {
       const annotation = state.plugins[ANNOTATION_PLUGIN_ID]?.documents[documentId];
       return annotation?.activeToolId === 'ink';
+    },
+    disabled: ({ state, documentId }) => {
+      return lacksPermission(state, documentId, PdfPermissionFlag.ModifyAnnotations);
     },
   },
 
@@ -1146,6 +1204,9 @@ export const commands: Record<string, Command<State>> = {
       const annotation = state.plugins[ANNOTATION_PLUGIN_ID]?.documents[documentId];
       return annotation?.activeToolId === 'freeText';
     },
+    disabled: ({ state, documentId }) => {
+      return lacksPermission(state, documentId, PdfPermissionFlag.ModifyAnnotations);
+    },
   },
 
   'annotation:add-stamp': {
@@ -1167,6 +1228,9 @@ export const commands: Record<string, Command<State>> = {
     active: ({ state, documentId }) => {
       const annotation = state.plugins[ANNOTATION_PLUGIN_ID]?.documents[documentId];
       return annotation?.activeToolId === 'stamp';
+    },
+    disabled: ({ state, documentId }) => {
+      return lacksPermission(state, documentId, PdfPermissionFlag.ModifyAnnotations);
     },
   },
 
@@ -1194,6 +1258,9 @@ export const commands: Record<string, Command<State>> = {
       const annotation = state.plugins[ANNOTATION_PLUGIN_ID]?.documents[documentId];
       return annotation?.activeToolId === 'square';
     },
+    disabled: ({ state, documentId }) => {
+      return lacksPermission(state, documentId, PdfPermissionFlag.ModifyAnnotations);
+    },
   },
 
   'annotation:add-circle': {
@@ -1220,6 +1287,9 @@ export const commands: Record<string, Command<State>> = {
       const annotation = state.plugins[ANNOTATION_PLUGIN_ID]?.documents[documentId];
       return annotation?.activeToolId === 'circle';
     },
+    disabled: ({ state, documentId }) => {
+      return lacksPermission(state, documentId, PdfPermissionFlag.ModifyAnnotations);
+    },
   },
 
   'annotation:add-line': {
@@ -1245,6 +1315,9 @@ export const commands: Record<string, Command<State>> = {
       const annotation = state.plugins[ANNOTATION_PLUGIN_ID]?.documents[documentId];
       return annotation?.activeToolId === 'line';
     },
+    disabled: ({ state, documentId }) => {
+      return lacksPermission(state, documentId, PdfPermissionFlag.ModifyAnnotations);
+    },
   },
 
   'annotation:add-arrow': {
@@ -1269,6 +1342,9 @@ export const commands: Record<string, Command<State>> = {
     active: ({ state, documentId }) => {
       const annotation = state.plugins[ANNOTATION_PLUGIN_ID]?.documents[documentId];
       return annotation?.activeToolId === 'lineArrow';
+    },
+    disabled: ({ state, documentId }) => {
+      return lacksPermission(state, documentId, PdfPermissionFlag.ModifyAnnotations);
     },
   },
 
@@ -1296,6 +1372,9 @@ export const commands: Record<string, Command<State>> = {
       const annotation = state.plugins[ANNOTATION_PLUGIN_ID]?.documents[documentId];
       return annotation?.activeToolId === 'polygon';
     },
+    disabled: ({ state, documentId }) => {
+      return lacksPermission(state, documentId, PdfPermissionFlag.ModifyAnnotations);
+    },
   },
 
   'annotation:add-polyline': {
@@ -1321,6 +1400,9 @@ export const commands: Record<string, Command<State>> = {
       const annotation = state.plugins[ANNOTATION_PLUGIN_ID]?.documents[documentId];
       return annotation?.activeToolId === 'polyline';
     },
+    disabled: ({ state, documentId }) => {
+      return lacksPermission(state, documentId, PdfPermissionFlag.ModifyAnnotations);
+    },
   },
 
   'annotation:delete-selected': {
@@ -1341,6 +1423,9 @@ export const commands: Record<string, Command<State>> = {
         selectedAnnotation.object.pageIndex,
         selectedAnnotation.object.id,
       );
+    },
+    disabled: ({ state, documentId }) => {
+      return lacksPermission(state, documentId, PdfPermissionFlag.ModifyAnnotations);
     },
   },
 
@@ -1366,6 +1451,9 @@ export const commands: Record<string, Command<State>> = {
       const ui = state.plugins['ui']?.documents[documentId];
       return ui?.openMenus['annotation-tools-menu'] !== undefined;
     },
+    disabled: ({ state, documentId }) => {
+      return lacksPermission(state, documentId, PdfPermissionFlag.ModifyAnnotations);
+    },
   },
 
   'annotation:overflow-shapes': {
@@ -1386,6 +1474,9 @@ export const commands: Record<string, Command<State>> = {
       const ui = state.plugins['ui']?.documents[documentId];
       return ui?.openMenus['shapes-tools-menu'] !== undefined;
     },
+    disabled: ({ state, documentId }) => {
+      return lacksPermission(state, documentId, PdfPermissionFlag.ModifyAnnotations);
+    },
   },
 
   // ─────────────────────────────────────────────────────────
@@ -1403,6 +1494,9 @@ export const commands: Record<string, Command<State>> = {
     active: ({ state, documentId }) => {
       const redaction = state.plugins[REDACTION_PLUGIN_ID]?.documents[documentId];
       return redaction?.activeType === RedactionMode.MarqueeRedact;
+    },
+    disabled: ({ state, documentId }) => {
+      return lacksPermission(state, documentId, PdfPermissionFlag.ModifyContents);
     },
   },
 
@@ -1441,6 +1535,9 @@ export const commands: Record<string, Command<State>> = {
       const redaction = state.plugins[REDACTION_PLUGIN_ID]?.documents[documentId];
       return redaction?.activeType === RedactionMode.RedactSelection;
     },
+    disabled: ({ state, documentId }) => {
+      return lacksPermission(state, documentId, PdfPermissionFlag.ModifyContents);
+    },
   },
 
   'redaction:apply-all': {
@@ -1454,7 +1551,10 @@ export const commands: Record<string, Command<State>> = {
     },
     disabled: ({ state, documentId }) => {
       const redaction = state.plugins[REDACTION_PLUGIN_ID]?.documents[documentId];
-      return redaction?.pendingCount === 0;
+      return (
+        redaction?.pendingCount === 0 ||
+        lacksPermission(state, documentId, PdfPermissionFlag.ModifyContents)
+      );
     },
   },
 
@@ -1469,7 +1569,10 @@ export const commands: Record<string, Command<State>> = {
     },
     disabled: ({ state, documentId }) => {
       const redaction = state.plugins[REDACTION_PLUGIN_ID]?.documents[documentId];
-      return redaction?.pendingCount === 0;
+      return (
+        redaction?.pendingCount === 0 ||
+        lacksPermission(state, documentId, PdfPermissionFlag.ModifyContents)
+      );
     },
   },
 
@@ -1514,6 +1617,9 @@ export const commands: Record<string, Command<State>> = {
       const scope = plugin?.provides().forDocument(documentId);
       scope?.copyToClipboard();
     },
+    disabled: ({ state, documentId }) => {
+      return lacksPermission(state, documentId, PdfPermissionFlag.CopyContents);
+    },
   },
 
   'selection:copy': {
@@ -1526,6 +1632,9 @@ export const commands: Record<string, Command<State>> = {
       const scope = plugin?.provides().forDocument(documentId);
       scope?.copyToClipboard();
       scope?.clear();
+    },
+    disabled: ({ state, documentId }) => {
+      return lacksPermission(state, documentId, PdfPermissionFlag.CopyContents);
     },
   },
 

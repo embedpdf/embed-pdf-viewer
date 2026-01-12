@@ -106,7 +106,12 @@ type MessageType =
   | 'preparePrintDocument'
   | 'saveAsCopy'
   | 'closeDocument'
-  | 'closeAllDocuments';
+  | 'closeAllDocuments'
+  | 'setDocumentEncryption'
+  | 'removeEncryption'
+  | 'unlockOwnerPermissions'
+  | 'isEncrypted'
+  | 'isOwnerUnlocked';
 
 /**
  * RemoteExecutor - Proxy for worker communication
@@ -501,5 +506,35 @@ export class RemoteExecutor implements IPdfiumExecutor {
 
   closeAllDocuments(): PdfTask<boolean> {
     return this.send<boolean>('closeAllDocuments', []);
+  }
+
+  setDocumentEncryption(
+    doc: PdfDocumentObject,
+    userPassword: string,
+    ownerPassword: string,
+    allowedFlags: number,
+  ): PdfTask<boolean> {
+    return this.send<boolean>('setDocumentEncryption', [
+      doc,
+      userPassword,
+      ownerPassword,
+      allowedFlags,
+    ]);
+  }
+
+  removeEncryption(doc: PdfDocumentObject): PdfTask<boolean> {
+    return this.send<boolean>('removeEncryption', [doc]);
+  }
+
+  unlockOwnerPermissions(doc: PdfDocumentObject, ownerPassword: string): PdfTask<boolean> {
+    return this.send<boolean>('unlockOwnerPermissions', [doc, ownerPassword]);
+  }
+
+  isEncrypted(doc: PdfDocumentObject): PdfTask<boolean> {
+    return this.send<boolean>('isEncrypted', [doc]);
+  }
+
+  isOwnerUnlocked(doc: PdfDocumentObject): PdfTask<boolean> {
+    return this.send<boolean>('isOwnerUnlocked', [doc]);
   }
 }

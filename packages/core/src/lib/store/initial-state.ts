@@ -1,5 +1,6 @@
 import { PdfDocumentObject, PdfErrorCode, Rotation } from '@embedpdf/models';
 import { PluginRegistryConfig } from '../types/plugin';
+import { PermissionConfig } from '../types/permissions';
 
 export type DocumentStatus = 'loading' | 'loaded' | 'error';
 
@@ -31,6 +32,9 @@ export interface DocumentState {
   // When a page is refreshed, its version is incremented
   pageRefreshVersions: Record<number, number>;
 
+  // Per-document permission overrides (optional)
+  permissions?: PermissionConfig;
+
   // Metadata
   loadStartedAt: number;
   loadedAt?: number;
@@ -42,6 +46,8 @@ export interface CoreState {
   activeDocumentId: string | null;
   defaultScale: number;
   defaultRotation: Rotation;
+  /** Global permission configuration applied to all documents unless overridden per-document */
+  globalPermissions?: PermissionConfig;
 }
 
 export const initialCoreState: (config?: PluginRegistryConfig) => CoreState = (config) => ({
@@ -50,4 +56,5 @@ export const initialCoreState: (config?: PluginRegistryConfig) => CoreState = (c
   activeDocumentId: null,
   defaultScale: config?.defaultScale ?? 1,
   defaultRotation: config?.defaultRotation ?? Rotation.Degree0,
+  globalPermissions: config?.permissions,
 });

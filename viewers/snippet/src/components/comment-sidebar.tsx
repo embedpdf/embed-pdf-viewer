@@ -8,6 +8,7 @@ import {
 } from '@embedpdf/plugin-annotation/preact';
 import { useScrollCapability } from '@embedpdf/plugin-scroll/preact';
 import { useTranslations } from '@embedpdf/plugin-i18n/preact';
+import { useDocumentPermissions } from '@embedpdf/core/preact';
 import { TrackedAnnotation } from '@embedpdf/plugin-annotation';
 import { uuidV4, PdfAnnotationSubtype, PdfAnnotationIcon } from '@embedpdf/models';
 import { AnnotationCard } from './comment-sidebar/annotation-card';
@@ -22,8 +23,12 @@ export const CommentSidebar = ({ documentId }: CommentSidebarProps) => {
   const { provides: annotation, state } = useAnnotation(documentId);
   const { provides: scrollApi } = useScrollCapability();
   const { translate } = useTranslations(documentId);
+  const { canModifyAnnotations } = useDocumentPermissions(documentId);
   const annotationRefs = useRef<Record<string, HTMLDivElement | null>>({});
   const scrollContainerRef = useRef<HTMLDivElement>(null);
+
+  // isReadOnly is the inverse of canModifyAnnotations
+  const isReadOnly = !canModifyAnnotations;
 
   const selectedAnnotation = state.selectedUid
     ? getAnnotationByUid(state, state.selectedUid)
@@ -167,6 +172,7 @@ export const CommentSidebar = ({ documentId }: CommentSidebarProps) => {
                     onDelete={handleDelete}
                     onReply={handleReply}
                     documentId={documentId}
+                    isReadOnly={isReadOnly}
                   />
                 </div>
               ))}
