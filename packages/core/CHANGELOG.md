@@ -1,5 +1,27 @@
 # @embedpdf/core
 
+## 2.2.0
+
+### Minor Changes
+
+- [#389](https://github.com/embedpdf/embed-pdf-viewer/pull/389) by [@bobsingor](https://github.com/bobsingor) – Add document permissions support:
+  - Add `useDocumentPermissions` hook for React, Svelte, and Vue with reactive permission state and helper methods (`hasPermission`, `hasAllPermissions`, and shorthand booleans like `canPrint`, `canCopyContents`, etc.)
+  - Add `UPDATE_DOCUMENT_SECURITY` action and `updateDocumentSecurity` action creator for updating document security state
+  - Add reducer case for updating document permissions and owner unlock state
+  - Add permission helper methods to `BasePlugin`: `getDocumentPermissions`, `checkPermission`, `requirePermission`
+  - Export `useDocumentPermissions` from shared, svelte, and vue entry points
+
+- [#389](https://github.com/embedpdf/embed-pdf-viewer/pull/389) by [@bobsingor](https://github.com/bobsingor) – Add permission override system with global and per-document configuration:
+  - Add `PermissionConfig` interface for configuring permission overrides with `enforceDocumentPermissions` and `overrides` options
+  - Add `permissions` option to `PluginRegistryConfig` for global permission configuration
+  - Add `permissions` to `DocumentState` for per-document permission overrides
+  - Add `getEffectivePermission` and `getEffectivePermissions` selectors for layered permission resolution (per-document → global → PDF)
+  - Add human-readable permission names (`print`, `modifyContents`, `copyContents`, etc.) as alternatives to numeric flags
+  - Update `BasePlugin` permission helpers (`checkPermission`, `requirePermission`, `getDocumentPermissions`) to use effective permissions
+  - Update `useDocumentPermissions` hooks (React, Svelte, Vue) to return both effective and raw PDF permissions
+  - Add `config` prop to `EmbedPDF` components for passing `PluginRegistryConfig`, deprecating individual `logger` prop
+  - Export `PermissionConfig`, `PermissionName`, `ALL_PERMISSION_FLAGS`, and permission selectors
+
 ## 2.1.2
 
 ## 2.1.1

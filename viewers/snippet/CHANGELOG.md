@@ -1,5 +1,26 @@
 # @embedpdf/snippet
 
+## 2.2.0
+
+### Minor Changes
+
+- [#389](https://github.com/embedpdf/embed-pdf-viewer/pull/389) by [@bobsingor](https://github.com/bobsingor) – Add document security and protection features:
+  - Add `ProtectModal` component for setting document encryption with user/owner passwords and permission restrictions
+  - Add `UnlockOwnerOverlay` component to notify users when viewing protected documents with restricted permissions
+  - Add `ViewPermissionsModal` component for viewing and unlocking document permissions
+  - Add `PermissionsDisplay` component for showing permission status
+  - Add permission-based command disabling for annotation, redaction, print, copy, and capture commands
+  - Add security-related translations for English, German, Dutch, French, Spanish, and Chinese
+  - Add new icons: `EyeIcon`, `EyeOffIcon`, `InfoIcon`, `UnlockIcon`
+  - Update UI schema with protection modal, view permissions modal, and unlock owner overlay
+
+- [#389](https://github.com/embedpdf/embed-pdf-viewer/pull/389) by [@bobsingor](https://github.com/bobsingor) – Add global permission configuration to snippet viewer:
+  - Add `permissions` option to `PDFViewerConfig` for global permission overrides
+  - Support `enforceDocumentPermissions` to ignore PDF permissions entirely
+  - Support `overrides` with human-readable names (`print`, `modifyAnnotations`, etc.) or numeric flags
+  - Update command permission checks to use effective permissions via `getEffectivePermission`
+  - Pass permission configuration to `EmbedPDF` via new `config` prop
+
 ## 2.1.2
 
 ### Patch Changes
