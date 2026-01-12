@@ -1,4 +1,4 @@
-import { BasePluginConfig, EventHook, DocumentState } from '@embedpdf/core';
+import { BasePluginConfig, EventHook, DocumentState, PermissionConfig } from '@embedpdf/core';
 import {
   PdfDocumentObject,
   Rotation,
@@ -44,6 +44,8 @@ export interface LoadDocumentUrlOptions {
   scale?: number;
   rotation?: Rotation;
   autoActivate?: boolean; // If true, this document becomes active when opened. Default: true
+  /** Per-document permission overrides */
+  permissions?: PermissionConfig;
 }
 
 export interface LoadDocumentBufferOptions {
@@ -54,6 +56,8 @@ export interface LoadDocumentBufferOptions {
   scale?: number;
   rotation?: Rotation;
   autoActivate?: boolean; // If true, this document becomes active when opened. Default: true
+  /** Per-document permission overrides */
+  permissions?: PermissionConfig;
 }
 
 export interface RetryOptions {
@@ -65,6 +69,8 @@ export interface OpenFileDialogOptions {
   scale?: number;
   rotation?: Rotation;
   autoActivate?: boolean;
+  /** Per-document permission overrides */
+  permissions?: PermissionConfig;
 }
 
 export interface OpenDocumentResponse {

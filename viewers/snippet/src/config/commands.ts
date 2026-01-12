@@ -34,15 +34,14 @@ import {
   PdfPermissionFlag,
   uuidV4,
 } from '@embedpdf/models';
+import { getEffectivePermission } from '@embedpdf/core';
 
 /**
- * Helper to check if the document has a specific permission flag.
+ * Helper to check if the document has a specific permission flag (after applying overrides).
  * Returns true if the permission is ALLOWED, false if denied.
  */
 const hasPermission = (state: State, documentId: string, flag: PdfPermissionFlag): boolean => {
-  const permissions =
-    state.core.documents[documentId]?.document?.permissions ?? PdfPermissionFlag.AllowAll;
-  return (permissions & flag) !== 0;
+  return getEffectivePermission(state.core, documentId, flag);
 };
 
 /**

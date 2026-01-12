@@ -1,15 +1,18 @@
 import { PdfPermissionFlag } from '@embedpdf/models';
 import { useCoreState } from './use-core-state.svelte';
+import { getEffectivePermission, getEffectivePermissions } from '../../lib/store/selectors';
 
 export interface DocumentPermissions {
-  /** Raw permission flags from the document */
+  /** Effective permission flags after applying overrides */
   permissions: number;
-  /** Check if a specific permission flag is allowed */
+  /** Raw PDF permission flags (before overrides) */
+  pdfPermissions: number;
+  /** Check if a specific permission flag is effectively allowed */
   hasPermission: (flag: PdfPermissionFlag) => boolean;
-  /** Check if all specified flags are allowed */
+  /** Check if all specified flags are effectively allowed */
   hasAllPermissions: (...flags: PdfPermissionFlag[]) => boolean;
 
-  // Shorthand booleans for all permission flags:
+  // Shorthand booleans for all permission flags (using effective permissions):
   /** Can print (possibly degraded quality) */
   canPrint: boolean;
   /** Can modify document contents */
@@ -29,7 +32,8 @@ export interface DocumentPermissions {
 }
 
 /**
- * Hook that provides reactive access to a document's permission flags.
+ * Hook that provides reactive access to a document's effective permission flags.
+ * Applies layered resolution: per-document override → global override → PDF permission.
  *
  * @param getDocumentId Function that returns the document ID
  * @returns An object with reactive permission properties.
@@ -38,44 +42,70 @@ export function useDocumentPermissions(getDocumentId: () => string): DocumentPer
   const coreStateRef = useCoreState();
 
   const documentId = $derived(getDocumentId());
-  const permissions = $derived(
-    coreStateRef.current?.documents[documentId]?.document?.permissions ??
-      PdfPermissionFlag.AllowAll,
+  const coreState = $derived(coreStateRef.current);
+
+  const effectivePermissions = $derived(
+    coreState ? getEffectivePermissions(coreState, documentId) : PdfPermissionFlag.AllowAll,
   );
 
-  const hasPermission = (flag: PdfPermissionFlag) => (permissions & flag) !== 0;
+  const pdfPermissions = $derived(
+    coreState?.documents[documentId]?.document?.permissions ?? PdfPermissionFlag.AllowAll,
+  );
+
+  const hasPermission = (flag: PdfPermissionFlag) =>
+    coreState ? getEffectivePermission(coreState, documentId, flag) : true;
+
   const hasAllPermissions = (...flags: PdfPermissionFlag[]) =>
-    flags.every((flag) => (permissions & flag) !== 0);
+    flags.every((flag) => (coreState ? getEffectivePermission(coreState, documentId, flag) : true));
 
   return {
     get permissions() {
-      return permissions;
+      return effectivePermissions;
+    },
+    get pdfPermissions() {
+      return pdfPermissions;
     },
     hasPermission,
     hasAllPermissions,
     get canPrint() {
-      return (permissions & PdfPermissionFlag.Print) !== 0;
+      return coreState
+        ? getEffectivePermission(coreState, documentId, PdfPermissionFlag.Print)
+        : true;
     },
     get canModifyContents() {
-      return (permissions & PdfPermissionFlag.ModifyContents) !== 0;
+      return coreState
+        ? getEffectivePermission(coreState, documentId, PdfPermissionFlag.ModifyContents)
+        : true;
     },
     get canCopyContents() {
-      return (permissions & PdfPermissionFlag.CopyContents) !== 0;
+      return coreState
+        ? getEffectivePermission(coreState, documentId, PdfPermissionFlag.CopyContents)
+        : true;
     },
     get canModifyAnnotations() {
-      return (permissions & PdfPermissionFlag.ModifyAnnotations) !== 0;
+      return coreState
+        ? getEffectivePermission(coreState, documentId, PdfPermissionFlag.ModifyAnnotations)
+        : true;
     },
     get canFillForms() {
-      return (permissions & PdfPermissionFlag.FillForms) !== 0;
+      return coreState
+        ? getEffectivePermission(coreState, documentId, PdfPermissionFlag.FillForms)
+        : true;
     },
     get canExtractForAccessibility() {
-      return (permissions & PdfPermissionFlag.ExtractForAccessibility) !== 0;
+      return coreState
+        ? getEffectivePermission(coreState, documentId, PdfPermissionFlag.ExtractForAccessibility)
+        : true;
     },
     get canAssembleDocument() {
-      return (permissions & PdfPermissionFlag.AssembleDocument) !== 0;
+      return coreState
+        ? getEffectivePermission(coreState, documentId, PdfPermissionFlag.AssembleDocument)
+        : true;
     },
     get canPrintHighQuality() {
-      return (permissions & PdfPermissionFlag.PrintHighQuality) !== 0;
+      return coreState
+        ? getEffectivePermission(coreState, documentId, PdfPermissionFlag.PrintHighQuality)
+        : true;
     },
   };
 }

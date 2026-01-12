@@ -16,6 +16,7 @@ import {
 } from '../store';
 import { Logger, PdfEngine, PdfPermissionFlag, PermissionDeniedError } from '@embedpdf/models';
 import { DocumentState } from '../store/initial-state';
+import { getEffectivePermission, getEffectivePermissions } from '../store/selectors';
 
 export interface StateChangeHandler<TState> {
   (state: TState): void;
@@ -420,20 +421,21 @@ export abstract class BasePlugin<
   // ─────────────────────────────────────────────────────────
 
   /**
-   * Get the permission flags for a document.
-   * Returns AllowAll if document not found or not loaded.
+   * Get the effective permission flags for a document.
+   * Applies layered resolution: per-document override → global override → PDF permission.
+   * Returns AllowAll if document not found.
    * @param documentId Document ID (optional, defaults to active document)
    */
   protected getDocumentPermissions(documentId?: string): number {
     const docId = documentId ?? this.coreState.core.activeDocumentId;
     if (!docId) return PdfPermissionFlag.AllowAll;
 
-    const docState = this.coreState.core.documents[docId];
-    return docState?.document?.permissions ?? PdfPermissionFlag.AllowAll;
+    return getEffectivePermissions(this.coreState.core, docId);
   }
 
   /**
    * Check if a document has the required permissions (returns boolean).
+   * Applies layered resolution: per-document override → global override → PDF permission.
    * Useful for conditional UI logic.
    * @param documentId Document ID (optional, defaults to active document)
    * @param flags Permission flags to check
@@ -442,33 +444,34 @@ export abstract class BasePlugin<
     documentId: string | undefined,
     ...flags: PdfPermissionFlag[]
   ): boolean {
-    const permissions = this.getDocumentPermissions(documentId);
-    for (const flag of flags) {
-      if (!(permissions & flag)) {
-        return false;
-      }
-    }
-    return true;
+    const docId = documentId ?? this.coreState.core.activeDocumentId;
+    if (!docId) return true;
+
+    return flags.every((flag) => getEffectivePermission(this.coreState.core, docId, flag));
   }
 
   /**
    * Assert that a document has the required permissions.
+   * Applies layered resolution: per-document override → global override → PDF permission.
    * Throws PermissionDeniedError if any flag is missing.
    * @param documentId Document ID (optional, defaults to active document)
    * @param flags Permission flags to require
    */
   protected requirePermission(documentId: string | undefined, ...flags: PdfPermissionFlag[]): void {
-    const permissions = this.getDocumentPermissions(documentId);
+    const docId = documentId ?? this.coreState.core.activeDocumentId;
+    if (!docId) return;
+
     const missingFlags: PdfPermissionFlag[] = [];
 
     for (const flag of flags) {
-      if (!(permissions & flag)) {
+      if (!getEffectivePermission(this.coreState.core, docId, flag)) {
         missingFlags.push(flag);
       }
     }
 
     if (missingFlags.length > 0) {
-      throw new PermissionDeniedError(missingFlags, permissions);
+      const effectivePermissions = getEffectivePermissions(this.coreState.core, docId);
+      throw new PermissionDeniedError(missingFlags, effectivePermissions);
     }
   }
 }

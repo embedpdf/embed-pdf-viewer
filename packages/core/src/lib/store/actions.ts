@@ -1,4 +1,5 @@
 import { PdfDocumentObject, PdfErrorCode, PdfPageObject, Rotation } from '@embedpdf/models';
+import { PermissionConfig } from '../types/permissions';
 
 // Document lifecycle actions
 export const START_LOADING_DOCUMENT = 'START_LOADING_DOCUMENT';
@@ -60,6 +61,7 @@ export interface StartLoadingDocumentAction {
     rotation?: Rotation;
     passwordProvided?: boolean;
     autoActivate?: boolean; // If true, this document becomes active when opened. Default: true
+    permissions?: PermissionConfig; // Per-document permission overrides
   };
 }
 
@@ -226,9 +228,10 @@ export const startLoadingDocument = (
   rotation?: Rotation,
   passwordProvided?: boolean,
   autoActivate?: boolean,
+  permissions?: PermissionConfig,
 ): CoreAction => ({
   type: START_LOADING_DOCUMENT,
-  payload: { documentId, name, scale, rotation, passwordProvided, autoActivate },
+  payload: { documentId, name, scale, rotation, passwordProvided, autoActivate, permissions },
 });
 
 export const updateDocumentLoadingProgress = (

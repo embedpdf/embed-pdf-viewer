@@ -259,6 +259,7 @@ export class DocumentManagerPlugin extends BasePlugin<
         options.rotation,
         !!options.password,
         options.autoActivate,
+        options.permissions,
       ),
     );
 
@@ -315,6 +316,7 @@ export class DocumentManagerPlugin extends BasePlugin<
         options.rotation,
         !!options.password,
         options.autoActivate,
+        options.permissions,
       ),
     );
 
