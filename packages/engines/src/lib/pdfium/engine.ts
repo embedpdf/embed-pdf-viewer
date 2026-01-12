@@ -4967,6 +4967,16 @@ export class PdfiumNative implements IPdfiumExecutor {
     const richContent = this.getAnnotRichContent(annotationPtr);
     const flags = this.getAnnotationFlags(annotationPtr);
 
+    // Try to extract font color from the appearance stream (/AP) first.
+    // This is more reliable than /DA because Adobe and other viewers may
+    // regenerate the appearance with different colors than what's in /DA.
+    // The /AP stream contains the actual rendered appearance.
+    const apContent = this.readPageAnnoAppearanceStream(annotationPtr, AppearanceMode.Normal);
+    const apFontColor = this.parseFillColorFromAppearanceStream(apContent);
+
+    // Prefer /AP color, fall back to /DA color, then default to black
+    const fontColor = apFontColor ?? da?.fontColor ?? '#000000';
+
     return {
       pageIndex: page.index,
       custom,
@@ -4974,7 +4984,7 @@ export class PdfiumNative implements IPdfiumExecutor {
       type: PdfAnnotationSubtype.FREETEXT,
       fontFamily: da?.fontFamily ?? PdfStandardFont.Unknown,
       fontSize: da?.fontSize ?? 12,
-      fontColor: da?.fontColor ?? '#000000',
+      fontColor,
       verticalAlign,
       backgroundColor,
       flags,
@@ -7274,6 +7284,59 @@ export class PdfiumNative implements IPdfiumExecutor {
     this.memoryManager.free(bufferPtr);
 
     return ap;
+  }
+
+  /**
+   * Parse the fill color from a PDF appearance stream content string.
+   *
+   * PDF appearance streams use operators like:
+   * - `r g b rg` - set RGB fill color (values 0-1)
+   * - `gray g` - set grayscale fill color (value 0-1)
+   * - `c m y k k` - set CMYK fill color (values 0-1)
+   *
+   * This function extracts the **last** fill color set in the stream,
+   * which is the one that will be used for rendering text.
+   *
+   * @param apContent - the appearance stream content string
+   * @returns WebColor hex string or undefined if no fill color found
+   *
+   * @private
+   */
+  private parseFillColorFromAppearanceStream(apContent: string): WebColor | undefined {
+    if (!apContent || apContent.length === 0) {
+      return undefined;
+    }
+
+    // Match RGB fill color: "r g b rg" where r, g, b are floats 0-1
+    // We want the LAST occurrence since that's what's used for text rendering
+    const rgbMatches = apContent.matchAll(
+      /(\d+(?:\.\d+)?)\s+(\d+(?:\.\d+)?)\s+(\d+(?:\.\d+)?)\s+rg\b/g,
+    );
+    let lastRgbMatch: RegExpMatchArray | null = null;
+    for (const match of rgbMatches) {
+      lastRgbMatch = match;
+    }
+
+    if (lastRgbMatch) {
+      const r = Math.round(parseFloat(lastRgbMatch[1]) * 255);
+      const g = Math.round(parseFloat(lastRgbMatch[2]) * 255);
+      const b = Math.round(parseFloat(lastRgbMatch[3]) * 255);
+      return pdfColorToWebColor({ red: r, green: g, blue: b });
+    }
+
+    // Match grayscale fill color: "gray g" where gray is a float 0-1
+    const grayMatches = apContent.matchAll(/(\d+(?:\.\d+)?)\s+g\b/g);
+    let lastGrayMatch: RegExpMatchArray | null = null;
+    for (const match of grayMatches) {
+      lastGrayMatch = match;
+    }
+
+    if (lastGrayMatch) {
+      const gray = Math.round(parseFloat(lastGrayMatch[1]) * 255);
+      return pdfColorToWebColor({ red: gray, green: gray, blue: gray });
+    }
+
+    return undefined;
   }
 
   /**
