@@ -1,6 +1,6 @@
 {
   "name": "@embedpdf/svelte-pdf-viewer",
-  "version": "2.1.2",
+  "version": "2.2.0",
   "description": "Svelte component for embedding PDF documents",
   "license": "MIT",
   "type": "module",

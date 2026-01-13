@@ -1,5 +1,15 @@
 # @embedpdf/plugin-document-manager
 
+## 2.2.0
+
+### Minor Changes
+
+- [#389](https://github.com/embedpdf/embed-pdf-viewer/pull/389) by [@bobsingor](https://github.com/bobsingor) – Add per-document permission overrides when opening documents:
+  - Add `permissions` option to `LoadDocumentUrlOptions` for URL-based document loading
+  - Add `permissions` option to `LoadDocumentBufferOptions` for buffer-based document loading
+  - Add `permissions` option to `OpenFileDialogOptions` for file dialog document loading
+  - Pass permission configuration to core store when documents are opened
+
 ## 2.1.2
 
 ## 2.1.1

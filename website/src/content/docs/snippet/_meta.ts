@@ -3,4 +3,5 @@ export default {
   'getting-started': 'Getting Started',
   theme: 'Theme',
   'customizing-ui': 'Customizing the UI',
+  security: 'Security & Permissions',
 }

@@ -1,6 +1,12 @@
 <script setup lang="ts">
 import { ref, provide, onMounted, onBeforeUnmount, shallowRef, computed } from 'vue';
-import { PluginRegistry, PluginBatchRegistrations, CoreState, DocumentState } from '@embedpdf/core';
+import {
+  PluginRegistry,
+  PluginBatchRegistrations,
+  PluginRegistryConfig,
+  CoreState,
+  DocumentState,
+} from '@embedpdf/core';
 import { Logger, PdfEngine } from '@embedpdf/models';
 import { pdfKey, PDFContextState } from '../context';
 import AutoMount from './auto-mount.vue';
@@ -10,6 +16,9 @@ export type { PluginBatchRegistrations };
 const props = withDefaults(
   defineProps<{
     engine: PdfEngine;
+    /** Registry configuration including logger, permissions, and defaults. */
+    config?: PluginRegistryConfig;
+    /** @deprecated Use config.logger instead. Will be removed in next major version. */
     logger?: Logger;
     plugins: PluginBatchRegistrations;
     onInitialized?: (registry: PluginRegistry) => Promise<void>;
@@ -58,7 +67,12 @@ provide<PDFContextState>(pdfKey, {
 });
 
 onMounted(async () => {
-  const reg = new PluginRegistry(props.engine, { logger: props.logger });
+  // Merge deprecated logger prop into config (config.logger takes precedence)
+  const finalConfig: PluginRegistryConfig = {
+    ...props.config,
+    logger: props.config?.logger ?? props.logger,
+  };
+  const reg = new PluginRegistry(props.engine, finalConfig);
   reg.registerPluginBatch(props.plugins);
   await reg.initialize();
 

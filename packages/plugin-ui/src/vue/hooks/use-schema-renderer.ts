@@ -209,6 +209,7 @@ export function useSchemaRenderer(documentId: MaybeRefOrGetter<string>) {
      *
      * Overlays are floating components positioned over the document content.
      * Unlike modals, multiple overlays can be visible and they don't block interaction.
+     * Overlay visibility is controlled by the enabledOverlays state.
      *
      * @example
      * ```vue
@@ -221,7 +222,7 @@ export function useSchemaRenderer(documentId: MaybeRefOrGetter<string>) {
     renderOverlays: (): VNode[] | null => {
       const schema = provides.value?.getSchema();
 
-      if (!schema?.overlays || !provides.value) return null;
+      if (!schema?.overlays || !provides.value || !uiState.value) return null;
 
       const OverlayRenderer = renderers.overlay;
       if (!OverlayRenderer) {
@@ -231,7 +232,12 @@ export function useSchemaRenderer(documentId: MaybeRefOrGetter<string>) {
       const overlays = Object.values(schema.overlays);
       if (overlays.length === 0) return null;
 
-      return overlays.map((overlaySchema) =>
+      // Filter overlays by enabled state (default to true if not explicitly set)
+      const enabledOverlays = overlays.filter(
+        (overlay) => uiState.value!.enabledOverlays[overlay.id] !== false,
+      );
+
+      return enabledOverlays.map((overlaySchema) =>
         h(OverlayRenderer, {
           key: overlaySchema.id,
           schema: overlaySchema,

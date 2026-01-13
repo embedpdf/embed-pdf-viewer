@@ -6,6 +6,7 @@ import {
 } from '@embedpdf/utils/@framework';
 import { TrackedAnnotation } from '@embedpdf/plugin-annotation';
 import { useState, JSX, CSSProperties, useRef, useEffect, useMemo } from '@framework';
+import { useDocumentPermissions } from '@embedpdf/core/@framework';
 
 import { useAnnotationCapability } from '../hooks';
 import {
@@ -71,7 +72,12 @@ export function AnnotationContainer<T extends PdfAnnotationObject>({
 }: AnnotationContainerProps<T>): JSX.Element {
   const [preview, setPreview] = useState<T>(trackedAnnotation.object);
   const { provides: annotationCapability } = useAnnotationCapability();
+  const { canModifyAnnotations } = useDocumentPermissions(documentId);
   const gestureBaseRef = useRef<T | null>(null);
+
+  // Override props based on permission
+  const effectiveIsDraggable = canModifyAnnotations && isDraggable;
+  const effectiveIsResizable = canModifyAnnotations && isResizable;
 
   // Get scoped API for this document (memoized to prevent infinite loops)
   const annotationProvides = useMemo(
@@ -149,7 +155,13 @@ export function AnnotationContainer<T extends PdfAnnotationObject>({
     includeVertices: vertexConfig ? true : false,
   });
 
-  const doubleProps = useDoublePressProps(onDoubleClick);
+  // Wrap onDoubleClick to respect permissions
+  const guardedOnDoubleClick = useMemo(() => {
+    if (!canModifyAnnotations || !onDoubleClick) return undefined;
+    return onDoubleClick;
+  }, [canModifyAnnotations, onDoubleClick]);
+
+  const doubleProps = useDoublePressProps(guardedOnDoubleClick);
 
   useEffect(() => {
     setPreview(trackedAnnotation.object);
@@ -158,7 +170,7 @@ export function AnnotationContainer<T extends PdfAnnotationObject>({
   return (
     <div data-no-interaction>
       <div
-        {...(isDraggable && isSelected ? dragProps : {})}
+        {...(effectiveIsDraggable && isSelected ? dragProps : {})}
         {...doubleProps}
         style={{
           position: 'absolute',
@@ -170,7 +182,7 @@ export function AnnotationContainer<T extends PdfAnnotationObject>({
           outlineOffset: isSelected ? `${outlineOffset}px` : '0px',
           pointerEvents: isSelected ? 'auto' : 'none',
           touchAction: 'none',
-          cursor: isSelected && isDraggable ? 'move' : 'default',
+          cursor: isSelected && effectiveIsDraggable ? 'move' : 'default',
           zIndex,
           ...style,
         }}
@@ -200,7 +212,7 @@ export function AnnotationContainer<T extends PdfAnnotationObject>({
         })()}
 
         {isSelected &&
-          isResizable &&
+          effectiveIsResizable &&
           resize.map(({ key, ...hProps }) =>
             resizeUI?.component ? (
               resizeUI.component({
@@ -218,6 +230,7 @@ export function AnnotationContainer<T extends PdfAnnotationObject>({
           )}
 
         {isSelected &&
+          canModifyAnnotations &&
           vertices.map(({ key, ...vProps }) =>
             vertexUI?.component ? (
               vertexUI.component({

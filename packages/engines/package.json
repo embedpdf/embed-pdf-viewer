@@ -1,6 +1,6 @@
 {
   "name": "@embedpdf/engines",
-  "version": "2.1.2",
+  "version": "2.2.0",
   "description": "Pluggable runtime layer that abstracts over multiple PDF engines (PDF-ium, Web Workers, mocks, etc.) to provide a unified API for rendering, search, annotation, and other document-level operations in EmbedPDF.",
   "type": "module",
   "main": "./dist/index.cjs",

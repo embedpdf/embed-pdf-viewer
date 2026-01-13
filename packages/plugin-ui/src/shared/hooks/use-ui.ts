@@ -24,12 +24,14 @@ export const useUIState = (documentId: string) => {
     const unsubSidebar = scope.onSidebarChanged(() => setState(scope.getState()));
     const unsubModal = scope.onModalChanged(() => setState(scope.getState()));
     const unsubMenu = scope.onMenuChanged(() => setState(scope.getState()));
+    const unsubOverlay = scope.onOverlayChanged(() => setState(scope.getState()));
 
     return () => {
       unsubToolbar();
       unsubSidebar();
       unsubModal();
       unsubMenu();
+      unsubOverlay();
     };
   }, [provides, documentId]);
 

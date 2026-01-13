@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useMemo, ReactNode } from '@framework';
 import { Logger, PdfEngine } from '@embedpdf/models';
-import { PluginRegistry, CoreState, DocumentState } from '@embedpdf/core';
+import { PluginRegistry, CoreState, DocumentState, PluginRegistryConfig } from '@embedpdf/core';
 import type { PluginBatchRegistrations } from '@embedpdf/core';
 
 import { PDFContext, PDFContextState } from '../context';
@@ -14,7 +14,11 @@ interface EmbedPDFProps {
    */
   engine: PdfEngine;
   /**
-   * The logger to use for the PDF viewer.
+   * Registry configuration including logger, permissions, and defaults.
+   */
+  config?: PluginRegistryConfig;
+  /**
+   * @deprecated Use config.logger instead. Will be removed in next major version.
    */
   logger?: Logger;
   /**
@@ -38,6 +42,7 @@ interface EmbedPDFProps {
 
 export function EmbedPDF({
   engine,
+  config,
   logger,
   onInitialized,
   plugins,
@@ -55,7 +60,12 @@ export function EmbedPDF({
   }, [onInitialized]);
 
   useEffect(() => {
-    const pdfViewer = new PluginRegistry(engine, { logger });
+    // Merge deprecated logger prop into config (config.logger takes precedence)
+    const finalConfig: PluginRegistryConfig = {
+      ...config,
+      logger: config?.logger ?? logger,
+    };
+    const pdfViewer = new PluginRegistry(engine, finalConfig);
     pdfViewer.registerPluginBatch(plugins);
 
     const initialize = async () => {

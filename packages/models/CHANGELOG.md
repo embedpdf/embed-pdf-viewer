@@ -1,5 +1,17 @@
 # @embedpdf/models
 
+## 2.2.0
+
+### Minor Changes
+
+- [#389](https://github.com/embedpdf/embed-pdf-viewer/pull/389) by [@bobsingor](https://github.com/bobsingor) – Add PDF permission and security types:
+  - Add `isEncrypted`, `isOwnerUnlocked`, and `permissions` properties to `PdfDocumentObject`
+  - Add `PdfPermissionFlag` enum with all PDF permission flags (Print, ModifyContents, CopyContents, ModifyAnnotations, FillForms, ExtractForAccessibility, AssembleDocument, PrintHighQuality) and `AllowAll` combination
+  - Add `buildPermissions` helper function for combining permission flags
+  - Add `PermissionDeniedError` class for permission check failures
+  - Add security methods to `PdfEngine` interface: `setDocumentEncryption`, `removeEncryption`, `unlockOwnerPermissions`, `isEncrypted`, `isOwnerUnlocked`
+  - Add security methods to `IPdfiumExecutor` interface
+
 ## 2.1.2
 
 ## 2.1.1

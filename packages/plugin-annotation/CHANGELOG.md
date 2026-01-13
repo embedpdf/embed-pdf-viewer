@@ -1,5 +1,18 @@
 # @embedpdf/plugin-annotation
 
+## 2.2.0
+
+### Minor Changes
+
+- [#389](https://github.com/embedpdf/embed-pdf-viewer/pull/389) by [@bobsingor](https://github.com/bobsingor) – Add permission checking for annotation operations:
+  - Check `PdfPermissionFlag.ModifyAnnotations` before creating, updating, or deleting annotations
+  - Check permission before activating annotation tools
+  - Check permission before creating annotations from text selection
+  - Update `AnnotationContainer` components (React, Svelte, Vue) to respect `canModifyAnnotations` permission:
+    - Disable drag/resize when permission is denied
+    - Hide vertex handles when permission is denied
+    - Guard double-click handlers based on permission
+
 ## 2.1.2
 
 ## 2.1.1

@@ -1,6 +1,6 @@
 {
   "name": "@embedpdf/react-pdf-viewer",
-  "version": "2.1.2",
+  "version": "2.2.0",
   "description": "React component for embedding PDF documents",
   "main": "dist/index.cjs",
   "module": "dist/index.js",

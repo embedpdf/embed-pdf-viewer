@@ -32,10 +32,15 @@ var createPdfium = (() => {
       '_EPDF_GetMetaTrapped',
       '_EPDF_GetPageRotationByIndex',
       '_EPDF_HasMetaText',
+      '_EPDF_IsEncrypted',
+      '_EPDF_IsOwnerUnlocked',
       '_EPDF_PNG_EncodeRGBA',
+      '_EPDF_RemoveEncryption',
       '_EPDF_RenderAnnotBitmap',
+      '_EPDF_SetEncryption',
       '_EPDF_SetMetaText',
       '_EPDF_SetMetaTrapped',
+      '_EPDF_UnlockOwnerPermissions',
       '_EPDFAction_CreateGoTo',
       '_EPDFAction_CreateGoToNamed',
       '_EPDFAction_CreateLaunch',
@@ -7396,6 +7401,24 @@ var createPdfium = (() => {
     ));
     var _FPDF_GetSecurityHandlerRevision = (Module['_FPDF_GetSecurityHandlerRevision'] =
       createExportWrapper('FPDF_GetSecurityHandlerRevision', 1));
+    var _EPDF_SetEncryption = (Module['_EPDF_SetEncryption'] = createExportWrapper(
+      'EPDF_SetEncryption',
+      4,
+    ));
+    var _EPDF_RemoveEncryption = (Module['_EPDF_RemoveEncryption'] = createExportWrapper(
+      'EPDF_RemoveEncryption',
+      1,
+    ));
+    var _EPDF_UnlockOwnerPermissions = (Module['_EPDF_UnlockOwnerPermissions'] =
+      createExportWrapper('EPDF_UnlockOwnerPermissions', 2));
+    var _EPDF_IsEncrypted = (Module['_EPDF_IsEncrypted'] = createExportWrapper(
+      'EPDF_IsEncrypted',
+      1,
+    ));
+    var _EPDF_IsOwnerUnlocked = (Module['_EPDF_IsOwnerUnlocked'] = createExportWrapper(
+      'EPDF_IsOwnerUnlocked',
+      1,
+    ));
     var _FPDF_GetPageCount = (Module['_FPDF_GetPageCount'] = createExportWrapper(
       'FPDF_GetPageCount',
       1,

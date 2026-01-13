@@ -1,4 +1,5 @@
 import { PdfDocumentObject, PdfErrorCode, PdfPageObject, Rotation } from '@embedpdf/models';
+import { PermissionConfig } from '../types/permissions';
 
 // Document lifecycle actions
 export const START_LOADING_DOCUMENT = 'START_LOADING_DOCUMENT';
@@ -12,6 +13,9 @@ export const SET_ACTIVE_DOCUMENT = 'SET_ACTIVE_DOCUMENT';
 // Reorder document actions
 export const REORDER_DOCUMENTS = 'REORDER_DOCUMENTS';
 export const MOVE_DOCUMENT = 'MOVE_DOCUMENT';
+
+// Security actions
+export const UPDATE_DOCUMENT_SECURITY = 'UPDATE_DOCUMENT_SECURITY';
 
 // Document-specific actions
 export const REFRESH_DOCUMENT = 'REFRESH_DOCUMENT';
@@ -41,6 +45,7 @@ export const CORE_ACTION_TYPES = [
   SET_DEFAULT_ROTATION,
   REORDER_DOCUMENTS,
   MOVE_DOCUMENT,
+  UPDATE_DOCUMENT_SECURITY,
 ] as const;
 
 // ─────────────────────────────────────────────────────────
@@ -56,6 +61,7 @@ export interface StartLoadingDocumentAction {
     rotation?: Rotation;
     passwordProvided?: boolean;
     autoActivate?: boolean; // If true, this document becomes active when opened. Default: true
+    permissions?: PermissionConfig; // Per-document permission overrides
   };
 }
 
@@ -116,6 +122,19 @@ export interface MoveDocumentAction {
   payload: {
     documentId: string;
     toIndex: number;
+  };
+}
+
+// ─────────────────────────────────────────────────────────
+// Security Actions
+// ─────────────────────────────────────────────────────────
+
+export interface UpdateDocumentSecurityAction {
+  type: typeof UPDATE_DOCUMENT_SECURITY;
+  payload: {
+    documentId: string;
+    permissions: number;
+    isOwnerUnlocked: boolean;
   };
 }
 
@@ -193,7 +212,8 @@ export type DocumentAction =
   | SetDefaultScaleAction
   | SetDefaultRotationAction
   | ReorderDocumentsAction
-  | MoveDocumentAction;
+  | MoveDocumentAction
+  | UpdateDocumentSecurityAction;
 
 // Core actions
 export type CoreAction = DocumentAction;
@@ -208,9 +228,10 @@ export const startLoadingDocument = (
   rotation?: Rotation,
   passwordProvided?: boolean,
   autoActivate?: boolean,
+  permissions?: PermissionConfig,
 ): CoreAction => ({
   type: START_LOADING_DOCUMENT,
-  payload: { documentId, name, scale, rotation, passwordProvided, autoActivate },
+  payload: { documentId, name, scale, rotation, passwordProvided, autoActivate, permissions },
 });
 
 export const updateDocumentLoadingProgress = (
@@ -300,4 +321,13 @@ export const reorderDocuments = (order: string[]): CoreAction => ({
 export const moveDocument = (documentId: string, toIndex: number): CoreAction => ({
   type: MOVE_DOCUMENT,
   payload: { documentId, toIndex },
+});
+
+export const updateDocumentSecurity = (
+  documentId: string,
+  permissions: number,
+  isOwnerUnlocked: boolean,
+): CoreAction => ({
+  type: UPDATE_DOCUMENT_SECURITY,
+  payload: { documentId, permissions, isOwnerUnlocked },
 });
