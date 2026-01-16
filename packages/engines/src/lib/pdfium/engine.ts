@@ -975,6 +975,9 @@ export class PdfiumNative implements IPdfiumExecutor {
       case PdfAnnotationSubtype.HIGHLIGHT:
         isSucceed = this.addTextMarkupContent(page, pageCtx.pagePtr, annotationPtr, annotation);
         break;
+      case PdfAnnotationSubtype.LINK:
+        isSucceed = this.addLinkContent(ctx.docPtr, pageCtx.pagePtr, annotationPtr, annotation);
+        break;
     }
 
     if (!isSucceed) {
@@ -2693,6 +2696,85 @@ export class PdfiumNative implements IPdfiumExecutor {
       )
     ) {
       return false;
+    }
+
+    return true;
+  }
+
+  /**
+   * Add link content (action or destination) to a link annotation
+   * @param docPtr - pointer to pdf document
+   * @param pagePtr - pointer to the page
+   * @param annotationPtr - pointer to pdf annotation
+   * @param annotation - the link annotation object
+   * @returns true if successful
+   *
+   * @private
+   */
+  private addLinkContent(
+    docPtr: number,
+    pagePtr: number,
+    annotationPtr: number,
+    annotation: PdfLinkAnnoObject,
+  ): boolean {
+    // Set common annotation properties
+    if (
+      annotation.created &&
+      !this.setAnnotationDate(annotationPtr, 'CreationDate', annotation.created)
+    ) {
+      return false;
+    }
+    if (annotation.custom && !this.setAnnotCustom(annotationPtr, annotation.custom)) {
+      return false;
+    }
+    if (annotation.modified && !this.setAnnotationDate(annotationPtr, 'M', annotation.modified)) {
+      return false;
+    }
+    if (annotation.flags && !this.setAnnotationFlags(annotationPtr, annotation.flags)) {
+      return false;
+    }
+    if (!this.setAnnotString(annotationPtr, 'T', annotation.author || '')) {
+      return false;
+    }
+
+    // Border style and width (default: underline with width 2)
+    const style = annotation.strokeStyle ?? PdfAnnotationBorderStyle.UNDERLINE;
+    const width = annotation.strokeWidth ?? 2;
+    if (!this.setBorderStyle(annotationPtr, style, width)) {
+      return false;
+    }
+    if (
+      annotation.strokeDashArray &&
+      !this.setBorderDashPattern(annotationPtr, annotation.strokeDashArray)
+    ) {
+      return false;
+    }
+
+    // Stroke color
+    if (annotation.strokeColor) {
+      if (
+        !this.setAnnotationColor(
+          annotationPtr,
+          annotation.strokeColor,
+          PdfAnnotationColorType.Color,
+        )
+      ) {
+        return false;
+      }
+    }
+
+    // IRT (In Reply To) - for grouping annotations
+    if (annotation.inReplyToId) {
+      if (!this.setInReplyToId(pagePtr, annotationPtr, annotation.inReplyToId)) {
+        return false;
+      }
+    }
+
+    // Target (action or destination)
+    if (annotation.target) {
+      if (!this.applyLinkTarget(docPtr, annotationPtr, annotation.target)) {
+        return false;
+      }
     }
 
     return true;
@@ -5019,6 +5101,24 @@ export class PdfiumNative implements IPdfiumExecutor {
     const created = this.getAnnotationDate(annotationPtr, 'CreationDate');
     const flags = this.getAnnotationFlags(annotationPtr);
 
+    // Read border style and width
+    const { style: strokeStyle, width: strokeWidth } = this.getBorderStyle(annotationPtr);
+
+    // Read stroke color
+    const strokeColor = this.getAnnotationColor(annotationPtr, PdfAnnotationColorType.Color);
+
+    // Read dash pattern if dashed
+    let strokeDashArray: number[] | undefined;
+    if (strokeStyle === PdfAnnotationBorderStyle.DASHED) {
+      const { ok, pattern } = this.getBorderDashPattern(annotationPtr);
+      if (ok) {
+        strokeDashArray = pattern;
+      }
+    }
+
+    // Read IRT (In Reply To)
+    const inReplyToId = this.getInReplyToId(annotationPtr);
+
     const target = this.readPdfLinkAnnoTarget(
       docPtr,
       () => {
@@ -5040,6 +5140,11 @@ export class PdfiumNative implements IPdfiumExecutor {
       author,
       modified,
       created,
+      strokeColor,
+      strokeWidth,
+      strokeStyle,
+      strokeDashArray,
+      inReplyToId,
     };
   }
 
@@ -6884,9 +6989,59 @@ export class PdfiumNative implements IPdfiumExecutor {
 
       case PdfActionType.RemoteGoto:
         // We need a file path to build a GoToR action. Your Action shape
-        // doesn’t carry a path, so we’ll reject for now.
+        // doesn't carry a path, so we'll reject for now.
         return false;
 
+      case PdfActionType.Unsupported:
+      default:
+        return false;
+    }
+  }
+
+  /**
+   * Apply a link target (action or destination) to a link annotation
+   * @param docPtr - pointer to pdf document
+   * @param annotationPtr - pointer to the link annotation
+   * @param target - the link target to apply
+   * @returns true if successful
+   *
+   * @private
+   */
+  private applyLinkTarget(docPtr: number, annotationPtr: number, target: PdfLinkTarget): boolean {
+    if (target.type === 'destination') {
+      const destPtr = this.createLocalDestPtr(docPtr, target.destination);
+      if (!destPtr) return false;
+      const actPtr = this.pdfiumModule.EPDFAction_CreateGoTo(docPtr, destPtr);
+      if (!actPtr) return false;
+      return !!this.pdfiumModule.EPDFAnnot_SetAction(annotationPtr, actPtr);
+    }
+
+    // target.type === 'action'
+    const action = target.action;
+    switch (action.type) {
+      case PdfActionType.Goto: {
+        const destPtr = this.createLocalDestPtr(docPtr, action.destination);
+        if (!destPtr) return false;
+        const actPtr = this.pdfiumModule.EPDFAction_CreateGoTo(docPtr, destPtr);
+        if (!actPtr) return false;
+        return !!this.pdfiumModule.EPDFAnnot_SetAction(annotationPtr, actPtr);
+      }
+
+      case PdfActionType.URI: {
+        const actPtr = this.pdfiumModule.EPDFAction_CreateURI(docPtr, action.uri);
+        if (!actPtr) return false;
+        return !!this.pdfiumModule.EPDFAnnot_SetAction(annotationPtr, actPtr);
+      }
+
+      case PdfActionType.LaunchAppOrOpenFile: {
+        const actPtr = this.withWString(action.path, (wptr) =>
+          this.pdfiumModule.EPDFAction_CreateLaunch(docPtr, wptr),
+        );
+        if (!actPtr) return false;
+        return !!this.pdfiumModule.EPDFAnnot_SetAction(annotationPtr, actPtr);
+      }
+
+      case PdfActionType.RemoteGoto:
       case PdfActionType.Unsupported:
       default:
         return false;

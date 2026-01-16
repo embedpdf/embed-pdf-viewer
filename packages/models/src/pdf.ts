@@ -1041,6 +1041,31 @@ export interface PdfLinkAnnoObject extends PdfAnnotationObjectBase {
    * target of the link
    */
   target: PdfLinkTarget | undefined;
+
+  /**
+   * Stroke color of the link border (e.g., "#00A5E4")
+   */
+  strokeColor?: string;
+
+  /**
+   * Width of the link border (default: 2)
+   */
+  strokeWidth?: number;
+
+  /**
+   * Style of the link border (default: UNDERLINE)
+   */
+  strokeStyle?: PdfAnnotationBorderStyle;
+
+  /**
+   * Dash pattern for dashed border style
+   */
+  strokeDashArray?: number[];
+
+  /**
+   * In reply to annotation id (for grouping with parent annotation)
+   */
+  inReplyToId?: string;
 }
 
 /**

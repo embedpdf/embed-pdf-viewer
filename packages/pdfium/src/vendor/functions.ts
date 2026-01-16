@@ -56,6 +56,7 @@ export const functions = {
   EPDFAnnot_GetRichContent: [['number', 'number', 'number'] as const, 'number'] as const,
   EPDFAnnot_GetTextAlignment: [['number'] as const, 'number'] as const,
   EPDFAnnot_GetVerticalAlignment: [['number'] as const, 'number'] as const,
+  EPDFAnnot_SetAction: [['number', 'number'] as const, 'boolean'] as const,
   EPDFAnnot_SetBorderDashPattern: [['number', 'number', 'number'] as const, 'boolean'] as const,
   EPDFAnnot_SetBorderStyle: [['number', 'number', 'number'] as const, 'boolean'] as const,
   EPDFAnnot_SetColor: [

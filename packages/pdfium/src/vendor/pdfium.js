@@ -65,6 +65,7 @@ var createPdfium = (() => {
       '_EPDFAnnot_GetRichContent',
       '_EPDFAnnot_GetTextAlignment',
       '_EPDFAnnot_GetVerticalAlignment',
+      '_EPDFAnnot_SetAction',
       '_EPDFAnnot_SetBorderDashPattern',
       '_EPDFAnnot_SetBorderStyle',
       '_EPDFAnnot_SetColor',
@@ -6085,6 +6086,10 @@ var createPdfium = (() => {
       createExportWrapper('FPDFAnnot_GetFormFieldExportValue', 4));
     var _FPDFAnnot_SetURI = (Module['_FPDFAnnot_SetURI'] = createExportWrapper(
       'FPDFAnnot_SetURI',
+      2,
+    ));
+    var _EPDFAnnot_SetAction = (Module['_EPDFAnnot_SetAction'] = createExportWrapper(
+      'EPDFAnnot_SetAction',
       2,
     ));
     var _FPDFAnnot_GetFileAttachment = (Module['_FPDFAnnot_GetFileAttachment'] =
