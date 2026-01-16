@@ -62,7 +62,7 @@
   "author": "Bob Singor, Ji Chang",
   "devDependencies": {
     "@rollup/plugin-commonjs": "^25.0.8",
-    "@rollup/plugin-node-resolve": "^15.2.1",
+    "@rollup/plugin-node-resolve": "^16.0.3",
     "@rollup/plugin-replace": "^5.0.2",
     "@rollup/plugin-typescript": "^12.3.0",
     "@types/emscripten": "^1.39.13",
