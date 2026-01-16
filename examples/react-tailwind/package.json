@@ -40,13 +40,13 @@
     "@embedpdf/plugin-viewport": "workspace:*",
     "@embedpdf/plugin-zoom": "workspace:*",
     "@embedpdf/utils": "workspace:*",
-    "react": "^18.2.0",
+    "react": "^19.2.3",
     "react-dom": "^18.2.0",
     "tailwind-merge": "^3.4.0"
   },
   "devDependencies": {
     "@tailwindcss/vite": "^4.1.18",
-    "@types/react": "^18.2.0",
+    "@types/react": "^19.2.8",
     "@types/react-dom": "^18.2.0",
     "@typescript-eslint/eslint-plugin": "^8.18.5",
     "@typescript-eslint/parser": "^8.18.5",
