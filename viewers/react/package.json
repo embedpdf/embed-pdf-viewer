@@ -28,7 +28,7 @@
     "@embedpdf/snippet": "workspace:*"
   },
   "devDependencies": {
-    "@types/react": "^18.2.0",
+    "@types/react": "^19.2.8",
     "@types/react-dom": "^18.2.0",
     "rimraf": "^6.1.2",
     "typescript": "^5.1.6",

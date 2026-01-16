@@ -50,7 +50,7 @@
   "devDependencies": {
     "@embedpdf/core": "workspace:*",
     "@embedpdf/build": "workspace:*",
-    "@types/react": "^18.2.0",
+    "@types/react": "^19.2.8",
     "typescript": "^5.0.0"
   },
   "peerDependencies": {

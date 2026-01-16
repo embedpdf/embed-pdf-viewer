@@ -54,7 +54,7 @@
     "@embedpdf/core": "workspace:*",
     "@embedpdf/plugin-selection": "workspace:*",
     "@embedpdf/plugin-interaction-manager": "workspace:*",
-    "@types/react": "^18.2.0",
+    "@types/react": "^19.2.8",
     "typescript": "^5.0.0"
   },
   "peerDependencies": {

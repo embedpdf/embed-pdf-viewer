@@ -63,7 +63,7 @@
     "@rollup/plugin-url": "^8.0.1",
     "@tailwindcss/postcss": "^4.1.17",
     "@types/node": "^20.5.4",
-    "@types/react": "^18.2.0",
+    "@types/react": "^19.2.8",
     "@types/uuid": "^9.0.2",
     "autoprefixer": "^10.4.23",
     "babel-plugin-transform-react-jsx": "^6.24.1",
