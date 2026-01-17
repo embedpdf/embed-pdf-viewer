@@ -4960,12 +4960,51 @@ export class PdfiumNative implements IPdfiumExecutor {
     const created = this.getAnnotationDate(annotationPtr, 'CreationDate');
     const defaultStyle = this.getAnnotString(annotationPtr, 'DS');
     const da = this.getAnnotationDefaultAppearance(annotationPtr);
+    // For FreeText, try /C first (annotation color), which is typically the background
+    // Note: This is different from Circle/Square where /C is stroke and /IC is fill
     const backgroundColor = this.getAnnotationColor(annotationPtr);
     const textAlign = this.getAnnotationTextAlignment(annotationPtr);
     const verticalAlign = this.getAnnotationVerticalAlignment(annotationPtr);
     const opacity = this.getAnnotationOpacity(annotationPtr);
     const richContent = this.getAnnotRichContent(annotationPtr);
     const flags = this.getAnnotationFlags(annotationPtr);
+
+    // Read border/stroke properties
+    // Try getBorderStyle first, fall back to getStrokeWidth if width is 0
+    const { style: strokeStyle, width: borderStyleWidth } = this.getBorderStyle(annotationPtr);
+    const { pattern: strokeDashArray } = this.getBorderDashPattern(annotationPtr);
+
+    // Read the appearance stream (/AP) for extracting colors.
+    // The /AP stream contains the actual rendered appearance, which is more
+    // reliable than /DA or /C because Adobe and other viewers may regenerate
+    // the appearance with different colors.
+    const apContent = this.readPageAnnoAppearanceStream(annotationPtr, AppearanceMode.Normal);
+
+    // Try to extract stroke color from the appearance stream (/AP) first.
+    // If not found, fall back to /C (annotation color) since some PDFs use the same
+    // color for both background and border.
+    const apStrokeColor = this.parseStrokeColorFromAppearanceStream(apContent);
+    // For FreeText, if there's no stroke color in /AP, use /C as fallback
+    const strokeColor = apStrokeColor ?? backgroundColor;
+
+    // Get stroke width: try border style, then FPDFAnnot_GetBorder, then appearance stream
+    let strokeWidth = borderStyleWidth;
+    if (strokeWidth === 0) {
+      strokeWidth = this.getStrokeWidth(annotationPtr);
+    }
+    // If still 0 but we have a stroke color, try to get width from appearance stream
+    if (strokeWidth === 0 && strokeColor) {
+      const apStrokeWidth = this.parseLineWidthFromAppearanceStream(apContent);
+      if (apStrokeWidth !== undefined && apStrokeWidth > 0) {
+        strokeWidth = apStrokeWidth;
+      }
+    }
+
+    // Try to extract font color from the appearance stream.
+    const apFontColor = this.parseFillColorFromAppearanceStream(apContent);
+
+    // Prefer /AP color, fall back to /DA color, then default to black
+    const fontColor = apFontColor ?? da?.fontColor ?? '#000000';
 
     return {
       pageIndex: page.index,
@@ -4974,9 +5013,13 @@ export class PdfiumNative implements IPdfiumExecutor {
       type: PdfAnnotationSubtype.FREETEXT,
       fontFamily: da?.fontFamily ?? PdfStandardFont.Unknown,
       fontSize: da?.fontSize ?? 12,
-      fontColor: da?.fontColor ?? '#000000',
+      fontColor,
       verticalAlign,
       backgroundColor,
+      strokeColor,
+      strokeWidth,
+      strokeStyle,
+      strokeDashArray,
       flags,
       opacity,
       textAlign,
@@ -5840,7 +5883,8 @@ export class PdfiumNative implements IPdfiumExecutor {
     const wPtr = this.memoryManager.malloc(4);
 
     const ok = this.pdfiumModule.FPDFAnnot_GetBorder(annotationPtr, hPtr, vPtr, wPtr);
-    const width = ok ? this.pdfiumModule.pdfium.getValue(wPtr, 'float') : 1; // default 1 pt
+    // Default to 1.5pt to better match Adobe's rendering of FreeText borders
+    const width = ok ? this.pdfiumModule.pdfium.getValue(wPtr, 'float') : 1.5;
 
     this.memoryManager.free(hPtr);
     this.memoryManager.free(vPtr);
@@ -7274,6 +7318,142 @@ export class PdfiumNative implements IPdfiumExecutor {
     this.memoryManager.free(bufferPtr);
 
     return ap;
+  }
+
+  /**
+   * Parse the fill color from a PDF appearance stream content string.
+   *
+   * PDF appearance streams use operators like:
+   * - `r g b rg` - set RGB fill color (values 0-1)
+   * - `gray g` - set grayscale fill color (value 0-1)
+   * - `c m y k k` - set CMYK fill color (values 0-1)
+   *
+   * This function extracts the **last** fill color set in the stream,
+   * which is the one that will be used for rendering text.
+   *
+   * @param apContent - the appearance stream content string
+   * @returns WebColor hex string or undefined if no fill color found
+   *
+   * @private
+   */
+  private parseFillColorFromAppearanceStream(apContent: string): WebColor | undefined {
+    if (!apContent || apContent.length === 0) {
+      return undefined;
+    }
+
+    // Match RGB fill color: "r g b rg" where r, g, b are floats 0-1
+    // We want the LAST occurrence since that's what's used for text rendering
+    const rgbMatches = apContent.matchAll(
+      /(\d+(?:\.\d+)?)\s+(\d+(?:\.\d+)?)\s+(\d+(?:\.\d+)?)\s+rg\b/g,
+    );
+    let lastRgbMatch: RegExpMatchArray | null = null;
+    for (const match of rgbMatches) {
+      lastRgbMatch = match;
+    }
+
+    if (lastRgbMatch) {
+      const r = Math.round(parseFloat(lastRgbMatch[1]) * 255);
+      const g = Math.round(parseFloat(lastRgbMatch[2]) * 255);
+      const b = Math.round(parseFloat(lastRgbMatch[3]) * 255);
+      return pdfColorToWebColor({ red: r, green: g, blue: b });
+    }
+
+    // Match grayscale fill color: "gray g" where gray is a float 0-1
+    const grayMatches = apContent.matchAll(/(\d+(?:\.\d+)?)\s+g\b/g);
+    let lastGrayMatch: RegExpMatchArray | null = null;
+    for (const match of grayMatches) {
+      lastGrayMatch = match;
+    }
+
+    if (lastGrayMatch) {
+      const gray = Math.round(parseFloat(lastGrayMatch[1]) * 255);
+      return pdfColorToWebColor({ red: gray, green: gray, blue: gray });
+    }
+
+    return undefined;
+  }
+
+  /**
+   * Parse the stroke color from a PDF appearance stream content string.
+   *
+   * PDF appearance streams use operators like:
+   * - `r g b RG` - set RGB stroke color (values 0-1)
+   * - `gray G` - set grayscale stroke color (value 0-1)
+   * - `c m y k K` - set CMYK stroke color (values 0-1)
+   *
+   * This function extracts the **last** stroke color set in the stream,
+   * which is the one that will be used for rendering borders.
+   *
+   * @param apContent - the appearance stream content string
+   * @returns WebColor hex string or undefined if no stroke color found
+   *
+   * @private
+   */
+  private parseStrokeColorFromAppearanceStream(apContent: string): WebColor | undefined {
+    if (!apContent || apContent.length === 0) {
+      return undefined;
+    }
+
+    // Match RGB stroke color: "r g b RG" where r, g, b are floats 0-1
+    // We want the LAST occurrence since that's what's used for border rendering
+    const rgbMatches = apContent.matchAll(
+      /(\d+(?:\.\d+)?)\s+(\d+(?:\.\d+)?)\s+(\d+(?:\.\d+)?)\s+RG\b/g,
+    );
+    let lastRgbMatch: RegExpMatchArray | null = null;
+    for (const match of rgbMatches) {
+      lastRgbMatch = match;
+    }
+
+    if (lastRgbMatch) {
+      const r = Math.round(parseFloat(lastRgbMatch[1]) * 255);
+      const g = Math.round(parseFloat(lastRgbMatch[2]) * 255);
+      const b = Math.round(parseFloat(lastRgbMatch[3]) * 255);
+      return pdfColorToWebColor({ red: r, green: g, blue: b });
+    }
+
+    // Match grayscale stroke color: "gray G" where gray is a float 0-1
+    const grayMatches = apContent.matchAll(/(\d+(?:\.\d+)?)\s+G\b/g);
+    let lastGrayMatch: RegExpMatchArray | null = null;
+    for (const match of grayMatches) {
+      lastGrayMatch = match;
+    }
+
+    if (lastGrayMatch) {
+      const gray = Math.round(parseFloat(lastGrayMatch[1]) * 255);
+      return pdfColorToWebColor({ red: gray, green: gray, blue: gray });
+    }
+
+    return undefined;
+  }
+
+  /**
+   * Parse the line width from a PDF appearance stream content string.
+   *
+   * The `w` operator sets the line width in PDF content streams.
+   *
+   * @param apContent - the appearance stream content string
+   * @returns line width in points, or undefined if not found
+   *
+   * @private
+   */
+  private parseLineWidthFromAppearanceStream(apContent: string): number | undefined {
+    if (!apContent || apContent.length === 0) {
+      return undefined;
+    }
+
+    // Match line width: "width w" where width is a float
+    // We want the LAST occurrence since that's what's used for rendering
+    const widthMatches = apContent.matchAll(/(\d+(?:\.\d+)?)\s+w\b/g);
+    let lastWidthMatch: RegExpMatchArray | null = null;
+    for (const match of widthMatches) {
+      lastWidthMatch = match;
+    }
+
+    if (lastWidthMatch) {
+      return parseFloat(lastWidthMatch[1]);
+    }
+
+    return undefined;
   }
 
   /**

@@ -25,6 +25,7 @@
 <script setup lang="ts">
 import { ref, watch, computed, onMounted } from 'vue';
 import {
+  PdfAnnotationBorderStyle,
   PdfFreeTextAnnoObject,
   PdfVerticalAlignment,
   standardFontCss,
@@ -92,6 +93,12 @@ const editorStyle = computed(() => {
   const scaleComp = needsComp ? computedFontPx / MIN_IOS_FOCUS_FONT_PX : 1;
   const invScalePercent = needsComp ? 100 / scaleComp : 100;
 
+  // Border styling
+  const strokeWidth = anno.strokeWidth ?? 0;
+  const strokeColor = anno.strokeColor;
+  const strokeStyle = anno.strokeStyle ?? PdfAnnotationBorderStyle.SOLID;
+  const hasBorder = strokeWidth > 0 && strokeColor;
+
   return {
     color: anno.fontColor,
     fontSize: `${adjustedFontPx}px`,
@@ -115,6 +122,12 @@ const editorStyle = computed(() => {
     outline: 'none',
     transform: needsComp ? `scale(${scaleComp})` : undefined,
     transformOrigin: 'top left',
+    boxSizing: 'border-box' as 'border-box',
+    ...(hasBorder && {
+      borderWidth: `${strokeWidth * props.scale}px`,
+      borderColor: strokeColor,
+      borderStyle: strokeStyle === PdfAnnotationBorderStyle.DASHED ? 'dashed' : 'solid',
+    }),
   };
 });
 </script>
