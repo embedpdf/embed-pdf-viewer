@@ -29,6 +29,8 @@ import {
   Rect,
   Task,
   uuidV4,
+  MatchFlag,
+  boundingRect,
 } from '@embedpdf/models';
 import {
   FormattedSelection,
@@ -258,6 +260,10 @@ export class RedactionPlugin extends BasePlugin<
 
       getState: () => this.getDocumentStateOrThrow(),
 
+      // Search-based redaction
+      searchText: (searchText, caseSensitive) => this.searchText(searchText, caseSensitive),
+      redactText: (searchText, caseSensitive) => this.redactText(searchText, caseSensitive),
+
       // Document-scoped operations
       forDocument: (documentId: string) => this.createRedactionScope(documentId),
 
@@ -299,6 +305,10 @@ export class RedactionPlugin extends BasePlugin<
       deselectPending: () => this.deselectPending(documentId),
 
       getState: () => this.getDocumentStateOrThrow(documentId),
+
+      // Search-based redaction
+      searchText: (searchText, caseSensitive) => this.searchText(searchText, caseSensitive, documentId),
+      redactText: (searchText, caseSensitive) => this.redactText(searchText, caseSensitive, documentId),
 
       onPendingChange: (listener: Listener<Record<number, RedactionItem[]>>) =>
         this.pending$.on((event) => {
@@ -747,6 +757,132 @@ export class RedactionPlugin extends BasePlugin<
         task.reject({ code: PdfErrorCode.Unknown, message: 'Failed to commit redactions' });
       },
     );
+
+    return task;
+  }
+
+  // ─────────────────────────────────────────────────────────
+  // Search-based Redaction
+  // ─────────────────────────────────────────────────────────
+
+  private searchText(
+    searchText: string,
+    caseSensitive?: boolean,
+    documentId?: string,
+  ): Task<{ totalCount: number; foundOnPages: number[] }, PdfErrorReason> {
+    const docId = documentId ?? this.getActiveDocumentId();
+
+    const coreDoc = this.coreState.core.documents[docId];
+    if (!coreDoc?.document) {
+      return PdfTaskHelper.reject({
+        code: PdfErrorCode.NotFound,
+        message: 'Document not found',
+      });
+    }
+
+    const flags = caseSensitive ? [MatchFlag.MatchCase] : [];
+
+    const task = new Task<{ totalCount: number; foundOnPages: number[] }, PdfErrorReason>();
+    this.engine
+      .searchAllPages(coreDoc.document, searchText, { flags })
+      .wait(
+        (result) => {
+          const foundOnPages = [...new Set(result.results.map((r) => r.pageIndex + 1))].sort(
+            (a, b) => a - b,
+          );
+          task.resolve({
+            totalCount: result.total,
+            foundOnPages,
+          });
+        },
+        (error) => {
+          task.reject(error.reason);
+        },
+      );
+
+    return task;
+  }
+
+  private redactText(
+    searchText: string,
+    caseSensitive?: boolean,
+    documentId?: string,
+  ): Task<boolean, PdfErrorReason> {
+    const docId = documentId ?? this.getActiveDocumentId();
+
+    // Prevent redacting without permission
+    if (!this.checkPermission(docId, PdfPermissionFlag.ModifyContents)) {
+      return PdfTaskHelper.reject({
+        code: PdfErrorCode.Security,
+        message: 'Document lacks ModifyContents permission',
+      });
+    }
+
+    const coreDoc = this.coreState.core.documents[docId];
+    if (!coreDoc?.document) {
+      return PdfTaskHelper.reject({
+        code: PdfErrorCode.NotFound,
+        message: 'Document not found',
+      });
+    }
+
+    const flags = caseSensitive ? [MatchFlag.MatchCase] : [];
+
+    const task = new Task<boolean, PdfErrorReason>();
+
+    // First search for the text
+    this.engine
+      .searchAllPages(coreDoc.document, searchText, { flags })
+      .wait(
+        (searchResult) => {
+          if (searchResult.total === 0) {
+            // No text found to redact
+            task.resolve(false);
+            return;
+          }
+
+          // Group rects by page - merge character rects into bounding rects for each match
+          const perPage = new Map<number, Rect[]>();
+          for (const result of searchResult.results) {
+            const bounding = boundingRect(result.rects);
+            if (bounding) {
+              const list = perPage.get(result.pageIndex) ?? [];
+              list.push(bounding);
+              perPage.set(result.pageIndex, list);
+            }
+          }
+
+          const pagesToRefresh = Array.from(perPage.keys());
+
+          // Redact each page
+          const redactTasks: PdfTask<boolean>[] = [];
+          for (const [pageIndex, rects] of perPage) {
+            if (coreDoc.document) {
+              const page = coreDoc.document.pages[pageIndex];
+              if (page && rects.length > 0) {
+                redactTasks.push(
+                  this.engine.redactTextInRects(coreDoc.document, page, rects, {
+                    drawBlackBoxes: this.config.drawBlackBoxes,
+                  }),
+                );
+              }
+            }
+          }
+
+          Task.all(redactTasks).wait(
+            () => {
+              this.dispatchCoreAction(refreshPages(docId, pagesToRefresh));
+              task.resolve(true);
+            },
+            (error) => {
+              task.reject(error.reason);
+            },
+          );
+        },
+        (error) => {
+          task.reject(error.reason);
+        },
+      );
 
     return task;
   }

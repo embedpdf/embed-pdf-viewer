@@ -118,6 +118,7 @@ import { SchemaSelectionMenu } from '@/ui/schema-selection-menu';
 import { SchemaOverlay } from '@/ui/schema-overlay';
 import { PrintModal } from '@/components/print-modal';
 import { PageControls } from '@/components/page-controls';
+import { SearchRedactionModal } from '@/components/search-redaction-modal';
 
 import {
   commands as defaultCommands,
@@ -480,6 +481,7 @@ export function PDFViewer({ config, onRegistryReady }: PDFViewerProps) {
       'page-controls': PageControls,
       'mode-select-button': ModeSelectButton,
       'view-permissions-modal': ViewPermissionsModal,
+      'search-redaction-modal': SearchRedactionModal,
     }),
     [],
   );
