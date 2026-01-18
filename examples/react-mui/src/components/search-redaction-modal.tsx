@@ -31,6 +31,7 @@ export const SearchRedactionModal: React.FC<SearchRedactionModalProps> = ({
   const [caseSensitive, setCaseSensitive] = useState(false);
   const [isSearching, setIsSearching] = useState(false);
   const [isRedacting, setIsRedacting] = useState(false);
+  const [isFocused, setIsFocused] = useState(false);
   const [searchResults, setSearchResults] = useState<{ totalCount: number; foundOnPages: number[] } | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -77,6 +78,7 @@ export const SearchRedactionModal: React.FC<SearchRedactionModalProps> = ({
       onClose();
       setSearchText('');
       setCaseSensitive(false);
+      setIsFocused(false);
       setSearchResults(null);
       setError(null);
     }
@@ -92,6 +94,8 @@ export const SearchRedactionModal: React.FC<SearchRedactionModalProps> = ({
             label="Search Text"
             value={searchText}
             onChange={(e) => setSearchText(e.target.value)}
+            onFocus={() => setIsFocused(true)}
+            onBlur={() => setIsFocused(false)}
             onKeyDown={(e) => {
               if (e.key === 'Enter' && !isSearching && !isRedacting && searchText.trim()) {
                 handleSearch();
@@ -99,7 +103,21 @@ export const SearchRedactionModal: React.FC<SearchRedactionModalProps> = ({
             }}
             placeholder="Enter text to search for..."
             disabled={isSearching || isRedacting}
-            sx={{ mb: 2 }}
+            sx={{
+              mb: 2,
+              '& .MuiOutlinedInput-root': {
+                '& fieldset legend span': {
+                  display: (searchText.trim() || isFocused) ? 'none' : 'inline-block',
+                  opacity: (searchText.trim() || isFocused) ? 0 : 1,
+                  transition: 'opacity 0.2s ease-in-out',
+                },
+              },
+              '& .MuiInputLabel-root': {
+                display: (searchText.trim() || isFocused) ? 'none' : 'block',
+                opacity: (searchText.trim() || isFocused) ? 0 : 1,
+                transition: 'opacity 0.2s ease-in-out',
+              },
+            }}
             autoFocus
           />
           <FormControlLabel
