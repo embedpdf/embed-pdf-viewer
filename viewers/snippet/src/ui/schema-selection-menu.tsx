@@ -5,6 +5,7 @@ import {
   SelectionMenuPropsBase,
   getUIItemProps,
 } from '@embedpdf/plugin-ui/preact';
+import { useCommand } from '@embedpdf/plugin-commands/preact';
 import { CommandButton } from '../components/command-button';
 
 export function SchemaSelectionMenu({ schema, documentId, props }: SelectionMenuRendererProps) {
@@ -46,6 +47,29 @@ export function SchemaSelectionMenu({ schema, documentId, props }: SelectionMenu
   );
 }
 
+/**
+ * Wrapper component for command buttons that checks visibility before rendering.
+ * This ensures the wrapper div is not rendered when the command is hidden.
+ */
+function CommandButtonItem({
+  item,
+  documentId,
+}: {
+  item: SelectionMenuItem & { type: 'command-button' };
+  documentId: string;
+}) {
+  const command = useCommand(item.commandId, documentId);
+
+  // Don't render wrapper div if command is hidden
+  if (!command?.visible) return null;
+
+  return (
+    <div {...getUIItemProps(item)}>
+      <CommandButton commandId={item.commandId} documentId={documentId} variant={item.variant} />
+    </div>
+  );
+}
+
 function SelectionMenuItemRenderer({
   item,
   documentId,
@@ -57,15 +81,7 @@ function SelectionMenuItemRenderer({
 }) {
   switch (item.type) {
     case 'command-button':
-      return (
-        <div {...getUIItemProps(item)}>
-          <CommandButton
-            commandId={item.commandId}
-            documentId={documentId}
-            variant={item.variant}
-          />
-        </div>
-      );
+      return <CommandButtonItem item={item} documentId={documentId} />;
 
     case 'divider':
       return (

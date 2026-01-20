@@ -1240,6 +1240,16 @@ export const viewerUISchema: UISchema = {
       closeOnClickOutside: true,
       closeOnEscape: true,
     },
+    'link-modal': {
+      id: 'link-modal',
+      content: {
+        type: 'component',
+        componentId: 'link-modal',
+      },
+      maxWidth: '28rem',
+      closeOnClickOutside: true,
+      closeOnEscape: true,
+    },
   },
 
   // ─────────────────────────────────────────────────────────
@@ -1294,6 +1304,13 @@ export const viewerUISchema: UISchema = {
         },
         {
           type: 'command-button',
+          id: 'toggle-link',
+          commandId: 'annotation:toggle-link',
+          variant: 'icon',
+          categories: ['annotation', 'annotation-link'],
+        },
+        {
+          type: 'command-button',
           id: 'toggle-annotation-style',
           commandId: 'panel:toggle-annotation-style',
           variant: 'icon',
@@ -1302,9 +1319,43 @@ export const viewerUISchema: UISchema = {
         {
           type: 'command-button',
           id: 'comment-button',
-          commandId: 'panel:toggle-comment',
+          commandId: 'annotation:toggle-comment',
           variant: 'icon',
-          categories: ['panel', 'panel-comment'],
+          categories: ['annotation', 'annotation-comment'],
+        },
+        {
+          type: 'command-button',
+          id: 'goto-link',
+          commandId: 'annotation:goto-link',
+          variant: 'icon-text',
+          categories: ['annotation', 'annotation-link'],
+        },
+      ],
+    },
+    groupAnnotation: {
+      id: 'groupAnnotation',
+      categories: ['annotation', 'annotation-group'],
+      items: [
+        {
+          type: 'command-button',
+          id: 'group-annotations',
+          commandId: 'annotation:group',
+          variant: 'icon',
+          categories: ['annotation', 'annotation-group'],
+        },
+        {
+          type: 'command-button',
+          id: 'ungroup-annotations',
+          commandId: 'annotation:ungroup',
+          variant: 'icon',
+          categories: ['annotation', 'annotation-group'],
+        },
+        {
+          type: 'command-button',
+          id: 'delete-all-annotations',
+          commandId: 'annotation:delete-all-selected',
+          variant: 'icon',
+          categories: ['annotation', 'annotation-delete', 'annotation-group'],
         },
       ],
     },
@@ -1337,6 +1388,7 @@ export const viewerUISchema: UISchema = {
           'add-strikeout',
           'add-underline',
           'add-squiggly',
+          'add-link',
           'redact-text',
         ],
       },
@@ -1375,6 +1427,13 @@ export const viewerUISchema: UISchema = {
           commandId: 'annotation:add-squiggly',
           variant: 'icon',
           categories: ['annotation', 'annotation-markup', 'annotation-squiggly'],
+        },
+        {
+          type: 'command-button',
+          id: 'add-link',
+          commandId: 'annotation:add-link',
+          variant: 'icon',
+          categories: ['annotation', 'annotation-link'],
         },
         {
           type: 'command-button',

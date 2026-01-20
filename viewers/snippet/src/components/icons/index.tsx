@@ -73,6 +73,9 @@ import { AlertTriangleIcon } from './alert-triangle';
 import { EyeIcon } from './eye';
 import { EyeOffIcon } from './eye-off';
 import { InfoIcon } from './info';
+import { LinkIcon } from './link';
+import { LinkOffIcon } from './link-off';
+import { ExternalLinkIcon } from './external-link';
 
 export type Icons = {
   [key: string]: IconComponent;
@@ -153,4 +156,7 @@ export const icons: Icons = {
   eye: EyeIcon,
   'eye-off': EyeOffIcon,
   info: InfoIcon,
+  link: LinkIcon,
+  linkOff: LinkOffIcon,
+  externalLink: ExternalLinkIcon,
 };

@@ -1,7 +1,7 @@
 import { blendModeToCss, PdfAnnotationObject, PdfBlendMode } from '@embedpdf/models';
 import {
   getAnnotationsByPageIndex,
-  getSelectedAnnotationByPageIndex,
+  getSelectedAnnotationIds,
   isHighlight,
   isInk,
   isSquiggly,
@@ -15,7 +15,9 @@ import {
   isPolygon,
   isFreeText,
   isStamp,
+  isLink,
 } from '@embedpdf/plugin-annotation';
+import { PdfLinkAnnoObject } from '@embedpdf/models';
 import { PointerEventHandlers } from '@embedpdf/plugin-interaction-manager';
 import { usePointerHandlers } from '@embedpdf/plugin-interaction-manager/@framework';
 import { useSelectionCapability } from '@embedpdf/plugin-selection/@framework';
@@ -31,6 +33,7 @@ import {
 
 import { useAnnotationCapability } from '../hooks';
 import { AnnotationContainer } from './annotation-container';
+import { GroupSelectionBox } from './group-selection-box';
 import { Highlight } from './text-markup/highlight';
 import { Underline } from './text-markup/underline';
 import { Strikeout } from './text-markup/strikeout';
@@ -41,6 +44,7 @@ import {
   CustomAnnotationRenderer,
   ResizeHandleUI,
   AnnotationSelectionMenuRenderFn,
+  GroupSelectionMenuRenderFn,
   VertexHandleUI,
 } from './types';
 import { Circle } from './annotations/circle';
@@ -49,6 +53,7 @@ import { Polyline } from './annotations/polyline';
 import { Polygon } from './annotations/polygon';
 import { FreeText } from './annotations/free-text';
 import { Stamp } from './annotations/stamp';
+import { Link } from './annotations/link';
 
 interface AnnotationsProps {
   documentId: string;
@@ -58,6 +63,7 @@ interface AnnotationsProps {
   pageWidth: number;
   pageHeight: number;
   selectionMenu?: AnnotationSelectionMenuRenderFn;
+  groupSelectionMenu?: GroupSelectionMenuRenderFn;
   resizeUI?: ResizeHandleUI;
   vertexUI?: VertexHandleUI;
   selectionOutlineColor?: string;
@@ -65,12 +71,12 @@ interface AnnotationsProps {
 }
 
 export function Annotations(annotationsProps: AnnotationsProps) {
-  const { documentId, pageIndex, scale, selectionMenu } = annotationsProps;
+  const { documentId, pageIndex, scale, pageWidth, pageHeight, selectionMenu } = annotationsProps;
   const { provides: annotationCapability } = useAnnotationCapability();
   const { provides: selectionProvides } = useSelectionCapability();
   const [annotations, setAnnotations] = useState<TrackedAnnotation[]>([]);
   const { register } = usePointerHandlers({ documentId, pageIndex });
-  const [selectionState, setSelectionState] = useState<TrackedAnnotation | null>(null);
+  const [allSelectedIds, setAllSelectedIds] = useState<string[]>([]);
   const [editingId, setEditingId] = useState<string | null>(null);
 
   // Get scoped API for this document (memoized to prevent infinite loops)
@@ -79,17 +85,20 @@ export function Annotations(annotationsProps: AnnotationsProps) {
     [annotationCapability, documentId],
   );
 
+  // Check if multiple annotations are selected
+  const isMultiSelected = allSelectedIds.length > 1;
+
   useEffect(() => {
     if (annotationProvides) {
       // Initialize with current state immediately
       const currentState = annotationProvides.getState();
       setAnnotations(getAnnotationsByPageIndex(currentState, pageIndex));
-      setSelectionState(getSelectedAnnotationByPageIndex(currentState, pageIndex));
+      setAllSelectedIds(getSelectedAnnotationIds(currentState));
 
       // Then subscribe to changes
       return annotationProvides.onStateChange((state) => {
         setAnnotations(getAnnotationsByPageIndex(state, pageIndex));
-        setSelectionState(getSelectedAnnotationByPageIndex(state, pageIndex));
+        setAllSelectedIds(getSelectedAnnotationIds(state));
       });
     }
   }, [annotationProvides, pageIndex]);
@@ -111,8 +120,19 @@ export function Annotations(annotationsProps: AnnotationsProps) {
     (e: MouseEvent | TouchEvent, annotation: TrackedAnnotation) => {
       e.stopPropagation();
       if (annotationProvides && selectionProvides) {
-        annotationProvides.selectAnnotation(pageIndex, annotation.object.id);
         selectionProvides.clear();
+
+        // Check for modifier key (Cmd on Mac, Ctrl on Windows/Linux)
+        const isModifierPressed = 'metaKey' in e ? e.metaKey || e.ctrlKey : false;
+
+        if (isModifierPressed) {
+          // Toggle selection: add or remove from current selection
+          annotationProvides.toggleSelection(pageIndex, annotation.object.id);
+        } else {
+          // Exclusive select: clear and select only this one
+          annotationProvides.selectAnnotation(pageIndex, annotation.object.id);
+        }
+
         if (annotation.object.id !== editingId) {
           setEditingId(null);
         }
@@ -121,16 +141,63 @@ export function Annotations(annotationsProps: AnnotationsProps) {
     [annotationProvides, selectionProvides, editingId, pageIndex],
   );
 
+  // Special handler for link annotations - if IRT exists, select the parent
+  const handleLinkClick = useCallback(
+    (e: MouseEvent | TouchEvent, annotation: TrackedAnnotation<PdfLinkAnnoObject>) => {
+      e.stopPropagation();
+      if (!annotationProvides || !selectionProvides) return;
+
+      selectionProvides.clear();
+
+      // If link has IRT, select the parent annotation instead
+      if (annotation.object.inReplyToId) {
+        const parentId = annotation.object.inReplyToId;
+        const parent = annotations.find((a) => a.object.id === parentId);
+        if (parent) {
+          annotationProvides.selectAnnotation(parent.object.pageIndex, parentId);
+          return;
+        }
+      }
+
+      // Standalone link - select it directly
+      annotationProvides.selectAnnotation(pageIndex, annotation.object.id);
+    },
+    [annotationProvides, selectionProvides, annotations, pageIndex],
+  );
+
   useEffect(() => {
     return register(handlers, {
       documentId,
     });
   }, [register, handlers]);
+  // Get selected annotations that are on THIS page (for group selection box)
+  const selectedAnnotationsOnPage = useMemo(() => {
+    return annotations.filter((anno) => allSelectedIds.includes(anno.object.id));
+  }, [annotations, allSelectedIds]);
+
+  // Check if all selected annotations on this page are resizable
+  const areAllSelectedResizable = useMemo(() => {
+    if (selectedAnnotationsOnPage.length < 2) return false;
+
+    return selectedAnnotationsOnPage.every((ta) => {
+      const tool = annotationProvides?.findToolForAnnotation(ta.object);
+      // Default to true if no tool found, but check tool config if available
+      return tool?.interaction.isResizable ?? true;
+    });
+  }, [selectedAnnotationsOnPage, annotationProvides]);
+
+  // Check if all selected annotations are on the same page (this page)
+  const allSelectedOnSamePage = useMemo(() => {
+    if (!annotationProvides) return false;
+    const allSelected = annotationProvides.getSelectedAnnotations();
+    // All selected must be on this page
+    return allSelected.length > 1 && allSelected.every((ta) => ta.object.pageIndex === pageIndex);
+  }, [annotationProvides, pageIndex, allSelectedIds]);
 
   return (
     <>
       {annotations.map((annotation) => {
-        const isSelected = selectionState?.object.id === annotation.object.id;
+        const isSelected = allSelectedIds.includes(annotation.object.id);
         const isEditing = editingId === annotation.object.id;
         const tool = annotationProvides?.findToolForAnnotation(annotation.object);
 
@@ -140,6 +207,7 @@ export function Annotations(annotationsProps: AnnotationsProps) {
               key={annotation.object.id}
               trackedAnnotation={annotation}
               isSelected={isSelected}
+              isMultiSelected={isMultiSelected}
               isDraggable={tool?.interaction.isDraggable ?? true}
               isResizable={tool?.interaction.isResizable ?? true}
               lockAspectRatio={tool?.interaction.lockAspectRatio ?? false}
@@ -168,6 +236,7 @@ export function Annotations(annotationsProps: AnnotationsProps) {
               key={annotation.object.id}
               trackedAnnotation={annotation}
               isSelected={isSelected}
+              isMultiSelected={isMultiSelected}
               isDraggable={tool?.interaction.isDraggable ?? true}
               isResizable={tool?.interaction.isResizable ?? true}
               lockAspectRatio={tool?.interaction.lockAspectRatio ?? false}
@@ -196,6 +265,7 @@ export function Annotations(annotationsProps: AnnotationsProps) {
               key={annotation.object.id}
               trackedAnnotation={annotation}
               isSelected={isSelected}
+              isMultiSelected={isMultiSelected}
               isDraggable={tool?.interaction.isDraggable ?? true}
               isResizable={tool?.interaction.isResizable ?? true}
               lockAspectRatio={tool?.interaction.lockAspectRatio ?? false}
@@ -224,6 +294,7 @@ export function Annotations(annotationsProps: AnnotationsProps) {
               key={annotation.object.id}
               trackedAnnotation={annotation}
               isSelected={isSelected}
+              isMultiSelected={isMultiSelected}
               isDraggable={tool?.interaction.isDraggable ?? false}
               isResizable={tool?.interaction.isResizable ?? false}
               lockAspectRatio={tool?.interaction.lockAspectRatio ?? false}
@@ -248,6 +319,7 @@ export function Annotations(annotationsProps: AnnotationsProps) {
               key={annotation.object.id}
               trackedAnnotation={annotation}
               isSelected={isSelected}
+              isMultiSelected={isMultiSelected}
               isDraggable={tool?.interaction.isDraggable ?? false}
               isResizable={tool?.interaction.isResizable ?? false}
               lockAspectRatio={tool?.interaction.lockAspectRatio ?? false}
@@ -272,6 +344,7 @@ export function Annotations(annotationsProps: AnnotationsProps) {
               key={annotation.object.id}
               trackedAnnotation={annotation}
               isSelected={isSelected}
+              isMultiSelected={isMultiSelected}
               isDraggable={tool?.interaction.isDraggable ?? false}
               isResizable={tool?.interaction.isResizable ?? false}
               lockAspectRatio={tool?.interaction.lockAspectRatio ?? false}
@@ -296,6 +369,7 @@ export function Annotations(annotationsProps: AnnotationsProps) {
               key={annotation.object.id}
               trackedAnnotation={annotation}
               isSelected={isSelected}
+              isMultiSelected={isMultiSelected}
               isDraggable={tool?.interaction.isDraggable ?? false}
               isResizable={tool?.interaction.isResizable ?? false}
               lockAspectRatio={tool?.interaction.lockAspectRatio ?? false}
@@ -320,6 +394,7 @@ export function Annotations(annotationsProps: AnnotationsProps) {
               key={annotation.object.id}
               trackedAnnotation={annotation}
               isSelected={isSelected}
+              isMultiSelected={isMultiSelected}
               isDraggable={tool?.interaction.isDraggable ?? true}
               isResizable={tool?.interaction.isResizable ?? false}
               lockAspectRatio={tool?.interaction.lockAspectRatio ?? false}
@@ -365,6 +440,7 @@ export function Annotations(annotationsProps: AnnotationsProps) {
               key={annotation.object.id}
               trackedAnnotation={annotation}
               isSelected={isSelected}
+              isMultiSelected={isMultiSelected}
               isDraggable={tool?.interaction.isDraggable ?? true}
               isResizable={tool?.interaction.isResizable ?? false}
               lockAspectRatio={tool?.interaction.lockAspectRatio ?? false}
@@ -404,6 +480,7 @@ export function Annotations(annotationsProps: AnnotationsProps) {
               key={annotation.object.id}
               trackedAnnotation={annotation}
               isSelected={isSelected}
+              isMultiSelected={isMultiSelected}
               isDraggable={tool?.interaction.isDraggable ?? true}
               isResizable={tool?.interaction.isResizable ?? false}
               lockAspectRatio={tool?.interaction.lockAspectRatio ?? false}
@@ -443,6 +520,7 @@ export function Annotations(annotationsProps: AnnotationsProps) {
               key={annotation.object.id}
               trackedAnnotation={annotation}
               isSelected={isSelected}
+              isMultiSelected={isMultiSelected}
               isDraggable={(tool?.interaction.isDraggable ?? true) && !isEditing}
               isResizable={tool?.interaction.isResizable ?? true}
               lockAspectRatio={tool?.interaction.lockAspectRatio ?? false}
@@ -480,6 +558,7 @@ export function Annotations(annotationsProps: AnnotationsProps) {
               key={annotation.object.id}
               trackedAnnotation={annotation}
               isSelected={isSelected}
+              isMultiSelected={isMultiSelected}
               isDraggable={tool?.interaction.isDraggable ?? true}
               isResizable={tool?.interaction.isResizable ?? true}
               lockAspectRatio={tool?.interaction.lockAspectRatio ?? false}
@@ -504,9 +583,55 @@ export function Annotations(annotationsProps: AnnotationsProps) {
           );
         }
 
+        if (isLink(annotation)) {
+          // IRT-linked links are not independently draggable/resizable
+          const hasIRT = !!annotation.object.inReplyToId;
+          return (
+            <AnnotationContainer
+              key={annotation.object.id}
+              trackedAnnotation={annotation}
+              isSelected={isSelected}
+              isMultiSelected={isMultiSelected}
+              isDraggable={false}
+              isResizable={false}
+              lockAspectRatio={false}
+              selectionMenu={hasIRT ? undefined : selectionMenu}
+              onSelect={(e) => handleLinkClick(e, annotation)}
+              {...annotationsProps}
+            >
+              {(obj) => (
+                <Link
+                  {...obj}
+                  isSelected={isSelected}
+                  scale={scale}
+                  onClick={(e) => handleLinkClick(e, annotation)}
+                  hasIRT={hasIRT}
+                />
+              )}
+            </AnnotationContainer>
+          );
+        }
+
         /* --------- fallback: an unsupported subtype --------------- */
         return null;
       })}
+
+      {/* Group selection box for multi-select resize */}
+      {allSelectedOnSamePage && selectedAnnotationsOnPage.length >= 2 && (
+        <GroupSelectionBox
+          documentId={documentId}
+          pageIndex={pageIndex}
+          scale={scale}
+          rotation={annotationsProps.rotation}
+          pageWidth={pageWidth}
+          pageHeight={pageHeight}
+          selectedAnnotations={selectedAnnotationsOnPage}
+          isResizable={areAllSelectedResizable}
+          resizeUI={annotationsProps.resizeUI}
+          selectionOutlineColor={annotationsProps.selectionOutlineColor}
+          groupSelectionMenu={annotationsProps.groupSelectionMenu}
+        />
+      )}
     </>
   );
 }

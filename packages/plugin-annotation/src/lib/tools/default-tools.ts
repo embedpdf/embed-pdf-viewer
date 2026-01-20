@@ -23,7 +23,8 @@ export const defaultTools = [
     },
     defaults: {
       type: PdfAnnotationSubtype.HIGHLIGHT,
-      color: '#FFCD45',
+      strokeColor: '#FFCD45',
+      color: '#FFCD45', // deprecated alias
       opacity: 1,
       blendMode: PdfBlendMode.Multiply,
     },
@@ -40,7 +41,8 @@ export const defaultTools = [
     },
     defaults: {
       type: PdfAnnotationSubtype.UNDERLINE,
-      color: '#E44234',
+      strokeColor: '#E44234',
+      color: '#E44234', // deprecated alias
       opacity: 1,
     },
   },
@@ -54,7 +56,8 @@ export const defaultTools = [
     },
     defaults: {
       type: PdfAnnotationSubtype.STRIKEOUT,
-      color: '#E44234',
+      strokeColor: '#E44234',
+      color: '#E44234', // deprecated alias
       opacity: 1,
     },
   },
@@ -70,7 +73,8 @@ export const defaultTools = [
     },
     defaults: {
       type: PdfAnnotationSubtype.SQUIGGLY,
-      color: '#E44234',
+      strokeColor: '#E44234',
+      color: '#E44234', // deprecated alias
       opacity: 1,
     },
   },
@@ -89,7 +93,8 @@ export const defaultTools = [
     },
     defaults: {
       type: PdfAnnotationSubtype.INK,
-      color: '#E44234',
+      strokeColor: '#E44234',
+      color: '#E44234', // deprecated alias
       opacity: 1,
       strokeWidth: 6,
     },
@@ -109,7 +114,8 @@ export const defaultTools = [
     defaults: {
       type: PdfAnnotationSubtype.INK,
       intent: 'InkHighlight',
-      color: '#FFCD45',
+      strokeColor: '#FFCD45',
+      color: '#FFCD45', // deprecated alias
       opacity: 1,
       strokeWidth: 14,
       blendMode: PdfBlendMode.Multiply,
@@ -277,7 +283,8 @@ export const defaultTools = [
       fontFamily: PdfStandardFont.Helvetica,
       textAlign: PdfTextAlignment.Left,
       verticalAlign: PdfVerticalAlignment.Top,
-      backgroundColor: 'transparent',
+      color: 'transparent', // fill color (matches shape convention)
+      backgroundColor: 'transparent', // deprecated alias
       opacity: 1,
     },
     clickBehavior: {

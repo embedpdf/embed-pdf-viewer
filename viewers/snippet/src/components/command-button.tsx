@@ -58,17 +58,17 @@ export function CommandButton({
         {variant === 'text' ? (
           <span className="text-sm">{command.label}</span>
         ) : variant === 'icon-text' ? (
-          <>
+          <span className="flex items-center whitespace-nowrap">
             {command.icon && (
               <Icon
                 icon={command.icon}
-                className="mr-2 h-5 w-5"
+                className="mr-1.5 h-5 w-5 flex-shrink-0"
                 primaryColor={iconProps.primaryColor}
                 secondaryColor={iconProps.secondaryColor}
               />
             )}
             <span>{command.label}</span>
-          </>
+          </span>
         ) : variant === 'tab' ? (
           <span className="px-3 py-1">{command.label}</span>
         ) : command.icon ? (

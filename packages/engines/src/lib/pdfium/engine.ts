@@ -99,6 +99,7 @@ import {
   isUuidV4,
   uuidV4,
   PdfAnnotationIcon,
+  PdfAnnotationReplyType,
   PdfRenderPageAnnotationOptions,
   PdfRedactTextOptions,
   PdfFlattenPageOptions,
@@ -1142,6 +1143,12 @@ export class PdfiumNative implements IPdfiumExecutor {
       case PdfAnnotationSubtype.SQUIGGLY: {
         /* replace quad-points / colour / strings in one go */
         ok = this.addTextMarkupContent(page, pageCtx.pagePtr, annotPtr, annotation);
+        break;
+      }
+
+      /* ── Link ─────────────────────────────────────────────────────────────── */
+      case PdfAnnotationSubtype.LINK: {
+        ok = this.addLinkContent(ctx.docPtr, pageCtx.pagePtr, annotPtr, annotation);
         break;
       }
 
@@ -2333,36 +2340,8 @@ export class PdfiumNative implements IPdfiumExecutor {
     annotationPtr: number,
     annotation: PdfTextAnnoObject,
   ) {
-    if (!this.setAnnotString(annotationPtr, 'Contents', annotation.contents ?? '')) {
-      return false;
-    }
-    if (annotation.custom && !this.setAnnotCustom(annotationPtr, annotation.custom)) {
-      return false;
-    }
-    if (!this.setAnnotString(annotationPtr, 'T', annotation.author || '')) {
-      return false;
-    }
-    if (annotation.modified && !this.setAnnotationDate(annotationPtr, 'M', annotation.modified)) {
-      return false;
-    }
-    if (
-      annotation.created &&
-      !this.setAnnotationDate(annotationPtr, 'CreationDate', annotation.created)
-    ) {
-      return false;
-    }
-    if (
-      annotation.inReplyToId &&
-      !this.setInReplyToId(pagePtr, annotationPtr, annotation.inReplyToId)
-    ) {
-      return false;
-    }
+    // Type-specific properties
     if (!this.setAnnotationIcon(annotationPtr, annotation.icon || PdfAnnotationIcon.Comment)) {
-      return false;
-    }
-    if (
-      !this.setAnnotationFlags(annotationPtr, annotation.flags || ['print', 'noZoom', 'noRotate'])
-    ) {
       return false;
     }
     if (annotation.state && !this.setAnnotString(annotationPtr, 'State', annotation.state)) {
@@ -2374,7 +2353,16 @@ export class PdfiumNative implements IPdfiumExecutor {
     ) {
       return false;
     }
-    return true;
+
+    // Text annotations have default flags if not specified
+    if (!annotation.flags) {
+      if (!this.setAnnotationFlags(annotationPtr, ['print', 'noZoom', 'noRotate'])) {
+        return false;
+      }
+    }
+
+    // Apply base annotation properties (author, contents, dates, flags, custom, IRT, RT)
+    return this.applyBaseAnnotationProperties(pagePtr, annotationPtr, annotation);
   }
 
   /**
@@ -2393,28 +2381,8 @@ export class PdfiumNative implements IPdfiumExecutor {
     annotationPtr: number,
     annotation: PdfFreeTextAnnoObject,
   ) {
-    if (
-      annotation.created &&
-      !this.setAnnotationDate(annotationPtr, 'CreationDate', annotation.created)
-    ) {
-      return false;
-    }
-    if (annotation.custom && !this.setAnnotCustom(annotationPtr, annotation.custom)) {
-      return false;
-    }
-    if (annotation.flags && !this.setAnnotationFlags(annotationPtr, annotation.flags)) {
-      return false;
-    }
-    if (annotation.modified && !this.setAnnotationDate(annotationPtr, 'M', annotation.modified)) {
-      return false;
-    }
+    // Type-specific properties
     if (!this.setBorderStyle(annotationPtr, PdfAnnotationBorderStyle.SOLID, 0)) {
-      return false;
-    }
-    if (!this.setAnnotString(annotationPtr, 'Contents', annotation.contents ?? '')) {
-      return false;
-    }
-    if (!this.setAnnotString(annotationPtr, 'T', annotation.author || '')) {
       return false;
     }
     if (!this.setAnnotationOpacity(annotationPtr, annotation.opacity ?? 1)) {
@@ -2439,20 +2407,20 @@ export class PdfiumNative implements IPdfiumExecutor {
     if (annotation.intent && !this.setAnnotIntent(annotationPtr, annotation.intent)) {
       return false;
     }
-    if (!annotation.backgroundColor || annotation.backgroundColor === 'transparent') {
+    // Prefer color, fall back to deprecated backgroundColor
+    const bgColor = annotation.color ?? annotation.backgroundColor;
+    if (!bgColor || bgColor === 'transparent') {
       if (!this.pdfiumModule.EPDFAnnot_ClearColor(annotationPtr, PdfAnnotationColorType.Color)) {
         return false;
       }
     } else if (
-      !this.setAnnotationColor(
-        annotationPtr,
-        annotation.backgroundColor ?? '#FFFFFF',
-        PdfAnnotationColorType.Color,
-      )
+      !this.setAnnotationColor(annotationPtr, bgColor ?? '#FFFFFF', PdfAnnotationColorType.Color)
     ) {
       return false;
     }
-    return true;
+
+    // Apply base annotation properties (author, contents, dates, flags, custom, IRT, RT)
+    return this.applyBaseAnnotationProperties(pagePtr, annotationPtr, annotation);
   }
 
   /**
@@ -2471,24 +2439,7 @@ export class PdfiumNative implements IPdfiumExecutor {
     annotationPtr: number,
     annotation: PdfInkAnnoObject,
   ) {
-    if (
-      annotation.created &&
-      !this.setAnnotationDate(annotationPtr, 'CreationDate', annotation.created)
-    ) {
-      return false;
-    }
-    if (annotation.custom && !this.setAnnotCustom(annotationPtr, annotation.custom)) {
-      return false;
-    }
-    if (annotation.flags && !this.setAnnotationFlags(annotationPtr, annotation.flags)) {
-      return false;
-    }
-    if (annotation.modified && !this.setAnnotationDate(annotationPtr, 'M', annotation.modified)) {
-      return false;
-    }
-    if (!this.setAnnotString(annotationPtr, 'Contents', annotation.contents ?? '')) {
-      return false;
-    }
+    // Type-specific properties
     if (
       !this.setBorderStyle(annotationPtr, PdfAnnotationBorderStyle.SOLID, annotation.strokeWidth)
     ) {
@@ -2497,23 +2448,17 @@ export class PdfiumNative implements IPdfiumExecutor {
     if (!this.setInkList(page, annotationPtr, annotation.inkList)) {
       return false;
     }
-    if (!this.setAnnotString(annotationPtr, 'T', annotation.author || '')) {
-      return false;
-    }
     if (!this.setAnnotationOpacity(annotationPtr, annotation.opacity ?? 1)) {
       return false;
     }
-    if (
-      !this.setAnnotationColor(
-        annotationPtr,
-        annotation.color ?? '#FFFF00',
-        PdfAnnotationColorType.Color,
-      )
-    ) {
+    // Prefer strokeColor, fall back to deprecated color
+    const strokeColor = annotation.strokeColor ?? annotation.color ?? '#FFFF00';
+    if (!this.setAnnotationColor(annotationPtr, strokeColor, PdfAnnotationColorType.Color)) {
       return false;
     }
 
-    return true;
+    // Apply base annotation properties (author, contents, dates, flags, custom, IRT, RT)
+    return this.applyBaseAnnotationProperties(pagePtr, annotationPtr, annotation);
   }
 
   /**
@@ -2532,21 +2477,7 @@ export class PdfiumNative implements IPdfiumExecutor {
     annotationPtr: number,
     annotation: PdfLineAnnoObject,
   ) {
-    if (
-      annotation.created &&
-      !this.setAnnotationDate(annotationPtr, 'CreationDate', annotation.created)
-    ) {
-      return false;
-    }
-    if (annotation.custom && !this.setAnnotCustom(annotationPtr, annotation.custom)) {
-      return false;
-    }
-    if (annotation.flags && !this.setAnnotationFlags(annotationPtr, annotation.flags)) {
-      return false;
-    }
-    if (annotation.modified && !this.setAnnotationDate(annotationPtr, 'M', annotation.modified)) {
-      return false;
-    }
+    // Type-specific properties
     if (
       !this.setLinePoints(
         page,
@@ -2566,12 +2497,6 @@ export class PdfiumNative implements IPdfiumExecutor {
     ) {
       return false;
     }
-    if (!this.setAnnotString(annotationPtr, 'Contents', annotation.contents ?? '')) {
-      return false;
-    }
-    if (!this.setAnnotString(annotationPtr, 'T', annotation.author || '')) {
-      return false;
-    }
     if (!this.setBorderStyle(annotationPtr, annotation.strokeStyle, annotation.strokeWidth)) {
       return false;
     }
@@ -2608,7 +2533,9 @@ export class PdfiumNative implements IPdfiumExecutor {
     ) {
       return false;
     }
-    return true;
+
+    // Apply base annotation properties (author, contents, dates, flags, custom, IRT, RT)
+    return this.applyBaseAnnotationProperties(pagePtr, annotationPtr, annotation);
   }
 
   /**
@@ -2627,21 +2554,7 @@ export class PdfiumNative implements IPdfiumExecutor {
     annotationPtr: number,
     annotation: PdfPolygonAnnoObject | PdfPolylineAnnoObject,
   ) {
-    if (
-      annotation.created &&
-      !this.setAnnotationDate(annotationPtr, 'CreationDate', annotation.created)
-    ) {
-      return false;
-    }
-    if (annotation.custom && !this.setAnnotCustom(annotationPtr, annotation.custom)) {
-      return false;
-    }
-    if (annotation.modified && !this.setAnnotationDate(annotationPtr, 'M', annotation.modified)) {
-      return false;
-    }
-    if (annotation.flags && !this.setAnnotationFlags(annotationPtr, annotation.flags)) {
-      return false;
-    }
+    // Type-specific properties
     if (
       annotation.type === PdfAnnotationSubtype.POLYLINE &&
       !this.setLineEndings(
@@ -2653,12 +2566,6 @@ export class PdfiumNative implements IPdfiumExecutor {
       return false;
     }
     if (!this.setPdfAnnoVertices(page, annotationPtr, annotation.vertices)) {
-      return false;
-    }
-    if (!this.setAnnotString(annotationPtr, 'Contents', annotation.contents ?? '')) {
-      return false;
-    }
-    if (!this.setAnnotString(annotationPtr, 'T', annotation.author || '')) {
       return false;
     }
     if (!this.setBorderStyle(annotationPtr, annotation.strokeStyle, annotation.strokeWidth)) {
@@ -2698,7 +2605,8 @@ export class PdfiumNative implements IPdfiumExecutor {
       return false;
     }
 
-    return true;
+    // Apply base annotation properties (author, contents, dates, flags, custom, IRT, RT)
+    return this.applyBaseAnnotationProperties(pagePtr, annotationPtr, annotation);
   }
 
   /**
@@ -2717,26 +2625,7 @@ export class PdfiumNative implements IPdfiumExecutor {
     annotationPtr: number,
     annotation: PdfLinkAnnoObject,
   ): boolean {
-    // Set common annotation properties
-    if (
-      annotation.created &&
-      !this.setAnnotationDate(annotationPtr, 'CreationDate', annotation.created)
-    ) {
-      return false;
-    }
-    if (annotation.custom && !this.setAnnotCustom(annotationPtr, annotation.custom)) {
-      return false;
-    }
-    if (annotation.modified && !this.setAnnotationDate(annotationPtr, 'M', annotation.modified)) {
-      return false;
-    }
-    if (annotation.flags && !this.setAnnotationFlags(annotationPtr, annotation.flags)) {
-      return false;
-    }
-    if (!this.setAnnotString(annotationPtr, 'T', annotation.author || '')) {
-      return false;
-    }
-
+    // Type-specific properties
     // Border style and width (default: underline with width 2)
     const style = annotation.strokeStyle ?? PdfAnnotationBorderStyle.UNDERLINE;
     const width = annotation.strokeWidth ?? 2;
@@ -2763,13 +2652,6 @@ export class PdfiumNative implements IPdfiumExecutor {
       }
     }
 
-    // IRT (In Reply To) - for grouping annotations
-    if (annotation.inReplyToId) {
-      if (!this.setInReplyToId(pagePtr, annotationPtr, annotation.inReplyToId)) {
-        return false;
-      }
-    }
-
     // Target (action or destination)
     if (annotation.target) {
       if (!this.applyLinkTarget(docPtr, annotationPtr, annotation.target)) {
@@ -2777,7 +2659,8 @@ export class PdfiumNative implements IPdfiumExecutor {
       }
     }
 
-    return true;
+    // Apply base annotation properties (author, contents, dates, flags, custom, IRT, RT)
+    return this.applyBaseAnnotationProperties(pagePtr, annotationPtr, annotation);
   }
 
   /**
@@ -2796,31 +2679,11 @@ export class PdfiumNative implements IPdfiumExecutor {
     annotationPtr: number,
     annotation: PdfCircleAnnoObject | PdfSquareAnnoObject,
   ) {
-    if (
-      annotation.created &&
-      !this.setAnnotationDate(annotationPtr, 'CreationDate', annotation.created)
-    ) {
-      return false;
-    }
-    if (annotation.custom && !this.setAnnotCustom(annotationPtr, annotation.custom)) {
-      return false;
-    }
-    if (annotation.modified && !this.setAnnotationDate(annotationPtr, 'M', annotation.modified)) {
-      return false;
-    }
-    if (!this.setAnnotString(annotationPtr, 'Contents', annotation.contents ?? '')) {
-      return false;
-    }
-    if (!this.setAnnotString(annotationPtr, 'T', annotation.author || '')) {
-      return false;
-    }
+    // Type-specific properties
     if (!this.setBorderStyle(annotationPtr, annotation.strokeStyle, annotation.strokeWidth)) {
       return false;
     }
     if (!this.setBorderDashPattern(annotationPtr, annotation.strokeDashArray ?? [])) {
-      return false;
-    }
-    if (!this.setAnnotationFlags(annotationPtr, annotation.flags)) {
       return false;
     }
     if (!annotation.color || annotation.color === 'transparent') {
@@ -2851,7 +2714,8 @@ export class PdfiumNative implements IPdfiumExecutor {
       return false;
     }
 
-    return true;
+    // Apply base annotation properties (author, contents, dates, flags, custom, IRT, RT)
+    return this.applyBaseAnnotationProperties(pagePtr, annotationPtr, annotation);
   }
 
   /**
@@ -2873,44 +2737,21 @@ export class PdfiumNative implements IPdfiumExecutor {
       | PdfStrikeOutAnnoObject
       | PdfSquigglyAnnoObject,
   ) {
-    if (
-      annotation.created &&
-      !this.setAnnotationDate(annotationPtr, 'CreationDate', annotation.created)
-    ) {
-      return false;
-    }
-    if (annotation.custom && !this.setAnnotCustom(annotationPtr, annotation.custom)) {
-      return false;
-    }
-    if (annotation.flags && !this.setAnnotationFlags(annotationPtr, annotation.flags)) {
-      return false;
-    }
-    if (annotation.modified && !this.setAnnotationDate(annotationPtr, 'M', annotation.modified)) {
-      return false;
-    }
+    // Type-specific properties
     if (!this.syncQuadPointsAnno(page, annotationPtr, annotation.segmentRects)) {
-      return false;
-    }
-    if (!this.setAnnotString(annotationPtr, 'Contents', annotation.contents ?? '')) {
-      return false;
-    }
-    if (!this.setAnnotString(annotationPtr, 'T', annotation.author || '')) {
       return false;
     }
     if (!this.setAnnotationOpacity(annotationPtr, annotation.opacity ?? 1)) {
       return false;
     }
-    if (
-      !this.setAnnotationColor(
-        annotationPtr,
-        annotation.color ?? '#FFFF00',
-        PdfAnnotationColorType.Color,
-      )
-    ) {
+    // Prefer strokeColor, fall back to deprecated color
+    const strokeColor = annotation.strokeColor ?? annotation.color ?? '#FFFF00';
+    if (!this.setAnnotationColor(annotationPtr, strokeColor, PdfAnnotationColorType.Color)) {
       return false;
     }
 
-    return true;
+    // Apply base annotation properties (author, contents, dates, flags, custom, IRT, RT)
+    return this.applyBaseAnnotationProperties(pagePtr, annotationPtr, annotation);
   }
 
   /**
@@ -2933,31 +2774,11 @@ export class PdfiumNative implements IPdfiumExecutor {
     annotation: PdfStampAnnoObject,
     imageData?: ImageData,
   ) {
-    if (
-      annotation.created &&
-      !this.setAnnotationDate(annotationPtr, 'CreationDate', annotation.created)
-    ) {
-      return false;
-    }
-    if (annotation.custom && !this.setAnnotCustom(annotationPtr, annotation.custom)) {
-      return false;
-    }
-    if (annotation.flags && !this.setAnnotationFlags(annotationPtr, annotation.flags)) {
-      return false;
-    }
-    if (annotation.modified && !this.setAnnotationDate(annotationPtr, 'M', annotation.modified)) {
-      return false;
-    }
+    // Type-specific properties
     if (annotation.icon && !this.setAnnotationIcon(annotationPtr, annotation.icon)) {
       return false;
     }
-    if (!this.setAnnotString(annotationPtr, 'T', annotation.author || '')) {
-      return false;
-    }
     if (annotation.subject && !this.setAnnotString(annotationPtr, 'Subj', annotation.subject)) {
-      return false;
-    }
-    if (!this.setAnnotString(annotationPtr, 'Contents', annotation.contents ?? '')) {
       return false;
     }
     if (imageData) {
@@ -2973,7 +2794,8 @@ export class PdfiumNative implements IPdfiumExecutor {
       return false;
     }
 
-    return true;
+    // Apply base annotation properties (author, contents, dates, flags, custom, IRT, RT)
+    return this.applyBaseAnnotationProperties(pagePtr, annotationPtr, annotation);
   }
 
   /**
@@ -4347,6 +4169,31 @@ export class PdfiumNative implements IPdfiumExecutor {
   }
 
   /**
+   * Get the reply type of the annotation (RT property per ISO 32000-2)
+   *
+   * @param annotationPtr - pointer to an `FPDF_ANNOTATION`
+   * @returns `PdfAnnotationReplyType`
+   */
+  private getReplyType(annotationPtr: number): PdfAnnotationReplyType {
+    return this.pdfiumModule.EPDFAnnot_GetReplyType(annotationPtr);
+  }
+
+  /**
+   * Set the reply type of the annotation (RT property per ISO 32000-2)
+   *
+   * @param annotationPtr - pointer to an `FPDF_ANNOTATION`
+   * @param replyType - `PdfAnnotationReplyType`
+   * @returns `true` on success
+   */
+  private setReplyType(annotationPtr: number, replyType?: PdfAnnotationReplyType): boolean {
+    // If undefined or Unknown, clear the RT key (Unknown = 0 removes the key)
+    return this.pdfiumModule.EPDFAnnot_SetReplyType(
+      annotationPtr,
+      replyType ?? PdfAnnotationReplyType.Unknown,
+    );
+  }
+
+  /**
    * Border-effect (“cloudy”) helper
    *
    * Calls the new PDFium function `EPDFAnnot_GetBorderEffect()` (July 2025).
@@ -4984,38 +4831,27 @@ export class PdfiumNative implements IPdfiumExecutor {
     annotationPtr: number,
     index: string,
   ): PdfTextAnnoObject | undefined {
-    const custom = this.getAnnotCustom(annotationPtr);
     const annoRect = this.readPageAnnoRect(annotationPtr);
     const rect = this.convertPageRectToDeviceRect(page, annoRect);
-    const author = this.getAnnotString(annotationPtr, 'T');
-    const modified = this.getAnnotationDate(annotationPtr, 'M');
-    const created = this.getAnnotationDate(annotationPtr, 'CreationDate');
-    const contents = this.getAnnotString(annotationPtr, 'Contents') || '';
+
+    // Type-specific properties
     const state = this.getAnnotString(annotationPtr, 'State') as PdfAnnotationState;
     const stateModel = this.getAnnotString(annotationPtr, 'StateModel') as PdfAnnotationStateModel;
     const color = this.getAnnotationColor(annotationPtr);
     const opacity = this.getAnnotationOpacity(annotationPtr);
-    const inReplyToId = this.getInReplyToId(annotationPtr);
-    const flags = this.getAnnotationFlags(annotationPtr);
     const icon = this.getAnnotationIcon(annotationPtr);
 
     return {
       pageIndex: page.index,
-      custom,
       id: index,
       type: PdfAnnotationSubtype.TEXT,
-      flags,
-      contents,
+      rect,
       color: color ?? '#FFFF00',
       opacity,
-      rect,
-      inReplyToId,
-      author,
-      modified,
-      created,
       state,
       stateModel,
       icon,
+      ...this.readBaseAnnotationProperties(annotationPtr),
     };
   }
 
@@ -5033,42 +4869,34 @@ export class PdfiumNative implements IPdfiumExecutor {
     annotationPtr: number,
     index: string,
   ): PdfFreeTextAnnoObject | undefined {
-    const custom = this.getAnnotCustom(annotationPtr);
     const annoRect = this.readPageAnnoRect(annotationPtr);
     const rect = this.convertPageRectToDeviceRect(page, annoRect);
-    const contents = this.getAnnotString(annotationPtr, 'Contents') || '';
-    const author = this.getAnnotString(annotationPtr, 'T');
-    const modified = this.getAnnotationDate(annotationPtr, 'M');
-    const created = this.getAnnotationDate(annotationPtr, 'CreationDate');
+
+    // Type-specific properties
     const defaultStyle = this.getAnnotString(annotationPtr, 'DS');
     const da = this.getAnnotationDefaultAppearance(annotationPtr);
-    const backgroundColor = this.getAnnotationColor(annotationPtr);
+    const bgColor = this.getAnnotationColor(annotationPtr);
     const textAlign = this.getAnnotationTextAlignment(annotationPtr);
     const verticalAlign = this.getAnnotationVerticalAlignment(annotationPtr);
     const opacity = this.getAnnotationOpacity(annotationPtr);
     const richContent = this.getAnnotRichContent(annotationPtr);
-    const flags = this.getAnnotationFlags(annotationPtr);
 
     return {
       pageIndex: page.index,
-      custom,
       id: index,
       type: PdfAnnotationSubtype.FREETEXT,
+      rect,
       fontFamily: da?.fontFamily ?? PdfStandardFont.Unknown,
       fontSize: da?.fontSize ?? 12,
       fontColor: da?.fontColor ?? '#000000',
       verticalAlign,
-      backgroundColor,
-      flags,
+      color: bgColor, // fill color (matches shape convention)
+      backgroundColor: bgColor, // deprecated alias
       opacity,
       textAlign,
       defaultStyle,
       richContent,
-      contents,
-      author,
-      modified,
-      created,
-      rect,
+      ...this.readBaseAnnotationProperties(annotationPtr),
     };
   }
 
@@ -5088,7 +4916,6 @@ export class PdfiumNative implements IPdfiumExecutor {
     annotationPtr: number,
     index: string,
   ): PdfLinkAnnoObject | undefined {
-    const custom = this.getAnnotCustom(annotationPtr);
     const linkPtr = this.pdfiumModule.FPDFAnnot_GetLink(annotationPtr);
     if (!linkPtr) {
       return;
@@ -5096,11 +4923,8 @@ export class PdfiumNative implements IPdfiumExecutor {
 
     const annoRect = this.readPageAnnoRect(annotationPtr);
     const rect = this.convertPageRectToDeviceRect(page, annoRect);
-    const author = this.getAnnotString(annotationPtr, 'T');
-    const modified = this.getAnnotationDate(annotationPtr, 'M');
-    const created = this.getAnnotationDate(annotationPtr, 'CreationDate');
-    const flags = this.getAnnotationFlags(annotationPtr);
 
+    // Type-specific properties
     // Read border style and width
     const { style: strokeStyle, width: strokeWidth } = this.getBorderStyle(annotationPtr);
 
@@ -5116,9 +4940,6 @@ export class PdfiumNative implements IPdfiumExecutor {
       }
     }
 
-    // Read IRT (In Reply To)
-    const inReplyToId = this.getInReplyToId(annotationPtr);
-
     const target = this.readPdfLinkAnnoTarget(
       docPtr,
       () => {
@@ -5131,20 +4952,15 @@ export class PdfiumNative implements IPdfiumExecutor {
 
     return {
       pageIndex: page.index,
-      custom,
       id: index,
       type: PdfAnnotationSubtype.LINK,
-      flags,
-      target,
       rect,
-      author,
-      modified,
-      created,
+      target,
       strokeColor,
       strokeWidth,
       strokeStyle,
       strokeDashArray,
-      inReplyToId,
+      ...this.readBaseAnnotationProperties(annotationPtr),
     };
   }
 
@@ -5164,26 +4980,19 @@ export class PdfiumNative implements IPdfiumExecutor {
     formHandle: number,
     index: string,
   ): PdfWidgetAnnoObject | undefined {
-    const custom = this.getAnnotCustom(annotationPtr);
     const pageRect = this.readPageAnnoRect(annotationPtr);
     const rect = this.convertPageRectToDeviceRect(page, pageRect);
-    const author = this.getAnnotString(annotationPtr, 'T');
-    const modified = this.getAnnotationDate(annotationPtr, 'M');
-    const created = this.getAnnotationDate(annotationPtr, 'CreationDate');
-    const flags = this.getAnnotationFlags(annotationPtr);
+
+    // Type-specific properties
     const field = this.readPdfWidgetAnnoField(formHandle, annotationPtr);
 
     return {
       pageIndex: page.index,
-      custom,
       id: index,
       type: PdfAnnotationSubtype.WIDGET,
-      flags,
       rect,
       field,
-      author,
-      modified,
-      created,
+      ...this.readBaseAnnotationProperties(annotationPtr),
     };
   }
 
@@ -5201,24 +5010,15 @@ export class PdfiumNative implements IPdfiumExecutor {
     annotationPtr: number,
     index: string,
   ): PdfFileAttachmentAnnoObject | undefined {
-    const custom = this.getAnnotCustom(annotationPtr);
     const pageRect = this.readPageAnnoRect(annotationPtr);
     const rect = this.convertPageRectToDeviceRect(page, pageRect);
-    const author = this.getAnnotString(annotationPtr, 'T');
-    const modified = this.getAnnotationDate(annotationPtr, 'M');
-    const created = this.getAnnotationDate(annotationPtr, 'CreationDate');
-    const flags = this.getAnnotationFlags(annotationPtr);
 
     return {
       pageIndex: page.index,
-      custom,
       id: index,
       type: PdfAnnotationSubtype.FILEATTACHMENT,
-      flags,
       rect,
-      author,
-      modified,
-      created,
+      ...this.readBaseAnnotationProperties(annotationPtr),
     };
   }
 
@@ -5236,38 +5036,30 @@ export class PdfiumNative implements IPdfiumExecutor {
     annotationPtr: number,
     index: string,
   ): PdfInkAnnoObject | undefined {
-    const custom = this.getAnnotCustom(annotationPtr);
     const pageRect = this.readPageAnnoRect(annotationPtr);
     const rect = this.convertPageRectToDeviceRect(page, pageRect);
-    const author = this.getAnnotString(annotationPtr, 'T');
-    const modified = this.getAnnotationDate(annotationPtr, 'M');
-    const created = this.getAnnotationDate(annotationPtr, 'CreationDate');
-    const color = this.getAnnotationColor(annotationPtr);
+
+    // Type-specific properties
+    const strokeColor = this.getAnnotationColor(annotationPtr) ?? '#FF0000';
     const opacity = this.getAnnotationOpacity(annotationPtr);
     const { width: strokeWidth } = this.getBorderStyle(annotationPtr);
     const inkList = this.getInkList(page, annotationPtr);
     const blendMode = this.pdfiumModule.EPDFAnnot_GetBlendMode(annotationPtr);
     const intent = this.getAnnotIntent(annotationPtr);
-    const flags = this.getAnnotationFlags(annotationPtr);
-    const contents = this.getAnnotString(annotationPtr, 'Contents') || '';
 
     return {
       pageIndex: page.index,
-      custom,
       id: index,
       type: PdfAnnotationSubtype.INK,
+      rect,
       ...(intent && { intent }),
-      contents,
       blendMode,
-      flags,
-      color: color ?? '#FF0000',
+      strokeColor,
+      color: strokeColor, // deprecated alias
       opacity,
       strokeWidth: strokeWidth === 0 ? 1 : strokeWidth,
-      rect,
       inkList,
-      author,
-      modified,
-      created,
+      ...this.readBaseAnnotationProperties(annotationPtr),
     };
   }
 
@@ -5285,22 +5077,18 @@ export class PdfiumNative implements IPdfiumExecutor {
     annotationPtr: number,
     index: string,
   ): PdfPolygonAnnoObject | undefined {
-    const custom = this.getAnnotCustom(annotationPtr);
     const pageRect = this.readPageAnnoRect(annotationPtr);
     const rect = this.convertPageRectToDeviceRect(page, pageRect);
-    const author = this.getAnnotString(annotationPtr, 'T');
-    const modified = this.getAnnotationDate(annotationPtr, 'M');
-    const created = this.getAnnotationDate(annotationPtr, 'CreationDate');
+
+    // Type-specific properties
     const vertices = this.readPdfAnnoVertices(page, annotationPtr);
-    const contents = this.getAnnotString(annotationPtr, 'Contents') || '';
-    const flags = this.getAnnotationFlags(annotationPtr);
     const strokeColor = this.getAnnotationColor(annotationPtr);
     const interiorColor = this.getAnnotationColor(
       annotationPtr,
       PdfAnnotationColorType.InteriorColor,
     );
     const opacity = this.getAnnotationOpacity(annotationPtr);
-    let { style: strokeStyle, width: strokeWidth } = this.getBorderStyle(annotationPtr);
+    const { style: strokeStyle, width: strokeWidth } = this.getBorderStyle(annotationPtr);
 
     let strokeDashArray: number[] | undefined;
     if (strokeStyle === PdfAnnotationBorderStyle.DASHED) {
@@ -5310,7 +5098,7 @@ export class PdfiumNative implements IPdfiumExecutor {
       }
     }
 
-    // ▼––– Remove redundant closing vertex for polygons ––––––––––––––––––––––
+    // Remove redundant closing vertex for polygons
     if (vertices.length > 1) {
       const first = vertices[0];
       const last = vertices[vertices.length - 1];
@@ -5321,22 +5109,17 @@ export class PdfiumNative implements IPdfiumExecutor {
 
     return {
       pageIndex: page.index,
-      custom,
       id: index,
       type: PdfAnnotationSubtype.POLYGON,
-      contents,
-      flags,
+      rect,
       strokeColor: strokeColor ?? '#FF0000',
       color: interiorColor ?? 'transparent',
       opacity,
       strokeWidth: strokeWidth === 0 ? 1 : strokeWidth,
       strokeStyle,
       strokeDashArray,
-      rect,
       vertices,
-      author,
-      modified,
-      created,
+      ...this.readBaseAnnotationProperties(annotationPtr),
     };
   }
 
@@ -5354,22 +5137,18 @@ export class PdfiumNative implements IPdfiumExecutor {
     annotationPtr: number,
     index: string,
   ): PdfPolylineAnnoObject | undefined {
-    const custom = this.getAnnotCustom(annotationPtr);
     const pageRect = this.readPageAnnoRect(annotationPtr);
     const rect = this.convertPageRectToDeviceRect(page, pageRect);
-    const author = this.getAnnotString(annotationPtr, 'T');
-    const modified = this.getAnnotationDate(annotationPtr, 'M');
-    const created = this.getAnnotationDate(annotationPtr, 'CreationDate');
+
+    // Type-specific properties
     const vertices = this.readPdfAnnoVertices(page, annotationPtr);
-    const contents = this.getAnnotString(annotationPtr, 'Contents') || '';
     const strokeColor = this.getAnnotationColor(annotationPtr);
-    const flags = this.getAnnotationFlags(annotationPtr);
     const interiorColor = this.getAnnotationColor(
       annotationPtr,
       PdfAnnotationColorType.InteriorColor,
     );
     const opacity = this.getAnnotationOpacity(annotationPtr);
-    let { style: strokeStyle, width: strokeWidth } = this.getBorderStyle(annotationPtr);
+    const { style: strokeStyle, width: strokeWidth } = this.getBorderStyle(annotationPtr);
 
     let strokeDashArray: number[] | undefined;
     if (strokeStyle === PdfAnnotationBorderStyle.DASHED) {
@@ -5382,11 +5161,9 @@ export class PdfiumNative implements IPdfiumExecutor {
 
     return {
       pageIndex: page.index,
-      custom,
       id: index,
       type: PdfAnnotationSubtype.POLYLINE,
-      contents,
-      flags,
+      rect,
       strokeColor: strokeColor ?? '#FF0000',
       color: interiorColor ?? 'transparent',
       opacity,
@@ -5394,11 +5171,8 @@ export class PdfiumNative implements IPdfiumExecutor {
       strokeStyle,
       strokeDashArray,
       lineEndings,
-      rect,
       vertices,
-      author,
-      modified,
-      created,
+      ...this.readBaseAnnotationProperties(annotationPtr),
     };
   }
 
@@ -5416,23 +5190,19 @@ export class PdfiumNative implements IPdfiumExecutor {
     annotationPtr: number,
     index: string,
   ): PdfLineAnnoObject | undefined {
-    const custom = this.getAnnotCustom(annotationPtr);
     const pageRect = this.readPageAnnoRect(annotationPtr);
     const rect = this.convertPageRectToDeviceRect(page, pageRect);
-    const author = this.getAnnotString(annotationPtr, 'T');
-    const modified = this.getAnnotationDate(annotationPtr, 'M');
-    const created = this.getAnnotationDate(annotationPtr, 'CreationDate');
+
+    // Type-specific properties
     const linePoints = this.getLinePoints(page, annotationPtr);
     const lineEndings = this.getLineEndings(annotationPtr);
-    const contents = this.getAnnotString(annotationPtr, 'Contents') || '';
     const strokeColor = this.getAnnotationColor(annotationPtr);
-    const flags = this.getAnnotationFlags(annotationPtr);
     const interiorColor = this.getAnnotationColor(
       annotationPtr,
       PdfAnnotationColorType.InteriorColor,
     );
     const opacity = this.getAnnotationOpacity(annotationPtr);
-    let { style: strokeStyle, width: strokeWidth } = this.getBorderStyle(annotationPtr);
+    const { style: strokeStyle, width: strokeWidth } = this.getBorderStyle(annotationPtr);
 
     let strokeDashArray: number[] | undefined;
     if (strokeStyle === PdfAnnotationBorderStyle.DASHED) {
@@ -5444,12 +5214,9 @@ export class PdfiumNative implements IPdfiumExecutor {
 
     return {
       pageIndex: page.index,
-      custom,
       id: index,
       type: PdfAnnotationSubtype.LINE,
-      flags,
       rect,
-      contents,
       strokeWidth: strokeWidth === 0 ? 1 : strokeWidth,
       strokeStyle,
       strokeDashArray,
@@ -5461,9 +5228,7 @@ export class PdfiumNative implements IPdfiumExecutor {
         start: PdfAnnotationLineEnding.None,
         end: PdfAnnotationLineEnding.None,
       },
-      author,
-      modified,
-      created,
+      ...this.readBaseAnnotationProperties(annotationPtr),
     };
   }
 
@@ -5481,35 +5246,26 @@ export class PdfiumNative implements IPdfiumExecutor {
     annotationPtr: number,
     index: string,
   ): PdfHighlightAnnoObject | undefined {
-    const custom = this.getAnnotCustom(annotationPtr);
     const pageRect = this.readPageAnnoRect(annotationPtr);
     const rect = this.convertPageRectToDeviceRect(page, pageRect);
+
+    // Type-specific properties
     const segmentRects = this.getQuadPointsAnno(page, annotationPtr);
-    const color = this.getAnnotationColor(annotationPtr);
+    const strokeColor = this.getAnnotationColor(annotationPtr) ?? '#FFFF00';
     const opacity = this.getAnnotationOpacity(annotationPtr);
     const blendMode = this.pdfiumModule.EPDFAnnot_GetBlendMode(annotationPtr);
 
-    const author = this.getAnnotString(annotationPtr, 'T');
-    const modified = this.getAnnotationDate(annotationPtr, 'M');
-    const created = this.getAnnotationDate(annotationPtr, 'CreationDate');
-    const contents = this.getAnnotString(annotationPtr, 'Contents') || '';
-    const flags = this.getAnnotationFlags(annotationPtr);
-
     return {
       pageIndex: page.index,
-      custom,
       id: index,
-      blendMode,
       type: PdfAnnotationSubtype.HIGHLIGHT,
       rect,
-      flags,
-      contents,
+      blendMode,
       segmentRects,
-      color: color ?? '#FFFF00',
+      strokeColor,
+      color: strokeColor, // deprecated alias
       opacity,
-      author,
-      modified,
-      created,
+      ...this.readBaseAnnotationProperties(annotationPtr),
     };
   }
 
@@ -5527,34 +5283,26 @@ export class PdfiumNative implements IPdfiumExecutor {
     annotationPtr: number,
     index: string,
   ): PdfUnderlineAnnoObject | undefined {
-    const custom = this.getAnnotCustom(annotationPtr);
     const pageRect = this.readPageAnnoRect(annotationPtr);
     const rect = this.convertPageRectToDeviceRect(page, pageRect);
-    const author = this.getAnnotString(annotationPtr, 'T');
-    const modified = this.getAnnotationDate(annotationPtr, 'M');
-    const created = this.getAnnotationDate(annotationPtr, 'CreationDate');
+
+    // Type-specific properties
     const segmentRects = this.getQuadPointsAnno(page, annotationPtr);
-    const contents = this.getAnnotString(annotationPtr, 'Contents') || '';
-    const color = this.getAnnotationColor(annotationPtr);
+    const strokeColor = this.getAnnotationColor(annotationPtr) ?? '#FF0000';
     const opacity = this.getAnnotationOpacity(annotationPtr);
     const blendMode = this.pdfiumModule.EPDFAnnot_GetBlendMode(annotationPtr);
-    const flags = this.getAnnotationFlags(annotationPtr);
 
     return {
       pageIndex: page.index,
-      custom,
       id: index,
-      blendMode,
       type: PdfAnnotationSubtype.UNDERLINE,
       rect,
-      flags,
-      contents,
+      blendMode,
       segmentRects,
-      color: color ?? '#FF0000',
+      strokeColor,
+      color: strokeColor, // deprecated alias
       opacity,
-      author,
-      modified,
-      created,
+      ...this.readBaseAnnotationProperties(annotationPtr),
     };
   }
 
@@ -5572,34 +5320,26 @@ export class PdfiumNative implements IPdfiumExecutor {
     annotationPtr: number,
     index: string,
   ): PdfStrikeOutAnnoObject | undefined {
-    const custom = this.getAnnotCustom(annotationPtr);
     const pageRect = this.readPageAnnoRect(annotationPtr);
     const rect = this.convertPageRectToDeviceRect(page, pageRect);
-    const author = this.getAnnotString(annotationPtr, 'T');
-    const modified = this.getAnnotationDate(annotationPtr, 'M');
-    const created = this.getAnnotationDate(annotationPtr, 'CreationDate');
+
+    // Type-specific properties
     const segmentRects = this.getQuadPointsAnno(page, annotationPtr);
-    const contents = this.getAnnotString(annotationPtr, 'Contents') || '';
-    const color = this.getAnnotationColor(annotationPtr);
+    const strokeColor = this.getAnnotationColor(annotationPtr) ?? '#FF0000';
     const opacity = this.getAnnotationOpacity(annotationPtr);
     const blendMode = this.pdfiumModule.EPDFAnnot_GetBlendMode(annotationPtr);
-    const flags = this.getAnnotationFlags(annotationPtr);
 
     return {
       pageIndex: page.index,
-      custom,
       id: index,
-      blendMode,
       type: PdfAnnotationSubtype.STRIKEOUT,
-      flags,
       rect,
-      contents,
+      blendMode,
       segmentRects,
-      color: color ?? '#FF0000',
+      strokeColor,
+      color: strokeColor, // deprecated alias
       opacity,
-      author,
-      modified,
-      created,
+      ...this.readBaseAnnotationProperties(annotationPtr),
     };
   }
 
@@ -5617,34 +5357,26 @@ export class PdfiumNative implements IPdfiumExecutor {
     annotationPtr: number,
     index: string,
   ): PdfSquigglyAnnoObject | undefined {
-    const custom = this.getAnnotCustom(annotationPtr);
     const pageRect = this.readPageAnnoRect(annotationPtr);
     const rect = this.convertPageRectToDeviceRect(page, pageRect);
-    const author = this.getAnnotString(annotationPtr, 'T');
-    const modified = this.getAnnotationDate(annotationPtr, 'M');
-    const created = this.getAnnotationDate(annotationPtr, 'CreationDate');
+
+    // Type-specific properties
     const segmentRects = this.getQuadPointsAnno(page, annotationPtr);
-    const contents = this.getAnnotString(annotationPtr, 'Contents') || '';
-    const color = this.getAnnotationColor(annotationPtr);
+    const strokeColor = this.getAnnotationColor(annotationPtr) ?? '#FF0000';
     const opacity = this.getAnnotationOpacity(annotationPtr);
     const blendMode = this.pdfiumModule.EPDFAnnot_GetBlendMode(annotationPtr);
-    const flags = this.getAnnotationFlags(annotationPtr);
 
     return {
       pageIndex: page.index,
-      custom,
       id: index,
-      blendMode,
       type: PdfAnnotationSubtype.SQUIGGLY,
       rect,
-      flags,
-      contents,
+      blendMode,
       segmentRects,
-      color: color ?? '#FF0000',
+      strokeColor,
+      color: strokeColor, // deprecated alias
       opacity,
-      author,
-      modified,
-      created,
+      ...this.readBaseAnnotationProperties(annotationPtr),
     };
   }
 
@@ -5662,24 +5394,15 @@ export class PdfiumNative implements IPdfiumExecutor {
     annotationPtr: number,
     index: string,
   ): PdfCaretAnnoObject | undefined {
-    const custom = this.getAnnotCustom(annotationPtr);
     const pageRect = this.readPageAnnoRect(annotationPtr);
     const rect = this.convertPageRectToDeviceRect(page, pageRect);
-    const author = this.getAnnotString(annotationPtr, 'T');
-    const modified = this.getAnnotationDate(annotationPtr, 'M');
-    const created = this.getAnnotationDate(annotationPtr, 'CreationDate');
-    const flags = this.getAnnotationFlags(annotationPtr);
 
     return {
       pageIndex: page.index,
-      custom,
       id: index,
       type: PdfAnnotationSubtype.CARET,
       rect,
-      flags,
-      author,
-      modified,
-      created,
+      ...this.readBaseAnnotationProperties(annotationPtr),
     };
   }
 
@@ -5697,26 +5420,15 @@ export class PdfiumNative implements IPdfiumExecutor {
     annotationPtr: number,
     index: string,
   ): PdfStampAnnoObject | undefined {
-    const custom = this.getAnnotCustom(annotationPtr);
     const pageRect = this.readPageAnnoRect(annotationPtr);
     const rect = this.convertPageRectToDeviceRect(page, pageRect);
-    const author = this.getAnnotString(annotationPtr, 'T');
-    const modified = this.getAnnotationDate(annotationPtr, 'M');
-    const created = this.getAnnotationDate(annotationPtr, 'CreationDate');
-    const flags = this.getAnnotationFlags(annotationPtr);
-    const contents = this.getAnnotString(annotationPtr, 'Contents') || '';
 
     return {
       pageIndex: page.index,
-      custom,
       id: index,
       type: PdfAnnotationSubtype.STAMP,
-      contents,
       rect,
-      author,
-      modified,
-      created,
-      flags,
+      ...this.readBaseAnnotationProperties(annotationPtr),
     };
   }
 
@@ -5987,21 +5699,17 @@ export class PdfiumNative implements IPdfiumExecutor {
     annotationPtr: number,
     index: string,
   ): PdfCircleAnnoObject {
-    const custom = this.getAnnotCustom(annotationPtr);
-    const flags = this.getAnnotationFlags(annotationPtr);
     const pageRect = this.readPageAnnoRect(annotationPtr);
     const rect = this.convertPageRectToDeviceRect(page, pageRect);
-    const author = this.getAnnotString(annotationPtr, 'T');
-    const modified = this.getAnnotationDate(annotationPtr, 'M');
-    const created = this.getAnnotationDate(annotationPtr, 'CreationDate');
-    const contents = this.getAnnotString(annotationPtr, 'Contents') || '';
+
+    // Type-specific properties
     const interiorColor = this.getAnnotationColor(
       annotationPtr,
       PdfAnnotationColorType.InteriorColor,
     );
     const strokeColor = this.getAnnotationColor(annotationPtr);
     const opacity = this.getAnnotationOpacity(annotationPtr);
-    let { style: strokeStyle, width: strokeWidth } = this.getBorderStyle(annotationPtr);
+    const { style: strokeStyle, width: strokeWidth } = this.getBorderStyle(annotationPtr);
 
     let strokeDashArray: number[] | undefined;
     if (strokeStyle === PdfAnnotationBorderStyle.DASHED) {
@@ -6013,21 +5721,16 @@ export class PdfiumNative implements IPdfiumExecutor {
 
     return {
       pageIndex: page.index,
-      custom,
       id: index,
       type: PdfAnnotationSubtype.CIRCLE,
-      flags,
+      rect,
       color: interiorColor ?? 'transparent',
       opacity,
-      contents,
       strokeWidth,
       strokeColor: strokeColor ?? '#FF0000',
       strokeStyle,
-      rect,
-      author,
-      modified,
-      created,
       ...(strokeDashArray !== undefined && { strokeDashArray }),
+      ...this.readBaseAnnotationProperties(annotationPtr),
     };
   }
 
@@ -6045,21 +5748,17 @@ export class PdfiumNative implements IPdfiumExecutor {
     annotationPtr: number,
     index: string,
   ): PdfSquareAnnoObject {
-    const custom = this.getAnnotCustom(annotationPtr);
-    const flags = this.getAnnotationFlags(annotationPtr);
     const pageRect = this.readPageAnnoRect(annotationPtr);
     const rect = this.convertPageRectToDeviceRect(page, pageRect);
-    const author = this.getAnnotString(annotationPtr, 'T');
-    const modified = this.getAnnotationDate(annotationPtr, 'M');
-    const created = this.getAnnotationDate(annotationPtr, 'CreationDate');
-    const contents = this.getAnnotString(annotationPtr, 'Contents') || '';
+
+    // Type-specific properties
     const interiorColor = this.getAnnotationColor(
       annotationPtr,
       PdfAnnotationColorType.InteriorColor,
     );
     const strokeColor = this.getAnnotationColor(annotationPtr);
     const opacity = this.getAnnotationOpacity(annotationPtr);
-    let { style: strokeStyle, width: strokeWidth } = this.getBorderStyle(annotationPtr);
+    const { style: strokeStyle, width: strokeWidth } = this.getBorderStyle(annotationPtr);
 
     let strokeDashArray: number[] | undefined;
     if (strokeStyle === PdfAnnotationBorderStyle.DASHED) {
@@ -6071,21 +5770,16 @@ export class PdfiumNative implements IPdfiumExecutor {
 
     return {
       pageIndex: page.index,
-      custom,
       id: index,
       type: PdfAnnotationSubtype.SQUARE,
-      flags,
+      rect,
       color: interiorColor ?? 'transparent',
       opacity,
-      contents,
       strokeColor: strokeColor ?? '#FF0000',
       strokeWidth,
       strokeStyle,
-      rect,
-      author,
-      modified,
-      created,
       ...(strokeDashArray !== undefined && { strokeDashArray }),
+      ...this.readBaseAnnotationProperties(annotationPtr),
     };
   }
 
@@ -6105,24 +5799,15 @@ export class PdfiumNative implements IPdfiumExecutor {
     annotationPtr: number,
     index: string,
   ): PdfUnsupportedAnnoObject {
-    const custom = this.getAnnotCustom(annotationPtr);
     const pageRect = this.readPageAnnoRect(annotationPtr);
     const rect = this.convertPageRectToDeviceRect(page, pageRect);
-    const author = this.getAnnotString(annotationPtr, 'T');
-    const modified = this.getAnnotationDate(annotationPtr, 'M');
-    const created = this.getAnnotationDate(annotationPtr, 'CreationDate');
-    const flags = this.getAnnotationFlags(annotationPtr);
 
     return {
       pageIndex: page.index,
-      custom,
       id: index,
-      flags,
       type,
       rect,
-      author,
-      modified,
-      created,
+      ...this.readBaseAnnotationProperties(annotationPtr),
     };
   }
 
@@ -6149,11 +5834,122 @@ export class PdfiumNative implements IPdfiumExecutor {
    * @param id - the id of the parent annotation
    * @returns `true` on success
    */
-  private setInReplyToId(pagePtr: number, annotationPtr: number, id: string): boolean {
+  private setInReplyToId(pagePtr: number, annotationPtr: number, id?: string): boolean {
+    // If no id provided, clear the IRT key
+    if (!id) {
+      return this.pdfiumModule.EPDFAnnot_SetLinkedAnnot(annotationPtr, 'IRT', 0);
+    }
+
+    // Otherwise, find parent and set the link
     const parentPtr = this.getAnnotationByName(pagePtr, id);
     if (!parentPtr) return false;
 
     return this.pdfiumModule.EPDFAnnot_SetLinkedAnnot(annotationPtr, 'IRT', parentPtr);
+  }
+
+  /**
+   * Apply all base annotation properties from PdfAnnotationObjectBase.
+   * The setInReplyToId and setReplyType functions handle clearing when undefined.
+   *
+   * @param pagePtr - pointer to page object
+   * @param annotationPtr - pointer to annotation object
+   * @param annotation - the annotation object containing properties to apply
+   * @returns `true` on success
+   */
+  private applyBaseAnnotationProperties(
+    pagePtr: number,
+    annotationPtr: number,
+    annotation: PdfAnnotationObject,
+  ): boolean {
+    // Author (T)
+    if (!this.setAnnotString(annotationPtr, 'T', annotation.author || '')) {
+      return false;
+    }
+
+    // Contents
+    if (!this.setAnnotString(annotationPtr, 'Contents', annotation.contents ?? '')) {
+      return false;
+    }
+
+    // Modified date (M)
+    if (annotation.modified) {
+      if (!this.setAnnotationDate(annotationPtr, 'M', annotation.modified)) {
+        return false;
+      }
+    }
+
+    // Creation date
+    if (annotation.created) {
+      if (!this.setAnnotationDate(annotationPtr, 'CreationDate', annotation.created)) {
+        return false;
+      }
+    }
+
+    // Flags
+    if (annotation.flags) {
+      if (!this.setAnnotationFlags(annotationPtr, annotation.flags)) {
+        return false;
+      }
+    }
+
+    // Custom data
+    if (annotation.custom) {
+      if (!this.setAnnotCustom(annotationPtr, annotation.custom)) {
+        return false;
+      }
+    }
+
+    // IRT (In Reply To) - setter handles clearing when undefined
+    if (!this.setInReplyToId(pagePtr, annotationPtr, annotation.inReplyToId)) {
+      return false;
+    }
+
+    // Reply Type - setter handles clearing when undefined
+    if (!this.setReplyType(annotationPtr, annotation.replyType)) {
+      return false;
+    }
+
+    return true;
+  }
+
+  /**
+   * Read all base annotation properties from PdfAnnotationObjectBase.
+   * Returns an object that can be spread into the annotation return value.
+   *
+   * @param annotationPtr - pointer to annotation object
+   * @returns object with base annotation properties
+   */
+  private readBaseAnnotationProperties(annotationPtr: number): {
+    author: string | undefined;
+    contents: string;
+    modified: Date | undefined;
+    created: Date | undefined;
+    flags: PdfAnnotationFlagName[];
+    custom: unknown;
+    inReplyToId?: string;
+    replyType?: PdfAnnotationReplyType;
+  } {
+    const author = this.getAnnotString(annotationPtr, 'T');
+    const contents = this.getAnnotString(annotationPtr, 'Contents') || '';
+    const modified = this.getAnnotationDate(annotationPtr, 'M');
+    const created = this.getAnnotationDate(annotationPtr, 'CreationDate');
+    const flags = this.getAnnotationFlags(annotationPtr);
+    const custom = this.getAnnotCustom(annotationPtr);
+    const inReplyToId = this.getInReplyToId(annotationPtr);
+    const replyType = this.getReplyType(annotationPtr);
+
+    return {
+      author,
+      contents,
+      modified,
+      created,
+      flags,
+      custom,
+      // Only include IRT if present
+      ...(inReplyToId && { inReplyToId }),
+      // Only include RT if present and not the default (Reply)
+      ...(replyType && replyType !== PdfAnnotationReplyType.Reply && { replyType }),
+    };
   }
 
   /**

@@ -12,6 +12,7 @@ import {
   isSquigglyTool,
   isStrikeoutTool,
   isUnderlineTool,
+  isLink,
 } from '@embedpdf/plugin-annotation/preact';
 import {
   REDACTION_PLUGIN_ID,
@@ -32,6 +33,8 @@ import {
   PdfAnnotationSubtype,
   PdfBlendMode,
   PdfPermissionFlag,
+  PdfActionType,
+  PdfLinkAnnoObject,
   uuidV4,
 } from '@embedpdf/models';
 import { getEffectivePermission } from '@embedpdf/core';
@@ -865,7 +868,7 @@ export const commands: Record<string, Command<State>> = {
     labelKey: 'annotation.highlight',
     icon: 'highlight',
     iconProps: ({ state }) => ({
-      primaryColor: getToolDefaultsById(state.plugins.annotation, 'highlight')?.color,
+      primaryColor: getToolDefaultsById(state.plugins.annotation, 'highlight')?.strokeColor,
     }),
     categories: ['annotation', 'annotation-markup', 'annotation-highlight'],
     action: ({ registry, documentId }) => {
@@ -900,7 +903,7 @@ export const commands: Record<string, Command<State>> = {
               flags: ['print'],
               type: PdfAnnotationSubtype.HIGHLIGHT,
               blendMode: PdfBlendMode.Multiply,
-              color: defaultSettings.color,
+              strokeColor: defaultSettings.strokeColor,
               opacity: defaultSettings.opacity,
               pageIndex: sel.pageIndex,
               rect: sel.rect,
@@ -939,7 +942,7 @@ export const commands: Record<string, Command<State>> = {
     labelKey: 'annotation.underline',
     icon: 'underline',
     iconProps: ({ state }) => ({
-      primaryColor: getToolDefaultsById(state.plugins.annotation, 'underline')?.color,
+      primaryColor: getToolDefaultsById(state.plugins.annotation, 'underline')?.strokeColor,
     }),
     categories: ['annotation', 'annotation-markup', 'annotation-underline'],
     action: ({ registry, documentId }) => {
@@ -973,7 +976,7 @@ export const commands: Record<string, Command<State>> = {
               created: new Date(),
               flags: ['print'],
               type: PdfAnnotationSubtype.UNDERLINE,
-              color: defaultSettings.color,
+              strokeColor: defaultSettings.strokeColor,
               opacity: defaultSettings.opacity,
               pageIndex: sel.pageIndex,
               rect: sel.rect,
@@ -1012,7 +1015,7 @@ export const commands: Record<string, Command<State>> = {
     labelKey: 'annotation.strikeout',
     icon: 'strikethrough',
     iconProps: ({ state }) => ({
-      primaryColor: getToolDefaultsById(state.plugins.annotation, 'strikeout')?.color,
+      primaryColor: getToolDefaultsById(state.plugins.annotation, 'strikeout')?.strokeColor,
     }),
     categories: ['annotation', 'annotation-markup', 'annotation-strikeout'],
     action: ({ registry, documentId }) => {
@@ -1046,7 +1049,7 @@ export const commands: Record<string, Command<State>> = {
               created: new Date(),
               flags: ['print'],
               type: PdfAnnotationSubtype.STRIKEOUT,
-              color: defaultSettings.color,
+              strokeColor: defaultSettings.strokeColor,
               opacity: defaultSettings.opacity,
               pageIndex: sel.pageIndex,
               rect: sel.rect,
@@ -1085,7 +1088,7 @@ export const commands: Record<string, Command<State>> = {
     labelKey: 'annotation.squiggly',
     icon: 'squiggly',
     iconProps: ({ state }) => ({
-      primaryColor: getToolDefaultsById(state.plugins.annotation, 'squiggly')?.color,
+      primaryColor: getToolDefaultsById(state.plugins.annotation, 'squiggly')?.strokeColor,
     }),
     categories: ['annotation', 'annotation-markup', 'annotation-squiggly'],
     action: ({ registry, documentId }) => {
@@ -1119,7 +1122,7 @@ export const commands: Record<string, Command<State>> = {
               created: new Date(),
               flags: ['print'],
               type: PdfAnnotationSubtype.SQUIGGLY,
-              color: defaultSettings.color,
+              strokeColor: defaultSettings.strokeColor,
               opacity: defaultSettings.opacity,
               pageIndex: sel.pageIndex,
               rect: sel.rect,
@@ -1429,6 +1432,83 @@ export const commands: Record<string, Command<State>> = {
     },
   },
 
+  'annotation:delete-all-selected': {
+    id: 'annotation:delete-all-selected',
+    labelKey: 'annotation.deleteAllSelected',
+    icon: 'trash',
+    categories: ['annotation', 'annotation-delete', 'annotation-group'],
+    action: ({ registry, documentId }) => {
+      const annotation = registry.getPlugin<AnnotationPlugin>(ANNOTATION_PLUGIN_ID)?.provides();
+      const scope = annotation?.forDocument(documentId);
+      if (!scope) return;
+
+      const selected = scope.getSelectedAnnotations();
+      if (selected.length === 0) return;
+
+      scope.deleteAnnotations(
+        selected.map((ta) => ({ pageIndex: ta.object.pageIndex, id: ta.object.id })),
+      );
+      scope.deselectAnnotation();
+    },
+    disabled: ({ state, documentId }) => {
+      return lacksPermission(state, documentId, PdfPermissionFlag.ModifyAnnotations);
+    },
+  },
+
+  'annotation:group': {
+    id: 'annotation:group',
+    labelKey: 'annotation.group',
+    icon: 'link',
+    categories: ['annotation', 'annotation-group'],
+    action: ({ registry, documentId }) => {
+      const annotation = registry.getPlugin<AnnotationPlugin>(ANNOTATION_PLUGIN_ID)?.provides();
+      const scope = annotation?.forDocument(documentId);
+      if (!scope) return;
+
+      scope.groupAnnotations();
+    },
+    disabled: ({ state, documentId }) => {
+      const annotationState = state.plugins[ANNOTATION_PLUGIN_ID]?.documents[documentId];
+      // Disabled if less than 2 annotations selected or lacking permissions
+      return (
+        (annotationState?.selectedUids?.length ?? 0) < 2 ||
+        lacksPermission(state, documentId, PdfPermissionFlag.ModifyAnnotations)
+      );
+    },
+  },
+
+  'annotation:ungroup': {
+    id: 'annotation:ungroup',
+    labelKey: 'annotation.ungroup',
+    icon: 'linkOff',
+    categories: ['annotation', 'annotation-group'],
+    action: ({ registry, documentId }) => {
+      const annotation = registry.getPlugin<AnnotationPlugin>(ANNOTATION_PLUGIN_ID)?.provides();
+      const scope = annotation?.forDocument(documentId);
+      if (!scope) return;
+
+      const selected = scope.getSelectedAnnotations();
+      if (selected.length === 0) return;
+
+      // Ungroup the first selected annotation's group
+      scope.ungroupAnnotations(selected[0].object.id);
+    },
+    disabled: ({ registry, state, documentId }) => {
+      // Disabled if selection is not part of a group
+      const annotation = registry.getPlugin<AnnotationPlugin>(ANNOTATION_PLUGIN_ID)?.provides();
+      const scope = annotation?.forDocument(documentId);
+      if (!scope) return true;
+
+      const selected = scope.getSelectedAnnotations();
+      if (selected.length === 0) return true;
+
+      return (
+        !scope.isInGroup(selected[0].object.id) ||
+        lacksPermission(state, documentId, PdfPermissionFlag.ModifyAnnotations)
+      );
+    },
+  },
+
   'annotation:overflow-tools': {
     id: 'annotation:overflow-tools',
     labelKey: 'annotation.moreTools',
@@ -1476,6 +1556,161 @@ export const commands: Record<string, Command<State>> = {
     },
     disabled: ({ state, documentId }) => {
       return lacksPermission(state, documentId, PdfPermissionFlag.ModifyAnnotations);
+    },
+  },
+
+  // Link annotation from text selection (standalone - no IRT)
+  'annotation:add-link': {
+    id: 'annotation:add-link',
+    labelKey: 'annotation.addLink',
+    icon: 'link',
+    categories: ['annotation', 'annotation-link'],
+    action: ({ registry, documentId }) => {
+      const ui = registry.getPlugin<UIPlugin>('ui')?.provides();
+      if (!ui) return;
+
+      // Open the link modal - it will detect text selection context
+      ui.forDocument(documentId).openModal('link-modal');
+    },
+    disabled: ({ state, documentId }) => {
+      return lacksPermission(state, documentId, PdfPermissionFlag.ModifyAnnotations);
+    },
+  },
+
+  // Toggle link on annotation: add if none exist, remove if they do
+  'annotation:toggle-link': {
+    id: 'annotation:toggle-link',
+    labelKey: ({ registry, documentId }) => {
+      const scope = registry
+        .getPlugin<AnnotationPlugin>(ANNOTATION_PLUGIN_ID)
+        ?.provides()
+        .forDocument(documentId);
+      if (!scope) return 'annotation.addLink';
+      const selected = scope.getSelectedAnnotation();
+      if (!selected) return 'annotation.addLink';
+      return scope.hasAttachedLinks(selected.object.id)
+        ? 'annotation.removeLink'
+        : 'annotation.addLink';
+    },
+    icon: ({ registry, documentId }) => {
+      const scope = registry
+        .getPlugin<AnnotationPlugin>(ANNOTATION_PLUGIN_ID)
+        ?.provides()
+        .forDocument(documentId);
+      if (!scope) return 'link';
+      const selected = scope.getSelectedAnnotation();
+      if (!selected) return 'link';
+      return scope.hasAttachedLinks(selected.object.id) ? 'linkOff' : 'link';
+    },
+    categories: ['annotation', 'annotation-link'],
+    action: ({ registry, documentId }) => {
+      const annotation = registry.getPlugin<AnnotationPlugin>(ANNOTATION_PLUGIN_ID)?.provides();
+      const ui = registry.getPlugin<UIPlugin>('ui')?.provides();
+      if (!annotation || !ui) return;
+
+      const scope = annotation.forDocument(documentId);
+      const selected = scope.getSelectedAnnotation();
+      if (!selected) return;
+
+      if (scope.hasAttachedLinks(selected.object.id)) {
+        scope.deleteAttachedLinks(selected.object.id);
+      } else {
+        ui.forDocument(documentId).openModal('link-modal');
+      }
+    },
+    visible: ({ registry, documentId }) => {
+      const scope = registry
+        .getPlugin<AnnotationPlugin>(ANNOTATION_PLUGIN_ID)
+        ?.provides()
+        .forDocument(documentId);
+      const selected = scope?.getSelectedAnnotation();
+      if (!selected) return true;
+      return selected.object.type !== PdfAnnotationSubtype.LINK;
+    },
+    disabled: ({ state, documentId }) => {
+      return lacksPermission(state, documentId, PdfPermissionFlag.ModifyAnnotations);
+    },
+  },
+
+  'annotation:toggle-comment': {
+    id: 'annotation:toggle-comment',
+    labelKey: 'annotation.comment',
+    icon: 'comment',
+    categories: ['annotation', 'annotation-comment'],
+    action: ({ registry, documentId }) => {
+      const uiPlugin = registry.getPlugin<UIPlugin>(UI_PLUGIN_ID);
+      if (!uiPlugin || !uiPlugin.provides) return;
+
+      const uiCapability = uiPlugin.provides();
+      if (!uiCapability) return;
+
+      const scope = uiCapability.forDocument(documentId);
+      scope.toggleSidebar('right', 'main', 'comment-panel');
+    },
+    active: ({ state, documentId }) => {
+      return isSidebarOpen(state.plugins, documentId, 'right', 'main', 'comment-panel');
+    },
+    visible: ({ registry, documentId }) => {
+      const scope = registry
+        .getPlugin<AnnotationPlugin>(ANNOTATION_PLUGIN_ID)
+        ?.provides()
+        .forDocument(documentId);
+      const selected = scope?.getSelectedAnnotation();
+      if (!selected) return true;
+      return selected.object.type !== PdfAnnotationSubtype.LINK;
+    },
+  },
+
+  // Go to link destination (for Link annotations only)
+  'annotation:goto-link': {
+    id: 'annotation:goto-link',
+    labelKey: 'annotation.gotoLink',
+    icon: 'externalLink',
+    categories: ['annotation', 'annotation-link'],
+    action: ({ registry, documentId }) => {
+      const annotation = registry.getPlugin<AnnotationPlugin>(ANNOTATION_PLUGIN_ID)?.provides();
+      const scroll = registry.getPlugin<ScrollPlugin>('scroll')?.provides();
+
+      if (!annotation) return;
+
+      const annotationScope = annotation.forDocument(documentId);
+      const selected = annotationScope.getSelectedAnnotation();
+      if (!selected || !isLink(selected)) return;
+
+      const linkAnnotation = selected.object as PdfLinkAnnoObject;
+      const target = linkAnnotation.target;
+      if (!target) return;
+
+      if (target.type === 'action') {
+        const action = target.action;
+        if (action.type === PdfActionType.URI) {
+          // Open external URL in new tab
+          window.open(action.uri, '_blank', 'noopener,noreferrer');
+        } else if (action.type === PdfActionType.Goto && scroll) {
+          // Navigate to page destination
+          const destination = action.destination;
+          scroll.forDocument(documentId).scrollToPage({
+            pageNumber: destination.pageIndex + 1,
+            behavior: 'smooth',
+          });
+        }
+      } else if (target.type === 'destination' && scroll) {
+        // Navigate to page destination
+        const destination = target.destination;
+        scroll.forDocument(documentId).scrollToPage({
+          pageNumber: destination.pageIndex + 1,
+          behavior: 'smooth',
+        });
+      }
+    },
+    visible: ({ registry, documentId }) => {
+      const scope = registry
+        .getPlugin<AnnotationPlugin>(ANNOTATION_PLUGIN_ID)
+        ?.provides()
+        .forDocument(documentId);
+      const selected = scope?.getSelectedAnnotation();
+      if (!selected) return false;
+      return selected.object.type === PdfAnnotationSubtype.LINK;
     },
   },
 

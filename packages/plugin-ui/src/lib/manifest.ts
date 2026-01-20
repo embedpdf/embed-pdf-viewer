@@ -8,7 +8,7 @@ export const manifest: PluginManifest<UIPluginConfig> = {
   name: 'UI Plugin',
   version: '1.0.0',
   provides: ['ui'],
-  requires: ['commands'], // Depends on commands
+  requires: [],
   optional: ['i18n'],
   defaultConfig: {
     schema: {

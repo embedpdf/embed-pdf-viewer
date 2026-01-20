@@ -121,6 +121,12 @@ export function isText(
   return a.object.type === PdfAnnotationSubtype.TEXT;
 }
 
+export function isLink(
+  a: TrackedAnnotation,
+): a is TrackedAnnotation<AnnoOf<PdfAnnotationSubtype.LINK>> {
+  return a.object.type === PdfAnnotationSubtype.LINK;
+}
+
 export function isSidebarAnnotation(
   a: TrackedAnnotation,
 ): a is TrackedAnnotation<AnnoOf<SidebarSubtype>> {
