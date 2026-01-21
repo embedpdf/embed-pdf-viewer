@@ -20,6 +20,9 @@ export const defaultTools = [
       textSelection: true,
       isDraggable: false,
       isResizable: false,
+      // Text markup annotations are anchored to text and should not move/resize in groups
+      isGroupDraggable: false,
+      isGroupResizable: false,
     },
     defaults: {
       type: PdfAnnotationSubtype.HIGHLIGHT,
@@ -38,6 +41,8 @@ export const defaultTools = [
       textSelection: true,
       isDraggable: false,
       isResizable: false,
+      isGroupDraggable: false,
+      isGroupResizable: false,
     },
     defaults: {
       type: PdfAnnotationSubtype.UNDERLINE,
@@ -53,6 +58,10 @@ export const defaultTools = [
     interaction: {
       exclusive: false,
       textSelection: true,
+      isDraggable: false,
+      isResizable: false,
+      isGroupDraggable: false,
+      isGroupResizable: false,
     },
     defaults: {
       type: PdfAnnotationSubtype.STRIKEOUT,
@@ -70,6 +79,8 @@ export const defaultTools = [
       textSelection: true,
       isDraggable: false,
       isResizable: false,
+      isGroupDraggable: false,
+      isGroupResizable: false,
     },
     defaults: {
       type: PdfAnnotationSubtype.SQUIGGLY,
@@ -179,8 +190,9 @@ export const defaultTools = [
       exclusive: false,
       cursor: 'crosshair',
       isDraggable: true,
-      isResizable: false,
+      isResizable: false, // Uses vertex editing when selected individually
       lockAspectRatio: false,
+      isGroupResizable: true, // Scales proportionally in a group
     },
     defaults: {
       type: PdfAnnotationSubtype.LINE,
@@ -203,8 +215,9 @@ export const defaultTools = [
       exclusive: false,
       cursor: 'crosshair',
       isDraggable: true,
-      isResizable: false,
+      isResizable: false, // Uses vertex editing when selected individually
       lockAspectRatio: false,
+      isGroupResizable: true, // Scales proportionally in a group
     },
     defaults: {
       type: PdfAnnotationSubtype.LINE,
@@ -232,8 +245,9 @@ export const defaultTools = [
       exclusive: false,
       cursor: 'crosshair',
       isDraggable: true,
-      isResizable: false,
+      isResizable: false, // Uses vertex editing when selected individually
       lockAspectRatio: false,
+      isGroupResizable: true, // Scales proportionally in a group
     },
     defaults: {
       type: PdfAnnotationSubtype.POLYLINE,
@@ -251,8 +265,9 @@ export const defaultTools = [
       exclusive: false,
       cursor: 'crosshair',
       isDraggable: true,
-      isResizable: false,
+      isResizable: false, // Uses vertex editing when selected individually
       lockAspectRatio: false,
+      isGroupResizable: true, // Scales proportionally in a group
     },
     defaults: {
       type: PdfAnnotationSubtype.POLYGON,

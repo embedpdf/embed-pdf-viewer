@@ -15,7 +15,9 @@ interface GroupSelectionBoxProps {
   pageHeight: number;
   /** All selected annotations on this page */
   selectedAnnotations: TrackedAnnotation[];
-  /** Whether the group is resizable (all annotations must be resizable) */
+  /** Whether the group is draggable (all annotations must be group-draggable) */
+  isDraggable: boolean;
+  /** Whether the group is resizable (all annotations must be group-resizable) */
   isResizable: boolean;
   /** Resize handle UI customization */
   resizeUI?: ResizeHandleUI;
@@ -67,6 +69,7 @@ export function GroupSelectionBox({
   pageWidth,
   pageHeight,
   selectedAnnotations,
+  isDraggable,
   isResizable,
   resizeUI,
   selectionOutlineColor = '#007ACC',
@@ -127,6 +130,9 @@ export function GroupSelectionBox({
       const isMove = transformType === 'move';
       const isResize = transformType === 'resize';
 
+      // Skip drag operations if group is not draggable
+      if (isMove && !isDraggable) return;
+
       if (event.state === 'start') {
         gestureBaseRef.current = groupBox;
 
@@ -137,7 +143,7 @@ export function GroupSelectionBox({
           plugin.startMultiDrag(documentId, selectedAnnotations[0]?.object.id ?? '', constraints);
         } else if (isResize) {
           isResizingRef.current = true;
-          // Start multi-resize
+          // Start multi-resize with all selected annotations
           const annotations = selectedAnnotations.map((ta) => ({
             id: ta.object.id,
             rect: ta.object.rect,
@@ -192,7 +198,7 @@ export function GroupSelectionBox({
           const finalDelta = plugin.endMultiDrag(documentId);
 
           if (finalDelta.x !== 0 || finalDelta.y !== 0) {
-            // Build patches using transformAnnotation for proper vertex handling
+            // Build patches for all selected annotations
             const patches = selectedAnnotations.map((ta) => {
               const newRect: Rect = {
                 ...ta.object.rect,
@@ -215,7 +221,9 @@ export function GroupSelectionBox({
               };
             });
 
-            annotationProvides?.updateAnnotations(patches);
+            if (patches.length > 0) {
+              annotationProvides?.updateAnnotations(patches);
+            }
           }
         } else if (isResize && isResizingRef.current) {
           isResizingRef.current = false;
@@ -223,7 +231,7 @@ export function GroupSelectionBox({
           // End multi-resize and get final rects
           const finalRects = plugin.endMultiResize(documentId);
 
-          // Build patches using transformAnnotation for proper vertex handling
+          // Build patches for all selected annotations
           const patches = Object.entries(finalRects).map(([id, newRect]) => {
             const anno = selectedAnnotations.find((ta) => ta.object.id === id);
             if (!anno) {
@@ -255,6 +263,7 @@ export function GroupSelectionBox({
       documentId,
       pageIndex,
       groupBox,
+      isDraggable,
       selectedAnnotations,
       annotationProvides,
       buildConstraints,
@@ -301,9 +310,9 @@ export function GroupSelectionBox({
 
   return (
     <div data-group-selection-box>
-      {/* Draggable group box */}
+      {/* Group box - draggable only if isDraggable is true */}
       <div
-        {...dragProps}
+        {...(isDraggable ? dragProps : {})}
         style={{
           position: 'absolute',
           left: previewGroupBox.origin.x * scale,
@@ -312,7 +321,7 @@ export function GroupSelectionBox({
           height: previewGroupBox.size.height * scale,
           outline: `2px dashed ${selectionOutlineColor}`,
           outlineOffset: `${outlineOffset + 2}px`,
-          cursor: 'move',
+          cursor: isDraggable ? 'move' : 'default',
           touchAction: 'none',
           zIndex,
         }}

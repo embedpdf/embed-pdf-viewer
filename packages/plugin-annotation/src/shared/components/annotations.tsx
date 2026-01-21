@@ -175,14 +175,25 @@ export function Annotations(annotationsProps: AnnotationsProps) {
     return annotations.filter((anno) => allSelectedIds.includes(anno.object.id));
   }, [annotations, allSelectedIds]);
 
-  // Check if all selected annotations on this page are resizable
+  // Check if all selected annotations on this page are draggable in group context
+  const areAllSelectedDraggable = useMemo(() => {
+    if (selectedAnnotationsOnPage.length < 2) return false;
+
+    return selectedAnnotationsOnPage.every((ta) => {
+      const tool = annotationProvides?.findToolForAnnotation(ta.object);
+      // Use group-specific property, falling back to single-annotation property
+      return tool?.interaction.isGroupDraggable ?? tool?.interaction.isDraggable ?? true;
+    });
+  }, [selectedAnnotationsOnPage, annotationProvides]);
+
+  // Check if all selected annotations on this page are resizable in group context
   const areAllSelectedResizable = useMemo(() => {
     if (selectedAnnotationsOnPage.length < 2) return false;
 
     return selectedAnnotationsOnPage.every((ta) => {
       const tool = annotationProvides?.findToolForAnnotation(ta.object);
-      // Default to true if no tool found, but check tool config if available
-      return tool?.interaction.isResizable ?? true;
+      // Use group-specific property, falling back to single-annotation property
+      return tool?.interaction.isGroupResizable ?? tool?.interaction.isResizable ?? true;
     });
   }, [selectedAnnotationsOnPage, annotationProvides]);
 
@@ -616,7 +627,7 @@ export function Annotations(annotationsProps: AnnotationsProps) {
         return null;
       })}
 
-      {/* Group selection box for multi-select resize */}
+      {/* Group selection box for multi-select drag/resize */}
       {allSelectedOnSamePage && selectedAnnotationsOnPage.length >= 2 && (
         <GroupSelectionBox
           documentId={documentId}
@@ -626,6 +637,7 @@ export function Annotations(annotationsProps: AnnotationsProps) {
           pageWidth={pageWidth}
           pageHeight={pageHeight}
           selectedAnnotations={selectedAnnotationsOnPage}
+          isDraggable={areAllSelectedDraggable}
           isResizable={areAllSelectedResizable}
           resizeUI={annotationsProps.resizeUI}
           selectionOutlineColor={annotationsProps.selectionOutlineColor}
