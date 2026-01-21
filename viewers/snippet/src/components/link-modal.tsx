@@ -156,6 +156,11 @@ export function LinkModal({ documentId, isOpen, onClose, onExited }: LinkModalPr
 
   const canSubmit = activeTab === 'page' || url.trim().length > 0;
 
+  const handleFormSubmit = (e: Event) => {
+    e.preventDefault();
+    handleSubmit();
+  };
+
   return (
     <Dialog
       open={isOpen ?? false}
@@ -164,7 +169,7 @@ export function LinkModal({ documentId, isOpen, onClose, onExited }: LinkModalPr
       onExited={onExited}
       className="md:w-[28rem]"
     >
-      <div className="space-y-6">
+      <form onSubmit={handleFormSubmit} className="space-y-6">
         {/* Tab buttons */}
         <div className="border-border-subtle flex border-b">
           <TabButton active={activeTab === 'url'} onClick={() => setActiveTab('url')}>
@@ -219,20 +224,21 @@ export function LinkModal({ documentId, isOpen, onClose, onExited }: LinkModalPr
         {/* Actions */}
         <div className="border-border-subtle flex justify-end space-x-3 border-t pt-4">
           <Button
+            type="button"
             onClick={onClose}
             className="border-border-default bg-bg-surface text-fg-secondary hover:bg-interactive-hover rounded-md border px-4 py-2 text-sm"
           >
             {translate('common.cancel') || 'Cancel'}
           </Button>
           <Button
-            onClick={handleSubmit}
+            type="submit"
             disabled={!canSubmit}
             className="bg-accent text-fg-on-accent hover:!bg-accent-hover rounded-md border border-transparent px-4 py-2 text-sm disabled:cursor-not-allowed disabled:opacity-50"
           >
             {translate('link.link') || 'Link'}
           </Button>
         </div>
-      </div>
+      </form>
     </Dialog>
   );
 }

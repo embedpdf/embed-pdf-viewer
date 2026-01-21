@@ -132,6 +132,7 @@ export const englishTranslations: Locale = {
       stamp: 'Stamp',
       freeText: 'Free Text',
       square: 'Square',
+      style: 'Annotation Style',
       styles: '{type} Styles',
       defaults: '{type} Defaults',
       // Sidebar labels
@@ -310,6 +311,16 @@ export const englishTranslations: Locale = {
     common: {
       close: 'Close',
       back: 'Back',
+      cancel: 'Cancel',
+    },
+    link: {
+      title: 'Insert Link',
+      url: 'URL',
+      page: 'Page',
+      enterUrl: 'Enter URL',
+      enterPage: 'Enter Page Number',
+      pageRange: 'Page 1 to {totalPages}',
+      link: 'Link',
     },
   },
 };
@@ -444,6 +455,7 @@ export const germanTranslations: Locale = {
       stamp: 'Stempel',
       freeText: 'Freitext',
       square: 'Quadrat',
+      style: 'Anmerkungsstil',
       styles: '{type}-Stile',
       defaults: '{type}-Standardwerte',
       // Sidebar labels
@@ -623,6 +635,16 @@ export const germanTranslations: Locale = {
     common: {
       close: 'Schließen',
       back: 'Zurück',
+      cancel: 'Abbrechen',
+    },
+    link: {
+      title: 'Link einfügen',
+      url: 'URL',
+      page: 'Seite',
+      enterUrl: 'URL eingeben',
+      enterPage: 'Seitennummer eingeben',
+      pageRange: 'Seite 1 bis {totalPages}',
+      link: 'Verknüpfen',
     },
   },
 };
@@ -758,6 +780,7 @@ export const dutchTranslations: Locale = {
       stamp: 'Stempel',
       freeText: 'Vrije tekst',
       square: 'Vierkant',
+      style: 'Annotatiestijl',
       styles: '{type} stijlen',
       defaults: '{type} standaardwaarden',
       // Sidebar labels
@@ -936,6 +959,16 @@ export const dutchTranslations: Locale = {
     common: {
       close: 'Sluiten',
       back: 'Terug',
+      cancel: 'Annuleren',
+    },
+    link: {
+      title: 'Link invoegen',
+      url: 'URL',
+      page: 'Pagina',
+      enterUrl: 'URL invoeren',
+      enterPage: 'Paginanummer invoeren',
+      pageRange: 'Pagina 1 tot {totalPages}',
+      link: 'Koppelen',
     },
   },
 };
@@ -1070,6 +1103,7 @@ export const frenchTranslations: Locale = {
       stamp: 'Tampon',
       freeText: 'Texte libre',
       square: 'Carré',
+      style: "Style d'annotation",
       styles: 'Styles de {type}',
       defaults: 'Valeurs par défaut de {type}',
       // Sidebar labels
@@ -1249,6 +1283,16 @@ export const frenchTranslations: Locale = {
     common: {
       close: 'Fermer',
       back: 'Retour',
+      cancel: 'Annuler',
+    },
+    link: {
+      title: 'Insérer un lien',
+      url: 'URL',
+      page: 'Page',
+      enterUrl: "Entrer l'URL",
+      enterPage: 'Entrer le numéro de page',
+      pageRange: 'Page 1 à {totalPages}',
+      link: 'Lier',
     },
   },
 };
@@ -1384,6 +1428,7 @@ export const spanishTranslations: Locale = {
       stamp: 'Sello',
       freeText: 'Texto libre',
       square: 'Cuadrado',
+      style: 'Estilo de anotación',
       styles: 'Estilos de {type}',
       defaults: 'Valores predeterminados de {type}',
       // Sidebar labels
@@ -1562,6 +1607,16 @@ export const spanishTranslations: Locale = {
     common: {
       close: 'Cerrar',
       back: 'Atrás',
+      cancel: 'Cancelar',
+    },
+    link: {
+      title: 'Insertar enlace',
+      url: 'URL',
+      page: 'Página',
+      enterUrl: 'Introducir URL',
+      enterPage: 'Introducir número de página',
+      pageRange: 'Página 1 a {totalPages}',
+      link: 'Enlazar',
     },
   },
 };
@@ -1696,6 +1751,7 @@ export const simplifiedChineseTranslations: Locale = {
       stamp: '印章',
       freeText: '任意文本',
       square: '矩形',
+      style: '批注样式',
       styles: '{type} 样式',
       defaults: '{type} 默认值',
       // Sidebar labels
@@ -1869,6 +1925,16 @@ export const simplifiedChineseTranslations: Locale = {
     common: {
       close: '关闭',
       back: '返回',
+      cancel: '取消',
+    },
+    link: {
+      title: '插入链接',
+      url: '网址',
+      page: '页面',
+      enterUrl: '输入网址',
+      enterPage: '输入页码',
+      pageRange: '第1页到第{totalPages}页',
+      link: '链接',
     },
   },
 };

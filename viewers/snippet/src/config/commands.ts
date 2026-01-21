@@ -1574,6 +1574,38 @@ export const commands: Record<string, Command<State>> = {
     },
   },
 
+  'annotation:toggle-annotation-style': {
+    id: 'annotation:toggle-annotation-style',
+    labelKey: 'annotation.style',
+    icon: 'palette',
+    categories: ['annotation', 'annotation-style'],
+    action: ({ registry, documentId }) => {
+      const uiPlugin = registry.getPlugin<UIPlugin>(UI_PLUGIN_ID);
+      if (!uiPlugin || !uiPlugin.provides) return;
+
+      const uiCapability = uiPlugin.provides();
+      if (!uiCapability) return;
+
+      const scope = uiCapability.forDocument(documentId);
+      scope.toggleSidebar('left', 'main', 'annotation-panel');
+    },
+    active: ({ state, documentId }) => {
+      return isSidebarOpen(state.plugins, documentId, 'left', 'main', 'annotation-panel');
+    },
+    visible: ({ registry, documentId }) => {
+      const scope = registry
+        .getPlugin<AnnotationPlugin>(ANNOTATION_PLUGIN_ID)
+        ?.provides()
+        .forDocument(documentId);
+      const selected = scope?.getSelectedAnnotation();
+      if (!selected) return true;
+      return selected.object.type !== PdfAnnotationSubtype.LINK;
+    },
+    disabled: ({ state, documentId }) => {
+      return lacksPermission(state, documentId, PdfPermissionFlag.ModifyAnnotations);
+    },
+  },
+
   // Toggle link on annotation: add if none exist, remove if they do
   'annotation:toggle-link': {
     id: 'annotation:toggle-link',

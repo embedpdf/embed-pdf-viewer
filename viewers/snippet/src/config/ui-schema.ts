@@ -1312,9 +1312,9 @@ export const viewerUISchema: UISchema = {
         {
           type: 'command-button',
           id: 'toggle-annotation-style',
-          commandId: 'panel:toggle-annotation-style',
+          commandId: 'annotation:toggle-annotation-style',
           variant: 'icon',
-          categories: ['panel', 'panel-annotation-style'],
+          categories: ['annotation', 'annotation-style'],
         },
         {
           type: 'command-button',
