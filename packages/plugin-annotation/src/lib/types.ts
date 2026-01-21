@@ -164,6 +164,14 @@ export interface AnnotationActiveToolChangeEvent {
   tool: AnnotationTool | null;
 }
 
+/**
+ * Represents what grouping action is available for the current selection.
+ * - 'group': Selection can be grouped (2+ annotations, not all in same group)
+ * - 'ungroup': Selection is exactly one complete group that can be ungrouped
+ * - 'disabled': No valid grouping action (0-1 annotations selected)
+ */
+export type GroupingAction = 'group' | 'ungroup' | 'disabled';
+
 // Scoped annotation capability for a specific document
 export interface AnnotationScope {
   getState(): AnnotationDocumentState;
@@ -230,6 +238,8 @@ export interface AnnotationScope {
   getGroupMembers(annotationId: string): TrackedAnnotation<PdfAnnotationObject>[];
   /** Check if an annotation is part of a group */
   isInGroup(annotationId: string): boolean;
+  /** Get the available grouping action for the current selection */
+  getGroupingAction(): GroupingAction;
 
   onStateChange: EventHook<AnnotationDocumentState>;
   onAnnotationEvent: EventHook<AnnotationEvent>;

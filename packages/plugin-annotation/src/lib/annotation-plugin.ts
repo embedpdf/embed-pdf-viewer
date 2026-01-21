@@ -40,6 +40,7 @@ import {
   MultiResizeEvent,
   GroupResizeAnnotationInfo,
   StartMultiResizeOptions,
+  GroupingAction,
 } from './types';
 import {
   setAnnotations,
@@ -76,6 +77,7 @@ import {
   getAttachedLinks,
   getGroupMembers,
   isInGroup,
+  getSelectionGroupingAction,
 } from './selectors';
 import { initialDocumentState } from './reducer';
 import { AnnotationTool } from './tools/types';
@@ -251,9 +253,21 @@ export class AnnotationPlugin extends BasePlugin<
         .filter((ta) => rectsIntersect(rect, ta.object.rect))
         .map((ta) => ta.object.id);
 
-      // Select the annotations
+      // Expand selection to include full groups
       if (selectedIds.length > 0) {
-        this.setSelectionMethod(selectedIds, documentId);
+        const expandedIds = new Set<string>();
+        for (const id of selectedIds) {
+          if (this.isInGroupMethod(id, documentId)) {
+            const members = this.getGroupMembersMethod(id, documentId);
+            for (const member of members) {
+              expandedIds.add(member.object.id);
+            }
+          } else {
+            expandedIds.add(id);
+          }
+        }
+
+        this.setSelectionMethod([...expandedIds], documentId);
       }
     });
 
@@ -415,6 +429,7 @@ export class AnnotationPlugin extends BasePlugin<
       ungroupAnnotations: (id) => this.ungroupAnnotationsMethod(id, documentId),
       getGroupMembers: (id) => this.getGroupMembersMethod(id, documentId),
       isInGroup: (id) => this.isInGroupMethod(id, documentId),
+      getGroupingAction: () => this.getGroupingActionMethod(documentId),
       onStateChange: (listener: Listener<AnnotationDocumentState>) =>
         this.state$.on((event) => {
           if (event.documentId === documentId) listener(event.state);
@@ -943,7 +958,16 @@ export class AnnotationPlugin extends BasePlugin<
     if (docState.selectedUids.includes(id)) {
       this.dispatch(removeFromSelection(docId, id));
     } else {
-      this.dispatch(addToSelection(docId, pageIndex, id));
+      if (this.isInGroupMethod(id, docId)) {
+        const members = this.getGroupMembersMethod(id, docId);
+        for (const member of members) {
+          if (!docState.selectedUids.includes(member.object.id)) {
+            this.dispatch(addToSelection(docId, member.object.pageIndex, member.object.id));
+          }
+        }
+      } else {
+        this.dispatch(addToSelection(docId, pageIndex, id));
+      }
     }
   }
 
@@ -1080,6 +1104,13 @@ export class AnnotationPlugin extends BasePlugin<
    */
   private isInGroupMethod(annotationId: string, documentId?: string): boolean {
     return isInGroup(this.getDocumentState(documentId), annotationId);
+  }
+
+  /**
+   * Get the available grouping action for the current selection.
+   */
+  private getGroupingActionMethod(documentId?: string): GroupingAction {
+    return getSelectionGroupingAction(this.getDocumentState(documentId));
   }
 
   // ─────────────────────────────────────────────────────────

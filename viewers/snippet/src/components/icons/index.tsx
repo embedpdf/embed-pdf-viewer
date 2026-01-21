@@ -77,6 +77,8 @@ import { LinkIcon } from './link';
 import { LinkOffIcon } from './link-off';
 import { ExternalLinkIcon } from './external-link';
 import { MarqueeSelectIcon } from './marquee-select';
+import { GroupIcon } from './group';
+import { UngroupIcon } from './ungroup';
 
 export type Icons = {
   [key: string]: IconComponent;
@@ -161,4 +163,6 @@ export const icons: Icons = {
   linkOff: LinkOffIcon,
   externalLink: ExternalLinkIcon,
   marqueeSelect: MarqueeSelectIcon,
+  group: GroupIcon,
+  ungroup: UngroupIcon,
 };

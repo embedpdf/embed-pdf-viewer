@@ -73,7 +73,7 @@ export function GroupSelectionBox({
   isResizable,
   resizeUI,
   selectionOutlineColor = '#007ACC',
-  outlineOffset = 1,
+  outlineOffset = 2,
   zIndex = 100,
   groupSelectionMenu,
 }: GroupSelectionBoxProps): JSX.Element | null {
@@ -312,7 +312,11 @@ export function GroupSelectionBox({
     <div data-group-selection-box>
       {/* Group box - draggable only if isDraggable is true */}
       <div
-        {...(isDraggable ? dragProps : {})}
+        {...(isDraggable
+          ? dragProps
+          : {
+              onPointerDown: (e) => e.stopPropagation(),
+            })}
         style={{
           position: 'absolute',
           left: previewGroupBox.origin.x * scale,
@@ -320,7 +324,7 @@ export function GroupSelectionBox({
           width: previewGroupBox.size.width * scale,
           height: previewGroupBox.size.height * scale,
           outline: `2px dashed ${selectionOutlineColor}`,
-          outlineOffset: `${outlineOffset + 2}px`,
+          outlineOffset: outlineOffset - 1,
           cursor: isDraggable ? 'move' : 'default',
           touchAction: 'none',
           zIndex,

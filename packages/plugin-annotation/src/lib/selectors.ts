@@ -3,6 +3,7 @@ import {
   AnnotationDocumentState,
   SidebarAnnotationEntry,
   TrackedAnnotation,
+  GroupingAction,
 } from './types';
 import {
   PdfAnnotationSubtype,
@@ -374,4 +375,26 @@ export const isInGroup = (s: AnnotationDocumentState, annotationId: string): boo
   }
 
   return false;
+};
+
+/**
+ * Determine what grouping action is available for the current selection.
+ *
+ * @param s - The annotation document state
+ * @returns The available grouping action
+ */
+export const getSelectionGroupingAction = (s: AnnotationDocumentState): GroupingAction => {
+  const selected = getSelectedAnnotations(s);
+  if (selected.length === 0) return 'disabled';
+
+  const firstId = selected[0].object.id;
+  if (isInGroup(s, firstId)) {
+    const members = getGroupMembers(s, firstId);
+    const memberIds = new Set(members.map((m) => m.object.id));
+    if (selected.every((ta) => memberIds.has(ta.object.id))) {
+      return 'ungroup';
+    }
+  }
+
+  return selected.length >= 2 ? 'group' : 'disabled';
 };

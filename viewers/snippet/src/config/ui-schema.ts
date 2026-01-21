@@ -1338,17 +1338,17 @@ export const viewerUISchema: UISchema = {
       items: [
         {
           type: 'command-button',
-          id: 'group-annotations',
-          commandId: 'annotation:group',
+          id: 'toggle-group-annotations',
+          commandId: 'annotation:toggle-group',
           variant: 'icon',
           categories: ['annotation', 'annotation-group'],
         },
         {
           type: 'command-button',
-          id: 'ungroup-annotations',
-          commandId: 'annotation:ungroup',
+          id: 'toggle-annotation-style',
+          commandId: 'panel:toggle-annotation-style',
           variant: 'icon',
-          categories: ['annotation', 'annotation-group'],
+          categories: ['panel', 'panel-annotation-style'],
         },
         {
           type: 'command-button',

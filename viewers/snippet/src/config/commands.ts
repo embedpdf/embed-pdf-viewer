@@ -1459,57 +1459,50 @@ export const commands: Record<string, Command<State>> = {
     },
   },
 
-  'annotation:group': {
-    id: 'annotation:group',
-    labelKey: 'annotation.group',
-    icon: 'link',
+  'annotation:toggle-group': {
+    id: 'annotation:toggle-group',
+    labelKey: ({ registry, documentId }) => {
+      const action = registry
+        .getPlugin<AnnotationPlugin>(ANNOTATION_PLUGIN_ID)
+        ?.provides()
+        .forDocument(documentId)
+        .getGroupingAction();
+      return action === 'ungroup' ? 'annotation.ungroup' : 'annotation.group';
+    },
+    icon: ({ registry, documentId }) => {
+      const action = registry
+        .getPlugin<AnnotationPlugin>(ANNOTATION_PLUGIN_ID)
+        ?.provides()
+        .forDocument(documentId)
+        .getGroupingAction();
+      return action === 'ungroup' ? 'ungroup' : 'group';
+    },
     categories: ['annotation', 'annotation-group'],
     action: ({ registry, documentId }) => {
-      const annotation = registry.getPlugin<AnnotationPlugin>(ANNOTATION_PLUGIN_ID)?.provides();
-      const scope = annotation?.forDocument(documentId);
+      const scope = registry
+        .getPlugin<AnnotationPlugin>(ANNOTATION_PLUGIN_ID)
+        ?.provides()
+        .forDocument(documentId);
       if (!scope) return;
 
-      scope.groupAnnotations();
-    },
-    disabled: ({ state, documentId }) => {
-      const annotationState = state.plugins[ANNOTATION_PLUGIN_ID]?.documents[documentId];
-      // Disabled if less than 2 annotations selected or lacking permissions
-      return (
-        (annotationState?.selectedUids?.length ?? 0) < 2 ||
-        lacksPermission(state, documentId, PdfPermissionFlag.ModifyAnnotations)
-      );
-    },
-  },
-
-  'annotation:ungroup': {
-    id: 'annotation:ungroup',
-    labelKey: 'annotation.ungroup',
-    icon: 'linkOff',
-    categories: ['annotation', 'annotation-group'],
-    action: ({ registry, documentId }) => {
-      const annotation = registry.getPlugin<AnnotationPlugin>(ANNOTATION_PLUGIN_ID)?.provides();
-      const scope = annotation?.forDocument(documentId);
-      if (!scope) return;
-
-      const selected = scope.getSelectedAnnotations();
-      if (selected.length === 0) return;
-
-      // Ungroup the first selected annotation's group
-      scope.ungroupAnnotations(selected[0].object.id);
+      const action = scope.getGroupingAction();
+      if (action === 'ungroup') {
+        const selected = scope.getSelectedAnnotations();
+        if (selected.length > 0) {
+          scope.ungroupAnnotations(selected[0].object.id);
+        }
+      } else if (action === 'group') {
+        scope.groupAnnotations();
+      }
     },
     disabled: ({ registry, state, documentId }) => {
-      // Disabled if selection is not part of a group
-      const annotation = registry.getPlugin<AnnotationPlugin>(ANNOTATION_PLUGIN_ID)?.provides();
-      const scope = annotation?.forDocument(documentId);
-      if (!scope) return true;
-
-      const selected = scope.getSelectedAnnotations();
-      if (selected.length === 0) return true;
-
-      return (
-        !scope.isInGroup(selected[0].object.id) ||
-        lacksPermission(state, documentId, PdfPermissionFlag.ModifyAnnotations)
-      );
+      if (lacksPermission(state, documentId, PdfPermissionFlag.ModifyAnnotations)) return true;
+      const action = registry
+        .getPlugin<AnnotationPlugin>(ANNOTATION_PLUGIN_ID)
+        ?.provides()
+        .forDocument(documentId)
+        .getGroupingAction();
+      return action === 'disabled';
     },
   },
 
