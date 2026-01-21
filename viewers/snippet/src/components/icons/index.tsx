@@ -76,6 +76,7 @@ import { InfoIcon } from './info';
 import { LinkIcon } from './link';
 import { LinkOffIcon } from './link-off';
 import { ExternalLinkIcon } from './external-link';
+import { MarqueeSelectIcon } from './marquee-select';
 
 export type Icons = {
   [key: string]: IconComponent;
@@ -159,4 +160,5 @@ export const icons: Icons = {
   link: LinkIcon,
   linkOff: LinkOffIcon,
   externalLink: ExternalLinkIcon,
+  marqueeSelect: MarqueeSelectIcon,
 };

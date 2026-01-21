@@ -2,25 +2,29 @@ import { useEffect, useMemo, useState } from '@framework';
 import { useDocumentState } from '@embedpdf/core/@framework';
 import { Rect } from '@embedpdf/models';
 
-import { useAnnotationCapability } from '../hooks';
+import { useSelectionPlugin } from '../hooks';
 
 interface MarqueeSelectionProps {
   /** Document ID */
   documentId: string;
   /** Index of the page this layer lives on */
   pageIndex: number;
-  /** Scale of the page */
+  /** Scale of the page (optional, defaults to document scale) */
   scale?: number;
   /** Optional CSS class applied to the marquee rectangle */
   className?: string;
-  /** Stroke / fill colours (defaults below) */
+  /** Stroke colour (default: 'rgba(0,122,204,0.8)') */
   stroke?: string;
+  /** Fill colour (default: 'rgba(0,122,204,0.15)') */
   fill?: string;
 }
 
 /**
- * MarqueeSelection renders a selection rectangle when the user drags to select annotations.
- * It follows the same pattern as MarqueeCapture from the capture plugin.
+ * MarqueeSelection renders a selection rectangle when the user drags to select items.
+ * Place this component on each page where you want marquee selection to work.
+ *
+ * Other plugins (e.g., annotation, form) can subscribe to `onMarqueeEnd` to
+ * determine which objects intersect with the marquee rect.
  */
 export const MarqueeSelection = ({
   documentId,
@@ -30,7 +34,7 @@ export const MarqueeSelection = ({
   stroke = 'rgba(0,122,204,0.8)',
   fill = 'rgba(0,122,204,0.15)',
 }: MarqueeSelectionProps) => {
-  const { provides: annotationPlugin } = useAnnotationCapability();
+  const { plugin: selPlugin } = useSelectionPlugin();
   const documentState = useDocumentState(documentId);
   const [rect, setRect] = useState<Rect | null>(null);
 
@@ -39,18 +43,22 @@ export const MarqueeSelection = ({
     return documentState?.scale ?? 1;
   }, [scale, documentState?.scale]);
 
-  useEffect(() => {
-    if (!annotationPlugin) return;
+  const pageSize = useMemo(() => {
+    const page = documentState?.document?.pages.find((p) => p.index === pageIndex);
+    return page?.size ?? { width: 0, height: 0 };
+  }, [documentState?.document?.pages, pageIndex]);
 
-    return annotationPlugin.registerMarqueeSelectionOnPage({
+  useEffect(() => {
+    if (!selPlugin || !documentId || pageSize.width === 0) return;
+
+    return selPlugin.registerMarqueeOnPage({
       documentId,
       pageIndex,
+      pageSize,
       scale: actualScale,
-      callback: {
-        onPreview: setRect,
-      },
+      onRectChange: setRect,
     });
-  }, [annotationPlugin, documentId, pageIndex, actualScale]);
+  }, [selPlugin, documentId, pageIndex, pageSize, actualScale]);
 
   if (!rect) return null;
 

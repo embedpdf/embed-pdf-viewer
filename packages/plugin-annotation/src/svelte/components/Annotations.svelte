@@ -19,7 +19,10 @@
     type TrackedAnnotation,
   } from '@embedpdf/plugin-annotation';
 
-  import { type PointerEventHandlersWithLifecycle } from '@embedpdf/plugin-interaction-manager';
+  import {
+    type PointerEventHandlersWithLifecycle,
+    type EmbedPdfPointerEvent,
+  } from '@embedpdf/plugin-interaction-manager';
   import { usePointerHandlers } from '@embedpdf/plugin-interaction-manager/svelte';
   import { useSelectionCapability } from '@embedpdf/plugin-selection/svelte';
 
@@ -104,8 +107,8 @@
   });
 
   // pointer handlers (capture-down to deselect when clicking empty layer)
-  const handlers: PointerEventHandlersWithLifecycle = {
-    onPointerDown: (_: unknown, pe: PointerEvent) => {
+  const handlers: PointerEventHandlersWithLifecycle<EmbedPdfPointerEvent<PointerEvent>> = {
+    onPointerDown: (_, pe) => {
       if (pe.target === pe.currentTarget && annotationProvides) {
         annotationProvides.deselectAnnotation();
         editingId = null;

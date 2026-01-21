@@ -1,5 +1,12 @@
 import { BasePluginConfig, EventHook } from '@embedpdf/core';
-import { PdfPageGeometry, PdfTask, Rect } from '@embedpdf/models';
+import { PdfPageGeometry, PdfTask, Rect, Size } from '@embedpdf/models';
+
+export interface MarqueeSelectionConfig {
+  /** Minimum drag distance in pixels before considering it a marquee */
+  minDragPx?: number;
+  /** Whether marquee selection is enabled (default: true) */
+  enabled?: boolean;
+}
 
 export interface SelectionPluginConfig extends BasePluginConfig {
   /**
@@ -8,6 +15,10 @@ export interface SelectionPluginConfig extends BasePluginConfig {
    * @default 40
    */
   menuHeight?: number;
+  /**
+   * Configuration for marquee selection behavior.
+   */
+  marquee?: MarqueeSelectionConfig;
 }
 
 export interface SelectionMenuPlacement {
@@ -62,6 +73,17 @@ export interface RegisterSelectionOnPageOptions {
   onRectsChange: (data: SelectionRectsCallback) => void;
 }
 
+export interface RegisterMarqueeOnPageOptions {
+  documentId: string;
+  pageIndex: number;
+  /** The page size (for marquee clamping) */
+  pageSize: Size;
+  /** The current scale factor (for marquee threshold calculation) */
+  scale: number;
+  /** Called when the marquee rect changes during drag, or null when cancelled/ended */
+  onRectChange: (rect: Rect | null) => void;
+}
+
 // ─────────────────────────────────────────────────────────
 // Events
 // ─────────────────────────────────────────────────────────
@@ -96,9 +118,45 @@ export interface EndSelectionEvent {
   documentId: string;
 }
 
+export interface MarqueeChangeEvent {
+  documentId: string;
+  pageIndex: number;
+  rect: Rect | null; // null when cancelled/ended
+}
+
+export interface MarqueeEndEvent {
+  documentId: string;
+  pageIndex: number;
+  rect: Rect;
+}
+
+// ─────────────────────────────────────────────────────────
+// Mode Configuration
+// ─────────────────────────────────────────────────────────
+
+export interface EnableForModeOptions {
+  /**
+   * Whether to show selection rects in the SelectionLayer.
+   * When false, the selection logic is enabled but the rects are not
+   * rendered (useful when a consuming plugin handles its own rendering).
+   * @default true
+   */
+  showRects?: boolean;
+}
+
 // ─────────────────────────────────────────────────────────
 // Capability
 // ─────────────────────────────────────────────────────────
+
+export interface MarqueeScopeEvent {
+  pageIndex: number;
+  rect: Rect | null;
+}
+
+export interface MarqueeEndScopeEvent {
+  pageIndex: number;
+  rect: Rect;
+}
 
 export interface SelectionScope {
   getFormattedSelection(): FormattedSelection[];
@@ -111,11 +169,15 @@ export interface SelectionScope {
   clear(): void;
   copyToClipboard(): void;
   getState(): SelectionDocumentState;
+  setMarqueeEnabled(enabled: boolean): void;
+  isMarqueeEnabled(): boolean;
   onSelectionChange: EventHook<SelectionRangeX | null>;
   onTextRetrieved: EventHook<string[]>;
   onCopyToClipboard: EventHook<string>;
   onBeginSelection: EventHook<{ page: number; index: number }>;
   onEndSelection: EventHook<void>;
+  onMarqueeChange: EventHook<MarqueeScopeEvent>;
+  onMarqueeEnd: EventHook<MarqueeEndScopeEvent>;
 }
 
 export interface SelectionCapability {
@@ -130,8 +192,12 @@ export interface SelectionCapability {
   clear(documentId?: string): void;
   copyToClipboard(documentId?: string): void;
   getState(documentId?: string): SelectionDocumentState;
-  enableForMode(modeId: string, documentId?: string): void;
+  enableForMode(modeId: string, options?: EnableForModeOptions, documentId?: string): void;
   isEnabledForMode(modeId: string, documentId?: string): boolean;
+
+  // Marquee selection
+  setMarqueeEnabled(enabled: boolean, documentId?: string): void;
+  isMarqueeEnabled(documentId?: string): boolean;
 
   // Document-scoped operations
   forDocument(documentId: string): SelectionScope;
@@ -142,4 +208,8 @@ export interface SelectionCapability {
   onCopyToClipboard: EventHook<CopyToClipboardEvent>;
   onBeginSelection: EventHook<BeginSelectionEvent>;
   onEndSelection: EventHook<EndSelectionEvent>;
+
+  // Marquee selection events
+  onMarqueeChange: EventHook<MarqueeChangeEvent>;
+  onMarqueeEnd: EventHook<MarqueeEndEvent>;
 }

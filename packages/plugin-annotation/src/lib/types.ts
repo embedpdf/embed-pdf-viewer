@@ -338,12 +338,6 @@ export interface AnnotationCapability {
     patchFn: PatchFunction<T>,
   ) => void;
 
-  /**
-   * Register marquee selection handlers for a specific page.
-   * Returns an unregister function.
-   */
-  registerMarqueeSelectionOnPage: (options: RegisterMarqueeSelectionOnPageOptions) => () => void;
-
   // Events (include documentId)
   onStateChange: EventHook<AnnotationStateChangeEvent>;
   onActiveToolChange: EventHook<AnnotationActiveToolChangeEvent>;
@@ -353,16 +347,6 @@ export interface AnnotationCapability {
 
 export interface GetPageAnnotationsOptions {
   pageIndex: number;
-}
-
-export interface RegisterMarqueeSelectionOnPageOptions {
-  documentId: string;
-  pageIndex: number;
-  scale: number;
-  callback: {
-    onPreview?: (rect: import('@embedpdf/models').Rect | null) => void;
-    onCommit?: (selectedIds: string[]) => void;
-  };
 }
 
 export interface SidebarAnnotationEntry {

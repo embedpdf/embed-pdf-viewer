@@ -32,7 +32,6 @@ import {
   RenderAnnotationOptions,
   TrackedAnnotation,
   TransformOptions,
-  RegisterMarqueeSelectionOnPageOptions,
   MultiDragState,
   MultiDragEvent,
   AnnotationConstraintInfo,
@@ -90,8 +89,8 @@ import {
   lineHandlerFactory,
   inkHandlerFactory,
   freeTextHandlerFactory,
-  createMarqueeSelectionHandler,
 } from './handlers';
+import { rectsIntersect } from './helpers';
 import { PatchRegistry, TransformContext } from './patching/patch-registry';
 import { patchInk, patchLine, patchPolyline, patchPolygon } from './patching/patches';
 
@@ -173,7 +172,8 @@ export class AnnotationPlugin extends BasePlugin<
     if (this.selection) {
       for (const tool of this.state.tools) {
         if (tool.interaction.textSelection) {
-          this.selection.enableForMode(tool.interaction.mode ?? tool.id);
+          // Text markup tools render their own highlight preview, so suppress selection layer rects
+          this.selection.enableForMode(tool.interaction.mode ?? tool.id, { showRects: false });
         }
       }
     }
@@ -232,6 +232,28 @@ export class AnnotationPlugin extends BasePlugin<
       const currentToolId = this.state.documents[s.documentId]?.activeToolId ?? null;
       if (newToolId !== currentToolId && s.documentId) {
         this.dispatch(setActiveToolId(s.documentId, newToolId));
+      }
+    });
+
+    // Subscribe to marquee selection end events from the selection plugin
+    // When a marquee selection completes, find and select intersecting annotations
+    this.selection?.onMarqueeEnd(({ documentId, pageIndex, rect }) => {
+      const docState = this.state.documents[documentId];
+      if (!docState) return;
+
+      // Get annotations on this page
+      const pageAnnotations = (docState.pages[pageIndex] ?? [])
+        .map((uid) => docState.byUid[uid])
+        .filter((ta): ta is TrackedAnnotation => ta !== undefined);
+
+      // Find annotations that intersect with the marquee rect
+      const selectedIds = pageAnnotations
+        .filter((ta) => rectsIntersect(rect, ta.object.rect))
+        .map((ta) => ta.object.id);
+
+      // Select the annotations
+      if (selectedIds.length > 0) {
+        this.setSelectionMethod(selectedIds, documentId);
       }
     });
 
@@ -346,7 +368,6 @@ export class AnnotationPlugin extends BasePlugin<
       addColorPreset: (color) => this.dispatch(addColorPreset(color)),
       transformAnnotation: (annotation, options) => this.transformAnnotation(annotation, options),
       registerPatchFunction: (type, patchFn) => this.registerPatchFunction(type, patchFn),
-      registerMarqueeSelectionOnPage: (options) => this.registerMarqueeSelectionOnPage(options),
 
       // Events
       onStateChange: this.state$.on,
@@ -517,68 +538,6 @@ export class AnnotationPlugin extends BasePlugin<
     }
 
     return () => unregisterFns.forEach((fn) => fn());
-  }
-
-  /**
-   * Register marquee selection handlers for a specific page.
-   * This allows users to drag a rectangle to select multiple annotations.
-   */
-  public registerMarqueeSelectionOnPage(opts: RegisterMarqueeSelectionOnPageOptions): () => void {
-    if (!this.interactionManager) {
-      this.logger.warn(
-        'AnnotationPlugin',
-        'MissingDependency',
-        'Interaction manager plugin not loaded, marquee selection disabled',
-      );
-      return () => {};
-    }
-
-    const coreDoc = this.getCoreDocument(opts.documentId);
-    if (!coreDoc || !coreDoc.document) {
-      this.logger.warn('AnnotationPlugin', 'DocumentNotFound', 'Document not found');
-      return () => {};
-    }
-
-    const page = coreDoc.document.pages[opts.pageIndex];
-    if (!page) {
-      this.logger.warn('AnnotationPlugin', 'PageNotFound', `Page ${opts.pageIndex} not found`);
-      return () => {};
-    }
-
-    // Get current annotations on this page
-    const docState = this.getDocumentState(opts.documentId);
-    const pageAnnotations = (docState.pages[opts.pageIndex] ?? [])
-      .map((uid) => docState.byUid[uid])
-      .filter((ta): ta is TrackedAnnotation => ta !== undefined);
-
-    const handlers = createMarqueeSelectionHandler({
-      pageSize: page.size,
-      scale: opts.scale,
-      annotations: pageAnnotations,
-      onPreview: opts.callback.onPreview,
-      onCommit: (selectedIds) => {
-        // Set the selection to the marquee-selected annotations
-        this.setSelectionMethod(selectedIds, opts.documentId);
-        opts.callback.onCommit?.(selectedIds);
-      },
-    });
-
-    // Register the marquee selection mode if not already registered
-    this.interactionManager.registerMode({
-      id: 'marqueeAnnotationSelect',
-      scope: 'page',
-      exclusive: true,
-      cursor: 'crosshair',
-    });
-
-    const off = this.interactionManager.registerHandlers({
-      documentId: opts.documentId,
-      modeId: 'marqueeAnnotationSelect',
-      handlers,
-      pageIndex: opts.pageIndex,
-    });
-
-    return off;
   }
 
   // ─────────────────────────────────────────────────────────

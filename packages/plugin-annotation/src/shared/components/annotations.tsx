@@ -18,7 +18,7 @@ import {
   isLink,
 } from '@embedpdf/plugin-annotation';
 import { PdfLinkAnnoObject } from '@embedpdf/models';
-import { PointerEventHandlers } from '@embedpdf/plugin-interaction-manager';
+import { PointerEventHandlers, EmbedPdfPointerEvent } from '@embedpdf/plugin-interaction-manager';
 import { usePointerHandlers } from '@embedpdf/plugin-interaction-manager/@framework';
 import { useSelectionCapability } from '@embedpdf/plugin-selection/@framework';
 import {
@@ -104,7 +104,7 @@ export function Annotations(annotationsProps: AnnotationsProps) {
   }, [annotationProvides, pageIndex]);
 
   const handlers = useMemo(
-    (): PointerEventHandlers<MouseEvent> => ({
+    (): PointerEventHandlers<EmbedPdfPointerEvent<MouseEvent>> => ({
       onPointerDown: (_, pe) => {
         // Only deselect if clicking directly on the layer (not on an annotation)
         if (pe.target === pe.currentTarget && annotationProvides) {

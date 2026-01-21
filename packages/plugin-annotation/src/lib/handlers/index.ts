@@ -6,4 +6,3 @@ export * from './polygon.handler';
 export * from './square.handler';
 export * from './stamp.handler';
 export * from './circle.handler';
-export * from './marquee-selection.handler';

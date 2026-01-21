@@ -387,6 +387,7 @@ import {
   TrackedAnnotation,
 } from '@embedpdf/plugin-annotation';
 import { usePointerHandlers } from '@embedpdf/plugin-interaction-manager/vue';
+import type { EmbedPdfPointerEvent } from '@embedpdf/plugin-interaction-manager';
 import { useSelectionCapability } from '@embedpdf/plugin-selection/vue';
 import { useAnnotationCapability } from '../hooks';
 import AnnotationContainer from './annotation-container.vue';
@@ -440,7 +441,7 @@ watchEffect((onCleanup) => {
   }
 });
 
-const handlePointerDown = (_pos: Position, pe: PointerEvent) => {
+const handlePointerDown = (_pos: Position, pe: EmbedPdfPointerEvent<PointerEvent>) => {
   if (pe.target === pe.currentTarget && annotationProvides.value) {
     annotationProvides.value.deselectAnnotation();
     editingId.value = null;

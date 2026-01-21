@@ -349,7 +349,11 @@ export const commands: Record<string, Command<State>> = {
       if (!pointer) return;
 
       const scope = pointer.forDocument(documentId);
-      scope.activate('pointerMode');
+      if (scope.getActiveMode() === 'pointerMode') {
+        scope.activateDefaultMode();
+      } else {
+        scope.activate('pointerMode');
+      }
     },
     active: ({ state, documentId }) =>
       state.plugins['interaction-manager']?.documents[documentId]?.activeMode === 'pointerMode',
