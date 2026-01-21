@@ -1,9 +1,9 @@
-import { Rect, Size } from '@embedpdf/models';
+import { Rect } from '@embedpdf/models';
 import { useInteractionHandles, CounterRotate } from '@embedpdf/utils/@framework';
-import { TrackedAnnotation, AnnotationConstraintInfo } from '@embedpdf/plugin-annotation';
+import { TrackedAnnotation } from '@embedpdf/plugin-annotation';
 import { useState, useMemo, useCallback, useRef, useEffect } from '@framework';
 
-import { useAnnotationPlugin, useAnnotationCapability } from '../hooks';
+import { useAnnotationPlugin } from '../hooks';
 import { ResizeHandleUI, GroupSelectionMenuRenderFn } from './types';
 
 interface GroupSelectionBoxProps {
@@ -78,7 +78,6 @@ export function GroupSelectionBox({
   groupSelectionMenu,
 }: GroupSelectionBoxProps): JSX.Element | null {
   const { plugin } = useAnnotationPlugin();
-  const { provides: annotationCapability } = useAnnotationCapability();
   const gestureBaseRef = useRef<Rect | null>(null);
   const isDraggingRef = useRef(false);
   const isResizingRef = useRef(false);
@@ -99,24 +98,8 @@ export function GroupSelectionBox({
     }
   }, [groupBox]);
 
-  // Get scoped API for this document
-  const annotationProvides = useMemo(
-    () => (annotationCapability ? annotationCapability.forDocument(documentId) : null),
-    [annotationCapability, documentId],
-  );
-
-  // Build constraint info for all selected annotations
-  const buildConstraints = useCallback((): AnnotationConstraintInfo[] => {
-    const pageSize: Size = { width: pageWidth, height: pageHeight };
-    return selectedAnnotations.map((ta) => ({
-      id: ta.object.id,
-      rect: ta.object.rect,
-      pageIndex: ta.object.pageIndex,
-      pageSize,
-    }));
-  }, [selectedAnnotations, pageWidth, pageHeight]);
-
-  // Handle both drag and resize updates
+  // Handle both drag and resize updates using unified plugin API
+  // The plugin handles attached links automatically and commits all patches
   const handleUpdate = useCallback(
     (
       event: Parameters<
@@ -124,7 +107,7 @@ export function GroupSelectionBox({
       >[0],
     ) => {
       if (!event.transformData?.type) return;
-      if (!plugin || !annotationCapability) return;
+      if (!plugin) return;
 
       const transformType = event.transformData.type;
       const isMove = transformType === 'move';
@@ -138,20 +121,17 @@ export function GroupSelectionBox({
 
         if (isMove) {
           isDraggingRef.current = true;
-          // Start multi-drag with constraints
-          const constraints = buildConstraints();
-          plugin.startMultiDrag(documentId, selectedAnnotations[0]?.object.id ?? '', constraints);
+          // Use unified drag API - plugin handles attached links automatically
+          plugin.startDrag(documentId, {
+            annotationIds: selectedAnnotations.map((ta) => ta.object.id),
+            pageSize: { width: pageWidth, height: pageHeight },
+          });
         } else if (isResize) {
           isResizingRef.current = true;
-          // Start multi-resize with all selected annotations
-          const annotations = selectedAnnotations.map((ta) => ({
-            id: ta.object.id,
-            rect: ta.object.rect,
-          }));
-          plugin.startMultiResize({
-            documentId,
-            pageIndex,
-            annotations,
+          // Use unified resize API - plugin handles attached links automatically
+          plugin.startResize(documentId, {
+            annotationIds: selectedAnnotations.map((ta) => ta.object.id),
+            pageSize: { width: pageWidth, height: pageHeight },
             resizeHandle: event.transformData.metadata?.handle ?? 'se',
           });
         }
@@ -167,8 +147,8 @@ export function GroupSelectionBox({
           y: newRect.origin.y - base.origin.y,
         };
 
-        // Update plugin and get clamped delta
-        const clampedDelta = plugin.updateMultiDrag(documentId, rawDelta);
+        // Plugin clamps delta and emits events (attached links receive updates too)
+        const clampedDelta = plugin.updateDrag(documentId, rawDelta);
 
         // Update preview group box with clamped delta
         setPreviewGroupBox({
@@ -181,8 +161,8 @@ export function GroupSelectionBox({
       } else if (isResize && event.transformData.changes.rect) {
         const newGroupBox = event.transformData.changes.rect;
 
-        // Update plugin
-        plugin.updateMultiResize(documentId, newGroupBox);
+        // Plugin computes rects for all participants and emits events
+        plugin.updateResize(documentId, newGroupBox);
 
         // Update preview
         setPreviewGroupBox(newGroupBox);
@@ -193,81 +173,16 @@ export function GroupSelectionBox({
 
         if (isMove && isDraggingRef.current) {
           isDraggingRef.current = false;
-
-          // End multi-drag and get final delta
-          const finalDelta = plugin.endMultiDrag(documentId);
-
-          if (finalDelta.x !== 0 || finalDelta.y !== 0) {
-            // Build patches for all selected annotations
-            const patches = selectedAnnotations.map((ta) => {
-              const newRect: Rect = {
-                ...ta.object.rect,
-                origin: {
-                  x: ta.object.rect.origin.x + finalDelta.x,
-                  y: ta.object.rect.origin.y + finalDelta.y,
-                },
-              };
-
-              // Use transformAnnotation to get proper patch (handles vertices, inkList, etc.)
-              const patch = annotationCapability.transformAnnotation(ta.object, {
-                type: 'move',
-                changes: { rect: newRect },
-              });
-
-              return {
-                pageIndex: ta.object.pageIndex,
-                id: ta.object.id,
-                patch,
-              };
-            });
-
-            if (patches.length > 0) {
-              annotationProvides?.updateAnnotations(patches);
-            }
-          }
+          // Plugin commits all patches (selected + attached links) - no patch building needed!
+          plugin.commitDrag(documentId);
         } else if (isResize && isResizingRef.current) {
           isResizingRef.current = false;
-
-          // End multi-resize and get final rects
-          const finalRects = plugin.endMultiResize(documentId);
-
-          // Build patches for all selected annotations
-          const patches = Object.entries(finalRects).map(([id, newRect]) => {
-            const anno = selectedAnnotations.find((ta) => ta.object.id === id);
-            if (!anno) {
-              return { pageIndex, id, patch: { rect: newRect } };
-            }
-
-            // Use transformAnnotation to get proper patch
-            const patch = annotationCapability.transformAnnotation(anno.object, {
-              type: 'resize',
-              changes: { rect: newRect },
-            });
-
-            return {
-              pageIndex: anno.object.pageIndex,
-              id,
-              patch,
-            };
-          });
-
-          if (patches.length > 0) {
-            annotationProvides?.updateAnnotations(patches);
-          }
+          // Plugin commits all patches (selected + attached links) - no patch building needed!
+          plugin.commitResize(documentId);
         }
       }
     },
-    [
-      plugin,
-      annotationCapability,
-      documentId,
-      pageIndex,
-      groupBox,
-      isDraggable,
-      selectedAnnotations,
-      annotationProvides,
-      buildConstraints,
-    ],
+    [plugin, documentId, pageWidth, pageHeight, groupBox, isDraggable, selectedAnnotations],
   );
 
   // UI constants

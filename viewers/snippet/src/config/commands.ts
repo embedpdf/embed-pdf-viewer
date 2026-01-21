@@ -1672,11 +1672,23 @@ export const commands: Record<string, Command<State>> = {
 
       const annotationScope = annotation.forDocument(documentId);
       const selected = annotationScope.getSelectedAnnotation();
-      if (!selected || !isLink(selected)) return;
+      if (!selected) return;
 
-      const linkAnnotation = selected.object as PdfLinkAnnoObject;
+      // Get the link annotation - either the selected one or the first attached link
+      let linkAnnotation: PdfLinkAnnoObject | null = null;
+
+      if (isLink(selected)) {
+        linkAnnotation = selected.object as PdfLinkAnnoObject;
+      } else {
+        const attachedLinks = annotationScope.getAttachedLinks(selected.object.id);
+        if (attachedLinks.length > 0) {
+          linkAnnotation = attachedLinks[0].object as PdfLinkAnnoObject;
+        }
+      }
+
+      if (!linkAnnotation?.target) return;
+
       const target = linkAnnotation.target;
-      if (!target) return;
 
       if (target.type === 'action') {
         const action = target.action;
@@ -1701,13 +1713,18 @@ export const commands: Record<string, Command<State>> = {
       }
     },
     visible: ({ registry, documentId }) => {
-      const scope = registry
-        .getPlugin<AnnotationPlugin>(ANNOTATION_PLUGIN_ID)
-        ?.provides()
-        .forDocument(documentId);
+      const annotation = registry.getPlugin<AnnotationPlugin>(ANNOTATION_PLUGIN_ID)?.provides();
+      if (!annotation) return false;
+
+      const scope = annotation.forDocument(documentId);
       const selected = scope?.getSelectedAnnotation();
       if (!selected) return false;
-      return selected.object.type === PdfAnnotationSubtype.LINK;
+
+      // Show if it's a LINK or has attached links
+      return (
+        selected.object.type === PdfAnnotationSubtype.LINK ||
+        scope.hasAttachedLinks(selected.object.id)
+      );
     },
   },
 

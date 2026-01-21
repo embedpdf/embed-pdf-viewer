@@ -32,15 +32,16 @@ import {
   RenderAnnotationOptions,
   TrackedAnnotation,
   TransformOptions,
-  MultiDragState,
-  MultiDragEvent,
   AnnotationConstraintInfo,
   CombinedConstraints,
-  MultiResizeState,
-  MultiResizeEvent,
-  GroupResizeAnnotationInfo,
-  StartMultiResizeOptions,
   GroupingAction,
+  UnifiedDragOptions,
+  UnifiedDragState,
+  UnifiedDragEvent,
+  UnifiedResizeOptions,
+  UnifiedResizeState,
+  UnifiedResizeEvent,
+  UnifiedResizeAnnotationInfo,
 } from './types';
 import {
   setAnnotations,
@@ -92,7 +93,7 @@ import {
   inkHandlerFactory,
   freeTextHandlerFactory,
 } from './handlers';
-import { rectsIntersect } from './helpers';
+import { rectsIntersect, isLink } from './helpers';
 import { PatchRegistry, TransformContext } from './patching/patch-registry';
 import { patchInk, patchLine, patchPolyline, patchPolygon } from './patching/patches';
 
@@ -123,13 +124,13 @@ export class AnnotationPlugin extends BasePlugin<
   private readonly toolsChange$ = createBehaviorEmitter<AnnotationToolsChangeEvent>();
   private readonly patchRegistry = new PatchRegistry();
 
-  // Multi-drag coordination (per-document)
-  private readonly multiDragStates = new Map<string, MultiDragState>();
-  private readonly multiDrag$ = createBehaviorEmitter<MultiDragEvent>();
+  // Unified drag coordination (per-document)
+  private readonly unifiedDragStates = new Map<string, UnifiedDragState>();
+  private readonly unifiedDrag$ = createBehaviorEmitter<UnifiedDragEvent>();
 
-  // Multi-resize coordination (per-document)
-  private readonly multiResizeStates = new Map<string, MultiResizeState>();
-  private readonly multiResize$ = createBehaviorEmitter<MultiResizeEvent>();
+  // Unified resize coordination (per-document) - NEW: Plugin owns all logic
+  private readonly unifiedResizeStates = new Map<string, UnifiedResizeState>();
+  private readonly unifiedResize$ = createBehaviorEmitter<UnifiedResizeEvent>();
 
   constructor(id: string, registry: PluginRegistry, config: AnnotationPluginConfig) {
     super(id, registry);
@@ -243,10 +244,11 @@ export class AnnotationPlugin extends BasePlugin<
       const docState = this.state.documents[documentId];
       if (!docState) return;
 
-      // Get annotations on this page
+      // Get annotations on this page (excluding LINK annotations)
       const pageAnnotations = (docState.pages[pageIndex] ?? [])
         .map((uid) => docState.byUid[uid])
-        .filter((ta): ta is TrackedAnnotation => ta !== undefined);
+        .filter((ta): ta is TrackedAnnotation => ta !== undefined)
+        .filter((ta) => !isLink(ta));
 
       // Find annotations that intersect with the marquee rect
       const selectedIds = pageAnnotations
@@ -1163,153 +1165,238 @@ export class AnnotationPlugin extends BasePlugin<
     };
   }
 
+  // ─────────────────────────────────────────────────────────
+  // Unified Drag API (Plugin owns all logic - framework just calls these)
+  // ─────────────────────────────────────────────────────────
+
   /**
-   * Start a multi-drag operation for a document.
-   * Called by the primary annotation's container when dragging starts.
+   * Start a unified drag operation.
+   * The plugin automatically expands the selection to include attached links.
+   * Framework components should call this instead of building their own logic.
+   *
    * @param documentId - The document ID
-   * @param primaryId - The ID of the annotation being dragged
-   * @param constraints - Constraint info for all selected annotations
+   * @param options - Drag options (annotationIds and pageSize)
    */
-  public startMultiDrag(
-    documentId: string,
-    primaryId: string,
-    constraints: AnnotationConstraintInfo[],
-  ): void {
+  public startDrag(documentId: string, options: UnifiedDragOptions): void {
+    const { annotationIds, pageSize } = options;
+
+    // 1. Expand to include attached links for each annotation
+    const attachedLinkIds: string[] = [];
+    for (const id of annotationIds) {
+      const links = this.getAttachedLinksMethod(id, documentId);
+      for (const link of links) {
+        if (!attachedLinkIds.includes(link.object.id)) {
+          attachedLinkIds.push(link.object.id);
+        }
+      }
+    }
+
+    const allParticipantIds = [...annotationIds, ...attachedLinkIds];
+
+    // 2. Store original rects and build constraints for all participants
+    const originalRects = new Map<string, Rect>();
+    const constraints: AnnotationConstraintInfo[] = [];
+
+    for (const id of allParticipantIds) {
+      const ta = this.getAnnotationById(id, documentId);
+      if (ta) {
+        originalRects.set(id, { ...ta.object.rect });
+        constraints.push({
+          id,
+          rect: ta.object.rect,
+          pageIndex: ta.object.pageIndex,
+          pageSize,
+        });
+      }
+    }
+
+    // 3. Compute combined constraints
     const combinedConstraints = this.computeCombinedConstraints(constraints);
-    const state: MultiDragState = {
+
+    // 4. Store state
+    const state: UnifiedDragState = {
       documentId,
       isDragging: true,
-      primaryId,
+      primaryIds: annotationIds,
+      attachedLinkIds,
+      allParticipantIds,
+      originalRects,
       delta: { x: 0, y: 0 },
       combinedConstraints,
-      participatingIds: constraints.map((c) => c.id),
     };
+    this.unifiedDragStates.set(documentId, state);
 
-    this.multiDragStates.set(documentId, state);
-    this.multiDrag$.emit({
-      documentId,
-      type: 'start',
-      state,
-    });
+    // 5. Emit start event for all participants (no patches yet - delta is 0)
+    this.unifiedDrag$.emit({ documentId, type: 'start', state, previewPatches: {} });
   }
 
   /**
-   * Update the drag delta during a multi-drag operation.
-   * Returns the clamped delta synchronously for the caller to use immediately.
-   * This avoids React state timing issues.
+   * Compute preview patches for all drag participants.
+   * Uses transformAnnotation to properly handle vertices, inkList, etc.
+   */
+  private computeDragPreviewPatches(
+    state: UnifiedDragState,
+    documentId: string,
+  ): Record<string, Partial<PdfAnnotationObject>> {
+    const previewPatches: Record<string, Partial<PdfAnnotationObject>> = {};
+
+    for (const id of state.allParticipantIds) {
+      const ta = this.getAnnotationById(id, documentId);
+      if (!ta) continue;
+
+      const originalRect = state.originalRects.get(id);
+      if (!originalRect) continue;
+
+      const newRect: Rect = {
+        ...originalRect,
+        origin: {
+          x: originalRect.origin.x + state.delta.x,
+          y: originalRect.origin.y + state.delta.y,
+        },
+      };
+
+      // Plugin does the transform - handles ink, polygon, line, etc.
+      previewPatches[id] = this.transformAnnotation(ta.object, {
+        type: 'move',
+        changes: { rect: newRect },
+      });
+    }
+
+    return previewPatches;
+  }
+
+  /**
+   * Update the drag delta during a unified drag operation.
+   * Returns the clamped delta synchronously for the caller's preview.
+   *
    * @param documentId - The document ID
    * @param rawDelta - The unconstrained delta from the drag gesture
    * @returns The clamped delta
    */
-  public updateMultiDrag(documentId: string, rawDelta: Position): Position {
-    const state = this.multiDragStates.get(documentId);
-    if (!state || !state.isDragging || !state.combinedConstraints) {
+  public updateDrag(documentId: string, rawDelta: Position): Position {
+    const state = this.unifiedDragStates.get(documentId);
+    if (!state?.isDragging) {
       return { x: 0, y: 0 };
     }
 
     const clampedDelta = this.clampDelta(rawDelta, state.combinedConstraints);
 
     // Update state
-    const newState: MultiDragState = {
+    const newState: UnifiedDragState = {
       ...state,
       delta: clampedDelta,
     };
-    this.multiDragStates.set(documentId, newState);
+    this.unifiedDragStates.set(documentId, newState);
 
-    // Emit for followers on other pages
-    this.multiDrag$.emit({
-      documentId,
-      type: 'update',
-      state: newState,
-    });
+    // Compute preview patches for ALL participants
+    const previewPatches = this.computeDragPreviewPatches(newState, documentId);
 
-    // Return clamped delta synchronously for the primary to use immediately
+    // Emit update with patches - components just apply them!
+    this.unifiedDrag$.emit({ documentId, type: 'update', state: newState, previewPatches });
+
     return clampedDelta;
   }
 
   /**
-   * End the current multi-drag operation.
+   * Commit the drag - plugin builds and applies ALL patches.
+   * This is the key method that centralizes patch building in the plugin.
+   *
    * @param documentId - The document ID
-   * @returns The final clamped delta
    */
-  public endMultiDrag(documentId: string): Position {
-    const state = this.multiDragStates.get(documentId);
-    if (!state) {
-      return { x: 0, y: 0 };
-    }
+  public commitDrag(documentId: string): void {
+    const state = this.unifiedDragStates.get(documentId);
+    if (!state) return;
 
     const finalDelta = state.delta;
 
-    // Create ended state
-    const endedState: MultiDragState = {
-      ...state,
-      isDragging: false,
-    };
+    if (finalDelta.x !== 0 || finalDelta.y !== 0) {
+      // Build patches for ALL participants (primary + attached links)
+      const patches: Array<{ pageIndex: number; id: string; patch: Partial<PdfAnnotationObject> }> =
+        [];
 
-    // Emit end event before cleanup
-    this.multiDrag$.emit({
+      for (const id of state.allParticipantIds) {
+        const ta = this.getAnnotationById(id, documentId);
+        if (!ta) continue;
+
+        const originalRect = state.originalRects.get(id) ?? ta.object.rect;
+        const newRect: Rect = {
+          ...originalRect,
+          origin: {
+            x: originalRect.origin.x + finalDelta.x,
+            y: originalRect.origin.y + finalDelta.y,
+          },
+        };
+
+        const patch = this.transformAnnotation(ta.object, {
+          type: 'move',
+          changes: { rect: newRect },
+        });
+
+        patches.push({ pageIndex: ta.object.pageIndex, id, patch });
+      }
+
+      // Apply all patches in one batch
+      if (patches.length > 0) {
+        this.updateAnnotationsMethod(patches, documentId);
+      }
+    }
+
+    // Emit end event with final patches
+    const endPatches = this.computeDragPreviewPatches(state, documentId);
+    this.unifiedDrag$.emit({
       documentId,
       type: 'end',
-      state: endedState,
+      state: { ...state, isDragging: false },
+      previewPatches: endPatches,
     });
 
-    // Clean up
-    this.multiDragStates.delete(documentId);
-
-    return finalDelta;
+    // Cleanup
+    this.unifiedDragStates.delete(documentId);
   }
 
   /**
-   * Cancel the current multi-drag operation without committing.
+   * Cancel the drag without committing.
+   *
    * @param documentId - The document ID
    */
-  public cancelMultiDrag(documentId: string): void {
-    const state = this.multiDragStates.get(documentId);
+  public cancelDrag(documentId: string): void {
+    const state = this.unifiedDragStates.get(documentId);
     if (!state) return;
 
-    // Create cancelled state
-    const cancelledState: MultiDragState = {
-      ...state,
-      isDragging: false,
-      delta: { x: 0, y: 0 },
-    };
-
-    // Emit cancel event
-    this.multiDrag$.emit({
+    // Emit cancel with empty patches (components should reset to original)
+    this.unifiedDrag$.emit({
       documentId,
       type: 'cancel',
-      state: cancelledState,
+      state: { ...state, isDragging: false, delta: { x: 0, y: 0 } },
+      previewPatches: {},
     });
 
-    // Clean up
-    this.multiDragStates.delete(documentId);
+    this.unifiedDragStates.delete(documentId);
   }
 
   /**
-   * Get the current multi-drag state for a document.
-   * @param documentId - The document ID
-   * @returns The multi-drag state or null if not in a multi-drag
+   * Get the current unified drag state for a document.
    */
-  public getMultiDragState(documentId: string): MultiDragState | null {
-    return this.multiDragStates.get(documentId) ?? null;
+  public getDragState(documentId: string): UnifiedDragState | null {
+    return this.unifiedDragStates.get(documentId) ?? null;
   }
 
   /**
-   * Subscribe to multi-drag state changes.
-   * Used by framework components to update preview positions.
+   * Subscribe to unified drag state changes.
+   * Framework components use this for preview updates.
    */
-  public get onMultiDragChange() {
-    return this.multiDrag$.on;
+  public get onDragChange() {
+    return this.unifiedDrag$.on;
   }
 
   // ─────────────────────────────────────────────────────────
-  // Multi-Resize Coordination (Internal API for framework components)
+  // Unified Resize API (Plugin owns all logic - framework just calls these)
   // ─────────────────────────────────────────────────────────
 
   /**
    * Compute the union bounding box of multiple rects.
    */
-  private computeGroupBoundingBox(rects: Rect[]): Rect {
+  private computeUnifiedGroupBoundingBox(rects: Rect[]): Rect {
     if (rects.length === 0) {
       return { origin: { x: 0, y: 0 }, size: { width: 0, height: 0 } };
     }
@@ -1335,15 +1422,22 @@ export class AnnotationPlugin extends BasePlugin<
   /**
    * Compute relative positions for annotations within a group bounding box.
    */
-  private computeRelativePositions(
-    annotations: Array<{ id: string; rect: Rect }>,
+  private computeUnifiedRelativePositions(
+    annotations: Array<{
+      id: string;
+      rect: Rect;
+      pageIndex: number;
+      isAttachedLink: boolean;
+      parentId?: string;
+    }>,
     groupBox: Rect,
-    pageIndex: number,
-  ): GroupResizeAnnotationInfo[] {
+  ): UnifiedResizeAnnotationInfo[] {
     return annotations.map((anno) => ({
       id: anno.id,
-      rect: anno.rect,
-      pageIndex,
+      originalRect: anno.rect,
+      pageIndex: anno.pageIndex,
+      isAttachedLink: anno.isAttachedLink,
+      parentId: anno.parentId,
       relativeX:
         groupBox.size.width > 0
           ? (anno.rect.origin.x - groupBox.origin.x) / groupBox.size.width
@@ -1360,18 +1454,18 @@ export class AnnotationPlugin extends BasePlugin<
   /**
    * Compute new rects for all annotations based on the new group bounding box.
    */
-  private computeResizedRects(
-    participatingAnnotations: GroupResizeAnnotationInfo[],
+  private computeUnifiedResizedRects(
+    participatingAnnotations: UnifiedResizeAnnotationInfo[],
     newGroupBox: Rect,
     minSize: number = 10,
-  ): Record<string, Rect> {
-    const result: Record<string, Rect> = {};
+  ): Map<string, Rect> {
+    const result = new Map<string, Rect>();
 
     for (const anno of participatingAnnotations) {
       const newWidth = Math.max(minSize, anno.relativeWidth * newGroupBox.size.width);
       const newHeight = Math.max(minSize, anno.relativeHeight * newGroupBox.size.height);
 
-      result[anno.id] = {
+      result.set(anno.id, {
         origin: {
           x: newGroupBox.origin.x + anno.relativeX * newGroupBox.size.width,
           y: newGroupBox.origin.y + anno.relativeY * newGroupBox.size.height,
@@ -1380,161 +1474,258 @@ export class AnnotationPlugin extends BasePlugin<
           width: newWidth,
           height: newHeight,
         },
-      };
+      });
     }
 
     return result;
   }
 
   /**
-   * Start a multi-resize operation for a document.
-   * Called by the GroupSelectionBox component when resize starts.
+   * Compute preview patches for all resize participants.
+   * Uses transformAnnotation to properly handle vertices, inkList, etc.
    */
-  public startMultiResize(options: StartMultiResizeOptions): void {
-    const { documentId, pageIndex, annotations, resizeHandle } = options;
+  private computeResizePreviewPatches(
+    computedRects: Map<string, Rect>,
+    documentId: string,
+  ): Record<string, Partial<PdfAnnotationObject>> {
+    const previewPatches: Record<string, Partial<PdfAnnotationObject>> = {};
 
-    // Compute the group bounding box
-    const groupBox = this.computeGroupBoundingBox(annotations.map((a) => a.rect));
+    for (const [id, newRect] of computedRects) {
+      const ta = this.getAnnotationById(id, documentId);
+      if (!ta) continue;
 
-    // Compute relative positions for each annotation
-    const participatingAnnotations = this.computeRelativePositions(
-      annotations,
+      // Plugin does the transform - handles ink, polygon, line, etc.
+      previewPatches[id] = this.transformAnnotation(ta.object, {
+        type: 'resize',
+        changes: { rect: newRect },
+      });
+    }
+
+    return previewPatches;
+  }
+
+  /**
+   * Start a unified resize operation.
+   * The plugin automatically expands the selection to include attached links.
+   *
+   * @param documentId - The document ID
+   * @param options - Resize options
+   */
+  public startResize(documentId: string, options: UnifiedResizeOptions): void {
+    const { annotationIds, pageSize, resizeHandle } = options;
+
+    // 1. Expand to include attached links for each annotation
+    const attachedLinkIds: string[] = [];
+    const annotationsWithLinks: Array<{
+      id: string;
+      rect: Rect;
+      pageIndex: number;
+      isAttachedLink: boolean;
+      parentId?: string;
+    }> = [];
+
+    for (const id of annotationIds) {
+      const ta = this.getAnnotationById(id, documentId);
+      if (ta) {
+        annotationsWithLinks.push({
+          id,
+          rect: ta.object.rect,
+          pageIndex: ta.object.pageIndex,
+          isAttachedLink: false,
+        });
+
+        // Get attached links for this annotation
+        const links = this.getAttachedLinksMethod(id, documentId);
+        for (const link of links) {
+          if (!attachedLinkIds.includes(link.object.id)) {
+            attachedLinkIds.push(link.object.id);
+            annotationsWithLinks.push({
+              id: link.object.id,
+              rect: link.object.rect,
+              pageIndex: link.object.pageIndex,
+              isAttachedLink: true,
+              parentId: id,
+            });
+          }
+        }
+      }
+    }
+
+    const allParticipantIds = [...annotationIds, ...attachedLinkIds];
+
+    // 2. Compute the group bounding box
+    const rects = annotationsWithLinks.map((a) => a.rect);
+    const groupBox = this.computeUnifiedGroupBoundingBox(rects);
+
+    // 3. Compute relative positions for each annotation
+    const participatingAnnotations = this.computeUnifiedRelativePositions(
+      annotationsWithLinks,
       groupBox,
-      pageIndex,
     );
 
-    const state: MultiResizeState = {
+    // 4. Compute initial rects
+    const computedRects = this.computeUnifiedResizedRects(participatingAnnotations, groupBox);
+
+    // 5. Store state
+    const state: UnifiedResizeState = {
       documentId,
       isResizing: true,
+      primaryIds: annotationIds,
+      attachedLinkIds,
+      allParticipantIds,
       originalGroupBox: groupBox,
       currentGroupBox: groupBox,
       participatingAnnotations,
       resizeHandle,
-      pageIndex,
+      computedRects,
     };
+    this.unifiedResizeStates.set(documentId, state);
 
-    this.multiResizeStates.set(documentId, state);
-
-    const computedRects = this.computeResizedRects(participatingAnnotations, groupBox);
-
-    this.multiResize$.emit({
+    // 6. Emit start event (no patches yet - initial state)
+    const startPatches = this.computeResizePreviewPatches(computedRects, documentId);
+    this.unifiedResize$.emit({
       documentId,
       type: 'start',
       state,
-      computedRects,
+      computedRects: Object.fromEntries(computedRects),
+      previewPatches: startPatches,
     });
   }
 
   /**
-   * Update the multi-resize with a new group bounding box.
-   * Returns the computed rects synchronously for immediate use.
+   * Update the resize with a new group bounding box.
+   * Returns the computed rects synchronously for immediate preview use.
+   *
+   * @param documentId - The document ID
+   * @param newGroupBox - The new group bounding box
+   * @returns Record of annotation ID to new rect
    */
-  public updateMultiResize(documentId: string, newGroupBox: Rect): Record<string, Rect> {
-    const state = this.multiResizeStates.get(documentId);
-    if (!state || !state.isResizing) {
+  public updateResize(documentId: string, newGroupBox: Rect): Record<string, Rect> {
+    const state = this.unifiedResizeStates.get(documentId);
+    if (!state?.isResizing) {
       return {};
     }
 
     // Compute new rects for all annotations
-    const computedRects = this.computeResizedRects(state.participatingAnnotations, newGroupBox);
+    const computedRects = this.computeUnifiedResizedRects(
+      state.participatingAnnotations,
+      newGroupBox,
+    );
 
     // Update state
-    const newState: MultiResizeState = {
+    const newState: UnifiedResizeState = {
       ...state,
       currentGroupBox: newGroupBox,
+      computedRects,
     };
-    this.multiResizeStates.set(documentId, newState);
+    this.unifiedResizeStates.set(documentId, newState);
 
-    // Emit for subscribers
-    this.multiResize$.emit({
+    const computedRectsObj = Object.fromEntries(computedRects);
+
+    // Compute preview patches for ALL participants
+    const previewPatches = this.computeResizePreviewPatches(computedRects, documentId);
+
+    // Emit for subscribers with patches - components just apply them!
+    this.unifiedResize$.emit({
       documentId,
       type: 'update',
       state: newState,
-      computedRects,
+      computedRects: computedRectsObj,
+      previewPatches,
     });
 
-    return computedRects;
+    return computedRectsObj;
   }
 
   /**
-   * End the multi-resize operation.
-   * Returns the final computed rects for batch update.
+   * Commit the resize - plugin builds and applies ALL patches.
+   *
+   * @param documentId - The document ID
    */
-  public endMultiResize(documentId: string): Record<string, Rect> {
-    const state = this.multiResizeStates.get(documentId);
-    if (!state) {
-      return {};
-    }
+  public commitResize(documentId: string): void {
+    const state = this.unifiedResizeStates.get(documentId);
+    if (!state) return;
 
-    const computedRects = this.computeResizedRects(
+    const computedRects = this.computeUnifiedResizedRects(
       state.participatingAnnotations,
       state.currentGroupBox,
     );
 
-    // Create ended state
-    const endedState: MultiResizeState = {
-      ...state,
-      isResizing: false,
-    };
+    // Build patches for ALL participants (primary + attached links)
+    const patches: Array<{ pageIndex: number; id: string; patch: Partial<PdfAnnotationObject> }> =
+      [];
 
-    // Emit end event before cleanup
-    this.multiResize$.emit({
+    for (const [id, newRect] of computedRects) {
+      const ta = this.getAnnotationById(id, documentId);
+      if (!ta) continue;
+
+      const patch = this.transformAnnotation(ta.object, {
+        type: 'resize',
+        changes: { rect: newRect },
+      });
+
+      patches.push({ pageIndex: ta.object.pageIndex, id, patch });
+    }
+
+    // Apply all patches in one batch
+    if (patches.length > 0) {
+      this.updateAnnotationsMethod(patches, documentId);
+    }
+
+    // Emit end event with final patches
+    const endPatches = this.computeResizePreviewPatches(computedRects, documentId);
+    this.unifiedResize$.emit({
       documentId,
       type: 'end',
-      state: endedState,
-      computedRects,
+      state: { ...state, isResizing: false },
+      computedRects: Object.fromEntries(computedRects),
+      previewPatches: endPatches,
     });
 
-    // Clean up
-    this.multiResizeStates.delete(documentId);
-
-    return computedRects;
+    // Cleanup
+    this.unifiedResizeStates.delete(documentId);
   }
 
   /**
-   * Cancel the multi-resize operation without committing.
+   * Cancel the resize without committing.
+   *
+   * @param documentId - The document ID
    */
-  public cancelMultiResize(documentId: string): void {
-    const state = this.multiResizeStates.get(documentId);
+  public cancelResize(documentId: string): void {
+    const state = this.unifiedResizeStates.get(documentId);
     if (!state) return;
 
-    // Create cancelled state with original rects
-    const cancelledState: MultiResizeState = {
-      ...state,
-      isResizing: false,
-      currentGroupBox: state.originalGroupBox,
-    };
-
-    const originalRects = this.computeResizedRects(
+    // Compute original rects
+    const originalRects = this.computeUnifiedResizedRects(
       state.participatingAnnotations,
       state.originalGroupBox,
     );
 
-    // Emit cancel event
-    this.multiResize$.emit({
+    // Emit cancel with empty patches (components should reset to original)
+    this.unifiedResize$.emit({
       documentId,
       type: 'cancel',
-      state: cancelledState,
-      computedRects: originalRects,
+      state: { ...state, isResizing: false, currentGroupBox: state.originalGroupBox },
+      computedRects: Object.fromEntries(originalRects),
+      previewPatches: {},
     });
 
-    // Clean up
-    this.multiResizeStates.delete(documentId);
+    this.unifiedResizeStates.delete(documentId);
   }
 
   /**
-   * Get the current multi-resize state for a document.
+   * Get the current unified resize state for a document.
    */
-  public getMultiResizeState(documentId: string): MultiResizeState | null {
-    return this.multiResizeStates.get(documentId) ?? null;
+  public getResizeState(documentId: string): UnifiedResizeState | null {
+    return this.unifiedResizeStates.get(documentId) ?? null;
   }
 
   /**
-   * Subscribe to multi-resize state changes.
-   * Used by framework components to update preview positions.
+   * Subscribe to unified resize state changes.
+   * Framework components use this for preview updates.
    */
-  public get onMultiResizeChange() {
-    return this.multiResize$.on;
+  public get onResizeChange() {
+    return this.unifiedResize$.on;
   }
 
   private updateAnnotationsMethod(

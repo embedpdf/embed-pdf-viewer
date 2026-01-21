@@ -305,6 +305,8 @@ export const getGroupLeaderId = (
 /**
  * Get all annotations in the same group as the given annotation.
  * Returns the leader plus all annotations with inReplyToId pointing to leader and replyType = Group.
+ * Note: LINK annotations are excluded - they use IRT/Group for attachment but are not "group members"
+ * in the user-facing sense.
  *
  * @param s - The annotation document state
  * @param annotationId - Any annotation ID in the group
@@ -319,18 +321,21 @@ export const getGroupMembers = (
 
   const members: TrackedAnnotation<PdfAnnotationObject>[] = [];
 
-  // Add the leader
+  // Add the leader (if it's not a LINK)
   const leader = s.byUid[leaderId];
-  if (leader) members.push(leader);
+  if (leader && leader.object.type !== PdfAnnotationSubtype.LINK) {
+    members.push(leader);
+  }
 
-  // Find all children with IRT pointing to leader and RT = Group
+  // Find all children with IRT pointing to leader and RT = Group (excluding LINKs)
   for (const uidList of Object.values(s.pages)) {
     for (const uid of uidList) {
       const ta = s.byUid[uid];
       if (
         ta &&
         ta.object.inReplyToId === leaderId &&
-        ta.object.replyType === PdfAnnotationReplyType.Group
+        ta.object.replyType === PdfAnnotationReplyType.Group &&
+        ta.object.type !== PdfAnnotationSubtype.LINK // Exclude LINK annotations
       ) {
         members.push(ta);
       }
@@ -346,6 +351,9 @@ export const getGroupMembers = (
  * - It has inReplyToId with replyType = Group (it's a group member), OR
  * - It has at least one other annotation pointing to it with replyType = Group (it's a group leader)
  *
+ * Note: LINK annotations are excluded - they use IRT/Group for attachment but are not "group members"
+ * in the user-facing sense. An annotation with only attached links is NOT considered "in a group".
+ *
  * @param s - The annotation document state
  * @param annotationId - The annotation ID to check
  * @returns true if the annotation is part of a group
@@ -354,12 +362,18 @@ export const isInGroup = (s: AnnotationDocumentState, annotationId: string): boo
   const ta = s.byUid[annotationId];
   if (!ta) return false;
 
+  // LINK annotations are never considered "in a group" for selection purposes
+  if (ta.object.type === PdfAnnotationSubtype.LINK) {
+    return false;
+  }
+
   // Is this annotation a group member (has IRT with RT = Group)?
+  // But only if it's not a LINK (already checked above)
   if (ta.object.inReplyToId && ta.object.replyType === PdfAnnotationReplyType.Group) {
     return true;
   }
 
-  // Is this annotation a group leader (has members pointing to it)?
+  // Is this annotation a group leader (has non-LINK members pointing to it)?
   // Check if any annotation has inReplyToId = this annotation's ID with RT = Group
   for (const uidList of Object.values(s.pages)) {
     for (const uid of uidList) {
@@ -367,7 +381,8 @@ export const isInGroup = (s: AnnotationDocumentState, annotationId: string): boo
       if (
         other &&
         other.object.inReplyToId === annotationId &&
-        other.object.replyType === PdfAnnotationReplyType.Group
+        other.object.replyType === PdfAnnotationReplyType.Group &&
+        other.object.type !== PdfAnnotationSubtype.LINK // Exclude LINK annotations
       ) {
         return true;
       }

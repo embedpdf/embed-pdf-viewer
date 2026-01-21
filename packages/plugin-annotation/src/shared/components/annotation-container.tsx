@@ -1,4 +1,4 @@
-import { PdfAnnotationObject } from '@embedpdf/models';
+import { PdfAnnotationObject, Rect } from '@embedpdf/models';
 import {
   CounterRotate,
   useDoublePressProps,
@@ -86,7 +86,6 @@ export function AnnotationContainer<T extends PdfAnnotationObject>({
   // When multi-selected, disable individual drag/resize - GroupSelectionBox handles it
   const effectiveIsDraggable = canModifyAnnotations && isDraggable && !isMultiSelected;
   const effectiveIsResizable = canModifyAnnotations && isResizable && !isMultiSelected;
-
   // Get scoped API for this document
   const annotationProvides = useMemo(
     () => (annotationCapability ? annotationCapability.forDocument(documentId) : null),
@@ -103,60 +102,87 @@ export function AnnotationContainer<T extends PdfAnnotationObject>({
   const HANDLE_SIZE = resizeUI?.size ?? 12;
   const VERTEX_SIZE = vertexUI?.size ?? 12;
 
+  // Store original rect at gesture start (only need rect for delta calculation)
+  const gestureBaseRectRef = useRef<Rect | null>(null);
+
   // Handle single-annotation drag/resize (only when NOT multi-selected)
+  // Uses the unified plugin API - all preview updates come from event subscriptions!
   const handleUpdate = useCallback(
     (
       event: Parameters<
         NonNullable<Parameters<typeof useInteractionHandles>[0]['controller']['onUpdate']>
       >[0],
     ) => {
-      if (!event.transformData?.type) return;
-      // Multi-select gestures are handled by GroupSelectionBox
-      if (isMultiSelected) return;
+      if (!event.transformData?.type || isMultiSelected || !plugin) return;
 
-      const transformType = event.transformData.type;
+      const { type, changes, metadata } = event.transformData;
+      const id = trackedAnnotation.object.id;
+      const pageSize = { width: pageWidth, height: pageHeight };
 
+      // Gesture start - initialize plugin drag/resize
       if (event.state === 'start') {
-        gestureBaseRef.current = currentObject;
-      }
-
-      const base = gestureBaseRef.current ?? currentObject;
-
-      // Apply transform for preview
-      const changes = event.transformData.changes.vertices
-        ? vertexConfig?.transformAnnotation(base, event.transformData.changes.vertices)
-        : { rect: event.transformData.changes.rect };
-
-      const patched = annotationCapability?.transformAnnotation<T>(base, {
-        type: transformType,
-        changes: changes as Partial<T>,
-        metadata: event.transformData.metadata,
-      });
-
-      if (patched) {
-        setPreview((prev) => ({
-          ...prev,
-          ...patched,
-        }));
-      }
-
-      if (event.state === 'end') {
-        gestureBaseRef.current = null;
-
-        // Commit the change - reuse patched from preview calculation
-        if (patched) {
-          annotationProvides?.updateAnnotation(pageIndex, trackedAnnotation.object.id, patched);
+        gestureBaseRectRef.current = trackedAnnotation.object.rect;
+        gestureBaseRef.current = trackedAnnotation.object; // For vertex edit
+        if (type === 'move') {
+          plugin.startDrag(documentId, { annotationIds: [id], pageSize });
+        } else if (type === 'resize') {
+          plugin.startResize(documentId, {
+            annotationIds: [id],
+            pageSize,
+            resizeHandle: metadata?.handle ?? 'se',
+          });
         }
+      }
+
+      // Gesture update - call plugin, preview comes from subscription
+      if (changes.rect && gestureBaseRectRef.current) {
+        if (type === 'move') {
+          const delta = {
+            x: changes.rect.origin.x - gestureBaseRectRef.current.origin.x,
+            y: changes.rect.origin.y - gestureBaseRectRef.current.origin.y,
+          };
+          plugin.updateDrag(documentId, delta);
+        } else if (type === 'resize') {
+          plugin.updateResize(documentId, changes.rect);
+        }
+      }
+
+      // Vertex edit - handle directly (no attached link handling needed)
+      if (type === 'vertex-edit' && changes.vertices && vertexConfig) {
+        const base = gestureBaseRef.current ?? trackedAnnotation.object;
+        const vertexChanges = vertexConfig.transformAnnotation(base, changes.vertices);
+        const patched = annotationCapability?.transformAnnotation<T>(base, {
+          type,
+          changes: vertexChanges as Partial<T>,
+          metadata,
+        });
+        if (patched) {
+          setPreview((prev) => ({ ...prev, ...patched }));
+          if (event.state === 'end') {
+            annotationProvides?.updateAnnotation(pageIndex, id, patched);
+          }
+        }
+      }
+
+      // Gesture end - commit
+      if (event.state === 'end') {
+        gestureBaseRectRef.current = null;
+        gestureBaseRef.current = null;
+        if (type === 'move') plugin.commitDrag(documentId);
+        else if (type === 'resize') plugin.commitResize(documentId);
       }
     },
     [
+      plugin,
+      documentId,
+      trackedAnnotation.object,
+      pageWidth,
+      pageHeight,
+      pageIndex,
       isMultiSelected,
-      currentObject,
-      trackedAnnotation.object.id,
+      vertexConfig,
       annotationCapability,
       annotationProvides,
-      pageIndex,
-      vertexConfig,
     ],
   );
 
@@ -203,74 +229,27 @@ export function AnnotationContainer<T extends PdfAnnotationObject>({
     setPreview(trackedAnnotation.object);
   }, [trackedAnnotation.object]);
 
-  // Subscribe to multi-drag changes (for follower preview updates)
+  // Subscribe to unified drag changes - plugin sends pre-computed patches!
+  // ALL preview updates come through here (primary, attached links, multi-select)
   useEffect(() => {
-    if (!plugin || !isMultiSelected) return;
+    if (!plugin) return;
+    const id = trackedAnnotation.object.id;
 
-    const unsubscribe = plugin.onMultiDragChange((event) => {
+    const handleEvent = (event: {
+      documentId: string;
+      type: string;
+      previewPatches?: Record<string, any>;
+    }) => {
       if (event.documentId !== documentId) return;
+      const patch = event.previewPatches?.[id];
+      if (event.type === 'update' && patch) setPreview((prev) => ({ ...prev, ...patch }) as T);
+      else if (event.type === 'cancel') setPreview(trackedAnnotation.object);
+    };
 
-      const isParticipating = event.state.participatingIds.includes(trackedAnnotation.object.id);
-      if (!isParticipating) return;
+    const unsubs = [plugin.onDragChange(handleEvent), plugin.onResizeChange(handleEvent)];
 
-      if (event.type === 'update') {
-        // Apply delta to preview using transformAnnotation for proper vertex handling
-        const delta = event.state.delta;
-        const newRect = {
-          ...trackedAnnotation.object.rect,
-          origin: {
-            x: trackedAnnotation.object.rect.origin.x + delta.x,
-            y: trackedAnnotation.object.rect.origin.y + delta.y,
-          },
-        };
-
-        // Use transformAnnotation to properly update vertices (inkList, linePoints, etc.)
-        const patched = annotationCapability?.transformAnnotation(trackedAnnotation.object, {
-          type: 'move',
-          changes: { rect: newRect } as Partial<T>,
-        });
-
-        if (patched) {
-          setPreview((prev) => ({ ...prev, ...patched }));
-        }
-      } else if (event.type === 'cancel') {
-        // Reset to original
-        setPreview(trackedAnnotation.object);
-      }
-      // On 'end', keep preview - batch update will sync via trackedAnnotation.object
-    });
-
-    return unsubscribe;
-  }, [plugin, documentId, isMultiSelected, trackedAnnotation.object, annotationCapability]);
-
-  // Subscribe to multi-resize changes (for follower preview updates)
-  useEffect(() => {
-    if (!plugin || !isMultiSelected) return;
-
-    const unsubscribe = plugin.onMultiResizeChange((event) => {
-      if (event.documentId !== documentId) return;
-
-      const newRect = event.computedRects[trackedAnnotation.object.id];
-      if (!newRect) return;
-
-      if (event.type === 'update') {
-        // Use transformAnnotation to properly update vertices (inkList, linePoints, etc.)
-        const patched = annotationCapability?.transformAnnotation(trackedAnnotation.object, {
-          type: 'resize',
-          changes: { rect: newRect } as Partial<T>,
-        });
-
-        if (patched) {
-          setPreview((prev) => ({ ...prev, ...patched }));
-        }
-      } else if (event.type === 'cancel') {
-        setPreview(trackedAnnotation.object);
-      }
-      // On 'end', keep preview - batch update will sync via trackedAnnotation.object
-    });
-
-    return unsubscribe;
-  }, [plugin, documentId, isMultiSelected, trackedAnnotation.object, annotationCapability]);
+    return () => unsubs.forEach((u) => u());
+  }, [plugin, documentId, trackedAnnotation.object]);
 
   // Determine if we should show the outline
   // When multi-selected, don't show individual outlines - GroupSelectionBox shows the group outline

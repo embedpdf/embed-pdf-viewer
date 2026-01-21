@@ -366,12 +366,11 @@ export interface SidebarAnnotationEntry {
 }
 
 // ─────────────────────────────────────────────────────────
-// Multi-Drag Types (Internal - used by framework components)
+// Constraint Types (Used by unified drag/resize APIs)
 // ─────────────────────────────────────────────────────────
 
 /**
  * Information about an annotation needed for constraint calculation.
- * Passed to startMultiDrag to compute combined movement constraints.
  */
 export interface AnnotationConstraintInfo {
   id: string;
@@ -396,48 +395,86 @@ export interface CombinedConstraints {
   maxRight: number;
 }
 
+// ─────────────────────────────────────────────────────────
+// Unified Drag API Types (Plugin owns all logic)
+// ─────────────────────────────────────────────────────────
+
 /**
- * State of the multi-drag operation for a document.
+ * Options for starting a unified drag operation.
+ * The plugin will automatically expand to include attached links.
  */
-export interface MultiDragState {
-  /** The document this multi-drag belongs to */
-  documentId: string;
-  /** Whether a multi-drag is currently in progress */
-  isDragging: boolean;
-  /** The ID of the annotation being actively dragged (the "primary") */
-  primaryId: string | null;
-  /** Current cumulative delta (already clamped to constraints) */
-  delta: Position;
-  /** Combined constraints computed at drag start */
-  combinedConstraints: CombinedConstraints | null;
-  /** All annotation IDs participating in this multi-drag */
-  participatingIds: string[];
+export interface UnifiedDragOptions {
+  /** The explicitly selected/dragged annotation IDs */
+  annotationIds: string[];
+  /** Page size for constraint calculation */
+  pageSize: Size;
 }
 
 /**
- * Event emitted when multi-drag state changes.
+ * State of the unified drag operation.
+ * Managed entirely by the plugin - framework components just subscribe.
  */
-export interface MultiDragEvent {
+export interface UnifiedDragState {
+  /** The document this drag belongs to */
+  documentId: string;
+  /** Whether a drag is currently in progress */
+  isDragging: boolean;
+  /** The explicitly selected annotation IDs (what the user selected) */
+  primaryIds: string[];
+  /** Auto-expanded attached link IDs */
+  attachedLinkIds: string[];
+  /** All participant IDs (primaryIds + attachedLinkIds) */
+  allParticipantIds: string[];
+  /** Original rects for all participants (for computing final patches) */
+  originalRects: Map<string, Rect>;
+  /** Current cumulative delta (already clamped to constraints) */
+  delta: Position;
+  /** Combined constraints computed at drag start */
+  combinedConstraints: CombinedConstraints;
+}
+
+/**
+ * Event emitted when unified drag state changes.
+ */
+export interface UnifiedDragEvent {
   /** The document this event belongs to */
   documentId: string;
   /** The type of change */
   type: 'start' | 'update' | 'end' | 'cancel';
   /** Current state */
-  state: MultiDragState;
+  state: UnifiedDragState;
+  /** Pre-computed patches for ALL participants - components just apply directly! */
+  previewPatches: Record<string, Partial<PdfAnnotationObject>>;
 }
 
 // ─────────────────────────────────────────────────────────
-// Multi-Resize Types (Internal - used by framework components)
+// Unified Resize API Types (Plugin owns all logic)
 // ─────────────────────────────────────────────────────────
 
 /**
- * Information about an annotation participating in group resize.
- * Includes its relative position within the group bounding box (0-1 normalized).
+ * Options for starting a unified resize operation.
+ * The plugin will automatically expand to include attached links.
  */
-export interface GroupResizeAnnotationInfo {
+export interface UnifiedResizeOptions {
+  /** The explicitly selected annotation IDs */
+  annotationIds: string[];
+  /** Page size for constraint calculation */
+  pageSize: Size;
+  /** Which resize handle is being used */
+  resizeHandle: string;
+}
+
+/**
+ * Information about an annotation participating in unified resize.
+ */
+export interface UnifiedResizeAnnotationInfo {
   id: string;
-  rect: Rect;
+  originalRect: Rect;
   pageIndex: number;
+  /** Whether this is an attached link (auto-expanded) */
+  isAttachedLink: boolean;
+  /** The parent annotation ID (if this is an attached link) */
+  parentId?: string;
   /** Relative X position within group (0-1) */
   relativeX: number;
   /** Relative Y position within group (0-1) */
@@ -449,45 +486,44 @@ export interface GroupResizeAnnotationInfo {
 }
 
 /**
- * State of the multi-resize operation for a document.
+ * State of the unified resize operation.
+ * Managed entirely by the plugin - framework components just subscribe.
  */
-export interface MultiResizeState {
-  /** The document this multi-resize belongs to */
+export interface UnifiedResizeState {
+  /** The document this resize belongs to */
   documentId: string;
-  /** Whether a multi-resize is currently in progress */
+  /** Whether a resize is currently in progress */
   isResizing: boolean;
+  /** The explicitly selected annotation IDs (what the user selected) */
+  primaryIds: string[];
+  /** Auto-expanded attached link IDs */
+  attachedLinkIds: string[];
+  /** All participant IDs (primaryIds + attachedLinkIds) */
+  allParticipantIds: string[];
   /** The original group bounding box at resize start */
   originalGroupBox: Rect;
   /** The current (resized) group bounding box */
   currentGroupBox: Rect;
   /** All annotations participating with their relative positions */
-  participatingAnnotations: GroupResizeAnnotationInfo[];
+  participatingAnnotations: UnifiedResizeAnnotationInfo[];
   /** Which resize handle is being used */
   resizeHandle: string;
-  /** Page index where the group resize is happening */
-  pageIndex: number;
+  /** Current computed rects for all participants */
+  computedRects: Map<string, Rect>;
 }
 
 /**
- * Event emitted when multi-resize state changes.
+ * Event emitted when unified resize state changes.
  */
-export interface MultiResizeEvent {
+export interface UnifiedResizeEvent {
   /** The document this event belongs to */
   documentId: string;
   /** The type of change */
   type: 'start' | 'update' | 'end' | 'cancel';
   /** Current state */
-  state: MultiResizeState;
+  state: UnifiedResizeState;
   /** Per-annotation computed rects for convenience (id -> new rect) */
   computedRects: Record<string, Rect>;
-}
-
-/**
- * Input for starting a multi-resize operation.
- */
-export interface StartMultiResizeOptions {
-  documentId: string;
-  pageIndex: number;
-  annotations: Array<{ id: string; rect: Rect }>;
-  resizeHandle: string;
+  /** Pre-computed patches for ALL participants - components just apply directly! */
+  previewPatches: Record<string, Partial<PdfAnnotationObject>>;
 }

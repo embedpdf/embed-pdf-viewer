@@ -12,6 +12,7 @@ import {
   uuidV4,
   PdfZoomMode,
   ignore,
+  PdfAnnotationReplyType,
 } from '@embedpdf/models';
 import { Dialog } from './ui/dialog';
 import { Button } from './ui/button';
@@ -95,6 +96,7 @@ export function LinkModal({ documentId, isOpen, onClose, onExited }: LinkModalPr
           pageIndex: selectedAnnotation.object.pageIndex,
           rect,
           inReplyToId: selectedAnnotation.object.id,
+          replyType: PdfAnnotationReplyType.Group,
           target,
           strokeStyle: PdfAnnotationBorderStyle.UNDERLINE,
           strokeColor: '#0000FF',
@@ -134,6 +136,7 @@ export function LinkModal({ documentId, isOpen, onClose, onExited }: LinkModalPr
               pageIndex: sel.pageIndex,
               rect: segmentRect,
               inReplyToId: highlightId,
+              replyType: PdfAnnotationReplyType.Group,
               target,
               strokeStyle: PdfAnnotationBorderStyle.UNDERLINE,
               strokeColor: '#0000FF',
