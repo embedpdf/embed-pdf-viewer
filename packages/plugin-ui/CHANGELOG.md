@@ -1,5 +1,11 @@
 # @embedpdf/plugin-ui
 
+## 2.3.0
+
+### Patch Changes
+
+- [#406](https://github.com/embedpdf/embed-pdf-viewer/pull/406) by [@bobsingor](https://github.com/bobsingor) – Removed `commands` from required dependencies. The UI plugin no longer requires the commands plugin to be registered.
+
 ## 2.2.0
 
 ### Minor Changes
