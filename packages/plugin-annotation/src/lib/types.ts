@@ -6,6 +6,9 @@ import {
   PdfErrorReason,
   PdfRenderPageAnnotationOptions,
   PdfTextAnnoObject,
+  Position,
+  Rect,
+  Size,
   Task,
 } from '@embedpdf/models';
 import { AnnotationTool } from './tools/types';
@@ -47,6 +50,33 @@ export interface TrackedAnnotation<T extends PdfAnnotationObject = PdfAnnotation
   object: T;
 }
 
+/**
+ * Represents a batch of pending annotation changes to be committed.
+ * Separates the collection of changes from their execution.
+ */
+export interface CommitBatch {
+  /** Annotations that need to be created in the PDF */
+  creations: Array<{
+    uid: string;
+    ta: TrackedAnnotation;
+    ctx?: AnnotationCreateContext<PdfAnnotationObject>;
+  }>;
+  /** Annotations that need to be updated in the PDF */
+  updates: Array<{
+    uid: string;
+    ta: TrackedAnnotation;
+  }>;
+  /** Annotations that need to be deleted from the PDF */
+  deletions: Array<{
+    uid: string;
+    ta: TrackedAnnotation;
+  }>;
+  /** All UIDs that are part of this commit batch */
+  committedUids: string[];
+  /** Whether this batch has any changes */
+  isEmpty: boolean;
+}
+
 export interface RenderAnnotationOptions {
   pageIndex: number;
   annotation: PdfAnnotationObject;
@@ -57,6 +87,13 @@ export interface RenderAnnotationOptions {
 export interface AnnotationDocumentState {
   pages: Record<number, string[]>;
   byUid: Record<string, TrackedAnnotation>;
+  /** Array of selected annotation UIDs (supports multi-selection) */
+  selectedUids: string[];
+  /**
+   * @deprecated Use `selectedUids` array or `getSelectedAnnotation()` instead.
+   * Returns the UID only when exactly one annotation is selected, otherwise null.
+   * Will be removed in next major version.
+   */
   selectedUid: string | null;
   activeToolId: string | null;
   hasPendingChanges: boolean;
@@ -127,15 +164,38 @@ export interface AnnotationActiveToolChangeEvent {
   tool: AnnotationTool | null;
 }
 
+/**
+ * Represents what grouping action is available for the current selection.
+ * - 'group': Selection can be grouped (2+ annotations, not all in same group)
+ * - 'ungroup': Selection is exactly one complete group that can be ungrouped
+ * - 'disabled': No valid grouping action (0-1 annotations selected)
+ */
+export type GroupingAction = 'group' | 'ungroup' | 'disabled';
+
 // Scoped annotation capability for a specific document
 export interface AnnotationScope {
   getState(): AnnotationDocumentState;
   getPageAnnotations(
     options: GetPageAnnotationsOptions,
   ): Task<PdfAnnotationObject[], PdfErrorReason>;
+  /** @deprecated Use getSelectedAnnotations() for multi-select support. Returns first selected or null. */
   getSelectedAnnotation(): TrackedAnnotation | null;
+  /** Get all selected annotations */
+  getSelectedAnnotations(): TrackedAnnotation[];
+  /** Get the IDs of all selected annotations */
+  getSelectedAnnotationIds(): string[];
   getAnnotationById(id: string): TrackedAnnotation | null;
+  /** Select a single annotation (clears previous selection) */
   selectAnnotation(pageIndex: number, annotationId: string): void;
+  /** Toggle an annotation in/out of the current selection */
+  toggleSelection(pageIndex: number, annotationId: string): void;
+  /** Add an annotation to the current selection */
+  addToSelection(pageIndex: number, annotationId: string): void;
+  /** Remove an annotation from the current selection */
+  removeFromSelection(annotationId: string): void;
+  /** Set the selection to a specific set of annotation IDs (for marquee) */
+  setSelection(ids: string[]): void;
+  /** Clear all selection */
   deselectAnnotation(): void;
   getActiveTool(): AnnotationTool | null;
   setActiveTool(toolId: string | null): void;
@@ -151,9 +211,36 @@ export interface AnnotationScope {
     annotationId: string,
     patch: Partial<PdfAnnotationObject>,
   ): void;
+  /** Batch update multiple annotations at once */
+  updateAnnotations(
+    patches: Array<{ pageIndex: number; id: string; patch: Partial<PdfAnnotationObject> }>,
+  ): void;
   deleteAnnotation(pageIndex: number, annotationId: string): void;
+  /** Delete multiple annotations in batch */
+  deleteAnnotations(annotations: Array<{ pageIndex: number; id: string }>): void;
   renderAnnotation(options: RenderAnnotationOptions): Task<Blob, PdfErrorReason>;
   commit(): Task<boolean, PdfErrorReason>;
+
+  // Attached links (IRT link children)
+  /** Get link annotations attached to an annotation via IRT relationship */
+  getAttachedLinks(annotationId: string): TrackedAnnotation[];
+  /** Check if an annotation has attached link children */
+  hasAttachedLinks(annotationId: string): boolean;
+  /** Delete all link annotations attached to an annotation */
+  deleteAttachedLinks(annotationId: string): void;
+
+  // Annotation grouping (RT = Group)
+  /** Group the currently selected annotations (first selected becomes leader) */
+  groupAnnotations(): void;
+  /** Ungroup all annotations in the group containing the specified annotation */
+  ungroupAnnotations(annotationId: string): void;
+  /** Get all annotations in the same group as the specified annotation */
+  getGroupMembers(annotationId: string): TrackedAnnotation<PdfAnnotationObject>[];
+  /** Check if an annotation is part of a group */
+  isInGroup(annotationId: string): boolean;
+  /** Get the available grouping action for the current selection */
+  getGroupingAction(): GroupingAction;
+
   onStateChange: EventHook<AnnotationDocumentState>;
   onAnnotationEvent: EventHook<AnnotationEvent>;
   onActiveToolChange: EventHook<AnnotationTool | null>;
@@ -165,9 +252,24 @@ export interface AnnotationCapability {
   getPageAnnotations: (
     options: GetPageAnnotationsOptions,
   ) => Task<PdfAnnotationObject[], PdfErrorReason>;
+  /** @deprecated Use getSelectedAnnotations() for multi-select support. Returns first selected or null. */
   getSelectedAnnotation: () => TrackedAnnotation | null;
+  /** Get all selected annotations */
+  getSelectedAnnotations: () => TrackedAnnotation[];
+  /** Get the IDs of all selected annotations */
+  getSelectedAnnotationIds: () => string[];
   getAnnotationById(id: string): TrackedAnnotation | null;
+  /** Select a single annotation (clears previous selection) */
   selectAnnotation: (pageIndex: number, annotationId: string) => void;
+  /** Toggle an annotation in/out of the current selection */
+  toggleSelection: (pageIndex: number, annotationId: string) => void;
+  /** Add an annotation to the current selection */
+  addToSelection: (pageIndex: number, annotationId: string) => void;
+  /** Remove an annotation from the current selection */
+  removeFromSelection: (annotationId: string) => void;
+  /** Set the selection to a specific set of annotation IDs (for marquee) */
+  setSelection: (ids: string[]) => void;
+  /** Clear all selection */
   deselectAnnotation: () => void;
   importAnnotations: (items: ImportAnnotationItem<PdfAnnotationObject>[]) => void;
   createAnnotation: <A extends PdfAnnotationObject>(
@@ -180,9 +282,39 @@ export interface AnnotationCapability {
     annotationId: string,
     patch: Partial<PdfAnnotationObject>,
   ) => void;
+  /** Batch update multiple annotations at once */
+  updateAnnotations: (
+    patches: Array<{ pageIndex: number; id: string; patch: Partial<PdfAnnotationObject> }>,
+  ) => void;
   deleteAnnotation: (pageIndex: number, annotationId: string) => void;
+  /** Delete multiple annotations in batch */
+  deleteAnnotations: (
+    annotations: Array<{ pageIndex: number; id: string }>,
+    documentId?: string,
+  ) => void;
   renderAnnotation: (options: RenderAnnotationOptions) => Task<Blob, PdfErrorReason>;
   commit: () => Task<boolean, PdfErrorReason>;
+
+  // Attached links (IRT link children)
+  /** Get link annotations attached to an annotation via IRT relationship */
+  getAttachedLinks: (annotationId: string, documentId?: string) => TrackedAnnotation[];
+  /** Check if an annotation has attached link children */
+  hasAttachedLinks: (annotationId: string, documentId?: string) => boolean;
+  /** Delete all link annotations attached to an annotation */
+  deleteAttachedLinks: (annotationId: string, documentId?: string) => void;
+
+  // Annotation grouping (RT = Group)
+  /** Group the currently selected annotations (first selected becomes leader) */
+  groupAnnotations: (documentId?: string) => void;
+  /** Ungroup all annotations in the group containing the specified annotation */
+  ungroupAnnotations: (annotationId: string, documentId?: string) => void;
+  /** Get all annotations in the same group as the specified annotation */
+  getGroupMembers: (
+    annotationId: string,
+    documentId?: string,
+  ) => TrackedAnnotation<PdfAnnotationObject>[];
+  /** Check if an annotation is part of a group */
+  isInGroup: (annotationId: string, documentId?: string) => boolean;
 
   // Document-scoped operations
   forDocument: (documentId: string) => AnnotationScope;
@@ -231,4 +363,167 @@ export interface SidebarAnnotationEntry {
   page: number;
   annotation: TrackedAnnotation;
   replies: TrackedAnnotation<PdfTextAnnoObject>[];
+}
+
+// ─────────────────────────────────────────────────────────
+// Constraint Types (Used by unified drag/resize APIs)
+// ─────────────────────────────────────────────────────────
+
+/**
+ * Information about an annotation needed for constraint calculation.
+ */
+export interface AnnotationConstraintInfo {
+  id: string;
+  rect: Rect;
+  pageIndex: number;
+  pageSize: Size;
+}
+
+/**
+ * Combined constraints representing the intersection of all selected annotations' movement limits.
+ * These are the maximum distances the group can move in each direction without any annotation
+ * leaving its page bounds.
+ */
+export interface CombinedConstraints {
+  /** Maximum distance we can move up (positive = can move up) */
+  maxUp: number;
+  /** Maximum distance we can move down */
+  maxDown: number;
+  /** Maximum distance we can move left */
+  maxLeft: number;
+  /** Maximum distance we can move right */
+  maxRight: number;
+}
+
+// ─────────────────────────────────────────────────────────
+// Unified Drag API Types (Plugin owns all logic)
+// ─────────────────────────────────────────────────────────
+
+/**
+ * Options for starting a unified drag operation.
+ * The plugin will automatically expand to include attached links.
+ */
+export interface UnifiedDragOptions {
+  /** The explicitly selected/dragged annotation IDs */
+  annotationIds: string[];
+  /** Page size for constraint calculation */
+  pageSize: Size;
+}
+
+/**
+ * State of the unified drag operation.
+ * Managed entirely by the plugin - framework components just subscribe.
+ */
+export interface UnifiedDragState {
+  /** The document this drag belongs to */
+  documentId: string;
+  /** Whether a drag is currently in progress */
+  isDragging: boolean;
+  /** The explicitly selected annotation IDs (what the user selected) */
+  primaryIds: string[];
+  /** Auto-expanded attached link IDs */
+  attachedLinkIds: string[];
+  /** All participant IDs (primaryIds + attachedLinkIds) */
+  allParticipantIds: string[];
+  /** Original rects for all participants (for computing final patches) */
+  originalRects: Map<string, Rect>;
+  /** Current cumulative delta (already clamped to constraints) */
+  delta: Position;
+  /** Combined constraints computed at drag start */
+  combinedConstraints: CombinedConstraints;
+}
+
+/**
+ * Event emitted when unified drag state changes.
+ */
+export interface UnifiedDragEvent {
+  /** The document this event belongs to */
+  documentId: string;
+  /** The type of change */
+  type: 'start' | 'update' | 'end' | 'cancel';
+  /** Current state */
+  state: UnifiedDragState;
+  /** Pre-computed patches for ALL participants - components just apply directly! */
+  previewPatches: Record<string, Partial<PdfAnnotationObject>>;
+}
+
+// ─────────────────────────────────────────────────────────
+// Unified Resize API Types (Plugin owns all logic)
+// ─────────────────────────────────────────────────────────
+
+/**
+ * Options for starting a unified resize operation.
+ * The plugin will automatically expand to include attached links.
+ */
+export interface UnifiedResizeOptions {
+  /** The explicitly selected annotation IDs */
+  annotationIds: string[];
+  /** Page size for constraint calculation */
+  pageSize: Size;
+  /** Which resize handle is being used */
+  resizeHandle: string;
+}
+
+/**
+ * Information about an annotation participating in unified resize.
+ */
+export interface UnifiedResizeAnnotationInfo {
+  id: string;
+  originalRect: Rect;
+  pageIndex: number;
+  /** Whether this is an attached link (auto-expanded) */
+  isAttachedLink: boolean;
+  /** The parent annotation ID (if this is an attached link) */
+  parentId?: string;
+  /** Relative X position within group (0-1) */
+  relativeX: number;
+  /** Relative Y position within group (0-1) */
+  relativeY: number;
+  /** Relative width within group (0-1) */
+  relativeWidth: number;
+  /** Relative height within group (0-1) */
+  relativeHeight: number;
+}
+
+/**
+ * State of the unified resize operation.
+ * Managed entirely by the plugin - framework components just subscribe.
+ */
+export interface UnifiedResizeState {
+  /** The document this resize belongs to */
+  documentId: string;
+  /** Whether a resize is currently in progress */
+  isResizing: boolean;
+  /** The explicitly selected annotation IDs (what the user selected) */
+  primaryIds: string[];
+  /** Auto-expanded attached link IDs */
+  attachedLinkIds: string[];
+  /** All participant IDs (primaryIds + attachedLinkIds) */
+  allParticipantIds: string[];
+  /** The original group bounding box at resize start */
+  originalGroupBox: Rect;
+  /** The current (resized) group bounding box */
+  currentGroupBox: Rect;
+  /** All annotations participating with their relative positions */
+  participatingAnnotations: UnifiedResizeAnnotationInfo[];
+  /** Which resize handle is being used */
+  resizeHandle: string;
+  /** Current computed rects for all participants */
+  computedRects: Map<string, Rect>;
+}
+
+/**
+ * Event emitted when unified resize state changes.
+ */
+export interface UnifiedResizeEvent {
+  /** The document this event belongs to */
+  documentId: string;
+  /** The type of change */
+  type: 'start' | 'update' | 'end' | 'cancel';
+  /** Current state */
+  state: UnifiedResizeState;
+  /** Per-annotation computed rects for convenience (id -> new rect) */
+  computedRects: Record<string, Rect>;
+  /** Pre-computed patches for ALL participants - components just apply directly! */
+  previewPatches: Record<string, Partial<PdfAnnotationObject>>;
 }

@@ -8,8 +8,8 @@ import { PdfInkListObject, Rect } from '@embedpdf/models';
 interface InkProps {
   /** Whether the annotation is selected */
   isSelected: boolean;
-  /** Stroke colour (falls back to PDFium default black) */
-  color?: string;
+  /** Stroke color */
+  strokeColor?: string;
   /** 0 – 1 */
   opacity?: number;
   /** Line width in PDF units */
@@ -29,7 +29,7 @@ interface InkProps {
  */
 export function Ink({
   isSelected,
-  color = '#000000',
+  strokeColor,
   opacity = 1,
   strokeWidth,
   inkList,
@@ -37,6 +37,7 @@ export function Ink({
   scale,
   onClick,
 }: InkProps): JSX.Element {
+  const resolvedColor = strokeColor ?? '#000000';
   /* convert each stroke to an SVG <path d=""> string */
   const paths = useMemo(() => {
     return inkList.map(({ points }) => {
@@ -80,7 +81,7 @@ export function Ink({
           style={{
             cursor: isSelected ? 'move' : 'pointer',
             pointerEvents: isSelected ? 'none' : 'visibleStroke',
-            stroke: color,
+            stroke: resolvedColor,
             strokeWidth: strokeWidth,
             strokeLinecap: 'round',
             strokeLinejoin: 'round',

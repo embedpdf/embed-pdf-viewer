@@ -20,6 +20,8 @@ export interface AnnotationContainerProps<T extends PdfAnnotationObject> {
   trackedAnnotation: TrackedAnnotation<T>;
   children: Snippet<[T]>;
   isSelected: boolean;
+  /** Whether multiple annotations are selected (container becomes passive) */
+  isMultiSelected?: boolean;
   isDraggable: boolean;
   isResizable: boolean;
   lockAspectRatio?: boolean;

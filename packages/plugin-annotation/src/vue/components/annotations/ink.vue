@@ -23,7 +23,7 @@
       :style="{
         cursor: isSelected ? 'move' : 'pointer',
         pointerEvents: isSelected ? 'none' : 'visibleStroke',
-        stroke: color,
+        stroke: resolvedColor,
         strokeWidth: strokeWidth,
         strokeLinecap: 'round',
         strokeLinejoin: 'round',
@@ -39,7 +39,8 @@ import { PdfInkListObject, Rect } from '@embedpdf/models';
 const props = withDefaults(
   defineProps<{
     isSelected: boolean;
-    color?: string;
+    /** Stroke color */
+    strokeColor?: string;
     opacity?: number;
     strokeWidth: number;
     inkList: PdfInkListObject[];
@@ -48,10 +49,11 @@ const props = withDefaults(
     onClick?: (e: PointerEvent | TouchEvent) => void;
   }>(),
   {
-    color: '#000000',
     opacity: 1,
   },
 );
+
+const resolvedColor = computed(() => props.strokeColor ?? '#000000');
 
 const paths = computed(() => {
   return props.inkList.map(({ points }) => {

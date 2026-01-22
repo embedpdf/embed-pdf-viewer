@@ -1,5 +1,11 @@
 # @embedpdf/plugin-interaction-manager
 
+## 2.3.0
+
+### Minor Changes
+
+- [#406](https://github.com/embedpdf/embed-pdf-viewer/pull/406) by [@bobsingor](https://github.com/bobsingor) – Added `stopImmediatePropagation()` and `isImmediatePropagationStopped()` methods to pointer events via the new `EmbedPdfPointerEventExtensions` interface. This allows higher-priority handlers to prevent lower-priority handlers from activating for the same event. Updated `mergeHandlers` to respect propagation state and stop calling handlers when propagation is stopped. Refactored `EmbedPdfPointerEvent` as a generic type that combines native events with extensions.
+
 ## 2.2.0
 
 ## 2.1.2

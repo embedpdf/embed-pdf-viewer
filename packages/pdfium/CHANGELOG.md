@@ -1,5 +1,11 @@
 # @embedpdf/pdfium
 
+## 2.3.0
+
+### Patch Changes
+
+- [#406](https://github.com/embedpdf/embed-pdf-viewer/pull/406) by [@bobsingor](https://github.com/bobsingor) – Updated PDFium WASM module with new bindings for annotation actions and reply types. Added `EPDFAnnot_SetAction`, `EPDFAnnot_GetReplyType`, and `EPDFAnnot_SetReplyType` functions to support link annotations and annotation grouping.
+
 ## 2.2.0
 
 ## 2.1.2

@@ -198,7 +198,12 @@ export class RedactionPlugin extends BasePlugin<
   }
 
   protected override onDocumentLoaded(documentId: string): void {
-    this.selectionCapability?.enableForMode(RedactionMode.RedactSelection, documentId);
+    // Redaction plugin renders its own selection rects, so suppress selection layer rects
+    this.selectionCapability?.enableForMode(
+      RedactionMode.RedactSelection,
+      { showRects: false },
+      documentId,
+    );
   }
 
   protected override onDocumentClosed(documentId: string): void {

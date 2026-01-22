@@ -105,7 +105,7 @@ const editorStyle = computed(() => {
           ? 'center'
           : 'flex-end',
     display: 'flex',
-    backgroundColor: anno.backgroundColor,
+    backgroundColor: anno.color ?? anno.backgroundColor,
     opacity: anno.opacity,
     width: needsComp ? `${invScalePercent}%` : '100%',
     height: needsComp ? `${invScalePercent}%` : '100%',

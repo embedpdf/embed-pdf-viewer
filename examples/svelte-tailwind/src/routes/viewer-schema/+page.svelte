@@ -28,7 +28,11 @@
   import { TilingLayer, TilingPluginPackage } from '@embedpdf/plugin-tiling/svelte';
   import { ExportPluginPackage } from '@embedpdf/plugin-export/svelte';
   import { PrintPluginPackage } from '@embedpdf/plugin-print/svelte';
-  import { SelectionLayer, SelectionPluginPackage } from '@embedpdf/plugin-selection/svelte';
+  import {
+    SelectionLayer,
+    SelectionPluginPackage,
+    MarqueeSelection,
+  } from '@embedpdf/plugin-selection/svelte';
   import { SearchLayer, SearchPluginPackage } from '@embedpdf/plugin-search/svelte';
   import { ThumbnailPluginPackage } from '@embedpdf/plugin-thumbnail/svelte';
   import { MarqueeCapture, CapturePluginPackage } from '@embedpdf/plugin-capture/svelte';
@@ -56,7 +60,14 @@
   import CustomZoomToolbar from '$lib/components/CustomZoomToolbar.svelte';
   import OutlineSidebar from '$lib/components/OutlineSidebar.svelte';
   import CommentSidebar from '$lib/components/CommentSidebar.svelte';
-  import { SchemaToolbar, SchemaPanel, SchemaMenu, SchemaSelectionMenu } from '$lib/ui';
+  import {
+    SchemaToolbar,
+    SchemaPanel,
+    SchemaMenu,
+    SchemaSelectionMenu,
+    SchemaModal,
+  } from '$lib/ui';
+  import LinkModal from '$lib/components/LinkModal.svelte';
   import {
     commands,
     viewerUISchema,
@@ -81,6 +92,7 @@
     'search-sidebar': SearchSidebar,
     'outline-sidebar': OutlineSidebar,
     'comment-sidebar': CommentSidebar,
+    'link-modal': LinkModal,
   }; // Type assertion needed due to component prop variations
 
   // UI Renderers
@@ -89,6 +101,7 @@
     sidebar: SchemaPanel,
     menu: SchemaMenu,
     selectionMenu: SchemaSelectionMenu,
+    modal: SchemaModal,
   };
 
   // Plugin configurations
@@ -211,6 +224,8 @@
   {@const redactionMenu = useSelectionMenu('redaction', () => documentId)}
   {@const selectionMenu = useSelectionMenu('selection', () => documentId)}
   {@const annotationMenu = useSelectionMenu('annotation', () => documentId)}
+  {@const groupAnnotationMenu = useSelectionMenu('groupAnnotation', () => documentId)}
+  {@const modalInfo = schemaRenderer.getModalInfo()}
 
   {@const topMainToolbar = schemaRenderer.getToolbarInfo('top', 'main')}
   {@const topSecondaryToolbar = schemaRenderer.getToolbarInfo('top', 'secondary')}
@@ -305,7 +320,9 @@
                               {documentId}
                               pageIndex={page.pageIndex}
                               selectionMenu={annotationMenu.renderFn}
+                              groupSelectionMenu={groupAnnotationMenu.renderFn}
                             />
+                            <MarqueeSelection {documentId} pageIndex={page.pageIndex} />
                           </PagePointerProvider>
                         </Rotate>
                       {/snippet}
@@ -332,4 +349,16 @@
       />
     {/if}
   </div>
+
+  <!-- Modal Rendering -->
+  {#if modalInfo}
+    {@const ModalRenderer = modalInfo.renderer}
+    <ModalRenderer
+      schema={modalInfo.schema}
+      documentId={modalInfo.documentId}
+      isOpen={modalInfo.isOpen}
+      onClose={modalInfo.onClose}
+      onExited={modalInfo.onExited}
+    />
+  {/if}
 {/snippet}

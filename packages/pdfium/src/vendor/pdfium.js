@@ -62,9 +62,11 @@ var createPdfium = (() => {
       '_EPDFAnnot_GetLineEndings',
       '_EPDFAnnot_GetOpacity',
       '_EPDFAnnot_GetRectangleDifferences',
+      '_EPDFAnnot_GetReplyType',
       '_EPDFAnnot_GetRichContent',
       '_EPDFAnnot_GetTextAlignment',
       '_EPDFAnnot_GetVerticalAlignment',
+      '_EPDFAnnot_SetAction',
       '_EPDFAnnot_SetBorderDashPattern',
       '_EPDFAnnot_SetBorderStyle',
       '_EPDFAnnot_SetColor',
@@ -75,6 +77,7 @@ var createPdfium = (() => {
       '_EPDFAnnot_SetLineEndings',
       '_EPDFAnnot_SetLinkedAnnot',
       '_EPDFAnnot_SetOpacity',
+      '_EPDFAnnot_SetReplyType',
       '_EPDFAnnot_SetTextAlignment',
       '_EPDFAnnot_SetVerticalAlignment',
       '_EPDFAnnot_SetVertices',
@@ -6087,6 +6090,10 @@ var createPdfium = (() => {
       'FPDFAnnot_SetURI',
       2,
     ));
+    var _EPDFAnnot_SetAction = (Module['_EPDFAnnot_SetAction'] = createExportWrapper(
+      'EPDFAnnot_SetAction',
+      2,
+    ));
     var _FPDFAnnot_GetFileAttachment = (Module['_FPDFAnnot_GetFileAttachment'] =
       createExportWrapper('FPDFAnnot_GetFileAttachment', 1));
     var _FPDFAnnot_AddFileAttachment = (Module['_FPDFAnnot_AddFileAttachment'] =
@@ -6219,6 +6226,14 @@ var createPdfium = (() => {
       createExportWrapper('EPDFAnnot_UpdateAppearanceToRect', 2));
     var _EPDFPage_CreateAnnot = (Module['_EPDFPage_CreateAnnot'] = createExportWrapper(
       'EPDFPage_CreateAnnot',
+      2,
+    ));
+    var _EPDFAnnot_GetReplyType = (Module['_EPDFAnnot_GetReplyType'] = createExportWrapper(
+      'EPDFAnnot_GetReplyType',
+      1,
+    ));
+    var _EPDFAnnot_SetReplyType = (Module['_EPDFAnnot_SetReplyType'] = createExportWrapper(
+      'EPDFAnnot_SetReplyType',
       2,
     ));
     var _FPDFDoc_GetAttachmentCount = (Module['_FPDFDoc_GetAttachmentCount'] = createExportWrapper(

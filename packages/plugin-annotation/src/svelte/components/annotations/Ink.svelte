@@ -3,7 +3,8 @@
 
   interface InkProps {
     isSelected: boolean;
-    color?: string;
+    /** Stroke color */
+    strokeColor?: string;
     opacity?: number;
     strokeWidth: number;
     inkList: PdfInkListObject[];
@@ -14,7 +15,7 @@
 
   let {
     isSelected,
-    color = '#000000',
+    strokeColor,
     opacity = 1,
     strokeWidth,
     inkList,
@@ -22,6 +23,8 @@
     scale,
     onClick,
   }: InkProps = $props();
+
+  const resolvedColor = $derived(strokeColor ?? '#000000');
 
   // derived SVG path data
   const paths = $derived.by(() =>
@@ -58,7 +61,7 @@
       ontouchstart={onClick}
       style:cursor={isSelected ? 'move' : 'pointer'}
       style:pointer-events={isSelected ? 'none' : 'visibleStroke'}
-      style:stroke={color}
+      style:stroke={resolvedColor}
       style:stroke-width={strokeWidth}
       style:stroke-linecap="round"
       style:stroke-linejoin="round"

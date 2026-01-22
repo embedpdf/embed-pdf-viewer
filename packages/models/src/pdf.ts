@@ -939,6 +939,36 @@ export enum PdfAnnotationLineEnding {
 }
 
 /**
+ * Reply type of annotation (RT property per ISO 32000-2)
+ *
+ * Specifies how an annotation relates to another annotation when it is
+ * a reply (via IRT - In Reply To). Valid values are:
+ * - Reply (/R): Normal comment reply (default if RT is missing)
+ * - Group (/Group): Logical grouping of annotations
+ *
+ * @public
+ */
+export enum PdfAnnotationReplyType {
+  /**
+   * Unknown or invalid reply type
+   */
+  Unknown = 0,
+  /**
+   * /R - Comment reply (default if RT is missing)
+   * The annotation is a child comment of the annotation referenced by IRT.
+   * Used for comment threads, reviewer discussions, sticky-note replies.
+   */
+  Reply = 1,
+  /**
+   * /Group - Logical grouping
+   * The annotation is grouped with the annotation referenced by IRT.
+   * They represent the same logical object. Used when multiple annotations
+   * act as one unit (e.g., visual shape + metadata/label).
+   */
+  Group = 2,
+}
+
+/**
  * Basic information of pdf annotation
  *
  * @public
@@ -1003,6 +1033,16 @@ export interface PdfAnnotationObjectBase {
    * Custom data of the annotation
    */
   custom?: any;
+
+  /**
+   * In reply to annotation id (IRT - for grouping or reply threads)
+   */
+  inReplyToId?: string;
+
+  /**
+   * Reply type (how this annotation relates to the parent via IRT)
+   */
+  replyType?: PdfAnnotationReplyType;
 }
 
 /**
@@ -1022,11 +1062,6 @@ export interface PdfPopupAnnoObject extends PdfAnnotationObjectBase {
    * Whether the popup is opened or not
    */
   open: boolean;
-
-  /**
-   * In reply to id
-   */
-  inReplyToId?: string;
 }
 
 /**
@@ -1041,6 +1076,26 @@ export interface PdfLinkAnnoObject extends PdfAnnotationObjectBase {
    * target of the link
    */
   target: PdfLinkTarget | undefined;
+
+  /**
+   * Stroke color of the link border (e.g., "#00A5E4")
+   */
+  strokeColor?: string;
+
+  /**
+   * Width of the link border (default: 2)
+   */
+  strokeWidth?: number;
+
+  /**
+   * Style of the link border (default: UNDERLINE)
+   */
+  strokeStyle?: PdfAnnotationBorderStyle;
+
+  /**
+   * Dash pattern for dashed border style
+   */
+  strokeDashArray?: number[];
 }
 
 /**
@@ -1065,11 +1120,6 @@ export interface PdfTextAnnoObject extends PdfAnnotationObjectBase {
    * opacity of text annotation
    */
   opacity?: number;
-
-  /**
-   * In reply to id
-   */
-  inReplyToId?: string;
 
   /**
    * State of the text annotation
@@ -1404,9 +1454,13 @@ export interface PdfInkAnnoObject extends PdfAnnotationObjectBase {
    */
   inkList: PdfInkListObject[];
   /**
-   * color of ink annotation
+   * Color of the ink stroke (preferred over deprecated `color`)
    */
-  color: string;
+  strokeColor?: string;
+  /**
+   * @deprecated Use strokeColor instead. Will be removed in next major version.
+   */
+  color?: string;
 
   /**
    * opacity of ink annotation
@@ -1594,9 +1648,13 @@ export interface PdfHighlightAnnoObject extends PdfAnnotationObjectBase {
   contents?: string;
 
   /**
-   * color of highlight annotation
+   * Color of the highlight markup (preferred over deprecated `color`)
    */
-  color: string;
+  strokeColor?: string;
+  /**
+   * @deprecated Use strokeColor instead. Will be removed in next major version.
+   */
+  color?: string;
 
   /**
    * opacity of highlight annotation
@@ -1846,20 +1904,24 @@ export interface PdfSquigglyAnnoObject extends PdfAnnotationObjectBase {
   /** {@inheritDoc PdfAnnotationObjectBase.type} */
   type: PdfAnnotationSubtype.SQUIGGLY;
   /**
-   * Text contents of the highlight annotation
+   * Text contents of the squiggly annotation
    */
   contents?: string;
   /**
-   * color of strike out annotation
+   * Color of the squiggly markup (preferred over deprecated `color`)
    */
-  color: string;
+  strokeColor?: string;
+  /**
+   * @deprecated Use strokeColor instead. Will be removed in next major version.
+   */
+  color?: string;
 
   /**
-   * opacity of strike out annotation
+   * opacity of squiggly annotation
    */
   opacity: number;
   /**
-   * quads of highlight area
+   * quads of squiggly area
    */
   segmentRects: Rect[];
 }
@@ -1873,20 +1935,24 @@ export interface PdfUnderlineAnnoObject extends PdfAnnotationObjectBase {
   /** {@inheritDoc PdfAnnotationObjectBase.type} */
   type: PdfAnnotationSubtype.UNDERLINE;
   /**
-   * Text contents of the highlight annotation
+   * Text contents of the underline annotation
    */
   contents?: string;
   /**
-   * color of strike out annotation
+   * Color of the underline markup (preferred over deprecated `color`)
    */
-  color: string;
+  strokeColor?: string;
+  /**
+   * @deprecated Use strokeColor instead. Will be removed in next major version.
+   */
+  color?: string;
 
   /**
-   * opacity of strike out annotation
+   * opacity of underline annotation
    */
   opacity: number;
   /**
-   * quads of highlight area
+   * quads of underline area
    */
   segmentRects: Rect[];
 }
@@ -1905,9 +1971,13 @@ export interface PdfStrikeOutAnnoObject extends PdfAnnotationObjectBase {
   contents?: string;
 
   /**
-   * color of strike out annotation
+   * Color of the strikeout markup (preferred over deprecated `color`)
    */
-  color: string;
+  strokeColor?: string;
+  /**
+   * @deprecated Use strokeColor instead. Will be removed in next major version.
+   */
+  color?: string;
 
   /**
    * opacity of strike out annotation
@@ -1915,7 +1985,7 @@ export interface PdfStrikeOutAnnoObject extends PdfAnnotationObjectBase {
   opacity: number;
 
   /**
-   * quads of highlight area
+   * quads of strikeout area
    */
   segmentRects: Rect[];
 }
@@ -1967,7 +2037,11 @@ export interface PdfFreeTextAnnoObject extends PdfAnnotationObjectBase {
    */
   opacity: number;
   /**
-   * Background color of the free text annotation
+   * Background/fill color of the free text annotation (matches shape convention)
+   */
+  color?: string;
+  /**
+   * @deprecated Use color instead. Will be removed in next major version.
    */
   backgroundColor?: string;
   /**

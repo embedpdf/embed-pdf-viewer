@@ -58,3 +58,7 @@ export { default as CopyIcon } from './CopyIcon.svelte';
 export { default as LockIcon } from './LockIcon.svelte';
 export { default as EyeIcon } from './EyeIcon.svelte';
 export { default as EyeOffIcon } from './EyeOffIcon.svelte';
+export { default as LinkIcon } from './LinkIcon.svelte';
+export { default as LinkOffIcon } from './LinkOffIcon.svelte';
+export { default as GroupIcon } from './GroupIcon.svelte';
+export { default as UngroupIcon } from './UngroupIcon.svelte';

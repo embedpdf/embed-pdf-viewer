@@ -538,12 +538,15 @@ export function restoreOffset(offset: Position, rotation: Rotation, scaleFactor:
   };
 }
 
+/** Empty rect constant (origin at 0,0 with zero size) */
+const EMPTY_RECT: Rect = { origin: { x: 0, y: 0 }, size: { width: 0, height: 0 } };
+
 /**
  * Return the smallest rectangle that encloses *all* `rects`.
  * If the array is empty, returns `null`.
  *
  * @param rects - array of rectangles
- * @returns smallest rectangle that encloses all the rectangles
+ * @returns smallest rectangle that encloses all the rectangles, or null if empty
  *
  * @public
  */
@@ -572,6 +575,19 @@ export function boundingRect(rects: Rect[]): Rect | null {
       height: maxY - minY,
     },
   };
+}
+
+/**
+ * Return the smallest rectangle that encloses *all* `rects`.
+ * If the array is empty, returns an empty rect (origin at 0,0 with zero size).
+ *
+ * @param rects - array of rectangles
+ * @returns smallest rectangle that encloses all the rectangles, or empty rect if empty
+ *
+ * @public
+ */
+export function boundingRectOrEmpty(rects: Rect[]): Rect {
+  return boundingRect(rects) ?? EMPTY_RECT;
 }
 
 export interface Matrix {
