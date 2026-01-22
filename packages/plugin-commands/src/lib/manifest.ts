@@ -9,7 +9,7 @@ export const manifest: PluginManifest<CommandsPluginConfig> = {
   version: '1.0.0',
   provides: ['commands'],
   requires: [],
-  optional: ['i18n'],
+  optional: ['i18n', 'ui'],
   defaultConfig: {
     commands: {},
   },

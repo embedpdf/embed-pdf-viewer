@@ -2,7 +2,8 @@ import { CSSProperties, MouseEvent, TouchEvent } from '@framework';
 import { Rect } from '@embedpdf/models';
 
 type UnderlineProps = {
-  color?: string;
+  /** Stroke/markup color */
+  strokeColor?: string;
   opacity?: number;
   segmentRects: Rect[];
   rect?: Rect;
@@ -12,7 +13,7 @@ type UnderlineProps = {
 };
 
 export function Underline({
-  color = '#FFFF00',
+  strokeColor,
   opacity = 0.5,
   segmentRects,
   rect,
@@ -20,6 +21,7 @@ export function Underline({
   onClick,
   style,
 }: UnderlineProps) {
+  const resolvedColor = strokeColor ?? '#FFFF00';
   const thickness = 2 * scale; // 2 CSS px at 100 % zoom
 
   return (
@@ -50,7 +52,7 @@ export function Underline({
               bottom: 0,
               width: '100%',
               height: thickness,
-              background: color,
+              background: resolvedColor,
               opacity: opacity,
               pointerEvents: 'none',
             }}

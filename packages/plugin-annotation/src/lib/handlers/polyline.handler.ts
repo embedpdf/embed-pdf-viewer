@@ -98,7 +98,11 @@ export const polylineHandlerFactory: HandlerFactory<PdfPolylineAnnoObject> = {
     };
 
     return {
-      onClick: (pos) => {
+      onClick: (pos, evt) => {
+        if (evt.metaKey || evt.ctrlKey) {
+          return;
+        }
+
         const clampedPos = clampToPage(pos);
         const vertices = getVertices();
         const lastVertex = vertices[vertices.length - 1];

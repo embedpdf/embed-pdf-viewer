@@ -3,8 +3,14 @@ import {
   AnnotationDocumentState,
   SidebarAnnotationEntry,
   TrackedAnnotation,
+  GroupingAction,
 } from './types';
-import { PdfTextAnnoObject } from '@embedpdf/models';
+import {
+  PdfAnnotationSubtype,
+  PdfTextAnnoObject,
+  PdfAnnotationReplyType,
+  PdfAnnotationObject,
+} from '@embedpdf/models';
 import { isSidebarAnnotation, isText } from './helpers';
 import { ToolMap } from './tools/tools-utils';
 
@@ -21,29 +27,64 @@ export const getAnnotations = (s: AnnotationDocumentState) => {
   return out;
 };
 
-/** The full `TrackedAnnotation` for the current selection. */
-export const getSelectedAnnotation = (s: AnnotationDocumentState) =>
-  s.selectedUid ? s.byUid[s.selectedUid] : null;
+/**
+ * The full `TrackedAnnotation` for the current selection.
+ * @deprecated Use getSelectedAnnotations() for multi-select support. Returns first selected or null.
+ */
+export const getSelectedAnnotation = (s: AnnotationDocumentState): TrackedAnnotation | null =>
+  s.selectedUids.length > 0 ? (s.byUid[s.selectedUids[0]] ?? null) : null;
+
+/** Get all selected TrackedAnnotations */
+export const getSelectedAnnotations = (s: AnnotationDocumentState): TrackedAnnotation[] =>
+  s.selectedUids
+    .map((uid) => s.byUid[uid])
+    .filter((ta): ta is TrackedAnnotation => ta !== undefined);
+
+/** Get the IDs of all selected annotations */
+export const getSelectedAnnotationIds = (s: AnnotationDocumentState): string[] => s.selectedUids;
 
 /** Get a tracked annotation by its ID */
 export const getAnnotationByUid = (s: AnnotationDocumentState, uid: string) => s.byUid[uid] ?? null;
 
-export const getSelectedAnnotationByPageIndex = (s: AnnotationDocumentState, pageIndex: number) => {
-  if (!s.selectedUid) return null;
-
+/**
+ * Get selected annotation on a specific page (single, for backward compatibility)
+ * @deprecated Use getSelectedAnnotationsByPageIndex() for multi-select support.
+ */
+export const getSelectedAnnotationByPageIndex = (
+  s: AnnotationDocumentState,
+  pageIndex: number,
+): TrackedAnnotation | null => {
   const pageUids = s.pages[pageIndex] ?? [];
 
-  // Check if the selected UID is on the requested page
-  if (pageUids.includes(s.selectedUid)) {
-    return s.byUid[s.selectedUid];
+  // Find the first selected UID that's on the requested page
+  for (const uid of s.selectedUids) {
+    if (pageUids.includes(uid)) {
+      return s.byUid[uid] ?? null;
+    }
   }
 
   return null;
 };
 
-/** Check if a given anno on a page is the current selection. */
-export const isAnnotationSelected = (s: AnnotationDocumentState, id: string) =>
-  s.selectedUid === id;
+/** Get all selected annotations on a specific page */
+export const getSelectedAnnotationsByPageIndex = (
+  s: AnnotationDocumentState,
+  pageIndex: number,
+): TrackedAnnotation[] => {
+  const pageUids = new Set(s.pages[pageIndex] ?? []);
+  return s.selectedUids
+    .filter((uid) => pageUids.has(uid))
+    .map((uid) => s.byUid[uid])
+    .filter((ta): ta is TrackedAnnotation => ta !== undefined);
+};
+
+/** Check if a given annotation is in the current selection. */
+export const isAnnotationSelected = (s: AnnotationDocumentState, id: string): boolean =>
+  s.selectedUids.includes(id);
+
+/** Check if multiple annotations are selected */
+export const hasMultipleSelected = (s: AnnotationDocumentState): boolean =>
+  s.selectedUids.length > 1;
 
 /**
  * Returns the current defaults for a specific tool by its ID.
@@ -148,4 +189,227 @@ export const getSidebarAnnotationsWithReplies = (
   }
 
   return out;
+};
+
+/* ─────────── IRT (In Reply To) selectors ─────────── */
+
+/**
+ * Get all IRT child annotation info for cascade delete.
+ * Returns array of { id, pageIndex } for each annotation that references parentId.
+ */
+export const getIRTChildIds = (
+  s: AnnotationDocumentState,
+  parentId: string,
+): { id: string; pageIndex: number }[] => {
+  const children: { id: string; pageIndex: number }[] = [];
+  for (const uidList of Object.values(s.pages)) {
+    for (const uid of uidList) {
+      const ta = s.byUid[uid];
+      if (ta && 'inReplyToId' in ta.object && ta.object.inReplyToId === parentId) {
+        children.push({ id: ta.object.id, pageIndex: ta.object.pageIndex });
+      }
+    }
+  }
+  return children;
+};
+
+/**
+ * Check if an annotation has any IRT children (links, replies, etc.)
+ */
+export const hasIRTChildren = (s: AnnotationDocumentState, parentId: string): boolean => {
+  for (const uidList of Object.values(s.pages)) {
+    for (const uid of uidList) {
+      const ta = s.byUid[uid];
+      if (ta && 'inReplyToId' in ta.object && ta.object.inReplyToId === parentId) {
+        return true;
+      }
+    }
+  }
+  return false;
+};
+
+/**
+ * Get IRT children filtered by annotation type (e.g., only LINK).
+ * @param s - The annotation document state
+ * @param parentId - The parent annotation ID
+ * @param types - Array of annotation subtypes to include
+ */
+export const getIRTChildrenByType = (
+  s: AnnotationDocumentState,
+  parentId: string,
+  types: PdfAnnotationSubtype[],
+): TrackedAnnotation[] => {
+  const children: TrackedAnnotation[] = [];
+  for (const uidList of Object.values(s.pages)) {
+    for (const uid of uidList) {
+      const ta = s.byUid[uid];
+      if (
+        ta &&
+        'inReplyToId' in ta.object &&
+        ta.object.inReplyToId === parentId &&
+        types.includes(ta.object.type)
+      ) {
+        children.push(ta);
+      }
+    }
+  }
+  return children;
+};
+
+/**
+ * Get link annotations attached to a parent annotation via IRT relationship.
+ * @param s - The annotation document state
+ * @param parentId - The parent annotation ID
+ */
+export const getAttachedLinks = (
+  s: AnnotationDocumentState,
+  parentId: string,
+): TrackedAnnotation[] => getIRTChildrenByType(s, parentId, [PdfAnnotationSubtype.LINK]);
+
+/**
+ * Check if an annotation has attached link children.
+ * @param s - The annotation document state
+ * @param parentId - The parent annotation ID
+ */
+export const hasAttachedLinks = (s: AnnotationDocumentState, parentId: string): boolean =>
+  getAttachedLinks(s, parentId).length > 0;
+
+/* ─────────── Group (RT = Group) selectors ─────────── */
+
+/**
+ * Get the leader ID of a group.
+ * If the annotation has inReplyToId with replyType = Group, return the inReplyToId.
+ * Otherwise, the annotation itself is the leader.
+ *
+ * @param s - The annotation document state
+ * @param annotationId - The annotation ID to find the group leader for
+ * @returns The leader annotation ID, or undefined if annotation not found
+ */
+export const getGroupLeaderId = (
+  s: AnnotationDocumentState,
+  annotationId: string,
+): string | undefined => {
+  const ta = s.byUid[annotationId];
+  if (!ta) return undefined;
+
+  // If this annotation has IRT with RT = Group, the IRT target is the leader
+  if (ta.object.inReplyToId && ta.object.replyType === PdfAnnotationReplyType.Group) {
+    return ta.object.inReplyToId;
+  }
+
+  // Otherwise, check if this annotation is a leader (has group members pointing to it)
+  // If it has no IRT or a different RT, it could be a leader
+  return annotationId;
+};
+
+/**
+ * Get all annotations in the same group as the given annotation.
+ * Returns the leader plus all annotations with inReplyToId pointing to leader and replyType = Group.
+ * Note: LINK annotations are excluded - they use IRT/Group for attachment but are not "group members"
+ * in the user-facing sense.
+ *
+ * @param s - The annotation document state
+ * @param annotationId - Any annotation ID in the group
+ * @returns Array of TrackedAnnotations in the group (including the annotation itself)
+ */
+export const getGroupMembers = (
+  s: AnnotationDocumentState,
+  annotationId: string,
+): TrackedAnnotation<PdfAnnotationObject>[] => {
+  const leaderId = getGroupLeaderId(s, annotationId);
+  if (!leaderId) return [];
+
+  const members: TrackedAnnotation<PdfAnnotationObject>[] = [];
+
+  // Add the leader (if it's not a LINK)
+  const leader = s.byUid[leaderId];
+  if (leader && leader.object.type !== PdfAnnotationSubtype.LINK) {
+    members.push(leader);
+  }
+
+  // Find all children with IRT pointing to leader and RT = Group (excluding LINKs)
+  for (const uidList of Object.values(s.pages)) {
+    for (const uid of uidList) {
+      const ta = s.byUid[uid];
+      if (
+        ta &&
+        ta.object.inReplyToId === leaderId &&
+        ta.object.replyType === PdfAnnotationReplyType.Group &&
+        ta.object.type !== PdfAnnotationSubtype.LINK // Exclude LINK annotations
+      ) {
+        members.push(ta);
+      }
+    }
+  }
+
+  return members;
+};
+
+/**
+ * Check if an annotation is part of a group.
+ * An annotation is in a group if:
+ * - It has inReplyToId with replyType = Group (it's a group member), OR
+ * - It has at least one other annotation pointing to it with replyType = Group (it's a group leader)
+ *
+ * Note: LINK annotations are excluded - they use IRT/Group for attachment but are not "group members"
+ * in the user-facing sense. An annotation with only attached links is NOT considered "in a group".
+ *
+ * @param s - The annotation document state
+ * @param annotationId - The annotation ID to check
+ * @returns true if the annotation is part of a group
+ */
+export const isInGroup = (s: AnnotationDocumentState, annotationId: string): boolean => {
+  const ta = s.byUid[annotationId];
+  if (!ta) return false;
+
+  // LINK annotations are never considered "in a group" for selection purposes
+  if (ta.object.type === PdfAnnotationSubtype.LINK) {
+    return false;
+  }
+
+  // Is this annotation a group member (has IRT with RT = Group)?
+  // But only if it's not a LINK (already checked above)
+  if (ta.object.inReplyToId && ta.object.replyType === PdfAnnotationReplyType.Group) {
+    return true;
+  }
+
+  // Is this annotation a group leader (has non-LINK members pointing to it)?
+  // Check if any annotation has inReplyToId = this annotation's ID with RT = Group
+  for (const uidList of Object.values(s.pages)) {
+    for (const uid of uidList) {
+      const other = s.byUid[uid];
+      if (
+        other &&
+        other.object.inReplyToId === annotationId &&
+        other.object.replyType === PdfAnnotationReplyType.Group &&
+        other.object.type !== PdfAnnotationSubtype.LINK // Exclude LINK annotations
+      ) {
+        return true;
+      }
+    }
+  }
+
+  return false;
+};
+
+/**
+ * Determine what grouping action is available for the current selection.
+ *
+ * @param s - The annotation document state
+ * @returns The available grouping action
+ */
+export const getSelectionGroupingAction = (s: AnnotationDocumentState): GroupingAction => {
+  const selected = getSelectedAnnotations(s);
+  if (selected.length === 0) return 'disabled';
+
+  const firstId = selected[0].object.id;
+  if (isInGroup(s, firstId)) {
+    const members = getGroupMembers(s, firstId);
+    const memberIds = new Set(members.map((m) => m.object.id));
+    if (selected.every((ta) => memberIds.has(ta.object.id))) {
+      return 'ungroup';
+    }
+  }
+
+  return selected.length >= 2 ? 'group' : 'disabled';
 };

@@ -2,7 +2,8 @@
   import type { Rect } from '@embedpdf/models';
 
   interface HighlightProps {
-    color?: string;
+    /** Stroke/markup color */
+    strokeColor?: string;
     opacity?: number;
     segmentRects: Rect[];
     rect?: Rect;
@@ -12,7 +13,7 @@
   }
 
   let {
-    color = '#FFFF00',
+    strokeColor,
     opacity = 0.5,
     segmentRects,
     rect,
@@ -20,6 +21,8 @@
     onClick,
     style,
   }: HighlightProps = $props();
+
+  const resolvedColor = $derived(strokeColor ?? '#FFFF00');
 </script>
 
 {#each segmentRects as b, i (i)}
@@ -33,7 +36,7 @@
     style:top="{(rect ? b.origin.y - rect.origin.y : b.origin.y) * scale}px"
     style:width="{b.size.width * scale}px"
     style:height="{b.size.height * scale}px"
-    style:background={color}
+    style:background={resolvedColor}
     style:opacity
     style:pointer-events={onClick ? 'auto' : 'none'}
     style:cursor={onClick ? 'pointer' : 'default'}

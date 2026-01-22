@@ -32,7 +32,7 @@ export const freeTextHandlerFactory: HandlerFactory<PdfFreeTextAnnoObject> = {
         opacity: tool.defaults.opacity ?? 1,
         fontSize: tool.defaults.fontSize ?? 12,
         fontFamily: tool.defaults.fontFamily ?? PdfStandardFont.Helvetica,
-        backgroundColor: tool.defaults.backgroundColor ?? 'transparent',
+        color: tool.defaults.color ?? tool.defaults.backgroundColor ?? 'transparent',
         textAlign: tool.defaults.textAlign ?? PdfTextAlignment.Left,
         verticalAlign: tool.defaults.verticalAlign ?? PdfVerticalAlignment.Top,
         contents: tool.defaults.contents ?? 'Insert text here',

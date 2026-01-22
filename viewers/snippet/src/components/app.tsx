@@ -60,6 +60,7 @@ import {
   SelectionLayer,
   SelectionPluginPackage,
   SelectionPluginConfig,
+  MarqueeSelection,
 } from '@embedpdf/plugin-selection/preact';
 import {
   TilingLayer,
@@ -117,6 +118,7 @@ import { AnnotationSidebar } from '@/components/annotation-sidebar';
 import { SchemaSelectionMenu } from '@/ui/schema-selection-menu';
 import { SchemaOverlay } from '@/ui/schema-overlay';
 import { PrintModal } from '@/components/print-modal';
+import { LinkModal } from '@/components/link-modal';
 import { PageControls } from '@/components/page-controls';
 
 import {
@@ -350,6 +352,7 @@ function ViewerLayout({ documentId, tabBarVisibility = 'multiple' }: ViewerLayou
 
   const selectionMenu = useSelectionMenu('selection', documentId);
   const annotationMenu = useSelectionMenu('annotation', documentId);
+  const groupAnnotationMenu = useSelectionMenu('groupAnnotation', documentId);
   const redactionMenu = useSelectionMenu('redaction', documentId);
 
   // Get document states for tab bar
@@ -429,7 +432,9 @@ function ViewerLayout({ documentId, tabBarVisibility = 'multiple' }: ViewerLayou
                                     documentId={documentId}
                                     pageIndex={pageIndex}
                                     selectionMenu={annotationMenu}
+                                    groupSelectionMenu={groupAnnotationMenu}
                                   />
+                                  <MarqueeSelection documentId={documentId} pageIndex={pageIndex} />
                                 </PagePointerProvider>
                               </Rotate>
                             )}
@@ -475,6 +480,7 @@ export function PDFViewer({ config, onRegistryReady }: PDFViewerProps) {
       'outline-sidebar': OutlineSidebar,
       'comment-sidebar': CommentSidebar,
       'print-modal': PrintModal,
+      'link-modal': LinkModal,
       'protect-modal': ProtectModal,
       'unlock-owner-overlay': UnlockOwnerOverlay,
       'page-controls': PageControls,

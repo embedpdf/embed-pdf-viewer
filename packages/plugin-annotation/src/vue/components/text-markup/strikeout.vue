@@ -23,7 +23,7 @@
         top: '50%',
         width: '100%',
         height: `${thickness}px`,
-        background: color,
+        background: resolvedColor,
         opacity: opacity,
         transform: 'translateY(-50%)',
         pointerEvents: 'none',
@@ -38,7 +38,8 @@ import { Rect } from '@embedpdf/models';
 
 const props = withDefaults(
   defineProps<{
-    color?: string;
+    /** Stroke/markup color */
+    strokeColor?: string;
     opacity?: number;
     segmentRects: Rect[];
     rect?: Rect;
@@ -46,10 +47,10 @@ const props = withDefaults(
     onClick?: (e: PointerEvent | TouchEvent) => void;
   }>(),
   {
-    color: '#FFFF00',
     opacity: 0.5,
   },
 );
 
+const resolvedColor = computed(() => props.strokeColor ?? '#FFFF00');
 const thickness = computed(() => 2 * props.scale);
 </script>

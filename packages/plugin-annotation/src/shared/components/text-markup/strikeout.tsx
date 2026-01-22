@@ -2,7 +2,8 @@ import { CSSProperties, MouseEvent, TouchEvent } from '@framework';
 import { Rect } from '@embedpdf/models';
 
 type StrikeoutProps = {
-  color?: string;
+  /** Stroke/markup color */
+  strokeColor?: string;
   opacity?: number;
   segmentRects: Rect[];
   rect?: Rect;
@@ -12,7 +13,7 @@ type StrikeoutProps = {
 };
 
 export function Strikeout({
-  color = '#FFFF00',
+  strokeColor,
   opacity = 0.5,
   segmentRects,
   rect,
@@ -20,6 +21,7 @@ export function Strikeout({
   onClick,
   style,
 }: StrikeoutProps) {
+  const resolvedColor = strokeColor ?? '#FFFF00';
   const thickness = 2 * scale;
 
   return (
@@ -50,7 +52,7 @@ export function Strikeout({
               top: '50%',
               width: '100%',
               height: thickness,
-              background: color,
+              background: resolvedColor,
               opacity: opacity,
               transform: 'translateY(-50%)',
               pointerEvents: 'none',

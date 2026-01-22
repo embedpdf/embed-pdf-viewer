@@ -24,7 +24,7 @@ export const annotationConfigs: Record<SidebarSubtype, AnnotationConfig> = {
     labelKey: 'annotation.highlight',
     icon: 'highlight',
     iconProps: (annotation: any) => ({
-      primaryColor: annotation.color || '#ffff00',
+      primaryColor: annotation.strokeColor || '#ffff00',
     }),
   },
   [PdfAnnotationSubtype.CIRCLE]: {
@@ -58,7 +58,7 @@ export const annotationConfigs: Record<SidebarSubtype, AnnotationConfig> = {
     labelKey: 'annotation.underline',
     icon: 'underline',
     iconProps: (annotation: any) => ({
-      primaryColor: annotation.color || '#000000',
+      primaryColor: annotation.strokeColor || '#000000',
     }),
   },
   [PdfAnnotationSubtype.SQUIGGLY]: {
@@ -66,7 +66,7 @@ export const annotationConfigs: Record<SidebarSubtype, AnnotationConfig> = {
     labelKey: 'annotation.squiggly',
     icon: 'squiggly',
     iconProps: (annotation: any) => ({
-      primaryColor: annotation.color || '#000000',
+      primaryColor: annotation.strokeColor || '#000000',
     }),
   },
   [PdfAnnotationSubtype.STRIKEOUT]: {
@@ -74,7 +74,7 @@ export const annotationConfigs: Record<SidebarSubtype, AnnotationConfig> = {
     labelKey: 'annotation.strikeout',
     icon: 'strikethrough',
     iconProps: (annotation: any) => ({
-      primaryColor: annotation.color || '#000000',
+      primaryColor: annotation.strokeColor || '#000000',
     }),
   },
   [PdfAnnotationSubtype.INK]: {
@@ -82,7 +82,7 @@ export const annotationConfigs: Record<SidebarSubtype, AnnotationConfig> = {
     labelKey: 'annotation.ink',
     icon: 'pencilMarker',
     iconProps: (annotation: any) => ({
-      primaryColor: annotation.color || '#000000',
+      primaryColor: annotation.strokeColor || '#000000',
     }),
   },
   [PdfAnnotationSubtype.FREETEXT]: {

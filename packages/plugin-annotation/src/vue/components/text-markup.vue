@@ -10,28 +10,28 @@
   >
     <Highlight
       v-if="activeTool.defaults.type === PdfAnnotationSubtype.HIGHLIGHT"
-      :color="activeTool.defaults.color"
+      :strokeColor="activeTool.defaults.strokeColor"
       :opacity="activeTool.defaults.opacity"
       :segmentRects="rects"
       :scale="scale"
     />
     <Underline
       v-else-if="activeTool.defaults.type === PdfAnnotationSubtype.UNDERLINE"
-      :color="activeTool.defaults.color"
+      :strokeColor="activeTool.defaults.strokeColor"
       :opacity="activeTool.defaults.opacity"
       :segmentRects="rects"
       :scale="scale"
     />
     <Strikeout
       v-else-if="activeTool.defaults.type === PdfAnnotationSubtype.STRIKEOUT"
-      :color="activeTool.defaults.color"
+      :strokeColor="activeTool.defaults.strokeColor"
       :opacity="activeTool.defaults.opacity"
       :segmentRects="rects"
       :scale="scale"
     />
     <Squiggly
       v-else-if="activeTool.defaults.type === PdfAnnotationSubtype.SQUIGGLY"
-      :color="activeTool.defaults.color"
+      :strokeColor="activeTool.defaults.strokeColor"
       :opacity="activeTool.defaults.opacity"
       :segmentRects="rects"
       :scale="scale"

@@ -57,7 +57,7 @@ export function TextMarkup({ documentId, pageIndex, scale }: TextMarkupProps) {
           }}
         >
           <Underline
-            color={activeTool.defaults?.color}
+            strokeColor={activeTool.defaults?.strokeColor}
             opacity={activeTool.defaults?.opacity}
             segmentRects={rects}
             scale={scale}
@@ -75,7 +75,7 @@ export function TextMarkup({ documentId, pageIndex, scale }: TextMarkupProps) {
           }}
         >
           <Highlight
-            color={activeTool.defaults?.color}
+            strokeColor={activeTool.defaults?.strokeColor}
             opacity={activeTool.defaults?.opacity}
             segmentRects={rects}
             scale={scale}
@@ -93,7 +93,7 @@ export function TextMarkup({ documentId, pageIndex, scale }: TextMarkupProps) {
           }}
         >
           <Strikeout
-            color={activeTool.defaults?.color}
+            strokeColor={activeTool.defaults?.strokeColor}
             opacity={activeTool.defaults?.opacity}
             segmentRects={rects}
             scale={scale}
@@ -111,7 +111,7 @@ export function TextMarkup({ documentId, pageIndex, scale }: TextMarkupProps) {
           }}
         >
           <Squiggly
-            color={activeTool.defaults?.color}
+            strokeColor={activeTool.defaults?.strokeColor}
             opacity={activeTool.defaults?.opacity}
             segmentRects={rects}
             scale={scale}

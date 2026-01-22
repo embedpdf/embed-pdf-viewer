@@ -7,6 +7,7 @@ import {
   VertexHandleUI,
   CustomAnnotationRenderer,
   AnnotationSelectionMenuRenderFn,
+  GroupSelectionMenuRenderFn,
 } from './types';
 import { AnnotationPaintLayer } from './annotation-paint-layer';
 import { PdfAnnotationObject, Rotation } from '@embedpdf/models';
@@ -19,6 +20,8 @@ type AnnotationLayerProps = Omit<HTMLAttributes<HTMLDivElement>, 'style'> & {
   rotation?: number;
   /** Customize selection menu across all annotations on this layer */
   selectionMenu?: AnnotationSelectionMenuRenderFn;
+  /** Customize group selection menu across all annotations on this layer */
+  groupSelectionMenu?: GroupSelectionMenuRenderFn;
   style?: CSSProperties;
   /** Customize resize handles */
   resizeUI?: ResizeHandleUI;
@@ -37,6 +40,7 @@ export function AnnotationLayer({
   scale: overrideScale,
   rotation: overrideRotation,
   selectionMenu,
+  groupSelectionMenu,
   resizeUI,
   vertexUI,
   selectionOutlineColor,
@@ -68,6 +72,7 @@ export function AnnotationLayer({
       <Annotations
         documentId={documentId}
         selectionMenu={selectionMenu}
+        groupSelectionMenu={groupSelectionMenu}
         pageIndex={pageIndex}
         scale={actualScale}
         rotation={actualRotation}

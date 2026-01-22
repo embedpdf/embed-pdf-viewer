@@ -67,7 +67,7 @@ export interface InkPreviewData {
   rect: Rect;
   inkList: PdfInkListObject[];
   strokeWidth: number;
-  color: string;
+  strokeColor: string;
   opacity: number;
 }
 
