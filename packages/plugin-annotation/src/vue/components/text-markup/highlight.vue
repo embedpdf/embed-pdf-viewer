@@ -10,7 +10,7 @@
       top: `${(rect ? b.origin.y - rect.origin.y : b.origin.y) * scale}px`,
       width: `${b.size.width * scale}px`,
       height: `${b.size.height * scale}px`,
-      background: color,
+      background: resolvedColor,
       opacity: opacity,
       pointerEvents: onClick ? 'auto' : 'none',
       cursor: onClick ? 'pointer' : 'default',
@@ -20,11 +20,13 @@
 </template>
 
 <script setup lang="ts">
+import { computed } from 'vue';
 import { Rect } from '@embedpdf/models';
 
-withDefaults(
+const props = withDefaults(
   defineProps<{
-    color?: string;
+    /** Stroke/markup color */
+    strokeColor?: string;
     opacity?: number;
     segmentRects: Rect[];
     rect?: Rect;
@@ -32,8 +34,9 @@ withDefaults(
     onClick?: (e: PointerEvent | TouchEvent) => void;
   }>(),
   {
-    color: '#FFFF00',
     opacity: 0.5,
   },
 );
+
+const resolvedColor = computed(() => props.strokeColor ?? '#FFFF00');
 </script>

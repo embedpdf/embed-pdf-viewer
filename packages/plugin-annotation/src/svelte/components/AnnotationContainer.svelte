@@ -1,7 +1,7 @@
 <script lang="ts" generics="T extends PdfAnnotationObject">
   import type { PdfAnnotationObject, Rect } from '@embedpdf/models';
   import { useDocumentPermissions } from '@embedpdf/core/svelte';
-  import { useAnnotationCapability } from '../hooks';
+  import { useAnnotationCapability, useAnnotationPlugin } from '../hooks';
   import type { AnnotationContainerProps } from './types';
   import {
     useInteractionHandles,
@@ -12,6 +12,7 @@
     type MenuWrapperProps,
   } from '@embedpdf/utils/svelte';
   import type { Snippet } from 'svelte';
+  import { untrack } from 'svelte';
   import { type AnnotationSelectionContext, type AnnotationSelectionMenuProps } from '../types';
 
   let {
@@ -24,6 +25,7 @@
     trackedAnnotation,
     children,
     isSelected,
+    isMultiSelected = false,
     isDraggable,
     isResizable,
     lockAspectRatio = false,
@@ -45,12 +47,18 @@
 
   let preview = $state<T>(trackedAnnotation.object);
   let annotationCapability = useAnnotationCapability();
+  const annotationPlugin = useAnnotationPlugin();
   const permissions = useDocumentPermissions(() => documentId);
   let gestureBaseRef = $state<T | null>(null);
+  let gestureBaseRectRef = $state<Rect | null>(null);
 
-  // Override props based on permission
-  const effectiveIsDraggable = $derived(permissions.canModifyAnnotations && isDraggable);
-  const effectiveIsResizable = $derived(permissions.canModifyAnnotations && isResizable);
+  // When multi-selected, disable individual drag/resize - GroupSelectionBox handles it
+  const effectiveIsDraggable = $derived(
+    permissions.canModifyAnnotations && isDraggable && !isMultiSelected,
+  );
+  const effectiveIsResizable = $derived(
+    permissions.canModifyAnnotations && isResizable && !isMultiSelected,
+  );
 
   // Wrap onDoubleClick to respect permissions
   const guardedOnDoubleClick = $derived(
@@ -66,16 +74,49 @@
     preview ? { ...trackedAnnotation.object, ...preview } : trackedAnnotation.object,
   );
 
-  // Defaults retain current behavior
+  // UI constants
   const HANDLE_COLOR = $derived(resizeUI?.color ?? '#007ACC');
   const VERTEX_COLOR = $derived(vertexUI?.color ?? '#007ACC');
   const HANDLE_SIZE = $derived(resizeUI?.size ?? 12);
   const VERTEX_SIZE = $derived(vertexUI?.size ?? 12);
 
+  // Determine if we should show the outline
+  // When multi-selected, don't show individual outlines - GroupSelectionBox shows the group outline
+  const showOutline = $derived(isSelected && !isMultiSelected);
+
+  // Sync preview with tracked annotation when it changes
   $effect(() => {
     if (trackedAnnotation.object) {
       preview = trackedAnnotation.object;
     }
+  });
+
+  // Subscribe to unified drag/resize changes - plugin sends pre-computed patches!
+  // ALL preview updates come through here (primary, attached links, multi-select)
+  $effect(() => {
+    const plugin = annotationPlugin.plugin;
+    if (!plugin) return;
+
+    const id = trackedAnnotation.object.id;
+
+    const handleEvent = (event: {
+      documentId: string;
+      type: string;
+      previewPatches?: Record<string, any>;
+    }) => {
+      if (event.documentId !== documentId) return;
+      const patch = event.previewPatches?.[id];
+      if (event.type === 'update' && patch) {
+        // Use untrack to prevent tracking the read of preview (like Vue's toRaw)
+        preview = { ...untrack(() => preview), ...patch } as T;
+      } else if (event.type === 'cancel') {
+        preview = trackedAnnotation.object;
+      }
+    };
+
+    const unsubs = [plugin.onDragChange(handleEvent), plugin.onResizeChange(handleEvent)];
+
+    return () => unsubs.forEach((u) => u());
   });
 
   const interactionHandles = useInteractionHandles(() => ({
@@ -90,39 +131,71 @@
       maintainAspectRatio: lockAspectRatio,
       pageRotation: rotation,
       scale: scale,
-      enabled: isSelected,
+      // Disable interaction handles when multi-selected
+      enabled: isSelected && !isMultiSelected,
       onUpdate: (event) => {
-        if (!event.transformData?.type) return;
+        if (!event.transformData?.type || isMultiSelected) return;
 
+        const plugin = annotationPlugin.plugin;
+        if (!plugin) return;
+
+        const { type, changes, metadata } = event.transformData;
+        const id = trackedAnnotation.object.id;
+        const pageSize = { width: pageWidth, height: pageHeight };
+
+        // Gesture start - initialize plugin drag/resize
         if (event.state === 'start') {
-          gestureBaseRef = currentObject;
+          gestureBaseRectRef = trackedAnnotation.object.rect;
+          gestureBaseRef = trackedAnnotation.object; // For vertex edit
+
+          if (type === 'move') {
+            plugin.startDrag(documentId, { annotationIds: [id], pageSize });
+          } else if (type === 'resize') {
+            plugin.startResize(documentId, {
+              annotationIds: [id],
+              pageSize,
+              resizeHandle: metadata?.handle ?? 'se',
+            });
+          }
         }
 
-        const transformType = event.transformData.type;
-        const base = gestureBaseRef ?? currentObject;
-
-        const changes = event.transformData.changes.vertices
-          ? vertexConfig?.transformAnnotation(base, event.transformData.changes.vertices)
-          : { rect: event.transformData.changes.rect };
-
-        const patched = annotationCapability.provides?.transformAnnotation<T>(base, {
-          type: transformType,
-          changes: changes as Partial<T>,
-          metadata: event.transformData.metadata,
-        });
-
-        if (patched) {
-          preview = {
-            ...preview,
-            ...patched,
-          };
+        // Gesture update - call plugin, preview comes from subscription
+        if (changes.rect && gestureBaseRectRef) {
+          if (type === 'move') {
+            const delta = {
+              x: changes.rect.origin.x - gestureBaseRectRef.origin.x,
+              y: changes.rect.origin.y - gestureBaseRectRef.origin.y,
+            };
+            plugin.updateDrag(documentId, delta);
+          } else if (type === 'resize') {
+            plugin.updateResize(documentId, changes.rect);
+          }
         }
-        if (event.state === 'end' && patched) {
+
+        // Vertex edit - handle directly (no attached link handling needed)
+        if (type === 'vertex-edit' && changes.vertices && vertexConfig) {
+          const base = gestureBaseRef ?? trackedAnnotation.object;
+          const vertexChanges = vertexConfig.transformAnnotation(base, changes.vertices);
+          const patched = annotationCapability.provides?.transformAnnotation<T>(base, {
+            type,
+            changes: vertexChanges as Partial<T>,
+            metadata,
+          });
+          if (patched) {
+            preview = { ...preview, ...patched };
+            if (event.state === 'end') {
+              const sanitized = deepToRaw(patched);
+              annotationProvides?.updateAnnotation(pageIndex, id, sanitized);
+            }
+          }
+        }
+
+        // Gesture end - commit
+        if (event.state === 'end') {
+          gestureBaseRectRef = null;
           gestureBaseRef = null;
-          // Sanitize to remove Svelte reactive properties before updating
-          // Use deepToRaw to recursively strip proxies while preserving complex objects
-          const sanitized = deepToRaw(patched);
-          annotationProvides?.updateAnnotation(pageIndex, trackedAnnotation.object.id, sanitized);
+          if (type === 'move') plugin.commitDrag(documentId);
+          else if (type === 'resize') plugin.commitResize(documentId);
         }
       },
     },
@@ -146,8 +219,10 @@
 
   // --- Selection Menu Logic ---
 
-  // Check if we should show menu
-  const shouldShowMenu = $derived(isSelected && (!!selectionMenu || !!selectionMenuSnippet));
+  // Check if we should show menu - hide when multi-selected
+  const shouldShowMenu = $derived(
+    isSelected && !isMultiSelected && (!!selectionMenu || !!selectionMenuSnippet),
+  );
 
   // Build context object for selection menu
   function buildContext(): AnnotationSelectionContext {
@@ -189,9 +264,9 @@
     style:top="{currentObject.rect.origin.y * scale}px"
     style:width="{currentObject.rect.size.width * scale}px"
     style:height="{currentObject.rect.size.height * scale}px"
-    style:outline={isSelected ? `1px solid ${selectionOutlineColor}` : 'none'}
-    style:outline-offset={isSelected ? `${outlineOffset}px` : '0px'}
-    style:pointer-events={isSelected ? 'auto' : 'none'}
+    style:outline={showOutline ? `1px solid ${selectionOutlineColor}` : 'none'}
+    style:outline-offset={showOutline ? `${outlineOffset}px` : '0px'}
+    style:pointer-events={isSelected && !isMultiSelected ? 'auto' : 'none'}
     style:touch-action="none"
     style:cursor={isSelected && effectiveIsDraggable ? 'move' : 'default'}
     style:z-index={zIndex}
@@ -215,6 +290,7 @@
       {@render children(currentObject)}
     {/if}
 
+    <!-- Resize handles - only when single-selected -->
     {#if isSelected && effectiveIsResizable}
       {#each resizeHandles as { key, style: handleStyle, ...hProps } (key)}
         {#if resizeUI?.component}
@@ -226,7 +302,8 @@
       {/each}
     {/if}
 
-    {#if isSelected && permissions.canModifyAnnotations}
+    <!-- Vertex handles - only when single-selected -->
+    {#if isSelected && permissions.canModifyAnnotations && !isMultiSelected}
       {#each vertexHandles as { key, style: vertexStyle, ...vProps } (key)}
         {#if vertexUI?.component}
           {@const Component = vertexUI.component}
@@ -238,7 +315,7 @@
     {/if}
   </div>
 
-  <!-- Selection Menu: Supports BOTH render function and snippet -->
+  <!-- Selection Menu: Supports BOTH render function and snippet - hide when multi-selected -->
   {#if shouldShowMenu}
     <CounterRotate
       rect={{

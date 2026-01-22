@@ -79,6 +79,20 @@ export const englishTranslations: Locale = {
       ink: 'Ink',
       stamp: 'Stamp',
       overflowTools: 'Overflow Tools',
+      group: 'Group',
+      ungroup: 'Ungroup',
+      addLink: 'Add Link',
+      removeLink: 'Remove Link',
+      deleteAllSelected: 'Delete All',
+    },
+    link: {
+      title: 'Insert Link',
+      url: 'URL',
+      page: 'Page',
+      enterUrl: 'Enter URL',
+      enterPage: 'Enter Page Number',
+      pageRange: 'Page 1 to {totalPages}',
+      link: 'Link',
     },
     redaction: {
       area: 'Redact Area',
@@ -136,6 +150,7 @@ export const englishTranslations: Locale = {
     },
     common: {
       close: 'Close',
+      cancel: 'Cancel',
     },
   },
 };
@@ -217,6 +232,20 @@ export const spanishTranslations: Locale = {
       ink: 'Tinta',
       stamp: 'Sello',
       overflowTools: 'Más herramientas',
+      group: 'Agrupar',
+      ungroup: 'Desagrupar',
+      addLink: 'Agregar enlace',
+      removeLink: 'Eliminar enlace',
+      deleteAllSelected: 'Eliminar todo',
+    },
+    link: {
+      title: 'Insertar enlace',
+      url: 'URL',
+      page: 'Página',
+      enterUrl: 'Ingrese URL',
+      enterPage: 'Ingrese número de página',
+      pageRange: 'Página 1 a {totalPages}',
+      link: 'Enlazar',
     },
     redaction: {
       area: 'Redactar área',
@@ -275,6 +304,7 @@ export const spanishTranslations: Locale = {
     },
     common: {
       close: 'Cerrar',
+      cancel: 'Cancelar',
     },
   },
 };
@@ -356,6 +386,20 @@ export const germanTranslations: Locale = {
       ink: 'Stift',
       stamp: 'Stempel',
       overflowTools: 'Weitere Werkzeuge',
+      group: 'Gruppieren',
+      ungroup: 'Gruppierung aufheben',
+      addLink: 'Link hinzufügen',
+      removeLink: 'Link entfernen',
+      deleteAllSelected: 'Alle löschen',
+    },
+    link: {
+      title: 'Link einfügen',
+      url: 'URL',
+      page: 'Seite',
+      enterUrl: 'URL eingeben',
+      enterPage: 'Seitenzahl eingeben',
+      pageRange: 'Seite 1 bis {totalPages}',
+      link: 'Verlinken',
     },
     redaction: {
       area: 'Bereich schwärzen',
@@ -414,6 +458,7 @@ export const germanTranslations: Locale = {
     },
     common: {
       close: 'Schließen',
+      cancel: 'Abbrechen',
     },
   },
 };
@@ -495,6 +540,20 @@ export const dutchTranslations: Locale = {
       ink: 'Inkt',
       stamp: 'Stempel',
       overflowTools: 'Meer gereedschappen',
+      group: 'Groeperen',
+      ungroup: 'Degroeperen',
+      addLink: 'Link toevoegen',
+      removeLink: 'Link verwijderen',
+      deleteAllSelected: 'Alles verwijderen',
+    },
+    link: {
+      title: 'Link invoegen',
+      url: 'URL',
+      page: 'Pagina',
+      enterUrl: 'Voer URL in',
+      enterPage: 'Voer paginanummer in',
+      pageRange: 'Pagina 1 tot {totalPages}',
+      link: 'Koppelen',
     },
     redaction: {
       area: 'Gebied redigeren',
@@ -553,6 +612,7 @@ export const dutchTranslations: Locale = {
     },
     common: {
       close: 'Sluiten',
+      cancel: 'Annuleren',
     },
   },
 };

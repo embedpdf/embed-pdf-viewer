@@ -43,22 +43,16 @@ export const MarqueeSelection = ({
     return documentState?.scale ?? 1;
   }, [scale, documentState?.scale]);
 
-  const pageSize = useMemo(() => {
-    const page = documentState?.document?.pages.find((p) => p.index === pageIndex);
-    return page?.size ?? { width: 0, height: 0 };
-  }, [documentState?.document?.pages, pageIndex]);
-
   useEffect(() => {
-    if (!selPlugin || !documentId || pageSize.width === 0) return;
+    if (!selPlugin || !documentId) return;
 
     return selPlugin.registerMarqueeOnPage({
       documentId,
       pageIndex,
-      pageSize,
       scale: actualScale,
       onRectChange: setRect,
     });
-  }, [selPlugin, documentId, pageIndex, pageSize, actualScale]);
+  }, [selPlugin, documentId, pageIndex, actualScale]);
 
   if (!rect) return null;
 

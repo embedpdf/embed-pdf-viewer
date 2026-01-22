@@ -76,8 +76,6 @@ export interface RegisterSelectionOnPageOptions {
 export interface RegisterMarqueeOnPageOptions {
   documentId: string;
   pageIndex: number;
-  /** The page size (for marquee clamping) */
-  pageSize: Size;
   /** The current scale factor (for marquee threshold calculation) */
   scale: number;
   /** Called when the marquee rect changes during drag, or null when cancelled/ended */

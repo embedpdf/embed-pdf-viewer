@@ -5,6 +5,8 @@
   import type {
     AnnotationSelectionMenuProps,
     AnnotationSelectionMenuRenderFn,
+    GroupSelectionMenuProps,
+    GroupSelectionMenuRenderFn,
     CustomAnnotationRenderer,
     ResizeHandleUI,
     VertexHandleUI,
@@ -24,6 +26,10 @@
     selectionMenu?: AnnotationSelectionMenuRenderFn;
     /** Snippet for custom selection menu (slot-based approach) */
     selectionMenuSnippet?: Snippet<[AnnotationSelectionMenuProps]>;
+    /** Render function for group selection menu (schema-driven approach) */
+    groupSelectionMenu?: GroupSelectionMenuRenderFn;
+    /** Snippet for custom group selection menu (slot-based approach) */
+    groupSelectionMenuSnippet?: Snippet<[GroupSelectionMenuProps]>;
     style?: Record<string, string | number | undefined>;
     /** Customize resize handles */
     resizeUI?: ResizeHandleUI;
@@ -43,6 +49,8 @@
     rotation: overrideRotation,
     selectionMenu,
     selectionMenuSnippet,
+    groupSelectionMenu,
+    groupSelectionMenuSnippet,
     resizeUI,
     vertexUI,
     selectionOutlineColor,
@@ -76,6 +84,8 @@
     {documentId}
     {selectionMenu}
     {selectionMenuSnippet}
+    {groupSelectionMenu}
+    {groupSelectionMenuSnippet}
     {pageIndex}
     scale={actualScale}
     rotation={actualRotation}

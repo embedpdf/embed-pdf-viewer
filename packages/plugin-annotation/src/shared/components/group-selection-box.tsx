@@ -1,4 +1,4 @@
-import { Rect } from '@embedpdf/models';
+import { Rect, boundingRectOrEmpty } from '@embedpdf/models';
 import { useInteractionHandles, CounterRotate } from '@embedpdf/utils/@framework';
 import { TrackedAnnotation } from '@embedpdf/plugin-annotation';
 import { useState, useMemo, useCallback, useRef, useEffect } from '@framework';
@@ -32,32 +32,6 @@ interface GroupSelectionBoxProps {
 }
 
 /**
- * Compute the union bounding box of multiple rects.
- */
-function computeGroupBoundingBox(rects: Rect[]): Rect {
-  if (rects.length === 0) {
-    return { origin: { x: 0, y: 0 }, size: { width: 0, height: 0 } };
-  }
-
-  let minX = Infinity;
-  let minY = Infinity;
-  let maxX = -Infinity;
-  let maxY = -Infinity;
-
-  for (const rect of rects) {
-    minX = Math.min(minX, rect.origin.x);
-    minY = Math.min(minY, rect.origin.y);
-    maxX = Math.max(maxX, rect.origin.x + rect.size.width);
-    maxY = Math.max(maxY, rect.origin.y + rect.size.height);
-  }
-
-  return {
-    origin: { x: minX, y: minY },
-    size: { width: maxX - minX, height: maxY - minY },
-  };
-}
-
-/**
  * GroupSelectionBox renders a bounding box around all selected annotations
  * with drag and resize handles for group manipulation.
  */
@@ -85,7 +59,7 @@ export function GroupSelectionBox({
   // Compute the group bounding box from all selected annotations
   const groupBox = useMemo(() => {
     const rects = selectedAnnotations.map((ta) => ta.object.rect);
-    return computeGroupBoundingBox(rects);
+    return boundingRectOrEmpty(rects);
   }, [selectedAnnotations]);
 
   // Preview state for the group box during drag/resize
@@ -224,7 +198,7 @@ export function GroupSelectionBox({
   }
 
   return (
-    <div data-group-selection-box>
+    <div data-group-selection-box data-no-interaction>
       {/* Group box - draggable only if isDraggable is true */}
       <div
         {...(isDraggable

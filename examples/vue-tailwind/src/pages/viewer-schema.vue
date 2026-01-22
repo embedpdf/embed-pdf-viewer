@@ -43,7 +43,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed } from 'vue';
+import { ref, computed, markRaw } from 'vue';
 import { EmbedPDF } from '@embedpdf/core/vue';
 import { usePdfiumEngine } from '@embedpdf/engines/vue';
 import { createPluginRegistration, PluginRegistry } from '@embedpdf/core';
@@ -80,7 +80,8 @@ import EmptyState from '../components/EmptyState.vue';
 import { ConsoleLogger } from '@embedpdf/models';
 import { commands } from '../config/commands';
 import { viewerUISchema } from '../config/ui-schema';
-import { SchemaToolbar, SchemaPanel, SchemaMenu } from '../ui';
+import { SchemaToolbar, SchemaPanel, SchemaMenu, SchemaModal } from '../ui';
+import LinkModal from '../components/LinkModal.vue';
 import ZoomToolbar from '../components/ZoomToolbar.vue';
 import ThumbnailsSidebar from '../components/ThumbnailsSidebar.vue';
 import SearchSidebar from '../components/SearchSidebar.vue';
@@ -115,21 +116,25 @@ const containerRef = ref<HTMLDivElement | null>(null);
 
 const { engine, isLoading, error } = usePdfiumEngine({
   logger,
+  wasmUrl: 'http://localhost:3020/pdfium.wasm',
 });
 
 // Memoize UIProvider props to prevent unnecessary remounts
+// Mark each component as raw to prevent reactivity
 const uiComponents = computed(() => ({
-  'zoom-toolbar': ZoomToolbar,
-  'thumbnails-sidebar': ThumbnailsSidebar,
-  'search-sidebar': SearchSidebar,
-  'outline-sidebar': OutlineSidebar,
+  'zoom-toolbar': markRaw(ZoomToolbar),
+  'thumbnails-sidebar': markRaw(ThumbnailsSidebar),
+  'search-sidebar': markRaw(SearchSidebar),
+  'outline-sidebar': markRaw(OutlineSidebar),
+  'link-modal': markRaw(LinkModal),
 }));
 
 const uiRenderers = computed(() => ({
-  toolbar: SchemaToolbar,
-  sidebar: SchemaPanel,
-  menu: SchemaMenu,
-  selectionMenu: SchemaSelectionMenu,
+  toolbar: markRaw(SchemaToolbar),
+  sidebar: markRaw(SchemaPanel),
+  menu: markRaw(SchemaMenu),
+  selectionMenu: markRaw(SchemaSelectionMenu),
+  modal: markRaw(SchemaModal),
 }));
 
 const plugins = computed(() => [

@@ -57,7 +57,9 @@
                           :documentId="documentId"
                           :pageIndex="page.pageIndex"
                           :selectionMenu="annotationMenu"
+                          :groupSelectionMenu="groupAnnotationMenu"
                         />
+                        <MarqueeSelection :documentId="documentId" :pageIndex="page.pageIndex" />
                       </PagePointerProvider>
                     </Rotate>
                   </Scroller>
@@ -74,6 +76,9 @@
     <!-- Right Panels -->
     <component :is="renderSidebar('right', 'main')" />
   </div>
+
+  <!-- Modals -->
+  <component :is="renderModal()" />
 </template>
 
 <script setup lang="ts">
@@ -91,7 +96,7 @@ import { TilingLayer } from '@embedpdf/plugin-tiling/vue';
 import { SearchLayer } from '@embedpdf/plugin-search/vue';
 import { MarqueeZoom, ZoomGestureWrapper } from '@embedpdf/plugin-zoom/vue';
 import { MarqueeCapture } from '@embedpdf/plugin-capture/vue';
-import { SelectionLayer } from '@embedpdf/plugin-selection/vue';
+import { SelectionLayer, MarqueeSelection } from '@embedpdf/plugin-selection/vue';
 import { RedactionLayer } from '@embedpdf/plugin-redaction/vue';
 import { AnnotationLayer } from '@embedpdf/plugin-annotation/vue';
 import LoadingSpinner from './LoadingSpinner.vue';
@@ -111,9 +116,10 @@ interface Props {
 
 const props = defineProps<Props>();
 
-const { renderToolbar, renderSidebar } = useSchemaRenderer(() => props.documentId);
+const { renderToolbar, renderSidebar, renderModal } = useSchemaRenderer(() => props.documentId);
 
 const annotationMenu = useSelectionMenu('annotation', () => props.documentId);
+const groupAnnotationMenu = useSelectionMenu('groupAnnotation', () => props.documentId);
 const redactionMenu = useSelectionMenu('redaction', () => props.documentId);
 const selectionMenu = useSelectionMenu('selection', () => props.documentId);
 </script>

@@ -379,7 +379,7 @@ export class SelectionPlugin extends BasePlugin<
    * only - marquee selection is only active in the default pointer mode.
    */
   public registerMarqueeOnPage(opts: RegisterMarqueeOnPageOptions) {
-    const { documentId, pageIndex, pageSize, scale, onRectChange } = opts;
+    const { documentId, pageIndex, scale, onRectChange } = opts;
     const docState = this.state.documents[documentId];
 
     if (!docState) {
@@ -391,6 +391,28 @@ export class SelectionPlugin extends BasePlugin<
       return () => {};
     }
 
+    // Get page size from core state (same pattern as ZoomPlugin)
+    const coreDoc = this.coreState.core.documents[documentId];
+    if (!coreDoc || !coreDoc.document) {
+      this.logger.warn(
+        'SelectionPlugin',
+        'DocumentNotFound',
+        `Cannot register marquee on page ${pageIndex}: document not found`,
+      );
+      return () => {};
+    }
+
+    const page = coreDoc.document.pages[pageIndex];
+    if (!page) {
+      this.logger.warn(
+        'SelectionPlugin',
+        'PageNotFound',
+        `Cannot register marquee on page ${pageIndex}: page not found`,
+      );
+      return () => {};
+    }
+
+    const pageSize = page.size;
     const minDragPx = this.config.marquee?.minDragPx ?? 5;
 
     // Create marquee selection handler
