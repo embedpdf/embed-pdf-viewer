@@ -1,5 +1,11 @@
 # @embedpdf/plugin-redaction
 
+## 2.3.0
+
+### Patch Changes
+
+- [#406](https://github.com/embedpdf/embed-pdf-viewer/pull/406) by [@bobsingor](https://github.com/bobsingor) – Updated to use the new `enableForMode` signature with options object. Configured redaction mode to suppress selection layer rects since the redaction plugin renders its own selection visualization.
+
 ## 2.2.0
 
 ### Minor Changes
