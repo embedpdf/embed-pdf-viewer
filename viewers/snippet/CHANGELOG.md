@@ -1,5 +1,11 @@
 # @embedpdf/snippet
 
+## 2.3.1
+
+### Patch Changes
+
+- [`57a8431`](https://github.com/embedpdf/embed-pdf-viewer/commit/57a843137bd968118e36a768c7012d9f8defad45) by [@bobsingor](https://github.com/bobsingor) – Fixed TabButton component causing unintended form submission when used inside forms. Added `type="button"` to prevent tab buttons from triggering form submit, which was causing the link modal to close immediately when switching to the Page tab.
+
 ## 2.3.0
 
 ### Minor Changes
