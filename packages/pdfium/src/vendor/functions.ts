@@ -49,6 +49,8 @@ export const functions = {
   EPDFAnnot_GetIntent: [['number', 'number', 'number'] as const, 'number'] as const,
   EPDFAnnot_GetLineEndings: [['number', 'number', 'number'] as const, 'boolean'] as const,
   EPDFAnnot_GetOpacity: [['number', 'number'] as const, 'boolean'] as const,
+  EPDFAnnot_GetOverlayText: [['number', 'number', 'number'] as const, 'number'] as const,
+  EPDFAnnot_GetOverlayTextRepeat: [['number'] as const, 'boolean'] as const,
   EPDFAnnot_GetRectangleDifferences: [
     ['number', 'number', 'number', 'number', 'number'] as const,
     'boolean',
@@ -74,6 +76,8 @@ export const functions = {
   EPDFAnnot_SetLineEndings: [['number', 'number', 'number'] as const, 'boolean'] as const,
   EPDFAnnot_SetLinkedAnnot: [['number', 'string', 'number'] as const, 'boolean'] as const,
   EPDFAnnot_SetOpacity: [['number', 'number'] as const, 'boolean'] as const,
+  EPDFAnnot_SetOverlayText: [['number', 'number'] as const, 'boolean'] as const,
+  EPDFAnnot_SetOverlayTextRepeat: [['number', 'boolean'] as const, 'boolean'] as const,
   EPDFAnnot_SetReplyType: [['number', 'number'] as const, 'boolean'] as const,
   EPDFAnnot_SetTextAlignment: [['number', 'number'] as const, 'boolean'] as const,
   EPDFAnnot_SetVerticalAlignment: [['number', 'number'] as const, 'boolean'] as const,
