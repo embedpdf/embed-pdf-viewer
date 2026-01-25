@@ -21,4 +21,5 @@ export * from './redaction-plugin';
 export * from './types';
 export * from './manifest';
 export * from './selectors';
+export * from './tools';
 export { initialState, initialDocumentState } from './reducer';

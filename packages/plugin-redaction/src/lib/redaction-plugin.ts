@@ -39,6 +39,7 @@ import {
   InteractionManagerCapability,
   InteractionManagerPlugin,
 } from '@embedpdf/plugin-interaction-manager';
+import { AnnotationCapability, AnnotationPlugin } from '@embedpdf/plugin-annotation';
 import {
   addPending,
   clearPending,
@@ -53,6 +54,7 @@ import {
 } from './actions';
 import { createMarqueeHandler } from './handlers';
 import { initialDocumentState } from './reducer';
+import { redactTools } from './tools';
 
 export class RedactionPlugin extends BasePlugin<
   RedactionPluginConfig,
@@ -65,6 +67,7 @@ export class RedactionPlugin extends BasePlugin<
   private config: RedactionPluginConfig;
   private selectionCapability: SelectionCapability | undefined;
   private interactionManagerCapability: InteractionManagerCapability | undefined;
+  private annotationCapability: AnnotationCapability | undefined;
 
   // Per-document emitters
   private readonly redactionSelection$ = new Map<
@@ -89,6 +92,14 @@ export class RedactionPlugin extends BasePlugin<
     this.interactionManagerCapability = this.registry
       .getPlugin<InteractionManagerPlugin>('interaction-manager')
       ?.provides();
+    this.annotationCapability = this.registry.getPlugin<AnnotationPlugin>('annotation')?.provides();
+
+    // Register redact tools with annotation plugin
+    if (this.annotationCapability) {
+      for (const tool of redactTools) {
+        this.annotationCapability.addTool(tool);
+      }
+    }
 
     if (this.interactionManagerCapability) {
       this.interactionManagerCapability.registerMode({

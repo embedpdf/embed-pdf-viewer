@@ -46,6 +46,7 @@ import {
   AnnotationSelectionMenuRenderFn,
   GroupSelectionMenuRenderFn,
   VertexHandleUI,
+  BoxedAnnotationRenderer,
 } from './types';
 import { Circle } from './annotations/circle';
 import { Line } from './annotations/line';
@@ -68,6 +69,8 @@ interface AnnotationsProps {
   vertexUI?: VertexHandleUI;
   selectionOutlineColor?: string;
   customAnnotationRenderer?: CustomAnnotationRenderer<PdfAnnotationObject>;
+  /** Custom renderers for specific annotation types (provided by external plugins) */
+  annotationRenderers?: BoxedAnnotationRenderer[];
 }
 
 export function Annotations(annotationsProps: AnnotationsProps) {
@@ -211,6 +214,37 @@ export function Annotations(annotationsProps: AnnotationsProps) {
         const isSelected = allSelectedIds.includes(annotation.object.id);
         const isEditing = editingId === annotation.object.id;
         const tool = annotationProvides?.findToolForAnnotation(annotation.object);
+
+        // Check for custom renderer first (from external plugins like redaction)
+        for (const renderer of annotationsProps.annotationRenderers ?? []) {
+          const element = renderer.tryRender(annotation, {
+            isSelected,
+            scale,
+            pageIndex,
+            onClick: (e) => handleClick(e, annotation),
+          });
+          if (element) {
+            return (
+              <AnnotationContainer
+                key={annotation.object.id}
+                trackedAnnotation={annotation}
+                isSelected={isSelected}
+                isMultiSelected={isMultiSelected}
+                isDraggable={tool?.interaction.isDraggable ?? false}
+                isResizable={tool?.interaction.isResizable ?? false}
+                lockAspectRatio={tool?.interaction.lockAspectRatio ?? false}
+                selectionMenu={selectionMenu}
+                onSelect={(e) => handleClick(e, annotation)}
+                style={{
+                  mixBlendMode: blendModeToCss(annotation.object.blendMode ?? PdfBlendMode.Normal),
+                }}
+                {...annotationsProps}
+              >
+                {() => element}
+              </AnnotationContainer>
+            );
+          }
+        }
 
         if (isInk(annotation)) {
           return (

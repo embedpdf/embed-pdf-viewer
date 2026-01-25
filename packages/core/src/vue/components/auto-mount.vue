@@ -31,14 +31,20 @@ const elements = computed(() => {
 </script>
 
 <template>
-  <NestedWrapper v-if="elements.wrappers.length > 0" :wrappers="elements.wrappers">
+  <NestedWrapper
+    v-if="elements.wrappers.length > 0"
+    :wrappers="elements.wrappers"
+    :utilities="elements.utilities"
+  >
     <slot />
   </NestedWrapper>
-  <slot v-else />
-
-  <component
-    v-for="(utility, index) in elements.utilities"
-    :key="`utility-${index}`"
-    :is="utility"
-  />
+  <template v-else>
+    <!-- No wrappers - render children and utilities directly -->
+    <slot />
+    <component
+      v-for="(utility, index) in elements.utilities"
+      :key="`utility-${index}`"
+      :is="utility"
+    />
+  </template>
 </template>

@@ -1654,7 +1654,10 @@ export const commands: Record<string, Command<State>> = {
         .forDocument(documentId);
       const selected = scope?.getSelectedAnnotation();
       if (!selected) return true;
-      return selected.object.type !== PdfAnnotationSubtype.LINK;
+      return (
+        selected.object.type !== PdfAnnotationSubtype.LINK &&
+        selected.object.type !== PdfAnnotationSubtype.REDACT
+      );
     },
     disabled: ({ state, documentId }) => {
       return lacksPermission(state, documentId, PdfPermissionFlag.ModifyAnnotations);

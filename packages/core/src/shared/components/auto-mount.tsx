@@ -31,18 +31,21 @@ export function AutoMount({ plugins, children }: AutoMountProps) {
     return { utilities, wrappers };
   }, [plugins]);
 
-  // React-specific wrapping logic
-  const wrappedContent = wrappers.reduce(
-    (content, Wrapper) => <Wrapper>{content}</Wrapper>,
-    children,
-  );
-
-  return (
+  // Combine children and utilities as siblings inside the wrapper chain
+  const contentWithUtilities = (
     <Fragment>
-      {wrappedContent}
+      {children}
       {utilities.map((Utility, i) => (
         <Utility key={`utility-${i}`} />
       ))}
     </Fragment>
   );
+
+  // Wrap everything together - utilities now inside wrapper context
+  const wrappedContent = wrappers.reduce(
+    (content, Wrapper) => <Wrapper>{content}</Wrapper>,
+    contentWithUtilities,
+  );
+
+  return <Fragment>{wrappedContent}</Fragment>;
 }

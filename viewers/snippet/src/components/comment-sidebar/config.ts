@@ -118,6 +118,14 @@ export const annotationConfigs: Record<SidebarSubtype, AnnotationConfig> = {
       primaryColor: '#dc2626',
     }),
   },
+  [PdfAnnotationSubtype.REDACT]: {
+    label: 'Redact',
+    labelKey: 'annotation.redact',
+    icon: 'redact',
+    iconProps: (annotation: any) => ({
+      primaryColor: annotation.color || '#000000',
+    }),
+  },
 };
 
 export const getAnnotationConfig = (annotation: TrackedAnnotation): AnnotationConfig | null => {
