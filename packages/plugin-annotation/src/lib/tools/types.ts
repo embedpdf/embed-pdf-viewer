@@ -107,10 +107,19 @@ export type AnnotationTool<T extends PdfAnnotationObject = PdfAnnotationObject> 
     /** If true, this interaction mode is activated by selecting text. */
     textSelection?: boolean;
 
-    /** Annotation interaction behaviors */
+    // Single annotation behaviors
+    /** Whether this annotation can be dragged when selected individually. */
     isDraggable?: boolean;
+    /** Whether this annotation can be resized when selected individually. */
     isResizable?: boolean;
+    /** Whether to maintain aspect ratio during resize. */
     lockAspectRatio?: boolean;
+
+    // Group behaviors (default to single annotation values if not specified)
+    /** Whether this annotation can be dragged when part of a group. Defaults to isDraggable. */
+    isGroupDraggable?: boolean;
+    /** Whether this annotation can be resized when part of a group. Defaults to isResizable. */
+    isGroupResizable?: boolean;
   };
 
   /** Tool-specific behavior settings that override plugin defaults */

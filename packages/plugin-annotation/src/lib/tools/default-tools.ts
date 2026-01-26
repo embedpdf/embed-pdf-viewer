@@ -20,10 +20,14 @@ export const defaultTools = [
       textSelection: true,
       isDraggable: false,
       isResizable: false,
+      // Text markup annotations are anchored to text and should not move/resize in groups
+      isGroupDraggable: false,
+      isGroupResizable: false,
     },
     defaults: {
       type: PdfAnnotationSubtype.HIGHLIGHT,
-      color: '#FFCD45',
+      strokeColor: '#FFCD45',
+      color: '#FFCD45', // deprecated alias
       opacity: 1,
       blendMode: PdfBlendMode.Multiply,
     },
@@ -37,10 +41,13 @@ export const defaultTools = [
       textSelection: true,
       isDraggable: false,
       isResizable: false,
+      isGroupDraggable: false,
+      isGroupResizable: false,
     },
     defaults: {
       type: PdfAnnotationSubtype.UNDERLINE,
-      color: '#E44234',
+      strokeColor: '#E44234',
+      color: '#E44234', // deprecated alias
       opacity: 1,
     },
   },
@@ -51,10 +58,15 @@ export const defaultTools = [
     interaction: {
       exclusive: false,
       textSelection: true,
+      isDraggable: false,
+      isResizable: false,
+      isGroupDraggable: false,
+      isGroupResizable: false,
     },
     defaults: {
       type: PdfAnnotationSubtype.STRIKEOUT,
-      color: '#E44234',
+      strokeColor: '#E44234',
+      color: '#E44234', // deprecated alias
       opacity: 1,
     },
   },
@@ -67,10 +79,13 @@ export const defaultTools = [
       textSelection: true,
       isDraggable: false,
       isResizable: false,
+      isGroupDraggable: false,
+      isGroupResizable: false,
     },
     defaults: {
       type: PdfAnnotationSubtype.SQUIGGLY,
-      color: '#E44234',
+      strokeColor: '#E44234',
+      color: '#E44234', // deprecated alias
       opacity: 1,
     },
   },
@@ -89,7 +104,8 @@ export const defaultTools = [
     },
     defaults: {
       type: PdfAnnotationSubtype.INK,
-      color: '#E44234',
+      strokeColor: '#E44234',
+      color: '#E44234', // deprecated alias
       opacity: 1,
       strokeWidth: 6,
     },
@@ -109,7 +125,8 @@ export const defaultTools = [
     defaults: {
       type: PdfAnnotationSubtype.INK,
       intent: 'InkHighlight',
-      color: '#FFCD45',
+      strokeColor: '#FFCD45',
+      color: '#FFCD45', // deprecated alias
       opacity: 1,
       strokeWidth: 14,
       blendMode: PdfBlendMode.Multiply,
@@ -173,8 +190,9 @@ export const defaultTools = [
       exclusive: false,
       cursor: 'crosshair',
       isDraggable: true,
-      isResizable: false,
+      isResizable: false, // Uses vertex editing when selected individually
       lockAspectRatio: false,
+      isGroupResizable: true, // Scales proportionally in a group
     },
     defaults: {
       type: PdfAnnotationSubtype.LINE,
@@ -197,8 +215,9 @@ export const defaultTools = [
       exclusive: false,
       cursor: 'crosshair',
       isDraggable: true,
-      isResizable: false,
+      isResizable: false, // Uses vertex editing when selected individually
       lockAspectRatio: false,
+      isGroupResizable: true, // Scales proportionally in a group
     },
     defaults: {
       type: PdfAnnotationSubtype.LINE,
@@ -226,8 +245,9 @@ export const defaultTools = [
       exclusive: false,
       cursor: 'crosshair',
       isDraggable: true,
-      isResizable: false,
+      isResizable: false, // Uses vertex editing when selected individually
       lockAspectRatio: false,
+      isGroupResizable: true, // Scales proportionally in a group
     },
     defaults: {
       type: PdfAnnotationSubtype.POLYLINE,
@@ -245,8 +265,9 @@ export const defaultTools = [
       exclusive: false,
       cursor: 'crosshair',
       isDraggable: true,
-      isResizable: false,
+      isResizable: false, // Uses vertex editing when selected individually
       lockAspectRatio: false,
+      isGroupResizable: true, // Scales proportionally in a group
     },
     defaults: {
       type: PdfAnnotationSubtype.POLYGON,
@@ -277,7 +298,8 @@ export const defaultTools = [
       fontFamily: PdfStandardFont.Helvetica,
       textAlign: PdfTextAlignment.Left,
       verticalAlign: PdfVerticalAlignment.Top,
-      backgroundColor: 'transparent',
+      color: 'transparent', // fill color (matches shape convention)
+      backgroundColor: 'transparent', // deprecated alias
       opacity: 1,
     },
     clickBehavior: {

@@ -18,6 +18,15 @@ export interface AnnotationSelectionContext {
 export type AnnotationSelectionMenuProps = SelectionMenuPropsBase<AnnotationSelectionContext>;
 export type AnnotationSelectionMenuRenderFn = SelectionMenuRenderFn<AnnotationSelectionContext>;
 
+export interface GroupSelectionContext {
+  type: 'group';
+  annotations: TrackedAnnotation[];
+  pageIndex: number;
+}
+
+export type GroupSelectionMenuProps = SelectionMenuPropsBase<GroupSelectionContext>;
+export type GroupSelectionMenuRenderFn = SelectionMenuRenderFn<GroupSelectionContext>;
+
 export type HandleProps = HandleElementProps & {
   backgroundColor?: string;
 };

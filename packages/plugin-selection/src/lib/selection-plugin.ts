@@ -21,6 +21,7 @@ import {
   InteractionManagerCapability,
   InteractionManagerPlugin,
   PointerEventHandlersWithLifecycle,
+  EmbedPdfPointerEvent,
 } from '@embedpdf/plugin-interaction-manager';
 import { ViewportCapability, ViewportMetrics, ViewportPlugin } from '@embedpdf/plugin-viewport';
 import { ScrollCapability, ScrollPlugin } from '@embedpdf/plugin-scroll';
@@ -45,6 +46,7 @@ import {
   SelectionRangeX,
   SelectionState,
   RegisterSelectionOnPageOptions,
+  RegisterMarqueeOnPageOptions,
   SelectionRectsCallback,
   SelectionScope,
   SelectionChangeEvent,
@@ -55,8 +57,15 @@ import {
   SelectionDocumentState,
   SelectionMenuPlacement,
   SelectionMenuPlacementEvent,
+  EnableForModeOptions,
+  MarqueeChangeEvent,
+  MarqueeEndEvent,
+  MarqueeScopeEvent,
+  MarqueeEndScopeEvent,
 } from './types';
-import { sliceBounds, rectsWithinSlice, glyphAt } from './utils';
+import { sliceBounds, rectsWithinSlice } from './utils';
+import { createTextSelectionHandler } from './handlers/text-selection.handler';
+import { createMarqueeSelectionHandler } from './handlers/marquee-selection.handler';
 
 export class SelectionPlugin extends BasePlugin<
   SelectionPluginConfig,
@@ -66,12 +75,16 @@ export class SelectionPlugin extends BasePlugin<
 > {
   static readonly id = 'selection' as const;
 
-  /** Modes that should trigger text-selection logic, per document */
-  private enabledModesPerDoc = new Map<string, Set<string>>();
+  /** Modes that should trigger text-selection logic, per document (mode -> config) */
+  private enabledModesPerDoc = new Map<string, Map<string, EnableForModeOptions>>();
 
   /* interactive state, per document */
   private selecting = new Map<string, boolean>();
   private anchor = new Map<string, { page: number; index: number } | undefined>();
+
+  /** Marquee state tracking, per document */
+  private marqueeEnabled = new Map<string, boolean>();
+  private marqueePage = new Map<string, number>();
 
   /** Page callbacks for rect updates, per document */
   private pageCallbacks = new Map<string, Map<number, (data: SelectionRectsCallback) => void>>();
@@ -103,14 +116,31 @@ export class SelectionPlugin extends BasePlugin<
     { cache: false },
   );
 
+  // Marquee selection emitters
+  private readonly marqueeChange$ = createScopedEmitter<
+    MarqueeScopeEvent,
+    MarqueeChangeEvent,
+    string
+  >((documentId, data) => ({ documentId, pageIndex: data.pageIndex, rect: data.rect }), {
+    cache: false,
+  });
+  private readonly marqueeEnd$ = createScopedEmitter<MarqueeEndScopeEvent, MarqueeEndEvent, string>(
+    (documentId, data) => ({ documentId, pageIndex: data.pageIndex, rect: data.rect }),
+    {
+      cache: false,
+    },
+  );
+
   private interactionManagerCapability: InteractionManagerCapability;
   private viewportCapability: ViewportCapability | null = null;
   private scrollCapability: ScrollCapability | null = null;
 
   private readonly menuHeight: number;
+  private readonly config: SelectionPluginConfig;
 
   constructor(id: string, registry: PluginRegistry, config: SelectionPluginConfig) {
     super(id, registry);
+    this.config = config;
     this.menuHeight = config.menuHeight ?? 40;
 
     const imPlugin = registry.getPlugin<InteractionManagerPlugin>('interaction-manager');
@@ -145,10 +175,17 @@ export class SelectionPlugin extends BasePlugin<
   /* ── life-cycle ────────────────────────────────────────── */
   protected override onDocumentLoadingStarted(documentId: string): void {
     this.dispatch(initSelectionState(documentId, initialSelectionDocumentState));
-    this.enabledModesPerDoc.set(documentId, new Set<string>(['pointerMode']));
+    this.enabledModesPerDoc.set(
+      documentId,
+      new Map<string, EnableForModeOptions>([['pointerMode', { showRects: true }]]),
+    );
     this.pageCallbacks.set(documentId, new Map());
     this.selecting.set(documentId, false);
     this.anchor.set(documentId, undefined);
+
+    // Initialize marquee state based on config
+    const marqueeConfig = this.config.marquee;
+    this.marqueeEnabled.set(documentId, marqueeConfig?.enabled !== false);
   }
 
   protected override onDocumentClosed(documentId: string): void {
@@ -157,12 +194,16 @@ export class SelectionPlugin extends BasePlugin<
     this.pageCallbacks.delete(documentId);
     this.selecting.delete(documentId);
     this.anchor.delete(documentId);
+    this.marqueeEnabled.delete(documentId);
+    this.marqueePage.delete(documentId);
     this.selChange$.clearScope(documentId);
     this.textRetrieved$.clearScope(documentId);
     this.copyToClipboard$.clearScope(documentId);
     this.beginSelection$.clearScope(documentId);
     this.endSelection$.clearScope(documentId);
     this.menuPlacement$.clearScope(documentId);
+    this.marqueeChange$.clearScope(documentId);
+    this.marqueeEnd$.clearScope(documentId);
   }
 
   async initialize() {}
@@ -173,6 +214,8 @@ export class SelectionPlugin extends BasePlugin<
     this.beginSelection$.clear();
     this.endSelection$.clear();
     this.menuPlacement$.clear();
+    this.marqueeChange$.clear();
+    this.marqueeEnd$.clear();
     super.destroy();
   }
 
@@ -197,9 +240,14 @@ export class SelectionPlugin extends BasePlugin<
       clear: (docId) => this.clearSelection(getDocId(docId)),
       copyToClipboard: (docId) => this.copyToClipboard(getDocId(docId)),
       getState: (docId) => this.getDocumentState(getDocId(docId)),
-      enableForMode: (modeId, docId) => this.enabledModesPerDoc.get(getDocId(docId))?.add(modeId),
+      enableForMode: (modeId, options, docId) =>
+        this.enabledModesPerDoc.get(getDocId(docId))?.set(modeId, { showRects: true, ...options }),
       isEnabledForMode: (modeId, docId) =>
         this.enabledModesPerDoc.get(getDocId(docId))?.has(modeId) ?? false,
+
+      // Marquee selection
+      setMarqueeEnabled: (enabled, docId) => this.setMarqueeEnabled(getDocId(docId), enabled),
+      isMarqueeEnabled: (docId) => this.isMarqueeEnabled(getDocId(docId)),
 
       // Document-scoped operations
       forDocument: this.createSelectionScope.bind(this),
@@ -210,6 +258,10 @@ export class SelectionPlugin extends BasePlugin<
       onTextRetrieved: this.textRetrieved$.onGlobal,
       onBeginSelection: this.beginSelection$.onGlobal,
       onEndSelection: this.endSelection$.onGlobal,
+
+      // Marquee selection events
+      onMarqueeChange: this.marqueeChange$.onGlobal,
+      onMarqueeEnd: this.marqueeEnd$.onGlobal,
     };
   }
 
@@ -230,11 +282,15 @@ export class SelectionPlugin extends BasePlugin<
       clear: () => this.clearSelection(documentId),
       copyToClipboard: () => this.copyToClipboard(documentId),
       getState: () => this.getDocumentState(documentId),
+      setMarqueeEnabled: (enabled) => this.setMarqueeEnabled(documentId, enabled),
+      isMarqueeEnabled: () => this.isMarqueeEnabled(documentId),
       onSelectionChange: this.selChange$.forScope(documentId),
       onTextRetrieved: this.textRetrieved$.forScope(documentId),
       onCopyToClipboard: this.copyToClipboard$.forScope(documentId),
       onBeginSelection: this.beginSelection$.forScope(documentId),
       onEndSelection: this.endSelection$.forScope(documentId),
+      onMarqueeChange: this.marqueeChange$.forScope(documentId),
+      onMarqueeEnd: this.marqueeEnd$.forScope(documentId),
     };
   }
 
@@ -259,6 +315,10 @@ export class SelectionPlugin extends BasePlugin<
     return this.menuPlacement$.forScope(documentId)(listener);
   }
 
+  /**
+   * Register text selection on a page. Uses `registerAlways` so any plugin
+   * can enable text selection for their mode via `enableForMode()`.
+   */
   public registerSelectionOnPage(opts: RegisterSelectionOnPageOptions) {
     const { documentId, pageIndex, onRectsChange } = opts;
     const docState = this.state.documents[documentId];
@@ -285,61 +345,25 @@ export class SelectionPlugin extends BasePlugin<
       boundingRect: selector.selectBoundingRectForPage(docState, pageIndex),
     });
 
-    const handlers: PointerEventHandlersWithLifecycle<PointerEvent> = {
-      onPointerDown: (point: Position, _evt, modeId) => {
-        if (!enabledModes?.has(modeId)) return;
+    // Create text selection handler
+    const textHandler = createTextSelectionHandler({
+      getGeometry: () => this.getDocumentState(documentId).geometry[pageIndex],
+      isEnabled: (modeId) => enabledModes?.has(modeId) ?? false,
+      onBegin: (g) => this.beginSelection(documentId, pageIndex, g),
+      onUpdate: (g) => this.updateSelection(documentId, pageIndex, g),
+      onEnd: () => this.endSelection(documentId),
+      onClear: () => this.clearSelection(documentId),
+      isSelecting: () => this.selecting.get(documentId) ?? false,
+      setCursor: (cursor) =>
+        cursor
+          ? interactionScope.setCursor('selection-text', cursor, 10)
+          : interactionScope.removeCursor('selection-text'),
+    });
 
-        // Clear the selection
-        this.clearSelection(documentId);
-
-        // Get geometry from cache (or load if needed)
-        const cached = this.getDocumentState(documentId).geometry[pageIndex];
-        if (cached) {
-          const g = glyphAt(cached, point);
-          if (g !== -1) {
-            this.beginSelection(documentId, pageIndex, g);
-          }
-        }
-      },
-      onPointerMove: (point: Position, _evt, modeId) => {
-        if (!enabledModes?.has(modeId)) return;
-
-        // Get cached geometry (should be instant if already loaded)
-        const cached = this.getDocumentState(documentId).geometry[pageIndex];
-        if (cached) {
-          const g = glyphAt(cached, point);
-
-          // Update cursor
-          if (g !== -1) {
-            interactionScope.setCursor('selection-text', 'text', 10);
-          } else {
-            interactionScope.removeCursor('selection-text');
-          }
-
-          // Update selection if we're selecting
-          if (this.selecting.get(documentId) && g !== -1) {
-            this.updateSelection(documentId, pageIndex, g);
-          }
-        }
-      },
-      onPointerUp: (_point: Position, _evt, modeId) => {
-        if (!enabledModes?.has(modeId)) return;
-        this.endSelection(documentId);
-      },
-      onHandlerActiveEnd: (modeId) => {
-        if (!enabledModes?.has(modeId)) return;
-        this.clearSelection(documentId);
-      },
-    };
-
-    // Register the handlers with interaction manager for all enabled modes
-    // This assumes `registerAlways` is a method that runs handlers for *any* mode,
-    // and the handler itself checks the `modeId`.
-    // If `registerAlways` is not available, this would need to register
-    // for each mode in `enabledModes` separately.
+    // Register text selection with registerAlways - any plugin can enable it for their mode
     const unregisterHandlers = this.interactionManagerCapability.registerAlways({
       scope: { type: 'page', documentId, pageIndex },
-      handlers,
+      handlers: textHandler,
     });
 
     // Return cleanup function
@@ -348,6 +372,79 @@ export class SelectionPlugin extends BasePlugin<
       this.pageCallbacks.get(documentId)?.delete(pageIndex);
       geoTask.abort({ code: PdfErrorCode.Cancelled, message: 'Cleanup' });
     };
+  }
+
+  /**
+   * Register marquee selection on a page. Uses `registerHandlers` with `pointerMode`
+   * only - marquee selection is only active in the default pointer mode.
+   */
+  public registerMarqueeOnPage(opts: RegisterMarqueeOnPageOptions) {
+    const { documentId, pageIndex, scale, onRectChange } = opts;
+    const docState = this.state.documents[documentId];
+
+    if (!docState) {
+      this.logger.warn(
+        'SelectionPlugin',
+        'RegisterMarqueeFailed',
+        `Cannot register marquee on page ${pageIndex} for document ${documentId}: document state not initialized.`,
+      );
+      return () => {};
+    }
+
+    // Get page size from core state (same pattern as ZoomPlugin)
+    const coreDoc = this.coreState.core.documents[documentId];
+    if (!coreDoc || !coreDoc.document) {
+      this.logger.warn(
+        'SelectionPlugin',
+        'DocumentNotFound',
+        `Cannot register marquee on page ${pageIndex}: document not found`,
+      );
+      return () => {};
+    }
+
+    const page = coreDoc.document.pages[pageIndex];
+    if (!page) {
+      this.logger.warn(
+        'SelectionPlugin',
+        'PageNotFound',
+        `Cannot register marquee on page ${pageIndex}: page not found`,
+      );
+      return () => {};
+    }
+
+    const pageSize = page.size;
+    const minDragPx = this.config.marquee?.minDragPx ?? 5;
+
+    // Create marquee selection handler
+    const marqueeHandler = createMarqueeSelectionHandler({
+      pageSize,
+      scale,
+      minDragPx,
+      isEnabled: () => this.marqueeEnabled.get(documentId) !== false,
+      onBegin: (pos) => this.beginMarquee(documentId, pageIndex, pos),
+      onChange: (rect) => {
+        this.updateMarquee(documentId, pageIndex, rect);
+        onRectChange(rect);
+      },
+      onEnd: (rect) => {
+        this.endMarquee(documentId, pageIndex, rect);
+        onRectChange(null);
+      },
+      onCancel: () => {
+        this.cancelMarquee(documentId);
+        onRectChange(null);
+      },
+    });
+
+    // Register marquee ONLY for pointerMode
+    const unregisterHandlers = this.interactionManagerCapability.registerHandlers({
+      documentId,
+      pageIndex,
+      modeId: 'pointerMode',
+      handlers: marqueeHandler,
+    });
+
+    return unregisterHandlers;
   }
 
   /**
@@ -474,7 +571,12 @@ export class SelectionPlugin extends BasePlugin<
     if (callback) {
       const docState = this.getDocumentState(documentId);
       const mode = this.interactionManagerCapability.forDocument(documentId).getActiveMode();
-      if (mode === 'pointerMode') {
+      const modeConfig = this.enabledModesPerDoc.get(documentId)?.get(mode);
+
+      // Show rects if mode is enabled and showRects is not explicitly false
+      const shouldShowRects = modeConfig && modeConfig.showRects !== false;
+
+      if (shouldShowRects) {
         callback({
           rects: selector.selectRectsForPage(docState, pageIndex),
           boundingRect: selector.selectBoundingRectForPage(docState, pageIndex),
@@ -638,5 +740,36 @@ export class SelectionPlugin extends BasePlugin<
     text.wait((text) => {
       this.copyToClipboard$.emit(documentId, text.join('\n'));
     }, ignore);
+  }
+
+  /* ── marquee selection state updates ─────────────────────── */
+  private beginMarquee(documentId: string, pageIndex: number, _startPos: Position) {
+    this.marqueePage.set(documentId, pageIndex);
+  }
+
+  private updateMarquee(documentId: string, pageIndex: number, rect: Rect) {
+    this.marqueeChange$.emit(documentId, { pageIndex, rect });
+  }
+
+  private endMarquee(documentId: string, pageIndex: number, rect: Rect) {
+    this.marqueeEnd$.emit(documentId, { pageIndex, rect });
+    this.marqueeChange$.emit(documentId, { pageIndex, rect: null });
+    this.marqueePage.delete(documentId);
+  }
+
+  private cancelMarquee(documentId: string) {
+    const pageIndex = this.marqueePage.get(documentId);
+    if (pageIndex !== undefined) {
+      this.marqueeChange$.emit(documentId, { pageIndex, rect: null });
+      this.marqueePage.delete(documentId);
+    }
+  }
+
+  private setMarqueeEnabled(documentId: string, enabled: boolean) {
+    this.marqueeEnabled.set(documentId, enabled);
+  }
+
+  private isMarqueeEnabled(documentId: string): boolean {
+    return this.marqueeEnabled.get(documentId) !== false;
   }
 }

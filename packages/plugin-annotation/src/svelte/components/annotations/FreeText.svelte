@@ -119,7 +119,7 @@
     style:font-size={`${adjustedFontPx}px`}
     style:font-family={standardFontCss(annotation.object.fontFamily)}
     style:text-align={textAlignmentToCss(annotation.object.textAlign)}
-    style:background-color={annotation.object.backgroundColor}
+    style:background-color={annotation.object.color ?? annotation.object.backgroundColor}
     style:opacity={annotation.object.opacity}
     style:width={needsComp ? `${invScalePercent}%` : '100%'}
     style:height={needsComp ? `${invScalePercent}%` : '100%'}

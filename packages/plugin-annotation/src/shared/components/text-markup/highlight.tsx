@@ -2,7 +2,8 @@ import { CSSProperties, MouseEvent, TouchEvent } from '@framework';
 import { Rect } from '@embedpdf/models';
 
 type HighlightProps = {
-  color?: string;
+  /** Stroke/markup color */
+  strokeColor?: string;
   opacity?: number;
   segmentRects: Rect[];
   rect?: Rect;
@@ -12,7 +13,7 @@ type HighlightProps = {
 };
 
 export function Highlight({
-  color = '#FFFF00',
+  strokeColor,
   opacity = 0.5,
   segmentRects,
   rect,
@@ -20,6 +21,8 @@ export function Highlight({
   onClick,
   style,
 }: HighlightProps) {
+  const resolvedColor = strokeColor ?? '#FFFF00';
+
   return (
     <>
       {segmentRects.map((b, i) => (
@@ -33,7 +36,7 @@ export function Highlight({
             top: (rect ? b.origin.y - rect.origin.y : b.origin.y) * scale,
             width: b.size.width * scale,
             height: b.size.height * scale,
-            background: color,
+            background: resolvedColor,
             opacity: opacity,
             pointerEvents: onClick ? 'auto' : 'none',
             cursor: onClick ? 'pointer' : 'default',

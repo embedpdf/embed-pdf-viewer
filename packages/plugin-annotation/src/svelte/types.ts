@@ -16,9 +16,18 @@ export interface AnnotationSelectionContext {
   pageIndex: number;
 }
 
+export interface GroupSelectionContext {
+  type: 'group';
+  annotations: TrackedAnnotation[];
+  pageIndex: number;
+}
+
 // For manual component props
 export type AnnotationSelectionMenuProps = SelectionMenuPropsBase<AnnotationSelectionContext>;
 export type AnnotationSelectionMenuRenderFn = SelectionMenuRenderFn<AnnotationSelectionContext>;
+
+export type GroupSelectionMenuProps = SelectionMenuPropsBase<GroupSelectionContext>;
+export type GroupSelectionMenuRenderFn = SelectionMenuRenderFn<GroupSelectionContext>;
 
 export interface HandleProps {
   backgroundColor?: string;

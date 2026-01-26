@@ -2,7 +2,8 @@
   import type { Rect } from '@embedpdf/models';
 
   interface UnderlineProps {
-    color?: string;
+    /** Stroke/markup color */
+    strokeColor?: string;
     opacity?: number;
     segmentRects: Rect[];
     rect?: Rect;
@@ -12,7 +13,7 @@
   }
 
   let {
-    color = '#FFFF00',
+    strokeColor,
     opacity = 0.5,
     segmentRects,
     rect,
@@ -21,6 +22,7 @@
     style,
   }: UnderlineProps = $props();
 
+  const resolvedColor = $derived(strokeColor ?? '#FFFF00');
   const thickness = $derived(2 * scale); // 2 CSS px at 100% zoom
 </script>
 
@@ -48,7 +50,7 @@
       style:bottom="0"
       style:width="100%"
       style:height="{thickness}px"
-      style:background={color}
+      style:background={resolvedColor}
       style:opacity
       style:pointer-events="none"
     ></div>

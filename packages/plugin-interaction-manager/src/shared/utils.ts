@@ -213,6 +213,9 @@ export function createPointerProvider(
       currentTarget: EventTarget | null;
     };
 
+    // Track propagation state for this event
+    let propagationStopped = false;
+
     if (isTouchEvent(evt)) {
       const tp =
         evt.type === 'touchend' || evt.type === 'touchcancel'
@@ -232,6 +235,10 @@ export function createPointerProvider(
         currentTarget: evt.currentTarget,
         setPointerCapture: () => {},
         releasePointerCapture: () => {},
+        stopImmediatePropagation: () => {
+          propagationStopped = true;
+        },
+        isImmediatePropagationStopped: () => propagationStopped,
       };
     } else {
       const pe = evt as PointerEvent;
@@ -251,6 +258,10 @@ export function createPointerProvider(
         releasePointerCapture: () => {
           (pe.target as HTMLElement)?.releasePointerCapture?.(pe.pointerId);
         },
+        stopImmediatePropagation: () => {
+          propagationStopped = true;
+        },
+        isImmediatePropagationStopped: () => propagationStopped,
       };
     }
 

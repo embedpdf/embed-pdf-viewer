@@ -74,7 +74,7 @@
       style:inset="0"
     >
       <Underline
-        color={activeTool.defaults?.color}
+        strokeColor={activeTool.defaults?.strokeColor}
         opacity={activeTool.defaults?.opacity}
         segmentRects={rects}
         {scale}
@@ -88,7 +88,7 @@
       style:inset="0"
     >
       <Highlight
-        color={activeTool.defaults?.color}
+        strokeColor={activeTool.defaults?.strokeColor}
         opacity={activeTool.defaults?.opacity}
         segmentRects={rects}
         {scale}
@@ -102,7 +102,7 @@
       style:inset="0"
     >
       <Strikeout
-        color={activeTool.defaults?.color}
+        strokeColor={activeTool.defaults?.strokeColor}
         opacity={activeTool.defaults?.opacity}
         segmentRects={rects}
         {scale}
@@ -116,7 +116,7 @@
       style:inset="0"
     >
       <Squiggly
-        color={activeTool.defaults?.color}
+        strokeColor={activeTool.defaults?.strokeColor}
         opacity={activeTool.defaults?.opacity}
         segmentRects={rects}
         {scale}
