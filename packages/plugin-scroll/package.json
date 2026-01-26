@@ -53,7 +53,7 @@
     "@embedpdf/core": "workspace:*",
     "@embedpdf/plugin-viewport": "workspace:*",
     "@embedpdf/plugin-spread": "workspace:*",
-    "@types/react": "^18.2.0",
+    "@types/react": "^19.2.8",
     "typescript": "^5.0.0"
   },
   "peerDependencies": {

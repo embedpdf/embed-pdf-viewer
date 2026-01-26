@@ -65,7 +65,7 @@
     "@embedpdf/models": "workspace:*",
     "@embedpdf/build": "workspace:*",
     "typescript": "^5.0.0",
-    "@types/react": "^18.2.0"
+    "@types/react": "^19.2.8"
   },
   "peerDependencies": {
     "react": ">=16.8.0",
