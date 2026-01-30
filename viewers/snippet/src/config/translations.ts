@@ -166,6 +166,9 @@ export const englishTranslations: Locale = {
       removeLink: 'Remove Link',
       gotoLink: 'Go to Link',
       comment: 'Comment',
+      redact: 'Redact',
+      overlayText: 'Overlay Text',
+      overlayTextPlaceholder: 'e.g., REDACTED',
     },
     redaction: {
       area: 'Redact Area',
@@ -489,6 +492,9 @@ export const germanTranslations: Locale = {
       removeLink: 'Link entfernen',
       gotoLink: 'Zum Link gehen',
       comment: 'Kommentar',
+      redact: 'Schwärzen',
+      overlayText: 'Überlagerungstext',
+      overlayTextPlaceholder: 'z.B. GESCHWÄRZT',
     },
     redaction: {
       area: 'Bereich schwärzen',
@@ -814,6 +820,9 @@ export const dutchTranslations: Locale = {
       removeLink: 'Link verwijderen',
       gotoLink: 'Ga naar link',
       comment: 'Opmerking',
+      redact: 'Redigeren',
+      overlayText: 'Overlaytekst',
+      overlayTextPlaceholder: 'bijv. GEREDIGEERD',
     },
     redaction: {
       area: 'Gebied redigeren',
@@ -1137,6 +1146,9 @@ export const frenchTranslations: Locale = {
       removeLink: 'Supprimer le lien',
       gotoLink: 'Aller au lien',
       comment: 'Commentaire',
+      redact: 'Caviarder',
+      overlayText: 'Texte de superposition',
+      overlayTextPlaceholder: 'ex: CAVIARDÉ',
     },
     redaction: {
       area: 'Caviarder la zone',
@@ -1462,6 +1474,9 @@ export const spanishTranslations: Locale = {
       removeLink: 'Eliminar enlace',
       gotoLink: 'Ir al enlace',
       comment: 'Comentario',
+      redact: 'Redactar',
+      overlayText: 'Texto superpuesto',
+      overlayTextPlaceholder: 'ej: REDACTADO',
     },
     redaction: {
       area: 'Redactar área',
@@ -1785,6 +1800,9 @@ export const simplifiedChineseTranslations: Locale = {
       removeLink: '移除链接',
       gotoLink: '跳转到链接',
       comment: '评论',
+      redact: '遮蔽',
+      overlayText: '覆盖文字',
+      overlayTextPlaceholder: '例如：已遮蔽',
     },
     redaction: {
       area: '遮蔽区域',

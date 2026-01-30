@@ -218,6 +218,8 @@ export interface AnnotationScope {
   deleteAnnotation(pageIndex: number, annotationId: string): void;
   /** Delete multiple annotations in batch */
   deleteAnnotations(annotations: Array<{ pageIndex: number; id: string }>): void;
+  /** Remove an annotation from state without calling the engine (no PDF modification) */
+  purgeAnnotation(pageIndex: number, annotationId: string): void;
   renderAnnotation(options: RenderAnnotationOptions): Task<Blob, PdfErrorReason>;
   commit(): Task<boolean, PdfErrorReason>;
 
@@ -292,6 +294,8 @@ export interface AnnotationCapability {
     annotations: Array<{ pageIndex: number; id: string }>,
     documentId?: string,
   ) => void;
+  /** Remove an annotation from state without calling the engine (no PDF modification) */
+  purgeAnnotation: (pageIndex: number, annotationId: string, documentId?: string) => void;
   renderAnnotation: (options: RenderAnnotationOptions) => Task<Blob, PdfErrorReason>;
   commit: () => Task<boolean, PdfErrorReason>;
 

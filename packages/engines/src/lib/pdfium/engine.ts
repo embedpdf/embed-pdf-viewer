@@ -4888,6 +4888,167 @@ export class PdfiumNative implements IPdfiumExecutor {
     return PdfTaskHelper.resolve<boolean>(!!ok);
   }
 
+  /**
+   * Apply a single redaction annotation, permanently removing content underneath
+   * and flattening the RO (Redact Overlay) appearance stream if present.
+   * The annotation is removed after successful application.
+   *
+   * @param doc - document object
+   * @param page - page object
+   * @param annotation - the redact annotation to apply
+   * @returns true if successful
+   */
+  public applyRedaction(
+    doc: PdfDocumentObject,
+    page: PdfPageObject,
+    annotation: PdfAnnotationObject,
+  ): PdfTask<boolean> {
+    this.logger.debug(
+      LOG_SOURCE,
+      LOG_CATEGORY,
+      'applyRedaction',
+      doc.id,
+      page.index,
+      annotation.id,
+    );
+    const label = 'ApplyRedaction';
+    this.logger.perf(LOG_SOURCE, LOG_CATEGORY, label, 'Begin', `${doc.id}-${page.index}`);
+
+    const ctx = this.cache.getContext(doc.id);
+    if (!ctx) {
+      this.logger.perf(LOG_SOURCE, LOG_CATEGORY, label, 'End', `${doc.id}-${page.index}`);
+      return PdfTaskHelper.reject<boolean>({
+        code: PdfErrorCode.DocNotOpen,
+        message: 'document does not open',
+      });
+    }
+
+    const pageCtx = ctx.acquirePage(page.index);
+    const annotPtr = this.getAnnotationByName(pageCtx.pagePtr, annotation.id);
+    if (!annotPtr) {
+      pageCtx.release();
+      this.logger.perf(LOG_SOURCE, LOG_CATEGORY, label, 'End', `${doc.id}-${page.index}`);
+      return PdfTaskHelper.reject<boolean>({
+        code: PdfErrorCode.NotFound,
+        message: 'annotation not found',
+      });
+    }
+
+    // Apply the redaction (removes content, flattens RO, removes annotation)
+    const ok = this.pdfiumModule.EPDFAnnot_ApplyRedaction(pageCtx.pagePtr, annotPtr);
+    this.pdfiumModule.FPDFPage_CloseAnnot(annotPtr);
+
+    if (ok) {
+      // Regenerate page content
+      this.pdfiumModule.FPDFPage_GenerateContent(pageCtx.pagePtr);
+    }
+
+    pageCtx.disposeImmediate();
+    this.logger.perf(LOG_SOURCE, LOG_CATEGORY, label, 'End', `${doc.id}-${page.index}`);
+
+    return PdfTaskHelper.resolve<boolean>(!!ok);
+  }
+
+  /**
+   * Apply all redaction annotations on a page, permanently removing content
+   * underneath each one and flattening RO streams if present.
+   * All redact annotations are removed after successful application.
+   *
+   * @param doc - document object
+   * @param page - page object
+   * @returns true if any redactions were applied
+   */
+  public applyAllRedactions(doc: PdfDocumentObject, page: PdfPageObject): PdfTask<boolean> {
+    this.logger.debug(LOG_SOURCE, LOG_CATEGORY, 'applyAllRedactions', doc.id, page.index);
+    const label = 'ApplyAllRedactions';
+    this.logger.perf(LOG_SOURCE, LOG_CATEGORY, label, 'Begin', `${doc.id}-${page.index}`);
+
+    const ctx = this.cache.getContext(doc.id);
+    if (!ctx) {
+      this.logger.perf(LOG_SOURCE, LOG_CATEGORY, label, 'End', `${doc.id}-${page.index}`);
+      return PdfTaskHelper.reject<boolean>({
+        code: PdfErrorCode.DocNotOpen,
+        message: 'document does not open',
+      });
+    }
+
+    const pageCtx = ctx.acquirePage(page.index);
+
+    // Apply all redactions at once (content removal + RO flattening + annotation removal)
+    const ok = this.pdfiumModule.EPDFPage_ApplyRedactions(pageCtx.pagePtr);
+
+    if (ok) {
+      // Regenerate page content
+      this.pdfiumModule.FPDFPage_GenerateContent(pageCtx.pagePtr);
+    }
+
+    pageCtx.disposeImmediate();
+    this.logger.perf(LOG_SOURCE, LOG_CATEGORY, label, 'End', `${doc.id}-${page.index}`);
+
+    return PdfTaskHelper.resolve<boolean>(!!ok);
+  }
+
+  /**
+   * Flatten an annotation's appearance (AP/N) to page content.
+   * The annotation's visual appearance becomes part of the page itself.
+   * The annotation is automatically removed after flattening.
+   *
+   * @param doc - document object
+   * @param page - page object
+   * @param annotation - the annotation to flatten
+   * @returns true if successful
+   */
+  public flattenAnnotation(
+    doc: PdfDocumentObject,
+    page: PdfPageObject,
+    annotation: PdfAnnotationObject,
+  ): PdfTask<boolean> {
+    this.logger.debug(
+      LOG_SOURCE,
+      LOG_CATEGORY,
+      'flattenAnnotation',
+      doc.id,
+      page.index,
+      annotation.id,
+    );
+    const label = 'FlattenAnnotation';
+    this.logger.perf(LOG_SOURCE, LOG_CATEGORY, label, 'Begin', `${doc.id}-${page.index}`);
+
+    const ctx = this.cache.getContext(doc.id);
+    if (!ctx) {
+      this.logger.perf(LOG_SOURCE, LOG_CATEGORY, label, 'End', `${doc.id}-${page.index}`);
+      return PdfTaskHelper.reject<boolean>({
+        code: PdfErrorCode.DocNotOpen,
+        message: 'document does not open',
+      });
+    }
+
+    const pageCtx = ctx.acquirePage(page.index);
+    const annotPtr = this.getAnnotationByName(pageCtx.pagePtr, annotation.id);
+    if (!annotPtr) {
+      pageCtx.release();
+      this.logger.perf(LOG_SOURCE, LOG_CATEGORY, label, 'End', `${doc.id}-${page.index}`);
+      return PdfTaskHelper.reject<boolean>({
+        code: PdfErrorCode.NotFound,
+        message: 'annotation not found',
+      });
+    }
+
+    // Flatten the annotation's appearance to page content and remove it
+    const ok = this.pdfiumModule.EPDFAnnot_Flatten(pageCtx.pagePtr, annotPtr);
+    this.pdfiumModule.FPDFPage_CloseAnnot(annotPtr);
+
+    if (ok) {
+      // Regenerate page content
+      this.pdfiumModule.FPDFPage_GenerateContent(pageCtx.pagePtr);
+    }
+
+    pageCtx.disposeImmediate();
+    this.logger.perf(LOG_SOURCE, LOG_CATEGORY, label, 'End', `${doc.id}-${page.index}`);
+
+    return PdfTaskHelper.resolve<boolean>(!!ok);
+  }
+
   /** Pack device-space Rects into an FS_QUADPOINTSF[] buffer (page space). */
   private allocFSQuadsBufferFromRects(page: PdfPageObject, rects: Rect[]) {
     const STRIDE = 32; // 8 floats × 4 bytes

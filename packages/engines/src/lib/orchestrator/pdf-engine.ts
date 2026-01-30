@@ -695,6 +695,44 @@ export class PdfEngine<T = Blob> implements IPdfEngine<T> {
     );
   }
 
+  applyRedaction(
+    doc: PdfDocumentObject,
+    page: PdfPageObject,
+    annotation: PdfAnnotationObject,
+  ): PdfTask<boolean> {
+    return this.workerQueue.enqueue(
+      {
+        execute: () => this.executor.applyRedaction(doc, page, annotation),
+        meta: { docId: doc.id, pageIndex: page.index, operation: 'applyRedaction' },
+      },
+      { priority: Priority.MEDIUM },
+    );
+  }
+
+  applyAllRedactions(doc: PdfDocumentObject, page: PdfPageObject): PdfTask<boolean> {
+    return this.workerQueue.enqueue(
+      {
+        execute: () => this.executor.applyAllRedactions(doc, page),
+        meta: { docId: doc.id, pageIndex: page.index, operation: 'applyAllRedactions' },
+      },
+      { priority: Priority.MEDIUM },
+    );
+  }
+
+  flattenAnnotation(
+    doc: PdfDocumentObject,
+    page: PdfPageObject,
+    annotation: PdfAnnotationObject,
+  ): PdfTask<boolean> {
+    return this.workerQueue.enqueue(
+      {
+        execute: () => this.executor.flattenAnnotation(doc, page, annotation),
+        meta: { docId: doc.id, pageIndex: page.index, operation: 'flattenAnnotation' },
+      },
+      { priority: Priority.MEDIUM },
+    );
+  }
+
   getTextSlices(doc: PdfDocumentObject, slices: PageTextSlice[]): PdfTask<string[]> {
     return this.workerQueue.enqueue(
       {

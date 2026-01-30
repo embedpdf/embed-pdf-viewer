@@ -98,6 +98,9 @@ type MessageType =
   | 'extractPages'
   | 'extractText'
   | 'redactTextInRects'
+  | 'applyRedaction'
+  | 'applyAllRedactions'
+  | 'flattenAnnotation'
   | 'getTextSlices'
   | 'getPageGlyphs'
   | 'getPageGeometry'
@@ -470,6 +473,26 @@ export class RemoteExecutor implements IPdfiumExecutor {
     options?: PdfRedactTextOptions,
   ): PdfTask<boolean> {
     return this.send<boolean>('redactTextInRects', [doc, page, rects, options]);
+  }
+
+  applyRedaction(
+    doc: PdfDocumentObject,
+    page: PdfPageObject,
+    annotation: PdfAnnotationObject,
+  ): PdfTask<boolean> {
+    return this.send<boolean>('applyRedaction', [doc, page, annotation]);
+  }
+
+  applyAllRedactions(doc: PdfDocumentObject, page: PdfPageObject): PdfTask<boolean> {
+    return this.send<boolean>('applyAllRedactions', [doc, page]);
+  }
+
+  flattenAnnotation(
+    doc: PdfDocumentObject,
+    page: PdfPageObject,
+    annotation: PdfAnnotationObject,
+  ): PdfTask<boolean> {
+    return this.send<boolean>('flattenAnnotation', [doc, page, annotation]);
   }
 
   getTextSlices(doc: PdfDocumentObject, slices: PageTextSlice[]): PdfTask<string[]> {

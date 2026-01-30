@@ -1,59 +1,40 @@
-import { PdfAnnotationSubtype, PdfRedactAnnoObject } from '@embedpdf/models';
+import { PdfAnnotationObject, PdfAnnotationSubtype, PdfRedactAnnoObject } from '@embedpdf/models';
 import { AnnotationTool } from '@embedpdf/plugin-annotation';
+import { RedactionMode } from './types';
 
 /**
- * Redact Highlight tool - for text-based redactions using QuadPoints.
- * NOT draggable/resizable (like text markup annotations).
+ * Unified Redact tool - handles both text-based and area-based redactions.
+ * Dynamically determines isDraggable/isResizable based on whether it has segmentRects.
  */
-export const redactHighlightTool: AnnotationTool<PdfRedactAnnoObject> = {
-  id: 'redactHighlight',
-  name: 'Redact Highlight',
-  matchScore: (a) => {
-    if (a.type !== PdfAnnotationSubtype.REDACT) return 0;
-    // Has QuadPoints = text-based redaction
-    return 'segmentRects' in a && (a as PdfRedactAnnoObject).segmentRects?.length > 0 ? 10 : 0;
-  },
+export const redactTool: AnnotationTool<PdfRedactAnnoObject> = {
+  id: 'redact',
+  name: 'Redact',
+  matchScore: (a: PdfAnnotationObject) => (a.type === PdfAnnotationSubtype.REDACT ? 10 : 0),
   interaction: {
+    mode: RedactionMode.Redact,
     exclusive: false,
+    cursor: 'crosshair',
     textSelection: true,
-    isDraggable: false,
-    isResizable: false,
+    // Dynamic based on whether it's a text or area redaction
+    isDraggable: (anno) => {
+      if (anno.type !== PdfAnnotationSubtype.REDACT) return true;
+      return !anno.segmentRects?.length;
+    },
+    isResizable: (anno) => {
+      if (anno.type !== PdfAnnotationSubtype.REDACT) return true;
+      return !anno.segmentRects?.length;
+    },
+    lockAspectRatio: false,
     isGroupDraggable: false,
     isGroupResizable: false,
   },
   defaults: {
     type: PdfAnnotationSubtype.REDACT,
-    color: '#FF0000', // Interior/preview color
-    overlayColor: '#000000', // Fill after redaction
-    opacity: 0.3,
-  },
-};
-
-/**
- * Redact Area tool - for marquee-based redactions.
- * IS draggable/resizable.
- */
-export const redactAreaTool: AnnotationTool<PdfRedactAnnoObject> = {
-  id: 'redactArea',
-  name: 'Redact Area',
-  matchScore: (a) => {
-    if (a.type !== PdfAnnotationSubtype.REDACT) return 0;
-    // No QuadPoints = area-based redaction
-    return !('segmentRects' in a) || !(a as PdfRedactAnnoObject).segmentRects?.length ? 10 : 0;
-  },
-  interaction: {
-    exclusive: false,
-    cursor: 'crosshair',
-    isDraggable: true,
-    isResizable: true,
-    lockAspectRatio: false,
-  },
-  defaults: {
-    type: PdfAnnotationSubtype.REDACT,
-    color: '#FF0000',
+    color: '#E44234',
     overlayColor: '#000000',
-    opacity: 0.3,
+    strokeColor: '#E44234',
+    opacity: 1,
   },
 };
 
-export const redactTools = [redactHighlightTool, redactAreaTool];
+export const redactTools = [redactTool];

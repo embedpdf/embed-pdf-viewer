@@ -1,10 +1,16 @@
 import { BasePluginConfig, CoreState, EventHook } from '@embedpdf/core';
 import { PluginRegistry } from '@embedpdf/core';
+import { Logger } from '@embedpdf/models';
 import { TranslationKey } from '@embedpdf/plugin-i18n';
 
 export type Dynamic<TStore, T> =
   | T
-  | ((context: { registry: PluginRegistry; state: TStore; documentId: string }) => T);
+  | ((context: {
+      registry: PluginRegistry;
+      state: TStore;
+      documentId: string;
+      logger: Logger;
+    }) => T);
 
 export interface IconProps {
   primaryColor?: string;
@@ -26,7 +32,12 @@ export interface Command<TStore = any> {
   iconProps?: Dynamic<TStore, IconProps>;
 
   // Execution - receives context object
-  action: (context: { registry: PluginRegistry; state: TStore; documentId: string }) => void;
+  action: (context: {
+    registry: PluginRegistry;
+    state: TStore;
+    documentId: string;
+    logger: Logger;
+  }) => void;
 
   // State predicates - ALWAYS receive documentId
   active?: Dynamic<TStore, boolean>;

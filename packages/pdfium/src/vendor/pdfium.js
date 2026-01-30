@@ -47,7 +47,9 @@ var createPdfium = (() => {
       '_EPDFAction_CreateRemoteGoToByName',
       '_EPDFAction_CreateRemoteGoToDest',
       '_EPDFAction_CreateURI',
+      '_EPDFAnnot_ApplyRedaction',
       '_EPDFAnnot_ClearColor',
+      '_EPDFAnnot_Flatten',
       '_EPDFAnnot_GenerateAppearance',
       '_EPDFAnnot_GenerateAppearanceWithBlend',
       '_EPDFAnnot_GetBlendMode',
@@ -106,6 +108,7 @@ var createPdfium = (() => {
       '_EPDFDest_CreateXYZ',
       '_EPDFNamedDest_Remove',
       '_EPDFNamedDest_SetDest',
+      '_EPDFPage_ApplyRedactions',
       '_EPDFPage_CreateAnnot',
       '_EPDFPage_GetAnnotByName',
       '_EPDFPage_GetAnnotCountRaw',
@@ -6252,6 +6255,18 @@ var createPdfium = (() => {
       createExportWrapper('EPDFAnnot_SetOverlayTextRepeat', 2));
     var _EPDFAnnot_GetOverlayTextRepeat = (Module['_EPDFAnnot_GetOverlayTextRepeat'] =
       createExportWrapper('EPDFAnnot_GetOverlayTextRepeat', 1));
+    var _EPDFAnnot_ApplyRedaction = (Module['_EPDFAnnot_ApplyRedaction'] = createExportWrapper(
+      'EPDFAnnot_ApplyRedaction',
+      2,
+    ));
+    var _EPDFPage_ApplyRedactions = (Module['_EPDFPage_ApplyRedactions'] = createExportWrapper(
+      'EPDFPage_ApplyRedactions',
+      1,
+    ));
+    var _EPDFAnnot_Flatten = (Module['_EPDFAnnot_Flatten'] = createExportWrapper(
+      'EPDFAnnot_Flatten',
+      2,
+    ));
     var _FPDFDoc_GetAttachmentCount = (Module['_FPDFDoc_GetAttachmentCount'] = createExportWrapper(
       'FPDFDoc_GetAttachmentCount',
       1,

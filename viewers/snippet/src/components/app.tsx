@@ -318,7 +318,7 @@ const DEFAULTS = {
 
   // Tools
   capture: { scale: 2, imageType: 'image/png' } as CapturePluginConfig,
-  redaction: { drawBlackBoxes: true } as RedactionPluginConfig,
+  redaction: { drawBlackBoxes: true, useAnnotationMode: true } as RedactionPluginConfig,
   print: {} as PrintPluginConfig,
   export: { defaultFileName: 'document.pdf' } as ExportPluginConfig,
   fullscreen: {} as FullscreenPluginConfig,

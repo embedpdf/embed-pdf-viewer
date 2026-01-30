@@ -65,7 +65,7 @@ export function RedactArea({ annotation, isSelected, scale, onClick, style }: Re
         border: !isHovered ? `2px solid ${strokeColor}` : 'none',
         boxSizing: 'border-box',
         cursor: 'pointer',
-        pointerEvents: 'auto',
+        pointerEvents: isSelected ? 'none' : 'auto',
         display: 'flex',
         alignItems: 'center',
         justifyContent:

@@ -2092,7 +2092,7 @@ export interface PdfRedactAnnoObject extends PdfAnnotationObjectBase {
   /**
    * Opacity of the redact annotation
    */
-  opacity: number;
+  opacity?: number;
 
   /**
    * Text displayed on the redacted area after applying the redaction
@@ -3188,6 +3188,37 @@ export interface PdfEngine<T = Blob> {
     options?: PdfRedactTextOptions,
   ) => PdfTask<boolean>;
   /**
+   * Apply a single REDACT annotation - removes content, flattens RO overlay, deletes annotation.
+   * @param doc - pdf document
+   * @param page - pdf page
+   * @param annotation - the REDACT annotation to apply
+   * @returns task contains the result
+   */
+  applyRedaction: (
+    doc: PdfDocumentObject,
+    page: PdfPageObject,
+    annotation: PdfAnnotationObject,
+  ) => PdfTask<boolean>;
+  /**
+   * Apply all REDACT annotations on a page - removes content, flattens overlays, deletes annotations.
+   * @param doc - pdf document
+   * @param page - pdf page
+   * @returns task contains the result
+   */
+  applyAllRedactions: (doc: PdfDocumentObject, page: PdfPageObject) => PdfTask<boolean>;
+  /**
+   * Flatten an annotation's appearance (AP/N) to page content and remove the annotation.
+   * @param doc - pdf document
+   * @param page - pdf page
+   * @param annotation - the annotation to flatten
+   * @returns task contains the result
+   */
+  flattenAnnotation: (
+    doc: PdfDocumentObject,
+    page: PdfPageObject,
+    annotation: PdfAnnotationObject,
+  ) => PdfTask<boolean>;
+  /**
    * Extract text on specified pdf pages
    * @param doc - pdf document
    * @param pageIndexes - indexes of pdf pages
@@ -3430,6 +3461,17 @@ export interface IPdfiumExecutor {
     page: PdfPageObject,
     rects: Rect[],
     options?: PdfRedactTextOptions,
+  ): PdfTask<boolean>;
+  applyRedaction(
+    doc: PdfDocumentObject,
+    page: PdfPageObject,
+    annotation: PdfAnnotationObject,
+  ): PdfTask<boolean>;
+  applyAllRedactions(doc: PdfDocumentObject, page: PdfPageObject): PdfTask<boolean>;
+  flattenAnnotation(
+    doc: PdfDocumentObject,
+    page: PdfPageObject,
+    annotation: PdfAnnotationObject,
   ): PdfTask<boolean>;
   getTextSlices(doc: PdfDocumentObject, slices: PageTextSlice[]): PdfTask<string[]>;
   getPageGlyphs(doc: PdfDocumentObject, page: PdfPageObject): PdfTask<PdfGlyphObject[]>;

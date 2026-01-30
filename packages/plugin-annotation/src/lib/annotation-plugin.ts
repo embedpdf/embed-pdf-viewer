@@ -354,6 +354,8 @@ export class AnnotationPlugin extends BasePlugin<
       deleteAnnotation: (pageIndex, id) => this.deleteAnnotation(pageIndex, id),
       deleteAnnotations: (annotations, documentId) =>
         this.deleteAnnotationsMethod(annotations, documentId),
+      purgeAnnotation: (pageIndex, id, documentId) =>
+        this.purgeAnnotationMethod(pageIndex, id, documentId),
       renderAnnotation: (options) => this.renderAnnotation(options),
       commit: () => this.commit(),
 
@@ -422,6 +424,7 @@ export class AnnotationPlugin extends BasePlugin<
       updateAnnotations: (patches) => this.updateAnnotationsMethod(patches, documentId),
       deleteAnnotation: (pageIndex, id) => this.deleteAnnotation(pageIndex, id, documentId),
       deleteAnnotations: (annotations) => this.deleteAnnotationsMethod(annotations, documentId),
+      purgeAnnotation: (pageIndex, id) => this.purgeAnnotationMethod(pageIndex, id, documentId),
       renderAnnotation: (options) => this.renderAnnotation(options, documentId),
       commit: () => this.commit(documentId),
       getAttachedLinks: (id) => this.getAttachedLinksMethod(id, documentId),
@@ -919,6 +922,11 @@ export class AnnotationPlugin extends BasePlugin<
     for (const { pageIndex, id } of annotations) {
       this.deleteAnnotation(pageIndex, id, documentId);
     }
+  }
+
+  private purgeAnnotationMethod(pageIndex: number, id: string, documentId?: string): void {
+    const docId = documentId ?? this.getActiveDocumentId();
+    this.dispatch(purgeAnnotation(docId, pageIndex, id));
   }
 
   private selectAnnotation(pageIndex: number, id: string, documentId?: string) {
@@ -1963,7 +1971,7 @@ export class AnnotationPlugin extends BasePlugin<
         pendingOps.push({ type: 'delete', task: deleteTask, ta, uid });
       } else {
         // If it was never synced, just remove from state immediately
-        this.dispatch(purgeAnnotation(docId, uid));
+        this.dispatch(purgeAnnotation(docId, ta.object.pageIndex, uid));
       }
     }
 
@@ -2028,7 +2036,7 @@ export class AnnotationPlugin extends BasePlugin<
           break;
 
         case 'delete':
-          this.dispatch(purgeAnnotation(docId, op.uid));
+          this.dispatch(purgeAnnotation(docId, op.ta.object.pageIndex, op.uid));
           this.events$.emit({
             type: 'delete',
             documentId: docId,

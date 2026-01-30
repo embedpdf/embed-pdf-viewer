@@ -351,6 +351,15 @@ export class EngineRunner {
       case 'redactTextInRects':
         task = engine.redactTextInRects!(...args);
         break;
+      case 'applyRedaction':
+        task = engine.applyRedaction!(...args);
+        break;
+      case 'applyAllRedactions':
+        task = engine.applyAllRedactions!(...args);
+        break;
+      case 'flattenAnnotation':
+        task = engine.flattenAnnotation!(...args);
+        break;
       case 'getTextSlices':
         task = engine.getTextSlices!(...args);
         break;

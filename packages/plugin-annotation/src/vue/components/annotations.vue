@@ -458,6 +458,7 @@ import {
   isStrikeout,
   isUnderline,
   TrackedAnnotation,
+  resolveInteractionProp,
 } from '@embedpdf/plugin-annotation';
 import type { PdfLinkAnnoObject } from '@embedpdf/models';
 import { usePointerHandlers } from '@embedpdf/plugin-interaction-manager/vue';
@@ -610,7 +611,13 @@ const areAllSelectedDraggable = computed(() => {
   return selectedAnnotationsOnPage.value.every((ta) => {
     const tool = annotationProvides.value?.findToolForAnnotation(ta.object);
     // Use group-specific property, falling back to single-annotation property
-    return tool?.interaction.isGroupDraggable ?? tool?.interaction.isDraggable ?? true;
+    const groupDraggable = resolveInteractionProp(
+      tool?.interaction.isGroupDraggable,
+      ta.object,
+      true,
+    );
+    const singleDraggable = resolveInteractionProp(tool?.interaction.isDraggable, ta.object, true);
+    return tool?.interaction.isGroupDraggable !== undefined ? groupDraggable : singleDraggable;
   });
 });
 
@@ -621,7 +628,13 @@ const areAllSelectedResizable = computed(() => {
   return selectedAnnotationsOnPage.value.every((ta) => {
     const tool = annotationProvides.value?.findToolForAnnotation(ta.object);
     // Use group-specific property, falling back to single-annotation property
-    return tool?.interaction.isGroupResizable ?? tool?.interaction.isResizable ?? true;
+    const groupResizable = resolveInteractionProp(
+      tool?.interaction.isGroupResizable,
+      ta.object,
+      true,
+    );
+    const singleResizable = resolveInteractionProp(tool?.interaction.isResizable, ta.object, true);
+    return tool?.interaction.isGroupResizable !== undefined ? groupResizable : singleResizable;
   });
 });
 
@@ -642,14 +655,14 @@ const getTool = (annotation: TrackedAnnotation) =>
 const isDraggable = (anno: TrackedAnnotation) => {
   if (isFreeText(anno) && editingId.value === anno.object.id) return false;
   if (isMultiSelected.value) return false;
-  return getTool(anno)?.interaction.isDraggable ?? false;
+  return resolveInteractionProp(getTool(anno)?.interaction.isDraggable, anno.object, false);
 };
 const isResizable = (anno: TrackedAnnotation) => {
   if (isMultiSelected.value) return false;
-  return getTool(anno)?.interaction.isResizable ?? false;
+  return resolveInteractionProp(getTool(anno)?.interaction.isResizable, anno.object, false);
 };
 const lockAspectRatio = (anno: TrackedAnnotation) =>
-  getTool(anno)?.interaction.lockAspectRatio ?? false;
+  resolveInteractionProp(getTool(anno)?.interaction.lockAspectRatio, anno.object, false);
 
 // Should show individual selection UI (not when multi-selected)
 const showIndividualSelection = (anno: TrackedAnnotation) =>

@@ -23,7 +23,7 @@ export const MarqueeRedact = ({
   pageIndex,
   scale: scaleOverride,
   className,
-  stroke = 'red',
+  stroke,
   fill = 'transparent',
 }: MarqueeRedactProps) => {
   const { plugin: redactionPlugin } = useRedactionPlugin();
@@ -35,6 +35,10 @@ export const MarqueeRedact = ({
     if (scaleOverride !== undefined) return scaleOverride;
     return documentState?.scale ?? 1;
   }, [scaleOverride, documentState?.scale]);
+
+  // Get stroke color from plugin (annotation mode uses tool defaults, legacy uses red)
+  // Allow prop override for backwards compatibility
+  const strokeColor = stroke ?? redactionPlugin?.getPreviewStrokeColor() ?? 'red';
 
   useEffect(() => {
     if (!redactionPlugin || !documentId) return;
@@ -59,7 +63,7 @@ export const MarqueeRedact = ({
         top: rect.origin.y * scale,
         width: rect.size.width * scale,
         height: rect.size.height * scale,
-        border: `1px solid ${stroke}`,
+        border: `1px solid ${strokeColor}`,
         background: fill,
         boxSizing: 'border-box',
       }}

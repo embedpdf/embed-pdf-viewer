@@ -29,6 +29,7 @@ const ANNOTATION_TYPE_KEYS: Record<number, string> = {
   12: 'annotation.strikeout',
   13: 'annotation.stamp',
   15: 'annotation.ink',
+  28: 'annotation.redact',
 };
 
 export function AnnotationSidebar({ documentId }: { documentId: string }) {
