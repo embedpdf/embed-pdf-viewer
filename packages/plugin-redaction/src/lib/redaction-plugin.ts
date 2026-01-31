@@ -45,9 +45,11 @@ import {
 } from '@embedpdf/plugin-interaction-manager';
 import {
   AnnotationCapability,
+  AnnotationCommandMetadata,
   AnnotationPlugin,
   AnnotationTool,
 } from '@embedpdf/plugin-annotation';
+import { HistoryCapability, HistoryPlugin } from '@embedpdf/plugin-history';
 import {
   addPending,
   clearPending,
@@ -76,6 +78,7 @@ export class RedactionPlugin extends BasePlugin<
   private selectionCapability: SelectionCapability | undefined;
   private interactionManagerCapability: InteractionManagerCapability | undefined;
   private annotationCapability: AnnotationCapability | undefined;
+  private historyCapability: HistoryCapability | undefined;
 
   /**
    * Determines which mode to use:
@@ -108,6 +111,7 @@ export class RedactionPlugin extends BasePlugin<
       .getPlugin<InteractionManagerPlugin>('interaction-manager')
       ?.provides();
     this.annotationCapability = this.registry.getPlugin<AnnotationPlugin>('annotation')?.provides();
+    this.historyCapability = this.registry.getPlugin<HistoryPlugin>('history')?.provides();
 
     // Determine mode based on config (default: false/legacy mode)
     if (this.config.useAnnotationMode) {
@@ -1088,6 +1092,15 @@ export class RedactionPlugin extends BasePlugin<
         );
         // Purge the annotation from state (engine already removed it from PDF)
         this.annotationCapability?.forDocument(docId).purgeAnnotation(pdfPage.index, annotationId);
+
+        // Purge history entries for this committed redaction (permanent, irreversible operation)
+        this.historyCapability
+          ?.forDocument(docId)
+          .purgeByMetadata<AnnotationCommandMetadata>(
+            (meta) => meta?.annotationIds?.includes(annotationId) ?? false,
+            'annotations',
+          );
+
         this.dispatchCoreAction(refreshPages(docId, [pdfPage.index]));
         this.events$.emit({ type: 'commit', documentId: docId, success: true });
         task.resolve(true);
@@ -1245,10 +1258,23 @@ export class RedactionPlugin extends BasePlugin<
       () => {
         // Purge all REDACT annotations from state (engine already removed them from PDF)
         const annoScope = this.annotationCapability?.forDocument(docId);
+        const allPurgedIds: string[] = [];
+
         for (const [pageIndex, ids] of redactAnnotationsByPage) {
           for (const id of ids) {
             annoScope?.purgeAnnotation(pageIndex, id);
+            allPurgedIds.push(id);
           }
+        }
+
+        // Purge history entries for all committed redactions (permanent, irreversible operations)
+        if (allPurgedIds.length > 0) {
+          this.historyCapability
+            ?.forDocument(docId)
+            .purgeByMetadata<AnnotationCommandMetadata>(
+              (meta) => meta?.annotationIds?.some((id) => allPurgedIds.includes(id)) ?? false,
+              'annotations',
+            );
         }
 
         this.dispatchCoreAction(refreshPages(docId, pagesToProcess));

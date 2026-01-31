@@ -1773,11 +1773,11 @@ export const commands: Record<string, Command<State>> = {
     categories: ['redaction', 'redaction-area'],
     action: ({ registry, documentId }) => {
       const redaction = registry.getPlugin<RedactionPlugin>('redaction')?.provides();
-      redaction?.forDocument(documentId).toggleMarqueeRedact();
+      redaction?.forDocument(documentId).toggleRedact();
     },
-    active: ({ state, documentId }) => {
-      const redaction = state.plugins[REDACTION_PLUGIN_ID]?.documents[documentId];
-      return redaction?.activeType === RedactionMode.MarqueeRedact;
+    active: ({ registry, documentId }) => {
+      const redaction = registry.getPlugin<RedactionPlugin>('redaction')?.provides();
+      return redaction?.forDocument(documentId).isRedactActive() ?? false;
     },
     disabled: ({ state, documentId }) => {
       return lacksPermission(state, documentId, PdfPermissionFlag.ModifyContents);

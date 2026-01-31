@@ -589,13 +589,6 @@ export const viewerUISchema: UISchema = {
           items: [
             {
               type: 'command-button',
-              id: 'redact-text',
-              commandId: 'redaction:redact-text',
-              variant: 'icon',
-              categories: ['redaction', 'redaction-text'],
-            },
-            {
-              type: 'command-button',
               id: 'redact-area',
               commandId: 'redaction:redact-area',
               variant: 'icon',

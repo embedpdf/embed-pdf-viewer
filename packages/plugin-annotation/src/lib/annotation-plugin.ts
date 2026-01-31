@@ -18,6 +18,7 @@ import {
 } from '@embedpdf/models';
 import {
   AnnotationCapability,
+  AnnotationCommandMetadata,
   AnnotationEvent,
   AnnotationPluginConfig,
   AnnotationState,
@@ -738,7 +739,7 @@ export class AnnotationPlugin extends BasePlugin<
       if (this.config.autoCommit) this.commit(docId);
       return;
     }
-    const command: Command = {
+    const command: Command<AnnotationCommandMetadata> = {
       execute,
       undo: () => {
         contexts.delete(id);
@@ -752,6 +753,7 @@ export class AnnotationPlugin extends BasePlugin<
           committed: false,
         });
       },
+      metadata: { annotationIds: [id] },
     };
     const historyScope = this.history.forDocument(docId);
     historyScope.register(command, this.ANNOTATION_HISTORY_TOPIC);
@@ -813,7 +815,7 @@ export class AnnotationPlugin extends BasePlugin<
     const originalPatch = Object.fromEntries(
       Object.keys(patch).map((key) => [key, originalObject[key as keyof PdfAnnotationObject]]),
     );
-    const command: Command = {
+    const command: Command<AnnotationCommandMetadata> = {
       execute,
       undo: () => {
         this.dispatch(patchAnnotation(docId, pageIndex, id, originalPatch));
@@ -826,6 +828,7 @@ export class AnnotationPlugin extends BasePlugin<
           committed: false,
         });
       },
+      metadata: { annotationIds: [id] },
     };
     const historyScope = this.history.forDocument(docId);
     historyScope.register(command, this.ANNOTATION_HISTORY_TOPIC);
@@ -886,7 +889,7 @@ export class AnnotationPlugin extends BasePlugin<
       if (this.config.autoCommit !== false) this.commit(docId);
       return;
     }
-    const command: Command = {
+    const command: Command<AnnotationCommandMetadata> = {
       execute,
       undo: () => {
         // Restore parent first
@@ -910,6 +913,7 @@ export class AnnotationPlugin extends BasePlugin<
           });
         }
       },
+      metadata: { annotationIds: [id, ...irtChildren.map((c) => c.id)] },
     };
     const historyScope = this.history.forDocument(docId);
     historyScope.register(command, this.ANNOTATION_HISTORY_TOPIC);
@@ -1803,7 +1807,7 @@ export class AnnotationPlugin extends BasePlugin<
       originalObject,
     }));
 
-    const command: Command = {
+    const command: Command<AnnotationCommandMetadata> = {
       execute,
       undo: () => {
         for (const { pageIndex, id, originalPatch, originalObject } of undoData) {
@@ -1818,6 +1822,7 @@ export class AnnotationPlugin extends BasePlugin<
           });
         }
       },
+      metadata: { annotationIds: patchData.map((p) => p.id) },
     };
 
     const historyScope = this.history.forDocument(docId);

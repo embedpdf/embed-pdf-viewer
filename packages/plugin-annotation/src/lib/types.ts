@@ -13,6 +13,16 @@ import {
 } from '@embedpdf/models';
 import { AnnotationTool } from './tools/types';
 
+/**
+ * Metadata attached to annotation history commands for filtering/purging.
+ * Used by the history plugin's purgeByMetadata method to identify commands
+ * that should be removed (e.g., after a permanent redaction commit).
+ */
+export interface AnnotationCommandMetadata {
+  /** The annotation IDs affected by this command */
+  annotationIds: string[];
+}
+
 export type AnnotationEvent =
   | {
       type: 'create';

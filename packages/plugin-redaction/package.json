@@ -55,6 +55,7 @@
     "@embedpdf/plugin-annotation": "workspace:*",
     "@embedpdf/plugin-selection": "workspace:*",
     "@embedpdf/plugin-interaction-manager": "workspace:*",
+    "@embedpdf/plugin-history": "workspace:*",
     "@types/react": "^18.2.0",
     "typescript": "^5.0.0"
   },
@@ -63,6 +64,7 @@
     "@embedpdf/plugin-annotation": "workspace:*",
     "@embedpdf/plugin-selection": "workspace:*",
     "@embedpdf/plugin-interaction-manager": "workspace:*",
+    "@embedpdf/plugin-history": "workspace:*",
     "preact": "^10.26.4",
     "react": ">=16.8.0",
     "react-dom": ">=16.8.0",
