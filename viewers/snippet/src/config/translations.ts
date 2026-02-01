@@ -78,6 +78,7 @@ export const englishTranslations: Locale = {
       thumbnails: 'Thumbnails',
       outline: 'Outline',
       annotationStyle: 'Annotation Style',
+      redaction: 'Redaction',
     },
     menu: {
       viewControls: 'View Controls',
@@ -173,10 +174,19 @@ export const englishTranslations: Locale = {
     redaction: {
       area: 'Redact Area',
       text: 'Redact Text',
+      apply: 'Apply Redaction',
       applyAll: 'Apply All',
       clearAll: 'Clear All',
       deleteSelected: 'Delete selected redaction',
       commitSelected: 'Apply selected redaction',
+      emptyState: 'No pending redactions',
+      panel: {
+        title: 'Redactions',
+        itemCount: '{count} pending redaction',
+        itemCountPlural: '{count} pending redactions',
+        clearAll: 'Clear All',
+        redactAll: 'Redact All',
+      },
     },
     history: {
       undo: 'Undo',
@@ -404,6 +414,7 @@ export const germanTranslations: Locale = {
       thumbnails: 'Miniaturansichten',
       outline: 'Gliederung',
       annotationStyle: 'Anmerkungsstil',
+      redaction: 'Schwärzung',
     },
     menu: {
       viewControls: 'Ansichtseinstellungen',
@@ -499,10 +510,19 @@ export const germanTranslations: Locale = {
     redaction: {
       area: 'Bereich schwärzen',
       text: 'Text schwärzen',
+      apply: 'Schwärzung anwenden',
       applyAll: 'Alle anwenden',
       clearAll: 'Alle löschen',
       deleteSelected: 'Ausgewählte Schwärzung löschen',
       commitSelected: 'Ausgewählte Schwärzung anwenden',
+      emptyState: 'Keine ausstehenden Schwärzungen',
+      panel: {
+        title: 'Schwärzungen',
+        itemCount: '{count} ausstehende Schwärzung',
+        itemCountPlural: '{count} ausstehende Schwärzungen',
+        clearAll: 'Alle löschen',
+        redactAll: 'Alle schwärzen',
+      },
     },
     history: {
       undo: 'Rückgängig',
@@ -732,6 +752,7 @@ export const dutchTranslations: Locale = {
       thumbnails: 'Miniaturen',
       outline: 'Overzicht',
       annotationStyle: 'Annotatiestijl',
+      redaction: 'Redactie',
     },
     menu: {
       viewControls: 'Weergave-instellingen',
@@ -827,10 +848,19 @@ export const dutchTranslations: Locale = {
     redaction: {
       area: 'Gebied redigeren',
       text: 'Tekst redigeren',
+      apply: 'Redactie toepassen',
       applyAll: 'Alles toepassen',
       clearAll: 'Alles wissen',
       deleteSelected: 'Geselecteerde redactie verwijderen',
       commitSelected: 'Geselecteerde redactie toepassen',
+      emptyState: 'Geen openstaande redacties',
+      panel: {
+        title: 'Redacties',
+        itemCount: '{count} openstaande redactie',
+        itemCountPlural: '{count} openstaande redacties',
+        clearAll: 'Alles wissen',
+        redactAll: 'Alles redigeren',
+      },
     },
     history: {
       undo: 'Ongedaan maken',
@@ -1058,6 +1088,7 @@ export const frenchTranslations: Locale = {
       thumbnails: 'Miniatures',
       outline: 'Plan',
       annotationStyle: "Style d'annotation",
+      redaction: 'Caviardage',
     },
     menu: {
       viewControls: "Contrôles d'affichage",
@@ -1153,10 +1184,19 @@ export const frenchTranslations: Locale = {
     redaction: {
       area: 'Caviarder la zone',
       text: 'Caviarder le texte',
+      apply: 'Appliquer le caviardage',
       applyAll: 'Tout appliquer',
       clearAll: 'Tout effacer',
       deleteSelected: 'Supprimer la rédaction sélectionnée',
       commitSelected: 'Appliquer la rédaction sélectionnée',
+      emptyState: 'Aucun caviardage en attente',
+      panel: {
+        title: 'Caviardages',
+        itemCount: '{count} caviardage en attente',
+        itemCountPlural: '{count} caviardages en attente',
+        clearAll: 'Tout effacer',
+        redactAll: 'Tout caviarder',
+      },
     },
     history: {
       undo: 'Annuler',
@@ -1386,6 +1426,7 @@ export const spanishTranslations: Locale = {
       thumbnails: 'Miniaturas',
       outline: 'Esquema',
       annotationStyle: 'Estilo de anotación',
+      redaction: 'Redacción',
     },
     menu: {
       viewControls: 'Controles de vista',
@@ -1481,10 +1522,19 @@ export const spanishTranslations: Locale = {
     redaction: {
       area: 'Redactar área',
       text: 'Redactar texto',
+      apply: 'Aplicar redacción',
       applyAll: 'Aplicar todo',
       clearAll: 'Borrar todo',
       deleteSelected: 'Eliminar redacción seleccionada',
       commitSelected: 'Aplicar redacción seleccionada',
+      emptyState: 'No hay redacciones pendientes',
+      panel: {
+        title: 'Redacciones',
+        itemCount: '{count} redacción pendiente',
+        itemCountPlural: '{count} redacciones pendientes',
+        clearAll: 'Borrar todo',
+        redactAll: 'Redactar todo',
+      },
     },
     history: {
       undo: 'Deshacer',
@@ -1712,6 +1762,7 @@ export const simplifiedChineseTranslations: Locale = {
       thumbnails: '缩略图',
       outline: '大纲',
       annotationStyle: '批注样式',
+      redaction: '遮蔽',
     },
     menu: {
       viewControls: '视图控件',
@@ -1807,10 +1858,19 @@ export const simplifiedChineseTranslations: Locale = {
     redaction: {
       area: '遮蔽区域',
       text: '遮蔽文本',
+      apply: '应用遮蔽',
       applyAll: '全部应用',
       clearAll: '全部取消',
       deleteSelected: '取消遮蔽',
       commitSelected: '应用遮蔽',
+      emptyState: '暂无待处理的遮蔽',
+      panel: {
+        title: '遮蔽',
+        itemCount: '{count} 个待处理遮蔽',
+        itemCountPlural: '{count} 个待处理遮蔽',
+        clearAll: '全部取消',
+        redactAll: '全部遮蔽',
+      },
     },
     history: {
       undo: '撤销',

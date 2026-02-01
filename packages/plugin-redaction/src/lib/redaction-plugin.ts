@@ -19,6 +19,7 @@ import {
   PluginRegistry,
   refreshPages,
   Listener,
+  arePropsEqual,
 } from '@embedpdf/core';
 import {
   PdfAnnotationSubtype,
@@ -56,6 +57,7 @@ import {
   deselectPending,
   endRedaction,
   removePending,
+  updatePending,
   selectPending,
   startRedaction,
   initRedactionState,
@@ -129,15 +131,15 @@ export class RedactionPlugin extends BasePlugin<
       this.useAnnotationMode = false;
     }
 
+    // Register redact tools with annotation plugin if in annotation mode
     if (this.useAnnotationMode) {
-      // Register redact tools with annotation plugin
       for (const tool of redactTools) {
         this.annotationCapability!.addTool(tool);
       }
-      this.setupAnnotationMode();
-    } else {
-      this.setupLegacyModes();
     }
+
+    // Register redaction modes (same for both annotation and legacy modes)
+    this.setupRedactionModes();
 
     // Info log when annotation plugin is available but annotation mode is not enabled
     if (!this.useAnnotationMode && this.annotationCapability) {
@@ -153,10 +155,10 @@ export class RedactionPlugin extends BasePlugin<
   }
 
   /**
-   * Setup for annotation mode - registers all redaction modes.
-   * All modes create REDACT annotations when annotation plugin is present.
+   * Setup redaction modes - registers all interaction modes for redaction.
+   * Works for both annotation mode and legacy mode.
    */
-  private setupAnnotationMode(): void {
+  private setupRedactionModes(): void {
     if (!this.interactionManagerCapability) return;
 
     // Register unified mode (recommended - supports both text and area)
@@ -168,25 +170,6 @@ export class RedactionPlugin extends BasePlugin<
     });
 
     // Also register legacy modes for backwards compatibility
-    this.interactionManagerCapability.registerMode({
-      id: RedactionMode.MarqueeRedact,
-      scope: 'page',
-      exclusive: false,
-      cursor: 'crosshair',
-    });
-    this.interactionManagerCapability.registerMode({
-      id: RedactionMode.RedactSelection,
-      scope: 'page',
-      exclusive: false,
-    });
-  }
-
-  /**
-   * Setup for legacy mode (no annotation plugin) - uses internal pending state
-   */
-  private setupLegacyModes(): void {
-    if (!this.interactionManagerCapability) return;
-
     this.interactionManagerCapability.registerMode({
       id: RedactionMode.MarqueeRedact,
       scope: 'page',
@@ -258,74 +241,81 @@ export class RedactionPlugin extends BasePlugin<
       const unsubEndSelection = selectionScope.onEndSelection(() => {
         const docState = this.getDocumentState(documentId);
         if (!docState?.isRedacting) return;
-
-        // Prevent creating redactions without permission
-        if (!this.checkPermission(documentId, PdfPermissionFlag.ModifyContents)) {
-          return;
-        }
+        if (!this.checkPermission(documentId, PdfPermissionFlag.ModifyContents)) return;
 
         const formattedSelection = selectionScope.getFormattedSelection();
         if (!formattedSelection.length) return;
+
+        // Fetch selected text BEFORE clearing (async, but started now while selection exists)
+        const textTask = selectionScope.getSelectedText();
 
         const emitter = this.redactionSelection$.get(documentId);
         emitter?.emit([]);
         selectionScope.clear();
 
-        if (this.useAnnotationMode) {
-          // ANNOTATION MODE: Create REDACT annotations via annotation plugin
-          this.createRedactAnnotationsFromSelection(documentId, formattedSelection);
-        } else {
-          // LEGACY MODE: Add to internal pending state
-          const items: RedactionItem[] = formattedSelection.map((s) => ({
-            id: uuidV4(),
-            kind: 'text',
-            page: s.pageIndex,
-            rect: s.rect,
-            rects: s.segmentRects,
-          }));
-
-          this.dispatch(addPending(documentId, items));
-          this.emitPendingChange(documentId);
-
-          if (items.length) {
-            this.selectPending(
-              items[items.length - 1].page,
-              items[items.length - 1].id,
-              documentId,
-            );
-          }
-        }
+        // Wait for text, then create redactions with text included
+        textTask.wait(
+          (textArr) => {
+            const text = textArr.join(' ');
+            this.createRedactionsFromSelection(documentId, formattedSelection, text);
+          },
+          () => {
+            // On error, still create redactions but without text
+            this.createRedactionsFromSelection(documentId, formattedSelection);
+          },
+        );
       });
 
       unsubscribers.push(unsubSelection, unsubEndSelection);
     }
 
-    // Setup annotation event forwarding in annotation mode
+    // Setup annotation event forwarding AND state sync in annotation mode
     if (this.useAnnotationMode && this.annotationCapability) {
       const annoScope = this.annotationCapability.forDocument(documentId);
 
-      // Forward annotation events for REDACT annotations (for external event consumers)
       const unsubEvents = annoScope.onAnnotationEvent((event) => {
-        if (event.type === 'create' && event.annotation.type === PdfAnnotationSubtype.REDACT) {
-          const item = this.annotationToRedactionItem(event.annotation);
-          this.events$.emit({ type: 'add', documentId, items: [item] });
-        } else if (
-          event.type === 'delete' &&
-          event.annotation.type === PdfAnnotationSubtype.REDACT
-        ) {
+        if (event.type === 'loaded') {
+          // Sync existing REDACT annotations after initial load
+          this.syncFromAnnotationLoad(documentId);
+          return;
+        }
+
+        // Only process REDACT annotations
+        if (event.annotation?.type !== PdfAnnotationSubtype.REDACT) return;
+        const redactAnno = event.annotation as PdfRedactAnnoObject;
+
+        if (event.type === 'create') {
+          this.syncFromAnnotationCreate(documentId, redactAnno);
+          this.events$.emit({
+            type: 'add',
+            documentId,
+            items: [this.annotationToRedactionItem(redactAnno)],
+          });
+        } else if (event.type === 'update') {
+          this.logger.debug('RedactionPlugin', 'AnnotationUpdated', {
+            documentId,
+            redactAnno,
+            patch: event.patch as Partial<PdfRedactAnnoObject>,
+          });
+          this.syncFromAnnotationUpdate(
+            documentId,
+            redactAnno,
+            event.patch as Partial<PdfRedactAnnoObject>,
+          );
+        } else if (event.type === 'delete') {
+          this.syncFromAnnotationDelete(documentId, redactAnno);
           this.events$.emit({
             type: 'remove',
             documentId,
-            page: event.annotation.pageIndex,
-            id: event.annotation.id,
+            page: redactAnno.pageIndex,
+            id: redactAnno.id,
           });
         }
       });
 
-      // Forward selection changes for REDACT annotations
+      // Sync selection state when annotation selection changes
       const unsubState = annoScope.onStateChange(() => {
-        // State change could indicate selection change - emit selected change
-        this.emitSelectedChange(documentId);
+        this.syncSelectionFromAnnotation(documentId);
       });
 
       unsubscribers.push(unsubEvents, unsubState);
@@ -342,26 +332,13 @@ export class RedactionPlugin extends BasePlugin<
 
   protected override onDocumentLoaded(documentId: string): void {
     // Redaction plugin renders its own selection rects, so suppress selection layer rects
-    if (this.useAnnotationMode) {
-      // Enable selection for modes that support text selection
-      this.selectionCapability?.enableForMode(
-        RedactionMode.Redact,
-        { showRects: false },
-        documentId,
-      );
-      this.selectionCapability?.enableForMode(
-        RedactionMode.RedactSelection,
-        { showRects: false },
-        documentId,
-      );
-    } else {
-      // Legacy: Enable selection for RedactSelection mode only
-      this.selectionCapability?.enableForMode(
-        RedactionMode.RedactSelection,
-        { showRects: false },
-        documentId,
-      );
-    }
+    // Enable selection for modes that support text selection (both annotation and legacy modes)
+    this.selectionCapability?.enableForMode(RedactionMode.Redact, { showRects: false }, documentId);
+    this.selectionCapability?.enableForMode(
+      RedactionMode.RedactSelection,
+      { showRects: false },
+      documentId,
+    );
   }
 
   protected override onDocumentClosed(documentId: string): void {
@@ -536,6 +513,107 @@ export class RedactionPlugin extends BasePlugin<
   }
 
   // ─────────────────────────────────────────────────────────
+  // Annotation Mode State Sync
+  // ─────────────────────────────────────────────────────────
+
+  /**
+   * Sync internal state when REDACT annotation is created.
+   * Called from annotation event listener in annotation mode.
+   */
+  private syncFromAnnotationCreate(documentId: string, annotation: PdfRedactAnnoObject): void {
+    const item = this.annotationToRedactionItem(annotation);
+    this.dispatch(addPending(documentId, [item]));
+  }
+
+  /**
+   * Sync internal state when REDACT annotation is updated (moved/resized/color changed).
+   * Called from annotation event listener in annotation mode.
+   */
+  private syncFromAnnotationUpdate(
+    documentId: string,
+    annotation: PdfRedactAnnoObject,
+    patch: Partial<PdfRedactAnnoObject>,
+  ): void {
+    // Only sync if rect, segmentRects, strokeColor, or color changed
+    if (
+      !('rect' in patch) &&
+      !('segmentRects' in patch) &&
+      !('strokeColor' in patch) &&
+      !('color' in patch)
+    )
+      return;
+
+    const updatePatch: {
+      rect?: Rect;
+      rects?: Rect[];
+      markColor?: string;
+      redactionColor?: string;
+    } = {};
+    if (patch.rect) updatePatch.rect = patch.rect;
+    if (patch.segmentRects) updatePatch.rects = patch.segmentRects;
+    if (patch.strokeColor) updatePatch.markColor = patch.strokeColor;
+    if (patch.color) updatePatch.redactionColor = patch.color;
+
+    this.logger.debug('RedactionPlugin', 'AnnotationUpdated', {
+      documentId,
+      annotation,
+      patch: updatePatch,
+    });
+
+    this.dispatch(updatePending(documentId, annotation.pageIndex, annotation.id, updatePatch));
+  }
+
+  /**
+   * Sync internal state when REDACT annotation is deleted.
+   * Called from annotation event listener in annotation mode.
+   */
+  private syncFromAnnotationDelete(documentId: string, annotation: PdfRedactAnnoObject): void {
+    this.dispatch(removePending(documentId, annotation.pageIndex, annotation.id));
+  }
+
+  /**
+   * Sync internal state from existing REDACT annotations after initial load.
+   * Called when annotation plugin emits 'loaded' event.
+   */
+  private syncFromAnnotationLoad(documentId: string): void {
+    const pending = this.getPendingFromAnnotations(documentId);
+
+    // Clear and repopulate (in case of reload scenarios)
+    this.dispatch(clearPending(documentId));
+
+    for (const [, items] of Object.entries(pending)) {
+      if (items.length > 0) {
+        this.dispatch(addPending(documentId, items));
+      }
+    }
+  }
+
+  /**
+   * Sync selection state from annotation plugin's selected REDACT annotation.
+   * Called when annotation plugin state changes.
+   */
+  private syncSelectionFromAnnotation(documentId: string): void {
+    const annoState = this.annotationCapability?.forDocument(documentId).getState();
+    if (!annoState) return;
+
+    // Find if a REDACT annotation is selected
+    const selectedRedact = annoState.selectedUids
+      .map((uid) => annoState.byUid[uid])
+      .find((ta) => ta?.object.type === PdfAnnotationSubtype.REDACT);
+
+    if (selectedRedact) {
+      const obj = selectedRedact.object as PdfRedactAnnoObject;
+      this.dispatch(selectPending(documentId, obj.pageIndex, obj.id));
+    } else {
+      // Check if currently selected in redaction state - if so, clear it
+      const docState = this.getDocumentState(documentId);
+      if (docState?.selected) {
+        this.dispatch(deselectPending(documentId));
+      }
+    }
+  }
+
+  // ─────────────────────────────────────────────────────────
   // Core Operations
   // ─────────────────────────────────────────────────────────
 
@@ -567,7 +645,6 @@ export class RedactionPlugin extends BasePlugin<
     } else {
       // LEGACY MODE: Add to internal pending state
       this.dispatch(addPending(id, items));
-      this.emitPendingChange(id);
     }
     this.events$.emit({ type: 'add', documentId: id, items });
   }
@@ -581,7 +658,6 @@ export class RedactionPlugin extends BasePlugin<
     } else {
       // LEGACY MODE: Remove from internal state
       this.dispatch(removePending(id, page, itemId));
-      this.emitPendingChange(id);
     }
     this.events$.emit({ type: 'remove', documentId: id, page, id: itemId });
   }
@@ -602,7 +678,6 @@ export class RedactionPlugin extends BasePlugin<
     } else {
       // LEGACY MODE: Clear internal state
       this.dispatch(clearPending(id));
-      this.emitPendingChange(id);
     }
     this.events$.emit({ type: 'clear', documentId: id });
   }
@@ -618,7 +693,6 @@ export class RedactionPlugin extends BasePlugin<
       this.dispatch(selectPending(id, page, itemId));
     }
     this.selectionCapability?.forDocument(id).clear();
-    this.emitSelectedChange(id);
   }
 
   private getSelectedPending(documentId?: string): SelectedRedaction | null {
@@ -636,7 +710,6 @@ export class RedactionPlugin extends BasePlugin<
       // LEGACY MODE: Update internal selection state
       this.dispatch(deselectPending(id));
     }
-    this.emitSelectedChange(id);
   }
 
   // ─────────────────────────────────────────────────────────
@@ -833,14 +906,17 @@ export class RedactionPlugin extends BasePlugin<
           this.createRedactAnnotationFromArea(opts.documentId, opts.pageIndex, r);
         } else {
           // LEGACY MODE: Add to internal pending state
+          const redactionColor = this.config.drawBlackBoxes ? '#000000' : 'transparent';
           const item: RedactionItem = {
             id: uuidV4(),
             kind: 'area',
             page: opts.pageIndex,
             rect: r,
+            source: 'legacy',
+            markColor: '#FF0000',
+            redactionColor,
           };
           this.dispatch(addPending(opts.documentId, [item]));
-          this.emitPendingChange(opts.documentId);
           this.selectPending(opts.pageIndex, item.id, opts.documentId);
         }
       },
@@ -861,87 +937,75 @@ export class RedactionPlugin extends BasePlugin<
       },
     });
 
-    // Register handlers for the modes that support marquee
-    if (this.useAnnotationMode) {
-      // Annotation mode: register for both unified and legacy marquee mode
-      const off2 = this.interactionManagerCapability.registerHandlers({
-        documentId: opts.documentId,
-        modeId: RedactionMode.Redact,
-        handlers,
-        pageIndex: opts.pageIndex,
-      });
-      const off3 = this.interactionManagerCapability.registerHandlers({
-        documentId: opts.documentId,
-        modeId: RedactionMode.MarqueeRedact,
-        handlers,
-        pageIndex: opts.pageIndex,
-      });
-      return () => {
-        off();
-        off2();
-        off3();
-      };
-    } else {
-      // Legacy mode: only MarqueeRedact mode
-      const off2 = this.interactionManagerCapability.registerHandlers({
-        documentId: opts.documentId,
-        modeId: RedactionMode.MarqueeRedact,
-        handlers,
-        pageIndex: opts.pageIndex,
-      });
-      return () => {
-        off();
-        off2();
-      };
-    }
+    // Register handlers for both unified Redact mode and legacy MarqueeRedact mode
+    const off2 = this.interactionManagerCapability.registerHandlers({
+      documentId: opts.documentId,
+      modeId: RedactionMode.Redact,
+      handlers,
+      pageIndex: opts.pageIndex,
+    });
+    const off3 = this.interactionManagerCapability.registerHandlers({
+      documentId: opts.documentId,
+      modeId: RedactionMode.MarqueeRedact,
+      handlers,
+      pageIndex: opts.pageIndex,
+    });
+
+    return () => {
+      off();
+      off2();
+      off3();
+    };
   }
 
   private queueCurrentSelectionAsPending(documentId?: string): Task<boolean, PdfErrorReason> {
     const id = documentId ?? this.getActiveDocumentId();
 
-    if (!this.selectionCapability)
+    if (!this.selectionCapability) {
       return PdfTaskHelper.reject({
         code: PdfErrorCode.NotFound,
         message: '[RedactionPlugin] selection plugin required',
       });
+    }
 
     const coreDoc = this.coreState.core.documents[id];
-    if (!coreDoc?.document)
+    if (!coreDoc?.document) {
       return PdfTaskHelper.reject({ code: PdfErrorCode.NotFound, message: 'Document not found' });
+    }
 
     const selectionScope = this.selectionCapability.forDocument(id);
     const formatted = selectionScope.getFormattedSelection();
     if (!formatted.length) return PdfTaskHelper.resolve(true);
+
+    // Fetch selected text BEFORE clearing (async, but started now while selection exists)
+    const textTask = selectionScope.getSelectedText();
 
     // Clear live UI selection
     const emitter = this.redactionSelection$.get(id);
     emitter?.emit([]);
     selectionScope.clear();
 
-    if (this.useAnnotationMode) {
-      // ANNOTATION MODE: Create REDACT annotations via annotation plugin
-      this.createRedactAnnotationsFromSelection(id, formatted);
-    } else {
-      // LEGACY MODE: Add to internal pending state
-      const uniqueId = uuidV4();
-      const items: RedactionItem[] = formatted.map((s) => ({
-        id: uniqueId,
-        kind: 'text',
-        page: s.pageIndex,
-        rect: s.rect,
-        rects: s.segmentRects,
-      }));
-
+    // Enable redact selection mode for legacy mode
+    if (!this.useAnnotationMode) {
       this.enableRedactSelection(id);
-      this.dispatch(addPending(id, items));
-      this.emitPendingChange(id);
-
-      // Auto-select the last one added
-      const last = items[items.length - 1];
-      this.selectPending(last.page, last.id, id);
     }
 
-    return PdfTaskHelper.resolve(true);
+    // Wait for text, then create redactions with text included
+    const task = new Task<boolean, PdfErrorReason>();
+    textTask.wait(
+      (textArr) => {
+        const text = textArr.join(' ');
+        this.createRedactionsFromSelection(id, formatted, text);
+        task.resolve(true);
+      },
+      () => {
+        // On error, still create redactions but without text
+        this.createRedactionsFromSelection(id, formatted);
+        task.resolve(true);
+      },
+    );
+
+    return task;
   }
 
   private commitPendingOne(
@@ -1027,7 +1091,6 @@ export class RedactionPlugin extends BasePlugin<
       .wait(
         () => {
           this.dispatch(removePending(docId, page, item.id));
-          this.emitPendingChange(docId);
           this.dispatchCoreAction(refreshPages(docId, [page]));
           this.events$.emit({ type: 'commit', documentId: docId, success: true });
           task.resolve(true);
@@ -1092,6 +1155,9 @@ export class RedactionPlugin extends BasePlugin<
         );
         // Purge the annotation from state (engine already removed it from PDF)
         this.annotationCapability?.forDocument(docId).purgeAnnotation(pdfPage.index, annotationId);
+
+        // Remove from internal pending state (purgeAnnotation doesn't emit events)
+        this.dispatch(removePending(docId, pdfPage.index, annotationId));
 
         // Purge history entries for this committed redaction (permanent, irreversible operation)
         this.historyCapability
@@ -1203,7 +1269,6 @@ export class RedactionPlugin extends BasePlugin<
       () => {
         this.dispatch(clearPending(docId));
         this.dispatchCoreAction(refreshPages(docId, pagesToRefresh));
-        this.emitPendingChange(docId);
         this.events$.emit({ type: 'commit', documentId: docId, success: true });
         task.resolve(true);
       },
@@ -1263,6 +1328,8 @@ export class RedactionPlugin extends BasePlugin<
         for (const [pageIndex, ids] of redactAnnotationsByPage) {
           for (const id of ids) {
             annoScope?.purgeAnnotation(pageIndex, id);
+            // Remove from internal pending state (purgeAnnotation doesn't emit events)
+            this.dispatch(removePending(docId, pageIndex, id));
             allPurgedIds.push(id);
           }
         }
@@ -1301,19 +1368,24 @@ export class RedactionPlugin extends BasePlugin<
 
   /**
    * Create REDACT annotations from text selection (annotation mode only)
+   * @returns Array of annotation IDs that were created
    */
   private createRedactAnnotationsFromSelection(
     documentId: string,
     formattedSelection: FormattedSelection[],
-  ): void {
-    if (!this.annotationCapability) return;
+    text?: string,
+  ): string[] {
+    if (!this.annotationCapability) return [];
 
     const annoScope = this.annotationCapability.forDocument(documentId);
     const tool = this.annotationCapability.getTool<AnnotationTool<PdfRedactAnnoObject>>('redact');
     const defaults = tool?.defaults;
+    const annotationIds: string[] = [];
 
     for (const selection of formattedSelection) {
       const annotationId = uuidV4();
+      annotationIds.push(annotationId);
+
       const annotation: PdfRedactAnnoObject = {
         ...defaults,
         id: annotationId,
@@ -1330,6 +1402,61 @@ export class RedactionPlugin extends BasePlugin<
       if (selection === formattedSelection[formattedSelection.length - 1]) {
         annoScope.selectAnnotation(selection.pageIndex, annotationId);
       }
+    }
+
+    // Update pending items with text if provided
+    // (syncFromAnnotationCreate adds the items to pending state)
+    if (text) {
+      for (let i = 0; i < annotationIds.length; i++) {
+        const pageIndex = formattedSelection[i].pageIndex;
+        this.dispatch(updatePending(documentId, pageIndex, annotationIds[i], { text }));
+      }
+    }
+
+    return annotationIds;
+  }
+
+  /**
+   * Create legacy RedactionItems from text selection (legacy mode only)
+   */
+  private createLegacyRedactionsFromSelection(
+    documentId: string,
+    formattedSelection: FormattedSelection[],
+    text?: string,
+  ): void {
+    const redactionColor = this.config.drawBlackBoxes ? '#000000' : 'transparent';
+    const items: RedactionItem[] = formattedSelection.map((s) => ({
+      id: uuidV4(),
+      kind: 'text' as const,
+      page: s.pageIndex,
+      rect: s.rect,
+      rects: s.segmentRects,
+      source: 'legacy' as const,
+      markColor: '#FF0000',
+      redactionColor,
+      text,
+    }));
+
+    this.dispatch(addPending(documentId, items));
+
+    if (items.length) {
+      this.selectPending(items[items.length - 1].page, items[items.length - 1].id, documentId);
+    }
+  }
+
+  /**
+   * Unified method to create redactions from text selection.
+   * Delegates to annotation mode or legacy mode helper based on configuration.
+   */
+  private createRedactionsFromSelection(
+    documentId: string,
+    formattedSelection: FormattedSelection[],
+    text?: string,
+  ): void {
+    if (this.useAnnotationMode) {
+      this.createRedactAnnotationsFromSelection(documentId, formattedSelection, text);
+    } else {
+      this.createLegacyRedactionsFromSelection(documentId, formattedSelection, text);
     }
   }
 
@@ -1380,6 +1507,9 @@ export class RedactionPlugin extends BasePlugin<
    * Convert a PdfRedactAnnoObject to a RedactionItem
    */
   private annotationToRedactionItem(anno: PdfRedactAnnoObject): RedactionItem {
+    const markColor = anno.strokeColor ?? '#FF0000';
+    const redactionColor = anno.color ?? 'transparent';
+
     if (anno.segmentRects && anno.segmentRects.length > 0) {
       return {
         id: anno.id,
@@ -1387,6 +1517,9 @@ export class RedactionPlugin extends BasePlugin<
         page: anno.pageIndex,
         rect: anno.rect,
         rects: anno.segmentRects,
+        source: 'annotation',
+        markColor,
+        redactionColor,
       };
     } else {
       return {
@@ -1394,6 +1527,9 @@ export class RedactionPlugin extends BasePlugin<
         kind: 'area',
         page: anno.pageIndex,
         rect: anno.rect,
+        source: 'annotation',
+        markColor,
+        redactionColor,
       };
     }
   }

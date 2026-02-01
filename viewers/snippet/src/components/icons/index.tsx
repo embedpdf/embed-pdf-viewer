@@ -79,6 +79,7 @@ import { ExternalLinkIcon } from './external-link';
 import { MarqueeSelectIcon } from './marquee-select';
 import { GroupIcon } from './group';
 import { UngroupIcon } from './ungroup';
+import { RedactionSidebarIcon } from './redaction-sidebar';
 
 export type Icons = {
   [key: string]: IconComponent;
@@ -165,4 +166,5 @@ export const icons: Icons = {
   marqueeSelect: MarqueeSelectIcon,
   group: GroupIcon,
   ungroup: UngroupIcon,
+  redactionSidebar: RedactionSidebarIcon,
 };

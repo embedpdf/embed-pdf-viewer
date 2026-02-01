@@ -600,6 +600,26 @@ export const commands: Record<string, Command<State>> = {
     },
   },
 
+  'panel:toggle-redaction': {
+    id: 'panel:toggle-redaction',
+    labelKey: 'panel.redaction',
+    icon: 'redactionSidebar',
+    categories: ['panel', 'panel-redaction', 'redaction'],
+    action: ({ registry, documentId }) => {
+      const uiPlugin = registry.getPlugin<UIPlugin>(UI_PLUGIN_ID);
+      if (!uiPlugin || !uiPlugin.provides) return;
+
+      const uiCapability = uiPlugin.provides();
+      if (!uiCapability) return;
+
+      const scope = uiCapability.forDocument(documentId);
+      scope.toggleSidebar('right', 'main', 'redaction-panel');
+    },
+    active: ({ state, documentId }) => {
+      return isSidebarOpen(state.plugins, documentId, 'right', 'main', 'redaction-panel');
+    },
+  },
+
   'panel:toggle-annotation-style': {
     id: 'panel:toggle-annotation-style',
     labelKey: 'panel.annotationStyle',

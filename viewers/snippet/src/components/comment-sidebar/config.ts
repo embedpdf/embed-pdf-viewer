@@ -123,7 +123,8 @@ export const annotationConfigs: Record<SidebarSubtype, AnnotationConfig> = {
     labelKey: 'annotation.redact',
     icon: 'redact',
     iconProps: (annotation: any) => ({
-      primaryColor: annotation.color || '#000000',
+      primaryColor: annotation.strokeColor || '#000000',
+      secondaryColor: annotation.color || '#000000',
     }),
   },
 };

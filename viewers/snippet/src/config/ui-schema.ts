@@ -595,6 +595,13 @@ export const viewerUISchema: UISchema = {
               categories: ['redaction', 'redaction-area'],
             },
             {
+              type: 'command-button',
+              id: 'toggle-redaction-panel',
+              commandId: 'panel:toggle-redaction',
+              variant: 'icon',
+              categories: ['panel', 'panel-redaction'],
+            },
+            {
               type: 'divider',
               id: 'redaction-tools-divider-1',
               orientation: 'vertical',
@@ -1211,6 +1218,23 @@ export const viewerUISchema: UISchema = {
       width: '250px',
       collapsible: true,
       defaultOpen: false,
+    },
+
+    'redaction-panel': {
+      id: 'redaction-panel',
+      position: {
+        placement: 'right',
+        slot: 'main',
+        order: 0,
+      },
+      content: {
+        type: 'component',
+        componentId: 'redaction-sidebar',
+      },
+      width: '250px',
+      collapsible: true,
+      defaultOpen: false,
+      categories: ['redaction'],
     },
   },
 

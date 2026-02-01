@@ -5,6 +5,7 @@ export const RedactIcon = ({
   size = 24,
   strokeWidth = 2,
   primaryColor = 'currentColor',
+  secondaryColor = 'currentColor',
   className,
   title,
 }: IconProps) => (
@@ -25,14 +26,14 @@ export const RedactIcon = ({
     {/* T-marker at top */}
     <path d="M7 4h10" />
     <path d="M12 4v8" />
-    {/* Redacted area with stripes - primaryColor */}
+    {/* Redacted area with stripes - primaryColor for stroke, secondaryColor for fill */}
     <defs>
       <clipPath id="stripeClip">
         <rect x="2" y="12" width="20" height="10" rx="2" />
       </clipPath>
     </defs>
     <rect x="2" y="12" width="20" height="10" rx="2" fill="none" stroke={primaryColor} />
-    <g clip-path="url(#stripeClip)" stroke={primaryColor}>
+    <g clip-path="url(#stripeClip)" stroke={secondaryColor}>
       <path d="M-7 24l12 -12" />
       <path d="M-3 24l12 -12" />
       <path d="M1 24l12 -12" />

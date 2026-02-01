@@ -115,6 +115,7 @@ import { HintLayer } from '@/components/hint-layer';
 import { CommentSidebar } from '@/components/comment-sidebar';
 import { CustomZoomToolbar } from '@/components/custom-zoom-toolbar';
 import { AnnotationSidebar } from '@/components/annotation-sidebar';
+import { RedactionSidebar } from '@/components/redaction-sidebar';
 import { SchemaSelectionMenu } from '@/ui/schema-selection-menu';
 import { SchemaOverlay } from '@/ui/schema-overlay';
 import { PrintModal } from '@/components/print-modal';
@@ -486,6 +487,7 @@ export function PDFViewer({ config, onRegistryReady }: PDFViewerProps) {
       'page-controls': PageControls,
       'mode-select-button': ModeSelectButton,
       'view-permissions-modal': ViewPermissionsModal,
+      'redaction-sidebar': RedactionSidebar,
     }),
     [],
   );

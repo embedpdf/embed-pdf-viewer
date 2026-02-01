@@ -40,20 +40,28 @@ export interface RedactionState {
   activeDocumentId: string | null;
 }
 
+// Source mode for redaction items
+export type RedactionSource = 'annotation' | 'legacy';
+
+// Common base for both kinds
+interface RedactionItemBase {
+  id: string;
+  page: number;
+  rect: Rect;
+  source: RedactionSource;
+  markColor: string; // Stroke/outline color (default: '#FF0000')
+  redactionColor: string; // Fill color for redaction (transparent or #000000 in legacy, anno.color in annotation mode)
+}
+
 export type RedactionItem =
-  | {
-      id: string;
+  | (RedactionItemBase & {
       kind: 'text';
-      page: number;
-      rect: Rect;
       rects: Rect[];
-    }
-  | {
-      id: string;
+      text?: string; // The highlighted text (optional, async populated)
+    })
+  | (RedactionItemBase & {
       kind: 'area';
-      page: number;
-      rect: Rect;
-    };
+    });
 
 export interface MarqueeRedactCallback {
   onPreview?: (rect: Rect | null) => void;
