@@ -31,6 +31,8 @@ export function RedactArea({ annotation, isSelected, scale, onClick, style }: Re
   const strokeColor = object.strokeColor ?? '#FF0000';
   // IC - Interior color (background fill when redaction is applied)
   const color = object.color ?? '#000000';
+  // CA - Opacity (0-1)
+  const opacity = object.opacity ?? 1;
   // OC - Overlay text color (Adobe extension), fallback to fontColor
   const textColor = object.fontColor ?? object.overlayColor ?? '#FFFFFF';
   // Overlay text properties
@@ -63,6 +65,7 @@ export function RedactArea({ annotation, isSelected, scale, onClick, style }: Re
         // Selected: no border (container handles it)
         background: isHovered ? color : 'transparent',
         border: !isHovered ? `2px solid ${strokeColor}` : 'none',
+        opacity: isHovered ? opacity : 1,
         boxSizing: 'border-box',
         cursor: 'pointer',
         pointerEvents: isSelected ? 'none' : 'auto',

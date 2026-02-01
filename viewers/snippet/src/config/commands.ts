@@ -1786,11 +1786,11 @@ export const commands: Record<string, Command<State>> = {
   // ─────────────────────────────────────────────────────────
   // Redaction Commands
   // ─────────────────────────────────────────────────────────
-  'redaction:redact-area': {
-    id: 'redaction:redact-area',
-    labelKey: 'redaction.area',
+  'redaction:redact': {
+    id: 'redaction:redact',
+    labelKey: 'redaction.redact',
     icon: 'redactArea',
-    categories: ['redaction', 'redaction-area'],
+    categories: ['redaction', 'redaction-combined'],
     action: ({ registry, documentId }) => {
       const redaction = registry.getPlugin<RedactionPlugin>('redaction')?.provides();
       redaction?.forDocument(documentId).toggleRedact();
@@ -1798,6 +1798,24 @@ export const commands: Record<string, Command<State>> = {
     active: ({ registry, documentId }) => {
       const redaction = registry.getPlugin<RedactionPlugin>('redaction')?.provides();
       return redaction?.forDocument(documentId).isRedactActive() ?? false;
+    },
+    disabled: ({ state, documentId }) => {
+      return lacksPermission(state, documentId, PdfPermissionFlag.ModifyContents);
+    },
+  },
+
+  'redaction:redact-area': {
+    id: 'redaction:redact-area',
+    labelKey: 'redaction.area',
+    icon: 'redactArea',
+    categories: ['redaction', 'redaction-area'],
+    action: ({ registry, documentId }) => {
+      const redaction = registry.getPlugin<RedactionPlugin>('redaction')?.provides();
+      redaction?.forDocument(documentId).toggleMarqueeRedact();
+    },
+    active: ({ registry, documentId }) => {
+      const redaction = registry.getPlugin<RedactionPlugin>('redaction')?.provides();
+      return redaction?.forDocument(documentId).isMarqueeRedactActive() ?? false;
     },
     disabled: ({ state, documentId }) => {
       return lacksPermission(state, documentId, PdfPermissionFlag.ModifyContents);

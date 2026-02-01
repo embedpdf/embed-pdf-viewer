@@ -1393,6 +1393,7 @@ export class RedactionPlugin extends BasePlugin<
         pageIndex: selection.pageIndex,
         rect: selection.rect,
         segmentRects: selection.segmentRects,
+        ...(text ? { custom: { text } } : {}),
         created: new Date(),
       };
 
@@ -1520,6 +1521,7 @@ export class RedactionPlugin extends BasePlugin<
         source: 'annotation',
         markColor,
         redactionColor,
+        ...(anno.custom?.text ? { text: anno.custom.text } : {}),
       };
     } else {
       return {

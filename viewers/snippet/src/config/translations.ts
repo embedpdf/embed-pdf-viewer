@@ -78,7 +78,7 @@ export const englishTranslations: Locale = {
       thumbnails: 'Thumbnails',
       outline: 'Outline',
       annotationStyle: 'Annotation Style',
-      redaction: 'Redaction',
+      redaction: 'Redaction Sidebar',
     },
     menu: {
       viewControls: 'View Controls',
@@ -172,6 +172,7 @@ export const englishTranslations: Locale = {
       overlayTextPlaceholder: 'e.g., REDACTED',
     },
     redaction: {
+      redact: 'Redact',
       area: 'Redact Area',
       text: 'Redact Text',
       apply: 'Apply Redaction',
@@ -414,7 +415,7 @@ export const germanTranslations: Locale = {
       thumbnails: 'Miniaturansichten',
       outline: 'Gliederung',
       annotationStyle: 'Anmerkungsstil',
-      redaction: 'Schwärzung',
+      redaction: 'Schwärzungs-Seitenleiste',
     },
     menu: {
       viewControls: 'Ansichtseinstellungen',
@@ -508,6 +509,7 @@ export const germanTranslations: Locale = {
       overlayTextPlaceholder: 'z.B. GESCHWÄRZT',
     },
     redaction: {
+      redact: 'Schwärzen',
       area: 'Bereich schwärzen',
       text: 'Text schwärzen',
       apply: 'Schwärzung anwenden',
@@ -752,7 +754,7 @@ export const dutchTranslations: Locale = {
       thumbnails: 'Miniaturen',
       outline: 'Overzicht',
       annotationStyle: 'Annotatiestijl',
-      redaction: 'Redactie',
+      redaction: 'Redactie Zijbalk',
     },
     menu: {
       viewControls: 'Weergave-instellingen',
@@ -846,6 +848,7 @@ export const dutchTranslations: Locale = {
       overlayTextPlaceholder: 'bijv. GEREDIGEERD',
     },
     redaction: {
+      redact: 'Redigeren',
       area: 'Gebied redigeren',
       text: 'Tekst redigeren',
       apply: 'Redactie toepassen',
@@ -1088,7 +1091,7 @@ export const frenchTranslations: Locale = {
       thumbnails: 'Miniatures',
       outline: 'Plan',
       annotationStyle: "Style d'annotation",
-      redaction: 'Caviardage',
+      redaction: 'Barre latérale de caviardage',
     },
     menu: {
       viewControls: "Contrôles d'affichage",
@@ -1182,6 +1185,7 @@ export const frenchTranslations: Locale = {
       overlayTextPlaceholder: 'ex: CAVIARDÉ',
     },
     redaction: {
+      redact: 'Caviarder',
       area: 'Caviarder la zone',
       text: 'Caviarder le texte',
       apply: 'Appliquer le caviardage',
@@ -1426,7 +1430,7 @@ export const spanishTranslations: Locale = {
       thumbnails: 'Miniaturas',
       outline: 'Esquema',
       annotationStyle: 'Estilo de anotación',
-      redaction: 'Redacción',
+      redaction: 'Barra lateral de redacción',
     },
     menu: {
       viewControls: 'Controles de vista',
@@ -1520,6 +1524,7 @@ export const spanishTranslations: Locale = {
       overlayTextPlaceholder: 'ej: REDACTADO',
     },
     redaction: {
+      redact: 'Redactar',
       area: 'Redactar área',
       text: 'Redactar texto',
       apply: 'Aplicar redacción',
@@ -1762,7 +1767,7 @@ export const simplifiedChineseTranslations: Locale = {
       thumbnails: '缩略图',
       outline: '大纲',
       annotationStyle: '批注样式',
-      redaction: '遮蔽',
+      redaction: '遮蔽侧边栏',
     },
     menu: {
       viewControls: '视图控件',
@@ -1856,6 +1861,7 @@ export const simplifiedChineseTranslations: Locale = {
       overlayTextPlaceholder: '例如：已遮蔽',
     },
     redaction: {
+      redact: '遮蔽',
       area: '遮蔽区域',
       text: '遮蔽文本',
       apply: '应用遮蔽',
