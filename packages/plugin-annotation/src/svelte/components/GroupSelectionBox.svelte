@@ -7,6 +7,7 @@
     CounterRotate,
     type MenuWrapperProps,
   } from '@embedpdf/utils/svelte';
+  import { useDocumentPermissions } from '@embedpdf/core/svelte';
   import { useAnnotationPlugin } from '../hooks';
   import type {
     GroupSelectionContext,
@@ -62,9 +63,14 @@
   }: GroupSelectionBoxProps = $props();
 
   const annotationPlugin = useAnnotationPlugin();
+  const permissions = useDocumentPermissions(() => documentId);
   let gestureBase = $state<Rect | null>(null);
   let isDraggingRef = $state(false);
   let isResizingRef = $state(false);
+
+  // Check permissions before allowing drag/resize
+  const effectiveIsDraggable = $derived(permissions.canModifyAnnotations && isDraggable);
+  const effectiveIsResizable = $derived(permissions.canModifyAnnotations && isResizable);
 
   // Helper to compute group box on demand
   function getGroupBox(): Rect {
@@ -121,7 +127,7 @@
         const isResize = transformType === 'resize';
 
         // Skip drag operations if group is not draggable
-        if (isMove && !isDraggable) return;
+        if (isMove && !effectiveIsDraggable) return;
 
         if (event.state === 'start') {
           gestureBase = getGroupBox();
@@ -235,9 +241,9 @@
 
 {#if selectedAnnotations.length >= 2}
   <div data-group-selection-box data-no-interaction>
-    <!-- Group box - draggable only if isDraggable is true -->
+    <!-- Group box - draggable only if effectiveIsDraggable is true -->
     <div
-      {...isDraggable
+      {...effectiveIsDraggable
         ? interactionHandles.dragProps
         : { onpointerdown: (e: PointerEvent) => e.stopPropagation() }}
       style:position="absolute"
@@ -247,12 +253,12 @@
       style:height="{previewGroupBox.size.height * scale}px"
       style:outline="2px dashed {selectionOutlineColor}"
       style:outline-offset="{outlineOffset - 1}px"
-      style:cursor={isDraggable ? 'move' : 'default'}
+      style:cursor={effectiveIsDraggable ? 'move' : 'default'}
       style:touch-action="none"
       style:z-index={zIndex}
     >
       <!-- Resize handles -->
-      {#if isResizable}
+      {#if effectiveIsResizable}
         {#each resizeHandles as { key, style: handleStyle, ...hProps } (key)}
           {#if resizeUI?.component}
             {@render resizeUI.component({ ...hProps, backgroundColor: HANDLE_COLOR })}

@@ -2,6 +2,7 @@ import { Rect, boundingRectOrEmpty } from '@embedpdf/models';
 import { useInteractionHandles, CounterRotate } from '@embedpdf/utils/@framework';
 import { TrackedAnnotation } from '@embedpdf/plugin-annotation';
 import { useState, useMemo, useCallback, useRef, useEffect } from '@framework';
+import { useDocumentPermissions } from '@embedpdf/core/@framework';
 
 import { useAnnotationPlugin } from '../hooks';
 import { ResizeHandleUI, GroupSelectionMenuRenderFn } from './types';
@@ -52,9 +53,14 @@ export function GroupSelectionBox({
   groupSelectionMenu,
 }: GroupSelectionBoxProps): JSX.Element | null {
   const { plugin } = useAnnotationPlugin();
+  const { canModifyAnnotations } = useDocumentPermissions(documentId);
   const gestureBaseRef = useRef<Rect | null>(null);
   const isDraggingRef = useRef(false);
   const isResizingRef = useRef(false);
+
+  // Check permissions before allowing drag/resize
+  const effectiveIsDraggable = canModifyAnnotations && isDraggable;
+  const effectiveIsResizable = canModifyAnnotations && isResizable;
 
   // Compute the group bounding box from all selected annotations
   const groupBox = useMemo(() => {
@@ -88,7 +94,7 @@ export function GroupSelectionBox({
       const isResize = transformType === 'resize';
 
       // Skip drag operations if group is not draggable
-      if (isMove && !isDraggable) return;
+      if (isMove && !effectiveIsDraggable) return;
 
       if (event.state === 'start') {
         gestureBaseRef.current = groupBox;
@@ -156,7 +162,15 @@ export function GroupSelectionBox({
         }
       }
     },
-    [plugin, documentId, pageWidth, pageHeight, groupBox, isDraggable, selectedAnnotations],
+    [
+      plugin,
+      documentId,
+      pageWidth,
+      pageHeight,
+      groupBox,
+      effectiveIsDraggable,
+      selectedAnnotations,
+    ],
   );
 
   // UI constants
@@ -199,9 +213,9 @@ export function GroupSelectionBox({
 
   return (
     <div data-group-selection-box data-no-interaction>
-      {/* Group box - draggable only if isDraggable is true */}
+      {/* Group box - draggable only if effectiveIsDraggable is true */}
       <div
-        {...(isDraggable
+        {...(effectiveIsDraggable
           ? dragProps
           : {
               onPointerDown: (e) => e.stopPropagation(),
@@ -214,13 +228,13 @@ export function GroupSelectionBox({
           height: previewGroupBox.size.height * scale,
           outline: `2px dashed ${selectionOutlineColor}`,
           outlineOffset: outlineOffset - 1,
-          cursor: isDraggable ? 'move' : 'default',
+          cursor: effectiveIsDraggable ? 'move' : 'default',
           touchAction: 'none',
           zIndex,
         }}
       >
         {/* Resize handles */}
-        {isResizable &&
+        {effectiveIsResizable &&
           resize.map(({ key, ...hProps }) =>
             resizeUI?.component ? (
               resizeUI.component({

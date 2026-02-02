@@ -1035,6 +1035,9 @@ export const commands: Record<string, Command<State>> = {
         selectedAnnotation.object.id,
       );
     },
+    disabled: ({ state, documentId }) => {
+      return lacksPermission(state, documentId, PdfPermissionFlag.ModifyAnnotations);
+    },
   },
 
   'annotation:apply-redaction': {
