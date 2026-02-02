@@ -70,7 +70,7 @@ export default {
 </script>
 
 <script setup lang="ts" generic="T extends PdfAnnotationObject">
-import { ref, computed, watch, watchEffect, useSlots, toRaw, shallowRef, VNode } from 'vue';
+import { ref, computed, watchEffect, useSlots, toRaw, shallowRef, VNode } from 'vue';
 import { PdfAnnotationObject, Rect } from '@embedpdf/models';
 import {
   CounterRotate,
@@ -319,13 +319,11 @@ const { dragProps, vertices, resize } = useInteractionHandles({
 const doubleProps = useDoublePressProps(guardedOnDoubleClick);
 
 // Sync preview with tracked annotation when it changes
-watch(
-  () => props.trackedAnnotation.object,
-  (newObject) => {
-    preview.value = newObject;
-  },
-  { deep: true },
-);
+watchEffect(() => {
+  if (props.trackedAnnotation.object) {
+    preview.value = props.trackedAnnotation.object;
+  }
+});
 
 // Subscribe to unified drag/resize changes - plugin sends pre-computed patches!
 // ALL preview updates come through here (primary, attached links, multi-select)

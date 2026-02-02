@@ -32,25 +32,26 @@ import {
 const props = defineProps<AnnotationRendererProps<PdfRedactAnnoObject>>();
 const isHovered = ref(false);
 
-const { object } = props.annotation;
-
-const segmentRects = computed(() => object.segmentRects ?? []);
-const rect = computed(() => object.rect);
+// Access props.annotation.object directly in computed to maintain reactivity
+const segmentRects = computed(() => props.annotation.object.segmentRects ?? []);
+const rect = computed(() => props.annotation.object.rect);
 
 // C - Border/stroke color
-const strokeColor = computed(() => object.strokeColor ?? '#FF0000');
+const strokeColor = computed(() => props.annotation.object.strokeColor ?? '#FF0000');
 // IC - Interior color (background fill when redaction is applied)
-const color = computed(() => object.color ?? '#000000');
+const color = computed(() => props.annotation.object.color ?? '#000000');
 // CA - Opacity (0-1)
-const opacity = computed(() => object.opacity ?? 1);
+const opacity = computed(() => props.annotation.object.opacity ?? 1);
 // OC - Overlay text color (Adobe extension), fallback to fontColor
-const textColor = computed(() => object.fontColor ?? object.overlayColor ?? '#FFFFFF');
+const textColor = computed(
+  () => props.annotation.object.fontColor ?? props.annotation.object.overlayColor ?? '#FFFFFF',
+);
 // Overlay text properties
-const overlayText = computed(() => object.overlayText);
-const overlayTextRepeat = computed(() => object.overlayTextRepeat ?? false);
-const fontSize = computed(() => object.fontSize ?? 12);
-const fontFamily = computed(() => object.fontFamily ?? PdfStandardFont.Helvetica);
-const textAlign = computed(() => object.textAlign ?? PdfTextAlignment.Center);
+const overlayText = computed(() => props.annotation.object.overlayText);
+const overlayTextRepeat = computed(() => props.annotation.object.overlayTextRepeat ?? false);
+const fontSize = computed(() => props.annotation.object.fontSize ?? 12);
+const fontFamily = computed(() => props.annotation.object.fontFamily ?? PdfStandardFont.Helvetica);
+const textAlign = computed(() => props.annotation.object.textAlign ?? PdfTextAlignment.Center);
 
 // Calculate how many times to repeat text (approximate)
 const renderedOverlayText = computed(() => {
