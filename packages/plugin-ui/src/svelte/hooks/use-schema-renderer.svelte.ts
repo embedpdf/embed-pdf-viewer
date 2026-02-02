@@ -162,6 +162,7 @@ export function useSchemaRenderer(getDocumentId: () => string | null) {
         isOpen,
         onClose: handleClose,
         onExited: handleExited,
+        modalProps: uiState.state.activeModal.props,
       };
     },
 

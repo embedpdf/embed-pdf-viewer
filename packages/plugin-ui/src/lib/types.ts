@@ -48,6 +48,7 @@ export interface SidebarSlotState {
 export interface ModalSlotState {
   modalId: string;
   isOpen: boolean; // false = animating out, true = visible
+  props?: Record<string, unknown>; // Optional props passed when opening the modal
 }
 
 export interface UIDocumentState {
@@ -183,7 +184,7 @@ export interface UIScope {
   isSidebarOpen(placement: string, slot: string, sidebarId?: string): boolean;
 
   // Modals (with animation lifecycle support)
-  openModal(modalId: string): void;
+  openModal(modalId: string, props?: Record<string, unknown>): void;
   closeModal(): void;
   clearModal(): void; // Called after exit animation completes
   getActiveModal(): ModalSlotState | null;
@@ -235,7 +236,7 @@ export interface UICapability {
     documentId?: string,
     activeTab?: string,
   ): void;
-  openModal(modalId: string, documentId?: string): void;
+  openModal(modalId: string, props?: Record<string, unknown>, documentId?: string): void;
   openMenu(
     menuId: string,
     triggeredByCommandId: string,

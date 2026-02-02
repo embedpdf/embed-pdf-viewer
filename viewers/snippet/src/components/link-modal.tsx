@@ -20,15 +20,18 @@ import { TabButton } from './ui/tab-button';
 import { useTranslations } from '@embedpdf/plugin-i18n/preact';
 
 type LinkTab = 'url' | 'page';
+type LinkSource = 'annotation' | 'selection';
 
 interface LinkModalProps {
   documentId: string;
   isOpen?: boolean;
   onClose?: () => void;
   onExited?: () => void;
+  /** Source context that triggered the modal */
+  source?: LinkSource;
 }
 
-export function LinkModal({ documentId, isOpen, onClose, onExited }: LinkModalProps) {
+export function LinkModal({ documentId, isOpen, onClose, onExited, source }: LinkModalProps) {
   const { provides: scroll } = useScrollCapability();
   const { provides: annotation } = useAnnotationCapability();
   const { provides: selection } = useSelectionCapability();
@@ -81,9 +84,10 @@ export function LinkModal({ documentId, isOpen, onClose, onExited }: LinkModalPr
       };
     }
 
-    // Create links based on context
-    if (selectedAnnotation) {
-      // IRT-linked links from selected annotation
+    // Helper to create link on annotation
+    const createLinkOnAnnotation = () => {
+      if (!selectedAnnotation) return false;
+
       const rects =
         'segmentRects' in selectedAnnotation.object
           ? selectedAnnotation.object.segmentRects
@@ -103,7 +107,13 @@ export function LinkModal({ documentId, isOpen, onClose, onExited }: LinkModalPr
           strokeWidth: 2,
         });
       }
-    } else if (textSelection.length > 0) {
+      return true;
+    };
+
+    // Helper to create link from text selection
+    const createLinkFromSelection = () => {
+      if (textSelection.length === 0) return false;
+
       const selectionText = selectionScope?.getSelectedText();
 
       // Create transparent highlight parent with IRT-linked links for each selection
@@ -149,6 +159,20 @@ export function LinkModal({ documentId, isOpen, onClose, onExited }: LinkModalPr
         }, ignore);
       }
       selectionScope?.clear();
+      return true;
+    };
+
+    // Create links based on the source context passed when opening the modal
+    // This ensures the correct context is used even when both annotation and text are selected
+    if (source === 'annotation') {
+      createLinkOnAnnotation();
+    } else if (source === 'selection') {
+      createLinkFromSelection();
+    } else {
+      // Fallback for backwards compatibility: annotation first, then selection
+      if (!createLinkOnAnnotation()) {
+        createLinkFromSelection();
+      }
     }
 
     onClose?.();

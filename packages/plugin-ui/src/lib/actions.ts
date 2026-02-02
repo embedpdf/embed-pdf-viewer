@@ -73,7 +73,7 @@ export interface SetSidebarTabAction extends Action {
 // Modal action types (with animation lifecycle)
 export interface OpenModalAction extends Action {
   type: typeof OPEN_MODAL;
-  payload: { documentId: string; modalId: string };
+  payload: { documentId: string; modalId: string; props?: Record<string, unknown> };
 }
 
 export interface CloseModalAction extends Action {
@@ -196,9 +196,13 @@ export const setSidebarTab = (
 });
 
 // Modal action creators (with animation lifecycle)
-export const openModal = (documentId: string, modalId: string): OpenModalAction => ({
+export const openModal = (
+  documentId: string,
+  modalId: string,
+  props?: Record<string, unknown>,
+): OpenModalAction => ({
   type: OPEN_MODAL,
-  payload: { documentId, modalId },
+  payload: { documentId, modalId, props },
 });
 
 export const closeModal = (documentId: string): CloseModalAction => ({
