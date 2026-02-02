@@ -340,13 +340,13 @@ export const viewerUISchema: UISchema = {
         breakpoints: {
           sm: {
             maxWidth: 640,
-            hide: ['add-text', 'add-stamp'],
+            hide: ['add-text', 'add-stamp', 'add-ink'],
             show: ['overflow-annotation-tools'],
           },
           md: {
             minWidth: 640,
             hide: ['overflow-annotation-tools'],
-            show: ['add-text', 'add-stamp'],
+            show: ['add-text', 'add-stamp', 'add-ink'],
           },
         },
       },
@@ -380,6 +380,13 @@ export const viewerUISchema: UISchema = {
               commandId: 'annotation:add-underline',
               variant: 'icon',
               categories: ['annotation', 'annotation-markup', 'annotation-underline'],
+            },
+            {
+              type: 'command-button',
+              id: 'add-squiggly',
+              commandId: 'annotation:add-squiggly',
+              variant: 'icon',
+              categories: ['annotation', 'annotation-markup', 'annotation-squiggly'],
             },
             {
               type: 'command-button',
@@ -1013,6 +1020,12 @@ export const viewerUISchema: UISchema = {
       id: 'annotation-tools-menu',
       categories: ['annotation'],
       items: [
+        {
+          type: 'command',
+          id: 'annotation:add-ink',
+          commandId: 'annotation:add-ink',
+          categories: ['annotation', 'annotation-ink'],
+        },
         {
           type: 'command',
           id: 'annotation:add-text',
