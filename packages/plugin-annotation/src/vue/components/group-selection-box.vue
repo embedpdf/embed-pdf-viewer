@@ -1,13 +1,13 @@
 <template>
   <div v-if="selectedAnnotations.length >= 2" data-group-selection-box data-no-interaction>
-    <!-- Group box - draggable only if isDraggable is true -->
+    <!-- Group box - draggable only if effectiveIsDraggable is true -->
     <div
-      v-bind="isDraggable ? dragProps : {}"
+      v-bind="effectiveIsDraggable ? dragProps : {}"
       :style="boxStyle"
-      @pointerdown="!isDraggable ? $event.stopPropagation() : undefined"
+      @pointerdown="!effectiveIsDraggable ? $event.stopPropagation() : undefined"
     >
       <!-- Resize handles -->
-      <template v-if="isResizable">
+      <template v-if="effectiveIsResizable">
         <template v-for="{ key, style, ...handle } in resize" :key="key">
           <slot
             v-if="slots['resize-handle']"
@@ -52,6 +52,7 @@ import {
   useInteractionHandles,
 } from '@embedpdf/utils/vue';
 import { TrackedAnnotation } from '@embedpdf/plugin-annotation';
+import { useDocumentPermissions } from '@embedpdf/core/vue';
 import { useAnnotationPlugin } from '../hooks';
 import {
   GroupSelectionContext,
@@ -94,9 +95,18 @@ const props = withDefaults(
 
 const slots = useSlots();
 const { plugin: annotationPlugin } = useAnnotationPlugin();
+const permissions = useDocumentPermissions(() => props.documentId);
 const gestureBase = shallowRef<Rect | null>(null);
 const isDraggingRef = ref(false);
 const isResizingRef = ref(false);
+
+// Check permissions before allowing drag/resize
+const effectiveIsDraggable = computed(
+  () => permissions.value.canModifyAnnotations && props.isDraggable,
+);
+const effectiveIsResizable = computed(
+  () => permissions.value.canModifyAnnotations && props.isResizable,
+);
 
 const HANDLE_COLOR = computed(() => props.resizeUI?.color ?? '#007ACC');
 const HANDLE_SIZE = computed(() => props.resizeUI?.size ?? 12);
@@ -131,7 +141,7 @@ const boxStyle = computed(() => ({
   height: `${previewGroupBox.value.size.height * props.scale}px`,
   outline: `2px dashed ${props.selectionOutlineColor}`,
   outlineOffset: `${props.outlineOffset - 1}px`,
-  cursor: props.isDraggable ? 'move' : 'default',
+  cursor: effectiveIsDraggable.value ? 'move' : 'default',
   touchAction: 'none',
   zIndex: props.zIndex,
 }));
@@ -211,7 +221,7 @@ const { dragProps, resize } = useInteractionHandles({
       const isResize = transformType === 'resize';
 
       // Skip drag operations if group is not draggable
-      if (isMove && !props.isDraggable) return;
+      if (isMove && !effectiveIsDraggable.value) return;
 
       if (event.state === 'start') {
         gestureBase.value = groupBox.value;
