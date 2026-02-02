@@ -6,6 +6,7 @@ export { default as GroupSelectionBox } from './group-selection-box.vue';
 export { default as PreviewRenderer } from './preview-renderer.vue';
 export { default as RenderAnnotation } from './render-annotation.vue';
 export { default as TextMarkup } from './text-markup.vue';
+export { default as RendererRegistryProvider } from './renderer-registry-provider.vue';
 
 export * from './annotations';
 export * from './text-markup';

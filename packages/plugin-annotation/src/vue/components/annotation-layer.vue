@@ -12,6 +12,7 @@
       :selectionOutlineColor="selectionOutlineColor"
       :selectionMenu="selectionMenu"
       :groupSelectionMenu="groupSelectionMenu"
+      :annotationRenderers="allRenderers"
     >
       <!-- Forward slots for manual customization (only used if selectionMenu prop not provided) -->
       <template #selection-menu="slotProps">
@@ -45,6 +46,7 @@ import {
   ResizeHandleUI,
   VertexHandleUI,
 } from '../types';
+import { useRendererRegistry, type BoxedAnnotationRenderer } from '../context';
 
 const props = defineProps<{
   /** The ID of the document that this layer displays annotations for */
@@ -62,7 +64,25 @@ const props = defineProps<{
   selectionMenu?: AnnotationSelectionMenuRenderFn;
   /** Customize group selection menu */
   groupSelectionMenu?: GroupSelectionMenuRenderFn;
+  /** Custom renderers for specific annotation types (provided by external plugins) */
+  annotationRenderers?: BoxedAnnotationRenderer[];
 }>();
+
+// Get renderers from registry (provided by parent)
+const registry = useRendererRegistry();
+
+// Merge: registry + explicit props (props take precedence by id)
+const allRenderers = computed(() => {
+  const fromRegistry = registry?.getAll() ?? [];
+  const fromProps = props.annotationRenderers ?? [];
+  const merged = [...fromRegistry];
+  for (const r of fromProps) {
+    const idx = merged.findIndex((m) => m.id === r.id);
+    if (idx >= 0) merged[idx] = r;
+    else merged.push(r);
+  }
+  return merged;
+});
 
 const documentState = useDocumentState(() => props.documentId);
 const page = computed(() => documentState.value?.document?.pages?.[props.pageIndex]);

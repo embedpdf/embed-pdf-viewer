@@ -53,8 +53,8 @@ export function RedactArea({ annotation, isSelected, scale, onClick, style }: Re
 
   return (
     <div
-      onPointerDown={onClick}
-      onTouchStart={onClick}
+      onPointerDown={!isSelected ? onClick : undefined}
+      onTouchStart={!isSelected ? onClick : undefined}
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}
       style={{
@@ -67,8 +67,8 @@ export function RedactArea({ annotation, isSelected, scale, onClick, style }: Re
         border: !isHovered ? `2px solid ${strokeColor}` : 'none',
         opacity: isHovered ? opacity : 1,
         boxSizing: 'border-box',
-        cursor: 'pointer',
-        pointerEvents: isSelected ? 'none' : 'auto',
+        pointerEvents: 'auto',
+        cursor: isSelected ? 'move' : 'pointer',
         display: 'flex',
         alignItems: 'center',
         justifyContent:

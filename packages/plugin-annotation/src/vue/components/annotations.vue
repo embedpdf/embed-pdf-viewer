@@ -1,8 +1,39 @@
 <template>
   <template v-for="annotation in annotations" :key="annotation.object.id">
+    <!-- Custom Renderer (from external plugins like redaction) -->
+    <AnnotationContainer
+      v-if="findCustomRenderer(annotation)"
+      :trackedAnnotation="annotation"
+      :isSelected="showIndividualSelection(annotation)"
+      :isDraggable="isDraggable(annotation)"
+      :isResizable="isResizable(annotation)"
+      :lockAspectRatio="lockAspectRatio(annotation)"
+      :onSelect="(e) => handleClick(e, annotation)"
+      :selectionMenu="isMultiSelected ? undefined : selectionMenu"
+      :style="{ mixBlendMode: blendModeToCss(annotation.object.blendMode ?? PdfBlendMode.Normal) }"
+      v-bind="containerProps"
+    >
+      <template #default>
+        <component
+          :is="findCustomRenderer(annotation)!.component"
+          :annotation="annotation"
+          :isSelected="isSelected(annotation)"
+          :scale="scale"
+          :pageIndex="pageIndex"
+          :onClick="(e: PointerEvent | TouchEvent) => handleClick(e, annotation)"
+        />
+      </template>
+      <template #selection-menu="slotProps" v-if="!isMultiSelected">
+        <slot name="selection-menu" v-bind="slotProps" />
+      </template>
+      <template #resize-handle="slotProps">
+        <slot name="resize-handle" v-bind="slotProps" />
+      </template>
+    </AnnotationContainer>
+
     <!-- Ink -->
     <AnnotationContainer
-      v-if="isInk(annotation)"
+      v-else-if="isInk(annotation)"
       :trackedAnnotation="annotation"
       :isSelected="showIndividualSelection(annotation)"
       :isDraggable="isDraggable(annotation)"
@@ -476,6 +507,7 @@ import {
   ResizeHandleUI,
   VertexHandleUI,
 } from '../types';
+import type { BoxedAnnotationRenderer } from '../context';
 
 const props = defineProps<{
   documentId: string;
@@ -491,7 +523,14 @@ const props = defineProps<{
   selectionMenu?: AnnotationSelectionMenuRenderFn;
   /** Render function for group selection menu (schema-driven approach) */
   groupSelectionMenu?: GroupSelectionMenuRenderFn;
+  /** Custom renderers for specific annotation types (provided by external plugins) */
+  annotationRenderers?: BoxedAnnotationRenderer[];
 }>();
+
+// Find a custom renderer for the given annotation
+const findCustomRenderer = (annotation: TrackedAnnotation) => {
+  return props.annotationRenderers?.find((r) => r.matches(annotation.object));
+};
 
 const { provides: annotationCapability } = useAnnotationCapability();
 const { provides: selectionProvides } = useSelectionCapability();

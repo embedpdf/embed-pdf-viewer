@@ -595,16 +595,16 @@ export const viewerUISchema: UISchema = {
               categories: ['redaction', 'redaction-combined'],
             },
             {
+              type: 'divider',
+              id: 'redaction-tools-divider-1',
+              orientation: 'vertical',
+            },
+            {
               type: 'command-button',
               id: 'toggle-redaction-panel',
               commandId: 'panel:toggle-redaction',
               variant: 'icon',
               categories: ['panel', 'panel-redaction'],
-            },
-            {
-              type: 'divider',
-              id: 'redaction-tools-divider-1',
-              orientation: 'vertical',
             },
             {
               type: 'command-button',
