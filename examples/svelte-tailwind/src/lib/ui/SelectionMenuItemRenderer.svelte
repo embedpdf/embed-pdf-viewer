@@ -4,7 +4,7 @@
     type SelectionMenuPropsBase,
     getUIItemProps,
   } from '@embedpdf/plugin-ui/svelte';
-  import CommandButton from '../components/CommandButton.svelte';
+  import CommandButtonItem from './CommandButtonItem.svelte';
   import ToolbarDivider from '../components/ui/ToolbarDivider.svelte';
   import Self from './SelectionMenuItemRenderer.svelte';
 
@@ -18,9 +18,7 @@
 </script>
 
 {#if item.type === 'command-button'}
-  <div {...getUIItemProps(item)}>
-    <CommandButton commandId={item.commandId} {documentId} variant={item.variant} />
-  </div>
+  <CommandButtonItem {item} {documentId} />
 {:else if item.type === 'divider'}
   <div {...getUIItemProps(item)}>
     <ToolbarDivider />

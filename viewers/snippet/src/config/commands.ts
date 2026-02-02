@@ -600,6 +600,26 @@ export const commands: Record<string, Command<State>> = {
     },
   },
 
+  'panel:toggle-redaction': {
+    id: 'panel:toggle-redaction',
+    labelKey: 'panel.redaction',
+    icon: 'redactionSidebar',
+    categories: ['panel', 'panel-redaction', 'redaction'],
+    action: ({ registry, documentId }) => {
+      const uiPlugin = registry.getPlugin<UIPlugin>(UI_PLUGIN_ID);
+      if (!uiPlugin || !uiPlugin.provides) return;
+
+      const uiCapability = uiPlugin.provides();
+      if (!uiCapability) return;
+
+      const scope = uiCapability.forDocument(documentId);
+      scope.toggleSidebar('right', 'main', 'redaction-panel');
+    },
+    active: ({ state, documentId }) => {
+      return isSidebarOpen(state.plugins, documentId, 'right', 'main', 'redaction-panel');
+    },
+  },
+
   'panel:toggle-annotation-style': {
     id: 'panel:toggle-annotation-style',
     labelKey: 'panel.annotationStyle',
@@ -1654,7 +1674,10 @@ export const commands: Record<string, Command<State>> = {
         .forDocument(documentId);
       const selected = scope?.getSelectedAnnotation();
       if (!selected) return true;
-      return selected.object.type !== PdfAnnotationSubtype.LINK;
+      return (
+        selected.object.type !== PdfAnnotationSubtype.LINK &&
+        selected.object.type !== PdfAnnotationSubtype.REDACT
+      );
     },
     disabled: ({ state, documentId }) => {
       return lacksPermission(state, documentId, PdfPermissionFlag.ModifyAnnotations);
@@ -1763,6 +1786,24 @@ export const commands: Record<string, Command<State>> = {
   // ─────────────────────────────────────────────────────────
   // Redaction Commands
   // ─────────────────────────────────────────────────────────
+  'redaction:redact': {
+    id: 'redaction:redact',
+    labelKey: 'redaction.redact',
+    icon: 'redactArea',
+    categories: ['redaction', 'redaction-combined'],
+    action: ({ registry, documentId }) => {
+      const redaction = registry.getPlugin<RedactionPlugin>('redaction')?.provides();
+      redaction?.forDocument(documentId).toggleRedact();
+    },
+    active: ({ registry, documentId }) => {
+      const redaction = registry.getPlugin<RedactionPlugin>('redaction')?.provides();
+      return redaction?.forDocument(documentId).isRedactActive() ?? false;
+    },
+    disabled: ({ state, documentId }) => {
+      return lacksPermission(state, documentId, PdfPermissionFlag.ModifyContents);
+    },
+  },
+
   'redaction:redact-area': {
     id: 'redaction:redact-area',
     labelKey: 'redaction.area',
@@ -1772,9 +1813,9 @@ export const commands: Record<string, Command<State>> = {
       const redaction = registry.getPlugin<RedactionPlugin>('redaction')?.provides();
       redaction?.forDocument(documentId).toggleMarqueeRedact();
     },
-    active: ({ state, documentId }) => {
-      const redaction = state.plugins[REDACTION_PLUGIN_ID]?.documents[documentId];
-      return redaction?.activeType === RedactionMode.MarqueeRedact;
+    active: ({ registry, documentId }) => {
+      const redaction = registry.getPlugin<RedactionPlugin>('redaction')?.provides();
+      return redaction?.forDocument(documentId).isMarqueeRedactActive() ?? false;
     },
     disabled: ({ state, documentId }) => {
       return lacksPermission(state, documentId, PdfPermissionFlag.ModifyContents);
@@ -1884,6 +1925,67 @@ export const commands: Record<string, Command<State>> = {
       redaction
         ?.forDocument(documentId)
         .commitPending(selectedRedaction.page, selectedRedaction.id);
+    },
+  },
+
+  'annotation:apply-redaction': {
+    id: 'annotation:apply-redaction',
+    labelKey: 'redaction.apply',
+    icon: 'check',
+    categories: ['annotation', 'annotation-redaction', 'redaction'],
+    action: ({ registry, documentId, logger }) => {
+      logger.debug('Command', 'ApplyRedaction', `Starting for document: ${documentId}`);
+
+      const annotation = registry.getPlugin<AnnotationPlugin>(ANNOTATION_PLUGIN_ID)?.provides();
+      const redaction = registry.getPlugin<RedactionPlugin>(REDACTION_PLUGIN_ID)?.provides();
+
+      if (!annotation || !redaction) {
+        logger.warn(
+          'Command',
+          'ApplyRedaction',
+          `Missing plugins - annotation: ${!!annotation}, redaction: ${!!redaction}`,
+        );
+        return;
+      }
+
+      const scope = annotation.forDocument(documentId);
+      const selected = scope.getSelectedAnnotation();
+
+      logger.debug(
+        'Command',
+        'ApplyRedaction',
+        `Selected annotation: ${selected ? JSON.stringify({ id: selected.object.id, type: selected.object.type, pageIndex: selected.object.pageIndex }) : 'none'}`,
+      );
+
+      if (!selected || selected.object.type !== PdfAnnotationSubtype.REDACT) {
+        logger.warn(
+          'Command',
+          'ApplyRedaction',
+          `No valid redaction selected - selected: ${!!selected}, type: ${selected?.object.type}`,
+        );
+        return;
+      }
+
+      logger.debug(
+        'Command',
+        'ApplyRedaction',
+        `Calling commitPending for page ${selected.object.pageIndex}, id ${selected.object.id}`,
+      );
+      redaction
+        .forDocument(documentId)
+        .commitPending(selected.object.pageIndex, selected.object.id);
+      logger.debug('Command', 'ApplyRedaction', 'commitPending called successfully');
+    },
+    visible: ({ registry, documentId }) => {
+      const scope = registry
+        .getPlugin<AnnotationPlugin>(ANNOTATION_PLUGIN_ID)
+        ?.provides()
+        .forDocument(documentId);
+      const selected = scope?.getSelectedAnnotation();
+      return selected?.object.type === PdfAnnotationSubtype.REDACT;
+    },
+    disabled: ({ state, documentId }) => {
+      return lacksPermission(state, documentId, PdfPermissionFlag.ModifyContents);
     },
   },
 

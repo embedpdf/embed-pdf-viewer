@@ -4,12 +4,15 @@ export interface HistoryPluginConfig extends BasePluginConfig {}
 
 /**
  * The core Command interface that other plugins will implement.
+ * @template T - Optional metadata type for identifying/filtering commands
  */
-export interface Command {
+export interface Command<T = unknown> {
   /** A function that applies the change. */
   execute(): void;
   /** A function that reverts the change. */
   undo(): void;
+  /** Optional metadata for identifying/filtering commands (e.g., for purging) */
+  metadata?: T;
 }
 
 /**
@@ -98,6 +101,15 @@ export interface HistoryScope {
    * @param topic The topic string that was affected by the action.
    */
   onHistoryChange: EventHook<string | undefined>;
+
+  /**
+   * Purges history entries that match the given predicate based on command metadata.
+   * Used to remove commands that are no longer valid (e.g., after a permanent redaction commit).
+   * @param predicate A function that returns true for commands that should be purged
+   * @param topic If provided, only purges entries for that specific topic
+   * @returns The number of entries that were purged
+   */
+  purgeByMetadata: <T>(predicate: (metadata: T | undefined) => boolean, topic?: string) => number;
 }
 
 export interface HistoryCapability {
@@ -148,4 +160,13 @@ export interface HistoryCapability {
    * An event hook that fires whenever a history action occurs.
    */
   onHistoryChange: EventHook<HistoryChangeEvent>;
+
+  /**
+   * Purges history entries that match the given predicate based on command metadata.
+   * Used to remove commands that are no longer valid (e.g., after a permanent redaction commit).
+   * @param predicate A function that returns true for commands that should be purged
+   * @param topic If provided, only purges entries for that specific topic
+   * @returns The number of entries that were purged
+   */
+  purgeByMetadata: <T>(predicate: (metadata: T | undefined) => boolean, topic?: string) => number;
 }

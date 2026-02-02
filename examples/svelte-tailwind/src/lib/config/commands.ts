@@ -1037,6 +1037,67 @@ export const commands: Record<string, Command<State>> = {
     },
   },
 
+  'annotation:apply-redaction': {
+    id: 'annotation:apply-redaction',
+    labelKey: 'redaction.apply',
+    icon: 'check',
+    categories: ['annotation', 'annotation-redaction', 'redaction'],
+    action: ({ registry, documentId, logger }) => {
+      logger.debug('Command', 'ApplyRedaction', `Starting for document: ${documentId}`);
+
+      const annotation = registry.getPlugin<AnnotationPlugin>(ANNOTATION_PLUGIN_ID)?.provides();
+      const redaction = registry.getPlugin<RedactionPlugin>(REDACTION_PLUGIN_ID)?.provides();
+
+      if (!annotation || !redaction) {
+        logger.warn(
+          'Command',
+          'ApplyRedaction',
+          `Missing plugins - annotation: ${!!annotation}, redaction: ${!!redaction}`,
+        );
+        return;
+      }
+
+      const scope = annotation.forDocument(documentId);
+      const selected = scope.getSelectedAnnotation();
+
+      logger.debug(
+        'Command',
+        'ApplyRedaction',
+        `Selected annotation: ${selected ? JSON.stringify({ id: selected.object.id, type: selected.object.type, pageIndex: selected.object.pageIndex }) : 'none'}`,
+      );
+
+      if (!selected || selected.object.type !== PdfAnnotationSubtype.REDACT) {
+        logger.warn(
+          'Command',
+          'ApplyRedaction',
+          `No valid redaction selected - selected: ${!!selected}, type: ${selected?.object.type}`,
+        );
+        return;
+      }
+
+      logger.debug(
+        'Command',
+        'ApplyRedaction',
+        `Calling commitPending for page ${selected.object.pageIndex}, id ${selected.object.id}`,
+      );
+      redaction
+        .forDocument(documentId)
+        .commitPending(selected.object.pageIndex, selected.object.id);
+      logger.debug('Command', 'ApplyRedaction', 'commitPending called successfully');
+    },
+    visible: ({ registry, documentId }) => {
+      const scope = registry
+        .getPlugin<AnnotationPlugin>(ANNOTATION_PLUGIN_ID)
+        ?.provides()
+        .forDocument(documentId);
+      const selected = scope?.getSelectedAnnotation();
+      return selected?.object.type === PdfAnnotationSubtype.REDACT;
+    },
+    disabled: ({ state, documentId }) => {
+      return lacksPermission(state, documentId, PdfPermissionFlag.ModifyContents);
+    },
+  },
+
   // ─────────────────────────────────────────────────────────
   // Redaction Commands
   // ─────────────────────────────────────────────────────────
@@ -1337,7 +1398,10 @@ export const commands: Record<string, Command<State>> = {
         .forDocument(documentId);
       const selected = scope?.getSelectedAnnotation();
       if (!selected) return true;
-      return selected.object.type !== PdfAnnotationSubtype.LINK;
+      return (
+        selected.object.type !== PdfAnnotationSubtype.LINK &&
+        selected.object.type !== PdfAnnotationSubtype.REDACT
+      );
     },
     disabled: ({ state, documentId }) => {
       return lacksPermission(state, documentId, PdfPermissionFlag.ModifyAnnotations);

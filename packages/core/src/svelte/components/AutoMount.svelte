@@ -37,13 +37,12 @@
 </script>
 
 {#if wrappers.length > 0}
-  <!-- wrap slot content inside all wrappers -->
-  <NestedWrapper {wrappers} {children} />
+  <!-- wrap slot content and utilities inside all wrappers -->
+  <NestedWrapper {wrappers} {utilities} {children} />
 {:else}
+  <!-- No wrappers - render children and utilities directly -->
   {@render children?.()}
+  {#each utilities as Utility, i (`utility-${i}`)}
+    <Utility />
+  {/each}
 {/if}
-
-<!-- mount all utilities -->
-{#each utilities as Utility, i (`utility-${i}`)}
-  <Utility />
-{/each}

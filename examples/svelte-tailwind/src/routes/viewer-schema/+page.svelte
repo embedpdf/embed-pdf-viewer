@@ -136,7 +136,9 @@
     createPluginRegistration(HistoryPluginPackage),
     createPluginRegistration(AnnotationPluginPackage),
     createPluginRegistration(FullscreenPluginPackage),
-    createPluginRegistration(RedactionPluginPackage),
+    createPluginRegistration(RedactionPluginPackage, {
+      useAnnotationMode: true,
+    }),
     createPluginRegistration(ThumbnailPluginPackage, {
       width: 120,
       paddingY: 10,

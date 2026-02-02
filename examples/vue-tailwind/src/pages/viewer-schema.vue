@@ -163,7 +163,9 @@ const plugins = computed(() => [
   }),
   createPluginRegistration(SelectionPluginPackage),
   createPluginRegistration(SearchPluginPackage),
-  createPluginRegistration(RedactionPluginPackage),
+  createPluginRegistration(RedactionPluginPackage, {
+    useAnnotationMode: true,
+  }),
   createPluginRegistration(CapturePluginPackage),
   createPluginRegistration(HistoryPluginPackage),
   createPluginRegistration(AnnotationPluginPackage),

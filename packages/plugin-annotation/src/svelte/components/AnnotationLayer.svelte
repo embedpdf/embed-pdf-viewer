@@ -11,6 +11,7 @@
     ResizeHandleUI,
     VertexHandleUI,
   } from '../types';
+  import { getRendererRegistry, type BoxedAnnotationRenderer } from '../context';
   import Annotations from './Annotations.svelte';
   import TextMarkup from './TextMarkup.svelte';
   import AnnotationPaintLayer from './AnnotationPaintLayer.svelte';
@@ -39,6 +40,8 @@
     selectionOutlineColor?: string;
     /** Customize annotation renderer */
     customAnnotationRenderer?: CustomAnnotationRenderer<PdfAnnotationObject>;
+    /** Custom annotation renderers from props */
+    annotationRenderers?: BoxedAnnotationRenderer[];
   };
 
   let {
@@ -55,8 +58,24 @@
     vertexUI,
     selectionOutlineColor,
     customAnnotationRenderer,
+    annotationRenderers,
     ...restProps
   }: AnnotationLayerProps = $props();
+
+  // Get registry and merge with props
+  const registry = getRendererRegistry();
+
+  const allRenderers = $derived.by(() => {
+    const fromRegistry = registry?.getAll() ?? [];
+    const fromProps = annotationRenderers ?? [];
+    const merged = [...fromRegistry];
+    for (const r of fromProps) {
+      const idx = merged.findIndex((m) => m.id === r.id);
+      if (idx >= 0) merged[idx] = r;
+      else merged.push(r);
+    }
+    return merged;
+  });
 
   const documentState = useDocumentState(() => documentId);
 
@@ -95,6 +114,7 @@
     {vertexUI}
     {selectionOutlineColor}
     {customAnnotationRenderer}
+    annotationRenderers={allRenderers}
   />
   <TextMarkup {documentId} {pageIndex} scale={actualScale} />
   <AnnotationPaintLayer {documentId} {pageIndex} scale={actualScale} />

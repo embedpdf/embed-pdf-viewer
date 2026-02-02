@@ -14,6 +14,9 @@ export function SelectionRedact({ documentId, pageIndex, scale }: SelectionRedac
   const [rects, setRects] = useState<Array<Rect>>([]);
   const [boundingRect, setBoundingRect] = useState<Rect | null>(null);
 
+  // Get stroke color from plugin (annotation mode uses tool defaults, legacy uses red)
+  const strokeColor = redactionPlugin?.getPreviewStrokeColor() ?? 'red';
+
   useEffect(() => {
     if (!redactionPlugin) return;
     return redactionPlugin.onRedactionSelectionChange(documentId, (formattedSelection) => {
@@ -39,7 +42,7 @@ export function SelectionRedact({ documentId, pageIndex, scale }: SelectionRedac
         opacity={1}
         rects={rects}
         scale={scale}
-        border="1px solid red"
+        border={`1px solid ${strokeColor}`}
       />
     </div>
   );

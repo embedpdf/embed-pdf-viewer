@@ -1,8 +1,39 @@
 <template>
   <template v-for="annotation in annotations" :key="annotation.object.id">
+    <!-- Custom Renderer (from external plugins like redaction) -->
+    <AnnotationContainer
+      v-if="findCustomRenderer(annotation)"
+      :trackedAnnotation="annotation"
+      :isSelected="showIndividualSelection(annotation)"
+      :isDraggable="isDraggable(annotation)"
+      :isResizable="isResizable(annotation)"
+      :lockAspectRatio="lockAspectRatio(annotation)"
+      :onSelect="(e) => handleClick(e, annotation)"
+      :selectionMenu="isMultiSelected ? undefined : selectionMenu"
+      :style="{ mixBlendMode: blendModeToCss(annotation.object.blendMode ?? PdfBlendMode.Normal) }"
+      v-bind="containerProps"
+    >
+      <template #default>
+        <component
+          :is="findCustomRenderer(annotation)!.component"
+          :annotation="annotation"
+          :isSelected="isSelected(annotation)"
+          :scale="scale"
+          :pageIndex="pageIndex"
+          :onClick="(e: PointerEvent | TouchEvent) => handleClick(e, annotation)"
+        />
+      </template>
+      <template #selection-menu="slotProps" v-if="!isMultiSelected">
+        <slot name="selection-menu" v-bind="slotProps" />
+      </template>
+      <template #resize-handle="slotProps">
+        <slot name="resize-handle" v-bind="slotProps" />
+      </template>
+    </AnnotationContainer>
+
     <!-- Ink -->
     <AnnotationContainer
-      v-if="isInk(annotation)"
+      v-else-if="isInk(annotation)"
       :trackedAnnotation="annotation"
       :isSelected="showIndividualSelection(annotation)"
       :isDraggable="isDraggable(annotation)"
@@ -458,6 +489,7 @@ import {
   isStrikeout,
   isUnderline,
   TrackedAnnotation,
+  resolveInteractionProp,
 } from '@embedpdf/plugin-annotation';
 import type { PdfLinkAnnoObject } from '@embedpdf/models';
 import { usePointerHandlers } from '@embedpdf/plugin-interaction-manager/vue';
@@ -475,6 +507,7 @@ import {
   ResizeHandleUI,
   VertexHandleUI,
 } from '../types';
+import type { BoxedAnnotationRenderer } from '../context';
 
 const props = defineProps<{
   documentId: string;
@@ -490,7 +523,14 @@ const props = defineProps<{
   selectionMenu?: AnnotationSelectionMenuRenderFn;
   /** Render function for group selection menu (schema-driven approach) */
   groupSelectionMenu?: GroupSelectionMenuRenderFn;
+  /** Custom renderers for specific annotation types (provided by external plugins) */
+  annotationRenderers?: BoxedAnnotationRenderer[];
 }>();
+
+// Find a custom renderer for the given annotation
+const findCustomRenderer = (annotation: TrackedAnnotation) => {
+  return props.annotationRenderers?.find((r) => r.matches(annotation.object));
+};
 
 const { provides: annotationCapability } = useAnnotationCapability();
 const { provides: selectionProvides } = useSelectionCapability();
@@ -610,7 +650,13 @@ const areAllSelectedDraggable = computed(() => {
   return selectedAnnotationsOnPage.value.every((ta) => {
     const tool = annotationProvides.value?.findToolForAnnotation(ta.object);
     // Use group-specific property, falling back to single-annotation property
-    return tool?.interaction.isGroupDraggable ?? tool?.interaction.isDraggable ?? true;
+    const groupDraggable = resolveInteractionProp(
+      tool?.interaction.isGroupDraggable,
+      ta.object,
+      true,
+    );
+    const singleDraggable = resolveInteractionProp(tool?.interaction.isDraggable, ta.object, true);
+    return tool?.interaction.isGroupDraggable !== undefined ? groupDraggable : singleDraggable;
   });
 });
 
@@ -621,7 +667,13 @@ const areAllSelectedResizable = computed(() => {
   return selectedAnnotationsOnPage.value.every((ta) => {
     const tool = annotationProvides.value?.findToolForAnnotation(ta.object);
     // Use group-specific property, falling back to single-annotation property
-    return tool?.interaction.isGroupResizable ?? tool?.interaction.isResizable ?? true;
+    const groupResizable = resolveInteractionProp(
+      tool?.interaction.isGroupResizable,
+      ta.object,
+      true,
+    );
+    const singleResizable = resolveInteractionProp(tool?.interaction.isResizable, ta.object, true);
+    return tool?.interaction.isGroupResizable !== undefined ? groupResizable : singleResizable;
   });
 });
 
@@ -642,14 +694,14 @@ const getTool = (annotation: TrackedAnnotation) =>
 const isDraggable = (anno: TrackedAnnotation) => {
   if (isFreeText(anno) && editingId.value === anno.object.id) return false;
   if (isMultiSelected.value) return false;
-  return getTool(anno)?.interaction.isDraggable ?? false;
+  return resolveInteractionProp(getTool(anno)?.interaction.isDraggable, anno.object, false);
 };
 const isResizable = (anno: TrackedAnnotation) => {
   if (isMultiSelected.value) return false;
-  return getTool(anno)?.interaction.isResizable ?? false;
+  return resolveInteractionProp(getTool(anno)?.interaction.isResizable, anno.object, false);
 };
 const lockAspectRatio = (anno: TrackedAnnotation) =>
-  getTool(anno)?.interaction.lockAspectRatio ?? false;
+  resolveInteractionProp(getTool(anno)?.interaction.lockAspectRatio, anno.object, false);
 
 // Should show individual selection UI (not when multi-selected)
 const showIndividualSelection = (anno: TrackedAnnotation) =>

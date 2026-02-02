@@ -47,7 +47,9 @@ var createPdfium = (() => {
       '_EPDFAction_CreateRemoteGoToByName',
       '_EPDFAction_CreateRemoteGoToDest',
       '_EPDFAction_CreateURI',
+      '_EPDFAnnot_ApplyRedaction',
       '_EPDFAnnot_ClearColor',
+      '_EPDFAnnot_Flatten',
       '_EPDFAnnot_GenerateAppearance',
       '_EPDFAnnot_GenerateAppearanceWithBlend',
       '_EPDFAnnot_GetBlendMode',
@@ -61,6 +63,8 @@ var createPdfium = (() => {
       '_EPDFAnnot_GetIntent',
       '_EPDFAnnot_GetLineEndings',
       '_EPDFAnnot_GetOpacity',
+      '_EPDFAnnot_GetOverlayText',
+      '_EPDFAnnot_GetOverlayTextRepeat',
       '_EPDFAnnot_GetRectangleDifferences',
       '_EPDFAnnot_GetReplyType',
       '_EPDFAnnot_GetRichContent',
@@ -77,6 +81,8 @@ var createPdfium = (() => {
       '_EPDFAnnot_SetLineEndings',
       '_EPDFAnnot_SetLinkedAnnot',
       '_EPDFAnnot_SetOpacity',
+      '_EPDFAnnot_SetOverlayText',
+      '_EPDFAnnot_SetOverlayTextRepeat',
       '_EPDFAnnot_SetReplyType',
       '_EPDFAnnot_SetTextAlignment',
       '_EPDFAnnot_SetVerticalAlignment',
@@ -102,6 +108,7 @@ var createPdfium = (() => {
       '_EPDFDest_CreateXYZ',
       '_EPDFNamedDest_Remove',
       '_EPDFNamedDest_SetDest',
+      '_EPDFPage_ApplyRedactions',
       '_EPDFPage_CreateAnnot',
       '_EPDFPage_GetAnnotByName',
       '_EPDFPage_GetAnnotCountRaw',
@@ -6234,6 +6241,30 @@ var createPdfium = (() => {
     ));
     var _EPDFAnnot_SetReplyType = (Module['_EPDFAnnot_SetReplyType'] = createExportWrapper(
       'EPDFAnnot_SetReplyType',
+      2,
+    ));
+    var _EPDFAnnot_SetOverlayText = (Module['_EPDFAnnot_SetOverlayText'] = createExportWrapper(
+      'EPDFAnnot_SetOverlayText',
+      2,
+    ));
+    var _EPDFAnnot_GetOverlayText = (Module['_EPDFAnnot_GetOverlayText'] = createExportWrapper(
+      'EPDFAnnot_GetOverlayText',
+      3,
+    ));
+    var _EPDFAnnot_SetOverlayTextRepeat = (Module['_EPDFAnnot_SetOverlayTextRepeat'] =
+      createExportWrapper('EPDFAnnot_SetOverlayTextRepeat', 2));
+    var _EPDFAnnot_GetOverlayTextRepeat = (Module['_EPDFAnnot_GetOverlayTextRepeat'] =
+      createExportWrapper('EPDFAnnot_GetOverlayTextRepeat', 1));
+    var _EPDFAnnot_ApplyRedaction = (Module['_EPDFAnnot_ApplyRedaction'] = createExportWrapper(
+      'EPDFAnnot_ApplyRedaction',
+      2,
+    ));
+    var _EPDFPage_ApplyRedactions = (Module['_EPDFPage_ApplyRedactions'] = createExportWrapper(
+      'EPDFPage_ApplyRedactions',
+      1,
+    ));
+    var _EPDFAnnot_Flatten = (Module['_EPDFAnnot_Flatten'] = createExportWrapper(
+      'EPDFAnnot_Flatten',
       2,
     ));
     var _FPDFDoc_GetAttachmentCount = (Module['_FPDFDoc_GetAttachmentCount'] = createExportWrapper(

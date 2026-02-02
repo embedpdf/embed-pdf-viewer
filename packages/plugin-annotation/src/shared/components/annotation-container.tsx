@@ -14,6 +14,8 @@ import {
   ResizeHandleUI,
   AnnotationSelectionMenuRenderFn,
   VertexHandleUI,
+  GroupSelectionMenuRenderFn,
+  BoxedAnnotationRenderer,
 } from './types';
 import { VertexConfig } from '../types';
 
@@ -43,6 +45,10 @@ interface AnnotationContainerProps<T extends PdfAnnotationObject> {
   vertexUI?: VertexHandleUI;
   selectionOutlineColor?: string;
   customAnnotationRenderer?: CustomAnnotationRenderer<T>;
+  /** Passed from parent but not used - destructured to prevent DOM spread */
+  groupSelectionMenu?: GroupSelectionMenuRenderFn;
+  /** Passed from parent but not used - destructured to prevent DOM spread */
+  annotationRenderers?: BoxedAnnotationRenderer[];
 }
 
 /**
@@ -75,6 +81,9 @@ export function AnnotationContainer<T extends PdfAnnotationObject>({
   vertexUI,
   selectionOutlineColor = '#007ACC',
   customAnnotationRenderer,
+  // Destructure props that shouldn't be passed to DOM elements
+  groupSelectionMenu: _groupSelectionMenu,
+  annotationRenderers: _annotationRenderers,
   ...props
 }: AnnotationContainerProps<T>): JSX.Element {
   const [preview, setPreview] = useState<T>(trackedAnnotation.object);

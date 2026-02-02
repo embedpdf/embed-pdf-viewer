@@ -18,6 +18,7 @@ import {
 } from '@embedpdf/models';
 import {
   AnnotationCapability,
+  AnnotationCommandMetadata,
   AnnotationEvent,
   AnnotationPluginConfig,
   AnnotationState,
@@ -354,6 +355,8 @@ export class AnnotationPlugin extends BasePlugin<
       deleteAnnotation: (pageIndex, id) => this.deleteAnnotation(pageIndex, id),
       deleteAnnotations: (annotations, documentId) =>
         this.deleteAnnotationsMethod(annotations, documentId),
+      purgeAnnotation: (pageIndex, id, documentId) =>
+        this.purgeAnnotationMethod(pageIndex, id, documentId),
       renderAnnotation: (options) => this.renderAnnotation(options),
       commit: () => this.commit(),
 
@@ -422,6 +425,7 @@ export class AnnotationPlugin extends BasePlugin<
       updateAnnotations: (patches) => this.updateAnnotationsMethod(patches, documentId),
       deleteAnnotation: (pageIndex, id) => this.deleteAnnotation(pageIndex, id, documentId),
       deleteAnnotations: (annotations) => this.deleteAnnotationsMethod(annotations, documentId),
+      purgeAnnotation: (pageIndex, id) => this.purgeAnnotationMethod(pageIndex, id, documentId),
       renderAnnotation: (options) => this.renderAnnotation(options, documentId),
       commit: () => this.commit(documentId),
       getAttachedLinks: (id) => this.getAttachedLinksMethod(id, documentId),
@@ -735,7 +739,7 @@ export class AnnotationPlugin extends BasePlugin<
       if (this.config.autoCommit) this.commit(docId);
       return;
     }
-    const command: Command = {
+    const command: Command<AnnotationCommandMetadata> = {
       execute,
       undo: () => {
         contexts.delete(id);
@@ -749,6 +753,7 @@ export class AnnotationPlugin extends BasePlugin<
           committed: false,
         });
       },
+      metadata: { annotationIds: [id] },
     };
     const historyScope = this.history.forDocument(docId);
     historyScope.register(command, this.ANNOTATION_HISTORY_TOPIC);
@@ -810,7 +815,7 @@ export class AnnotationPlugin extends BasePlugin<
     const originalPatch = Object.fromEntries(
       Object.keys(patch).map((key) => [key, originalObject[key as keyof PdfAnnotationObject]]),
     );
-    const command: Command = {
+    const command: Command<AnnotationCommandMetadata> = {
       execute,
       undo: () => {
         this.dispatch(patchAnnotation(docId, pageIndex, id, originalPatch));
@@ -823,6 +828,7 @@ export class AnnotationPlugin extends BasePlugin<
           committed: false,
         });
       },
+      metadata: { annotationIds: [id] },
     };
     const historyScope = this.history.forDocument(docId);
     historyScope.register(command, this.ANNOTATION_HISTORY_TOPIC);
@@ -883,7 +889,7 @@ export class AnnotationPlugin extends BasePlugin<
       if (this.config.autoCommit !== false) this.commit(docId);
       return;
     }
-    const command: Command = {
+    const command: Command<AnnotationCommandMetadata> = {
       execute,
       undo: () => {
         // Restore parent first
@@ -907,6 +913,7 @@ export class AnnotationPlugin extends BasePlugin<
           });
         }
       },
+      metadata: { annotationIds: [id, ...irtChildren.map((c) => c.id)] },
     };
     const historyScope = this.history.forDocument(docId);
     historyScope.register(command, this.ANNOTATION_HISTORY_TOPIC);
@@ -919,6 +926,11 @@ export class AnnotationPlugin extends BasePlugin<
     for (const { pageIndex, id } of annotations) {
       this.deleteAnnotation(pageIndex, id, documentId);
     }
+  }
+
+  private purgeAnnotationMethod(pageIndex: number, id: string, documentId?: string): void {
+    const docId = documentId ?? this.getActiveDocumentId();
+    this.dispatch(purgeAnnotation(docId, pageIndex, id));
   }
 
   private selectAnnotation(pageIndex: number, id: string, documentId?: string) {
@@ -1795,7 +1807,7 @@ export class AnnotationPlugin extends BasePlugin<
       originalObject,
     }));
 
-    const command: Command = {
+    const command: Command<AnnotationCommandMetadata> = {
       execute,
       undo: () => {
         for (const { pageIndex, id, originalPatch, originalObject } of undoData) {
@@ -1810,6 +1822,7 @@ export class AnnotationPlugin extends BasePlugin<
           });
         }
       },
+      metadata: { annotationIds: patchData.map((p) => p.id) },
     };
 
     const historyScope = this.history.forDocument(docId);
@@ -1963,7 +1976,7 @@ export class AnnotationPlugin extends BasePlugin<
         pendingOps.push({ type: 'delete', task: deleteTask, ta, uid });
       } else {
         // If it was never synced, just remove from state immediately
-        this.dispatch(purgeAnnotation(docId, uid));
+        this.dispatch(purgeAnnotation(docId, ta.object.pageIndex, uid));
       }
     }
 
@@ -2028,7 +2041,7 @@ export class AnnotationPlugin extends BasePlugin<
           break;
 
         case 'delete':
-          this.dispatch(purgeAnnotation(docId, op.uid));
+          this.dispatch(purgeAnnotation(docId, op.ta.object.pageIndex, op.uid));
           this.events$.emit({
             type: 'delete',
             documentId: docId,
