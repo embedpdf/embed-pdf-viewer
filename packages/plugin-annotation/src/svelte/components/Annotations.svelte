@@ -30,6 +30,7 @@
   import { useSelectionCapability } from '@embedpdf/plugin-selection/svelte';
 
   import { useAnnotationCapability } from '../hooks';
+  import type { BoxedAnnotationRenderer } from '../context';
 
   import Highlight from './text-markup/Highlight.svelte';
   import Underline from './text-markup/Underline.svelte';
@@ -77,8 +78,15 @@
     vertexUI?: VertexHandleUI;
     selectionOutlineColor?: string;
     customAnnotationRenderer?: CustomAnnotationRenderer<PdfAnnotationObject>;
+    /** Custom annotation renderers from registry/props */
+    annotationRenderers?: BoxedAnnotationRenderer[];
   }
   let annotationsProps: AnnotationsProps = $props();
+
+  // Helper to find custom renderer for an annotation
+  function findCustomRenderer(annotation: TrackedAnnotation): BoxedAnnotationRenderer | undefined {
+    return annotationsProps.annotationRenderers?.find((r) => r.matches(annotation.object));
+  }
 
   // ---------- capabilities / handlers ----------
   const annotationCapability = useAnnotationCapability();
@@ -244,8 +252,39 @@
   {@const isEditing = editingId === annotation.object.id}
   {@const tool = annotationProvides?.findToolForAnnotation(annotation.object)}
   {@const mixBlendMode = blendModeToCss(annotation.object.blendMode ?? PdfBlendMode.Normal)}
+  {@const customRenderer = findCustomRenderer(annotation)}
 
-  {#if isInk(annotation)}
+  {#if customRenderer}
+    <AnnotationContainer
+      trackedAnnotation={annotation}
+      isSelected={isSelected && !isMultiSelected}
+      isDraggable={resolveInteractionProp(tool?.interaction.isDraggable, annotation.object, true) &&
+        !isMultiSelected}
+      isResizable={resolveInteractionProp(tool?.interaction.isResizable, annotation.object, true) &&
+        !isMultiSelected}
+      lockAspectRatio={resolveInteractionProp(
+        tool?.interaction.lockAspectRatio,
+        annotation.object,
+        false,
+      )}
+      selectionMenu={isMultiSelected ? undefined : annotationsProps.selectionMenu}
+      selectionMenuSnippet={isMultiSelected ? undefined : annotationsProps.selectionMenuSnippet}
+      onSelect={(e) => handleClick(e, annotation)}
+      style="mix-blend-mode: {mixBlendMode}"
+      {...annotationsProps}
+    >
+      {#snippet children(_obj)}
+        {@const CustomComponent = customRenderer.component}
+        <CustomComponent
+          {annotation}
+          {isSelected}
+          scale={annotationsProps.scale}
+          pageIndex={annotationsProps.pageIndex}
+          onClick={(e: PointerEvent | TouchEvent) => handleClick(e, annotation)}
+        />
+      {/snippet}
+    </AnnotationContainer>
+  {:else if isInk(annotation)}
     <AnnotationContainer
       trackedAnnotation={annotation}
       isSelected={isSelected && !isMultiSelected}

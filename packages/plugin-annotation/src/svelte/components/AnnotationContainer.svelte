@@ -37,7 +37,7 @@
     outlineOffset = 1,
     onDoubleClick,
     onSelect,
-    zIndex = 20,
+    zIndex = 1,
     resizeUI,
     vertexUI,
     selectionOutlineColor = '#007ACC',

@@ -771,8 +771,6 @@ export const viewerUISchema: UISchema = {
       ],
     },
   },
-
-  modals: {},
   // ─────────────────────────────────────────────────────────
   // Panels (Sidebars)
   // ─────────────────────────────────────────────────────────
@@ -866,6 +864,12 @@ export const viewerUISchema: UISchema = {
           type: 'command-button',
           id: 'delete-annotation',
           commandId: 'annotation:delete-selected',
+          variant: 'icon',
+        },
+        {
+          type: 'command-button',
+          id: 'apply-redaction',
+          commandId: 'annotation:apply-redaction',
           variant: 'icon',
         },
         {

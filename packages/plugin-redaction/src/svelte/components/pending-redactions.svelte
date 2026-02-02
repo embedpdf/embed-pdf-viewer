@@ -48,11 +48,13 @@
 
     const scoped = redactionValue.forDocument(documentId);
     const currentState = scoped.getState();
-    items = currentState.pending[pageIndex] ?? [];
+    // Only show legacy mode items (not annotation-based redactions)
+    items = (currentState.pending[pageIndex] ?? []).filter((it) => it.source === 'legacy');
     selectedId = currentState.selected?.page === pageIndex ? currentState.selected.id : null;
 
     const off1 = scoped.onPendingChange((map) => {
-      items = map[pageIndex] ?? [];
+      // Only show legacy mode items (not annotation-based redactions)
+      items = (map[pageIndex] ?? []).filter((it) => it.source === 'legacy');
     });
 
     const off2 = scoped.onSelectedChange((sel) => {
