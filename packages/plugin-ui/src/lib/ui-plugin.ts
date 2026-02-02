@@ -284,7 +284,8 @@ export class UIPlugin extends BasePlugin<UIPluginConfig, UICapability, UIState, 
         this.setSidebarForDocument(placement, slot, sidebarId, documentId, activeTab),
       toggleSidebar: (placement, slot, sidebarId, documentId, activeTab) =>
         this.toggleSidebarForDocument(placement, slot, sidebarId, documentId, activeTab),
-      openModal: (modalId, documentId) => this.openModalForDocument(modalId, documentId),
+      openModal: (modalId, props, documentId) =>
+        this.openModalForDocument(modalId, props, documentId),
       openMenu: (menuId, triggeredByCommandId, triggeredByItemId, documentId) =>
         this.openMenuForDocument(menuId, triggeredByCommandId, triggeredByItemId, documentId),
       toggleMenu: (menuId, triggeredByCommandId, triggeredByItemId, documentId) =>
@@ -360,7 +361,7 @@ export class UIPlugin extends BasePlugin<UIPluginConfig, UICapability, UIState, 
       getSidebarTab: (sidebarId) => this.getSidebarTabForDocument(sidebarId, documentId),
 
       // ───── Modals (with animation lifecycle) ─────
-      openModal: (modalId) => this.openModalForDocument(modalId, documentId),
+      openModal: (modalId, props) => this.openModalForDocument(modalId, props, documentId),
       closeModal: () => this.closeModalForDocument(documentId),
       clearModal: () => this.clearModalForDocument(documentId),
       getActiveModal: () => this.getActiveModalForDocument(documentId),
@@ -537,9 +538,13 @@ export class UIPlugin extends BasePlugin<UIPluginConfig, UICapability, UIState, 
   // Core Operations - Modals (with animation lifecycle)
   // ─────────────────────────────────────────────────────────
 
-  private openModalForDocument(modalId: string, documentId?: string): void {
+  private openModalForDocument(
+    modalId: string,
+    props?: Record<string, unknown>,
+    documentId?: string,
+  ): void {
     const id = documentId ?? this.getActiveDocumentId();
-    this.dispatch(openModal(id, modalId));
+    this.dispatch(openModal(id, modalId, props));
     this.modalChanged$.emit(id, { modalId, isOpen: true });
   }
 

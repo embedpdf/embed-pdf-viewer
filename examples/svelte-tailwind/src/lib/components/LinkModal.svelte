@@ -17,15 +17,18 @@
   import { Dialog, DialogContent, DialogFooter, Button } from './ui';
 
   type LinkTab = 'url' | 'page';
+  type LinkSource = 'annotation' | 'selection';
 
   interface Props {
     documentId: string;
     isOpen?: boolean;
     onClose?: () => void;
     onExited?: () => void;
+    /** Source context that triggered the modal */
+    source?: LinkSource;
   }
 
-  let { documentId, isOpen = false, onClose, onExited }: Props = $props();
+  let { documentId, isOpen = false, onClose, onExited, source }: Props = $props();
 
   const scrollCapability = useScrollCapability();
   const annotationCapability = useAnnotationCapability();
@@ -85,9 +88,10 @@
       };
     }
 
-    // Create links based on context
-    if (selectedAnnotation) {
-      // IRT-linked links from selected annotation
+    // Helper to create link on annotation
+    const createLinkOnAnnotation = () => {
+      if (!selectedAnnotation) return false;
+
       const rects =
         'segmentRects' in selectedAnnotation.object
           ? selectedAnnotation.object.segmentRects
@@ -107,7 +111,13 @@
           strokeWidth: 2,
         });
       }
-    } else if (textSelection.length > 0) {
+      return true;
+    };
+
+    // Helper to create link from text selection
+    const createLinkFromSelection = () => {
+      if (textSelection.length === 0) return false;
+
       const selectionText = selectionScope?.getSelectedText();
 
       // Create transparent highlight parent with IRT-linked links for each selection
@@ -153,6 +163,20 @@
         }, ignore);
       }
       selectionScope?.clear();
+      return true;
+    };
+
+    // Create links based on the source context passed when opening the modal
+    // This ensures the correct context is used even when both annotation and text are selected
+    if (source === 'annotation') {
+      createLinkOnAnnotation();
+    } else if (source === 'selection') {
+      createLinkFromSelection();
+    } else {
+      // Fallback for backwards compatibility: annotation first, then selection
+      if (!createLinkOnAnnotation()) {
+        createLinkFromSelection();
+      }
     }
 
     onClose?.();

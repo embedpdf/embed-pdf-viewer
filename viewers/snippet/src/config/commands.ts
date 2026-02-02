@@ -1586,8 +1586,8 @@ export const commands: Record<string, Command<State>> = {
       const ui = registry.getPlugin<UIPlugin>('ui')?.provides();
       if (!ui) return;
 
-      // Open the link modal - it will detect text selection context
-      ui.forDocument(documentId).openModal('link-modal');
+      // Open the link modal with selection context
+      ui.forDocument(documentId).openModal('link-modal', { source: 'selection' });
     },
     disabled: ({ state, documentId }) => {
       return lacksPermission(state, documentId, PdfPermissionFlag.ModifyAnnotations);
@@ -1664,7 +1664,7 @@ export const commands: Record<string, Command<State>> = {
       if (scope.hasAttachedLinks(selected.object.id)) {
         scope.deleteAttachedLinks(selected.object.id);
       } else {
-        ui.forDocument(documentId).openModal('link-modal');
+        ui.forDocument(documentId).openModal('link-modal', { source: 'annotation' });
       }
     },
     visible: ({ registry, documentId }) => {

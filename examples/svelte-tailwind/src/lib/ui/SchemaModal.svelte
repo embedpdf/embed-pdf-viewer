@@ -11,7 +11,7 @@
 
   interface Props extends ModalRendererProps {}
 
-  let { schema, documentId, isOpen, onClose, onExited }: Props = $props();
+  let { schema, documentId, isOpen, onClose, onExited, modalProps }: Props = $props();
 
   const { getCustomComponent } = useItemRenderer();
 
@@ -28,5 +28,5 @@
 </script>
 
 {#if ModalComponent}
-  <ModalComponent {documentId} {isOpen} {onClose} {onExited} />
+  <ModalComponent {documentId} {isOpen} {onClose} {onExited} {...modalProps} />
 {/if}

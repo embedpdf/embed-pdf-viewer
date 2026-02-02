@@ -167,6 +167,7 @@ export function useSchemaRenderer(documentId: MaybeRefOrGetter<string>) {
         isOpen,
         onClose: handleClose,
         onExited: handleExited,
+        modalProps: uiState.value.activeModal.props,
       });
     },
 
