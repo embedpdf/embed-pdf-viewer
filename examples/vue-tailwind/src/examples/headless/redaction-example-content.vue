@@ -5,7 +5,8 @@ import { Scroller } from '@embedpdf/plugin-scroll/vue';
 import { RenderLayer } from '@embedpdf/plugin-render/vue';
 import { PagePointerProvider } from '@embedpdf/plugin-interaction-manager/vue';
 import { SelectionLayer } from '@embedpdf/plugin-selection/vue';
-import { RedactionLayer, RedactionMode, useRedaction } from '@embedpdf/plugin-redaction/vue';
+import { RedactionLayer, useRedaction } from '@embedpdf/plugin-redaction/vue';
+import { RedactionMode } from '@embedpdf/plugin-redaction';
 import { Type, Square, AlertCircle, Loader2, Check, Trash2 } from 'lucide-vue-next';
 
 const props = defineProps<{

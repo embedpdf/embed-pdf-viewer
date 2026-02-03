@@ -137,6 +137,8 @@ export class PdfEngine<T = Blob> implements IPdfEngine<T> {
     const task = new Task<boolean, PdfErrorReason>();
     try {
       this.executor.destroy();
+      // Clean up image converter resources (e.g., encoder worker pool)
+      this.options.imageConverter.destroy?.();
       task.resolve(true);
     } catch (error) {
       task.reject({ code: PdfErrorCode.Unknown, message: String(error) });
