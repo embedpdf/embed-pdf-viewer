@@ -7,6 +7,7 @@ import { RedactIcon } from './icons/redact';
 import { RedactAreaIcon } from './icons/redact-area';
 import { Icon } from './ui/icon';
 import { Button } from './ui/button';
+import { useDocumentPermissions } from '@embedpdf/core/preact';
 
 export interface RedactionSidebarProps {
   documentId: string;
@@ -72,6 +73,7 @@ const EmptyState = ({ documentId }: { documentId: string }) => {
 
 export function RedactionSidebar({ documentId }: RedactionSidebarProps) {
   const { state, provides } = useRedaction(documentId);
+  const { canModifyAnnotations, canModifyContents } = useDocumentPermissions(documentId);
   const { provides: scrollApi } = useScrollCapability();
   const { translate } = useTranslations(documentId);
 
@@ -151,13 +153,15 @@ export function RedactionSidebar({ documentId }: RedactionSidebarProps) {
         <div class="border-border-subtle flex gap-2 border-t p-3">
           <Button
             onClick={handleClearAll}
-            className="border-border-default bg-bg-surface text-fg-secondary hover:bg-interactive-hover flex-1 rounded-md border px-4 py-2 text-sm"
+            disabled={!canModifyAnnotations}
+            className="border-border-default bg-bg-surface text-fg-secondary hover:bg-interactive-hover flex-1 rounded-md border px-4 py-2 text-sm disabled:cursor-not-allowed disabled:opacity-50"
           >
             {translate('redaction.panel.clearAll', { fallback: 'Clear All' })}
           </Button>
           <Button
             onClick={handleRedactAll}
-            className="bg-accent text-fg-on-accent hover:!bg-accent-hover flex-1 rounded-md border border-transparent px-4 py-2 text-sm"
+            disabled={!canModifyContents}
+            className="bg-accent text-fg-on-accent hover:!bg-accent-hover flex-1 rounded-md border border-transparent px-4 py-2 text-sm disabled:cursor-not-allowed disabled:opacity-50"
           >
             {translate('redaction.panel.redactAll', { fallback: 'Redact All' })}
           </Button>
