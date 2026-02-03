@@ -6,7 +6,8 @@ import { RenderLayer } from '@embedpdf/plugin-render/vue';
 import { PagePointerProvider } from '@embedpdf/plugin-interaction-manager/vue';
 import { SelectionLayer } from '@embedpdf/plugin-selection/vue';
 import { AnnotationLayer, useAnnotation } from '@embedpdf/plugin-annotation/vue';
-import { RedactionLayer, RedactionMode, useRedaction } from '@embedpdf/plugin-redaction/vue';
+import { RedactionLayer, useRedaction } from '@embedpdf/plugin-redaction/vue';
+import { RedactionMode } from '@embedpdf/plugin-redaction';
 import { PdfAnnotationSubtype, PdfRedactAnnoObject } from '@embedpdf/models';
 import { AlertCircle, Loader2, Check, Crosshair, Trash2 } from 'lucide-vue-next';
 

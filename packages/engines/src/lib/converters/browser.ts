@@ -66,12 +66,12 @@ export const browserImageDataToBlobConverter: ImageDataConverter<Blob> = (
  * This is the preferred approach for performance
  *
  * @param workerPool - Instance of ImageEncoderWorkerPool
- * @returns ImageDataConverter function
+ * @returns ImageDataConverter function with destroy() for cleanup
  */
 export function createWorkerPoolImageConverter(
   workerPool: ImageEncoderWorkerPool,
 ): ImageDataConverter<Blob> {
-  return (
+  const converter: ImageDataConverter<Blob> = (
     getImageData: LazyImageData,
     imageType: ImageConversionTypes = 'image/webp',
     quality?: number,
@@ -91,6 +91,11 @@ export function createWorkerPoolImageConverter(
       quality,
     );
   };
+
+  // Attach destroy method to clean up worker pool
+  converter.destroy = () => workerPool.destroy();
+
+  return converter;
 }
 
 /**
@@ -101,12 +106,12 @@ export function createWorkerPoolImageConverter(
  * - Fallback: Main-thread Canvas for older browsers without OffscreenCanvas in workers
  *
  * @param workerPool - Instance of ImageEncoderWorkerPool
- * @returns ImageDataConverter function
+ * @returns ImageDataConverter function with destroy() for cleanup
  */
 export function createHybridImageConverter(
   workerPool: ImageEncoderWorkerPool,
 ): ImageDataConverter<Blob> {
-  return async (
+  const converter: ImageDataConverter<Blob> = async (
     getImageData: LazyImageData,
     imageType: ImageConversionTypes = 'image/webp',
     quality?: number,
@@ -131,4 +136,9 @@ export function createHybridImageConverter(
       return browserImageDataToBlobConverter(getImageData, imageType, quality);
     }
   };
+
+  // Attach destroy method to clean up worker pool
+  converter.destroy = () => workerPool.destroy();
+
+  return converter;
 }
