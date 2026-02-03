@@ -1,5 +1,16 @@
 # @embedpdf/models
 
+## 2.4.0
+
+### Minor Changes
+
+- [#426](https://github.com/embedpdf/embed-pdf-viewer/pull/426) by [@bobsingor](https://github.com/bobsingor) – Added support for REDACT annotation type with full read/write capabilities:
+  - Added `PdfRedactAnnoObject` interface for redact annotations with properties for overlay text, colors, and font settings
+  - Added `PdfAnnotationColorType.OverlayColor` enum value for redaction overlay color
+  - Added `PdfRedactAnnoObject` to `PdfSupportedAnnoObject` union type
+  - Added new engine interface methods: `applyRedaction`, `applyAllRedactions`, `flattenAnnotation`
+  - Added corresponding methods to `IPdfiumExecutor` interface
+
 ## 2.3.0
 
 ### Minor Changes
