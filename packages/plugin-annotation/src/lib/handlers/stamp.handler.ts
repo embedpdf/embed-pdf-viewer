@@ -62,9 +62,9 @@ export const stampHandlerFactory: HandlerFactory<PdfStampAnnoObject> = {
 
         const { imageSrc, imageSize } = tool.defaults;
 
-        const placeStamp = (originalData: ImageData, width: number, height: number) => {
+        const placeStamp = (imageData: ImageData, width: number, height: number) => {
           // Pre-rotate the image data to match page rotation
-          const imageData = rotateImageData(originalData, pageRotation);
+          const transformedImageData = rotateImageData(imageData, pageRotation);
 
           // Calculate effective page dimensions based on rotation
           const effectivePageWidth =
@@ -99,7 +99,7 @@ export const stampHandlerFactory: HandlerFactory<PdfStampAnnoObject> = {
             created: new Date(),
           };
 
-          onCommit(anno, { imageData });
+          onCommit(anno, { imageData: transformedImageData });
         };
 
         if (imageSrc) {

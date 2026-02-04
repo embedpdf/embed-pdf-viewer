@@ -532,7 +532,10 @@ export class AnnotationPlugin extends BasePlugin<
 
       const pageSize =
         page.rotation % 2 !== 0
-          ? { width: page.size.height, height: page.size.width }
+          ? {
+              width: page.size.height,
+              height: page.size.width,
+            }
           : page.size;
 
       const context: HandlerContext<PdfAnnotationObject> = {

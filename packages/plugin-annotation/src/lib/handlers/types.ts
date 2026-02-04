@@ -13,6 +13,7 @@ import {
   PdfStandardFont,
   PdfTextAlignment,
   PdfVerticalAlignment,
+  Rotation,
 } from '@embedpdf/models';
 import { AnnotationTool } from '../tools/types';
 
@@ -149,6 +150,7 @@ export interface HandlerFactory<A extends PdfAnnotationObject> {
 export interface HandlerContext<A extends PdfAnnotationObject> {
   getTool: () => AnnotationTool<A> | undefined;
   pageIndex: number;
+  pageRotation: Rotation;
   pageSize: Size;
   pageRotation: Rotation;
   scale: number;
