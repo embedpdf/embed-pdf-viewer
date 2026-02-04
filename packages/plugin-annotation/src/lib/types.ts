@@ -13,6 +13,16 @@ import {
 } from '@embedpdf/models';
 import { AnnotationTool } from './tools/types';
 
+/**
+ * Metadata attached to annotation history commands for filtering/purging.
+ * Used by the history plugin's purgeByMetadata method to identify commands
+ * that should be removed (e.g., after a permanent redaction commit).
+ */
+export interface AnnotationCommandMetadata {
+  /** The annotation IDs affected by this command */
+  annotationIds: string[];
+}
+
 export type AnnotationEvent =
   | {
       type: 'create';
@@ -218,6 +228,8 @@ export interface AnnotationScope {
   deleteAnnotation(pageIndex: number, annotationId: string): void;
   /** Delete multiple annotations in batch */
   deleteAnnotations(annotations: Array<{ pageIndex: number; id: string }>): void;
+  /** Remove an annotation from state without calling the engine (no PDF modification) */
+  purgeAnnotation(pageIndex: number, annotationId: string): void;
   renderAnnotation(options: RenderAnnotationOptions): Task<Blob, PdfErrorReason>;
   commit(): Task<boolean, PdfErrorReason>;
 
@@ -292,6 +304,8 @@ export interface AnnotationCapability {
     annotations: Array<{ pageIndex: number; id: string }>,
     documentId?: string,
   ) => void;
+  /** Remove an annotation from state without calling the engine (no PDF modification) */
+  purgeAnnotation: (pageIndex: number, annotationId: string, documentId?: string) => void;
   renderAnnotation: (options: RenderAnnotationOptions) => Task<Blob, PdfErrorReason>;
   commit: () => Task<boolean, PdfErrorReason>;
 

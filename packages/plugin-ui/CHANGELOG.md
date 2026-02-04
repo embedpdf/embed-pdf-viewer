@@ -1,5 +1,15 @@
 # @embedpdf/plugin-ui
 
+## 2.4.0
+
+### Minor Changes
+
+- [#428](https://github.com/embedpdf/embed-pdf-viewer/pull/428) by [@bobsingor](https://github.com/bobsingor) – Added modal props feature to pass context when opening modals:
+  - Extended `openModal(modalId, props?)` to accept optional props parameter
+  - Added `props` field to `ModalSlotState` type
+  - Added `modalProps` to `ModalRendererProps` for all frameworks (Preact, React, Svelte, Vue)
+  - Updated schema renderers to pass `modalProps` through to modal components
+
 ## 2.3.0
 
 ### Patch Changes

@@ -60,6 +60,7 @@ export interface ModalRendererProps {
   onClose: () => void; // Triggers closeModal()
   onExited: () => void; // Triggers clearModal() after animation completes
   className?: string;
+  modalProps?: Record<string, unknown>; // Props passed when opening the modal
 }
 
 export type ModalRenderer = ComponentType<ModalRendererProps>;

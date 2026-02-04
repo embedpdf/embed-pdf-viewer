@@ -1212,6 +1212,7 @@ export enum PDF_FORM_FIELD_TYPE {
 export enum PdfAnnotationColorType {
   Color = 0,
   InteriorColor = 1,
+  OverlayColor = 2,
 }
 
 /**
@@ -2055,6 +2056,76 @@ export interface PdfFreeTextAnnoObject extends PdfAnnotationObjectBase {
 }
 
 /**
+ * Pdf redact annotation
+ *
+ * @public
+ */
+export interface PdfRedactAnnoObject extends PdfAnnotationObjectBase {
+  /** {@inheritDoc PdfAnnotationObjectBase.type} */
+  type: PdfAnnotationSubtype.REDACT;
+
+  /**
+   * Text contents of the redact annotation
+   */
+  contents?: string;
+
+  /**
+   * Quads defining the redaction areas (like markup annotations)
+   */
+  segmentRects: Rect[];
+
+  /**
+   * Interior color - the preview color shown BEFORE redaction is applied
+   */
+  color?: string;
+
+  /**
+   * Overlay color - the fill color shown AFTER redaction is applied
+   */
+  overlayColor?: string;
+
+  /**
+   * Stroke/border color of the redaction box
+   */
+  strokeColor?: string;
+
+  /**
+   * Opacity of the redact annotation
+   */
+  opacity?: number;
+
+  /**
+   * Text displayed on the redacted area after applying the redaction
+   */
+  overlayText?: string;
+
+  /**
+   * Whether the overlay text repeats to fill the redaction area
+   */
+  overlayTextRepeat?: boolean;
+
+  /**
+   * Font family for the overlay text
+   */
+  fontFamily?: PdfStandardFont;
+
+  /**
+   * Font size for the overlay text
+   */
+  fontSize?: number;
+
+  /**
+   * Font color for the overlay text
+   */
+  fontColor?: string;
+
+  /**
+   * Text alignment for the overlay text
+   */
+  textAlign?: PdfTextAlignment;
+}
+
+/**
  * All annotation that support
  *
  * @public
@@ -2076,7 +2147,8 @@ export type PdfSupportedAnnoObject =
   | PdfUnderlineAnnoObject
   | PdfStrikeOutAnnoObject
   | PdfCaretAnnoObject
-  | PdfFreeTextAnnoObject;
+  | PdfFreeTextAnnoObject
+  | PdfRedactAnnoObject;
 
 /**
  * Pdf annotation that does not support
@@ -3116,6 +3188,37 @@ export interface PdfEngine<T = Blob> {
     options?: PdfRedactTextOptions,
   ) => PdfTask<boolean>;
   /**
+   * Apply a single REDACT annotation - removes content, flattens RO overlay, deletes annotation.
+   * @param doc - pdf document
+   * @param page - pdf page
+   * @param annotation - the REDACT annotation to apply
+   * @returns task contains the result
+   */
+  applyRedaction: (
+    doc: PdfDocumentObject,
+    page: PdfPageObject,
+    annotation: PdfAnnotationObject,
+  ) => PdfTask<boolean>;
+  /**
+   * Apply all REDACT annotations on a page - removes content, flattens overlays, deletes annotations.
+   * @param doc - pdf document
+   * @param page - pdf page
+   * @returns task contains the result
+   */
+  applyAllRedactions: (doc: PdfDocumentObject, page: PdfPageObject) => PdfTask<boolean>;
+  /**
+   * Flatten an annotation's appearance (AP/N) to page content and remove the annotation.
+   * @param doc - pdf document
+   * @param page - pdf page
+   * @param annotation - the annotation to flatten
+   * @returns task contains the result
+   */
+  flattenAnnotation: (
+    doc: PdfDocumentObject,
+    page: PdfPageObject,
+    annotation: PdfAnnotationObject,
+  ) => PdfTask<boolean>;
+  /**
    * Extract text on specified pdf pages
    * @param doc - pdf document
    * @param pageIndexes - indexes of pdf pages
@@ -3358,6 +3461,17 @@ export interface IPdfiumExecutor {
     page: PdfPageObject,
     rects: Rect[],
     options?: PdfRedactTextOptions,
+  ): PdfTask<boolean>;
+  applyRedaction(
+    doc: PdfDocumentObject,
+    page: PdfPageObject,
+    annotation: PdfAnnotationObject,
+  ): PdfTask<boolean>;
+  applyAllRedactions(doc: PdfDocumentObject, page: PdfPageObject): PdfTask<boolean>;
+  flattenAnnotation(
+    doc: PdfDocumentObject,
+    page: PdfPageObject,
+    annotation: PdfAnnotationObject,
   ): PdfTask<boolean>;
   getTextSlices(doc: PdfDocumentObject, slices: PageTextSlice[]): PdfTask<string[]>;
   getPageGlyphs(doc: PdfDocumentObject, page: PdfPageObject): PdfTask<PdfGlyphObject[]>;

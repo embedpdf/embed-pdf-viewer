@@ -37,6 +37,7 @@ import {
   PdfSquareAnnoObject,
   PdfFreeTextAnnoObject,
   PdfCaretAnnoObject,
+  PdfRedactAnnoObject,
   PdfSquigglyAnnoObject,
   PdfStrikeOutAnnoObject,
   PdfUnderlineAnnoObject,
@@ -979,6 +980,9 @@ export class PdfiumNative implements IPdfiumExecutor {
       case PdfAnnotationSubtype.LINK:
         isSucceed = this.addLinkContent(ctx.docPtr, pageCtx.pagePtr, annotationPtr, annotation);
         break;
+      case PdfAnnotationSubtype.REDACT:
+        isSucceed = this.addRedactContent(page, pageCtx.pagePtr, annotationPtr, annotation);
+        break;
     }
 
     if (!isSucceed) {
@@ -1149,6 +1153,12 @@ export class PdfiumNative implements IPdfiumExecutor {
       /* ── Link ─────────────────────────────────────────────────────────────── */
       case PdfAnnotationSubtype.LINK: {
         ok = this.addLinkContent(ctx.docPtr, pageCtx.pagePtr, annotPtr, annotation);
+        break;
+      }
+
+      /* ── Redact ───────────────────────────────────────────────────────────── */
+      case PdfAnnotationSubtype.REDACT: {
+        ok = this.addRedactContent(page, pageCtx.pagePtr, annotPtr, annotation);
         break;
       }
 
@@ -2755,6 +2765,116 @@ export class PdfiumNative implements IPdfiumExecutor {
   }
 
   /**
+   * Add content to redact annotation
+   * @param page - page info
+   * @param pagePtr - pointer to page object
+   * @param annotationPtr - pointer to redact annotation
+   * @param annotation - redact annotation
+   * @returns whether redact content is added to annotation
+   *
+   * @private
+   */
+  private addRedactContent(
+    page: PdfPageObject,
+    pagePtr: number,
+    annotationPtr: number,
+    annotation: PdfRedactAnnoObject,
+  ) {
+    // Sync QuadPoints for redaction areas
+    if (!this.syncQuadPointsAnno(page, annotationPtr, annotation.segmentRects)) {
+      return false;
+    }
+
+    // Set opacity
+    if (!this.setAnnotationOpacity(annotationPtr, annotation.opacity ?? 1)) {
+      return false;
+    }
+
+    // Set interior/preview color (IC)
+    if (!annotation.color || annotation.color === 'transparent') {
+      if (
+        !this.pdfiumModule.EPDFAnnot_ClearColor(annotationPtr, PdfAnnotationColorType.InteriorColor)
+      ) {
+        return false;
+      }
+    } else if (
+      !this.setAnnotationColor(
+        annotationPtr,
+        annotation.color,
+        PdfAnnotationColorType.InteriorColor,
+      )
+    ) {
+      return false;
+    }
+
+    // Set overlay color (OC) - the fill after redaction is applied
+    if (!annotation.overlayColor || annotation.overlayColor === 'transparent') {
+      if (
+        !this.pdfiumModule.EPDFAnnot_ClearColor(annotationPtr, PdfAnnotationColorType.OverlayColor)
+      ) {
+        return false;
+      }
+    } else if (
+      !this.setAnnotationColor(
+        annotationPtr,
+        annotation.overlayColor,
+        PdfAnnotationColorType.OverlayColor,
+      )
+    ) {
+      return false;
+    }
+
+    // Set stroke/border color (C)
+    if (!annotation.strokeColor || annotation.strokeColor === 'transparent') {
+      if (!this.pdfiumModule.EPDFAnnot_ClearColor(annotationPtr, PdfAnnotationColorType.Color)) {
+        return false;
+      }
+    } else if (
+      !this.setAnnotationColor(annotationPtr, annotation.strokeColor, PdfAnnotationColorType.Color)
+    ) {
+      return false;
+    }
+
+    // Set overlay text
+    if (!this.setOverlayText(annotationPtr, annotation.overlayText)) {
+      return false;
+    }
+
+    // Set overlay text repeat
+    if (
+      annotation.overlayTextRepeat !== undefined &&
+      !this.setOverlayTextRepeat(annotationPtr, annotation.overlayTextRepeat)
+    ) {
+      return false;
+    }
+
+    // Set font properties via default appearance (DA) if provided
+    if (annotation.fontFamily !== undefined || annotation.fontSize !== undefined) {
+      if (
+        !this.setAnnotationDefaultAppearance(
+          annotationPtr,
+          annotation.fontFamily ?? PdfStandardFont.Helvetica,
+          annotation.fontSize ?? 12,
+          annotation.fontColor ?? '#000000',
+        )
+      ) {
+        return false;
+      }
+    }
+
+    // Set text alignment
+    if (
+      annotation.textAlign !== undefined &&
+      !this.setAnnotationTextAlignment(annotationPtr, annotation.textAlign)
+    ) {
+      return false;
+    }
+
+    // Apply base annotation properties (author, contents, dates, flags, custom, IRT, RT)
+    return this.applyBaseAnnotationProperties(pagePtr, annotationPtr, annotation);
+  }
+
+  /**
    * Add contents to stamp annotation
    * @param docPtr - pointer to pdf document object
    * @param page - page info
@@ -3861,6 +3981,11 @@ export class PdfiumNative implements IPdfiumExecutor {
           annotation = this.readPdfCaretAnno(page, annotationPtr, index);
         }
         break;
+      case PdfAnnotationSubtype.REDACT:
+        {
+          annotation = this.readPdfRedactAnno(page, annotationPtr, index);
+        }
+        break;
       default:
         {
           annotation = this.readPdfAnno(page, subType, annotationPtr, index);
@@ -4031,6 +4156,71 @@ export class PdfiumNative implements IPdfiumExecutor {
     alignment: PdfVerticalAlignment,
   ): boolean {
     return !!this.pdfiumModule.EPDFAnnot_SetVerticalAlignment(annotationPtr, alignment);
+  }
+
+  /**
+   * Get the overlay text from a Redact annotation.
+   *
+   * @param annotationPtr pointer returned by `FPDFPage_GetAnnot`
+   * @returns overlay text string or `undefined` if not set
+   *
+   * @private
+   */
+  private getOverlayText(annotationPtr: number): string | undefined {
+    const len = this.pdfiumModule.EPDFAnnot_GetOverlayText(annotationPtr, 0, 0);
+    if (len === 0) return undefined;
+
+    const bytes = (len + 1) * 2;
+    const ptr = this.memoryManager.malloc(bytes);
+
+    this.pdfiumModule.EPDFAnnot_GetOverlayText(annotationPtr, ptr, bytes);
+    const value = this.pdfiumModule.pdfium.UTF16ToString(ptr);
+    this.memoryManager.free(ptr);
+
+    return value || undefined;
+  }
+
+  /**
+   * Set the overlay text on a Redact annotation.
+   *
+   * @param annotationPtr pointer returned by `FPDFPage_GetAnnot`
+   * @param text overlay text to set, or undefined/empty to clear
+   * @returns `true` on success
+   *
+   * @private
+   */
+  private setOverlayText(annotationPtr: number, text: string | undefined): boolean {
+    if (!text) {
+      return this.pdfiumModule.EPDFAnnot_SetOverlayText(annotationPtr, 0);
+    }
+    return this.withWString(text, (wPtr) => {
+      return this.pdfiumModule.EPDFAnnot_SetOverlayText(annotationPtr, wPtr);
+    });
+  }
+
+  /**
+   * Get whether overlay text repeats in a Redact annotation.
+   *
+   * @param annotationPtr pointer returned by `FPDFPage_GetAnnot`
+   * @returns `true` if overlay text repeats
+   *
+   * @private
+   */
+  private getOverlayTextRepeat(annotationPtr: number): boolean {
+    return this.pdfiumModule.EPDFAnnot_GetOverlayTextRepeat(annotationPtr);
+  }
+
+  /**
+   * Set whether overlay text repeats in a Redact annotation.
+   *
+   * @param annotationPtr pointer returned by `FPDFPage_GetAnnot`
+   * @param repeat whether overlay text should repeat
+   * @returns `true` on success
+   *
+   * @private
+   */
+  private setOverlayTextRepeat(annotationPtr: number, repeat: boolean): boolean {
+    return this.pdfiumModule.EPDFAnnot_SetOverlayTextRepeat(annotationPtr, repeat);
   }
 
   /**
@@ -4694,6 +4884,167 @@ export class PdfiumNative implements IPdfiumExecutor {
 
     pageCtx.disposeImmediate();
     this.logger.perf('PDFiumEngine', 'Engine', label, 'End', `${doc.id}-${page.index}`);
+
+    return PdfTaskHelper.resolve<boolean>(!!ok);
+  }
+
+  /**
+   * Apply a single redaction annotation, permanently removing content underneath
+   * and flattening the RO (Redact Overlay) appearance stream if present.
+   * The annotation is removed after successful application.
+   *
+   * @param doc - document object
+   * @param page - page object
+   * @param annotation - the redact annotation to apply
+   * @returns true if successful
+   */
+  public applyRedaction(
+    doc: PdfDocumentObject,
+    page: PdfPageObject,
+    annotation: PdfAnnotationObject,
+  ): PdfTask<boolean> {
+    this.logger.debug(
+      LOG_SOURCE,
+      LOG_CATEGORY,
+      'applyRedaction',
+      doc.id,
+      page.index,
+      annotation.id,
+    );
+    const label = 'ApplyRedaction';
+    this.logger.perf(LOG_SOURCE, LOG_CATEGORY, label, 'Begin', `${doc.id}-${page.index}`);
+
+    const ctx = this.cache.getContext(doc.id);
+    if (!ctx) {
+      this.logger.perf(LOG_SOURCE, LOG_CATEGORY, label, 'End', `${doc.id}-${page.index}`);
+      return PdfTaskHelper.reject<boolean>({
+        code: PdfErrorCode.DocNotOpen,
+        message: 'document does not open',
+      });
+    }
+
+    const pageCtx = ctx.acquirePage(page.index);
+    const annotPtr = this.getAnnotationByName(pageCtx.pagePtr, annotation.id);
+    if (!annotPtr) {
+      pageCtx.release();
+      this.logger.perf(LOG_SOURCE, LOG_CATEGORY, label, 'End', `${doc.id}-${page.index}`);
+      return PdfTaskHelper.reject<boolean>({
+        code: PdfErrorCode.NotFound,
+        message: 'annotation not found',
+      });
+    }
+
+    // Apply the redaction (removes content, flattens RO, removes annotation)
+    const ok = this.pdfiumModule.EPDFAnnot_ApplyRedaction(pageCtx.pagePtr, annotPtr);
+    this.pdfiumModule.FPDFPage_CloseAnnot(annotPtr);
+
+    if (ok) {
+      // Regenerate page content
+      this.pdfiumModule.FPDFPage_GenerateContent(pageCtx.pagePtr);
+    }
+
+    pageCtx.disposeImmediate();
+    this.logger.perf(LOG_SOURCE, LOG_CATEGORY, label, 'End', `${doc.id}-${page.index}`);
+
+    return PdfTaskHelper.resolve<boolean>(!!ok);
+  }
+
+  /**
+   * Apply all redaction annotations on a page, permanently removing content
+   * underneath each one and flattening RO streams if present.
+   * All redact annotations are removed after successful application.
+   *
+   * @param doc - document object
+   * @param page - page object
+   * @returns true if any redactions were applied
+   */
+  public applyAllRedactions(doc: PdfDocumentObject, page: PdfPageObject): PdfTask<boolean> {
+    this.logger.debug(LOG_SOURCE, LOG_CATEGORY, 'applyAllRedactions', doc.id, page.index);
+    const label = 'ApplyAllRedactions';
+    this.logger.perf(LOG_SOURCE, LOG_CATEGORY, label, 'Begin', `${doc.id}-${page.index}`);
+
+    const ctx = this.cache.getContext(doc.id);
+    if (!ctx) {
+      this.logger.perf(LOG_SOURCE, LOG_CATEGORY, label, 'End', `${doc.id}-${page.index}`);
+      return PdfTaskHelper.reject<boolean>({
+        code: PdfErrorCode.DocNotOpen,
+        message: 'document does not open',
+      });
+    }
+
+    const pageCtx = ctx.acquirePage(page.index);
+
+    // Apply all redactions at once (content removal + RO flattening + annotation removal)
+    const ok = this.pdfiumModule.EPDFPage_ApplyRedactions(pageCtx.pagePtr);
+
+    if (ok) {
+      // Regenerate page content
+      this.pdfiumModule.FPDFPage_GenerateContent(pageCtx.pagePtr);
+    }
+
+    pageCtx.disposeImmediate();
+    this.logger.perf(LOG_SOURCE, LOG_CATEGORY, label, 'End', `${doc.id}-${page.index}`);
+
+    return PdfTaskHelper.resolve<boolean>(!!ok);
+  }
+
+  /**
+   * Flatten an annotation's appearance (AP/N) to page content.
+   * The annotation's visual appearance becomes part of the page itself.
+   * The annotation is automatically removed after flattening.
+   *
+   * @param doc - document object
+   * @param page - page object
+   * @param annotation - the annotation to flatten
+   * @returns true if successful
+   */
+  public flattenAnnotation(
+    doc: PdfDocumentObject,
+    page: PdfPageObject,
+    annotation: PdfAnnotationObject,
+  ): PdfTask<boolean> {
+    this.logger.debug(
+      LOG_SOURCE,
+      LOG_CATEGORY,
+      'flattenAnnotation',
+      doc.id,
+      page.index,
+      annotation.id,
+    );
+    const label = 'FlattenAnnotation';
+    this.logger.perf(LOG_SOURCE, LOG_CATEGORY, label, 'Begin', `${doc.id}-${page.index}`);
+
+    const ctx = this.cache.getContext(doc.id);
+    if (!ctx) {
+      this.logger.perf(LOG_SOURCE, LOG_CATEGORY, label, 'End', `${doc.id}-${page.index}`);
+      return PdfTaskHelper.reject<boolean>({
+        code: PdfErrorCode.DocNotOpen,
+        message: 'document does not open',
+      });
+    }
+
+    const pageCtx = ctx.acquirePage(page.index);
+    const annotPtr = this.getAnnotationByName(pageCtx.pagePtr, annotation.id);
+    if (!annotPtr) {
+      pageCtx.release();
+      this.logger.perf(LOG_SOURCE, LOG_CATEGORY, label, 'End', `${doc.id}-${page.index}`);
+      return PdfTaskHelper.reject<boolean>({
+        code: PdfErrorCode.NotFound,
+        message: 'annotation not found',
+      });
+    }
+
+    // Flatten the annotation's appearance to page content and remove it
+    const ok = this.pdfiumModule.EPDFAnnot_Flatten(pageCtx.pagePtr, annotPtr);
+    this.pdfiumModule.FPDFPage_CloseAnnot(annotPtr);
+
+    if (ok) {
+      // Regenerate page content
+      this.pdfiumModule.FPDFPage_GenerateContent(pageCtx.pagePtr);
+    }
+
+    pageCtx.disposeImmediate();
+    this.logger.perf(LOG_SOURCE, LOG_CATEGORY, label, 'End', `${doc.id}-${page.index}`);
 
     return PdfTaskHelper.resolve<boolean>(!!ok);
   }
@@ -5402,6 +5753,63 @@ export class PdfiumNative implements IPdfiumExecutor {
       id: index,
       type: PdfAnnotationSubtype.CARET,
       rect,
+      ...this.readBaseAnnotationProperties(annotationPtr),
+    };
+  }
+
+  /**
+   * Read pdf redact annotation
+   * @param page  - pdf page info
+   * @param annotationPtr - pointer to pdf annotation
+   * @param index  - index of annotation in the pdf page
+   * @returns pdf redact annotation
+   *
+   * @private
+   */
+  private readPdfRedactAnno(
+    page: PdfPageObject,
+    annotationPtr: number,
+    index: string,
+  ): PdfRedactAnnoObject {
+    const pageRect = this.readPageAnnoRect(annotationPtr);
+    const rect = this.convertPageRectToDeviceRect(page, pageRect);
+
+    // QuadPoints for redaction areas
+    const segmentRects = this.getQuadPointsAnno(page, annotationPtr);
+
+    // Colors: IC = interior/preview, OC = overlay, C = stroke
+    const color = this.getAnnotationColor(annotationPtr, PdfAnnotationColorType.InteriorColor);
+    const overlayColor = this.getAnnotationColor(
+      annotationPtr,
+      PdfAnnotationColorType.OverlayColor,
+    );
+    const strokeColor = this.getAnnotationColor(annotationPtr, PdfAnnotationColorType.Color);
+    const opacity = this.getAnnotationOpacity(annotationPtr);
+
+    // Overlay text properties
+    const overlayText = this.getOverlayText(annotationPtr);
+    const overlayTextRepeat = this.getOverlayTextRepeat(annotationPtr);
+
+    // Font properties from DA
+    const da = this.getAnnotationDefaultAppearance(annotationPtr);
+    const textAlign = this.getAnnotationTextAlignment(annotationPtr);
+
+    return {
+      pageIndex: page.index,
+      id: index,
+      type: PdfAnnotationSubtype.REDACT,
+      rect,
+      segmentRects,
+      color,
+      overlayColor,
+      strokeColor,
+      opacity,
+      overlayText,
+      overlayTextRepeat,
+      fontFamily: da?.fontFamily,
+      fontSize: da?.fontSize,
+      fontColor: da?.fontColor,
+      textAlign,
       ...this.readBaseAnnotationProperties(annotationPtr),
     };
   }

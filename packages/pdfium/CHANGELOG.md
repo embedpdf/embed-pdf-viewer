@@ -1,5 +1,22 @@
 # @embedpdf/pdfium
 
+## 2.4.0
+
+### Minor Changes
+
+- [#426](https://github.com/embedpdf/embed-pdf-viewer/pull/426) by [@bobsingor](https://github.com/bobsingor) – Added PDFium functions for redaction annotation support:
+  - Added `EPDFAnnot_ApplyRedaction` to apply a single redaction annotation
+  - Added `EPDFAnnot_Flatten` to flatten an annotation's appearance to page content
+  - Added `EPDFPage_ApplyRedactions` to apply all redactions on a page
+  - Added `EPDFAnnot_GetOverlayText` and `EPDFAnnot_SetOverlayText` for overlay text
+  - Added `EPDFAnnot_GetOverlayTextRepeat` and `EPDFAnnot_SetOverlayTextRepeat` for text repeat setting
+
+### Patch Changes
+
+- [#433](https://github.com/embedpdf/embed-pdf-viewer/pull/433) by [@bobsingor](https://github.com/bobsingor) – Reduced WASM binary size from 7.4MB to 4.5MB by removing debug symbols (-g flag) from the build.
+
+  Thanks to @Mikescops for reporting this.
+
 ## 2.3.0
 
 ### Patch Changes

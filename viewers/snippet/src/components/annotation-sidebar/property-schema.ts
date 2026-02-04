@@ -19,9 +19,12 @@ export interface PropertyConfig {
     | 'fontColor'
     | 'textAlign'
     | 'verticalAlign'
-    | 'blendMode';
+    | 'blendMode'
+    | 'text';
   /** Translation key for the label */
   labelKey: string;
+  /** Translation key for the placeholder (optional, for text inputs) */
+  placeholderKey?: string;
   /** Minimum value for sliders */
   min?: number;
   /** Maximum value for sliders */
@@ -113,6 +116,14 @@ export const PROPERTY_CONFIGS: Record<string, PropertyConfig> = {
     type: 'blendMode',
     labelKey: 'annotation.blendMode',
   },
+
+  // Redact properties
+  overlayText: {
+    key: 'overlayText',
+    type: 'text',
+    labelKey: 'annotation.overlayText',
+    placeholderKey: 'annotation.overlayTextPlaceholder',
+  },
 };
 
 /**
@@ -159,6 +170,17 @@ export const ANNOTATION_PROPERTIES: Partial<Record<PdfAnnotationSubtype, string[
     'verticalAlign',
     'opacity',
     'color',
+  ],
+  [PdfAnnotationSubtype.REDACT]: [
+    'strokeColor',
+    'color',
+    'opacity',
+    //'overlayText',
+    //'overlayTextRepeat',
+    //'fontFamily',
+    //'fontSize',
+    //'fontColor',
+    //'textAlign',
   ],
 };
 

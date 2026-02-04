@@ -865,6 +865,12 @@ export const viewerUISchema: UISchema = {
         },
         {
           type: 'command-button',
+          id: 'apply-redaction',
+          commandId: 'annotation:apply-redaction',
+          variant: 'icon',
+        },
+        {
+          type: 'command-button',
           id: 'toggle-link',
           commandId: 'annotation:toggle-link',
           variant: 'icon',

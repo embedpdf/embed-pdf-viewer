@@ -18,6 +18,17 @@ The process involves two main stages:
 Redaction is an irreversible process. Once committed, the original content is removed and cannot be restored from the document.
 </Callout>
 
+## Operating Modes
+
+The Redaction Plugin supports two operating modes:
+
+| Mode | Description |
+| :--- | :--- |
+| **[Legacy Mode](#usage)** | Pending redactions are stored in internal state. Simple setup, suitable for single-session workflows where one user marks and applies redactions immediately. |
+| **[Annotation Mode](#annotation-mode)** | Pending redactions are stored as PDF REDACT annotations. Enables collaborative workflows, customizable colors, and undo/redo support. |
+
+Choose the mode that best fits your use case before implementing.
+
 ## Installation
 
 The plugin has optional but highly recommended dependencies on the `Selection` and `Interaction Manager` plugins, which are required for marking text and areas, respectively.
@@ -139,7 +150,7 @@ const redaction = useRedaction(() => documentId);
 
 ## Live Example
 
-Try marking text or areas for redaction. Use the "Mark Text" button to select text, or "Mark Area" to draw rectangles. Click on a pending mark to see the contextual menu, then apply or remove individual marks. Use "Apply All" to permanently redact all pending marks.
+This example demonstrates the full redaction workflow in **legacy mode**. Use the "Mark Text" button to select text, or "Mark Area" to draw rectangles. Click on a pending mark to see the contextual menu, then apply or remove individual marks. Use "Apply All" to permanently redact all pending marks.
 
 import { RedactionExample } from '../../code-examples/headless/redaction-example'
 
@@ -152,13 +163,137 @@ import { RedactionExample } from '../../code-examples/headless/redaction-example
   <RedactionExample />
 </CodeExample>
 
+## Annotation Mode
+
+The Redaction Plugin supports an alternative **annotation mode** where pending redactions are stored as PDF REDACT annotations instead of internal state. This integrates with the Annotation Plugin and provides:
+
+- **Customizable colors**: Change the mark and overlay colors for each redaction
+- **Collaborative workflows**: One user can prepare redactions, save the PDF, and send it to another user for review. The reviewer can inspect, modify, or apply the redactions
+- **Undo/redo support**: Integrates with the History Plugin for full undo/redo functionality
+- **Persistent state**: Redaction marks are saved as part of the PDF and persist across sessions
+
+<Callout type="info" title="When to Use Annotation Mode">
+Use annotation mode when you need collaborative review workflows, customizable colors, or want redaction marks to be saved into the PDF for later review.
+</Callout>
+
+### Enabling Annotation Mode
+
+To enable annotation mode, register `AnnotationPluginPackage` and set `useAnnotationMode: true`:
+
+```typescript {4-5, 15-18}
+import { createPluginRegistration } from '@embedpdf/core'
+import { InteractionManagerPluginPackage } from '@embedpdf/plugin-interaction-manager/svelte'
+import { SelectionPluginPackage } from '@embedpdf/plugin-selection/svelte'
+import { AnnotationPluginPackage } from '@embedpdf/plugin-annotation/svelte'
+import { RedactionPluginPackage } from '@embedpdf/plugin-redaction/svelte'
+import { HistoryPluginPackage } from '@embedpdf/plugin-history/svelte'
+
+const plugins = [
+  // ... other essential plugins
+  createPluginRegistration(DocumentManagerPluginPackage, { /* ... */ }),
+  createPluginRegistration(RenderPluginPackage),
+  createPluginRegistration(InteractionManagerPluginPackage),
+  createPluginRegistration(SelectionPluginPackage),
+  createPluginRegistration(HistoryPluginPackage),
+  createPluginRegistration(AnnotationPluginPackage),
+  createPluginRegistration(RedactionPluginPackage, {
+    useAnnotationMode: true,
+  }),
+]
+```
+
+### Required Layers
+
+In annotation mode, you need **both** the `AnnotationLayer` and `RedactionLayer`:
+
+- **`AnnotationLayer`**: Renders the REDACT annotations (pending redactions)
+- **`RedactionLayer`**: Renders the marquee drawing UI and text selection highlights during marking
+
+```svelte
+<script lang="ts">
+import { AnnotationLayer } from '@embedpdf/plugin-annotation/svelte';
+import { RedactionLayer } from '@embedpdf/plugin-redaction/svelte';
+
+let { documentId }: { documentId: string } = $props();
+</script>
+
+{#snippet renderPage(page)}
+  <PagePointerProvider {documentId} pageIndex={page.pageIndex}>
+    <RenderLayer {documentId} pageIndex={page.pageIndex} />
+    <SelectionLayer {documentId} pageIndex={page.pageIndex} />
+    <!-- AnnotationLayer renders REDACT annotations -->
+    <AnnotationLayer {documentId} pageIndex={page.pageIndex} />
+    <!-- RedactionLayer renders marquee/selection UI during marking -->
+    <RedactionLayer {documentId} pageIndex={page.pageIndex} />
+  </PagePointerProvider>
+{/snippet}
+
+<Scroller {documentId} {renderPage} />
+```
+
+### Unified Redact Mode
+
+Use `toggleRedact()` for a unified mode that supports both text selection and area marquee in a single mode:
+
+```svelte
+<script lang="ts">
+import { useRedaction, RedactionMode } from '@embedpdf/plugin-redaction/svelte';
+
+let { documentId }: { documentId: string } = $props();
+const redaction = useRedaction(() => documentId);
+
+// Check if redact mode is active
+const isActive = $derived(redaction.state.activeType === RedactionMode.Redact);
+</script>
+
+<!-- Toggle unified redact mode (supports both text and area) -->
+<button onclick={() => redaction.provides?.toggleRedact()}>
+  Redact
+</button>
+```
+
+This unified mode works in both legacy and annotation modes.
+
+### Customizing Colors
+
+In annotation mode, redaction colors can be customized. Use the `useAnnotation` store to access the annotation state and update colors on selected annotations:
+
+```svelte
+<script lang="ts">
+import { useAnnotation } from '@embedpdf/plugin-annotation/svelte';
+import { PdfAnnotationSubtype, type PdfRedactAnnoObject } from '@embedpdf/models';
+
+let { documentId }: { documentId: string } = $props();
+const annotation = useAnnotation(() => documentId);
+
+// Get the selected REDACT annotation
+const selectedRedact = $derived(() => {
+  if (!annotation.state.selectedUid) return null;
+  const tracked = annotation.state.byUid[annotation.state.selectedUid];
+  if (!tracked || tracked.object.type !== PdfAnnotationSubtype.REDACT) return null;
+  return tracked.object as PdfRedactAnnoObject;
+});
+
+// Update colors on the selected annotation
+const changeColor = (color: string) => {
+  const selected = selectedRedact();
+  if (!selected || !annotation.provides) return;
+  annotation.provides.updateAnnotation(selected.pageIndex, selected.id, {
+    strokeColor: color,
+    color: color,
+  });
+};
+</script>
+```
+
 ## API Reference
 
 ### Configuration (`RedactionPluginConfig`)
 
-| Option | Type | Description |
-| :--- | :--- | :--- |
-| **`drawBlackBoxes`** | `boolean` | If `true`, a black rectangle is drawn over the redacted content after committing. **Default**: `true` |
+| Option | Type | Default | Description |
+| :--- | :--- | :--- | :--- |
+| **`drawBlackBoxes`** | `boolean` | `true` | If `true`, a black rectangle is drawn over the redacted content after committing. **Only applies in legacy mode.** In annotation mode, the overlay color is controlled by the annotation's `color` property. |
+| **`useAnnotationMode`** | `boolean` | `false` | When `true`, pending redactions are stored as PDF REDACT annotations (requires `AnnotationPluginPackage`). When `false`, uses internal pending state (legacy mode). |
 
 ### Component: `<RedactionLayer />`
 
@@ -201,7 +336,7 @@ Connects your components to the redaction plugin's state and methods for a speci
 | Property | Type | Description |
 | :--- | :--- | :--- |
 | **`isRedacting`**| `boolean`| `true` when any redaction mode is active. |
-| **`activeType`** | `RedactionMode \| null` | The currently active mode (`'marqueeRedact'` or `'redactSelection'`). |
+| **`activeType`** | `RedactionMode \| null` | The currently active mode: `'redact'` (unified), `'redactSelection'` (text only), or `'marqueeRedact'` (area only). |
 | **`pending`**| `object`| A map of pending redactions, keyed by page number. |
 | **`pendingCount`**| `number`| The total number of pending redactions across all pages. |
 | **`selected`**| `object \| null`| The currently selected pending redaction, if any. |
@@ -212,8 +347,11 @@ A selection of key methods available on the `provides` object:
 
 | Method | Description |
 | :--- | :--- |
-| **`toggleRedactSelection()`** | Toggles the text redaction mode. |
-| **`toggleMarqueeRedact()`** | Toggles the area redaction mode. |
+| **`toggleRedact()`** | Toggles the unified redact mode (supports both text selection and area marquee). |
+| **`enableRedact()`** | Enables the unified redact mode. |
+| **`isRedactActive()`** | Returns `true` if the unified redact mode is active. |
+| **`toggleRedactSelection()`** | Toggles the text-only redaction mode. |
+| **`toggleMarqueeRedact()`** | Toggles the area-only redaction mode. |
 | **`addPending(items)`** | Programmatically adds new `RedactionItem`s to the pending queue. |
 | **`removePending(page, id)`** | Removes a specific pending redaction mark. |
 | **`clearPending()`** | Removes all pending redaction marks. |

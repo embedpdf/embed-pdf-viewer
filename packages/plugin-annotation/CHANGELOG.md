@@ -1,5 +1,25 @@
 # @embedpdf/plugin-annotation
 
+## 2.4.0
+
+### Minor Changes
+
+- [#426](https://github.com/embedpdf/embed-pdf-viewer/pull/426) by [@bobsingor](https://github.com/bobsingor) – Added annotation renderer registry and enhanced annotation capabilities:
+  - Added `purgeAnnotation()` method to remove annotations from state without calling the PDF engine
+  - Added annotation renderer registry allowing external plugins to register custom annotation renderers
+  - Added `useRegisterRenderers()` hook and `AnnotationRendererProvider` context for renderer registration
+  - Changed interaction properties (`isDraggable`, `isResizable`, `lockAspectRatio`) to support dynamic functions based on annotation
+  - Added `AnnotationCommandMetadata` interface for history command filtering
+  - Added `isRedact()` helper function for type-checking redact annotations
+  - Framework exports now include `AnnotationPluginPackage` with `AnnotationRendererProvider` wrapper
+
+### Patch Changes
+
+- [#429](https://github.com/embedpdf/embed-pdf-viewer/pull/429) by [@bobsingor](https://github.com/bobsingor) – Fixed group selection box ignoring document permissions:
+  - Added `canModifyAnnotations` permission check to `GroupSelectionBox` component across React, Vue, and Svelte
+  - Group drag and resize operations are now properly disabled when the user lacks annotation modification permissions
+  - This aligns group selection behavior with individual annotation container permission checks
+
 ## 2.3.0
 
 ### Minor Changes

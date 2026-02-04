@@ -5,6 +5,7 @@ export const RedactAreaIcon = ({
   size = 24,
   strokeWidth = 2,
   primaryColor = 'currentColor',
+  secondaryColor = 'currentColor',
   className,
   title,
 }: IconProps) => (
@@ -33,7 +34,7 @@ export const RedactAreaIcon = ({
       </clipPath>
     </defs>
     <rect x="10" y="10" width="12" height="12" rx="2" fill="none" />
-    <g clip-path="url(#redactClip)">
+    <g clip-path="url(#redactClip)" stroke={secondaryColor}>
       <path d="M-2 24l14 -14" />
       <path d="M2 24l14 -14" />
       <path d="M6 24l14 -14" />

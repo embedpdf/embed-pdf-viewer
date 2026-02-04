@@ -158,17 +158,17 @@ watch(
 
     const scoped = redactionValue.forDocument(docId);
 
-    // Initialize with current state
+    // Initialize with current state - only show legacy mode items
     const currentState = scoped.getState();
-    items.value = currentState.pending[pageIdx] ?? [];
+    items.value = (currentState.pending[pageIdx] ?? []).filter((it) => it.source === 'legacy');
     selectedId.value =
       currentState.selected && currentState.selected.page === pageIdx
         ? currentState.selected.id
         : null;
 
-    // Subscribe to future changes
+    // Subscribe to future changes - only show legacy mode items
     const off1 = scoped.onPendingChange((map) => {
-      items.value = map[pageIdx] ?? [];
+      items.value = (map[pageIdx] ?? []).filter((it) => it.source === 'legacy');
     });
 
     const off2 = scoped.onSelectedChange((sel) => {

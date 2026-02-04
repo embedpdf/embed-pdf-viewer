@@ -5,6 +5,7 @@ export { default as Annotations } from './Annotations.svelte';
 export { default as GroupSelectionBox } from './GroupSelectionBox.svelte';
 export { default as PreviewRenderer } from './PreviewRenderer.svelte';
 export { default as RenderAnnotation } from './RenderAnnotation.svelte';
+export { default as RendererRegistryProvider } from './RendererRegistryProvider.svelte';
 export { default as TextMarkup } from './TextMarkup.svelte';
 
 export * from './annotations';

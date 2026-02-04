@@ -64,6 +64,7 @@ import { PointerIcon } from './pointer';
 import { RedactIcon } from './redact';
 import { IconComponent } from './types';
 import { RedactAreaIcon } from './redact-area';
+import { RedactCombinedIcon } from './redact-combined';
 import { CheckIcon } from './check';
 import { FileIcon } from './file';
 import { PlusIcon } from './plus';
@@ -79,6 +80,7 @@ import { ExternalLinkIcon } from './external-link';
 import { MarqueeSelectIcon } from './marquee-select';
 import { GroupIcon } from './group';
 import { UngroupIcon } from './ungroup';
+import { RedactionSidebarIcon } from './redaction-sidebar';
 
 export type Icons = {
   [key: string]: IconComponent;
@@ -150,6 +152,7 @@ export const icons: Icons = {
   pointer: PointerIcon,
   redact: RedactIcon,
   redactArea: RedactAreaIcon,
+  redactCombined: RedactCombinedIcon,
   check: CheckIcon,
   file: FileIcon,
   plus: PlusIcon,
@@ -165,4 +168,5 @@ export const icons: Icons = {
   marqueeSelect: MarqueeSelectIcon,
   group: GroupIcon,
   ungroup: UngroupIcon,
+  redactionSidebar: RedactionSidebarIcon,
 };

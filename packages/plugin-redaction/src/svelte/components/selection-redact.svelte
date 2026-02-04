@@ -15,6 +15,9 @@
   let rects = $state<Rect[]>([]);
   let boundingRect = $state<Rect | null>(null);
 
+  // Get stroke color from plugin (annotation mode uses tool defaults, legacy uses red)
+  const strokeColor = $derived(redactionPlugin.plugin?.getPreviewStrokeColor() ?? 'red');
+
   $effect(() => {
     if (!redactionPlugin.plugin) {
       rects = [];
@@ -37,6 +40,12 @@
     style:position="absolute"
     style:inset="0"
   >
-    <Highlight color="transparent" opacity={1} {rects} {scale} border="1px solid red" />
+    <Highlight
+      color="transparent"
+      opacity={1}
+      {rects}
+      {scale}
+      border={`1px solid ${strokeColor}`}
+    />
   </div>
 {/if}

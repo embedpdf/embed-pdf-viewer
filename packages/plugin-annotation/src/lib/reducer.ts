@@ -376,16 +376,23 @@ export const reducer: Reducer<AnnotationState, AnnotationAction> = (state, actio
     }
 
     case PURGE_ANNOTATION: {
-      const { documentId, uid } = action.payload;
+      const { documentId, pageIndex, uid } = action.payload;
       const docState = state.documents[documentId];
-      if (!docState) return state;
+      if (!docState || !docState.byUid[uid]) return state;
 
       const { [uid]: _gone, ...rest } = docState.byUid;
       return {
         ...state,
         documents: {
           ...state.documents,
-          [documentId]: { ...docState, byUid: rest },
+          [documentId]: {
+            ...docState,
+            pages: {
+              ...docState.pages,
+              [pageIndex]: (docState.pages[pageIndex] ?? []).filter((u) => u !== uid),
+            },
+            byUid: rest,
+          },
         },
       };
     }

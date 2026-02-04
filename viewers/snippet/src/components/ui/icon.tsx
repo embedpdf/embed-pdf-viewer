@@ -30,7 +30,7 @@ export function Icon({
   size = 24,
   strokeWidth = 2,
   primaryColor = 'currentColor',
-  secondaryColor = 'none',
+  secondaryColor = 'currentColor',
   className,
 }: IconProps): VNode | null {
   // Check built-in icons first

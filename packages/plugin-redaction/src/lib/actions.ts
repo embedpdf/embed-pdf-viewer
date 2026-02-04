@@ -1,4 +1,5 @@
 import { Action } from '@embedpdf/core';
+import { Rect } from '@embedpdf/models';
 import { RedactionItem, RedactionMode, RedactionDocumentState } from './types';
 
 // Document lifecycle
@@ -13,6 +14,7 @@ export const SET_ACTIVE_TYPE = 'SET_ACTIVE_TYPE';
 
 export const ADD_PENDING = 'ADD_PENDING';
 export const REMOVE_PENDING = 'REMOVE_PENDING';
+export const UPDATE_PENDING = 'UPDATE_PENDING';
 export const CLEAR_PENDING = 'CLEAR_PENDING';
 
 export const SELECT_PENDING = 'SELECT_PENDING';
@@ -81,6 +83,22 @@ export interface ClearPendingAction extends Action {
   payload: string; // documentId
 }
 
+export interface UpdatePendingAction extends Action {
+  type: typeof UPDATE_PENDING;
+  payload: {
+    documentId: string;
+    page: number;
+    id: string;
+    patch: {
+      rect?: Rect;
+      rects?: Rect[];
+      markColor?: string;
+      text?: string;
+      redactionColor?: string;
+    };
+  };
+}
+
 export interface SelectPendingAction extends Action {
   type: typeof SELECT_PENDING;
   payload: {
@@ -104,6 +122,7 @@ export type RedactionAction =
   | SetActiveTypeAction
   | AddPendingAction
   | RemovePendingAction
+  | UpdatePendingAction
   | ClearPendingAction
   | SelectPendingAction
   | DeselectPendingAction;
@@ -142,6 +161,22 @@ export const removePending = (
 export const clearPending = (documentId: string): ClearPendingAction => ({
   type: CLEAR_PENDING,
   payload: documentId,
+});
+
+export const updatePending = (
+  documentId: string,
+  page: number,
+  id: string,
+  patch: {
+    rect?: Rect;
+    rects?: Rect[];
+    markColor?: string;
+    text?: string;
+    redactionColor?: string;
+  },
+): UpdatePendingAction => ({
+  type: UPDATE_PENDING,
+  payload: { documentId, page, id, patch },
 });
 
 export const startRedaction = (documentId: string, mode: RedactionMode): StartRedactionAction => ({

@@ -137,6 +137,8 @@ export class PdfEngine<T = Blob> implements IPdfEngine<T> {
     const task = new Task<boolean, PdfErrorReason>();
     try {
       this.executor.destroy();
+      // Clean up image converter resources (e.g., encoder worker pool)
+      this.options.imageConverter.destroy?.();
       task.resolve(true);
     } catch (error) {
       task.reject({ code: PdfErrorCode.Unknown, message: String(error) });
@@ -690,6 +692,44 @@ export class PdfEngine<T = Blob> implements IPdfEngine<T> {
       {
         execute: () => this.executor.redactTextInRects(doc, page, rects, options),
         meta: { docId: doc.id, pageIndex: page.index, operation: 'redactTextInRects' },
+      },
+      { priority: Priority.MEDIUM },
+    );
+  }
+
+  applyRedaction(
+    doc: PdfDocumentObject,
+    page: PdfPageObject,
+    annotation: PdfAnnotationObject,
+  ): PdfTask<boolean> {
+    return this.workerQueue.enqueue(
+      {
+        execute: () => this.executor.applyRedaction(doc, page, annotation),
+        meta: { docId: doc.id, pageIndex: page.index, operation: 'applyRedaction' },
+      },
+      { priority: Priority.MEDIUM },
+    );
+  }
+
+  applyAllRedactions(doc: PdfDocumentObject, page: PdfPageObject): PdfTask<boolean> {
+    return this.workerQueue.enqueue(
+      {
+        execute: () => this.executor.applyAllRedactions(doc, page),
+        meta: { docId: doc.id, pageIndex: page.index, operation: 'applyAllRedactions' },
+      },
+      { priority: Priority.MEDIUM },
+    );
+  }
+
+  flattenAnnotation(
+    doc: PdfDocumentObject,
+    page: PdfPageObject,
+    annotation: PdfAnnotationObject,
+  ): PdfTask<boolean> {
+    return this.workerQueue.enqueue(
+      {
+        execute: () => this.executor.flattenAnnotation(doc, page, annotation),
+        meta: { docId: doc.id, pageIndex: page.index, operation: 'flattenAnnotation' },
       },
       { priority: Priority.MEDIUM },
     );

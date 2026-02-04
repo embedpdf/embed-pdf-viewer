@@ -79,6 +79,8 @@ export function PropertySection(props: PropertySectionProps) {
       return <VerticalAlignSection {...props} />;
     case 'blendMode':
       return <BlendModeSection {...props} />;
+    case 'text':
+      return <TextSection {...props} />;
     default:
       return null;
   }
@@ -540,6 +542,40 @@ function BlendModeSection({ config, value, onChange, translate }: PropertySectio
           </option>
         ))}
       </select>
+    </Section>
+  );
+}
+
+/* ─── Text Section ───────────────────────────────────────────────────────── */
+
+function TextSection({ config, value, onChange, translate }: PropertySectionProps) {
+  const [text, setText] = useState(value ?? '');
+
+  useEffect(() => setText(value ?? ''), [value]);
+
+  // Debounce the text value before triggering onChange
+  const debouncedText = useDebounce(text, 300);
+  useEffect(() => {
+    if (debouncedText !== value) {
+      onChange(debouncedText);
+    }
+  }, [debouncedText]);
+
+  const handleChange = (e: Event) => {
+    const val = (e.target as HTMLInputElement).value;
+    setText(val);
+  };
+
+  return (
+    <Section>
+      <SectionLabel>{translate(config.labelKey)}</SectionLabel>
+      <input
+        type="text"
+        class="border-border-default bg-bg-input text-fg-primary w-full rounded border px-2 py-1 text-sm"
+        value={text}
+        onInput={handleChange}
+        placeholder={config.placeholderKey ? translate(config.placeholderKey) : undefined}
+      />
     </Section>
   );
 }

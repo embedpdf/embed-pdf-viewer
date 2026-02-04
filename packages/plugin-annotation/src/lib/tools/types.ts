@@ -1,6 +1,28 @@
 import { PdfAnnotationObject, PdfAnnotationSubtype, Size } from '@embedpdf/models';
 
 /**
+ * A dynamic boolean property that can be either a static boolean
+ * or a function that receives the annotation and returns a boolean.
+ */
+export type DynamicBooleanProp = boolean | ((annotation: PdfAnnotationObject) => boolean);
+
+/**
+ * Resolves a dynamic boolean property to its actual value.
+ * @param prop The dynamic property (boolean or function)
+ * @param annotation The annotation to pass to the function if prop is a function
+ * @param defaultValue The default value if prop is undefined
+ */
+export function resolveInteractionProp(
+  prop: DynamicBooleanProp | undefined,
+  annotation: PdfAnnotationObject,
+  defaultValue: boolean,
+): boolean {
+  if (prop === undefined) return defaultValue;
+  if (typeof prop === 'function') return prop(annotation);
+  return prop;
+}
+
+/**
  * Specific configuration for Stamp tools.
  */
 export interface StampToolConfig {
@@ -108,18 +130,18 @@ export type AnnotationTool<T extends PdfAnnotationObject = PdfAnnotationObject> 
     textSelection?: boolean;
 
     // Single annotation behaviors
-    /** Whether this annotation can be dragged when selected individually. */
-    isDraggable?: boolean;
-    /** Whether this annotation can be resized when selected individually. */
-    isResizable?: boolean;
-    /** Whether to maintain aspect ratio during resize. */
-    lockAspectRatio?: boolean;
+    /** Whether this annotation can be dragged when selected individually. Can be dynamic based on annotation. */
+    isDraggable?: DynamicBooleanProp;
+    /** Whether this annotation can be resized when selected individually. Can be dynamic based on annotation. */
+    isResizable?: DynamicBooleanProp;
+    /** Whether to maintain aspect ratio during resize. Can be dynamic based on annotation. */
+    lockAspectRatio?: DynamicBooleanProp;
 
     // Group behaviors (default to single annotation values if not specified)
-    /** Whether this annotation can be dragged when part of a group. Defaults to isDraggable. */
-    isGroupDraggable?: boolean;
-    /** Whether this annotation can be resized when part of a group. Defaults to isResizable. */
-    isGroupResizable?: boolean;
+    /** Whether this annotation can be dragged when part of a group. Defaults to isDraggable. Can be dynamic based on annotation. */
+    isGroupDraggable?: DynamicBooleanProp;
+    /** Whether this annotation can be resized when part of a group. Defaults to isResizable. Can be dynamic based on annotation. */
+    isGroupResizable?: DynamicBooleanProp;
   };
 
   /** Tool-specific behavior settings that override plugin defaults */
