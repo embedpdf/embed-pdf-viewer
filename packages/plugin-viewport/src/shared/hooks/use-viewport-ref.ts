@@ -29,8 +29,8 @@ export function useViewportRef(documentId: string) {
     };
     container.addEventListener('scroll', onScroll);
 
-    // On resize
-    const resizeObserver = new ResizeObserver(() => {
+    // Helper to update viewport metrics
+    const updateMetrics = () => {
       viewportPlugin.setViewportResizeMetrics(documentId, {
         width: container.offsetWidth,
         height: container.offsetHeight,
@@ -43,8 +43,22 @@ export function useViewportRef(documentId: string) {
         clientLeft: container.clientLeft,
         clientTop: container.clientTop,
       });
+    };
+
+    // Set initial metrics
+    updateMetrics();
+
+    // On resize - use requestAnimationFrame to defer updates to next frame
+    // This prevents "ResizeObserver loop completed with undelivered notifications" errors
+    // that occur when ResizeObserver callbacks trigger layout changes synchronously
+    /*
+    const resizeObserver = new ResizeObserver(() => {
+      requestAnimationFrame(() => {
+        updateMetrics();
+      });
     });
     resizeObserver.observe(container);
+    */
 
     // Subscribe to scroll requests for this document
     const unsubscribeScrollRequest = viewportPlugin.onScrollRequest(
@@ -59,7 +73,7 @@ export function useViewportRef(documentId: string) {
     // Cleanup
     return () => {
       viewportPlugin.unregisterViewport(documentId);
-      resizeObserver.disconnect();
+      //resizeObserver.disconnect();
       container.removeEventListener('scroll', onScroll);
       unsubscribeScrollRequest();
     };

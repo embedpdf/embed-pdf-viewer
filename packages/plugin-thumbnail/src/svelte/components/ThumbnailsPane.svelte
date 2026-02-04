@@ -74,8 +74,11 @@
     if (!vp || !thumbnailPlugin.plugin) return;
 
     const scope = thumbnailPlugin.plugin.provides().forDocument(documentId);
+    // Wrap in requestAnimationFrame to prevent "ResizeObserver loop" errors
     const resizeObserver = new ResizeObserver(() => {
-      scope.updateWindow(vp.scrollTop, vp.clientHeight);
+      requestAnimationFrame(() => {
+        scope.updateWindow(vp.scrollTop, vp.clientHeight);
+      });
     });
 
     resizeObserver.observe(vp);

@@ -261,7 +261,10 @@ export function setupZoomGestures({
   const unsubViewport = viewportScope.onViewportChange(() => updateMargin());
 
   // Use ResizeObserver to update margin when element size changes
-  const resizeObserver = new ResizeObserver(() => updateMargin());
+  // Wrap in requestAnimationFrame to prevent "ResizeObserver loop" errors
+  const resizeObserver = new ResizeObserver(() => {
+    requestAnimationFrame(() => updateMargin());
+  });
   resizeObserver.observe(element);
 
   // Initial margin calculation

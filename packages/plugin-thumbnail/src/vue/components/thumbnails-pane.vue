@@ -75,8 +75,11 @@ watch(
     vp.addEventListener('scroll', onScroll);
 
     // Setup resize observer for viewport changes
+    // Wrap in requestAnimationFrame to prevent "ResizeObserver loop" errors
     const resizeObserver = new ResizeObserver(() => {
-      scope.updateWindow(vp.scrollTop, vp.clientHeight);
+      requestAnimationFrame(() => {
+        scope.updateWindow(vp.scrollTop, vp.clientHeight);
+      });
     });
     resizeObserver.observe(vp);
 

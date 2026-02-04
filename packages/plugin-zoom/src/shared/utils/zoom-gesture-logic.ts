@@ -244,7 +244,29 @@ export function setupZoomGestures({
   const unsubZoom = zoomScope.onStateChange(() => updateMargin());
 
   // Use ResizeObserver to update margin when element or container size changes
-  const resizeObserver = new ResizeObserver(() => updateMargin());
+  // Hybrid approach: update immediately on first call, debounce rapid successive calls
+  // This prevents both "ResizeObserver loop" errors AND visual flashing
+  let marginRafId: number | null = null;
+  let lastUpdateTime = 0;
+  const resizeObserver = new ResizeObserver(() => {
+    const now = performance.now();
+
+    // If more than 1 frame (~16ms) since last update, update immediately
+    if (now - lastUpdateTime > 16) {
+      lastUpdateTime = now;
+      updateMargin();
+    } else {
+      // Debounce rapid successive updates
+      if (marginRafId !== null) {
+        cancelAnimationFrame(marginRafId);
+      }
+      marginRafId = requestAnimationFrame(() => {
+        marginRafId = null;
+        lastUpdateTime = performance.now();
+        updateMargin();
+      });
+    }
+  });
   resizeObserver.observe(element);
   resizeObserver.observe(container);
 
@@ -275,6 +297,9 @@ export function setupZoomGestures({
     }
     if (wheelZoomTimeout) {
       clearTimeout(wheelZoomTimeout);
+    }
+    if (marginRafId !== null) {
+      cancelAnimationFrame(marginRafId);
     }
     unsubZoom();
     resizeObserver.disconnect();

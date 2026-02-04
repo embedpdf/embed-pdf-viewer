@@ -1,5 +1,5 @@
 import { h, Fragment } from 'preact';
-import { useMemo } from 'preact/hooks';
+import { useMemo, useEffect } from 'preact/hooks';
 import styles from '../styles/index.css';
 import { EmbedPDF } from '@embedpdf/core/preact';
 import { createPluginRegistration, PluginRegistry, PermissionConfig } from '@embedpdf/core';
@@ -160,6 +160,8 @@ export interface PDFViewerConfig {
   wasmUrl?: string;
   /** Enable debug logging. Default: false */
   log?: boolean;
+  /** Enable debug mode with error overlay for development. Default: false */
+  debug?: boolean;
 
   // === Global Permissions ===
   /**
@@ -503,6 +505,78 @@ export function PDFViewer({ config, onRegistryReady }: PDFViewerProps) {
     }),
     [],
   );
+
+  // Debug mode: Show error overlay for runtime errors (like ResizeObserver errors)
+  useEffect(() => {
+    if (!config.debug) return;
+
+    const showErrorOverlay = (message: string, stack?: string) => {
+      // Remove existing overlay if any
+      const existing = document.getElementById('embedpdf-error-overlay');
+      if (existing) existing.remove();
+
+      const overlay = document.createElement('div');
+      overlay.id = 'embedpdf-error-overlay';
+      overlay.style.cssText = `
+        position: fixed;
+        inset: 0;
+        background: rgba(0, 0, 0, 0.85);
+        color: white;
+        padding: 40px;
+        font-family: monospace;
+        font-size: 14px;
+        z-index: 99999;
+        overflow: auto;
+      `;
+
+      overlay.innerHTML = `
+        <div style="max-width: 800px; margin: 0 auto;">
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+            <h2 style="color: #ff6b6b; margin: 0;">Uncaught runtime error:</h2>
+            <button id="embedpdf-close-error-overlay" style="background: #333; color: white; border: none; padding: 8px 16px; cursor: pointer; border-radius: 4px;">
+              Close
+            </button>
+          </div>
+          <div style="background: #1a1a1a; padding: 20px; border-radius: 8px; border-left: 4px solid #ff6b6b;">
+            <div style="color: #ff6b6b; font-weight: bold; margin-bottom: 10px;">ERROR</div>
+            <div style="color: #fff;">${message}</div>
+            ${stack ? `<pre style="color: #888; margin-top: 15px; white-space: pre-wrap; font-size: 12px;">${stack}</pre>` : ''}
+          </div>
+        </div>
+      `;
+
+      document.body.appendChild(overlay);
+
+      document.getElementById('embedpdf-close-error-overlay')?.addEventListener('click', () => {
+        overlay.remove();
+      });
+    };
+
+    const handleError = (event: ErrorEvent) => {
+      const message = event.message || 'Unknown error';
+      const stack = event.error?.stack || `at ${event.filename}:${event.lineno}:${event.colno}`;
+      showErrorOverlay(message, stack);
+    };
+
+    const handleUnhandledRejection = (event: PromiseRejectionEvent) => {
+      const message = event.reason?.message || String(event.reason);
+      const stack = event.reason?.stack;
+      showErrorOverlay(message, stack);
+    };
+
+    window.addEventListener('error', handleError);
+    window.addEventListener('unhandledrejection', handleUnhandledRejection);
+
+    return () => {
+      window.removeEventListener('error', handleError);
+      window.removeEventListener('unhandledrejection', handleUnhandledRejection);
+      // Clean up overlay on unmount
+      const existing = document.getElementById('embedpdf-error-overlay');
+      if (existing) existing.remove();
+    };
+  }, [config.debug]);
+
+  console.log(config);
 
   if (!engine || isLoading)
     return (
