@@ -1,10 +1,15 @@
-import { RedactionItem, RedactionState } from './types';
+import { Reducer } from '@embedpdf/core';
+import { RedactionItem, RedactionState, RedactionDocumentState } from './types';
 import {
   RedactionAction,
+  INIT_REDACTION_STATE,
+  CLEANUP_REDACTION_STATE,
+  SET_ACTIVE_DOCUMENT,
   ADD_PENDING,
   CLEAR_PENDING,
   END_REDACTION,
   REMOVE_PENDING,
+  UPDATE_PENDING,
   START_REDACTION,
   SET_ACTIVE_TYPE,
   SELECT_PENDING,
@@ -16,7 +21,7 @@ const calculatePendingCount = (pending: Record<number, RedactionItem[]>): number
   return Object.values(pending).reduce((total, items) => total + items.length, 0);
 };
 
-export const initialState: RedactionState = {
+export const initialDocumentState: RedactionDocumentState = {
   isRedacting: false,
   activeType: null,
   pending: {},
@@ -24,56 +29,225 @@ export const initialState: RedactionState = {
   selected: null,
 };
 
-export const redactionReducer = (state = initialState, action: RedactionAction): RedactionState => {
+export const initialState: RedactionState = {
+  documents: {},
+  activeDocumentId: null,
+};
+
+export const redactionReducer: Reducer<RedactionState, RedactionAction> = (
+  state = initialState,
+  action,
+) => {
   switch (action.type) {
+    case INIT_REDACTION_STATE: {
+      const { documentId, state: docState } = action.payload;
+      return {
+        ...state,
+        documents: {
+          ...state.documents,
+          [documentId]: docState,
+        },
+        // Set as active if no active document
+        activeDocumentId: state.activeDocumentId ?? documentId,
+      };
+    }
+
+    case CLEANUP_REDACTION_STATE: {
+      const documentId = action.payload;
+      const { [documentId]: removed, ...remainingDocs } = state.documents;
+      return {
+        ...state,
+        documents: remainingDocs,
+        activeDocumentId: state.activeDocumentId === documentId ? null : state.activeDocumentId,
+      };
+    }
+
+    case SET_ACTIVE_DOCUMENT: {
+      return {
+        ...state,
+        activeDocumentId: action.payload,
+      };
+    }
+
     case ADD_PENDING: {
-      const next = { ...state.pending };
-      for (const item of action.payload) {
-        next[item.page] = (next[item.page] ?? []).concat(item);
+      const { documentId, items } = action.payload;
+      const docState = state.documents[documentId];
+      if (!docState) return state;
+
+      const next = { ...docState.pending };
+      for (const item of items) {
+        const existing = next[item.page] ?? [];
+        // Skip if item with same ID already exists
+        if (existing.some((it) => it.id === item.id)) continue;
+        next[item.page] = existing.concat(item);
       }
-      return { ...state, pending: next, pendingCount: calculatePendingCount(next) };
+
+      return {
+        ...state,
+        documents: {
+          ...state.documents,
+          [documentId]: {
+            ...docState,
+            pending: next,
+            pendingCount: calculatePendingCount(next),
+          },
+        },
+      };
     }
 
     case REMOVE_PENDING: {
-      const { page, id } = action.payload;
-      const list = state.pending[page] ?? [];
+      const { documentId, page, id } = action.payload;
+      const docState = state.documents[documentId];
+      if (!docState) return state;
+
+      const list = docState.pending[page] ?? [];
       const filtered = list.filter((it) => it.id !== id);
-      const next = { ...state.pending, [page]: filtered };
+      const next = { ...docState.pending, [page]: filtered };
 
       // if the removed one was selected → clear selection
       const stillSelected =
-        state.selected && !(state.selected.page === page && state.selected.id === id);
+        docState.selected && !(docState.selected.page === page && docState.selected.id === id);
 
       return {
         ...state,
-        pending: next,
-        pendingCount: calculatePendingCount(next),
-        selected: stillSelected ? state.selected : null,
+        documents: {
+          ...state.documents,
+          [documentId]: {
+            ...docState,
+            pending: next,
+            pendingCount: calculatePendingCount(next),
+            selected: stillSelected ? docState.selected : null,
+          },
+        },
       };
     }
 
-    case CLEAR_PENDING:
-      return { ...state, pending: {}, pendingCount: 0, selected: null };
+    case UPDATE_PENDING: {
+      const { documentId, page, id, patch } = action.payload;
+      const docState = state.documents[documentId];
+      if (!docState) return state;
 
-    case SELECT_PENDING:
-      return { ...state, selected: { page: action.payload.page, id: action.payload.id } };
+      const list = docState.pending[page] ?? [];
+      const updated = list.map((item) => (item.id === id ? { ...item, ...patch } : item));
 
-    case DESELECT_PENDING:
-      return { ...state, selected: null };
-
-    case START_REDACTION:
-      return { ...state, isRedacting: true, activeType: action.payload };
-    case END_REDACTION:
       return {
         ...state,
-        pending: {},
-        pendingCount: 0,
-        selected: null,
-        isRedacting: false,
-        activeType: null,
+        documents: {
+          ...state.documents,
+          [documentId]: {
+            ...docState,
+            pending: { ...docState.pending, [page]: updated },
+          },
+        },
       };
-    case SET_ACTIVE_TYPE:
-      return { ...state, activeType: action.payload };
+    }
+
+    case CLEAR_PENDING: {
+      const documentId = action.payload;
+      const docState = state.documents[documentId];
+      if (!docState) return state;
+
+      return {
+        ...state,
+        documents: {
+          ...state.documents,
+          [documentId]: {
+            ...docState,
+            pending: {},
+            pendingCount: 0,
+            selected: null,
+          },
+        },
+      };
+    }
+
+    case SELECT_PENDING: {
+      const { documentId, page, id } = action.payload;
+      const docState = state.documents[documentId];
+      if (!docState) return state;
+
+      return {
+        ...state,
+        documents: {
+          ...state.documents,
+          [documentId]: {
+            ...docState,
+            selected: { page, id },
+          },
+        },
+      };
+    }
+
+    case DESELECT_PENDING: {
+      const documentId = action.payload;
+      const docState = state.documents[documentId];
+      if (!docState) return state;
+
+      return {
+        ...state,
+        documents: {
+          ...state.documents,
+          [documentId]: {
+            ...docState,
+            selected: null,
+          },
+        },
+      };
+    }
+
+    case START_REDACTION: {
+      const { documentId, mode } = action.payload;
+      const docState = state.documents[documentId];
+      if (!docState) return state;
+
+      return {
+        ...state,
+        documents: {
+          ...state.documents,
+          [documentId]: {
+            ...docState,
+            isRedacting: true,
+            activeType: mode,
+          },
+        },
+      };
+    }
+
+    case END_REDACTION: {
+      const documentId = action.payload;
+      const docState = state.documents[documentId];
+      if (!docState) return state;
+
+      return {
+        ...state,
+        documents: {
+          ...state.documents,
+          [documentId]: {
+            ...docState,
+            isRedacting: false,
+            activeType: null,
+          },
+        },
+      };
+    }
+
+    case SET_ACTIVE_TYPE: {
+      const { documentId, mode } = action.payload;
+      const docState = state.documents[documentId];
+      if (!docState) return state;
+
+      return {
+        ...state,
+        documents: {
+          ...state.documents,
+          [documentId]: {
+            ...docState,
+            activeType: mode,
+          },
+        },
+      };
+    }
+
     default:
       return state;
   }

@@ -1,6 +1,6 @@
 {
   "name": "@embedpdf/plugin-rotate",
-  "version": "1.5.0",
+  "version": "2.4.0",
   "type": "module",
   "license": "MIT",
   "main": "./dist/index.cjs",

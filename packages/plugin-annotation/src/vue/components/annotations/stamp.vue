@@ -12,6 +12,7 @@
     @touchstart="onClick"
   >
     <RenderAnnotation
+      :documentId="documentId"
       :pageIndex="pageIndex"
       :annotation="{ ...annotation.object, id: annotation.object.id }"
       :scaleFactor="scale"
@@ -27,6 +28,7 @@ import RenderAnnotation from '../render-annotation.vue';
 defineProps<{
   isSelected: boolean;
   annotation: TrackedAnnotation<PdfStampAnnoObject>;
+  documentId: string;
   pageIndex: number;
   scale: number;
   onClick: (e: PointerEvent | TouchEvent) => void;

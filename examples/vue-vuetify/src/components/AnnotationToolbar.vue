@@ -2,7 +2,13 @@
 import { computed } from 'vue';
 import { useAnnotation } from '@embedpdf/plugin-annotation/vue';
 
-const { provides, state } = useAnnotation();
+interface AnnotationToolbarProps {
+  documentId: string;
+}
+
+const props = defineProps<AnnotationToolbarProps>();
+
+const { provides, state } = useAnnotation(() => props.documentId);
 
 const activeToolId = computed(() => state.value.activeToolId);
 

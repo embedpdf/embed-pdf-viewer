@@ -1,5 +1,86 @@
 # @embedpdf/plugin-history
 
+## 2.4.0
+
+### Minor Changes
+
+- [#426](https://github.com/embedpdf/embed-pdf-viewer/pull/426) by [@bobsingor](https://github.com/bobsingor) – Added history purging by command metadata:
+  - Added `purgeByMetadata()` method to remove history entries matching a predicate on command metadata
+  - Added generic `metadata` field to `Command` interface for attaching identifiable data to commands
+  - Enables permanent operations (like redaction commits) to clean up related undo/redo history
+
+## 2.3.0
+
+## 2.2.0
+
+## 2.1.2
+
+## 2.1.1
+
+## 2.1.0
+
+## 2.0.2
+
+## 2.0.1
+
+## 2.0.0
+
+### Major Changes
+
+- [#279](https://github.com/embedpdf/embed-pdf-viewer/pull/279) by [@bobsingor](https://github.com/bobsingor) – ## Multi-Document Support
+
+  The history plugin now supports per-document history state.
+
+  ### Breaking Changes
+  - **Actions**:
+    - Replaced `SET_HISTORY_STATE` with `SET_HISTORY_DOCUMENT_STATE` that requires `documentId`
+    - Added document lifecycle actions: `INIT_HISTORY_STATE` and `CLEANUP_HISTORY_STATE`
+  - **State Structure**: Plugin state now uses `documents: Record<string, HistoryDocumentState>` to track per-document history state.
+  - **Action Creators**:
+    - `setHistoryState(documentId, state)` - Now requires document ID
+    - Added `initHistoryState(documentId)` and `cleanupHistoryState(documentId)`
+
+  ### Framework-Specific Changes (React/Preact, Svelte, Vue)
+  - **Hooks**:
+    - Added Svelte hooks support (`@embedpdf/plugin-history/svelte`)
+    - All hooks work with document-scoped capabilities
+
+  ### New Features
+  - Per-document history state tracking
+  - Document lifecycle management with automatic state initialization and cleanup
+
+## 2.0.0-next.3
+
+## 2.0.0-next.2
+
+## 2.0.0-next.1
+
+## 2.0.0-next.0
+
+### Major Changes
+
+- [#279](https://github.com/embedpdf/embed-pdf-viewer/pull/279) by [@bobsingor](https://github.com/bobsingor) – ## Multi-Document Support
+
+  The history plugin now supports per-document history state.
+
+  ### Breaking Changes
+  - **Actions**:
+    - Replaced `SET_HISTORY_STATE` with `SET_HISTORY_DOCUMENT_STATE` that requires `documentId`
+    - Added document lifecycle actions: `INIT_HISTORY_STATE` and `CLEANUP_HISTORY_STATE`
+  - **State Structure**: Plugin state now uses `documents: Record<string, HistoryDocumentState>` to track per-document history state.
+  - **Action Creators**:
+    - `setHistoryState(documentId, state)` - Now requires document ID
+    - Added `initHistoryState(documentId)` and `cleanupHistoryState(documentId)`
+
+  ### Framework-Specific Changes (React/Preact, Svelte, Vue)
+  - **Hooks**:
+    - Added Svelte hooks support (`@embedpdf/plugin-history/svelte`)
+    - All hooks work with document-scoped capabilities
+
+  ### New Features
+  - Per-document history state tracking
+  - Document lifecycle management with automatic state initialization and cleanup
+
 ## 1.5.0
 
 ## 1.4.1

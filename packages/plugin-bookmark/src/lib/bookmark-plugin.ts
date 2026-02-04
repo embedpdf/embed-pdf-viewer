@@ -1,7 +1,7 @@
 import { BasePlugin, PluginRegistry } from '@embedpdf/core';
 import { PdfBookmarkObject, PdfEngine, PdfErrorReason, Task } from '@embedpdf/models';
 
-import { BookmarkCapability, BookmarkPluginConfig } from './types';
+import { BookmarkCapability, BookmarkPluginConfig, BookmarkScope } from './types';
 
 export class BookmarkPlugin extends BasePlugin<BookmarkPluginConfig, BookmarkCapability> {
   static readonly id = 'bookmark' as const;
@@ -12,16 +12,44 @@ export class BookmarkPlugin extends BasePlugin<BookmarkPluginConfig, BookmarkCap
 
   async initialize(_: BookmarkPluginConfig): Promise<void> {}
 
+  // ─────────────────────────────────────────────────────────
+  // Capability
+  // ─────────────────────────────────────────────────────────
+
   protected buildCapability(): BookmarkCapability {
     return {
-      getBookmarks: this.getBookmarks.bind(this),
+      // Active document operations
+      getBookmarks: () => this.getBookmarks(),
+
+      // Document-scoped operations
+      forDocument: (documentId: string) => this.createBookmarkScope(documentId),
     };
   }
 
-  private getBookmarks(): Task<{ bookmarks: PdfBookmarkObject[] }, PdfErrorReason> {
-    const doc = this.coreState.core.document;
-    if (!doc) throw new Error('Document not open');
+  // ─────────────────────────────────────────────────────────
+  // Document Scoping
+  // ─────────────────────────────────────────────────────────
 
-    return this.engine.getBookmarks(doc);
+  private createBookmarkScope(documentId: string): BookmarkScope {
+    return {
+      getBookmarks: () => this.getBookmarks(documentId),
+    };
+  }
+
+  // ─────────────────────────────────────────────────────────
+  // Core Operations
+  // ─────────────────────────────────────────────────────────
+
+  private getBookmarks(
+    documentId?: string,
+  ): Task<{ bookmarks: PdfBookmarkObject[] }, PdfErrorReason> {
+    const id = documentId ?? this.getActiveDocumentId();
+    const coreDoc = this.coreState.core.documents[id];
+
+    if (!coreDoc?.document) {
+      throw new Error(`Document ${id} not loaded`);
+    }
+
+    return this.engine.getBookmarks(coreDoc.document);
   }
 }

@@ -5,14 +5,19 @@
   import { untrack } from 'svelte';
 
   interface TileImgProps {
+    documentId: string;
     pageIndex: number;
     tile: Tile;
     dpr: number;
     scale: number;
   }
 
-  let { pageIndex, tile, dpr, scale }: TileImgProps = $props();
+  let { documentId, pageIndex, tile, dpr, scale }: TileImgProps = $props();
   const tilingCapability = useTilingCapability();
+
+  // Derived scoped capability for the specific document
+  const scope = $derived(tilingCapability.provides?.forDocument(documentId) ?? null);
+
   let url = $state<string>('');
   // urlRef is NOT reactive - similar to React's useRef
   let urlRef: string | null = null;
@@ -44,16 +49,16 @@
     // Check if we already have a URL for this tile (already rendered)
     if (urlRef) return;
 
-    if (!tilingCapability) return;
+    if (!scope) return;
 
     // Clone to avoid reactive proxies that Web Workers cannot clone
     const plainTile = untrack(() => createPlainTile(tile));
-    const task = tilingCapability.provides?.renderTile({
+    const task = scope.renderTile({
       pageIndex: _pageIndex,
       tile: plainTile,
       dpr,
     });
-    task?.wait((blob) => {
+    task.wait((blob) => {
       const objectUrl = URL.createObjectURL(blob);
       urlRef = objectUrl;
       url = objectUrl;
@@ -64,7 +69,7 @@
         URL.revokeObjectURL(urlRef);
         urlRef = null;
       } else {
-        task?.abort({
+        task.abort({
           code: PdfErrorCode.Cancelled,
           message: 'canceled render task',
         });

@@ -4,7 +4,7 @@ import { fileURLToPath } from 'url';
 import sharp from 'sharp';
 
 import { init } from '@embedpdf/pdfium';
-import { PdfiumEngine } from '@embedpdf/engines/pdfium';
+import { PdfiumNative, PdfEngine } from '@embedpdf/engines/pdfium';
 import { createNodeImageDataToBufferConverter } from '@embedpdf/engines/converters';
 import { ConsoleLogger, Rotation } from '@embedpdf/models';
 
@@ -12,17 +12,23 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 
 async function runExample() {
-  const consoleLogger = new ConsoleLogger();
+  const logger = new ConsoleLogger();
 
+  // Create the image converter using sharp
   const imageConverter = createNodeImageDataToBufferConverter(sharp);
 
-  // Initialize PDFium
-  const pdfiumInstance = await init();
-  const engine = new PdfiumEngine(pdfiumInstance, {
-    logger: consoleLogger,
-    imageDataConverter: imageConverter,
+  // Initialize PDFium WASM module
+  const pdfiumModule = await init();
+
+  // Create the native executor (low-level PDFium wrapper)
+  const native = new PdfiumNative(pdfiumModule, { logger });
+
+  // Create the orchestrator (high-level API with priority scheduling)
+  // PdfiumNative initializes PDFium in its constructor, no separate init needed
+  const engine = new PdfEngine(native, {
+    imageConverter,
+    logger,
   });
-  engine.initialize();
 
   const pdfPath = process.argv[2] || join(__dirname, 'sample.pdf');
   const pdfBuffer = await readFile(pdfPath);

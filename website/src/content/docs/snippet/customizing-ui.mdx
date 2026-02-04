@@ -1,0 +1,404 @@
+# Customizing the UI
+
+The EmbedPDF snippet provides a powerful, declarative way to customize the user interface. You can add custom buttons, modify toolbars, create menus, and register custom icons—all at runtime after the viewer initializes.
+
+## Core Concepts
+
+The UI system is built on three pillars:
+
+1. **Commands** - Define *what* happens (the logic)
+2. **Icons** - Define *how* it looks (the visuals)  
+3. **Schema** - Define *where* it appears (the layout)
+
+## Disabling Features
+
+You can easily disable entire groups of features using the `disabledCategories` configuration option. This removes the associated toolbar buttons, menu items, and commands.
+
+```javascript
+const viewer = EmbedPDF.init({
+  // ...
+  disabledCategories: ['annotation', 'print']
+});
+```
+
+### Interactive Example
+
+Toggle the checkboxes below to see how categories are disabled in real-time:
+
+import DisableCategoriesExample from './code-examples/disable-categories-example';
+import { ExampleWrapper } from '@/components/example-wrapper';
+
+<CodeExample
+  codePaths={[
+    "content/docs/snippet/code-examples/disable-categories-example.tsx"
+  ]}
+>
+  <ExampleWrapper>
+    <DisableCategoriesExample />
+  </ExampleWrapper>
+</CodeExample>
+
+### Available Categories
+
+Categories are hierarchical—disabling a parent category (e.g., `annotation`) disables all its children.
+
+| Group | Categories |
+| :--- | :--- |
+| **Zoom** | `zoom`, `zoom-in`, `zoom-out`, `zoom-fit-page`, `zoom-fit-width`, `zoom-marquee`, `zoom-level` |
+| **Annotation** | `annotation`, `annotation-markup`, `annotation-highlight`, `annotation-underline`, `annotation-strikeout`, `annotation-squiggly`, `annotation-ink`, `annotation-text`, `annotation-stamp` |
+| **Shapes** | `annotation-shape`, `annotation-rectangle`, `annotation-circle`, `annotation-line`, `annotation-arrow`, `annotation-polygon`, `annotation-polyline` |
+| **Redaction** | `redaction`, `redaction-area`, `redaction-text`, `redaction-apply`, `redaction-clear` |
+| **Document** | `document`, `document-open`, `document-close`, `document-print`, `document-capture`, `document-export`, `document-fullscreen` |
+| **Page** | `page`, `spread`, `rotate`, `scroll`, `navigation` |
+| **Panel** | `panel`, `panel-sidebar`, `panel-search`, `panel-comment` |
+| **Tools** | `tools`, `pan`, `pointer`, `capture` |
+| **Selection** | `selection`, `selection-copy` |
+| **History** | `history`, `history-undo`, `history-redo` |
+
+## Quick Start: Replacing a Toolbar Button
+
+Here's how to replace an existing button with your own:
+
+```javascript
+const viewer = EmbedPDF.init({
+  type: 'container',
+  target: document.getElementById('pdf-viewer'),
+  src: 'https://snippet.embedpdf.com/ebook.pdf'
+});
+
+// Wait for the viewer to be ready
+const registry = await viewer.registry;
+
+// 1. Get the plugins
+const commands = registry.getPlugin('commands').provides();
+const ui = registry.getPlugin('ui').provides();
+
+// 2. Register a stroke-based icon (like Tabler icons)
+viewer.registerIcon('smiley', {
+  viewBox: '0 0 24 24',
+  paths: [
+    { d: 'M3 12a9 9 0 1 0 18 0a9 9 0 1 0 -18 0', stroke: 'currentColor', fill: 'none' },
+    { d: 'M9 10l.01 0', stroke: 'currentColor', fill: 'none' },
+    { d: 'M15 10l.01 0', stroke: 'currentColor', fill: 'none' },
+    { d: 'M9.5 15a3.5 3.5 0 0 0 5 0', stroke: 'currentColor', fill: 'none' }
+  ]
+});
+
+// 3. Register a custom command
+commands.registerCommand({
+  id: 'custom.hello',
+  label: 'Say Hello',
+  icon: 'smiley',
+  action: () => alert('Hello from EmbedPDF!')
+});
+
+// 4. Replace a button in the toolbar
+const schema = ui.getSchema();
+const toolbar = schema.toolbars['main-toolbar'];
+
+// Find and modify the right-group items
+const items = JSON.parse(JSON.stringify(toolbar.items));
+const rightGroup = items.find(item => item.id === 'right-group');
+
+if (rightGroup) {
+  // Replace the comment button with our smiley button
+  const idx = rightGroup.items.findIndex(item => item.id === 'comment-button');
+  if (idx !== -1) {
+    rightGroup.items[idx] = {
+      type: 'command-button',
+      id: 'smiley-button',
+      commandId: 'custom.hello',
+      variant: 'icon'
+    };
+  }
+}
+
+ui.mergeSchema({
+  toolbars: { 'main-toolbar': { ...toolbar, items } }
+});
+```
+
+### Interactive Example
+
+In this example, the comment button is **replaced** with a smiley 😊, and a star ⭐ is **added** to the document menu. Click them to see feedback:
+
+import UICustomizationExample from './code-examples/ui-customization-example';
+
+<CodeExample 
+  codePaths={[
+    "content/docs/snippet/code-examples/ui-customization-example.tsx"
+  ]}
+>
+  <ExampleWrapper>
+    <UICustomizationExample />
+  </ExampleWrapper>
+</CodeExample>
+
+## Command Structure
+
+A command defines the behavior of a button or menu item:
+
+```javascript
+commands.registerCommand({
+  // Required
+  id: 'custom.my-action',           // Unique identifier
+  action: ({ registry, state, documentId }) => {
+    // Your logic here
+  },
+
+  // Display (at least one recommended)
+  label: 'My Action',               // Button text
+  labelKey: 'commands.myAction',    // i18n key (if using translations)
+  icon: 'myIcon',                   // Icon ID
+
+  // Optional behavior
+  disabled: ({ state }) => !state.core.activeDocumentId,  // Dynamic disabled state
+  active: ({ state }) => state.myPlugin.isActive,         // Toggle/active state
+  visible: true,                    // Show/hide
+  shortcuts: ['Ctrl+Shift+M'],      // Keyboard shortcut
+  categories: ['annotation'],       // For category-based filtering
+});
+```
+
+## Icon Registration
+
+Icons can be registered during initialization or at runtime. The system supports both **fill-based** and **stroke-based** icons.
+
+### Fill-Based Icons (simple)
+
+For icons with a single filled path:
+
+```javascript
+viewer.registerIcon('myIcon', {
+  viewBox: '0 0 24 24',
+  path: 'M12 17.27L18.18 21l-1.64-7.03L22 9.24l-7.19-.61L12 2...'
+});
+```
+
+### Stroke-Based Icons (like Tabler, Lucide, Feather)
+
+For outline-style icons, use the `paths` array with stroke properties:
+
+```javascript
+viewer.registerIcon('smiley', {
+  viewBox: '0 0 24 24',
+  paths: [
+    { d: 'M3 12a9 9 0 1 0 18 0a9 9 0 1 0 -18 0', stroke: 'currentColor', fill: 'none' },
+    { d: 'M9 10l.01 0', stroke: 'currentColor', fill: 'none' },
+    { d: 'M15 10l.01 0', stroke: 'currentColor', fill: 'none' },
+    { d: 'M9.5 15a3.5 3.5 0 0 0 5 0', stroke: 'currentColor', fill: 'none' }
+  ]
+});
+```
+
+### Register During Initialization
+
+```javascript
+const viewer = EmbedPDF.init({
+  // ...
+  icons: {
+    star: {
+      viewBox: '0 0 24 24',
+      paths: [
+        { d: 'M12 17.75l-6.172 3.245l1.179 -6.873l-5 -4.867l6.9 -1l3.086 -6.253l3.086 6.253l6.9 1l-5 4.867l1.179 6.873z', stroke: 'currentColor', fill: 'none' }
+      ]
+    }
+  }
+});
+```
+
+### Register Multiple at Runtime
+
+```javascript
+viewer.registerIcons({
+  icon1: { viewBox: '0 0 24 24', path: '...' },
+  icon2: { viewBox: '0 0 24 24', paths: [{ d: '...', stroke: 'currentColor', fill: 'none' }] }
+});
+```
+
+## UI Schema Structure
+
+The schema defines how UI elements are laid out:
+
+### Toolbar Items
+
+```javascript
+ui.mergeSchema({
+  toolbars: {
+    'main-toolbar': {
+      id: 'main-toolbar',
+      position: { placement: 'top', slot: 'main', order: 0 },
+      permanent: true,
+      items: [
+        // Command button
+        {
+          type: 'command-button',
+          id: 'my-button',
+          commandId: 'custom.my-action',
+          variant: 'icon'  // 'icon', 'text', or 'icon-text'
+        },
+
+        // Divider
+        {
+          type: 'divider',
+          id: 'my-divider',
+          orientation: 'vertical'
+        },
+
+        // Group (for alignment)
+        {
+          type: 'group',
+          id: 'my-group',
+          alignment: 'end',  // 'start', 'center', 'end'
+          gap: 2,
+          items: [/* nested items */]
+        },
+
+        // Spacer (flexible space)
+        {
+          type: 'spacer',
+          id: 'my-spacer',
+          flex: true
+        }
+      ]
+    }
+  }
+});
+```
+
+### Menu Items
+
+```javascript
+ui.mergeSchema({
+  menus: {
+    'document-menu': {
+      id: 'document-menu',
+      items: [
+        // Command item
+        {
+          type: 'command',
+          id: 'my-menu-item',
+          commandId: 'custom.my-action'
+        },
+
+        // Divider
+        {
+          type: 'divider',
+          id: 'menu-divider'
+        },
+
+        // Submenu
+        {
+          type: 'submenu',
+          id: 'my-submenu',
+          label: 'More Options',
+          icon: 'chevronRight',
+          menuId: 'my-submenu-menu'  // References another menu
+        },
+
+        // Section (grouped items with header)
+        {
+          type: 'section',
+          id: 'my-section',
+          label: 'View Options',
+          items: [/* section items */]
+        }
+      ]
+    }
+  }
+});
+```
+
+## Adding a Custom Menu
+
+To add a completely new dropdown menu:
+
+```javascript
+// 1. Register the toggle command
+commands.registerCommand({
+  id: 'custom.toggle-my-menu',
+  icon: 'menu',
+  label: 'My Menu',
+  action: ({ registry, documentId }) => {
+    const ui = registry.getPlugin('ui').provides();
+    ui.forDocument(documentId).toggleMenu(
+      'my-custom-menu',        // Menu ID
+      'custom.toggle-my-menu', // Command ID (for tracking)
+      'my-menu-button'         // Button ID (for positioning)
+    );
+  }
+});
+
+// 2. Define the menu in schema
+ui.mergeSchema({
+  menus: {
+    'my-custom-menu': {
+      id: 'my-custom-menu',
+      items: [
+        { type: 'command', id: 'action-1', commandId: 'custom.action1' },
+        { type: 'divider', id: 'div-1' },
+        { type: 'command', id: 'action-2', commandId: 'custom.action2' }
+      ]
+    }
+  },
+  toolbars: {
+    'main-toolbar': {
+      // ... add the menu button
+      items: [
+        {
+          type: 'command-button',
+          id: 'my-menu-button',
+          commandId: 'custom.toggle-my-menu',
+          variant: 'icon'
+        }
+      ]
+    }
+  }
+});
+```
+
+## Accessing Plugin State
+
+Commands can read from the global state to make dynamic decisions:
+
+```javascript
+commands.registerCommand({
+  id: 'zoom.custom-fit',
+  label: 'Custom Fit',
+  icon: 'zoomFit',
+  
+  // Disable if no document is open
+  disabled: ({ state }) => !state.core.activeDocumentId,
+  
+  // Show as active when zoom is at 100%
+  active: ({ state, documentId }) => {
+    const zoomState = state.zoom?.documents?.[documentId];
+    return zoomState?.zoomLevel === 1;
+  },
+  
+  action: ({ registry, documentId }) => {
+    const zoom = registry.getPlugin('zoom').provides();
+    zoom.forDocument(documentId).setZoom(1); // 100%
+  }
+});
+```
+
+## Best Practices
+
+1. **Use unique IDs**: Prefix custom command IDs with `custom.` to avoid conflicts
+2. **Register icons first**: Ensure icons are registered before the UI renders
+3. **Use categories**: Group related commands for easier management
+4. **Prefer labelKey**: Use i18n keys for translatable labels
+
+```javascript
+// Good: Organized and translatable
+commands.registerCommand({
+  id: 'custom.company.feature',
+  labelKey: 'commands.myFeature',
+  icon: 'customFeature',
+  categories: ['custom', 'editing'],
+  action: () => { /* ... */ }
+});
+```
+
+

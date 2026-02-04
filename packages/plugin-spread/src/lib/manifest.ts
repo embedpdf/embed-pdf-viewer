@@ -8,9 +8,7 @@ export const manifest: PluginManifest<SpreadPluginConfig> = {
   name: 'Spread Plugin',
   version: '1.0.0',
   provides: ['spread'],
-  requires: ['loader'],
-  optional: [],
-  defaultConfig: {
-    enabled: true,
-  },
+  requires: [],
+  optional: ['viewport'],
+  defaultConfig: {},
 };

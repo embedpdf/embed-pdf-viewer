@@ -1,43 +1,44 @@
 import { Rect } from '@embedpdf/models';
-import { onMounted, onUnmounted, ref, watch } from 'vue';
-
+import { onBeforeUnmount, ref, watch, toValue, type MaybeRefOrGetter } from 'vue';
 import { useViewportPlugin } from './use-viewport';
 
-export function useViewportRef() {
+/**
+ * Hook to get a ref for the viewport container element with automatic setup/teardown
+ * @param documentId Document ID (can be ref, computed, getter, or plain value).
+ */
+export function useViewportRef(documentId: MaybeRefOrGetter<string>) {
   const { plugin: pluginRef } = useViewportPlugin();
   const containerRef = ref<HTMLDivElement | null>(null);
 
+  let cleanup: (() => void) | null = null;
+
   // Setup function that runs when both plugin and container are available
-  const setupViewport = () => {
+  const setupViewport = (docId: string) => {
     const viewportPlugin = pluginRef.value;
     const container = containerRef.value;
 
     if (!container || !viewportPlugin) return;
 
-    let cleanedUp = false;
-    /* ---------- live rect provider --------------------------------- */
-    const provideRect = (): Rect => {
-      const r = container.getBoundingClientRect();
-      return {
-        origin: { x: r.left, y: r.top },
-        size: { width: r.width, height: r.height },
-      };
-    };
-    viewportPlugin.registerBoundingRectProvider(provideRect);
+    // Register this viewport for the document
+    try {
+      viewportPlugin.registerViewport(docId);
+    } catch (error) {
+      console.error(`Failed to register viewport for document ${docId}:`, error);
+      return;
+    }
 
-    // Example: On scroll, call setMetrics
+    // On scroll
     const onScroll = () => {
-      viewportPlugin.setViewportScrollMetrics({
+      viewportPlugin.setViewportScrollMetrics(docId, {
         scrollTop: container.scrollTop,
         scrollLeft: container.scrollLeft,
       });
     };
     container.addEventListener('scroll', onScroll);
 
-    // Example: On resize, call setMetrics
+    // On resize
     const resizeObserver = new ResizeObserver(() => {
-      if (cleanedUp) return;
-      viewportPlugin.setViewportResizeMetrics({
+      viewportPlugin.setViewportResizeMetrics(docId, {
         width: container.offsetWidth,
         height: container.offsetHeight,
         clientWidth: container.clientWidth,
@@ -46,11 +47,15 @@ export function useViewportRef() {
         scrollLeft: container.scrollLeft,
         scrollWidth: container.scrollWidth,
         scrollHeight: container.scrollHeight,
+        clientLeft: container.clientLeft,
+        clientTop: container.clientTop,
       });
     });
     resizeObserver.observe(container);
 
+    // Subscribe to scroll requests for this document
     const unsubscribeScrollRequest = viewportPlugin.onScrollRequest(
+      docId,
       ({ x, y, behavior = 'auto' }) => {
         requestAnimationFrame(() => {
           container.scrollTo({ left: x, top: y, behavior });
@@ -60,54 +65,34 @@ export function useViewportRef() {
 
     // Return cleanup function
     return () => {
-      cleanedUp = true;
-      resizeObserver.disconnect();
-      viewportPlugin.registerBoundingRectProvider(null);
+      viewportPlugin.unregisterViewport(docId);
       container.removeEventListener('scroll', onScroll);
       unsubscribeScrollRequest();
     };
   };
 
-  let cleanup: (() => void) | null = null;
-
-  // Watch for changes in the plugin - this is the Vue equivalent of React's dependency array
+  // Watch for changes in plugin, container, or documentId
   watch(
-    pluginRef,
-    () => {
-      // Clean up previous setup if it exists
+    [pluginRef, containerRef, () => toValue(documentId)],
+    ([, , docId]) => {
+      // Clean up previous setup
       if (cleanup) {
         cleanup();
         cleanup = null;
       }
 
-      // Setup new viewport if plugin is available
-      cleanup = setupViewport() || null;
-    },
-    { immediate: true }, // Run immediately if plugin is already available
-  );
-
-  // Also watch for container changes (though this is less likely to change)
-  watch(
-    containerRef,
-    () => {
-      // Clean up previous setup if it exists
-      if (cleanup) {
-        cleanup();
-        cleanup = null;
-      }
-
-      // Setup new viewport if both plugin and container are available
-      cleanup = setupViewport() || null;
+      // Setup new viewport
+      cleanup = setupViewport(docId) || null;
     },
     { immediate: true },
   );
 
-  onUnmounted(() => {
+  onBeforeUnmount(() => {
     if (cleanup) {
       cleanup();
+      cleanup = null;
     }
   });
 
-  // Return the ref so your Vue code can attach it to a div
   return containerRef;
 }

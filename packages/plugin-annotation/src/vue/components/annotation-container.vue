@@ -1,9 +1,13 @@
 <template>
-  <div data-no-interaction>
-    <div v-bind="{ ...dragProps, ...doubleProps }" :style="containerStyle">
+  <div data-no-interaction :style="{ display: 'contents' }">
+    <div
+      v-bind="{ ...(effectiveIsDraggable && isSelected ? dragProps : {}), ...doubleProps }"
+      :style="mergedContainerStyle"
+    >
       <slot :annotation="currentObject"></slot>
 
-      <template v-if="isSelected && isResizable">
+      <!-- Resize handles - only when single-selected -->
+      <template v-if="isSelected && effectiveIsResizable">
         <template v-for="{ key, style, ...handle } in resize" :key="key">
           <slot
             v-if="slots['resize-handle']"
@@ -17,7 +21,12 @@
         </template>
       </template>
 
-      <template v-if="isSelected && vertices.length > 0">
+      <!-- Vertex handles - only when single-selected -->
+      <template
+        v-if="
+          isSelected && permissions.canModifyAnnotations && !isMultiSelected && vertices.length > 0
+        "
+      >
         <template v-for="{ key, style, ...vertex } in vertices" :key="key">
           <slot
             v-if="slots['vertex-handle']"
@@ -32,61 +41,77 @@
       </template>
     </div>
 
-    <CounterRotate
-      :rect="{
-        origin: {
-          x: currentObject.rect.origin.x * scale,
-          y: currentObject.rect.origin.y * scale,
-        },
-        size: {
-          width: currentObject.rect.size.width * scale,
-          height: currentObject.rect.size.height * scale,
-        },
-      }"
-      :rotation="rotation"
-    >
+    <!-- Selection Menu: Supports BOTH render function and slot - hide when multi-selected -->
+    <CounterRotate v-if="shouldShowMenu" :rect="menuRect" :rotation="rotation">
       <template #default="{ rect, menuWrapperProps }">
+        <!-- Priority 1: Render function prop (schema-driven) -->
+        <component v-if="selectionMenu" :is="renderSelectionMenu(rect, menuWrapperProps)" />
+
+        <!-- Priority 2: Slot (manual customization) -->
         <slot
+          v-else
           name="selection-menu"
-          :annotation="trackedAnnotation"
+          :context="menuContext"
           :selected="isSelected"
           :rect="rect"
-          :menu-wrapper-props="menuWrapperProps"
+          :placement="menuPlacement"
+          :menuWrapperProps="menuWrapperProps"
         />
       </template>
     </CounterRotate>
   </div>
 </template>
 
+<script lang="ts">
+// Disable attribute inheritance so style doesn't fall through to root element
+export default {
+  inheritAttrs: false,
+};
+</script>
+
 <script setup lang="ts" generic="T extends PdfAnnotationObject">
-import { ref, computed, watch, useSlots, toRaw, shallowRef } from 'vue';
-import { PdfAnnotationObject } from '@embedpdf/models';
-import { CounterRotate, useDoublePressProps, useInteractionHandles } from '@embedpdf/utils/vue';
+import { ref, computed, watchEffect, useSlots, toRaw, shallowRef, VNode } from 'vue';
+import { PdfAnnotationObject, Rect } from '@embedpdf/models';
+import {
+  CounterRotate,
+  MenuWrapperProps,
+  SelectionMenuPlacement,
+  useDoublePressProps,
+  useInteractionHandles,
+} from '@embedpdf/utils/vue';
 import { TrackedAnnotation } from '@embedpdf/plugin-annotation';
+import { useDocumentPermissions } from '@embedpdf/core/vue';
 import { VertexConfig } from '../../shared/types';
-import { useAnnotationCapability } from '../hooks';
+import { useAnnotationCapability, useAnnotationPlugin } from '../hooks';
+import { AnnotationSelectionContext, AnnotationSelectionMenuRenderFn } from '../types';
 
 const props = withDefaults(
   defineProps<{
     scale: number;
+    documentId: string;
     pageIndex: number;
     rotation: number;
     pageWidth: number;
     pageHeight: number;
     trackedAnnotation: TrackedAnnotation<T>;
     isSelected: boolean;
+    /** Whether multiple annotations are selected (container becomes passive) */
+    isMultiSelected?: boolean;
     isDraggable: boolean;
     isResizable: boolean;
     lockAspectRatio?: boolean;
     vertexConfig?: VertexConfig<T>;
+    selectionMenu?: AnnotationSelectionMenuRenderFn;
     outlineOffset?: number;
     onDoubleClick?: (event: PointerEvent | MouseEvent) => void;
     onSelect: (event: TouchEvent | MouseEvent) => void;
     zIndex?: number;
     selectionOutlineColor?: string;
+    style?: Record<string, string | number>;
   }>(),
   {
     lockAspectRatio: false,
+    isMultiSelected: false,
     outlineOffset: 1,
     zIndex: 1,
     selectionOutlineColor: '#007ACC',
@@ -99,12 +124,89 @@ const HANDLE_SIZE = 12;
 const VERTEX_SIZE = 12;
 
 const preview = shallowRef<Partial<T>>(toRaw(props.trackedAnnotation.object));
-const { provides: annotationProvides } = useAnnotationCapability();
+const { provides: annotationCapability } = useAnnotationCapability();
+const { plugin: annotationPlugin } = useAnnotationPlugin();
+const permissions = useDocumentPermissions(props.documentId);
 const gestureBaseRef = ref<T | null>(null);
+const gestureBaseRectRef = shallowRef<Rect | null>(null);
+
+// When multi-selected, disable individual drag/resize - GroupSelectionBox handles it
+const effectiveIsDraggable = computed(
+  () => permissions.value.canModifyAnnotations && props.isDraggable && !props.isMultiSelected,
+);
+const effectiveIsResizable = computed(
+  () => permissions.value.canModifyAnnotations && props.isResizable && !props.isMultiSelected,
+);
+
+// Wrap onDoubleClick to respect permissions - check at call time
+const guardedOnDoubleClick = props.onDoubleClick
+  ? (e: PointerEvent | MouseEvent) => {
+      if (permissions.value.canModifyAnnotations) {
+        props.onDoubleClick?.(e);
+      }
+    }
+  : undefined;
+
+// Get scoped API for this document (similar to React's useMemo)
+const annotationProvides = computed(() =>
+  annotationCapability.value ? annotationCapability.value.forDocument(props.documentId) : null,
+);
 
 const currentObject = computed<T>(
   () => ({ ...toRaw(props.trackedAnnotation.object), ...toRaw(preview.value) }) as T,
 );
+
+// Determine if we should show the outline
+// When multi-selected, don't show individual outlines - GroupSelectionBox shows the group outline
+const showOutline = computed(() => props.isSelected && !props.isMultiSelected);
+
+// --- Selection Menu Logic ---
+
+// Check if we should show any menu at all - hide when multi-selected
+const shouldShowMenu = computed(() => {
+  return (
+    props.isSelected && !props.isMultiSelected && (props.selectionMenu || slots['selection-menu'])
+  );
+});
+
+// Computed rect for menu positioning
+const menuRect = computed<Rect>(() => ({
+  origin: {
+    x: currentObject.value.rect.origin.x * props.scale,
+    y: currentObject.value.rect.origin.y * props.scale,
+  },
+  size: {
+    width: currentObject.value.rect.size.width * props.scale,
+    height: currentObject.value.rect.size.height * props.scale,
+  },
+}));
+
+// Build the context object for selection menu
+const menuContext = computed<AnnotationSelectionContext>(() => ({
+  type: 'annotation',
+  annotation: props.trackedAnnotation,
+  pageIndex: props.pageIndex,
+}));
+
+// Placement hints
+const menuPlacement = computed<SelectionMenuPlacement>(() => ({
+  suggestTop: false, // Could calculate based on position in viewport
+  spaceAbove: 0,
+  spaceBelow: 0,
+}));
+
+// Render via function (for schema-driven approach)
+const renderSelectionMenu = (rect: Rect, menuWrapperProps: MenuWrapperProps): VNode | null => {
+  if (!props.selectionMenu) return null;
+
+  return props.selectionMenu({
+    rect,
+    menuWrapperProps,
+    selected: props.isSelected,
+    placement: menuPlacement.value,
+    context: menuContext.value,
+  });
+};
 
 const elementSnapshot = computed(() => {
   const obj = toRaw(currentObject.value);
@@ -120,8 +222,8 @@ const constraintsSnapshot = computed(() => ({
   minWidth: 10,
   minHeight: 10,
   boundingBox: {
-    width: props.pageWidth / props.scale,
-    height: props.pageHeight / props.scale,
+    width: props.pageWidth,
+    height: props.pageHeight,
   },
 }));
 
@@ -133,37 +235,70 @@ const { dragProps, vertices, resize } = useInteractionHandles({
     maintainAspectRatio: computed(() => props.lockAspectRatio),
     pageRotation: computed(() => props.rotation),
     scale: computed(() => props.scale),
-    enabled: computed(() => props.isSelected),
+    // Disable interaction handles when multi-selected
+    enabled: computed(() => props.isSelected && !props.isMultiSelected),
     onUpdate: (event) => {
-      if (!event.transformData?.type) return;
+      if (!event.transformData?.type || props.isMultiSelected) return;
 
+      const plugin = annotationPlugin.value;
+      if (!plugin) return;
+
+      const { type, changes, metadata } = event.transformData;
+      const id = props.trackedAnnotation.object.id;
+      const pageSize = { width: props.pageWidth, height: props.pageHeight };
+
+      // Gesture start - initialize plugin drag/resize
       if (event.state === 'start') {
-        gestureBaseRef.value = currentObject.value;
+        gestureBaseRectRef.value = props.trackedAnnotation.object.rect;
+        gestureBaseRef.value = currentObject.value; // For vertex edit
+
+        if (type === 'move') {
+          plugin.startDrag(props.documentId, { annotationIds: [id], pageSize });
+        } else if (type === 'resize') {
+          plugin.startResize(props.documentId, {
+            annotationIds: [id],
+            pageSize,
+            resizeHandle: metadata?.handle ?? 'se',
+          });
+        }
       }
 
-      const base = gestureBaseRef.value ?? currentObject.value;
-
-      const changes = event.transformData.changes.vertices
-        ? props.vertexConfig?.transformAnnotation(toRaw(base), event.transformData.changes.vertices)
-        : { rect: event.transformData.changes.rect };
-
-      const patched = annotationProvides.value?.transformAnnotation<T>(base, {
-        type: event.transformData.type,
-        changes: changes as Partial<T>,
-        metadata: event.transformData.metadata,
-      });
-
-      if (patched) {
-        preview.value = { ...toRaw(preview.value), ...patched };
+      // Gesture update - call plugin, preview comes from subscription
+      if (changes.rect && gestureBaseRectRef.value) {
+        if (type === 'move') {
+          const delta = {
+            x: changes.rect.origin.x - gestureBaseRectRef.value.origin.x,
+            y: changes.rect.origin.y - gestureBaseRectRef.value.origin.y,
+          };
+          plugin.updateDrag(props.documentId, delta);
+        } else if (type === 'resize') {
+          plugin.updateResize(props.documentId, changes.rect);
+        }
       }
 
-      if (event.state === 'end' && patched) {
+      // Vertex edit - handle directly (no attached link handling needed)
+      if (type === 'vertex-edit' && changes.vertices && props.vertexConfig) {
+        const base = gestureBaseRef.value ?? currentObject.value;
+        const vertexChanges = props.vertexConfig.transformAnnotation(toRaw(base), changes.vertices);
+        const patched = annotationCapability.value?.transformAnnotation<T>(base, {
+          type,
+          changes: vertexChanges as Partial<T>,
+          metadata,
+        });
+        if (patched) {
+          preview.value = { ...toRaw(preview.value), ...patched };
+          if (event.state === 'end') {
+            annotationProvides.value?.updateAnnotation(props.pageIndex, id, patched);
+          }
+        }
+      }
+
+      // Gesture end - commit
+      if (event.state === 'end') {
+        gestureBaseRectRef.value = null;
         gestureBaseRef.value = null;
-        annotationProvides.value?.updateAnnotation(
-          props.pageIndex,
-          props.trackedAnnotation.object.id,
-          patched,
-        );
+        if (type === 'move') plugin.commitDrag(props.documentId);
+        else if (type === 'resize') plugin.commitResize(props.documentId);
       }
     },
   },
@@ -181,15 +316,41 @@ const { dragProps, vertices, resize } = useInteractionHandles({
   includeVertices: !!props.vertexConfig,
 });
 
-const doubleProps = useDoublePressProps(props.onDoubleClick);
+const doubleProps = useDoublePressProps(guardedOnDoubleClick);
 
-watch(
-  () => props.trackedAnnotation.object,
-  (newObject) => {
-    preview.value = newObject;
-  },
-  { deep: true },
-);
+// Sync preview with tracked annotation when it changes
+watchEffect(() => {
+  if (props.trackedAnnotation.object) {
+    preview.value = props.trackedAnnotation.object;
+  }
+});
+
+// Subscribe to unified drag/resize changes - plugin sends pre-computed patches!
+// ALL preview updates come through here (primary, attached links, multi-select)
+watchEffect((onCleanup) => {
+  const plugin = annotationPlugin.value;
+  if (!plugin) return;
+
+  const id = props.trackedAnnotation.object.id;
+
+  const handleEvent = (event: {
+    documentId: string;
+    type: string;
+    previewPatches?: Record<string, any>;
+  }) => {
+    if (event.documentId !== props.documentId) return;
+    const patch = event.previewPatches?.[id];
+    if (event.type === 'update' && patch) {
+      preview.value = { ...toRaw(preview.value), ...patch } as T;
+    } else if (event.type === 'cancel') {
+      preview.value = props.trackedAnnotation.object;
+    }
+  };
+
+  const unsubs = [plugin.onDragChange(handleEvent), plugin.onResizeChange(handleEvent)];
+
+  onCleanup(() => unsubs.forEach((u) => u()));
+});
 
 const containerStyle = computed(() => ({
   position: 'absolute' as 'absolute',
@@ -197,12 +358,18 @@ const containerStyle = computed(() => ({
   top: `${currentObject.value.rect.origin.y * props.scale}px`,
   width: `${currentObject.value.rect.size.width * props.scale}px`,
   height: `${currentObject.value.rect.size.height * props.scale}px`,
-  outline: props.isSelected ? `1px solid ${props.selectionOutlineColor}` : 'none',
-  outlineOffset: props.isSelected ? `${props.outlineOffset}px` : '0px',
-  pointerEvents: props.isSelected ? 'auto' : ('none' as 'auto' | 'none'),
+  outline: showOutline.value ? `1px solid ${props.selectionOutlineColor}` : 'none',
+  outlineOffset: showOutline.value ? `${props.outlineOffset}px` : '0px',
+  pointerEvents: props.isSelected && !props.isMultiSelected ? 'auto' : ('none' as 'auto' | 'none'),
   touchAction: 'none',
-  cursor: props.isSelected && props.isDraggable ? 'move' : 'default',
+  cursor: props.isSelected && effectiveIsDraggable.value ? 'move' : 'default',
   zIndex: props.zIndex,
+}));
+
+// Merge container style with passed style prop (for mixBlendMode, etc.)
+const mergedContainerStyle = computed(() => ({
+  ...containerStyle.value,
+  ...(props.style ?? {}),
 }));
 
 // Add useSlots to access slot information

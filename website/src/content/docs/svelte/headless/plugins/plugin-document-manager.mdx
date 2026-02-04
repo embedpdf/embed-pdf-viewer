@@ -1,0 +1,278 @@
+---
+title: Document Manager Plugin
+description: Manage PDF documents, open files from URLs or local files, track document state, and control which document is active. Required for all PDF viewers.
+searchable: true
+---
+
+import { Callout } from '@/components/callout'
+
+# Document Manager Plugin
+
+The Document Manager Plugin is responsible for managing PDF documents in your viewer. It handles opening documents from URLs or local files, tracking document state (loading, loaded, error), and controlling which document is currently active.
+
+This plugin is required for any PDF viewer, whether you're displaying a single document or multiple documents. It provides the foundation for document lifecycle management and enables features like tab interfaces for multi-document applications.
+
+## Installation
+
+The plugin is available as a separate NPM package.
+
+```sh npm2yarn
+npm install @embedpdf/plugin-document-manager
+````
+
+## Registration
+
+Import `DocumentManagerPluginPackage` and add it to the `plugins` array. You can configure initial documents to load automatically when the plugin initializes.
+
+```typescript {4, 7-16}
+import { createPluginRegistration } from '@embedpdf/core'
+import { EmbedPDF } from '@embedpdf/core/svelte'
+// ... other imports
+import { DocumentManagerPluginPackage } from '@embedpdf/plugin-document-manager/svelte'
+
+const plugins = [
+  // Register the document manager plugin first
+  createPluginRegistration(DocumentManagerPluginPackage, {
+    // Optional: Load documents automatically on initialization
+    initialDocuments: [
+      { url: 'https://example.com/document1.pdf' },
+      { url: 'https://example.com/document2.pdf' },
+    ],
+    // Optional: Limit the maximum number of open documents
+    maxDocuments: 10,
+  }),
+  // ... other plugins like Viewport, Scroll, Render, etc.
+  createPluginRegistration(ViewportPluginPackage),
+  createPluginRegistration(ScrollPluginPackage),
+  createPluginRegistration(RenderPluginPackage),
+]
+```
+
+## Usage
+
+### 1. Rendering the Active Document
+
+Because the viewer can hold multiple documents in memory (e.g., in background tabs), you need a way to render *only* the currently active one.
+
+The `<DocumentContent />` component handles this logic for you. It takes a `documentId` and provides a snippet with the document's status (`isLoading`, `isError`, `isLoaded`).
+
+```svelte
+<script lang="ts">
+import { DocumentContent } from '@embedpdf/plugin-document-manager/svelte';
+</script>
+
+<EmbedPDF engine={pdfEngine.engine} {plugins}>
+  {#snippet children({ activeDocumentId })}
+    {#if !activeDocumentId}
+      <div>No document selected</div>
+    {:else}
+      <DocumentContent documentId={activeDocumentId}>
+        {#snippet children(documentContent)}
+          {#if documentContent.isLoading}
+            <LoadingSpinner />
+          {:else if documentContent.isError}
+            <ErrorMessage />
+          {:else if documentContent.isLoaded}
+            <!-- Only render the heavy viewer components when loaded -->
+            <Viewport {documentId}>
+              <!-- ... Scroller, etc ... -->
+            </Viewport>
+          {/if}
+        {/snippet}
+      </DocumentContent>
+    {/if}
+  {/snippet}
+</EmbedPDF>
+```
+
+### 2. Opening Files
+
+The plugin provides methods to open files from URLs or the user's file system. Use the `useDocumentManagerCapability` store to access these actions.
+
+```svelte
+<script lang="ts">
+import { useDocumentManagerCapability } from '@embedpdf/plugin-document-manager/svelte';
+
+const docManager = useDocumentManagerCapability();
+
+const handleOpenFile = async () => {
+  // Opens the native system file picker
+  // The plugin handles reading the buffer and creating the document
+  await docManager.provides?.openFileDialog();
+};
+
+const handleOpenUrl = () => {
+  docManager.provides?.openDocumentUrl({ 
+    url: 'https://example.com/report.pdf',
+    password: 'optional-password' 
+  });
+};
+</script>
+
+<button onclick={handleOpenFile}>Open File</button>
+```
+
+### 3. Building a Tab Bar
+
+To build a multi-document interface, you need to know which documents are open and which one is active. The `useOpenDocuments` and `useActiveDocument` stores provide this reactive state.
+
+```svelte
+<script lang="ts">
+import { 
+  useOpenDocuments, 
+  useActiveDocument, 
+  useDocumentManagerCapability 
+} from '@embedpdf/plugin-document-manager/svelte';
+
+const documents = useOpenDocuments(); // Reactive object with .current array
+const activeDoc = useActiveDocument();
+const docManager = useDocumentManagerCapability();
+
+const handleTabClick = (docId: string) => {
+  docManager.provides?.setActiveDocument(docId);
+};
+
+const handleClose = (e: Event, docId: string) => {
+  e.stopPropagation();
+  docManager.provides?.closeDocument(docId);
+};
+</script>
+
+<div class="tabs">
+  {#each documents.current as doc (doc.id)}
+    <div
+      class:active={doc.id === activeDoc.current?.activeDocumentId}
+      onclick={() => handleTabClick(doc.id)}
+    >
+      {doc.name}
+      <button onclick={(e) => handleClose(e, doc.id)}>x</button>
+    </div>
+  {/each}
+</div>
+```
+
+## Live Examples
+
+### Multi-Document Viewer with Tabs
+
+This example demonstrates a complete PDF viewer with a tab bar for managing multiple documents. You can open multiple PDFs, switch between them using tabs, and close documents.
+
+import { DocumentManagerExample } from '../../code-examples/headless/document-manager-example'
+
+<CodeExample 
+  codePaths={[
+    "../../examples/svelte-tailwind/src/examples/headless/document-manager-example.svelte",
+    "../../examples/svelte-tailwind/src/examples/headless/document-manager-example-content.svelte"
+  ]}
+>
+  <DocumentManagerExample />
+</CodeExample>
+
+## Security & Permissions
+
+You can secure your documents by setting permission overrides (e.g., to disable printing or copying) when loading them.
+
+For a comprehensive guide on handling PDF security and permissions, see the **[Security & Permissions](../security)** documentation.
+
+## API Reference
+
+### Configuration (`DocumentManagerPluginConfig`)
+
+You can pass these options when registering the plugin with `createPluginRegistration`:
+
+| Option | Type | Description |
+| :--- | :--- | :--- |
+| **`initialDocuments`** | `InitialDocumentOptions[]` | An array of documents to load automatically when the plugin initializes. Each item can be either `{ url: string, documentId?: string, ... }` or `{ buffer: ArrayBuffer, name: string, documentId?: string, ... }`. |
+| **`maxDocuments`** | `number` | The maximum number of documents that can be open simultaneously. If not specified, there is no limit. |
+
+### Store: `useDocumentManagerCapability()`
+
+This store provides access to all document management operations.
+
+#### Returns
+
+| Property | Type | Description |
+| :--- | :--- | :--- |
+| **`provides`** | `DocumentManagerCapability \| null` | An object with methods to manage documents, or `null` if the plugin is not ready. |
+
+#### `DocumentManagerCapability` Methods
+
+| Method | Description |
+| :--- | :--- |
+| **`openDocumentUrl(options)`** | Opens a document from a URL. Returns a `Task<OpenDocumentResponse, PdfErrorReason>`. |
+| **`openDocumentBuffer(options)`** | Opens a document from an `ArrayBuffer`. Returns a `Task<OpenDocumentResponse, PdfErrorReason>`. |
+| **`openFileDialog(options?)`** | Opens the browser's native file picker. Returns a `Task<OpenDocumentResponse, PdfErrorReason>`. |
+| **`closeDocument(documentId)`** | Closes a specific document. Returns a `Task<void, PdfErrorReason>`. |
+| **`closeAllDocuments()`** | Closes all open documents. Returns a `Task<void[], PdfErrorReason>`. |
+| **`setActiveDocument(documentId)`** | Sets the active document. Throws an error if the document is not open. |
+| **`getActiveDocumentId()`** | Returns the ID of the currently active document, or `null` if none. |
+| **`getActiveDocument()`** | Returns the `PdfDocumentObject` of the active document, or `null` if none. |
+| **`getDocumentOrder()`** | Returns an array of document IDs in their current tab order. |
+| **`moveDocument(documentId, toIndex)`** | Moves a document to a specific position in the tab order. |
+| **`swapDocuments(documentId1, documentId2)`** | Swaps the positions of two documents in the tab order. |
+| **`getDocument(documentId)`** | Returns the `PdfDocumentObject` for a specific document, or `null` if not found. |
+| **`getDocumentState(documentId)`** | Returns the `DocumentState` for a specific document, or `null` if not found. |
+| **`getOpenDocuments()`** | Returns an array of all open `DocumentState` objects in tab order. |
+| **`isDocumentOpen(documentId)`** | Returns `true` if the document is currently open. |
+| **`getDocumentCount()`** | Returns the number of currently open documents. |
+| **`getDocumentIndex(documentId)`** | Returns the index of a document in the tab order, or `-1` if not found. |
+| **`retryDocument(documentId, options?)`** | Retries loading a document that failed to load (e.g., with a new password). Returns a `Task<OpenDocumentResponse, PdfErrorReason>`. |
+
+### Store: `useActiveDocument()`
+
+A convenience store for accessing the active document.
+
+#### Returns
+
+| Property | Type | Description |
+| :--- | :--- | :--- |
+| **`current`** | `{ activeDocumentId: string \| null, activeDocument: DocumentState \| null }` | Access via `.current` property. |
+
+#### `current` Properties
+
+| Property | Type | Description |
+| :--- | :--- | :--- |
+| **`activeDocumentId`** | `string \| null` | The ID of the currently active document. |
+| **`activeDocument`** | `DocumentState \| null` | The state of the currently active document. |
+
+### Store: `useOpenDocuments(documentIds?)`
+
+A store for accessing all open documents.
+
+#### Returns
+
+| Property | Type | Description |
+| :--- | :--- | :--- |
+| **`current`** | `DocumentState[]` | An array of all open documents in tab order. Access via `.current` property. If `documentIds` is provided, returns only those documents in the specified order. |
+
+### Component: `<DocumentContent />`
+
+A headless component that provides loading, error, and loaded states for a specific document.
+
+#### Props
+
+| Prop | Type | Description |
+| :--- | :--- | :--- |
+| **`documentId`** | `string \| null` | **(Required)** The ID of the document to render content for. |
+
+#### Snippet Props
+
+| Property | Type | Description |
+| :--- | :--- | :--- |
+| **`documentState`** | `DocumentState` | The full state object for the document. |
+| **`isLoading`** | `boolean` | `true` if the document is currently loading. |
+| **`isError`** | `boolean` | `true` if the document failed to load. |
+| **`isLoaded`** | `boolean` | `true` if the document has loaded successfully. |
+
+### Events
+
+The plugin emits events that you can subscribe to for reacting to document lifecycle changes:
+
+| Event | Type | Description |
+| :--- | :--- | :--- |
+| **`onDocumentOpened`** | `EventHook<DocumentState>` | Emitted when a document is successfully loaded. |
+| **`onDocumentClosed`** | `EventHook<string>` | Emitted when a document is closed. The payload is the document ID. |
+| **`onActiveDocumentChanged`** | `EventHook<DocumentChangeEvent>` | Emitted when the active document changes. |
+| **`onDocumentOrderChanged`** | `EventHook<DocumentOrderChangeEvent>` | Emitted when documents are reordered. |
+| **`onDocumentError`** | `EventHook<DocumentErrorEvent>` | Emitted when a document fails to load. |
+

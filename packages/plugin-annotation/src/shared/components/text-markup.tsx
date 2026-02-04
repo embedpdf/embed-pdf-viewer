@@ -10,11 +10,12 @@ import { Underline } from './text-markup/underline';
 import { Strikeout } from './text-markup/strikeout';
 
 interface TextMarkupProps {
+  documentId: string;
   pageIndex: number;
   scale: number;
 }
 
-export function TextMarkup({ pageIndex, scale }: TextMarkupProps) {
+export function TextMarkup({ documentId, pageIndex, scale }: TextMarkupProps) {
   const { provides: selectionProvides } = useSelectionCapability();
   const { provides: annotationProvides } = useAnnotationCapability();
   const [rects, setRects] = useState<Array<Rect>>([]);
@@ -24,19 +25,22 @@ export function TextMarkup({ pageIndex, scale }: TextMarkupProps) {
   useEffect(() => {
     if (!selectionProvides) return;
 
-    const off = selectionProvides.onSelectionChange(() => {
-      setRects(selectionProvides.getHighlightRectsForPage(pageIndex));
-      setBoundingRect(selectionProvides.getBoundingRectForPage(pageIndex));
+    return selectionProvides.forDocument(documentId).onSelectionChange(() => {
+      setRects(selectionProvides.forDocument(documentId).getHighlightRectsForPage(pageIndex));
+      setBoundingRect(selectionProvides.forDocument(documentId).getBoundingRectForPage(pageIndex));
     });
-    return off;
-  }, [selectionProvides, pageIndex]);
+  }, [selectionProvides, documentId, pageIndex]);
 
   useEffect(() => {
     if (!annotationProvides) return;
 
-    const off = annotationProvides.onActiveToolChange(setActiveTool);
-    return off;
-  }, [annotationProvides]);
+    // Initialize with current active tool
+    setActiveTool(annotationProvides.forDocument(documentId).getActiveTool());
+
+    return annotationProvides
+      .forDocument(documentId)
+      .onActiveToolChange((event) => setActiveTool(event));
+  }, [annotationProvides, documentId]);
 
   if (!boundingRect) return null;
   if (!activeTool || !activeTool.defaults) return null;
@@ -53,7 +57,7 @@ export function TextMarkup({ pageIndex, scale }: TextMarkupProps) {
           }}
         >
           <Underline
-            color={activeTool.defaults?.color}
+            strokeColor={activeTool.defaults?.strokeColor}
             opacity={activeTool.defaults?.opacity}
             segmentRects={rects}
             scale={scale}
@@ -71,7 +75,7 @@ export function TextMarkup({ pageIndex, scale }: TextMarkupProps) {
           }}
         >
           <Highlight
-            color={activeTool.defaults?.color}
+            strokeColor={activeTool.defaults?.strokeColor}
             opacity={activeTool.defaults?.opacity}
             segmentRects={rects}
             scale={scale}
@@ -89,7 +93,7 @@ export function TextMarkup({ pageIndex, scale }: TextMarkupProps) {
           }}
         >
           <Strikeout
-            color={activeTool.defaults?.color}
+            strokeColor={activeTool.defaults?.strokeColor}
             opacity={activeTool.defaults?.opacity}
             segmentRects={rects}
             scale={scale}
@@ -107,7 +111,7 @@ export function TextMarkup({ pageIndex, scale }: TextMarkupProps) {
           }}
         >
           <Squiggly
-            color={activeTool.defaults?.color}
+            strokeColor={activeTool.defaults?.strokeColor}
             opacity={activeTool.defaults?.opacity}
             segmentRects={rects}
             scale={scale}

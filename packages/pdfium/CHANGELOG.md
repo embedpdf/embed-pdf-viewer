@@ -1,5 +1,83 @@
 # @embedpdf/pdfium
 
+## 2.4.0
+
+### Minor Changes
+
+- [#426](https://github.com/embedpdf/embed-pdf-viewer/pull/426) by [@bobsingor](https://github.com/bobsingor) – Added PDFium functions for redaction annotation support:
+  - Added `EPDFAnnot_ApplyRedaction` to apply a single redaction annotation
+  - Added `EPDFAnnot_Flatten` to flatten an annotation's appearance to page content
+  - Added `EPDFPage_ApplyRedactions` to apply all redactions on a page
+  - Added `EPDFAnnot_GetOverlayText` and `EPDFAnnot_SetOverlayText` for overlay text
+  - Added `EPDFAnnot_GetOverlayTextRepeat` and `EPDFAnnot_SetOverlayTextRepeat` for text repeat setting
+
+### Patch Changes
+
+- [#433](https://github.com/embedpdf/embed-pdf-viewer/pull/433) by [@bobsingor](https://github.com/bobsingor) – Reduced WASM binary size from 7.4MB to 4.5MB by removing debug symbols (-g flag) from the build.
+
+  Thanks to @Mikescops for reporting this.
+
+## 2.3.0
+
+### Patch Changes
+
+- [#406](https://github.com/embedpdf/embed-pdf-viewer/pull/406) by [@bobsingor](https://github.com/bobsingor) – Updated PDFium WASM module with new bindings for annotation actions and reply types. Added `EPDFAnnot_SetAction`, `EPDFAnnot_GetReplyType`, and `EPDFAnnot_SetReplyType` functions to support link annotations and annotation grouping.
+
+## 2.2.0
+
+## 2.1.2
+
+### Patch Changes
+
+- [#369](https://github.com/embedpdf/embed-pdf-viewer/pull/369) by [@bobsingor](https://github.com/bobsingor) – Improved PDF content handling with the following changes:
+  - **Shading object support**: Shading patterns (gradients, mesh shadings) are now properly preserved and regenerated when modifying PDF pages. Previously, shading objects could be lost during page content updates.
+  - **Shading redaction**: Redaction now correctly removes shading objects that fall entirely within a redaction area, ensuring complete content removal.
+  - **Graphics state preservation**: Existing graphics state resources (such as soft masks, overprint modes, and other advanced properties) are now preserved with their original names during content regeneration.
+
+## 2.1.1
+
+### Patch Changes
+
+- [`04140d1`](https://github.com/embedpdf/embed-pdf-viewer/commit/04140d1ecf5029d4d23755016fd0d1bfd4141ca6) by [@bobsingor](https://github.com/bobsingor) – Improved PDF editing and redaction capabilities with Form XObject support and enhanced image handling
+
+  **Text Redaction Improvements**
+  - Individual subpath extraction and redaction for complex paths (e.g., vector text in logos)
+  - Instead of removing entire path objects, individual letter glyphs can now be selectively redacted
+  - Fixed image-to-page transform matrix ordering for accurate redaction positioning
+
+  **Enhanced Image Redaction**
+  - Added 1-bit image support with proper ImageMask handling
+  - ImageMask images now correctly use the fill color from the graphics state
+  - Added JPEG SMask (soft mask) decoding for proper transparency handling in WASM
+  - Inline images (BI...ID...EI format) are now converted to XObject images for editing
+  - Improved handling of paletted/indexed images with alpha transparency
+
+  **Form XObject Content Editing**
+  - Added proper support for editing content within Form XObjects (embedded forms in PDFs)
+  - Form XObject streams are now edited in-place rather than attempting to add/remove separate content streams
+  - Added `GetMutableFormStream()` API to CPDF_PageObjectHolder for direct Form XObject access
+
+  **Pattern Color Support**
+  - Added Pattern resource tracking in page content generation
+  - Pattern colors are now properly preserved and emitted during content regeneration
+  - Added fill/stroke pattern resource name tracking in color state
+
+## 2.1.0
+
+## 2.0.2
+
+## 2.0.1
+
+## 2.0.0
+
+## 2.0.0-next.3
+
+## 2.0.0-next.2
+
+## 2.0.0-next.1
+
+## 2.0.0-next.0
+
 ## 1.5.0
 
 ## 1.4.1

@@ -1,0 +1,123 @@
+---
+title: Spread Layouts
+description: Display pages individually or in a two-page, book-like spread layout.
+---
+
+import { SpreadExample } from '../../code-examples/viewer/spread-example';
+
+# Spread Layouts
+
+The PDFViewer supports switching between single-page view and two-page "spread" views. This is ideal for reading magazines, books, or any content designed to be viewed side-by-side.
+
+## Configuration
+
+You can configure the initial layout mode using the `spread` config object.
+
+```vue
+<script setup lang="ts">
+import { PDFViewer, SpreadMode } from '@embedpdf/vue-pdf-viewer';
+</script>
+
+<template>
+  <PDFViewer
+    :config="{
+      spread: {
+        defaultSpreadMode: SpreadMode.Odd
+      }
+    }"
+  />
+</template>
+```
+
+### Understanding Spread Modes
+
+| Mode | Description | Page Grouping |
+| :--- | :--- | :--- |
+| `SpreadMode.None` | **Default**. Each page is displayed individually in a vertical list. | `[1], [2], [3], [4]` |
+| `SpreadMode.Odd` | Pages are paired starting from page 1. Good for content where page 1 is the left side of a spread. | `[1, 2], [3, 4]` |
+| `SpreadMode.Even` | The first page is standalone (e.g., a cover), and subsequent pages are paired. | `[1], [2, 3], [4, 5]` |
+
+## Programmatic Control
+
+You can dynamically change the layout mode using the plugin API.
+
+<CodeExample
+  codePaths={[
+    "../../examples/vue-tailwind/src/examples/viewer/spread-example.vue"
+  ]}
+>
+  <SpreadExample />
+</CodeExample>
+
+### Changing the Mode
+
+```vue
+<script setup lang="ts">
+import { ref } from 'vue';
+import { PDFViewer, SpreadMode, type PluginRegistry, type SpreadPlugin } from '@embedpdf/vue-pdf-viewer';
+
+const registry = ref<PluginRegistry | null>(null);
+
+const handleReady = (r: PluginRegistry) => {
+  registry.value = r;
+};
+
+const setBookView = () => {
+  const spreadPlugin = registry.value?.getPlugin<SpreadPlugin>('spread')?.provides();
+  const docSpread = spreadPlugin?.forDocument('my-doc-id');
+  docSpread?.setSpreadMode(SpreadMode.Even);
+};
+
+const setSinglePage = () => {
+  const spreadPlugin = registry.value?.getPlugin<SpreadPlugin>('spread')?.provides();
+  const docSpread = spreadPlugin?.forDocument('my-doc-id');
+  docSpread?.setSpreadMode(SpreadMode.None);
+};
+</script>
+
+<template>
+  <PDFViewer @ready="handleReady" :config="{ src: '/doc.pdf' }" />
+</template>
+```
+
+### Reading Current Mode
+
+```vue
+<script setup lang="ts">
+const getCurrentMode = () => {
+  const spreadPlugin = registry.value?.getPlugin<SpreadPlugin>('spread')?.provides();
+  const docSpread = spreadPlugin?.forDocument('my-doc-id');
+  return docSpread?.getSpreadMode();
+};
+</script>
+```
+
+## Listening for Changes
+
+You can listen for layout changes to keep your external UI in sync.
+
+```vue
+<script setup lang="ts">
+import { PDFViewer, type PluginRegistry } from '@embedpdf/vue-pdf-viewer';
+
+const handleReady = (registry: PluginRegistry) => {
+  const spreadPlugin = registry.getPlugin('spread')?.provides();
+
+  // Subscribe to global spread changes (any document)
+  spreadPlugin?.onSpreadChange(({ documentId, spreadMode }) => {
+    console.log(`Document ${documentId} layout changed to ${spreadMode}`);
+  });
+
+  // Or subscribe to a specific document
+  const docSpread = spreadPlugin?.forDocument('my-doc');
+  docSpread?.onSpreadChange((spreadMode) => {
+    console.log(`My doc is now in ${spreadMode} mode`);
+  });
+};
+</script>
+
+<template>
+  <PDFViewer @ready="handleReady" :config="{ src: '/doc.pdf' }" />
+</template>
+```
+

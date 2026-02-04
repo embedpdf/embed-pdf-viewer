@@ -11,7 +11,6 @@ export const manifest: PluginManifest<ThumbnailPluginConfig> = {
   requires: ['render'],
   optional: ['scroll'],
   defaultConfig: {
-    enabled: true,
     width: 150,
     gap: 10,
     buffer: 3,

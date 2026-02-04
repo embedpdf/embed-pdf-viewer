@@ -1,5 +1,5 @@
-import { BasePluginConfig, Emitter, EventHook } from '@embedpdf/core';
-import { PdfPageObject, Rect, Rotation } from '@embedpdf/models';
+import { BasePluginConfig, EventHook } from '@embedpdf/core';
+import { PdfPageObject, PdfPageObjectWithRotatedSize, Rect, Rotation } from '@embedpdf/models';
 import { ViewportMetrics } from '@embedpdf/plugin-viewport';
 import { VirtualItem } from './types/virtual-item';
 
@@ -12,15 +12,34 @@ export interface PageChangeState {
   startTime: number;
 }
 
-export interface ScrollState extends ScrollMetrics {
+// Per-document scroll state
+export interface ScrollDocumentState {
   virtualItems: VirtualItem[];
   totalPages: number;
+  currentPage: number;
   totalContentSize: { width: number; height: number };
-  desiredScrollPosition: { x: number; y: number };
   strategy: ScrollStrategy;
   pageGap: number;
-  scale: number;
+
+  // Scroll metrics
+  visiblePages: number[];
+  pageVisibilityMetrics: PageVisibilityMetrics[];
+  renderedPageIndexes: number[];
+  scrollOffset: { x: number; y: number };
+  startSpacing: number;
+  endSpacing: number;
   pageChangeState: PageChangeState;
+}
+
+// Plugin state
+export interface ScrollState {
+  // Global defaults (applied to new documents)
+  defaultStrategy: ScrollStrategy;
+  defaultPageGap: number;
+  defaultBufferSize: number;
+
+  // Per-document states
+  documents: Record<string, ScrollDocumentState>;
 }
 
 export interface ScrollerLayout {
@@ -29,7 +48,7 @@ export interface ScrollerLayout {
   totalWidth: number;
   totalHeight: number;
   pageGap: number;
-  strategy: ScrollState['strategy'];
+  strategy: ScrollStrategy;
   items: VirtualItem[];
 }
 
@@ -69,47 +88,89 @@ export interface ScrollMetrics {
   endSpacing: number;
 }
 
-export interface ScrollStrategyInterface {
-  initialize(container: HTMLElement, innerDiv: HTMLElement): void;
-  destroy(): void;
-  updateLayout(viewport: ViewportMetrics, pdfPageObject: PdfPageObject[][]): void;
-  handleScroll(viewport: ViewportMetrics): void;
-  getVirtualItems(): VirtualItem[];
-  scrollToPage(pageNumber: number, behavior?: ScrollBehavior): void;
-  calculateDimensions(pdfPageObject: PdfPageObject[][]): void;
-}
-
 export interface ScrollPluginConfig extends BasePluginConfig {
-  strategy?: ScrollStrategy;
-  initialPage?: number;
-  bufferSize?: number;
-  pageGap?: number;
+  defaultStrategy?: ScrollStrategy;
+  defaultPageGap?: number;
+  defaultBufferSize?: number;
 }
 
-export type LayoutChangePayload = Pick<ScrollState, 'virtualItems' | 'totalContentSize'>;
+export type LayoutChangePayload = Pick<ScrollDocumentState, 'virtualItems' | 'totalContentSize'>;
 
 export interface ScrollToPageOptions {
   pageNumber: number;
   pageCoordinates?: { x: number; y: number };
   behavior?: ScrollBehavior;
-  center?: boolean;
+  /**
+   * Horizontal alignment as a percentage (0-100).
+   * 0 = target at left edge, 50 = centered, 100 = target at right edge.
+   */
+  alignX?: number;
+  /**
+   * Vertical alignment as a percentage (0-100).
+   * 0 = target at top edge, 50 = centered, 100 = target at bottom edge.
+   * Useful for mobile where UI overlays may cover part of the screen (e.g., alignY: 25 for top quarter).
+   */
+  alignY?: number;
 }
 
-export interface PageChangePayload {
+// Events include documentId
+export interface PageChangeEvent {
+  documentId: string;
   pageNumber: number;
   totalPages: number;
 }
 
-export interface ScrollCapability {
-  onStateChange: EventHook<ScrollState>;
-  onScroll: EventHook<ScrollMetrics>;
+export interface ScrollEvent {
+  documentId: string;
+  metrics: ScrollMetrics;
+}
+
+export interface LayoutChangeEvent {
+  documentId: string;
+  layout: LayoutChangePayload;
+}
+
+export interface PageChangeStateEvent {
+  documentId: string;
+  state: PageChangeState;
+}
+
+export interface LayoutReadyEvent {
+  documentId: string;
+  /** True only on the first layout ready after document load, false on subsequent (e.g., tab switches) */
+  isInitial: boolean;
+  pageNumber: number;
+  totalPages: number;
+}
+
+// Scoped scroll capability
+export interface ScrollScope {
   getCurrentPage(): number;
   getTotalPages(): number;
   getPageChangeState(): PageChangeState;
-  onPageChange: EventHook<PageChangePayload>;
+  scrollToPage(options: ScrollToPageOptions): void;
+  scrollToNextPage(behavior?: ScrollBehavior): void;
+  scrollToPreviousPage(behavior?: ScrollBehavior): void;
+  getSpreadPagesWithRotatedSize(): PdfPageObjectWithRotatedSize[][];
+  getMetrics(viewport?: ViewportMetrics): ScrollMetrics;
+  getLayout(): LayoutChangePayload;
+  getRectPositionForPage(
+    page: number,
+    rect: Rect,
+    scale?: number,
+    rotation?: Rotation,
+  ): Rect | null;
+  setScrollStrategy(strategy: ScrollStrategy): void;
+  onPageChange: EventHook<PageChangeEvent>;
+  onScroll: EventHook<ScrollMetrics>;
   onLayoutChange: EventHook<LayoutChangePayload>;
-  onPageChangeState: EventHook<PageChangeState>;
-  onLayoutReady: EventHook<boolean>;
+}
+
+export interface ScrollCapability {
+  // Active document operations (defaults to active document)
+  getCurrentPage(): number;
+  getTotalPages(): number;
+  getPageChangeState(): PageChangeState;
   scrollToPage(options: ScrollToPageOptions): void;
   scrollToNextPage(behavior?: ScrollBehavior): void;
   scrollToPreviousPage(behavior?: ScrollBehavior): void;
@@ -121,7 +182,19 @@ export interface ScrollCapability {
     scale?: number,
     rotation?: Rotation,
   ): Rect | null;
-  setScrollStrategy(strategy: ScrollStrategy): void;
+
+  // Document-scoped operations
+  forDocument(documentId: string): ScrollScope;
+
+  // Global settings
+  setScrollStrategy(strategy: ScrollStrategy, documentId?: string): void;
   getPageGap(): number;
-  getPageChangeState: () => PageChangeState;
+
+  // Events (all include documentId)
+  onPageChange: EventHook<PageChangeEvent>;
+  onScroll: EventHook<ScrollEvent>;
+  onLayoutChange: EventHook<LayoutChangeEvent>;
+  onLayoutReady: EventHook<LayoutReadyEvent>;
+  onPageChangeState: EventHook<PageChangeStateEvent>;
+  onStateChange: EventHook<ScrollDocumentState>;
 }

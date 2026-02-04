@@ -4,11 +4,11 @@
     :style="{
       position: 'absolute',
       pointerEvents: 'none',
-      left: `${rect.origin.x * scale}px`,
-      top: `${rect.origin.y * scale}px`,
-      width: `${rect.size.width * scale}px`,
-      height: `${rect.size.height * scale}px`,
-      border: `1px solid ${stroke}`,
+      left: `${rect.origin.x * actualScale}px`,
+      top: `${rect.origin.y * actualScale}px`,
+      width: `${rect.size.width * actualScale}px`,
+      height: `${rect.size.height * actualScale}px`,
+      border: `1px solid ${strokeColor}`,
       background: fill,
       boxSizing: 'border-box',
     }"
@@ -17,15 +17,18 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, onUnmounted } from 'vue';
+import { ref, watch, computed } from 'vue';
+import { useDocumentState } from '@embedpdf/core/vue';
 import type { Rect } from '@embedpdf/models';
 import { useRedactionPlugin } from '../hooks/use-redaction';
 
 interface MarqueeRedactProps {
+  /** The ID of the document */
+  documentId: string;
   /** Index of the page this layer lives on */
   pageIndex: number;
   /** Scale of the page */
-  scale: number;
+  scale?: number;
   /** Optional CSS class applied to the marquee rectangle */
   className?: string;
   /** Stroke / fill colours (defaults below) */
@@ -39,25 +42,38 @@ const props = withDefaults(defineProps<MarqueeRedactProps>(), {
 });
 
 const { plugin: redactionPlugin } = useRedactionPlugin();
+const documentState = useDocumentState(() => props.documentId);
 const rect = ref<Rect | null>(null);
 
-let unregister: (() => void) | undefined;
+const actualScale = computed(() => {
+  if (props.scale !== undefined) return props.scale;
+  return documentState.value?.scale ?? 1;
+});
 
-onMounted(() => {
-  if (!redactionPlugin.value) return;
+// Get stroke color from plugin (annotation mode uses tool defaults, legacy uses red)
+// Allow prop override for backwards compatibility
+const strokeColor = computed(
+  () => props.stroke ?? redactionPlugin.value?.getPreviewStrokeColor() ?? 'red',
+);
 
-  unregister = redactionPlugin.value.registerMarqueeOnPage({
-    pageIndex: props.pageIndex,
-    scale: props.scale,
-    callback: {
-      onPreview: (newRect) => {
-        rect.value = newRect;
+watch(
+  [redactionPlugin, () => props.documentId, () => props.pageIndex, actualScale],
+  ([plugin, docId, pageIdx, scale], _, onCleanup) => {
+    if (!plugin || !docId) return;
+
+    const unregister = plugin.registerMarqueeOnPage({
+      documentId: docId,
+      pageIndex: pageIdx,
+      scale,
+      callback: {
+        onPreview: (newRect) => {
+          rect.value = newRect;
+        },
       },
-    },
-  });
-});
+    });
 
-onUnmounted(() => {
-  unregister?.();
-});
+    onCleanup(unregister);
+  },
+  { immediate: true },
+);
 </script>

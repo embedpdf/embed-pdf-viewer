@@ -9,12 +9,16 @@
       "@embedpdf/models",
       "@embedpdf/plugin-*",
       "@embedpdf/pdfium",
-      "@embedpdf/utils"
+      "@embedpdf/utils",
+      "@embedpdf/snippet",
+      "@embedpdf/react-pdf-viewer",
+      "@embedpdf/vue-pdf-viewer",
+      "@embedpdf/svelte-pdf-viewer"
     ]
   ],
   "linked": [],
   "access": "public",
   "baseBranch": "main",
   "updateInternalDependencies": "patch",
-  "ignore": ["@embedpdf/website", "@embedpdf/snippet", "@embedpdf/example-*"]
+  "ignore": ["@embedpdf/website", "@embedpdf/example-*"]
 }

@@ -20,6 +20,7 @@ html {
 
 .nextra-code span {
   @apply bg-(--shiki-light-bg) text-(--shiki-light);
+  @apply dark:bg-(--shiki-dark-bg) dark:text-(--shiki-dark);
 }
 
 code.nextra-code {

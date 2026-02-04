@@ -1,21 +1,35 @@
 import { useCapability, usePlugin } from '@embedpdf/core/@framework';
 import { Rotation } from '@embedpdf/models';
-import { RotatePlugin } from '@embedpdf/plugin-rotate';
+import { initialDocumentState, RotatePlugin } from '@embedpdf/plugin-rotate';
 import { useEffect, useState } from '@framework';
 
 export const useRotatePlugin = () => usePlugin<RotatePlugin>(RotatePlugin.id);
 export const useRotateCapability = () => useCapability<RotatePlugin>(RotatePlugin.id);
 
-export const useRotate = () => {
+/**
+ * Hook for rotation state for a specific document
+ * @param documentId Document ID
+ */
+export const useRotate = (documentId: string) => {
   const { provides } = useRotateCapability();
-  const [rotation, setRotation] = useState<Rotation>(0);
+  const [rotation, setRotation] = useState<Rotation>(initialDocumentState.rotation);
 
   useEffect(() => {
-    return provides?.onRotateChange((rotation) => setRotation(rotation));
-  }, [provides]);
+    if (!provides) return;
+
+    const scope = provides.forDocument(documentId);
+
+    // Get initial state
+    setRotation(scope.getRotation());
+
+    // Subscribe to rotation changes
+    return scope.onRotateChange((newRotation) => {
+      setRotation(newRotation);
+    });
+  }, [provides, documentId]);
 
   return {
     rotation,
-    provides,
+    provides: provides?.forDocument(documentId) ?? null,
   };
 };

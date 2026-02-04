@@ -11,7 +11,6 @@ export const manifest: PluginManifest<ExportPluginConfig> = {
   requires: [],
   optional: [],
   defaultConfig: {
-    enabled: true,
     defaultFileName: 'document.pdf',
   },
 };

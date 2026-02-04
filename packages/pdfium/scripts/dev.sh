@@ -5,7 +5,6 @@ set -x   # verbose – remove once everything works smoothly
 ROOT=/workspace
 SRC=$ROOT/packages/pdfium/pdfium-src
 OUT=$SRC/out/wasm
-WORK=/opt/work/pdfium-src
 PDFIUM=$ROOT/packages/pdfium
 
 # make them visible in child shells
@@ -58,13 +57,12 @@ cp -f "$PDFIUM/build/patch/build/toolchain/wasm/BUILD.gn" \
 #fi
 
 ###############################################################################
-# 1) GN gen (container-local) — two-step style you wanted, but with OUT last
+# 1) GN gen — run from source directory (running from elsewhere with --root causes issues)
 ###############################################################################
 (
-  cd "$WORK" && \
-  gn --time --root="$SRC" gen \
-    --args='is_debug=false treat_warnings_as_errors=false pdf_use_skia=false pdf_enable_xfa=false pdf_enable_v8=false is_component_build=false clang_use_chrome_plugins=false pdf_is_standalone=true use_debug_fission=false use_custom_libcxx=false use_sysroot=false pdf_is_complete_lib=true pdf_use_partition_alloc=false is_clang=false symbol_level=0 target_os="wasm" target_cpu="wasm"' \
-    "$OUT"
+  cd "$SRC" && \
+  gn gen out/wasm \
+    --args='is_debug=false treat_warnings_as_errors=false pdf_use_skia=false pdf_enable_xfa=false pdf_enable_v8=false is_component_build=false clang_use_chrome_plugins=false pdf_is_standalone=true use_debug_fission=false use_custom_libcxx=false use_sysroot=false pdf_is_complete_lib=true pdf_use_partition_alloc=false is_clang=false symbol_level=0 target_os="wasm" target_cpu="wasm"'
 )
 
 ###############################################################################

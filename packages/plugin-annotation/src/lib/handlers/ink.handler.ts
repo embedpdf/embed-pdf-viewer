@@ -28,7 +28,7 @@ export const inkHandlerFactory: HandlerFactory<PdfInkAnnoObject> = {
       return {
         ...tool.defaults,
         strokeWidth: tool.defaults.strokeWidth ?? 1,
-        color: tool.defaults.color ?? '#000000',
+        strokeColor: tool.defaults.strokeColor ?? tool.defaults.color ?? '#000000',
         opacity: tool.defaults.opacity ?? 1,
         flags: tool.defaults.flags ?? ['print'],
       };

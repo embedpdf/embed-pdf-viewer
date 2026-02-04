@@ -1,6 +1,11 @@
 <script lang="ts">
   import type { Logger, PdfEngine } from '@embedpdf/models';
-  import { type IPlugin, type PluginBatchRegistrations, PluginRegistry } from '@embedpdf/core';
+  import {
+    type IPlugin,
+    type PluginBatchRegistrations,
+    type PluginRegistryConfig,
+    PluginRegistry,
+  } from '@embedpdf/core';
   import { type Snippet } from 'svelte';
   import AutoMount from './AutoMount.svelte';
   import { pdfContext, type PDFContextState } from '../hooks';
@@ -13,7 +18,11 @@
      */
     engine: PdfEngine;
     /**
-     * The logger to use for the PDF viewer.
+     * Registry configuration including logger, permissions, and defaults.
+     */
+    config?: PluginRegistryConfig;
+    /**
+     * @deprecated Use config.logger instead. Will be removed in next major version.
      */
     logger?: Logger;
     /**
@@ -37,6 +46,7 @@
 
   let {
     engine,
+    config,
     logger,
     onInitialized,
     plugins,
@@ -54,7 +64,12 @@
 
   $effect(() => {
     if (engine || (engine && plugins)) {
-      const reg = new PluginRegistry(engine, { logger });
+      // Merge deprecated logger prop into config (config.logger takes precedence)
+      const finalConfig: PluginRegistryConfig = {
+        ...config,
+        logger: config?.logger ?? logger,
+      };
+      const reg = new PluginRegistry(engine, finalConfig);
       reg.registerPluginBatch(plugins);
 
       const initialize = async () => {
@@ -65,11 +80,38 @@
           return;
         }
 
+        const store = reg.getStore();
+        pdfContext.coreState = store.getState().core;
+
+        const unsubscribe = store.subscribe((action, newState, oldState) => {
+          // Only update if it's a core action and the core state changed
+          if (store.isCoreAction(action) && newState.core !== oldState.core) {
+            pdfContext.coreState = newState.core;
+
+            // Update convenience accessors
+            const activeDocumentId = newState.core.activeDocumentId ?? null;
+            const documents = newState.core.documents ?? {};
+            const documentOrder = newState.core.documentOrder ?? [];
+
+            pdfContext.activeDocumentId = activeDocumentId;
+            pdfContext.activeDocument =
+              activeDocumentId && documents[activeDocumentId] ? documents[activeDocumentId] : null;
+            pdfContext.documents = documents;
+            pdfContext.documentStates = documentOrder
+              .map((docId) => documents[docId])
+              .filter(
+                (doc): doc is import('@embedpdf/core').DocumentState =>
+                  doc !== null && doc !== undefined,
+              );
+          }
+        });
+
         /* always call the *latest* callback */
         await latestInit?.(reg);
 
         // if the registry is destroyed, don't do anything
         if (reg.isDestroyed()) {
+          unsubscribe();
           return;
         }
 
@@ -82,14 +124,28 @@
         // Provide the registry to children via context
         pdfContext.registry = reg;
         pdfContext.isInitializing = false;
+
+        return unsubscribe;
       };
-      initialize().catch(console.error);
+
+      let cleanup: (() => void) | undefined;
+      initialize()
+        .then((unsub) => {
+          cleanup = unsub;
+        })
+        .catch(console.error);
 
       return () => {
+        cleanup?.();
         reg.destroy();
         pdfContext.registry = null;
-        pdfContext.isInitializing = false;
+        pdfContext.coreState = null;
+        pdfContext.isInitializing = true;
         pdfContext.pluginsReady = false;
+        pdfContext.activeDocumentId = null;
+        pdfContext.activeDocument = null;
+        pdfContext.documents = {};
+        pdfContext.documentStates = [];
       };
     }
   });

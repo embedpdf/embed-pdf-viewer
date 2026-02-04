@@ -2,7 +2,8 @@ import { CSSProperties, MouseEvent, TouchEvent } from '@framework';
 import { Rect } from '@embedpdf/models';
 
 type SquigglyProps = {
-  color?: string;
+  /** Stroke/markup color */
+  strokeColor?: string;
   opacity?: number;
   segmentRects: Rect[];
   rect?: Rect;
@@ -12,7 +13,7 @@ type SquigglyProps = {
 };
 
 export function Squiggly({
-  color = '#FFFF00',
+  strokeColor,
   opacity = 0.5,
   segmentRects,
   rect,
@@ -20,12 +21,13 @@ export function Squiggly({
   onClick,
   style,
 }: SquigglyProps) {
+  const resolvedColor = strokeColor ?? '#FFFF00';
   const amplitude = 2 * scale; // wave height
   const period = 6 * scale; // wave length
 
   const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${period}" height="${amplitude * 2}" viewBox="0 0 ${period} ${amplitude * 2}">
       <path d="M0 ${amplitude} Q ${period / 4} 0 ${period / 2} ${amplitude} T ${period} ${amplitude}"
-            fill="none" stroke="${color}" stroke-width="${amplitude}" stroke-linecap="round"/>
+            fill="none" stroke="${resolvedColor}" stroke-width="${amplitude}" stroke-linecap="round"/>
     </svg>`;
 
   // Completely escape the SVG markup

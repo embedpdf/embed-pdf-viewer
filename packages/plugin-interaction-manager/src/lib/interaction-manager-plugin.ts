@@ -1,4 +1,10 @@
-import { BasePlugin, createBehaviorEmitter, createEmitter, PluginRegistry } from '@embedpdf/core';
+import {
+  BasePlugin,
+  createBehaviorEmitter,
+  createEmitter,
+  Listener,
+  PluginRegistry,
+} from '@embedpdf/core';
 
 import {
   InteractionExclusionRules,
@@ -11,11 +17,18 @@ import {
   PointerEventHandlersWithLifecycle,
   RegisterAlwaysOptions,
   RegisterHandlersOptions,
+  ModeChangeEvent,
+  CursorChangeEvent,
+  StateChangeEvent,
+  InteractionDocumentState,
+  InteractionManagerScope,
 } from './types';
 import {
   activateMode,
   addExclusionAttribute,
   addExclusionClass,
+  cleanupInteractionState,
+  initInteractionState,
   pauseInteraction,
   removeExclusionAttribute,
   removeExclusionClass,
@@ -23,6 +36,7 @@ import {
   setCursor,
   setDefaultMode,
   setExclusionRules,
+  InteractionManagerAction,
 } from './actions';
 import { mergeHandlers } from './helper';
 
@@ -35,9 +49,9 @@ type HandlerSet = Set<PointerEventHandlersWithLifecycle>;
 type PageHandlerMap = Map<number /*pageIdx*/, HandlerSet>;
 
 interface ModeBuckets {
-  /** handlers that listen on the global wrapper (only once per viewer) */
+  /** handlers that listen on the global wrapper */
   global: HandlerSet;
-  /** handlers that listen on a *specific* page wrapper */
+  /** handlers that listen on a specific page wrapper */
   page: PageHandlerMap;
 }
 
@@ -46,25 +60,34 @@ const INITIAL_MODE = 'pointerMode';
 export class InteractionManagerPlugin extends BasePlugin<
   InteractionManagerPluginConfig,
   InteractionManagerCapability,
-  InteractionManagerState
+  InteractionManagerState,
+  InteractionManagerAction
 > {
   static readonly id = 'interaction-manager' as const;
 
+  // Global mode definitions (shared across documents)
   private modes = new Map<string, InteractionMode>();
-  private cursorClaims = new Map<string, CursorClaim>();
-  private buckets = new Map<string, ModeBuckets>();
 
-  private alwaysGlobal = new Set<PointerEventHandlersWithLifecycle>();
-  private alwaysPage = new Map<number, Set<PointerEventHandlersWithLifecycle>>();
+  // Per-document cursor claims: documentId -> token -> claim
+  private cursorClaims = new Map<string, Map<string, CursorClaim>>();
 
-  private readonly onModeChange$ = createEmitter<InteractionManagerState>();
+  // Per-document handler buckets: documentId -> modeId -> buckets
+  private buckets = new Map<string, Map<string, ModeBuckets>>();
+
+  // Per-document always-active handlers
+  private alwaysGlobal = new Map<string, Set<PointerEventHandlersWithLifecycle>>();
+  private alwaysPage = new Map<string, Map<number, Set<PointerEventHandlersWithLifecycle>>>();
+
+  // Event emitters
+  private readonly onModeChange$ = createEmitter<ModeChangeEvent>();
   private readonly onHandlerChange$ = createEmitter<InteractionManagerState>();
-  private readonly onCursorChange$ = createEmitter<string>();
-  private readonly onStateChange$ = createBehaviorEmitter<InteractionManagerState>();
+  private readonly onCursorChange$ = createEmitter<CursorChangeEvent>();
+  private readonly onStateChange$ = createBehaviorEmitter<StateChangeEvent>();
 
   constructor(id: string, registry: PluginRegistry, config: InteractionManagerPluginConfig) {
     super(id, registry);
 
+    // Register default mode globally
     this.registerMode({
       id: INITIAL_MODE,
       scope: 'page',
@@ -72,38 +95,92 @@ export class InteractionManagerPlugin extends BasePlugin<
       cursor: 'auto',
     });
 
-    this.setDefaultMode(INITIAL_MODE);
-    this.activate(INITIAL_MODE);
+    this.dispatch(setDefaultMode(INITIAL_MODE));
     if (config.exclusionRules) {
       this.dispatch(setExclusionRules(config.exclusionRules));
     }
   }
 
-  async initialize(_: InteractionManagerPluginConfig): Promise<void> {}
+  // ─────────────────────────────────────────────────────────
+  // Document Lifecycle Hooks (from BasePlugin)
+  // ─────────────────────────────────────────────────────────
+
+  protected override onDocumentLoadingStarted(documentId: string): void {
+    // Initialize interaction state for this document
+    const docState: InteractionDocumentState = {
+      activeMode: this.state.defaultMode,
+      cursor: 'auto',
+      paused: false,
+    };
+
+    this.dispatch(initInteractionState(documentId, docState));
+
+    // Initialize per-document data structures
+    this.cursorClaims.set(documentId, new Map());
+    this.buckets.set(documentId, new Map());
+    this.alwaysGlobal.set(documentId, new Set());
+    this.alwaysPage.set(documentId, new Map());
+
+    // Initialize buckets for all registered modes
+    const docBuckets = this.buckets.get(documentId)!;
+    for (const modeId of this.modes.keys()) {
+      docBuckets.set(modeId, { global: new Set(), page: new Map() });
+    }
+
+    this.logger.debug(
+      'InteractionManagerPlugin',
+      'DocumentOpened',
+      `Initialized interaction state for document: ${documentId}`,
+    );
+  }
+
+  protected override onDocumentClosed(documentId: string): void {
+    // Cleanup per-document data structures
+    this.cursorClaims.delete(documentId);
+    this.buckets.delete(documentId);
+    this.alwaysGlobal.delete(documentId);
+    this.alwaysPage.delete(documentId);
+
+    // Cleanup state
+    this.dispatch(cleanupInteractionState(documentId));
+
+    this.logger.debug(
+      'InteractionManagerPlugin',
+      'DocumentClosed',
+      `Cleaned up interaction state for document: ${documentId}`,
+    );
+  }
+
+  // ─────────────────────────────────────────────────────────
+  // Capability
+  // ─────────────────────────────────────────────────────────
 
   protected buildCapability(): InteractionManagerCapability {
     return {
-      activate: (modeId: string) => this.activate(modeId),
-      onModeChange: this.onModeChange$.on,
-      onCursorChange: this.onCursorChange$.on,
-      onHandlerChange: this.onHandlerChange$.on,
-      onStateChange: this.onStateChange$.on,
-      getActiveMode: () => this.state.activeMode,
+      // Active document operations
+      getActiveMode: () => this.getActiveMode(),
       getActiveInteractionMode: () => this.getActiveInteractionMode(),
-      activateDefaultMode: () => this.activate(this.state.defaultMode),
+      activate: (modeId: string) => this.activate(modeId),
+      activateDefaultMode: () => this.activateDefaultMode(),
+      setCursor: (token: string, cursor: string, priority?: number) =>
+        this.setCursor(token, cursor, priority),
+      getCurrentCursor: () => this.getCurrentCursor(),
+      removeCursor: (token: string) => this.removeCursor(token),
+      getHandlersForScope: (scope: InteractionScope) => this.getHandlersForScope(scope),
+      activeModeIsExclusive: () => this.activeModeIsExclusive(),
+      pause: () => this.pause(),
+      resume: () => this.resume(),
+      // Treat a destroyed registry as "paused" so late DOM events are ignored during teardown.
+      isPaused: () => this.registry.isDestroyed() || this.isPaused(),
+      getState: () => this.getDocumentStateOrThrow(),
+
+      // Document-scoped operations
+      forDocument: (documentId: string) => this.createInteractionScope(documentId),
+
+      // Global management
       registerMode: (mode: InteractionMode) => this.registerMode(mode),
       registerHandlers: (options: RegisterHandlersOptions) => this.registerHandlers(options),
       registerAlways: (options: RegisterAlwaysOptions) => this.registerAlways(options),
-      setCursor: (token: string, cursor: string, priority = 0) =>
-        this.setCursor(token, cursor, priority),
-      removeCursor: (token: string) => this.removeCursor(token),
-      getCurrentCursor: () => this.state.cursor,
-      getHandlersForScope: (scope: InteractionScope) => this.getHandlersForScope(scope),
-      activeModeIsExclusive: () => this.activeModeIsExclusive(),
-      pause: () => this.dispatch(pauseInteraction()),
-      resume: () => this.dispatch(resumeInteraction()),
-      // Treat a destroyed registry as "paused" so late DOM events are ignored during teardown.
-      isPaused: () => this.registry.isDestroyed() || this.state.paused,
       setDefaultMode: (id: string) => this.setDefaultMode(id),
       getDefaultMode: () => this.state.defaultMode,
       getExclusionRules: () => this.state.exclusionRules,
@@ -114,27 +191,109 @@ export class InteractionManagerPlugin extends BasePlugin<
       addExclusionAttribute: (attribute: string) => this.dispatch(addExclusionAttribute(attribute)),
       removeExclusionAttribute: (attribute: string) =>
         this.dispatch(removeExclusionAttribute(attribute)),
+
+      // Events
+      onModeChange: this.onModeChange$.on,
+      onCursorChange: this.onCursorChange$.on,
+      onHandlerChange: this.onHandlerChange$.on,
+      onStateChange: this.onStateChange$.on,
     };
   }
 
-  private activate(mode: string) {
-    if (!this.modes.has(mode)) {
-      throw new Error(`[interaction] unknown mode '${mode}'`);
+  // ─────────────────────────────────────────────────────────
+  // Document Scoping
+  // ─────────────────────────────────────────────────────────
+
+  private createInteractionScope(documentId: string): InteractionManagerScope {
+    return {
+      getActiveMode: () => this.getActiveMode(documentId),
+      getActiveInteractionMode: () => this.getActiveInteractionMode(documentId),
+      activate: (modeId: string) => this.activate(modeId, documentId),
+      activateDefaultMode: () => this.activateDefaultMode(documentId),
+      setCursor: (token: string, cursor: string, priority?: number) =>
+        this.setCursor(token, cursor, priority, documentId),
+      getCurrentCursor: () => this.getCurrentCursor(documentId),
+      removeCursor: (token: string) => this.removeCursor(token, documentId),
+      getHandlersForScope: (scope: InteractionScope) => this.getHandlersForScope(scope),
+      activeModeIsExclusive: () => this.activeModeIsExclusive(documentId),
+      pause: () => this.pause(documentId),
+      resume: () => this.resume(documentId),
+      isPaused: () => this.isPaused(documentId),
+      getState: () => this.getDocumentStateOrThrow(documentId),
+      onModeChange: (listener: Listener<string>) =>
+        this.onModeChange$.on((event) => {
+          if (event.documentId === documentId) listener(event.activeMode);
+        }),
+      onCursorChange: (listener: Listener<string>) =>
+        this.onCursorChange$.on((event) => {
+          if (event.documentId === documentId) listener(event.cursor);
+        }),
+      onStateChange: (listener: Listener<InteractionDocumentState>) =>
+        this.onStateChange$.on((event) => {
+          if (event.documentId === documentId) listener(event.state);
+        }),
+    };
+  }
+
+  // ─────────────────────────────────────────────────────────
+  // State Helpers
+  // ─────────────────────────────────────────────────────────
+
+  private getDocumentState(documentId?: string): InteractionDocumentState | null {
+    const id = documentId ?? this.getActiveDocumentId();
+    return this.state.documents[id] ?? null;
+  }
+
+  private getDocumentStateOrThrow(documentId?: string): InteractionDocumentState {
+    const state = this.getDocumentState(documentId);
+    if (!state) {
+      throw new Error(`Interaction state not found for document: ${documentId ?? 'active'}`);
     }
-    if (mode === this.state.activeMode) return;
+    return state;
+  }
 
-    const previousMode = this.state.activeMode;
-    this.cursorClaims.clear(); // prevent cursor leaks
+  // ─────────────────────────────────────────────────────────
+  // Core Operations
+  // ─────────────────────────────────────────────────────────
 
-    this.notifyHandlersInactive(previousMode);
+  private activate(modeId: string, documentId?: string) {
+    const id = documentId ?? this.getActiveDocumentId();
+    const docState = this.getDocumentStateOrThrow(id);
 
-    this.dispatch(activateMode(mode));
-    this.emitCursor();
+    if (!this.modes.has(modeId)) {
+      throw new Error(`[interaction] unknown mode '${modeId}'`);
+    }
+    if (modeId === docState.activeMode) return;
 
-    // Call lifecycle hooks for handlers going active
-    this.notifyHandlersActive(mode);
+    const previousMode = docState.activeMode;
 
-    this.onModeChange$.emit({ ...this.state, activeMode: mode });
+    // Clear cursor claims for this document
+    this.cursorClaims.get(id)?.clear();
+
+    // Notify handlers going inactive
+    this.notifyHandlersInactive(id, previousMode);
+
+    // Update state
+    this.dispatch(activateMode(id, modeId));
+
+    // Emit cursor
+    this.emitCursor(id);
+
+    // Notify handlers going active
+    this.notifyHandlersActive(id, modeId);
+
+    // Emit mode change event
+    this.onModeChange$.emit({
+      documentId: id,
+      activeMode: modeId,
+      previousMode,
+    });
+  }
+
+  private activateDefaultMode(documentId?: string) {
+    const id = documentId ?? this.getActiveDocumentIdOrNull();
+    if (!id) return;
+    this.activate(this.state.defaultMode, id);
   }
 
   private setDefaultMode(modeId: string) {
@@ -144,88 +303,71 @@ export class InteractionManagerPlugin extends BasePlugin<
     this.dispatch(setDefaultMode(modeId));
   }
 
-  private notifyHandlersActive(modeId: string) {
-    this.alwaysGlobal.forEach((handler) => {
-      handler.onHandlerActiveStart?.(modeId);
-    });
-
-    this.alwaysPage.forEach((handlerSet) => {
-      handlerSet.forEach((handler) => {
-        handler.onHandlerActiveStart?.(modeId);
-      });
-    });
-
-    const mode = this.modes.get(modeId);
-    if (!mode) return;
-
-    const bucket = this.buckets.get(modeId);
-    if (!bucket) return;
-
-    // Notify global handlers if mode is global
-    if (mode.scope === 'global') {
-      bucket.global.forEach((handler) => {
-        handler.onHandlerActiveStart?.(modeId);
-      });
-    }
-
-    // Notify page handlers if mode is page
-    if (mode.scope === 'page') {
-      bucket.page.forEach((handlerSet, pageIndex) => {
-        handlerSet.forEach((handler) => {
-          handler.onHandlerActiveStart?.(modeId);
-        });
-      });
-    }
+  private getActiveMode(documentId?: string): string {
+    return this.getDocumentStateOrThrow(documentId).activeMode;
   }
 
-  private notifyHandlersInactive(modeId: string) {
-    this.alwaysGlobal.forEach((handler) => {
-      handler.onHandlerActiveEnd?.(modeId);
-    });
-
-    this.alwaysPage.forEach((handlerSet) => {
-      handlerSet.forEach((handler) => {
-        handler.onHandlerActiveEnd?.(modeId);
-      });
-    });
-
-    const mode = this.modes.get(modeId);
-    if (!mode) return;
-
-    const bucket = this.buckets.get(modeId);
-    if (!bucket) return;
-
-    // Notify global handlers if mode is global
-    if (mode.scope === 'global') {
-      bucket.global.forEach((handler) => {
-        handler.onHandlerActiveEnd?.(modeId);
-      });
-    }
-
-    // Notify page handlers if mode is page
-    if (mode.scope === 'page') {
-      bucket.page.forEach((handlerSet, pageIndex) => {
-        handlerSet.forEach((handler) => {
-          handler.onHandlerActiveEnd?.(modeId);
-        });
-      });
-    }
+  private getActiveInteractionMode(documentId?: string): InteractionMode | null {
+    const docState = this.getDocumentState(documentId);
+    if (!docState) return null;
+    return this.modes.get(docState.activeMode) ?? null;
   }
+
+  private activeModeIsExclusive(documentId?: string): boolean {
+    const mode = this.getActiveInteractionMode(documentId);
+    return !!mode?.exclusive;
+  }
+
+  private pause(documentId?: string): void {
+    const id = documentId ?? this.getActiveDocumentId();
+    this.dispatch(pauseInteraction(id));
+  }
+
+  private resume(documentId?: string): void {
+    const id = documentId ?? this.getActiveDocumentId();
+    this.dispatch(resumeInteraction(id));
+  }
+
+  private isPaused(documentId?: string): boolean {
+    return this.getDocumentStateOrThrow(documentId).paused;
+  }
+
+  // ─────────────────────────────────────────────────────────
+  // Mode Management
+  // ─────────────────────────────────────────────────────────
 
   private registerMode(mode: InteractionMode) {
     this.modes.set(mode.id, mode);
-    if (!this.buckets.has(mode.id)) {
-      this.buckets.set(mode.id, { global: new Set(), page: new Map() });
+
+    // Add buckets for this mode in all existing documents
+    for (const documentId of this.buckets.keys()) {
+      const docBuckets = this.buckets.get(documentId)!;
+      if (!docBuckets.has(mode.id)) {
+        docBuckets.set(mode.id, { global: new Set(), page: new Map() });
+      }
     }
   }
 
-  /** ---------- pointer-handler handling ------------ */
-  private registerHandlers({ modeId, handlers, pageIndex }: RegisterHandlersOptions): () => void {
+  // ─────────────────────────────────────────────────────────
+  // Handler Management
+  // ─────────────────────────────────────────────────────────
+
+  private registerHandlers({
+    documentId,
+    modeId,
+    handlers,
+    pageIndex,
+  }: RegisterHandlersOptions): () => void {
     const modeIds = Array.isArray(modeId) ? modeId : [modeId];
     const cleanupFunctions: (() => void)[] = [];
 
+    const docBuckets = this.buckets.get(documentId);
+    if (!docBuckets) {
+      throw new Error(`No buckets found for document: ${documentId}`);
+    }
+
     for (const id of modeIds) {
-      const bucket = this.buckets.get(id);
+      const bucket = docBuckets.get(id);
       if (!bucket) throw new Error(`unknown mode '${id}'`);
 
       if (pageIndex == null) {
@@ -236,7 +378,6 @@ export class InteractionManagerPlugin extends BasePlugin<
         bucket.page.set(pageIndex, set);
       }
 
-      // Create cleanup function for this specific mode
       cleanupFunctions.push(() => {
         if (pageIndex == null) {
           bucket.global.delete(handlers);
@@ -254,7 +395,6 @@ export class InteractionManagerPlugin extends BasePlugin<
 
     this.onHandlerChange$.emit({ ...this.state });
 
-    // Return a cleanup function that removes handlers from all registered modes
     return () => {
       cleanupFunctions.forEach((cleanup) => cleanup());
       this.onHandlerChange$.emit({ ...this.state });
@@ -263,13 +403,21 @@ export class InteractionManagerPlugin extends BasePlugin<
 
   public registerAlways({ scope, handlers }: RegisterAlwaysOptions): () => void {
     if (scope.type === 'global') {
-      this.alwaysGlobal.add(handlers);
+      const set = this.alwaysGlobal.get(scope.documentId) ?? new Set();
+      set.add(handlers);
+      this.alwaysGlobal.set(scope.documentId, set);
       this.onHandlerChange$.emit({ ...this.state });
-      return () => this.alwaysGlobal.delete(handlers);
+      return () => {
+        set.delete(handlers);
+        this.onHandlerChange$.emit({ ...this.state });
+      };
     }
-    const set = this.alwaysPage.get(scope.pageIndex) ?? new Set();
+
+    const docPageMap = this.alwaysPage.get(scope.documentId) ?? new Map();
+    const set = docPageMap.get(scope.pageIndex) ?? new Set();
     set.add(handlers);
-    this.alwaysPage.set(scope.pageIndex, set);
+    docPageMap.set(scope.pageIndex, set);
+    this.alwaysPage.set(scope.documentId, docPageMap);
     this.onHandlerChange$.emit({ ...this.state });
     return () => {
       set.delete(handlers);
@@ -277,82 +425,201 @@ export class InteractionManagerPlugin extends BasePlugin<
     };
   }
 
-  /** Returns the *merged* handler set that should be active for the given
-   *  provider (`global` wrapper or a single page wrapper).
-   *  – `alwaysGlobal` / `alwaysPage` are **always** active.
-   *  – Handlers that belong to the current mode are added on top **iff**
-   *    the mode’s own scope matches the provider’s scope.            */
   private getHandlersForScope(scope: InteractionScope): PointerEventHandlers | null {
-    if (!this.state) return null;
+    const docState = this.getDocumentState(scope.documentId);
+    if (!docState) return null;
 
-    const mode = this.modes.get(this.state.activeMode);
+    const mode = this.modes.get(docState.activeMode);
     if (!mode) return null;
 
-    const bucket = this.buckets.get(mode.id);
+    const docBuckets = this.buckets.get(scope.documentId);
+    if (!docBuckets) return null;
+
+    const bucket = docBuckets.get(mode.id);
     if (!bucket) return null;
 
-    /** helper – merge two handler sets into one object (or `null` if both are empty) */
     const mergeSets = (a: HandlerSet, b: HandlerSet) =>
       a.size || b.size ? mergeHandlers([...a, ...b]) : null;
 
-    /* ─────────────────────  GLOBAL PROVIDER  ─────────────────────── */
     if (scope.type === 'global') {
+      const alwaysSet = this.alwaysGlobal.get(scope.documentId) ?? new Set<PointerEventHandlers>();
       const modeSpecific =
-        mode.scope === 'global' // only include mode handlers if the
-          ? bucket.global // mode itself is global-scoped
-          : new Set<PointerEventHandlers>();
-      return mergeSets(this.alwaysGlobal, modeSpecific);
+        mode.scope === 'global' ? bucket.global : new Set<PointerEventHandlers>();
+      return mergeSets(alwaysSet, modeSpecific);
     }
 
-    /* ───────────────────────  PAGE PROVIDER  ──────────────────────── */
-    const alwaysPageSet = this.alwaysPage.get(scope.pageIndex) ?? new Set<PointerEventHandlers>();
+    const alwaysPageSet =
+      this.alwaysPage.get(scope.documentId)?.get(scope.pageIndex) ??
+      new Set<PointerEventHandlers>();
     const modePageSet =
       mode.scope === 'page'
         ? (bucket.page.get(scope.pageIndex) ?? new Set<PointerEventHandlers>())
-        : new Set<PointerEventHandlers>(); // global-scoped mode → ignore page buckets
+        : new Set<PointerEventHandlers>();
 
     return mergeSets(alwaysPageSet, modePageSet);
   }
 
-  /** ---------- cursor handling --------------------- */
-  private setCursor(token: string, cursor: string, priority = 0) {
-    this.cursorClaims.set(token, { cursor, priority });
-    this.emitCursor();
-  }
-  private removeCursor(token: string) {
-    this.cursorClaims.delete(token);
-    this.emitCursor();
+  // ─────────────────────────────────────────────────────────
+  // Cursor Management
+  // ─────────────────────────────────────────────────────────
+
+  private setCursor(token: string, cursor: string, priority = 0, documentId?: string) {
+    const id = documentId ?? this.getActiveDocumentId();
+    const claims = this.cursorClaims.get(id);
+    if (!claims) return;
+
+    claims.set(token, { cursor, priority });
+    this.emitCursor(id);
   }
 
-  private emitCursor() {
-    /* pick highest priority claim, else mode baseline */
-    const top = [...this.cursorClaims.values()].sort((a, b) => b.priority - a.priority)[0] ?? {
-      cursor: this.modes.get(this.state.activeMode)?.cursor ?? 'auto',
+  private removeCursor(token: string, documentId?: string) {
+    const id = documentId ?? this.getActiveDocumentId();
+    const claims = this.cursorClaims.get(id);
+    if (!claims) return;
+
+    claims.delete(token);
+    this.emitCursor(id);
+  }
+
+  private getCurrentCursor(documentId?: string): string {
+    return this.getDocumentStateOrThrow(documentId).cursor;
+  }
+
+  private emitCursor(documentId: string) {
+    const claims = this.cursorClaims.get(documentId);
+    if (!claims) return;
+
+    const docState = this.getDocumentState(documentId);
+    if (!docState) return;
+
+    const top = [...claims.values()].sort((a, b) => b.priority - a.priority)[0] ?? {
+      cursor: this.modes.get(docState.activeMode)?.cursor ?? 'auto',
     };
 
-    if (top.cursor !== this.state.cursor) {
-      this.dispatch(setCursor(top.cursor));
-      this.onCursorChange$.emit(top.cursor);
+    if (top.cursor !== docState.cursor) {
+      this.dispatch(setCursor(documentId, top.cursor));
+      this.onCursorChange$.emit({
+        documentId,
+        cursor: top.cursor,
+      });
     }
   }
 
-  override onStoreUpdated(_: InteractionManagerState, newState: InteractionManagerState): void {
-    this.onStateChange$.emit(newState);
+  // ─────────────────────────────────────────────────────────
+  // Handler Lifecycle Notifications
+  // ─────────────────────────────────────────────────────────
+
+  private notifyHandlersActive(documentId: string, modeId: string) {
+    // Notify always-active handlers
+    this.alwaysGlobal.get(documentId)?.forEach((handler) => {
+      handler.onHandlerActiveStart?.(modeId);
+    });
+
+    this.alwaysPage.get(documentId)?.forEach((handlerSet) => {
+      handlerSet.forEach((handler) => {
+        handler.onHandlerActiveStart?.(modeId);
+      });
+    });
+
+    const mode = this.modes.get(modeId);
+    if (!mode) return;
+
+    const docBuckets = this.buckets.get(documentId);
+    if (!docBuckets) return;
+
+    const bucket = docBuckets.get(modeId);
+    if (!bucket) return;
+
+    if (mode.scope === 'global') {
+      bucket.global.forEach((handler) => {
+        handler.onHandlerActiveStart?.(modeId);
+      });
+    }
+
+    if (mode.scope === 'page') {
+      bucket.page.forEach((handlerSet) => {
+        handlerSet.forEach((handler) => {
+          handler.onHandlerActiveStart?.(modeId);
+        });
+      });
+    }
   }
 
-  private activeModeIsExclusive(): boolean {
-    const mode = this.modes.get(this.state.activeMode);
-    return !!mode?.exclusive;
+  private notifyHandlersInactive(documentId: string, modeId: string) {
+    // Notify always-active handlers
+    this.alwaysGlobal.get(documentId)?.forEach((handler) => {
+      handler.onHandlerActiveEnd?.(modeId);
+    });
+
+    this.alwaysPage.get(documentId)?.forEach((handlerSet) => {
+      handlerSet.forEach((handler) => {
+        handler.onHandlerActiveEnd?.(modeId);
+      });
+    });
+
+    const mode = this.modes.get(modeId);
+    if (!mode) return;
+
+    const docBuckets = this.buckets.get(documentId);
+    if (!docBuckets) return;
+
+    const bucket = docBuckets.get(modeId);
+    if (!bucket) return;
+
+    if (mode.scope === 'global') {
+      bucket.global.forEach((handler) => {
+        handler.onHandlerActiveEnd?.(modeId);
+      });
+    }
+
+    if (mode.scope === 'page') {
+      bucket.page.forEach((handlerSet) => {
+        handlerSet.forEach((handler) => {
+          handler.onHandlerActiveEnd?.(modeId);
+        });
+      });
+    }
   }
 
-  private getActiveInteractionMode(): InteractionMode | null {
-    return this.modes.get(this.state.activeMode) ?? null;
+  // ─────────────────────────────────────────────────────────
+  // Store Update Handlers
+  // ─────────────────────────────────────────────────────────
+
+  override onStoreUpdated(
+    prevState: InteractionManagerState,
+    newState: InteractionManagerState,
+  ): void {
+    // Emit state changes for each changed document
+    for (const documentId in newState.documents) {
+      const prevDoc = prevState.documents[documentId];
+      const newDoc = newState.documents[documentId];
+
+      if (prevDoc !== newDoc) {
+        this.onStateChange$.emit({
+          documentId,
+          state: newDoc,
+        });
+      }
+    }
   }
 
-  // keep emitter clean
+  // ─────────────────────────────────────────────────────────
+  // Lifecycle
+  // ─────────────────────────────────────────────────────────
+
+  async initialize(_: InteractionManagerPluginConfig): Promise<void> {
+    this.logger.info(
+      'InteractionManagerPlugin',
+      'Initialize',
+      'Interaction Manager Plugin initialized',
+    );
+  }
+
   async destroy(): Promise<void> {
     this.onModeChange$.clear();
     this.onCursorChange$.clear();
+    this.onHandlerChange$.clear();
+    this.onStateChange$.clear();
     await super.destroy();
   }
 }

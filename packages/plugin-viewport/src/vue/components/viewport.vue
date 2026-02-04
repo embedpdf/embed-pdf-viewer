@@ -1,12 +1,19 @@
 <script setup lang="ts">
-import { ref, watch, useAttrs } from 'vue';
-
-import { useViewportCapability, useViewportRef } from '../hooks';
+import { ref, watch, useAttrs, provide } from 'vue';
+import { useIsViewportGated, useViewportCapability, useViewportRef } from '../hooks';
 
 /* -------------------------------------------------- */
 /* props & attrs                                      */
 /* -------------------------------------------------- */
-const attrs = useAttrs(); // forward class/id/… to <div>
+interface Props {
+  /**
+   * The ID of the document that this viewport displays
+   */
+  documentId: string;
+}
+
+const props = defineProps<Props>();
+const attrs = useAttrs();
 
 /* -------------------------------------------------- */
 /* plugin + reactive viewport gap                     */
@@ -23,9 +30,19 @@ watch(
 );
 
 /* -------------------------------------------------- */
+/* Gating logic                                    */
+/* -------------------------------------------------- */
+const isGated = useIsViewportGated(() => props.documentId);
+
+/* -------------------------------------------------- */
 /* element ref that wires up scroll / resize logic    */
 /* -------------------------------------------------- */
-const viewportRef = useViewportRef();
+const viewportRef = useViewportRef(() => props.documentId);
+
+/* -------------------------------------------------- */
+/* Provide viewport element to child components       */
+/* -------------------------------------------------- */
+provide('viewport-element', viewportRef);
 </script>
 
 <template>
@@ -34,6 +51,6 @@ const viewportRef = useViewportRef();
     v-bind="attrs"
     :style="{ padding: `${viewportGap}px`, width: '100%', height: '100%', overflow: 'auto' }"
   >
-    <slot />
+    <slot v-if="!isGated" />
   </div>
 </template>

@@ -13,8 +13,8 @@ export default defineConfig({
       rollupTypes: false,
       entryRoot: 'src/examples',
       outDir: 'dist/examples',
-      // Only include .vue files for type generation
-      include: ['src/examples/**/*.vue'],
+      // Include .vue files for type generation from subdirectories
+      include: ['src/examples/**/*.vue', 'src/examples/**/*.ts'],
       beforeWriteFile: (filePath, content) => {
         // Rename .vue.d.ts to .d.ts
         if (filePath.endsWith('.vue.d.ts')) {
@@ -32,10 +32,10 @@ export default defineConfig({
     sourcemap: true,
     emptyOutDir: true,
     lib: {
-      // Use .ts files as entry points for bundling
+      // Use .ts files as entry points for bundling (now in subdirectories)
       entry: Object.fromEntries(
         glob
-          .sync('src/examples/*.ts')
+          .sync('src/examples/**/*.ts')
           .map((file) => [
             path.relative('src/examples', file.slice(0, file.length - path.extname(file).length)),
             fileURLToPath(new URL(file, import.meta.url)),
@@ -44,7 +44,11 @@ export default defineConfig({
       formats: ['es'],
     },
     rollupOptions: {
-      external: ['vue', /^@embedpdf\//],
+      external: (id: string) => {
+        if (/^vue($|\/)/.test(id)) return true;
+        if (/^@embedpdf\//.test(id) && !id.startsWith('@embedpdf/vue-pdf-viewer')) return true;
+        return false;
+      },
       output: {
         entryFileNames: '[name].js',
         chunkFileNames: '[name].js',

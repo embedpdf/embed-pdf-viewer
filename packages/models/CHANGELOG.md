@@ -1,5 +1,454 @@
 # @embedpdf/models
 
+## 2.4.0
+
+### Minor Changes
+
+- [#426](https://github.com/embedpdf/embed-pdf-viewer/pull/426) by [@bobsingor](https://github.com/bobsingor) – Added support for REDACT annotation type with full read/write capabilities:
+  - Added `PdfRedactAnnoObject` interface for redact annotations with properties for overlay text, colors, and font settings
+  - Added `PdfAnnotationColorType.OverlayColor` enum value for redaction overlay color
+  - Added `PdfRedactAnnoObject` to `PdfSupportedAnnoObject` union type
+  - Added new engine interface methods: `applyRedaction`, `applyAllRedactions`, `flattenAnnotation`
+  - Added corresponding methods to `IPdfiumExecutor` interface
+
+## 2.3.0
+
+### Minor Changes
+
+- [#406](https://github.com/embedpdf/embed-pdf-viewer/pull/406) by [@bobsingor](https://github.com/bobsingor) – Added `PdfAnnotationReplyType` enum with `Reply` and `Group` values to support annotation relationships per ISO 32000-2. Added `inReplyToId` and `replyType` properties to `PdfAnnotationObjectBase` for annotation grouping and reply threads. Extended `PdfLinkAnnoObject` with styling properties: `strokeColor`, `strokeWidth`, `strokeStyle`, and `strokeDashArray`. Deprecated `color` in favor of `strokeColor` for text markup and ink annotations. Deprecated `backgroundColor` in favor of `color` for free text annotations. Fixed documentation comments for squiggly, underline, and strikeout annotations.
+
+## 2.2.0
+
+### Minor Changes
+
+- [#389](https://github.com/embedpdf/embed-pdf-viewer/pull/389) by [@bobsingor](https://github.com/bobsingor) – Add PDF permission and security types:
+  - Add `isEncrypted`, `isOwnerUnlocked`, and `permissions` properties to `PdfDocumentObject`
+  - Add `PdfPermissionFlag` enum with all PDF permission flags (Print, ModifyContents, CopyContents, ModifyAnnotations, FillForms, ExtractForAccessibility, AssembleDocument, PrintHighQuality) and `AllowAll` combination
+  - Add `buildPermissions` helper function for combining permission flags
+  - Add `PermissionDeniedError` class for permission check failures
+  - Add security methods to `PdfEngine` interface: `setDocumentEncryption`, `removeEncryption`, `unlockOwnerPermissions`, `isEncrypted`, `isOwnerUnlocked`
+  - Add security methods to `IPdfiumExecutor` interface
+
+## 2.1.2
+
+## 2.1.1
+
+## 2.1.0
+
+### Minor Changes
+
+- [#361](https://github.com/embedpdf/embed-pdf-viewer/pull/361) by [@bobsingor](https://github.com/bobsingor) – Add font-related type definitions
+  - **FontCharset**: Enum for PDF font charset values (SHIFTJIS, HANGEUL, GB2312, etc.)
+  - **FontFile**: Interface for describing font file metadata (file, weight, italic)
+  - **FontPackageMeta**: Interface for font package metadata used by `@embedpdf/fonts-*` packages
+
+## 2.0.2
+
+## 2.0.1
+
+## 2.0.0
+
+### Major Changes
+
+- [#303](https://github.com/embedpdf/embed-pdf-viewer/pull/303) by [@bobsingor](https://github.com/bobsingor) – # Remove `initialize()` - PDFium Now Initializes in Constructor
+
+  This release removes the `initialize()` method from all engine classes. PDFium is now automatically initialized in the constructor, simplifying the API and reducing boilerplate.
+
+  ## Breaking Changes
+
+  ### `initialize()` Method Removed
+
+  The `initialize()` method has been removed from:
+  - `PdfiumNative` (formerly `PdfiumEngine`)
+  - `PdfEngine` orchestrator
+  - `RemoteExecutor`
+  - `WebWorkerEngine`
+  - `IPdfiumExecutor` interface
+  - `PdfEngine` interface (in models)
+
+  **Migration:**
+
+  ```typescript
+  // Before
+  const native = new PdfiumNative(wasmModule, { logger });
+  native.initialize();
+
+  const engine = new PdfEngine(native, { imageConverter, logger });
+  engine.initialize();
+
+  // After - no initialize() needed!
+  const native = new PdfiumNative(wasmModule, { logger });
+  const engine = new PdfEngine(native, { imageConverter, logger });
+
+  // Ready to use immediately
+  const doc = await engine.openDocumentBuffer(file).toPromise();
+  ```
+
+  ### Framework Hooks Simplified
+
+  The `usePdfiumEngine` hooks (React, Vue, Svelte) no longer require calling `initialize()`:
+
+  ```typescript
+  // Before
+  const { engine, isLoading } = usePdfiumEngine();
+  const [initialized, setInitialized] = useState(false);
+
+  useEffect(() => {
+    if (engine && !initialized) {
+      engine.initialize().wait(setInitialized, ignore);
+    }
+  }, [engine, initialized]);
+
+  // After - engine is ready when returned!
+  const { engine, isLoading } = usePdfiumEngine();
+
+  if (!isLoading && engine) {
+    // Ready to use immediately
+  }
+  ```
+
+  ### `PluginRegistry.ensureEngineInitialized()` Removed
+
+  The `ensureEngineInitialized()` method and `engineInitialized` property have been removed from `PluginRegistry` since engines are now initialized in their constructors.
+
+  ## Cross-Platform Image Data
+
+  ### `ImageData` → `ImageDataLike`
+
+  The engine now returns `ImageDataLike` (a plain object with `data`, `width`, `height`) instead of the browser-specific `ImageData` class. This enables Node.js compatibility without polyfills.
+
+  **Affected types:**
+  - `PdfImageObject.imageData` now uses `ImageDataLike`
+  - All raw render methods return `ImageDataLike`
+
+  ### Browser Converter Fallback
+
+  `browserImageDataToBlobConverter` now falls back to regular `<canvas>` when `OffscreenCanvas` is not available (older browsers). The hybrid converter (`createHybridImageConverter`) uses:
+  1. Worker pool with `OffscreenCanvas` (preferred, non-blocking)
+  2. Main-thread `<canvas>` fallback (blocking, but works everywhere)
+
+  ## Benefits
+  - **Simpler API**: One less step to get started
+  - **Less boilerplate**: No more `initialize()` calls in every component
+  - **Node.js compatible**: `ImageDataLike` works without browser APIs
+  - **Broader browser support**: Canvas fallback for older browsers
+
+### Minor Changes
+
+- [#303](https://github.com/embedpdf/embed-pdf-viewer/pull/303) by [@bobsingor](https://github.com/bobsingor) – # Major Engine Architecture Refactor: Orchestrator Layer & Image Encoding Pool
+
+  This release introduces a significant architectural improvement to the PDF engine system, separating concerns between execution and orchestration while adding parallel image encoding capabilities.
+
+  ## Breaking Changes
+
+  ### Engine Class Renamed
+  - `PdfiumEngine` → `PdfiumNative` (the "dumb" executor)
+  - New `PdfEngine` class wraps executors with orchestration logic
+  - Factory functions (`createPdfiumEngine`) now return the orchestrated `PdfEngine<Blob>` wrapper
+
+  **Migration:**
+
+  ```typescript
+  // Before
+  import { PdfiumEngine } from '@embedpdf/engines';
+  const engine = new PdfiumEngine(wasmModule, { logger });
+
+  // After
+  import { createPdfiumEngine } from '@embedpdf/engines/pdfium-worker-engine';
+  // or
+  import { createPdfiumEngine } from '@embedpdf/engines/pdfium-direct-engine';
+
+  const engine = await createPdfiumEngine('/wasm/pdfium.wasm', {
+    logger,
+    encoderPoolSize: 2, // Optional: parallel image encoding
+  });
+  ```
+
+  ### Rendering Methods Changed
+  - `renderPage()` → Returns final encoded result (Blob) via orchestrator
+  - `renderPageRaw()` → New method, returns raw `ImageData` from executor
+  - `renderThumbnail()` → `renderThumbnailRaw()` for raw data
+  - `renderPageAnnotation()` → `renderPageAnnotationRaw()` for raw data
+
+  ### Search API Simplified
+  - `searchAllPages()` → Now orchestrated at the `PdfEngine` level
+  - `searchInPage()` → New single-page search method in executor
+  - Progress tracking improved with proper `CompoundTask` support
+
+  ### Document Loading Changes
+  - Removed `openDocumentFromLoader()` - range request loading removed from executor
+  - Removed `openDocumentUrl()` - URL fetching now handled in orchestrator
+  - `openDocumentBuffer()` remains as the primary method in executor
+
+  ## New Features
+
+  ### 1. Orchestrator Architecture
+
+  New three-layer architecture:
+  - **Executor Layer** (`PdfiumNative`, `RemoteExecutor`): "Dumb" workers that execute PDF operations
+  - **Orchestrator Layer** (`PdfEngine`): "Smart" coordinator with priority queues and scheduling
+  - **Worker Pool** (`ImageEncoderWorkerPool`): Parallel image encoding
+
+  Benefits:
+  - Priority-based task scheduling
+  - Visibility-aware rendering (viewport-based prioritization)
+  - Parallel image encoding (non-blocking)
+  - Automatic task cancellation and cleanup
+
+  ### 2. Image Encoder Worker Pool
+
+  ```typescript
+  const engine = await createPdfiumEngine('/wasm/pdfium.wasm', {
+    encoderPoolSize: 2, // Creates 2 encoder workers
+  });
+  ```
+
+  - Offloads `OffscreenCanvas.convertToBlob()` from main PDFium worker
+  - Prevents blocking during image encoding
+  - Configurable pool size (default: 2 workers)
+  - Automatic load balancing
+
+  ### 3. Task Queue System
+
+  New `WorkerTaskQueue` with:
+  - Priority levels: `CRITICAL`, `HIGH`, `MEDIUM`, `LOW`
+  - Visibility-based ranking for render tasks
+  - Automatic task deduplication
+  - Graceful cancellation
+
+  ### 4. CompoundTask for Multi-Page Operations
+
+  New `CompoundTask` class for aggregating results:
+
+  ```typescript
+  // Automatic progress tracking
+  const task = engine.searchAllPages(doc, 'keyword');
+  task.onProgress((progress) => {
+    console.log(`Page ${progress.page} complete`);
+  });
+  ```
+
+  - `CompoundTask.gather()` - Like `Promise.all()` with progress
+  - `CompoundTask.gatherIndexed()` - Returns `Record<number, Result>`
+  - `CompoundTask.first()` - Like `Promise.race()`
+  - Automatic child task cleanup
+
+  ## API Additions
+
+  ### Models Package
+  - `CompoundTask` - Multi-task aggregation with progress
+  - `ImageConversionTypes` type refinements
+  - `PdfAnnotationsProgress.result` (renamed from `annotations`)
+
+  ### Engines Package
+
+  New exports:
+  - `PdfEngine` - Main orchestrator class
+  - `RemoteExecutor` - Worker communication proxy
+  - `ImageEncoderWorkerPool` - Image encoding pool
+  - `WorkerTaskQueue` - Priority-based queue
+  - `PdfiumNative` - Renamed from `PdfiumEngine`
+
+  New image converters:
+  - `browserImageDataToBlobConverter` - Legacy converter
+  - `createWorkerPoolImageConverter()` - Pool-based converter
+  - `createHybridImageConverter()` - Fallback support
+
+  ### Plugin-Render Package
+
+  New config options:
+
+  ```typescript
+  {
+    render: {
+      defaultImageType: 'image/webp',
+      defaultImageQuality: 0.92
+    }
+  }
+  ```
+
+  ## Improvements
+  - **Performance**: Parallel image encoding improves render throughput by ~40-60%
+  - **Responsiveness**: Priority queues ensure visible pages render first
+  - **Memory**: Better cleanup of completed tasks and worker references
+  - **Logging**: Enhanced performance logging with duration tracking
+  - **Developer Experience**: Clearer separation of concerns
+
+- [#279](https://github.com/embedpdf/embed-pdf-viewer/pull/279) by [@bobsingor](https://github.com/bobsingor) – ## Multi-Document Support
+
+  Minor updates to model types to support multi-document architecture.
+
+  ### Changes
+  - **PdfDocumentObject**: Removed optional `name` property. Document identification is now handled through the `id` field.
+  - **PdfFileWithoutContent**: Removed optional `name` property. File identification is now handled through the `id` field.
+
+  ### Migration
+
+  If you were using the `name` property on documents or files, you should now use the `id` field for identification purposes.
+
+## 2.0.0-next.3
+
+### Minor Changes
+
+- [`f13b2d4`](https://github.com/embedpdf/embed-pdf-viewer/commit/f13b2d48eebd7b2f02e881fee80f68bf4219c1d6) by [@bobsingor](https://github.com/bobsingor) – # Major Engine Architecture Refactor: Orchestrator Layer & Image Encoding Pool
+
+  This release introduces a significant architectural improvement to the PDF engine system, separating concerns between execution and orchestration while adding parallel image encoding capabilities.
+
+  ## Breaking Changes
+
+  ### Engine Class Renamed
+  - `PdfiumEngine` → `PdfiumNative` (the "dumb" executor)
+  - New `PdfEngine` class wraps executors with orchestration logic
+  - Factory functions (`createPdfiumEngine`) now return the orchestrated `PdfEngine<Blob>` wrapper
+
+  **Migration:**
+
+  ```typescript
+  // Before
+  import { PdfiumEngine } from '@embedpdf/engines';
+  const engine = new PdfiumEngine(wasmModule, { logger });
+
+  // After
+  import { createPdfiumEngine } from '@embedpdf/engines/pdfium-worker-engine';
+  // or
+  import { createPdfiumEngine } from '@embedpdf/engines/pdfium-direct-engine';
+
+  const engine = await createPdfiumEngine('/wasm/pdfium.wasm', {
+    logger,
+    encoderPoolSize: 2, // Optional: parallel image encoding
+  });
+  ```
+
+  ### Rendering Methods Changed
+  - `renderPage()` → Returns final encoded result (Blob) via orchestrator
+  - `renderPageRaw()` → New method, returns raw `ImageData` from executor
+  - `renderThumbnail()` → `renderThumbnailRaw()` for raw data
+  - `renderPageAnnotation()` → `renderPageAnnotationRaw()` for raw data
+
+  ### Search API Simplified
+  - `searchAllPages()` → Now orchestrated at the `PdfEngine` level
+  - `searchInPage()` → New single-page search method in executor
+  - Progress tracking improved with proper `CompoundTask` support
+
+  ### Document Loading Changes
+  - Removed `openDocumentFromLoader()` - range request loading removed from executor
+  - Removed `openDocumentUrl()` - URL fetching now handled in orchestrator
+  - `openDocumentBuffer()` remains as the primary method in executor
+
+  ## New Features
+
+  ### 1. Orchestrator Architecture
+
+  New three-layer architecture:
+  - **Executor Layer** (`PdfiumNative`, `RemoteExecutor`): "Dumb" workers that execute PDF operations
+  - **Orchestrator Layer** (`PdfEngine`): "Smart" coordinator with priority queues and scheduling
+  - **Worker Pool** (`ImageEncoderWorkerPool`): Parallel image encoding
+
+  Benefits:
+  - Priority-based task scheduling
+  - Visibility-aware rendering (viewport-based prioritization)
+  - Parallel image encoding (non-blocking)
+  - Automatic task cancellation and cleanup
+
+  ### 2. Image Encoder Worker Pool
+
+  ```typescript
+  const engine = await createPdfiumEngine('/wasm/pdfium.wasm', {
+    encoderPoolSize: 2, // Creates 2 encoder workers
+  });
+  ```
+
+  - Offloads `OffscreenCanvas.convertToBlob()` from main PDFium worker
+  - Prevents blocking during image encoding
+  - Configurable pool size (default: 2 workers)
+  - Automatic load balancing
+
+  ### 3. Task Queue System
+
+  New `WorkerTaskQueue` with:
+  - Priority levels: `CRITICAL`, `HIGH`, `MEDIUM`, `LOW`
+  - Visibility-based ranking for render tasks
+  - Automatic task deduplication
+  - Graceful cancellation
+
+  ### 4. CompoundTask for Multi-Page Operations
+
+  New `CompoundTask` class for aggregating results:
+
+  ```typescript
+  // Automatic progress tracking
+  const task = engine.searchAllPages(doc, 'keyword');
+  task.onProgress((progress) => {
+    console.log(`Page ${progress.page} complete`);
+  });
+  ```
+
+  - `CompoundTask.gather()` - Like `Promise.all()` with progress
+  - `CompoundTask.gatherIndexed()` - Returns `Record<number, Result>`
+  - `CompoundTask.first()` - Like `Promise.race()`
+  - Automatic child task cleanup
+
+  ## API Additions
+
+  ### Models Package
+  - `CompoundTask` - Multi-task aggregation with progress
+  - `ImageConversionTypes` type refinements
+  - `PdfAnnotationsProgress.result` (renamed from `annotations`)
+
+  ### Engines Package
+
+  New exports:
+  - `PdfEngine` - Main orchestrator class
+  - `RemoteExecutor` - Worker communication proxy
+  - `ImageEncoderWorkerPool` - Image encoding pool
+  - `WorkerTaskQueue` - Priority-based queue
+  - `PdfiumNative` - Renamed from `PdfiumEngine`
+
+  New image converters:
+  - `browserImageDataToBlobConverter` - Legacy converter
+  - `createWorkerPoolImageConverter()` - Pool-based converter
+  - `createHybridImageConverter()` - Fallback support
+
+  ### Plugin-Render Package
+
+  New config options:
+
+  ```typescript
+  {
+    render: {
+      defaultImageType: 'image/webp',
+      defaultImageQuality: 0.92
+    }
+  }
+  ```
+
+  ## Improvements
+  - **Performance**: Parallel image encoding improves render throughput by ~40-60%
+  - **Responsiveness**: Priority queues ensure visible pages render first
+  - **Memory**: Better cleanup of completed tasks and worker references
+  - **Logging**: Enhanced performance logging with duration tracking
+  - **Developer Experience**: Clearer separation of concerns
+
+## 2.0.0-next.2
+
+## 2.0.0-next.1
+
+## 2.0.0-next.0
+
+### Minor Changes
+
+- [#279](https://github.com/embedpdf/embed-pdf-viewer/pull/279) by [@bobsingor](https://github.com/bobsingor) – ## Multi-Document Support
+
+  Minor updates to model types to support multi-document architecture.
+
+  ### Changes
+  - **PdfDocumentObject**: Removed optional `name` property. Document identification is now handled through the `id` field.
+  - **PdfFileWithoutContent**: Removed optional `name` property. File identification is now handled through the `id` field.
+
+  ### Migration
+
+  If you were using the `name` property on documents or files, you should now use the `id` field for identification purposes.
+
 ## 1.5.0
 
 ### Minor Changes
@@ -7,13 +456,10 @@
 - [#238](https://github.com/embedpdf/embed-pdf-viewer/pull/238) by [@0xbe7a](https://github.com/0xbe7a) – Add optional **form widget rendering** to the render pipeline.
 
   ### What changed
-
   - **@embedpdf/models**
-
     - `PdfRenderPageOptions` now supports `withForms?: boolean` to request drawing interactive form widgets.
 
   - **@embedpdf/engines**
-
     - `PdfiumEngine.renderPage` and `renderPageRect` honor `withForms`.
       When enabled, the engine initializes the page form handle and calls `FPDF_FFLDraw` with the correct device transform.
     - New helper `computeFormDrawParams(matrix, rect, pageSize, rotation)` calculates start offsets and sizes for `FPDF_FFLDraw`.

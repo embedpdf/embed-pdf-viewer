@@ -1,0 +1,376 @@
+---
+title: Redaction Plugin
+description: Securely and permanently remove text and image content from a PDF document in Vue.
+searchable: true
+---
+
+import { Callout } from '@/components/callout'
+
+# Redaction Plugin
+
+The Redaction Plugin provides the tools to permanently remove sensitive content from a PDF document. Unlike annotations which are simply layered on top, redaction is a destructive process that alters the underlying PDF content, making it unrecoverable.
+
+The process involves two main stages:
+1.  **Marking**: Users mark content for redaction by selecting text or drawing a rectangle over an area. These marks are called "pending redactions."
+2.  **Committing**: Users apply the pending redactions, which permanently removes the marked content from the document in the viewer's memory and, optionally, draws black boxes in its place.
+
+<Callout type="warning" title="Destructive Action">
+Redaction is an irreversible process. Once committed, the original content is removed and cannot be restored from the document.
+</Callout>
+
+## Operating Modes
+
+The Redaction Plugin supports two operating modes:
+
+| Mode | Description |
+| :--- | :--- |
+| **[Legacy Mode](#usage)** | Pending redactions are stored in internal state. Simple setup, suitable for single-session workflows where one user marks and applies redactions immediately. |
+| **[Annotation Mode](#annotation-mode)** | Pending redactions are stored as PDF REDACT annotations. Enables collaborative workflows, customizable colors, and undo/redo support. |
+
+Choose the mode that best fits your use case before implementing.
+
+## Installation
+
+The plugin has optional but highly recommended dependencies on the `Selection` and `Interaction Manager` plugins, which are required for marking text and areas, respectively.
+
+```sh npm2yarn
+npm install @embedpdf/plugin-redaction @embedpdf/plugin-selection @embedpdf/plugin-interaction-manager
+````
+
+## Registration
+
+Import `RedactionPluginPackage` and its dependencies, then add them to the `plugins` array. The dependencies should be registered first.
+
+```typescript {5, 17-19}
+import { createPluginRegistration } from '@embedpdf/core'
+// ... other imports
+import { InteractionManagerPluginPackage } from '@embedpdf/plugin-interaction-manager/vue'
+import { SelectionPluginPackage } from '@embedpdf/plugin-selection/vue'
+import { RedactionPluginPackage } from '@embedpdf/plugin-redaction/vue'
+
+const plugins = [
+  // ... other essential plugins
+  createPluginRegistration(DocumentManagerPluginPackage, { /* ... */ }),
+  createPluginRegistration(RenderPluginPackage),
+
+  // Register dependencies first
+  createPluginRegistration(InteractionManagerPluginPackage),
+  createPluginRegistration(SelectionPluginPackage),
+
+  // Register and configure the redaction plugin
+  createPluginRegistration(RedactionPluginPackage, {
+    drawBlackBoxes: true, // Draw black boxes over redacted content
+  }),
+]
+```
+
+## Usage
+
+The plugin's functionality is primarily managed through the `<RedactionLayer />` component and the `useRedaction` composable.
+
+### 1. Add the `<RedactionLayer />`
+
+This component is responsible for rendering all redaction-related UI, including the text selection highlights, area selection marquee, and all pending redaction marks. It must be placed inside your `<Scroller />`'s default slot and be a child of the `<PagePointerProvider>`.
+
+```vue {3, 11}
+<script setup lang="ts">
+import { PagePointerProvider } from '@embedpdf/plugin-interaction-manager/vue';
+import { RedactionLayer } from '@embedpdf/plugin-redaction/vue';
+</script>
+<template>
+  <Scroller :document-id="activeDocumentId">
+    <template #default="{ page }">
+      <PagePointerProvider :document-id="activeDocumentId" :page-index="page.pageIndex">
+        <RenderLayer :document-id="activeDocumentId" :page-index="page.pageIndex" />
+        <SelectionLayer :document-id="activeDocumentId" :page-index="page.pageIndex" />
+        <RedactionLayer :document-id="activeDocumentId" :page-index="page.pageIndex" />
+      </PagePointerProvider>
+    </template>
+  </Scroller>
+</template>
+```
+
+### 2. Build a Redaction Toolbar
+
+The `useRedaction` composable provides the `state` of the redaction process (e.g., how many marks are pending) and a `provides` object with methods to control it for a specific document. You can build a toolbar to allow users to switch between redaction modes and apply their changes.
+
+```vue
+<script setup lang="ts">
+import { useRedaction } from '@embedpdf/plugin-redaction/vue';
+
+const props = defineProps<{ documentId: string }>();
+const { state, provides } = useRedaction(() => props.documentId);
+</script>
+
+<template>
+  <div v-if="provides">
+    <button @click="provides.toggleRedactSelection()">Mark Text</button>
+    <button @click="provides.toggleMarqueeRedact()">Mark Area</button>
+    <span>{{ state.pendingCount }} pending marks</span>
+    <button
+      @click="provides.commitAllPending()"
+      :disabled="state.pendingCount === 0"
+    >
+      Apply All Redactions
+    </button>
+  </div>
+</template>
+```
+
+### 3. Create a Menu for Pending Marks
+
+You can provide a `selection-menu` scoped slot to the `<RedactionLayer />` to display a custom UI when a user clicks on a pending redaction mark. This is useful for allowing users to apply or remove individual marks.
+
+```vue
+<script setup lang="ts">
+import { RedactionLayer, useRedaction } from '@embedpdf/plugin-redaction/vue';
+
+const props = defineProps<{ documentId: string }>();
+const { provides } = useRedaction(() => props.documentId);
+</script>
+
+<template>
+  <RedactionLayer :document-id="documentId" :page-index="page.pageIndex">
+    <template #selection-menu="{ selected, context, menuWrapperProps, rect }">
+      <div v-if="selected" v-bind="menuWrapperProps">
+        <div
+          :style="{ 
+            position: 'absolute', 
+            top: `${rect.size.height + 10}px`, 
+            left: 0, 
+            pointerEvents: 'auto' 
+          }"
+        >
+          <button @click="provides?.removePending(context.item.page, context.item.id)">Remove</button>
+        </div>
+      </div>
+    </template>
+  </RedactionLayer>
+</template>
+```
+
+## Live Example
+
+This example demonstrates the full redaction workflow in **legacy mode**. Use the "Mark Text" and "Mark Area" buttons to queue redactions. Click a pending mark to see the option to remove it. Finally, click "Apply All" to permanently redact the content.
+
+import { RedactionExample } from '../../code-examples/headless/redaction-example';
+
+<CodeExample 
+  codePaths={[
+    "../../examples/vue-tailwind/src/examples/headless/redaction-example.vue",
+    "../../examples/vue-tailwind/src/examples/headless/redaction-example-content.vue"
+  ]}
+>
+  <RedactionExample />
+</CodeExample>
+
+## Annotation Mode
+
+The Redaction Plugin supports an alternative **annotation mode** where pending redactions are stored as PDF REDACT annotations instead of internal state. This integrates with the Annotation Plugin and provides:
+
+- **Customizable colors**: Change the mark and overlay colors for each redaction
+- **Collaborative workflows**: One user can prepare redactions, save the PDF, and send it to another user for review. The reviewer can inspect, modify, or apply the redactions
+- **Undo/redo support**: Integrates with the History Plugin for full undo/redo functionality
+- **Persistent state**: Redaction marks are saved as part of the PDF and persist across sessions
+
+<Callout type="info" title="When to Use Annotation Mode">
+Use annotation mode when you need collaborative review workflows, customizable colors, or want redaction marks to be saved into the PDF for later review.
+</Callout>
+
+### Enabling Annotation Mode
+
+To enable annotation mode, register `AnnotationPluginPackage` and set `useAnnotationMode: true`:
+
+```typescript {4-5, 15-18}
+import { createPluginRegistration } from '@embedpdf/core'
+import { InteractionManagerPluginPackage } from '@embedpdf/plugin-interaction-manager/vue'
+import { SelectionPluginPackage } from '@embedpdf/plugin-selection/vue'
+import { AnnotationPluginPackage } from '@embedpdf/plugin-annotation/vue'
+import { RedactionPluginPackage } from '@embedpdf/plugin-redaction/vue'
+import { HistoryPluginPackage } from '@embedpdf/plugin-history/vue'
+
+const plugins = [
+  // ... other essential plugins
+  createPluginRegistration(DocumentManagerPluginPackage, { /* ... */ }),
+  createPluginRegistration(RenderPluginPackage),
+  createPluginRegistration(InteractionManagerPluginPackage),
+  createPluginRegistration(SelectionPluginPackage),
+  createPluginRegistration(HistoryPluginPackage),
+  createPluginRegistration(AnnotationPluginPackage),
+  createPluginRegistration(RedactionPluginPackage, {
+    useAnnotationMode: true,
+  }),
+]
+```
+
+### Required Layers
+
+In annotation mode, you need **both** the `AnnotationLayer` and `RedactionLayer`:
+
+- **`AnnotationLayer`**: Renders the REDACT annotations (pending redactions)
+- **`RedactionLayer`**: Renders the marquee drawing UI and text selection highlights during marking
+
+```vue
+<script setup lang="ts">
+import { AnnotationLayer } from '@embedpdf/plugin-annotation/vue';
+import { RedactionLayer } from '@embedpdf/plugin-redaction/vue';
+</script>
+
+<template>
+  <Scroller :document-id="activeDocumentId">
+    <template #default="{ page }">
+      <PagePointerProvider :document-id="activeDocumentId" :page-index="page.pageIndex">
+        <RenderLayer :document-id="activeDocumentId" :page-index="page.pageIndex" />
+        <SelectionLayer :document-id="activeDocumentId" :page-index="page.pageIndex" />
+        <!-- AnnotationLayer renders REDACT annotations -->
+        <AnnotationLayer :document-id="activeDocumentId" :page-index="page.pageIndex" />
+        <!-- RedactionLayer renders marquee/selection UI during marking -->
+        <RedactionLayer :document-id="activeDocumentId" :page-index="page.pageIndex" />
+      </PagePointerProvider>
+    </template>
+  </Scroller>
+</template>
+```
+
+### Unified Redact Mode
+
+Use `toggleRedact()` for a unified mode that supports both text selection and area marquee in a single mode:
+
+```vue
+<script setup lang="ts">
+import { useRedaction, RedactionMode } from '@embedpdf/plugin-redaction/vue';
+
+const props = defineProps<{ documentId: string }>();
+const { state, provides } = useRedaction(() => props.documentId);
+
+// Toggle unified redact mode (supports both text and area)
+const handleToggle = () => provides.value?.toggleRedact();
+
+// Check if redact mode is active
+const isActive = computed(() => state.value.activeType === RedactionMode.Redact);
+</script>
+```
+
+This unified mode works in both legacy and annotation modes.
+
+### Customizing Colors
+
+In annotation mode, redaction colors can be customized. Use the `useAnnotation` composable to access the annotation state and update colors on selected annotations:
+
+```vue
+<script setup lang="ts">
+import { computed } from 'vue';
+import { useAnnotation } from '@embedpdf/plugin-annotation/vue';
+import { PdfAnnotationSubtype, PdfRedactAnnoObject } from '@embedpdf/models';
+
+const props = defineProps<{ documentId: string }>();
+const { state: annotationState, provides: annotationApi } = useAnnotation(() => props.documentId);
+
+// Get the selected REDACT annotation
+const selectedRedact = computed(() => {
+  if (!annotationState.value.selectedUid) return null;
+  const tracked = annotationState.value.byUid[annotationState.value.selectedUid];
+  if (!tracked || tracked.object.type !== PdfAnnotationSubtype.REDACT) return null;
+  return tracked.object as PdfRedactAnnoObject;
+});
+
+// Update colors on the selected annotation
+const changeColor = (color: string) => {
+  if (!selectedRedact.value || !annotationApi.value) return;
+  annotationApi.value.updateAnnotation(selectedRedact.value.pageIndex, selectedRedact.value.id, {
+    strokeColor: color,
+    color: color,
+  });
+};
+</script>
+```
+
+### Annotation Mode Live Example
+
+This example demonstrates annotation mode with a color picker. Click the "Redact" button to enable marking mode, then select text or draw rectangles. Click on a pending redaction to select it, then use the color swatches to change its color.
+
+import { RedactionAnnotationExample } from '../../code-examples/headless/redaction-annotation-example';
+
+<CodeExample 
+  codePaths={[
+    "../../examples/vue-tailwind/src/examples/headless/redaction-annotation-example.vue",
+    "../../examples/vue-tailwind/src/examples/headless/redaction-annotation-example-content.vue"
+  ]}
+>
+  <RedactionAnnotationExample />
+</CodeExample>
+
+## API Reference
+
+### Configuration (`RedactionPluginConfig`)
+
+| Option | Type | Default | Description |
+| :--- | :--- | :--- | :--- |
+| **`drawBlackBoxes`** | `boolean` | `true` | If `true`, a black rectangle is drawn over the redacted content after committing. **Only applies in legacy mode.** In annotation mode, the overlay color is controlled by the annotation's `color` property. |
+| **`useAnnotationMode`** | `boolean` | `false` | When `true`, pending redactions are stored as PDF REDACT annotations (requires `AnnotationPluginPackage`). When `false`, uses internal pending state (legacy mode). |
+
+### Component: `<RedactionLayer />`
+
+Renders all UI related to marking and managing redactions.
+
+| Prop | Type | Description |
+| :--- | :--- | :--- |
+| **`documentId`** | `string` | **(Required)** The ID of the document. |
+| **`pageIndex`** | `number` | **(Required)** The page index this layer corresponds to. |
+
+### Scoped Slot: `selection-menu`
+
+The `<RedactionLayer>` provides a scoped slot to render a custom menu when a pending redaction is selected.
+
+| Prop | Type | Description |
+| :--- | :--- | :--- |
+| `context` | `object` | The context containing the `item` (the pending redaction). |
+| `selected` | `boolean` | `true` if a pending redaction is currently selected. |
+| `menuWrapperProps` | `object` | Vue props to bind to your menu's wrapper element for positioning. |
+| `rect` | `Rect` | The bounding box of the selected pending redaction. |
+
+### Composable: `useRedaction(documentId)`
+
+Connects your components to the redaction plugin's state and methods for a specific document.
+
+#### Parameters
+
+| Parameter | Type | Description |
+| :--- | :--- | :--- |
+| **`documentId`** | `() => string` | A getter function that returns the document ID to track. |
+
+#### Returns
+
+| Property | Type | Description |
+| :--- | :--- | :--- |
+| **`state`** | `RedactionState` | An object containing the current state of the redaction process. |
+| **`provides`**| `Ref<RedactionScope \| null>` | A ref object with methods to control the plugin, or `null` if not ready. |
+
+#### `RedactionState` Properties
+
+| Property | Type | Description |
+| :--- | :--- | :--- |
+| **`isRedacting`**| `boolean`| `true` when any redaction mode is active. |
+| **`activeType`** | `RedactionMode \| null` | The currently active mode: `'redact'` (unified), `'redactSelection'` (text only), or `'marqueeRedact'` (area only). |
+| **`pending`**| `object`| A map of pending redactions, keyed by page number. |
+| **`pendingCount`**| `number`| The total number of pending redactions across all pages. |
+| **`selected`**| `object \| null`| The currently selected pending redaction, if any. |
+
+#### `RedactionScope` Methods
+
+A selection of key methods available on the `provides` object:
+
+| Method | Description |
+| :--- | :--- |
+| **`toggleRedact()`** | Toggles the unified redact mode (supports both text selection and area marquee). |
+| **`enableRedact()`** | Enables the unified redact mode. |
+| **`isRedactActive()`** | Returns `true` if the unified redact mode is active. |
+| **`toggleRedactSelection()`** | Toggles the text-only redaction mode. |
+| **`toggleMarqueeRedact()`** | Toggles the area-only redaction mode. |
+| **`addPending(items)`** | Programmatically adds new `RedactionItem`s to the pending queue. |
+| **`removePending(page, id)`** | Removes a specific pending redaction mark. |
+| **`clearPending()`** | Removes all pending redaction marks. |
+| **`commitAllPending()`** | **(Destructive)** Applies all pending redactions to the document. Returns a `Task`. |
+| **`commitPending(page, id)`** | **(Destructive)** Applies a single pending redaction. Returns a `Task`. |
+| **`onStateChange(cb)`** | Subscribes to any change in the `RedactionState`. |
+| **`onRedactionEvent(cb)`** | Subscribes to events like adding, removing, or committing redactions. |

@@ -16,6 +16,7 @@ import { AnyPreviewState, HandlerServices } from '@embedpdf/plugin-annotation';
 import PreviewRenderer from './preview-renderer.vue';
 
 const props = defineProps<{
+  documentId: string;
   pageIndex: number;
   scale: number;
 }>();
@@ -72,18 +73,23 @@ let unregister: (() => void) | undefined;
 
 watchEffect((onCleanup) => {
   if (annotationPlugin.value) {
-    unregister = annotationPlugin.value.registerPageHandlers(props.pageIndex, props.scale, {
-      services: services.value,
-      onPreview: (toolId, state) => {
-        const next = new Map(previews.value);
-        if (state) {
-          next.set(toolId, state);
-        } else {
-          next.delete(toolId);
-        }
-        previews.value = next;
+    unregister = annotationPlugin.value.registerPageHandlers(
+      props.documentId,
+      props.pageIndex,
+      props.scale,
+      {
+        services: services.value,
+        onPreview: (toolId, state) => {
+          const next = new Map(previews.value);
+          if (state) {
+            next.set(toolId, state);
+          } else {
+            next.delete(toolId);
+          }
+          previews.value = next;
+        },
       },
-    });
+    );
   }
 
   onCleanup(() => {

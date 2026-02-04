@@ -5,12 +5,16 @@
   "type": "module",
   "license": "MIT",
   "exports": {
-    "./*": "./dist/examples/*.js"
+    "./headless/*": "./dist/examples/headless/*.js",
+    "./viewer/*": "./dist/examples/viewer/*.js"
   },
   "typesVersions": {
     "*": {
-      "*": [
-        "./dist/examples/*.d.ts"
+      "headless/*": [
+        "./dist/examples/headless/*.d.ts"
+      ],
+      "viewer/*": [
+        "./dist/examples/viewer/*.d.ts"
       ]
     }
   },
@@ -29,13 +33,16 @@
     "@embedpdf/core": "workspace:*",
     "@embedpdf/engines": "workspace:*",
     "@embedpdf/models": "workspace:*",
+    "@embedpdf/pdfium": "workspace:*",
     "@embedpdf/plugin-annotation": "workspace:*",
     "@embedpdf/plugin-capture": "workspace:*",
+    "@embedpdf/plugin-commands": "workspace:*",
+    "@embedpdf/plugin-document-manager": "workspace:*",
     "@embedpdf/plugin-export": "workspace:*",
     "@embedpdf/plugin-fullscreen": "workspace:*",
     "@embedpdf/plugin-history": "workspace:*",
+    "@embedpdf/plugin-i18n": "workspace:*",
     "@embedpdf/plugin-interaction-manager": "workspace:*",
-    "@embedpdf/plugin-loader": "workspace:*",
     "@embedpdf/plugin-pan": "workspace:*",
     "@embedpdf/plugin-print": "workspace:*",
     "@embedpdf/plugin-redaction": "workspace:*",
@@ -47,18 +54,25 @@
     "@embedpdf/plugin-spread": "workspace:*",
     "@embedpdf/plugin-thumbnail": "workspace:*",
     "@embedpdf/plugin-tiling": "workspace:*",
+    "@embedpdf/plugin-ui": "workspace:*",
+    "@embedpdf/plugin-view-manager": "workspace:*",
     "@embedpdf/plugin-viewport": "workspace:*",
     "@embedpdf/plugin-zoom": "workspace:*",
-    "vue": "^3.5.0"
+    "@embedpdf/vue-pdf-viewer": "workspace:*",
+    "@embedpdf/snippet": "workspace:*",
+    "@embedpdf/utils": "workspace:*",
+    "lucide-vue-next": "^0.562.0",
+    "tailwind-merge": "^3.4.0",
+    "vue": "^3.5.26"
   },
   "devDependencies": {
-    "@tailwindcss/vite": "^4.1.11",
+    "@tailwindcss/vite": "^4.1.18",
     "@typescript-eslint/eslint-plugin": "^8.18.5",
     "@typescript-eslint/parser": "^8.18.5",
-    "@vitejs/plugin-vue": "^5.0.4",
-    "eslint": "^9.17.0",
-    "eslint-plugin-vue": "^9.25.0",
-    "glob": "^10.4.5",
+    "@vitejs/plugin-vue": "^6.0.3",
+    "eslint": "^9.39.2",
+    "eslint-plugin-vue": "^10.6.2",
+    "glob": "^13.0.0",
     "tailwindcss": "^4.1.11",
     "typescript": "^5.7.3",
     "vite": "^6.3.5",

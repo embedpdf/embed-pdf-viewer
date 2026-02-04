@@ -1,0 +1,82 @@
+---
+title: Getting Started with Snippet
+description: Add a full-featured PDF viewer to your application in minutes using the EmbedPDF Snippet.
+---
+{/* @embedpdf-version 2.0.0-next.2 */}
+
+import { Tabs } from '@/components/tabs'
+import { FrameworkCards } from '@/components/framework-cards'
+
+# Getting Started
+
+The **EmbedPDF Snippet** is a pre-built, production-ready PDF viewer. Unlike the headless libraries which require you to build your own UI, the snippet comes with a polished interface, toolbars, and sidebars out of the box.
+
+## 1. Using a Framework?
+
+If you are building a modern web application with React, Vue, or Svelte, we strongly recommend using our official component wrappers. They handle lifecycle management and type safety for you.
+
+<div className="mb-10 mt-6">
+  <FrameworkCards />
+</div>
+
+## 2. Vanilla HTML/JS (CDN)
+
+If you aren't using a build tool, or just want to test quickly, you can load the viewer directly from our CDN.
+
+```html copy filename="index.html"
+<div id="pdf-viewer" style="height: 100vh"></div>
+
+<script type="module">
+  import EmbedPDF from '__EMBEDPDF_JS_URL__';
+
+  EmbedPDF.init({
+    type: 'container',
+    target: document.getElementById('pdf-viewer'),
+    src: '__DEMO_PDF_URL__',
+    theme: { preference: 'system' }
+  });
+</script>
+```
+
+## 3. NPM Package (Vanilla JS)
+
+If you are using a bundler (Vite, Webpack, etc.) but don't need a framework wrapper, you can install the snippet directly from NPM.
+
+### Installation
+
+```sh npm2yarn
+npm install @embedpdf/snippet
+```
+
+### Usage
+
+```ts copy filename="main.ts"
+import EmbedPDF from '@embedpdf/snippet';
+
+const container = document.getElementById('pdf-viewer');
+
+if (container) {
+  EmbedPDF.init({
+    type: 'container',
+    target: container,
+    src: 'https://snippet.embedpdf.com/ebook.pdf',
+    theme: { preference: 'system' }
+  });
+}
+```
+
+## Configuration
+
+The `config` object allows you to customize the viewer's behavior and appearance.
+
+| Option | Type | Description |
+| :--- | :--- | :--- |
+| **`src`** | `string` | URL to the PDF document to load on startup. |
+| **`theme`** | `object` | Customize colors or set preference. See [Theme](./theme). |
+| **`disabledCategories`** | `string[]` | Disable specific UI features by category. See [Customizing UI](./customizing-ui#disabling-features). |
+| **`i18n`** | `object` | Configure internationalization and translations. See [I18n Plugin](./plugins/plugin-i18n). |
+| **`scroll`** | `object` | Configure scroll behavior and page display modes. See [Scroll Plugin](./plugins/plugin-scroll). |
+
+## Next Steps
+
+If you need complete control over the UI (e.g., building your own toolbar from scratch), check out our **[Headless Libraries](..)** instead.

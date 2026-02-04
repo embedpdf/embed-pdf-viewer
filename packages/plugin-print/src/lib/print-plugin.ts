@@ -2,12 +2,19 @@ import { BasePlugin, createEmitter, Listener, PluginRegistry, Unsubscribe } from
 import {
   PdfErrorCode,
   PdfErrorReason,
+  PdfPermissionFlag,
   PdfPrintOptions,
   PdfTaskHelper,
   Task,
 } from '@embedpdf/models';
 
-import { PrintCapability, PrintPluginConfig, PrintProgress, PrintReadyEvent } from './types';
+import {
+  PrintCapability,
+  PrintPluginConfig,
+  PrintProgress,
+  PrintReadyEvent,
+  PrintScope,
+} from './types';
 
 export class PrintPlugin extends BasePlugin<PrintPluginConfig, PrintCapability> {
   static readonly id = 'print' as const;
@@ -18,43 +25,110 @@ export class PrintPlugin extends BasePlugin<PrintPluginConfig, PrintCapability> 
     super(id, registry);
   }
 
-  async initialize(_: PrintPluginConfig): Promise<void> {}
+  // ─────────────────────────────────────────────────────────
+  // Capability
+  // ─────────────────────────────────────────────────────────
 
   protected buildCapability(): PrintCapability {
     return {
-      print: this.print.bind(this),
+      // Active document operations
+      print: (options?: PdfPrintOptions) => this.print(options),
+
+      // Document-scoped operations
+      forDocument: (documentId: string) => this.createPrintScope(documentId),
     };
   }
+
+  // ─────────────────────────────────────────────────────────
+  // Document Scoping
+  // ─────────────────────────────────────────────────────────
+
+  private createPrintScope(documentId: string): PrintScope {
+    return {
+      print: (options?: PdfPrintOptions) => this.print(options, documentId),
+    };
+  }
+
+  // ─────────────────────────────────────────────────────────
+  // Core Operations
+  // ─────────────────────────────────────────────────────────
+
+  private print(
+    options?: PdfPrintOptions,
+    documentId?: string,
+  ): Task<ArrayBuffer, PdfErrorReason, PrintProgress> {
+    const id = documentId ?? this.getActiveDocumentId();
+
+    // Prevent printing without permission
+    if (!this.checkPermission(id, PdfPermissionFlag.Print)) {
+      this.logger.debug(
+        'PrintPlugin',
+        'Print',
+        `Cannot print: document ${id} lacks Print permission`,
+      );
+      return PdfTaskHelper.reject({
+        code: PdfErrorCode.Security,
+        message: 'Document lacks Print permission',
+      });
+    }
+
+    const printOptions = options ?? {};
+    const task = new Task<ArrayBuffer, PdfErrorReason, PrintProgress>();
+
+    task.progress({ stage: 'preparing', message: 'Preparing document...' });
+
+    const prepare = this.preparePrintDocument(printOptions, id);
+    prepare.wait(
+      (buffer) => {
+        task.progress({ stage: 'document-ready', message: 'Document prepared successfully' });
+        // Emit buffer + task for the framework layer to display & trigger print
+        this.printReady$.emit({
+          documentId: id,
+          options: printOptions,
+          buffer,
+          task,
+        });
+      },
+      (error) => task.fail(error),
+    );
+
+    return task;
+  }
+
+  private preparePrintDocument(
+    options: PdfPrintOptions,
+    documentId: string,
+  ): Task<ArrayBuffer, PdfErrorReason> {
+    const coreDoc = this.coreState.core.documents[documentId];
+
+    if (!coreDoc?.document) {
+      return PdfTaskHelper.reject({
+        code: PdfErrorCode.DocNotOpen,
+        message: `Document ${documentId} not found`,
+      });
+    }
+
+    return this.engine.preparePrintDocument(coreDoc.document, options);
+  }
+
+  // ─────────────────────────────────────────────────────────
+  // Event Listeners
+  // ─────────────────────────────────────────────────────────
 
   public onPrintRequest(listener: Listener<PrintReadyEvent>): Unsubscribe {
     return this.printReady$.on(listener);
   }
 
-  private print(options?: PdfPrintOptions): Task<ArrayBuffer, PdfErrorReason, PrintProgress> {
-    const printOptions = options ?? {};
-    const task = new Task<ArrayBuffer, PdfErrorReason, PrintProgress>();
-    task.progress({ stage: 'preparing', message: 'Preparing document...' });
+  // ─────────────────────────────────────────────────────────
+  // Lifecycle
+  // ─────────────────────────────────────────────────────────
 
-    const prepare = this.preparePrintDocument(printOptions);
-    prepare.wait((buffer) => {
-      task.progress({ stage: 'document-ready', message: 'Document prepared successfully' });
-      // Emit buffer + task for the framework layer to display & trigger print
-      this.printReady$.emit({ options: printOptions, buffer, task });
-    }, task.fail);
-
-    return task;
+  async initialize(_: PrintPluginConfig): Promise<void> {
+    this.logger.info('PrintPlugin', 'Initialize', 'Print plugin initialized');
   }
 
-  public preparePrintDocument(options: PdfPrintOptions): Task<ArrayBuffer, PdfErrorReason> {
-    const document = this.coreState.core.document;
-
-    if (!document) {
-      return PdfTaskHelper.reject({
-        code: PdfErrorCode.DocNotOpen,
-        message: 'Document not found',
-      });
-    }
-
-    return this.engine.preparePrintDocument(document, options);
+  async destroy(): Promise<void> {
+    this.printReady$.clear();
+    await super.destroy();
   }
 }

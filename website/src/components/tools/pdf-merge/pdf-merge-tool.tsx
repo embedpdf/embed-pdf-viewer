@@ -51,7 +51,7 @@ export const PdfMergeTool = () => {
         // Add the document to state
         setDocs((prevDocs) => ({
           ...prevDocs,
-          [doc.id]: { doc: { ...doc, name: fileName }, pages },
+          [doc.id]: { doc, pages, fileName },
         }))
       } catch (error) {
         console.error('Error processing document:', error)
@@ -218,7 +218,7 @@ export const PdfMergeTool = () => {
       subtitle="right in your browser"
       description="Securely combine PDFs with complete privacy"
       badgeText="PDF Merge Tool"
-      badgeColor="border-purple-200 bg-purple-50 text-purple-800"
+      badgeColor="border-purple-200 bg-purple-50 text-purple-800 dark:border-purple-800/30 dark:bg-purple-900/20 dark:text-purple-300"
       gradientColor="from-purple-600 to-blue-700"
     >
       {!engine ? (
@@ -253,7 +253,9 @@ export const PdfMergeTool = () => {
         <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
           {/* Source documents */}
           <div>
-            <h2 className="mb-2 text-xl font-semibold">Source Documents</h2>
+            <h2 className="mb-2 text-xl font-semibold dark:text-white">
+              Source Documents
+            </h2>
             <DocumentView
               documents={docs}
               onUpdatePages={handleUpdatePages}
@@ -265,7 +267,9 @@ export const PdfMergeTool = () => {
 
           {/* Target document */}
           <div>
-            <h2 className="mb-2 text-xl font-semibold">New Document</h2>
+            <h2 className="mb-2 text-xl font-semibold dark:text-white">
+              New Document
+            </h2>
             <MergeView
               pages={mergePages}
               onDragEnd={handleDragEnd}

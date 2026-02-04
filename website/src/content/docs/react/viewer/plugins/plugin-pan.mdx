@@ -1,0 +1,94 @@
+---
+title: Pan (Hand Tool)
+description: Enable users to scroll the document by dragging with a hand tool.
+---
+
+import PanExample from '../../code-examples/viewer/pan-example';
+import { ExampleWrapper } from '@/components/example-wrapper';
+
+# Pan (Hand Tool)
+
+The Pan plugin provides a "hand tool" mode that allows users to click and drag to scroll the document. This is often preferred over text selection for navigation, especially on touch devices.
+
+## Configuration
+
+You can configure when the pan tool should be active by default using the `pan` config object.
+
+```tsx
+<PDFViewer
+  config={{
+    pan: {
+      // 'mobile' | 'always' | 'never'
+      defaultMode: 'mobile' 
+    }
+  }}
+/>
+```
+
+### Modes
+
+| Mode | Description |
+| :--- | :--- |
+| `'mobile'` | **Default**. Pan is enabled by default only on touch devices. Desktop users start in text selection mode. |
+| `'always'` | Pan is always the default mode. |
+| `'never'` | Text selection (or another mode) is always the default. |
+
+## Programmatic Control
+
+You can toggle the pan mode programmatically, for example, to build a custom toolbar.
+
+<CodeExample
+  codePaths={[
+    "content/docs/react/code-examples/viewer/pan-example.tsx"
+  ]}
+>
+  <ExampleWrapper>
+    <PanExample />
+  </ExampleWrapper>
+</CodeExample>
+
+### Toggling Mode
+
+```tsx
+import { PanPlugin } from '@embedpdf/react-pdf-viewer';
+
+const registry = await viewerRef.current?.registry;
+const panPlugin = registry.getPlugin<PanPlugin>('pan')?.provides();
+const docPan = panPlugin?.forDocument('my-doc-id');
+
+// Toggle between Pan and previous mode (usually Text Selection)
+docPan?.togglePan();
+
+// Explicitly enable or disable
+docPan?.enablePan();
+docPan?.disablePan();
+```
+
+### Checking State
+
+```tsx
+const isPanning = docPan?.isPanMode();
+```
+
+## Listening for Changes
+
+You can listen for changes in the interaction mode to update your UI (e.g., highlighting the active tool).
+
+```tsx
+const registry = await viewerRef.current?.registry;
+const panPlugin = registry.getPlugin('pan').provides();
+
+// Subscribe to global changes
+panPlugin.onPanModeChange(({ documentId, isPanMode }) => {
+  console.log(`Document ${documentId} pan mode is now: ${isPanMode}`);
+});
+
+// Or subscribe to a specific document
+const docPan = panPlugin.forDocument('my-doc');
+docPan.onPanModeChange((isPanMode) => {
+  // Update your toolbar state
+  setToolState(isPanMode ? 'hand' : 'cursor');
+});
+```
+
+

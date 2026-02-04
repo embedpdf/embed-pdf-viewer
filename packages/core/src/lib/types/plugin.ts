@@ -2,6 +2,7 @@ import { PluginRegistry } from '../registry/plugin-registry';
 import { Logger, PdfEngine, Rotation } from '@embedpdf/models';
 import { Action, Reducer } from '../store/types';
 import { CoreState } from '../store';
+import { PermissionConfig } from './permissions';
 
 export interface IPlugin<TConfig = unknown> {
   id: string;
@@ -14,13 +15,18 @@ export interface IPlugin<TConfig = unknown> {
 }
 
 export interface BasePluginConfig {
-  enabled?: boolean;
+  // Base interface for plugin configs - extend with plugin-specific options
 }
 
 export interface PluginRegistryConfig {
-  rotation?: Rotation;
-  scale?: number;
+  defaultRotation?: Rotation;
+  defaultScale?: number;
   logger?: Logger;
+  /**
+   * Global permission configuration.
+   * Applied to all documents unless overridden per-document.
+   */
+  permissions?: PermissionConfig;
 }
 
 export interface PluginManifest<TConfig = unknown> {

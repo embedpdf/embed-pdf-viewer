@@ -1,5 +1,140 @@
 # @embedpdf/plugin-annotation
 
+## 2.4.0
+
+### Minor Changes
+
+- [#426](https://github.com/embedpdf/embed-pdf-viewer/pull/426) by [@bobsingor](https://github.com/bobsingor) – Added annotation renderer registry and enhanced annotation capabilities:
+  - Added `purgeAnnotation()` method to remove annotations from state without calling the PDF engine
+  - Added annotation renderer registry allowing external plugins to register custom annotation renderers
+  - Added `useRegisterRenderers()` hook and `AnnotationRendererProvider` context for renderer registration
+  - Changed interaction properties (`isDraggable`, `isResizable`, `lockAspectRatio`) to support dynamic functions based on annotation
+  - Added `AnnotationCommandMetadata` interface for history command filtering
+  - Added `isRedact()` helper function for type-checking redact annotations
+  - Framework exports now include `AnnotationPluginPackage` with `AnnotationRendererProvider` wrapper
+
+### Patch Changes
+
+- [#429](https://github.com/embedpdf/embed-pdf-viewer/pull/429) by [@bobsingor](https://github.com/bobsingor) – Fixed group selection box ignoring document permissions:
+  - Added `canModifyAnnotations` permission check to `GroupSelectionBox` component across React, Vue, and Svelte
+  - Group drag and resize operations are now properly disabled when the user lacks annotation modification permissions
+  - This aligns group selection behavior with individual annotation container permission checks
+
+## 2.3.0
+
+### Minor Changes
+
+- [#406](https://github.com/embedpdf/embed-pdf-viewer/pull/406) by [@bobsingor](https://github.com/bobsingor) – Added multi-selection support with new Redux actions: `ADD_TO_SELECTION`, `REMOVE_FROM_SELECTION`, and `SET_SELECTION`. The `selectedUids` array now tracks multiple selected annotations, with `selectedUid` computed for backward compatibility. Implemented annotation grouping and ungrouping using IRT/RT properties via `groupAnnotations()` and `ungroupAnnotations()` methods. Added unified drag and resize API (`startDrag`, `updateDrag`, `commitDrag`, `cancelDrag`, `startResize`, `updateResize`, `commitResize`, `cancelResize`) that handles multi-annotation operations including attached link annotations. Added `Link` annotation component and `GroupSelectionBox` component for Preact, Svelte, and Vue frameworks. Updated text markup tools to use `strokeColor` and suppress selection layer rects. Improved commit process with `collectPendingChanges`, `executeCommitBatch`, and commit locking to prevent concurrent modifications.
+
+## 2.2.0
+
+### Minor Changes
+
+- [#389](https://github.com/embedpdf/embed-pdf-viewer/pull/389) by [@bobsingor](https://github.com/bobsingor) – Add permission checking for annotation operations:
+  - Check `PdfPermissionFlag.ModifyAnnotations` before creating, updating, or deleting annotations
+  - Check permission before activating annotation tools
+  - Check permission before creating annotations from text selection
+  - Update `AnnotationContainer` components (React, Svelte, Vue) to respect `canModifyAnnotations` permission:
+    - Disable drag/resize when permission is denied
+    - Hide vertex handles when permission is denied
+    - Guard double-click handlers based on permission
+
+## 2.1.2
+
+## 2.1.1
+
+## 2.1.0
+
+## 2.0.2
+
+## 2.0.1
+
+## 2.0.0
+
+### Major Changes
+
+- [#279](https://github.com/embedpdf/embed-pdf-viewer/pull/279) by [@bobsingor](https://github.com/bobsingor) – ## Multi-Document Support
+
+  The annotation plugin now supports multiple documents with per-document annotation state and tool management.
+
+  ### Breaking Changes
+  - **All Actions**: All annotation actions now require a `documentId` parameter:
+    - `setAnnotations(documentId, annotations)` - was `setAnnotations(annotations)`
+    - `selectAnnotation(documentId, pageIndex, id)` - was `selectAnnotation(pageIndex, id)`
+    - `deselectAnnotation(documentId)` - was `deselectAnnotation()` (no params)
+    - `setActiveToolId(documentId, toolId)` - was `setActiveToolId(toolId)`
+    - `createAnnotation(documentId, pageIndex, annotation)` - was `createAnnotation(pageIndex, annotation)`
+    - `patchAnnotation(documentId, pageIndex, id, patch)` - was `patchAnnotation(pageIndex, id, patch)`
+    - `deleteAnnotation(documentId, pageIndex, id)` - was `deleteAnnotation(pageIndex, id)`
+    - `commitPendingChanges(documentId)` - was `commitPendingChanges()` (no params)
+    - `purgeAnnotation(documentId, uid)` - was `purgeAnnotation(uid)`
+  - **State Structure**: Plugin state now uses `documents: Record<string, AnnotationDocumentState>` instead of a flat structure. Each document has its own annotations, selected annotation, and active tool.
+  - **Capability Methods**: All capability methods that previously operated on a single document now require document scoping or operate on the active document by default.
+
+  ### Framework-Specific Changes (React/Preact, Svelte, Vue)
+  - **AnnotationContainer Component**:
+    - Now requires `documentId` prop (React/Preact: `@embedpdf/plugin-annotation/react`, Svelte: `@embedpdf/plugin-annotation/svelte`, Vue: `@embedpdf/plugin-annotation/vue`)
+    - Component now uses `forDocument(documentId)` to get document-scoped annotation capability
+    - `selectionMenu` prop type changed to `AnnotationSelectionMenuRenderFn` for better type safety
+    - Bounding box constraints now use unscaled page dimensions (scale is applied internally)
+  - **Annotation Hooks**:
+    - All hooks now work with document-scoped capabilities via `forDocument()`
+    - Components automatically scope operations to the provided `documentId`
+
+  ### New Features
+  - Per-document annotation storage and management
+  - Per-document active tool tracking
+  - Document lifecycle hooks for automatic state initialization and cleanup
+  - `forDocument()` method for document-scoped operations
+
+### Patch Changes
+
+- [#303](https://github.com/embedpdf/embed-pdf-viewer/pull/303) by [@bobsingor](https://github.com/bobsingor) – Fixed Vue `AnnotationContainer` component where `mixBlendMode` style was incorrectly applied to the selection menu. The style now only applies to the annotation content div, matching the behavior of React and Svelte implementations. This was caused by Vue's attribute inheritance passing the style to the root element which wrapped both the annotation and the selection menu.
+
+## 2.0.0-next.3
+
+## 2.0.0-next.2
+
+## 2.0.0-next.1
+
+## 2.0.0-next.0
+
+### Major Changes
+
+- [#279](https://github.com/embedpdf/embed-pdf-viewer/pull/279) by [@bobsingor](https://github.com/bobsingor) – ## Multi-Document Support
+
+  The annotation plugin now supports multiple documents with per-document annotation state and tool management.
+
+  ### Breaking Changes
+  - **All Actions**: All annotation actions now require a `documentId` parameter:
+    - `setAnnotations(documentId, annotations)` - was `setAnnotations(annotations)`
+    - `selectAnnotation(documentId, pageIndex, id)` - was `selectAnnotation(pageIndex, id)`
+    - `deselectAnnotation(documentId)` - was `deselectAnnotation()` (no params)
+    - `setActiveToolId(documentId, toolId)` - was `setActiveToolId(toolId)`
+    - `createAnnotation(documentId, pageIndex, annotation)` - was `createAnnotation(pageIndex, annotation)`
+    - `patchAnnotation(documentId, pageIndex, id, patch)` - was `patchAnnotation(pageIndex, id, patch)`
+    - `deleteAnnotation(documentId, pageIndex, id)` - was `deleteAnnotation(pageIndex, id)`
+    - `commitPendingChanges(documentId)` - was `commitPendingChanges()` (no params)
+    - `purgeAnnotation(documentId, uid)` - was `purgeAnnotation(uid)`
+  - **State Structure**: Plugin state now uses `documents: Record<string, AnnotationDocumentState>` instead of a flat structure. Each document has its own annotations, selected annotation, and active tool.
+  - **Capability Methods**: All capability methods that previously operated on a single document now require document scoping or operate on the active document by default.
+
+  ### Framework-Specific Changes (React/Preact, Svelte, Vue)
+  - **AnnotationContainer Component**:
+    - Now requires `documentId` prop (React/Preact: `@embedpdf/plugin-annotation/react`, Svelte: `@embedpdf/plugin-annotation/svelte`, Vue: `@embedpdf/plugin-annotation/vue`)
+    - Component now uses `forDocument(documentId)` to get document-scoped annotation capability
+    - `selectionMenu` prop type changed to `AnnotationSelectionMenuRenderFn` for better type safety
+    - Bounding box constraints now use unscaled page dimensions (scale is applied internally)
+  - **Annotation Hooks**:
+    - All hooks now work with document-scoped capabilities via `forDocument()`
+    - Components automatically scope operations to the provided `documentId`
+
+  ### New Features
+  - Per-document annotation storage and management
+  - Per-document active tool tracking
+  - Document lifecycle hooks for automatic state initialization and cleanup
+  - `forDocument()` method for document-scoped operations
+
 ## 1.5.0
 
 ## 1.4.1

@@ -1,6 +1,6 @@
 {
   "name": "@embedpdf/plugin-search",
-  "version": "1.5.0",
+  "version": "2.4.0",
   "type": "module",
   "license": "MIT",
   "main": "./dist/index.cjs",
@@ -50,13 +50,11 @@
   "devDependencies": {
     "@embedpdf/build": "workspace:*",
     "@embedpdf/core": "workspace:*",
-    "@embedpdf/plugin-loader": "workspace:*",
     "@types/react": "^18.2.0",
     "typescript": "^5.0.0"
   },
   "peerDependencies": {
     "@embedpdf/core": "workspace:*",
-    "@embedpdf/plugin-loader": "workspace:*",
     "react": ">=16.8.0",
     "react-dom": ">=16.8.0",
     "preact": "^10.26.4",

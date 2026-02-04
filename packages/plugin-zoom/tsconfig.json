@@ -16,6 +16,7 @@
     "paths": {
       "@framework": ["./src/react/adapter.ts"],
       "@embedpdf/core/@framework": ["./src/react/core.ts"],
+      "@embedpdf/plugin-viewport/@framework": ["./src/react/viewport.ts"],
       "@embedpdf/plugin-zoom": ["./src/index.ts"]
     }
   },

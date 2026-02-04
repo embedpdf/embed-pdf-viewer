@@ -1,0 +1,135 @@
+---
+title: Getting Started
+description: Build your first simple PDF viewer with EmbedPDF and Svelte in just a few steps.
+searchable: true
+---
+
+# Getting Started
+
+Let's build a basic, scrollable PDF viewer in Svelte. This guide will walk you through the essential setup.
+
+## 1. Installation
+
+You'll need a few packages to create a minimal viewer: the core library, the engine, and a few essential plugins.
+
+```sh npm2yarn
+npm install @embedpdf/core @embedpdf/engines @embedpdf/plugin-document-manager @embedpdf/plugin-viewport @embedpdf/plugin-scroll @embedpdf/plugin-render
+````
+
+## 2. Create Your Viewer Component
+
+The core of your viewer will be the `<EmbedPDF>` component, which manages the engine and plugins.
+
+Here is a minimal `PDFViewer` component that loads a document from a URL and renders it in a vertically scrollable viewport.
+
+```svelte copy filename="PDFViewer.svelte"
+<script lang="ts">
+import { usePdfiumEngine } from '@embedpdf/engines/svelte';
+import { EmbedPDF } from '@embedpdf/core/svelte';
+import { createPluginRegistration } from '@embedpdf/core';
+
+// Import the essential plugins and their components
+import { ViewportPluginPackage, Viewport } from '@embedpdf/plugin-viewport/svelte';
+import {
+  Scroller,
+  ScrollPluginPackage,
+  type RenderPageProps,
+} from '@embedpdf/plugin-scroll/svelte';
+import {
+  DocumentManagerPluginPackage,
+  DocumentContent,
+} from '@embedpdf/plugin-document-manager/svelte';
+import { RenderLayer, RenderPluginPackage } from '@embedpdf/plugin-render/svelte';
+
+// 1. Initialize the engine with the Svelte store
+const pdfEngine = usePdfiumEngine();
+
+// 2. Register the plugins you need
+const plugins = [
+  createPluginRegistration(DocumentManagerPluginPackage, {
+    initialDocuments: [{ url: 'https://snippet.embedpdf.com/ebook.pdf' }],
+  }),
+  createPluginRegistration(ViewportPluginPackage),
+  createPluginRegistration(ScrollPluginPackage),
+  createPluginRegistration(RenderPluginPackage),
+];
+</script>
+
+{#if pdfEngine.isLoading || !pdfEngine.engine}
+  <div class="loading-pane">
+    Loading PDF Engine...
+  </div>
+{:else}
+  <!-- 3. Wrap your UI with the <EmbedPDF> provider -->
+  <div style="height: 500px;">
+    <EmbedPDF engine={pdfEngine.engine} {plugins}>
+      {#snippet children({ activeDocumentId })}
+        {#if activeDocumentId}
+          {@const documentId = activeDocumentId}
+          <DocumentContent {documentId}>
+            {#snippet children(documentContent)}
+              {#if documentContent.isLoaded}
+                {#snippet renderPage(page: RenderPageProps)}
+                  <div
+                    style:width="{page.width}px"
+                    style:height="{page.height}px"
+                    style:position="relative"
+                  >
+                    <!-- The RenderLayer is responsible for drawing the page -->
+                    <RenderLayer {documentId} pageIndex={page.pageIndex} />
+                  </div>
+                {/snippet}
+                <Viewport {documentId} style="background-color: #f1f3f5;">
+                  <Scroller {documentId} {renderPage} />
+                </Viewport>
+              {/if}
+            {/snippet}
+          </DocumentContent>
+        {/if}
+      {/snippet}
+    </EmbedPDF>
+  </div>
+{/if}
+
+<style>
+.loading-pane {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  height: 100%;
+}
+</style>
+```
+
+## 3. Render Your Component
+
+Finally, import and use your new `<PDFViewer />` component in your main application file.
+
+```svelte filename="App.svelte"
+<script lang="ts">
+import PDFViewer from './PDFViewer.svelte';
+</script>
+
+<PDFViewer />
+```
+
+### Interactive Example
+
+When you run the code above, it will produce a functional, scrollable PDF viewer like the one shown here:
+
+import { GettingStartedExample } from '../code-examples/headless/getting-started-example';
+
+<CodeExample 
+  codePaths={[
+    "../../examples/svelte-tailwind/src/examples/headless/getting-started.svelte"
+  ]}
+>
+  <GettingStartedExample />
+</CodeExample>
+
+You now have a functional PDF viewer!
+
+## Next Steps
+
+  - Discover how to add more features by **[Understanding Plugins](./understanding-plugins)**. 
+  - See a complete implementation with the **[Full Example: Svelte Tailwind PDF Viewer](./full-example)**.

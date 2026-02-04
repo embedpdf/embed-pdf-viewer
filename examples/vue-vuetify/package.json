@@ -15,7 +15,6 @@
     "@embedpdf/core": "workspace:*",
     "@embedpdf/engines": "workspace:*",
     "@embedpdf/models": "workspace:*",
-    "@embedpdf/plugin-loader": "workspace:*",
     "@embedpdf/plugin-viewport": "workspace:*",
     "@embedpdf/plugin-scroll": "workspace:*",
     "@embedpdf/plugin-render": "workspace:*",
@@ -33,24 +32,27 @@
     "@embedpdf/plugin-thumbnail": "workspace:*",
     "@embedpdf/plugin-redaction": "workspace:*",
     "@embedpdf/plugin-annotation": "workspace:*",
+    "@embedpdf/plugin-document-manager": "workspace:*",
+    "@embedpdf/plugin-capture": "workspace:*",
+    "@embedpdf/plugin-history": "workspace:*",
     "@embedpdf/utils": "workspace:*",
     "@fontsource/roboto": "5.2.6",
     "@mdi/font": "7.4.47",
-    "vue": "^3.5.0",
-    "vuetify": "^3.9.1"
+    "vue": "^3.5.26",
+    "vuetify": "^3.11.4"
   },
   "devDependencies": {
-    "@tsconfig/node22": "^22.0.0",
+    "@tsconfig/node22": "^22.0.5",
     "@types/node": "^22.9.0",
-    "@vitejs/plugin-vue": "^5.2.3",
-    "@vue/tsconfig": "^0.7.0",
-    "npm-run-all2": "^7.0.2",
+    "@vitejs/plugin-vue": "^6.0.3",
+    "@vue/tsconfig": "^0.8.1",
+    "npm-run-all2": "^8.0.4",
     "sass-embedded": "^1.89.2",
-    "typescript": "^5.7.3",
+    "typescript": "^5.9.3",
     "unplugin-fonts": "^1.3.1",
-    "unplugin-vue-components": "^29.0.0",
+    "unplugin-vue-components": "^30.0.0",
     "vite": "^6.3.5",
     "vite-plugin-vuetify": "^2.1.2",
-    "vue-tsc": "^3.0.1"
+    "vue-tsc": "^3.2.0"
   }
 }

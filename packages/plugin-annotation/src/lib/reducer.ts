@@ -8,13 +8,24 @@ import {
   PATCH_ANNOTATION,
   PURGE_ANNOTATION,
   SELECT_ANNOTATION,
+  ADD_TO_SELECTION,
+  REMOVE_FROM_SELECTION,
+  SET_SELECTION,
   SET_ACTIVE_TOOL_ID,
   SET_ANNOTATIONS,
   AnnotationAction,
   SET_TOOL_DEFAULTS,
   ADD_TOOL,
+  INIT_ANNOTATION_STATE,
+  CLEANUP_ANNOTATION_STATE,
+  SET_ACTIVE_DOCUMENT,
 } from './actions';
-import { AnnotationPluginConfig, AnnotationState, TrackedAnnotation } from './types';
+import {
+  AnnotationPluginConfig,
+  AnnotationState,
+  AnnotationDocumentState,
+  TrackedAnnotation,
+} from './types';
 import { defaultTools } from './tools/default-tools';
 import { AnnotationTool } from './tools/types';
 
@@ -31,17 +42,35 @@ const DEFAULT_COLORS = [
   '#FFFFFF',
 ];
 
+/**
+ * Compute the deprecated selectedUid from selectedUids.
+ * Returns the UID only when exactly one annotation is selected, otherwise null.
+ */
+const computeSelectedUid = (selectedUids: string[]): string | null =>
+  selectedUids.length === 1 ? selectedUids[0] : null;
+
+// Per-document initial state
+export const initialDocumentState = (): AnnotationDocumentState => ({
+  pages: {},
+  byUid: {},
+  selectedUids: [],
+  selectedUid: null,
+  activeToolId: null,
+  hasPendingChanges: false,
+});
+
+// Helper function to patch an annotation in a document state
 const patchAnno = (
-  state: AnnotationState,
+  docState: AnnotationDocumentState,
   uid: string,
   patch: Partial<TrackedAnnotation['object']>,
-): AnnotationState => {
-  const prev = state.byUid[uid];
-  if (!prev) return state;
+): AnnotationDocumentState => {
+  const prev = docState.byUid[uid];
+  if (!prev) return docState;
   return {
-    ...state,
+    ...docState,
     byUid: {
-      ...state.byUid,
+      ...docState.byUid,
       [uid]: {
         ...prev,
         commitState: prev.commitState === 'synced' ? 'dirty' : prev.commitState,
@@ -64,25 +93,57 @@ export const initialState = (cfg: AnnotationPluginConfig): AnnotationState => {
   (cfg.tools || []).forEach((t) => toolMap.set(t.id, t));
 
   return {
-    pages: {},
-    byUid: {},
-    selectedUid: null,
-    activeToolId: null,
+    documents: {},
+    activeDocumentId: null,
     // `Array.from(toolMap.values())` now correctly returns `AnnotationTool[]`, which matches the state's type.
     tools: Array.from(toolMap.values()),
     colorPresets: cfg.colorPresets ?? DEFAULT_COLORS,
-    hasPendingChanges: false,
   };
 };
 
 export const reducer: Reducer<AnnotationState, AnnotationAction> = (state, action) => {
   switch (action.type) {
+    case INIT_ANNOTATION_STATE: {
+      const { documentId, state: docState } = action.payload;
+      return {
+        ...state,
+        documents: {
+          ...state.documents,
+          [documentId]: docState,
+        },
+        // Set as active if no active document
+        activeDocumentId: state.activeDocumentId ?? documentId,
+      };
+    }
+
+    case CLEANUP_ANNOTATION_STATE: {
+      const documentId = action.payload;
+      const { [documentId]: removed, ...remainingDocs } = state.documents;
+      return {
+        ...state,
+        documents: remainingDocs,
+        activeDocumentId: state.activeDocumentId === documentId ? null : state.activeDocumentId,
+      };
+    }
+
+    case SET_ACTIVE_DOCUMENT: {
+      return {
+        ...state,
+        activeDocumentId: action.payload,
+      };
+    }
+
     case SET_ANNOTATIONS: {
-      const newPages = { ...state.pages };
-      const newByUid = { ...state.byUid };
-      for (const [pgStr, list] of Object.entries(action.payload)) {
+      const { documentId, annotations } = action.payload;
+      const docState = state.documents[documentId];
+      if (!docState) return state;
+
+      const newPages: Record<number, string[]> = {};
+      const newByUid: Record<string, TrackedAnnotation> = {};
+
+      for (const [pgStr, list] of Object.entries(annotations)) {
         const pageIndex = Number(pgStr);
-        const oldUidsOnPage = state.pages[pageIndex] || [];
+        const oldUidsOnPage = docState.pages[pageIndex] || [];
         for (const uid of oldUidsOnPage) {
           delete newByUid[uid];
         }
@@ -93,12 +154,250 @@ export const reducer: Reducer<AnnotationState, AnnotationAction> = (state, actio
         });
         newPages[pageIndex] = newUidsOnPage;
       }
-      return { ...state, pages: newPages, byUid: newByUid };
+
+      return {
+        ...state,
+        documents: {
+          ...state.documents,
+          [documentId]: {
+            ...docState,
+            pages: newPages,
+            byUid: newByUid,
+          },
+        },
+      };
     }
 
-    case SET_ACTIVE_TOOL_ID:
-      return { ...state, activeToolId: action.payload };
+    case SELECT_ANNOTATION: {
+      // Exclusive select: clears previous selection and selects only this one
+      const { documentId, id } = action.payload;
+      const docState = state.documents[documentId];
+      if (!docState) return state;
 
+      return {
+        ...state,
+        documents: {
+          ...state.documents,
+          [documentId]: { ...docState, selectedUids: [id], selectedUid: id },
+        },
+      };
+    }
+
+    case DESELECT_ANNOTATION: {
+      // Clear all selection
+      const { documentId } = action.payload;
+      const docState = state.documents[documentId];
+      if (!docState) return state;
+
+      return {
+        ...state,
+        documents: {
+          ...state.documents,
+          [documentId]: { ...docState, selectedUids: [], selectedUid: null },
+        },
+      };
+    }
+
+    case ADD_TO_SELECTION: {
+      const { documentId, id } = action.payload;
+      const docState = state.documents[documentId];
+      if (!docState) return state;
+
+      // Don't add duplicates
+      if (docState.selectedUids.includes(id)) return state;
+
+      const newSelectedUids = [...docState.selectedUids, id];
+      return {
+        ...state,
+        documents: {
+          ...state.documents,
+          [documentId]: {
+            ...docState,
+            selectedUids: newSelectedUids,
+            selectedUid: computeSelectedUid(newSelectedUids),
+          },
+        },
+      };
+    }
+
+    case REMOVE_FROM_SELECTION: {
+      const { documentId, id } = action.payload;
+      const docState = state.documents[documentId];
+      if (!docState) return state;
+
+      const newSelectedUids = docState.selectedUids.filter((uid) => uid !== id);
+      return {
+        ...state,
+        documents: {
+          ...state.documents,
+          [documentId]: {
+            ...docState,
+            selectedUids: newSelectedUids,
+            selectedUid: computeSelectedUid(newSelectedUids),
+          },
+        },
+      };
+    }
+
+    case SET_SELECTION: {
+      const { documentId, ids } = action.payload;
+      const docState = state.documents[documentId];
+      if (!docState) return state;
+
+      return {
+        ...state,
+        documents: {
+          ...state.documents,
+          [documentId]: {
+            ...docState,
+            selectedUids: ids,
+            selectedUid: computeSelectedUid(ids),
+          },
+        },
+      };
+    }
+
+    case SET_ACTIVE_TOOL_ID: {
+      const { documentId, toolId } = action.payload;
+      const docState = state.documents[documentId];
+      if (!docState) return state;
+
+      return {
+        ...state,
+        documents: {
+          ...state.documents,
+          [documentId]: { ...docState, activeToolId: toolId },
+        },
+      };
+    }
+
+    case CREATE_ANNOTATION: {
+      const { documentId, pageIndex, annotation } = action.payload;
+      const docState = state.documents[documentId];
+      if (!docState) return state;
+
+      const uid = annotation.id;
+      return {
+        ...state,
+        documents: {
+          ...state.documents,
+          [documentId]: {
+            ...docState,
+            pages: {
+              ...docState.pages,
+              [pageIndex]: [...(docState.pages[pageIndex] ?? []), uid],
+            },
+            byUid: {
+              ...docState.byUid,
+              [uid]: { commitState: 'new', object: annotation },
+            },
+            hasPendingChanges: true,
+          },
+        },
+      };
+    }
+
+    case DELETE_ANNOTATION: {
+      const { documentId, pageIndex, id: uid } = action.payload;
+      const docState = state.documents[documentId];
+      if (!docState || !docState.byUid[uid]) return state;
+
+      return {
+        ...state,
+        documents: {
+          ...state.documents,
+          [documentId]: {
+            ...docState,
+            pages: {
+              ...docState.pages,
+              [pageIndex]: (docState.pages[pageIndex] ?? []).filter((u) => u !== uid),
+            },
+            byUid: {
+              ...docState.byUid,
+              [uid]: { ...docState.byUid[uid], commitState: 'deleted' },
+            },
+            hasPendingChanges: true,
+          },
+        },
+      };
+    }
+
+    case PATCH_ANNOTATION: {
+      const { documentId, id, patch } = action.payload;
+      const docState = state.documents[documentId];
+      if (!docState) return state;
+
+      return {
+        ...state,
+        documents: {
+          ...state.documents,
+          [documentId]: patchAnno(docState, id, patch),
+        },
+      };
+    }
+
+    case COMMIT_PENDING_CHANGES: {
+      const { documentId, committedUids } = action.payload;
+      const docState = state.documents[documentId];
+      if (!docState) return state;
+
+      const committedSet = new Set(committedUids);
+      const cleaned: Record<string, TrackedAnnotation> = {};
+      let stillHasPending = false;
+
+      for (const [uid, ta] of Object.entries(docState.byUid)) {
+        if (committedSet.has(uid)) {
+          // This UID was committed - mark as synced
+          cleaned[uid] = {
+            ...ta,
+            commitState:
+              ta.commitState === 'dirty' || ta.commitState === 'new' ? 'synced' : ta.commitState,
+          };
+        } else {
+          // This UID was not committed - keep its current state
+          cleaned[uid] = ta;
+          if (
+            ta.commitState === 'new' ||
+            ta.commitState === 'dirty' ||
+            ta.commitState === 'deleted'
+          ) {
+            stillHasPending = true;
+          }
+        }
+      }
+
+      return {
+        ...state,
+        documents: {
+          ...state.documents,
+          [documentId]: { ...docState, byUid: cleaned, hasPendingChanges: stillHasPending },
+        },
+      };
+    }
+
+    case PURGE_ANNOTATION: {
+      const { documentId, pageIndex, uid } = action.payload;
+      const docState = state.documents[documentId];
+      if (!docState || !docState.byUid[uid]) return state;
+
+      const { [uid]: _gone, ...rest } = docState.byUid;
+      return {
+        ...state,
+        documents: {
+          ...state.documents,
+          [documentId]: {
+            ...docState,
+            pages: {
+              ...docState.pages,
+              [pageIndex]: (docState.pages[pageIndex] ?? []).filter((u) => u !== uid),
+            },
+            byUid: rest,
+          },
+        },
+      };
+    }
+
+    // Global actions
     case ADD_TOOL: {
       const toolMap = new Map(state.tools.map((t) => [t.id, t]));
       toolMap.set(action.payload.id, action.payload);
@@ -118,67 +417,10 @@ export const reducer: Reducer<AnnotationState, AnnotationAction> = (state, actio
       };
     }
 
-    case SELECT_ANNOTATION:
-      return { ...state, selectedUid: action.payload.id };
-
-    case DESELECT_ANNOTATION:
-      return { ...state, selectedUid: null };
-
     case ADD_COLOR_PRESET:
       return state.colorPresets.includes(action.payload)
         ? state
         : { ...state, colorPresets: [...state.colorPresets, action.payload] };
-
-    case CREATE_ANNOTATION: {
-      const { pageIndex, annotation } = action.payload;
-      const uid = annotation.id;
-      return {
-        ...state,
-        pages: { ...state.pages, [pageIndex]: [...(state.pages[pageIndex] ?? []), uid] },
-        byUid: { ...state.byUid, [uid]: { commitState: 'new', object: annotation } },
-        hasPendingChanges: true,
-      };
-    }
-
-    case DELETE_ANNOTATION: {
-      const { pageIndex, id: uid } = action.payload;
-      if (!state.byUid[uid]) return state;
-
-      /* keep the object but mark it as deleted */
-      return {
-        ...state,
-        pages: {
-          ...state.pages,
-          [pageIndex]: (state.pages[pageIndex] ?? []).filter((u) => u !== uid),
-        },
-        byUid: {
-          ...state.byUid,
-          [uid]: { ...state.byUid[uid], commitState: 'deleted' },
-        },
-        hasPendingChanges: true,
-      };
-    }
-
-    case PATCH_ANNOTATION:
-      return patchAnno(state, action.payload.id, action.payload.patch);
-
-    case COMMIT_PENDING_CHANGES: {
-      const cleaned: AnnotationState['byUid'] = {};
-      for (const [uid, ta] of Object.entries(state.byUid)) {
-        cleaned[uid] = {
-          ...ta,
-          commitState:
-            ta.commitState === 'dirty' || ta.commitState === 'new' ? 'synced' : ta.commitState,
-        };
-      }
-      return { ...state, byUid: cleaned, hasPendingChanges: false };
-    }
-
-    case PURGE_ANNOTATION: {
-      const { uid } = action.payload;
-      const { [uid]: _gone, ...rest } = state.byUid;
-      return { ...state, byUid: rest };
-    }
 
     default:
       return state;

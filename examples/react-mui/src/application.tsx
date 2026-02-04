@@ -4,7 +4,12 @@ import { usePdfiumEngine } from '@embedpdf/engines/react';
 import { ConsoleLogger, PdfAnnotationSubtype, PdfStampAnnoObject } from '@embedpdf/models';
 import { Viewport, ViewportPluginPackage } from '@embedpdf/plugin-viewport/react';
 import { Scroller, ScrollPluginPackage, ScrollStrategy } from '@embedpdf/plugin-scroll/react';
-import { LoaderPluginPackage } from '@embedpdf/plugin-loader/react';
+import {
+  DocumentManagerPluginPackage,
+  DocumentContent,
+  DocumentContext,
+  DocumentManagerPlugin,
+} from '@embedpdf/plugin-document-manager/react';
 import { RenderLayer, RenderPluginPackage } from '@embedpdf/plugin-render/react';
 import { TilingLayer, TilingPluginPackage } from '@embedpdf/plugin-tiling/react';
 import { MarqueeZoom, ZoomMode, ZoomPluginPackage } from '@embedpdf/plugin-zoom/react';
@@ -16,20 +21,22 @@ import {
 } from '@embedpdf/plugin-interaction-manager/react';
 import { PanPluginPackage } from '@embedpdf/plugin-pan/react';
 import { Rotate, RotatePluginPackage } from '@embedpdf/plugin-rotate/react';
-import { SpreadPluginPackage } from '@embedpdf/plugin-spread/react';
+import { SpreadMode, SpreadPluginPackage } from '@embedpdf/plugin-spread/react';
 import { FullscreenPluginPackage } from '@embedpdf/plugin-fullscreen/react';
 import { ExportPluginPackage } from '@embedpdf/plugin-export/react';
+import { PrintPluginPackage } from '@embedpdf/plugin-print/react';
 import { RedactionLayer, RedactionPluginPackage } from '@embedpdf/plugin-redaction/react';
 import { ThumbnailPluginPackage } from '@embedpdf/plugin-thumbnail/react';
 import { SelectionPluginPackage } from '@embedpdf/plugin-selection/react';
 import { SelectionLayer } from '@embedpdf/plugin-selection/react';
+import { CapturePluginPackage, MarqueeCapture } from '@embedpdf/plugin-capture/react';
+import { HistoryPluginPackage } from '@embedpdf/plugin-history/react';
 import {
   AnnotationLayer,
   AnnotationPlugin,
   AnnotationPluginPackage,
   AnnotationTool,
 } from '@embedpdf/plugin-annotation/react';
-
 import { CircularProgress, Box, Alert } from '@mui/material';
 import SearchOutlinedIcon from '@mui/icons-material/SearchOutlined';
 import { useMemo, useRef } from 'react';
@@ -43,63 +50,6 @@ import { ViewSidebarReverseIcon } from './icons';
 import { AnnotationSelectionMenu } from './components/annotation-selection-menu';
 import { RedactionSelectionMenu } from './components/redaction-selection-menu';
 
-const plugins = [
-  createPluginRegistration(LoaderPluginPackage, {
-    loadingOptions: {
-      type: 'url',
-      pdfFile: {
-        id: 'pdf',
-        url: 'https://snippet.embedpdf.com/ebook.pdf',
-      },
-    },
-  }),
-  createPluginRegistration(ViewportPluginPackage, {
-    viewportGap: 10,
-  }),
-  createPluginRegistration(ScrollPluginPackage, {
-    strategy: ScrollStrategy.Vertical,
-  }),
-  createPluginRegistration(RenderPluginPackage),
-  createPluginRegistration(TilingPluginPackage, {
-    tileSize: 768,
-    overlapPx: 2.5,
-    extraRings: 0,
-  }),
-  createPluginRegistration(ZoomPluginPackage, {
-    defaultZoomLevel: ZoomMode.FitPage,
-  }),
-  createPluginRegistration(SearchPluginPackage),
-  createPluginRegistration(InteractionManagerPluginPackage),
-  createPluginRegistration(PanPluginPackage),
-  createPluginRegistration(RotatePluginPackage),
-  createPluginRegistration(SpreadPluginPackage),
-  createPluginRegistration(FullscreenPluginPackage),
-  createPluginRegistration(ExportPluginPackage),
-  createPluginRegistration(ThumbnailPluginPackage, {
-    paddingY: 10,
-  }),
-  createPluginRegistration(SelectionPluginPackage),
-  createPluginRegistration(AnnotationPluginPackage),
-  createPluginRegistration(RedactionPluginPackage),
-];
-
-const drawerComponents: DrawerComponent[] = [
-  {
-    id: 'search',
-    component: Search,
-    icon: SearchOutlinedIcon,
-    label: 'Search',
-    position: 'right',
-  },
-  {
-    id: 'sidebar',
-    component: Sidebar,
-    icon: ViewSidebarReverseIcon,
-    label: 'Sidebar',
-    position: 'left',
-  },
-];
-
 const consoleLogger = new ConsoleLogger();
 
 function App() {
@@ -110,6 +60,47 @@ function App() {
 
   const { engine, isLoading, error } = usePdfiumEngine(isDev ? { logger: consoleLogger } : {});
   const popperContainerRef = useRef<HTMLDivElement>(null);
+
+  const plugins = useMemo(
+    () => [
+      createPluginRegistration(ViewportPluginPackage, {
+        viewportGap: 10,
+      }),
+      createPluginRegistration(ScrollPluginPackage, {
+        defaultStrategy: ScrollStrategy.Vertical,
+      }),
+      createPluginRegistration(DocumentManagerPluginPackage),
+      createPluginRegistration(InteractionManagerPluginPackage),
+      createPluginRegistration(ZoomPluginPackage, {
+        defaultZoomLevel: ZoomMode.FitPage,
+      }),
+      createPluginRegistration(PanPluginPackage),
+      createPluginRegistration(SpreadPluginPackage, {
+        defaultSpreadMode: SpreadMode.None,
+      }),
+      createPluginRegistration(RotatePluginPackage),
+      createPluginRegistration(RenderPluginPackage),
+      createPluginRegistration(TilingPluginPackage, {
+        tileSize: 768,
+        overlapPx: 2.5,
+        extraRings: 0,
+      }),
+      createPluginRegistration(ExportPluginPackage),
+      createPluginRegistration(PrintPluginPackage),
+      createPluginRegistration(SelectionPluginPackage),
+      createPluginRegistration(SearchPluginPackage),
+      createPluginRegistration(RedactionPluginPackage),
+      createPluginRegistration(CapturePluginPackage),
+      createPluginRegistration(HistoryPluginPackage),
+      createPluginRegistration(AnnotationPluginPackage),
+      createPluginRegistration(FullscreenPluginPackage),
+      createPluginRegistration(ThumbnailPluginPackage, {
+        width: 120,
+        paddingY: 10,
+      }),
+    ],
+    [],
+  );
 
   if (error) {
     return (
@@ -122,7 +113,7 @@ function App() {
           alignItems: 'center',
         }}
       >
-        <Alert severity="error">Failed to initialize PDF viewer:</Alert>
+        <Alert severity="error">Failed to initialize PDF viewer: {error.message}</Alert>
       </Box>
     );
   }
@@ -144,159 +135,220 @@ function App() {
   }
 
   return (
-    <DrawerProvider components={drawerComponents}>
-      <EmbedPDF
-        engine={engine}
-        plugins={plugins}
-        onInitialized={async (registry) => {
-          const annotation = registry.getPlugin<AnnotationPlugin>('annotation')?.provides();
-          annotation?.addTool<AnnotationTool<PdfStampAnnoObject>>({
-            id: 'stampApproved',
-            name: 'Stamp Approved',
-            interaction: {
-              exclusive: false,
-              cursor: 'crosshair',
-            },
-            matchScore: () => 0,
-            defaults: {
-              type: PdfAnnotationSubtype.STAMP,
-              imageSrc:
-                'https://upload.wikimedia.org/wikipedia/commons/thumb/3/3b/Eo_circle_green_checkmark.svg/512px-Eo_circle_green_checkmark.svg.png',
-              imageSize: { width: 20, height: 20 },
-            },
-          });
-        }}
-      >
-        {({ pluginsReady }) => (
-          <Box
-            sx={{
-              height: '100%',
-              width: '100%',
-              display: 'flex',
-              flexDirection: 'column',
-              position: 'relative',
-              userSelect: 'none',
-            }}
-          >
-            <Toolbar />
+    <EmbedPDF
+      engine={engine}
+      logger={isDev ? consoleLogger : undefined}
+      plugins={plugins}
+      onInitialized={async (registry) => {
+        // Load default PDF URL on initialization
+        registry
+          ?.getPlugin<DocumentManagerPlugin>(DocumentManagerPlugin.id)
+          ?.provides()
+          ?.openDocumentUrl({ url: 'https://snippet.embedpdf.com/ebook.pdf' })
+          .toPromise();
 
-            {/* Main content area with sidebars */}
-            <Box sx={{ display: 'flex', flexGrow: 1, overflow: 'hidden' }}>
-              {/* Left Sidebar */}
-              <Drawer position="left" />
+        // Add custom annotation tool
+        const annotation = registry.getPlugin<AnnotationPlugin>('annotation')?.provides();
+        annotation?.addTool<AnnotationTool<PdfStampAnnoObject>>({
+          id: 'stampApproved',
+          name: 'Stamp Approved',
+          interaction: {
+            exclusive: false,
+            cursor: 'crosshair',
+          },
+          matchScore: () => 0,
+          defaults: {
+            type: PdfAnnotationSubtype.STAMP,
+            imageSrc:
+              'https://upload.wikimedia.org/wikipedia/commons/thumb/3/3b/Eo_circle_green_checkmark.svg/512px-Eo_circle_green_checkmark.svg.png',
+            imageSize: { width: 20, height: 20 },
+          },
+        });
+      }}
+    >
+      {({ pluginsReady }) => (
+        <>
+          {pluginsReady ? (
+            <DocumentContext>
+              {({ activeDocumentId }) => {
+                // Define drawer components with documentId from context
+                const drawerComponents: DrawerComponent[] = [
+                  {
+                    id: 'search',
+                    component: Search,
+                    icon: SearchOutlinedIcon,
+                    label: 'Search',
+                    position: 'right',
+                    props: { documentId: activeDocumentId },
+                  },
+                  {
+                    id: 'sidebar',
+                    component: Sidebar,
+                    icon: ViewSidebarReverseIcon,
+                    label: 'Sidebar',
+                    position: 'left',
+                    props: { documentId: activeDocumentId },
+                  },
+                ];
 
-              {/* Main Viewport */}
-              <Box
-                ref={popperContainerRef}
-                sx={{
-                  flex: '1 1 0', // grow / shrink, flex-basis 0
-                  minWidth: 0, // allow shrinking inside flex row
-                  display: 'flex',
-                  flexDirection: 'column',
-                  position: 'relative',
-                }}
-              >
-                <GlobalPointerProvider>
-                  <Viewport
-                    style={{
-                      width: '100%',
-                      height: '100%',
-                      flexGrow: 1,
-                      backgroundColor: '#f1f3f5',
-                      overflow: 'auto',
-                    }}
-                  >
-                    {!pluginsReady && (
-                      <Box
-                        sx={{
-                          display: 'flex',
-                          justifyContent: 'center',
-                          alignItems: 'center',
-                          height: '100%',
-                          width: '100%',
-                        }}
-                      >
-                        <CircularProgress size={48} />
+                return (
+                  <DrawerProvider components={drawerComponents}>
+                    <Box
+                      sx={{
+                        height: '100%',
+                        width: '100%',
+                        display: 'flex',
+                        flexDirection: 'column',
+                        position: 'relative',
+                        userSelect: 'none',
+                      }}
+                    >
+                      {activeDocumentId && <Toolbar documentId={activeDocumentId} />}
+
+                      {/* Main content area with sidebars */}
+                      <Box sx={{ display: 'flex', flexGrow: 1, overflow: 'hidden' }}>
+                        {/* Left Sidebar */}
+                        <Drawer position="left" />
+
+                        {/* Main Viewport */}
+                        <Box
+                          ref={popperContainerRef}
+                          sx={{
+                            flex: '1 1 0', // grow / shrink, flex-basis 0
+                            minWidth: 0, // allow shrinking inside flex row
+                            display: 'flex',
+                            flexDirection: 'column',
+                            position: 'relative',
+                          }}
+                        >
+                          {activeDocumentId && (
+                            <DocumentContent documentId={activeDocumentId}>
+                              {({ isLoading: docLoading, isLoaded }) => (
+                                <>
+                                  {docLoading && (
+                                    <Box
+                                      sx={{
+                                        display: 'flex',
+                                        justifyContent: 'center',
+                                        alignItems: 'center',
+                                        height: '100%',
+                                        width: '100%',
+                                      }}
+                                    >
+                                      <CircularProgress size={48} />
+                                    </Box>
+                                  )}
+                                  {isLoaded && (
+                                    <GlobalPointerProvider documentId={activeDocumentId}>
+                                      <Viewport
+                                        documentId={activeDocumentId}
+                                        style={{
+                                          width: '100%',
+                                          height: '100%',
+                                          flexGrow: 1,
+                                          backgroundColor: '#f1f3f5',
+                                          overflow: 'auto',
+                                        }}
+                                      >
+                                        <Scroller
+                                          documentId={activeDocumentId}
+                                          renderPage={({ pageIndex }) => (
+                                            <Rotate
+                                              documentId={activeDocumentId}
+                                              pageIndex={pageIndex}
+                                              style={{ backgroundColor: '#fff' }}
+                                            >
+                                              <PagePointerProvider
+                                                documentId={activeDocumentId}
+                                                pageIndex={pageIndex}
+                                              >
+                                                <RenderLayer
+                                                  documentId={activeDocumentId}
+                                                  pageIndex={pageIndex}
+                                                  scale={1}
+                                                  style={{ pointerEvents: 'none' }}
+                                                />
+                                                <TilingLayer
+                                                  documentId={activeDocumentId}
+                                                  pageIndex={pageIndex}
+                                                  style={{ pointerEvents: 'none' }}
+                                                />
+                                                <SearchLayer
+                                                  documentId={activeDocumentId}
+                                                  pageIndex={pageIndex}
+                                                />
+                                                <MarqueeZoom
+                                                  documentId={activeDocumentId}
+                                                  pageIndex={pageIndex}
+                                                />
+                                                <MarqueeCapture
+                                                  documentId={activeDocumentId}
+                                                  pageIndex={pageIndex}
+                                                />
+                                                <SelectionLayer
+                                                  documentId={activeDocumentId}
+                                                  pageIndex={pageIndex}
+                                                />
+                                                <RedactionLayer
+                                                  documentId={activeDocumentId}
+                                                  pageIndex={pageIndex}
+                                                  selectionMenu={(props) => (
+                                                    <RedactionSelectionMenu
+                                                      {...props}
+                                                      documentId={activeDocumentId}
+                                                      container={popperContainerRef.current}
+                                                    />
+                                                  )}
+                                                />
+                                                <AnnotationLayer
+                                                  documentId={activeDocumentId}
+                                                  pageIndex={pageIndex}
+                                                  selectionMenu={(props) => (
+                                                    <AnnotationSelectionMenu
+                                                      {...props}
+                                                      documentId={activeDocumentId}
+                                                      container={popperContainerRef.current}
+                                                    />
+                                                  )}
+                                                />
+                                              </PagePointerProvider>
+                                            </Rotate>
+                                          )}
+                                        />
+                                        <PageControls documentId={activeDocumentId} />
+                                      </Viewport>
+                                    </GlobalPointerProvider>
+                                  )}
+                                </>
+                              )}
+                            </DocumentContent>
+                          )}
+                        </Box>
+
+                        {/* Right Sidebar */}
+                        <Drawer position="right" />
                       </Box>
-                    )}
-                    {pluginsReady && (
-                      <Scroller
-                        renderPage={({ document, width, height, pageIndex, scale, rotation }) => (
-                          <Rotate key={document?.id} pageSize={{ width, height }}>
-                            <PagePointerProvider
-                              pageIndex={pageIndex}
-                              pageWidth={width}
-                              pageHeight={height}
-                              rotation={rotation}
-                              scale={scale}
-                            >
-                              <RenderLayer
-                                pageIndex={pageIndex}
-                                style={{ pointerEvents: 'none' }}
-                              />
-                              <TilingLayer
-                                pageIndex={pageIndex}
-                                scale={scale}
-                                style={{ pointerEvents: 'none' }}
-                              />
-                              <SearchLayer
-                                pageIndex={pageIndex}
-                                scale={scale}
-                                style={{ pointerEvents: 'none' }}
-                              />
-                              <MarqueeZoom pageIndex={pageIndex} scale={scale} />
-                              <SelectionLayer pageIndex={pageIndex} scale={scale} />
-                              <RedactionLayer
-                                pageIndex={pageIndex}
-                                scale={scale}
-                                rotation={rotation}
-                                selectionMenu={({ menuWrapperProps, selected, item }) => (
-                                  <>
-                                    {selected ? (
-                                      <RedactionSelectionMenu
-                                        menuWrapperProps={menuWrapperProps}
-                                        selected={item}
-                                        container={popperContainerRef.current}
-                                      />
-                                    ) : null}
-                                  </>
-                                )}
-                              />
-                              <AnnotationLayer
-                                pageIndex={pageIndex}
-                                scale={scale}
-                                pageWidth={width}
-                                pageHeight={height}
-                                rotation={rotation}
-                                selectionMenu={({ menuWrapperProps, selected, annotation }) => (
-                                  <>
-                                    {selected ? (
-                                      <AnnotationSelectionMenu
-                                        menuWrapperProps={menuWrapperProps}
-                                        selected={annotation}
-                                        container={popperContainerRef.current}
-                                      />
-                                    ) : null}
-                                  </>
-                                )}
-                              />
-                            </PagePointerProvider>
-                          </Rotate>
-                        )}
-                      />
-                    )}
-                    <PageControls />
-                  </Viewport>
-                </GlobalPointerProvider>
-              </Box>
-
-              {/* Right Sidebar */}
-              <Drawer position="right" />
+                    </Box>
+                  </DrawerProvider>
+                );
+              }}
+            </DocumentContext>
+          ) : (
+            <Box
+              sx={{
+                display: 'flex',
+                justifyContent: 'center',
+                alignItems: 'center',
+                height: '100%',
+                width: '100%',
+              }}
+            >
+              <CircularProgress size={48} />
             </Box>
-          </Box>
-        )}
-      </EmbedPDF>
-    </DrawerProvider>
+          )}
+        </>
+      )}
+    </EmbedPDF>
   );
 }
 

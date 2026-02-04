@@ -32,17 +32,24 @@ var createPdfium = (() => {
       '_EPDF_GetMetaTrapped',
       '_EPDF_GetPageRotationByIndex',
       '_EPDF_HasMetaText',
+      '_EPDF_IsEncrypted',
+      '_EPDF_IsOwnerUnlocked',
       '_EPDF_PNG_EncodeRGBA',
+      '_EPDF_RemoveEncryption',
       '_EPDF_RenderAnnotBitmap',
+      '_EPDF_SetEncryption',
       '_EPDF_SetMetaText',
       '_EPDF_SetMetaTrapped',
+      '_EPDF_UnlockOwnerPermissions',
       '_EPDFAction_CreateGoTo',
       '_EPDFAction_CreateGoToNamed',
       '_EPDFAction_CreateLaunch',
       '_EPDFAction_CreateRemoteGoToByName',
       '_EPDFAction_CreateRemoteGoToDest',
       '_EPDFAction_CreateURI',
+      '_EPDFAnnot_ApplyRedaction',
       '_EPDFAnnot_ClearColor',
+      '_EPDFAnnot_Flatten',
       '_EPDFAnnot_GenerateAppearance',
       '_EPDFAnnot_GenerateAppearanceWithBlend',
       '_EPDFAnnot_GetBlendMode',
@@ -56,10 +63,14 @@ var createPdfium = (() => {
       '_EPDFAnnot_GetIntent',
       '_EPDFAnnot_GetLineEndings',
       '_EPDFAnnot_GetOpacity',
+      '_EPDFAnnot_GetOverlayText',
+      '_EPDFAnnot_GetOverlayTextRepeat',
       '_EPDFAnnot_GetRectangleDifferences',
+      '_EPDFAnnot_GetReplyType',
       '_EPDFAnnot_GetRichContent',
       '_EPDFAnnot_GetTextAlignment',
       '_EPDFAnnot_GetVerticalAlignment',
+      '_EPDFAnnot_SetAction',
       '_EPDFAnnot_SetBorderDashPattern',
       '_EPDFAnnot_SetBorderStyle',
       '_EPDFAnnot_SetColor',
@@ -70,6 +81,9 @@ var createPdfium = (() => {
       '_EPDFAnnot_SetLineEndings',
       '_EPDFAnnot_SetLinkedAnnot',
       '_EPDFAnnot_SetOpacity',
+      '_EPDFAnnot_SetOverlayText',
+      '_EPDFAnnot_SetOverlayTextRepeat',
+      '_EPDFAnnot_SetReplyType',
       '_EPDFAnnot_SetTextAlignment',
       '_EPDFAnnot_SetVerticalAlignment',
       '_EPDFAnnot_SetVertices',
@@ -94,6 +108,7 @@ var createPdfium = (() => {
       '_EPDFDest_CreateXYZ',
       '_EPDFNamedDest_Remove',
       '_EPDFNamedDest_SetDest',
+      '_EPDFPage_ApplyRedactions',
       '_EPDFPage_CreateAnnot',
       '_EPDFPage_GetAnnotByName',
       '_EPDFPage_GetAnnotCountRaw',
@@ -4486,7 +4501,7 @@ var createPdfium = (() => {
         HEAP32[(buf + 12) >> 2] = stat.uid;
         HEAP32[(buf + 16) >> 2] = stat.gid;
         HEAP32[(buf + 20) >> 2] = stat.rdev;
-        (tempI64 = [
+        ((tempI64 = [
           stat.size >>> 0,
           ((tempDouble = stat.size),
           +Math.abs(tempDouble) >= 1.0
@@ -4496,13 +4511,13 @@ var createPdfium = (() => {
             : 0),
         ]),
           (HEAP32[(buf + 24) >> 2] = tempI64[0]),
-          (HEAP32[(buf + 28) >> 2] = tempI64[1]);
+          (HEAP32[(buf + 28) >> 2] = tempI64[1]));
         HEAP32[(buf + 32) >> 2] = 4096;
         HEAP32[(buf + 36) >> 2] = stat.blocks;
         var atime = stat.atime.getTime();
         var mtime = stat.mtime.getTime();
         var ctime = stat.ctime.getTime();
-        (tempI64 = [
+        ((tempI64 = [
           Math.floor(atime / 1000) >>> 0,
           ((tempDouble = Math.floor(atime / 1000)),
           +Math.abs(tempDouble) >= 1.0
@@ -4512,9 +4527,9 @@ var createPdfium = (() => {
             : 0),
         ]),
           (HEAP32[(buf + 40) >> 2] = tempI64[0]),
-          (HEAP32[(buf + 44) >> 2] = tempI64[1]);
+          (HEAP32[(buf + 44) >> 2] = tempI64[1]));
         HEAPU32[(buf + 48) >> 2] = (atime % 1000) * 1000 * 1000;
-        (tempI64 = [
+        ((tempI64 = [
           Math.floor(mtime / 1000) >>> 0,
           ((tempDouble = Math.floor(mtime / 1000)),
           +Math.abs(tempDouble) >= 1.0
@@ -4524,9 +4539,9 @@ var createPdfium = (() => {
             : 0),
         ]),
           (HEAP32[(buf + 56) >> 2] = tempI64[0]),
-          (HEAP32[(buf + 60) >> 2] = tempI64[1]);
+          (HEAP32[(buf + 60) >> 2] = tempI64[1]));
         HEAPU32[(buf + 64) >> 2] = (mtime % 1000) * 1000 * 1000;
-        (tempI64 = [
+        ((tempI64 = [
           Math.floor(ctime / 1000) >>> 0,
           ((tempDouble = Math.floor(ctime / 1000)),
           +Math.abs(tempDouble) >= 1.0
@@ -4536,9 +4551,9 @@ var createPdfium = (() => {
             : 0),
         ]),
           (HEAP32[(buf + 72) >> 2] = tempI64[0]),
-          (HEAP32[(buf + 76) >> 2] = tempI64[1]);
+          (HEAP32[(buf + 76) >> 2] = tempI64[1]));
         HEAPU32[(buf + 80) >> 2] = (ctime % 1000) * 1000 * 1000;
-        (tempI64 = [
+        ((tempI64 = [
           stat.ino >>> 0,
           ((tempDouble = stat.ino),
           +Math.abs(tempDouble) >= 1.0
@@ -4548,7 +4563,7 @@ var createPdfium = (() => {
             : 0),
         ]),
           (HEAP32[(buf + 88) >> 2] = tempI64[0]),
-          (HEAP32[(buf + 92) >> 2] = tempI64[1]);
+          (HEAP32[(buf + 92) >> 2] = tempI64[1]));
         return 0;
       },
       doMsync(addr, stream, len, flags, offset) {
@@ -4687,7 +4702,7 @@ var createPdfium = (() => {
                   : 8; // DT_REG, regular file.
           }
           assert(id);
-          (tempI64 = [
+          ((tempI64 = [
             id >>> 0,
             ((tempDouble = id),
             +Math.abs(tempDouble) >= 1.0
@@ -4697,8 +4712,8 @@ var createPdfium = (() => {
               : 0),
           ]),
             (HEAP32[(dirp + pos) >> 2] = tempI64[0]),
-            (HEAP32[(dirp + pos + 4) >> 2] = tempI64[1]);
-          (tempI64 = [
+            (HEAP32[(dirp + pos + 4) >> 2] = tempI64[1]));
+          ((tempI64 = [
             ((idx + 1) * struct_size) >>> 0,
             ((tempDouble = (idx + 1) * struct_size),
             +Math.abs(tempDouble) >= 1.0
@@ -4708,7 +4723,7 @@ var createPdfium = (() => {
               : 0),
           ]),
             (HEAP32[(dirp + pos + 8) >> 2] = tempI64[0]),
-            (HEAP32[(dirp + pos + 12) >> 2] = tempI64[1]);
+            (HEAP32[(dirp + pos + 12) >> 2] = tempI64[1]));
           HEAP16[(dirp + pos + 16) >> 1] = 280;
           HEAP8[dirp + pos + 18] = type;
           stringToUTF8(name, dirp + pos + 19, 256);
@@ -5223,7 +5238,7 @@ var createPdfium = (() => {
         if (isNaN(offset)) return 61;
         var stream = SYSCALLS.getStreamFromFD(fd);
         FS.llseek(stream, offset, whence);
-        (tempI64 = [
+        ((tempI64 = [
           stream.position >>> 0,
           ((tempDouble = stream.position),
           +Math.abs(tempDouble) >= 1.0
@@ -5233,7 +5248,7 @@ var createPdfium = (() => {
             : 0),
         ]),
           (HEAP32[newOffset >> 2] = tempI64[0]),
-          (HEAP32[(newOffset + 4) >> 2] = tempI64[1]);
+          (HEAP32[(newOffset + 4) >> 2] = tempI64[1]));
         if (stream.getdents && offset === 0 && whence === 0) stream.getdents = null; // reset readdir state
         return 0;
       } catch (e) {
@@ -5345,7 +5360,7 @@ var createPdfium = (() => {
       if (n < 128) {
         target.push(n);
       } else {
-        target.push(n % 128 | 128, n >> 7);
+        target.push((n % 128) | 128, n >> 7);
       }
     };
 
@@ -6082,6 +6097,10 @@ var createPdfium = (() => {
       'FPDFAnnot_SetURI',
       2,
     ));
+    var _EPDFAnnot_SetAction = (Module['_EPDFAnnot_SetAction'] = createExportWrapper(
+      'EPDFAnnot_SetAction',
+      2,
+    ));
     var _FPDFAnnot_GetFileAttachment = (Module['_FPDFAnnot_GetFileAttachment'] =
       createExportWrapper('FPDFAnnot_GetFileAttachment', 1));
     var _FPDFAnnot_AddFileAttachment = (Module['_FPDFAnnot_AddFileAttachment'] =
@@ -6214,6 +6233,38 @@ var createPdfium = (() => {
       createExportWrapper('EPDFAnnot_UpdateAppearanceToRect', 2));
     var _EPDFPage_CreateAnnot = (Module['_EPDFPage_CreateAnnot'] = createExportWrapper(
       'EPDFPage_CreateAnnot',
+      2,
+    ));
+    var _EPDFAnnot_GetReplyType = (Module['_EPDFAnnot_GetReplyType'] = createExportWrapper(
+      'EPDFAnnot_GetReplyType',
+      1,
+    ));
+    var _EPDFAnnot_SetReplyType = (Module['_EPDFAnnot_SetReplyType'] = createExportWrapper(
+      'EPDFAnnot_SetReplyType',
+      2,
+    ));
+    var _EPDFAnnot_SetOverlayText = (Module['_EPDFAnnot_SetOverlayText'] = createExportWrapper(
+      'EPDFAnnot_SetOverlayText',
+      2,
+    ));
+    var _EPDFAnnot_GetOverlayText = (Module['_EPDFAnnot_GetOverlayText'] = createExportWrapper(
+      'EPDFAnnot_GetOverlayText',
+      3,
+    ));
+    var _EPDFAnnot_SetOverlayTextRepeat = (Module['_EPDFAnnot_SetOverlayTextRepeat'] =
+      createExportWrapper('EPDFAnnot_SetOverlayTextRepeat', 2));
+    var _EPDFAnnot_GetOverlayTextRepeat = (Module['_EPDFAnnot_GetOverlayTextRepeat'] =
+      createExportWrapper('EPDFAnnot_GetOverlayTextRepeat', 1));
+    var _EPDFAnnot_ApplyRedaction = (Module['_EPDFAnnot_ApplyRedaction'] = createExportWrapper(
+      'EPDFAnnot_ApplyRedaction',
+      2,
+    ));
+    var _EPDFPage_ApplyRedactions = (Module['_EPDFPage_ApplyRedactions'] = createExportWrapper(
+      'EPDFPage_ApplyRedactions',
+      1,
+    ));
+    var _EPDFAnnot_Flatten = (Module['_EPDFAnnot_Flatten'] = createExportWrapper(
+      'EPDFAnnot_Flatten',
       2,
     ));
     var _FPDFDoc_GetAttachmentCount = (Module['_FPDFDoc_GetAttachmentCount'] = createExportWrapper(
@@ -7396,6 +7447,24 @@ var createPdfium = (() => {
     ));
     var _FPDF_GetSecurityHandlerRevision = (Module['_FPDF_GetSecurityHandlerRevision'] =
       createExportWrapper('FPDF_GetSecurityHandlerRevision', 1));
+    var _EPDF_SetEncryption = (Module['_EPDF_SetEncryption'] = createExportWrapper(
+      'EPDF_SetEncryption',
+      4,
+    ));
+    var _EPDF_RemoveEncryption = (Module['_EPDF_RemoveEncryption'] = createExportWrapper(
+      'EPDF_RemoveEncryption',
+      1,
+    ));
+    var _EPDF_UnlockOwnerPermissions = (Module['_EPDF_UnlockOwnerPermissions'] =
+      createExportWrapper('EPDF_UnlockOwnerPermissions', 2));
+    var _EPDF_IsEncrypted = (Module['_EPDF_IsEncrypted'] = createExportWrapper(
+      'EPDF_IsEncrypted',
+      1,
+    ));
+    var _EPDF_IsOwnerUnlocked = (Module['_EPDF_IsOwnerUnlocked'] = createExportWrapper(
+      'EPDF_IsOwnerUnlocked',
+      1,
+    ));
     var _FPDF_GetPageCount = (Module['_FPDF_GetPageCount'] = createExportWrapper(
       'FPDF_GetPageCount',
       1,

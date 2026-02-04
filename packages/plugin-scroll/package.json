@@ -1,6 +1,6 @@
 {
   "name": "@embedpdf/plugin-scroll",
-  "version": "1.5.0",
+  "version": "2.4.0",
   "type": "module",
   "license": "MIT",
   "main": "./dist/index.cjs",
@@ -52,6 +52,7 @@
     "@embedpdf/build": "workspace:*",
     "@embedpdf/core": "workspace:*",
     "@embedpdf/plugin-viewport": "workspace:*",
+    "@embedpdf/plugin-spread": "workspace:*",
     "@types/react": "^18.2.0",
     "typescript": "^5.0.0"
   },

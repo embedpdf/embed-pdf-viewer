@@ -1,0 +1,124 @@
+@import 'tailwindcss';
+@import url('https://fonts.googleapis.com/css2?family=Open+Sans:wght@400;600&display=swap');
+
+/* ─────────────────────────────────────────────────────────
+   Theme System - Tailwind 4 CSS Custom Properties
+   ───────────────────────────────────────────────────────── */
+
+@theme {
+  /* Background colors */
+  --color-bg-app: var(--ep-background-app);
+  --color-bg-surface: var(--ep-background-surface);
+  --color-bg-surface-alt: var(--ep-background-surface-alt);
+  --color-bg-elevated: var(--ep-background-elevated);
+  --color-bg-overlay: var(--ep-background-overlay);
+  --color-bg-input: var(--ep-background-input);
+
+  /* Foreground/text colors */
+  --color-fg-primary: var(--ep-foreground-primary);
+  --color-fg-secondary: var(--ep-foreground-secondary);
+  --color-fg-muted: var(--ep-foreground-muted);
+  --color-fg-disabled: var(--ep-foreground-disabled);
+  --color-fg-on-accent: var(--ep-foreground-on-accent);
+
+  /* Border colors */
+  --color-border-default: var(--ep-border-default);
+  --color-border-subtle: var(--ep-border-subtle);
+  --color-border-strong: var(--ep-border-strong);
+
+  /* Accent colors */
+  --color-accent: var(--ep-accent-primary);
+  --color-accent-hover: var(--ep-accent-primary-hover);
+  --color-accent-active: var(--ep-accent-primary-active);
+  --color-accent-light: var(--ep-accent-primary-light);
+  --color-accent-fg: var(--ep-accent-primary-foreground);
+
+  /* Interactive colors */
+  --color-interactive-hover: var(--ep-interactive-hover);
+  --color-interactive-active: var(--ep-interactive-active);
+  --color-interactive-selected: var(--ep-interactive-selected);
+  --color-interactive-focus: var(--ep-interactive-focus);
+  --color-interactive-focus-ring: var(--ep-interactive-focus-ring);
+
+  /* State colors */
+  --color-state-error: var(--ep-state-error);
+  --color-state-error-light: var(--ep-state-error-light);
+  --color-state-warning: var(--ep-state-warning);
+  --color-state-warning-light: var(--ep-state-warning-light);
+  --color-state-success: var(--ep-state-success);
+  --color-state-success-light: var(--ep-state-success-light);
+  --color-state-info: var(--ep-state-info);
+  --color-state-info-light: var(--ep-state-info-light);
+
+  /* Tooltip colors */
+  --color-tooltip-bg: var(--ep-tooltip-background);
+  --color-tooltip-fg: var(--ep-tooltip-foreground);
+
+  /* Scrollbar colors */
+  --color-scrollbar-track: var(--ep-scrollbar-track);
+  --color-scrollbar-thumb: var(--ep-scrollbar-thumb);
+  --color-scrollbar-thumb-hover: var(--ep-scrollbar-thumb-hover);
+}
+
+/* ─────────────────────────────────────────────────────────
+   Host Element - Default Theme Values (Light)
+   ───────────────────────────────────────────────────────── */
+
+:host {
+  /* Tailwind CSS variables */
+  --tw-translate-x: 0;
+  --tw-translate-y: 0;
+  --tw-translate-z: 0;
+  --tw-rotate-x: rotateX(0);
+  --tw-rotate-y: rotateY(0);
+  --tw-rotate-z: rotateZ(0);
+  --tw-skew-x: skewX(0);
+  --tw-skew-y: skewY(0);
+  --tw-border-style: solid;
+  --tw-gradient-from: #0000;
+  --tw-gradient-via: #0000;
+  --tw-gradient-to: #0000;
+  --tw-gradient-from-position: 0%;
+  --tw-gradient-via-position: 50%;
+  --tw-gradient-to-position: 100%;
+  --tw-shadow: 0 0 #0000;
+  --tw-inset-shadow: 0 0 #0000;
+  --tw-ring-shadow: 0 0 #0000;
+  --tw-inset-ring-shadow: 0 0 #0000;
+  --tw-ring-offset-width: 0px;
+  --tw-ring-offset-color: #fff;
+  --tw-ring-offset-shadow: 0 0 #0000;
+  --tw-outline-style: solid;
+
+  /* Host display settings */
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  width: 100%;
+  height: 100%;
+  font-family: 'Open Sans', system-ui, sans-serif;
+  color: var(--ep-foreground-primary);
+  background-color: var(--ep-background-surface);
+}
+
+/* ─────────────────────────────────────────────────────────
+   Custom Scrollbar Styling
+   ───────────────────────────────────────────────────────── */
+
+:host *::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+:host *::-webkit-scrollbar-track {
+  background: var(--ep-scrollbar-track);
+}
+
+:host *::-webkit-scrollbar-thumb {
+  background: var(--ep-scrollbar-thumb);
+  border-radius: 4px;
+}
+
+:host *::-webkit-scrollbar-thumb:hover {
+  background: var(--ep-scrollbar-thumb-hover);
+}

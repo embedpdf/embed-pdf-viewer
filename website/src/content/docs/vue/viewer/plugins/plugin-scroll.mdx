@@ -1,0 +1,145 @@
+---
+title: Scrolling & Navigation
+description: Configure layout directions, render gaps, and control navigation programmatically.
+---
+
+import { ScrollExample } from '../../code-examples/viewer/scroll-example';
+import { ScrollInitialPageExample } from '../../code-examples/viewer/scroll-initial-page-example';
+
+# Scrolling & Navigation
+
+The PDFViewer includes a powerful scroll engine capable of handling large documents with ease. It supports vertical and horizontal layouts, smooth scrolling animations, and programmatic navigation control.
+
+## Configuration
+
+You can configure global scroll settings via the `scroll` property.
+
+```vue
+<script setup lang="ts">
+import { PDFViewer, ScrollStrategy } from '@embedpdf/vue-pdf-viewer';
+</script>
+
+<template>
+  <PDFViewer
+    :config="{
+      documentManager: {
+        initialDocuments: [{ 
+          url: 'https://snippet.embedpdf.com/ebook.pdf',
+          documentId: 'my-doc'
+        }]
+      },
+      scroll: {
+        defaultStrategy: ScrollStrategy.Vertical,
+        defaultPageGap: 20
+      }
+    }"
+  />
+</template>
+```
+
+## Controlling Navigation Programmatically
+
+You can control the viewer from your own application logic.
+
+<CodeExample codePaths={["../../examples/vue-tailwind/src/examples/viewer/scroll-example.vue"]}> 
+  <ScrollExample />
+</CodeExample>
+
+### Targeting the Active Document
+
+```vue
+<script setup lang="ts">
+import { ref } from 'vue';
+import { PDFViewer, type PluginRegistry } from '@embedpdf/vue-pdf-viewer';
+
+const registry = ref<PluginRegistry | null>(null);
+
+const handleReady = (r: PluginRegistry) => {
+  registry.value = r;
+};
+
+const nextPage = () => {
+  const scroll = registry.value?.getPlugin('scroll')?.provides();
+  scroll?.scrollToNextPage();
+};
+
+const goToPage = (pageNumber: number) => {
+  const scroll = registry.value?.getPlugin('scroll')?.provides();
+  scroll?.scrollToPage({ pageNumber });
+};
+</script>
+
+<template>
+  <PDFViewer @ready="handleReady" :config="{ src: '/doc.pdf' }" />
+</template>
+```
+
+### Targeting a Specific Document
+
+If you have multiple documents open, you can target a specific one using its ID.
+
+```vue
+<script setup lang="ts">
+const goToPage10 = () => {
+  const scroll = registry.value?.getPlugin('scroll')?.provides();
+  const docScroll = scroll?.forDocument('my-doc');
+  docScroll?.scrollToPage({ pageNumber: 10 });
+};
+</script>
+```
+
+## Scrolling on Load
+
+Because documents load asynchronously, you cannot simply call `scrollToPage` immediately after initialization. Instead, you should listen for the `onLayoutReady` event. This event fires when the document structure is calculated and the viewer is ready to scroll.
+
+<CodeExample codePaths={["../../examples/vue-tailwind/src/examples/viewer/scroll-initial-page-example.vue"]}> 
+  <ScrollInitialPageExample />
+</CodeExample>
+
+```vue
+<script setup lang="ts">
+import { PDFViewer, type PluginRegistry } from '@embedpdf/vue-pdf-viewer';
+
+const handleReady = (registry: PluginRegistry) => {
+  const scroll = registry.getPlugin('scroll')?.provides();
+
+  scroll?.onLayoutReady((event) => {
+    // Check if this is the document we want to control
+    if (event.documentId === 'my-doc' && event.isInitial) {
+      scroll.forDocument('my-doc').scrollToPage({ 
+        pageNumber: 3, 
+        behavior: 'instant' // Instant jump for initial load
+      });
+    }
+  });
+};
+</script>
+
+<template>
+  <PDFViewer @ready="handleReady" :config="{ src: '/doc.pdf' }" />
+</template>
+```
+
+## Listening for Page Changes
+
+You can listen for page change events to keep your application UI in sync.
+
+```vue
+<script setup lang="ts">
+import { PDFViewer, type PluginRegistry } from '@embedpdf/vue-pdf-viewer';
+
+const handleReady = (registry: PluginRegistry) => {
+  const scroll = registry.getPlugin('scroll')?.provides();
+
+  scroll?.onPageChange((event) => {
+    console.log(`Doc: ${event.documentId}`);
+    console.log(`Current Page: ${event.pageNumber}`);
+    console.log(`Total Pages: ${event.totalPages}`);
+  });
+};
+</script>
+
+<template>
+  <PDFViewer @ready="handleReady" :config="{ src: '/doc.pdf' }" />
+</template>
+```

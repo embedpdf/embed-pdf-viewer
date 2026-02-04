@@ -1,5 +1,87 @@
 # @embedpdf/utils
 
+## 2.4.0
+
+## 2.3.0
+
+## 2.2.0
+
+## 2.1.2
+
+## 2.1.1
+
+## 2.1.0
+
+## 2.0.2
+
+### Patch Changes
+
+- [#360](https://github.com/embedpdf/embed-pdf-viewer/pull/360) by [@bobsingor](https://github.com/bobsingor) – Fixed aspect ratio being lost when resizing annotations near canvas bounding box edges.
+
+## 2.0.1
+
+## 2.0.0
+
+### Minor Changes
+
+- [#279](https://github.com/embedpdf/embed-pdf-viewer/pull/279) by [@bobsingor](https://github.com/bobsingor) – ## Multi-Document Support
+
+  Added utilities for selection menu positioning and context handling.
+
+  ### New Features
+  - **SelectionMenuPlacement**: New interface for placement hints when positioning selection menus (suggestTop, spaceAbove, spaceBelow).
+  - **SelectionMenuContextBase**: Base context type that all layer contexts must extend, providing a discriminated union pattern for menu contexts.
+  - **Selection Menu Utilities**: New selection menu utilities exported from the main utils package.
+
+### Patch Changes
+
+- [#303](https://github.com/embedpdf/embed-pdf-viewer/pull/303) by [@bobsingor](https://github.com/bobsingor) – Refactored `CounterRotateContainer` to use a Svelte action (`action: Action<HTMLElement>`) instead of a ref callback (`ref: (el: HTMLElement | null) => void`). This is the idiomatic Svelte pattern for attaching lifecycle-managed behavior to DOM elements. Updated `MenuWrapperProps` type accordingly.
+
+  **Migration:**
+
+  ```svelte
+  <!-- Before -->
+  <span bind:this={el} style={menuWrapperProps.style}>
+  $effect(() => { menuWrapperProps.ref(el); });
+
+  <!-- After -->
+  <span use:menuWrapperProps.action style={menuWrapperProps.style}>
+  ```
+
+## 2.0.0-next.3
+
+## 2.0.0-next.2
+
+## 2.0.0-next.1
+
+### Patch Changes
+
+- [`caec11d`](https://github.com/embedpdf/embed-pdf-viewer/commit/caec11d7e8b925e641b4834aadf9a126edfb3586) by [@bobsingor](https://github.com/bobsingor) – Refactored `CounterRotateContainer` to use a Svelte action (`action: Action<HTMLElement>`) instead of a ref callback (`ref: (el: HTMLElement | null) => void`). This is the idiomatic Svelte pattern for attaching lifecycle-managed behavior to DOM elements. Updated `MenuWrapperProps` type accordingly.
+
+  **Migration:**
+
+  ```svelte
+  <!-- Before -->
+  <span bind:this={el} style={menuWrapperProps.style}>
+  $effect(() => { menuWrapperProps.ref(el); });
+
+  <!-- After -->
+  <span use:menuWrapperProps.action style={menuWrapperProps.style}>
+  ```
+
+## 2.0.0-next.0
+
+### Minor Changes
+
+- [#279](https://github.com/embedpdf/embed-pdf-viewer/pull/279) by [@bobsingor](https://github.com/bobsingor) – ## Multi-Document Support
+
+  Added utilities for selection menu positioning and context handling.
+
+  ### New Features
+  - **SelectionMenuPlacement**: New interface for placement hints when positioning selection menus (suggestTop, spaceAbove, spaceBelow).
+  - **SelectionMenuContextBase**: Base context type that all layer contexts must extend, providing a discriminated union pattern for menu contexts.
+  - **Selection Menu Utilities**: New selection menu utilities exported from the main utils package.
+
 ## 1.5.0
 
 ## 1.4.1

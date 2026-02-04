@@ -1,6 +1,6 @@
 {
   "name": "@embedpdf/pdfium",
-  "version": "1.5.0",
+  "version": "2.4.0",
   "private": false,
   "description": "PDFium WebAssembly for the web platform. This package provides a powerful JavaScript interface to PDFium, enabling high-quality PDF rendering and manipulation directly in web applications.",
   "type": "module",
@@ -64,13 +64,13 @@
     "@rollup/plugin-commonjs": "^25.0.8",
     "@rollup/plugin-node-resolve": "^15.2.1",
     "@rollup/plugin-replace": "^5.0.2",
-    "@rollup/plugin-typescript": "^11.1.2",
+    "@rollup/plugin-typescript": "^12.3.0",
     "@types/emscripten": "^1.39.13",
-    "cpy-cli": "^5.0.0",
+    "cpy-cli": "^6.0.0",
     "magic-string": "^0.30.17",
-    "rollup": "^3.28.0",
+    "rollup": "^4.53.5",
     "rollup-plugin-copy": "^3.4.0",
-    "rollup-plugin-dts": "^6.2.1",
+    "rollup-plugin-dts": "^6.3.0",
     "typescript": "^5.0.0"
   },
   "publishConfig": {

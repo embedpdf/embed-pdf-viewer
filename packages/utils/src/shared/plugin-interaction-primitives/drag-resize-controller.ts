@@ -36,6 +36,24 @@ export interface InteractionEvent {
   transformData?: TransformData;
 }
 
+/** Anchor describes which edges stay fixed when resizing. */
+type Anchor = {
+  x: 'left' | 'right' | 'center';
+  y: 'top' | 'bottom' | 'center';
+};
+
+/**
+ * Derive anchor from handle.
+ * - 'e' means we're dragging east → left edge is anchored
+ * - 'nw' means we're dragging north-west → bottom-right corner is anchored
+ */
+function getAnchor(handle: ResizeHandle): Anchor {
+  return {
+    x: handle.includes('e') ? 'left' : handle.includes('w') ? 'right' : 'center',
+    y: handle.includes('s') ? 'top' : handle.includes('n') ? 'bottom' : 'center',
+  };
+}
+
 /**
  * Pure geometric controller that manages drag/resize/vertex-edit logic.
  */
@@ -344,141 +362,183 @@ export class DragResizeController {
     return this.applyConstraints(position);
   }
 
+  /**
+   * Calculate the new rect after a resize operation.
+   * Pipeline: applyDelta → enforceAspectRatio → clampToBounds → applyConstraints
+   */
   private calculateResizePosition(delta: Position, handle: ResizeHandle): Rect {
     if (!this.startElement) return this.config.element;
 
-    let {
-      origin: { x, y },
-      size: { width, height },
-    } = this.startElement;
+    const anchor = getAnchor(handle);
+    const aspectRatio = this.startElement.size.width / this.startElement.size.height || 1;
 
-    switch (handle) {
-      case 'se':
-        width += delta.x;
-        height += delta.y;
-        break;
-      case 'sw':
-        x += delta.x;
-        width -= delta.x;
-        height += delta.y;
-        break;
-      case 'ne':
-        width += delta.x;
-        y += delta.y;
-        height -= delta.y;
-        break;
-      case 'nw':
-        x += delta.x;
-        width -= delta.x;
-        y += delta.y;
-        height -= delta.y;
-        break;
-      case 'n':
-        y += delta.y;
-        height -= delta.y;
-        break;
-      case 's':
-        height += delta.y;
-        break;
-      case 'e':
-        width += delta.x;
-        break;
-      case 'w':
-        x += delta.x;
-        width -= delta.x;
-        break;
+    // Step 1: Apply delta to get raw resize
+    let rect = this.applyResizeDelta(delta, anchor);
+
+    // Step 2: Enforce aspect ratio if enabled
+    if (this.config.maintainAspectRatio) {
+      rect = this.enforceAspectRatio(rect, anchor, aspectRatio);
     }
 
-    // Maintain aspect ratio if needed
-    if (this.config.maintainAspectRatio && this.startElement) {
-      const aspectRatio = this.startElement.size.width / this.startElement.size.height;
+    // Step 3: Clamp to bounding box
+    rect = this.clampToBounds(rect, anchor, aspectRatio);
 
-      if (['n', 's', 'e', 'w'].includes(handle)) {
-        if (handle === 'n' || handle === 's') {
-          const newWidth = height * aspectRatio;
-          const widthDiff = newWidth - width;
-          width = newWidth;
-          x -= widthDiff / 2;
-        } else {
-          const newHeight = width / aspectRatio;
-          const heightDiff = newHeight - height;
-          height = newHeight;
-          if (handle === 'w') {
-            x = this.startElement.origin.x + this.startElement.size.width - width;
-          }
-          y -= heightDiff / 2;
-        }
+    // Step 4: Apply min/max constraints
+    return this.applyConstraints(rect);
+  }
+
+  /**
+   * Apply the mouse delta to produce a raw (unconstrained) resized rect.
+   */
+  private applyResizeDelta(delta: Position, anchor: Anchor): Rect {
+    const start = this.startElement!;
+    let x = start.origin.x;
+    let y = start.origin.y;
+    let width = start.size.width;
+    let height = start.size.height;
+
+    // Horizontal: if anchor is left, right edge moves; if anchor is right, left edge moves
+    if (anchor.x === 'left') {
+      width += delta.x;
+    } else if (anchor.x === 'right') {
+      x += delta.x;
+      width -= delta.x;
+    }
+    // anchor.x === 'center' means no horizontal resize from this handle
+
+    // Vertical: if anchor is top, bottom edge moves; if anchor is bottom, top edge moves
+    if (anchor.y === 'top') {
+      height += delta.y;
+    } else if (anchor.y === 'bottom') {
+      y += delta.y;
+      height -= delta.y;
+    }
+
+    return { origin: { x, y }, size: { width, height } };
+  }
+
+  /**
+   * Enforce aspect ratio while respecting the anchor.
+   * For edge handles (center anchor on one axis), the rect expands symmetrically on that axis.
+   * For corner handles, the anchor corner stays fixed.
+   */
+  private enforceAspectRatio(rect: Rect, anchor: Anchor, aspectRatio: number): Rect {
+    const start = this.startElement!;
+    let { x, y } = rect.origin;
+    let { width, height } = rect.size;
+
+    const isEdgeHandle = anchor.x === 'center' || anchor.y === 'center';
+
+    if (isEdgeHandle) {
+      // Edge handle: one dimension drives, the other follows, centered on the non-moving axis
+      if (anchor.y === 'center') {
+        // Horizontal edge (e/w): width is primary
+        height = width / aspectRatio;
+        // Center vertically relative to original
+        y = start.origin.y + (start.size.height - height) / 2;
       } else {
-        const widthChange = Math.abs(width - this.startElement.size.width);
-        const heightChange = Math.abs(height - this.startElement.size.height);
-        if (widthChange > heightChange) {
-          height = width / aspectRatio;
-        } else {
-          width = height * aspectRatio;
-        }
-        if (handle.includes('w')) {
-          x = this.startElement.origin.x + this.startElement.size.width - width;
-        }
-        if (handle.includes('n')) {
-          y = this.startElement.origin.y + this.startElement.size.height - height;
-        }
+        // Vertical edge (n/s): height is primary
+        width = height * aspectRatio;
+        // Center horizontally relative to original
+        x = start.origin.x + (start.size.width - width) / 2;
+      }
+    } else {
+      // Corner handle: pick the dominant axis based on which changed more
+      const dw = Math.abs(width - start.size.width);
+      const dh = Math.abs(height - start.size.height);
+
+      if (dw >= dh) {
+        height = width / aspectRatio;
+      } else {
+        width = height * aspectRatio;
       }
     }
 
-    // Handle-aware bounding box clamping to avoid shifting opposite edge
+    // Reposition based on anchor
+    if (anchor.x === 'right') {
+      x = start.origin.x + start.size.width - width;
+    }
+    if (anchor.y === 'bottom') {
+      y = start.origin.y + start.size.height - height;
+    }
+
+    return { origin: { x, y }, size: { width, height } };
+  }
+
+  /**
+   * Clamp rect to bounding box while respecting anchor and aspect ratio.
+   */
+  private clampToBounds(rect: Rect, anchor: Anchor, aspectRatio: number): Rect {
     const bbox = this.config.constraints?.boundingBox;
-    if (bbox) {
-      switch (handle) {
-        case 'e':
-          width = Math.min(width, bbox.width - x);
-          break;
-        case 's':
-          height = Math.min(height, bbox.height - y);
-          break;
-        case 'se':
-          width = Math.min(width, bbox.width - x);
-          height = Math.min(height, bbox.height - y);
-          break;
-        case 'w':
-          if (x < 0) {
-            width += x;
-            x = 0;
-          }
-          break;
-        case 'n':
-          if (y < 0) {
-            height += y;
-            y = 0;
-          }
-          break;
-        case 'sw':
-          if (x < 0) {
-            width += x;
-            x = 0;
-          }
-          height = Math.min(height, bbox.height - y);
-          break;
-        case 'nw':
-          if (x < 0) {
-            width += x;
-            x = 0;
-          }
-          if (y < 0) {
-            height += y;
-            y = 0;
-          }
-          break;
-        case 'ne':
-          width = Math.min(width, bbox.width - x);
-          if (y < 0) {
-            height += y;
-            y = 0;
-          }
-          break;
+    if (!bbox) return rect;
+
+    const start = this.startElement!;
+    let { x, y } = rect.origin;
+    let { width, height } = rect.size;
+
+    // Ensure positive dimensions
+    width = Math.max(1, width);
+    height = Math.max(1, height);
+
+    // Calculate anchor points (the edges/corners that must stay fixed)
+    const anchorX = anchor.x === 'left' ? start.origin.x : start.origin.x + start.size.width;
+    const anchorY = anchor.y === 'top' ? start.origin.y : start.origin.y + start.size.height;
+
+    // Calculate max available space from anchor
+    const maxW =
+      anchor.x === 'left'
+        ? bbox.width - anchorX
+        : anchor.x === 'right'
+          ? anchorX
+          : Math.min(start.origin.x, bbox.width - start.origin.x - start.size.width) * 2 +
+            start.size.width;
+
+    const maxH =
+      anchor.y === 'top'
+        ? bbox.height - anchorY
+        : anchor.y === 'bottom'
+          ? anchorY
+          : Math.min(start.origin.y, bbox.height - start.origin.y - start.size.height) * 2 +
+            start.size.height;
+
+    if (this.config.maintainAspectRatio) {
+      // Find the scaling factor that fits both constraints
+      const scaleW = width > maxW ? maxW / width : 1;
+      const scaleH = height > maxH ? maxH / height : 1;
+      const scale = Math.min(scaleW, scaleH);
+
+      if (scale < 1) {
+        width *= scale;
+        height *= scale;
       }
+    } else {
+      // Clamp independently
+      width = Math.min(width, maxW);
+      height = Math.min(height, maxH);
     }
 
-    return this.applyConstraints({ origin: { x, y }, size: { width, height } });
+    // Recompute position based on anchor
+    if (anchor.x === 'left') {
+      x = anchorX;
+    } else if (anchor.x === 'right') {
+      x = anchorX - width;
+    } else {
+      x = start.origin.x + (start.size.width - width) / 2;
+    }
+
+    if (anchor.y === 'top') {
+      y = anchorY;
+    } else if (anchor.y === 'bottom') {
+      y = anchorY - height;
+    } else {
+      y = start.origin.y + (start.size.height - height) / 2;
+    }
+
+    // Final clamp to ensure we're within bounds (handles center anchor edge cases)
+    x = Math.max(0, Math.min(x, bbox.width - width));
+    y = Math.max(0, Math.min(y, bbox.height - height));
+
+    return { origin: { x, y }, size: { width, height } };
   }
 
   private applyConstraints(position: Rect): Rect {
@@ -490,14 +550,41 @@ export class DragResizeController {
       size: { width, height },
     } = position;
 
-    // Apply size constraints
-    width = Math.max(constraints.minWidth || 1, width);
-    height = Math.max(constraints.minHeight || 1, height);
+    const minW = constraints.minWidth ?? 1;
+    const minH = constraints.minHeight ?? 1;
+    const maxW = constraints.maxWidth;
+    const maxH = constraints.maxHeight;
 
-    if (constraints.maxWidth) width = Math.min(constraints.maxWidth, width);
-    if (constraints.maxHeight) height = Math.min(constraints.maxHeight, height);
+    if (this.config.maintainAspectRatio && width > 0 && height > 0) {
+      const ratio = width / height;
 
-    // Apply bounding box constraints
+      // Enforce mins (scale up)
+      if (width < minW) {
+        width = minW;
+        height = width / ratio;
+      }
+      if (height < minH) {
+        height = minH;
+        width = height * ratio;
+      }
+
+      // Enforce maxes (scale down)
+      if (maxW !== undefined && width > maxW) {
+        width = maxW;
+        height = width / ratio;
+      }
+      if (maxH !== undefined && height > maxH) {
+        height = maxH;
+        width = height * ratio;
+      }
+    } else {
+      width = Math.max(minW, width);
+      height = Math.max(minH, height);
+      if (maxW !== undefined) width = Math.min(maxW, width);
+      if (maxH !== undefined) height = Math.min(maxH, height);
+    }
+
+    // Clamp position to bounding box
     if (constraints.boundingBox) {
       x = Math.max(0, Math.min(x, constraints.boundingBox.width - width));
       y = Math.max(0, Math.min(y, constraints.boundingBox.height - height));

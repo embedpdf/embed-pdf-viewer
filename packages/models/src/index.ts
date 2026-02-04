@@ -15,6 +15,8 @@ export * from './color';
 export * from './date';
 export * from './helpers';
 export * from './uuid';
+export * from './compound-task';
+export * from './fonts';
 
 /**
  * ignore will do nothing when called.

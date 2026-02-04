@@ -1,0 +1,14 @@
+{
+  "extends": "../../tsconfig.json",
+  "compilerOptions": {
+    "jsx": "react-jsx",
+    "jsxImportSource": "react",
+    "baseUrl": "../..",
+    "paths": {
+      "@framework": ["src/react/adapter.ts"],
+      "@embedpdf/core/@framework": ["src/react/core.ts"],
+      "@embedpdf/plugin-document-manager": ["src/lib/index.ts"]
+    }
+  },
+  "include": ["../shared/**/*.ts", "../shared/**/*.tsx", "./**/*.ts", "./**/*.tsx"]
+}

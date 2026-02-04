@@ -1,33 +1,39 @@
 import { Paper, IconButton, Popper } from '@mui/material';
 import DeleteOutlineOutlinedIcon from '@mui/icons-material/DeleteOutlineOutlined';
 import DoneIcon from '@mui/icons-material/Done';
-import { MenuWrapperProps } from '@embedpdf/utils/react';
 import { useState } from 'react';
-import { RedactionItem, useRedactionCapability } from '@embedpdf/plugin-redaction/react';
+import {
+  RedactionSelectionMenuProps,
+  useRedactionCapability,
+} from '@embedpdf/plugin-redaction/react';
 
-interface RedactionSelectionMenuProps {
-  menuWrapperProps: MenuWrapperProps;
-  selected: RedactionItem;
+interface Props extends RedactionSelectionMenuProps {
+  documentId: string;
   container?: HTMLElement | null;
 }
 
 export function RedactionSelectionMenu({
   selected,
+  context,
+  documentId,
   container,
   menuWrapperProps,
-}: RedactionSelectionMenuProps) {
-  const { provides: redaction } = useRedactionCapability();
+}: Props) {
+  const { provides: redactionCapability } = useRedactionCapability();
   const [anchorEl, setAnchorEl] = useState<HTMLSpanElement | null>(null);
+
+  // Get document-scoped API
+  const redaction = redactionCapability?.forDocument(documentId);
 
   const handleDelete = () => {
     if (!redaction) return;
-    const { page, id } = selected;
+    const { page, id } = context.item;
     redaction.removePending(page, id);
   };
 
   const handleCommit = () => {
     if (!redaction) return;
-    const { page, id } = selected;
+    const { page, id } = context.item;
     redaction.commitPending(page, id);
   };
 
@@ -35,7 +41,7 @@ export function RedactionSelectionMenu({
     <>
       <span {...menuWrapperProps} ref={setAnchorEl} />
       <Popper
-        open={Boolean(anchorEl)}
+        open={Boolean(anchorEl) && selected}
         anchorEl={anchorEl}
         placement="bottom"
         modifiers={[{ name: 'offset', options: { offset: [0, 8] } }]}

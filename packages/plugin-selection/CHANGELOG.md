@@ -1,5 +1,125 @@
 # @embedpdf/plugin-selection
 
+## 2.4.0
+
+## 2.3.0
+
+### Minor Changes
+
+- [#406](https://github.com/embedpdf/embed-pdf-viewer/pull/406) by [@bobsingor](https://github.com/bobsingor) – Added marquee selection functionality allowing users to drag a rectangle to select multiple elements. Introduced `createMarqueeSelectionHandler` and `createTextSelectionHandler` as separate pointer event handlers that can be combined with `mergeHandlers`. Added `MarqueeSelection` component for Preact, Svelte, and Vue. Added `EnableForModeOptions` interface with `showRects` option for configurable selection behavior. Added `onMarqueeChange` and `onMarqueeEnd` events. Added `setMarqueeEnabled` and `isMarqueeEnabled` methods to the capability.
+
+## 2.2.0
+
+## 2.1.2
+
+## 2.1.1
+
+## 2.1.0
+
+## 2.0.2
+
+## 2.0.1
+
+## 2.0.0
+
+### Major Changes
+
+- [#279](https://github.com/embedpdf/embed-pdf-viewer/pull/279) by [@bobsingor](https://github.com/bobsingor) – ## Multi-Document Support
+
+  The selection plugin now supports per-document text selection state and operations.
+
+  ### Breaking Changes
+  - **All Actions**: Now require `documentId` parameter:
+    - `cachePageGeometry(documentId, page, geo)` - was `cachePageGeometry(page, geo)`
+    - `setSelection(documentId, selection)` - was `setSelection(selection)`
+    - `startSelection(documentId)` - was `startSelection()` (no params)
+    - `endSelection(documentId)` - was `endSelection()` (no params)
+    - `clearSelection(documentId)` - was `clearSelection()` (no params)
+    - `setRects(documentId, rects)` - was `setRects(rects)`
+    - `setSlices(documentId, slices)` - was `setSlices(slices)`
+  - **State Structure**: Plugin state now uses `documents: Record<string, SelectionDocumentState>` to track per-document selection state including cached page geometry, selection ranges, rects, and slices.
+  - **Action Creators**: All action creators now require `documentId`.
+
+  ### Framework-Specific Changes (React/Preact, Svelte, Vue)
+  - **SelectionLayer Component**:
+    - Now requires `documentId` prop (React/Preact: `@embedpdf/plugin-selection/react`, Svelte: `@embedpdf/plugin-selection/svelte`, Vue: `@embedpdf/plugin-selection/vue`)
+    - `scale` prop is now optional - if not provided, uses document state scale
+    - Added optional `rotation` prop - if not provided, uses document state rotation
+    - Added optional `selectionMenu` prop for custom selection menu rendering
+    - Component subscribes to document-specific selection state and menu placement
+  - **CopyToClipboard Component**:
+    - Updated to handle document-scoped copy events with `{ text }` payload format
+
+  ### New Features
+  - Per-document text selection tracking
+  - Per-document page geometry caching
+  - Per-document selection rects and slices
+  - Document lifecycle management with automatic state initialization and cleanup
+
+### Patch Changes
+
+- [#303](https://github.com/embedpdf/embed-pdf-viewer/pull/303) by [@bobsingor](https://github.com/bobsingor) – Added configurable `menuHeight` option to `SelectionPluginConfig`. This allows customizing the height used to determine whether the selection menu appears above or below the selection. Default value is `40` pixels. Also fixed type imports in Svelte `SelectionLayer` component.
+
+  ```typescript
+  createPluginRegistration(SelectionPluginPackage, {
+    enabled: true,
+    menuHeight: 50, // Custom menu height for placement calculations
+  });
+  ```
+
+## 2.0.0-next.3
+
+## 2.0.0-next.2
+
+## 2.0.0-next.1
+
+### Patch Changes
+
+- [`caec11d`](https://github.com/embedpdf/embed-pdf-viewer/commit/caec11d7e8b925e641b4834aadf9a126edfb3586) by [@bobsingor](https://github.com/bobsingor) – Added configurable `menuHeight` option to `SelectionPluginConfig`. This allows customizing the height used to determine whether the selection menu appears above or below the selection. Default value is `40` pixels. Also fixed type imports in Svelte `SelectionLayer` component.
+
+  ```typescript
+  createPluginRegistration(SelectionPluginPackage, {
+    enabled: true,
+    menuHeight: 50, // Custom menu height for placement calculations
+  });
+  ```
+
+## 2.0.0-next.0
+
+### Major Changes
+
+- [#279](https://github.com/embedpdf/embed-pdf-viewer/pull/279) by [@bobsingor](https://github.com/bobsingor) – ## Multi-Document Support
+
+  The selection plugin now supports per-document text selection state and operations.
+
+  ### Breaking Changes
+  - **All Actions**: Now require `documentId` parameter:
+    - `cachePageGeometry(documentId, page, geo)` - was `cachePageGeometry(page, geo)`
+    - `setSelection(documentId, selection)` - was `setSelection(selection)`
+    - `startSelection(documentId)` - was `startSelection()` (no params)
+    - `endSelection(documentId)` - was `endSelection()` (no params)
+    - `clearSelection(documentId)` - was `clearSelection()` (no params)
+    - `setRects(documentId, rects)` - was `setRects(rects)`
+    - `setSlices(documentId, slices)` - was `setSlices(slices)`
+  - **State Structure**: Plugin state now uses `documents: Record<string, SelectionDocumentState>` to track per-document selection state including cached page geometry, selection ranges, rects, and slices.
+  - **Action Creators**: All action creators now require `documentId`.
+
+  ### Framework-Specific Changes (React/Preact, Svelte, Vue)
+  - **SelectionLayer Component**:
+    - Now requires `documentId` prop (React/Preact: `@embedpdf/plugin-selection/react`, Svelte: `@embedpdf/plugin-selection/svelte`, Vue: `@embedpdf/plugin-selection/vue`)
+    - `scale` prop is now optional - if not provided, uses document state scale
+    - Added optional `rotation` prop - if not provided, uses document state rotation
+    - Added optional `selectionMenu` prop for custom selection menu rendering
+    - Component subscribes to document-specific selection state and menu placement
+  - **CopyToClipboard Component**:
+    - Updated to handle document-scoped copy events with `{ text }` payload format
+
+  ### New Features
+  - Per-document text selection tracking
+  - Per-document page geometry caching
+  - Per-document selection rects and slices
+  - Document lifecycle management with automatic state initialization and cleanup
+
 ## 1.5.0
 
 ## 1.4.1
@@ -67,7 +187,6 @@
 ### Minor Changes
 
 - [#141](https://github.com/embedpdf/embed-pdf-viewer/pull/141) by [@bobsingor](https://github.com/bobsingor) – Break out imperative selection APIs from **capability** to **plugin**, and slim the capability surface.
-
   - **Removed from `SelectionCapability`:**
     - `getGeometry(page)`
     - `begin(page, glyphIdx)`

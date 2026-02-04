@@ -1,35 +1,37 @@
 <script lang="ts">
   import type { Snippet } from 'svelte';
+  import type { HTMLAttributes } from 'svelte/elements';
   import { useFullscreenPlugin, useFullscreenCapability } from '../hooks';
+  import { handleFullscreenRequest } from '../../shared/utils/fullscreen-utils';
 
-  interface Props {
+  type FullscreenProviderProps = Omit<HTMLAttributes<HTMLDivElement>, 'style'> & {
     children: Snippet;
     class?: string;
     style?: string;
-  }
+  };
 
-  const { children, class: className, style }: Props = $props();
+  let {
+    children,
+    class: propsClass,
+    style: propsStyle,
+    ...restProps
+  }: FullscreenProviderProps = $props();
 
-  const fullscreenCapability = useFullscreenCapability();
-  const fullscreenPlugin = useFullscreenPlugin();
+  const fullscreenCapabilityState = useFullscreenCapability();
+  const fullscreenPluginState = useFullscreenPlugin();
 
-  let containerElement: HTMLDivElement | undefined;
+  let containerRef = $state<HTMLDivElement | null>(null);
 
   // Handle fullscreen requests
   $effect(() => {
-    if (!fullscreenCapability.provides) return;
+    const capability = fullscreenCapabilityState.provides;
+    const plugin = fullscreenPluginState.plugin;
 
-    const unsub = fullscreenCapability.provides.onRequest(async (action) => {
-      if (action === 'enter') {
-        const el = containerElement;
-        if (el && !document.fullscreenElement) {
-          await el.requestFullscreen();
-        }
-      } else {
-        if (document.fullscreenElement) {
-          await document.exitFullscreen();
-        }
-      }
+    if (!capability || !plugin) return;
+
+    const unsub = capability.onRequest(async (event) => {
+      const targetSelector = plugin.getTargetSelector();
+      await handleFullscreenRequest(event, containerRef, targetSelector);
     });
 
     return unsub;
@@ -37,10 +39,12 @@
 
   // Listen for fullscreen changes
   $effect(() => {
-    if (!fullscreenPlugin.plugin) return;
+    const plugin = fullscreenPluginState.plugin;
+
+    if (!plugin) return;
 
     const handler = () => {
-      fullscreenPlugin.plugin.setFullscreenState(!!document.fullscreenElement);
+      plugin.setFullscreenState(!!document.fullscreenElement);
     };
 
     document.addEventListener('fullscreenchange', handler);
@@ -49,9 +53,13 @@
 </script>
 
 <div
-  bind:this={containerElement}
-  class={className}
-  style="position: relative; width: 100%; height: 100%; {style || ''}"
+  {...restProps}
+  bind:this={containerRef}
+  style:position="relative"
+  style:width="100%"
+  style:height="100%"
+  style={propsStyle}
+  class={propsClass}
 >
   {@render children()}
 </div>
