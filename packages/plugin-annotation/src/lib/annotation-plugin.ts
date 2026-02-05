@@ -1,4 +1,4 @@
-import { BasePlugin, createBehaviorEmitter, PluginRegistry, Listener } from '@embedpdf/core';
+import { BasePlugin, createBehaviorEmitter, PluginRegistry, Listener, clamp } from '@embedpdf/core';
 import {
   ignore,
   PdfAnnotationObject,
@@ -15,6 +15,7 @@ import {
   Position,
   Rect,
   PdfAnnotationReplyType,
+  Rotation,
 } from '@embedpdf/models';
 import {
   AnnotationCapability,
@@ -1934,6 +1935,43 @@ export class AnnotationPlugin extends BasePlugin<
   }
 
   /**
+   * Rotates ImageData counter-clockwise to compensate for PDF page rotation.
+   */
+  private rotateImageDataToUpright(data: ImageData, pageRotation: Rotation): ImageData {
+    if (pageRotation === Rotation.Degree0) return data;
+
+    const canvas = document.createElement('canvas');
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return data;
+
+    const { width, height } = data;
+
+    if (pageRotation === Rotation.Degree90 || pageRotation === Rotation.Degree270) {
+      canvas.width = height;
+      canvas.height = width;
+    } else {
+      canvas.width = width;
+      canvas.height = height;
+    }
+
+    const angle = (pageRotation * -90 * Math.PI) / 180;
+
+    ctx.translate(canvas.width / 2, canvas.height / 2);
+    ctx.rotate(angle);
+    ctx.translate(-width / 2, -height / 2);
+
+    const tempCanvas = document.createElement('canvas');
+    tempCanvas.width = width;
+    tempCanvas.height = height;
+    const tempCtx = tempCanvas.getContext('2d');
+    if (!tempCtx) return data;
+    tempCtx.putImageData(data, 0, 0);
+
+    ctx.drawImage(tempCanvas, 0, 0);
+    return ctx.getImageData(0, 0, canvas.width, canvas.height);
+  }
+
+  /**
    * Executes a batch of pending changes by creating engine tasks.
    * Returns a task that resolves when all operations complete.
    */
@@ -1955,9 +1993,39 @@ export class AnnotationPlugin extends BasePlugin<
     }> = [];
 
     // Process creations
-    for (const { uid, ta, ctx } of batch.creations) {
+    for (let { uid, ta, ctx } of batch.creations) {
       const page = doc.pages.find((p) => p.index === ta.object.pageIndex);
       if (!page) continue;
+
+      // Ensure stamp image is upright relative to the current page rotation
+      if (ta.object.type === PdfAnnotationSubtype.STAMP && ctx && (ctx as any).imageData) {
+        const pageRotation = page.rotation ?? Rotation.Degree0;
+        if (pageRotation !== Rotation.Degree0) {
+          const rawImageData = (ctx as any).imageData;
+
+          // Pre-rotate the image data to match page rotation
+          const pageRotation = page.rotation ?? Rotation.Degree0;
+          const rotatedImageData = this.rotateImageDataToUpright(rawImageData, pageRotation);
+
+          // Update context with rotated image
+          ctx = {
+            ...(ctx as any),
+            imageData: rotatedImageData,
+          };
+
+          const { x, y } = ta.object.rect.origin;
+          const { width, height } = ta.object.rect.size;
+
+          // Clamp ORIGIN in device space; engine handles rotation during mapping
+          const finalX = clamp(x, 0, page.size.width - width);
+          const finalY = clamp(y, 0, page.size.height - height);
+
+          ta.object.rect = {
+            ...ta.object.rect,
+            origin: { x: finalX, y: finalY },
+          };
+        }
+      }
 
       const createTask = this.engine.createPageAnnotation!(doc, page, ta.object, ctx);
       pendingOps.push({ type: 'create', task: createTask, ta, uid, ctx });
