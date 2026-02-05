@@ -13,7 +13,6 @@ import {
   PdfStandardFont,
   PdfTextAlignment,
   PdfVerticalAlignment,
-  Rotation,
 } from '@embedpdf/models';
 import { AnnotationTool } from '../tools/types';
 
