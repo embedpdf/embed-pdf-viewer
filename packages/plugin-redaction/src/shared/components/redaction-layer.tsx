@@ -27,6 +27,7 @@ export const RedactionLayer = ({
   selectionMenu,
 }: RedactionLayerProps) => {
   const documentState = useDocumentState(documentId);
+  const page = documentState?.document?.pages?.[pageIndex];
 
   const actualScale = useMemo(() => {
     if (scale !== undefined) return scale;
@@ -35,8 +36,11 @@ export const RedactionLayer = ({
 
   const actualRotation = useMemo(() => {
     if (rotation !== undefined) return rotation;
-    return documentState?.rotation ?? Rotation.Degree0;
-  }, [rotation, documentState?.rotation]);
+    // Combine page intrinsic rotation with document rotation
+    const pageRotation = page?.rotation ?? 0;
+    const docRotation = documentState?.rotation ?? 0;
+    return ((pageRotation + docRotation) % 4) as Rotation;
+  }, [rotation, page?.rotation, documentState?.rotation]);
 
   return (
     <Fragment>

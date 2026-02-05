@@ -24,16 +24,24 @@ export interface HandleDescriptor {
 }
 
 function diagonalCursor(handle: ResizeHandle, rot: QuarterTurns): string {
-  // Standard cursors; diagonals flip on odd quarter-turns
+  const isOddRotation = rot % 2 === 1;
+
+  // Edge handles: swap ns/ew on odd rotations
+  if (handle === 'n' || handle === 's') {
+    return isOddRotation ? 'ew-resize' : 'ns-resize';
+  }
+  if (handle === 'e' || handle === 'w') {
+    return isOddRotation ? 'ns-resize' : 'ew-resize';
+  }
+
+  // Corner handles: diagonals flip on odd quarter-turns
   const diag0: Record<'nw' | 'ne' | 'sw' | 'se', string> = {
     nw: 'nwse-resize',
     ne: 'nesw-resize',
     sw: 'nesw-resize',
     se: 'nwse-resize',
   };
-  if (handle === 'n' || handle === 's') return 'ns-resize';
-  if (handle === 'e' || handle === 'w') return 'ew-resize';
-  if (rot % 2 === 0) return diag0[handle as 'nw' | 'ne' | 'sw' | 'se'];
+  if (!isOddRotation) return diag0[handle as 'nw' | 'ne' | 'sw' | 'se'];
   return { nw: 'nesw-resize', ne: 'nwse-resize', sw: 'nwse-resize', se: 'nesw-resize' }[
     handle as 'nw' | 'ne' | 'sw' | 'se'
   ]!;

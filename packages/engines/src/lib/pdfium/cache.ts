@@ -7,11 +7,19 @@ export interface CacheConfig {
   pageTtl?: number;
   /** Maximum number of pages to keep in cache per document (default: 50) */
   maxPagesPerDocument?: number;
+  /**
+   * When true, pages are loaded with normalized rotation:
+   * - All coordinates (annotations, text, rendering) are in 0° space
+   * - The original rotation is preserved for reference
+   * @default false
+   */
+  normalizeRotation?: boolean;
 }
 
 const DEFAULT_CONFIG: Required<CacheConfig> = {
   pageTtl: 5000, // 5 seconds
   maxPagesPerDocument: 10,
+  normalizeRotation: false,
 };
 
 export class PdfCache {
@@ -27,10 +35,12 @@ export class PdfCache {
   }
 
   /** Open (or re-use) a document */
-  setDocument(id: string, filePtr: number, docPtr: number) {
+  setDocument(id: string, filePtr: number, docPtr: number, normalizeRotation: boolean = false) {
     let ctx = this.docs.get(id);
     if (!ctx) {
-      ctx = new DocumentContext(filePtr, docPtr, this.pdfium, this.memoryManager, this.config);
+      // Use per-document normalizeRotation, overriding global config
+      const docConfig = { ...this.config, normalizeRotation };
+      ctx = new DocumentContext(filePtr, docPtr, this.pdfium, this.memoryManager, docConfig);
       this.docs.set(id, ctx);
     }
   }
@@ -91,6 +101,7 @@ export class PdfCache {
 
 export class DocumentContext {
   private readonly pageCache: PageCache;
+  public readonly normalizeRotation: boolean;
 
   constructor(
     public readonly filePtr: number,
@@ -99,6 +110,7 @@ export class DocumentContext {
     private readonly memoryManager: MemoryManager,
     config: Required<CacheConfig>,
   ) {
+    this.normalizeRotation = config.normalizeRotation;
     this.pageCache = new PageCache(pdfium, docPtr, config);
   }
 
@@ -155,7 +167,16 @@ export class PageCache {
       // Ensure we don't exceed max cache size
       this.evictIfNeeded();
 
-      const pagePtr = this.pdf.FPDF_LoadPage(this.docPtr, pageIdx);
+      let pagePtr: number;
+      if (this.config.normalizeRotation) {
+        // Load page with normalized rotation - all coords will be in 0° space
+        // We pass 0 (null pointer) since rotation is already stored in PdfPageObject
+        pagePtr = this.pdf.EPDF_LoadPageNormalized(this.docPtr, pageIdx, 0);
+      } else {
+        // Current behavior
+        pagePtr = this.pdf.FPDF_LoadPage(this.docPtr, pageIdx);
+      }
+
       ctx = new PageContext(this.pdf, this.docPtr, pageIdx, pagePtr, this.config.pageTtl, () => {
         this.cache.delete(pageIdx);
         this.removeFromAccessOrder(pageIdx);

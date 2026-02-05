@@ -41,7 +41,12 @@ export const PagePointerProvider = ({
   // Calculate inline - this is cheap and memoization isn't necessary
   const page = documentState?.document?.pages?.[pageIndex];
   const naturalPageSize = page?.size ?? { width: 0, height: 0 };
-  const rotation = rotationOverride ?? documentState?.rotation ?? 0;
+  // If override is provided, use it directly (consistent with other layer components)
+  // Otherwise, combine page intrinsic rotation with document rotation
+  const pageRotation = page?.rotation ?? 0;
+  const docRotation = documentState?.rotation ?? 0;
+  const rotation =
+    rotationOverride !== undefined ? rotationOverride : (pageRotation + docRotation) % 4;
   const scale = scaleOverride ?? documentState?.scale ?? 1;
   const displaySize = transformSize(naturalPageSize, 0, scale);
 

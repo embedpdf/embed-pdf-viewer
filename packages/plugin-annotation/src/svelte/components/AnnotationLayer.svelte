@@ -87,11 +87,13 @@
     overrideScale !== undefined ? overrideScale : (documentState?.current?.scale ?? 1),
   );
 
-  const actualRotation = $derived(
-    overrideRotation !== undefined
-      ? overrideRotation
-      : (documentState?.current?.rotation ?? Rotation.Degree0),
-  );
+  const actualRotation = $derived.by(() => {
+    if (overrideRotation !== undefined) return overrideRotation;
+    // Combine page intrinsic rotation with document rotation
+    const pageRotation = page?.rotation ?? 0;
+    const docRotation = documentState?.current?.rotation ?? 0;
+    return ((pageRotation + docRotation) % 4) as Rotation;
+  });
 </script>
 
 <div

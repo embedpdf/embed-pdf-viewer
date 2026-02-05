@@ -313,6 +313,10 @@ export class PdfiumNative implements IPdfiumExecutor {
   openDocumentBuffer(file: PdfFile, options?: PdfOpenDocumentBufferOptions) {
     this.logger.debug(LOG_SOURCE, LOG_CATEGORY, 'openDocumentBuffer', file, options);
     this.logger.perf(LOG_SOURCE, LOG_CATEGORY, `OpenDocumentBuffer`, 'Begin', file.id);
+
+    // Per-document normalizeRotation setting (defaults to false for backwards compatibility)
+    const normalizeRotation = options?.normalizeRotation ?? false;
+
     const array = new Uint8Array(file.content);
     const length = array.length;
     const filePtr = this.memoryManager.malloc(length);
@@ -337,13 +341,17 @@ export class PdfiumNative implements IPdfiumExecutor {
     const pages: PdfPageObject[] = [];
     const sizePtr = this.memoryManager.malloc(8);
     for (let index = 0; index < pageCount; index++) {
-      const result = this.pdfiumModule.FPDF_GetPageSizeByIndexF(docPtr, index, sizePtr);
+      // Use normalized size function when normalizeRotation is enabled
+      const result = normalizeRotation
+        ? this.pdfiumModule.EPDF_GetPageSizeByIndexNormalized(docPtr, index, sizePtr)
+        : this.pdfiumModule.FPDF_GetPageSizeByIndexF(docPtr, index, sizePtr);
+
       if (!result) {
         const lastError = this.pdfiumModule.FPDF_GetLastError();
         this.logger.error(
           LOG_SOURCE,
           LOG_CATEGORY,
-          `FPDF_GetPageSizeByIndexF failed with ${lastError}`,
+          `${normalizeRotation ? 'EPDF_GetPageSizeByIndexNormalized' : 'FPDF_GetPageSizeByIndexF'} failed with ${lastError}`,
         );
         this.memoryManager.free(sizePtr);
         this.pdfiumModule.FPDF_CloseDocument(docPtr);
@@ -351,7 +359,7 @@ export class PdfiumNative implements IPdfiumExecutor {
         this.logger.perf(LOG_SOURCE, LOG_CATEGORY, `OpenDocumentBuffer`, 'End', file.id);
         return PdfTaskHelper.reject<PdfDocumentObject>({
           code: lastError,
-          message: `FPDF_GetPageSizeByIndexF failed`,
+          message: `${normalizeRotation ? 'EPDF_GetPageSizeByIndexNormalized' : 'FPDF_GetPageSizeByIndexF'} failed`,
         });
       }
 
@@ -382,9 +390,10 @@ export class PdfiumNative implements IPdfiumExecutor {
       isEncrypted,
       isOwnerUnlocked,
       permissions,
+      normalizedRotation: normalizeRotation,
     };
 
-    this.cache.setDocument(file.id, filePtr, docPtr);
+    this.cache.setDocument(file.id, filePtr, docPtr, normalizeRotation);
 
     this.logger.perf(LOG_SOURCE, LOG_CATEGORY, `OpenDocumentBuffer`, 'End', file.id);
 
@@ -835,7 +844,7 @@ export class PdfiumNative implements IPdfiumExecutor {
       });
     }
 
-    const annotations = this.readPageAnnotations(ctx, page);
+    const annotations = this.readPageAnnotations(doc, ctx, page);
 
     this.logger.perf(
       LOG_SOURCE,
@@ -923,7 +932,7 @@ export class PdfiumNative implements IPdfiumExecutor {
       });
     }
 
-    if (!this.setPageAnnoRect(page, annotationPtr, annotation.rect)) {
+    if (!this.setPageAnnoRect(doc, page, annotationPtr, annotation.rect)) {
       this.pdfiumModule.FPDFPage_CloseAnnot(annotationPtr);
       pageCtx.release();
       this.logger.perf(
@@ -942,10 +951,11 @@ export class PdfiumNative implements IPdfiumExecutor {
     let isSucceed = false;
     switch (annotation.type) {
       case PdfAnnotationSubtype.INK:
-        isSucceed = this.addInkStroke(page, pageCtx.pagePtr, annotationPtr, annotation);
+        isSucceed = this.addInkStroke(doc, page, pageCtx.pagePtr, annotationPtr, annotation);
         break;
       case PdfAnnotationSubtype.STAMP:
         isSucceed = this.addStampContent(
+          doc,
           ctx.docPtr,
           page,
           pageCtx.pagePtr,
@@ -961,11 +971,11 @@ export class PdfiumNative implements IPdfiumExecutor {
         isSucceed = this.addFreeTextContent(page, pageCtx.pagePtr, annotationPtr, annotation);
         break;
       case PdfAnnotationSubtype.LINE:
-        isSucceed = this.addLineContent(page, pageCtx.pagePtr, annotationPtr, annotation);
+        isSucceed = this.addLineContent(doc, page, pageCtx.pagePtr, annotationPtr, annotation);
         break;
       case PdfAnnotationSubtype.POLYLINE:
       case PdfAnnotationSubtype.POLYGON:
-        isSucceed = this.addPolyContent(page, pageCtx.pagePtr, annotationPtr, annotation);
+        isSucceed = this.addPolyContent(doc, page, pageCtx.pagePtr, annotationPtr, annotation);
         break;
       case PdfAnnotationSubtype.CIRCLE:
       case PdfAnnotationSubtype.SQUARE:
@@ -975,13 +985,19 @@ export class PdfiumNative implements IPdfiumExecutor {
       case PdfAnnotationSubtype.STRIKEOUT:
       case PdfAnnotationSubtype.SQUIGGLY:
       case PdfAnnotationSubtype.HIGHLIGHT:
-        isSucceed = this.addTextMarkupContent(page, pageCtx.pagePtr, annotationPtr, annotation);
+        isSucceed = this.addTextMarkupContent(
+          doc,
+          page,
+          pageCtx.pagePtr,
+          annotationPtr,
+          annotation,
+        );
         break;
       case PdfAnnotationSubtype.LINK:
         isSucceed = this.addLinkContent(ctx.docPtr, pageCtx.pagePtr, annotationPtr, annotation);
         break;
       case PdfAnnotationSubtype.REDACT:
-        isSucceed = this.addRedactContent(page, pageCtx.pagePtr, annotationPtr, annotation);
+        isSucceed = this.addRedactContent(doc, page, pageCtx.pagePtr, annotationPtr, annotation);
         break;
     }
 
@@ -1076,7 +1092,7 @@ export class PdfiumNative implements IPdfiumExecutor {
     }
 
     /* 1 ── (re)set bounding-box ────────────────────────────────────────────── */
-    if (!this.setPageAnnoRect(page, annotPtr, annotation.rect)) {
+    if (!this.setPageAnnoRect(doc, page, annotPtr, annotation.rect)) {
       this.pdfiumModule.FPDFPage_CloseAnnot(annotPtr);
       pageCtx.release();
       this.logger.perf(
@@ -1099,13 +1115,13 @@ export class PdfiumNative implements IPdfiumExecutor {
       case PdfAnnotationSubtype.INK: {
         /* clear every existing stroke first */
         if (!this.pdfiumModule.FPDFAnnot_RemoveInkList(annotPtr)) break;
-        ok = this.addInkStroke(page, pageCtx.pagePtr, annotPtr, annotation);
+        ok = this.addInkStroke(doc, page, pageCtx.pagePtr, annotPtr, annotation);
         break;
       }
 
       /* ── Stamp ───────────────────────────────────────────────────────────── */
       case PdfAnnotationSubtype.STAMP: {
-        ok = this.addStampContent(ctx.docPtr, page, pageCtx.pagePtr, annotPtr, annotation);
+        ok = this.addStampContent(doc, ctx.docPtr, page, pageCtx.pagePtr, annotPtr, annotation);
         break;
       }
 
@@ -1129,14 +1145,14 @@ export class PdfiumNative implements IPdfiumExecutor {
 
       /* ── Line ─────────────────────────────────────────────────────────────── */
       case PdfAnnotationSubtype.LINE: {
-        ok = this.addLineContent(page, pageCtx.pagePtr, annotPtr, annotation);
+        ok = this.addLineContent(doc, page, pageCtx.pagePtr, annotPtr, annotation);
         break;
       }
 
       /* ── Polygon / Polyline ───────────────────────────────────────────────── */
       case PdfAnnotationSubtype.POLYGON:
       case PdfAnnotationSubtype.POLYLINE: {
-        ok = this.addPolyContent(page, pageCtx.pagePtr, annotPtr, annotation);
+        ok = this.addPolyContent(doc, page, pageCtx.pagePtr, annotPtr, annotation);
         break;
       }
 
@@ -1146,7 +1162,7 @@ export class PdfiumNative implements IPdfiumExecutor {
       case PdfAnnotationSubtype.STRIKEOUT:
       case PdfAnnotationSubtype.SQUIGGLY: {
         /* replace quad-points / colour / strings in one go */
-        ok = this.addTextMarkupContent(page, pageCtx.pagePtr, annotPtr, annotation);
+        ok = this.addTextMarkupContent(doc, page, pageCtx.pagePtr, annotPtr, annotation);
         break;
       }
 
@@ -1158,7 +1174,7 @@ export class PdfiumNative implements IPdfiumExecutor {
 
       /* ── Redact ───────────────────────────────────────────────────────────── */
       case PdfAnnotationSubtype.REDACT: {
-        ok = this.addRedactContent(page, pageCtx.pagePtr, annotPtr, annotation);
+        ok = this.addRedactContent(doc, page, pageCtx.pagePtr, annotPtr, annotation);
         break;
       }
 
@@ -2444,6 +2460,7 @@ export class PdfiumNative implements IPdfiumExecutor {
    * @private
    */
   private addInkStroke(
+    doc: PdfDocumentObject,
     page: PdfPageObject,
     pagePtr: number,
     annotationPtr: number,
@@ -2455,7 +2472,7 @@ export class PdfiumNative implements IPdfiumExecutor {
     ) {
       return false;
     }
-    if (!this.setInkList(page, annotationPtr, annotation.inkList)) {
+    if (!this.setInkList(doc, page, annotationPtr, annotation.inkList)) {
       return false;
     }
     if (!this.setAnnotationOpacity(annotationPtr, annotation.opacity ?? 1)) {
@@ -2482,6 +2499,7 @@ export class PdfiumNative implements IPdfiumExecutor {
    * @private
    */
   private addLineContent(
+    doc: PdfDocumentObject,
     page: PdfPageObject,
     pagePtr: number,
     annotationPtr: number,
@@ -2490,6 +2508,7 @@ export class PdfiumNative implements IPdfiumExecutor {
     // Type-specific properties
     if (
       !this.setLinePoints(
+        doc,
         page,
         annotationPtr,
         annotation.linePoints.start,
@@ -2559,6 +2578,7 @@ export class PdfiumNative implements IPdfiumExecutor {
    * @private
    */
   private addPolyContent(
+    doc: PdfDocumentObject,
     page: PdfPageObject,
     pagePtr: number,
     annotationPtr: number,
@@ -2575,7 +2595,7 @@ export class PdfiumNative implements IPdfiumExecutor {
     ) {
       return false;
     }
-    if (!this.setPdfAnnoVertices(page, annotationPtr, annotation.vertices)) {
+    if (!this.setPdfAnnoVertices(doc, page, annotationPtr, annotation.vertices)) {
       return false;
     }
     if (!this.setBorderStyle(annotationPtr, annotation.strokeStyle, annotation.strokeWidth)) {
@@ -2738,6 +2758,7 @@ export class PdfiumNative implements IPdfiumExecutor {
    * @private
    */
   addTextMarkupContent(
+    doc: PdfDocumentObject,
     page: PdfPageObject,
     pagePtr: number,
     annotationPtr: number,
@@ -2748,7 +2769,7 @@ export class PdfiumNative implements IPdfiumExecutor {
       | PdfSquigglyAnnoObject,
   ) {
     // Type-specific properties
-    if (!this.syncQuadPointsAnno(page, annotationPtr, annotation.segmentRects)) {
+    if (!this.syncQuadPointsAnno(doc, page, annotationPtr, annotation.segmentRects)) {
       return false;
     }
     if (!this.setAnnotationOpacity(annotationPtr, annotation.opacity ?? 1)) {
@@ -2775,13 +2796,14 @@ export class PdfiumNative implements IPdfiumExecutor {
    * @private
    */
   private addRedactContent(
+    doc: PdfDocumentObject,
     page: PdfPageObject,
     pagePtr: number,
     annotationPtr: number,
     annotation: PdfRedactAnnoObject,
   ) {
     // Sync QuadPoints for redaction areas
-    if (!this.syncQuadPointsAnno(page, annotationPtr, annotation.segmentRects)) {
+    if (!this.syncQuadPointsAnno(doc, page, annotationPtr, annotation.segmentRects)) {
       return false;
     }
 
@@ -2876,6 +2898,7 @@ export class PdfiumNative implements IPdfiumExecutor {
 
   /**
    * Add contents to stamp annotation
+   * @param doc - pdf document object
    * @param docPtr - pointer to pdf document object
    * @param page - page info
    * @param pagePtr - pointer to page object
@@ -2887,6 +2910,7 @@ export class PdfiumNative implements IPdfiumExecutor {
    * @private
    */
   addStampContent(
+    doc: PdfDocumentObject,
     docPtr: number,
     page: PdfPageObject,
     pagePtr: number,
@@ -2906,7 +2930,9 @@ export class PdfiumNative implements IPdfiumExecutor {
         this.pdfiumModule.FPDFAnnot_RemoveObject(annotationPtr, i);
       }
 
-      if (!this.addImageObject(docPtr, page, pagePtr, annotationPtr, annotation.rect, imageData)) {
+      if (
+        !this.addImageObject(doc, docPtr, page, pagePtr, annotationPtr, annotation.rect, imageData)
+      ) {
         return false;
       }
     }
@@ -2920,6 +2946,7 @@ export class PdfiumNative implements IPdfiumExecutor {
 
   /**
    * Add image object to annotation
+   * @param doc - pdf document object
    * @param docPtr - pointer to pdf document object
    * @param page - page info
    * @param pagePtr - pointer to page object
@@ -2931,6 +2958,7 @@ export class PdfiumNative implements IPdfiumExecutor {
    * @private
    */
   addImageObject(
+    doc: PdfDocumentObject,
     docPtr: number,
     page: PdfPageObject,
     pagePtr: number,
@@ -3001,7 +3029,7 @@ export class PdfiumNative implements IPdfiumExecutor {
     }
     this.memoryManager.free(matrixPtr);
 
-    const pagePos = this.convertDevicePointToPagePoint(page, {
+    const pagePos = this.convertDevicePointToPagePoint(doc, page, {
       x: rect.origin.x,
       y: rect.origin.y + imageData.height, // shift down by the image height
     });
@@ -3773,20 +3801,21 @@ export class PdfiumNative implements IPdfiumExecutor {
   /**
    * Read page annotations
    *
+   * @param doc - pdf document object
    * @param ctx - document context
    * @param page - page info
    * @returns annotations on the pdf page
    *
    * @private
    */
-  private readPageAnnotations(ctx: DocumentContext, page: PdfPageObject) {
+  private readPageAnnotations(doc: PdfDocumentObject, ctx: DocumentContext, page: PdfPageObject) {
     return ctx.borrowPage(page.index, (pageCtx) => {
       const annotationCount = this.pdfiumModule.FPDFPage_GetAnnotCount(pageCtx.pagePtr);
 
       const annotations: PdfAnnotationObject[] = [];
       for (let i = 0; i < annotationCount; i++) {
         pageCtx.withAnnotation(i, (annotPtr) => {
-          const anno = this.readPageAnnotation(ctx.docPtr, page, annotPtr, pageCtx);
+          const anno = this.readPageAnnotation(doc, ctx.docPtr, page, annotPtr, pageCtx);
           if (anno) annotations.push(anno);
         });
       }
@@ -3797,13 +3826,18 @@ export class PdfiumNative implements IPdfiumExecutor {
   /**
    * Read page annotations without loading the page (raw approach)
    *
+   * @param doc - pdf document object
    * @param ctx - document context
    * @param page - page info
    * @returns annotations on the pdf page
    *
    * @private
    */
-  private readPageAnnotationsRaw(ctx: DocumentContext, page: PdfPageObject): PdfAnnotationObject[] {
+  private readPageAnnotationsRaw(
+    doc: PdfDocumentObject,
+    ctx: DocumentContext,
+    page: PdfPageObject,
+  ): PdfAnnotationObject[] {
     const count = this.pdfiumModule.EPDFPage_GetAnnotCountRaw(ctx.docPtr, page.index);
     if (count <= 0) return [];
 
@@ -3814,7 +3848,7 @@ export class PdfiumNative implements IPdfiumExecutor {
       if (!annotPtr) continue;
 
       try {
-        const anno = this.readPageAnnotation(ctx.docPtr, page, annotPtr);
+        const anno = this.readPageAnnotation(doc, ctx.docPtr, page, annotPtr);
         if (anno) out.push(anno);
       } finally {
         this.pdfiumModule.FPDFPage_CloseAnnot(annotPtr);
@@ -3853,7 +3887,7 @@ export class PdfiumNative implements IPdfiumExecutor {
       });
     }
 
-    const out = this.readPageAnnotationsRaw(ctx, page);
+    const out = this.readPageAnnotationsRaw(doc, ctx, page);
 
     this.logger.perf(
       LOG_SOURCE,
@@ -3875,6 +3909,7 @@ export class PdfiumNative implements IPdfiumExecutor {
   /**
    * Read pdf annotation from pdf document
    *
+   * @param doc - pdf document object
    * @param docPtr - pointer to pdf document
    * @param page - page info
    * @param annotationPtr - pointer to pdf annotation
@@ -3884,6 +3919,7 @@ export class PdfiumNative implements IPdfiumExecutor {
    * @private
    */
   private readPageAnnotation(
+    doc: PdfDocumentObject,
     docPtr: number,
     page: PdfPageObject,
     annotationPtr: number,
@@ -3901,94 +3937,94 @@ export class PdfiumNative implements IPdfiumExecutor {
     switch (subType) {
       case PdfAnnotationSubtype.TEXT:
         {
-          annotation = this.readPdfTextAnno(page, annotationPtr, index);
+          annotation = this.readPdfTextAnno(doc, page, annotationPtr, index);
         }
         break;
       case PdfAnnotationSubtype.FREETEXT:
         {
-          annotation = this.readPdfFreeTextAnno(page, annotationPtr, index);
+          annotation = this.readPdfFreeTextAnno(doc, page, annotationPtr, index);
         }
         break;
       case PdfAnnotationSubtype.LINK:
         {
-          annotation = this.readPdfLinkAnno(page, docPtr, annotationPtr, index);
+          annotation = this.readPdfLinkAnno(doc, page, docPtr, annotationPtr, index);
         }
         break;
       case PdfAnnotationSubtype.WIDGET:
         if (pageCtx) {
-          return this.readPdfWidgetAnno(page, annotationPtr, pageCtx.getFormHandle(), index);
+          return this.readPdfWidgetAnno(doc, page, annotationPtr, pageCtx.getFormHandle(), index);
         }
       case PdfAnnotationSubtype.FILEATTACHMENT:
         {
-          annotation = this.readPdfFileAttachmentAnno(page, annotationPtr, index);
+          annotation = this.readPdfFileAttachmentAnno(doc, page, annotationPtr, index);
         }
         break;
       case PdfAnnotationSubtype.INK:
         {
-          annotation = this.readPdfInkAnno(page, annotationPtr, index);
+          annotation = this.readPdfInkAnno(doc, page, annotationPtr, index);
         }
         break;
       case PdfAnnotationSubtype.POLYGON:
         {
-          annotation = this.readPdfPolygonAnno(page, annotationPtr, index);
+          annotation = this.readPdfPolygonAnno(doc, page, annotationPtr, index);
         }
         break;
       case PdfAnnotationSubtype.POLYLINE:
         {
-          annotation = this.readPdfPolylineAnno(page, annotationPtr, index);
+          annotation = this.readPdfPolylineAnno(doc, page, annotationPtr, index);
         }
         break;
       case PdfAnnotationSubtype.LINE:
         {
-          annotation = this.readPdfLineAnno(page, annotationPtr, index);
+          annotation = this.readPdfLineAnno(doc, page, annotationPtr, index);
         }
         break;
       case PdfAnnotationSubtype.HIGHLIGHT:
-        annotation = this.readPdfHighlightAnno(page, annotationPtr, index);
+        annotation = this.readPdfHighlightAnno(doc, page, annotationPtr, index);
         break;
       case PdfAnnotationSubtype.STAMP:
         {
-          annotation = this.readPdfStampAnno(page, annotationPtr, index);
+          annotation = this.readPdfStampAnno(doc, page, annotationPtr, index);
         }
         break;
       case PdfAnnotationSubtype.SQUARE:
         {
-          annotation = this.readPdfSquareAnno(page, annotationPtr, index);
+          annotation = this.readPdfSquareAnno(doc, page, annotationPtr, index);
         }
         break;
       case PdfAnnotationSubtype.CIRCLE:
         {
-          annotation = this.readPdfCircleAnno(page, annotationPtr, index);
+          annotation = this.readPdfCircleAnno(doc, page, annotationPtr, index);
         }
         break;
       case PdfAnnotationSubtype.UNDERLINE:
         {
-          annotation = this.readPdfUnderlineAnno(page, annotationPtr, index);
+          annotation = this.readPdfUnderlineAnno(doc, page, annotationPtr, index);
         }
         break;
       case PdfAnnotationSubtype.SQUIGGLY:
         {
-          annotation = this.readPdfSquigglyAnno(page, annotationPtr, index);
+          annotation = this.readPdfSquigglyAnno(doc, page, annotationPtr, index);
         }
         break;
       case PdfAnnotationSubtype.STRIKEOUT:
         {
-          annotation = this.readPdfStrikeOutAnno(page, annotationPtr, index);
+          annotation = this.readPdfStrikeOutAnno(doc, page, annotationPtr, index);
         }
         break;
       case PdfAnnotationSubtype.CARET:
         {
-          annotation = this.readPdfCaretAnno(page, annotationPtr, index);
+          annotation = this.readPdfCaretAnno(doc, page, annotationPtr, index);
         }
         break;
       case PdfAnnotationSubtype.REDACT:
         {
-          annotation = this.readPdfRedactAnno(page, annotationPtr, index);
+          annotation = this.readPdfRedactAnno(doc, page, annotationPtr, index);
         }
         break;
       default:
         {
-          annotation = this.readPdfAnno(page, subType, annotationPtr, index);
+          annotation = this.readPdfAnno(doc, page, subType, annotationPtr, index);
         }
         break;
     }
@@ -4632,11 +4668,16 @@ export class PdfiumNative implements IPdfiumExecutor {
 
   /**
    * Get the start and end points of a LINE / POLYLINE annot.
+   * @param doc - pdf document object
    * @param annotationPtr - pointer to an `FPDF_ANNOTATION`
    * @param page - logical page info object (`PdfPageObject`)
    * @returns `{ start, end }` or `undefined` when PDFium can't read them
    */
-  private getLinePoints(page: PdfPageObject, annotationPtr: number): LinePoints | undefined {
+  private getLinePoints(
+    doc: PdfDocumentObject,
+    page: PdfPageObject,
+    annotationPtr: number,
+  ): LinePoints | undefined {
     const startPtr = this.memoryManager.malloc(8); // FS_POINTF (x,y floats)
     const endPtr = this.memoryManager.malloc(8);
 
@@ -4658,8 +4699,8 @@ export class PdfiumNative implements IPdfiumExecutor {
     this.memoryManager.free(endPtr);
 
     // page -> device using the new helper (handles rotation/scale consistently)
-    const start = this.convertPagePointToDevicePoint(page, { x: sx, y: sy });
-    const end = this.convertPagePointToDevicePoint(page, { x: ex, y: ey });
+    const start = this.convertPagePointToDevicePoint(doc, page, { x: sx, y: sy });
+    const end = this.convertPagePointToDevicePoint(doc, page, { x: ex, y: ey });
 
     return { start, end };
   }
@@ -4667,6 +4708,7 @@ export class PdfiumNative implements IPdfiumExecutor {
   /**
    * Set the two end‑points of a **Line** annotation
    * by writing a new /L array `[ x1 y1 x2 y2 ]`.
+   * @param doc - pdf document object
    * @param page - logical page info object (`PdfPageObject`)
    * @param annotPtr - pointer to the annotation whose line points are needed
    * @param start - start point
@@ -4674,13 +4716,14 @@ export class PdfiumNative implements IPdfiumExecutor {
    * @returns true on success
    */
   private setLinePoints(
+    doc: PdfDocumentObject,
     page: PdfPageObject,
     annotPtr: number,
     start: Position,
     end: Position,
   ): boolean {
-    const p1 = this.convertDevicePointToPagePoint(page, start);
-    const p2 = this.convertDevicePointToPagePoint(page, end);
+    const p1 = this.convertDevicePointToPagePoint(doc, page, start);
+    const p2 = this.convertDevicePointToPagePoint(doc, page, end);
 
     if (!p1 || !p2) return false;
 
@@ -4706,13 +4749,18 @@ export class PdfiumNative implements IPdfiumExecutor {
    * This preserves the true shape for rotated / skewed text, whereas callers
    * that only need axis-aligned boxes can collapse each quad themselves.
    *
+   * @param doc           - pdf document object
    * @param page          - logical page info object (`PdfPageObject`)
    * @param annotationPtr - pointer to the annotation whose quads are needed
    * @returns Array of `Rect` objects (`[]` if the annotation has no quads)
    *
    * @private
    */
-  private getQuadPointsAnno(page: PdfPageObject, annotationPtr: number): Rect[] {
+  private getQuadPointsAnno(
+    doc: PdfDocumentObject,
+    page: PdfPageObject,
+    annotationPtr: number,
+  ): Rect[] {
     const quadCount = this.pdfiumModule.FPDFAnnot_CountAttachmentPoints(annotationPtr);
     if (quadCount === 0) return [];
 
@@ -4735,10 +4783,10 @@ export class PdfiumNative implements IPdfiumExecutor {
         }
 
         // convert to device-space
-        const p1 = this.convertPagePointToDevicePoint(page, { x: xs[0], y: ys[0] });
-        const p2 = this.convertPagePointToDevicePoint(page, { x: xs[1], y: ys[1] });
-        const p3 = this.convertPagePointToDevicePoint(page, { x: xs[2], y: ys[2] });
-        const p4 = this.convertPagePointToDevicePoint(page, { x: xs[3], y: ys[3] });
+        const p1 = this.convertPagePointToDevicePoint(doc, page, { x: xs[0], y: ys[0] });
+        const p2 = this.convertPagePointToDevicePoint(doc, page, { x: xs[1], y: ys[1] });
+        const p3 = this.convertPagePointToDevicePoint(doc, page, { x: xs[2], y: ys[2] });
+        const p4 = this.convertPagePointToDevicePoint(doc, page, { x: xs[3], y: ys[3] });
 
         quads.push({ p1, p2, p3, p4 });
       }
@@ -4752,6 +4800,7 @@ export class PdfiumNative implements IPdfiumExecutor {
   /**
    * Set the quadrilaterals for a **Highlight / Underline / StrikeOut / Squiggly** markup annotation.
    *
+   * @param doc           - pdf document object
    * @param page          - logical page info object (`PdfPageObject`)
    * @param annotationPtr - pointer to the annotation whose quads are needed
    * @param rects         - array of `Rect` objects (`[]` if the annotation has no quads)
@@ -4759,7 +4808,12 @@ export class PdfiumNative implements IPdfiumExecutor {
    *
    * @private
    */
-  private syncQuadPointsAnno(page: PdfPageObject, annotPtr: number, rects: Rect[]): boolean {
+  private syncQuadPointsAnno(
+    doc: PdfDocumentObject,
+    page: PdfPageObject,
+    annotPtr: number,
+    rects: Rect[],
+  ): boolean {
     const FS_QUADPOINTSF_SIZE = 8 * 4; // eight floats, 32 bytes
     const pdf = this.pdfiumModule.pdfium;
     const count = this.pdfiumModule.FPDFAnnot_CountAttachmentPoints(annotPtr);
@@ -4768,10 +4822,10 @@ export class PdfiumNative implements IPdfiumExecutor {
     /** write one quad into `buf` in annotation space */
     const writeQuad = (r: Rect) => {
       const q = rectToQuad(r); // TL, TR, BR, BL
-      const p1 = this.convertDevicePointToPagePoint(page, q.p1);
-      const p2 = this.convertDevicePointToPagePoint(page, q.p2);
-      const p3 = this.convertDevicePointToPagePoint(page, q.p3); // BR
-      const p4 = this.convertDevicePointToPagePoint(page, q.p4); // BL
+      const p1 = this.convertDevicePointToPagePoint(doc, page, q.p1);
+      const p2 = this.convertDevicePointToPagePoint(doc, page, q.p2);
+      const p3 = this.convertDevicePointToPagePoint(doc, page, q.p3); // BR
+      const p4 = this.convertDevicePointToPagePoint(doc, page, q.p4); // BL
 
       // PDF QuadPoints order: BL, BR, TL, TR (bottom-left, bottom-right, top-left, top-right)
       pdf.setValue(buf + 0, p1.x, 'float'); // BL (bottom-left)
@@ -4863,7 +4917,7 @@ export class PdfiumNative implements IPdfiumExecutor {
     const pageCtx = ctx.acquirePage(page.index);
 
     // pack buffer → native call
-    const { ptr, count } = this.allocFSQuadsBufferFromRects(page, clean);
+    const { ptr, count } = this.allocFSQuadsBufferFromRects(doc, page, clean);
     let ok = false;
     try {
       // If your wrapper exposes FPDFText_RedactInQuads, call that instead.
@@ -5050,7 +5104,7 @@ export class PdfiumNative implements IPdfiumExecutor {
   }
 
   /** Pack device-space Rects into an FS_QUADPOINTSF[] buffer (page space). */
-  private allocFSQuadsBufferFromRects(page: PdfPageObject, rects: Rect[]) {
+  private allocFSQuadsBufferFromRects(doc: PdfDocumentObject, page: PdfPageObject, rects: Rect[]) {
     const STRIDE = 32; // 8 floats × 4 bytes
     const count = rects.length;
     const ptr = this.memoryManager.malloc(STRIDE * count);
@@ -5061,10 +5115,10 @@ export class PdfiumNative implements IPdfiumExecutor {
       const q = rectToQuad(r); // TL, TR, BR, BL (device-space)
 
       // Convert into PAGE USER SPACE (native expects page coords)
-      const p1 = this.convertDevicePointToPagePoint(page, q.p1); // TL
-      const p2 = this.convertDevicePointToPagePoint(page, q.p2); // TR
-      const p3 = this.convertDevicePointToPagePoint(page, q.p3); // BR
-      const p4 = this.convertDevicePointToPagePoint(page, q.p4); // BL
+      const p1 = this.convertDevicePointToPagePoint(doc, page, q.p1); // TL
+      const p2 = this.convertDevicePointToPagePoint(doc, page, q.p2); // TR
+      const p3 = this.convertDevicePointToPagePoint(doc, page, q.p3); // BR
+      const p4 = this.convertDevicePointToPagePoint(doc, page, q.p4); // BL
 
       const base = ptr + i * STRIDE;
 
@@ -5085,12 +5139,17 @@ export class PdfiumNative implements IPdfiumExecutor {
 
   /**
    * Read ink list from annotation
+   * @param doc - pdf document object
    * @param page  - logical page info object (`PdfPageObject`)
    * @param pagePtr - pointer to the page
    * @param annotationPtr - pointer to the annotation whose ink list is needed
    * @returns ink list
    */
-  private getInkList(page: PdfPageObject, annotationPtr: number): PdfInkListObject[] {
+  private getInkList(
+    doc: PdfDocumentObject,
+    page: PdfPageObject,
+    annotationPtr: number,
+  ): PdfInkListObject[] {
     const inkList: PdfInkListObject[] = [];
     const pathCount = this.pdfiumModule.FPDFAnnot_GetInkListCount(annotationPtr);
     if (pathCount <= 0) return inkList;
@@ -5113,7 +5172,7 @@ export class PdfiumNative implements IPdfiumExecutor {
           const base = buf + j * POINT_STRIDE;
           const px = pdf.getValue(base + 0, 'float');
           const py = pdf.getValue(base + 4, 'float');
-          const d = this.convertPagePointToDevicePoint(page, { x: px, y: py });
+          const d = this.convertPagePointToDevicePoint(doc, page, { x: px, y: py });
           points.push({ x: d.x, y: d.y });
         }
 
@@ -5128,6 +5187,7 @@ export class PdfiumNative implements IPdfiumExecutor {
 
   /**
    * Add ink list to annotation
+   * @param doc - pdf document object
    * @param page  - logical page info object (`PdfPageObject`)
    * @param pagePtr - pointer to the page
    * @param annotationPtr - pointer to the annotation whose ink list is needed
@@ -5135,6 +5195,7 @@ export class PdfiumNative implements IPdfiumExecutor {
    * @returns `true` if the operation was successful
    */
   private setInkList(
+    doc: PdfDocumentObject,
     page: PdfPageObject,
     annotationPtr: number,
     inkList: PdfInkListObject[],
@@ -5151,7 +5212,7 @@ export class PdfiumNative implements IPdfiumExecutor {
       // device -> page for each vertex
       for (let i = 0; i < n; i++) {
         const pDev = stroke.points[i];
-        const pPage = this.convertDevicePointToPagePoint(page, pDev);
+        const pPage = this.convertDevicePointToPagePoint(doc, page, pDev);
 
         pdf.setValue(buf + i * POINT_STRIDE + 0, pPage.x, 'float');
         pdf.setValue(buf + i * POINT_STRIDE + 4, pPage.y, 'float');
@@ -5178,12 +5239,13 @@ export class PdfiumNative implements IPdfiumExecutor {
    * @private
    */
   private readPdfTextAnno(
+    doc: PdfDocumentObject,
     page: PdfPageObject,
     annotationPtr: number,
     index: string,
   ): PdfTextAnnoObject | undefined {
     const annoRect = this.readPageAnnoRect(annotationPtr);
-    const rect = this.convertPageRectToDeviceRect(page, annoRect);
+    const rect = this.convertPageRectToDeviceRect(doc, page, annoRect);
 
     // Type-specific properties
     const state = this.getAnnotString(annotationPtr, 'State') as PdfAnnotationState;
@@ -5216,12 +5278,13 @@ export class PdfiumNative implements IPdfiumExecutor {
    * @private
    */
   private readPdfFreeTextAnno(
+    doc: PdfDocumentObject,
     page: PdfPageObject,
     annotationPtr: number,
     index: string,
   ): PdfFreeTextAnnoObject | undefined {
     const annoRect = this.readPageAnnoRect(annotationPtr);
-    const rect = this.convertPageRectToDeviceRect(page, annoRect);
+    const rect = this.convertPageRectToDeviceRect(doc, page, annoRect);
 
     // Type-specific properties
     const defaultStyle = this.getAnnotString(annotationPtr, 'DS');
@@ -5262,6 +5325,7 @@ export class PdfiumNative implements IPdfiumExecutor {
    * @private
    */
   private readPdfLinkAnno(
+    doc: PdfDocumentObject,
     page: PdfPageObject,
     docPtr: number,
     annotationPtr: number,
@@ -5273,7 +5337,7 @@ export class PdfiumNative implements IPdfiumExecutor {
     }
 
     const annoRect = this.readPageAnnoRect(annotationPtr);
-    const rect = this.convertPageRectToDeviceRect(page, annoRect);
+    const rect = this.convertPageRectToDeviceRect(doc, page, annoRect);
 
     // Type-specific properties
     // Read border style and width
@@ -5326,13 +5390,14 @@ export class PdfiumNative implements IPdfiumExecutor {
    * @private
    */
   private readPdfWidgetAnno(
+    doc: PdfDocumentObject,
     page: PdfPageObject,
     annotationPtr: number,
     formHandle: number,
     index: string,
   ): PdfWidgetAnnoObject | undefined {
     const pageRect = this.readPageAnnoRect(annotationPtr);
-    const rect = this.convertPageRectToDeviceRect(page, pageRect);
+    const rect = this.convertPageRectToDeviceRect(doc, page, pageRect);
 
     // Type-specific properties
     const field = this.readPdfWidgetAnnoField(formHandle, annotationPtr);
@@ -5357,12 +5422,13 @@ export class PdfiumNative implements IPdfiumExecutor {
    * @private
    */
   private readPdfFileAttachmentAnno(
+    doc: PdfDocumentObject,
     page: PdfPageObject,
     annotationPtr: number,
     index: string,
   ): PdfFileAttachmentAnnoObject | undefined {
     const pageRect = this.readPageAnnoRect(annotationPtr);
-    const rect = this.convertPageRectToDeviceRect(page, pageRect);
+    const rect = this.convertPageRectToDeviceRect(doc, page, pageRect);
 
     return {
       pageIndex: page.index,
@@ -5383,18 +5449,19 @@ export class PdfiumNative implements IPdfiumExecutor {
    * @private
    */
   private readPdfInkAnno(
+    doc: PdfDocumentObject,
     page: PdfPageObject,
     annotationPtr: number,
     index: string,
   ): PdfInkAnnoObject | undefined {
     const pageRect = this.readPageAnnoRect(annotationPtr);
-    const rect = this.convertPageRectToDeviceRect(page, pageRect);
+    const rect = this.convertPageRectToDeviceRect(doc, page, pageRect);
 
     // Type-specific properties
     const strokeColor = this.getAnnotationColor(annotationPtr) ?? '#FF0000';
     const opacity = this.getAnnotationOpacity(annotationPtr);
     const { width: strokeWidth } = this.getBorderStyle(annotationPtr);
-    const inkList = this.getInkList(page, annotationPtr);
+    const inkList = this.getInkList(doc, page, annotationPtr);
     const blendMode = this.pdfiumModule.EPDFAnnot_GetBlendMode(annotationPtr);
     const intent = this.getAnnotIntent(annotationPtr);
 
@@ -5424,15 +5491,16 @@ export class PdfiumNative implements IPdfiumExecutor {
    * @private
    */
   private readPdfPolygonAnno(
+    doc: PdfDocumentObject,
     page: PdfPageObject,
     annotationPtr: number,
     index: string,
   ): PdfPolygonAnnoObject | undefined {
     const pageRect = this.readPageAnnoRect(annotationPtr);
-    const rect = this.convertPageRectToDeviceRect(page, pageRect);
+    const rect = this.convertPageRectToDeviceRect(doc, page, pageRect);
 
     // Type-specific properties
-    const vertices = this.readPdfAnnoVertices(page, annotationPtr);
+    const vertices = this.readPdfAnnoVertices(doc, page, annotationPtr);
     const strokeColor = this.getAnnotationColor(annotationPtr);
     const interiorColor = this.getAnnotationColor(
       annotationPtr,
@@ -5484,15 +5552,16 @@ export class PdfiumNative implements IPdfiumExecutor {
    * @private
    */
   private readPdfPolylineAnno(
+    doc: PdfDocumentObject,
     page: PdfPageObject,
     annotationPtr: number,
     index: string,
   ): PdfPolylineAnnoObject | undefined {
     const pageRect = this.readPageAnnoRect(annotationPtr);
-    const rect = this.convertPageRectToDeviceRect(page, pageRect);
+    const rect = this.convertPageRectToDeviceRect(doc, page, pageRect);
 
     // Type-specific properties
-    const vertices = this.readPdfAnnoVertices(page, annotationPtr);
+    const vertices = this.readPdfAnnoVertices(doc, page, annotationPtr);
     const strokeColor = this.getAnnotationColor(annotationPtr);
     const interiorColor = this.getAnnotationColor(
       annotationPtr,
@@ -5537,15 +5606,16 @@ export class PdfiumNative implements IPdfiumExecutor {
    * @private
    */
   private readPdfLineAnno(
+    doc: PdfDocumentObject,
     page: PdfPageObject,
     annotationPtr: number,
     index: string,
   ): PdfLineAnnoObject | undefined {
     const pageRect = this.readPageAnnoRect(annotationPtr);
-    const rect = this.convertPageRectToDeviceRect(page, pageRect);
+    const rect = this.convertPageRectToDeviceRect(doc, page, pageRect);
 
     // Type-specific properties
-    const linePoints = this.getLinePoints(page, annotationPtr);
+    const linePoints = this.getLinePoints(doc, page, annotationPtr);
     const lineEndings = this.getLineEndings(annotationPtr);
     const strokeColor = this.getAnnotationColor(annotationPtr);
     const interiorColor = this.getAnnotationColor(
@@ -5593,15 +5663,16 @@ export class PdfiumNative implements IPdfiumExecutor {
    * @private
    */
   private readPdfHighlightAnno(
+    doc: PdfDocumentObject,
     page: PdfPageObject,
     annotationPtr: number,
     index: string,
   ): PdfHighlightAnnoObject | undefined {
     const pageRect = this.readPageAnnoRect(annotationPtr);
-    const rect = this.convertPageRectToDeviceRect(page, pageRect);
+    const rect = this.convertPageRectToDeviceRect(doc, page, pageRect);
 
     // Type-specific properties
-    const segmentRects = this.getQuadPointsAnno(page, annotationPtr);
+    const segmentRects = this.getQuadPointsAnno(doc, page, annotationPtr);
     const strokeColor = this.getAnnotationColor(annotationPtr) ?? '#FFFF00';
     const opacity = this.getAnnotationOpacity(annotationPtr);
     const blendMode = this.pdfiumModule.EPDFAnnot_GetBlendMode(annotationPtr);
@@ -5630,15 +5701,16 @@ export class PdfiumNative implements IPdfiumExecutor {
    * @private
    */
   private readPdfUnderlineAnno(
+    doc: PdfDocumentObject,
     page: PdfPageObject,
     annotationPtr: number,
     index: string,
   ): PdfUnderlineAnnoObject | undefined {
     const pageRect = this.readPageAnnoRect(annotationPtr);
-    const rect = this.convertPageRectToDeviceRect(page, pageRect);
+    const rect = this.convertPageRectToDeviceRect(doc, page, pageRect);
 
     // Type-specific properties
-    const segmentRects = this.getQuadPointsAnno(page, annotationPtr);
+    const segmentRects = this.getQuadPointsAnno(doc, page, annotationPtr);
     const strokeColor = this.getAnnotationColor(annotationPtr) ?? '#FF0000';
     const opacity = this.getAnnotationOpacity(annotationPtr);
     const blendMode = this.pdfiumModule.EPDFAnnot_GetBlendMode(annotationPtr);
@@ -5667,15 +5739,16 @@ export class PdfiumNative implements IPdfiumExecutor {
    * @private
    */
   private readPdfStrikeOutAnno(
+    doc: PdfDocumentObject,
     page: PdfPageObject,
     annotationPtr: number,
     index: string,
   ): PdfStrikeOutAnnoObject | undefined {
     const pageRect = this.readPageAnnoRect(annotationPtr);
-    const rect = this.convertPageRectToDeviceRect(page, pageRect);
+    const rect = this.convertPageRectToDeviceRect(doc, page, pageRect);
 
     // Type-specific properties
-    const segmentRects = this.getQuadPointsAnno(page, annotationPtr);
+    const segmentRects = this.getQuadPointsAnno(doc, page, annotationPtr);
     const strokeColor = this.getAnnotationColor(annotationPtr) ?? '#FF0000';
     const opacity = this.getAnnotationOpacity(annotationPtr);
     const blendMode = this.pdfiumModule.EPDFAnnot_GetBlendMode(annotationPtr);
@@ -5704,15 +5777,16 @@ export class PdfiumNative implements IPdfiumExecutor {
    * @private
    */
   private readPdfSquigglyAnno(
+    doc: PdfDocumentObject,
     page: PdfPageObject,
     annotationPtr: number,
     index: string,
   ): PdfSquigglyAnnoObject | undefined {
     const pageRect = this.readPageAnnoRect(annotationPtr);
-    const rect = this.convertPageRectToDeviceRect(page, pageRect);
+    const rect = this.convertPageRectToDeviceRect(doc, page, pageRect);
 
     // Type-specific properties
-    const segmentRects = this.getQuadPointsAnno(page, annotationPtr);
+    const segmentRects = this.getQuadPointsAnno(doc, page, annotationPtr);
     const strokeColor = this.getAnnotationColor(annotationPtr) ?? '#FF0000';
     const opacity = this.getAnnotationOpacity(annotationPtr);
     const blendMode = this.pdfiumModule.EPDFAnnot_GetBlendMode(annotationPtr);
@@ -5741,12 +5815,13 @@ export class PdfiumNative implements IPdfiumExecutor {
    * @private
    */
   private readPdfCaretAnno(
+    doc: PdfDocumentObject,
     page: PdfPageObject,
     annotationPtr: number,
     index: string,
   ): PdfCaretAnnoObject | undefined {
     const pageRect = this.readPageAnnoRect(annotationPtr);
-    const rect = this.convertPageRectToDeviceRect(page, pageRect);
+    const rect = this.convertPageRectToDeviceRect(doc, page, pageRect);
 
     return {
       pageIndex: page.index,
@@ -5767,15 +5842,16 @@ export class PdfiumNative implements IPdfiumExecutor {
    * @private
    */
   private readPdfRedactAnno(
+    doc: PdfDocumentObject,
     page: PdfPageObject,
     annotationPtr: number,
     index: string,
   ): PdfRedactAnnoObject {
     const pageRect = this.readPageAnnoRect(annotationPtr);
-    const rect = this.convertPageRectToDeviceRect(page, pageRect);
+    const rect = this.convertPageRectToDeviceRect(doc, page, pageRect);
 
     // QuadPoints for redaction areas
-    const segmentRects = this.getQuadPointsAnno(page, annotationPtr);
+    const segmentRects = this.getQuadPointsAnno(doc, page, annotationPtr);
 
     // Colors: IC = interior/preview, OC = overlay, C = stroke
     const color = this.getAnnotationColor(annotationPtr, PdfAnnotationColorType.InteriorColor);
@@ -5824,12 +5900,13 @@ export class PdfiumNative implements IPdfiumExecutor {
    * @private
    */
   private readPdfStampAnno(
+    doc: PdfDocumentObject,
     page: PdfPageObject,
     annotationPtr: number,
     index: string,
   ): PdfStampAnnoObject | undefined {
     const pageRect = this.readPageAnnoRect(annotationPtr);
-    const rect = this.convertPageRectToDeviceRect(page, pageRect);
+    const rect = this.convertPageRectToDeviceRect(doc, page, pageRect);
 
     return {
       pageIndex: page.index,
@@ -6103,12 +6180,13 @@ export class PdfiumNative implements IPdfiumExecutor {
    * @private
    */
   private readPdfCircleAnno(
+    doc: PdfDocumentObject,
     page: PdfPageObject,
     annotationPtr: number,
     index: string,
   ): PdfCircleAnnoObject {
     const pageRect = this.readPageAnnoRect(annotationPtr);
-    const rect = this.convertPageRectToDeviceRect(page, pageRect);
+    const rect = this.convertPageRectToDeviceRect(doc, page, pageRect);
 
     // Type-specific properties
     const interiorColor = this.getAnnotationColor(
@@ -6152,12 +6230,13 @@ export class PdfiumNative implements IPdfiumExecutor {
    * @private
    */
   private readPdfSquareAnno(
+    doc: PdfDocumentObject,
     page: PdfPageObject,
     annotationPtr: number,
     index: string,
   ): PdfSquareAnnoObject {
     const pageRect = this.readPageAnnoRect(annotationPtr);
-    const rect = this.convertPageRectToDeviceRect(page, pageRect);
+    const rect = this.convertPageRectToDeviceRect(doc, page, pageRect);
 
     // Type-specific properties
     const interiorColor = this.getAnnotationColor(
@@ -6202,13 +6281,14 @@ export class PdfiumNative implements IPdfiumExecutor {
    * @private
    */
   private readPdfAnno(
+    doc: PdfDocumentObject,
     page: PdfPageObject,
     type: PdfUnsupportedAnnoObject['type'],
     annotationPtr: number,
     index: string,
   ): PdfUnsupportedAnnoObject {
     const pageRect = this.readPageAnnoRect(annotationPtr);
-    const rect = this.convertPageRectToDeviceRect(page, pageRect);
+    const rect = this.convertPageRectToDeviceRect(doc, page, pageRect);
 
     return {
       pageIndex: page.index,
@@ -6582,13 +6662,18 @@ export class PdfiumNative implements IPdfiumExecutor {
 
   /**
    * Read vertices of pdf annotation
+   * @param doc - pdf document object
    * @param page  - pdf page infor
    * @param annotationPtr - pointer to pdf annotation
    * @returns vertices of pdf annotation
    *
    * @private
    */
-  private readPdfAnnoVertices(page: PdfPageObject, annotationPtr: number): Position[] {
+  private readPdfAnnoVertices(
+    doc: PdfDocumentObject,
+    page: PdfPageObject,
+    annotationPtr: number,
+  ): Position[] {
     const vertices: Position[] = [];
     const count = this.pdfiumModule.FPDFAnnot_GetVertices(annotationPtr, 0, 0);
     const pointMemorySize = 8;
@@ -6601,7 +6686,7 @@ export class PdfiumNative implements IPdfiumExecutor {
         'float',
       );
 
-      const { x, y } = this.convertPagePointToDevicePoint(page, {
+      const { x, y } = this.convertPagePointToDevicePoint(doc, page, {
         x: pointX,
         y: pointY,
       });
@@ -6618,6 +6703,7 @@ export class PdfiumNative implements IPdfiumExecutor {
   /**
    * Sync the vertices of a polygon or polyline annotation.
    *
+   * @param doc - pdf document object
    * @param page  - pdf page infor
    * @param annotPtr - pointer to pdf annotation
    * @param vertices - the vertices to be set
@@ -6625,13 +6711,18 @@ export class PdfiumNative implements IPdfiumExecutor {
    *
    * @private
    */
-  private setPdfAnnoVertices(page: PdfPageObject, annotPtr: number, vertices: Position[]): boolean {
+  private setPdfAnnoVertices(
+    doc: PdfDocumentObject,
+    page: PdfPageObject,
+    annotPtr: number,
+    vertices: Position[],
+  ): boolean {
     const pdf = this.pdfiumModule.pdfium;
     const FS_POINTF_SIZE = 8;
 
     const buf = this.memoryManager.malloc(FS_POINTF_SIZE * vertices.length);
     vertices.forEach((v, i) => {
-      const pagePt = this.convertDevicePointToPagePoint(page, v);
+      const pagePt = this.convertDevicePointToPagePoint(doc, page, v);
       pdf.setValue(buf + i * FS_POINTF_SIZE + 0, pagePt.x, 'float');
       pdf.setValue(buf + i * FS_POINTF_SIZE + 4, pagePt.y, 'float');
     });
@@ -7502,16 +7593,23 @@ export class PdfiumNative implements IPdfiumExecutor {
 
   /**
    * Convert coordinate of point from device coordinate to page coordinate
+   * @param doc - pdf document object
    * @param page  - pdf page infor
    * @param position - position of point
    * @returns converted position
    *
    * @private
    */
-  private convertDevicePointToPagePoint(page: PdfPageObject, position: Position): Position {
+  private convertDevicePointToPagePoint(
+    doc: PdfDocumentObject,
+    page: PdfPageObject,
+    position: Position,
+  ): Position {
     const DW = page.size.width;
     const DH = page.size.height;
-    const r = page.rotation & 3;
+    // When normalizeRotation is enabled, PDFium treats pages as 0° rotation,
+    // so we must also use 0° for coordinate transformations
+    const r = doc.normalizedRotation ? 0 : page.rotation & 3;
 
     if (r === 0) {
       // 0°
@@ -7535,16 +7633,23 @@ export class PdfiumNative implements IPdfiumExecutor {
 
   /**
    * Convert coordinate of point from page coordinate to device coordinate
+   * @param doc - pdf document object
    * @param page  - pdf page infor
    * @param position - position of point
    * @returns converted position
    *
    * @private
    */
-  private convertPagePointToDevicePoint(page: PdfPageObject, position: Position): Position {
+  private convertPagePointToDevicePoint(
+    doc: PdfDocumentObject,
+    page: PdfPageObject,
+    position: Position,
+  ): Position {
     const DW = page.size.width;
     const DH = page.size.height;
-    const r = page.rotation & 3;
+    // When normalizeRotation is enabled, PDFium treats pages as 0° rotation,
+    // so we must also use 0° for coordinate transformations
+    const r = doc.normalizedRotation ? 0 : page.rotation & 3;
 
     if (r === 0) {
       // 0°
@@ -7566,6 +7671,7 @@ export class PdfiumNative implements IPdfiumExecutor {
 
   /**
    * Convert coordinate of rectangle from page coordinate to device coordinate
+   * @param doc - pdf document object
    * @param page  - pdf page infor
    * @param pagePtr - pointer to pdf page object
    * @param pageRect - rectangle that needs to be converted
@@ -7574,6 +7680,7 @@ export class PdfiumNative implements IPdfiumExecutor {
    * @private
    */
   private convertPageRectToDeviceRect(
+    doc: PdfDocumentObject,
     page: PdfPageObject,
     pageRect: {
       left: number;
@@ -7582,7 +7689,7 @@ export class PdfiumNative implements IPdfiumExecutor {
       bottom: number;
     },
   ): Rect {
-    const { x, y } = this.convertPagePointToDevicePoint(page, {
+    const { x, y } = this.convertPagePointToDevicePoint(doc, page, {
       x: pageRect.left,
       y: pageRect.top,
     });
@@ -7663,6 +7770,7 @@ export class PdfiumNative implements IPdfiumExecutor {
 
   /**
    * Set the rect of specified annotation
+   * @param doc - pdf document object
    * @param page - page info that the annotation is belonged to
    * @param annotationPtr - pointer to annotation object
    * @param rect - target rectangle
@@ -7670,7 +7778,12 @@ export class PdfiumNative implements IPdfiumExecutor {
    *
    * @private
    */
-  private setPageAnnoRect(page: PdfPageObject, annotPtr: number, rect: Rect): boolean {
+  private setPageAnnoRect(
+    doc: PdfDocumentObject,
+    page: PdfPageObject,
+    annotPtr: number,
+    rect: Rect,
+  ): boolean {
     // Snap device edges the same way FPDF_DeviceToPage(int,int,...) did (truncate → floor for ≥0)
     const x0d = Math.floor(rect.origin.x);
     const y0d = Math.floor(rect.origin.y);
@@ -7678,10 +7791,10 @@ export class PdfiumNative implements IPdfiumExecutor {
     const y1d = Math.floor(rect.origin.y + rect.size.height);
 
     // Map all 4 integer corners to page space (handles any /Rotate)
-    const TL = this.convertDevicePointToPagePoint(page, { x: x0d, y: y0d });
-    const TR = this.convertDevicePointToPagePoint(page, { x: x1d, y: y0d });
-    const BR = this.convertDevicePointToPagePoint(page, { x: x1d, y: y1d });
-    const BL = this.convertDevicePointToPagePoint(page, { x: x0d, y: y1d });
+    const TL = this.convertDevicePointToPagePoint(doc, page, { x: x0d, y: y0d });
+    const TR = this.convertDevicePointToPagePoint(doc, page, { x: x1d, y: y0d });
+    const BR = this.convertDevicePointToPagePoint(doc, page, { x: x1d, y: y1d });
+    const BL = this.convertDevicePointToPagePoint(doc, page, { x: x0d, y: y1d });
 
     // Page-space AABB
     let left = Math.min(TL.x, TR.x, BR.x, BL.x);
@@ -7732,6 +7845,7 @@ export class PdfiumNative implements IPdfiumExecutor {
 
   /**
    * Get highlight rects for a specific character range (for search highlighting)
+   * @param doc - pdf document object
    * @param page - pdf page info
    * @param pagePtr - pointer to pdf page
    * @param textPagePtr - pointer to pdf text page
@@ -7742,6 +7856,7 @@ export class PdfiumNative implements IPdfiumExecutor {
    * @private
    */
   private getHighlightRects(
+    doc: PdfDocumentObject,
     page: PdfPageObject,
     textPagePtr: number,
     startIndex: number,
@@ -7766,10 +7881,10 @@ export class PdfiumNative implements IPdfiumExecutor {
       const bottom = this.pdfiumModule.pdfium.getValue(b, 'double');
 
       // transform all four corners to device space
-      const p1 = this.convertPagePointToDevicePoint(page, { x: left, y: top });
-      const p2 = this.convertPagePointToDevicePoint(page, { x: right, y: top });
-      const p3 = this.convertPagePointToDevicePoint(page, { x: right, y: bottom });
-      const p4 = this.convertPagePointToDevicePoint(page, { x: left, y: bottom });
+      const p1 = this.convertPagePointToDevicePoint(doc, page, { x: left, y: top });
+      const p2 = this.convertPagePointToDevicePoint(doc, page, { x: right, y: top });
+      const p3 = this.convertPagePointToDevicePoint(doc, page, { x: right, y: bottom });
+      const p4 = this.convertPagePointToDevicePoint(doc, page, { x: left, y: bottom });
 
       const xs = [p1.x, p2.x, p3.x, p4.x];
       const ys = [p1.y, p2.y, p3.y, p4.y];
@@ -7824,7 +7939,7 @@ export class PdfiumNative implements IPdfiumExecutor {
     this.pdfiumModule.pdfium.stringToUTF16(keyword, keywordPtr, length);
 
     try {
-      const results = this.searchAllInPage(ctx, page, keywordPtr, flags);
+      const results = this.searchAllInPage(doc, ctx, page, keywordPtr, flags);
       return PdfTaskHelper.resolve(results);
     } finally {
       this.memoryManager.free(keywordPtr);
@@ -7869,7 +7984,7 @@ export class PdfiumNative implements IPdfiumExecutor {
       // Process all pages in a tight loop - no queue overhead!
       for (let i = 0; i < pages.length; i++) {
         const page = pages[i];
-        const annotations = this.readPageAnnotationsRaw(ctx, page);
+        const annotations = this.readPageAnnotationsRaw(doc, ctx, page);
         results[page.index] = annotations;
 
         // Stream progress per page
@@ -7936,7 +8051,7 @@ export class PdfiumNative implements IPdfiumExecutor {
         // Process all pages in a tight loop - no queue overhead!
         for (let i = 0; i < pages.length; i++) {
           const page = pages[i];
-          const pageResults = this.searchAllInPage(ctx, page, keywordPtr, flags);
+          const pageResults = this.searchAllInPage(doc, ctx, page, keywordPtr, flags);
           results[page.index] = pageResults;
 
           // Stream progress per page
@@ -8058,6 +8173,7 @@ export class PdfiumNative implements IPdfiumExecutor {
    * @private
    */
   private searchAllInPage(
+    doc: PdfDocumentObject,
     ctx: DocumentContext,
     page: PdfPageObject,
     keywordPtr: number,
@@ -8088,7 +8204,7 @@ export class PdfiumNative implements IPdfiumExecutor {
         const charIndex = this.pdfiumModule.FPDFText_GetSchResultIndex(searchHandle);
         const charCount = this.pdfiumModule.FPDFText_GetSchCount(searchHandle);
 
-        const rects = this.getHighlightRects(page, textPagePtr, charIndex, charCount);
+        const rects = this.getHighlightRects(doc, page, textPagePtr, charIndex, charCount);
 
         const context = this.buildContext(fullText, charIndex, charCount);
 

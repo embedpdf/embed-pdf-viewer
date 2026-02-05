@@ -96,7 +96,6 @@ export class TilingPlugin extends BasePlugin<TilingPluginConfig, TilingCapabilit
     const refreshedTiles: Record<number, Tile[]> = {};
     const refreshTimestamp = Date.now();
     const scale = coreDoc.scale;
-    const rotation = coreDoc.rotation;
 
     for (const pageIndex of pageIndexes) {
       const metric = currentMetrics.pageVisibilityMetrics.find(
@@ -107,11 +106,14 @@ export class TilingPlugin extends BasePlugin<TilingPluginConfig, TilingCapabilit
       const page = coreDoc.document.pages[pageIndex];
       if (!page) continue;
 
+      // Calculate effective rotation for this page (page intrinsic + document rotation)
+      const effectiveRotation = ((page.rotation ?? 0) + coreDoc.rotation) % 4;
+
       refreshedTiles[pageIndex] = calculateTilesForPage({
         page,
         metric,
         scale,
-        rotation,
+        rotation: effectiveRotation,
         tileSize: this.config.tileSize,
         overlapPx: this.config.overlapPx,
         extraRings: this.config.extraRings,
@@ -135,7 +137,6 @@ export class TilingPlugin extends BasePlugin<TilingPluginConfig, TilingCapabilit
     if (!coreDoc || !coreDoc.document) return;
 
     const scale = coreDoc.scale;
-    const rotation = coreDoc.rotation;
     const visibleTiles: { [pageIndex: number]: Tile[] } = {};
 
     for (const scrollMetric of scrollMetrics.pageVisibilityMetrics) {
@@ -143,12 +144,15 @@ export class TilingPlugin extends BasePlugin<TilingPluginConfig, TilingCapabilit
       const page = coreDoc.document.pages[pageIndex];
       if (!page) continue;
 
+      // Calculate effective rotation for this page (page intrinsic + document rotation)
+      const effectiveRotation = ((page.rotation ?? 0) + coreDoc.rotation) % 4;
+
       // Calculate tiles for the page using the utility function
       const tiles = calculateTilesForPage({
         page,
         metric: scrollMetric,
         scale,
-        rotation,
+        rotation: effectiveRotation,
         tileSize: this.config.tileSize,
         overlapPx: this.config.overlapPx,
         extraRings: this.config.extraRings,

@@ -170,6 +170,7 @@ export class PdfEngine<T = Blob> implements IPdfEngine<T> {
         // Then open in worker - use wait() to properly propagate task errors
         this.openDocumentBuffer(pdfFile, {
           password: options?.password,
+          normalizeRotation: options?.normalizeRotation,
         }).wait(
           (doc) => task.resolve(doc),
           (error) => task.fail(error),

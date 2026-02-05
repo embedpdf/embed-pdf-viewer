@@ -20,9 +20,13 @@ const page = computed(() => documentState.value?.document?.pages?.[props.pageInd
 const width = computed(() => page.value?.size?.width ?? 0);
 const height = computed(() => page.value?.size?.height ?? 0);
 
+// If override is provided, use it directly (consistent with other layer components)
+// Otherwise, combine page intrinsic rotation with document rotation
+const pageRotation = computed(() => page.value?.rotation ?? 0);
 const rotation = computed(() => {
   if (props.rotation !== undefined) return props.rotation;
-  return documentState.value?.rotation ?? 0;
+  const docRotation = documentState.value?.rotation ?? 0;
+  return (pageRotation.value + docRotation) % 4;
 });
 
 const scale = computed(() => {

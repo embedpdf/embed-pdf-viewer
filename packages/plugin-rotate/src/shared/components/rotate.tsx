@@ -28,7 +28,12 @@ export function Rotate({
   const page = documentState?.document?.pages?.[pageIndex];
   const width = page?.size?.width ?? 0;
   const height = page?.size?.height ?? 0;
-  const rotation = rotationOverride ?? documentState?.rotation ?? 0;
+  // If override is provided, use it directly (consistent with other layer components)
+  // Otherwise, combine page intrinsic rotation with document rotation
+  const pageRotation = page?.rotation ?? 0;
+  const docRotation = documentState?.rotation ?? 0;
+  const rotation =
+    rotationOverride !== undefined ? rotationOverride : (pageRotation + docRotation) % 4;
   const scale = scaleOverride ?? documentState?.scale ?? 1;
 
   const matrix =
