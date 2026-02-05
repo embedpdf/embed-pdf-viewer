@@ -1,5 +1,13 @@
 # @embedpdf/plugin-tiling
 
+## 2.5.0
+
+### Patch Changes
+
+- [#441](https://github.com/embedpdf/embed-pdf-viewer/pull/441) by [@bobsingor](https://github.com/bobsingor) – Fixed tile calculations to account for page intrinsic rotation:
+  - Updated `refreshTilesForPages()` to compute effective rotation as `(pageRotation + docRotation) % 4` for each page
+  - Updated `onScrollMetricsChange()` to use effective rotation per page when calculating tiles
+
 ## 2.4.1
 
 ## 2.4.0
