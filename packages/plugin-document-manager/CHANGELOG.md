@@ -1,5 +1,16 @@
 # @embedpdf/plugin-document-manager
 
+## 2.5.0
+
+### Minor Changes
+
+- [#441](https://github.com/embedpdf/embed-pdf-viewer/pull/441) by [@bobsingor](https://github.com/bobsingor) – Enabled rotation normalization by default for all documents opened through the document manager:
+  - Added `normalizeRotation: true` to `openDocumentFromUrl()` method
+  - Added `normalizeRotation: true` to `openDocumentFromBuffer()` method
+  - Added `normalizeRotation: true` to internal `doOpen()` method
+
+  This ensures all documents managed by the plugin have consistent coordinate handling regardless of individual page rotations.
+
 ## 2.4.1
 
 ## 2.4.0

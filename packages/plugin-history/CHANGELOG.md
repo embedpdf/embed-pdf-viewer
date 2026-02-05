@@ -1,5 +1,7 @@
 # @embedpdf/plugin-history
 
+## 2.5.0
+
 ## 2.4.1
 
 ## 2.4.0

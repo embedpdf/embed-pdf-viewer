@@ -1,5 +1,16 @@
 # @embedpdf/models
 
+## 2.5.0
+
+### Minor Changes
+
+- [#441](https://github.com/embedpdf/embed-pdf-viewer/pull/441) by [@bobsingor](https://github.com/bobsingor) – Added support for per-document rotation normalization:
+  - Added `normalizedRotation: boolean` property to `PdfDocumentObject` to track whether the document was opened with normalized rotation
+  - Added `normalizeRotation?: boolean` option to `PdfOpenDocumentBufferOptions` interface
+  - Added `normalizeRotation?: boolean` option to `PdfOpenDocumentUrlOptions` interface
+
+  When `normalizeRotation` is enabled, all page coordinates (annotations, text, rendering) are in 0° space regardless of the page's original rotation.
+
 ## 2.4.1
 
 ## 2.4.0
