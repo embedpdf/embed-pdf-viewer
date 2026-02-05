@@ -150,7 +150,6 @@ export interface HandlerFactory<A extends PdfAnnotationObject> {
 export interface HandlerContext<A extends PdfAnnotationObject> {
   getTool: () => AnnotationTool<A> | undefined;
   pageIndex: number;
-  pageRotation: Rotation;
   pageSize: Size;
   scale: number;
   services: HandlerServices;
