@@ -71,6 +71,12 @@ export interface PdfDocumentObject {
    * Use PdfPermissionFlag to check individual permissions.
    */
   permissions: number;
+
+  /**
+   * Whether page rotation was normalized when opening the document.
+   * When true, all page coordinates are in 0° space regardless of original rotation.
+   */
+  normalizedRotation: boolean;
 }
 
 /**
@@ -2729,6 +2735,12 @@ export interface PdfOpenDocumentBufferOptions {
    * Password for the document
    */
   password?: string;
+  /**
+   * When true, normalizes page rotation so all coordinates are in 0° space.
+   * The original rotation is preserved in page.rotation for reference.
+   * @default false
+   */
+  normalizeRotation?: boolean;
 }
 
 export interface PdfRequestOptions {
@@ -2759,6 +2771,12 @@ export interface PdfOpenDocumentUrlOptions {
    * HTTP request options for fetching the PDF
    */
   requestOptions?: PdfRequestOptions;
+  /**
+   * When true, normalizes page rotation so all coordinates are in 0° space.
+   * The original rotation is preserved in page.rotation for reference.
+   * @default false
+   */
+  normalizeRotation?: boolean;
 }
 
 export interface PdfRenderOptions {

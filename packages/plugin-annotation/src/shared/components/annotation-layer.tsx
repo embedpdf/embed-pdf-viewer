@@ -78,8 +78,11 @@ export function AnnotationLayer({
 
   const actualRotation = useMemo(() => {
     if (overrideRotation !== undefined) return overrideRotation;
-    return documentState?.rotation ?? Rotation.Degree0;
-  }, [overrideRotation, documentState?.rotation]);
+    // Combine page intrinsic rotation with document rotation
+    const pageRotation = page?.rotation ?? 0;
+    const docRotation = documentState?.rotation ?? 0;
+    return ((pageRotation + docRotation) % 4) as Rotation;
+  }, [overrideRotation, page?.rotation, documentState?.rotation]);
 
   return (
     <div

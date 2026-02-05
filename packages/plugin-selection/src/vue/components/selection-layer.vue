@@ -25,6 +25,7 @@ const props = withDefaults(defineProps<SelectionLayerProps>(), {
 const slots = useSlots();
 const { plugin: selPlugin } = useSelectionPlugin();
 const documentState = useDocumentState(() => props.documentId);
+const page = computed(() => documentState.value?.document?.pages?.[props.pageIndex]);
 const rects = ref<Rect[]>([]);
 const boundingRect = ref<Rect | null>(null);
 const placement = ref<SelectionMenuPlacement | null>(null);
@@ -36,7 +37,10 @@ const actualScale = computed(() => {
 
 const actualRotation = computed(() => {
   if (props.rotation !== undefined) return props.rotation;
-  return documentState.value?.rotation ?? Rotation.Degree0;
+  // Combine page intrinsic rotation with document rotation
+  const pageRotation = page.value?.rotation ?? 0;
+  const docRotation = documentState.value?.rotation ?? 0;
+  return ((pageRotation + docRotation) % 4) as Rotation;
 });
 
 // Check if menu should render: placement is valid AND (render fn OR slot exists)

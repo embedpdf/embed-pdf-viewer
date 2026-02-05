@@ -70,7 +70,13 @@ export abstract class BaseScrollStrategy {
   ): ScrollMetrics {
     const range = this.getVisibleRange(viewport, virtualItems, scale);
     const visibleItems = virtualItems.slice(range.start, range.end + 1);
-    const pageVisibilityMetrics = this.calculatePageVisibility(visibleItems, viewport, scale);
+    const totalContentSize = this.getTotalContentSize(virtualItems);
+    const pageVisibilityMetrics = this.calculatePageVisibility(
+      visibleItems,
+      viewport,
+      scale,
+      totalContentSize.width,
+    );
     const visiblePages = pageVisibilityMetrics.map((m) => m.pageNumber);
     const renderedPageIndexes = virtualItems
       .slice(range.start, range.end + 1)
@@ -101,12 +107,18 @@ export abstract class BaseScrollStrategy {
     virtualItems: VirtualItem[],
     viewport: ViewportMetrics,
     scale: number,
+    contentWidth?: number,
   ): ScrollMetrics['pageVisibilityMetrics'] {
     const visibilityMetrics: ScrollMetrics['pageVisibilityMetrics'] = [];
+    // Calculate max width for centering if not provided
+    const maxWidth = contentWidth ?? Math.max(...virtualItems.map((i) => i.width));
 
     virtualItems.forEach((item) => {
+      // Calculate horizontal centering offset for items narrower than max width
+      const centeringOffsetX = item.width < maxWidth ? (maxWidth - item.width) / 2 : 0;
+
       item.pageLayouts.forEach((page) => {
-        const itemX = item.x * scale;
+        const itemX = (item.x + centeringOffsetX) * scale;
         const itemY = item.y * scale;
         const pageX = itemX + page.x * scale;
         const pageY = itemY + page.y * scale;
