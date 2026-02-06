@@ -83,6 +83,24 @@ export interface RegisterMarqueeOnPageOptions {
 }
 
 // ─────────────────────────────────────────────────────────
+// Component Style Types
+// ─────────────────────────────────────────────────────────
+
+export interface TextSelectionStyle {
+  /** Background color for text selection highlights. Default: 'rgba(33,150,243)' */
+  background?: string;
+}
+
+export interface MarqueeSelectionStyle {
+  /** Fill/background color inside the marquee rectangle. Default: 'rgba(0,122,204,0.15)' */
+  background?: string;
+  /** Border color of the marquee rectangle. Default: 'rgba(0,122,204,0.8)' */
+  borderColor?: string;
+  /** Border style. Default: 'dashed' */
+  borderStyle?: 'solid' | 'dashed' | 'dotted';
+}
+
+// ─────────────────────────────────────────────────────────
 // Events
 // ─────────────────────────────────────────────────────────
 

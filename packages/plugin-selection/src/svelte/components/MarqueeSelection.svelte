@@ -12,9 +12,19 @@
     scale?: number;
     /** Optional CSS class applied to the marquee rectangle */
     class?: string;
-    /** Stroke colour (default: 'rgba(0,122,204,0.8)') */
+    /** Fill/background color inside the marquee rectangle. Default: 'rgba(0,122,204,0.15)' */
+    background?: string;
+    /** Border color of the marquee rectangle. Default: 'rgba(0,122,204,0.8)' */
+    borderColor?: string;
+    /** Border style. Default: 'dashed' */
+    borderStyle?: 'solid' | 'dashed' | 'dotted';
+    /**
+     * @deprecated Use `borderColor` instead.
+     */
     stroke?: string;
-    /** Fill colour (default: 'rgba(0,122,204,0.15)') */
+    /**
+     * @deprecated Use `background` instead.
+     */
     fill?: string;
   }
 
@@ -23,12 +33,19 @@
     pageIndex,
     scale: scaleOverride,
     class: propsClass,
-    stroke = 'rgba(0,122,204,0.8)',
-    fill = 'rgba(0,122,204,0.15)',
+    background,
+    borderColor,
+    borderStyle = 'dashed',
+    stroke,
+    fill,
   }: MarqueeSelectionProps = $props();
 
   const selectionPlugin = useSelectionPlugin();
   const documentState = useDocumentState(() => documentId);
+
+  // Resolve deprecated props: new CSS-standard props take precedence
+  const resolvedBorderColor = $derived(borderColor ?? stroke ?? 'rgba(0,122,204,0.8)');
+  const resolvedBackground = $derived(background ?? fill ?? 'rgba(0,122,204,0.15)');
 
   let rect = $state<Rect | null>(null);
 
@@ -62,8 +79,8 @@
     style:top={`${rect.origin.y * actualScale}px`}
     style:width={`${rect.size.width * actualScale}px`}
     style:height={`${rect.size.height * actualScale}px`}
-    style:border={`1px dashed ${stroke}`}
-    style:background={fill}
+    style:border={`1px ${borderStyle} ${resolvedBorderColor}`}
+    style:background={resolvedBackground}
     style:box-sizing="border-box"
     style:z-index="1000"
     class={propsClass}
