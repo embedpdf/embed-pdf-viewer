@@ -62,6 +62,8 @@ import {
   MarqueeEndEvent,
   MarqueeScopeEvent,
   MarqueeEndScopeEvent,
+  EmptySpaceClickEvent,
+  EmptySpaceClickScopeEvent,
 } from './types';
 import { sliceBounds, rectsWithinSlice } from './utils';
 import { createTextSelectionHandler } from './handlers/text-selection.handler';
@@ -151,6 +153,18 @@ export class SelectionPlugin extends BasePlugin<
     }),
     { cache: false },
   );
+  private readonly emptySpaceClick$ = createScopedEmitter<
+    EmptySpaceClickScopeEvent,
+    EmptySpaceClickEvent,
+    string
+  >(
+    (documentId, data) => ({
+      documentId,
+      pageIndex: data.pageIndex,
+      modeId: data.modeId,
+    }),
+    { cache: false },
+  );
 
   private interactionManagerCapability: InteractionManagerCapability;
   private viewportCapability: ViewportCapability | null = null;
@@ -231,6 +245,7 @@ export class SelectionPlugin extends BasePlugin<
     this.menuPlacement$.clearScope(documentId);
     this.marqueeChange$.clearScope(documentId);
     this.marqueeEnd$.clearScope(documentId);
+    this.emptySpaceClick$.clearScope(documentId);
   }
 
   async initialize() {}
@@ -243,6 +258,7 @@ export class SelectionPlugin extends BasePlugin<
     this.menuPlacement$.clear();
     this.marqueeChange$.clear();
     this.marqueeEnd$.clear();
+    this.emptySpaceClick$.clear();
     super.destroy();
   }
 
@@ -287,6 +303,9 @@ export class SelectionPlugin extends BasePlugin<
       // Marquee selection events
       onMarqueeChange: this.marqueeChange$.onGlobal,
       onMarqueeEnd: this.marqueeEnd$.onGlobal,
+
+      // Empty space click event
+      onEmptySpaceClick: this.emptySpaceClick$.onGlobal,
     };
   }
 
@@ -316,6 +335,7 @@ export class SelectionPlugin extends BasePlugin<
       onEndSelection: this.endSelection$.forScope(documentId),
       onMarqueeChange: this.marqueeChange$.forScope(documentId),
       onMarqueeEnd: this.marqueeEnd$.forScope(documentId),
+      onEmptySpaceClick: this.emptySpaceClick$.forScope(documentId),
     };
   }
 
@@ -387,6 +407,7 @@ export class SelectionPlugin extends BasePlugin<
         cursor
           ? interactionScope.setCursor('selection-text', cursor, 10)
           : interactionScope.removeCursor('selection-text'),
+      onEmptySpaceClick: (modeId) => this.emptySpaceClick$.emit(documentId, { pageIndex, modeId }),
     });
 
     // Register text selection with registerAlways - any plugin can enable it for their mode

@@ -151,6 +151,12 @@ export interface MarqueeEndEvent {
   modeId: string;
 }
 
+export interface EmptySpaceClickEvent {
+  documentId: string;
+  pageIndex: number;
+  modeId: string;
+}
+
 // ─────────────────────────────────────────────────────────
 // Mode Configuration
 // ─────────────────────────────────────────────────────────
@@ -205,6 +211,11 @@ export interface MarqueeEndScopeEvent {
   modeId: string;
 }
 
+export interface EmptySpaceClickScopeEvent {
+  pageIndex: number;
+  modeId: string;
+}
+
 export interface SelectionScope {
   getFormattedSelection(): FormattedSelection[];
   getFormattedSelectionForPage(page: number): FormattedSelection | null;
@@ -232,6 +243,7 @@ export interface SelectionScope {
   onEndSelection: EventHook<{ modeId: string }>;
   onMarqueeChange: EventHook<MarqueeScopeEvent>;
   onMarqueeEnd: EventHook<MarqueeEndScopeEvent>;
+  onEmptySpaceClick: EventHook<EmptySpaceClickScopeEvent>;
 }
 
 export interface SelectionCapability {
@@ -271,4 +283,7 @@ export interface SelectionCapability {
   // Marquee selection events
   onMarqueeChange: EventHook<MarqueeChangeEvent>;
   onMarqueeEnd: EventHook<MarqueeEndEvent>;
+
+  // Empty space click event
+  onEmptySpaceClick: EventHook<EmptySpaceClickEvent>;
 }

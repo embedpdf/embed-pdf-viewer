@@ -308,7 +308,18 @@ export class RedactionPlugin extends BasePlugin<
         }
       });
 
-      unsubscribers.push(unsubSelection, unsubEndSelection, unsubMarqueeChange, unsubMarqueeEnd);
+      // Deselect pending redaction when clicking on empty page space
+      const unsubEmptySpaceClick = selectionScope.onEmptySpaceClick(() => {
+        this.deselectPending(documentId);
+      });
+
+      unsubscribers.push(
+        unsubSelection,
+        unsubEndSelection,
+        unsubMarqueeChange,
+        unsubMarqueeEnd,
+        unsubEmptySpaceClick,
+      );
     }
 
     // Setup annotation event forwarding AND state sync in annotation mode

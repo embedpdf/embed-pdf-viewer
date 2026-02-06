@@ -22,6 +22,8 @@ export interface TextSelectionHandlerOptions {
   isSelecting: () => boolean;
   /** Set or remove the text cursor */
   setCursor: (cursor: string | null) => void;
+  /** Called when the user clicks directly on empty page space (target === currentTarget) */
+  onEmptySpaceClick?: (modeId: string) => void;
 }
 
 /**
@@ -34,7 +36,12 @@ export function createTextSelectionHandler(
   opts: TextSelectionHandlerOptions,
 ): PointerEventHandlersWithLifecycle<EmbedPdfPointerEvent> {
   return {
-    onPointerDown: (point: Position, _evt, modeId) => {
+    onPointerDown: (point: Position, evt, modeId) => {
+      // Detect click on empty page space (fires for ALL modes)
+      if (evt.target === evt.currentTarget) {
+        opts.onEmptySpaceClick?.(modeId);
+      }
+
       if (!opts.isEnabled(modeId)) return;
 
       // Clear the current selection
