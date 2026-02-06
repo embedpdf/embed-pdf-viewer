@@ -120,7 +120,6 @@ watch(
         <div
           v-for="layout in item.pageLayouts"
           :key="layout.pageNumber"
-          data-epdf-page-container
           :style="{
             width: `${layout.rotatedWidth}px`,
             height: `${layout.rotatedHeight}px`,

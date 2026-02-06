@@ -94,7 +94,6 @@
         >
           {#each item.pageLayouts as layout (layout.pageNumber)}
             <div
-              data-epdf-page-container
               style:width={`${layout.rotatedWidth}px`}
               style:height={`${layout.rotatedHeight}px`}
               style:position="relative"
