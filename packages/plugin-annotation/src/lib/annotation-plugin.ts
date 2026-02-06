@@ -477,6 +477,11 @@ export class AnnotationPlugin extends BasePlugin<
             tool: this.getActiveTool(documentId),
           });
         }
+
+        // Update page activity when selection changes
+        if (prevDoc?.selectedUids !== nextDoc.selectedUids) {
+          this.updateAnnotationSelectionActivity(documentId, nextDoc);
+        }
       }
     }
 
@@ -954,16 +959,35 @@ export class AnnotationPlugin extends BasePlugin<
       this.dispatch(selectAnnotation(docId, pageIndex, id));
     }
 
-    // Claim page activity so the scroll plugin can elevate this page
-    this.interactionManager?.claimPageActivity(docId, 'annotation-selection', pageIndex);
+    // Page activity is managed centrally in onStoreUpdated via updateAnnotationSelectionActivity
   }
 
   private deselectAnnotation(documentId?: string) {
     const docId = documentId ?? this.getActiveDocumentId();
     this.dispatch(deselectAnnotation(docId));
+    // Page activity is managed centrally in onStoreUpdated via updateAnnotationSelectionActivity
+  }
 
-    // Release page activity claim
-    this.interactionManager?.releasePageActivity(docId, 'annotation-selection');
+  /**
+   * Derive page activity from the current annotation selection.
+   * Called from onStoreUpdated whenever selectedUids changes,
+   * so ALL selection code paths are covered automatically.
+   */
+  private updateAnnotationSelectionActivity(docId: string, docState: AnnotationDocumentState) {
+    if (docState.selectedUids.length === 0) {
+      this.interactionManager?.releasePageActivity(docId, 'annotation-selection');
+      return;
+    }
+    // Claim for the page of the first selected annotation
+    const firstUid = docState.selectedUids[0];
+    const ta = docState.byUid[firstUid];
+    if (ta) {
+      this.interactionManager?.claimPageActivity(
+        docId,
+        'annotation-selection',
+        ta.object.pageIndex,
+      );
+    }
   }
 
   // ─────────────────────────────────────────────────────────
