@@ -2,7 +2,6 @@ import {
   RedactionPluginConfig,
   RedactionCapability,
   RedactionState,
-  RegisterMarqueeOnPageOptions,
   RedactionItem,
   SelectedRedaction,
   RedactionMode,
@@ -64,7 +63,6 @@ import {
   cleanupRedactionState,
   RedactionAction,
 } from './actions';
-import { createMarqueeHandler } from './handlers';
 import { initialDocumentState } from './reducer';
 import { redactTools } from './tools';
 
@@ -93,6 +91,12 @@ export class RedactionPlugin extends BasePlugin<
   private readonly redactionSelection$ = new Map<
     string,
     ReturnType<typeof createBehaviorEmitter<FormattedSelection[]>>
+  >();
+  private readonly redactionMarquee$ = new Map<
+    string,
+    ReturnType<
+      typeof createBehaviorEmitter<{ pageIndex: number; rect: Rect | null; modeId: string }>
+    >
   >();
 
   // Global emitters with documentId
@@ -219,8 +223,12 @@ export class RedactionPlugin extends BasePlugin<
       }),
     );
 
-    // Create per-document emitter
+    // Create per-document emitters
     this.redactionSelection$.set(documentId, createBehaviorEmitter<FormattedSelection[]>());
+    this.redactionMarquee$.set(
+      documentId,
+      createBehaviorEmitter<{ pageIndex: number; rect: Rect | null; modeId: string }>(),
+    );
     // Setup selection listeners for this document
     const unsubscribers: Array<() => void> = [];
 
@@ -266,7 +274,41 @@ export class RedactionPlugin extends BasePlugin<
         );
       });
 
-      unsubscribers.push(unsubSelection, unsubEndSelection);
+      // Forward marquee preview rects (for MarqueeRedact component)
+      const unsubMarqueeChange = selectionScope.onMarqueeChange((event) => {
+        const docState = this.getDocumentState(documentId);
+        if (!docState?.isRedacting) return;
+        this.redactionMarquee$
+          .get(documentId)
+          ?.emit({ pageIndex: event.pageIndex, rect: event.rect, modeId: event.modeId });
+      });
+
+      // Create area redaction when marquee completes
+      const unsubMarqueeEnd = selectionScope.onMarqueeEnd((event) => {
+        const docState = this.getDocumentState(documentId);
+        if (!docState?.isRedacting) return;
+        if (!this.checkPermission(documentId, PdfPermissionFlag.ModifyContents)) return;
+
+        if (this.useAnnotationMode) {
+          this.createRedactAnnotationFromArea(documentId, event.pageIndex, event.rect);
+        } else {
+          // Legacy mode: create pending item
+          const redactionColor = this.config.drawBlackBoxes ? '#000000' : 'transparent';
+          const item: RedactionItem = {
+            id: uuidV4(),
+            kind: 'area',
+            page: event.pageIndex,
+            rect: event.rect,
+            source: 'legacy',
+            markColor: '#FF0000',
+            redactionColor,
+          };
+          this.dispatch(addPending(documentId, [item]));
+          this.selectPending(event.pageIndex, item.id, documentId);
+        }
+      });
+
+      unsubscribers.push(unsubSelection, unsubEndSelection, unsubMarqueeChange, unsubMarqueeEnd);
     }
 
     // Setup annotation event forwarding AND state sync in annotation mode
@@ -331,12 +373,35 @@ export class RedactionPlugin extends BasePlugin<
   }
 
   protected override onDocumentLoaded(documentId: string): void {
-    // Redaction plugin renders its own selection rects, so suppress selection layer rects
-    // Enable selection for modes that support text selection (both annotation and legacy modes)
-    this.selectionCapability?.enableForMode(RedactionMode.Redact, { showRects: false }, documentId);
+    // Redaction plugin renders its own selection & marquee rects, so suppress selection layer rects.
+    // Unified mode: both text selection and marquee
+    this.selectionCapability?.enableForMode(
+      RedactionMode.Redact,
+      {
+        enableSelection: true,
+        showSelectionRects: false,
+        enableMarquee: true,
+        showMarqueeRects: false,
+      },
+      documentId,
+    );
+    // Legacy marquee-only mode
+    this.selectionCapability?.enableForMode(
+      RedactionMode.MarqueeRedact,
+      {
+        enableSelection: false,
+        enableMarquee: true,
+        showMarqueeRects: false,
+      },
+      documentId,
+    );
+    // Legacy selection-only mode
     this.selectionCapability?.enableForMode(
       RedactionMode.RedactSelection,
-      { showRects: false },
+      {
+        enableSelection: true,
+        showSelectionRects: false,
+      },
       documentId,
     );
   }
@@ -349,6 +414,10 @@ export class RedactionPlugin extends BasePlugin<
     const emitter = this.redactionSelection$.get(documentId);
     emitter?.clear();
     this.redactionSelection$.delete(documentId);
+
+    const marqueeEmitter = this.redactionMarquee$.get(documentId);
+    marqueeEmitter?.clear();
+    this.redactionMarquee$.delete(documentId);
 
     // Cleanup unsubscribers
     const unsubscribers = this.documentUnsubscribers.get(documentId);
@@ -687,10 +756,13 @@ export class RedactionPlugin extends BasePlugin<
 
     if (this.useAnnotationMode) {
       // ANNOTATION MODE: Select annotation via annotation plugin
+      // (annotation plugin handles 'annotation-selection' page activity)
       this.annotationCapability?.forDocument(id).selectAnnotation(page, itemId);
     } else {
       // LEGACY MODE: Update internal selection state
       this.dispatch(selectPending(id, page, itemId));
+      // Claim page activity so the scroll plugin can elevate this page
+      this.interactionManagerCapability?.claimPageActivity(id, 'redaction-selection', page);
     }
     this.selectionCapability?.forDocument(id).clear();
   }
@@ -705,10 +777,13 @@ export class RedactionPlugin extends BasePlugin<
 
     if (this.useAnnotationMode) {
       // ANNOTATION MODE: Deselect via annotation plugin
+      // (annotation plugin handles 'annotation-selection' page activity)
       this.annotationCapability?.forDocument(id).deselectAnnotation();
     } else {
       // LEGACY MODE: Update internal selection state
       this.dispatch(deselectPending(id));
+      // Release page activity claim
+      this.interactionManagerCapability?.releasePageActivity(id, 'redaction-selection');
     }
   }
 
@@ -859,6 +934,14 @@ export class RedactionPlugin extends BasePlugin<
     return emitter?.on(callback) ?? (() => {});
   }
 
+  public onRedactionMarqueeChange(
+    documentId: string,
+    callback: (data: { pageIndex: number; rect: Rect | null; modeId: string }) => void,
+  ) {
+    const emitter = this.redactionMarquee$.get(documentId);
+    return emitter?.on(callback) ?? (() => {});
+  }
+
   /**
    * Get the stroke color for redaction previews.
    * In annotation mode: returns tool's defaults.strokeColor
@@ -870,92 +953,6 @@ export class RedactionPlugin extends BasePlugin<
       return tool?.defaults.strokeColor ?? '#FF0000';
     }
     return '#FF0000';
-  }
-
-  public registerMarqueeOnPage(opts: RegisterMarqueeOnPageOptions) {
-    if (!this.interactionManagerCapability) {
-      this.logger.warn(
-        'RedactionPlugin',
-        'MissingDependency',
-        'Interaction manager plugin not loaded, marquee redaction disabled',
-      );
-      return () => {};
-    }
-
-    const coreDoc = this.coreState.core.documents[opts.documentId];
-    if (!coreDoc?.document) {
-      this.logger.warn('RedactionPlugin', 'DocumentNotFound', 'Document not found');
-      return () => {};
-    }
-
-    const page = coreDoc.document.pages[opts.pageIndex];
-    if (!page) {
-      this.logger.warn('RedactionPlugin', 'PageNotFound', `Page ${opts.pageIndex} not found`);
-      return () => {};
-    }
-
-    const handlers = createMarqueeHandler({
-      pageSize: page.size,
-      scale: opts.scale,
-      onPreview: opts.callback.onPreview,
-      onCommit: (r) => {
-        opts.callback.onCommit?.(r);
-
-        if (this.useAnnotationMode) {
-          // ANNOTATION MODE: Create REDACT annotation via annotation plugin
-          this.createRedactAnnotationFromArea(opts.documentId, opts.pageIndex, r);
-        } else {
-          // LEGACY MODE: Add to internal pending state
-          const redactionColor = this.config.drawBlackBoxes ? '#000000' : 'transparent';
-          const item: RedactionItem = {
-            id: uuidV4(),
-            kind: 'area',
-            page: opts.pageIndex,
-            rect: r,
-            source: 'legacy',
-            markColor: '#FF0000',
-            redactionColor,
-          };
-          this.dispatch(addPending(opts.documentId, [item]));
-          this.selectPending(opts.pageIndex, item.id, opts.documentId);
-        }
-      },
-    });
-
-    const off = this.interactionManagerCapability.registerAlways({
-      handlers: {
-        onPointerDown: (_, evt) => {
-          if (evt.target === evt.currentTarget) {
-            this.deselectPending(opts.documentId);
-          }
-        },
-      },
-      scope: {
-        type: 'page',
-        documentId: opts.documentId,
-        pageIndex: opts.pageIndex,
-      },
-    });
-
-    // Register handlers for both unified Redact mode and legacy MarqueeRedact mode
-    const off2 = this.interactionManagerCapability.registerHandlers({
-      documentId: opts.documentId,
-      modeId: RedactionMode.Redact,
-      handlers,
-      pageIndex: opts.pageIndex,
-    });
-    const off3 = this.interactionManagerCapability.registerHandlers({
-      documentId: opts.documentId,
-      modeId: RedactionMode.MarqueeRedact,
-      handlers,
-      pageIndex: opts.pageIndex,
-    });
-
-    return () => {
-      off();
-      off2();
-      off3();
-    };
   }
 
   private queueCurrentSelectionAsPending(documentId?: string): Task<boolean, PdfErrorReason> {
@@ -1590,6 +1587,8 @@ export class RedactionPlugin extends BasePlugin<
     // Cleanup all per-document emitters
     this.redactionSelection$.forEach((emitter) => emitter.clear());
     this.redactionSelection$.clear();
+    this.redactionMarquee$.forEach((emitter) => emitter.clear());
+    this.redactionMarquee$.clear();
 
     // Cleanup all unsubscribers
     this.documentUnsubscribers.forEach((unsubscribers) => {

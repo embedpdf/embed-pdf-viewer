@@ -94,6 +94,7 @@ export interface SelectionMenuPlacementEvent {
 export interface SelectionChangeEvent {
   documentId: string;
   selection: SelectionRangeX | null;
+  modeId: string;
 }
 
 export interface TextRetrievedEvent {
@@ -110,22 +111,26 @@ export interface BeginSelectionEvent {
   documentId: string;
   page: number;
   index: number;
+  modeId: string;
 }
 
 export interface EndSelectionEvent {
   documentId: string;
+  modeId: string;
 }
 
 export interface MarqueeChangeEvent {
   documentId: string;
   pageIndex: number;
   rect: Rect | null; // null when cancelled/ended
+  modeId: string;
 }
 
 export interface MarqueeEndEvent {
   documentId: string;
   pageIndex: number;
   rect: Rect;
+  modeId: string;
 }
 
 // ─────────────────────────────────────────────────────────
@@ -135,11 +140,35 @@ export interface MarqueeEndEvent {
 export interface EnableForModeOptions {
   /**
    * Whether to show selection rects in the SelectionLayer.
-   * When false, the selection logic is enabled but the rects are not
-   * rendered (useful when a consuming plugin handles its own rendering).
+   * @deprecated Use `showSelectionRects` instead.
    * @default true
    */
   showRects?: boolean;
+  /**
+   * Enable text selection for this mode.
+   * @default true
+   */
+  enableSelection?: boolean;
+  /**
+   * Whether to show text selection rects in the SelectionLayer.
+   * When false, the selection logic is enabled but the rects are not
+   * rendered (useful when a consuming plugin handles its own rendering).
+   * Takes precedence over `showRects`.
+   * @default true
+   */
+  showSelectionRects?: boolean;
+  /**
+   * Enable marquee selection for this mode.
+   * @default false
+   */
+  enableMarquee?: boolean;
+  /**
+   * Whether to show the marquee rect in the MarqueeSelection component.
+   * When false, the marquee logic runs but the rect is not rendered
+   * (useful when a consuming plugin handles its own rendering).
+   * @default true
+   */
+  showMarqueeRects?: boolean;
 }
 
 // ─────────────────────────────────────────────────────────
@@ -149,11 +178,13 @@ export interface EnableForModeOptions {
 export interface MarqueeScopeEvent {
   pageIndex: number;
   rect: Rect | null;
+  modeId: string;
 }
 
 export interface MarqueeEndScopeEvent {
   pageIndex: number;
   rect: Rect;
+  modeId: string;
 }
 
 export interface SelectionScope {
@@ -167,13 +198,20 @@ export interface SelectionScope {
   clear(): void;
   copyToClipboard(): void;
   getState(): SelectionDocumentState;
+  /**
+   * @deprecated Use `enableForMode` with `enableMarquee` option on the capability instead.
+   */
   setMarqueeEnabled(enabled: boolean): void;
+  /**
+   * @deprecated Use `enableForMode` / `isEnabledForMode` on the capability instead.
+   */
   isMarqueeEnabled(): boolean;
+  // TODO(next-major): change to EventHook<{ selection: SelectionRangeX | null; modeId: string }>
   onSelectionChange: EventHook<SelectionRangeX | null>;
   onTextRetrieved: EventHook<string[]>;
   onCopyToClipboard: EventHook<string>;
-  onBeginSelection: EventHook<{ page: number; index: number }>;
-  onEndSelection: EventHook<void>;
+  onBeginSelection: EventHook<{ page: number; index: number; modeId: string }>;
+  onEndSelection: EventHook<{ modeId: string }>;
   onMarqueeChange: EventHook<MarqueeScopeEvent>;
   onMarqueeEnd: EventHook<MarqueeEndScopeEvent>;
 }
@@ -193,8 +231,13 @@ export interface SelectionCapability {
   enableForMode(modeId: string, options?: EnableForModeOptions, documentId?: string): void;
   isEnabledForMode(modeId: string, documentId?: string): boolean;
 
-  // Marquee selection
+  /**
+   * @deprecated Use `enableForMode` with `enableMarquee` option instead.
+   */
   setMarqueeEnabled(enabled: boolean, documentId?: string): void;
+  /**
+   * @deprecated Use `enableForMode` / `isEnabledForMode` instead.
+   */
   isMarqueeEnabled(documentId?: string): boolean;
 
   // Document-scoped operations

@@ -9,7 +9,7 @@ export const manifest: PluginManifest<ScrollPluginConfig> = {
   version: '1.0.0',
   provides: ['scroll'],
   requires: ['viewport'],
-  optional: ['spread'],
+  optional: ['spread', 'interaction-manager'],
   defaultConfig: {
     defaultPageGap: 10,
     defaultBufferSize: 4,

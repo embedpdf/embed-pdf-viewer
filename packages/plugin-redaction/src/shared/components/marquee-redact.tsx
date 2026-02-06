@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from '@framework';
+import { useEffect, useState } from '@framework';
 import { useDocumentState } from '@embedpdf/core/@framework';
 import { Rect } from '@embedpdf/models';
 
@@ -31,10 +31,7 @@ export const MarqueeRedact = ({
 
   const [rect, setRect] = useState<Rect | null>(null);
 
-  const scale = useMemo(() => {
-    if (scaleOverride !== undefined) return scaleOverride;
-    return documentState?.scale ?? 1;
-  }, [scaleOverride, documentState?.scale]);
+  const scale = scaleOverride ?? documentState?.scale ?? 1;
 
   // Get stroke color from plugin (annotation mode uses tool defaults, legacy uses red)
   // Allow prop override for backwards compatibility
@@ -42,15 +39,10 @@ export const MarqueeRedact = ({
 
   useEffect(() => {
     if (!redactionPlugin || !documentId) return;
-    return redactionPlugin.registerMarqueeOnPage({
-      documentId,
-      pageIndex,
-      scale,
-      callback: {
-        onPreview: setRect,
-      },
+    return redactionPlugin.onRedactionMarqueeChange(documentId, (data) => {
+      setRect(data.pageIndex === pageIndex ? data.rect : null);
     });
-  }, [redactionPlugin, documentId, pageIndex, scale]);
+  }, [redactionPlugin, documentId, pageIndex]);
 
   if (!rect) return null;
 

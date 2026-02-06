@@ -100,9 +100,12 @@ export function Scroller({ documentId, renderPage, ...props }: ScrollerProps) {
             {item.pageLayouts.map((layout) => (
               <div
                 key={layout.pageNumber}
+                data-epdf-page-container
                 style={{
                   width: `${layout.rotatedWidth}px`,
                   height: `${layout.rotatedHeight}px`,
+                  position: 'relative',
+                  zIndex: layout.elevated ? 1 : undefined,
                 }}
               >
                 {renderPage({

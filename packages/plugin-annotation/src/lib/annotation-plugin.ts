@@ -177,7 +177,11 @@ export class AnnotationPlugin extends BasePlugin<
       for (const tool of this.state.tools) {
         if (tool.interaction.textSelection) {
           // Text markup tools render their own highlight preview, so suppress selection layer rects
-          this.selection.enableForMode(tool.interaction.mode ?? tool.id, { showRects: false });
+          this.selection.enableForMode(tool.interaction.mode ?? tool.id, {
+            showSelectionRects: false,
+            enableSelection: true,
+            enableMarquee: false,
+          });
         }
       }
     }
@@ -241,7 +245,10 @@ export class AnnotationPlugin extends BasePlugin<
 
     // Subscribe to marquee selection end events from the selection plugin
     // When a marquee selection completes, find and select intersecting annotations
-    this.selection?.onMarqueeEnd(({ documentId, pageIndex, rect }) => {
+    this.selection?.onMarqueeEnd(({ documentId, pageIndex, rect, modeId }) => {
+      // Only select annotations during pointer mode marquee, not during redaction etc.
+      if (modeId !== 'pointerMode') return;
+
       const docState = this.state.documents[documentId];
       if (!docState) return;
 
@@ -946,11 +953,17 @@ export class AnnotationPlugin extends BasePlugin<
       // Normal single selection
       this.dispatch(selectAnnotation(docId, pageIndex, id));
     }
+
+    // Claim page activity so the scroll plugin can elevate this page
+    this.interactionManager?.claimPageActivity(docId, 'annotation-selection', pageIndex);
   }
 
   private deselectAnnotation(documentId?: string) {
     const docId = documentId ?? this.getActiveDocumentId();
     this.dispatch(deselectAnnotation(docId));
+
+    // Release page activity claim
+    this.interactionManager?.releasePageActivity(docId, 'annotation-selection');
   }
 
   // ─────────────────────────────────────────────────────────
