@@ -3,6 +3,7 @@ import { ScrollerLayout, ScrollDocumentState } from './types';
 export const getScrollerLayout = (
   documentState: ScrollDocumentState,
   scale: number,
+  elevatedPages?: Set<number>,
 ): ScrollerLayout => {
   return {
     startSpacing: documentState.startSpacing,
@@ -21,6 +22,7 @@ export const getScrollerLayout = (
             rotatedHeight: layout.rotatedHeight * scale,
             width: layout.width * scale,
             height: layout.height * scale,
+            elevated: elevatedPages?.has(layout.pageIndex) ?? false,
           };
         }),
       };

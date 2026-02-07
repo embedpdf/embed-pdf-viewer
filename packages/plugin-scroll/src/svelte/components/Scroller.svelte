@@ -96,6 +96,8 @@
             <div
               style:width={`${layout.rotatedWidth}px`}
               style:height={`${layout.rotatedHeight}px`}
+              style:position="relative"
+              style:z-index={layout.elevated ? '1' : undefined}
             >
               {@render renderPage(layout)}
             </div>

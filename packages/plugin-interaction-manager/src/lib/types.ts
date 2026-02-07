@@ -154,6 +154,13 @@ export interface StateChangeEvent {
   state: InteractionDocumentState;
 }
 
+export interface PageActivityChangeEvent {
+  documentId: string;
+  pageIndex: number;
+  /** Whether this page now has any active topics */
+  hasActivity: boolean;
+}
+
 // Scoped interaction capability
 export interface InteractionManagerScope {
   getActiveMode(): string;
@@ -169,9 +176,13 @@ export interface InteractionManagerScope {
   resume(): void;
   isPaused(): boolean;
   getState(): InteractionDocumentState;
+  claimPageActivity(topic: string, pageIndex: number): void;
+  releasePageActivity(topic: string): void;
+  hasPageActivity(pageIndex: number): boolean;
   onModeChange: EventHook<string>;
   onCursorChange: EventHook<string>;
   onStateChange: EventHook<InteractionDocumentState>;
+  onPageActivityChange: EventHook<{ pageIndex: number; hasActivity: boolean }>;
 }
 
 export interface InteractionManagerCapability {
@@ -206,9 +217,15 @@ export interface InteractionManagerCapability {
   addExclusionAttribute(attribute: string): void;
   removeExclusionAttribute(attribute: string): void;
 
+  // Page activity
+  claimPageActivity(documentId: string, topic: string, pageIndex: number): void;
+  releasePageActivity(documentId: string, topic: string): void;
+  hasPageActivity(documentId: string, pageIndex: number): boolean;
+
   // Events (all include documentId)
   onModeChange: EventHook<ModeChangeEvent>;
   onCursorChange: EventHook<CursorChangeEvent>;
   onHandlerChange: EventHook<InteractionManagerState>;
   onStateChange: EventHook<StateChangeEvent>;
+  onPageActivityChange: EventHook<PageActivityChangeEvent>;
 }

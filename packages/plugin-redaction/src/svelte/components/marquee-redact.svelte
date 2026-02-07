@@ -44,15 +44,8 @@
       return;
     }
 
-    return redactionPlugin.plugin.registerMarqueeOnPage({
-      documentId,
-      pageIndex,
-      scale: actualScale,
-      callback: {
-        onPreview: (newRect) => {
-          rect = newRect;
-        },
-      },
+    return redactionPlugin.plugin.onRedactionMarqueeChange(documentId, (data) => {
+      rect = data.pageIndex === pageIndex ? data.rect : null;
     });
   });
 </script>

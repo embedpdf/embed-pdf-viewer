@@ -14,22 +14,24 @@ export interface MarqueeSelectionHandlerOptions {
   minDragPx?: number;
   /** Check if marquee selection is enabled for this mode */
   isEnabled: (modeId: string) => boolean;
+  /** Returns whether text selection is currently active (skip marquee if so) */
+  isTextSelecting?: () => boolean;
   /** Called when marquee selection begins */
-  onBegin: (startPos: Position) => void;
+  onBegin: (startPos: Position, modeId: string) => void;
   /** Called during drag with the current marquee rect */
-  onChange: (rect: Rect) => void;
+  onChange: (rect: Rect, modeId: string) => void;
   /** Called when marquee selection completes (drag was large enough) */
-  onEnd: (rect: Rect) => void;
+  onEnd: (rect: Rect, modeId: string) => void;
   /** Called when marquee selection is cancelled (drag too small or cancelled) */
-  onCancel: () => void;
+  onCancel: (modeId: string) => void;
 }
 
 /**
  * Creates a marquee selection handler that allows users to drag a selection rectangle.
  *
- * This handler is meant to be combined with the text selection handler using `mergeHandlers`.
- * The text selection handler should have higher priority and call `stopImmediatePropagation()`
- * when text is hit, preventing this marquee handler from activating.
+ * This handler is meant to be combined with the text selection handler. When text is hit,
+ * the text selection handler sets its selecting state, and this handler checks via
+ * `isTextSelecting` to avoid activating during text selection.
  */
 export function createMarqueeSelectionHandler(
   opts: MarqueeSelectionHandlerOptions,
@@ -42,10 +44,11 @@ export function createMarqueeSelectionHandler(
   return {
     onPointerDown: (pos, evt, modeId) => {
       if (!opts.isEnabled(modeId)) return;
+      if (opts.isTextSelecting?.()) return;
 
       start = pos;
       last = { origin: { x: pos.x, y: pos.y }, size: { width: 0, height: 0 } };
-      opts.onBegin(pos);
+      opts.onBegin(pos, modeId);
       evt.setPointerCapture?.();
     },
 
@@ -62,7 +65,7 @@ export function createMarqueeSelectionHandler(
         size: { width: Math.abs(x - start.x), height: Math.abs(y - start.y) },
       };
 
-      opts.onChange(last);
+      opts.onChange(last, modeId);
     },
 
     onPointerUp: (_pos, evt, modeId) => {
@@ -72,9 +75,9 @@ export function createMarqueeSelectionHandler(
         // Only commit if the drag was large enough
         const dragPx = Math.max(last.size.width, last.size.height) * scale;
         if (dragPx > minDragPx) {
-          opts.onEnd(last);
+          opts.onEnd(last, modeId);
         } else {
-          opts.onCancel();
+          opts.onCancel(modeId);
         }
       }
 
@@ -88,7 +91,7 @@ export function createMarqueeSelectionHandler(
 
       start = null;
       last = null;
-      opts.onCancel();
+      opts.onCancel(modeId);
       evt.releasePointerCapture?.();
     },
   };

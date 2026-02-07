@@ -177,7 +177,11 @@ export class AnnotationPlugin extends BasePlugin<
       for (const tool of this.state.tools) {
         if (tool.interaction.textSelection) {
           // Text markup tools render their own highlight preview, so suppress selection layer rects
-          this.selection.enableForMode(tool.interaction.mode ?? tool.id, { showRects: false });
+          this.selection.enableForMode(tool.interaction.mode ?? tool.id, {
+            showSelectionRects: false,
+            enableSelection: true,
+            enableMarquee: false,
+          });
         }
       }
     }
@@ -241,7 +245,10 @@ export class AnnotationPlugin extends BasePlugin<
 
     // Subscribe to marquee selection end events from the selection plugin
     // When a marquee selection completes, find and select intersecting annotations
-    this.selection?.onMarqueeEnd(({ documentId, pageIndex, rect }) => {
+    this.selection?.onMarqueeEnd(({ documentId, pageIndex, rect, modeId }) => {
+      // Only select annotations during pointer mode marquee, not during redaction etc.
+      if (modeId !== 'pointerMode') return;
+
       const docState = this.state.documents[documentId];
       if (!docState) return;
 
@@ -469,6 +476,11 @@ export class AnnotationPlugin extends BasePlugin<
             documentId,
             tool: this.getActiveTool(documentId),
           });
+        }
+
+        // Update page activity when selection changes
+        if (prevDoc?.selectedUids !== nextDoc.selectedUids) {
+          this.updateAnnotationSelectionActivity(documentId, nextDoc);
         }
       }
     }
@@ -946,11 +958,36 @@ export class AnnotationPlugin extends BasePlugin<
       // Normal single selection
       this.dispatch(selectAnnotation(docId, pageIndex, id));
     }
+
+    // Page activity is managed centrally in onStoreUpdated via updateAnnotationSelectionActivity
   }
 
   private deselectAnnotation(documentId?: string) {
     const docId = documentId ?? this.getActiveDocumentId();
     this.dispatch(deselectAnnotation(docId));
+    // Page activity is managed centrally in onStoreUpdated via updateAnnotationSelectionActivity
+  }
+
+  /**
+   * Derive page activity from the current annotation selection.
+   * Called from onStoreUpdated whenever selectedUids changes,
+   * so ALL selection code paths are covered automatically.
+   */
+  private updateAnnotationSelectionActivity(docId: string, docState: AnnotationDocumentState) {
+    if (docState.selectedUids.length === 0) {
+      this.interactionManager?.releasePageActivity(docId, 'annotation-selection');
+      return;
+    }
+    // Claim for the page of the first selected annotation
+    const firstUid = docState.selectedUids[0];
+    const ta = docState.byUid[firstUid];
+    if (ta) {
+      this.interactionManager?.claimPageActivity(
+        docId,
+        'annotation-selection',
+        ta.object.pageIndex,
+      );
+    }
   }
 
   // ─────────────────────────────────────────────────────────

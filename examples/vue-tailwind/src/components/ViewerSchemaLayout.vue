@@ -59,7 +59,6 @@
                           :selectionMenu="annotationMenu"
                           :groupSelectionMenu="groupAnnotationMenu"
                         />
-                        <MarqueeSelection :documentId="documentId" :pageIndex="page.pageIndex" />
                       </PagePointerProvider>
                     </Rotate>
                   </Scroller>
@@ -96,7 +95,7 @@ import { TilingLayer } from '@embedpdf/plugin-tiling/vue';
 import { SearchLayer } from '@embedpdf/plugin-search/vue';
 import { MarqueeZoom, ZoomGestureWrapper } from '@embedpdf/plugin-zoom/vue';
 import { MarqueeCapture } from '@embedpdf/plugin-capture/vue';
-import { SelectionLayer, MarqueeSelection } from '@embedpdf/plugin-selection/vue';
+import { SelectionLayer } from '@embedpdf/plugin-selection/vue';
 import { RedactionLayer } from '@embedpdf/plugin-redaction/vue';
 import { AnnotationLayer } from '@embedpdf/plugin-annotation/vue';
 import LoadingSpinner from './LoadingSpinner.vue';
