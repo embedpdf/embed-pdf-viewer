@@ -1,5 +1,13 @@
 # @embedpdf/plugin-redaction
 
+## 2.6.0
+
+### Minor Changes
+
+- [#447](https://github.com/embedpdf/embed-pdf-viewer/pull/447) by [@bobsingor](https://github.com/bobsingor) – Subscribe to selection plugin's `onEmptySpaceClick` event to deselect pending redactions when the user clicks on empty page space. Restores background-click-to-deselect behavior that was lost during the marquee unification.
+
+- [#447](https://github.com/embedpdf/embed-pdf-viewer/pull/447) by [@bobsingor](https://github.com/bobsingor) – Unified marquee redaction with the selection plugin's marquee infrastructure. Removed standalone `createMarqueeHandler`, `registerMarqueeOnPage`, `RegisterMarqueeOnPageOptions`, and `MarqueeRedactCallback`. Marquee redaction now subscribes to selection plugin's `onMarqueeChange` and `onMarqueeEnd` events and forwards them via new `onRedactionMarqueeChange` method. Enabled marquee for `RedactionMode.Redact` and `RedactionMode.MarqueeRedact` modes via `enableForMode`. Added page activity claims (`redaction-selection` topic) in legacy mode for scroll plugin page elevation.
+
 ## 2.5.0
 
 ### Patch Changes
