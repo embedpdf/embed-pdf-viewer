@@ -535,11 +535,16 @@ export class ScrollPlugin extends BasePlugin<
       this.spread?.forDocument(id).getSpreadPages() ||
       coreDoc.document?.pages.map((page) => [page]) ||
       [];
+
     return spreadPages.map((spread) =>
-      spread.map((page) => ({
-        ...page,
-        rotatedSize: transformSize(page.size, coreDoc.rotation, 1),
-      })),
+      spread.map((page) => {
+        // Combine page intrinsic rotation with document rotation
+        const effectiveRotation = ((page.rotation ?? 0) + coreDoc.rotation) % 4;
+        return {
+          ...page,
+          rotatedSize: transformSize(page.size, effectiveRotation, 1),
+        };
+      }),
     );
   }
 
@@ -569,11 +574,15 @@ export class ScrollPlugin extends BasePlugin<
 
     this.startPageChange(id, pageNumber, behavior);
 
+    // Calculate effective rotation for this page (page intrinsic + document rotation)
+    const pageObj = coreDoc.document?.pages[pageNumber - 1];
+    const effectiveRotation = ((pageObj?.rotation ?? 0) + coreDoc.rotation) % 4;
+
     const position = strategy.getScrollPositionForPage(
       pageNumber,
       docState.virtualItems,
       coreDoc.scale,
-      coreDoc.rotation,
+      effectiveRotation as Rotation,
       pageCoordinates,
     );
 
@@ -680,11 +689,18 @@ export class ScrollPlugin extends BasePlugin<
     const strategy = this.getStrategy(id);
     const coreDoc = this.getCoreDocumentOrThrow(id);
 
+    // Calculate effective rotation if not provided (page intrinsic + document rotation)
+    let effectiveRotation = rotation;
+    if (effectiveRotation === undefined) {
+      const pageObj = coreDoc.document?.pages[pageIndex];
+      effectiveRotation = (((pageObj?.rotation ?? 0) + coreDoc.rotation) % 4) as Rotation;
+    }
+
     return strategy.getRectPositionForPage(
       pageIndex + 1,
       docState.virtualItems,
       scale ?? coreDoc.scale,
-      rotation ?? coreDoc.rotation,
+      effectiveRotation,
       rect,
     );
   }

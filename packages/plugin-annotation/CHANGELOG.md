@@ -1,5 +1,14 @@
 # @embedpdf/plugin-annotation
 
+## 2.5.0
+
+### Patch Changes
+
+- [#441](https://github.com/embedpdf/embed-pdf-viewer/pull/441) by [@bobsingor](https://github.com/bobsingor) – Fixed rotation calculation in AnnotationLayer components to properly combine page intrinsic rotation with document rotation:
+  - Updated React `AnnotationLayer` component to compute effective rotation as `(pageRotation + docRotation) % 4`
+  - Updated Vue `annotation-layer.vue` component with the same rotation logic
+  - Updated Svelte `AnnotationLayer.svelte` component with the same rotation logic
+
 ## 2.4.1
 
 ## 2.4.0

@@ -36,7 +36,13 @@
   // Get page dimensions and transformations from document state
   const page = $derived(documentState.current?.document?.pages?.[pageIndex]);
   const naturalPageSize = $derived(page?.size ?? { width: 0, height: 0 });
-  const rotation = $derived(rotationOverride ?? documentState.current?.rotation ?? 0);
+  // If override is provided, use it directly (consistent with other layer components)
+  // Otherwise, combine page intrinsic rotation with document rotation
+  const pageRotation = $derived(page?.rotation ?? 0);
+  const docRotation = $derived(documentState.current?.rotation ?? 0);
+  const rotation = $derived(
+    rotationOverride !== undefined ? rotationOverride : (pageRotation + docRotation) % 4,
+  );
   const scale = $derived(scaleOverride ?? documentState.current?.scale ?? 1);
   const displaySize = $derived(transformSize(naturalPageSize, 0, scale));
 

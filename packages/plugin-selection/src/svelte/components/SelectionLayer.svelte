@@ -46,6 +46,8 @@
   const selectionPlugin = useSelectionPlugin();
   const documentState = useDocumentState(() => documentId);
 
+  const page = $derived(documentState.current?.document?.pages?.[pageIndex]);
+
   let rects = $state<Rect[]>([]);
   let boundingRect = $state<Rect | null>(null);
   let placement = $state<UtilsSelectionMenuPlacement | null>(null);
@@ -54,19 +56,21 @@
     scaleOverride !== undefined ? scaleOverride : (documentState.current?.scale ?? 1),
   );
 
-  const actualRotation = $derived(
-    rotationOverride !== undefined
-      ? rotationOverride
-      : (documentState.current?.rotation ?? Rotation.Degree0),
-  );
+  const actualRotation = $derived.by(() => {
+    if (rotationOverride !== undefined) return rotationOverride;
+    // Combine page intrinsic rotation with document rotation
+    const pageRotation = page?.rotation ?? 0;
+    const docRotation = documentState.current?.rotation ?? 0;
+    return ((pageRotation + docRotation) % 4) as Rotation;
+  });
 
   // Check if menu should render: placement is valid AND (render fn OR snippet exists)
   const shouldRenderMenu = $derived(
     Boolean(
       placement &&
-        placement.pageIndex === pageIndex &&
-        placement.isVisible &&
-        (selectionMenu || selectionMenuSnippet),
+      placement.pageIndex === pageIndex &&
+      placement.isVisible &&
+      (selectionMenu || selectionMenuSnippet),
     ),
   );
 

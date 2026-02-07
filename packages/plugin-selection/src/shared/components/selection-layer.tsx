@@ -25,6 +25,7 @@ export function SelectionLayer({
 }: Props) {
   const { plugin: selPlugin } = useSelectionPlugin();
   const documentState = useDocumentState(documentId);
+  const page = documentState?.document?.pages?.[pageIndex];
   const [rects, setRects] = useState<Rect[]>([]);
   const [boundingRect, setBoundingRect] = useState<Rect | null>(null);
 
@@ -62,8 +63,11 @@ export function SelectionLayer({
 
   const actualRotation = useMemo(() => {
     if (rotationOverride !== undefined) return rotationOverride;
-    return documentState?.rotation ?? Rotation.Degree0;
-  }, [rotationOverride, documentState?.rotation]);
+    // Combine page intrinsic rotation with document rotation
+    const pageRotation = page?.rotation ?? 0;
+    const docRotation = documentState?.rotation ?? 0;
+    return ((pageRotation + docRotation) % 4) as Rotation;
+  }, [rotationOverride, page?.rotation, documentState?.rotation]);
 
   const shouldRenderMenu =
     selectionMenu && placement && placement.pageIndex === pageIndex && placement.isVisible;

@@ -32,12 +32,17 @@
   }: RedactionLayerProps = $props();
 
   const documentState = useDocumentState(() => documentId);
+  const page = $derived(documentState.current?.document?.pages?.[pageIndex]);
 
   const actualScale = $derived(scale !== undefined ? scale : (documentState.current?.scale ?? 1));
 
-  const actualRotation = $derived(
-    rotation !== undefined ? rotation : (documentState.current?.rotation ?? Rotation.Degree0),
-  );
+  const actualRotation = $derived.by(() => {
+    if (rotation !== undefined) return rotation;
+    // Combine page intrinsic rotation with document rotation
+    const pageRotation = page?.rotation ?? 0;
+    const docRotation = documentState.current?.rotation ?? 0;
+    return ((pageRotation + docRotation) % 4) as Rotation;
+  });
 </script>
 
 <PendingRedactions

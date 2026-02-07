@@ -1,5 +1,15 @@
 # @embedpdf/utils
 
+## 2.5.0
+
+### Patch Changes
+
+- [#441](https://github.com/embedpdf/embed-pdf-viewer/pull/441) by [@bobsingor](https://github.com/bobsingor) – Fixed resize handle cursors to account for page rotation:
+  - Updated `diagonalCursor()` function to swap `ns-resize` and `ew-resize` cursors for edge handles (n, s, e, w) on odd rotation values (90° and 270°)
+  - Reorganized cursor logic to handle edge handles separately from corner handles
+
+  Previously, edge resize handles showed incorrect cursors on rotated pages (e.g., north handle showed `ns-resize` instead of `ew-resize` on 90° rotated pages).
+
 ## 2.4.1
 
 ## 2.4.0

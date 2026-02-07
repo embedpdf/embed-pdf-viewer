@@ -23,7 +23,14 @@ const documentState = useDocumentState(() => props.documentId);
 // Calculate inline - this is cheap and memoization isn't necessary
 const page = computed(() => documentState.value?.document?.pages?.[props.pageIndex]);
 const naturalPageSize = computed(() => page.value?.size ?? { width: 0, height: 0 });
-const rotation = computed(() => props.rotation ?? documentState.value?.rotation ?? 0);
+// If override is provided, use it directly (consistent with other layer components)
+// Otherwise, combine page intrinsic rotation with document rotation
+const pageRotation = computed(() => page.value?.rotation ?? 0);
+const rotation = computed(() => {
+  if (props.rotation !== undefined) return props.rotation;
+  const docRotation = documentState.value?.rotation ?? 0;
+  return (pageRotation.value + docRotation) % 4;
+});
 const scale = computed(() => props.scale ?? documentState.value?.scale ?? 1);
 const displaySize = computed(() => transformSize(naturalPageSize.value, 0, scale.value));
 
