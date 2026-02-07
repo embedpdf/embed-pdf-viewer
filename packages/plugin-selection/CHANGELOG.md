@@ -1,5 +1,15 @@
 # @embedpdf/plugin-selection
 
+## 2.6.0
+
+### Minor Changes
+
+- [#447](https://github.com/embedpdf/embed-pdf-viewer/pull/447) by [@bobsingor](https://github.com/bobsingor) – Added `onEmptySpaceClick` event to `SelectionScope` and `SelectionCapability`. Fires when the user clicks directly on the page background (empty space) rather than on a child element. Detection runs before mode-gating so it fires for all modes regardless of whether text or marquee selection is enabled. New `EmptySpaceClickEvent` and `EmptySpaceClickScopeEvent` type exports.
+
+- [#447](https://github.com/embedpdf/embed-pdf-viewer/pull/447) by [@bobsingor](https://github.com/bobsingor) – Unified text selection and marquee selection under the `enableForMode` API. Extended `EnableForModeOptions` with `enableSelection`, `showSelectionRects`, `enableMarquee`, and `showMarqueeRects` options. Deprecated `showRects` (use `showSelectionRects`), `setMarqueeEnabled`, and `isMarqueeEnabled` (use `enableForMode` with `enableMarquee`). Added `modeId` to `SelectionChangeEvent`, `BeginSelectionEvent`, `EndSelectionEvent`, `MarqueeChangeEvent`, `MarqueeEndEvent`, and their scoped counterparts. Marquee handler now uses `registerAlways` so any plugin can enable marquee for their mode. Removed `stopImmediatePropagation` from text selection handler in favor of `isTextSelecting` coordination.
+
+  Refactored `SelectionLayer` into a thin orchestrator that composes the new `TextSelection` component and existing `MarqueeSelection` component. Consumers no longer need to render `MarqueeSelection` separately -- `SelectionLayer` now includes both text and marquee selection. Added new `TextSelection` export for advanced standalone usage. Added `textStyle` and `marqueeStyle` props to `SelectionLayer` for consistent CSS-standard styling (`background`, `borderColor`, `borderStyle`). `MarqueeSelection` updated with CSS-standard props (`background`, `borderColor`, `borderStyle`); old `stroke` and `fill` props deprecated. New `TextSelectionStyle` and `MarqueeSelectionStyle` type exports.
+
 ## 2.5.0
 
 ### Patch Changes

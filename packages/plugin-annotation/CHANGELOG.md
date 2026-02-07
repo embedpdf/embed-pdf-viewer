@@ -1,5 +1,11 @@
 # @embedpdf/plugin-annotation
 
+## 2.6.0
+
+### Minor Changes
+
+- [#447](https://github.com/embedpdf/embed-pdf-viewer/pull/447) by [@bobsingor](https://github.com/bobsingor) – Added `modeId` filtering to marquee end event handler so annotation selection only triggers during `pointerMode`, preventing interference with redaction marquees. Added page activity claims (`annotation-selection` topic) when selecting/deselecting annotations for scroll plugin page elevation.
+
 ## 2.5.0
 
 ### Patch Changes
