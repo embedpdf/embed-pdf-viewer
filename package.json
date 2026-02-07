@@ -43,7 +43,7 @@
     "lint-staged": "^16.2.7",
     "prettier": "^3.7.4",
     "prettier-plugin-svelte": "^3.4.1",
-    "prettier-plugin-tailwindcss": "^0.6.11",
+    "prettier-plugin-tailwindcss": "^0.7.2",
     "rimraf": "latest",
     "turbo": "latest",
     "turbowatch": "^2.29.4",
