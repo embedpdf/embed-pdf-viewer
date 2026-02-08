@@ -9,6 +9,7 @@ const locales = [
   { code: 'de', name: 'German' },
   { code: 'fr', name: 'French' },
   { code: 'es', name: 'Spanish' },
+  { code: 'zh-CN', name: 'Chinese' },
 ]
 
 interface I18nExampleProps {

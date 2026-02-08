@@ -1,5 +1,27 @@
 # @embedpdf/plugin-commands
 
+## 2.5.0
+
+## 2.4.1
+
+## 2.4.0
+
+### Minor Changes
+
+- [#426](https://github.com/embedpdf/embed-pdf-viewer/pull/426) by [@bobsingor](https://github.com/bobsingor) – Added `logger` to command action context, enabling commands to log debug information through the plugin's logger instance.
+
+## 2.3.0
+
+### Minor Changes
+
+- [#406](https://github.com/embedpdf/embed-pdf-viewer/pull/406) by [@bobsingor](https://github.com/bobsingor) – Made `labelKey` dynamic, allowing it to be a function that returns different translation keys based on state. Added dynamic `icon` support so command icons can change at runtime. Added `registry` to the dynamic evaluation context for accessing other plugins. Made `ui` an optional dependency instead of not listed. Added early return in `detectCommandChanges` when document is not fully loaded.
+
+## 2.2.0
+
+## 2.1.2
+
+## 2.1.1
+
 ## 2.1.0
 
 ## 2.0.2

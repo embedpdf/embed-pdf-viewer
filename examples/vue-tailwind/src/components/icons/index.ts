@@ -54,3 +54,7 @@ export { default as PointerIcon } from './PointerIcon.vue';
 export { default as SidebarIcon } from './SidebarIcon.vue';
 export { default as CommentIcon } from './CommentIcon.vue';
 export { default as CopyIcon } from './CopyIcon.vue';
+export { default as LinkIcon } from './LinkIcon.vue';
+export { default as LinkOffIcon } from './LinkOffIcon.vue';
+export { default as GroupIcon } from './GroupIcon.vue';
+export { default as UngroupIcon } from './UngroupIcon.vue';

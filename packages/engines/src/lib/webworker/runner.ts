@@ -354,6 +354,15 @@ export class EngineRunner {
       case 'redactTextInRects':
         task = engine.redactTextInRects!(...args);
         break;
+      case 'applyRedaction':
+        task = engine.applyRedaction!(...args);
+        break;
+      case 'applyAllRedactions':
+        task = engine.applyAllRedactions!(...args);
+        break;
+      case 'flattenAnnotation':
+        task = engine.flattenAnnotation!(...args);
+        break;
       case 'getTextSlices':
         task = engine.getTextSlices!(...args);
         break;
@@ -371,6 +380,21 @@ export class EngineRunner {
         break;
       case 'preparePrintDocument':
         task = engine.preparePrintDocument!(...args);
+        break;
+      case 'setDocumentEncryption':
+        task = engine.setDocumentEncryption(...args);
+        break;
+      case 'removeEncryption':
+        task = engine.removeEncryption(...args);
+        break;
+      case 'unlockOwnerPermissions':
+        task = engine.unlockOwnerPermissions(...args);
+        break;
+      case 'isEncrypted':
+        task = engine.isEncrypted(...args);
+        break;
+      case 'isOwnerUnlocked':
+        task = engine.isOwnerUnlocked(...args);
         break;
       default:
         // This should never be reached due to the earlier check, but provides exhaustiveness

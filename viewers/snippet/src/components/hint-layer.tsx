@@ -1,6 +1,7 @@
 import { h } from 'preact';
-import { useInteractionManager } from '@embedpdf/plugin-interaction-manager/preact';
+import { useInteractionManagerCapability } from '@embedpdf/plugin-interaction-manager/preact';
 import { useEffect, useState } from 'preact/hooks';
+import { useTranslations } from '@embedpdf/plugin-i18n/preact';
 
 interface HintState {
   show: boolean;
@@ -8,13 +9,18 @@ interface HintState {
   isAnimating: boolean;
 }
 
-export const HintLayer = () => {
-  const { provides: interactionManager } = useInteractionManager();
+export interface HintLayerProps {
+  documentId: string;
+}
+
+export const HintLayer = ({ documentId }: HintLayerProps) => {
+  const { provides: interactionManager } = useInteractionManagerCapability();
   const [hint, setHint] = useState<HintState>({
     show: false,
     mode: null,
     isAnimating: false,
   });
+  const { translate } = useTranslations(documentId);
 
   useEffect(() => {
     if (!interactionManager) return;
@@ -54,7 +60,7 @@ export const HintLayer = () => {
   if (!hint.show && !hint.isAnimating) return null;
 
   const hintText =
-    hint.mode === 'marqueeZoom' ? 'Drag to select area to zoom' : 'Drag to select area to capture';
+    hint.mode === 'marqueeZoom' ? translate('zoom.dragTip') : translate('capture.dragTip');
 
   const hintColor = hint.mode === 'marqueeZoom' ? 'rgba(33,150,243,0.8)' : 'rgba(76,175,80,0.8)';
 

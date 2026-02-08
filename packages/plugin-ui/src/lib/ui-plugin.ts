@@ -23,6 +23,8 @@ import {
   ModalChangedEvent,
   MenuChangedData,
   MenuChangedEvent,
+  OverlayChangedData,
+  OverlayChangedEvent,
   ModalSlotState,
 } from './types';
 import {
@@ -40,6 +42,7 @@ import {
   openMenu,
   closeMenu,
   closeAllMenus,
+  setOverlayEnabled,
   setDisabledCategories,
   setHiddenItems,
 } from './actions';
@@ -97,6 +100,12 @@ export class UIPlugin extends BasePlugin<UIPluginConfig, UICapability, UIState, 
     { cache: false },
   );
 
+  private readonly overlayChanged$ = createScopedEmitter<
+    OverlayChangedData,
+    OverlayChangedEvent,
+    string
+  >((documentId, data) => ({ documentId, ...data }), { cache: false });
+
   constructor(id: string, registry: PluginRegistry, config: UIPluginConfig) {
     super(id, registry);
     this.schema = config.schema;
@@ -139,6 +148,7 @@ export class UIPlugin extends BasePlugin<UIPluginConfig, UICapability, UIState, 
     this.sidebarChanged$.clear();
     this.modalChanged$.clear();
     this.menuChanged$.clear();
+    this.overlayChanged$.clear();
     this.stylesheetInvalidated$.clear();
     super.destroy();
   }
@@ -155,6 +165,7 @@ export class UIPlugin extends BasePlugin<UIPluginConfig, UICapability, UIState, 
     this.sidebarChanged$.clearScope(documentId);
     this.modalChanged$.clearScope(documentId);
     this.menuChanged$.clearScope(documentId);
+    this.overlayChanged$.clearScope(documentId);
   }
 
   /**
@@ -273,11 +284,20 @@ export class UIPlugin extends BasePlugin<UIPluginConfig, UICapability, UIState, 
         this.setSidebarForDocument(placement, slot, sidebarId, documentId, activeTab),
       toggleSidebar: (placement, slot, sidebarId, documentId, activeTab) =>
         this.toggleSidebarForDocument(placement, slot, sidebarId, documentId, activeTab),
-      openModal: (modalId, documentId) => this.openModalForDocument(modalId, documentId),
+      openModal: (modalId, props, documentId) =>
+        this.openModalForDocument(modalId, props, documentId),
       openMenu: (menuId, triggeredByCommandId, triggeredByItemId, documentId) =>
         this.openMenuForDocument(menuId, triggeredByCommandId, triggeredByItemId, documentId),
       toggleMenu: (menuId, triggeredByCommandId, triggeredByItemId, documentId) =>
         this.toggleMenuForDocument(menuId, triggeredByCommandId, triggeredByItemId, documentId),
+
+      // Overlay operations
+      enableOverlay: (overlayId, documentId) =>
+        this.enableOverlayForDocument(overlayId, documentId),
+      disableOverlay: (overlayId, documentId) =>
+        this.disableOverlayForDocument(overlayId, documentId),
+      toggleOverlay: (overlayId, documentId) =>
+        this.toggleOverlayForDocument(overlayId, documentId),
 
       // Document-scoped operations
       forDocument: (documentId) => this.createUIScope(documentId),
@@ -302,6 +322,7 @@ export class UIPlugin extends BasePlugin<UIPluginConfig, UICapability, UIState, 
       onSidebarChanged: this.sidebarChanged$.onGlobal,
       onModalChanged: this.modalChanged$.onGlobal,
       onMenuChanged: this.menuChanged$.onGlobal,
+      onOverlayChanged: this.overlayChanged$.onGlobal,
       onCategoryChanged: this.categoryChanged$.on,
     };
   }
@@ -340,7 +361,7 @@ export class UIPlugin extends BasePlugin<UIPluginConfig, UICapability, UIState, 
       getSidebarTab: (sidebarId) => this.getSidebarTabForDocument(sidebarId, documentId),
 
       // ───── Modals (with animation lifecycle) ─────
-      openModal: (modalId) => this.openModalForDocument(modalId, documentId),
+      openModal: (modalId, props) => this.openModalForDocument(modalId, props, documentId),
       closeModal: () => this.closeModalForDocument(documentId),
       clearModal: () => this.clearModalForDocument(documentId),
       getActiveModal: () => this.getActiveModalForDocument(documentId),
@@ -356,6 +377,13 @@ export class UIPlugin extends BasePlugin<UIPluginConfig, UICapability, UIState, 
       isMenuOpen: (menuId) => this.isMenuOpenForDocument(menuId, documentId),
       getOpenMenus: () => this.getOpenMenusForDocument(documentId),
 
+      // ───── Overlays ─────
+      enableOverlay: (overlayId) => this.enableOverlayForDocument(overlayId, documentId),
+      disableOverlay: (overlayId) => this.disableOverlayForDocument(overlayId, documentId),
+      toggleOverlay: (overlayId) => this.toggleOverlayForDocument(overlayId, documentId),
+      isOverlayEnabled: (overlayId) => this.isOverlayEnabledForDocument(overlayId, documentId),
+      getEnabledOverlays: () => this.getEnabledOverlaysForDocument(documentId),
+
       // ───── Schema & state ─────
       getSchema: () => this.schema,
       getState: () => this.getDocumentStateOrThrow(documentId),
@@ -365,6 +393,7 @@ export class UIPlugin extends BasePlugin<UIPluginConfig, UICapability, UIState, 
       onSidebarChanged: this.sidebarChanged$.forScope(documentId),
       onModalChanged: this.modalChanged$.forScope(documentId),
       onMenuChanged: this.menuChanged$.forScope(documentId),
+      onOverlayChanged: this.overlayChanged$.forScope(documentId),
     };
   }
 
@@ -509,9 +538,13 @@ export class UIPlugin extends BasePlugin<UIPluginConfig, UICapability, UIState, 
   // Core Operations - Modals (with animation lifecycle)
   // ─────────────────────────────────────────────────────────
 
-  private openModalForDocument(modalId: string, documentId?: string): void {
+  private openModalForDocument(
+    modalId: string,
+    props?: Record<string, unknown>,
+    documentId?: string,
+  ): void {
     const id = documentId ?? this.getActiveDocumentId();
-    this.dispatch(openModal(id, modalId));
+    this.dispatch(openModal(id, modalId, props));
     this.modalChanged$.emit(id, { modalId, isOpen: true });
   }
 
@@ -590,5 +623,45 @@ export class UIPlugin extends BasePlugin<UIPluginConfig, UICapability, UIState, 
     triggeredByItemId?: string;
   }> {
     return Object.values(this.getDocumentStateOrThrow(documentId).openMenus);
+  }
+
+  // ─────────────────────────────────────────────────────────
+  // Core Operations - Overlays
+  // ─────────────────────────────────────────────────────────
+
+  private enableOverlayForDocument(overlayId: string, documentId?: string): void {
+    const id = documentId ?? this.getActiveDocumentId();
+    this.dispatch(setOverlayEnabled(id, overlayId, true));
+    this.overlayChanged$.emit(id, { overlayId, isEnabled: true });
+  }
+
+  private disableOverlayForDocument(overlayId: string, documentId?: string): void {
+    const id = documentId ?? this.getActiveDocumentId();
+    this.dispatch(setOverlayEnabled(id, overlayId, false));
+    this.overlayChanged$.emit(id, { overlayId, isEnabled: false });
+  }
+
+  private toggleOverlayForDocument(overlayId: string, documentId?: string): void {
+    const id = documentId ?? this.getActiveDocumentId();
+    const isEnabled = this.isOverlayEnabledForDocument(overlayId, id);
+
+    if (isEnabled) {
+      this.disableOverlayForDocument(overlayId, id);
+    } else {
+      this.enableOverlayForDocument(overlayId, id);
+    }
+  }
+
+  private isOverlayEnabledForDocument(overlayId: string, documentId?: string): boolean {
+    const enabledOverlays = this.getDocumentStateOrThrow(documentId).enabledOverlays;
+    // Default to true if not explicitly set (matches schema behavior)
+    return enabledOverlays[overlayId] ?? true;
+  }
+
+  private getEnabledOverlaysForDocument(documentId?: string): string[] {
+    const enabledOverlays = this.getDocumentStateOrThrow(documentId).enabledOverlays;
+    return Object.entries(enabledOverlays)
+      .filter(([, enabled]) => enabled)
+      .map(([overlayId]) => overlayId);
   }
 }

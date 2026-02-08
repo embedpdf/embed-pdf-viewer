@@ -21,6 +21,9 @@ export const OPEN_MENU = 'UI/OPEN_MENU';
 export const CLOSE_MENU = 'UI/CLOSE_MENU';
 export const CLOSE_ALL_MENUS = 'UI/CLOSE_ALL_MENUS';
 
+// Overlay actions
+export const SET_OVERLAY_ENABLED = 'UI/SET_OVERLAY_ENABLED';
+
 // Category actions
 export const SET_DISABLED_CATEGORIES = 'UI/SET_DISABLED_CATEGORIES';
 export const SET_HIDDEN_ITEMS = 'UI/SET_HIDDEN_ITEMS';
@@ -70,7 +73,7 @@ export interface SetSidebarTabAction extends Action {
 // Modal action types (with animation lifecycle)
 export interface OpenModalAction extends Action {
   type: typeof OPEN_MODAL;
-  payload: { documentId: string; modalId: string };
+  payload: { documentId: string; modalId: string; props?: Record<string, unknown> };
 }
 
 export interface CloseModalAction extends Action {
@@ -98,6 +101,12 @@ export interface CloseAllMenusAction extends Action {
   payload: { documentId: string };
 }
 
+// Overlay action types
+export interface SetOverlayEnabledAction extends Action {
+  type: typeof SET_OVERLAY_ENABLED;
+  payload: { documentId: string; overlayId: string; enabled: boolean };
+}
+
 export interface SetDisabledCategoriesAction extends Action {
   type: typeof SET_DISABLED_CATEGORIES;
   payload: { categories: string[] };
@@ -122,6 +131,7 @@ export type UIAction =
   | OpenMenuAction
   | CloseMenuAction
   | CloseAllMenusAction
+  | SetOverlayEnabledAction
   | SetDisabledCategoriesAction
   | SetHiddenItemsAction;
 
@@ -186,9 +196,13 @@ export const setSidebarTab = (
 });
 
 // Modal action creators (with animation lifecycle)
-export const openModal = (documentId: string, modalId: string): OpenModalAction => ({
+export const openModal = (
+  documentId: string,
+  modalId: string,
+  props?: Record<string, unknown>,
+): OpenModalAction => ({
   type: OPEN_MODAL,
-  payload: { documentId, modalId },
+  payload: { documentId, modalId, props },
 });
 
 export const closeModal = (documentId: string): CloseModalAction => ({
@@ -214,6 +228,16 @@ export const closeMenu = (documentId: string, menuId: string): CloseMenuAction =
 export const closeAllMenus = (documentId: string): CloseAllMenusAction => ({
   type: CLOSE_ALL_MENUS,
   payload: { documentId },
+});
+
+// Overlay action creators
+export const setOverlayEnabled = (
+  documentId: string,
+  overlayId: string,
+  enabled: boolean,
+): SetOverlayEnabledAction => ({
+  type: SET_OVERLAY_ENABLED,
+  payload: { documentId, overlayId, enabled },
 });
 
 export const setDisabledCategories = (categories: string[]): SetDisabledCategoriesAction => ({

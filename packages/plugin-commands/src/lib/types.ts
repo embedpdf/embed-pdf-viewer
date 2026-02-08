@@ -1,8 +1,16 @@
 import { BasePluginConfig, CoreState, EventHook } from '@embedpdf/core';
 import { PluginRegistry } from '@embedpdf/core';
+import { Logger } from '@embedpdf/models';
 import { TranslationKey } from '@embedpdf/plugin-i18n';
 
-export type Dynamic<TStore, T> = T | ((context: { state: TStore; documentId: string }) => T);
+export type Dynamic<TStore, T> =
+  | T
+  | ((context: {
+      registry: PluginRegistry;
+      state: TStore;
+      documentId: string;
+      logger: Logger;
+    }) => T);
 
 export interface IconProps {
   primaryColor?: string;
@@ -16,7 +24,7 @@ export interface Command<TStore = any> {
 
   // Labels - support both i18n and plain strings
   label?: string; // Plain string (used if no i18n)
-  labelKey?: TranslationKey; // i18n key (takes precedence if i18n available)
+  labelKey?: Dynamic<TStore, TranslationKey>; // i18n key (takes precedence if i18n available), can be dynamic
   labelParams?: Dynamic<TStore, Record<string, string | number>>; // Dynamic params for interpolation
 
   // Icon
@@ -24,7 +32,12 @@ export interface Command<TStore = any> {
   iconProps?: Dynamic<TStore, IconProps>;
 
   // Execution - receives context object
-  action: (context: { registry: PluginRegistry; state: TStore; documentId: string }) => void;
+  action: (context: {
+    registry: PluginRegistry;
+    state: TStore;
+    documentId: string;
+    logger: Logger;
+  }) => void;
 
   // State predicates - ALWAYS receive documentId
   active?: Dynamic<TStore, boolean>;
@@ -86,6 +99,7 @@ export interface CommandStateChangedEvent {
     disabled?: boolean;
     visible?: boolean;
     label?: string;
+    icon?: string;
     iconProps?: IconProps;
   };
 }

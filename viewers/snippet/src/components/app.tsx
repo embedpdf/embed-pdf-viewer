@@ -2,7 +2,7 @@ import { h, Fragment } from 'preact';
 import { useMemo } from 'preact/hooks';
 import styles from '../styles/index.css';
 import { EmbedPDF } from '@embedpdf/core/preact';
-import { createPluginRegistration, PluginRegistry } from '@embedpdf/core';
+import { createPluginRegistration, PluginRegistry, PermissionConfig } from '@embedpdf/core';
 import { usePdfiumEngine } from '@embedpdf/engines/preact';
 import { AllLogger, ConsoleLogger, PerfLogger, Rotation } from '@embedpdf/models';
 import {
@@ -114,9 +114,11 @@ import { HintLayer } from '@/components/hint-layer';
 import { CommentSidebar } from '@/components/comment-sidebar';
 import { CustomZoomToolbar } from '@/components/custom-zoom-toolbar';
 import { AnnotationSidebar } from '@/components/annotation-sidebar';
+import { RedactionSidebar } from '@/components/redaction-sidebar';
 import { SchemaSelectionMenu } from '@/ui/schema-selection-menu';
 import { SchemaOverlay } from '@/ui/schema-overlay';
 import { PrintModal } from '@/components/print-modal';
+import { LinkModal } from '@/components/link-modal';
 import { PageControls } from '@/components/page-controls';
 
 import {
@@ -128,6 +130,7 @@ import {
   germanTranslations,
   frenchTranslations,
   spanishTranslations,
+  simplifiedChineseTranslations,
 } from '@/config';
 import { ThemeConfig } from '@/config/theme';
 import { IconsConfig } from '@/config/icon-registry';
@@ -135,6 +138,10 @@ import { TabBar, TabBarVisibility } from '@/components/tab-bar';
 import { EmptyState } from '@/components/empty-state';
 import { DocumentPasswordPrompt } from '@/components/document-password-prompt';
 import { ModeSelectButton } from './mode-select-button';
+import { Capture } from '@/components/capture';
+import { ProtectModal } from './protect-modal';
+import { UnlockOwnerOverlay } from './unlock-owner-overlay';
+import { ViewPermissionsModal } from './view-permissions-modal';
 
 // ============================================================================
 // Main Configuration Interface - Uses actual plugin config types directly
@@ -152,6 +159,20 @@ export interface PDFViewerConfig {
   wasmUrl?: string;
   /** Enable debug logging. Default: false */
   log?: boolean;
+
+  // === Global Permissions ===
+  /**
+   * Global permission configuration applied to all documents.
+   * Per-document permissions (in documentManager.initialDocuments) can override these.
+   *
+   * @example
+   * // Disable printing globally
+   * permissions: { overrides: { print: false } }
+   *
+   * // Ignore PDF permissions entirely (allow all by default)
+   * permissions: { enforceDocumentPermissions: false }
+   */
+  permissions?: PermissionConfig;
 
   // === Appearance ===
   /** Theme configuration */
@@ -269,6 +290,7 @@ const DEFAULTS = {
       germanTranslations,
       frenchTranslations,
       spanishTranslations,
+      simplifiedChineseTranslations,
     ],
     paramResolvers: defaultParamResolvers,
   } as I18nPluginConfig,
@@ -296,7 +318,7 @@ const DEFAULTS = {
 
   // Tools
   capture: { scale: 2, imageType: 'image/png' } as CapturePluginConfig,
-  redaction: { drawBlackBoxes: true } as RedactionPluginConfig,
+  redaction: { drawBlackBoxes: true, useAnnotationMode: true } as RedactionPluginConfig,
   print: {} as PrintPluginConfig,
   export: { defaultFileName: 'document.pdf' } as ExportPluginConfig,
   fullscreen: {} as FullscreenPluginConfig,
@@ -330,6 +352,7 @@ function ViewerLayout({ documentId, tabBarVisibility = 'multiple' }: ViewerLayou
 
   const selectionMenu = useSelectionMenu('selection', documentId);
   const annotationMenu = useSelectionMenu('annotation', documentId);
+  const groupAnnotationMenu = useSelectionMenu('groupAnnotation', documentId);
   const redactionMenu = useSelectionMenu('redaction', documentId);
 
   // Get document states for tab bar
@@ -409,8 +432,8 @@ function ViewerLayout({ documentId, tabBarVisibility = 'multiple' }: ViewerLayou
                                     documentId={documentId}
                                     pageIndex={pageIndex}
                                     selectionMenu={annotationMenu}
+                                    groupSelectionMenu={groupAnnotationMenu}
                                   />
-                                  <HintLayer />
                                 </PagePointerProvider>
                               </Rotate>
                             )}
@@ -456,8 +479,13 @@ export function PDFViewer({ config, onRegistryReady }: PDFViewerProps) {
       'outline-sidebar': OutlineSidebar,
       'comment-sidebar': CommentSidebar,
       'print-modal': PrintModal,
+      'link-modal': LinkModal,
+      'protect-modal': ProtectModal,
+      'unlock-owner-overlay': UnlockOwnerOverlay,
       'page-controls': PageControls,
       'mode-select-button': ModeSelectButton,
+      'view-permissions-modal': ViewPermissionsModal,
+      'redaction-sidebar': RedactionSidebar,
     }),
     [],
   );
@@ -488,7 +516,10 @@ export function PDFViewer({ config, onRegistryReady }: PDFViewerProps) {
     <>
       <style>{styles}</style>
       <EmbedPDF
-        logger={config.log ? logger : undefined}
+        config={{
+          logger: config.log ? logger : undefined,
+          permissions: config.permissions,
+        }}
         onInitialized={async (registry) => {
           // Call the callback if provided
           if (onRegistryReady && registry) {
@@ -597,6 +628,8 @@ export function PDFViewer({ config, onRegistryReady }: PDFViewerProps) {
                     className="relative flex h-full w-full select-none flex-col"
                   >
                     <ViewerLayout documentId={activeDocumentId} tabBarVisibility={config.tabBar} />
+                    <Capture documentId={activeDocumentId} />
+                    <HintLayer documentId={activeDocumentId} />
                   </UIProvider>
                 ) : (
                   <EmptyState />

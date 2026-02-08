@@ -1,5 +1,59 @@
 # @embedpdf/plugin-annotation
 
+## 2.5.0
+
+### Patch Changes
+
+- [#441](https://github.com/embedpdf/embed-pdf-viewer/pull/441) by [@bobsingor](https://github.com/bobsingor) – Fixed rotation calculation in AnnotationLayer components to properly combine page intrinsic rotation with document rotation:
+  - Updated React `AnnotationLayer` component to compute effective rotation as `(pageRotation + docRotation) % 4`
+  - Updated Vue `annotation-layer.vue` component with the same rotation logic
+  - Updated Svelte `AnnotationLayer.svelte` component with the same rotation logic
+
+## 2.4.1
+
+## 2.4.0
+
+### Minor Changes
+
+- [#426](https://github.com/embedpdf/embed-pdf-viewer/pull/426) by [@bobsingor](https://github.com/bobsingor) – Added annotation renderer registry and enhanced annotation capabilities:
+  - Added `purgeAnnotation()` method to remove annotations from state without calling the PDF engine
+  - Added annotation renderer registry allowing external plugins to register custom annotation renderers
+  - Added `useRegisterRenderers()` hook and `AnnotationRendererProvider` context for renderer registration
+  - Changed interaction properties (`isDraggable`, `isResizable`, `lockAspectRatio`) to support dynamic functions based on annotation
+  - Added `AnnotationCommandMetadata` interface for history command filtering
+  - Added `isRedact()` helper function for type-checking redact annotations
+  - Framework exports now include `AnnotationPluginPackage` with `AnnotationRendererProvider` wrapper
+
+### Patch Changes
+
+- [#429](https://github.com/embedpdf/embed-pdf-viewer/pull/429) by [@bobsingor](https://github.com/bobsingor) – Fixed group selection box ignoring document permissions:
+  - Added `canModifyAnnotations` permission check to `GroupSelectionBox` component across React, Vue, and Svelte
+  - Group drag and resize operations are now properly disabled when the user lacks annotation modification permissions
+  - This aligns group selection behavior with individual annotation container permission checks
+
+## 2.3.0
+
+### Minor Changes
+
+- [#406](https://github.com/embedpdf/embed-pdf-viewer/pull/406) by [@bobsingor](https://github.com/bobsingor) – Added multi-selection support with new Redux actions: `ADD_TO_SELECTION`, `REMOVE_FROM_SELECTION`, and `SET_SELECTION`. The `selectedUids` array now tracks multiple selected annotations, with `selectedUid` computed for backward compatibility. Implemented annotation grouping and ungrouping using IRT/RT properties via `groupAnnotations()` and `ungroupAnnotations()` methods. Added unified drag and resize API (`startDrag`, `updateDrag`, `commitDrag`, `cancelDrag`, `startResize`, `updateResize`, `commitResize`, `cancelResize`) that handles multi-annotation operations including attached link annotations. Added `Link` annotation component and `GroupSelectionBox` component for Preact, Svelte, and Vue frameworks. Updated text markup tools to use `strokeColor` and suppress selection layer rects. Improved commit process with `collectPendingChanges`, `executeCommitBatch`, and commit locking to prevent concurrent modifications.
+
+## 2.2.0
+
+### Minor Changes
+
+- [#389](https://github.com/embedpdf/embed-pdf-viewer/pull/389) by [@bobsingor](https://github.com/bobsingor) – Add permission checking for annotation operations:
+  - Check `PdfPermissionFlag.ModifyAnnotations` before creating, updating, or deleting annotations
+  - Check permission before activating annotation tools
+  - Check permission before creating annotations from text selection
+  - Update `AnnotationContainer` components (React, Svelte, Vue) to respect `canModifyAnnotations` permission:
+    - Disable drag/resize when permission is denied
+    - Hide vertex handles when permission is denied
+    - Guard double-click handlers based on permission
+
+## 2.1.2
+
+## 2.1.1
+
 ## 2.1.0
 
 ## 2.0.2

@@ -57,6 +57,9 @@ export class EmbedPdfContainer extends (BaseElement as typeof HTMLElement) {
     // Clean up system preference listener
     this.systemPreferenceCleanup?.();
     this.systemPreferenceCleanup = null;
+
+    // Unmount Preact components - triggers cleanup chain (engine destroy, plugin cleanup, etc.)
+    render(null, this.root);
   }
 
   /**

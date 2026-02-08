@@ -1,5 +1,94 @@
 # @embedpdf/snippet
 
+## 2.5.0
+
+## 2.4.1
+
+### Patch Changes
+
+- [#434](https://github.com/embedpdf/embed-pdf-viewer/pull/434) by [@bobsingor](https://github.com/bobsingor) – Fixed memory leak in `EmbedPdfContainer` where Preact components were not unmounted on disconnect:
+  - Added `render(null, this.root)` in `disconnectedCallback()` to properly unmount Preact components
+  - This triggers the cleanup chain: plugin destroy, engine destroy, and worker termination
+
+  Previously, navigating between pages would leave workers running (1 PDFium + 2 encoder workers per viewer instance).
+
+## 2.4.0
+
+### Minor Changes
+
+- [#428](https://github.com/embedpdf/embed-pdf-viewer/pull/428) by [@bobsingor](https://github.com/bobsingor) – Fixed link modal context handling:
+  - Added `source` prop to LinkModal to distinguish between annotation and text selection context
+  - Updated `annotation:add-link` command to pass `{ source: 'selection' }` when opening modal
+  - Updated `annotation:toggle-link` command to pass `{ source: 'annotation' }` when opening modal
+  - Prevents incorrect behavior where annotation selection would override text selection when creating links
+
+- [#426](https://github.com/embedpdf/embed-pdf-viewer/pull/426) by [@bobsingor](https://github.com/bobsingor) – Added redaction management features:
+  - Added `RedactionSidebar` component for viewing and managing pending redactions
+  - Added `annotation:apply-redaction` command to apply the selected redaction annotation
+  - Added `redaction:redact` command for unified redact mode (text + area)
+  - Added `panel:toggle-redaction` command for toggling the redaction sidebar
+  - Added redaction panel configuration to UI schema
+  - Added REDACT annotation type support in annotation sidebar
+  - Added `redactCombined` and `redactionSidebar` icons
+  - Added translations for redaction panel, overlay text, and redaction states
+  - Updated redaction toolbar to use unified redact mode
+
+### Patch Changes
+
+- [#430](https://github.com/embedpdf/embed-pdf-viewer/pull/430) by [@bobsingor](https://github.com/bobsingor) – Added document permission checks to redaction sidebar buttons:
+  - "Clear All" button is now disabled when `canModifyAnnotations` is false
+  - "Redact All" button is now disabled when `canModifyContents` is false
+  - Added squiggly annotation tool to annotation toolbar
+  - Added ink tool to annotation overflow menu and responsive breakpoints
+
+- [`57a8431`](https://github.com/embedpdf/embed-pdf-viewer/commit/57a843137bd968118e36a768c7012d9f8defad45) by [@bobsingor](https://github.com/bobsingor) – Fixed TabButton component causing unintended form submission when used inside forms. Added `type="button"` to prevent tab buttons from triggering form submit, which was causing the link modal to close immediately when switching to the Page tab.
+
+## 2.3.0
+
+### Minor Changes
+
+- [#406](https://github.com/embedpdf/embed-pdf-viewer/pull/406) by [@bobsingor](https://github.com/bobsingor) – Added `LinkModal` component for creating and editing link annotations with URL and internal page targets. Added new icons: `GroupIcon`, `UngroupIcon`, `LinkIcon`, `LinkOffIcon`, `ExternalLinkIcon`, and `MarqueeSelectIcon`. Updated annotation sidebar to support multi-selection using `getSelectedAnnotations` selector. Added grouping and ungrouping commands with dynamic labels and icons. Added marquee selection command. Updated UI schema and translations for new link and grouping features.
+
+## 2.2.0
+
+### Minor Changes
+
+- [#389](https://github.com/embedpdf/embed-pdf-viewer/pull/389) by [@bobsingor](https://github.com/bobsingor) – Add document security and protection features:
+  - Add `ProtectModal` component for setting document encryption with user/owner passwords and permission restrictions
+  - Add `UnlockOwnerOverlay` component to notify users when viewing protected documents with restricted permissions
+  - Add `ViewPermissionsModal` component for viewing and unlocking document permissions
+  - Add `PermissionsDisplay` component for showing permission status
+  - Add permission-based command disabling for annotation, redaction, print, copy, and capture commands
+  - Add security-related translations for English, German, Dutch, French, Spanish, and Chinese
+  - Add new icons: `EyeIcon`, `EyeOffIcon`, `InfoIcon`, `UnlockIcon`
+  - Update UI schema with protection modal, view permissions modal, and unlock owner overlay
+
+- [#389](https://github.com/embedpdf/embed-pdf-viewer/pull/389) by [@bobsingor](https://github.com/bobsingor) – Add global permission configuration to snippet viewer:
+  - Add `permissions` option to `PDFViewerConfig` for global permission overrides
+  - Support `enforceDocumentPermissions` to ignore PDF permissions entirely
+  - Support `overrides` with human-readable names (`print`, `modifyAnnotations`, etc.) or numeric flags
+  - Update command permission checks to use effective permissions via `getEffectivePermission`
+  - Pass permission configuration to `EmbedPDF` via new `config` prop
+
+## 2.1.2
+
+### Patch Changes
+
+- [#369](https://github.com/embedpdf/embed-pdf-viewer/pull/369) by [@bobsingor](https://github.com/bobsingor) – Add missing translations for redaction delete and commit commands (`redaction.deleteSelected` and `redaction.commitSelected`) in all supported languages (English, German, Dutch, French, Spanish).
+
+- [#381](https://github.com/embedpdf/embed-pdf-viewer/pull/381) by [@bobsingor](https://github.com/bobsingor) –
+  - Add i18n support for capture and print dialogs with translations for all supported languages
+  - Add `document:capture` command to toolbar for screenshot functionality
+  - Refactor hint-layer and capture components to use translation hooks
+  - Remove unused `@types/classnames` dependency
+
+- [#378](https://github.com/embedpdf/embed-pdf-viewer/pull/378) by [@bobsingor](https://github.com/bobsingor) –
+  - Add Simplified Chinese (zh-CN) translations for all UI elements
+  - Add i18n support for annotation type labels in comment sidebar with translation keys and fallbacks
+  - Fix rimraf command to use `--glob` flag for compatibility with rimraf v4+
+
+## 2.1.1
+
 ## 2.1.0
 
 ### Patch Changes

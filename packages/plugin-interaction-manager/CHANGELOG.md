@@ -1,5 +1,30 @@
 # @embedpdf/plugin-interaction-manager
 
+## 2.5.0
+
+### Patch Changes
+
+- [#441](https://github.com/embedpdf/embed-pdf-viewer/pull/441) by [@bobsingor](https://github.com/bobsingor) – Fixed rotation calculation in PagePointerProvider components to properly handle rotation override and combine page intrinsic rotation with document rotation:
+  - Updated React `PagePointerProvider` to use rotation override directly when provided, otherwise combine page and document rotation
+  - Updated Vue `page-pointer-provider.vue` with the same rotation logic
+  - Updated Svelte `PagePointerProvider.svelte` with the same rotation logic
+
+## 2.4.1
+
+## 2.4.0
+
+## 2.3.0
+
+### Minor Changes
+
+- [#406](https://github.com/embedpdf/embed-pdf-viewer/pull/406) by [@bobsingor](https://github.com/bobsingor) – Added `stopImmediatePropagation()` and `isImmediatePropagationStopped()` methods to pointer events via the new `EmbedPdfPointerEventExtensions` interface. This allows higher-priority handlers to prevent lower-priority handlers from activating for the same event. Updated `mergeHandlers` to respect propagation state and stop calling handlers when propagation is stopped. Refactored `EmbedPdfPointerEvent` as a generic type that combines native events with extensions.
+
+## 2.2.0
+
+## 2.1.2
+
+## 2.1.1
+
 ## 2.1.0
 
 ## 2.0.2

@@ -27,6 +27,38 @@ export const viewerUISchema: UISchema = {
         localeOverrides: {
           groups: [
             {
+              id: 'chinese-languages',
+              locales: ['zh-CN'],
+              breakpoints: {
+                sm: {
+                  replaceHide: ['zoom-toolbar', 'mode-select-button', 'overflow-tabs-button'],
+                  replaceShow: [
+                    'view-mode',
+                    'annotate-mode',
+                    'shapes-mode',
+                    'redact-mode',
+
+                    'pan-button',
+                    'pointer-button',
+                    'divider-3',
+                  ],
+                },
+                md: {
+                  replaceShow: [
+                    'view-mode',
+                    'annotate-mode',
+                    'shapes-mode',
+                    'redact-mode',
+                    'zoom-toolbar',
+                    'pan-button',
+                    'pointer-button',
+                    'divider-3',
+                  ],
+                  replaceHide: ['zoom-menu-button', 'mode-select-button', 'overflow-tabs-button'],
+                },
+              },
+            },
+            {
               id: 'germanic-languages',
               locales: ['de', 'nl'],
               breakpoints: {
@@ -308,13 +340,13 @@ export const viewerUISchema: UISchema = {
         breakpoints: {
           sm: {
             maxWidth: 640,
-            hide: ['add-text', 'add-stamp'],
+            hide: ['add-text', 'add-stamp', 'add-ink'],
             show: ['overflow-annotation-tools'],
           },
           md: {
             minWidth: 640,
             hide: ['overflow-annotation-tools'],
-            show: ['add-text', 'add-stamp'],
+            show: ['add-text', 'add-stamp', 'add-ink'],
           },
         },
       },
@@ -348,6 +380,13 @@ export const viewerUISchema: UISchema = {
               commandId: 'annotation:add-underline',
               variant: 'icon',
               categories: ['annotation', 'annotation-markup', 'annotation-underline'],
+            },
+            {
+              type: 'command-button',
+              id: 'add-squiggly',
+              commandId: 'annotation:add-squiggly',
+              variant: 'icon',
+              categories: ['annotation', 'annotation-markup', 'annotation-squiggly'],
             },
             {
               type: 'command-button',
@@ -557,36 +596,51 @@ export const viewerUISchema: UISchema = {
           items: [
             {
               type: 'command-button',
-              id: 'redact-text',
-              commandId: 'redaction:redact-text',
+              id: 'redact',
+              commandId: 'redaction:redact',
               variant: 'icon',
-              categories: ['redaction', 'redaction-text'],
-            },
-            {
-              type: 'command-button',
-              id: 'redact-area',
-              commandId: 'redaction:redact-area',
-              variant: 'icon',
-              categories: ['redaction', 'redaction-area'],
+              categories: ['redaction', 'redaction-combined'],
             },
             {
               type: 'divider',
-              id: 'divider-5',
+              id: 'redaction-tools-divider-1',
               orientation: 'vertical',
             },
             {
               type: 'command-button',
-              id: 'apply-redactions',
-              commandId: 'redaction:apply-all',
+              id: 'toggle-redaction-panel',
+              commandId: 'panel:toggle-redaction',
               variant: 'icon',
-              categories: ['redaction', 'redaction-apply'],
+              categories: ['panel', 'panel-redaction'],
             },
             {
               type: 'command-button',
-              id: 'clear-redactions',
-              commandId: 'redaction:clear-all',
+              id: 'toggle-annotation-style',
+              commandId: 'panel:toggle-annotation-style',
               variant: 'icon',
-              categories: ['redaction', 'redaction-clear'],
+              categories: ['panel', 'panel-annotation-style'],
+            },
+            {
+              type: 'divider',
+              id: 'redaction-tools-divider-2',
+              orientation: 'vertical',
+              visibilityDependsOn: {
+                itemIds: ['toggle-annotation-style'],
+              },
+            },
+            {
+              type: 'command-button',
+              id: 'undo-button',
+              commandId: 'history:undo',
+              variant: 'icon',
+              categories: ['history', 'history-undo'],
+            },
+            {
+              type: 'command-button',
+              id: 'redo-button',
+              commandId: 'history:redo',
+              variant: 'icon',
+              categories: ['history', 'history-redo'],
             },
           ],
         },
@@ -931,6 +985,18 @@ export const viewerUISchema: UISchema = {
         },
         {
           type: 'command',
+          id: 'document:protect',
+          commandId: 'document:protect',
+          categories: ['document', 'document-protect'],
+        },
+        {
+          type: 'command',
+          id: 'document:capture',
+          commandId: 'document:capture',
+          categories: ['document', 'document-capture'],
+        },
+        {
+          type: 'command',
           id: 'document:export',
           commandId: 'document:export',
           categories: ['document', 'document-export'],
@@ -939,7 +1005,7 @@ export const viewerUISchema: UISchema = {
           type: 'divider',
           id: 'divider-11',
           visibilityDependsOn: {
-            itemIds: ['document:export', 'document:print'],
+            itemIds: ['document:export', 'document:print', 'document:capture', 'document:protect'],
           },
         },
         {
@@ -954,6 +1020,12 @@ export const viewerUISchema: UISchema = {
       id: 'annotation-tools-menu',
       categories: ['annotation'],
       items: [
+        {
+          type: 'command',
+          id: 'annotation:add-ink',
+          commandId: 'annotation:add-ink',
+          categories: ['annotation', 'annotation-ink'],
+        },
         {
           type: 'command',
           id: 'annotation:add-text',
@@ -1160,6 +1232,23 @@ export const viewerUISchema: UISchema = {
       collapsible: true,
       defaultOpen: false,
     },
+
+    'redaction-panel': {
+      id: 'redaction-panel',
+      position: {
+        placement: 'right',
+        slot: 'main',
+        order: 0,
+      },
+      content: {
+        type: 'component',
+        componentId: 'redaction-sidebar',
+      },
+      width: '250px',
+      collapsible: true,
+      defaultOpen: false,
+      categories: ['redaction'],
+    },
   },
 
   // ─────────────────────────────────────────────────────────
@@ -1171,6 +1260,36 @@ export const viewerUISchema: UISchema = {
       content: {
         type: 'component',
         componentId: 'print-modal',
+      },
+      maxWidth: '28rem',
+      closeOnClickOutside: true,
+      closeOnEscape: true,
+    },
+    'protect-modal': {
+      id: 'protect-modal',
+      content: {
+        type: 'component',
+        componentId: 'protect-modal',
+      },
+      maxWidth: '28rem',
+      closeOnClickOutside: true,
+      closeOnEscape: true,
+    },
+    'view-permissions-modal': {
+      id: 'view-permissions-modal',
+      content: {
+        type: 'component',
+        componentId: 'view-permissions-modal',
+      },
+      maxWidth: '28rem',
+      closeOnClickOutside: true,
+      closeOnEscape: true,
+    },
+    'link-modal': {
+      id: 'link-modal',
+      content: {
+        type: 'component',
+        componentId: 'link-modal',
       },
       maxWidth: '28rem',
       closeOnClickOutside: true,
@@ -1196,6 +1315,21 @@ export const viewerUISchema: UISchema = {
       },
       defaultEnabled: true,
     },
+    'unlock-owner-overlay': {
+      id: 'unlock-owner-overlay',
+      position: {
+        anchor: 'bottom-right',
+        offset: {
+          bottom: '1.5rem',
+          right: '1.5rem',
+        },
+      },
+      content: {
+        type: 'component',
+        componentId: 'unlock-owner-overlay',
+      },
+      defaultEnabled: true,
+    },
   },
 
   // ─────────────────────────────────────────────────────────
@@ -1208,10 +1342,58 @@ export const viewerUISchema: UISchema = {
       items: [
         {
           type: 'command-button',
+          id: 'comment-button',
+          commandId: 'annotation:toggle-comment',
+          variant: 'icon',
+          categories: ['annotation', 'annotation-comment'],
+        },
+        {
+          type: 'command-button',
+          id: 'toggle-link',
+          commandId: 'annotation:toggle-link',
+          variant: 'icon',
+          categories: ['annotation', 'annotation-link'],
+        },
+        {
+          type: 'command-button',
+          id: 'toggle-annotation-style',
+          commandId: 'annotation:toggle-annotation-style',
+          variant: 'icon',
+          categories: ['annotation', 'annotation-style'],
+        },
+        {
+          type: 'command-button',
+          id: 'apply-redaction',
+          commandId: 'annotation:apply-redaction',
+          variant: 'icon',
+          categories: ['annotation', 'annotation-redaction'],
+        },
+        {
+          type: 'command-button',
           id: 'delete-annotation',
           commandId: 'annotation:delete-selected',
           variant: 'icon',
           categories: ['annotation', 'annotation-delete'],
+        },
+        {
+          type: 'command-button',
+          id: 'goto-link',
+          commandId: 'annotation:goto-link',
+          variant: 'icon-text',
+          categories: ['annotation', 'annotation-link'],
+        },
+      ],
+    },
+    groupAnnotation: {
+      id: 'groupAnnotation',
+      categories: ['annotation', 'annotation-group'],
+      items: [
+        {
+          type: 'command-button',
+          id: 'toggle-group-annotations',
+          commandId: 'annotation:toggle-group',
+          variant: 'icon',
+          categories: ['annotation', 'annotation-group'],
         },
         {
           type: 'command-button',
@@ -1222,10 +1404,10 @@ export const viewerUISchema: UISchema = {
         },
         {
           type: 'command-button',
-          id: 'comment-button',
-          commandId: 'panel:toggle-comment',
+          id: 'delete-all-annotations',
+          commandId: 'annotation:delete-all-selected',
           variant: 'icon',
-          categories: ['panel', 'panel-comment'],
+          categories: ['annotation', 'annotation-delete', 'annotation-group'],
         },
       ],
     },
@@ -1258,6 +1440,7 @@ export const viewerUISchema: UISchema = {
           'add-strikeout',
           'add-underline',
           'add-squiggly',
+          'add-link',
           'redact-text',
         ],
       },
@@ -1296,6 +1479,13 @@ export const viewerUISchema: UISchema = {
           commandId: 'annotation:add-squiggly',
           variant: 'icon',
           categories: ['annotation', 'annotation-markup', 'annotation-squiggly'],
+        },
+        {
+          type: 'command-button',
+          id: 'add-link',
+          commandId: 'annotation:add-link',
+          variant: 'icon',
+          categories: ['annotation', 'annotation-link'],
         },
         {
           type: 'command-button',

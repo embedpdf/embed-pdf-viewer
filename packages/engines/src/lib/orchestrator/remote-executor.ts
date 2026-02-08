@@ -100,6 +100,9 @@ type MessageType =
   | 'extractPages'
   | 'extractText'
   | 'redactTextInRects'
+  | 'applyRedaction'
+  | 'applyAllRedactions'
+  | 'flattenAnnotation'
   | 'getTextSlices'
   | 'getPageGlyphs'
   | 'getPageGeometry'
@@ -108,7 +111,12 @@ type MessageType =
   | 'preparePrintDocument'
   | 'saveAsCopy'
   | 'closeDocument'
-  | 'closeAllDocuments';
+  | 'closeAllDocuments'
+  | 'setDocumentEncryption'
+  | 'removeEncryption'
+  | 'unlockOwnerPermissions'
+  | 'isEncrypted'
+  | 'isOwnerUnlocked';
 
 /**
  * RemoteExecutor - Proxy for worker communication
@@ -485,6 +493,26 @@ export class RemoteExecutor implements IPdfiumExecutor {
     return this.send<boolean>('redactTextInRects', [doc, page, rects, options]);
   }
 
+  applyRedaction(
+    doc: PdfDocumentObject,
+    page: PdfPageObject,
+    annotation: PdfAnnotationObject,
+  ): PdfTask<boolean> {
+    return this.send<boolean>('applyRedaction', [doc, page, annotation]);
+  }
+
+  applyAllRedactions(doc: PdfDocumentObject, page: PdfPageObject): PdfTask<boolean> {
+    return this.send<boolean>('applyAllRedactions', [doc, page]);
+  }
+
+  flattenAnnotation(
+    doc: PdfDocumentObject,
+    page: PdfPageObject,
+    annotation: PdfAnnotationObject,
+  ): PdfTask<boolean> {
+    return this.send<boolean>('flattenAnnotation', [doc, page, annotation]);
+  }
+
   getTextSlices(doc: PdfDocumentObject, slices: PageTextSlice[]): PdfTask<string[]> {
     return this.send<string[]>('getTextSlices', [doc, slices]);
   }
@@ -519,5 +547,35 @@ export class RemoteExecutor implements IPdfiumExecutor {
 
   closeAllDocuments(): PdfTask<boolean> {
     return this.send<boolean>('closeAllDocuments', []);
+  }
+
+  setDocumentEncryption(
+    doc: PdfDocumentObject,
+    userPassword: string,
+    ownerPassword: string,
+    allowedFlags: number,
+  ): PdfTask<boolean> {
+    return this.send<boolean>('setDocumentEncryption', [
+      doc,
+      userPassword,
+      ownerPassword,
+      allowedFlags,
+    ]);
+  }
+
+  removeEncryption(doc: PdfDocumentObject): PdfTask<boolean> {
+    return this.send<boolean>('removeEncryption', [doc]);
+  }
+
+  unlockOwnerPermissions(doc: PdfDocumentObject, ownerPassword: string): PdfTask<boolean> {
+    return this.send<boolean>('unlockOwnerPermissions', [doc, ownerPassword]);
+  }
+
+  isEncrypted(doc: PdfDocumentObject): PdfTask<boolean> {
+    return this.send<boolean>('isEncrypted', [doc]);
+  }
+
+  isOwnerUnlocked(doc: PdfDocumentObject): PdfTask<boolean> {
+    return this.send<boolean>('isOwnerUnlocked', [doc]);
   }
 }

@@ -1,5 +1,25 @@
 # @embedpdf/plugin-print
 
+## 2.5.0
+
+## 2.4.1
+
+## 2.4.0
+
+## 2.3.0
+
+## 2.2.0
+
+### Minor Changes
+
+- [#389](https://github.com/embedpdf/embed-pdf-viewer/pull/389) by [@bobsingor](https://github.com/bobsingor) – Add permission checking for print operations:
+  - Check `PdfPermissionFlag.Print` before allowing document printing
+  - Return `PdfErrorCode.Security` error when print permission is denied
+
+## 2.1.2
+
+## 2.1.1
+
 ## 2.1.0
 
 ## 2.0.2

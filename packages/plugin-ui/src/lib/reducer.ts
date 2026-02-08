@@ -14,6 +14,7 @@ import {
   OPEN_MENU,
   CLOSE_MENU,
   CLOSE_ALL_MENUS,
+  SET_OVERLAY_ENABLED,
   SET_DISABLED_CATEGORIES,
   SET_HIDDEN_ITEMS,
 } from './actions';
@@ -24,6 +25,7 @@ export const initialDocumentState: UIDocumentState = {
   activeModal: null,
   openMenus: {},
   sidebarTabs: {},
+  enabledOverlays: {},
 };
 
 export const initialState: UIState = {
@@ -50,6 +52,16 @@ export const uiReducer = (state = initialState, action: UIAction): UIState => {
         }
       });
 
+      // Initialize overlay enabled state from schema's defaultEnabled
+      const enabledOverlays: Record<string, boolean> = {};
+
+      if (schema.overlays) {
+        Object.values(schema.overlays).forEach((overlay) => {
+          // Default to true if defaultEnabled is not specified
+          enabledOverlays[overlay.id] = overlay.defaultEnabled ?? true;
+        });
+      }
+
       return {
         ...state,
         documents: {
@@ -57,6 +69,7 @@ export const uiReducer = (state = initialState, action: UIAction): UIState => {
           [documentId]: {
             ...initialDocumentState,
             activeToolbars, // Initialize with permanent toolbars
+            enabledOverlays, // Initialize with overlay enabled states
           },
         },
       };
@@ -209,7 +222,7 @@ export const uiReducer = (state = initialState, action: UIAction): UIState => {
     // ─────────────────────────────────────────────────────────
 
     case OPEN_MODAL: {
-      const { documentId, modalId } = action.payload;
+      const { documentId, modalId, props } = action.payload;
       const docState = state.documents[documentId] || initialDocumentState;
 
       return {
@@ -221,6 +234,7 @@ export const uiReducer = (state = initialState, action: UIAction): UIState => {
             activeModal: {
               modalId,
               isOpen: true,
+              props,
             },
             openMenus: {}, // Close all menus when opening modal
           },
@@ -322,6 +336,29 @@ export const uiReducer = (state = initialState, action: UIAction): UIState => {
           [documentId]: {
             ...docState,
             openMenus: {},
+          },
+        },
+      };
+    }
+
+    // ─────────────────────────────────────────────────────────
+    // Overlay Actions
+    // ─────────────────────────────────────────────────────────
+
+    case SET_OVERLAY_ENABLED: {
+      const { documentId, overlayId, enabled } = action.payload;
+      const docState = state.documents[documentId] || initialDocumentState;
+
+      return {
+        ...state,
+        documents: {
+          ...state.documents,
+          [documentId]: {
+            ...docState,
+            enabledOverlays: {
+              ...docState.enabledOverlays,
+              [overlayId]: enabled,
+            },
           },
         },
       };

@@ -33,17 +33,19 @@ export function PendingRedactions({
     // Use document-scoped hooks so we only receive events for this document
     const scoped = redaction.forDocument(documentId);
 
-    // Initialize with current state
+    // Initialize with current state - only show legacy mode items
     const currentState = scoped.getState();
-    setItems(currentState.pending[pageIndex] ?? []);
+    setItems((currentState.pending[pageIndex] ?? []).filter((it) => it.source === 'legacy'));
     setSelectedId(
       currentState.selected && currentState.selected.page === pageIndex
         ? currentState.selected.id
         : null,
     );
 
-    // Subscribe to future changes
-    const off1 = scoped.onPendingChange((map) => setItems(map[pageIndex] ?? []));
+    // Subscribe to future changes - only show legacy mode items
+    const off1 = scoped.onPendingChange((map) => {
+      setItems((map[pageIndex] ?? []).filter((it) => it.source === 'legacy'));
+    });
     const off2 = scoped.onSelectedChange((sel) => {
       setSelectedId(sel && sel.page === pageIndex ? sel.id : null);
     });
@@ -82,7 +84,7 @@ export function PendingRedactions({
                   background: 'transparent',
                   outline: selectedId === it.id ? `1px solid ${bboxStroke}` : 'none',
                   outlineOffset: '2px',
-                  border: `1px solid red`,
+                  border: `1px solid ${it.markColor}`,
                   pointerEvents: 'auto',
                   cursor: 'pointer',
                 }}
@@ -138,7 +140,7 @@ export function PendingRedactions({
                 rect={b}
                 rects={it.rects}
                 color="transparent"
-                border="1px solid red"
+                border={`1px solid ${it.markColor}`}
                 scale={scale}
                 onClick={(e) => select(e, it.id)}
               />

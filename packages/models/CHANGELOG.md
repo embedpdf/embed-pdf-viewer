@@ -1,5 +1,51 @@
 # @embedpdf/models
 
+## 2.5.0
+
+### Minor Changes
+
+- [#441](https://github.com/embedpdf/embed-pdf-viewer/pull/441) by [@bobsingor](https://github.com/bobsingor) – Added support for per-document rotation normalization:
+  - Added `normalizedRotation: boolean` property to `PdfDocumentObject` to track whether the document was opened with normalized rotation
+  - Added `normalizeRotation?: boolean` option to `PdfOpenDocumentBufferOptions` interface
+  - Added `normalizeRotation?: boolean` option to `PdfOpenDocumentUrlOptions` interface
+
+  When `normalizeRotation` is enabled, all page coordinates (annotations, text, rendering) are in 0° space regardless of the page's original rotation.
+
+## 2.4.1
+
+## 2.4.0
+
+### Minor Changes
+
+- [#426](https://github.com/embedpdf/embed-pdf-viewer/pull/426) by [@bobsingor](https://github.com/bobsingor) – Added support for REDACT annotation type with full read/write capabilities:
+  - Added `PdfRedactAnnoObject` interface for redact annotations with properties for overlay text, colors, and font settings
+  - Added `PdfAnnotationColorType.OverlayColor` enum value for redaction overlay color
+  - Added `PdfRedactAnnoObject` to `PdfSupportedAnnoObject` union type
+  - Added new engine interface methods: `applyRedaction`, `applyAllRedactions`, `flattenAnnotation`
+  - Added corresponding methods to `IPdfiumExecutor` interface
+
+## 2.3.0
+
+### Minor Changes
+
+- [#406](https://github.com/embedpdf/embed-pdf-viewer/pull/406) by [@bobsingor](https://github.com/bobsingor) – Added `PdfAnnotationReplyType` enum with `Reply` and `Group` values to support annotation relationships per ISO 32000-2. Added `inReplyToId` and `replyType` properties to `PdfAnnotationObjectBase` for annotation grouping and reply threads. Extended `PdfLinkAnnoObject` with styling properties: `strokeColor`, `strokeWidth`, `strokeStyle`, and `strokeDashArray`. Deprecated `color` in favor of `strokeColor` for text markup and ink annotations. Deprecated `backgroundColor` in favor of `color` for free text annotations. Fixed documentation comments for squiggly, underline, and strikeout annotations.
+
+## 2.2.0
+
+### Minor Changes
+
+- [#389](https://github.com/embedpdf/embed-pdf-viewer/pull/389) by [@bobsingor](https://github.com/bobsingor) – Add PDF permission and security types:
+  - Add `isEncrypted`, `isOwnerUnlocked`, and `permissions` properties to `PdfDocumentObject`
+  - Add `PdfPermissionFlag` enum with all PDF permission flags (Print, ModifyContents, CopyContents, ModifyAnnotations, FillForms, ExtractForAccessibility, AssembleDocument, PrintHighQuality) and `AllowAll` combination
+  - Add `buildPermissions` helper function for combining permission flags
+  - Add `PermissionDeniedError` class for permission check failures
+  - Add security methods to `PdfEngine` interface: `setDocumentEncryption`, `removeEncryption`, `unlockOwnerPermissions`, `isEncrypted`, `isOwnerUnlocked`
+  - Add security methods to `IPdfiumExecutor` interface
+
+## 2.1.2
+
+## 2.1.1
+
 ## 2.1.0
 
 ### Minor Changes

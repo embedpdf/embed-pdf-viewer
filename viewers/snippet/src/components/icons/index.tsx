@@ -64,11 +64,23 @@ import { PointerIcon } from './pointer';
 import { RedactIcon } from './redact';
 import { IconComponent } from './types';
 import { RedactAreaIcon } from './redact-area';
+import { RedactCombinedIcon } from './redact-combined';
 import { CheckIcon } from './check';
 import { FileIcon } from './file';
 import { PlusIcon } from './plus';
 import { LockIcon } from './lock';
+import { UnlockIcon } from './unlock';
 import { AlertTriangleIcon } from './alert-triangle';
+import { EyeIcon } from './eye';
+import { EyeOffIcon } from './eye-off';
+import { InfoIcon } from './info';
+import { LinkIcon } from './link';
+import { LinkOffIcon } from './link-off';
+import { ExternalLinkIcon } from './external-link';
+import { MarqueeSelectIcon } from './marquee-select';
+import { GroupIcon } from './group';
+import { UngroupIcon } from './ungroup';
+import { RedactionSidebarIcon } from './redaction-sidebar';
 
 export type Icons = {
   [key: string]: IconComponent;
@@ -140,9 +152,21 @@ export const icons: Icons = {
   pointer: PointerIcon,
   redact: RedactIcon,
   redactArea: RedactAreaIcon,
+  redactCombined: RedactCombinedIcon,
   check: CheckIcon,
   file: FileIcon,
   plus: PlusIcon,
   lock: LockIcon,
+  unlock: UnlockIcon,
   alertTriangle: AlertTriangleIcon,
+  eye: EyeIcon,
+  'eye-off': EyeOffIcon,
+  info: InfoIcon,
+  link: LinkIcon,
+  linkOff: LinkOffIcon,
+  externalLink: ExternalLinkIcon,
+  marqueeSelect: MarqueeSelectIcon,
+  group: GroupIcon,
+  ungroup: UngroupIcon,
+  redactionSidebar: RedactionSidebarIcon,
 };

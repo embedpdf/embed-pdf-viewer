@@ -11,10 +11,15 @@
       :vertexUI="vertexUI"
       :selectionOutlineColor="selectionOutlineColor"
       :selectionMenu="selectionMenu"
+      :groupSelectionMenu="groupSelectionMenu"
+      :annotationRenderers="allRenderers"
     >
       <!-- Forward slots for manual customization (only used if selectionMenu prop not provided) -->
       <template #selection-menu="slotProps">
         <slot name="selection-menu" v-bind="slotProps"></slot>
+      </template>
+      <template #group-selection-menu="slotProps">
+        <slot name="group-selection-menu" v-bind="slotProps"></slot>
       </template>
       <template #resize-handle="slotProps">
         <slot name="resize-handle" v-bind="slotProps"></slot>
@@ -35,7 +40,13 @@ import { Rotation } from '@embedpdf/models';
 import Annotations from './annotations.vue';
 import TextMarkup from './text-markup.vue';
 import AnnotationPaintLayer from './annotation-paint-layer.vue';
-import { AnnotationSelectionMenuRenderFn, ResizeHandleUI, VertexHandleUI } from '../types';
+import {
+  AnnotationSelectionMenuRenderFn,
+  GroupSelectionMenuRenderFn,
+  ResizeHandleUI,
+  VertexHandleUI,
+} from '../types';
+import { useRendererRegistry, type BoxedAnnotationRenderer } from '../context';
 
 const props = defineProps<{
   /** The ID of the document that this layer displays annotations for */
@@ -51,7 +62,27 @@ const props = defineProps<{
   selectionOutlineColor?: string;
   /** Customize selection menu */
   selectionMenu?: AnnotationSelectionMenuRenderFn;
+  /** Customize group selection menu */
+  groupSelectionMenu?: GroupSelectionMenuRenderFn;
+  /** Custom renderers for specific annotation types (provided by external plugins) */
+  annotationRenderers?: BoxedAnnotationRenderer[];
 }>();
+
+// Get renderers from registry (provided by parent)
+const registry = useRendererRegistry();
+
+// Merge: registry + explicit props (props take precedence by id)
+const allRenderers = computed(() => {
+  const fromRegistry = registry?.getAll() ?? [];
+  const fromProps = props.annotationRenderers ?? [];
+  const merged = [...fromRegistry];
+  for (const r of fromProps) {
+    const idx = merged.findIndex((m) => m.id === r.id);
+    if (idx >= 0) merged[idx] = r;
+    else merged.push(r);
+  }
+  return merged;
+});
 
 const documentState = useDocumentState(() => props.documentId);
 const page = computed(() => documentState.value?.document?.pages?.[props.pageIndex]);
@@ -65,6 +96,9 @@ const actualScale = computed(() => {
 
 const actualRotation = computed(() => {
   if (props.rotation !== undefined) return props.rotation;
-  return documentState.value?.rotation ?? Rotation.Degree0;
+  // Combine page intrinsic rotation with document rotation
+  const pageRotation = page.value?.rotation ?? 0;
+  const docRotation = documentState.value?.rotation ?? 0;
+  return ((pageRotation + docRotation) % 4) as Rotation;
 });
 </script>

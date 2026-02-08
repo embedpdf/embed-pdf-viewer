@@ -1,5 +1,26 @@
 # @embedpdf/plugin-history
 
+## 2.5.0
+
+## 2.4.1
+
+## 2.4.0
+
+### Minor Changes
+
+- [#426](https://github.com/embedpdf/embed-pdf-viewer/pull/426) by [@bobsingor](https://github.com/bobsingor) – Added history purging by command metadata:
+  - Added `purgeByMetadata()` method to remove history entries matching a predicate on command metadata
+  - Added generic `metadata` field to `Command` interface for attaching identifiable data to commands
+  - Enables permanent operations (like redaction commits) to clean up related undo/redo history
+
+## 2.3.0
+
+## 2.2.0
+
+## 2.1.2
+
+## 2.1.1
+
 ## 2.1.0
 
 ## 2.0.2

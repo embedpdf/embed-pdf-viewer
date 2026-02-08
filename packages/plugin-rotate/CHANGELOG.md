@@ -1,5 +1,26 @@
 # @embedpdf/plugin-rotate
 
+## 2.5.0
+
+### Patch Changes
+
+- [#441](https://github.com/embedpdf/embed-pdf-viewer/pull/441) by [@bobsingor](https://github.com/bobsingor) – Fixed rotation calculation in Rotate components to properly handle rotation override and combine page intrinsic rotation with document rotation:
+  - Updated React `Rotate` component to use rotation override directly when provided, otherwise combine page and document rotation
+  - Updated Vue `rotate.vue` component with the same rotation logic
+  - Updated Svelte `Rotate.svelte` component with the same rotation logic
+
+## 2.4.1
+
+## 2.4.0
+
+## 2.3.0
+
+## 2.2.0
+
+## 2.1.2
+
+## 2.1.1
+
 ## 2.1.0
 
 ## 2.0.2

@@ -1,5 +1,27 @@
 # @embedpdf/plugin-scroll
 
+## 2.5.0
+
+### Patch Changes
+
+- [#441](https://github.com/embedpdf/embed-pdf-viewer/pull/441) by [@bobsingor](https://github.com/bobsingor) – Fixed scroll calculations to account for page intrinsic rotation:
+  - Updated `getSpreadPagesWithSizes()` to compute effective rotation as `(pageRotation + docRotation) % 4` for each page
+  - Updated `scrollToPage()` to use effective rotation when calculating scroll position
+  - Updated `getRectPositionForPage()` to use effective rotation when provided rotation is undefined
+  - Fixed `calculatePageVisibility()` in base strategy to account for horizontal centering offset
+
+## 2.4.1
+
+## 2.4.0
+
+## 2.3.0
+
+## 2.2.0
+
+## 2.1.2
+
+## 2.1.1
+
 ## 2.1.0
 
 ## 2.0.2

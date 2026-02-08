@@ -168,6 +168,7 @@ export function useSchemaRenderer(documentId: string) {
               isOpen={activeModal.isOpen}
               onClose={handleClose}
               onExited={handleExited}
+              modalProps={activeModal.props}
             />
           )}
         </Fragment>
@@ -213,6 +214,7 @@ export function useSchemaRenderer(documentId: string) {
      *
      * Overlays are floating components positioned over the document content.
      * Unlike modals, multiple overlays can be visible and they don't block interaction.
+     * Overlay visibility is controlled by the enabledOverlays state.
      *
      * @example
      * ```tsx
@@ -223,7 +225,7 @@ export function useSchemaRenderer(documentId: string) {
      * ```
      */
     renderOverlays: () => {
-      if (!schema || !provides) {
+      if (!schema || !provides || !uiState) {
         return null;
       }
 
@@ -234,10 +236,15 @@ export function useSchemaRenderer(documentId: string) {
 
       const overlays = schema.overlays ? Object.values(schema.overlays) : [];
 
+      // Filter overlays by enabled state (default to true if not explicitly set)
+      const enabledOverlays = overlays.filter(
+        (overlay) => uiState.enabledOverlays[overlay.id] !== false,
+      );
+
       // Always return the same element type (Fragment) with stable key
       return (
         <Fragment key="overlays-slot">
-          {overlays.map((overlaySchema) => (
+          {enabledOverlays.map((overlaySchema) => (
             <OverlayRenderer
               key={overlaySchema.id}
               schema={overlaySchema}

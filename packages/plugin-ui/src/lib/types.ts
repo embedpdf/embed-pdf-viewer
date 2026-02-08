@@ -48,6 +48,7 @@ export interface SidebarSlotState {
 export interface ModalSlotState {
   modalId: string;
   isOpen: boolean; // false = animating out, true = visible
+  props?: Record<string, unknown>; // Optional props passed when opening the modal
 }
 
 export interface UIDocumentState {
@@ -67,6 +68,10 @@ export interface UIDocumentState {
 
   // Active tabs within sidebars
   sidebarTabs: Record<string, string>; // sidebarId -> activeTabId
+
+  // Enabled overlays (overlayId -> enabled state)
+  // Initialized from schema's defaultEnabled, can be toggled at runtime
+  enabledOverlays: Record<string, boolean>;
 }
 
 /**
@@ -143,6 +148,15 @@ export interface MenuChangedEvent extends MenuChangedData {
   documentId: string;
 }
 
+export interface OverlayChangedData {
+  overlayId: string;
+  isEnabled: boolean;
+}
+
+export interface OverlayChangedEvent extends OverlayChangedData {
+  documentId: string;
+}
+
 export interface OpenMenuState {
   menuId: string;
   triggeredByCommandId?: string; // Which command opened it
@@ -170,7 +184,7 @@ export interface UIScope {
   isSidebarOpen(placement: string, slot: string, sidebarId?: string): boolean;
 
   // Modals (with animation lifecycle support)
-  openModal(modalId: string): void;
+  openModal(modalId: string, props?: Record<string, unknown>): void;
   closeModal(): void;
   clearModal(): void; // Called after exit animation completes
   getActiveModal(): ModalSlotState | null;
@@ -184,6 +198,13 @@ export interface UIScope {
   isMenuOpen(menuId: string): boolean;
   getOpenMenus(): OpenMenuState[];
 
+  // Overlays
+  enableOverlay(overlayId: string): void;
+  disableOverlay(overlayId: string): void;
+  toggleOverlay(overlayId: string): void;
+  isOverlayEnabled(overlayId: string): boolean;
+  getEnabledOverlays(): string[];
+
   // Schema access
   getSchema(): UISchema;
 
@@ -195,6 +216,7 @@ export interface UIScope {
   onSidebarChanged: EventHook<{ placement: string; slot: string; sidebarId: string }>;
   onModalChanged: EventHook<{ modalId: string | null; isOpen: boolean }>;
   onMenuChanged: EventHook<{ menuId: string; isOpen: boolean }>;
+  onOverlayChanged: EventHook<{ overlayId: string; isEnabled: boolean }>;
 }
 
 export interface UICapability {
@@ -214,7 +236,7 @@ export interface UICapability {
     documentId?: string,
     activeTab?: string,
   ): void;
-  openModal(modalId: string, documentId?: string): void;
+  openModal(modalId: string, props?: Record<string, unknown>, documentId?: string): void;
   openMenu(
     menuId: string,
     triggeredByCommandId: string,
@@ -227,6 +249,11 @@ export interface UICapability {
     triggeredByItemId: string,
     documentId?: string,
   ): void;
+
+  // Overlay operations
+  enableOverlay(overlayId: string, documentId?: string): void;
+  disableOverlay(overlayId: string, documentId?: string): void;
+  toggleOverlay(overlayId: string, documentId?: string): void;
 
   // Document-scoped operations
   forDocument(documentId: string): UIScope;
@@ -259,5 +286,6 @@ export interface UICapability {
   }>;
   onModalChanged: EventHook<{ documentId: string; modalId: string | null; isOpen: boolean }>;
   onMenuChanged: EventHook<{ documentId: string; menuId: string; isOpen: boolean }>;
+  onOverlayChanged: EventHook<{ documentId: string; overlayId: string; isEnabled: boolean }>;
   onCategoryChanged: EventHook<{ disabledCategories: string[]; hiddenItems: string[] }>;
 }

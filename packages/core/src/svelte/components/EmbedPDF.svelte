@@ -1,6 +1,11 @@
 <script lang="ts">
   import type { Logger, PdfEngine } from '@embedpdf/models';
-  import { type IPlugin, type PluginBatchRegistrations, PluginRegistry } from '@embedpdf/core';
+  import {
+    type IPlugin,
+    type PluginBatchRegistrations,
+    type PluginRegistryConfig,
+    PluginRegistry,
+  } from '@embedpdf/core';
   import { type Snippet } from 'svelte';
   import AutoMount from './AutoMount.svelte';
   import { pdfContext, type PDFContextState } from '../hooks';
@@ -13,7 +18,11 @@
      */
     engine: PdfEngine;
     /**
-     * The logger to use for the PDF viewer.
+     * Registry configuration including logger, permissions, and defaults.
+     */
+    config?: PluginRegistryConfig;
+    /**
+     * @deprecated Use config.logger instead. Will be removed in next major version.
      */
     logger?: Logger;
     /**
@@ -37,6 +46,7 @@
 
   let {
     engine,
+    config,
     logger,
     onInitialized,
     plugins,
@@ -54,7 +64,12 @@
 
   $effect(() => {
     if (engine || (engine && plugins)) {
-      const reg = new PluginRegistry(engine, { logger });
+      // Merge deprecated logger prop into config (config.logger takes precedence)
+      const finalConfig: PluginRegistryConfig = {
+        ...config,
+        logger: config?.logger ?? logger,
+      };
+      const reg = new PluginRegistry(engine, finalConfig);
       reg.registerPluginBatch(plugins);
 
       const initialize = async () => {

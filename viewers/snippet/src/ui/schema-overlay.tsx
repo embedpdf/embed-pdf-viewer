@@ -61,11 +61,11 @@ export function SchemaOverlay({ schema, documentId, className }: OverlayRenderer
 
   return (
     <div
-      className={`absolute ${anchorClasses} ${className || ''}`}
+      className={`z-3 absolute ${anchorClasses} ${className || ''}`}
       style={offsetStyles}
       data-overlay-id={schema.id}
     >
-      {renderCustomComponent(content.componentId, documentId, {})}
+      {renderCustomComponent(content.componentId, documentId)}
     </div>
   );
 }

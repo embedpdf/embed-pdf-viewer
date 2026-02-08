@@ -771,8 +771,6 @@ export const viewerUISchema: UISchema = {
       ],
     },
   },
-
-  modals: {},
   // ─────────────────────────────────────────────────────────
   // Panels (Sidebars)
   // ─────────────────────────────────────────────────────────
@@ -840,6 +838,22 @@ export const viewerUISchema: UISchema = {
   },
 
   // ─────────────────────────────────────────────────────────
+  // Modals
+  // ─────────────────────────────────────────────────────────
+  modals: {
+    'link-modal': {
+      id: 'link-modal',
+      content: {
+        type: 'component',
+        componentId: 'link-modal',
+      },
+      maxWidth: '28rem',
+      closeOnClickOutside: true,
+      closeOnEscape: true,
+    },
+  },
+
+  // ─────────────────────────────────────────────────────────
   // Selection Menus
   // ─────────────────────────────────────────────────────────
   selectionMenus: {
@@ -850,6 +864,35 @@ export const viewerUISchema: UISchema = {
           type: 'command-button',
           id: 'delete-annotation',
           commandId: 'annotation:delete-selected',
+          variant: 'icon',
+        },
+        {
+          type: 'command-button',
+          id: 'apply-redaction',
+          commandId: 'annotation:apply-redaction',
+          variant: 'icon',
+        },
+        {
+          type: 'command-button',
+          id: 'toggle-link',
+          commandId: 'annotation:toggle-link',
+          variant: 'icon',
+        },
+      ],
+    },
+    groupAnnotation: {
+      id: 'groupAnnotation',
+      items: [
+        {
+          type: 'command-button',
+          id: 'toggle-group',
+          commandId: 'annotation:toggle-group',
+          variant: 'icon',
+        },
+        {
+          type: 'command-button',
+          id: 'delete-all-selected',
+          commandId: 'annotation:delete-all-selected',
           variant: 'icon',
         },
       ],
@@ -878,6 +921,12 @@ export const viewerUISchema: UISchema = {
           type: 'command-button',
           id: 'copy-selection',
           commandId: 'selection:copy',
+          variant: 'icon',
+        },
+        {
+          type: 'command-button',
+          id: 'add-link',
+          commandId: 'annotation:add-link',
           variant: 'icon',
         },
       ],

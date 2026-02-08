@@ -2,6 +2,7 @@ import { BasePlugin, createEmitter, Listener, PluginRegistry, Unsubscribe } from
 import {
   PdfErrorCode,
   PdfErrorReason,
+  PdfPermissionFlag,
   PdfPrintOptions,
   PdfTaskHelper,
   Task,
@@ -57,6 +58,20 @@ export class PrintPlugin extends BasePlugin<PrintPluginConfig, PrintCapability> 
     documentId?: string,
   ): Task<ArrayBuffer, PdfErrorReason, PrintProgress> {
     const id = documentId ?? this.getActiveDocumentId();
+
+    // Prevent printing without permission
+    if (!this.checkPermission(id, PdfPermissionFlag.Print)) {
+      this.logger.debug(
+        'PrintPlugin',
+        'Print',
+        `Cannot print: document ${id} lacks Print permission`,
+      );
+      return PdfTaskHelper.reject({
+        code: PdfErrorCode.Security,
+        message: 'Document lacks Print permission',
+      });
+    }
+
     const printOptions = options ?? {};
     const task = new Task<ArrayBuffer, PdfErrorReason, PrintProgress>();
 

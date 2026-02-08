@@ -1,5 +1,30 @@
 # @embedpdf/plugin-selection
 
+## 2.5.0
+
+### Patch Changes
+
+- [#441](https://github.com/embedpdf/embed-pdf-viewer/pull/441) by [@bobsingor](https://github.com/bobsingor) – Fixed rotation calculation in SelectionLayer components to properly combine page intrinsic rotation with document rotation:
+  - Updated React `SelectionLayer` component to compute effective rotation as `(pageRotation + docRotation) % 4`
+  - Updated Vue `selection-layer.vue` component with the same rotation logic
+  - Updated Svelte `SelectionLayer.svelte` component with the same rotation logic
+
+## 2.4.1
+
+## 2.4.0
+
+## 2.3.0
+
+### Minor Changes
+
+- [#406](https://github.com/embedpdf/embed-pdf-viewer/pull/406) by [@bobsingor](https://github.com/bobsingor) – Added marquee selection functionality allowing users to drag a rectangle to select multiple elements. Introduced `createMarqueeSelectionHandler` and `createTextSelectionHandler` as separate pointer event handlers that can be combined with `mergeHandlers`. Added `MarqueeSelection` component for Preact, Svelte, and Vue. Added `EnableForModeOptions` interface with `showRects` option for configurable selection behavior. Added `onMarqueeChange` and `onMarqueeEnd` events. Added `setMarqueeEnabled` and `isMarqueeEnabled` methods to the capability.
+
+## 2.2.0
+
+## 2.1.2
+
+## 2.1.1
+
 ## 2.1.0
 
 ## 2.0.2

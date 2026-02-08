@@ -8,7 +8,7 @@
       top: `${rect.origin.y * actualScale}px`,
       width: `${rect.size.width * actualScale}px`,
       height: `${rect.size.height * actualScale}px`,
-      border: `1px solid ${stroke}`,
+      border: `1px solid ${strokeColor}`,
       background: fill,
       boxSizing: 'border-box',
     }"
@@ -50,23 +50,22 @@ const actualScale = computed(() => {
   return documentState.value?.scale ?? 1;
 });
 
+// Get stroke color from plugin (annotation mode uses tool defaults, legacy uses red)
+// Allow prop override for backwards compatibility
+const strokeColor = computed(
+  () => props.stroke ?? redactionPlugin.value?.getPreviewStrokeColor() ?? 'red',
+);
+
 watch(
-  [redactionPlugin, () => props.documentId, () => props.pageIndex, actualScale],
-  ([plugin, docId, pageIdx, scale], _, onCleanup) => {
+  [redactionPlugin, () => props.documentId, () => props.pageIndex],
+  ([plugin, docId, pageIdx], _, onCleanup) => {
     if (!plugin || !docId) return;
 
-    const unregister = plugin.registerMarqueeOnPage({
-      documentId: docId,
-      pageIndex: pageIdx,
-      scale,
-      callback: {
-        onPreview: (newRect) => {
-          rect.value = newRect;
-        },
-      },
+    const unsubscribe = plugin.onRedactionMarqueeChange(docId, (data) => {
+      rect.value = data.pageIndex === pageIdx ? data.rect : null;
     });
 
-    onCleanup(unregister);
+    onCleanup(unsubscribe);
   },
   { immediate: true },
 );

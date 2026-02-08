@@ -3,7 +3,20 @@ import { PdfErrorReason, Rect, Task } from '@embedpdf/models';
 
 // Redaction mode enum
 export enum RedactionMode {
+  /**
+   * Unified redaction mode - supports both text selection and area marquee simultaneously.
+   * Available when annotation plugin is present.
+   */
+  Redact = 'redact',
+  /**
+   * Area-based redactions only (marquee selection).
+   * For backwards compatibility with existing code.
+   */
   MarqueeRedact = 'marqueeRedact',
+  /**
+   * Text-based redactions only (text selection).
+   * For backwards compatibility with existing code.
+   */
   RedactSelection = 'redactSelection',
 }
 
@@ -27,35 +40,36 @@ export interface RedactionState {
   activeDocumentId: string | null;
 }
 
+// Source mode for redaction items
+export type RedactionSource = 'annotation' | 'legacy';
+
+// Common base for both kinds
+interface RedactionItemBase {
+  id: string;
+  page: number;
+  rect: Rect;
+  source: RedactionSource;
+  markColor: string; // Stroke/outline color (default: '#FF0000')
+  redactionColor: string; // Fill color for redaction (transparent or #000000 in legacy, anno.color in annotation mode)
+}
+
 export type RedactionItem =
-  | {
-      id: string;
+  | (RedactionItemBase & {
       kind: 'text';
-      page: number;
-      rect: Rect;
       rects: Rect[];
-    }
-  | {
-      id: string;
+      text?: string; // The highlighted text (optional, async populated)
+    })
+  | (RedactionItemBase & {
       kind: 'area';
-      page: number;
-      rect: Rect;
-    };
-
-export interface MarqueeRedactCallback {
-  onPreview?: (rect: Rect | null) => void;
-  onCommit?: (rect: Rect) => void;
-}
-
-export interface RegisterMarqueeOnPageOptions {
-  documentId: string;
-  pageIndex: number;
-  scale: number;
-  callback: MarqueeRedactCallback;
-}
+    });
 
 export interface RedactionPluginConfig extends BasePluginConfig {
   drawBlackBoxes: boolean;
+  /**
+   * When true, use annotation-based redactions (requires annotation plugin).
+   * When false (default), use legacy internal pending state.
+   */
+  useAnnotationMode?: boolean;
 }
 
 // Events include documentId
@@ -101,10 +115,18 @@ export interface StateChangeEvent {
 export interface RedactionScope {
   queueCurrentSelectionAsPending(): Task<boolean, PdfErrorReason>;
 
+  // Unified redact mode (recommended)
+  enableRedact(): void;
+  toggleRedact(): void;
+  isRedactActive(): boolean;
+  endRedact(): void;
+
+  // Legacy marquee mode (area-based redactions)
   enableMarqueeRedact(): void;
   toggleMarqueeRedact(): void;
   isMarqueeRedactActive(): boolean;
 
+  // Legacy selection mode (text-based redactions)
   enableRedactSelection(): void;
   toggleRedactSelection(): void;
   isRedactSelectionActive(): boolean;
@@ -114,9 +136,6 @@ export interface RedactionScope {
   clearPending(): void;
   commitAllPending(): Task<boolean, PdfErrorReason>;
   commitPending(page: number, id: string): Task<boolean, PdfErrorReason>;
-
-  endRedaction(): void;
-  startRedaction(): void;
 
   selectPending(page: number, id: string): void;
   getSelectedPending(): SelectedRedaction | null;
@@ -134,10 +153,18 @@ export interface RedactionCapability {
   // Active document operations
   queueCurrentSelectionAsPending(): Task<boolean, PdfErrorReason>;
 
+  // Unified redact mode (recommended)
+  enableRedact(): void;
+  toggleRedact(): void;
+  isRedactActive(): boolean;
+  endRedact(): void;
+
+  // Legacy marquee mode (area-based redactions)
   enableMarqueeRedact(): void;
   toggleMarqueeRedact(): void;
   isMarqueeRedactActive(): boolean;
 
+  // Legacy selection mode (text-based redactions)
   enableRedactSelection(): void;
   toggleRedactSelection(): void;
   isRedactSelectionActive(): boolean;
@@ -147,9 +174,6 @@ export interface RedactionCapability {
   clearPending(): void;
   commitAllPending(): Task<boolean, PdfErrorReason>;
   commitPending(page: number, id: string): Task<boolean, PdfErrorReason>;
-
-  endRedaction(): void;
-  startRedaction(): void;
 
   selectPending(page: number, id: string): void;
   getSelectedPending(): SelectedRedaction | null;

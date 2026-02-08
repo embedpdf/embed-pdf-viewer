@@ -57,6 +57,7 @@
                           :documentId="documentId"
                           :pageIndex="page.pageIndex"
                           :selectionMenu="annotationMenu"
+                          :groupSelectionMenu="groupAnnotationMenu"
                         />
                       </PagePointerProvider>
                     </Rotate>
@@ -74,6 +75,9 @@
     <!-- Right Panels -->
     <component :is="renderSidebar('right', 'main')" />
   </div>
+
+  <!-- Modals -->
+  <component :is="renderModal()" />
 </template>
 
 <script setup lang="ts">
@@ -111,9 +115,10 @@ interface Props {
 
 const props = defineProps<Props>();
 
-const { renderToolbar, renderSidebar } = useSchemaRenderer(() => props.documentId);
+const { renderToolbar, renderSidebar, renderModal } = useSchemaRenderer(() => props.documentId);
 
 const annotationMenu = useSelectionMenu('annotation', () => props.documentId);
+const groupAnnotationMenu = useSelectionMenu('groupAnnotation', () => props.documentId);
 const redactionMenu = useSelectionMenu('redaction', () => props.documentId);
 const selectionMenu = useSelectionMenu('selection', () => props.documentId);
 </script>

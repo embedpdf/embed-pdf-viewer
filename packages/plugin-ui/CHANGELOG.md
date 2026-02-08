@@ -1,5 +1,49 @@
 # @embedpdf/plugin-ui
 
+## 2.5.0
+
+## 2.4.1
+
+## 2.4.0
+
+### Minor Changes
+
+- [#428](https://github.com/embedpdf/embed-pdf-viewer/pull/428) by [@bobsingor](https://github.com/bobsingor) – Added modal props feature to pass context when opening modals:
+  - Extended `openModal(modalId, props?)` to accept optional props parameter
+  - Added `props` field to `ModalSlotState` type
+  - Added `modalProps` to `ModalRendererProps` for all frameworks (Preact, React, Svelte, Vue)
+  - Updated schema renderers to pass `modalProps` through to modal components
+
+## 2.3.0
+
+### Patch Changes
+
+- [#406](https://github.com/embedpdf/embed-pdf-viewer/pull/406) by [@bobsingor](https://github.com/bobsingor) – Removed `commands` from required dependencies. The UI plugin no longer requires the commands plugin to be registered.
+
+## 2.2.0
+
+### Minor Changes
+
+- [#389](https://github.com/embedpdf/embed-pdf-viewer/pull/389) by [@bobsingor](https://github.com/bobsingor) – Add overlay enable/disable functionality:
+  - Add `SET_OVERLAY_ENABLED` action and `setOverlayEnabled` action creator
+  - Add `enabledOverlays` state to `UIDocumentState` for tracking overlay visibility
+  - Add overlay management methods to `UIScope`: `enableOverlay`, `disableOverlay`, `toggleOverlay`, `isOverlayEnabled`, `getEnabledOverlays`
+  - Add `onOverlayChanged` event hook for overlay state changes
+  - Update schema renderer to filter overlays by enabled state
+  - Initialize overlay enabled state from schema's `defaultEnabled` property
+
+## 2.1.2
+
+## 2.1.1
+
+### Patch Changes
+
+- [#364](https://github.com/embedpdf/embed-pdf-viewer/pull/364) by [@bobsingor](https://github.com/bobsingor) – Fixed toolbar/sidebar/modal switching causing unnecessary component remounts
+
+  The `useSchemaRenderer` hook was using the toolbar/sidebar/modal ID as the React key, which caused full component remounts when switching between different toolbars in the same slot (e.g., annotation-toolbar → shapes-toolbar). This resulted in visible flashing of sibling components like the RenderLayer.
+
+  The fix uses stable slot-based keys (`toolbar-slot-top-secondary`, `sidebar-slot-left-main`, etc.) so that switching content within a slot only updates the children without remounting the wrapper element. This prevents React/Preact reconciliation from affecting sibling components in the tree.
+
 ## 2.1.0
 
 ## 2.0.2

@@ -59,6 +59,10 @@ import UnderlineIcon from './UnderlineIcon.svelte';
 import UndoIcon from './UndoIcon.svelte';
 import ZigzagIcon from './ZigzagIcon.svelte';
 import ZoomChevronDownIcon from './ZoomChevronDownIcon.svelte';
+import LinkIcon from './LinkIcon.svelte';
+import LinkOffIcon from './LinkOffIcon.svelte';
+import GroupIcon from './GroupIcon.svelte';
+import UngroupIcon from './UngroupIcon.svelte';
 
 // Define the standard Prop type for your icons for consistency
 export interface IconProps extends SVGAttributes<SVGSVGElement> {
@@ -124,6 +128,10 @@ export const iconRegistry = {
   undo: UndoIcon,
   zigzag: ZigzagIcon,
   'zoom-chevron-down': ZoomChevronDownIcon,
+  link: LinkIcon,
+  'link-off': LinkOffIcon,
+  group: GroupIcon,
+  ungroup: UngroupIcon,
 } as const;
 
 // Extract valid keys for Type Safety

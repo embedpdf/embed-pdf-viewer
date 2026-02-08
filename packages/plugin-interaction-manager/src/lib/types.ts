@@ -46,18 +46,43 @@ export interface InteractionMode {
   wantsRawTouch?: boolean;
 }
 
-export interface EmbedPdfPointerEvent {
+/**
+ * Extensions added to pointer events by the interaction manager.
+ * These methods are added on top of whatever native event type is used.
+ */
+export interface EmbedPdfPointerEventExtensions {
+  /** Prevents remaining handlers from being called for this event */
+  stopImmediatePropagation(): void;
+  /** Returns true if stopImmediatePropagation() was called */
+  isImmediatePropagationStopped(): boolean;
+  setPointerCapture?(): void;
+  releasePointerCapture?(): void;
+}
+
+/**
+ * Base properties available when no native event type is specified.
+ * Used in plugin layer where DOM types are not available.
+ */
+export interface EmbedPdfPointerEventBase {
   clientX: number;
   clientY: number;
   ctrlKey: boolean;
   shiftKey: boolean;
   altKey: boolean;
   metaKey: boolean;
-  target: any;
-  currentTarget: any;
-  setPointerCapture?(): void;
-  releasePointerCapture?(): void;
+  target: unknown;
+  currentTarget: unknown;
 }
+
+/**
+ * Pointer event type that combines a native event with our extensions.
+ *
+ * Usage:
+ * - Plugin layer: `EmbedPdfPointerEvent` (uses base properties)
+ * - React: `EmbedPdfPointerEvent<React.MouseEvent>`
+ * - Vue/Svelte: `EmbedPdfPointerEvent<PointerEvent>`
+ */
+export type EmbedPdfPointerEvent<T = EmbedPdfPointerEventBase> = T & EmbedPdfPointerEventExtensions;
 
 export interface PointerEventHandlers<T = EmbedPdfPointerEvent> {
   onPointerDown?(pos: Position, evt: T, modeId: string): void;
@@ -76,8 +101,9 @@ export interface PointerEventHandlers<T = EmbedPdfPointerEvent> {
   onDoubleClick?(pos: Position, evt: T, modeId: string): void;
 }
 
-export interface PointerEventHandlersWithLifecycle<T = EmbedPdfPointerEvent>
-  extends PointerEventHandlers<T> {
+export interface PointerEventHandlersWithLifecycle<
+  T = EmbedPdfPointerEvent,
+> extends PointerEventHandlers<T> {
   onHandlerActiveStart?(modeId: string): void;
   onHandlerActiveEnd?(modeId: string): void;
 }
@@ -128,6 +154,13 @@ export interface StateChangeEvent {
   state: InteractionDocumentState;
 }
 
+export interface PageActivityChangeEvent {
+  documentId: string;
+  pageIndex: number;
+  /** Whether this page now has any active topics */
+  hasActivity: boolean;
+}
+
 // Scoped interaction capability
 export interface InteractionManagerScope {
   getActiveMode(): string;
@@ -143,9 +176,13 @@ export interface InteractionManagerScope {
   resume(): void;
   isPaused(): boolean;
   getState(): InteractionDocumentState;
+  claimPageActivity(topic: string, pageIndex: number): void;
+  releasePageActivity(topic: string): void;
+  hasPageActivity(pageIndex: number): boolean;
   onModeChange: EventHook<string>;
   onCursorChange: EventHook<string>;
   onStateChange: EventHook<InteractionDocumentState>;
+  onPageActivityChange: EventHook<{ pageIndex: number; hasActivity: boolean }>;
 }
 
 export interface InteractionManagerCapability {
@@ -180,9 +217,15 @@ export interface InteractionManagerCapability {
   addExclusionAttribute(attribute: string): void;
   removeExclusionAttribute(attribute: string): void;
 
+  // Page activity
+  claimPageActivity(documentId: string, topic: string, pageIndex: number): void;
+  releasePageActivity(documentId: string, topic: string): void;
+  hasPageActivity(documentId: string, pageIndex: number): boolean;
+
   // Events (all include documentId)
   onModeChange: EventHook<ModeChangeEvent>;
   onCursorChange: EventHook<CursorChangeEvent>;
   onHandlerChange: EventHook<InteractionManagerState>;
   onStateChange: EventHook<StateChangeEvent>;
+  onPageActivityChange: EventHook<PageActivityChangeEvent>;
 }

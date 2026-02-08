@@ -1,17 +1,36 @@
 /** @jsxImportSource preact */
 import { h } from 'preact';
-import {
-  useAnnotationCapability,
-  AnnotationTool,
-  useAnnotation,
-} from '@embedpdf/plugin-annotation/preact';
+import { useAnnotationCapability, useAnnotation } from '@embedpdf/plugin-annotation/preact';
 import { useTranslations } from '@embedpdf/plugin-i18n/preact';
-import { PdfAnnotationSubtype } from '@embedpdf/models';
-import { getAnnotationByUid } from '@embedpdf/plugin-annotation';
+import { getSelectedAnnotations } from '@embedpdf/plugin-annotation';
 
-import { SidebarPropsBase } from './annotation-sidebar/common';
-import { SidebarRegistry } from './annotation-sidebar/registry';
 import { EmptyState } from './annotation-sidebar/empty-state';
+import { DynamicSidebar } from './annotation-sidebar/dynamic-sidebar';
+import { ANNOTATION_PROPERTIES } from './annotation-sidebar/property-schema';
+
+/**
+ * Map annotation subtypes to their translation keys for the sidebar title.
+ * Values correspond to PdfAnnotationSubtype enum:
+ * TEXT=1, LINK=2, FREETEXT=3, LINE=4, SQUARE=5, CIRCLE=6, POLYGON=7,
+ * POLYLINE=8, HIGHLIGHT=9, UNDERLINE=10, SQUIGGLY=11, STRIKEOUT=12,
+ * STAMP=13, CARET=14, INK=15
+ */
+const ANNOTATION_TYPE_KEYS: Record<number, string> = {
+  1: 'annotation.text',
+  3: 'annotation.freeText',
+  4: 'annotation.line',
+  5: 'annotation.square',
+  6: 'annotation.circle',
+  7: 'annotation.polygon',
+  8: 'annotation.polyline',
+  9: 'annotation.highlight',
+  10: 'annotation.underline',
+  11: 'annotation.squiggly',
+  12: 'annotation.strikeout',
+  13: 'annotation.stamp',
+  15: 'annotation.ink',
+  28: 'annotation.redact',
+};
 
 export function AnnotationSidebar({ documentId }: { documentId: string }) {
   const { provides: annotationCapability } = useAnnotationCapability();
@@ -21,51 +40,64 @@ export function AnnotationSidebar({ documentId }: { documentId: string }) {
   if (!annotationCapability || !annotation) return null;
 
   const colorPresets = annotationCapability?.getColorPresets() ?? [];
+  const selectedAnnotations = getSelectedAnnotations(state);
+  const activeTool = annotation.getActiveTool();
 
-  let tool: AnnotationTool | null = null;
-  let subtype: PdfAnnotationSubtype | null = null;
-  const selectedAnnotation = state.selectedUid
-    ? getAnnotationByUid(state, state.selectedUid)
-    : null;
-  // 1. Determine which tool and subtype we are working with
-  if (selectedAnnotation) {
-    // If an annotation is selected, find the best tool that matches it
-    tool = annotation.findToolForAnnotation(selectedAnnotation.object);
-    subtype = selectedAnnotation.object.type;
-  } else if (state.activeToolId) {
-    // If no annotation is selected, use the active tool from the toolbar
-    tool = annotation.getActiveTool() ?? null;
-    subtype = tool?.defaults.type ?? null;
+  // Determine mode
+  const isEditing = selectedAnnotations.length > 0;
+  const isMulti = selectedAnnotations.length > 1;
+
+  // Compute title
+  let title = '';
+  if (isMulti) {
+    // Multiple annotations selected
+    title = translate('annotation.multiSelect', {
+      params: { count: String(selectedAnnotations.length) },
+    });
+  } else if (isEditing) {
+    // Single annotation selected
+    const subtype = selectedAnnotations[0].object.type;
+    const typeKey = ANNOTATION_TYPE_KEYS[subtype];
+    const annotationType = typeKey ? translate(typeKey) : '';
+    title = annotationType
+      ? translate('annotation.styles', { params: { type: annotationType } })
+      : '';
+  } else if (activeTool) {
+    // Tool defaults mode
+    const subtype = activeTool.defaults.type;
+    if (subtype !== undefined) {
+      const typeKey = ANNOTATION_TYPE_KEYS[subtype];
+      const annotationType = typeKey ? translate(typeKey) : '';
+      title = annotationType
+        ? translate('annotation.defaults', { params: { type: annotationType } })
+        : '';
+    }
   }
 
-  // 2. If we couldn't determine a subtype, show the empty state
-  if (subtype === null) return <EmptyState documentId={documentId} />;
+  // Check if we have properties to show
+  const types = isEditing
+    ? [...new Set(selectedAnnotations.map((a) => a.object.type))]
+    : activeTool?.defaults.type !== undefined
+      ? [activeTool.defaults.type]
+      : [];
 
-  const entry = SidebarRegistry[subtype];
-  if (!entry) return <EmptyState documentId={documentId} />;
+  const hasProperties =
+    types.length > 0 && types.some((t) => (ANNOTATION_PROPERTIES[t]?.length ?? 0) > 0);
 
-  const { component: Sidebar, titleKey } = entry;
-
-  // 3. Prepare the simplified props for the sidebar component
-  const commonProps: SidebarPropsBase<any> = {
-    documentId,
-    selected: selectedAnnotation,
-    activeTool: tool,
-    colorPresets,
-  };
-
-  // 4. Get the translated title
-  const resolvedTitleKey = typeof titleKey === 'function' ? titleKey(commonProps as any) : titleKey;
-  const annotationType = resolvedTitleKey ? translate(resolvedTitleKey) : '';
-  const titleSuffixKey = selectedAnnotation ? 'annotation.styles' : 'annotation.defaults';
-  const computedTitle = annotationType
-    ? translate(titleSuffixKey, { params: { type: annotationType } })
-    : '';
+  // If nothing to show, display empty state
+  if (!hasProperties && !isEditing && !activeTool) {
+    return <EmptyState documentId={documentId} />;
+  }
 
   return (
     <div class="h-full overflow-y-auto p-4">
-      {computedTitle && <h2 class="text-md mb-4 font-medium">{computedTitle}</h2>}
-      <Sidebar {...(commonProps as any)} />
+      {title && <h2 class="text-md mb-4 font-medium">{title}</h2>}
+      <DynamicSidebar
+        documentId={documentId}
+        annotations={selectedAnnotations}
+        activeTool={activeTool}
+        colorPresets={colorPresets}
+      />
     </div>
   );
 }

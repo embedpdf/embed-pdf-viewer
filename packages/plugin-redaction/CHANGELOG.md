@@ -1,5 +1,52 @@
 # @embedpdf/plugin-redaction
 
+## 2.5.0
+
+### Patch Changes
+
+- [#441](https://github.com/embedpdf/embed-pdf-viewer/pull/441) by [@bobsingor](https://github.com/bobsingor) – Fixed rotation calculation in RedactionLayer components to properly combine page intrinsic rotation with document rotation:
+  - Updated React `RedactionLayer` component to compute effective rotation as `(pageRotation + docRotation) % 4`
+  - Updated Vue `redaction-layer.vue` component with the same rotation logic
+  - Updated Svelte `redaction-layer.svelte` component with the same rotation logic
+
+## 2.4.1
+
+## 2.4.0
+
+### Minor Changes
+
+- [#426](https://github.com/embedpdf/embed-pdf-viewer/pull/426) by [@bobsingor](https://github.com/bobsingor) – Added annotation-based redaction mode for integrated redaction workflow:
+  - Added `useAnnotationMode` config option to use REDACT annotations as pending redactions
+  - Added unified `RedactionMode.Redact` mode supporting both text selection and area marquee
+  - Added `redactTool` annotation tool for integration with annotation plugin
+  - Added `RedactHighlight` and `RedactArea` components for rendering redact annotations
+  - Added automatic renderer registration via framework-specific `RedactionPluginPackage`
+  - Added `source`, `markColor`, `redactionColor`, and `text` properties to `RedactionItem` type
+  - Pending redactions now sync with annotation plugin state in annotation mode
+  - Added `enableRedact()`, `toggleRedact()`, `isRedactActive()`, `endRedact()` methods
+  - Removed deprecated `startRedaction()` and `endRedaction()` methods from scope API
+
+## 2.3.0
+
+### Patch Changes
+
+- [#406](https://github.com/embedpdf/embed-pdf-viewer/pull/406) by [@bobsingor](https://github.com/bobsingor) – Updated to use the new `enableForMode` signature with options object. Configured redaction mode to suppress selection layer rects since the redaction plugin renders its own selection visualization.
+
+## 2.2.0
+
+### Minor Changes
+
+- [#389](https://github.com/embedpdf/embed-pdf-viewer/pull/389) by [@bobsingor](https://github.com/bobsingor) – Add permission checking for redaction operations:
+  - Check `PdfPermissionFlag.ModifyContents` before adding pending redaction items
+  - Check permission before enabling redact selection or marquee redact modes
+  - Check permission before starting redaction mode
+  - Check permission before committing pending redactions (single or all)
+  - Return `PdfErrorCode.Security` error when permission is denied for commit operations
+
+## 2.1.2
+
+## 2.1.1
+
 ## 2.1.0
 
 ## 2.0.2

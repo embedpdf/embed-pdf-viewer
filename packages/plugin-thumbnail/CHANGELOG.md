@@ -1,5 +1,25 @@
 # @embedpdf/plugin-thumbnail
 
+## 2.5.0
+
+### Patch Changes
+
+- [#441](https://github.com/embedpdf/embed-pdf-viewer/pull/441) by [@bobsingor](https://github.com/bobsingor) – Fixed thumbnail rendering to account for page intrinsic rotation:
+  - Updated `rebuildLayout()` to swap width/height for pages with 90° or 270° rotation when calculating thumbnail dimensions
+  - Added `rotation: page.rotation` to render options in `renderThumb()` to ensure thumbnails display with correct orientation
+
+## 2.4.1
+
+## 2.4.0
+
+## 2.3.0
+
+## 2.2.0
+
+## 2.1.2
+
+## 2.1.1
+
 ## 2.1.0
 
 ## 2.0.2

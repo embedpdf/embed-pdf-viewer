@@ -56,7 +56,14 @@
   import CustomZoomToolbar from '$lib/components/CustomZoomToolbar.svelte';
   import OutlineSidebar from '$lib/components/OutlineSidebar.svelte';
   import CommentSidebar from '$lib/components/CommentSidebar.svelte';
-  import { SchemaToolbar, SchemaPanel, SchemaMenu, SchemaSelectionMenu } from '$lib/ui';
+  import {
+    SchemaToolbar,
+    SchemaPanel,
+    SchemaMenu,
+    SchemaSelectionMenu,
+    SchemaModal,
+  } from '$lib/ui';
+  import LinkModal from '$lib/components/LinkModal.svelte';
   import {
     commands,
     viewerUISchema,
@@ -81,6 +88,7 @@
     'search-sidebar': SearchSidebar,
     'outline-sidebar': OutlineSidebar,
     'comment-sidebar': CommentSidebar,
+    'link-modal': LinkModal,
   }; // Type assertion needed due to component prop variations
 
   // UI Renderers
@@ -89,6 +97,7 @@
     sidebar: SchemaPanel,
     menu: SchemaMenu,
     selectionMenu: SchemaSelectionMenu,
+    modal: SchemaModal,
   };
 
   // Plugin configurations
@@ -123,7 +132,9 @@
     createPluginRegistration(HistoryPluginPackage),
     createPluginRegistration(AnnotationPluginPackage),
     createPluginRegistration(FullscreenPluginPackage),
-    createPluginRegistration(RedactionPluginPackage),
+    createPluginRegistration(RedactionPluginPackage, {
+      useAnnotationMode: true,
+    }),
     createPluginRegistration(ThumbnailPluginPackage, {
       width: 120,
       paddingY: 10,
@@ -211,6 +222,8 @@
   {@const redactionMenu = useSelectionMenu('redaction', () => documentId)}
   {@const selectionMenu = useSelectionMenu('selection', () => documentId)}
   {@const annotationMenu = useSelectionMenu('annotation', () => documentId)}
+  {@const groupAnnotationMenu = useSelectionMenu('groupAnnotation', () => documentId)}
+  {@const modalInfo = schemaRenderer.getModalInfo()}
 
   {@const topMainToolbar = schemaRenderer.getToolbarInfo('top', 'main')}
   {@const topSecondaryToolbar = schemaRenderer.getToolbarInfo('top', 'secondary')}
@@ -305,6 +318,7 @@
                               {documentId}
                               pageIndex={page.pageIndex}
                               selectionMenu={annotationMenu.renderFn}
+                              groupSelectionMenu={groupAnnotationMenu.renderFn}
                             />
                           </PagePointerProvider>
                         </Rotate>
@@ -332,4 +346,16 @@
       />
     {/if}
   </div>
+
+  <!-- Modal Rendering -->
+  {#if modalInfo}
+    {@const ModalRenderer = modalInfo.renderer}
+    <ModalRenderer
+      schema={modalInfo.schema}
+      documentId={modalInfo.documentId}
+      isOpen={modalInfo.isOpen}
+      onClose={modalInfo.onClose}
+      onExited={modalInfo.onExited}
+    />
+  {/if}
 {/snippet}

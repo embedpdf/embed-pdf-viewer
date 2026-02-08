@@ -8,6 +8,7 @@ export interface ModalRendererProps {
   isOpen: boolean;
   onClose: () => void;
   onExited: () => void;
+  modalProps?: Record<string, unknown>;
 }
 
 /**
@@ -16,7 +17,14 @@ export interface ModalRendererProps {
  * Renders modals defined in the UI schema.
  * Supports animation lifecycle via isOpen and onExited props.
  */
-export function SchemaModal({ schema, documentId, isOpen, onClose, onExited }: ModalRendererProps) {
+export function SchemaModal({
+  schema,
+  documentId,
+  isOpen,
+  onClose,
+  onExited,
+  modalProps,
+}: ModalRendererProps) {
   const { content } = schema;
   const { renderCustomComponent } = useItemRenderer();
 
@@ -31,6 +39,7 @@ export function SchemaModal({ schema, documentId, isOpen, onClose, onExited }: M
         isOpen,
         onClose,
         onExited,
+        ...modalProps,
       })}
     </Fragment>
   );

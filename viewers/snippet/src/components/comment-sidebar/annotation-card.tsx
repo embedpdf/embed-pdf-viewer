@@ -19,6 +19,7 @@ interface AnnotationCardProps {
   onDelete: (annotation: TrackedAnnotation) => void;
   onReply: (inReplyToId: string, contents: string) => void;
   documentId: string;
+  isReadOnly?: boolean;
 }
 
 export const AnnotationCard = ({
@@ -29,6 +30,7 @@ export const AnnotationCard = ({
   onDelete,
   onReply,
   documentId,
+  isReadOnly = false,
 }: AnnotationCardProps) => {
   const { annotation, replies } = entry;
   const [isMenuOpen, setMenuOpen] = useState(false);
@@ -40,13 +42,16 @@ export const AnnotationCard = ({
   const hasReplies = replies.length > 0;
   const showCommentInput = !hasContent && !hasReplies;
   const inputRef = useRef<HTMLInputElement>(null);
+  const prevSelectedRef = useRef(false);
   const author = annotation.object.author || 'Guest';
 
+  // Only focus when transitioning from not-selected to selected
   useEffect(() => {
-    if (isSelected) {
+    if (isSelected && !prevSelectedRef.current) {
       inputRef.current?.focus({ preventScroll: true });
     }
-  }, [isSelected, entry]);
+    prevSelectedRef.current = isSelected;
+  }, [isSelected]);
 
   if (!config) return null;
 
@@ -68,7 +73,12 @@ export const AnnotationCard = ({
     >
       <div className="p-4">
         <div className="flex items-start space-x-3">
-          <AnnotationIcon annotation={annotation} config={config} className="h-8 w-8" />
+          <AnnotationIcon
+            annotation={annotation}
+            config={config}
+            title={translate(config.labelKey, { fallback: config.label })}
+            className="h-8 w-8"
+          />
           <div className="min-w-0 flex-1">
             <div className="flex items-center justify-between">
               <div className="leading-none">
@@ -77,27 +87,29 @@ export const AnnotationCard = ({
                   {formatDate(annotation.object.modified || annotation.object.created)}
                 </span>
               </div>
-              <div className="relative">
-                <button
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    setMenuOpen(true);
-                  }}
-                  className="text-fg-disabled hover:bg-interactive-hover hover:text-fg-secondary rounded-md p-1"
-                >
-                  <svg className="h-4 w-4" fill="currentColor" viewBox="0 0 20 20">
-                    <path d="M6 10a2 2 0 11-4 0 2 2 0 014 0zM12 10a2 2 0 11-4 0 2 2 0 014 0zM16 12a2 2 0 100-4 2 2 0 000 4z" />
-                  </svg>
-                </button>
-                {isMenuOpen && (
-                  <MenuDropdown
-                    onEdit={() => setEditing(true)}
-                    onDelete={() => onDelete(annotation)}
-                    onClose={() => setMenuOpen(false)}
-                    documentId={documentId}
-                  />
-                )}
-              </div>
+              {!isReadOnly && (
+                <div className="relative">
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setMenuOpen(true);
+                    }}
+                    className="text-fg-disabled hover:bg-interactive-hover hover:text-fg-secondary rounded-md p-1"
+                  >
+                    <svg className="h-4 w-4" fill="currentColor" viewBox="0 0 20 20">
+                      <path d="M6 10a2 2 0 11-4 0 2 2 0 014 0zM12 10a2 2 0 11-4 0 2 2 0 014 0zM16 12a2 2 0 100-4 2 2 0 000 4z" />
+                    </svg>
+                  </button>
+                  {isMenuOpen && (
+                    <MenuDropdown
+                      onEdit={() => setEditing(true)}
+                      onDelete={() => onDelete(annotation)}
+                      onClose={() => setMenuOpen(false)}
+                      documentId={documentId}
+                    />
+                  )}
+                </div>
+              )}
             </div>
 
             {annotation.object.custom?.text && (
@@ -109,8 +121,8 @@ export const AnnotationCard = ({
               />
             )}
 
-            <div className="mt-2">
-              {isEditing ? (
+            {isEditing ? (
+              <div className="mt-2">
                 <EditCommentForm
                   initialText={annotation.object.contents || ''}
                   onSave={handleSaveEdit}
@@ -118,10 +130,10 @@ export const AnnotationCard = ({
                   autoFocus
                   documentId={documentId}
                 />
-              ) : hasContent ? (
-                <p className="text-fg-primary text-sm">{annotation.object.contents}</p>
-              ) : null}
-            </div>
+              </div>
+            ) : hasContent ? (
+              <p className="text-fg-primary mt-2 text-sm">{annotation.object.contents}</p>
+            ) : null}
           </div>
         </div>
 
@@ -135,12 +147,13 @@ export const AnnotationCard = ({
                 onDelete={() => onDelete(reply)}
                 isReply
                 documentId={documentId}
+                isReadOnly={isReadOnly}
               />
             ))}
           </div>
         )}
 
-        {!isEditing && (
+        {!isEditing && !isReadOnly && (
           <AnnotationInput
             inputRef={inputRef}
             isFocused={isSelected}

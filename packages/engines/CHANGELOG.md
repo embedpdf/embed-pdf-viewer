@@ -1,5 +1,64 @@
 # @embedpdf/engines
 
+## 2.5.0
+
+### Minor Changes
+
+- [#441](https://github.com/embedpdf/embed-pdf-viewer/pull/441) by [@bobsingor](https://github.com/bobsingor) – Implemented per-document rotation normalization in the PDFium engine:
+  - Updated `PdfCache.setDocument()` to accept per-document `normalizeRotation` flag
+  - Added `normalizeRotation` property to `DocumentContext` for tracking document-level setting
+  - Updated `PageCache` to use `EPDF_LoadPageNormalized` when normalization is enabled
+  - Modified page size retrieval to use `EPDF_GetPageSizeByIndexNormalized` for normalized documents
+  - Propagated `doc: PdfDocumentObject` parameter through 30+ coordinate transformation methods to access the normalization flag
+  - Updated `convertDevicePointToPagePoint` and `convertPagePointToDevicePoint` to use 0° rotation when normalization is enabled
+
+  This change allows annotations, text selection, and rendering to work correctly across pages with different rotations by treating all coordinates in a consistent 0° space.
+
+## 2.4.1
+
+### Patch Changes
+
+- [#434](https://github.com/embedpdf/embed-pdf-viewer/pull/434) by [@bobsingor](https://github.com/bobsingor) – Fixed memory leak where image encoder workers were never terminated when the engine was destroyed:
+  - Added optional `destroy()` method to `ImageDataConverter` interface for resource cleanup
+  - Updated `createWorkerPoolImageConverter` and `createHybridImageConverter` to attach `destroy()` that terminates the encoder worker pool
+  - Updated `PdfEngine.destroy()` to call `imageConverter.destroy?.()` to clean up encoder workers
+
+  Previously, each viewer instance would leave 2 encoder workers running after destruction.
+
+## 2.4.0
+
+### Minor Changes
+
+- [#426](https://github.com/embedpdf/embed-pdf-viewer/pull/426) by [@bobsingor](https://github.com/bobsingor) – Added redaction annotation engine methods:
+  - Added `applyRedaction()` to apply a single REDACT annotation, removing content and flattening the overlay
+  - Added `applyAllRedactions()` to apply all REDACT annotations on a page
+  - Added `flattenAnnotation()` to flatten any annotation's appearance to page content
+  - Added `readPdfRedactAnno()` for reading REDACT annotations with all properties
+  - Added `addRedactContent()` for creating REDACT annotations with QuadPoints, colors, and overlay text
+  - Added overlay text getter/setter methods for REDACT annotations
+
+## 2.3.0
+
+### Minor Changes
+
+- [#406](https://github.com/embedpdf/embed-pdf-viewer/pull/406) by [@bobsingor](https://github.com/bobsingor) – Added support for creating and updating PDF link annotations with URI and internal page targets. Implemented IRT (In Reply To) and RT (Reply Type) property handling for annotation relationships and grouping. Refactored annotation content methods to use centralized `applyBaseAnnotationProperties` and `readBaseAnnotationProperties` helpers, reducing code duplication. Updated text markup and ink handlers to prefer `strokeColor` over deprecated `color` property.
+
+## 2.2.0
+
+### Minor Changes
+
+- [#389](https://github.com/embedpdf/embed-pdf-viewer/pull/389) by [@bobsingor](https://github.com/bobsingor) – Add document security/encryption engine methods:
+  - Add `setDocumentEncryption` for setting AES-256 encryption with user/owner passwords and permission flags
+  - Add `removeEncryption` for marking documents for encryption removal on save
+  - Add `unlockOwnerPermissions` for unlocking owner permissions on encrypted documents
+  - Add `isEncrypted` and `isOwnerUnlocked` query methods
+  - Implement security methods in `PdfEngine` orchestrator, `RemoteExecutor`, `PdfiumNative`, `WebWorkerEngine`, and `EngineRunner`
+  - Query and store `isEncrypted`, `isOwnerUnlocked`, and `permissions` when opening documents
+
+## 2.1.2
+
+## 2.1.1
+
 ## 2.1.0
 
 ### Minor Changes

@@ -12,6 +12,7 @@ import {
   isSquigglyTool,
   isStrikeoutTool,
   isUnderlineTool,
+  isLink,
 } from '@embedpdf/plugin-annotation/preact';
 import {
   REDACTION_PLUGIN_ID,
@@ -27,7 +28,32 @@ import { ScrollPlugin, ScrollStrategy } from '@embedpdf/plugin-scroll/preact';
 import { InteractionManagerPlugin } from '@embedpdf/plugin-interaction-manager/preact';
 import { FullscreenPlugin } from '@embedpdf/plugin-fullscreen/preact';
 import { SELECTION_PLUGIN_ID, SelectionPlugin } from '@embedpdf/plugin-selection/preact';
-import { ignore, PdfAnnotationSubtype, PdfBlendMode, uuidV4 } from '@embedpdf/models';
+import {
+  ignore,
+  PdfAnnotationSubtype,
+  PdfBlendMode,
+  PdfPermissionFlag,
+  PdfActionType,
+  PdfLinkAnnoObject,
+  uuidV4,
+} from '@embedpdf/models';
+import { getEffectivePermission } from '@embedpdf/core';
+
+/**
+ * Helper to check if the document has a specific permission flag (after applying overrides).
+ * Returns true if the permission is ALLOWED, false if denied.
+ */
+const hasPermission = (state: State, documentId: string, flag: PdfPermissionFlag): boolean => {
+  return getEffectivePermission(state.core, documentId, flag);
+};
+
+/**
+ * Helper to check if the document lacks a specific permission (for disabled states).
+ * Returns true if the permission is DENIED, false if allowed.
+ */
+const lacksPermission = (state: State, documentId: string, flag: PdfPermissionFlag): boolean => {
+  return !hasPermission(state, documentId, flag);
+};
 
 export const commands: Record<string, Command<State>> = {
   // ─────────────────────────────────────────────────────────
@@ -323,7 +349,11 @@ export const commands: Record<string, Command<State>> = {
       if (!pointer) return;
 
       const scope = pointer.forDocument(documentId);
-      scope.activate('pointerMode');
+      if (scope.getActiveMode() === 'pointerMode') {
+        scope.activateDefaultMode();
+      } else {
+        scope.activate('pointerMode');
+      }
     },
     active: ({ state, documentId }) =>
       state.plugins['interaction-manager']?.documents[documentId]?.activeMode === 'pointerMode',
@@ -440,6 +470,23 @@ export const commands: Record<string, Command<State>> = {
       const scope = uiCapability.forDocument(documentId);
       scope.openModal('print-modal');
     },
+    disabled: ({ state, documentId }) => {
+      return lacksPermission(state, documentId, PdfPermissionFlag.Print);
+    },
+  },
+
+  'document:protect': {
+    id: 'document:protect',
+    labelKey: 'document.protect',
+    icon: 'lock',
+    categories: ['document', 'document-protect'],
+    action: ({ registry, documentId }) => {
+      const ui = registry.getPlugin<UIPlugin>('ui')?.provides();
+      if (!ui) return;
+
+      const scope = ui.forDocument(documentId);
+      scope.openModal('protect-modal');
+    },
   },
 
   'document:export': {
@@ -450,6 +497,22 @@ export const commands: Record<string, Command<State>> = {
     action: ({ registry, documentId }) => {
       const exportPlugin = registry.getPlugin<ExportPlugin>('export')?.provides();
       exportPlugin?.forDocument(documentId).download();
+    },
+  },
+
+  'document:capture': {
+    id: 'document:capture',
+    labelKey: 'capture.screenshot',
+    icon: 'screenshot',
+    categories: ['document', 'document-capture'],
+    action: ({ registry, documentId }) => {
+      const capture = registry.getPlugin<CapturePlugin>('capture')?.provides();
+      capture?.forDocument(documentId).toggleMarqueeCapture();
+    },
+    active: ({ state, documentId }) => {
+      return (
+        state.plugins['interaction-manager']?.documents[documentId]?.activeMode === 'marqueeCapture'
+      );
     },
   },
 
@@ -537,6 +600,26 @@ export const commands: Record<string, Command<State>> = {
     },
   },
 
+  'panel:toggle-redaction': {
+    id: 'panel:toggle-redaction',
+    labelKey: 'panel.redaction',
+    icon: 'redactionSidebar',
+    categories: ['panel', 'panel-redaction', 'redaction'],
+    action: ({ registry, documentId }) => {
+      const uiPlugin = registry.getPlugin<UIPlugin>(UI_PLUGIN_ID);
+      if (!uiPlugin || !uiPlugin.provides) return;
+
+      const uiCapability = uiPlugin.provides();
+      if (!uiCapability) return;
+
+      const scope = uiCapability.forDocument(documentId);
+      scope.toggleSidebar('right', 'main', 'redaction-panel');
+    },
+    active: ({ state, documentId }) => {
+      return isSidebarOpen(state.plugins, documentId, 'right', 'main', 'redaction-panel');
+    },
+  },
+
   'panel:toggle-annotation-style': {
     id: 'panel:toggle-annotation-style',
     labelKey: 'panel.annotationStyle',
@@ -554,6 +637,9 @@ export const commands: Record<string, Command<State>> = {
     },
     active: ({ state, documentId }) => {
       return isSidebarOpen(state.plugins, documentId, 'left', 'main', 'annotation-panel');
+    },
+    disabled: ({ state, documentId }) => {
+      return lacksPermission(state, documentId, PdfPermissionFlag.ModifyAnnotations);
     },
   },
 
@@ -806,7 +892,7 @@ export const commands: Record<string, Command<State>> = {
     labelKey: 'annotation.highlight',
     icon: 'highlight',
     iconProps: ({ state }) => ({
-      primaryColor: getToolDefaultsById(state.plugins.annotation, 'highlight')?.color,
+      primaryColor: getToolDefaultsById(state.plugins.annotation, 'highlight')?.strokeColor,
     }),
     categories: ['annotation', 'annotation-markup', 'annotation-highlight'],
     action: ({ registry, documentId }) => {
@@ -841,7 +927,7 @@ export const commands: Record<string, Command<State>> = {
               flags: ['print'],
               type: PdfAnnotationSubtype.HIGHLIGHT,
               blendMode: PdfBlendMode.Multiply,
-              color: defaultSettings.color,
+              strokeColor: defaultSettings.strokeColor,
               opacity: defaultSettings.opacity,
               pageIndex: sel.pageIndex,
               rect: sel.rect,
@@ -870,6 +956,9 @@ export const commands: Record<string, Command<State>> = {
       const annotation = state.plugins[ANNOTATION_PLUGIN_ID]?.documents[documentId];
       return annotation?.activeToolId === 'highlight';
     },
+    disabled: ({ state, documentId }) => {
+      return lacksPermission(state, documentId, PdfPermissionFlag.ModifyAnnotations);
+    },
   },
 
   'annotation:add-underline': {
@@ -877,7 +966,7 @@ export const commands: Record<string, Command<State>> = {
     labelKey: 'annotation.underline',
     icon: 'underline',
     iconProps: ({ state }) => ({
-      primaryColor: getToolDefaultsById(state.plugins.annotation, 'underline')?.color,
+      primaryColor: getToolDefaultsById(state.plugins.annotation, 'underline')?.strokeColor,
     }),
     categories: ['annotation', 'annotation-markup', 'annotation-underline'],
     action: ({ registry, documentId }) => {
@@ -911,7 +1000,7 @@ export const commands: Record<string, Command<State>> = {
               created: new Date(),
               flags: ['print'],
               type: PdfAnnotationSubtype.UNDERLINE,
-              color: defaultSettings.color,
+              strokeColor: defaultSettings.strokeColor,
               opacity: defaultSettings.opacity,
               pageIndex: sel.pageIndex,
               rect: sel.rect,
@@ -940,6 +1029,9 @@ export const commands: Record<string, Command<State>> = {
       const annotation = state.plugins[ANNOTATION_PLUGIN_ID]?.documents[documentId];
       return annotation?.activeToolId === 'underline';
     },
+    disabled: ({ state, documentId }) => {
+      return lacksPermission(state, documentId, PdfPermissionFlag.ModifyAnnotations);
+    },
   },
 
   'annotation:add-strikeout': {
@@ -947,7 +1039,7 @@ export const commands: Record<string, Command<State>> = {
     labelKey: 'annotation.strikeout',
     icon: 'strikethrough',
     iconProps: ({ state }) => ({
-      primaryColor: getToolDefaultsById(state.plugins.annotation, 'strikeout')?.color,
+      primaryColor: getToolDefaultsById(state.plugins.annotation, 'strikeout')?.strokeColor,
     }),
     categories: ['annotation', 'annotation-markup', 'annotation-strikeout'],
     action: ({ registry, documentId }) => {
@@ -981,7 +1073,7 @@ export const commands: Record<string, Command<State>> = {
               created: new Date(),
               flags: ['print'],
               type: PdfAnnotationSubtype.STRIKEOUT,
-              color: defaultSettings.color,
+              strokeColor: defaultSettings.strokeColor,
               opacity: defaultSettings.opacity,
               pageIndex: sel.pageIndex,
               rect: sel.rect,
@@ -1010,6 +1102,9 @@ export const commands: Record<string, Command<State>> = {
       const annotation = state.plugins[ANNOTATION_PLUGIN_ID]?.documents[documentId];
       return annotation?.activeToolId === 'strikeout';
     },
+    disabled: ({ state, documentId }) => {
+      return lacksPermission(state, documentId, PdfPermissionFlag.ModifyAnnotations);
+    },
   },
 
   'annotation:add-squiggly': {
@@ -1017,7 +1112,7 @@ export const commands: Record<string, Command<State>> = {
     labelKey: 'annotation.squiggly',
     icon: 'squiggly',
     iconProps: ({ state }) => ({
-      primaryColor: getToolDefaultsById(state.plugins.annotation, 'squiggly')?.color,
+      primaryColor: getToolDefaultsById(state.plugins.annotation, 'squiggly')?.strokeColor,
     }),
     categories: ['annotation', 'annotation-markup', 'annotation-squiggly'],
     action: ({ registry, documentId }) => {
@@ -1051,7 +1146,7 @@ export const commands: Record<string, Command<State>> = {
               created: new Date(),
               flags: ['print'],
               type: PdfAnnotationSubtype.SQUIGGLY,
-              color: defaultSettings.color,
+              strokeColor: defaultSettings.strokeColor,
               opacity: defaultSettings.opacity,
               pageIndex: sel.pageIndex,
               rect: sel.rect,
@@ -1080,6 +1175,9 @@ export const commands: Record<string, Command<State>> = {
       const annotation = state.plugins[ANNOTATION_PLUGIN_ID]?.documents[documentId];
       return annotation?.activeToolId === 'squiggly';
     },
+    disabled: ({ state, documentId }) => {
+      return lacksPermission(state, documentId, PdfPermissionFlag.ModifyAnnotations);
+    },
   },
 
   'annotation:add-ink': {
@@ -1104,6 +1202,9 @@ export const commands: Record<string, Command<State>> = {
     active: ({ state, documentId }) => {
       const annotation = state.plugins[ANNOTATION_PLUGIN_ID]?.documents[documentId];
       return annotation?.activeToolId === 'ink';
+    },
+    disabled: ({ state, documentId }) => {
+      return lacksPermission(state, documentId, PdfPermissionFlag.ModifyAnnotations);
     },
   },
 
@@ -1130,6 +1231,9 @@ export const commands: Record<string, Command<State>> = {
       const annotation = state.plugins[ANNOTATION_PLUGIN_ID]?.documents[documentId];
       return annotation?.activeToolId === 'freeText';
     },
+    disabled: ({ state, documentId }) => {
+      return lacksPermission(state, documentId, PdfPermissionFlag.ModifyAnnotations);
+    },
   },
 
   'annotation:add-stamp': {
@@ -1151,6 +1255,9 @@ export const commands: Record<string, Command<State>> = {
     active: ({ state, documentId }) => {
       const annotation = state.plugins[ANNOTATION_PLUGIN_ID]?.documents[documentId];
       return annotation?.activeToolId === 'stamp';
+    },
+    disabled: ({ state, documentId }) => {
+      return lacksPermission(state, documentId, PdfPermissionFlag.ModifyAnnotations);
     },
   },
 
@@ -1178,6 +1285,9 @@ export const commands: Record<string, Command<State>> = {
       const annotation = state.plugins[ANNOTATION_PLUGIN_ID]?.documents[documentId];
       return annotation?.activeToolId === 'square';
     },
+    disabled: ({ state, documentId }) => {
+      return lacksPermission(state, documentId, PdfPermissionFlag.ModifyAnnotations);
+    },
   },
 
   'annotation:add-circle': {
@@ -1204,6 +1314,9 @@ export const commands: Record<string, Command<State>> = {
       const annotation = state.plugins[ANNOTATION_PLUGIN_ID]?.documents[documentId];
       return annotation?.activeToolId === 'circle';
     },
+    disabled: ({ state, documentId }) => {
+      return lacksPermission(state, documentId, PdfPermissionFlag.ModifyAnnotations);
+    },
   },
 
   'annotation:add-line': {
@@ -1229,6 +1342,9 @@ export const commands: Record<string, Command<State>> = {
       const annotation = state.plugins[ANNOTATION_PLUGIN_ID]?.documents[documentId];
       return annotation?.activeToolId === 'line';
     },
+    disabled: ({ state, documentId }) => {
+      return lacksPermission(state, documentId, PdfPermissionFlag.ModifyAnnotations);
+    },
   },
 
   'annotation:add-arrow': {
@@ -1253,6 +1369,9 @@ export const commands: Record<string, Command<State>> = {
     active: ({ state, documentId }) => {
       const annotation = state.plugins[ANNOTATION_PLUGIN_ID]?.documents[documentId];
       return annotation?.activeToolId === 'lineArrow';
+    },
+    disabled: ({ state, documentId }) => {
+      return lacksPermission(state, documentId, PdfPermissionFlag.ModifyAnnotations);
     },
   },
 
@@ -1280,6 +1399,9 @@ export const commands: Record<string, Command<State>> = {
       const annotation = state.plugins[ANNOTATION_PLUGIN_ID]?.documents[documentId];
       return annotation?.activeToolId === 'polygon';
     },
+    disabled: ({ state, documentId }) => {
+      return lacksPermission(state, documentId, PdfPermissionFlag.ModifyAnnotations);
+    },
   },
 
   'annotation:add-polyline': {
@@ -1305,6 +1427,9 @@ export const commands: Record<string, Command<State>> = {
       const annotation = state.plugins[ANNOTATION_PLUGIN_ID]?.documents[documentId];
       return annotation?.activeToolId === 'polyline';
     },
+    disabled: ({ state, documentId }) => {
+      return lacksPermission(state, documentId, PdfPermissionFlag.ModifyAnnotations);
+    },
   },
 
   'annotation:delete-selected': {
@@ -1325,6 +1450,79 @@ export const commands: Record<string, Command<State>> = {
         selectedAnnotation.object.pageIndex,
         selectedAnnotation.object.id,
       );
+    },
+    disabled: ({ state, documentId }) => {
+      return lacksPermission(state, documentId, PdfPermissionFlag.ModifyAnnotations);
+    },
+  },
+
+  'annotation:delete-all-selected': {
+    id: 'annotation:delete-all-selected',
+    labelKey: 'annotation.deleteAllSelected',
+    icon: 'trash',
+    categories: ['annotation', 'annotation-delete', 'annotation-group'],
+    action: ({ registry, documentId }) => {
+      const annotation = registry.getPlugin<AnnotationPlugin>(ANNOTATION_PLUGIN_ID)?.provides();
+      const scope = annotation?.forDocument(documentId);
+      if (!scope) return;
+
+      const selected = scope.getSelectedAnnotations();
+      if (selected.length === 0) return;
+
+      scope.deleteAnnotations(
+        selected.map((ta) => ({ pageIndex: ta.object.pageIndex, id: ta.object.id })),
+      );
+      scope.deselectAnnotation();
+    },
+    disabled: ({ state, documentId }) => {
+      return lacksPermission(state, documentId, PdfPermissionFlag.ModifyAnnotations);
+    },
+  },
+
+  'annotation:toggle-group': {
+    id: 'annotation:toggle-group',
+    labelKey: ({ registry, documentId }) => {
+      const action = registry
+        .getPlugin<AnnotationPlugin>(ANNOTATION_PLUGIN_ID)
+        ?.provides()
+        .forDocument(documentId)
+        .getGroupingAction();
+      return action === 'ungroup' ? 'annotation.ungroup' : 'annotation.group';
+    },
+    icon: ({ registry, documentId }) => {
+      const action = registry
+        .getPlugin<AnnotationPlugin>(ANNOTATION_PLUGIN_ID)
+        ?.provides()
+        .forDocument(documentId)
+        .getGroupingAction();
+      return action === 'ungroup' ? 'ungroup' : 'group';
+    },
+    categories: ['annotation', 'annotation-group'],
+    action: ({ registry, documentId }) => {
+      const scope = registry
+        .getPlugin<AnnotationPlugin>(ANNOTATION_PLUGIN_ID)
+        ?.provides()
+        .forDocument(documentId);
+      if (!scope) return;
+
+      const action = scope.getGroupingAction();
+      if (action === 'ungroup') {
+        const selected = scope.getSelectedAnnotations();
+        if (selected.length > 0) {
+          scope.ungroupAnnotations(selected[0].object.id);
+        }
+      } else if (action === 'group') {
+        scope.groupAnnotations();
+      }
+    },
+    disabled: ({ registry, state, documentId }) => {
+      if (lacksPermission(state, documentId, PdfPermissionFlag.ModifyAnnotations)) return true;
+      const action = registry
+        .getPlugin<AnnotationPlugin>(ANNOTATION_PLUGIN_ID)
+        ?.provides()
+        .forDocument(documentId)
+        .getGroupingAction();
+      return action === 'disabled';
     },
   },
 
@@ -1350,6 +1548,9 @@ export const commands: Record<string, Command<State>> = {
       const ui = state.plugins['ui']?.documents[documentId];
       return ui?.openMenus['annotation-tools-menu'] !== undefined;
     },
+    disabled: ({ state, documentId }) => {
+      return lacksPermission(state, documentId, PdfPermissionFlag.ModifyAnnotations);
+    },
   },
 
   'annotation:overflow-shapes': {
@@ -1370,11 +1571,239 @@ export const commands: Record<string, Command<State>> = {
       const ui = state.plugins['ui']?.documents[documentId];
       return ui?.openMenus['shapes-tools-menu'] !== undefined;
     },
+    disabled: ({ state, documentId }) => {
+      return lacksPermission(state, documentId, PdfPermissionFlag.ModifyAnnotations);
+    },
+  },
+
+  // Link annotation from text selection (standalone - no IRT)
+  'annotation:add-link': {
+    id: 'annotation:add-link',
+    labelKey: 'annotation.addLink',
+    icon: 'link',
+    categories: ['annotation', 'annotation-link'],
+    action: ({ registry, documentId }) => {
+      const ui = registry.getPlugin<UIPlugin>('ui')?.provides();
+      if (!ui) return;
+
+      // Open the link modal with selection context
+      ui.forDocument(documentId).openModal('link-modal', { source: 'selection' });
+    },
+    disabled: ({ state, documentId }) => {
+      return lacksPermission(state, documentId, PdfPermissionFlag.ModifyAnnotations);
+    },
+  },
+
+  'annotation:toggle-annotation-style': {
+    id: 'annotation:toggle-annotation-style',
+    labelKey: 'annotation.style',
+    icon: 'palette',
+    categories: ['annotation', 'annotation-style'],
+    action: ({ registry, documentId }) => {
+      const uiPlugin = registry.getPlugin<UIPlugin>(UI_PLUGIN_ID);
+      if (!uiPlugin || !uiPlugin.provides) return;
+
+      const uiCapability = uiPlugin.provides();
+      if (!uiCapability) return;
+
+      const scope = uiCapability.forDocument(documentId);
+      scope.toggleSidebar('left', 'main', 'annotation-panel');
+    },
+    active: ({ state, documentId }) => {
+      return isSidebarOpen(state.plugins, documentId, 'left', 'main', 'annotation-panel');
+    },
+    visible: ({ registry, documentId }) => {
+      const scope = registry
+        .getPlugin<AnnotationPlugin>(ANNOTATION_PLUGIN_ID)
+        ?.provides()
+        .forDocument(documentId);
+      const selected = scope?.getSelectedAnnotation();
+      if (!selected) return true;
+      return selected.object.type !== PdfAnnotationSubtype.LINK;
+    },
+    disabled: ({ state, documentId }) => {
+      return lacksPermission(state, documentId, PdfPermissionFlag.ModifyAnnotations);
+    },
+  },
+
+  // Toggle link on annotation: add if none exist, remove if they do
+  'annotation:toggle-link': {
+    id: 'annotation:toggle-link',
+    labelKey: ({ registry, documentId }) => {
+      const scope = registry
+        .getPlugin<AnnotationPlugin>(ANNOTATION_PLUGIN_ID)
+        ?.provides()
+        .forDocument(documentId);
+      if (!scope) return 'annotation.addLink';
+      const selected = scope.getSelectedAnnotation();
+      if (!selected) return 'annotation.addLink';
+      return scope.hasAttachedLinks(selected.object.id)
+        ? 'annotation.removeLink'
+        : 'annotation.addLink';
+    },
+    icon: ({ registry, documentId }) => {
+      const scope = registry
+        .getPlugin<AnnotationPlugin>(ANNOTATION_PLUGIN_ID)
+        ?.provides()
+        .forDocument(documentId);
+      if (!scope) return 'link';
+      const selected = scope.getSelectedAnnotation();
+      if (!selected) return 'link';
+      return scope.hasAttachedLinks(selected.object.id) ? 'linkOff' : 'link';
+    },
+    categories: ['annotation', 'annotation-link'],
+    action: ({ registry, documentId }) => {
+      const annotation = registry.getPlugin<AnnotationPlugin>(ANNOTATION_PLUGIN_ID)?.provides();
+      const ui = registry.getPlugin<UIPlugin>('ui')?.provides();
+      if (!annotation || !ui) return;
+
+      const scope = annotation.forDocument(documentId);
+      const selected = scope.getSelectedAnnotation();
+      if (!selected) return;
+
+      if (scope.hasAttachedLinks(selected.object.id)) {
+        scope.deleteAttachedLinks(selected.object.id);
+      } else {
+        ui.forDocument(documentId).openModal('link-modal', { source: 'annotation' });
+      }
+    },
+    visible: ({ registry, documentId }) => {
+      const scope = registry
+        .getPlugin<AnnotationPlugin>(ANNOTATION_PLUGIN_ID)
+        ?.provides()
+        .forDocument(documentId);
+      const selected = scope?.getSelectedAnnotation();
+      if (!selected) return true;
+      return (
+        selected.object.type !== PdfAnnotationSubtype.LINK &&
+        selected.object.type !== PdfAnnotationSubtype.REDACT
+      );
+    },
+    disabled: ({ state, documentId }) => {
+      return lacksPermission(state, documentId, PdfPermissionFlag.ModifyAnnotations);
+    },
+  },
+
+  'annotation:toggle-comment': {
+    id: 'annotation:toggle-comment',
+    labelKey: 'annotation.comment',
+    icon: 'comment',
+    categories: ['annotation', 'annotation-comment'],
+    action: ({ registry, documentId }) => {
+      const uiPlugin = registry.getPlugin<UIPlugin>(UI_PLUGIN_ID);
+      if (!uiPlugin || !uiPlugin.provides) return;
+
+      const uiCapability = uiPlugin.provides();
+      if (!uiCapability) return;
+
+      const scope = uiCapability.forDocument(documentId);
+      scope.toggleSidebar('right', 'main', 'comment-panel');
+    },
+    active: ({ state, documentId }) => {
+      return isSidebarOpen(state.plugins, documentId, 'right', 'main', 'comment-panel');
+    },
+    visible: ({ registry, documentId }) => {
+      const scope = registry
+        .getPlugin<AnnotationPlugin>(ANNOTATION_PLUGIN_ID)
+        ?.provides()
+        .forDocument(documentId);
+      const selected = scope?.getSelectedAnnotation();
+      if (!selected) return true;
+      return selected.object.type !== PdfAnnotationSubtype.LINK;
+    },
+  },
+
+  // Go to link destination (for Link annotations only)
+  'annotation:goto-link': {
+    id: 'annotation:goto-link',
+    labelKey: 'annotation.gotoLink',
+    icon: 'externalLink',
+    categories: ['annotation', 'annotation-link'],
+    action: ({ registry, documentId }) => {
+      const annotation = registry.getPlugin<AnnotationPlugin>(ANNOTATION_PLUGIN_ID)?.provides();
+      const scroll = registry.getPlugin<ScrollPlugin>('scroll')?.provides();
+
+      if (!annotation) return;
+
+      const annotationScope = annotation.forDocument(documentId);
+      const selected = annotationScope.getSelectedAnnotation();
+      if (!selected) return;
+
+      // Get the link annotation - either the selected one or the first attached link
+      let linkAnnotation: PdfLinkAnnoObject | null = null;
+
+      if (isLink(selected)) {
+        linkAnnotation = selected.object as PdfLinkAnnoObject;
+      } else {
+        const attachedLinks = annotationScope.getAttachedLinks(selected.object.id);
+        if (attachedLinks.length > 0) {
+          linkAnnotation = attachedLinks[0].object as PdfLinkAnnoObject;
+        }
+      }
+
+      if (!linkAnnotation?.target) return;
+
+      const target = linkAnnotation.target;
+
+      if (target.type === 'action') {
+        const action = target.action;
+        if (action.type === PdfActionType.URI) {
+          // Open external URL in new tab
+          window.open(action.uri, '_blank', 'noopener,noreferrer');
+        } else if (action.type === PdfActionType.Goto && scroll) {
+          // Navigate to page destination
+          const destination = action.destination;
+          scroll.forDocument(documentId).scrollToPage({
+            pageNumber: destination.pageIndex + 1,
+            behavior: 'smooth',
+          });
+        }
+      } else if (target.type === 'destination' && scroll) {
+        // Navigate to page destination
+        const destination = target.destination;
+        scroll.forDocument(documentId).scrollToPage({
+          pageNumber: destination.pageIndex + 1,
+          behavior: 'smooth',
+        });
+      }
+    },
+    visible: ({ registry, documentId }) => {
+      const annotation = registry.getPlugin<AnnotationPlugin>(ANNOTATION_PLUGIN_ID)?.provides();
+      if (!annotation) return false;
+
+      const scope = annotation.forDocument(documentId);
+      const selected = scope?.getSelectedAnnotation();
+      if (!selected) return false;
+
+      // Show if it's a LINK or has attached links
+      return (
+        selected.object.type === PdfAnnotationSubtype.LINK ||
+        scope.hasAttachedLinks(selected.object.id)
+      );
+    },
   },
 
   // ─────────────────────────────────────────────────────────
   // Redaction Commands
   // ─────────────────────────────────────────────────────────
+  'redaction:redact': {
+    id: 'redaction:redact',
+    labelKey: 'redaction.redact',
+    icon: 'redactArea',
+    categories: ['redaction', 'redaction-combined'],
+    action: ({ registry, documentId }) => {
+      const redaction = registry.getPlugin<RedactionPlugin>('redaction')?.provides();
+      redaction?.forDocument(documentId).toggleRedact();
+    },
+    active: ({ registry, documentId }) => {
+      const redaction = registry.getPlugin<RedactionPlugin>('redaction')?.provides();
+      return redaction?.forDocument(documentId).isRedactActive() ?? false;
+    },
+    disabled: ({ state, documentId }) => {
+      return lacksPermission(state, documentId, PdfPermissionFlag.ModifyContents);
+    },
+  },
+
   'redaction:redact-area': {
     id: 'redaction:redact-area',
     labelKey: 'redaction.area',
@@ -1384,9 +1813,12 @@ export const commands: Record<string, Command<State>> = {
       const redaction = registry.getPlugin<RedactionPlugin>('redaction')?.provides();
       redaction?.forDocument(documentId).toggleMarqueeRedact();
     },
-    active: ({ state, documentId }) => {
-      const redaction = state.plugins[REDACTION_PLUGIN_ID]?.documents[documentId];
-      return redaction?.activeType === RedactionMode.MarqueeRedact;
+    active: ({ registry, documentId }) => {
+      const redaction = registry.getPlugin<RedactionPlugin>('redaction')?.provides();
+      return redaction?.forDocument(documentId).isMarqueeRedactActive() ?? false;
+    },
+    disabled: ({ state, documentId }) => {
+      return lacksPermission(state, documentId, PdfPermissionFlag.ModifyContents);
     },
   },
 
@@ -1425,6 +1857,9 @@ export const commands: Record<string, Command<State>> = {
       const redaction = state.plugins[REDACTION_PLUGIN_ID]?.documents[documentId];
       return redaction?.activeType === RedactionMode.RedactSelection;
     },
+    disabled: ({ state, documentId }) => {
+      return lacksPermission(state, documentId, PdfPermissionFlag.ModifyContents);
+    },
   },
 
   'redaction:apply-all': {
@@ -1438,7 +1873,10 @@ export const commands: Record<string, Command<State>> = {
     },
     disabled: ({ state, documentId }) => {
       const redaction = state.plugins[REDACTION_PLUGIN_ID]?.documents[documentId];
-      return redaction?.pendingCount === 0;
+      return (
+        redaction?.pendingCount === 0 ||
+        lacksPermission(state, documentId, PdfPermissionFlag.ModifyContents)
+      );
     },
   },
 
@@ -1453,7 +1891,10 @@ export const commands: Record<string, Command<State>> = {
     },
     disabled: ({ state, documentId }) => {
       const redaction = state.plugins[REDACTION_PLUGIN_ID]?.documents[documentId];
-      return redaction?.pendingCount === 0;
+      return (
+        redaction?.pendingCount === 0 ||
+        lacksPermission(state, documentId, PdfPermissionFlag.ModifyContents)
+      );
     },
   },
 
@@ -1487,6 +1928,67 @@ export const commands: Record<string, Command<State>> = {
     },
   },
 
+  'annotation:apply-redaction': {
+    id: 'annotation:apply-redaction',
+    labelKey: 'redaction.apply',
+    icon: 'check',
+    categories: ['annotation', 'annotation-redaction', 'redaction'],
+    action: ({ registry, documentId, logger }) => {
+      logger.debug('Command', 'ApplyRedaction', `Starting for document: ${documentId}`);
+
+      const annotation = registry.getPlugin<AnnotationPlugin>(ANNOTATION_PLUGIN_ID)?.provides();
+      const redaction = registry.getPlugin<RedactionPlugin>(REDACTION_PLUGIN_ID)?.provides();
+
+      if (!annotation || !redaction) {
+        logger.warn(
+          'Command',
+          'ApplyRedaction',
+          `Missing plugins - annotation: ${!!annotation}, redaction: ${!!redaction}`,
+        );
+        return;
+      }
+
+      const scope = annotation.forDocument(documentId);
+      const selected = scope.getSelectedAnnotation();
+
+      logger.debug(
+        'Command',
+        'ApplyRedaction',
+        `Selected annotation: ${selected ? JSON.stringify({ id: selected.object.id, type: selected.object.type, pageIndex: selected.object.pageIndex }) : 'none'}`,
+      );
+
+      if (!selected || selected.object.type !== PdfAnnotationSubtype.REDACT) {
+        logger.warn(
+          'Command',
+          'ApplyRedaction',
+          `No valid redaction selected - selected: ${!!selected}, type: ${selected?.object.type}`,
+        );
+        return;
+      }
+
+      logger.debug(
+        'Command',
+        'ApplyRedaction',
+        `Calling commitPending for page ${selected.object.pageIndex}, id ${selected.object.id}`,
+      );
+      redaction
+        .forDocument(documentId)
+        .commitPending(selected.object.pageIndex, selected.object.id);
+      logger.debug('Command', 'ApplyRedaction', 'commitPending called successfully');
+    },
+    visible: ({ registry, documentId }) => {
+      const scope = registry
+        .getPlugin<AnnotationPlugin>(ANNOTATION_PLUGIN_ID)
+        ?.provides()
+        .forDocument(documentId);
+      const selected = scope?.getSelectedAnnotation();
+      return selected?.object.type === PdfAnnotationSubtype.REDACT;
+    },
+    disabled: ({ state, documentId }) => {
+      return lacksPermission(state, documentId, PdfPermissionFlag.ModifyContents);
+    },
+  },
+
   'selection:copy-to-clipboard': {
     id: 'selection:copy-to-clipboard',
     labelKey: 'selection.copyToClipboard',
@@ -1497,6 +1999,9 @@ export const commands: Record<string, Command<State>> = {
       const plugin = registry.getPlugin<SelectionPlugin>('selection');
       const scope = plugin?.provides().forDocument(documentId);
       scope?.copyToClipboard();
+    },
+    disabled: ({ state, documentId }) => {
+      return lacksPermission(state, documentId, PdfPermissionFlag.CopyContents);
     },
   },
 
@@ -1510,6 +2015,9 @@ export const commands: Record<string, Command<State>> = {
       const scope = plugin?.provides().forDocument(documentId);
       scope?.copyToClipboard();
       scope?.clear();
+    },
+    disabled: ({ state, documentId }) => {
+      return lacksPermission(state, documentId, PdfPermissionFlag.CopyContents);
     },
   },
 

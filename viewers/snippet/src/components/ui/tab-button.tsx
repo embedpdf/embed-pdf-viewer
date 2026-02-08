@@ -31,6 +31,7 @@ export function TabButton({
 
   return (
     <button
+      type="button"
       ref={anchorRef}
       onClick={onClick}
       disabled={disabled}

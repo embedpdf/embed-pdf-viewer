@@ -12,6 +12,9 @@ export const SET_ACTIVE_DOCUMENT = 'ANNOTATION/SET_ACTIVE_DOCUMENT';
 export const SET_ANNOTATIONS = 'ANNOTATION/SET_ANNOTATIONS';
 export const SELECT_ANNOTATION = 'ANNOTATION/SELECT_ANNOTATION';
 export const DESELECT_ANNOTATION = 'ANNOTATION/DESELECT_ANNOTATION';
+export const ADD_TO_SELECTION = 'ANNOTATION/ADD_TO_SELECTION';
+export const REMOVE_FROM_SELECTION = 'ANNOTATION/REMOVE_FROM_SELECTION';
+export const SET_SELECTION = 'ANNOTATION/SET_SELECTION';
 export const SET_ACTIVE_TOOL_ID = 'ANNOTATION/SET_ACTIVE_TOOL_ID';
 export const CREATE_ANNOTATION = 'ANNOTATION/CREATE_ANNOTATION';
 export const PATCH_ANNOTATION = 'ANNOTATION/PATCH_ANNOTATION';
@@ -56,6 +59,18 @@ export interface DeselectAnnotationAction extends Action {
   type: typeof DESELECT_ANNOTATION;
   payload: { documentId: string };
 }
+export interface AddToSelectionAction extends Action {
+  type: typeof ADD_TO_SELECTION;
+  payload: { documentId: string; pageIndex: number; id: string };
+}
+export interface RemoveFromSelectionAction extends Action {
+  type: typeof REMOVE_FROM_SELECTION;
+  payload: { documentId: string; id: string };
+}
+export interface SetSelectionAction extends Action {
+  type: typeof SET_SELECTION;
+  payload: { documentId: string; ids: string[] };
+}
 export interface SetActiveToolIdAction extends Action {
   type: typeof SET_ACTIVE_TOOL_ID;
   payload: { documentId: string; toolId: string | null };
@@ -79,11 +94,11 @@ export interface DeleteAnnotationAction extends Action {
 }
 export interface CommitAction extends Action {
   type: typeof COMMIT_PENDING_CHANGES;
-  payload: { documentId: string };
+  payload: { documentId: string; committedUids: string[] };
 }
 export interface PurgeAnnotationAction extends Action {
   type: typeof PURGE_ANNOTATION;
-  payload: { documentId: string; uid: string };
+  payload: { documentId: string; pageIndex: number; uid: string };
 }
 
 // Global actions
@@ -107,6 +122,9 @@ export type AnnotationAction =
   | SetAnnotationsAction
   | SelectAnnotationAction
   | DeselectAnnotationAction
+  | AddToSelectionAction
+  | RemoveFromSelectionAction
+  | SetSelectionAction
   | SetActiveToolIdAction
   | CreateAnnotationAction
   | PatchAnnotationAction
@@ -156,6 +174,25 @@ export const deselectAnnotation = (documentId: string): DeselectAnnotationAction
   payload: { documentId },
 });
 
+export const addToSelection = (
+  documentId: string,
+  pageIndex: number,
+  id: string,
+): AddToSelectionAction => ({
+  type: ADD_TO_SELECTION,
+  payload: { documentId, pageIndex, id },
+});
+
+export const removeFromSelection = (documentId: string, id: string): RemoveFromSelectionAction => ({
+  type: REMOVE_FROM_SELECTION,
+  payload: { documentId, id },
+});
+
+export const setSelection = (documentId: string, ids: string[]): SetSelectionAction => ({
+  type: SET_SELECTION,
+  payload: { documentId, ids },
+});
+
 export const setActiveToolId = (
   documentId: string,
   toolId: string | null,
@@ -192,14 +229,21 @@ export const deleteAnnotation = (
   payload: { documentId, pageIndex, id },
 });
 
-export const commitPendingChanges = (documentId: string): CommitAction => ({
+export const commitPendingChanges = (
+  documentId: string,
+  committedUids: string[],
+): CommitAction => ({
   type: COMMIT_PENDING_CHANGES,
-  payload: { documentId },
+  payload: { documentId, committedUids },
 });
 
-export const purgeAnnotation = (documentId: string, uid: string): PurgeAnnotationAction => ({
+export const purgeAnnotation = (
+  documentId: string,
+  pageIndex: number,
+  uid: string,
+): PurgeAnnotationAction => ({
   type: PURGE_ANNOTATION,
-  payload: { documentId, uid },
+  payload: { documentId, pageIndex, uid },
 });
 
 // Global action creators

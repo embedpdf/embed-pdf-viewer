@@ -24,7 +24,7 @@
   }: HighlightProps = $props();
 
   // Rename rect to boundingRect for clarity
-  const boundingRect = rect;
+  const boundingRect = $derived(rect);
 </script>
 
 {#each rects as b, i (i)}

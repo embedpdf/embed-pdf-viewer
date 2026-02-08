@@ -14,13 +14,6 @@ The UI system is built on three pillars:
 
 You can easily disable entire groups of features using the `disabledCategories` configuration option. This removes the associated toolbar buttons, menu items, and commands.
 
-Categories are hierarchical, allowing you to disable broad groups or specific features:
-
-- `annotation` - Disables all annotation features
-- `annotation-highlight` - Disables only the highlight tool
-- `zoom` - Disables all zoom controls
-- `print` - Disables print functionality
-
 ```javascript
 const viewer = EmbedPDF.init({
   // ...
@@ -44,6 +37,23 @@ import { ExampleWrapper } from '@/components/example-wrapper';
     <DisableCategoriesExample />
   </ExampleWrapper>
 </CodeExample>
+
+### Available Categories
+
+Categories are hierarchical—disabling a parent category (e.g., `annotation`) disables all its children.
+
+| Group | Categories |
+| :--- | :--- |
+| **Zoom** | `zoom`, `zoom-in`, `zoom-out`, `zoom-fit-page`, `zoom-fit-width`, `zoom-marquee`, `zoom-level` |
+| **Annotation** | `annotation`, `annotation-markup`, `annotation-highlight`, `annotation-underline`, `annotation-strikeout`, `annotation-squiggly`, `annotation-ink`, `annotation-text`, `annotation-stamp` |
+| **Shapes** | `annotation-shape`, `annotation-rectangle`, `annotation-circle`, `annotation-line`, `annotation-arrow`, `annotation-polygon`, `annotation-polyline` |
+| **Redaction** | `redaction`, `redaction-area`, `redaction-text`, `redaction-apply`, `redaction-clear` |
+| **Document** | `document`, `document-open`, `document-close`, `document-print`, `document-capture`, `document-export`, `document-fullscreen`, `document-protect` |
+| **Page** | `page`, `spread`, `rotate`, `scroll`, `navigation` |
+| **Panel** | `panel`, `panel-sidebar`, `panel-search`, `panel-comment` |
+| **Tools** | `tools`, `pan`, `pointer`, `capture` |
+| **Selection** | `selection`, `selection-copy` |
+| **History** | `history`, `history-undo`, `history-redo` |
 
 ## Quick Start: Replacing a Toolbar Button
 

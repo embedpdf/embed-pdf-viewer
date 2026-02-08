@@ -39,7 +39,8 @@ import { Rect } from '@embedpdf/models';
 
 const props = withDefaults(
   defineProps<{
-    color?: string;
+    /** Stroke/markup color */
+    strokeColor?: string;
     opacity?: number;
     segmentRects: Rect[];
     rect?: Rect;
@@ -47,11 +48,11 @@ const props = withDefaults(
     onClick?: (e: PointerEvent | TouchEvent) => void;
   }>(),
   {
-    color: '#FFFF00',
     opacity: 0.5,
   },
 );
 
+const resolvedColor = computed(() => props.strokeColor ?? '#FFFF00');
 const amplitude = computed(() => 2 * props.scale);
 const period = computed(() => 6 * props.scale);
 
@@ -62,7 +63,7 @@ const svgDataUri = computed(() => {
     amp * 2
   }" viewBox="0 0 ${per} ${amp * 2}">
     <path d="M0 ${amp} Q ${per / 4} 0 ${per / 2} ${amp} T ${per} ${amp}"
-          fill="none" stroke="${props.color}" stroke-width="${amp}" stroke-linecap="round"/>
+          fill="none" stroke="${resolvedColor.value}" stroke-width="${amp}" stroke-linecap="round"/>
   </svg>`;
   return `url("data:image/svg+xml;utf8,${encodeURIComponent(svg)}")`;
 });

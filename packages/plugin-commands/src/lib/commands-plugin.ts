@@ -7,6 +7,7 @@ import {
   Listener,
   arePropsEqual,
 } from '@embedpdf/core';
+import { Logger } from '@embedpdf/models';
 import { I18nCapability, I18nPlugin } from '@embedpdf/plugin-i18n';
 import {
   CommandsCapability,
@@ -230,15 +231,22 @@ export class CommandsPlugin extends BasePlugin<
       shortcutLabel: command.shortcutLabel,
       categories: command.categories,
       description: command.description,
-      execute: () => command.action({ registry: this.registry, state, documentId: resolvedDocId }),
+      execute: () =>
+        command.action({
+          registry: this.registry,
+          state,
+          documentId: resolvedDocId,
+          logger: this.logger,
+        }),
     };
   }
 
   private resolveLabel(command: Command, state: StoreState<any>, documentId: string): string {
     // Priority: labelKey (with i18n) > label (plain string) > id (fallback)
-    if (command.labelKey && this.i18n) {
+    const labelKey = this.resolveDynamic(command.labelKey, state, documentId);
+    if (labelKey && this.i18n) {
       const params = this.resolveDynamic(command.labelParams, state, documentId);
-      return this.i18n.t(command.labelKey, { params, documentId });
+      return this.i18n.t(labelKey, { params, documentId });
     }
 
     if (command.label) {
@@ -257,9 +265,18 @@ export class CommandsPlugin extends BasePlugin<
 
     // Check if it's a function (the dynamic evaluator)
     if (typeof value === 'function') {
-      return (value as (context: { state: StoreState<any>; documentId: string }) => T)({
+      return (
+        value as (context: {
+          registry: PluginRegistry;
+          state: StoreState<any>;
+          documentId: string;
+          logger: Logger;
+        }) => T
+      )({
+        registry: this.registry,
         state,
         documentId,
+        logger: this.logger,
       });
     }
 
@@ -408,6 +425,10 @@ export class CommandsPlugin extends BasePlugin<
   }
 
   private detectCommandChanges(documentId: string, newState: StoreState<any>): void {
+    // Skip if document isn't fully loaded yet
+    const coreDoc = newState.core.documents[documentId];
+    if (!coreDoc || coreDoc.status !== 'loaded') return;
+
     const previousCache = this.previousStates.get(documentId) ?? new Map();
     const changedCommandIds: string[] = [];
 
@@ -435,6 +456,9 @@ export class CommandsPlugin extends BasePlugin<
       }
       if (prevResolved.label !== newResolved.label) {
         changes.label = newResolved.label;
+      }
+      if (prevResolved.icon !== newResolved.icon) {
+        changes.icon = newResolved.icon;
       }
       if (!arePropsEqual(prevResolved.iconProps, newResolved.iconProps)) {
         changes.iconProps = newResolved.iconProps;

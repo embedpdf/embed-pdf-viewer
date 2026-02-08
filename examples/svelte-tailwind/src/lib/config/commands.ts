@@ -23,6 +23,24 @@ import { isSidebarOpen, isToolbarOpen, UI_PLUGIN_ID, type UIPlugin } from '@embe
 import { ScrollStrategy, type ScrollPlugin } from '@embedpdf/plugin-scroll';
 import type { InteractionManagerPlugin } from '@embedpdf/plugin-interaction-manager';
 import type { SelectionPlugin } from '@embedpdf/plugin-selection';
+import { PdfAnnotationSubtype, PdfPermissionFlag } from '@embedpdf/models';
+import { getEffectivePermission } from '@embedpdf/core';
+
+/**
+ * Helper to check if the document has a specific permission flag (after applying overrides).
+ * Returns true if the permission is ALLOWED, false if denied.
+ */
+const hasPermission = (state: State, documentId: string, flag: PdfPermissionFlag): boolean => {
+  return getEffectivePermission(state.core, documentId, flag);
+};
+
+/**
+ * Helper to check if the document lacks a specific permission (for disabled states).
+ * Returns true if the permission is DENIED, false if allowed.
+ */
+const lacksPermission = (state: State, documentId: string, flag: PdfPermissionFlag): boolean => {
+  return !hasPermission(state, documentId, flag);
+};
 
 export const commands: Record<string, Command<State>> = {
   // ─────────────────────────────────────────────────────────
@@ -310,7 +328,11 @@ export const commands: Record<string, Command<State>> = {
       if (!pointer) return;
 
       const scope = pointer.forDocument(documentId);
-      scope.activate('pointerMode');
+      if (scope.getActiveMode() === 'pointerMode') {
+        scope.activateDefaultMode();
+      } else {
+        scope.activate('pointerMode');
+      }
     },
     active: ({ state, documentId }) =>
       state.plugins['interaction-manager']?.documents[documentId]?.activeMode === 'pointerMode',
@@ -1013,6 +1035,70 @@ export const commands: Record<string, Command<State>> = {
         selectedAnnotation.object.id,
       );
     },
+    disabled: ({ state, documentId }) => {
+      return lacksPermission(state, documentId, PdfPermissionFlag.ModifyAnnotations);
+    },
+  },
+
+  'annotation:apply-redaction': {
+    id: 'annotation:apply-redaction',
+    labelKey: 'redaction.apply',
+    icon: 'check',
+    categories: ['annotation', 'annotation-redaction', 'redaction'],
+    action: ({ registry, documentId, logger }) => {
+      logger.debug('Command', 'ApplyRedaction', `Starting for document: ${documentId}`);
+
+      const annotation = registry.getPlugin<AnnotationPlugin>(ANNOTATION_PLUGIN_ID)?.provides();
+      const redaction = registry.getPlugin<RedactionPlugin>(REDACTION_PLUGIN_ID)?.provides();
+
+      if (!annotation || !redaction) {
+        logger.warn(
+          'Command',
+          'ApplyRedaction',
+          `Missing plugins - annotation: ${!!annotation}, redaction: ${!!redaction}`,
+        );
+        return;
+      }
+
+      const scope = annotation.forDocument(documentId);
+      const selected = scope.getSelectedAnnotation();
+
+      logger.debug(
+        'Command',
+        'ApplyRedaction',
+        `Selected annotation: ${selected ? JSON.stringify({ id: selected.object.id, type: selected.object.type, pageIndex: selected.object.pageIndex }) : 'none'}`,
+      );
+
+      if (!selected || selected.object.type !== PdfAnnotationSubtype.REDACT) {
+        logger.warn(
+          'Command',
+          'ApplyRedaction',
+          `No valid redaction selected - selected: ${!!selected}, type: ${selected?.object.type}`,
+        );
+        return;
+      }
+
+      logger.debug(
+        'Command',
+        'ApplyRedaction',
+        `Calling commitPending for page ${selected.object.pageIndex}, id ${selected.object.id}`,
+      );
+      redaction
+        .forDocument(documentId)
+        .commitPending(selected.object.pageIndex, selected.object.id);
+      logger.debug('Command', 'ApplyRedaction', 'commitPending called successfully');
+    },
+    visible: ({ registry, documentId }) => {
+      const scope = registry
+        .getPlugin<AnnotationPlugin>(ANNOTATION_PLUGIN_ID)
+        ?.provides()
+        .forDocument(documentId);
+      const selected = scope?.getSelectedAnnotation();
+      return selected?.object.type === PdfAnnotationSubtype.REDACT;
+    },
+    disabled: ({ state, documentId }) => {
+      return lacksPermission(state, documentId, PdfPermissionFlag.ModifyContents);
+    },
   },
 
   // ─────────────────────────────────────────────────────────
@@ -1175,6 +1261,153 @@ export const commands: Record<string, Command<State>> = {
     active: ({ state, documentId }) => {
       const ui = state.plugins['ui']?.documents[documentId];
       return ui?.openMenus['annotation-tools-menu'] !== undefined;
+    },
+  },
+
+  // ─────────────────────────────────────────────────────────
+  // Group Annotation Commands
+  // ─────────────────────────────────────────────────────────
+  'annotation:toggle-group': {
+    id: 'annotation:toggle-group',
+    labelKey: ({ registry, documentId }) => {
+      const action = registry
+        .getPlugin<AnnotationPlugin>(ANNOTATION_PLUGIN_ID)
+        ?.provides()
+        .forDocument(documentId)
+        .getGroupingAction();
+      return action === 'ungroup' ? 'annotation.ungroup' : 'annotation.group';
+    },
+    icon: ({ registry, documentId }) => {
+      const action = registry
+        .getPlugin<AnnotationPlugin>(ANNOTATION_PLUGIN_ID)
+        ?.provides()
+        .forDocument(documentId)
+        .getGroupingAction();
+      return action === 'ungroup' ? 'ungroup' : 'group';
+    },
+    categories: ['annotation'],
+    action: ({ registry, documentId }) => {
+      const scope = registry
+        .getPlugin<AnnotationPlugin>(ANNOTATION_PLUGIN_ID)
+        ?.provides()
+        .forDocument(documentId);
+      if (!scope) return;
+
+      const action = scope.getGroupingAction();
+      if (action === 'ungroup') {
+        const selected = scope.getSelectedAnnotations();
+        if (selected.length > 0) {
+          scope.ungroupAnnotations(selected[0].object.id);
+        }
+      } else if (action === 'group') {
+        scope.groupAnnotations();
+      }
+    },
+    disabled: ({ registry, state, documentId }) => {
+      if (lacksPermission(state, documentId, PdfPermissionFlag.ModifyAnnotations)) return true;
+      const action = registry
+        .getPlugin<AnnotationPlugin>(ANNOTATION_PLUGIN_ID)
+        ?.provides()
+        .forDocument(documentId)
+        .getGroupingAction();
+      return action === 'disabled';
+    },
+  },
+
+  'annotation:delete-all-selected': {
+    id: 'annotation:delete-all-selected',
+    labelKey: 'annotation.deleteAllSelected',
+    icon: 'trash',
+    categories: ['annotation'],
+    action: ({ registry, documentId }) => {
+      const annotation = registry.getPlugin<AnnotationPlugin>(ANNOTATION_PLUGIN_ID)?.provides();
+      const annotationScope = annotation?.forDocument(documentId);
+      if (!annotationScope) return;
+
+      const selectedAnnotations = annotationScope.getSelectedAnnotations();
+      for (const anno of selectedAnnotations) {
+        annotationScope.deleteAnnotation(anno.object.pageIndex, anno.object.id);
+      }
+    },
+    disabled: ({ state, documentId }) => {
+      return lacksPermission(state, documentId, PdfPermissionFlag.ModifyAnnotations);
+    },
+  },
+
+  // ─────────────────────────────────────────────────────────
+  // Link Annotation Commands
+  // ─────────────────────────────────────────────────────────
+  'annotation:add-link': {
+    id: 'annotation:add-link',
+    labelKey: 'annotation.addLink',
+    icon: 'link',
+    categories: ['annotation'],
+    action: ({ registry, documentId }) => {
+      const ui = registry.getPlugin<UIPlugin>('ui')?.provides();
+      if (!ui) return;
+
+      // Open the link modal with selection context
+      ui.forDocument(documentId).openModal('link-modal', { source: 'selection' });
+    },
+    disabled: ({ state, documentId }) => {
+      return lacksPermission(state, documentId, PdfPermissionFlag.ModifyAnnotations);
+    },
+  },
+
+  'annotation:toggle-link': {
+    id: 'annotation:toggle-link',
+    labelKey: ({ registry, documentId }) => {
+      const scope = registry
+        .getPlugin<AnnotationPlugin>(ANNOTATION_PLUGIN_ID)
+        ?.provides()
+        .forDocument(documentId);
+      if (!scope) return 'annotation.addLink';
+      const selected = scope.getSelectedAnnotation();
+      if (!selected) return 'annotation.addLink';
+      return scope.hasAttachedLinks(selected.object.id)
+        ? 'annotation.removeLink'
+        : 'annotation.addLink';
+    },
+    icon: ({ registry, documentId }) => {
+      const scope = registry
+        .getPlugin<AnnotationPlugin>(ANNOTATION_PLUGIN_ID)
+        ?.provides()
+        .forDocument(documentId);
+      if (!scope) return 'link';
+      const selected = scope.getSelectedAnnotation();
+      if (!selected) return 'link';
+      return scope.hasAttachedLinks(selected.object.id) ? 'link-off' : 'link';
+    },
+    categories: ['annotation'],
+    action: ({ registry, documentId }) => {
+      const annotation = registry.getPlugin<AnnotationPlugin>(ANNOTATION_PLUGIN_ID)?.provides();
+      const ui = registry.getPlugin<UIPlugin>('ui')?.provides();
+      if (!annotation || !ui) return;
+
+      const scope = annotation.forDocument(documentId);
+      const selected = scope.getSelectedAnnotation();
+      if (!selected) return;
+
+      if (scope.hasAttachedLinks(selected.object.id)) {
+        scope.deleteAttachedLinks(selected.object.id);
+      } else {
+        ui.forDocument(documentId).openModal('link-modal', { source: 'annotation' });
+      }
+    },
+    visible: ({ registry, documentId }) => {
+      const scope = registry
+        .getPlugin<AnnotationPlugin>(ANNOTATION_PLUGIN_ID)
+        ?.provides()
+        .forDocument(documentId);
+      const selected = scope?.getSelectedAnnotation();
+      if (!selected) return true;
+      return (
+        selected.object.type !== PdfAnnotationSubtype.LINK &&
+        selected.object.type !== PdfAnnotationSubtype.REDACT
+      );
+    },
+    disabled: ({ state, documentId }) => {
+      return lacksPermission(state, documentId, PdfPermissionFlag.ModifyAnnotations);
     },
   },
 };

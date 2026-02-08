@@ -1,6 +1,5 @@
 em++ $(ls ./code/cpp/*.cpp) \
   /workspace/packages/pdfium/pdfium-src/out/wasm/obj/libpdfium.a \
-  -g \
   -v \
   -sEXPORT_ES6=1 \
   -sENVIRONMENT=node,worker,web,shell \

@@ -44,6 +44,7 @@ const props = withDefaults(defineProps<RedactionLayerProps>(), {
 });
 
 const documentState = useDocumentState(() => props.documentId);
+const page = computed(() => documentState.value?.document?.pages?.[props.pageIndex]);
 
 const actualScale = computed(() => {
   if (props.scale !== undefined) return props.scale;
@@ -52,6 +53,9 @@ const actualScale = computed(() => {
 
 const actualRotation = computed(() => {
   if (props.rotation !== undefined) return props.rotation;
-  return documentState.value?.rotation ?? Rotation.Degree0;
+  // Combine page intrinsic rotation with document rotation
+  const pageRotation = page.value?.rotation ?? 0;
+  const docRotation = documentState.value?.rotation ?? 0;
+  return ((pageRotation + docRotation) % 4) as Rotation;
 });
 </script>

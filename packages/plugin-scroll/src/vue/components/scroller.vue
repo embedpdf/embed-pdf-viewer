@@ -123,6 +123,8 @@ watch(
           :style="{
             width: `${layout.rotatedWidth}px`,
             height: `${layout.rotatedHeight}px`,
+            position: 'relative',
+            zIndex: layout.elevated ? 1 : undefined,
           }"
         >
           <slot :page="layout" />

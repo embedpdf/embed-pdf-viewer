@@ -113,7 +113,7 @@ export function FreeText({
                 ? 'center'
                 : 'flex-end',
           display: 'flex',
-          backgroundColor: annotation.object.backgroundColor,
+          backgroundColor: annotation.object.color ?? annotation.object.backgroundColor,
           opacity: annotation.object.opacity,
           width: needsComp ? `${invScalePercent}%` : '100%',
           height: needsComp ? `${invScalePercent}%` : '100%',

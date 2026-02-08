@@ -33,8 +33,12 @@
   const width = $derived(page?.size?.width ?? 0);
   const height = $derived(page?.size?.height ?? 0);
 
+  // If override is provided, use it directly (consistent with other layer components)
+  // Otherwise, combine page intrinsic rotation with document rotation
+  const pageRotation = $derived(page?.rotation ?? 0);
+  const docRotation = $derived(documentState.current?.rotation ?? 0);
   const rotation = $derived(
-    rotationOverride !== undefined ? rotationOverride : (documentState.current?.rotation ?? 0),
+    rotationOverride !== undefined ? rotationOverride : (pageRotation + docRotation) % 4,
   );
 
   const scale = $derived(
