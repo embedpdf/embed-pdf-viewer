@@ -34,11 +34,15 @@ export const patchSquare: PatchFunction<PdfSquareAnnoObject> = (orig, ctx) => {
       if (ctx.metadata?.rotationAngle !== undefined) {
         const angleDegrees = ctx.metadata.rotationAngle;
 
-        // Use the unrotatedRect if available, otherwise use current rect
-        const unrotatedRect = orig.unrotatedRect ?? orig.rect;
+        // Use the provided unrotatedRect override when available, otherwise fall back to stored value
+        const baseUnrotatedRect = ctx.changes.unrotatedRect ?? orig.unrotatedRect ?? orig.rect;
+        const normalizedUnrotatedRect = {
+          origin: { ...baseUnrotatedRect.origin },
+          size: { ...baseUnrotatedRect.size },
+        };
 
         // Calculate the new AABB from the rotated unrotated rect
-        const newRect = calculateRotatedRectAABB(unrotatedRect, angleDegrees);
+        const newRect = calculateRotatedRectAABB(normalizedUnrotatedRect, angleDegrees);
 
         // Calculate new rotation value
         const newRotation = angleDegrees;
@@ -46,7 +50,7 @@ export const patchSquare: PatchFunction<PdfSquareAnnoObject> = (orig, ctx) => {
         return {
           rect: newRect,
           rotation: newRotation,
-          unrotatedRect: unrotatedRect,
+          unrotatedRect: normalizedUnrotatedRect,
         };
       }
       return ctx.changes;

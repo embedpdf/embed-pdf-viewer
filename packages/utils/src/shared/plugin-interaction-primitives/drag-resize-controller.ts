@@ -1,4 +1,5 @@
 import { Position, Rect } from '@embedpdf/models';
+import { ROTATION_HANDLE_MARGIN } from './utils';
 
 export interface DragResizeConfig {
   element: Rect;
@@ -13,6 +14,8 @@ export interface DragResizeConfig {
   maintainAspectRatio?: boolean;
   pageRotation?: number;
   scale?: number;
+  rotationSnapAngles?: number[];
+  rotationSnapThreshold?: number;
 }
 
 export type InteractionState = 'idle' | 'dragging' | 'resizing' | 'vertex-editing' | 'rotating';
@@ -33,6 +36,9 @@ export interface TransformData {
     rotationAngle?: number;
     /** The center point used for rotation */
     rotationCenter?: Position;
+    rotationDelta?: number;
+    isSnapped?: boolean;
+    snappedAngle?: number;
   };
 }
 
@@ -76,9 +82,13 @@ export class DragResizeController {
 
   // Rotation state
   private rotationCenter: Position | null = null;
+  private centerScreen: Position | null = null; // Cached center in screen coords
   private startAngle: number = 0;
   private initialRotation: number = 0; // The rotation value when interaction started
   private lastComputedRotation: number = 0; // The last computed rotation during move
+  private cursorStartAngle: number = 0;
+  private rotationDelta: number = 0;
+  private rotationSnappedAngle: number | null = null;
 
   constructor(
     private config: DragResizeConfig,
@@ -166,14 +176,27 @@ export class DragResizeController {
       y: this.config.element.origin.y + this.config.element.size.height / 2,
     };
 
+    // Cache the center in screen coordinates, derived from the handle's DOM center
+    // (clientX/Y is the handle's getBoundingClientRect center, not the raw click).
+    // The handle orbits at initialRotation degrees at distance `radius` from center.
+    const { scale = 1 } = this.config;
+    const sw = this.config.element.size.width * scale;
+    const sh = this.config.element.size.height * scale;
+    const radius = Math.max(sw, sh) / 2 + ROTATION_HANDLE_MARGIN;
+    const angleRad = (initialRotation * Math.PI) / 180;
+    this.centerScreen = {
+      x: clientX - radius * Math.sin(angleRad),
+      y: clientY + radius * Math.cos(angleRad),
+    };
+
     // Store the starting angle based on the initial rotation (where the handle is)
     // The handle starts at initialRotation degrees from vertical (0 = top)
     this.startAngle = initialRotation;
     this.initialRotation = initialRotation;
     this.lastComputedRotation = initialRotation;
-
-    // Store the start point so we can calculate angular delta
-    // We'll track mouse movement relative to start and translate to angular change
+    this.cursorStartAngle = initialRotation;
+    this.rotationDelta = 0;
+    this.rotationSnappedAngle = null;
 
     this.onUpdate({
       state: 'start',
@@ -184,7 +207,9 @@ export class DragResizeController {
         },
         metadata: {
           rotationAngle: initialRotation,
+          rotationDelta: 0,
           rotationCenter: this.rotationCenter,
+          isSnapped: false,
         },
       },
     });
@@ -192,41 +217,57 @@ export class DragResizeController {
 
   /**
    * Calculate the angle from the center to a point in screen coordinates.
-   * Uses the start point as a reference to establish the center's screen position.
+   * Uses the cached `centerScreen` position computed once at drag start from
+   * the handle element's actual DOM center (not the raw click position).
    */
   private calculateAngleFromMouse(clientX: number, clientY: number): number {
-    if (!this.rotationCenter || !this.startPoint) return this.initialRotation;
+    if (!this.centerScreen) return this.initialRotation;
 
-    const { scale = 1 } = this.config;
+    const dx = clientX - this.centerScreen.x;
+    const dy = clientY - this.centerScreen.y;
 
-    // The handle was positioned at startAngle degrees when the drag started.
-    // Calculate where the center would be in screen space based on the initial handle position.
-    // Handle position relative to center in element coords:
-    const radius =
-      Math.max(this.config.element.size.width, this.config.element.size.height) / 2 + 30 / scale; // Match the default radius calculation from utils
+    // Dead zone: when the mouse is very close to the center, atan2 becomes
+    // extremely sensitive to sub-pixel movements. Hold the last stable angle.
+    const dist = Math.sqrt(dx * dx + dy * dy);
+    if (dist < 10) return this.lastComputedRotation;
 
-    // Initial handle angle in radians (0 = top, clockwise positive, converted to math coords)
-    const initialAngleRad = ((this.initialRotation - 90) * Math.PI) / 180;
+    // atan2 gives angle from +X axis; rotate +90° so 0° = top (north)
+    const angleDeg = Math.atan2(dy, dx) * (180 / Math.PI) + 90;
 
-    // Handle position relative to center in element coords
-    const handleOffsetX = radius * Math.cos(initialAngleRad);
-    const handleOffsetY = radius * Math.sin(initialAngleRad);
+    return this.normalizeAngle(Math.round(angleDeg));
+  }
 
-    // Approximate center position in screen coords
-    // startPoint is where the handle was clicked, which is at the handle position
-    const centerScreenX = this.startPoint.x - handleOffsetX * scale;
-    const centerScreenY = this.startPoint.y - handleOffsetY * scale;
+  private normalizeAngle(angle: number): number {
+    const normalized = angle % 360;
+    return normalized < 0 ? normalized + 360 : normalized;
+  }
 
-    // Calculate angle from center to current mouse position
-    const dx = clientX - centerScreenX;
-    const dy = clientY - centerScreenY;
+  private applyRotationSnapping(angle: number): {
+    angle: number;
+    isSnapped: boolean;
+    snapTarget?: number;
+  } {
+    const snapAngles = this.config.rotationSnapAngles ?? [0, 90, 180, 270];
+    const threshold = this.config.rotationSnapThreshold ?? 4;
+    const normalizedAngle = this.normalizeAngle(angle);
 
-    // Convert to degrees (atan2 gives angle from +X axis, we want from top/+Y)
-    let angleDeg = Math.atan2(dy, dx) * (180 / Math.PI);
-    // Adjust so 0 = top (which is -90 in standard math coords)
-    angleDeg = angleDeg + 90;
+    for (const candidate of snapAngles) {
+      const normalizedCandidate = this.normalizeAngle(candidate);
+      const diff = Math.abs(normalizedAngle - normalizedCandidate);
+      const minimalDiff = Math.min(diff, 360 - diff);
+      if (minimalDiff <= threshold) {
+        return {
+          angle: normalizedCandidate,
+          isSnapped: true,
+          snapTarget: normalizedCandidate,
+        };
+      }
+    }
 
-    return angleDeg;
+    return {
+      angle: normalizedAngle,
+      isSnapped: false,
+    };
   }
 
   move(clientX: number, clientY: number) {
@@ -282,19 +323,31 @@ export class DragResizeController {
       });
     } else if (this.state === 'rotating' && this.rotationCenter) {
       // Calculate the new rotation angle based on where the mouse is
-      const newRotation = this.calculateAngleFromMouse(clientX, clientY);
-      this.lastComputedRotation = newRotation;
+      const absoluteAngle = this.calculateAngleFromMouse(clientX, clientY);
+      const snapResult = this.applyRotationSnapping(absoluteAngle);
+      const snappedAngle = this.normalizeAngle(snapResult.angle);
+      const previousAngle = this.lastComputedRotation;
+      const rawDelta = snappedAngle - previousAngle;
+      const adjustedDelta =
+        rawDelta > 180 ? rawDelta - 360 : rawDelta < -180 ? rawDelta + 360 : rawDelta;
+
+      this.rotationDelta += adjustedDelta;
+      this.lastComputedRotation = snappedAngle;
+      this.rotationSnappedAngle = snapResult.isSnapped ? snappedAngle : null;
 
       this.onUpdate({
         state: 'move',
         transformData: {
           type: 'rotate',
           changes: {
-            rotation: newRotation,
+            rotation: snappedAngle,
           },
           metadata: {
-            rotationAngle: newRotation,
+            rotationAngle: snappedAngle,
+            rotationDelta: this.rotationDelta,
             rotationCenter: this.rotationCenter,
+            isSnapped: snapResult.isSnapped,
+            snappedAngle: this.rotationSnappedAngle ?? undefined,
           },
         },
       });
@@ -331,7 +384,10 @@ export class DragResizeController {
           },
           metadata: {
             rotationAngle: this.lastComputedRotation,
+            rotationDelta: this.rotationDelta,
             rotationCenter: this.rotationCenter || undefined,
+            isSnapped: this.rotationSnappedAngle !== null,
+            snappedAngle: this.rotationSnappedAngle ?? undefined,
           },
         },
       });
@@ -385,7 +441,9 @@ export class DragResizeController {
           },
           metadata: {
             rotationAngle: this.initialRotation,
+            rotationDelta: 0,
             rotationCenter: this.rotationCenter || undefined,
+            isSnapped: false,
           },
         },
       });
@@ -421,9 +479,13 @@ export class DragResizeController {
     this.startVertices = [];
     // Reset rotation state
     this.rotationCenter = null;
+    this.centerScreen = null;
     this.startAngle = 0;
     this.initialRotation = 0;
     this.lastComputedRotation = 0;
+    this.cursorStartAngle = 0;
+    this.rotationDelta = 0;
+    this.rotationSnappedAngle = null;
   }
 
   private getCurrentPosition() {

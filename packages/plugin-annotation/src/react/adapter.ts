@@ -18,6 +18,8 @@ export type {
   MouseEvent,
   PointerEvent,
   TouchEvent,
+  KeyboardEvent,
+  FormEvent,
 } from 'react';
 
 export const suppressContentEditableWarningProps = {

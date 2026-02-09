@@ -149,8 +149,14 @@ export interface TransformOptions<T extends PdfAnnotationObject = PdfAnnotationO
     maintainAspectRatio?: boolean;
     /** Rotation angle in degrees (for 'rotate' transform type) */
     rotationAngle?: number;
+    /** Delta from the initial rotation angle in degrees */
+    rotationDelta?: number;
     /** Center point for rotation (defaults to rect center) */
     rotationCenter?: { x: number; y: number };
+    /** Whether the rotation is currently snapped to a guide */
+    isSnapped?: boolean;
+    /** Snap target angle when isSnapped is true */
+    snappedAngle?: number;
     [key: string]: any;
   };
 }
@@ -563,5 +569,48 @@ export interface UnifiedResizeEvent {
   /** Per-annotation computed rects for convenience (id -> new rect) */
   computedRects: Record<string, Rect>;
   /** Pre-computed patches for ALL participants - components just apply directly! */
+  previewPatches: Record<string, Partial<PdfAnnotationObject>>;
+}
+
+// ─────────────────────────────────────────────────────────
+// Unified Rotation API Types
+// ─────────────────────────────────────────────────────────
+
+export interface UnifiedRotateOptions {
+  /** The explicitly selected annotation IDs */
+  annotationIds: string[];
+  /** Angle reported by the interaction controller at gesture start */
+  cursorAngle: number;
+  /** Optional rotation center override (defaults to selection center) */
+  rotationCenter?: Position;
+}
+
+export interface UnifiedRotateParticipant {
+  id: string;
+  rect: Rect;
+  pageIndex: number;
+  rotation: number;
+  unrotatedRect?: Rect;
+  isAttachedLink: boolean;
+  parentId?: string;
+}
+
+export interface UnifiedRotateState {
+  documentId: string;
+  isRotating: boolean;
+  primaryIds: string[];
+  attachedLinkIds: string[];
+  allParticipantIds: string[];
+  rotationCenter: Position;
+  cursorStartAngle: number;
+  currentAngle: number;
+  delta: number;
+  participants: UnifiedRotateParticipant[];
+}
+
+export interface UnifiedRotateEvent {
+  documentId: string;
+  type: 'start' | 'update' | 'end' | 'cancel';
+  state: UnifiedRotateState;
   previewPatches: Record<string, Partial<PdfAnnotationObject>>;
 }

@@ -107,7 +107,14 @@ export function useDragResize(options: UseDragResizeOptions) {
         if (!enabled) return;
         e.preventDefault();
         e.stopPropagation();
-        controllerRef.current?.startRotation(e.clientX, e.clientY, initialRotation);
+        // Use the handle's actual DOM center, not the raw click position.
+        // This avoids up to handleSize/2 px error when the user clicks
+        // near the edge of the handle circle, which would shift the
+        // reverse-engineered center and distort angles near the center.
+        const handleRect = (e.currentTarget as HTMLElement).getBoundingClientRect();
+        const handleCenterX = handleRect.left + handleRect.width / 2;
+        const handleCenterY = handleRect.top + handleRect.height / 2;
+        controllerRef.current?.startRotation(handleCenterX, handleCenterY, initialRotation);
         (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
       },
       onPointerMove: handleMove,

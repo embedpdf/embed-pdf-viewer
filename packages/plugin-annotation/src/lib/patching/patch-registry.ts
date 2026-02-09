@@ -14,8 +14,14 @@ export interface TransformContext<T extends PdfAnnotationObject = PdfAnnotationO
     maintainAspectRatio?: boolean;
     /** Rotation angle in degrees (for 'rotate' transform type) */
     rotationAngle?: number;
+    /** Delta from the initial rotation angle in degrees */
+    rotationDelta?: number;
     /** Center point for rotation (defaults to rect center) */
     rotationCenter?: { x: number; y: number };
+    /** Whether the rotation input is currently snapped */
+    isSnapped?: boolean;
+    /** Snap target angle when isSnapped is true */
+    snappedAngle?: number;
     [key: string]: any;
   };
 }

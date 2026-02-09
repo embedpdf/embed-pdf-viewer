@@ -30,6 +30,9 @@ export interface RotationUI {
   connectorWidth?: number;
 }
 
+/** Screen-pixel gap between the rect edge and the rotation handle center (default orbit margin). */
+export const ROTATION_HANDLE_MARGIN = 30;
+
 export interface HandleDescriptor {
   handle: ResizeHandle;
   style: Record<string, number | string>;
@@ -185,23 +188,16 @@ export function describeRotationFromConfig(
   const centerY = scaledHeight / 2;
 
   // Calculate radius - distance from center to handle
-  // Default: slightly larger than the diagonal to ensure handle is outside the rect
-  const defaultRadius = Math.max(scaledWidth, scaledHeight) / 2 + 30;
+  // Default: far enough from center so the handle clears the rect at any angle
+  const defaultRadius = Math.max(scaledWidth, scaledHeight) / 2 + ROTATION_HANDLE_MARGIN;
   const radius = ui.radius !== undefined ? ui.radius * scale : defaultRadius;
 
-  // Convert angle to radians (0 degrees = top, positive = clockwise)
-  // In CSS/screen coordinates: 0 deg points up (-Y), 90 deg points right (+X)
-  const angleRad = ((currentAngle - 90) * Math.PI) / 180;
-
-  // Calculate handle position (relative to element's top-left corner)
-  const handleCenterX = centerX + radius * Math.cos(angleRad);
-  const handleCenterY = centerY + radius * Math.sin(angleRad);
+  // Handle orbits at currentAngle (0° = top, clockwise positive)
+  const angleRad = (currentAngle * Math.PI) / 180;
+  const handleCenterX = centerX + radius * Math.sin(angleRad);
+  const handleCenterY = centerY - radius * Math.cos(angleRad);
   const handleLeft = handleCenterX - handleSize / 2;
   const handleTop = handleCenterY - handleSize / 2;
-
-  // Connector line from center to handle
-  // We'll use a rotated line by setting its origin at center and rotating it
-  const connectorLength = radius - handleSize / 2;
 
   return {
     handleStyle: {
@@ -219,10 +215,10 @@ export function describeRotationFromConfig(
       ? {
           position: 'absolute',
           left: centerX - connectorWidth / 2 + 'px',
-          top: centerY + 'px',
+          top: centerY - radius + 'px',
           width: connectorWidth + 'px',
-          height: connectorLength + 'px',
-          transformOrigin: 'top center',
+          height: radius + 'px',
+          transformOrigin: 'center bottom',
           transform: `rotate(${currentAngle}deg)`,
           zIndex: zIndex - 1,
           pointerEvents: 'none',
