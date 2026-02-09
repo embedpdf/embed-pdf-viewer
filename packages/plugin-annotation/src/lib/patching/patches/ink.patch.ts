@@ -1,7 +1,12 @@
 import { expandRect, PdfInkAnnoObject, Rect, rectFromPoints } from '@embedpdf/models';
 
 import { PatchFunction } from '../patch-registry';
-import { calculateRotatedRectAABB, resolveRotateRects } from '../patch-utils';
+import {
+  calculateRotatedRectAABB,
+  calculateRotatedRectAABBAroundPoint,
+  resolveAnnotationRotationCenter,
+  resolveRotateRects,
+} from '../patch-utils';
 
 export const patchInk: PatchFunction<PdfInkAnnoObject> = (original, ctx) => {
   // Handle different transformation types
@@ -149,8 +154,22 @@ export const patchInk: PatchFunction<PdfInkAnnoObject> = (original, ctx) => {
         const merged = { ...original, ...ctx.changes };
         // Recalculate rect using the same logic as deriveRect
         const pts = merged.inkList.flatMap((s) => s.points);
-        const rect = expandRect(rectFromPoints(pts), merged.strokeWidth / 2);
-        return { ...ctx.changes, rect };
+        const tightRect = expandRect(rectFromPoints(pts), merged.strokeWidth / 2);
+
+        // If rotated, tightRect is the new unrotatedRect; compute the visible AABB
+        // Use the original rotation center so the annotation doesn't jump
+        if (original.unrotatedRect) {
+          return {
+            ...ctx.changes,
+            unrotatedRect: tightRect,
+            rect: calculateRotatedRectAABBAroundPoint(
+              tightRect,
+              original.rotation ?? 0,
+              resolveAnnotationRotationCenter(original),
+            ),
+          };
+        }
+        return { ...ctx.changes, rect: tightRect };
       }
       return ctx.changes;
 

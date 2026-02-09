@@ -4,6 +4,8 @@ import { PatchFunction } from '../patch-registry';
 import {
   compensateRotatedVertexEdit,
   calculateRotatedRectAABB,
+  calculateRotatedRectAABBAroundPoint,
+  resolveAnnotationRotationCenter,
   resolveRotateRects,
   resolveVertexEditRects,
 } from '../patch-utils';
@@ -129,8 +131,22 @@ export const patchPolygon: PatchFunction<PdfPolygonAnnoObject> = (orig, ctx) => 
         const merged = { ...orig, ...ctx.changes };
         // Recalculate rect using the same logic as deriveRect
         const pad = merged.strokeWidth / 2;
-        const rect = expandRect(rectFromPoints(merged.vertices), pad);
-        return { ...ctx.changes, rect };
+        const tightRect = expandRect(rectFromPoints(merged.vertices), pad);
+
+        // If rotated, tightRect is the new unrotatedRect; compute the visible AABB
+        // Use the original rotation center so the annotation doesn't jump
+        if (orig.unrotatedRect) {
+          return {
+            ...ctx.changes,
+            unrotatedRect: tightRect,
+            rect: calculateRotatedRectAABBAroundPoint(
+              tightRect,
+              orig.rotation ?? 0,
+              resolveAnnotationRotationCenter(orig),
+            ),
+          };
+        }
+        return { ...ctx.changes, rect: tightRect };
       }
       return ctx.changes;
 

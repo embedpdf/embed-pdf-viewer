@@ -7,6 +7,8 @@ import {
   lineRectWithEndings,
   resolveRotateRects,
   resolveVertexEditRects,
+  calculateRotatedRectAABBAroundPoint,
+  resolveAnnotationRotationCenter,
 } from '../patch-utils';
 
 export const patchLine: PatchFunction<PdfLineAnnoObject> = (orig, ctx) => {
@@ -140,12 +142,25 @@ export const patchLine: PatchFunction<PdfLineAnnoObject> = (orig, ctx) => {
       // For property updates that might affect the rect
       if (ctx.changes.strokeWidth || ctx.changes.lineEndings) {
         const merged = { ...orig, ...ctx.changes };
-        const rect = lineRectWithEndings(
+        const tightRect = lineRectWithEndings(
           [merged.linePoints.start, merged.linePoints.end],
           merged.strokeWidth,
           merged.lineEndings,
         );
-        return { ...ctx.changes, rect };
+
+        // If rotated, tightRect is the new unrotatedRect; compute the visible AABB
+        if (orig.unrotatedRect) {
+          return {
+            ...ctx.changes,
+            unrotatedRect: tightRect,
+            rect: calculateRotatedRectAABBAroundPoint(
+              tightRect,
+              orig.rotation ?? 0,
+              resolveAnnotationRotationCenter(orig),
+            ),
+          };
+        }
+        return { ...ctx.changes, rect: tightRect };
       }
       return ctx.changes;
 

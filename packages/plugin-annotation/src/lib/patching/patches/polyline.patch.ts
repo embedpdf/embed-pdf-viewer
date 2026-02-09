@@ -4,7 +4,9 @@ import { PatchFunction } from '../patch-registry';
 import {
   compensateRotatedVertexEdit,
   calculateRotatedRectAABB,
+  calculateRotatedRectAABBAroundPoint,
   lineRectWithEndings,
+  resolveAnnotationRotationCenter,
   resolveRotateRects,
   resolveVertexEditRects,
 } from '../patch-utils';
@@ -128,8 +130,26 @@ export const patchPolyline: PatchFunction<PdfPolylineAnnoObject> = (orig, ctx) =
       if (ctx.changes.strokeWidth !== undefined || ctx.changes.lineEndings !== undefined) {
         const merged = { ...orig, ...ctx.changes };
         // Recalculate rect using the same logic as deriveRect
-        const rect = lineRectWithEndings(merged.vertices, merged.strokeWidth, merged.lineEndings);
-        return { ...ctx.changes, rect };
+        const tightRect = lineRectWithEndings(
+          merged.vertices,
+          merged.strokeWidth,
+          merged.lineEndings,
+        );
+
+        // If rotated, tightRect is the new unrotatedRect; compute the visible AABB
+        // Use the original rotation center so the annotation doesn't jump
+        if (orig.unrotatedRect) {
+          return {
+            ...ctx.changes,
+            unrotatedRect: tightRect,
+            rect: calculateRotatedRectAABBAroundPoint(
+              tightRect,
+              orig.rotation ?? 0,
+              resolveAnnotationRotationCenter(orig),
+            ),
+          };
+        }
+        return { ...ctx.changes, rect: tightRect };
       }
       return ctx.changes;
 
