@@ -2,6 +2,7 @@ import { expandRect, PdfPolygonAnnoObject, rectFromPoints } from '@embedpdf/mode
 
 import { PatchFunction } from '../patch-registry';
 import {
+  compensateRotatedVertexEdit,
   calculateRotatedRectAABB,
   resolveRotateRects,
   resolveVertexEditRects,
@@ -14,10 +15,13 @@ export const patchPolygon: PatchFunction<PdfPolygonAnnoObject> = (orig, ctx) => 
       // Polygon vertex editing: update vertices and recalculate rect
       if (ctx.changes.vertices && ctx.changes.vertices.length) {
         const pad = orig.strokeWidth / 2;
-        const rect = expandRect(rectFromPoints(ctx.changes.vertices), pad);
+        const rawVertices = ctx.changes.vertices;
+        const rawRect = expandRect(rectFromPoints(rawVertices), pad);
+        const compensated = compensateRotatedVertexEdit(orig, rawVertices, rawRect);
+        const rect = expandRect(rectFromPoints(compensated), pad);
         return {
           ...resolveVertexEditRects(orig, rect),
-          vertices: ctx.changes.vertices,
+          vertices: compensated,
         };
       }
       return ctx.changes;

@@ -2,6 +2,7 @@ import { PdfLineAnnoObject } from '@embedpdf/models';
 
 import { PatchFunction } from '../patch-registry';
 import {
+  compensateRotatedVertexEdit,
   calculateRotatedRectAABB,
   lineRectWithEndings,
   resolveRotateRects,
@@ -15,10 +16,16 @@ export const patchLine: PatchFunction<PdfLineAnnoObject> = (orig, ctx) => {
       // Line vertex editing: update line points and recalculate rect
       if (ctx.changes.linePoints) {
         const { start, end } = ctx.changes.linePoints;
-        const rect = lineRectWithEndings([start, end], orig.strokeWidth, orig.lineEndings);
+        const rawPoints = [start, end];
+        const rawRect = lineRectWithEndings(rawPoints, orig.strokeWidth, orig.lineEndings);
+        const compensated = compensateRotatedVertexEdit(orig, rawPoints, rawRect);
+        const rect = lineRectWithEndings(compensated, orig.strokeWidth, orig.lineEndings);
         return {
           ...resolveVertexEditRects(orig, rect),
-          linePoints: { start, end },
+          linePoints: {
+            start: compensated[0],
+            end: compensated[1],
+          },
         };
       }
       return ctx.changes;

@@ -7,6 +7,7 @@ import {
   rectFromPoints,
   expandRect,
 } from '@embedpdf/models';
+
 import { LINE_ENDING_HANDLERS } from './line-ending-handlers';
 import {
   calculateRotatedRectAABB,
@@ -102,9 +103,9 @@ export function lineRectWithEndings(
 }
 
 /**
- * Build rect patches for vertex editing while keeping the visual rotation center stable.
+ * Build rect patches for vertex editing.
  * For rotated annotations, the tight rect is kept as unrotatedRect and the AABB is
- * computed around the pre-edit center.
+ * computed around the new content center so rotation UI follows the edited geometry.
  */
 export function resolveVertexEditRects(
   original: { rect: Rect; unrotatedRect?: Rect; rotation?: number },
@@ -112,9 +113,9 @@ export function resolveVertexEditRects(
 ): { rect: Rect; unrotatedRect?: Rect } {
   if (!original.unrotatedRect) return { rect: tightRect };
 
-  const stableCenter = resolveAnnotationRotationCenter(original);
+  const center = getRectCenter(tightRect);
   return {
-    rect: calculateRotatedRectAABBAroundPoint(tightRect, original.rotation ?? 0, stableCenter),
+    rect: calculateRotatedRectAABBAroundPoint(tightRect, original.rotation ?? 0, center),
     unrotatedRect: tightRect,
   };
 }
@@ -160,4 +161,38 @@ export function resolveRotateRects(
     rect: calculateRotatedRectAABBAroundPoint(nextUnrotatedRect, angleDegrees, nextCenter),
     unrotatedRect: nextUnrotatedRect,
   };
+}
+
+/**
+ * Compensate vertices for rotated vertex editing so the dragged point tracks the cursor
+ * while the rotation center follows edited geometry.
+ *
+ * Without this compensation, changing the tight bounds center during a rotated vertex edit
+ * applies an additional translation to all points, which appears as opposite-end drift.
+ */
+export function compensateRotatedVertexEdit(
+  original: { rect: Rect; unrotatedRect?: Rect; rotation?: number },
+  vertices: Position[],
+  tightRect: Rect,
+): Position[] {
+  if (!original.unrotatedRect) return vertices;
+
+  const angle = original.rotation ?? 0;
+  if (Math.abs(angle % 360) < 1e-8) return vertices;
+
+  const baseCenter = resolveAnnotationRotationCenter(original);
+  const nextCenter = getRectCenter(tightRect);
+
+  // q = (I - R) * (baseCenter - nextCenter)
+  const rad = (angle * Math.PI) / 180;
+  const cos = Math.cos(rad);
+  const sin = Math.sin(rad);
+  const dx = baseCenter.x - nextCenter.x;
+  const dy = baseCenter.y - nextCenter.y;
+
+  const qx = (1 - cos) * dx + sin * dy;
+  const qy = -sin * dx + (1 - cos) * dy;
+  if (Math.abs(qx) < 1e-8 && Math.abs(qy) < 1e-8) return vertices;
+
+  return vertices.map((v) => ({ x: v.x + qx, y: v.y + qy }));
 }

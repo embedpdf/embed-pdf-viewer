@@ -2,6 +2,7 @@ import { PdfPolylineAnnoObject } from '@embedpdf/models';
 
 import { PatchFunction } from '../patch-registry';
 import {
+  compensateRotatedVertexEdit,
   calculateRotatedRectAABB,
   lineRectWithEndings,
   resolveRotateRects,
@@ -14,10 +15,13 @@ export const patchPolyline: PatchFunction<PdfPolylineAnnoObject> = (orig, ctx) =
     case 'vertex-edit':
       // Polyline vertex editing: update vertices and recalculate rect
       if (ctx.changes.vertices && ctx.changes.vertices.length) {
-        const rect = lineRectWithEndings(ctx.changes.vertices, orig.strokeWidth, orig.lineEndings);
+        const rawVertices = ctx.changes.vertices;
+        const rawRect = lineRectWithEndings(rawVertices, orig.strokeWidth, orig.lineEndings);
+        const compensated = compensateRotatedVertexEdit(orig, rawVertices, rawRect);
+        const rect = lineRectWithEndings(compensated, orig.strokeWidth, orig.lineEndings);
         return {
           ...resolveVertexEditRects(orig, rect),
-          vertices: ctx.changes.vertices,
+          vertices: compensated,
         };
       }
       return ctx.changes;

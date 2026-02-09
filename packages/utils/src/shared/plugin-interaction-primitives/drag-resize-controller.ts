@@ -140,7 +140,12 @@ export class DragResizeController {
 
   updateConfig(config: Partial<DragResizeConfig>) {
     this.config = { ...this.config, ...config };
-    this.currentVertices = config.vertices || [];
+    // Keep the gesture buffer stable during active vertex editing.
+    // Otherwise rerendered preview vertices can overwrite `currentVertices`
+    // and cause end() to emit compensated vertices a second time.
+    if (this.state !== 'vertex-editing') {
+      this.currentVertices = config.vertices || [];
+    }
   }
 
   startDrag(clientX: number, clientY: number) {
