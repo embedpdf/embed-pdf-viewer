@@ -3,9 +3,9 @@ import { PdfLineAnnoObject } from '@embedpdf/models';
 import { PatchFunction } from '../patch-registry';
 import {
   calculateRotatedRectAABB,
-  getRectCenter,
   lineRectWithEndings,
-  preserveRectCenter,
+  resolveRotateRects,
+  resolveVertexEditRects,
 } from '../patch-utils';
 
 export const patchLine: PatchFunction<PdfLineAnnoObject> = (orig, ctx) => {
@@ -16,16 +16,8 @@ export const patchLine: PatchFunction<PdfLineAnnoObject> = (orig, ctx) => {
       if (ctx.changes.linePoints) {
         const { start, end } = ctx.changes.linePoints;
         const rect = lineRectWithEndings([start, end], orig.strokeWidth, orig.lineEndings);
-        if (orig.unrotatedRect) {
-          const stableRect = preserveRectCenter(rect, getRectCenter(orig.unrotatedRect));
-          return {
-            rect: calculateRotatedRectAABB(stableRect, orig.rotation ?? 0),
-            unrotatedRect: stableRect,
-            linePoints: { start, end },
-          };
-        }
         return {
-          rect,
+          ...resolveVertexEditRects(orig, rect),
           linePoints: { start, end },
         };
       }
@@ -130,13 +122,9 @@ export const patchLine: PatchFunction<PdfLineAnnoObject> = (orig, ctx) => {
           size: { ...baseUnrotatedRect.size },
         };
 
-        // Calculate the new AABB from the rotated unrotated rect
-        const newRect = calculateRotatedRectAABB(normalizedUnrotatedRect, angleDegrees);
-
         return {
-          rect: newRect,
+          ...resolveRotateRects(orig, normalizedUnrotatedRect, angleDegrees),
           rotation: angleDegrees,
-          unrotatedRect: normalizedUnrotatedRect,
         };
       }
       return ctx.changes;

@@ -3,6 +3,16 @@ import { ROTATION_HANDLE_MARGIN } from './utils';
 
 export interface DragResizeConfig {
   element: Rect;
+  /**
+   * Optional world-space pivot to use for rotation interactions.
+   * Defaults to the center of `element`.
+   */
+  rotationCenter?: Position;
+  /**
+   * Optional rect used for rotation-handle orbit layout (typically the visible AABB container).
+   * Defaults to `element`.
+   */
+  rotationElement?: Rect;
   vertices?: Position[];
   constraints?: {
     minWidth?: number;
@@ -196,13 +206,18 @@ export class DragResizeController {
     });
   }
 
-  startRotation(clientX: number, clientY: number, initialRotation: number = 0) {
+  startRotation(
+    clientX: number,
+    clientY: number,
+    initialRotation: number = 0,
+    orbitRadiusPx?: number,
+  ) {
     this.state = 'rotating';
     this.startPoint = { x: clientX, y: clientY };
     this.startElement = { ...this.config.element };
 
-    // Calculate rotation center in element coordinates
-    this.rotationCenter = {
+    // Use explicit rotation center when provided (keeps pivot stable after vertex edits).
+    this.rotationCenter = this.config.rotationCenter ?? {
       x: this.config.element.origin.x + this.config.element.size.width / 2,
       y: this.config.element.origin.y + this.config.element.size.height / 2,
     };
@@ -211,9 +226,10 @@ export class DragResizeController {
     // (clientX/Y is the handle's getBoundingClientRect center, not the raw click).
     // The handle orbits at initialRotation degrees at distance `radius` from center.
     const { scale = 1 } = this.config;
-    const sw = this.config.element.size.width * scale;
-    const sh = this.config.element.size.height * scale;
-    const radius = Math.max(sw, sh) / 2 + ROTATION_HANDLE_MARGIN;
+    const orbitRect = this.config.rotationElement ?? this.config.element;
+    const sw = orbitRect.size.width * scale;
+    const sh = orbitRect.size.height * scale;
+    const radius = orbitRadiusPx ?? Math.max(sw, sh) / 2 + ROTATION_HANDLE_MARGIN;
     const angleRad = (initialRotation * Math.PI) / 180;
     this.centerScreen = {
       x: clientX - radius * Math.sin(angleRad),

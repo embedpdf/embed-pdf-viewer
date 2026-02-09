@@ -1,7 +1,7 @@
 import { PdfSquareAnnoObject } from '@embedpdf/models';
 
 import { PatchFunction } from '../patch-registry';
-import { calculateRotatedRectAABB, getRectCenter } from '../patch-utils';
+import { calculateRotatedRectAABB, resolveRotateRects } from '../patch-utils';
 
 export const patchSquare: PatchFunction<PdfSquareAnnoObject> = (orig, ctx) => {
   switch (ctx.type) {
@@ -49,16 +49,12 @@ export const patchSquare: PatchFunction<PdfSquareAnnoObject> = (orig, ctx) => {
           size: { ...baseUnrotatedRect.size },
         };
 
-        // Calculate the new AABB from the rotated unrotated rect
-        const newRect = calculateRotatedRectAABB(normalizedUnrotatedRect, angleDegrees);
-
         // Calculate new rotation value
         const newRotation = angleDegrees;
 
         return {
-          rect: newRect,
+          ...resolveRotateRects(orig, normalizedUnrotatedRect, angleDegrees),
           rotation: newRotation,
-          unrotatedRect: normalizedUnrotatedRect,
         };
       }
       return ctx.changes;

@@ -8,61 +8,24 @@ import {
   expandRect,
 } from '@embedpdf/models';
 import { LINE_ENDING_HANDLERS } from './line-ending-handlers';
+import {
+  calculateRotatedRectAABB,
+  calculateRotatedRectAABBAroundPoint,
+  getRectCenter,
+  inferRotationCenterFromRects,
+  rotatePointAroundCenter,
+  rotateVertices,
+} from '../geometry/rotation';
 
 const EXTRA_PADDING = 1.2;
 
-/**
- * Rotate a point around a center by the given angle in degrees.
- * @param point - The point to rotate
- * @param center - The center of rotation
- * @param angleDegrees - Rotation angle in degrees (clockwise)
- * @returns The rotated point
- */
-export function rotatePointAroundCenter(
-  point: Position,
-  center: Position,
-  angleDegrees: number,
-): Position {
-  const angleRad = (angleDegrees * Math.PI) / 180;
-  const cos = Math.cos(angleRad);
-  const sin = Math.sin(angleRad);
-
-  // Translate point to origin, rotate, then translate back
-  const dx = point.x - center.x;
-  const dy = point.y - center.y;
-
-  return {
-    x: center.x + dx * cos - dy * sin,
-    y: center.y + dx * sin + dy * cos,
-  };
-}
-
-/**
- * Rotate an array of vertices around a center point.
- * @param vertices - Array of points to rotate
- * @param center - Center of rotation
- * @param angleDegrees - Rotation angle in degrees (clockwise)
- * @returns Array of rotated points
- */
-export function rotateVertices(
-  vertices: Position[],
-  center: Position,
-  angleDegrees: number,
-): Position[] {
-  return vertices.map((v) => rotatePointAroundCenter(v, center, angleDegrees));
-}
-
-/**
- * Calculate the center of a rectangle.
- * @param rect - The rectangle
- * @returns The center point
- */
-export function getRectCenter(rect: Rect): Position {
-  return {
-    x: rect.origin.x + rect.size.width / 2,
-    y: rect.origin.y + rect.size.height / 2,
-  };
-}
+export {
+  rotatePointAroundCenter,
+  rotateVertices,
+  getRectCenter,
+  calculateRotatedRectAABB,
+  calculateRotatedRectAABBAroundPoint,
+};
 
 /**
  * Calculate the axis-aligned bounding box for rotated vertices.
@@ -77,34 +40,6 @@ export function calculateAABBFromVertices(vertices: Position[], padding: number 
 
   const baseRect = rectFromPoints(vertices);
   return padding > 0 ? expandRect(baseRect, padding) : baseRect;
-}
-
-/**
- * Calculate the axis-aligned bounding box for a rotated rectangle.
- * This is used for simple shape annotations (circle, square) that store rotation.
- * @param unrotatedRect - The original unrotated rectangle
- * @param angleDegrees - Rotation angle in degrees
- * @returns The axis-aligned bounding box after rotation
- */
-export function calculateRotatedRectAABB(unrotatedRect: Rect, angleDegrees: number): Rect {
-  const center = getRectCenter(unrotatedRect);
-
-  // Get the four corners of the unrotated rect
-  const corners: Position[] = [
-    { x: unrotatedRect.origin.x, y: unrotatedRect.origin.y }, // top-left
-    { x: unrotatedRect.origin.x + unrotatedRect.size.width, y: unrotatedRect.origin.y }, // top-right
-    {
-      x: unrotatedRect.origin.x + unrotatedRect.size.width,
-      y: unrotatedRect.origin.y + unrotatedRect.size.height,
-    }, // bottom-right
-    { x: unrotatedRect.origin.x, y: unrotatedRect.origin.y + unrotatedRect.size.height }, // bottom-left
-  ];
-
-  // Rotate corners
-  const rotatedCorners = rotateVertices(corners, center, angleDegrees);
-
-  // Calculate AABB
-  return rectFromPoints(rotatedCorners);
 }
 
 /**
@@ -167,17 +102,62 @@ export function lineRectWithEndings(
 }
 
 /**
- * Expand a tight bounding rect so its center matches oldCenter.
- * Used during vertex editing on rotated annotations to keep the
- * rotation center stable and prevent visual drift of unmoved content.
+ * Build rect patches for vertex editing while keeping the visual rotation center stable.
+ * For rotated annotations, the tight rect is kept as unrotatedRect and the AABB is
+ * computed around the pre-edit center.
  */
-export function preserveRectCenter(tightRect: Rect, oldCenter: Position): Rect {
-  const currentCenter = getRectCenter(tightRect);
+export function resolveVertexEditRects(
+  original: { rect: Rect; unrotatedRect?: Rect; rotation?: number },
+  tightRect: Rect,
+): { rect: Rect; unrotatedRect?: Rect } {
+  if (!original.unrotatedRect) return { rect: tightRect };
+
+  const stableCenter = resolveAnnotationRotationCenter(original);
   return {
-    origin: {
-      x: tightRect.origin.x + (oldCenter.x - currentCenter.x),
-      y: tightRect.origin.y + (oldCenter.y - currentCenter.y),
-    },
-    size: tightRect.size,
+    rect: calculateRotatedRectAABBAroundPoint(tightRect, original.rotation ?? 0, stableCenter),
+    unrotatedRect: tightRect,
+  };
+}
+
+/**
+ * Resolve an annotation's effective rotation center in page coordinates.
+ */
+export function resolveAnnotationRotationCenter(original: {
+  rect: Rect;
+  unrotatedRect?: Rect;
+  rotation?: number;
+}): Position {
+  if (!original.unrotatedRect) return getRectCenter(original.rect);
+  return inferRotationCenterFromRects(
+    original.unrotatedRect,
+    original.rect,
+    original.rotation ?? 0,
+  );
+}
+
+/**
+ * Build rotate patches while preserving an annotation's effective rotation center.
+ * The incoming unrotated rect may already include a translation (group rotation/orbit).
+ */
+export function resolveRotateRects(
+  original: { rect: Rect; unrotatedRect?: Rect; rotation?: number },
+  nextUnrotatedRect: Rect,
+  angleDegrees: number,
+): { rect: Rect; unrotatedRect: Rect } {
+  const baseCenter = resolveAnnotationRotationCenter(original);
+  const translation = original.unrotatedRect
+    ? {
+        x: nextUnrotatedRect.origin.x - original.unrotatedRect.origin.x,
+        y: nextUnrotatedRect.origin.y - original.unrotatedRect.origin.y,
+      }
+    : { x: 0, y: 0 };
+  const nextCenter = {
+    x: baseCenter.x + translation.x,
+    y: baseCenter.y + translation.y,
+  };
+
+  return {
+    rect: calculateRotatedRectAABBAroundPoint(nextUnrotatedRect, angleDegrees, nextCenter),
+    unrotatedRect: nextUnrotatedRect,
   };
 }

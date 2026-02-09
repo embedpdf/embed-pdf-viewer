@@ -18,6 +18,7 @@ import {
   KeyboardEvent,
 } from '@framework';
 import { useDocumentPermissions } from '@embedpdf/core/@framework';
+import { inferRotationCenterFromRects } from '../../lib/geometry/rotation';
 
 import { useAnnotationCapability, useAnnotationPlugin } from '../hooks';
 import {
@@ -312,8 +313,16 @@ export function AnnotationContainer<T extends PdfAnnotationObject>({
     [closeRotationEditor],
   );
 
-  // Use unrotatedRect as the controller element so resize/vertex-edit operate in unrotated space
-  const controllerElement = (currentObject as any).unrotatedRect ?? currentObject.rect;
+  // Geometry model:
+  // - `rect` is the visible AABB container.
+  // - `unrotatedRect` is the local editing frame for resize/vertex operations.
+  const explicitUnrotatedRect = (currentObject as any).unrotatedRect as Rect | undefined;
+  const effectiveUnrotatedRect = explicitUnrotatedRect ?? currentObject.rect;
+  const rotationPivot =
+    explicitUnrotatedRect && annotationRotation !== 0
+      ? inferRotationCenterFromRects(effectiveUnrotatedRect, currentObject.rect, annotationRotation)
+      : undefined;
+  const controllerElement = effectiveUnrotatedRect;
 
   const {
     dragProps,
@@ -332,6 +341,8 @@ export function AnnotationContainer<T extends PdfAnnotationObject>({
       maintainAspectRatio: lockAspectRatio,
       pageRotation: rotation,
       annotationRotation: annotationRotation,
+      rotationCenter: rotationPivot,
+      rotationElement: currentObject.rect,
       scale: scale,
       // Disable interaction handles when multi-selected
       enabled: isSelected && !isMultiSelected,
@@ -406,22 +417,36 @@ export function AnnotationContainer<T extends PdfAnnotationObject>({
   const showOutline = isSelected && !isMultiSelected;
 
   // Three-layer model: outer div (AABB) + inner rotated div (unrotatedRect) + content
-  const effectiveUnrotatedRect = (currentObject as any).unrotatedRect ?? currentObject.rect;
   const aabbWidth = currentObject.rect.size.width * scale;
   const aabbHeight = currentObject.rect.size.height * scale;
   const innerWidth = effectiveUnrotatedRect.size.width * scale;
   const innerHeight = effectiveUnrotatedRect.size.height * scale;
-  const centerX = aabbWidth / 2;
-  const centerY = aabbHeight / 2;
+  const usesCustomPivot = Boolean(explicitUnrotatedRect) && annotationRotation !== 0;
+  const innerLeft = usesCustomPivot
+    ? (effectiveUnrotatedRect.origin.x - currentObject.rect.origin.x) * scale
+    : (aabbWidth - innerWidth) / 2;
+  const innerTop = usesCustomPivot
+    ? (effectiveUnrotatedRect.origin.y - currentObject.rect.origin.y) * scale
+    : (aabbHeight - innerHeight) / 2;
+  const innerTransformOrigin =
+    usesCustomPivot && rotationPivot
+      ? `${(rotationPivot.x - effectiveUnrotatedRect.origin.x) * scale}px ${(rotationPivot.y - effectiveUnrotatedRect.origin.y) * scale}px`
+      : 'center center';
+  const centerX = rotationPivot
+    ? (rotationPivot.x - currentObject.rect.origin.x) * scale
+    : aabbWidth / 2;
+  const centerY = rotationPivot
+    ? (rotationPivot.y - currentObject.rect.origin.y) * scale
+    : aabbHeight / 2;
   const guideLength = Math.max(300, Math.max(aabbWidth, aabbHeight) + 80);
 
   // For children, override rect to use unrotatedRect so content renders in unrotated space
   const childObject = useMemo(() => {
-    if ((currentObject as any).unrotatedRect) {
-      return { ...currentObject, rect: (currentObject as any).unrotatedRect };
+    if (explicitUnrotatedRect) {
+      return { ...currentObject, rect: explicitUnrotatedRect };
     }
     return currentObject;
-  }, [currentObject]);
+  }, [currentObject, explicitUnrotatedRect]);
 
   return (
     <div data-no-interaction>
@@ -619,12 +644,12 @@ export function AnnotationContainer<T extends PdfAnnotationObject>({
           {...doubleProps}
           style={{
             position: 'absolute',
-            left: (aabbWidth - innerWidth) / 2,
-            top: (aabbHeight - innerHeight) / 2,
+            left: innerLeft,
+            top: innerTop,
             width: innerWidth,
             height: innerHeight,
             transform: annotationRotation !== 0 ? `rotate(${annotationRotation}deg)` : undefined,
-            transformOrigin: 'center center',
+            transformOrigin: innerTransformOrigin,
             outline: showOutline ? `1px solid ${selectionOutlineColor}` : 'none',
             outlineOffset: showOutline ? `${outlineOffset}px` : '0px',
             pointerEvents: isSelected && !isMultiSelected ? 'auto' : 'none',

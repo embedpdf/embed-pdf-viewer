@@ -1,7 +1,7 @@
 import { expandRect, PdfInkAnnoObject, Rect, rectFromPoints } from '@embedpdf/models';
 
 import { PatchFunction } from '../patch-registry';
-import { calculateRotatedRectAABB, getRectCenter } from '../patch-utils';
+import { calculateRotatedRectAABB, resolveRotateRects } from '../patch-utils';
 
 export const patchInk: PatchFunction<PdfInkAnnoObject> = (original, ctx) => {
   // Handle different transformation types
@@ -136,13 +136,9 @@ export const patchInk: PatchFunction<PdfInkAnnoObject> = (original, ctx) => {
           size: { ...baseUnrotatedRect.size },
         };
 
-        // Calculate the new AABB from the rotated unrotated rect
-        const newRect = calculateRotatedRectAABB(normalizedUnrotatedRect, angleDegrees);
-
         return {
-          rect: newRect,
+          ...resolveRotateRects(original, normalizedUnrotatedRect, angleDegrees),
           rotation: angleDegrees,
-          unrotatedRect: normalizedUnrotatedRect,
         };
       }
       return ctx.changes;

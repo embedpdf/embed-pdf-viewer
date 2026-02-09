@@ -1,7 +1,7 @@
 import { PdfCircleAnnoObject } from '@embedpdf/models';
 
 import { PatchFunction } from '../patch-registry';
-import { calculateRotatedRectAABB, getRectCenter } from '../patch-utils';
+import { calculateRotatedRectAABB, resolveRotateRects } from '../patch-utils';
 
 export const patchCircle: PatchFunction<PdfCircleAnnoObject> = (orig, ctx) => {
   switch (ctx.type) {
@@ -49,18 +49,14 @@ export const patchCircle: PatchFunction<PdfCircleAnnoObject> = (orig, ctx) => {
           size: { ...baseUnrotatedRect.size },
         };
 
-        // Calculate the new AABB from the rotated unrotated rect
-        const newRect = calculateRotatedRectAABB(normalizedUnrotatedRect, angleDegrees);
-
         // Calculate new rotation value (accumulate or set absolute)
         // If rotationAngle is absolute (from interaction), use it directly
         // If it's delta, add to existing rotation
         const newRotation = angleDegrees;
 
         return {
-          rect: newRect,
+          ...resolveRotateRects(orig, normalizedUnrotatedRect, angleDegrees),
           rotation: newRotation,
-          unrotatedRect: normalizedUnrotatedRect,
         };
       }
       return ctx.changes;

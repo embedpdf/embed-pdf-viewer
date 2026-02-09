@@ -18,6 +18,8 @@ import {
 
 export interface UseDragResizeOptions {
   element: MaybeRef<Rect>;
+  rotationCenter?: MaybeRef<Position>;
+  rotationElement?: MaybeRef<Rect>;
   vertices?: MaybeRef<Position[]>;
   constraints?: MaybeRef<DragResizeConfig['constraints']>;
   maintainAspectRatio?: MaybeRef<boolean>;
@@ -34,6 +36,8 @@ export function useDragResize(options: UseDragResizeOptions) {
   const {
     onUpdate,
     element,
+    rotationCenter,
+    rotationElement,
     vertices,
     constraints,
     maintainAspectRatio,
@@ -46,6 +50,8 @@ export function useDragResize(options: UseDragResizeOptions) {
   // Build initial plain config
   const initialCfg: DragResizeConfig = {
     element: rectDTO(norm(element)),
+    rotationCenter: rotationCenter ? norm(rotationCenter) : undefined,
+    rotationElement: rotationElement ? rectDTO(norm(rotationElement)) : undefined,
     vertices: vertices ? vertsDTO(norm(vertices)) : undefined,
     constraints: constraintsDTO(constraints),
     maintainAspectRatio: boolDTO(enabled === undefined ? undefined : norm(maintainAspectRatio!)),
@@ -64,6 +70,8 @@ export function useDragResize(options: UseDragResizeOptions) {
   watch(
     () => ({
       element,
+      rotationCenter,
+      rotationElement,
       vertices,
       constraints,
       maintainAspectRatio,
@@ -74,6 +82,8 @@ export function useDragResize(options: UseDragResizeOptions) {
     (nc) => {
       controller.value?.updateConfig({
         element: rectDTO(norm(nc.element)),
+        rotationCenter: nc.rotationCenter ? norm(nc.rotationCenter) : undefined,
+        rotationElement: nc.rotationElement ? rectDTO(norm(nc.rotationElement)) : undefined,
         vertices: nc.vertices ? vertsDTO(norm(nc.vertices)) : undefined,
         constraints: constraintsDTO(nc.constraints),
         maintainAspectRatio: boolDTO(

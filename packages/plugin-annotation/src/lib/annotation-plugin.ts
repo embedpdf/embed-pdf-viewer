@@ -108,7 +108,11 @@ import {
   patchCircle,
   patchSquare,
 } from './patching/patches';
-import { getRectCenter, rotatePointAroundCenter } from './patching/patch-utils';
+import {
+  getRectCenter,
+  resolveAnnotationRotationCenter,
+  rotatePointAroundCenter,
+} from './patching/patch-utils';
 
 export class AnnotationPlugin extends BasePlugin<
   AnnotationPluginConfig,
@@ -1942,7 +1946,11 @@ export class AnnotationPlugin extends BasePlugin<
       const ta = this.getAnnotationById(participant.id, documentId);
       if (!ta) continue;
 
-      const originalCenter = getRectCenter(participant.rect);
+      const originalCenter = resolveAnnotationRotationCenter({
+        rect: participant.rect,
+        unrotatedRect: participant.unrotatedRect,
+        rotation: participant.rotation,
+      });
       const rotatedCenter = rotatePointAroundCenter(
         originalCenter,
         state.rotationCenter,

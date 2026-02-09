@@ -3,9 +3,9 @@ import { PdfPolylineAnnoObject } from '@embedpdf/models';
 import { PatchFunction } from '../patch-registry';
 import {
   calculateRotatedRectAABB,
-  getRectCenter,
   lineRectWithEndings,
-  preserveRectCenter,
+  resolveRotateRects,
+  resolveVertexEditRects,
 } from '../patch-utils';
 
 export const patchPolyline: PatchFunction<PdfPolylineAnnoObject> = (orig, ctx) => {
@@ -15,16 +15,8 @@ export const patchPolyline: PatchFunction<PdfPolylineAnnoObject> = (orig, ctx) =
       // Polyline vertex editing: update vertices and recalculate rect
       if (ctx.changes.vertices && ctx.changes.vertices.length) {
         const rect = lineRectWithEndings(ctx.changes.vertices, orig.strokeWidth, orig.lineEndings);
-        if (orig.unrotatedRect) {
-          const stableRect = preserveRectCenter(rect, getRectCenter(orig.unrotatedRect));
-          return {
-            rect: calculateRotatedRectAABB(stableRect, orig.rotation ?? 0),
-            unrotatedRect: stableRect,
-            vertices: ctx.changes.vertices,
-          };
-        }
         return {
-          rect,
+          ...resolveVertexEditRects(orig, rect),
           vertices: ctx.changes.vertices,
         };
       }
@@ -120,13 +112,9 @@ export const patchPolyline: PatchFunction<PdfPolylineAnnoObject> = (orig, ctx) =
           size: { ...baseUnrotatedRect.size },
         };
 
-        // Calculate the new AABB from the rotated unrotated rect
-        const newRect = calculateRotatedRectAABB(normalizedUnrotatedRect, angleDegrees);
-
         return {
-          rect: newRect,
+          ...resolveRotateRects(orig, normalizedUnrotatedRect, angleDegrees),
           rotation: angleDegrees,
-          unrotatedRect: normalizedUnrotatedRect,
         };
       }
       return ctx.changes;

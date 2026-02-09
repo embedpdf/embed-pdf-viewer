@@ -44,6 +44,8 @@ export interface RotationHandleDescriptor {
   handleStyle: Record<string, number | string>;
   /** Style for the connector line (if shown) */
   connectorStyle: Record<string, number | string>;
+  /** Orbit radius in screen pixels used to position the handle. */
+  radius: number;
   /** Attributes for the handle element */
   attrs?: Record<string, any>;
 }
@@ -206,11 +208,17 @@ export function describeRotationFromConfig(
   const scale = cfg.scale ?? 1;
   const rect = cfg.element;
 
-  // Calculate the center of the element (in scaled coordinates, relative to the element's origin)
-  const scaledWidth = rect.size.width * scale;
-  const scaledHeight = rect.size.height * scale;
-  const centerX = scaledWidth / 2;
-  const centerY = scaledHeight / 2;
+  const orbitRect = cfg.rotationElement ?? rect;
+  const orbitCenter = cfg.rotationCenter ?? {
+    x: rect.origin.x + rect.size.width / 2,
+    y: rect.origin.y + rect.size.height / 2,
+  };
+
+  // Center in scaled coordinates, relative to the orbit rect's origin.
+  const scaledWidth = orbitRect.size.width * scale;
+  const scaledHeight = orbitRect.size.height * scale;
+  const centerX = (orbitCenter.x - orbitRect.origin.x) * scale;
+  const centerY = (orbitCenter.y - orbitRect.origin.y) * scale;
 
   // Calculate radius - distance from center to handle
   // Default: far enough from center so the handle clears the rect at any angle
@@ -250,6 +258,7 @@ export function describeRotationFromConfig(
           pointerEvents: 'none',
         }
       : {},
+    radius,
     attrs: { 'data-epdf-rotation-handle': true },
   };
 }

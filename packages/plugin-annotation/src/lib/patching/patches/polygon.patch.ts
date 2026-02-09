@@ -1,7 +1,11 @@
 import { expandRect, PdfPolygonAnnoObject, rectFromPoints } from '@embedpdf/models';
 
 import { PatchFunction } from '../patch-registry';
-import { calculateRotatedRectAABB, getRectCenter, preserveRectCenter } from '../patch-utils';
+import {
+  calculateRotatedRectAABB,
+  resolveRotateRects,
+  resolveVertexEditRects,
+} from '../patch-utils';
 
 export const patchPolygon: PatchFunction<PdfPolygonAnnoObject> = (orig, ctx) => {
   // Handle different transformation types
@@ -11,16 +15,8 @@ export const patchPolygon: PatchFunction<PdfPolygonAnnoObject> = (orig, ctx) => 
       if (ctx.changes.vertices && ctx.changes.vertices.length) {
         const pad = orig.strokeWidth / 2;
         const rect = expandRect(rectFromPoints(ctx.changes.vertices), pad);
-        if (orig.unrotatedRect) {
-          const stableRect = preserveRectCenter(rect, getRectCenter(orig.unrotatedRect));
-          return {
-            rect: calculateRotatedRectAABB(stableRect, orig.rotation ?? 0),
-            unrotatedRect: stableRect,
-            vertices: ctx.changes.vertices,
-          };
-        }
         return {
-          rect,
+          ...resolveVertexEditRects(orig, rect),
           vertices: ctx.changes.vertices,
         };
       }
@@ -116,13 +112,9 @@ export const patchPolygon: PatchFunction<PdfPolygonAnnoObject> = (orig, ctx) => 
           size: { ...baseUnrotatedRect.size },
         };
 
-        // Calculate the new AABB from the rotated unrotated rect
-        const newRect = calculateRotatedRectAABB(normalizedUnrotatedRect, angleDegrees);
-
         return {
-          rect: newRect,
+          ...resolveRotateRects(orig, normalizedUnrotatedRect, angleDegrees),
           rotation: angleDegrees,
-          unrotatedRect: normalizedUnrotatedRect,
         };
       }
       return ctx.changes;

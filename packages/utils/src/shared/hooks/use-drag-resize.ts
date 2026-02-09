@@ -38,6 +38,8 @@ export function useDragResize(options: UseDragResizeOptions) {
     }
   }, [
     config.element,
+    config.rotationCenter,
+    config.rotationElement,
     config.constraints,
     config.maintainAspectRatio,
     config.pageRotation,
@@ -103,7 +105,7 @@ export function useDragResize(options: UseDragResizeOptions) {
   );
 
   const createRotationHandler = useCallback(
-    (initialRotation: number = 0): ResizeHandleEventProps => ({
+    (initialRotation: number = 0, orbitRadiusPx?: number): ResizeHandleEventProps => ({
       onPointerDown: (e: PointerEvent) => {
         if (!enabled) return;
         e.preventDefault();
@@ -115,7 +117,12 @@ export function useDragResize(options: UseDragResizeOptions) {
         const handleRect = (e.currentTarget as HTMLElement).getBoundingClientRect();
         const handleCenterX = handleRect.left + handleRect.width / 2;
         const handleCenterY = handleRect.top + handleRect.height / 2;
-        controllerRef.current?.startRotation(handleCenterX, handleCenterY, initialRotation);
+        controllerRef.current?.startRotation(
+          handleCenterX,
+          handleCenterY,
+          initialRotation,
+          orbitRadiusPx,
+        );
         (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
       },
       onPointerMove: handleMove,
