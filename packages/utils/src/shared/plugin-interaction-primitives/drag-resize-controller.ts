@@ -113,6 +113,8 @@ export class DragResizeController {
   private state: InteractionState = 'idle';
   private startPoint: Position | null = null;
   private startElement: Rect | null = null;
+  private startRotationElement: Rect | null = null;
+  private gestureRotationCenter: Position | null = null;
   private activeHandle: ResizeHandle | null = null;
   private currentPosition: Rect | null = null;
 
@@ -152,6 +154,9 @@ export class DragResizeController {
     this.state = 'dragging';
     this.startPoint = { x: clientX, y: clientY };
     this.startElement = { ...this.config.element };
+    this.startRotationElement = this.config.rotationElement
+      ? { ...this.config.rotationElement }
+      : null;
     this.currentPosition = { ...this.config.element };
 
     this.onUpdate({
@@ -196,6 +201,10 @@ export class DragResizeController {
     this.activeVertexIndex = vertexIndex;
     this.startPoint = { x: clientX, y: clientY };
     this.startVertices = [...this.currentVertices];
+    this.gestureRotationCenter = this.config.rotationCenter ?? {
+      x: this.config.element.origin.x + this.config.element.size.width / 2,
+      y: this.config.element.origin.y + this.config.element.size.height / 2,
+    };
 
     this.onUpdate({
       state: 'start',
@@ -525,6 +534,8 @@ export class DragResizeController {
     this.state = 'idle';
     this.startPoint = null;
     this.startElement = null;
+    this.startRotationElement = null;
+    this.gestureRotationCenter = null;
     this.activeHandle = null;
     this.currentPosition = null;
     this.activeVertexIndex = null;
@@ -593,10 +604,36 @@ export class DragResizeController {
   private clampPoint(p: Position): Position {
     const bbox = this.config.constraints?.boundingBox;
     if (!bbox) return p;
-    return {
-      x: Math.max(0, Math.min(p.x, bbox.width)),
-      y: Math.max(0, Math.min(p.y, bbox.height)),
-    };
+
+    const { annotationRotation = 0 } = this.config;
+    if (annotationRotation === 0) {
+      return {
+        x: Math.max(0, Math.min(p.x, bbox.width)),
+        y: Math.max(0, Math.min(p.y, bbox.height)),
+      };
+    }
+
+    // When rotated, vertices live in unrotated space. Transform to visual
+    // (page) space, clamp to page bounds, then inverse-rotate back.
+    const center = this.gestureRotationCenter ??
+      this.config.rotationCenter ?? {
+        x: this.config.element.origin.x + this.config.element.size.width / 2,
+        y: this.config.element.origin.y + this.config.element.size.height / 2,
+      };
+    const rad = (annotationRotation * Math.PI) / 180;
+
+    // Rotate to visual space
+    const visual = rotatePointAround(p, center, rad);
+
+    // Clamp in visual space
+    const clampedX = Math.max(0, Math.min(visual.x, bbox.width));
+    const clampedY = Math.max(0, Math.min(visual.y, bbox.height));
+
+    // If no clamping was needed, return the original point
+    if (clampedX === visual.x && clampedY === visual.y) return p;
+
+    // Inverse-rotate the clamped visual position back to unrotated space
+    return rotatePointAround({ x: clampedX, y: clampedY }, center, -rad);
   }
 
   private calculateVertexPosition(clientX: number, clientY: number): Position[] {
@@ -628,6 +665,47 @@ export class DragResizeController {
         height: this.startElement.size.height,
       },
     };
+
+    // When the annotation is rotated, the visible footprint is the AABB, not
+    // the unrotatedRect. Clamp based on AABB dimensions so the annotation can
+    // move freely within the page bounds.
+    const { annotationRotation = 0, constraints } = this.config;
+    const bbox = constraints?.boundingBox;
+    if (annotationRotation !== 0 && bbox) {
+      let aabbW: number;
+      let aabbH: number;
+      let offsetX: number;
+      let offsetY: number;
+
+      if (this.startRotationElement) {
+        // Use the captured AABB rect (handles custom pivots correctly)
+        aabbW = this.startRotationElement.size.width;
+        aabbH = this.startRotationElement.size.height;
+        offsetX = this.startRotationElement.origin.x - this.startElement.origin.x;
+        offsetY = this.startRotationElement.origin.y - this.startElement.origin.y;
+      } else {
+        // Compute AABB dimensions from unrotated rect + rotation (center rotation)
+        const rad = Math.abs((annotationRotation * Math.PI) / 180);
+        const cos = Math.abs(Math.cos(rad));
+        const sin = Math.abs(Math.sin(rad));
+        const w = position.size.width;
+        const h = position.size.height;
+        aabbW = w * cos + h * sin;
+        aabbH = w * sin + h * cos;
+        offsetX = (w - aabbW) / 2;
+        offsetY = (h - aabbH) / 2;
+      }
+
+      // Clamp so the AABB stays within page bounds
+      let { x, y } = position.origin;
+      x = Math.max(-offsetX, Math.min(x, bbox.width - aabbW - offsetX));
+      y = Math.max(-offsetY, Math.min(y, bbox.height - aabbH - offsetY));
+
+      return {
+        origin: { x, y },
+        size: position.size,
+      };
+    }
 
     return this.applyConstraints(position);
   }
