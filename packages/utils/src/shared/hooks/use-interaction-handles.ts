@@ -77,6 +77,7 @@ export function useInteractionHandles(opts: {
     controller.element.size.height,
     controller.scale,
     controller.pageRotation,
+    controller.annotationRotation,
     controller.maintainAspectRatio,
     resizeUI?.handleSize,
     resizeUI?.spacing,

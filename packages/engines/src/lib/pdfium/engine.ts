@@ -948,10 +948,19 @@ export class PdfiumNative implements IPdfiumExecutor {
       });
     }
 
+    // Rotate vertices for PDF storage if the annotation has rotation
+    const saveAnnotation = this.prepareAnnotationForSave(annotation);
+
     let isSucceed = false;
-    switch (annotation.type) {
+    switch (saveAnnotation.type) {
       case PdfAnnotationSubtype.INK:
-        isSucceed = this.addInkStroke(doc, page, pageCtx.pagePtr, annotationPtr, annotation);
+        isSucceed = this.addInkStroke(
+          doc,
+          page,
+          pageCtx.pagePtr,
+          annotationPtr,
+          saveAnnotation as PdfInkAnnoObject,
+        );
         break;
       case PdfAnnotationSubtype.STAMP:
         isSucceed = this.addStampContent(
@@ -960,26 +969,48 @@ export class PdfiumNative implements IPdfiumExecutor {
           page,
           pageCtx.pagePtr,
           annotationPtr,
-          annotation,
+          saveAnnotation as PdfStampAnnoObject,
           context?.imageData,
         );
         break;
       case PdfAnnotationSubtype.TEXT:
-        isSucceed = this.addTextContent(page, pageCtx.pagePtr, annotationPtr, annotation);
+        isSucceed = this.addTextContent(
+          page,
+          pageCtx.pagePtr,
+          annotationPtr,
+          saveAnnotation as PdfTextAnnoObject,
+        );
         break;
       case PdfAnnotationSubtype.FREETEXT:
-        isSucceed = this.addFreeTextContent(page, pageCtx.pagePtr, annotationPtr, annotation);
+        isSucceed = this.addFreeTextContent(
+          page,
+          pageCtx.pagePtr,
+          annotationPtr,
+          saveAnnotation as PdfFreeTextAnnoObject,
+        );
         break;
       case PdfAnnotationSubtype.LINE:
-        isSucceed = this.addLineContent(doc, page, pageCtx.pagePtr, annotationPtr, annotation);
+        isSucceed = this.addLineContent(
+          doc,
+          page,
+          pageCtx.pagePtr,
+          annotationPtr,
+          saveAnnotation as PdfLineAnnoObject,
+        );
         break;
       case PdfAnnotationSubtype.POLYLINE:
       case PdfAnnotationSubtype.POLYGON:
-        isSucceed = this.addPolyContent(doc, page, pageCtx.pagePtr, annotationPtr, annotation);
+        isSucceed = this.addPolyContent(
+          doc,
+          page,
+          pageCtx.pagePtr,
+          annotationPtr,
+          saveAnnotation as PdfPolygonAnnoObject | PdfPolylineAnnoObject,
+        );
         break;
       case PdfAnnotationSubtype.CIRCLE:
       case PdfAnnotationSubtype.SQUARE:
-        isSucceed = this.addShapeContent(page, pageCtx.pagePtr, annotationPtr, annotation);
+        isSucceed = this.addShapeContent(page, pageCtx.pagePtr, annotationPtr, saveAnnotation);
         break;
       case PdfAnnotationSubtype.UNDERLINE:
       case PdfAnnotationSubtype.STRIKEOUT:
@@ -990,14 +1021,25 @@ export class PdfiumNative implements IPdfiumExecutor {
           page,
           pageCtx.pagePtr,
           annotationPtr,
-          annotation,
+          saveAnnotation as PdfHighlightAnnoObject,
         );
         break;
       case PdfAnnotationSubtype.LINK:
-        isSucceed = this.addLinkContent(ctx.docPtr, pageCtx.pagePtr, annotationPtr, annotation);
+        isSucceed = this.addLinkContent(
+          ctx.docPtr,
+          pageCtx.pagePtr,
+          annotationPtr,
+          saveAnnotation as PdfLinkAnnoObject,
+        );
         break;
       case PdfAnnotationSubtype.REDACT:
-        isSucceed = this.addRedactContent(doc, page, pageCtx.pagePtr, annotationPtr, annotation);
+        isSucceed = this.addRedactContent(
+          doc,
+          page,
+          pageCtx.pagePtr,
+          annotationPtr,
+          saveAnnotation as PdfRedactAnnoObject,
+        );
         break;
     }
 
@@ -1108,51 +1150,91 @@ export class PdfiumNative implements IPdfiumExecutor {
       });
     }
 
-    /* 2 ── wipe previous payload and rebuild fresh one ─────────────────────── */
+    /* 2 ── For rotated vertex types, rotate vertices for PDF storage ────────── */
+    // PDF stores physically rotated vertices so other viewers render correctly.
+    // Our viewer stores unrotated vertices + rotation metadata in EPDFCustom.
+    const saveAnnotation = this.prepareAnnotationForSave(annotation);
+
+    /* 3 ── wipe previous payload and rebuild fresh one ─────────────────────── */
     let ok = false;
-    switch (annotation.type) {
+    switch (saveAnnotation.type) {
       /* ── Ink ─────────────────────────────────────────────────────────────── */
       case PdfAnnotationSubtype.INK: {
         /* clear every existing stroke first */
         if (!this.pdfiumModule.FPDFAnnot_RemoveInkList(annotPtr)) break;
-        ok = this.addInkStroke(doc, page, pageCtx.pagePtr, annotPtr, annotation);
+        ok = this.addInkStroke(
+          doc,
+          page,
+          pageCtx.pagePtr,
+          annotPtr,
+          saveAnnotation as PdfInkAnnoObject,
+        );
         break;
       }
 
       /* ── Stamp ───────────────────────────────────────────────────────────── */
       case PdfAnnotationSubtype.STAMP: {
-        ok = this.addStampContent(doc, ctx.docPtr, page, pageCtx.pagePtr, annotPtr, annotation);
+        ok = this.addStampContent(
+          doc,
+          ctx.docPtr,
+          page,
+          pageCtx.pagePtr,
+          annotPtr,
+          saveAnnotation as PdfStampAnnoObject,
+        );
         break;
       }
 
       case PdfAnnotationSubtype.TEXT: {
-        ok = this.addTextContent(page, pageCtx.pagePtr, annotPtr, annotation);
+        ok = this.addTextContent(
+          page,
+          pageCtx.pagePtr,
+          annotPtr,
+          saveAnnotation as PdfTextAnnoObject,
+        );
         break;
       }
 
       /* ── Free text ────────────────────────────────────────────────────────── */
       case PdfAnnotationSubtype.FREETEXT: {
-        ok = this.addFreeTextContent(page, pageCtx.pagePtr, annotPtr, annotation);
+        ok = this.addFreeTextContent(
+          page,
+          pageCtx.pagePtr,
+          annotPtr,
+          saveAnnotation as PdfFreeTextAnnoObject,
+        );
         break;
       }
 
       /* ── Shape ───────────────────────────────────────────────────────────── */
       case PdfAnnotationSubtype.CIRCLE:
       case PdfAnnotationSubtype.SQUARE: {
-        ok = this.addShapeContent(page, pageCtx.pagePtr, annotPtr, annotation);
+        ok = this.addShapeContent(page, pageCtx.pagePtr, annotPtr, saveAnnotation);
         break;
       }
 
       /* ── Line ─────────────────────────────────────────────────────────────── */
       case PdfAnnotationSubtype.LINE: {
-        ok = this.addLineContent(doc, page, pageCtx.pagePtr, annotPtr, annotation);
+        ok = this.addLineContent(
+          doc,
+          page,
+          pageCtx.pagePtr,
+          annotPtr,
+          saveAnnotation as PdfLineAnnoObject,
+        );
         break;
       }
 
       /* ── Polygon / Polyline ───────────────────────────────────────────────── */
       case PdfAnnotationSubtype.POLYGON:
       case PdfAnnotationSubtype.POLYLINE: {
-        ok = this.addPolyContent(doc, page, pageCtx.pagePtr, annotPtr, annotation);
+        ok = this.addPolyContent(
+          doc,
+          page,
+          pageCtx.pagePtr,
+          annotPtr,
+          saveAnnotation as PdfPolygonAnnoObject | PdfPolylineAnnoObject,
+        );
         break;
       }
 
@@ -1162,19 +1244,36 @@ export class PdfiumNative implements IPdfiumExecutor {
       case PdfAnnotationSubtype.STRIKEOUT:
       case PdfAnnotationSubtype.SQUIGGLY: {
         /* replace quad-points / colour / strings in one go */
-        ok = this.addTextMarkupContent(doc, page, pageCtx.pagePtr, annotPtr, annotation);
+        ok = this.addTextMarkupContent(
+          doc,
+          page,
+          pageCtx.pagePtr,
+          annotPtr,
+          saveAnnotation as PdfHighlightAnnoObject,
+        );
         break;
       }
 
       /* ── Link ─────────────────────────────────────────────────────────────── */
       case PdfAnnotationSubtype.LINK: {
-        ok = this.addLinkContent(ctx.docPtr, pageCtx.pagePtr, annotPtr, annotation);
+        ok = this.addLinkContent(
+          ctx.docPtr,
+          pageCtx.pagePtr,
+          annotPtr,
+          saveAnnotation as PdfLinkAnnoObject,
+        );
         break;
       }
 
       /* ── Redact ───────────────────────────────────────────────────────────── */
       case PdfAnnotationSubtype.REDACT: {
-        ok = this.addRedactContent(doc, page, pageCtx.pagePtr, annotPtr, annotation);
+        ok = this.addRedactContent(
+          doc,
+          page,
+          pageCtx.pagePtr,
+          annotPtr,
+          saveAnnotation as PdfRedactAnnoObject,
+        );
         break;
       }
 
@@ -1183,7 +1282,7 @@ export class PdfiumNative implements IPdfiumExecutor {
         ok = false;
     }
 
-    /* 3 ── regenerate appearance if payload was changed ───────────────────── */
+    /* 4 ── regenerate appearance if payload was changed ───────────────────── */
     if (ok) {
       if (annotation.blendMode !== undefined) {
         this.pdfiumModule.EPDFAnnot_GenerateAppearanceWithBlend(annotPtr, annotation.blendMode);
@@ -1193,7 +1292,7 @@ export class PdfiumNative implements IPdfiumExecutor {
       this.pdfiumModule.FPDFPage_GenerateContent(pageCtx.pagePtr);
     }
 
-    /* 4 ── tidy-up native handles ──────────────────────────────────────────── */
+    /* 5 ── tidy-up native handles ──────────────────────────────────────────── */
     this.pdfiumModule.FPDFPage_CloseAnnot(annotPtr);
     pageCtx.release();
     this.logger.perf(
@@ -4114,7 +4213,73 @@ export class PdfiumNative implements IPdfiumExecutor {
         break;
     }
 
+    // Post-process: reverse-rotate vertices for vertex types that have rotation metadata
+    if (annotation) {
+      annotation = this.reverseRotateAnnotationOnLoad(annotation);
+    }
+
     return annotation;
+  }
+
+  /**
+   * On load, if a vertex-type annotation has rotation metadata in EPDFCustom,
+   * reverse-rotate the PDF's physically rotated vertices by -rotation to recover
+   * the unrotated vertices for runtime editing.
+   */
+  private reverseRotateAnnotationOnLoad(annotation: PdfAnnotationObject): PdfAnnotationObject {
+    const rotation = annotation.rotation;
+    const unrotatedRect = annotation.unrotatedRect;
+
+    // Only process vertex types that have rotation metadata
+    if (!rotation || rotation === 0 || !unrotatedRect) {
+      return annotation;
+    }
+
+    const center: Position = {
+      x: unrotatedRect.origin.x + unrotatedRect.size.width / 2,
+      y: unrotatedRect.origin.y + unrotatedRect.size.height / 2,
+    };
+
+    // Reverse-rotate by -rotation to recover unrotated vertices
+    switch (annotation.type) {
+      case PdfAnnotationSubtype.INK: {
+        const ink = annotation as PdfInkAnnoObject;
+        const unrotatedInkList = ink.inkList.map((stroke) => ({
+          points: stroke.points.map((p) => this.rotatePointForSave(p, center, -rotation)),
+        }));
+        return { ...ink, inkList: unrotatedInkList };
+      }
+
+      case PdfAnnotationSubtype.LINE: {
+        const line = annotation as PdfLineAnnoObject;
+        return {
+          ...line,
+          linePoints: {
+            start: this.rotatePointForSave(line.linePoints.start, center, -rotation),
+            end: this.rotatePointForSave(line.linePoints.end, center, -rotation),
+          },
+        };
+      }
+
+      case PdfAnnotationSubtype.POLYGON: {
+        const poly = annotation as PdfPolygonAnnoObject;
+        return {
+          ...poly,
+          vertices: poly.vertices.map((v) => this.rotatePointForSave(v, center, -rotation)),
+        };
+      }
+
+      case PdfAnnotationSubtype.POLYLINE: {
+        const polyline = annotation as PdfPolylineAnnoObject;
+        return {
+          ...polyline,
+          vertices: polyline.vertices.map((v) => this.rotatePointForSave(v, center, -rotation)),
+        };
+      }
+
+      default:
+        return annotation;
+    }
   }
 
   /**
@@ -6449,6 +6614,85 @@ export class PdfiumNative implements IPdfiumExecutor {
     if (!parentPtr) return false;
 
     return this.pdfiumModule.EPDFAnnot_SetLinkedAnnot(annotationPtr, 'IRT', parentPtr);
+  }
+
+  /**
+   * Rotate a point around a center by the given angle in degrees.
+   * Used to rotate vertices for PDF storage.
+   */
+  private rotatePointForSave(point: Position, center: Position, angleDegrees: number): Position {
+    const rad = (angleDegrees * Math.PI) / 180;
+    const cos = Math.cos(rad);
+    const sin = Math.sin(rad);
+    const dx = point.x - center.x;
+    const dy = point.y - center.y;
+    return {
+      x: center.x + dx * cos - dy * sin,
+      y: center.y + dx * sin + dy * cos,
+    };
+  }
+
+  /**
+   * Prepare an annotation for saving to PDF.
+   * For vertex types (ink, line, polygon, polyline) with rotation,
+   * physically rotates the vertices by +rotation so that other PDF viewers
+   * see the correct visual result. Our viewer reverse-rotates on load.
+   */
+  private prepareAnnotationForSave(annotation: PdfAnnotationObject): PdfAnnotationObject {
+    const rotation = annotation.rotation;
+    const unrotatedRect = annotation.unrotatedRect;
+
+    // If no rotation or no unrotatedRect, return as-is
+    if (!rotation || rotation === 0 || !unrotatedRect) {
+      return annotation;
+    }
+
+    // Compute the center of the unrotated rect (same as AABB center)
+    const center: Position = {
+      x: unrotatedRect.origin.x + unrotatedRect.size.width / 2,
+      y: unrotatedRect.origin.y + unrotatedRect.size.height / 2,
+    };
+
+    switch (annotation.type) {
+      case PdfAnnotationSubtype.INK: {
+        const ink = annotation as PdfInkAnnoObject;
+        const rotatedInkList = ink.inkList.map((stroke) => ({
+          points: stroke.points.map((p) => this.rotatePointForSave(p, center, rotation)),
+        }));
+        return { ...ink, inkList: rotatedInkList };
+      }
+
+      case PdfAnnotationSubtype.LINE: {
+        const line = annotation as PdfLineAnnoObject;
+        return {
+          ...line,
+          linePoints: {
+            start: this.rotatePointForSave(line.linePoints.start, center, rotation),
+            end: this.rotatePointForSave(line.linePoints.end, center, rotation),
+          },
+        };
+      }
+
+      case PdfAnnotationSubtype.POLYGON: {
+        const poly = annotation as PdfPolygonAnnoObject;
+        return {
+          ...poly,
+          vertices: poly.vertices.map((v) => this.rotatePointForSave(v, center, rotation)),
+        };
+      }
+
+      case PdfAnnotationSubtype.POLYLINE: {
+        const polyline = annotation as PdfPolylineAnnoObject;
+        return {
+          ...polyline,
+          vertices: polyline.vertices.map((v) => this.rotatePointForSave(v, center, rotation)),
+        };
+      }
+
+      default:
+        // Non-vertex types (square, circle, freetext, etc.) - no vertex rotation needed
+        return annotation;
+    }
   }
 
   /**

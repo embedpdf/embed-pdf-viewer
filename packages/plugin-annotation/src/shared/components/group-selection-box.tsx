@@ -341,44 +341,19 @@ export function GroupSelectionBox({
 
   return (
     <div data-group-selection-box data-no-interaction>
-      {/* Group box - draggable only if effectiveIsDraggable is true */}
+      {/* Outer div: AABB container - stable center for help lines and rotation handle */}
       <div
-        {...(effectiveIsDraggable
-          ? dragProps
-          : {
-              onPointerDown: (e) => e.stopPropagation(),
-            })}
         style={{
           position: 'absolute',
           left: previewGroupBox.origin.x * scale,
           top: previewGroupBox.origin.y * scale,
-          width: previewGroupBox.size.width * scale,
-          height: previewGroupBox.size.height * scale,
-          outline: `2px dashed ${selectionOutlineColor}`,
-          outlineOffset: outlineOffset - 1,
-          cursor: effectiveIsDraggable ? 'move' : 'default',
-          touchAction: 'none',
+          width: groupBoxWidth,
+          height: groupBoxHeight,
+          pointerEvents: 'none',
           zIndex,
         }}
       >
-        {/* Resize handles */}
-        {effectiveIsResizable &&
-          resize.map(({ key, ...hProps }) =>
-            resizeUI?.component ? (
-              resizeUI.component({
-                key,
-                ...hProps,
-                backgroundColor: HANDLE_COLOR,
-              })
-            ) : (
-              <div
-                key={key}
-                {...hProps}
-                style={{ ...hProps.style, backgroundColor: HANDLE_COLOR }}
-              />
-            ),
-          )}
-
+        {/* Rotation guide lines - anchored at stable center */}
         {rotationActive && (
           <>
             {/* Fixed snap lines (cross at 0/90/180/270) */}
@@ -424,46 +399,7 @@ export function GroupSelectionBox({
           </>
         )}
 
-        {/* Rotation handle - kept in DOM during rotation to preserve pointer capture */}
-        {isRotatable && rotationHandle && (
-          <>
-            {Object.keys(rotationHandle.connector.style).length > 0 && (
-              <div
-                style={{
-                  ...rotationHandle.connector.style,
-                  backgroundColor: HANDLE_COLOR,
-                  opacity: rotationActive ? 0 : 1,
-                }}
-              />
-            )}
-            <div
-              {...rotationHandle.handle}
-              style={{
-                ...rotationHandle.handle.style,
-                backgroundColor: HANDLE_COLOR,
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                opacity: rotationActive ? 0 : 1,
-              }}
-            >
-              <svg
-                width="10"
-                height="10"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="white"
-                strokeWidth="2"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              >
-                <path d="M21 12a9 9 0 1 1-9-9c2.52 0 4.93 1 6.74 2.74L21 8" />
-                <path d="M21 3v5h-5" />
-              </svg>
-            </div>
-          </>
-        )}
-
+        {/* Rotation label - above the stable center */}
         {isRotatable && (
           <div
             style={{
@@ -530,6 +466,86 @@ export function GroupSelectionBox({
             )}
           </div>
         )}
+
+        {/* Rotation handle - orbits in AABB space */}
+        {isRotatable && rotationHandle && (
+          <>
+            {Object.keys(rotationHandle.connector.style).length > 0 && (
+              <div
+                style={{
+                  ...rotationHandle.connector.style,
+                  backgroundColor: HANDLE_COLOR,
+                  opacity: rotationActive ? 0 : 1,
+                }}
+              />
+            )}
+            <div
+              {...rotationHandle.handle}
+              style={{
+                ...rotationHandle.handle.style,
+                backgroundColor: HANDLE_COLOR,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                pointerEvents: 'auto',
+                opacity: rotationActive ? 0 : 1,
+              }}
+            >
+              <svg
+                width="10"
+                height="10"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="white"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              >
+                <path d="M21 12a9 9 0 1 1-9-9c2.52 0 4.93 1 6.74 2.74L21 8" />
+                <path d="M21 3v5h-5" />
+              </svg>
+            </div>
+          </>
+        )}
+
+        {/* Inner div: group content area with outline and resize handles */}
+        <div
+          {...(effectiveIsDraggable
+            ? dragProps
+            : {
+                onPointerDown: (e: any) => e.stopPropagation(),
+              })}
+          style={{
+            position: 'absolute',
+            left: 0,
+            top: 0,
+            width: groupBoxWidth,
+            height: groupBoxHeight,
+            outline: `2px dashed ${selectionOutlineColor}`,
+            outlineOffset: outlineOffset - 1,
+            cursor: effectiveIsDraggable ? 'move' : 'default',
+            touchAction: 'none',
+            pointerEvents: 'auto',
+          }}
+        >
+          {/* Resize handles */}
+          {effectiveIsResizable &&
+            resize.map(({ key, ...hProps }) =>
+              resizeUI?.component ? (
+                resizeUI.component({
+                  key,
+                  ...hProps,
+                  backgroundColor: HANDLE_COLOR,
+                })
+              ) : (
+                <div
+                  key={key}
+                  {...hProps}
+                  style={{ ...hProps.style, backgroundColor: HANDLE_COLOR }}
+                />
+              ),
+            )}
+        </div>
       </div>
 
       {/* Group selection menu */}

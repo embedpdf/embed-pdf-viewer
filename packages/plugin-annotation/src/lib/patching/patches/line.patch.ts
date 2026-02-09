@@ -1,7 +1,12 @@
 import { PdfLineAnnoObject } from '@embedpdf/models';
 
 import { PatchFunction } from '../patch-registry';
-import { lineRectWithEndings, rotatePointAroundCenter, getRectCenter } from '../patch-utils';
+import {
+  calculateRotatedRectAABB,
+  getRectCenter,
+  lineRectWithEndings,
+  preserveRectCenter,
+} from '../patch-utils';
 
 export const patchLine: PatchFunction<PdfLineAnnoObject> = (orig, ctx) => {
   // Handle different transformation types
@@ -11,6 +16,14 @@ export const patchLine: PatchFunction<PdfLineAnnoObject> = (orig, ctx) => {
       if (ctx.changes.linePoints) {
         const { start, end } = ctx.changes.linePoints;
         const rect = lineRectWithEndings([start, end], orig.strokeWidth, orig.lineEndings);
+        if (orig.unrotatedRect) {
+          const stableRect = preserveRectCenter(rect, getRectCenter(orig.unrotatedRect));
+          return {
+            rect: calculateRotatedRectAABB(stableRect, orig.rotation ?? 0),
+            unrotatedRect: stableRect,
+            linePoints: { start, end },
+          };
+        }
         return {
           rect,
           linePoints: { start, end },
@@ -24,20 +37,30 @@ export const patchLine: PatchFunction<PdfLineAnnoObject> = (orig, ctx) => {
         const dx = ctx.changes.rect.origin.x - orig.rect.origin.x;
         const dy = ctx.changes.rect.origin.y - orig.rect.origin.y;
 
-        return {
+        const result: Partial<PdfLineAnnoObject> = {
           rect: ctx.changes.rect,
           linePoints: {
             start: { x: orig.linePoints.start.x + dx, y: orig.linePoints.start.y + dy },
             end: { x: orig.linePoints.end.x + dx, y: orig.linePoints.end.y + dy },
           },
         };
+
+        // Also translate unrotatedRect if the annotation is rotated
+        if (orig.unrotatedRect) {
+          result.unrotatedRect = {
+            origin: { x: orig.unrotatedRect.origin.x + dx, y: orig.unrotatedRect.origin.y + dy },
+            size: { ...orig.unrotatedRect.size },
+          };
+        }
+
+        return result;
       }
       return ctx.changes;
 
     case 'resize':
-      // Complex resize with scaling
+      // Complex resize with scaling -- operates in unrotated space
       if (ctx.changes.rect) {
-        const oldRect = orig.rect;
+        const oldRect = orig.unrotatedRect ?? orig.rect;
         const newRect = ctx.changes.rect;
         let scaleX = newRect.size.width / oldRect.size.width;
         let scaleY = newRect.size.height / oldRect.size.height;
@@ -79,32 +102,41 @@ export const patchLine: PatchFunction<PdfLineAnnoObject> = (orig, ctx) => {
           },
         };
 
-        return {
-          rect: ctx.changes.rect,
+        const result: Partial<PdfLineAnnoObject> = {
           linePoints: newLinePoints,
         };
+
+        // If rotated, ctx.changes.rect is the new unrotatedRect; compute AABB
+        if (orig.unrotatedRect) {
+          result.unrotatedRect = ctx.changes.rect;
+          result.rect = calculateRotatedRectAABB(ctx.changes.rect, orig.rotation ?? 0);
+        } else {
+          result.rect = ctx.changes.rect;
+        }
+
+        return result;
       }
       return ctx.changes;
 
     case 'rotate':
-      // Rotate line points around the center
+      // Store rotation angle and compute AABB -- line points are NOT rotated at runtime
       if (ctx.metadata?.rotationAngle !== undefined) {
-        const center = ctx.metadata.rotationCenter ?? getRectCenter(orig.rect);
         const angleDegrees = ctx.metadata.rotationAngle;
 
-        const rotatedStart = rotatePointAroundCenter(orig.linePoints.start, center, angleDegrees);
-        const rotatedEnd = rotatePointAroundCenter(orig.linePoints.end, center, angleDegrees);
+        // Use the provided unrotatedRect override when available, otherwise fall back to stored value
+        const baseUnrotatedRect = ctx.changes.unrotatedRect ?? orig.unrotatedRect ?? orig.rect;
+        const normalizedUnrotatedRect = {
+          origin: { ...baseUnrotatedRect.origin },
+          size: { ...baseUnrotatedRect.size },
+        };
 
-        // Recalculate the bounding rect from rotated line points
-        const rect = lineRectWithEndings(
-          [rotatedStart, rotatedEnd],
-          orig.strokeWidth,
-          orig.lineEndings,
-        );
+        // Calculate the new AABB from the rotated unrotated rect
+        const newRect = calculateRotatedRectAABB(normalizedUnrotatedRect, angleDegrees);
 
         return {
-          rect,
-          linePoints: { start: rotatedStart, end: rotatedEnd },
+          rect: newRect,
+          rotation: angleDegrees,
+          unrotatedRect: normalizedUnrotatedRect,
         };
       }
       return ctx.changes;

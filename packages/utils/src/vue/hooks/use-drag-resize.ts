@@ -22,6 +22,7 @@ export interface UseDragResizeOptions {
   constraints?: MaybeRef<DragResizeConfig['constraints']>;
   maintainAspectRatio?: MaybeRef<boolean>;
   pageRotation?: MaybeRef<number>;
+  annotationRotation?: MaybeRef<number>;
   scale?: MaybeRef<number>;
   onUpdate?: (event: InteractionEvent) => void;
   enabled?: MaybeRef<boolean>;
@@ -37,6 +38,7 @@ export function useDragResize(options: UseDragResizeOptions) {
     constraints,
     maintainAspectRatio,
     pageRotation,
+    annotationRotation,
     scale,
     enabled,
   } = options;
@@ -48,6 +50,9 @@ export function useDragResize(options: UseDragResizeOptions) {
     constraints: constraintsDTO(constraints),
     maintainAspectRatio: boolDTO(enabled === undefined ? undefined : norm(maintainAspectRatio!)),
     pageRotation: numDTO(pageRotation === undefined ? undefined : norm(pageRotation!)),
+    annotationRotation: numDTO(
+      annotationRotation === undefined ? undefined : norm(annotationRotation!),
+    ),
     scale: numDTO(scale === undefined ? undefined : norm(scale!)),
   };
 
@@ -63,6 +68,7 @@ export function useDragResize(options: UseDragResizeOptions) {
       constraints,
       maintainAspectRatio,
       pageRotation,
+      annotationRotation,
       scale,
     }),
     (nc) => {
@@ -74,6 +80,9 @@ export function useDragResize(options: UseDragResizeOptions) {
           nc.maintainAspectRatio === undefined ? undefined : norm(nc.maintainAspectRatio!),
         ),
         pageRotation: numDTO(nc.pageRotation === undefined ? undefined : norm(nc.pageRotation!)),
+        annotationRotation: numDTO(
+          nc.annotationRotation === undefined ? undefined : norm(nc.annotationRotation!),
+        ),
         scale: numDTO(nc.scale === undefined ? undefined : norm(nc.scale!)),
       });
     },

@@ -6,22 +6,30 @@ import { calculateRotatedRectAABB, getRectCenter } from '../patch-utils';
 export const patchCircle: PatchFunction<PdfCircleAnnoObject> = (orig, ctx) => {
   switch (ctx.type) {
     case 'move':
-      // Simple move: just update rect
+      // Simple move: just update rect (and unrotatedRect if rotated)
       if (ctx.changes.rect) {
+        if (orig.unrotatedRect) {
+          const dx = ctx.changes.rect.origin.x - orig.rect.origin.x;
+          const dy = ctx.changes.rect.origin.y - orig.rect.origin.y;
+          return {
+            rect: ctx.changes.rect,
+            unrotatedRect: {
+              origin: { x: orig.unrotatedRect.origin.x + dx, y: orig.unrotatedRect.origin.y + dy },
+              size: { ...orig.unrotatedRect.size },
+            },
+          };
+        }
         return { rect: ctx.changes.rect };
       }
       return ctx.changes;
 
     case 'resize':
-      // Resize: update rect (circle/ellipse doesn't have vertices)
+      // Resize: operates in unrotated space
       if (ctx.changes.rect) {
-        // If the annotation has rotation, we need to update unrotatedRect too
-        if (orig.rotation && orig.rotation !== 0) {
-          // The new rect is the AABB, we need to calculate what the unrotated rect would be
-          // For now, we'll store the new rect as unrotatedRect and recalculate AABB
-          // This is a simplification - full implementation would reverse the rotation
+        // If rotated, ctx.changes.rect is the new unrotatedRect; compute AABB
+        if (orig.unrotatedRect) {
           return {
-            rect: ctx.changes.rect,
+            rect: calculateRotatedRectAABB(ctx.changes.rect, orig.rotation ?? 0),
             unrotatedRect: ctx.changes.rect,
           };
         }

@@ -1,7 +1,7 @@
 import { expandRect, PdfInkAnnoObject, Rect, rectFromPoints } from '@embedpdf/models';
 
 import { PatchFunction } from '../patch-registry';
-import { rotatePointAroundCenter, getRectCenter } from '../patch-utils';
+import { calculateRotatedRectAABB, getRectCenter } from '../patch-utils';
 
 export const patchInk: PatchFunction<PdfInkAnnoObject> = (original, ctx) => {
   // Handle different transformation types
@@ -24,17 +24,31 @@ export const patchInk: PatchFunction<PdfInkAnnoObject> = (original, ctx) => {
           })),
         }));
 
-        return {
+        const result: Partial<PdfInkAnnoObject> = {
           rect: ctx.changes.rect,
           inkList: movedInkList,
         };
+
+        // Also translate unrotatedRect if the annotation is rotated
+        if (original.unrotatedRect) {
+          result.unrotatedRect = {
+            origin: {
+              x: original.unrotatedRect.origin.x + dx,
+              y: original.unrotatedRect.origin.y + dy,
+            },
+            size: { ...original.unrotatedRect.size },
+          };
+        }
+
+        return result;
       }
       return ctx.changes;
 
     case 'resize':
-      // Complex resize with scaling
+      // Complex resize with scaling -- operates in unrotated space
       if (ctx.changes.rect) {
-        const oldRect = original.rect;
+        // Use unrotatedRect as the reference for scaling (falls back to rect if not rotated)
+        const oldRect = original.unrotatedRect ?? original.rect;
         const newRect = ctx.changes.rect;
         let scaleX = newRect.size.width / oldRect.size.width;
         let scaleY = newRect.size.height / oldRect.size.height;
@@ -93,30 +107,42 @@ export const patchInk: PatchFunction<PdfInkAnnoObject> = (original, ctx) => {
           })),
         }));
 
-        return {
-          rect: ctx.changes.rect,
+        const result: Partial<PdfInkAnnoObject> = {
           inkList: newInkList,
           strokeWidth: newStrokeWidth,
         };
+
+        // If rotated, ctx.changes.rect is the new unrotatedRect; compute AABB
+        if (original.unrotatedRect) {
+          result.unrotatedRect = ctx.changes.rect;
+          result.rect = calculateRotatedRectAABB(ctx.changes.rect, original.rotation ?? 0);
+        } else {
+          result.rect = ctx.changes.rect;
+        }
+
+        return result;
       }
       return ctx.changes;
     case 'rotate':
-      // Rotate all ink stroke points around the center
+      // Store rotation angle and compute AABB -- ink points are NOT rotated at runtime
       if (ctx.metadata?.rotationAngle !== undefined) {
-        const center = ctx.metadata.rotationCenter ?? getRectCenter(original.rect);
         const angleDegrees = ctx.metadata.rotationAngle;
 
-        const rotatedInkList = original.inkList.map((stroke) => ({
-          points: stroke.points.map((p) => rotatePointAroundCenter(p, center, angleDegrees)),
-        }));
+        // Use the provided unrotatedRect override when available, otherwise fall back to stored value
+        const baseUnrotatedRect =
+          ctx.changes.unrotatedRect ?? original.unrotatedRect ?? original.rect;
+        const normalizedUnrotatedRect = {
+          origin: { ...baseUnrotatedRect.origin },
+          size: { ...baseUnrotatedRect.size },
+        };
 
-        // Recalculate the bounding rect from rotated points
-        const allPoints = rotatedInkList.flatMap((s) => s.points);
-        const rect = expandRect(rectFromPoints(allPoints), original.strokeWidth / 2);
+        // Calculate the new AABB from the rotated unrotated rect
+        const newRect = calculateRotatedRectAABB(normalizedUnrotatedRect, angleDegrees);
 
         return {
-          rect,
-          inkList: rotatedInkList,
+          rect: newRect,
+          rotation: angleDegrees,
+          unrotatedRect: normalizedUnrotatedRect,
         };
       }
       return ctx.changes;

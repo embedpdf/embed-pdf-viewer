@@ -41,6 +41,7 @@ export function useDragResize(options: UseDragResizeOptions) {
     config.constraints,
     config.maintainAspectRatio,
     config.pageRotation,
+    config.annotationRotation,
     config.scale,
     config.vertices,
   ]);

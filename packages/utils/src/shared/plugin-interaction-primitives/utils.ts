@@ -48,28 +48,48 @@ export interface RotationHandleDescriptor {
   attrs?: Record<string, any>;
 }
 
-function diagonalCursor(handle: ResizeHandle, rot: QuarterTurns): string {
-  const isOddRotation = rot % 2 === 1;
+/**
+ * Base angle (degrees, clockwise from north) for each resize handle.
+ * Used to compute the effective angle after page + annotation rotation.
+ */
+const HANDLE_BASE_ANGLE: Record<ResizeHandle, number> = {
+  n: 0,
+  ne: 45,
+  e: 90,
+  se: 135,
+  s: 180,
+  sw: 225,
+  w: 270,
+  nw: 315,
+};
 
-  // Edge handles: swap ns/ew on odd rotations
-  if (handle === 'n' || handle === 's') {
-    return isOddRotation ? 'ew-resize' : 'ns-resize';
-  }
-  if (handle === 'e' || handle === 'w') {
-    return isOddRotation ? 'ns-resize' : 'ew-resize';
-  }
+/**
+ * Cursor names mapped to 45-degree sectors.
+ * Sector 0 = north (337.5..22.5), sector 1 = NE (22.5..67.5), etc.
+ */
+const SECTOR_CURSORS: string[] = [
+  'ns-resize', // 0: north
+  'nesw-resize', // 1: NE
+  'ew-resize', // 2: east
+  'nwse-resize', // 3: SE
+  'ns-resize', // 4: south
+  'nesw-resize', // 5: SW
+  'ew-resize', // 6: west
+  'nwse-resize', // 7: NW
+];
 
-  // Corner handles: diagonals flip on odd quarter-turns
-  const diag0: Record<'nw' | 'ne' | 'sw' | 'se', string> = {
-    nw: 'nwse-resize',
-    ne: 'nesw-resize',
-    sw: 'nesw-resize',
-    se: 'nwse-resize',
-  };
-  if (!isOddRotation) return diag0[handle as 'nw' | 'ne' | 'sw' | 'se'];
-  return { nw: 'nesw-resize', ne: 'nwse-resize', sw: 'nwse-resize', se: 'nesw-resize' }[
-    handle as 'nw' | 'ne' | 'sw' | 'se'
-  ]!;
+function diagonalCursor(
+  handle: ResizeHandle,
+  pageQuarterTurns: QuarterTurns,
+  annotationRotation: number = 0,
+): string {
+  const pageAngle = pageQuarterTurns * 90;
+  const totalAngle = HANDLE_BASE_ANGLE[handle] + pageAngle + annotationRotation;
+  // Normalize to [0, 360)
+  const normalized = ((totalAngle % 360) + 360) % 360;
+  // Map to 45-degree sector (0..7)
+  const sector = Math.round(normalized / 45) % 8;
+  return SECTOR_CURSORS[sector];
 }
 
 function edgeOffset(k: number, spacing: number, mode: 'outside' | 'inside' | 'center') {
@@ -93,7 +113,8 @@ export function describeResizeFromConfig(
     rotationAwareCursor = true,
   } = ui;
 
-  const rotation = ((cfg.pageRotation ?? 0) % 4) as QuarterTurns;
+  const pageQuarterTurns = ((cfg.pageRotation ?? 0) % 4) as QuarterTurns;
+  const annotationRot = cfg.annotationRotation ?? 0;
 
   const off = (edge: 'top' | 'right' | 'bottom' | 'left') => ({
     [edge]: edgeOffset(handleSize, spacing, offsetMode) + 'px',
@@ -124,7 +145,10 @@ export function describeResizeFromConfig(
       height: handleSize + 'px',
       borderRadius: '50%',
       zIndex,
-      cursor: rotationAwareCursor ? diagonalCursor(handle, rotation) : 'default',
+      cursor: rotationAwareCursor
+        ? diagonalCursor(handle, pageQuarterTurns, annotationRot)
+        : 'default',
+      pointerEvents: 'auto',
       touchAction: 'none',
       ...(pos as any),
     },
@@ -156,6 +180,7 @@ export function describeVerticesFromConfig(
         borderRadius: '50%',
         cursor: 'pointer',
         zIndex,
+        pointerEvents: 'auto',
         touchAction: 'none',
       },
       attrs: { 'data-epdf-vertex': i },
@@ -209,6 +234,7 @@ export function describeRotationFromConfig(
       borderRadius: '50%',
       cursor: 'grab',
       zIndex,
+      pointerEvents: 'auto',
       touchAction: 'none',
     },
     connectorStyle: showConnector

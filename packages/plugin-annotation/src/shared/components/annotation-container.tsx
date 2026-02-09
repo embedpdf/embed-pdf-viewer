@@ -163,7 +163,9 @@ export function AnnotationContainer<T extends PdfAnnotationObject>({
 
       // Gesture start - initialize plugin drag/resize
       if (event.state === 'start') {
-        gestureBaseRectRef.current = trackedAnnotation.object.rect;
+        // Use unrotatedRect as gesture base so deltas are computed in unrotated space
+        gestureBaseRectRef.current =
+          (trackedAnnotation.object as any).unrotatedRect ?? trackedAnnotation.object.rect;
         gestureBaseRef.current = trackedAnnotation.object; // For vertex edit
         if (type === 'move') {
           plugin.startDrag(documentId, { annotationIds: [id], pageSize });
@@ -310,6 +312,9 @@ export function AnnotationContainer<T extends PdfAnnotationObject>({
     [closeRotationEditor],
   );
 
+  // Use unrotatedRect as the controller element so resize/vertex-edit operate in unrotated space
+  const controllerElement = (currentObject as any).unrotatedRect ?? currentObject.rect;
+
   const {
     dragProps,
     vertices,
@@ -317,7 +322,7 @@ export function AnnotationContainer<T extends PdfAnnotationObject>({
     rotation: rotationHandle,
   } = useInteractionHandles({
     controller: {
-      element: currentObject.rect,
+      element: controllerElement,
       vertices: vertexConfig?.extractVertices(currentObject),
       constraints: {
         minWidth: 10,
@@ -326,6 +331,7 @@ export function AnnotationContainer<T extends PdfAnnotationObject>({
       },
       maintainAspectRatio: lockAspectRatio,
       pageRotation: rotation,
+      annotationRotation: annotationRotation,
       scale: scale,
       // Disable interaction handles when multi-selected
       enabled: isSelected && !isMultiSelected,
@@ -398,53 +404,42 @@ export function AnnotationContainer<T extends PdfAnnotationObject>({
   // Determine if we should show the outline
   // When multi-selected, don't show individual outlines - GroupSelectionBox shows the group outline
   const showOutline = isSelected && !isMultiSelected;
-  const boxWidth = currentObject.rect.size.width * scale;
-  const boxHeight = currentObject.rect.size.height * scale;
-  const centerX = boxWidth / 2;
-  const centerY = boxHeight / 2;
-  const guideLength = Math.max(300, Math.max(boxWidth, boxHeight) + 80);
+
+  // Three-layer model: outer div (AABB) + inner rotated div (unrotatedRect) + content
+  const effectiveUnrotatedRect = (currentObject as any).unrotatedRect ?? currentObject.rect;
+  const aabbWidth = currentObject.rect.size.width * scale;
+  const aabbHeight = currentObject.rect.size.height * scale;
+  const innerWidth = effectiveUnrotatedRect.size.width * scale;
+  const innerHeight = effectiveUnrotatedRect.size.height * scale;
+  const centerX = aabbWidth / 2;
+  const centerY = aabbHeight / 2;
+  const guideLength = Math.max(300, Math.max(aabbWidth, aabbHeight) + 80);
+
+  // For children, override rect to use unrotatedRect so content renders in unrotated space
+  const childObject = useMemo(() => {
+    if ((currentObject as any).unrotatedRect) {
+      return { ...currentObject, rect: (currentObject as any).unrotatedRect };
+    }
+    return currentObject;
+  }, [currentObject]);
 
   return (
     <div data-no-interaction>
+      {/* Outer div: AABB container - stable center, holds help lines + rotation handle */}
       <div
-        {...(effectiveIsDraggable && isSelected ? dragProps : {})}
-        {...doubleProps}
         style={{
           position: 'absolute',
           left: currentObject.rect.origin.x * scale,
           top: currentObject.rect.origin.y * scale,
-          width: boxWidth,
-          height: boxHeight,
-          outline: showOutline ? `1px solid ${selectionOutlineColor}` : 'none',
-          outlineOffset: showOutline ? `${outlineOffset}px` : '0px',
-          pointerEvents: isSelected && !isMultiSelected ? 'auto' : 'none',
-          touchAction: 'none',
-          cursor: isSelected && effectiveIsDraggable ? 'move' : 'default',
+          width: aabbWidth,
+          height: aabbHeight,
+          pointerEvents: 'none',
           zIndex,
           ...style,
         }}
         {...props}
       >
-        {(() => {
-          const childrenRender =
-            typeof children === 'function' ? children(currentObject) : children;
-          const customRender = customAnnotationRenderer?.({
-            annotation: currentObject,
-            children: childrenRender,
-            isSelected,
-            scale,
-            rotation,
-            pageWidth,
-            pageHeight,
-            pageIndex,
-            onSelect,
-          });
-          if (customRender !== null && customRender !== undefined) {
-            return customRender;
-          }
-          return childrenRender;
-        })()}
-
+        {/* Rotation guide lines - anchored at stable AABB center */}
         {rotationActive && (
           <>
             {/* Fixed snap lines (cross at 0/90/180/270) */}
@@ -490,25 +485,7 @@ export function AnnotationContainer<T extends PdfAnnotationObject>({
           </>
         )}
 
-        {/* Resize handles - only when single-selected */}
-        {isSelected &&
-          effectiveIsResizable &&
-          resize.map(({ key, ...hProps }) =>
-            resizeUI?.component ? (
-              resizeUI.component({
-                key,
-                ...hProps,
-                backgroundColor: HANDLE_COLOR,
-              })
-            ) : (
-              <div
-                key={key}
-                {...hProps}
-                style={{ ...hProps.style, backgroundColor: HANDLE_COLOR }}
-              />
-            ),
-          )}
-
+        {/* Rotation label - above the AABB center */}
         {isSelected && isRotatable && (
           <div
             style={{
@@ -577,27 +554,7 @@ export function AnnotationContainer<T extends PdfAnnotationObject>({
           </div>
         )}
 
-        {/* Vertex handles - only when single-selected */}
-        {isSelected &&
-          canModifyAnnotations &&
-          !isMultiSelected &&
-          vertices.map(({ key, ...vProps }) =>
-            vertexUI?.component ? (
-              vertexUI.component({
-                key,
-                ...vProps,
-                backgroundColor: VERTEX_COLOR,
-              })
-            ) : (
-              <div
-                key={key}
-                {...vProps}
-                style={{ ...vProps.style, backgroundColor: VERTEX_COLOR }}
-              />
-            ),
-          )}
-
-        {/* Rotation handle - kept in DOM during rotation to preserve pointer capture */}
+        {/* Rotation handle - orbits in AABB space, kept in DOM during rotation */}
         {isSelected &&
           isRotatable &&
           rotationHandle &&
@@ -634,6 +591,7 @@ export function AnnotationContainer<T extends PdfAnnotationObject>({
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
+                  pointerEvents: 'auto',
                   opacity: rotationActive ? 0 : 1,
                 }}
               >
@@ -654,6 +612,86 @@ export function AnnotationContainer<T extends PdfAnnotationObject>({
               </div>
             </>
           ))}
+
+        {/* Inner div: rotated content area - holds content, resize handles, vertex handles */}
+        <div
+          {...(effectiveIsDraggable && isSelected ? dragProps : {})}
+          {...doubleProps}
+          style={{
+            position: 'absolute',
+            left: (aabbWidth - innerWidth) / 2,
+            top: (aabbHeight - innerHeight) / 2,
+            width: innerWidth,
+            height: innerHeight,
+            transform: annotationRotation !== 0 ? `rotate(${annotationRotation}deg)` : undefined,
+            transformOrigin: 'center center',
+            outline: showOutline ? `1px solid ${selectionOutlineColor}` : 'none',
+            outlineOffset: showOutline ? `${outlineOffset}px` : '0px',
+            pointerEvents: isSelected && !isMultiSelected ? 'auto' : 'none',
+            touchAction: 'none',
+            cursor: isSelected && effectiveIsDraggable ? 'move' : 'default',
+          }}
+        >
+          {/* Annotation content - renders in unrotated coordinate space */}
+          {(() => {
+            const childrenRender =
+              typeof children === 'function' ? children(childObject) : children;
+            const customRender = customAnnotationRenderer?.({
+              annotation: childObject,
+              children: childrenRender,
+              isSelected,
+              scale,
+              rotation,
+              pageWidth,
+              pageHeight,
+              pageIndex,
+              onSelect,
+            });
+            if (customRender !== null && customRender !== undefined) {
+              return customRender;
+            }
+            return childrenRender;
+          })()}
+
+          {/* Resize handles - rotate with the shape */}
+          {isSelected &&
+            effectiveIsResizable &&
+            resize.map(({ key, ...hProps }) =>
+              resizeUI?.component ? (
+                resizeUI.component({
+                  key,
+                  ...hProps,
+                  backgroundColor: HANDLE_COLOR,
+                })
+              ) : (
+                <div
+                  key={key}
+                  {...hProps}
+                  style={{ ...hProps.style, backgroundColor: HANDLE_COLOR }}
+                />
+              ),
+            )}
+
+          {/* Vertex handles - rotate with the shape */}
+          {isSelected &&
+            canModifyAnnotations &&
+            !isMultiSelected &&
+            vertices.map(({ key, ...vProps }) =>
+              vertexUI?.component ? (
+                vertexUI.component({
+                  key,
+                  ...vProps,
+                  backgroundColor: VERTEX_COLOR,
+                })
+              ) : (
+                <div
+                  key={key}
+                  {...vProps}
+                  style={{ ...vProps.style, backgroundColor: VERTEX_COLOR }}
+                />
+              ),
+            )}
+        </div>
       </div>
 
       {/* Selection menu - hide when multi-selected */}

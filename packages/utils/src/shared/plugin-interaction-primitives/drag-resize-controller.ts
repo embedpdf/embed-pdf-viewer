@@ -13,6 +13,8 @@ export interface DragResizeConfig {
   };
   maintainAspectRatio?: boolean;
   pageRotation?: number;
+  /** Rotation of the annotation itself in degrees (used to project mouse deltas into local space for resize/vertex-edit) */
+  annotationRotation?: number;
   scale?: number;
   rotationSnapAngles?: number[];
   rotationSnapThreshold?: number;
@@ -62,6 +64,35 @@ function getAnchor(handle: ResizeHandle): Anchor {
   return {
     x: handle.includes('e') ? 'left' : handle.includes('w') ? 'right' : 'center',
     y: handle.includes('s') ? 'top' : handle.includes('n') ? 'bottom' : 'center',
+  };
+}
+
+/** Get the anchor point (the visually fixed point) in page space for a given rect and anchor. */
+function getAnchorPoint(rect: Rect, anchor: Anchor): Position {
+  const x =
+    anchor.x === 'left'
+      ? rect.origin.x
+      : anchor.x === 'right'
+        ? rect.origin.x + rect.size.width
+        : rect.origin.x + rect.size.width / 2;
+  const y =
+    anchor.y === 'top'
+      ? rect.origin.y
+      : anchor.y === 'bottom'
+        ? rect.origin.y + rect.size.height
+        : rect.origin.y + rect.size.height / 2;
+  return { x, y };
+}
+
+/** Rotate a point around a center by the given angle in radians. */
+function rotatePointAround(p: Position, c: Position, rad: number): Position {
+  const dx = p.x - c.x;
+  const dy = p.y - c.y;
+  const cos = Math.cos(rad);
+  const sin = Math.sin(rad);
+  return {
+    x: c.x + dx * cos - dy * sin,
+    y: c.y + dx * sin + dy * cos,
   };
 }
 
@@ -288,7 +319,7 @@ export class DragResizeController {
         },
       });
     } else if (this.state === 'resizing' && this.activeHandle && this.startElement) {
-      const delta = this.calculateDelta(clientX, clientY);
+      const delta = this.calculateLocalDelta(clientX, clientY);
       const position = this.calculateResizePosition(delta, this.activeHandle);
       this.currentPosition = position;
 
@@ -519,6 +550,25 @@ export class DragResizeController {
     };
   }
 
+  /**
+   * Calculate delta projected into the annotation's local (unrotated) coordinate space.
+   * Used for resize and vertex-edit where mouse movement must be mapped to the
+   * annotation's own axes, accounting for its rotation.
+   */
+  private calculateLocalDelta(clientX: number, clientY: number): Position {
+    const pageDelta = this.calculateDelta(clientX, clientY);
+    const { annotationRotation = 0 } = this.config;
+    if (annotationRotation === 0) return pageDelta;
+
+    const rad = (annotationRotation * Math.PI) / 180;
+    const cos = Math.cos(rad);
+    const sin = Math.sin(rad);
+    return {
+      x: cos * pageDelta.x + sin * pageDelta.y,
+      y: -sin * pageDelta.x + cos * pageDelta.y,
+    };
+  }
+
   private clampPoint(p: Position): Position {
     const bbox = this.config.constraints?.boundingBox;
     if (!bbox) return p;
@@ -531,7 +581,7 @@ export class DragResizeController {
   private calculateVertexPosition(clientX: number, clientY: number): Position[] {
     if (this.activeVertexIndex === null) return this.startVertices;
 
-    const delta = this.calculateDelta(clientX, clientY);
+    const delta = this.calculateLocalDelta(clientX, clientY);
     const newVertices = [...this.startVertices];
     const currentVertex = newVertices[this.activeVertexIndex];
 
@@ -583,7 +633,35 @@ export class DragResizeController {
     rect = this.clampToBounds(rect, anchor, aspectRatio);
 
     // Step 4: Apply min/max constraints
-    return this.applyConstraints(rect);
+    rect = this.applyConstraints(rect);
+
+    // Step 5: Compensate for visual anchor drift when the annotation is rotated.
+    // Resizing shifts the unrotatedRect center, which moves the rotation center and
+    // causes the visually-anchored edge to drift. Translate the rect to cancel this.
+    const { annotationRotation = 0 } = this.config;
+    if (annotationRotation !== 0 && this.startElement) {
+      const rad = (annotationRotation * Math.PI) / 180;
+      const anchorPt = getAnchorPoint(this.startElement, anchor);
+      const oldCenter: Position = {
+        x: this.startElement.origin.x + this.startElement.size.width / 2,
+        y: this.startElement.origin.y + this.startElement.size.height / 2,
+      };
+      const newCenter: Position = {
+        x: rect.origin.x + rect.size.width / 2,
+        y: rect.origin.y + rect.size.height / 2,
+      };
+      const oldVisual = rotatePointAround(anchorPt, oldCenter, rad);
+      const newVisual = rotatePointAround(anchorPt, newCenter, rad);
+      rect = {
+        origin: {
+          x: rect.origin.x + (oldVisual.x - newVisual.x),
+          y: rect.origin.y + (oldVisual.y - newVisual.y),
+        },
+        size: rect.size,
+      };
+    }
+
+    return rect;
   }
 
   /**

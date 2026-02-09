@@ -165,3 +165,19 @@ export function lineRectWithEndings(
   const pad = strokeWidth / 2 + EXTRA_PADDING * strokeWidth;
   return expandRect(baseRect, pad);
 }
+
+/**
+ * Expand a tight bounding rect so its center matches oldCenter.
+ * Used during vertex editing on rotated annotations to keep the
+ * rotation center stable and prevent visual drift of unmoved content.
+ */
+export function preserveRectCenter(tightRect: Rect, oldCenter: Position): Rect {
+  const currentCenter = getRectCenter(tightRect);
+  return {
+    origin: {
+      x: tightRect.origin.x + (oldCenter.x - currentCenter.x),
+      y: tightRect.origin.y + (oldCenter.y - currentCenter.y),
+    },
+    size: tightRect.size,
+  };
+}

@@ -1,7 +1,7 @@
 import { expandRect, PdfPolygonAnnoObject, rectFromPoints } from '@embedpdf/models';
 
 import { PatchFunction } from '../patch-registry';
-import { rotateVertices, getRectCenter } from '../patch-utils';
+import { calculateRotatedRectAABB, getRectCenter, preserveRectCenter } from '../patch-utils';
 
 export const patchPolygon: PatchFunction<PdfPolygonAnnoObject> = (orig, ctx) => {
   // Handle different transformation types
@@ -10,8 +10,17 @@ export const patchPolygon: PatchFunction<PdfPolygonAnnoObject> = (orig, ctx) => 
       // Polygon vertex editing: update vertices and recalculate rect
       if (ctx.changes.vertices && ctx.changes.vertices.length) {
         const pad = orig.strokeWidth / 2;
+        const rect = expandRect(rectFromPoints(ctx.changes.vertices), pad);
+        if (orig.unrotatedRect) {
+          const stableRect = preserveRectCenter(rect, getRectCenter(orig.unrotatedRect));
+          return {
+            rect: calculateRotatedRectAABB(stableRect, orig.rotation ?? 0),
+            unrotatedRect: stableRect,
+            vertices: ctx.changes.vertices,
+          };
+        }
         return {
-          rect: expandRect(rectFromPoints(ctx.changes.vertices), pad),
+          rect,
           vertices: ctx.changes.vertices,
         };
       }
@@ -24,17 +33,27 @@ export const patchPolygon: PatchFunction<PdfPolygonAnnoObject> = (orig, ctx) => 
         const dy = ctx.changes.rect.origin.y - orig.rect.origin.y;
         const moved = orig.vertices.map((p) => ({ x: p.x + dx, y: p.y + dy }));
 
-        return {
+        const result: Partial<PdfPolygonAnnoObject> = {
           rect: ctx.changes.rect,
           vertices: moved,
         };
+
+        // Also translate unrotatedRect if the annotation is rotated
+        if (orig.unrotatedRect) {
+          result.unrotatedRect = {
+            origin: { x: orig.unrotatedRect.origin.x + dx, y: orig.unrotatedRect.origin.y + dy },
+            size: { ...orig.unrotatedRect.size },
+          };
+        }
+
+        return result;
       }
       return ctx.changes;
 
     case 'resize':
-      // Complex resize with scaling
+      // Complex resize with scaling -- operates in unrotated space
       if (ctx.changes.rect) {
-        const oldRect = orig.rect;
+        const oldRect = orig.unrotatedRect ?? orig.rect;
         const newRect = ctx.changes.rect;
         let scaleX = newRect.size.width / oldRect.size.width;
         let scaleY = newRect.size.height / oldRect.size.height;
@@ -70,26 +89,40 @@ export const patchPolygon: PatchFunction<PdfPolygonAnnoObject> = (orig, ctx) => 
           y: ctx.changes.rect!.origin.y + (vertex.y - oldRect.origin.y) * scaleY,
         }));
 
-        return {
-          rect: ctx.changes.rect,
+        const result: Partial<PdfPolygonAnnoObject> = {
           vertices: scaledVertices,
         };
+
+        // If rotated, ctx.changes.rect is the new unrotatedRect; compute AABB
+        if (orig.unrotatedRect) {
+          result.unrotatedRect = ctx.changes.rect;
+          result.rect = calculateRotatedRectAABB(ctx.changes.rect, orig.rotation ?? 0);
+        } else {
+          result.rect = ctx.changes.rect;
+        }
+
+        return result;
       }
       return ctx.changes;
     case 'rotate':
-      // Rotate all vertices around the center
+      // Store rotation angle and compute AABB -- vertices are NOT rotated at runtime
       if (ctx.metadata?.rotationAngle !== undefined) {
-        const center = ctx.metadata.rotationCenter ?? getRectCenter(orig.rect);
         const angleDegrees = ctx.metadata.rotationAngle;
-        const rotatedVertices = rotateVertices(orig.vertices, center, angleDegrees);
 
-        // Recalculate the bounding rect from rotated vertices
-        const pad = orig.strokeWidth / 2;
-        const rect = expandRect(rectFromPoints(rotatedVertices), pad);
+        // Use the provided unrotatedRect override when available, otherwise fall back to stored value
+        const baseUnrotatedRect = ctx.changes.unrotatedRect ?? orig.unrotatedRect ?? orig.rect;
+        const normalizedUnrotatedRect = {
+          origin: { ...baseUnrotatedRect.origin },
+          size: { ...baseUnrotatedRect.size },
+        };
+
+        // Calculate the new AABB from the rotated unrotated rect
+        const newRect = calculateRotatedRectAABB(normalizedUnrotatedRect, angleDegrees);
 
         return {
-          rect,
-          vertices: rotatedVertices,
+          rect: newRect,
+          rotation: angleDegrees,
+          unrotatedRect: normalizedUnrotatedRect,
         };
       }
       return ctx.changes;
