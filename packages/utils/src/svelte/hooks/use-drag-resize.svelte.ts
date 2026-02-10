@@ -50,7 +50,7 @@ export function useDragResize(getOptions: () => UseDragResizeOptions) {
   const handleMove = (e: PointerEvent) => {
     e.preventDefault();
     e.stopPropagation();
-    controller?.move(e.clientX, e.clientY);
+    controller?.move(e.clientX, e.clientY, e.buttons);
   };
 
   const handleEnd = (e: PointerEvent) => {

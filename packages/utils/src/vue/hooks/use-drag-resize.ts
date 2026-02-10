@@ -113,7 +113,7 @@ export function useDragResize(options: UseDragResizeOptions) {
     controller.value?.startDrag(e.clientX, e.clientY);
     (e.currentTarget as HTMLElement).setPointerCapture?.(e.pointerId);
   };
-  const handleMove = (e: PointerEvent) => controller.value?.move(e.clientX, e.clientY);
+  const handleMove = (e: PointerEvent) => controller.value?.move(e.clientX, e.clientY, e.buttons);
   const handleEnd = (e: PointerEvent) => {
     controller.value?.end();
     (e.currentTarget as HTMLElement).releasePointerCapture?.(e.pointerId);

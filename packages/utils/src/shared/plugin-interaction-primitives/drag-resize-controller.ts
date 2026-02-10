@@ -244,10 +244,13 @@ export class DragResizeController {
     const sw = orbitRect.size.width * scale;
     const sh = orbitRect.size.height * scale;
     const radius = orbitRadiusPx ?? Math.max(sw, sh) / 2 + ROTATION_HANDLE_MARGIN;
-    const angleRad = (initialRotation * Math.PI) / 180;
+    // The handle's screen-space angle differs from the page-space angle by the
+    // page rotation offset (each pageRotation unit is a 90° CW turn).
+    const pageRotOffset = (this.config.pageRotation ?? 0) * 90;
+    const screenAngleRad = ((initialRotation + pageRotOffset) * Math.PI) / 180;
     this.centerScreen = {
-      x: clientX - radius * Math.sin(angleRad),
-      y: clientY + radius * Math.cos(angleRad),
+      x: clientX - radius * Math.sin(screenAngleRad),
+      y: clientY + radius * Math.cos(screenAngleRad),
     };
 
     // Store the starting angle based on the initial rotation (where the handle is)
@@ -292,8 +295,11 @@ export class DragResizeController {
     const dist = Math.sqrt(dx * dx + dy * dy);
     if (dist < 10) return this.lastComputedRotation;
 
-    // atan2 gives angle from +X axis; rotate +90° so 0° = top (north)
-    const angleDeg = Math.atan2(dy, dx) * (180 / Math.PI) + 90;
+    // atan2 gives angle from +X axis; rotate +90° so 0° = top (north).
+    // Subtract the page rotation offset to convert the screen-space angle
+    // back to the page-space angle used by the annotation model.
+    const pageRotOffset = (this.config.pageRotation ?? 0) * 90;
+    const angleDeg = Math.atan2(dy, dx) * (180 / Math.PI) + 90 - pageRotOffset;
 
     return this.normalizeAngle(Math.round(angleDeg));
   }
@@ -331,8 +337,15 @@ export class DragResizeController {
     };
   }
 
-  move(clientX: number, clientY: number) {
+  move(clientX: number, clientY: number, buttons?: number) {
     if (this.state === 'idle' || !this.startPoint) return;
+
+    // Safety net: if the button is no longer pressed but we never received
+    // pointerup/pointercancel, finalize the gesture to avoid a "stuck" drag.
+    if (buttons !== undefined && buttons === 0) {
+      this.end();
+      return;
+    }
 
     if (this.state === 'dragging' && this.startElement) {
       const delta = this.calculateDelta(clientX, clientY);
@@ -717,6 +730,50 @@ export class DragResizeController {
   private calculateResizePosition(delta: Position, handle: ResizeHandle): Rect {
     if (!this.startElement) return this.config.element;
 
+    const { annotationRotation = 0 } = this.config;
+    const bbox = this.config.constraints?.boundingBox;
+
+    // For rotated annotations, clamp using visual AABB bounds.
+    // This avoids "other side growth" when the dragged side hits the page edge.
+    if (annotationRotation !== 0 && bbox) {
+      const target = this.computeResizeRect(delta, handle, false, true);
+      if (this.isRectWithinRotatedBounds(target, annotationRotation, bbox)) {
+        return target;
+      }
+
+      let best = this.computeResizeRect({ x: 0, y: 0 }, handle, false, true);
+      let low = 0;
+      let high = 1;
+      for (let i = 0; i < 20; i += 1) {
+        const mid = (low + high) / 2;
+        const trial = this.computeResizeRect(
+          { x: delta.x * mid, y: delta.y * mid },
+          handle,
+          false,
+          true,
+        );
+        if (this.isRectWithinRotatedBounds(trial, annotationRotation, bbox)) {
+          best = trial;
+          low = mid;
+        } else {
+          high = mid;
+        }
+      }
+
+      return best;
+    }
+
+    return this.computeResizeRect(delta, handle, true, false);
+  }
+
+  private computeResizeRect(
+    delta: Position,
+    handle: ResizeHandle,
+    clampLocalBounds: boolean,
+    skipConstraintBoundingClamp: boolean,
+  ): Rect {
+    if (!this.startElement) return this.config.element;
+
     const anchor = getAnchor(handle);
     const aspectRatio = this.startElement.size.width / this.startElement.size.height || 1;
 
@@ -728,17 +785,26 @@ export class DragResizeController {
       rect = this.enforceAspectRatio(rect, anchor, aspectRatio);
     }
 
-    // Step 3: Clamp to bounding box
-    rect = this.clampToBounds(rect, anchor, aspectRatio);
+    // Step 3: Clamp in local/unrotated frame when requested
+    if (clampLocalBounds) {
+      rect = this.clampToBounds(rect, anchor);
+    }
 
     // Step 4: Apply min/max constraints
-    rect = this.applyConstraints(rect);
+    rect = this.applyConstraints(rect, skipConstraintBoundingClamp);
+
+    // In rotated resize mode we skip axis-aligned bounding clamps and solve
+    // against visual bounds separately. Re-anchor after size constraints so
+    // dragging past min/max does not keep translating the rect.
+    if (skipConstraintBoundingClamp) {
+      rect = this.reanchorRect(rect, anchor);
+    }
 
     // Step 5: Compensate for visual anchor drift when the annotation is rotated.
     // Resizing shifts the unrotatedRect center, which moves the rotation center and
     // causes the visually-anchored edge to drift. Translate the rect to cancel this.
     const { annotationRotation = 0 } = this.config;
-    if (annotationRotation !== 0 && this.startElement) {
+    if (annotationRotation !== 0) {
       const rad = (annotationRotation * Math.PI) / 180;
       const anchorPt = getAnchorPoint(this.startElement, anchor);
       const oldCenter: Position = {
@@ -761,6 +827,60 @@ export class DragResizeController {
     }
 
     return rect;
+  }
+
+  private isRectWithinRotatedBounds(
+    rect: Rect,
+    angleDegrees: number,
+    bbox: { width: number; height: number },
+  ): boolean {
+    const eps = 1e-6;
+    const rad = (angleDegrees * Math.PI) / 180;
+    const cos = Math.abs(Math.cos(rad));
+    const sin = Math.abs(Math.sin(rad));
+    const w = rect.size.width;
+    const h = rect.size.height;
+    const aabbW = w * cos + h * sin;
+    const aabbH = w * sin + h * cos;
+    const centerX = rect.origin.x + w / 2;
+    const centerY = rect.origin.y + h / 2;
+    const left = centerX - aabbW / 2;
+    const top = centerY - aabbH / 2;
+    const right = centerX + aabbW / 2;
+    const bottom = centerY + aabbH / 2;
+
+    return left >= -eps && top >= -eps && right <= bbox.width + eps && bottom <= bbox.height + eps;
+  }
+
+  /**
+   * Reposition rect from current size so the start-gesture anchor remains fixed.
+   * This prevents translation drift when constraints clamp width/height.
+   */
+  private reanchorRect(rect: Rect, anchor: Anchor): Rect {
+    const start = this.startElement!;
+    let x: number;
+    let y: number;
+
+    if (anchor.x === 'left') {
+      x = start.origin.x;
+    } else if (anchor.x === 'right') {
+      x = start.origin.x + start.size.width - rect.size.width;
+    } else {
+      x = start.origin.x + (start.size.width - rect.size.width) / 2;
+    }
+
+    if (anchor.y === 'top') {
+      y = start.origin.y;
+    } else if (anchor.y === 'bottom') {
+      y = start.origin.y + start.size.height - rect.size.height;
+    } else {
+      y = start.origin.y + (start.size.height - rect.size.height) / 2;
+    }
+
+    return {
+      origin: { x, y },
+      size: rect.size,
+    };
   }
 
   /**
@@ -842,9 +962,9 @@ export class DragResizeController {
   }
 
   /**
-   * Clamp rect to bounding box while respecting anchor and aspect ratio.
+   * Clamp rect to bounding box while respecting anchor.
    */
-  private clampToBounds(rect: Rect, anchor: Anchor, aspectRatio: number): Rect {
+  private clampToBounds(rect: Rect, anchor: Anchor): Rect {
     const bbox = this.config.constraints?.boundingBox;
     if (!bbox) return rect;
 
@@ -917,7 +1037,7 @@ export class DragResizeController {
     return { origin: { x, y }, size: { width, height } };
   }
 
-  private applyConstraints(position: Rect): Rect {
+  private applyConstraints(position: Rect, skipBoundingClamp: boolean = false): Rect {
     const { constraints } = this.config;
     if (!constraints) return position;
 
@@ -961,7 +1081,7 @@ export class DragResizeController {
     }
 
     // Clamp position to bounding box
-    if (constraints.boundingBox) {
+    if (constraints.boundingBox && !skipBoundingClamp) {
       x = Math.max(0, Math.min(x, constraints.boundingBox.width - width));
       y = Math.max(0, Math.min(y, constraints.boundingBox.height - height));
     }
