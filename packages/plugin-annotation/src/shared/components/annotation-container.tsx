@@ -13,9 +13,7 @@ import {
   useEffect,
   useMemo,
   useCallback,
-  FormEvent,
-  ChangeEvent,
-  KeyboardEvent,
+  createPortal,
 } from '@framework';
 import { useDocumentPermissions } from '@embedpdf/core/@framework';
 import { inferRotationCenterFromRects } from '../../lib/geometry/rotation';
@@ -105,8 +103,8 @@ export function AnnotationContainer<T extends PdfAnnotationObject>({
 }: AnnotationContainerProps<T>): JSX.Element {
   const [preview, setPreview] = useState<T>(trackedAnnotation.object);
   const [liveRotation, setLiveRotation] = useState<number | null>(null); // Track rotation during drag
-  const [isRotationEditing, setIsRotationEditing] = useState(false);
-  const [rotationDraft, setRotationDraft] = useState('');
+  const [cursorScreen, setCursorScreen] = useState<{ x: number; y: number } | null>(null);
+  const [isHandleHovered, setIsHandleHovered] = useState(false);
   const { provides: annotationCapability } = useAnnotationCapability();
   const { plugin } = useAnnotationPlugin();
   const { canModifyAnnotations } = useDocumentPermissions(documentId);
@@ -134,7 +132,7 @@ export function AnnotationContainer<T extends PdfAnnotationObject>({
   const VERTEX_SIZE = vertexUI?.size ?? 12;
   const ROTATION_SIZE = rotationUI?.size ?? 16;
   const ROTATION_RADIUS = rotationUI?.radius; // undefined = auto-calculate
-  const SHOW_CONNECTOR = rotationUI?.showConnector ?? true;
+  const SHOW_CONNECTOR = rotationUI?.showConnector ?? false;
 
   // Get annotation's current rotation (for simple shapes that store rotation)
   // During drag, use liveRotation if available; otherwise use the annotation's rotation
@@ -211,6 +209,8 @@ export function AnnotationContainer<T extends PdfAnnotationObject>({
 
       if (type === 'rotate') {
         const cursorAngle = metadata?.rotationAngle ?? annotationRotation;
+        const cursorPos = metadata?.cursorPosition;
+        if (cursorPos) setCursorScreen({ x: cursorPos.clientX, y: cursorPos.clientY });
         if (event.state === 'start') {
           setLiveRotation(cursorAngle);
           plugin.startRotation(documentId, {
@@ -223,6 +223,7 @@ export function AnnotationContainer<T extends PdfAnnotationObject>({
           plugin.updateRotation(documentId, cursorAngle, metadata?.rotationDelta);
         } else if (event.state === 'end') {
           setLiveRotation(null);
+          setCursorScreen(null);
           plugin.commitRotation(documentId);
         }
         return;
@@ -249,68 +250,6 @@ export function AnnotationContainer<T extends PdfAnnotationObject>({
       annotationProvides,
       annotationRotation,
     ],
-  );
-
-  const applyManualRotation = useCallback(
-    (nextAngle: number) => {
-      if (!plugin) return;
-      const id = trackedAnnotation.object.id;
-      const rect = trackedAnnotation.object.rect;
-      const center = {
-        x: rect.origin.x + rect.size.width / 2,
-        y: rect.origin.y + rect.size.height / 2,
-      };
-      const currentAngle = annotationRotation;
-      plugin.startRotation(documentId, {
-        annotationIds: [id],
-        cursorAngle: currentAngle,
-        rotationCenter: center,
-      });
-      plugin.updateRotation(documentId, nextAngle, nextAngle - currentAngle);
-      plugin.commitRotation(documentId);
-    },
-    [annotationRotation, documentId, plugin, trackedAnnotation.object],
-  );
-
-  const rotationLabel = `${normalizedRotationDisplay.toFixed(0)}°`;
-
-  const openRotationEditor = useCallback(() => {
-    if (rotationActive) return;
-    setRotationDraft(String(normalizedRotationDisplay));
-    setIsRotationEditing(true);
-  }, [normalizedRotationDisplay, rotationActive]);
-
-  const closeRotationEditor = useCallback(() => {
-    setIsRotationEditing(false);
-  }, []);
-
-  const handleRotationEditorSubmit = useCallback(
-    (event: FormEvent<HTMLFormElement>) => {
-      event.preventDefault();
-      const value = Number(rotationDraft);
-      if (!Number.isFinite(value)) {
-        closeRotationEditor();
-        return;
-      }
-      const normalized = ((value % 360) + 360) % 360;
-      applyManualRotation(normalized);
-      closeRotationEditor();
-    },
-    [applyManualRotation, closeRotationEditor, rotationDraft],
-  );
-
-  const handleRotationDraftChange = useCallback((event: ChangeEvent<HTMLInputElement>) => {
-    setRotationDraft(event.target.value);
-  }, []);
-
-  const handleRotationEditorKeyDown = useCallback(
-    (event: KeyboardEvent<HTMLInputElement>) => {
-      if (event.key === 'Escape') {
-        event.preventDefault();
-        closeRotationEditor();
-      }
-    },
-    [closeRotationEditor],
   );
 
   // Geometry model:
@@ -510,93 +449,47 @@ export function AnnotationContainer<T extends PdfAnnotationObject>({
           </>
         )}
 
-        {/* Rotation label - above the AABB center */}
-        {isSelected && isRotatable && (
-          <div
-            style={{
-              position: 'absolute',
-              left: centerX,
-              top: -40,
-              transform: 'translate(-50%, -100%)',
-              zIndex: zIndex + 4,
-              pointerEvents: 'auto',
-            }}
-          >
-            {isRotationEditing ? (
-              <form
-                onSubmit={handleRotationEditorSubmit}
-                style={{ display: 'inline-flex', gap: 4 }}
-                onPointerDown={(event) => event.stopPropagation()}
-              >
-                <input
-                  autoFocus
-                  value={rotationDraft}
-                  onChange={handleRotationDraftChange}
-                  onBlur={closeRotationEditor}
-                  onKeyDown={handleRotationEditorKeyDown}
-                  style={{
-                    width: 64,
-                    padding: '4px 6px',
-                    borderRadius: 4,
-                    border: `1px solid ${ROTATION_CONNECTOR_COLOR}`,
-                    background: '#fff',
-                    color: '#111',
-                  }}
-                />
-                <button
-                  type="submit"
-                  style={{
-                    border: 'none',
-                    background: ROTATION_COLOR,
-                    color: '#fff',
-                    borderRadius: 4,
-                    padding: '4px 8px',
-                    cursor: 'pointer',
-                  }}
-                >
-                  Set
-                </button>
-              </form>
-            ) : (
-              <button
-                type="button"
-                onClick={openRotationEditor}
-                disabled={rotationActive}
-                style={{
-                  border: 'none',
-                  background: ROTATION_COLOR,
-                  color: '#fff',
-                  borderRadius: 999,
-                  padding: '4px 10px',
-                  fontSize: 12,
-                  cursor: rotationActive ? 'default' : 'pointer',
-                  opacity: rotationActive ? 0.6 : 1,
-                }}
-              >
-                {rotationLabel}
-              </button>
-            )}
-          </div>
-        )}
-
         {/* Rotation handle - orbits in AABB space, kept in DOM during rotation */}
         {isSelected &&
           isRotatable &&
+          !isMultiSelected &&
           rotationHandle &&
           (rotationUI?.component ? (
-            rotationUI.component({
-              ...rotationHandle.handle,
-              backgroundColor: ROTATION_COLOR,
-              connectorStyle: {
-                ...rotationHandle.connector.style,
-                backgroundColor: ROTATION_CONNECTOR_COLOR,
+            <div
+              onPointerEnter={() => setIsHandleHovered(true)}
+              onPointerLeave={() => {
+                setIsHandleHovered(false);
+                setCursorScreen(null);
+              }}
+              onPointerMove={(e: any) => {
+                if (!rotationActive) setCursorScreen({ x: e.clientX, y: e.clientY });
+              }}
+              style={{ display: 'contents' }}
+            >
+              {rotationUI.component({
+                ...rotationHandle.handle,
+                backgroundColor: ROTATION_COLOR,
+                connectorStyle: {
+                  ...rotationHandle.connector.style,
+                  backgroundColor: ROTATION_CONNECTOR_COLOR,
+                  opacity: rotationActive ? 0 : 1,
+                },
+                showConnector: SHOW_CONNECTOR,
                 opacity: rotationActive ? 0 : 1,
-              },
-              showConnector: SHOW_CONNECTOR,
-              opacity: rotationActive ? 0 : 1,
-            })
+              })}
+            </div>
           ) : (
-            <>
+            <div
+              onPointerEnter={() => setIsHandleHovered(true)}
+              onPointerLeave={() => {
+                setIsHandleHovered(false);
+                setCursorScreen(null);
+              }}
+              onPointerMove={(e: any) => {
+                if (!rotationActive) setCursorScreen({ x: e.clientX, y: e.clientY });
+              }}
+              style={{ display: 'contents' }}
+            >
               {/* Connector line */}
               {SHOW_CONNECTOR && (
                 <div
@@ -635,7 +528,7 @@ export function AnnotationContainer<T extends PdfAnnotationObject>({
                   <path d="M21 3v5h-5" />
                 </svg>
               </div>
-            </>
+            </div>
           ))}
 
         {/* Inner div: rotated content area - holds content, resize handles, vertex handles */}
@@ -681,6 +574,7 @@ export function AnnotationContainer<T extends PdfAnnotationObject>({
           {/* Resize handles - rotate with the shape */}
           {isSelected &&
             effectiveIsResizable &&
+            !rotationActive &&
             resize.map(({ key, ...hProps }) =>
               resizeUI?.component ? (
                 resizeUI.component({
@@ -701,6 +595,7 @@ export function AnnotationContainer<T extends PdfAnnotationObject>({
           {isSelected &&
             canModifyAnnotations &&
             !isMultiSelected &&
+            !rotationActive &&
             vertices.map(({ key, ...vProps }) =>
               vertexUI?.component ? (
                 vertexUI.component({
@@ -719,8 +614,8 @@ export function AnnotationContainer<T extends PdfAnnotationObject>({
         </div>
       </div>
 
-      {/* Selection menu - hide when multi-selected */}
-      {selectionMenu && !isMultiSelected && (
+      {/* Selection menu - hide when multi-selected or rotating */}
+      {selectionMenu && !isMultiSelected && !rotationActive && (
         <CounterRotate
           rect={{
             origin: {
@@ -758,6 +653,31 @@ export function AnnotationContainer<T extends PdfAnnotationObject>({
           }}
         </CounterRotate>
       )}
+
+      {/* Cursor-following rotation tooltip - portaled to document.body to escape CSS transform chain */}
+      {(rotationActive || isHandleHovered) &&
+        cursorScreen &&
+        createPortal(
+          <div
+            style={{
+              position: 'fixed',
+              left: cursorScreen.x + 16,
+              top: cursorScreen.y - 16,
+              background: 'rgba(0,0,0,0.8)',
+              color: '#fff',
+              padding: '4px 8px',
+              borderRadius: 4,
+              fontSize: 12,
+              fontFamily: 'monospace',
+              pointerEvents: 'none',
+              zIndex: 10000,
+              whiteSpace: 'nowrap',
+            }}
+          >
+            {normalizedRotationDisplay.toFixed(0)}°
+          </div>,
+          document.body,
+        )}
     </div>
   );
 }

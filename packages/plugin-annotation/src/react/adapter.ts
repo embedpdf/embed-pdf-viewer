@@ -22,6 +22,8 @@ export type {
   FormEvent,
 } from 'react';
 
+export { createPortal } from 'react-dom';
+
 export const suppressContentEditableWarningProps = {
   suppressContentEditableWarning: true,
 };

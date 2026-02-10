@@ -52,6 +52,8 @@ export interface TransformData {
     rotationDelta?: number;
     isSnapped?: boolean;
     snappedAngle?: number;
+    /** Screen-space cursor position during the gesture */
+    cursorPosition?: { clientX: number; clientY: number };
   };
 }
 
@@ -297,6 +299,7 @@ export class DragResizeController {
             rotationCenter: this.rotationCenter,
             isSnapped: snapResult.isSnapped,
             snappedAngle: this.rotationSnappedAngle ?? undefined,
+            cursorPosition: { clientX, clientY },
           },
         },
       });

@@ -24,4 +24,6 @@ export type KeyboardEvent<T = Element> = JSX.TargetedKeyboardEvent<
 >;
 export type FormEvent<T = Element> = JSX.TargetedEvent<T extends EventTarget ? T : never>;
 
+export { createPortal } from 'preact/compat';
+
 export const suppressContentEditableWarningProps = {};
