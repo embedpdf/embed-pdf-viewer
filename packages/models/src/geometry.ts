@@ -599,6 +599,160 @@ export interface Matrix {
   f: number;
 }
 
+/**
+ * Normalize an angle in degrees to the range [0, 360).
+ *
+ * @param degrees - angle in degrees
+ * @returns normalized angle in [0, 360)
+ *
+ * @public
+ */
+export function normalizeAngle(degrees: number): number {
+  const normalized = degrees % 360;
+  return normalized < 0 ? normalized + 360 : normalized;
+}
+
+/**
+ * Calculate the center of a rectangle.
+ *
+ * @param rect - rectangle
+ * @returns center position
+ *
+ * @public
+ */
+export function getRectCenter(rect: Rect): Position {
+  return {
+    x: rect.origin.x + rect.size.width / 2,
+    y: rect.origin.y + rect.size.height / 2,
+  };
+}
+
+/**
+ * Rotate a point around a center by the given angle in degrees.
+ *
+ * @param point - the point to rotate
+ * @param center - the center of rotation
+ * @param angleDegrees - rotation angle in degrees
+ * @returns rotated point
+ *
+ * @public
+ */
+export function rotatePointAround(
+  point: Position,
+  center: Position,
+  angleDegrees: number,
+): Position {
+  const angleRad = (angleDegrees * Math.PI) / 180;
+  const cos = Math.cos(angleRad);
+  const sin = Math.sin(angleRad);
+  const dx = point.x - center.x;
+  const dy = point.y - center.y;
+  return {
+    x: center.x + dx * cos - dy * sin,
+    y: center.y + dx * sin + dy * cos,
+  };
+}
+
+/**
+ * Rotate an array of points around a center by the given angle in degrees.
+ *
+ * @param points - the points to rotate
+ * @param center - the center of rotation
+ * @param angleDegrees - rotation angle in degrees
+ * @returns rotated points
+ *
+ * @public
+ */
+export function rotateVertices(
+  points: Position[],
+  center: Position,
+  angleDegrees: number,
+): Position[] {
+  return points.map((v) => rotatePointAround(v, center, angleDegrees));
+}
+
+/**
+ * Calculate the axis-aligned bounding box for a rectangle rotated around an arbitrary point.
+ *
+ * @param rect - the unrotated rectangle
+ * @param angleDegrees - rotation angle in degrees
+ * @param center - the center of rotation
+ * @returns the AABB of the rotated rectangle
+ *
+ * @public
+ */
+export function calculateRotatedRectAABBAroundPoint(
+  rect: Rect,
+  angleDegrees: number,
+  center: Position,
+): Rect {
+  const corners: Position[] = [
+    { x: rect.origin.x, y: rect.origin.y },
+    { x: rect.origin.x + rect.size.width, y: rect.origin.y },
+    { x: rect.origin.x + rect.size.width, y: rect.origin.y + rect.size.height },
+    { x: rect.origin.x, y: rect.origin.y + rect.size.height },
+  ];
+  const rotated = rotateVertices(corners, center, angleDegrees);
+  return rectFromPoints(rotated);
+}
+
+/**
+ * Calculate the axis-aligned bounding box for a rectangle rotated around its own center.
+ *
+ * @param unrotatedRect - the unrotated rectangle
+ * @param angleDegrees - rotation angle in degrees
+ * @returns the AABB of the rotated rectangle
+ *
+ * @public
+ */
+export function calculateRotatedRectAABB(unrotatedRect: Rect, angleDegrees: number): Rect {
+  return calculateRotatedRectAABBAroundPoint(
+    unrotatedRect,
+    angleDegrees,
+    getRectCenter(unrotatedRect),
+  );
+}
+
+/**
+ * Infer the world-space rotation center from unrotated rect + rotated AABB + angle.
+ * Falls back to the unrotated rect center when angle is effectively 0.
+ *
+ * @param unrotatedRect - the unrotated rectangle
+ * @param rotatedAabb - the axis-aligned bounding box of the rotated rectangle
+ * @param angleDegrees - rotation angle in degrees
+ * @returns the inferred rotation center
+ *
+ * @public
+ */
+export function inferRotationCenterFromRects(
+  unrotatedRect: Rect,
+  rotatedAabb: Rect,
+  angleDegrees: number,
+): Position {
+  const angleRad = (angleDegrees * Math.PI) / 180;
+  const cos = Math.cos(angleRad);
+  const sin = Math.sin(angleRad);
+
+  // (I - R) becomes singular at 0deg (and full turns), where pivot is irrelevant.
+  const m00 = 1 - cos;
+  const m01 = sin;
+  const m10 = -sin;
+  const m11 = 1 - cos;
+  const det = m00 * m11 - m01 * m10;
+
+  const unrotatedCenter = getRectCenter(unrotatedRect);
+  if (Math.abs(det) < 1e-10) return unrotatedCenter;
+
+  const rotatedCenter = getRectCenter(rotatedAabb);
+  const rhsX = rotatedCenter.x - (cos * unrotatedCenter.x - sin * unrotatedCenter.y);
+  const rhsY = rotatedCenter.y - (sin * unrotatedCenter.x + cos * unrotatedCenter.y);
+
+  return {
+    x: (m11 * rhsX - m01 * rhsY) / det,
+    y: (-m10 * rhsX + m00 * rhsY) / det,
+  };
+}
+
 export function buildUserToDeviceMatrix(
   rect: Rect,
   rotation: Rotation,

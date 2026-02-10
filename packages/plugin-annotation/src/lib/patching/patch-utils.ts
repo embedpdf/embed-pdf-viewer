@@ -6,22 +6,21 @@ import {
   rotateAndTranslatePoint,
   rectFromPoints,
   expandRect,
+  getRectCenter,
+  rotatePointAround,
+  rotateVertices,
+  calculateRotatedRectAABB,
+  calculateRotatedRectAABBAroundPoint,
+  inferRotationCenterFromRects,
 } from '@embedpdf/models';
 
 import { LINE_ENDING_HANDLERS } from './line-ending-handlers';
-import {
-  calculateRotatedRectAABB,
-  calculateRotatedRectAABBAroundPoint,
-  getRectCenter,
-  inferRotationCenterFromRects,
-  rotatePointAroundCenter,
-  rotateVertices,
-} from '../geometry/rotation';
 
 const EXTRA_PADDING = 1.2;
 
+// Re-export for downstream consumers that import from patch-utils
 export {
-  rotatePointAroundCenter,
+  rotatePointAround as rotatePointAroundCenter,
   rotateVertices,
   getRectCenter,
   calculateRotatedRectAABB,

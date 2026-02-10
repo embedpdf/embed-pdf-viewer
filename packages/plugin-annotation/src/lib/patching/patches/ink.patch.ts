@@ -5,159 +5,77 @@ import {
   calculateRotatedRectAABB,
   calculateRotatedRectAABBAroundPoint,
   resolveAnnotationRotationCenter,
-  resolveRotateRects,
 } from '../patch-utils';
+import { baseRotateChanges, baseMoveChanges, baseResizeScaling } from '../base-patch';
 
 export const patchInk: PatchFunction<PdfInkAnnoObject> = (original, ctx) => {
-  // Handle different transformation types
   switch (ctx.type) {
     case 'vertex-edit':
-      // For ink annotations, vertex editing doesn't make much sense
-      // Just return the changes as-is
       return ctx.changes;
 
-    case 'move':
-      // Simple move: just update rect and adjust ink points accordingly
-      if (ctx.changes.rect) {
-        const dx = ctx.changes.rect.origin.x - original.rect.origin.x;
-        const dy = ctx.changes.rect.origin.y - original.rect.origin.y;
+    case 'move': {
+      if (!ctx.changes.rect) return ctx.changes;
+      const { dx, dy, rects } = baseMoveChanges(original, ctx.changes.rect);
+      return {
+        ...rects,
+        inkList: original.inkList.map((stroke) => ({
+          points: stroke.points.map((p) => ({ x: p.x + dx, y: p.y + dy })),
+        })),
+      };
+    }
 
-        const movedInkList = original.inkList.map((stroke) => ({
-          points: stroke.points.map((p) => ({
-            x: p.x + dx,
-            y: p.y + dy,
-          })),
-        }));
+    case 'resize': {
+      if (!ctx.changes.rect) return ctx.changes;
 
-        const result: Partial<PdfInkAnnoObject> = {
-          rect: ctx.changes.rect,
-          inkList: movedInkList,
-        };
+      // Use base scaling for scale factors, min-size enforcement, and aspect ratio
+      const { scaleX, scaleY, oldRect, resolvedRect, rects } = baseResizeScaling(
+        original,
+        ctx.changes.rect,
+        ctx.metadata,
+      );
 
-        // Also translate unrotatedRect if the annotation is rotated
-        if (original.unrotatedRect) {
-          result.unrotatedRect = {
-            origin: {
-              x: original.unrotatedRect.origin.x + dx,
-              y: original.unrotatedRect.origin.y + dy,
-            },
-            size: { ...original.unrotatedRect.size },
-          };
-        }
+      // Ink-specific: scale stroke width and use inset mapping to keep strokes inside rect
+      const inset = (r: Rect, pad: number): Rect => ({
+        origin: { x: r.origin.x + pad, y: r.origin.y + pad },
+        size: {
+          width: Math.max(1, r.size.width - pad * 2),
+          height: Math.max(1, r.size.height - pad * 2),
+        },
+      });
 
-        return result;
-      }
-      return ctx.changes;
+      const strokeScale = Math.min(
+        resolvedRect.size.width / oldRect.size.width,
+        resolvedRect.size.height / oldRect.size.height,
+      );
+      const newStrokeWidth = Math.max(1, Math.round(original.strokeWidth * strokeScale));
 
-    case 'resize':
-      // Complex resize with scaling -- operates in unrotated space
-      if (ctx.changes.rect) {
-        // Use unrotatedRect as the reference for scaling (falls back to rect if not rotated)
-        const oldRect = original.unrotatedRect ?? original.rect;
-        const newRect = ctx.changes.rect;
-        let scaleX = newRect.size.width / oldRect.size.width;
-        let scaleY = newRect.size.height / oldRect.size.height;
+      const innerOld = inset(oldRect, original.strokeWidth / 2);
+      const innerNew = inset(resolvedRect, newStrokeWidth / 2);
 
-        // Enforce minimum size to avoid collapse
-        const minSize = 10;
-        if (newRect.size.width < minSize || newRect.size.height < minSize) {
-          scaleX = Math.max(scaleX, minSize / oldRect.size.width);
-          scaleY = Math.max(scaleY, minSize / oldRect.size.height);
-          ctx.changes.rect = {
-            origin: newRect.origin,
-            size: {
-              width: oldRect.size.width * scaleX,
-              height: oldRect.size.height * scaleY,
-            },
-          };
-        }
+      const sx = innerNew.size.width / Math.max(innerOld.size.width, 1e-6);
+      const sy = innerNew.size.height / Math.max(innerOld.size.height, 1e-6);
 
-        // Optional: Uniform scaling (preserve aspect ratio)
-        if (ctx.metadata?.maintainAspectRatio) {
-          const minScale = Math.min(scaleX, scaleY);
-          scaleX = minScale;
-          scaleY = minScale;
-          ctx.changes.rect!.size = {
-            width: oldRect.size.width * minScale,
-            height: oldRect.size.height * minScale,
-          };
-        }
-
-        // Keep stroke inside rect: map inner-old -> inner-new
-        const inset = (r: Rect, pad: number): Rect => ({
-          origin: { x: r.origin.x + pad, y: r.origin.y + pad },
-          size: {
-            width: Math.max(1, r.size.width - pad * 2),
-            height: Math.max(1, r.size.height - pad * 2),
-          },
-        });
-
-        // Scale stroke by the limiting axis to avoid overflow
-        const strokeScale = Math.min(
-          ctx.changes.rect!.size.width / oldRect.size.width,
-          ctx.changes.rect!.size.height / oldRect.size.height,
-        );
-        const newStrokeWidth = Math.max(1, Math.round(original.strokeWidth * strokeScale));
-
-        const innerOld = inset(oldRect, original.strokeWidth / 2);
-        const innerNew = inset(ctx.changes.rect!, newStrokeWidth / 2);
-
-        const sx = innerNew.size.width / Math.max(innerOld.size.width, 1e-6);
-        const sy = innerNew.size.height / Math.max(innerOld.size.height, 1e-6);
-
-        const newInkList = original.inkList.map((stroke) => ({
+      return {
+        ...rects,
+        inkList: original.inkList.map((stroke) => ({
           points: stroke.points.map((p) => ({
             x: innerNew.origin.x + (p.x - innerOld.origin.x) * sx,
             y: innerNew.origin.y + (p.y - innerOld.origin.y) * sy,
           })),
-        }));
+        })),
+        strokeWidth: newStrokeWidth,
+      };
+    }
 
-        const result: Partial<PdfInkAnnoObject> = {
-          inkList: newInkList,
-          strokeWidth: newStrokeWidth,
-        };
-
-        // If rotated, ctx.changes.rect is the new unrotatedRect; compute AABB
-        if (original.unrotatedRect) {
-          result.unrotatedRect = ctx.changes.rect;
-          result.rect = calculateRotatedRectAABB(ctx.changes.rect, original.rotation ?? 0);
-        } else {
-          result.rect = ctx.changes.rect;
-        }
-
-        return result;
-      }
-      return ctx.changes;
     case 'rotate':
-      // Store rotation angle and compute AABB -- ink points are NOT rotated at runtime
-      if (ctx.metadata?.rotationAngle !== undefined) {
-        const angleDegrees = ctx.metadata.rotationAngle;
-
-        // Use the provided unrotatedRect override when available, otherwise fall back to stored value
-        const baseUnrotatedRect =
-          ctx.changes.unrotatedRect ?? original.unrotatedRect ?? original.rect;
-        const normalizedUnrotatedRect = {
-          origin: { ...baseUnrotatedRect.origin },
-          size: { ...baseUnrotatedRect.size },
-        };
-
-        return {
-          ...resolveRotateRects(original, normalizedUnrotatedRect, angleDegrees),
-          rotation: angleDegrees,
-        };
-      }
-      return ctx.changes;
+      return baseRotateChanges(original, ctx) ?? ctx.changes;
 
     case 'property-update':
-      // For property updates that might affect the rect (strokeWidth changes)
       if (ctx.changes.strokeWidth !== undefined) {
         const merged = { ...original, ...ctx.changes };
-        // Recalculate rect using the same logic as deriveRect
         const pts = merged.inkList.flatMap((s) => s.points);
         const tightRect = expandRect(rectFromPoints(pts), merged.strokeWidth / 2);
 
-        // If rotated, tightRect is the new unrotatedRect; compute the visible AABB
-        // Use the original rotation center so the annotation doesn't jump
         if (original.unrotatedRect) {
           return {
             ...ctx.changes,
@@ -174,7 +92,6 @@ export const patchInk: PatchFunction<PdfInkAnnoObject> = (original, ctx) => {
       return ctx.changes;
 
     default:
-      // For other property updates or unknown types, just return the changes
       return ctx.changes;
   }
 };

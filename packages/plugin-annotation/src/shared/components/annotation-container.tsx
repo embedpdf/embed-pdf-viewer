@@ -459,7 +459,6 @@ export function AnnotationContainer<T extends PdfAnnotationObject>({
           width: aabbWidth,
           height: aabbHeight,
           pointerEvents: 'none',
-          border: '1px solid red',
           zIndex,
           ...style,
         }}
