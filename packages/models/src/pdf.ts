@@ -1045,7 +1045,6 @@ export interface PdfAnnotationObjectBase {
   /**
    * The original unrotated rectangle of the annotation.
    * This is stored when rotation is applied, allowing accurate editing.
-   * Similar to Apryse's "trn-unrotated-rect" metadata.
    */
   unrotatedRect?: Rect;
 

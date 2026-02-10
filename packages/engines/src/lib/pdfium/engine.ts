@@ -6740,7 +6740,7 @@ export class PdfiumNative implements IPdfiumExecutor {
       }
     }
 
-    // Handle rotation: store unrotatedRect in custom data (like Apryse's trn-unrotated-rect)
+    // Handle rotation: store unrotatedRect in custom data
     const existingCustom = this.getAnnotCustom(annotationPtr) ?? {};
     const customData = {
       ...existingCustom,

@@ -138,8 +138,8 @@ export function AnnotationContainer<T extends PdfAnnotationObject>({
 
   // Get annotation's current rotation (for simple shapes that store rotation)
   // During drag, use liveRotation if available; otherwise use the annotation's rotation
-  const annotationRotation = liveRotation ?? (currentObject as any).rotation ?? 0;
-  const rotationDisplay = liveRotation ?? (currentObject as any).rotation ?? 0;
+  const annotationRotation = liveRotation ?? currentObject.rotation ?? 0;
+  const rotationDisplay = liveRotation ?? currentObject.rotation ?? 0;
   const normalizedRotationDisplay = Number.isFinite(rotationDisplay)
     ? Math.round(rotationDisplay * 10) / 10
     : 0;
@@ -166,7 +166,7 @@ export function AnnotationContainer<T extends PdfAnnotationObject>({
       if (event.state === 'start') {
         // Use unrotatedRect as gesture base so deltas are computed in unrotated space
         gestureBaseRectRef.current =
-          (trackedAnnotation.object as any).unrotatedRect ?? trackedAnnotation.object.rect;
+          trackedAnnotation.object.unrotatedRect ?? trackedAnnotation.object.rect;
         gestureBaseRef.current = trackedAnnotation.object; // For vertex edit
         if (type === 'move') {
           plugin.startDrag(documentId, { annotationIds: [id], pageSize });
@@ -316,7 +316,7 @@ export function AnnotationContainer<T extends PdfAnnotationObject>({
   // Geometry model:
   // - `rect` is the visible AABB container.
   // - `unrotatedRect` is the local editing frame for resize/vertex operations.
-  const explicitUnrotatedRect = (currentObject as any).unrotatedRect as Rect | undefined;
+  const explicitUnrotatedRect = currentObject.unrotatedRect;
   const effectiveUnrotatedRect = explicitUnrotatedRect ?? currentObject.rect;
   const rotationPivot =
     explicitUnrotatedRect && annotationRotation !== 0
