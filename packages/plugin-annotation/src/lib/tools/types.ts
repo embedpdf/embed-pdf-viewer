@@ -134,6 +134,8 @@ export type AnnotationTool<T extends PdfAnnotationObject = PdfAnnotationObject> 
     isDraggable?: DynamicBooleanProp;
     /** Whether this annotation can be resized when selected individually. Can be dynamic based on annotation. */
     isResizable?: DynamicBooleanProp;
+    /** Whether this annotation can be rotated when selected individually. Can be dynamic based on annotation. */
+    isRotatable?: DynamicBooleanProp;
     /** Whether to maintain aspect ratio during resize. Can be dynamic based on annotation. */
     lockAspectRatio?: DynamicBooleanProp;
 

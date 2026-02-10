@@ -31,7 +31,7 @@ export interface RotationUI {
 }
 
 /** Screen-pixel gap between the rect edge and the rotation handle center (default orbit margin). */
-export const ROTATION_HANDLE_MARGIN = 30;
+export const ROTATION_HANDLE_MARGIN = 20;
 
 export interface HandleDescriptor {
   handle: ResizeHandle;
@@ -220,13 +220,17 @@ export function describeRotationFromConfig(
   const centerX = (orbitCenter.x - orbitRect.origin.x) * scale;
   const centerY = (orbitCenter.y - orbitRect.origin.y) * scale;
 
-  // Calculate radius - distance from center to handle
-  // Default: far enough from center so the handle clears the rect at any angle
-  const defaultRadius = Math.max(scaledWidth, scaledHeight) / 2 + ROTATION_HANDLE_MARGIN;
-  const radius = ui.radius !== undefined ? ui.radius * scale : defaultRadius;
-
   // Handle orbits at currentAngle (0° = top, clockwise positive)
   const angleRad = (currentAngle * Math.PI) / 180;
+
+  // Calculate radius - distance from center to handle.
+  // The handle always sits at the shape's local "top" because currentAngle
+  // matches the annotation rotation and the shape rotates with it. So the
+  // distance from center to the nearest edge in the handle's direction is
+  // always halfHeight of the unrotated rect, regardless of the angle.
+  const defaultRadius = (rect.size.height * scale) / 2 + ROTATION_HANDLE_MARGIN;
+  const radius = ui.radius !== undefined ? ui.radius * scale : defaultRadius;
+
   const handleCenterX = centerX + radius * Math.sin(angleRad);
   const handleCenterY = centerY - radius * Math.cos(angleRad);
   const handleLeft = handleCenterX - handleSize / 2;

@@ -266,6 +266,11 @@ export function Annotations(annotationsProps: AnnotationsProps) {
                   annotation.object,
                   false,
                 )}
+                isRotatable={resolveInteractionProp(
+                  tool?.interaction.isRotatable,
+                  annotation.object,
+                  false,
+                )}
                 selectionMenu={selectionMenu}
                 onSelect={(e) => handleClick(e, annotation)}
                 style={{
@@ -300,6 +305,11 @@ export function Annotations(annotationsProps: AnnotationsProps) {
                 tool?.interaction.lockAspectRatio,
                 annotation.object,
                 false,
+              )}
+              isRotatable={resolveInteractionProp(
+                tool?.interaction.isRotatable,
+                annotation.object,
+                true,
               )}
               selectionMenu={selectionMenu}
               onSelect={(e) => handleClick(e, annotation)}
@@ -342,6 +352,11 @@ export function Annotations(annotationsProps: AnnotationsProps) {
                 annotation.object,
                 false,
               )}
+              isRotatable={resolveInteractionProp(
+                tool?.interaction.isRotatable,
+                annotation.object,
+                true,
+              )}
               selectionMenu={selectionMenu}
               onSelect={(e) => handleClick(e, annotation)}
               style={{
@@ -382,6 +397,11 @@ export function Annotations(annotationsProps: AnnotationsProps) {
                 tool?.interaction.lockAspectRatio,
                 annotation.object,
                 false,
+              )}
+              isRotatable={resolveInteractionProp(
+                tool?.interaction.isRotatable,
+                annotation.object,
+                true,
               )}
               selectionMenu={selectionMenu}
               onSelect={(e) => handleClick(e, annotation)}
@@ -424,6 +444,11 @@ export function Annotations(annotationsProps: AnnotationsProps) {
                 annotation.object,
                 false,
               )}
+              isRotatable={resolveInteractionProp(
+                tool?.interaction.isRotatable,
+                annotation.object,
+                false,
+              )}
               selectionMenu={selectionMenu}
               onSelect={(e) => handleClick(e, annotation)}
               zIndex={0}
@@ -458,6 +483,11 @@ export function Annotations(annotationsProps: AnnotationsProps) {
               )}
               lockAspectRatio={resolveInteractionProp(
                 tool?.interaction.lockAspectRatio,
+                annotation.object,
+                false,
+              )}
+              isRotatable={resolveInteractionProp(
+                tool?.interaction.isRotatable,
                 annotation.object,
                 false,
               )}
@@ -498,6 +528,11 @@ export function Annotations(annotationsProps: AnnotationsProps) {
                 annotation.object,
                 false,
               )}
+              isRotatable={resolveInteractionProp(
+                tool?.interaction.isRotatable,
+                annotation.object,
+                false,
+              )}
               selectionMenu={selectionMenu}
               onSelect={(e) => handleClick(e, annotation)}
               zIndex={0}
@@ -532,6 +567,11 @@ export function Annotations(annotationsProps: AnnotationsProps) {
               )}
               lockAspectRatio={resolveInteractionProp(
                 tool?.interaction.lockAspectRatio,
+                annotation.object,
+                false,
+              )}
+              isRotatable={resolveInteractionProp(
+                tool?.interaction.isRotatable,
                 annotation.object,
                 false,
               )}
@@ -571,6 +611,11 @@ export function Annotations(annotationsProps: AnnotationsProps) {
                 tool?.interaction.lockAspectRatio,
                 annotation.object,
                 false,
+              )}
+              isRotatable={resolveInteractionProp(
+                tool?.interaction.isRotatable,
+                annotation.object,
+                true,
               )}
               selectionMenu={selectionMenu}
               onSelect={(e) => handleClick(e, annotation)}
@@ -630,6 +675,11 @@ export function Annotations(annotationsProps: AnnotationsProps) {
                 annotation.object,
                 false,
               )}
+              isRotatable={resolveInteractionProp(
+                tool?.interaction.isRotatable,
+                annotation.object,
+                true,
+              )}
               selectionMenu={selectionMenu}
               onSelect={(e) => handleClick(e, annotation)}
               vertexConfig={{
@@ -682,6 +732,11 @@ export function Annotations(annotationsProps: AnnotationsProps) {
                 annotation.object,
                 false,
               )}
+              isRotatable={resolveInteractionProp(
+                tool?.interaction.isRotatable,
+                annotation.object,
+                true,
+              )}
               selectionMenu={selectionMenu}
               onSelect={(e) => handleClick(e, annotation)}
               vertexConfig={{
@@ -733,6 +788,11 @@ export function Annotations(annotationsProps: AnnotationsProps) {
                 annotation.object,
                 false,
               )}
+              isRotatable={resolveInteractionProp(
+                tool?.interaction.isRotatable,
+                annotation.object,
+                true,
+              )}
               selectionMenu={selectionMenu}
               onSelect={(e) => handleClick(e, annotation)}
               style={{
@@ -783,6 +843,11 @@ export function Annotations(annotationsProps: AnnotationsProps) {
                 annotation.object,
                 false,
               )}
+              isRotatable={resolveInteractionProp(
+                tool?.interaction.isRotatable,
+                annotation.object,
+                true,
+              )}
               selectionMenu={selectionMenu}
               onSelect={(e) => handleClick(e, annotation)}
               style={{
@@ -816,6 +881,7 @@ export function Annotations(annotationsProps: AnnotationsProps) {
               isDraggable={false}
               isResizable={false}
               lockAspectRatio={false}
+              isRotatable={false}
               selectionMenu={hasIRT ? undefined : selectionMenu}
               onSelect={(e) => handleLinkClick(e, annotation)}
               {...annotationsProps}

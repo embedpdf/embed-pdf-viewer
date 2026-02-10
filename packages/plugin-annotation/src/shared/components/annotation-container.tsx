@@ -734,8 +734,16 @@ export function AnnotationContainer<T extends PdfAnnotationObject>({
           }}
           rotation={rotation}
         >
-          {(counterRotateProps) =>
-            selectionMenu({
+          {(counterRotateProps) => {
+            // The handle's visual angle = annotationRotation + pageRotation (in degrees).
+            // `rotation` is in quarter turns (0-3), so multiply by 90 to get degrees.
+            // The menu (suggestTop: false) renders at the visual bottom (180deg).
+            // Flip the menu to the top when the handle is in the bottom visual hemisphere
+            // to prevent it from overlapping with the rotation handle.
+            const effectiveAngle = (((annotationRotation + rotation * 90) % 360) + 360) % 360;
+            const handleNearMenuSide = isRotatable && effectiveAngle > 90 && effectiveAngle < 270;
+
+            return selectionMenu({
               ...counterRotateProps,
               context: {
                 type: 'annotation',
@@ -744,10 +752,10 @@ export function AnnotationContainer<T extends PdfAnnotationObject>({
               },
               selected: isSelected,
               placement: {
-                suggestTop: false,
+                suggestTop: handleNearMenuSide,
               },
-            })
-          }
+            });
+          }}
         </CounterRotate>
       )}
     </div>
