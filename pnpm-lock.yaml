@@ -1649,6 +1649,9 @@ importers:
       '@embedpdf/core':
         specifier: workspace:*
         version: link:../core
+      '@embedpdf/plugin-interaction-manager':
+        specifier: workspace:*
+        version: link:../plugin-interaction-manager
       '@embedpdf/plugin-spread':
         specifier: workspace:*
         version: link:../plugin-spread

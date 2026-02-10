@@ -61,7 +61,7 @@ export function SchemaOverlay({ schema, documentId, className }: OverlayRenderer
 
   return (
     <div
-      className={`absolute ${anchorClasses} ${className || ''}`}
+      className={`z-3 absolute ${anchorClasses} ${className || ''}`}
       style={offsetStyles}
       data-overlay-id={schema.id}
     >

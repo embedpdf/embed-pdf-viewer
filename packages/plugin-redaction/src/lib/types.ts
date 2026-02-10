@@ -63,18 +63,6 @@ export type RedactionItem =
       kind: 'area';
     });
 
-export interface MarqueeRedactCallback {
-  onPreview?: (rect: Rect | null) => void;
-  onCommit?: (rect: Rect) => void;
-}
-
-export interface RegisterMarqueeOnPageOptions {
-  documentId: string;
-  pageIndex: number;
-  scale: number;
-  callback: MarqueeRedactCallback;
-}
-
 export interface RedactionPluginConfig extends BasePluginConfig {
   drawBlackBoxes: boolean;
   /**

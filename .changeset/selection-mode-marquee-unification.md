@@ -1,0 +1,7 @@
+---
+'@embedpdf/plugin-selection': minor
+---
+
+Unified text selection and marquee selection under the `enableForMode` API. Extended `EnableForModeOptions` with `enableSelection`, `showSelectionRects`, `enableMarquee`, and `showMarqueeRects` options. Deprecated `showRects` (use `showSelectionRects`), `setMarqueeEnabled`, and `isMarqueeEnabled` (use `enableForMode` with `enableMarquee`). Added `modeId` to `SelectionChangeEvent`, `BeginSelectionEvent`, `EndSelectionEvent`, `MarqueeChangeEvent`, `MarqueeEndEvent`, and their scoped counterparts. Marquee handler now uses `registerAlways` so any plugin can enable marquee for their mode. Removed `stopImmediatePropagation` from text selection handler in favor of `isTextSelecting` coordination.
+
+Refactored `SelectionLayer` into a thin orchestrator that composes the new `TextSelection` component and existing `MarqueeSelection` component. Consumers no longer need to render `MarqueeSelection` separately -- `SelectionLayer` now includes both text and marquee selection. Added new `TextSelection` export for advanced standalone usage. Added `textStyle` and `marqueeStyle` props to `SelectionLayer` for consistent CSS-standard styling (`background`, `borderColor`, `borderStyle`). `MarqueeSelection` updated with CSS-standard props (`background`, `borderColor`, `borderStyle`); old `stroke` and `fill` props deprecated. New `TextSelectionStyle` and `MarqueeSelectionStyle` type exports.

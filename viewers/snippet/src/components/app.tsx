@@ -60,7 +60,6 @@ import {
   SelectionLayer,
   SelectionPluginPackage,
   SelectionPluginConfig,
-  MarqueeSelection,
 } from '@embedpdf/plugin-selection/preact';
 import {
   TilingLayer,
@@ -435,7 +434,6 @@ function ViewerLayout({ documentId, tabBarVisibility = 'multiple' }: ViewerLayou
                                     selectionMenu={annotationMenu}
                                     groupSelectionMenu={groupAnnotationMenu}
                                   />
-                                  <MarqueeSelection documentId={documentId} pageIndex={pageIndex} />
                                 </PagePointerProvider>
                               </Rotate>
                             )}
