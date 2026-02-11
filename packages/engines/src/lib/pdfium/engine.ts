@@ -3124,12 +3124,14 @@ export class PdfiumNative implements IPdfiumExecutor {
         return false;
       }
     }
-    if (!this.pdfiumModule.EPDFAnnot_UpdateAppearanceToRect(annotationPtr, PdfStampFit.Cover)) {
+
+    // Apply base annotation properties first so that EPDFRotate / EPDFUnrotatedRect
+    // are available when UpdateAppearanceToRect reads them for rotation-aware AP generation.
+    if (!this.applyBaseAnnotationProperties(doc, page, pagePtr, annotationPtr, annotation)) {
       return false;
     }
 
-    // Apply base annotation properties (author, contents, dates, flags, custom, IRT, RT)
-    return this.applyBaseAnnotationProperties(doc, page, pagePtr, annotationPtr, annotation);
+    return !!this.pdfiumModule.EPDFAnnot_UpdateAppearanceToRect(annotationPtr, PdfStampFit.Cover);
   }
 
   /**
@@ -7468,7 +7470,14 @@ export class PdfiumNative implements IPdfiumExecutor {
     // 2) device size (rotation-aware) → integer pixels
     const finalScale = Math.max(0.01, scaleFactor * dpr);
 
-    const rect = toIntRect(annotation.rect);
+    // For rotated stamps, render using unrotated dimensions (CSS handles rotation)
+    const isRotatedStamp =
+      annotation.type === PdfAnnotationSubtype.STAMP &&
+      !!annotation.rotation &&
+      !!annotation.unrotatedRect;
+    const renderRect = isRotatedStamp ? annotation.unrotatedRect! : annotation.rect;
+
+    const rect = toIntRect(renderRect);
     const devRect = toIntRect(transformRect(page.size, rect, rotation, finalScale));
 
     const wDev = Math.max(1, devRect.size.width);
@@ -7498,18 +7507,31 @@ export class PdfiumNative implements IPdfiumExecutor {
     const mView = new Float32Array(this.pdfiumModule.pdfium.HEAPF32.buffer, mPtr, 6);
     mView.set([M.a, M.b, M.c, M.d, M.e, M.f]);
 
-    // 5) render (DisplayMatrix is applied inside EPDF_RenderAnnotBitmap)
+    // 5) render
     const FLAGS = RenderFlag.REVERSE_BYTE_ORDER;
     let ok = false;
     try {
-      ok = !!this.pdfiumModule.EPDF_RenderAnnotBitmap(
-        bitmapPtr,
-        pageCtx.pagePtr,
-        annotPtr,
-        mode,
-        mPtr,
-        FLAGS,
-      );
+      if (isRotatedStamp) {
+        // Use the unrotated rendering path: ignores AP Matrix, uses
+        // EPDFUnrotatedRect for MatchRect — no annotation state mutation.
+        ok = !!this.pdfiumModule.EPDF_RenderAnnotBitmapUnrotated(
+          bitmapPtr,
+          pageCtx.pagePtr,
+          annotPtr,
+          mode,
+          mPtr,
+          FLAGS,
+        );
+      } else {
+        ok = !!this.pdfiumModule.EPDF_RenderAnnotBitmap(
+          bitmapPtr,
+          pageCtx.pagePtr,
+          annotPtr,
+          mode,
+          mPtr,
+          FLAGS,
+        );
+      }
     } finally {
       this.memoryManager.free(mPtr);
       this.pdfiumModule.FPDFBitmap_Destroy(bitmapPtr); // frees wrapper, not our heapPtr

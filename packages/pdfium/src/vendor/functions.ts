@@ -21,6 +21,10 @@ export const functions = {
     ['number', 'number', 'number', 'number', 'number', 'number'] as const,
     'boolean',
   ] as const,
+  EPDF_RenderAnnotBitmapUnrotated: [
+    ['number', 'number', 'number', 'number', 'number', 'number'] as const,
+    'boolean',
+  ] as const,
   EPDF_SetEncryption: [['number', 'string', 'string', 'number'] as const, 'boolean'] as const,
   EPDF_SetMetaText: [['number', 'string', 'number'] as const, 'boolean'] as const,
   EPDF_SetMetaTrapped: [['number', 'number'] as const, 'boolean'] as const,
@@ -36,6 +40,7 @@ export const functions = {
   EPDFAnnot_Flatten: [['number', 'number'] as const, 'boolean'] as const,
   EPDFAnnot_GenerateAppearance: [['number'] as const, 'boolean'] as const,
   EPDFAnnot_GenerateAppearanceWithBlend: [['number', 'number'] as const, 'boolean'] as const,
+  EPDFAnnot_GetAPMatrix: [['number', 'number', 'number'] as const, 'boolean'] as const,
   EPDFAnnot_GetBlendMode: [['number'] as const, 'number'] as const,
   EPDFAnnot_GetBorderDashPattern: [['number', 'number', 'number'] as const, 'boolean'] as const,
   EPDFAnnot_GetBorderDashPatternCount: [['number'] as const, 'number'] as const,
@@ -67,6 +72,7 @@ export const functions = {
   EPDFAnnot_GetUnrotatedRect: [['number', 'number'] as const, 'boolean'] as const,
   EPDFAnnot_GetVerticalAlignment: [['number'] as const, 'number'] as const,
   EPDFAnnot_SetAction: [['number', 'number'] as const, 'boolean'] as const,
+  EPDFAnnot_SetAPMatrix: [['number', 'number', 'number'] as const, 'boolean'] as const,
   EPDFAnnot_SetBorderDashPattern: [['number', 'number', 'number'] as const, 'boolean'] as const,
   EPDFAnnot_SetBorderStyle: [['number', 'number', 'number'] as const, 'boolean'] as const,
   EPDFAnnot_SetColor: [
