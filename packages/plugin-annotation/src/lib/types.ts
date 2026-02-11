@@ -514,6 +514,8 @@ export interface UnifiedResizeOptions {
 export interface UnifiedResizeAnnotationInfo {
   id: string;
   originalRect: Rect;
+  /** The original unrotated rect at resize start (only for rotated annotations) */
+  originalUnrotatedRect?: Rect;
   pageIndex: number;
   /** Whether this is an attached link (auto-expanded) */
   isAttachedLink: boolean;
@@ -538,6 +540,8 @@ export interface UnifiedResizeState {
   documentId: string;
   /** Whether a resize is currently in progress */
   isResizing: boolean;
+  /** Whether this is a group resize (multiple primary annotations) */
+  isGroupResize: boolean;
   /** The explicitly selected annotation IDs (what the user selected) */
   primaryIds: string[];
   /** Auto-expanded attached link IDs */

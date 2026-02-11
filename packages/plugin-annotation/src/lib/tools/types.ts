@@ -144,6 +144,8 @@ export type AnnotationTool<T extends PdfAnnotationObject = PdfAnnotationObject> 
     isGroupDraggable?: DynamicBooleanProp;
     /** Whether this annotation can be resized when part of a group. Defaults to isResizable. Can be dynamic based on annotation. */
     isGroupResizable?: DynamicBooleanProp;
+    /** Whether this annotation can be rotated when part of a group. Defaults to isRotatable. Can be dynamic based on annotation. */
+    isGroupRotatable?: DynamicBooleanProp;
   };
 
   /** Tool-specific behavior settings that override plugin defaults */

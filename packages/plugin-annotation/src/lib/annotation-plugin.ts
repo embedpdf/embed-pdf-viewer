@@ -107,12 +107,15 @@ import {
   patchPolygon,
   patchCircle,
   patchSquare,
+  patchFreeText,
+  patchStamp,
 } from './patching/patches';
 import {
   getRectCenter,
   resolveAnnotationRotationCenter,
   rotatePointAroundCenter,
 } from './patching/patch-utils';
+import { convertAABBRectToUnrotatedSpace } from './geometry/rotation';
 
 export class AnnotationPlugin extends BasePlugin<
   AnnotationPluginConfig,
@@ -241,6 +244,8 @@ export class AnnotationPlugin extends BasePlugin<
     this.patchRegistry.register(PdfAnnotationSubtype.POLYGON, patchPolygon);
     this.patchRegistry.register(PdfAnnotationSubtype.CIRCLE, patchCircle);
     this.patchRegistry.register(PdfAnnotationSubtype.SQUARE, patchSquare);
+    this.patchRegistry.register(PdfAnnotationSubtype.FREETEXT, patchFreeText);
+    this.patchRegistry.register(PdfAnnotationSubtype.STAMP, patchStamp);
   }
 
   async initialize(): Promise<void> {
@@ -1560,6 +1565,7 @@ export class AnnotationPlugin extends BasePlugin<
     annotations: Array<{
       id: string;
       rect: Rect;
+      unrotatedRect?: Rect;
       pageIndex: number;
       isAttachedLink: boolean;
       parentId?: string;
@@ -1569,6 +1575,7 @@ export class AnnotationPlugin extends BasePlugin<
     return annotations.map((anno) => ({
       id: anno.id,
       originalRect: anno.rect,
+      originalUnrotatedRect: anno.unrotatedRect,
       pageIndex: anno.pageIndex,
       isAttachedLink: anno.isAttachedLink,
       parentId: anno.parentId,
@@ -1623,15 +1630,33 @@ export class AnnotationPlugin extends BasePlugin<
     documentId: string,
   ): Record<string, Partial<PdfAnnotationObject>> {
     const previewPatches: Record<string, Partial<PdfAnnotationObject>> = {};
+    const state = this.unifiedResizeStates.get(documentId);
+    // Build a lookup for participant info (needed for AABB→unrotated conversion)
+    const participantMap = state
+      ? new Map(state.participatingAnnotations.map((p) => [p.id, p]))
+      : undefined;
 
     for (const [id, newRect] of computedRects) {
       const ta = this.getAnnotationById(id, documentId);
       if (!ta) continue;
 
+      // For group resize, computed rects are in AABB space but baseResizeScaling
+      // expects unrotated space. Convert for rotated annotations.
+      let targetRect = newRect;
+      const info = participantMap?.get(id);
+      if (state?.isGroupResize && info?.originalUnrotatedRect) {
+        targetRect = convertAABBRectToUnrotatedSpace(
+          newRect,
+          info.originalRect,
+          info.originalUnrotatedRect,
+          ta.object.rotation ?? 0,
+        );
+      }
+
       // Plugin does the transform - handles ink, polygon, line, etc.
       previewPatches[id] = this.transformAnnotation(ta.object, {
         type: 'resize',
-        changes: { rect: newRect },
+        changes: { rect: targetRect },
       });
     }
 
@@ -1653,6 +1678,7 @@ export class AnnotationPlugin extends BasePlugin<
     const annotationsWithLinks: Array<{
       id: string;
       rect: Rect;
+      unrotatedRect?: Rect;
       pageIndex: number;
       isAttachedLink: boolean;
       parentId?: string;
@@ -1664,6 +1690,9 @@ export class AnnotationPlugin extends BasePlugin<
         annotationsWithLinks.push({
           id,
           rect: ta.object.rect,
+          unrotatedRect: ta.object.unrotatedRect
+            ? this.cloneRect(ta.object.unrotatedRect)
+            : undefined,
           pageIndex: ta.object.pageIndex,
           isAttachedLink: false,
         });
@@ -1676,6 +1705,9 @@ export class AnnotationPlugin extends BasePlugin<
             annotationsWithLinks.push({
               id: link.object.id,
               rect: link.object.rect,
+              unrotatedRect: link.object.unrotatedRect
+                ? this.cloneRect(link.object.unrotatedRect)
+                : undefined,
               pageIndex: link.object.pageIndex,
               isAttachedLink: true,
               parentId: id,
@@ -1704,6 +1736,7 @@ export class AnnotationPlugin extends BasePlugin<
     const state: UnifiedResizeState = {
       documentId,
       isResizing: true,
+      isGroupResize: annotationIds.length > 1,
       primaryIds: annotationIds,
       attachedLinkIds,
       allParticipantIds,
@@ -1788,14 +1821,27 @@ export class AnnotationPlugin extends BasePlugin<
     // Build patches for ALL participants (primary + attached links)
     const patches: Array<{ pageIndex: number; id: string; patch: Partial<PdfAnnotationObject> }> =
       [];
+    const participantMap = new Map(state.participatingAnnotations.map((p) => [p.id, p]));
 
     for (const [id, newRect] of computedRects) {
       const ta = this.getAnnotationById(id, documentId);
       if (!ta) continue;
 
+      // For group resize, convert AABB-space rect to unrotated space
+      let targetRect = newRect;
+      const info = participantMap.get(id);
+      if (state.isGroupResize && info?.originalUnrotatedRect) {
+        targetRect = convertAABBRectToUnrotatedSpace(
+          newRect,
+          info.originalRect,
+          info.originalUnrotatedRect,
+          ta.object.rotation ?? 0,
+        );
+      }
+
       const patch = this.transformAnnotation(ta.object, {
         type: 'resize',
-        changes: { rect: newRect },
+        changes: { rect: targetRect },
       });
 
       patches.push({ pageIndex: ta.object.pageIndex, id, patch });

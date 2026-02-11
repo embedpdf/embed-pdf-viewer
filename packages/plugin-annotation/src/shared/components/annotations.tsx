@@ -221,6 +221,27 @@ export function Annotations(annotationsProps: AnnotationsProps) {
     });
   }, [selectedAnnotationsOnPage, annotationProvides]);
 
+  // Check if all selected annotations on this page are rotatable in group context
+  const areAllSelectedRotatable = useMemo(() => {
+    if (selectedAnnotationsOnPage.length < 2) return false;
+
+    return selectedAnnotationsOnPage.every((ta) => {
+      const tool = annotationProvides?.findToolForAnnotation(ta.object);
+      // Use group-specific property, falling back to single-annotation property
+      const groupRotatable = resolveInteractionProp(
+        tool?.interaction.isGroupRotatable,
+        ta.object,
+        true,
+      );
+      const singleRotatable = resolveInteractionProp(
+        tool?.interaction.isRotatable,
+        ta.object,
+        true,
+      );
+      return tool?.interaction.isGroupRotatable !== undefined ? groupRotatable : singleRotatable;
+    });
+  }, [selectedAnnotationsOnPage, annotationProvides]);
+
   // Check if all selected annotations are on the same page (this page)
   const allSelectedOnSamePage = useMemo(() => {
     if (!annotationProvides) return false;
@@ -915,6 +936,7 @@ export function Annotations(annotationsProps: AnnotationsProps) {
           selectedAnnotations={selectedAnnotationsOnPage}
           isDraggable={areAllSelectedDraggable}
           isResizable={areAllSelectedResizable}
+          isRotatable={areAllSelectedRotatable}
           resizeUI={annotationsProps.resizeUI}
           selectionOutlineColor={annotationsProps.selectionOutlineColor}
           groupSelectionMenu={annotationsProps.groupSelectionMenu}
