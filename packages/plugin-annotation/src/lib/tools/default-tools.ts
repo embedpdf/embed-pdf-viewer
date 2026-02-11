@@ -144,10 +144,10 @@ export const defaultTools = [
       isDraggable: true,
       isResizable: true,
       lockAspectRatio: false,
-      isGroupResizable: (a) => {
-        // Allow group resize only when near an orthogonal angle (within 6°)
+      lockGroupAspectRatio: (a) => {
+        // Lock aspect ratio when rotation is not near an orthogonal angle (within 6°)
         const r = (((a.rotation ?? 0) % 90) + 90) % 90;
-        return r < 6 || r > 84;
+        return r >= 6 && r <= 84;
       },
     },
     defaults: {
@@ -173,10 +173,10 @@ export const defaultTools = [
       isDraggable: true,
       isResizable: true,
       lockAspectRatio: false,
-      isGroupResizable: (a) => {
-        // Allow group resize only when near an orthogonal angle (within 6°)
+      lockGroupAspectRatio: (a) => {
+        // Lock aspect ratio when rotation is not near an orthogonal angle (within 6°)
         const r = (((a.rotation ?? 0) % 90) + 90) % 90;
-        return r < 6 || r > 84;
+        return r >= 6 && r <= 84;
       },
     },
     defaults: {
@@ -203,6 +203,11 @@ export const defaultTools = [
       isResizable: false, // Uses vertex editing when selected individually
       lockAspectRatio: false,
       isGroupResizable: true, // Scales proportionally in a group
+      lockGroupAspectRatio: (a) => {
+        // Lock aspect ratio when rotation is not near an orthogonal angle (within 6°)
+        const r = (((a.rotation ?? 0) % 90) + 90) % 90;
+        return r >= 6 && r <= 84;
+      },
     },
     defaults: {
       type: PdfAnnotationSubtype.LINE,
@@ -228,6 +233,11 @@ export const defaultTools = [
       isResizable: false, // Uses vertex editing when selected individually
       lockAspectRatio: false,
       isGroupResizable: true, // Scales proportionally in a group
+      lockGroupAspectRatio: (a) => {
+        // Lock aspect ratio when rotation is not near an orthogonal angle (within 6°)
+        const r = (((a.rotation ?? 0) % 90) + 90) % 90;
+        return r >= 6 && r <= 84;
+      },
     },
     defaults: {
       type: PdfAnnotationSubtype.LINE,
@@ -258,6 +268,11 @@ export const defaultTools = [
       isResizable: false, // Uses vertex editing when selected individually
       lockAspectRatio: false,
       isGroupResizable: true, // Scales proportionally in a group
+      lockGroupAspectRatio: (a) => {
+        // Lock aspect ratio when rotation is not near an orthogonal angle (within 6°)
+        const r = (((a.rotation ?? 0) % 90) + 90) % 90;
+        return r >= 6 && r <= 84;
+      },
     },
     defaults: {
       type: PdfAnnotationSubtype.POLYLINE,
@@ -278,6 +293,11 @@ export const defaultTools = [
       isResizable: false, // Uses vertex editing when selected individually
       lockAspectRatio: false,
       isGroupResizable: true, // Scales proportionally in a group
+      lockGroupAspectRatio: (a) => {
+        // Lock aspect ratio when rotation is not near an orthogonal angle (within 6°)
+        const r = (((a.rotation ?? 0) % 90) + 90) % 90;
+        return r >= 6 && r <= 84;
+      },
     },
     defaults: {
       type: PdfAnnotationSubtype.POLYGON,
@@ -299,10 +319,10 @@ export const defaultTools = [
       isDraggable: true,
       isResizable: true,
       lockAspectRatio: false,
-      isGroupResizable: (a) => {
-        // Allow group resize only when near an orthogonal angle (within 6°)
+      lockGroupAspectRatio: (a) => {
+        // Lock aspect ratio when rotation is not near an orthogonal angle (within 6°)
         const r = (((a.rotation ?? 0) % 90) + 90) % 90;
-        return r < 6 || r > 84;
+        return r >= 6 && r <= 84;
       },
     },
     defaults: {
@@ -333,10 +353,10 @@ export const defaultTools = [
       isDraggable: true,
       isResizable: true,
       lockAspectRatio: true,
-      isGroupResizable: (a) => {
-        // Allow group resize only when near an orthogonal angle (within 6°)
+      lockGroupAspectRatio: (a) => {
+        // Lock aspect ratio when rotation is not near an orthogonal angle (within 6°)
         const r = (((a.rotation ?? 0) % 90) + 90) % 90;
-        return r < 6 || r > 84;
+        return r >= 6 && r <= 84;
       },
     },
     defaults: {

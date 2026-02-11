@@ -140,6 +140,8 @@ export type AnnotationTool<T extends PdfAnnotationObject = PdfAnnotationObject> 
     lockAspectRatio?: DynamicBooleanProp;
 
     // Group behaviors (default to single annotation values if not specified)
+    /** Whether to maintain aspect ratio during group resize. Defaults to lockAspectRatio. Can be dynamic based on annotation. */
+    lockGroupAspectRatio?: DynamicBooleanProp;
     /** Whether this annotation can be dragged when part of a group. Defaults to isDraggable. Can be dynamic based on annotation. */
     isGroupDraggable?: DynamicBooleanProp;
     /** Whether this annotation can be resized when part of a group. Defaults to isResizable. Can be dynamic based on annotation. */

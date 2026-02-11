@@ -1,16 +1,7 @@
 import { Rect, boundingRectOrEmpty } from '@embedpdf/models';
 import { useInteractionHandles, CounterRotate } from '@embedpdf/utils/@framework';
 import { TrackedAnnotation } from '@embedpdf/plugin-annotation';
-import {
-  useState,
-  useMemo,
-  useCallback,
-  useRef,
-  useEffect,
-  FormEvent,
-  ChangeEvent,
-  KeyboardEvent,
-} from '@framework';
+import { useState, useMemo, useCallback, useRef, useEffect, createPortal } from '@framework';
 import { useDocumentPermissions } from '@embedpdf/core/@framework';
 
 import { useAnnotationPlugin } from '../hooks';
@@ -31,6 +22,8 @@ interface GroupSelectionBoxProps {
   isResizable: boolean;
   /** Whether the group can be rotated */
   isRotatable?: boolean;
+  /** Whether to lock aspect ratio during group resize */
+  lockAspectRatio?: boolean;
   /** Resize handle UI customization */
   resizeUI?: ResizeHandleUI;
   /** Selection outline color */
@@ -58,6 +51,7 @@ export function GroupSelectionBox({
   isDraggable,
   isResizable,
   isRotatable = true,
+  lockAspectRatio = false,
   resizeUI,
   selectionOutlineColor = '#007ACC',
   outlineOffset = 2,
@@ -70,8 +64,8 @@ export function GroupSelectionBox({
   const isDraggingRef = useRef(false);
   const isResizingRef = useRef(false);
   const [liveRotation, setLiveRotation] = useState<number | null>(null);
-  const [isRotationEditing, setIsRotationEditing] = useState(false);
-  const [rotationDraft, setRotationDraft] = useState('');
+  const [cursorScreen, setCursorScreen] = useState<{ x: number; y: number } | null>(null);
+  const [isHandleHovered, setIsHandleHovered] = useState(false);
 
   // Check permissions before allowing drag/resize
   const effectiveIsDraggable = canModifyAnnotations && isDraggable;
@@ -147,6 +141,8 @@ export function GroupSelectionBox({
         if (!isRotatable) return;
         const ids = selectedAnnotations.map((ta) => ta.object.id);
         const cursorAngle = event.transformData.metadata?.rotationAngle ?? 0;
+        const cursorPos = event.transformData.metadata?.cursorPosition;
+        if (cursorPos) setCursorScreen({ x: cursorPos.clientX, y: cursorPos.clientY });
         if (event.state === 'start') {
           setLiveRotation(cursorAngle);
           plugin.startRotation(documentId, {
@@ -163,6 +159,7 @@ export function GroupSelectionBox({
           );
         } else if (event.state === 'end') {
           setLiveRotation(null);
+          setCursorScreen(null);
           plugin.commitRotation(documentId);
         }
         return;
@@ -227,66 +224,9 @@ export function GroupSelectionBox({
 
   const groupRotationDisplay = liveRotation ?? 0;
   const rotationActive = liveRotation !== null;
-
-  const applyGroupManualRotation = useCallback(
-    (nextAngle: number) => {
-      if (!plugin) return;
-      const ids = selectedAnnotations.map((ta) => ta.object.id);
-      const rect = previewGroupBox;
-      const center = {
-        x: rect.origin.x + rect.size.width / 2,
-        y: rect.origin.y + rect.size.height / 2,
-      };
-      const currentAngle = groupRotationDisplay;
-      plugin.startRotation(documentId, {
-        annotationIds: ids,
-        cursorAngle: currentAngle,
-        rotationCenter: center,
-      });
-      plugin.updateRotation(documentId, nextAngle, nextAngle - currentAngle);
-      plugin.commitRotation(documentId);
-    },
-    [documentId, plugin, previewGroupBox, selectedAnnotations, groupRotationDisplay],
-  );
-
-  const openGroupRotationEditor = useCallback(() => {
-    if (rotationActive) return;
-    setRotationDraft(String((Math.round(groupRotationDisplay * 10) / 10).toFixed(0)));
-    setIsRotationEditing(true);
-  }, [groupRotationDisplay, rotationActive]);
-
-  const closeGroupRotationEditor = useCallback(() => {
-    setIsRotationEditing(false);
-  }, []);
-
-  const handleGroupRotationSubmit = useCallback(
-    (event: FormEvent<HTMLFormElement>) => {
-      event.preventDefault();
-      const value = Number(rotationDraft);
-      if (!Number.isFinite(value)) {
-        closeGroupRotationEditor();
-        return;
-      }
-      const normalized = ((value % 360) + 360) % 360;
-      applyGroupManualRotation(normalized);
-      closeGroupRotationEditor();
-    },
-    [applyGroupManualRotation, closeGroupRotationEditor, rotationDraft],
-  );
-
-  const handleGroupRotationDraftChange = useCallback((event: ChangeEvent<HTMLInputElement>) => {
-    setRotationDraft(event.target.value);
-  }, []);
-
-  const handleGroupRotationKeyDown = useCallback(
-    (event: KeyboardEvent<HTMLInputElement>) => {
-      if (event.key === 'Escape') {
-        event.preventDefault();
-        closeGroupRotationEditor();
-      }
-    },
-    [closeGroupRotationEditor],
-  );
+  const normalizedRotationDisplay = Number.isFinite(groupRotationDisplay)
+    ? Math.round(groupRotationDisplay * 10) / 10
+    : 0;
 
   // UI constants
   const HANDLE_COLOR = resizeUI?.color ?? '#007ACC';
@@ -305,7 +245,7 @@ export function GroupSelectionBox({
         minHeight: 20,
         boundingBox: { width: pageWidth, height: pageHeight },
       },
-      maintainAspectRatio: false,
+      maintainAspectRatio: lockAspectRatio,
       pageRotation: rotation,
       scale: scale,
       enabled: true,
@@ -315,7 +255,7 @@ export function GroupSelectionBox({
       handleSize: HANDLE_SIZE,
       spacing: outlineOffset,
       offsetMode: 'outside',
-      includeSides: true,
+      includeSides: !lockAspectRatio,
       zIndex: zIndex + 1,
     },
     vertexUI: {
@@ -332,7 +272,6 @@ export function GroupSelectionBox({
     return null;
   }
 
-  const groupRotationLabel = `${(Math.round(groupRotationDisplay * 10) / 10).toFixed(0)}°`;
   const groupBoxWidth = previewGroupBox.size.width * scale;
   const groupBoxHeight = previewGroupBox.size.height * scale;
   const groupCenterX = groupBoxWidth / 2;
@@ -399,86 +338,19 @@ export function GroupSelectionBox({
           </>
         )}
 
-        {/* Rotation label - above the stable center */}
-        {isRotatable && (
-          <div
-            style={{
-              position: 'absolute',
-              left: groupCenterX,
-              top: -40,
-              transform: 'translate(-50%, -100%)',
-              pointerEvents: 'auto',
-            }}
-          >
-            {isRotationEditing ? (
-              <form
-                onSubmit={handleGroupRotationSubmit}
-                style={{ display: 'inline-flex', gap: 4 }}
-                onPointerDown={(event) => event.stopPropagation()}
-              >
-                <input
-                  autoFocus
-                  value={rotationDraft}
-                  onChange={handleGroupRotationDraftChange}
-                  onBlur={closeGroupRotationEditor}
-                  onKeyDown={handleGroupRotationKeyDown}
-                  style={{
-                    width: 64,
-                    padding: '4px 6px',
-                    borderRadius: 4,
-                    border: `1px solid ${HANDLE_COLOR}`,
-                    background: '#fff',
-                    color: '#111',
-                  }}
-                />
-                <button
-                  type="submit"
-                  style={{
-                    border: 'none',
-                    background: HANDLE_COLOR,
-                    color: '#fff',
-                    borderRadius: 4,
-                    padding: '4px 8px',
-                    cursor: 'pointer',
-                  }}
-                >
-                  Set
-                </button>
-              </form>
-            ) : (
-              <button
-                type="button"
-                onClick={openGroupRotationEditor}
-                disabled={rotationActive}
-                style={{
-                  border: 'none',
-                  background: HANDLE_COLOR,
-                  color: '#fff',
-                  borderRadius: 999,
-                  padding: '4px 10px',
-                  fontSize: 12,
-                  cursor: rotationActive ? 'default' : 'pointer',
-                  opacity: rotationActive ? 0.6 : 1,
-                }}
-              >
-                {groupRotationLabel}
-              </button>
-            )}
-          </div>
-        )}
-
         {/* Rotation handle - orbits in AABB space */}
         {isRotatable && rotationHandle && (
-          <>
-            {Object.keys(rotationHandle.connector.style).length > 0 && (
-              <div
-                style={{
-                  ...rotationHandle.connector.style,
-                  backgroundColor: HANDLE_COLOR,
-                  opacity: rotationActive ? 0 : 1,
-                }}
-              />
-            )}
+          <div
+            onPointerEnter={() => setIsHandleHovered(true)}
+            onPointerLeave={() => {
+              setIsHandleHovered(false);
+              setCursorScreen(null);
+            }}
+            onPointerMove={(e: any) => {
+              if (!rotationActive) setCursorScreen({ x: e.clientX, y: e.clientY });
+            }}
+            style={{ display: 'contents' }}
+          >
             <div
               {...rotationHandle.handle}
               style={{
@@ -505,7 +377,7 @@ export function GroupSelectionBox({
                 <path d="M21 3v5h-5" />
               </svg>
             </div>
-          </>
+          </div>
         )}
 
         {/* Inner div: group content area with outline and resize handles */}
@@ -521,7 +393,7 @@ export function GroupSelectionBox({
             top: 0,
             width: groupBoxWidth,
             height: groupBoxHeight,
-            outline: `2px dashed ${selectionOutlineColor}`,
+            outline: rotationActive ? 'none' : `2px dashed ${selectionOutlineColor}`,
             outlineOffset: outlineOffset - 1,
             cursor: effectiveIsDraggable ? 'move' : 'default',
             touchAction: 'none',
@@ -530,6 +402,7 @@ export function GroupSelectionBox({
         >
           {/* Resize handles */}
           {effectiveIsResizable &&
+            !rotationActive &&
             resize.map(({ key, ...hProps }) =>
               resizeUI?.component ? (
                 resizeUI.component({
@@ -547,6 +420,31 @@ export function GroupSelectionBox({
             )}
         </div>
       </div>
+
+      {/* Cursor-following rotation tooltip */}
+      {(rotationActive || isHandleHovered) &&
+        cursorScreen &&
+        createPortal(
+          <div
+            style={{
+              position: 'fixed',
+              left: cursorScreen.x + 16,
+              top: cursorScreen.y - 16,
+              background: 'rgba(0,0,0,0.8)',
+              color: '#fff',
+              padding: '4px 8px',
+              borderRadius: 4,
+              fontSize: 12,
+              fontFamily: 'monospace',
+              pointerEvents: 'none',
+              zIndex: 10000,
+              whiteSpace: 'nowrap',
+            }}
+          >
+            {normalizedRotationDisplay.toFixed(0)}°
+          </div>,
+          document.body,
+        )}
 
       {/* Group selection menu */}
       {groupSelectionMenu && (

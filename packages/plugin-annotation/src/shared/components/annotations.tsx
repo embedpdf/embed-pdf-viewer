@@ -242,6 +242,26 @@ export function Annotations(annotationsProps: AnnotationsProps) {
     });
   }, [selectedAnnotationsOnPage, annotationProvides]);
 
+  // Check if any selected annotation on this page needs aspect ratio locked during group resize
+  const shouldLockGroupAspectRatio = useMemo(() => {
+    if (selectedAnnotationsOnPage.length < 2) return false;
+
+    return selectedAnnotationsOnPage.some((ta) => {
+      const tool = annotationProvides?.findToolForAnnotation(ta.object);
+      const groupLock = resolveInteractionProp(
+        tool?.interaction.lockGroupAspectRatio,
+        ta.object,
+        false,
+      );
+      const singleLock = resolveInteractionProp(
+        tool?.interaction.lockAspectRatio,
+        ta.object,
+        false,
+      );
+      return tool?.interaction.lockGroupAspectRatio !== undefined ? groupLock : singleLock;
+    });
+  }, [selectedAnnotationsOnPage, annotationProvides]);
+
   // Check if all selected annotations are on the same page (this page)
   const allSelectedOnSamePage = useMemo(() => {
     if (!annotationProvides) return false;
@@ -937,6 +957,7 @@ export function Annotations(annotationsProps: AnnotationsProps) {
           isDraggable={areAllSelectedDraggable}
           isResizable={areAllSelectedResizable}
           isRotatable={areAllSelectedRotatable}
+          lockAspectRatio={shouldLockGroupAspectRatio}
           resizeUI={annotationsProps.resizeUI}
           selectionOutlineColor={annotationsProps.selectionOutlineColor}
           groupSelectionMenu={annotationsProps.groupSelectionMenu}
