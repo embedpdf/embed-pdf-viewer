@@ -8,7 +8,12 @@ import {
   calculateRotatedRectAABBAroundPoint,
   resolveAnnotationRotationCenter,
 } from '../patch-utils';
-import { baseRotateChanges, baseMoveChanges, baseResizeScaling } from '../base-patch';
+import {
+  baseRotateChanges,
+  baseMoveChanges,
+  baseResizeScaling,
+  rotateOrbitDelta,
+} from '../base-patch';
 
 export const patchLine: PatchFunction<PdfLineAnnoObject> = (orig, ctx) => {
   switch (ctx.type) {
@@ -60,8 +65,18 @@ export const patchLine: PatchFunction<PdfLineAnnoObject> = (orig, ctx) => {
       };
     }
 
-    case 'rotate':
-      return baseRotateChanges(orig, ctx) ?? ctx.changes;
+    case 'rotate': {
+      const result = baseRotateChanges(orig, ctx);
+      if (!result) return ctx.changes;
+      const { dx, dy } = rotateOrbitDelta(orig, result);
+      return {
+        ...result,
+        linePoints: {
+          start: { x: orig.linePoints.start.x + dx, y: orig.linePoints.start.y + dy },
+          end: { x: orig.linePoints.end.x + dx, y: orig.linePoints.end.y + dy },
+        },
+      };
+    }
 
     case 'property-update':
       if (ctx.changes.strokeWidth || ctx.changes.lineEndings) {

@@ -8,7 +8,12 @@ import {
   resolveAnnotationRotationCenter,
   resolveVertexEditRects,
 } from '../patch-utils';
-import { baseRotateChanges, baseMoveChanges, baseResizeScaling } from '../base-patch';
+import {
+  baseRotateChanges,
+  baseMoveChanges,
+  baseResizeScaling,
+  rotateOrbitDelta,
+} from '../base-patch';
 
 export const patchPolyline: PatchFunction<PdfPolylineAnnoObject> = (orig, ctx) => {
   switch (ctx.type) {
@@ -50,8 +55,15 @@ export const patchPolyline: PatchFunction<PdfPolylineAnnoObject> = (orig, ctx) =
       };
     }
 
-    case 'rotate':
-      return baseRotateChanges(orig, ctx) ?? ctx.changes;
+    case 'rotate': {
+      const result = baseRotateChanges(orig, ctx);
+      if (!result) return ctx.changes;
+      const { dx, dy } = rotateOrbitDelta(orig, result);
+      return {
+        ...result,
+        vertices: orig.vertices.map((v) => ({ x: v.x + dx, y: v.y + dy })),
+      };
+    }
 
     case 'property-update':
       if (ctx.changes.strokeWidth !== undefined || ctx.changes.lineEndings !== undefined) {

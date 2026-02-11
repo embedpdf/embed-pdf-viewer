@@ -6,7 +6,12 @@ import {
   calculateRotatedRectAABBAroundPoint,
   resolveAnnotationRotationCenter,
 } from '../patch-utils';
-import { baseRotateChanges, baseMoveChanges, baseResizeScaling } from '../base-patch';
+import {
+  baseRotateChanges,
+  baseMoveChanges,
+  baseResizeScaling,
+  rotateOrbitDelta,
+} from '../base-patch';
 
 export const patchInk: PatchFunction<PdfInkAnnoObject> = (original, ctx) => {
   switch (ctx.type) {
@@ -67,8 +72,17 @@ export const patchInk: PatchFunction<PdfInkAnnoObject> = (original, ctx) => {
       };
     }
 
-    case 'rotate':
-      return baseRotateChanges(original, ctx) ?? ctx.changes;
+    case 'rotate': {
+      const result = baseRotateChanges(original, ctx);
+      if (!result) return ctx.changes;
+      const { dx, dy } = rotateOrbitDelta(original, result);
+      return {
+        ...result,
+        inkList: original.inkList.map((stroke) => ({
+          points: stroke.points.map((p) => ({ x: p.x + dx, y: p.y + dy })),
+        })),
+      };
+    }
 
     case 'property-update':
       if (ctx.changes.strokeWidth !== undefined) {

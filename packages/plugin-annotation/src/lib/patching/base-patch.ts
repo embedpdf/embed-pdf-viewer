@@ -145,3 +145,25 @@ export function baseResizeScaling(
 
   return { scaleX, scaleY, oldRect, resolvedRect: newRect, rects };
 }
+
+// ---------------------------------------------------------------------------
+// Rotate – orbit translation for point-based annotations
+// ---------------------------------------------------------------------------
+
+/**
+ * Compute the orbit translation (dx/dy) from a rotation result.
+ * Point-based annotations (line, polyline, polygon, ink) use this to
+ * translate their vertices/points alongside the rect orbit during
+ * group rotation. For single-annotation rotation the delta is zero.
+ */
+export function rotateOrbitDelta(
+  orig: RotatableAnnotation,
+  rotateResult: { unrotatedRect?: Rect },
+): { dx: number; dy: number } {
+  const baseRect = orig.unrotatedRect ?? orig.rect;
+  const newRect = rotateResult.unrotatedRect ?? baseRect;
+  return {
+    dx: newRect.origin.x - baseRect.origin.x,
+    dy: newRect.origin.y - baseRect.origin.y,
+  };
+}
