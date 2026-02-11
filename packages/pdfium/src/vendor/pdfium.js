@@ -61,6 +61,7 @@ var createPdfium = (() => {
       '_EPDFAnnot_GetBorderStyle',
       '_EPDFAnnot_GetColor',
       '_EPDFAnnot_GetDefaultAppearance',
+      '_EPDFAnnot_GetExtendedRotation',
       '_EPDFAnnot_GetIcon',
       '_EPDFAnnot_GetIntent',
       '_EPDFAnnot_GetLineEndings',
@@ -72,12 +73,14 @@ var createPdfium = (() => {
       '_EPDFAnnot_GetRichContent',
       '_EPDFAnnot_GetRotate',
       '_EPDFAnnot_GetTextAlignment',
+      '_EPDFAnnot_GetUnrotatedRect',
       '_EPDFAnnot_GetVerticalAlignment',
       '_EPDFAnnot_SetAction',
       '_EPDFAnnot_SetBorderDashPattern',
       '_EPDFAnnot_SetBorderStyle',
       '_EPDFAnnot_SetColor',
       '_EPDFAnnot_SetDefaultAppearance',
+      '_EPDFAnnot_SetExtendedRotation',
       '_EPDFAnnot_SetIcon',
       '_EPDFAnnot_SetIntent',
       '_EPDFAnnot_SetLine',
@@ -89,6 +92,7 @@ var createPdfium = (() => {
       '_EPDFAnnot_SetReplyType',
       '_EPDFAnnot_SetRotate',
       '_EPDFAnnot_SetTextAlignment',
+      '_EPDFAnnot_SetUnrotatedRect',
       '_EPDFAnnot_SetVerticalAlignment',
       '_EPDFAnnot_SetVertices',
       '_EPDFAnnot_UpdateAppearanceToRect',
@@ -6277,6 +6281,18 @@ var createPdfium = (() => {
     ));
     var _EPDFAnnot_Flatten = (Module['_EPDFAnnot_Flatten'] = createExportWrapper(
       'EPDFAnnot_Flatten',
+      2,
+    ));
+    var _EPDFAnnot_SetExtendedRotation = (Module['_EPDFAnnot_SetExtendedRotation'] =
+      createExportWrapper('EPDFAnnot_SetExtendedRotation', 2));
+    var _EPDFAnnot_GetExtendedRotation = (Module['_EPDFAnnot_GetExtendedRotation'] =
+      createExportWrapper('EPDFAnnot_GetExtendedRotation', 2));
+    var _EPDFAnnot_SetUnrotatedRect = (Module['_EPDFAnnot_SetUnrotatedRect'] = createExportWrapper(
+      'EPDFAnnot_SetUnrotatedRect',
+      2,
+    ));
+    var _EPDFAnnot_GetUnrotatedRect = (Module['_EPDFAnnot_GetUnrotatedRect'] = createExportWrapper(
+      'EPDFAnnot_GetUnrotatedRect',
       2,
     ));
     var _FPDFDoc_GetAttachmentCount = (Module['_FPDFDoc_GetAttachmentCount'] = createExportWrapper(
