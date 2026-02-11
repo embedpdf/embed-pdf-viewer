@@ -145,12 +145,11 @@ export function resolveRotateRects(
   angleDegrees: number,
 ): { rect: Rect; unrotatedRect: Rect } {
   const baseCenter = resolveAnnotationRotationCenter(original);
-  const translation = original.unrotatedRect
-    ? {
-        x: nextUnrotatedRect.origin.x - original.unrotatedRect.origin.x,
-        y: nextUnrotatedRect.origin.y - original.unrotatedRect.origin.y,
-      }
-    : { x: 0, y: 0 };
+  const baseRect = original.unrotatedRect ?? original.rect;
+  const translation = {
+    x: nextUnrotatedRect.origin.x - baseRect.origin.x,
+    y: nextUnrotatedRect.origin.y - baseRect.origin.y,
+  };
   const nextCenter = {
     x: baseCenter.x + translation.x,
     y: baseCenter.y + translation.y,

@@ -1966,9 +1966,10 @@ export class AnnotationPlugin extends BasePlugin<
         type: 'rotate',
         changes: {
           rotation: nextRotation,
-          ...(participant.unrotatedRect && {
-            unrotatedRect: this.translateRect(participant.unrotatedRect, translation),
-          }),
+          unrotatedRect: this.translateRect(
+            participant.unrotatedRect ?? participant.rect,
+            translation,
+          ),
         },
         metadata: {
           rotationAngle: nextRotation,
