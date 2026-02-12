@@ -9,8 +9,8 @@ import {
   AnnotationPluginPackage,
   AnnotationTool,
   useAnnotation,
-  useAnnotationCapability,
-  type AnnotationSelectionMenuProps,
+  type HandleProps,
+  type RotationHandleComponentProps,
 } from '@embedpdf/plugin-annotation/react'
 import {
   InteractionManagerPluginPackage,
@@ -32,15 +32,7 @@ import {
 } from '@embedpdf/plugin-viewport/react'
 import { HistoryPluginPackage } from '@embedpdf/plugin-history/react'
 import { PdfAnnotationSubtype, PdfStampAnnoObject } from '@embedpdf/models'
-import {
-  Loader2,
-  Check,
-  X,
-  Pencil,
-  Square,
-  Highlighter,
-  Trash2,
-} from 'lucide-react'
+import { Loader2, Pencil, Square, GitBranch, Stamp, Trash2 } from 'lucide-react'
 
 const plugins = [
   createPluginRegistration(DocumentManagerPluginPackage, {
@@ -57,58 +49,90 @@ const plugins = [
   }),
 ]
 
-/**
- * A custom selection menu that appears when an annotation is selected.
- * Shows a delete button to remove the annotation.
- */
-const AnnotationSelectionMenu = ({
-  selected,
-  context,
-  documentId,
-  menuWrapperProps,
-  rect,
-  placement,
-}: AnnotationSelectionMenuProps & { documentId: string }) => {
-  const { provides: annotationCapability } = useAnnotationCapability()
-  const annotationScope = annotationCapability?.forDocument(documentId)
+// ---------------------------------------------------------------------------
+// Custom handle components
+// ---------------------------------------------------------------------------
 
-  const handleDelete = () => {
-    if (!annotationScope) return
-    const { pageIndex, id } = context.annotation.object
-    annotationScope.deleteAnnotation(pageIndex, id)
-  }
+/** Square resize handles instead of the default circles */
+const SquareResizeHandle = ({
+  style,
+  backgroundColor,
+  ...rest
+}: HandleProps) => (
+  <div
+    {...rest}
+    style={{
+      ...style,
+      backgroundColor: 'transparent',
+      border: `2px solid ${backgroundColor ?? '#475569'}`,
+      borderRadius: 2,
+    }}
+  />
+)
 
-  if (!selected) return null
+/** Diamond-shaped vertex handles (rotated 45deg squares) */
+const DiamondVertexHandle = ({
+  style,
+  backgroundColor,
+  ...rest
+}: HandleProps) => (
+  <div
+    {...rest}
+    style={{
+      ...style,
+      backgroundColor: backgroundColor ?? '#475569',
+      borderRadius: 1,
+      transform: `${(style as any)?.transform ?? ''} rotate(45deg)`.trim(),
+    }}
+  />
+)
 
-  const menuStyle: React.CSSProperties = {
-    position: 'absolute',
-    pointerEvents: 'auto',
-    cursor: 'default',
-    top: placement.suggestTop ? -46 : rect.size.height + 8,
-  }
-
-  return (
-    <div {...menuWrapperProps}>
-      <div
-        style={menuStyle}
-        className="rounded-lg border border-gray-200 bg-white shadow-lg dark:border-gray-700 dark:bg-gray-800"
+/** Custom rotation handle — a rounded pill with a rotate icon */
+const PillRotationHandle = ({
+  style,
+  backgroundColor,
+  connectorStyle,
+  showConnector,
+  iconColor = 'white',
+  ...rest
+}: RotationHandleComponentProps) => (
+  <>
+    {showConnector && connectorStyle && <div style={connectorStyle} />}
+    <div
+      {...rest}
+      style={{
+        ...style,
+        backgroundColor: backgroundColor ?? '#475569',
+        borderRadius: 999,
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        boxShadow: '0 1px 3px rgba(0,0,0,0.25)',
+      }}
+    >
+      <svg
+        width="12"
+        height="12"
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke={iconColor}
+        strokeWidth="2.5"
+        strokeLinecap="round"
+        strokeLinejoin="round"
       >
-        <div className="flex items-center gap-1 px-2 py-1">
-          <button
-            onClick={handleDelete}
-            className="flex items-center justify-center rounded p-1.5 text-gray-600 transition-colors hover:bg-gray-100 hover:text-red-600 dark:text-gray-300 dark:hover:bg-gray-700 dark:hover:text-red-400"
-            aria-label="Delete annotation"
-            title="Delete annotation"
-          >
-            <Trash2 size={16} />
-          </button>
-        </div>
-      </div>
+        <path d="M1 4v6h6" />
+        <path d="M23 20v-6h-6" />
+        <path d="M20.49 9A9 9 0 0 0 5.64 5.64L1 10M23 14l-4.64 4.36A9 9 0 0 1 3.51 15" />
+      </svg>
     </div>
-  )
-}
+  </>
+)
 
-const AnnotationToolbar = ({ documentId }: { documentId: string }) => {
+// ---------------------------------------------------------------------------
+// Toolbar
+// ---------------------------------------------------------------------------
+
+const Toolbar = ({ documentId }: { documentId: string }) => {
   const { provides: annotationApi, state } = useAnnotation(documentId)
 
   const handleDelete = () => {
@@ -122,11 +146,10 @@ const AnnotationToolbar = ({ documentId }: { documentId: string }) => {
   }
 
   const tools = [
-    { id: 'stampCheckmark', name: 'Checkmark', icon: Check },
-    { id: 'stampCross', name: 'Cross', icon: X },
-    { id: 'ink', name: 'Pen', icon: Pencil },
     { id: 'square', name: 'Square', icon: Square },
-    { id: 'highlight', name: 'Highlight', icon: Highlighter },
+    { id: 'ink', name: 'Pen', icon: Pencil },
+    { id: 'polyline', name: 'Polyline', icon: GitBranch },
+    { id: 'stampImage', name: 'Stamp', icon: Stamp },
   ]
 
   return (
@@ -136,7 +159,6 @@ const AnnotationToolbar = ({ documentId }: { documentId: string }) => {
       </span>
       <div className="h-4 w-px bg-gray-300 dark:bg-gray-600" />
 
-      {/* Tool buttons */}
       <div className="flex items-center gap-1.5">
         {tools.map((tool) => {
           const Icon = tool.icon
@@ -149,7 +171,7 @@ const AnnotationToolbar = ({ documentId }: { documentId: string }) => {
               }
               className={`inline-flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-xs font-medium shadow-sm transition-all ${
                 isActive
-                  ? 'bg-blue-500 text-white ring-1 ring-blue-600'
+                  ? 'bg-slate-600 text-white ring-1 ring-slate-700'
                   : 'bg-white text-gray-600 ring-1 ring-gray-300 hover:bg-gray-50 hover:text-gray-900 dark:bg-gray-700 dark:text-gray-300 dark:ring-gray-600 dark:hover:bg-gray-600 dark:hover:text-gray-100'
               } `}
               title={tool.name}
@@ -163,7 +185,6 @@ const AnnotationToolbar = ({ documentId }: { documentId: string }) => {
 
       <div className="h-4 w-px bg-gray-300 dark:bg-gray-600" />
 
-      {/* Delete button */}
       <button
         onClick={handleDelete}
         disabled={!state.selectedUid}
@@ -173,22 +194,20 @@ const AnnotationToolbar = ({ documentId }: { documentId: string }) => {
         <span className="hidden sm:inline">Delete</span>
       </button>
 
-      {/* Status hint */}
       {state.activeToolId && (
-        <span className="hidden animate-pulse text-xs text-blue-600 dark:text-blue-400 lg:inline">
+        <span className="hidden animate-pulse text-xs text-slate-600 dark:text-slate-400 lg:inline">
           Click on the PDF to add annotation
-        </span>
-      )}
-      {state.selectedUid && !state.activeToolId && (
-        <span className="hidden text-xs text-gray-500 dark:text-gray-400 lg:inline">
-          Annotation selected — drag to move or click Delete
         </span>
       )}
     </div>
   )
 }
 
-export const PDFViewer = () => {
+// ---------------------------------------------------------------------------
+// Viewer
+// ---------------------------------------------------------------------------
+
+export const CustomUIViewer = () => {
   const { engine, isLoading } = usePdfiumEngine()
 
   if (isLoading || !engine) {
@@ -213,32 +232,14 @@ export const PDFViewer = () => {
           .getPlugin<AnnotationPlugin>(AnnotationPlugin.id)
           ?.provides()
         annotation?.addTool<AnnotationTool<PdfStampAnnoObject>>({
-          id: 'stampCheckmark',
-          name: 'Checkmark',
-          interaction: {
-            exclusive: false,
-            cursor: 'crosshair',
-          },
+          id: 'stampImage',
+          name: 'Image Stamp',
+          interaction: { exclusive: false, cursor: 'crosshair' },
           matchScore: () => 0,
           defaults: {
             type: PdfAnnotationSubtype.STAMP,
             imageSrc: '/circle-checkmark.png',
-            imageSize: { width: 30, height: 30 },
-          },
-        })
-
-        annotation?.addTool<AnnotationTool<PdfStampAnnoObject>>({
-          id: 'stampCross',
-          name: 'Cross',
-          interaction: {
-            exclusive: false,
-            cursor: 'crosshair',
-          },
-          matchScore: () => 0,
-          defaults: {
-            type: PdfAnnotationSubtype.STAMP,
-            imageSrc: '/circle-cross.png',
-            imageSize: { width: 30, height: 30 },
+            imageSize: { width: 40, height: 40 },
           },
         })
       }}
@@ -252,10 +253,8 @@ export const PDFViewer = () => {
                   className="overflow-hidden rounded-lg border border-gray-300 bg-white shadow-sm dark:border-gray-700 dark:bg-gray-900"
                   style={{ userSelect: 'none' }}
                 >
-                  {/* Toolbar */}
-                  <AnnotationToolbar documentId={activeDocumentId} />
+                  <Toolbar documentId={activeDocumentId} />
 
-                  {/* PDF Viewer Area */}
                   <div className="relative h-[450px] sm:h-[550px]">
                     <Viewport
                       documentId={activeDocumentId}
@@ -280,12 +279,37 @@ export const PDFViewer = () => {
                             <AnnotationLayer
                               documentId={activeDocumentId}
                               pageIndex={pageIndex}
-                              selectionMenu={(props) => (
-                                <AnnotationSelectionMenu
-                                  {...props}
-                                  documentId={activeDocumentId}
-                                />
-                              )}
+                              resizeUI={{
+                                size: 10,
+                                color: '#475569',
+                                component: SquareResizeHandle,
+                              }}
+                              vertexUI={{
+                                size: 10,
+                                color: '#475569',
+                                component: DiamondVertexHandle,
+                              }}
+                              rotationUI={{
+                                size: 24,
+                                color: '#475569',
+                                iconColor: 'white',
+                                margin: 28,
+                                showConnector: true,
+                                connectorColor: '#94a3b8',
+                                component: PillRotationHandle,
+                              }}
+                              selectionOutline={{
+                                color: '#475569',
+                                style: 'solid',
+                                width: 1,
+                                offset: 2,
+                              }}
+                              groupSelectionOutline={{
+                                color: '#64748b',
+                                style: 'dashed',
+                                width: 2,
+                                offset: 3,
+                              }}
                             />
                           </PagePointerProvider>
                         )}

@@ -255,6 +255,105 @@ import { PDFViewer } from '../../code-examples/headless/annotation-example';
 </CodeExample>
 
 
+## Customizing Annotation UI
+
+The `<AnnotationLayer />` is fully headless — you can replace every visual element with your own components. This includes resize handles, vertex handles, the rotation handle, and the selection outline.
+
+### Custom Handle Components
+
+Each handle type accepts a `component` prop — a render function that receives positioning, event handlers, and style data. You **must** spread these props onto your element for interactions to work correctly.
+
+```tsx
+import {
+  AnnotationLayer,
+  type HandleProps,
+  type RotationHandleComponentProps,
+} from '@embedpdf/plugin-annotation/react';
+
+// Square resize handles instead of the default circles
+const SquareHandle = ({ style, backgroundColor, ...rest }: HandleProps) => (
+  <div
+    {...rest}
+    style={{
+      ...style,
+      backgroundColor: 'transparent',
+      border: `2px solid ${backgroundColor}`,
+      borderRadius: 2,
+    }}
+  />
+);
+
+// Diamond-shaped vertex handles
+const DiamondVertex = ({ style, backgroundColor, ...rest }: HandleProps) => (
+  <div
+    {...rest}
+    style={{
+      ...style,
+      backgroundColor,
+      borderRadius: 1,
+      transform: `${style?.transform ?? ''} rotate(45deg)`.trim(),
+    }}
+  />
+);
+
+// Custom rotation handle with a connector line
+const RotationPill = ({
+  style, backgroundColor, connectorStyle,
+  showConnector, iconColor, ...rest
+}: RotationHandleComponentProps) => (
+  <>
+    {showConnector && <div style={connectorStyle} />}
+    <div {...rest} style={{ ...style, backgroundColor, borderRadius: 999 }}>
+      <svg width="12" height="12" viewBox="0 0 24 24"
+        fill="none" stroke={iconColor} strokeWidth="2.5">
+        <path d="M1 4v6h6" />
+        <path d="M23 20v-6h-6" />
+        <path d="M20.49 9A9 9 0 0 0 5.64 5.64L1 10M23 14l-4.64 4.36A9 9 0 0 1 3.51 15" />
+      </svg>
+    </div>
+  </>
+);
+```
+
+### Passing Custom UI to the Layer
+
+Pass the custom components alongside color, size, and outline configuration:
+
+```tsx
+<AnnotationLayer
+  documentId={activeDocumentId}
+  pageIndex={pageIndex}
+  resizeUI={{ size: 10, color: '#475569', component: SquareHandle }}
+  vertexUI={{ size: 10, color: '#475569', component: DiamondVertex }}
+  rotationUI={{
+    size: 24,
+    color: '#475569',
+    iconColor: 'white',
+    margin: 28,
+    showConnector: true,
+    connectorColor: '#94a3b8',
+    component: RotationPill,
+  }}
+  selectionOutline={{ color: '#475569', style: 'solid', width: 1, offset: 2 }}
+  groupSelectionOutline={{ color: '#64748b', style: 'dashed', width: 2, offset: 3 }}
+/>
+```
+
+### Live Example — Custom UI
+
+Try creating annotations below to see the custom square resize handles, diamond vertex handles, and pill-shaped rotation handle in action.
+
+import { CustomUIViewer } from '../../code-examples/headless/annotation-custom-ui-example';
+
+<CodeExample
+  codePaths={[
+    "content/docs/react/code-examples/headless/annotation-custom-ui-example.tsx"
+  ]}
+>
+  <CustomUIViewer />
+</CodeExample>
+
+
 ## API Reference
 
 ### Configuration (`AnnotationPluginConfig`)
@@ -279,25 +378,52 @@ The primary component for rendering and interacting with annotations.
 | **`scale`** | `number` | The zoom scale of the page. |
 | **`rotation`** | `number` | The rotation of the page. |
 | **`selectionMenu`** | `(props) => JSX.Element` | A render prop for a custom menu that appears when an annotation is selected. |
-| **`resizeUI`** / **`vertexUI`** | `object` | Objects to customize the appearance of resize and vertex handles. |
-| **`selectionOutlineColor`**| `string` | The color of the outline around a selected annotation. **Default**: `'#007ACC'` |
+| **`resizeUI`** | `ResizeHandleUI` | Customize resize handle size, color, or provide a custom component. |
+| **`vertexUI`** | `VertexHandleUI` | Customize vertex handle size, color, or provide a custom component. |
+| **`rotationUI`** | `RotationHandleUI` | Customize rotation handle size, color, margin, icon, connector, or provide a custom component. |
+| **`selectionOutline`** | `SelectionOutline` | Customize the outline around selected annotations (`color`, `style`, `width`, `offset`). |
+| **`groupSelectionOutline`** | `SelectionOutline` | Customize the outline for group selections. Falls back to `selectionOutline`. |
+| ~~**`selectionOutlineColor`**~~ | `string` | **Deprecated.** Use `selectionOutline.color` instead. |
 
-#### Customizing Handles (`resizeUI` and `vertexUI`)
-
-You can customize the visual appearance of the interactive handles for resizing and editing vertices. Both `resizeUI` and `vertexUI` accept an object with the following shape:
+#### `ResizeHandleUI` / `VertexHandleUI`
 
 ```typescript
-interface HandleUI {
-  /** Handle size in CSS pixels */
-  size?: number; // Default: 12
-  /** Default background color for the handle */
-  color?: string; // Default: '#007ACC'
-  /** Custom component to render for each handle */
+interface ResizeHandleUI {
+  size?: number;    // Handle size in px (default: 12)
+  color?: string;   // Background color (default: '#007ACC')
   component?: (props: HandleProps) => JSX.Element;
+}
+// VertexHandleUI has the same shape
+```
+
+#### `RotationHandleUI`
+
+```typescript
+interface RotationHandleUI {
+  size?: number;           // Handle size in px (default: 16)
+  color?: string;          // Background color (default: '#007ACC')
+  iconColor?: string;      // Icon stroke color (default: 'white')
+  margin?: number;         // Gap from bounding box edge in px (default: 20)
+  showConnector?: boolean; // Show connector line (default: false)
+  connectorColor?: string; // Connector line color (default: same as color)
+  component?: (props: RotationHandleComponentProps) => JSX.Element;
 }
 ```
 
-The `HandleProps` passed to a custom `component` include positioning styles and event handlers, which must be applied to your custom element.
+#### `SelectionOutline`
+
+```typescript
+type SelectionOutlineStyle = 'solid' | 'dashed' | 'dotted';
+
+interface SelectionOutline {
+  color?: string;               // Outline color (default: '#007ACC')
+  style?: SelectionOutlineStyle; // Default: 'solid' (single) / 'dashed' (group)
+  width?: number;               // Outline width in px (default: 1 / 2)
+  offset?: number;              // Outline offset in px (default: 1 / 2)
+}
+```
+
+The `HandleProps` passed to a custom `component` include positioning styles and event handlers, which must be spread onto your custom element for interactions to work.
 
 ### Hook: `useAnnotation(documentId)`
 
