@@ -3107,23 +3107,6 @@ export interface PdfEngine<T = Blob> {
     annotation: PdfAnnotationObject,
   ) => PdfTask<boolean>;
   /**
-   * Update only the position/rect of an annotation.
-   * Optimized for interactive move/resize controls.
-   * @param doc - pdf document
-   * @param page - pdf page
-   * @param annotationId - unique id of annotation (NM field)
-   * @param rect - new bounding rectangle
-   * @param unrotatedRect - optional unrotated rect for rotated annotations
-   * @returns task indicating success or failure
-   */
-  updateAnnotationPosition: (
-    doc: PdfDocumentObject,
-    page: PdfPageObject,
-    annotationId: string,
-    rect: Rect,
-    unrotatedRect?: Rect,
-  ) => PdfTask<boolean>;
-  /**
    * get all text rects in pdf page
    * @param doc - pdf document
    * @param page - pdf page
@@ -3459,17 +3442,6 @@ export interface IPdfiumExecutor {
     doc: PdfDocumentObject,
     page: PdfPageObject,
     annotation: PdfAnnotationObject,
-  ): PdfTask<boolean>;
-  /**
-   * Update only the position/rect of an annotation.
-   * Optimized for interactive move/resize controls.
-   */
-  updateAnnotationPosition(
-    doc: PdfDocumentObject,
-    page: PdfPageObject,
-    annotationId: string,
-    rect: Rect,
-    unrotatedRect?: Rect,
   ): PdfTask<boolean>;
   getPageTextRects(doc: PdfDocumentObject, page: PdfPageObject): PdfTask<PdfTextRectObject[]>;
 

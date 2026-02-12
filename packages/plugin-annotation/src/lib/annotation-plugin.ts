@@ -394,8 +394,6 @@ export class AnnotationPlugin extends BasePlugin<
         this.purgeAnnotationMethod(pageIndex, id, documentId),
       renderAnnotation: (options) => this.renderAnnotation(options),
       commit: () => this.commit(),
-      updateAnnotationPosition: (pageIndex, id, rect, unrotatedRect) =>
-        this.updateAnnotationPosition(pageIndex, id, rect, unrotatedRect),
 
       // Attached links (IRT link children)
       getAttachedLinks: (id, documentId) => this.getAttachedLinksMethod(id, documentId),
@@ -465,8 +463,6 @@ export class AnnotationPlugin extends BasePlugin<
       purgeAnnotation: (pageIndex, id) => this.purgeAnnotationMethod(pageIndex, id, documentId),
       renderAnnotation: (options) => this.renderAnnotation(options, documentId),
       commit: () => this.commit(documentId),
-      updateAnnotationPosition: (pageIndex, id, rect, unrotatedRect) =>
-        this.updateAnnotationPosition(pageIndex, id, rect, unrotatedRect, documentId),
       getAttachedLinks: (id) => this.getAttachedLinksMethod(id, documentId),
       hasAttachedLinks: (id) => this.hasAttachedLinksMethod(id, documentId),
       deleteAttachedLinks: (id) => this.deleteAttachedLinksMethod(id, documentId),
@@ -966,65 +962,6 @@ export class AnnotationPlugin extends BasePlugin<
     };
     const historyScope = this.history.forDocument(docId);
     historyScope.register(command, this.ANNOTATION_HISTORY_TOPIC);
-  }
-
-  /**
-   * Update only the position/rect of an annotation.
-   * This is optimized for interactive move/resize controls - it bypasses
-   * the full annotation update flow and directly updates the PDF.
-   *
-   * The local state is also updated to reflect the position change.
-   */
-  private updateAnnotationPosition(
-    pageIndex: number,
-    annotationId: string,
-    rect: Rect,
-    unrotatedRect?: Rect,
-    documentId?: string,
-  ): Task<boolean, PdfErrorReason> {
-    const docId = documentId ?? this.getActiveDocumentId();
-    const coreDocState = this.getCoreDocument(docId);
-    const doc = coreDocState?.document;
-
-    if (!doc) {
-      return PdfTaskHelper.reject({
-        code: PdfErrorCode.NotFound,
-        message: 'Document not found',
-      });
-    }
-
-    const page = doc.pages.find((p) => p.index === pageIndex);
-    if (!page) {
-      return PdfTaskHelper.reject({
-        code: PdfErrorCode.NotFound,
-        message: 'Page not found',
-      });
-    }
-
-    // Call the engine method directly
-    const task = this.engine.updateAnnotationPosition(doc, page, annotationId, rect, unrotatedRect);
-
-    // Update local state on success
-    task.wait(() => {
-      // Patch local state with new rect
-      this.dispatch(
-        patchAnnotation(docId, pageIndex, annotationId, {
-          rect,
-          ...(unrotatedRect && { unrotatedRect }),
-        }),
-      );
-
-      this.events$.emit({
-        type: 'update',
-        documentId: docId,
-        annotation: this.getDocumentState(docId).byUid[annotationId]?.object,
-        pageIndex,
-        patch: { rect, ...(unrotatedRect && { unrotatedRect }) },
-        committed: true,
-      });
-    }, ignore);
-
-    return task;
   }
 
   private deleteAnnotationsMethod(

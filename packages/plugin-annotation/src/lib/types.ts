@@ -254,16 +254,6 @@ export interface AnnotationScope {
   renderAnnotation(options: RenderAnnotationOptions): Task<Blob, PdfErrorReason>;
   commit(): Task<boolean, PdfErrorReason>;
 
-  /**
-   * Update only the position/rect of an annotation.
-   * Optimized for interactive move/resize controls - bypasses full annotation update.
-   */
-  updateAnnotationPosition(
-    pageIndex: number,
-    annotationId: string,
-    rect: import('@embedpdf/models').Rect,
-    unrotatedRect?: import('@embedpdf/models').Rect,
-  ): Task<boolean, PdfErrorReason>;
   // Attached links (IRT link children)
   /** Get link annotations attached to an annotation via IRT relationship */
   getAttachedLinks(annotationId: string): TrackedAnnotation[];
@@ -340,16 +330,6 @@ export interface AnnotationCapability {
   renderAnnotation: (options: RenderAnnotationOptions) => Task<Blob, PdfErrorReason>;
   commit: () => Task<boolean, PdfErrorReason>;
 
-  /**
-   * Update only the position/rect of an annotation.
-   * Optimized for interactive move/resize controls - bypasses full annotation update.
-   */
-  updateAnnotationPosition: (
-    pageIndex: number,
-    annotationId: string,
-    rect: import('@embedpdf/models').Rect,
-    unrotatedRect?: import('@embedpdf/models').Rect,
-  ) => Task<boolean, PdfErrorReason>;
   // Attached links (IRT link children)
   /** Get link annotations attached to an annotation via IRT relationship */
   getAttachedLinks: (annotationId: string, documentId?: string) => TrackedAnnotation[];

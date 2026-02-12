@@ -306,9 +306,6 @@ export class EngineRunner {
       case 'updatePageAnnotation':
         task = engine.updatePageAnnotation!(...args);
         break;
-      case 'updateAnnotationPosition':
-        task = engine.updateAnnotationPosition!(...args);
-        break;
       case 'removePageAnnotation':
         task = engine.removePageAnnotation!(...args);
         break;
