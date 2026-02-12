@@ -2842,6 +2842,12 @@ export interface PdfRenderPageAnnotationOptions extends PdfRenderOptions {
    * Appearance mode normal down or rollover
    */
   mode?: AppearanceMode;
+  /**
+   * When true and annotation.unrotatedRect is present, render using the
+   * unrotated path (ignores AP Matrix rotation). Falls back to normal
+   * rendering if unrotatedRect is not available on the annotation.
+   */
+  unrotated?: boolean;
 }
 
 export interface PdfRenderThumbnailOptions extends PdfRenderOptions {

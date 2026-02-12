@@ -7394,12 +7394,10 @@ export class PdfiumNative implements IPdfiumExecutor {
     // 2) device size (rotation-aware) → integer pixels
     const finalScale = Math.max(0.01, scaleFactor * dpr);
 
-    // For rotated stamps, render using unrotated dimensions (CSS handles rotation)
-    const isRotatedStamp =
-      annotation.type === PdfAnnotationSubtype.STAMP &&
-      !!annotation.rotation &&
-      !!annotation.unrotatedRect;
-    const renderRect = isRotatedStamp ? annotation.unrotatedRect! : annotation.rect;
+    // When the caller opts in and an unrotatedRect is available, use it for
+    // bitmap dimensions and the unrotated WASM render path (CSS handles rotation).
+    const unrotated = !!options?.unrotated && !!annotation.unrotatedRect;
+    const renderRect = unrotated ? annotation.unrotatedRect! : annotation.rect;
 
     const rect = toIntRect(renderRect);
     const devRect = toIntRect(transformRect(page.size, rect, rotation, finalScale));
@@ -7435,7 +7433,7 @@ export class PdfiumNative implements IPdfiumExecutor {
     const FLAGS = RenderFlag.REVERSE_BYTE_ORDER;
     let ok = false;
     try {
-      if (isRotatedStamp) {
+      if (unrotated) {
         // Use the unrotated rendering path: ignores AP Matrix, uses
         // EPDFUnrotatedRect for MatchRect — no annotation state mutation.
         ok = !!this.pdfiumModule.EPDF_RenderAnnotBitmapUnrotated(
