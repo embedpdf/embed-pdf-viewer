@@ -9,7 +9,10 @@
       :pageHeight="pageHeight"
       :resizeUI="resizeUI"
       :vertexUI="vertexUI"
+      :rotationUI="rotationUI"
       :selectionOutlineColor="selectionOutlineColor"
+      :selectionOutline="selectionOutline"
+      :groupSelectionOutline="groupSelectionOutline"
       :selectionMenu="selectionMenu"
       :groupSelectionMenu="groupSelectionMenu"
       :annotationRenderers="allRenderers"
@@ -26,6 +29,9 @@
       </template>
       <template #vertex-handle="slotProps">
         <slot name="vertex-handle" v-bind="slotProps"></slot>
+      </template>
+      <template #rotation-handle="slotProps">
+        <slot name="rotation-handle" v-bind="slotProps"></slot>
       </template>
     </Annotations>
     <TextMarkup :documentId="documentId" :pageIndex="pageIndex" :scale="actualScale" />
@@ -45,6 +51,8 @@ import {
   GroupSelectionMenuRenderFn,
   ResizeHandleUI,
   VertexHandleUI,
+  RotationHandleUI,
+  SelectionOutline,
 } from '../types';
 import { useRendererRegistry, type BoxedAnnotationRenderer } from '../context';
 
@@ -58,8 +66,14 @@ const props = defineProps<{
   resizeUI?: ResizeHandleUI;
   /** Customize vertex handles */
   vertexUI?: VertexHandleUI;
-  /** Customize selection outline color */
+  /** Customize rotation handle */
+  rotationUI?: RotationHandleUI;
+  /** @deprecated Use `selectionOutline` instead */
   selectionOutlineColor?: string;
+  /** Customize the selection outline for individual annotations */
+  selectionOutline?: SelectionOutline;
+  /** Customize the selection outline for the group selection box (falls back to selectionOutline) */
+  groupSelectionOutline?: SelectionOutline;
   /** Customize selection menu */
   selectionMenu?: AnnotationSelectionMenuRenderFn;
   /** Customize group selection menu */
