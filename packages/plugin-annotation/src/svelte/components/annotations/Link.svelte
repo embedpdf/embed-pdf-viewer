@@ -66,6 +66,8 @@
   <!-- Invisible hit area for the entire link region -->
   <!-- IRT links are not directly clickable - interaction goes through parent -->
   <rect
+    role="button"
+    tabindex={-1}
     x={0}
     y={0}
     {width}

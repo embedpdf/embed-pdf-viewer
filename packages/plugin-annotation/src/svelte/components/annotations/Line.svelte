@@ -69,6 +69,8 @@
 >
   <!-- Main line -->
   <line
+    role="button"
+    tabindex={-1}
     {x1}
     {y1}
     {x2}
@@ -87,6 +89,8 @@
   <!-- Optional arrowheads / butt caps -->
   {#if endings.start}
     <path
+      role="button"
+      tabindex={-1}
       d={endings.start.d}
       transform={endings.start.transform}
       onpointerdown={onClick}
@@ -107,6 +111,8 @@
 
   {#if endings.end}
     <path
+      role="button"
+      tabindex={-1}
       d={endings.end.d}
       transform={endings.end.transform}
       stroke={strokeColor}

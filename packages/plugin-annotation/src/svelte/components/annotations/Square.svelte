@@ -60,6 +60,8 @@
   viewBox={`0 0 ${width + strokeWidth} ${height + strokeWidth}`}
 >
   <rect
+    role="button"
+    tabindex={-1}
     {x}
     {y}
     {width}

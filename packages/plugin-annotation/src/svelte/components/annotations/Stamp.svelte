@@ -18,6 +18,8 @@
 </script>
 
 <div
+  role="button"
+  tabindex={-1}
   style="position: absolute; width: 100%; height: 100%; z-index: 2;"
   style:pointer-events={isSelected ? 'none' : 'auto'}
   style:cursor="pointer"

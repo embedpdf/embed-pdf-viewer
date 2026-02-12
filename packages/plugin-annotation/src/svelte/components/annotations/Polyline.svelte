@@ -86,6 +86,8 @@
   viewBox={`0 0 ${rect.size.width} ${rect.size.height}`}
 >
   <path
+    role="button"
+    tabindex={-1}
     d={pathData}
     onpointerdown={onClick}
     ontouchstart={onClick}
@@ -101,6 +103,8 @@
 
   {#if endings.start}
     <path
+      role="button"
+      tabindex={-1}
       d={endings.start.d}
       transform={endings.start.transform}
       stroke={strokeColor}
@@ -120,6 +124,8 @@
 
   {#if endings.end}
     <path
+      role="button"
+      tabindex={-1}
       d={endings.end.d}
       transform={endings.end.transform}
       stroke={strokeColor}

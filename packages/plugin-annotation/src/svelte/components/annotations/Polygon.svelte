@@ -75,6 +75,8 @@
   viewBox={`0 0 ${rect.size.width} ${rect.size.height}`}
 >
   <path
+    role="button"
+    tabindex={-1}
     d={pathData}
     onpointerdown={onClick}
     ontouchstart={onClick}

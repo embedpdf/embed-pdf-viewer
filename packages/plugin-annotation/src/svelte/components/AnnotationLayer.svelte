@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { Rotation, type PdfAnnotationObject } from '@embedpdf/models';
+  import { type Rotation, type PdfAnnotationObject } from '@embedpdf/models';
   import { useDocumentState } from '@embedpdf/core/svelte';
   import type { HTMLAttributes } from 'svelte/elements';
   import type {

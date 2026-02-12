@@ -76,6 +76,8 @@
   viewBox={`0 0 ${width} ${height}`}
 >
   <ellipse
+    role="button"
+    tabindex={-1}
     {cx}
     {cy}
     {rx}

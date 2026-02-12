@@ -54,6 +54,8 @@
 >
   {#each paths as d, i (i)}
     <path
+      role="button"
+      tabindex={-1}
       {d}
       fill="none"
       {opacity}
