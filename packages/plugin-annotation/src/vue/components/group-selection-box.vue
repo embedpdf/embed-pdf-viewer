@@ -139,6 +139,7 @@ import {
   GroupSelectionMenuRenderFn,
   ResizeHandleUI,
   RotationHandleUI,
+  RotationHandleSlotProps,
   SelectionOutline,
 } from '../types';
 
@@ -161,9 +162,9 @@ const props = withDefaults(
     /** Whether to lock aspect ratio during group resize */
     lockAspectRatio?: boolean;
     /** Resize handle UI customization */
-    resizeUI?: ResizeHandleUI;
+    resizeUi?: ResizeHandleUI;
     /** Rotation handle UI customization */
-    rotationUI?: RotationHandleUI;
+    rotationUi?: RotationHandleUI;
     /** @deprecated Use `selectionOutline.color` instead */
     selectionOutlineColor?: string;
     /** @deprecated Use `selectionOutline.offset` instead */
@@ -206,16 +207,16 @@ const effectiveIsRotatable = computed(
 );
 
 // UI constants
-const HANDLE_COLOR = computed(() => props.resizeUI?.color ?? '#007ACC');
-const HANDLE_SIZE = computed(() => props.resizeUI?.size ?? 12);
-const ROTATION_SIZE = computed(() => props.rotationUI?.size ?? 32);
-const ROTATION_COLOR = computed(() => props.rotationUI?.color ?? HANDLE_COLOR.value);
+const HANDLE_COLOR = computed(() => props.resizeUi?.color ?? '#007ACC');
+const HANDLE_SIZE = computed(() => props.resizeUi?.size ?? 12);
+const ROTATION_SIZE = computed(() => props.rotationUi?.size ?? 32);
+const ROTATION_COLOR = computed(() => props.rotationUi?.color ?? HANDLE_COLOR.value);
 const ROTATION_CONNECTOR_COLOR = computed(
-  () => props.rotationUI?.connectorColor ?? ROTATION_COLOR.value,
+  () => props.rotationUi?.connectorColor ?? ROTATION_COLOR.value,
 );
-const ROTATION_ICON_COLOR = computed(() => props.rotationUI?.iconColor ?? 'white');
-const SHOW_CONNECTOR = computed(() => props.rotationUI?.showConnector ?? false);
-const ROTATION_MARGIN = computed(() => props.rotationUI?.margin);
+const ROTATION_ICON_COLOR = computed(() => props.rotationUi?.iconColor ?? 'white');
+const SHOW_CONNECTOR = computed(() => props.rotationUi?.showConnector ?? false);
+const ROTATION_MARGIN = computed(() => props.rotationUi?.margin);
 
 // Outline resolution (new object > deprecated props > group defaults)
 const outlineColor = computed(
@@ -364,8 +365,8 @@ const rotationHandleBindings = computed(() => {
   return rest;
 });
 
-const rotationHandleSlotProps = computed(() => {
-  if (!rotationHandleData.value) return {};
+const rotationHandleSlotProps = computed<RotationHandleSlotProps | Record<string, never>>(() => {
+  if (!rotationHandleData.value) return {} as Record<string, never>;
   return {
     ...rotationHandleData.value.handle,
     backgroundColor: ROTATION_COLOR.value,

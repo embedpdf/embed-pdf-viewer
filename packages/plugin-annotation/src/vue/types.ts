@@ -1,3 +1,4 @@
+import type { CSSProperties } from 'vue';
 import type { SelectionMenuPropsBase, SelectionMenuRenderFn } from '@embedpdf/utils/vue';
 import { TrackedAnnotation } from '@embedpdf/plugin-annotation';
 
@@ -53,6 +54,18 @@ export interface RotationHandleUI {
   /** Color for the icon inside the handle (default: "white") */
   iconColor?: string;
   // Note: Use #rotation-handle slot for custom rendering instead of component prop
+}
+
+/** Slot props passed to the `#rotation-handle` scoped slot */
+export interface RotationHandleSlotProps {
+  key: string | number;
+  style: CSSProperties;
+  backgroundColor: string;
+  iconColor: string;
+  connectorStyle: CSSProperties;
+  showConnector: boolean;
+  opacity: number;
+  [key: string]: any; // pointer event handlers + data attrs
 }
 
 export type SelectionOutlineStyle = 'solid' | 'dashed' | 'dotted';

@@ -7,9 +7,9 @@
       :rotation="actualRotation"
       :pageWidth="pageWidth"
       :pageHeight="pageHeight"
-      :resizeUI="resizeUI"
-      :vertexUI="vertexUI"
-      :rotationUI="rotationUI"
+      :resizeUi="resolvedResizeUi"
+      :vertexUi="resolvedVertexUi"
+      :rotationUi="rotationUi"
       :selectionOutlineColor="selectionOutlineColor"
       :selectionOutline="selectionOutline"
       :groupSelectionOutline="groupSelectionOutline"
@@ -40,7 +40,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed } from 'vue';
+import { computed, onMounted } from 'vue';
 import { useDocumentState } from '@embedpdf/core/vue';
 import { Rotation } from '@embedpdf/models';
 import Annotations from './annotations.vue';
@@ -63,11 +63,15 @@ const props = defineProps<{
   scale?: number;
   rotation?: number;
   /** Customize resize handles */
+  resizeUi?: ResizeHandleUI;
+  /** @deprecated Use `resizeUi` (or `:resize-ui` in templates) instead */
   resizeUI?: ResizeHandleUI;
   /** Customize vertex handles */
+  vertexUi?: VertexHandleUI;
+  /** @deprecated Use `vertexUi` (or `:vertex-ui` in templates) instead */
   vertexUI?: VertexHandleUI;
   /** Customize rotation handle */
-  rotationUI?: RotationHandleUI;
+  rotationUi?: RotationHandleUI;
   /** @deprecated Use `selectionOutline` instead */
   selectionOutlineColor?: string;
   /** Customize the selection outline for individual annotations */
@@ -81,6 +85,23 @@ const props = defineProps<{
   /** Custom renderers for specific annotation types (provided by external plugins) */
   annotationRenderers?: BoxedAnnotationRenderer[];
 }>();
+
+// Resolve deprecated prop aliases (resizeUI -> resizeUi, vertexUI -> vertexUi)
+const resolvedResizeUi = computed(() => props.resizeUi ?? props.resizeUI);
+const resolvedVertexUi = computed(() => props.vertexUi ?? props.vertexUI);
+
+onMounted(() => {
+  if (props.resizeUI) {
+    console.warn(
+      '[AnnotationLayer] The "resizeUI" prop is deprecated. Use :resize-ui in templates instead.',
+    );
+  }
+  if (props.vertexUI) {
+    console.warn(
+      '[AnnotationLayer] The "vertexUI" prop is deprecated. Use :vertex-ui in templates instead.',
+    );
+  }
+});
 
 // Get renderers from registry (provided by parent)
 const registry = useRendererRegistry();

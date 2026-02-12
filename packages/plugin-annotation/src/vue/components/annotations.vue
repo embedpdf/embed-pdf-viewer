@@ -497,8 +497,8 @@
     :isResizable="areAllSelectedResizable"
     :isRotatable="areAllSelectedRotatable"
     :lockAspectRatio="shouldLockGroupAspectRatio"
-    :resizeUI="resizeUI"
-    :rotationUI="rotationUI"
+    :resizeUi="resizeUi"
+    :rotationUi="rotationUi"
     :selectionOutlineColor="selectionOutlineColor"
     :selectionOutline="groupSelectionOutline ?? selectionOutline"
     :groupSelectionMenu="groupSelectionMenu"
@@ -564,9 +564,9 @@ const props = defineProps<{
   rotation: number;
   pageWidth: number;
   pageHeight: number;
-  resizeUI?: ResizeHandleUI;
-  vertexUI?: VertexHandleUI;
-  rotationUI?: RotationHandleUI;
+  resizeUi?: ResizeHandleUI;
+  vertexUi?: VertexHandleUI;
+  rotationUi?: RotationHandleUI;
   selectionOutlineColor?: string;
   selectionOutline?: SelectionOutline;
   groupSelectionOutline?: SelectionOutline;

@@ -169,7 +169,10 @@ import { useAnnotationCapability, useAnnotationPlugin } from '../hooks';
 import {
   AnnotationSelectionContext,
   AnnotationSelectionMenuRenderFn,
+  ResizeHandleUI,
+  VertexHandleUI,
   RotationHandleUI,
+  RotationHandleSlotProps,
   SelectionOutline,
 } from '../types';
 
@@ -200,8 +203,12 @@ const props = withDefaults(
     selectionOutlineColor?: string;
     /** Customize the selection outline (color, style, width, offset) */
     selectionOutline?: SelectionOutline;
+    /** Customize resize handle appearance */
+    resizeUi?: ResizeHandleUI;
+    /** Customize vertex handle appearance */
+    vertexUi?: VertexHandleUI;
     /** Customize rotation handle appearance */
-    rotationUI?: RotationHandleUI;
+    rotationUi?: RotationHandleUI;
     style?: CSSProperties;
   }>(),
   {
@@ -215,18 +222,18 @@ const props = withDefaults(
 );
 
 // UI constants
-const HANDLE_COLOR = '#007ACC';
-const VERTEX_COLOR = '#007ACC';
-const HANDLE_SIZE = 12;
-const VERTEX_SIZE = 12;
-const ROTATION_SIZE = computed(() => props.rotationUI?.size ?? 32);
-const ROTATION_COLOR = computed(() => props.rotationUI?.color ?? '#007ACC');
+const HANDLE_COLOR = computed(() => props.resizeUi?.color ?? '#007ACC');
+const VERTEX_COLOR = computed(() => props.vertexUi?.color ?? '#007ACC');
+const HANDLE_SIZE = computed(() => props.resizeUi?.size ?? 12);
+const VERTEX_SIZE = computed(() => props.vertexUi?.size ?? 12);
+const ROTATION_SIZE = computed(() => props.rotationUi?.size ?? 32);
+const ROTATION_COLOR = computed(() => props.rotationUi?.color ?? '#007ACC');
 const ROTATION_CONNECTOR_COLOR = computed(
-  () => props.rotationUI?.connectorColor ?? ROTATION_COLOR.value,
+  () => props.rotationUi?.connectorColor ?? ROTATION_COLOR.value,
 );
-const ROTATION_ICON_COLOR = computed(() => props.rotationUI?.iconColor ?? 'white');
-const SHOW_CONNECTOR = computed(() => props.rotationUI?.showConnector ?? false);
-const ROTATION_MARGIN = computed(() => props.rotationUI?.margin);
+const ROTATION_ICON_COLOR = computed(() => props.rotationUi?.iconColor ?? 'white');
+const SHOW_CONNECTOR = computed(() => props.rotationUi?.showConnector ?? false);
+const ROTATION_MARGIN = computed(() => props.rotationUi?.margin);
 
 // Outline resolution (new object > deprecated props > defaults)
 const outlineColor = computed(
@@ -497,14 +504,14 @@ const {
     },
   },
   resizeUI: {
-    handleSize: HANDLE_SIZE,
+    handleSize: HANDLE_SIZE.value,
     spacing: outlineOff.value,
     offsetMode: 'outside',
     includeSides: props.lockAspectRatio ? false : true,
     zIndex: props.zIndex + 1,
   },
   vertexUI: {
-    vertexSize: VERTEX_SIZE,
+    vertexSize: VERTEX_SIZE.value,
     zIndex: props.zIndex + 2,
   },
   rotationUI: {
@@ -694,8 +701,8 @@ const rotationHandleBindings = computed(() => {
   return rest;
 });
 
-const rotationHandleSlotProps = computed(() => {
-  if (!rotationHandleData.value) return {};
+const rotationHandleSlotProps = computed<RotationHandleSlotProps | Record<string, never>>(() => {
+  if (!rotationHandleData.value) return {} as Record<string, never>;
   return {
     ...rotationHandleData.value.handle,
     backgroundColor: ROTATION_COLOR.value,
