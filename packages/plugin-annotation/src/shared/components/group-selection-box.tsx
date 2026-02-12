@@ -66,7 +66,7 @@ export function GroupSelectionBox({
   selectionOutlineColor,
   outlineOffset,
   selectionOutline,
-  zIndex = 100,
+  zIndex = 2,
   groupSelectionMenu,
 }: GroupSelectionBoxProps): JSX.Element | null {
   const { plugin } = useAnnotationPlugin();
@@ -81,6 +81,7 @@ export function GroupSelectionBox({
   // Check permissions before allowing drag/resize
   const effectiveIsDraggable = canModifyAnnotations && isDraggable;
   const effectiveIsResizable = canModifyAnnotations && isResizable;
+  const effectiveIsRotatable = canModifyAnnotations && isRotatable;
 
   // Compute the group bounding box from all selected annotations
   const groupBox = useMemo(() => {
@@ -292,7 +293,7 @@ export function GroupSelectionBox({
       showConnector: SHOW_CONNECTOR,
     },
     includeVertices: false,
-    includeRotation: isRotatable,
+    includeRotation: effectiveIsRotatable,
     currentRotation: liveRotation ?? 0,
   });
 
@@ -368,7 +369,7 @@ export function GroupSelectionBox({
         )}
 
         {/* Rotation handle - orbits in AABB space */}
-        {isRotatable &&
+        {effectiveIsRotatable &&
           rotationHandle &&
           (rotationUI?.component ? (
             <div
@@ -530,8 +531,17 @@ export function GroupSelectionBox({
           }}
           rotation={rotation}
         >
-          {(counterRotateProps) =>
-            groupSelectionMenu({
+          {(counterRotateProps) => {
+            // The handle's visual angle = groupRotationDisplay + pageRotation (in degrees).
+            // `rotation` is in quarter turns (0-3), so multiply by 90 to get degrees.
+            // The menu (suggestTop: false) renders at the visual bottom (180deg).
+            // Flip the menu to the top when the handle is in the bottom visual hemisphere
+            // to prevent it from overlapping with the rotation handle.
+            const effectiveAngle = (((groupRotationDisplay + rotation * 90) % 360) + 360) % 360;
+            const handleNearMenuSide =
+              effectiveIsRotatable && effectiveAngle > 90 && effectiveAngle < 270;
+
+            return groupSelectionMenu({
               ...counterRotateProps,
               context: {
                 type: 'group',
@@ -540,10 +550,10 @@ export function GroupSelectionBox({
               },
               selected: true,
               placement: {
-                suggestTop: false,
+                suggestTop: handleNearMenuSide,
               },
-            })
-          }
+            });
+          }}
         </CounterRotate>
       )}
     </div>

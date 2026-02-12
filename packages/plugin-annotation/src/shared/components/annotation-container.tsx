@@ -119,6 +119,7 @@ export function AnnotationContainer<T extends PdfAnnotationObject>({
   // When multi-selected, disable individual drag/resize - GroupSelectionBox handles it
   const effectiveIsDraggable = canModifyAnnotations && isDraggable && !isMultiSelected;
   const effectiveIsResizable = canModifyAnnotations && isResizable && !isMultiSelected;
+  const effectiveIsRotatable = canModifyAnnotations && isRotatable && !isMultiSelected;
   // Get scoped API for this document
   const annotationProvides = useMemo(
     () => (annotationCapability ? annotationCapability.forDocument(documentId) : null),
@@ -318,7 +319,7 @@ export function AnnotationContainer<T extends PdfAnnotationObject>({
       showConnector: SHOW_CONNECTOR,
     },
     includeVertices: vertexConfig ? true : false,
-    includeRotation: isRotatable,
+    includeRotation: effectiveIsRotatable,
     currentRotation: annotationRotation,
   });
 
@@ -464,8 +465,7 @@ export function AnnotationContainer<T extends PdfAnnotationObject>({
 
         {/* Rotation handle - orbits in AABB space, kept in DOM during rotation */}
         {isSelected &&
-          isRotatable &&
-          !isMultiSelected &&
+          effectiveIsRotatable &&
           rotationHandle &&
           (rotationUI?.component ? (
             <div
@@ -650,7 +650,8 @@ export function AnnotationContainer<T extends PdfAnnotationObject>({
             // Flip the menu to the top when the handle is in the bottom visual hemisphere
             // to prevent it from overlapping with the rotation handle.
             const effectiveAngle = (((annotationRotation + rotation * 90) % 360) + 360) % 360;
-            const handleNearMenuSide = isRotatable && effectiveAngle > 90 && effectiveAngle < 270;
+            const handleNearMenuSide =
+              effectiveIsRotatable && effectiveAngle > 90 && effectiveAngle < 270;
 
             return selectionMenu({
               ...counterRotateProps,
