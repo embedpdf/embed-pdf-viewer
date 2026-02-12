@@ -53,9 +53,8 @@
   viewBox={`0 0 ${rect.size.width} ${rect.size.height}`}
 >
   {#each paths as d, i (i)}
+    <!-- svelte-ignore a11y_no_static_element_interactions -->
     <path
-      role="button"
-      tabindex={-1}
       {d}
       fill="none"
       {opacity}

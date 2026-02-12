@@ -74,9 +74,8 @@
   {height}
   viewBox={`0 0 ${rect.size.width} ${rect.size.height}`}
 >
+  <!-- svelte-ignore a11y_no_static_element_interactions -->
   <path
-    role="button"
-    tabindex={-1}
     d={pathData}
     onpointerdown={onClick}
     ontouchstart={onClick}

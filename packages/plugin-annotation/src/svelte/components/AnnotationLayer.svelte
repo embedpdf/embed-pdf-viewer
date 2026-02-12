@@ -10,6 +10,8 @@
     CustomAnnotationRenderer,
     ResizeHandleUI,
     VertexHandleUI,
+    RotationHandleUI,
+    SelectionOutline,
   } from '../types';
   import { getRendererRegistry, type BoxedAnnotationRenderer } from '../context';
   import Annotations from './Annotations.svelte';
@@ -36,8 +38,14 @@
     resizeUI?: ResizeHandleUI;
     /** Customize vertex handles */
     vertexUI?: VertexHandleUI;
-    /** Customize selection outline color */
+    /** Customize rotation handle */
+    rotationUI?: RotationHandleUI;
+    /** @deprecated Use `selectionOutline` instead */
     selectionOutlineColor?: string;
+    /** Customize the selection outline for individual annotations */
+    selectionOutline?: SelectionOutline;
+    /** Customize the selection outline for the group selection box (falls back to selectionOutline) */
+    groupSelectionOutline?: SelectionOutline;
     /** Customize annotation renderer */
     customAnnotationRenderer?: CustomAnnotationRenderer<PdfAnnotationObject>;
     /** Custom annotation renderers from props */
@@ -56,7 +64,10 @@
     groupSelectionMenuSnippet,
     resizeUI,
     vertexUI,
+    rotationUI,
     selectionOutlineColor,
+    selectionOutline,
+    groupSelectionOutline,
     customAnnotationRenderer,
     annotationRenderers,
     ...restProps
@@ -114,7 +125,10 @@
     {pageHeight}
     {resizeUI}
     {vertexUI}
+    {rotationUI}
     {selectionOutlineColor}
+    {selectionOutline}
+    {groupSelectionOutline}
     {customAnnotationRenderer}
     annotationRenderers={allRenderers}
   />

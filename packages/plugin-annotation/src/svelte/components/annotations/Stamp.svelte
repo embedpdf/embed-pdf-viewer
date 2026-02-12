@@ -15,6 +15,7 @@
   let { documentId, isSelected, annotation, pageIndex, scale, onClick }: StampProps = $props();
 
   let annotationProp = $derived({ ...annotation.object, id: annotation.object.id });
+  const unrotated = $derived(!!annotation.object.rotation && !!annotation.object.unrotatedRect);
 </script>
 
 <div
@@ -26,5 +27,11 @@
   onpointerdown={onClick}
   ontouchstart={onClick}
 >
-  <RenderAnnotation {documentId} {pageIndex} annotation={annotationProp} scaleFactor={scale} />
+  <RenderAnnotation
+    {documentId}
+    {pageIndex}
+    annotation={annotationProp}
+    scaleFactor={scale}
+    {unrotated}
+  />
 </div>

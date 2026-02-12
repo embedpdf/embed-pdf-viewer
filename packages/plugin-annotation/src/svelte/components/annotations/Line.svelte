@@ -68,9 +68,8 @@
   viewBox={`0 0 ${rect.size.width} ${rect.size.height}`}
 >
   <!-- Main line -->
+  <!-- svelte-ignore a11y_no_static_element_interactions -->
   <line
-    role="button"
-    tabindex={-1}
     {x1}
     {y1}
     {x2}
@@ -88,9 +87,8 @@
 
   <!-- Optional arrowheads / butt caps -->
   {#if endings.start}
+    <!-- svelte-ignore a11y_no_static_element_interactions -->
     <path
-      role="button"
-      tabindex={-1}
       d={endings.start.d}
       transform={endings.start.transform}
       onpointerdown={onClick}
@@ -110,9 +108,8 @@
   {/if}
 
   {#if endings.end}
+    <!-- svelte-ignore a11y_no_static_element_interactions -->
     <path
-      role="button"
-      tabindex={-1}
       d={endings.end.d}
       transform={endings.end.transform}
       stroke={strokeColor}

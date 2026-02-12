@@ -75,9 +75,8 @@
   {svgHeight}
   viewBox={`0 0 ${width} ${height}`}
 >
+  <!-- svelte-ignore a11y_no_static_element_interactions -->
   <ellipse
-    role="button"
-    tabindex={-1}
     {cx}
     {cy}
     {rx}

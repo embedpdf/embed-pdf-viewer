@@ -54,6 +54,50 @@ export interface VertexHandleUI {
   component?: Snippet<[HandleProps]>;
 }
 
+/** Props for the rotation handle component */
+export interface RotationHandleComponentProps extends HandleProps {
+  /** Props for the connector line element */
+  connectorStyle?: string;
+  /** Whether to show the connector line */
+  showConnector?: boolean;
+  /** Color for the icon inside the handle (default: "white") */
+  iconColor?: string;
+  /** Opacity of the handle (0 during active rotation) */
+  opacity?: number;
+}
+
+/** UI customization for rotation handle */
+export interface RotationHandleUI {
+  /** Handle size in CSS px (default: 32) */
+  size?: number;
+  /** Gap in CSS px between the bounding box edge and the rotation handle center (default: 20) */
+  margin?: number;
+  /** Default background color for the handle (used by default renderer) */
+  color?: string;
+  /** Color for the connector line (default: same as color) */
+  connectorColor?: string;
+  /** Whether to show the connector line (default: false) */
+  showConnector?: boolean;
+  /** Color for the icon inside the handle (default: "white") */
+  iconColor?: string;
+  /** Custom renderer for the rotation handle (overrides default) */
+  component?: Snippet<[RotationHandleComponentProps]>;
+}
+
+export type SelectionOutlineStyle = 'solid' | 'dashed' | 'dotted';
+
+/** Customize the selection outline (color, style, width, offset) */
+export interface SelectionOutline {
+  /** Outline color (default: '#007ACC') */
+  color?: string;
+  /** Outline style (default: 'solid' for single, 'dashed' for group) */
+  style?: SelectionOutlineStyle;
+  /** Outline width in px (default: 1 for single, 2 for group) */
+  width?: number;
+  /** Outline offset in px (default: 1 for single, 2 for group) */
+  offset?: number;
+}
+
 /**
  * Props for the custom annotation renderer
  */
