@@ -36,6 +36,8 @@ export interface PropertyConfig {
   unit?: string;
   /** Whether to debounce changes (for sliders) */
   debounce?: boolean;
+  /** If true, only show this property when editing an existing annotation (not for tool defaults) */
+  editOnly?: boolean;
 }
 
 /**
@@ -124,6 +126,7 @@ export const PROPERTY_CONFIGS: Record<string, PropertyConfig> = {
     type: 'rotation',
     labelKey: 'annotation.rotation',
     debounce: true,
+    editOnly: true,
   },
 
   // Redact properties
