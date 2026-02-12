@@ -27,6 +27,7 @@ import {
   RotationHandleUI,
   GroupSelectionMenuRenderFn,
   BoxedAnnotationRenderer,
+  SelectionOutline,
 } from './types';
 import { VertexConfig } from '../types';
 
@@ -49,6 +50,7 @@ interface AnnotationContainerProps<T extends PdfAnnotationObject> {
   style?: CSSProperties;
   vertexConfig?: VertexConfig<T>;
   selectionMenu?: AnnotationSelectionMenuRenderFn;
+  /** @deprecated Use `selectionOutline.offset` instead */
   outlineOffset?: number;
   onDoubleClick?: (event: any) => void;
   onSelect: (event: any) => void;
@@ -56,7 +58,10 @@ interface AnnotationContainerProps<T extends PdfAnnotationObject> {
   resizeUI?: ResizeHandleUI;
   vertexUI?: VertexHandleUI;
   rotationUI?: RotationHandleUI;
+  /** @deprecated Use `selectionOutline.color` instead */
   selectionOutlineColor?: string;
+  /** Customize the selection outline (color, style, width, offset) */
+  selectionOutline?: SelectionOutline;
   customAnnotationRenderer?: CustomAnnotationRenderer<T>;
   /** Passed from parent but not used - destructured to prevent DOM spread */
   groupSelectionMenu?: GroupSelectionMenuRenderFn;
@@ -94,7 +99,8 @@ export function AnnotationContainer<T extends PdfAnnotationObject>({
   resizeUI,
   vertexUI,
   rotationUI,
-  selectionOutlineColor = '#007ACC',
+  selectionOutlineColor,
+  selectionOutline,
   customAnnotationRenderer,
   // Destructure props that shouldn't be passed to DOM elements
   groupSelectionMenu: _groupSelectionMenu,
@@ -130,9 +136,16 @@ export function AnnotationContainer<T extends PdfAnnotationObject>({
   const ROTATION_CONNECTOR_COLOR = rotationUI?.connectorColor ?? ROTATION_COLOR;
   const HANDLE_SIZE = resizeUI?.size ?? 12;
   const VERTEX_SIZE = vertexUI?.size ?? 12;
-  const ROTATION_SIZE = rotationUI?.size ?? 16;
-  const ROTATION_RADIUS = rotationUI?.radius; // undefined = auto-calculate
+  const ROTATION_SIZE = rotationUI?.size ?? 32;
+  const ROTATION_MARGIN = rotationUI?.margin; // undefined = use default (20)
+  const ROTATION_ICON_COLOR = rotationUI?.iconColor ?? 'white';
   const SHOW_CONNECTOR = rotationUI?.showConnector ?? false;
+
+  // Outline resolution (new object > deprecated props > defaults)
+  const outlineColor = selectionOutline?.color ?? selectionOutlineColor ?? '#007ACC';
+  const outlineStyle = selectionOutline?.style ?? 'solid';
+  const outlineWidth = selectionOutline?.width ?? 1;
+  const outlineOff = selectionOutline?.offset ?? outlineOffset ?? 1;
 
   // Get annotation's current rotation (for simple shapes that store rotation)
   // During drag, use liveRotation if available; otherwise use the annotation's rotation
@@ -289,7 +302,7 @@ export function AnnotationContainer<T extends PdfAnnotationObject>({
     },
     resizeUI: {
       handleSize: HANDLE_SIZE,
-      spacing: outlineOffset,
+      spacing: outlineOff,
       offsetMode: 'outside',
       includeSides: lockAspectRatio ? false : true,
       zIndex: zIndex + 1,
@@ -300,7 +313,7 @@ export function AnnotationContainer<T extends PdfAnnotationObject>({
     },
     rotationUI: {
       handleSize: ROTATION_SIZE,
-      radius: ROTATION_RADIUS,
+      margin: ROTATION_MARGIN,
       zIndex: zIndex + 3,
       showConnector: SHOW_CONNECTOR,
     },
@@ -469,6 +482,7 @@ export function AnnotationContainer<T extends PdfAnnotationObject>({
               {rotationUI.component({
                 ...rotationHandle.handle,
                 backgroundColor: ROTATION_COLOR,
+                iconColor: ROTATION_ICON_COLOR,
                 connectorStyle: {
                   ...rotationHandle.connector.style,
                   backgroundColor: ROTATION_CONNECTOR_COLOR,
@@ -515,11 +529,11 @@ export function AnnotationContainer<T extends PdfAnnotationObject>({
               >
                 {/* Default rotation icon - a curved arrow */}
                 <svg
-                  width="10"
-                  height="10"
+                  width={Math.round(ROTATION_SIZE * 0.6)}
+                  height={Math.round(ROTATION_SIZE * 0.6)}
                   viewBox="0 0 24 24"
                   fill="none"
-                  stroke="white"
+                  stroke={ROTATION_ICON_COLOR}
                   strokeWidth="2"
                   strokeLinecap="round"
                   strokeLinejoin="round"
@@ -543,8 +557,8 @@ export function AnnotationContainer<T extends PdfAnnotationObject>({
             height: innerHeight,
             transform: annotationRotation !== 0 ? `rotate(${annotationRotation}deg)` : undefined,
             transformOrigin: innerTransformOrigin,
-            outline: showOutline ? `1px solid ${selectionOutlineColor}` : 'none',
-            outlineOffset: showOutline ? `${outlineOffset}px` : '0px',
+            outline: showOutline ? `${outlineWidth}px ${outlineStyle} ${outlineColor}` : 'none',
+            outlineOffset: showOutline ? `${outlineOff}px` : '0px',
             pointerEvents: isSelected && !isMultiSelected ? 'auto' : 'none',
             touchAction: 'none',
             cursor: isSelected && effectiveIsDraggable ? 'move' : 'default',

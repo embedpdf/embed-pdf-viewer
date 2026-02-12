@@ -18,10 +18,10 @@ export interface VertexUI {
 }
 
 export interface RotationUI {
-  /** Handle size in px (default 16) */
+  /** Handle size in px (default 32) */
   handleSize?: number;
-  /** Distance from the center of the bounding box to the handle (default: calculated from rect) */
-  radius?: number;
+  /** Screen-pixel gap between bounding box edge and handle center (default 30) */
+  margin?: number;
   /** z-index of the rotation handle (default 5) */
   zIndex?: number;
   /** Whether to show the connector line from center to handle (default true) */
@@ -31,7 +31,7 @@ export interface RotationUI {
 }
 
 /** Screen-pixel gap between the rect edge and the rotation handle center (default orbit margin). */
-export const ROTATION_HANDLE_MARGIN = 20;
+export const ROTATION_HANDLE_MARGIN = 30;
 
 export interface HandleDescriptor {
   handle: ResizeHandle;
@@ -228,8 +228,8 @@ export function describeRotationFromConfig(
   // matches the annotation rotation and the shape rotates with it. So the
   // distance from center to the nearest edge in the handle's direction is
   // always halfHeight of the unrotated rect, regardless of the angle.
-  const defaultRadius = (rect.size.height * scale) / 2 + ROTATION_HANDLE_MARGIN;
-  const radius = ui.radius !== undefined ? ui.radius * scale : defaultRadius;
+  const margin = ui.margin ?? ROTATION_HANDLE_MARGIN;
+  const radius = (rect.size.height * scale) / 2 + margin;
 
   const handleCenterX = centerX + radius * Math.sin(angleRad);
   const handleCenterY = centerY - radius * Math.cos(angleRad);

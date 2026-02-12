@@ -47,6 +47,8 @@ import {
   AnnotationSelectionMenuRenderFn,
   GroupSelectionMenuRenderFn,
   VertexHandleUI,
+  RotationHandleUI,
+  SelectionOutline,
   BoxedAnnotationRenderer,
 } from './types';
 import { Circle } from './annotations/circle';
@@ -68,7 +70,10 @@ interface AnnotationsProps {
   groupSelectionMenu?: GroupSelectionMenuRenderFn;
   resizeUI?: ResizeHandleUI;
   vertexUI?: VertexHandleUI;
+  rotationUI?: RotationHandleUI;
   selectionOutlineColor?: string;
+  selectionOutline?: SelectionOutline;
+  groupSelectionOutline?: SelectionOutline;
   customAnnotationRenderer?: CustomAnnotationRenderer<PdfAnnotationObject>;
   /** Custom renderers for specific annotation types (provided by external plugins) */
   annotationRenderers?: BoxedAnnotationRenderer[];
@@ -959,7 +964,11 @@ export function Annotations(annotationsProps: AnnotationsProps) {
           isRotatable={areAllSelectedRotatable}
           lockAspectRatio={shouldLockGroupAspectRatio}
           resizeUI={annotationsProps.resizeUI}
+          rotationUI={annotationsProps.rotationUI}
           selectionOutlineColor={annotationsProps.selectionOutlineColor}
+          selectionOutline={
+            annotationsProps.groupSelectionOutline ?? annotationsProps.selectionOutline
+          }
           groupSelectionMenu={annotationsProps.groupSelectionMenu}
         />
       )}

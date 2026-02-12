@@ -57,20 +57,37 @@ export interface RotationHandleComponentProps extends HandleProps {
   connectorStyle?: CSSProperties;
   /** Whether to show the connector line */
   showConnector?: boolean;
+  /** Color for the icon inside the handle (default: "white") */
+  iconColor?: string;
+}
+
+export type SelectionOutlineStyle = 'solid' | 'dashed' | 'dotted';
+
+export interface SelectionOutline {
+  /** Outline color (default: '#007ACC') */
+  color?: string;
+  /** Outline style (default: 'solid' for single, 'dashed' for group) */
+  style?: SelectionOutlineStyle;
+  /** Outline width in px (default: 1 for single, 2 for group) */
+  width?: number;
+  /** Outline offset in px (default: 1 for single, 2 for group) */
+  offset?: number;
 }
 
 /** UI customization for rotation handle */
 export interface RotationHandleUI {
   /** Handle size in CSS px (default: 16) */
   size?: number;
-  /** Distance from the center of the bounding box to the handle (default: auto-calculated) */
-  radius?: number;
+  /** Gap in CSS px between the bounding box edge and the rotation handle center (default: 20) */
+  margin?: number;
   /** Default background color for the handle (used by default renderer) */
   color?: string;
   /** Color for the connector line (default: same as color) */
   connectorColor?: string;
   /** Whether to show the connector line (default: true) */
   showConnector?: boolean;
+  /** Color for the icon inside the handle (default: "white") */
+  iconColor?: string;
   /** Custom renderer for the rotation handle (overrides default) */
   component?: (p: RotationHandleComponentProps) => JSX.Element;
 }

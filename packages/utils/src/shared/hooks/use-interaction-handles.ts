@@ -147,7 +147,7 @@ export function useInteractionHandles(opts: {
     controller.scale,
     currentRotation,
     rotationUI?.handleSize,
-    rotationUI?.radius,
+    rotationUI?.margin,
     rotationUI?.zIndex,
     rotationUI?.showConnector,
     rotationUI?.connectorWidth,

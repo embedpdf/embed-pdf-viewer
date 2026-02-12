@@ -5,7 +5,12 @@ import { useState, useMemo, useCallback, useRef, useEffect, createPortal } from 
 import { useDocumentPermissions } from '@embedpdf/core/@framework';
 
 import { useAnnotationPlugin } from '../hooks';
-import { ResizeHandleUI, GroupSelectionMenuRenderFn } from './types';
+import {
+  ResizeHandleUI,
+  RotationHandleUI,
+  GroupSelectionMenuRenderFn,
+  SelectionOutline,
+} from './types';
 
 interface GroupSelectionBoxProps {
   documentId: string;
@@ -26,10 +31,14 @@ interface GroupSelectionBoxProps {
   lockAspectRatio?: boolean;
   /** Resize handle UI customization */
   resizeUI?: ResizeHandleUI;
-  /** Selection outline color */
+  /** Rotation handle UI customization */
+  rotationUI?: RotationHandleUI;
+  /** @deprecated Use `selectionOutline.color` instead */
   selectionOutlineColor?: string;
-  /** Outline offset */
+  /** @deprecated Use `selectionOutline.offset` instead */
   outlineOffset?: number;
+  /** Customize the selection outline (color, style, width, offset) */
+  selectionOutline?: SelectionOutline;
   /** Z-index for the group box */
   zIndex?: number;
   /** Group selection menu render function */
@@ -53,8 +62,10 @@ export function GroupSelectionBox({
   isRotatable = true,
   lockAspectRatio = false,
   resizeUI,
-  selectionOutlineColor = '#007ACC',
-  outlineOffset = 2,
+  rotationUI,
+  selectionOutlineColor,
+  outlineOffset,
+  selectionOutline,
   zIndex = 100,
   groupSelectionMenu,
 }: GroupSelectionBoxProps): JSX.Element | null {
@@ -231,6 +242,18 @@ export function GroupSelectionBox({
   // UI constants
   const HANDLE_COLOR = resizeUI?.color ?? '#007ACC';
   const HANDLE_SIZE = resizeUI?.size ?? 12;
+  const ROTATION_COLOR = rotationUI?.color ?? HANDLE_COLOR;
+  const ROTATION_CONNECTOR_COLOR = rotationUI?.connectorColor ?? ROTATION_COLOR;
+  const ROTATION_SIZE = rotationUI?.size ?? 32;
+  const ROTATION_MARGIN = rotationUI?.margin;
+  const ROTATION_ICON_COLOR = rotationUI?.iconColor ?? 'white';
+  const SHOW_CONNECTOR = rotationUI?.showConnector ?? false;
+
+  // Outline resolution (new object > deprecated props > group defaults)
+  const outlineColor = selectionOutline?.color ?? selectionOutlineColor ?? '#007ACC';
+  const outlineStyleVal = selectionOutline?.style ?? 'dashed';
+  const outlineWidth = selectionOutline?.width ?? 2;
+  const outlineOff = selectionOutline?.offset ?? outlineOffset ?? 2;
 
   // Use interaction handles for both drag and resize
   const {
@@ -253,7 +276,7 @@ export function GroupSelectionBox({
     },
     resizeUI: {
       handleSize: HANDLE_SIZE,
-      spacing: outlineOffset,
+      spacing: outlineOff,
       offsetMode: 'outside',
       includeSides: !lockAspectRatio,
       zIndex: zIndex + 1,
@@ -261,6 +284,12 @@ export function GroupSelectionBox({
     vertexUI: {
       vertexSize: 0,
       zIndex: zIndex,
+    },
+    rotationUI: {
+      handleSize: ROTATION_SIZE,
+      margin: ROTATION_MARGIN,
+      zIndex: zIndex + 2,
+      showConnector: SHOW_CONNECTOR,
     },
     includeVertices: false,
     includeRotation: isRotatable,
@@ -339,46 +368,84 @@ export function GroupSelectionBox({
         )}
 
         {/* Rotation handle - orbits in AABB space */}
-        {isRotatable && rotationHandle && (
-          <div
-            onPointerEnter={() => setIsHandleHovered(true)}
-            onPointerLeave={() => {
-              setIsHandleHovered(false);
-              setCursorScreen(null);
-            }}
-            onPointerMove={(e: any) => {
-              if (!rotationActive) setCursorScreen({ x: e.clientX, y: e.clientY });
-            }}
-            style={{ display: 'contents' }}
-          >
+        {isRotatable &&
+          rotationHandle &&
+          (rotationUI?.component ? (
             <div
-              {...rotationHandle.handle}
-              style={{
-                ...rotationHandle.handle.style,
-                backgroundColor: HANDLE_COLOR,
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                pointerEvents: 'auto',
-                opacity: rotationActive ? 0 : 1,
+              onPointerEnter={() => setIsHandleHovered(true)}
+              onPointerLeave={() => {
+                setIsHandleHovered(false);
+                setCursorScreen(null);
               }}
+              onPointerMove={(e: any) => {
+                if (!rotationActive) setCursorScreen({ x: e.clientX, y: e.clientY });
+              }}
+              style={{ display: 'contents' }}
             >
-              <svg
-                width="10"
-                height="10"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="white"
-                strokeWidth="2"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              >
-                <path d="M21 12a9 9 0 1 1-9-9c2.52 0 4.93 1 6.74 2.74L21 8" />
-                <path d="M21 3v5h-5" />
-              </svg>
+              {rotationUI.component({
+                ...rotationHandle.handle,
+                backgroundColor: ROTATION_COLOR,
+                iconColor: ROTATION_ICON_COLOR,
+                connectorStyle: {
+                  ...rotationHandle.connector.style,
+                  backgroundColor: ROTATION_CONNECTOR_COLOR,
+                  opacity: rotationActive ? 0 : 1,
+                },
+                showConnector: SHOW_CONNECTOR,
+                opacity: rotationActive ? 0 : 1,
+              })}
             </div>
-          </div>
-        )}
+          ) : (
+            <div
+              onPointerEnter={() => setIsHandleHovered(true)}
+              onPointerLeave={() => {
+                setIsHandleHovered(false);
+                setCursorScreen(null);
+              }}
+              onPointerMove={(e: any) => {
+                if (!rotationActive) setCursorScreen({ x: e.clientX, y: e.clientY });
+              }}
+              style={{ display: 'contents' }}
+            >
+              {/* Connector line */}
+              {SHOW_CONNECTOR && (
+                <div
+                  style={{
+                    ...rotationHandle.connector.style,
+                    backgroundColor: ROTATION_CONNECTOR_COLOR,
+                    opacity: rotationActive ? 0 : 1,
+                  }}
+                />
+              )}
+              {/* Rotation handle */}
+              <div
+                {...rotationHandle.handle}
+                style={{
+                  ...rotationHandle.handle.style,
+                  backgroundColor: ROTATION_COLOR,
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  pointerEvents: 'auto',
+                  opacity: rotationActive ? 0 : 1,
+                }}
+              >
+                <svg
+                  width={Math.round(ROTATION_SIZE * 0.6)}
+                  height={Math.round(ROTATION_SIZE * 0.6)}
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke={ROTATION_ICON_COLOR}
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                >
+                  <path d="M21 12a9 9 0 1 1-9-9c2.52 0 4.93 1 6.74 2.74L21 8" />
+                  <path d="M21 3v5h-5" />
+                </svg>
+              </div>
+            </div>
+          ))}
 
         {/* Inner div: group content area with outline and resize handles */}
         <div
@@ -393,8 +460,10 @@ export function GroupSelectionBox({
             top: 0,
             width: groupBoxWidth,
             height: groupBoxHeight,
-            outline: rotationActive ? 'none' : `2px dashed ${selectionOutlineColor}`,
-            outlineOffset: outlineOffset - 1,
+            outline: rotationActive
+              ? 'none'
+              : `${outlineWidth}px ${outlineStyleVal} ${outlineColor}`,
+            outlineOffset: outlineOff - 1,
             cursor: effectiveIsDraggable ? 'move' : 'default',
             touchAction: 'none',
             pointerEvents: 'auto',
