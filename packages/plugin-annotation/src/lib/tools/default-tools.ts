@@ -121,6 +121,11 @@ export const defaultTools = [
       isDraggable: true,
       isResizable: true,
       lockAspectRatio: false,
+      lockGroupAspectRatio: (a) => {
+        // Lock aspect ratio when rotation is not near an orthogonal angle (within 6°)
+        const r = (((a.rotation ?? 0) % 90) + 90) % 90;
+        return r >= 6 && r <= 84;
+      },
     },
     defaults: {
       type: PdfAnnotationSubtype.INK,
@@ -356,11 +361,7 @@ export const defaultTools = [
       isDraggable: true,
       isResizable: true,
       lockAspectRatio: true,
-      lockGroupAspectRatio: (a) => {
-        // Lock aspect ratio when rotation is not near an orthogonal angle (within 6°)
-        const r = (((a.rotation ?? 0) % 90) + 90) % 90;
-        return r >= 6 && r <= 84;
-      },
+      lockGroupAspectRatio: true,
     },
     defaults: {
       type: PdfAnnotationSubtype.STAMP,
