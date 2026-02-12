@@ -12,7 +12,7 @@
     "build": "turbo run build",
     "build:react-mui": "turbo run build --filter=\"./packages/*\" --filter=\"./examples/react-mui\"",
     "build:vue-vuetify": "turbo run build --filter=\"./packages/*\" --filter=\"./examples/vue-vuetify\"",
-    "build:svelte-tailwind": "turbo run build --filter=\"./packages/*\" --filter=\"./examples/svelte-tailwind\"",
+    "build:svelte-tailwind": "pnpm build:packages && pnpm --filter @embedpdf/example-svelte-tailwind run build:app",
     "build:packages": "turbo run build --filter=\"./packages/*\"",
     "build:viewers": "turbo run build --filter=\"./packages/*\" --filter=\"./viewers/*\"",
     "build:snippet": "turbo run build --filter=\"./packages/*\" --filter=\"./viewers/snippet\"",
