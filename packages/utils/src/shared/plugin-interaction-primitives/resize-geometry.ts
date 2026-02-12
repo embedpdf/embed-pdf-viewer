@@ -117,11 +117,25 @@ export function enforceAspectRatio(
   } else {
     const dw = Math.abs(width - startRect.size.width);
     const dh = Math.abs(height - startRect.size.height);
+    const total = dw + dh;
 
-    if (dw >= dh) {
-      height = width / aspectRatio;
+    if (total === 0) {
+      width = startRect.size.width;
+      height = startRect.size.height;
     } else {
-      width = height * aspectRatio;
+      // Smooth weighted blend between the width-driven and height-driven
+      // results.  Both candidate pairs lie on the line w/h = aspectRatio
+      // through the origin, so any linear combination preserves the ratio
+      // exactly — while eliminating the discontinuous jump that the old
+      // hard `dw >= dh` switch caused at the boundary.
+      const wWeight = dw / total;
+      const hWeight = dh / total;
+      const wFromW = width;
+      const hFromW = width / aspectRatio;
+      const wFromH = height * aspectRatio;
+      const hFromH = height;
+      width = wWeight * wFromW + hWeight * wFromH;
+      height = wWeight * hFromW + hWeight * hFromH;
     }
   }
 
