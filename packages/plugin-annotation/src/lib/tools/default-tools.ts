@@ -342,6 +342,9 @@ export const defaultTools = [
       defaultSize: { width: 100, height: 20 },
       defaultContent: 'Insert text',
     },
+    behavior: {
+      insertUpright: true,
+    },
   },
   {
     id: 'stamp' as const,
@@ -362,6 +365,9 @@ export const defaultTools = [
     defaults: {
       type: PdfAnnotationSubtype.STAMP,
       // No imageSrc by default, which tells the UI to open a file picker
+    },
+    behavior: {
+      insertUpright: true,
     },
   },
 ] satisfies readonly AnnotationTool[];

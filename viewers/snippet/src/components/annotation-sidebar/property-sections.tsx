@@ -27,6 +27,7 @@ import {
   LineEndingSelect,
   FontFamilySelect,
   FontSizeInputSelect,
+  RotationInput,
   Section,
   SectionLabel,
   ValueDisplay,
@@ -81,6 +82,8 @@ export function PropertySection(props: PropertySectionProps) {
       return <BlendModeSection {...props} />;
     case 'text':
       return <TextSection {...props} />;
+    case 'rotation':
+      return <RotationSection {...props} />;
     default:
       return null;
   }
@@ -576,6 +579,28 @@ function TextSection({ config, value, onChange, translate }: PropertySectionProp
         onInput={handleChange}
         placeholder={config.placeholderKey ? translate(config.placeholderKey) : undefined}
       />
+    </Section>
+  );
+}
+
+/* ─── Rotation Section ───────────────────────────────────────────────────── */
+
+function RotationSection({ config, value, onChange, translate }: PropertySectionProps) {
+  const [rotation, setRotation] = useState(value ?? 0);
+
+  useEffect(() => setRotation(value ?? 0), [value]);
+
+  const debRotation = useDebounce(rotation, 300);
+  useEffect(() => {
+    if (debRotation !== value) {
+      onChange(debRotation);
+    }
+  }, [debRotation]);
+
+  return (
+    <Section>
+      <SectionLabel>{translate(config.labelKey)}</SectionLabel>
+      <RotationInput value={rotation} onChange={setRotation} />
     </Section>
   );
 }

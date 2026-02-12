@@ -65,29 +65,34 @@ export const patchPolyline: PatchFunction<PdfPolylineAnnoObject> = (orig, ctx) =
       };
     }
 
-    case 'property-update':
-      if (ctx.changes.strokeWidth !== undefined || ctx.changes.lineEndings !== undefined) {
-        const merged = { ...orig, ...ctx.changes };
-        const tightRect = lineRectWithEndings(
-          merged.vertices,
-          merged.strokeWidth,
-          merged.lineEndings,
-        );
+    case 'property-update': {
+      const needsRectUpdate =
+        ctx.changes.strokeWidth !== undefined ||
+        ctx.changes.lineEndings !== undefined ||
+        ctx.changes.rotation !== undefined;
+      if (!needsRectUpdate) return ctx.changes;
 
-        if (orig.unrotatedRect) {
-          return {
-            ...ctx.changes,
-            unrotatedRect: tightRect,
-            rect: calculateRotatedRectAABBAroundPoint(
-              tightRect,
-              orig.rotation ?? 0,
-              resolveAnnotationRotationCenter(orig),
-            ),
-          };
-        }
-        return { ...ctx.changes, rect: tightRect };
+      const merged = { ...orig, ...ctx.changes };
+      const tightRect = lineRectWithEndings(
+        merged.vertices,
+        merged.strokeWidth,
+        merged.lineEndings,
+      );
+
+      const effectiveRotation = ctx.changes.rotation ?? orig.rotation ?? 0;
+      if (orig.unrotatedRect || ctx.changes.rotation !== undefined) {
+        return {
+          ...ctx.changes,
+          unrotatedRect: tightRect,
+          rect: calculateRotatedRectAABBAroundPoint(
+            tightRect,
+            effectiveRotation,
+            resolveAnnotationRotationCenter(orig),
+          ),
+        };
       }
-      return ctx.changes;
+      return { ...ctx.changes, rect: tightRect };
+    }
 
     default:
       return ctx.changes;

@@ -65,26 +65,29 @@ export const patchPolygon: PatchFunction<PdfPolygonAnnoObject> = (orig, ctx) => 
       };
     }
 
-    case 'property-update':
-      if (ctx.changes.strokeWidth !== undefined) {
-        const merged = { ...orig, ...ctx.changes };
-        const pad = merged.strokeWidth / 2;
-        const tightRect = expandRect(rectFromPoints(merged.vertices), pad);
+    case 'property-update': {
+      const needsRectUpdate =
+        ctx.changes.strokeWidth !== undefined || ctx.changes.rotation !== undefined;
+      if (!needsRectUpdate) return ctx.changes;
 
-        if (orig.unrotatedRect) {
-          return {
-            ...ctx.changes,
-            unrotatedRect: tightRect,
-            rect: calculateRotatedRectAABBAroundPoint(
-              tightRect,
-              orig.rotation ?? 0,
-              resolveAnnotationRotationCenter(orig),
-            ),
-          };
-        }
-        return { ...ctx.changes, rect: tightRect };
+      const merged = { ...orig, ...ctx.changes };
+      const pad = merged.strokeWidth / 2;
+      const tightRect = expandRect(rectFromPoints(merged.vertices), pad);
+
+      const effectiveRotation = ctx.changes.rotation ?? orig.rotation ?? 0;
+      if (orig.unrotatedRect || ctx.changes.rotation !== undefined) {
+        return {
+          ...ctx.changes,
+          unrotatedRect: tightRect,
+          rect: calculateRotatedRectAABBAroundPoint(
+            tightRect,
+            effectiveRotation,
+            resolveAnnotationRotationCenter(orig),
+          ),
+        };
       }
-      return ctx.changes;
+      return { ...ctx.changes, rect: tightRect };
+    }
 
     default:
       return ctx.changes;

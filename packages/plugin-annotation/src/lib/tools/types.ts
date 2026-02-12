@@ -99,6 +99,25 @@ type ClickBehaviorFor<T extends PdfAnnotationObject> =
       };
 
 /**
+ * Map of annotation types that support the insertUpright behavior.
+ * Only types with a "natural upright orientation" (readable text, image content)
+ * should be listed here.
+ */
+export interface InsertUprightBehaviorMap {
+  [PdfAnnotationSubtype.STAMP]: true;
+  [PdfAnnotationSubtype.FREETEXT]: true;
+}
+
+// Helper type to conditionally add insertUpright to behavior
+type InsertUprightBehaviorFor<T extends PdfAnnotationObject> =
+  Extract<T['type'], keyof InsertUprightBehaviorMap> extends never
+    ? {}
+    : {
+        /** Counter-rotate new annotations to appear visually upright on rotated pages. */
+        insertUpright?: boolean;
+      };
+
+/**
  * The primary interface for defining an annotation tool.
  * Uses a type alias to properly combine the base interface with conditional properties.
  */
@@ -156,5 +175,5 @@ export type AnnotationTool<T extends PdfAnnotationObject = PdfAnnotationObject> 
     deactivateToolAfterCreate?: boolean;
     /** When true, select the annotation immediately after creation. Overrides plugin config. */
     selectAfterCreate?: boolean;
-  };
+  } & InsertUprightBehaviorFor<T>;
 } & ClickBehaviorFor<T>;

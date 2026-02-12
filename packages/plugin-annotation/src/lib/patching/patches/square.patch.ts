@@ -1,7 +1,12 @@
 import { PdfSquareAnnoObject } from '@embedpdf/models';
 
 import { PatchFunction } from '../patch-registry';
-import { baseRotateChanges, baseMoveChanges, baseResizeScaling } from '../base-patch';
+import {
+  baseRotateChanges,
+  baseMoveChanges,
+  baseResizeScaling,
+  basePropertyRotationChanges,
+} from '../base-patch';
 
 export const patchSquare: PatchFunction<PdfSquareAnnoObject> = (orig, ctx) => {
   switch (ctx.type) {
@@ -15,6 +20,12 @@ export const patchSquare: PatchFunction<PdfSquareAnnoObject> = (orig, ctx) => {
 
     case 'rotate':
       return baseRotateChanges(orig, ctx) ?? ctx.changes;
+
+    case 'property-update':
+      if (ctx.changes.rotation !== undefined) {
+        return { ...ctx.changes, ...basePropertyRotationChanges(orig, ctx.changes.rotation) };
+      }
+      return ctx.changes;
 
     default:
       return ctx.changes;

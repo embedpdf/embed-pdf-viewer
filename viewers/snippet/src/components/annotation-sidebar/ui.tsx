@@ -377,6 +377,94 @@ export const FontFamilySelect = (props: {
   />
 );
 
+// —— Rotation input ─────────────────────────────────────────────────
+
+/**
+ * Compact rotation control with a numeric input and -90°/+90° quick-rotate buttons.
+ * Values wrap around (e.g. 350 + 90 = 80, 10 - 90 = 280).
+ */
+export const RotationInput = ({
+  value,
+  onChange,
+}: {
+  value: number;
+  onChange: (degrees: number) => void;
+}) => {
+  const norm = ((value % 360) + 360) % 360;
+
+  const rotate = (delta: number) => {
+    onChange((((norm + delta) % 360) + 360) % 360);
+  };
+
+  return (
+    <div class="flex items-center gap-1">
+      {/* Rotate counter-clockwise (-90°) */}
+      <button
+        type="button"
+        title="-90°"
+        class="border-border-default bg-bg-input text-fg-primary hover:bg-interactive-hover flex h-8 w-8 shrink-0 items-center justify-center rounded border"
+        onClick={() => rotate(-90)}
+      >
+        <svg
+          width="16"
+          height="16"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="2"
+          stroke-linecap="round"
+          stroke-linejoin="round"
+        >
+          <path d="M1 4v6h6" />
+          <path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10" />
+        </svg>
+      </button>
+
+      {/* Numeric input */}
+      <div class="relative flex-1">
+        <input
+          type="number"
+          min="0"
+          max="359"
+          class="border-border-default bg-bg-input text-fg-primary h-8 w-full rounded border px-2 pr-6 text-center text-sm"
+          value={norm}
+          onInput={(e) => {
+            const val = parseInt((e.target as HTMLInputElement).value, 10);
+            if (Number.isFinite(val)) {
+              onChange(((val % 360) + 360) % 360);
+            }
+          }}
+        />
+        <span class="text-fg-muted pointer-events-none absolute inset-y-0 right-2 flex items-center text-xs">
+          {'\u00B0'}
+        </span>
+      </div>
+
+      {/* Rotate clockwise (+90°) */}
+      <button
+        type="button"
+        title="+90°"
+        class="border-border-default bg-bg-input text-fg-primary hover:bg-interactive-hover flex h-8 w-8 shrink-0 items-center justify-center rounded border"
+        onClick={() => rotate(90)}
+      >
+        <svg
+          width="16"
+          height="16"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="2"
+          stroke-linecap="round"
+          stroke-linejoin="round"
+        >
+          <path d="M23 4v6h-6" />
+          <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10" />
+        </svg>
+      </button>
+    </div>
+  );
+};
+
 // —— Font-size combo-box ────────────────────────────────────────────
 export const FontSizeInputSelect = ({
   value,

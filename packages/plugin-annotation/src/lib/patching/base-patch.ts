@@ -43,6 +43,27 @@ export function baseRotateChanges(
 }
 
 // ---------------------------------------------------------------------------
+// Property-update rotation – recompute rect/unrotatedRect for a new angle
+// ---------------------------------------------------------------------------
+
+/**
+ * Shared property-update rotation logic.
+ * Recomputes rect and unrotatedRect for a new rotation angle, preserving
+ * the annotation's rotation center. Works for all annotation types since
+ * it only touches rect/unrotatedRect/rotation.
+ */
+export function basePropertyRotationChanges(
+  orig: RotatableAnnotation,
+  newRotation: number,
+): { rotation: number; rect: Rect; unrotatedRect: Rect } {
+  const unrotatedRect = orig.unrotatedRect ?? orig.rect;
+  return {
+    rotation: newRotation,
+    ...resolveRotateRects(orig, unrotatedRect, newRotation),
+  };
+}
+
+// ---------------------------------------------------------------------------
 // Move – rect + unrotatedRect translation (callers add their own points)
 // ---------------------------------------------------------------------------
 

@@ -84,26 +84,29 @@ export const patchInk: PatchFunction<PdfInkAnnoObject> = (original, ctx) => {
       };
     }
 
-    case 'property-update':
-      if (ctx.changes.strokeWidth !== undefined) {
-        const merged = { ...original, ...ctx.changes };
-        const pts = merged.inkList.flatMap((s) => s.points);
-        const tightRect = expandRect(rectFromPoints(pts), merged.strokeWidth / 2);
+    case 'property-update': {
+      const needsRectUpdate =
+        ctx.changes.strokeWidth !== undefined || ctx.changes.rotation !== undefined;
+      if (!needsRectUpdate) return ctx.changes;
 
-        if (original.unrotatedRect) {
-          return {
-            ...ctx.changes,
-            unrotatedRect: tightRect,
-            rect: calculateRotatedRectAABBAroundPoint(
-              tightRect,
-              original.rotation ?? 0,
-              resolveAnnotationRotationCenter(original),
-            ),
-          };
-        }
-        return { ...ctx.changes, rect: tightRect };
+      const merged = { ...original, ...ctx.changes };
+      const pts = merged.inkList.flatMap((s) => s.points);
+      const tightRect = expandRect(rectFromPoints(pts), merged.strokeWidth / 2);
+
+      const effectiveRotation = ctx.changes.rotation ?? original.rotation ?? 0;
+      if (original.unrotatedRect || ctx.changes.rotation !== undefined) {
+        return {
+          ...ctx.changes,
+          unrotatedRect: tightRect,
+          rect: calculateRotatedRectAABBAroundPoint(
+            tightRect,
+            effectiveRotation,
+            resolveAnnotationRotationCenter(original),
+          ),
+        };
       }
-      return ctx.changes;
+      return { ...ctx.changes, rect: tightRect };
+    }
 
     default:
       return ctx.changes;

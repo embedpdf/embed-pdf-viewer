@@ -15,6 +15,7 @@ import {
   Position,
   Rect,
   PdfAnnotationReplyType,
+  Rotation,
 } from '@embedpdf/models';
 import {
   AnnotationCapability,
@@ -343,10 +344,10 @@ export class AnnotationPlugin extends BasePlugin<
             documentId,
           );
 
-          if (this.getToolBehavior(activeTool, 'deactivateToolAfterCreate')) {
+          if (activeTool.behavior?.deactivateToolAfterCreate) {
             this.setActiveTool(null, documentId);
           }
-          if (this.getToolBehavior(activeTool, 'selectAfterCreate')) {
+          if (activeTool.behavior?.selectAfterCreate) {
             this.selectAnnotation(selection.pageIndex, annotationId, documentId);
           }
         }, ignore);
@@ -568,6 +569,10 @@ export class AnnotationPlugin extends BasePlugin<
 
     const unregisterFns: (() => void)[] = [];
 
+    // Compute effective page rotation (page intrinsic + document rotation)
+    const effectivePageRotation = (((page.rotation ?? 0) + (docState?.rotation ?? 0)) %
+      4) as Rotation;
+
     for (const tool of this.state.tools) {
       if (!tool.defaults.type) continue;
       const factory = this.handlerFactories.get(tool.defaults.type);
@@ -576,15 +581,16 @@ export class AnnotationPlugin extends BasePlugin<
       const context: HandlerContext<PdfAnnotationObject> = {
         pageIndex,
         pageSize: page.size,
+        pageRotation: effectivePageRotation,
         scale,
         services: callbacks.services, // Pass through services
         onPreview: (state) => callbacks.onPreview(tool.id, state),
         onCommit: (annotation, ctx) => {
           this.createAnnotation(pageIndex, annotation, ctx, documentId);
-          if (this.getToolBehavior(tool, 'deactivateToolAfterCreate')) {
+          if (tool.behavior?.deactivateToolAfterCreate) {
             this.setActiveTool(null, documentId);
           }
-          if (this.getToolBehavior(tool, 'selectAfterCreate')) {
+          if (tool.behavior?.selectAfterCreate) {
             this.selectAnnotation(pageIndex, annotation.id, documentId);
           }
         },
@@ -2547,22 +2553,5 @@ export class AnnotationPlugin extends BasePlugin<
     );
 
     return task;
-  }
-
-  /**
-   * Gets the effective behavior setting for a tool, checking tool-specific config first,
-   * then falling back to plugin config.
-   */
-  private getToolBehavior(
-    tool: AnnotationTool,
-    setting: 'deactivateToolAfterCreate' | 'selectAfterCreate',
-  ): boolean {
-    // Check if tool has specific behavior setting
-    if (tool.behavior?.[setting] !== undefined) {
-      return tool.behavior[setting];
-    }
-
-    // Fall back to plugin config
-    return this.config[setting] !== false;
   }
 }

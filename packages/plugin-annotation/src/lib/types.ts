@@ -120,9 +120,20 @@ export interface AnnotationState {
   colorPresets: string[];
 }
 
+/**
+ * Partial tool definition for overriding default tools by ID.
+ * When a tool with the same `id` as a default tool is provided, its properties
+ * are deep-merged with the default (user values take precedence).
+ */
+export type AnnotationToolOverride = { id: string } & Partial<Omit<AnnotationTool, 'id'>>;
+
 export interface AnnotationPluginConfig extends BasePluginConfig {
-  /** A list of custom tools to add or default tools to override. */
-  tools?: AnnotationTool[];
+  /**
+   * A list of tools to add or override. If a tool's `id` matches a default tool,
+   * it is deep-merged with the default (partial overrides are supported).
+   * New tools (unmatched `id`) are added as-is.
+   */
+  tools?: (AnnotationTool | AnnotationToolOverride)[];
   colorPresets?: string[];
   /** When true (default), automatically commit the annotation changes into the PDF document. */
   autoCommit?: boolean;
