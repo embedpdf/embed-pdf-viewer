@@ -568,7 +568,11 @@
       {#if isSelected && effectiveIsResizable && !rotationActive}
         {#each resizeHandles as { key, style: handleStyle, ...hProps } (key)}
           {#if resizeUI?.component}
-            {@render resizeUI.component({ ...hProps, backgroundColor: HANDLE_COLOR })}
+            {@render resizeUI.component({
+              ...hProps,
+              style: handleStyle,
+              backgroundColor: HANDLE_COLOR,
+            })}
           {:else}
             <div {...hProps} style="{handleStyle}; background-color: {HANDLE_COLOR};"></div>
           {/if}
@@ -579,7 +583,11 @@
       {#if isSelected && permissions.canModifyAnnotations && !isMultiSelected && !rotationActive}
         {#each vertexHandles as { key, style: vertexStyle, ...vProps } (key)}
           {#if vertexUI?.component}
-            {@render vertexUI.component({ ...vProps, backgroundColor: VERTEX_COLOR })}
+            {@render vertexUI.component({
+              ...vProps,
+              style: vertexStyle,
+              backgroundColor: VERTEX_COLOR,
+            })}
           {:else}
             <div {...vProps} style="{vertexStyle}; background-color: {VERTEX_COLOR};"></div>
           {/if}

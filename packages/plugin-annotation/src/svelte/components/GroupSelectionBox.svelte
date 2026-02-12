@@ -500,7 +500,11 @@
         {#if effectiveIsResizable && !rotationActive}
           {#each resizeHandles as { key, style: handleStyle, ...hProps } (key)}
             {#if resizeUI?.component}
-              {@render resizeUI.component({ ...hProps, backgroundColor: HANDLE_COLOR })}
+              {@render resizeUI.component({
+                ...hProps,
+                style: handleStyle,
+                backgroundColor: HANDLE_COLOR,
+              })}
             {:else}
               <div {...hProps} style="{handleStyle}; background-color: {HANDLE_COLOR};"></div>
             {/if}
