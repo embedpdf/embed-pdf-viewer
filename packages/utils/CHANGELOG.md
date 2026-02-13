@@ -1,5 +1,14 @@
 # @embedpdf/utils
 
+## 2.6.0
+
+### Minor Changes
+
+- [#452](https://github.com/embedpdf/embed-pdf-viewer/pull/452) by [@bobsingor](https://github.com/bobsingor) –
+  - Update `DragResizeController` to support rotation interactions.
+  - Add `useInteractionHandles` support for rotation handles.
+  - Add rotation snapping and constraints.
+
 ## 2.5.0
 
 ### Patch Changes

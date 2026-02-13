@@ -1,5 +1,23 @@
 # @embedpdf/plugin-annotation
 
+## 2.6.0
+
+### Minor Changes
+
+- [#447](https://github.com/embedpdf/embed-pdf-viewer/pull/447) by [@bobsingor](https://github.com/bobsingor) – Added `modeId` filtering to marquee end event handler so annotation selection only triggers during `pointerMode`, preventing interference with redaction marquees. Added page activity claims (`annotation-selection` topic) when selecting/deselecting annotations for scroll plugin page elevation.
+
+- [#452](https://github.com/embedpdf/embed-pdf-viewer/pull/452) by [@bobsingor](https://github.com/bobsingor) –
+  - Add support for rotating annotations.
+  - Add `rotationUI` prop to `AnnotationLayer` and `AnnotationContainer`.
+  - Add `isRotatable` and `isGroupRotatable` properties to `AnnotationTool`.
+  - Add `insertUpright` behavior for stamps and free text.
+  - Update `AnnotationLayer` to support custom rotation handles via slots/components.
+
+### Patch Changes
+
+- [#458](https://github.com/embedpdf/embed-pdf-viewer/pull/458) by [@bobsingor](https://github.com/bobsingor) –
+  - Use `standardFontCssProperties` in FreeText components (React, Svelte, Vue) so bold/italic render correctly on all platforms.
+
 ## 2.5.0
 
 ### Patch Changes

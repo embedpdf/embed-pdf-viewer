@@ -1,5 +1,13 @@
 # @embedpdf/snippet
 
+## 2.6.0
+
+### Minor Changes
+
+- [#452](https://github.com/embedpdf/embed-pdf-viewer/pull/452) by [@bobsingor](https://github.com/bobsingor) –
+  - Add rotation property control to the annotation sidebar.
+  - Update selection menu to handle rotated annotations.
+
 ## 2.5.0
 
 ## 2.4.1

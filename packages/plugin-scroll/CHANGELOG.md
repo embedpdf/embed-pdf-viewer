@@ -1,5 +1,11 @@
 # @embedpdf/plugin-scroll
 
+## 2.6.0
+
+### Minor Changes
+
+- [#447](https://github.com/embedpdf/embed-pdf-viewer/pull/447) by [@bobsingor](https://github.com/bobsingor) – Added page elevation support driven by interaction manager page activity. New `elevated` boolean on `PageLayout` interface. Scroll plugin subscribes to `onPageActivityChange` and tracks elevated pages per document. Scroller components (React, Svelte, Vue) apply `zIndex: 1` and `position: relative` on page containers when `layout.elevated` is true. Added optional dependency on `@embedpdf/plugin-interaction-manager`.
+
 ## 2.5.0
 
 ### Patch Changes

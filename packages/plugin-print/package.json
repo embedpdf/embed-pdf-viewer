@@ -1,6 +1,6 @@
 {
   "name": "@embedpdf/plugin-print",
-  "version": "2.5.0",
+  "version": "2.6.0",
   "type": "module",
   "license": "MIT",
   "main": "./dist/index.cjs",
