@@ -32,8 +32,8 @@ export const redactTool: AnnotationTool<PdfRedactAnnoObject> = {
   },
   defaults: {
     type: PdfAnnotationSubtype.REDACT,
-    color: '#E44234',
-    overlayColor: '#000000',
+    color: '#000000',
+    overlayColor: '#FFFFFF',
     strokeColor: '#E44234',
     opacity: 1,
   },

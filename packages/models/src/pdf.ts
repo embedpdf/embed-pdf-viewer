@@ -2094,12 +2094,12 @@ export interface PdfRedactAnnoObject extends PdfAnnotationObjectBase {
   segmentRects: Rect[];
 
   /**
-   * Interior color - the preview color shown BEFORE redaction is applied
+   * Interior color (IC) - the fill color used to paint the redacted area after redaction is applied
    */
   color?: string;
 
   /**
-   * Overlay color - the fill color shown AFTER redaction is applied
+   * Overlay text color - the color of the overlay text displayed on the redacted area
    */
   overlayColor?: string;
 
