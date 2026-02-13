@@ -180,7 +180,7 @@ Replace the default circular resize handles with custom markup. The snippet rece
   } from '@embedpdf/plugin-annotation/svelte';
 </script>
 
-{#snippet resizeHandleSnippet({ style, backgroundColor, ...rest }: HandleProps)}
+{#snippet resizeHandleSnippet({ style, backgroundColor, key: _key, ...rest }: HandleProps)}
   <div
     {...rest}
     style="{style}; background-color: transparent; border: 2px solid {backgroundColor ?? '#475569'}; border-radius: 2px;"
@@ -197,7 +197,7 @@ Replace the default circular resize handles with custom markup. The snippet rece
 Replace vertex handles (used on polyline/polygon annotations) with custom shapes. This example creates diamond-shaped handles by adding a `rotate(45deg)` transform.
 
 ```svelte
-{#snippet vertexHandleSnippet({ style, backgroundColor, ...rest }: HandleProps)}
+{#snippet vertexHandleSnippet({ style, backgroundColor, key: _key, ...rest }: HandleProps)}
   <div
     {...rest}
     style="{style}; background-color: {backgroundColor ?? '#475569'}; border-radius: 1px; rotate: 45deg;"
@@ -214,7 +214,7 @@ Replace the rotation handle with fully custom markup. The snippet provides addit
   import { type RotationHandleComponentProps } from '@embedpdf/plugin-annotation/svelte';
 </script>
 
-{#snippet rotationHandleSnippet({ style, backgroundColor, connectorStyle, showConnector, iconColor, opacity, ...rest }: RotationHandleComponentProps)}
+{#snippet rotationHandleSnippet({ style, backgroundColor, connectorStyle, showConnector, iconColor, opacity, border: _border, ...rest }: RotationHandleComponentProps)}
   {#if showConnector && connectorStyle}
     <div style={connectorStyle}></div>
   {/if}
@@ -363,25 +363,32 @@ interface ResizeHandleUI {
 ```typescript
 interface RotationHandleUI {
   size?: number;           // Handle size in px (default: 32)
-  color?: string;          // Background color (default: '#007ACC')
-  iconColor?: string;      // Icon stroke color (default: 'white')
-  margin?: number;         // Gap from bounding box edge in px (default: 20)
+  color?: string;          // Background color (default: 'white')
+  iconColor?: string;      // Icon stroke color (default: '#007ACC')
+  margin?: number;         // Gap from bounding box edge in px (default: 35)
   showConnector?: boolean; // Show connector line (default: false)
-  connectorColor?: string; // Connector line color (default: same as color)
+  connectorColor?: string; // Connector line color (default: '#007ACC')
+  border?: RotationHandleBorder; // Border configuration
   component?: Snippet<[RotationHandleComponentProps]>; // Custom snippet
+}
+
+interface RotationHandleBorder {
+  color?: string;  // Border color (default: '#007ACC')
+  style?: BorderStyle; // Border style (default: 'solid')
+  width?: number;  // Border width in px (default: 1)
 }
 ```
 
 #### `SelectionOutline`
 
 ```typescript
-type SelectionOutlineStyle = 'solid' | 'dashed' | 'dotted';
+type BorderStyle = 'solid' | 'dashed' | 'dotted';
 
 interface SelectionOutline {
-  color?: string;               // Outline color (default: '#007ACC')
-  style?: SelectionOutlineStyle; // Default: 'solid' (single) / 'dashed' (group)
-  width?: number;               // Outline width in px (default: 1 / 2)
-  offset?: number;              // Outline offset in px (default: 1 / 2)
+  color?: string;        // Outline color (default: '#007ACC')
+  style?: BorderStyle;   // Default: 'solid' (single) / 'dashed' (group)
+  width?: number;        // Outline width in px (default: 1 / 2)
+  offset?: number;       // Outline offset in px (default: 1 / 2)
 }
 ```
 

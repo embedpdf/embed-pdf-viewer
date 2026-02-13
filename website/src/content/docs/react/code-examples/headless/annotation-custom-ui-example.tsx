@@ -55,11 +55,13 @@ const plugins = [
 
 /** Square resize handles instead of the default circles */
 const SquareResizeHandle = ({
+  key,
   style,
   backgroundColor,
   ...rest
 }: HandleProps) => (
   <div
+    key={key}
     {...rest}
     style={{
       ...style,
@@ -72,11 +74,13 @@ const SquareResizeHandle = ({
 
 /** Diamond-shaped vertex handles (rotated 45deg squares) */
 const DiamondVertexHandle = ({
+  key,
   style,
   backgroundColor,
   ...rest
 }: HandleProps) => (
   <div
+    key={key}
     {...rest}
     style={{
       ...style,
@@ -94,6 +98,7 @@ const PillRotationHandle = ({
   connectorStyle,
   showConnector,
   iconColor = 'white',
+  border: _border,
   ...rest
 }: RotationHandleComponentProps) => (
   <>

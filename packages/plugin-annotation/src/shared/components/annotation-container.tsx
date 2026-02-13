@@ -66,6 +66,8 @@ interface AnnotationContainerProps<T extends PdfAnnotationObject> {
   /** Passed from parent but not used - destructured to prevent DOM spread */
   groupSelectionMenu?: GroupSelectionMenuRenderFn;
   /** Passed from parent but not used - destructured to prevent DOM spread */
+  groupSelectionOutline?: SelectionOutline;
+  /** Passed from parent but not used - destructured to prevent DOM spread */
   annotationRenderers?: BoxedAnnotationRenderer[];
 }
 
@@ -104,6 +106,7 @@ export function AnnotationContainer<T extends PdfAnnotationObject>({
   customAnnotationRenderer,
   // Destructure props that shouldn't be passed to DOM elements
   groupSelectionMenu: _groupSelectionMenu,
+  groupSelectionOutline: _groupSelectionOutline,
   annotationRenderers: _annotationRenderers,
   ...props
 }: AnnotationContainerProps<T>): JSX.Element {
@@ -133,14 +136,17 @@ export function AnnotationContainer<T extends PdfAnnotationObject>({
   // UI constants
   const HANDLE_COLOR = resizeUI?.color ?? '#007ACC';
   const VERTEX_COLOR = vertexUI?.color ?? '#007ACC';
-  const ROTATION_COLOR = rotationUI?.color ?? '#007ACC';
-  const ROTATION_CONNECTOR_COLOR = rotationUI?.connectorColor ?? ROTATION_COLOR;
+  const ROTATION_COLOR = rotationUI?.color ?? 'white';
+  const ROTATION_CONNECTOR_COLOR = rotationUI?.connectorColor ?? '#007ACC';
   const HANDLE_SIZE = resizeUI?.size ?? 12;
   const VERTEX_SIZE = vertexUI?.size ?? 12;
   const ROTATION_SIZE = rotationUI?.size ?? 32;
-  const ROTATION_MARGIN = rotationUI?.margin; // undefined = use default (20)
-  const ROTATION_ICON_COLOR = rotationUI?.iconColor ?? 'white';
+  const ROTATION_MARGIN = rotationUI?.margin; // undefined = use default (35)
+  const ROTATION_ICON_COLOR = rotationUI?.iconColor ?? '#007ACC';
   const SHOW_CONNECTOR = rotationUI?.showConnector ?? false;
+  const ROTATION_BORDER_COLOR = rotationUI?.border?.color ?? '#007ACC';
+  const ROTATION_BORDER_WIDTH = rotationUI?.border?.width ?? 1;
+  const ROTATION_BORDER_STYLE = rotationUI?.border?.style ?? 'solid';
 
   // Outline resolution (new object > deprecated props > defaults)
   const outlineColor = selectionOutline?.color ?? selectionOutlineColor ?? '#007ACC';
@@ -490,6 +496,11 @@ export function AnnotationContainer<T extends PdfAnnotationObject>({
                 },
                 showConnector: SHOW_CONNECTOR,
                 opacity: rotationActive ? 0 : 1,
+                border: {
+                  color: ROTATION_BORDER_COLOR,
+                  width: ROTATION_BORDER_WIDTH,
+                  style: ROTATION_BORDER_STYLE,
+                },
               })}
             </div>
           ) : (
@@ -520,6 +531,8 @@ export function AnnotationContainer<T extends PdfAnnotationObject>({
                 style={{
                   ...rotationHandle.handle.style,
                   backgroundColor: ROTATION_COLOR,
+                  border: `${ROTATION_BORDER_WIDTH}px ${ROTATION_BORDER_STYLE} ${ROTATION_BORDER_COLOR}`,
+                  boxSizing: 'border-box',
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',

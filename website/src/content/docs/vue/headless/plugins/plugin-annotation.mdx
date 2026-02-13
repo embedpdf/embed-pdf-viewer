@@ -263,7 +263,7 @@ Replace the default circular resize handles with custom markup. The slot receive
 ```vue
 <AnnotationLayer :document-id="documentId" :page-index="page.pageIndex"
   :resize-ui="{ size: 10, color: '#475569' }">
-  <template #resize-handle="{ style, backgroundColor, ...rest }">
+  <template #resize-handle="{ style, backgroundColor, key: _key, ...rest }">
     <div v-bind="rest" :style="{
       ...style,
       backgroundColor: 'transparent',
@@ -279,7 +279,7 @@ Replace the default circular resize handles with custom markup. The slot receive
 Replace vertex handles (used on polyline/polygon annotations) with custom shapes. This example creates diamond-shaped handles by adding a `rotate(45deg)` transform.
 
 ```vue
-<template #vertex-handle="{ style, backgroundColor, ...rest }">
+<template #vertex-handle="{ style, backgroundColor, key: _key, ...rest }">
   <div v-bind="rest" :style="{
     ...style,
     backgroundColor: backgroundColor ?? '#475569',
@@ -294,7 +294,7 @@ Replace vertex handles (used on polyline/polygon annotations) with custom shapes
 Replace the rotation handle with fully custom markup. The slot provides additional props for the connector line and icon color.
 
 ```vue
-<template #rotation-handle="{ style, backgroundColor, connectorStyle, showConnector, iconColor, ...rest }">
+<template #rotation-handle="{ style, backgroundColor, connectorStyle, showConnector, iconColor, border: _border, ...rest }">
   <!-- Connector line (optional) -->
   <div v-if="showConnector && connectorStyle" :style="connectorStyle" />
   <!-- Handle element -->
@@ -339,13 +339,13 @@ Pass UI configuration alongside the slots to control sizes, colors, and outline 
   :selection-outline="{ color: '#475569', style: 'solid', width: 1, offset: 2 }"
   :group-selection-outline="{ color: '#64748b', style: 'dashed', width: 2, offset: 3 }"
 >
-  <template #resize-handle="{ style, backgroundColor, ...rest }">
+  <template #resize-handle="{ style, backgroundColor, key: _key, ...rest }">
     <!-- your custom resize handle -->
   </template>
-  <template #vertex-handle="{ style, backgroundColor, ...rest }">
+  <template #vertex-handle="{ style, backgroundColor, key: _key, ...rest }">
     <!-- your custom vertex handle -->
   </template>
-  <template #rotation-handle="{ style, backgroundColor, connectorStyle, showConnector, iconColor, ...rest }">
+  <template #rotation-handle="{ style, backgroundColor, connectorStyle, showConnector, iconColor, border: _border, ...rest }">
     <!-- your custom rotation handle -->
   </template>
 </AnnotationLayer>
@@ -412,24 +412,31 @@ interface ResizeHandleUI {
 ```typescript
 interface RotationHandleUI {
   size?: number;           // Handle size in px (default: 16)
-  color?: string;          // Background color (default: '#007ACC')
-  iconColor?: string;      // Icon stroke color (default: 'white')
-  margin?: number;         // Gap from bounding box edge in px (default: 20)
+  color?: string;          // Background color (default: 'white')
+  iconColor?: string;      // Icon stroke color (default: '#007ACC')
+  margin?: number;         // Gap from bounding box edge in px (default: 35)
   showConnector?: boolean; // Show connector line (default: false)
-  connectorColor?: string; // Connector line color (default: same as color)
+  connectorColor?: string; // Connector line color (default: '#007ACC')
+  border?: RotationHandleBorder; // Border configuration
+}
+
+interface RotationHandleBorder {
+  color?: string;  // Border color (default: '#007ACC')
+  style?: BorderStyle; // Border style (default: 'solid')
+  width?: number;  // Border width in px (default: 1)
 }
 ```
 
 #### `SelectionOutline`
 
 ```typescript
-type SelectionOutlineStyle = 'solid' | 'dashed' | 'dotted';
+type BorderStyle = 'solid' | 'dashed' | 'dotted';
 
 interface SelectionOutline {
-  color?: string;               // Outline color (default: '#007ACC')
-  style?: SelectionOutlineStyle; // Default: 'solid' (single) / 'dashed' (group)
-  width?: number;               // Outline width in px (default: 1 / 2)
-  offset?: number;              // Outline offset in px (default: 1 / 2)
+  color?: string;        // Outline color (default: '#007ACC')
+  style?: BorderStyle;   // Default: 'solid' (single) / 'dashed' (group)
+  width?: number;        // Outline width in px (default: 1 / 2)
+  offset?: number;       // Outline offset in px (default: 1 / 2)
 }
 ```
 
@@ -479,6 +486,7 @@ Replace the default rotation handle with custom markup.
 | `iconColor` | `string` | The configured icon color (from `rotationUi.iconColor`). |
 | `connectorStyle` | `CSSProperties \| undefined` | Style for the connector line, if enabled. |
 | `showConnector` | `boolean` | Whether the connector line should be rendered. |
+| `border` | `RotationHandleBorder` | Resolved border configuration (color, style, width). |
 | `...rest` | — | Event handlers and data attributes. Must be bound with `v-bind`. |
 
 ### Composable: `useAnnotation(documentId)`

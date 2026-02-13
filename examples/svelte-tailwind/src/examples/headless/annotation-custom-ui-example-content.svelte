@@ -69,7 +69,7 @@
 </script>
 
 <!-- Custom square resize handles -->
-{#snippet resizeHandleSnippet({ style, backgroundColor, ...rest }: HandleProps)}
+{#snippet resizeHandleSnippet({ style, backgroundColor, key: _key, ...rest }: HandleProps)}
   <div
     {...rest}
     style="{style}; background-color: transparent; border: 2px solid {backgroundColor ??
@@ -78,7 +78,7 @@
 {/snippet}
 
 <!-- Custom diamond vertex handles (rotated 45deg squares) -->
-{#snippet vertexHandleSnippet({ style, backgroundColor, ...rest }: HandleProps)}
+{#snippet vertexHandleSnippet({ style, backgroundColor, key: _key, ...rest }: HandleProps)}
   <div
     {...rest}
     style="{style}; background-color: {backgroundColor ??
@@ -94,6 +94,7 @@
   showConnector,
   iconColor,
   opacity,
+  border: _border,
   ...rest
 }: RotationHandleComponentProps)}
   {#if showConnector && connectorStyle}

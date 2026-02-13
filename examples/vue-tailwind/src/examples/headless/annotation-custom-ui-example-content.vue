@@ -170,12 +170,12 @@ const rotationHandleStyle = (style: CSSProperties, backgroundColor?: string): CS
                 }"
               >
                 <!-- Custom square resize handles -->
-                <template #resize-handle="{ style, backgroundColor, ...rest }">
+                <template #resize-handle="{ style, backgroundColor, key: _key, ...rest }">
                   <div v-bind="rest" :style="resizeHandleStyle(style, backgroundColor)" />
                 </template>
 
                 <!-- Custom diamond vertex handles -->
-                <template #vertex-handle="{ style, backgroundColor, ...rest }">
+                <template #vertex-handle="{ style, backgroundColor, key: _key, ...rest }">
                   <div v-bind="rest" :style="vertexHandleStyle(style, backgroundColor)" />
                 </template>
 
@@ -187,6 +187,7 @@ const rotationHandleStyle = (style: CSSProperties, backgroundColor?: string): CS
                     connectorStyle,
                     showConnector,
                     iconColor,
+                    border: _border,
                     ...rest
                   }"
                 >

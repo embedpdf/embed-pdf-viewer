@@ -210,13 +210,14 @@ const effectiveIsRotatable = computed(
 const HANDLE_COLOR = computed(() => props.resizeUi?.color ?? '#007ACC');
 const HANDLE_SIZE = computed(() => props.resizeUi?.size ?? 12);
 const ROTATION_SIZE = computed(() => props.rotationUi?.size ?? 32);
-const ROTATION_COLOR = computed(() => props.rotationUi?.color ?? HANDLE_COLOR.value);
-const ROTATION_CONNECTOR_COLOR = computed(
-  () => props.rotationUi?.connectorColor ?? ROTATION_COLOR.value,
-);
-const ROTATION_ICON_COLOR = computed(() => props.rotationUi?.iconColor ?? 'white');
+const ROTATION_COLOR = computed(() => props.rotationUi?.color ?? 'white');
+const ROTATION_CONNECTOR_COLOR = computed(() => props.rotationUi?.connectorColor ?? '#007ACC');
+const ROTATION_ICON_COLOR = computed(() => props.rotationUi?.iconColor ?? '#007ACC');
 const SHOW_CONNECTOR = computed(() => props.rotationUi?.showConnector ?? false);
 const ROTATION_MARGIN = computed(() => props.rotationUi?.margin);
+const ROTATION_BORDER_COLOR = computed(() => props.rotationUi?.border?.color ?? '#007ACC');
+const ROTATION_BORDER_WIDTH = computed(() => props.rotationUi?.border?.width ?? 1);
+const ROTATION_BORDER_STYLE = computed(() => props.rotationUi?.border?.style ?? 'solid');
 
 // Outline resolution (new object > deprecated props > group defaults)
 const outlineColor = computed(
@@ -352,6 +353,8 @@ const connectorLineStyle = computed<CSSProperties>(() => ({
 const rotationHandleStyle = computed<CSSProperties>(() => ({
   ...(rotationHandleData.value?.handle.style ?? {}),
   backgroundColor: ROTATION_COLOR.value,
+  border: `${ROTATION_BORDER_WIDTH.value}px ${ROTATION_BORDER_STYLE.value} ${ROTATION_BORDER_COLOR.value}`,
+  boxSizing: 'border-box',
   display: 'flex',
   alignItems: 'center',
   justifyContent: 'center',
@@ -374,6 +377,11 @@ const rotationHandleSlotProps = computed<RotationHandleSlotProps | Record<string
     connectorStyle: connectorLineStyle.value,
     showConnector: SHOW_CONNECTOR.value,
     opacity: rotationActive.value ? 0 : 1,
+    border: {
+      color: ROTATION_BORDER_COLOR.value,
+      width: ROTATION_BORDER_WIDTH.value,
+      style: ROTATION_BORDER_STYLE.value,
+    },
   };
 });
 

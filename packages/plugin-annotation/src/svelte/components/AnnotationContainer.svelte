@@ -91,14 +91,17 @@
   // UI constants
   const HANDLE_COLOR = $derived(resizeUI?.color ?? '#007ACC');
   const VERTEX_COLOR = $derived(vertexUI?.color ?? '#007ACC');
-  const ROTATION_COLOR = $derived(rotationUI?.color ?? '#007ACC');
-  const ROTATION_CONNECTOR_COLOR = $derived(rotationUI?.connectorColor ?? ROTATION_COLOR);
+  const ROTATION_COLOR = $derived(rotationUI?.color ?? 'white');
+  const ROTATION_CONNECTOR_COLOR = $derived(rotationUI?.connectorColor ?? '#007ACC');
   const HANDLE_SIZE = $derived(resizeUI?.size ?? 12);
   const VERTEX_SIZE = $derived(vertexUI?.size ?? 12);
   const ROTATION_SIZE = $derived(rotationUI?.size ?? 32);
   const ROTATION_MARGIN = $derived(rotationUI?.margin);
-  const ROTATION_ICON_COLOR = $derived(rotationUI?.iconColor ?? 'white');
+  const ROTATION_ICON_COLOR = $derived(rotationUI?.iconColor ?? '#007ACC');
   const SHOW_CONNECTOR = $derived(rotationUI?.showConnector ?? false);
+  const ROTATION_BORDER_COLOR = $derived(rotationUI?.border?.color ?? '#007ACC');
+  const ROTATION_BORDER_WIDTH = $derived(rotationUI?.border?.width ?? 1);
+  const ROTATION_BORDER_STYLE = $derived(rotationUI?.border?.style ?? 'solid');
 
   // Outline resolution (new object > deprecated props > defaults)
   const outlineColor = $derived(selectionOutline?.color ?? selectionOutlineColor ?? '#007ACC');
@@ -476,6 +479,11 @@
             connectorStyle: `${rotationHandle.connector.style}; background-color: ${ROTATION_CONNECTOR_COLOR}; opacity: ${rotationActive ? 0 : 1};`,
             showConnector: SHOW_CONNECTOR,
             opacity: rotationActive ? 0 : 1,
+            border: {
+              color: ROTATION_BORDER_COLOR,
+              width: ROTATION_BORDER_WIDTH,
+              style: ROTATION_BORDER_STYLE,
+            },
           })}
         </div>
       {:else}
@@ -508,7 +516,7 @@
               onpointercancel: rotationHandle.handle.onpointercancel,
             }}
             style="{rotationHandle.handle
-              .style}; background-color: {ROTATION_COLOR}; display: flex; align-items: center; justify-content: center; pointer-events: auto; opacity: {rotationActive
+              .style}; background-color: {ROTATION_COLOR}; border: {ROTATION_BORDER_WIDTH}px {ROTATION_BORDER_STYLE} {ROTATION_BORDER_COLOR}; box-sizing: border-box; display: flex; align-items: center; justify-content: center; pointer-events: auto; opacity: {rotationActive
               ? 0
               : 1};"
           >

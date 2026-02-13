@@ -10,7 +10,7 @@ import {
 import { stylesToString } from '../utils/styles-to-string';
 
 export type HandleElementProps = {
-  key: string | number;
+  key?: string | number;
   style: string;
   onpointerdown: (e: PointerEvent) => void;
   onpointermove: (e: PointerEvent) => void;
@@ -89,7 +89,6 @@ export function useInteractionHandles(
     const desc = describeRotationFromConfig(controller, rotationUI, currentRotation);
     return {
       handle: {
-        key: 'rotation',
         style: stylesToString(desc.handleStyle),
         ...dragResize.createRotationProps(currentRotation, desc.radius),
         ...(desc.attrs ?? {}),

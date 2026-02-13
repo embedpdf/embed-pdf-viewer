@@ -243,12 +243,15 @@ export function GroupSelectionBox({
   // UI constants
   const HANDLE_COLOR = resizeUI?.color ?? '#007ACC';
   const HANDLE_SIZE = resizeUI?.size ?? 12;
-  const ROTATION_COLOR = rotationUI?.color ?? HANDLE_COLOR;
-  const ROTATION_CONNECTOR_COLOR = rotationUI?.connectorColor ?? ROTATION_COLOR;
+  const ROTATION_COLOR = rotationUI?.color ?? 'white';
+  const ROTATION_CONNECTOR_COLOR = rotationUI?.connectorColor ?? '#007ACC';
   const ROTATION_SIZE = rotationUI?.size ?? 32;
   const ROTATION_MARGIN = rotationUI?.margin;
-  const ROTATION_ICON_COLOR = rotationUI?.iconColor ?? 'white';
+  const ROTATION_ICON_COLOR = rotationUI?.iconColor ?? '#007ACC';
   const SHOW_CONNECTOR = rotationUI?.showConnector ?? false;
+  const ROTATION_BORDER_COLOR = rotationUI?.border?.color ?? '#007ACC';
+  const ROTATION_BORDER_WIDTH = rotationUI?.border?.width ?? 1;
+  const ROTATION_BORDER_STYLE = rotationUI?.border?.style ?? 'solid';
 
   // Outline resolution (new object > deprecated props > group defaults)
   const outlineColor = selectionOutline?.color ?? selectionOutlineColor ?? '#007ACC';
@@ -394,6 +397,11 @@ export function GroupSelectionBox({
                 },
                 showConnector: SHOW_CONNECTOR,
                 opacity: rotationActive ? 0 : 1,
+                border: {
+                  color: ROTATION_BORDER_COLOR,
+                  width: ROTATION_BORDER_WIDTH,
+                  style: ROTATION_BORDER_STYLE,
+                },
               })}
             </div>
           ) : (
@@ -424,6 +432,8 @@ export function GroupSelectionBox({
                 style={{
                   ...rotationHandle.handle.style,
                   backgroundColor: ROTATION_COLOR,
+                  border: `${ROTATION_BORDER_WIDTH}px ${ROTATION_BORDER_STYLE} ${ROTATION_BORDER_COLOR}`,
+                  boxSizing: 'border-box',
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',

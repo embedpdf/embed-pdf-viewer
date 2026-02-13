@@ -11,7 +11,7 @@ import {
 } from '../plugin-interaction-primitives/utils';
 
 export type HandleElementProps = {
-  key: string | number;
+  key?: string | number;
   style: CSSProperties;
   onPointerDown: (e: PointerEvent) => void;
   onPointerMove: (e: PointerEvent) => void;
@@ -121,7 +121,6 @@ export function useInteractionHandles(opts: {
     const desc = describeRotationFromConfig(controller, rotationUI, currentRotation);
     return {
       handle: {
-        key: 'rotation',
         style: desc.handleStyle as CSSProperties,
         ...createRotationProps(currentRotation, desc.radius),
         ...(desc.attrs ?? {}),

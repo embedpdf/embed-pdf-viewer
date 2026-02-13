@@ -12,7 +12,7 @@ import type { Position, Rect } from '@embedpdf/models';
 import { norm, rectDTO, vertsDTO, type MaybeRef } from '../utils/interaction-normalize';
 
 export type HandleElementProps = {
-  key: string | number;
+  key?: string | number;
   style: CSSProperties;
   onPointerdown: (e: PointerEvent) => void;
   onPointermove: (e: PointerEvent) => void;
@@ -145,7 +145,6 @@ export function useInteractionHandles(opts: UseInteractionHandlesOptions) {
     );
     return {
       handle: {
-        key: 'rotation',
         style: desc.handleStyle as CSSProperties,
         ...createRotationProps(rot, desc.radius),
         ...(desc.attrs ?? {}),

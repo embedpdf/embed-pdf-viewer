@@ -31,7 +31,7 @@ export interface RotationUI {
 }
 
 /** Screen-pixel gap between the rect edge and the rotation handle center (default orbit margin). */
-export const ROTATION_HANDLE_MARGIN = 30;
+export const ROTATION_HANDLE_MARGIN = 35;
 
 export interface HandleDescriptor {
   handle: ResizeHandle;
