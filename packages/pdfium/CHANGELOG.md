@@ -1,5 +1,18 @@
 # @embedpdf/pdfium
 
+## 2.6.0
+
+### Minor Changes
+
+- [#452](https://github.com/embedpdf/embed-pdf-viewer/pull/452) by [@bobsingor](https://github.com/bobsingor) –
+  - Export new rotation-related PDFium functions: `EPDFAnnot_SetRotate`, `EPDFAnnot_GetRotate`, `EPDFAnnot_SetExtendedRotation`, etc.
+  - Update WASM build.
+
+### Patch Changes
+
+- [#458](https://github.com/embedpdf/embed-pdf-viewer/pull/458) by [@bobsingor](https://github.com/bobsingor) –
+  - Add abbreviated font name aliases (Helv, ZaDb, Cour, etc.) and missing Helvetica-Oblique mapping in `StringToStandardFont`.
+
 ## 2.5.0
 
 ### Minor Changes

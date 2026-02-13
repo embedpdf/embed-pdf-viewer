@@ -1,5 +1,19 @@
 # @embedpdf/engines
 
+## 2.6.0
+
+### Minor Changes
+
+- [#452](https://github.com/embedpdf/embed-pdf-viewer/pull/452) by [@bobsingor](https://github.com/bobsingor) –
+  - Update PDFium engine to support saving and loading rotated annotations.
+  - Add support for `EPDFAnnot_SetRotate`, `EPDFAnnot_SetExtendedRotation`, and `EPDFAnnot_SetUnrotatedRect`.
+  - Implement unrotated rendering path for rotated annotations.
+
+### Patch Changes
+
+- [#458](https://github.com/embedpdf/embed-pdf-viewer/pull/458) by [@bobsingor](https://github.com/bobsingor) –
+  - Fallback unknown font to Helvetica in `setAnnotationDefaultAppearance` so annotations with non-standard fonts can still be edited.
+
 ## 2.5.0
 
 ### Minor Changes

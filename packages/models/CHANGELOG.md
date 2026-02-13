@@ -1,5 +1,21 @@
 # @embedpdf/models
 
+## 2.6.0
+
+### Minor Changes
+
+- [#452](https://github.com/embedpdf/embed-pdf-viewer/pull/452) by [@bobsingor](https://github.com/bobsingor) –
+  - Add rotation geometry utilities: `rotatePointAround`, `calculateRotatedRectAABB`, `inferRotationCenterFromRects`.
+  - Add `rotation` and `unrotatedRect` properties to `PdfAnnotationObjectBase`.
+
+### Patch Changes
+
+- [#459](https://github.com/embedpdf/embed-pdf-viewer/pull/459) by [@bobsingor](https://github.com/bobsingor) – Fix JSDoc descriptions for `color` and `overlayColor` on `PdfRedactAnnoObject` to match actual semantics.
+
+- [#458](https://github.com/embedpdf/embed-pdf-viewer/pull/458) by [@bobsingor](https://github.com/bobsingor) –
+  - Fix `StandardFontDescriptor.css` to use base family names only (not variant-specific like `"Helvetica-Bold"`).
+  - Add `StandardFontCssProperties` interface and `standardFontCssProperties()` for cross-platform font rendering with proper `fontWeight`/`fontStyle`.
+
 ## 2.5.0
 
 ### Minor Changes

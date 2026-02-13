@@ -1,5 +1,11 @@
 # @embedpdf/plugin-interaction-manager
 
+## 2.6.0
+
+### Minor Changes
+
+- [#447](https://github.com/embedpdf/embed-pdf-viewer/pull/447) by [@bobsingor](https://github.com/bobsingor) – Added topic-based page activity tracking system. New methods `claimPageActivity`, `releasePageActivity`, and `hasPageActivity` on both `InteractionManagerCapability` and `InteractionManagerScope`. New `onPageActivityChange` event and `PageActivityChangeEvent` type. Topics are named strings (e.g. 'annotation-selection', 'selection-menu') that can be active on one page at a time per document, automatically moving when re-claimed on a different page.
+
 ## 2.5.0
 
 ### Patch Changes
