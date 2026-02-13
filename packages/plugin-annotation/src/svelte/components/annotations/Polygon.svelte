@@ -74,6 +74,7 @@
   {height}
   viewBox={`0 0 ${rect.size.width} ${rect.size.height}`}
 >
+  <!-- svelte-ignore a11y_no_static_element_interactions -->
   <path
     d={pathData}
     onpointerdown={onClick}

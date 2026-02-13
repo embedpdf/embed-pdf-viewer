@@ -82,21 +82,51 @@ const patchAnno = (
 };
 
 export const initialState = (cfg: AnnotationPluginConfig): AnnotationState => {
-  // Create a Map with a general type signature. This resolves the type conflicts.
-  const toolMap = new Map<string, AnnotationTool>();
+  // Build a map of default tools, keyed by ID.
+  const defaultMap = new Map<string, AnnotationTool>();
+  defaultTools.forEach((t) => defaultMap.set(t.id, t as AnnotationTool));
 
-  // The `satisfies` operator has already validated the specific types in `defaultTools`.
-  // Now, we cast each one to the general `AnnotationTool` type for storage in our unified map.
-  defaultTools.forEach((t) => toolMap.set(t.id, t as AnnotationTool));
+  // Deep-merge user-provided tools with defaults (user values take precedence).
+  // New tools (unmatched ID) are added as-is.
+  const toolMap = new Map<string, AnnotationTool>(defaultMap);
+  (cfg.tools || []).forEach((userTool) => {
+    const base = defaultMap.get(userTool.id);
+    if (base) {
+      toolMap.set(userTool.id, {
+        ...base,
+        ...userTool,
+        defaults: { ...base.defaults, ...userTool.defaults },
+        interaction: { ...base.interaction, ...userTool.interaction },
+        behavior: { ...base.behavior, ...userTool.behavior },
+        ...((base as any).clickBehavior || (userTool as any).clickBehavior
+          ? {
+              clickBehavior: {
+                ...(base as any).clickBehavior,
+                ...(userTool as any).clickBehavior,
+              },
+            }
+          : {}),
+      } as AnnotationTool);
+    } else {
+      toolMap.set(userTool.id, userTool as AnnotationTool);
+    }
+  });
 
-  // User-provided tools can now be safely added, as they also match the `AnnotationTool` type.
-  (cfg.tools || []).forEach((t) => toolMap.set(t.id, t));
+  // Resolve behavior: merge global config defaults into each tool's behavior.
+  const tools = Array.from(toolMap.values()).map((t) => ({
+    ...t,
+    behavior: {
+      ...t.behavior,
+      deactivateToolAfterCreate:
+        t.behavior?.deactivateToolAfterCreate ?? cfg.deactivateToolAfterCreate ?? false,
+      selectAfterCreate: t.behavior?.selectAfterCreate ?? cfg.selectAfterCreate ?? true,
+    },
+  }));
 
   return {
     documents: {},
     activeDocumentId: null,
-    // `Array.from(toolMap.values())` now correctly returns `AnnotationTool[]`, which matches the state's type.
-    tools: Array.from(toolMap.values()),
+    tools,
     colorPresets: cfg.colorPresets ?? DEFAULT_COLORS,
   };
 };

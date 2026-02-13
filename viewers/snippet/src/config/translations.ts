@@ -170,6 +170,7 @@ export const englishTranslations: Locale = {
       redact: 'Redact',
       overlayText: 'Overlay Text',
       overlayTextPlaceholder: 'e.g., REDACTED',
+      rotation: 'Rotation',
     },
     redaction: {
       redact: 'Redact',
@@ -507,6 +508,7 @@ export const germanTranslations: Locale = {
       redact: 'Schwärzen',
       overlayText: 'Überlagerungstext',
       overlayTextPlaceholder: 'z.B. GESCHWÄRZT',
+      rotation: 'Drehung',
     },
     redaction: {
       redact: 'Schwärzen',
@@ -846,6 +848,7 @@ export const dutchTranslations: Locale = {
       redact: 'Redigeren',
       overlayText: 'Overlaytekst',
       overlayTextPlaceholder: 'bijv. GEREDIGEERD',
+      rotation: 'Rotatie',
     },
     redaction: {
       redact: 'Redigeren',
@@ -1183,6 +1186,7 @@ export const frenchTranslations: Locale = {
       redact: 'Caviarder',
       overlayText: 'Texte de superposition',
       overlayTextPlaceholder: 'ex: CAVIARDÉ',
+      rotation: 'Rotation',
     },
     redaction: {
       redact: 'Caviarder',
@@ -1522,6 +1526,7 @@ export const spanishTranslations: Locale = {
       redact: 'Redactar',
       overlayText: 'Texto superpuesto',
       overlayTextPlaceholder: 'ej: REDACTADO',
+      rotation: 'Rotación',
     },
     redaction: {
       redact: 'Redactar',
@@ -1859,6 +1864,7 @@ export const simplifiedChineseTranslations: Locale = {
       redact: '遮蔽',
       overlayText: '覆盖文字',
       overlayTextPlaceholder: '例如：已遮蔽',
+      rotation: '旋转',
     },
     redaction: {
       redact: '遮蔽',

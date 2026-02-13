@@ -47,6 +47,8 @@ import {
   AnnotationSelectionMenuRenderFn,
   GroupSelectionMenuRenderFn,
   VertexHandleUI,
+  RotationHandleUI,
+  SelectionOutline,
   BoxedAnnotationRenderer,
 } from './types';
 import { Circle } from './annotations/circle';
@@ -68,7 +70,10 @@ interface AnnotationsProps {
   groupSelectionMenu?: GroupSelectionMenuRenderFn;
   resizeUI?: ResizeHandleUI;
   vertexUI?: VertexHandleUI;
+  rotationUI?: RotationHandleUI;
   selectionOutlineColor?: string;
+  selectionOutline?: SelectionOutline;
+  groupSelectionOutline?: SelectionOutline;
   customAnnotationRenderer?: CustomAnnotationRenderer<PdfAnnotationObject>;
   /** Custom renderers for specific annotation types (provided by external plugins) */
   annotationRenderers?: BoxedAnnotationRenderer[];
@@ -221,6 +226,47 @@ export function Annotations(annotationsProps: AnnotationsProps) {
     });
   }, [selectedAnnotationsOnPage, annotationProvides]);
 
+  // Check if all selected annotations on this page are rotatable in group context
+  const areAllSelectedRotatable = useMemo(() => {
+    if (selectedAnnotationsOnPage.length < 2) return false;
+
+    return selectedAnnotationsOnPage.every((ta) => {
+      const tool = annotationProvides?.findToolForAnnotation(ta.object);
+      // Use group-specific property, falling back to single-annotation property
+      const groupRotatable = resolveInteractionProp(
+        tool?.interaction.isGroupRotatable,
+        ta.object,
+        true,
+      );
+      const singleRotatable = resolveInteractionProp(
+        tool?.interaction.isRotatable,
+        ta.object,
+        true,
+      );
+      return tool?.interaction.isGroupRotatable !== undefined ? groupRotatable : singleRotatable;
+    });
+  }, [selectedAnnotationsOnPage, annotationProvides]);
+
+  // Check if any selected annotation on this page needs aspect ratio locked during group resize
+  const shouldLockGroupAspectRatio = useMemo(() => {
+    if (selectedAnnotationsOnPage.length < 2) return false;
+
+    return selectedAnnotationsOnPage.some((ta) => {
+      const tool = annotationProvides?.findToolForAnnotation(ta.object);
+      const groupLock = resolveInteractionProp(
+        tool?.interaction.lockGroupAspectRatio,
+        ta.object,
+        false,
+      );
+      const singleLock = resolveInteractionProp(
+        tool?.interaction.lockAspectRatio,
+        ta.object,
+        false,
+      );
+      return tool?.interaction.lockGroupAspectRatio !== undefined ? groupLock : singleLock;
+    });
+  }, [selectedAnnotationsOnPage, annotationProvides]);
+
   // Check if all selected annotations are on the same page (this page)
   const allSelectedOnSamePage = useMemo(() => {
     if (!annotationProvides) return false;
@@ -266,6 +312,11 @@ export function Annotations(annotationsProps: AnnotationsProps) {
                   annotation.object,
                   false,
                 )}
+                isRotatable={resolveInteractionProp(
+                  tool?.interaction.isRotatable,
+                  annotation.object,
+                  false,
+                )}
                 selectionMenu={selectionMenu}
                 onSelect={(e) => handleClick(e, annotation)}
                 style={{
@@ -300,6 +351,11 @@ export function Annotations(annotationsProps: AnnotationsProps) {
                 tool?.interaction.lockAspectRatio,
                 annotation.object,
                 false,
+              )}
+              isRotatable={resolveInteractionProp(
+                tool?.interaction.isRotatable,
+                annotation.object,
+                true,
               )}
               selectionMenu={selectionMenu}
               onSelect={(e) => handleClick(e, annotation)}
@@ -342,6 +398,11 @@ export function Annotations(annotationsProps: AnnotationsProps) {
                 annotation.object,
                 false,
               )}
+              isRotatable={resolveInteractionProp(
+                tool?.interaction.isRotatable,
+                annotation.object,
+                true,
+              )}
               selectionMenu={selectionMenu}
               onSelect={(e) => handleClick(e, annotation)}
               style={{
@@ -382,6 +443,11 @@ export function Annotations(annotationsProps: AnnotationsProps) {
                 tool?.interaction.lockAspectRatio,
                 annotation.object,
                 false,
+              )}
+              isRotatable={resolveInteractionProp(
+                tool?.interaction.isRotatable,
+                annotation.object,
+                true,
               )}
               selectionMenu={selectionMenu}
               onSelect={(e) => handleClick(e, annotation)}
@@ -424,6 +490,11 @@ export function Annotations(annotationsProps: AnnotationsProps) {
                 annotation.object,
                 false,
               )}
+              isRotatable={resolveInteractionProp(
+                tool?.interaction.isRotatable,
+                annotation.object,
+                false,
+              )}
               selectionMenu={selectionMenu}
               onSelect={(e) => handleClick(e, annotation)}
               zIndex={0}
@@ -458,6 +529,11 @@ export function Annotations(annotationsProps: AnnotationsProps) {
               )}
               lockAspectRatio={resolveInteractionProp(
                 tool?.interaction.lockAspectRatio,
+                annotation.object,
+                false,
+              )}
+              isRotatable={resolveInteractionProp(
+                tool?.interaction.isRotatable,
                 annotation.object,
                 false,
               )}
@@ -498,6 +574,11 @@ export function Annotations(annotationsProps: AnnotationsProps) {
                 annotation.object,
                 false,
               )}
+              isRotatable={resolveInteractionProp(
+                tool?.interaction.isRotatable,
+                annotation.object,
+                false,
+              )}
               selectionMenu={selectionMenu}
               onSelect={(e) => handleClick(e, annotation)}
               zIndex={0}
@@ -532,6 +613,11 @@ export function Annotations(annotationsProps: AnnotationsProps) {
               )}
               lockAspectRatio={resolveInteractionProp(
                 tool?.interaction.lockAspectRatio,
+                annotation.object,
+                false,
+              )}
+              isRotatable={resolveInteractionProp(
+                tool?.interaction.isRotatable,
                 annotation.object,
                 false,
               )}
@@ -571,6 +657,11 @@ export function Annotations(annotationsProps: AnnotationsProps) {
                 tool?.interaction.lockAspectRatio,
                 annotation.object,
                 false,
+              )}
+              isRotatable={resolveInteractionProp(
+                tool?.interaction.isRotatable,
+                annotation.object,
+                true,
               )}
               selectionMenu={selectionMenu}
               onSelect={(e) => handleClick(e, annotation)}
@@ -630,6 +721,11 @@ export function Annotations(annotationsProps: AnnotationsProps) {
                 annotation.object,
                 false,
               )}
+              isRotatable={resolveInteractionProp(
+                tool?.interaction.isRotatable,
+                annotation.object,
+                true,
+              )}
               selectionMenu={selectionMenu}
               onSelect={(e) => handleClick(e, annotation)}
               vertexConfig={{
@@ -682,6 +778,11 @@ export function Annotations(annotationsProps: AnnotationsProps) {
                 annotation.object,
                 false,
               )}
+              isRotatable={resolveInteractionProp(
+                tool?.interaction.isRotatable,
+                annotation.object,
+                true,
+              )}
               selectionMenu={selectionMenu}
               onSelect={(e) => handleClick(e, annotation)}
               vertexConfig={{
@@ -733,6 +834,11 @@ export function Annotations(annotationsProps: AnnotationsProps) {
                 annotation.object,
                 false,
               )}
+              isRotatable={resolveInteractionProp(
+                tool?.interaction.isRotatable,
+                annotation.object,
+                true,
+              )}
               selectionMenu={selectionMenu}
               onSelect={(e) => handleClick(e, annotation)}
               style={{
@@ -783,6 +889,11 @@ export function Annotations(annotationsProps: AnnotationsProps) {
                 annotation.object,
                 false,
               )}
+              isRotatable={resolveInteractionProp(
+                tool?.interaction.isRotatable,
+                annotation.object,
+                true,
+              )}
               selectionMenu={selectionMenu}
               onSelect={(e) => handleClick(e, annotation)}
               style={{
@@ -816,6 +927,7 @@ export function Annotations(annotationsProps: AnnotationsProps) {
               isDraggable={false}
               isResizable={false}
               lockAspectRatio={false}
+              isRotatable={false}
               selectionMenu={hasIRT ? undefined : selectionMenu}
               onSelect={(e) => handleLinkClick(e, annotation)}
               {...annotationsProps}
@@ -849,8 +961,14 @@ export function Annotations(annotationsProps: AnnotationsProps) {
           selectedAnnotations={selectedAnnotationsOnPage}
           isDraggable={areAllSelectedDraggable}
           isResizable={areAllSelectedResizable}
+          isRotatable={areAllSelectedRotatable}
+          lockAspectRatio={shouldLockGroupAspectRatio}
           resizeUI={annotationsProps.resizeUI}
+          rotationUI={annotationsProps.rotationUI}
           selectionOutlineColor={annotationsProps.selectionOutlineColor}
+          selectionOutline={
+            annotationsProps.groupSelectionOutline ?? annotationsProps.selectionOutline
+          }
           groupSelectionMenu={annotationsProps.groupSelectionMenu}
         />
       )}

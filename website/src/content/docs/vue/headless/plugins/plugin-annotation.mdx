@@ -248,6 +248,125 @@ import { AnnotationExample } from '../../code-examples/headless/annotation-examp
   <AnnotationExample />
 </CodeExample>
 
+## Customizing Annotation UI
+
+The `<AnnotationLayer />` is fully headless — you can replace every visual element with your own markup. This includes resize handles, vertex handles, the rotation handle, and the selection outline.
+
+In Vue, custom handles are provided via **scoped slots** rather than component props. Each slot receives positioning styles, event handlers, and appearance data that you **must** bind onto your element for interactions to work correctly.
+
+### Custom Handle Slots
+
+#### `#resize-handle`
+
+Replace the default circular resize handles with custom markup. The slot receives `style`, `backgroundColor`, and event handler props.
+
+```vue
+<AnnotationLayer :document-id="documentId" :page-index="page.pageIndex"
+  :resize-ui="{ size: 10, color: '#475569' }">
+  <template #resize-handle="{ style, backgroundColor, key: _key, ...rest }">
+    <div v-bind="rest" :style="{
+      ...style,
+      backgroundColor: 'transparent',
+      border: `2px solid ${backgroundColor ?? '#475569'}`,
+      borderRadius: '2px',
+    }" />
+  </template>
+</AnnotationLayer>
+```
+
+#### `#vertex-handle`
+
+Replace vertex handles (used on polyline/polygon annotations) with custom shapes. This example creates diamond-shaped handles by adding a `rotate(45deg)` transform.
+
+```vue
+<template #vertex-handle="{ style, backgroundColor, key: _key, ...rest }">
+  <div v-bind="rest" :style="{
+    ...style,
+    backgroundColor: backgroundColor ?? '#475569',
+    borderRadius: '1px',
+    transform: `${style?.transform ?? ''} rotate(45deg)`.trim(),
+  }" />
+</template>
+```
+
+#### `#rotation-handle`
+
+Replace the rotation handle with fully custom markup. The slot provides additional props for the connector line and icon color.
+
+```vue
+<template #rotation-handle="{ style, backgroundColor, connectorStyle, showConnector, iconColor, border: _border, ...rest }">
+  <!-- Connector line (optional) -->
+  <div v-if="showConnector && connectorStyle" :style="connectorStyle" />
+  <!-- Handle element -->
+  <div v-bind="rest" :style="{
+    ...style,
+    backgroundColor: backgroundColor ?? '#475569',
+    borderRadius: '999px',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    boxShadow: '0 1px 3px rgba(0,0,0,0.25)',
+  }">
+    <svg width="12" height="12" viewBox="0 0 24 24" fill="none"
+      :stroke="iconColor ?? 'white'" stroke-width="2.5"
+      stroke-linecap="round" stroke-linejoin="round">
+      <path d="M1 4v6h6" />
+      <path d="M23 20v-6h-6" />
+      <path d="M20.49 9A9 9 0 0 0 5.64 5.64L1 10M23 14l-4.64 4.36A9 9 0 0 1 3.51 15" />
+    </svg>
+  </div>
+</template>
+```
+
+### Configuring Outline and Handle Props
+
+Pass UI configuration alongside the slots to control sizes, colors, and outline styles:
+
+```vue
+<AnnotationLayer
+  :document-id="documentId"
+  :page-index="page.pageIndex"
+  :resize-ui="{ size: 10, color: '#475569' }"
+  :vertex-ui="{ size: 10, color: '#475569' }"
+  :rotation-ui="{
+    size: 24,
+    color: '#475569',
+    iconColor: 'white',
+    margin: 28,
+    showConnector: true,
+    connectorColor: '#94a3b8',
+  }"
+  :selection-outline="{ color: '#475569', style: 'solid', width: 1, offset: 2 }"
+  :group-selection-outline="{ color: '#64748b', style: 'dashed', width: 2, offset: 3 }"
+>
+  <template #resize-handle="{ style, backgroundColor, key: _key, ...rest }">
+    <!-- your custom resize handle -->
+  </template>
+  <template #vertex-handle="{ style, backgroundColor, key: _key, ...rest }">
+    <!-- your custom vertex handle -->
+  </template>
+  <template #rotation-handle="{ style, backgroundColor, connectorStyle, showConnector, iconColor, border: _border, ...rest }">
+    <!-- your custom rotation handle -->
+  </template>
+</AnnotationLayer>
+```
+
+### Live Example — Custom UI
+
+Try creating annotations below to see the custom square resize handles, diamond vertex handles, and pill-shaped rotation handle in action.
+
+import { CustomUIExample } from '../../code-examples/headless/annotation-custom-ui-example';
+
+<CodeExample
+  codePaths={[
+    "../../examples/vue-tailwind/src/examples/headless/annotation-custom-ui-example.vue",
+    "../../examples/vue-tailwind/src/examples/headless/annotation-custom-ui-example-content.vue"
+  ]}
+>
+  <CustomUIExample />
+</CodeExample>
+
+
 ## API Reference
 
 ### Configuration (`AnnotationPluginConfig`)
@@ -269,24 +388,65 @@ The primary component for rendering and interacting with annotations.
 | :--- | :--- | :--- |
 | **`documentId`** | `string` | **(Required)** The ID of the document this layer belongs to. |
 | **`pageIndex`** | `number` | **(Required)** The page index this layer corresponds to. |
-| **`selectionOutlineColor`**| `string` | The color of the outline around a selected annotation. **Default**: `'#007ACC'` |
+| **`scale`** | `number` | The zoom scale of the page. |
+| **`rotation`** | `number` | The rotation of the page. |
+| **`resizeUi`** | `ResizeHandleUI` | Customize resize handle size and color. |
+| **`vertexUi`** | `VertexHandleUI` | Customize vertex handle size and color. |
+| **`rotationUi`** | `RotationHandleUI` | Customize rotation handle size, color, margin, icon, and connector. |
+| **`selectionOutline`** | `SelectionOutline` | Customize the outline around selected annotations (`color`, `style`, `width`, `offset`). |
+| **`groupSelectionOutline`** | `SelectionOutline` | Customize the outline for group selections. Falls back to `selectionOutline`. |
+| ~~**`selectionOutlineColor`**~~ | `string` | **Deprecated.** Use `selectionOutline.color` instead. |
 
-#### Customizing Handles (`resizeUI` and `vertexUI`)
-
-You can customize the visual appearance of the interactive handles for resizing and editing vertices. Both `resizeUI` and `vertexUI` accept an object with the following shape:
+#### `ResizeHandleUI` / `VertexHandleUI`
 
 ```typescript
-interface HandleUI {
-  /** Handle size in CSS pixels */
-  size?: number; // Default: 12
-  /** Default background color for the handle */
-  color?: string; // Default: '#007ACC'
+interface ResizeHandleUI {
+  size?: number;    // Handle size in px (default: 12)
+  color?: string;   // Background color (default: '#007ACC')
+}
+// VertexHandleUI has the same shape
+```
+
+#### `RotationHandleUI`
+
+```typescript
+interface RotationHandleUI {
+  size?: number;           // Handle size in px (default: 16)
+  color?: string;          // Background color (default: 'white')
+  iconColor?: string;      // Icon stroke color (default: '#007ACC')
+  margin?: number;         // Gap from bounding box edge in px (default: 35)
+  showConnector?: boolean; // Show connector line (default: false)
+  connectorColor?: string; // Connector line color (default: '#007ACC')
+  border?: RotationHandleBorder; // Border configuration
+}
+
+interface RotationHandleBorder {
+  color?: string;  // Border color (default: '#007ACC')
+  style?: BorderStyle; // Border style (default: 'solid')
+  width?: number;  // Border width in px (default: 1)
 }
 ```
 
-### Scoped Slot: `selection-menu`
+#### `SelectionOutline`
 
-The `<AnnotationLayer>` provides a scoped slot to render a custom menu when an annotation is selected.
+```typescript
+type BorderStyle = 'solid' | 'dashed' | 'dotted';
+
+interface SelectionOutline {
+  color?: string;        // Outline color (default: '#007ACC')
+  style?: BorderStyle;   // Default: 'solid' (single) / 'dashed' (group)
+  width?: number;        // Outline width in px (default: 1 / 2)
+  offset?: number;       // Outline offset in px (default: 1 / 2)
+}
+```
+
+### Scoped Slots
+
+The `<AnnotationLayer>` provides scoped slots to render custom UI elements.
+
+#### `#selection-menu`
+
+Render a custom menu when an annotation is selected.
 
 | Prop | Type | Description |
 | :--- | :--- | :--- |
@@ -294,6 +454,40 @@ The `<AnnotationLayer>` provides a scoped slot to render a custom menu when an a
 | `selected` | `boolean` | `true` if an annotation is currently selected. |
 | `menuWrapperProps` | `object` | Vue props to bind to your menu's wrapper element for positioning. |
 | `rect` | `Rect` | The bounding box of the selected annotation. |
+
+#### `#resize-handle`
+
+Replace the default resize handles with custom markup.
+
+| Prop | Type | Description |
+| :--- | :--- | :--- |
+| `style` | `CSSProperties` | Positioning and sizing styles. Must be applied to your element. |
+| `backgroundColor` | `string` | The configured handle color (from `resizeUi.color`). |
+| `...rest` | — | Event handlers and data attributes. Must be bound with `v-bind`. |
+
+#### `#vertex-handle`
+
+Replace the default vertex handles with custom markup.
+
+| Prop | Type | Description |
+| :--- | :--- | :--- |
+| `style` | `CSSProperties` | Positioning and sizing styles. Must be applied to your element. |
+| `backgroundColor` | `string` | The configured handle color (from `vertexUi.color`). |
+| `...rest` | — | Event handlers and data attributes. Must be bound with `v-bind`. |
+
+#### `#rotation-handle`
+
+Replace the default rotation handle with custom markup.
+
+| Prop | Type | Description |
+| :--- | :--- | :--- |
+| `style` | `CSSProperties` | Positioning and sizing styles. Must be applied to your element. |
+| `backgroundColor` | `string` | The configured handle color (from `rotationUi.color`). |
+| `iconColor` | `string` | The configured icon color (from `rotationUi.iconColor`). |
+| `connectorStyle` | `CSSProperties \| undefined` | Style for the connector line, if enabled. |
+| `showConnector` | `boolean` | Whether the connector line should be rendered. |
+| `border` | `RotationHandleBorder` | Resolved border configuration (color, style, width). |
+| `...rest` | — | Event handlers and data attributes. Must be bound with `v-bind`. |
 
 ### Composable: `useAnnotation(documentId)`
 

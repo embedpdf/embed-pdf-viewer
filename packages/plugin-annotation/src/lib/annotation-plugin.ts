@@ -15,6 +15,7 @@ import {
   Position,
   Rect,
   PdfAnnotationReplyType,
+  Rotation,
 } from '@embedpdf/models';
 import {
   AnnotationCapability,
@@ -43,6 +44,10 @@ import {
   UnifiedResizeState,
   UnifiedResizeEvent,
   UnifiedResizeAnnotationInfo,
+  UnifiedRotateOptions,
+  UnifiedRotateState,
+  UnifiedRotateEvent,
+  UnifiedRotateParticipant,
 } from './types';
 import {
   setAnnotations,
@@ -96,7 +101,22 @@ import {
 } from './handlers';
 import { rectsIntersect, isLink } from './helpers';
 import { PatchRegistry, TransformContext } from './patching/patch-registry';
-import { patchInk, patchLine, patchPolyline, patchPolygon } from './patching/patches';
+import {
+  patchInk,
+  patchLine,
+  patchPolyline,
+  patchPolygon,
+  patchCircle,
+  patchSquare,
+  patchFreeText,
+  patchStamp,
+} from './patching/patches';
+import {
+  getRectCenter,
+  resolveAnnotationRotationCenter,
+  rotatePointAroundCenter,
+} from './patching/patch-utils';
+import { convertAABBRectToUnrotatedSpace } from './geometry/rotation';
 
 export class AnnotationPlugin extends BasePlugin<
   AnnotationPluginConfig,
@@ -132,6 +152,10 @@ export class AnnotationPlugin extends BasePlugin<
   // Unified resize coordination (per-document) - NEW: Plugin owns all logic
   private readonly unifiedResizeStates = new Map<string, UnifiedResizeState>();
   private readonly unifiedResize$ = createBehaviorEmitter<UnifiedResizeEvent>();
+
+  // Unified rotation coordination (per-document)
+  private readonly unifiedRotateStates = new Map<string, UnifiedRotateState>();
+  private readonly unifiedRotate$ = createBehaviorEmitter<UnifiedRotateEvent>();
 
   constructor(id: string, registry: PluginRegistry, config: AnnotationPluginConfig) {
     super(id, registry);
@@ -219,6 +243,10 @@ export class AnnotationPlugin extends BasePlugin<
     this.patchRegistry.register(PdfAnnotationSubtype.LINE, patchLine);
     this.patchRegistry.register(PdfAnnotationSubtype.POLYLINE, patchPolyline);
     this.patchRegistry.register(PdfAnnotationSubtype.POLYGON, patchPolygon);
+    this.patchRegistry.register(PdfAnnotationSubtype.CIRCLE, patchCircle);
+    this.patchRegistry.register(PdfAnnotationSubtype.SQUARE, patchSquare);
+    this.patchRegistry.register(PdfAnnotationSubtype.FREETEXT, patchFreeText);
+    this.patchRegistry.register(PdfAnnotationSubtype.STAMP, patchStamp);
   }
 
   async initialize(): Promise<void> {
@@ -316,10 +344,10 @@ export class AnnotationPlugin extends BasePlugin<
             documentId,
           );
 
-          if (this.getToolBehavior(activeTool, 'deactivateToolAfterCreate')) {
+          if (activeTool.behavior?.deactivateToolAfterCreate) {
             this.setActiveTool(null, documentId);
           }
-          if (this.getToolBehavior(activeTool, 'selectAfterCreate')) {
+          if (activeTool.behavior?.selectAfterCreate) {
             this.selectAnnotation(selection.pageIndex, annotationId, documentId);
           }
         }, ignore);
@@ -537,6 +565,10 @@ export class AnnotationPlugin extends BasePlugin<
 
     const unregisterFns: (() => void)[] = [];
 
+    // Compute effective page rotation (page intrinsic + document rotation)
+    const effectivePageRotation = (((page.rotation ?? 0) + (docState?.rotation ?? 0)) %
+      4) as Rotation;
+
     for (const tool of this.state.tools) {
       if (!tool.defaults.type) continue;
       const factory = this.handlerFactories.get(tool.defaults.type);
@@ -545,15 +577,16 @@ export class AnnotationPlugin extends BasePlugin<
       const context: HandlerContext<PdfAnnotationObject> = {
         pageIndex,
         pageSize: page.size,
+        pageRotation: effectivePageRotation,
         scale,
         services: callbacks.services, // Pass through services
         onPreview: (state) => callbacks.onPreview(tool.id, state),
         onCommit: (annotation, ctx) => {
           this.createAnnotation(pageIndex, annotation, ctx, documentId);
-          if (this.getToolBehavior(tool, 'deactivateToolAfterCreate')) {
+          if (tool.behavior?.deactivateToolAfterCreate) {
             this.setActiveTool(null, documentId);
           }
-          if (this.getToolBehavior(tool, 'selectAfterCreate')) {
+          if (tool.behavior?.selectAfterCreate) {
             this.selectAnnotation(pageIndex, annotation.id, documentId);
           }
         },
@@ -1475,6 +1508,7 @@ export class AnnotationPlugin extends BasePlugin<
     annotations: Array<{
       id: string;
       rect: Rect;
+      unrotatedRect?: Rect;
       pageIndex: number;
       isAttachedLink: boolean;
       parentId?: string;
@@ -1484,6 +1518,7 @@ export class AnnotationPlugin extends BasePlugin<
     return annotations.map((anno) => ({
       id: anno.id,
       originalRect: anno.rect,
+      originalUnrotatedRect: anno.unrotatedRect,
       pageIndex: anno.pageIndex,
       isAttachedLink: anno.isAttachedLink,
       parentId: anno.parentId,
@@ -1538,15 +1573,33 @@ export class AnnotationPlugin extends BasePlugin<
     documentId: string,
   ): Record<string, Partial<PdfAnnotationObject>> {
     const previewPatches: Record<string, Partial<PdfAnnotationObject>> = {};
+    const state = this.unifiedResizeStates.get(documentId);
+    // Build a lookup for participant info (needed for AABB→unrotated conversion)
+    const participantMap = state
+      ? new Map(state.participatingAnnotations.map((p) => [p.id, p]))
+      : undefined;
 
     for (const [id, newRect] of computedRects) {
       const ta = this.getAnnotationById(id, documentId);
       if (!ta) continue;
 
+      // For group resize, computed rects are in AABB space but baseResizeScaling
+      // expects unrotated space. Convert for rotated annotations.
+      let targetRect = newRect;
+      const info = participantMap?.get(id);
+      if (state?.isGroupResize && info?.originalUnrotatedRect) {
+        targetRect = convertAABBRectToUnrotatedSpace(
+          newRect,
+          info.originalRect,
+          info.originalUnrotatedRect,
+          ta.object.rotation ?? 0,
+        );
+      }
+
       // Plugin does the transform - handles ink, polygon, line, etc.
       previewPatches[id] = this.transformAnnotation(ta.object, {
         type: 'resize',
-        changes: { rect: newRect },
+        changes: { rect: targetRect },
       });
     }
 
@@ -1568,6 +1621,7 @@ export class AnnotationPlugin extends BasePlugin<
     const annotationsWithLinks: Array<{
       id: string;
       rect: Rect;
+      unrotatedRect?: Rect;
       pageIndex: number;
       isAttachedLink: boolean;
       parentId?: string;
@@ -1579,6 +1633,9 @@ export class AnnotationPlugin extends BasePlugin<
         annotationsWithLinks.push({
           id,
           rect: ta.object.rect,
+          unrotatedRect: ta.object.unrotatedRect
+            ? this.cloneRect(ta.object.unrotatedRect)
+            : undefined,
           pageIndex: ta.object.pageIndex,
           isAttachedLink: false,
         });
@@ -1591,6 +1648,9 @@ export class AnnotationPlugin extends BasePlugin<
             annotationsWithLinks.push({
               id: link.object.id,
               rect: link.object.rect,
+              unrotatedRect: link.object.unrotatedRect
+                ? this.cloneRect(link.object.unrotatedRect)
+                : undefined,
               pageIndex: link.object.pageIndex,
               isAttachedLink: true,
               parentId: id,
@@ -1619,6 +1679,7 @@ export class AnnotationPlugin extends BasePlugin<
     const state: UnifiedResizeState = {
       documentId,
       isResizing: true,
+      isGroupResize: annotationIds.length > 1,
       primaryIds: annotationIds,
       attachedLinkIds,
       allParticipantIds,
@@ -1703,14 +1764,27 @@ export class AnnotationPlugin extends BasePlugin<
     // Build patches for ALL participants (primary + attached links)
     const patches: Array<{ pageIndex: number; id: string; patch: Partial<PdfAnnotationObject> }> =
       [];
+    const participantMap = new Map(state.participatingAnnotations.map((p) => [p.id, p]));
 
     for (const [id, newRect] of computedRects) {
       const ta = this.getAnnotationById(id, documentId);
       if (!ta) continue;
 
+      // For group resize, convert AABB-space rect to unrotated space
+      let targetRect = newRect;
+      const info = participantMap.get(id);
+      if (state.isGroupResize && info?.originalUnrotatedRect) {
+        targetRect = convertAABBRectToUnrotatedSpace(
+          newRect,
+          info.originalRect,
+          info.originalUnrotatedRect,
+          ta.object.rotation ?? 0,
+        );
+      }
+
       const patch = this.transformAnnotation(ta.object, {
         type: 'resize',
-        changes: { rect: newRect },
+        changes: { rect: targetRect },
       });
 
       patches.push({ pageIndex: ta.object.pageIndex, id, patch });
@@ -1775,6 +1849,258 @@ export class AnnotationPlugin extends BasePlugin<
    */
   public get onResizeChange() {
     return this.unifiedResize$.on;
+  }
+
+  // ─────────────────────────────────────────────────────────
+  // Unified Rotation API (Plugin owns all rotation logic)
+  // ─────────────────────────────────────────────────────────
+
+  private cloneRect(rect: Rect): Rect {
+    return {
+      origin: { x: rect.origin.x, y: rect.origin.y },
+      size: { width: rect.size.width, height: rect.size.height },
+    };
+  }
+
+  private translateRect(rect: Rect, delta: Position): Rect {
+    return {
+      origin: {
+        x: rect.origin.x + delta.x,
+        y: rect.origin.y + delta.y,
+      },
+      size: { ...rect.size },
+    };
+  }
+
+  private normalizeAngle(angle: number): number {
+    const normalized = angle % 360;
+    return normalized < 0 ? normalized + 360 : normalized;
+  }
+
+  private normalizeDelta(delta: number): number {
+    const normalized = ((delta + 540) % 360) - 180;
+    return normalized;
+  }
+
+  private buildRotationParticipants(
+    annotationIds: string[],
+    documentId: string,
+  ): { participants: UnifiedRotateParticipant[]; attachedLinkIds: string[] } {
+    const participants: UnifiedRotateParticipant[] = [];
+    const attachedLinkIds: string[] = [];
+
+    for (const id of annotationIds) {
+      const ta = this.getAnnotationById(id, documentId);
+      if (!ta) continue;
+
+      participants.push({
+        id,
+        rect: this.cloneRect(ta.object.rect),
+        pageIndex: ta.object.pageIndex,
+        rotation: ta.object.rotation ?? 0,
+        unrotatedRect: ta.object.unrotatedRect
+          ? this.cloneRect(ta.object.unrotatedRect)
+          : undefined,
+        isAttachedLink: false,
+      });
+
+      const links = this.getAttachedLinksMethod(id, documentId);
+      for (const link of links) {
+        if (attachedLinkIds.includes(link.object.id)) continue;
+        attachedLinkIds.push(link.object.id);
+        participants.push({
+          id: link.object.id,
+          rect: this.cloneRect(link.object.rect),
+          pageIndex: link.object.pageIndex,
+          rotation: link.object.rotation ?? 0,
+          unrotatedRect: link.object.unrotatedRect
+            ? this.cloneRect(link.object.unrotatedRect)
+            : undefined,
+          isAttachedLink: true,
+          parentId: id,
+        });
+      }
+    }
+
+    return { participants, attachedLinkIds };
+  }
+
+  private computeRotatePreviewPatches(
+    state: UnifiedRotateState,
+    documentId: string,
+  ): Record<string, Partial<PdfAnnotationObject>> {
+    const preview: Record<string, Partial<PdfAnnotationObject>> = {};
+
+    for (const participant of state.participants) {
+      const ta = this.getAnnotationById(participant.id, documentId);
+      if (!ta) continue;
+
+      const originalCenter = resolveAnnotationRotationCenter({
+        rect: participant.rect,
+        unrotatedRect: participant.unrotatedRect,
+        rotation: participant.rotation,
+      });
+      const rotatedCenter = rotatePointAroundCenter(
+        originalCenter,
+        state.rotationCenter,
+        state.delta,
+      );
+      const translation = {
+        x: rotatedCenter.x - originalCenter.x,
+        y: rotatedCenter.y - originalCenter.y,
+      };
+      const nextRotation = this.normalizeAngle(participant.rotation + state.delta);
+
+      const patch = this.transformAnnotation(ta.object, {
+        type: 'rotate',
+        changes: {
+          rotation: nextRotation,
+          unrotatedRect: this.translateRect(
+            participant.unrotatedRect ?? participant.rect,
+            translation,
+          ),
+        },
+        metadata: {
+          rotationAngle: nextRotation,
+          rotationDelta: state.delta,
+          rotationCenter: state.rotationCenter,
+        },
+      });
+
+      if (!patch.rect && (translation.x !== 0 || translation.y !== 0)) {
+        patch.rect = {
+          origin: {
+            x: ta.object.rect.origin.x + translation.x,
+            y: ta.object.rect.origin.y + translation.y,
+          },
+          size: { ...ta.object.rect.size },
+        };
+      }
+
+      preview[participant.id] = patch;
+    }
+
+    return preview;
+  }
+
+  public startRotation(documentId: string, options: UnifiedRotateOptions): void {
+    const { annotationIds, cursorAngle, rotationCenter } = options;
+    const { participants, attachedLinkIds } = this.buildRotationParticipants(
+      annotationIds,
+      documentId,
+    );
+    if (participants.length === 0) return;
+
+    const rects = participants.map((p) => p.rect);
+    const groupBox = this.computeUnifiedGroupBoundingBox(rects);
+    const center = rotationCenter ?? {
+      x: groupBox.origin.x + groupBox.size.width / 2,
+      y: groupBox.origin.y + groupBox.size.height / 2,
+    };
+
+    const state: UnifiedRotateState = {
+      documentId,
+      isRotating: true,
+      primaryIds: annotationIds,
+      attachedLinkIds,
+      allParticipantIds: participants.map((p) => p.id),
+      rotationCenter: center,
+      cursorStartAngle: cursorAngle,
+      currentAngle: cursorAngle,
+      delta: 0,
+      participants,
+    };
+
+    this.unifiedRotateStates.set(documentId, state);
+
+    const previewPatches = this.computeRotatePreviewPatches(state, documentId);
+    this.unifiedRotate$.emit({
+      documentId,
+      type: 'start',
+      state,
+      previewPatches,
+    });
+  }
+
+  public updateRotation(documentId: string, cursorAngle: number, rotationDelta?: number): void {
+    const state = this.unifiedRotateStates.get(documentId);
+    if (!state?.isRotating) {
+      return;
+    }
+
+    const delta =
+      rotationDelta !== undefined
+        ? rotationDelta
+        : this.normalizeDelta(cursorAngle - state.cursorStartAngle);
+
+    const newState: UnifiedRotateState = {
+      ...state,
+      currentAngle: cursorAngle,
+      delta,
+    };
+    this.unifiedRotateStates.set(documentId, newState);
+
+    const previewPatches = this.computeRotatePreviewPatches(newState, documentId);
+
+    this.unifiedRotate$.emit({
+      documentId,
+      type: 'update',
+      state: newState,
+      previewPatches,
+    });
+  }
+
+  public commitRotation(documentId: string): void {
+    const state = this.unifiedRotateStates.get(documentId);
+    if (!state) return;
+
+    const previewPatches = this.computeRotatePreviewPatches(state, documentId);
+    const patches: Array<{ pageIndex: number; id: string; patch: Partial<PdfAnnotationObject> }> =
+      [];
+
+    for (const [id, patch] of Object.entries(previewPatches)) {
+      const ta = this.getAnnotationById(id, documentId);
+      if (!ta) continue;
+      patches.push({ pageIndex: ta.object.pageIndex, id, patch });
+    }
+
+    if (patches.length > 0) {
+      this.updateAnnotationsMethod(patches, documentId);
+    }
+
+    this.unifiedRotate$.emit({
+      documentId,
+      type: 'end',
+      state: { ...state, isRotating: false },
+      previewPatches,
+    });
+
+    this.unifiedRotateStates.delete(documentId);
+  }
+
+  public cancelRotation(documentId: string): void {
+    const state = this.unifiedRotateStates.get(documentId);
+    if (!state) return;
+
+    this.unifiedRotate$.emit({
+      documentId,
+      type: 'cancel',
+      state: { ...state, isRotating: false, delta: 0, currentAngle: state.cursorStartAngle },
+      previewPatches: {},
+    });
+
+    this.unifiedRotateStates.delete(documentId);
+  }
+
+  public getRotateState(documentId: string): UnifiedRotateState | null {
+    return this.unifiedRotateStates.get(documentId) ?? null;
+  }
+
+  /**
+   * Subscribe to unified rotation state changes.
+   */
+  public get onRotateChange() {
+    return this.unifiedRotate$.on;
   }
 
   private updateAnnotationsMethod(
@@ -2164,22 +2490,5 @@ export class AnnotationPlugin extends BasePlugin<
     );
 
     return task;
-  }
-
-  /**
-   * Gets the effective behavior setting for a tool, checking tool-specific config first,
-   * then falling back to plugin config.
-   */
-  private getToolBehavior(
-    tool: AnnotationTool,
-    setting: 'deactivateToolAfterCreate' | 'selectAfterCreate',
-  ): boolean {
-    // Check if tool has specific behavior setting
-    if (tool.behavior?.[setting] !== undefined) {
-      return tool.behavior[setting];
-    }
-
-    // Fall back to plugin config
-    return this.config[setting] !== false;
   }
 }

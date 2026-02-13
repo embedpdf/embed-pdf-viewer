@@ -63,8 +63,12 @@ export function DynamicSidebar({
   // If we can't determine any types, don't render
   if (types.length === 0) return null;
 
-  // Get shared properties for the selected types
-  const properties = getSharedProperties(types);
+  // Get shared properties for the selected types, filtering out
+  // edit-only properties (e.g. rotation) when editing tool defaults
+  const sharedProperties = getSharedProperties(types);
+  const properties = isEditing
+    ? sharedProperties
+    : sharedProperties.filter((p) => !PROPERTY_CONFIGS[p]?.editOnly);
 
   // If no properties to show, don't render
   if (properties.length === 0) return null;

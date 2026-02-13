@@ -65,6 +65,7 @@
 >
   <!-- Invisible hit area for the entire link region -->
   <!-- IRT links are not directly clickable - interaction goes through parent -->
+  <!-- svelte-ignore a11y_no_static_element_interactions -->
   <rect
     x={0}
     y={0}

@@ -39,6 +39,7 @@ var createPdfium = (() => {
       '_EPDF_PNG_EncodeRGBA',
       '_EPDF_RemoveEncryption',
       '_EPDF_RenderAnnotBitmap',
+      '_EPDF_RenderAnnotBitmapUnrotated',
       '_EPDF_SetEncryption',
       '_EPDF_SetMetaText',
       '_EPDF_SetMetaTrapped',
@@ -54,6 +55,7 @@ var createPdfium = (() => {
       '_EPDFAnnot_Flatten',
       '_EPDFAnnot_GenerateAppearance',
       '_EPDFAnnot_GenerateAppearanceWithBlend',
+      '_EPDFAnnot_GetAPMatrix',
       '_EPDFAnnot_GetBlendMode',
       '_EPDFAnnot_GetBorderDashPattern',
       '_EPDFAnnot_GetBorderDashPatternCount',
@@ -61,6 +63,7 @@ var createPdfium = (() => {
       '_EPDFAnnot_GetBorderStyle',
       '_EPDFAnnot_GetColor',
       '_EPDFAnnot_GetDefaultAppearance',
+      '_EPDFAnnot_GetExtendedRotation',
       '_EPDFAnnot_GetIcon',
       '_EPDFAnnot_GetIntent',
       '_EPDFAnnot_GetLineEndings',
@@ -70,13 +73,17 @@ var createPdfium = (() => {
       '_EPDFAnnot_GetRectangleDifferences',
       '_EPDFAnnot_GetReplyType',
       '_EPDFAnnot_GetRichContent',
+      '_EPDFAnnot_GetRotate',
       '_EPDFAnnot_GetTextAlignment',
+      '_EPDFAnnot_GetUnrotatedRect',
       '_EPDFAnnot_GetVerticalAlignment',
       '_EPDFAnnot_SetAction',
+      '_EPDFAnnot_SetAPMatrix',
       '_EPDFAnnot_SetBorderDashPattern',
       '_EPDFAnnot_SetBorderStyle',
       '_EPDFAnnot_SetColor',
       '_EPDFAnnot_SetDefaultAppearance',
+      '_EPDFAnnot_SetExtendedRotation',
       '_EPDFAnnot_SetIcon',
       '_EPDFAnnot_SetIntent',
       '_EPDFAnnot_SetLine',
@@ -86,7 +93,9 @@ var createPdfium = (() => {
       '_EPDFAnnot_SetOverlayText',
       '_EPDFAnnot_SetOverlayTextRepeat',
       '_EPDFAnnot_SetReplyType',
+      '_EPDFAnnot_SetRotate',
       '_EPDFAnnot_SetTextAlignment',
+      '_EPDFAnnot_SetUnrotatedRect',
       '_EPDFAnnot_SetVerticalAlignment',
       '_EPDFAnnot_SetVertices',
       '_EPDFAnnot_UpdateAppearanceToRect',
@@ -6237,6 +6246,14 @@ var createPdfium = (() => {
       'EPDFPage_CreateAnnot',
       2,
     ));
+    var _EPDFAnnot_SetRotate = (Module['_EPDFAnnot_SetRotate'] = createExportWrapper(
+      'EPDFAnnot_SetRotate',
+      2,
+    ));
+    var _EPDFAnnot_GetRotate = (Module['_EPDFAnnot_GetRotate'] = createExportWrapper(
+      'EPDFAnnot_GetRotate',
+      2,
+    ));
     var _EPDFAnnot_GetReplyType = (Module['_EPDFAnnot_GetReplyType'] = createExportWrapper(
       'EPDFAnnot_GetReplyType',
       1,
@@ -6268,6 +6285,26 @@ var createPdfium = (() => {
     var _EPDFAnnot_Flatten = (Module['_EPDFAnnot_Flatten'] = createExportWrapper(
       'EPDFAnnot_Flatten',
       2,
+    ));
+    var _EPDFAnnot_SetExtendedRotation = (Module['_EPDFAnnot_SetExtendedRotation'] =
+      createExportWrapper('EPDFAnnot_SetExtendedRotation', 2));
+    var _EPDFAnnot_GetExtendedRotation = (Module['_EPDFAnnot_GetExtendedRotation'] =
+      createExportWrapper('EPDFAnnot_GetExtendedRotation', 2));
+    var _EPDFAnnot_SetUnrotatedRect = (Module['_EPDFAnnot_SetUnrotatedRect'] = createExportWrapper(
+      'EPDFAnnot_SetUnrotatedRect',
+      2,
+    ));
+    var _EPDFAnnot_GetUnrotatedRect = (Module['_EPDFAnnot_GetUnrotatedRect'] = createExportWrapper(
+      'EPDFAnnot_GetUnrotatedRect',
+      2,
+    ));
+    var _EPDFAnnot_SetAPMatrix = (Module['_EPDFAnnot_SetAPMatrix'] = createExportWrapper(
+      'EPDFAnnot_SetAPMatrix',
+      3,
+    ));
+    var _EPDFAnnot_GetAPMatrix = (Module['_EPDFAnnot_GetAPMatrix'] = createExportWrapper(
+      'EPDFAnnot_GetAPMatrix',
+      3,
     ));
     var _FPDFDoc_GetAttachmentCount = (Module['_FPDFDoc_GetAttachmentCount'] = createExportWrapper(
       'FPDFDoc_GetAttachmentCount',
@@ -7502,6 +7539,8 @@ var createPdfium = (() => {
       'EPDF_RenderAnnotBitmap',
       6,
     ));
+    var _EPDF_RenderAnnotBitmapUnrotated = (Module['_EPDF_RenderAnnotBitmapUnrotated'] =
+      createExportWrapper('EPDF_RenderAnnotBitmapUnrotated', 6));
     var _FPDF_ClosePage = (Module['_FPDF_ClosePage'] = createExportWrapper('FPDF_ClosePage', 1));
     var _FPDF_CloseDocument = (Module['_FPDF_CloseDocument'] = createExportWrapper(
       'FPDF_CloseDocument',

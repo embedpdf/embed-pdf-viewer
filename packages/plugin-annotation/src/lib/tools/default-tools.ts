@@ -121,6 +121,11 @@ export const defaultTools = [
       isDraggable: true,
       isResizable: true,
       lockAspectRatio: false,
+      lockGroupAspectRatio: (a) => {
+        // Lock aspect ratio when rotation is not near an orthogonal angle (within 6°)
+        const r = (((a.rotation ?? 0) % 90) + 90) % 90;
+        return r >= 6 && r <= 84;
+      },
     },
     defaults: {
       type: PdfAnnotationSubtype.INK,
@@ -144,6 +149,11 @@ export const defaultTools = [
       isDraggable: true,
       isResizable: true,
       lockAspectRatio: false,
+      lockGroupAspectRatio: (a) => {
+        // Lock aspect ratio when rotation is not near an orthogonal angle (within 6°)
+        const r = (((a.rotation ?? 0) % 90) + 90) % 90;
+        return r >= 6 && r <= 84;
+      },
     },
     defaults: {
       type: PdfAnnotationSubtype.CIRCLE,
@@ -168,6 +178,11 @@ export const defaultTools = [
       isDraggable: true,
       isResizable: true,
       lockAspectRatio: false,
+      lockGroupAspectRatio: (a) => {
+        // Lock aspect ratio when rotation is not near an orthogonal angle (within 6°)
+        const r = (((a.rotation ?? 0) % 90) + 90) % 90;
+        return r >= 6 && r <= 84;
+      },
     },
     defaults: {
       type: PdfAnnotationSubtype.SQUARE,
@@ -193,6 +208,11 @@ export const defaultTools = [
       isResizable: false, // Uses vertex editing when selected individually
       lockAspectRatio: false,
       isGroupResizable: true, // Scales proportionally in a group
+      lockGroupAspectRatio: (a) => {
+        // Lock aspect ratio when rotation is not near an orthogonal angle (within 6°)
+        const r = (((a.rotation ?? 0) % 90) + 90) % 90;
+        return r >= 6 && r <= 84;
+      },
     },
     defaults: {
       type: PdfAnnotationSubtype.LINE,
@@ -218,6 +238,11 @@ export const defaultTools = [
       isResizable: false, // Uses vertex editing when selected individually
       lockAspectRatio: false,
       isGroupResizable: true, // Scales proportionally in a group
+      lockGroupAspectRatio: (a) => {
+        // Lock aspect ratio when rotation is not near an orthogonal angle (within 6°)
+        const r = (((a.rotation ?? 0) % 90) + 90) % 90;
+        return r >= 6 && r <= 84;
+      },
     },
     defaults: {
       type: PdfAnnotationSubtype.LINE,
@@ -248,6 +273,11 @@ export const defaultTools = [
       isResizable: false, // Uses vertex editing when selected individually
       lockAspectRatio: false,
       isGroupResizable: true, // Scales proportionally in a group
+      lockGroupAspectRatio: (a) => {
+        // Lock aspect ratio when rotation is not near an orthogonal angle (within 6°)
+        const r = (((a.rotation ?? 0) % 90) + 90) % 90;
+        return r >= 6 && r <= 84;
+      },
     },
     defaults: {
       type: PdfAnnotationSubtype.POLYLINE,
@@ -268,6 +298,11 @@ export const defaultTools = [
       isResizable: false, // Uses vertex editing when selected individually
       lockAspectRatio: false,
       isGroupResizable: true, // Scales proportionally in a group
+      lockGroupAspectRatio: (a) => {
+        // Lock aspect ratio when rotation is not near an orthogonal angle (within 6°)
+        const r = (((a.rotation ?? 0) % 90) + 90) % 90;
+        return r >= 6 && r <= 84;
+      },
     },
     defaults: {
       type: PdfAnnotationSubtype.POLYGON,
@@ -289,6 +324,11 @@ export const defaultTools = [
       isDraggable: true,
       isResizable: true,
       lockAspectRatio: false,
+      lockGroupAspectRatio: (a) => {
+        // Lock aspect ratio when rotation is not near an orthogonal angle (within 6°)
+        const r = (((a.rotation ?? 0) % 90) + 90) % 90;
+        return r >= 6 && r <= 84;
+      },
     },
     defaults: {
       type: PdfAnnotationSubtype.FREETEXT,
@@ -307,6 +347,9 @@ export const defaultTools = [
       defaultSize: { width: 100, height: 20 },
       defaultContent: 'Insert text',
     },
+    behavior: {
+      insertUpright: true,
+    },
   },
   {
     id: 'stamp' as const,
@@ -318,10 +361,14 @@ export const defaultTools = [
       isDraggable: true,
       isResizable: true,
       lockAspectRatio: true,
+      lockGroupAspectRatio: true,
     },
     defaults: {
       type: PdfAnnotationSubtype.STAMP,
       // No imageSrc by default, which tells the UI to open a file picker
+    },
+    behavior: {
+      insertUpright: true,
     },
   },
 ] satisfies readonly AnnotationTool[];

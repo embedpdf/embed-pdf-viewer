@@ -19,5 +19,11 @@ export type MouseEvent<T = Element> = JSX.TargetedMouseEvent<T extends EventTarg
 export type PointerEvent<T = Element> = JSX.TargetedPointerEvent<T extends EventTarget ? T : never>;
 export type ChangeEvent<T = Element> = JSX.TargetedInputEvent<T extends EventTarget ? T : never>;
 export type TouchEvent<T = Element> = JSX.TargetedTouchEvent<T extends EventTarget ? T : never>;
+export type KeyboardEvent<T = Element> = JSX.TargetedKeyboardEvent<
+  T extends EventTarget ? T : never
+>;
+export type FormEvent<T = Element> = JSX.TargetedEvent<T extends EventTarget ? T : never>;
+
+export { createPortal } from 'preact/compat';
 
 export const suppressContentEditableWarningProps = {};
