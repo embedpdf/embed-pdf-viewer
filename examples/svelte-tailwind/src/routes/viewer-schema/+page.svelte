@@ -79,6 +79,7 @@
   // Initialize the engine
   const pdfEngine = usePdfiumEngine({
     logger,
+    wasmUrl: 'http://localhost:3020/pdfium.wasm',
   });
 
   // UI Components registry

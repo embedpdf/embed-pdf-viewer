@@ -116,6 +116,7 @@ const containerRef = ref<HTMLDivElement | null>(null);
 
 const { engine, isLoading, error } = usePdfiumEngine({
   logger,
+  wasmUrl: 'http://localhost:3020/pdfium.wasm',
 });
 
 // Memoize UIProvider props to prevent unnecessary remounts

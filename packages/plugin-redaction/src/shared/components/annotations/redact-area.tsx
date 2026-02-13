@@ -3,7 +3,7 @@ import {
   PdfRedactAnnoObject,
   PdfStandardFont,
   PdfTextAlignment,
-  standardFontCss,
+  standardFontCssProperties,
   textAlignmentToCss,
 } from '@embedpdf/models';
 import { TrackedAnnotation } from '@embedpdf/plugin-annotation';
@@ -86,7 +86,7 @@ export function RedactArea({ annotation, isSelected, scale, onClick, style }: Re
           style={{
             color: textColor,
             fontSize: fontSize * scale,
-            fontFamily: standardFontCss(fontFamily),
+            ...standardFontCssProperties(fontFamily),
             textAlign: textAlignmentToCss(textAlign),
             whiteSpace: overlayTextRepeat ? 'normal' : 'nowrap',
             overflow: 'hidden',

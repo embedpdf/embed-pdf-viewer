@@ -10,7 +10,7 @@ import {
 import {
   PdfFreeTextAnnoObject,
   PdfVerticalAlignment,
-  standardFontCss,
+  standardFontCssProperties,
   textAlignmentToCss,
 } from '@embedpdf/models';
 import { useAnnotationCapability } from '../..';
@@ -103,7 +103,7 @@ export function FreeText({
         style={{
           color: annotation.object.fontColor,
           fontSize: adjustedFontPx,
-          fontFamily: standardFontCss(annotation.object.fontFamily),
+          ...standardFontCssProperties(annotation.object.fontFamily),
           textAlign: textAlignmentToCss(annotation.object.textAlign),
           flexDirection: 'column',
           justifyContent:

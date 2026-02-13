@@ -4,7 +4,7 @@ import {
   PdfStandardFont,
   PdfTextAlignment,
   Rect,
-  standardFontCss,
+  standardFontCssProperties,
   textAlignmentToCss,
 } from '@embedpdf/models';
 import { TrackedAnnotation } from '@embedpdf/plugin-annotation';
@@ -104,7 +104,7 @@ export function RedactHighlight({
               style={{
                 color: textColor,
                 fontSize: Math.min(fontSize * scale, b.size.height * scale * 0.8),
-                fontFamily: standardFontCss(fontFamily),
+                ...standardFontCssProperties(fontFamily),
                 textAlign: textAlignmentToCss(textAlign),
                 whiteSpace: overlayTextRepeat ? 'normal' : 'nowrap',
                 overflow: 'hidden',
