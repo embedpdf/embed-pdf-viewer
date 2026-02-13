@@ -4647,11 +4647,13 @@ export class PdfiumNative implements IPdfiumExecutor {
     fontSize: number,
     color: WebColor,
   ): boolean {
+    // Fallback unknown / non-standard fonts to Helvetica so the write never fails.
+    const resolvedFont = font === PdfStandardFont.Unknown ? PdfStandardFont.Helvetica : font;
     const { red, green, blue } = webColorToPdfColor(color); // 0-255 ints
 
     return !!this.pdfiumModule.EPDFAnnot_SetDefaultAppearance(
       annotationPtr,
-      font,
+      resolvedFont,
       fontSize,
       red & 0xff,
       green & 0xff,

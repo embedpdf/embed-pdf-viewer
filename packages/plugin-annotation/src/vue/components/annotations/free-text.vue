@@ -27,7 +27,7 @@ import { ref, watch, computed, onMounted } from 'vue';
 import {
   PdfFreeTextAnnoObject,
   PdfVerticalAlignment,
-  standardFontCss,
+  standardFontCssProperties,
   textAlignmentToCss,
 } from '@embedpdf/models';
 import { TrackedAnnotation } from '@embedpdf/plugin-annotation';
@@ -95,7 +95,7 @@ const editorStyle = computed(() => {
   return {
     color: anno.fontColor,
     fontSize: `${adjustedFontPx}px`,
-    fontFamily: standardFontCss(anno.fontFamily),
+    ...standardFontCssProperties(anno.fontFamily),
     textAlign: textAlignmentToCss(anno.textAlign),
     flexDirection: 'column' as 'column',
     justifyContent:

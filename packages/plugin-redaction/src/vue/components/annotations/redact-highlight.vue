@@ -25,7 +25,7 @@ import type { PdfRedactAnnoObject, Rect } from '@embedpdf/models';
 import {
   PdfStandardFont,
   PdfTextAlignment,
-  standardFontCss,
+  standardFontCssProperties,
   textAlignmentToCss,
 } from '@embedpdf/models';
 
@@ -90,7 +90,7 @@ const getSegmentStyle = (b: Rect): CSSProperties => ({
 const getTextStyle = (b: Rect): CSSProperties => ({
   color: textColor.value,
   fontSize: `${Math.min(fontSize.value * props.scale, b.size.height * props.scale * 0.8)}px`,
-  fontFamily: standardFontCss(fontFamily.value),
+  ...standardFontCssProperties(fontFamily.value),
   textAlign: textAlignmentToCss(textAlign.value),
   whiteSpace: overlayTextRepeat.value ? 'normal' : 'nowrap',
   overflow: 'hidden',
