@@ -8307,7 +8307,7 @@ export class PdfiumNative implements IPdfiumExecutor {
       right: 0,
       bottom: 0,
     };
-    if (this.pdfiumModule.FPDFAnnot_GetRect(annotationPtr, pageRectPtr)) {
+    if (this.pdfiumModule.EPDFAnnot_GetRect(annotationPtr, pageRectPtr)) {
       pageRect.left = this.pdfiumModule.pdfium.getValue(pageRectPtr, 'float');
       pageRect.top = this.pdfiumModule.pdfium.getValue(pageRectPtr + 4, 'float');
       pageRect.right = this.pdfiumModule.pdfium.getValue(pageRectPtr + 8, 'float');

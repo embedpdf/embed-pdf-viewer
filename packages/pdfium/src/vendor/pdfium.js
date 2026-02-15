@@ -70,6 +70,7 @@ var createPdfium = (() => {
       '_EPDFAnnot_GetOpacity',
       '_EPDFAnnot_GetOverlayText',
       '_EPDFAnnot_GetOverlayTextRepeat',
+      '_EPDFAnnot_GetRect',
       '_EPDFAnnot_GetRectangleDifferences',
       '_EPDFAnnot_GetReplyType',
       '_EPDFAnnot_GetRichContent',
@@ -6296,6 +6297,10 @@ var createPdfium = (() => {
     ));
     var _EPDFAnnot_GetUnrotatedRect = (Module['_EPDFAnnot_GetUnrotatedRect'] = createExportWrapper(
       'EPDFAnnot_GetUnrotatedRect',
+      2,
+    ));
+    var _EPDFAnnot_GetRect = (Module['_EPDFAnnot_GetRect'] = createExportWrapper(
+      'EPDFAnnot_GetRect',
       2,
     ));
     var _EPDFAnnot_SetAPMatrix = (Module['_EPDFAnnot_SetAPMatrix'] = createExportWrapper(

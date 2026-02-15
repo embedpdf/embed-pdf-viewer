@@ -61,6 +61,7 @@ export const functions = {
   EPDFAnnot_GetOpacity: [['number', 'number'] as const, 'boolean'] as const,
   EPDFAnnot_GetOverlayText: [['number', 'number', 'number'] as const, 'number'] as const,
   EPDFAnnot_GetOverlayTextRepeat: [['number'] as const, 'boolean'] as const,
+  EPDFAnnot_GetRect: [['number', 'number'] as const, 'boolean'] as const,
   EPDFAnnot_GetRectangleDifferences: [
     ['number', 'number', 'number', 'number', 'number'] as const,
     'boolean',
