@@ -976,6 +976,9 @@ export const viewerUISchema: UISchema = {
         {
           type: 'divider',
           id: 'divider-10',
+          visibilityDependsOn: {
+            itemIds: ['document:open', 'document:close'],
+          },
         },
         {
           type: 'command',
