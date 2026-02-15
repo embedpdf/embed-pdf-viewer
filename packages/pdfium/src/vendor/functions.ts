@@ -61,6 +61,7 @@ export const functions = {
   EPDFAnnot_GetOpacity: [['number', 'number'] as const, 'boolean'] as const,
   EPDFAnnot_GetOverlayText: [['number', 'number', 'number'] as const, 'number'] as const,
   EPDFAnnot_GetOverlayTextRepeat: [['number'] as const, 'boolean'] as const,
+  EPDFAnnot_GetRect: [['number', 'number'] as const, 'boolean'] as const,
   EPDFAnnot_GetRectangleDifferences: [
     ['number', 'number', 'number', 'number', 'number'] as const,
     'boolean',
@@ -532,8 +533,9 @@ export const functions = {
   FPDFBookmark_GetFirstChild: [['number', 'number'] as const, 'number'] as const,
   FPDFBookmark_GetNextSibling: [['number', 'number'] as const, 'number'] as const,
   FPDFBookmark_GetTitle: [['number', 'number', 'number'] as const, 'number'] as const,
+  FPDFCatalog_GetLanguage: [['number', 'number', 'number'] as const, 'number'] as const,
   FPDFCatalog_IsTagged: [['number'] as const, 'boolean'] as const,
-  FPDFCatalog_SetLanguage: [['number', 'string'] as const, 'boolean'] as const,
+  FPDFCatalog_SetLanguage: [['number', 'number'] as const, 'boolean'] as const,
   FPDFClipPath_CountPaths: [['number'] as const, 'number'] as const,
   FPDFClipPath_CountPathSegments: [['number', 'number'] as const, 'number'] as const,
   FPDFClipPath_GetPathSegment: [['number', 'number', 'number'] as const, 'number'] as const,
@@ -751,6 +753,7 @@ export const functions = {
     ['number', 'string', 'number', 'number', 'number'] as const,
     'boolean',
   ] as const,
+  FPDFPageObjMark_GetParamFloatValue: [['number', 'string', 'number'] as const, 'boolean'] as const,
   FPDFPageObjMark_GetParamIntValue: [['number', 'string', 'number'] as const, 'boolean'] as const,
   FPDFPageObjMark_GetParamKey: [
     ['number', 'number', 'number', 'number', 'number'] as const,
@@ -764,6 +767,10 @@ export const functions = {
   FPDFPageObjMark_RemoveParam: [['number', 'number', 'string'] as const, 'boolean'] as const,
   FPDFPageObjMark_SetBlobParam: [
     ['number', 'number', 'number', 'string', 'number', 'number'] as const,
+    'boolean',
+  ] as const,
+  FPDFPageObjMark_SetFloatParam: [
+    ['number', 'number', 'number', 'string', 'number'] as const,
     'boolean',
   ] as const,
   FPDFPageObjMark_SetIntParam: [

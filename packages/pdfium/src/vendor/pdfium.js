@@ -70,6 +70,7 @@ var createPdfium = (() => {
       '_EPDFAnnot_GetOpacity',
       '_EPDFAnnot_GetOverlayText',
       '_EPDFAnnot_GetOverlayTextRepeat',
+      '_EPDFAnnot_GetRect',
       '_EPDFAnnot_GetRectangleDifferences',
       '_EPDFAnnot_GetReplyType',
       '_EPDFAnnot_GetRichContent',
@@ -365,6 +366,7 @@ var createPdfium = (() => {
       '_FPDFBookmark_GetFirstChild',
       '_FPDFBookmark_GetNextSibling',
       '_FPDFBookmark_GetTitle',
+      '_FPDFCatalog_GetLanguage',
       '_FPDFCatalog_IsTagged',
       '_FPDFCatalog_SetLanguage',
       '_FPDFClipPath_CountPaths',
@@ -509,12 +511,14 @@ var createPdfium = (() => {
       '_FPDFPageObjMark_CountParams',
       '_FPDFPageObjMark_GetName',
       '_FPDFPageObjMark_GetParamBlobValue',
+      '_FPDFPageObjMark_GetParamFloatValue',
       '_FPDFPageObjMark_GetParamIntValue',
       '_FPDFPageObjMark_GetParamKey',
       '_FPDFPageObjMark_GetParamStringValue',
       '_FPDFPageObjMark_GetParamValueType',
       '_FPDFPageObjMark_RemoveParam',
       '_FPDFPageObjMark_SetBlobParam',
+      '_FPDFPageObjMark_SetFloatParam',
       '_FPDFPageObjMark_SetIntParam',
       '_FPDFPageObjMark_SetStringParam',
       '_FPDFPath_BezierTo',
@@ -6298,6 +6302,10 @@ var createPdfium = (() => {
       'EPDFAnnot_GetUnrotatedRect',
       2,
     ));
+    var _EPDFAnnot_GetRect = (Module['_EPDFAnnot_GetRect'] = createExportWrapper(
+      'EPDFAnnot_GetRect',
+      2,
+    ));
     var _EPDFAnnot_SetAPMatrix = (Module['_EPDFAnnot_SetAPMatrix'] = createExportWrapper(
       'EPDFAnnot_SetAPMatrix',
       3,
@@ -6361,6 +6369,10 @@ var createPdfium = (() => {
     var _FPDFCatalog_IsTagged = (Module['_FPDFCatalog_IsTagged'] = createExportWrapper(
       'FPDFCatalog_IsTagged',
       1,
+    ));
+    var _FPDFCatalog_GetLanguage = (Module['_FPDFCatalog_GetLanguage'] = createExportWrapper(
+      'FPDFCatalog_GetLanguage',
+      3,
     ));
     var _FPDFCatalog_SetLanguage = (Module['_FPDFCatalog_SetLanguage'] = createExportWrapper(
       'FPDFCatalog_SetLanguage',
@@ -6635,6 +6647,8 @@ var createPdfium = (() => {
       createExportWrapper('FPDFPageObjMark_GetParamValueType', 2));
     var _FPDFPageObjMark_GetParamIntValue = (Module['_FPDFPageObjMark_GetParamIntValue'] =
       createExportWrapper('FPDFPageObjMark_GetParamIntValue', 3));
+    var _FPDFPageObjMark_GetParamFloatValue = (Module['_FPDFPageObjMark_GetParamFloatValue'] =
+      createExportWrapper('FPDFPageObjMark_GetParamFloatValue', 3));
     var _FPDFPageObjMark_GetParamStringValue = (Module['_FPDFPageObjMark_GetParamStringValue'] =
       createExportWrapper('FPDFPageObjMark_GetParamStringValue', 5));
     var _FPDFPageObjMark_GetParamBlobValue = (Module['_FPDFPageObjMark_GetParamBlobValue'] =
@@ -6643,6 +6657,8 @@ var createPdfium = (() => {
       createExportWrapper('FPDFPageObj_HasTransparency', 1));
     var _FPDFPageObjMark_SetIntParam = (Module['_FPDFPageObjMark_SetIntParam'] =
       createExportWrapper('FPDFPageObjMark_SetIntParam', 5));
+    var _FPDFPageObjMark_SetFloatParam = (Module['_FPDFPageObjMark_SetFloatParam'] =
+      createExportWrapper('FPDFPageObjMark_SetFloatParam', 5));
     var _FPDFPageObjMark_SetStringParam = (Module['_FPDFPageObjMark_SetStringParam'] =
       createExportWrapper('FPDFPageObjMark_SetStringParam', 5));
     var _FPDFPageObjMark_SetBlobParam = (Module['_FPDFPageObjMark_SetBlobParam'] =
@@ -7676,14 +7692,14 @@ var createPdfium = (() => {
       (__emscripten_stack_alloc = wasmExports['_emscripten_stack_alloc'])(a0);
     var _emscripten_stack_get_current = () =>
       (_emscripten_stack_get_current = wasmExports['emscripten_stack_get_current'])();
-    var dynCall_ji = (Module['dynCall_ji'] = createExportWrapper('dynCall_ji', 2));
-    var dynCall_jij = (Module['dynCall_jij'] = createExportWrapper('dynCall_jij', 4));
-    var dynCall_iiij = (Module['dynCall_iiij'] = createExportWrapper('dynCall_iiij', 5));
-    var dynCall_iij = (Module['dynCall_iij'] = createExportWrapper('dynCall_iij', 4));
     var dynCall_j = (Module['dynCall_j'] = createExportWrapper('dynCall_j', 1));
+    var dynCall_ji = (Module['dynCall_ji'] = createExportWrapper('dynCall_ji', 2));
+    var dynCall_iiij = (Module['dynCall_iiij'] = createExportWrapper('dynCall_iiij', 5));
     var dynCall_jji = (Module['dynCall_jji'] = createExportWrapper('dynCall_jji', 4));
     var dynCall_iji = (Module['dynCall_iji'] = createExportWrapper('dynCall_iji', 4));
     var dynCall_viijii = (Module['dynCall_viijii'] = createExportWrapper('dynCall_viijii', 7));
+    var dynCall_jij = (Module['dynCall_jij'] = createExportWrapper('dynCall_jij', 4));
+    var dynCall_iij = (Module['dynCall_iij'] = createExportWrapper('dynCall_iij', 4));
     var dynCall_iiji = (Module['dynCall_iiji'] = createExportWrapper('dynCall_iiji', 5));
     var dynCall_jiji = (Module['dynCall_jiji'] = createExportWrapper('dynCall_jiji', 5));
     var dynCall_iiiiij = (Module['dynCall_iiiiij'] = createExportWrapper('dynCall_iiiiij', 7));
