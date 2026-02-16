@@ -3099,6 +3099,7 @@ export interface PdfEngine<T = Blob> {
     doc: PdfDocumentObject,
     page: PdfPageObject,
     annotation: PdfAnnotationObject,
+    options?: { regenerateAppearance?: boolean },
   ) => PdfTask<boolean>;
   /**
    * Remove a annotation on specified page
@@ -3443,6 +3444,7 @@ export interface IPdfiumExecutor {
     doc: PdfDocumentObject,
     page: PdfPageObject,
     annotation: PdfAnnotationObject,
+    options?: { regenerateAppearance?: boolean },
   ): PdfTask<boolean>;
   removePageAnnotation(
     doc: PdfDocumentObject,

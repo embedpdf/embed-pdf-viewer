@@ -1098,6 +1098,7 @@ export class PdfiumNative implements IPdfiumExecutor {
     doc: PdfDocumentObject,
     page: PdfPageObject,
     annotation: PdfAnnotationObject,
+    options?: { regenerateAppearance?: boolean },
   ): PdfTask<boolean> {
     this.logger.debug(LOG_SOURCE, LOG_CATEGORY, 'updatePageAnnotation', doc, page, annotation);
     this.logger.perf(
@@ -1291,7 +1292,7 @@ export class PdfiumNative implements IPdfiumExecutor {
     }
 
     /* 4 ── regenerate appearance if payload was changed ───────────────────── */
-    if (ok) {
+    if (ok && options?.regenerateAppearance !== false) {
       if (annotation.blendMode !== undefined) {
         this.pdfiumModule.EPDFAnnot_GenerateAppearanceWithBlend(annotPtr, annotation.blendMode);
       } else {

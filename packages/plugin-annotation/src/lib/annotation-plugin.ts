@@ -60,6 +60,7 @@ import {
   addColorPreset,
   createAnnotation,
   patchAnnotation,
+  moveAnnotation,
   deleteAnnotation,
   commitPendingChanges,
   purgeAnnotation,
@@ -387,6 +388,8 @@ export class AnnotationPlugin extends BasePlugin<
       createAnnotation: (pageIndex, anno, ctx) => this.createAnnotation(pageIndex, anno, ctx),
       updateAnnotation: (pageIndex, id, patch) => this.updateAnnotation(pageIndex, id, patch),
       updateAnnotations: (patches) => this.updateAnnotationsMethod(patches),
+      moveAnnotation: (pageIndex, id, position, mode, documentId) =>
+        this.moveAnnotationMethod(pageIndex, id, position, mode, documentId),
       deleteAnnotation: (pageIndex, id) => this.deleteAnnotation(pageIndex, id),
       deleteAnnotations: (annotations, documentId) =>
         this.deleteAnnotationsMethod(annotations, documentId),
@@ -458,6 +461,8 @@ export class AnnotationPlugin extends BasePlugin<
       updateAnnotation: (pageIndex, id, patch) =>
         this.updateAnnotation(pageIndex, id, patch, documentId),
       updateAnnotations: (patches) => this.updateAnnotationsMethod(patches, documentId),
+      moveAnnotation: (pageIndex, id, position, mode) =>
+        this.moveAnnotationMethod(pageIndex, id, position, mode, documentId),
       deleteAnnotation: (pageIndex, id) => this.deleteAnnotation(pageIndex, id, documentId),
       deleteAnnotations: (annotations) => this.deleteAnnotationsMethod(annotations, documentId),
       purgeAnnotation: (pageIndex, id) => this.purgeAnnotationMethod(pageIndex, id, documentId),
@@ -1417,9 +1422,9 @@ export class AnnotationPlugin extends BasePlugin<
         patches.push({ pageIndex: ta.object.pageIndex, id, patch });
       }
 
-      // Apply all patches in one batch
+      // Apply all patches in one batch (use move to preserve appearance stream)
       if (patches.length > 0) {
-        this.updateAnnotationsMethod(patches, documentId);
+        this.moveAnnotationsMethod(patches, documentId);
       }
     }
 
@@ -2192,6 +2197,116 @@ export class AnnotationPlugin extends BasePlugin<
     historyScope.register(command, this.ANNOTATION_HISTORY_TOPIC);
   }
 
+  private moveAnnotationsMethod(
+    patches: Array<{ pageIndex: number; id: string; patch: Partial<PdfAnnotationObject> }>,
+    documentId?: string,
+  ) {
+    const docId = documentId ?? this.getActiveDocumentId();
+
+    if (!this.checkPermission(docId, PdfPermissionFlag.ModifyAnnotations)) {
+      this.logger.debug(
+        'AnnotationPlugin',
+        'MoveAnnotations',
+        `Cannot move annotations: document ${docId} lacks ModifyAnnotations permission`,
+      );
+      return;
+    }
+
+    const docState = this.getDocumentState(docId);
+
+    const moveData = patches
+      .map(({ pageIndex, id, patch }) => {
+        const originalObject = docState.byUid[id]?.object;
+        if (!originalObject) return null;
+        return { pageIndex, id, patch, originalObject };
+      })
+      .filter((p): p is NonNullable<typeof p> => p !== null);
+
+    if (moveData.length === 0) return;
+
+    const execute = () => {
+      for (const { pageIndex, id, patch, originalObject } of moveData) {
+        this.dispatch(moveAnnotation(docId, pageIndex, id, patch));
+        this.events$.emit({
+          type: 'update',
+          documentId: docId,
+          annotation: originalObject,
+          pageIndex,
+          patch,
+          committed: false,
+        });
+      }
+    };
+
+    if (!this.history) {
+      execute();
+      if (this.config.autoCommit !== false) {
+        this.commit(docId);
+      }
+      return;
+    }
+
+    // Build undo data: reverse patches restore original positional values
+    const undoData = moveData.map(({ pageIndex, id, patch, originalObject }) => ({
+      pageIndex,
+      id,
+      originalPatch: Object.fromEntries(
+        Object.keys(patch).map((key) => [key, originalObject[key as keyof PdfAnnotationObject]]),
+      ),
+      originalObject,
+    }));
+
+    const command: Command<AnnotationCommandMetadata> = {
+      execute,
+      undo: () => {
+        // Undo of a move is also a move (AP preserved in both directions)
+        for (const { pageIndex, id, originalPatch, originalObject } of undoData) {
+          this.dispatch(moveAnnotation(docId, pageIndex, id, originalPatch));
+          this.events$.emit({
+            type: 'update',
+            documentId: docId,
+            annotation: originalObject,
+            pageIndex,
+            patch: originalPatch,
+            committed: false,
+          });
+        }
+      },
+      metadata: { annotationIds: moveData.map((p) => p.id) },
+    };
+
+    const historyScope = this.history.forDocument(docId);
+    historyScope.register(command, this.ANNOTATION_HISTORY_TOPIC);
+  }
+
+  private moveAnnotationMethod(
+    pageIndex: number,
+    annotationId: string,
+    position: Position,
+    mode: 'delta' | 'absolute' = 'delta',
+    documentId?: string,
+  ): void {
+    const docId = documentId ?? this.getActiveDocumentId();
+    const ta = this.getAnnotationById(annotationId, docId);
+    if (!ta) return;
+
+    const currentRect = ta.object.rect;
+    const newRect: Rect = {
+      ...currentRect,
+      origin:
+        mode === 'absolute'
+          ? { x: position.x, y: position.y }
+          : { x: currentRect.origin.x + position.x, y: currentRect.origin.y + position.y },
+    };
+
+    const patch = this.transformAnnotation(ta.object, {
+      type: 'move',
+      changes: { rect: newRect },
+    });
+
+    this.moveAnnotationsMethod([{ pageIndex, id: annotationId, patch }], docId);
+  }
+
   public getActiveTool(documentId?: string): AnnotationTool | null {
     const docState = this.getDocumentState(documentId);
     if (!docState.activeToolId) return null;
@@ -2275,6 +2390,9 @@ export class AnnotationPlugin extends BasePlugin<
             ctx: contexts?.get(ta.object.id) as AnnotationCreateContext<PdfAnnotationObject>,
           });
           break;
+        case 'moved':
+          batch.updates.push({ uid, ta, moved: true });
+          break;
         case 'dirty':
           batch.updates.push({ uid, ta });
           break;
@@ -2317,12 +2435,14 @@ export class AnnotationPlugin extends BasePlugin<
       pendingOps.push({ type: 'create', task: createTask, ta, uid, ctx });
     }
 
-    // Process updates
-    for (const { uid, ta } of batch.updates) {
+    // Process updates (moved entries skip AP regeneration to preserve appearance stream)
+    for (const { uid, ta, moved } of batch.updates) {
       const page = doc.pages.find((p) => p.index === ta.object.pageIndex);
       if (!page) continue;
 
-      const updateTask = this.engine.updatePageAnnotation!(doc, page, ta.object);
+      const updateTask = moved
+        ? this.engine.updatePageAnnotation!(doc, page, ta.object, { regenerateAppearance: false })
+        : this.engine.updatePageAnnotation!(doc, page, ta.object);
       pendingOps.push({ type: 'update', task: updateTask, ta, uid });
     }
 

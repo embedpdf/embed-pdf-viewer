@@ -53,7 +53,7 @@ export type AnnotationToolsChangeEvent = {
   tools: AnnotationTool[];
 };
 
-export type CommitState = 'new' | 'dirty' | 'deleted' | 'synced' | 'ignored';
+export type CommitState = 'new' | 'dirty' | 'moved' | 'deleted' | 'synced' | 'ignored';
 
 export interface TrackedAnnotation<T extends PdfAnnotationObject = PdfAnnotationObject> {
   commitState: CommitState;
@@ -75,6 +75,8 @@ export interface CommitBatch {
   updates: Array<{
     uid: string;
     ta: TrackedAnnotation;
+    /** When true, only positional data changed -- skip appearance regeneration */
+    moved?: boolean;
   }>;
   /** Annotations that need to be deleted from the PDF */
   deletions: Array<{
@@ -246,6 +248,13 @@ export interface AnnotationScope {
   updateAnnotations(
     patches: Array<{ pageIndex: number; id: string; patch: Partial<PdfAnnotationObject> }>,
   ): void;
+  /** Move an annotation by delta or to an absolute position (preserves appearance stream) */
+  moveAnnotation(
+    pageIndex: number,
+    annotationId: string,
+    position: Position,
+    mode?: 'delta' | 'absolute',
+  ): void;
   deleteAnnotation(pageIndex: number, annotationId: string): void;
   /** Delete multiple annotations in batch */
   deleteAnnotations(annotations: Array<{ pageIndex: number; id: string }>): void;
@@ -318,6 +327,14 @@ export interface AnnotationCapability {
   /** Batch update multiple annotations at once */
   updateAnnotations: (
     patches: Array<{ pageIndex: number; id: string; patch: Partial<PdfAnnotationObject> }>,
+  ) => void;
+  /** Move an annotation by delta or to an absolute position (preserves appearance stream) */
+  moveAnnotation: (
+    pageIndex: number,
+    annotationId: string,
+    position: Position,
+    mode?: 'delta' | 'absolute',
+    documentId?: string,
   ) => void;
   deleteAnnotation: (pageIndex: number, annotationId: string) => void;
   /** Delete multiple annotations in batch */

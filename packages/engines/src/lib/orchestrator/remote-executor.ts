@@ -373,8 +373,9 @@ export class RemoteExecutor implements IPdfiumExecutor {
     doc: PdfDocumentObject,
     page: PdfPageObject,
     annotation: PdfAnnotationObject,
+    options?: { regenerateAppearance?: boolean },
   ): PdfTask<boolean> {
-    return this.send<boolean>('updatePageAnnotation', [doc, page, annotation]);
+    return this.send<boolean>('updatePageAnnotation', [doc, page, annotation, options]);
   }
 
   removePageAnnotation(

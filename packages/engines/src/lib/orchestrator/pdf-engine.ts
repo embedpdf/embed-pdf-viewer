@@ -439,10 +439,11 @@ export class PdfEngine<T = Blob> implements IPdfEngine<T> {
     doc: PdfDocumentObject,
     page: PdfPageObject,
     annotation: PdfAnnotationObject,
+    options?: { regenerateAppearance?: boolean },
   ): PdfTask<boolean> {
     return this.workerQueue.enqueue(
       {
-        execute: () => this.executor.updatePageAnnotation(doc, page, annotation),
+        execute: () => this.executor.updatePageAnnotation(doc, page, annotation, options),
         meta: { docId: doc.id, pageIndex: page.index, operation: 'updatePageAnnotation' },
       },
       { priority: Priority.MEDIUM },
