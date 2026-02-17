@@ -30,6 +30,8 @@ export class RenderPlugin extends BasePlugin<RenderPluginConfig, RenderCapabilit
       // Active document operations
       renderPage: (options: RenderPageOptions) => this.renderPage(options),
       renderPageRect: (options: RenderPageRectOptions) => this.renderPageRect(options),
+      renderPageRaw: (options: RenderPageOptions) => this.renderPageRaw(options),
+      renderPageRectRaw: (options: RenderPageRectOptions) => this.renderPageRectRaw(options),
 
       // Document-scoped operations
       forDocument: (documentId: string) => this.createRenderScope(documentId),
@@ -44,6 +46,9 @@ export class RenderPlugin extends BasePlugin<RenderPluginConfig, RenderCapabilit
     return {
       renderPage: (options: RenderPageOptions) => this.renderPage(options, documentId),
       renderPageRect: (options: RenderPageRectOptions) => this.renderPageRect(options, documentId),
+      renderPageRaw: (options: RenderPageOptions) => this.renderPageRaw(options, documentId),
+      renderPageRectRaw: (options: RenderPageRectOptions) =>
+        this.renderPageRectRaw(options, documentId),
     };
   }
 
@@ -97,6 +102,57 @@ export class RenderPlugin extends BasePlugin<RenderPluginConfig, RenderCapabilit
     };
 
     return this.engine.renderPageRect(coreDoc.document, page, rect, mergedOptions);
+  }
+
+  // ─────────────────────────────────────────────────────────
+  // Raw Rendering (returns ImageDataLike, skips encoding)
+  // ─────────────────────────────────────────────────────────
+
+  private renderPageRaw({ pageIndex, options }: RenderPageOptions, documentId?: string) {
+    const id = documentId ?? this.getActiveDocumentId();
+    const coreDoc = this.coreState.core.documents[id];
+
+    if (!coreDoc?.document) {
+      throw new Error(`Document ${id} not loaded`);
+    }
+
+    const page = coreDoc.document.pages.find((p) => p.index === pageIndex);
+    if (!page) {
+      throw new Error(`Page ${pageIndex} not found in document ${id}`);
+    }
+
+    const mergedOptions = {
+      ...(options ?? {}),
+      withForms: options?.withForms ?? this.config.withForms ?? false,
+      withAnnotations: options?.withAnnotations ?? this.config.withAnnotations ?? false,
+    };
+
+    return this.engine.renderPageRaw(coreDoc.document, page, mergedOptions);
+  }
+
+  private renderPageRectRaw(
+    { pageIndex, rect, options }: RenderPageRectOptions,
+    documentId?: string,
+  ) {
+    const id = documentId ?? this.getActiveDocumentId();
+    const coreDoc = this.coreState.core.documents[id];
+
+    if (!coreDoc?.document) {
+      throw new Error(`Document ${id} not loaded`);
+    }
+
+    const page = coreDoc.document.pages.find((p) => p.index === pageIndex);
+    if (!page) {
+      throw new Error(`Page ${pageIndex} not found in document ${id}`);
+    }
+
+    const mergedOptions = {
+      ...(options ?? {}),
+      withForms: options?.withForms ?? this.config.withForms ?? false,
+      withAnnotations: options?.withAnnotations ?? this.config.withAnnotations ?? false,
+    };
+
+    return this.engine.renderPageRectRaw(coreDoc.document, page, rect, mergedOptions);
   }
 
   // ─────────────────────────────────────────────────────────

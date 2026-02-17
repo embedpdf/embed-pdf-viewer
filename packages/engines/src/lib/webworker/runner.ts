@@ -288,6 +288,12 @@ export class EngineRunner {
       case 'renderPageRect':
         task = engine.renderPageRect!(...args);
         break;
+      case 'renderPageRaw':
+        task = engine.renderPageRaw!(...args);
+        break;
+      case 'renderPageRectRaw':
+        task = engine.renderPageRectRaw!(...args);
+        break;
       case 'renderPageAnnotation':
         task = engine.renderPageAnnotation!(...args);
         break;

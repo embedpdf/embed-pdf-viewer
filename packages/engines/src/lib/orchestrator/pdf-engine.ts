@@ -308,6 +308,37 @@ export class PdfEngine<T = Blob> implements IPdfEngine<T> {
     );
   }
 
+  // ========== Raw Rendering (no encoding) ==========
+
+  renderPageRaw(
+    doc: PdfDocumentObject,
+    page: PdfPageObject,
+    options?: PdfRenderPageOptions,
+  ): PdfTask<ImageDataLike> {
+    return this.workerQueue.enqueue(
+      {
+        execute: () => this.executor.renderPageRaw(doc, page, options),
+        meta: { docId: doc.id, pageIndex: page.index, operation: 'renderPageRaw' },
+      },
+      { priority: Priority.HIGH },
+    );
+  }
+
+  renderPageRectRaw(
+    doc: PdfDocumentObject,
+    page: PdfPageObject,
+    rect: Rect,
+    options?: PdfRenderPageOptions,
+  ): PdfTask<ImageDataLike> {
+    return this.workerQueue.enqueue(
+      {
+        execute: () => this.executor.renderPageRect(doc, page, rect, options),
+        meta: { docId: doc.id, pageIndex: page.index, operation: 'renderPageRectRaw' },
+      },
+      { priority: Priority.HIGH },
+    );
+  }
+
   renderThumbnail(
     doc: PdfDocumentObject,
     page: PdfPageObject,

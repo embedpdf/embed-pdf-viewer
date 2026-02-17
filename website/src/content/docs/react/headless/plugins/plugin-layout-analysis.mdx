@@ -1,0 +1,209 @@
+---
+title: Layout Analysis Plugin
+description: AI-powered document layout analysis running locally in the browser, detecting text blocks, tables, images, headers, and more.
+searchable: true
+---
+
+# Layout Analysis Plugin
+
+The Layout Analysis Plugin brings AI-powered document understanding directly into your PDF viewer. It uses ONNX Runtime to run deep learning models **locally in the browser**, detecting layout elements like text blocks, tables, images, headings, formulas, and more.
+
+Because all inference happens on-device, **no data ever leaves the browser**. This makes it ideal for applications that handle sensitive or confidential documents. Models are loaded on demand from HuggingFace CDN (or a custom server) and cached locally using the browser's Cache API.
+
+The plugin optionally supports **table structure analysis**, which identifies rows, columns, and cells within detected tables. All results are mapped to PDF page coordinates for precise overlay rendering.
+
+## Installation
+
+This plugin depends on the **AI Manager** and **Render** plugins.
+
+```sh npm2yarn
+npm install @embedpdf/plugin-layout-analysis @embedpdf/plugin-ai-manager @embedpdf/ai @embedpdf/plugin-render
+````
+
+## Registration
+
+First create an AI runtime, then register the AI Manager and Layout Analysis plugins.
+
+```tsx {6-7,10-11,21-28}
+import { createPluginRegistration } from '@embedpdf/core'
+import { EmbedPDF } from '@embedpdf/core/react'
+// ... other imports
+import { RenderPluginPackage } from '@embedpdf/plugin-render/react'
+import { createAiRuntime } from '@embedpdf/ai/web'
+import { AiManagerPluginPackage } from '@embedpdf/plugin-ai-manager'
+import { LayoutAnalysisPluginPackage } from '@embedpdf/plugin-layout-analysis/react'
+
+// Create the AI runtime (loads ONNX Runtime on demand)
+const aiRuntime = createAiRuntime({
+  backend: 'auto', // tries WebGPU first, falls back to WASM
+  cache: true,      // caches models in the browser Cache API
+})
+
+const plugins = [
+  // ... other essential plugins
+  createPluginRegistration(DocumentManagerPluginPackage, { /* ... */ }),
+  createPluginRegistration(ViewportPluginPackage),
+  createPluginRegistration(RenderPluginPackage), // Required dependency
+
+  // Register the AI manager with the runtime
+  createPluginRegistration(AiManagerPluginPackage, {
+    runtime: aiRuntime,
+  }),
+
+  // Register and configure layout analysis
+  createPluginRegistration(LayoutAnalysisPluginPackage, {
+    threshold: 0.35,      // confidence threshold for detections
+    tableStructure: true,  // enable table structure analysis
+  }),
+]
+```
+
+## Usage
+
+The plugin provides the `<LayoutAnalysisLayer />` component for displaying results, and the `useLayoutAnalysisCapability` hook for programmatic access.
+
+### Analyzing a Page
+
+Use the `useLayoutAnalysisCapability` hook to trigger analysis. The returned task supports **progress tracking** (including model download progress) and **cancellation**.
+
+```tsx
+import { useLayoutAnalysisCapability } from '@embedpdf/plugin-layout-analysis/react'
+
+const AnalyzeButton = ({ documentId }) => {
+  const { provides: layoutAnalysis } = useLayoutAnalysisCapability()
+  const [status, setStatus] = useState('idle')
+
+  const handleAnalyze = () => {
+    if (!layoutAnalysis) return
+
+    const task = layoutAnalysis.analyzePage(0)
+
+    task.onProgress((p) => {
+      if (p.stage === 'downloading-model') {
+        setStatus(`Downloading model: ${((p.loaded / p.total) * 100).toFixed(0)}%`)
+      } else if (p.stage === 'creating-session') {
+        setStatus('Initializing model...')
+      } else {
+        setStatus(p.stage)
+      }
+    })
+
+    task.wait(
+      (layout) => {
+        setStatus(`Done — ${layout.blocks.length} blocks detected`)
+      },
+      (error) => {
+        setStatus(`Error: ${error.reason.message}`)
+      },
+    )
+  }
+
+  return <button onClick={handleAnalyze}>{status}</button>
+}
+```
+
+### Displaying Results
+
+Place the `<LayoutAnalysisLayer />` component on top of the `<RenderLayer />` inside your page renderer. It draws color-coded bounding boxes for each detected element with labels and confidence scores.
+
+You must provide the `documentId` and `pageIndex`. The component reads the current zoom scale from the document state automatically, or you can pass a `scale` override.
+
+```tsx
+import { LayoutAnalysisLayer } from '@embedpdf/plugin-layout-analysis/react'
+import { RenderLayer } from '@embedpdf/plugin-render/react'
+
+<Scroller
+  documentId={activeDocumentId}
+  renderPage={({ pageIndex }) => (
+    <>
+      <RenderLayer
+        documentId={activeDocumentId}
+        pageIndex={pageIndex}
+      />
+      <LayoutAnalysisLayer
+        documentId={activeDocumentId}
+        pageIndex={pageIndex}
+      />
+    </>
+  )}
+/>
+```
+
+## Live Example
+
+This example shows a PDF viewer with an "Analyze" button. Click it to run layout detection on the current page. The model (~130 MB) is downloaded on first use and cached for subsequent runs.
+
+import { PDFViewer } from '../../code-examples/headless/layout-analysis-example';
+
+<CodeExample 
+  codePaths={[
+    "content/docs/react/code-examples/headless/layout-analysis-example.tsx"
+  ]}
+>
+  <PDFViewer />
+</CodeExample>
+
+## API Reference
+
+### Configuration (`LayoutAnalysisPluginConfig`)
+
+| Option | Type | Description |
+| :--- | :--- | :--- |
+| **`threshold`** | `number` | Minimum confidence score for a detection to be included. <br />**Default**: `0.35` |
+| **`tableStructure`** | `boolean` | If `true`, runs a second model to detect rows, columns, and cells within tables. <br />**Default**: `false` |
+| **`autoAnalyze`** | `boolean` | If `true`, automatically analyzes pages as they load. <br />**Default**: `false` |
+| **`renderScale`** | `number` | Scale factor for rendering pages before analysis. Higher values improve detection accuracy at the cost of memory. <br />**Default**: `2.0` |
+
+### Component: `<LayoutAnalysisLayer />`
+
+Renders bounding boxes over a PDF page for detected layout elements.
+
+| Prop | Type | Description |
+| :--- | :--- | :--- |
+| **`documentId`** | `string` | **(Required)** The ID of the document. |
+| **`pageIndex`** | `number` | **(Required)** The page index to display layout results for. |
+| **`scale`** | `number` | Zoom scale multiplier. Falls back to the document's current scale. |
+| **`threshold`** | `number` | Confidence threshold — blocks below this are hidden. <br />**Default**: `0.35` |
+| **`style`** | `CSSProperties` | Additional styles applied to the container element. |
+
+### Hook: `useLayoutAnalysisCapability()`
+
+Access the plugin API.
+
+#### `LayoutAnalysisCapability` Methods
+
+| Method | Description |
+| :--- | :--- |
+| **`analyzePage(pageIndex)`** | Analyzes a single page. Returns a `Task` with progress and abort support. |
+| **`analyzeAllPages()`** | Analyzes all pages sequentially. Returns a `Task` with per-page progress. |
+| **`getPageLayout(pageIndex)`** | Returns the cached `PageLayout` for a page, or `null` if not yet analyzed. |
+| **`forDocument(id)`** | Returns a document-scoped `LayoutAnalysisScope`. |
+| **`setOverlayVisible(visible)`** | Toggles overlay visibility in the plugin state. |
+| **`setThreshold(threshold)`** | Updates the active confidence threshold. |
+| **`selectBlock(blockId)`** | Selects a block by ID, or `null` to deselect. |
+
+### Progress Stages (`PageAnalysisProgress`)
+
+The `onProgress` callback receives one of these stages during `analyzePage`:
+
+| Stage | Fields | Description |
+| :--- | :--- | :--- |
+| `rendering` | `pageIndex` | Rendering the page to an image for the model. |
+| `downloading-model` | `pageIndex`, `loaded`, `total` | Downloading the AI model from the server (first run only). |
+| `creating-session` | `pageIndex` | Initializing the ONNX inference session after download. |
+| `layout-detection` | `pageIndex` | Running layout detection inference. |
+| `table-structure` | `pageIndex`, `tableIndex`, `tableCount` | Analyzing table structure (if enabled). |
+| `mapping-coordinates` | `pageIndex` | Mapping results to PDF page coordinates. |
+
+### Result: `LayoutBlock`
+
+Each detected element in the `PageLayout.blocks` array has these fields:
+
+| Field | Type | Description |
+| :--- | :--- | :--- |
+| **`id`** | `number` | Unique ID for this detection. |
+| **`classId`** | `number` | Numeric class ID from the model. |
+| **`label`** | `string` | Human-readable label (e.g., `text`, `table`, `image`, `header`). |
+| **`score`** | `number` | Confidence score from 0 to 1. |
+| **`rect`** | `Rect` | Bounding box in PDF page coordinates (points). |
+| **`readingOrder`** | `number` | Estimated reading order index. |
