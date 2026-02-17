@@ -16,6 +16,8 @@ import {
   Rect,
   PdfAnnotationReplyType,
   Rotation,
+  AnnotationAppearanceMap,
+  PdfRenderPageAnnotationOptions,
 } from '@embedpdf/models';
 import {
   AnnotationCapability,
@@ -146,6 +148,9 @@ export class AnnotationPlugin extends BasePlugin<
   private readonly toolsChange$ = createBehaviorEmitter<AnnotationToolsChangeEvent>();
   private readonly patchRegistry = new PatchRegistry();
 
+  // Appearance stream cache: documentId -> pageIndex -> AnnotationAppearanceMap
+  private readonly appearanceCache = new Map<string, Map<number, AnnotationAppearanceMap>>();
+
   // Unified drag coordination (per-document)
   private readonly unifiedDragStates = new Map<string, UnifiedDragState>();
   private readonly unifiedDrag$ = createBehaviorEmitter<UnifiedDragEvent>();
@@ -220,6 +225,7 @@ export class AnnotationPlugin extends BasePlugin<
     this.pendingContexts.delete(documentId);
     this.isInitialLoadComplete.delete(documentId);
     this.importQueue.delete(documentId);
+    this.appearanceCache.delete(documentId);
 
     this.logger.debug(
       'AnnotationPlugin',
@@ -396,6 +402,10 @@ export class AnnotationPlugin extends BasePlugin<
       purgeAnnotation: (pageIndex, id, documentId) =>
         this.purgeAnnotationMethod(pageIndex, id, documentId),
       renderAnnotation: (options) => this.renderAnnotation(options),
+      getPageAppearances: (pageIndex, options, documentId) =>
+        this.getPageAppearances(pageIndex, options, documentId),
+      invalidatePageAppearances: (pageIndex, documentId) =>
+        this.invalidatePageAppearances(pageIndex, documentId),
       commit: () => this.commit(),
 
       // Attached links (IRT link children)
@@ -467,6 +477,10 @@ export class AnnotationPlugin extends BasePlugin<
       deleteAnnotations: (annotations) => this.deleteAnnotationsMethod(annotations, documentId),
       purgeAnnotation: (pageIndex, id) => this.purgeAnnotationMethod(pageIndex, id, documentId),
       renderAnnotation: (options) => this.renderAnnotation(options, documentId),
+      getPageAppearances: (pageIndex, options) =>
+        this.getPageAppearances(pageIndex, options, documentId),
+      invalidatePageAppearances: (pageIndex) =>
+        this.invalidatePageAppearances(pageIndex, documentId),
       commit: () => this.commit(documentId),
       getAttachedLinks: (id) => this.getAttachedLinksMethod(id, documentId),
       hasAttachedLinks: (id) => this.hasAttachedLinksMethod(id, documentId),
@@ -697,6 +711,86 @@ export class AnnotationPlugin extends BasePlugin<
     }
 
     return this.engine.renderPageAnnotation(doc, page, annotation, options);
+  }
+
+  /**
+   * Batch-fetch rendered appearance stream images for all annotations on a page.
+   * Results are cached per document + page. Call invalidatePageAppearances to clear.
+   */
+  private getPageAppearances(
+    pageIndex: number,
+    options?: PdfRenderPageAnnotationOptions,
+    documentId?: string,
+  ): Task<AnnotationAppearanceMap, PdfErrorReason> {
+    const id = documentId ?? this.getActiveDocumentId();
+    const docState = this.getCoreDocument(id);
+    const doc = docState?.document;
+
+    if (!doc) {
+      return PdfTaskHelper.reject({ code: PdfErrorCode.NotFound, message: 'Document not found' });
+    }
+
+    const page = doc.pages.find((p: any) => p.index === pageIndex);
+    if (!page) {
+      return PdfTaskHelper.reject({ code: PdfErrorCode.NotFound, message: 'Page not found' });
+    }
+
+    // Check cache first (only when no options override the default rendering params)
+    let docCache = this.appearanceCache.get(id);
+    if (!docCache) {
+      docCache = new Map();
+      this.appearanceCache.set(id, docCache);
+    }
+
+    const cached = docCache.get(pageIndex);
+    if (cached && !options) {
+      const task = new Task<AnnotationAppearanceMap, PdfErrorReason>();
+      task.resolve(cached);
+      return task;
+    }
+
+    const engineTask = this.engine.renderPageAnnotationsRaw(doc, page, options);
+    const resultTask = new Task<AnnotationAppearanceMap, PdfErrorReason>();
+
+    engineTask.wait(
+      (result) => {
+        docCache!.set(pageIndex, result);
+        resultTask.resolve(result);
+      },
+      (error) => {
+        resultTask.fail(error);
+      },
+    );
+
+    return resultTask;
+  }
+
+  /**
+   * Clear cached appearances for a specific page (e.g. on zoom change).
+   */
+  private invalidatePageAppearances(pageIndex: number, documentId?: string): void {
+    const id = documentId ?? this.getActiveDocumentId();
+    const docCache = this.appearanceCache.get(id);
+    if (docCache) {
+      docCache.delete(pageIndex);
+    }
+  }
+
+  /**
+   * Remove a single annotation's entry from the page appearance cache.
+   * Used after committing changes that regenerate the annotation's appearance.
+   */
+  private invalidateAnnotationAppearance(
+    annotId: string,
+    pageIndex: number,
+    documentId?: string,
+  ): void {
+    const id = documentId ?? this.getActiveDocumentId();
+    const docCache = this.appearanceCache.get(id);
+    if (!docCache) return;
+    const pageMap = docCache.get(pageIndex);
+    if (!pageMap) return;
+    delete pageMap[annotId];
   }
 
   private importAnnotations(
@@ -2424,6 +2518,7 @@ export class AnnotationPlugin extends BasePlugin<
       ta: TrackedAnnotation;
       uid: string;
       ctx?: AnnotationCreateContext<PdfAnnotationObject>;
+      moved?: boolean;
     }> = [];
 
     // Process creations
@@ -2443,7 +2538,7 @@ export class AnnotationPlugin extends BasePlugin<
       const updateTask = moved
         ? this.engine.updatePageAnnotation!(doc, page, ta.object, { regenerateAppearance: false })
         : this.engine.updatePageAnnotation!(doc, page, ta.object);
-      pendingOps.push({ type: 'update', task: updateTask, ta, uid });
+      pendingOps.push({ type: 'update', task: updateTask, ta, uid, moved });
     }
 
     // Process deletions
@@ -2469,6 +2564,15 @@ export class AnnotationPlugin extends BasePlugin<
       () => {
         // Emit events for all completed operations
         this.emitCommitEvents(docId, pendingOps, contexts);
+
+        // Invalidate appearance cache for committed annotations that had AP regenerated
+        // Skip moved annotations -- moves preserve the appearance stream
+        for (const op of pendingOps) {
+          if (op.type === 'update' && op.moved) continue;
+          if (op.type === 'create' || op.type === 'update' || op.type === 'delete') {
+            this.invalidateAnnotationAppearance(op.ta.object.id, op.ta.object.pageIndex, docId);
+          }
+        }
 
         // Update state
         this.dispatch(commitPendingChanges(docId, batch.committedUids));

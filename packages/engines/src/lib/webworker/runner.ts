@@ -291,6 +291,9 @@ export class EngineRunner {
       case 'renderPageAnnotation':
         task = engine.renderPageAnnotation!(...args);
         break;
+      case 'renderPageAnnotationsRaw':
+        task = engine.renderPageAnnotationsRaw!(...args);
+        break;
       case 'renderThumbnail':
         task = engine.renderThumbnail!(...args);
         break;

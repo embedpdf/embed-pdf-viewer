@@ -37,6 +37,7 @@ import {
   serializeLogger,
   IPdfiumExecutor,
   ImageDataLike,
+  AnnotationAppearanceMap,
 } from '@embedpdf/models';
 import type { WorkerRequest, WorkerResponse } from './pdfium-native-runner';
 import type { FontFallbackConfig } from '../pdfium/font-fallback';
@@ -80,6 +81,7 @@ type MessageType =
   | 'renderPageRect'
   | 'renderThumbnailRaw'
   | 'renderPageAnnotationRaw'
+  | 'renderPageAnnotationsRaw'
   | 'getPageAnnotations'
   | 'getPageAnnotationsRaw'
   | 'createPageAnnotation'
@@ -347,6 +349,14 @@ export class RemoteExecutor implements IPdfiumExecutor {
     options?: PdfRenderPageAnnotationOptions,
   ): PdfTask<ImageDataLike> {
     return this.send<ImageDataLike>('renderPageAnnotationRaw', [doc, page, annotation, options]);
+  }
+
+  renderPageAnnotationsRaw(
+    doc: PdfDocumentObject,
+    page: PdfPageObject,
+    options?: PdfRenderPageAnnotationOptions,
+  ): PdfTask<AnnotationAppearanceMap> {
+    return this.send<AnnotationAppearanceMap>('renderPageAnnotationsRaw', [doc, page, options]);
   }
 
   getPageAnnotationsRaw(
