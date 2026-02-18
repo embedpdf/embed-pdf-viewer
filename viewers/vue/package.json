@@ -1,6 +1,6 @@
 {
   "name": "@embedpdf/vue-pdf-viewer",
-  "version": "2.6.0",
+  "version": "2.6.1",
   "description": "Vue component for embedding PDF documents",
   "main": "dist/index.cjs",
   "module": "dist/index.js",
