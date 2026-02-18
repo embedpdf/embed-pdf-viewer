@@ -5,15 +5,15 @@ import { LayoutBlock } from './types';
 const MODEL_INPUT_SIZE = 800;
 
 /**
- * Map layout detections from model output space to PDF page coordinates.
+ * Map layout detections from model output space to page coordinates.
  *
  * The model outputs coordinates in its 800x800 input space (or sometimes
  * in source image space). This function:
  * 1. Normalizes coordinates to source image space
- * 2. Scales from source image pixels to PDF page points
+ * 2. Scales from source image pixels to page points
  *
- * PDF coordinates are in points (1/72 inch), origin at bottom-left.
- * Image coordinates are in pixels, origin at top-left.
+ * Page coordinates use top-left origin (same as browser/CSS),
+ * matching the project's Rect convention.
  */
 export function mapDetectionsToPageCoordinates(
   detections: LayoutDetection[],
@@ -30,9 +30,9 @@ export function mapDetectionsToPageCoordinates(
   return normalized.map((det) => {
     const [x1, y1, x2, y2] = det.bbox;
 
-    // Convert from image space (top-left origin) to PDF space (bottom-left origin)
+    // Scale from image pixels to page points (both use top-left origin)
     const pdfX = x1 * scaleX;
-    const pdfY = pageSize.height - y2 * scaleY;
+    const pdfY = y1 * scaleY;
     const pdfW = (x2 - x1) * scaleX;
     const pdfH = (y2 - y1) * scaleY;
 
@@ -100,7 +100,7 @@ function normalizeToSourceSpace(detections: LayoutDetection[], imageSize: Size):
 
 /**
  * Map table structure element coordinates from the padded crop space
- * to PDF page coordinates.
+ * to page coordinates.
  *
  * The table crop is rendered via `renderPageRectRaw(tableRect)` producing
  * `cropImageSize` pixels, then `padImageData` adds `padding` white pixels
@@ -108,7 +108,7 @@ function normalizeToSourceSpace(detections: LayoutDetection[], imageSize: Size):
  * in that padded image's coordinate space.
  *
  * Mapping: padded image coords → remove padding → crop pixel coords →
- * normalize to [0,1] within crop → scale to PDF rect → offset by rect origin.
+ * scale to page rect dimensions → offset by rect origin.
  */
 export function mapTableElementToPageCoordinates(
   elementBbox: [number, number, number, number],
@@ -124,15 +124,15 @@ export function mapTableElementToPageCoordinates(
   const cx2 = ex2 - padding;
   const cy2 = ey2 - padding;
 
-  // Scale from crop pixels to PDF rect dimensions
+  // Scale from crop pixels to page rect dimensions
   const scaleX = tableRect.size.width / cropImageSize.width;
   const scaleY = tableRect.size.height / cropImageSize.height;
 
-  // Map to PDF space (flip Y: image top-left origin → PDF bottom-left origin)
+  // Map to page space (both use top-left origin)
   const pdfX = tableRect.origin.x + cx1 * scaleX;
+  const pdfY = tableRect.origin.y + cy1 * scaleY;
   const pdfW = (cx2 - cx1) * scaleX;
   const pdfH = (cy2 - cy1) * scaleY;
-  const pdfY = tableRect.origin.y + tableRect.size.height - cy2 * scaleY;
 
   return {
     origin: { x: pdfX, y: pdfY },
