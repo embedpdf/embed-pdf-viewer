@@ -97,6 +97,7 @@ class WebPlatformAdapter implements PlatformAdapter {
     const session = await ort.InferenceSession.create(new Uint8Array(buffer), {
       executionProviders: [provider],
       graphOptimizationLevel: 'all',
+      logSeverityLevel: 3,
     });
 
     return {
