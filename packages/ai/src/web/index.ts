@@ -13,6 +13,9 @@ import {
 declare global {
   interface Navigator {
     gpu?: { requestAdapter(): Promise<unknown | null> };
+    userAgentData?: {
+      getHighEntropyValues?(hints: string[]): Promise<{ architecture?: string }>;
+    };
   }
 }
 
@@ -45,16 +48,27 @@ class WebPlatformAdapter implements PlatformAdapter {
 
   async resolveBackend(preferred: AiBackend | 'auto'): Promise<AiBackend> {
     if (preferred !== 'auto') return preferred;
+    if (typeof navigator === 'undefined') return 'wasm';
 
-    // Check WebGPU availability via navigator.gpu
-    if (typeof navigator !== 'undefined' && navigator.gpu) {
-      try {
-        const adapter = await navigator.gpu.requestAdapter();
-        if (adapter) return 'webgpu';
-      } catch {
-        // WebGPU not available
-      }
-    }
+    const isIPhone = /iPhone/.test(navigator.userAgent);
+    const hasWebGPU = !!navigator.gpu;
+
+    // iPhone: WASM crashes, must use WebGPU
+    if (isIPhone && hasWebGPU) return 'webgpu';
+
+    if (!hasWebGPU) return 'wasm';
+
+    // WebGPU is available -- only enable on Apple Silicon Macs (tested).
+    // Windows/Linux/Intel Macs: WASM is safer for launch.
+    let arch: string | null = null;
+    try {
+      const hints = await navigator.userAgentData?.getHighEntropyValues?.(['architecture']);
+      arch = hints?.architecture ?? null;
+    } catch {}
+
+    const isMac = /Macintosh/.test(navigator.userAgent);
+    if (isMac && arch === 'arm') return 'webgpu';
+
     return 'wasm';
   }
 

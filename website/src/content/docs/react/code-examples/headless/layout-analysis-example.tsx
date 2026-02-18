@@ -28,7 +28,7 @@ import {
 import { Loader2, ScanSearch } from 'lucide-react'
 
 const aiRuntime = createAiRuntime({
-  backend: 'wasm',
+  backend: 'auto',
   cache: true,
 })
 
