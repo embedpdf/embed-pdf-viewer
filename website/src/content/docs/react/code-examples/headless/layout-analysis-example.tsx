@@ -34,7 +34,7 @@ const aiRuntime = createAiRuntime({
 
 const plugins = [
   createPluginRegistration(DocumentManagerPluginPackage, {
-    initialDocuments: [{ url: '/bank-statement.pdf' }],
+    initialDocuments: [{ url: 'https://arxiv.org/pdf/1706.03762' }],
   }),
   createPluginRegistration(ViewportPluginPackage),
   createPluginRegistration(ScrollPluginPackage),
@@ -63,7 +63,7 @@ const AnalyzeToolbar = ({ documentId }: { documentId: string }) => {
     if (!layoutAnalysis) return
 
     setStatus({ type: 'analyzing', stage: 'Starting...' })
-    const task = layoutAnalysis.analyzePage(0)
+    const task = layoutAnalysis.analyzeAllPages()
 
     task.onProgress((p) => {
       if (p.stage === 'downloading-model') {
@@ -72,23 +72,45 @@ const AnalyzeToolbar = ({ documentId }: { documentId: string }) => {
       } else if (p.stage === 'creating-session') {
         setStatus({ type: 'analyzing', stage: 'Initializing model...' })
       } else if (p.stage === 'rendering') {
-        setStatus({ type: 'analyzing', stage: 'Rendering page...' })
+        setStatus({
+          type: 'analyzing',
+          stage: `Rendering page ${p.pageIndex + 1}...`,
+        })
       } else if (p.stage === 'layout-detection') {
-        setStatus({ type: 'analyzing', stage: 'Detecting layout...' })
+        setStatus({
+          type: 'analyzing',
+          stage: `Detecting layout on page ${p.pageIndex + 1}...`,
+        })
       } else if (p.stage === 'table-structure') {
         setStatus({
           type: 'analyzing',
-          stage: `Table ${p.tableIndex + 1}/${p.tableCount}...`,
+          stage: `Page ${p.pageIndex + 1}: table ${p.tableIndex + 1}/${p.tableCount}...`,
         })
       } else if (p.stage === 'mapping-coordinates') {
-        setStatus({ type: 'analyzing', stage: 'Mapping coordinates...' })
+        setStatus({
+          type: 'analyzing',
+          stage: `Mapping coordinates (page ${p.pageIndex + 1})...`,
+        })
+      } else if (p.stage === 'page-complete') {
+        setStatus({
+          type: 'analyzing',
+          stage: `Page ${p.completed}/${p.total} complete`,
+        })
       }
     })
 
     task.wait(
-      (layout) => {
+      (result) => {
         const backend = aiManager?.getBackend() ?? 'unknown'
-        setStatus({ type: 'done', blockCount: layout.blocks.length, backend })
+        const totalBlocks = result.pages.reduce(
+          (sum, p) => sum + p.blocks.length,
+          0,
+        )
+        setStatus({
+          type: 'done',
+          blockCount: totalBlocks,
+          backend,
+        })
       },
       (error) => {
         setStatus({
@@ -113,14 +135,15 @@ const AnalyzeToolbar = ({ documentId }: { documentId: string }) => {
         ) : (
           <ScanSearch size={14} />
         )}
-        {isAnalyzing ? 'Analyzing...' : 'Analyze Page'}
+        {isAnalyzing ? 'Analyzing...' : 'Analyze All Pages'}
       </button>
 
       <span className="text-xs text-gray-500 dark:text-gray-400">
-        {status.type === 'idle' && 'Click to detect layout elements on page 1'}
+        {status.type === 'idle' &&
+          'Click to detect layout elements on all pages'}
         {status.type === 'analyzing' && status.stage}
         {status.type === 'done' &&
-          `${status.blockCount} elements detected (${status.backend})`}
+          `${status.blockCount} elements detected across all pages (${status.backend})`}
         {status.type === 'error' && status.message}
       </span>
     </div>
