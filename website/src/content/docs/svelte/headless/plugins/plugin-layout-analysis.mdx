@@ -20,11 +20,15 @@ The plugin optionally supports **table structure analysis**, which identifies ro
 
 ## Installation
 
-This plugin depends on the **AI Manager** and **Render** plugins.
+This plugin depends on the **AI Manager** and **Render** plugins. You also need to install `onnxruntime-web`, which provides the ONNX Runtime that powers inference in the browser.
 
 ```sh npm2yarn
-npm install @embedpdf/plugin-layout-analysis @embedpdf/plugin-ai-manager @embedpdf/ai @embedpdf/plugin-render
+npm install @embedpdf/plugin-layout-analysis @embedpdf/plugin-ai-manager @embedpdf/ai @embedpdf/plugin-render onnxruntime-web
 ````
+
+<Callout type="info" title="Node.js usage">
+  For server-side inference, install `onnxruntime-node` instead of `onnxruntime-web`.
+</Callout>
 
 ## Registration
 

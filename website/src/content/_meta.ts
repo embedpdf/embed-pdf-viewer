@@ -55,6 +55,13 @@ export default {
       timestamp: false,
     },
   },
+  ['layout-analysis']: {
+    title: 'Layout Analysis',
+    type: 'page',
+    theme: {
+      timestamp: false,
+    },
+  },
   docs: {
     title: 'Docs',
     type: 'page',

@@ -1,6 +1,6 @@
 {
   "name": "@embedpdf/ai",
-  "version": "2.6.0",
+  "version": "0.0.1",
   "description": "AI runtime for EmbedPDF – manages ONNX model loading, inference, and built-in pipelines (layout detection, table structure) across browser and Node.js.",
   "type": "module",
   "main": "./dist/index.cjs",
