@@ -8,7 +8,14 @@
     "esModuleInterop": true,
     "skipLibCheck": true,
     "outDir": "dist",
-    "rootDir": "src"
+    "jsx": "react-jsx",
+    "jsxImportSource": "react",
+    "rootDir": "src",
+    "paths": {
+      "@framework": ["./src/react/adapter.ts"],
+      "@embedpdf/core/@framework": ["./src/react/core.ts"],
+      "@embedpdf/plugin-ai-manager": ["./src/index.ts"]
+    }
   },
   "include": ["src"],
   "exclude": ["node_modules", "dist", "**/*.test.ts"]

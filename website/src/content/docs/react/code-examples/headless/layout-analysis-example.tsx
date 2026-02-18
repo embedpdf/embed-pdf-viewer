@@ -23,7 +23,7 @@ import { createAiRuntime } from '@embedpdf/ai/web'
 import {
   AiManagerPluginPackage,
   AiManagerPlugin,
-} from '@embedpdf/plugin-ai-manager'
+} from '@embedpdf/plugin-ai-manager/react'
 import {
   LayoutAnalysisPluginPackage,
   LayoutAnalysisLayer,
