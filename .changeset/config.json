@@ -52,6 +52,8 @@
     "@embedpdf/example-vue-tailwind",
     "@embedpdf/example-vue-vuetify",
     "@embedpdf/example-svelte-tailwind",
+    "@embedpdf/example-engines-node",
+    "@embedpdf/example-pdfium-node",
     "@embedpdf/ai",
     "@embedpdf/plugin-ai-manager",
     "@embedpdf/plugin-layout-analysis"
