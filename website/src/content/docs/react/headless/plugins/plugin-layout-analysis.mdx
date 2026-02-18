@@ -4,7 +4,13 @@ description: AI-powered document layout analysis running locally in the browser,
 searchable: true
 ---
 
+import { Callout } from '@/components/callout'
+
 # Layout Analysis Plugin
+
+<Callout type="warning" title="Experimental">
+  This plugin is **experimental**. Running deep learning models in the browser is resource-intensive — on many devices the browser tab may become very slow or even crash, particularly on mobile or lower-end hardware. As models get smaller and browser APIs improve, stability and performance will continue to get better.
+</Callout>
 
 The Layout Analysis Plugin brings AI-powered document understanding directly into your PDF viewer. It uses ONNX Runtime to run deep learning models **locally in the browser**, detecting layout elements like text blocks, tables, images, headings, formulas, and more.
 
