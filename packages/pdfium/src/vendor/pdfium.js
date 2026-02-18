@@ -56,6 +56,7 @@ var createPdfium = (() => {
       '_EPDFAnnot_GenerateAppearance',
       '_EPDFAnnot_GenerateAppearanceWithBlend',
       '_EPDFAnnot_GetAPMatrix',
+      '_EPDFAnnot_GetAvailableAppearanceModes',
       '_EPDFAnnot_GetBlendMode',
       '_EPDFAnnot_GetBorderDashPattern',
       '_EPDFAnnot_GetBorderDashPatternCount',
@@ -6314,6 +6315,8 @@ var createPdfium = (() => {
       'EPDFAnnot_GetAPMatrix',
       3,
     ));
+    var _EPDFAnnot_GetAvailableAppearanceModes = (Module['_EPDFAnnot_GetAvailableAppearanceModes'] =
+      createExportWrapper('EPDFAnnot_GetAvailableAppearanceModes', 1));
     var _FPDFDoc_GetAttachmentCount = (Module['_FPDFDoc_GetAttachmentCount'] = createExportWrapper(
       'FPDFDoc_GetAttachmentCount',
       1,

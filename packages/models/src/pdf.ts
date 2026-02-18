@@ -2481,6 +2481,59 @@ export interface PdfPageGeometry {
 }
 
 /**
+ * Font information extracted from a PDF text object.
+ *
+ * @public
+ */
+export interface PdfFontInfo {
+  /** PostScript name (e.g. "HOEPNL+Arial,Bold"). */
+  name: string;
+  /** Font family name (e.g. "Arial"). */
+  familyName: string;
+  /** Weight 100-900 (400 = normal, 700 = bold). */
+  weight: number;
+  /** Whether the font is italic. */
+  italic: boolean;
+  /** Whether the font is monospaced (fixed-pitch). */
+  monospaced: boolean;
+  /** Whether the font data is embedded in the PDF. */
+  embedded: boolean;
+}
+
+/**
+ * A rich text run: consecutive characters sharing the same text object,
+ * font, size, and color.
+ *
+ * @public
+ */
+export interface PdfTextRun {
+  /** The text content (UTF-8). */
+  text: string;
+  /** Bounding box in PDF page coordinates (points). */
+  rect: Rect;
+  /** Font metadata (uniform within the run). */
+  font: PdfFontInfo;
+  /** Font size in points. */
+  fontSize: number;
+  /** Fill color (RGBA). */
+  color: PdfAlphaColor;
+  /** Start character index in the text page. */
+  charIndex: number;
+  /** Number of characters in this run. */
+  charCount: number;
+}
+
+/**
+ * Rich text runs for a single page.
+ *
+ * @public
+ */
+export interface PdfPageTextRuns {
+  /** Text runs ordered by reading order. */
+  runs: PdfTextRun[];
+}
+
+/**
  * form field value
  * @public
  */
@@ -3037,6 +3090,35 @@ export interface PdfEngine<T = Blob> {
     options?: PdfRenderPageOptions,
   ) => PdfTask<T>;
   /**
+   * Render the specified pdf page and return raw pixel data (ImageDataLike)
+   * without encoding to the output format T. Useful for AI/ML pipelines
+   * that need direct pixel access.
+   * @param doc - pdf document
+   * @param page - pdf page
+   * @param options - render options (imageType/imageQuality are ignored)
+   * @returns task contains raw ImageDataLike or error
+   */
+  renderPageRaw: (
+    doc: PdfDocumentObject,
+    page: PdfPageObject,
+    options?: PdfRenderPageOptions,
+  ) => PdfTask<ImageDataLike>;
+  /**
+   * Render the specified rect of a pdf page and return raw pixel data
+   * (ImageDataLike) without encoding to the output format T.
+   * @param doc - pdf document
+   * @param page - pdf page
+   * @param rect - target rect in PDF coordinate space
+   * @param options - render options (imageType/imageQuality are ignored)
+   * @returns task contains raw ImageDataLike or error
+   */
+  renderPageRectRaw: (
+    doc: PdfDocumentObject,
+    page: PdfPageObject,
+    rect: Rect,
+    options?: PdfRenderPageOptions,
+  ) => PdfTask<ImageDataLike>;
+  /**
    * Render the thumbnail of specified pdf page
    * @param doc - pdf document
    * @param page - pdf page
@@ -3277,6 +3359,13 @@ export interface PdfEngine<T = Blob> {
    */
   getPageGeometry: (doc: PdfDocumentObject, page: PdfPageObject) => PdfTask<PdfPageGeometry>;
   /**
+   * Get rich text runs for a page, grouped by text object with font and color info
+   * @param doc - pdf document
+   * @param page - pdf page
+   * @returns task contains the text runs
+   */
+  getPageTextRuns: (doc: PdfDocumentObject, page: PdfPageObject) => PdfTask<PdfPageTextRuns>;
+  /**
    * Merge multiple pdf documents
    * @param files - all the pdf files
    * @returns task contains the merged pdf file
@@ -3513,6 +3602,7 @@ export interface IPdfiumExecutor {
   getTextSlices(doc: PdfDocumentObject, slices: PageTextSlice[]): PdfTask<string[]>;
   getPageGlyphs(doc: PdfDocumentObject, page: PdfPageObject): PdfTask<PdfGlyphObject[]>;
   getPageGeometry(doc: PdfDocumentObject, page: PdfPageObject): PdfTask<PdfPageGeometry>;
+  getPageTextRuns(doc: PdfDocumentObject, page: PdfPageObject): PdfTask<PdfPageTextRuns>;
   merge(files: PdfFile[]): PdfTask<PdfFile>;
   mergePages(mergeConfigs: Array<{ docId: string; pageIndices: number[] }>): PdfTask<PdfFile>;
   preparePrintDocument(doc: PdfDocumentObject, options?: PdfPrintOptions): PdfTask<ArrayBuffer>;

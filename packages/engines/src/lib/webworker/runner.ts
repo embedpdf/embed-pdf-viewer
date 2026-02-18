@@ -288,6 +288,12 @@ export class EngineRunner {
       case 'renderPageRect':
         task = engine.renderPageRect!(...args);
         break;
+      case 'renderPageRaw':
+        task = engine.renderPageRaw!(...args);
+        break;
+      case 'renderPageRectRaw':
+        task = engine.renderPageRectRaw!(...args);
+        break;
       case 'renderPageAnnotation':
         task = engine.renderPageAnnotation!(...args);
         break;
@@ -368,6 +374,9 @@ export class EngineRunner {
         break;
       case 'getPageGeometry':
         task = engine.getPageGeometry!(...args);
+        break;
+      case 'getPageTextRuns':
+        task = engine.getPageTextRuns!(...args);
         break;
       case 'merge':
         task = engine.merge!(...args);

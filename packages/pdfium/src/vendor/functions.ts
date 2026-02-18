@@ -41,6 +41,7 @@ export const functions = {
   EPDFAnnot_GenerateAppearance: [['number'] as const, 'boolean'] as const,
   EPDFAnnot_GenerateAppearanceWithBlend: [['number', 'number'] as const, 'boolean'] as const,
   EPDFAnnot_GetAPMatrix: [['number', 'number', 'number'] as const, 'boolean'] as const,
+  EPDFAnnot_GetAvailableAppearanceModes: [['number'] as const, 'number'] as const,
   EPDFAnnot_GetBlendMode: [['number'] as const, 'number'] as const,
   EPDFAnnot_GetBorderDashPattern: [['number', 'number', 'number'] as const, 'boolean'] as const,
   EPDFAnnot_GetBorderDashPatternCount: [['number'] as const, 'number'] as const,
