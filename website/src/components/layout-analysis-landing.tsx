@@ -3,7 +3,7 @@
 import React, { useState, useCallback, useRef, useEffect, useMemo } from 'react'
 import Link from 'next/link'
 import { createPluginRegistration } from '@embedpdf/core'
-import { EmbedPDF, useCapability } from '@embedpdf/core/react'
+import { EmbedPDF } from '@embedpdf/core/react'
 import { usePdfiumEngine } from '@embedpdf/engines/react'
 import {
   Viewport,
@@ -24,6 +24,7 @@ import { createAiRuntime } from '@embedpdf/ai/web'
 import {
   AiManagerPluginPackage,
   AiManagerPlugin,
+  useAiManagerCapability,
 } from '@embedpdf/plugin-ai-manager/react'
 import {
   LayoutAnalysisPluginPackage,
@@ -163,7 +164,7 @@ const AnalyzeToolbar = ({ documentId }: { documentId: string }) => {
     tableStructureThreshold,
     provides,
   } = useLayoutAnalysis(documentId)
-  const { provides: aiManager } = useCapability<AiManagerPlugin>('ai-manager')
+  const { provides: aiManager } = useAiManagerCapability()
   const [status, setStatus] = useState<AnalysisStatus>({ type: 'idle' })
   const activeTaskRef = useRef<LayoutTask<
     DocumentLayout,
@@ -677,6 +678,19 @@ const ViewTabs = ({
   </div>
 )
 
+// ─── Model Preloader ─────────────────────────────────────────
+
+const ModelPreloader = () => {
+  const { provides: aiManager } = useAiManagerCapability()
+
+  useEffect(() => {
+    aiManager?.loadModel('layout-detection')
+    aiManager?.loadModel('table-structure')
+  }, [aiManager])
+
+  return null
+}
+
 // ─── Main Viewer ─────────────────────────────────────────────
 
 const LayoutAnalysisViewer = () => {
@@ -706,6 +720,7 @@ const LayoutAnalysisViewer = () => {
             {({ isLoaded }) =>
               isLoaded && (
                 <div className="overflow-hidden rounded-lg border border-gray-300 bg-white shadow-sm dark:border-gray-700 dark:bg-gray-900">
+                  <ModelPreloader />
                   <ViewerToolbar documentId={activeDocumentId} />
                   <AnalyzeToolbar documentId={activeDocumentId} />
                   <ViewTabs mode={viewMode} onChange={setViewMode} />
