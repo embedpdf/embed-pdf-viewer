@@ -47,7 +47,11 @@
   "updateInternalDependencies": "patch",
   "ignore": [
     "@embedpdf/website",
-    "@embedpdf/example-*",
+    "@embedpdf/example-react-tailwind",
+    "@embedpdf/example-react-mui",
+    "@embedpdf/example-vue-tailwind",
+    "@embedpdf/example-vue-vuetify",
+    "@embedpdf/example-svelte-tailwind",
     "@embedpdf/ai",
     "@embedpdf/plugin-ai-manager",
     "@embedpdf/plugin-layout-analysis"
