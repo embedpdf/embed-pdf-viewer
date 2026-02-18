@@ -1,5 +1,11 @@
 # @embedpdf/models
 
+## 2.6.1
+
+### Patch Changes
+
+- [#473](https://github.com/embedpdf/embed-pdf-viewer/pull/473) by [@bobsingor](https://github.com/bobsingor) – Add PdfFontInfo, PdfTextRun, and PdfPageTextRuns types for rich text extraction with font metadata and color info. Add renderPageRaw and renderPageRectRaw methods to PdfEngine for raw pixel output (ImageDataLike). Add getPageTextRuns to PdfEngine and IPdfiumExecutor. Add TaskSequence utility for composing sequential Task operations with abort propagation.
+
 ## 2.6.0
 
 ### Minor Changes
