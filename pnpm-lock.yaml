@@ -432,6 +432,9 @@ importers:
         specifier: ^0.555.0
         version: 0.555.0(svelte@5.50.1)
     devDependencies:
+      '@embedpdf/ai':
+        specifier: workspace:*
+        version: link:../../packages/ai
       '@embedpdf/core':
         specifier: workspace:*
         version: link:../../packages/core
@@ -444,6 +447,9 @@ importers:
       '@embedpdf/pdfium':
         specifier: workspace:*
         version: link:../../packages/pdfium
+      '@embedpdf/plugin-ai-manager':
+        specifier: workspace:*
+        version: link:../../packages/plugin-ai-manager
       '@embedpdf/plugin-annotation':
         specifier: workspace:*
         version: link:../../packages/plugin-annotation
@@ -471,6 +477,9 @@ importers:
       '@embedpdf/plugin-interaction-manager':
         specifier: workspace:*
         version: link:../../packages/plugin-interaction-manager
+      '@embedpdf/plugin-layout-analysis':
+        specifier: workspace:*
+        version: link:../../packages/plugin-layout-analysis
       '@embedpdf/plugin-pan':
         specifier: workspace:*
         version: link:../../packages/plugin-pan
@@ -564,6 +573,9 @@ importers:
 
   examples/vue-tailwind:
     dependencies:
+      '@embedpdf/ai':
+        specifier: workspace:*
+        version: link:../../packages/ai
       '@embedpdf/core':
         specifier: workspace:*
         version: link:../../packages/core
@@ -576,6 +588,9 @@ importers:
       '@embedpdf/pdfium':
         specifier: workspace:*
         version: link:../../packages/pdfium
+      '@embedpdf/plugin-ai-manager':
+        specifier: workspace:*
+        version: link:../../packages/plugin-ai-manager
       '@embedpdf/plugin-annotation':
         specifier: workspace:*
         version: link:../../packages/plugin-annotation
@@ -603,6 +618,9 @@ importers:
       '@embedpdf/plugin-interaction-manager':
         specifier: workspace:*
         version: link:../../packages/plugin-interaction-manager
+      '@embedpdf/plugin-layout-analysis':
+        specifier: workspace:*
+        version: link:../../packages/plugin-layout-analysis
       '@embedpdf/plugin-pan':
         specifier: workspace:*
         version: link:../../packages/plugin-pan
@@ -1137,6 +1155,21 @@ importers:
       '@embedpdf/models':
         specifier: workspace:*
         version: link:../models
+      preact:
+        specifier: ^10.26.4
+        version: 10.28.3
+      react:
+        specifier: '>=16.8.0'
+        version: 18.3.1
+      react-dom:
+        specifier: '>=16.8.0'
+        version: 18.3.1(react@18.3.1)
+      svelte:
+        specifier: '>=5 <6'
+        version: 5.50.1
+      vue:
+        specifier: '>=3.2.0'
+        version: 3.5.28(typescript@5.9.3)
     devDependencies:
       '@embedpdf/build':
         specifier: workspace:*
@@ -1144,6 +1177,9 @@ importers:
       '@embedpdf/core':
         specifier: workspace:*
         version: link:../core
+      '@types/react':
+        specifier: ^18.2.0
+        version: 18.3.28
       typescript:
         specifier: ^5.0.0
         version: 5.9.3
@@ -16364,7 +16400,7 @@ snapshots:
       '@next/eslint-plugin-next': 16.1.6
       eslint: 9.39.2(jiti@2.6.1)
       eslint-import-resolver-node: 0.3.9
-      eslint-import-resolver-typescript: 3.10.1(eslint-plugin-import@2.32.0)(eslint@9.39.2(jiti@2.6.1))
+      eslint-import-resolver-typescript: 3.10.1(eslint-plugin-import@2.32.0(@typescript-eslint/parser@8.55.0(eslint@9.39.2(jiti@2.6.1))(typescript@5.9.3))(eslint@9.39.2(jiti@2.6.1)))(eslint@9.39.2(jiti@2.6.1))
       eslint-plugin-import: 2.32.0(@typescript-eslint/parser@8.55.0(eslint@9.39.2(jiti@2.6.1))(typescript@5.9.3))(eslint-import-resolver-typescript@3.10.1)(eslint@9.39.2(jiti@2.6.1))
       eslint-plugin-jsx-a11y: 6.10.2(eslint@9.39.2(jiti@2.6.1))
       eslint-plugin-react: 7.37.5(eslint@9.39.2(jiti@2.6.1))
@@ -16391,7 +16427,7 @@ snapshots:
     transitivePeerDependencies:
       - supports-color
 
-  eslint-import-resolver-typescript@3.10.1(eslint-plugin-import@2.32.0)(eslint@9.39.2(jiti@2.6.1)):
+  eslint-import-resolver-typescript@3.10.1(eslint-plugin-import@2.32.0(@typescript-eslint/parser@8.55.0(eslint@9.39.2(jiti@2.6.1))(typescript@5.9.3))(eslint@9.39.2(jiti@2.6.1)))(eslint@9.39.2(jiti@2.6.1)):
     dependencies:
       '@nolyfill/is-core-module': 1.0.39
       debug: 4.4.3
@@ -16406,14 +16442,14 @@ snapshots:
     transitivePeerDependencies:
       - supports-color
 
-  eslint-module-utils@2.12.1(@typescript-eslint/parser@8.55.0(eslint@9.39.2(jiti@2.6.1))(typescript@5.9.3))(eslint-import-resolver-node@0.3.9)(eslint-import-resolver-typescript@3.10.1)(eslint@9.39.2(jiti@2.6.1)):
+  eslint-module-utils@2.12.1(@typescript-eslint/parser@8.55.0(eslint@9.39.2(jiti@2.6.1))(typescript@5.9.3))(eslint-import-resolver-node@0.3.9)(eslint-import-resolver-typescript@3.10.1(eslint-plugin-import@2.32.0(@typescript-eslint/parser@8.55.0(eslint@9.39.2(jiti@2.6.1))(typescript@5.9.3))(eslint@9.39.2(jiti@2.6.1)))(eslint@9.39.2(jiti@2.6.1)))(eslint@9.39.2(jiti@2.6.1)):
     dependencies:
       debug: 3.2.7
     optionalDependencies:
       '@typescript-eslint/parser': 8.55.0(eslint@9.39.2(jiti@2.6.1))(typescript@5.9.3)
       eslint: 9.39.2(jiti@2.6.1)
       eslint-import-resolver-node: 0.3.9
-      eslint-import-resolver-typescript: 3.10.1(eslint-plugin-import@2.32.0)(eslint@9.39.2(jiti@2.6.1))
+      eslint-import-resolver-typescript: 3.10.1(eslint-plugin-import@2.32.0(@typescript-eslint/parser@8.55.0(eslint@9.39.2(jiti@2.6.1))(typescript@5.9.3))(eslint@9.39.2(jiti@2.6.1)))(eslint@9.39.2(jiti@2.6.1))
     transitivePeerDependencies:
       - supports-color
 
@@ -16428,7 +16464,7 @@ snapshots:
       doctrine: 2.1.0
       eslint: 9.39.2(jiti@2.6.1)
       eslint-import-resolver-node: 0.3.9
-      eslint-module-utils: 2.12.1(@typescript-eslint/parser@8.55.0(eslint@9.39.2(jiti@2.6.1))(typescript@5.9.3))(eslint-import-resolver-node@0.3.9)(eslint-import-resolver-typescript@3.10.1)(eslint@9.39.2(jiti@2.6.1))
+      eslint-module-utils: 2.12.1(@typescript-eslint/parser@8.55.0(eslint@9.39.2(jiti@2.6.1))(typescript@5.9.3))(eslint-import-resolver-node@0.3.9)(eslint-import-resolver-typescript@3.10.1(eslint-plugin-import@2.32.0(@typescript-eslint/parser@8.55.0(eslint@9.39.2(jiti@2.6.1))(typescript@5.9.3))(eslint@9.39.2(jiti@2.6.1)))(eslint@9.39.2(jiti@2.6.1)))(eslint@9.39.2(jiti@2.6.1))
       hasown: 2.0.2
       is-core-module: 2.16.1
       is-glob: 4.0.3

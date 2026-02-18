@@ -85,7 +85,7 @@ export class LayoutAnalysisPlugin extends BasePlugin<
     PageLayoutChangeEvent,
     PageLayoutChangeGlobalEvent,
     string
-  >((documentId, data) => ({ documentId, ...data }));
+  >((documentId, data) => ({ documentId, ...data }), { cache: false });
 
   private readonly stateChange$ = createEmitter<StateChangeEvent>();
 

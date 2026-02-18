@@ -1,1 +1,1 @@
-export * from './use-layout-analysis';
+export * from './use-layout-analysis.svelte';

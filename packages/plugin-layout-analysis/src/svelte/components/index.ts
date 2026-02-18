@@ -1,1 +1,1 @@
-// Svelte components can be added here.
+export { default as LayoutAnalysisLayer } from './LayoutAnalysisLayer.svelte';
