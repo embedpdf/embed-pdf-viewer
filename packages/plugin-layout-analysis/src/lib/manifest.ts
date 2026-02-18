@@ -11,7 +11,8 @@ export const manifest: PluginManifest<LayoutAnalysisPluginConfig> = {
   requires: ['render', 'ai-manager'],
   optional: [],
   defaultConfig: {
-    threshold: 0.35,
+    layoutThreshold: 0.35,
+    tableStructureThreshold: 0.8,
     tableStructure: false,
     autoAnalyze: false,
     renderScale: 2.0,

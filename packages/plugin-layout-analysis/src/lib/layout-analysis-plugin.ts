@@ -1,13 +1,25 @@
-import { BasePlugin, PluginRegistry, createScopedEmitter } from '@embedpdf/core';
-import { Task, TaskSequence, Size, Rect } from '@embedpdf/models';
+import {
+  BasePlugin,
+  PluginRegistry,
+  createScopedEmitter,
+  createEmitter,
+  Listener,
+} from '@embedpdf/core';
+import {
+  Task,
+  TaskStage,
+  TaskSequence,
+  Size,
+  Rect,
+  PdfPageTextRuns,
+  uuidV4,
+} from '@embedpdf/models';
 import {
   LayoutDetectionPipeline,
   TableStructurePipeline,
   LayoutDetectionInput,
   TableStructureInput,
   PipelineProgress,
-  ImageDataLike,
-  clamp,
 } from '@embedpdf/ai';
 import { AiManagerPlugin, AiManagerCapability } from '@embedpdf/plugin-ai-manager';
 import { RenderCapability, RenderPlugin } from '@embedpdf/plugin-render';
@@ -26,6 +38,8 @@ import {
   TableStructureElement,
   PageLayoutChangeEvent,
   PageLayoutChangeGlobalEvent,
+  StateChangeEvent,
+  AnalyzePageOptions,
 } from './types';
 import {
   LayoutAnalysisAction,
@@ -34,9 +48,15 @@ import {
   setPageStatus,
   setPageLayout,
   setPageError,
-  setOverlayVisible,
-  setThreshold,
+  setLayoutOverlayVisible,
+  setTableStructureOverlayVisible,
+  setTableStructureEnabled,
+  setLayoutThreshold,
+  setTableStructureThreshold,
   selectBlock,
+  setPageTableStructures,
+  clearPageResults,
+  clearAllResults,
 } from './actions';
 import {
   mapDetectionsToPageCoordinates,
@@ -44,10 +64,7 @@ import {
 } from './coordinate-mapper';
 
 const TABLE_CLASS_ID = 21;
-const TABLE_MIN_SCORE = 0.2;
-const CROP_MARGIN_RATIO = 0.12;
-const CROP_MARGIN_MIN_PX = 24;
-const CROP_MARGIN_MAX_PX = 64;
+const TABLE_MIN_SCORE = 0.1;
 
 export class LayoutAnalysisPlugin extends BasePlugin<
   LayoutAnalysisPluginConfig,
@@ -70,6 +87,10 @@ export class LayoutAnalysisPlugin extends BasePlugin<
     string
   >((documentId, data) => ({ documentId, ...data }));
 
+  private readonly stateChange$ = createEmitter<StateChangeEvent>();
+
+  private readonly activeTasks = new Map<string, Task<any, any, any>>();
+
   constructor(id: string, registry: PluginRegistry, config: LayoutAnalysisPluginConfig) {
     super(id, registry);
     this.aiManager = this.registry.getPlugin<AiManagerPlugin>('ai-manager')!.provides();
@@ -78,12 +99,17 @@ export class LayoutAnalysisPlugin extends BasePlugin<
 
   async initialize(config: LayoutAnalysisPluginConfig): Promise<void> {
     this.pluginConfig = {
-      threshold: 0.35,
+      layoutThreshold: 0.35,
+      tableStructureThreshold: 0.8,
       tableStructure: false,
       autoAnalyze: false,
       renderScale: 2.0,
       ...config,
     };
+
+    if (this.pluginConfig.tableStructure) {
+      this.dispatch(setTableStructureEnabled(true));
+    }
   }
 
   protected onDocumentLoaded(documentId: string): void {
@@ -91,20 +117,52 @@ export class LayoutAnalysisPlugin extends BasePlugin<
   }
 
   protected onDocumentClosed(documentId: string): void {
+    this.abortActiveTask(documentId);
     this.dispatch(cleanupLayoutState(documentId));
     this.pageLayoutChange$.clearScope(documentId);
   }
 
+  protected onStoreUpdated(prevState: LayoutAnalysisState, newState: LayoutAnalysisState): void {
+    if (prevState === newState) return;
+
+    for (const documentId in newState.documents) {
+      const changed =
+        prevState.documents[documentId] !== newState.documents[documentId] ||
+        prevState.layoutOverlayVisible !== newState.layoutOverlayVisible ||
+        prevState.tableStructureOverlayVisible !== newState.tableStructureOverlayVisible ||
+        prevState.tableStructureEnabled !== newState.tableStructureEnabled ||
+        prevState.layoutThreshold !== newState.layoutThreshold ||
+        prevState.tableStructureThreshold !== newState.tableStructureThreshold ||
+        prevState.selectedBlockId !== newState.selectedBlockId;
+
+      if (changed) {
+        this.stateChange$.emit({ documentId, state: newState });
+      }
+    }
+  }
+
   protected buildCapability(): LayoutAnalysisCapability {
     return {
-      analyzePage: (pageIndex) => this.analyzePage(pageIndex),
-      analyzeAllPages: () => this.analyzeAllPages(),
+      analyzePage: (pageIndex, options) => this.analyzePage(pageIndex, undefined, options),
+      analyzeAllPages: (options) => this.analyzeAllPages(undefined, options),
       getPageLayout: (pageIndex) => this.getPageLayout(pageIndex),
+      getPageTextRuns: (pageIndex) => this.getPageTextRuns(pageIndex),
       forDocument: (documentId) => this.createScope(documentId),
       onPageLayoutChange: this.pageLayoutChange$.onGlobal,
-      setOverlayVisible: (visible) => this.dispatch(setOverlayVisible(visible)),
-      setThreshold: (t) => this.dispatch(setThreshold(t)),
+      onStateChange: this.stateChange$.on,
+      setLayoutOverlayVisible: (v) => this.dispatch(setLayoutOverlayVisible(v)),
+      setTableStructureOverlayVisible: (v) => this.dispatch(setTableStructureOverlayVisible(v)),
+      setTableStructureEnabled: (v) => this.dispatch(setTableStructureEnabled(v)),
+      setLayoutThreshold: (t) => this.dispatch(setLayoutThreshold(t)),
+      setTableStructureThreshold: (t) => this.dispatch(setTableStructureThreshold(t)),
       selectBlock: (id) => this.dispatch(selectBlock(id)),
+      clearPageResults: (docId, pageIndex) => {
+        this.dispatch(clearPageResults(docId, pageIndex));
+        this.pageLayoutChange$.emit(docId, { pageIndex, layout: null });
+      },
+      clearAllResults: (docId) => {
+        this.dispatch(clearAllResults(docId));
+      },
     };
   }
 
@@ -113,6 +171,7 @@ export class LayoutAnalysisPlugin extends BasePlugin<
   private analyzePage(
     pageIndex: number,
     documentId?: string,
+    options?: AnalyzePageOptions,
   ): LayoutTask<PageLayout, PageAnalysisProgress> {
     const task = new Task<PageLayout, LayoutAnalysisErrorReason, PageAnalysisProgress>();
 
@@ -122,15 +181,32 @@ export class LayoutAnalysisPlugin extends BasePlugin<
       return task;
     }
 
-    this.dispatch(setPageStatus(docId, pageIndex, 'analyzing'));
+    const pageState = this.getPageState(pageIndex, docId);
+    const hasLayout = pageState?.layout != null;
+    const hasTableStructure = pageState?.tableStructureAnalyzed ?? false;
+    const tableEnabled = this.state.tableStructureEnabled;
+    const force = options?.force ?? false;
 
-    this.doAnalyzePage(docId, pageIndex, task);
+    const needsLayout = !hasLayout || force;
+    const needsTableStructure = tableEnabled && (!hasTableStructure || force);
+
+    if (!needsLayout && !needsTableStructure) {
+      task.resolve(pageState!.layout!);
+      return task;
+    }
+
+    this.dispatch(setPageStatus(docId, pageIndex, 'analyzing'));
+    this.doAnalyzePage(docId, pageIndex, task, {
+      runLayout: needsLayout,
+      runTableStructure: needsTableStructure,
+    });
 
     return task;
   }
 
   private analyzeAllPages(
     documentId?: string,
+    options?: AnalyzePageOptions,
   ): LayoutTask<DocumentLayout, DocumentAnalysisProgress> {
     const task = new Task<DocumentLayout, LayoutAnalysisErrorReason, DocumentAnalysisProgress>();
 
@@ -146,30 +222,49 @@ export class LayoutAnalysisPlugin extends BasePlugin<
       return task;
     }
 
+    this.trackTask(docId, task);
+
     const pageCount = coreDoc.document.pageCount;
     const pages: PageLayout[] = [];
     let completed = 0;
+    let currentPageTask: LayoutTask<PageLayout, PageAnalysisProgress> | null = null;
+
+    const origAbort = task.abort.bind(task);
+    task.abort = (reason: any) => {
+      currentPageTask?.abort(reason);
+      origAbort(reason);
+    };
 
     const analyzeNext = (idx: number) => {
+      if (task.state.stage !== TaskStage.Pending) return;
+
       if (idx >= pageCount) {
         task.resolve({ pages });
         return;
       }
 
-      const pageTask = this.analyzePage(idx, docId);
+      const pageTask = this.analyzePage(idx, docId, options);
+      currentPageTask = pageTask;
 
       pageTask.onProgress((p) => {
-        task.progress(p);
+        if (task.state.stage === TaskStage.Pending) {
+          task.progress(p);
+        }
       });
 
       pageTask.wait(
         (layout) => {
+          if (task.state.stage !== TaskStage.Pending) return;
           pages.push(layout);
           completed++;
           task.progress({ stage: 'page-complete', pageIndex: idx, completed, total: pageCount });
           analyzeNext(idx + 1);
         },
-        (err) => task.fail(err),
+        (err) => {
+          if (task.state.stage === TaskStage.Pending) {
+            task.fail(err);
+          }
+        },
       );
     };
 
@@ -180,18 +275,74 @@ export class LayoutAnalysisPlugin extends BasePlugin<
   private getPageLayout(pageIndex: number, documentId?: string): PageLayout | null {
     const docId = documentId ?? this.getActiveDocumentId();
     if (!docId) return null;
-    const layoutState = this.getLayoutState();
-    const docState = layoutState?.documents[docId];
-    return docState?.pages[pageIndex]?.layout ?? null;
+    return this.getPageState(pageIndex, docId)?.layout ?? null;
+  }
+
+  private getPageState(pageIndex: number, documentId: string) {
+    return this.state.documents[documentId]?.pages[pageIndex] ?? null;
+  }
+
+  private getPageTextRuns(pageIndex: number, documentId?: string): Task<PdfPageTextRuns, any, any> {
+    const task = new Task<PdfPageTextRuns, any, any>();
+
+    const docId = documentId ?? this.getActiveDocumentId();
+    if (!docId) {
+      task.reject({ type: 'no-document', message: 'No document loaded' });
+      return task;
+    }
+
+    const coreDoc = this.coreState.core.documents[docId];
+    if (!coreDoc?.document) {
+      task.reject({ type: 'no-document', message: 'No document loaded' });
+      return task;
+    }
+
+    const page = coreDoc.document.pages[pageIndex];
+    if (!page) {
+      task.reject({ type: 'no-document', message: `Page ${pageIndex} not found` });
+      return task;
+    }
+
+    const engineTask = this.engine.getPageTextRuns(coreDoc.document, page);
+    engineTask.wait(
+      (result) => task.resolve(result),
+      (err) => task.reject(err),
+    );
+
+    return task;
   }
 
   private createScope(documentId: string): LayoutAnalysisScope {
     return {
-      analyzePage: (pageIndex) => this.analyzePage(pageIndex, documentId),
-      analyzeAllPages: () => this.analyzeAllPages(documentId),
+      analyzePage: (pageIndex, options) => this.analyzePage(pageIndex, documentId, options),
+      analyzeAllPages: (options) => this.analyzeAllPages(documentId, options),
       getPageLayout: (pageIndex) => this.getPageLayout(pageIndex, documentId),
+      getPageTextRuns: (pageIndex) => this.getPageTextRuns(pageIndex, documentId),
       onPageLayoutChange: this.pageLayoutChange$.forScope(documentId),
+      getState: () => this.state,
+      onStateChange: (listener: Listener<LayoutAnalysisState>) =>
+        this.stateChange$.on((event) => {
+          if (event.documentId === documentId) listener(event.state);
+        }),
     };
+  }
+
+  // ─── Task tracking & abort ────────────────────────────────
+
+  private trackTask(documentId: string, task: Task<any, any, any>): void {
+    this.abortActiveTask(documentId);
+    this.activeTasks.set(documentId, task);
+
+    const cleanup = () => this.activeTasks.delete(documentId);
+    task.wait(cleanup, cleanup);
+  }
+
+  private abortActiveTask(documentId: string): void {
+    const existing = this.activeTasks.get(documentId);
+    if (existing) {
+      existing.abort({ type: 'no-document', message: 'Aborted' });
+      this.activeTasks.delete(documentId);
+    }
   }
 
   // ─── Internal pipeline ───────────────────────────────────
@@ -200,6 +351,7 @@ export class LayoutAnalysisPlugin extends BasePlugin<
     documentId: string,
     pageIndex: number,
     task: Task<PageLayout, LayoutAnalysisErrorReason, PageAnalysisProgress>,
+    phases: { runLayout: boolean; runTableStructure: boolean },
   ): void {
     const seq = new TaskSequence(task);
 
@@ -220,89 +372,86 @@ export class LayoutAnalysisPlugin extends BasePlugin<
         const pageSize: Size = page.size;
         const renderScope = this.renderCapability.forDocument(documentId);
 
-        // 1. Render page to raw ImageDataLike (no Blob encoding round-trip)
-        task.progress({ stage: 'rendering', pageIndex });
-        const imageData = await seq.run(() =>
-          renderScope.renderPageRaw({
-            pageIndex,
-            options: { scaleFactor: this.pluginConfig.renderScale },
-          }),
-        );
+        let layout: PageLayout;
 
-        // 2. Run layout detection (model loading progress flows through)
-        task.progress({ stage: 'layout-detection', pageIndex });
-        const input: LayoutDetectionInput = {
-          imageData,
-          sourceWidth: imageData.width,
-          sourceHeight: imageData.height,
-        };
+        this.logger.debug('LayoutAnalysis', 'analyzePage', `page ${pageIndex}`, {
+          runLayout: phases.runLayout,
+          runTableStructure: phases.runTableStructure,
+        });
 
-        const detections = await seq.runWithProgress(
-          () => this.aiManager.run(this.layoutPipeline, input),
-          (p: PipelineProgress) => {
-            if (p.stage === 'downloading-model') {
-              return {
-                stage: 'downloading-model' as const,
-                pageIndex,
-                loaded: p.loaded,
-                total: p.total,
-              };
-            }
-            if (p.stage === 'creating-session') {
-              return { stage: 'creating-session' as const, pageIndex };
-            }
-            return { stage: 'layout-detection' as const, pageIndex };
-          },
-        );
-
-        // 3. Map coordinates to PDF page space
-        task.progress({ stage: 'mapping-coordinates', pageIndex });
-        const imageSize: Size = { width: imageData.width, height: imageData.height };
-        const blocks = mapDetectionsToPageCoordinates(detections, imageSize, pageSize);
-
-        // 4. Table structure (if enabled)
-        const tableStructures = new Map<number, TableStructureElement[]>();
-        if (this.pluginConfig.tableStructure) {
-          const tableBlocks = blocks.filter(
-            (b) => b.classId === TABLE_CLASS_ID && b.score >= TABLE_MIN_SCORE,
+        if (phases.runLayout) {
+          task.progress({ stage: 'rendering', pageIndex });
+          const imageData = await seq.run(() =>
+            renderScope.renderPageRaw({
+              pageIndex,
+              options: { scaleFactor: this.pluginConfig.renderScale },
+            }),
           );
 
-          for (let ti = 0; ti < tableBlocks.length; ti++) {
-            task.progress({
-              stage: 'table-structure',
-              pageIndex,
-              tableIndex: ti,
-              tableCount: tableBlocks.length,
-            });
+          task.progress({ stage: 'layout-detection', pageIndex });
+          const input: LayoutDetectionInput = {
+            imageData,
+            sourceWidth: imageData.width,
+            sourceHeight: imageData.height,
+          };
 
-            try {
-              const tableBlock = tableBlocks[ti];
-              const elements = await this.analyzeTableStructure(
-                tableBlock.rect,
-                documentId,
-                pageIndex,
-                seq,
-                ti,
-                tableBlocks.length,
-              );
-              tableStructures.set(tableBlock.id, elements);
-            } catch {
-              tableStructures.set(tableBlocks[ti].id, []);
-            }
+          const detections = await seq.runWithProgress(
+            () => this.aiManager.run(this.layoutPipeline, input),
+            (p: PipelineProgress) => {
+              if (p.stage === 'downloading-model') {
+                return {
+                  stage: 'downloading-model' as const,
+                  pageIndex,
+                  loaded: p.loaded,
+                  total: p.total,
+                };
+              }
+              if (p.stage === 'creating-session') {
+                return { stage: 'creating-session' as const, pageIndex };
+              }
+              return { stage: 'layout-detection' as const, pageIndex };
+            },
+          );
+
+          task.progress({ stage: 'mapping-coordinates', pageIndex });
+          const imageSize: Size = { width: imageData.width, height: imageData.height };
+          const blocks = mapDetectionsToPageCoordinates(detections, imageSize, pageSize);
+          for (const block of blocks) {
+            block.id = uuidV4();
           }
+
+          layout = {
+            pageIndex,
+            blocks,
+            tableStructures: new Map(),
+            imageSize,
+            pageSize,
+          };
+
+          this.logger.debug('LayoutAnalysis', 'layoutDetection', `page ${pageIndex} complete`, {
+            blockCount: blocks.length,
+          });
+
+          this.dispatch(setPageLayout(documentId, pageIndex, layout));
+          this.pageLayoutChange$.emit(documentId, { pageIndex, layout });
+        } else {
+          layout = this.getPageLayout(pageIndex, documentId)!;
         }
 
-        // 5. Build and store result
-        const layout: PageLayout = {
-          pageIndex,
-          blocks,
-          tableStructures,
-          imageSize,
-          pageSize,
-        };
+        if (phases.runTableStructure) {
+          const tableStructures = await this.runTableStructurePass(
+            documentId,
+            pageIndex,
+            layout,
+            seq,
+            task,
+          );
 
-        this.dispatch(setPageLayout(documentId, pageIndex, layout));
-        this.pageLayoutChange$.emit(documentId, { pageIndex, layout });
+          layout = { ...layout, tableStructures };
+          this.dispatch(setPageTableStructures(documentId, pageIndex, tableStructures));
+          this.pageLayoutChange$.emit(documentId, { pageIndex, layout });
+        }
+
         task.resolve(layout);
       },
       (err) => {
@@ -316,15 +465,69 @@ export class LayoutAnalysisPlugin extends BasePlugin<
       (error) => {
         if (error.type === 'reject') {
           this.dispatch(setPageError(documentId, pageIndex, error.reason.message));
+        } else if (error.type === 'abort') {
+          this.dispatch(setPageStatus(documentId, pageIndex, 'idle'));
         }
       },
     );
   }
 
-  /**
-   * Render just the table region from PDFium, add white padding,
-   * run the table structure model, and map results to PDF coordinates.
-   */
+  private async runTableStructurePass(
+    documentId: string,
+    pageIndex: number,
+    layout: PageLayout,
+    seq: TaskSequence<LayoutAnalysisErrorReason, PageAnalysisProgress>,
+    task: Task<PageLayout, LayoutAnalysisErrorReason, PageAnalysisProgress>,
+  ): Promise<Map<string, TableStructureElement[]>> {
+    const tableStructures = new Map<string, TableStructureElement[]>();
+    const tableBlocks = layout.blocks.filter(
+      (b) => b.classId === TABLE_CLASS_ID && b.score >= TABLE_MIN_SCORE,
+    );
+
+    this.logger.debug('LayoutAnalysis', 'runTableStructurePass', {
+      totalBlocks: layout.blocks.length,
+      qualifyingTableBlocks: tableBlocks.length,
+      tableBlockScores: tableBlocks.map((b) => b.score),
+      tableMinScore: TABLE_MIN_SCORE,
+    });
+
+    for (let ti = 0; ti < tableBlocks.length; ti++) {
+      task.progress({
+        stage: 'table-structure',
+        pageIndex,
+        tableIndex: ti,
+        tableCount: tableBlocks.length,
+      });
+
+      try {
+        const tableBlock = tableBlocks[ti];
+        const elements = await this.analyzeTableStructure(
+          tableBlock.rect,
+          documentId,
+          pageIndex,
+          seq,
+          ti,
+          tableBlocks.length,
+        );
+        this.logger.debug(
+          'LayoutAnalysis',
+          'tableStructure',
+          `table ${ti} (block ${tableBlock.id})`,
+          {
+            elementsCount: elements.length,
+            tableRect: tableBlock.rect,
+            sampleElement: elements.length > 0 ? elements[0] : null,
+          },
+        );
+        tableStructures.set(tableBlock.id, elements);
+      } catch {
+        tableStructures.set(tableBlocks[ti].id, []);
+      }
+    }
+
+    return tableStructures;
+  }
+
   private async analyzeTableStructure(
     tableRect: Rect,
     documentId: string,
@@ -335,7 +538,6 @@ export class LayoutAnalysisPlugin extends BasePlugin<
   ): Promise<TableStructureElement[]> {
     if (tableRect.size.width < 1 || tableRect.size.height < 1) return [];
 
-    // Render the table rect directly from PDFium (no pixel-level cropping)
     const renderScope = this.renderCapability.forDocument(documentId);
     const cropData = await seq.run(() =>
       renderScope.renderPageRectRaw({
@@ -348,15 +550,7 @@ export class LayoutAnalysisPlugin extends BasePlugin<
     const cropSize: Size = { width: cropData.width, height: cropData.height };
     if (cropSize.width < 8 || cropSize.height < 8) return [];
 
-    // Add white padding around the crop for the AI model
-    const pad = computePadding(cropSize);
-    const paddedData = padImageData(cropData, pad);
-
-    // Run table structure pipeline (model loading progress flows through)
-    const input: TableStructureInput = {
-      imageData: paddedData,
-      pageRect: { x1: 0, y1: 0, x2: paddedData.width, y2: paddedData.height },
-    };
+    const input: TableStructureInput = { imageData: cropData };
 
     const result = await seq.runWithProgress(
       () => this.aiManager.run(this.tablePipeline, input),
@@ -376,46 +570,11 @@ export class LayoutAnalysisPlugin extends BasePlugin<
       },
     );
 
-    // Map table element coordinates to PDF page space
     return result.elements.map((el) => ({
       classId: el.classId,
       label: el.label,
       score: el.score,
-      rect: mapTableElementToPageCoordinates(el.bbox, tableRect, cropSize, pad),
+      rect: mapTableElementToPageCoordinates(el.bbox, tableRect, cropSize),
     }));
   }
-
-  private getLayoutState(): LayoutAnalysisState {
-    return this.state;
-  }
-}
-
-// ─── Utility functions ─────────────────────────────────────
-
-function computePadding(cropSize: Size): number {
-  const margin = Math.round(Math.min(cropSize.width, cropSize.height) * CROP_MARGIN_RATIO);
-  return clamp(margin, CROP_MARGIN_MIN_PX, CROP_MARGIN_MAX_PX);
-}
-
-function padImageData(src: ImageDataLike, pad: number): ImageDataLike {
-  const w = src.width + pad * 2;
-  const h = src.height + pad * 2;
-  const dst = new Uint8ClampedArray(w * h * 4);
-
-  // Fill with white
-  for (let i = 0; i < dst.length; i += 4) {
-    dst[i] = 255;
-    dst[i + 1] = 255;
-    dst[i + 2] = 255;
-    dst[i + 3] = 255;
-  }
-
-  // Copy source into center
-  for (let dy = 0; dy < src.height; dy++) {
-    const srcOffset = dy * src.width * 4;
-    const dstOffset = ((dy + pad) * w + pad) * 4;
-    dst.set(src.data.subarray(srcOffset, srcOffset + src.width * 4), dstOffset);
-  }
-
-  return { data: dst, width: w, height: h };
 }

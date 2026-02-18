@@ -1,12 +1,14 @@
 import { BasePluginConfig, EventHook } from '@embedpdf/core';
-import { Task, Rect, Size, Rotation } from '@embedpdf/models';
+import { Task, Rect, Size, PdfPageTextRuns } from '@embedpdf/models';
 import { AiErrorReason } from '@embedpdf/ai';
 
 // ─── Plugin Config ─────────────────────────────────────────
 
 export interface LayoutAnalysisPluginConfig extends BasePluginConfig {
-  /** Detection confidence threshold (default: 0.35). */
-  threshold?: number;
+  /** Layout detection confidence threshold (default: 0.35). */
+  layoutThreshold?: number;
+  /** Table structure confidence threshold (default: 0.8). */
+  tableStructureThreshold?: number;
   /** Enable table structure analysis (default: false). */
   tableStructure?: boolean;
   /** Auto-analyze when a page first loads (default: false). */
@@ -21,8 +23,8 @@ export interface LayoutAnalysisPluginConfig extends BasePluginConfig {
  * A single layout block in PDF page coordinates (points).
  */
 export interface LayoutBlock {
-  /** Unique ID for this detection. */
-  id: number;
+  /** Globally unique ID for this detection. */
+  id: string;
   /** Numeric class ID from the model. */
   classId: number;
   /** Human-readable label (e.g., 'text', 'table', 'image'). */
@@ -53,7 +55,7 @@ export interface TableStructureElement {
 export interface PageLayout {
   pageIndex: number;
   blocks: LayoutBlock[];
-  tableStructures: Map<number, TableStructureElement[]>;
+  tableStructures: Map<string, TableStructureElement[]>;
   /** The image dimensions used for analysis. */
   imageSize: Size;
   /** The PDF page size in points. */
@@ -96,6 +98,7 @@ export interface PageAnalysisState {
   status: PageAnalysisStatus;
   layout: PageLayout | null;
   error: string | null;
+  tableStructureAnalyzed: boolean;
 }
 
 export interface LayoutAnalysisState {
@@ -105,9 +108,12 @@ export interface LayoutAnalysisState {
       pages: Record<number, PageAnalysisState>;
     }
   >;
-  overlayVisible: boolean;
-  selectedBlockId: number | null;
-  activeThreshold: number;
+  layoutOverlayVisible: boolean;
+  tableStructureOverlayVisible: boolean;
+  tableStructureEnabled: boolean;
+  selectedBlockId: string | null;
+  layoutThreshold: number;
+  tableStructureThreshold: number;
 }
 
 // ─── Events ────────────────────────────────────────────────
@@ -121,24 +127,54 @@ export interface PageLayoutChangeGlobalEvent extends PageLayoutChangeEvent {
   documentId: string;
 }
 
+export interface StateChangeEvent {
+  documentId: string;
+  state: LayoutAnalysisState;
+}
+
 // ─── Capability ────────────────────────────────────────────
 
+export interface AnalyzePageOptions {
+  /** Re-analyze even if results already exist. */
+  force?: boolean;
+}
+
 export interface LayoutAnalysisScope {
-  analyzePage(pageIndex: number): LayoutTask<PageLayout, PageAnalysisProgress>;
-  analyzeAllPages(): LayoutTask<DocumentLayout, DocumentAnalysisProgress>;
+  analyzePage(
+    pageIndex: number,
+    options?: AnalyzePageOptions,
+  ): LayoutTask<PageLayout, PageAnalysisProgress>;
+  analyzeAllPages(
+    options?: AnalyzePageOptions,
+  ): LayoutTask<DocumentLayout, DocumentAnalysisProgress>;
   getPageLayout(pageIndex: number): PageLayout | null;
+  getPageTextRuns(pageIndex: number): Task<PdfPageTextRuns, any, any>;
   onPageLayoutChange: EventHook<PageLayoutChangeEvent>;
+  getState(): LayoutAnalysisState;
+  onStateChange: EventHook<LayoutAnalysisState>;
 }
 
 export interface LayoutAnalysisCapability {
-  analyzePage(pageIndex: number): LayoutTask<PageLayout, PageAnalysisProgress>;
-  analyzeAllPages(): LayoutTask<DocumentLayout, DocumentAnalysisProgress>;
+  analyzePage(
+    pageIndex: number,
+    options?: AnalyzePageOptions,
+  ): LayoutTask<PageLayout, PageAnalysisProgress>;
+  analyzeAllPages(
+    options?: AnalyzePageOptions,
+  ): LayoutTask<DocumentLayout, DocumentAnalysisProgress>;
   getPageLayout(pageIndex: number): PageLayout | null;
+  getPageTextRuns(pageIndex: number): Task<PdfPageTextRuns, any, any>;
   forDocument(documentId: string): LayoutAnalysisScope;
 
   onPageLayoutChange: EventHook<PageLayoutChangeGlobalEvent>;
+  onStateChange: EventHook<StateChangeEvent>;
 
-  setOverlayVisible(visible: boolean): void;
-  setThreshold(threshold: number): void;
-  selectBlock(blockId: number | null): void;
+  setLayoutOverlayVisible(visible: boolean): void;
+  setTableStructureOverlayVisible(visible: boolean): void;
+  setTableStructureEnabled(enabled: boolean): void;
+  setLayoutThreshold(threshold: number): void;
+  setTableStructureThreshold(threshold: number): void;
+  selectBlock(blockId: string | null): void;
+  clearPageResults(documentId: string, pageIndex: number): void;
+  clearAllResults(documentId: string): void;
 }

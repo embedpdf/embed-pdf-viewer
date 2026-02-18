@@ -375,6 +375,9 @@ export class EngineRunner {
       case 'getPageGeometry':
         task = engine.getPageGeometry!(...args);
         break;
+      case 'getPageTextRuns':
+        task = engine.getPageTextRuns!(...args);
+        break;
       case 'merge':
         task = engine.merge!(...args);
         break;

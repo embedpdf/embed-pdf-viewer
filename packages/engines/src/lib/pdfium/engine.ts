@@ -113,6 +113,10 @@ import {
   PdfTrappedStatus,
   PdfStampFit,
   PdfAddAttachmentParams,
+  PdfFontInfo,
+  PdfTextRun,
+  PdfPageTextRuns,
+  PdfAlphaColor,
 } from '@embedpdf/models';
 import { computeFormDrawParams, isValidCustomKey, readArrayBuffer, readString } from './helper';
 import { WrappedPdfiumModule } from '@embedpdf/pdfium';
@@ -3687,6 +3691,225 @@ export class PdfiumNative implements IPdfiumExecutor {
     }
 
     return runs;
+  }
+
+  /**
+   * Rich text runs: groups consecutive characters sharing the same
+   * text object, font, size, and fill color into structured segments
+   * with full font metadata and bounding boxes in PDF page coordinates.
+   *
+   * @public
+   */
+  getPageTextRuns(doc: PdfDocumentObject, page: PdfPageObject): PdfTask<PdfPageTextRuns> {
+    const label = 'getPageTextRuns';
+    this.logger.perf(LOG_SOURCE, LOG_CATEGORY, label, 'Begin', doc.id);
+
+    const ctx = this.cache.getContext(doc.id);
+    if (!ctx) {
+      this.logger.perf(LOG_SOURCE, LOG_CATEGORY, label, 'End', doc.id);
+      return PdfTaskHelper.reject({
+        code: PdfErrorCode.DocNotOpen,
+        message: 'document does not open',
+      });
+    }
+
+    const pageCtx = ctx.acquirePage(page.index);
+    const textPagePtr = pageCtx.getTextPage();
+    const charCount = this.pdfiumModule.FPDFText_CountChars(textPagePtr);
+
+    const runs: PdfTextRun[] = [];
+    let runStart = 0;
+    let curObjPtr: number | null = null;
+    let curFont: PdfFontInfo | null = null;
+    let curFontSize = 0;
+    let curColor: PdfAlphaColor | null = null;
+    let bounds: { minX: number; minY: number; maxX: number; maxY: number } | null = null;
+
+    const flushRun = (end: number) => {
+      if (curObjPtr === null || curFont === null || curColor === null || bounds === null) return;
+      const count = end - runStart;
+      if (count <= 0) return;
+
+      const bufPtr = this.memoryManager.malloc(2 * (count + 1));
+      this.pdfiumModule.FPDFText_GetText(textPagePtr, runStart, count, bufPtr);
+      const text = stripPdfUnwantedMarkers(this.pdfiumModule.pdfium.UTF16ToString(bufPtr));
+      this.memoryManager.free(bufPtr);
+
+      runs.push({
+        text,
+        rect: {
+          origin: { x: bounds.minX, y: bounds.minY },
+          size: {
+            width: Math.max(1, bounds.maxX - bounds.minX),
+            height: Math.max(1, bounds.maxY - bounds.minY),
+          },
+        },
+        font: curFont,
+        fontSize: curFontSize,
+        color: curColor,
+        charIndex: runStart,
+        charCount: count,
+      });
+    };
+
+    const rPtr = this.memoryManager.malloc(4);
+    const gPtr = this.memoryManager.malloc(4);
+    const bPtr = this.memoryManager.malloc(4);
+    const aPtr = this.memoryManager.malloc(4);
+    const rectPtr = this.memoryManager.malloc(16);
+    const dx1Ptr = this.memoryManager.malloc(4);
+    const dy1Ptr = this.memoryManager.malloc(4);
+    const dx2Ptr = this.memoryManager.malloc(4);
+    const dy2Ptr = this.memoryManager.malloc(4);
+    const italicAnglePtr = this.memoryManager.malloc(4);
+
+    for (let i = 0; i < charCount; i++) {
+      const uc = this.pdfiumModule.FPDFText_GetUnicode(textPagePtr, i);
+      if (uc === 0xfffe || uc === 0xfffd) continue;
+
+      const objPtr = this.pdfiumModule.FPDFText_GetTextObject(textPagePtr, i) as number;
+      if (objPtr === 0) continue;
+
+      const fontSize = this.pdfiumModule.FPDFText_GetFontSize(textPagePtr, i);
+
+      this.pdfiumModule.FPDFText_GetFillColor(textPagePtr, i, rPtr, gPtr, bPtr, aPtr);
+      const red = this.pdfiumModule.pdfium.getValue(rPtr, 'i32') & 0xff;
+      const green = this.pdfiumModule.pdfium.getValue(gPtr, 'i32') & 0xff;
+      const blue = this.pdfiumModule.pdfium.getValue(bPtr, 'i32') & 0xff;
+      const alpha = this.pdfiumModule.pdfium.getValue(aPtr, 'i32') & 0xff;
+
+      const fontInfo = this.readFontInfoFromTextObject(objPtr, italicAnglePtr);
+
+      const needNewRun =
+        curObjPtr === null ||
+        objPtr !== curObjPtr ||
+        fontInfo.name !== curFont!.name ||
+        Math.abs(fontSize - curFontSize) > 0.01 ||
+        red !== curColor!.red ||
+        green !== curColor!.green ||
+        blue !== curColor!.blue;
+
+      if (needNewRun) {
+        flushRun(i);
+        curObjPtr = objPtr;
+        curFont = fontInfo;
+        curFontSize = fontSize;
+        curColor = { red, green, blue, alpha };
+        runStart = i;
+        bounds = null;
+      }
+
+      // Expand bounds with this character's bbox
+      if (this.pdfiumModule.FPDFText_GetLooseCharBox(textPagePtr, i, rectPtr)) {
+        const left = this.pdfiumModule.pdfium.getValue(rectPtr, 'float');
+        const top = this.pdfiumModule.pdfium.getValue(rectPtr + 4, 'float');
+        const right = this.pdfiumModule.pdfium.getValue(rectPtr + 8, 'float');
+        const bottom = this.pdfiumModule.pdfium.getValue(rectPtr + 12, 'float');
+
+        if (left !== right && top !== bottom) {
+          this.pdfiumModule.FPDF_PageToDevice(
+            pageCtx.pagePtr,
+            0,
+            0,
+            page.size.width,
+            page.size.height,
+            0,
+            left,
+            top,
+            dx1Ptr,
+            dy1Ptr,
+          );
+          this.pdfiumModule.FPDF_PageToDevice(
+            pageCtx.pagePtr,
+            0,
+            0,
+            page.size.width,
+            page.size.height,
+            0,
+            right,
+            bottom,
+            dx2Ptr,
+            dy2Ptr,
+          );
+
+          const x1 = this.pdfiumModule.pdfium.getValue(dx1Ptr, 'i32');
+          const y1 = this.pdfiumModule.pdfium.getValue(dy1Ptr, 'i32');
+          const x2 = this.pdfiumModule.pdfium.getValue(dx2Ptr, 'i32');
+          const y2 = this.pdfiumModule.pdfium.getValue(dy2Ptr, 'i32');
+          const cx = Math.min(x1, x2);
+          const cy = Math.min(y1, y2);
+          const cw = Math.abs(x2 - x1);
+          const ch = Math.abs(y2 - y1);
+
+          if (bounds === null) {
+            bounds = { minX: cx, minY: cy, maxX: cx + cw, maxY: cy + ch };
+          } else {
+            bounds.minX = Math.min(bounds.minX, cx);
+            bounds.minY = Math.min(bounds.minY, cy);
+            bounds.maxX = Math.max(bounds.maxX, cx + cw);
+            bounds.maxY = Math.max(bounds.maxY, cy + ch);
+          }
+        }
+      }
+    }
+
+    flushRun(charCount);
+
+    [rPtr, gPtr, bPtr, aPtr, rectPtr, dx1Ptr, dy1Ptr, dx2Ptr, dy2Ptr, italicAnglePtr].forEach((p) =>
+      this.memoryManager.free(p),
+    );
+
+    pageCtx.release();
+    this.logger.perf(LOG_SOURCE, LOG_CATEGORY, label, 'End', doc.id);
+    return PdfTaskHelper.resolve({ runs });
+  }
+
+  /**
+   * Read font metadata from a text object handle via FPDFFont_* APIs.
+   */
+  private readFontInfoFromTextObject(textObjPtr: number, italicAnglePtr: number): PdfFontInfo {
+    const fontPtr = this.pdfiumModule.FPDFTextObj_GetFont(textObjPtr);
+
+    let name = '';
+    let familyName = '';
+    let weight = 400;
+    let italic = false;
+    let monospaced = false;
+    let embedded = false;
+
+    if (fontPtr) {
+      // PostScript name via FPDFFont_GetBaseFontName
+      const nameLen = this.pdfiumModule.FPDFFont_GetBaseFontName(fontPtr, 0, 0);
+      if (nameLen > 0) {
+        const nameBuf = this.memoryManager.malloc(nameLen + 1);
+        this.pdfiumModule.FPDFFont_GetBaseFontName(fontPtr, nameBuf, nameLen + 1);
+        name = this.pdfiumModule.pdfium.UTF8ToString(nameBuf);
+        this.memoryManager.free(nameBuf);
+      }
+
+      // Family name via FPDFFont_GetFamilyName
+      const famLen = this.pdfiumModule.FPDFFont_GetFamilyName(fontPtr, 0, 0);
+      if (famLen > 0) {
+        const famBuf = this.memoryManager.malloc(famLen + 1);
+        this.pdfiumModule.FPDFFont_GetFamilyName(fontPtr, famBuf, famLen + 1);
+        familyName = this.pdfiumModule.pdfium.UTF8ToString(famBuf);
+        this.memoryManager.free(famBuf);
+      }
+
+      weight = this.pdfiumModule.FPDFFont_GetWeight(fontPtr);
+      embedded = this.pdfiumModule.FPDFFont_GetIsEmbedded(fontPtr) !== 0;
+
+      if (this.pdfiumModule.FPDFFont_GetItalicAngle(fontPtr, italicAnglePtr)) {
+        const angle = this.pdfiumModule.pdfium.getValue(italicAnglePtr, 'i32');
+        italic = angle !== 0;
+      }
+
+      // Bit 0 of font flags = FixedPitch (monospaced)
+      const flags = this.pdfiumModule.FPDFFont_GetFlags(fontPtr);
+      monospaced = (flags & 1) !== 0;
+    }
+
+    return { name, familyName, weight, italic, monospaced, embedded };
   }
 
   /**

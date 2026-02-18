@@ -1,4 +1,4 @@
-import { Task } from '@embedpdf/models';
+import { Task, Logger } from '@embedpdf/models';
 
 /**
  * Error reasons for AI operations.
@@ -54,6 +54,8 @@ export interface AiRuntimeConfig {
    * `ort.env.wasm.wasmPaths` so ONNX Runtime can locate its WASM binaries.
    */
   wasmPaths?: string;
+  /** Logger instance for runtime and pipeline diagnostics. Defaults to NoopLogger. */
+  logger?: Logger;
 }
 
 /**
@@ -121,6 +123,8 @@ export interface OnnxTensorLike {
 export interface PipelineContext {
   /** The active backend. */
   backend: AiBackend;
+  /** Logger for pipeline diagnostics. */
+  logger: Logger;
 }
 
 /**

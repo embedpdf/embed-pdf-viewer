@@ -30,7 +30,7 @@ npm install @embedpdf/plugin-layout-analysis @embedpdf/plugin-ai-manager @embedp
 
 First create an AI runtime, then register the AI Manager and Layout Analysis plugins.
 
-```tsx {6-7,10-11,21-28}
+```tsx {6-7,9-13,21-31}
 import { createPluginRegistration } from '@embedpdf/core'
 import { EmbedPDF } from '@embedpdf/core/react'
 // ... other imports
@@ -58,19 +58,55 @@ const plugins = [
 
   // Register and configure layout analysis
   createPluginRegistration(LayoutAnalysisPluginPackage, {
-    threshold: 0.35,      // confidence threshold for detections
-    tableStructure: true,  // enable table structure analysis
+    layoutThreshold: 0.35,          // confidence threshold for layout detections
+    tableStructureThreshold: 0.8,   // confidence threshold for table elements
+    tableStructure: false,          // enable table structure analysis
   }),
 ]
 ```
 
 ## Usage
 
-The plugin provides the `<LayoutAnalysisLayer />` component for displaying results, and the `useLayoutAnalysisCapability` hook for programmatic access.
+The plugin provides the `<LayoutAnalysisLayer />` component for displaying results, the `useLayoutAnalysis` hook for document-scoped reactive state, and the `useLayoutAnalysisCapability` hook for direct API access.
+
+### The `useLayoutAnalysis` Hook
+
+The `useLayoutAnalysis(documentId)` hook is the primary way to interact with the plugin from React. It returns reactive state and scoped methods for a specific document.
+
+```tsx
+import { useLayoutAnalysis } from '@embedpdf/plugin-layout-analysis/react'
+
+const MyToolbar = ({ documentId }) => {
+  const {
+    pages,                          // per-page analysis state
+    layoutOverlayVisible,           // layout overlay toggle
+    tableStructureOverlayVisible,   // table overlay toggle
+    tableStructureEnabled,          // table analysis enabled
+    layoutThreshold,                // current layout threshold
+    tableStructureThreshold,        // current table threshold
+    selectedBlockId,                // currently selected block (string UUID)
+    scope,                          // document-scoped LayoutAnalysisScope
+    provides,                       // full LayoutAnalysisCapability
+  } = useLayoutAnalysis(documentId)
+
+  return (
+    <div>
+      <button onClick={() => provides?.setLayoutOverlayVisible(!layoutOverlayVisible)}>
+        Toggle Layout Overlay
+      </button>
+      <button onClick={() => provides?.setTableStructureEnabled(!tableStructureEnabled)}>
+        Toggle Table Analysis
+      </button>
+    </div>
+  )
+}
+```
 
 ### Analyzing a Page
 
-Use the `useLayoutAnalysisCapability` hook to trigger analysis. The returned task supports **progress tracking** (including model download progress) and **cancellation**.
+Use the capability to trigger analysis. The returned task supports **progress tracking** (including model download progress) and **cancellation**.
+
+The plugin implements **smart caching** — pages that have already been analyzed are skipped automatically. Pass `{ force: true }` to re-analyze regardless.
 
 ```tsx
 import { useLayoutAnalysisCapability } from '@embedpdf/plugin-layout-analysis/react'
@@ -82,24 +118,33 @@ const AnalyzeButton = ({ documentId }) => {
   const handleAnalyze = () => {
     if (!layoutAnalysis) return
 
-    const task = layoutAnalysis.analyzePage(0)
+    // Smart caching: already-analyzed pages are skipped.
+    // Pass { force: true } to re-analyze all pages.
+    const task = layoutAnalysis.analyzeAllPages()
 
     task.onProgress((p) => {
       if (p.stage === 'downloading-model') {
         setStatus(`Downloading model: ${((p.loaded / p.total) * 100).toFixed(0)}%`)
       } else if (p.stage === 'creating-session') {
         setStatus('Initializing model...')
+      } else if (p.stage === 'page-complete') {
+        setStatus(`Page ${p.completed}/${p.total} complete`)
       } else {
         setStatus(p.stage)
       }
     })
 
     task.wait(
-      (layout) => {
-        setStatus(`Done — ${layout.blocks.length} blocks detected`)
+      (result) => {
+        const totalBlocks = result.pages.reduce((sum, p) => sum + p.blocks.length, 0)
+        setStatus(`Done — ${totalBlocks} blocks detected`)
       },
       (error) => {
-        setStatus(`Error: ${error.reason.message}`)
+        if (error.type === 'abort') {
+          setStatus('Cancelled')
+        } else {
+          setStatus(`Error: ${error.reason.message}`)
+        }
       },
     )
   }
@@ -108,11 +153,24 @@ const AnalyzeButton = ({ documentId }) => {
 }
 ```
 
+### Cancellation
+
+The task returned by `analyzePage` and `analyzeAllPages` can be cancelled at any time by calling `abort()`:
+
+```tsx
+const task = layoutAnalysis.analyzeAllPages()
+
+// Later, to cancel:
+task.abort({ type: 'no-document', message: 'Cancelled by user' })
+```
+
+When aborted, the error callback receives `error.type === 'abort'` and the page status resets to `idle`.
+
 ### Displaying Results
 
-Place the `<LayoutAnalysisLayer />` component on top of the `<RenderLayer />` inside your page renderer. It draws color-coded bounding boxes for each detected element with labels and confidence scores.
+Place the `<LayoutAnalysisLayer />` component on top of the `<RenderLayer />` inside your page renderer. It draws color-coded bounding boxes for each detected layout element with labels and confidence scores. When table structure analysis is enabled, table rows, columns, and cells are rendered as dashed overlays.
 
-You must provide the `documentId` and `pageIndex`. The component reads the current zoom scale from the document state automatically, or you can pass a `scale` override.
+The layer reads thresholds, overlay visibility, and selected block state directly from the plugin state — no props needed beyond `documentId` and `pageIndex`.
 
 ```tsx
 import { LayoutAnalysisLayer } from '@embedpdf/plugin-layout-analysis/react'
@@ -137,7 +195,7 @@ import { RenderLayer } from '@embedpdf/plugin-render/react'
 
 ## Live Example
 
-This example shows a PDF viewer with an "Analyze" button. Click it to run layout detection on the current page. The model (~130 MB) is downloaded on first use and cached for subsequent runs.
+This example shows a full-featured layout analysis viewer with controls for analyzing pages, toggling layout and table structure overlays independently, adjusting confidence thresholds with sliders, and enabling/disabling table structure analysis at runtime. The model (~130 MB) is downloaded on first use and cached for subsequent runs.
 
 import { PDFViewer } from '../../code-examples/headless/layout-analysis-example';
 
@@ -155,38 +213,62 @@ import { PDFViewer } from '../../code-examples/headless/layout-analysis-example'
 
 | Option | Type | Description |
 | :--- | :--- | :--- |
-| **`threshold`** | `number` | Minimum confidence score for a detection to be included. <br />**Default**: `0.35` |
-| **`tableStructure`** | `boolean` | If `true`, runs a second model to detect rows, columns, and cells within tables. <br />**Default**: `false` |
+| **`layoutThreshold`** | `number` | Minimum confidence score for a layout detection to be displayed. <br />**Default**: `0.35` |
+| **`tableStructureThreshold`** | `number` | Minimum confidence score for a table structure element to be displayed. <br />**Default**: `0.8` |
+| **`tableStructure`** | `boolean` | If `true`, enables table structure analysis at startup. Can be toggled at runtime via `setTableStructureEnabled()`. <br />**Default**: `false` |
 | **`autoAnalyze`** | `boolean` | If `true`, automatically analyzes pages as they load. <br />**Default**: `false` |
 | **`renderScale`** | `number` | Scale factor for rendering pages before analysis. Higher values improve detection accuracy at the cost of memory. <br />**Default**: `2.0` |
 
 ### Component: `<LayoutAnalysisLayer />`
 
-Renders bounding boxes over a PDF page for detected layout elements.
+Renders bounding boxes over a PDF page for detected layout elements and table structure. Thresholds, overlay visibility, and selected block state are read directly from the plugin state.
 
 | Prop | Type | Description |
 | :--- | :--- | :--- |
 | **`documentId`** | `string` | **(Required)** The ID of the document. |
 | **`pageIndex`** | `number` | **(Required)** The page index to display layout results for. |
 | **`scale`** | `number` | Zoom scale multiplier. Falls back to the document's current scale. |
-| **`threshold`** | `number` | Confidence threshold — blocks below this are hidden. <br />**Default**: `0.35` |
 | **`style`** | `CSSProperties` | Additional styles applied to the container element. |
+
+### Hook: `useLayoutAnalysis(documentId)`
+
+Document-scoped convenience hook that returns reactive plugin state and methods.
+
+| Return Field | Type | Description |
+| :--- | :--- | :--- |
+| **`pages`** | `Record<number, PageAnalysisState>` | Per-page analysis state for the document. |
+| **`layoutOverlayVisible`** | `boolean` | Whether layout block overlays are shown. |
+| **`tableStructureOverlayVisible`** | `boolean` | Whether table structure overlays are shown. |
+| **`tableStructureEnabled`** | `boolean` | Whether table structure analysis is enabled. |
+| **`layoutThreshold`** | `number` | Current layout detection confidence threshold. |
+| **`tableStructureThreshold`** | `number` | Current table structure confidence threshold. |
+| **`selectedBlockId`** | `string \| null` | The UUID of the currently selected block. |
+| **`scope`** | `LayoutAnalysisScope` | Document-scoped methods (`analyzePage`, `analyzeAllPages`, etc.). |
+| **`provides`** | `LayoutAnalysisCapability` | Full plugin capability with global methods. |
 
 ### Hook: `useLayoutAnalysisCapability()`
 
-Access the plugin API.
+Low-level hook that returns the full plugin capability directly.
 
 #### `LayoutAnalysisCapability` Methods
 
 | Method | Description |
 | :--- | :--- |
-| **`analyzePage(pageIndex)`** | Analyzes a single page. Returns a `Task` with progress and abort support. |
-| **`analyzeAllPages()`** | Analyzes all pages sequentially. Returns a `Task` with per-page progress. |
+| **`analyzePage(pageIndex, options?)`** | Analyzes a single page. Skips if already analyzed unless `{ force: true }`. Returns a `Task` with progress and abort support. |
+| **`analyzeAllPages(options?)`** | Analyzes all pages sequentially. Skips already-analyzed pages unless `{ force: true }`. Returns a `Task` with per-page progress. |
 | **`getPageLayout(pageIndex)`** | Returns the cached `PageLayout` for a page, or `null` if not yet analyzed. |
+| **`getPageTextRuns(pageIndex)`** | Returns raw text runs from the PDF engine for a page (font, size, color, text content). |
 | **`forDocument(id)`** | Returns a document-scoped `LayoutAnalysisScope`. |
-| **`setOverlayVisible(visible)`** | Toggles overlay visibility in the plugin state. |
-| **`setThreshold(threshold)`** | Updates the active confidence threshold. |
-| **`selectBlock(blockId)`** | Selects a block by ID, or `null` to deselect. |
+| **`onPageLayoutChange`** | Event hook fired when a page's layout results change. |
+| **`onStateChange`** | Event hook fired when any plugin state changes (thresholds, visibility, etc.). |
+| **`setLayoutOverlayVisible(visible)`** | Toggles visibility of layout block overlays. |
+| **`setTableStructureOverlayVisible(visible)`** | Toggles visibility of table structure overlays. |
+| **`setTableStructureEnabled(enabled)`** | Enables or disables table structure analysis. When enabled, the next analysis run includes the table structure pass. |
+| **`setLayoutThreshold(threshold)`** | Updates the layout detection confidence threshold. |
+| **`setTableStructureThreshold(threshold)`** | Updates the table structure confidence threshold. |
+| **`selectBlock(blockId)`** | Selects a block by UUID, or `null` to deselect. |
+| **`clearPageResults(documentId, pageIndex)`** | Clears cached results for a single page (forces re-analysis on next run). |
+| **`clearAllResults(documentId)`** | Clears cached results for all pages in a document. |
 
 ### Progress Stages (`PageAnalysisProgress`)
 
@@ -201,15 +283,28 @@ The `onProgress` callback receives one of these stages during `analyzePage`:
 | `table-structure` | `pageIndex`, `tableIndex`, `tableCount` | Analyzing table structure (if enabled). |
 | `mapping-coordinates` | `pageIndex` | Mapping results to PDF page coordinates. |
 
+When using `analyzeAllPages`, an additional `page-complete` stage is emitted with `pageIndex`, `completed`, and `total` fields.
+
 ### Result: `LayoutBlock`
 
 Each detected element in the `PageLayout.blocks` array has these fields:
 
 | Field | Type | Description |
 | :--- | :--- | :--- |
-| **`id`** | `number` | Unique ID for this detection. |
+| **`id`** | `string` | Globally unique UUID for this detection. |
 | **`classId`** | `number` | Numeric class ID from the model. |
 | **`label`** | `string` | Human-readable label (e.g., `text`, `table`, `image`, `header`). |
 | **`score`** | `number` | Confidence score from 0 to 1. |
 | **`rect`** | `Rect` | Bounding box in PDF page coordinates (points). |
 | **`readingOrder`** | `number` | Estimated reading order index. |
+
+### Result: `TableStructureElement`
+
+When table structure analysis is enabled, each table block in `PageLayout.tableStructures` maps to an array of these elements:
+
+| Field | Type | Description |
+| :--- | :--- | :--- |
+| **`classId`** | `number` | Numeric class ID (e.g., 0 = table, 1 = column, 2 = row). |
+| **`label`** | `string` | Human-readable label (`table`, `table_column`, `table_row`, `table_column_header`, `table_projected_row_header`, `table_spanning_cell`). |
+| **`score`** | `number` | Confidence score from 0 to 1. |
+| **`rect`** | `Rect` | Bounding box in PDF page coordinates (points). |

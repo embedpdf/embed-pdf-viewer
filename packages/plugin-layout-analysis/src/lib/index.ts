@@ -23,3 +23,4 @@ export * from './layout-analysis-plugin';
 export * from './types';
 export * from './manifest';
 export * from './coordinate-mapper';
+export * from './merge-utils';

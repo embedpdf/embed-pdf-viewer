@@ -7,16 +7,25 @@ import {
   SET_PAGE_STATUS,
   SET_PAGE_LAYOUT,
   SET_PAGE_ERROR,
-  SET_OVERLAY_VISIBLE,
-  SET_THRESHOLD,
+  SET_LAYOUT_OVERLAY_VISIBLE,
+  SET_TABLE_STRUCTURE_OVERLAY_VISIBLE,
+  SET_TABLE_STRUCTURE_ENABLED,
+  SET_LAYOUT_THRESHOLD,
+  SET_TABLE_STRUCTURE_THRESHOLD,
   SELECT_BLOCK,
+  SET_PAGE_TABLE_STRUCTURES,
+  CLEAR_PAGE_RESULTS,
+  CLEAR_ALL_RESULTS,
 } from './actions';
 
 export const initialState: LayoutAnalysisState = {
   documents: {},
-  overlayVisible: true,
+  layoutOverlayVisible: true,
+  tableStructureOverlayVisible: true,
+  tableStructureEnabled: false,
   selectedBlockId: null,
-  activeThreshold: 0.35,
+  layoutThreshold: 0.35,
+  tableStructureThreshold: 0.8,
 };
 
 export const reducer: Reducer<LayoutAnalysisState, LayoutAnalysisAction> = (
@@ -45,7 +54,12 @@ export const reducer: Reducer<LayoutAnalysisState, LayoutAnalysisAction> = (
       const { documentId, pageIndex, status } = action.payload;
       const doc = state.documents[documentId];
       if (!doc) return state;
-      const page = doc.pages[pageIndex] ?? { status: 'idle', layout: null, error: null };
+      const page = doc.pages[pageIndex] ?? {
+        status: 'idle',
+        layout: null,
+        error: null,
+        tableStructureAnalyzed: false,
+      };
       return {
         ...state,
         documents: {
@@ -73,7 +87,12 @@ export const reducer: Reducer<LayoutAnalysisState, LayoutAnalysisAction> = (
             ...doc,
             pages: {
               ...doc.pages,
-              [pageIndex]: { status: 'complete', layout, error: null },
+              [pageIndex]: {
+                status: 'complete',
+                layout,
+                error: null,
+                tableStructureAnalyzed: false,
+              },
             },
           },
         },
@@ -92,18 +111,79 @@ export const reducer: Reducer<LayoutAnalysisState, LayoutAnalysisAction> = (
             ...doc,
             pages: {
               ...doc.pages,
-              [pageIndex]: { status: 'error', layout: null, error },
+              [pageIndex]: { status: 'error', layout: null, error, tableStructureAnalyzed: false },
             },
           },
         },
       };
     }
 
-    case SET_OVERLAY_VISIBLE:
-      return { ...state, overlayVisible: action.payload };
+    case CLEAR_PAGE_RESULTS: {
+      const { documentId, pageIndex } = action.payload;
+      const doc = state.documents[documentId];
+      if (!doc) return state;
+      const { [pageIndex]: _, ...restPages } = doc.pages;
+      return {
+        ...state,
+        documents: {
+          ...state.documents,
+          [documentId]: { ...doc, pages: restPages },
+        },
+      };
+    }
 
-    case SET_THRESHOLD:
-      return { ...state, activeThreshold: action.payload };
+    case CLEAR_ALL_RESULTS: {
+      const { documentId } = action.payload;
+      const doc = state.documents[documentId];
+      if (!doc) return state;
+      return {
+        ...state,
+        documents: {
+          ...state.documents,
+          [documentId]: { ...doc, pages: {} },
+        },
+      };
+    }
+
+    case SET_PAGE_TABLE_STRUCTURES: {
+      const { documentId, pageIndex, tableStructures } = action.payload;
+      const doc = state.documents[documentId];
+      if (!doc) return state;
+      const page = doc.pages[pageIndex];
+      if (!page?.layout) return state;
+      return {
+        ...state,
+        documents: {
+          ...state.documents,
+          [documentId]: {
+            ...doc,
+            pages: {
+              ...doc.pages,
+              [pageIndex]: {
+                ...page,
+                layout: { ...page.layout, tableStructures },
+                tableStructureAnalyzed: true,
+              },
+            },
+          },
+        },
+      };
+    }
+
+    case SET_LAYOUT_OVERLAY_VISIBLE:
+      return { ...state, layoutOverlayVisible: action.payload };
+
+    case SET_TABLE_STRUCTURE_OVERLAY_VISIBLE:
+      return { ...state, tableStructureOverlayVisible: action.payload };
+
+    case SET_TABLE_STRUCTURE_ENABLED:
+      return { ...state, tableStructureEnabled: action.payload };
+
+    case SET_LAYOUT_THRESHOLD:
+      return { ...state, layoutThreshold: action.payload };
+
+    case SET_TABLE_STRUCTURE_THRESHOLD:
+      return { ...state, tableStructureThreshold: action.payload };
 
     case SELECT_BLOCK:
       return { ...state, selectedBlockId: action.payload };

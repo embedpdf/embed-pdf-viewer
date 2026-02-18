@@ -1,17 +1,20 @@
-import { useEffect, useState, useMemo } from '@framework';
+import { useEffect, useState, useMemo, useCallback } from '@framework';
 import type { CSSProperties } from '@framework';
 
 import { useDocumentState } from '@embedpdf/core/@framework';
 
 import { useLayoutAnalysisCapability } from '../hooks/use-layout-analysis';
-import { PageLayout } from '@embedpdf/plugin-layout-analysis';
+import {
+  PageLayout,
+  LayoutAnalysisState,
+  LayoutBlock,
+  TableStructureElement,
+} from '@embedpdf/plugin-layout-analysis';
 
 export interface LayoutAnalysisLayerProps {
   documentId: string;
   pageIndex: number;
   scale?: number;
-  /** Confidence threshold — blocks below this are hidden. */
-  threshold?: number;
   style?: CSSProperties;
 }
 
@@ -43,6 +46,9 @@ const CLASS_BORDER_COLORS: Record<string, string> = {
   reference: 'rgba(75, 85, 99, 0.7)',
 };
 
+const TABLE_STRUCTURE_COLOR = 'rgba(234, 88, 12, 0.12)';
+const TABLE_STRUCTURE_BORDER = 'rgba(234, 88, 12, 0.5)';
+
 function getColorForLabel(label: string): string {
   return CLASS_COLORS[label] ?? `hsla(${hashCode(label) % 360}, 70%, 50%, 0.15)`;
 }
@@ -59,25 +65,16 @@ function hashCode(str: string): number {
   return Math.abs(hash);
 }
 
-/**
- * LayoutAnalysisLayer renders bounding boxes over a PDF page
- * for all detected layout elements.
- *
- * Place on top of the RenderLayer with the same dimensions.
- * Accepts an optional `scale` prop; falls back to the document's
- * current scale from the core store.
- */
 export function LayoutAnalysisLayer({
   documentId,
   pageIndex,
   scale: scaleOverride,
-  threshold = 0.35,
   style,
 }: LayoutAnalysisLayerProps) {
   const { provides: layoutAnalysis } = useLayoutAnalysisCapability();
   const documentState = useDocumentState(documentId);
   const [layout, setLayout] = useState<PageLayout | null>(null);
-  const [selectedBlockId, setSelectedBlockId] = useState<number | null>(null);
+  const [pluginState, setPluginState] = useState<LayoutAnalysisState | null>(null);
 
   const scope = useMemo(
     () => layoutAnalysis?.forDocument(documentId),
@@ -92,22 +89,47 @@ export function LayoutAnalysisLayer({
   useEffect(() => {
     if (!scope) {
       setLayout(null);
+      setPluginState(null);
       return;
     }
     setLayout(scope.getPageLayout(pageIndex));
-    return scope.onPageLayoutChange((event) => {
+    setPluginState(scope.getState());
+
+    const unsub1 = scope.onPageLayoutChange((event) => {
       if (event.pageIndex === pageIndex) {
         setLayout(event.layout);
       }
     });
+
+    const unsub2 = scope.onStateChange((state) => {
+      setPluginState(state);
+    });
+
+    return () => {
+      unsub1();
+      unsub2();
+    };
   }, [scope, pageIndex]);
 
-  const filteredBlocks = useMemo(() => {
-    if (!layout) return [];
-    return layout.blocks.filter((block) => block.score >= threshold);
-  }, [layout, threshold]);
+  const layoutOverlayVisible = pluginState?.layoutOverlayVisible ?? true;
+  const tableStructureOverlayVisible = pluginState?.tableStructureOverlayVisible ?? true;
+  const layoutThreshold = pluginState?.layoutThreshold ?? 0.35;
+  const tableStructureThreshold = pluginState?.tableStructureThreshold ?? 0.8;
+  const selectedBlockId = pluginState?.selectedBlockId ?? null;
 
-  if (!layout || filteredBlocks.length === 0) {
+  const filteredBlocks = useMemo(() => {
+    if (!layout || !layoutOverlayVisible) return [];
+    return layout.blocks.filter((block) => block.score >= layoutThreshold);
+  }, [layout, layoutOverlayVisible, layoutThreshold]);
+
+  const handleBlockClick = useCallback(
+    (blockId: string) => {
+      layoutAnalysis?.selectBlock(selectedBlockId === blockId ? null : blockId);
+    },
+    [layoutAnalysis, selectedBlockId],
+  );
+
+  if (!layout || (!layoutOverlayVisible && !tableStructureOverlayVisible)) {
     return null;
   }
 
@@ -118,53 +140,111 @@ export function LayoutAnalysisLayer({
 
   return (
     <div style={containerStyle} data-layout-analysis-layer="">
-      {filteredBlocks.map((block) => {
-        const isSelected = selectedBlockId === block.id;
+      {filteredBlocks.map((block) => (
+        <BlockOverlay
+          key={block.id}
+          block={block}
+          scale={actualScale}
+          isSelected={selectedBlockId === block.id}
+          onClick={handleBlockClick}
+        />
+      ))}
 
-        const blockStyle: CSSProperties = {
-          position: 'absolute',
-          left: block.rect.origin.x * actualScale,
-          top: block.rect.origin.y * actualScale,
-          width: block.rect.size.width * actualScale,
-          height: block.rect.size.height * actualScale,
-          backgroundColor: getColorForLabel(block.label),
-          border: `1.5px solid ${getBorderColorForLabel(block.label)}`,
-          boxSizing: 'border-box',
-          pointerEvents: 'auto',
-          cursor: 'pointer',
-          opacity: isSelected ? 1 : 0.8,
-          outline: isSelected ? '2px solid #3b82f6' : 'none',
-          transition: 'opacity 0.15s',
-        };
-
-        const labelStyle: CSSProperties = {
-          position: 'absolute',
-          top: '-18px',
-          left: '0',
-          fontSize: '10px',
-          lineHeight: '16px',
-          padding: '0 4px',
-          backgroundColor: getBorderColorForLabel(block.label),
-          color: '#fff',
-          borderRadius: '2px',
-          whiteSpace: 'nowrap',
-          pointerEvents: 'none',
-        };
-
-        return (
-          <div
-            key={block.id}
-            style={blockStyle}
-            data-block-id={block.id}
-            data-block-label={block.label}
-            onClick={() => setSelectedBlockId(isSelected ? null : block.id)}
-          >
-            <span style={labelStyle}>
-              {block.label} {(block.score * 100).toFixed(0)}%
-            </span>
-          </div>
-        );
-      })}
+      {tableStructureOverlayVisible &&
+        layout.tableStructures &&
+        Array.from(layout.tableStructures.entries())
+          .filter(([blockId]) => {
+            const parent = layout.blocks.find((b) => b.id === blockId);
+            return parent && parent.score >= layoutThreshold;
+          })
+          .map(([blockId, elements]) =>
+            elements
+              .filter((el) => el.score >= tableStructureThreshold)
+              .map((el, idx) => (
+                <TableStructureOverlay
+                  key={`ts-${blockId}-${idx}`}
+                  element={el}
+                  scale={actualScale}
+                />
+              )),
+          )}
     </div>
   );
+}
+
+function BlockOverlay({
+  block,
+  scale,
+  isSelected,
+  onClick,
+}: {
+  block: LayoutBlock;
+  scale: number;
+  isSelected: boolean;
+  onClick: (id: string) => void;
+}) {
+  const blockStyle: CSSProperties = {
+    position: 'absolute',
+    left: block.rect.origin.x * scale,
+    top: block.rect.origin.y * scale,
+    width: block.rect.size.width * scale,
+    height: block.rect.size.height * scale,
+    backgroundColor: getColorForLabel(block.label),
+    border: `1.5px solid ${getBorderColorForLabel(block.label)}`,
+    boxSizing: 'border-box',
+    pointerEvents: 'auto',
+    cursor: 'pointer',
+    opacity: isSelected ? 1 : 0.8,
+    outline: isSelected ? '2px solid #3b82f6' : 'none',
+    transition: 'opacity 0.15s',
+  };
+
+  const labelStyle: CSSProperties = {
+    position: 'absolute',
+    top: '-18px',
+    left: '0',
+    fontSize: '10px',
+    lineHeight: '16px',
+    padding: '0 4px',
+    backgroundColor: getBorderColorForLabel(block.label),
+    color: '#fff',
+    borderRadius: '2px',
+    whiteSpace: 'nowrap',
+    pointerEvents: 'none',
+  };
+
+  return (
+    <div
+      style={blockStyle}
+      data-block-id={block.id}
+      data-block-label={block.label}
+      onClick={() => onClick(block.id)}
+    >
+      <span style={labelStyle}>
+        {block.label} {(block.score * 100).toFixed(0)}%
+      </span>
+    </div>
+  );
+}
+
+function TableStructureOverlay({
+  element,
+  scale,
+}: {
+  element: TableStructureElement;
+  scale: number;
+}) {
+  const elStyle: CSSProperties = {
+    position: 'absolute',
+    left: element.rect.origin.x * scale,
+    top: element.rect.origin.y * scale,
+    width: element.rect.size.width * scale,
+    height: element.rect.size.height * scale,
+    backgroundColor: TABLE_STRUCTURE_COLOR,
+    border: `1px dashed ${TABLE_STRUCTURE_BORDER}`,
+    boxSizing: 'border-box',
+    pointerEvents: 'none',
+  };
+
+  return <div style={elStyle} data-table-element={element.label} />;
 }

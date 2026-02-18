@@ -10,6 +10,7 @@ import {
   ImageDataLike,
   imageDataToCHW,
   softmax,
+  clamp,
   IMAGENET_MEAN,
   IMAGENET_STD,
 } from '../processing/image';
@@ -18,6 +19,9 @@ import { inputNameByHint } from '../processing/tensor';
 const SCORE_THRESHOLD = 0.35;
 const SHORTEST_EDGE = 800;
 const LONGEST_EDGE = 1000;
+const CROP_MARGIN_RATIO = 0.12;
+const CROP_MARGIN_MIN_PX = 24;
+const CROP_MARGIN_MAX_PX = 64;
 
 /**
  * Class labels for table structure.
@@ -35,10 +39,8 @@ export const TABLE_STRUCTURE_LABELS: Record<number, string> = {
  * Input for the table structure pipeline.
  */
 export interface TableStructureInput {
-  /** RGBA image data of the cropped table region (with padding). */
+  /** RGBA image data of the cropped table region (unpadded). */
   imageData: ImageDataLike;
-  /** The page-space bounding box of the table crop (for coordinate mapping back). */
-  pageRect: { x1: number; y1: number; x2: number; y2: number };
 }
 
 /**
@@ -51,7 +53,7 @@ export interface TableElement {
   label: string;
   /** Confidence score (0 to 1). */
   score: number;
-  /** Bounding box in source image coordinates [x1, y1, x2, y2]. */
+  /** Bounding box in source (unpadded) image pixel coordinates [x1, y1, x2, y2]. */
   bbox: [number, number, number, number];
 }
 
@@ -64,12 +66,20 @@ export interface TableStructureResult {
 
 /**
  * Pipeline for Table Transformer structure recognition.
+ *
+ * Accepts an unpadded crop image. Internally pads with white margins
+ * (for better edge detection), resizes for the model, runs inference,
+ * and maps output coordinates back to the unpadded crop's pixel space.
  */
 export class TableStructurePipeline implements AiPipeline<
   TableStructureInput,
   TableStructureResult
 > {
   readonly modelId = 'table-structure';
+
+  private sourceWidth = 1;
+  private sourceHeight = 1;
+  private padding = 0;
 
   preprocess(
     input: TableStructureInput,
@@ -78,11 +88,14 @@ export class TableStructurePipeline implements AiPipeline<
   ): OnnxFeeds {
     const { imageData } = input;
 
-    // Resize maintaining aspect ratio
-    const targetSize = computeTargetSize(imageData.width, imageData.height);
-    const resizedData = resizeImageData(imageData, targetSize.width, targetSize.height);
+    this.sourceWidth = imageData.width;
+    this.sourceHeight = imageData.height;
+    this.padding = computePadding(imageData.width, imageData.height);
 
-    // Convert to CHW with ImageNet normalization
+    const paddedData = padImageData(imageData, this.padding);
+    const targetSize = computeTargetSize(paddedData.width, paddedData.height);
+    const resizedData = resizeImageData(paddedData, targetSize.width, targetSize.height);
+
     const chw = imageDataToCHW(resizedData, IMAGENET_MEAN, IMAGENET_STD);
 
     const imageName = inputNameByHint(session.inputNames, ['pixel_values', 'image', 'input'], 0);
@@ -96,7 +109,6 @@ export class TableStructurePipeline implements AiPipeline<
           type: 'float32',
         };
       } else if (name.toLowerCase().includes('mask')) {
-        // Create a mask tensor of ones
         const count = targetSize.width * targetSize.height;
         const maskData = new Float32Array(count);
         maskData.fill(1);
@@ -111,20 +123,59 @@ export class TableStructurePipeline implements AiPipeline<
     return feeds;
   }
 
-  postprocess(outputs: OnnxOutputs, _context: PipelineContext): TableStructureResult {
+  postprocess(outputs: OnnxOutputs, context: PipelineContext): TableStructureResult {
     const { logits, boxes } = selectTableOutputs(outputs);
     if (!logits || !boxes) {
       return { elements: [] };
     }
 
-    // We need the input size to map coordinates, but we can infer it from the context
-    // The pageRect mapping happens in the layout analysis plugin, not here
-    const elements = decodeTableStructure(logits, boxes);
+    const elements = decodeTableStructure(
+      logits,
+      boxes,
+      this.sourceWidth,
+      this.sourceHeight,
+      this.padding,
+    );
+
+    context.logger.debug('TableStructurePipeline', 'postprocess', {
+      elementCount: elements.length,
+      sourceWidth: this.sourceWidth,
+      sourceHeight: this.sourceHeight,
+      padding: this.padding,
+      sampleBbox: elements.length > 0 ? elements[0].bbox : null,
+    });
+
     return { elements };
   }
 }
 
 // ─── Internal helpers ─────────────────────────────────────────
+
+function computePadding(width: number, height: number): number {
+  const margin = Math.round(Math.min(width, height) * CROP_MARGIN_RATIO);
+  return clamp(margin, CROP_MARGIN_MIN_PX, CROP_MARGIN_MAX_PX);
+}
+
+function padImageData(src: ImageDataLike, pad: number): ImageDataLike {
+  const w = src.width + pad * 2;
+  const h = src.height + pad * 2;
+  const dst = new Uint8ClampedArray(w * h * 4);
+
+  for (let i = 0; i < dst.length; i += 4) {
+    dst[i] = 255;
+    dst[i + 1] = 255;
+    dst[i + 2] = 255;
+    dst[i + 3] = 255;
+  }
+
+  for (let dy = 0; dy < src.height; dy++) {
+    const srcOffset = dy * src.width * 4;
+    const dstOffset = ((dy + pad) * w + pad) * 4;
+    dst.set(src.data.subarray(srcOffset, srcOffset + src.width * 4), dstOffset);
+  }
+
+  return { data: dst, width: w, height: h };
+}
 
 function computeTargetSize(width: number, height: number): { width: number; height: number } {
   const shortest = Math.min(width, height);
@@ -147,13 +198,11 @@ function selectTableOutputs(result: OnnxOutputs): {
     if (!tensor || !Array.isArray(tensor.dims) || tensor.type !== 'float32') continue;
     const dims = tensor.dims;
 
-    // Box tensor: last dim is 4
     if ((dims.length === 3 && dims[2] === 4) || (dims.length === 2 && dims[1] === 4)) {
       boxes = tensor;
       continue;
     }
 
-    // Logits tensor: last dim >= 3 (number of classes)
     if ((dims.length === 3 && dims[2] >= 3) || (dims.length === 2 && dims[1] >= 3)) {
       const classes = dims.length === 3 ? dims[2] : dims[1];
       const bestClasses = logits ? (logits.dims.length === 3 ? logits.dims[2] : logits.dims[1]) : 0;
@@ -166,9 +215,16 @@ function selectTableOutputs(result: OnnxOutputs): {
   return { logits, boxes };
 }
 
+/**
+ * Decode model output into table structure elements with coordinates
+ * mapped back to the unpadded source crop's pixel space.
+ */
 function decodeTableStructure(
   logitsTensor: OnnxTensorLike,
   boxesTensor: OnnxTensorLike,
+  sourceWidth: number,
+  sourceHeight: number,
+  padding: number,
 ): TableElement[] {
   const logits = logitsTensor.data as Float32Array;
   const boxes = boxesTensor.data as Float32Array;
@@ -181,6 +237,9 @@ function decodeTableStructure(
   );
   const classCount = logitsDims.length === 3 ? logitsDims[2] || 0 : logitsDims[1] || 0;
   const noObjectClass = classCount - 1;
+
+  const paddedWidth = sourceWidth + padding * 2;
+  const paddedHeight = sourceHeight + padding * 2;
 
   const out: TableElement[] = [];
   for (let i = 0; i < queryCount; i++) {
@@ -204,17 +263,14 @@ function decodeTableStructure(
     const bw = boxes[boxBase + 2];
     const bh = boxes[boxBase + 3];
 
-    // Detect normalized vs absolute coordinates
     const looksNormalized = Math.max(Math.abs(cx), Math.abs(cy), Math.abs(bw), Math.abs(bh)) <= 2.5;
 
     let x1: number, y1: number, x2: number, y2: number;
     if (looksNormalized) {
-      // cx, cy, w, h in normalized coords — convert to absolute
-      // The actual mapping to page coords happens in the plugin layer
-      x1 = cx - bw / 2;
-      y1 = cy - bh / 2;
-      x2 = cx + bw / 2;
-      y2 = cy + bh / 2;
+      x1 = (cx - bw / 2) * paddedWidth - padding;
+      y1 = (cy - bh / 2) * paddedHeight - padding;
+      x2 = (cx + bw / 2) * paddedWidth - padding;
+      y2 = (cy + bh / 2) * paddedHeight - padding;
     } else {
       x1 = cx;
       y1 = cy;

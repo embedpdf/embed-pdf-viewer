@@ -42,7 +42,7 @@ export function mapDetectionsToPageCoordinates(
     };
 
     return {
-      id: det.id,
+      id: String(det.id),
       classId: det.classId,
       label: det.label,
       score: det.score,
@@ -99,40 +99,27 @@ function normalizeToSourceSpace(detections: LayoutDetection[], imageSize: Size):
 }
 
 /**
- * Map table structure element coordinates from the padded crop space
+ * Map table structure element coordinates from the crop's pixel space
  * to page coordinates.
  *
- * The table crop is rendered via `renderPageRectRaw(tableRect)` producing
- * `cropImageSize` pixels, then `padImageData` adds `padding` white pixels
- * on each side. The model receives the padded image and outputs bboxes
- * in that padded image's coordinate space.
- *
- * Mapping: padded image coords → remove padding → crop pixel coords →
- * scale to page rect dimensions → offset by rect origin.
+ * The pipeline outputs bboxes in the unpadded crop's pixel space.
+ * This function scales from crop pixels to the table rect's page
+ * dimensions and offsets by the rect origin.
  */
 export function mapTableElementToPageCoordinates(
   elementBbox: [number, number, number, number],
   tableRect: Rect,
   cropImageSize: Size,
-  padding: number,
 ): Rect {
   const [ex1, ey1, ex2, ey2] = elementBbox;
 
-  // Remove padding offset to get crop-relative pixel coords
-  const cx1 = ex1 - padding;
-  const cy1 = ey1 - padding;
-  const cx2 = ex2 - padding;
-  const cy2 = ey2 - padding;
-
-  // Scale from crop pixels to page rect dimensions
   const scaleX = tableRect.size.width / cropImageSize.width;
   const scaleY = tableRect.size.height / cropImageSize.height;
 
-  // Map to page space (both use top-left origin)
-  const pdfX = tableRect.origin.x + cx1 * scaleX;
-  const pdfY = tableRect.origin.y + cy1 * scaleY;
-  const pdfW = (cx2 - cx1) * scaleX;
-  const pdfH = (cy2 - cy1) * scaleY;
+  const pdfX = tableRect.origin.x + ex1 * scaleX;
+  const pdfY = tableRect.origin.y + ey1 * scaleY;
+  const pdfW = (ex2 - ex1) * scaleX;
+  const pdfH = (ey2 - ey1) * scaleY;
 
   return {
     origin: { x: pdfX, y: pdfY },

@@ -130,7 +130,7 @@ export class LayoutDetectionPipeline implements AiPipeline<
     };
   }
 
-  postprocess(outputs: OnnxOutputs, _context: PipelineContext): LayoutDetection[] {
+  postprocess(outputs: OnnxOutputs, context: PipelineContext): LayoutDetection[] {
     const selected = selectDetectionOutput(outputs);
     if (!selected) return [];
 
@@ -140,6 +140,11 @@ export class LayoutDetectionPipeline implements AiPipeline<
       Number.isInteger(bboxCount) && bboxCount! >= 0
         ? rawAll.slice(0, Math.min(bboxCount!, rawAll.length))
         : rawAll;
+
+    context.logger.debug('LayoutDetectionPipeline', 'postprocess', {
+      detectionCount: raw.length,
+      sampleBbox: raw.length > 0 ? raw[0].bbox : null,
+    });
 
     return raw;
   }

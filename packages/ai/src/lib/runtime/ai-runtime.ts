@@ -1,4 +1,4 @@
-import { Task, TaskSequence } from '@embedpdf/models';
+import { Task, TaskSequence, Logger, NoopLogger } from '@embedpdf/models';
 import {
   AiBackend,
   AiErrorReason,
@@ -24,6 +24,7 @@ export class AiRuntime {
   private loadingTasks = new Map<string, AiTask<void, ModelLoadProgress>>();
   private activeBackend: AiBackend | null = null;
   private config: Required<Pick<AiRuntimeConfig, 'cache'>> & AiRuntimeConfig;
+  private readonly logger: Logger;
 
   constructor(
     private platform: PlatformAdapter,
@@ -33,6 +34,7 @@ export class AiRuntime {
       cache: true,
       ...config,
     };
+    this.logger = config.logger ?? new NoopLogger();
   }
 
   /**
@@ -145,6 +147,12 @@ export class AiRuntime {
     try {
       const url = resolveModelUrl(modelId, this.config.models?.[modelId]?.url);
       const backend = await this.platform.resolveBackend(this.config.backend ?? 'auto');
+      this.logger.debug(
+        'AiRuntime',
+        'loadModel',
+        `Loading model "${modelId}" with backend "${backend}"`,
+        { url },
+      );
 
       const session = await this.platform.loadModel(
         url,
@@ -163,13 +171,16 @@ export class AiRuntime {
       this.sessions.set(modelId, session);
       this.activeBackend = backend;
       this.loadingTasks.delete(modelId);
+      this.logger.debug('AiRuntime', 'loadModel', `Model "${modelId}" loaded successfully`);
       task.resolve(undefined);
     } catch (err) {
       this.loadingTasks.delete(modelId);
+      const message = err instanceof Error ? err.message : String(err);
+      this.logger.error('AiRuntime', 'loadModel', `Failed to load model "${modelId}": ${message}`);
       task.reject({
         type: 'model-load-failed',
         modelId,
-        message: err instanceof Error ? err.message : String(err),
+        message,
       });
     }
   }
@@ -190,26 +201,36 @@ export class AiRuntime {
 
     const context: PipelineContext = {
       backend: this.activeBackend ?? 'wasm',
+      logger: this.logger,
     };
 
     try {
-      // Preprocessing
       task.progress({ stage: 'preprocessing' });
+      this.logger.perf('AiRuntime', 'pipeline', 'preprocess', 'Begin', pipeline.modelId);
       const feeds: OnnxFeeds = pipeline.preprocess(input, session, context);
+      this.logger.perf('AiRuntime', 'pipeline', 'preprocess', 'End', pipeline.modelId);
 
-      // Inference
       task.progress({ stage: 'inference' });
+      this.logger.perf('AiRuntime', 'pipeline', 'inference', 'Begin', pipeline.modelId);
       const outputs: OnnxOutputs = (await session.run(feeds)) as OnnxOutputs;
+      this.logger.perf('AiRuntime', 'pipeline', 'inference', 'End', pipeline.modelId);
 
-      // Postprocessing
       task.progress({ stage: 'postprocessing' });
+      this.logger.perf('AiRuntime', 'pipeline', 'postprocess', 'Begin', pipeline.modelId);
       const result = pipeline.postprocess(outputs, context);
+      this.logger.perf('AiRuntime', 'pipeline', 'postprocess', 'End', pipeline.modelId);
 
       task.resolve(result);
     } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      this.logger.error(
+        'AiRuntime',
+        'pipeline',
+        `Inference failed for "${pipeline.modelId}": ${message}`,
+      );
       task.reject({
         type: 'inference-failed',
-        message: err instanceof Error ? err.message : String(err),
+        message,
       });
     }
   }
