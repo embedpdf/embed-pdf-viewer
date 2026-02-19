@@ -1,4 +1,4 @@
-import { PdfPageGeometry, Position, Rect } from '@embedpdf/models';
+import { PdfPageGeometry, PdfRun, Position, Rect } from '@embedpdf/models';
 import { SelectionRangeX } from './types';
 
 /**
@@ -480,6 +480,7 @@ export function expandToLineBoundary(
   // Expand backward through runs on the same visual row
   for (let r = resolved.runIdx - 1; r >= 0; r--) {
     const run = geo.runs[r];
+    if (isZeroSizeRun(run)) continue;
     if (!runsOverlapVertically(run.rect.y, run.rect.y + run.rect.height, anchorTop, anchorBottom)) {
       break;
     }
@@ -489,6 +490,7 @@ export function expandToLineBoundary(
   // Expand forward through runs on the same visual row
   for (let r = resolved.runIdx + 1; r < geo.runs.length; r++) {
     const run = geo.runs[r];
+    if (isZeroSizeRun(run)) continue;
     if (!runsOverlapVertically(run.rect.y, run.rect.y + run.rect.height, anchorTop, anchorBottom)) {
       break;
     }
@@ -496,6 +498,10 @@ export function expandToLineBoundary(
   }
 
   return { from, to };
+}
+
+function isZeroSizeRun(run: PdfRun): boolean {
+  return run.rect.width === 0 && run.rect.height === 0;
 }
 
 function runsOverlapVertically(
