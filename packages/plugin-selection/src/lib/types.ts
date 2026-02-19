@@ -31,6 +31,12 @@ export interface SelectionPluginConfig extends BasePluginConfig {
    * @default 3
    */
   minSelectionDragDistance?: number;
+  /**
+   * Maximum number of pages whose geometry data is kept in memory per document.
+   * Oldest unused pages are evicted when this limit is exceeded.
+   * @default 50
+   */
+  maxCachedGeometries?: number;
 }
 
 export interface SelectionMenuPlacement {

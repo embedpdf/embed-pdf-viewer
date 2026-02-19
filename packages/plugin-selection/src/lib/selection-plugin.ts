@@ -28,6 +28,7 @@ import { ScrollCapability, ScrollPlugin } from '@embedpdf/plugin-scroll';
 
 import {
   cachePageGeometry,
+  evictPageGeometry,
   setSelection,
   SelectionAction,
   endSelection,
@@ -92,6 +93,9 @@ export class SelectionPlugin extends BasePlugin<
 
   /** Page callbacks for rect updates, per document */
   private pageCallbacks = new Map<string, Map<number, (data: SelectionRectsCallback) => void>>();
+
+  /** LRU access order for geometry cache, per document (oldest first) */
+  private geoAccessOrder = new Map<string, number[]>();
 
   private readonly menuPlacement$ = createScopedEmitter<
     SelectionMenuPlacement | null,
@@ -229,6 +233,7 @@ export class SelectionPlugin extends BasePlugin<
       ]),
     );
     this.pageCallbacks.set(documentId, new Map());
+    this.geoAccessOrder.set(documentId, []);
     this.selecting.set(documentId, false);
     this.anchor.set(documentId, undefined);
     this.hasTextAnchor.set(documentId, false);
@@ -238,6 +243,7 @@ export class SelectionPlugin extends BasePlugin<
     this.dispatch(cleanupSelectionState(documentId));
     this.enabledModesPerDoc.delete(documentId);
     this.pageCallbacks.delete(documentId);
+    this.geoAccessOrder.delete(documentId);
     this.selecting.delete(documentId);
     this.hasTextAnchor.delete(documentId);
     this.anchor.delete(documentId);
@@ -394,6 +400,27 @@ export class SelectionPlugin extends BasePlugin<
       rects: selector.selectRectsForPage(docState, pageIndex),
       boundingRect: selector.selectBoundingRectForPage(docState, pageIndex),
     });
+
+    // When geometry arrives (possibly re-fetched after eviction), recompute
+    // rects for this page if it falls within an active selection.
+    geoTask.wait((geo) => {
+      const currentState = this.getDocumentState(documentId);
+      const sel = currentState.selection;
+      if (!sel || pageIndex < sel.start.page || pageIndex > sel.end.page) return;
+
+      const sb = sliceBounds(sel, geo, pageIndex);
+      if (!sb) return;
+
+      const pageRects = rectsWithinSlice(geo, sb.from, sb.to);
+      this.dispatch(setRects(documentId, { ...currentState.rects, [pageIndex]: pageRects }));
+      this.dispatch(
+        setSlices(documentId, {
+          ...currentState.slices,
+          [pageIndex]: { start: sb.from, count: sb.to - sb.from + 1 },
+        }),
+      );
+      this.notifyPage(documentId, pageIndex);
+    }, ignore);
 
     // Create text selection handler
     const textHandler = createTextSelectionHandler({
@@ -690,6 +717,7 @@ export class SelectionPlugin extends BasePlugin<
     const task = this.engine.getPageGeometry(coreDoc.document, page);
     task.wait((geo) => {
       this.dispatch(cachePageGeometry(documentId, pageIdx, geo));
+      this.touchGeometry(documentId, pageIdx);
     }, ignore);
     return task;
   }
@@ -697,9 +725,49 @@ export class SelectionPlugin extends BasePlugin<
   /* ── geometry cache ───────────────────────────────────── */
   private getOrLoadGeometry(documentId: string, pageIdx: number): PdfTask<PdfPageGeometry> {
     const cached = this.getDocumentState(documentId).geometry[pageIdx];
-    if (cached) return PdfTaskHelper.resolve(cached);
+    if (cached) {
+      this.touchGeometry(documentId, pageIdx);
+      return PdfTaskHelper.resolve(cached);
+    }
 
     return this.getNewPageGeometryAndCache(documentId, pageIdx);
+  }
+
+  /* ── geometry LRU eviction ──────────────────────────────── */
+
+  private touchGeometry(documentId: string, pageIdx: number): void {
+    const order = this.geoAccessOrder.get(documentId);
+    if (!order) return;
+
+    const idx = order.indexOf(pageIdx);
+    if (idx > -1) order.splice(idx, 1);
+    order.push(pageIdx);
+
+    this.evictGeometryIfNeeded(documentId);
+  }
+
+  private evictGeometryIfNeeded(documentId: string): void {
+    const max = this.config.maxCachedGeometries ?? 50;
+    const order = this.geoAccessOrder.get(documentId);
+    if (!order || order.length <= max) return;
+
+    const pinned = this.pageCallbacks.get(documentId);
+    const toEvict: number[] = [];
+
+    while (order.length - toEvict.length > max) {
+      const candidate = order.find((p) => !toEvict.includes(p) && !pinned?.has(p));
+      if (candidate === undefined) break;
+      toEvict.push(candidate);
+    }
+
+    if (toEvict.length === 0) return;
+
+    for (const p of toEvict) {
+      const idx = order.indexOf(p);
+      if (idx > -1) order.splice(idx, 1);
+    }
+
+    this.dispatch(evictPageGeometry(documentId, toEvict));
   }
 
   /* ── selection state updates ───────────────────────────── */

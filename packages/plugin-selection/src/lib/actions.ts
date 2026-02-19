@@ -11,6 +11,7 @@ export const END_SELECTION = 'SELECTION/END_SELECTION';
 export const CLEAR_SELECTION = 'SELECTION/CLEAR_SELECTION';
 export const SET_RECTS = 'SELECTION/SET_RECTS';
 export const SET_SLICES = 'SELECTION/SET_SLICES';
+export const EVICT_PAGE_GEOMETRY = 'SELECTION/EVICT_PAGE_GEOMETRY';
 export const RESET = 'SELECTION/RESET'; // This might be obsolete, but we'll keep it for now
 
 export interface InitSelectionStateAction extends Action {
@@ -60,6 +61,11 @@ export interface SetSlicesAction extends Action {
   payload: { documentId: string; slices: Record<number, { start: number; count: number }> };
 }
 
+export interface EvictPageGeometryAction extends Action {
+  type: typeof EVICT_PAGE_GEOMETRY;
+  payload: { documentId: string; pages: number[] };
+}
+
 export interface ResetAction extends Action {
   type: typeof RESET;
   payload: { documentId: string };
@@ -75,6 +81,7 @@ export type SelectionAction =
   | ClearSelectionAction
   | SetRectsAction
   | SetSlicesAction
+  | EvictPageGeometryAction
   | ResetAction;
 
 export const initSelectionState = (
@@ -131,6 +138,14 @@ export const setSlices = (
   documentId: string,
   slices: Record<number, { start: number; count: number }>,
 ): SetSlicesAction => ({ type: SET_SLICES, payload: { documentId, slices } });
+
+export const evictPageGeometry = (
+  documentId: string,
+  pages: number[],
+): EvictPageGeometryAction => ({
+  type: EVICT_PAGE_GEOMETRY,
+  payload: { documentId, pages },
+});
 
 export const reset = (documentId: string): ResetAction => ({
   type: RESET,
