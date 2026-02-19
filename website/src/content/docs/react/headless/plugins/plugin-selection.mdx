@@ -166,6 +166,9 @@ import { PDFViewer } from '../../code-examples/headless/selection-example';
 | Option | Type | Description |
 | :--- | :--- | :--- |
 | **`menuHeight`** | `number` | The approximate height of the selection menu in pixels. Used to determine whether to show the menu above or below the selection. <br/>**Default**: `40` |
+| **`toleranceFactor`** | `number` | Multiplied by average glyph height to derive the hit-testing tolerance radius. Set to `0` to require exact hits. <br/>**Default**: `1.5` |
+| **`minSelectionDragDistance`** | `number` | Minimum drag distance (in page-coordinate units) the pointer must move before a drag-selection starts. Prevents accidental selection on simple clicks. <br/>**Default**: `3` |
+| **`maxCachedGeometries`** | `number` | Maximum number of pages whose geometry data is kept in memory per document. Oldest unused pages are evicted when this limit is exceeded. <br/>**Default**: `50` |
 
 ### Component: `<SelectionLayer />`
 

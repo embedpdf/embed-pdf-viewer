@@ -2403,13 +2403,22 @@ export interface SearchAllPagesResult {
  */
 export interface PdfGlyphObject {
   /**
-   * Origin of the glyph
+   * Origin of the glyph (loose bounds from FPDFText_GetLooseCharBox)
    */
   origin: { x: number; y: number };
   /**
-   * Size of the glyph
+   * Size of the glyph (loose bounds from FPDFText_GetLooseCharBox)
    */
   size: { width: number; height: number };
+  /**
+   * Tight bounds origin (from FPDFText_GetCharBox, closely surrounds the actual glyph shape).
+   * Used for hit-testing to match Chrome's FPDFText_GetCharIndexAtPos behaviour.
+   */
+  tightOrigin?: { x: number; y: number };
+  /**
+   * Tight bounds size (from FPDFText_GetCharBox)
+   */
+  tightSize?: { width: number; height: number };
   /**
    * Whether the glyph is a space
    */
@@ -2427,25 +2436,42 @@ export interface PdfGlyphObject {
  */
 export interface PdfGlyphSlim {
   /**
-   * X coordinate of the glyph
+   * X coordinate of the glyph (loose bounds from FPDFText_GetLooseCharBox)
    */
   x: number;
   /**
-   * Y coordinate of the glyph
+   * Y coordinate of the glyph (loose bounds from FPDFText_GetLooseCharBox)
    */
   y: number;
   /**
-   * Width of the glyph
+   * Width of the glyph (loose bounds from FPDFText_GetLooseCharBox)
    */
   width: number;
   /**
-   * Height of the glyph
+   * Height of the glyph (loose bounds from FPDFText_GetLooseCharBox)
    */
   height: number;
   /**
    * Flags of the glyph
    */
   flags: number;
+  /**
+   * Tight X coordinate (from FPDFText_GetCharBox).
+   * Used for hit-testing to match Chrome's FPDFText_GetCharIndexAtPos behaviour.
+   */
+  tightX?: number;
+  /**
+   * Tight Y coordinate (from FPDFText_GetCharBox)
+   */
+  tightY?: number;
+  /**
+   * Tight width (from FPDFText_GetCharBox)
+   */
+  tightWidth?: number;
+  /**
+   * Tight height (from FPDFText_GetCharBox)
+   */
+  tightHeight?: number;
 }
 
 /**
@@ -2466,6 +2492,10 @@ export interface PdfRun {
    * Glyphs of the run
    */
   glyphs: PdfGlyphSlim[];
+  /**
+   * Font size of the run (all glyphs in a run share the same font size)
+   */
+  fontSize?: number;
 }
 
 /**
