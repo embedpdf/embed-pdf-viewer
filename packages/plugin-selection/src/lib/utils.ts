@@ -17,7 +17,8 @@ import { SelectionRangeX } from './types';
  * @returns glyph index, or -1 if nothing was hit
  */
 export function glyphAt(geo: PdfPageGeometry, pt: Position, toleranceFactor = 0.9): number {
-  // --- Pass 1: exact bounding-box match (original behaviour) ---
+  // --- Pass 1: exact bounding-box match using tight bounds (char_box) ---
+  // Matches PDFium's GetIndexAtPos first-pass check at cpdf_textpage.cpp:494
   for (const run of geo.runs) {
     const inRun =
       pt.y >= run.rect.y &&
@@ -27,9 +28,13 @@ export function glyphAt(geo: PdfPageGeometry, pt: Position, toleranceFactor = 0.
 
     if (!inRun) continue;
 
-    const rel = run.glyphs.findIndex(
-      (g) => pt.x >= g.x && pt.x <= g.x + g.width && pt.y >= g.y && pt.y <= g.y + g.height,
-    );
+    const rel = run.glyphs.findIndex((g) => {
+      const gx = g.tightX ?? g.x;
+      const gy = g.tightY ?? g.y;
+      const gw = g.tightWidth ?? g.width;
+      const gh = g.tightHeight ?? g.height;
+      return pt.x >= gx && pt.x <= gx + gw && pt.y >= gy && pt.y <= gy + gh;
+    });
 
     if (rel !== -1) {
       return run.charStart + rel;
@@ -38,7 +43,8 @@ export function glyphAt(geo: PdfPageGeometry, pt: Position, toleranceFactor = 0.
 
   if (toleranceFactor <= 0) return -1;
 
-  // --- Pass 2: tolerance-expanded match (nearest by Manhattan distance) ---
+  // --- Pass 2: tolerance-expanded match using tight bounds ---
+  // Matches PDFium's GetIndexAtPos tolerance pass at cpdf_textpage.cpp:502-520
   const tolerance = computeTolerance(geo, toleranceFactor);
   const halfTol = tolerance / 2;
 
@@ -46,7 +52,6 @@ export function glyphAt(geo: PdfPageGeometry, pt: Position, toleranceFactor = 0.
   let bestDist = Infinity;
 
   for (const run of geo.runs) {
-    // Quick run-level bounds check with tolerance
     if (
       pt.y < run.rect.y - halfTol ||
       pt.y > run.rect.y + run.rect.height + halfTol ||
@@ -58,12 +63,17 @@ export function glyphAt(geo: PdfPageGeometry, pt: Position, toleranceFactor = 0.
 
     for (let i = 0; i < run.glyphs.length; i++) {
       const g = run.glyphs[i];
-      if (g.flags === 2) continue; // skip empty glyphs
+      if (g.flags === 2) continue;
 
-      const expandedLeft = g.x - halfTol;
-      const expandedRight = g.x + g.width + halfTol;
-      const expandedTop = g.y - halfTol;
-      const expandedBottom = g.y + g.height + halfTol;
+      const gx = g.tightX ?? g.x;
+      const gy = g.tightY ?? g.y;
+      const gw = g.tightWidth ?? g.width;
+      const gh = g.tightHeight ?? g.height;
+
+      const expandedLeft = gx - halfTol;
+      const expandedRight = gx + gw + halfTol;
+      const expandedTop = gy - halfTol;
+      const expandedBottom = gy + gh + halfTol;
 
       if (
         pt.x < expandedLeft ||
@@ -74,9 +84,8 @@ export function glyphAt(geo: PdfPageGeometry, pt: Position, toleranceFactor = 0.
         continue;
       }
 
-      // Manhattan distance to nearest edge (matches PDFium's GetIndexAtPos)
-      const curXdif = Math.min(Math.abs(pt.x - g.x), Math.abs(pt.x - (g.x + g.width)));
-      const curYdif = Math.min(Math.abs(pt.y - g.y), Math.abs(pt.y - (g.y + g.height)));
+      const curXdif = Math.min(Math.abs(pt.x - gx), Math.abs(pt.x - (gx + gw)));
+      const curYdif = Math.min(Math.abs(pt.y - gy), Math.abs(pt.y - (gy + gh)));
       const dist = curXdif + curYdif;
 
       if (dist < bestDist) {

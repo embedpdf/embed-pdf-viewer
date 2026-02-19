@@ -3669,6 +3669,8 @@ export class PdfiumNative implements IPdfiumExecutor {
         width: g.size.width,
         height: g.size.height,
         flags: g.isEmpty ? 2 : g.isSpace ? 1 : 0,
+        ...(g.tightOrigin && { tightX: g.tightOrigin.x, tightY: g.tightOrigin.y }),
+        ...(g.tightSize && { tightWidth: g.tightSize.width, tightHeight: g.tightSize.height }),
       });
 
       /* 4 — expand the run's bounding rect */
@@ -3936,14 +3938,30 @@ export class PdfiumNative implements IPdfiumExecutor {
     const dx2Ptr = this.memoryManager.malloc(4);
     const dy2Ptr = this.memoryManager.malloc(4);
     const rectPtr = this.memoryManager.malloc(16); // 4 floats = 16 bytes
+    const tLeftPtr = this.memoryManager.malloc(8);
+    const tRightPtr = this.memoryManager.malloc(8);
+    const tBottomPtr = this.memoryManager.malloc(8);
+    const tTopPtr = this.memoryManager.malloc(8);
 
-    const allPtrs = [rectPtr, dx1Ptr, dy1Ptr, dx2Ptr, dy2Ptr];
+    const allPtrs = [
+      rectPtr,
+      dx1Ptr,
+      dy1Ptr,
+      dx2Ptr,
+      dy2Ptr,
+      tLeftPtr,
+      tRightPtr,
+      tBottomPtr,
+      tTopPtr,
+    ];
 
     let x = 0,
       y = 0,
       width = 0,
       height = 0,
       isSpace = false;
+    let tightOrigin: { x: number; y: number } | undefined;
+    let tightSize: { width: number; height: number } | undefined;
 
     // ── 1) loose glyph bbox (FPDFText_GetLooseCharBox) ──────────
     if (this.pdfiumModule.FPDFText_GetLooseCharBox(textPagePtr, charIndex, rectPtr)) {
@@ -3998,7 +4016,60 @@ export class PdfiumNative implements IPdfiumExecutor {
       width = Math.max(1, Math.abs(x2 - x1));
       height = Math.max(1, Math.abs(y2 - y1));
 
-      // ── 3) extra flags ────────────────────────────────────────
+      // ── 3) tight glyph bbox (FPDFText_GetCharBox) ─────────────
+      if (
+        this.pdfiumModule.FPDFText_GetCharBox(
+          textPagePtr,
+          charIndex,
+          tLeftPtr,
+          tRightPtr,
+          tBottomPtr,
+          tTopPtr,
+        )
+      ) {
+        const tLeft = this.pdfiumModule.pdfium.getValue(tLeftPtr, 'double');
+        const tRight = this.pdfiumModule.pdfium.getValue(tRightPtr, 'double');
+        const tBottom = this.pdfiumModule.pdfium.getValue(tBottomPtr, 'double');
+        const tTop = this.pdfiumModule.pdfium.getValue(tTopPtr, 'double');
+
+        this.pdfiumModule.FPDF_PageToDevice(
+          pagePtr,
+          0,
+          0,
+          page.size.width,
+          page.size.height,
+          0,
+          tLeft,
+          tTop,
+          dx1Ptr,
+          dy1Ptr,
+        );
+        this.pdfiumModule.FPDF_PageToDevice(
+          pagePtr,
+          0,
+          0,
+          page.size.width,
+          page.size.height,
+          0,
+          tRight,
+          tBottom,
+          dx2Ptr,
+          dy2Ptr,
+        );
+
+        const tx1 = this.pdfiumModule.pdfium.getValue(dx1Ptr, 'i32');
+        const ty1 = this.pdfiumModule.pdfium.getValue(dy1Ptr, 'i32');
+        const tx2 = this.pdfiumModule.pdfium.getValue(dx2Ptr, 'i32');
+        const ty2 = this.pdfiumModule.pdfium.getValue(dy2Ptr, 'i32');
+
+        tightOrigin = { x: Math.min(tx1, tx2), y: Math.min(ty1, ty2) };
+        tightSize = {
+          width: Math.max(1, Math.abs(tx2 - tx1)),
+          height: Math.max(1, Math.abs(ty2 - ty1)),
+        };
+      }
+
+      // ── 4) extra flags ────────────────────────────────────────
       const uc = this.pdfiumModule.FPDFText_GetUnicode(textPagePtr, charIndex);
       isSpace = uc === 32;
     }
@@ -4009,6 +4080,8 @@ export class PdfiumNative implements IPdfiumExecutor {
     return {
       origin: { x, y },
       size: { width, height },
+      ...(tightOrigin && { tightOrigin }),
+      ...(tightSize && { tightSize }),
       ...(isSpace && { isSpace }),
     };
   }

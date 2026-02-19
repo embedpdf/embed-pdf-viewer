@@ -2411,6 +2411,15 @@ export interface PdfGlyphObject {
    */
   size: { width: number; height: number };
   /**
+   * Tight bounds origin (from FPDFText_GetCharBox, closely surrounds the actual glyph shape).
+   * Used for hit-testing to match Chrome's FPDFText_GetCharIndexAtPos behaviour.
+   */
+  tightOrigin?: { x: number; y: number };
+  /**
+   * Tight bounds size (from FPDFText_GetCharBox)
+   */
+  tightSize?: { width: number; height: number };
+  /**
    * Whether the glyph is a space
    */
   isSpace?: boolean;
@@ -2446,6 +2455,23 @@ export interface PdfGlyphSlim {
    * Flags of the glyph
    */
   flags: number;
+  /**
+   * Tight X coordinate (from FPDFText_GetCharBox).
+   * Used for hit-testing to match Chrome's FPDFText_GetCharIndexAtPos behaviour.
+   */
+  tightX?: number;
+  /**
+   * Tight Y coordinate (from FPDFText_GetCharBox)
+   */
+  tightY?: number;
+  /**
+   * Tight width (from FPDFText_GetCharBox)
+   */
+  tightWidth?: number;
+  /**
+   * Tight height (from FPDFText_GetCharBox)
+   */
+  tightHeight?: number;
 }
 
 /**
