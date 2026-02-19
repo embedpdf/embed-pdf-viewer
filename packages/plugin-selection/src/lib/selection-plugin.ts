@@ -65,7 +65,7 @@ import {
   EmptySpaceClickEvent,
   EmptySpaceClickScopeEvent,
 } from './types';
-import { sliceBounds, rectsWithinSlice } from './utils';
+import { sliceBounds, rectsWithinSlice, expandToWordBoundary, expandToLineBoundary } from './utils';
 import { createTextSelectionHandler } from './handlers/text-selection.handler';
 import { createMarqueeSelectionHandler } from './handlers/marquee-selection.handler';
 
@@ -83,6 +83,9 @@ export class SelectionPlugin extends BasePlugin<
   /* interactive state, per document */
   private selecting = new Map<string, boolean>();
   private anchor = new Map<string, { page: number; index: number } | undefined>();
+
+  /** Whether the text handler has a pending anchor (before drag threshold is met) */
+  private hasTextAnchor = new Map<string, boolean>();
 
   /** Tracks the page a marquee drag started on, per document */
   private marqueePage = new Map<string, number>();
@@ -228,6 +231,7 @@ export class SelectionPlugin extends BasePlugin<
     this.pageCallbacks.set(documentId, new Map());
     this.selecting.set(documentId, false);
     this.anchor.set(documentId, undefined);
+    this.hasTextAnchor.set(documentId, false);
   }
 
   protected override onDocumentClosed(documentId: string): void {
@@ -235,6 +239,7 @@ export class SelectionPlugin extends BasePlugin<
     this.enabledModesPerDoc.delete(documentId);
     this.pageCallbacks.delete(documentId);
     this.selecting.delete(documentId);
+    this.hasTextAnchor.delete(documentId);
     this.anchor.delete(documentId);
     this.marqueePage.delete(documentId);
     this.selChange$.clearScope(documentId);
@@ -408,6 +413,11 @@ export class SelectionPlugin extends BasePlugin<
           ? interactionScope.setCursor('selection-text', cursor, 10)
           : interactionScope.removeCursor('selection-text'),
       onEmptySpaceClick: (modeId) => this.emptySpaceClick$.emit(documentId, { pageIndex, modeId }),
+      onWordSelect: (g, modeId) => this.selectWord(documentId, pageIndex, g, modeId),
+      onLineSelect: (g, modeId) => this.selectLine(documentId, pageIndex, g, modeId),
+      setHasTextAnchor: (active) => this.hasTextAnchor.set(documentId, active),
+      minDragDistance: this.config.minSelectionDragDistance,
+      toleranceFactor: this.config.toleranceFactor,
     });
 
     // Register text selection with registerAlways - any plugin can enable it for their mode
@@ -480,7 +490,8 @@ export class SelectionPlugin extends BasePlugin<
         const config = this.enabledModesPerDoc.get(documentId)?.get(modeId);
         return config?.enableMarquee === true;
       },
-      isTextSelecting: () => this.selecting.get(documentId) ?? false,
+      isTextSelecting: () =>
+        (this.selecting.get(documentId) ?? false) || (this.hasTextAnchor.get(documentId) ?? false),
       onBegin: (pos, modeId) => this.beginMarquee(documentId, pageIndex, pos, modeId),
       onChange: (rect, modeId) => {
         this.updateMarquee(documentId, pageIndex, rect, modeId);
@@ -715,6 +726,59 @@ export class SelectionPlugin extends BasePlugin<
     this.selChange$.emit(documentId, null);
     this.emitMenuPlacement(documentId, null);
     this.notifyAllPages(documentId);
+  }
+
+  private selectWord(documentId: string, page: number, charIndex: number, modeId: string) {
+    const geo = this.getDocumentState(documentId).geometry[page];
+    if (!geo) return;
+
+    const bounds = expandToWordBoundary(geo, charIndex);
+    if (!bounds) return;
+
+    this.applyInstantSelection(documentId, page, bounds.from, bounds.to, modeId);
+  }
+
+  private selectLine(documentId: string, page: number, charIndex: number, modeId: string) {
+    const geo = this.getDocumentState(documentId).geometry[page];
+    if (!geo) return;
+
+    const bounds = expandToLineBoundary(geo, charIndex);
+    if (!bounds) return;
+
+    this.applyInstantSelection(documentId, page, bounds.from, bounds.to, modeId);
+  }
+
+  /**
+   * Set a selection range without going through the drag begin/update/end flow.
+   * Used by double-click (word) and triple-click (line) selection.
+   */
+  private applyInstantSelection(
+    documentId: string,
+    page: number,
+    from: number,
+    to: number,
+    modeId: string,
+  ) {
+    const range: SelectionRangeX = {
+      start: { page, index: from },
+      end: { page, index: to },
+    };
+
+    this.selecting.set(documentId, false);
+    this.anchor.set(documentId, undefined);
+    this.dispatch(startSelection(documentId));
+    this.dispatch(setSelection(documentId, range));
+    this.updateRectsAndSlices(documentId, range);
+    this.dispatch(endSelection(documentId));
+
+    this.selChange$.emit(documentId, range);
+    this.beginSelection$.emit(documentId, { page, index: from, modeId });
+    this.endSelection$.emit(documentId, { modeId });
+
+    for (let p = range.start.page; p <= range.end.page; p++) {
+      this.notifyPage(documentId, p);
+    }
+    this.recalculateMenuPlacement(documentId);
   }
 
   private updateSelection(documentId: string, page: number, index: number, modeId: string) {
