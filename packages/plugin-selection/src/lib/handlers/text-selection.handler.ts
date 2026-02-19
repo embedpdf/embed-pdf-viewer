@@ -61,7 +61,7 @@ export function createTextSelectionHandler(
   opts: TextSelectionHandlerOptions,
 ): PointerEventHandlersWithLifecycle<EmbedPdfPointerEvent> {
   const minDrag = opts.minDragDistance ?? 3;
-  const tolFactor = opts.toleranceFactor ?? 0.9;
+  const tolFactor = opts.toleranceFactor ?? 1.5;
 
   // Drag-threshold state
   let anchorGlyph: number | null = null;

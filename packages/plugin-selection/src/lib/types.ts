@@ -22,7 +22,7 @@ export interface SelectionPluginConfig extends BasePluginConfig {
   /**
    * Tolerance factor for hit-testing glyphs. Multiplied by average glyph
    * height to derive the tolerance radius. Set to 0 to require exact hits.
-   * @default 0.9
+   * @default 1.5
    */
   toleranceFactor?: number;
   /**

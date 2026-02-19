@@ -13,10 +13,10 @@ import { SelectionRangeX } from './types';
  * @param pt - point in page coordinates
  * @param toleranceFactor - multiplied by average glyph height to derive the
  *                          tolerance radius. 0 disables the fallback.
- *                          Default 0.9 (see Chromium's pdfium-page.cc kTolerance).
+ *                          Default 1.5 (see Chromium's pdfium-page.cc kTolerance).
  * @returns glyph index, or -1 if nothing was hit
  */
-export function glyphAt(geo: PdfPageGeometry, pt: Position, toleranceFactor = 0.9): number {
+export function glyphAt(geo: PdfPageGeometry, pt: Position, toleranceFactor = 1.5): number {
   // --- Pass 1: exact bounding-box match using tight bounds (char_box) ---
   // Matches PDFium's GetIndexAtPos first-pass check at cpdf_textpage.cpp:494
   for (const run of geo.runs) {
