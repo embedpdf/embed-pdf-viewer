@@ -149,6 +149,8 @@ export function rectsWithinSlice(
 ): Rect[] {
   const textRuns: TextRunInfo[] = [];
 
+  const CHAR_DISTANCE_FACTOR = 2.5;
+
   for (const run of geo.runs) {
     const runStart = run.charStart;
     const runEnd = runStart + run.glyphs.length - 1;
@@ -162,27 +164,52 @@ export function rectsWithinSlice(
     let minY = Infinity,
       maxY = -Infinity;
     let charCount = 0;
+    let widthSum = 0;
+    let prevRight = -Infinity;
+
+    const flushSubRun = () => {
+      if (minX !== Infinity && charCount > 0) {
+        textRuns.push({
+          rect: {
+            origin: { x: minX, y: minY },
+            size: { width: maxX - minX, height: maxY - minY },
+          },
+          charCount,
+          fontSize: run.fontSize,
+        });
+      }
+      minX = Infinity;
+      maxX = -Infinity;
+      minY = Infinity;
+      maxY = -Infinity;
+      charCount = 0;
+      widthSum = 0;
+      prevRight = -Infinity;
+    };
 
     for (let i = sIdx; i <= eIdx; i++) {
       const g = run.glyphs[i];
-      if (g.flags === 2) continue; // empty glyph
+      if (g.flags === 2) continue;
+
+      if (charCount > 0 && prevRight > -Infinity) {
+        const gap = Math.abs(g.x - prevRight);
+        const avgWidth = widthSum / charCount;
+        if (avgWidth > 0 && gap > CHAR_DISTANCE_FACTOR * avgWidth) {
+          flushSubRun();
+        }
+      }
 
       minX = Math.min(minX, g.x);
       maxX = Math.max(maxX, g.x + g.width);
       minY = Math.min(minY, g.y);
       maxY = Math.max(maxY, g.y + g.height);
+
       charCount++;
+      widthSum += g.width;
+      prevRight = g.x + g.width;
     }
 
-    if (minX !== Infinity && charCount > 0) {
-      textRuns.push({
-        rect: {
-          origin: { x: minX, y: minY },
-          size: { width: maxX - minX, height: maxY - minY },
-        },
-        charCount,
-      });
-    }
+    flushSubRun();
   }
 
   // If merge is false, just return the individual rects
@@ -212,11 +239,12 @@ export function rectsWithinSlice(
  */
 
 /**
- * Text run info for rect merging (similar to Chromium's ScreenRectTextRunInfo)
+ * Text run info for rect merging (similar to Chromium's PdfRectTextRunInfo)
  */
 export interface TextRunInfo {
   rect: Rect;
   charCount: number;
+  fontSize?: number;
 }
 
 /**
@@ -273,6 +301,21 @@ export function getVerticalOverlap(rect1: Rect, rect2: Rect): number {
  * Returns true if there is sufficient horizontal and vertical overlap
  */
 export function shouldMergeHorizontalRects(textRun1: TextRunInfo, textRun2: TextRunInfo): boolean {
+  const FONT_SIZE_RATIO_THRESHOLD = 1.5;
+  if (
+    textRun1.fontSize != null &&
+    textRun2.fontSize != null &&
+    textRun1.fontSize > 0 &&
+    textRun2.fontSize > 0
+  ) {
+    const ratio =
+      Math.max(textRun1.fontSize, textRun2.fontSize) /
+      Math.min(textRun1.fontSize, textRun2.fontSize);
+    if (ratio > FONT_SIZE_RATIO_THRESHOLD) {
+      return false;
+    }
+  }
+
   const VERTICAL_OVERLAP_THRESHOLD = 0.8;
   const rect1 = textRun1.rect;
   const rect2 = textRun2.rect;
@@ -294,7 +337,11 @@ export function shouldMergeHorizontalRects(textRun1: TextRunInfo, textRun2: Text
 }
 
 /**
- * Merge adjacent rectangles based on proximity and overlap (similar to Chromium's algorithm)
+ * Merge adjacent rectangles based on proximity and overlap.
+ *
+ * Adapted from Chromium's MergeAdjacentRects (pdfium_range.cc):
+ *  - The merge DECISION uses the loose `rect` (via shouldMergeHorizontalRects).
+ *  - The OUTPUT rect always uses loose bounds.
  */
 export function mergeAdjacentRects(textRuns: TextRunInfo[]): Rect[] {
   const results: Rect[] = [];

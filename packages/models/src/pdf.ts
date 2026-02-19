@@ -2403,11 +2403,11 @@ export interface SearchAllPagesResult {
  */
 export interface PdfGlyphObject {
   /**
-   * Origin of the glyph
+   * Origin of the glyph (loose bounds from FPDFText_GetLooseCharBox)
    */
   origin: { x: number; y: number };
   /**
-   * Size of the glyph
+   * Size of the glyph (loose bounds from FPDFText_GetLooseCharBox)
    */
   size: { width: number; height: number };
   /**
@@ -2427,19 +2427,19 @@ export interface PdfGlyphObject {
  */
 export interface PdfGlyphSlim {
   /**
-   * X coordinate of the glyph
+   * X coordinate of the glyph (loose bounds from FPDFText_GetLooseCharBox)
    */
   x: number;
   /**
-   * Y coordinate of the glyph
+   * Y coordinate of the glyph (loose bounds from FPDFText_GetLooseCharBox)
    */
   y: number;
   /**
-   * Width of the glyph
+   * Width of the glyph (loose bounds from FPDFText_GetLooseCharBox)
    */
   width: number;
   /**
-   * Height of the glyph
+   * Height of the glyph (loose bounds from FPDFText_GetLooseCharBox)
    */
   height: number;
   /**
@@ -2466,6 +2466,10 @@ export interface PdfRun {
    * Glyphs of the run
    */
   glyphs: PdfGlyphSlim[];
+  /**
+   * Font size of the run (all glyphs in a run share the same font size)
+   */
+  fontSize?: number;
 }
 
 /**

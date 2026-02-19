@@ -67,6 +67,7 @@ import {
   PdfErrorReason,
   TextContext,
   PdfGlyphObject,
+  PdfGlyphSlim,
   PdfPageGeometry,
   PdfRun,
   toIntRect,
@@ -3650,6 +3651,7 @@ export class PdfiumNative implements IPdfiumExecutor {
           },
           charStart: i,
           glyphs: [],
+          fontSize: this.pdfiumModule.FPDFText_GetFontSize(textPagePtr, i),
         };
         bounds = {
           minX: g.origin.x,
@@ -3935,13 +3937,15 @@ export class PdfiumNative implements IPdfiumExecutor {
     const dy2Ptr = this.memoryManager.malloc(4);
     const rectPtr = this.memoryManager.malloc(16); // 4 floats = 16 bytes
 
+    const allPtrs = [rectPtr, dx1Ptr, dy1Ptr, dx2Ptr, dy2Ptr];
+
     let x = 0,
       y = 0,
       width = 0,
       height = 0,
       isSpace = false;
 
-    // ── 1) raw glyph bbox in                      page-user-space
+    // ── 1) loose glyph bbox (FPDFText_GetLooseCharBox) ──────────
     if (this.pdfiumModule.FPDFText_GetLooseCharBox(textPagePtr, charIndex, rectPtr)) {
       const left = this.pdfiumModule.pdfium.getValue(rectPtr, 'float');
       const top = this.pdfiumModule.pdfium.getValue(rectPtr + 4, 'float');
@@ -3949,7 +3953,7 @@ export class PdfiumNative implements IPdfiumExecutor {
       const bottom = this.pdfiumModule.pdfium.getValue(rectPtr + 12, 'float');
 
       if (left === right || top === bottom) {
-        [rectPtr, dx1Ptr, dy1Ptr, dx2Ptr, dy2Ptr].forEach((p) => this.memoryManager.free(p));
+        allPtrs.forEach((p) => this.memoryManager.free(p));
 
         return {
           origin: { x: 0, y: 0 },
@@ -3958,14 +3962,14 @@ export class PdfiumNative implements IPdfiumExecutor {
         };
       }
 
-      // ── 2) map 2 opposite corners to            device-space
+      // ── 2) map loose corners to device-space ──────────────────
       this.pdfiumModule.FPDF_PageToDevice(
         pagePtr,
         0,
         0,
         page.size.width,
         page.size.height,
-        /*rotate=*/ 0,
+        0,
         left,
         top,
         dx1Ptr,
@@ -3977,7 +3981,7 @@ export class PdfiumNative implements IPdfiumExecutor {
         0,
         page.size.width,
         page.size.height,
-        /*rotate=*/ 0,
+        0,
         right,
         bottom,
         dx2Ptr,
@@ -3994,13 +3998,13 @@ export class PdfiumNative implements IPdfiumExecutor {
       width = Math.max(1, Math.abs(x2 - x1));
       height = Math.max(1, Math.abs(y2 - y1));
 
-      // ── 3) extra flags ───────────────────────────────────────
+      // ── 3) extra flags ────────────────────────────────────────
       const uc = this.pdfiumModule.FPDFText_GetUnicode(textPagePtr, charIndex);
       isSpace = uc === 32;
     }
 
     // ── free tmps ───────────────────────────────────────────────
-    [rectPtr, dx1Ptr, dy1Ptr, dx2Ptr, dy2Ptr].forEach((p) => this.memoryManager.free(p));
+    allPtrs.forEach((p) => this.memoryManager.free(p));
 
     return {
       origin: { x, y },
