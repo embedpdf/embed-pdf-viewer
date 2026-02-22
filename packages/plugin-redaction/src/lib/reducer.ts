@@ -9,6 +9,7 @@ import {
   CLEAR_PENDING,
   END_REDACTION,
   REMOVE_PENDING,
+  UPDATE_PENDING,
   START_REDACTION,
   SET_ACTIVE_TYPE,
   SELECT_PENDING,
@@ -75,7 +76,10 @@ export const redactionReducer: Reducer<RedactionState, RedactionAction> = (
 
       const next = { ...docState.pending };
       for (const item of items) {
-        next[item.page] = (next[item.page] ?? []).concat(item);
+        const existing = next[item.page] ?? [];
+        // Skip if item with same ID already exists
+        if (existing.some((it) => it.id === item.id)) continue;
+        next[item.page] = existing.concat(item);
       }
 
       return {
@@ -113,6 +117,26 @@ export const redactionReducer: Reducer<RedactionState, RedactionAction> = (
             pending: next,
             pendingCount: calculatePendingCount(next),
             selected: stillSelected ? docState.selected : null,
+          },
+        },
+      };
+    }
+
+    case UPDATE_PENDING: {
+      const { documentId, page, id, patch } = action.payload;
+      const docState = state.documents[documentId];
+      if (!docState) return state;
+
+      const list = docState.pending[page] ?? [];
+      const updated = list.map((item) => (item.id === id ? { ...item, ...patch } : item));
+
+      return {
+        ...state,
+        documents: {
+          ...state.documents,
+          [documentId]: {
+            ...docState,
+            pending: { ...docState.pending, [page]: updated },
           },
         },
       };
@@ -200,9 +224,6 @@ export const redactionReducer: Reducer<RedactionState, RedactionAction> = (
           ...state.documents,
           [documentId]: {
             ...docState,
-            pending: {},
-            pendingCount: 0,
-            selected: null,
             isRedacting: false,
             activeType: null,
           },

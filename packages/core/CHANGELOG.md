@@ -1,5 +1,21 @@
 # @embedpdf/core
 
+## 2.6.2
+
+## 2.6.1
+
+## 2.6.0
+
+## 2.5.0
+
+## 2.4.1
+
+## 2.4.0
+
+### Patch Changes
+
+- [#426](https://github.com/embedpdf/embed-pdf-viewer/pull/426) by [@bobsingor](https://github.com/bobsingor) – Fixed AutoMount component to render utilities inside wrapper context. Utilities registered via `addUtility()` now have access to context provided by wrappers (React, Vue, Svelte), enabling plugins to share context between wrappers and utilities.
+
 ## 2.3.0
 
 ## 2.2.0

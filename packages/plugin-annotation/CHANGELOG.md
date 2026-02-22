@@ -1,5 +1,58 @@
 # @embedpdf/plugin-annotation
 
+## 2.6.2
+
+## 2.6.1
+
+## 2.6.0
+
+### Minor Changes
+
+- [#447](https://github.com/embedpdf/embed-pdf-viewer/pull/447) by [@bobsingor](https://github.com/bobsingor) – Added `modeId` filtering to marquee end event handler so annotation selection only triggers during `pointerMode`, preventing interference with redaction marquees. Added page activity claims (`annotation-selection` topic) when selecting/deselecting annotations for scroll plugin page elevation.
+
+- [#452](https://github.com/embedpdf/embed-pdf-viewer/pull/452) by [@bobsingor](https://github.com/bobsingor) –
+  - Add support for rotating annotations.
+  - Add `rotationUI` prop to `AnnotationLayer` and `AnnotationContainer`.
+  - Add `isRotatable` and `isGroupRotatable` properties to `AnnotationTool`.
+  - Add `insertUpright` behavior for stamps and free text.
+  - Update `AnnotationLayer` to support custom rotation handles via slots/components.
+
+### Patch Changes
+
+- [#458](https://github.com/embedpdf/embed-pdf-viewer/pull/458) by [@bobsingor](https://github.com/bobsingor) –
+  - Use `standardFontCssProperties` in FreeText components (React, Svelte, Vue) so bold/italic render correctly on all platforms.
+
+## 2.5.0
+
+### Patch Changes
+
+- [#441](https://github.com/embedpdf/embed-pdf-viewer/pull/441) by [@bobsingor](https://github.com/bobsingor) – Fixed rotation calculation in AnnotationLayer components to properly combine page intrinsic rotation with document rotation:
+  - Updated React `AnnotationLayer` component to compute effective rotation as `(pageRotation + docRotation) % 4`
+  - Updated Vue `annotation-layer.vue` component with the same rotation logic
+  - Updated Svelte `AnnotationLayer.svelte` component with the same rotation logic
+
+## 2.4.1
+
+## 2.4.0
+
+### Minor Changes
+
+- [#426](https://github.com/embedpdf/embed-pdf-viewer/pull/426) by [@bobsingor](https://github.com/bobsingor) – Added annotation renderer registry and enhanced annotation capabilities:
+  - Added `purgeAnnotation()` method to remove annotations from state without calling the PDF engine
+  - Added annotation renderer registry allowing external plugins to register custom annotation renderers
+  - Added `useRegisterRenderers()` hook and `AnnotationRendererProvider` context for renderer registration
+  - Changed interaction properties (`isDraggable`, `isResizable`, `lockAspectRatio`) to support dynamic functions based on annotation
+  - Added `AnnotationCommandMetadata` interface for history command filtering
+  - Added `isRedact()` helper function for type-checking redact annotations
+  - Framework exports now include `AnnotationPluginPackage` with `AnnotationRendererProvider` wrapper
+
+### Patch Changes
+
+- [#429](https://github.com/embedpdf/embed-pdf-viewer/pull/429) by [@bobsingor](https://github.com/bobsingor) – Fixed group selection box ignoring document permissions:
+  - Added `canModifyAnnotations` permission check to `GroupSelectionBox` component across React, Vue, and Svelte
+  - Group drag and resize operations are now properly disabled when the user lacks annotation modification permissions
+  - This aligns group selection behavior with individual annotation container permission checks
+
 ## 2.3.0
 
 ### Minor Changes

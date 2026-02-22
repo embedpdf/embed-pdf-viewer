@@ -60,7 +60,6 @@ import {
   SelectionLayer,
   SelectionPluginPackage,
   SelectionPluginConfig,
-  MarqueeSelection,
 } from '@embedpdf/plugin-selection/preact';
 import {
   TilingLayer,
@@ -115,6 +114,7 @@ import { HintLayer } from '@/components/hint-layer';
 import { CommentSidebar } from '@/components/comment-sidebar';
 import { CustomZoomToolbar } from '@/components/custom-zoom-toolbar';
 import { AnnotationSidebar } from '@/components/annotation-sidebar';
+import { RedactionSidebar } from '@/components/redaction-sidebar';
 import { SchemaSelectionMenu } from '@/ui/schema-selection-menu';
 import { SchemaOverlay } from '@/ui/schema-overlay';
 import { PrintModal } from '@/components/print-modal';
@@ -319,7 +319,7 @@ const DEFAULTS = {
 
   // Tools
   capture: { scale: 2, imageType: 'image/png' } as CapturePluginConfig,
-  redaction: { drawBlackBoxes: true } as RedactionPluginConfig,
+  redaction: { drawBlackBoxes: true, useAnnotationMode: true } as RedactionPluginConfig,
   print: {} as PrintPluginConfig,
   export: { defaultFileName: 'document.pdf' } as ExportPluginConfig,
   fullscreen: {} as FullscreenPluginConfig,
@@ -435,7 +435,6 @@ function ViewerLayout({ documentId, tabBarVisibility = 'multiple' }: ViewerLayou
                                     selectionMenu={annotationMenu}
                                     groupSelectionMenu={groupAnnotationMenu}
                                   />
-                                  <MarqueeSelection documentId={documentId} pageIndex={pageIndex} />
                                 </PagePointerProvider>
                               </Rotate>
                             )}
@@ -488,6 +487,7 @@ export function PDFViewer({ config, onRegistryReady }: PDFViewerProps) {
       'mode-select-button': ModeSelectButton,
       'view-permissions-modal': ViewPermissionsModal,
       'search-redaction-modal': SearchRedactionModal,
+      'redaction-sidebar': RedactionSidebar,
     }),
     [],
   );

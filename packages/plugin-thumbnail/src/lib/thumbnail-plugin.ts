@@ -227,7 +227,11 @@ export class ThumbnailPlugin extends BasePlugin<
 
     let offset = PADDING_Y; // Start with top padding
     const thumbs: ThumbMeta[] = coreDoc.document.pages.map((p) => {
-      const ratio = p.size.height / p.size.width;
+      // Apply page rotation to get correct dimensions (90° or 270° swaps width/height)
+      const isRotated90or270 = p.rotation % 2 === 1;
+      const effectiveWidth = isRotated90or270 ? p.size.height : p.size.width;
+      const effectiveHeight = isRotated90or270 ? p.size.width : p.size.height;
+      const ratio = effectiveHeight / effectiveWidth;
       const imgH = Math.round(INNER_W * ratio);
       const wrapH = P + imgH + P + L; // padding + image + padding + label
 
@@ -389,6 +393,7 @@ export class ThumbnailPlugin extends BasePlugin<
       options: {
         scaleFactor: scale,
         dpr,
+        rotation: page.rotation,
       },
     });
 

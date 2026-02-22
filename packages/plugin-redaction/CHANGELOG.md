@@ -1,5 +1,53 @@
 # @embedpdf/plugin-redaction
 
+## 2.6.2
+
+## 2.6.1
+
+## 2.6.0
+
+### Minor Changes
+
+- [#447](https://github.com/embedpdf/embed-pdf-viewer/pull/447) by [@bobsingor](https://github.com/bobsingor) – Subscribe to selection plugin's `onEmptySpaceClick` event to deselect pending redactions when the user clicks on empty page space. Restores background-click-to-deselect behavior that was lost during the marquee unification.
+
+- [#447](https://github.com/embedpdf/embed-pdf-viewer/pull/447) by [@bobsingor](https://github.com/bobsingor) – Unified marquee redaction with the selection plugin's marquee infrastructure. Removed standalone `createMarqueeHandler`, `registerMarqueeOnPage`, `RegisterMarqueeOnPageOptions`, and `MarqueeRedactCallback`. Marquee redaction now subscribes to selection plugin's `onMarqueeChange` and `onMarqueeEnd` events and forwards them via new `onRedactionMarqueeChange` method. Enabled marquee for `RedactionMode.Redact` and `RedactionMode.MarqueeRedact` modes via `enableForMode`. Added page activity claims (`redaction-selection` topic) in legacy mode for scroll plugin page elevation.
+
+### Patch Changes
+
+- [#459](https://github.com/embedpdf/embed-pdf-viewer/pull/459) by [@bobsingor](https://github.com/bobsingor) – Fix default redaction fill color (`color`) to `#000000` (black) and overlay text color (`overlayColor`) to `#FFFFFF` (white).
+
+- [#458](https://github.com/embedpdf/embed-pdf-viewer/pull/458) by [@bobsingor](https://github.com/bobsingor) –
+  - Use `standardFontCssProperties` in redaction overlay components (React, Svelte, Vue) for consistent font rendering.
+
+- [#452](https://github.com/embedpdf/embed-pdf-viewer/pull/452) by [@bobsingor](https://github.com/bobsingor) –
+  - Explicitly disable rotation for redaction tools.
+
+## 2.5.0
+
+### Patch Changes
+
+- [#441](https://github.com/embedpdf/embed-pdf-viewer/pull/441) by [@bobsingor](https://github.com/bobsingor) – Fixed rotation calculation in RedactionLayer components to properly combine page intrinsic rotation with document rotation:
+  - Updated React `RedactionLayer` component to compute effective rotation as `(pageRotation + docRotation) % 4`
+  - Updated Vue `redaction-layer.vue` component with the same rotation logic
+  - Updated Svelte `redaction-layer.svelte` component with the same rotation logic
+
+## 2.4.1
+
+## 2.4.0
+
+### Minor Changes
+
+- [#426](https://github.com/embedpdf/embed-pdf-viewer/pull/426) by [@bobsingor](https://github.com/bobsingor) – Added annotation-based redaction mode for integrated redaction workflow:
+  - Added `useAnnotationMode` config option to use REDACT annotations as pending redactions
+  - Added unified `RedactionMode.Redact` mode supporting both text selection and area marquee
+  - Added `redactTool` annotation tool for integration with annotation plugin
+  - Added `RedactHighlight` and `RedactArea` components for rendering redact annotations
+  - Added automatic renderer registration via framework-specific `RedactionPluginPackage`
+  - Added `source`, `markColor`, `redactionColor`, and `text` properties to `RedactionItem` type
+  - Pending redactions now sync with annotation plugin state in annotation mode
+  - Added `enableRedact()`, `toggleRedact()`, `isRedactActive()`, `endRedact()` methods
+  - Removed deprecated `startRedaction()` and `endRedaction()` methods from scope API
+
 ## 2.3.0
 
 ### Patch Changes

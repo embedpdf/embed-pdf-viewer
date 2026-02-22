@@ -1,17 +1,53 @@
 <template>
   <template v-for="annotation in annotations" :key="annotation.object.id">
-    <!-- Ink -->
+    <!-- Custom Renderer (from external plugins like redaction) -->
     <AnnotationContainer
-      v-if="isInk(annotation)"
+      v-if="findCustomRenderer(annotation)"
       :trackedAnnotation="annotation"
       :isSelected="showIndividualSelection(annotation)"
       :isDraggable="isDraggable(annotation)"
       :isResizable="isResizable(annotation)"
+      :isRotatable="isRotatableFor(annotation, false)"
+      :lockAspectRatio="lockAspectRatio(annotation)"
+      :onSelect="(e) => handleClick(e, annotation)"
+      :selectionMenu="isMultiSelected ? undefined : selectionMenu"
+      :style="blendStyle(annotation)"
+      v-bind="containerProps"
+    >
+      <template #default>
+        <component
+          :is="findCustomRenderer(annotation)!.component"
+          :annotation="annotation"
+          :isSelected="isSelected(annotation)"
+          :scale="scale"
+          :pageIndex="pageIndex"
+          :onClick="(e: PointerEvent | TouchEvent) => handleClick(e, annotation)"
+        />
+      </template>
+      <template #selection-menu="slotProps" v-if="!isMultiSelected">
+        <slot name="selection-menu" v-bind="slotProps" />
+      </template>
+      <template #resize-handle="slotProps">
+        <slot name="resize-handle" v-bind="slotProps" />
+      </template>
+      <template #rotation-handle="slotProps">
+        <slot name="rotation-handle" v-bind="slotProps" />
+      </template>
+    </AnnotationContainer>
+
+    <!-- Ink -->
+    <AnnotationContainer
+      v-else-if="isInk(annotation)"
+      :trackedAnnotation="annotation"
+      :isSelected="showIndividualSelection(annotation)"
+      :isDraggable="isDraggable(annotation)"
+      :isResizable="isResizable(annotation)"
+      :isRotatable="isRotatableFor(annotation, true)"
       :lockAspectRatio="lockAspectRatio(annotation)"
       :onSelect="(e) => handleClick(e, annotation)"
       :vertexConfig="getVertexConfig(annotation)"
       :selectionMenu="isMultiSelected ? undefined : selectionMenu"
-      :style="{ mixBlendMode: blendModeToCss(annotation.object.blendMode ?? PdfBlendMode.Normal) }"
+      :style="blendStyle(annotation)"
       v-bind="containerProps"
     >
       <template #default="{ annotation: currentObject }">
@@ -31,6 +67,9 @@
       <template #vertex-handle="slotProps">
         <slot name="vertex-handle" v-bind="slotProps" />
       </template>
+      <template #rotation-handle="slotProps">
+        <slot name="rotation-handle" v-bind="slotProps" />
+      </template>
     </AnnotationContainer>
 
     <!-- Square -->
@@ -40,11 +79,12 @@
       :isSelected="showIndividualSelection(annotation)"
       :isDraggable="isDraggable(annotation)"
       :isResizable="isResizable(annotation)"
+      :isRotatable="isRotatableFor(annotation, true)"
       :lockAspectRatio="lockAspectRatio(annotation)"
       :onSelect="(e) => handleClick(e, annotation)"
       :vertexConfig="getVertexConfig(annotation)"
       :selectionMenu="isMultiSelected ? undefined : selectionMenu"
-      :style="{ mixBlendMode: blendModeToCss(annotation.object.blendMode ?? PdfBlendMode.Normal) }"
+      :style="blendStyle(annotation)"
       v-bind="containerProps"
     >
       <template #default="{ annotation: currentObject }">
@@ -64,6 +104,9 @@
       <template #vertex-handle="slotProps">
         <slot name="vertex-handle" v-bind="slotProps" />
       </template>
+      <template #rotation-handle="slotProps">
+        <slot name="rotation-handle" v-bind="slotProps" />
+      </template>
     </AnnotationContainer>
 
     <!-- Circle -->
@@ -73,11 +116,12 @@
       :isSelected="showIndividualSelection(annotation)"
       :isDraggable="isDraggable(annotation)"
       :isResizable="isResizable(annotation)"
+      :isRotatable="isRotatableFor(annotation, true)"
       :lockAspectRatio="lockAspectRatio(annotation)"
       :onSelect="(e) => handleClick(e, annotation)"
       :vertexConfig="getVertexConfig(annotation)"
       :selectionMenu="isMultiSelected ? undefined : selectionMenu"
-      :style="{ mixBlendMode: blendModeToCss(annotation.object.blendMode ?? PdfBlendMode.Normal) }"
+      :style="blendStyle(annotation)"
       v-bind="containerProps"
     >
       <template #default="{ annotation: currentObject }">
@@ -97,6 +141,9 @@
       <template #vertex-handle="slotProps">
         <slot name="vertex-handle" v-bind="slotProps" />
       </template>
+      <template #rotation-handle="slotProps">
+        <slot name="rotation-handle" v-bind="slotProps" />
+      </template>
     </AnnotationContainer>
 
     <!-- Line -->
@@ -106,11 +153,12 @@
       :isSelected="showIndividualSelection(annotation)"
       :isDraggable="isDraggable(annotation)"
       :isResizable="isResizable(annotation)"
+      :isRotatable="isRotatableFor(annotation, true)"
       :lockAspectRatio="lockAspectRatio(annotation)"
       :onSelect="(e) => handleClick(e, annotation)"
       :vertexConfig="getVertexConfig(annotation)"
       :selectionMenu="isMultiSelected ? undefined : selectionMenu"
-      :style="{ mixBlendMode: blendModeToCss(annotation.object.blendMode ?? PdfBlendMode.Normal) }"
+      :style="blendStyle(annotation)"
       v-bind="containerProps"
     >
       <template #default="{ annotation: currentObject }">
@@ -130,6 +178,9 @@
       <template #vertex-handle="slotProps">
         <slot name="vertex-handle" v-bind="slotProps" />
       </template>
+      <template #rotation-handle="slotProps">
+        <slot name="rotation-handle" v-bind="slotProps" />
+      </template>
     </AnnotationContainer>
 
     <!-- Polyline -->
@@ -139,11 +190,12 @@
       :isSelected="showIndividualSelection(annotation)"
       :isDraggable="isDraggable(annotation)"
       :isResizable="isResizable(annotation)"
+      :isRotatable="isRotatableFor(annotation, true)"
       :lockAspectRatio="lockAspectRatio(annotation)"
       :onSelect="(e) => handleClick(e, annotation)"
       :vertexConfig="getVertexConfig(annotation)"
       :selectionMenu="isMultiSelected ? undefined : selectionMenu"
-      :style="{ mixBlendMode: blendModeToCss(annotation.object.blendMode ?? PdfBlendMode.Normal) }"
+      :style="blendStyle(annotation)"
       v-bind="containerProps"
     >
       <template #default="{ annotation: currentObject }">
@@ -163,6 +215,9 @@
       <template #vertex-handle="slotProps">
         <slot name="vertex-handle" v-bind="slotProps" />
       </template>
+      <template #rotation-handle="slotProps">
+        <slot name="rotation-handle" v-bind="slotProps" />
+      </template>
     </AnnotationContainer>
 
     <!-- Polygon -->
@@ -172,11 +227,12 @@
       :isSelected="showIndividualSelection(annotation)"
       :isDraggable="isDraggable(annotation)"
       :isResizable="isResizable(annotation)"
+      :isRotatable="isRotatableFor(annotation, true)"
       :lockAspectRatio="lockAspectRatio(annotation)"
       :onSelect="(e) => handleClick(e, annotation)"
       :vertexConfig="getVertexConfig(annotation)"
       :selectionMenu="isMultiSelected ? undefined : selectionMenu"
-      :style="{ mixBlendMode: blendModeToCss(annotation.object.blendMode ?? PdfBlendMode.Normal) }"
+      :style="blendStyle(annotation)"
       v-bind="containerProps"
     >
       <template #default="{ annotation: currentObject }">
@@ -196,6 +252,9 @@
       <template #vertex-handle="slotProps">
         <slot name="vertex-handle" v-bind="slotProps" />
       </template>
+      <template #rotation-handle="slotProps">
+        <slot name="rotation-handle" v-bind="slotProps" />
+      </template>
     </AnnotationContainer>
 
     <!-- FreeText -->
@@ -205,12 +264,13 @@
       :isSelected="showIndividualSelection(annotation)"
       :isDraggable="isDraggable(annotation)"
       :isResizable="isResizable(annotation)"
+      :isRotatable="isRotatableFor(annotation, true)"
       :lockAspectRatio="lockAspectRatio(annotation)"
       :onSelect="(e) => handleClick(e, annotation)"
       :onDoubleClick="(e) => handleDoubleClick(e, annotation.object.id)"
       :vertexConfig="getVertexConfig(annotation)"
       :selectionMenu="isMultiSelected ? undefined : selectionMenu"
-      :style="{ mixBlendMode: blendModeToCss(annotation.object.blendMode ?? PdfBlendMode.Normal) }"
+      :style="blendStyle(annotation)"
       v-bind="containerProps"
     >
       <template #default="{ annotation: currentObject }">
@@ -232,6 +292,9 @@
       <template #vertex-handle="slotProps">
         <slot name="vertex-handle" v-bind="slotProps" />
       </template>
+      <template #rotation-handle="slotProps">
+        <slot name="rotation-handle" v-bind="slotProps" />
+      </template>
     </AnnotationContainer>
 
     <!-- Stamp -->
@@ -241,11 +304,12 @@
       :isSelected="showIndividualSelection(annotation)"
       :isDraggable="isDraggable(annotation)"
       :isResizable="isResizable(annotation)"
+      :isRotatable="isRotatableFor(annotation, true)"
       :lockAspectRatio="lockAspectRatio(annotation)"
       :onSelect="(e) => handleClick(e, annotation)"
       :vertexConfig="getVertexConfig(annotation)"
       :selectionMenu="isMultiSelected ? undefined : selectionMenu"
-      :style="{ mixBlendMode: blendModeToCss(annotation.object.blendMode ?? PdfBlendMode.Normal) }"
+      :style="blendStyle(annotation)"
       v-bind="containerProps"
     >
       <template #default>
@@ -267,6 +331,9 @@
       <template #vertex-handle="slotProps">
         <slot name="vertex-handle" v-bind="slotProps" />
       </template>
+      <template #rotation-handle="slotProps">
+        <slot name="rotation-handle" v-bind="slotProps" />
+      </template>
     </AnnotationContainer>
 
     <!-- Text Markup: Underline, StrikeOut, Squiggly, Highlight -->
@@ -276,12 +343,13 @@
       :isSelected="showIndividualSelection(annotation)"
       :isDraggable="isDraggable(annotation)"
       :isResizable="isResizable(annotation)"
+      :isRotatable="isRotatableFor(annotation, false)"
       :lockAspectRatio="lockAspectRatio(annotation)"
       :onSelect="(e) => handleClick(e, annotation)"
       :vertexConfig="getVertexConfig(annotation)"
       :selectionMenu="isMultiSelected ? undefined : selectionMenu"
       :zIndex="0"
-      :style="{ mixBlendMode: blendModeToCss(annotation.object.blendMode ?? PdfBlendMode.Normal) }"
+      :style="blendStyle(annotation)"
       v-bind="containerProps"
     >
       <template #default="{ annotation: currentObject }">
@@ -302,12 +370,13 @@
       :isSelected="showIndividualSelection(annotation)"
       :isDraggable="isDraggable(annotation)"
       :isResizable="isResizable(annotation)"
+      :isRotatable="isRotatableFor(annotation, false)"
       :lockAspectRatio="lockAspectRatio(annotation)"
       :onSelect="(e) => handleClick(e, annotation)"
       :vertexConfig="getVertexConfig(annotation)"
       :selectionMenu="isMultiSelected ? undefined : selectionMenu"
       :zIndex="0"
-      :style="{ mixBlendMode: blendModeToCss(annotation.object.blendMode ?? PdfBlendMode.Normal) }"
+      :style="blendStyle(annotation)"
       v-bind="containerProps"
     >
       <template #default="{ annotation: currentObject }">
@@ -328,12 +397,13 @@
       :isSelected="showIndividualSelection(annotation)"
       :isDraggable="isDraggable(annotation)"
       :isResizable="isResizable(annotation)"
+      :isRotatable="isRotatableFor(annotation, false)"
       :lockAspectRatio="lockAspectRatio(annotation)"
       :onSelect="(e) => handleClick(e, annotation)"
       :vertexConfig="getVertexConfig(annotation)"
       :selectionMenu="isMultiSelected ? undefined : selectionMenu"
       :zIndex="0"
-      :style="{ mixBlendMode: blendModeToCss(annotation.object.blendMode ?? PdfBlendMode.Normal) }"
+      :style="blendStyle(annotation)"
       v-bind="containerProps"
     >
       <template #default="{ annotation: currentObject }">
@@ -354,14 +424,13 @@
       :isSelected="showIndividualSelection(annotation)"
       :isDraggable="isDraggable(annotation)"
       :isResizable="isResizable(annotation)"
+      :isRotatable="isRotatableFor(annotation, false)"
       :lockAspectRatio="lockAspectRatio(annotation)"
       :onSelect="(e) => handleClick(e, annotation)"
       :vertexConfig="getVertexConfig(annotation)"
       :selectionMenu="isMultiSelected ? undefined : selectionMenu"
       :zIndex="0"
-      :style="{
-        mixBlendMode: blendModeToCss(annotation.object.blendMode ?? PdfBlendMode.Multiply),
-      }"
+      :style="blendStyle(annotation, PdfBlendMode.Multiply)"
       v-bind="containerProps"
     >
       <template #default="{ annotation: currentObject }">
@@ -384,12 +453,13 @@
       :isMultiSelected="isMultiSelected"
       :isDraggable="false"
       :isResizable="false"
+      :isRotatable="false"
       :lockAspectRatio="false"
       :onSelect="(e) => handleLinkClick(e, annotation)"
       :selectionMenu="
         annotation.object.inReplyToId ? undefined : isMultiSelected ? undefined : selectionMenu
       "
-      :style="{ mixBlendMode: blendModeToCss(annotation.object.blendMode ?? PdfBlendMode.Normal) }"
+      :style="blendStyle(annotation)"
       v-bind="containerProps"
     >
       <template #default="{ annotation: currentObject }">
@@ -425,8 +495,12 @@
     :selectedAnnotations="selectedAnnotationsOnPage"
     :isDraggable="areAllSelectedDraggable"
     :isResizable="areAllSelectedResizable"
-    :resizeUI="resizeUI"
+    :isRotatable="areAllSelectedRotatable"
+    :lockAspectRatio="shouldLockGroupAspectRatio"
+    :resizeUi="resizeUi"
+    :rotationUi="rotationUi"
     :selectionOutlineColor="selectionOutlineColor"
+    :selectionOutline="groupSelectionOutline ?? selectionOutline"
     :groupSelectionMenu="groupSelectionMenu"
   >
     <template #group-selection-menu="slotProps">
@@ -435,11 +509,14 @@
     <template #resize-handle="slotProps">
       <slot name="resize-handle" v-bind="slotProps" />
     </template>
+    <template #rotation-handle="slotProps">
+      <slot name="rotation-handle" v-bind="slotProps" />
+    </template>
   </GroupSelectionBox>
 </template>
 
 <script setup lang="ts">
-import { ref, watchEffect, computed } from 'vue';
+import { ref, watchEffect, computed, type CSSProperties } from 'vue';
 import { blendModeToCss, PdfBlendMode, Position } from '@embedpdf/models';
 import {
   getAnnotationsByPageIndex,
@@ -458,6 +535,7 @@ import {
   isStrikeout,
   isUnderline,
   TrackedAnnotation,
+  resolveInteractionProp,
 } from '@embedpdf/plugin-annotation';
 import type { PdfLinkAnnoObject } from '@embedpdf/models';
 import { usePointerHandlers } from '@embedpdf/plugin-interaction-manager/vue';
@@ -474,7 +552,10 @@ import {
   GroupSelectionMenuRenderFn,
   ResizeHandleUI,
   VertexHandleUI,
+  RotationHandleUI,
+  SelectionOutline,
 } from '../types';
+import type { BoxedAnnotationRenderer } from '../context';
 
 const props = defineProps<{
   documentId: string;
@@ -483,14 +564,32 @@ const props = defineProps<{
   rotation: number;
   pageWidth: number;
   pageHeight: number;
-  resizeUI?: ResizeHandleUI;
-  vertexUI?: VertexHandleUI;
+  resizeUi?: ResizeHandleUI;
+  vertexUi?: VertexHandleUI;
+  rotationUi?: RotationHandleUI;
   selectionOutlineColor?: string;
+  selectionOutline?: SelectionOutline;
+  groupSelectionOutline?: SelectionOutline;
   /** Render function for selection menu (schema-driven approach) */
   selectionMenu?: AnnotationSelectionMenuRenderFn;
   /** Render function for group selection menu (schema-driven approach) */
   groupSelectionMenu?: GroupSelectionMenuRenderFn;
+  /** Custom renderers for specific annotation types (provided by external plugins) */
+  annotationRenderers?: BoxedAnnotationRenderer[];
 }>();
+
+// Typed helper to avoid inline CSS objects in template (prevents TS2742 csstype errors in .d.ts output)
+const blendStyle = (
+  annotation: TrackedAnnotation,
+  defaultBlend = PdfBlendMode.Normal,
+): CSSProperties => ({
+  mixBlendMode: blendModeToCss(annotation.object.blendMode ?? defaultBlend),
+});
+
+// Find a custom renderer for the given annotation
+const findCustomRenderer = (annotation: TrackedAnnotation) => {
+  return props.annotationRenderers?.find((r) => r.matches(annotation.object));
+};
 
 const { provides: annotationCapability } = useAnnotationCapability();
 const { provides: selectionProvides } = useSelectionCapability();
@@ -610,7 +709,13 @@ const areAllSelectedDraggable = computed(() => {
   return selectedAnnotationsOnPage.value.every((ta) => {
     const tool = annotationProvides.value?.findToolForAnnotation(ta.object);
     // Use group-specific property, falling back to single-annotation property
-    return tool?.interaction.isGroupDraggable ?? tool?.interaction.isDraggable ?? true;
+    const groupDraggable = resolveInteractionProp(
+      tool?.interaction.isGroupDraggable,
+      ta.object,
+      true,
+    );
+    const singleDraggable = resolveInteractionProp(tool?.interaction.isDraggable, ta.object, true);
+    return tool?.interaction.isGroupDraggable !== undefined ? groupDraggable : singleDraggable;
   });
 });
 
@@ -621,7 +726,45 @@ const areAllSelectedResizable = computed(() => {
   return selectedAnnotationsOnPage.value.every((ta) => {
     const tool = annotationProvides.value?.findToolForAnnotation(ta.object);
     // Use group-specific property, falling back to single-annotation property
-    return tool?.interaction.isGroupResizable ?? tool?.interaction.isResizable ?? true;
+    const groupResizable = resolveInteractionProp(
+      tool?.interaction.isGroupResizable,
+      ta.object,
+      true,
+    );
+    const singleResizable = resolveInteractionProp(tool?.interaction.isResizable, ta.object, true);
+    return tool?.interaction.isGroupResizable !== undefined ? groupResizable : singleResizable;
+  });
+});
+
+// Check if all selected annotations on this page are rotatable in group context
+const areAllSelectedRotatable = computed(() => {
+  if (selectedAnnotationsOnPage.value.length < 2) return false;
+
+  return selectedAnnotationsOnPage.value.every((ta) => {
+    const tool = annotationProvides.value?.findToolForAnnotation(ta.object);
+    const groupRotatable = resolveInteractionProp(
+      tool?.interaction.isGroupRotatable,
+      ta.object,
+      true,
+    );
+    const singleRotatable = resolveInteractionProp(tool?.interaction.isRotatable, ta.object, true);
+    return tool?.interaction.isGroupRotatable !== undefined ? groupRotatable : singleRotatable;
+  });
+});
+
+// Check if any selected annotation on this page needs aspect ratio locked during group resize
+const shouldLockGroupAspectRatio = computed(() => {
+  if (selectedAnnotationsOnPage.value.length < 2) return false;
+
+  return selectedAnnotationsOnPage.value.some((ta) => {
+    const tool = annotationProvides.value?.findToolForAnnotation(ta.object);
+    const groupLock = resolveInteractionProp(
+      tool?.interaction.lockGroupAspectRatio,
+      ta.object,
+      false,
+    );
+    const singleLock = resolveInteractionProp(tool?.interaction.lockAspectRatio, ta.object, false);
+    return tool?.interaction.lockGroupAspectRatio !== undefined ? groupLock : singleLock;
   });
 });
 
@@ -642,22 +785,31 @@ const getTool = (annotation: TrackedAnnotation) =>
 const isDraggable = (anno: TrackedAnnotation) => {
   if (isFreeText(anno) && editingId.value === anno.object.id) return false;
   if (isMultiSelected.value) return false;
-  return getTool(anno)?.interaction.isDraggable ?? false;
+  return resolveInteractionProp(getTool(anno)?.interaction.isDraggable, anno.object, false);
 };
 const isResizable = (anno: TrackedAnnotation) => {
   if (isMultiSelected.value) return false;
-  return getTool(anno)?.interaction.isResizable ?? false;
+  return resolveInteractionProp(getTool(anno)?.interaction.isResizable, anno.object, false);
 };
 const lockAspectRatio = (anno: TrackedAnnotation) =>
-  getTool(anno)?.interaction.lockAspectRatio ?? false;
+  resolveInteractionProp(getTool(anno)?.interaction.lockAspectRatio, anno.object, false);
+const isRotatableFor = (anno: TrackedAnnotation, fallback: boolean) => {
+  if (isMultiSelected.value) return false;
+  return resolveInteractionProp(getTool(anno)?.interaction.isRotatable, anno.object, fallback);
+};
 
 // Should show individual selection UI (not when multi-selected)
 const showIndividualSelection = (anno: TrackedAnnotation) =>
   isSelected(anno) && !isMultiSelected.value;
 
-// Props to pass to AnnotationContainer (excluding selectionMenu which is handled explicitly)
+// Props to pass to AnnotationContainer (excluding props that are handled explicitly or are group-only)
 const containerProps = computed(() => {
-  const { selectionMenu: _sm, groupSelectionMenu: _gsm, ...rest } = props;
+  const {
+    selectionMenu: _sm,
+    groupSelectionMenu: _gsm,
+    groupSelectionOutline: _gso,
+    ...rest
+  } = props;
   return rest;
 });
 

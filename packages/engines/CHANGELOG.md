@@ -1,5 +1,72 @@
 # @embedpdf/engines
 
+## 2.6.2
+
+### Patch Changes
+
+- [#475](https://github.com/embedpdf/embed-pdf-viewer/pull/475) by [@bobsingor](https://github.com/bobsingor) – ### Extract tight glyph bounds and font size from PDFium
+  - `readGlyphInfo` now calls `FPDFText_GetCharBox` alongside `FPDFText_GetLooseCharBox` to extract tight character bounds (closely surrounding the actual glyph shape) and maps them to device-space coordinates.
+  - `buildRunsFromGlyphs` passes tight bounds through to each `PdfGlyphSlim` record (`tightX`, `tightY`, `tightWidth`, `tightHeight`) and stores per-run `fontSize` from `FPDFText_GetFontSize`.
+
+## 2.6.1
+
+### Patch Changes
+
+- [#473](https://github.com/embedpdf/embed-pdf-viewer/pull/473) by [@bobsingor](https://github.com/bobsingor) – Implement getPageTextRuns in PdfiumNative, WebWorkerEngine, and RemoteExecutor for extracting rich text runs with font, size, and color metadata. Implement renderPageRaw and renderPageRectRaw in WebWorkerEngine for returning raw ImageDataLike pixel data without encoding.
+
+- [#463](https://github.com/embedpdf/embed-pdf-viewer/pull/463) by [@bobsingor](https://github.com/bobsingor) – Update readPageAnnoRect to call EPDFAnnot_GetRect instead of FPDFAnnot_GetRect, ensuring annotation rectangles are always normalized. Fixes link annotations appearing below their expected position when the PDF Rect array has inverted y-coordinates.
+
+## 2.6.0
+
+### Minor Changes
+
+- [#452](https://github.com/embedpdf/embed-pdf-viewer/pull/452) by [@bobsingor](https://github.com/bobsingor) –
+  - Update PDFium engine to support saving and loading rotated annotations.
+  - Add support for `EPDFAnnot_SetRotate`, `EPDFAnnot_SetExtendedRotation`, and `EPDFAnnot_SetUnrotatedRect`.
+  - Implement unrotated rendering path for rotated annotations.
+
+### Patch Changes
+
+- [#458](https://github.com/embedpdf/embed-pdf-viewer/pull/458) by [@bobsingor](https://github.com/bobsingor) –
+  - Fallback unknown font to Helvetica in `setAnnotationDefaultAppearance` so annotations with non-standard fonts can still be edited.
+
+## 2.5.0
+
+### Minor Changes
+
+- [#441](https://github.com/embedpdf/embed-pdf-viewer/pull/441) by [@bobsingor](https://github.com/bobsingor) – Implemented per-document rotation normalization in the PDFium engine:
+  - Updated `PdfCache.setDocument()` to accept per-document `normalizeRotation` flag
+  - Added `normalizeRotation` property to `DocumentContext` for tracking document-level setting
+  - Updated `PageCache` to use `EPDF_LoadPageNormalized` when normalization is enabled
+  - Modified page size retrieval to use `EPDF_GetPageSizeByIndexNormalized` for normalized documents
+  - Propagated `doc: PdfDocumentObject` parameter through 30+ coordinate transformation methods to access the normalization flag
+  - Updated `convertDevicePointToPagePoint` and `convertPagePointToDevicePoint` to use 0° rotation when normalization is enabled
+
+  This change allows annotations, text selection, and rendering to work correctly across pages with different rotations by treating all coordinates in a consistent 0° space.
+
+## 2.4.1
+
+### Patch Changes
+
+- [#434](https://github.com/embedpdf/embed-pdf-viewer/pull/434) by [@bobsingor](https://github.com/bobsingor) – Fixed memory leak where image encoder workers were never terminated when the engine was destroyed:
+  - Added optional `destroy()` method to `ImageDataConverter` interface for resource cleanup
+  - Updated `createWorkerPoolImageConverter` and `createHybridImageConverter` to attach `destroy()` that terminates the encoder worker pool
+  - Updated `PdfEngine.destroy()` to call `imageConverter.destroy?.()` to clean up encoder workers
+
+  Previously, each viewer instance would leave 2 encoder workers running after destruction.
+
+## 2.4.0
+
+### Minor Changes
+
+- [#426](https://github.com/embedpdf/embed-pdf-viewer/pull/426) by [@bobsingor](https://github.com/bobsingor) – Added redaction annotation engine methods:
+  - Added `applyRedaction()` to apply a single REDACT annotation, removing content and flattening the overlay
+  - Added `applyAllRedactions()` to apply all REDACT annotations on a page
+  - Added `flattenAnnotation()` to flatten any annotation's appearance to page content
+  - Added `readPdfRedactAnno()` for reading REDACT annotations with all properties
+  - Added `addRedactContent()` for creating REDACT annotations with QuadPoints, colors, and overlay text
+  - Added overlay text getter/setter methods for REDACT annotations
+
 ## 2.3.0
 
 ### Minor Changes

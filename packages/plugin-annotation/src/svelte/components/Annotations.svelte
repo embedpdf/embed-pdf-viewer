@@ -18,6 +18,7 @@
     isStrikeout,
     isUnderline,
     type TrackedAnnotation,
+    resolveInteractionProp,
   } from '@embedpdf/plugin-annotation';
   import type { PdfLinkAnnoObject } from '@embedpdf/models';
 
@@ -29,6 +30,7 @@
   import { useSelectionCapability } from '@embedpdf/plugin-selection/svelte';
 
   import { useAnnotationCapability } from '../hooks';
+  import type { BoxedAnnotationRenderer } from '../context';
 
   import Highlight from './text-markup/Highlight.svelte';
   import Underline from './text-markup/Underline.svelte';
@@ -52,6 +54,8 @@
     CustomAnnotationRenderer,
     ResizeHandleUI,
     VertexHandleUI,
+    RotationHandleUI,
+    SelectionOutline,
   } from '../types';
   import AnnotationContainer from './AnnotationContainer.svelte';
   import type { Snippet } from 'svelte';
@@ -74,10 +78,23 @@
     groupSelectionMenuSnippet?: Snippet<[GroupSelectionMenuProps]>;
     resizeUI?: ResizeHandleUI;
     vertexUI?: VertexHandleUI;
+    rotationUI?: RotationHandleUI;
+    /** @deprecated Use `selectionOutline` instead */
     selectionOutlineColor?: string;
+    /** Customize the selection outline for individual annotations */
+    selectionOutline?: SelectionOutline;
+    /** Customize the selection outline for the group selection box (falls back to selectionOutline) */
+    groupSelectionOutline?: SelectionOutline;
     customAnnotationRenderer?: CustomAnnotationRenderer<PdfAnnotationObject>;
+    /** Custom annotation renderers from registry/props */
+    annotationRenderers?: BoxedAnnotationRenderer[];
   }
   let annotationsProps: AnnotationsProps = $props();
+
+  // Helper to find custom renderer for an annotation
+  function findCustomRenderer(annotation: TrackedAnnotation): BoxedAnnotationRenderer | undefined {
+    return annotationsProps.annotationRenderers?.find((r) => r.matches(annotation.object));
+  }
 
   // ---------- capabilities / handlers ----------
   const annotationCapability = useAnnotationCapability();
@@ -193,7 +210,17 @@
     return selectedAnnotationsOnPage.every((ta) => {
       const tool = annotationProvides?.findToolForAnnotation(ta.object);
       // Use group-specific property, falling back to single-annotation property
-      return tool?.interaction.isGroupDraggable ?? tool?.interaction.isDraggable ?? true;
+      const groupDraggable = resolveInteractionProp(
+        tool?.interaction.isGroupDraggable,
+        ta.object,
+        true,
+      );
+      const singleDraggable = resolveInteractionProp(
+        tool?.interaction.isDraggable,
+        ta.object,
+        true,
+      );
+      return tool?.interaction.isGroupDraggable !== undefined ? groupDraggable : singleDraggable;
     });
   });
 
@@ -204,7 +231,58 @@
     return selectedAnnotationsOnPage.every((ta) => {
       const tool = annotationProvides?.findToolForAnnotation(ta.object);
       // Use group-specific property, falling back to single-annotation property
-      return tool?.interaction.isGroupResizable ?? tool?.interaction.isResizable ?? true;
+      const groupResizable = resolveInteractionProp(
+        tool?.interaction.isGroupResizable,
+        ta.object,
+        true,
+      );
+      const singleResizable = resolveInteractionProp(
+        tool?.interaction.isResizable,
+        ta.object,
+        true,
+      );
+      return tool?.interaction.isGroupResizable !== undefined ? groupResizable : singleResizable;
+    });
+  });
+
+  // Check if all selected annotations on this page are rotatable in group context
+  const areAllSelectedRotatable = $derived.by(() => {
+    if (selectedAnnotationsOnPage.length < 2) return false;
+
+    return selectedAnnotationsOnPage.every((ta) => {
+      const tool = annotationProvides?.findToolForAnnotation(ta.object);
+      // Use group-specific property, falling back to single-annotation property
+      const groupRotatable = resolveInteractionProp(
+        tool?.interaction.isGroupRotatable,
+        ta.object,
+        true,
+      );
+      const singleRotatable = resolveInteractionProp(
+        tool?.interaction.isRotatable,
+        ta.object,
+        true,
+      );
+      return tool?.interaction.isGroupRotatable !== undefined ? groupRotatable : singleRotatable;
+    });
+  });
+
+  // Check if any selected annotation on this page needs aspect ratio locked during group resize
+  const shouldLockGroupAspectRatio = $derived.by(() => {
+    if (selectedAnnotationsOnPage.length < 2) return false;
+
+    return selectedAnnotationsOnPage.some((ta) => {
+      const tool = annotationProvides?.findToolForAnnotation(ta.object);
+      const groupLock = resolveInteractionProp(
+        tool?.interaction.lockGroupAspectRatio,
+        ta.object,
+        false,
+      );
+      const singleLock = resolveInteractionProp(
+        tool?.interaction.lockAspectRatio,
+        ta.object,
+        false,
+      );
+      return tool?.interaction.lockGroupAspectRatio !== undefined ? groupLock : singleLock;
     });
   });
 
@@ -223,14 +301,51 @@
   {@const isEditing = editingId === annotation.object.id}
   {@const tool = annotationProvides?.findToolForAnnotation(annotation.object)}
   {@const mixBlendMode = blendModeToCss(annotation.object.blendMode ?? PdfBlendMode.Normal)}
+  {@const customRenderer = findCustomRenderer(annotation)}
 
-  {#if isInk(annotation)}
+  {#if customRenderer}
     <AnnotationContainer
       trackedAnnotation={annotation}
-      isSelected={isSelected && !isMultiSelected}
-      isDraggable={(tool?.interaction.isDraggable ?? true) && !isMultiSelected}
-      isResizable={(tool?.interaction.isResizable ?? true) && !isMultiSelected}
-      lockAspectRatio={tool?.interaction.lockAspectRatio ?? false}
+      {isSelected}
+      {isMultiSelected}
+      isDraggable={resolveInteractionProp(tool?.interaction.isDraggable, annotation.object, false)}
+      isResizable={resolveInteractionProp(tool?.interaction.isResizable, annotation.object, false)}
+      isRotatable={resolveInteractionProp(tool?.interaction.isRotatable, annotation.object, false)}
+      lockAspectRatio={resolveInteractionProp(
+        tool?.interaction.lockAspectRatio,
+        annotation.object,
+        false,
+      )}
+      selectionMenu={isMultiSelected ? undefined : annotationsProps.selectionMenu}
+      selectionMenuSnippet={isMultiSelected ? undefined : annotationsProps.selectionMenuSnippet}
+      onSelect={(e) => handleClick(e, annotation)}
+      style="mix-blend-mode: {mixBlendMode}"
+      {...annotationsProps}
+    >
+      {#snippet children(_obj)}
+        {@const CustomComponent = customRenderer.component}
+        <CustomComponent
+          {annotation}
+          {isSelected}
+          scale={annotationsProps.scale}
+          pageIndex={annotationsProps.pageIndex}
+          onClick={(e: PointerEvent | TouchEvent) => handleClick(e, annotation)}
+        />
+      {/snippet}
+    </AnnotationContainer>
+  {:else if isInk(annotation)}
+    <AnnotationContainer
+      trackedAnnotation={annotation}
+      {isSelected}
+      {isMultiSelected}
+      isDraggable={resolveInteractionProp(tool?.interaction.isDraggable, annotation.object, true)}
+      isResizable={resolveInteractionProp(tool?.interaction.isResizable, annotation.object, true)}
+      isRotatable={resolveInteractionProp(tool?.interaction.isRotatable, annotation.object, true)}
+      lockAspectRatio={resolveInteractionProp(
+        tool?.interaction.lockAspectRatio,
+        annotation.object,
+        false,
+      )}
       selectionMenu={isMultiSelected ? undefined : annotationsProps.selectionMenu}
       selectionMenuSnippet={isMultiSelected ? undefined : annotationsProps.selectionMenuSnippet}
       onSelect={(e) => handleClick(e, annotation)}
@@ -249,10 +364,16 @@
   {:else if isSquare(annotation)}
     <AnnotationContainer
       trackedAnnotation={annotation}
-      isSelected={isSelected && !isMultiSelected}
-      isDraggable={(tool?.interaction.isDraggable ?? true) && !isMultiSelected}
-      isResizable={(tool?.interaction.isResizable ?? true) && !isMultiSelected}
-      lockAspectRatio={tool?.interaction.lockAspectRatio ?? false}
+      {isSelected}
+      {isMultiSelected}
+      isDraggable={resolveInteractionProp(tool?.interaction.isDraggable, annotation.object, true)}
+      isResizable={resolveInteractionProp(tool?.interaction.isResizable, annotation.object, true)}
+      isRotatable={resolveInteractionProp(tool?.interaction.isRotatable, annotation.object, true)}
+      lockAspectRatio={resolveInteractionProp(
+        tool?.interaction.lockAspectRatio,
+        annotation.object,
+        false,
+      )}
       selectionMenu={isMultiSelected ? undefined : annotationsProps.selectionMenu}
       selectionMenuSnippet={isMultiSelected ? undefined : annotationsProps.selectionMenuSnippet}
       onSelect={(e: MouseEvent | TouchEvent) => handleClick(e, annotation)}
@@ -271,10 +392,16 @@
   {:else if isCircle(annotation)}
     <AnnotationContainer
       trackedAnnotation={annotation}
-      isSelected={isSelected && !isMultiSelected}
-      isDraggable={(tool?.interaction.isDraggable ?? true) && !isMultiSelected}
-      isResizable={(tool?.interaction.isResizable ?? true) && !isMultiSelected}
-      lockAspectRatio={tool?.interaction.lockAspectRatio ?? false}
+      {isSelected}
+      {isMultiSelected}
+      isDraggable={resolveInteractionProp(tool?.interaction.isDraggable, annotation.object, true)}
+      isResizable={resolveInteractionProp(tool?.interaction.isResizable, annotation.object, true)}
+      isRotatable={resolveInteractionProp(tool?.interaction.isRotatable, annotation.object, true)}
+      lockAspectRatio={resolveInteractionProp(
+        tool?.interaction.lockAspectRatio,
+        annotation.object,
+        false,
+      )}
       selectionMenu={isMultiSelected ? undefined : annotationsProps.selectionMenu}
       selectionMenuSnippet={isMultiSelected ? undefined : annotationsProps.selectionMenuSnippet}
       onSelect={(e: MouseEvent | TouchEvent) => handleClick(e, annotation)}
@@ -293,10 +420,16 @@
   {:else if isUnderline(annotation)}
     <AnnotationContainer
       trackedAnnotation={annotation}
-      isSelected={isSelected && !isMultiSelected}
-      isDraggable={(tool?.interaction.isDraggable ?? false) && !isMultiSelected}
-      isResizable={(tool?.interaction.isResizable ?? false) && !isMultiSelected}
-      lockAspectRatio={tool?.interaction.lockAspectRatio ?? false}
+      {isSelected}
+      {isMultiSelected}
+      isDraggable={resolveInteractionProp(tool?.interaction.isDraggable, annotation.object, false)}
+      isResizable={resolveInteractionProp(tool?.interaction.isResizable, annotation.object, false)}
+      isRotatable={resolveInteractionProp(tool?.interaction.isRotatable, annotation.object, false)}
+      lockAspectRatio={resolveInteractionProp(
+        tool?.interaction.lockAspectRatio,
+        annotation.object,
+        false,
+      )}
       selectionMenu={isMultiSelected ? undefined : annotationsProps.selectionMenu}
       selectionMenuSnippet={isMultiSelected ? undefined : annotationsProps.selectionMenuSnippet}
       onSelect={(e: MouseEvent | TouchEvent) => handleClick(e, annotation)}
@@ -315,10 +448,16 @@
   {:else if isStrikeout(annotation)}
     <AnnotationContainer
       trackedAnnotation={annotation}
-      isSelected={isSelected && !isMultiSelected}
-      isDraggable={(tool?.interaction.isDraggable ?? false) && !isMultiSelected}
-      isResizable={(tool?.interaction.isResizable ?? false) && !isMultiSelected}
-      lockAspectRatio={tool?.interaction.lockAspectRatio ?? false}
+      {isSelected}
+      {isMultiSelected}
+      isDraggable={resolveInteractionProp(tool?.interaction.isDraggable, annotation.object, false)}
+      isResizable={resolveInteractionProp(tool?.interaction.isResizable, annotation.object, false)}
+      isRotatable={resolveInteractionProp(tool?.interaction.isRotatable, annotation.object, false)}
+      lockAspectRatio={resolveInteractionProp(
+        tool?.interaction.lockAspectRatio,
+        annotation.object,
+        false,
+      )}
       selectionMenu={isMultiSelected ? undefined : annotationsProps.selectionMenu}
       selectionMenuSnippet={isMultiSelected ? undefined : annotationsProps.selectionMenuSnippet}
       onSelect={(e: MouseEvent | TouchEvent) => handleClick(e, annotation)}
@@ -337,10 +476,16 @@
   {:else if isSquiggly(annotation)}
     <AnnotationContainer
       trackedAnnotation={annotation}
-      isSelected={isSelected && !isMultiSelected}
-      isDraggable={(tool?.interaction.isDraggable ?? false) && !isMultiSelected}
-      isResizable={(tool?.interaction.isResizable ?? false) && !isMultiSelected}
-      lockAspectRatio={tool?.interaction.lockAspectRatio ?? false}
+      {isSelected}
+      {isMultiSelected}
+      isDraggable={resolveInteractionProp(tool?.interaction.isDraggable, annotation.object, false)}
+      isResizable={resolveInteractionProp(tool?.interaction.isResizable, annotation.object, false)}
+      isRotatable={resolveInteractionProp(tool?.interaction.isRotatable, annotation.object, false)}
+      lockAspectRatio={resolveInteractionProp(
+        tool?.interaction.lockAspectRatio,
+        annotation.object,
+        false,
+      )}
       selectionMenu={isMultiSelected ? undefined : annotationsProps.selectionMenu}
       selectionMenuSnippet={isMultiSelected ? undefined : annotationsProps.selectionMenuSnippet}
       onSelect={(e: MouseEvent | TouchEvent) => handleClick(e, annotation)}
@@ -359,10 +504,16 @@
   {:else if isHighlight(annotation)}
     <AnnotationContainer
       trackedAnnotation={annotation}
-      isSelected={isSelected && !isMultiSelected}
-      isDraggable={(tool?.interaction.isDraggable ?? false) && !isMultiSelected}
-      isResizable={(tool?.interaction.isResizable ?? false) && !isMultiSelected}
-      lockAspectRatio={tool?.interaction.lockAspectRatio ?? false}
+      {isSelected}
+      {isMultiSelected}
+      isDraggable={resolveInteractionProp(tool?.interaction.isDraggable, annotation.object, false)}
+      isResizable={resolveInteractionProp(tool?.interaction.isResizable, annotation.object, false)}
+      isRotatable={resolveInteractionProp(tool?.interaction.isRotatable, annotation.object, false)}
+      lockAspectRatio={resolveInteractionProp(
+        tool?.interaction.lockAspectRatio,
+        annotation.object,
+        false,
+      )}
       onSelect={(e: MouseEvent | TouchEvent) => handleClick(e, annotation)}
       zIndex={0}
       selectionMenu={isMultiSelected ? undefined : annotationsProps.selectionMenu}
@@ -381,10 +532,16 @@
   {:else if isLine(annotation)}
     <AnnotationContainer
       trackedAnnotation={annotation}
-      isSelected={isSelected && !isMultiSelected}
-      isDraggable={(tool?.interaction.isDraggable ?? true) && !isMultiSelected}
-      isResizable={(tool?.interaction.isResizable ?? false) && !isMultiSelected}
-      lockAspectRatio={tool?.interaction.lockAspectRatio ?? false}
+      {isSelected}
+      {isMultiSelected}
+      isDraggable={resolveInteractionProp(tool?.interaction.isDraggable, annotation.object, true)}
+      isResizable={resolveInteractionProp(tool?.interaction.isResizable, annotation.object, false)}
+      isRotatable={resolveInteractionProp(tool?.interaction.isRotatable, annotation.object, true)}
+      lockAspectRatio={resolveInteractionProp(
+        tool?.interaction.lockAspectRatio,
+        annotation.object,
+        false,
+      )}
       selectionMenu={isMultiSelected ? undefined : annotationsProps.selectionMenu}
       selectionMenuSnippet={isMultiSelected ? undefined : annotationsProps.selectionMenuSnippet}
       onSelect={(e: MouseEvent | TouchEvent) => handleClick(e, annotation)}
@@ -412,10 +569,16 @@
       trackedAnnotation={annotation}
       selectionMenu={isMultiSelected ? undefined : annotationsProps.selectionMenu}
       selectionMenuSnippet={isMultiSelected ? undefined : annotationsProps.selectionMenuSnippet}
-      isDraggable={(tool?.interaction.isDraggable ?? true) && !isMultiSelected}
-      isResizable={(tool?.interaction.isResizable ?? false) && !isMultiSelected}
-      lockAspectRatio={tool?.interaction.lockAspectRatio ?? false}
-      isSelected={isSelected && !isMultiSelected}
+      isDraggable={resolveInteractionProp(tool?.interaction.isDraggable, annotation.object, true)}
+      isResizable={resolveInteractionProp(tool?.interaction.isResizable, annotation.object, false)}
+      isRotatable={resolveInteractionProp(tool?.interaction.isRotatable, annotation.object, true)}
+      lockAspectRatio={resolveInteractionProp(
+        tool?.interaction.lockAspectRatio,
+        annotation.object,
+        false,
+      )}
+      {isSelected}
+      {isMultiSelected}
       onSelect={(e: MouseEvent | TouchEvent) => handleClick(e, annotation)}
       vertexConfig={{
         extractVertices: (a) => a.vertices,
@@ -436,10 +599,16 @@
   {:else if isPolygon(annotation)}
     <AnnotationContainer
       trackedAnnotation={annotation}
-      isSelected={isSelected && !isMultiSelected}
-      isDraggable={(tool?.interaction.isDraggable ?? true) && !isMultiSelected}
-      isResizable={(tool?.interaction.isResizable ?? false) && !isMultiSelected}
-      lockAspectRatio={tool?.interaction.lockAspectRatio ?? false}
+      {isSelected}
+      {isMultiSelected}
+      isDraggable={resolveInteractionProp(tool?.interaction.isDraggable, annotation.object, true)}
+      isResizable={resolveInteractionProp(tool?.interaction.isResizable, annotation.object, false)}
+      isRotatable={resolveInteractionProp(tool?.interaction.isRotatable, annotation.object, true)}
+      lockAspectRatio={resolveInteractionProp(
+        tool?.interaction.lockAspectRatio,
+        annotation.object,
+        false,
+      )}
       selectionMenu={isMultiSelected ? undefined : annotationsProps.selectionMenu}
       selectionMenuSnippet={isMultiSelected ? undefined : annotationsProps.selectionMenuSnippet}
       onSelect={(e: MouseEvent | TouchEvent) => handleClick(e, annotation)}
@@ -462,10 +631,17 @@
   {:else if isFreeText(annotation)}
     <AnnotationContainer
       trackedAnnotation={annotation}
-      isSelected={isSelected && !isMultiSelected}
-      isDraggable={(tool?.interaction.isDraggable ?? true) && !isEditing && !isMultiSelected}
-      isResizable={(tool?.interaction.isResizable ?? true) && !isMultiSelected}
-      lockAspectRatio={tool?.interaction.lockAspectRatio ?? false}
+      {isSelected}
+      {isMultiSelected}
+      isDraggable={resolveInteractionProp(tool?.interaction.isDraggable, annotation.object, true) &&
+        !isEditing}
+      isResizable={resolveInteractionProp(tool?.interaction.isResizable, annotation.object, true)}
+      isRotatable={resolveInteractionProp(tool?.interaction.isRotatable, annotation.object, true)}
+      lockAspectRatio={resolveInteractionProp(
+        tool?.interaction.lockAspectRatio,
+        annotation.object,
+        false,
+      )}
       selectionMenu={isMultiSelected ? undefined : annotationsProps.selectionMenu}
       selectionMenuSnippet={isMultiSelected ? undefined : annotationsProps.selectionMenuSnippet}
       onSelect={(e) => handleClick(e, annotation)}
@@ -491,10 +667,16 @@
   {:else if isStamp(annotation)}
     <AnnotationContainer
       trackedAnnotation={annotation}
-      isSelected={isSelected && !isMultiSelected}
-      isDraggable={(tool?.interaction.isDraggable ?? true) && !isMultiSelected}
-      isResizable={(tool?.interaction.isResizable ?? true) && !isMultiSelected}
-      lockAspectRatio={tool?.interaction.lockAspectRatio ?? false}
+      {isSelected}
+      {isMultiSelected}
+      isDraggable={resolveInteractionProp(tool?.interaction.isDraggable, annotation.object, true)}
+      isResizable={resolveInteractionProp(tool?.interaction.isResizable, annotation.object, true)}
+      isRotatable={resolveInteractionProp(tool?.interaction.isRotatable, annotation.object, true)}
+      lockAspectRatio={resolveInteractionProp(
+        tool?.interaction.lockAspectRatio,
+        annotation.object,
+        false,
+      )}
       selectionMenu={isMultiSelected ? undefined : annotationsProps.selectionMenu}
       selectionMenuSnippet={isMultiSelected ? undefined : annotationsProps.selectionMenuSnippet}
       onSelect={(e: MouseEvent | TouchEvent) => handleClick(e, annotation)}
@@ -516,10 +698,11 @@
     {@const hasIRT = !!annotation.object.inReplyToId}
     <AnnotationContainer
       trackedAnnotation={annotation}
-      isSelected={isSelected && !isMultiSelected}
+      {isSelected}
       {isMultiSelected}
       isDraggable={false}
       isResizable={false}
+      isRotatable={false}
       lockAspectRatio={false}
       selectionMenu={hasIRT
         ? undefined
@@ -560,8 +743,12 @@
     selectedAnnotations={selectedAnnotationsOnPage}
     isDraggable={areAllSelectedDraggable}
     isResizable={areAllSelectedResizable}
+    isRotatable={areAllSelectedRotatable}
+    lockAspectRatio={shouldLockGroupAspectRatio}
     resizeUI={annotationsProps.resizeUI}
+    rotationUI={annotationsProps.rotationUI}
     selectionOutlineColor={annotationsProps.selectionOutlineColor}
+    selectionOutline={annotationsProps.groupSelectionOutline ?? annotationsProps.selectionOutline}
     groupSelectionMenu={annotationsProps.groupSelectionMenu}
     groupSelectionMenuSnippet={annotationsProps.groupSelectionMenuSnippet}
   />

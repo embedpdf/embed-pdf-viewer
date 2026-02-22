@@ -46,7 +46,8 @@ export type SidebarSubtype =
   | PdfAnnotationSubtype.LINE
   | PdfAnnotationSubtype.POLYLINE
   | PdfAnnotationSubtype.FREETEXT
-  | PdfAnnotationSubtype.STAMP;
+  | PdfAnnotationSubtype.STAMP
+  | PdfAnnotationSubtype.REDACT;
 
 /* ------------------------------------------------------------------ */
 /* 2. Narrowing type‑guards (add more as needed)                      */
@@ -144,6 +145,12 @@ export function isLink(
   return a.object.type === PdfAnnotationSubtype.LINK;
 }
 
+export function isRedact(
+  a: TrackedAnnotation,
+): a is TrackedAnnotation<AnnoOf<PdfAnnotationSubtype.REDACT>> {
+  return a.object.type === PdfAnnotationSubtype.REDACT;
+}
+
 export function isSidebarAnnotation(
   a: TrackedAnnotation,
 ): a is TrackedAnnotation<AnnoOf<SidebarSubtype>> {
@@ -156,6 +163,7 @@ export function isSidebarAnnotation(
     isLine(a) ||
     isPolyline(a) ||
     isFreeText(a) ||
-    isStamp(a)
+    isStamp(a) ||
+    isRedact(a)
   );
 }

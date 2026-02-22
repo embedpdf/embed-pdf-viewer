@@ -9,7 +9,7 @@ export const manifest: PluginManifest<RedactionPluginConfig> = {
   version: '1.0.0',
   provides: ['redaction'],
   requires: [],
-  optional: ['interaction-manager', 'selection'],
+  optional: ['interaction-manager', 'selection', 'annotation'],
   defaultConfig: {
     drawBlackBoxes: true,
   },

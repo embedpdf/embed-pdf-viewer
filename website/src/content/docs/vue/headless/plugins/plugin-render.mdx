@@ -4,11 +4,19 @@ description: Provides the essential <RenderLayer /> component for visually rende
 searchable: true
 ---
 
+import { Callout } from '@/components/callout'
+
 # Render Plugin
 
 The Render Plugin is the visual heart of the PDF viewer. It is responsible for taking the raw PDF data from the core engine and "painting" it onto the screen. It supports high-fidelity rendering of text, images, vector graphics, and form widgets.
 
 This plugin works seamlessly in multi-document environments, allowing you to render pages from different documents simultaneously using specific `documentId` references.
+
+<Callout type="warning" title="Performance Warning">
+  Rendering large documents or using high zoom levels with only the Render Plugin can lead to high memory usage and browser crashes, especially on mobile devices.
+
+  For production applications, we strongly recommend using the [Tiling Plugin](./plugin-tiling) alongside the Render Plugin. The Tiling Plugin breaks pages into smaller chunks, significantly reducing memory usage while maintaining high fidelity at any zoom level.
+</Callout>
 
 ## Installation
 

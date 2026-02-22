@@ -22,6 +22,7 @@ import {
   PdfFileUrl,
   PdfGlyphObject,
   PdfPageGeometry,
+  PdfPageTextRuns,
   PageTextSlice,
   AnnotationCreateContext,
   PdfEngineMethodArgs,
@@ -39,6 +40,7 @@ import {
   PdfPrintOptions,
   PdfBookmarkObject,
   PdfAddAttachmentParams,
+  ImageDataLike,
 } from '@embedpdf/models';
 import { ExecuteRequest, Response, SpecificExecuteRequest } from './runner';
 
@@ -426,6 +428,48 @@ export class WebWorkerEngine implements PdfEngine {
   }
 
   /**
+   * {@inheritDoc @embedpdf/models!PdfEngine.renderPageRaw}
+   *
+   * @public
+   */
+  renderPageRaw(doc: PdfDocumentObject, page: PdfPageObject, options?: PdfRenderPageOptions) {
+    this.logger.debug(LOG_SOURCE, LOG_CATEGORY, 'renderPageRaw', doc, page, options);
+    const requestId = this.generateRequestId(doc.id);
+    const task = new WorkerTask<ImageDataLike>(this.worker, requestId);
+
+    const request: ExecuteRequest = createRequest(requestId, 'renderPageRaw', [doc, page, options]);
+    this.proxy(task, request);
+
+    return task;
+  }
+
+  /**
+   * {@inheritDoc @embedpdf/models!PdfEngine.renderPageRectRaw}
+   *
+   * @public
+   */
+  renderPageRectRaw(
+    doc: PdfDocumentObject,
+    page: PdfPageObject,
+    rect: Rect,
+    options?: PdfRenderPageOptions,
+  ) {
+    this.logger.debug(LOG_SOURCE, LOG_CATEGORY, 'renderPageRectRaw', doc, page, rect, options);
+    const requestId = this.generateRequestId(doc.id);
+    const task = new WorkerTask<ImageDataLike>(this.worker, requestId);
+
+    const request: ExecuteRequest = createRequest(requestId, 'renderPageRectRaw', [
+      doc,
+      page,
+      rect,
+      options,
+    ]);
+    this.proxy(task, request);
+
+    return task;
+  }
+
+  /**
    * {@inheritDoc @embedpdf/models!PdfEngine.renderAnnotation}
    *
    * @public
@@ -796,6 +840,62 @@ export class WebWorkerEngine implements PdfEngine {
   }
 
   /**
+   * {@inheritDoc @embedpdf/models!PdfEngine.applyRedaction}
+   *
+   * @public
+   */
+  applyRedaction(doc: PdfDocumentObject, page: PdfPageObject, annotation: PdfAnnotationObject) {
+    this.logger.debug(LOG_SOURCE, LOG_CATEGORY, 'applyRedaction', doc, page, annotation);
+    const requestId = this.generateRequestId(doc.id);
+    const task = new WorkerTask<boolean>(this.worker, requestId);
+
+    const request: ExecuteRequest = createRequest(requestId, 'applyRedaction', [
+      doc,
+      page,
+      annotation,
+    ]);
+    this.proxy(task, request);
+
+    return task;
+  }
+
+  /**
+   * {@inheritDoc @embedpdf/models!PdfEngine.applyAllRedactions}
+   *
+   * @public
+   */
+  applyAllRedactions(doc: PdfDocumentObject, page: PdfPageObject) {
+    this.logger.debug(LOG_SOURCE, LOG_CATEGORY, 'applyAllRedactions', doc, page);
+    const requestId = this.generateRequestId(doc.id);
+    const task = new WorkerTask<boolean>(this.worker, requestId);
+
+    const request: ExecuteRequest = createRequest(requestId, 'applyAllRedactions', [doc, page]);
+    this.proxy(task, request);
+
+    return task;
+  }
+
+  /**
+   * {@inheritDoc @embedpdf/models!PdfEngine.flattenAnnotation}
+   *
+   * @public
+   */
+  flattenAnnotation(doc: PdfDocumentObject, page: PdfPageObject, annotation: PdfAnnotationObject) {
+    this.logger.debug(LOG_SOURCE, LOG_CATEGORY, 'flattenAnnotation', doc, page, annotation);
+    const requestId = this.generateRequestId(doc.id);
+    const task = new WorkerTask<boolean>(this.worker, requestId);
+
+    const request: ExecuteRequest = createRequest(requestId, 'flattenAnnotation', [
+      doc,
+      page,
+      annotation,
+    ]);
+    this.proxy(task, request);
+
+    return task;
+  }
+
+  /**
    * {@inheritDoc @embedpdf/models!PdfEngine.extractText}
    *
    * @public
@@ -854,6 +954,22 @@ export class WebWorkerEngine implements PdfEngine {
     const task = new WorkerTask<PdfPageGeometry>(this.worker, requestId);
 
     const request: ExecuteRequest = createRequest(requestId, 'getPageGeometry', [doc, page]);
+    this.proxy(task, request);
+
+    return task;
+  }
+
+  /**
+   * {@inheritDoc @embedpdf/models!PdfEngine.getPageTextRuns}
+   *
+   * @public
+   */
+  getPageTextRuns(doc: PdfDocumentObject, page: PdfPageObject) {
+    this.logger.debug(LOG_SOURCE, LOG_CATEGORY, 'getPageTextRuns', doc, page);
+    const requestId = this.generateRequestId(doc.id);
+    const task = new WorkerTask<PdfPageTextRuns>(this.worker, requestId);
+
+    const request: ExecuteRequest = createRequest(requestId, 'getPageTextRuns', [doc, page]);
     this.proxy(task, request);
 
     return task;

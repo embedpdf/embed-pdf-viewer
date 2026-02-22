@@ -28,11 +28,7 @@
   import { TilingLayer, TilingPluginPackage } from '@embedpdf/plugin-tiling/svelte';
   import { ExportPluginPackage } from '@embedpdf/plugin-export/svelte';
   import { PrintPluginPackage } from '@embedpdf/plugin-print/svelte';
-  import {
-    SelectionLayer,
-    SelectionPluginPackage,
-    MarqueeSelection,
-  } from '@embedpdf/plugin-selection/svelte';
+  import { SelectionLayer, SelectionPluginPackage } from '@embedpdf/plugin-selection/svelte';
   import { SearchLayer, SearchPluginPackage } from '@embedpdf/plugin-search/svelte';
   import { ThumbnailPluginPackage } from '@embedpdf/plugin-thumbnail/svelte';
   import { MarqueeCapture, CapturePluginPackage } from '@embedpdf/plugin-capture/svelte';
@@ -136,7 +132,9 @@
     createPluginRegistration(HistoryPluginPackage),
     createPluginRegistration(AnnotationPluginPackage),
     createPluginRegistration(FullscreenPluginPackage),
-    createPluginRegistration(RedactionPluginPackage),
+    createPluginRegistration(RedactionPluginPackage, {
+      useAnnotationMode: true,
+    }),
     createPluginRegistration(ThumbnailPluginPackage, {
       width: 120,
       paddingY: 10,
@@ -322,7 +320,6 @@
                               selectionMenu={annotationMenu.renderFn}
                               groupSelectionMenu={groupAnnotationMenu.renderFn}
                             />
-                            <MarqueeSelection {documentId} pageIndex={page.pageIndex} />
                           </PagePointerProvider>
                         </Rotate>
                       {/snippet}

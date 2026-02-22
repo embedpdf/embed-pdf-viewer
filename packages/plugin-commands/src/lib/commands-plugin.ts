@@ -7,6 +7,7 @@ import {
   Listener,
   arePropsEqual,
 } from '@embedpdf/core';
+import { Logger } from '@embedpdf/models';
 import { I18nCapability, I18nPlugin } from '@embedpdf/plugin-i18n';
 import {
   CommandsCapability,
@@ -230,7 +231,13 @@ export class CommandsPlugin extends BasePlugin<
       shortcutLabel: command.shortcutLabel,
       categories: command.categories,
       description: command.description,
-      execute: () => command.action({ registry: this.registry, state, documentId: resolvedDocId }),
+      execute: () =>
+        command.action({
+          registry: this.registry,
+          state,
+          documentId: resolvedDocId,
+          logger: this.logger,
+        }),
     };
   }
 
@@ -263,11 +270,13 @@ export class CommandsPlugin extends BasePlugin<
           registry: PluginRegistry;
           state: StoreState<any>;
           documentId: string;
+          logger: Logger;
         }) => T
       )({
         registry: this.registry,
         state,
         documentId,
+        logger: this.logger,
       });
     }
 

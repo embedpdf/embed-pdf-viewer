@@ -3,7 +3,7 @@
   import {
     type PdfFreeTextAnnoObject,
     PdfVerticalAlignment,
-    standardFontCss,
+    standardFontCssProperties,
     textAlignmentToCss,
   } from '@embedpdf/models';
   import type { TrackedAnnotation } from '@embedpdf/plugin-annotation';
@@ -93,10 +93,14 @@
         ? 'center'
         : 'flex-end',
   );
+
+  const fontCss = $derived(standardFontCssProperties(annotation.object.fontFamily));
 </script>
 
 <!-- Outer positioned container -->
 <div
+  role="button"
+  tabindex={-1}
   style:position="absolute"
   style:width={`${outerW}px`}
   style:height={`${outerH}px`}
@@ -109,6 +113,7 @@
   <!-- Editable span -->
   <span
     bind:this={editorRef}
+    role="textbox"
     tabindex="0"
     contenteditable={isEditing}
     onblur={handleBlur}
@@ -117,7 +122,9 @@
     style:justify-content={justify}
     style:color={annotation.object.fontColor}
     style:font-size={`${adjustedFontPx}px`}
-    style:font-family={standardFontCss(annotation.object.fontFamily)}
+    style:font-family={fontCss.fontFamily}
+    style:font-weight={fontCss.fontWeight}
+    style:font-style={fontCss.fontStyle}
     style:text-align={textAlignmentToCss(annotation.object.textAlign)}
     style:background-color={annotation.object.color ?? annotation.object.backgroundColor}
     style:opacity={annotation.object.opacity}

@@ -168,6 +168,7 @@ export function useSchemaRenderer(documentId: string) {
               isOpen={activeModal.isOpen}
               onClose={handleClose}
               onExited={handleExited}
+              modalProps={activeModal.props}
             />
           )}
         </Fragment>

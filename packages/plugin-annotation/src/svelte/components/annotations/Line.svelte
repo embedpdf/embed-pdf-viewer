@@ -68,6 +68,7 @@
   viewBox={`0 0 ${rect.size.width} ${rect.size.height}`}
 >
   <!-- Main line -->
+  <!-- svelte-ignore a11y_no_static_element_interactions -->
   <line
     {x1}
     {y1}
@@ -86,6 +87,7 @@
 
   <!-- Optional arrowheads / butt caps -->
   {#if endings.start}
+    <!-- svelte-ignore a11y_no_static_element_interactions -->
     <path
       d={endings.start.d}
       transform={endings.start.transform}
@@ -106,6 +108,7 @@
   {/if}
 
   {#if endings.end}
+    <!-- svelte-ignore a11y_no_static_element_interactions -->
     <path
       d={endings.end.d}
       transform={endings.end.transform}

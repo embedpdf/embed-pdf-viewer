@@ -232,6 +232,89 @@ export class HistoryPlugin extends BasePlugin<
     return data.globalIndex < data.globalTimeline.length - 1;
   }
 
+  /**
+   * Purges history entries that match the given predicate based on command metadata.
+   * Used to remove commands that are no longer valid (e.g., after a permanent redaction commit).
+   *
+   * @param predicate A function that returns true for commands that should be purged
+   * @param topic If provided, only purges entries for that specific topic
+   * @param documentId The document to purge history for
+   * @returns The number of entries that were purged
+   */
+  private purgeByMetadata<T>(
+    predicate: (metadata: T | undefined) => boolean,
+    topic: string | undefined,
+    documentId: string,
+  ): number {
+    const data = this.getDocumentHistoryData(documentId);
+    let purgedCount = 0;
+
+    // Helper to check if a command should be purged
+    const shouldPurge = (command: Command): boolean => {
+      return predicate(command.metadata as T | undefined);
+    };
+
+    // 1. Purge from topic histories
+    const topicsToProcess = topic ? [topic] : Array.from(data.topicHistories.keys());
+
+    for (const topicName of topicsToProcess) {
+      const topicHistory = data.topicHistories.get(topicName);
+      if (!topicHistory) continue;
+
+      const newCommands: Command[] = [];
+      let indexAdjustment = 0;
+
+      for (let i = 0; i < topicHistory.commands.length; i++) {
+        const command = topicHistory.commands[i];
+        if (shouldPurge(command)) {
+          // If this entry is at or before currentIndex, we need to adjust
+          if (i <= topicHistory.currentIndex) {
+            indexAdjustment++;
+          }
+          purgedCount++;
+        } else {
+          newCommands.push(command);
+        }
+      }
+
+      topicHistory.commands = newCommands;
+      topicHistory.currentIndex = Math.max(-1, topicHistory.currentIndex - indexAdjustment);
+    }
+
+    // 2. Purge from global timeline
+    const newTimeline: HistoryEntry[] = [];
+    let globalIndexAdjustment = 0;
+
+    for (let i = 0; i < data.globalTimeline.length; i++) {
+      const entry = data.globalTimeline[i];
+      const matchesTopic = !topic || entry.topic === topic;
+
+      if (matchesTopic && shouldPurge(entry.command)) {
+        // If this entry is at or before globalIndex, we need to adjust
+        if (i <= data.globalIndex) {
+          globalIndexAdjustment++;
+        }
+      } else {
+        newTimeline.push(entry);
+      }
+    }
+
+    data.globalTimeline = newTimeline;
+    data.globalIndex = Math.max(-1, data.globalIndex - globalIndexAdjustment);
+
+    // 3. Emit history change if anything was purged
+    if (purgedCount > 0) {
+      this.emitHistoryChange(documentId, topic);
+      this.logger.debug(
+        'HistoryPlugin',
+        'PurgeByMetadata',
+        `Purged ${purgedCount} history entries for document: ${documentId}${topic ? `, topic: ${topic}` : ''}`,
+      );
+    }
+
+    return purgedCount;
+  }
+
   // ─────────────────────────────────────────────────────────
   // Document Scoping
   // ─────────────────────────────────────────────────────────
@@ -250,6 +333,8 @@ export class HistoryPlugin extends BasePlugin<
             listener(event.topic);
           }
         }),
+      purgeByMetadata: <T>(predicate: (metadata: T | undefined) => boolean, topic?: string) =>
+        this.purgeByMetadata(predicate, topic, documentId),
     };
   }
 
@@ -295,6 +380,12 @@ export class HistoryPlugin extends BasePlugin<
 
       // Events
       onHistoryChange: this.historyChange$.on,
+
+      // Purge operations
+      purgeByMetadata: <T>(predicate: (metadata: T | undefined) => boolean, topic?: string) => {
+        const documentId = this.getActiveDocumentId();
+        return this.purgeByMetadata(predicate, topic, documentId);
+      },
     };
   }
 

@@ -1,5 +1,66 @@
 # @embedpdf/snippet
 
+## 2.6.2
+
+## 2.6.1
+
+### Patch Changes
+
+- [#465](https://github.com/embedpdf/embed-pdf-viewer/pull/465) by [@bobsingor](https://github.com/bobsingor) – Switch toolbar close command from hardcoded pointerMode to activateDefaultMode. On mobile devices the default mode is pan mode rather than pointer mode, and activating pointer mode prevented scrolling (only allowing text selection).
+
+- [#466](https://github.com/embedpdf/embed-pdf-viewer/pull/466) by [@bobsingor](https://github.com/bobsingor) – Fix toolbar UI visibility: hide the mode select dropdown when no annotation/shape/redact modes are available (previously showed a dropdown with a single item), and hide the file-actions divider when document:open and document:close items are not visible.
+
+## 2.6.0
+
+### Minor Changes
+
+- [#452](https://github.com/embedpdf/embed-pdf-viewer/pull/452) by [@bobsingor](https://github.com/bobsingor) –
+  - Add rotation property control to the annotation sidebar.
+  - Update selection menu to handle rotated annotations.
+
+## 2.5.0
+
+## 2.4.1
+
+### Patch Changes
+
+- [#434](https://github.com/embedpdf/embed-pdf-viewer/pull/434) by [@bobsingor](https://github.com/bobsingor) – Fixed memory leak in `EmbedPdfContainer` where Preact components were not unmounted on disconnect:
+  - Added `render(null, this.root)` in `disconnectedCallback()` to properly unmount Preact components
+  - This triggers the cleanup chain: plugin destroy, engine destroy, and worker termination
+
+  Previously, navigating between pages would leave workers running (1 PDFium + 2 encoder workers per viewer instance).
+
+## 2.4.0
+
+### Minor Changes
+
+- [#428](https://github.com/embedpdf/embed-pdf-viewer/pull/428) by [@bobsingor](https://github.com/bobsingor) – Fixed link modal context handling:
+  - Added `source` prop to LinkModal to distinguish between annotation and text selection context
+  - Updated `annotation:add-link` command to pass `{ source: 'selection' }` when opening modal
+  - Updated `annotation:toggle-link` command to pass `{ source: 'annotation' }` when opening modal
+  - Prevents incorrect behavior where annotation selection would override text selection when creating links
+
+- [#426](https://github.com/embedpdf/embed-pdf-viewer/pull/426) by [@bobsingor](https://github.com/bobsingor) – Added redaction management features:
+  - Added `RedactionSidebar` component for viewing and managing pending redactions
+  - Added `annotation:apply-redaction` command to apply the selected redaction annotation
+  - Added `redaction:redact` command for unified redact mode (text + area)
+  - Added `panel:toggle-redaction` command for toggling the redaction sidebar
+  - Added redaction panel configuration to UI schema
+  - Added REDACT annotation type support in annotation sidebar
+  - Added `redactCombined` and `redactionSidebar` icons
+  - Added translations for redaction panel, overlay text, and redaction states
+  - Updated redaction toolbar to use unified redact mode
+
+### Patch Changes
+
+- [#430](https://github.com/embedpdf/embed-pdf-viewer/pull/430) by [@bobsingor](https://github.com/bobsingor) – Added document permission checks to redaction sidebar buttons:
+  - "Clear All" button is now disabled when `canModifyAnnotations` is false
+  - "Redact All" button is now disabled when `canModifyContents` is false
+  - Added squiggly annotation tool to annotation toolbar
+  - Added ink tool to annotation overflow menu and responsive breakpoints
+
+- [`57a8431`](https://github.com/embedpdf/embed-pdf-viewer/commit/57a843137bd968118e36a768c7012d9f8defad45) by [@bobsingor](https://github.com/bobsingor) – Fixed TabButton component causing unintended form submission when used inside forms. Added `type="button"` to prevent tab buttons from triggering form submit, which was causing the link modal to close immediately when switching to the Page tab.
+
 ## 2.3.0
 
 ### Minor Changes

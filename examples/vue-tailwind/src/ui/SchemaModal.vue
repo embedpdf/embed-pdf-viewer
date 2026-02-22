@@ -20,6 +20,7 @@ interface Props {
   isOpen: boolean;
   onClose: () => void;
   onExited: () => void;
+  modalProps?: Record<string, unknown>;
 }
 
 const props = defineProps<Props>();
@@ -38,6 +39,7 @@ const modalContent = computed(() => {
     isOpen: props.isOpen,
     onClose: props.onClose,
     onExited: props.onExited,
+    ...props.modalProps,
   });
 });
 </script>

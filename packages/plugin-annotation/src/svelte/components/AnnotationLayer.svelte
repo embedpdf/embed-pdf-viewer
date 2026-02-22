@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { Rotation, type PdfAnnotationObject } from '@embedpdf/models';
+  import { type Rotation, type PdfAnnotationObject } from '@embedpdf/models';
   import { useDocumentState } from '@embedpdf/core/svelte';
   import type { HTMLAttributes } from 'svelte/elements';
   import type {
@@ -10,7 +10,10 @@
     CustomAnnotationRenderer,
     ResizeHandleUI,
     VertexHandleUI,
+    RotationHandleUI,
+    SelectionOutline,
   } from '../types';
+  import { getRendererRegistry, type BoxedAnnotationRenderer } from '../context';
   import Annotations from './Annotations.svelte';
   import TextMarkup from './TextMarkup.svelte';
   import AnnotationPaintLayer from './AnnotationPaintLayer.svelte';
@@ -35,10 +38,18 @@
     resizeUI?: ResizeHandleUI;
     /** Customize vertex handles */
     vertexUI?: VertexHandleUI;
-    /** Customize selection outline color */
+    /** Customize rotation handle */
+    rotationUI?: RotationHandleUI;
+    /** @deprecated Use `selectionOutline` instead */
     selectionOutlineColor?: string;
+    /** Customize the selection outline for individual annotations */
+    selectionOutline?: SelectionOutline;
+    /** Customize the selection outline for the group selection box (falls back to selectionOutline) */
+    groupSelectionOutline?: SelectionOutline;
     /** Customize annotation renderer */
     customAnnotationRenderer?: CustomAnnotationRenderer<PdfAnnotationObject>;
+    /** Custom annotation renderers from props */
+    annotationRenderers?: BoxedAnnotationRenderer[];
   };
 
   let {
@@ -53,10 +64,29 @@
     groupSelectionMenuSnippet,
     resizeUI,
     vertexUI,
+    rotationUI,
     selectionOutlineColor,
+    selectionOutline,
+    groupSelectionOutline,
     customAnnotationRenderer,
+    annotationRenderers,
     ...restProps
   }: AnnotationLayerProps = $props();
+
+  // Get registry and merge with props
+  const registry = getRendererRegistry();
+
+  const allRenderers = $derived.by(() => {
+    const fromRegistry = registry?.getAll() ?? [];
+    const fromProps = annotationRenderers ?? [];
+    const merged = [...fromRegistry];
+    for (const r of fromProps) {
+      const idx = merged.findIndex((m) => m.id === r.id);
+      if (idx >= 0) merged[idx] = r;
+      else merged.push(r);
+    }
+    return merged;
+  });
 
   const documentState = useDocumentState(() => documentId);
 
@@ -68,11 +98,13 @@
     overrideScale !== undefined ? overrideScale : (documentState?.current?.scale ?? 1),
   );
 
-  const actualRotation = $derived(
-    overrideRotation !== undefined
-      ? overrideRotation
-      : (documentState?.current?.rotation ?? Rotation.Degree0),
-  );
+  const actualRotation = $derived.by(() => {
+    if (overrideRotation !== undefined) return overrideRotation;
+    // Combine page intrinsic rotation with document rotation
+    const pageRotation = page?.rotation ?? 0;
+    const docRotation = documentState?.current?.rotation ?? 0;
+    return ((pageRotation + docRotation) % 4) as Rotation;
+  });
 </script>
 
 <div
@@ -93,8 +125,12 @@
     {pageHeight}
     {resizeUI}
     {vertexUI}
+    {rotationUI}
     {selectionOutlineColor}
+    {selectionOutline}
+    {groupSelectionOutline}
     {customAnnotationRenderer}
+    annotationRenderers={allRenderers}
   />
   <TextMarkup {documentId} {pageIndex} scale={actualScale} />
   <AnnotationPaintLayer {documentId} {pageIndex} scale={actualScale} />

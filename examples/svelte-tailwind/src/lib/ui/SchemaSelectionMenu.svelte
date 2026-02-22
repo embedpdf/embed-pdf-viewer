@@ -14,7 +14,7 @@
     `;
 
     if (props.placement?.suggestTop) {
-      style += 'top: -48px;';
+      style += 'top: -56px;';
     } else {
       style += `top: ${props.rect.size.height + 8}px;`;
     }

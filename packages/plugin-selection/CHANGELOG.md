@@ -1,5 +1,57 @@
 # @embedpdf/plugin-selection
 
+## 2.6.2
+
+### Patch Changes
+
+- [#475](https://github.com/embedpdf/embed-pdf-viewer/pull/475) by [@bobsingor](https://github.com/bobsingor) – ### Selection plugin: Chrome PDFium parity and geometry cache eviction
+
+  **Double-click / triple-click selection**
+  - Double-click selects the word around the clicked glyph, triple-click selects the full visual line, matching Chromium's `PDFiumEngine::OnMultipleClick` behaviour.
+
+  **Drag threshold**
+  - Pointer-down no longer immediately begins a drag-selection. The pointer must move beyond a configurable `minSelectionDragDistance` (default 3 px) before selection starts, preventing accidental selections on simple clicks.
+
+  **Tolerance-based hit-testing with tight bounds**
+  - `glyphAt` now performs two-pass hit-testing adapted from PDFium's `CPDF_TextPage::GetIndexAtPos`: an exact-match pass followed by a tolerance-expanded nearest-neighbour pass using Manhattan distance.
+  - Hit-testing uses tight glyph bounds (`FPDFText_GetCharBox`) instead of loose bounds (`FPDFText_GetLooseCharBox`), matching Chrome's behaviour and preventing cross-line selection jumping on short lines. Configurable via `toleranceFactor` (default 1.5).
+
+  **Font-size-aware rectangle merging**
+  - `shouldMergeHorizontalRects` now refuses to merge runs whose font sizes differ by more than 1.5x, preventing a large character (e.g. a heading "1") from merging into adjacent body-text lines.
+  - `rectsWithinSlice` sub-splits runs when the horizontal gap between consecutive glyphs exceeds 2.5x the average glyph width, mirroring Chrome's `CalculateTextRunInfoAt` character-distance heuristic.
+
+  **Geometry cache eviction (LRU)**
+  - Added `maxCachedGeometries` config option (default 50) to bound per-document geometry memory. Least-recently-used pages are evicted when the limit is exceeded; pages with active UI registrations are pinned and never evicted.
+  - When an evicted page scrolls back into view and falls within an active selection, its rects are lazily recomputed and pushed to the UI.
+
+  **Marquee / text-selection coordination**
+  - Introduced `hasTextAnchor` state so the marquee handler does not activate while the text handler has a pending anchor (before the drag threshold is met).
+
+## 2.6.1
+
+## 2.6.0
+
+### Minor Changes
+
+- [#447](https://github.com/embedpdf/embed-pdf-viewer/pull/447) by [@bobsingor](https://github.com/bobsingor) – Added `onEmptySpaceClick` event to `SelectionScope` and `SelectionCapability`. Fires when the user clicks directly on the page background (empty space) rather than on a child element. Detection runs before mode-gating so it fires for all modes regardless of whether text or marquee selection is enabled. New `EmptySpaceClickEvent` and `EmptySpaceClickScopeEvent` type exports.
+
+- [#447](https://github.com/embedpdf/embed-pdf-viewer/pull/447) by [@bobsingor](https://github.com/bobsingor) – Unified text selection and marquee selection under the `enableForMode` API. Extended `EnableForModeOptions` with `enableSelection`, `showSelectionRects`, `enableMarquee`, and `showMarqueeRects` options. Deprecated `showRects` (use `showSelectionRects`), `setMarqueeEnabled`, and `isMarqueeEnabled` (use `enableForMode` with `enableMarquee`). Added `modeId` to `SelectionChangeEvent`, `BeginSelectionEvent`, `EndSelectionEvent`, `MarqueeChangeEvent`, `MarqueeEndEvent`, and their scoped counterparts. Marquee handler now uses `registerAlways` so any plugin can enable marquee for their mode. Removed `stopImmediatePropagation` from text selection handler in favor of `isTextSelecting` coordination.
+
+  Refactored `SelectionLayer` into a thin orchestrator that composes the new `TextSelection` component and existing `MarqueeSelection` component. Consumers no longer need to render `MarqueeSelection` separately -- `SelectionLayer` now includes both text and marquee selection. Added new `TextSelection` export for advanced standalone usage. Added `textStyle` and `marqueeStyle` props to `SelectionLayer` for consistent CSS-standard styling (`background`, `borderColor`, `borderStyle`). `MarqueeSelection` updated with CSS-standard props (`background`, `borderColor`, `borderStyle`); old `stroke` and `fill` props deprecated. New `TextSelectionStyle` and `MarqueeSelectionStyle` type exports.
+
+## 2.5.0
+
+### Patch Changes
+
+- [#441](https://github.com/embedpdf/embed-pdf-viewer/pull/441) by [@bobsingor](https://github.com/bobsingor) – Fixed rotation calculation in SelectionLayer components to properly combine page intrinsic rotation with document rotation:
+  - Updated React `SelectionLayer` component to compute effective rotation as `(pageRotation + docRotation) % 4`
+  - Updated Vue `selection-layer.vue` component with the same rotation logic
+  - Updated Svelte `SelectionLayer.svelte` component with the same rotation logic
+
+## 2.4.1
+
+## 2.4.0
+
 ## 2.3.0
 
 ### Minor Changes

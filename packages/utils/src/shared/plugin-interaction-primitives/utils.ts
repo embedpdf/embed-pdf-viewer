@@ -17,26 +17,81 @@ export interface VertexUI {
   zIndex?: number; // default 4
 }
 
+export interface RotationUI {
+  /** Handle size in px (default 32) */
+  handleSize?: number;
+  /** Screen-pixel gap between bounding box edge and handle center (default 30) */
+  margin?: number;
+  /** z-index of the rotation handle (default 5) */
+  zIndex?: number;
+  /** Whether to show the connector line from center to handle (default true) */
+  showConnector?: boolean;
+  /** Connector line width in px (default 1) */
+  connectorWidth?: number;
+}
+
+/** Screen-pixel gap between the rect edge and the rotation handle center (default orbit margin). */
+export const ROTATION_HANDLE_MARGIN = 35;
+
 export interface HandleDescriptor {
   handle: ResizeHandle;
   style: Record<string, number | string>;
   attrs?: Record<string, any>;
 }
 
-function diagonalCursor(handle: ResizeHandle, rot: QuarterTurns): string {
-  // Standard cursors; diagonals flip on odd quarter-turns
-  const diag0: Record<'nw' | 'ne' | 'sw' | 'se', string> = {
-    nw: 'nwse-resize',
-    ne: 'nesw-resize',
-    sw: 'nesw-resize',
-    se: 'nwse-resize',
-  };
-  if (handle === 'n' || handle === 's') return 'ns-resize';
-  if (handle === 'e' || handle === 'w') return 'ew-resize';
-  if (rot % 2 === 0) return diag0[handle as 'nw' | 'ne' | 'sw' | 'se'];
-  return { nw: 'nesw-resize', ne: 'nwse-resize', sw: 'nwse-resize', se: 'nesw-resize' }[
-    handle as 'nw' | 'ne' | 'sw' | 'se'
-  ]!;
+export interface RotationHandleDescriptor {
+  /** Style for the rotation handle itself */
+  handleStyle: Record<string, number | string>;
+  /** Style for the connector line (if shown) */
+  connectorStyle: Record<string, number | string>;
+  /** Orbit radius in screen pixels used to position the handle. */
+  radius: number;
+  /** Attributes for the handle element */
+  attrs?: Record<string, any>;
+}
+
+/**
+ * Base angle (degrees, clockwise from north) for each resize handle.
+ * Used to compute the effective angle after page + annotation rotation.
+ */
+const HANDLE_BASE_ANGLE: Record<ResizeHandle, number> = {
+  n: 0,
+  ne: 45,
+  e: 90,
+  se: 135,
+  s: 180,
+  sw: 225,
+  w: 270,
+  nw: 315,
+};
+
+/**
+ * Cursor names mapped to 45-degree sectors.
+ * Sector 0 = north (337.5..22.5), sector 1 = NE (22.5..67.5), etc.
+ */
+const SECTOR_CURSORS: string[] = [
+  'ns-resize', // 0: north
+  'nesw-resize', // 1: NE
+  'ew-resize', // 2: east
+  'nwse-resize', // 3: SE
+  'ns-resize', // 4: south
+  'nesw-resize', // 5: SW
+  'ew-resize', // 6: west
+  'nwse-resize', // 7: NW
+];
+
+function diagonalCursor(
+  handle: ResizeHandle,
+  pageQuarterTurns: QuarterTurns,
+  annotationRotation: number = 0,
+): string {
+  const pageAngle = pageQuarterTurns * 90;
+  const totalAngle = HANDLE_BASE_ANGLE[handle] + pageAngle + annotationRotation;
+  // Normalize to [0, 360)
+  const normalized = ((totalAngle % 360) + 360) % 360;
+  // Map to 45-degree sector (0..7)
+  const sector = Math.round(normalized / 45) % 8;
+  return SECTOR_CURSORS[sector];
 }
 
 function edgeOffset(k: number, spacing: number, mode: 'outside' | 'inside' | 'center') {
@@ -60,7 +115,8 @@ export function describeResizeFromConfig(
     rotationAwareCursor = true,
   } = ui;
 
-  const rotation = ((cfg.pageRotation ?? 0) % 4) as QuarterTurns;
+  const pageQuarterTurns = ((cfg.pageRotation ?? 0) % 4) as QuarterTurns;
+  const annotationRot = cfg.annotationRotation ?? 0;
 
   const off = (edge: 'top' | 'right' | 'bottom' | 'left') => ({
     [edge]: edgeOffset(handleSize, spacing, offsetMode) + 'px',
@@ -91,7 +147,10 @@ export function describeResizeFromConfig(
       height: handleSize + 'px',
       borderRadius: '50%',
       zIndex,
-      cursor: rotationAwareCursor ? diagonalCursor(handle, rotation) : 'default',
+      cursor: rotationAwareCursor
+        ? diagonalCursor(handle, pageQuarterTurns, annotationRot)
+        : 'default',
+      pointerEvents: 'auto',
       touchAction: 'none',
       ...(pos as any),
     },
@@ -123,9 +182,87 @@ export function describeVerticesFromConfig(
         borderRadius: '50%',
         cursor: 'pointer',
         zIndex,
+        pointerEvents: 'auto',
         touchAction: 'none',
       },
       attrs: { 'data-epdf-vertex': i },
     };
   });
+}
+
+/**
+ * Describe the rotation handle position and style.
+ * The rotation handle orbits around the center of the bounding box based on the current angle.
+ *
+ * @param cfg - The drag/resize config containing the element rect and scale
+ * @param ui - UI customization options
+ * @param currentAngle - The current rotation angle in degrees (0 = top, clockwise positive)
+ */
+export function describeRotationFromConfig(
+  cfg: DragResizeConfig,
+  ui: RotationUI = {},
+  currentAngle: number = 0,
+): RotationHandleDescriptor {
+  const { handleSize = 16, zIndex = 5, showConnector = true, connectorWidth = 1 } = ui;
+
+  const scale = cfg.scale ?? 1;
+  const rect = cfg.element;
+
+  const orbitRect = cfg.rotationElement ?? rect;
+  const orbitCenter = cfg.rotationCenter ?? {
+    x: rect.origin.x + rect.size.width / 2,
+    y: rect.origin.y + rect.size.height / 2,
+  };
+
+  // Center in scaled coordinates, relative to the orbit rect's origin.
+  const scaledWidth = orbitRect.size.width * scale;
+  const scaledHeight = orbitRect.size.height * scale;
+  const centerX = (orbitCenter.x - orbitRect.origin.x) * scale;
+  const centerY = (orbitCenter.y - orbitRect.origin.y) * scale;
+
+  // Handle orbits at currentAngle (0° = top, clockwise positive)
+  const angleRad = (currentAngle * Math.PI) / 180;
+
+  // Calculate radius - distance from center to handle.
+  // The handle always sits at the shape's local "top" because currentAngle
+  // matches the annotation rotation and the shape rotates with it. So the
+  // distance from center to the nearest edge in the handle's direction is
+  // always halfHeight of the unrotated rect, regardless of the angle.
+  const margin = ui.margin ?? ROTATION_HANDLE_MARGIN;
+  const radius = (rect.size.height * scale) / 2 + margin;
+
+  const handleCenterX = centerX + radius * Math.sin(angleRad);
+  const handleCenterY = centerY - radius * Math.cos(angleRad);
+  const handleLeft = handleCenterX - handleSize / 2;
+  const handleTop = handleCenterY - handleSize / 2;
+
+  return {
+    handleStyle: {
+      position: 'absolute',
+      left: handleLeft + 'px',
+      top: handleTop + 'px',
+      width: handleSize + 'px',
+      height: handleSize + 'px',
+      borderRadius: '50%',
+      cursor: 'grab',
+      zIndex,
+      pointerEvents: 'auto',
+      touchAction: 'none',
+    },
+    connectorStyle: showConnector
+      ? {
+          position: 'absolute',
+          left: centerX - connectorWidth / 2 + 'px',
+          top: centerY - radius + 'px',
+          width: connectorWidth + 'px',
+          height: radius + 'px',
+          transformOrigin: 'center bottom',
+          transform: `rotate(${currentAngle}deg)`,
+          zIndex: zIndex - 1,
+          pointerEvents: 'none',
+        }
+      : {},
+    radius,
+    attrs: { 'data-epdf-rotation-handle': true },
+  };
 }

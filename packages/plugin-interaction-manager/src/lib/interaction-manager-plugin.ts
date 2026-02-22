@@ -20,6 +20,7 @@ import {
   ModeChangeEvent,
   CursorChangeEvent,
   StateChangeEvent,
+  PageActivityChangeEvent,
   InteractionDocumentState,
   InteractionManagerScope,
 } from './types';
@@ -78,11 +79,15 @@ export class InteractionManagerPlugin extends BasePlugin<
   private alwaysGlobal = new Map<string, Set<PointerEventHandlersWithLifecycle>>();
   private alwaysPage = new Map<string, Map<number, Set<PointerEventHandlersWithLifecycle>>>();
 
+  // Per-document page activities: documentId -> Map<topic, pageIndex>
+  private pageActivities = new Map<string, Map<string, number>>();
+
   // Event emitters
   private readonly onModeChange$ = createEmitter<ModeChangeEvent>();
   private readonly onHandlerChange$ = createEmitter<InteractionManagerState>();
   private readonly onCursorChange$ = createEmitter<CursorChangeEvent>();
   private readonly onStateChange$ = createBehaviorEmitter<StateChangeEvent>();
+  private readonly onPageActivityChange$ = createEmitter<PageActivityChangeEvent>();
 
   constructor(id: string, registry: PluginRegistry, config: InteractionManagerPluginConfig) {
     super(id, registry);
@@ -120,6 +125,7 @@ export class InteractionManagerPlugin extends BasePlugin<
     this.buckets.set(documentId, new Map());
     this.alwaysGlobal.set(documentId, new Set());
     this.alwaysPage.set(documentId, new Map());
+    this.pageActivities.set(documentId, new Map());
 
     // Initialize buckets for all registered modes
     const docBuckets = this.buckets.get(documentId)!;
@@ -135,11 +141,23 @@ export class InteractionManagerPlugin extends BasePlugin<
   }
 
   protected override onDocumentClosed(documentId: string): void {
+    // Emit release events for any remaining page activities
+    const topics = this.pageActivities.get(documentId);
+    if (topics) {
+      // Collect unique pages that have topics
+      const activePages = new Set(topics.values());
+      topics.clear();
+      for (const pageIndex of activePages) {
+        this.onPageActivityChange$.emit({ documentId, pageIndex, hasActivity: false });
+      }
+    }
+
     // Cleanup per-document data structures
     this.cursorClaims.delete(documentId);
     this.buckets.delete(documentId);
     this.alwaysGlobal.delete(documentId);
     this.alwaysPage.delete(documentId);
+    this.pageActivities.delete(documentId);
 
     // Cleanup state
     this.dispatch(cleanupInteractionState(documentId));
@@ -192,11 +210,20 @@ export class InteractionManagerPlugin extends BasePlugin<
       removeExclusionAttribute: (attribute: string) =>
         this.dispatch(removeExclusionAttribute(attribute)),
 
+      // Page activity
+      claimPageActivity: (documentId: string, topic: string, pageIndex: number) =>
+        this.claimPageActivity(documentId, topic, pageIndex),
+      releasePageActivity: (documentId: string, topic: string) =>
+        this.releasePageActivity(documentId, topic),
+      hasPageActivity: (documentId: string, pageIndex: number) =>
+        this.hasPageActivity(documentId, pageIndex),
+
       // Events
       onModeChange: this.onModeChange$.on,
       onCursorChange: this.onCursorChange$.on,
       onHandlerChange: this.onHandlerChange$.on,
       onStateChange: this.onStateChange$.on,
+      onPageActivityChange: this.onPageActivityChange$.on,
     };
   }
 
@@ -220,6 +247,10 @@ export class InteractionManagerPlugin extends BasePlugin<
       resume: () => this.resume(documentId),
       isPaused: () => this.isPaused(documentId),
       getState: () => this.getDocumentStateOrThrow(documentId),
+      claimPageActivity: (topic: string, pageIndex: number) =>
+        this.claimPageActivity(documentId, topic, pageIndex),
+      releasePageActivity: (topic: string) => this.releasePageActivity(documentId, topic),
+      hasPageActivity: (pageIndex: number) => this.hasPageActivity(documentId, pageIndex),
       onModeChange: (listener: Listener<string>) =>
         this.onModeChange$.on((event) => {
           if (event.documentId === documentId) listener(event.activeMode);
@@ -231,6 +262,11 @@ export class InteractionManagerPlugin extends BasePlugin<
       onStateChange: (listener: Listener<InteractionDocumentState>) =>
         this.onStateChange$.on((event) => {
           if (event.documentId === documentId) listener(event.state);
+        }),
+      onPageActivityChange: (listener: Listener<{ pageIndex: number; hasActivity: boolean }>) =>
+        this.onPageActivityChange$.on((event) => {
+          if (event.documentId === documentId)
+            listener({ pageIndex: event.pageIndex, hasActivity: event.hasActivity });
         }),
     };
   }
@@ -506,6 +542,76 @@ export class InteractionManagerPlugin extends BasePlugin<
   }
 
   // ─────────────────────────────────────────────────────────
+  // Page Activity Management
+  // ─────────────────────────────────────────────────────────
+
+  private claimPageActivity(documentId: string, topic: string, pageIndex: number): void {
+    let topics = this.pageActivities.get(documentId);
+    if (!topics) {
+      topics = new Map();
+      this.pageActivities.set(documentId, topics);
+    }
+
+    const oldPage = topics.get(topic);
+
+    // No-op if already on the same page
+    if (oldPage === pageIndex) return;
+
+    // Set new page
+    topics.set(topic, pageIndex);
+
+    // Release old page if it existed and now has no topics
+    if (oldPage !== undefined && !this.pageHasAnyTopic(documentId, oldPage)) {
+      this.onPageActivityChange$.emit({ documentId, pageIndex: oldPage, hasActivity: false });
+    }
+
+    // Emit for new page if it just gained its first topic
+    if (this.countTopicsOnPage(documentId, pageIndex) === 1) {
+      this.onPageActivityChange$.emit({ documentId, pageIndex, hasActivity: true });
+    }
+  }
+
+  private releasePageActivity(documentId: string, topic: string): void {
+    const topics = this.pageActivities.get(documentId);
+    if (!topics) return;
+
+    const page = topics.get(topic);
+    if (page === undefined) return;
+
+    topics.delete(topic);
+
+    // If page has no more topics, emit
+    if (!this.pageHasAnyTopic(documentId, page)) {
+      this.onPageActivityChange$.emit({ documentId, pageIndex: page, hasActivity: false });
+    }
+  }
+
+  private hasPageActivity(documentId: string, pageIndex: number): boolean {
+    return this.pageHasAnyTopic(documentId, pageIndex);
+  }
+
+  /** Helper: does any topic point to this page? */
+  private pageHasAnyTopic(documentId: string, pageIndex: number): boolean {
+    const topics = this.pageActivities.get(documentId);
+    if (!topics) return false;
+    for (const p of topics.values()) {
+      if (p === pageIndex) return true;
+    }
+    return false;
+  }
+
+  /** Helper: count topics on a page */
+  private countTopicsOnPage(documentId: string, pageIndex: number): number {
+    const topics = this.pageActivities.get(documentId);
+    if (!topics) return 0;
+    let count = 0;
+    for (const p of topics.values()) {
+      if (p === pageIndex) count++;
+    }
+    return count;
+  }
+
+  // ─────────────────────────────────────────────────────────
   // Handler Lifecycle Notifications
   // ─────────────────────────────────────────────────────────
 
@@ -616,10 +722,12 @@ export class InteractionManagerPlugin extends BasePlugin<
   }
 
   async destroy(): Promise<void> {
+    this.pageActivities.clear();
     this.onModeChange$.clear();
     this.onCursorChange$.clear();
     this.onHandlerChange$.clear();
     this.onStateChange$.clear();
+    this.onPageActivityChange$.clear();
     await super.destroy();
   }
 }

@@ -22,7 +22,7 @@
     pageIndex,
     scale: scaleOverride,
     className = '',
-    stroke = 'red',
+    stroke,
     fill = 'transparent',
   }: MarqueeRedactProps = $props();
 
@@ -34,21 +34,18 @@
     scaleOverride !== undefined ? scaleOverride : (documentState.current?.scale ?? 1),
   );
 
+  // Get stroke color from plugin (annotation mode uses tool defaults, legacy uses red)
+  // Allow prop override for backwards compatibility
+  const strokeColor = $derived(stroke ?? redactionPlugin.plugin?.getPreviewStrokeColor() ?? 'red');
+
   $effect(() => {
     if (!redactionPlugin.plugin || !documentId) {
       rect = null;
       return;
     }
 
-    return redactionPlugin.plugin.registerMarqueeOnPage({
-      documentId,
-      pageIndex,
-      scale: actualScale,
-      callback: {
-        onPreview: (newRect) => {
-          rect = newRect;
-        },
-      },
+    return redactionPlugin.plugin.onRedactionMarqueeChange(documentId, (data) => {
+      rect = data.pageIndex === pageIndex ? data.rect : null;
     });
   });
 </script>
@@ -62,7 +59,7 @@
     style:top={`${rect.origin.y * actualScale}px`}
     style:width={`${rect.size.width * actualScale}px`}
     style:height={`${rect.size.height * actualScale}px`}
-    style:border={`1px solid ${stroke}`}
+    style:border={`1px solid ${strokeColor}`}
     style:background={fill}
     style:box-sizing="border-box"
   ></div>

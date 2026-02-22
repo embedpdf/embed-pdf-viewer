@@ -27,6 +27,7 @@ import {
   PageTextSlice,
   PdfGlyphObject,
   PdfPageGeometry,
+  PdfPageTextRuns,
   PdfPrintOptions,
   PdfSignatureObject,
   AnnotationCreateContext,
@@ -98,9 +99,13 @@ type MessageType =
   | 'extractPages'
   | 'extractText'
   | 'redactTextInRects'
+  | 'applyRedaction'
+  | 'applyAllRedactions'
+  | 'flattenAnnotation'
   | 'getTextSlices'
   | 'getPageGlyphs'
   | 'getPageGeometry'
+  | 'getPageTextRuns'
   | 'merge'
   | 'mergePages'
   | 'preparePrintDocument'
@@ -472,6 +477,26 @@ export class RemoteExecutor implements IPdfiumExecutor {
     return this.send<boolean>('redactTextInRects', [doc, page, rects, options]);
   }
 
+  applyRedaction(
+    doc: PdfDocumentObject,
+    page: PdfPageObject,
+    annotation: PdfAnnotationObject,
+  ): PdfTask<boolean> {
+    return this.send<boolean>('applyRedaction', [doc, page, annotation]);
+  }
+
+  applyAllRedactions(doc: PdfDocumentObject, page: PdfPageObject): PdfTask<boolean> {
+    return this.send<boolean>('applyAllRedactions', [doc, page]);
+  }
+
+  flattenAnnotation(
+    doc: PdfDocumentObject,
+    page: PdfPageObject,
+    annotation: PdfAnnotationObject,
+  ): PdfTask<boolean> {
+    return this.send<boolean>('flattenAnnotation', [doc, page, annotation]);
+  }
+
   getTextSlices(doc: PdfDocumentObject, slices: PageTextSlice[]): PdfTask<string[]> {
     return this.send<string[]>('getTextSlices', [doc, slices]);
   }
@@ -482,6 +507,10 @@ export class RemoteExecutor implements IPdfiumExecutor {
 
   getPageGeometry(doc: PdfDocumentObject, page: PdfPageObject): PdfTask<PdfPageGeometry> {
     return this.send<PdfPageGeometry>('getPageGeometry', [doc, page]);
+  }
+
+  getPageTextRuns(doc: PdfDocumentObject, page: PdfPageObject): PdfTask<PdfPageTextRuns> {
+    return this.send<PdfPageTextRuns>('getPageTextRuns', [doc, page]);
   }
 
   merge(files: PdfFile[]): PdfTask<PdfFile> {

@@ -104,12 +104,15 @@ import {
 import { Dialog, DialogContent, DialogFooter, Button } from './ui';
 
 type LinkTab = 'url' | 'page';
+type LinkSource = 'annotation' | 'selection';
 
 interface Props {
   documentId: string;
   isOpen?: boolean;
   onClose?: () => void;
   onExited?: () => void;
+  /** Source context that triggered the modal */
+  source?: LinkSource;
 }
 
 const props = defineProps<Props>();
@@ -186,9 +189,10 @@ const handleSubmit = () => {
     };
   }
 
-  // Create links based on context
-  if (selectedAnnotation.value) {
-    // IRT-linked links from selected annotation
+  // Helper to create link on annotation
+  const createLinkOnAnnotation = () => {
+    if (!selectedAnnotation.value) return false;
+
     const anno = selectedAnnotation.value;
     const rects = 'segmentRects' in anno.object ? anno.object.segmentRects : [anno.object.rect];
 
@@ -206,7 +210,13 @@ const handleSubmit = () => {
         strokeWidth: 2,
       });
     }
-  } else if (textSelection.value.length > 0) {
+    return true;
+  };
+
+  // Helper to create link from text selection
+  const createLinkFromSelection = () => {
+    if (textSelection.value.length === 0) return false;
+
     const selectionText = selectionScope.value?.getSelectedText();
 
     // Create transparent highlight parent with IRT-linked links for each selection
@@ -252,6 +262,20 @@ const handleSubmit = () => {
       }, ignore);
     }
     selectionScope.value?.clear();
+    return true;
+  };
+
+  // Create links based on the source context passed when opening the modal
+  // This ensures the correct context is used even when both annotation and text are selected
+  if (props.source === 'annotation') {
+    createLinkOnAnnotation();
+  } else if (props.source === 'selection') {
+    createLinkFromSelection();
+  } else {
+    // Fallback for backwards compatibility: annotation first, then selection
+    if (!createLinkOnAnnotation()) {
+      createLinkFromSelection();
+    }
   }
 
   props.onClose?.();

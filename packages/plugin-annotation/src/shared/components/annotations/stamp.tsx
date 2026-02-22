@@ -20,6 +20,8 @@ export function Stamp({
   scale,
   onClick,
 }: StampProps) {
+  const unrotated = !!annotation.object.rotation && !!annotation.object.unrotatedRect;
+
   return (
     <div
       style={{
@@ -38,6 +40,7 @@ export function Stamp({
         pageIndex={pageIndex}
         annotation={{ ...annotation.object, id: annotation.object.id }}
         scaleFactor={scale}
+        unrotated={unrotated}
       />
     </div>
   );

@@ -1,5 +1,28 @@
 # @embedpdf/plugin-interaction-manager
 
+## 2.6.2
+
+## 2.6.1
+
+## 2.6.0
+
+### Minor Changes
+
+- [#447](https://github.com/embedpdf/embed-pdf-viewer/pull/447) by [@bobsingor](https://github.com/bobsingor) – Added topic-based page activity tracking system. New methods `claimPageActivity`, `releasePageActivity`, and `hasPageActivity` on both `InteractionManagerCapability` and `InteractionManagerScope`. New `onPageActivityChange` event and `PageActivityChangeEvent` type. Topics are named strings (e.g. 'annotation-selection', 'selection-menu') that can be active on one page at a time per document, automatically moving when re-claimed on a different page.
+
+## 2.5.0
+
+### Patch Changes
+
+- [#441](https://github.com/embedpdf/embed-pdf-viewer/pull/441) by [@bobsingor](https://github.com/bobsingor) – Fixed rotation calculation in PagePointerProvider components to properly handle rotation override and combine page intrinsic rotation with document rotation:
+  - Updated React `PagePointerProvider` to use rotation override directly when provided, otherwise combine page and document rotation
+  - Updated Vue `page-pointer-provider.vue` with the same rotation logic
+  - Updated Svelte `PagePointerProvider.svelte` with the same rotation logic
+
+## 2.4.1
+
+## 2.4.0
+
 ## 2.3.0
 
 ### Minor Changes

@@ -222,7 +222,7 @@ export const uiReducer = (state = initialState, action: UIAction): UIState => {
     // ─────────────────────────────────────────────────────────
 
     case OPEN_MODAL: {
-      const { documentId, modalId } = action.payload;
+      const { documentId, modalId, props } = action.payload;
       const docState = state.documents[documentId] || initialDocumentState;
 
       return {
@@ -234,6 +234,7 @@ export const uiReducer = (state = initialState, action: UIAction): UIState => {
             activeModal: {
               modalId,
               isOpen: true,
+              props,
             },
             openMenus: {}, // Close all menus when opening modal
           },

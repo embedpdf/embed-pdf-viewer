@@ -42,13 +42,16 @@ export const AnnotationCard = ({
   const hasReplies = replies.length > 0;
   const showCommentInput = !hasContent && !hasReplies;
   const inputRef = useRef<HTMLInputElement>(null);
+  const prevSelectedRef = useRef(false);
   const author = annotation.object.author || 'Guest';
 
+  // Only focus when transitioning from not-selected to selected
   useEffect(() => {
-    if (isSelected) {
+    if (isSelected && !prevSelectedRef.current) {
       inputRef.current?.focus({ preventScroll: true });
     }
-  }, [isSelected, entry]);
+    prevSelectedRef.current = isSelected;
+  }, [isSelected]);
 
   if (!config) return null;
 

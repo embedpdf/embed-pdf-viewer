@@ -10,6 +10,7 @@ import {
 import { PdfPageObjectWithRotatedSize, Rect, Rotation, transformSize } from '@embedpdf/models';
 import { ViewportCapability, ViewportMetrics, ViewportPlugin } from '@embedpdf/plugin-viewport';
 import { SpreadCapability, SpreadPlugin } from '@embedpdf/plugin-spread';
+import { InteractionManagerPlugin } from '@embedpdf/plugin-interaction-manager';
 
 import {
   ScrollCapability,
@@ -55,6 +56,9 @@ export class ScrollPlugin extends BasePlugin<
   private viewport: ViewportCapability;
   private spread: SpreadCapability | null;
 
+  // Elevated pages per document (derived from InteractionManager page activity)
+  private elevatedPages = new Map<string, Set<number>>();
+
   // Strategies per document
   private strategies = new Map<string, BaseScrollStrategy>();
 
@@ -99,6 +103,24 @@ export class ScrollPlugin extends BasePlugin<
     this.spread?.onSpreadChange((event) => {
       this.refreshDocumentLayout(event.documentId);
     });
+
+    // Subscribe to page activity changes from the interaction manager (optional)
+    const im = this.registry.getPlugin<InteractionManagerPlugin>('interaction-manager')?.provides();
+    if (im) {
+      im.onPageActivityChange((event) => {
+        let pages = this.elevatedPages.get(event.documentId);
+        if (event.hasActivity) {
+          if (!pages) {
+            pages = new Set();
+            this.elevatedPages.set(event.documentId, pages);
+          }
+          pages.add(event.pageIndex);
+        } else {
+          pages?.delete(event.pageIndex);
+        }
+        this.pushScrollerLayout(event.documentId);
+      });
+    }
 
     // Subscribe to viewport changes (per document) with throttling
     this.viewport.onViewportChange((event) => {
@@ -168,6 +190,9 @@ export class ScrollPlugin extends BasePlugin<
     this.layoutReady.delete(documentId);
     this.initialLayoutFired.delete(documentId);
 
+    // Cleanup elevated pages
+    this.elevatedPages.delete(documentId);
+
     // Cleanup scroller layout emitter
     const emitter = this.scrollerLayoutEmitters.get(documentId);
     if (emitter) {
@@ -231,7 +256,7 @@ export class ScrollPlugin extends BasePlugin<
       throw new Error(`Cannot get scroller layout for document: ${documentId}`);
     }
 
-    return getScrollerLayout(docState, coreDoc.scale);
+    return getScrollerLayout(docState, coreDoc.scale, this.elevatedPages.get(documentId));
   }
 
   public setLayoutReady(documentId: string): void {
@@ -535,11 +560,16 @@ export class ScrollPlugin extends BasePlugin<
       this.spread?.forDocument(id).getSpreadPages() ||
       coreDoc.document?.pages.map((page) => [page]) ||
       [];
+
     return spreadPages.map((spread) =>
-      spread.map((page) => ({
-        ...page,
-        rotatedSize: transformSize(page.size, coreDoc.rotation, 1),
-      })),
+      spread.map((page) => {
+        // Combine page intrinsic rotation with document rotation
+        const effectiveRotation = ((page.rotation ?? 0) + coreDoc.rotation) % 4;
+        return {
+          ...page,
+          rotatedSize: transformSize(page.size, effectiveRotation, 1),
+        };
+      }),
     );
   }
 
@@ -569,11 +599,15 @@ export class ScrollPlugin extends BasePlugin<
 
     this.startPageChange(id, pageNumber, behavior);
 
+    // Calculate effective rotation for this page (page intrinsic + document rotation)
+    const pageObj = coreDoc.document?.pages[pageNumber - 1];
+    const effectiveRotation = ((pageObj?.rotation ?? 0) + coreDoc.rotation) % 4;
+
     const position = strategy.getScrollPositionForPage(
       pageNumber,
       docState.virtualItems,
       coreDoc.scale,
-      coreDoc.rotation,
+      effectiveRotation as Rotation,
       pageCoordinates,
     );
 
@@ -680,11 +714,18 @@ export class ScrollPlugin extends BasePlugin<
     const strategy = this.getStrategy(id);
     const coreDoc = this.getCoreDocumentOrThrow(id);
 
+    // Calculate effective rotation if not provided (page intrinsic + document rotation)
+    let effectiveRotation = rotation;
+    if (effectiveRotation === undefined) {
+      const pageObj = coreDoc.document?.pages[pageIndex];
+      effectiveRotation = (((pageObj?.rotation ?? 0) + coreDoc.rotation) % 4) as Rotation;
+    }
+
     return strategy.getRectPositionForPage(
       pageIndex + 1,
       docState.virtualItems,
       scale ?? coreDoc.scale,
-      rotation ?? coreDoc.rotation,
+      effectiveRotation,
       rect,
     );
   }
@@ -744,6 +785,7 @@ export class ScrollPlugin extends BasePlugin<
     this.strategies.clear();
     this.layoutReady.clear();
     this.initialLayoutFired.clear();
+    this.elevatedPages.clear();
 
     // Clear all scroller layout emitters
     for (const emitter of this.scrollerLayoutEmitters.values()) {

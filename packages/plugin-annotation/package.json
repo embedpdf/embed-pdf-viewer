@@ -1,6 +1,6 @@
 {
   "name": "@embedpdf/plugin-annotation",
-  "version": "2.3.0",
+  "version": "2.6.2",
   "type": "module",
   "license": "MIT",
   "main": "./dist/index.cjs",
@@ -55,6 +55,7 @@
     "@embedpdf/plugin-selection": "workspace:*",
     "@embedpdf/plugin-history": "workspace:*",
     "@types/react": "^18.2.0",
+    "@types/react-dom": "^18.2.0",
     "typescript": "^5.0.0"
   },
   "peerDependencies": {

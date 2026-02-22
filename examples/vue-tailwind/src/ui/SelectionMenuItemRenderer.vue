@@ -1,7 +1,5 @@
 <template>
-  <div v-if="item.type === 'command-button'" v-bind="getUIItemProps(item)">
-    <CommandButton :commandId="item.commandId" :documentId="documentId" :variant="item.variant" />
-  </div>
+  <CommandButtonItem v-if="item.type === 'command-button'" :item="item" :documentId="documentId" />
   <div v-else-if="item.type === 'divider'" v-bind="getUIItemProps(item)">
     <ToolbarDivider orientation="vertical" />
   </div>
@@ -23,7 +21,7 @@
 <script setup lang="ts">
 import type { SelectionMenuItem, SelectionMenuPropsBase } from '@embedpdf/plugin-ui/vue';
 import { getUIItemProps } from '@embedpdf/plugin-ui/vue';
-import CommandButton from '../components/CommandButton.vue';
+import CommandButtonItem from './CommandButtonItem.vue';
 import ToolbarDivider from '../components/ui/ToolbarDivider.vue';
 
 defineProps<{

@@ -46,7 +46,13 @@ const HELVETICA_DESC: StandardFontDescriptor = {
   css: 'Helvetica, Arial, sans-serif',
 } as const;
 
-/* Canonical table – order follows enum values */
+/*
+ * Canonical table – order follows enum values.
+ *
+ * The `css` field is the **base family** only (same for every variant within a
+ * family).  Bold / italic are expressed through separate CSS properties – see
+ * `standardFontCssProperties`.
+ */
 const STANDARD_FONT_DESCRIPTORS: readonly StandardFontDescriptor[] = Object.freeze([
   {
     id: PdfStandardFont.Courier,
@@ -62,7 +68,7 @@ const STANDARD_FONT_DESCRIPTORS: readonly StandardFontDescriptor[] = Object.free
     bold: true,
     italic: false,
     label: 'Courier Bold',
-    css: '"Courier-Bold", Courier, monospace',
+    css: 'Courier, monospace',
   },
   {
     id: PdfStandardFont.Courier_BoldOblique,
@@ -70,7 +76,7 @@ const STANDARD_FONT_DESCRIPTORS: readonly StandardFontDescriptor[] = Object.free
     bold: true,
     italic: true,
     label: 'Courier Bold Oblique',
-    css: '"Courier-BoldOblique", Courier, monospace',
+    css: 'Courier, monospace',
   },
   {
     id: PdfStandardFont.Courier_Oblique,
@@ -78,7 +84,7 @@ const STANDARD_FONT_DESCRIPTORS: readonly StandardFontDescriptor[] = Object.free
     bold: false,
     italic: true,
     label: 'Courier Oblique',
-    css: '"Courier-Oblique", Courier, monospace',
+    css: 'Courier, monospace',
   },
   HELVETICA_DESC,
   {
@@ -87,7 +93,7 @@ const STANDARD_FONT_DESCRIPTORS: readonly StandardFontDescriptor[] = Object.free
     bold: true,
     italic: false,
     label: 'Helvetica Bold',
-    css: '"Helvetica-Bold", Arial, sans-serif',
+    css: 'Helvetica, Arial, sans-serif',
   },
   {
     id: PdfStandardFont.Helvetica_BoldOblique,
@@ -95,7 +101,7 @@ const STANDARD_FONT_DESCRIPTORS: readonly StandardFontDescriptor[] = Object.free
     bold: true,
     italic: true,
     label: 'Helvetica Bold Oblique',
-    css: '"Helvetica-BoldOblique", Arial, sans-serif',
+    css: 'Helvetica, Arial, sans-serif',
   },
   {
     id: PdfStandardFont.Helvetica_Oblique,
@@ -103,7 +109,7 @@ const STANDARD_FONT_DESCRIPTORS: readonly StandardFontDescriptor[] = Object.free
     bold: false,
     italic: true,
     label: 'Helvetica Oblique',
-    css: '"Helvetica-Oblique", Arial, sans-serif',
+    css: 'Helvetica, Arial, sans-serif',
   },
   {
     id: PdfStandardFont.Times_Roman,
@@ -119,7 +125,7 @@ const STANDARD_FONT_DESCRIPTORS: readonly StandardFontDescriptor[] = Object.free
     bold: true,
     italic: false,
     label: 'Times Bold',
-    css: '"Times New Roman Bold", Times, serif',
+    css: '"Times New Roman", Times, serif',
   },
   {
     id: PdfStandardFont.Times_BoldItalic,
@@ -127,7 +133,7 @@ const STANDARD_FONT_DESCRIPTORS: readonly StandardFontDescriptor[] = Object.free
     bold: true,
     italic: true,
     label: 'Times Bold Italic',
-    css: '"Times New Roman Bold Italic", Times, serif',
+    css: '"Times New Roman", Times, serif',
   },
   {
     id: PdfStandardFont.Times_Italic,
@@ -135,7 +141,7 @@ const STANDARD_FONT_DESCRIPTORS: readonly StandardFontDescriptor[] = Object.free
     bold: false,
     italic: true,
     label: 'Times Italic',
-    css: '"Times New Roman Italic", Times, serif',
+    css: '"Times New Roman", Times, serif',
   },
   {
     id: PdfStandardFont.Symbol,
@@ -143,7 +149,7 @@ const STANDARD_FONT_DESCRIPTORS: readonly StandardFontDescriptor[] = Object.free
     bold: false,
     italic: false,
     label: 'Symbol',
-    css: 'Symbol',
+    css: 'Symbol, serif',
   },
   {
     id: PdfStandardFont.ZapfDingbats,
@@ -151,7 +157,7 @@ const STANDARD_FONT_DESCRIPTORS: readonly StandardFontDescriptor[] = Object.free
     bold: false,
     italic: false,
     label: 'Zapf Dingbats',
-    css: 'ZapfDingbats',
+    css: 'ZapfDingbats, serif',
   },
 ]);
 
@@ -211,6 +217,28 @@ export function standardFontLabel(font: PdfStandardFont): string {
 }
 export function standardFontCss(font: PdfStandardFont): string {
   return getStandardFontDescriptor(font).css;
+}
+
+/**
+ * CSS properties needed to render a standard PDF font correctly across all
+ * platforms.  Bold / italic are expressed via `fontWeight` and `fontStyle`
+ * instead of being baked into the `fontFamily` name (e.g. "Helvetica-Bold"),
+ * which doesn't exist as a system font on Windows/Linux.
+ */
+export interface StandardFontCssProperties {
+  fontFamily: string;
+  fontWeight: 'normal' | 'bold';
+  fontStyle: 'normal' | 'italic';
+}
+
+/** Resolve a `PdfStandardFont` enum to cross-platform CSS properties. */
+export function standardFontCssProperties(font: PdfStandardFont): StandardFontCssProperties {
+  const desc = getStandardFontDescriptor(font);
+  return {
+    fontFamily: desc.css,
+    fontWeight: desc.bold ? 'bold' : 'normal',
+    fontStyle: desc.italic ? 'italic' : 'normal',
+  };
 }
 
 /* ─────────────────────────  UI helpers  ────────────────────────── */

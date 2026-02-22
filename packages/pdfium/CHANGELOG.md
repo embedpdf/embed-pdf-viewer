@@ -1,5 +1,57 @@
 # @embedpdf/pdfium
 
+## 2.6.2
+
+## 2.6.1
+
+### Patch Changes
+
+- [#463](https://github.com/embedpdf/embed-pdf-viewer/pull/463) by [@bobsingor](https://github.com/bobsingor) – Add EPDFAnnot_GetRect that wraps FPDFAnnot_GetRect with rect normalization. Upstream FPDFAnnot_GetRect does not normalize the rect read from the PDF dictionary, so when a PDF stores its Rect array with y1 > y2 the top/bottom values are inverted. This caused link annotations to be positioned incorrectly.
+
+- [#463](https://github.com/embedpdf/embed-pdf-viewer/pull/463) by [@bobsingor](https://github.com/bobsingor) – Sync pdfium-src with upstream chromium/7689
+
+## 2.6.0
+
+### Minor Changes
+
+- [#452](https://github.com/embedpdf/embed-pdf-viewer/pull/452) by [@bobsingor](https://github.com/bobsingor) –
+  - Export new rotation-related PDFium functions: `EPDFAnnot_SetRotate`, `EPDFAnnot_GetRotate`, `EPDFAnnot_SetExtendedRotation`, etc.
+  - Update WASM build.
+
+### Patch Changes
+
+- [#458](https://github.com/embedpdf/embed-pdf-viewer/pull/458) by [@bobsingor](https://github.com/bobsingor) –
+  - Add abbreviated font name aliases (Helv, ZaDb, Cour, etc.) and missing Helvetica-Oblique mapping in `StringToStandardFont`.
+
+## 2.5.0
+
+### Minor Changes
+
+- [#441](https://github.com/embedpdf/embed-pdf-viewer/pull/441) by [@bobsingor](https://github.com/bobsingor) – Added new PDFium functions to support normalized page rotation:
+  - `EPDF_GetPageSizeByIndexNormalized`: Returns page dimensions as if the page had 0° rotation (swaps width/height for 90°/270° rotated pages)
+  - `EPDF_LoadPageNormalized`: Loads a page with normalized rotation, treating all coordinates in 0° space
+
+  These functions enable the engine to work with page coordinates consistently regardless of original page rotation.
+
+## 2.4.1
+
+## 2.4.0
+
+### Minor Changes
+
+- [#426](https://github.com/embedpdf/embed-pdf-viewer/pull/426) by [@bobsingor](https://github.com/bobsingor) – Added PDFium functions for redaction annotation support:
+  - Added `EPDFAnnot_ApplyRedaction` to apply a single redaction annotation
+  - Added `EPDFAnnot_Flatten` to flatten an annotation's appearance to page content
+  - Added `EPDFPage_ApplyRedactions` to apply all redactions on a page
+  - Added `EPDFAnnot_GetOverlayText` and `EPDFAnnot_SetOverlayText` for overlay text
+  - Added `EPDFAnnot_GetOverlayTextRepeat` and `EPDFAnnot_SetOverlayTextRepeat` for text repeat setting
+
+### Patch Changes
+
+- [#433](https://github.com/embedpdf/embed-pdf-viewer/pull/433) by [@bobsingor](https://github.com/bobsingor) – Reduced WASM binary size from 7.4MB to 4.5MB by removing debug symbols (-g flag) from the build.
+
+  Thanks to @Mikescops for reporting this.
+
 ## 2.3.0
 
 ### Patch Changes

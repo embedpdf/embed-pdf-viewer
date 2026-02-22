@@ -71,6 +71,12 @@ export interface PdfDocumentObject {
    * Use PdfPermissionFlag to check individual permissions.
    */
   permissions: number;
+
+  /**
+   * Whether page rotation was normalized when opening the document.
+   * When true, all page coordinates are in 0° space regardless of original rotation.
+   */
+  normalizedRotation: boolean;
 }
 
 /**
@@ -1030,6 +1036,19 @@ export interface PdfAnnotationObjectBase {
   rect: Rect;
 
   /**
+   * Rotation angle in degrees (clockwise).
+   * When set, the annotation is visually rotated around its center.
+   * The rect becomes the axis-aligned bounding box after rotation.
+   */
+  rotation?: number;
+
+  /**
+   * The original unrotated rectangle of the annotation.
+   * This is stored when rotation is applied, allowing accurate editing.
+   */
+  unrotatedRect?: Rect;
+
+  /**
    * Custom data of the annotation
    */
   custom?: any;
@@ -1212,6 +1231,7 @@ export enum PDF_FORM_FIELD_TYPE {
 export enum PdfAnnotationColorType {
   Color = 0,
   InteriorColor = 1,
+  OverlayColor = 2,
 }
 
 /**
@@ -2055,6 +2075,76 @@ export interface PdfFreeTextAnnoObject extends PdfAnnotationObjectBase {
 }
 
 /**
+ * Pdf redact annotation
+ *
+ * @public
+ */
+export interface PdfRedactAnnoObject extends PdfAnnotationObjectBase {
+  /** {@inheritDoc PdfAnnotationObjectBase.type} */
+  type: PdfAnnotationSubtype.REDACT;
+
+  /**
+   * Text contents of the redact annotation
+   */
+  contents?: string;
+
+  /**
+   * Quads defining the redaction areas (like markup annotations)
+   */
+  segmentRects: Rect[];
+
+  /**
+   * Interior color (IC) - the fill color used to paint the redacted area after redaction is applied
+   */
+  color?: string;
+
+  /**
+   * Overlay text color - the color of the overlay text displayed on the redacted area
+   */
+  overlayColor?: string;
+
+  /**
+   * Stroke/border color of the redaction box
+   */
+  strokeColor?: string;
+
+  /**
+   * Opacity of the redact annotation
+   */
+  opacity?: number;
+
+  /**
+   * Text displayed on the redacted area after applying the redaction
+   */
+  overlayText?: string;
+
+  /**
+   * Whether the overlay text repeats to fill the redaction area
+   */
+  overlayTextRepeat?: boolean;
+
+  /**
+   * Font family for the overlay text
+   */
+  fontFamily?: PdfStandardFont;
+
+  /**
+   * Font size for the overlay text
+   */
+  fontSize?: number;
+
+  /**
+   * Font color for the overlay text
+   */
+  fontColor?: string;
+
+  /**
+   * Text alignment for the overlay text
+   */
+  textAlign?: PdfTextAlignment;
+}
+
+/**
  * All annotation that support
  *
  * @public
@@ -2076,7 +2166,8 @@ export type PdfSupportedAnnoObject =
   | PdfUnderlineAnnoObject
   | PdfStrikeOutAnnoObject
   | PdfCaretAnnoObject
-  | PdfFreeTextAnnoObject;
+  | PdfFreeTextAnnoObject
+  | PdfRedactAnnoObject;
 
 /**
  * Pdf annotation that does not support
@@ -2312,13 +2403,22 @@ export interface SearchAllPagesResult {
  */
 export interface PdfGlyphObject {
   /**
-   * Origin of the glyph
+   * Origin of the glyph (loose bounds from FPDFText_GetLooseCharBox)
    */
   origin: { x: number; y: number };
   /**
-   * Size of the glyph
+   * Size of the glyph (loose bounds from FPDFText_GetLooseCharBox)
    */
   size: { width: number; height: number };
+  /**
+   * Tight bounds origin (from FPDFText_GetCharBox, closely surrounds the actual glyph shape).
+   * Used for hit-testing to match Chrome's FPDFText_GetCharIndexAtPos behaviour.
+   */
+  tightOrigin?: { x: number; y: number };
+  /**
+   * Tight bounds size (from FPDFText_GetCharBox)
+   */
+  tightSize?: { width: number; height: number };
   /**
    * Whether the glyph is a space
    */
@@ -2336,25 +2436,42 @@ export interface PdfGlyphObject {
  */
 export interface PdfGlyphSlim {
   /**
-   * X coordinate of the glyph
+   * X coordinate of the glyph (loose bounds from FPDFText_GetLooseCharBox)
    */
   x: number;
   /**
-   * Y coordinate of the glyph
+   * Y coordinate of the glyph (loose bounds from FPDFText_GetLooseCharBox)
    */
   y: number;
   /**
-   * Width of the glyph
+   * Width of the glyph (loose bounds from FPDFText_GetLooseCharBox)
    */
   width: number;
   /**
-   * Height of the glyph
+   * Height of the glyph (loose bounds from FPDFText_GetLooseCharBox)
    */
   height: number;
   /**
    * Flags of the glyph
    */
   flags: number;
+  /**
+   * Tight X coordinate (from FPDFText_GetCharBox).
+   * Used for hit-testing to match Chrome's FPDFText_GetCharIndexAtPos behaviour.
+   */
+  tightX?: number;
+  /**
+   * Tight Y coordinate (from FPDFText_GetCharBox)
+   */
+  tightY?: number;
+  /**
+   * Tight width (from FPDFText_GetCharBox)
+   */
+  tightWidth?: number;
+  /**
+   * Tight height (from FPDFText_GetCharBox)
+   */
+  tightHeight?: number;
 }
 
 /**
@@ -2375,6 +2492,10 @@ export interface PdfRun {
    * Glyphs of the run
    */
   glyphs: PdfGlyphSlim[];
+  /**
+   * Font size of the run (all glyphs in a run share the same font size)
+   */
+  fontSize?: number;
 }
 
 /**
@@ -2387,6 +2508,59 @@ export interface PdfPageGeometry {
    * Runs of the page
    */
   runs: PdfRun[];
+}
+
+/**
+ * Font information extracted from a PDF text object.
+ *
+ * @public
+ */
+export interface PdfFontInfo {
+  /** PostScript name (e.g. "HOEPNL+Arial,Bold"). */
+  name: string;
+  /** Font family name (e.g. "Arial"). */
+  familyName: string;
+  /** Weight 100-900 (400 = normal, 700 = bold). */
+  weight: number;
+  /** Whether the font is italic. */
+  italic: boolean;
+  /** Whether the font is monospaced (fixed-pitch). */
+  monospaced: boolean;
+  /** Whether the font data is embedded in the PDF. */
+  embedded: boolean;
+}
+
+/**
+ * A rich text run: consecutive characters sharing the same text object,
+ * font, size, and color.
+ *
+ * @public
+ */
+export interface PdfTextRun {
+  /** The text content (UTF-8). */
+  text: string;
+  /** Bounding box in PDF page coordinates (points). */
+  rect: Rect;
+  /** Font metadata (uniform within the run). */
+  font: PdfFontInfo;
+  /** Font size in points. */
+  fontSize: number;
+  /** Fill color (RGBA). */
+  color: PdfAlphaColor;
+  /** Start character index in the text page. */
+  charIndex: number;
+  /** Number of characters in this run. */
+  charCount: number;
+}
+
+/**
+ * Rich text runs for a single page.
+ *
+ * @public
+ */
+export interface PdfPageTextRuns {
+  /** Text runs ordered by reading order. */
+  runs: PdfTextRun[];
 }
 
 /**
@@ -2657,6 +2831,12 @@ export interface PdfOpenDocumentBufferOptions {
    * Password for the document
    */
   password?: string;
+  /**
+   * When true, normalizes page rotation so all coordinates are in 0° space.
+   * The original rotation is preserved in page.rotation for reference.
+   * @default false
+   */
+  normalizeRotation?: boolean;
 }
 
 export interface PdfRequestOptions {
@@ -2687,6 +2867,12 @@ export interface PdfOpenDocumentUrlOptions {
    * HTTP request options for fetching the PDF
    */
   requestOptions?: PdfRequestOptions;
+  /**
+   * When true, normalizes page rotation so all coordinates are in 0° space.
+   * The original rotation is preserved in page.rotation for reference.
+   * @default false
+   */
+  normalizeRotation?: boolean;
 }
 
 export interface PdfRenderOptions {
@@ -2739,6 +2925,12 @@ export interface PdfRenderPageAnnotationOptions extends PdfRenderOptions {
    * Appearance mode normal down or rollover
    */
   mode?: AppearanceMode;
+  /**
+   * When true and annotation.unrotatedRect is present, render using the
+   * unrotated path (ignores AP Matrix rotation). Falls back to normal
+   * rendering if unrotatedRect is not available on the annotation.
+   */
+  unrotated?: boolean;
 }
 
 export interface PdfRenderThumbnailOptions extends PdfRenderOptions {
@@ -2928,6 +3120,35 @@ export interface PdfEngine<T = Blob> {
     options?: PdfRenderPageOptions,
   ) => PdfTask<T>;
   /**
+   * Render the specified pdf page and return raw pixel data (ImageDataLike)
+   * without encoding to the output format T. Useful for AI/ML pipelines
+   * that need direct pixel access.
+   * @param doc - pdf document
+   * @param page - pdf page
+   * @param options - render options (imageType/imageQuality are ignored)
+   * @returns task contains raw ImageDataLike or error
+   */
+  renderPageRaw: (
+    doc: PdfDocumentObject,
+    page: PdfPageObject,
+    options?: PdfRenderPageOptions,
+  ) => PdfTask<ImageDataLike>;
+  /**
+   * Render the specified rect of a pdf page and return raw pixel data
+   * (ImageDataLike) without encoding to the output format T.
+   * @param doc - pdf document
+   * @param page - pdf page
+   * @param rect - target rect in PDF coordinate space
+   * @param options - render options (imageType/imageQuality are ignored)
+   * @returns task contains raw ImageDataLike or error
+   */
+  renderPageRectRaw: (
+    doc: PdfDocumentObject,
+    page: PdfPageObject,
+    rect: Rect,
+    options?: PdfRenderPageOptions,
+  ) => PdfTask<ImageDataLike>;
+  /**
    * Render the thumbnail of specified pdf page
    * @param doc - pdf document
    * @param page - pdf page
@@ -3116,6 +3337,37 @@ export interface PdfEngine<T = Blob> {
     options?: PdfRedactTextOptions,
   ) => PdfTask<boolean>;
   /**
+   * Apply a single REDACT annotation - removes content, flattens RO overlay, deletes annotation.
+   * @param doc - pdf document
+   * @param page - pdf page
+   * @param annotation - the REDACT annotation to apply
+   * @returns task contains the result
+   */
+  applyRedaction: (
+    doc: PdfDocumentObject,
+    page: PdfPageObject,
+    annotation: PdfAnnotationObject,
+  ) => PdfTask<boolean>;
+  /**
+   * Apply all REDACT annotations on a page - removes content, flattens overlays, deletes annotations.
+   * @param doc - pdf document
+   * @param page - pdf page
+   * @returns task contains the result
+   */
+  applyAllRedactions: (doc: PdfDocumentObject, page: PdfPageObject) => PdfTask<boolean>;
+  /**
+   * Flatten an annotation's appearance (AP/N) to page content and remove the annotation.
+   * @param doc - pdf document
+   * @param page - pdf page
+   * @param annotation - the annotation to flatten
+   * @returns task contains the result
+   */
+  flattenAnnotation: (
+    doc: PdfDocumentObject,
+    page: PdfPageObject,
+    annotation: PdfAnnotationObject,
+  ) => PdfTask<boolean>;
+  /**
    * Extract text on specified pdf pages
    * @param doc - pdf document
    * @param pageIndexes - indexes of pdf pages
@@ -3136,6 +3388,13 @@ export interface PdfEngine<T = Blob> {
    * @returns task contains the geometry
    */
   getPageGeometry: (doc: PdfDocumentObject, page: PdfPageObject) => PdfTask<PdfPageGeometry>;
+  /**
+   * Get rich text runs for a page, grouped by text object with font and color info
+   * @param doc - pdf document
+   * @param page - pdf page
+   * @returns task contains the text runs
+   */
+  getPageTextRuns: (doc: PdfDocumentObject, page: PdfPageObject) => PdfTask<PdfPageTextRuns>;
   /**
    * Merge multiple pdf documents
    * @param files - all the pdf files
@@ -3359,9 +3618,21 @@ export interface IPdfiumExecutor {
     rects: Rect[],
     options?: PdfRedactTextOptions,
   ): PdfTask<boolean>;
+  applyRedaction(
+    doc: PdfDocumentObject,
+    page: PdfPageObject,
+    annotation: PdfAnnotationObject,
+  ): PdfTask<boolean>;
+  applyAllRedactions(doc: PdfDocumentObject, page: PdfPageObject): PdfTask<boolean>;
+  flattenAnnotation(
+    doc: PdfDocumentObject,
+    page: PdfPageObject,
+    annotation: PdfAnnotationObject,
+  ): PdfTask<boolean>;
   getTextSlices(doc: PdfDocumentObject, slices: PageTextSlice[]): PdfTask<string[]>;
   getPageGlyphs(doc: PdfDocumentObject, page: PdfPageObject): PdfTask<PdfGlyphObject[]>;
   getPageGeometry(doc: PdfDocumentObject, page: PdfPageObject): PdfTask<PdfPageGeometry>;
+  getPageTextRuns(doc: PdfDocumentObject, page: PdfPageObject): PdfTask<PdfPageTextRuns>;
   merge(files: PdfFile[]): PdfTask<PdfFile>;
   mergePages(mergeConfigs: Array<{ docId: string; pageIndices: number[] }>): PdfTask<PdfFile>;
   preparePrintDocument(doc: PdfDocumentObject, options?: PdfPrintOptions): PdfTask<ArrayBuffer>;

@@ -59,6 +59,7 @@
   height={svgHeight}
   viewBox={`0 0 ${width + strokeWidth} ${height + strokeWidth}`}
 >
+  <!-- svelte-ignore a11y_no_static_element_interactions -->
   <rect
     {x}
     {y}

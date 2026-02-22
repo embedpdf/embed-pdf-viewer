@@ -98,7 +98,7 @@ export interface CommitAction extends Action {
 }
 export interface PurgeAnnotationAction extends Action {
   type: typeof PURGE_ANNOTATION;
-  payload: { documentId: string; uid: string };
+  payload: { documentId: string; pageIndex: number; uid: string };
 }
 
 // Global actions
@@ -237,9 +237,13 @@ export const commitPendingChanges = (
   payload: { documentId, committedUids },
 });
 
-export const purgeAnnotation = (documentId: string, uid: string): PurgeAnnotationAction => ({
+export const purgeAnnotation = (
+  documentId: string,
+  pageIndex: number,
+  uid: string,
+): PurgeAnnotationAction => ({
   type: PURGE_ANNOTATION,
-  payload: { documentId, uid },
+  payload: { documentId, pageIndex, uid },
 });
 
 // Global action creators

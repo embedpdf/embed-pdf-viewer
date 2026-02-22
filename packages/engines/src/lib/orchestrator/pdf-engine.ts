@@ -34,6 +34,7 @@ import {
   PageTextSlice,
   PdfGlyphObject,
   PdfPageGeometry,
+  PdfPageTextRuns,
   PdfPrintOptions,
   PdfEngineFeature,
   PdfEngineOperation,
@@ -137,6 +138,8 @@ export class PdfEngine<T = Blob> implements IPdfEngine<T> {
     const task = new Task<boolean, PdfErrorReason>();
     try {
       this.executor.destroy();
+      // Clean up image converter resources (e.g., encoder worker pool)
+      this.options.imageConverter.destroy?.();
       task.resolve(true);
     } catch (error) {
       task.reject({ code: PdfErrorCode.Unknown, message: String(error) });
@@ -168,6 +171,7 @@ export class PdfEngine<T = Blob> implements IPdfEngine<T> {
         // Then open in worker - use wait() to properly propagate task errors
         this.openDocumentBuffer(pdfFile, {
           password: options?.password,
+          normalizeRotation: options?.normalizeRotation,
         }).wait(
           (doc) => task.resolve(doc),
           (error) => task.fail(error),
@@ -302,6 +306,37 @@ export class PdfEngine<T = Blob> implements IPdfEngine<T> {
       doc.id,
       page.index,
       Priority.HIGH,
+    );
+  }
+
+  // ========== Raw Rendering (no encoding) ==========
+
+  renderPageRaw(
+    doc: PdfDocumentObject,
+    page: PdfPageObject,
+    options?: PdfRenderPageOptions,
+  ): PdfTask<ImageDataLike> {
+    return this.workerQueue.enqueue(
+      {
+        execute: () => this.executor.renderPageRaw(doc, page, options),
+        meta: { docId: doc.id, pageIndex: page.index, operation: 'renderPageRaw' },
+      },
+      { priority: Priority.HIGH },
+    );
+  }
+
+  renderPageRectRaw(
+    doc: PdfDocumentObject,
+    page: PdfPageObject,
+    rect: Rect,
+    options?: PdfRenderPageOptions,
+  ): PdfTask<ImageDataLike> {
+    return this.workerQueue.enqueue(
+      {
+        execute: () => this.executor.renderPageRect(doc, page, rect, options),
+        meta: { docId: doc.id, pageIndex: page.index, operation: 'renderPageRectRaw' },
+      },
+      { priority: Priority.HIGH },
     );
   }
 
@@ -695,6 +730,44 @@ export class PdfEngine<T = Blob> implements IPdfEngine<T> {
     );
   }
 
+  applyRedaction(
+    doc: PdfDocumentObject,
+    page: PdfPageObject,
+    annotation: PdfAnnotationObject,
+  ): PdfTask<boolean> {
+    return this.workerQueue.enqueue(
+      {
+        execute: () => this.executor.applyRedaction(doc, page, annotation),
+        meta: { docId: doc.id, pageIndex: page.index, operation: 'applyRedaction' },
+      },
+      { priority: Priority.MEDIUM },
+    );
+  }
+
+  applyAllRedactions(doc: PdfDocumentObject, page: PdfPageObject): PdfTask<boolean> {
+    return this.workerQueue.enqueue(
+      {
+        execute: () => this.executor.applyAllRedactions(doc, page),
+        meta: { docId: doc.id, pageIndex: page.index, operation: 'applyAllRedactions' },
+      },
+      { priority: Priority.MEDIUM },
+    );
+  }
+
+  flattenAnnotation(
+    doc: PdfDocumentObject,
+    page: PdfPageObject,
+    annotation: PdfAnnotationObject,
+  ): PdfTask<boolean> {
+    return this.workerQueue.enqueue(
+      {
+        execute: () => this.executor.flattenAnnotation(doc, page, annotation),
+        meta: { docId: doc.id, pageIndex: page.index, operation: 'flattenAnnotation' },
+      },
+      { priority: Priority.MEDIUM },
+    );
+  }
+
   getTextSlices(doc: PdfDocumentObject, slices: PageTextSlice[]): PdfTask<string[]> {
     return this.workerQueue.enqueue(
       {
@@ -720,6 +793,16 @@ export class PdfEngine<T = Blob> implements IPdfEngine<T> {
       {
         execute: () => this.executor.getPageGeometry(doc, page),
         meta: { docId: doc.id, pageIndex: page.index, operation: 'getPageGeometry' },
+      },
+      { priority: Priority.MEDIUM },
+    );
+  }
+
+  getPageTextRuns(doc: PdfDocumentObject, page: PdfPageObject): PdfTask<PdfPageTextRuns> {
+    return this.workerQueue.enqueue(
+      {
+        execute: () => this.executor.getPageTextRuns(doc, page),
+        meta: { docId: doc.id, pageIndex: page.index, operation: 'getPageTextRuns' },
       },
       { priority: Priority.MEDIUM },
     );

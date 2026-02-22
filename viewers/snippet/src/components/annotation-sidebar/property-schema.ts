@@ -19,9 +19,13 @@ export interface PropertyConfig {
     | 'fontColor'
     | 'textAlign'
     | 'verticalAlign'
-    | 'blendMode';
+    | 'blendMode'
+    | 'text'
+    | 'rotation';
   /** Translation key for the label */
   labelKey: string;
+  /** Translation key for the placeholder (optional, for text inputs) */
+  placeholderKey?: string;
   /** Minimum value for sliders */
   min?: number;
   /** Maximum value for sliders */
@@ -32,6 +36,8 @@ export interface PropertyConfig {
   unit?: string;
   /** Whether to debounce changes (for sliders) */
   debounce?: boolean;
+  /** If true, only show this property when editing an existing annotation (not for tool defaults) */
+  editOnly?: boolean;
 }
 
 /**
@@ -113,6 +119,23 @@ export const PROPERTY_CONFIGS: Record<string, PropertyConfig> = {
     type: 'blendMode',
     labelKey: 'annotation.blendMode',
   },
+
+  // Rotation
+  rotation: {
+    key: 'rotation',
+    type: 'rotation',
+    labelKey: 'annotation.rotation',
+    debounce: true,
+    editOnly: true,
+  },
+
+  // Redact properties
+  overlayText: {
+    key: 'overlayText',
+    type: 'text',
+    labelKey: 'annotation.overlayText',
+    placeholderKey: 'annotation.overlayTextPlaceholder',
+  },
 };
 
 /**
@@ -121,12 +144,33 @@ export const PROPERTY_CONFIGS: Record<string, PropertyConfig> = {
  */
 export const ANNOTATION_PROPERTIES: Partial<Record<PdfAnnotationSubtype, string[]>> = {
   // Ink uses strokeColor (was: color)
-  [PdfAnnotationSubtype.INK]: ['strokeColor', 'opacity', 'strokeWidth'],
+  [PdfAnnotationSubtype.INK]: ['strokeColor', 'opacity', 'strokeWidth', 'rotation'],
 
   // Shapes: color for interior fill, strokeColor for border
-  [PdfAnnotationSubtype.CIRCLE]: ['color', 'opacity', 'strokeColor', 'strokeStyle', 'strokeWidth'],
-  [PdfAnnotationSubtype.SQUARE]: ['color', 'opacity', 'strokeColor', 'strokeStyle', 'strokeWidth'],
-  [PdfAnnotationSubtype.POLYGON]: ['strokeColor', 'opacity', 'strokeStyle', 'strokeWidth', 'color'],
+  [PdfAnnotationSubtype.CIRCLE]: [
+    'color',
+    'opacity',
+    'strokeColor',
+    'strokeStyle',
+    'strokeWidth',
+    'rotation',
+  ],
+  [PdfAnnotationSubtype.SQUARE]: [
+    'color',
+    'opacity',
+    'strokeColor',
+    'strokeStyle',
+    'strokeWidth',
+    'rotation',
+  ],
+  [PdfAnnotationSubtype.POLYGON]: [
+    'strokeColor',
+    'opacity',
+    'strokeStyle',
+    'strokeWidth',
+    'color',
+    'rotation',
+  ],
   [PdfAnnotationSubtype.LINE]: [
     'strokeColor',
     'opacity',
@@ -134,6 +178,7 @@ export const ANNOTATION_PROPERTIES: Partial<Record<PdfAnnotationSubtype, string[
     'strokeWidth',
     'lineEndings',
     'color',
+    'rotation',
   ],
   [PdfAnnotationSubtype.POLYLINE]: [
     'strokeColor',
@@ -142,6 +187,7 @@ export const ANNOTATION_PROPERTIES: Partial<Record<PdfAnnotationSubtype, string[
     'strokeWidth',
     'lineEndings',
     'color',
+    'rotation',
   ],
 
   // Text markup uses strokeColor (was: color) - the color of the markup stroke
@@ -149,6 +195,9 @@ export const ANNOTATION_PROPERTIES: Partial<Record<PdfAnnotationSubtype, string[
   [PdfAnnotationSubtype.UNDERLINE]: ['strokeColor', 'opacity', 'blendMode'],
   [PdfAnnotationSubtype.STRIKEOUT]: ['strokeColor', 'opacity', 'blendMode'],
   [PdfAnnotationSubtype.SQUIGGLY]: ['strokeColor', 'opacity', 'blendMode'],
+
+  // Stamp
+  [PdfAnnotationSubtype.STAMP]: ['rotation'],
 
   // FreeText: color for fill (was: backgroundColor), plus font properties
   [PdfAnnotationSubtype.FREETEXT]: [
@@ -159,6 +208,18 @@ export const ANNOTATION_PROPERTIES: Partial<Record<PdfAnnotationSubtype, string[
     'verticalAlign',
     'opacity',
     'color',
+    'rotation',
+  ],
+  [PdfAnnotationSubtype.REDACT]: [
+    'strokeColor',
+    'color',
+    'opacity',
+    //'overlayText',
+    //'overlayTextRepeat',
+    //'fontFamily',
+    //'fontSize',
+    //'fontColor',
+    //'textAlign',
   ],
 };
 
