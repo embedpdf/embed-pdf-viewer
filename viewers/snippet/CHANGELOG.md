@@ -1,5 +1,11 @@
 # @embedpdf/snippet
 
+## 2.6.3
+
+### Patch Changes
+
+- [#478](https://github.com/embedpdf/embed-pdf-viewer/pull/478) by [@phreyah](https://github.com/phreyah) – Add Swedish (`sv`) translations to the snippet viewer.
+
 ## 2.6.2
 
 ## 2.6.1

@@ -1,6 +1,6 @@
 {
   "name": "@embedpdf/pdfium",
-  "version": "2.6.2",
+  "version": "2.6.3",
   "private": false,
   "description": "PDFium WebAssembly for the web platform. This package provides a powerful JavaScript interface to PDFium, enabling high-quality PDF rendering and manipulation directly in web applications.",
   "type": "module",
