@@ -41,9 +41,10 @@ import { RedactToolbar } from './redact-toolbar';
 
 interface ToolbarProps {
   documentId: string;
+  onOpenSearchRedactionModal?: () => void;
 }
 
-export const Toolbar = ({ documentId }: ToolbarProps) => {
+export const Toolbar = ({ documentId, onOpenSearchRedactionModal }: ToolbarProps) => {
   const { provides: panProvider, isPanning } = usePan(documentId);
   const { provides: rotateProvider } = useRotate(documentId);
   const { spreadMode, provides: spreadProvider } = useSpread(documentId);
@@ -307,7 +308,7 @@ export const Toolbar = ({ documentId }: ToolbarProps) => {
         </MuiToolbar>
       </AppBar>
       {mode === 'annotate' && documentId && <AnnotationToolbar documentId={documentId} />}
-      {mode === 'redact' && documentId && <RedactToolbar documentId={documentId} />}
+      {mode === 'redact' && documentId && <RedactToolbar documentId={documentId} onOpenSearchRedactionModal={onOpenSearchRedactionModal} />}
     </>
   );
 };

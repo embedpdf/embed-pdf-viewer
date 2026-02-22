@@ -1898,6 +1898,20 @@ export const commands: Record<string, Command<State>> = {
     },
   },
 
+  'redaction:redact-search': {
+    id: 'redaction:redact-search',
+    labelKey: 'redaction.search',
+    icon: 'search',
+    categories: ['redaction', 'redaction-search'],
+    action: ({ registry, documentId }) => {
+      const ui = registry.getPlugin<UIPlugin>('ui')?.provides();
+      ui?.forDocument(documentId).openModal('search-redaction-modal');
+    },
+    disabled: ({ state, documentId }) => {
+      return lacksPermission(state, documentId, PdfPermissionFlag.ModifyContents);
+    },
+  },
+
   'redaction:delete-selected': {
     id: 'redaction:delete-selected',
     labelKey: 'redaction.deleteSelected',

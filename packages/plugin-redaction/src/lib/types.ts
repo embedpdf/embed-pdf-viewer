@@ -143,6 +143,10 @@ export interface RedactionScope {
 
   getState(): RedactionDocumentState;
 
+  // Search-based redaction
+  searchText(searchText: string, caseSensitive?: boolean): Task<{ totalCount: number; foundOnPages: number[] }, PdfErrorReason>;
+  redactText(searchText: string, caseSensitive?: boolean): Task<boolean, PdfErrorReason>;
+
   onPendingChange: EventHook<Record<number, RedactionItem[]>>;
   onSelectedChange: EventHook<SelectedRedaction | null>;
   onRedactionEvent: EventHook<RedactionEvent>;
@@ -180,6 +184,10 @@ export interface RedactionCapability {
   deselectPending(): void;
 
   getState(): RedactionDocumentState;
+
+  // Search-based redaction
+  searchText(searchText: string, caseSensitive?: boolean): Task<{ totalCount: number; foundOnPages: number[] }, PdfErrorReason>;
+  redactText(searchText: string, caseSensitive?: boolean): Task<boolean, PdfErrorReason>;
 
   // Document-scoped operations
   forDocument(documentId: string): RedactionScope;
