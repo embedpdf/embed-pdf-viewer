@@ -1,5 +1,21 @@
 # @embedpdf/engines
 
+## 2.6.2
+
+### Patch Changes
+
+- [#475](https://github.com/embedpdf/embed-pdf-viewer/pull/475) by [@bobsingor](https://github.com/bobsingor) – ### Extract tight glyph bounds and font size from PDFium
+  - `readGlyphInfo` now calls `FPDFText_GetCharBox` alongside `FPDFText_GetLooseCharBox` to extract tight character bounds (closely surrounding the actual glyph shape) and maps them to device-space coordinates.
+  - `buildRunsFromGlyphs` passes tight bounds through to each `PdfGlyphSlim` record (`tightX`, `tightY`, `tightWidth`, `tightHeight`) and stores per-run `fontSize` from `FPDFText_GetFontSize`.
+
+## 2.6.1
+
+### Patch Changes
+
+- [#473](https://github.com/embedpdf/embed-pdf-viewer/pull/473) by [@bobsingor](https://github.com/bobsingor) – Implement getPageTextRuns in PdfiumNative, WebWorkerEngine, and RemoteExecutor for extracting rich text runs with font, size, and color metadata. Implement renderPageRaw and renderPageRectRaw in WebWorkerEngine for returning raw ImageDataLike pixel data without encoding.
+
+- [#463](https://github.com/embedpdf/embed-pdf-viewer/pull/463) by [@bobsingor](https://github.com/bobsingor) – Update readPageAnnoRect to call EPDFAnnot_GetRect instead of FPDFAnnot_GetRect, ensuring annotation rectangles are always normalized. Fixes link annotations appearing below their expected position when the PDF Rect array has inverted y-coordinates.
+
 ## 2.6.0
 
 ### Minor Changes

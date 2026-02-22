@@ -1,0 +1,300 @@
+---
+title: Layout Analysis Plugin
+description: AI-powered document layout analysis running locally in the browser, detecting text blocks, tables, images, headers, and more.
+searchable: true
+---
+
+import { Callout } from '@/components/callout'
+
+# Layout Analysis Plugin
+
+<Callout type="warning" title="Experimental">
+  This plugin is **experimental**. Running deep learning models in the browser is resource-intensive — on many devices the browser tab may become very slow or even crash, particularly on mobile or lower-end hardware. As models get smaller and browser APIs improve, stability and performance will continue to get better.
+</Callout>
+
+The Layout Analysis Plugin brings AI-powered document understanding directly into your PDF viewer. It uses ONNX Runtime to run deep learning models **locally in the browser**, detecting layout elements like text blocks, tables, images, headings, formulas, and more.
+
+Because all inference happens on-device, **no data ever leaves the browser**. This makes it ideal for applications that handle sensitive or confidential documents. Models are loaded on demand from HuggingFace CDN (or a custom server) and cached locally using the browser's Cache API.
+
+The plugin optionally supports **table structure analysis**, which identifies rows, columns, and cells within detected tables. All results are mapped to PDF page coordinates for precise overlay rendering.
+
+## Installation
+
+This plugin depends on the **AI Manager** and **Render** plugins. You also need to install `onnxruntime-web`, which provides the ONNX Runtime that powers inference in the browser.
+
+```sh npm2yarn
+npm install @embedpdf/plugin-layout-analysis @embedpdf/plugin-ai-manager @embedpdf/ai @embedpdf/plugin-render onnxruntime-web
+````
+
+<Callout type="info" title="Node.js usage">
+  For server-side inference, install `onnxruntime-node` instead of `onnxruntime-web`.
+</Callout>
+
+## Registration
+
+First create an AI runtime, then register the AI Manager and Layout Analysis plugins.
+
+```typescript {6-7,9-13,21-31}
+import { createPluginRegistration } from '@embedpdf/core'
+// ... other imports
+import { RenderPluginPackage } from '@embedpdf/plugin-render/svelte'
+import { createAiRuntime } from '@embedpdf/ai/web'
+import { AiManagerPluginPackage } from '@embedpdf/plugin-ai-manager/svelte'
+import { LayoutAnalysisPluginPackage } from '@embedpdf/plugin-layout-analysis/svelte'
+
+// Create the AI runtime (loads ONNX Runtime on demand)
+const aiRuntime = createAiRuntime({
+  backend: 'auto', // tries WebGPU first, falls back to WASM
+  cache: true,      // caches models in the browser Cache API
+})
+
+const plugins = [
+  // ... other essential plugins
+  createPluginRegistration(DocumentManagerPluginPackage, { /* ... */ }),
+  createPluginRegistration(ViewportPluginPackage),
+  createPluginRegistration(RenderPluginPackage), // Required dependency
+
+  // Register the AI manager with the runtime
+  createPluginRegistration(AiManagerPluginPackage, {
+    runtime: aiRuntime,
+  }),
+
+  // Register and configure layout analysis
+  createPluginRegistration(LayoutAnalysisPluginPackage, {
+    layoutThreshold: 0.35,          // confidence threshold for layout detections
+    tableStructureThreshold: 0.8,   // confidence threshold for table elements
+    tableStructure: false,          // enable table structure analysis
+  }),
+]
+```
+
+## Usage
+
+The plugin provides the `<LayoutAnalysisLayer />` component for displaying results, the `useLayoutAnalysis` store for document-scoped reactive state, and the `useLayoutAnalysisCapability` store for direct API access.
+
+### The `useLayoutAnalysis` Store
+
+The `useLayoutAnalysis(getDocumentId)` store is the primary way to interact with the plugin from Svelte. It returns reactive state and scoped methods for a specific document.
+
+```svelte
+<script lang="ts">
+import { useLayoutAnalysis } from '@embedpdf/plugin-layout-analysis/svelte'
+
+let { documentId }: { documentId: string } = $props()
+const la = useLayoutAnalysis(() => documentId)
+
+const isOverlayVisible = $derived(la.layoutOverlayVisible)
+</script>
+
+<button onclick={() => la.provides?.setLayoutOverlayVisible(!la.layoutOverlayVisible)}>
+  Toggle Layout Overlay
+</button>
+<button onclick={() => la.provides?.setTableStructureEnabled(!la.tableStructureEnabled)}>
+  Toggle Table Analysis
+</button>
+```
+
+### Analyzing Pages
+
+Use the scope to trigger analysis. The returned task supports **progress tracking** (including model download progress) and **cancellation**.
+
+The plugin implements **smart caching** — pages that have already been analyzed are skipped automatically. Pass `{ force: true }` to re-analyze regardless.
+
+```svelte
+<script lang="ts">
+import { useLayoutAnalysis } from '@embedpdf/plugin-layout-analysis/svelte'
+
+let { documentId }: { documentId: string } = $props()
+const la = useLayoutAnalysis(() => documentId)
+let status = $state('idle')
+
+function handleAnalyze() {
+  if (!la.scope) return
+
+  const task = la.scope.analyzeAllPages()
+
+  task.onProgress((p) => {
+    if (p.stage === 'downloading-model') {
+      status = `Downloading model: ${((p.loaded / p.total) * 100).toFixed(0)}%`
+    } else if (p.stage === 'creating-session') {
+      status = 'Initializing model...'
+    } else if (p.stage === 'page-complete') {
+      status = `Page ${p.completed}/${p.total} complete`
+    } else {
+      status = p.stage
+    }
+  })
+
+  task.wait(
+    (result) => {
+      const totalBlocks = result.pages.reduce((sum, p) => sum + p.blocks.length, 0)
+      status = `Done — ${totalBlocks} blocks detected`
+    },
+    (error) => {
+      status = error.type === 'abort' ? 'Cancelled' : error.reason.message
+    },
+  )
+}
+</script>
+
+<button onclick={handleAnalyze}>{status}</button>
+```
+
+### Cancellation
+
+The task returned by `analyzePage` and `analyzeAllPages` can be cancelled at any time by calling `abort()`:
+
+```typescript
+const task = la.scope.analyzeAllPages()
+
+// Later, to cancel:
+task.abort({ type: 'no-document', message: 'Cancelled by user' })
+```
+
+When aborted, the error callback receives `error.type === 'abort'` and the page status resets to `idle`.
+
+### Displaying Results
+
+Place the `<LayoutAnalysisLayer />` component on top of the `<RenderLayer />` inside your page renderer snippet. It draws color-coded bounding boxes for each detected layout element with labels and confidence scores. When table structure analysis is enabled, table rows, columns, and cells are rendered as dashed overlays.
+
+The layer reads thresholds, overlay visibility, and selected block state directly from the plugin state — no props needed beyond `documentId` and `pageIndex`.
+
+```svelte
+<script lang="ts">
+import { LayoutAnalysisLayer } from '@embedpdf/plugin-layout-analysis/svelte'
+import { RenderLayer } from '@embedpdf/plugin-render/svelte'
+</script>
+
+{#snippet renderPage(page)}
+  <RenderLayer {documentId} pageIndex={page.pageIndex} />
+  <LayoutAnalysisLayer {documentId} pageIndex={page.pageIndex} />
+{/snippet}
+
+<Scroller {documentId} {renderPage} />
+```
+
+## Live Example
+
+This example shows a full-featured layout analysis viewer with controls for analyzing pages, toggling layout and table structure overlays independently, adjusting confidence thresholds with sliders, and enabling/disabling table structure analysis at runtime. The model (~130 MB) is downloaded on first use and cached for subsequent runs.
+
+import { LayoutAnalysisExample } from '../../code-examples/headless/layout-analysis-example';
+
+<CodeExample 
+  codePaths={[
+    "../../examples/svelte-tailwind/src/examples/headless/layout-analysis-example.svelte",
+    "../../examples/svelte-tailwind/src/examples/headless/layout-analysis-example-content.svelte"
+  ]}
+>
+  <LayoutAnalysisExample />
+</CodeExample>
+
+## API Reference
+
+### Configuration (`LayoutAnalysisPluginConfig`)
+
+| Option | Type | Description |
+| :--- | :--- | :--- |
+| **`layoutThreshold`** | `number` | Minimum confidence score for a layout detection to be displayed. <br />**Default**: `0.35` |
+| **`tableStructureThreshold`** | `number` | Minimum confidence score for a table structure element to be displayed. <br />**Default**: `0.8` |
+| **`tableStructure`** | `boolean` | If `true`, enables table structure analysis at startup. Can be toggled at runtime via `setTableStructureEnabled()`. <br />**Default**: `false` |
+| **`autoAnalyze`** | `boolean` | If `true`, automatically analyzes pages as they load. <br />**Default**: `false` |
+| **`renderScale`** | `number` | Scale factor for rendering pages before analysis. Higher values improve detection accuracy at the cost of memory. <br />**Default**: `2.0` |
+
+### Component: `<LayoutAnalysisLayer />`
+
+Renders bounding boxes over a PDF page for detected layout elements and table structure. Thresholds, overlay visibility, and selected block state are read directly from the plugin state.
+
+| Prop | Type | Description |
+| :--- | :--- | :--- |
+| **`documentId`** | `string` | **(Required)** The ID of the document. |
+| **`pageIndex`** | `number` | **(Required)** The page index to display layout results for. |
+| **`scale`** | `number` | Zoom scale multiplier. Falls back to the document's current scale. |
+| **`class`** | `string` | Optional CSS class applied to the container element. |
+| **`style`** | `string` | Optional inline styles applied to the container element. |
+
+### Store: `useLayoutAnalysis(getDocumentId)`
+
+Document-scoped store that returns reactive plugin state and methods.
+
+#### Parameters
+
+| Parameter | Type | Description |
+| :--- | :--- | :--- |
+| **`getDocumentId`** | `() => string \| null` | A getter function that returns the document ID to track. |
+
+#### Returns
+
+| Property | Type | Description |
+| :--- | :--- | :--- |
+| **`pages`** | `Record<number, PageAnalysisState>` | Per-page analysis state for the document. |
+| **`layoutOverlayVisible`** | `boolean` | Whether layout block overlays are shown. |
+| **`tableStructureOverlayVisible`** | `boolean` | Whether table structure overlays are shown. |
+| **`tableStructureEnabled`** | `boolean` | Whether table structure analysis is enabled. |
+| **`layoutThreshold`** | `number` | Current layout detection confidence threshold. |
+| **`tableStructureThreshold`** | `number` | Current table structure confidence threshold. |
+| **`selectedBlockId`** | `string \| null` | The UUID of the currently selected block. |
+| **`scope`** | `LayoutAnalysisScope \| null` | Document-scoped methods (`analyzePage`, `analyzeAllPages`, etc.). |
+| **`provides`** | `LayoutAnalysisCapability` | Full plugin capability with global methods. |
+
+### Store: `useLayoutAnalysisCapability()`
+
+Low-level store that returns the full plugin capability directly.
+
+#### `LayoutAnalysisCapability` Methods
+
+| Method | Description |
+| :--- | :--- |
+| **`analyzePage(pageIndex, options?)`** | Analyzes a single page. Skips if already analyzed unless `{ force: true }`. Returns a `Task` with progress and abort support. |
+| **`analyzeAllPages(options?)`** | Analyzes all pages sequentially. Skips already-analyzed pages unless `{ force: true }`. Returns a `Task` with per-page progress. |
+| **`getPageLayout(pageIndex)`** | Returns the cached `PageLayout` for a page, or `null` if not yet analyzed. |
+| **`getPageTextRuns(pageIndex)`** | Returns raw text runs from the PDF engine for a page (font, size, color, text content). |
+| **`forDocument(id)`** | Returns a document-scoped `LayoutAnalysisScope`. |
+| **`onPageLayoutChange`** | Event hook fired when a page's layout results change. |
+| **`onStateChange`** | Event hook fired when any plugin state changes (thresholds, visibility, etc.). |
+| **`setLayoutOverlayVisible(visible)`** | Toggles visibility of layout block overlays. |
+| **`setTableStructureOverlayVisible(visible)`** | Toggles visibility of table structure overlays. |
+| **`setTableStructureEnabled(enabled)`** | Enables or disables table structure analysis. When enabled, the next analysis run includes the table structure pass. |
+| **`setLayoutThreshold(threshold)`** | Updates the layout detection confidence threshold. |
+| **`setTableStructureThreshold(threshold)`** | Updates the table structure confidence threshold. |
+| **`selectBlock(blockId)`** | Selects a block by UUID, or `null` to deselect. |
+| **`clearPageResults(documentId, pageIndex)`** | Clears cached results for a single page (forces re-analysis on next run). |
+| **`clearAllResults(documentId)`** | Clears cached results for all pages in a document. |
+
+### Progress Stages (`PageAnalysisProgress`)
+
+The `onProgress` callback receives one of these stages during `analyzePage`:
+
+| Stage | Fields | Description |
+| :--- | :--- | :--- |
+| `rendering` | `pageIndex` | Rendering the page to an image for the model. |
+| `downloading-model` | `pageIndex`, `loaded`, `total` | Downloading the AI model from the server (first run only). |
+| `creating-session` | `pageIndex` | Initializing the ONNX inference session after download. |
+| `layout-detection` | `pageIndex` | Running layout detection inference. |
+| `table-structure` | `pageIndex`, `tableIndex`, `tableCount` | Analyzing table structure (if enabled). |
+| `mapping-coordinates` | `pageIndex` | Mapping results to PDF page coordinates. |
+
+When using `analyzeAllPages`, an additional `page-complete` stage is emitted with `pageIndex`, `completed`, and `total` fields.
+
+### Result: `LayoutBlock`
+
+Each detected element in the `PageLayout.blocks` array has these fields:
+
+| Field | Type | Description |
+| :--- | :--- | :--- |
+| **`id`** | `string` | Globally unique UUID for this detection. |
+| **`classId`** | `number` | Numeric class ID from the model. |
+| **`label`** | `string` | Human-readable label (e.g., `text`, `table`, `image`, `header`). |
+| **`score`** | `number` | Confidence score from 0 to 1. |
+| **`rect`** | `Rect` | Bounding box in PDF page coordinates (points). |
+| **`readingOrder`** | `number` | Estimated reading order index. |
+
+### Result: `TableStructureElement`
+
+When table structure analysis is enabled, each table block in `PageLayout.tableStructures` maps to an array of these elements:
+
+| Field | Type | Description |
+| :--- | :--- | :--- |
+| **`classId`** | `number` | Numeric class ID (e.g., 0 = table, 1 = column, 2 = row). |
+| **`label`** | `string` | Human-readable label (`table`, `table_column`, `table_row`, `table_column_header`, `table_projected_row_header`, `table_spanning_cell`). |
+| **`score`** | `number` | Confidence score from 0 to 1. |
+| **`rect`** | `Rect` | Bounding box in PDF page coordinates (points). |

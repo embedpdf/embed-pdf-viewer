@@ -19,6 +19,24 @@ export interface SelectionPluginConfig extends BasePluginConfig {
    * Configuration for marquee selection behavior.
    */
   marquee?: MarqueeSelectionConfig;
+  /**
+   * Tolerance factor for hit-testing glyphs. Multiplied by average glyph
+   * height to derive the tolerance radius. Set to 0 to require exact hits.
+   * @default 1.5
+   */
+  toleranceFactor?: number;
+  /**
+   * Minimum drag distance (in page-coordinate units) the pointer must move
+   * before a drag-selection starts. Prevents accidental selection on simple clicks.
+   * @default 3
+   */
+  minSelectionDragDistance?: number;
+  /**
+   * Maximum number of pages whose geometry data is kept in memory per document.
+   * Oldest unused pages are evicted when this limit is exceeded.
+   * @default 50
+   */
+  maxCachedGeometries?: number;
 }
 
 export interface SelectionMenuPlacement {

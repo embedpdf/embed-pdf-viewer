@@ -1,5 +1,15 @@
 # @embedpdf/snippet
 
+## 2.6.2
+
+## 2.6.1
+
+### Patch Changes
+
+- [#465](https://github.com/embedpdf/embed-pdf-viewer/pull/465) by [@bobsingor](https://github.com/bobsingor) – Switch toolbar close command from hardcoded pointerMode to activateDefaultMode. On mobile devices the default mode is pan mode rather than pointer mode, and activating pointer mode prevented scrolling (only allowing text selection).
+
+- [#466](https://github.com/embedpdf/embed-pdf-viewer/pull/466) by [@bobsingor](https://github.com/bobsingor) – Fix toolbar UI visibility: hide the mode select dropdown when no annotation/shape/redact modes are available (previously showed a dropdown with a single item), and hide the file-actions divider when document:open and document:close items are not visible.
+
 ## 2.6.0
 
 ### Minor Changes

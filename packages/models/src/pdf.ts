@@ -2444,13 +2444,22 @@ export interface SearchAllPagesResult {
  */
 export interface PdfGlyphObject {
   /**
-   * Origin of the glyph
+   * Origin of the glyph (loose bounds from FPDFText_GetLooseCharBox)
    */
   origin: { x: number; y: number };
   /**
-   * Size of the glyph
+   * Size of the glyph (loose bounds from FPDFText_GetLooseCharBox)
    */
   size: { width: number; height: number };
+  /**
+   * Tight bounds origin (from FPDFText_GetCharBox, closely surrounds the actual glyph shape).
+   * Used for hit-testing to match Chrome's FPDFText_GetCharIndexAtPos behaviour.
+   */
+  tightOrigin?: { x: number; y: number };
+  /**
+   * Tight bounds size (from FPDFText_GetCharBox)
+   */
+  tightSize?: { width: number; height: number };
   /**
    * Whether the glyph is a space
    */
@@ -2468,25 +2477,42 @@ export interface PdfGlyphObject {
  */
 export interface PdfGlyphSlim {
   /**
-   * X coordinate of the glyph
+   * X coordinate of the glyph (loose bounds from FPDFText_GetLooseCharBox)
    */
   x: number;
   /**
-   * Y coordinate of the glyph
+   * Y coordinate of the glyph (loose bounds from FPDFText_GetLooseCharBox)
    */
   y: number;
   /**
-   * Width of the glyph
+   * Width of the glyph (loose bounds from FPDFText_GetLooseCharBox)
    */
   width: number;
   /**
-   * Height of the glyph
+   * Height of the glyph (loose bounds from FPDFText_GetLooseCharBox)
    */
   height: number;
   /**
    * Flags of the glyph
    */
   flags: number;
+  /**
+   * Tight X coordinate (from FPDFText_GetCharBox).
+   * Used for hit-testing to match Chrome's FPDFText_GetCharIndexAtPos behaviour.
+   */
+  tightX?: number;
+  /**
+   * Tight Y coordinate (from FPDFText_GetCharBox)
+   */
+  tightY?: number;
+  /**
+   * Tight width (from FPDFText_GetCharBox)
+   */
+  tightWidth?: number;
+  /**
+   * Tight height (from FPDFText_GetCharBox)
+   */
+  tightHeight?: number;
 }
 
 /**
@@ -2507,6 +2533,10 @@ export interface PdfRun {
    * Glyphs of the run
    */
   glyphs: PdfGlyphSlim[];
+  /**
+   * Font size of the run (all glyphs in a run share the same font size)
+   */
+  fontSize?: number;
 }
 
 /**
@@ -2519,6 +2549,59 @@ export interface PdfPageGeometry {
    * Runs of the page
    */
   runs: PdfRun[];
+}
+
+/**
+ * Font information extracted from a PDF text object.
+ *
+ * @public
+ */
+export interface PdfFontInfo {
+  /** PostScript name (e.g. "HOEPNL+Arial,Bold"). */
+  name: string;
+  /** Font family name (e.g. "Arial"). */
+  familyName: string;
+  /** Weight 100-900 (400 = normal, 700 = bold). */
+  weight: number;
+  /** Whether the font is italic. */
+  italic: boolean;
+  /** Whether the font is monospaced (fixed-pitch). */
+  monospaced: boolean;
+  /** Whether the font data is embedded in the PDF. */
+  embedded: boolean;
+}
+
+/**
+ * A rich text run: consecutive characters sharing the same text object,
+ * font, size, and color.
+ *
+ * @public
+ */
+export interface PdfTextRun {
+  /** The text content (UTF-8). */
+  text: string;
+  /** Bounding box in PDF page coordinates (points). */
+  rect: Rect;
+  /** Font metadata (uniform within the run). */
+  font: PdfFontInfo;
+  /** Font size in points. */
+  fontSize: number;
+  /** Fill color (RGBA). */
+  color: PdfAlphaColor;
+  /** Start character index in the text page. */
+  charIndex: number;
+  /** Number of characters in this run. */
+  charCount: number;
+}
+
+/**
+ * Rich text runs for a single page.
+ *
+ * @public
+ */
+export interface PdfPageTextRuns {
+  /** Text runs ordered by reading order. */
+  runs: PdfTextRun[];
 }
 
 /**
@@ -3078,6 +3161,35 @@ export interface PdfEngine<T = Blob> {
     options?: PdfRenderPageOptions,
   ) => PdfTask<T>;
   /**
+   * Render the specified pdf page and return raw pixel data (ImageDataLike)
+   * without encoding to the output format T. Useful for AI/ML pipelines
+   * that need direct pixel access.
+   * @param doc - pdf document
+   * @param page - pdf page
+   * @param options - render options (imageType/imageQuality are ignored)
+   * @returns task contains raw ImageDataLike or error
+   */
+  renderPageRaw: (
+    doc: PdfDocumentObject,
+    page: PdfPageObject,
+    options?: PdfRenderPageOptions,
+  ) => PdfTask<ImageDataLike>;
+  /**
+   * Render the specified rect of a pdf page and return raw pixel data
+   * (ImageDataLike) without encoding to the output format T.
+   * @param doc - pdf document
+   * @param page - pdf page
+   * @param rect - target rect in PDF coordinate space
+   * @param options - render options (imageType/imageQuality are ignored)
+   * @returns task contains raw ImageDataLike or error
+   */
+  renderPageRectRaw: (
+    doc: PdfDocumentObject,
+    page: PdfPageObject,
+    rect: Rect,
+    options?: PdfRenderPageOptions,
+  ) => PdfTask<ImageDataLike>;
+  /**
    * Render the thumbnail of specified pdf page
    * @param doc - pdf document
    * @param page - pdf page
@@ -3332,6 +3444,13 @@ export interface PdfEngine<T = Blob> {
    */
   getPageGeometry: (doc: PdfDocumentObject, page: PdfPageObject) => PdfTask<PdfPageGeometry>;
   /**
+   * Get rich text runs for a page, grouped by text object with font and color info
+   * @param doc - pdf document
+   * @param page - pdf page
+   * @returns task contains the text runs
+   */
+  getPageTextRuns: (doc: PdfDocumentObject, page: PdfPageObject) => PdfTask<PdfPageTextRuns>;
+  /**
    * Merge multiple pdf documents
    * @param files - all the pdf files
    * @returns task contains the merged pdf file
@@ -3574,6 +3693,7 @@ export interface IPdfiumExecutor {
   getTextSlices(doc: PdfDocumentObject, slices: PageTextSlice[]): PdfTask<string[]>;
   getPageGlyphs(doc: PdfDocumentObject, page: PdfPageObject): PdfTask<PdfGlyphObject[]>;
   getPageGeometry(doc: PdfDocumentObject, page: PdfPageObject): PdfTask<PdfPageGeometry>;
+  getPageTextRuns(doc: PdfDocumentObject, page: PdfPageObject): PdfTask<PdfPageTextRuns>;
   merge(files: PdfFile[]): PdfTask<PdfFile>;
   mergePages(mergeConfigs: Array<{ docId: string; pageIndices: number[] }>): PdfTask<PdfFile>;
   preparePrintDocument(doc: PdfDocumentObject, options?: PdfPrintOptions): PdfTask<ArrayBuffer>;
