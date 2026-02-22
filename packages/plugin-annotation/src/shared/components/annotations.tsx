@@ -1,4 +1,10 @@
-import { blendModeToCss, PdfAnnotationObject, PdfBlendMode } from '@embedpdf/models';
+import {
+  blendModeToCss,
+  PdfAnnotationObject,
+  PdfBlendMode,
+  AnnotationAppearanceMap,
+  AnnotationAppearances,
+} from '@embedpdf/models';
 import {
   getAnnotationsByPageIndex,
   getSelectedAnnotationIds,
@@ -30,6 +36,7 @@ import {
   MouseEvent,
   Fragment,
   TouchEvent,
+  useRef,
 } from '@framework';
 
 import { useAnnotationCapability } from '../hooks';
@@ -58,6 +65,7 @@ import { Polygon } from './annotations/polygon';
 import { FreeText } from './annotations/free-text';
 import { Stamp } from './annotations/stamp';
 import { Link } from './annotations/link';
+import { AppearanceImage } from './appearance-image';
 
 interface AnnotationsProps {
   documentId: string;
@@ -87,6 +95,8 @@ export function Annotations(annotationsProps: AnnotationsProps) {
   const { register } = usePointerHandlers({ documentId, pageIndex });
   const [allSelectedIds, setAllSelectedIds] = useState<string[]>([]);
   const [editingId, setEditingId] = useState<string | null>(null);
+  const [appearanceMap, setAppearanceMap] = useState<AnnotationAppearanceMap>({});
+  const prevScaleRef = useRef<number>(scale);
 
   // Get scoped API for this document (memoized to prevent infinite loops)
   const annotationProvides = useMemo(
@@ -111,6 +121,26 @@ export function Annotations(annotationsProps: AnnotationsProps) {
       });
     }
   }, [annotationProvides, pageIndex]);
+
+  // Fetch batch-rendered appearance images for this page
+  useEffect(() => {
+    if (!annotationProvides) return;
+
+    // Invalidate on scale change
+    if (prevScaleRef.current !== scale) {
+      annotationProvides.invalidatePageAppearances(pageIndex);
+      prevScaleRef.current = scale;
+    }
+
+    const task = annotationProvides.getPageAppearances(pageIndex, {
+      scaleFactor: scale,
+      dpr: typeof window !== 'undefined' ? window.devicePixelRatio : 1,
+    });
+    task.wait(
+      (map) => setAppearanceMap(map),
+      () => setAppearanceMap({}),
+    );
+  }, [annotationProvides, pageIndex, scale]);
 
   const handlers = useMemo(
     (): PointerEventHandlers<EmbedPdfPointerEvent<MouseEvent>> => ({
@@ -275,12 +305,79 @@ export function Annotations(annotationsProps: AnnotationsProps) {
     return allSelected.length > 1 && allSelected.every((ta) => ta.object.pageIndex === pageIndex);
   }, [annotationProvides, pageIndex, allSelectedIds]);
 
+  /**
+   * Check if an annotation should render using its pre-rendered appearance stream image.
+   * Returns the appearances object if available, or null to fall back to dict-based SVG/CSS.
+   */
+  const getAppearanceForAnnotation = useCallback(
+    (ta: TrackedAnnotation): AnnotationAppearances | null => {
+      // Not in dict editing mode
+      if (ta.dictMode) return null;
+      // Not EmbedPDF-rotated (has rotation + unrotatedRect)
+      if (ta.object.rotation && ta.object.unrotatedRect) return null;
+      // Has appearance in cache
+      const appearances = appearanceMap[ta.object.id];
+      if (!appearances?.normal) return null;
+      return appearances;
+    },
+    [appearanceMap],
+  );
+
   return (
     <>
       {annotations.map((annotation) => {
         const isSelected = allSelectedIds.includes(annotation.object.id);
         const isEditing = editingId === annotation.object.id;
         const tool = annotationProvides?.findToolForAnnotation(annotation.object);
+
+        // Try appearance stream rendering (AP mode) for non-stamp annotations
+        // Stamps use AP for initial display too, but keep their own component for resize
+        const appearances = getAppearanceForAnnotation(annotation);
+        console.log('appearances', appearances);
+        if (appearances?.normal && !isStamp(annotation)) {
+          return (
+            <AnnotationContainer
+              key={annotation.object.id}
+              trackedAnnotation={annotation}
+              isSelected={isSelected}
+              isMultiSelected={isMultiSelected}
+              isDraggable={resolveInteractionProp(
+                tool?.interaction.isDraggable,
+                annotation.object,
+                true,
+              )}
+              isResizable={resolveInteractionProp(
+                tool?.interaction.isResizable,
+                annotation.object,
+                false,
+              )}
+              lockAspectRatio={resolveInteractionProp(
+                tool?.interaction.lockAspectRatio,
+                annotation.object,
+                false,
+              )}
+              isRotatable={resolveInteractionProp(
+                tool?.interaction.isRotatable,
+                annotation.object,
+                false,
+              )}
+              selectionMenu={selectionMenu}
+              onSelect={(e) => handleClick(e, annotation)}
+              style={{
+                mixBlendMode: blendModeToCss(annotation.object.blendMode ?? PdfBlendMode.Normal),
+              }}
+              {...annotationsProps}
+            >
+              {() => (
+                <AppearanceImage
+                  appearance={appearances.normal!}
+                  isSelected={isSelected}
+                  onClick={(e) => handleClick(e, annotation)}
+                />
+              )}
+            </AnnotationContainer>
+          );
+        }
 
         // Check for custom renderer first (from external plugins like redaction)
         for (const renderer of annotationsProps.annotationRenderers ?? []) {

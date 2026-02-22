@@ -1,6 +1,7 @@
 import { BasePluginConfig, EventHook } from '@embedpdf/core';
 import {
   AnnotationCreateContext,
+  AnnotationAppearanceMap,
   PdfAnnotationObject,
   PdfAnnotationSubtype,
   PdfErrorReason,
@@ -53,11 +54,13 @@ export type AnnotationToolsChangeEvent = {
   tools: AnnotationTool[];
 };
 
-export type CommitState = 'new' | 'dirty' | 'deleted' | 'synced' | 'ignored';
+export type CommitState = 'new' | 'dirty' | 'moved' | 'deleted' | 'synced' | 'ignored';
 
 export interface TrackedAnnotation<T extends PdfAnnotationObject = PdfAnnotationObject> {
   commitState: CommitState;
   object: T;
+  /** When true, render using dict-based SVG/CSS instead of appearance stream image */
+  dictMode?: boolean;
 }
 
 /**
@@ -75,6 +78,8 @@ export interface CommitBatch {
   updates: Array<{
     uid: string;
     ta: TrackedAnnotation;
+    /** When true, only positional data changed -- skip appearance regeneration */
+    moved?: boolean;
   }>;
   /** Annotations that need to be deleted from the PDF */
   deletions: Array<{
@@ -246,12 +251,26 @@ export interface AnnotationScope {
   updateAnnotations(
     patches: Array<{ pageIndex: number; id: string; patch: Partial<PdfAnnotationObject> }>,
   ): void;
+  /** Move an annotation by delta or to an absolute position (preserves appearance stream) */
+  moveAnnotation(
+    pageIndex: number,
+    annotationId: string,
+    position: Position,
+    mode?: 'delta' | 'absolute',
+  ): void;
   deleteAnnotation(pageIndex: number, annotationId: string): void;
   /** Delete multiple annotations in batch */
   deleteAnnotations(annotations: Array<{ pageIndex: number; id: string }>): void;
   /** Remove an annotation from state without calling the engine (no PDF modification) */
   purgeAnnotation(pageIndex: number, annotationId: string): void;
   renderAnnotation(options: RenderAnnotationOptions): Task<Blob, PdfErrorReason>;
+  /** Batch-fetch rendered appearance stream images for all annotations on a page */
+  getPageAppearances(
+    pageIndex: number,
+    options?: PdfRenderPageAnnotationOptions,
+  ): Task<AnnotationAppearanceMap, PdfErrorReason>;
+  /** Clear cached appearance images for a page (e.g. on zoom change) */
+  invalidatePageAppearances(pageIndex: number): void;
   commit(): Task<boolean, PdfErrorReason>;
 
   // Attached links (IRT link children)
@@ -319,6 +338,14 @@ export interface AnnotationCapability {
   updateAnnotations: (
     patches: Array<{ pageIndex: number; id: string; patch: Partial<PdfAnnotationObject> }>,
   ) => void;
+  /** Move an annotation by delta or to an absolute position (preserves appearance stream) */
+  moveAnnotation: (
+    pageIndex: number,
+    annotationId: string,
+    position: Position,
+    mode?: 'delta' | 'absolute',
+    documentId?: string,
+  ) => void;
   deleteAnnotation: (pageIndex: number, annotationId: string) => void;
   /** Delete multiple annotations in batch */
   deleteAnnotations: (
@@ -328,6 +355,14 @@ export interface AnnotationCapability {
   /** Remove an annotation from state without calling the engine (no PDF modification) */
   purgeAnnotation: (pageIndex: number, annotationId: string, documentId?: string) => void;
   renderAnnotation: (options: RenderAnnotationOptions) => Task<Blob, PdfErrorReason>;
+  /** Batch-fetch rendered appearance stream images for all annotations on a page */
+  getPageAppearances: (
+    pageIndex: number,
+    options?: PdfRenderPageAnnotationOptions,
+    documentId?: string,
+  ) => Task<AnnotationAppearanceMap, PdfErrorReason>;
+  /** Clear cached appearance images for a page (e.g. on zoom change) */
+  invalidatePageAppearances: (pageIndex: number, documentId?: string) => void;
   commit: () => Task<boolean, PdfErrorReason>;
 
   // Attached links (IRT link children)

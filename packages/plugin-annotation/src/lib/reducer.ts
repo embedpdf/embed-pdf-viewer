@@ -6,6 +6,7 @@ import {
   DELETE_ANNOTATION,
   DESELECT_ANNOTATION,
   PATCH_ANNOTATION,
+  MOVE_ANNOTATION,
   PURGE_ANNOTATION,
   SELECT_ANNOTATION,
   ADD_TO_SELECTION,
@@ -73,7 +74,34 @@ const patchAnno = (
       ...docState.byUid,
       [uid]: {
         ...prev,
-        commitState: prev.commitState === 'synced' ? 'dirty' : prev.commitState,
+        commitState:
+          prev.commitState === 'synced' || prev.commitState === 'moved'
+            ? 'dirty'
+            : prev.commitState,
+        object: { ...prev.object, ...patch },
+        dictMode: true,
+      } as TrackedAnnotation,
+    },
+    hasPendingChanges: true,
+  };
+};
+
+// Helper function to apply a move to an annotation (position-only, preserves AP)
+const moveAnno = (
+  docState: AnnotationDocumentState,
+  uid: string,
+  patch: Partial<TrackedAnnotation['object']>,
+): AnnotationDocumentState => {
+  const prev = docState.byUid[uid];
+  if (!prev) return docState;
+  return {
+    ...docState,
+    byUid: {
+      ...docState.byUid,
+      [uid]: {
+        ...prev,
+        // synced -> moved, moved -> moved, dirty stays dirty, new stays new
+        commitState: prev.commitState === 'synced' ? 'moved' : prev.commitState,
         object: { ...prev.object, ...patch },
       } as TrackedAnnotation,
     },
@@ -366,6 +394,20 @@ export const reducer: Reducer<AnnotationState, AnnotationAction> = (state, actio
       };
     }
 
+    case MOVE_ANNOTATION: {
+      const { documentId, id, patch } = action.payload;
+      const docState = state.documents[documentId];
+      if (!docState) return state;
+
+      return {
+        ...state,
+        documents: {
+          ...state.documents,
+          [documentId]: moveAnno(docState, id, patch),
+        },
+      };
+    }
+
     case COMMIT_PENDING_CHANGES: {
       const { documentId, committedUids } = action.payload;
       const docState = state.documents[documentId];
@@ -377,11 +419,14 @@ export const reducer: Reducer<AnnotationState, AnnotationAction> = (state, actio
 
       for (const [uid, ta] of Object.entries(docState.byUid)) {
         if (committedSet.has(uid)) {
-          // This UID was committed - mark as synced
+          // This UID was committed - mark as synced, clear dictMode
           cleaned[uid] = {
             ...ta,
             commitState:
-              ta.commitState === 'dirty' || ta.commitState === 'new' ? 'synced' : ta.commitState,
+              ta.commitState === 'dirty' || ta.commitState === 'new' || ta.commitState === 'moved'
+                ? 'synced'
+                : ta.commitState,
+            dictMode: undefined,
           };
         } else {
           // This UID was not committed - keep its current state
@@ -389,6 +434,7 @@ export const reducer: Reducer<AnnotationState, AnnotationAction> = (state, actio
           if (
             ta.commitState === 'new' ||
             ta.commitState === 'dirty' ||
+            ta.commitState === 'moved' ||
             ta.commitState === 'deleted'
           ) {
             stillHasPending = true;

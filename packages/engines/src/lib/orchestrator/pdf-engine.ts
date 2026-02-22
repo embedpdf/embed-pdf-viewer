@@ -46,6 +46,7 @@ import {
   CompoundTask,
   ImageDataLike,
   IPdfiumExecutor,
+  AnnotationAppearanceMap,
 } from '@embedpdf/models';
 import { WorkerTaskQueue, Priority } from './task-queue';
 import type { ImageDataConverter } from '../converters/types';
@@ -369,6 +370,14 @@ export class PdfEngine<T = Blob> implements IPdfEngine<T> {
     );
   }
 
+  renderPageAnnotationsRaw(
+    doc: PdfDocumentObject,
+    page: PdfPageObject,
+    options?: PdfRenderPageAnnotationOptions,
+  ): PdfTask<AnnotationAppearanceMap> {
+    return this.executor.renderPageAnnotationsRaw(doc, page, options);
+  }
+
   /**
    * Helper to render and encode in two stages with priority queue
    */
@@ -471,10 +480,11 @@ export class PdfEngine<T = Blob> implements IPdfEngine<T> {
     doc: PdfDocumentObject,
     page: PdfPageObject,
     annotation: PdfAnnotationObject,
+    options?: { regenerateAppearance?: boolean },
   ): PdfTask<boolean> {
     return this.workerQueue.enqueue(
       {
-        execute: () => this.executor.updatePageAnnotation(doc, page, annotation),
+        execute: () => this.executor.updatePageAnnotation(doc, page, annotation, options),
         meta: { docId: doc.id, pageIndex: page.index, operation: 'updatePageAnnotation' },
       },
       { priority: Priority.MEDIUM },

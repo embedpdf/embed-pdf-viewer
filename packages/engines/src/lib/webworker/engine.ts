@@ -40,6 +40,7 @@ import {
   PdfPrintOptions,
   PdfBookmarkObject,
   PdfAddAttachmentParams,
+  AnnotationAppearanceMap,
   ImageDataLike,
 } from '@embedpdf/models';
 import { ExecuteRequest, Response, SpecificExecuteRequest } from './runner';
@@ -495,6 +496,25 @@ export class WebWorkerEngine implements PdfEngine {
     return task;
   }
 
+  renderPageAnnotationsRaw(
+    doc: PdfDocumentObject,
+    page: PdfPageObject,
+    options?: PdfRenderPageAnnotationOptions,
+  ) {
+    this.logger.debug(LOG_SOURCE, LOG_CATEGORY, 'renderPageAnnotationsRaw', doc, page, options);
+    const requestId = this.generateRequestId(doc.id);
+    const task = new WorkerTask<AnnotationAppearanceMap>(this.worker, requestId);
+
+    const request: ExecuteRequest = createRequest(requestId, 'renderPageAnnotationsRaw', [
+      doc,
+      page,
+      options,
+    ]);
+    this.proxy(task, request);
+
+    return task;
+  }
+
   /**
    * {@inheritDoc @embedpdf/models!PdfEngine.getAllAnnotations}
    *
@@ -569,6 +589,7 @@ export class WebWorkerEngine implements PdfEngine {
     doc: PdfDocumentObject,
     page: PdfPageObject,
     annotation: PdfAnnotationObject,
+    options?: { regenerateAppearance?: boolean },
   ) {
     this.logger.debug(LOG_SOURCE, LOG_CATEGORY, 'updatePageAnnotation', doc, page, annotation);
     const requestId = this.generateRequestId(doc.id);
@@ -578,6 +599,7 @@ export class WebWorkerEngine implements PdfEngine {
       doc,
       page,
       annotation,
+      options,
     ]);
     this.proxy(task, request);
 

@@ -114,6 +114,12 @@ import {
   PdfTrappedStatus,
   PdfStampFit,
   PdfAddAttachmentParams,
+  AnnotationAppearanceMap,
+  AnnotationAppearances,
+  AnnotationAppearanceImage,
+  AP_MODE_NORMAL,
+  AP_MODE_ROLLOVER,
+  AP_MODE_DOWN,
   PdfFontInfo,
   PdfTextRun,
   PdfPageTextRuns,
@@ -1103,6 +1109,7 @@ export class PdfiumNative implements IPdfiumExecutor {
     doc: PdfDocumentObject,
     page: PdfPageObject,
     annotation: PdfAnnotationObject,
+    options?: { regenerateAppearance?: boolean },
   ): PdfTask<boolean> {
     this.logger.debug(LOG_SOURCE, LOG_CATEGORY, 'updatePageAnnotation', doc, page, annotation);
     this.logger.perf(
@@ -1296,7 +1303,7 @@ export class PdfiumNative implements IPdfiumExecutor {
     }
 
     /* 4 ── regenerate appearance if payload was changed ───────────────────── */
-    if (ok) {
+    if (ok && options?.regenerateAppearance !== false) {
       if (annotation.blendMode !== undefined) {
         this.pdfiumModule.EPDFAnnot_GenerateAppearanceWithBlend(annotPtr, annotation.blendMode);
       } else {
@@ -4446,6 +4453,12 @@ export class PdfiumNative implements IPdfiumExecutor {
     // Post-process: reverse-rotate vertices for vertex types that have rotation metadata
     if (annotation) {
       annotation = this.reverseRotateAnnotationOnLoad(annotation);
+
+      // Populate available appearance stream modes bitmask
+      const apModes = this.pdfiumModule.EPDFAnnot_GetAvailableAppearanceModes(annotationPtr);
+      if (apModes) {
+        annotation.appearanceModes = apModes;
+      }
     }
 
     return annotation;
@@ -7788,6 +7801,194 @@ export class PdfiumNative implements IPdfiumExecutor {
     task.resolve(imageDataLike);
     this.memoryManager.free(heapPtr);
     return task;
+  }
+
+  /**
+   * Batch-render all annotation appearance streams for a page in one call.
+   * Returns a map of annotation ID -> rendered appearances (Normal/Rollover/Down).
+   * Skips annotations that have rotation + unrotatedRect (EmbedPDF-rotated)
+   * and annotations without any appearance stream.
+   *
+   * @public
+   */
+  renderPageAnnotationsRaw(
+    doc: PdfDocumentObject,
+    page: PdfPageObject,
+    options?: PdfRenderPageAnnotationOptions,
+  ): PdfTask<AnnotationAppearanceMap> {
+    const { scaleFactor = 1, rotation = Rotation.Degree0, dpr = 1 } = options ?? {};
+
+    this.logger.debug(LOG_SOURCE, LOG_CATEGORY, 'renderPageAnnotationsRaw', doc, page, options);
+    this.logger.perf(
+      LOG_SOURCE,
+      LOG_CATEGORY,
+      'RenderPageAnnotationsRaw',
+      'Begin',
+      `${doc.id}-${page.index}`,
+    );
+
+    const ctx = this.cache.getContext(doc.id);
+    if (!ctx) {
+      this.logger.perf(
+        LOG_SOURCE,
+        LOG_CATEGORY,
+        'RenderPageAnnotationsRaw',
+        'End',
+        `${doc.id}-${page.index}`,
+      );
+      return PdfTaskHelper.reject({
+        code: PdfErrorCode.DocNotOpen,
+        message: 'document does not open',
+      });
+    }
+
+    const pageCtx = ctx.acquirePage(page.index);
+    const result: AnnotationAppearanceMap = {};
+    const finalScale = Math.max(0.01, scaleFactor * dpr);
+    const annotCount = this.pdfiumModule.FPDFPage_GetAnnotCount(pageCtx.pagePtr);
+
+    for (let i = 0; i < annotCount; i++) {
+      const annotPtr = this.pdfiumModule.FPDFPage_GetAnnot(pageCtx.pagePtr, i);
+      if (!annotPtr) continue;
+
+      try {
+        // Read annotation NM (id)
+        const nm = this.getAnnotString(annotPtr, 'NM');
+        if (!nm) continue;
+
+        // Skip EmbedPDF-rotated annotations (have rotation + unrotatedRect)
+        const extRotation = this.getAnnotExtendedRotation(annotPtr);
+        if (extRotation !== 0) {
+          const unrotatedRaw = this.readAnnotUnrotatedRect(annotPtr);
+          if (unrotatedRaw) continue;
+        }
+
+        // Detect available AP modes
+        const apModes = this.pdfiumModule.EPDFAnnot_GetAvailableAppearanceModes(annotPtr);
+        if (!apModes) continue;
+
+        const appearances: AnnotationAppearances = {};
+
+        // Render each available mode
+        const modesToRender: Array<{
+          bit: number;
+          mode: AppearanceMode;
+          key: keyof AnnotationAppearances;
+        }> = [
+          { bit: AP_MODE_NORMAL, mode: AppearanceMode.Normal, key: 'normal' },
+          { bit: AP_MODE_ROLLOVER, mode: AppearanceMode.Rollover, key: 'rollover' },
+          { bit: AP_MODE_DOWN, mode: AppearanceMode.Down, key: 'down' },
+        ];
+
+        for (const { bit, mode, key } of modesToRender) {
+          if (!(apModes & bit)) continue;
+
+          const rendered = this.renderSingleAnnotAppearance(
+            doc,
+            page,
+            pageCtx,
+            annotPtr,
+            mode,
+            rotation,
+            finalScale,
+          );
+          if (rendered) {
+            appearances[key] = rendered;
+          }
+        }
+
+        if (appearances.normal || appearances.rollover || appearances.down) {
+          result[nm] = appearances;
+        }
+      } finally {
+        this.pdfiumModule.FPDFPage_CloseAnnot(annotPtr);
+      }
+    }
+
+    pageCtx.release();
+    this.logger.perf(
+      LOG_SOURCE,
+      LOG_CATEGORY,
+      'RenderPageAnnotationsRaw',
+      'End',
+      `${doc.id}-${page.index}`,
+    );
+
+    const task = new Task<AnnotationAppearanceMap, PdfErrorReason>();
+    task.resolve(result);
+    return task;
+  }
+
+  /**
+   * Render a single annotation's appearance for a given mode.
+   * Returns the image data and rect, or null on failure.
+   * @private
+   */
+  private renderSingleAnnotAppearance(
+    doc: PdfDocumentObject,
+    page: PdfPageObject,
+    pageCtx: PageContext,
+    annotPtr: number,
+    mode: AppearanceMode,
+    rotation: Rotation,
+    finalScale: number,
+  ): AnnotationAppearanceImage | null {
+    // Read rect using EPDFAnnot_GetRect (normalized) and convert to device coords
+    const pageRect = this.readPageAnnoRect(annotPtr);
+    const annotRect = this.convertPageRectToDeviceRect(doc, page, pageRect);
+
+    const rect = toIntRect(annotRect);
+    const devRect = toIntRect(transformRect(page.size, rect, rotation, finalScale));
+    const wDev = Math.max(1, devRect.size.width);
+    const hDev = Math.max(1, devRect.size.height);
+    const stride = wDev * 4;
+    const bytes = stride * hDev;
+
+    const heapPtr = this.memoryManager.malloc(bytes);
+    const bitmapPtr = this.pdfiumModule.FPDFBitmap_CreateEx(
+      wDev,
+      hDev,
+      BitmapFormat.Bitmap_BGRA,
+      heapPtr,
+      stride,
+    );
+    this.pdfiumModule.FPDFBitmap_FillRect(bitmapPtr, 0, 0, wDev, hDev, 0x00000000);
+
+    const M = buildUserToDeviceMatrix(rect, rotation, wDev, hDev);
+    const mPtr = this.memoryManager.malloc(6 * 4);
+    const mView = new Float32Array(this.pdfiumModule.pdfium.HEAPF32.buffer, mPtr, 6);
+    mView.set([M.a, M.b, M.c, M.d, M.e, M.f]);
+
+    const FLAGS = RenderFlag.REVERSE_BYTE_ORDER;
+    let ok = false;
+    try {
+      ok = !!this.pdfiumModule.EPDF_RenderAnnotBitmap(
+        bitmapPtr,
+        pageCtx.pagePtr,
+        annotPtr,
+        mode,
+        mPtr,
+        FLAGS,
+      );
+    } finally {
+      this.memoryManager.free(mPtr);
+      this.pdfiumModule.FPDFBitmap_Destroy(bitmapPtr);
+    }
+
+    if (!ok) {
+      this.memoryManager.free(heapPtr);
+      return null;
+    }
+
+    const data = this.pdfiumModule.pdfium.HEAPU8.subarray(heapPtr, heapPtr + bytes);
+    const imageData: ImageDataLike = {
+      data: new Uint8ClampedArray(data),
+      width: wDev,
+      height: hDev,
+    };
+    this.memoryManager.free(heapPtr);
+
+    return { data: imageData, rect: annotRect };
   }
 
   private renderRectEncoded(
