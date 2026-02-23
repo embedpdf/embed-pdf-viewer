@@ -68,7 +68,7 @@ export function Annotations(annotationsProps: AnnotationsProps) {
   const { register } = usePointerHandlers({ documentId, pageIndex });
   const [allSelectedIds, setAllSelectedIds] = useState<string[]>([]);
   const [editingId, setEditingId] = useState<string | null>(null);
-  const [appearanceMap, setAppearanceMap] = useState<AnnotationAppearanceMap>({});
+  const [appearanceMap, setAppearanceMap] = useState<AnnotationAppearanceMap<Blob>>({});
   const prevScaleRef = useRef<number>(scale);
 
   const annotationProvides = useMemo(
@@ -236,7 +236,7 @@ export function Annotations(annotationsProps: AnnotationsProps) {
   }, [annotationProvides, pageIndex, allSelectedIds]);
 
   const getAppearanceForAnnotation = useCallback(
-    (ta: TrackedAnnotation): AnnotationAppearances | null => {
+    (ta: TrackedAnnotation): AnnotationAppearances<Blob> | null => {
       if (ta.dictMode) return null;
       if (ta.object.rotation && ta.object.unrotatedRect) return null;
       const appearances = appearanceMap[ta.object.id];

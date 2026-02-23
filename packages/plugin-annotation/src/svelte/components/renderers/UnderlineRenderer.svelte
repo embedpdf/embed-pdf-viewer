@@ -3,7 +3,12 @@
   import type { AnnotationRendererProps } from '../../context/types';
   import Underline from '../text-markup/Underline.svelte';
 
-  let { currentObject, scale, onClick }: AnnotationRendererProps<PdfUnderlineAnnoObject> = $props();
+  let {
+    currentObject,
+    scale,
+    onClick,
+    appearanceActive,
+  }: AnnotationRendererProps<PdfUnderlineAnnoObject> = $props();
 </script>
 
-<Underline {...currentObject} {scale} {onClick} />
+<Underline {...currentObject} {scale} {onClick} {appearanceActive} />

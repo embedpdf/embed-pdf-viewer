@@ -10,8 +10,8 @@
       top: `${(rect ? b.origin.y - rect.origin.y : b.origin.y) * scale}px`,
       width: `${b.size.width * scale}px`,
       height: `${b.size.height * scale}px`,
-      background: resolvedColor,
-      opacity: opacity,
+      background: appearanceActive ? 'transparent' : resolvedColor,
+      opacity: appearanceActive ? undefined : opacity,
       pointerEvents: onClick ? 'auto' : 'none',
       cursor: onClick ? 'pointer' : 'default',
       zIndex: onClick ? 1 : undefined,
@@ -36,9 +36,12 @@ const props = withDefaults(
     rect?: Rect;
     scale: number;
     onClick?: (e: PointerEvent | TouchEvent) => void;
+    /** When true, AP image provides the visual; only render hit area */
+    appearanceActive?: boolean;
   }>(),
   {
     opacity: 0.5,
+    appearanceActive: false,
   },
 );
 

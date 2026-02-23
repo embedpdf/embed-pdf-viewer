@@ -209,7 +209,7 @@ const props = withDefaults(
     onDoubleClick?: (event: PointerEvent | MouseEvent | TouchEvent) => void;
     onSelect: (event: PointerEvent | MouseEvent | TouchEvent) => void;
     /** Pre-rendered appearance stream images for AP mode rendering */
-    appearance?: AnnotationAppearances | null;
+    appearance?: AnnotationAppearances<Blob> | null;
     zIndex?: number;
     /** @deprecated Use `selectionOutline.color` instead */
     selectionOutlineColor?: string;

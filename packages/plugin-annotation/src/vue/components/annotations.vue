@@ -145,7 +145,7 @@ const { register } = usePointerHandlers({
   pageIndex: props.pageIndex,
 });
 const editingId = ref<string | null>(null);
-const appearanceMap = shallowRef<AnnotationAppearanceMap>({});
+const appearanceMap = shallowRef<AnnotationAppearanceMap<Blob>>({});
 let prevScale = props.scale;
 
 const annotationProvides = computed(() =>
@@ -165,7 +165,7 @@ const resolveRenderer = (annotation: TrackedAnnotation): BoxedAnnotationRenderer
   return allRenderers.value.find((r) => r.matches(annotation.object)) ?? null;
 };
 
-const getAppearanceForAnnotation = (ta: TrackedAnnotation): AnnotationAppearances | null => {
+const getAppearanceForAnnotation = (ta: TrackedAnnotation): AnnotationAppearances<Blob> | null => {
   if (ta.dictMode) return null;
   if (ta.object.rotation && ta.object.unrotatedRect) return null;
   const appearances = appearanceMap.value[ta.object.id];
@@ -439,7 +439,7 @@ const getContainerStyle = (
 const getAppearance = (
   annotation: TrackedAnnotation,
   renderer: BoxedAnnotationRenderer,
-): AnnotationAppearances | null | undefined => {
+): AnnotationAppearances<Blob> | null | undefined => {
   const tool = annotationProvides.value?.findToolForAnnotation(annotation.object);
   const useAP = tool?.behavior?.useAppearanceStream ?? renderer.useAppearanceStream ?? true;
   return useAP ? getAppearanceForAnnotation(annotation) : undefined;

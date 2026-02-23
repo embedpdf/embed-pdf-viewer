@@ -10,6 +10,8 @@ type StrikeoutProps = {
   scale: number;
   onClick?: (e: MouseEvent<HTMLDivElement> | TouchEvent<HTMLDivElement>) => void;
   style?: CSSProperties;
+  /** When true, AP image provides the visual; only render hit area */
+  appearanceActive?: boolean;
 };
 
 export function Strikeout({
@@ -20,6 +22,7 @@ export function Strikeout({
   scale,
   onClick,
   style,
+  appearanceActive = false,
 }: StrikeoutProps) {
   const resolvedColor = strokeColor ?? '#FFFF00';
   const thickness = 2 * scale;
@@ -44,20 +47,22 @@ export function Strikeout({
             ...style,
           }}
         >
-          {/* Visual strikeout line */}
-          <div
-            style={{
-              position: 'absolute',
-              left: 0,
-              top: '50%',
-              width: '100%',
-              height: thickness,
-              background: resolvedColor,
-              opacity: opacity,
-              transform: 'translateY(-50%)',
-              pointerEvents: 'none',
-            }}
-          />
+          {/* Visual -- hidden when AP active, never interactive */}
+          {!appearanceActive && (
+            <div
+              style={{
+                position: 'absolute',
+                left: 0,
+                top: '50%',
+                width: '100%',
+                height: thickness,
+                background: resolvedColor,
+                opacity: opacity,
+                transform: 'translateY(-50%)',
+                pointerEvents: 'none',
+              }}
+            />
+          )}
         </div>
       ))}
     </>

@@ -3,7 +3,12 @@
   import type { AnnotationRendererProps } from '../../context/types';
   import Squiggly from '../text-markup/Squiggly.svelte';
 
-  let { currentObject, scale, onClick }: AnnotationRendererProps<PdfSquigglyAnnoObject> = $props();
+  let {
+    currentObject,
+    scale,
+    onClick,
+    appearanceActive,
+  }: AnnotationRendererProps<PdfSquigglyAnnoObject> = $props();
 </script>
 
-<Squiggly {...currentObject} {scale} {onClick} />
+<Squiggly {...currentObject} {scale} {onClick} {appearanceActive} />

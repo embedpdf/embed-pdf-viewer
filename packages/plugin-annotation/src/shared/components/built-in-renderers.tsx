@@ -156,8 +156,13 @@ export const builtInRenderers: BoxedAnnotationRenderer[] = [
   createRenderer<PdfHighlightAnnoObject>({
     id: 'highlight',
     matches: (a): a is PdfHighlightAnnoObject => a.type === PdfAnnotationSubtype.HIGHLIGHT,
-    render: ({ currentObject, scale, onClick }) => (
-      <Highlight {...currentObject} scale={scale} onClick={onClick} />
+    render: ({ currentObject, scale, onClick, appearanceActive }) => (
+      <Highlight
+        {...currentObject}
+        scale={scale}
+        onClick={onClick}
+        appearanceActive={appearanceActive}
+      />
     ),
     zIndex: 0,
     interactionDefaults: { isDraggable: false, isResizable: false, isRotatable: false },
@@ -169,8 +174,13 @@ export const builtInRenderers: BoxedAnnotationRenderer[] = [
   createRenderer<PdfUnderlineAnnoObject>({
     id: 'underline',
     matches: (a): a is PdfUnderlineAnnoObject => a.type === PdfAnnotationSubtype.UNDERLINE,
-    render: ({ currentObject, scale, onClick }) => (
-      <Underline {...currentObject} scale={scale} onClick={onClick} />
+    render: ({ currentObject, scale, onClick, appearanceActive }) => (
+      <Underline
+        {...currentObject}
+        scale={scale}
+        onClick={onClick}
+        appearanceActive={appearanceActive}
+      />
     ),
     zIndex: 0,
     interactionDefaults: { isDraggable: false, isResizable: false, isRotatable: false },
@@ -179,8 +189,13 @@ export const builtInRenderers: BoxedAnnotationRenderer[] = [
   createRenderer<PdfStrikeOutAnnoObject>({
     id: 'strikeout',
     matches: (a): a is PdfStrikeOutAnnoObject => a.type === PdfAnnotationSubtype.STRIKEOUT,
-    render: ({ currentObject, scale, onClick }) => (
-      <Strikeout {...currentObject} scale={scale} onClick={onClick} />
+    render: ({ currentObject, scale, onClick, appearanceActive }) => (
+      <Strikeout
+        {...currentObject}
+        scale={scale}
+        onClick={onClick}
+        appearanceActive={appearanceActive}
+      />
     ),
     zIndex: 0,
     interactionDefaults: { isDraggable: false, isResizable: false, isRotatable: false },
@@ -189,8 +204,13 @@ export const builtInRenderers: BoxedAnnotationRenderer[] = [
   createRenderer<PdfSquigglyAnnoObject>({
     id: 'squiggly',
     matches: (a): a is PdfSquigglyAnnoObject => a.type === PdfAnnotationSubtype.SQUIGGLY,
-    render: ({ currentObject, scale, onClick }) => (
-      <Squiggly {...currentObject} scale={scale} onClick={onClick} />
+    render: ({ currentObject, scale, onClick, appearanceActive }) => (
+      <Squiggly
+        {...currentObject}
+        scale={scale}
+        onClick={onClick}
+        appearanceActive={appearanceActive}
+      />
     ),
     zIndex: 0,
     interactionDefaults: { isDraggable: false, isResizable: false, isRotatable: false },

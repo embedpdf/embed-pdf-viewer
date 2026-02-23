@@ -439,8 +439,8 @@ export const AP_MODE_DOWN = 4; // bit 2
  * A rendered appearance stream image for a single mode of an annotation.
  * @public
  */
-export interface AnnotationAppearanceImage {
-  data: ImageDataLike;
+export interface AnnotationAppearanceImage<TImage = ImageDataLike> {
+  data: TImage;
   rect: Rect;
 }
 
@@ -449,17 +449,20 @@ export interface AnnotationAppearanceImage {
  * keyed by mode (normal, rollover, down).
  * @public
  */
-export interface AnnotationAppearances {
-  normal?: AnnotationAppearanceImage;
-  rollover?: AnnotationAppearanceImage;
-  down?: AnnotationAppearanceImage;
+export interface AnnotationAppearances<TImage = ImageDataLike> {
+  normal?: AnnotationAppearanceImage<TImage>;
+  rollover?: AnnotationAppearanceImage<TImage>;
+  down?: AnnotationAppearanceImage<TImage>;
 }
 
 /**
  * Map of annotation ID to its rendered appearance stream images.
  * @public
  */
-export type AnnotationAppearanceMap = Record<string, AnnotationAppearances>;
+export type AnnotationAppearanceMap<TImage = ImageDataLike> = Record<
+  string,
+  AnnotationAppearances<TImage>
+>;
 
 /**
  * Representation of pdf action
@@ -3218,6 +3221,19 @@ export interface PdfEngine<T = Blob> {
     options?: PdfRenderPageAnnotationOptions,
   ): PdfTask<T>;
   /**
+   * Batch-render all annotation appearance streams for a page and encode
+   * each rendered image to the output type of this engine.
+   * Returns a map of annotation ID to rendered appearances (Normal/Rollover/Down).
+   * @param doc - pdf document
+   * @param page - pdf page
+   * @param options - render options
+   */
+  renderPageAnnotations(
+    doc: PdfDocumentObject,
+    page: PdfPageObject,
+    options?: PdfRenderPageAnnotationOptions,
+  ): PdfTask<AnnotationAppearanceMap<T>>;
+  /**
    * Batch-render all annotation appearance streams for a page.
    * Returns a map of annotation ID to rendered appearances (Normal/Rollover/Down).
    * Skips EmbedPDF-rotated annotations and annotations without appearance streams.
@@ -3229,7 +3245,7 @@ export interface PdfEngine<T = Blob> {
     doc: PdfDocumentObject,
     page: PdfPageObject,
     options?: PdfRenderPageAnnotationOptions,
-  ): PdfTask<AnnotationAppearanceMap>;
+  ): PdfTask<AnnotationAppearanceMap<ImageDataLike>>;
   /**
    * Get annotations of pdf page
    * @param doc - pdf document
@@ -3604,7 +3620,7 @@ export interface IPdfiumExecutor {
     doc: PdfDocumentObject,
     page: PdfPageObject,
     options?: PdfRenderPageAnnotationOptions,
-  ): PdfTask<AnnotationAppearanceMap>;
+  ): PdfTask<AnnotationAppearanceMap<ImageDataLike>>;
 
   // Single page operations
   getPageAnnotationsRaw(

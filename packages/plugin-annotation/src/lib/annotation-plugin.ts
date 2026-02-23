@@ -148,8 +148,8 @@ export class AnnotationPlugin extends BasePlugin<
   private readonly toolsChange$ = createBehaviorEmitter<AnnotationToolsChangeEvent>();
   private readonly patchRegistry = new PatchRegistry();
 
-  // Appearance stream cache: documentId -> pageIndex -> AnnotationAppearanceMap
-  private readonly appearanceCache = new Map<string, Map<number, AnnotationAppearanceMap>>();
+  // Appearance stream cache: documentId -> pageIndex -> AnnotationAppearanceMap<Blob>
+  private readonly appearanceCache = new Map<string, Map<number, AnnotationAppearanceMap<Blob>>>();
 
   // Unified drag coordination (per-document)
   private readonly unifiedDragStates = new Map<string, UnifiedDragState>();
@@ -721,7 +721,7 @@ export class AnnotationPlugin extends BasePlugin<
     pageIndex: number,
     options?: PdfRenderPageAnnotationOptions,
     documentId?: string,
-  ): Task<AnnotationAppearanceMap, PdfErrorReason> {
+  ): Task<AnnotationAppearanceMap<Blob>, PdfErrorReason> {
     const id = documentId ?? this.getActiveDocumentId();
     const docState = this.getCoreDocument(id);
     const doc = docState?.document;
@@ -744,13 +744,13 @@ export class AnnotationPlugin extends BasePlugin<
 
     const cached = docCache.get(pageIndex);
     if (cached && !options) {
-      const task = new Task<AnnotationAppearanceMap, PdfErrorReason>();
+      const task = new Task<AnnotationAppearanceMap<Blob>, PdfErrorReason>();
       task.resolve(cached);
       return task;
     }
 
-    const engineTask = this.engine.renderPageAnnotationsRaw(doc, page, options);
-    const resultTask = new Task<AnnotationAppearanceMap, PdfErrorReason>();
+    const engineTask = this.engine.renderPageAnnotations(doc, page, options);
+    const resultTask = new Task<AnnotationAppearanceMap<Blob>, PdfErrorReason>();
 
     engineTask.wait(
       (result) => {

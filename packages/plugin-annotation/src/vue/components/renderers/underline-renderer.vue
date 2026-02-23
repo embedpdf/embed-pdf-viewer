@@ -1,5 +1,10 @@
 <template>
-  <UnderlineVue v-bind="currentObject" :scale="scale" :onClick="onClick" />
+  <UnderlineVue
+    v-bind="currentObject"
+    :scale="scale"
+    :onClick="onClick"
+    :appearanceActive="appearanceActive"
+  />
 </template>
 
 <script setup lang="ts">
@@ -7,6 +12,6 @@ import { PdfUnderlineAnnoObject } from '@embedpdf/models';
 import { AnnotationRendererProps } from '../../context/types';
 import UnderlineVue from '../text-markup/underline.vue';
 
-const { currentObject, scale, onClick } =
+const { currentObject, scale, onClick, appearanceActive } =
   defineProps<AnnotationRendererProps<PdfUnderlineAnnoObject>>();
 </script>

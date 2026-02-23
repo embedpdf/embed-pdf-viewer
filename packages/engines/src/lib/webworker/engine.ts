@@ -496,6 +496,25 @@ export class WebWorkerEngine implements PdfEngine {
     return task;
   }
 
+  renderPageAnnotations(
+    doc: PdfDocumentObject,
+    page: PdfPageObject,
+    options?: PdfRenderPageAnnotationOptions,
+  ) {
+    this.logger.debug(LOG_SOURCE, LOG_CATEGORY, 'renderPageAnnotations', doc, page, options);
+    const requestId = this.generateRequestId(doc.id);
+    const task = new WorkerTask<AnnotationAppearanceMap<Blob>>(this.worker, requestId);
+
+    const request: ExecuteRequest = createRequest(requestId, 'renderPageAnnotations', [
+      doc,
+      page,
+      options,
+    ]);
+    this.proxy(task, request);
+
+    return task;
+  }
+
   renderPageAnnotationsRaw(
     doc: PdfDocumentObject,
     page: PdfPageObject,
@@ -503,7 +522,7 @@ export class WebWorkerEngine implements PdfEngine {
   ) {
     this.logger.debug(LOG_SOURCE, LOG_CATEGORY, 'renderPageAnnotationsRaw', doc, page, options);
     const requestId = this.generateRequestId(doc.id);
-    const task = new WorkerTask<AnnotationAppearanceMap>(this.worker, requestId);
+    const task = new WorkerTask<AnnotationAppearanceMap<ImageDataLike>>(this.worker, requestId);
 
     const request: ExecuteRequest = createRequest(requestId, 'renderPageAnnotationsRaw', [
       doc,

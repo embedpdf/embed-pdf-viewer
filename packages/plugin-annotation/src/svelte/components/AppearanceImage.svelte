@@ -1,32 +1,44 @@
 <script lang="ts">
-  import type { AnnotationAppearanceImage } from '@embedpdf/models';
+  import { type AnnotationAppearanceImage } from '@embedpdf/models';
 
   interface Props {
-    appearance: AnnotationAppearanceImage;
+    appearance: AnnotationAppearanceImage<Blob>;
     style?: string;
   }
 
   let { appearance, style }: Props = $props();
 
-  let canvas: HTMLCanvasElement;
+  let imageUrl = $state<string | null>(null);
+  let currentUrl: string | null = null;
 
   $effect(() => {
-    if (!canvas) return;
+    const url = URL.createObjectURL(appearance.data);
+    imageUrl = url;
+    currentUrl = url;
 
-    const { data } = appearance;
-    canvas.width = data.width;
-    canvas.height = data.height;
-
-    const ctx = canvas.getContext('2d');
-    if (!ctx) return;
-
-    const imageData = new ImageData(data.data, data.width, data.height);
-    ctx.putImageData(imageData, 0, 0);
+    return () => {
+      if (currentUrl) {
+        URL.revokeObjectURL(currentUrl);
+        currentUrl = null;
+      }
+    };
   });
+
+  function handleLoad() {
+    if (currentUrl) {
+      URL.revokeObjectURL(currentUrl);
+      currentUrl = null;
+    }
+  }
 </script>
 
-<canvas
-  bind:this={canvas}
-  style="position: absolute; width: 100%; height: 100%; display: block; pointer-events: none; {style ??
-    ''}"
-></canvas>
+{#if imageUrl}
+  <img
+    src={imageUrl}
+    alt=""
+    draggable="false"
+    onload={handleLoad}
+    style="position: absolute; width: 100%; height: 100%; display: block; pointer-events: none; user-select: none; {style ??
+      ''}"
+  />
+{/if}

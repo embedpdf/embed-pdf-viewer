@@ -42,7 +42,7 @@ export interface AnnotationContainerProps<T extends PdfAnnotationObject> {
   onDoubleClick?: (event: any) => void;
   onSelect: (event: any) => void;
   /** Pre-rendered appearance stream images for AP mode rendering */
-  appearance?: AnnotationAppearances | null;
+  appearance?: AnnotationAppearances<Blob> | null;
   zIndex?: number;
   resizeUI?: ResizeHandleUI;
   vertexUI?: VertexHandleUI;

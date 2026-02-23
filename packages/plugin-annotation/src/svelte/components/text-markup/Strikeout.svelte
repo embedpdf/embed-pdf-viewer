@@ -10,6 +10,8 @@
     scale: number;
     onClick?: (e: MouseEvent | TouchEvent) => void;
     style?: Record<string, string | number | undefined>;
+    /** When true, AP image provides the visual; only render hit area */
+    appearanceActive?: boolean;
   }
 
   let {
@@ -20,6 +22,7 @@
     scale,
     onClick,
     style,
+    appearanceActive = false,
   }: StrikeoutProps = $props();
 
   const resolvedColor = $derived(strokeColor ?? '#FFFF00');
@@ -43,17 +46,19 @@
     style:z-index={onClick ? 1 : 0}
     {...style ? Object.fromEntries(Object.entries(style).map(([k, v]) => [`style:${k}`, v])) : {}}
   >
-    <!-- Visual strikeout line -->
-    <div
-      style:position="absolute"
-      style:left="0"
-      style:top="50%"
-      style:width="100%"
-      style:height="{thickness}px"
-      style:background={resolvedColor}
-      style:opacity
-      style:transform="translateY(-50%)"
-      style:pointer-events="none"
-    ></div>
+    <!-- Visual -- hidden when AP active, never interactive -->
+    {#if !appearanceActive}
+      <div
+        style:position="absolute"
+        style:left="0"
+        style:top="50%"
+        style:width="100%"
+        style:height="{thickness}px"
+        style:background={resolvedColor}
+        style:opacity
+        style:transform="translateY(-50%)"
+        style:pointer-events="none"
+      ></div>
+    {/if}
   </div>
 {/each}

@@ -10,6 +10,8 @@
     scale: number;
     onClick?: (e: MouseEvent | TouchEvent) => void;
     style?: Record<string, string | number | undefined>;
+    /** When true, AP image provides the visual; only render hit area */
+    appearanceActive?: boolean;
   }
 
   let {
@@ -20,6 +22,7 @@
     scale,
     onClick,
     style,
+    appearanceActive = false,
   }: HighlightProps = $props();
 
   const resolvedColor = $derived(strokeColor ?? '#FFFF00');
@@ -36,8 +39,8 @@
     style:top="{(rect ? b.origin.y - rect.origin.y : b.origin.y) * scale}px"
     style:width="{b.size.width * scale}px"
     style:height="{b.size.height * scale}px"
-    style:background={resolvedColor}
-    style:opacity
+    style:background={appearanceActive ? 'transparent' : resolvedColor}
+    style:opacity={appearanceActive ? undefined : opacity}
     style:pointer-events={onClick ? 'auto' : 'none'}
     style:cursor={onClick ? 'pointer' : 'default'}
     style:z-index={onClick ? 1 : undefined}

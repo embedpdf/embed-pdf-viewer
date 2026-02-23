@@ -80,7 +80,7 @@
   let annotations = $state<TrackedAnnotation[]>([]);
   let allSelectedIds = $state<string[]>([]);
   let editingId = $state<string | null>(null);
-  let appearanceMap = $state<AnnotationAppearanceMap>({});
+  let appearanceMap = $state<AnnotationAppearanceMap<Blob>>({});
   let prevScale: number = annotationsProps.scale;
 
   const annotationProvides = $derived(
@@ -102,7 +102,7 @@
     return allRenderers.find((r) => r.matches(annotation.object)) ?? null;
   }
 
-  function getAppearanceForAnnotation(ta: TrackedAnnotation): AnnotationAppearances | null {
+  function getAppearanceForAnnotation(ta: TrackedAnnotation): AnnotationAppearances<Blob> | null {
     if (ta.dictMode) return null;
     if (ta.object.rotation && ta.object.unrotatedRect) return null;
     const appearances = appearanceMap[ta.object.id];

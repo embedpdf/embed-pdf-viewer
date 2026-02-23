@@ -1,45 +1,52 @@
-import { useEffect, useRef, CSSProperties } from '@framework';
-import { AnnotationAppearanceImage } from '@embedpdf/models';
+import type { AnnotationAppearanceImage } from '@embedpdf/models';
+import { useEffect, useRef, useState, CSSProperties } from '@framework';
 
 interface AppearanceImageProps {
-  appearance: AnnotationAppearanceImage;
+  appearance: AnnotationAppearanceImage<Blob>;
   style?: CSSProperties;
 }
 
 /**
- * Renders a pre-rendered annotation appearance stream image using a canvas.
- * The ImageDataLike data is drawn once and the canvas is sized to fill its container.
+ * Renders a pre-rendered annotation appearance stream image as an img URL.
  * Purely visual -- pointer events are always disabled; hit-area SVG handles interaction.
  */
 export function AppearanceImage({ appearance, style }: AppearanceImageProps) {
-  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const [imageUrl, setImageUrl] = useState<string | null>(null);
+  const urlRef = useRef<string | null>(null);
 
   useEffect(() => {
-    const canvas = canvasRef.current;
-    if (!canvas) return;
+    const url = URL.createObjectURL(appearance.data);
+    setImageUrl(url);
+    urlRef.current = url;
 
-    const { data } = appearance;
-    canvas.width = data.width;
-    canvas.height = data.height;
+    return () => {
+      if (urlRef.current) {
+        URL.revokeObjectURL(urlRef.current);
+        urlRef.current = null;
+      }
+    };
+  }, [appearance.data]);
 
-    const ctx = canvas.getContext('2d');
-    if (!ctx) return;
+  const handleImageLoad = () => {
+    if (urlRef.current) {
+      URL.revokeObjectURL(urlRef.current);
+      urlRef.current = null;
+    }
+  };
 
-    const imageData = new ImageData(data.data, data.width, data.height);
-    ctx.putImageData(imageData, 0, 0);
-  }, [appearance]);
-
-  return (
-    <canvas
-      ref={canvasRef}
+  return imageUrl ? (
+    <img
+      src={imageUrl}
+      onLoad={handleImageLoad}
       style={{
         position: 'absolute',
         width: '100%',
         height: '100%',
         display: 'block',
         pointerEvents: 'none',
+        userSelect: 'none',
         ...style,
       }}
     />
-  );
+  ) : null;
 }

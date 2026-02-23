@@ -16,7 +16,9 @@
       zIndex: onClick ? 1 : 0,
     }"
   >
+    <!-- Visual -- hidden when AP active, never interactive -->
     <div
+      v-if="!appearanceActive"
       :style="{
         position: 'absolute',
         left: 0,
@@ -50,9 +52,12 @@ const props = withDefaults(
     rect?: Rect;
     scale: number;
     onClick?: (e: PointerEvent | TouchEvent) => void;
+    /** When true, AP image provides the visual; only render hit area */
+    appearanceActive?: boolean;
   }>(),
   {
     opacity: 0.5,
+    appearanceActive: false,
   },
 );
 

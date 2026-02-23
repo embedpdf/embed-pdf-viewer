@@ -268,7 +268,7 @@ export interface AnnotationScope {
   getPageAppearances(
     pageIndex: number,
     options?: PdfRenderPageAnnotationOptions,
-  ): Task<AnnotationAppearanceMap, PdfErrorReason>;
+  ): Task<AnnotationAppearanceMap<Blob>, PdfErrorReason>;
   /** Clear cached appearance images for a page (e.g. on zoom change) */
   invalidatePageAppearances(pageIndex: number): void;
   commit(): Task<boolean, PdfErrorReason>;
@@ -360,7 +360,7 @@ export interface AnnotationCapability {
     pageIndex: number,
     options?: PdfRenderPageAnnotationOptions,
     documentId?: string,
-  ) => Task<AnnotationAppearanceMap, PdfErrorReason>;
+  ) => Task<AnnotationAppearanceMap<Blob>, PdfErrorReason>;
   /** Clear cached appearance images for a page (e.g. on zoom change) */
   invalidatePageAppearances: (pageIndex: number, documentId?: string) => void;
   commit: () => Task<boolean, PdfErrorReason>;

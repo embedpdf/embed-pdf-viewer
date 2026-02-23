@@ -1,12 +1,17 @@
 <template>
-  <canvas
-    ref="canvasRef"
+  <img
+    v-if="imageUrl"
+    :src="imageUrl"
+    alt=""
+    draggable="false"
+    @load="handleImageLoad"
     :style="{
       position: 'absolute',
       width: '100%',
       height: '100%',
       display: 'block',
       pointerEvents: 'none',
+      userSelect: 'none',
       ...style,
     }"
   />
@@ -17,24 +22,30 @@ import { ref, watchEffect, type CSSProperties } from 'vue';
 import type { AnnotationAppearanceImage } from '@embedpdf/models';
 
 const props = defineProps<{
-  appearance: AnnotationAppearanceImage;
+  appearance: AnnotationAppearanceImage<Blob>;
   style?: CSSProperties;
 }>();
 
-const canvasRef = ref<HTMLCanvasElement>();
+const imageUrl = ref<string | null>(null);
+const urlRef = ref<string | null>(null);
 
-watchEffect(() => {
-  const canvas = canvasRef.value;
-  if (!canvas) return;
+watchEffect((onCleanup) => {
+  const url = URL.createObjectURL(props.appearance.data);
+  imageUrl.value = url;
+  urlRef.value = url;
 
-  const { data } = props.appearance;
-  canvas.width = data.width;
-  canvas.height = data.height;
-
-  const ctx = canvas.getContext('2d');
-  if (!ctx) return;
-
-  const imageData = new ImageData(data.data, data.width, data.height);
-  ctx.putImageData(imageData, 0, 0);
+  onCleanup(() => {
+    if (urlRef.value) {
+      URL.revokeObjectURL(urlRef.value);
+      urlRef.value = null;
+    }
+  });
 });
+
+const handleImageLoad = () => {
+  if (urlRef.value) {
+    URL.revokeObjectURL(urlRef.value);
+    urlRef.value = null;
+  }
+};
 </script>
