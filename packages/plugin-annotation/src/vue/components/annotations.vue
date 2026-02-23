@@ -1,27 +1,27 @@
 <template>
-  <template v-for="annotation in annotations" :key="annotation.object.id">
-    <template v-if="resolveRenderer(annotation)">
+  <template v-for="{ annotation, renderer } in resolvedAnnotations" :key="annotation.object.id">
+    <template v-if="renderer">
       <AnnotationContainer
         :trackedAnnotation="annotation"
         :isSelected="allSelectedIds.includes(annotation.object.id)"
         :isEditing="editingId === annotation.object.id"
         :isMultiSelected="isMultiSelected"
-        :isDraggable="getFinalDraggable(annotation)"
-        :isResizable="getResolvedResizable(annotation)"
-        :lockAspectRatio="getResolvedLockAspectRatio(annotation)"
-        :isRotatable="getResolvedRotatable(annotation)"
-        :vertexConfig="resolveRenderer(annotation)!.vertexConfig"
-        :selectionMenu="getSelectionMenu(annotation, resolveRenderer(annotation)!)"
-        :onSelect="getOnSelect(annotation, resolveRenderer(annotation)!)"
-        :onDoubleClick="getOnDoubleClick(resolveRenderer(annotation)!, annotation)"
-        :zIndex="resolveRenderer(annotation)!.zIndex"
-        :style="getContainerStyle(annotation, resolveRenderer(annotation)!)"
-        :appearance="getAppearance(annotation, resolveRenderer(annotation)!)"
+        :isDraggable="getFinalDraggable(annotation, renderer)"
+        :isResizable="getResolvedResizable(annotation, renderer)"
+        :lockAspectRatio="getResolvedLockAspectRatio(annotation, renderer)"
+        :isRotatable="getResolvedRotatable(annotation, renderer)"
+        :vertexConfig="renderer.vertexConfig"
+        :selectionMenu="getSelectionMenu(annotation, renderer)"
+        :onSelect="getOnSelect(annotation, renderer)"
+        :onDoubleClick="getOnDoubleClick(renderer, annotation)"
+        :zIndex="renderer.zIndex"
+        :style="getContainerStyle(annotation, renderer)"
+        :appearance="getAppearance(annotation, renderer)"
         v-bind="containerProps"
       >
         <template #default="{ annotation: currentObject, appearanceActive }">
           <component
-            :is="resolveRenderer(annotation)!.component"
+            :is="renderer.component"
             :annotation="annotation"
             :currentObject="currentObject"
             :isSelected="allSelectedIds.includes(annotation.object.id)"
@@ -29,7 +29,7 @@
             :scale="scale"
             :pageIndex="pageIndex"
             :documentId="documentId"
-            :onClick="getOnSelect(annotation, resolveRenderer(annotation)!)"
+            :onClick="getOnSelect(annotation, renderer)"
             :appearanceActive="appearanceActive"
           />
         </template>
@@ -82,7 +82,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, watchEffect, type CSSProperties } from 'vue';
+import { ref, shallowRef, computed, watch, type CSSProperties } from 'vue';
 import {
   blendModeToCss,
   PdfAnnotationObject,
@@ -138,14 +138,14 @@ const props = defineProps<{
 
 const { provides: annotationCapability } = useAnnotationCapability();
 const { provides: selectionProvides } = useSelectionCapability();
-const annotations = ref<TrackedAnnotation[]>([]);
-const allSelectedIds = ref<string[]>([]);
+const annotations = shallowRef<TrackedAnnotation[]>([]);
+const allSelectedIds = shallowRef<string[]>([]);
 const { register } = usePointerHandlers({
   documentId: () => props.documentId,
   pageIndex: props.pageIndex,
 });
 const editingId = ref<string | null>(null);
-const appearanceMap = ref<AnnotationAppearanceMap>({});
+const appearanceMap = shallowRef<AnnotationAppearanceMap>({});
 let prevScale = props.scale;
 
 const annotationProvides = computed(() =>
@@ -173,39 +173,136 @@ const getAppearanceForAnnotation = (ta: TrackedAnnotation): AnnotationAppearance
   return appearances;
 };
 
-// Subscribe to annotation state
-watchEffect((onCleanup) => {
-  if (annotationProvides.value) {
-    const currentState = annotationProvides.value.getState();
-    annotations.value = getAnnotationsByPageIndex(currentState, props.pageIndex);
-    allSelectedIds.value = getSelectedAnnotationIds(currentState);
+// Subscribe to annotation state. Explicit watch dependencies avoid accidental
+// reactive tracking inside provider methods that can create update loops.
+watch(
+  [annotationProvides, () => props.pageIndex],
+  ([provides, pageIndex], _prev, onCleanup) => {
+    if (!provides) {
+      annotations.value = [];
+      allSelectedIds.value = [];
+      return;
+    }
 
-    const off = annotationProvides.value.onStateChange((state) => {
-      annotations.value = getAnnotationsByPageIndex(state, props.pageIndex);
+    const syncState = (state: ReturnType<typeof provides.getState>) => {
+      annotations.value = getAnnotationsByPageIndex(state, pageIndex);
       allSelectedIds.value = getSelectedAnnotationIds(state);
-    });
+    };
+
+    syncState(provides.getState());
+    const off = provides.onStateChange(syncState);
     onCleanup(off);
-  }
-});
+  },
+  { immediate: true },
+);
 
 // Fetch appearance map, invalidate on scale change
-watchEffect(() => {
-  if (!annotationProvides.value) return;
+watch(
+  [annotationProvides, () => props.pageIndex, () => props.scale],
+  ([provides, pageIndex, scale], _prev, onCleanup) => {
+    if (!provides) {
+      appearanceMap.value = {};
+      return;
+    }
 
-  if (prevScale !== props.scale) {
-    annotationProvides.value.invalidatePageAppearances(props.pageIndex);
-    prevScale = props.scale;
-  }
+    if (prevScale !== scale) {
+      provides.invalidatePageAppearances(pageIndex);
+      prevScale = scale;
+    }
 
-  const task = annotationProvides.value.getPageAppearances(props.pageIndex, {
-    scaleFactor: props.scale,
-    dpr: typeof window !== 'undefined' ? window.devicePixelRatio : 1,
-  });
-  task.wait(
-    (map) => (appearanceMap.value = map),
-    () => (appearanceMap.value = {}),
+    let cancelled = false;
+    onCleanup(() => {
+      cancelled = true;
+    });
+
+    const task = provides.getPageAppearances(pageIndex, {
+      scaleFactor: scale,
+      dpr: typeof window !== 'undefined' ? window.devicePixelRatio : 1,
+    });
+    task.wait(
+      (map) => {
+        if (!cancelled) appearanceMap.value = map;
+      },
+      () => {
+        if (!cancelled) appearanceMap.value = {};
+      },
+    );
+  },
+  { immediate: true },
+);
+
+const resolvedAnnotations = computed(() =>
+  annotations.value.map((annotation) => ({
+    annotation,
+    renderer: resolveRenderer(annotation),
+  })),
+);
+
+const getFinalDraggable = (annotation: TrackedAnnotation, renderer: BoxedAnnotationRenderer) => {
+  const tool = annotationProvides.value?.findToolForAnnotation(annotation.object);
+  const defaults = renderer.interactionDefaults;
+  const isEditing = editingId.value === annotation.object.id;
+  const resolvedDraggable = resolveInteractionProp(
+    tool?.interaction.isDraggable,
+    annotation.object,
+    defaults?.isDraggable ?? true,
   );
-});
+  return renderer.isDraggable
+    ? renderer.isDraggable(resolvedDraggable, { isEditing })
+    : resolvedDraggable;
+};
+
+const getResolvedResizable = (annotation: TrackedAnnotation, renderer: BoxedAnnotationRenderer) => {
+  const tool = annotationProvides.value?.findToolForAnnotation(annotation.object);
+  return resolveInteractionProp(
+    tool?.interaction.isResizable,
+    annotation.object,
+    renderer.interactionDefaults?.isResizable ?? false,
+  );
+};
+
+const getResolvedLockAspectRatio = (
+  annotation: TrackedAnnotation,
+  renderer: BoxedAnnotationRenderer,
+) => {
+  const tool = annotationProvides.value?.findToolForAnnotation(annotation.object);
+  return resolveInteractionProp(
+    tool?.interaction.lockAspectRatio,
+    annotation.object,
+    renderer.interactionDefaults?.lockAspectRatio ?? false,
+  );
+};
+
+const getResolvedRotatable = (annotation: TrackedAnnotation, renderer: BoxedAnnotationRenderer) => {
+  const tool = annotationProvides.value?.findToolForAnnotation(annotation.object);
+  return resolveInteractionProp(
+    tool?.interaction.isRotatable,
+    annotation.object,
+    renderer.interactionDefaults?.isRotatable ?? false,
+  );
+};
+
+const getSelectionMenu = (annotation: TrackedAnnotation, renderer: BoxedAnnotationRenderer) => {
+  if (renderer.hideSelectionMenu?.(annotation.object)) return undefined;
+  if (isMultiSelected.value) return undefined;
+  return props.selectionMenu;
+};
+
+const getOnSelect = (annotation: TrackedAnnotation, renderer: BoxedAnnotationRenderer) => {
+  if (renderer.selectOverride) {
+    const selectHelpers: SelectOverrideHelpers = {
+      defaultSelect: handleClick,
+      selectAnnotation: (pi: number, id: string) =>
+        annotationProvides.value?.selectAnnotation(pi, id),
+      clearSelection: () => selectionProvides.value?.clear(),
+      allAnnotations: annotations.value,
+      pageIndex: props.pageIndex,
+    };
+    return (e: AnnotationInteractionEvent) =>
+      renderer.selectOverride!(e, annotation, selectHelpers);
+  }
+  return (e: AnnotationInteractionEvent) => handleClick(e, annotation);
+};
 
 const handlePointerDown = (_pos: Position, pe: EmbedPdfPointerEvent<PointerEvent>) => {
   if (pe.target === pe.currentTarget && annotationProvides.value) {
@@ -237,14 +334,19 @@ const setEditingId = (id: string) => {
   editingId.value = id;
 };
 
-watchEffect((onCleanup) => {
-  if (annotationProvides.value) {
-    const unregister = register({ onPointerDown: handlePointerDown });
+const pointerHandlers = { onPointerDown: handlePointerDown };
+
+watch(
+  annotationProvides,
+  (provides, _prev, onCleanup) => {
+    if (!provides) return;
+    const unregister = register(pointerHandlers);
     if (unregister) {
       onCleanup(unregister);
     }
-  }
-});
+  },
+  { immediate: true },
+);
 
 const selectedAnnotationsOnPage = computed(() =>
   annotations.value.filter((anno) => allSelectedIds.value.includes(anno.object.id)),
@@ -314,77 +416,6 @@ const allSelectedOnSamePage = computed(() => {
 });
 
 // --- Renderer resolution helpers ---
-
-const getFinalDraggable = (annotation: TrackedAnnotation) => {
-  const renderer = resolveRenderer(annotation);
-  if (!renderer) return false;
-  const tool = annotationProvides.value?.findToolForAnnotation(annotation.object);
-  const defaults = renderer.interactionDefaults;
-  const isEditing = editingId.value === annotation.object.id;
-  const resolvedDraggable = resolveInteractionProp(
-    tool?.interaction.isDraggable,
-    annotation.object,
-    defaults?.isDraggable ?? true,
-  );
-  return renderer.isDraggable
-    ? renderer.isDraggable(resolvedDraggable, { isEditing })
-    : resolvedDraggable;
-};
-
-const getResolvedResizable = (annotation: TrackedAnnotation) => {
-  const renderer = resolveRenderer(annotation);
-  if (!renderer) return false;
-  const tool = annotationProvides.value?.findToolForAnnotation(annotation.object);
-  return resolveInteractionProp(
-    tool?.interaction.isResizable,
-    annotation.object,
-    renderer.interactionDefaults?.isResizable ?? false,
-  );
-};
-
-const getResolvedLockAspectRatio = (annotation: TrackedAnnotation) => {
-  const renderer = resolveRenderer(annotation);
-  if (!renderer) return false;
-  const tool = annotationProvides.value?.findToolForAnnotation(annotation.object);
-  return resolveInteractionProp(
-    tool?.interaction.lockAspectRatio,
-    annotation.object,
-    renderer.interactionDefaults?.lockAspectRatio ?? false,
-  );
-};
-
-const getResolvedRotatable = (annotation: TrackedAnnotation) => {
-  const renderer = resolveRenderer(annotation);
-  if (!renderer) return false;
-  const tool = annotationProvides.value?.findToolForAnnotation(annotation.object);
-  return resolveInteractionProp(
-    tool?.interaction.isRotatable,
-    annotation.object,
-    renderer.interactionDefaults?.isRotatable ?? false,
-  );
-};
-
-const getSelectionMenu = (annotation: TrackedAnnotation, renderer: BoxedAnnotationRenderer) => {
-  if (renderer.hideSelectionMenu?.(annotation.object)) return undefined;
-  if (isMultiSelected.value) return undefined;
-  return props.selectionMenu;
-};
-
-const getOnSelect = (annotation: TrackedAnnotation, renderer: BoxedAnnotationRenderer) => {
-  if (renderer.selectOverride) {
-    const selectHelpers: SelectOverrideHelpers = {
-      defaultSelect: handleClick,
-      selectAnnotation: (pi: number, id: string) =>
-        annotationProvides.value?.selectAnnotation(pi, id),
-      clearSelection: () => selectionProvides.value?.clear(),
-      allAnnotations: annotations.value,
-      pageIndex: props.pageIndex,
-    };
-    return (e: AnnotationInteractionEvent) =>
-      renderer.selectOverride!(e, annotation, selectHelpers);
-  }
-  return (e: AnnotationInteractionEvent) => handleClick(e, annotation);
-};
 
 const getOnDoubleClick = (renderer: BoxedAnnotationRenderer, annotation: TrackedAnnotation) => {
   if (!renderer.onDoubleClick) return undefined;
