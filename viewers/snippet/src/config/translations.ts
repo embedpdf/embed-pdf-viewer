@@ -2116,7 +2116,7 @@ export const swedishTranslations: Locale = {
       title: 'Dokumentdisposition',
       loading: 'Läser in disposition...',
       noOutline: 'Ingen disposition tillgänglig',
-      noBookmarks: "Det här dokumentet har inga bokmärken",
+      noBookmarks: 'Det här dokumentet har inga bokmärken',
     },
     page: {
       settings: 'Sidinställningar',

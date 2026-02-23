@@ -6,9 +6,18 @@ import {
   shallowRef,
   type InjectionKey,
   type ShallowRef,
+  type Component,
+  type CSSProperties,
 } from 'vue';
-import type { BoxedAnnotationRenderer, AnnotationRendererEntry } from './types';
+import type {
+  BoxedAnnotationRenderer,
+  AnnotationRendererEntry,
+  AnnotationRendererProps,
+  AnnotationInteractionEvent,
+  SelectOverrideHelpers,
+} from './types';
 import type { PdfAnnotationObject } from '@embedpdf/models';
+import type { VertexConfig } from '../../shared/types';
 
 /**
  * Annotation Renderer Registry
@@ -31,9 +40,7 @@ export function createRendererRegistry(): AnnotationRendererRegistry {
   return {
     register(entries: BoxedAnnotationRenderer[]) {
       const ids = new Set(entries.map((e) => e.id));
-      // Add new, replace existing by id
       renderers.value = [...renderers.value.filter((r) => !ids.has(r.id)), ...entries];
-      // Return cleanup function
       return () => {
         renderers.value = renderers.value.filter((r) => !entries.some((e) => e.id === r.id));
       };
@@ -77,10 +84,27 @@ export function createRenderer<T extends PdfAnnotationObject>(
     id: entry.id,
     matches: entry.matches,
     component: markRaw(entry.component) as Component<AnnotationRendererProps>,
+    vertexConfig: entry.vertexConfig as VertexConfig<PdfAnnotationObject> | undefined,
+    zIndex: entry.zIndex,
+    containerStyle: entry.containerStyle as
+      | ((annotation: PdfAnnotationObject) => CSSProperties)
+      | undefined,
+    interactionDefaults: entry.interactionDefaults,
+    useAppearanceStream: entry.useAppearanceStream,
+    isDraggable: entry.isDraggable,
+    onDoubleClick: entry.onDoubleClick,
+    selectOverride: entry.selectOverride as BoxedAnnotationRenderer['selectOverride'],
+    hideSelectionMenu: entry.hideSelectionMenu as
+      | ((annotation: PdfAnnotationObject) => boolean)
+      | undefined,
   };
 }
 
 // Re-export types for convenience
-import type { Component } from 'vue';
-import type { AnnotationRendererProps } from './types';
-export type { AnnotationRendererProps, AnnotationRendererEntry, BoxedAnnotationRenderer };
+export type {
+  AnnotationRendererProps,
+  AnnotationRendererEntry,
+  BoxedAnnotationRenderer,
+  AnnotationInteractionEvent,
+  SelectOverrideHelpers,
+};

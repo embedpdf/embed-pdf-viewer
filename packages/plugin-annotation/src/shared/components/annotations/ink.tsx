@@ -1,9 +1,7 @@
 import { useMemo, MouseEvent, TouchEvent } from '@framework';
 import { PdfInkListObject, Rect } from '@embedpdf/models';
 
-/* ---------------------------------------------------------------- *\
-|* Types                                                            *|
-\* ---------------------------------------------------------------- */
+const MIN_HIT_AREA_SCREEN_PX = 20;
 
 interface InkProps {
   /** Whether the annotation is selected */
@@ -22,6 +20,8 @@ interface InkProps {
   scale: number;
   /** Callback for when the annotation is clicked */
   onClick?: (e: MouseEvent<SVGPathElement> | TouchEvent<SVGPathElement>) => void;
+  /** When true, AP canvas provides the visual; only render hit area */
+  appearanceActive?: boolean;
 }
 
 /**
@@ -36,14 +36,14 @@ export function Ink({
   rect,
   scale,
   onClick,
+  appearanceActive = false,
 }: InkProps): JSX.Element {
   const resolvedColor = strokeColor ?? '#000000';
-  /* convert each stroke to an SVG <path d=""> string */
+
   const paths = useMemo(() => {
     return inkList.map(({ points }) => {
       let d = '';
       points.forEach(({ x, y }, i) => {
-        // localise to the annotation’s own bbox so viewBox can stay tidy
         const lx = x - rect.origin.x;
         const ly = y - rect.origin.y;
         d += (i === 0 ? 'M' : 'L') + lx + ' ' + ly + ' ';
@@ -52,9 +52,9 @@ export function Ink({
     });
   }, [inkList, rect]);
 
-  /* absolute placement + scaling just like your text-markup components */
   const width = rect.size.width * scale;
   const height = rect.size.height * scale;
+  const hitStrokeWidth = Math.max(strokeWidth, MIN_HIT_AREA_SCREEN_PX / scale);
 
   return (
     <svg
@@ -70,24 +70,41 @@ export function Ink({
       height={height}
       viewBox={`0 0 ${rect.size.width} ${rect.size.height}`}
     >
+      {/* Hit area -- always rendered, transparent, wider stroke for mobile */}
       {paths.map((d, i) => (
         <path
-          key={i}
+          key={`hit-${i}`}
           d={d}
           fill="none"
-          opacity={opacity}
+          stroke="transparent"
+          strokeWidth={hitStrokeWidth}
           onPointerDown={onClick}
           onTouchStart={onClick}
           style={{
             cursor: isSelected ? 'move' : 'pointer',
             pointerEvents: isSelected ? 'none' : 'visibleStroke',
-            stroke: resolvedColor,
-            strokeWidth: strokeWidth,
             strokeLinecap: 'round',
             strokeLinejoin: 'round',
           }}
         />
       ))}
+      {/* Visual -- hidden when AP active, never interactive */}
+      {!appearanceActive &&
+        paths.map((d, i) => (
+          <path
+            key={`vis-${i}`}
+            d={d}
+            fill="none"
+            opacity={opacity}
+            style={{
+              pointerEvents: 'none',
+              stroke: resolvedColor,
+              strokeWidth: strokeWidth,
+              strokeLinecap: 'round',
+              strokeLinejoin: 'round',
+            }}
+          />
+        ))}
     </svg>
   );
 }

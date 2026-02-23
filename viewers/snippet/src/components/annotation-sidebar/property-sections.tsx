@@ -117,7 +117,12 @@ function ColorSection({
       <SectionLabel className="mb-3">{translate(config.labelKey)}</SectionLabel>
       <div class="grid grid-cols-6 gap-x-1 gap-y-4">
         {colorPresets.map((c) => (
-          <ColorSwatch key={c} color={c} active={c === color} onSelect={handleChange} />
+          <ColorSwatch
+            key={c}
+            color={c}
+            active={c.toLowerCase() === color?.toLowerCase()}
+            onSelect={handleChange}
+          />
         ))}
         {allowTransparent && (
           <ColorSwatch
@@ -405,7 +410,12 @@ function FontColorSection({
       <SectionLabel className="mb-3">{translate(config.labelKey)}</SectionLabel>
       <div class="grid grid-cols-6 gap-x-1 gap-y-4">
         {colorPresets.map((c) => (
-          <ColorSwatch key={c} color={c} active={c === fontColor} onSelect={handleChange} />
+          <ColorSwatch
+            key={c}
+            color={c}
+            active={c.toLowerCase() === fontColor?.toLowerCase()}
+            onSelect={handleChange}
+          />
         ))}
       </div>
     </Section>
@@ -592,7 +602,7 @@ function RotationSection({ config, value, onChange, translate }: PropertySection
 
   const debRotation = useDebounce(rotation, 300);
   useEffect(() => {
-    if (debRotation !== value) {
+    if (debRotation !== (value ?? 0)) {
       onChange(debRotation);
     }
   }, [debRotation]);

@@ -10,6 +10,8 @@ type HighlightProps = {
   scale: number;
   onClick?: (e: MouseEvent<HTMLDivElement> | TouchEvent<HTMLDivElement>) => void;
   style?: CSSProperties;
+  /** When true, AP image provides the visual; only render hit area */
+  appearanceActive?: boolean;
 };
 
 export function Highlight({
@@ -20,6 +22,7 @@ export function Highlight({
   scale,
   onClick,
   style,
+  appearanceActive = false,
 }: HighlightProps) {
   const resolvedColor = strokeColor ?? '#FFFF00';
 
@@ -36,8 +39,8 @@ export function Highlight({
             top: (rect ? b.origin.y - rect.origin.y : b.origin.y) * scale,
             width: b.size.width * scale,
             height: b.size.height * scale,
-            background: resolvedColor,
-            opacity: opacity,
+            background: appearanceActive ? 'transparent' : resolvedColor,
+            opacity: appearanceActive ? undefined : opacity,
             pointerEvents: onClick ? 'auto' : 'none',
             cursor: onClick ? 'pointer' : 'default',
             zIndex: onClick ? 1 : undefined,

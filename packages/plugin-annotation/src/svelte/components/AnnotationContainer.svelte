@@ -15,6 +15,7 @@
   import { untrack } from 'svelte';
   import { type AnnotationSelectionContext, type AnnotationSelectionMenuProps } from '../types';
   import { inferRotationCenterFromRects } from '../../lib/geometry/rotation';
+  import AppearanceImage from './AppearanceImage.svelte';
 
   let {
     documentId,
@@ -26,6 +27,7 @@
     trackedAnnotation,
     children,
     isSelected,
+    isEditing = false,
     isMultiSelected = false,
     isDraggable,
     isResizable,
@@ -39,6 +41,7 @@
     outlineOffset = 1,
     onDoubleClick,
     onSelect,
+    appearance,
     zIndex = 1,
     resizeUI,
     vertexUI,
@@ -53,10 +56,11 @@
     ...restProps
   }: AnnotationContainerProps<T> = $props();
 
-  let preview = $state<T>(trackedAnnotation.object);
+  let preview = $state<T | null>(null);
   let liveRotation = $state<number | null>(null);
   let cursorScreen = $state<{ x: number; y: number } | null>(null);
   let isHandleHovered = $state(false);
+  let gestureActive = $state(false);
   let annotationCapability = useAnnotationCapability();
   const annotationPlugin = useAnnotationPlugin();
   const permissions = useDocumentPermissions(() => documentId);
@@ -163,6 +167,10 @@
   );
   const guideLength = $derived(Math.max(300, Math.max(aabbWidth, aabbHeight) + 80));
 
+  const apActive = $derived(
+    !!appearance?.normal && !gestureActive && !isEditing && !trackedAnnotation.dictMode,
+  );
+
   // For children, override rect to use unrotatedRect so content renders in unrotated space
   const childObject = $derived.by(() => {
     if (explicitUnrotatedRect) {
@@ -198,7 +206,7 @@
       const patch = event.previewPatches?.[id];
       if (event.type === 'update' && patch) {
         // Use untrack to prevent tracking the read of preview (like Vue's toRaw)
-        preview = { ...untrack(() => preview), ...patch } as T;
+        preview = { ...(untrack(() => preview) ?? trackedAnnotation.object), ...patch } as T;
       } else if (event.type === 'cancel') {
         preview = trackedAnnotation.object;
       }
@@ -242,10 +250,13 @@
 
         // Gesture start - initialize plugin drag/resize
         if (event.state === 'start') {
-          // Use unrotatedRect as gesture base so deltas are computed in unrotated space
           gestureBaseRectRef =
             (trackedAnnotation.object as any).unrotatedRect ?? trackedAnnotation.object.rect;
-          gestureBaseRef = trackedAnnotation.object; // For vertex edit
+          gestureBaseRef = trackedAnnotation.object;
+
+          if (type === 'resize' || type === 'vertex-edit') {
+            gestureActive = true;
+          }
 
           if (type === 'move') {
             plugin.startDrag(documentId, { annotationIds: [id], pageSize });
@@ -281,7 +292,7 @@
             metadata,
           });
           if (patched) {
-            preview = { ...preview, ...patched };
+            preview = { ...(preview ?? trackedAnnotation.object), ...patched };
             if (event.state === 'end') {
               const sanitized = deepToRaw(patched);
               annotationProvides?.updateAnnotation(pageIndex, id, sanitized);
@@ -314,6 +325,7 @@
 
         // Gesture end - commit
         if (event.state === 'end') {
+          gestureActive = false;
           gestureBaseRectRef = null;
           gestureBaseRef = null;
           if (type === 'move') plugin.commitDrag(documentId);
@@ -407,6 +419,7 @@
 </script>
 
 <div data-no-interaction>
+  <!-- svelte-ignore a11y_no_static_element_interactions -->
   <!-- Outer div: AABB container - stable center for help lines and rotation handle -->
   <div
     style:position="absolute"
@@ -569,7 +582,15 @@
           onSelect,
         })}
       {:else}
-        {@render children(childObject)}
+        {@render children(childObject, { appearanceActive: apActive })}
+      {/if}
+
+      <!-- AP overlay canvas (always in DOM, toggled via display) -->
+      {#if appearance?.normal}
+        <AppearanceImage
+          appearance={appearance.normal}
+          style="display: {apActive ? 'block' : 'none'};"
+        />
       {/if}
 
       <!-- Resize handles - rotate with the shape -->

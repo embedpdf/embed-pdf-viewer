@@ -68,7 +68,14 @@
         :style="innerRotatedStyle"
       >
         <!-- Annotation content - renders in unrotated coordinate space -->
-        <slot :annotation="childObject"></slot>
+        <slot :annotation="childObject" :appearanceActive="apActive"></slot>
+
+        <!-- AP overlay canvas (always in DOM, toggled via display) -->
+        <AppearanceImageVue
+          v-if="appearance?.normal"
+          :appearance="appearance.normal"
+          :style="{ display: apActive ? 'block' : 'none' }"
+        />
 
         <!-- Resize handles - rotate with the shape -->
         <template v-if="isSelected && effectiveIsResizable && !rotationActive">
@@ -153,7 +160,8 @@ import {
   type CSSProperties,
   type VNode,
 } from 'vue';
-import { PdfAnnotationObject, Rect } from '@embedpdf/models';
+import { PdfAnnotationObject, Rect, AnnotationAppearances } from '@embedpdf/models';
+import AppearanceImageVue from './appearance-image.vue';
 import { inferRotationCenterFromRects } from '@embedpdf/plugin-annotation';
 import {
   CounterRotate,
@@ -186,6 +194,8 @@ const props = withDefaults(
     pageHeight: number;
     trackedAnnotation: TrackedAnnotation<T>;
     isSelected: boolean;
+    /** Whether the annotation is in editing mode */
+    isEditing?: boolean;
     /** Whether multiple annotations are selected (container becomes passive) */
     isMultiSelected?: boolean;
     isDraggable: boolean;
@@ -196,8 +206,10 @@ const props = withDefaults(
     selectionMenu?: AnnotationSelectionMenuRenderFn;
     /** @deprecated Use `selectionOutline.offset` instead */
     outlineOffset?: number;
-    onDoubleClick?: (event: PointerEvent | MouseEvent) => void;
-    onSelect: (event: TouchEvent | MouseEvent) => void;
+    onDoubleClick?: (event: PointerEvent | MouseEvent | TouchEvent) => void;
+    onSelect: (event: PointerEvent | MouseEvent | TouchEvent) => void;
+    /** Pre-rendered appearance stream images for AP mode rendering */
+    appearance?: AnnotationAppearances<Blob> | null;
     zIndex?: number;
     /** @deprecated Use `selectionOutline.color` instead */
     selectionOutlineColor?: string;
@@ -213,6 +225,7 @@ const props = withDefaults(
   }>(),
   {
     lockAspectRatio: false,
+    isEditing: false,
     isMultiSelected: false,
     isRotatable: true,
     outlineOffset: 1,
@@ -248,6 +261,7 @@ const preview = shallowRef<Partial<T>>(toRaw(props.trackedAnnotation.object));
 const liveRotation = ref<number | null>(null);
 const cursorScreen = ref<{ x: number; y: number } | null>(null);
 const isHandleHovered = ref(false);
+const gestureActive = ref(false);
 const { provides: annotationCapability } = useAnnotationCapability();
 const { plugin: annotationPlugin } = useAnnotationPlugin();
 const permissions = useDocumentPermissions(props.documentId);
@@ -425,11 +439,14 @@ const {
 
       // Gesture start - initialize plugin drag/resize
       if (event.state === 'start') {
-        // Use unrotatedRect as gesture base so deltas are computed in unrotated space
         gestureBaseRectRef.value =
           (props.trackedAnnotation.object as any).unrotatedRect ??
           props.trackedAnnotation.object.rect;
-        gestureBaseRef.value = currentObject.value; // For vertex edit
+        gestureBaseRef.value = currentObject.value;
+
+        if (type === 'resize' || type === 'vertex-edit') {
+          gestureActive.value = true;
+        }
 
         if (type === 'move') {
           plugin.startDrag(props.documentId, { annotationIds: [id], pageSize });
@@ -497,6 +514,7 @@ const {
 
       // Gesture end - commit
       if (event.state === 'end') {
+        gestureActive.value = false;
         gestureBaseRectRef.value = null;
         gestureBaseRef.value = null;
         if (type === 'move') plugin.commitDrag(props.documentId);
@@ -612,6 +630,14 @@ const centerY = computed(() =>
 );
 const guideLength = computed(() => Math.max(300, Math.max(aabbWidth.value, aabbHeight.value) + 80));
 const rotationIconSize = computed(() => Math.round(ROTATION_SIZE.value * 0.6));
+
+const apActive = computed(
+  () =>
+    !!props.appearance?.normal &&
+    !gestureActive.value &&
+    !props.isEditing &&
+    !props.trackedAnnotation.dictMode,
+);
 
 // ─── Extracted style computations ──────────────────────────────────────
 const contentsStyle: CSSProperties = { display: 'contents' };

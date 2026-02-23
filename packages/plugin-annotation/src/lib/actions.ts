@@ -18,6 +18,7 @@ export const SET_SELECTION = 'ANNOTATION/SET_SELECTION';
 export const SET_ACTIVE_TOOL_ID = 'ANNOTATION/SET_ACTIVE_TOOL_ID';
 export const CREATE_ANNOTATION = 'ANNOTATION/CREATE_ANNOTATION';
 export const PATCH_ANNOTATION = 'ANNOTATION/PATCH_ANNOTATION';
+export const MOVE_ANNOTATION = 'ANNOTATION/MOVE_ANNOTATION';
 export const DELETE_ANNOTATION = 'ANNOTATION/DELETE_ANNOTATION';
 export const COMMIT_PENDING_CHANGES = 'ANNOTATION/COMMIT';
 export const PURGE_ANNOTATION = 'ANNOTATION/PURGE_ANNOTATION';
@@ -88,6 +89,15 @@ export interface PatchAnnotationAction extends Action {
     patch: Partial<PdfAnnotationObject>;
   };
 }
+export interface MoveAnnotationAction extends Action {
+  type: typeof MOVE_ANNOTATION;
+  payload: {
+    documentId: string;
+    pageIndex: number;
+    id: string;
+    patch: Partial<PdfAnnotationObject>;
+  };
+}
 export interface DeleteAnnotationAction extends Action {
   type: typeof DELETE_ANNOTATION;
   payload: { documentId: string; pageIndex: number; id: string };
@@ -128,6 +138,7 @@ export type AnnotationAction =
   | SetActiveToolIdAction
   | CreateAnnotationAction
   | PatchAnnotationAction
+  | MoveAnnotationAction
   | DeleteAnnotationAction
   | CommitAction
   | PurgeAnnotationAction
@@ -217,6 +228,16 @@ export const patchAnnotation = (
   patch: Partial<PdfAnnotationObject>,
 ): PatchAnnotationAction => ({
   type: PATCH_ANNOTATION,
+  payload: { documentId, pageIndex, id, patch },
+});
+
+export const moveAnnotation = (
+  documentId: string,
+  pageIndex: number,
+  id: string,
+  patch: Partial<PdfAnnotationObject>,
+): MoveAnnotationAction => ({
+  type: MOVE_ANNOTATION,
   payload: { documentId, pageIndex, id, patch },
 });
 

@@ -56,6 +56,10 @@
   </svg>
 </template>
 
+<script lang="ts">
+export default { inheritAttrs: false };
+</script>
+
 <script setup lang="ts">
 import { computed } from 'vue';
 import { PdfAnnotationBorderStyle, Rect } from '@embedpdf/models';
@@ -77,7 +81,7 @@ const props = withDefaults(
     /** Current page zoom factor */
     scale: number;
     /** Click handler (used for selection) */
-    onClick?: (e: MouseEvent | TouchEvent) => void;
+    onClick?: (e: PointerEvent | MouseEvent | TouchEvent) => void;
     /** Whether this link has an IRT (In Reply To) reference - disables direct interaction */
     hasIRT?: boolean;
   }>(),

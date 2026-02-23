@@ -32,7 +32,7 @@ interface Props {
 
 const props = defineProps<Props>();
 
-const { state: uiState } = useUIState(props.documentId);
+const { state: uiState } = useUIState(() => props.documentId);
 const { provides } = useUICapability();
 const anchorRegistry = useAnchorRegistry();
 const renderers = useRenderers();

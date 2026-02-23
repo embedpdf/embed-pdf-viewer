@@ -175,5 +175,7 @@ export type AnnotationTool<T extends PdfAnnotationObject = PdfAnnotationObject> 
     deactivateToolAfterCreate?: boolean;
     /** When true, select the annotation immediately after creation. Overrides plugin config. */
     selectAfterCreate?: boolean;
+    /** Override whether this annotation type uses AP rendering before editing (default: true) */
+    useAppearanceStream?: boolean;
   } & InsertUprightBehaviorFor<T>;
 } & ClickBehaviorFor<T>;

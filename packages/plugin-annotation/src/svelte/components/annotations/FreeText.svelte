@@ -1,4 +1,3 @@
-<!-- Free-text.svelte -->
 <script lang="ts">
   import {
     type PdfFreeTextAnnoObject,
@@ -9,7 +8,6 @@
   import type { TrackedAnnotation } from '@embedpdf/plugin-annotation';
   import { useAnnotationCapability } from '../../hooks';
 
-  // ---------- props ----------
   interface FreeTextProps {
     documentId: string;
     isSelected: boolean;
@@ -19,26 +17,33 @@
     scale: number;
     onClick?: (e: MouseEvent | TouchEvent) => void;
     onDoubleClick?: (e: MouseEvent) => void;
+    appearanceActive?: boolean;
   }
 
-  let { documentId, isSelected, isEditing, annotation, pageIndex, scale, onClick }: FreeTextProps =
-    $props();
+  let {
+    documentId,
+    isSelected,
+    isEditing,
+    annotation,
+    pageIndex,
+    scale,
+    onClick,
+    appearanceActive = false,
+  }: FreeTextProps = $props();
 
-  // ---------- capabilities ----------
   const annotationCapability = useAnnotationCapability();
 
-  // Get scoped API for this document
   const annotationProvides = $derived(
     annotationCapability.provides ? annotationCapability.provides.forDocument(documentId) : null,
   );
 
-  // ---------- refs / state ----------
   let editorRef: HTMLSpanElement | null = null;
   let isIOS = $state(false);
+  let editingRef = false;
 
-  // Focus and move caret to end when entering edit mode
   $effect(() => {
     if (!isEditing || !editorRef) return;
+    editingRef = true;
     editorRef.focus();
 
     const selection = window.getSelection?.();
@@ -51,7 +56,6 @@
     selection.addRange(range);
   });
 
-  // One-time iOS detection (prevents zoom by font-size compensation)
   $effect.pre(() => {
     try {
       const nav = navigator as any;
@@ -64,15 +68,15 @@
     }
   });
 
-  // Persist contents on blur
   function handleBlur() {
+    if (!editingRef) return;
+    editingRef = false;
     if (!annotationProvides || !editorRef) return;
     annotationProvides.updateAnnotation(pageIndex, annotation.object.id, {
       contents: editorRef.innerText,
     });
   }
 
-  // ---------- iOS zoom compensation ----------
   const computedFontPx = $derived(annotation.object.fontSize * scale);
   const MIN_IOS_FOCUS_FONT_PX = 16;
   const needsComp = $derived(
@@ -82,7 +86,6 @@
   const scaleComp = $derived(needsComp ? computedFontPx / MIN_IOS_FOCUS_FONT_PX : 1);
   const invScalePercent = $derived(needsComp ? 100 / scaleComp : 100);
 
-  // ---------- derived sizes ----------
   const outerW = $derived(annotation.object.rect.size.width * scale);
   const outerH = $derived(annotation.object.rect.size.height * scale);
 
@@ -97,7 +100,6 @@
   const fontCss = $derived(standardFontCssProperties(annotation.object.fontFamily));
 </script>
 
-<!-- Outer positioned container -->
 <div
   role="button"
   tabindex={-1}
@@ -107,10 +109,10 @@
   style:z-index={2}
   style:cursor={isSelected && !isEditing ? 'move' : 'default'}
   style:pointer-events={isSelected && !isEditing ? 'none' : 'auto'}
+  style:opacity={appearanceActive ? 0 : 1}
   onpointerdown={onClick}
   ontouchstart={onClick}
 >
-  <!-- Editable span -->
   <span
     bind:this={editorRef}
     role="textbox"

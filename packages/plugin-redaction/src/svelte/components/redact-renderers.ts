@@ -16,6 +16,8 @@ export const redactRenderers: BoxedAnnotationRenderer[] = [
       'segmentRects' in a &&
       (a.segmentRects?.length ?? 0) > 0,
     component: RedactHighlight,
+    interactionDefaults: { isDraggable: false, isResizable: false, isRotatable: false },
+    useAppearanceStream: false,
   }),
   createRenderer<PdfRedactAnnoObject>({
     id: 'redactArea',
@@ -23,5 +25,7 @@ export const redactRenderers: BoxedAnnotationRenderer[] = [
       a.type === PdfAnnotationSubtype.REDACT &&
       (!('segmentRects' in a) || !(a.segmentRects?.length ?? 0)),
     component: RedactArea,
+    interactionDefaults: { isDraggable: false, isResizable: false, isRotatable: false },
+    useAppearanceStream: false,
   }),
 ];

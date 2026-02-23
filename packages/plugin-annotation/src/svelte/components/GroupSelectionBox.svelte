@@ -409,6 +409,7 @@
       <!-- Rotation handle - orbits in AABB space -->
       {#if effectiveIsRotatable && rotationHandle}
         {#if rotationUI?.component}
+          <!-- svelte-ignore a11y_no_static_element_interactions -->
           <div
             onpointerenter={() => (isHandleHovered = true)}
             onpointerleave={() => {
@@ -435,6 +436,7 @@
             })}
           </div>
         {:else}
+          <!-- svelte-ignore a11y_no_static_element_interactions -->
           <div
             onpointerenter={() => (isHandleHovered = true)}
             onpointerleave={() => {

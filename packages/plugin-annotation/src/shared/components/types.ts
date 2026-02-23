@@ -6,6 +6,7 @@ import {
   SelectionMenuRenderFn,
 } from '@embedpdf/utils/@framework';
 import { JSX, CSSProperties, MouseEvent, TouchEvent } from '@framework';
+import { VertexConfig } from '../types';
 
 export type ResizeDirection = 'top-left' | 'top-right' | 'bottom-left' | 'bottom-right' | 'none';
 
@@ -129,14 +130,35 @@ export type CustomAnnotationRenderer<T extends PdfAnnotationObject> = (
 ) => JSX.Element | null;
 
 /**
+ * Properly typed event for annotation interactions (click, select, etc.)
+ */
+export type AnnotationInteractionEvent = MouseEvent<Element> | TouchEvent<Element>;
+
+/**
  * Props for an annotation renderer entry
  */
-export interface AnnotationRendererProps<T extends PdfAnnotationObject> {
+export interface AnnotationRendererProps<T extends PdfAnnotationObject = PdfAnnotationObject> {
   annotation: TrackedAnnotation<T>;
+  currentObject: T;
   isSelected: boolean;
+  isEditing: boolean;
   scale: number;
   pageIndex: number;
-  onClick: (e: MouseEvent<Element> | TouchEvent<Element>) => void;
+  documentId: string;
+  onClick: (e: AnnotationInteractionEvent) => void;
+  /** When true, AP canvas provides the visual; component should only render hit area */
+  appearanceActive: boolean;
+}
+
+/**
+ * Helpers passed to selectOverride for custom selection behavior.
+ */
+export interface SelectOverrideHelpers {
+  defaultSelect: (e: AnnotationInteractionEvent, annotation: TrackedAnnotation) => void;
+  selectAnnotation: (pageIndex: number, id: string) => void;
+  clearSelection: () => void;
+  allAnnotations: TrackedAnnotation[];
+  pageIndex: number;
 }
 
 /**
@@ -153,23 +175,70 @@ export interface AnnotationRendererEntry<T extends PdfAnnotationObject = PdfAnno
 
   /** The component to render the annotation */
   render: (props: AnnotationRendererProps<T>) => JSX.Element;
+
+  /** Vertex configuration for annotations with draggable vertices (line, polyline, polygon) */
+  vertexConfig?: VertexConfig<T>;
+
+  /** z-index for the annotation container (default: 1, text markup uses 0) */
+  zIndex?: number;
+
+  /** Style applied to the annotation container (overrides default blendMode style) */
+  containerStyle?: (annotation: T) => CSSProperties;
+
+  /** Type-specific interaction fallbacks used when the tool doesn't define a property */
+  interactionDefaults?: {
+    isDraggable?: boolean;
+    isResizable?: boolean;
+    isRotatable?: boolean;
+    lockAspectRatio?: boolean;
+  };
+
+  /** Whether this annotation type uses AP rendering before editing (default: true) */
+  useAppearanceStream?: boolean;
+
+  /** Override resolved isDraggable (e.g., FreeText disables drag while editing) */
+  isDraggable?: (toolDraggable: boolean, context: { isEditing: boolean }) => boolean;
+
+  /** Handle double-click on the annotation container */
+  onDoubleClick?: (annotationId: string, setEditingId: (id: string) => void) => void;
+
+  /** Override default selection behavior (e.g., Link IRT parent resolution) */
+  selectOverride?: (
+    e: AnnotationInteractionEvent,
+    annotation: TrackedAnnotation<T>,
+    helpers: SelectOverrideHelpers,
+  ) => void;
+
+  /** Return true to hide the selection menu for this annotation */
+  hideSelectionMenu?: (annotation: T) => boolean;
 }
 
 /**
- * Props passed to tryRender (everything except annotation which is passed separately)
- */
-export type BoxedRendererProps = Omit<AnnotationRendererProps<PdfAnnotationObject>, 'annotation'>;
-
-/**
  * Boxed renderer that encapsulates type safety internally.
- * The generic is erased - this is what the registry actually stores.
+ * The generic is erased -- this is what the registry actually stores.
  */
 export interface BoxedAnnotationRenderer {
-  /** Unique identifier for this renderer */
   id: string;
-
-  /** Combined match + render: returns null if doesn't match, JSX.Element if it does */
-  tryRender: (annotation: TrackedAnnotation, props: BoxedRendererProps) => JSX.Element | null;
+  matches: (annotation: PdfAnnotationObject) => boolean;
+  render: (props: AnnotationRendererProps) => JSX.Element;
+  vertexConfig?: VertexConfig<PdfAnnotationObject>;
+  zIndex?: number;
+  containerStyle?: (annotation: PdfAnnotationObject) => CSSProperties;
+  interactionDefaults?: {
+    isDraggable?: boolean;
+    isResizable?: boolean;
+    isRotatable?: boolean;
+    lockAspectRatio?: boolean;
+  };
+  useAppearanceStream?: boolean;
+  isDraggable?: (toolDraggable: boolean, context: { isEditing: boolean }) => boolean;
+  onDoubleClick?: (annotationId: string, setEditingId: (id: string) => void) => void;
+  selectOverride?: (
+    e: AnnotationInteractionEvent,
+    annotation: TrackedAnnotation,
+    helpers: SelectOverrideHelpers,
+  ) => void;
+  hideSelectionMenu?: (annotation: PdfAnnotationObject) => boolean;
 }
 
 /**
@@ -181,14 +250,20 @@ export function createRenderer<T extends PdfAnnotationObject>(
 ): BoxedAnnotationRenderer {
   return {
     id: entry.id,
-    tryRender: (annotation, props) => {
-      if (entry.matches(annotation.object)) {
-        return entry.render({
-          ...props,
-          annotation: annotation as TrackedAnnotation<T>,
-        });
-      }
-      return null;
-    },
+    matches: (annotation) => entry.matches(annotation),
+    render: (props) => entry.render(props as AnnotationRendererProps<T>),
+    vertexConfig: entry.vertexConfig as VertexConfig<PdfAnnotationObject> | undefined,
+    zIndex: entry.zIndex,
+    containerStyle: entry.containerStyle as
+      | ((annotation: PdfAnnotationObject) => CSSProperties)
+      | undefined,
+    interactionDefaults: entry.interactionDefaults,
+    useAppearanceStream: entry.useAppearanceStream,
+    isDraggable: entry.isDraggable,
+    onDoubleClick: entry.onDoubleClick,
+    selectOverride: entry.selectOverride as BoxedAnnotationRenderer['selectOverride'],
+    hideSelectionMenu: entry.hideSelectionMenu as
+      | ((annotation: PdfAnnotationObject) => boolean)
+      | undefined,
   };
 }

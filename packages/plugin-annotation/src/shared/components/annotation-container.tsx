@@ -1,4 +1,4 @@
-import { PdfAnnotationObject, Rect } from '@embedpdf/models';
+import { PdfAnnotationObject, Rect, AnnotationAppearances } from '@embedpdf/models';
 import {
   CounterRotate,
   useDoublePressProps,
@@ -23,12 +23,14 @@ import {
   CustomAnnotationRenderer,
   ResizeHandleUI,
   AnnotationSelectionMenuRenderFn,
+  AnnotationInteractionEvent,
   VertexHandleUI,
   RotationHandleUI,
   GroupSelectionMenuRenderFn,
   BoxedAnnotationRenderer,
   SelectionOutline,
 } from './types';
+import { AppearanceImage } from './appearance-image';
 import { VertexConfig } from '../types';
 
 interface AnnotationContainerProps<T extends PdfAnnotationObject> {
@@ -39,8 +41,10 @@ interface AnnotationContainerProps<T extends PdfAnnotationObject> {
   pageWidth: number;
   pageHeight: number;
   trackedAnnotation: TrackedAnnotation<T>;
-  children: JSX.Element | ((annotation: T) => JSX.Element);
+  children: JSX.Element | ((annotation: T, options: { appearanceActive: boolean }) => JSX.Element);
   isSelected: boolean;
+  /** Whether the annotation is in editing mode (e.g., FreeText text editing) */
+  isEditing?: boolean;
   /** Whether multiple annotations are selected (container becomes passive) */
   isMultiSelected?: boolean;
   isDraggable: boolean;
@@ -53,7 +57,9 @@ interface AnnotationContainerProps<T extends PdfAnnotationObject> {
   /** @deprecated Use `selectionOutline.offset` instead */
   outlineOffset?: number;
   onDoubleClick?: (event: any) => void;
-  onSelect: (event: any) => void;
+  onSelect: (event: AnnotationInteractionEvent) => void;
+  /** Pre-rendered appearance stream images for AP mode rendering */
+  appearance?: AnnotationAppearances<Blob> | null;
   zIndex?: number;
   resizeUI?: ResizeHandleUI;
   vertexUI?: VertexHandleUI;
@@ -86,6 +92,7 @@ export function AnnotationContainer<T extends PdfAnnotationObject>({
   trackedAnnotation,
   children,
   isSelected,
+  isEditing = false,
   isMultiSelected = false,
   isDraggable,
   isResizable,
@@ -97,6 +104,7 @@ export function AnnotationContainer<T extends PdfAnnotationObject>({
   outlineOffset = 1,
   onDoubleClick,
   onSelect,
+  appearance,
   zIndex = 1,
   resizeUI,
   vertexUI,
@@ -111,9 +119,10 @@ export function AnnotationContainer<T extends PdfAnnotationObject>({
   ...props
 }: AnnotationContainerProps<T>): JSX.Element {
   const [preview, setPreview] = useState<T>(trackedAnnotation.object);
-  const [liveRotation, setLiveRotation] = useState<number | null>(null); // Track rotation during drag
+  const [liveRotation, setLiveRotation] = useState<number | null>(null);
   const [cursorScreen, setCursorScreen] = useState<{ x: number; y: number } | null>(null);
   const [isHandleHovered, setIsHandleHovered] = useState(false);
+  const [gestureActive, setGestureActive] = useState(false);
   const { provides: annotationCapability } = useAnnotationCapability();
   const { plugin } = useAnnotationPlugin();
   const { canModifyAnnotations } = useDocumentPermissions(documentId);
@@ -182,10 +191,12 @@ export function AnnotationContainer<T extends PdfAnnotationObject>({
 
       // Gesture start - initialize plugin drag/resize
       if (event.state === 'start') {
-        // Use unrotatedRect as gesture base so deltas are computed in unrotated space
         gestureBaseRectRef.current =
           trackedAnnotation.object.unrotatedRect ?? trackedAnnotation.object.rect;
-        gestureBaseRef.current = trackedAnnotation.object; // For vertex edit
+        gestureBaseRef.current = trackedAnnotation.object;
+        if (type === 'resize' || type === 'vertex-edit') {
+          setGestureActive(true);
+        }
         if (type === 'move') {
           plugin.startDrag(documentId, { annotationIds: [id], pageSize });
         } else if (type === 'resize') {
@@ -253,6 +264,7 @@ export function AnnotationContainer<T extends PdfAnnotationObject>({
       if (event.state === 'end') {
         gestureBaseRectRef.current = null;
         gestureBaseRef.current = null;
+        setGestureActive(false);
         if (type === 'move') plugin.commitDrag(documentId);
         else if (type === 'resize') plugin.commitResize(documentId);
       }
@@ -406,6 +418,9 @@ export function AnnotationContainer<T extends PdfAnnotationObject>({
     }
     return currentObject;
   }, [currentObject, explicitUnrotatedRect]);
+
+  const apActive =
+    !!appearance?.normal && !gestureActive && !isEditing && !trackedAnnotation.dictMode;
 
   return (
     <div data-no-interaction>
@@ -577,10 +592,12 @@ export function AnnotationContainer<T extends PdfAnnotationObject>({
             cursor: isSelected && effectiveIsDraggable ? 'move' : 'default',
           }}
         >
-          {/* Annotation content - renders in unrotated coordinate space */}
+          {/* Dict content -- always in DOM so hit area handles clicks and vertex handles keep pointer capture */}
           {(() => {
             const childrenRender =
-              typeof children === 'function' ? children(childObject) : children;
+              typeof children === 'function'
+                ? children(childObject, { appearanceActive: apActive })
+                : children;
             const customRender = customAnnotationRenderer?.({
               annotation: childObject,
               children: childrenRender,
@@ -592,11 +609,16 @@ export function AnnotationContainer<T extends PdfAnnotationObject>({
               pageIndex,
               onSelect,
             });
-            if (customRender !== null && customRender !== undefined) {
-              return customRender;
-            }
-            return childrenRender;
+            return customRender ?? childrenRender;
           })()}
+
+          {/* AP canvas -- purely visual, never interactive */}
+          {appearance?.normal && (
+            <AppearanceImage
+              appearance={appearance.normal}
+              style={{ display: apActive ? 'block' : 'none' }}
+            />
+          )}
 
           {/* Resize handles - rotate with the shape */}
           {isSelected &&

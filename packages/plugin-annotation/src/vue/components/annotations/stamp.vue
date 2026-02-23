@@ -21,6 +21,10 @@
   </div>
 </template>
 
+<script lang="ts">
+export default { inheritAttrs: false };
+</script>
+
 <script setup lang="ts">
 import { computed } from 'vue';
 import { PdfStampAnnoObject } from '@embedpdf/models';
@@ -37,7 +41,6 @@ const props = defineProps<{
 }>();
 
 const unrotated = computed(
-  () =>
-    !!(props.annotation.object as any).rotation && !!(props.annotation.object as any).unrotatedRect,
+  () => !!props.annotation.object.rotation && !!props.annotation.object.unrotatedRect,
 );
 </script>
