@@ -50,11 +50,14 @@ const props = withDefaults(defineProps<Props>(), {
   variant: 'text',
 });
 
-const command = useCommand(props.commandId, props.documentId);
+const command = useCommand(
+  () => props.commandId,
+  () => props.documentId,
+);
 
 // Register this button with the anchor registry if itemId is provided
 const finalItemId = computed(() => props.itemId || props.commandId);
-const anchorRef = useRegisterAnchor(props.documentId, finalItemId.value);
+const anchorRef = useRegisterAnchor(() => props.documentId, finalItemId);
 
 // Get the icon component from the command's icon property
 const iconName = computed(() => (command.value?.icon ? `${command.value.icon}Icon` : null));
