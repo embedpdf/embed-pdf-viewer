@@ -375,7 +375,13 @@ export class PdfEngine<T = Blob> implements IPdfEngine<T> {
     page: PdfPageObject,
     options?: PdfRenderPageAnnotationOptions,
   ): PdfTask<AnnotationAppearanceMap> {
-    return this.executor.renderPageAnnotationsRaw(doc, page, options);
+    return this.workerQueue.enqueue(
+      {
+        execute: () => this.executor.renderPageAnnotationsRaw(doc, page, options),
+        meta: { docId: doc.id, pageIndex: page.index, operation: 'renderPageAnnotationsRaw' },
+      },
+      { priority: Priority.MEDIUM },
+    );
   }
 
   /**
