@@ -17,6 +17,7 @@ import { useAnnotationCapability } from '../..';
 import { TrackedAnnotation } from '@embedpdf/plugin-annotation';
 
 interface FreeTextProps {
+  documentId: string;
   isSelected: boolean;
   isEditing: boolean;
   annotation: TrackedAnnotation<PdfFreeTextAnnoObject>;
@@ -29,6 +30,7 @@ interface FreeTextProps {
 }
 
 export function FreeText({
+  documentId,
   isSelected,
   isEditing,
   annotation,
@@ -39,7 +41,8 @@ export function FreeText({
 }: FreeTextProps) {
   const editorRef = useRef<HTMLSpanElement>(null);
   const editingRef = useRef(false);
-  const { provides: annotationProvides } = useAnnotationCapability();
+  const { provides: annotationCapability } = useAnnotationCapability();
+  const annotationProvides = annotationCapability?.forDocument(documentId) ?? null;
   const [isIOS, setIsIOS] = useState(false);
 
   useEffect(() => {

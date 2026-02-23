@@ -419,14 +419,13 @@ export const reducer: Reducer<AnnotationState, AnnotationAction> = (state, actio
 
       for (const [uid, ta] of Object.entries(docState.byUid)) {
         if (committedSet.has(uid)) {
-          // This UID was committed - mark as synced, clear dictMode
+          // This UID was committed - mark as synced
           cleaned[uid] = {
             ...ta,
             commitState:
               ta.commitState === 'dirty' || ta.commitState === 'new' || ta.commitState === 'moved'
                 ? 'synced'
                 : ta.commitState,
-            dictMode: undefined,
           };
         } else {
           // This UID was not committed - keep its current state

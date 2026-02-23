@@ -10,19 +10,35 @@
     :width="svgWidth"
     :height="svgHeight"
     :viewBox="`0 0 ${geometry.width + strokeWidth} ${geometry.height + strokeWidth}`"
+    overflow="visible"
   >
+    <!-- Hit area -- always rendered, transparent, wider stroke for mobile -->
     <rect
+      :x="geometry.x"
+      :y="geometry.y"
+      :width="geometry.width"
+      :height="geometry.height"
+      fill="transparent"
+      stroke="transparent"
+      :stroke-width="hitStrokeWidth"
+      @pointerdown="onClick"
+      @touchstart="onClick"
+      :style="{
+        cursor: isSelected ? 'move' : 'pointer',
+        pointerEvents: isSelected ? 'none' : color === 'transparent' ? 'visibleStroke' : 'visible',
+      }"
+    />
+    <!-- Visual -- hidden when AP active, never interactive -->
+    <rect
+      v-if="!appearanceActive"
       :x="geometry.x"
       :y="geometry.y"
       :width="geometry.width"
       :height="geometry.height"
       :fill="color"
       :opacity="opacity"
-      @pointerdown="onClick"
-      @touchstart="onClick"
       :style="{
-        cursor: isSelected ? 'move' : 'pointer',
-        pointerEvents: isSelected ? 'none' : color === 'transparent' ? 'visibleStroke' : 'visible',
+        pointerEvents: 'none',
         stroke: strokeColor ?? color,
         strokeWidth: strokeWidth,
         ...(strokeStyle === PdfAnnotationBorderStyle.DASHED && {
@@ -37,6 +53,8 @@
 import { computed } from 'vue';
 import { PdfAnnotationBorderStyle, Rect } from '@embedpdf/models';
 
+const MIN_HIT_AREA_SCREEN_PX = 20;
+
 const props = withDefaults(
   defineProps<{
     isSelected: boolean;
@@ -49,11 +67,13 @@ const props = withDefaults(
     rect: Rect;
     scale: number;
     onClick?: (e: PointerEvent | TouchEvent) => void;
+    appearanceActive?: boolean;
   }>(),
   {
     color: '#000000',
     opacity: 1,
     strokeStyle: PdfAnnotationBorderStyle.SOLID,
+    appearanceActive: false,
   },
 );
 
@@ -73,4 +93,7 @@ const geometry = computed(() => {
 
 const svgWidth = computed(() => (geometry.value.width + props.strokeWidth) * props.scale);
 const svgHeight = computed(() => (geometry.value.height + props.strokeWidth) * props.scale);
+const hitStrokeWidth = computed(() =>
+  Math.max(props.strokeWidth, MIN_HIT_AREA_SCREEN_PX / props.scale),
+);
 </script>

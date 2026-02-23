@@ -37,7 +37,6 @@ const props = defineProps<{
 }>();
 
 const unrotated = computed(
-  () =>
-    !!(props.annotation.object as any).rotation && !!(props.annotation.object as any).unrotatedRect,
+  () => !!props.annotation.object.rotation && !!props.annotation.object.unrotatedRect,
 );
 </script>

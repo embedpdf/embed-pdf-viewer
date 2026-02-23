@@ -12,54 +12,74 @@
     :height="height"
     :viewBox="`0 0 ${rect.size.width} ${rect.size.height}`"
   >
+    <!-- Hit area -- always rendered, transparent, wider stroke for mobile -->
     <path
       :d="pathData"
+      fill="transparent"
+      stroke="transparent"
+      :stroke-width="hitStrokeWidth"
       @pointerdown="onClick"
       @touchstart="onClick"
-      :opacity="opacity"
       :style="{
-        fill: currentVertex ? 'none' : color,
-        stroke: strokeColor ?? color,
-        strokeWidth,
         cursor: isSelected ? 'move' : 'pointer',
         pointerEvents: isSelected ? 'none' : color === 'transparent' ? 'visibleStroke' : 'visible',
         strokeLinecap: 'butt',
         strokeLinejoin: 'miter',
-        ...(strokeStyle === PdfAnnotationBorderStyle.DASHED && {
-          strokeDasharray: strokeDashArray?.join(','),
-        }),
       }"
     />
-    <path
-      v-if="isPreviewing && localPts.length > 1"
-      :d="`M ${localPts[localPts.length - 1].x} ${
-        localPts[localPts.length - 1].y
-      } L ${localPts[0].x} ${localPts[0].y}`"
-      fill="none"
-      :style="{
-        stroke: strokeColor,
-        strokeWidth,
-        strokeDasharray: '4,4',
-        opacity: 0.7,
-      }"
-    />
-    <rect
-      v-if="isPreviewing && localPts.length >= 2"
-      :x="localPts[0].x - handleSize / scale / 2"
-      :y="localPts[0].y - handleSize / scale / 2"
-      :width="handleSize / scale"
-      :height="handleSize / scale"
-      :fill="strokeColor"
-      :opacity="0.4"
-      :stroke="strokeColor"
-      :stroke-width="strokeWidth / 2"
-    />
+
+    <!-- Visual -- hidden when AP active, never interactive -->
+    <template v-if="!appearanceActive">
+      <path
+        :d="pathData"
+        :opacity="opacity"
+        :style="{
+          fill: currentVertex ? 'none' : color,
+          stroke: strokeColor ?? color,
+          strokeWidth,
+          pointerEvents: 'none',
+          strokeLinecap: 'butt',
+          strokeLinejoin: 'miter',
+          ...(strokeStyle === PdfAnnotationBorderStyle.DASHED && {
+            strokeDasharray: strokeDashArray?.join(','),
+          }),
+        }"
+      />
+      <path
+        v-if="isPreviewing && localPts.length > 1"
+        :d="`M ${localPts[localPts.length - 1].x} ${
+          localPts[localPts.length - 1].y
+        } L ${localPts[0].x} ${localPts[0].y}`"
+        fill="none"
+        :style="{
+          stroke: strokeColor,
+          strokeWidth,
+          strokeDasharray: '4,4',
+          opacity: 0.7,
+          pointerEvents: 'none',
+        }"
+      />
+      <rect
+        v-if="isPreviewing && localPts.length >= 2"
+        :x="localPts[0].x - handleSize / scale / 2"
+        :y="localPts[0].y - handleSize / scale / 2"
+        :width="handleSize / scale"
+        :height="handleSize / scale"
+        :fill="strokeColor"
+        :opacity="0.4"
+        :stroke="strokeColor"
+        :stroke-width="strokeWidth / 2"
+        style="pointer-events: none"
+      />
+    </template>
   </svg>
 </template>
 
 <script setup lang="ts">
 import { computed } from 'vue';
 import { Rect, Position, PdfAnnotationBorderStyle } from '@embedpdf/models';
+
+const MIN_HIT_AREA_SCREEN_PX = 20;
 
 const props = withDefaults(
   defineProps<{
@@ -76,6 +96,7 @@ const props = withDefaults(
     onClick?: (e: PointerEvent | TouchEvent) => void;
     currentVertex?: Position;
     handleSize?: number;
+    appearanceActive?: boolean;
   }>(),
   {
     color: 'transparent',
@@ -83,6 +104,7 @@ const props = withDefaults(
     opacity: 1,
     strokeStyle: PdfAnnotationBorderStyle.SOLID,
     handleSize: 14,
+    appearanceActive: false,
   },
 );
 
@@ -112,4 +134,7 @@ const isPreviewing = computed(() => props.currentVertex && props.vertices.length
 
 const width = computed(() => props.rect.size.width * props.scale);
 const height = computed(() => props.rect.size.height * props.scale);
+const hitStrokeWidth = computed(() =>
+  Math.max(props.strokeWidth, MIN_HIT_AREA_SCREEN_PX / props.scale),
+);
 </script>

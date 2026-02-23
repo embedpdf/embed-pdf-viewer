@@ -10,7 +10,7 @@ import {
   GroupSelectionMenuRenderFn,
 } from '../types';
 import { VertexConfig } from '../../shared/types';
-import { PdfAnnotationObject } from '@embedpdf/models';
+import { PdfAnnotationObject, AnnotationAppearances } from '@embedpdf/models';
 import { TrackedAnnotation } from '@embedpdf/plugin-annotation';
 import type { BoxedAnnotationRenderer } from '../context';
 
@@ -22,8 +22,10 @@ export interface AnnotationContainerProps<T extends PdfAnnotationObject> {
   pageWidth: number;
   pageHeight: number;
   trackedAnnotation: TrackedAnnotation<T>;
-  children: Snippet<[T]>;
+  children: Snippet<[T, { appearanceActive: boolean }]>;
   isSelected: boolean;
+  /** Whether the annotation is in editing mode (e.g., FreeText text editing) */
+  isEditing?: boolean;
   /** Whether multiple annotations are selected (container becomes passive) */
   isMultiSelected?: boolean;
   isDraggable: boolean;
@@ -39,6 +41,8 @@ export interface AnnotationContainerProps<T extends PdfAnnotationObject> {
   outlineOffset?: number;
   onDoubleClick?: (event: any) => void;
   onSelect: (event: any) => void;
+  /** Pre-rendered appearance stream images for AP mode rendering */
+  appearance?: AnnotationAppearances | null;
   zIndex?: number;
   resizeUI?: ResizeHandleUI;
   vertexUI?: VertexHandleUI;

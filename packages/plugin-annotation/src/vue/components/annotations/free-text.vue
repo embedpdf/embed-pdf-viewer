@@ -7,6 +7,7 @@
       cursor: isSelected && !isEditing ? 'move' : 'default',
       pointerEvents: isSelected && !isEditing ? 'none' : 'auto',
       zIndex: 2,
+      opacity: appearanceActive ? 0 : 1,
     }"
     @pointerdown="onClick"
     @touchstart="onClick"
@@ -33,17 +34,28 @@ import {
 import { TrackedAnnotation } from '@embedpdf/plugin-annotation';
 import { useAnnotationCapability } from '../../hooks';
 
-const props = defineProps<{
-  isSelected: boolean;
-  isEditing: boolean;
-  annotation: TrackedAnnotation<PdfFreeTextAnnoObject>;
-  pageIndex: number;
-  scale: number;
-  onClick?: (e: PointerEvent | TouchEvent) => void;
-}>();
+const props = withDefaults(
+  defineProps<{
+    documentId: string;
+    isSelected: boolean;
+    isEditing: boolean;
+    annotation: TrackedAnnotation<PdfFreeTextAnnoObject>;
+    pageIndex: number;
+    scale: number;
+    onClick?: (e: PointerEvent | TouchEvent) => void;
+    appearanceActive?: boolean;
+  }>(),
+  {
+    appearanceActive: false,
+  },
+);
 
 const editorRef = ref<HTMLSpanElement | null>(null);
-const { provides: annotationProvides } = useAnnotationCapability();
+const editingRef = ref(false);
+const { provides: annotationCapability } = useAnnotationCapability();
+const annotationProvides = computed(
+  () => annotationCapability.value?.forDocument(props.documentId) ?? null,
+);
 const isIOS = ref(false);
 
 onMounted(() => {
@@ -61,6 +73,7 @@ watch(
   () => props.isEditing,
   (editing) => {
     if (editing && editorRef.value) {
+      editingRef.value = true;
       const editor = editorRef.value;
       editor.focus();
       const selection = window.getSelection();
@@ -76,6 +89,8 @@ watch(
 );
 
 const handleBlur = () => {
+  if (!editingRef.value) return;
+  editingRef.value = false;
   if (!annotationProvides.value || !editorRef.value) return;
   annotationProvides.value.updateAnnotation(props.pageIndex, props.annotation.object.id, {
     contents: editorRef.value.innerText,

@@ -12,15 +12,15 @@
     :height="height"
     :viewBox="`0 0 ${rect.size.width} ${rect.size.height}`"
   >
+    <!-- Hit area -- always rendered, transparent, wider stroke for mobile -->
     <path
       :d="pathData"
+      fill="none"
+      stroke="transparent"
+      :stroke-width="hitStrokeWidth"
       @pointerdown="onClick"
       @touchstart="onClick"
-      :opacity="opacity"
       :style="{
-        fill: 'none',
-        stroke: strokeColor ?? color,
-        strokeWidth,
         cursor: isSelected ? 'move' : 'pointer',
         pointerEvents: isSelected ? 'none' : 'visibleStroke',
         strokeLinecap: 'butt',
@@ -31,22 +31,72 @@
       v-if="endings.start"
       :d="endings.start.d"
       :transform="endings.start.transform"
-      :stroke="strokeColor"
-      :fill="endings.start.filled ? color : 'none'"
+      fill="transparent"
+      stroke="transparent"
+      :stroke-width="hitStrokeWidth"
       @pointerdown="onClick"
       @touchstart="onClick"
-      :style="getEndingStyle(endings.start)"
+      :style="{
+        cursor: isSelected ? 'move' : 'pointer',
+        pointerEvents: isSelected ? 'none' : endings.start.filled ? 'visible' : 'visibleStroke',
+        strokeLinecap: 'butt',
+      }"
     />
     <path
       v-if="endings.end"
       :d="endings.end.d"
       :transform="endings.end.transform"
-      :stroke="strokeColor"
-      :fill="endings.end.filled ? color : 'none'"
+      fill="transparent"
+      stroke="transparent"
+      :stroke-width="hitStrokeWidth"
       @pointerdown="onClick"
       @touchstart="onClick"
-      :style="getEndingStyle(endings.end)"
+      :style="{
+        cursor: isSelected ? 'move' : 'pointer',
+        pointerEvents: isSelected ? 'none' : endings.end.filled ? 'visible' : 'visibleStroke',
+        strokeLinecap: 'butt',
+      }"
     />
+
+    <!-- Visual -- hidden when AP active, never interactive -->
+    <template v-if="!appearanceActive">
+      <path
+        :d="pathData"
+        :opacity="opacity"
+        :style="{
+          fill: 'none',
+          stroke: strokeColor ?? color,
+          strokeWidth,
+          pointerEvents: 'none',
+          strokeLinecap: 'butt',
+          strokeLinejoin: 'miter',
+        }"
+      />
+      <path
+        v-if="endings.start"
+        :d="endings.start.d"
+        :transform="endings.start.transform"
+        :stroke="strokeColor"
+        :fill="endings.start.filled ? color : 'none'"
+        :style="{
+          pointerEvents: 'none',
+          strokeWidth,
+          strokeLinecap: 'butt',
+        }"
+      />
+      <path
+        v-if="endings.end"
+        :d="endings.end.d"
+        :transform="endings.end.transform"
+        :stroke="strokeColor"
+        :fill="endings.end.filled ? color : 'none'"
+        :style="{
+          pointerEvents: 'none',
+          strokeWidth,
+          strokeLinecap: 'butt',
+        }"
+      />
+    </template>
   </svg>
 </template>
 
@@ -54,6 +104,8 @@
 import { computed } from 'vue';
 import { Rect, Position, LineEndings } from '@embedpdf/models';
 import { patching } from '@embedpdf/plugin-annotation';
+
+const MIN_HIT_AREA_SCREEN_PX = 20;
 
 const props = withDefaults(
   defineProps<{
@@ -67,11 +119,13 @@ const props = withDefaults(
     isSelected: boolean;
     onClick?: (e: PointerEvent | TouchEvent) => void;
     lineEndings?: LineEndings;
+    appearanceActive?: boolean;
   }>(),
   {
     color: 'transparent',
     strokeColor: '#000000',
     opacity: 1,
+    appearanceActive: false,
   },
 );
 
@@ -116,16 +170,9 @@ const endings = computed(() => {
   };
 });
 
-const getEndingStyle = (ending: patching.SvgEnding) => ({
-  cursor: props.isSelected ? 'move' : 'pointer',
-  strokeWidth: props.strokeWidth,
-  pointerEvents: (props.isSelected ? 'none' : ending.filled ? 'visible' : 'visibleStroke') as
-    | 'none'
-    | 'visible'
-    | 'visibleStroke',
-  strokeLinecap: 'butt' as 'butt',
-});
-
 const width = computed(() => props.rect.size.width * props.scale);
 const height = computed(() => props.rect.size.height * props.scale);
+const hitStrokeWidth = computed(() =>
+  Math.max(props.strokeWidth, MIN_HIT_AREA_SCREEN_PX / props.scale),
+);
 </script>

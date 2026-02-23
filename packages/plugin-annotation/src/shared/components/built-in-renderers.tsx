@@ -208,10 +208,12 @@ export const builtInRenderers: BoxedAnnotationRenderer[] = [
       isEditing,
       scale,
       pageIndex,
+      documentId,
       onClick,
       appearanceActive,
     }) => (
       <FreeText
+        documentId={documentId}
         isSelected={isSelected}
         isEditing={isEditing}
         annotation={{ ...annotation, object: currentObject }}
