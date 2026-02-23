@@ -1,18 +1,17 @@
-import { useEffect, useRef, MouseEvent, TouchEvent, CSSProperties } from '@framework';
+import { useEffect, useRef, CSSProperties } from '@framework';
 import { AnnotationAppearanceImage } from '@embedpdf/models';
 
 interface AppearanceImageProps {
   appearance: AnnotationAppearanceImage;
-  onClick?: (e: MouseEvent<HTMLCanvasElement> | TouchEvent<HTMLCanvasElement>) => void;
   style?: CSSProperties;
-  isSelected?: boolean;
 }
 
 /**
  * Renders a pre-rendered annotation appearance stream image using a canvas.
  * The ImageDataLike data is drawn once and the canvas is sized to fill its container.
+ * Purely visual -- pointer events are always disabled; hit-area SVG handles interaction.
  */
-export function AppearanceImage({ appearance, onClick, style, isSelected }: AppearanceImageProps) {
+export function AppearanceImage({ appearance, style }: AppearanceImageProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
 
   useEffect(() => {
@@ -33,15 +32,12 @@ export function AppearanceImage({ appearance, onClick, style, isSelected }: Appe
   return (
     <canvas
       ref={canvasRef}
-      onPointerDown={onClick}
-      onTouchStart={onClick}
       style={{
         position: 'absolute',
         width: '100%',
         height: '100%',
         display: 'block',
-        pointerEvents: isSelected ? 'none' : 'auto',
-        cursor: 'pointer',
+        pointerEvents: 'none',
         ...style,
       }}
     />

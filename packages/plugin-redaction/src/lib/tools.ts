@@ -37,6 +37,9 @@ export const redactTool: AnnotationTool<PdfRedactAnnoObject> = {
     strokeColor: '#E44234',
     opacity: 1,
   },
+  behavior: {
+    useAppearanceStream: false,
+  },
 };
 
 export const redactTools = [redactTool];

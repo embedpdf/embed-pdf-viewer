@@ -369,6 +369,7 @@ export const defaultTools = [
     },
     behavior: {
       insertUpright: true,
+      useAppearanceStream: false,
     },
   },
 ] satisfies readonly AnnotationTool[];

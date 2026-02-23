@@ -2,9 +2,7 @@ import { useMemo, MouseEvent, TouchEvent } from '@framework';
 import { Rect, LinePoints, LineEndings, PdfAnnotationBorderStyle } from '@embedpdf/models';
 import { patching } from '@embedpdf/plugin-annotation';
 
-/* ---------------------------------------------------------------- *\
-|* Types                                                            *|
-\* ---------------------------------------------------------------- */
+const MIN_HIT_AREA_SCREEN_PX = 20;
 
 interface LineProps {
   /** interior colour */
@@ -31,6 +29,8 @@ interface LineProps {
   onClick?: (e: MouseEvent<SVGElement> | TouchEvent<SVGElement>) => void;
   /** Whether the annotation is selected */
   isSelected: boolean;
+  /** When true, AP canvas provides the visual; only render hit area */
+  appearanceActive?: boolean;
 }
 
 /**
@@ -49,10 +49,8 @@ export function Line({
   scale,
   onClick,
   isSelected,
+  appearanceActive = false,
 }: LineProps): JSX.Element {
-  /* -------------------------------------------------------------- */
-  /*  Localise the line within its own bounding box                 */
-  /* -------------------------------------------------------------- */
   const { x1, y1, x2, y2 } = useMemo(() => {
     return {
       x1: linePoints.start.x - rect.origin.x,
@@ -62,9 +60,6 @@ export function Line({
     };
   }, [linePoints, rect]);
 
-  /* -------------------------------------------------------------- */
-  /*  Arrow-head path data via shared factory                       */
-  /* -------------------------------------------------------------- */
   const endings = useMemo(() => {
     const angle = Math.atan2(y2 - y1, x2 - x1);
     return {
@@ -73,11 +68,9 @@ export function Line({
     };
   }, [lineEndings, strokeWidth, x1, y1, x2, y2]);
 
-  /* -------------------------------------------------------------- */
-  /*  Absolute placement + scaling (same pattern as other shapes)   */
-  /* -------------------------------------------------------------- */
   const width = rect.size.width * scale;
   const height = rect.size.height * scale;
+  const hitStrokeWidth = Math.max(strokeWidth, MIN_HIT_AREA_SCREEN_PX / scale);
 
   return (
     <svg
@@ -93,65 +86,107 @@ export function Line({
       height={height}
       viewBox={`0 0 ${rect.size.width} ${rect.size.height}`}
     >
-      {/* Main line */}
+      {/* Hit area -- always rendered, transparent, wider stroke for mobile */}
       <line
         x1={x1}
         y1={y1}
         x2={x2}
         y2={y2}
-        opacity={opacity}
+        stroke="transparent"
+        strokeWidth={hitStrokeWidth}
         onPointerDown={onClick}
         onTouchStart={onClick}
         style={{
           cursor: isSelected ? 'move' : 'pointer',
           pointerEvents: isSelected ? 'none' : 'visibleStroke',
-          stroke: strokeColor,
-          strokeWidth,
           strokeLinecap: 'butt',
-          ...(strokeStyle === PdfAnnotationBorderStyle.DASHED && {
-            strokeDasharray: strokeDashArray?.join(','),
-          }),
         }}
       />
-
-      {/* Optional arrowheads / butt caps */}
       {endings.start && (
         <path
           d={endings.start.d}
           transform={endings.start.transform}
+          fill="transparent"
+          stroke="transparent"
+          strokeWidth={hitStrokeWidth}
           onPointerDown={onClick}
           onTouchStart={onClick}
-          stroke={strokeColor}
           style={{
             cursor: isSelected ? 'move' : 'pointer',
-            strokeWidth,
-            strokeLinecap: 'butt',
             pointerEvents: isSelected ? 'none' : endings.start.filled ? 'visible' : 'visibleStroke',
-            ...(strokeStyle === PdfAnnotationBorderStyle.DASHED && {
-              strokeDasharray: strokeDashArray?.join(','),
-            }),
+            strokeLinecap: 'butt',
           }}
-          fill={endings.start.filled ? color : 'none'}
         />
       )}
       {endings.end && (
         <path
           d={endings.end.d}
           transform={endings.end.transform}
-          stroke={strokeColor}
+          fill="transparent"
+          stroke="transparent"
+          strokeWidth={hitStrokeWidth}
           onPointerDown={onClick}
           onTouchStart={onClick}
           style={{
             cursor: isSelected ? 'move' : 'pointer',
-            strokeWidth,
-            strokeLinecap: 'butt',
             pointerEvents: isSelected ? 'none' : endings.end.filled ? 'visible' : 'visibleStroke',
-            ...(strokeStyle === PdfAnnotationBorderStyle.DASHED && {
-              strokeDasharray: strokeDashArray?.join(','),
-            }),
+            strokeLinecap: 'butt',
           }}
-          fill={endings.end.filled ? color : 'none'}
         />
+      )}
+
+      {/* Visual -- hidden when AP active, never interactive */}
+      {!appearanceActive && (
+        <>
+          <line
+            x1={x1}
+            y1={y1}
+            x2={x2}
+            y2={y2}
+            opacity={opacity}
+            style={{
+              pointerEvents: 'none',
+              stroke: strokeColor,
+              strokeWidth,
+              strokeLinecap: 'butt',
+              ...(strokeStyle === PdfAnnotationBorderStyle.DASHED && {
+                strokeDasharray: strokeDashArray?.join(','),
+              }),
+            }}
+          />
+          {endings.start && (
+            <path
+              d={endings.start.d}
+              transform={endings.start.transform}
+              stroke={strokeColor}
+              fill={endings.start.filled ? color : 'none'}
+              style={{
+                pointerEvents: 'none',
+                strokeWidth,
+                strokeLinecap: 'butt',
+                ...(strokeStyle === PdfAnnotationBorderStyle.DASHED && {
+                  strokeDasharray: strokeDashArray?.join(','),
+                }),
+              }}
+            />
+          )}
+          {endings.end && (
+            <path
+              d={endings.end.d}
+              transform={endings.end.transform}
+              stroke={strokeColor}
+              fill={endings.end.filled ? color : 'none'}
+              style={{
+                pointerEvents: 'none',
+                strokeWidth,
+                strokeLinecap: 'butt',
+                ...(strokeStyle === PdfAnnotationBorderStyle.DASHED && {
+                  strokeDasharray: strokeDashArray?.join(','),
+                }),
+              }}
+            />
+          )}
+        </>
       )}
     </svg>
   );
