@@ -19,6 +19,10 @@
   ></div>
 </template>
 
+<script lang="ts">
+export default { inheritAttrs: false };
+</script>
+
 <script setup lang="ts">
 import { computed } from 'vue';
 import { Rect } from '@embedpdf/models';
