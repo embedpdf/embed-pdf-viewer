@@ -27,7 +27,7 @@ import type { PdfRedactAnnoObject } from '@embedpdf/models';
 import {
   PdfStandardFont,
   PdfTextAlignment,
-  standardFontCss,
+  standardFontCssProperties,
   textAlignmentToCss,
 } from '@embedpdf/models';
 
@@ -86,7 +86,7 @@ const containerStyle = computed<CSSProperties>(() => ({
 const textStyle = computed<CSSProperties>(() => ({
   color: textColor.value,
   fontSize: `${fontSize.value * props.scale}px`,
-  fontFamily: standardFontCss(fontFamily.value),
+  ...standardFontCssProperties(fontFamily.value),
   textAlign: textAlignmentToCss(textAlign.value),
   whiteSpace: overlayTextRepeat.value ? 'normal' : 'nowrap',
   overflow: 'hidden',

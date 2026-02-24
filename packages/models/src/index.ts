@@ -16,6 +16,7 @@ export * from './date';
 export * from './helpers';
 export * from './uuid';
 export * from './compound-task';
+export * from './task-sequence';
 export * from './fonts';
 
 /**

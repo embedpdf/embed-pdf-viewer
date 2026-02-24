@@ -34,6 +34,7 @@ import {
   PageTextSlice,
   PdfGlyphObject,
   PdfPageGeometry,
+  PdfPageTextRuns,
   PdfPrintOptions,
   PdfEngineFeature,
   PdfEngineOperation,
@@ -45,6 +46,7 @@ import {
   CompoundTask,
   ImageDataLike,
   IPdfiumExecutor,
+  AnnotationAppearanceMap,
 } from '@embedpdf/models';
 import { WorkerTaskQueue, Priority } from './task-queue';
 import type { ImageDataConverter } from '../converters/types';
@@ -308,6 +310,37 @@ export class PdfEngine<T = Blob> implements IPdfEngine<T> {
     );
   }
 
+  // ========== Raw Rendering (no encoding) ==========
+
+  renderPageRaw(
+    doc: PdfDocumentObject,
+    page: PdfPageObject,
+    options?: PdfRenderPageOptions,
+  ): PdfTask<ImageDataLike> {
+    return this.workerQueue.enqueue(
+      {
+        execute: () => this.executor.renderPageRaw(doc, page, options),
+        meta: { docId: doc.id, pageIndex: page.index, operation: 'renderPageRaw' },
+      },
+      { priority: Priority.HIGH },
+    );
+  }
+
+  renderPageRectRaw(
+    doc: PdfDocumentObject,
+    page: PdfPageObject,
+    rect: Rect,
+    options?: PdfRenderPageOptions,
+  ): PdfTask<ImageDataLike> {
+    return this.workerQueue.enqueue(
+      {
+        execute: () => this.executor.renderPageRect(doc, page, rect, options),
+        meta: { docId: doc.id, pageIndex: page.index, operation: 'renderPageRectRaw' },
+      },
+      { priority: Priority.HIGH },
+    );
+  }
+
   renderThumbnail(
     doc: PdfDocumentObject,
     page: PdfPageObject,
@@ -334,6 +367,59 @@ export class PdfEngine<T = Blob> implements IPdfEngine<T> {
       doc.id,
       page.index,
       Priority.MEDIUM,
+    );
+  }
+
+  renderPageAnnotations(
+    doc: PdfDocumentObject,
+    page: PdfPageObject,
+    options?: PdfRenderPageAnnotationOptions,
+  ): PdfTask<AnnotationAppearanceMap<T>> {
+    const resultTask = new Task<AnnotationAppearanceMap<T>, PdfErrorReason>();
+
+    const renderHandle = this.workerQueue.enqueue(
+      {
+        execute: () => this.executor.renderPageAnnotationsRaw(doc, page, options),
+        meta: { docId: doc.id, pageIndex: page.index, operation: 'renderPageAnnotationsRaw' },
+      },
+      { priority: Priority.MEDIUM },
+    );
+
+    // Wire up abort: when resultTask is aborted, also abort the queue task
+    const originalAbort = resultTask.abort.bind(resultTask);
+    resultTask.abort = (reason) => {
+      renderHandle.abort(reason);
+      originalAbort(reason);
+    };
+
+    renderHandle.wait(
+      (rawMap) => {
+        if (resultTask.state.stage !== 0 /* Pending */) {
+          return;
+        }
+        this.encodeAppearanceMap(rawMap, options, resultTask);
+      },
+      (error) => {
+        if (resultTask.state.stage === 0 /* Pending */) {
+          resultTask.fail(error);
+        }
+      },
+    );
+
+    return resultTask;
+  }
+
+  renderPageAnnotationsRaw(
+    doc: PdfDocumentObject,
+    page: PdfPageObject,
+    options?: PdfRenderPageAnnotationOptions,
+  ): PdfTask<AnnotationAppearanceMap<ImageDataLike>> {
+    return this.workerQueue.enqueue(
+      {
+        execute: () => this.executor.renderPageAnnotationsRaw(doc, page, options),
+        meta: { docId: doc.id, pageIndex: page.index, operation: 'renderPageAnnotationsRaw' },
+      },
+      { priority: Priority.MEDIUM },
     );
   }
 
@@ -408,6 +494,62 @@ export class PdfEngine<T = Blob> implements IPdfEngine<T> {
       .catch((error) => resultTask.reject({ code: PdfErrorCode.Unknown, message: String(error) }));
   }
 
+  /**
+   * Encode a full annotation appearance map to the output type T.
+   */
+  private encodeAppearanceMap(
+    rawMap: AnnotationAppearanceMap<ImageDataLike>,
+    options: PdfRenderPageAnnotationOptions | undefined,
+    resultTask: Task<AnnotationAppearanceMap<T>, PdfErrorReason>,
+  ): void {
+    const imageType = options?.imageType ?? 'image/webp';
+    const quality = options?.imageQuality;
+
+    const convertImage = (rawImageData: ImageDataLike): Promise<T> => {
+      const plainImageData = {
+        data: new Uint8ClampedArray(rawImageData.data),
+        width: rawImageData.width,
+        height: rawImageData.height,
+      };
+      return this.options.imageConverter(() => plainImageData, imageType, quality);
+    };
+
+    const jobs: Promise<void>[] = [];
+    const encodedMap: AnnotationAppearanceMap<T> = {};
+    const modes: Array<'normal' | 'rollover' | 'down'> = ['normal', 'rollover', 'down'];
+
+    for (const [annotationId, appearances] of Object.entries(rawMap)) {
+      const encodedAppearances: NonNullable<AnnotationAppearanceMap<T>[string]> = {};
+      encodedMap[annotationId] = encodedAppearances;
+
+      for (const mode of modes) {
+        const appearance = appearances[mode];
+        if (!appearance) continue;
+
+        jobs.push(
+          convertImage(appearance.data).then((encodedData) => {
+            encodedAppearances[mode] = {
+              data: encodedData,
+              rect: appearance.rect,
+            };
+          }),
+        );
+      }
+    }
+
+    Promise.all(jobs)
+      .then(() => {
+        if (resultTask.state.stage === 0 /* Pending */) {
+          resultTask.resolve(encodedMap);
+        }
+      })
+      .catch((error) => {
+        if (resultTask.state.stage === 0 /* Pending */) {
+          resultTask.reject({ code: PdfErrorCode.Unknown, message: String(error) });
+        }
+      });
+  }
+
   // ========== Annotations ==========
 
   getPageAnnotations(doc: PdfDocumentObject, page: PdfPageObject): PdfTask<PdfAnnotationObject[]> {
@@ -439,10 +581,11 @@ export class PdfEngine<T = Blob> implements IPdfEngine<T> {
     doc: PdfDocumentObject,
     page: PdfPageObject,
     annotation: PdfAnnotationObject,
+    options?: { regenerateAppearance?: boolean },
   ): PdfTask<boolean> {
     return this.workerQueue.enqueue(
       {
-        execute: () => this.executor.updatePageAnnotation(doc, page, annotation),
+        execute: () => this.executor.updatePageAnnotation(doc, page, annotation, options),
         meta: { docId: doc.id, pageIndex: page.index, operation: 'updatePageAnnotation' },
       },
       { priority: Priority.MEDIUM },
@@ -761,6 +904,16 @@ export class PdfEngine<T = Blob> implements IPdfEngine<T> {
       {
         execute: () => this.executor.getPageGeometry(doc, page),
         meta: { docId: doc.id, pageIndex: page.index, operation: 'getPageGeometry' },
+      },
+      { priority: Priority.MEDIUM },
+    );
+  }
+
+  getPageTextRuns(doc: PdfDocumentObject, page: PdfPageObject): PdfTask<PdfPageTextRuns> {
+    return this.workerQueue.enqueue(
+      {
+        execute: () => this.executor.getPageTextRuns(doc, page),
+        meta: { docId: doc.id, pageIndex: page.index, operation: 'getPageTextRuns' },
       },
       { priority: Priority.MEDIUM },
     );

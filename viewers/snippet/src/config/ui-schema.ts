@@ -247,7 +247,7 @@ export const viewerUISchema: UISchema = {
           componentId: 'mode-select-button',
           categories: ['mode'],
           visibilityDependsOn: {
-            menuId: 'mode-tabs-overflow-menu',
+            itemIds: ['mode:annotate', 'mode:shapes', 'mode:redact'],
           },
         },
 
@@ -976,6 +976,9 @@ export const viewerUISchema: UISchema = {
         {
           type: 'divider',
           id: 'divider-10',
+          visibilityDependsOn: {
+            itemIds: ['document:open', 'document:close'],
+          },
         },
         {
           type: 'command',

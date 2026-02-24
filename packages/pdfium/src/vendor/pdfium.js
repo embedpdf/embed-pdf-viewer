@@ -39,6 +39,7 @@ var createPdfium = (() => {
       '_EPDF_PNG_EncodeRGBA',
       '_EPDF_RemoveEncryption',
       '_EPDF_RenderAnnotBitmap',
+      '_EPDF_RenderAnnotBitmapUnrotated',
       '_EPDF_SetEncryption',
       '_EPDF_SetMetaText',
       '_EPDF_SetMetaTrapped',
@@ -54,6 +55,8 @@ var createPdfium = (() => {
       '_EPDFAnnot_Flatten',
       '_EPDFAnnot_GenerateAppearance',
       '_EPDFAnnot_GenerateAppearanceWithBlend',
+      '_EPDFAnnot_GetAPMatrix',
+      '_EPDFAnnot_GetAvailableAppearanceModes',
       '_EPDFAnnot_GetBlendMode',
       '_EPDFAnnot_GetBorderDashPattern',
       '_EPDFAnnot_GetBorderDashPatternCount',
@@ -61,22 +64,28 @@ var createPdfium = (() => {
       '_EPDFAnnot_GetBorderStyle',
       '_EPDFAnnot_GetColor',
       '_EPDFAnnot_GetDefaultAppearance',
+      '_EPDFAnnot_GetExtendedRotation',
       '_EPDFAnnot_GetIcon',
       '_EPDFAnnot_GetIntent',
       '_EPDFAnnot_GetLineEndings',
       '_EPDFAnnot_GetOpacity',
       '_EPDFAnnot_GetOverlayText',
       '_EPDFAnnot_GetOverlayTextRepeat',
+      '_EPDFAnnot_GetRect',
       '_EPDFAnnot_GetRectangleDifferences',
       '_EPDFAnnot_GetReplyType',
       '_EPDFAnnot_GetRichContent',
+      '_EPDFAnnot_GetRotate',
       '_EPDFAnnot_GetTextAlignment',
+      '_EPDFAnnot_GetUnrotatedRect',
       '_EPDFAnnot_GetVerticalAlignment',
       '_EPDFAnnot_SetAction',
+      '_EPDFAnnot_SetAPMatrix',
       '_EPDFAnnot_SetBorderDashPattern',
       '_EPDFAnnot_SetBorderStyle',
       '_EPDFAnnot_SetColor',
       '_EPDFAnnot_SetDefaultAppearance',
+      '_EPDFAnnot_SetExtendedRotation',
       '_EPDFAnnot_SetIcon',
       '_EPDFAnnot_SetIntent',
       '_EPDFAnnot_SetLine',
@@ -86,7 +95,9 @@ var createPdfium = (() => {
       '_EPDFAnnot_SetOverlayText',
       '_EPDFAnnot_SetOverlayTextRepeat',
       '_EPDFAnnot_SetReplyType',
+      '_EPDFAnnot_SetRotate',
       '_EPDFAnnot_SetTextAlignment',
+      '_EPDFAnnot_SetUnrotatedRect',
       '_EPDFAnnot_SetVerticalAlignment',
       '_EPDFAnnot_SetVertices',
       '_EPDFAnnot_UpdateAppearanceToRect',
@@ -356,6 +367,7 @@ var createPdfium = (() => {
       '_FPDFBookmark_GetFirstChild',
       '_FPDFBookmark_GetNextSibling',
       '_FPDFBookmark_GetTitle',
+      '_FPDFCatalog_GetLanguage',
       '_FPDFCatalog_IsTagged',
       '_FPDFCatalog_SetLanguage',
       '_FPDFClipPath_CountPaths',
@@ -500,12 +512,14 @@ var createPdfium = (() => {
       '_FPDFPageObjMark_CountParams',
       '_FPDFPageObjMark_GetName',
       '_FPDFPageObjMark_GetParamBlobValue',
+      '_FPDFPageObjMark_GetParamFloatValue',
       '_FPDFPageObjMark_GetParamIntValue',
       '_FPDFPageObjMark_GetParamKey',
       '_FPDFPageObjMark_GetParamStringValue',
       '_FPDFPageObjMark_GetParamValueType',
       '_FPDFPageObjMark_RemoveParam',
       '_FPDFPageObjMark_SetBlobParam',
+      '_FPDFPageObjMark_SetFloatParam',
       '_FPDFPageObjMark_SetIntParam',
       '_FPDFPageObjMark_SetStringParam',
       '_FPDFPath_BezierTo',
@@ -6237,6 +6251,14 @@ var createPdfium = (() => {
       'EPDFPage_CreateAnnot',
       2,
     ));
+    var _EPDFAnnot_SetRotate = (Module['_EPDFAnnot_SetRotate'] = createExportWrapper(
+      'EPDFAnnot_SetRotate',
+      2,
+    ));
+    var _EPDFAnnot_GetRotate = (Module['_EPDFAnnot_GetRotate'] = createExportWrapper(
+      'EPDFAnnot_GetRotate',
+      2,
+    ));
     var _EPDFAnnot_GetReplyType = (Module['_EPDFAnnot_GetReplyType'] = createExportWrapper(
       'EPDFAnnot_GetReplyType',
       1,
@@ -6269,6 +6291,32 @@ var createPdfium = (() => {
       'EPDFAnnot_Flatten',
       2,
     ));
+    var _EPDFAnnot_SetExtendedRotation = (Module['_EPDFAnnot_SetExtendedRotation'] =
+      createExportWrapper('EPDFAnnot_SetExtendedRotation', 2));
+    var _EPDFAnnot_GetExtendedRotation = (Module['_EPDFAnnot_GetExtendedRotation'] =
+      createExportWrapper('EPDFAnnot_GetExtendedRotation', 2));
+    var _EPDFAnnot_SetUnrotatedRect = (Module['_EPDFAnnot_SetUnrotatedRect'] = createExportWrapper(
+      'EPDFAnnot_SetUnrotatedRect',
+      2,
+    ));
+    var _EPDFAnnot_GetUnrotatedRect = (Module['_EPDFAnnot_GetUnrotatedRect'] = createExportWrapper(
+      'EPDFAnnot_GetUnrotatedRect',
+      2,
+    ));
+    var _EPDFAnnot_GetRect = (Module['_EPDFAnnot_GetRect'] = createExportWrapper(
+      'EPDFAnnot_GetRect',
+      2,
+    ));
+    var _EPDFAnnot_SetAPMatrix = (Module['_EPDFAnnot_SetAPMatrix'] = createExportWrapper(
+      'EPDFAnnot_SetAPMatrix',
+      3,
+    ));
+    var _EPDFAnnot_GetAPMatrix = (Module['_EPDFAnnot_GetAPMatrix'] = createExportWrapper(
+      'EPDFAnnot_GetAPMatrix',
+      3,
+    ));
+    var _EPDFAnnot_GetAvailableAppearanceModes = (Module['_EPDFAnnot_GetAvailableAppearanceModes'] =
+      createExportWrapper('EPDFAnnot_GetAvailableAppearanceModes', 1));
     var _FPDFDoc_GetAttachmentCount = (Module['_FPDFDoc_GetAttachmentCount'] = createExportWrapper(
       'FPDFDoc_GetAttachmentCount',
       1,
@@ -6324,6 +6372,10 @@ var createPdfium = (() => {
     var _FPDFCatalog_IsTagged = (Module['_FPDFCatalog_IsTagged'] = createExportWrapper(
       'FPDFCatalog_IsTagged',
       1,
+    ));
+    var _FPDFCatalog_GetLanguage = (Module['_FPDFCatalog_GetLanguage'] = createExportWrapper(
+      'FPDFCatalog_GetLanguage',
+      3,
     ));
     var _FPDFCatalog_SetLanguage = (Module['_FPDFCatalog_SetLanguage'] = createExportWrapper(
       'FPDFCatalog_SetLanguage',
@@ -6598,6 +6650,8 @@ var createPdfium = (() => {
       createExportWrapper('FPDFPageObjMark_GetParamValueType', 2));
     var _FPDFPageObjMark_GetParamIntValue = (Module['_FPDFPageObjMark_GetParamIntValue'] =
       createExportWrapper('FPDFPageObjMark_GetParamIntValue', 3));
+    var _FPDFPageObjMark_GetParamFloatValue = (Module['_FPDFPageObjMark_GetParamFloatValue'] =
+      createExportWrapper('FPDFPageObjMark_GetParamFloatValue', 3));
     var _FPDFPageObjMark_GetParamStringValue = (Module['_FPDFPageObjMark_GetParamStringValue'] =
       createExportWrapper('FPDFPageObjMark_GetParamStringValue', 5));
     var _FPDFPageObjMark_GetParamBlobValue = (Module['_FPDFPageObjMark_GetParamBlobValue'] =
@@ -6606,6 +6660,8 @@ var createPdfium = (() => {
       createExportWrapper('FPDFPageObj_HasTransparency', 1));
     var _FPDFPageObjMark_SetIntParam = (Module['_FPDFPageObjMark_SetIntParam'] =
       createExportWrapper('FPDFPageObjMark_SetIntParam', 5));
+    var _FPDFPageObjMark_SetFloatParam = (Module['_FPDFPageObjMark_SetFloatParam'] =
+      createExportWrapper('FPDFPageObjMark_SetFloatParam', 5));
     var _FPDFPageObjMark_SetStringParam = (Module['_FPDFPageObjMark_SetStringParam'] =
       createExportWrapper('FPDFPageObjMark_SetStringParam', 5));
     var _FPDFPageObjMark_SetBlobParam = (Module['_FPDFPageObjMark_SetBlobParam'] =
@@ -7502,6 +7558,8 @@ var createPdfium = (() => {
       'EPDF_RenderAnnotBitmap',
       6,
     ));
+    var _EPDF_RenderAnnotBitmapUnrotated = (Module['_EPDF_RenderAnnotBitmapUnrotated'] =
+      createExportWrapper('EPDF_RenderAnnotBitmapUnrotated', 6));
     var _FPDF_ClosePage = (Module['_FPDF_ClosePage'] = createExportWrapper('FPDF_ClosePage', 1));
     var _FPDF_CloseDocument = (Module['_FPDF_CloseDocument'] = createExportWrapper(
       'FPDF_CloseDocument',
@@ -7637,14 +7695,14 @@ var createPdfium = (() => {
       (__emscripten_stack_alloc = wasmExports['_emscripten_stack_alloc'])(a0);
     var _emscripten_stack_get_current = () =>
       (_emscripten_stack_get_current = wasmExports['emscripten_stack_get_current'])();
-    var dynCall_ji = (Module['dynCall_ji'] = createExportWrapper('dynCall_ji', 2));
-    var dynCall_jij = (Module['dynCall_jij'] = createExportWrapper('dynCall_jij', 4));
-    var dynCall_iiij = (Module['dynCall_iiij'] = createExportWrapper('dynCall_iiij', 5));
-    var dynCall_iij = (Module['dynCall_iij'] = createExportWrapper('dynCall_iij', 4));
     var dynCall_j = (Module['dynCall_j'] = createExportWrapper('dynCall_j', 1));
+    var dynCall_ji = (Module['dynCall_ji'] = createExportWrapper('dynCall_ji', 2));
+    var dynCall_iiij = (Module['dynCall_iiij'] = createExportWrapper('dynCall_iiij', 5));
     var dynCall_jji = (Module['dynCall_jji'] = createExportWrapper('dynCall_jji', 4));
     var dynCall_iji = (Module['dynCall_iji'] = createExportWrapper('dynCall_iji', 4));
     var dynCall_viijii = (Module['dynCall_viijii'] = createExportWrapper('dynCall_viijii', 7));
+    var dynCall_jij = (Module['dynCall_jij'] = createExportWrapper('dynCall_jij', 4));
+    var dynCall_iij = (Module['dynCall_iij'] = createExportWrapper('dynCall_iij', 4));
     var dynCall_iiji = (Module['dynCall_iiji'] = createExportWrapper('dynCall_iiji', 5));
     var dynCall_jiji = (Module['dynCall_jiji'] = createExportWrapper('dynCall_jiji', 5));
     var dynCall_iiiiij = (Module['dynCall_iiiiij'] = createExportWrapper('dynCall_iiiiij', 7));

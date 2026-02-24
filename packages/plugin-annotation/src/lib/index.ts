@@ -25,5 +25,6 @@ export * from './helpers';
 export * from './handlers/types';
 export * from './tools/types';
 export * from './tools/tools-utils';
+export * from './geometry';
 export * as patching from './patching';
 export { initialState, initialDocumentState } from './reducer';

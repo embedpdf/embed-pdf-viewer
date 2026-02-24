@@ -1,14 +1,12 @@
 import { useMemo, MouseEvent, TouchEvent } from '@framework';
 import { PdfAnnotationBorderStyle, Rect } from '@embedpdf/models';
 
-/* ---------------------------------------------------------------- *\
-|* Types                                                            *|
-\* ---------------------------------------------------------------- */
+const MIN_HIT_AREA_SCREEN_PX = 20;
 
 interface SquareProps {
   /** Whether the annotation is selected */
   isSelected: boolean;
-  /** Fill colour – defaults to PDFium’s black if omitted */
+  /** Fill colour – defaults to PDFium's black if omitted */
   color?: string;
   /** Stroke colour – defaults to same as fill when omitted */
   strokeColor?: string;
@@ -26,6 +24,8 @@ interface SquareProps {
   scale: number;
   /** Click handler (used for selection) */
   onClick?: (e: MouseEvent<SVGElement> | TouchEvent<SVGElement>) => void;
+  /** When true, AP canvas provides the visual; only render hit area */
+  appearanceActive?: boolean;
 }
 
 /**
@@ -42,16 +42,11 @@ export function Square({
   rect,
   scale,
   onClick,
+  appearanceActive = false,
 }: SquareProps): JSX.Element {
-  /* ------------------------------------------------------------------ */
-  /* geometry helpers                                                   */
-  /* ------------------------------------------------------------------ */
   const { width, height, x, y } = useMemo(() => {
-    // Full bounding box *includes* stroke width.
     const outerW = rect.size.width;
     const outerH = rect.size.height;
-
-    // Remove the stroke so the visible fill matches the preview.
     const innerW = Math.max(outerW - strokeWidth, 0);
     const innerH = Math.max(outerH - strokeWidth, 0);
 
@@ -65,6 +60,7 @@ export function Square({
 
   const svgWidth = (width + strokeWidth) * scale;
   const svgHeight = (height + strokeWidth) * scale;
+  const hitStrokeWidth = Math.max(strokeWidth, MIN_HIT_AREA_SCREEN_PX / scale);
 
   return (
     <svg
@@ -78,14 +74,17 @@ export function Square({
       width={svgWidth}
       height={svgHeight}
       viewBox={`0 0 ${width + strokeWidth} ${height + strokeWidth}`}
+      overflow="visible"
     >
+      {/* Hit area -- always rendered, transparent, wider stroke for mobile */}
       <rect
         x={x}
         y={y}
         width={width}
         height={height}
-        fill={color}
-        opacity={opacity}
+        fill="transparent"
+        stroke="transparent"
+        strokeWidth={hitStrokeWidth}
         onPointerDown={onClick}
         onTouchStart={onClick}
         style={{
@@ -95,13 +94,27 @@ export function Square({
             : color === 'transparent'
               ? 'visibleStroke'
               : 'visible',
-          stroke: strokeColor ?? color,
-          strokeWidth,
-          ...(strokeStyle === PdfAnnotationBorderStyle.DASHED && {
-            strokeDasharray: strokeDashArray?.join(','),
-          }),
         }}
       />
+      {/* Visual -- hidden when AP active, never interactive */}
+      {!appearanceActive && (
+        <rect
+          x={x}
+          y={y}
+          width={width}
+          height={height}
+          fill={color}
+          opacity={opacity}
+          style={{
+            pointerEvents: 'none',
+            stroke: strokeColor ?? color,
+            strokeWidth,
+            ...(strokeStyle === PdfAnnotationBorderStyle.DASHED && {
+              strokeDasharray: strokeDashArray?.join(','),
+            }),
+          }}
+        />
+      )}
     </svg>
   );
 }

@@ -18,10 +18,13 @@ import {
 
 export interface UseDragResizeOptions {
   element: MaybeRef<Rect>;
+  rotationCenter?: MaybeRef<Position | undefined>;
+  rotationElement?: MaybeRef<Rect | undefined>;
   vertices?: MaybeRef<Position[]>;
   constraints?: MaybeRef<DragResizeConfig['constraints']>;
   maintainAspectRatio?: MaybeRef<boolean>;
   pageRotation?: MaybeRef<number>;
+  annotationRotation?: MaybeRef<number>;
   scale?: MaybeRef<number>;
   onUpdate?: (event: InteractionEvent) => void;
   enabled?: MaybeRef<boolean>;
@@ -33,10 +36,13 @@ export function useDragResize(options: UseDragResizeOptions) {
   const {
     onUpdate,
     element,
+    rotationCenter,
+    rotationElement,
     vertices,
     constraints,
     maintainAspectRatio,
     pageRotation,
+    annotationRotation,
     scale,
     enabled,
   } = options;
@@ -44,10 +50,15 @@ export function useDragResize(options: UseDragResizeOptions) {
   // Build initial plain config
   const initialCfg: DragResizeConfig = {
     element: rectDTO(norm(element)),
+    rotationCenter: rotationCenter ? norm(rotationCenter) : undefined,
+    rotationElement: rotationElement ? rectDTO(norm(rotationElement)) : undefined,
     vertices: vertices ? vertsDTO(norm(vertices)) : undefined,
     constraints: constraintsDTO(constraints),
     maintainAspectRatio: boolDTO(enabled === undefined ? undefined : norm(maintainAspectRatio!)),
     pageRotation: numDTO(pageRotation === undefined ? undefined : norm(pageRotation!)),
+    annotationRotation: numDTO(
+      annotationRotation === undefined ? undefined : norm(annotationRotation!),
+    ),
     scale: numDTO(scale === undefined ? undefined : norm(scale!)),
   };
 
@@ -59,21 +70,29 @@ export function useDragResize(options: UseDragResizeOptions) {
   watch(
     () => ({
       element,
+      rotationCenter,
+      rotationElement,
       vertices,
       constraints,
       maintainAspectRatio,
       pageRotation,
+      annotationRotation,
       scale,
     }),
     (nc) => {
       controller.value?.updateConfig({
         element: rectDTO(norm(nc.element)),
+        rotationCenter: nc.rotationCenter ? norm(nc.rotationCenter) : undefined,
+        rotationElement: nc.rotationElement ? rectDTO(norm(nc.rotationElement)) : undefined,
         vertices: nc.vertices ? vertsDTO(norm(nc.vertices)) : undefined,
         constraints: constraintsDTO(nc.constraints),
         maintainAspectRatio: boolDTO(
           nc.maintainAspectRatio === undefined ? undefined : norm(nc.maintainAspectRatio!),
         ),
         pageRotation: numDTO(nc.pageRotation === undefined ? undefined : norm(nc.pageRotation!)),
+        annotationRotation: numDTO(
+          nc.annotationRotation === undefined ? undefined : norm(nc.annotationRotation!),
+        ),
         scale: numDTO(nc.scale === undefined ? undefined : norm(nc.scale!)),
       });
     },
@@ -94,7 +113,7 @@ export function useDragResize(options: UseDragResizeOptions) {
     controller.value?.startDrag(e.clientX, e.clientY);
     (e.currentTarget as HTMLElement).setPointerCapture?.(e.pointerId);
   };
-  const handleMove = (e: PointerEvent) => controller.value?.move(e.clientX, e.clientY);
+  const handleMove = (e: PointerEvent) => controller.value?.move(e.clientX, e.clientY, e.buttons);
   const handleEnd = (e: PointerEvent) => {
     controller.value?.end();
     (e.currentTarget as HTMLElement).releasePointerCapture?.(e.pointerId);
@@ -130,6 +149,26 @@ export function useDragResize(options: UseDragResizeOptions) {
     onPointercancel: handleCancel,
   });
 
+  const createRotationProps = (initialRotation: number = 0, orbitRadiusPx?: number) => ({
+    onPointerdown: (e: PointerEvent) => {
+      if (!isEnabled()) return;
+      e.preventDefault();
+      e.stopPropagation();
+      // Use the handle's actual DOM center, not the raw click position.
+      // This avoids up to handleSize/2 px error when the user clicks
+      // near the edge of the handle circle, which would shift the
+      // reverse-engineered center and distort angles near the center.
+      const handleRect = (e.currentTarget as HTMLElement).getBoundingClientRect();
+      const handleCenterX = handleRect.left + handleRect.width / 2;
+      const handleCenterY = handleRect.top + handleRect.height / 2;
+      controller.value?.startRotation(handleCenterX, handleCenterY, initialRotation, orbitRadiusPx);
+      (e.currentTarget as HTMLElement).setPointerCapture?.(e.pointerId);
+    },
+    onPointermove: handleMove,
+    onPointerup: handleEnd,
+    onPointercancel: handleCancel,
+  });
+
   const dragProps = computed(() =>
     isEnabled()
       ? {
@@ -141,5 +180,5 @@ export function useDragResize(options: UseDragResizeOptions) {
       : {},
   );
 
-  return { dragProps, createResizeProps, createVertexProps };
+  return { dragProps, createResizeProps, createVertexProps, createRotationProps };
 }

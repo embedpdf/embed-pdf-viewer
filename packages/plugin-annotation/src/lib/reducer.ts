@@ -6,6 +6,7 @@ import {
   DELETE_ANNOTATION,
   DESELECT_ANNOTATION,
   PATCH_ANNOTATION,
+  MOVE_ANNOTATION,
   PURGE_ANNOTATION,
   SELECT_ANNOTATION,
   ADD_TO_SELECTION,
@@ -73,7 +74,34 @@ const patchAnno = (
       ...docState.byUid,
       [uid]: {
         ...prev,
-        commitState: prev.commitState === 'synced' ? 'dirty' : prev.commitState,
+        commitState:
+          prev.commitState === 'synced' || prev.commitState === 'moved'
+            ? 'dirty'
+            : prev.commitState,
+        object: { ...prev.object, ...patch },
+        dictMode: true,
+      } as TrackedAnnotation,
+    },
+    hasPendingChanges: true,
+  };
+};
+
+// Helper function to apply a move to an annotation (position-only, preserves AP)
+const moveAnno = (
+  docState: AnnotationDocumentState,
+  uid: string,
+  patch: Partial<TrackedAnnotation['object']>,
+): AnnotationDocumentState => {
+  const prev = docState.byUid[uid];
+  if (!prev) return docState;
+  return {
+    ...docState,
+    byUid: {
+      ...docState.byUid,
+      [uid]: {
+        ...prev,
+        // synced -> moved, moved -> moved, dirty stays dirty, new stays new
+        commitState: prev.commitState === 'synced' ? 'moved' : prev.commitState,
         object: { ...prev.object, ...patch },
       } as TrackedAnnotation,
     },
@@ -82,21 +110,51 @@ const patchAnno = (
 };
 
 export const initialState = (cfg: AnnotationPluginConfig): AnnotationState => {
-  // Create a Map with a general type signature. This resolves the type conflicts.
-  const toolMap = new Map<string, AnnotationTool>();
+  // Build a map of default tools, keyed by ID.
+  const defaultMap = new Map<string, AnnotationTool>();
+  defaultTools.forEach((t) => defaultMap.set(t.id, t as AnnotationTool));
 
-  // The `satisfies` operator has already validated the specific types in `defaultTools`.
-  // Now, we cast each one to the general `AnnotationTool` type for storage in our unified map.
-  defaultTools.forEach((t) => toolMap.set(t.id, t as AnnotationTool));
+  // Deep-merge user-provided tools with defaults (user values take precedence).
+  // New tools (unmatched ID) are added as-is.
+  const toolMap = new Map<string, AnnotationTool>(defaultMap);
+  (cfg.tools || []).forEach((userTool) => {
+    const base = defaultMap.get(userTool.id);
+    if (base) {
+      toolMap.set(userTool.id, {
+        ...base,
+        ...userTool,
+        defaults: { ...base.defaults, ...userTool.defaults },
+        interaction: { ...base.interaction, ...userTool.interaction },
+        behavior: { ...base.behavior, ...userTool.behavior },
+        ...((base as any).clickBehavior || (userTool as any).clickBehavior
+          ? {
+              clickBehavior: {
+                ...(base as any).clickBehavior,
+                ...(userTool as any).clickBehavior,
+              },
+            }
+          : {}),
+      } as AnnotationTool);
+    } else {
+      toolMap.set(userTool.id, userTool as AnnotationTool);
+    }
+  });
 
-  // User-provided tools can now be safely added, as they also match the `AnnotationTool` type.
-  (cfg.tools || []).forEach((t) => toolMap.set(t.id, t));
+  // Resolve behavior: merge global config defaults into each tool's behavior.
+  const tools = Array.from(toolMap.values()).map((t) => ({
+    ...t,
+    behavior: {
+      ...t.behavior,
+      deactivateToolAfterCreate:
+        t.behavior?.deactivateToolAfterCreate ?? cfg.deactivateToolAfterCreate ?? false,
+      selectAfterCreate: t.behavior?.selectAfterCreate ?? cfg.selectAfterCreate ?? true,
+    },
+  }));
 
   return {
     documents: {},
     activeDocumentId: null,
-    // `Array.from(toolMap.values())` now correctly returns `AnnotationTool[]`, which matches the state's type.
-    tools: Array.from(toolMap.values()),
+    tools,
     colorPresets: cfg.colorPresets ?? DEFAULT_COLORS,
   };
 };
@@ -336,6 +394,20 @@ export const reducer: Reducer<AnnotationState, AnnotationAction> = (state, actio
       };
     }
 
+    case MOVE_ANNOTATION: {
+      const { documentId, id, patch } = action.payload;
+      const docState = state.documents[documentId];
+      if (!docState) return state;
+
+      return {
+        ...state,
+        documents: {
+          ...state.documents,
+          [documentId]: moveAnno(docState, id, patch),
+        },
+      };
+    }
+
     case COMMIT_PENDING_CHANGES: {
       const { documentId, committedUids } = action.payload;
       const docState = state.documents[documentId];
@@ -351,7 +423,9 @@ export const reducer: Reducer<AnnotationState, AnnotationAction> = (state, actio
           cleaned[uid] = {
             ...ta,
             commitState:
-              ta.commitState === 'dirty' || ta.commitState === 'new' ? 'synced' : ta.commitState,
+              ta.commitState === 'dirty' || ta.commitState === 'new' || ta.commitState === 'moved'
+                ? 'synced'
+                : ta.commitState,
           };
         } else {
           // This UID was not committed - keep its current state
@@ -359,6 +433,7 @@ export const reducer: Reducer<AnnotationState, AnnotationAction> = (state, actio
           if (
             ta.commitState === 'new' ||
             ta.commitState === 'dirty' ||
+            ta.commitState === 'moved' ||
             ta.commitState === 'deleted'
           ) {
             stillHasPending = true;

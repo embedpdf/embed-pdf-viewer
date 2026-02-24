@@ -16,16 +16,22 @@
       :pageIndex="pageIndex"
       :annotation="{ ...annotation.object, id: annotation.object.id }"
       :scaleFactor="scale"
+      :unrotated="unrotated"
     />
   </div>
 </template>
 
+<script lang="ts">
+export default { inheritAttrs: false };
+</script>
+
 <script setup lang="ts">
+import { computed } from 'vue';
 import { PdfStampAnnoObject } from '@embedpdf/models';
 import { TrackedAnnotation } from '@embedpdf/plugin-annotation';
 import RenderAnnotation from '../render-annotation.vue';
 
-defineProps<{
+const props = defineProps<{
   isSelected: boolean;
   annotation: TrackedAnnotation<PdfStampAnnoObject>;
   documentId: string;
@@ -33,4 +39,8 @@ defineProps<{
   scale: number;
   onClick: (e: PointerEvent | TouchEvent) => void;
 }>();
+
+const unrotated = computed(
+  () => !!props.annotation.object.rotation && !!props.annotation.object.unrotatedRect,
+);
 </script>

@@ -50,7 +50,7 @@ export function useDragResize(getOptions: () => UseDragResizeOptions) {
   const handleMove = (e: PointerEvent) => {
     e.preventDefault();
     e.stopPropagation();
-    controller?.move(e.clientX, e.clientY);
+    controller?.move(e.clientX, e.clientY, e.buttons);
   };
 
   const handleEnd = (e: PointerEvent) => {
@@ -86,6 +86,29 @@ export function useDragResize(getOptions: () => UseDragResizeOptions) {
     onpointercancel: handleEnd,
   });
 
+  const createRotationHandler = (
+    initialRotation: number = 0,
+    orbitRadiusPx?: number,
+  ): ResizeHandleEventProps => ({
+    onpointerdown: (e: PointerEvent) => {
+      if (!enabled) return;
+      e.preventDefault();
+      e.stopPropagation();
+      // Use the handle's actual DOM center, not the raw click position.
+      // This avoids up to handleSize/2 px error when the user clicks
+      // near the edge of the handle circle, which would shift the
+      // reverse-engineered center and distort angles near the center.
+      const handleRect = (e.currentTarget as HTMLElement).getBoundingClientRect();
+      const handleCenterX = handleRect.left + handleRect.width / 2;
+      const handleCenterY = handleRect.top + handleRect.height / 2;
+      controller?.startRotation(handleCenterX, handleCenterY, initialRotation, orbitRadiusPx);
+      (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
+    },
+    onpointermove: handleMove,
+    onpointerup: handleEnd,
+    onpointercancel: handleEnd,
+  });
+
   const dragProps = $derived(
     enabled
       ? {
@@ -103,5 +126,6 @@ export function useDragResize(getOptions: () => UseDragResizeOptions) {
     },
     createResizeProps: createResizeHandler,
     createVertexProps: createVertexHandler,
+    createRotationProps: createRotationHandler,
   };
 }

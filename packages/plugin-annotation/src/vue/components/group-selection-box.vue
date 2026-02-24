@@ -1,24 +1,90 @@
 <template>
   <div v-if="selectedAnnotations.length >= 2" data-group-selection-box data-no-interaction>
-    <!-- Group box - draggable only if effectiveIsDraggable is true -->
-    <div
-      v-bind="effectiveIsDraggable ? dragProps : {}"
-      :style="boxStyle"
-      @pointerdown="!effectiveIsDraggable ? $event.stopPropagation() : undefined"
-    >
-      <!-- Resize handles -->
-      <template v-if="effectiveIsResizable">
-        <template v-for="{ key, style, ...handle } in resize" :key="key">
-          <slot
-            v-if="slots['resize-handle']"
-            name="resize-handle"
-            v-bind="{ key, style, ...handle, backgroundColor: HANDLE_COLOR }"
-          >
-            <div v-bind="handle" :style="[style, { backgroundColor: HANDLE_COLOR }]" />
-          </slot>
-          <div v-else v-bind="handle" :style="[style, { backgroundColor: HANDLE_COLOR }]" />
-        </template>
+    <!-- Outer div: AABB container - stable center for guide lines and rotation handle -->
+    <div :style="outerStyle">
+      <!-- Rotation guide lines - anchored at stable center -->
+      <template v-if="rotationActive">
+        <div :style="guideHorizontalStyle" />
+        <div :style="guideVerticalStyle" />
+        <div :style="guideAngleStyle" />
       </template>
+
+      <!-- Rotation handle - orbits in AABB space -->
+      <template v-if="effectiveIsRotatable && rotationHandleData">
+        <div
+          @pointerenter="isHandleHovered = true"
+          @pointerleave="
+            isHandleHovered = false;
+            cursorScreen = null;
+          "
+          @pointermove="onHandlePointerMove"
+          :style="contentsStyle"
+        >
+          <!-- Connector line -->
+          <div v-if="SHOW_CONNECTOR" :style="connectorLineStyle" />
+          <!-- Rotation handle element -->
+          <slot
+            v-if="slots['rotation-handle']"
+            name="rotation-handle"
+            v-bind="rotationHandleSlotProps"
+          >
+            <div v-bind="rotationHandleBindings" :style="rotationHandleStyle">
+              <svg
+                :width="rotationIconSize"
+                :height="rotationIconSize"
+                viewBox="0 0 24 24"
+                fill="none"
+                :stroke="ROTATION_ICON_COLOR"
+                stroke-width="2"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+              >
+                <path d="M21 12a9 9 0 1 1-9-9c2.52 0 4.93 1 6.74 2.74L21 8" />
+                <path d="M21 3v5h-5" />
+              </svg>
+            </div>
+          </slot>
+          <div v-else v-bind="rotationHandleBindings" :style="rotationHandleStyle">
+            <svg
+              :width="rotationIconSize"
+              :height="rotationIconSize"
+              viewBox="0 0 24 24"
+              fill="none"
+              :stroke="ROTATION_ICON_COLOR"
+              stroke-width="2"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+            >
+              <path d="M21 12a9 9 0 1 1-9-9c2.52 0 4.93 1 6.74 2.74L21 8" />
+              <path d="M21 3v5h-5" />
+            </svg>
+          </div>
+        </div>
+      </template>
+
+      <!-- Inner div: group content area with outline and resize handles -->
+      <div
+        v-bind="
+          effectiveIsDraggable
+            ? dragProps
+            : { onPointerdown: (e: PointerEvent) => e.stopPropagation() }
+        "
+        :style="boxStyle"
+      >
+        <!-- Resize handles -->
+        <template v-if="effectiveIsResizable && !rotationActive">
+          <template v-for="{ key, style, ...handle } in resize" :key="key">
+            <slot
+              v-if="slots['resize-handle']"
+              name="resize-handle"
+              v-bind="{ key, style, ...handle, backgroundColor: HANDLE_COLOR }"
+            >
+              <div v-bind="handle" :style="[style, { backgroundColor: HANDLE_COLOR }]" />
+            </slot>
+            <div v-else v-bind="handle" :style="[style, { backgroundColor: HANDLE_COLOR }]" />
+          </template>
+        </template>
+      </div>
     </div>
 
     <!-- Group selection menu -->
@@ -39,11 +105,25 @@
         />
       </template>
     </CounterRotate>
+
+    <!-- Cursor-following rotation tooltip - portaled to body to escape CSS transform chain -->
+    <Teleport to="body" v-if="(rotationActive || isHandleHovered) && cursorScreen">
+      <div :style="tooltipStyle">{{ normalizedRotationDisplay.toFixed(0) }}°</div>
+    </Teleport>
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, computed, useSlots, VNode, shallowRef, watch } from 'vue';
+import {
+  ref,
+  computed,
+  useSlots,
+  type CSSProperties,
+  type VNode,
+  shallowRef,
+  watch,
+  Teleport,
+} from 'vue';
 import { Rect, boundingRectOrEmpty } from '@embedpdf/models';
 import {
   CounterRotate,
@@ -56,9 +136,11 @@ import { useDocumentPermissions } from '@embedpdf/core/vue';
 import { useAnnotationPlugin } from '../hooks';
 import {
   GroupSelectionContext,
-  GroupSelectionMenuProps,
   GroupSelectionMenuRenderFn,
   ResizeHandleUI,
+  RotationHandleUI,
+  RotationHandleSlotProps,
+  SelectionOutline,
 } from '../types';
 
 const props = withDefaults(
@@ -75,12 +157,20 @@ const props = withDefaults(
     isDraggable: boolean;
     /** Whether the group is resizable (all annotations must be group-resizable) */
     isResizable: boolean;
+    /** Whether the group can be rotated */
+    isRotatable?: boolean;
+    /** Whether to lock aspect ratio during group resize */
+    lockAspectRatio?: boolean;
     /** Resize handle UI customization */
-    resizeUI?: ResizeHandleUI;
-    /** Selection outline color */
+    resizeUi?: ResizeHandleUI;
+    /** Rotation handle UI customization */
+    rotationUi?: RotationHandleUI;
+    /** @deprecated Use `selectionOutline.color` instead */
     selectionOutlineColor?: string;
-    /** Outline offset */
+    /** @deprecated Use `selectionOutline.offset` instead */
     outlineOffset?: number;
+    /** Customize the selection outline (color, style, width, offset) */
+    selectionOutline?: SelectionOutline;
     /** Z-index for the group box */
     zIndex?: number;
     /** Group selection menu render function */
@@ -90,6 +180,8 @@ const props = withDefaults(
     selectionOutlineColor: '#007ACC',
     outlineOffset: 2,
     zIndex: 100,
+    isRotatable: true,
+    lockAspectRatio: false,
   },
 );
 
@@ -99,17 +191,50 @@ const permissions = useDocumentPermissions(() => props.documentId);
 const gestureBase = shallowRef<Rect | null>(null);
 const isDraggingRef = ref(false);
 const isResizingRef = ref(false);
+const liveRotation = ref<number | null>(null);
+const cursorScreen = ref<{ x: number; y: number } | null>(null);
+const isHandleHovered = ref(false);
 
-// Check permissions before allowing drag/resize
+// Check permissions before allowing drag/resize/rotate
 const effectiveIsDraggable = computed(
   () => permissions.value.canModifyAnnotations && props.isDraggable,
 );
 const effectiveIsResizable = computed(
   () => permissions.value.canModifyAnnotations && props.isResizable,
 );
+const effectiveIsRotatable = computed(
+  () => permissions.value.canModifyAnnotations && props.isRotatable,
+);
 
-const HANDLE_COLOR = computed(() => props.resizeUI?.color ?? '#007ACC');
-const HANDLE_SIZE = computed(() => props.resizeUI?.size ?? 12);
+// UI constants
+const HANDLE_COLOR = computed(() => props.resizeUi?.color ?? '#007ACC');
+const HANDLE_SIZE = computed(() => props.resizeUi?.size ?? 12);
+const ROTATION_SIZE = computed(() => props.rotationUi?.size ?? 32);
+const ROTATION_COLOR = computed(() => props.rotationUi?.color ?? 'white');
+const ROTATION_CONNECTOR_COLOR = computed(() => props.rotationUi?.connectorColor ?? '#007ACC');
+const ROTATION_ICON_COLOR = computed(() => props.rotationUi?.iconColor ?? '#007ACC');
+const SHOW_CONNECTOR = computed(() => props.rotationUi?.showConnector ?? false);
+const ROTATION_MARGIN = computed(() => props.rotationUi?.margin);
+const ROTATION_BORDER_COLOR = computed(() => props.rotationUi?.border?.color ?? '#007ACC');
+const ROTATION_BORDER_WIDTH = computed(() => props.rotationUi?.border?.width ?? 1);
+const ROTATION_BORDER_STYLE = computed(() => props.rotationUi?.border?.style ?? 'solid');
+
+// Outline resolution (new object > deprecated props > group defaults)
+const outlineColor = computed(
+  () => props.selectionOutline?.color ?? props.selectionOutlineColor ?? '#007ACC',
+);
+const outlineStyleVal = computed(() => props.selectionOutline?.style ?? 'dashed');
+const outlineWidth = computed(() => props.selectionOutline?.width ?? 2);
+const outlineOff = computed(() => props.selectionOutline?.offset ?? props.outlineOffset ?? 2);
+
+// Rotation display
+const groupRotationDisplay = computed(() => liveRotation.value ?? 0);
+const rotationActive = computed(() => liveRotation.value !== null);
+const normalizedRotationDisplay = computed(() => {
+  const val = groupRotationDisplay.value;
+  return Number.isFinite(val) ? Math.round(val * 10) / 10 : 0;
+});
+const rotationIconSize = computed(() => Math.round(ROTATION_SIZE.value * 0.6));
 
 // Compute the group bounding box from all selected annotations
 const groupBox = computed(() => {
@@ -121,7 +246,6 @@ const groupBox = computed(() => {
 const previewGroupBox = shallowRef<Rect>(groupBox.value);
 
 // Watch for groupBox changes and sync previewGroupBox when not dragging/resizing
-// Use watchEffect equivalent via computed with side effects won't work, need explicit watch
 watch(
   () => groupBox.value,
   (newGroupBox) => {
@@ -132,18 +256,148 @@ watch(
   { immediate: true },
 );
 
-// Box styling
-const boxStyle = computed(() => ({
-  position: 'absolute' as 'absolute',
+// Subscribe to rotation end/cancel events
+watch(
+  () => annotationPlugin.value,
+  (plugin, _old, onCleanup) => {
+    if (!plugin) return;
+    const unsub = plugin.onRotateChange((event: { documentId: string; type: string }) => {
+      if (event.documentId !== props.documentId) return;
+      if (event.type === 'end' || event.type === 'cancel') {
+        liveRotation.value = null;
+      }
+    });
+    onCleanup(unsub);
+  },
+  { immediate: true },
+);
+
+// Layout computations
+const groupBoxWidth = computed(() => previewGroupBox.value.size.width * props.scale);
+const groupBoxHeight = computed(() => previewGroupBox.value.size.height * props.scale);
+const groupCenterX = computed(() => groupBoxWidth.value / 2);
+const groupCenterY = computed(() => groupBoxHeight.value / 2);
+const groupGuideLength = computed(() =>
+  Math.max(300, Math.max(groupBoxWidth.value, groupBoxHeight.value) + 80),
+);
+
+// ─── Extracted style computations ──────────────────────────────────────
+const contentsStyle: CSSProperties = { display: 'contents' };
+
+const outerStyle = computed<CSSProperties>(() => ({
+  position: 'absolute',
   left: `${previewGroupBox.value.origin.x * props.scale}px`,
   top: `${previewGroupBox.value.origin.y * props.scale}px`,
-  width: `${previewGroupBox.value.size.width * props.scale}px`,
-  height: `${previewGroupBox.value.size.height * props.scale}px`,
-  outline: `2px dashed ${props.selectionOutlineColor}`,
-  outlineOffset: `${props.outlineOffset - 1}px`,
+  width: `${groupBoxWidth.value}px`,
+  height: `${groupBoxHeight.value}px`,
+  pointerEvents: 'none',
+  zIndex: props.zIndex,
+}));
+
+const boxStyle = computed<CSSProperties>(() => ({
+  position: 'absolute',
+  left: 0,
+  top: 0,
+  width: `${groupBoxWidth.value}px`,
+  height: `${groupBoxHeight.value}px`,
+  outline: rotationActive.value
+    ? 'none'
+    : `${outlineWidth.value}px ${outlineStyleVal.value} ${outlineColor.value}`,
+  outlineOffset: `${outlineOff.value - 1}px`,
   cursor: effectiveIsDraggable.value ? 'move' : 'default',
   touchAction: 'none',
-  zIndex: props.zIndex,
+  pointerEvents: 'auto',
+}));
+
+const guideHorizontalStyle = computed<CSSProperties>(() => ({
+  position: 'absolute',
+  left: `${groupCenterX.value - groupGuideLength.value / 2}px`,
+  top: `${groupCenterY.value}px`,
+  width: `${groupGuideLength.value}px`,
+  height: '1px',
+  backgroundColor: HANDLE_COLOR.value,
+  opacity: 0.35,
+  pointerEvents: 'none',
+}));
+
+const guideVerticalStyle = computed<CSSProperties>(() => ({
+  position: 'absolute',
+  left: `${groupCenterX.value}px`,
+  top: `${groupCenterY.value - groupGuideLength.value / 2}px`,
+  width: '1px',
+  height: `${groupGuideLength.value}px`,
+  backgroundColor: HANDLE_COLOR.value,
+  opacity: 0.35,
+  pointerEvents: 'none',
+}));
+
+const guideAngleStyle = computed<CSSProperties>(() => ({
+  position: 'absolute',
+  left: `${groupCenterX.value - groupGuideLength.value / 2}px`,
+  top: `${groupCenterY.value}px`,
+  width: `${groupGuideLength.value}px`,
+  height: '1px',
+  transformOrigin: 'center center',
+  transform: `rotate(${groupRotationDisplay.value}deg)`,
+  backgroundColor: HANDLE_COLOR.value,
+  opacity: 0.8,
+  pointerEvents: 'none',
+}));
+
+const connectorLineStyle = computed<CSSProperties>(() => ({
+  ...(rotationHandleData.value?.connector.style ?? {}),
+  backgroundColor: ROTATION_CONNECTOR_COLOR.value,
+  opacity: rotationActive.value ? 0 : 1,
+}));
+
+const rotationHandleStyle = computed<CSSProperties>(() => ({
+  ...(rotationHandleData.value?.handle.style ?? {}),
+  backgroundColor: ROTATION_COLOR.value,
+  border: `${ROTATION_BORDER_WIDTH.value}px ${ROTATION_BORDER_STYLE.value} ${ROTATION_BORDER_COLOR.value}`,
+  boxSizing: 'border-box',
+  display: 'flex',
+  alignItems: 'center',
+  justifyContent: 'center',
+  pointerEvents: 'auto',
+  opacity: rotationActive.value ? 0 : 1,
+}));
+
+const rotationHandleBindings = computed(() => {
+  if (!rotationHandleData.value) return {};
+  const { style: _s, ...rest } = rotationHandleData.value.handle;
+  return rest;
+});
+
+const rotationHandleSlotProps = computed<RotationHandleSlotProps | Record<string, never>>(() => {
+  if (!rotationHandleData.value) return {} as Record<string, never>;
+  return {
+    ...rotationHandleData.value.handle,
+    backgroundColor: ROTATION_COLOR.value,
+    iconColor: ROTATION_ICON_COLOR.value,
+    connectorStyle: connectorLineStyle.value,
+    showConnector: SHOW_CONNECTOR.value,
+    opacity: rotationActive.value ? 0 : 1,
+    border: {
+      color: ROTATION_BORDER_COLOR.value,
+      width: ROTATION_BORDER_WIDTH.value,
+      style: ROTATION_BORDER_STYLE.value,
+    },
+  };
+});
+
+const tooltipStyle = computed<CSSProperties>(() => ({
+  position: 'fixed',
+  left: cursorScreen.value ? `${cursorScreen.value.x + 16}px` : '0',
+  top: cursorScreen.value ? `${cursorScreen.value.y - 16}px` : '0',
+  background: 'rgba(0,0,0,0.8)',
+  color: '#fff',
+  padding: '4px 8px',
+  borderRadius: '4px',
+  fontSize: '12px',
+  fontFamily: 'monospace',
+  pointerEvents: 'none',
+  zIndex: 10000,
+  whiteSpace: 'nowrap',
 }));
 
 // Menu rect for counter-rotate component
@@ -165,10 +419,15 @@ const menuContext = computed<GroupSelectionContext>(() => ({
   pageIndex: props.pageIndex,
 }));
 
-// Placement hints
-const menuPlacement = computed<SelectionMenuPlacement>(() => ({
-  suggestTop: false,
-}));
+// Placement hints - calculate suggestTop based on rotation handle position
+const menuPlacement = computed<SelectionMenuPlacement>(() => {
+  const effectiveAngle = (((groupRotationDisplay.value + props.rotation * 90) % 360) + 360) % 360;
+  const handleNearMenuSide =
+    effectiveIsRotatable.value && effectiveAngle > 90 && effectiveAngle < 270;
+  return {
+    suggestTop: handleNearMenuSide,
+  };
+});
 
 // Check if we should show menu
 const shouldShowMenu = computed(() => {
@@ -188,6 +447,13 @@ const renderGroupMenu = (rect: Rect, menuWrapperProps: MenuWrapperProps): VNode 
   });
 };
 
+// Handle pointer move on the rotation handle wrapper (for cursor tooltip when not rotating)
+const onHandlePointerMove = (e: PointerEvent) => {
+  if (!rotationActive.value) {
+    cursorScreen.value = { x: e.clientX, y: e.clientY };
+  }
+};
+
 // Element snapshot for interaction handles
 const elementSnapshot = computed(() => previewGroupBox.value);
 
@@ -201,13 +467,17 @@ const constraintsSnapshot = computed(() => ({
   },
 }));
 
-// Use interaction handles for both drag and resize
-const { dragProps, resize } = useInteractionHandles({
+// Use interaction handles for drag, resize, and rotation
+const {
+  dragProps,
+  resize,
+  rotation: rotationHandleData,
+} = useInteractionHandles({
   controller: {
     element: elementSnapshot,
     vertices: computed(() => []),
     constraints: constraintsSnapshot,
-    maintainAspectRatio: computed(() => false),
+    maintainAspectRatio: computed(() => props.lockAspectRatio),
     pageRotation: computed(() => props.rotation),
     scale: computed(() => props.scale),
     enabled: computed(() => true),
@@ -228,14 +498,12 @@ const { dragProps, resize } = useInteractionHandles({
 
         if (isMove) {
           isDraggingRef.value = true;
-          // Use unified drag API - plugin handles attached links automatically
           plugin.startDrag(props.documentId, {
             annotationIds: props.selectedAnnotations.map((ta) => ta.object.id),
             pageSize: { width: props.pageWidth, height: props.pageHeight },
           });
         } else if (isResize) {
           isResizingRef.value = true;
-          // Use unified resize API - plugin handles attached links automatically
           plugin.startResize(props.documentId, {
             annotationIds: props.selectedAnnotations.map((ta) => ta.object.id),
             pageSize: { width: props.pageWidth, height: props.pageHeight },
@@ -244,20 +512,46 @@ const { dragProps, resize } = useInteractionHandles({
         }
       }
 
+      // Handle rotation
+      if (transformType === 'rotate') {
+        if (!props.isRotatable) return;
+        const ids = props.selectedAnnotations.map((ta) => ta.object.id);
+        const cursorAngle = event.transformData.metadata?.rotationAngle ?? 0;
+        const cursorPos = event.transformData.metadata?.cursorPosition;
+        if (cursorPos) cursorScreen.value = { x: cursorPos.clientX, y: cursorPos.clientY };
+        if (event.state === 'start') {
+          liveRotation.value = cursorAngle;
+          plugin.startRotation(props.documentId, {
+            annotationIds: ids,
+            cursorAngle,
+            rotationCenter: event.transformData.metadata?.rotationCenter,
+          });
+        } else if (event.state === 'move') {
+          liveRotation.value = cursorAngle;
+          plugin.updateRotation(
+            props.documentId,
+            cursorAngle,
+            event.transformData.metadata?.rotationDelta,
+          );
+        } else if (event.state === 'end') {
+          liveRotation.value = null;
+          cursorScreen.value = null;
+          plugin.commitRotation(props.documentId);
+        }
+        return;
+      }
+
       const base = gestureBase.value ?? groupBox.value;
 
       if (isMove && event.transformData.changes.rect) {
-        // Calculate delta from original position
         const newRect = event.transformData.changes.rect;
         const rawDelta = {
           x: newRect.origin.x - base.origin.x,
           y: newRect.origin.y - base.origin.y,
         };
 
-        // Plugin clamps delta and emits events (attached links receive updates too)
         const clampedDelta = plugin.updateDrag(props.documentId, rawDelta);
 
-        // Update preview group box with clamped delta
         previewGroupBox.value = {
           ...base,
           origin: {
@@ -267,11 +561,7 @@ const { dragProps, resize } = useInteractionHandles({
         };
       } else if (isResize && event.transformData.changes.rect) {
         const newGroupBox = event.transformData.changes.rect;
-
-        // Plugin computes rects for all participants and emits events
         plugin.updateResize(props.documentId, newGroupBox);
-
-        // Update preview
         previewGroupBox.value = newGroupBox;
       }
 
@@ -280,11 +570,9 @@ const { dragProps, resize } = useInteractionHandles({
 
         if (isMove && isDraggingRef.value) {
           isDraggingRef.value = false;
-          // Plugin commits all patches (selected + attached links) - no patch building needed!
           plugin.commitDrag(props.documentId);
         } else if (isResize && isResizingRef.value) {
           isResizingRef.value = false;
-          // Plugin commits all patches (selected + attached links) - no patch building needed!
           plugin.commitResize(props.documentId);
         }
       }
@@ -292,15 +580,23 @@ const { dragProps, resize } = useInteractionHandles({
   },
   resizeUI: {
     handleSize: HANDLE_SIZE.value,
-    spacing: props.outlineOffset,
+    spacing: outlineOff.value,
     offsetMode: 'outside',
-    includeSides: true,
+    includeSides: !props.lockAspectRatio,
     zIndex: props.zIndex + 1,
   },
   vertexUI: {
     vertexSize: 0,
     zIndex: props.zIndex,
   },
+  rotationUI: {
+    handleSize: ROTATION_SIZE.value,
+    margin: ROTATION_MARGIN.value,
+    zIndex: props.zIndex + 2,
+    showConnector: SHOW_CONNECTOR.value,
+  },
   includeVertices: false,
+  includeRotation: effectiveIsRotatable,
+  currentRotation: computed(() => liveRotation.value ?? 0),
 });
 </script>

@@ -1,19 +1,21 @@
-<!-- Square.svelte -->
 <script lang="ts">
   import type { Rect } from '@embedpdf/models';
   import { PdfAnnotationBorderStyle } from '@embedpdf/models';
 
+  const MIN_HIT_AREA_SCREEN_PX = 20;
+
   interface SquareProps {
     isSelected: boolean;
-    color?: string; // fill color (defaults to black)
-    strokeColor?: string; // stroke color (defaults to fill when omitted)
-    opacity?: number; // 0–1
-    strokeWidth: number; // PDF units
+    color?: string;
+    strokeColor?: string;
+    opacity?: number;
+    strokeWidth: number;
     strokeStyle?: PdfAnnotationBorderStyle;
     strokeDashArray?: number[];
-    rect: Rect; // bbox includes stroke
-    scale: number; // page zoom
+    rect: Rect;
+    scale: number;
     onClick?: (e: MouseEvent | TouchEvent) => void;
+    appearanceActive?: boolean;
   }
 
   let {
@@ -27,9 +29,9 @@
     rect,
     scale,
     onClick,
+    appearanceActive = false,
   }: SquareProps = $props();
 
-  // Geometry helpers — compute inner rect so visual fill matches preview
   const { width, height, x, y } = $derived.by(() => {
     const outerW = rect.size.width;
     const outerH = rect.size.height;
@@ -45,6 +47,7 @@
 
   const svgWidth = $derived((width + strokeWidth) * scale);
   const svgHeight = $derived((height + strokeWidth) * scale);
+  const hitStrokeWidth = $derived(Math.max(strokeWidth, MIN_HIT_AREA_SCREEN_PX / scale));
 
   const dash = $derived(
     strokeStyle === PdfAnnotationBorderStyle.DASHED ? strokeDashArray?.join(',') : undefined,
@@ -58,14 +61,18 @@
   width={svgWidth}
   height={svgHeight}
   viewBox={`0 0 ${width + strokeWidth} ${height + strokeWidth}`}
+  overflow="visible"
 >
+  <!-- Hit area -- always rendered, transparent, wider stroke for mobile -->
+  <!-- svelte-ignore a11y_no_static_element_interactions -->
   <rect
     {x}
     {y}
     {width}
     {height}
-    fill={color}
-    {opacity}
+    fill="transparent"
+    stroke="transparent"
+    stroke-width={hitStrokeWidth}
     onpointerdown={onClick}
     ontouchstart={onClick}
     style:cursor={isSelected ? 'move' : 'pointer'}
@@ -74,8 +81,20 @@
       : color === 'transparent'
         ? 'visibleStroke'
         : 'visible'}
-    style:stroke={strokeColor ?? color}
-    style:stroke-width={strokeWidth}
-    style:stroke-dasharray={dash}
   />
+  <!-- Visual -- hidden when AP active, never interactive -->
+  {#if !appearanceActive}
+    <rect
+      {x}
+      {y}
+      {width}
+      {height}
+      fill={color}
+      {opacity}
+      style:pointer-events="none"
+      style:stroke={strokeColor ?? color}
+      style:stroke-width={strokeWidth}
+      style:stroke-dasharray={dash}
+    />
+  {/if}
 </svg>

@@ -67,6 +67,7 @@ const AnnotationSelectionMenu = ({
   documentId,
   menuWrapperProps,
   rect,
+  placement,
 }: AnnotationSelectionMenuProps & { documentId: string }) => {
   const { provides: annotationCapability } = useAnnotationCapability()
   const annotationScope = annotationCapability?.forDocument(documentId)
@@ -83,7 +84,7 @@ const AnnotationSelectionMenu = ({
     position: 'absolute',
     pointerEvents: 'auto',
     cursor: 'default',
-    top: rect.size.height + 8,
+    top: placement.suggestTop ? -46 : rect.size.height + 8,
   }
 
   return (

@@ -1,6 +1,7 @@
 import { BasePluginConfig } from '@embedpdf/core';
 import {
   ImageConversionTypes,
+  ImageDataLike,
   PdfErrorReason,
   PdfRenderPageOptions,
   Rect,
@@ -45,12 +46,16 @@ export interface RenderPageOptions {
 export interface RenderScope {
   renderPage(options: RenderPageOptions): Task<Blob, PdfErrorReason>;
   renderPageRect(options: RenderPageRectOptions): Task<Blob, PdfErrorReason>;
+  renderPageRaw(options: RenderPageOptions): Task<ImageDataLike, PdfErrorReason>;
+  renderPageRectRaw(options: RenderPageRectOptions): Task<ImageDataLike, PdfErrorReason>;
 }
 
 export interface RenderCapability {
   // Active document operations
   renderPage(options: RenderPageOptions): Task<Blob, PdfErrorReason>;
   renderPageRect(options: RenderPageRectOptions): Task<Blob, PdfErrorReason>;
+  renderPageRaw(options: RenderPageOptions): Task<ImageDataLike, PdfErrorReason>;
+  renderPageRectRaw(options: RenderPageRectOptions): Task<ImageDataLike, PdfErrorReason>;
 
   // Document-scoped operations
   forDocument(documentId: string): RenderScope;

@@ -806,7 +806,7 @@ export const commands: Record<string, Command<State>> = {
       const interactionScope = interactionManager.forDocument(documentId);
       if (!interactionScope) return;
 
-      interactionScope.activate('pointerMode');
+      interactionScope.activateDefaultMode();
       ui.forDocument(documentId).closeToolbarSlot('top', 'secondary');
     },
     active: ({ state, documentId }) => {

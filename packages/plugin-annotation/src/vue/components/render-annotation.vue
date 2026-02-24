@@ -24,10 +24,12 @@ const props = withDefaults(
     pageIndex: number;
     annotation: PdfAnnotationObject;
     scaleFactor?: number;
+    unrotated?: boolean;
     style?: CSSProperties;
   }>(),
   {
     scaleFactor: 1,
+    unrotated: false,
   },
 );
 
@@ -45,6 +47,7 @@ watch(
   () => [
     props.pageIndex,
     props.scaleFactor,
+    props.unrotated,
     props.documentId,
     annotationId.value,
     rectWidth.value,
@@ -64,6 +67,7 @@ watch(
         options: {
           scaleFactor: props.scaleFactor,
           dpr: window.devicePixelRatio,
+          unrotated: props.unrotated,
         },
       });
 

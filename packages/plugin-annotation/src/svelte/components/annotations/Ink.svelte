@@ -1,9 +1,10 @@
 <script lang="ts">
   import type { PdfInkListObject, Rect } from '@embedpdf/models';
 
+  const MIN_HIT_AREA_SCREEN_PX = 20;
+
   interface InkProps {
     isSelected: boolean;
-    /** Stroke color */
     strokeColor?: string;
     opacity?: number;
     strokeWidth: number;
@@ -11,6 +12,7 @@
     rect: Rect;
     scale: number;
     onClick?: (e: MouseEvent | TouchEvent) => void;
+    appearanceActive?: boolean;
   }
 
   let {
@@ -22,11 +24,11 @@
     rect,
     scale,
     onClick,
+    appearanceActive = false,
   }: InkProps = $props();
 
   const resolvedColor = $derived(strokeColor ?? '#000000');
 
-  // derived SVG path data
   const paths = $derived.by(() =>
     inkList.map(({ points }) => {
       let d = '';
@@ -42,6 +44,7 @@
 
   const width = $derived(rect.size.width * scale);
   const height = $derived(rect.size.height * scale);
+  const hitStrokeWidth = $derived(Math.max(strokeWidth, MIN_HIT_AREA_SCREEN_PX / scale));
 </script>
 
 <svg
@@ -52,19 +55,35 @@
   {height}
   viewBox={`0 0 ${rect.size.width} ${rect.size.height}`}
 >
-  {#each paths as d, i (i)}
+  <!-- Hit area -- always rendered, transparent, wider stroke for mobile -->
+  {#each paths as d, i (`hit-${i}`)}
+    <!-- svelte-ignore a11y_no_static_element_interactions -->
     <path
       {d}
       fill="none"
-      {opacity}
+      stroke="transparent"
+      stroke-width={hitStrokeWidth}
       onpointerdown={onClick}
       ontouchstart={onClick}
       style:cursor={isSelected ? 'move' : 'pointer'}
       style:pointer-events={isSelected ? 'none' : 'visibleStroke'}
-      style:stroke={resolvedColor}
-      style:stroke-width={strokeWidth}
       style:stroke-linecap="round"
       style:stroke-linejoin="round"
     />
   {/each}
+  <!-- Visual -- hidden when AP active, never interactive -->
+  {#if !appearanceActive}
+    {#each paths as d, i (`vis-${i}`)}
+      <path
+        {d}
+        fill="none"
+        {opacity}
+        style:pointer-events="none"
+        style:stroke={resolvedColor}
+        style:stroke-width={strokeWidth}
+        style:stroke-linecap="round"
+        style:stroke-linejoin="round"
+      />
+    {/each}
+  {/if}
 </svg>

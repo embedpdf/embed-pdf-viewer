@@ -1,6 +1,7 @@
 import { BasePluginConfig, EventHook } from '@embedpdf/core';
 import {
   AnnotationCreateContext,
+  AnnotationAppearanceMap,
   PdfAnnotationObject,
   PdfAnnotationSubtype,
   PdfErrorReason,
@@ -53,11 +54,13 @@ export type AnnotationToolsChangeEvent = {
   tools: AnnotationTool[];
 };
 
-export type CommitState = 'new' | 'dirty' | 'deleted' | 'synced' | 'ignored';
+export type CommitState = 'new' | 'dirty' | 'moved' | 'deleted' | 'synced' | 'ignored';
 
 export interface TrackedAnnotation<T extends PdfAnnotationObject = PdfAnnotationObject> {
   commitState: CommitState;
   object: T;
+  /** When true, render using dict-based SVG/CSS instead of appearance stream image */
+  dictMode?: boolean;
 }
 
 /**
@@ -75,6 +78,8 @@ export interface CommitBatch {
   updates: Array<{
     uid: string;
     ta: TrackedAnnotation;
+    /** When true, only positional data changed -- skip appearance regeneration */
+    moved?: boolean;
   }>;
   /** Annotations that need to be deleted from the PDF */
   deletions: Array<{
@@ -120,9 +125,20 @@ export interface AnnotationState {
   colorPresets: string[];
 }
 
+/**
+ * Partial tool definition for overriding default tools by ID.
+ * When a tool with the same `id` as a default tool is provided, its properties
+ * are deep-merged with the default (user values take precedence).
+ */
+export type AnnotationToolOverride = { id: string } & Partial<Omit<AnnotationTool, 'id'>>;
+
 export interface AnnotationPluginConfig extends BasePluginConfig {
-  /** A list of custom tools to add or default tools to override. */
-  tools?: AnnotationTool[];
+  /**
+   * A list of tools to add or override. If a tool's `id` matches a default tool,
+   * it is deep-merged with the default (partial overrides are supported).
+   * New tools (unmatched `id`) are added as-is.
+   */
+  tools?: (AnnotationTool | AnnotationToolOverride)[];
   colorPresets?: string[];
   /** When true (default), automatically commit the annotation changes into the PDF document. */
   autoCommit?: boolean;
@@ -139,7 +155,7 @@ export interface AnnotationPluginConfig extends BasePluginConfig {
  */
 export interface TransformOptions<T extends PdfAnnotationObject = PdfAnnotationObject> {
   /** The type of transformation */
-  type: 'move' | 'resize' | 'vertex-edit' | 'property-update';
+  type: 'move' | 'resize' | 'vertex-edit' | 'rotate' | 'property-update';
 
   /** The changes to apply */
   changes: Partial<T>;
@@ -147,6 +163,16 @@ export interface TransformOptions<T extends PdfAnnotationObject = PdfAnnotationO
   /** Optional metadata */
   metadata?: {
     maintainAspectRatio?: boolean;
+    /** Rotation angle in degrees (for 'rotate' transform type) */
+    rotationAngle?: number;
+    /** Delta from the initial rotation angle in degrees */
+    rotationDelta?: number;
+    /** Center point for rotation (defaults to rect center) */
+    rotationCenter?: { x: number; y: number };
+    /** Whether the rotation is currently snapped to a guide */
+    isSnapped?: boolean;
+    /** Snap target angle when isSnapped is true */
+    snappedAngle?: number;
     [key: string]: any;
   };
 }
@@ -225,12 +251,26 @@ export interface AnnotationScope {
   updateAnnotations(
     patches: Array<{ pageIndex: number; id: string; patch: Partial<PdfAnnotationObject> }>,
   ): void;
+  /** Move an annotation by delta or to an absolute position (preserves appearance stream) */
+  moveAnnotation(
+    pageIndex: number,
+    annotationId: string,
+    position: Position,
+    mode?: 'delta' | 'absolute',
+  ): void;
   deleteAnnotation(pageIndex: number, annotationId: string): void;
   /** Delete multiple annotations in batch */
   deleteAnnotations(annotations: Array<{ pageIndex: number; id: string }>): void;
   /** Remove an annotation from state without calling the engine (no PDF modification) */
   purgeAnnotation(pageIndex: number, annotationId: string): void;
   renderAnnotation(options: RenderAnnotationOptions): Task<Blob, PdfErrorReason>;
+  /** Batch-fetch rendered appearance stream images for all annotations on a page */
+  getPageAppearances(
+    pageIndex: number,
+    options?: PdfRenderPageAnnotationOptions,
+  ): Task<AnnotationAppearanceMap<Blob>, PdfErrorReason>;
+  /** Clear cached appearance images for a page (e.g. on zoom change) */
+  invalidatePageAppearances(pageIndex: number): void;
   commit(): Task<boolean, PdfErrorReason>;
 
   // Attached links (IRT link children)
@@ -298,6 +338,14 @@ export interface AnnotationCapability {
   updateAnnotations: (
     patches: Array<{ pageIndex: number; id: string; patch: Partial<PdfAnnotationObject> }>,
   ) => void;
+  /** Move an annotation by delta or to an absolute position (preserves appearance stream) */
+  moveAnnotation: (
+    pageIndex: number,
+    annotationId: string,
+    position: Position,
+    mode?: 'delta' | 'absolute',
+    documentId?: string,
+  ) => void;
   deleteAnnotation: (pageIndex: number, annotationId: string) => void;
   /** Delete multiple annotations in batch */
   deleteAnnotations: (
@@ -307,6 +355,14 @@ export interface AnnotationCapability {
   /** Remove an annotation from state without calling the engine (no PDF modification) */
   purgeAnnotation: (pageIndex: number, annotationId: string, documentId?: string) => void;
   renderAnnotation: (options: RenderAnnotationOptions) => Task<Blob, PdfErrorReason>;
+  /** Batch-fetch rendered appearance stream images for all annotations on a page */
+  getPageAppearances: (
+    pageIndex: number,
+    options?: PdfRenderPageAnnotationOptions,
+    documentId?: string,
+  ) => Task<AnnotationAppearanceMap<Blob>, PdfErrorReason>;
+  /** Clear cached appearance images for a page (e.g. on zoom change) */
+  invalidatePageAppearances: (pageIndex: number, documentId?: string) => void;
   commit: () => Task<boolean, PdfErrorReason>;
 
   // Attached links (IRT link children)
@@ -484,6 +540,8 @@ export interface UnifiedResizeOptions {
 export interface UnifiedResizeAnnotationInfo {
   id: string;
   originalRect: Rect;
+  /** The original unrotated rect at resize start (only for rotated annotations) */
+  originalUnrotatedRect?: Rect;
   pageIndex: number;
   /** Whether this is an attached link (auto-expanded) */
   isAttachedLink: boolean;
@@ -508,6 +566,8 @@ export interface UnifiedResizeState {
   documentId: string;
   /** Whether a resize is currently in progress */
   isResizing: boolean;
+  /** Whether this is a group resize (multiple primary annotations) */
+  isGroupResize: boolean;
   /** The explicitly selected annotation IDs (what the user selected) */
   primaryIds: string[];
   /** Auto-expanded attached link IDs */
@@ -539,5 +599,48 @@ export interface UnifiedResizeEvent {
   /** Per-annotation computed rects for convenience (id -> new rect) */
   computedRects: Record<string, Rect>;
   /** Pre-computed patches for ALL participants - components just apply directly! */
+  previewPatches: Record<string, Partial<PdfAnnotationObject>>;
+}
+
+// ─────────────────────────────────────────────────────────
+// Unified Rotation API Types
+// ─────────────────────────────────────────────────────────
+
+export interface UnifiedRotateOptions {
+  /** The explicitly selected annotation IDs */
+  annotationIds: string[];
+  /** Angle reported by the interaction controller at gesture start */
+  cursorAngle: number;
+  /** Optional rotation center override (defaults to selection center) */
+  rotationCenter?: Position;
+}
+
+export interface UnifiedRotateParticipant {
+  id: string;
+  rect: Rect;
+  pageIndex: number;
+  rotation: number;
+  unrotatedRect?: Rect;
+  isAttachedLink: boolean;
+  parentId?: string;
+}
+
+export interface UnifiedRotateState {
+  documentId: string;
+  isRotating: boolean;
+  primaryIds: string[];
+  attachedLinkIds: string[];
+  allParticipantIds: string[];
+  rotationCenter: Position;
+  cursorStartAngle: number;
+  currentAngle: number;
+  delta: number;
+  participants: UnifiedRotateParticipant[];
+}
+
+export interface UnifiedRotateEvent {
+  documentId: string;
+  type: 'start' | 'update' | 'end' | 'cancel';
+  state: UnifiedRotateState;
   previewPatches: Record<string, Partial<PdfAnnotationObject>>;
 }

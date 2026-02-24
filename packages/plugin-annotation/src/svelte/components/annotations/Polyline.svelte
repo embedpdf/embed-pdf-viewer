@@ -1,7 +1,8 @@
-<!-- Polyline.svelte -->
 <script lang="ts">
   import type { Rect, Position, LineEndings } from '@embedpdf/models';
   import { patching } from '@embedpdf/plugin-annotation';
+
+  const MIN_HIT_AREA_SCREEN_PX = 20;
 
   interface PolylineProps {
     rect: Rect;
@@ -13,8 +14,8 @@
     scale: number;
     isSelected: boolean;
     onClick?: (e: MouseEvent | TouchEvent) => void;
-    /** Optional start & end endings */
     lineEndings?: LineEndings;
+    appearanceActive?: boolean;
   }
 
   let {
@@ -28,14 +29,13 @@
     isSelected,
     onClick,
     lineEndings,
+    appearanceActive = false,
   }: PolylineProps = $props();
 
-  // Localize vertices to the annotation rect
   const localPts = $derived(
     vertices.map(({ x, y }) => ({ x: x - rect.origin.x, y: y - rect.origin.y })),
   );
 
-  // Build path data: "M x0 y0 L x1 y1 ..."
   const pathData = $derived.by(() => {
     if (!localPts.length) return '';
     const [first, ...rest] = localPts;
@@ -48,25 +48,24 @@
     );
   });
 
-  // Compute endings (angles from first→second, last-1→last)
   const endings = $derived.by(() => {
     if (localPts.length < 2) return { start: null as any, end: null as any };
     const toAngle = (a: Position, b: Position) => Math.atan2(b.y - a.y, b.x - a.x);
 
-    const startRad = toAngle(localPts[0], localPts[1]); // FROM first TO second
-    const endRad = toAngle(localPts[localPts.length - 2], localPts[localPts.length - 1]); // FROM second-to-last TO last
+    const startRad = toAngle(localPts[0], localPts[1]);
+    const endRad = toAngle(localPts[localPts.length - 2], localPts[localPts.length - 1]);
 
     const start = patching.createEnding(
       lineEndings?.start,
       strokeWidth,
-      startRad + Math.PI, // tip outward from start
+      startRad + Math.PI,
       localPts[0].x,
       localPts[0].y,
     );
     const end = patching.createEnding(
       lineEndings?.end,
       strokeWidth,
-      endRad, // tip in line direction
+      endRad,
       localPts[localPts.length - 1].x,
       localPts[localPts.length - 1].y,
     );
@@ -75,6 +74,7 @@
 
   const width = $derived(rect.size.width * scale);
   const height = $derived(rect.size.height * scale);
+  const hitStrokeWidth = $derived(Math.max(strokeWidth, MIN_HIT_AREA_SCREEN_PX / scale));
 </script>
 
 <svg
@@ -85,30 +85,31 @@
   {height}
   viewBox={`0 0 ${rect.size.width} ${rect.size.height}`}
 >
+  <!-- Hit area -- always rendered, transparent, wider stroke for mobile -->
+  <!-- svelte-ignore a11y_no_static_element_interactions -->
   <path
     d={pathData}
+    fill="none"
+    stroke="transparent"
+    stroke-width={hitStrokeWidth}
     onpointerdown={onClick}
     ontouchstart={onClick}
-    {opacity}
-    style:fill="none"
-    style:stroke={strokeColor ?? color}
-    style:stroke-width={strokeWidth}
     style:cursor={isSelected ? 'move' : 'pointer'}
     style:pointer-events={isSelected ? 'none' : 'visibleStroke'}
     style:stroke-linecap="butt"
     style:stroke-linejoin="miter"
   />
-
   {#if endings.start}
+    <!-- svelte-ignore a11y_no_static_element_interactions -->
     <path
       d={endings.start.d}
       transform={endings.start.transform}
-      stroke={strokeColor}
-      fill={endings.start.filled ? color : 'none'}
+      fill="transparent"
+      stroke="transparent"
+      stroke-width={hitStrokeWidth}
       onpointerdown={onClick}
       ontouchstart={onClick}
       style:cursor={isSelected ? 'move' : 'pointer'}
-      style:stroke-width={strokeWidth}
       style:pointer-events={isSelected
         ? 'none'
         : endings.start.filled
@@ -117,19 +118,55 @@
       style:stroke-linecap="butt"
     />
   {/if}
-
   {#if endings.end}
+    <!-- svelte-ignore a11y_no_static_element_interactions -->
     <path
       d={endings.end.d}
       transform={endings.end.transform}
-      stroke={strokeColor}
-      fill={endings.end.filled ? color : 'none'}
+      fill="transparent"
+      stroke="transparent"
+      stroke-width={hitStrokeWidth}
       onpointerdown={onClick}
       ontouchstart={onClick}
       style:cursor={isSelected ? 'move' : 'pointer'}
-      style:stroke-width={strokeWidth}
       style:pointer-events={isSelected ? 'none' : endings.end.filled ? 'visible' : 'visibleStroke'}
       style:stroke-linecap="butt"
     />
+  {/if}
+
+  <!-- Visual -- hidden when AP active, never interactive -->
+  {#if !appearanceActive}
+    <path
+      d={pathData}
+      {opacity}
+      style:fill="none"
+      style:stroke={strokeColor ?? color}
+      style:stroke-width={strokeWidth}
+      style:pointer-events="none"
+      style:stroke-linecap="butt"
+      style:stroke-linejoin="miter"
+    />
+    {#if endings.start}
+      <path
+        d={endings.start.d}
+        transform={endings.start.transform}
+        stroke={strokeColor}
+        fill={endings.start.filled ? color : 'none'}
+        style:pointer-events="none"
+        style:stroke-width={strokeWidth}
+        style:stroke-linecap="butt"
+      />
+    {/if}
+    {#if endings.end}
+      <path
+        d={endings.end.d}
+        transform={endings.end.transform}
+        stroke={strokeColor}
+        fill={endings.end.filled ? color : 'none'}
+        style:pointer-events="none"
+        style:stroke-width={strokeWidth}
+        style:stroke-linecap="butt"
+      />
+    {/if}
   {/if}
 </svg>

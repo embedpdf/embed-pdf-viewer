@@ -428,6 +428,43 @@ export type ImageDataLike = {
 };
 
 /**
+ * Bitmask constants for annotation appearance stream modes.
+ * @public
+ */
+export const AP_MODE_NORMAL = 1; // bit 0
+export const AP_MODE_ROLLOVER = 2; // bit 1
+export const AP_MODE_DOWN = 4; // bit 2
+
+/**
+ * A rendered appearance stream image for a single mode of an annotation.
+ * @public
+ */
+export interface AnnotationAppearanceImage<TImage = ImageDataLike> {
+  data: TImage;
+  rect: Rect;
+}
+
+/**
+ * All available appearance stream images for one annotation,
+ * keyed by mode (normal, rollover, down).
+ * @public
+ */
+export interface AnnotationAppearances<TImage = ImageDataLike> {
+  normal?: AnnotationAppearanceImage<TImage>;
+  rollover?: AnnotationAppearanceImage<TImage>;
+  down?: AnnotationAppearanceImage<TImage>;
+}
+
+/**
+ * Map of annotation ID to its rendered appearance stream images.
+ * @public
+ */
+export type AnnotationAppearanceMap<TImage = ImageDataLike> = Record<
+  string,
+  AnnotationAppearances<TImage>
+>;
+
+/**
  * Representation of pdf action
  *
  * @public
@@ -1036,9 +1073,29 @@ export interface PdfAnnotationObjectBase {
   rect: Rect;
 
   /**
+   * Rotation angle in degrees (clockwise).
+   * When set, the annotation is visually rotated around its center.
+   * The rect becomes the axis-aligned bounding box after rotation.
+   */
+  rotation?: number;
+
+  /**
+   * The original unrotated rectangle of the annotation.
+   * This is stored when rotation is applied, allowing accurate editing.
+   */
+  unrotatedRect?: Rect;
+
+  /**
    * Custom data of the annotation
    */
   custom?: any;
+
+  /**
+   * Bitmask of available appearance stream modes.
+   * bit 0 (1) = Normal, bit 1 (2) = Rollover, bit 2 (4) = Down.
+   * 0 or undefined = no appearance stream.
+   */
+  appearanceModes?: number;
 
   /**
    * In reply to annotation id (IRT - for grouping or reply threads)
@@ -2081,12 +2138,12 @@ export interface PdfRedactAnnoObject extends PdfAnnotationObjectBase {
   segmentRects: Rect[];
 
   /**
-   * Interior color - the preview color shown BEFORE redaction is applied
+   * Interior color (IC) - the fill color used to paint the redacted area after redaction is applied
    */
   color?: string;
 
   /**
-   * Overlay color - the fill color shown AFTER redaction is applied
+   * Overlay text color - the color of the overlay text displayed on the redacted area
    */
   overlayColor?: string;
 
@@ -2390,13 +2447,22 @@ export interface SearchAllPagesResult {
  */
 export interface PdfGlyphObject {
   /**
-   * Origin of the glyph
+   * Origin of the glyph (loose bounds from FPDFText_GetLooseCharBox)
    */
   origin: { x: number; y: number };
   /**
-   * Size of the glyph
+   * Size of the glyph (loose bounds from FPDFText_GetLooseCharBox)
    */
   size: { width: number; height: number };
+  /**
+   * Tight bounds origin (from FPDFText_GetCharBox, closely surrounds the actual glyph shape).
+   * Used for hit-testing to match Chrome's FPDFText_GetCharIndexAtPos behaviour.
+   */
+  tightOrigin?: { x: number; y: number };
+  /**
+   * Tight bounds size (from FPDFText_GetCharBox)
+   */
+  tightSize?: { width: number; height: number };
   /**
    * Whether the glyph is a space
    */
@@ -2414,25 +2480,42 @@ export interface PdfGlyphObject {
  */
 export interface PdfGlyphSlim {
   /**
-   * X coordinate of the glyph
+   * X coordinate of the glyph (loose bounds from FPDFText_GetLooseCharBox)
    */
   x: number;
   /**
-   * Y coordinate of the glyph
+   * Y coordinate of the glyph (loose bounds from FPDFText_GetLooseCharBox)
    */
   y: number;
   /**
-   * Width of the glyph
+   * Width of the glyph (loose bounds from FPDFText_GetLooseCharBox)
    */
   width: number;
   /**
-   * Height of the glyph
+   * Height of the glyph (loose bounds from FPDFText_GetLooseCharBox)
    */
   height: number;
   /**
    * Flags of the glyph
    */
   flags: number;
+  /**
+   * Tight X coordinate (from FPDFText_GetCharBox).
+   * Used for hit-testing to match Chrome's FPDFText_GetCharIndexAtPos behaviour.
+   */
+  tightX?: number;
+  /**
+   * Tight Y coordinate (from FPDFText_GetCharBox)
+   */
+  tightY?: number;
+  /**
+   * Tight width (from FPDFText_GetCharBox)
+   */
+  tightWidth?: number;
+  /**
+   * Tight height (from FPDFText_GetCharBox)
+   */
+  tightHeight?: number;
 }
 
 /**
@@ -2453,6 +2536,10 @@ export interface PdfRun {
    * Glyphs of the run
    */
   glyphs: PdfGlyphSlim[];
+  /**
+   * Font size of the run (all glyphs in a run share the same font size)
+   */
+  fontSize?: number;
 }
 
 /**
@@ -2465,6 +2552,59 @@ export interface PdfPageGeometry {
    * Runs of the page
    */
   runs: PdfRun[];
+}
+
+/**
+ * Font information extracted from a PDF text object.
+ *
+ * @public
+ */
+export interface PdfFontInfo {
+  /** PostScript name (e.g. "HOEPNL+Arial,Bold"). */
+  name: string;
+  /** Font family name (e.g. "Arial"). */
+  familyName: string;
+  /** Weight 100-900 (400 = normal, 700 = bold). */
+  weight: number;
+  /** Whether the font is italic. */
+  italic: boolean;
+  /** Whether the font is monospaced (fixed-pitch). */
+  monospaced: boolean;
+  /** Whether the font data is embedded in the PDF. */
+  embedded: boolean;
+}
+
+/**
+ * A rich text run: consecutive characters sharing the same text object,
+ * font, size, and color.
+ *
+ * @public
+ */
+export interface PdfTextRun {
+  /** The text content (UTF-8). */
+  text: string;
+  /** Bounding box in PDF page coordinates (points). */
+  rect: Rect;
+  /** Font metadata (uniform within the run). */
+  font: PdfFontInfo;
+  /** Font size in points. */
+  fontSize: number;
+  /** Fill color (RGBA). */
+  color: PdfAlphaColor;
+  /** Start character index in the text page. */
+  charIndex: number;
+  /** Number of characters in this run. */
+  charCount: number;
+}
+
+/**
+ * Rich text runs for a single page.
+ *
+ * @public
+ */
+export interface PdfPageTextRuns {
+  /** Text runs ordered by reading order. */
+  runs: PdfTextRun[];
 }
 
 /**
@@ -2829,6 +2969,12 @@ export interface PdfRenderPageAnnotationOptions extends PdfRenderOptions {
    * Appearance mode normal down or rollover
    */
   mode?: AppearanceMode;
+  /**
+   * When true and annotation.unrotatedRect is present, render using the
+   * unrotated path (ignores AP Matrix rotation). Falls back to normal
+   * rendering if unrotatedRect is not available on the annotation.
+   */
+  unrotated?: boolean;
 }
 
 export interface PdfRenderThumbnailOptions extends PdfRenderOptions {
@@ -3018,6 +3164,35 @@ export interface PdfEngine<T = Blob> {
     options?: PdfRenderPageOptions,
   ) => PdfTask<T>;
   /**
+   * Render the specified pdf page and return raw pixel data (ImageDataLike)
+   * without encoding to the output format T. Useful for AI/ML pipelines
+   * that need direct pixel access.
+   * @param doc - pdf document
+   * @param page - pdf page
+   * @param options - render options (imageType/imageQuality are ignored)
+   * @returns task contains raw ImageDataLike or error
+   */
+  renderPageRaw: (
+    doc: PdfDocumentObject,
+    page: PdfPageObject,
+    options?: PdfRenderPageOptions,
+  ) => PdfTask<ImageDataLike>;
+  /**
+   * Render the specified rect of a pdf page and return raw pixel data
+   * (ImageDataLike) without encoding to the output format T.
+   * @param doc - pdf document
+   * @param page - pdf page
+   * @param rect - target rect in PDF coordinate space
+   * @param options - render options (imageType/imageQuality are ignored)
+   * @returns task contains raw ImageDataLike or error
+   */
+  renderPageRectRaw: (
+    doc: PdfDocumentObject,
+    page: PdfPageObject,
+    rect: Rect,
+    options?: PdfRenderPageOptions,
+  ) => PdfTask<ImageDataLike>;
+  /**
    * Render the thumbnail of specified pdf page
    * @param doc - pdf document
    * @param page - pdf page
@@ -3045,6 +3220,32 @@ export interface PdfEngine<T = Blob> {
     annotation: PdfAnnotationObject,
     options?: PdfRenderPageAnnotationOptions,
   ): PdfTask<T>;
+  /**
+   * Batch-render all annotation appearance streams for a page and encode
+   * each rendered image to the output type of this engine.
+   * Returns a map of annotation ID to rendered appearances (Normal/Rollover/Down).
+   * @param doc - pdf document
+   * @param page - pdf page
+   * @param options - render options
+   */
+  renderPageAnnotations(
+    doc: PdfDocumentObject,
+    page: PdfPageObject,
+    options?: PdfRenderPageAnnotationOptions,
+  ): PdfTask<AnnotationAppearanceMap<T>>;
+  /**
+   * Batch-render all annotation appearance streams for a page.
+   * Returns a map of annotation ID to rendered appearances (Normal/Rollover/Down).
+   * Skips EmbedPDF-rotated annotations and annotations without appearance streams.
+   * @param doc - pdf document
+   * @param page - pdf page
+   * @param options - render options (scaleFactor, dpr, rotation)
+   */
+  renderPageAnnotationsRaw(
+    doc: PdfDocumentObject,
+    page: PdfPageObject,
+    options?: PdfRenderPageAnnotationOptions,
+  ): PdfTask<AnnotationAppearanceMap<ImageDataLike>>;
   /**
    * Get annotations of pdf page
    * @param doc - pdf document
@@ -3080,6 +3281,7 @@ export interface PdfEngine<T = Blob> {
     doc: PdfDocumentObject,
     page: PdfPageObject,
     annotation: PdfAnnotationObject,
+    options?: { regenerateAppearance?: boolean },
   ) => PdfTask<boolean>;
   /**
    * Remove a annotation on specified page
@@ -3258,6 +3460,13 @@ export interface PdfEngine<T = Blob> {
    */
   getPageGeometry: (doc: PdfDocumentObject, page: PdfPageObject) => PdfTask<PdfPageGeometry>;
   /**
+   * Get rich text runs for a page, grouped by text object with font and color info
+   * @param doc - pdf document
+   * @param page - pdf page
+   * @returns task contains the text runs
+   */
+  getPageTextRuns: (doc: PdfDocumentObject, page: PdfPageObject) => PdfTask<PdfPageTextRuns>;
+  /**
    * Merge multiple pdf documents
    * @param files - all the pdf files
    * @returns task contains the merged pdf file
@@ -3407,6 +3616,11 @@ export interface IPdfiumExecutor {
     annotation: PdfAnnotationObject,
     options?: PdfRenderPageAnnotationOptions,
   ): PdfTask<ImageDataLike>;
+  renderPageAnnotationsRaw(
+    doc: PdfDocumentObject,
+    page: PdfPageObject,
+    options?: PdfRenderPageAnnotationOptions,
+  ): PdfTask<AnnotationAppearanceMap<ImageDataLike>>;
 
   // Single page operations
   getPageAnnotationsRaw(
@@ -3424,6 +3638,7 @@ export interface IPdfiumExecutor {
     doc: PdfDocumentObject,
     page: PdfPageObject,
     annotation: PdfAnnotationObject,
+    options?: { regenerateAppearance?: boolean },
   ): PdfTask<boolean>;
   removePageAnnotation(
     doc: PdfDocumentObject,
@@ -3494,6 +3709,7 @@ export interface IPdfiumExecutor {
   getTextSlices(doc: PdfDocumentObject, slices: PageTextSlice[]): PdfTask<string[]>;
   getPageGlyphs(doc: PdfDocumentObject, page: PdfPageObject): PdfTask<PdfGlyphObject[]>;
   getPageGeometry(doc: PdfDocumentObject, page: PdfPageObject): PdfTask<PdfPageGeometry>;
+  getPageTextRuns(doc: PdfDocumentObject, page: PdfPageObject): PdfTask<PdfPageTextRuns>;
   merge(files: PdfFile[]): PdfTask<PdfFile>;
   mergePages(mergeConfigs: Array<{ docId: string; pageIndices: number[] }>): PdfTask<PdfFile>;
   preparePrintDocument(doc: PdfDocumentObject, options?: PdfPrintOptions): PdfTask<ArrayBuffer>;

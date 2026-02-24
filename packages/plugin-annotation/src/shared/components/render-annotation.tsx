@@ -10,6 +10,7 @@ type RenderAnnotationProps = Omit<HTMLAttributes<HTMLImageElement>, 'style'> & {
   scaleFactor?: number;
   dpr?: number;
   style?: CSSProperties;
+  unrotated?: boolean;
 };
 
 export function RenderAnnotation({
@@ -17,6 +18,7 @@ export function RenderAnnotation({
   pageIndex,
   annotation,
   scaleFactor = 1,
+  unrotated,
   style,
   ...props
 }: RenderAnnotationProps) {
@@ -34,6 +36,7 @@ export function RenderAnnotation({
         options: {
           scaleFactor,
           dpr: window.devicePixelRatio,
+          unrotated,
         },
       });
       task.wait((blob) => {
@@ -54,7 +57,16 @@ export function RenderAnnotation({
         }
       };
     }
-  }, [pageIndex, scaleFactor, annotationProvides, documentId, annotation.id, width, height]);
+  }, [
+    pageIndex,
+    scaleFactor,
+    unrotated,
+    annotationProvides,
+    documentId,
+    annotation.id,
+    width,
+    height,
+  ]);
 
   const handleImageLoad = () => {
     if (urlRef.current) {

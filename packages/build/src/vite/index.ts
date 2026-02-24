@@ -147,6 +147,7 @@ export function defineLibrary() {
             'preact',
             'preact/hooks',
             'preact/jsx-runtime',
+            'preact/compat',
             'react',
             'react/jsx-runtime',
           ],

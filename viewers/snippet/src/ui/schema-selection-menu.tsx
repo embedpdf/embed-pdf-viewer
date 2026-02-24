@@ -21,7 +21,7 @@ export function SchemaSelectionMenu({ schema, documentId, props }: SelectionMenu
   };
 
   if (placement?.suggestTop) {
-    menuStyle.top = -40 - 8;
+    menuStyle.top = -42 - 8;
   } else {
     menuStyle.top = rect.size.height + 8;
   }

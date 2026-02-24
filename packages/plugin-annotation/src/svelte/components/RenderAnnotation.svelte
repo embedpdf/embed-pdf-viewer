@@ -10,6 +10,7 @@
     annotation: PdfAnnotationObject;
     scaleFactor?: number;
     dpr?: number;
+    unrotated?: boolean;
     style?: Record<string, string | number | undefined>;
   }
 
@@ -18,6 +19,7 @@
     pageIndex,
     annotation,
     scaleFactor = 1,
+    unrotated = false,
     style,
     ...restProps
   }: RenderAnnotationProps = $props();
@@ -43,6 +45,7 @@
         options: {
           scaleFactor,
           dpr: window.devicePixelRatio,
+          unrotated,
         },
       });
 

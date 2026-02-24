@@ -11,6 +11,7 @@ import {
   SET_RECTS,
   INIT_SELECTION_STATE,
   CLEANUP_SELECTION_STATE,
+  EVICT_PAGE_GEOMETRY,
 } from './actions';
 
 export const initialSelectionDocumentState: SelectionDocumentState = {
@@ -119,6 +120,21 @@ export const selectionReducer = (state = initialState, action: SelectionAction):
       const docState = state.documents[documentId];
       if (!docState) return state;
       return updateDocState(state, documentId, { ...docState, slices });
+    }
+
+    case EVICT_PAGE_GEOMETRY: {
+      const { documentId, pages } = action.payload;
+      const docState = state.documents[documentId];
+      if (!docState) return state;
+      const geometry = { ...docState.geometry };
+      const rects = { ...docState.rects };
+      const slices = { ...docState.slices };
+      for (const p of pages) {
+        delete geometry[p];
+        delete rects[p];
+        delete slices[p];
+      }
+      return updateDocState(state, documentId, { ...docState, geometry, rects, slices });
     }
 
     case RESET: {

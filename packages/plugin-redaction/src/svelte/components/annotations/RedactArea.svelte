@@ -4,7 +4,7 @@
   import {
     PdfStandardFont,
     PdfTextAlignment,
-    standardFontCss,
+    standardFontCssProperties,
     textAlignmentToCss,
   } from '@embedpdf/models';
 
@@ -27,6 +27,7 @@
   const overlayTextRepeat = $derived(object.overlayTextRepeat ?? false);
   const fontSize = $derived(object.fontSize ?? 12);
   const fontFamily = $derived(object.fontFamily ?? PdfStandardFont.Helvetica);
+  const fontCss = $derived(standardFontCssProperties(fontFamily));
   const textAlign = $derived(object.textAlign ?? PdfTextAlignment.Center);
 
   // Calculate how many times to repeat text (approximate)
@@ -75,7 +76,9 @@
     <span
       style:color={textColor}
       style:font-size="{fontSize * scale}px"
-      style:font-family={standardFontCss(fontFamily)}
+      style:font-family={fontCss.fontFamily}
+      style:font-weight={fontCss.fontWeight}
+      style:font-style={fontCss.fontStyle}
       style:text-align={textAlignmentToCss(textAlign)}
       style:white-space={overlayTextRepeat ? 'normal' : 'nowrap'}
       style:overflow="hidden"

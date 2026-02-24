@@ -6,12 +6,12 @@ import {
   uuidV4,
 } from '@embedpdf/models';
 import { HandlerFactory } from './types';
-import { clamp } from '@embedpdf/core';
+import { applyInsertUpright, clampAnnotationToPage } from '../patching';
 
 export const stampHandlerFactory: HandlerFactory<PdfStampAnnoObject> = {
   annotationType: PdfAnnotationSubtype.STAMP,
   create(context) {
-    const { services, onCommit, getTool, pageSize } = context;
+    const { services, onCommit, getTool, pageSize, pageRotation } = context;
 
     return {
       onPointerDown: (pos) => {
@@ -21,18 +21,13 @@ export const stampHandlerFactory: HandlerFactory<PdfStampAnnoObject> = {
         const { imageSrc, imageSize } = tool.defaults;
 
         const placeStamp = (imageData: ImageData, width: number, height: number) => {
-          // Center the stamp at the click position, then clamp origin to stay fully on-page.
-          const originX = pos.x - width / 2;
-          const originY = pos.y - height / 2;
-          const finalX = clamp(originX, 0, pageSize.width - width);
-          const finalY = clamp(originY, 0, pageSize.height - height);
-
+          // Create rect centered at click position (unclamped)
           const rect: Rect = {
-            origin: { x: finalX, y: finalY },
+            origin: { x: pos.x - width / 2, y: pos.y - height / 2 },
             size: { width, height },
           };
 
-          const anno: PdfStampAnnoObject = {
+          let anno: PdfStampAnnoObject = {
             ...tool.defaults,
             rect,
             type: PdfAnnotationSubtype.STAMP,
@@ -43,6 +38,12 @@ export const stampHandlerFactory: HandlerFactory<PdfStampAnnoObject> = {
             id: uuidV4(),
             created: new Date(),
           };
+
+          // Apply insert-upright rotation (utility handles everything via patch system)
+          if (tool.behavior?.insertUpright) {
+            anno = applyInsertUpright(anno, pageRotation, false);
+          }
+          anno = clampAnnotationToPage(anno, pageSize);
 
           onCommit(anno, { imageData });
         };

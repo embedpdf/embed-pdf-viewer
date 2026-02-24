@@ -5,6 +5,8 @@ import { TextMarkup } from './text-markup';
 import {
   ResizeHandleUI,
   VertexHandleUI,
+  RotationHandleUI,
+  SelectionOutline,
   CustomAnnotationRenderer,
   AnnotationSelectionMenuRenderFn,
   GroupSelectionMenuRenderFn,
@@ -29,8 +31,14 @@ type AnnotationLayerProps = Omit<HTMLAttributes<HTMLDivElement>, 'style'> & {
   resizeUI?: ResizeHandleUI;
   /** Customize vertex handles */
   vertexUI?: VertexHandleUI;
-  /** Customize selection outline color */
+  /** Customize rotation handle */
+  rotationUI?: RotationHandleUI;
+  /** @deprecated Use `selectionOutline` instead */
   selectionOutlineColor?: string;
+  /** Customize the selection outline for individual annotations */
+  selectionOutline?: SelectionOutline;
+  /** Customize the selection outline for the group selection box (falls back to selectionOutline) */
+  groupSelectionOutline?: SelectionOutline;
   /** Customize annotation renderer */
   customAnnotationRenderer?: CustomAnnotationRenderer<PdfAnnotationObject>;
   /** Custom renderers for specific annotation types (provided by external plugins) */
@@ -47,7 +55,10 @@ export function AnnotationLayer({
   groupSelectionMenu,
   resizeUI,
   vertexUI,
+  rotationUI,
   selectionOutlineColor,
+  selectionOutline,
+  groupSelectionOutline,
   customAnnotationRenderer,
   annotationRenderers,
   ...props
@@ -102,7 +113,10 @@ export function AnnotationLayer({
         pageHeight={height}
         resizeUI={resizeUI}
         vertexUI={vertexUI}
+        rotationUI={rotationUI}
         selectionOutlineColor={selectionOutlineColor}
+        selectionOutline={selectionOutline}
+        groupSelectionOutline={groupSelectionOutline}
         customAnnotationRenderer={customAnnotationRenderer}
         annotationRenderers={allRenderers}
       />

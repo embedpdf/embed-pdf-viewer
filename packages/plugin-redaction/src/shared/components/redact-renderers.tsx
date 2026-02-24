@@ -15,13 +15,33 @@ export const redactRenderers: BoxedAnnotationRenderer[] = [
       a.type === PdfAnnotationSubtype.REDACT &&
       'segmentRects' in a &&
       (a.segmentRects?.length ?? 0) > 0,
-    render: (props) => <RedactHighlight {...props} />,
+    render: ({ annotation, isSelected, scale, pageIndex, onClick }) => (
+      <RedactHighlight
+        annotation={annotation}
+        isSelected={isSelected}
+        scale={scale}
+        pageIndex={pageIndex}
+        onClick={onClick}
+      />
+    ),
+    interactionDefaults: { isDraggable: false, isResizable: false, isRotatable: false },
+    useAppearanceStream: false,
   }),
   createRenderer<PdfRedactAnnoObject>({
     id: 'redactArea',
     matches: (a): a is PdfRedactAnnoObject =>
       a.type === PdfAnnotationSubtype.REDACT &&
       (!('segmentRects' in a) || !(a.segmentRects?.length ?? 0)),
-    render: (props) => <RedactArea {...props} />,
+    render: ({ annotation, isSelected, scale, pageIndex, onClick }) => (
+      <RedactArea
+        annotation={annotation}
+        isSelected={isSelected}
+        scale={scale}
+        pageIndex={pageIndex}
+        onClick={onClick}
+      />
+    ),
+    interactionDefaults: { isDraggable: false, isResizable: false, isRotatable: false },
+    useAppearanceStream: false,
   }),
 ];

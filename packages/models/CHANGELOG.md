@@ -1,5 +1,36 @@
 # @embedpdf/models
 
+## 2.6.2
+
+### Patch Changes
+
+- [#475](https://github.com/embedpdf/embed-pdf-viewer/pull/475) by [@bobsingor](https://github.com/bobsingor) – ### Tight glyph bounds and font size on run/glyph models
+  - `PdfGlyphSlim` gains optional `tightX`, `tightY`, `tightWidth`, `tightHeight` fields for tight character bounds from `FPDFText_GetCharBox` (closely surrounding the actual glyph shape, as opposed to the existing loose bounds from `FPDFText_GetLooseCharBox`).
+  - `PdfGlyphObject` gains optional `tightOrigin` and `tightSize` fields for the same purpose at the intermediate object level.
+  - `PdfRun` gains an optional `fontSize` field populated from `FPDFText_GetFontSize`, used for font-size-aware rectangle merging during selection.
+
+## 2.6.1
+
+### Patch Changes
+
+- [#473](https://github.com/embedpdf/embed-pdf-viewer/pull/473) by [@bobsingor](https://github.com/bobsingor) – Add PdfFontInfo, PdfTextRun, and PdfPageTextRuns types for rich text extraction with font metadata and color info. Add renderPageRaw and renderPageRectRaw methods to PdfEngine for raw pixel output (ImageDataLike). Add getPageTextRuns to PdfEngine and IPdfiumExecutor. Add TaskSequence utility for composing sequential Task operations with abort propagation.
+
+## 2.6.0
+
+### Minor Changes
+
+- [#452](https://github.com/embedpdf/embed-pdf-viewer/pull/452) by [@bobsingor](https://github.com/bobsingor) –
+  - Add rotation geometry utilities: `rotatePointAround`, `calculateRotatedRectAABB`, `inferRotationCenterFromRects`.
+  - Add `rotation` and `unrotatedRect` properties to `PdfAnnotationObjectBase`.
+
+### Patch Changes
+
+- [#459](https://github.com/embedpdf/embed-pdf-viewer/pull/459) by [@bobsingor](https://github.com/bobsingor) – Fix JSDoc descriptions for `color` and `overlayColor` on `PdfRedactAnnoObject` to match actual semantics.
+
+- [#458](https://github.com/embedpdf/embed-pdf-viewer/pull/458) by [@bobsingor](https://github.com/bobsingor) –
+  - Fix `StandardFontDescriptor.css` to use base family names only (not variant-specific like `"Helvetica-Bold"`).
+  - Add `StandardFontCssProperties` interface and `standardFontCssProperties()` for cross-platform font rendering with proper `fontWeight`/`fontStyle`.
+
 ## 2.5.0
 
 ### Minor Changes

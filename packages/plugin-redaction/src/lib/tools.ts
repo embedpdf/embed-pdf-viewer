@@ -24,16 +24,21 @@ export const redactTool: AnnotationTool<PdfRedactAnnoObject> = {
       if (anno.type !== PdfAnnotationSubtype.REDACT) return true;
       return !anno.segmentRects?.length;
     },
+    isRotatable: false,
     lockAspectRatio: false,
     isGroupDraggable: false,
     isGroupResizable: false,
+    isGroupRotatable: false,
   },
   defaults: {
     type: PdfAnnotationSubtype.REDACT,
-    color: '#E44234',
-    overlayColor: '#000000',
+    color: '#000000',
+    overlayColor: '#FFFFFF',
     strokeColor: '#E44234',
     opacity: 1,
+  },
+  behavior: {
+    useAppearanceStream: false,
   },
 };
 

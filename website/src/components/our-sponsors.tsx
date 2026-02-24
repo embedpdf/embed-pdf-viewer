@@ -33,6 +33,11 @@ const silverSponsors: Sponsor[] = [
 
 const bronzeSponsors: Sponsor[] = [
   {
+    name: 'Accrual',
+    logo: '/sponsors/sponsor-accrual.jpg',
+    url: 'https://www.accrual.com?utm_source=embedpdf&utm_campaign=oss',
+  },
+  {
     name: 'Lefebvre',
     logo: '/sponsors/sponsor-lefebvre.png',
     url: 'https://www.lefebvre-group.com?utm_source=embedpdf&utm_campaign=oss',

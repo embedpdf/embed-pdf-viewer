@@ -11,11 +11,12 @@ import { HandlerFactory, PreviewState } from './types';
 import { useState } from '../utils/use-state';
 import { clamp } from '@embedpdf/core';
 import { useClickDetector } from './click-detector';
+import { applyInsertUpright, clampAnnotationToPage } from '../patching';
 
 export const freeTextHandlerFactory: HandlerFactory<PdfFreeTextAnnoObject> = {
   annotationType: PdfAnnotationSubtype.FREETEXT,
   create(context) {
-    const { onCommit, onPreview, getTool, pageSize, pageIndex } = context;
+    const { onCommit, onPreview, getTool, pageSize, pageIndex, pageRotation } = context;
     const [getStart, setStart] = useState<{ x: number; y: number } | null>(null);
 
     const clampToPage = (pos: { x: number; y: number }) => ({
@@ -53,21 +54,15 @@ export const freeTextHandlerFactory: HandlerFactory<PdfFreeTextAnnoObject> = {
 
         const { width, height } = clickConfig.defaultSize;
 
-        // Center the text box at click position, but keep within bounds
-        const halfWidth = width / 2;
-        const halfHeight = height / 2;
-        const x = clamp(pos.x - halfWidth, 0, pageSize.width - width);
-        const y = clamp(pos.y - halfHeight, 0, pageSize.height - height);
-
         const rect: Rect = {
-          origin: { x, y },
+          origin: { x: pos.x - width / 2, y: pos.y - height / 2 },
           size: { width, height },
         };
 
         // Use defaultContent from clickBehavior if available, otherwise use tool defaults
         const contents = clickConfig.defaultContent ?? defaults.contents;
 
-        const anno: PdfFreeTextAnnoObject = {
+        let anno: PdfFreeTextAnnoObject = {
           ...defaults,
           contents,
           type: PdfAnnotationSubtype.FREETEXT,
@@ -76,6 +71,11 @@ export const freeTextHandlerFactory: HandlerFactory<PdfFreeTextAnnoObject> = {
           id: uuidV4(),
           created: new Date(),
         };
+
+        if (tool.behavior?.insertUpright) {
+          anno = applyInsertUpright(anno, pageRotation, false);
+        }
+        anno = clampAnnotationToPage(anno, pageSize);
 
         onCommit(anno);
       },
@@ -150,7 +150,8 @@ export const freeTextHandlerFactory: HandlerFactory<PdfFreeTextAnnoObject> = {
             size: { width, height },
           };
 
-          const anno: PdfFreeTextAnnoObject = {
+          const tool = getTool();
+          let anno: PdfFreeTextAnnoObject = {
             ...defaults,
             type: PdfAnnotationSubtype.FREETEXT,
             rect,
@@ -158,6 +159,11 @@ export const freeTextHandlerFactory: HandlerFactory<PdfFreeTextAnnoObject> = {
             id: uuidV4(),
             created: new Date(),
           };
+
+          if (tool?.behavior?.insertUpright) {
+            anno = applyInsertUpright(anno, pageRotation, true);
+          }
+
           onCommit(anno);
         }
 

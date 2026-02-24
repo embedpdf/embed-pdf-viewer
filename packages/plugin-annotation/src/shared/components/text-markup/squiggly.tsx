@@ -10,6 +10,8 @@ type SquigglyProps = {
   scale: number;
   onClick?: (e: MouseEvent<HTMLDivElement> | TouchEvent<HTMLDivElement>) => void;
   style?: CSSProperties;
+  /** When true, AP image provides the visual; only render hit area */
+  appearanceActive?: boolean;
 };
 
 export function Squiggly({
@@ -20,6 +22,7 @@ export function Squiggly({
   scale,
   onClick,
   style,
+  appearanceActive = false,
 }: SquigglyProps) {
   const resolvedColor = strokeColor ?? '#FFFF00';
   const amplitude = 2 * scale; // wave height
@@ -53,21 +56,23 @@ export function Squiggly({
             ...style,
           }}
         >
-          {/* Visual squiggly line */}
-          <div
-            style={{
-              position: 'absolute',
-              left: 0,
-              bottom: 0,
-              width: '100%',
-              height: amplitude * 2,
-              backgroundImage: svgDataUri,
-              backgroundRepeat: 'repeat-x',
-              backgroundSize: `${period}px ${amplitude * 2}px`,
-              opacity: opacity,
-              pointerEvents: 'none',
-            }}
-          />
+          {/* Visual -- hidden when AP active, never interactive */}
+          {!appearanceActive && (
+            <div
+              style={{
+                position: 'absolute',
+                left: 0,
+                bottom: 0,
+                width: '100%',
+                height: amplitude * 2,
+                backgroundImage: svgDataUri,
+                backgroundRepeat: 'repeat-x',
+                backgroundSize: `${period}px ${amplitude * 2}px`,
+                opacity: opacity,
+                pointerEvents: 'none',
+              }}
+            />
+          )}
         </div>
       ))}
     </>

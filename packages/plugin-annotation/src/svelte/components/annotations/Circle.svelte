@@ -1,27 +1,20 @@
 <script lang="ts">
   import { PdfAnnotationBorderStyle, type Rect } from '@embedpdf/models';
 
+  const MIN_HIT_AREA_SCREEN_PX = 20;
+
   interface CircleProps {
-    /** Whether the annotation is selected */
     isSelected: boolean;
-    /** Fill colour – defaults to PDFium’s black if omitted */
     color?: string;
-    /** Stroke colour – defaults to same as fill when omitted */
     strokeColor?: string;
-    /** 0 – 1 */
     opacity?: number;
-    /** Stroke width in PDF units */
     strokeWidth: number;
-    /** Stroke type – defaults to solid when omitted */
     strokeStyle?: PdfAnnotationBorderStyle;
-    /** Stroke dash array – defaults to undefined when omitted */
     strokeDashArray?: number[];
-    /** Bounding box of the annotation */
     rect: Rect;
-    /** Current page zoom factor */
     scale: number;
-    /** Pointer/touch handler (used for selection) */
     onClick?: (e: PointerEvent | TouchEvent) => void;
+    appearanceActive?: boolean;
   }
 
   let {
@@ -35,21 +28,18 @@
     rect,
     scale,
     onClick,
+    appearanceActive = false,
   }: CircleProps = $props();
 
   const { width, height, cx, cy, rx, ry } = $derived.by(() => {
-    // Full bounding box *includes* stroke width.
     const outerW = rect.size.width;
     const outerH = rect.size.height;
-
-    // Remove the stroke so the visible fill matches the preview.
     const innerW = Math.max(outerW - strokeWidth, 0);
     const innerH = Math.max(outerH - strokeWidth, 0);
 
     return {
       width: outerW,
       height: outerH,
-      // Centre of the fill sits strokeWidth/2 in from the edges
       cx: strokeWidth / 2 + innerW / 2,
       cy: strokeWidth / 2 + innerH / 2,
       rx: innerW / 2,
@@ -59,6 +49,7 @@
 
   let svgWidth = $derived(width * scale);
   let svgHeight = $derived(height * scale);
+  let hitStrokeWidth = $derived(Math.max(strokeWidth, MIN_HIT_AREA_SCREEN_PX / scale));
 
   let peValue = $derived(
     isSelected ? 'none' : color === 'transparent' ? 'visibleStroke' : 'visible',
@@ -71,25 +62,41 @@
   style:height={`${svgHeight}px`}
   style:pointer-events="none"
   style:z-index="2"
-  {svgWidth}
-  {svgHeight}
+  width={svgWidth}
+  height={svgHeight}
   viewBox={`0 0 ${width} ${height}`}
+  overflow="visible"
 >
+  <!-- Hit area -- always rendered, transparent, wider stroke for mobile -->
+  <!-- svelte-ignore a11y_no_static_element_interactions -->
   <ellipse
     {cx}
     {cy}
     {rx}
     {ry}
-    fill={color}
-    {opacity}
+    fill="transparent"
+    stroke="transparent"
+    stroke-width={hitStrokeWidth}
     onpointerdown={(e) => onClick?.(e)}
     ontouchstart={(e) => onClick?.(e)}
     style:cursor={isSelected ? 'move' : 'pointer'}
     pointer-events={peValue}
-    stroke={strokeColor ?? color}
-    stroke-width={strokeWidth}
-    stroke-dasharray={strokeStyle === PdfAnnotationBorderStyle.DASHED
-      ? strokeDashArray?.join(',')
-      : undefined}
   />
+  <!-- Visual -- hidden when AP active, never interactive -->
+  {#if !appearanceActive}
+    <ellipse
+      {cx}
+      {cy}
+      {rx}
+      {ry}
+      fill={color}
+      {opacity}
+      style:pointer-events="none"
+      stroke={strokeColor ?? color}
+      stroke-width={strokeWidth}
+      stroke-dasharray={strokeStyle === PdfAnnotationBorderStyle.DASHED
+        ? strokeDashArray?.join(',')
+        : undefined}
+    />
+  {/if}
 </svg>

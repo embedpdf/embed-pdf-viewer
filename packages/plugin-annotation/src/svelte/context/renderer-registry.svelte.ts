@@ -3,8 +3,11 @@ import type {
   BoxedAnnotationRenderer,
   AnnotationRendererEntry,
   AnnotationRendererProps,
+  AnnotationInteractionEvent,
+  SelectOverrideHelpers,
 } from './types';
 import type { PdfAnnotationObject } from '@embedpdf/models';
+import type { VertexConfig } from '../../shared/types';
 import type { Component } from 'svelte';
 
 /**
@@ -26,9 +29,7 @@ export function createRendererRegistry(): AnnotationRendererRegistry {
   return {
     register(entries) {
       const ids = new Set(entries.map((e) => e.id));
-      // Add new, replace existing by id
       renderers = [...renderers.filter((r) => !ids.has(r.id)), ...entries];
-      // Return cleanup function
       return () => {
         renderers = renderers.filter((r) => !entries.some((e) => e.id === r.id));
       };
@@ -59,8 +60,27 @@ export function createRenderer<T extends PdfAnnotationObject>(
     id: entry.id,
     matches: entry.matches,
     component: entry.component as Component<AnnotationRendererProps>,
+    vertexConfig: entry.vertexConfig as VertexConfig<PdfAnnotationObject> | undefined,
+    zIndex: entry.zIndex,
+    containerStyle: entry.containerStyle as
+      | ((annotation: PdfAnnotationObject) => string)
+      | undefined,
+    interactionDefaults: entry.interactionDefaults,
+    useAppearanceStream: entry.useAppearanceStream,
+    isDraggable: entry.isDraggable,
+    onDoubleClick: entry.onDoubleClick,
+    selectOverride: entry.selectOverride as BoxedAnnotationRenderer['selectOverride'],
+    hideSelectionMenu: entry.hideSelectionMenu as
+      | ((annotation: PdfAnnotationObject) => boolean)
+      | undefined,
   };
 }
 
 // Re-export types for convenience
-export type { AnnotationRendererProps, AnnotationRendererEntry, BoxedAnnotationRenderer };
+export type {
+  AnnotationRendererProps,
+  AnnotationRendererEntry,
+  BoxedAnnotationRenderer,
+  AnnotationInteractionEvent,
+  SelectOverrideHelpers,
+};

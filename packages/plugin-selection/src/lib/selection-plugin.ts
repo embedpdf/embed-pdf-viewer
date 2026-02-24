@@ -28,6 +28,7 @@ import { ScrollCapability, ScrollPlugin } from '@embedpdf/plugin-scroll';
 
 import {
   cachePageGeometry,
+  evictPageGeometry,
   setSelection,
   SelectionAction,
   endSelection,
@@ -65,7 +66,7 @@ import {
   EmptySpaceClickEvent,
   EmptySpaceClickScopeEvent,
 } from './types';
-import { sliceBounds, rectsWithinSlice } from './utils';
+import { sliceBounds, rectsWithinSlice, expandToWordBoundary, expandToLineBoundary } from './utils';
 import { createTextSelectionHandler } from './handlers/text-selection.handler';
 import { createMarqueeSelectionHandler } from './handlers/marquee-selection.handler';
 
@@ -84,11 +85,17 @@ export class SelectionPlugin extends BasePlugin<
   private selecting = new Map<string, boolean>();
   private anchor = new Map<string, { page: number; index: number } | undefined>();
 
+  /** Whether the text handler has a pending anchor (before drag threshold is met) */
+  private hasTextAnchor = new Map<string, boolean>();
+
   /** Tracks the page a marquee drag started on, per document */
   private marqueePage = new Map<string, number>();
 
   /** Page callbacks for rect updates, per document */
   private pageCallbacks = new Map<string, Map<number, (data: SelectionRectsCallback) => void>>();
+
+  /** LRU access order for geometry cache, per document (oldest first) */
+  private geoAccessOrder = new Map<string, number[]>();
 
   private readonly menuPlacement$ = createScopedEmitter<
     SelectionMenuPlacement | null,
@@ -226,15 +233,19 @@ export class SelectionPlugin extends BasePlugin<
       ]),
     );
     this.pageCallbacks.set(documentId, new Map());
+    this.geoAccessOrder.set(documentId, []);
     this.selecting.set(documentId, false);
     this.anchor.set(documentId, undefined);
+    this.hasTextAnchor.set(documentId, false);
   }
 
   protected override onDocumentClosed(documentId: string): void {
     this.dispatch(cleanupSelectionState(documentId));
     this.enabledModesPerDoc.delete(documentId);
     this.pageCallbacks.delete(documentId);
+    this.geoAccessOrder.delete(documentId);
     this.selecting.delete(documentId);
+    this.hasTextAnchor.delete(documentId);
     this.anchor.delete(documentId);
     this.marqueePage.delete(documentId);
     this.selChange$.clearScope(documentId);
@@ -390,6 +401,27 @@ export class SelectionPlugin extends BasePlugin<
       boundingRect: selector.selectBoundingRectForPage(docState, pageIndex),
     });
 
+    // When geometry arrives (possibly re-fetched after eviction), recompute
+    // rects for this page if it falls within an active selection.
+    geoTask.wait((geo) => {
+      const currentState = this.getDocumentState(documentId);
+      const sel = currentState.selection;
+      if (!sel || pageIndex < sel.start.page || pageIndex > sel.end.page) return;
+
+      const sb = sliceBounds(sel, geo, pageIndex);
+      if (!sb) return;
+
+      const pageRects = rectsWithinSlice(geo, sb.from, sb.to);
+      this.dispatch(setRects(documentId, { ...currentState.rects, [pageIndex]: pageRects }));
+      this.dispatch(
+        setSlices(documentId, {
+          ...currentState.slices,
+          [pageIndex]: { start: sb.from, count: sb.to - sb.from + 1 },
+        }),
+      );
+      this.notifyPage(documentId, pageIndex);
+    }, ignore);
+
     // Create text selection handler
     const textHandler = createTextSelectionHandler({
       getGeometry: () => this.getDocumentState(documentId).geometry[pageIndex],
@@ -408,6 +440,11 @@ export class SelectionPlugin extends BasePlugin<
           ? interactionScope.setCursor('selection-text', cursor, 10)
           : interactionScope.removeCursor('selection-text'),
       onEmptySpaceClick: (modeId) => this.emptySpaceClick$.emit(documentId, { pageIndex, modeId }),
+      onWordSelect: (g, modeId) => this.selectWord(documentId, pageIndex, g, modeId),
+      onLineSelect: (g, modeId) => this.selectLine(documentId, pageIndex, g, modeId),
+      setHasTextAnchor: (active) => this.hasTextAnchor.set(documentId, active),
+      minDragDistance: this.config.minSelectionDragDistance,
+      toleranceFactor: this.config.toleranceFactor,
     });
 
     // Register text selection with registerAlways - any plugin can enable it for their mode
@@ -480,7 +517,8 @@ export class SelectionPlugin extends BasePlugin<
         const config = this.enabledModesPerDoc.get(documentId)?.get(modeId);
         return config?.enableMarquee === true;
       },
-      isTextSelecting: () => this.selecting.get(documentId) ?? false,
+      isTextSelecting: () =>
+        (this.selecting.get(documentId) ?? false) || (this.hasTextAnchor.get(documentId) ?? false),
       onBegin: (pos, modeId) => this.beginMarquee(documentId, pageIndex, pos, modeId),
       onChange: (rect, modeId) => {
         this.updateMarquee(documentId, pageIndex, rect, modeId);
@@ -679,6 +717,7 @@ export class SelectionPlugin extends BasePlugin<
     const task = this.engine.getPageGeometry(coreDoc.document, page);
     task.wait((geo) => {
       this.dispatch(cachePageGeometry(documentId, pageIdx, geo));
+      this.touchGeometry(documentId, pageIdx);
     }, ignore);
     return task;
   }
@@ -686,9 +725,49 @@ export class SelectionPlugin extends BasePlugin<
   /* ── geometry cache ───────────────────────────────────── */
   private getOrLoadGeometry(documentId: string, pageIdx: number): PdfTask<PdfPageGeometry> {
     const cached = this.getDocumentState(documentId).geometry[pageIdx];
-    if (cached) return PdfTaskHelper.resolve(cached);
+    if (cached) {
+      this.touchGeometry(documentId, pageIdx);
+      return PdfTaskHelper.resolve(cached);
+    }
 
     return this.getNewPageGeometryAndCache(documentId, pageIdx);
+  }
+
+  /* ── geometry LRU eviction ──────────────────────────────── */
+
+  private touchGeometry(documentId: string, pageIdx: number): void {
+    const order = this.geoAccessOrder.get(documentId);
+    if (!order) return;
+
+    const idx = order.indexOf(pageIdx);
+    if (idx > -1) order.splice(idx, 1);
+    order.push(pageIdx);
+
+    this.evictGeometryIfNeeded(documentId);
+  }
+
+  private evictGeometryIfNeeded(documentId: string): void {
+    const max = this.config.maxCachedGeometries ?? 50;
+    const order = this.geoAccessOrder.get(documentId);
+    if (!order || order.length <= max) return;
+
+    const pinned = this.pageCallbacks.get(documentId);
+    const toEvict: number[] = [];
+
+    while (order.length - toEvict.length > max) {
+      const candidate = order.find((p) => !toEvict.includes(p) && !pinned?.has(p));
+      if (candidate === undefined) break;
+      toEvict.push(candidate);
+    }
+
+    if (toEvict.length === 0) return;
+
+    for (const p of toEvict) {
+      const idx = order.indexOf(p);
+      if (idx > -1) order.splice(idx, 1);
+    }
+
+    this.dispatch(evictPageGeometry(documentId, toEvict));
   }
 
   /* ── selection state updates ───────────────────────────── */
@@ -715,6 +794,59 @@ export class SelectionPlugin extends BasePlugin<
     this.selChange$.emit(documentId, null);
     this.emitMenuPlacement(documentId, null);
     this.notifyAllPages(documentId);
+  }
+
+  private selectWord(documentId: string, page: number, charIndex: number, modeId: string) {
+    const geo = this.getDocumentState(documentId).geometry[page];
+    if (!geo) return;
+
+    const bounds = expandToWordBoundary(geo, charIndex);
+    if (!bounds) return;
+
+    this.applyInstantSelection(documentId, page, bounds.from, bounds.to, modeId);
+  }
+
+  private selectLine(documentId: string, page: number, charIndex: number, modeId: string) {
+    const geo = this.getDocumentState(documentId).geometry[page];
+    if (!geo) return;
+
+    const bounds = expandToLineBoundary(geo, charIndex);
+    if (!bounds) return;
+
+    this.applyInstantSelection(documentId, page, bounds.from, bounds.to, modeId);
+  }
+
+  /**
+   * Set a selection range without going through the drag begin/update/end flow.
+   * Used by double-click (word) and triple-click (line) selection.
+   */
+  private applyInstantSelection(
+    documentId: string,
+    page: number,
+    from: number,
+    to: number,
+    modeId: string,
+  ) {
+    const range: SelectionRangeX = {
+      start: { page, index: from },
+      end: { page, index: to },
+    };
+
+    this.selecting.set(documentId, false);
+    this.anchor.set(documentId, undefined);
+    this.dispatch(startSelection(documentId));
+    this.dispatch(setSelection(documentId, range));
+    this.updateRectsAndSlices(documentId, range);
+    this.dispatch(endSelection(documentId));
+
+    this.selChange$.emit(documentId, range);
+    this.beginSelection$.emit(documentId, { page, index: from, modeId });
+    this.endSelection$.emit(documentId, { modeId });
+
+    for (let p = range.start.page; p <= range.end.page; p++) {
+      this.notifyPage(documentId, p);
+    }
+    this.recalculateMenuPlacement(documentId);
   }
 
   private updateSelection(documentId: string, page: number, index: number, modeId: string) {

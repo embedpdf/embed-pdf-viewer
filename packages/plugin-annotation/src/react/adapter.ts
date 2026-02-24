@@ -18,7 +18,11 @@ export type {
   MouseEvent,
   PointerEvent,
   TouchEvent,
+  KeyboardEvent,
+  FormEvent,
 } from 'react';
+
+export { createPortal } from 'react-dom';
 
 export const suppressContentEditableWarningProps = {
   suppressContentEditableWarning: true,
