@@ -1,0 +1,49 @@
+---
+title: Vue PDF Viewer
+description: Choose your path - use our drop-in PDFViewer component or build a completely custom viewer with headless composables.
+searchable: true
+---
+
+import { Cards } from '@/components/cards'
+
+# Vue PDF Viewer
+
+EmbedPDF offers two ways to add PDF viewing to your Vue application. Choose the approach that fits your project.
+
+<Cards num={2}>
+  <Cards.Card
+    title="Drop-in Viewer"
+    description="A complete, pre-built PDF viewer with toolbar and thumbnails. Import, configure, done."
+    href="/docs/vue/viewer/introduction"
+    arrow
+  />
+  <Cards.Card
+    title="Headless Composables"
+    description="Build a completely custom viewer using our composables and unstyled components. Total UI freedom."
+    href="/docs/vue/headless/introduction"
+    arrow
+  />
+</Cards>
+
+## Which should I choose?
+
+| Use Case | Recommendation |
+| :--- | :--- |
+| I need a viewer up and running in minutes | **Drop-in Viewer** |
+| I want to match my app's design system exactly | **Headless Composables** |
+| I need a simple document preview | **Drop-in Viewer** |
+| I'm building a document editor or annotation tool | **Headless Composables** |
+| I want the smallest possible bundle size | **Headless Composables** |
+| I don't want to write any UI code | **Drop-in Viewer** |
+
+## Technology
+
+Both options are powered by the same high-performance engine:
+
+- **PDFium via WebAssembly** — The same rendering engine used in Google Chrome
+- **Virtualization** — Only renders visible pages, handling 1000+ page documents smoothly
+- **First-class TypeScript** — Full type definitions for a great developer experience
+- **Tree-shakeable** — Import only what you use
+
+Ready to get started? Pick your path above!
+

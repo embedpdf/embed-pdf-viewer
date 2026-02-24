@@ -10,7 +10,5 @@ export const manifest: PluginManifest<HistoryPluginConfig> = {
   provides: ['history'],
   requires: [],
   optional: [],
-  defaultConfig: {
-    enabled: true,
-  },
+  defaultConfig: {},
 };

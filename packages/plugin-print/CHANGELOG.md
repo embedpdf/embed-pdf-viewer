@@ -1,5 +1,129 @@
 # @embedpdf/plugin-print
 
+## 2.6.2
+
+## 2.6.1
+
+## 2.6.0
+
+## 2.5.0
+
+## 2.4.1
+
+## 2.4.0
+
+## 2.3.0
+
+## 2.2.0
+
+### Minor Changes
+
+- [#389](https://github.com/embedpdf/embed-pdf-viewer/pull/389) by [@bobsingor](https://github.com/bobsingor) – Add permission checking for print operations:
+  - Check `PdfPermissionFlag.Print` before allowing document printing
+  - Return `PdfErrorCode.Security` error when print permission is denied
+
+## 2.1.2
+
+## 2.1.1
+
+## 2.1.0
+
+## 2.0.2
+
+## 2.0.1
+
+## 2.0.0
+
+### Major Changes
+
+- [#279](https://github.com/embedpdf/embed-pdf-viewer/pull/279) by [@bobsingor](https://github.com/bobsingor) – ## Multi-Document Support
+
+  The print plugin now supports printing from multiple documents.
+
+  ### Breaking Changes
+  - **Methods**: `print()` now accepts an optional `documentId` parameter and operates on the active document by default.
+  - **Events**: `PrintReadyEvent` now includes `documentId` field for document context.
+  - **Capability**: Added `forDocument(documentId)` method that returns `PrintScope` for document-specific operations.
+
+  ### Framework-Specific Changes (React/Preact, Svelte, Vue)
+  - **usePrint Hook**:
+    - Now requires `documentId` parameter: `usePrint(documentId)` (React/Preact: `@embedpdf/plugin-print/react`, Svelte: `@embedpdf/plugin-print/svelte`, Vue: `@embedpdf/plugin-print/vue`)
+    - Returns document-scoped print capability via `forDocument()`
+
+  ### New Features
+  - `PrintScope` interface for document-scoped print operations
+  - Support for printing any document, not just the active one
+  - Document-aware print ready events
+
+## 2.0.0-next.3
+
+## 2.0.0-next.2
+
+## 2.0.0-next.1
+
+## 2.0.0-next.0
+
+### Major Changes
+
+- [#279](https://github.com/embedpdf/embed-pdf-viewer/pull/279) by [@bobsingor](https://github.com/bobsingor) – ## Multi-Document Support
+
+  The print plugin now supports printing from multiple documents.
+
+  ### Breaking Changes
+  - **Methods**: `print()` now accepts an optional `documentId` parameter and operates on the active document by default.
+  - **Events**: `PrintReadyEvent` now includes `documentId` field for document context.
+  - **Capability**: Added `forDocument(documentId)` method that returns `PrintScope` for document-specific operations.
+
+  ### Framework-Specific Changes (React/Preact, Svelte, Vue)
+  - **usePrint Hook**:
+    - Now requires `documentId` parameter: `usePrint(documentId)` (React/Preact: `@embedpdf/plugin-print/react`, Svelte: `@embedpdf/plugin-print/svelte`, Vue: `@embedpdf/plugin-print/vue`)
+    - Returns document-scoped print capability via `forDocument()`
+
+  ### New Features
+  - `PrintScope` interface for document-scoped print operations
+  - Support for printing any document, not just the active one
+  - Document-aware print ready events
+
+## 1.5.0
+
+## 1.4.1
+
+## 1.4.0
+
+### Minor Changes
+
+- [#222](https://github.com/embedpdf/embed-pdf-viewer/pull/222) by [@andrewrisse](https://github.com/andrewrisse) – feat: Add Svelte 5 adapter (`/svelte` export) with Rune-based hooks (`usePrintPlugin`, `usePrintCapability`) and `PrintFrame.svelte` utility component.
+
+## 1.3.16
+
+## 1.3.15
+
+## 1.3.14
+
+## 1.3.13
+
+## 1.3.12
+
+## 1.3.11
+
+## 1.3.10
+
+## 1.3.9
+
+## 1.3.8
+
+## 1.3.7
+
+## 1.3.6
+
+## 1.3.5
+
+## 1.3.4
+
+## 1.3.3
+
+## 1.3.2
+
 ## 1.3.1
 
 ## 1.3.0
@@ -19,7 +143,6 @@
 ### Patch Changes
 
 - [#141](https://github.com/embedpdf/embed-pdf-viewer/pull/141) by [@bobsingor](https://github.com/bobsingor) – Improved `PrintPlugin` flexibility:
-
   - `print` method now accepts **optional** `PdfPrintOptions`. If none are provided, it falls back to default options.
   - Updated `PrintCapability` type accordingly (`print(options?: PdfPrintOptions)`).
   - Removed the hard requirement on `"render"` from the plugin manifest, simplifying dependency setup.

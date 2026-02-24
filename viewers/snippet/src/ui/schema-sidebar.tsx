@@ -1,0 +1,487 @@
+import { h, Fragment } from 'preact';
+import { createPortal } from 'preact/compat';
+import { useState, useRef, useCallback, useEffect } from 'preact/hooks';
+import { SidebarRendererProps, useItemRenderer, useUIContainer } from '@embedpdf/plugin-ui/preact';
+import { Icon } from '@/components/ui/icon';
+
+// Drawer snap points as percentages
+const SNAP_CLOSED = 0;
+const SNAP_HALF = 50;
+const SNAP_FULL = 100;
+
+// Animation duration in ms
+const ANIMATION_DURATION = 300;
+
+// Threshold for velocity-based snapping (pixels per ms)
+const VELOCITY_THRESHOLD = 0.5;
+
+// Threshold for position-based snapping (percentage)
+const POSITION_THRESHOLD_UP = 75; // Above this, snap to full
+const POSITION_THRESHOLD_DOWN = 25; // Below this, close
+
+// Breakpoint for mobile drawer behavior
+const MOBILE_BREAKPOINT = 768;
+
+type DrawerState = 'closed' | 'half' | 'full';
+
+/**
+ * Schema-driven Sidebar Renderer for Preact
+ *
+ * On large containers: Traditional sidebar (left/right)
+ * On small containers: Bottom drawer with drag-to-resize
+ */
+export function SchemaSidebar({ schema, documentId, isOpen, onClose }: SidebarRendererProps) {
+  const { getContainer } = useUIContainer();
+
+  // Get initial size synchronously to prevent flicker on mount
+  const getInitialSize = () => {
+    const container = getContainer();
+    if (!container) return false; // Default to desktop if container not ready
+    return container.clientWidth < MOBILE_BREAKPOINT;
+  };
+
+  const [isSmallContainer, setIsSmallContainer] = useState<boolean>(getInitialSize);
+
+  // Watch for container size changes (resize only, not initial)
+  useEffect(() => {
+    const container = getContainer();
+    if (!container) return;
+
+    const checkContainerSize = () => {
+      const width = container.clientWidth;
+      setIsSmallContainer(width < MOBILE_BREAKPOINT);
+    };
+
+    const observer = new ResizeObserver(checkContainerSize);
+    observer.observe(container);
+
+    return () => observer.disconnect();
+  }, [getContainer]);
+
+  const { position, content, width } = schema;
+  const { renderCustomComponent } = useItemRenderer();
+  const container = getContainer();
+
+  // On small containers, render as bottom drawer (portaled to root)
+  if (isSmallContainer && container) {
+    return createPortal(
+      <BottomDrawer
+        schema={schema}
+        documentId={documentId}
+        isOpen={isOpen}
+        onClose={onClose}
+        renderCustomComponent={renderCustomComponent}
+        content={content}
+        rootElement={container}
+      />,
+      container,
+    );
+  }
+
+  // On large containers, render as traditional sidebar (only when open)
+  if (!isOpen) return null;
+
+  const positionClasses = getPositionClasses(position.placement);
+  const widthStyle = width ? { width } : undefined;
+
+  return (
+    <div
+      className={`${positionClasses} border-border-default bg-bg-surface flex flex-col shadow-lg`}
+      style={widthStyle}
+      data-sidebar-id={schema.id}
+    >
+      {/* Sidebar Content */}
+      <div className="min-h-0 flex-1">
+        {content.type === 'tabs' && (
+          <TabsContent
+            content={content}
+            documentId={documentId}
+            renderCustomComponent={renderCustomComponent}
+          />
+        )}
+        {content.type === 'component' && (
+          <>{renderCustomComponent(content.componentId, documentId, {})}</>
+        )}
+      </div>
+    </div>
+  );
+}
+
+/**
+ * Bottom Drawer Component with drag-to-resize functionality
+ * Handles open/close animations based on isOpen prop
+ */
+function BottomDrawer({
+  schema,
+  documentId,
+  isOpen,
+  onClose,
+  renderCustomComponent,
+  content,
+  rootElement,
+}: {
+  schema: SidebarRendererProps['schema'];
+  documentId: string;
+  isOpen: boolean;
+  onClose: () => void;
+  renderCustomComponent: (componentId: string, documentId: string, props: any) => any;
+  content: SidebarRendererProps['schema']['content'];
+  rootElement: HTMLElement;
+}) {
+  // Track the visual state separately from isOpen to allow animations
+  const [drawerState, setDrawerState] = useState<DrawerState>('closed');
+  const [isDragging, setIsDragging] = useState(false);
+  const [dragOffset, setDragOffset] = useState(0);
+  const [isVisible, setIsVisible] = useState(false);
+
+  const drawerRef = useRef<HTMLDivElement>(null);
+  const dragStartRef = useRef({ y: 0, height: 0, time: 0, state: 'half' as DrawerState });
+  const lastDragRef = useRef({ y: 0, time: 0 });
+
+  // Handle isOpen changes for enter/exit animations
+  useEffect(() => {
+    if (isOpen) {
+      // Opening: make visible immediately, then animate to half
+      setIsVisible(true);
+      // Use requestAnimationFrame to ensure the closed state renders first
+      requestAnimationFrame(() => {
+        requestAnimationFrame(() => {
+          setDrawerState('half');
+        });
+      });
+    } else {
+      // Closing: animate to closed, then hide after animation
+      setDrawerState('closed');
+      const timer = setTimeout(() => {
+        setIsVisible(false);
+      }, ANIMATION_DURATION);
+      return () => clearTimeout(timer);
+    }
+  }, [isOpen]);
+
+  // Get the current height percentage based on state
+  const getHeightFromState = (state: DrawerState): number => {
+    switch (state) {
+      case 'closed':
+        return SNAP_CLOSED;
+      case 'half':
+        return SNAP_HALF;
+      case 'full':
+        return SNAP_FULL;
+    }
+  };
+
+  // Calculate the target snap point based on current position and velocity
+  const calculateSnapPoint = (currentPercent: number, velocity: number): DrawerState => {
+    // Velocity-based snapping (fast swipe)
+    if (Math.abs(velocity) > VELOCITY_THRESHOLD) {
+      if (velocity > 0) {
+        // Swiping down (closing)
+        return currentPercent > SNAP_HALF ? 'half' : 'closed';
+      } else {
+        // Swiping up (opening)
+        return currentPercent < SNAP_HALF ? 'half' : 'full';
+      }
+    }
+
+    // Position-based snapping (slow drag)
+    if (currentPercent >= POSITION_THRESHOLD_UP) {
+      return 'full';
+    } else if (currentPercent <= POSITION_THRESHOLD_DOWN) {
+      return 'closed';
+    } else {
+      return 'half';
+    }
+  };
+
+  // Handle drag start
+  const handleDragStart = useCallback(
+    (clientY: number) => {
+      if (!drawerRef.current) return;
+
+      const containerHeight = rootElement.clientHeight;
+      const currentHeight = drawerRef.current.offsetHeight;
+      const currentPercent = (currentHeight / containerHeight) * 100;
+
+      // Sync drawerState with actual visual position to prevent desyncs
+      // This handles cases where the animation hasn't completed or state is stale
+      let actualState: DrawerState;
+      if (currentPercent >= 75) {
+        actualState = 'full';
+      } else if (currentPercent <= 25) {
+        actualState = 'closed';
+      } else {
+        actualState = 'half';
+      }
+
+      dragStartRef.current = {
+        y: clientY,
+        height: currentPercent,
+        time: Date.now(),
+        // Store the actual state at drag start for consistent calculations
+        state: actualState,
+      };
+      lastDragRef.current = { y: clientY, time: Date.now() };
+
+      // Reset offset and sync state
+      setDragOffset(0);
+      if (actualState !== drawerState) {
+        setDrawerState(actualState);
+      }
+      setIsDragging(true);
+    },
+    [rootElement, drawerState],
+  );
+
+  // Handle drag move
+  const handleDragMove = useCallback(
+    (clientY: number) => {
+      if (!isDragging) return;
+
+      const containerHeight = rootElement.clientHeight;
+      const deltaY = dragStartRef.current.y - clientY;
+      const deltaPercent = (deltaY / containerHeight) * 100;
+      const newPercent = Math.max(0, Math.min(100, dragStartRef.current.height + deltaPercent));
+
+      // Store for velocity calculation
+      lastDragRef.current = { y: clientY, time: Date.now() };
+
+      // Calculate offset from the state captured at drag start (not from potentially stale closure)
+      const statePercent = getHeightFromState(dragStartRef.current.state);
+      setDragOffset(newPercent - statePercent);
+    },
+    [isDragging, rootElement],
+  );
+
+  // Handle drag end
+  const handleDragEnd = useCallback(() => {
+    if (!isDragging) return;
+
+    // Check if this was just a click (minimal movement) - ignore it
+    const totalMovement = Math.abs(dragStartRef.current.y - lastDragRef.current.y);
+    if (totalMovement < 5) {
+      setIsDragging(false);
+      setDragOffset(0);
+      return;
+    }
+
+    // Calculate final position using state captured at drag start
+    const statePercent = getHeightFromState(dragStartRef.current.state);
+    const currentPercent = statePercent + dragOffset;
+
+    // Calculate velocity (positive = moving down/closing)
+    const timeDelta = Date.now() - lastDragRef.current.time;
+    const yDelta = lastDragRef.current.y - dragStartRef.current.y;
+    const velocity = timeDelta > 0 ? yDelta / timeDelta : 0;
+
+    // Determine snap point
+    const newState = calculateSnapPoint(currentPercent, velocity);
+
+    if (newState === 'closed') {
+      // Set state to closed BEFORE stopping drag so transition animates from current position to 0%
+      // (otherwise it would jump to baseHeight first, then animate)
+      setDrawerState('closed');
+      setIsDragging(false);
+      setDragOffset(0);
+      onClose();
+    } else {
+      setIsDragging(false);
+      setDragOffset(0);
+      setDrawerState(newState);
+    }
+  }, [isDragging, dragOffset, onClose]);
+
+  // Touch event handlers
+  const handleTouchStart = useCallback(
+    (e: TouchEvent) => {
+      handleDragStart(e.touches[0].clientY);
+    },
+    [handleDragStart],
+  );
+
+  const handleTouchMove = useCallback(
+    (e: TouchEvent) => {
+      if (isDragging) {
+        // Fix: Only prevent default if the browser allows it
+        if (e.cancelable) {
+          e.preventDefault();
+        }
+        // We still want to handle the drag logic even if we couldn't preventDefault
+        // (though usually touch-action: none prevents us getting here in a scroll state)
+        handleDragMove(e.touches[0].clientY);
+      }
+    },
+    [isDragging, handleDragMove],
+  );
+
+  const handleTouchEnd = useCallback(() => {
+    handleDragEnd();
+  }, [handleDragEnd]);
+
+  // Mouse event handlers
+  const handleMouseDown = useCallback(
+    (e: MouseEvent) => {
+      e.preventDefault();
+      handleDragStart(e.clientY);
+    },
+    [handleDragStart],
+  );
+
+  // Global mouse move/up handlers
+  useEffect(() => {
+    if (!isDragging) return;
+
+    const handleMouseMove = (e: MouseEvent) => {
+      handleDragMove(e.clientY);
+    };
+
+    const handleMouseUp = () => {
+      handleDragEnd();
+    };
+
+    document.addEventListener('mousemove', handleMouseMove);
+    document.addEventListener('mouseup', handleMouseUp);
+
+    return () => {
+      document.removeEventListener('mousemove', handleMouseMove);
+      document.removeEventListener('mouseup', handleMouseUp);
+    };
+  }, [isDragging, handleDragMove, handleDragEnd]);
+
+  // Don't render anything if not visible
+  if (!isVisible) return null;
+
+  // Calculate the actual height to display
+  // When dragging, use the state captured at drag start for consistency
+  const baseHeight = isDragging
+    ? getHeightFromState(dragStartRef.current.state)
+    : getHeightFromState(drawerState);
+  const displayHeight = isDragging
+    ? Math.max(0, Math.min(100, baseHeight + dragOffset))
+    : baseHeight;
+
+  // Calculate backdrop opacity (0 when closed, 1 when fully open)
+  const backdropOpacity = Math.min(displayHeight / SNAP_HALF, 1) * 0.3;
+
+  return (
+    <>
+      {/* Backdrop overlay */}
+      <div
+        className={`bg-bg-overlay absolute inset-0 z-40 transition-opacity duration-300 ${
+          displayHeight === 0 ? 'pointer-events-none' : ''
+        }`}
+        style={{ opacity: backdropOpacity }}
+        onClick={onClose}
+      />
+
+      {/* Drawer */}
+      <div
+        ref={drawerRef}
+        className={`bg-bg-surface absolute inset-x-0 bottom-0 z-50 flex flex-col rounded-t-2xl shadow-2xl ${
+          !isDragging ? 'transition-[height] duration-300 ease-out' : ''
+        }`}
+        style={{ height: `${displayHeight}%` }}
+        data-sidebar-id={schema.id}
+      >
+        {/* Drag Handle */}
+        <div
+          className="flex flex-shrink-0 cursor-grab touch-none items-center justify-center py-3 active:cursor-grabbing"
+          onTouchStart={handleTouchStart}
+          onTouchMove={handleTouchMove}
+          onTouchEnd={handleTouchEnd}
+          onMouseDown={handleMouseDown}
+        >
+          <div className="bg-border-default h-1.5 w-12 rounded-full" />
+        </div>
+
+        {/* Drawer Content */}
+        <div className="min-h-0 flex-1 overflow-hidden">
+          {content.type === 'tabs' && (
+            <TabsContent
+              content={content}
+              documentId={documentId}
+              renderCustomComponent={renderCustomComponent}
+            />
+          )}
+          {content.type === 'component' && (
+            <>{renderCustomComponent(content.componentId, documentId, {})}</>
+          )}
+        </div>
+      </div>
+    </>
+  );
+}
+
+/**
+ * Renders tabs content
+ */
+function TabsContent({
+  content,
+  documentId,
+  renderCustomComponent,
+}: {
+  content: Extract<SidebarRendererProps['schema']['content'], { type: 'tabs' }>;
+  documentId: string;
+  renderCustomComponent: (componentId: string, documentId: string, props: any) => any;
+}) {
+  const [activeTab, setActiveTab] = useState(content.tabs[0]?.id || '');
+
+  return (
+    <div className="flex h-full flex-1 flex-col">
+      {/* Tab Buttons */}
+      <div role="tablist" className="bg-bg-surface mx-4 my-4 flex flex-shrink-0 overflow-hidden">
+        {content.tabs.map((tab, idx, array) => {
+          const isActive = activeTab === tab.id;
+          const isFirst = idx === 0;
+          const isLast = idx === array.length - 1;
+
+          return (
+            <button
+              key={tab.id}
+              role="tab"
+              aria-selected={isActive}
+              tabIndex={isActive ? 0 : -1}
+              onClick={() => setActiveTab(tab.id)}
+              className={`relative flex h-7 flex-1 cursor-pointer items-center justify-center border outline-none transition-colors ${
+                isFirst ? 'rounded-l-md' : ''
+              } ${isLast ? 'rounded-r-md' : ''} ${!isLast ? 'border-r-0' : ''} ${
+                isActive
+                  ? 'border-accent bg-accent text-fg-on-accent'
+                  : 'border-border-default text-fg-secondary hover:bg-interactive-hover'
+              }`}
+            >
+              {tab.icon && <Icon icon={tab.icon} className="h-5 w-5" />}
+            </button>
+          );
+        })}
+      </div>
+
+      {/* Tab Content */}
+      <div className="min-h-0 flex-1 overflow-auto">
+        {content.tabs
+          .filter((tab) => tab.id === activeTab)
+          .map((tab) => (
+            <Fragment key={tab.id}>
+              {renderCustomComponent(tab.componentId, documentId, {})}
+            </Fragment>
+          ))}
+      </div>
+    </div>
+  );
+}
+
+/**
+ * Get position classes for sidebar positioning
+ */
+function getPositionClasses(placement: 'left' | 'right' | 'top' | 'bottom'): string {
+  switch (placement) {
+    case 'left':
+      return 'border-r';
+    case 'right':
+      return 'border-l';
+    case 'top':
+      return 'border-b';
+    case 'bottom':
+      return 'border-t';
+  }
+}

@@ -125,19 +125,19 @@ export const PdfMetadataEditorTool = () => {
       subtitle="right in your browser"
       description="Securely edit PDF document properties and metadata"
       badgeText="PDF Metadata Editor"
-      badgeColor="border-purple-200 bg-purple-50 text-purple-800"
+      badgeColor="border-purple-200 bg-purple-50 text-purple-800 dark:border-purple-800/30 dark:bg-purple-900/20 dark:text-purple-300"
       gradientColor="from-purple-600 to-pink-700"
     >
       {!engine ? (
         <LoadingState borderColor="border-pink-500" />
       ) : error ? (
         <div className="mb-12 text-center">
-          <div className="mx-auto max-w-md rounded-lg bg-red-50 p-4 text-red-700">
+          <div className="mx-auto max-w-md rounded-lg bg-red-50 p-4 text-red-700 dark:bg-red-900/20 dark:text-red-300">
             {error}
           </div>
           <button
             onClick={() => setError(null)}
-            className="mt-4 text-blue-600 hover:text-blue-800"
+            className="mt-4 text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300"
           >
             Try again
           </button>

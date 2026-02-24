@@ -6,6 +6,7 @@ import type { PdfPrintOptions } from '@embedpdf/models';
 
 interface Props {
   open: boolean;
+  documentId: string;
 }
 
 interface Emits {
@@ -16,7 +17,7 @@ const props = defineProps<Props>();
 const emit = defineEmits<Emits>();
 
 const { provides: printCapability } = usePrintCapability();
-const { state } = useScroll();
+const { state } = useScroll(() => props.documentId);
 
 // Dialog state
 type PageSelection = 'all' | 'current' | 'custom';

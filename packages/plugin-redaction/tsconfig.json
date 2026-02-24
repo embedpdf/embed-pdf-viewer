@@ -14,6 +14,7 @@
     "paths": {
       "@framework": ["./src/react/adapter.ts"],
       "@embedpdf/core/@framework": ["./src/react/core.ts"],
+      "@embedpdf/plugin-annotation/@framework": ["./src/react/annotation.ts"],
       "@embedpdf/utils/@framework": ["./src/react/utils.ts"],
       "@embedpdf/plugin-redaction": ["./src/index.ts"]
     }

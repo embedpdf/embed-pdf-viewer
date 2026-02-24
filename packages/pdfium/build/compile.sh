@@ -1,6 +1,5 @@
 em++ $(ls ./code/cpp/*.cpp) \
   /workspace/packages/pdfium/pdfium-src/out/wasm/obj/libpdfium.a \
-  -g \
   -v \
   -sENVIRONMENT=node,worker,web,shell \
   -sMODULARIZE=1 \

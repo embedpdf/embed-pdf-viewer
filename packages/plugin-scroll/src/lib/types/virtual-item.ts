@@ -7,6 +7,7 @@ export interface PageLayout {
   height: number;
   rotatedWidth: number;
   rotatedHeight: number;
+  elevated: boolean;
 }
 
 export interface VirtualItem {

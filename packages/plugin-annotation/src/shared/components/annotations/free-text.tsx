@@ -10,13 +10,14 @@ import {
 import {
   PdfFreeTextAnnoObject,
   PdfVerticalAlignment,
-  standardFontCss,
+  standardFontCssProperties,
   textAlignmentToCss,
 } from '@embedpdf/models';
 import { useAnnotationCapability } from '../..';
 import { TrackedAnnotation } from '@embedpdf/plugin-annotation';
 
 interface FreeTextProps {
+  documentId: string;
   isSelected: boolean;
   isEditing: boolean;
   annotation: TrackedAnnotation<PdfFreeTextAnnoObject>;
@@ -24,22 +25,29 @@ interface FreeTextProps {
   scale: number;
   onClick?: (e: MouseEvent<HTMLDivElement> | TouchEvent<HTMLDivElement>) => void;
   onDoubleClick?: (event: MouseEvent<HTMLDivElement>) => void;
+  /** When true, AP canvas provides the visual; hide text content */
+  appearanceActive?: boolean;
 }
 
 export function FreeText({
+  documentId,
   isSelected,
   isEditing,
   annotation,
   pageIndex,
   scale,
   onClick,
+  appearanceActive = false,
 }: FreeTextProps) {
   const editorRef = useRef<HTMLSpanElement>(null);
-  const { provides: annotationProvides } = useAnnotationCapability();
+  const editingRef = useRef(false);
+  const { provides: annotationCapability } = useAnnotationCapability();
+  const annotationProvides = annotationCapability?.forDocument(documentId) ?? null;
   const [isIOS, setIsIOS] = useState(false);
 
   useEffect(() => {
     if (isEditing && editorRef.current) {
+      editingRef.current = true;
       const editor = editorRef.current;
       editor.focus();
 
@@ -67,6 +75,8 @@ export function FreeText({
   }, []);
 
   const handleBlur = () => {
+    if (!editingRef.current) return;
+    editingRef.current = false;
     if (!annotationProvides) return;
     if (!editorRef.current) return;
     annotationProvides.updateAnnotation(pageIndex, annotation.object.id, {
@@ -92,6 +102,7 @@ export function FreeText({
         cursor: isSelected && !isEditing ? 'move' : 'default',
         pointerEvents: isSelected && !isEditing ? 'none' : 'auto',
         zIndex: 2,
+        opacity: appearanceActive ? 0 : 1,
       }}
       onPointerDown={onClick}
       onTouchStart={onClick}
@@ -103,7 +114,7 @@ export function FreeText({
         style={{
           color: annotation.object.fontColor,
           fontSize: adjustedFontPx,
-          fontFamily: standardFontCss(annotation.object.fontFamily),
+          ...standardFontCssProperties(annotation.object.fontFamily),
           textAlign: textAlignmentToCss(annotation.object.textAlign),
           flexDirection: 'column',
           justifyContent:
@@ -113,7 +124,7 @@ export function FreeText({
                 ? 'center'
                 : 'flex-end',
           display: 'flex',
-          backgroundColor: annotation.object.backgroundColor,
+          backgroundColor: annotation.object.color ?? annotation.object.backgroundColor,
           opacity: annotation.object.opacity,
           width: needsComp ? `${invScalePercent}%` : '100%',
           height: needsComp ? `${invScalePercent}%` : '100%',

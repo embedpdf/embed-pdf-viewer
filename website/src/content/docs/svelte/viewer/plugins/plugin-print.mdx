@@ -1,0 +1,85 @@
+---
+title: Printing
+description: Programmatically trigger high-quality document printing.
+---
+
+import { PrintExample } from '../../code-examples/viewer/print-example';
+
+# Printing
+
+The PDFViewer includes a high-quality print engine that prepares documents for the browser's native print dialog. While a print button is included in the default toolbar (under the document menu), you may want to trigger printing from your own UI.
+
+## Programmatic Control
+
+You can control printing using the `print` plugin API. This method returns a `Task` that allows you to track the progress of the print preparation (rendering pages to high-res canvas/images).
+
+<CodeExample
+  codePaths={[
+    "../../examples/svelte-tailwind/src/examples/viewer/print-example.svelte"
+  ]}
+>
+  <PrintExample />
+</CodeExample>
+
+### Printing the Active Document
+
+To print whatever document is currently visible:
+
+```svelte
+<script lang="ts">
+  import { PDFViewer, type PluginRegistry } from '@embedpdf/svelte-pdf-viewer';
+
+  let registry = $state<PluginRegistry | null>(null);
+
+  const handleReady = (r: PluginRegistry) => {
+    registry = r;
+  };
+
+  const print = () => {
+    const printPlugin = registry?.getPlugin('print')?.provides();
+    printPlugin?.print();
+  };
+</script>
+
+<PDFViewer onready={handleReady} config={{ src: '/doc.pdf' }} />
+```
+
+### Printing a Specific Document
+
+To target a specific document:
+
+```svelte
+<script lang="ts">
+  const printDocument = () => {
+    const printPlugin = registry?.getPlugin('print')?.provides();
+    const docPrint = printPlugin?.forDocument('invoice-123');
+
+    docPrint?.print().wait(
+      () => console.log('Print dialog opened'),
+      (error) => console.error('Print failed', error)
+    );
+  };
+</script>
+```
+
+### Print Options
+
+You can pass options to the `print` method to control what gets printed:
+
+```svelte
+<script lang="ts">
+  const printWithOptions = () => {
+    const printPlugin = registry?.getPlugin('print')?.provides();
+    const docPrint = printPlugin?.forDocument('invoice-123');
+
+    docPrint?.print({
+      // Print specific pages
+      pageRanges: '1-3, 5, 8', 
+      
+      // Include annotations in the print output
+      includeAnnotations: true 
+    });
+  };
+</script>
+```
+

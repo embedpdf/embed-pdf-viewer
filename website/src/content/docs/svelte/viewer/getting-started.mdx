@@ -1,0 +1,113 @@
+---
+title: Getting Started
+description: Add a complete PDF viewer to your Svelte app in under 5 minutes.
+searchable: true
+---
+
+# Getting Started with the Drop-in Viewer
+
+The `@embedpdf/svelte-pdf-viewer` package provides a complete, production-ready PDF viewer component. It includes a toolbar, sidebar with thumbnails, and all the features you'd expect—right out of the box.
+
+## Installation
+
+```sh npm2yarn
+npm install @embedpdf/svelte-pdf-viewer
+```
+
+## Basic Usage
+
+Import the `PDFViewer` component and render it with a PDF source:
+
+```svelte copy filename="App.svelte"
+<script lang="ts">
+  import { PDFViewer } from '@embedpdf/svelte-pdf-viewer';
+</script>
+
+<div style="height: 100vh;">
+  <PDFViewer
+    config={{
+      src: 'https://snippet.embedpdf.com/ebook.pdf',
+      theme: { preference: 'light' }
+    }}
+    style="width: 100%; height: 100%;"
+  />
+</div>
+```
+
+That's it! You now have a fully functional PDF viewer.
+
+## Live Example
+
+import { ViewerExample } from '../code-examples/viewer/viewer-example';
+
+<CodeExample codePaths={["../../examples/svelte-tailwind/src/examples/viewer/viewer-example.svelte"]}> 
+  <ViewerExample />
+</CodeExample>
+
+## SvelteKit
+
+The component works seamlessly with SvelteKit. Since it uses browser APIs (Canvas, WebAssembly), make sure to import it only on the client side:
+
+```svelte copy filename="src/routes/viewer/+page.svelte"
+<script lang="ts">
+  import { PDFViewer } from '@embedpdf/svelte-pdf-viewer';
+</script>
+
+<div style="height: 100vh;">
+  <PDFViewer
+    config={{
+      src: 'https://snippet.embedpdf.com/ebook.pdf'
+    }}
+    style="width: 100%; height: 100%;"
+  />
+</div>
+```
+
+If you encounter SSR issues, you can use dynamic imports:
+
+```svelte copy filename="src/routes/viewer/+page.svelte"
+<script lang="ts">
+  import { onMount } from 'svelte';
+
+  let PDFViewer: typeof import('@embedpdf/svelte-pdf-viewer').PDFViewer;
+
+  onMount(async () => {
+    const module = await import('@embedpdf/svelte-pdf-viewer');
+    PDFViewer = module.PDFViewer;
+  });
+</script>
+
+<div style="height: 100vh;">
+  {#if PDFViewer}
+    <PDFViewer
+      config={{
+        src: 'https://snippet.embedpdf.com/ebook.pdf'
+      }}
+      style="width: 100%; height: 100%;"
+    />
+  {/if}
+</div>
+```
+
+## Configuration Options
+
+The `config` prop accepts the following top-level options for plugins and general behavior:
+
+| Option | Type | Description |
+| :--- | :--- | :--- |
+| `src` | `string` | URL or path to the PDF document |
+| `theme` | `object` | Theme configuration. See [Theme](./theme) |
+| `tabBar` | `'always' \| 'multiple' \| 'never'` | Control visibility of the document tab bar. **Default**: `'multiple'` |
+| `disabledCategories` | `string[]` | Hide specific UI features. See [Customizing the UI](./customizing-ui) |
+| `i18n` | `object` | Configure locales and translations. See [Internationalization](./plugins/plugin-i18n) |
+| `annotations` | `object` | Configure annotation defaults (author, tools). See [Annotations](./plugins/plugin-annotation) |
+| `pan` | `object` | Configure the hand tool behavior. See [Pan Tool](./plugins/plugin-pan) |
+| `zoom` | `object` | Configure default zoom levels and limits. See [Zoom](./plugins/plugin-zoom) |
+| `spread` | `object` | Configure two-page spread layouts. See [Spread](./plugins/plugin-spread) |
+| `scroll` | `object` | Configure scroll direction and logic. See [Scrolling](./plugins/plugin-scroll) |
+| `documentManager` | `object` | Advanced document loading options. See [Document Manager](./plugins/plugin-document-manager) |
+
+## Need More Control?
+
+If you need complete control over the UI—custom toolbars, unique layouts, or integration with your design system—check out our [Headless Components](/docs/svelte/headless/introduction).
+

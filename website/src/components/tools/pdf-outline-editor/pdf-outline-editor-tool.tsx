@@ -195,19 +195,19 @@ export const PdfOutlineEditorTool = () => {
       subtitle="right in your browser"
       description="Manage bookmarks and navigation in your PDF documents"
       badgeText="PDF Outline Editor"
-      badgeColor="border-indigo-200 bg-indigo-50 text-indigo-800"
+      badgeColor="border-indigo-200 bg-indigo-50 text-indigo-800 dark:border-indigo-800/30 dark:bg-indigo-900/20 dark:text-indigo-300"
       gradientColor="from-teal-600 to-green-700"
     >
       {!engine ? (
         <LoadingState borderColor="border-indigo-500" />
       ) : error ? (
         <div className="mb-12 text-center">
-          <div className="mx-auto max-w-md rounded-lg bg-red-50 p-4 text-red-700">
+          <div className="mx-auto max-w-md rounded-lg bg-red-50 p-4 text-red-700 dark:bg-red-900/20 dark:text-red-300">
             {error}
           </div>
           <button
             onClick={() => setError(null)}
-            className="mt-4 text-blue-600 hover:text-blue-800"
+            className="mt-4 text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300"
           >
             Try again
           </button>
@@ -242,28 +242,30 @@ export const PdfOutlineEditorTool = () => {
         <div className="space-y-6">
           {/* Document Info Header */}
           <div className="group relative">
-            <div className="absolute -inset-0.5 rounded-2xl bg-gradient-to-r from-teal-600 to-green-700 opacity-20 blur transition duration-300"></div>
-            <div className="relative rounded-2xl bg-white p-6 shadow-md">
+            <div className="absolute -inset-0.5 rounded-2xl bg-gradient-to-r from-teal-600 to-green-700 opacity-20 blur transition duration-300 dark:opacity-30"></div>
+            <div className="relative rounded-2xl bg-white p-6 shadow-md dark:border dark:border-gray-800 dark:bg-gray-900">
               <div className="flex items-center justify-between">
                 <div className="flex items-center">
                   <div className="flex-shrink-0">
-                    <div className="flex h-12 w-12 items-center justify-center rounded-lg bg-gradient-to-br from-teal-600 to-green-700">
+                    <div className="flex h-12 w-12 items-center justify-center rounded-lg bg-gradient-to-br from-teal-600 to-green-700 shadow-sm">
                       <FileText className="h-6 w-6 text-white" />
                     </div>
                   </div>
                   <div className="ml-4">
-                    <h3 className="text-lg font-bold text-gray-900">
+                    <h3 className="text-lg font-bold text-gray-900 dark:text-white">
                       Editing Bookmarks
                     </h3>
-                    <p className="text-gray-600">{document.fileName}</p>
-                    <p className="text-sm text-gray-500">
+                    <p className="text-gray-600 dark:text-gray-400">
+                      {document.fileName}
+                    </p>
+                    <p className="text-sm text-gray-500 dark:text-gray-500">
                       {document.doc.pageCount} page
                       {document.doc.pageCount !== 1 ? 's' : ''}
                     </p>
                   </div>
                 </div>
                 {hasChanges && (
-                  <div className="rounded-full bg-amber-100 px-3 py-1 text-sm font-medium text-amber-800">
+                  <div className="rounded-full bg-amber-100 px-3 py-1 text-sm font-medium text-amber-800 dark:bg-amber-900/30 dark:text-amber-300">
                     Unsaved changes
                   </div>
                 )}
@@ -273,18 +275,18 @@ export const PdfOutlineEditorTool = () => {
 
           {/* Bookmark Editor */}
           <div className="group relative">
-            <div className="absolute -inset-0.5 rounded-2xl bg-gradient-to-r from-teal-600 to-green-700 opacity-10 blur transition duration-300 group-hover:opacity-20"></div>
-            <div className="relative overflow-hidden rounded-2xl bg-white shadow-md">
+            <div className="absolute -inset-0.5 rounded-2xl bg-gradient-to-r from-teal-600 to-green-700 opacity-10 blur transition duration-300 group-hover:opacity-20 dark:opacity-20 dark:group-hover:opacity-30"></div>
+            <div className="relative overflow-hidden rounded-2xl bg-white shadow-md dark:border dark:border-gray-800 dark:bg-gray-900">
               <div className="p-8">
                 <div className="mb-6 flex items-center justify-between">
-                  <h3 className="flex items-center gap-2 text-2xl font-bold text-gray-900">
-                    <BookOpen className="h-7 w-7 text-teal-600" />
+                  <h3 className="flex items-center gap-2 text-2xl font-bold text-gray-900 dark:text-white">
+                    <BookOpen className="h-7 w-7 text-teal-600 dark:text-teal-400" />
                     Document Outline
                   </h3>
                   <div className="flex gap-2">
                     <button
                       onClick={handleAddRootBookmark}
-                      className="inline-flex items-center gap-2 rounded-lg bg-green-100 px-4 py-2 text-sm font-medium text-green-700 transition-colors hover:bg-green-200"
+                      className="inline-flex items-center gap-2 rounded-lg bg-green-100 px-4 py-2 text-sm font-medium text-green-700 transition-colors hover:bg-green-200 dark:bg-green-900/30 dark:text-green-400 dark:hover:bg-green-900/50"
                     >
                       <Plus className="h-4 w-4" />
                       Add Bookmark
@@ -292,7 +294,7 @@ export const PdfOutlineEditorTool = () => {
                     {bookmarks.length > 0 && (
                       <button
                         onClick={handleDeleteAll}
-                        className="rounded-lg bg-red-100 px-4 py-2 text-sm font-medium text-red-700 transition-colors hover:bg-red-200"
+                        className="rounded-lg bg-red-100 px-4 py-2 text-sm font-medium text-red-700 transition-colors hover:bg-red-200 dark:bg-red-900/30 dark:text-red-400 dark:hover:bg-red-900/50"
                       >
                         Delete All
                       </button>
@@ -301,12 +303,12 @@ export const PdfOutlineEditorTool = () => {
                 </div>
 
                 {bookmarks.length === 0 ? (
-                  <div className="rounded-lg border-2 border-dashed border-gray-200 bg-gray-50 p-12 text-center">
-                    <BookOpen className="mx-auto mb-4 h-12 w-12 text-gray-400" />
-                    <h4 className="mb-2 text-lg font-medium text-gray-900">
+                  <div className="rounded-lg border-2 border-dashed border-gray-200 bg-gray-50 p-12 text-center dark:border-gray-700 dark:bg-gray-800/50">
+                    <BookOpen className="mx-auto mb-4 h-12 w-12 text-gray-400 dark:text-gray-500" />
+                    <h4 className="mb-2 text-lg font-medium text-gray-900 dark:text-white">
                       No Bookmarks
                     </h4>
-                    <p className="mb-4 text-gray-500">
+                    <p className="mb-4 text-gray-500 dark:text-gray-400">
                       This document doesn&apos;t have any bookmarks yet.
                     </p>
                     <button
@@ -327,7 +329,7 @@ export const PdfOutlineEditorTool = () => {
 
                 {/* Action Buttons */}
                 {(bookmarks.length > 0 || hasChanges) && (
-                  <div className="mt-8 flex flex-col gap-4 border-t border-gray-200 pt-8 sm:flex-row">
+                  <div className="mt-8 flex flex-col gap-4 border-t border-gray-200 pt-8 dark:border-gray-700 sm:flex-row">
                     <button
                       onClick={handleSave}
                       disabled={isSaving || !hasChanges}
@@ -339,7 +341,7 @@ export const PdfOutlineEditorTool = () => {
                     {hasChanges && (
                       <button
                         onClick={handleReset}
-                        className="inline-flex items-center justify-center gap-2 rounded-lg border border-gray-300 px-8 py-4 text-lg font-medium text-gray-700 transition-colors hover:bg-gray-50"
+                        className="inline-flex items-center justify-center gap-2 rounded-lg border border-gray-300 px-8 py-4 text-lg font-medium text-gray-700 transition-colors hover:bg-gray-50 dark:border-gray-600 dark:text-gray-300 dark:hover:bg-gray-800"
                       >
                         <RotateCcw className="h-5 w-5" />
                         Reset Changes

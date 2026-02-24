@@ -1,0 +1,93 @@
+---
+title: Getting Started
+description: Add a complete PDF viewer to your React app in under 5 minutes.
+searchable: true
+---
+
+# Getting Started with the Drop-in Viewer
+
+The `@embedpdf/react-pdf-viewer` package provides a complete, production-ready PDF viewer component. It includes a toolbar, sidebar with thumbnails, and all the features you'd expect—right out of the box.
+
+## Installation
+
+```sh npm2yarn
+npm install @embedpdf/react-pdf-viewer
+```
+
+## Basic Usage
+
+Import the `PDFViewer` component and render it with a PDF source:
+
+```tsx copy filename="App.tsx"
+import { PDFViewer } from '@embedpdf/react-pdf-viewer';
+
+export default function App() {
+  return (
+    <div style={{ height: '100vh' }}>
+      <PDFViewer 
+        config={{
+          src: 'https://snippet.embedpdf.com/ebook.pdf',
+          theme: { preference: 'light' }
+        }}
+      />
+    </div>
+  );
+}
+```
+
+That's it! You now have a fully functional PDF viewer.
+
+## Live Example
+
+import ViewerExample from '../code-examples/viewer/viewer-example';
+import { ExampleWrapper } from '@/components/example-wrapper';
+
+<CodeExample codePaths={["content/docs/react/code-examples/viewer/viewer-example.tsx"]}> 
+  <ExampleWrapper>
+    <ViewerExample />
+  </ExampleWrapper>
+</CodeExample>
+
+## Next.js App Router
+
+The component works seamlessly with Next.js. Since it uses browser APIs (Canvas, WebAssembly), make sure to use it in a Client Component:
+
+```tsx copy filename="app/viewer/page.tsx"
+'use client';
+
+import { PDFViewer } from '@embedpdf/react-pdf-viewer';
+
+export default function ViewerPage() {
+  return (
+    <div style={{ height: '100vh' }}>
+      <PDFViewer 
+        config={{
+          src: 'https://snippet.embedpdf.com/ebook.pdf'
+        }}
+      />
+    </div>
+  );
+}
+```
+
+## Configuration Options
+
+The `config` prop accepts the following top-level options for plugins and general behavior:
+
+| Option | Type | Description |
+| :--- | :--- | :--- |
+| `src` | `string` | URL or path to the PDF document |
+| `theme` | `object` | Theme configuration. See [Theme](./theme) |
+| `tabBar` | `'always' \| 'multiple' \| 'never'` | Control visibility of the document tab bar. **Default**: `'multiple'` |
+| `disabledCategories` | `string[]` | Hide specific UI features. See [Customizing the UI](./customizing-ui) |
+| `i18n` | `object` | Configure locales and translations. See [Internationalization](./plugins/plugin-i18n) |
+| `annotations` | `object` | Configure annotation defaults (author, tools). See [Annotations](./plugins/plugin-annotation) |
+| `pan` | `object` | Configure the hand tool behavior. See [Pan Tool](./plugins/plugin-pan) |
+| `zoom` | `object` | Configure default zoom levels and limits. See [Zoom](./plugins/plugin-zoom) |
+| `spread` | `object` | Configure two-page spread layouts. See [Spread](./plugins/plugin-spread) |
+| `scroll` | `object` | Configure scroll direction and logic. See [Scrolling](./plugins/plugin-scroll) |
+| `documentManager` | `object` | Advanced document loading options. See [Document Manager](./plugins/plugin-document-manager) |
+
+## Need More Control?
+
+If you need complete control over the UI—custom toolbars, unique layouts, or integration with your design system—check out our [Headless Components](/docs/react/headless/introduction).

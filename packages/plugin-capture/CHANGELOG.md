@@ -1,5 +1,147 @@
 # @embedpdf/plugin-capture
 
+## 2.6.2
+
+## 2.6.1
+
+## 2.6.0
+
+## 2.5.0
+
+## 2.4.1
+
+## 2.4.0
+
+## 2.3.0
+
+## 2.2.0
+
+## 2.1.2
+
+## 2.1.1
+
+## 2.1.0
+
+## 2.0.2
+
+## 2.0.1
+
+## 2.0.0
+
+### Major Changes
+
+- [#279](https://github.com/embedpdf/embed-pdf-viewer/pull/279) by [@bobsingor](https://github.com/bobsingor) – ## Multi-Document Support
+
+  The capture plugin now supports multiple documents with per-document state management.
+
+  ### Breaking Changes
+  - **CaptureAreaEvent**: Now includes `documentId` field. All capture events are scoped to a specific document.
+  - **RegisterMarqueeOnPageOptions**: Now requires `documentId` field to specify which document the marquee capture should be registered for.
+  - **CaptureCapability**:
+    - Removed `onMarqueeCaptureActiveChange` event hook
+    - Added `onStateChange` event hook that emits `StateChangeEvent` with `documentId` and state
+    - Added `getState()` method to get current document state
+    - Added `forDocument(documentId: string)` method that returns a `CaptureScope` for document-specific operations
+  - **State Management**: Plugin now maintains per-document state with `CaptureDocumentState` tracking `isMarqueeCaptureActive` per document.
+
+  ### Framework-Specific Changes (React/Preact, Svelte, Vue)
+  - **MarqueeCapture Component**:
+    - Now requires `documentId` prop (React/Preact: `@embedpdf/plugin-capture/react`, Svelte: `@embedpdf/plugin-capture/svelte`, Vue: `@embedpdf/plugin-capture/vue`)
+    - `scale` prop is now optional - if not provided, uses document state scale
+    - Component now uses `useDocumentState` hook to get document scale automatically
+  - **useCapture Hook**:
+    - Now requires `documentId` parameter: `useCapture(documentId)`
+    - Returns document-scoped capture state and operations
+
+  ### New Features
+  - `CaptureScope` interface for document-scoped operations
+  - Per-document marquee capture state tracking
+  - Document lifecycle management with automatic state initialization and cleanup
+  - `forDocument()` method for operating on specific documents
+
+## 2.0.0-next.3
+
+## 2.0.0-next.2
+
+## 2.0.0-next.1
+
+## 2.0.0-next.0
+
+### Major Changes
+
+- [#279](https://github.com/embedpdf/embed-pdf-viewer/pull/279) by [@bobsingor](https://github.com/bobsingor) – ## Multi-Document Support
+
+  The capture plugin now supports multiple documents with per-document state management.
+
+  ### Breaking Changes
+  - **CaptureAreaEvent**: Now includes `documentId` field. All capture events are scoped to a specific document.
+  - **RegisterMarqueeOnPageOptions**: Now requires `documentId` field to specify which document the marquee capture should be registered for.
+  - **CaptureCapability**:
+    - Removed `onMarqueeCaptureActiveChange` event hook
+    - Added `onStateChange` event hook that emits `StateChangeEvent` with `documentId` and state
+    - Added `getState()` method to get current document state
+    - Added `forDocument(documentId: string)` method that returns a `CaptureScope` for document-specific operations
+  - **State Management**: Plugin now maintains per-document state with `CaptureDocumentState` tracking `isMarqueeCaptureActive` per document.
+
+  ### Framework-Specific Changes (React/Preact, Svelte, Vue)
+  - **MarqueeCapture Component**:
+    - Now requires `documentId` prop (React/Preact: `@embedpdf/plugin-capture/react`, Svelte: `@embedpdf/plugin-capture/svelte`, Vue: `@embedpdf/plugin-capture/vue`)
+    - `scale` prop is now optional - if not provided, uses document state scale
+    - Component now uses `useDocumentState` hook to get document scale automatically
+  - **useCapture Hook**:
+    - Now requires `documentId` parameter: `useCapture(documentId)`
+    - Returns document-scoped capture state and operations
+
+  ### New Features
+  - `CaptureScope` interface for document-scoped operations
+  - Per-document marquee capture state tracking
+  - Document lifecycle management with automatic state initialization and cleanup
+  - `forDocument()` method for operating on specific documents
+
+## 1.5.0
+
+## 1.4.1
+
+### Patch Changes
+
+- [#234](https://github.com/embedpdf/embed-pdf-viewer/pull/234) by [@bobsingor](https://github.com/bobsingor) – feat: Add Svelte 5 adapter (`/svelte` export) for the Capture plugin. Includes Rune-based hooks (`useCapture`, `useCaptureCapability`, `useCapturePlugin`) and the `MarqueeCapture.svelte` component.
+
+## 1.4.0
+
+## 1.3.16
+
+## 1.3.15
+
+## 1.3.14
+
+### Patch Changes
+
+- [#212](https://github.com/embedpdf/embed-pdf-viewer/pull/212) by [@bobsingor](https://github.com/bobsingor) – Add reactive state for marquee capture mode
+
+## 1.3.13
+
+## 1.3.12
+
+## 1.3.11
+
+## 1.3.10
+
+## 1.3.9
+
+## 1.3.8
+
+## 1.3.7
+
+## 1.3.6
+
+## 1.3.5
+
+## 1.3.4
+
+## 1.3.3
+
+## 1.3.2
+
 ## 1.3.1
 
 ## 1.3.0

@@ -5,6 +5,8 @@
     "moduleResolution": "bundler",
     "strict": true,
     "declaration": true,
+    "declarationDir": "dist",
+    "emitDeclarationOnly": false,
     "esModuleInterop": true,
     "skipLibCheck": true,
     "outDir": "dist",
@@ -14,6 +16,7 @@
     "paths": {
       "@framework": ["./src/react/adapter.ts"],
       "@embedpdf/core/@framework": ["./src/react/core.ts"],
+      "@embedpdf/plugin-viewport/@framework": ["./src/react/viewport.ts"],
       "@embedpdf/plugin-zoom": ["./src/index.ts"]
     }
   },

@@ -1,0 +1,50 @@
+import { Locale } from '../types';
+
+export const esES: Locale = {
+  code: 'es',
+  name: 'Español',
+  translations: {
+    commands: {
+      zoom: {
+        in: 'Acercar',
+        out: 'Alejar',
+        fitWidth: 'Ajustar al ancho',
+        fitPage: 'Ajustar a la página',
+        automatic: 'Automático',
+        level: 'Nivel de zoom ({level}%)',
+        inArea: 'Acercar área',
+      },
+      fullscreen: {
+        enter: 'Pantalla completa',
+        exit: 'Salir de pantalla completa',
+      },
+      rotate: {
+        clockwise: 'Girar a la derecha',
+        counterclockwise: 'Girar a la izquierda',
+      },
+      menu: 'Menú',
+      sidebar: 'Barra lateral',
+      search: 'Buscar',
+      comment: 'Comentario',
+      download: 'Descargar',
+      print: 'Imprimir',
+      openFile: 'Abrir PDF',
+      save: 'Guardar',
+      settings: 'Configuración',
+      view: 'Ver',
+      annotate: 'Anotar',
+      shapes: 'Formas',
+      redact: 'Redactar',
+      fillAndSign: 'Rellenar y firmar',
+      form: 'Formulario',
+      pan: 'Desplazar',
+      pointer: 'Puntero',
+      undo: 'Deshacer',
+      redo: 'Rehacer',
+      copy: 'Copiar',
+      screenshot: 'Captura de pantalla',
+      nextPage: 'Página siguiente',
+      previousPage: 'Página anterior',
+    },
+  },
+};

@@ -11,7 +11,6 @@ export const manifest: PluginManifest<PanPluginConfig> = {
   requires: ['interaction-manager', 'viewport'],
   optional: [],
   defaultConfig: {
-    enabled: true,
     defaultMode: 'mobile',
   },
 };

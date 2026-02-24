@@ -2,6 +2,8 @@ import { MouseEvent, TouchEvent, useMemo } from '@framework';
 import { Rect, Position, LineEndings } from '@embedpdf/models';
 import { patching } from '@embedpdf/plugin-annotation';
 
+const MIN_HIT_AREA_SCREEN_PX = 20;
+
 interface PolylineProps {
   rect: Rect;
   vertices: Position[];
@@ -14,6 +16,8 @@ interface PolylineProps {
   onClick?: (e: MouseEvent<SVGElement> | TouchEvent<SVGElement>) => void;
   /** Optional start & end endings */
   lineEndings?: LineEndings;
+  /** When true, AP canvas provides the visual; only render hit area */
+  appearanceActive?: boolean;
 }
 
 export function Polyline({
@@ -27,14 +31,13 @@ export function Polyline({
   isSelected,
   onClick,
   lineEndings,
+  appearanceActive = false,
 }: PolylineProps): JSX.Element {
-  // Localise vertices to annotation rect
   const localPts = useMemo(
     () => vertices.map(({ x, y }) => ({ x: x - rect.origin.x, y: y - rect.origin.y })),
     [vertices, rect],
   );
 
-  // Build path data "M x0 y0 L x1 y1 ..."
   const pathData = useMemo(() => {
     if (!localPts.length) return '';
     const [first, ...rest] = localPts;
@@ -47,26 +50,24 @@ export function Polyline({
     );
   }, [localPts]);
 
-  // Compute endings (angles from first→second, last-1→last)
   const endings = useMemo(() => {
     if (localPts.length < 2) return { start: null, end: null };
     const toAngle = (a: Position, b: Position) => Math.atan2(b.y - a.y, b.x - a.x);
 
-    // Calculate angles in the direction of the line segments
-    const startRad = toAngle(localPts[0], localPts[1]); // direction FROM first TO second
-    const endRad = toAngle(localPts[localPts.length - 2], localPts[localPts.length - 1]); // direction FROM second-to-last TO last
+    const startRad = toAngle(localPts[0], localPts[1]);
+    const endRad = toAngle(localPts[localPts.length - 2], localPts[localPts.length - 1]);
 
     const start = patching.createEnding(
       lineEndings?.start,
       strokeWidth,
-      startRad + Math.PI, // tip points outward from line start
+      startRad + Math.PI,
       localPts[0].x,
       localPts[0].y,
     );
     const end = patching.createEnding(
       lineEndings?.end,
       strokeWidth,
-      endRad, // tip points in line direction
+      endRad,
       localPts[localPts.length - 1].x,
       localPts[localPts.length - 1].y,
     );
@@ -75,6 +76,7 @@ export function Polyline({
 
   const width = rect.size.width * scale;
   const height = rect.size.height * scale;
+  const hitStrokeWidth = Math.max(strokeWidth, MIN_HIT_AREA_SCREEN_PX / scale);
 
   return (
     <svg
@@ -90,15 +92,15 @@ export function Polyline({
       height={height}
       viewBox={`0 0 ${rect.size.width} ${rect.size.height}`}
     >
+      {/* Hit area -- always rendered, transparent, wider stroke for mobile */}
       <path
         d={pathData}
+        fill="none"
+        stroke="transparent"
+        strokeWidth={hitStrokeWidth}
         onPointerDown={onClick}
         onTouchStart={onClick}
-        opacity={opacity}
         style={{
-          fill: 'none',
-          stroke: strokeColor ?? color,
-          strokeWidth,
           cursor: isSelected ? 'move' : 'pointer',
           pointerEvents: isSelected ? 'none' : 'visibleStroke',
           strokeLinecap: 'butt',
@@ -109,13 +111,13 @@ export function Polyline({
         <path
           d={endings.start.d}
           transform={endings.start.transform}
-          stroke={strokeColor}
-          fill={endings.start.filled ? color : 'none'}
+          fill="transparent"
+          stroke="transparent"
+          strokeWidth={hitStrokeWidth}
           onPointerDown={onClick}
           onTouchStart={onClick}
           style={{
             cursor: isSelected ? 'move' : 'pointer',
-            strokeWidth,
             pointerEvents: isSelected ? 'none' : endings.start.filled ? 'visible' : 'visibleStroke',
             strokeLinecap: 'butt',
           }}
@@ -125,17 +127,61 @@ export function Polyline({
         <path
           d={endings.end.d}
           transform={endings.end.transform}
-          stroke={strokeColor}
-          fill={endings.end.filled ? color : 'none'}
+          fill="transparent"
+          stroke="transparent"
+          strokeWidth={hitStrokeWidth}
           onPointerDown={onClick}
           onTouchStart={onClick}
           style={{
             cursor: isSelected ? 'move' : 'pointer',
-            strokeWidth,
             pointerEvents: isSelected ? 'none' : endings.end.filled ? 'visible' : 'visibleStroke',
             strokeLinecap: 'butt',
           }}
         />
+      )}
+
+      {/* Visual -- hidden when AP active, never interactive */}
+      {!appearanceActive && (
+        <>
+          <path
+            d={pathData}
+            opacity={opacity}
+            style={{
+              fill: 'none',
+              stroke: strokeColor ?? color,
+              strokeWidth,
+              pointerEvents: 'none',
+              strokeLinecap: 'butt',
+              strokeLinejoin: 'miter',
+            }}
+          />
+          {endings.start && (
+            <path
+              d={endings.start.d}
+              transform={endings.start.transform}
+              stroke={strokeColor}
+              fill={endings.start.filled ? color : 'none'}
+              style={{
+                pointerEvents: 'none',
+                strokeWidth,
+                strokeLinecap: 'butt',
+              }}
+            />
+          )}
+          {endings.end && (
+            <path
+              d={endings.end.d}
+              transform={endings.end.transform}
+              stroke={strokeColor}
+              fill={endings.end.filled ? color : 'none'}
+              style={{
+                pointerEvents: 'none',
+                strokeWidth,
+                strokeLinecap: 'butt',
+              }}
+            />
+          )}
+        </>
       )}
     </svg>
   );

@@ -1,0 +1,13 @@
+{
+  "extends": "../../tsconfig.json",
+  "compilerOptions": {
+    "baseUrl": "../..",
+    "types": ["svelte"],
+    "paths": {
+      "@embedpdf/engines": ["src/lib/index.ts"],
+      "@embedpdf/engines/pdfium-worker-engine": ["src/lib/pdfium/web/worker-engine.ts"],
+      "@embedpdf/engines/pdfium-direct-engine": ["src/lib/pdfium/web/direct-engine.ts"]
+    }
+  },
+  "include": ["./**/*.ts", "./**/*.svelte"]
+}

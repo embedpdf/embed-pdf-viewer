@@ -1,0 +1,143 @@
+---
+title: Loading & Documents
+description: Open PDFs from URLs, local files (buffers), and manage multi-document tabs programmatically.
+---
+
+import DocumentLoadingExample from '../../code-examples/viewer/document-loading-example';
+import { ExampleWrapper } from '@/components/example-wrapper';
+
+# Loading & Managing Documents
+
+The PDFViewer includes a robust `document-manager` that handles file loading, error states, and tab management. While the viewer provides a built-in "Open File" button, you often need to trigger these actions from your own application logic—for example, loading a file when a user clicks a link in your dashboard.
+
+## Configuration
+
+You can configure initial documents and limits via the `documentManager` config property.
+
+```tsx
+<PDFViewer
+  config={{
+    documentManager: {
+      // Load these files on startup
+      initialDocuments: [
+        { 
+          url: 'https://snippet.embedpdf.com/ebook.pdf',
+          // By default, autoActivate is true. 
+          // This document will open and become active.
+          autoActivate: true,
+          // OPTIONAL: Set a custom ID so you can easily reference
+          // this document later (e.g. to scroll or close it).
+          documentId: 'ebook-embedpdf',
+        },
+        { 
+          url: 'https://snippet.embedpdf.com/ebook.pdf',
+          // If we don't set this to false, this document would
+          // steal focus immediately after loading!
+          autoActivate: false 
+        }
+      ],
+      // Limit total open tabs (older ones may be closed)
+      maxDocuments: 10
+    },
+    // Show the built-in tab bar if you want tabs inside the viewer
+    tabBar: 'multiple' // 'always', 'multiple' (default), or 'never'
+  }}
+/>
+```
+
+## Programmatic Loading
+
+You can control document loading using the `document-manager` plugin API.
+
+<CodeExample
+  codePaths={[
+    "content/docs/react/code-examples/viewer/document-loading-example.tsx"
+  ]}
+>
+  <ExampleWrapper>
+    <DocumentLoadingExample />
+  </ExampleWrapper>
+</CodeExample>
+
+### Loading from URL
+
+Use `openDocumentUrl` to load remote files.
+
+```tsx
+// Inside your component
+const openRemotePdf = async () => {
+  const registry = await viewerRef.current?.registry;
+  const docManager = registry.getPlugin('document-manager').provides();
+
+  docManager.openDocumentUrl({
+    url: 'https://snippet.embedpdf.com/ebook.pdf',
+    documentId: 'invoice-123', // Optional: fixed ID for easy reference
+    autoActivate: true         // Switch tab to this document immediately
+  });
+};
+```
+
+### Loading from Buffer (Local Files)
+
+To load a file selected by the user (via `<input type="file">`) or fetched via a custom API request, use `openDocumentBuffer`. This accepts a raw `ArrayBuffer`.
+
+```tsx
+// Example: Handling a file input change
+const handleFileSelect = async (event: React.ChangeEvent<HTMLInputElement>) => {
+  const file = event.target.files?.[0];
+  if (!file) return;
+  
+  const buffer = await file.arrayBuffer();
+
+  const registry = await viewerRef.current?.registry;
+  const docManager = registry.getPlugin('document-manager').provides();
+
+  docManager.openDocumentBuffer({
+    buffer: buffer,
+    name: file.name, // Display name for the tab
+    autoActivate: true
+  });
+};
+```
+
+### Native File Picker
+
+You can also trigger the browser's native file picker dialog directly through the viewer API.
+
+```tsx
+docManager.openFileDialog();
+```
+
+## Managing Active Documents
+
+You can switch tabs or close documents programmatically.
+
+```tsx
+// Switch to a specific document
+docManager.setActiveDocument('invoice-123');
+
+// Close a specific document
+docManager.closeDocument('invoice-123');
+
+// Close all documents
+docManager.closeAllDocuments();
+```
+
+## Events
+
+You can listen for document lifecycle events to sync your external UI (like a sidebar list) with the viewer state.
+
+| Event | Payload | Description |
+| --- | --- | --- |
+| **`onDocumentOpened`** | `DocumentState` | Fired when a document successfully loads. |
+| **`onDocumentClosed`** | `documentId` | Fired when a document tab is closed. |
+| **`onActiveDocumentChanged`** | `{ previous, current }` | Fired when the user switches tabs. |
+| **`onDocumentError`** | `{ documentId, error }` | Fired if a document fails to load (e.g. 404, corrupt PDF). |
+
+```tsx
+docManager.onDocumentOpened((doc) => {
+  console.log(`Opened: ${doc.name} (${doc.id})`);
+});
+```
+
+

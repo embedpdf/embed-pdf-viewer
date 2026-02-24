@@ -22,35 +22,24 @@ npm install @embedpdf/engines
 
 ## The `usePdfiumEngine` Composable
 
-This function handles the creation of the `WebWorkerEngine`, manages its loading and error states as reactive refs, and automatically cleans up the engine when the component is unmounted.
+This function handles the creation of the PDF engine, manages its loading and error states as reactive refs, and automatically cleans up the engine when the component is unmounted. The engine is fully initialized when returned—no additional setup required.
 
 Here's a basic example using the Composition API with `<script setup>`:
 
 ```vue filename="PDFProcessor.vue"
 <script setup>
-import { ref, watchEffect } from 'vue';
 import { usePdfiumEngine } from '@embedpdf/engines/vue';
 
 // The composable returns reactive refs
 const { engine, isLoading, error } = usePdfiumEngine();
-const isReady = ref(false);
-
-watchEffect(() => {
-  // The engine ref needs to be initialized once it's available.
-  if (engine.value && !isReady.value) {
-    engine.value.initialize().toPromise().then(() => {
-      isReady.value = true;
-    });
-  }
-});
 </script>
 
 <template>
   <div v-if="error">
     Error: {{ error.message }}
   </div>
-  <div v-else-if="isLoading || !isReady">
-    Initializing PDF Engine...
+  <div v-else-if="isLoading || !engine">
+    Loading PDF Engine...
   </div>
   <div v-else>
     <p>PDF Engine is ready to use!</p>

@@ -1,0 +1,115 @@
+---
+title: Zoom
+description: Configure initial zoom levels and control zooming programmatically.
+---
+
+import { ZoomExample } from '../../code-examples/viewer/zoom-example';
+
+# Zoom
+
+The PDFViewer comes with a built-in zoom toolbar, but you can also control zoom behavior through configuration and the plugin API.
+
+## Configuration
+
+You can set the default zoom level and limits in the `config` prop.
+
+```vue
+<script setup lang="ts">
+import { PDFViewer, ZoomMode } from '@embedpdf/vue-pdf-viewer';
+</script>
+
+<template>
+  <PDFViewer
+    :config="{
+      zoom: {
+        defaultZoomLevel: ZoomMode.FitPage,
+        minZoom: 0.5,
+        maxZoom: 3.0
+      }
+    }"
+  />
+</template>
+```
+
+### Available Zoom Modes
+
+The `ZoomMode` enum provides standard presets:
+
+| Mode | Description |
+| :--- | :--- |
+| `ZoomMode.Automatic` | Tries to find the best fit for the screen. |
+| `ZoomMode.FitPage` | Fits the entire page within the view. |
+| `ZoomMode.FitWidth` | Fits the page width to the view width. |
+
+## Programmatic Control
+
+You can control the zoom level from outside the viewer using the plugin registry.
+
+<CodeExample
+  codePaths={[
+    "../../examples/vue-tailwind/src/examples/viewer/zoom-example.vue"
+  ]}
+>
+  <ZoomExample />
+</CodeExample>
+
+### Accessing the API
+
+```vue
+<script setup lang="ts">
+import { ref } from 'vue';
+import { PDFViewer, ZoomMode, type PluginRegistry, type ZoomPlugin } from '@embedpdf/vue-pdf-viewer';
+
+const registry = ref<PluginRegistry | null>(null);
+
+const handleReady = (r: PluginRegistry) => {
+  registry.value = r;
+};
+
+const zoomIn = () => {
+  const zoomPlugin = registry.value?.getPlugin<ZoomPlugin>('zoom')?.provides();
+  const docZoom = zoomPlugin?.forDocument('my-document-id');
+  docZoom?.zoomIn();
+};
+
+const zoomOut = () => {
+  const zoomPlugin = registry.value?.getPlugin<ZoomPlugin>('zoom')?.provides();
+  const docZoom = zoomPlugin?.forDocument('my-document-id');
+  docZoom?.zoomOut();
+};
+
+const fitWidth = () => {
+  const zoomPlugin = registry.value?.getPlugin<ZoomPlugin>('zoom')?.provides();
+  const docZoom = zoomPlugin?.forDocument('my-document-id');
+  docZoom?.requestZoom(ZoomMode.FitWidth);
+};
+</script>
+
+<template>
+  <PDFViewer @ready="handleReady" :config="{ src: '/doc.pdf' }" />
+</template>
+```
+
+### Listening to Zoom Changes
+
+You can listen for zoom changes using the event system.
+
+```vue
+<script setup lang="ts">
+import { PDFViewer, type PluginRegistry } from '@embedpdf/vue-pdf-viewer';
+
+const handleReady = (registry: PluginRegistry) => {
+  const zoomPlugin = registry.getPlugin('zoom')?.provides();
+  const docZoom = zoomPlugin?.forDocument('my-document-id');
+
+  docZoom?.onStateChange((state) => {
+    console.log('Current Zoom:', state.currentZoomLevel);
+  });
+};
+</script>
+
+<template>
+  <PDFViewer @ready="handleReady" :config="{ src: '/doc.pdf' }" />
+</template>
+```
+

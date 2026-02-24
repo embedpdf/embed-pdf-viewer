@@ -1,5 +1,133 @@
 # @embedpdf/plugin-export
 
+## 2.6.2
+
+## 2.6.1
+
+## 2.6.0
+
+## 2.5.0
+
+## 2.4.1
+
+## 2.4.0
+
+## 2.3.0
+
+## 2.2.0
+
+## 2.1.2
+
+## 2.1.1
+
+## 2.1.0
+
+## 2.0.2
+
+## 2.0.1
+
+## 2.0.0
+
+### Major Changes
+
+- [#279](https://github.com/embedpdf/embed-pdf-viewer/pull/279) by [@bobsingor](https://github.com/bobsingor) – ## Multi-Document Support
+
+  The export plugin now supports exporting multiple documents.
+
+  ### Breaking Changes
+  - **Methods**: All methods now accept an optional `documentId` parameter:
+    - `saveAsCopy(documentId?)` - Saves a copy of the specified or active document
+    - `download(documentId?)` - Downloads the specified or active document
+  - **Events**: `DownloadRequestEvent` now includes `documentId` field. The `onRequest` event hook now receives events with document context.
+  - **Capability**: Added `forDocument(documentId)` method that returns `ExportScope` for document-specific operations.
+
+  ### Framework-Specific Changes (React/Preact, Svelte, Vue)
+  - **Download Component**:
+    - Updated to handle document-scoped export operations (React/Preact: `@embedpdf/plugin-export/react`, Svelte: `@embedpdf/plugin-export/svelte`, Vue: `@embedpdf/plugin-export/vue`)
+    - Now uses `event.documentId` from download request events
+    - Removed `fileName` prop - uses document name from export task
+
+  ### New Features
+  - `ExportScope` interface for document-scoped export operations
+  - Support for exporting any document, not just the active one
+  - Document-aware download request events
+
+## 2.0.0-next.3
+
+## 2.0.0-next.2
+
+## 2.0.0-next.1
+
+## 2.0.0-next.0
+
+### Major Changes
+
+- [#279](https://github.com/embedpdf/embed-pdf-viewer/pull/279) by [@bobsingor](https://github.com/bobsingor) – ## Multi-Document Support
+
+  The export plugin now supports exporting multiple documents.
+
+  ### Breaking Changes
+  - **Methods**: All methods now accept an optional `documentId` parameter:
+    - `saveAsCopy(documentId?)` - Saves a copy of the specified or active document
+    - `download(documentId?)` - Downloads the specified or active document
+  - **Events**: `DownloadRequestEvent` now includes `documentId` field. The `onRequest` event hook now receives events with document context.
+  - **Capability**: Added `forDocument(documentId)` method that returns `ExportScope` for document-specific operations.
+
+  ### Framework-Specific Changes (React/Preact, Svelte, Vue)
+  - **Download Component**:
+    - Updated to handle document-scoped export operations (React/Preact: `@embedpdf/plugin-export/react`, Svelte: `@embedpdf/plugin-export/svelte`, Vue: `@embedpdf/plugin-export/vue`)
+    - Now uses `event.documentId` from download request events
+    - Removed `fileName` prop - uses document name from export task
+
+  ### New Features
+  - `ExportScope` interface for document-scoped export operations
+  - Support for exporting any document, not just the active one
+  - Document-aware download request events
+
+## 1.5.0
+
+## 1.4.1
+
+### Patch Changes
+
+- [#234](https://github.com/embedpdf/embed-pdf-viewer/pull/234) by [@bobsingor](https://github.com/bobsingor) – refactor(svelte): Update `Download.svelte` component to correctly access plugin and capability instances from the refactored hooks.
+
+## 1.4.0
+
+### Minor Changes
+
+- [#222](https://github.com/embedpdf/embed-pdf-viewer/pull/222) by [@andrewrisse](https://github.com/andrewrisse) – feat: Add Svelte 5 adapter (`/svelte` export) with Rune-based hooks (`useExportPlugin`, `useExportCapability`) and `Download.svelte` utility component.
+
+## 1.3.16
+
+## 1.3.15
+
+## 1.3.14
+
+## 1.3.13
+
+## 1.3.12
+
+## 1.3.11
+
+## 1.3.10
+
+## 1.3.9
+
+## 1.3.8
+
+## 1.3.7
+
+## 1.3.6
+
+## 1.3.5
+
+## 1.3.4
+
+## 1.3.3
+
+## 1.3.2
+
 ## 1.3.1
 
 ## 1.3.0

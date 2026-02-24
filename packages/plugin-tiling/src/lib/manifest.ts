@@ -12,7 +12,6 @@ export const manifest: PluginManifest<TilingPluginConfig> = {
   requires: ['render', 'scroll', 'viewport'],
   optional: [],
   defaultConfig: {
-    enabled: true,
     tileSize: 768,
     overlapPx: 2.5,
     extraRings: 0,

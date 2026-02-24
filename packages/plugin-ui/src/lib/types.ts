@@ -1,281 +1,291 @@
-import { CoreState } from '@embedpdf/core';
-import { UI_PLUGIN_ID } from './manifest';
-import { UIComponent } from './ui-component';
-import { MenuRegistry, MenuManagerCapabilities, IconProps } from './menu/types';
-import {
-  SetHeaderVisiblePayload,
-  TogglePanelPayload,
-  UpdateComponentStatePayload,
-} from './actions';
+import { BasePluginConfig, EventHook } from '@embedpdf/core';
+import { UISchema } from './schema';
+import { StylesheetConfig } from './utils';
 
-export interface UIPluginConfig {
-  enabled: boolean;
-  components: Record<string, UIComponentType>;
-  menuItems?: MenuRegistry;
+// Re-export schema types
+export * from './schema';
+
+export interface UIPluginConfig extends BasePluginConfig {
+  /** UI schema */
+  schema: UISchema;
+
+  /** Categories to disable at initialization */
+  disabledCategories?: string[];
+
+  /** Config for stylesheet generation */
+  stylesheetConfig?: StylesheetConfig;
 }
 
-export interface UIPluginState {
-  panel: {
-    [id: string]: PanelState;
-  };
-  header: {
-    [id: string]: HeaderState;
-  };
-  groupedItems: {
-    [id: string]: {};
-  };
-  divider: {
-    [id: string]: {};
-  };
-  iconButton: {
-    [id: string]: {};
-  };
-  tabButton: {
-    [id: string]: {};
-  };
-  selectButton: {
-    [id: string]: {};
-  };
-  custom: {
-    [id: string]: any;
-  };
-  floating: {
-    [id: string]: FloatingState;
-  };
-  commandMenu: {
-    [id: string]: CommandMenuState;
-  };
+export interface UIState {
+  documents: Record<string, UIDocumentState>;
+
+  /** Globally disabled categories */
+  disabledCategories: string[];
+
+  /** Item IDs that are hidden (computed from disabled categories) */
+  hiddenItems: string[];
 }
 
-export type NavbarPlacement = 'top' | 'bottom' | 'left' | 'right';
-
-export interface childrenFunctionOptions {
-  context?: Record<string, any>;
-  filter?: (childId: string) => boolean;
+/**
+ * Toolbar slot state
+ */
+export interface ToolbarSlotState {
+  toolbarId: string;
+  isOpen: boolean;
 }
 
-export type UICapability = MenuManagerCapabilities & {
-  registerComponentRenderer: (
-    type: string,
-    renderer: (
-      props: any,
-      children: (options?: childrenFunctionOptions) => any[],
-      context?: Record<string, any>,
-    ) => any,
-  ) => void;
-  getComponent: <T extends BaseUIComponent<any, any, any>>(
-    id: string,
-  ) => UIComponent<T> | undefined;
-  getCommandMenu: () => UIComponent<CommandMenuComponent> | undefined;
-  hideCommandMenu: () => void;
-  getHeadersByPlacement: (
-    placement: 'top' | 'bottom' | 'left' | 'right',
-  ) => UIComponent<HeaderComponent<any>>[];
-  getPanelsByLocation: (location: 'left' | 'right') => UIComponent<PanelComponent<any>>[];
-  getFloatingComponents: (
-    viewportPosition?: 'inside' | 'outside',
-  ) => UIComponent<FloatingComponent>[];
-  addSlot: (parentId: string, slotId: string, priority?: number) => void;
-  registerComponent: (componentId: string, componentProps: UIComponentType) => UIComponent<any>;
-  togglePanel: (payload: TogglePanelPayload) => void;
-  setHeaderVisible: (payload: SetHeaderVisiblePayload) => void;
-  updateComponentState: <T>(payload: UpdateComponentStatePayload<T>) => void;
-};
-
-export interface BaseUIComponent<TProps, TInitial = undefined, TStore = any> {
-  id: string; // e.g., "highlightToolButton",
-  type: string; // e.g., "toolButton",
-  render?: string;
-  /**
-   * A function that returns a context object for the component's children.
-   */
-  getChildContext?: ((props: TProps) => Record<string, any>) | Record<string, any>;
-
-  /**
-   * A function that returns a partial set of props from the initial state.
-   */
-  props?: ((init: TInitial) => TProps) | TProps;
-
-  /**
-   * An object containing the initial state for the component, typed as TInitial.
-   */
-  initialState?: TInitial;
-
-  /**
-   * A function that, on store changes, returns new or changed props to update
-   * the component with (Redux-like).
-   */
-  mapStateToProps?: (storeState: TStore, ownProps: TProps) => TProps;
+/**
+ * Sidebar slot state
+ */
+export interface SidebarSlotState {
+  sidebarId: string;
+  isOpen: boolean;
 }
 
-export interface Slot {
-  componentId: string;
-  priority: number;
-  className?: string;
+/**
+ * Modal slot state - supports animation lifecycle
+ */
+export interface ModalSlotState {
+  modalId: string;
+  isOpen: boolean; // false = animating out, true = visible
+  props?: Record<string, unknown>; // Optional props passed when opening the modal
 }
 
-export interface PanelState {
-  open: boolean;
-  visibleChild: string | null;
+export interface UIDocumentState {
+  // Active toolbar per slot
+  // `${placement}-${slot}` -> { toolbarId, isOpen }
+  activeToolbars: Record<string, ToolbarSlotState>;
+
+  // Active sidebar per slot
+  // `${placement}-${slot}` -> { sidebarId, isOpen }
+  activeSidebars: Record<string, SidebarSlotState>;
+
+  // Active modal (only one globally, supports animation lifecycle)
+  activeModal: ModalSlotState | null;
+
+  // Open menus with metadata
+  openMenus: Record<string, OpenMenuState>;
+
+  // Active tabs within sidebars
+  sidebarTabs: Record<string, string>; // sidebarId -> activeTabId
+
+  // Enabled overlays (overlayId -> enabled state)
+  // Initialized from schema's defaultEnabled, can be toggled at runtime
+  enabledOverlays: Record<string, boolean>;
 }
 
-export interface PanelProps {
-  location: 'left' | 'right';
-  open: boolean;
-  visibleChild: string | null;
-  [name: string]: any;
+/**
+ * Responsive visibility rule for a single item at a specific breakpoint
+ */
+export interface ResponsiveVisibilityRule {
+  breakpointId: string;
+  minWidth?: number;
+  maxWidth?: number;
+  visible: boolean;
+  priority: number; // Higher priority wins in conflicts
 }
 
-export interface PanelComponent<TStore = any>
-  extends BaseUIComponent<PanelProps, PanelState, TStore> {
-  type: 'panel';
-  slots: Slot[];
+/**
+ * Computed responsive metadata for an item
+ */
+export interface ResponsiveItemMetadata {
+  itemId: string;
+  /** Always true for SSR/hydration - actual visibility controlled by CSS/styles */
+  shouldRender: boolean;
+  /** Ordered rules from lowest to highest breakpoint */
+  visibilityRules: ResponsiveVisibilityRule[];
+  /** Quick lookup: is visible at default/base size? */
+  defaultVisible: boolean;
 }
 
-export interface HeaderState {
-  visible?: boolean;
-  visibleChild?: string | null;
+/**
+ * Result of processing all responsive rules
+ */
+export interface ResponsiveMetadata {
+  items: Map<string, ResponsiveItemMetadata>;
+  breakpoints: Map<string, { minWidth?: number; maxWidth?: number }>;
 }
 
-export interface HeaderProps {
-  placement: 'top' | 'bottom' | 'left' | 'right';
-  style?: Record<string, string>;
-  visible?: boolean;
-  visibleChild?: string | null;
+// ─────────────────────────────────────────────────────────
+// Events
+// ─────────────────────────────────────────────────────────
+
+export interface ToolbarChangedData {
+  placement: string;
+  slot: string;
+  toolbarId: string;
 }
 
-export interface HeaderComponent<TStore = any>
-  extends BaseUIComponent<HeaderProps, HeaderState, TStore> {
-  type: 'header';
-  slots: Slot[];
+export interface ToolbarChangedEvent extends ToolbarChangedData {
+  documentId: string;
 }
 
-export interface GroupedItemsProps {
-  justifyContent?: 'start' | 'center' | 'end';
-  grow?: number;
-  gap?: number;
+export interface SidebarChangedData {
+  placement: string;
+  slot: string;
+  sidebarId: string;
 }
 
-export interface GroupedItemsComponent<TStore = any>
-  extends BaseUIComponent<GroupedItemsProps, undefined, TStore> {
-  type: 'groupedItems';
-  slots: Slot[];
+export interface SidebarChangedEvent extends SidebarChangedData {
+  documentId: string;
 }
 
-export interface DividerComponent<TStore = any>
-  extends BaseUIComponent<undefined, undefined, TStore> {
-  type: 'divider';
+export interface ModalChangedData {
+  modalId: string | null;
+  isOpen: boolean;
 }
 
-export interface IconButtonProps {
-  active?: boolean;
-  disabled?: boolean;
-  commandId?: string;
-  iconProps?: IconProps;
-  onClick?: () => void;
-  label?: string;
-  img?: string;
-  color?: string;
+export interface ModalChangedEvent extends ModalChangedData {
+  documentId: string;
 }
 
-export interface IconButtonComponent<TStore = any>
-  extends BaseUIComponent<IconButtonProps, undefined, TStore> {
-  type: 'iconButton';
+export interface MenuChangedData {
+  menuId: string;
+  isOpen: boolean;
 }
 
-export interface TabButtonProps {
-  active?: boolean;
-  commandId?: string;
-  onClick?: () => void;
-  label: string;
+export interface MenuChangedEvent extends MenuChangedData {
+  documentId: string;
 }
 
-export interface TabButtonComponent<TStore = any>
-  extends BaseUIComponent<TabButtonProps, undefined, TStore> {
-  type: 'tabButton';
+export interface OverlayChangedData {
+  overlayId: string;
+  isEnabled: boolean;
 }
 
-export interface SelectButtonProps {
-  active?: boolean;
-  commandIds: string[];
-  menuCommandId: string;
-  activeCommandId: string;
+export interface OverlayChangedEvent extends OverlayChangedData {
+  documentId: string;
 }
 
-export interface SelectButtonComponent<TStore = any>
-  extends BaseUIComponent<SelectButtonProps, undefined, TStore> {
-  type: 'selectButton';
+export interface OpenMenuState {
+  menuId: string;
+  triggeredByCommandId?: string; // Which command opened it
+  triggeredByItemId?: string; // Which toolbar/menu item triggered it
 }
 
-export interface CustomComponent<TStore = any> extends BaseUIComponent<any, any, TStore> {
-  type: 'custom';
-  render: string;
-  slots?: Slot[];
+// ─────────────────────────────────────────────────────────
+// Capability
+// ─────────────────────────────────────────────────────────
+
+export interface UIScope {
+  // Toolbars
+  setActiveToolbar(placement: string, slot: string, toolbarId: string): void;
+  getActiveToolbar(placement: string, slot: string): string | null;
+  closeToolbarSlot(placement: string, slot: string): void;
+  isToolbarOpen(placement: string, slot: string, toolbarId?: string): boolean;
+
+  // Sidebars
+  setActiveSidebar(placement: string, slot: string, sidebarId: string, activeTab?: string): void;
+  getActiveSidebar(placement: string, slot: string): string | null;
+  closeSidebarSlot(placement: string, slot: string): void;
+  toggleSidebar(placement: string, slot: string, sidebarId: string, activeTab?: string): void;
+  setSidebarTab(sidebarId: string, tabId: string): void;
+  getSidebarTab(sidebarId: string): string | null;
+  isSidebarOpen(placement: string, slot: string, sidebarId?: string): boolean;
+
+  // Modals (with animation lifecycle support)
+  openModal(modalId: string, props?: Record<string, unknown>): void;
+  closeModal(): void;
+  clearModal(): void; // Called after exit animation completes
+  getActiveModal(): ModalSlotState | null;
+  isModalOpen(): boolean;
+
+  // Menus
+  openMenu(menuId: string, triggeredByCommandId: string, triggeredByItemId: string): void;
+  closeMenu(menuId: string): void;
+  toggleMenu(menuId: string, triggeredByCommandId: string, triggeredByItemId: string): void;
+  closeAllMenus(): void;
+  isMenuOpen(menuId: string): boolean;
+  getOpenMenus(): OpenMenuState[];
+
+  // Overlays
+  enableOverlay(overlayId: string): void;
+  disableOverlay(overlayId: string): void;
+  toggleOverlay(overlayId: string): void;
+  isOverlayEnabled(overlayId: string): boolean;
+  getEnabledOverlays(): string[];
+
+  // Schema access
+  getSchema(): UISchema;
+
+  // State
+  getState(): UIDocumentState;
+
+  // Events
+  onToolbarChanged: EventHook<{ placement: string; slot: string; toolbarId: string }>;
+  onSidebarChanged: EventHook<{ placement: string; slot: string; sidebarId: string }>;
+  onModalChanged: EventHook<{ modalId: string | null; isOpen: boolean }>;
+  onMenuChanged: EventHook<{ menuId: string; isOpen: boolean }>;
+  onOverlayChanged: EventHook<{ overlayId: string; isEnabled: boolean }>;
 }
 
-export interface FloatingState {
-  [name: string]: any;
+export interface UICapability {
+  // Active document operations
+  setActiveToolbar(placement: string, slot: string, toolbarId: string, documentId?: string): void;
+  setActiveSidebar(
+    placement: string,
+    slot: string,
+    sidebarId: string,
+    documentId?: string,
+    activeTab?: string,
+  ): void;
+  toggleSidebar(
+    placement: string,
+    slot: string,
+    sidebarId: string,
+    documentId?: string,
+    activeTab?: string,
+  ): void;
+  openModal(modalId: string, props?: Record<string, unknown>, documentId?: string): void;
+  openMenu(
+    menuId: string,
+    triggeredByCommandId: string,
+    triggeredByItemId: string,
+    documentId?: string,
+  ): void;
+  toggleMenu(
+    menuId: string,
+    triggeredByCommandId: string,
+    triggeredByItemId: string,
+    documentId?: string,
+  ): void;
+
+  // Overlay operations
+  enableOverlay(overlayId: string, documentId?: string): void;
+  disableOverlay(overlayId: string, documentId?: string): void;
+  toggleOverlay(overlayId: string, documentId?: string): void;
+
+  // Document-scoped operations
+  forDocument(documentId: string): UIScope;
+
+  // Schema access
+  getSchema(): UISchema;
+  mergeSchema(partial: Partial<UISchema>): void;
+
+  // Category management
+  disableCategory(category: string): void;
+  enableCategory(category: string): void;
+  toggleCategory(category: string): void;
+  setDisabledCategories(categories: string[]): void;
+  getDisabledCategories(): string[];
+  isCategoryDisabled(category: string): boolean;
+  getHiddenItems(): string[];
+
+  // Global events
+  onToolbarChanged: EventHook<{
+    documentId: string;
+    placement: string;
+    slot: string;
+    toolbarId: string;
+  }>;
+  onSidebarChanged: EventHook<{
+    documentId: string;
+    placement: string;
+    slot: string;
+    sidebarId: string;
+  }>;
+  onModalChanged: EventHook<{ documentId: string; modalId: string | null; isOpen: boolean }>;
+  onMenuChanged: EventHook<{ documentId: string; menuId: string; isOpen: boolean }>;
+  onOverlayChanged: EventHook<{ documentId: string; overlayId: string; isEnabled: boolean }>;
+  onCategoryChanged: EventHook<{ disabledCategories: string[]; hiddenItems: string[] }>;
 }
-
-export interface FloatingComponentProps {
-  scrollerPosition: 'inside' | 'outside';
-  [name: string]: any;
-}
-
-export interface FloatingComponent<TStore = any>
-  extends BaseUIComponent<FloatingComponentProps, FloatingState, TStore> {
-  type: 'floating';
-  slots?: Slot[];
-}
-
-export interface CommandMenuState {
-  triggerElement?: HTMLElement;
-  activeCommand: string | null;
-  open: boolean;
-  position?: 'top' | 'bottom' | 'left' | 'right';
-  flatten?: boolean;
-}
-
-export interface CommandMenuProps {
-  triggerElement?: HTMLElement;
-  activeCommand: string | null;
-  open: boolean;
-  position?: 'top' | 'bottom' | 'left' | 'right';
-  flatten?: boolean;
-}
-
-export interface CommandMenuComponent<TStore = any>
-  extends BaseUIComponent<CommandMenuProps, CommandMenuState, TStore> {
-  type: 'commandMenu';
-}
-
-// Add this type to extend component props with an ID
-export type WithComponentId<TProps> = TProps & {
-  id: string;
-};
-
-// Add this type for render functions that need component ID in props
-export type ComponentRenderFunction<TProps> = (
-  props: WithComponentId<TProps>,
-  children: (options?: childrenFunctionOptions) => any[],
-  context?: Record<string, any>,
-) => any;
-
-export interface GlobalStoreState<TPlugins extends Record<string, any> = {}> {
-  core: CoreState;
-  plugins: {
-    [UI_PLUGIN_ID]: UIPluginState;
-  } & TPlugins;
-}
-
-export type UIComponentType<TStore = any> =
-  | GroupedItemsComponent<TStore>
-  | DividerComponent<TStore>
-  | IconButtonComponent<TStore>
-  | TabButtonComponent<TStore>
-  | HeaderComponent<TStore>
-  | PanelComponent<TStore>
-  | CustomComponent<TStore>
-  | FloatingComponent<TStore>
-  | CommandMenuComponent<TStore>
-  | SelectButtonComponent<TStore>;

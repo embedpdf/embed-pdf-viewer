@@ -1,8 +1,12 @@
 <script setup lang="ts">
-import { ref, computed } from 'vue';
+import { ref, computed, toValue, type MaybeRefOrGetter } from 'vue';
 import { useZoom, ZoomMode } from '@embedpdf/plugin-zoom/vue';
 import type { ZoomLevel } from '@embedpdf/plugin-zoom';
 import { useInteractionManager } from '@embedpdf/plugin-interaction-manager/vue';
+
+interface ZoomControlsProps {
+  documentId: string;
+}
 
 interface ZoomModeItem {
   value: ZoomLevel;
@@ -14,6 +18,8 @@ interface ZoomPresetItem {
   value: number;
   label: string;
 }
+
+const props = defineProps<ZoomControlsProps>();
 
 const ZOOM_PRESETS: ZoomPresetItem[] = [
   { value: 0.5, label: '50%' },
@@ -30,8 +36,8 @@ const ZOOM_MODES: ZoomModeItem[] = [
   { value: ZoomMode.FitWidth, label: 'Fit to Width', icon: 'mdi-arrow-expand-horizontal' },
 ];
 
-const { state: zoomState, provides: zoomProvider } = useZoom();
-const { state: interactionManagerState } = useInteractionManager();
+const { state: zoomState, provides: zoomProvider } = useZoom(() => props.documentId);
+const { state: interactionManagerState } = useInteractionManager(() => props.documentId);
 
 const menuOpen = ref(false);
 

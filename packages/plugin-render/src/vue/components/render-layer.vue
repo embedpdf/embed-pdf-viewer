@@ -1,112 +1,133 @@
 <script setup lang="ts">
-import { ref, watch, onBeforeUnmount, computed } from 'vue';
-import { ignore, PdfErrorCode, PdfErrorReason, Task } from '@embedpdf/models';
+import { ref, computed, watch } from 'vue';
+import { ignore, PdfErrorCode } from '@embedpdf/models';
+import { useDocumentState } from '@embedpdf/core/vue';
+import { useRenderCapability } from '../hooks';
 
-import { useRenderCapability, useRenderPlugin } from '../hooks';
-
-interface Props {
+interface RenderLayerProps {
+  /**
+   * The ID of the document to render from
+   */
+  documentId: string;
+  /**
+   * The page index to render (0-based)
+   */
   pageIndex: number;
   /**
-   * The scale factor for rendering the page.
+   * Optional scale override. If not provided, uses document's current scale.
    */
   scale?: number;
   /**
-   * @deprecated Use `scale` instead. Will be removed in the next major release.
+   * Optional device pixel ratio override. If not provided, uses window.devicePixelRatio.
    */
-  scaleFactor?: number;
   dpr?: number;
 }
 
-const props = defineProps<Props>();
-
-// Handle deprecation: prefer scale over scaleFactor, but fall back to scaleFactor if scale is not provided
-const actualScale = computed(() => props.scale ?? props.scaleFactor ?? 1);
+const props = defineProps<RenderLayerProps>();
 
 const { provides: renderProvides } = useRenderCapability();
-const { plugin: renderPlugin } = useRenderPlugin();
+const documentState = useDocumentState(() => props.documentId);
 
 const imageUrl = ref<string | null>(null);
-const refreshTick = ref(0);
+let urlRef: string | null = null;
+let hasLoaded = false;
 
-let currentBlobUrl: string | null = null;
-let currentTask: Task<Blob, PdfErrorReason> | null = null;
+// Get refresh version from core state
+const refreshVersion = computed(() => {
+  if (!documentState.value) return 0;
+  return documentState.value.pageRefreshVersions[props.pageIndex] || 0;
+});
 
-/* ------------------------------------------ */
-/* Helper function to abort current task */
-/* ------------------------------------------ */
-function abortCurrentTask() {
-  if (currentTask && !currentBlobUrl) {
-    currentTask.abort({
-      code: PdfErrorCode.Cancelled,
-      message: 'canceled render task',
-    });
-  }
-}
+// Determine actual render options: use overrides if provided, otherwise fall back to document state
+const actualScale = computed(() => {
+  if (props.scale !== undefined) return props.scale;
+  return documentState.value?.scale ?? 1;
+});
 
-/* ------------------------------------------ */
-/* render whenever pageIndex/scale/dpr/tick change */
-/* ------------------------------------------ */
-function revoke() {
-  if (currentBlobUrl) {
-    URL.revokeObjectURL(currentBlobUrl);
-    currentBlobUrl = null;
-  }
-}
+const actualDpr = computed(() => {
+  if (props.dpr !== undefined) return props.dpr;
+  return window.devicePixelRatio;
+});
 
-function startRender() {
-  abortCurrentTask();
-  revoke();
-  currentTask = null;
-
-  if (!renderProvides.value) return;
-
-  const task = renderProvides.value.renderPage({
-    pageIndex: props.pageIndex,
-    options: {
-      scaleFactor: actualScale.value,
-      dpr: props.dpr || window.devicePixelRatio,
-    },
-  });
-
-  currentTask = task;
-
-  task.wait((blob) => {
-    currentBlobUrl = URL.createObjectURL(blob);
-    imageUrl.value = currentBlobUrl;
-    currentTask = null;
-  }, ignore);
-}
-
-// Watch for external refresh events
+// Render page when dependencies change
 watch(
-  renderPlugin,
-  (pluginInstance, _, onCleanup) => {
-    if (pluginInstance) {
-      const unsubscribe = pluginInstance.onRefreshPages((pages: number[]) => {
-        if (pages.includes(props.pageIndex)) {
-          refreshTick.value++;
-        }
-      });
-      onCleanup(unsubscribe);
+  [
+    () => props.documentId,
+    () => props.pageIndex,
+    actualScale,
+    actualDpr,
+    renderProvides,
+    refreshVersion,
+  ],
+  ([docId, pageIdx, scale, dpr, capability], [prevDocId], onCleanup) => {
+    if (!capability) {
+      imageUrl.value = null;
+      return;
     }
+
+    // CRITICAL: Clear image immediately when documentId changes (not for zoom/scale)
+    if (prevDocId !== undefined && prevDocId !== docId) {
+      imageUrl.value = null;
+      if (urlRef && hasLoaded) {
+        URL.revokeObjectURL(urlRef);
+        urlRef = null;
+        hasLoaded = false;
+      }
+    }
+
+    // Revoke old URL before creating new one (if it's been loaded)
+    if (urlRef && hasLoaded && prevDocId === docId) {
+      URL.revokeObjectURL(urlRef);
+      urlRef = null;
+      hasLoaded = false;
+    }
+
+    const task = capability.forDocument(docId).renderPage({
+      pageIndex: pageIdx,
+      options: {
+        scaleFactor: scale,
+        dpr,
+      },
+    });
+
+    task.wait((blob) => {
+      const objectUrl = URL.createObjectURL(blob);
+      urlRef = objectUrl;
+      imageUrl.value = objectUrl;
+      hasLoaded = false;
+    }, ignore);
+
+    onCleanup(() => {
+      if (urlRef) {
+        // Only revoke if image has loaded
+        if (hasLoaded) {
+          URL.revokeObjectURL(urlRef);
+          urlRef = null;
+          hasLoaded = false;
+        }
+      } else {
+        // Task still in progress, abort it
+        task.abort({
+          code: PdfErrorCode.Cancelled,
+          message: 'canceled render task',
+        });
+      }
+    });
   },
   { immediate: true },
 );
 
-// Watch for changes that require a re-render
-watch(
-  () => [props.pageIndex, actualScale.value, props.dpr, renderProvides.value, refreshTick.value],
-  startRender,
-  { immediate: true },
-);
-
-/* ------------------------------------------ */
-onBeforeUnmount(() => {
-  abortCurrentTask();
-  revoke();
-});
+function handleImageLoad() {
+  hasLoaded = true;
+}
 </script>
 
 <template>
-  <img v-if="imageUrl" :src="imageUrl" :style="{ width: '100%', height: '100%' }" @load="revoke" />
+  <img
+    v-if="imageUrl"
+    :src="imageUrl"
+    :style="{ width: '100%', height: '100%' }"
+    @load="handleImageLoad"
+    v-bind="$attrs"
+  />
 </template>

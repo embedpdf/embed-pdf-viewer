@@ -1,6 +1,8 @@
 'use client'
 
-import React, { useMemo, useState, useEffect, useRef, useCallback } from 'react'
+import React, { useState, useEffect, useRef } from 'react'
+import { useTheme } from 'next-themes'
+import type { EmbedPdfContainer } from '@embedpdf/snippet'
 
 interface PDFViewerProps {
   style?: React.CSSProperties
@@ -10,6 +12,8 @@ interface PDFViewerProps {
 export default function PDFViewer({ style, className }: PDFViewerProps) {
   const [isClient, setIsClient] = useState(false)
   const viewerRef = useRef<HTMLDivElement>(null)
+  const embedPdfRef = useRef<EmbedPdfContainer | null>(null)
+  const { resolvedTheme } = useTheme()
 
   // Ensure we're on the client side
   useEffect(() => {
@@ -25,12 +29,21 @@ export default function PDFViewer({ style, className }: PDFViewerProps) {
         // Dynamic import to avoid SSR issues
         const EmbedPDF = (await import('@embedpdf/snippet')).default
 
-        EmbedPDF.init({
+        const viewer = EmbedPDF.init({
           type: 'container',
           target: viewerRef.current!,
           src: 'https://snippet.embedpdf.com/ebook.pdf',
           worker: true,
+          tabBar: 'always',
+          theme: {
+            // Use 'system' to follow OS preference, or sync with Next.js theme
+            preference: resolvedTheme === 'dark' ? 'dark' : 'light',
+          },
         })
+
+        if (viewer) {
+          embedPdfRef.current = viewer
+        }
       } catch (error) {
         console.error('Failed to load EmbedPDF:', error)
       }
@@ -38,6 +51,13 @@ export default function PDFViewer({ style, className }: PDFViewerProps) {
 
     loadEmbedPDF()
   }, [isClient])
+
+  // Sync theme with Next.js theme changes
+  useEffect(() => {
+    if (embedPdfRef.current && resolvedTheme) {
+      embedPdfRef.current.setTheme(resolvedTheme === 'dark' ? 'dark' : 'light')
+    }
+  }, [resolvedTheme])
 
   // Show loading state during SSR and initial client render
   if (!isClient) {

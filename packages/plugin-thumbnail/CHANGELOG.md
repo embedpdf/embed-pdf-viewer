@@ -1,5 +1,155 @@
 # @embedpdf/plugin-thumbnail
 
+## 2.6.2
+
+## 2.6.1
+
+## 2.6.0
+
+## 2.5.0
+
+### Patch Changes
+
+- [#441](https://github.com/embedpdf/embed-pdf-viewer/pull/441) by [@bobsingor](https://github.com/bobsingor) – Fixed thumbnail rendering to account for page intrinsic rotation:
+  - Updated `rebuildLayout()` to swap width/height for pages with 90° or 270° rotation when calculating thumbnail dimensions
+  - Added `rotation: page.rotation` to render options in `renderThumb()` to ensure thumbnails display with correct orientation
+
+## 2.4.1
+
+## 2.4.0
+
+## 2.3.0
+
+## 2.2.0
+
+## 2.1.2
+
+## 2.1.1
+
+## 2.1.0
+
+## 2.0.2
+
+## 2.0.1
+
+## 2.0.0
+
+### Major Changes
+
+- [#279](https://github.com/embedpdf/embed-pdf-viewer/pull/279) by [@bobsingor](https://github.com/bobsingor) – ## Multi-Document Support
+
+  The thumbnail plugin now supports per-document thumbnail window state and viewport metrics.
+
+  ### Breaking Changes
+  - **Actions**: All actions now require `documentId`:
+    - `setWindowState(documentId, window)` - Sets thumbnail window state for a document
+    - `updateViewportMetrics(documentId, scrollY, viewportH)` - Updates viewport metrics for a document
+  - **State Structure**: Plugin state now uses `documents: Record<string, ThumbnailDocumentState>` to track per-document thumbnail state including window state and viewport metrics.
+  - **Action Creators**: All action creators now require `documentId`:
+    - `initThumbnailState(documentId, state)`
+    - `setWindowState(documentId, window)`
+    - `updateViewportMetrics(documentId, scrollY, viewportH)`
+
+  ### Framework-Specific Changes (React/Preact, Svelte, Vue)
+  - **ThumbImg Component**:
+    - Now requires `documentId` prop (React/Preact: `@embedpdf/plugin-thumbnail/react`, Svelte: `@embedpdf/plugin-thumbnail/svelte`, Vue: `@embedpdf/plugin-thumbnail/vue`)
+    - Component now uses `forDocument(documentId)` to get document-scoped thumbnail capability
+    - Subscribes to document-specific page refresh events
+
+  ### New Features
+  - Per-document thumbnail window state tracking
+  - Per-document viewport metrics for thumbnail positioning
+  - Document lifecycle management with automatic state initialization and cleanup
+
+## 2.0.0-next.3
+
+## 2.0.0-next.2
+
+## 2.0.0-next.1
+
+## 2.0.0-next.0
+
+### Major Changes
+
+- [#279](https://github.com/embedpdf/embed-pdf-viewer/pull/279) by [@bobsingor](https://github.com/bobsingor) – ## Multi-Document Support
+
+  The thumbnail plugin now supports per-document thumbnail window state and viewport metrics.
+
+  ### Breaking Changes
+  - **Actions**: All actions now require `documentId`:
+    - `setWindowState(documentId, window)` - Sets thumbnail window state for a document
+    - `updateViewportMetrics(documentId, scrollY, viewportH)` - Updates viewport metrics for a document
+  - **State Structure**: Plugin state now uses `documents: Record<string, ThumbnailDocumentState>` to track per-document thumbnail state including window state and viewport metrics.
+  - **Action Creators**: All action creators now require `documentId`:
+    - `initThumbnailState(documentId, state)`
+    - `setWindowState(documentId, window)`
+    - `updateViewportMetrics(documentId, scrollY, viewportH)`
+
+  ### Framework-Specific Changes (React/Preact, Svelte, Vue)
+  - **ThumbImg Component**:
+    - Now requires `documentId` prop (React/Preact: `@embedpdf/plugin-thumbnail/react`, Svelte: `@embedpdf/plugin-thumbnail/svelte`, Vue: `@embedpdf/plugin-thumbnail/vue`)
+    - Component now uses `forDocument(documentId)` to get document-scoped thumbnail capability
+    - Subscribes to document-specific page refresh events
+
+  ### New Features
+  - Per-document thumbnail window state tracking
+  - Per-document viewport metrics for thumbnail positioning
+  - Document lifecycle management with automatic state initialization and cleanup
+
+## 1.5.0
+
+## 1.4.1
+
+### Patch Changes
+
+- [#234](https://github.com/embedpdf/embed-pdf-viewer/pull/234) by [@bobsingor](https://github.com/bobsingor) – refactor(svelte): Update `ThumbImg.svelte` and `ThumbnailsPane.svelte` components to correctly access plugin/capability instances from refactored hooks.
+
+## 1.4.0
+
+### Minor Changes
+
+- [#222](https://github.com/embedpdf/embed-pdf-viewer/pull/222) by [@andrewrisse](https://github.com/andrewrisse) – feat: Add Svelte 5 adapter (`/svelte` export) with Rune-based hooks (`useThumbnailPlugin`, `useThumbnailCapability`) and components (`ThumbnailsPane.svelte`, `ThumbImg.svelte`).
+
+## 1.3.16
+
+## 1.3.15
+
+## 1.3.14
+
+## 1.3.13
+
+## 1.3.12
+
+## 1.3.11
+
+## 1.3.10
+
+## 1.3.9
+
+## 1.3.8
+
+## 1.3.7
+
+## 1.3.6
+
+### Patch Changes
+
+- [#189](https://github.com/embedpdf/embed-pdf-viewer/pull/189) by [@bobsingor](https://github.com/bobsingor) – Fix bug Cannot read properties of null (reading 'totalHeight') on thumbnails
+
+## 1.3.5
+
+### Patch Changes
+
+- [#187](https://github.com/embedpdf/embed-pdf-viewer/pull/187) by [@bobsingor](https://github.com/bobsingor) – Fix bug that prevents from scrolling down in the thumbnail container
+
+- [#187](https://github.com/embedpdf/embed-pdf-viewer/pull/187) by [@bobsingor](https://github.com/bobsingor) – Add Vue framework layer for thumbnail plugin
+
+## 1.3.4
+
+## 1.3.3
+
+## 1.3.2
+
 ## 1.3.1
 
 ## 1.3.0

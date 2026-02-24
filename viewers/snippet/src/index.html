@@ -1,0 +1,32 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>EmbedPDF</title>
+  <style>
+    html, body { overscroll-behavior: none; }
+    body {
+      margin: 0;
+      padding: 0;
+    }
+  </style>
+</head>
+<body>
+  <div id="pdf-viewer" style="height: 100dvh"></div>
+  <script async type="module">
+    import EmbedPDF from './embedpdf.js';
+
+    const viewer = EmbedPDF.init({
+      type: 'container',
+      target: document.getElementById('pdf-viewer'),
+      src: 'https://snippet.embedpdf.com/ebook.pdf',
+      worker: true,
+      tabBar: 'always',
+      theme: {
+        preference: 'system'
+      }
+    })
+  </script>
+</body>
+</html>

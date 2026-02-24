@@ -1,0 +1,98 @@
+---
+title: Zoom
+description: Configure initial zoom levels and control zooming programmatically.
+---
+
+import ZoomExample from '../../code-examples/viewer/zoom-example';
+import { ExampleWrapper } from '@/components/example-wrapper';
+
+# Zoom
+
+The PDFViewer comes with a built-in zoom toolbar, but you can also control zoom behavior through configuration and the plugin API.
+
+## Configuration
+
+You can set the default zoom level and limits in the `config` prop.
+
+```tsx
+import { ZoomMode } from '@embedpdf/react-pdf-viewer';
+
+<PDFViewer
+  config={{
+    zoom: {
+      defaultZoomLevel: ZoomMode.FitPage, // or a number like 1.5
+      minZoom: 0.5,
+      maxZoom: 3.0
+    }
+  }}
+/>
+```
+
+### Available Zoom Modes
+
+The `ZoomMode` enum provides standard presets:
+
+| Mode | Description |
+| :--- | :--- |
+| `ZoomMode.Automatic` | Tries to find the best fit for the screen. |
+| `ZoomMode.FitPage` | Fits the entire page within the view. |
+| `ZoomMode.FitWidth` | Fits the page width to the view width. |
+
+## Programmatic Control
+
+You can control the zoom level from outside the viewer using the plugin registry. This is useful for building custom toolbars or resetting the view based on external events.
+
+<CodeExample
+  codePaths={[
+    "content/docs/react/code-examples/viewer/zoom-example.tsx"
+  ]}
+>
+  <ExampleWrapper>
+    <ZoomExample />
+  </ExampleWrapper>
+</CodeExample>
+
+### Accessing the API
+
+```tsx
+import { ZoomMode, ZoomPlugin } from '@embedpdf/react-pdf-viewer';
+
+// Inside your component
+const registry = await viewerRef.current?.registry;
+const zoomPlugin = registry.getPlugin<ZoomPlugin>('zoom')?.provides();
+const docZoom = zoomPlugin?.forDocument('my-document-id');
+
+// Zoom In/Out
+docZoom?.zoomIn();
+docZoom?.zoomOut();
+
+// Set specific zoom
+docZoom?.requestZoom(ZoomMode.FitWidth);
+docZoom?.requestZoom(1.5); // 150%
+```
+
+### Listening to Zoom Changes
+
+You can listen for zoom changes using the event system.
+
+```tsx
+useEffect(() => {
+  const viewer = viewerRef.current;
+  if (!viewer) return;
+
+  const handleReady = async () => {
+    const registry = await viewer.registry;
+    const zoomPlugin = registry.getPlugin('zoom')?.provides();
+    const docZoom = zoomPlugin?.forDocument('my-document-id');
+
+    // Subscribe to state changes
+    docZoom?.onStateChange((state) => {
+      console.log('Current Zoom:', state.currentZoomLevel);
+    });
+  };
+
+  // ... setup listener
+}, []);
+```
+
+

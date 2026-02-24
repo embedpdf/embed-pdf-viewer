@@ -4,17 +4,21 @@ import { AppearanceMode, ignore, PdfAnnotationObject, PdfErrorCode } from '@embe
 import { useAnnotationCapability } from '../hooks/use-annotation';
 
 type RenderAnnotationProps = Omit<HTMLAttributes<HTMLImageElement>, 'style'> & {
+  documentId: string;
   pageIndex: number;
   annotation: PdfAnnotationObject;
   scaleFactor?: number;
   dpr?: number;
   style?: CSSProperties;
+  unrotated?: boolean;
 };
 
 export function RenderAnnotation({
+  documentId,
   pageIndex,
   annotation,
   scaleFactor = 1,
+  unrotated,
   style,
   ...props
 }: RenderAnnotationProps) {
@@ -26,12 +30,13 @@ export function RenderAnnotation({
 
   useEffect(() => {
     if (annotationProvides) {
-      const task = annotationProvides.renderAnnotation({
+      const task = annotationProvides.forDocument(documentId).renderAnnotation({
         pageIndex,
         annotation,
         options: {
           scaleFactor,
           dpr: window.devicePixelRatio,
+          unrotated,
         },
       });
       task.wait((blob) => {
@@ -52,7 +57,16 @@ export function RenderAnnotation({
         }
       };
     }
-  }, [pageIndex, scaleFactor, annotationProvides, annotation.id, width, height]);
+  }, [
+    pageIndex,
+    scaleFactor,
+    unrotated,
+    annotationProvides,
+    documentId,
+    annotation.id,
+    width,
+    height,
+  ]);
 
   const handleImageLoad = () => {
     if (urlRef.current) {

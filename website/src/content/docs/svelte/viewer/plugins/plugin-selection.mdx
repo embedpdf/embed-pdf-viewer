@@ -1,0 +1,128 @@
+---
+title: Text Selection
+description: Control text selection programmatically and listen for selection events.
+---
+
+import { SelectionExample } from '../../code-examples/viewer/selection-example';
+import { SelectionTextExample } from '../../code-examples/viewer/selection-text-example';
+
+# Text Selection
+
+The PDFViewer enables users to select text naturally, just like on a webpage. While the viewer provides built-in context menus for selection, you can also interact with the selection state programmatically to build custom features like "Copy to Clipboard" buttons or extract selected text.
+
+## Programmatic Control
+
+You can control selection behavior using the `selection` plugin API.
+
+<CodeExample
+  codePaths={[
+    "../../examples/svelte-tailwind/src/examples/viewer/selection-example.svelte"
+  ]}
+>
+  <SelectionExample />
+</CodeExample>
+
+### Interacting with Selection
+
+To perform actions on the current text selection:
+
+```svelte
+<script lang="ts">
+  import { PDFViewer, type PluginRegistry } from '@embedpdf/svelte-pdf-viewer';
+
+  let registry = $state<PluginRegistry | null>(null);
+
+  const handleReady = (r: PluginRegistry) => {
+    registry = r;
+  };
+
+  const copyToClipboard = () => {
+    const selection = registry?.getPlugin('selection')?.provides();
+    const scope = selection?.forDocument('my-doc');
+    scope?.copyToClipboard();
+  };
+
+  const clearSelection = () => {
+    const selection = registry?.getPlugin('selection')?.provides();
+    const scope = selection?.forDocument('my-doc');
+    scope?.clear();
+  };
+</script>
+
+<PDFViewer onready={handleReady} config={{ src: '/doc.pdf' }} />
+```
+
+## Reading Selected Text
+
+You can also retrieve the actual text content that the user has selected. This is useful for features like "Quote Selection" or custom search actions.
+
+<CodeExample
+  codePaths={[
+    "../../examples/svelte-tailwind/src/examples/viewer/selection-text-example.svelte"
+  ]}
+>
+  <SelectionTextExample />
+</CodeExample>
+
+```svelte
+<script lang="ts">
+  const getSelectedText = async () => {
+    const selection = registry?.getPlugin('selection')?.provides();
+    const scope = selection?.forDocument('my-doc');
+    
+    const text = await scope?.getSelectedText().toPromise();
+    console.log('Selected text:', text?.join(' '));
+  };
+</script>
+```
+
+## Listening for Changes
+
+You can listen for selection events to update your UI (e.g., enabling a "Copy" button only when text is selected).
+
+```svelte
+<script lang="ts">
+  import { PDFViewer, type PluginRegistry } from '@embedpdf/svelte-pdf-viewer';
+
+  let hasSelection = $state(false);
+
+  const handleReady = (registry: PluginRegistry) => {
+    const selection = registry.getPlugin('selection')?.provides();
+    const scope = selection?.forDocument('my-doc');
+
+    // Subscribe to selection changes
+    scope?.onSelectionChange((selectionRange) => {
+      if (selectionRange) {
+        console.log('Text selected!');
+        hasSelection = true;
+      } else {
+        console.log('Selection cleared');
+        hasSelection = false;
+      }
+    });
+  };
+</script>
+
+<PDFViewer onready={handleReady} config={{ src: '/doc.pdf' }} />
+```
+
+### Getting Selection Details
+
+The `selectionRange` object (or `scope.getFormattedSelection()`) provides detailed information about the selection:
+
+```svelte
+<script lang="ts">
+  const getSelectionDetails = () => {
+    const selection = registry?.getPlugin('selection')?.provides();
+    const scope = selection?.forDocument('my-doc');
+    const selections = scope?.getFormattedSelection();
+
+    selections?.forEach(sel => {
+      console.log(`Page: ${sel.pageIndex}`);
+      console.log(`Bounding Box:`, sel.rect);
+      console.log(`Text lines:`, sel.textLines);
+    });
+  };
+</script>
+```
+

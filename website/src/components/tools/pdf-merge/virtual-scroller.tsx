@@ -233,7 +233,7 @@ export const VirtualScroller: React.FC<VirtualScrollerProps> = ({
   return (
     <div
       ref={containerRef}
-      className="h-[400px] overflow-auto rounded-lg border border-gray-200 bg-gray-50 p-4"
+      className="h-[400px] overflow-auto rounded-lg border border-gray-200 bg-gray-50 p-4 dark:border-gray-700 dark:bg-gray-900/50"
       onScroll={handleScroll}
     >
       <div className="relative w-full" style={{ height: `${totalHeight}px` }}>
@@ -248,8 +248,8 @@ export const VirtualScroller: React.FC<VirtualScrollerProps> = ({
               key={`${page.docId}-${page.pageIndex}`}
               className={`group relative cursor-pointer rounded-lg border-2 p-3 transition-all duration-200 ${
                 page.selected
-                  ? 'border-purple-500 bg-purple-50 shadow-md'
-                  : 'border-gray-200 bg-white hover:border-gray-300 hover:shadow-sm'
+                  ? 'border-purple-500 bg-purple-50 shadow-md dark:border-purple-500/60 dark:bg-purple-900/20'
+                  : 'border-gray-200 bg-white hover:border-gray-300 hover:shadow-sm dark:border-gray-700 dark:bg-gray-800 dark:hover:border-gray-600'
               }`}
               onClick={() => handlePageClick(page)}
               style={{
@@ -262,8 +262,8 @@ export const VirtualScroller: React.FC<VirtualScrollerProps> = ({
                 <span
                   className={`rounded-full px-2 py-1 text-xs font-medium ${
                     page.selected
-                      ? 'bg-purple-200 text-purple-800'
-                      : 'bg-gray-200 text-gray-600'
+                      ? 'bg-purple-200 text-purple-800 dark:bg-purple-900/50 dark:text-purple-200'
+                      : 'bg-gray-200 text-gray-600 dark:bg-gray-700 dark:text-gray-300'
                   }`}
                 >
                   {page.pageIndex + 1}
@@ -273,10 +273,10 @@ export const VirtualScroller: React.FC<VirtualScrollerProps> = ({
                 <img
                   src={page.thumbnail}
                   alt={`Page ${page.pageIndex + 1}`}
-                  className="h-full w-full rounded-md object-contain p-2"
+                  className="h-full w-full rounded-md object-contain p-2 dark:opacity-90"
                 />
               ) : (
-                <div className="flex h-full w-full animate-pulse items-center justify-center rounded-md bg-gray-100 text-sm text-gray-400">
+                <div className="flex h-full w-full animate-pulse items-center justify-center rounded-md bg-gray-100 text-sm text-gray-400 dark:bg-gray-700/50 dark:text-gray-500">
                   Loading...
                 </div>
               )}

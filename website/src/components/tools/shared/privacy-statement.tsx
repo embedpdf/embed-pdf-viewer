@@ -28,10 +28,12 @@ export const PrivacyStatement = ({
 
   return (
     <div
-      className={`rounded-2xl border border-green-200 bg-green-50/50 backdrop-blur-sm ${sizeClasses[size]} ${className}`}
+      className={`rounded-2xl border border-green-200 bg-green-50/50 backdrop-blur-sm ${sizeClasses[size]} ${className} dark:border-green-900/30 dark:bg-green-900/10`}
     >
-      <p className={`font-medium text-gray-800`}>
-        <Shield className={`inline ${iconSizes[size]} mr-1 text-green-600`} />
+      <p className={`font-medium text-gray-800 dark:text-gray-200`}>
+        <Shield
+          className={`inline ${iconSizes[size]} mr-1 text-green-600 dark:text-green-400`}
+        />
         <span className="font-semibold">100% Private:</span> Your files never
         leave your device. No uploads, no tracking, no cookies. All processing
         happens locally in your browser with{' '}

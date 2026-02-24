@@ -10,7 +10,5 @@ export const manifest: PluginManifest<BookmarkPluginConfig> = {
   provides: ['bookmark'],
   requires: [],
   optional: [],
-  defaultConfig: {
-    enabled: true,
-  },
+  defaultConfig: {},
 };

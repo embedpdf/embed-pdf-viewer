@@ -1,3 +1,4 @@
+import Footer from '@/components/footer'
 import Homepage from '@/components/homepage'
 import Navbar from '@/components/navbar'
 import { ConfigProvider } from '@/components/stores/config'
@@ -7,7 +8,7 @@ export default async function HomePage() {
   const pageMap = await getPageMap()
 
   return (
-    <ConfigProvider navbar={<Navbar />} pageMap={pageMap}>
+    <ConfigProvider navbar={<Navbar />} pageMap={pageMap} footer={<Footer />}>
       <Homepage />
     </ConfigProvider>
   )

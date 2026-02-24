@@ -1,5 +1,6 @@
 import { ref, onMounted, onBeforeUnmount, watch, Ref } from 'vue';
 import { ignore, type Logger, type PdfEngine } from '@embedpdf/models';
+import type { FontFallbackConfig } from '@embedpdf/engines';
 
 const defaultWasmUrl =
   'https://cdn.jsdelivr.net/npm/@embedpdf/pdfium@__PDFIUM_VERSION__/dist/pdfium.wasm';
@@ -8,6 +9,10 @@ interface UsePdfiumEngineProps {
   wasmUrl?: string;
   worker?: boolean;
   logger?: Logger;
+  /**
+   * Font fallback configuration for handling missing fonts in PDFs.
+   */
+  fontFallback?: FontFallbackConfig;
 }
 
 interface UsePdfiumEngineResult {
@@ -21,7 +26,7 @@ interface UsePdfiumEngineResult {
  * and keeps its lifetime tied to the component.
  */
 export function usePdfiumEngine(props: UsePdfiumEngineProps = {}): UsePdfiumEngineResult {
-  const { wasmUrl = defaultWasmUrl, worker = true, logger } = props;
+  const { wasmUrl = defaultWasmUrl, worker = true, logger, fontFallback } = props;
 
   const engine = ref<PdfEngine | null>(null);
   const isLoading = ref(true);
@@ -33,7 +38,7 @@ export function usePdfiumEngine(props: UsePdfiumEngineProps = {}): UsePdfiumEngi
 
   /* re‑load if reactive props change ----------------------------- */
   watch(
-    () => [wasmUrl, worker, logger] as const,
+    () => [wasmUrl, worker, logger, fontFallback] as const,
     () => {
       destroyEngine();
       loadEngine();
@@ -46,17 +51,8 @@ export function usePdfiumEngine(props: UsePdfiumEngineProps = {}): UsePdfiumEngi
         ? await import('@embedpdf/engines/pdfium-worker-engine')
         : await import('@embedpdf/engines/pdfium-direct-engine');
 
-      const pdfEngine = await createPdfiumEngine(wasmUrl, logger);
-      pdfEngine.initialize().wait(
-        () => {
-          isLoading.value = false;
-          engine.value = pdfEngine;
-        },
-        (e) => {
-          error.value = new Error(e.reason.message);
-          isLoading.value = false;
-        },
-      );
+      const pdfEngine = await createPdfiumEngine(wasmUrl, { logger, fontFallback });
+      engine.value = pdfEngine;
       isLoading.value = false;
     } catch (e) {
       error.value = e as Error;

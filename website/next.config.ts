@@ -5,6 +5,25 @@ import { remarkNpm2Yarn } from '@theguild/remark-npm2yarn'
 import { globSync } from 'glob'
 import { visit } from 'unist-util-visit'
 import { Plugin } from 'unified'
+import { remarkCodeExample } from './src/lib/remark-code-example'
+import { rehypeCodeExample } from './src/lib/rehype-code-example'
+import { rehypeCdnUrls } from './src/lib/rehype-cdn-urls'
+import { readFileSync } from 'fs'
+import { resolve } from 'path'
+import { fileURLToPath } from 'url'
+import { dirname } from 'path'
+
+// Get __dirname equivalent in ESM
+const __filename = fileURLToPath(import.meta.url)
+const __dirname = dirname(__filename)
+
+// Read snippet version from package.json for use in client components
+const snippetPackageJson = JSON.parse(
+  readFileSync(resolve(__dirname, '../viewers/snippet/package.json'), 'utf8'),
+)
+const SNIPPET_VERSION = snippetPackageJson.version
+// Extract major version for CDN URL (e.g., "2.0.1" → "2")
+const SNIPPET_MAJOR_VERSION = SNIPPET_VERSION.split('.')[0]
 
 /**
  * This plugin overrides the import source for the Tabs component to use the custom component
@@ -46,16 +65,102 @@ const withNextra = nextra({
         },
       ] satisfies Pluggable,
       overrideNpm2YarnImports,
+      [
+        remarkCodeExample,
+        {
+          // Base GitHub URL for your repository
+          githubBaseUrl:
+            'https://github.com/embedpdf/embed-pdf-viewer/blob/main/website/',
+        },
+      ],
     ],
+    rehypePlugins: [rehypeCodeExample, rehypeCdnUrls],
   },
 })
 
-const nextConfig = async (phase: string) => {
-  const nextConfig: NextConfig = {}
+// Pre-built example packages that should NOT be analyzed/transpiled by Next.js.
+// These packages use Vue/Svelte and have their own build process.
+// Next.js has issues with `export *` re-exports across package boundaries,
+// which causes sporadic "Attempted import error" failures.
+const EXTERNAL_EXAMPLE_PACKAGES = [
+  '@embedpdf/example-vue-tailwind',
+  '@embedpdf/example-svelte-tailwind',
+]
 
+// Export a function that handles phase-specific logic and merges with Nextra
+export default async (phase: string) => {
+  // Build config with env
+  const nextConfig: NextConfig = {
+    env: {
+      NEXT_PUBLIC_SNIPPET_VERSION: SNIPPET_VERSION,
+      NEXT_PUBLIC_SNIPPET_MAJOR_VERSION: SNIPPET_MAJOR_VERSION,
+    },
+    // Mark Vue/Svelte example packages as external for server-side bundling
+    serverExternalPackages: EXTERNAL_EXAMPLE_PACKAGES,
+    // Redirects for moved documentation pages (from /docs/{framework}/* to /docs/{framework}/headless/*)
+    async redirects() {
+      const frameworks = ['react', 'vue', 'svelte']
+      const headlessPages = [
+        'engine',
+        'full-example',
+        'getting-started',
+        'introduction',
+        'understanding-plugins',
+      ]
+      const pluginPages = [
+        'plugin-annotation',
+        'plugin-capture',
+        'plugin-commands',
+        'plugin-document-manager',
+        'plugin-export',
+        'plugin-i18n',
+        'plugin-pan',
+        'plugin-print',
+        'plugin-redaction',
+        'plugin-render',
+        'plugin-rotate',
+        'plugin-scroll',
+        'plugin-selection',
+        'plugin-spread',
+        'plugin-thumbnail',
+        'plugin-tiling',
+        'plugin-view-manager',
+        'plugin-viewport',
+        'plugin-zoom',
+      ]
+
+      const redirects: Array<{
+        source: string
+        destination: string
+        permanent: boolean
+      }> = []
+
+      for (const framework of frameworks) {
+        // Redirect headless pages
+        for (const page of headlessPages) {
+          redirects.push({
+            source: `/docs/${framework}/${page}`,
+            destination: `/docs/${framework}/headless/${page}`,
+            permanent: true,
+          })
+        }
+        // Redirect plugin pages
+        for (const plugin of pluginPages) {
+          redirects.push({
+            source: `/docs/${framework}/plugins/${plugin}`,
+            destination: `/docs/${framework}/headless/plugins/${plugin}`,
+            permanent: true,
+          })
+        }
+      }
+
+      return redirects
+    },
+  }
+
+  // Add transpilePackages in development (but exclude the pre-built examples)
   if (phase === 'phase-development-server') {
     const fs = await import('node:fs')
-
     const allFiles = globSync('../packages/*/package.json')
 
     const packageNames = allFiles
@@ -68,11 +173,20 @@ const nextConfig = async (phase: string) => {
         }
       })
       .filter((pkg: string) => pkg?.startsWith('@embedpdf'))
+      // Explicitly exclude the example packages from transpilation
+      .filter((pkg: string) => !EXTERNAL_EXAMPLE_PACKAGES.includes(pkg))
 
     nextConfig.transpilePackages = packageNames
   }
 
-  return nextConfig
-}
+  // Apply Nextra wrapper
+  const nextraWrapped = withNextra(nextConfig)
 
-export default withNextra(nextConfig)
+  // If nextra returns a function, call it with phase
+  const finalConfig =
+    typeof nextraWrapped === 'function'
+      ? await (nextraWrapped as (phase: string) => Promise<NextConfig>)(phase)
+      : nextraWrapped
+
+  return finalConfig
+}

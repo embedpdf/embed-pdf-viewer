@@ -1,0 +1,102 @@
+---
+title: Export Plugin
+description: Adds functionality to download the current PDF document.
+searchable: true
+---
+
+# Export Plugin
+
+The Export Plugin provides a simple way for users to download and save the PDF file they are viewing.
+
+## Installation
+
+The plugin is available as a separate NPM package.
+
+```sh npm2yarn
+npm install @embedpdf/plugin-export
+````
+
+## Registration
+
+Import `ExportPluginPackage` and add it to the `plugins` array. You can configure a fallback filename for the downloaded file.
+
+```tsx {4, 14-16}
+import { createPluginRegistration } from '@embedpdf/core'
+import { EmbedPDF } from '@embedpdf/core/react'
+// ... other imports
+import { ExportPluginPackage } from '@embedpdf/plugin-export/react'
+
+const plugins = [
+  // ... other essential plugins
+  createPluginRegistration(DocumentManagerPluginPackage, { /* ... */ }),
+  createPluginRegistration(ViewportPluginPackage),
+  createPluginRegistration(ScrollPluginPackage),
+  createPluginRegistration(RenderPluginPackage),
+
+  // Register the export plugin
+  createPluginRegistration(ExportPluginPackage, {
+    defaultFileName: 'my-document.pdf',
+  }),
+]
+```
+
+## Usage
+
+The plugin works by combining a hook for initiating the download with a component that handles the browser interaction.
+
+### Triggering a Download
+
+Use the `useExport` hook to get access to the plugin's `download` method for the specific document. Call this method from a button in your toolbar to start the download process.
+
+```tsx {1,4, 7}
+import { useExport } from '@embedpdf/plugin-export/react';
+
+export const ExportToolbar = ({ documentId }) => {
+  const { provides: exportApi } = useExport(documentId);
+
+  return (
+    <button onClick={() => exportApi?.download()} disabled={!exportApi}>
+      Download
+    </button>
+  );
+};
+```
+
+## Live Example
+
+This example shows a viewer with a download button. Clicking it will trigger a download of the PDF file.
+
+import { PDFViewer } from '../../code-examples/headless/export-example';
+
+<CodeExample 
+  codePaths={[
+    "content/docs/react/code-examples/headless/export-example.tsx"
+  ]}
+>
+  <PDFViewer />
+</CodeExample>
+
+## API Reference
+
+### Configuration (`ExportPluginConfig`)
+
+| Option | Type | Description |
+| :--- | :--- | :--- |
+| **`defaultFileName`** | `string` | A fallback filename to use for the downloaded file if the original document does not have a name. <br />**Default**: `document.pdf` |
+
+### Hook: `useExport(documentId)`
+
+This hook connects your component to the export plugin's functions for a specific document.
+
+#### Returns
+
+| Property | Type | Description |
+| :--- | :--- | :--- |
+| **`provides`** | `ExportCapability \| null` | An object with methods to control exporting, or `null` if the plugin is not ready. |
+
+#### `ExportCapability` Methods
+
+| Method | Description |
+| :--- | :--- |
+| **`download()`** | The primary method to trigger a download. It signals the auto-mounted `<Download />` component to prepare the file and prompt the user. |
+| **`saveAsCopy()`** | A lower-level method that returns a `Task<ArrayBuffer>`. It retrieves the document's data as an `ArrayBuffer` without triggering a download. Useful for custom export logic. |

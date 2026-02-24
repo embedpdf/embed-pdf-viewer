@@ -1,0 +1,16 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "composite": true,
+    "declaration": true,
+    "declarationMap": true,
+    "emitDeclarationOnly": false,
+    "noEmit": false,
+    "outDir": "dist",
+    "rootDir": "src",
+    "types": ["vite/client"],
+    "moduleResolution": "Bundler"
+  },
+  "include": ["src/examples/**/*.ts", "src/examples/**/*.vue"],
+  "exclude": ["node_modules", "dist"]
+}

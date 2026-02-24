@@ -2,24 +2,29 @@ import { CSSProperties, MouseEvent, TouchEvent } from '@framework';
 import { Rect } from '@embedpdf/models';
 
 type StrikeoutProps = {
-  color?: string;
+  /** Stroke/markup color */
+  strokeColor?: string;
   opacity?: number;
   segmentRects: Rect[];
   rect?: Rect;
   scale: number;
   onClick?: (e: MouseEvent<HTMLDivElement> | TouchEvent<HTMLDivElement>) => void;
   style?: CSSProperties;
+  /** When true, AP image provides the visual; only render hit area */
+  appearanceActive?: boolean;
 };
 
 export function Strikeout({
-  color = '#FFFF00',
+  strokeColor,
   opacity = 0.5,
   segmentRects,
   rect,
   scale,
   onClick,
   style,
+  appearanceActive = false,
 }: StrikeoutProps) {
+  const resolvedColor = strokeColor ?? '#FFFF00';
   const thickness = 2 * scale;
 
   return (
@@ -42,20 +47,22 @@ export function Strikeout({
             ...style,
           }}
         >
-          {/* Visual strikeout line */}
-          <div
-            style={{
-              position: 'absolute',
-              left: 0,
-              top: '50%',
-              width: '100%',
-              height: thickness,
-              background: color,
-              opacity: opacity,
-              transform: 'translateY(-50%)',
-              pointerEvents: 'none',
-            }}
-          />
+          {/* Visual -- hidden when AP active, never interactive */}
+          {!appearanceActive && (
+            <div
+              style={{
+                position: 'absolute',
+                left: 0,
+                top: '50%',
+                width: '100%',
+                height: thickness,
+                background: resolvedColor,
+                opacity: opacity,
+                transform: 'translateY(-50%)',
+                pointerEvents: 'none',
+              }}
+            />
+          )}
         </div>
       ))}
     </>

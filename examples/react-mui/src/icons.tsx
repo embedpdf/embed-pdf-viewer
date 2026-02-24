@@ -8,15 +8,171 @@ export const PageSettingsIcon = (props: SvgIconProps) => (
   </SvgIcon>
 );
 
-/** Same icon, rotated 180 deg so it “points” the other way. */
+/** Same icon, rotated 180 deg so it "points" the other way. */
 export const ViewSidebarReverseIcon = forwardRef<SVGSVGElement, SvgIconProps>((props, ref) => (
   <ViewSidebarOutlinedIcon
     ref={ref}
     {...props}
     sx={{
-      transform: 'rotate(180deg)',
+      transform: 'rotate(180deg)' as const,
       // keep any sx the caller passes:
       ...props.sx,
     }}
   />
 ));
+
+export const RedactAreaIcon = forwardRef<SVGSVGElement, SvgIconProps>((props, ref) => (
+  <SvgIcon ref={ref} {...props} viewBox="0 0 24 24" fill="none">
+    <path stroke="none" d="M0 0h24v24H0z" fill="none" />
+    <path d="M6 20h-3" stroke="currentColor" strokeWidth={2} strokeLinecap="square" />
+    <path d="M3 20v-3" stroke="currentColor" strokeWidth={2} strokeLinecap="square" />
+    <path d="M3 13v-3" stroke="currentColor" strokeWidth={2} strokeLinecap="square" />
+    <path d="M3 6v-3" stroke="currentColor" strokeWidth={2} strokeLinecap="square" />
+    <path d="M3 3h3" stroke="currentColor" strokeWidth={2} strokeLinecap="square" />
+    <path d="M10 3h3" stroke="currentColor" strokeWidth={2} strokeLinecap="square" />
+    <path d="M17 3h3" stroke="currentColor" strokeWidth={2} strokeLinecap="square" />
+    <path d="M20 3v3" stroke="currentColor" strokeWidth={2} strokeLinecap="square" />
+    <defs>
+      <clipPath id="redactClip">
+        <rect x="10" y="10" width="12" height="12" />
+      </clipPath>
+    </defs>
+    <rect
+      x="10"
+      y="10"
+      width="12"
+      height="12"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth={2}
+      strokeLinecap="square"
+    />
+    <g clipPath="url(#redactClip)">
+      <path
+        d="M-2 24l14 -14"
+        stroke="currentColor"
+        strokeWidth={2}
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+      <path
+        d="M2 24l14 -14"
+        stroke="currentColor"
+        strokeWidth={2}
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+      <path
+        d="M6 24l14 -14"
+        stroke="currentColor"
+        strokeWidth={2}
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+      <path
+        d="M10 24l15 -15"
+        stroke="currentColor"
+        strokeWidth={2}
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+      <path
+        d="M14 24l15 -15"
+        stroke="currentColor"
+        strokeWidth={2}
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+      <path
+        d="M18 24l15 -15"
+        stroke="currentColor"
+        strokeWidth={2}
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </g>
+  </SvgIcon>
+));
+
+RedactAreaIcon.displayName = 'RedactAreaIcon';
+
+export const RedactIcon = forwardRef<SVGSVGElement, SvgIconProps>((props, ref) => (
+  <SvgIcon ref={ref} {...props} viewBox="0 0 24 24" fill="none">
+    <path stroke="none" d="M0 0h24v24H0z" fill="none" />
+    <path d="M5 4h14" stroke="currentColor" strokeWidth={3} />
+    <path d="M12 4v8" stroke="currentColor" strokeWidth={3} />
+    <defs>
+      <clipPath id="stripeClip">
+        <rect x="2" y="12" width="20" height="10" />
+      </clipPath>
+    </defs>
+    <rect x="2" y="12" width="20" height="10" fill="none" stroke="currentColor" strokeWidth={2} />
+    <g clipPath="url(#stripeClip)">
+      <path
+        d="M-7 24l12 -12"
+        stroke="currentColor"
+        strokeWidth={2}
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+      <path
+        d="M-3 24l12 -12"
+        stroke="currentColor"
+        strokeWidth={2}
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+      <path
+        d="M1 24l12 -12"
+        stroke="currentColor"
+        strokeWidth={2}
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+      <path
+        d="M5 24l12 -12"
+        stroke="currentColor"
+        strokeWidth={2}
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+      <path
+        d="M9 24l12 -12"
+        stroke="currentColor"
+        strokeWidth={2}
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+      <path
+        d="M13 24l12 -12"
+        stroke="currentColor"
+        strokeWidth={2}
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+      <path
+        d="M17 24l12 -12"
+        stroke="currentColor"
+        strokeWidth={2}
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+      <path
+        d="M21 24l12 -12"
+        stroke="currentColor"
+        strokeWidth={2}
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+      <path
+        d="M25 24l12 -12"
+        stroke="currentColor"
+        strokeWidth={2}
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </g>
+  </SvgIcon>
+));
+
+RedactIcon.displayName = 'RedactIcon';

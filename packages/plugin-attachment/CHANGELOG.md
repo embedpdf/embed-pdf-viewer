@@ -1,5 +1,119 @@
 # @embedpdf/plugin-attachment
 
+## 2.6.2
+
+## 2.6.1
+
+## 2.6.0
+
+## 2.5.0
+
+## 2.4.1
+
+## 2.4.0
+
+## 2.3.0
+
+## 2.2.0
+
+## 2.1.2
+
+## 2.1.1
+
+## 2.1.0
+
+## 2.0.2
+
+## 2.0.1
+
+## 2.0.0
+
+### Major Changes
+
+- [#279](https://github.com/embedpdf/embed-pdf-viewer/pull/279) by [@bobsingor](https://github.com/bobsingor) – ## Multi-Document Support
+
+  The attachment plugin now supports accessing attachments from multiple documents.
+
+  ### Breaking Changes
+  - **Methods**: All methods now accept an optional `documentId` parameter and operate on the active document by default:
+    - `getAttachments(documentId?)` - Returns attachments for the specified or active document
+    - `downloadAttachment(attachment, documentId?)` - Downloads attachment from the specified or active document
+  - **Capability**: Added `forDocument(documentId)` method that returns `AttachmentScope` for document-specific operations.
+
+  ### Framework-Specific Changes (React/Preact, Svelte, Vue)
+  - **Hooks**:
+    - Added Svelte hooks support (`@embedpdf/plugin-attachment/svelte`)
+    - All hooks work with document-scoped capabilities via `forDocument()`
+
+  ### New Features
+  - `AttachmentScope` interface for document-scoped attachment operations
+  - Support for accessing attachments from any document, not just the active one
+
+## 2.0.0-next.3
+
+## 2.0.0-next.2
+
+## 2.0.0-next.1
+
+## 2.0.0-next.0
+
+### Major Changes
+
+- [#279](https://github.com/embedpdf/embed-pdf-viewer/pull/279) by [@bobsingor](https://github.com/bobsingor) – ## Multi-Document Support
+
+  The attachment plugin now supports accessing attachments from multiple documents.
+
+  ### Breaking Changes
+  - **Methods**: All methods now accept an optional `documentId` parameter and operate on the active document by default:
+    - `getAttachments(documentId?)` - Returns attachments for the specified or active document
+    - `downloadAttachment(attachment, documentId?)` - Downloads attachment from the specified or active document
+  - **Capability**: Added `forDocument(documentId)` method that returns `AttachmentScope` for document-specific operations.
+
+  ### Framework-Specific Changes (React/Preact, Svelte, Vue)
+  - **Hooks**:
+    - Added Svelte hooks support (`@embedpdf/plugin-attachment/svelte`)
+    - All hooks work with document-scoped capabilities via `forDocument()`
+
+  ### New Features
+  - `AttachmentScope` interface for document-scoped attachment operations
+  - Support for accessing attachments from any document, not just the active one
+
+## 1.5.0
+
+## 1.4.1
+
+## 1.4.0
+
+## 1.3.16
+
+## 1.3.15
+
+## 1.3.14
+
+## 1.3.13
+
+## 1.3.12
+
+## 1.3.11
+
+## 1.3.10
+
+## 1.3.9
+
+## 1.3.8
+
+## 1.3.7
+
+## 1.3.6
+
+## 1.3.5
+
+## 1.3.4
+
+## 1.3.3
+
+## 1.3.2
+
 ## 1.3.1
 
 ## 1.3.0

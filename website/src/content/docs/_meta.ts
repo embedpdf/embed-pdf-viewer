@@ -1,6 +1,14 @@
 export default {
-  pdfium: {
-    title: 'PDFium JavaScript API',
+  react: {
+    title: 'React',
+    type: 'page',
+  },
+  vue: {
+    title: 'Vue',
+    type: 'page',
+  },
+  svelte: {
+    title: 'Svelte',
     type: 'page',
   },
   snippet: {
@@ -11,12 +19,8 @@ export default {
     title: 'Engines',
     type: 'page',
   },
-  react: {
-    title: 'React',
-    type: 'page',
-  },
-  vue: {
-    title: 'Vue',
+  pdfium: {
+    title: 'PDFium JavaScript API',
     type: 'page',
   },
   index: {

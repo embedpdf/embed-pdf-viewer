@@ -1,97 +1,102 @@
 <script setup lang="ts">
-import { ref, onMounted, onBeforeUnmount, toRaw, computed } from 'vue';
-import { ignore, PdfErrorCode, PdfErrorReason, Task } from '@embedpdf/models';
-import type { StyleValue } from 'vue';
+import { ref, computed, watch, onBeforeUnmount, toRaw } from 'vue';
+import { ignore, PdfErrorCode } from '@embedpdf/models';
 
 import type { Tile } from '@embedpdf/plugin-tiling';
 import { useTilingCapability } from '../hooks';
 
 interface Props {
+  documentId: string;
   pageIndex: number;
   tile: Tile;
   scale: number;
   dpr?: number;
-  style?: StyleValue;
 }
 
 const props = withDefaults(defineProps<Props>(), {
-  dpr: () => window.devicePixelRatio,
+  dpr: () => (typeof window !== 'undefined' ? window.devicePixelRatio : 1),
 });
 
 const { provides: tilingCapability } = useTilingCapability();
-
 const url = ref<string>();
-let blobUrl: string | null = null;
-let renderTask: Task<Blob, PdfErrorReason> | null = null;
-
-/* -------------------------------------------------- */
-/* Helper functions                                   */
-/* -------------------------------------------------- */
-function revoke() {
-  if (blobUrl) {
-    URL.revokeObjectURL(blobUrl);
-    blobUrl = null;
-  }
-}
-
-function abortCurrentTask() {
-  if (renderTask && !blobUrl) {
-    renderTask.abort({
-      code: PdfErrorCode.Cancelled,
-      message: 'canceled tile render',
-    });
-  }
-}
-
-/* -------------------------------------------------- */
-/* start one render task when component mounts        */
-/* -------------------------------------------------- */
-onMounted(() => {
-  if (!tilingCapability.value) return;
-
-  const task = tilingCapability.value.renderTile({
-    pageIndex: props.pageIndex,
-    tile: toRaw(props.tile),
-    dpr: props.dpr,
-  });
-
-  renderTask = task;
-  task.wait((blob) => {
-    blobUrl = URL.createObjectURL(blob);
-    url.value = blobUrl;
-    renderTask = null; // Task completed
-  }, ignore);
-});
-
-/* -------------------------------------------------- */
-/* cleanup                                            */
-/* -------------------------------------------------- */
-onBeforeUnmount(() => {
-  abortCurrentTask();
-  revoke();
-});
-
-/* -------------------------------------------------- */
-/* helpers                                            */
-/* -------------------------------------------------- */
 const relScale = computed(() => props.scale / props.tile.srcScale);
+
+// Track last rendered tile ID to prevent duplicates
+let lastRenderedId: string | undefined;
+let currentTask: any = null;
+
+watch(
+  [() => props.tile.id, () => props.documentId, tilingCapability],
+  ([tileId, docId, capability], [prevTileId, prevDocId]) => {
+    if (!capability) return;
+
+    const scope = capability.forDocument(docId);
+
+    // CRITICAL: Clear image immediately when documentId changes
+    if (prevDocId !== undefined && prevDocId !== docId) {
+      if (url.value) {
+        URL.revokeObjectURL(url.value);
+        url.value = undefined;
+      }
+      if (currentTask) {
+        currentTask.abort({ code: PdfErrorCode.Cancelled, message: 'switching documents' });
+        currentTask = null;
+      }
+      lastRenderedId = undefined; // Reset so new document tiles render
+    }
+
+    // Already rendered this exact tile (for same document)
+    if (lastRenderedId === tileId && prevDocId === docId) return;
+
+    // Cancel previous task if any
+    if (currentTask) {
+      currentTask.abort({ code: PdfErrorCode.Cancelled, message: 'switching tiles' });
+      currentTask = null;
+    }
+
+    // Clean up old URL
+    if (url.value) {
+      URL.revokeObjectURL(url.value);
+      url.value = undefined;
+    }
+
+    lastRenderedId = tileId;
+
+    currentTask = scope.renderTile({
+      pageIndex: props.pageIndex,
+      tile: toRaw(props.tile),
+      dpr: props.dpr,
+    });
+
+    currentTask.wait((blob: Blob) => {
+      url.value = URL.createObjectURL(blob);
+      currentTask = null;
+    }, ignore);
+  },
+  { immediate: true },
+);
+
+onBeforeUnmount(() => {
+  if (currentTask) {
+    currentTask.abort({ code: PdfErrorCode.Cancelled, message: 'unmounting' });
+  }
+  if (url.value) {
+    URL.revokeObjectURL(url.value);
+  }
+});
 </script>
 
 <template>
   <img
     v-if="url"
     :src="url"
-    :style="[
-      {
-        position: 'absolute',
-        left: tile.screenRect.origin.x * relScale + 'px',
-        top: tile.screenRect.origin.y * relScale + 'px',
-        width: tile.screenRect.size.width * relScale + 'px',
-        height: tile.screenRect.size.height * relScale + 'px',
-        display: 'block',
-      },
-      props.style,
-    ]"
-    @load="revoke"
+    :style="{
+      position: 'absolute',
+      left: `${tile.screenRect.origin.x * relScale}px`,
+      top: `${tile.screenRect.origin.y * relScale}px`,
+      width: `${tile.screenRect.size.width * relScale}px`,
+      height: `${tile.screenRect.size.height * relScale}px`,
+      display: 'block',
+    }"
   />
 </template>

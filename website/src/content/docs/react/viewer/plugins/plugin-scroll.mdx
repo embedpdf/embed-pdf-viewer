@@ -1,0 +1,108 @@
+---
+title: Scrolling & Navigation
+description: Configure layout directions, render gaps, and control navigation programmatically.
+---
+
+import ScrollExample from '../../code-examples/viewer/scroll-example';
+import ScrollInitialPageExample from '../../code-examples/viewer/scroll-initial-page-example';
+import { ExampleWrapper } from '@/components/example-wrapper';
+
+# Scrolling & Navigation
+
+The PDFViewer includes a powerful scroll engine capable of handling large documents with ease. It supports vertical and horizontal layouts, smooth scrolling animations, and programmatic navigation control.
+
+## Configuration
+
+You can configure global scroll settings via the `scroll` property. To load specific documents with known IDs (useful for programmatic control), use `documentManager`.
+
+```tsx
+import { PDFViewer, ScrollStrategy } from '@embedpdf/react-pdf-viewer';
+
+<PDFViewer
+  config={{
+    documentManager: {
+      initialDocuments: [{ 
+        url: 'https://snippet.embedpdf.com/ebook.pdf',
+        documentId: 'my-doc'
+      }]
+    },
+    scroll: {
+      defaultStrategy: ScrollStrategy.Vertical,  // or ScrollStrategy.Horizontal
+      defaultPageGap: 20
+    }
+  }}
+/>
+```
+
+## Controlling Navigation Programmatically
+
+You can control the viewer from your own application logic—for example, building custom "Next/Previous" buttons or a table of contents that lives outside the PDF viewer.
+
+<CodeExample codePaths={["content/docs/react/code-examples/viewer/scroll-example.tsx"]}> 
+  <ExampleWrapper>
+    <ScrollExample />
+  </ExampleWrapper>
+</CodeExample>
+
+### Targeting the Active Document
+
+If you call methods directly on the scroll capability, they automatically apply to the currently **active** document (the one visible in the viewport).
+
+```tsx
+const registry = await viewerRef.current?.registry;
+const scroll = registry.getPlugin('scroll').provides();
+
+// Scrolls whatever document is currently active
+scroll.scrollToNextPage();
+scroll.scrollToPage({ pageNumber: 5 });
+```
+
+### Targeting a Specific Document
+
+If you are building a complex app with multiple documents open, you can target a specific one using its ID.
+
+```tsx
+// Target the document we named 'my-doc' in config
+const docScroll = scroll.forDocument('my-doc');
+docScroll.scrollToPage({ pageNumber: 10 });
+```
+
+## Scrolling on Load
+
+Because documents load asynchronously, you cannot simply call `scrollToPage` immediately after initialization. Instead, you should listen for the `onLayoutReady` event. This event fires when the document structure is calculated and the viewer is ready to scroll.
+
+<CodeExample codePaths={["content/docs/react/code-examples/viewer/scroll-initial-page-example.tsx"]}> 
+  <ExampleWrapper>
+    <ScrollInitialPageExample />
+  </ExampleWrapper>
+</CodeExample>
+
+```tsx
+const registry = await viewerRef.current?.registry;
+const scroll = registry.getPlugin('scroll').provides();
+
+scroll.onLayoutReady((event) => {
+  // Check if this is the document we want to control
+  if (event.documentId === 'my-doc' && event.isInitial) {
+    scroll.forDocument('my-doc').scrollToPage({ 
+      pageNumber: 3, 
+      behavior: 'instant' // Instant jump for initial load
+    });
+  }
+});
+```
+
+## Listening for Page Changes
+
+You can listen for page change events to keep your application UI (like a "Page X of Y" label) in sync with the viewer.
+
+```tsx
+const registry = await viewerRef.current?.registry;
+const scroll = registry.getPlugin('scroll').provides();
+
+const unsubscribe = scroll.onPageChange((event) => {
+  console.log(`Doc: ${event.documentId}`);
+  console.log(`Current Page: ${event.pageNumber}`);
+  console.log(`Total Pages: ${event.totalPages}`);
+});
+```

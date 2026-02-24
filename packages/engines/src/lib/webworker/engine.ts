@@ -22,6 +22,7 @@ import {
   PdfFileUrl,
   PdfGlyphObject,
   PdfPageGeometry,
+  PdfPageTextRuns,
   PageTextSlice,
   AnnotationCreateContext,
   PdfEngineMethodArgs,
@@ -39,6 +40,8 @@ import {
   PdfPrintOptions,
   PdfBookmarkObject,
   PdfAddAttachmentParams,
+  AnnotationAppearanceMap,
+  ImageDataLike,
 } from '@embedpdf/models';
 import { ExecuteRequest, Response, SpecificExecuteRequest } from './runner';
 
@@ -198,22 +201,6 @@ export class WebWorkerEngine implements PdfEngine {
    */
   generateRequestId(id: string) {
     return `${id}.${Date.now()}.${Math.random()}`;
-  }
-
-  /**
-   * {@inheritDoc @embedpdf/models!PdfEngine.initialize}
-   *
-   * @public
-   */
-  initialize() {
-    this.logger.debug(LOG_SOURCE, LOG_CATEGORY, 'initialize');
-    const requestId = this.generateRequestId('General');
-    const task = new WorkerTask<boolean>(this.worker, requestId);
-
-    const request: ExecuteRequest = createRequest(requestId, 'initialize', []);
-    this.proxy(task, request);
-
-    return task;
   }
 
   /**
@@ -442,6 +429,48 @@ export class WebWorkerEngine implements PdfEngine {
   }
 
   /**
+   * {@inheritDoc @embedpdf/models!PdfEngine.renderPageRaw}
+   *
+   * @public
+   */
+  renderPageRaw(doc: PdfDocumentObject, page: PdfPageObject, options?: PdfRenderPageOptions) {
+    this.logger.debug(LOG_SOURCE, LOG_CATEGORY, 'renderPageRaw', doc, page, options);
+    const requestId = this.generateRequestId(doc.id);
+    const task = new WorkerTask<ImageDataLike>(this.worker, requestId);
+
+    const request: ExecuteRequest = createRequest(requestId, 'renderPageRaw', [doc, page, options]);
+    this.proxy(task, request);
+
+    return task;
+  }
+
+  /**
+   * {@inheritDoc @embedpdf/models!PdfEngine.renderPageRectRaw}
+   *
+   * @public
+   */
+  renderPageRectRaw(
+    doc: PdfDocumentObject,
+    page: PdfPageObject,
+    rect: Rect,
+    options?: PdfRenderPageOptions,
+  ) {
+    this.logger.debug(LOG_SOURCE, LOG_CATEGORY, 'renderPageRectRaw', doc, page, rect, options);
+    const requestId = this.generateRequestId(doc.id);
+    const task = new WorkerTask<ImageDataLike>(this.worker, requestId);
+
+    const request: ExecuteRequest = createRequest(requestId, 'renderPageRectRaw', [
+      doc,
+      page,
+      rect,
+      options,
+    ]);
+    this.proxy(task, request);
+
+    return task;
+  }
+
+  /**
    * {@inheritDoc @embedpdf/models!PdfEngine.renderAnnotation}
    *
    * @public
@@ -460,6 +489,44 @@ export class WebWorkerEngine implements PdfEngine {
       doc,
       page,
       annotation,
+      options,
+    ]);
+    this.proxy(task, request);
+
+    return task;
+  }
+
+  renderPageAnnotations(
+    doc: PdfDocumentObject,
+    page: PdfPageObject,
+    options?: PdfRenderPageAnnotationOptions,
+  ) {
+    this.logger.debug(LOG_SOURCE, LOG_CATEGORY, 'renderPageAnnotations', doc, page, options);
+    const requestId = this.generateRequestId(doc.id);
+    const task = new WorkerTask<AnnotationAppearanceMap<Blob>>(this.worker, requestId);
+
+    const request: ExecuteRequest = createRequest(requestId, 'renderPageAnnotations', [
+      doc,
+      page,
+      options,
+    ]);
+    this.proxy(task, request);
+
+    return task;
+  }
+
+  renderPageAnnotationsRaw(
+    doc: PdfDocumentObject,
+    page: PdfPageObject,
+    options?: PdfRenderPageAnnotationOptions,
+  ) {
+    this.logger.debug(LOG_SOURCE, LOG_CATEGORY, 'renderPageAnnotationsRaw', doc, page, options);
+    const requestId = this.generateRequestId(doc.id);
+    const task = new WorkerTask<AnnotationAppearanceMap<ImageDataLike>>(this.worker, requestId);
+
+    const request: ExecuteRequest = createRequest(requestId, 'renderPageAnnotationsRaw', [
+      doc,
+      page,
       options,
     ]);
     this.proxy(task, request);
@@ -558,6 +625,7 @@ export class WebWorkerEngine implements PdfEngine {
     doc: PdfDocumentObject,
     page: PdfPageObject,
     annotation: PdfAnnotationObject,
+    options?: { regenerateAppearance?: boolean },
   ) {
     this.logger.debug(LOG_SOURCE, LOG_CATEGORY, 'updatePageAnnotation', doc, page, annotation);
     const requestId = this.generateRequestId(doc.id);
@@ -567,6 +635,7 @@ export class WebWorkerEngine implements PdfEngine {
       doc,
       page,
       annotation,
+      options,
     ]);
     this.proxy(task, request);
 
@@ -829,6 +898,62 @@ export class WebWorkerEngine implements PdfEngine {
   }
 
   /**
+   * {@inheritDoc @embedpdf/models!PdfEngine.applyRedaction}
+   *
+   * @public
+   */
+  applyRedaction(doc: PdfDocumentObject, page: PdfPageObject, annotation: PdfAnnotationObject) {
+    this.logger.debug(LOG_SOURCE, LOG_CATEGORY, 'applyRedaction', doc, page, annotation);
+    const requestId = this.generateRequestId(doc.id);
+    const task = new WorkerTask<boolean>(this.worker, requestId);
+
+    const request: ExecuteRequest = createRequest(requestId, 'applyRedaction', [
+      doc,
+      page,
+      annotation,
+    ]);
+    this.proxy(task, request);
+
+    return task;
+  }
+
+  /**
+   * {@inheritDoc @embedpdf/models!PdfEngine.applyAllRedactions}
+   *
+   * @public
+   */
+  applyAllRedactions(doc: PdfDocumentObject, page: PdfPageObject) {
+    this.logger.debug(LOG_SOURCE, LOG_CATEGORY, 'applyAllRedactions', doc, page);
+    const requestId = this.generateRequestId(doc.id);
+    const task = new WorkerTask<boolean>(this.worker, requestId);
+
+    const request: ExecuteRequest = createRequest(requestId, 'applyAllRedactions', [doc, page]);
+    this.proxy(task, request);
+
+    return task;
+  }
+
+  /**
+   * {@inheritDoc @embedpdf/models!PdfEngine.flattenAnnotation}
+   *
+   * @public
+   */
+  flattenAnnotation(doc: PdfDocumentObject, page: PdfPageObject, annotation: PdfAnnotationObject) {
+    this.logger.debug(LOG_SOURCE, LOG_CATEGORY, 'flattenAnnotation', doc, page, annotation);
+    const requestId = this.generateRequestId(doc.id);
+    const task = new WorkerTask<boolean>(this.worker, requestId);
+
+    const request: ExecuteRequest = createRequest(requestId, 'flattenAnnotation', [
+      doc,
+      page,
+      annotation,
+    ]);
+    this.proxy(task, request);
+
+    return task;
+  }
+
+  /**
    * {@inheritDoc @embedpdf/models!PdfEngine.extractText}
    *
    * @public
@@ -887,6 +1012,22 @@ export class WebWorkerEngine implements PdfEngine {
     const task = new WorkerTask<PdfPageGeometry>(this.worker, requestId);
 
     const request: ExecuteRequest = createRequest(requestId, 'getPageGeometry', [doc, page]);
+    this.proxy(task, request);
+
+    return task;
+  }
+
+  /**
+   * {@inheritDoc @embedpdf/models!PdfEngine.getPageTextRuns}
+   *
+   * @public
+   */
+  getPageTextRuns(doc: PdfDocumentObject, page: PdfPageObject) {
+    this.logger.debug(LOG_SOURCE, LOG_CATEGORY, 'getPageTextRuns', doc, page);
+    const requestId = this.generateRequestId(doc.id);
+    const task = new WorkerTask<PdfPageTextRuns>(this.worker, requestId);
+
+    const request: ExecuteRequest = createRequest(requestId, 'getPageTextRuns', [doc, page]);
     this.proxy(task, request);
 
     return task;
@@ -970,6 +1111,99 @@ export class WebWorkerEngine implements PdfEngine {
     const requestId = this.generateRequestId('closeAllDocuments');
     const task = new WorkerTask<boolean>(this.worker, requestId);
     const request: ExecuteRequest = createRequest(requestId, 'closeAllDocuments', []);
+    this.proxy(task, request);
+
+    return task;
+  }
+
+  /**
+   * {@inheritDoc @embedpdf/models!PdfEngine.setDocumentEncryption}
+   *
+   * @public
+   */
+  setDocumentEncryption(
+    doc: PdfDocumentObject,
+    userPassword: string,
+    ownerPassword: string,
+    allowedFlags: number,
+  ) {
+    this.logger.debug(LOG_SOURCE, LOG_CATEGORY, 'setDocumentEncryption', doc, allowedFlags);
+    const requestId = this.generateRequestId(doc.id);
+    const task = new WorkerTask<boolean>(this.worker, requestId);
+
+    const request: ExecuteRequest = createRequest(requestId, 'setDocumentEncryption', [
+      doc,
+      userPassword,
+      ownerPassword,
+      allowedFlags,
+    ]);
+    this.proxy(task, request);
+
+    return task;
+  }
+
+  /**
+   * {@inheritDoc @embedpdf/models!PdfEngine.removeEncryption}
+   *
+   * @public
+   */
+  removeEncryption(doc: PdfDocumentObject) {
+    this.logger.debug(LOG_SOURCE, LOG_CATEGORY, 'removeEncryption', doc);
+    const requestId = this.generateRequestId(doc.id);
+    const task = new WorkerTask<boolean>(this.worker, requestId);
+
+    const request: ExecuteRequest = createRequest(requestId, 'removeEncryption', [doc]);
+    this.proxy(task, request);
+
+    return task;
+  }
+
+  /**
+   * {@inheritDoc @embedpdf/models!PdfEngine.unlockOwnerPermissions}
+   *
+   * @public
+   */
+  unlockOwnerPermissions(doc: PdfDocumentObject, ownerPassword: string) {
+    this.logger.debug(LOG_SOURCE, LOG_CATEGORY, 'unlockOwnerPermissions', doc);
+    const requestId = this.generateRequestId(doc.id);
+    const task = new WorkerTask<boolean>(this.worker, requestId);
+
+    const request: ExecuteRequest = createRequest(requestId, 'unlockOwnerPermissions', [
+      doc,
+      ownerPassword,
+    ]);
+    this.proxy(task, request);
+
+    return task;
+  }
+
+  /**
+   * {@inheritDoc @embedpdf/models!PdfEngine.isEncrypted}
+   *
+   * @public
+   */
+  isEncrypted(doc: PdfDocumentObject) {
+    this.logger.debug(LOG_SOURCE, LOG_CATEGORY, 'isEncrypted', doc);
+    const requestId = this.generateRequestId(doc.id);
+    const task = new WorkerTask<boolean>(this.worker, requestId);
+
+    const request: ExecuteRequest = createRequest(requestId, 'isEncrypted', [doc]);
+    this.proxy(task, request);
+
+    return task;
+  }
+
+  /**
+   * {@inheritDoc @embedpdf/models!PdfEngine.isOwnerUnlocked}
+   *
+   * @public
+   */
+  isOwnerUnlocked(doc: PdfDocumentObject) {
+    this.logger.debug(LOG_SOURCE, LOG_CATEGORY, 'isOwnerUnlocked', doc);
+    const requestId = this.generateRequestId(doc.id);
+    const task = new WorkerTask<boolean>(this.worker, requestId);
+
+    const request: ExecuteRequest = createRequest(requestId, 'isOwnerUnlocked', [doc]);
     this.proxy(task, request);
 
     return task;

@@ -11,7 +11,6 @@ export const manifest: PluginManifest<AnnotationPluginConfig> = {
   requires: ['interaction-manager', 'selection'],
   optional: ['history'],
   defaultConfig: {
-    enabled: true,
     autoCommit: true,
     annotationAuthor: 'Guest',
     deactivateToolAfterCreate: false,

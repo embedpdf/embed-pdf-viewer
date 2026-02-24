@@ -1,0 +1,199 @@
+---
+title: Capture Plugin
+description: Enables users to select a rectangular area on a page and export it as an image snapshot in Svelte.
+searchable: true
+---
+
+# Capture Plugin
+
+The Capture Plugin provides a "snapshot" tool, allowing users to select a rectangular area (a marquee) on any page and export that specific section as a high-resolution image.
+
+## Installation
+
+This plugin depends on the `Render` and `Interaction Manager` plugins. You must install all three packages.
+
+```sh npm2yarn
+npm install @embedpdf/plugin-capture @embedpdf/plugin-render @embedpdf/plugin-interaction-manager
+````
+
+## Registration
+
+Import `CapturePluginPackage` and its dependencies, then add them to the `plugins` array. The dependencies should be registered before the capture plugin.
+
+```typescript {5, 18-22}
+import { createPluginRegistration } from '@embedpdf/core'
+// ... other imports
+import { RenderPluginPackage } from '@embedpdf/plugin-render/svelte'
+import { InteractionManagerPluginPackage } from '@embedpdf/plugin-interaction-manager/svelte'
+import { CapturePluginPackage } from '@embedpdf/plugin-capture/svelte'
+
+const plugins = [
+  // ... other essential plugins
+  createPluginRegistration(DocumentManagerPluginPackage, { /* ... */ }),
+  createPluginRegistration(ViewportPluginPackage),
+  createPluginRegistration(ScrollPluginPackage),
+
+  // Register dependencies first
+  createPluginRegistration(RenderPluginPackage),
+  createPluginRegistration(InteractionManagerPluginPackage),
+
+  // Register and configure the capture plugin
+  createPluginRegistration(CapturePluginPackage, {
+    scale: 2.0, // Render captured image at 2x resolution
+    imageType: 'image/png',
+    withAnnotations: true,
+  }),
+]
+```
+
+## Usage
+
+The plugin works by combining a UI component to draw the selection area, a store to control the capture mode, and an event listener to handle the final image.
+
+### 1. Add the `<MarqueeCapture />` Component
+
+To enable the visual selection tool, place the `<MarqueeCapture />` component inside the `renderPage` snippet of your `<Scroller />`. It must be a child of `<PagePointerProvider>` to correctly handle mouse or touch interactions.
+
+```svelte {3, 11}
+<script lang="ts">
+import { PagePointerProvider } from '@embedpdf/plugin-interaction-manager/svelte';
+import { MarqueeCapture } from '@embedpdf/plugin-capture/svelte';
+
+let { documentId }: { documentId: string } = $props();
+</script>
+
+{#snippet renderPage(page)}
+  <PagePointerProvider {documentId} pageIndex={page.pageIndex}>
+    <RenderLayer {documentId} pageIndex={page.pageIndex} />
+    <MarqueeCapture {documentId} pageIndex={page.pageIndex} />
+  </PagePointerProvider>
+{/snippet}
+
+<Scroller {documentId} {renderPage} />
+```
+
+### 2. Build a Toolbar Button
+
+Use the `useCapture` store to get access to the plugin's methods for a specific document. The `toggleMarqueeCapture()` method activates and deactivates the selection mode.
+
+```svelte
+<script lang="ts">
+import { useCapture } from '@embedpdf/plugin-capture/svelte';
+
+let { documentId }: { documentId: string } = $props();
+const capture = useCapture(() => documentId);
+const isActive = $derived(capture.state.isMarqueeCaptureActive);
+</script>
+
+<button onclick={() => capture.provides?.toggleMarqueeCapture()}>
+  {isActive ? 'Cancel' : 'Capture Area'}
+</button>
+```
+
+### 3. Handle the Captured Image
+
+After the user selects an area, the plugin fires an event with the resulting image data. You must listen for this event using the `onCaptureArea` method to receive the `Blob`. From there, you can display the image or trigger a download.
+
+```svelte
+<script lang="ts">
+import { onMount, onDestroy } from 'svelte';
+import { useCapture, type CaptureAreaEvent } from '@embedpdf/plugin-capture/svelte';
+
+let { documentId }: { documentId: string } = $props();
+const capture = useCapture(() => documentId);
+let imageUrl = $state<string | null>(null);
+let unsubscribe: (() => void) | undefined;
+
+onMount(() => {
+  unsubscribe = capture.provides?.onCaptureArea((result: CaptureAreaEvent) => {
+    const newUrl = URL.createObjectURL(result.blob);
+    imageUrl = newUrl;
+  });
+});
+
+onDestroy(() => {
+  unsubscribe?.();
+  if (imageUrl) URL.revokeObjectURL(imageUrl);
+});
+</script>
+
+{#if !imageUrl}
+  <p>Select an area to capture.</p>
+{:else}
+  <img src={imageUrl} alt="Captured PDF area" />
+{/if}
+```
+
+## Live Example
+
+Click the "Capture Area" button, then click and drag a rectangle over the PDF. The selected area will appear below as an image, with a button to download it.
+
+import { CaptureExample } from '../../code-examples/headless/capture-example';
+
+<CodeExample 
+  codePaths={[
+    "../../examples/svelte-tailwind/src/examples/headless/capture-example.svelte",
+    "../../examples/svelte-tailwind/src/examples/headless/capture-example-content.svelte"
+  ]}
+>
+  <CaptureExample />
+</CodeExample>
+
+## API Reference
+
+### Configuration (`CapturePluginConfig`)
+
+| Option | Type | Description |
+| :--- | :--- | :--- |
+| **`scale`** | `number` | The resolution multiplier for the captured image. A value of `2` means 2x resolution. **Default**: `1` |
+| **`imageType`** | `string` | The image format, e.g., `'image/png'`, `'image/jpeg'`. **Default**: `'image/png'` |
+| **`withAnnotations`** | `boolean` | If `true`, annotations will be included in the captured image. **Default**: `false` |
+
+### Component: `<MarqueeCapture />`
+
+The component that renders the visual selection rectangle.
+
+| Prop | Type | Description |
+| :--- | :--- | :--- |
+| **`documentId`** | `string` | **(Required)** The ID of the document. |
+| **`pageIndex`** | `number` | **(Required)** The page index this component is rendered on. |
+| **`class`** | `string` | Optional CSS class for custom styling of the marquee. |
+| **`stroke`** | `string` | The color of the marquee's border. |
+| **`fill`** | `string` | The background color of the marquee. |
+
+### Store: `useCapture(documentId)`
+
+Connects your component to the capture plugin's state and functions for a specific document.
+
+#### Parameters
+
+| Parameter | Type | Description |
+| :--- | :--- | :--- |
+| **`documentId`** | `() => string` | A getter function that returns the document ID to track. |
+
+#### Returns
+
+| Property | Type | Description |
+| :--- | :--- | :--- |
+| **`state`** | `CaptureState` | An object containing the current state, such as `isMarqueeCaptureActive`. |
+| **`provides`**| `CaptureScope \| null` | An object with methods to interact with the plugin, or `null` if not ready. |
+
+#### `CaptureScope` Methods
+
+| Method | Description |
+| :--- | :--- |
+| **`toggleMarqueeCapture()`** | Toggles the marquee selection mode on or off. |
+| **`onCaptureArea(callback)`** | Subscribes to the capture event. The callback receives a `CaptureAreaEvent` object when an area is successfully captured. |
+| **`captureArea(pageIndex, rect)`** | Programmatically captures a specified rectangular area on a page. |
+
+### Event: `CaptureAreaEvent`
+
+The object passed to the `onCaptureArea` callback after a successful capture.
+
+| Property | Type | Description |
+| :--- | :--- | :--- |
+| **`pageIndex`** | `number` | The index of the page where the capture occurred. |
+| **`rect`** | `Rect` | An object describing the position and size of the captured area in PDF points. |
+| **`blob`** | `Blob` | The captured image data as a `Blob` object. |
+| **`imageType`** | `string` | The MIME type of the captured image (e.g., `'image/png'`). |
+| **`scale`** | `number` | The resolution scale factor used for the capture. |

@@ -1,45 +1,57 @@
 <script setup lang="ts">
+import { ref, watch, computed } from 'vue';
+import { useDocumentState } from '@embedpdf/core/vue';
 import type { Tile } from '@embedpdf/plugin-tiling';
-import { ref, onMounted, onBeforeUnmount } from 'vue';
-import type { StyleValue } from 'vue';
 
 import { useTilingCapability } from '../hooks';
 import TileImg from './tile-img.vue';
 
-interface Props {
+interface TilingLayerProps {
+  documentId: string;
   pageIndex: number;
-  scale: number;
-  style?: StyleValue;
+  scale?: number;
 }
 
-const props = defineProps<Props>();
+const props = defineProps<TilingLayerProps>();
 
-const tiles = ref<Tile[]>([]);
 const { provides: tilingProvides } = useTilingCapability();
+const documentState = useDocumentState(() => props.documentId);
+const tiles = ref<Tile[]>([]);
 
-let unsubscribe: (() => void) | undefined;
+const actualScale = computed(() => {
+  if (props.scale !== undefined) return props.scale;
+  return documentState.value?.scale ?? 1;
+});
 
-onMounted(() => {
-  if (tilingProvides.value) {
-    unsubscribe = tilingProvides.value.onTileRendering((tilesMap) => {
-      tiles.value = tilesMap[props.pageIndex] ?? [];
+watch(
+  [tilingProvides, () => props.documentId, () => props.pageIndex],
+  ([provides, docId, pageIdx], _, onCleanup) => {
+    if (!provides) {
+      tiles.value = [];
+      return;
+    }
+
+    const unsubscribe = provides.onTileRendering((event) => {
+      if (event.documentId === docId) {
+        tiles.value = event.tiles[pageIdx] ?? [];
+      }
     });
-  }
-});
 
-onBeforeUnmount(() => {
-  unsubscribe?.();
-});
+    onCleanup(unsubscribe);
+  },
+  { immediate: true },
+);
 </script>
 
 <template>
-  <div :style="style" v-bind="$attrs">
+  <div v-bind="$attrs">
     <TileImg
       v-for="tile in tiles"
       :key="tile.id"
+      :documentId="documentId"
       :pageIndex="pageIndex"
       :tile="tile"
-      :scale="scale"
+      :scale="actualScale"
     />
   </div>
 </template>

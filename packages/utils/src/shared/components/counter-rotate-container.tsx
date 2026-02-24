@@ -1,6 +1,6 @@
 import { Rect, Rotation } from '@embedpdf/models';
 import { getCounterRotation } from '@embedpdf/utils';
-import { ReactNode, CSSProperties, PointerEvent, Fragment, TouchEvent } from '@framework';
+import { ReactNode, CSSProperties, Fragment, useRef, useEffect } from '@framework';
 
 interface CounterRotateProps {
   rect: Rect;
@@ -9,8 +9,7 @@ interface CounterRotateProps {
 
 export interface MenuWrapperProps {
   style: CSSProperties;
-  onPointerDown: (e: PointerEvent<HTMLDivElement>) => void;
-  onTouchStart: (e: TouchEvent<HTMLDivElement>) => void;
+  ref: (el: HTMLDivElement | null) => void;
 }
 
 interface CounterRotateComponentProps extends CounterRotateProps {
@@ -24,6 +23,38 @@ interface CounterRotateComponentProps extends CounterRotateProps {
 export function CounterRotate({ children, ...props }: CounterRotateComponentProps) {
   const { rect, rotation } = props;
   const { matrix, width, height } = getCounterRotation(rect, rotation);
+  const elementRef = useRef<HTMLDivElement | null>(null);
+
+  // Use native event listeners with capture phase to prevent event propagation
+  useEffect(() => {
+    const element = elementRef.current;
+    if (!element) return;
+
+    const handlePointerDown = (e: Event) => {
+      // Stop propagation to prevent underlying layers from receiving the event
+      e.stopPropagation();
+      // DO NOT use e.preventDefault() here - it breaks click events on mobile/tablet!
+      // preventDefault() stops the browser from generating click events from touch,
+      // which makes buttons inside this container non-functional on touch devices.
+    };
+
+    const handleTouchStart = (e: Event) => {
+      // Stop propagation to prevent underlying layers from receiving the event
+      e.stopPropagation();
+      // DO NOT use e.preventDefault() here - it breaks click events on mobile/tablet!
+      // preventDefault() stops the browser from generating click events from touch,
+      // which makes buttons inside this container non-functional on touch devices.
+    };
+
+    // Use capture phase to intercept before synthetic events
+    element.addEventListener('pointerdown', handlePointerDown, { capture: true });
+    element.addEventListener('touchstart', handleTouchStart, { capture: true });
+
+    return () => {
+      element.removeEventListener('pointerdown', handlePointerDown, { capture: true });
+      element.removeEventListener('touchstart', handleTouchStart, { capture: true });
+    };
+  }, []);
 
   const menuWrapperStyle: CSSProperties = {
     position: 'absolute',
@@ -37,10 +68,11 @@ export function CounterRotate({ children, ...props }: CounterRotateComponentProp
     zIndex: 3,
   };
 
-  const menuWrapperProps = {
+  const menuWrapperProps: MenuWrapperProps = {
     style: menuWrapperStyle,
-    onPointerDown: (e: PointerEvent<HTMLDivElement>) => e.stopPropagation(),
-    onTouchStart: (e: TouchEvent<HTMLDivElement>) => e.stopPropagation(),
+    ref: (el: HTMLDivElement | null) => {
+      elementRef.current = el;
+    },
   };
 
   return (

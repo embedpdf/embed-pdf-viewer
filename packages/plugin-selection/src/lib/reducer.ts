@@ -1,4 +1,4 @@
-import { SelectionState } from './types';
+import { SelectionDocumentState, SelectionState } from './types';
 import {
   SelectionAction,
   CACHE_PAGE_GEOMETRY,
@@ -9,9 +9,12 @@ import {
   RESET,
   SET_SLICES,
   SET_RECTS,
+  INIT_SELECTION_STATE,
+  CLEANUP_SELECTION_STATE,
+  EVICT_PAGE_GEOMETRY,
 } from './actions';
 
-export const initialState: SelectionState = {
+export const initialSelectionDocumentState: SelectionDocumentState = {
   geometry: {},
   rects: {},
   slices: {},
@@ -20,26 +23,127 @@ export const initialState: SelectionState = {
   selecting: false,
 };
 
+export const initialState: SelectionState = {
+  documents: {},
+};
+
+const updateDocState = (
+  state: SelectionState,
+  documentId: string,
+  newDocState: SelectionDocumentState,
+): SelectionState => ({
+  ...state,
+  documents: {
+    ...state.documents,
+    [documentId]: newDocState,
+  },
+});
+
 export const selectionReducer = (state = initialState, action: SelectionAction): SelectionState => {
   switch (action.type) {
-    case CACHE_PAGE_GEOMETRY: {
-      const { page, geo } = action.payload;
-      return { ...state, geometry: { ...state.geometry, [page]: geo } };
+    case INIT_SELECTION_STATE: {
+      const { documentId, state: docState } = action.payload;
+      return updateDocState(state, documentId, docState);
     }
-    case SET_SELECTION:
-      return { ...state, selection: action.payload, active: true };
-    case START_SELECTION:
-      return { ...state, selecting: true, selection: null, rects: {} };
-    case END_SELECTION:
-      return { ...state, selecting: false };
-    case CLEAR_SELECTION:
-      return { ...state, selecting: false, selection: null, rects: {}, active: false };
-    case SET_RECTS:
-      return { ...state, rects: action.payload };
-    case SET_SLICES:
-      return { ...state, slices: action.payload };
-    case RESET:
-      return initialState;
+
+    case CLEANUP_SELECTION_STATE: {
+      const documentId = action.payload;
+      const { [documentId]: removed, ...remaining } = state.documents;
+      return {
+        ...state,
+        documents: remaining,
+      };
+    }
+
+    case CACHE_PAGE_GEOMETRY: {
+      const { documentId, page, geo } = action.payload;
+      const docState = state.documents[documentId];
+      if (!docState) return state;
+      return updateDocState(state, documentId, {
+        ...docState,
+        geometry: { ...docState.geometry, [page]: geo },
+      });
+    }
+
+    case SET_SELECTION: {
+      const { documentId, selection } = action.payload;
+      const docState = state.documents[documentId];
+      if (!docState) return state;
+      return updateDocState(state, documentId, {
+        ...docState,
+        selection,
+        active: true,
+      });
+    }
+
+    case START_SELECTION: {
+      const { documentId } = action.payload;
+      const docState = state.documents[documentId];
+      if (!docState) return state;
+      return updateDocState(state, documentId, {
+        ...docState,
+        selecting: true,
+        selection: null,
+        rects: {},
+      });
+    }
+
+    case END_SELECTION: {
+      const { documentId } = action.payload;
+      const docState = state.documents[documentId];
+      if (!docState) return state;
+      return updateDocState(state, documentId, { ...docState, selecting: false });
+    }
+
+    case CLEAR_SELECTION: {
+      const { documentId } = action.payload;
+      const docState = state.documents[documentId];
+      if (!docState) return state;
+      return updateDocState(state, documentId, {
+        ...docState,
+        selecting: false,
+        selection: null,
+        rects: {},
+        active: false,
+      });
+    }
+
+    case SET_RECTS: {
+      const { documentId, rects } = action.payload;
+      const docState = state.documents[documentId];
+      if (!docState) return state;
+      return updateDocState(state, documentId, { ...docState, rects });
+    }
+
+    case SET_SLICES: {
+      const { documentId, slices } = action.payload;
+      const docState = state.documents[documentId];
+      if (!docState) return state;
+      return updateDocState(state, documentId, { ...docState, slices });
+    }
+
+    case EVICT_PAGE_GEOMETRY: {
+      const { documentId, pages } = action.payload;
+      const docState = state.documents[documentId];
+      if (!docState) return state;
+      const geometry = { ...docState.geometry };
+      const rects = { ...docState.rects };
+      const slices = { ...docState.slices };
+      for (const p of pages) {
+        delete geometry[p];
+        delete rects[p];
+        delete slices[p];
+      }
+      return updateDocState(state, documentId, { ...docState, geometry, rects, slices });
+    }
+
+    case RESET: {
+      const { documentId } = action.payload;
+      const docState = state.documents[documentId];
+      if (!docState) return state;
+      return updateDocState(state, documentId, initialSelectionDocumentState);
+    }
+
     default:
       return state;
   }

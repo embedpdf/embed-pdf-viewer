@@ -1,5 +1,186 @@
 # @embedpdf/plugin-interaction-manager
 
+## 2.6.2
+
+## 2.6.1
+
+## 2.6.0
+
+### Minor Changes
+
+- [#447](https://github.com/embedpdf/embed-pdf-viewer/pull/447) by [@bobsingor](https://github.com/bobsingor) – Added topic-based page activity tracking system. New methods `claimPageActivity`, `releasePageActivity`, and `hasPageActivity` on both `InteractionManagerCapability` and `InteractionManagerScope`. New `onPageActivityChange` event and `PageActivityChangeEvent` type. Topics are named strings (e.g. 'annotation-selection', 'selection-menu') that can be active on one page at a time per document, automatically moving when re-claimed on a different page.
+
+## 2.5.0
+
+### Patch Changes
+
+- [#441](https://github.com/embedpdf/embed-pdf-viewer/pull/441) by [@bobsingor](https://github.com/bobsingor) – Fixed rotation calculation in PagePointerProvider components to properly handle rotation override and combine page intrinsic rotation with document rotation:
+  - Updated React `PagePointerProvider` to use rotation override directly when provided, otherwise combine page and document rotation
+  - Updated Vue `page-pointer-provider.vue` with the same rotation logic
+  - Updated Svelte `PagePointerProvider.svelte` with the same rotation logic
+
+## 2.4.1
+
+## 2.4.0
+
+## 2.3.0
+
+### Minor Changes
+
+- [#406](https://github.com/embedpdf/embed-pdf-viewer/pull/406) by [@bobsingor](https://github.com/bobsingor) – Added `stopImmediatePropagation()` and `isImmediatePropagationStopped()` methods to pointer events via the new `EmbedPdfPointerEventExtensions` interface. This allows higher-priority handlers to prevent lower-priority handlers from activating for the same event. Updated `mergeHandlers` to respect propagation state and stop calling handlers when propagation is stopped. Refactored `EmbedPdfPointerEvent` as a generic type that combines native events with extensions.
+
+## 2.2.0
+
+## 2.1.2
+
+## 2.1.1
+
+## 2.1.0
+
+## 2.0.2
+
+### Patch Changes
+
+- [#355](https://github.com/embedpdf/embed-pdf-viewer/pull/355) by [@bobsingor](https://github.com/bobsingor) – Fixed an error that was thrown when activating the default interaction mode without an active document.
+
+## 2.0.1
+
+## 2.0.0
+
+### Major Changes
+
+- [#279](https://github.com/embedpdf/embed-pdf-viewer/pull/279) by [@bobsingor](https://github.com/bobsingor) – ## Multi-Document Support
+
+  The interaction manager plugin now supports per-document interaction modes, cursors, and pause/resume state.
+
+  ### Breaking Changes
+  - **All Per-Document Actions**: Now require `documentId` parameter:
+    - `activateMode(documentId, mode)` - was `activateMode(mode)`
+    - `pauseInteraction(documentId)` - was `pauseInteraction()` (no params)
+    - `resumeInteraction(documentId)` - was `resumeInteraction()` (no params)
+    - `setCursor(documentId, cursor)` - was `setCursor(cursor)`
+  - **Capability Methods**: All methods that previously operated on a single document now require document scoping:
+    - `activate(mode)` → `forDocument(id).activate(mode)`
+    - `getActiveMode()` → `forDocument(id).getActiveMode()`
+    - `activateDefaultMode()` → `forDocument(id).activateDefaultMode()`
+    - `pause()` → `forDocument(id).pause()`
+    - `resume()` → `forDocument(id).resume()`
+    - `getCursor()` → `forDocument(id).getCursor()`
+    - `setCursor(cursor)` → `forDocument(id).setCursor(cursor)`
+  - **State Structure**: Plugin state now uses `documents: Record<string, InteractionDocumentState>` to track per-document interaction state (active mode, cursor, paused state).
+  - **Events**: `onModeChange` events now include `documentId` in the event payload.
+
+  ### Framework-Specific Changes (React/Preact, Svelte, Vue)
+  - **GlobalPointerProvider Component**:
+    - Now requires `documentId` prop (React/Preact: `@embedpdf/plugin-interaction-manager/react`, Svelte: `@embedpdf/plugin-interaction-manager/svelte`, Vue: `@embedpdf/plugin-interaction-manager/vue`)
+    - Uses document-scoped pointer provider configuration
+  - **PagePointerProvider Component**:
+    - Now requires `documentId` prop
+    - Uses `useDocumentState` to get document-specific state
+    - Automatically gets page size and position from document state
+
+  ### New Features
+  - `forDocument(documentId)` method returns `InteractionScope` for document-specific operations
+  - Per-document mode management (each document can have its own active interaction mode)
+  - Per-document cursor state
+  - Per-document pause/resume state
+  - Document lifecycle management with automatic state initialization and cleanup
+
+## 2.0.0-next.3
+
+## 2.0.0-next.2
+
+## 2.0.0-next.1
+
+## 2.0.0-next.0
+
+### Major Changes
+
+- [#279](https://github.com/embedpdf/embed-pdf-viewer/pull/279) by [@bobsingor](https://github.com/bobsingor) – ## Multi-Document Support
+
+  The interaction manager plugin now supports per-document interaction modes, cursors, and pause/resume state.
+
+  ### Breaking Changes
+  - **All Per-Document Actions**: Now require `documentId` parameter:
+    - `activateMode(documentId, mode)` - was `activateMode(mode)`
+    - `pauseInteraction(documentId)` - was `pauseInteraction()` (no params)
+    - `resumeInteraction(documentId)` - was `resumeInteraction()` (no params)
+    - `setCursor(documentId, cursor)` - was `setCursor(cursor)`
+  - **Capability Methods**: All methods that previously operated on a single document now require document scoping:
+    - `activate(mode)` → `forDocument(id).activate(mode)`
+    - `getActiveMode()` → `forDocument(id).getActiveMode()`
+    - `activateDefaultMode()` → `forDocument(id).activateDefaultMode()`
+    - `pause()` → `forDocument(id).pause()`
+    - `resume()` → `forDocument(id).resume()`
+    - `getCursor()` → `forDocument(id).getCursor()`
+    - `setCursor(cursor)` → `forDocument(id).setCursor(cursor)`
+  - **State Structure**: Plugin state now uses `documents: Record<string, InteractionDocumentState>` to track per-document interaction state (active mode, cursor, paused state).
+  - **Events**: `onModeChange` events now include `documentId` in the event payload.
+
+  ### Framework-Specific Changes (React/Preact, Svelte, Vue)
+  - **GlobalPointerProvider Component**:
+    - Now requires `documentId` prop (React/Preact: `@embedpdf/plugin-interaction-manager/react`, Svelte: `@embedpdf/plugin-interaction-manager/svelte`, Vue: `@embedpdf/plugin-interaction-manager/vue`)
+    - Uses document-scoped pointer provider configuration
+  - **PagePointerProvider Component**:
+    - Now requires `documentId` prop
+    - Uses `useDocumentState` to get document-specific state
+    - Automatically gets page size and position from document state
+
+  ### New Features
+  - `forDocument(documentId)` method returns `InteractionScope` for document-specific operations
+  - Per-document mode management (each document can have its own active interaction mode)
+  - Per-document cursor state
+  - Per-document pause/resume state
+  - Document lifecycle management with automatic state initialization and cleanup
+
+## 1.5.0
+
+## 1.4.1
+
+### Patch Changes
+
+- [#234](https://github.com/embedpdf/embed-pdf-viewer/pull/234) by [@bobsingor](https://github.com/bobsingor) – refactor(svelte): Update provider components (`GlobalPointerProvider`, `PagePointerProvider`) and hooks (`useInteractionManager`, `useCursor`, `usePointerHandlers`, `useIsPageExclusive`) to use the refactored Svelte core hooks and return reactive state objects.
+
+## 1.4.0
+
+### Minor Changes
+
+- [#222](https://github.com/embedpdf/embed-pdf-viewer/pull/222) by [@andrewrisse](https://github.com/andrewrisse) – feat: Add Svelte 5 adapter (`/svelte` export) with Rune-based hooks (`useInteractionManager`, `useCursor`, `usePointerHandlers`, `useIsPageExclusive`) and provider components (`GlobalPointerProvider.svelte`, `PagePointerProvider.svelte`). Thanks to @andrewrisse for adding the Svelte adapter!
+
+## 1.3.16
+
+### Patch Changes
+
+- [`fa0e3a8`](https://github.com/embedpdf/embed-pdf-viewer/commit/fa0e3a87977dfdd2e040a2612bcc4779a286db03) by [@bobsingor](https://github.com/bobsingor) – Guard against late callbacks after registry teardown
+
+## 1.3.15
+
+## 1.3.14
+
+## 1.3.13
+
+## 1.3.12
+
+## 1.3.11
+
+## 1.3.10
+
+## 1.3.9
+
+## 1.3.8
+
+## 1.3.7
+
+## 1.3.6
+
+## 1.3.5
+
+## 1.3.4
+
+## 1.3.3
+
+## 1.3.2
+
 ## 1.3.1
 
 ## 1.3.0
@@ -19,7 +200,6 @@
 ### Minor Changes
 
 - [#141](https://github.com/embedpdf/embed-pdf-viewer/pull/141) by [@bobsingor](https://github.com/bobsingor) – Simplified usage of `PagePointerProvider`:
-
   - Added default `position: relative`, `width`, and `height` styles to the React and Vue implementations of `PagePointerProvider`. Consumers no longer need to manually set these.
   - Ensures consistent sizing based on `pageWidth` and `pageHeight`.
 

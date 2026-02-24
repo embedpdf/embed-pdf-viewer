@@ -3,6 +3,7 @@ import {
   PdfAnnotationObject,
   PdfAnnotationSubtype,
   Rect,
+  Rotation,
   Size,
   AnnotationCreateContext,
   PdfAnnotationBorderStyle,
@@ -67,7 +68,7 @@ export interface InkPreviewData {
   rect: Rect;
   inkList: PdfInkListObject[];
   strokeWidth: number;
-  color: string;
+  strokeColor: string;
   opacity: number;
 }
 
@@ -150,6 +151,8 @@ export interface HandlerContext<A extends PdfAnnotationObject> {
   getTool: () => AnnotationTool<A> | undefined;
   pageIndex: number;
   pageSize: Size;
+  /** Effective page rotation (page intrinsic + document rotation), as a quarter-turn value (0-3). */
+  pageRotation: Rotation;
   scale: number;
   services: HandlerServices;
   onPreview: (state: AnyPreviewState | null) => void;

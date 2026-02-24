@@ -13,13 +13,13 @@ const createHeading = (
       className === 'sr-only'
         ? 'sr-only'
         : cn(
-            'tracking-tight text-slate-900',
+            'tracking-tight text-slate-900 dark:text-slate-100',
             Tag === 'h1'
               ? 'font-bold'
               : 'font-semibold target:animate-[fade-in_1.5s]',
             {
               h1: 'mt-2 text-4xl',
-              h2: 'mt-10 border-b pb-1 text-3xl nextra-border',
+              h2: 'mt-10 border-b pb-1 text-3xl nextra-border dark:border-gray-700',
               h3: 'mt-8 text-2xl',
               h4: 'mt-8 text-xl',
               h5: 'mt-8 text-lg',

@@ -1,0 +1,119 @@
+---
+title: Security & Permissions
+description: Configure security settings and permission overrides in the Vue PDF Viewer.
+searchable: true
+---
+
+import { Callout } from '@/components/callout'
+import { SecurityViewerExample } from '../code-examples/viewer/security-example'
+
+# Security & Permissions
+
+The `PDFViewer` component provides high-level configuration options to manage document permissions. It respects PDF security flags by default (e.g., disabling the print button if printing is disallowed) but gives you control to override these behaviors.
+
+## Understanding PDF Security
+
+PDF documents support two concepts that are often confused: **encryption** and **permissions**.
+
+### Document Encryption (Protects Access)
+
+PDFs can be encrypted using AES-256 or RC4. This is real cryptographic security - without the correct password, the document bytes cannot be decrypted.
+
+- **User Password**: Required to open and view the document
+- **Owner Password**: Can also open the document and grants full access in compliant viewers
+
+Encryption answers the question: **"Who can access this document?"**
+
+### Permission Flags (Not Security)
+
+PDFs can also contain permission flags indicating allowed actions: printing, copying text, editing, etc.
+
+<Callout type="warning">
+  **Critical:** Permission flags are **never** cryptographically enforced - not even when encryption is enabled. They are simply metadata that viewers choose to honor.
+</Callout>
+
+Here's why: Once a user has the password and decrypts the document, they have the full unencrypted content in memory. At that point, they can:
+- Ignore the permission flags entirely
+- Modify or remove the flags
+- Save a new PDF without any restrictions
+
+There is no technical way to enforce "you can view this document but not print it." If someone can see the content, they can screenshot it, print it, or extract it. Permission flags are a **polite request** to compliant viewers, not a security barrier.
+
+## Quick Start
+
+You can configure permissions globally by passing a `permissions` object to the `config` prop.
+
+```vue
+<script setup>
+import { PDFViewer } from '@embedpdf/vue-pdf-viewer';
+</script>
+
+<template>
+  <PDFViewer 
+    :config="{
+      src: '/document.pdf',
+      permissions: {
+        // Ignore PDF flags entirely
+        enforceDocumentPermissions: false,
+        
+        // Or override specific flags
+        overrides: {
+          print: false, // Disable printing for everyone
+          copyContents: true // Allow copying even if PDF forbids it
+        }
+      }
+    }" 
+  />
+</template>
+```
+
+## How It Works
+
+When `PDFViewer` loads a document, it resolves permissions in the following order:
+
+1. **Overrides**: Any flags specified in `config.permissions.overrides` take precedence.
+2. **Enforcement**: If `enforceDocumentPermissions` is `false`, the viewer ignores the PDF's internal flags and assumes "Allow All" for anything not explicitly overridden.
+3. **PDF Flags**: If enforcement is on (default) and no override exists, the viewer uses the settings embedded in the PDF file.
+
+The UI automatically adapts to these effective permissions. For example:
+- If `print` is denied, the **Print** button in the toolbar becomes disabled or hidden.
+- If `copyContents` is denied, text selection is disabled on the canvas.
+- If `modifyAnnotations` is denied, annotation tools are disabled.
+
+## Interactive Example
+
+Switch between the tabs to see how different permission configurations affect the viewer. Observe how the **Print** button and **Text Selection** behave in each mode.
+
+- **Full Access**: Ignores PDF restrictions (`enforceDocumentPermissions: false`)
+- **Print Disabled**: Printing is blocked, but text selection works
+- **Read-Only**: Printing, copying, and modifications are all blocked
+
+<CodeExample 
+  codePaths={[
+    "../../examples/vue-tailwind/src/examples/viewer/security-example.vue"
+  ]}
+>
+  <SecurityViewerExample />
+</CodeExample>
+
+## API Reference
+
+### `PDFViewerConfig.permissions`
+
+| Property | Type | Default | Description |
+| :--- | :--- | :--- | :--- |
+| **`enforceDocumentPermissions`** | `boolean` | `true` | If `false`, ignores the PDF's internal permission flags. |
+| **`overrides`** | `object` | `undefined` | Map of permission names to boolean values (`true` = allow, `false` = deny). |
+
+### Supported Permission Names
+
+| Name | Description |
+| :--- | :--- |
+| `print` | Printing the document |
+| `printHighQuality` | High-quality printing |
+| `modifyContents` | Modifying pages or content |
+| `copyContents` | Selecting and copying text/images |
+| `modifyAnnotations` | Adding, editing, or removing annotations |
+| `fillForms` | Filling interactive form fields |
+| `extractForAccessibility` | Extracting content for screen readers |
+| `assembleDocument` | Inserting, rotating, or deleting pages |

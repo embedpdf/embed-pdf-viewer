@@ -36,7 +36,7 @@ interface HighlightProps {
 
 const props = withDefaults(defineProps<HighlightProps>(), {
   color: '#FFFF00',
-  opacity: 0.5,
+  opacity: 1,
   border: '1px solid red',
 });
 

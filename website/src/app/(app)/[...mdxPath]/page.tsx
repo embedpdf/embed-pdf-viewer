@@ -19,16 +19,16 @@ type PageProps = Readonly<{
   }>
 }>
 
-const Wrapper = getMDXComponents().wrapper
+const Wrapper = getMDXComponents().wrapper ?? Fragment
 
 export default async function Page(props: PageProps) {
   const params = await props.params
 
   const result = await importPage(params.mdxPath)
-  const { default: MDXContent, toc, metadata } = result
+  const { default: MDXContent, ...rest } = result
 
   return (
-    <Wrapper toc={toc} metadata={metadata}>
+    <Wrapper {...rest}>
       <MDXContent {...props} params={params} />
     </Wrapper>
   )

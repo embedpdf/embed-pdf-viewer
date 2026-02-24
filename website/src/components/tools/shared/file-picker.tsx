@@ -287,13 +287,13 @@ export const FilePicker = ({
       <div className="mb-12">
         <div className="mx-auto max-w-md space-y-4">
           <div className="text-center">
-            <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-amber-100">
-              <Lock className="h-6 w-6 text-amber-600" />
+            <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-amber-100 dark:bg-amber-900/30">
+              <Lock className="h-6 w-6 text-amber-600 dark:text-amber-400" />
             </div>
-            <h3 className="mb-2 text-lg font-semibold text-gray-900">
+            <h3 className="mb-2 text-lg font-semibold text-gray-900 dark:text-white">
               Password Required
             </h3>
-            <p className="mb-6 text-sm text-gray-600">
+            <p className="mb-6 text-sm text-gray-600 dark:text-gray-400">
               {pendingFiles.filter((f) => f.needsPassword).length === 1
                 ? 'This PDF is password protected. Please enter the password to continue.'
                 : 'Some PDFs are password protected. Please enter the passwords to continue.'}
@@ -304,10 +304,10 @@ export const FilePicker = ({
             file.needsPassword ? (
               <div
                 key={file.id}
-                className="rounded-lg border border-gray-200 bg-white p-4 shadow-sm"
+                className="rounded-lg border border-gray-200 bg-white p-4 shadow-sm dark:border-gray-700 dark:bg-gray-800"
               >
                 <div className="mb-3">
-                  <label className="mb-1 block text-sm font-medium text-gray-700">
+                  <label className="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">
                     Password for &quot;{file.file.name}&quot;
                   </label>
                   <div className="relative">
@@ -321,12 +321,12 @@ export const FilePicker = ({
                         e.key === 'Enter' && handlePasswordSubmit(file.id)
                       }
                       placeholder="Enter password..."
-                      className={`w-full rounded-md border px-3 py-2 text-sm focus:outline-none focus:ring-1 ${
+                      className={`w-full rounded-md border px-3 py-2 text-sm focus:outline-none focus:ring-1 dark:bg-gray-900 dark:text-white ${
                         file.isValidated
-                          ? 'border-green-300 bg-green-50 focus:border-green-500 focus:ring-green-500'
+                          ? 'border-green-300 bg-green-50 focus:border-green-500 focus:ring-green-500 dark:border-green-800 dark:bg-green-900/20'
                           : file.hasFailedAttempt
-                            ? 'border-red-300 bg-red-50 focus:border-red-500 focus:ring-red-500'
-                            : 'border-gray-300 focus:border-blue-500 focus:ring-blue-500'
+                            ? 'border-red-300 bg-red-50 focus:border-red-500 focus:ring-red-500 dark:border-red-800 dark:bg-red-900/20'
+                            : 'border-gray-300 focus:border-blue-500 focus:ring-blue-500 dark:border-gray-600 dark:focus:border-blue-400 dark:focus:ring-blue-400'
                       }`}
                       disabled={isLoading || file.isValidated}
                     />
@@ -349,12 +349,12 @@ export const FilePicker = ({
                     )}
                   </div>
                   {file.isValidated && (
-                    <p className="mt-1 text-xs text-green-600">
+                    <p className="mt-1 text-xs text-green-600 dark:text-green-400">
                       Password correct ✓
                     </p>
                   )}
                   {file.hasFailedAttempt && !file.isValidated && (
-                    <p className="mt-1 text-xs text-red-600">
+                    <p className="mt-1 text-xs text-red-600 dark:text-red-400">
                       Incorrect password
                     </p>
                   )}
@@ -379,7 +379,7 @@ export const FilePicker = ({
           <div className="text-center">
             <button
               onClick={handleRetry}
-              className="text-sm text-gray-500 hover:text-gray-700"
+              className="text-sm text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
             >
               Cancel and select different files
             </button>
@@ -393,15 +393,15 @@ export const FilePicker = ({
   if (error) {
     return (
       <div className="mb-12 text-center">
-        <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-red-100">
-          <AlertCircle className="h-6 w-6 text-red-600" />
+        <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-red-100 dark:bg-red-900/30">
+          <AlertCircle className="h-6 w-6 text-red-600 dark:text-red-400" />
         </div>
-        <div className="mx-auto mb-4 max-w-md rounded-lg border border-red-200 bg-red-50 p-4 text-red-700">
+        <div className="mx-auto mb-4 max-w-md rounded-lg border border-red-200 bg-red-50 p-4 text-red-700 dark:border-red-800 dark:bg-red-900/20 dark:text-red-300">
           {error}
         </div>
         <button
           onClick={handleRetry}
-          className="text-sm font-medium text-blue-600 hover:text-blue-800"
+          className="text-sm font-medium text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300"
         >
           Try again
         </button>
@@ -414,7 +414,9 @@ export const FilePicker = ({
     <div className="mb-12">
       <div
         className={`mx-auto flex max-w-xl flex-col items-center justify-center rounded-2xl border-2 border-dashed p-8 transition-colors ${
-          isDragOver ? 'border-blue-400 bg-blue-50' : 'border-gray-300 bg-white'
+          isDragOver
+            ? 'border-blue-400 bg-blue-50 dark:border-blue-500 dark:bg-blue-900/20'
+            : 'border-gray-300 bg-white dark:border-gray-700 dark:bg-gray-800/50'
         } ${disabled || isLoading || pendingFiles.length ? 'opacity-60' : ''}`}
         onDragOver={handleDragOver}
         onDragLeave={handleDragLeave}
@@ -439,13 +441,15 @@ export const FilePicker = ({
           {isLoading ? 'Loading...' : buttonText}
         </button>
 
-        <p className="mt-3 text-xs text-gray-500">
+        <p className="mt-3 text-xs text-gray-500 dark:text-gray-400">
           or drag & drop {multiple ? 'PDF files' : 'a PDF file'} here
         </p>
 
-        <p className="mt-6 text-center text-sm text-gray-500">{helperText}</p>
+        <p className="mt-6 text-center text-sm text-gray-500 dark:text-gray-400">
+          {helperText}
+        </p>
         {!engine && (
-          <p className="mt-2 text-xs text-amber-600">
+          <p className="mt-2 text-xs text-amber-600 dark:text-amber-400">
             Initializing PDF engine...
           </p>
         )}
@@ -453,15 +457,15 @@ export const FilePicker = ({
 
       {/* Staged list */}
       {stagedFiles.length > 0 && (
-        <div className="mx-auto mt-6 max-w-xl rounded-lg border border-gray-200 bg-white p-4">
+        <div className="mx-auto mt-6 max-w-xl rounded-lg border border-gray-200 bg-white p-4 dark:border-gray-700 dark:bg-gray-800">
           <div className="mb-3 flex items-center justify-between">
-            <h4 className="text-sm font-semibold text-gray-800">
+            <h4 className="text-sm font-semibold text-gray-800 dark:text-gray-200">
               {stagedFiles.length} file{stagedFiles.length > 1 ? 's' : ''} ready
               to process
             </h4>
             <button
               onClick={clearStage}
-              className="text-xs text-gray-500 hover:text-gray-700"
+              className="text-xs text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
             >
               Clear
             </button>
@@ -470,19 +474,19 @@ export const FilePicker = ({
             {stagedFiles.map((item) => (
               <li
                 key={item.id}
-                className="flex items-center justify-between rounded-md border border-gray-100 px-3 py-2"
+                className="flex items-center justify-between rounded-md border border-gray-100 px-3 py-2 dark:border-gray-700"
               >
                 <div className="min-w-0">
-                  <p className="truncate text-sm text-gray-900">
+                  <p className="truncate text-sm text-gray-900 dark:text-gray-100">
                     {item.file.name}
                   </p>
-                  <p className="text-xs text-gray-500">
+                  <p className="text-xs text-gray-500 dark:text-gray-400">
                     {(item.file.size / (1024 * 1024)).toFixed(2)} MB
                   </p>
                 </div>
                 <button
                   onClick={() => removeFromStage(item.id)}
-                  className="rounded-full p-1 text-gray-400 hover:bg-gray-100 hover:text-gray-700"
+                  className="rounded-full p-1 text-gray-400 hover:bg-gray-100 hover:text-gray-700 dark:text-gray-500 dark:hover:bg-gray-700 dark:hover:text-gray-300"
                   aria-label="Remove file"
                   title="Remove file"
                 >

@@ -2,30 +2,35 @@ import { CSSProperties, MouseEvent, TouchEvent } from '@framework';
 import { Rect } from '@embedpdf/models';
 
 type SquigglyProps = {
-  color?: string;
+  /** Stroke/markup color */
+  strokeColor?: string;
   opacity?: number;
   segmentRects: Rect[];
   rect?: Rect;
   scale: number;
   onClick?: (e: MouseEvent<HTMLDivElement> | TouchEvent<HTMLDivElement>) => void;
   style?: CSSProperties;
+  /** When true, AP image provides the visual; only render hit area */
+  appearanceActive?: boolean;
 };
 
 export function Squiggly({
-  color = '#FFFF00',
+  strokeColor,
   opacity = 0.5,
   segmentRects,
   rect,
   scale,
   onClick,
   style,
+  appearanceActive = false,
 }: SquigglyProps) {
+  const resolvedColor = strokeColor ?? '#FFFF00';
   const amplitude = 2 * scale; // wave height
   const period = 6 * scale; // wave length
 
   const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${period}" height="${amplitude * 2}" viewBox="0 0 ${period} ${amplitude * 2}">
       <path d="M0 ${amplitude} Q ${period / 4} 0 ${period / 2} ${amplitude} T ${period} ${amplitude}"
-            fill="none" stroke="${color}" stroke-width="${amplitude}" stroke-linecap="round"/>
+            fill="none" stroke="${resolvedColor}" stroke-width="${amplitude}" stroke-linecap="round"/>
     </svg>`;
 
   // Completely escape the SVG markup
@@ -51,21 +56,23 @@ export function Squiggly({
             ...style,
           }}
         >
-          {/* Visual squiggly line */}
-          <div
-            style={{
-              position: 'absolute',
-              left: 0,
-              bottom: 0,
-              width: '100%',
-              height: amplitude * 2,
-              backgroundImage: svgDataUri,
-              backgroundRepeat: 'repeat-x',
-              backgroundSize: `${period}px ${amplitude * 2}px`,
-              opacity: opacity,
-              pointerEvents: 'none',
-            }}
-          />
+          {/* Visual -- hidden when AP active, never interactive */}
+          {!appearanceActive && (
+            <div
+              style={{
+                position: 'absolute',
+                left: 0,
+                bottom: 0,
+                width: '100%',
+                height: amplitude * 2,
+                backgroundImage: svgDataUri,
+                backgroundRepeat: 'repeat-x',
+                backgroundSize: `${period}px ${amplitude * 2}px`,
+                opacity: opacity,
+                pointerEvents: 'none',
+              }}
+            />
+          )}
         </div>
       ))}
     </>

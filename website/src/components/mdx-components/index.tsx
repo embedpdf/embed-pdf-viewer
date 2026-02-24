@@ -13,12 +13,13 @@ import { Code } from './code'
 import { Pre } from './pre'
 import { PdfMergeTool } from '../tools/pdf-merge'
 import ToolsOverview from '../tools-overview'
+import { CodeExample } from '../code-example'
 import { Heading, MDXWrapper } from 'nextra'
 
 const Blockquote: FC<ComponentProps<'blockquote'>> = (props) => (
   <blockquote
     className={cn(
-      'not-first:mt-6 border-gray-300 italic text-gray-700',
+      'not-first:mt-6 border-gray-300 italic text-gray-700 dark:border-gray-700 dark:text-gray-300',
       'border-s-2 ps-6',
     )}
     {...props}
@@ -33,6 +34,7 @@ const WrapperComponent = ({
   children,
   metadata,
   bottomContent,
+  sourceCode,
   ...props
 }: WrapperComponentProps): ReactNode => {
   // Fix the type issue by properly typing the toc transformation
@@ -49,6 +51,7 @@ const WrapperComponent = ({
         toc={processedToc}
         metadata={metadata}
         bottomContent={bottomContent}
+        sourceCode={sourceCode}
       >
         <main
           data-pagefind-body={
@@ -63,7 +66,7 @@ const WrapperComponent = ({
 }
 
 const DEFAULT_COMPONENTS = getNextraMDXComponents({
-  a: Link,
+  a: (anchorProps) => <Link {...anchorProps} href={anchorProps.href || ''} />,
   code: Code,
   blockquote: Blockquote,
   h1: H1,
@@ -72,7 +75,9 @@ const DEFAULT_COMPONENTS = getNextraMDXComponents({
   h4: H4,
   h5: H5,
   h6: H6,
-  hr: (props) => <hr className="nextra-border my-8" {...props} />,
+  hr: (props) => (
+    <hr className="nextra-border my-8 dark:border-gray-800" {...props} />
+  ),
   li: (props) => <li className="my-2" {...props} />,
   ol: (props) => (
     <ol
@@ -100,6 +105,7 @@ const DEFAULT_COMPONENTS = getNextraMDXComponents({
   wrapper: WrapperComponent,
   PdfMergeTool,
   ToolsOverview,
+  CodeExample,
 })
 
 export const useMDXComponents = (components?: Readonly<MDXComponents>) => {

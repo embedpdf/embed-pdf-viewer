@@ -1,3 +1,6 @@
 export default {
-  introduction: 'Introduction',
+  index: {
+    title: 'Overview',
+    type: 'doc',
+  },
 }

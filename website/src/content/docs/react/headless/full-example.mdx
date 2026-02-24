@@ -1,0 +1,164 @@
+---
+title: 'Full Example: React MUI PDF Viewer'
+description: Explore a complete, production-ready PDF viewer built with EmbedPDF and Material-UI.
+searchable: true
+---
+
+import { Callout } from '@/components/callout'
+
+# Full Example: React MUI PDF Viewer
+
+While the previous guides show how to use individual plugins, it's often helpful to see how they all come together in a complete application. This page showcases a feature-rich, responsive PDF viewer built with EmbedPDF and **Material-UI**.
+
+This example serves as a practical blueprint, demonstrating how to build a polished and cohesive user experience by combining EmbedPDF's headless components with a popular UI library.
+
+- **Live Demo:** [**mui.embedpdf.com**](https://mui.embedpdf.com/)
+- **Source Code:** [**View on GitHub**](https://github.com/embedpdf/embed-pdf-viewer/tree/main/examples/react-mui)
+
+<Callout type="info">
+This example is a great starting point for your own project. Feel free to fork the repository and adapt the code to fit your needs.
+</Callout>
+
+## Features Showcase
+
+The MUI example integrates numerous plugins to create a comprehensive viewing experience.
+
+| Feature                                                    | Plugin(s) Used                                        |
+| ---------------------------------------------------------- | ----------------------------------------------------- |
+| Virtualized scrolling with smooth page rendering           | `@embedpdf/plugin-scroll` & `@embedpdf/plugin-render` |
+| Advanced zoom controls (presets, fit-to-page, marquee)     | `@embedpdf/plugin-zoom`                               |
+| Pan/hand tool for easy navigation                          | `@embedpdf/plugin-pan`                                |
+| Page rotation in 90-degree increments                      | `@embedpdf/plugin-rotate`                             |
+| Single and two-page spread layouts                         | `@embedpdf/plugin-spread`                             |
+| Thumbnail sidebar for quick page jumping                   | `@embedpdf/plugin-thumbnail`                          |
+| In-document text search with result highlighting           | `@embedpdf/plugin-search`                             |
+| File opening and downloading                               | `@embedpdf/plugin-document-manager` & `@embedpdf/plugin-export` |
+| Fullscreen mode                                            | `@embedpdf/plugin-fullscreen`                         |
+| Text selection and copy-to-clipboard                       | `@embedpdf/plugin-selection`                          |
+
+## Core Concepts Illustrated
+
+### 1. Centralized Plugin Registration
+
+All features are enabled and configured in a single `plugins` array. This makes it easy to see what capabilities the viewer has and to add or remove features.
+
+```tsx filename="src/application.tsx" {2-18}
+const plugins = [
+  createPluginRegistration(DocumentManagerPluginPackage, { /* ... */ }),
+  createPluginRegistration(ViewportPluginPackage, { /* ... */ }),
+  createPluginRegistration(ScrollPluginPackage, { /* ... */ }),
+  createPluginRegistration(RenderPluginPackage),
+  createPluginRegistration(TilingPluginPackage, { /* ... */ }),
+  createPluginRegistration(ZoomPluginPackage, { /* ... */ }),
+  createPluginRegistration(SearchPluginPackage),
+  createPluginRegistration(InteractionManagerPluginPackage),
+  createPluginRegistration(PanPluginPackage),
+  createPluginRegistration(RotatePluginPackage),
+  createPluginRegistration(SpreadPluginPackage),
+  createPluginRegistration(FullscreenPluginPackage),
+  createPluginRegistration(ExportPluginPackage),
+  createPluginRegistration(ThumbnailPluginPackage),
+  createPluginRegistration(SelectionPluginPackage),
+];
+
+function App() {
+  // ...
+  return (
+    <EmbedPDF engine={engine} plugins={plugins}>
+      {({ activeDocumentId }) =>
+        activeDocumentId && (
+          <DocumentContent documentId={activeDocumentId}>
+            {({ isLoaded }) =>
+              isLoaded && (
+                <>
+                  <Toolbar documentId={activeDocumentId} />
+                  <Viewport documentId={activeDocumentId}>
+                    {/* Viewer UI with documentId passed to components */}
+                  </Viewport>
+                </>
+              )
+            }
+          </DocumentContent>
+        )
+      }
+    </EmbedPDF>
+  );
+}
+````
+
+### 2\. Composable UI Components
+
+The UI is broken down into logical, reusable components (`<Toolbar />`, `<Sidebar />`, `<Search />`, etc.). Each component is responsible for a specific piece of the UI and uses EmbedPDF hooks to interact with the relevant plugins.
+
+For example, the `<Toolbar />` component uses multiple hooks to manage different functionalities like panning, rotating, and changing the page layout.
+
+```tsx filename="src/components/toolbar/index.tsx"
+import { usePan } from '@embedpdf/plugin-pan/react';
+import { useRotate } from '@embedpdf/plugin-rotate/react';
+import { useSpread } from '@embedpdf/plugin-spread/react';
+// ... other imports
+
+interface ToolbarProps {
+  documentId: string;
+}
+
+export const Toolbar = ({ documentId }: ToolbarProps) => {
+  const { provides: panProvider, isPanning } = usePan(documentId);
+  const { provides: rotateProvider } = useRotate(documentId);
+  const { spreadMode, provides: spreadProvider } = useSpread(documentId);
+  // ...
+
+  return (
+    <AppBar>
+      <MuiToolbar>
+        {/* ... */}
+        <ToggleIconButton isOpen={isPanning} onClick={() => panProvider?.togglePan()}>
+          <BackHandOutlinedIcon />
+        </ToggleIconButton>
+        {/* ... other buttons for rotate, spread, etc. */}
+      </MuiToolbar>
+    </AppBar>
+  );
+};
+```
+
+### 3\. Responsive Design
+
+The example uses MUI's built-in responsive utilities and a custom `useIsMobile` hook to adapt the layout for smaller screens. On mobile, sidebars collapse into a bottom sheet, and some toolbar icons are hidden to save space, providing a more native-like experience.
+
+## Running the Example Locally
+
+You can run the full MUI example on your machine to experiment with the code.
+
+> **Prerequisites:** You'll need Node.js 18+ and pnpm.
+
+### 1. Clone the repository:
+
+```bash
+git clone https://github.com/embedpdf/embed-pdf-viewer.git
+cd embed-pdf-viewer
+```
+
+### 2. Install dependencies:
+
+```bash
+pnpm install
+```
+
+
+### 3.  Build the core packages
+The example imports the core EmbedPDF packages from the local workspace. You need to build them once.
+
+```bash
+pnpm run build --filter "./packages/*"
+```
+
+### 4.  Run the example's dev server:
+
+```bash
+pnpm --filter @embedpdf/example-react-mui run dev
+```
+
+Vite will start the development server, and you can access the viewer at `http://localhost:3000`.
+
+

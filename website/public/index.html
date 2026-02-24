@@ -1,0 +1,211 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Bank Statement - EmbedPDF Style</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            -webkit-print-color-adjust: exact;
+        }
+        @media print {
+            .no-print { display: none !important; }
+            body { background: white; padding: 0; }
+            .page-break { page-break-after: always; }
+            /* Remove shadows for print to look like a real document */
+            .shadow-2xl, .shadow-sm, .shadow-md { box-shadow: none !important; }
+            /* Ensure borders print nicely */
+            .border { border-color: #e2e8f0 !important; }
+        }
+    </style>
+</head>
+<body class="bg-slate-100 min-h-screen px-4 md:px-0">
+    <!-- Main Statement Page -->
+    <div class="max-w-4xl mx-auto bg-white shadow-2xl rounded-sm overflow-hidden border border-slate-200 relative" id="statement">
+        
+        <!-- Decorative top bar for screen only (adds depth) -->
+        <div class="h-1 bg-indigo-600 w-full absolute top-0 left-0 no-print"></div>
+
+        <!-- Header Section -->
+        <div class="p-8 md:p-12 border-b border-slate-100">
+            <div class="flex flex-col md:flex-row justify-between items-start gap-8 md:gap-0">
+                <div>
+                    <!-- Logo Area -->
+                    <div class="flex items-center gap-3 mb-8">
+                        <div class="w-10 h-10 bg-indigo-600 rounded-lg flex items-center justify-center shadow-indigo-200 shadow-lg">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z" />
+                            </svg>
+                        </div>
+                        <div>
+                            <span class="block text-xl font-bold tracking-tight text-slate-900 leading-none">EMBED<span class="text-indigo-600">BANK</span></span>
+                            <span class="text-[10px] text-slate-400 font-medium tracking-widest uppercase">Global Systems</span>
+                        </div>
+                    </div>
+                    
+                    <div class="text-slate-600 text-sm leading-relaxed">
+                        <p class="font-semibold text-slate-900 text-base mb-1">Alex J. Henderson</p>
+                        <p>128 Innovation Way, Suite 400</p>
+                        <p>San Francisco, CA 94105</p>
+                        <p>United States</p>
+                    </div>
+                </div>
+
+                <div class="text-left md:text-right bg-slate-50 p-6 rounded-lg border border-slate-100 md:bg-transparent md:p-0 md:border-0 w-full md:w-auto">
+                    <h2 class="text-indigo-600 font-bold text-xs uppercase tracking-widest mb-2">Statement Period</h2>
+                    <p class="text-slate-900 font-bold text-3xl mb-6 tracking-tight">Nov 2024</p>
+                    
+                    <div class="space-y-2 text-sm">
+                        <div class="flex justify-between md:justify-end gap-4">
+                            <span class="text-slate-400">Account No:</span> 
+                            <span class="font-mono font-medium text-slate-700">**** 8842</span>
+                        </div>
+                        <div class="flex justify-between md:justify-end gap-4">
+                            <span class="text-slate-400">Statement Date:</span> 
+                            <span class="font-medium text-slate-700">Dec 01, 2024</span>
+                        </div>
+                        <div class="flex justify-between md:justify-end gap-4">
+                            <span class="text-slate-400">SWIFT/BIC:</span> 
+                            <span class="font-mono font-medium text-slate-700">EMBDUS6S</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Summary Cards -->
+        <div class="grid grid-cols-1 md:grid-cols-3 divide-y md:divide-y-0 md:divide-x divide-slate-100 border-b border-slate-100">
+            <div class="p-6 md:p-8">
+                <p class="text-xs text-slate-400 uppercase tracking-wider font-semibold mb-2">Opening Balance</p>
+                <p class="text-2xl font-medium text-slate-900">$12,450.00</p>
+            </div>
+            <div class="p-6 md:p-8 bg-indigo-50/30">
+                <div class="flex justify-between items-center mb-2">
+                    <p class="text-xs text-indigo-600 uppercase tracking-wider font-semibold">Net Activity</p>
+                    <span class="bg-indigo-100 text-indigo-700 text-[10px] font-bold px-2 py-0.5 rounded-full">+17.2%</span>
+                </div>
+                <p class="text-2xl font-medium text-indigo-700">+$2,145.50</p>
+            </div>
+            <div class="p-6 md:p-8">
+                <p class="text-xs text-slate-400 uppercase tracking-wider font-semibold mb-2">Closing Balance</p>
+                <p class="text-2xl font-bold text-slate-900">$14,595.50</p>
+            </div>
+        </div>
+
+        <!-- Transactions Table -->
+        <div class="p-8 md:p-12">
+            <div class="flex items-center justify-between mb-8">
+                <h3 class="text-slate-900 font-bold text-lg">Transaction History</h3>
+                <span class="text-xs font-medium text-slate-400 bg-slate-100 px-3 py-1 rounded-full">All Transactions</span>
+            </div>
+
+            <div class="overflow-x-auto">
+                <table class="w-full text-left border-collapse">
+                    <thead>
+                        <tr class="text-xs font-bold text-slate-400 uppercase tracking-wider border-b-2 border-slate-100">
+                            <th class="pb-4 pl-2 font-semibold w-24">Date</th>
+                            <th class="pb-4 font-semibold">Description</th>
+                            <th class="pb-4 font-semibold text-right">Amount</th>
+                            <th class="pb-4 pr-2 font-semibold text-right">Balance</th>
+                        </tr>
+                    </thead>
+                    <tbody class="text-sm">
+                        <!-- Row 1 -->
+                        <tr class="group hover:bg-slate-50 transition-colors border-b border-slate-50">
+                            <td class="py-5 pl-2 text-slate-500 font-medium">Nov 02</td>
+                            <td class="py-5">
+                                <div class="flex items-center gap-3">
+                                    <div class="w-8 h-8 rounded-full bg-emerald-100 text-emerald-600 flex items-center justify-center text-xs font-bold shrink-0 no-print">
+                                        <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
+                                            <path fill-rule="evenodd" d="M3.293 9.707a1 1 0 010-1.414l6-6a1 1 0 011.414 0l6 6a1 1 0 01-1.414 1.414L11 5.414V17a1 1 0 11-2 0V5.414L4.707 9.707a1 1 0 01-1.414 0z" clip-rule="evenodd" />
+                                        </svg>
+                                    </div>
+                                    <div>
+                                        <p class="font-semibold text-slate-800">Stripe Payout - Sales</p>
+                                        <p class="text-xs text-slate-400 mt-0.5">ID: TRN-99210-AS</p>
+                                    </div>
+                                </div>
+                            </td>
+                            <td class="py-5 text-right font-bold text-emerald-600">+$3,200.00</td>
+                            <td class="py-5 pr-2 text-right text-slate-600 font-medium">$15,650.00</td>
+                        </tr>
+                        <!-- Row 2 -->
+                        <tr class="group hover:bg-slate-50 transition-colors border-b border-slate-50">
+                            <td class="py-5 pl-2 text-slate-500 font-medium">Nov 05</td>
+                            <td class="py-5">
+                                <div class="flex items-center gap-3">
+                                    <div class="w-8 h-8 rounded-full bg-slate-100 text-slate-500 flex items-center justify-center text-xs font-bold shrink-0 no-print">AWS</div>
+                                    <div>
+                                        <p class="font-semibold text-slate-800">Amazon Web Services</p>
+                                        <p class="text-xs text-slate-400 mt-0.5">Cloud Infrastructure</p>
+                                    </div>
+                                </div>
+                            </td>
+                            <td class="py-5 text-right font-medium text-slate-900">-$412.50</td>
+                            <td class="py-5 pr-2 text-right text-slate-600 font-medium">$15,237.50</td>
+                        </tr>
+                        <!-- Row 3 -->
+                        <tr class="group hover:bg-slate-50 transition-colors border-b border-slate-50">
+                            <td class="py-5 pl-2 text-slate-500 font-medium">Nov 12</td>
+                            <td class="py-5">
+                                <div class="flex items-center gap-3">
+                                    <div class="w-8 h-8 rounded-full bg-slate-100 text-slate-500 flex items-center justify-center text-xs font-bold shrink-0 no-print">SBX</div>
+                                    <div>
+                                        <p class="font-semibold text-slate-800">Starbucks Coffee</p>
+                                        <p class="text-xs text-slate-400 mt-0.5">San Francisco, CA</p>
+                                    </div>
+                                </div>
+                            </td>
+                            <td class="py-5 text-right font-medium text-slate-900">-$12.00</td>
+                            <td class="py-5 pr-2 text-right text-slate-600 font-medium">$15,225.50</td>
+                        </tr>
+                        <!-- Row 4 -->
+                        <tr class="group hover:bg-slate-50 transition-colors border-b border-slate-50">
+                            <td class="py-5 pl-2 text-slate-500 font-medium">Nov 18</td>
+                            <td class="py-5">
+                                <div class="flex items-center gap-3">
+                                    <div class="w-8 h-8 rounded-full bg-slate-100 text-slate-500 flex items-center justify-center text-xs font-bold shrink-0 no-print">AI</div>
+                                    <div>
+                                        <p class="font-semibold text-slate-800">OpenAI Subscription</p>
+                                        <p class="text-xs text-slate-400 mt-0.5">Monthly Billing</p>
+                                    </div>
+                                </div>
+                            </td>
+                            <td class="py-5 text-right font-medium text-slate-900">-$20.00</td>
+                            <td class="py-5 pr-2 text-right text-slate-600 font-medium">$15,205.50</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- Footer Info -->
+        <div class="p-8 md:p-12 bg-slate-900 text-white mt-12">
+            <div class="flex flex-col md:flex-row justify-between items-start md:items-end gap-6 md:gap-0">
+                <div class="max-w-md text-[10px] text-slate-400 uppercase tracking-widest leading-relaxed">
+                    <p class="font-bold text-slate-200 mb-2 flex items-center gap-2">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 text-indigo-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
+                        </svg>
+                        FDIC Insured
+                    </p>
+                    <p>Member FDIC. Your deposits are insured up to $250,000. EmbedBank is a financial technology company, not a bank. Banking services provided by Partner Bank, N.A. All rights reserved &copy; 2024.</p>
+                </div>
+                <div class="text-left md:text-right w-full md:w-auto">
+                    <p class="text-[10px] text-slate-400 uppercase tracking-widest mb-1">Page</p>
+                    <p class="text-sm font-medium">01 of 01</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Instructions for user -->
+    <div class="max-w-4xl mx-auto mt-8 text-center no-print">
+        <p class="text-slate-400 text-sm italic">Note: For the best PDF result, ensure "Background Graphics" is enabled in your print settings.</p>
+    </div>
+
+</body>
+</html>

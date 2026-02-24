@@ -1,0 +1,109 @@
+---
+title: Export Plugin
+description: Adds functionality to download the current PDF document in your Vue application.
+searchable: true
+---
+
+# Export Plugin
+
+The Export Plugin provides a simple way for users to download and save the PDF file they are viewing.
+
+## Installation
+
+The plugin is available as a separate NPM package.
+
+```sh npm2yarn
+npm install @embedpdf/plugin-export
+````
+
+## Registration
+
+Import `ExportPluginPackage` and add it to the `plugins` array. You can configure a fallback filename for the downloaded file.
+
+```typescript {3, 13-15}
+import { createPluginRegistration } from '@embedpdf/core'
+// ... other imports
+import { ExportPluginPackage } from '@embedpdf/plugin-export/vue'
+
+const plugins = [
+  // ... other essential plugins
+  createPluginRegistration(DocumentManagerPluginPackage, { /* ... */ }),
+  createPluginRegistration(ViewportPluginPackage),
+  createPluginRegistration(ScrollPluginPackage),
+  createPluginRegistration(RenderPluginPackage),
+
+  // Register the export plugin
+  createPluginRegistration(ExportPluginPackage, {
+    defaultFileName: 'my-document.pdf',
+  }),
+]
+```
+
+## Usage
+
+The plugin works by combining a composable for initiating the download with a component that handles the browser interaction.
+
+### Triggering a Download
+
+Use the `useExport` composable to get access to the plugin's `download` method for the specific document. Call this method from a button in your toolbar to start the download process.
+
+```vue {2,5,9}
+<script setup lang="ts">
+import { useExport } from '@embedpdf/plugin-export/vue';
+
+const props = defineProps<{ documentId: string }>();
+const { provides: exportApi } = useExport(() => props.documentId);
+</script>
+
+<template>
+  <button @click="exportApi?.download()" :disabled="!exportApi">
+    Download
+  </button>
+</template>
+```
+
+## Live Example
+
+This example shows a viewer with a download button. Clicking it will trigger a download of the PDF file.
+
+import { ExportExample } from '../../code-examples/headless/export-example';
+
+<CodeExample 
+  codePaths={[
+    "../../examples/vue-tailwind/src/examples/headless/export-example.vue",
+    "../../examples/vue-tailwind/src/examples/headless/export-example-content.vue"
+  ]}
+>
+  <ExportExample />
+</CodeExample>
+
+## API Reference
+
+### Configuration (`ExportPluginConfig`)
+
+| Option | Type | Description |
+| :--- | :--- | :--- |
+| **`defaultFileName`** | `string` | A fallback filename to use for the downloaded file if the original document does not have a name. <br />**Default**: `document.pdf` |
+
+### Composable: `useExport(documentId)`
+
+This composable connects your component to the export plugin's functions for a specific document.
+
+#### Parameters
+
+| Parameter | Type | Description |
+| :--- | :--- | :--- |
+| **`documentId`** | `() => string` | A getter function that returns the document ID to track. |
+
+#### Returns
+
+| Property | Type | Description |
+| :--- | :--- | :--- |
+| **`provides`** | `Ref<ExportScope \| null>` | A ref object with methods to control exporting, or `null` if the plugin is not ready. |
+
+#### `ExportScope` Methods
+
+| Method | Description |
+| :--- | :--- |
+| **`download()`** | The primary method to trigger a download. It signals the auto-mounted `<Download />` component to prepare the file and prompt the user. |
+| **`saveAsCopy()`** | A lower-level method that returns a `Task<ArrayBuffer>`. It retrieves the document's data as an `ArrayBuffer` without triggering a download. Useful for custom export logic. |

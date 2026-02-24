@@ -1,0 +1,151 @@
+---
+title: Rotate Plugin
+description: Add functionality to rotate the entire PDF document in 90-degree increments in Vue.
+searchable: true
+---
+
+# Rotate Plugin
+
+The Rotate Plugin allows you to change the orientation of the entire document. It applies a rotation to every page, letting users view content in 90-degree increments.
+
+## Installation
+
+This plugin is available as a separate NPM package.
+
+```sh npm2yarn
+npm install @embedpdf/plugin-rotate
+````
+
+## Registration
+
+Import `RotatePluginPackage` and add it to the `plugins` array. You can also specify a default rotation to apply when a document is first loaded.
+
+```typescript {3, 15-17}
+import { createPluginRegistration } from '@embedpdf/core'
+import { Rotation } from '@embedpdf/models'
+import { RotatePluginPackage } from '@embedpdf/plugin-rotate/vue'
+
+const plugins = [
+  // ... other essential plugins
+  createPluginRegistration(DocumentManagerPluginPackage, {
+    /* ... */
+  }),
+  createPluginRegistration(ViewportPluginPackage),
+  createPluginRegistration(ScrollPluginPackage),
+  createPluginRegistration(RenderPluginPackage),
+
+  // Register and configure the rotate plugin
+  createPluginRegistration(RotatePluginPackage, {
+    defaultRotation: Rotation.Degree90, // Start documents rotated 90° clockwise
+  }),
+]
+
+// ... rest of your component
+```
+
+## Usage
+
+The plugin provides the `useRotate` composable to control the rotation from your UI and a `<Rotate />` component to apply the visual transformation to each page.
+
+### Building a Rotate Toolbar
+
+Use the `useRotate` composable to get the current `rotation` state and the `provides` object, which contains methods to change it for a specific document. The `rotation` state is a number from the `Rotation` enum (0 = 0°, 1 = 90°, 2 = 180°, 3 = 270°).
+
+```vue
+<script setup lang="ts">
+import { useRotate } from '@embedpdf/plugin-rotate/vue'
+
+const props = defineProps<{ documentId: string }>();
+const { rotation, provides: rotate } = useRotate(() => props.documentId);
+</script>
+
+<template>
+  <div v-if="rotate" class="toolbar">
+    <span>Current Rotation: {{ rotation * 90 }}°</span>
+    <button @click="rotate.rotateBackward">Rotate Left</button>
+    <button @click="rotate.rotateForward">Rotate Right</button>
+  </div>
+</template>
+```
+
+### Applying the Rotation
+
+For the rotation to be visible, you must wrap your page layers with the `<Rotate />` component inside the `<Scroller>`'s default slot. This component calculates and applies the necessary CSS transform. It's important to place it *outside* the `PagePointerProvider` to ensure interactions are correctly mapped to the rotated page.
+
+```vue {5, 12}
+// Inside your main PDFViewer component
+<template>
+  <Scroller :document-id="activeDocumentId">
+    <template #default="{ page }">
+      <Rotate :document-id="activeDocumentId" :page-index="page.pageIndex">
+        <PagePointerProvider
+          :document-id="activeDocumentId"
+          :page-index="page.pageIndex"
+        >
+          <RenderLayer :document-id="activeDocumentId" :page-index="page.pageIndex" />
+        </PagePointerProvider>
+      </Rotate>
+    </template>
+  </Scroller>
+</template>
+```
+
+## Live Example
+
+This is a complete viewer that uses the `<RotateToolbar />` and correctly applies the `<Rotate />` component to each page.
+
+import { RotateExample } from '../../code-examples/headless/rotate-example';
+
+<CodeExample 
+  codePaths={[
+    "../../examples/vue-tailwind/src/examples/headless/rotate-example.vue",
+    "../../examples/vue-tailwind/src/examples/headless/rotate-example-content.vue"
+  ]}
+>
+  <RotateExample />
+</CodeExample>
+
+## API Reference
+
+### Configuration (`RotatePluginConfig`)
+
+| Option | Type | Description |
+| :--- | :--- | :--- |
+| **`defaultRotation`** | `Rotation` | Sets the initial rotation for loaded documents. The `Rotation` enum can be imported from `@embedpdf/models`. <br />**Default**: `Rotation.Degree0` |
+
+### Composable: `useRotate(documentId)`
+
+Connects your component to the rotate plugin's state and functions for a specific document.
+
+#### Parameters
+
+| Parameter | Type | Description |
+| :--- | :--- | :--- |
+| **`documentId`** | `() => string` | A getter function that returns the document ID to track. |
+
+#### Returns
+
+| Property | Type | Description |
+| :--- | :--- | :--- |
+| **`rotation`** | `Rotation` | The current reactive rotation state (0, 1, 2, or 3). |
+| **`provides`** | `Ref<RotateCapability \| null>` | A ref object with methods to control rotation, or `null` if the plugin is not ready. |
+
+#### `RotateCapability` Methods
+
+| Method | Description |
+| :--- | :--- |
+| **`rotateForward()`** | Rotates the document 90 degrees clockwise. |
+| **`rotateBackward()`** | Rotates the document 90 degrees counter-clockwise. |
+| **`setRotation(rotation)`** | Sets the document to a specific `Rotation` value. |
+| **`getRotation()`** | Returns the current rotation value. |
+
+### Component: `<Rotate />`
+
+A wrapper component that applies the correct CSS rotation transform to its children.
+
+#### Props
+
+| Prop | Type | Description |
+| :--- | :--- | :--- |
+| **`documentId`** | `string` | (Required) The ID of the document. |
+| **`pageIndex`** | `number` | (Required) The page index. |

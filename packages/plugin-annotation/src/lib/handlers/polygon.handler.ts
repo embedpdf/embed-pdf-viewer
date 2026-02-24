@@ -98,7 +98,11 @@ export const polygonHandlerFactory: HandlerFactory<PdfPolygonAnnoObject> = {
     };
 
     return {
-      onClick: (pos) => {
+      onClick: (pos, evt) => {
+        if (evt.metaKey || evt.ctrlKey) {
+          return;
+        }
+
         const clampedPos = clampToPage(pos);
 
         if (isInsideStartHandle(clampedPos) && getVertices().length >= 3) {

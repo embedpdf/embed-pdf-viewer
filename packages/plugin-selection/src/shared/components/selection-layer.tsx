@@ -1,58 +1,65 @@
-import { useEffect, useState } from '@framework';
-import { Rect } from '@embedpdf/models';
-import { useSelectionCapability, useSelectionPlugin } from '../hooks';
+import { Fragment } from '@framework';
+import { Rotation } from '@embedpdf/models';
+import { TextSelectionStyle, MarqueeSelectionStyle } from '@embedpdf/plugin-selection';
+import { SelectionSelectionMenuRenderFn } from '../types';
+import { TextSelection } from './text-selection';
+import { MarqueeSelection } from './marquee-selection';
 
 type Props = {
+  documentId: string;
   pageIndex: number;
-  scale: number;
+  scale?: number;
+  rotation?: Rotation;
+  /**
+   * @deprecated Use `textStyle.background` instead.
+   */
   background?: string;
+  /** Styling options for text selection highlights */
+  textStyle?: TextSelectionStyle;
+  /** Styling options for the marquee selection rectangle */
+  marqueeStyle?: MarqueeSelectionStyle;
+  /** Optional CSS class applied to the marquee rectangle */
+  marqueeClassName?: string;
+  selectionMenu?: SelectionSelectionMenuRenderFn;
 };
 
-export function SelectionLayer({ pageIndex, scale, background = 'rgba(33,150,243)' }: Props) {
-  const { plugin: selPlugin } = useSelectionPlugin();
-  const [rects, setRects] = useState<Rect[]>([]);
-  const [boundingRect, setBoundingRect] = useState<Rect | null>(null);
-
-  useEffect(() => {
-    if (!selPlugin) return;
-
-    return selPlugin.registerSelectionOnPage({
-      pageIndex,
-      onRectsChange: ({ rects, boundingRect }) => {
-        setRects(rects);
-        setBoundingRect(boundingRect);
-      },
-    });
-  }, [selPlugin, pageIndex]);
-
-  if (!boundingRect) return null;
-
+/**
+ * SelectionLayer is a convenience component that composes both text selection
+ * and marquee selection on a single page.
+ *
+ * For advanced use cases, you can use `TextSelection` and `MarqueeSelection`
+ * individually.
+ */
+export function SelectionLayer({
+  documentId,
+  pageIndex,
+  scale,
+  rotation,
+  background,
+  textStyle,
+  marqueeStyle,
+  marqueeClassName,
+  selectionMenu,
+}: Props) {
   return (
-    <div
-      style={{
-        position: 'absolute',
-        left: boundingRect.origin.x * scale,
-        top: boundingRect.origin.y * scale,
-        width: boundingRect.size.width * scale,
-        height: boundingRect.size.height * scale,
-        mixBlendMode: 'multiply',
-        isolation: 'isolate',
-      }}
-    >
-      {rects.map((b, i) => (
-        <div
-          key={i}
-          style={{
-            position: 'absolute',
-            left: (b.origin.x - boundingRect.origin.x) * scale,
-            top: (b.origin.y - boundingRect.origin.y) * scale,
-            width: b.size.width * scale,
-            height: b.size.height * scale,
-            background,
-            pointerEvents: 'none',
-          }}
-        />
-      ))}
-    </div>
+    <Fragment>
+      <TextSelection
+        documentId={documentId}
+        pageIndex={pageIndex}
+        scale={scale}
+        rotation={rotation}
+        background={textStyle?.background ?? background}
+        selectionMenu={selectionMenu}
+      />
+      <MarqueeSelection
+        documentId={documentId}
+        pageIndex={pageIndex}
+        scale={scale}
+        background={marqueeStyle?.background}
+        borderColor={marqueeStyle?.borderColor}
+        borderStyle={marqueeStyle?.borderStyle}
+        className={marqueeClassName}
+      />
+    </Fragment>
   );
 }

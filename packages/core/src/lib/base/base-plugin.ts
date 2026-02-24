@@ -1,7 +1,22 @@
 import { IPlugin } from '../types/plugin';
 import { PluginRegistry } from '../registry/plugin-registry';
-import { Action, CoreAction, CoreState, PluginStore, Store, StoreState } from '../store';
-import { Logger, PdfEngine } from '@embedpdf/models';
+import {
+  Action,
+  CLOSE_DOCUMENT,
+  CoreAction,
+  CoreState,
+  PluginStore,
+  SET_ACTIVE_DOCUMENT,
+  SET_DOCUMENT_LOADED,
+  SET_ROTATION,
+  SET_SCALE,
+  START_LOADING_DOCUMENT,
+  Store,
+  StoreState,
+} from '../store';
+import { Logger, PdfEngine, PdfPermissionFlag, PermissionDeniedError } from '@embedpdf/models';
+import { DocumentState } from '../store/initial-state';
+import { getEffectivePermission, getEffectivePermissions } from '../store/selectors';
 
 export interface StateChangeHandler<TState> {
   (state: TState): void;
@@ -12,8 +27,7 @@ export abstract class BasePlugin<
   TCapability = unknown,
   TState = unknown,
   TAction extends Action = Action,
-> implements IPlugin<TConfig>
-{
+> implements IPlugin<TConfig> {
   static readonly id: string;
 
   protected pluginStore: PluginStore<TState, TAction>;
@@ -26,6 +40,11 @@ export abstract class BasePlugin<
   private debouncedTimeouts: Record<string, number> = {};
   private unsubscribeFromState: (() => void) | null = null;
   private unsubscribeFromCoreStore: (() => void) | null = null;
+  private unsubscribeFromStartLoadingDocument: (() => void) | null = null;
+  private unsubscribeFromSetDocumentLoaded: (() => void) | null = null;
+  private unsubscribeFromCloseDocument: (() => void) | null = null;
+  private unsubscribeFromSetScale: (() => void) | null = null;
+  private unsubscribeFromSetRotation: (() => void) | null = null;
 
   private _capability?: Readonly<TCapability>;
 
@@ -50,6 +69,39 @@ export abstract class BasePlugin<
     });
     this.unsubscribeFromCoreStore = this.coreStore.subscribe((action, newState, oldState) => {
       this.onCoreStoreUpdated(oldState, newState);
+      if (newState.core.activeDocumentId !== oldState.core.activeDocumentId) {
+        this.onActiveDocumentChanged(
+          oldState.core.activeDocumentId,
+          newState.core.activeDocumentId,
+        );
+      }
+    });
+    this.unsubscribeFromStartLoadingDocument = this.coreStore.onAction(
+      START_LOADING_DOCUMENT,
+      (action) => {
+        this.onDocumentLoadingStarted(action.payload.documentId);
+      },
+    );
+    this.unsubscribeFromSetDocumentLoaded = this.coreStore.onAction(
+      SET_DOCUMENT_LOADED,
+      (action) => {
+        this.onDocumentLoaded(action.payload.documentId);
+      },
+    );
+    this.unsubscribeFromCloseDocument = this.coreStore.onAction(CLOSE_DOCUMENT, (action) => {
+      this.onDocumentClosed(action.payload.documentId);
+    });
+    this.unsubscribeFromSetScale = this.coreStore.onAction(SET_SCALE, (action, state) => {
+      const targetId = action.payload.documentId ?? state.core.activeDocumentId;
+      if (targetId) {
+        this.onScaleChanged(targetId, action.payload.scale);
+      }
+    });
+    this.unsubscribeFromSetRotation = this.coreStore.onAction(SET_ROTATION, (action, state) => {
+      const targetId = action.payload.documentId ?? state.core.activeDocumentId;
+      if (targetId) {
+        this.onRotationChanged(targetId, action.payload.rotation);
+      }
     });
 
     // Initialize ready state
@@ -216,6 +268,49 @@ export abstract class BasePlugin<
   }
 
   /**
+   * Called when a document is opened
+   * Override to initialize per-document state
+   * @param documentId The ID of the document that was opened
+   */
+  protected onDocumentLoadingStarted(documentId: string): void {
+    // Default: no-op
+  }
+
+  /**
+   * Called when a document is loaded
+   * @param documentId The ID of the document that is loaded
+   */
+  protected onDocumentLoaded(documentId: string): void {
+    // Default: no-op
+  }
+
+  /**
+   * Called when a document is closed
+   * Override to cleanup per-document state
+   * @param documentId The ID of the document that was closed
+   */
+  protected onDocumentClosed(documentId: string): void {
+    // Default: no-op
+  }
+
+  /**
+   * Called when the active document changes
+   * @param previousId The ID of the previous active document
+   * @param currentId The ID of the new active document
+   */
+  protected onActiveDocumentChanged(previousId: string | null, currentId: string | null): void {
+    // Default: no-op
+  }
+
+  protected onScaleChanged(documentId: string, scale: number): void {
+    // Default: no-op
+  }
+
+  protected onRotationChanged(documentId: string, rotation: number): void {
+    // Default: no-op
+  }
+
+  /**
    * Cleanup method to be called when plugin is being destroyed
    */
   public destroy(): void {
@@ -232,6 +327,26 @@ export abstract class BasePlugin<
     if (this.unsubscribeFromCoreStore) {
       this.unsubscribeFromCoreStore();
       this.unsubscribeFromCoreStore = null;
+    }
+    if (this.unsubscribeFromStartLoadingDocument) {
+      this.unsubscribeFromStartLoadingDocument();
+      this.unsubscribeFromStartLoadingDocument = null;
+    }
+    if (this.unsubscribeFromSetDocumentLoaded) {
+      this.unsubscribeFromSetDocumentLoaded();
+      this.unsubscribeFromSetDocumentLoaded = null;
+    }
+    if (this.unsubscribeFromCloseDocument) {
+      this.unsubscribeFromCloseDocument();
+      this.unsubscribeFromCloseDocument = null;
+    }
+    if (this.unsubscribeFromSetScale) {
+      this.unsubscribeFromSetScale();
+      this.unsubscribeFromSetScale = null;
+    }
+    if (this.unsubscribeFromSetRotation) {
+      this.unsubscribeFromSetRotation();
+      this.unsubscribeFromSetRotation = null;
     }
   }
 
@@ -256,5 +371,107 @@ export abstract class BasePlugin<
     this.readyPromise = new Promise((resolve) => {
       this.readyResolve = resolve;
     });
+  }
+
+  /**
+   * Get the active document ID
+   * @throws Error if no active document exists
+   */
+  protected getActiveDocumentId(): string {
+    const id = this.coreState.core.activeDocumentId;
+    if (!id) {
+      throw new Error('No active document');
+    }
+    return id;
+  }
+
+  /**
+   * Get the active document ID or null if none exists
+   */
+  protected getActiveDocumentIdOrNull(): string | null {
+    return this.coreState.core.activeDocumentId;
+  }
+
+  /**
+   * Get core document state for a specific document
+   * @param documentId Document ID (optional, defaults to active document)
+   * @returns Document state or null if not found
+   */
+  protected getCoreDocument(documentId?: string): DocumentState | null {
+    const id = documentId ?? this.getActiveDocumentIdOrNull();
+    if (!id) return null;
+    return this.coreState.core.documents[id] ?? null;
+  }
+
+  /**
+   * Get core document state for a specific document
+   * @param documentId Document ID (optional, defaults to active document)
+   * @throws Error if document not found
+   */
+  protected getCoreDocumentOrThrow(documentId?: string): DocumentState {
+    const doc = this.getCoreDocument(documentId);
+    if (!doc) {
+      throw new Error(`Document not found: ${documentId ?? 'active'}`);
+    }
+    return doc;
+  }
+
+  // ─────────────────────────────────────────────────────────
+  // Permission Helpers
+  // ─────────────────────────────────────────────────────────
+
+  /**
+   * Get the effective permission flags for a document.
+   * Applies layered resolution: per-document override → global override → PDF permission.
+   * Returns AllowAll if document not found.
+   * @param documentId Document ID (optional, defaults to active document)
+   */
+  protected getDocumentPermissions(documentId?: string): number {
+    const docId = documentId ?? this.coreState.core.activeDocumentId;
+    if (!docId) return PdfPermissionFlag.AllowAll;
+
+    return getEffectivePermissions(this.coreState.core, docId);
+  }
+
+  /**
+   * Check if a document has the required permissions (returns boolean).
+   * Applies layered resolution: per-document override → global override → PDF permission.
+   * Useful for conditional UI logic.
+   * @param documentId Document ID (optional, defaults to active document)
+   * @param flags Permission flags to check
+   */
+  protected checkPermission(
+    documentId: string | undefined,
+    ...flags: PdfPermissionFlag[]
+  ): boolean {
+    const docId = documentId ?? this.coreState.core.activeDocumentId;
+    if (!docId) return true;
+
+    return flags.every((flag) => getEffectivePermission(this.coreState.core, docId, flag));
+  }
+
+  /**
+   * Assert that a document has the required permissions.
+   * Applies layered resolution: per-document override → global override → PDF permission.
+   * Throws PermissionDeniedError if any flag is missing.
+   * @param documentId Document ID (optional, defaults to active document)
+   * @param flags Permission flags to require
+   */
+  protected requirePermission(documentId: string | undefined, ...flags: PdfPermissionFlag[]): void {
+    const docId = documentId ?? this.coreState.core.activeDocumentId;
+    if (!docId) return;
+
+    const missingFlags: PdfPermissionFlag[] = [];
+
+    for (const flag of flags) {
+      if (!getEffectivePermission(this.coreState.core, docId, flag)) {
+        missingFlags.push(flag);
+      }
+    }
+
+    if (missingFlags.length > 0) {
+      const effectivePermissions = getEffectivePermissions(this.coreState.core, docId);
+      throw new PermissionDeniedError(missingFlags, effectivePermissions);
+    }
   }
 }

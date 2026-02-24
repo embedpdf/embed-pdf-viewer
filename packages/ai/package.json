@@ -1,0 +1,70 @@
+{
+  "name": "@embedpdf/ai",
+  "version": "0.0.1",
+  "description": "AI runtime for EmbedPDF – manages ONNX model loading, inference, and built-in pipelines (layout detection, table structure) across browser and Node.js.",
+  "type": "module",
+  "main": "./dist/index.cjs",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "require": "./dist/index.cjs"
+    },
+    "./web": {
+      "types": "./dist/web/index.d.ts",
+      "import": "./dist/web/index.js",
+      "require": "./dist/web/index.cjs"
+    },
+    "./node": {
+      "types": "./dist/node/index.d.ts",
+      "import": "./dist/node/index.js",
+      "require": "./dist/node/index.cjs"
+    }
+  },
+  "scripts": {
+    "build:base": "vite build --mode base",
+    "build": "pnpm run clean && vite build --mode base",
+    "clean": "rimraf dist",
+    "lint": "eslint src --color",
+    "lint:fix": "eslint src --color --fix"
+  },
+  "dependencies": {
+    "@embedpdf/models": "workspace:*"
+  },
+  "devDependencies": {
+    "@embedpdf/build": "workspace:*",
+    "onnxruntime-web": "^1.22.0",
+    "typescript": "^5.0.0"
+  },
+  "peerDependencies": {
+    "onnxruntime-web": ">=1.18.0",
+    "onnxruntime-node": ">=1.18.0"
+  },
+  "peerDependenciesMeta": {
+    "onnxruntime-web": {
+      "optional": true
+    },
+    "onnxruntime-node": {
+      "optional": true
+    }
+  },
+  "files": [
+    "dist",
+    "README.md"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/embedpdf/embed-pdf-viewer",
+    "directory": "packages/ai"
+  },
+  "homepage": "https://www.embedpdf.com/docs",
+  "bugs": {
+    "url": "https://github.com/embedpdf/embed-pdf-viewer/issues"
+  },
+  "license": "MIT",
+  "publishConfig": {
+    "access": "public"
+  }
+}

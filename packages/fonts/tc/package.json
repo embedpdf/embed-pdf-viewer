@@ -1,0 +1,54 @@
+{
+  "name": "@embedpdf/fonts-tc",
+  "version": "1.0.0",
+  "private": false,
+  "description": "Traditional Chinese (Big5) fallback fonts for EmbedPDF - Noto Sans Hant (7 weights)",
+  "type": "module",
+  "main": "./dist/index.cjs",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "require": "./dist/index.cjs"
+    }
+  },
+  "scripts": {
+    "build": "vite build",
+    "clean": "rimraf dist"
+  },
+  "keywords": [
+    "fonts",
+    "noto",
+    "chinese",
+    "traditional",
+    "pdf",
+    "embedpdf",
+    "cjk"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/embedpdf/embed-pdf-viewer",
+    "directory": "packages/fonts/tc"
+  },
+  "homepage": "https://www.embedpdf.com/docs",
+  "bugs": {
+    "url": "https://github.com/embedpdf/embed-pdf-viewer/issues"
+  },
+  "author": "Bob Singor",
+  "license": "OFL-1.1",
+  "files": [
+    "dist",
+    "fonts/*.otf",
+    "README.md"
+  ],
+  "devDependencies": {
+    "@embedpdf/build": "workspace:*",
+    "@embedpdf/models": "workspace:*",
+    "typescript": "^5.0.0"
+  },
+  "publishConfig": {
+    "access": "public"
+  }
+}

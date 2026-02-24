@@ -1,5 +1,131 @@
 # @embedpdf/plugin-pan
 
+## 2.6.2
+
+## 2.6.1
+
+## 2.6.0
+
+## 2.5.0
+
+## 2.4.1
+
+## 2.4.0
+
+## 2.3.0
+
+## 2.2.0
+
+## 2.1.2
+
+## 2.1.1
+
+## 2.1.0
+
+## 2.0.2
+
+## 2.0.1
+
+## 2.0.0
+
+### Major Changes
+
+- [#279](https://github.com/embedpdf/embed-pdf-viewer/pull/279) by [@bobsingor](https://github.com/bobsingor) – ## Multi-Document Support
+
+  The pan plugin now supports per-document pan mode state.
+
+  ### Breaking Changes
+  - **Actions**: All actions now require `documentId`:
+    - `setPanMode(documentId, isPanMode)` - was `setPanMode(isPanMode)`
+  - **State Structure**: Plugin state now uses `documents: Record<string, PanDocumentState>` to track per-document pan mode.
+  - **Capability Methods**: Methods now operate on the active document by default, or use `forDocument(id)` for specific documents.
+
+  ### Framework-Specific Changes (React/Preact, Svelte, Vue)
+  - **usePan Hook**:
+    - Now requires `documentId` parameter: `usePan(documentId)` (React/Preact: `@embedpdf/plugin-pan/react`, Svelte: `@embedpdf/plugin-pan/svelte`, Vue: `@embedpdf/plugin-pan/vue`)
+    - Returns document-scoped pan capability via `forDocument()`
+    - Subscribes to document-specific pan mode changes
+
+  ### New Features
+  - Per-document pan mode tracking
+  - `forDocument()` method for document-scoped operations
+  - Document lifecycle management with automatic state initialization and cleanup
+
+## 2.0.0-next.3
+
+## 2.0.0-next.2
+
+## 2.0.0-next.1
+
+## 2.0.0-next.0
+
+### Major Changes
+
+- [#279](https://github.com/embedpdf/embed-pdf-viewer/pull/279) by [@bobsingor](https://github.com/bobsingor) – ## Multi-Document Support
+
+  The pan plugin now supports per-document pan mode state.
+
+  ### Breaking Changes
+  - **Actions**: All actions now require `documentId`:
+    - `setPanMode(documentId, isPanMode)` - was `setPanMode(isPanMode)`
+  - **State Structure**: Plugin state now uses `documents: Record<string, PanDocumentState>` to track per-document pan mode.
+  - **Capability Methods**: Methods now operate on the active document by default, or use `forDocument(id)` for specific documents.
+
+  ### Framework-Specific Changes (React/Preact, Svelte, Vue)
+  - **usePan Hook**:
+    - Now requires `documentId` parameter: `usePan(documentId)` (React/Preact: `@embedpdf/plugin-pan/react`, Svelte: `@embedpdf/plugin-pan/svelte`, Vue: `@embedpdf/plugin-pan/vue`)
+    - Returns document-scoped pan capability via `forDocument()`
+    - Subscribes to document-specific pan mode changes
+
+  ### New Features
+  - Per-document pan mode tracking
+  - `forDocument()` method for document-scoped operations
+  - Document lifecycle management with automatic state initialization and cleanup
+
+## 1.5.0
+
+## 1.4.1
+
+### Patch Changes
+
+- [#234](https://github.com/embedpdf/embed-pdf-viewer/pull/234) by [@bobsingor](https://github.com/bobsingor) – refactor(svelte): Update `usePan` hook to return a reactive state object, aligning with the core hook refactoring.
+
+## 1.4.0
+
+### Minor Changes
+
+- [#222](https://github.com/embedpdf/embed-pdf-viewer/pull/222) by [@andrewrisse](https://github.com/andrewrisse) – feat: Add Svelte 5 adapter (`/svelte` export) with Rune-based hooks (`usePan`, etc.) and `PanMode.svelte` utility component.
+
+## 1.3.16
+
+## 1.3.15
+
+## 1.3.14
+
+## 1.3.13
+
+## 1.3.12
+
+## 1.3.11
+
+## 1.3.10
+
+## 1.3.9
+
+## 1.3.8
+
+## 1.3.7
+
+## 1.3.6
+
+## 1.3.5
+
+## 1.3.4
+
+## 1.3.3
+
+## 1.3.2
+
 ## 1.3.1
 
 ## 1.3.0

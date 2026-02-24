@@ -134,9 +134,11 @@ const BookmarkItem: React.FC<BookmarkItemProps> = ({
     <div
       ref={setNodeRef}
       style={style}
-      className={`group rounded-lg border ${
-        isDragging ? 'border-teal-300 bg-teal-50' : 'border-gray-200 bg-white'
-      } mb-2 shadow-sm transition-all hover:shadow-md`}
+      className={`group mb-2 rounded-lg border shadow-sm transition-all hover:shadow-md ${
+        isDragging
+          ? 'border-teal-300 bg-teal-50 dark:border-teal-700 dark:bg-teal-900/30'
+          : 'border-gray-200 bg-white dark:border-gray-700 dark:bg-gray-800'
+      }`}
     >
       <div
         className={`flex items-center ${depth > 0 ? `pl-${Math.min(depth * 4, 12)}` : ''}`}
@@ -145,7 +147,7 @@ const BookmarkItem: React.FC<BookmarkItemProps> = ({
         <div
           {...attributes}
           {...listeners}
-          className="flex-shrink-0 cursor-move p-2 text-gray-400 hover:text-gray-600"
+          className="flex-shrink-0 cursor-move p-2 text-gray-400 hover:text-gray-600 dark:text-gray-500 dark:hover:text-gray-300"
         >
           <GripVertical className="h-5 w-5" />
         </div>
@@ -154,7 +156,7 @@ const BookmarkItem: React.FC<BookmarkItemProps> = ({
         {hasChildren && (
           <button
             onClick={() => onToggleExpand(bookmark.id)}
-            className="flex-shrink-0 p-1 text-gray-500 hover:text-gray-700"
+            className="flex-shrink-0 p-1 text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
           >
             {bookmark.isExpanded ? (
               <ChevronDown className="h-4 w-4" />
@@ -176,7 +178,7 @@ const BookmarkItem: React.FC<BookmarkItemProps> = ({
                   setEditForm({ ...editForm, title: e.target.value })
                 }
                 placeholder="Bookmark title"
-                className="flex-1 rounded-md border border-gray-300 px-3 py-1 text-sm focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                className="flex-1 rounded-md border border-gray-300 px-3 py-1 text-sm focus:border-teal-500 focus:outline-none focus:ring-1 focus:ring-teal-500 dark:border-gray-600 dark:bg-gray-700 dark:text-white dark:focus:border-teal-400 dark:focus:ring-teal-400"
                 autoFocus
               />
               <select
@@ -187,7 +189,7 @@ const BookmarkItem: React.FC<BookmarkItemProps> = ({
                     pageIndex: parseInt(e.target.value),
                   })
                 }
-                className="rounded-md border border-gray-300 px-3 py-1 text-sm focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                className="rounded-md border border-gray-300 px-3 py-1 text-sm focus:border-teal-500 focus:outline-none focus:ring-1 focus:ring-teal-500 dark:border-gray-600 dark:bg-gray-700 dark:text-white dark:focus:border-teal-400 dark:focus:ring-teal-400"
               >
                 {Array.from({ length: document.pageCount }, (_, i) => (
                   <option key={i} value={i}>
@@ -197,44 +199,44 @@ const BookmarkItem: React.FC<BookmarkItemProps> = ({
               </select>
               <button
                 onClick={handleSave}
-                className="rounded-md bg-green-100 p-1.5 text-green-700 hover:bg-green-200"
+                className="rounded-md bg-green-100 p-1.5 text-green-700 hover:bg-green-200 dark:bg-green-900/30 dark:text-green-400 dark:hover:bg-green-900/50"
               >
                 <Check className="h-4 w-4" />
               </button>
               <button
                 onClick={handleCancel}
-                className="rounded-md bg-gray-100 p-1.5 text-gray-700 hover:bg-gray-200"
+                className="rounded-md bg-gray-100 p-1.5 text-gray-700 hover:bg-gray-200 dark:bg-gray-700 dark:text-gray-300 dark:hover:bg-gray-600"
               >
                 <X className="h-4 w-4" />
               </button>
             </div>
           ) : (
             <>
-              <FileText className="mr-2 h-4 w-4 flex-shrink-0 text-teal-600" />
-              <span className="flex-1 text-sm font-medium text-gray-900">
+              <FileText className="mr-2 h-4 w-4 flex-shrink-0 text-teal-600 dark:text-teal-400" />
+              <span className="flex-1 text-sm font-medium text-gray-900 dark:text-gray-100">
                 {bookmark.title || 'Untitled'}
               </span>
               {bookmark.target?.type === 'destination' && (
-                <span className="mr-2 rounded-full bg-gray-100 px-2 py-0.5 text-xs text-gray-600">
+                <span className="mr-2 rounded-full bg-gray-100 px-2 py-0.5 text-xs text-gray-600 dark:bg-gray-700 dark:text-gray-300">
                   Page {bookmark.target.destination.pageIndex + 1}
                 </span>
               )}
               <div className="flex gap-1 opacity-0 transition-opacity group-hover:opacity-100">
                 <button
                   onClick={() => onUpdate(bookmark.id, { isEditing: true })}
-                  className="rounded-md p-1.5 text-gray-500 hover:bg-gray-100 hover:text-gray-700"
+                  className="rounded-md p-1.5 text-gray-500 hover:bg-gray-100 hover:text-gray-700 dark:text-gray-400 dark:hover:bg-gray-700 dark:hover:text-gray-200"
                 >
                   <Edit2 className="h-4 w-4" />
                 </button>
                 <button
                   onClick={() => onAddChild(bookmark.id)}
-                  className="rounded-md p-1.5 text-gray-500 hover:bg-gray-100 hover:text-gray-700"
+                  className="rounded-md p-1.5 text-gray-500 hover:bg-gray-100 hover:text-gray-700 dark:text-gray-400 dark:hover:bg-gray-700 dark:hover:text-gray-200"
                 >
                   <Plus className="h-4 w-4" />
                 </button>
                 <button
                   onClick={() => onDelete(bookmark.id)}
-                  className="rounded-md p-1.5 text-red-500 hover:bg-red-50 hover:text-red-700"
+                  className="rounded-md p-1.5 text-red-500 hover:bg-red-50 hover:text-red-700 dark:text-red-400 dark:hover:bg-red-900/30 dark:hover:text-red-300"
                 >
                   <Trash2 className="h-4 w-4" />
                 </button>
@@ -246,7 +248,7 @@ const BookmarkItem: React.FC<BookmarkItemProps> = ({
 
       {/* Children */}
       {hasChildren && bookmark.isExpanded && (
-        <div className="ml-8 border-l-2 border-gray-100 pl-2">
+        <div className="ml-8 border-l-2 border-gray-100 pl-2 dark:border-gray-700">
           <SortableContext
             items={(bookmark.children as EditableBookmark[]).map((b) => b.id)}
             strategy={verticalListSortingStrategy}
@@ -489,8 +491,8 @@ export const BookmarkTree: React.FC<BookmarkTreeProps> = ({
 
       <DragOverlay>
         {activeId ? (
-          <div className="rounded-lg border border-indigo-300 bg-indigo-50 p-3 shadow-lg">
-            <span className="text-sm font-medium">
+          <div className="rounded-lg border border-indigo-300 bg-indigo-50 p-3 shadow-lg dark:border-indigo-700 dark:bg-indigo-900/80">
+            <span className="text-sm font-medium text-indigo-900 dark:text-indigo-100">
               {findBookmark(activeId)?.title || 'Bookmark'}
             </span>
           </div>

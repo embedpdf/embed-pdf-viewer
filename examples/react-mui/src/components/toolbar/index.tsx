@@ -1,5 +1,5 @@
 import { usePan } from '@embedpdf/plugin-pan/react';
-import { useRotateCapability } from '@embedpdf/plugin-rotate/react';
+import { useRotate } from '@embedpdf/plugin-rotate/react';
 import { useSpread } from '@embedpdf/plugin-spread/react';
 import MenuIcon from '@mui/icons-material/Menu';
 import BackHandOutlinedIcon from '@mui/icons-material/BackHandOutlined';
@@ -35,17 +35,25 @@ import { AnnotationToolbar } from './annotation-toolbar';
 import { SpreadMode } from '@embedpdf/plugin-spread';
 import { useFullscreen } from '@embedpdf/plugin-fullscreen/react';
 import { useExportCapability } from '@embedpdf/plugin-export/react';
-import { useLoaderCapability } from '@embedpdf/plugin-loader/react';
+import { useDocumentManagerCapability } from '@embedpdf/plugin-document-manager/react';
 import { useIsMobile } from '../../hooks/use-is-mobile';
+import { RedactToolbar } from './redact-toolbar';
 
-export const Toolbar = () => {
-  const { provides: panProvider, isPanning } = usePan();
-  const { provides: rotateProvider } = useRotateCapability();
-  const { spreadMode, provides: spreadProvider } = useSpread();
+interface ToolbarProps {
+  documentId: string;
+}
+
+export const Toolbar = ({ documentId }: ToolbarProps) => {
+  const { provides: panProvider, isPanning } = usePan(documentId);
+  const { provides: rotateProvider } = useRotate(documentId);
+  const { spreadMode, provides: spreadProvider } = useSpread(documentId);
   const { provides: fullscreenProvider, state: fullscreenState } = useFullscreen();
-  const { provides: exportProvider } = useExportCapability();
-  const { provides: loaderProvider } = useLoaderCapability();
+  const { provides: exportCapability } = useExportCapability();
+  const { provides: documentManager } = useDocumentManagerCapability();
   const isMobile = useIsMobile();
+
+  // Get document-scoped API for export
+  const exportProvider = exportCapability?.forDocument(documentId);
 
   // Menu state for page settings
   const [pageSettingsAnchorEl, setPageSettingsAnchorEl] = useState<null | HTMLElement>(null);
@@ -56,8 +64,8 @@ export const Toolbar = () => {
   const menuOpen = Boolean(menuAnchorEl);
 
   // View/Annotate mode
-  const [mode, setMode] = useState<'view' | 'annotate'>('view');
-  const handleModeChange = (_event: SyntheticEvent, value: 'view' | 'annotate') => {
+  const [mode, setMode] = useState<'view' | 'annotate' | 'redact'>('view');
+  const handleModeChange = (_event: SyntheticEvent, value: 'view' | 'annotate' | 'redact') => {
     setMode(value);
   };
 
@@ -108,7 +116,7 @@ export const Toolbar = () => {
   };
 
   const handleOpenFilePicker = () => {
-    loaderProvider?.openFileDialog();
+    documentManager?.openFileDialog();
     handleMenuClose();
   };
 
@@ -242,7 +250,7 @@ export const Toolbar = () => {
             flexItem
             sx={{ backgroundColor: 'white', my: 1.2, opacity: 0.5 }}
           />
-          <ZoomControls />
+          <ZoomControls documentId={documentId} />
           {!isMobile && (
             <>
               <Divider
@@ -255,22 +263,51 @@ export const Toolbar = () => {
               </ToggleIconButton>
             </>
           )}
-          <Box sx={{ flexGrow: 1, display: 'flex', justifyContent: 'center' }}>
+          <Box
+            sx={{
+              flexGrow: 1,
+              display: 'flex',
+              justifyContent: 'center',
+              minWidth: 0, // Allow shrinking below content size
+              overflow: 'hidden', // Prevent overflow
+            }}
+          >
             <Tabs
               value={mode}
               onChange={handleModeChange}
               textColor="inherit"
-              TabIndicatorProps={{ style: { backgroundColor: 'white', opacity: 0.7 } }}
-              sx={{ minHeight: 32, '& .MuiTab-root': { minHeight: 32, paddingY: 0.5 } }}
+              variant="scrollable"
+              scrollButtons="auto"
+              allowScrollButtonsMobile
+              slotProps={{
+                indicator: { style: { backgroundColor: 'white', opacity: 0.7 } },
+              }}
+              sx={{
+                minHeight: 32,
+                maxWidth: '100%',
+                '& .MuiTab-root': {
+                  minHeight: 32,
+                  paddingY: 0.5,
+                  minWidth: 'auto',
+                  fontSize: '0.875rem',
+                },
+                '& .MuiTabs-scrollButtons': {
+                  '&.Mui-disabled': {
+                    opacity: 0.3,
+                  },
+                },
+              }}
             >
               <Tab label="View" value="view" />
               <Tab label="Annotate" value="annotate" />
+              <Tab label="Redact" value="redact" />
             </Tabs>
           </Box>
           <DrawerToggleButton componentId="search" />
         </MuiToolbar>
       </AppBar>
-      {mode === 'annotate' && <AnnotationToolbar />}
+      {mode === 'annotate' && documentId && <AnnotationToolbar documentId={documentId} />}
+      {mode === 'redact' && documentId && <RedactToolbar documentId={documentId} />}
     </>
   );
 };

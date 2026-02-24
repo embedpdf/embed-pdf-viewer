@@ -1,5 +1,139 @@
 # @embedpdf/plugin-spread
 
+## 2.6.2
+
+## 2.6.1
+
+## 2.6.0
+
+## 2.5.0
+
+## 2.4.1
+
+## 2.4.0
+
+## 2.3.0
+
+## 2.2.0
+
+## 2.1.2
+
+## 2.1.1
+
+## 2.1.0
+
+## 2.0.2
+
+## 2.0.1
+
+## 2.0.0
+
+### Major Changes
+
+- [#279](https://github.com/embedpdf/embed-pdf-viewer/pull/279) by [@bobsingor](https://github.com/bobsingor) – ## Multi-Document Support
+
+  The spread plugin now supports per-document spread mode and page grouping.
+
+  ### Breaking Changes
+  - **Actions**: All actions now require `documentId`:
+    - `setSpreadMode(documentId, spreadMode)` - was `setSpreadMode(mode)`
+    - Added `setPageGrouping(documentId, grouping)` action for custom page grouping
+  - **State Structure**: Plugin state now uses `documents: Record<string, SpreadDocumentState>` to track per-document spread mode and page grouping.
+  - **Action Creators**: All action creators now require `documentId`:
+    - `initSpreadState(documentId, state)`
+    - `setSpreadMode(documentId, spreadMode)`
+    - `setPageGrouping(documentId, grouping)`
+
+  ### Framework-Specific Changes (React/Preact, Svelte, Vue)
+  - **useSpread Hook**:
+    - Now requires `documentId` parameter: `useSpread(documentId)` (React/Preact: `@embedpdf/plugin-spread/react`, Svelte: `@embedpdf/plugin-spread/svelte`, Vue: `@embedpdf/plugin-spread/vue`)
+    - Returns document-scoped spread capability via `forDocument()`
+    - Subscribes to document-specific spread mode changes
+
+  ### New Features
+  - Per-document spread mode tracking
+  - Per-document page grouping configuration
+  - Document lifecycle management with automatic state initialization and cleanup
+
+## 2.0.0-next.3
+
+## 2.0.0-next.2
+
+## 2.0.0-next.1
+
+## 2.0.0-next.0
+
+### Major Changes
+
+- [#279](https://github.com/embedpdf/embed-pdf-viewer/pull/279) by [@bobsingor](https://github.com/bobsingor) – ## Multi-Document Support
+
+  The spread plugin now supports per-document spread mode and page grouping.
+
+  ### Breaking Changes
+  - **Actions**: All actions now require `documentId`:
+    - `setSpreadMode(documentId, spreadMode)` - was `setSpreadMode(mode)`
+    - Added `setPageGrouping(documentId, grouping)` action for custom page grouping
+  - **State Structure**: Plugin state now uses `documents: Record<string, SpreadDocumentState>` to track per-document spread mode and page grouping.
+  - **Action Creators**: All action creators now require `documentId`:
+    - `initSpreadState(documentId, state)`
+    - `setSpreadMode(documentId, spreadMode)`
+    - `setPageGrouping(documentId, grouping)`
+
+  ### Framework-Specific Changes (React/Preact, Svelte, Vue)
+  - **useSpread Hook**:
+    - Now requires `documentId` parameter: `useSpread(documentId)` (React/Preact: `@embedpdf/plugin-spread/react`, Svelte: `@embedpdf/plugin-spread/svelte`, Vue: `@embedpdf/plugin-spread/vue`)
+    - Returns document-scoped spread capability via `forDocument()`
+    - Subscribes to document-specific spread mode changes
+
+  ### New Features
+  - Per-document spread mode tracking
+  - Per-document page grouping configuration
+  - Document lifecycle management with automatic state initialization and cleanup
+
+## 1.5.0
+
+## 1.4.1
+
+### Patch Changes
+
+- [#234](https://github.com/embedpdf/embed-pdf-viewer/pull/234) by [@bobsingor](https://github.com/bobsingor) – refactor(svelte): Update `useSpread` hook to return a reactive state object, aligning with the core hook refactoring.
+
+## 1.4.0
+
+### Minor Changes
+
+- [#222](https://github.com/embedpdf/embed-pdf-viewer/pull/222) by [@andrewrisse](https://github.com/andrewrisse) – feat: Add Svelte 5 adapter (`/svelte` export) with Rune-based hooks (`useSpread`, etc.).
+
+## 1.3.16
+
+## 1.3.15
+
+## 1.3.14
+
+## 1.3.13
+
+## 1.3.12
+
+## 1.3.11
+
+## 1.3.10
+
+## 1.3.9
+
+## 1.3.8
+
+## 1.3.7
+
+## 1.3.6
+
+## 1.3.5
+
+## 1.3.4
+
+## 1.3.3
+
+## 1.3.2
+
 ## 1.3.1
 
 ## 1.3.0
@@ -19,7 +153,6 @@
 ### Minor Changes
 
 - [#141](https://github.com/embedpdf/embed-pdf-viewer/pull/141) by [@bobsingor](https://github.com/bobsingor) – Streamlined `SpreadCapability` and simplified Vue hook behavior.
-
   - Removed `getSpreadPagesObjects(pages: PdfPageObject[]): PdfPageObject[][]` from `SpreadCapability`.
     - Spread grouping is now an internal concern of the spread plugin/strategies.
   - Vue `useSpread` hook refactor:

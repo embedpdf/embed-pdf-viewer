@@ -1,4 +1,4 @@
-import { PointerEventHandlers } from './types';
+import { EmbedPdfPointerEvent, PointerEventHandlers } from './types';
 
 export function mergeHandlers(list: PointerEventHandlers[]): PointerEventHandlers {
   const keys: (keyof PointerEventHandlers)[] = [
@@ -19,8 +19,12 @@ export function mergeHandlers(list: PointerEventHandlers[]): PointerEventHandler
   ];
   const out: Partial<PointerEventHandlers> = {};
   for (const k of keys) {
-    out[k] = (evt: any, nativeEvt: any, modeId: string) => {
-      for (const h of list) h[k]?.(evt, nativeEvt, modeId);
+    out[k] = (pos: any, evt: EmbedPdfPointerEvent, modeId: string) => {
+      for (const h of list) {
+        // Stop calling handlers if propagation was stopped
+        if (evt.isImmediatePropagationStopped()) break;
+        h[k]?.(pos, evt, modeId);
+      }
     };
   }
   return out as PointerEventHandlers;

@@ -2,24 +2,30 @@ import { CSSProperties, MouseEvent, TouchEvent } from '@framework';
 import { Rect } from '@embedpdf/models';
 
 type HighlightProps = {
-  color?: string;
+  /** Stroke/markup color */
+  strokeColor?: string;
   opacity?: number;
   segmentRects: Rect[];
   rect?: Rect;
   scale: number;
   onClick?: (e: MouseEvent<HTMLDivElement> | TouchEvent<HTMLDivElement>) => void;
   style?: CSSProperties;
+  /** When true, AP image provides the visual; only render hit area */
+  appearanceActive?: boolean;
 };
 
 export function Highlight({
-  color = '#FFFF00',
+  strokeColor,
   opacity = 0.5,
   segmentRects,
   rect,
   scale,
   onClick,
   style,
+  appearanceActive = false,
 }: HighlightProps) {
+  const resolvedColor = strokeColor ?? '#FFFF00';
+
   return (
     <>
       {segmentRects.map((b, i) => (
@@ -33,8 +39,8 @@ export function Highlight({
             top: (rect ? b.origin.y - rect.origin.y : b.origin.y) * scale,
             width: b.size.width * scale,
             height: b.size.height * scale,
-            background: color,
-            opacity: opacity,
+            background: appearanceActive ? 'transparent' : resolvedColor,
+            opacity: appearanceActive ? undefined : opacity,
             pointerEvents: onClick ? 'auto' : 'none',
             cursor: onClick ? 'pointer' : 'default',
             zIndex: onClick ? 1 : undefined,

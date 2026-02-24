@@ -2,24 +2,29 @@ import { CSSProperties, MouseEvent, TouchEvent } from '@framework';
 import { Rect } from '@embedpdf/models';
 
 type UnderlineProps = {
-  color?: string;
+  /** Stroke/markup color */
+  strokeColor?: string;
   opacity?: number;
   segmentRects: Rect[];
   rect?: Rect;
   scale: number;
   onClick?: (e: MouseEvent<HTMLDivElement> | TouchEvent<HTMLDivElement>) => void;
   style?: CSSProperties;
+  /** When true, AP image provides the visual; only render hit area */
+  appearanceActive?: boolean;
 };
 
 export function Underline({
-  color = '#FFFF00',
+  strokeColor,
   opacity = 0.5,
   segmentRects,
   rect,
   scale,
   onClick,
   style,
+  appearanceActive = false,
 }: UnderlineProps) {
+  const resolvedColor = strokeColor ?? '#FFFF00';
   const thickness = 2 * scale; // 2 CSS px at 100 % zoom
 
   return (
@@ -42,19 +47,21 @@ export function Underline({
             ...style,
           }}
         >
-          {/* Visual underline */}
-          <div
-            style={{
-              position: 'absolute',
-              left: 0,
-              bottom: 0,
-              width: '100%',
-              height: thickness,
-              background: color,
-              opacity: opacity,
-              pointerEvents: 'none',
-            }}
-          />
+          {/* Visual -- hidden when AP active, never interactive */}
+          {!appearanceActive && (
+            <div
+              style={{
+                position: 'absolute',
+                left: 0,
+                bottom: 0,
+                width: '100%',
+                height: thickness,
+                background: resolvedColor,
+                opacity: opacity,
+                pointerEvents: 'none',
+              }}
+            />
+          )}
         </div>
       ))}
     </>

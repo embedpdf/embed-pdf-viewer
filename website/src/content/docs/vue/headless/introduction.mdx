@@ -1,0 +1,37 @@
+---
+title: Headless Introduction
+description: Learn about the headless, composable approach of the @embedpdf/vue library.
+searchable: true
+---
+
+# Headless Components
+
+EmbedPDF Vue's headless library is an **unopinionated UI toolkit** for building fully customized PDF experiences.
+
+Unlike the [Drop-in Viewer](/docs/vue/viewer/introduction) which gives you a pre-built interface, the headless library provides the logic (composables) and rendering primitives (components) but **zero styling**. You are responsible for building the UI—toolbars, buttons, and layout.
+
+## Core Concepts
+
+1.  **You Control the UI:** We provide the logic, you provide the pixels. Use your own button components, your own CSS (Tailwind, scoped styles, etc.), and your own layout.
+2.  **Composable by Design:** Build your viewer by composing specialized components (`<RenderLayer />`, `<Scroller />`) and composables (`useSearch`, `useSelection`).
+3.  **Minimal Bundle Size:** Import only the plugins you need. If you don't need annotations, don't import the plugin.
+
+## When to Use
+
+Choose **Headless Components** if:
+
+- You need to match your application's design system exactly.
+- You are building a specialized viewer (e.g., review, or split-pane layouts).
+- You want to integrate PDF features into an existing UI workflow.
+- You need the smallest possible bundle size.
+
+## Comparison
+
+| Feature | Drop-in Viewer | Headless Components |
+| :--- | :--- | :--- |
+| **Setup Time** | Minutes | Hours |
+| **UI Customization** | Theme colors, toggle features | 100% Control |
+| **Bundle Size** | Larger (includes full UI) | Minimal (tree-shakeable) |
+| **Best For** | Standard viewing | Custom apps & design systems |
+
+Ready to build? [Start your custom viewer](/docs/vue/headless/getting-started).

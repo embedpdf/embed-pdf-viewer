@@ -1,66 +1,58 @@
-<template>
-  <div
-    v-if="boundingRect"
-    :style="{
-      position: 'absolute',
-      left: `${boundingRect.origin.x * scale}px`,
-      top: `${boundingRect.origin.y * scale}px`,
-      width: `${boundingRect.size.width * scale}px`,
-      height: `${boundingRect.size.height * scale}px`,
-      mixBlendMode: 'multiply',
-      isolation: 'isolate',
-      pointerEvents: 'none',
-    }"
-  >
-    <div
-      v-for="(rect, i) in rects"
-      :key="i"
-      :style="{
-        position: 'absolute',
-        left: `${(rect.origin.x - boundingRect.origin.x) * scale}px`,
-        top: `${(rect.origin.y - boundingRect.origin.y) * scale}px`,
-        width: `${rect.size.width * scale}px`,
-        height: `${rect.size.height * scale}px`,
-        background: background,
-      }"
-    />
-  </div>
-</template>
-
 <script setup lang="ts">
-import { ref, onMounted, onUnmounted } from 'vue';
-import type { Rect } from '@embedpdf/models';
-import { useSelectionPlugin } from '../hooks/use-selection';
+import { computed } from 'vue';
+import { Rotation } from '@embedpdf/models';
+import type { TextSelectionStyle, MarqueeSelectionStyle } from '@embedpdf/plugin-selection';
+import type { SelectionSelectionMenuRenderFn } from '../types';
+import TextSelection from './text-selection.vue';
+import MarqueeSelection from './marquee-selection.vue';
 
-interface Props {
+interface SelectionLayerProps {
+  documentId: string;
   pageIndex: number;
-  scale: number;
+  scale?: number;
+  rotation?: Rotation;
+  /**
+   * @deprecated Use `textStyle.background` instead.
+   * Background color for selection rectangles.
+   */
   background?: string;
+  /** Styling options for text selection highlights */
+  textStyle?: TextSelectionStyle;
+  /** Styling options for the marquee selection rectangle */
+  marqueeStyle?: MarqueeSelectionStyle;
+  /** Optional CSS class applied to the marquee rectangle */
+  marqueeClassName?: string;
+  /** Render function for selection menu (schema-driven approach) */
+  selectionMenu?: SelectionSelectionMenuRenderFn;
 }
 
-const props = withDefaults(defineProps<Props>(), {
-  background: 'rgba(33, 150, 243)',
+const props = withDefaults(defineProps<SelectionLayerProps>(), {
+  rotation: Rotation.Degree0,
 });
 
-const { plugin: sel } = useSelectionPlugin();
-const rects = ref<Rect[]>([]);
-const boundingRect = ref<Rect | null>(null);
-
-let unregister: (() => void) | undefined;
-
-onMounted(() => {
-  if (!sel.value) return;
-
-  unregister = sel.value.registerSelectionOnPage({
-    pageIndex: props.pageIndex,
-    onRectsChange: ({ rects: newRects, boundingRect: newBoundingRect }) => {
-      rects.value = newRects;
-      boundingRect.value = newBoundingRect;
-    },
-  });
-});
-
-onUnmounted(() => {
-  unregister?.();
-});
+const resolvedTextBackground = computed(() => props.textStyle?.background ?? props.background);
 </script>
+
+<template>
+  <TextSelection
+    :document-id="documentId"
+    :page-index="pageIndex"
+    :scale="scale"
+    :rotation="rotation"
+    :background="resolvedTextBackground"
+    :selection-menu="selectionMenu"
+  >
+    <template #selection-menu="menuProps">
+      <slot name="selection-menu" v-bind="menuProps" />
+    </template>
+  </TextSelection>
+  <MarqueeSelection
+    :document-id="documentId"
+    :page-index="pageIndex"
+    :scale="scale"
+    :background="marqueeStyle?.background"
+    :border-color="marqueeStyle?.borderColor"
+    :border-style="marqueeStyle?.borderStyle"
+    :class-name="marqueeClassName"
+  />
+</template>

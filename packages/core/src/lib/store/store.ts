@@ -15,6 +15,9 @@ export class Store<CoreState, CoreAction extends Action = Action> {
   private listeners: StoreListener<CoreState>[] = [];
   private pluginListeners: Record<string, PluginListener[]> = {};
 
+  // Prevents re-entrant dispatch during reducer execution (like Redux)
+  private isDispatching = false;
+
   /**
    * Initializes the store with the provided core state.
    * @param reducer          The core reducer function
@@ -55,15 +58,32 @@ export class Store<CoreState, CoreAction extends Action = Action> {
       return this.getState();
     }
 
+    if (this.isDispatching) {
+      throw new Error(
+        'Reducers may not dispatch actions. ' +
+          'To trigger cascading actions, dispatch from a listener callback instead.',
+      );
+    }
+
     const oldState = this.getState();
-    // Update core state via its reducer
-    this.state.core = this.coreReducer(this.state.core, action);
 
-    const newState = this.getState();
-    // Notify all main-store subscribers
-    this.listeners.forEach((listener) => listener(action, newState, oldState));
+    try {
+      this.isDispatching = true;
+      // Update core state via its reducer
+      this.state.core = this.coreReducer(this.state.core, action);
+    } finally {
+      // Always reset flag, even if reducer throws
+      this.isDispatching = false;
+    }
 
-    return newState;
+    // Notify all main-store subscribers (can now safely dispatch)
+    // Get fresh state for each listener to handle nested dispatches correctly
+    this.listeners.forEach((listener) => {
+      const currentState = this.getState(); // Fresh snapshot for each listener
+      listener(action, currentState, oldState);
+    });
+
+    return this.getState();
   }
 
   /**
@@ -74,43 +94,60 @@ export class Store<CoreState, CoreAction extends Action = Action> {
    * @param pluginId   The plugin identifier
    * @param action     The plugin action to dispatch
    * @param notifyGlobal Whether to also notify global store listeners
-   * @returns The updated *global* store state
+   * @returns The updated plugin state
    */
   dispatchToPlugin<PluginAction extends Action>(
     pluginId: string,
     action: PluginAction,
     notifyGlobal: boolean = true,
   ): any {
+    if (this.isDispatching) {
+      throw new Error(
+        'Reducers may not dispatch actions. ' +
+          'To trigger cascading actions, dispatch from a listener callback instead.',
+      );
+    }
+
     const oldGlobalState = this.getState();
 
     const reducer = this.pluginReducers[pluginId];
     if (!reducer) {
       // No plugin found, just return the old state
-      return oldGlobalState;
+      return oldGlobalState.plugins[pluginId];
     }
 
     // Grab the old plugin state
     const oldPluginState = oldGlobalState.plugins[pluginId];
-    // Reduce to new plugin state
-    const newPluginState = reducer(oldPluginState, action);
-    // Update the store's plugin slice
-    this.state.plugins[pluginId] = newPluginState;
 
-    const newGlobalState = this.getState();
-
-    // If we are notifying the main store subscribers about plugin changes
-    if (notifyGlobal) {
-      this.listeners.forEach((listener) => listener(action, newGlobalState, oldGlobalState));
+    try {
+      this.isDispatching = true;
+      // Reduce to new plugin state
+      const newPluginState = reducer(oldPluginState, action);
+      // Update the store's plugin slice
+      this.state.plugins[pluginId] = newPluginState;
+    } finally {
+      this.isDispatching = false;
     }
 
-    // Notify plugin-specific listeners
-    if (this.pluginListeners[pluginId]) {
-      this.pluginListeners[pluginId].forEach((listener) => {
-        listener(action, newPluginState, oldPluginState);
+    // Notify listeners (can now safely dispatch)
+    // Get fresh state for each listener to handle nested dispatches correctly
+    if (notifyGlobal) {
+      this.listeners.forEach((listener) => {
+        const currentGlobalState = this.getState(); // Fresh snapshot for each listener
+        listener(action, currentGlobalState, oldGlobalState);
       });
     }
 
-    return newPluginState;
+    // Notify plugin-specific listeners
+    // Get fresh plugin state for each listener
+    if (this.pluginListeners[pluginId]) {
+      this.pluginListeners[pluginId].forEach((listener) => {
+        const currentPluginState = this.getState().plugins[pluginId]; // Fresh snapshot for each listener
+        listener(action, currentPluginState, oldPluginState);
+      });
+    }
+
+    return this.getState().plugins[pluginId];
   }
 
   /**
@@ -123,31 +160,44 @@ export class Store<CoreState, CoreAction extends Action = Action> {
    * @param action The action to dispatch (can be CoreAction or any Action).
    */
   dispatch(action: CoreAction | Action): StoreState<CoreState> {
-    // Keep old state to notify global listeners *once*, after all reducers run.
+    if (this.isDispatching) {
+      throw new Error(
+        'Reducers may not dispatch actions. ' +
+          'To trigger cascading actions, dispatch from a listener callback instead.',
+      );
+    }
+
     const oldState = this.getState();
-    // 1) Apply core reducer (only if action is a CoreAction)
-    if (this.isCoreAction(action)) {
-      this.state.core = this.coreReducer(this.state.core, action);
-    }
 
-    // 2) Apply plugin reducers (without globally notifying after each plugin)
-    for (const pluginId in this.pluginReducers) {
-      const reducer = this.pluginReducers[pluginId];
-      const oldPluginState = oldState.plugins[pluginId];
-      if (reducer) {
-        this.state.plugins[pluginId] = reducer(oldPluginState, action);
+    try {
+      this.isDispatching = true;
+
+      // 1) Apply core reducer (only if action is a CoreAction)
+      if (this.isCoreAction(action)) {
+        this.state.core = this.coreReducer(this.state.core, action);
       }
-      // We do *not* notify global listeners or plugin listeners here,
-      // as that might be undesired "fan-out". If you want per-plugin subscription
-      // triggered on every dispatch, you can do so here, but that’s up to you.
+
+      // 2) Apply plugin reducers (without globally notifying after each plugin)
+      for (const pluginId in this.pluginReducers) {
+        const reducer = this.pluginReducers[pluginId];
+        const oldPluginState = oldState.plugins[pluginId];
+        if (reducer) {
+          this.state.plugins[pluginId] = reducer(oldPluginState, action);
+        }
+      }
+    } finally {
+      this.isDispatching = false;
     }
 
-    // 3) Notify global listeners *once* with the final new state
-    const newState = this.getState();
-    this.listeners.forEach((listener) => listener(action, newState, oldState));
+    // 3) Notify global listeners *once* with the final new state (can now safely dispatch)
+    // Get fresh state for each listener to handle nested dispatches correctly
+    this.listeners.forEach((listener) => {
+      const currentState = this.getState(); // Fresh snapshot for each listener
+      listener(action, currentState, oldState);
+    });
 
     // 4) Return the new global store state
-    return newState;
+    return this.getState();
   }
 
   /**
@@ -155,6 +205,14 @@ export class Store<CoreState, CoreAction extends Action = Action> {
    * @returns The current store state.
    */
   getState(): StoreState<CoreState> {
+    if (this.isDispatching) {
+      throw new Error(
+        'You may not call store.getState() while the reducer is executing. ' +
+          'The reducer has already received the state as an argument. ' +
+          'Pass it down from the top reducer instead of reading it from the store.',
+      );
+    }
+
     return {
       core: { ...this.state.core },
       plugins: { ...this.state.plugins },
@@ -169,8 +227,21 @@ export class Store<CoreState, CoreAction extends Action = Action> {
    * @returns A function to unsubscribe the listener
    */
   subscribe(listener: StoreListener<CoreState>) {
+    if (this.isDispatching) {
+      throw new Error(
+        'You may not call store.subscribe() while the reducer is executing. ' +
+          'If you would like to be notified after the store has been updated, subscribe from a ' +
+          'component and invoke store.getState() in the callback to access the latest state.',
+      );
+    }
+
     this.listeners.push(listener);
     return () => {
+      if (this.isDispatching) {
+        throw new Error(
+          'You may not unsubscribe from a store listener while the reducer is executing.',
+        );
+      }
       this.listeners = this.listeners.filter((l) => l !== listener);
     };
   }
@@ -190,12 +261,21 @@ export class Store<CoreState, CoreAction extends Action = Action> {
       );
     }
 
+    if (this.isDispatching) {
+      throw new Error('You may not call store.subscribeToPlugin() while the reducer is executing.');
+    }
+
     if (!this.pluginListeners[pluginId]) {
       this.pluginListeners[pluginId] = [];
     }
     this.pluginListeners[pluginId].push(listener);
 
     return () => {
+      if (this.isDispatching) {
+        throw new Error(
+          'You may not unsubscribe from a store listener while the reducer is executing.',
+        );
+      }
       this.pluginListeners[pluginId] = this.pluginListeners[pluginId].filter((l) => l !== listener);
       if (this.pluginListeners[pluginId].length === 0) {
         delete this.pluginListeners[pluginId];
@@ -247,8 +327,6 @@ export class Store<CoreState, CoreAction extends Action = Action> {
    * Adjust if you have a more refined way to differentiate CoreAction vs. any other Action.
    */
   public isCoreAction(action: Action): action is CoreAction {
-    // In many codebases you'd do something more robust here
-    // or rely on TypeScript's narrowing logic if possible.
     return CORE_ACTION_TYPES.includes(action.type as (typeof CORE_ACTION_TYPES)[number]);
   }
 

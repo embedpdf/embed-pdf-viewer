@@ -5,9 +5,26 @@ import {
   PdfStrikeOutAnnoObject,
   PdfUnderlineAnnoObject,
   PdfHighlightAnnoObject,
+  Rect,
 } from '@embedpdf/models';
 import { TrackedAnnotation } from './types';
 import { AnnotationTool } from './tools/types';
+
+/* ------------------------------------------------------------------ */
+/* Geometry Helpers                                                    */
+/* ------------------------------------------------------------------ */
+
+/**
+ * Check if two rectangles intersect
+ */
+export function rectsIntersect(a: Rect, b: Rect): boolean {
+  return !(
+    a.origin.x + a.size.width < b.origin.x ||
+    b.origin.x + b.size.width < a.origin.x ||
+    a.origin.y + a.size.height < b.origin.y ||
+    b.origin.y + b.size.height < a.origin.y
+  );
+}
 
 /* ------------------------------------------------------------------ */
 /* 1. Generic “subtype‑to‑object” mapper                              */
@@ -29,7 +46,8 @@ export type SidebarSubtype =
   | PdfAnnotationSubtype.LINE
   | PdfAnnotationSubtype.POLYLINE
   | PdfAnnotationSubtype.FREETEXT
-  | PdfAnnotationSubtype.STAMP;
+  | PdfAnnotationSubtype.STAMP
+  | PdfAnnotationSubtype.REDACT;
 
 /* ------------------------------------------------------------------ */
 /* 2. Narrowing type‑guards (add more as needed)                      */
@@ -121,6 +139,18 @@ export function isText(
   return a.object.type === PdfAnnotationSubtype.TEXT;
 }
 
+export function isLink(
+  a: TrackedAnnotation,
+): a is TrackedAnnotation<AnnoOf<PdfAnnotationSubtype.LINK>> {
+  return a.object.type === PdfAnnotationSubtype.LINK;
+}
+
+export function isRedact(
+  a: TrackedAnnotation,
+): a is TrackedAnnotation<AnnoOf<PdfAnnotationSubtype.REDACT>> {
+  return a.object.type === PdfAnnotationSubtype.REDACT;
+}
+
 export function isSidebarAnnotation(
   a: TrackedAnnotation,
 ): a is TrackedAnnotation<AnnoOf<SidebarSubtype>> {
@@ -133,6 +163,7 @@ export function isSidebarAnnotation(
     isLine(a) ||
     isPolyline(a) ||
     isFreeText(a) ||
-    isStamp(a)
+    isStamp(a) ||
+    isRedact(a)
   );
 }

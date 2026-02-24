@@ -14,7 +14,7 @@ type HighlightProps = Omit<HTMLAttributes<HTMLDivElement>, 'style'> & {
 
 export function Highlight({
   color = '#FFFF00',
-  opacity = 0.5,
+  opacity = 1,
   border = '1px solid red',
   rects,
   rect,

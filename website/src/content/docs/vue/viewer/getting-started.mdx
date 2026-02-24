@@ -1,0 +1,118 @@
+---
+title: Getting Started
+description: Add a complete PDF viewer to your Vue app in under 5 minutes.
+searchable: true
+---
+
+# Getting Started with the Drop-in Viewer
+
+The `@embedpdf/vue-pdf-viewer` package provides a complete, production-ready PDF viewer component. It includes a toolbar, sidebar with thumbnails, and all the features you'd expect—right out of the box.
+
+## Installation
+
+```sh npm2yarn
+npm install @embedpdf/vue-pdf-viewer
+```
+
+## Basic Usage
+
+Import the `PDFViewer` component and render it with a PDF source:
+
+```vue copy filename="App.vue"
+<script setup lang="ts">
+import { PDFViewer } from '@embedpdf/vue-pdf-viewer';
+</script>
+
+<template>
+  <div style="height: 100vh;">
+    <PDFViewer
+      :config="{
+        src: 'https://snippet.embedpdf.com/ebook.pdf',
+        theme: { preference: 'light' }
+      }"
+      :style="{ width: '100%', height: '100%' }"
+    />
+  </div>
+</template>
+```
+
+That's it! You now have a fully functional PDF viewer.
+
+## Live Example
+
+import { ViewerExample } from '../code-examples/viewer/viewer-example';
+
+<CodeExample codePaths={["../../examples/vue-tailwind/src/examples/viewer/viewer-example.vue"]}> 
+  <ViewerExample />
+</CodeExample>
+
+## Nuxt 3
+
+The component works seamlessly with Nuxt 3. Since it uses browser APIs (Canvas, WebAssembly), make sure to wrap it in a `<ClientOnly>` component or use dynamic imports:
+
+```vue copy filename="pages/viewer.vue"
+<script setup lang="ts">
+import { PDFViewer } from '@embedpdf/vue-pdf-viewer';
+</script>
+
+<template>
+  <div style="height: 100vh;">
+    <ClientOnly>
+      <PDFViewer
+        :config="{
+          src: 'https://snippet.embedpdf.com/ebook.pdf'
+        }"
+        :style="{ width: '100%', height: '100%' }"
+      />
+    </ClientOnly>
+  </div>
+</template>
+```
+
+If you encounter SSR issues, you can use dynamic imports:
+
+```vue copy filename="pages/viewer.vue"
+<script setup lang="ts">
+import { defineAsyncComponent } from 'vue';
+
+const PDFViewer = defineAsyncComponent(() =>
+  import('@embedpdf/vue-pdf-viewer').then((m) => m.PDFViewer)
+);
+</script>
+
+<template>
+  <div style="height: 100vh;">
+    <ClientOnly>
+      <PDFViewer
+        :config="{
+          src: 'https://snippet.embedpdf.com/ebook.pdf'
+        }"
+        :style="{ width: '100%', height: '100%' }"
+      />
+    </ClientOnly>
+  </div>
+</template>
+```
+
+## Configuration Options
+
+The `config` prop accepts the following top-level options for plugins and general behavior:
+
+| Option | Type | Description |
+| :--- | :--- | :--- |
+| `src` | `string` | URL or path to the PDF document |
+| `theme` | `object` | Theme configuration. See [Theme](./theme) |
+| `tabBar` | `'always' \| 'multiple' \| 'never'` | Control visibility of the document tab bar. **Default**: `'multiple'` |
+| `disabledCategories` | `string[]` | Hide specific UI features. See [Customizing the UI](./customizing-ui) |
+| `i18n` | `object` | Configure locales and translations. See [Internationalization](./plugins/plugin-i18n) |
+| `annotations` | `object` | Configure annotation defaults (author, tools). See [Annotations](./plugins/plugin-annotation) |
+| `pan` | `object` | Configure the hand tool behavior. See [Pan Tool](./plugins/plugin-pan) |
+| `zoom` | `object` | Configure default zoom levels and limits. See [Zoom](./plugins/plugin-zoom) |
+| `spread` | `object` | Configure two-page spread layouts. See [Spread](./plugins/plugin-spread) |
+| `scroll` | `object` | Configure scroll direction and logic. See [Scrolling](./plugins/plugin-scroll) |
+| `documentManager` | `object` | Advanced document loading options. See [Document Manager](./plugins/plugin-document-manager) |
+
+## Need More Control?
+
+If you need complete control over the UI—custom toolbars, unique layouts, or integration with your design system—check out our [Headless Composables](/docs/vue/headless/introduction).
+

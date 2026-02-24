@@ -4,7 +4,7 @@ import { PdfAnnotationObject, PdfAnnotationSubtype } from '@embedpdf/models';
 
 export interface TransformContext<T extends PdfAnnotationObject = PdfAnnotationObject> {
   /** The type of transformation being applied */
-  type: 'move' | 'resize' | 'vertex-edit' | 'property-update';
+  type: 'move' | 'resize' | 'vertex-edit' | 'rotate' | 'property-update';
 
   /** The changes being applied - can be any properties of the annotation */
   changes: Partial<T>;
@@ -12,6 +12,16 @@ export interface TransformContext<T extends PdfAnnotationObject = PdfAnnotationO
   /** Optional metadata about the transformation */
   metadata?: {
     maintainAspectRatio?: boolean;
+    /** Rotation angle in degrees (for 'rotate' transform type) */
+    rotationAngle?: number;
+    /** Delta from the initial rotation angle in degrees */
+    rotationDelta?: number;
+    /** Center point for rotation (defaults to rect center) */
+    rotationCenter?: { x: number; y: number };
+    /** Whether the rotation input is currently snapped */
+    isSnapped?: boolean;
+    /** Snap target angle when isSnapped is true */
+    snappedAngle?: number;
     [key: string]: any;
   };
 }

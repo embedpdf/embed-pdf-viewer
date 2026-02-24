@@ -1,29 +1,39 @@
 import { useCapability, usePlugin } from '@embedpdf/core/@framework';
-import { SearchPlugin, SearchState } from '@embedpdf/plugin-search';
-import { useEffect, useState } from '@framework';
+import {
+  SearchPlugin,
+  SearchDocumentState,
+  SearchScope,
+  initialSearchDocumentState,
+} from '@embedpdf/plugin-search';
+import { useEffect, useMemo, useState } from '@framework';
 
 export const useSearchPlugin = () => usePlugin<SearchPlugin>(SearchPlugin.id);
 export const useSearchCapability = () => useCapability<SearchPlugin>(SearchPlugin.id);
 
-export const useSearch = () => {
+export const useSearch = (
+  documentId: string,
+): {
+  state: SearchDocumentState;
+  provides: SearchScope | null;
+} => {
   const { provides } = useSearchCapability();
-  const [searchState, setSearchState] = useState<SearchState>({
-    flags: [],
-    results: [],
-    total: 0,
-    activeResultIndex: 0,
-    showAllResults: true,
-    query: '',
-    loading: false,
-    active: false,
-  });
+  const [searchState, setSearchState] = useState<SearchDocumentState>(initialSearchDocumentState);
+
+  const scope = useMemo(() => provides?.forDocument(documentId), [provides, documentId]);
 
   useEffect(() => {
-    return provides?.onStateChange((state) => setSearchState(state));
-  }, [provides]);
+    if (!scope) {
+      setSearchState(initialSearchDocumentState);
+      return;
+    }
+    // Set initial state
+    setSearchState(scope.getState());
+    // Subscribe to changes
+    return scope.onStateChange((state) => setSearchState(state));
+  }, [scope]);
 
   return {
     state: searchState,
-    provides,
+    provides: scope ?? null,
   };
 };

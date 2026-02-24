@@ -7,6 +7,7 @@
     "paths": {
       "@framework": ["src/preact/adapter.ts"],
       "@embedpdf/core/@framework": ["src/preact/core.ts"],
+      "@embedpdf/plugin-annotation/@framework": ["src/preact/annotation.ts"],
       "@embedpdf/utils/@framework": ["src/preact/utils.ts"],
       "@embedpdf/plugin-redaction": ["src/lib/index.ts"]
     }

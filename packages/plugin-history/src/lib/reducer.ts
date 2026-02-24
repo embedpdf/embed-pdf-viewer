@@ -1,8 +1,14 @@
 import { Reducer } from '@embedpdf/core';
-import { HistoryAction, SET_HISTORY_STATE } from './actions';
-import { HistoryState } from './types';
+import {
+  HistoryAction,
+  INIT_HISTORY_STATE,
+  CLEANUP_HISTORY_STATE,
+  SET_HISTORY_DOCUMENT_STATE,
+  SET_ACTIVE_HISTORY_DOCUMENT,
+} from './actions';
+import { HistoryState, HistoryDocumentState } from './types';
 
-export const initialState: HistoryState = {
+const initialDocumentState: HistoryDocumentState = {
   global: {
     canUndo: false,
     canRedo: false,
@@ -10,13 +16,57 @@ export const initialState: HistoryState = {
   topics: {},
 };
 
+export const initialState: HistoryState = {
+  documents: {},
+  activeDocumentId: null,
+};
+
 export const reducer: Reducer<HistoryState, HistoryAction> = (state = initialState, action) => {
   switch (action.type) {
-    case SET_HISTORY_STATE:
+    case INIT_HISTORY_STATE: {
+      const { documentId } = action.payload;
       return {
         ...state,
-        ...action.payload,
+        documents: {
+          ...state.documents,
+          [documentId]: { ...initialDocumentState },
+        },
       };
+    }
+
+    case CLEANUP_HISTORY_STATE: {
+      const { documentId } = action.payload;
+      const { [documentId]: removed, ...remainingDocs } = state.documents;
+
+      return {
+        ...state,
+        documents: remainingDocs,
+        activeDocumentId: state.activeDocumentId === documentId ? null : state.activeDocumentId,
+      };
+    }
+
+    case SET_HISTORY_DOCUMENT_STATE: {
+      const { documentId, state: docState } = action.payload;
+      if (!state.documents[documentId]) {
+        return state;
+      }
+
+      return {
+        ...state,
+        documents: {
+          ...state.documents,
+          [documentId]: docState,
+        },
+      };
+    }
+
+    case SET_ACTIVE_HISTORY_DOCUMENT: {
+      return {
+        ...state,
+        activeDocumentId: action.payload,
+      };
+    }
+
     default:
       return state;
   }

@@ -20,8 +20,43 @@ export default {
       timestamp: false,
     },
   },
+  ['sponsors']: {
+    title: 'Our Sponsors',
+    type: 'page',
+    theme: {
+      timestamp: false,
+    },
+  },
   ['sponsorship']: {
     title: 'Sponsorship',
+    type: 'page',
+    theme: {
+      timestamp: false,
+    },
+  },
+  ['react-pdf-viewer']: {
+    title: 'React PDF Viewer',
+    type: 'page',
+    theme: {
+      timestamp: false,
+    },
+  },
+  ['vue-pdf-viewer']: {
+    title: 'Vue PDF Viewer',
+    type: 'page',
+    theme: {
+      timestamp: false,
+    },
+  },
+  ['svelte-pdf-viewer']: {
+    title: 'Svelte PDF Viewer',
+    type: 'page',
+    theme: {
+      timestamp: false,
+    },
+  },
+  ['layout-analysis']: {
+    title: 'Layout Analysis',
     type: 'page',
     theme: {
       timestamp: false,

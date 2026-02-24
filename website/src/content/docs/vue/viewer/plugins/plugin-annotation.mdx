@@ -1,0 +1,123 @@
+---
+title: Annotations
+description: Enable users to highlight, draw, and add notes to documents.
+---
+
+import { AnnotationExample } from '../../code-examples/viewer/annotation-example';
+
+# Annotations
+
+The PDFViewer includes a powerful annotation system that supports highlights, ink drawings, shapes, and more. While the built-in toolbar provides a UI for these tools, you can also control them programmatically.
+
+## Configuration
+
+You can configure annotation defaults like the author name using the `annotation` config object.
+
+```vue
+<template>
+  <PDFViewer
+    :config="{
+      annotation: {
+        annotationAuthor: 'John Doe',
+        autoCommit: true,
+        selectAfterCreate: true
+      }
+    }"
+  />
+</template>
+```
+
+## Programmatic Control
+
+You can control the active tool and manage annotations programmatically.
+
+<CodeExample
+  codePaths={[
+    "../../examples/vue-tailwind/src/examples/viewer/annotation-example.vue"
+  ]}
+>
+  <AnnotationExample />
+</CodeExample>
+
+### Setting the Active Tool
+
+Use `setActiveTool` to switch between tools. Pass `null` to switch back to the default selection cursor.
+
+```vue
+<script setup lang="ts">
+import { ref } from 'vue';
+import { PDFViewer, type PluginRegistry, type AnnotationPlugin } from '@embedpdf/vue-pdf-viewer';
+
+const registry = ref<PluginRegistry | null>(null);
+
+const handleReady = (r: PluginRegistry) => {
+  registry.value = r;
+};
+
+const activateHighlighter = () => {
+  const annotationPlugin = registry.value?.getPlugin<AnnotationPlugin>('annotation')?.provides();
+  annotationPlugin?.setActiveTool('highlight');
+};
+
+const activatePen = () => {
+  const annotationPlugin = registry.value?.getPlugin<AnnotationPlugin>('annotation')?.provides();
+  annotationPlugin?.setActiveTool('ink');
+};
+
+const deactivateTool = () => {
+  const annotationPlugin = registry.value?.getPlugin<AnnotationPlugin>('annotation')?.provides();
+  annotationPlugin?.setActiveTool(null);
+};
+</script>
+
+<template>
+  <PDFViewer @ready="handleReady" :config="{ src: '/doc.pdf' }" />
+</template>
+```
+
+### Common Tool IDs
+
+| Tool | ID | Description |
+| :--- | :--- | :--- |
+| Highlight | `'highlight'` | Text highlighter |
+| Underline | `'underline'` | Text underline |
+| Ink (Pen) | `'ink'` | Freehand drawing |
+| Rectangle | `'square'` | Square/Rectangle shape |
+| Circle | `'circle'` | Circle/Ellipse shape |
+| Text | `'freeText'` | Free text box |
+| Note | `'text'` | Sticky note |
+
+## Listening for Changes
+
+You can listen for annotation events (creation, deletion, updates) to sync with a backend or update your UI.
+
+```vue
+<script setup lang="ts">
+import { PDFViewer, type PluginRegistry } from '@embedpdf/vue-pdf-viewer';
+
+const handleReady = (registry: PluginRegistry) => {
+  const annotationPlugin = registry.getPlugin('annotation')?.provides();
+
+  // Listen for creation, updates, and deletion
+  annotationPlugin?.onAnnotationEvent((event) => {
+    const { type, annotation, pageIndex } = event;
+
+    if (type === 'create') {
+      console.log('Created annotation:', annotation.id);
+    } else if (type === 'delete') {
+      console.log('Deleted annotation:', annotation.id);
+    }
+  });
+
+  // Listen for tool changes
+  annotationPlugin?.onActiveToolChange(({ tool }) => {
+    console.log('Active tool:', tool ? tool.name : 'Selection');
+  });
+};
+</script>
+
+<template>
+  <PDFViewer @ready="handleReady" :config="{ src: '/doc.pdf' }" />
+</template>
+```
+

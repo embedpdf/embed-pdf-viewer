@@ -1,27 +1,24 @@
 name: Release
 
-# 1️⃣  When to run
-# ──────────────────────────────────────────────────────────────────────
 on:
   push:
-    branches: [main]          # only after code is merged to main
-    paths:                    # ignore website/docs–only commits
+    branches: [main]
+    paths:
       - "packages/**"
+      - "viewers/**"
       - ".changeset/**"
       - "pnpm-lock.yaml"
   workflow_dispatch: {}
 
-# 2️⃣  Only one release job at a time
-# ──────────────────────────────────────────────────────────────────────
 concurrency:
   group: release
   cancel-in-progress: false
 
 permissions:
-  contents: write             # create tags + version-bump PR
-  id-token: write             # provenance for npm provenance
-  pull-requests: write         # create version-bump PR
-  
+  contents: write
+  id-token: write
+  pull-requests: write
+
 env:
   CI: true
 
@@ -33,31 +30,114 @@ jobs:
       NPM_TOKEN:    ${{ secrets.NPM_TOKEN }}
 
     steps:
-      # ─── Check out the repo ────────────────────────────────────────
-      - uses: actions/checkout@v4
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
-      # ─── Set up PNPM 8 (change if you pin another major) ───────────
-      - uses: pnpm/action-setup@v4
+      - name: Setup PNPM
+        uses: pnpm/action-setup@v4
         with:
           version: 10.4.0
           run_install: false
 
-      # ─── Set up Node and cache the pnpm store ──────────────────────
-      - uses: actions/setup-node@v4
+      - name: Setup Node
+        uses: actions/setup-node@v4
         with:
           node-version: 20
           cache: pnpm
           registry-url: "https://registry.npmjs.org"
 
-      # ─── Install deps (root + workspaces) ──────────────────────────
-      - run: pnpm install --frozen-lockfile
-      - run: pnpm run build:packages
+      - name: Install deps
+        run: pnpm install --frozen-lockfile
 
-      # ─── Version-bump PR & publish (Changesets magic) ──────────────
-      - name: Version packages and (eventually) publish
+      - name: Build packages
+        run: pnpm run build:viewers
+
+      # Changesets will either open a version PR or publish if already versioned
+      - name: Version / Publish via Changesets
         id: changesets
         uses: changesets/action@v1
         with:
           commit: "chore: version packages"
           title:  "chore: version packages"
-          publish: pnpm ci:publish         # defined in root package.json
+          publish: pnpm ci:publish
+          createGithubReleases: false
+
+      # Robust publish detection via the file your ci:publish writes
+      - name: Detect publish summary
+        id: published
+        run: |
+          if [ -f "pnpm-publish-summary.json" ]; then
+            COUNT=$(jq '.publishedPackages | length' pnpm-publish-summary.json 2>/dev/null || echo 0)
+            if [ "$COUNT" -gt 0 ]; then
+              echo "did_publish=true" >> $GITHUB_OUTPUT
+              echo "published=$(jq -c '.publishedPackages' pnpm-publish-summary.json)" >> $GITHUB_OUTPUT
+              echo "version=$(jq -r '.publishedPackages[0].version' pnpm-publish-summary.json)" >> $GITHUB_OUTPUT
+            else
+              echo "did_publish=false" >> $GITHUB_OUTPUT
+            fi
+          else
+            echo "did_publish=false" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Get merged PR info
+        if: steps.published.outputs.did_publish == 'true'
+        id: merged_pr
+        uses: actions-ecosystem/action-get-merged-pull-request@v1
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Prepare release notes
+        if: steps.published.outputs.did_publish == 'true'
+        env:
+          PR_BODY: ${{ steps.merged_pr.outputs.body }}
+        run: |
+          echo "$PR_BODY" | sed -n '/# Releases/,$p' | tail -n +2 > release-notes.md || true
+          if [ ! -s release-notes.md ]; then
+            echo "Automated release." > release-notes.md
+          fi
+          echo "Release notes:"
+          cat release-notes.md
+
+      - name: Package published dists
+        if: steps.published.outputs.did_publish == 'true'
+        env:
+          PUBLISHED_JSON: ${{ steps.published.outputs.published }}
+        run: |
+          mkdir -p release-assets
+          echo "$PUBLISHED_JSON" | jq -r '.[].name' | while read name; do
+            short=$(echo "$name" | sed 's!.*/!!')
+            # Handle viewers (snippet, react, vue, svelte) which are in viewers/
+            if [ "$short" = "snippet" ] || [ "$short" = "react-pdf-viewer" ] || [ "$short" = "vue-pdf-viewer" ] || [ "$short" = "svelte-pdf-viewer" ]; then
+              # Map package name to directory name
+              case "$short" in
+                "react-pdf-viewer") dir="viewers/react" ;;
+                "vue-pdf-viewer") dir="viewers/vue" ;;
+                "svelte-pdf-viewer") dir="viewers/svelte" ;;
+                *) dir="viewers/$short" ;;
+              esac
+            else
+              dir="packages/$short"
+            fi
+            if [ -d "$dir/dist" ]; then
+              echo "Packaging $short from $dir"
+              (cd "$dir" && zip -r "../../release-assets/${short}-dist.zip" dist >/dev/null 2>&1 || zip -r "../release-assets/${short}-dist.zip" dist >/dev/null)
+              tar -czf "release-assets/${short}-dist.tar.gz" -C "$dir" dist
+            else
+              echo "No dist for $short"
+            fi
+          done
+          ls -lh release-assets || true
+
+      - name: Create GitHub Release (draft)
+        if: steps.published.outputs.did_publish == 'true'
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v${{ steps.published.outputs.version }}
+          name: Release v${{ steps.published.outputs.version }}
+          body_path: release-notes.md
+          files: release-assets/*
+          draft: false
+          prerelease: false
+          make_latest: true

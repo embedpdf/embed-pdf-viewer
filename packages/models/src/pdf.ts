@@ -16,6 +16,11 @@ export interface PdfPageObject {
    * Orignal size of this page
    */
   size: Size;
+
+  /**
+   * Rotation of this page
+   */
+  rotation: Rotation;
 }
 
 /**
@@ -42,11 +47,6 @@ export interface PdfDocumentObject {
   id: string;
 
   /**
-   * Name of the document
-   */
-  name?: string;
-
-  /**
    * Count of pages in this document
    */
   pageCount: number;
@@ -55,6 +55,28 @@ export interface PdfDocumentObject {
    * Pages in this document
    */
   pages: PdfPageObject[];
+
+  /**
+   * Whether the document is encrypted
+   */
+  isEncrypted: boolean;
+
+  /**
+   * Whether owner permissions are currently unlocked
+   */
+  isOwnerUnlocked: boolean;
+
+  /**
+   * Raw permission flags from FPDF_GetDocPermissions.
+   * Use PdfPermissionFlag to check individual permissions.
+   */
+  permissions: number;
+
+  /**
+   * Whether page rotation was normalized when opening the document.
+   * When true, all page coordinates are in 0° space regardless of original rotation.
+   */
+  normalizedRotation: boolean;
 }
 
 /**
@@ -391,6 +413,56 @@ export type PdfImage = {
   width: number;
   height: number;
 };
+
+/**
+ * Image data type that matches both browser's ImageData and plain objects.
+ * Used for raw rendering output that may include colorSpace from browser APIs.
+ *
+ * @public
+ */
+export type ImageDataLike = {
+  data: Uint8ClampedArray<ArrayBuffer>;
+  width: number;
+  height: number;
+  colorSpace?: PredefinedColorSpace;
+};
+
+/**
+ * Bitmask constants for annotation appearance stream modes.
+ * @public
+ */
+export const AP_MODE_NORMAL = 1; // bit 0
+export const AP_MODE_ROLLOVER = 2; // bit 1
+export const AP_MODE_DOWN = 4; // bit 2
+
+/**
+ * A rendered appearance stream image for a single mode of an annotation.
+ * @public
+ */
+export interface AnnotationAppearanceImage<TImage = ImageDataLike> {
+  data: TImage;
+  rect: Rect;
+}
+
+/**
+ * All available appearance stream images for one annotation,
+ * keyed by mode (normal, rollover, down).
+ * @public
+ */
+export interface AnnotationAppearances<TImage = ImageDataLike> {
+  normal?: AnnotationAppearanceImage<TImage>;
+  rollover?: AnnotationAppearanceImage<TImage>;
+  down?: AnnotationAppearanceImage<TImage>;
+}
+
+/**
+ * Map of annotation ID to its rendered appearance stream images.
+ * @public
+ */
+export type AnnotationAppearanceMap<TImage = ImageDataLike> = Record<
+  string,
+  AnnotationAppearances<TImage>
+>;
 
 /**
  * Representation of pdf action
@@ -910,6 +982,36 @@ export enum PdfAnnotationLineEnding {
 }
 
 /**
+ * Reply type of annotation (RT property per ISO 32000-2)
+ *
+ * Specifies how an annotation relates to another annotation when it is
+ * a reply (via IRT - In Reply To). Valid values are:
+ * - Reply (/R): Normal comment reply (default if RT is missing)
+ * - Group (/Group): Logical grouping of annotations
+ *
+ * @public
+ */
+export enum PdfAnnotationReplyType {
+  /**
+   * Unknown or invalid reply type
+   */
+  Unknown = 0,
+  /**
+   * /R - Comment reply (default if RT is missing)
+   * The annotation is a child comment of the annotation referenced by IRT.
+   * Used for comment threads, reviewer discussions, sticky-note replies.
+   */
+  Reply = 1,
+  /**
+   * /Group - Logical grouping
+   * The annotation is grouped with the annotation referenced by IRT.
+   * They represent the same logical object. Used when multiple annotations
+   * act as one unit (e.g., visual shape + metadata/label).
+   */
+  Group = 2,
+}
+
+/**
  * Basic information of pdf annotation
  *
  * @public
@@ -971,9 +1073,39 @@ export interface PdfAnnotationObjectBase {
   rect: Rect;
 
   /**
+   * Rotation angle in degrees (clockwise).
+   * When set, the annotation is visually rotated around its center.
+   * The rect becomes the axis-aligned bounding box after rotation.
+   */
+  rotation?: number;
+
+  /**
+   * The original unrotated rectangle of the annotation.
+   * This is stored when rotation is applied, allowing accurate editing.
+   */
+  unrotatedRect?: Rect;
+
+  /**
    * Custom data of the annotation
    */
   custom?: any;
+
+  /**
+   * Bitmask of available appearance stream modes.
+   * bit 0 (1) = Normal, bit 1 (2) = Rollover, bit 2 (4) = Down.
+   * 0 or undefined = no appearance stream.
+   */
+  appearanceModes?: number;
+
+  /**
+   * In reply to annotation id (IRT - for grouping or reply threads)
+   */
+  inReplyToId?: string;
+
+  /**
+   * Reply type (how this annotation relates to the parent via IRT)
+   */
+  replyType?: PdfAnnotationReplyType;
 }
 
 /**
@@ -993,11 +1125,6 @@ export interface PdfPopupAnnoObject extends PdfAnnotationObjectBase {
    * Whether the popup is opened or not
    */
   open: boolean;
-
-  /**
-   * In reply to id
-   */
-  inReplyToId?: string;
 }
 
 /**
@@ -1012,6 +1139,26 @@ export interface PdfLinkAnnoObject extends PdfAnnotationObjectBase {
    * target of the link
    */
   target: PdfLinkTarget | undefined;
+
+  /**
+   * Stroke color of the link border (e.g., "#00A5E4")
+   */
+  strokeColor?: string;
+
+  /**
+   * Width of the link border (default: 2)
+   */
+  strokeWidth?: number;
+
+  /**
+   * Style of the link border (default: UNDERLINE)
+   */
+  strokeStyle?: PdfAnnotationBorderStyle;
+
+  /**
+   * Dash pattern for dashed border style
+   */
+  strokeDashArray?: number[];
 }
 
 /**
@@ -1036,11 +1183,6 @@ export interface PdfTextAnnoObject extends PdfAnnotationObjectBase {
    * opacity of text annotation
    */
   opacity?: number;
-
-  /**
-   * In reply to id
-   */
-  inReplyToId?: string;
 
   /**
    * State of the text annotation
@@ -1133,6 +1275,7 @@ export enum PDF_FORM_FIELD_TYPE {
 export enum PdfAnnotationColorType {
   Color = 0,
   InteriorColor = 1,
+  OverlayColor = 2,
 }
 
 /**
@@ -1387,9 +1530,13 @@ export interface PdfInkAnnoObject extends PdfAnnotationObjectBase {
    */
   inkList: PdfInkListObject[];
   /**
-   * color of ink annotation
+   * Color of the ink stroke (preferred over deprecated `color`)
    */
-  color: string;
+  strokeColor?: string;
+  /**
+   * @deprecated Use strokeColor instead. Will be removed in next major version.
+   */
+  color?: string;
 
   /**
    * opacity of ink annotation
@@ -1577,9 +1724,13 @@ export interface PdfHighlightAnnoObject extends PdfAnnotationObjectBase {
   contents?: string;
 
   /**
-   * color of highlight annotation
+   * Color of the highlight markup (preferred over deprecated `color`)
    */
-  color: string;
+  strokeColor?: string;
+  /**
+   * @deprecated Use strokeColor instead. Will be removed in next major version.
+   */
+  color?: string;
 
   /**
    * opacity of highlight annotation
@@ -1669,9 +1820,9 @@ export interface PdfPathObject {
 export interface PdfImageObject {
   type: PdfPageObjectType.IMAGE;
   /**
-   * data of the image
+   * data of the image (cross-platform compatible, works in Node.js and browsers)
    */
-  imageData: ImageData;
+  imageData: ImageDataLike;
   /**
    * transform matrix
    */
@@ -1829,20 +1980,24 @@ export interface PdfSquigglyAnnoObject extends PdfAnnotationObjectBase {
   /** {@inheritDoc PdfAnnotationObjectBase.type} */
   type: PdfAnnotationSubtype.SQUIGGLY;
   /**
-   * Text contents of the highlight annotation
+   * Text contents of the squiggly annotation
    */
   contents?: string;
   /**
-   * color of strike out annotation
+   * Color of the squiggly markup (preferred over deprecated `color`)
    */
-  color: string;
+  strokeColor?: string;
+  /**
+   * @deprecated Use strokeColor instead. Will be removed in next major version.
+   */
+  color?: string;
 
   /**
-   * opacity of strike out annotation
+   * opacity of squiggly annotation
    */
   opacity: number;
   /**
-   * quads of highlight area
+   * quads of squiggly area
    */
   segmentRects: Rect[];
 }
@@ -1856,20 +2011,24 @@ export interface PdfUnderlineAnnoObject extends PdfAnnotationObjectBase {
   /** {@inheritDoc PdfAnnotationObjectBase.type} */
   type: PdfAnnotationSubtype.UNDERLINE;
   /**
-   * Text contents of the highlight annotation
+   * Text contents of the underline annotation
    */
   contents?: string;
   /**
-   * color of strike out annotation
+   * Color of the underline markup (preferred over deprecated `color`)
    */
-  color: string;
+  strokeColor?: string;
+  /**
+   * @deprecated Use strokeColor instead. Will be removed in next major version.
+   */
+  color?: string;
 
   /**
-   * opacity of strike out annotation
+   * opacity of underline annotation
    */
   opacity: number;
   /**
-   * quads of highlight area
+   * quads of underline area
    */
   segmentRects: Rect[];
 }
@@ -1888,9 +2047,13 @@ export interface PdfStrikeOutAnnoObject extends PdfAnnotationObjectBase {
   contents?: string;
 
   /**
-   * color of strike out annotation
+   * Color of the strikeout markup (preferred over deprecated `color`)
    */
-  color: string;
+  strokeColor?: string;
+  /**
+   * @deprecated Use strokeColor instead. Will be removed in next major version.
+   */
+  color?: string;
 
   /**
    * opacity of strike out annotation
@@ -1898,7 +2061,7 @@ export interface PdfStrikeOutAnnoObject extends PdfAnnotationObjectBase {
   opacity: number;
 
   /**
-   * quads of highlight area
+   * quads of strikeout area
    */
   segmentRects: Rect[];
 }
@@ -1950,7 +2113,11 @@ export interface PdfFreeTextAnnoObject extends PdfAnnotationObjectBase {
    */
   opacity: number;
   /**
-   * Background color of the free text annotation
+   * Background/fill color of the free text annotation (matches shape convention)
+   */
+  color?: string;
+  /**
+   * @deprecated Use color instead. Will be removed in next major version.
    */
   backgroundColor?: string;
   /**
@@ -1961,6 +2128,76 @@ export interface PdfFreeTextAnnoObject extends PdfAnnotationObjectBase {
    * Rich content of the free text annotation
    */
   richContent?: string;
+}
+
+/**
+ * Pdf redact annotation
+ *
+ * @public
+ */
+export interface PdfRedactAnnoObject extends PdfAnnotationObjectBase {
+  /** {@inheritDoc PdfAnnotationObjectBase.type} */
+  type: PdfAnnotationSubtype.REDACT;
+
+  /**
+   * Text contents of the redact annotation
+   */
+  contents?: string;
+
+  /**
+   * Quads defining the redaction areas (like markup annotations)
+   */
+  segmentRects: Rect[];
+
+  /**
+   * Interior color (IC) - the fill color used to paint the redacted area after redaction is applied
+   */
+  color?: string;
+
+  /**
+   * Overlay text color - the color of the overlay text displayed on the redacted area
+   */
+  overlayColor?: string;
+
+  /**
+   * Stroke/border color of the redaction box
+   */
+  strokeColor?: string;
+
+  /**
+   * Opacity of the redact annotation
+   */
+  opacity?: number;
+
+  /**
+   * Text displayed on the redacted area after applying the redaction
+   */
+  overlayText?: string;
+
+  /**
+   * Whether the overlay text repeats to fill the redaction area
+   */
+  overlayTextRepeat?: boolean;
+
+  /**
+   * Font family for the overlay text
+   */
+  fontFamily?: PdfStandardFont;
+
+  /**
+   * Font size for the overlay text
+   */
+  fontSize?: number;
+
+  /**
+   * Font color for the overlay text
+   */
+  fontColor?: string;
+
+  /**
+   * Text alignment for the overlay text
+   */
+  textAlign?: PdfTextAlignment;
 }
 
 /**
@@ -1985,7 +2222,8 @@ export type PdfSupportedAnnoObject =
   | PdfUnderlineAnnoObject
   | PdfStrikeOutAnnoObject
   | PdfCaretAnnoObject
-  | PdfFreeTextAnnoObject;
+  | PdfFreeTextAnnoObject
+  | PdfRedactAnnoObject;
 
 /**
  * Pdf annotation that does not support
@@ -2016,6 +2254,43 @@ export interface PdfAttachmentObject {
   size?: number;
   creationDate?: Date;
   checksum: string;
+}
+
+/**
+ * Font charset constants from PDFium (fpdf_sysfontinfo.h)
+ * Used for font fallback system when PDFs require fonts not embedded in the document.
+ *
+ * @public
+ */
+export enum FontCharset {
+  /** ANSI charset (Western European) */
+  ANSI = 0,
+  /** Default charset */
+  DEFAULT = 1,
+  /** Symbol charset */
+  SYMBOL = 2,
+  /** Japanese (Shift-JIS) */
+  SHIFTJIS = 128,
+  /** Korean (Hangeul) */
+  HANGEUL = 129,
+  /** Simplified Chinese (GB2312) */
+  GB2312 = 134,
+  /** Traditional Chinese (Big5) */
+  CHINESEBIG5 = 136,
+  /** Greek */
+  GREEK = 161,
+  /** Vietnamese */
+  VIETNAMESE = 163,
+  /** Hebrew */
+  HEBREW = 177,
+  /** Arabic */
+  ARABIC = 178,
+  /** Cyrillic (Russian, etc.) */
+  CYRILLIC = 204,
+  /** Thai */
+  THAI = 222,
+  /** Eastern European */
+  EASTERNEUROPEAN = 238,
 }
 
 /**
@@ -2184,13 +2459,22 @@ export interface SearchAllPagesResult {
  */
 export interface PdfGlyphObject {
   /**
-   * Origin of the glyph
+   * Origin of the glyph (loose bounds from FPDFText_GetLooseCharBox)
    */
   origin: { x: number; y: number };
   /**
-   * Size of the glyph
+   * Size of the glyph (loose bounds from FPDFText_GetLooseCharBox)
    */
   size: { width: number; height: number };
+  /**
+   * Tight bounds origin (from FPDFText_GetCharBox, closely surrounds the actual glyph shape).
+   * Used for hit-testing to match Chrome's FPDFText_GetCharIndexAtPos behaviour.
+   */
+  tightOrigin?: { x: number; y: number };
+  /**
+   * Tight bounds size (from FPDFText_GetCharBox)
+   */
+  tightSize?: { width: number; height: number };
   /**
    * Whether the glyph is a space
    */
@@ -2208,25 +2492,42 @@ export interface PdfGlyphObject {
  */
 export interface PdfGlyphSlim {
   /**
-   * X coordinate of the glyph
+   * X coordinate of the glyph (loose bounds from FPDFText_GetLooseCharBox)
    */
   x: number;
   /**
-   * Y coordinate of the glyph
+   * Y coordinate of the glyph (loose bounds from FPDFText_GetLooseCharBox)
    */
   y: number;
   /**
-   * Width of the glyph
+   * Width of the glyph (loose bounds from FPDFText_GetLooseCharBox)
    */
   width: number;
   /**
-   * Height of the glyph
+   * Height of the glyph (loose bounds from FPDFText_GetLooseCharBox)
    */
   height: number;
   /**
    * Flags of the glyph
    */
   flags: number;
+  /**
+   * Tight X coordinate (from FPDFText_GetCharBox).
+   * Used for hit-testing to match Chrome's FPDFText_GetCharIndexAtPos behaviour.
+   */
+  tightX?: number;
+  /**
+   * Tight Y coordinate (from FPDFText_GetCharBox)
+   */
+  tightY?: number;
+  /**
+   * Tight width (from FPDFText_GetCharBox)
+   */
+  tightWidth?: number;
+  /**
+   * Tight height (from FPDFText_GetCharBox)
+   */
+  tightHeight?: number;
 }
 
 /**
@@ -2247,6 +2548,10 @@ export interface PdfRun {
    * Glyphs of the run
    */
   glyphs: PdfGlyphSlim[];
+  /**
+   * Font size of the run (all glyphs in a run share the same font size)
+   */
+  fontSize?: number;
 }
 
 /**
@@ -2259,6 +2564,59 @@ export interface PdfPageGeometry {
    * Runs of the page
    */
   runs: PdfRun[];
+}
+
+/**
+ * Font information extracted from a PDF text object.
+ *
+ * @public
+ */
+export interface PdfFontInfo {
+  /** PostScript name (e.g. "HOEPNL+Arial,Bold"). */
+  name: string;
+  /** Font family name (e.g. "Arial"). */
+  familyName: string;
+  /** Weight 100-900 (400 = normal, 700 = bold). */
+  weight: number;
+  /** Whether the font is italic. */
+  italic: boolean;
+  /** Whether the font is monospaced (fixed-pitch). */
+  monospaced: boolean;
+  /** Whether the font data is embedded in the PDF. */
+  embedded: boolean;
+}
+
+/**
+ * A rich text run: consecutive characters sharing the same text object,
+ * font, size, and color.
+ *
+ * @public
+ */
+export interface PdfTextRun {
+  /** The text content (UTF-8). */
+  text: string;
+  /** Bounding box in PDF page coordinates (points). */
+  rect: Rect;
+  /** Font metadata (uniform within the run). */
+  font: PdfFontInfo;
+  /** Font size in points. */
+  fontSize: number;
+  /** Fill color (RGBA). */
+  color: PdfAlphaColor;
+  /** Start character index in the text page. */
+  charIndex: number;
+  /** Number of characters in this run. */
+  charCount: number;
+}
+
+/**
+ * Rich text runs for a single page.
+ *
+ * @public
+ */
+export interface PdfPageTextRuns {
+  /** Text runs ordered by reading order. */
+  runs: PdfTextRun[];
 }
 
 /**
@@ -2293,15 +2651,75 @@ export interface PdfAnnotationTransformation {
  */
 export type PdfFileContent = ArrayBuffer;
 
-export enum PdfPermission {
-  PrintDocument = 2 ** 3,
-  ModifyContent = 2 ** 4,
-  CopyOrExtract = 2 ** 5,
-  AddOrModifyTextAnnot = 2 ** 6,
-  FillInExistingForm = 2 ** 9,
-  ExtractTextOrGraphics = 2 ** 10,
-  AssembleDocument = 2 ** 11,
-  PrintHighQuality = 2 ** 12,
+/**
+ * PDF permission flags per ISO 32000-1 Table 22
+ * These are the flags to pass to setDocumentEncryption indicating what actions ARE ALLOWED.
+ * Use buildPermissions() helper to combine flags.
+ *
+ * @public
+ */
+export enum PdfPermissionFlag {
+  /** Bit 3: Print (possibly degraded quality) */
+  Print = 1 << 2,
+  /** Bit 4: Modify document contents */
+  ModifyContents = 1 << 3,
+  /** Bit 5: Copy/extract text and graphics */
+  CopyContents = 1 << 4,
+  /** Bit 6: Add/modify annotations, fill forms */
+  ModifyAnnotations = 1 << 5,
+  /** Bit 9: Fill in existing form fields */
+  FillForms = 1 << 8,
+  /** Bit 10: Extract for accessibility */
+  ExtractForAccessibility = 1 << 9,
+  /** Bit 11: Assemble document (insert, rotate, delete pages) */
+  AssembleDocument = 1 << 10,
+  /** Bit 12: High quality print */
+  PrintHighQuality = 1 << 11,
+
+  /** Common combination: Allow all permissions */
+  AllowAll = Print |
+    ModifyContents |
+    CopyContents |
+    ModifyAnnotations |
+    FillForms |
+    ExtractForAccessibility |
+    AssembleDocument |
+    PrintHighQuality,
+}
+
+/**
+ * Helper function to combine permission flags for setDocumentEncryption.
+ * Note: PrintHighQuality automatically includes Print (enforced in C++ layer as well).
+ *
+ * @param flags - Permission flags to combine
+ * @returns Combined permission flags as a number
+ *
+ * @public
+ */
+export function buildPermissions(...flags: PdfPermissionFlag[]): number {
+  let result = flags.reduce((acc, flag) => acc | flag, 0);
+  // Enforce: PrintHighQuality implies Print
+  if (result & PdfPermissionFlag.PrintHighQuality) {
+    result |= PdfPermissionFlag.Print;
+  }
+  return result;
+}
+
+/**
+ * Error thrown when a permission check fails.
+ *
+ * @public
+ */
+export class PermissionDeniedError extends Error {
+  public readonly name = 'PermissionDeniedError';
+
+  constructor(
+    public readonly requiredFlags: PdfPermissionFlag[],
+    public readonly currentPermissions: number,
+  ) {
+    const flagNames = requiredFlags.map((f) => PdfPermissionFlag[f]).join(', ');
+    super(`Permission denied. Required: ${flagNames}`);
+  }
 }
 
 export enum PdfPageFlattenFlag {
@@ -2325,11 +2743,6 @@ export interface PdfFileWithoutContent {
    * id of file
    */
   id: string;
-
-  /**
-   * Name of the file
-   */
-  name?: string;
 }
 
 export interface PdfFileLoader extends PdfFileWithoutContent {
@@ -2348,7 +2761,7 @@ export interface PdfFileLoader extends PdfFileWithoutContent {
 
 export interface PdfAnnotationsProgress {
   page: number;
-  annotations: PdfAnnotationObject[];
+  result: PdfAnnotationObject[];
 }
 
 /**
@@ -2375,36 +2788,43 @@ export interface PdfFileUrl extends PdfFileWithoutContent {
 }
 
 export enum PdfErrorCode {
-  Ok, //  #define FPDF_ERR_SUCCESS 0    // No error.
-  Unknown, // #define FPDF_ERR_UNKNOWN 1    // Unknown error.
-  NotFound, // #define FPDF_ERR_FILE 2       // File not found or could not be opened.
-  WrongFormat, // #define FPDF_ERR_FORMAT 3     // File not in PDF format or corrupted.
-  Password, // #define FPDF_ERR_PASSWORD 4   // Password required or incorrect password.
-  Security, // #define FPDF_ERR_SECURITY 5   // Unsupported security scheme.
-  PageError, // #define FPDF_ERR_PAGE 6       // Page not found or content error.
-  XFALoad, // #ifdef PDF_ENABLE_XFA
-  XFALayout, //
-  Cancelled,
-  Initialization,
-  NotReady,
-  NotSupport,
-  LoadDoc,
-  DocNotOpen,
-  CantCloseDoc,
-  CantCreateNewDoc,
-  CantImportPages,
-  CantCreateAnnot,
-  CantSetAnnotRect,
-  CantSetAnnotContent,
-  CantRemoveInkList,
-  CantAddInkStoke,
-  CantReadAttachmentSize,
-  CantReadAttachmentContent,
-  CantFocusAnnot,
-  CantSelectText,
-  CantSelectOption,
-  CantCheckField,
-  CantSetAnnotString,
+  // ═══════════════════════════════════════════════════════
+  // PDFium Error Codes (MUST NOT CHANGE ORDER - maps to C defines)
+  // ═══════════════════════════════════════════════════════
+  Ok = 0, // #define FPDF_ERR_SUCCESS 0
+  Unknown = 1, // #define FPDF_ERR_UNKNOWN 1
+  NotFound = 2, // #define FPDF_ERR_FILE 2
+  WrongFormat = 3, // #define FPDF_ERR_FORMAT 3
+  Password = 4, // #define FPDF_ERR_PASSWORD 4 - Password required or incorrect
+  Security = 5, // #define FPDF_ERR_SECURITY 5
+  PageError = 6, // #define FPDF_ERR_PAGE 6
+  XFALoad = 7, // #define FPDF_ERR_XFALOAD 7
+  XFALayout = 8, // #define FPDF_ERR_XFALAYOUT 8
+
+  // ═══════════════════════════════════════════════════════
+  // Custom Error Codes (Can add/modify freely)
+  // ═══════════════════════════════════════════════════════
+  Cancelled = 9,
+  Initialization = 10,
+  NotReady = 11,
+  NotSupport = 12,
+  LoadDoc = 13,
+  DocNotOpen = 14,
+  CantCloseDoc = 15,
+  CantCreateNewDoc = 16,
+  CantImportPages = 17,
+  CantCreateAnnot = 18,
+  CantSetAnnotRect = 19,
+  CantSetAnnotContent = 20,
+  CantRemoveInkList = 21,
+  CantAddInkStoke = 22,
+  CantReadAttachmentSize = 23,
+  CantReadAttachmentContent = 24,
+  CantFocusAnnot = 25,
+  CantSelectText = 26,
+  CantSelectOption = 27,
+  CantCheckField = 28,
+  CantSetAnnotString = 29,
 }
 
 export interface PdfErrorReason {
@@ -2467,6 +2887,27 @@ export interface PdfOpenDocumentBufferOptions {
    * Password for the document
    */
   password?: string;
+  /**
+   * When true, normalizes page rotation so all coordinates are in 0° space.
+   * The original rotation is preserved in page.rotation for reference.
+   * @default false
+   */
+  normalizeRotation?: boolean;
+}
+
+export interface PdfRequestOptions {
+  /**
+   * Custom HTTP headers to include in all requests (HEAD, GET, range requests)
+   * Example: { 'Authorization': 'Bearer token', 'X-Custom-Header': 'value' }
+   */
+  headers?: Record<string, string>;
+  /**
+   * Controls whether cookies are sent with requests
+   * - 'omit': Never send cookies (default)
+   * - 'same-origin': Send cookies for same-origin requests
+   * - 'include': Always send cookies (requires CORS)
+   */
+  credentials?: RequestCredentials;
 }
 
 export interface PdfOpenDocumentUrlOptions {
@@ -2478,6 +2919,16 @@ export interface PdfOpenDocumentUrlOptions {
    * Loading mode
    */
   mode?: 'auto' | 'range-request' | 'full-fetch';
+  /**
+   * HTTP request options for fetching the PDF
+   */
+  requestOptions?: PdfRequestOptions;
+  /**
+   * When true, normalizes page rotation so all coordinates are in 0° space.
+   * The original rotation is preserved in page.rotation for reference.
+   * @default false
+   */
+  normalizeRotation?: boolean;
 }
 
 export interface PdfRenderOptions {
@@ -2519,6 +2970,10 @@ export interface PdfRenderPageOptions extends PdfRenderOptions {
    * Whether to render annotations
    */
   withAnnotations?: boolean;
+  /**
+   * Whether to render interactive form widgets
+   */
+  withForms?: boolean;
 }
 
 export interface PdfRenderPageAnnotationOptions extends PdfRenderOptions {
@@ -2526,6 +2981,12 @@ export interface PdfRenderPageAnnotationOptions extends PdfRenderOptions {
    * Appearance mode normal down or rollover
    */
   mode?: AppearanceMode;
+  /**
+   * When true and annotation.unrotatedRect is present, render using the
+   * unrotated path (ignores AP Matrix rotation). Falls back to normal
+   * rendering if unrotatedRect is not available on the annotation.
+   */
+  unrotated?: boolean;
 }
 
 export interface PdfRenderThumbnailOptions extends PdfRenderOptions {
@@ -2613,11 +3074,6 @@ export interface PdfEngine<T = Blob> {
    * @returns support or not
    */
   isSupport?: (feature: PdfEngineFeature) => PdfTask<PdfEngineOperation[]>;
-  /**
-   * Initialize the engine
-   * @returns task that indicate whether initialization is successful
-   */
-  initialize?: () => PdfTask<boolean>;
   /**
    * Destroy the engine
    * @returns task that indicate whether destroy is successful
@@ -2720,6 +3176,35 @@ export interface PdfEngine<T = Blob> {
     options?: PdfRenderPageOptions,
   ) => PdfTask<T>;
   /**
+   * Render the specified pdf page and return raw pixel data (ImageDataLike)
+   * without encoding to the output format T. Useful for AI/ML pipelines
+   * that need direct pixel access.
+   * @param doc - pdf document
+   * @param page - pdf page
+   * @param options - render options (imageType/imageQuality are ignored)
+   * @returns task contains raw ImageDataLike or error
+   */
+  renderPageRaw: (
+    doc: PdfDocumentObject,
+    page: PdfPageObject,
+    options?: PdfRenderPageOptions,
+  ) => PdfTask<ImageDataLike>;
+  /**
+   * Render the specified rect of a pdf page and return raw pixel data
+   * (ImageDataLike) without encoding to the output format T.
+   * @param doc - pdf document
+   * @param page - pdf page
+   * @param rect - target rect in PDF coordinate space
+   * @param options - render options (imageType/imageQuality are ignored)
+   * @returns task contains raw ImageDataLike or error
+   */
+  renderPageRectRaw: (
+    doc: PdfDocumentObject,
+    page: PdfPageObject,
+    rect: Rect,
+    options?: PdfRenderPageOptions,
+  ) => PdfTask<ImageDataLike>;
+  /**
    * Render the thumbnail of specified pdf page
    * @param doc - pdf document
    * @param page - pdf page
@@ -2747,6 +3232,32 @@ export interface PdfEngine<T = Blob> {
     annotation: PdfAnnotationObject,
     options?: PdfRenderPageAnnotationOptions,
   ): PdfTask<T>;
+  /**
+   * Batch-render all annotation appearance streams for a page and encode
+   * each rendered image to the output type of this engine.
+   * Returns a map of annotation ID to rendered appearances (Normal/Rollover/Down).
+   * @param doc - pdf document
+   * @param page - pdf page
+   * @param options - render options
+   */
+  renderPageAnnotations(
+    doc: PdfDocumentObject,
+    page: PdfPageObject,
+    options?: PdfRenderPageAnnotationOptions,
+  ): PdfTask<AnnotationAppearanceMap<T>>;
+  /**
+   * Batch-render all annotation appearance streams for a page.
+   * Returns a map of annotation ID to rendered appearances (Normal/Rollover/Down).
+   * Skips EmbedPDF-rotated annotations and annotations without appearance streams.
+   * @param doc - pdf document
+   * @param page - pdf page
+   * @param options - render options (scaleFactor, dpr, rotation)
+   */
+  renderPageAnnotationsRaw(
+    doc: PdfDocumentObject,
+    page: PdfPageObject,
+    options?: PdfRenderPageAnnotationOptions,
+  ): PdfTask<AnnotationAppearanceMap<ImageDataLike>>;
   /**
    * Get annotations of pdf page
    * @param doc - pdf document
@@ -2792,6 +3303,7 @@ export interface PdfEngine<T = Blob> {
     doc: PdfDocumentObject,
     page: PdfPageObject,
     annotation: PdfAnnotationObject,
+    options?: { regenerateAppearance?: boolean },
   ) => PdfTask<boolean>;
   /**
    * Remove a annotation on specified page
@@ -2918,6 +3430,37 @@ export interface PdfEngine<T = Blob> {
     options?: PdfRedactTextOptions,
   ) => PdfTask<boolean>;
   /**
+   * Apply a single REDACT annotation - removes content, flattens RO overlay, deletes annotation.
+   * @param doc - pdf document
+   * @param page - pdf page
+   * @param annotation - the REDACT annotation to apply
+   * @returns task contains the result
+   */
+  applyRedaction: (
+    doc: PdfDocumentObject,
+    page: PdfPageObject,
+    annotation: PdfAnnotationObject,
+  ) => PdfTask<boolean>;
+  /**
+   * Apply all REDACT annotations on a page - removes content, flattens overlays, deletes annotations.
+   * @param doc - pdf document
+   * @param page - pdf page
+   * @returns task contains the result
+   */
+  applyAllRedactions: (doc: PdfDocumentObject, page: PdfPageObject) => PdfTask<boolean>;
+  /**
+   * Flatten an annotation's appearance (AP/N) to page content and remove the annotation.
+   * @param doc - pdf document
+   * @param page - pdf page
+   * @param annotation - the annotation to flatten
+   * @returns task contains the result
+   */
+  flattenAnnotation: (
+    doc: PdfDocumentObject,
+    page: PdfPageObject,
+    annotation: PdfAnnotationObject,
+  ) => PdfTask<boolean>;
+  /**
    * Extract text on specified pdf pages
    * @param doc - pdf document
    * @param pageIndexes - indexes of pdf pages
@@ -2938,6 +3481,13 @@ export interface PdfEngine<T = Blob> {
    * @returns task contains the geometry
    */
   getPageGeometry: (doc: PdfDocumentObject, page: PdfPageObject) => PdfTask<PdfPageGeometry>;
+  /**
+   * Get rich text runs for a page, grouped by text object with font and color info
+   * @param doc - pdf document
+   * @param page - pdf page
+   * @returns task contains the text runs
+   */
+  getPageTextRuns: (doc: PdfDocumentObject, page: PdfPageObject) => PdfTask<PdfPageTextRuns>;
   /**
    * Merge multiple pdf documents
    * @param files - all the pdf files
@@ -2975,6 +3525,48 @@ export interface PdfEngine<T = Blob> {
    * @returns task that all documents are closed or not
    */
   closeAllDocuments: () => PdfTask<boolean>;
+  /**
+   * Sets AES-256 encryption on a document.
+   * Must be called before saveAsCopy() for encryption to take effect.
+   * @param doc - pdf document
+   * @param userPassword - Password to open document (empty = no open password)
+   * @param ownerPassword - Password to change permissions (required)
+   * @param allowedFlags - OR'd PdfPermissionFlag values indicating allowed actions
+   * @returns task indicating success or failure
+   */
+  setDocumentEncryption: (
+    doc: PdfDocumentObject,
+    userPassword: string,
+    ownerPassword: string,
+    allowedFlags: number,
+  ) => PdfTask<boolean>;
+  /**
+   * Marks document for encryption removal on save.
+   * Call this to remove password protection when saving.
+   * @param doc - pdf document
+   * @returns task indicating success
+   */
+  removeEncryption: (doc: PdfDocumentObject) => PdfTask<boolean>;
+  /**
+   * Attempt to unlock owner permissions on an encrypted document.
+   * Call this after opening a document with user-level access to gain full permissions.
+   * @param doc - pdf document
+   * @param ownerPassword - the owner password
+   * @returns task that indicates whether unlock succeeded
+   */
+  unlockOwnerPermissions: (doc: PdfDocumentObject, ownerPassword: string) => PdfTask<boolean>;
+  /**
+   * Check if a document is encrypted.
+   * @param doc - pdf document
+   * @returns task that resolves to true if the document is encrypted
+   */
+  isEncrypted: (doc: PdfDocumentObject) => PdfTask<boolean>;
+  /**
+   * Check if owner permissions are currently unlocked.
+   * @param doc - pdf document
+   * @returns task that resolves to true if owner permissions are unlocked
+   */
+  isOwnerUnlocked: (doc: PdfDocumentObject) => PdfTask<boolean>;
 }
 
 /**
@@ -2983,6 +3575,182 @@ export interface PdfEngine<T = Blob> {
  * @public
  */
 export type PdfEngineMethodName = keyof Required<PdfEngine>;
+
+/**
+ * Progress info for batch operations
+ * Emitted per-page as the batch is processed
+ *
+ * @public
+ */
+export interface BatchProgress<T> {
+  /** Index of the page that was just processed */
+  pageIndex: number;
+  /** Result for this page */
+  result: T;
+  /** Number of pages completed so far */
+  completed: number;
+  /** Total number of pages in this batch */
+  total: number;
+}
+
+/**
+ * Executor interface for PDFium implementations.
+ * Can be either PdfiumNative (direct) or RemoteExecutor (worker proxy).
+ *
+ * @public
+ */
+export interface IPdfiumExecutor {
+  // Core operations
+  destroy(): void;
+  openDocumentBuffer(
+    file: PdfFile,
+    options?: PdfOpenDocumentBufferOptions,
+  ): PdfTask<PdfDocumentObject>;
+  getMetadata(doc: PdfDocumentObject): PdfTask<PdfMetadataObject>;
+  setMetadata(doc: PdfDocumentObject, metadata: Partial<PdfMetadataObject>): PdfTask<boolean>;
+  getDocPermissions(doc: PdfDocumentObject): PdfTask<number>;
+  getDocUserPermissions(doc: PdfDocumentObject): PdfTask<number>;
+  getSignatures(doc: PdfDocumentObject): PdfTask<PdfSignatureObject[]>;
+  getBookmarks(doc: PdfDocumentObject): PdfTask<PdfBookmarksObject>;
+  setBookmarks(doc: PdfDocumentObject, bookmarks: PdfBookmarkObject[]): PdfTask<boolean>;
+  deleteBookmarks(doc: PdfDocumentObject): PdfTask<boolean>;
+
+  // Raw rendering (returns ImageDataLike, not Blob)
+  renderPageRaw(
+    doc: PdfDocumentObject,
+    page: PdfPageObject,
+    options?: PdfRenderPageOptions,
+  ): PdfTask<ImageDataLike>;
+  renderPageRect(
+    doc: PdfDocumentObject,
+    page: PdfPageObject,
+    rect: Rect,
+    options?: PdfRenderPageOptions,
+  ): PdfTask<ImageDataLike>;
+  renderThumbnailRaw(
+    doc: PdfDocumentObject,
+    page: PdfPageObject,
+    options?: PdfRenderThumbnailOptions,
+  ): PdfTask<ImageDataLike>;
+  renderPageAnnotationRaw(
+    doc: PdfDocumentObject,
+    page: PdfPageObject,
+    annotation: PdfAnnotationObject,
+    options?: PdfRenderPageAnnotationOptions,
+  ): PdfTask<ImageDataLike>;
+  renderPageAnnotationsRaw(
+    doc: PdfDocumentObject,
+    page: PdfPageObject,
+    options?: PdfRenderPageAnnotationOptions,
+  ): PdfTask<AnnotationAppearanceMap<ImageDataLike>>;
+
+  // Single page operations
+  getPageAnnotationsRaw(
+    doc: PdfDocumentObject,
+    page: PdfPageObject,
+  ): PdfTask<PdfAnnotationObject[]>;
+  getPageAnnotations(doc: PdfDocumentObject, page: PdfPageObject): PdfTask<PdfAnnotationObject[]>;
+  createPageAnnotation<A extends PdfAnnotationObject>(
+    doc: PdfDocumentObject,
+    page: PdfPageObject,
+    annotation: A,
+    context?: AnnotationCreateContext<A>,
+  ): PdfTask<string>;
+  updatePageAnnotation(
+    doc: PdfDocumentObject,
+    page: PdfPageObject,
+    annotation: PdfAnnotationObject,
+    options?: { regenerateAppearance?: boolean },
+  ): PdfTask<boolean>;
+  removePageAnnotation(
+    doc: PdfDocumentObject,
+    page: PdfPageObject,
+    annotation: PdfAnnotationObject,
+  ): PdfTask<boolean>;
+  getPageTextRects(doc: PdfDocumentObject, page: PdfPageObject): PdfTask<PdfTextRectObject[]>;
+
+  // Single page search
+  searchInPage(
+    doc: PdfDocumentObject,
+    page: PdfPageObject,
+    keyword: string,
+    flags: number,
+  ): PdfTask<SearchResult[]>;
+
+  // Batch operations (process multiple pages in one call for performance)
+  getAnnotationsBatch(
+    doc: PdfDocumentObject,
+    pages: PdfPageObject[],
+  ): PdfTask<Record<number, PdfAnnotationObject[]>, BatchProgress<PdfAnnotationObject[]>>;
+
+  searchBatch(
+    doc: PdfDocumentObject,
+    pages: PdfPageObject[],
+    keyword: string,
+    flags: number,
+  ): PdfTask<Record<number, SearchResult[]>, BatchProgress<SearchResult[]>>;
+
+  // Other operations
+  getAttachments(doc: PdfDocumentObject): PdfTask<PdfAttachmentObject[]>;
+  addAttachment(doc: PdfDocumentObject, params: PdfAddAttachmentParams): PdfTask<boolean>;
+  removeAttachment(doc: PdfDocumentObject, attachment: PdfAttachmentObject): PdfTask<boolean>;
+  readAttachmentContent(
+    doc: PdfDocumentObject,
+    attachment: PdfAttachmentObject,
+  ): PdfTask<ArrayBuffer>;
+  setFormFieldValue(
+    doc: PdfDocumentObject,
+    page: PdfPageObject,
+    annotation: PdfWidgetAnnoObject,
+    value: FormFieldValue,
+  ): PdfTask<boolean>;
+  flattenPage(
+    doc: PdfDocumentObject,
+    page: PdfPageObject,
+    options?: PdfFlattenPageOptions,
+  ): PdfTask<PdfPageFlattenResult>;
+  extractPages(doc: PdfDocumentObject, pageIndexes: number[]): PdfTask<ArrayBuffer>;
+  extractText(doc: PdfDocumentObject, pageIndexes: number[]): PdfTask<string>;
+  redactTextInRects(
+    doc: PdfDocumentObject,
+    page: PdfPageObject,
+    rects: Rect[],
+    options?: PdfRedactTextOptions,
+  ): PdfTask<boolean>;
+  applyRedaction(
+    doc: PdfDocumentObject,
+    page: PdfPageObject,
+    annotation: PdfAnnotationObject,
+  ): PdfTask<boolean>;
+  applyAllRedactions(doc: PdfDocumentObject, page: PdfPageObject): PdfTask<boolean>;
+  flattenAnnotation(
+    doc: PdfDocumentObject,
+    page: PdfPageObject,
+    annotation: PdfAnnotationObject,
+  ): PdfTask<boolean>;
+  getTextSlices(doc: PdfDocumentObject, slices: PageTextSlice[]): PdfTask<string[]>;
+  getPageGlyphs(doc: PdfDocumentObject, page: PdfPageObject): PdfTask<PdfGlyphObject[]>;
+  getPageGeometry(doc: PdfDocumentObject, page: PdfPageObject): PdfTask<PdfPageGeometry>;
+  getPageTextRuns(doc: PdfDocumentObject, page: PdfPageObject): PdfTask<PdfPageTextRuns>;
+  merge(files: PdfFile[]): PdfTask<PdfFile>;
+  mergePages(mergeConfigs: Array<{ docId: string; pageIndices: number[] }>): PdfTask<PdfFile>;
+  preparePrintDocument(doc: PdfDocumentObject, options?: PdfPrintOptions): PdfTask<ArrayBuffer>;
+  saveAsCopy(doc: PdfDocumentObject): PdfTask<ArrayBuffer>;
+  closeDocument(doc: PdfDocumentObject): PdfTask<boolean>;
+  closeAllDocuments(): PdfTask<boolean>;
+
+  // Security operations
+  setDocumentEncryption(
+    doc: PdfDocumentObject,
+    userPassword: string,
+    ownerPassword: string,
+    allowedFlags: number,
+  ): PdfTask<boolean>;
+  removeEncryption(doc: PdfDocumentObject): PdfTask<boolean>;
+  unlockOwnerPermissions(doc: PdfDocumentObject, ownerPassword: string): PdfTask<boolean>;
+  isEncrypted(doc: PdfDocumentObject): PdfTask<boolean>;
+  isOwnerUnlocked(doc: PdfDocumentObject): PdfTask<boolean>;
+}
 
 /**
  * Arguments of PdfEngine method

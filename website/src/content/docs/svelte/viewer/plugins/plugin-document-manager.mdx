@@ -1,0 +1,184 @@
+---
+title: Loading & Documents
+description: Open PDFs from URLs, local files (buffers), and manage multi-document tabs programmatically.
+---
+
+import { DocumentLoadingExample } from '../../code-examples/viewer/document-loading-example';
+
+# Loading & Managing Documents
+
+The PDFViewer includes a robust `document-manager` that handles file loading, error states, and tab management. While the viewer provides a built-in "Open File" button, you often need to trigger these actions from your own application logic—for example, loading a file when a user clicks a link in your dashboard.
+
+## Configuration
+
+You can configure initial documents and limits via the `documentManager` config property.
+
+```svelte
+<PDFViewer
+  config={{
+    documentManager: {
+      // Load these files on startup
+      initialDocuments: [
+        { 
+          url: 'https://snippet.embedpdf.com/ebook.pdf',
+          // By default, autoActivate is true. 
+          // This document will open and become active.
+          autoActivate: true,
+          // OPTIONAL: Set a custom ID so you can easily reference
+          // this document later (e.g. to scroll or close it).
+          documentId: 'ebook-embedpdf',
+        },
+        { 
+          url: 'https://snippet.embedpdf.com/ebook.pdf',
+          // If we don't set this to false, this document would
+          // steal focus immediately after loading!
+          autoActivate: false 
+        }
+      ],
+      // Limit total open tabs (older ones may be closed)
+      maxDocuments: 10
+    },
+    // Show the built-in tab bar if you want tabs inside the viewer
+    tabBar: 'multiple' // 'always', 'multiple' (default), or 'never'
+  }}
+/>
+```
+
+## Programmatic Loading
+
+You can control document loading using the `document-manager` plugin API.
+
+<CodeExample
+  codePaths={[
+    "../../examples/svelte-tailwind/src/examples/viewer/document-loading-example.svelte"
+  ]}
+>
+  <DocumentLoadingExample />
+</CodeExample>
+
+### Loading from URL
+
+Use `openDocumentUrl` to load remote files.
+
+```svelte
+<script lang="ts">
+  import { PDFViewer, type PluginRegistry } from '@embedpdf/svelte-pdf-viewer';
+
+  let registry = $state<PluginRegistry | null>(null);
+
+  const handleReady = (r: PluginRegistry) => {
+    registry = r;
+  };
+
+  const openRemotePdf = () => {
+    const docManager = registry?.getPlugin('document-manager')?.provides();
+
+    docManager?.openDocumentUrl({
+      url: 'https://snippet.embedpdf.com/ebook.pdf',
+      documentId: 'invoice-123', // Optional: fixed ID for easy reference
+      autoActivate: true         // Switch tab to this document immediately
+    });
+  };
+</script>
+
+<PDFViewer onready={handleReady} config={{ src: '/doc.pdf' }} />
+```
+
+### Loading from Buffer (Local Files)
+
+To load a file selected by the user (via `<input type="file">`) or fetched via a custom API request, use `openDocumentBuffer`. This accepts a raw `ArrayBuffer`.
+
+```svelte
+<script lang="ts">
+  import { PDFViewer, type PluginRegistry } from '@embedpdf/svelte-pdf-viewer';
+
+  let registry = $state<PluginRegistry | null>(null);
+
+  const handleReady = (r: PluginRegistry) => {
+    registry = r;
+  };
+
+  const handleFileSelect = async (event: Event) => {
+    const target = event.target as HTMLInputElement;
+    const file = target.files?.[0];
+    if (!file) return;
+    
+    const buffer = await file.arrayBuffer();
+
+    const docManager = registry?.getPlugin('document-manager')?.provides();
+
+    docManager?.openDocumentBuffer({
+      buffer: buffer,
+      name: file.name, // Display name for the tab
+      autoActivate: true
+    });
+  };
+</script>
+
+<input type="file" accept=".pdf" onchange={handleFileSelect} />
+<PDFViewer onready={handleReady} config={{ src: '/doc.pdf' }} />
+```
+
+### Native File Picker
+
+You can also trigger the browser's native file picker dialog directly through the viewer API.
+
+```svelte
+<script lang="ts">
+  const openFilePicker = () => {
+    const docManager = registry?.getPlugin('document-manager')?.provides();
+    docManager?.openFileDialog();
+  };
+</script>
+```
+
+## Managing Active Documents
+
+You can switch tabs or close documents programmatically.
+
+```svelte
+<script lang="ts">
+  const switchDocument = () => {
+    const docManager = registry?.getPlugin('document-manager')?.provides();
+    docManager?.setActiveDocument('invoice-123');
+  };
+
+  const closeDocument = () => {
+    const docManager = registry?.getPlugin('document-manager')?.provides();
+    docManager?.closeDocument('invoice-123');
+  };
+
+  const closeAll = () => {
+    const docManager = registry?.getPlugin('document-manager')?.provides();
+    docManager?.closeAllDocuments();
+  };
+</script>
+```
+
+## Events
+
+You can listen for document lifecycle events to sync your external UI (like a sidebar list) with the viewer state.
+
+| Event | Payload | Description |
+| --- | --- | --- |
+| **`onDocumentOpened`** | `DocumentState` | Fired when a document successfully loads. |
+| **`onDocumentClosed`** | `documentId` | Fired when a document tab is closed. |
+| **`onActiveDocumentChanged`** | `{ previous, current }` | Fired when the user switches tabs. |
+| **`onDocumentError`** | `{ documentId, error }` | Fired if a document fails to load (e.g. 404, corrupt PDF). |
+
+```svelte
+<script lang="ts">
+  import { PDFViewer, type PluginRegistry } from '@embedpdf/svelte-pdf-viewer';
+
+  const handleReady = (registry: PluginRegistry) => {
+    const docManager = registry.getPlugin('document-manager')?.provides();
+
+    docManager?.onDocumentOpened((doc) => {
+      console.log(`Opened: ${doc.name} (${doc.id})`);
+    });
+  };
+</script>
+
+<PDFViewer onready={handleReady} config={{ src: '/doc.pdf' }} />
+```
+

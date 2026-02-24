@@ -1,0 +1,181 @@
+---
+title: Security & Permissions
+description: Understand how to handle PDF security, encryption, and permission overrides in your Svelte application.
+searchable: true
+---
+
+import { Callout } from '@/components/callout'
+import { SecurityExample } from '../code-examples/headless/security-example'
+
+# Security & Permissions
+
+When building a PDF viewer, it's crucial to understand the difference between **cryptographic security** (encryption) and **viewer-enforced permissions** (usage restrictions). This guide explains how EmbedPDF handles both and gives you control over document permissions.
+
+## Understanding PDF Security
+
+PDF documents support two concepts that are often confused: **encryption** and **permissions**.
+
+### Document Encryption (Protects Access)
+
+PDFs can be encrypted using AES-256 or RC4. This is real cryptographic security - without the correct password, the document bytes cannot be decrypted.
+
+- **User Password**: Required to open and view the document. EmbedPDF handles this automatically by prompting for a password when loading an encrypted document.
+- **Owner Password**: Can also open the document and grants full access in compliant viewers.
+
+Encryption answers the question: **"Who can access this document?"**
+
+### Permission Flags (Not Security)
+
+PDFs can also contain permission flags indicating allowed actions: printing, copying text, editing, etc.
+
+<Callout type="warning">
+  **Critical:** Permission flags are **never** cryptographically enforced - not even when encryption is enabled. They are simply metadata that viewers choose to honor.
+</Callout>
+
+Here's why: Once a user has the password and decrypts the document, they have the full unencrypted content in memory. At that point, they can:
+- Ignore the permission flags entirely
+- Modify or remove the flags
+- Save a new PDF without any restrictions
+
+There is no technical way to enforce "you can view this document but not print it." If someone can see the content, they can screenshot it, print it, or extract it. Permission flags are a **polite request** to compliant viewers, not a security barrier.
+
+## How EmbedPDF Handles Permissions
+
+By default, EmbedPDF acts as a "good citizen" and honors permission flags:
+
+- If `Print` is denied, the print button is disabled.
+- If `CopyContents` is denied, text selection is disabled.
+- If `ModifyAnnotations` is denied, annotation tools are locked.
+
+However, since you control the viewer, we give you the option to **override** these flags when your use case requires it (e.g., internal enterprise tools, accessibility needs, or when you simply don't want to enforce arbitrary restrictions from PDFs you don't control).
+
+## Permission Overrides
+
+EmbedPDF uses a **layered resolution system** to determine the effective permissions for a document. The final decision is made in this order:
+
+1. **Per-Document Override** (Highest priority)
+2. **Global Configuration**
+3. **Enforce Setting** (`enforceDocumentPermissions`)
+4. **PDF Document Flags** (Lowest priority, used if no overrides exist)
+
+### 1. Global Configuration
+
+You can set permission rules that apply to *all* documents loaded in your viewer instance by passing a `config` object to the `<EmbedPDF>` component.
+
+```svelte
+<script lang="ts">
+  import { EmbedPDF } from '@embedpdf/core/svelte';
+  
+  const config = {
+    permissions: {
+      overrides: {
+        print: false, // Force disable printing for all documents
+        modifyContents: false
+      }
+    }
+  };
+</script>
+
+<EmbedPDF engine={engine} {config}>...</EmbedPDF>
+```
+
+### 2. Per-Document Configuration
+
+You can set permissions for specific documents when opening them. This overrides any global settings.
+
+```svelte
+<script>
+  // Using Document Manager Plugin
+  createPluginRegistration(DocumentManagerPluginPackage, {
+    initialDocuments: [
+      { 
+        url: '/confidential.pdf',
+        permissions: {
+          overrides: {
+            // Force allow printing even if PDF says "no"
+            print: true 
+          }
+        }
+      }
+    ]
+  })
+</script>
+```
+
+### 3. Ignoring Document Permissions
+
+If you want to treat all documents as "unrestricted" regardless of their internal flags, you can disable enforcement entirely.
+
+```ts
+const config = {
+  permissions: {
+    // Ignore PDF flags entirely (treat as "Allow All")
+    enforceDocumentPermissions: false 
+  }
+};
+```
+
+## Using Permissions in Your UI
+
+The `useDocumentPermissions` hook allows you to reactively check permissions and update your UI accordingly (e.g., disable buttons).
+
+```svelte
+<script lang="ts">
+  import { useDocumentPermissions } from '@embedpdf/core/svelte';
+  
+  let { documentId } = $props();
+  // Returns effective permissions (after overrides)
+  const perms = useDocumentPermissions(() => documentId);
+</script>
+
+<button 
+  disabled={!perms.canPrint}
+  style:opacity={perms.canPrint ? 1 : 0.5}
+>
+  Print Document
+</button>
+```
+
+## Interactive Example
+
+Switch between the tabs to see how different permission configurations affect the viewer:
+
+- **Full Access**: Ignores PDF restrictions (`enforceDocumentPermissions: false`)
+- **Print Disabled**: Printing is blocked, but text selection works
+- **Read-Only**: Printing, copying, and modifications are all blocked
+
+The status panel shows the effective permissions for the active document.
+
+<CodeExample 
+  codePaths={[
+    "../../examples/svelte-tailwind/src/examples/headless/security-example.svelte"
+  ]}
+>
+  <SecurityExample />
+</CodeExample>
+
+## API Reference
+
+### `PermissionConfig`
+
+Configuration object for permissions, accepted in `PluginRegistryConfig` (global) or `LoadDocumentOptions` (per-document).
+
+| Property | Type | Default | Description |
+| :--- | :--- | :--- | :--- |
+| **`enforceDocumentPermissions`** | `boolean` | `true` | If `false`, the viewer ignores the PDF's internal permission flags and treats the document as having full permissions (unless specific overrides are set). |
+| **`overrides`** | `PermissionOverrides` | `undefined` | A map of permission flags to boolean values. `true` forces permission to ALLOW, `false` forces DENY. |
+
+### Available Permission Names
+
+You can use these string keys in the `overrides` object:
+
+| Key | Corresponding Flag | Description |
+| :--- | :--- | :--- |
+| **`print`** | `PdfPermissionFlag.Print` | Printing the document (may be low quality). |
+| **`printHighQuality`** | `PdfPermissionFlag.PrintHighQuality` | High-quality printing. |
+| **`modifyContents`** | `PdfPermissionFlag.ModifyContents` | Modifying the document contents (pages, etc.). |
+| **`copyContents`** | `PdfPermissionFlag.CopyContents` | Copying text or graphics. |
+| **`modifyAnnotations`** | `PdfPermissionFlag.ModifyAnnotations` | Adding/editing annotations. |
+| **`fillForms`** | `PdfPermissionFlag.FillForms` | Filling in form fields. |
+| **`extractForAccessibility`** | `PdfPermissionFlag.ExtractForAccessibility` | Extracting text for screen readers. |
+| **`assembleDocument`** | `PdfPermissionFlag.AssembleDocument` | Inserting, rotating, or deleting pages. |

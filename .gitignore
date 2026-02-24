@@ -12,3 +12,6 @@ config/tsup.frameworks.config.bundled*
 .gclient*
 .cipd
 .idea
+publish-summary.json
+**/.svelte-kit
+**/*/*.tgz

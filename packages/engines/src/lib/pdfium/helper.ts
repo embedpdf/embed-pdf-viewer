@@ -1,3 +1,4 @@
+import { Matrix, Rotation, Rect, Size } from '@embedpdf/models';
 import { PdfiumRuntimeMethods, PdfiumModule } from '@embedpdf/pdfium';
 
 /**
@@ -91,4 +92,66 @@ export function isValidCustomKey(key: string): boolean {
     if (c < 0x20 || c > 0x7e) return false;
   }
   return true;
+}
+
+interface FormDrawParams {
+  startX: number;
+  startY: number;
+  formsWidth: number;
+  formsHeight: number;
+  scaleX: number;
+  scaleY: number;
+}
+
+export function computeFormDrawParams(
+  matrix: Matrix,
+  rect: Rect,
+  pageSize: Size,
+  rotation: Rotation,
+): FormDrawParams {
+  const rectLeft = rect.origin.x;
+  const rectBottom = rect.origin.y;
+  const rectRight = rectLeft + rect.size.width;
+  const rectTop = rectBottom + rect.size.height;
+  const pageWidth = pageSize.width;
+  const pageHeight = pageSize.height;
+
+  // Extract the per-axis scale that the render matrix applies.
+  const scaleX = Math.hypot(matrix.a, matrix.b);
+  const scaleY = Math.hypot(matrix.c, matrix.d);
+  const swap = (rotation & 1) === 1;
+
+  const formsWidth = swap
+    ? Math.max(1, Math.round(pageHeight * scaleX))
+    : Math.max(1, Math.round(pageWidth * scaleX));
+  const formsHeight = swap
+    ? Math.max(1, Math.round(pageWidth * scaleY))
+    : Math.max(1, Math.round(pageHeight * scaleY));
+
+  let startX: number;
+  let startY: number;
+  switch (rotation) {
+    case Rotation.Degree0:
+      startX = -Math.round(rectLeft * scaleX);
+      startY = -Math.round(rectBottom * scaleY);
+      break;
+    case Rotation.Degree90:
+      startX = Math.round((rectTop - pageHeight) * scaleX);
+      startY = -Math.round(rectLeft * scaleY);
+      break;
+    case Rotation.Degree180:
+      startX = Math.round((rectRight - pageWidth) * scaleX);
+      startY = Math.round((rectTop - pageHeight) * scaleY);
+      break;
+    case Rotation.Degree270:
+      startX = -Math.round(rectBottom * scaleX);
+      startY = Math.round((rectRight - pageWidth) * scaleY);
+      break;
+    default:
+      startX = -Math.round(rectLeft * scaleX);
+      startY = -Math.round(rectBottom * scaleY);
+      break;
+  }
+
+  return { startX, startY, formsWidth, formsHeight, scaleX, scaleY };
 }

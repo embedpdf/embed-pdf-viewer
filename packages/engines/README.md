@@ -10,7 +10,7 @@
 
 # @embedpdf/engines
 
-Pluggable rendering engines for EmbedPDF. Ships with **`PdfiumEngine`** – a high‑level, promise‑first wrapper built on top of `@embedpdf/pdfium`.
+Pluggable rendering engines for EmbedPDF. Ships with **`PdfiumNative`** (low-level executor) and **`PdfEngine`** (high-level orchestrator) – a promise‑first API built on top of `@embedpdf/pdfium`.
 
 ## Documentation
 
@@ -43,7 +43,8 @@ npm install @embedpdf/engines @embedpdf/pdfium
 
 ```typescript
 import { init } from '@embedpdf/pdfium';
-import { PdfiumEngine } from '@embedpdf/engines/pdfium';
+import { PdfiumNative, PdfEngine } from '@embedpdf/engines/pdfium';
+import { browserImageDataToBlobConverter } from '@embedpdf/engines/converters';
 
 const pdfiumWasm =
   'https://cdn.jsdelivr.net/npm/@embedpdf/pdfium/dist/pdfium.wasm';
@@ -51,15 +52,20 @@ const pdfiumWasm =
 (async () => {
   const response = await fetch(pdfiumWasm);
   const wasmBinary = await response.arrayBuffer();
-  // 1 – boot the low‑level WASM module
-  const pdfium = await init({ wasmBinary });
 
-  // 2 – create the high‑level engine
-  const engine = new PdfiumEngine(pdfium);
-  engine.initialize();
+  // 1 – boot the low‑level WASM module
+  const pdfiumModule = await init({ wasmBinary });
 
-  // 3 – open & render
-  const document = await engine
+  // 2 – create the native executor (initializes PDFium automatically)
+  const native = new PdfiumNative(pdfiumModule);
+
+  // 3 – create the orchestrator with image converter
+  const engine = new PdfEngine(native, {
+    imageConverter: browserImageDataToBlobConverter,
+  });
+
+  // 4 – open & render
+  const doc = await engine
     .openDocumentUrl({ id: 'demo', url: '/demo.pdf' })
     .toPromise();
   const page0 = doc.pages[0];

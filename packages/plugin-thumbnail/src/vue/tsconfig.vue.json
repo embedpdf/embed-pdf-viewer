@@ -1,0 +1,12 @@
+{
+  "extends": "../../tsconfig.json",
+  "compilerOptions": {
+    "jsx": "preserve",
+    "types": ["vue"],
+    "baseUrl": "../..",
+    "paths": {
+      "@embedpdf/plugin-thumbnail": ["src/lib/index.ts"]
+    }
+  },
+  "include": ["./**/*.ts", "./**/*.vue"]
+}

@@ -11,11 +11,13 @@
       "@embedpdf/plugin-attachment",
       "@embedpdf/plugin-bookmark",
       "@embedpdf/plugin-capture",
+      "@embedpdf/plugin-commands",
+      "@embedpdf/plugin-document-manager",
       "@embedpdf/plugin-export",
       "@embedpdf/plugin-fullscreen",
       "@embedpdf/plugin-history",
+      "@embedpdf/plugin-i18n",
       "@embedpdf/plugin-interaction-manager",
-      "@embedpdf/plugin-loader",
       "@embedpdf/plugin-pan",
       "@embedpdf/plugin-print",
       "@embedpdf/plugin-redaction",
@@ -28,15 +30,32 @@
       "@embedpdf/plugin-thumbnail",
       "@embedpdf/plugin-tiling",
       "@embedpdf/plugin-ui",
+      "@embedpdf/plugin-view-manager",
       "@embedpdf/plugin-viewport",
       "@embedpdf/plugin-zoom",
       "@embedpdf/pdfium",
-      "@embedpdf/utils"
+      "@embedpdf/utils",
+      "@embedpdf/snippet",
+      "@embedpdf/react-pdf-viewer",
+      "@embedpdf/vue-pdf-viewer",
+      "@embedpdf/svelte-pdf-viewer"
     ]
   ],
   "linked": [],
   "access": "public",
   "baseBranch": "main",
   "updateInternalDependencies": "patch",
-  "ignore": ["@embedpdf/website", "@embedpdf/snippet", "@embedpdf/example-*"]
+  "ignore": [
+    "@embedpdf/website",
+    "@embedpdf/example-react-tailwind",
+    "@embedpdf/example-react-mui",
+    "@embedpdf/example-vue-tailwind",
+    "@embedpdf/example-vue-vuetify",
+    "@embedpdf/example-svelte-tailwind",
+    "@embedpdf/example-engines-node",
+    "@embedpdf/example-pdfium-node",
+    "@embedpdf/ai",
+    "@embedpdf/plugin-ai-manager",
+    "@embedpdf/plugin-layout-analysis"
+  ]
 }

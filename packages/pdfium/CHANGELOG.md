@@ -1,5 +1,178 @@
 # @embedpdf/pdfium
 
+## 2.6.2
+
+## 2.6.1
+
+### Patch Changes
+
+- [#463](https://github.com/embedpdf/embed-pdf-viewer/pull/463) by [@bobsingor](https://github.com/bobsingor) – Add EPDFAnnot_GetRect that wraps FPDFAnnot_GetRect with rect normalization. Upstream FPDFAnnot_GetRect does not normalize the rect read from the PDF dictionary, so when a PDF stores its Rect array with y1 > y2 the top/bottom values are inverted. This caused link annotations to be positioned incorrectly.
+
+- [#463](https://github.com/embedpdf/embed-pdf-viewer/pull/463) by [@bobsingor](https://github.com/bobsingor) – Sync pdfium-src with upstream chromium/7689
+
+## 2.6.0
+
+### Minor Changes
+
+- [#452](https://github.com/embedpdf/embed-pdf-viewer/pull/452) by [@bobsingor](https://github.com/bobsingor) –
+  - Export new rotation-related PDFium functions: `EPDFAnnot_SetRotate`, `EPDFAnnot_GetRotate`, `EPDFAnnot_SetExtendedRotation`, etc.
+  - Update WASM build.
+
+### Patch Changes
+
+- [#458](https://github.com/embedpdf/embed-pdf-viewer/pull/458) by [@bobsingor](https://github.com/bobsingor) –
+  - Add abbreviated font name aliases (Helv, ZaDb, Cour, etc.) and missing Helvetica-Oblique mapping in `StringToStandardFont`.
+
+## 2.5.0
+
+### Minor Changes
+
+- [#441](https://github.com/embedpdf/embed-pdf-viewer/pull/441) by [@bobsingor](https://github.com/bobsingor) – Added new PDFium functions to support normalized page rotation:
+  - `EPDF_GetPageSizeByIndexNormalized`: Returns page dimensions as if the page had 0° rotation (swaps width/height for 90°/270° rotated pages)
+  - `EPDF_LoadPageNormalized`: Loads a page with normalized rotation, treating all coordinates in 0° space
+
+  These functions enable the engine to work with page coordinates consistently regardless of original page rotation.
+
+## 2.4.1
+
+## 2.4.0
+
+### Minor Changes
+
+- [#426](https://github.com/embedpdf/embed-pdf-viewer/pull/426) by [@bobsingor](https://github.com/bobsingor) – Added PDFium functions for redaction annotation support:
+  - Added `EPDFAnnot_ApplyRedaction` to apply a single redaction annotation
+  - Added `EPDFAnnot_Flatten` to flatten an annotation's appearance to page content
+  - Added `EPDFPage_ApplyRedactions` to apply all redactions on a page
+  - Added `EPDFAnnot_GetOverlayText` and `EPDFAnnot_SetOverlayText` for overlay text
+  - Added `EPDFAnnot_GetOverlayTextRepeat` and `EPDFAnnot_SetOverlayTextRepeat` for text repeat setting
+
+### Patch Changes
+
+- [#433](https://github.com/embedpdf/embed-pdf-viewer/pull/433) by [@bobsingor](https://github.com/bobsingor) – Reduced WASM binary size from 7.4MB to 4.5MB by removing debug symbols (-g flag) from the build.
+
+  Thanks to @Mikescops for reporting this.
+
+## 2.3.0
+
+### Patch Changes
+
+- [#406](https://github.com/embedpdf/embed-pdf-viewer/pull/406) by [@bobsingor](https://github.com/bobsingor) – Updated PDFium WASM module with new bindings for annotation actions and reply types. Added `EPDFAnnot_SetAction`, `EPDFAnnot_GetReplyType`, and `EPDFAnnot_SetReplyType` functions to support link annotations and annotation grouping.
+
+## 2.2.0
+
+## 2.1.2
+
+### Patch Changes
+
+- [#369](https://github.com/embedpdf/embed-pdf-viewer/pull/369) by [@bobsingor](https://github.com/bobsingor) – Improved PDF content handling with the following changes:
+  - **Shading object support**: Shading patterns (gradients, mesh shadings) are now properly preserved and regenerated when modifying PDF pages. Previously, shading objects could be lost during page content updates.
+  - **Shading redaction**: Redaction now correctly removes shading objects that fall entirely within a redaction area, ensuring complete content removal.
+  - **Graphics state preservation**: Existing graphics state resources (such as soft masks, overprint modes, and other advanced properties) are now preserved with their original names during content regeneration.
+
+## 2.1.1
+
+### Patch Changes
+
+- [`04140d1`](https://github.com/embedpdf/embed-pdf-viewer/commit/04140d1ecf5029d4d23755016fd0d1bfd4141ca6) by [@bobsingor](https://github.com/bobsingor) – Improved PDF editing and redaction capabilities with Form XObject support and enhanced image handling
+
+  **Text Redaction Improvements**
+  - Individual subpath extraction and redaction for complex paths (e.g., vector text in logos)
+  - Instead of removing entire path objects, individual letter glyphs can now be selectively redacted
+  - Fixed image-to-page transform matrix ordering for accurate redaction positioning
+
+  **Enhanced Image Redaction**
+  - Added 1-bit image support with proper ImageMask handling
+  - ImageMask images now correctly use the fill color from the graphics state
+  - Added JPEG SMask (soft mask) decoding for proper transparency handling in WASM
+  - Inline images (BI...ID...EI format) are now converted to XObject images for editing
+  - Improved handling of paletted/indexed images with alpha transparency
+
+  **Form XObject Content Editing**
+  - Added proper support for editing content within Form XObjects (embedded forms in PDFs)
+  - Form XObject streams are now edited in-place rather than attempting to add/remove separate content streams
+  - Added `GetMutableFormStream()` API to CPDF_PageObjectHolder for direct Form XObject access
+
+  **Pattern Color Support**
+  - Added Pattern resource tracking in page content generation
+  - Pattern colors are now properly preserved and emitted during content regeneration
+  - Added fill/stroke pattern resource name tracking in color state
+
+## 2.1.0
+
+## 2.0.2
+
+## 2.0.1
+
+## 2.0.0
+
+## 2.0.0-next.3
+
+## 2.0.0-next.2
+
+## 2.0.0-next.1
+
+## 2.0.0-next.0
+
+## 1.5.0
+
+## 1.4.1
+
+## 1.4.0
+
+## 1.3.16
+
+## 1.3.15
+
+## 1.3.14
+
+## 1.3.13
+
+## 1.3.12
+
+## 1.3.11
+
+### Patch Changes
+
+- [`4ae4fc5`](https://github.com/embedpdf/embed-pdf-viewer/commit/4ae4fc5f8d417d0b18dbbdad10b00a8dd2dc796d) by [@bobsingor](https://github.com/bobsingor) – No changes, test workflow
+
+## 1.3.10
+
+### Patch Changes
+
+- [`5daa1b0`](https://github.com/embedpdf/embed-pdf-viewer/commit/5daa1b066243784097596dade60acaad5afa0899) by [@bobsingor](https://github.com/bobsingor) – No changes, test workflow
+
+## 1.3.9
+
+### Patch Changes
+
+- [`674f23e`](https://github.com/embedpdf/embed-pdf-viewer/commit/674f23e12aa83ed2bd296df4621782beca218adb) by [@bobsingor](https://github.com/bobsingor) – No changes, testing workflow
+
+## 1.3.8
+
+### Patch Changes
+
+- [#194](https://github.com/embedpdf/embed-pdf-viewer/pull/194) by [@bobsingor](https://github.com/bobsingor) – No changes, test new release workflow
+
+## 1.3.7
+
+### Patch Changes
+
+- [#192](https://github.com/embedpdf/embed-pdf-viewer/pull/192) by [@bobsingor](https://github.com/bobsingor) – Nothing really changed, testing new release workflow
+
+## 1.3.6
+
+## 1.3.5
+
+## 1.3.4
+
+## 1.3.3
+
+## 1.3.2
+
+### Patch Changes
+
+- [#181](https://github.com/embedpdf/embed-pdf-viewer/pull/181) by [@bobsingor](https://github.com/bobsingor) – Add new function EPDF_GetPageRotationByIndex
+
 ## 1.3.1
 
 ### Patch Changes
