@@ -4,11 +4,6 @@ import { FormEvent, useCallback, useMemo } from '@framework';
 import { FieldProps } from '../types';
 import { checkboxStyle } from './style';
 
-/**
- *
- * @param props - properties of Checkbox field
- * @returns CheckboxField component
- */
 export function CheckboxField(props: FieldProps) {
   const { field, isEditable, values, onChangeValues } = props;
 
@@ -44,6 +39,7 @@ export function CheckboxField(props: FieldProps) {
       value={field.value}
       checked={isChecked}
       onChange={handleChange}
+      autoFocus={props.autoFocus}
       style={checkboxStyle}
     />
   );

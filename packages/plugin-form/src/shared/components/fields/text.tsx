@@ -1,15 +1,11 @@
 import { PDF_FORM_FIELD_FLAG } from '@embedpdf/models';
-import { FormEvent, useCallback, useMemo, CSSProperties } from '@framework';
+import { FormEvent, useCallback, useMemo } from '@framework';
 
 import { FieldProps } from '../types';
 import { inputStyle, textareaStyle } from './style';
-/**
- *
- * @param props - properties of Text field
- * @returns TextField component
- */
+
 export function TextField(props: FieldProps) {
-  const { field, isEditable, values, onChangeValues } = props;
+  const { field, isEditable, values, onChangeValues, onBlur, autoFocus } = props;
 
   const { flag } = field;
   const name = field.name;
@@ -46,6 +42,8 @@ export function TextField(props: FieldProps) {
       aria-label={name}
       value={value}
       onChange={changeValue}
+      onBlur={onBlur}
+      autoFocus={autoFocus}
       style={textareaStyle}
     />
   ) : (
@@ -57,6 +55,8 @@ export function TextField(props: FieldProps) {
       aria-label={name}
       value={value}
       onChange={changeValue}
+      onBlur={onBlur}
+      autoFocus={autoFocus}
       style={inputStyle}
     />
   );

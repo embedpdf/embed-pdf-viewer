@@ -13,8 +13,8 @@ const baseStyle: CSSProperties = {
 const baseInputStyle: CSSProperties = {
   ...baseStyle,
   borderRadius: 0,
-  backgroundColor: '#fffb8b',
-  borderWidth: '1px solid #7f96ed',
+  backgroundColor: 'transparent',
+  border: '1px solid #7f96ed',
   outline: 'none',
   fontFamily: '"Courier New", Courier, monospace',
 };

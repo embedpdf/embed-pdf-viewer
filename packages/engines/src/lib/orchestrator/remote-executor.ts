@@ -96,6 +96,7 @@ type MessageType =
   | 'addAttachment'
   | 'removeAttachment'
   | 'readAttachmentContent'
+  | 'getPageAnnoWidgets'
   | 'setFormFieldValue'
   | 'flattenPage'
   | 'extractPages'
@@ -452,6 +453,10 @@ export class RemoteExecutor implements IPdfiumExecutor {
     attachment: PdfAttachmentObject,
   ): PdfTask<ArrayBuffer> {
     return this.send<ArrayBuffer>('readAttachmentContent', [doc, attachment]);
+  }
+
+  getPageAnnoWidgets(doc: PdfDocumentObject, page: PdfPageObject): PdfTask<PdfWidgetAnnoObject[]> {
+    return this.send<PdfWidgetAnnoObject[]>('getPageAnnoWidgets', [doc, page]);
   }
 
   setFormFieldValue(

@@ -101,6 +101,7 @@ import {
   AttachmentPluginPackage,
   AttachmentPluginConfig,
 } from '@embedpdf/plugin-attachment/preact';
+import { FormPluginPackage, FormPluginConfig, FormLayer } from '@embedpdf/plugin-form/preact';
 
 import { SchemaToolbar } from '@/ui/schema-toolbar';
 import { SchemaSidebar } from '@/ui/schema-sidebar';
@@ -222,7 +223,8 @@ export interface PDFViewerConfig {
   i18n?: Partial<I18nPluginConfig>;
   /** UI schema options (schema, disabledCategories) */
   ui?: Partial<UIPluginConfig>;
-
+  /** Form options (withForms, withAnnotations) */
+  form?: Partial<FormPluginConfig>;
   // Viewport & Navigation
   /** Viewport options (viewportGap, scrollEndDelay) */
   viewport?: Partial<ViewportPluginConfig>;
@@ -326,6 +328,7 @@ const DEFAULTS = {
   // Infrastructure
   history: {} as HistoryPluginConfig,
   interactionManager: {} as InteractionManagerPluginConfig,
+  form: {} as FormPluginConfig,
 };
 
 // Props for the PDFViewer Component
@@ -434,6 +437,7 @@ function ViewerLayout({ documentId, tabBarVisibility = 'multiple' }: ViewerLayou
                                     selectionMenu={annotationMenu}
                                     groupSelectionMenu={groupAnnotationMenu}
                                   />
+                                  <FormLayer documentId={documentId} pageIndex={pageIndex} />
                                 </PagePointerProvider>
                               </Rotate>
                             )}
@@ -614,6 +618,7 @@ export function PDFViewer({ config, onRegistryReady }: PDFViewerProps) {
             ...DEFAULTS.interactionManager,
             ...config.interactionManager,
           }),
+          createPluginRegistration(FormPluginPackage, { ...DEFAULTS.form, ...config.form }),
         ]}
       >
         {({ pluginsReady, activeDocumentId }) => (

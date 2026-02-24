@@ -8,6 +8,7 @@ type RenderWidgetProps = Omit<HTMLAttributes<HTMLImageElement>, 'style'> & {
   annotation: PdfWidgetAnnoObject;
   scaleFactor?: number;
   dpr?: number;
+  renderKey?: number;
   style?: CSSProperties;
 };
 
@@ -15,6 +16,7 @@ export function RenderWidget({
   pageIndex,
   annotation,
   scaleFactor = 1,
+  renderKey = 0,
   style,
   ...props
 }: RenderWidgetProps) {
@@ -52,7 +54,7 @@ export function RenderWidget({
         }
       };
     }
-  }, [pageIndex, scaleFactor, formProvides, annotation.id, width, height]);
+  }, [pageIndex, scaleFactor, formProvides, annotation.id, width, height, renderKey]);
 
   const handleImageLoad = () => {
     if (urlRef.current) {

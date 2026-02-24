@@ -29,4 +29,12 @@ export interface FieldProps {
    * callback for value change
    */
   onChangeValues?: (values: FormFieldValue[]) => void;
+  /**
+   * callback when the user finishes editing (blur)
+   */
+  onBlur?: () => void;
+  /**
+   * auto-focus the field when it mounts (entering edit mode)
+   */
+  autoFocus?: boolean;
 }

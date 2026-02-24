@@ -1,6 +1,12 @@
 import { BasePlugin, PluginRegistry } from '@embedpdf/core';
-import { FormCapability, FormPluginConfig, FormState, RenderWidgetOptions } from './types';
-import { FormAction } from './actions';
+import {
+  FormCapability,
+  FormPluginConfig,
+  FormScope,
+  FormState,
+  RenderWidgetOptions,
+} from './types';
+import { FormAction, initFormState, cleanupFormState } from './actions';
 import {
   FormFieldValue,
   PdfErrorCode,
@@ -11,6 +17,7 @@ import {
   Task,
 } from '@embedpdf/models';
 import { AnnotationCapability, AnnotationPlugin } from '@embedpdf/plugin-annotation';
+import { initialDocumentState } from './reducer';
 
 export class FormPlugin extends BasePlugin<
   FormPluginConfig,
@@ -20,35 +27,59 @@ export class FormPlugin extends BasePlugin<
 > {
   static readonly id = 'form' as const;
 
-  private readonly annotation: AnnotationCapability | null;
+  private annotation: AnnotationCapability | null = null;
 
-  constructor(id: string, registry: PluginRegistry, config: FormPluginConfig) {
+  constructor(id: string, registry: PluginRegistry, _config: FormPluginConfig) {
     super(id, registry);
 
     this.annotation = registry.getPlugin<AnnotationPlugin>('annotation')?.provides() ?? null;
   }
 
-  async initialize(_: FormPluginConfig): Promise<void> {}
+  async initialize(): Promise<void> {}
+
+  protected override onDocumentLoadingStarted(documentId: string): void {
+    this.dispatch(initFormState(documentId, { ...initialDocumentState }));
+  }
+
+  protected override onDocumentClosed(documentId: string): void {
+    this.dispatch(cleanupFormState(documentId));
+  }
 
   protected buildCapability(): FormCapability {
     return {
-      getPageFormAnnoWidgets: this.getPageFormAnnoWidgets.bind(this),
-      setFormFieldValues: this.setFormFieldValues.bind(this),
-      renderWidget: this.renderWidget.bind(this),
+      getPageFormAnnoWidgets: (pageIndex, documentId?) =>
+        this.getPageFormAnnoWidgets(pageIndex, documentId),
+      setFormFieldValues: (pageIndex, annotation, values, documentId?) =>
+        this.setFormFieldValues(pageIndex, annotation, values, documentId),
+      renderWidget: (options, documentId?) => this.renderWidget(options, documentId),
+      forDocument: (documentId) => this.createFormScope(documentId),
     };
   }
 
-  getPageFormAnnoWidgets(pageIndex: number): PdfTask<PdfWidgetAnnoObject[]> {
-    const coreState = this.coreState.core;
+  private createFormScope(documentId: string): FormScope {
+    return {
+      getPageFormAnnoWidgets: (pageIndex) => this.getPageFormAnnoWidgets(pageIndex, documentId),
+      setFormFieldValues: (pageIndex, annotation, values) =>
+        this.setFormFieldValues(pageIndex, annotation, values, documentId),
+      renderWidget: (options) => this.renderWidget(options, documentId),
+    };
+  }
 
-    if (!coreState.document) {
+  private getPageFormAnnoWidgets(
+    pageIndex: number,
+    documentId?: string,
+  ): PdfTask<PdfWidgetAnnoObject[]> {
+    const docState = this.getCoreDocumentOrThrow(documentId);
+    const doc = docState.document;
+
+    if (!doc) {
       return PdfTaskHelper.reject({
         code: PdfErrorCode.DocNotOpen,
-        message: 'document does not open',
+        message: 'document is not open',
       });
     }
 
-    const page = coreState.document.pages.find((page) => page.index === pageIndex);
+    const page = doc.pages.find((p) => p.index === pageIndex);
     if (!page) {
       return PdfTaskHelper.reject({
         code: PdfErrorCode.NotFound,
@@ -56,26 +87,26 @@ export class FormPlugin extends BasePlugin<
       });
     }
 
-    return this.engine.getPageAnnoWidgets(coreState.document, page);
+    return this.engine.getPageAnnoWidgets(doc, page);
   }
 
-  setFormFieldValues(
+  private setFormFieldValues(
     pageIndex: number,
     annotation: PdfWidgetAnnoObject,
     values: FormFieldValue[],
+    documentId?: string,
   ): PdfTask<boolean> {
-    const coreState = this.coreState.core;
+    const docState = this.getCoreDocumentOrThrow(documentId);
+    const doc = docState.document;
 
-    const task = new Task<boolean, PdfErrorReason>();
-
-    if (!coreState.document) {
+    if (!doc) {
       return PdfTaskHelper.reject({
         code: PdfErrorCode.DocNotOpen,
-        message: 'document does not open',
+        message: 'document is not open',
       });
     }
 
-    const page = coreState.document.pages.find((page) => page.index === pageIndex);
+    const page = doc.pages.find((p) => p.index === pageIndex);
     if (!page) {
       return PdfTaskHelper.reject({
         code: PdfErrorCode.NotFound,
@@ -83,10 +114,11 @@ export class FormPlugin extends BasePlugin<
       });
     }
 
+    const task = new Task<boolean, PdfErrorReason>();
     const tasks: Task<boolean, PdfErrorReason>[] = [];
+
     for (const value of values) {
-      const task = this.engine.setFormFieldValue(coreState.document, page, annotation, value);
-      tasks.push(task);
+      tasks.push(this.engine.setFormFieldValue(doc, page, annotation, value));
     }
 
     Task.allSettled(tasks).wait(() => {
@@ -96,7 +128,10 @@ export class FormPlugin extends BasePlugin<
     return task;
   }
 
-  renderWidget(options: RenderWidgetOptions): Task<Blob, PdfErrorReason> {
+  private renderWidget(
+    options: RenderWidgetOptions,
+    documentId?: string,
+  ): Task<Blob, PdfErrorReason> {
     if (!this.annotation) {
       return PdfTaskHelper.reject({
         code: PdfErrorCode.NotFound,
@@ -104,7 +139,8 @@ export class FormPlugin extends BasePlugin<
       });
     }
 
-    return this.annotation.renderAnnotation(options);
+    const id = documentId ?? this.getActiveDocumentId();
+    return this.annotation.forDocument(id).renderAnnotation(options);
   }
 
   async destroy(): Promise<void> {

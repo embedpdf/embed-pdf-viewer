@@ -4,13 +4,8 @@ import { FormEvent, useCallback, useMemo, selectProps, optionProps } from '@fram
 import { FieldProps } from '../types';
 import { selectStyle } from './style';
 
-/**
- *
- * @param props - properties of Combobox field
- * @returns ComboboxField component
- */
 export function ComboboxField(props: FieldProps) {
-  const { field, isEditable, values, onChangeValues } = props;
+  const { field, isEditable, values, onChangeValues, onBlur, autoFocus } = props;
 
   const { flag, options } = field;
   const name = field.alternateName || field.name;
@@ -52,6 +47,8 @@ export function ComboboxField(props: FieldProps) {
       aria-label={name}
       {...selectProps(isMultipleChoice, selectedTexts)}
       onChange={handleChange}
+      onBlur={onBlur}
+      autoFocus={autoFocus}
       style={selectStyle}
     >
       {options.map((option: PdfWidgetAnnoOption, index) => {

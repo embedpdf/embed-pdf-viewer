@@ -4,11 +4,6 @@ import { FormEvent, useCallback, useMemo } from '@framework';
 import { FieldProps } from '../types';
 import { buttonStyle } from './style';
 
-/**
- *
- * @param props - properties of RadioButton field
- * @returns RadioButtonField component
- */
 export function RadioButtonField(props: FieldProps) {
   const { field, isEditable, values, onChangeValues } = props;
 
@@ -50,6 +45,7 @@ export function RadioButtonField(props: FieldProps) {
       value={defaultValue}
       checked={isChecked}
       onChange={handleChange}
+      autoFocus={props.autoFocus}
       style={buttonStyle}
     />
   );

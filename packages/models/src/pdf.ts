@@ -3698,6 +3698,7 @@ export interface IPdfiumExecutor {
     doc: PdfDocumentObject,
     attachment: PdfAttachmentObject,
   ): PdfTask<ArrayBuffer>;
+  getPageAnnoWidgets(doc: PdfDocumentObject, page: PdfPageObject): PdfTask<PdfWidgetAnnoObject[]>;
   setFormFieldValue(
     doc: PdfDocumentObject,
     page: PdfPageObject,

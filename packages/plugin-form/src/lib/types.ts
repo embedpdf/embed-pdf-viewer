@@ -16,14 +16,30 @@ export interface RenderWidgetOptions {
   options?: PdfRenderPageAnnotationOptions;
 }
 
-export interface FormCapability {
-  getPageFormAnnoWidgets: (pageIndex: number) => PdfTask<PdfWidgetAnnoObject[]>;
-  setFormFieldValues: (
+export interface FormDocumentState {}
+
+export interface FormState {
+  documents: Record<string, FormDocumentState>;
+}
+
+export interface FormScope {
+  getPageFormAnnoWidgets(pageIndex: number): PdfTask<PdfWidgetAnnoObject[]>;
+  setFormFieldValues(
     pageIndex: number,
     annotation: PdfWidgetAnnoObject,
     values: FormFieldValue[],
-  ) => PdfTask<boolean>;
-  renderWidget: (options: RenderWidgetOptions) => Task<Blob, PdfErrorReason>;
+  ): PdfTask<boolean>;
+  renderWidget(options: RenderWidgetOptions): Task<Blob, PdfErrorReason>;
 }
 
-export interface FormState {}
+export interface FormCapability {
+  getPageFormAnnoWidgets(pageIndex: number, documentId?: string): PdfTask<PdfWidgetAnnoObject[]>;
+  setFormFieldValues(
+    pageIndex: number,
+    annotation: PdfWidgetAnnoObject,
+    values: FormFieldValue[],
+    documentId?: string,
+  ): PdfTask<boolean>;
+  renderWidget(options: RenderWidgetOptions, documentId?: string): Task<Blob, PdfErrorReason>;
+  forDocument(documentId: string): FormScope;
+}

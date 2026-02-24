@@ -853,7 +853,7 @@ export class PdfiumNative implements IPdfiumExecutor {
       });
     }
 
-    const annotationWidgets = this.readPageAnnoWidgets(ctx, page);
+    const annotationWidgets = this.readPageAnnoWidgets(doc, ctx, page);
 
     this.logger.perf(
       LOG_SOURCE,
@@ -4303,14 +4303,18 @@ export class PdfiumNative implements IPdfiumExecutor {
    *
    * @private
    */
-  private readPageAnnoWidgets(ctx: DocumentContext, page: PdfPageObject): PdfWidgetAnnoObject[] {
+  private readPageAnnoWidgets(
+    doc: PdfDocumentObject,
+    ctx: DocumentContext,
+    page: PdfPageObject,
+  ): PdfWidgetAnnoObject[] {
     return ctx.borrowPage(page.index, (pageCtx) => {
       const annotationCount = this.pdfiumModule.FPDFPage_GetAnnotCount(pageCtx.pagePtr);
 
       const annotations: PdfWidgetAnnoObject[] = [];
       for (let i = 0; i < annotationCount; i++) {
         pageCtx.withAnnotation(i, (annotPtr) => {
-          const anno = this.readPageAnnoWidget(page, annotPtr, pageCtx);
+          const anno = this.readPageAnnoWidget(doc, page, annotPtr, pageCtx);
           if (anno) annotations.push(anno);
         });
       }
@@ -4365,6 +4369,7 @@ export class PdfiumNative implements IPdfiumExecutor {
    * @private
    */
   private readPageAnnoWidget(
+    doc: PdfDocumentObject,
     page: PdfPageObject,
     annotationPtr: number,
     pageCtx: PageContext,
@@ -4380,7 +4385,7 @@ export class PdfiumNative implements IPdfiumExecutor {
 
     if (subType !== PdfAnnotationSubtype.WIDGET) return;
 
-    return this.readPdfWidgetAnno(page, annotationPtr, pageCtx.getFormHandle(), index);
+    return this.readPdfWidgetAnno(doc, page, annotationPtr, pageCtx.getFormHandle(), index);
   }
 
   /*

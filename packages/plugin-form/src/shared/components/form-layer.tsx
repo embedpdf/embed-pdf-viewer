@@ -1,12 +1,14 @@
-import { Fragment, useCallback, useEffect, useRef, useState } from '@framework';
+import { useCallback, useEffect, useMemo, useState } from '@framework';
 import type { CSSProperties, HTMLAttributes } from '@framework';
 
-import { FormFieldValue, ignore, PdfErrorCode, PdfWidgetAnnoObject } from '@embedpdf/models';
+import { FormFieldValue, ignore, PdfWidgetAnnoObject } from '@embedpdf/models';
+import { useDocumentState } from '@embedpdf/core/@framework';
 
-import { useFormCapability, useFormPlugin } from '../hooks/use-form';
+import { useFormCapability } from '../hooks/use-form';
 import { Field } from './field';
 
 type FormLayerProps = Omit<HTMLAttributes<HTMLDivElement>, 'style'> & {
+  documentId: string;
   pageIndex: number;
   /**
    * The scale factor for rendering the page.
@@ -15,25 +17,38 @@ type FormLayerProps = Omit<HTMLAttributes<HTMLDivElement>, 'style'> & {
   style?: CSSProperties;
 };
 
-export function FormLayer({ pageIndex, scale, style, ...props }: FormLayerProps) {
+export function FormLayer({
+  documentId,
+  pageIndex,
+  scale: overrideScale,
+  style,
+  ...props
+}: FormLayerProps) {
   const { provides: formProvides } = useFormCapability();
-  const { plugin: formPlugin } = useFormPlugin();
+  const documentState = useDocumentState(documentId);
+
+  const actualScale = useMemo(() => {
+    if (overrideScale !== undefined) return overrideScale;
+    return documentState?.scale ?? 1;
+  }, [overrideScale, documentState?.scale]);
+
+  const scope = useMemo(() => formProvides?.forDocument(documentId), [formProvides, documentId]);
 
   const [annoWidgets, setAnnoWidgets] = useState<PdfWidgetAnnoObject[]>([]);
 
   useEffect(() => {
-    if (!formPlugin) return;
-    const task = formPlugin.getPageFormAnnoWidgets(pageIndex);
+    if (!scope) return;
+    const task = scope.getPageFormAnnoWidgets(pageIndex);
     task.wait(setAnnoWidgets, ignore);
-  }, [formPlugin, pageIndex]);
+  }, [scope, pageIndex]);
 
   const onChangeValues = useCallback(
     (annotation: PdfWidgetAnnoObject, values: FormFieldValue[]) => {
-      if (!formPlugin) return;
-      const task = formPlugin.setFormFieldValues(pageIndex, annotation, values);
+      if (!scope) return;
+      const task = scope.setFormFieldValues(pageIndex, annotation, values);
       task.wait(ignore, ignore);
     },
-    [formPlugin, pageIndex],
+    [scope, pageIndex],
   );
 
   return (
@@ -41,7 +56,7 @@ export function FormLayer({ pageIndex, scale, style, ...props }: FormLayerProps)
       {annoWidgets.map((annoWidget) => (
         <Field
           key={annoWidget.id}
-          scale={scale || 1}
+          scale={actualScale}
           pageIndex={pageIndex}
           annotation={annoWidget}
           field={annoWidget.field}

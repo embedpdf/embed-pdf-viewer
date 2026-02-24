@@ -16,3 +16,4 @@ export const FormPluginPackage: PluginPackage<FormPlugin, FormPluginConfig, Form
 export * from './form-plugin';
 export * from './types';
 export * from './manifest';
+export { initialState, initialDocumentState } from './reducer';
