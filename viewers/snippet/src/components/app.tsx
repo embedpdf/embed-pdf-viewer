@@ -132,6 +132,7 @@ import {
   spanishTranslations,
   simplifiedChineseTranslations,
   japaneseTranslations,
+  swedishTranslations,
 } from '@/config';
 import { ThemeConfig } from '@/config/theme';
 import { IconsConfig } from '@/config/icon-registry';
@@ -293,6 +294,7 @@ const DEFAULTS = {
       spanishTranslations,
       simplifiedChineseTranslations,
       japaneseTranslations,
+      swedishTranslations,
     ],
     paramResolvers: defaultParamResolvers,
   } as I18nPluginConfig,

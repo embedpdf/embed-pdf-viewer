@@ -26,6 +26,7 @@
     { code: 'es', name: 'Spanish' },
     { code: 'zh-CN', name: 'Chinese' },
     { code: 'ja', name: 'Japanese' },
+    { code: 'sv', name: 'Swedish' },
   ];
 
   let currentLocale = $state('en');
