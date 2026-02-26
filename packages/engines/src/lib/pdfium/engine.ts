@@ -1864,32 +1864,35 @@ export class PdfiumNative implements IPdfiumExecutor {
         break;
       case 'checked':
         {
-          const kReturn = 0x0d;
-          if (!this.pdfiumModule.FORM_OnChar(formHandle, pageCtx.pagePtr, kReturn, 0)) {
-            this.logger.debug(
-              LOG_SOURCE,
-              LOG_CATEGORY,
-              'SetFormFieldValue',
-              'failed to set field checked',
-            );
-            this.logger.perf(
-              LOG_SOURCE,
-              LOG_CATEGORY,
-              `SetFormFieldValue`,
-              'End',
-              `${doc.id}-${annotation.id}`,
-            );
-            this.pdfiumModule.FORM_ForceToKillFocus(formHandle);
-            this.pdfiumModule.FPDFPage_CloseAnnot(annotationPtr);
-            this.pdfiumModule.FORM_OnBeforeClosePage(pageCtx.pagePtr, formHandle);
-            pageCtx.release();
-            this.pdfiumModule.PDFiumExt_ExitFormFillEnvironment(formHandle);
-            this.pdfiumModule.PDFiumExt_CloseFormFillInfo(formFillInfoPtr);
+          const currentChecked = !!this.pdfiumModule.FPDFAnnot_IsChecked(formHandle, annotationPtr);
+          if (currentChecked !== value.isChecked) {
+            const kReturn = 0x0d;
+            if (!this.pdfiumModule.FORM_OnChar(formHandle, pageCtx.pagePtr, kReturn, 0)) {
+              this.logger.debug(
+                LOG_SOURCE,
+                LOG_CATEGORY,
+                'SetFormFieldValue',
+                'failed to set field checked',
+              );
+              this.logger.perf(
+                LOG_SOURCE,
+                LOG_CATEGORY,
+                `SetFormFieldValue`,
+                'End',
+                `${doc.id}-${annotation.id}`,
+              );
+              this.pdfiumModule.FORM_ForceToKillFocus(formHandle);
+              this.pdfiumModule.FPDFPage_CloseAnnot(annotationPtr);
+              this.pdfiumModule.FORM_OnBeforeClosePage(pageCtx.pagePtr, formHandle);
+              pageCtx.release();
+              this.pdfiumModule.PDFiumExt_ExitFormFillEnvironment(formHandle);
+              this.pdfiumModule.PDFiumExt_CloseFormFillInfo(formFillInfoPtr);
 
-            return PdfTaskHelper.reject({
-              code: PdfErrorCode.CantCheckField,
-              message: 'failed to set field checked',
-            });
+              return PdfTaskHelper.reject({
+                code: PdfErrorCode.CantCheckField,
+                message: 'failed to set field checked',
+              });
+            }
           }
         }
         break;
