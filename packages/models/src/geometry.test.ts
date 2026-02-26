@@ -6,6 +6,7 @@ import {
   Rotation,
   transformRect,
   restoreRect,
+  rectsIntersect,
 } from './geometry';
 
 describe('Geometry', () => {
@@ -162,5 +163,29 @@ describe('Geometry', () => {
         scaleFactor,
       ),
     ).toStrictEqual(rect);
+  });
+
+  test('rectsIntersect should return true for overlapping rects', () => {
+    const a = { origin: { x: 0, y: 0 }, size: { width: 10, height: 10 } };
+    const b = { origin: { x: 5, y: 5 }, size: { width: 10, height: 10 } };
+    expect(rectsIntersect(a, b)).toBe(true);
+  });
+
+  test('rectsIntersect should return false for disjoint rects', () => {
+    const a = { origin: { x: 0, y: 0 }, size: { width: 10, height: 10 } };
+    const b = { origin: { x: 11, y: 11 }, size: { width: 10, height: 10 } };
+    expect(rectsIntersect(a, b)).toBe(false);
+  });
+
+  test('rectsIntersect should return true for edge touch', () => {
+    const a = { origin: { x: 0, y: 0 }, size: { width: 10, height: 10 } };
+    const b = { origin: { x: 10, y: 0 }, size: { width: 10, height: 10 } };
+    expect(rectsIntersect(a, b)).toBe(true);
+  });
+
+  test('rectsIntersect should return true for containment', () => {
+    const outer = { origin: { x: 0, y: 0 }, size: { width: 20, height: 20 } };
+    const inner = { origin: { x: 5, y: 5 }, size: { width: 2, height: 2 } };
+    expect(rectsIntersect(outer, inner)).toBe(true);
   });
 });

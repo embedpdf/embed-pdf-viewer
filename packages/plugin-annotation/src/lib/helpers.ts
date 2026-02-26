@@ -5,26 +5,12 @@ import {
   PdfStrikeOutAnnoObject,
   PdfUnderlineAnnoObject,
   PdfHighlightAnnoObject,
-  Rect,
+  rectsIntersect,
 } from '@embedpdf/models';
 import { TrackedAnnotation } from './types';
 import { AnnotationTool } from './tools/types';
 
-/* ------------------------------------------------------------------ */
-/* Geometry Helpers                                                    */
-/* ------------------------------------------------------------------ */
-
-/**
- * Check if two rectangles intersect
- */
-export function rectsIntersect(a: Rect, b: Rect): boolean {
-  return !(
-    a.origin.x + a.size.width < b.origin.x ||
-    b.origin.x + b.size.width < a.origin.x ||
-    a.origin.y + a.size.height < b.origin.y ||
-    b.origin.y + b.size.height < a.origin.y
-  );
-}
+export { rectsIntersect };
 
 /* ------------------------------------------------------------------ */
 /* 1. Generic “subtype‑to‑object” mapper                              */

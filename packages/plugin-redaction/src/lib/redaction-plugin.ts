@@ -21,6 +21,7 @@ import {
   arePropsEqual,
 } from '@embedpdf/core';
 import {
+  PdfAnnotationObject,
   PdfAnnotationSubtype,
   PdfDocumentObject,
   PdfErrorCode,
@@ -32,6 +33,7 @@ import {
   PdfTaskHelper,
   Rect,
   Task,
+  rectsIntersect,
   uuidV4,
 } from '@embedpdf/models';
 import {
@@ -1016,6 +1018,70 @@ export class RedactionPlugin extends BasePlugin<
     return task;
   }
 
+  private getRedactionHitRects(annotation: PdfRedactAnnoObject): Rect[] {
+    return annotation.segmentRects?.length ? annotation.segmentRects : [annotation.rect];
+  }
+
+  private intersectsAnyRect(rect: Rect, targets: Rect[]): boolean {
+    return targets.some((target) => rectsIntersect(rect, target));
+  }
+
+  private collectLinkedThreadAnnotationIds(documentId: string, seedIds: string[]): Set<string> {
+    if (!this.annotationCapability || seedIds.length === 0) return new Set<string>();
+
+    const state = this.annotationCapability.forDocument(documentId).getState();
+    const seedSet = new Set(seedIds);
+    const linked = new Set<string>();
+    const queue = [...seedSet];
+
+    while (queue.length > 0) {
+      const parentId = queue.shift()!;
+      for (const ta of Object.values(state.byUid)) {
+        const childId = ta.object.id;
+        if (!ta.object.inReplyToId || ta.object.inReplyToId !== parentId) continue;
+        if (seedSet.has(childId) || linked.has(childId)) continue;
+        linked.add(childId);
+        queue.push(childId);
+      }
+    }
+
+    return linked;
+  }
+
+  private runBoolTasks(tasks: Task<boolean, PdfErrorReason>[]): Task<boolean, PdfErrorReason> {
+    if (!tasks.length) return PdfTaskHelper.resolve(true);
+
+    const result = new Task<boolean, PdfErrorReason>();
+    Task.all(tasks).wait(
+      () => result.resolve(true),
+      (error) => result.fail(error),
+    );
+    return result;
+  }
+
+  private purgeAffectedAnnotationState(
+    documentId: string,
+    affectedIds: Set<string>,
+    pageByAnnotationId: Map<string, number>,
+  ): void {
+    const annoScope = this.annotationCapability?.forDocument(documentId);
+    for (const id of affectedIds) {
+      const pageIndex = pageByAnnotationId.get(id);
+      if (pageIndex === undefined) continue;
+      annoScope?.purgeAnnotation(pageIndex, id);
+      this.dispatch(removePending(documentId, pageIndex, id));
+    }
+
+    if (affectedIds.size > 0) {
+      this.historyCapability
+        ?.forDocument(documentId)
+        .purgeByMetadata<AnnotationCommandMetadata>(
+          (meta) => meta?.annotationIds?.some((id) => affectedIds.has(id)) ?? false,
+          'annotations',
+        );
+    }
+  }
+
   private commitPendingOne(
     page: number,
     id: string,
@@ -1148,50 +1214,105 @@ export class RedactionPlugin extends BasePlugin<
       });
     }
 
-    this.logger.debug(
-      'RedactionPlugin',
-      'ApplyRedactionAnnotationMode',
-      `Calling engine.applyRedaction for annotation ${annotationId} on page ${pdfPage.index}`,
-    );
+    const redactionHitRects = this.getRedactionHitRects(anno.object);
+    const linkedIds = this.collectLinkedThreadAnnotationIds(docId, [annotationId]);
+    const pageByAnnotationId = new Map<string, number>();
+    pageByAnnotationId.set(annotationId, pdfPage.index);
 
-    this.engine.applyRedaction(doc, pdfPage, anno.object).wait(
-      () => {
-        this.logger.debug(
-          'RedactionPlugin',
-          'ApplyRedactionAnnotationMode',
-          `Successfully applied redaction ${annotationId} on page ${pdfPage.index}`,
+    this.engine.getPageAnnotations(doc, pdfPage).wait(
+      (pageAnnotations) => {
+        const removeById = new Map<string, PdfAnnotationObject>();
+
+        for (const annotation of pageAnnotations) {
+          pageByAnnotationId.set(annotation.id, annotation.pageIndex);
+
+          if (annotation.id === annotationId) continue;
+
+          if (linkedIds.has(annotation.id) && annotation.type !== PdfAnnotationSubtype.REDACT) {
+            removeById.set(annotation.id, annotation);
+            continue;
+          }
+
+          if (!this.intersectsAnyRect(annotation.rect, redactionHitRects)) continue;
+          if (annotation.type === PdfAnnotationSubtype.REDACT) continue;
+
+          removeById.set(annotation.id, annotation);
+        }
+
+        // Remove linked-thread annotations that may live outside the current page.
+        const annotationState = this.annotationCapability?.forDocument(docId).getState();
+        if (annotationState) {
+          for (const linkedId of linkedIds) {
+            if (removeById.has(linkedId)) continue;
+            const ta = Object.values(annotationState.byUid).find((candidate) => candidate.object.id === linkedId);
+            if (!ta || ta.object.type === PdfAnnotationSubtype.REDACT) continue;
+            pageByAnnotationId.set(linkedId, ta.object.pageIndex);
+            removeById.set(linkedId, ta.object);
+          }
+        }
+
+        const removalTasks: Task<boolean, PdfErrorReason>[] = [];
+        for (const annotation of removeById.values()) {
+          const page = doc.pages[annotation.pageIndex];
+          if (!page) continue;
+          removalTasks.push(this.engine.removePageAnnotation(doc, page, annotation));
+        }
+        const cleanupTasks = [...removalTasks];
+
+        this.runBoolTasks(cleanupTasks).wait(
+          () => {
+            this.logger.debug(
+              'RedactionPlugin',
+              'ApplyRedactionAnnotationMode',
+              `Calling engine.applyRedaction for annotation ${annotationId} on page ${pdfPage.index}`,
+            );
+
+            this.engine.applyRedaction(doc, pdfPage, anno.object).wait(
+              () => {
+                const affectedIds = new Set<string>([annotationId, ...removeById.keys()]);
+                this.purgeAffectedAnnotationState(docId, affectedIds, pageByAnnotationId);
+
+                this.dispatchCoreAction(refreshPages(docId, [pdfPage.index]));
+                this.events$.emit({ type: 'commit', documentId: docId, success: true });
+                task.resolve(true);
+              },
+              (error) => {
+                this.logger.error(
+                  'RedactionPlugin',
+                  'ApplyRedactionAnnotationMode',
+                  `Failed to apply redaction ${annotationId}: ${
+                    error.reason?.message ?? 'Unknown error'
+                  }`,
+                );
+                this.events$.emit({
+                  type: 'commit',
+                  documentId: docId,
+                  success: false,
+                  error: error.reason,
+                });
+                task.reject({ code: PdfErrorCode.Unknown, message: 'Failed to apply redaction' });
+              },
+            );
+          },
+          (error) => {
+            this.events$.emit({
+              type: 'commit',
+              documentId: docId,
+              success: false,
+              error: error.reason,
+            });
+            task.reject({ code: PdfErrorCode.Unknown, message: 'Failed to cleanup annotations' });
+          },
         );
-        // Purge the annotation from state (engine already removed it from PDF)
-        this.annotationCapability?.forDocument(docId).purgeAnnotation(pdfPage.index, annotationId);
-
-        // Remove from internal pending state (purgeAnnotation doesn't emit events)
-        this.dispatch(removePending(docId, pdfPage.index, annotationId));
-
-        // Purge history entries for this committed redaction (permanent, irreversible operation)
-        this.historyCapability
-          ?.forDocument(docId)
-          .purgeByMetadata<AnnotationCommandMetadata>(
-            (meta) => meta?.annotationIds?.includes(annotationId) ?? false,
-            'annotations',
-          );
-
-        this.dispatchCoreAction(refreshPages(docId, [pdfPage.index]));
-        this.events$.emit({ type: 'commit', documentId: docId, success: true });
-        task.resolve(true);
       },
       (error) => {
-        this.logger.error(
-          'RedactionPlugin',
-          'ApplyRedactionAnnotationMode',
-          `Failed to apply redaction ${annotationId}: ${error.reason?.message ?? 'Unknown error'}`,
-        );
         this.events$.emit({
           type: 'commit',
           documentId: docId,
           success: false,
           error: error.reason,
         });
-        task.reject({ code: PdfErrorCode.Unknown, message: 'Failed to apply redaction' });
+        task.reject({ code: PdfErrorCode.Unknown, message: 'Failed to inspect page annotations' });
       },
     );
 
@@ -1301,60 +1422,116 @@ export class RedactionPlugin extends BasePlugin<
     docId: string,
     doc: PdfDocumentObject,
   ): Task<boolean, PdfErrorReason> {
-    // Collect all REDACT annotation IDs per page (for purging after apply)
     const annoState = this.annotationCapability!.forDocument(docId).getState();
-    const redactAnnotationsByPage = new Map<number, string[]>();
+    const redactAnnotationsByPage = new Map<number, PdfRedactAnnoObject[]>();
+    const pageByAnnotationId = new Map<string, number>();
 
     for (const ta of Object.values(annoState.byUid)) {
-      if (ta.object.type === PdfAnnotationSubtype.REDACT) {
-        const pageIds = redactAnnotationsByPage.get(ta.object.pageIndex) ?? [];
-        pageIds.push(ta.object.id);
-        redactAnnotationsByPage.set(ta.object.pageIndex, pageIds);
-      }
+      pageByAnnotationId.set(ta.object.id, ta.object.pageIndex);
+      if (ta.object.type !== PdfAnnotationSubtype.REDACT) continue;
+
+      const list = redactAnnotationsByPage.get(ta.object.pageIndex) ?? [];
+      list.push(ta.object as PdfRedactAnnoObject);
+      redactAnnotationsByPage.set(ta.object.pageIndex, list);
     }
 
     const pagesToProcess = Array.from(redactAnnotationsByPage.keys());
+    if (pagesToProcess.length === 0) return PdfTaskHelper.resolve(true);
 
-    if (pagesToProcess.length === 0) {
-      return PdfTaskHelper.resolve(true);
+    const seedRedactionIds = Array.from(redactAnnotationsByPage.values()).flatMap((annotations) =>
+      annotations.map((annotation) => annotation.id),
+    );
+    const linkedIds = this.collectLinkedThreadAnnotationIds(docId, seedRedactionIds);
+
+    const linkedRemovalById = new Map<string, PdfAnnotationObject>();
+    for (const ta of Object.values(annoState.byUid)) {
+      if (!linkedIds.has(ta.object.id)) continue;
+      if (ta.object.type === PdfAnnotationSubtype.REDACT) continue;
+      linkedRemovalById.set(ta.object.id, ta.object);
     }
 
-    const tasks: PdfTask<boolean>[] = [];
-    for (const pageIndex of pagesToProcess) {
-      const page = doc.pages[pageIndex];
+    const linkedRemovalTasks: Task<boolean, PdfErrorReason>[] = [];
+    for (const annotation of linkedRemovalById.values()) {
+      const page = doc.pages[annotation.pageIndex];
       if (!page) continue;
-      tasks.push(this.engine.applyAllRedactions(doc, page));
+      linkedRemovalTasks.push(this.engine.removePageAnnotation(doc, page, annotation));
     }
 
     const task = new Task<boolean, PdfErrorReason>();
-    Task.all(tasks).wait(
+    this.runBoolTasks(linkedRemovalTasks).wait(
       () => {
-        // Purge all REDACT annotations from state (engine already removed them from PDF)
-        const annoScope = this.annotationCapability?.forDocument(docId);
-        const allPurgedIds: string[] = [];
-
-        for (const [pageIndex, ids] of redactAnnotationsByPage) {
-          for (const id of ids) {
-            annoScope?.purgeAnnotation(pageIndex, id);
-            // Remove from internal pending state (purgeAnnotation doesn't emit events)
-            this.dispatch(removePending(docId, pageIndex, id));
-            allPurgedIds.push(id);
+        const pageTasks = pagesToProcess.map((pageIndex) => {
+          const pageTask = new Task<{ removedIds: string[] }, PdfErrorReason>();
+          const page = doc.pages[pageIndex];
+          const redactions = redactAnnotationsByPage.get(pageIndex) ?? [];
+          if (!page || redactions.length === 0) {
+            pageTask.resolve({ removedIds: [] });
+            return pageTask;
           }
-        }
 
-        // Purge history entries for all committed redactions (permanent, irreversible operations)
-        if (allPurgedIds.length > 0) {
-          this.historyCapability
-            ?.forDocument(docId)
-            .purgeByMetadata<AnnotationCommandMetadata>(
-              (meta) => meta?.annotationIds?.some((id) => allPurgedIds.includes(id)) ?? false,
-              'annotations',
-            );
-        }
+          const redactionRects = redactions.flatMap((annotation) => this.getRedactionHitRects(annotation));
 
-        this.dispatchCoreAction(refreshPages(docId, pagesToProcess));
-        this.events$.emit({ type: 'commit', documentId: docId, success: true });
-        task.resolve(true);
+          this.engine.getPageAnnotations(doc, page).wait(
+            (pageAnnotations) => {
+              const removeById = new Map<string, PdfAnnotationObject>();
+
+              for (const annotation of pageAnnotations) {
+                pageByAnnotationId.set(annotation.id, annotation.pageIndex);
+
+                if (seedRedactionIds.includes(annotation.id)) continue;
+                if (linkedRemovalById.has(annotation.id)) continue;
+                if (!this.intersectsAnyRect(annotation.rect, redactionRects)) continue;
+                if (annotation.type === PdfAnnotationSubtype.REDACT) continue;
+
+                removeById.set(annotation.id, annotation);
+              }
+
+              const cleanupTasks: Task<boolean, PdfErrorReason>[] = [
+                ...Array.from(removeById.values()).map((annotation) =>
+                  this.engine.removePageAnnotation(doc, page, annotation),
+                ),
+              ];
+
+              this.runBoolTasks(cleanupTasks).wait(
+                () => {
+                  this.engine.applyAllRedactions(doc, page).wait(
+                    () => pageTask.resolve({ removedIds: Array.from(removeById.keys()) }),
+                    (error) => pageTask.fail(error),
+                  );
+                },
+                (error) => pageTask.fail(error),
+              );
+            },
+            (error) => pageTask.fail(error),
+          );
+
+          return pageTask;
+        });
+
+        Task.all(pageTasks).wait(
+          (results) => {
+            const affectedIds = new Set<string>(seedRedactionIds);
+            for (const id of linkedRemovalById.keys()) affectedIds.add(id);
+            for (const result of results) {
+              for (const id of result.removedIds) affectedIds.add(id);
+            }
+
+            this.purgeAffectedAnnotationState(docId, affectedIds, pageByAnnotationId);
+
+            this.dispatchCoreAction(refreshPages(docId, pagesToProcess));
+            this.events$.emit({ type: 'commit', documentId: docId, success: true });
+            task.resolve(true);
+          },
+          (error) => {
+            this.events$.emit({
+              type: 'commit',
+              documentId: docId,
+              success: false,
+              error: error.reason,
+            });
+            task.reject({ code: PdfErrorCode.Unknown, message: 'Failed to apply redactions' });
+          },
+        );
       },
       (error) => {
         this.events$.emit({
@@ -1363,7 +1540,7 @@ export class RedactionPlugin extends BasePlugin<
           success: false,
           error: error.reason,
         });
-        task.reject({ code: PdfErrorCode.Unknown, message: 'Failed to apply redactions' });
+        task.reject({ code: PdfErrorCode.Unknown, message: 'Failed to remove linked annotations' });
       },
     );
 

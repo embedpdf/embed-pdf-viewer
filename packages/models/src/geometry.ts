@@ -335,6 +335,25 @@ export function rectEquals(a: Rect, b: Rect): boolean {
 }
 
 /**
+ * Check whether two rectangles intersect.
+ * Touching edges are considered intersecting.
+ *
+ * @param a - first rectangle
+ * @param b - second rectangle
+ * @returns true when rectangles overlap or touch
+ *
+ * @public
+ */
+export function rectsIntersect(a: Rect, b: Rect): boolean {
+  return !(
+    a.origin.x + a.size.width < b.origin.x ||
+    b.origin.x + b.size.width < a.origin.x ||
+    a.origin.y + a.size.height < b.origin.y ||
+    b.origin.y + b.size.height < a.origin.y
+  );
+}
+
+/**
  * Calculate the rect from the given points
  * @param pts - points
  * @returns rect
