@@ -21,8 +21,6 @@ import {
   arePropsEqual,
 } from '@embedpdf/core';
 import {
-  FormFieldValue,
-  PDF_FORM_FIELD_TYPE,
   PdfAnnotationObject,
   PdfAnnotationSubtype,
   PdfDocumentObject,
@@ -31,7 +29,6 @@ import {
   PdfPageObject,
   PdfPermissionFlag,
   PdfRedactAnnoObject,
-  PdfWidgetAnnoObject,
   PdfTask,
   PdfTaskHelper,
   Rect,
@@ -1051,50 +1048,6 @@ export class RedactionPlugin extends BasePlugin<
     return linked;
   }
 
-  private getWidgetClearOperations(widget: PdfWidgetAnnoObject): FormFieldValue[] {
-    const type = widget.field.type;
-
-    if (type === PDF_FORM_FIELD_TYPE.TEXTFIELD || type === PDF_FORM_FIELD_TYPE.XFA_TEXTFIELD) {
-      return [{ kind: 'text', text: '' }];
-    }
-
-    if (
-      type === PDF_FORM_FIELD_TYPE.CHECKBOX ||
-      type === PDF_FORM_FIELD_TYPE.RADIOBUTTON ||
-      type === PDF_FORM_FIELD_TYPE.XFA_CHECKBOX
-    ) {
-      return [{ kind: 'checked', isChecked: false }];
-    }
-
-    if (
-      type === PDF_FORM_FIELD_TYPE.COMBOBOX ||
-      type === PDF_FORM_FIELD_TYPE.LISTBOX ||
-      type === PDF_FORM_FIELD_TYPE.XFA_COMBOBOX ||
-      type === PDF_FORM_FIELD_TYPE.XFA_LISTBOX
-    ) {
-      return widget.field.options
-        .map((option, index) => ({ option, index }))
-        .filter(({ option }) => option.isSelected)
-        .map(({ index }) => ({ kind: 'selection' as const, index, isSelected: false }));
-    }
-
-    return [];
-  }
-
-  private clearWidgetValue(
-    doc: PdfDocumentObject,
-    page: PdfPageObject,
-    widget: PdfWidgetAnnoObject,
-  ): Task<boolean, PdfErrorReason> {
-    const operations = this.getWidgetClearOperations(widget);
-    if (operations.length === 0) return PdfTaskHelper.resolve(true);
-
-    const tasks = operations.map((operation) =>
-      this.engine.setFormFieldValue(doc, page, widget, operation),
-    );
-    return this.runBoolTasks(tasks);
-  }
-
   private runBoolTasks(tasks: Task<boolean, PdfErrorReason>[]): Task<boolean, PdfErrorReason> {
     if (!tasks.length) return PdfTaskHelper.resolve(true);
 
@@ -1269,7 +1222,6 @@ export class RedactionPlugin extends BasePlugin<
     this.engine.getPageAnnotations(doc, pdfPage).wait(
       (pageAnnotations) => {
         const removeById = new Map<string, PdfAnnotationObject>();
-        const widgetsToClear = new Map<string, PdfWidgetAnnoObject>();
 
         for (const annotation of pageAnnotations) {
           pageByAnnotationId.set(annotation.id, annotation.pageIndex);
@@ -1278,22 +1230,13 @@ export class RedactionPlugin extends BasePlugin<
 
           if (linkedIds.has(annotation.id) && annotation.type !== PdfAnnotationSubtype.REDACT) {
             removeById.set(annotation.id, annotation);
-            widgetsToClear.delete(annotation.id);
             continue;
           }
 
           if (!this.intersectsAnyRect(annotation.rect, redactionHitRects)) continue;
           if (annotation.type === PdfAnnotationSubtype.REDACT) continue;
 
-          if (annotation.type === PdfAnnotationSubtype.WIDGET) {
-            if (!removeById.has(annotation.id)) {
-              widgetsToClear.set(annotation.id, annotation as PdfWidgetAnnoObject);
-            }
-            continue;
-          }
-
           removeById.set(annotation.id, annotation);
-          widgetsToClear.delete(annotation.id);
         }
 
         // Remove linked-thread annotations that may live outside the current page.
@@ -1305,7 +1248,6 @@ export class RedactionPlugin extends BasePlugin<
             if (!ta || ta.object.type === PdfAnnotationSubtype.REDACT) continue;
             pageByAnnotationId.set(linkedId, ta.object.pageIndex);
             removeById.set(linkedId, ta.object);
-            widgetsToClear.delete(linkedId);
           }
         }
 
@@ -1315,11 +1257,7 @@ export class RedactionPlugin extends BasePlugin<
           if (!page) continue;
           removalTasks.push(this.engine.removePageAnnotation(doc, page, annotation));
         }
-
-        const widgetTasks = Array.from(widgetsToClear.values()).map((widget) =>
-          this.clearWidgetValue(doc, pdfPage, widget),
-        );
-        const cleanupTasks = [...removalTasks, ...widgetTasks];
+        const cleanupTasks = [...removalTasks];
 
         this.runBoolTasks(cleanupTasks).wait(
           () => {
@@ -1536,7 +1474,6 @@ export class RedactionPlugin extends BasePlugin<
           this.engine.getPageAnnotations(doc, page).wait(
             (pageAnnotations) => {
               const removeById = new Map<string, PdfAnnotationObject>();
-              const widgetsToClear = new Map<string, PdfWidgetAnnoObject>();
 
               for (const annotation of pageAnnotations) {
                 pageByAnnotationId.set(annotation.id, annotation.pageIndex);
@@ -1546,20 +1483,12 @@ export class RedactionPlugin extends BasePlugin<
                 if (!this.intersectsAnyRect(annotation.rect, redactionRects)) continue;
                 if (annotation.type === PdfAnnotationSubtype.REDACT) continue;
 
-                if (annotation.type === PdfAnnotationSubtype.WIDGET) {
-                  widgetsToClear.set(annotation.id, annotation as PdfWidgetAnnoObject);
-                } else {
-                  removeById.set(annotation.id, annotation);
-                  widgetsToClear.delete(annotation.id);
-                }
+                removeById.set(annotation.id, annotation);
               }
 
               const cleanupTasks: Task<boolean, PdfErrorReason>[] = [
                 ...Array.from(removeById.values()).map((annotation) =>
                   this.engine.removePageAnnotation(doc, page, annotation),
-                ),
-                ...Array.from(widgetsToClear.values()).map((widget) =>
-                  this.clearWidgetValue(doc, page, widget),
                 ),
               ];
 
