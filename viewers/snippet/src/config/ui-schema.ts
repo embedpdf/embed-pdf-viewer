@@ -27,8 +27,8 @@ export const viewerUISchema: UISchema = {
         localeOverrides: {
           groups: [
             {
-              id: 'chinese-languages',
-              locales: ['zh-CN'],
+              id: 'cjk-languages',
+              locales: ['zh-CN', 'ja'],
               breakpoints: {
                 sm: {
                   replaceHide: ['zoom-toolbar', 'mode-select-button', 'overflow-tabs-button'],
