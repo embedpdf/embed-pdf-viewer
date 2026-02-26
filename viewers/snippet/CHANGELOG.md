@@ -1,5 +1,17 @@
 # @embedpdf/snippet
 
+## 2.7.0
+
+### Patch Changes
+
+- [#486](https://github.com/embedpdf/embed-pdf-viewer/pull/486) by [@shunyy](https://github.com/shunyy) – Add Japanese (`ja`) translations to the snippet viewer. Thanks to @shunyy !
+
+- [#478](https://github.com/embedpdf/embed-pdf-viewer/pull/478) by [@phreyah](https://github.com/phreyah) – Add Swedish (`sv`) translations to the snippet viewer.
+
+- [#487](https://github.com/embedpdf/embed-pdf-viewer/pull/487) by [@shunyy](https://github.com/shunyy) – Expose `fontFallback` configuration option in the snippet viewer.
+
+- [#467](https://github.com/embedpdf/embed-pdf-viewer/pull/467) by [@bobsingor](https://github.com/bobsingor) – Fixed color matching case insensitivity and rotation debounce logic in the annotation sidebar.
+
 ## 2.6.2
 
 ## 2.6.1
