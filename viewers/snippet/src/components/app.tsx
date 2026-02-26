@@ -4,6 +4,7 @@ import styles from '../styles/index.css';
 import { EmbedPDF } from '@embedpdf/core/preact';
 import { createPluginRegistration, PluginRegistry, PermissionConfig } from '@embedpdf/core';
 import { usePdfiumEngine } from '@embedpdf/engines/preact';
+import type { FontFallbackConfig } from '@embedpdf/engines';
 import { AllLogger, ConsoleLogger, PerfLogger, Rotation } from '@embedpdf/models';
 import {
   Viewport,
@@ -161,6 +162,8 @@ export interface PDFViewerConfig {
   wasmUrl?: string;
   /** Enable debug logging. Default: false */
   log?: boolean;
+  /** Font fallback configuration. Defaults to CDN fonts from jsDelivr. */
+  fontFallback?: FontFallbackConfig;
 
   // === Global Permissions ===
   /**
@@ -469,6 +472,7 @@ const logger = new AllLogger([new ConsoleLogger(), new PerfLogger()]);
 export function PDFViewer({ config, onRegistryReady }: PDFViewerProps) {
   const { engine, isLoading } = usePdfiumEngine({
     ...(config.wasmUrl && { wasmUrl: config.wasmUrl }),
+    ...(config.fontFallback && { fontFallback: config.fontFallback }),
     worker: config.worker,
     logger: config.log ? logger : undefined,
   });
