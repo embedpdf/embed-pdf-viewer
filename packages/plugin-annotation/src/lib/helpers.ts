@@ -39,6 +39,7 @@ export type TextMarkupSubtype =
   | PdfAnnotationSubtype.SQUIGGLY;
 export type SidebarSubtype =
   | TextMarkupSubtype
+  | PdfAnnotationSubtype.TEXT
   | PdfAnnotationSubtype.INK
   | PdfAnnotationSubtype.SQUARE
   | PdfAnnotationSubtype.CIRCLE
@@ -155,6 +156,7 @@ export function isSidebarAnnotation(
   a: TrackedAnnotation,
 ): a is TrackedAnnotation<AnnoOf<SidebarSubtype>> {
   return (
+    (isText(a) && !a.object.inReplyToId) ||
     isTextMarkup(a) ||
     isInk(a) ||
     isSquare(a) ||
