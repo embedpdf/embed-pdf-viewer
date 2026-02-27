@@ -1,5 +1,11 @@
 # @embedpdf/plugin-redaction
 
+## 2.7.0
+
+### Patch Changes
+
+- [#467](https://github.com/embedpdf/embed-pdf-viewer/pull/467) by [@bobsingor](https://github.com/bobsingor) – Updated redaction tools and renderers to explicitly disable appearance stream usage, ensuring dynamic rendering for redaction marks.
+
 ## 2.6.2
 
 ## 2.6.1

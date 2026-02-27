@@ -27,6 +27,8 @@ const locales = [
   { code: 'fr', name: 'French' },
   { code: 'es', name: 'Spanish' },
   { code: 'zh-CN', name: 'Chinese' },
+  { code: 'ja', name: 'Japanese' },
+  { code: 'sv', name: 'Swedish' },
 ];
 
 const currentLocale = ref('en');
