@@ -45,6 +45,10 @@ export class ThumbnailPlugin extends BasePlugin<
 
   // Per-document task caches
   private readonly taskCaches = new Map<string, Map<number, Task<Blob, PdfErrorReason>>>();
+  private readonly bitmapTaskCaches = new Map<
+    string,
+    Map<number, Task<ImageBitmap, PdfErrorReason>>
+  >();
 
   // Per-document auto-scroll tracking
   private readonly canAutoScroll = new Map<string, boolean>();
@@ -82,6 +86,12 @@ export class ThumbnailPlugin extends BasePlugin<
           taskCache.delete(pageIndex);
         }
       }
+      const bitmapTaskCache = this.bitmapTaskCaches.get(documentId);
+      if (bitmapTaskCache) {
+        for (const pageIndex of pages) {
+          bitmapTaskCache.delete(pageIndex);
+        }
+      }
     });
 
     // Auto-scroll thumbnails when the main scroller's current page changes
@@ -114,6 +124,7 @@ export class ThumbnailPlugin extends BasePlugin<
 
     // Initialize task cache
     this.taskCaches.set(documentId, new Map());
+    this.bitmapTaskCaches.set(documentId, new Map());
     this.canAutoScroll.set(documentId, true);
 
     this.logger.debug(
@@ -144,6 +155,17 @@ export class ThumbnailPlugin extends BasePlugin<
       taskCache.clear();
       this.taskCaches.delete(documentId);
     }
+    const bitmapTaskCache = this.bitmapTaskCaches.get(documentId);
+    if (bitmapTaskCache) {
+      bitmapTaskCache.forEach((task) => {
+        task.abort({
+          code: 'cancelled' as any,
+          message: 'Document closed',
+        });
+      });
+      bitmapTaskCache.clear();
+      this.bitmapTaskCaches.delete(documentId);
+    }
 
     this.canAutoScroll.delete(documentId);
     this.window$.clearScope(documentId);
@@ -170,6 +192,8 @@ export class ThumbnailPlugin extends BasePlugin<
       // Active document operations
       scrollToThumb: (pageIdx) => this.scrollToThumb(pageIdx),
       renderThumb: (idx, dpr) => this.renderThumb(idx, dpr),
+      renderThumbBitmap: (idx, dpr) => this.renderThumbBitmap(idx, dpr),
+      renderMode: this.renderCapability.renderMode,
       updateWindow: (scrollY, viewportH) => this.updateWindow(scrollY, viewportH),
       getWindow: () => this.getWindow(),
 
@@ -191,6 +215,8 @@ export class ThumbnailPlugin extends BasePlugin<
     return {
       scrollToThumb: (pageIdx) => this.scrollToThumb(pageIdx, documentId),
       renderThumb: (idx, dpr) => this.renderThumb(idx, dpr, documentId),
+      renderThumbBitmap: (idx, dpr) => this.renderThumbBitmap(idx, dpr, documentId),
+      renderMode: this.renderCapability.renderMode,
       updateWindow: (scrollY, viewportH) => this.updateWindow(scrollY, viewportH, documentId),
       getWindow: () => this.getWindow(documentId),
       onWindow: this.window$.forScope(documentId),
@@ -402,6 +428,51 @@ export class ThumbnailPlugin extends BasePlugin<
     return task;
   }
 
+  // Probably makes less sense for thumbnails because bitmaps are not reusable like blobs.
+  // Just for benchmarking purposes...
+  private renderThumbBitmap(idx: number, dpr: number, documentId?: string) {
+    const id = documentId ?? this.getActiveDocumentId();
+    const bitmapTaskCache = this.bitmapTaskCaches.get(id);
+    if (!bitmapTaskCache) {
+      throw new Error(`Bitmap task cache not found for document: ${id}`);
+    }
+
+    if (bitmapTaskCache.has(idx)) return bitmapTaskCache.get(idx)!;
+
+    const coreDoc = this.coreState.core.documents[id];
+    if (!coreDoc?.document) {
+      throw new Error(`Document not found: ${id}`);
+    }
+
+    const page = coreDoc.document.pages[idx];
+    if (!page) {
+      throw new Error(`Page ${idx} not found in document: ${id}`);
+    }
+
+    const OUTER_W = this.cfg.width ?? 120;
+    const P = this.cfg.imagePadding ?? 0;
+    const INNER_W = Math.max(1, OUTER_W - 2 * P);
+
+    const scale = INNER_W / page.size.width;
+
+    const task = this.renderCapability.forDocument(id).renderPageRectBitmap({
+      pageIndex: idx,
+      rect: { origin: { x: 0, y: 0 }, size: page.size },
+      options: {
+        scaleFactor: scale,
+        dpr,
+        rotation: page.rotation,
+      },
+    });
+
+    bitmapTaskCache.set(idx, task);
+    task.wait(
+      () => bitmapTaskCache.delete(idx),
+      () => bitmapTaskCache.delete(idx),
+    );
+    return task;
+  }
+
   // ─────────────────────────────────────────────────────────
   // Lifecycle
   // ─────────────────────────────────────────────────────────
@@ -426,6 +497,18 @@ export class ThumbnailPlugin extends BasePlugin<
       cache.clear();
     });
     this.taskCaches.clear();
+
+    this.bitmapTaskCaches.forEach((cache) => {
+      cache.forEach((task) => {
+        task.abort({
+          code: 'cancelled' as any,
+          message: 'Plugin destroyed',
+        });
+      });
+      cache.clear();
+    });
+    this.bitmapTaskCaches.clear();
+
     this.canAutoScroll.clear();
 
     super.destroy();

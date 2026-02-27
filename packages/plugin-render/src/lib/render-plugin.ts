@@ -1,4 +1,5 @@
 import { BasePlugin, PluginRegistry } from '@embedpdf/core';
+import { PdfDocumentObject, PdfPageObject, PdfRenderPageOptions } from '@embedpdf/models';
 import {
   RenderCapability,
   RenderPageOptions,
@@ -32,6 +33,9 @@ export class RenderPlugin extends BasePlugin<RenderPluginConfig, RenderCapabilit
       renderPageRect: (options: RenderPageRectOptions) => this.renderPageRect(options),
       renderPageRaw: (options: RenderPageOptions) => this.renderPageRaw(options),
       renderPageRectRaw: (options: RenderPageRectOptions) => this.renderPageRectRaw(options),
+      renderPageBitmap: (options: RenderPageOptions) => this.renderPageBitmap(options),
+      renderPageRectBitmap: (options: RenderPageRectOptions) => this.renderPageRectBitmap(options),
+      renderMode: this.config.renderMode ?? 'blob',
 
       // Document-scoped operations
       forDocument: (documentId: string) => this.createRenderScope(documentId),
@@ -49,6 +53,51 @@ export class RenderPlugin extends BasePlugin<RenderPluginConfig, RenderCapabilit
       renderPageRaw: (options: RenderPageOptions) => this.renderPageRaw(options, documentId),
       renderPageRectRaw: (options: RenderPageRectOptions) =>
         this.renderPageRectRaw(options, documentId),
+      renderPageBitmap: (options: RenderPageOptions) => this.renderPageBitmap(options, documentId),
+      renderPageRectBitmap: (options: RenderPageRectOptions) =>
+        this.renderPageRectBitmap(options, documentId),
+      renderMode: this.config.renderMode ?? 'blob',
+    };
+  }
+
+  // ─────────────────────────────────────────────────────────
+  // Helpers
+  // ─────────────────────────────────────────────────────────
+
+  private resolveDocAndPage(
+    pageIndex: number,
+    documentId?: string,
+  ): { doc: PdfDocumentObject; page: PdfPageObject } {
+    const id = documentId ?? this.getActiveDocumentId();
+    const coreDoc = this.coreState.core.documents[id];
+
+    if (!coreDoc?.document) {
+      throw new Error(`Document ${id} not loaded`);
+    }
+
+    const page = coreDoc.document.pages.find((p) => p.index === pageIndex);
+    if (!page) {
+      throw new Error(`Page ${pageIndex} not found in document ${id}`);
+    }
+
+    return { doc: coreDoc.document, page };
+  }
+
+  private mergeImageOptions(options?: PdfRenderPageOptions): PdfRenderPageOptions {
+    return {
+      ...(options ?? {}),
+      withForms: options?.withForms ?? this.config.withForms ?? false,
+      withAnnotations: options?.withAnnotations ?? this.config.withAnnotations ?? false,
+      imageType: options?.imageType ?? this.config.defaultImageType ?? 'image/png',
+      imageQuality: options?.imageQuality ?? this.config.defaultImageQuality ?? 0.92,
+    };
+  }
+
+  private mergeRawOptions(options?: PdfRenderPageOptions): PdfRenderPageOptions {
+    return {
+      ...(options ?? {}),
+      withForms: options?.withForms ?? this.config.withForms ?? false,
+      withAnnotations: options?.withAnnotations ?? this.config.withAnnotations ?? false,
     };
   }
 
@@ -57,51 +106,13 @@ export class RenderPlugin extends BasePlugin<RenderPluginConfig, RenderCapabilit
   // ─────────────────────────────────────────────────────────
 
   private renderPage({ pageIndex, options }: RenderPageOptions, documentId?: string) {
-    const id = documentId ?? this.getActiveDocumentId();
-    const coreDoc = this.coreState.core.documents[id];
-
-    if (!coreDoc?.document) {
-      throw new Error(`Document ${id} not loaded`);
-    }
-
-    const page = coreDoc.document.pages.find((p) => p.index === pageIndex);
-    if (!page) {
-      throw new Error(`Page ${pageIndex} not found in document ${id}`);
-    }
-
-    const mergedOptions = {
-      ...(options ?? {}),
-      withForms: options?.withForms ?? this.config.withForms ?? false,
-      withAnnotations: options?.withAnnotations ?? this.config.withAnnotations ?? false,
-      imageType: options?.imageType ?? this.config.defaultImageType ?? 'image/png',
-      imageQuality: options?.imageQuality ?? this.config.defaultImageQuality ?? 0.92,
-    };
-
-    return this.engine.renderPage(coreDoc.document, page, mergedOptions);
+    const { doc, page } = this.resolveDocAndPage(pageIndex, documentId);
+    return this.engine.renderPage(doc, page, this.mergeImageOptions(options));
   }
 
   private renderPageRect({ pageIndex, rect, options }: RenderPageRectOptions, documentId?: string) {
-    const id = documentId ?? this.getActiveDocumentId();
-    const coreDoc = this.coreState.core.documents[id];
-
-    if (!coreDoc?.document) {
-      throw new Error(`Document ${id} not loaded`);
-    }
-
-    const page = coreDoc.document.pages.find((p) => p.index === pageIndex);
-    if (!page) {
-      throw new Error(`Page ${pageIndex} not found in document ${id}`);
-    }
-
-    const mergedOptions = {
-      ...(options ?? {}),
-      withForms: options?.withForms ?? this.config.withForms ?? false,
-      withAnnotations: options?.withAnnotations ?? this.config.withAnnotations ?? false,
-      imageType: options?.imageType ?? this.config.defaultImageType ?? 'image/png',
-      imageQuality: options?.imageQuality ?? this.config.defaultImageQuality ?? 0.92,
-    };
-
-    return this.engine.renderPageRect(coreDoc.document, page, rect, mergedOptions);
+    const { doc, page } = this.resolveDocAndPage(pageIndex, documentId);
+    return this.engine.renderPageRect(doc, page, rect, this.mergeImageOptions(options));
   }
 
   // ─────────────────────────────────────────────────────────
@@ -109,50 +120,52 @@ export class RenderPlugin extends BasePlugin<RenderPluginConfig, RenderCapabilit
   // ─────────────────────────────────────────────────────────
 
   private renderPageRaw({ pageIndex, options }: RenderPageOptions, documentId?: string) {
-    const id = documentId ?? this.getActiveDocumentId();
-    const coreDoc = this.coreState.core.documents[id];
-
-    if (!coreDoc?.document) {
-      throw new Error(`Document ${id} not loaded`);
-    }
-
-    const page = coreDoc.document.pages.find((p) => p.index === pageIndex);
-    if (!page) {
-      throw new Error(`Page ${pageIndex} not found in document ${id}`);
-    }
-
-    const mergedOptions = {
-      ...(options ?? {}),
-      withForms: options?.withForms ?? this.config.withForms ?? false,
-      withAnnotations: options?.withAnnotations ?? this.config.withAnnotations ?? false,
-    };
-
-    return this.engine.renderPageRaw(coreDoc.document, page, mergedOptions);
+    const { doc, page } = this.resolveDocAndPage(pageIndex, documentId);
+    return this.engine.renderPageRaw(doc, page, this.mergeRawOptions(options));
   }
 
   private renderPageRectRaw(
     { pageIndex, rect, options }: RenderPageRectOptions,
     documentId?: string,
   ) {
-    const id = documentId ?? this.getActiveDocumentId();
-    const coreDoc = this.coreState.core.documents[id];
+    const { doc, page } = this.resolveDocAndPage(pageIndex, documentId);
+    return this.engine.renderPageRectRaw(doc, page, rect, this.mergeRawOptions(options));
+  }
 
-    if (!coreDoc?.document) {
-      throw new Error(`Document ${id} not loaded`);
-    }
+  // ─────────────────────────────────────────────────────────
+  // Bitmap Rendering (raw → createImageBitmap on main thread)
+  // ─────────────────────────────────────────────────────────
 
-    const page = coreDoc.document.pages.find((p) => p.index === pageIndex);
-    if (!page) {
-      throw new Error(`Page ${pageIndex} not found in document ${id}`);
-    }
+  private renderPageBitmap({ pageIndex, options }: RenderPageOptions, documentId?: string) {
+    const { doc, page } = this.resolveDocAndPage(pageIndex, documentId);
+    return this.engine
+      .renderPageRaw(doc, page, {
+        ...this.mergeRawOptions(options),
+        priority: 3,
+      })
+      .map(async (raw) => {
+        const sizeLabel = `${raw.width}x${raw.height}`;
+        this.logger.perf('RenderPlugin', 'createImageBitmap', 'call', 'Begin', sizeLabel);
+        const bmp = await createImageBitmap(new ImageData(raw.data, raw.width, raw.height));
+        this.logger.perf('RenderPlugin', 'createImageBitmap', 'call', 'End', sizeLabel);
+        return bmp;
+      });
+  }
 
-    const mergedOptions = {
-      ...(options ?? {}),
-      withForms: options?.withForms ?? this.config.withForms ?? false,
-      withAnnotations: options?.withAnnotations ?? this.config.withAnnotations ?? false,
-    };
-
-    return this.engine.renderPageRectRaw(coreDoc.document, page, rect, mergedOptions);
+  private renderPageRectBitmap(
+    { pageIndex, rect, options }: RenderPageRectOptions,
+    documentId?: string,
+  ) {
+    const { doc, page } = this.resolveDocAndPage(pageIndex, documentId);
+    return this.engine
+      .renderPageRectRaw(doc, page, rect, this.mergeRawOptions(options))
+      .map(async (raw) => {
+        const sizeLabel = `${raw.width}x${raw.height}`;
+        this.logger.perf('RenderPlugin', 'createImageBitmap', 'call', 'Begin', sizeLabel);
+        const bmp = await createImageBitmap(new ImageData(raw.data, raw.width, raw.height));
+        this.logger.perf('RenderPlugin', 'createImageBitmap', 'call', 'End', sizeLabel);
+        return bmp;
+      });
   }
 
   // ─────────────────────────────────────────────────────────

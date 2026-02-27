@@ -88,6 +88,8 @@ export interface RefreshPagesEvent {
 export interface ThumbnailScope {
   scrollToThumb(pageIdx: number): void;
   renderThumb(pageIdx: number, dpr: number): Task<Blob, PdfErrorReason>;
+  renderThumbBitmap(pageIdx: number, dpr: number): Task<ImageBitmap, PdfErrorReason>;
+  readonly renderMode: 'blob' | 'bitmap';
   updateWindow(scrollY: number, viewportH: number): void;
   getWindow(): WindowState | null;
   onWindow: EventHook<WindowState | null>;
@@ -99,6 +101,8 @@ export interface ThumbnailCapability {
   // Active document operations
   scrollToThumb(pageIdx: number): void;
   renderThumb(pageIdx: number, dpr: number): Task<Blob, PdfErrorReason>;
+  renderThumbBitmap(pageIdx: number, dpr: number): Task<ImageBitmap, PdfErrorReason>;
+  readonly renderMode: 'blob' | 'bitmap';
   updateWindow(scrollY: number, viewportH: number): void;
   getWindow(): WindowState | null;
 

@@ -29,6 +29,11 @@ export interface RenderPluginConfig extends BasePluginConfig {
    * Defaults to `0.92`.
    */
   defaultImageQuality?: number;
+  /**
+   * 'blob' (default): encode to Blob, render via <img>.
+   * 'bitmap': createImageBitmap, render via <canvas>.
+   */
+  renderMode?: 'blob' | 'bitmap';
 }
 
 export interface RenderPageRectOptions {
@@ -48,6 +53,9 @@ export interface RenderScope {
   renderPageRect(options: RenderPageRectOptions): Task<Blob, PdfErrorReason>;
   renderPageRaw(options: RenderPageOptions): Task<ImageDataLike, PdfErrorReason>;
   renderPageRectRaw(options: RenderPageRectOptions): Task<ImageDataLike, PdfErrorReason>;
+  renderPageBitmap(options: RenderPageOptions): Task<ImageBitmap, PdfErrorReason>;
+  renderPageRectBitmap(options: RenderPageRectOptions): Task<ImageBitmap, PdfErrorReason>;
+  readonly renderMode: 'blob' | 'bitmap';
 }
 
 export interface RenderCapability {
@@ -56,6 +64,9 @@ export interface RenderCapability {
   renderPageRect(options: RenderPageRectOptions): Task<Blob, PdfErrorReason>;
   renderPageRaw(options: RenderPageOptions): Task<ImageDataLike, PdfErrorReason>;
   renderPageRectRaw(options: RenderPageRectOptions): Task<ImageDataLike, PdfErrorReason>;
+  renderPageBitmap(options: RenderPageOptions): Task<ImageBitmap, PdfErrorReason>;
+  renderPageRectBitmap(options: RenderPageRectOptions): Task<ImageBitmap, PdfErrorReason>;
+  readonly renderMode: 'blob' | 'bitmap';
 
   // Document-scoped operations
   forDocument(documentId: string): RenderScope;

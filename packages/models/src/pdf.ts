@@ -2940,6 +2940,10 @@ export interface PdfRenderOptions {
    * Image quality (0-1) for jpeg and png
    */
   imageQuality?: number;
+  /**
+   * Scheduling priority (higher = more urgent). Only used by the orchestrator engine.
+   */
+  priority?: number;
 }
 
 export interface ConvertToBlobOptions {

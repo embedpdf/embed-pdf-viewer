@@ -272,6 +272,61 @@ export class Task<R, D, P = unknown> {
   }
 
   /**
+   * Transform the result of this task using a mapping function.
+   * Returns a new Task that resolves with the mapped value.
+   * Aborting the derived task also aborts the source task.
+   *
+   * @param fn - mapping function (may return a value or a Promise)
+   * @returns a new Task that resolves with the mapped result
+   */
+  map<U>(fn: (result: R) => U | Promise<U>): Task<U, D> {
+    const derived = new Task<U, D>();
+
+    // Wire abort propagation: aborting derived aborts source
+    const originalAbort = derived.abort.bind(derived);
+    derived.abort = (reason: D) => {
+      this.abort(reason);
+      originalAbort(reason);
+    };
+
+    this.wait(
+      (result) => {
+        if (derived.state.stage !== TaskStage.Pending) return;
+        try {
+          const mapped = fn(result);
+          if (mapped instanceof Promise) {
+            mapped.then(
+              (value) => {
+                if (derived.state.stage === TaskStage.Pending) {
+                  derived.resolve(value);
+                }
+              },
+              (err) => {
+                if (derived.state.stage === TaskStage.Pending) {
+                  derived.reject(err);
+                }
+              },
+            );
+          } else {
+            derived.resolve(mapped);
+          }
+        } catch (err) {
+          if (derived.state.stage === TaskStage.Pending) {
+            derived.reject(err as D);
+          }
+        }
+      },
+      (error) => {
+        if (derived.state.stage === TaskStage.Pending) {
+          derived.fail(error);
+        }
+      },
+    );
+
+    return derived;
+  }
+
+  /**
    * add a progress callback
    * @param cb - progress callback
    */

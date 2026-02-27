@@ -142,6 +142,7 @@ import { Capture } from '@/components/capture';
 import { ProtectModal } from './protect-modal';
 import { UnlockOwnerOverlay } from './unlock-owner-overlay';
 import { ViewPermissionsModal } from './view-permissions-modal';
+import { PerfOverlay } from './perf-overlay';
 
 // ============================================================================
 // Main Configuration Interface - Uses actual plugin config types directly
@@ -460,7 +461,10 @@ function ViewerLayout({ documentId, tabBarVisibility = 'multiple' }: ViewerLayou
   );
 }
 
-const logger = new AllLogger([new ConsoleLogger(), new PerfLogger()]);
+const logger = new AllLogger([
+  // new ConsoleLogger(),
+  new PerfLogger(),
+]);
 
 export function PDFViewer({ config, onRegistryReady }: PDFViewerProps) {
   const { engine, isLoading } = usePdfiumEngine({
@@ -630,6 +634,7 @@ export function PDFViewer({ config, onRegistryReady }: PDFViewerProps) {
                     <ViewerLayout documentId={activeDocumentId} tabBarVisibility={config.tabBar} />
                     <Capture documentId={activeDocumentId} />
                     <HintLayer documentId={activeDocumentId} />
+                    <PerfOverlay />
                   </UIProvider>
                 ) : (
                   <EmptyState />

@@ -43,11 +43,18 @@ export interface TilingEvent {
 
 export interface TilingScope {
   renderTile: (options: RenderTileOptions) => Task<Blob, PdfErrorReason>;
+  renderTileBitmap: (options: RenderTileOptions) => Task<ImageBitmap, PdfErrorReason>;
+  readonly renderMode: 'blob' | 'bitmap';
   onTileRendering: EventHook<Record<number, Tile[]>>;
 }
 
 export interface TilingCapability {
   renderTile: (options: RenderTileOptions, documentId?: string) => Task<Blob, PdfErrorReason>;
+  renderTileBitmap: (
+    options: RenderTileOptions,
+    documentId?: string,
+  ) => Task<ImageBitmap, PdfErrorReason>;
+  readonly renderMode: 'blob' | 'bitmap';
   forDocument(documentId: string): TilingScope;
   onTileRendering: EventHook<TilingEvent>;
 }

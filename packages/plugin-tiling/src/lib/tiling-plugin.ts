@@ -177,6 +177,8 @@ export class TilingPlugin extends BasePlugin<TilingPluginConfig, TilingCapabilit
   protected buildCapability(): TilingCapability {
     return {
       renderTile: this.renderTile.bind(this),
+      renderTileBitmap: this.renderTileBitmap.bind(this),
+      renderMode: this.renderCapability.renderMode,
       forDocument: this.createTilingScope.bind(this),
       onTileRendering: this.tileRendering$.on,
     };
@@ -185,6 +187,8 @@ export class TilingPlugin extends BasePlugin<TilingPluginConfig, TilingCapabilit
   private createTilingScope(documentId: string): TilingScope {
     return {
       renderTile: (options) => this.renderTile(options, documentId),
+      renderTileBitmap: (options) => this.renderTileBitmap(options, documentId),
+      renderMode: this.renderCapability.renderMode,
       onTileRendering: (listener: Listener<Record<number, Tile[]>>) =>
         this.tileRendering$.on((event) => {
           if (event.documentId === documentId) listener(event.tiles);
@@ -201,6 +205,30 @@ export class TilingPlugin extends BasePlugin<TilingPluginConfig, TilingCapabilit
     this.dispatch(markTileStatus(id, options.pageIndex, options.tile.id, 'rendering'));
 
     const task = this.renderCapability.forDocument(id).renderPageRect({
+      pageIndex: options.pageIndex,
+      rect: options.tile.pageRect,
+      options: {
+        scaleFactor: options.tile.srcScale,
+        dpr: options.dpr,
+      },
+    });
+
+    task.wait(() => {
+      this.dispatch(markTileStatus(id, options.pageIndex, options.tile.id, 'ready'));
+    }, ignore);
+
+    return task;
+  }
+
+  private renderTileBitmap(options: RenderTileOptions, documentId?: string) {
+    const id = documentId ?? this.getActiveDocumentId();
+    if (!this.renderCapability) {
+      throw new Error('Render capability not available.');
+    }
+
+    this.dispatch(markTileStatus(id, options.pageIndex, options.tile.id, 'rendering'));
+
+    const task = this.renderCapability.forDocument(id).renderPageRectBitmap({
       pageIndex: options.pageIndex,
       rect: options.tile.pageRect,
       options: {
