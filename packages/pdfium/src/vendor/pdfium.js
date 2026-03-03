@@ -79,6 +79,7 @@ var createPdfium = (() => {
       '_EPDFAnnot_GetTextAlignment',
       '_EPDFAnnot_GetUnrotatedRect',
       '_EPDFAnnot_GetVerticalAlignment',
+      '_EPDFAnnot_HasAppearanceStream',
       '_EPDFAnnot_SetAction',
       '_EPDFAnnot_SetAPMatrix',
       '_EPDFAnnot_SetBorderDashPattern',
@@ -6317,6 +6318,8 @@ var createPdfium = (() => {
     ));
     var _EPDFAnnot_GetAvailableAppearanceModes = (Module['_EPDFAnnot_GetAvailableAppearanceModes'] =
       createExportWrapper('EPDFAnnot_GetAvailableAppearanceModes', 1));
+    var _EPDFAnnot_HasAppearanceStream = (Module['_EPDFAnnot_HasAppearanceStream'] =
+      createExportWrapper('EPDFAnnot_HasAppearanceStream', 2));
     var _FPDFDoc_GetAttachmentCount = (Module['_FPDFDoc_GetAttachmentCount'] = createExportWrapper(
       'FPDFDoc_GetAttachmentCount',
       1,

@@ -1,40 +1,43 @@
-import { FormFieldValue, PdfWidgetAnnoField, PdfWidgetAnnoObject } from '@embedpdf/models';
+import {
+  FormFieldValue,
+  PdfWidgetAnnoField,
+  PdfWidgetAnnoObject,
+  PdfTextWidgetAnnoField,
+  PdfCheckboxWidgetAnnoField,
+  PdfRadioButtonWidgetAnnoField,
+  PdfComboboxWidgetAnnoField,
+  PdfListboxWidgetAnnoField,
+  PdfPushButtonWidgetAnnoField,
+} from '@embedpdf/models';
 
 export interface FieldProps {
-  /**
-   * pdf annotation object
-   */
   annotation: PdfWidgetAnnoObject;
-  /**
-   * scale factor
-   */
   scale: number;
-  /**
-   * page index
-   */
   pageIndex: number;
-  /**
-   * Field info
-   */
   field: PdfWidgetAnnoField;
-  /**
-   * Whether this field is editable
-   */
   isEditable: boolean;
-  /**
-   * config
-   */
   values: FormFieldValue[];
-  /**
-   * callback for value change
-   */
   onChangeValues?: (values: FormFieldValue[]) => void;
-  /**
-   * callback when the user finishes editing (blur)
-   */
   onBlur?: () => void;
-  /**
-   * auto-focus the field when it mounts (entering edit mode)
-   */
-  autoFocus?: boolean;
+  inputRef?: (el: HTMLElement | null) => void;
 }
+
+export type TextFieldProps = Omit<FieldProps, 'field'> & {
+  field: PdfTextWidgetAnnoField;
+};
+
+export type CheckboxFieldProps = Omit<FieldProps, 'field'> & {
+  field: PdfCheckboxWidgetAnnoField;
+};
+
+export type RadioButtonFieldProps = Omit<FieldProps, 'field'> & {
+  field: PdfRadioButtonWidgetAnnoField;
+};
+
+export type ComboboxFieldProps = Omit<FieldProps, 'field'> & {
+  field: PdfComboboxWidgetAnnoField | PdfListboxWidgetAnnoField;
+};
+
+export type PushButtonFieldProps = Omit<FieldProps, 'field'> & {
+  field: PdfPushButtonWidgetAnnoField;
+};

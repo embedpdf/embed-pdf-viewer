@@ -1318,14 +1318,30 @@ export enum PdfAnnotationFlags {
  */
 export enum PDF_FORM_FIELD_FLAG {
   NONE = 0,
+  // Common flags (PDF 1.7 Table 8.70)
   READONLY = 1 << 0,
   REQUIRED = 1 << 1,
   NOEXPORT = 1 << 2,
+  // Text field flags (PDF 1.7 Table 8.77)
   TEXT_MULTIPLINE = 1 << 12,
   TEXT_PASSWORD = 1 << 13,
+  TEXT_FILESELECT = 1 << 20,
+  TEXT_DONOTSPELLCHECK = 1 << 22,
+  TEXT_DONOTSCROLL = 1 << 23,
+  TEXT_COMB = 1 << 24,
+  TEXT_RICHTEXT = 1 << 25,
+  // Button field flags (PDF 1.7 Table 8.75)
+  BUTTON_NOTOGGLETOOFF = 1 << 14,
+  BUTTON_RADIO = 1 << 15,
+  BUTTON_PUSHBUTTON = 1 << 16,
+  BUTTON_RADIOSINUNISON = 1 << 25,
+  // Choice field flags (PDF 1.7 Table 8.79)
   CHOICE_COMBO = 1 << 17,
   CHOICE_EDIT = 1 << 18,
+  CHOICE_SORT = 1 << 19,
   CHOICE_MULTL_SELECT = 1 << 21,
+  CHOICE_DONOTSPELLCHECK = 1 << 22,
+  CHOICE_COMMITONSELCHANGE = 1 << 26,
 }
 
 /**
@@ -1437,40 +1453,102 @@ export function namesToFlags(names: readonly PdfAnnotationFlagName[]): PdfAnnota
 }
 
 /**
- * Field of PDF widget annotation
+ * Shared properties across all widget annotation field types
  *
  * @public
  */
-export interface PdfWidgetAnnoField {
-  /**
-   * flag of field
-   */
+export interface PdfWidgetAnnoFieldBase {
   flag: PDF_FORM_FIELD_FLAG;
-  /**
-   * name of field
-   */
   name: string;
-  /**
-   * alternate name of field
-   */
   alternateName: string;
-  /**
-   * type of field
-   */
-  type: PDF_FORM_FIELD_TYPE;
-  /**
-   * value of field
-   */
   value: string;
-  /**
-   * whether field is checked
-   */
+}
+
+/**
+ * @public
+ */
+export interface PdfTextWidgetAnnoField extends PdfWidgetAnnoFieldBase {
+  type: PDF_FORM_FIELD_TYPE.TEXTFIELD;
+  maxLen?: number;
+}
+
+/**
+ * @public
+ */
+export interface PdfCheckboxWidgetAnnoField extends PdfWidgetAnnoFieldBase {
+  type: PDF_FORM_FIELD_TYPE.CHECKBOX;
   isChecked: boolean;
-  /**
-   * options of field
-   */
+}
+
+/**
+ * @public
+ */
+export interface PdfRadioButtonWidgetAnnoField extends PdfWidgetAnnoFieldBase {
+  type: PDF_FORM_FIELD_TYPE.RADIOBUTTON;
+  isChecked: boolean;
   options: PdfWidgetAnnoOption[];
 }
+
+/**
+ * @public
+ */
+export interface PdfComboboxWidgetAnnoField extends PdfWidgetAnnoFieldBase {
+  type: PDF_FORM_FIELD_TYPE.COMBOBOX;
+  options: PdfWidgetAnnoOption[];
+}
+
+/**
+ * @public
+ */
+export interface PdfListboxWidgetAnnoField extends PdfWidgetAnnoFieldBase {
+  type: PDF_FORM_FIELD_TYPE.LISTBOX;
+  options: PdfWidgetAnnoOption[];
+}
+
+/**
+ * @public
+ */
+export interface PdfPushButtonWidgetAnnoField extends PdfWidgetAnnoFieldBase {
+  type: PDF_FORM_FIELD_TYPE.PUSHBUTTON;
+}
+
+/**
+ * @public
+ */
+export interface PdfSignatureWidgetAnnoField extends PdfWidgetAnnoFieldBase {
+  type: PDF_FORM_FIELD_TYPE.SIGNATURE;
+}
+
+/**
+ * @public
+ */
+export interface PdfUnknownWidgetAnnoField extends PdfWidgetAnnoFieldBase {
+  type:
+    | PDF_FORM_FIELD_TYPE.UNKNOWN
+    | PDF_FORM_FIELD_TYPE.XFA
+    | PDF_FORM_FIELD_TYPE.XFA_CHECKBOX
+    | PDF_FORM_FIELD_TYPE.XFA_COMBOBOX
+    | PDF_FORM_FIELD_TYPE.XFA_IMAGEFIELD
+    | PDF_FORM_FIELD_TYPE.XFA_LISTBOX
+    | PDF_FORM_FIELD_TYPE.XFA_PUSHBUTTON
+    | PDF_FORM_FIELD_TYPE.XFA_SIGNATURE
+    | PDF_FORM_FIELD_TYPE.XFA_TEXTFIELD;
+}
+
+/**
+ * Discriminated union of all widget annotation field types
+ *
+ * @public
+ */
+export type PdfWidgetAnnoField =
+  | PdfTextWidgetAnnoField
+  | PdfCheckboxWidgetAnnoField
+  | PdfRadioButtonWidgetAnnoField
+  | PdfComboboxWidgetAnnoField
+  | PdfListboxWidgetAnnoField
+  | PdfPushButtonWidgetAnnoField
+  | PdfSignatureWidgetAnnoField
+  | PdfUnknownWidgetAnnoField;
 
 /**
  * PDF widget object

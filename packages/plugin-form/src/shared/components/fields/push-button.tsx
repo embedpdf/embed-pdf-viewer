@@ -1,13 +1,8 @@
 import { PDF_FORM_FIELD_FLAG } from '@embedpdf/models';
-import { FieldProps } from '../types';
+import { PushButtonFieldProps } from '../types';
 import { buttonStyle } from './style';
 
-/**
- *
- * @param props - properties of PushButton field
- * @returns PushButtonField component
- */
-export function PushButtonField(props: FieldProps) {
+export function PushButtonField(props: PushButtonFieldProps) {
   const { field, isEditable } = props;
 
   const { flag } = field;

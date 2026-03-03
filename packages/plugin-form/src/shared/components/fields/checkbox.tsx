@@ -1,10 +1,10 @@
 import { PDF_FORM_FIELD_FLAG } from '@embedpdf/models';
 import { FormEvent, useCallback, useMemo } from '@framework';
 
-import { FieldProps } from '../types';
+import { CheckboxFieldProps } from '../types';
 import { checkboxStyle } from './style';
 
-export function CheckboxField(props: FieldProps) {
+export function CheckboxField(props: CheckboxFieldProps) {
   const { field, isEditable, values, onChangeValues } = props;
 
   const { flag } = field;
@@ -27,7 +27,7 @@ export function CheckboxField(props: FieldProps) {
   }, [field.isChecked, values[0]]);
 
   const isDisabled = !isEditable || !!(flag & PDF_FORM_FIELD_FLAG.READONLY);
-  const isRequired = !!(flag & PDF_FORM_FIELD_FLAG.READONLY);
+  const isRequired = !!(flag & PDF_FORM_FIELD_FLAG.REQUIRED);
 
   return (
     <input
@@ -39,7 +39,6 @@ export function CheckboxField(props: FieldProps) {
       value={field.value}
       checked={isChecked}
       onChange={handleChange}
-      autoFocus={props.autoFocus}
       style={checkboxStyle}
     />
   );

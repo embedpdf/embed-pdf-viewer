@@ -1,10 +1,10 @@
 import { PdfWidgetAnnoOption, PDF_FORM_FIELD_FLAG } from '@embedpdf/models';
 import { FormEvent, useCallback, useMemo } from '@framework';
 
-import { FieldProps } from '../types';
+import { RadioButtonFieldProps } from '../types';
 import { buttonStyle } from './style';
 
-export function RadioButtonField(props: FieldProps) {
+export function RadioButtonField(props: RadioButtonFieldProps) {
   const { field, isEditable, values, onChangeValues } = props;
 
   const { flag, options } = field;
@@ -33,7 +33,7 @@ export function RadioButtonField(props: FieldProps) {
   );
 
   const isDisabled = !isEditable || !!(flag & PDF_FORM_FIELD_FLAG.READONLY);
-  const isRequired = !!(flag & PDF_FORM_FIELD_FLAG.READONLY);
+  const isRequired = !!(flag & PDF_FORM_FIELD_FLAG.REQUIRED);
 
   return (
     <input
@@ -45,7 +45,6 @@ export function RadioButtonField(props: FieldProps) {
       value={defaultValue}
       checked={isChecked}
       onChange={handleChange}
-      autoFocus={props.autoFocus}
       style={buttonStyle}
     />
   );

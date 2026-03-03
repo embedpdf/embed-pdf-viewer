@@ -73,6 +73,7 @@ export const functions = {
   EPDFAnnot_GetTextAlignment: [['number'] as const, 'number'] as const,
   EPDFAnnot_GetUnrotatedRect: [['number', 'number'] as const, 'boolean'] as const,
   EPDFAnnot_GetVerticalAlignment: [['number'] as const, 'number'] as const,
+  EPDFAnnot_HasAppearanceStream: [['number', 'number'] as const, 'boolean'] as const,
   EPDFAnnot_SetAction: [['number', 'number'] as const, 'boolean'] as const,
   EPDFAnnot_SetAPMatrix: [['number', 'number', 'number'] as const, 'boolean'] as const,
   EPDFAnnot_SetBorderDashPattern: [['number', 'number', 'number'] as const, 'boolean'] as const,

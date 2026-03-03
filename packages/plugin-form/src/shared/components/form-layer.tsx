@@ -35,6 +35,7 @@ export function FormLayer({
   const scope = useMemo(() => formProvides?.forDocument(documentId), [formProvides, documentId]);
 
   const [annoWidgets, setAnnoWidgets] = useState<PdfWidgetAnnoObject[]>([]);
+  const [fieldValues, setFieldValues] = useState<Record<string, FormFieldValue[]>>({});
 
   useEffect(() => {
     if (!scope) return;
@@ -45,6 +46,7 @@ export function FormLayer({
   const onChangeValues = useCallback(
     (annotation: PdfWidgetAnnoObject, values: FormFieldValue[]) => {
       if (!scope) return;
+      setFieldValues((prev) => ({ ...prev, [annotation.id]: values }));
       const task = scope.setFormFieldValues(pageIndex, annotation, values);
       task.wait(ignore, ignore);
     },
@@ -61,7 +63,7 @@ export function FormLayer({
           annotation={annoWidget}
           field={annoWidget.field}
           isEditable={true}
-          values={[]}
+          values={fieldValues[annoWidget.id] ?? []}
           onChangeValues={(values) => onChangeValues(annoWidget, values)}
         />
       ))}

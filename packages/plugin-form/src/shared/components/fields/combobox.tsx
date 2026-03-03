@@ -1,45 +1,53 @@
-import { PdfWidgetAnnoOption, PDF_FORM_FIELD_FLAG } from '@embedpdf/models';
+import { PdfWidgetAnnoOption, PDF_FORM_FIELD_FLAG, FormFieldValue } from '@embedpdf/models';
 import { FormEvent, useCallback, useMemo, selectProps, optionProps } from '@framework';
 
-import { FieldProps } from '../types';
+import { ComboboxFieldProps } from '../types';
 import { selectStyle } from './style';
 
-export function ComboboxField(props: FieldProps) {
-  const { field, isEditable, values, onChangeValues, onBlur, autoFocus } = props;
+export function ComboboxField(props: ComboboxFieldProps) {
+  const { field, isEditable, values, onChangeValues, onBlur, inputRef } = props;
 
   const { flag, options } = field;
   const name = field.alternateName || field.name;
-  const defalutValues = useMemo(() => {
-    return options
-      .filter((option: PdfWidgetAnnoOption) => {
-        return option.isSelected;
-      })
-      .map((option) => {
-        return {
-          kind: 'text',
-          text: option.label,
-        };
-      });
+  const defaultValues = useMemo(() => {
+    return options.flatMap<FormFieldValue>((option, index) =>
+      option.isSelected ? [{ kind: 'selection', index, isSelected: true }] : [],
+    );
   }, [options]);
 
-  const selectedValues = values || defalutValues;
+  const selectedValues = values && values.length > 0 ? values : defaultValues;
 
   const isDisabled = !isEditable || !!(flag & PDF_FORM_FIELD_FLAG.READONLY);
-  const isRequired = !!(flag & PDF_FORM_FIELD_FLAG.READONLY);
+  const isRequired = !!(flag & PDF_FORM_FIELD_FLAG.REQUIRED);
   const isMultipleChoice = !!(flag & PDF_FORM_FIELD_FLAG.CHOICE_MULTL_SELECT);
 
   const handleChange = useCallback(
     (evt: FormEvent) => {
-      const value = (evt.target as HTMLSelectElement).value;
-      onChangeValues?.([{ kind: 'text', text: value }]);
+      const select = evt.target as HTMLSelectElement;
+      if (isMultipleChoice) {
+        const selected: FormFieldValue[] = [];
+        for (let i = 0; i < select.options.length; i++) {
+          if (select.options[i].selected) {
+            selected.push({ kind: 'selection', index: i, isSelected: true });
+          }
+        }
+        onChangeValues?.(selected);
+      } else {
+        onChangeValues?.([{ kind: 'selection', index: select.selectedIndex, isSelected: true }]);
+      }
     },
-    [onChangeValues],
+    [onChangeValues, isMultipleChoice],
   );
 
-  const selectedTexts = selectedValues.map((value) => (value.kind === 'text' ? value.text : 'On'));
+  const selectedTexts = selectedValues.map((value) => {
+    if (value.kind === 'selection') return options[value.index]?.label ?? '';
+    if (value.kind === 'text') return value.text;
+    return '';
+  });
 
   return (
     <select
+      ref={inputRef as (el: HTMLSelectElement | null) => void}
       required={isRequired}
       disabled={isDisabled}
       multiple={isMultipleChoice}
@@ -48,7 +56,6 @@ export function ComboboxField(props: FieldProps) {
       {...selectProps(isMultipleChoice, selectedTexts)}
       onChange={handleChange}
       onBlur={onBlur}
-      autoFocus={autoFocus}
       style={selectStyle}
     >
       {options.map((option: PdfWidgetAnnoOption, index) => {

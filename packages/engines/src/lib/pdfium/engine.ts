@@ -54,6 +54,7 @@ import {
   PdfHighlightAnnoObject,
   PdfStampAnnoObjectContents,
   PdfWidgetAnnoField,
+  PdfUnknownWidgetAnnoField,
   PdfTransformMatrix,
   FormFieldValue,
   PdfErrorCode,
@@ -1914,32 +1915,36 @@ export class PdfiumNative implements IPdfiumExecutor {
         break;
       case 'checked':
         {
-          const kReturn = 0x0d;
-          if (!this.pdfiumModule.FORM_OnChar(formHandle, pageCtx.pagePtr, kReturn, 0)) {
-            this.logger.debug(
-              LOG_SOURCE,
-              LOG_CATEGORY,
-              'SetFormFieldValue',
-              'failed to set field checked',
-            );
-            this.logger.perf(
-              LOG_SOURCE,
-              LOG_CATEGORY,
-              `SetFormFieldValue`,
-              'End',
-              `${doc.id}-${annotation.id}`,
-            );
-            this.pdfiumModule.FORM_ForceToKillFocus(formHandle);
-            this.pdfiumModule.FPDFPage_CloseAnnot(annotationPtr);
-            this.pdfiumModule.FORM_OnBeforeClosePage(pageCtx.pagePtr, formHandle);
-            pageCtx.release();
-            this.pdfiumModule.PDFiumExt_ExitFormFillEnvironment(formHandle);
-            this.pdfiumModule.PDFiumExt_CloseFormFillInfo(formFillInfoPtr);
+          const rawChecked = this.pdfiumModule.FPDFAnnot_IsChecked(formHandle, annotationPtr);
+          const currentlyChecked = !!rawChecked;
+          if (currentlyChecked !== value.isChecked) {
+            const kReturn = 0x0d;
+            if (!this.pdfiumModule.FORM_OnChar(formHandle, pageCtx.pagePtr, kReturn, 0)) {
+              this.logger.debug(
+                LOG_SOURCE,
+                LOG_CATEGORY,
+                'SetFormFieldValue',
+                'failed to set field checked',
+              );
+              this.logger.perf(
+                LOG_SOURCE,
+                LOG_CATEGORY,
+                `SetFormFieldValue`,
+                'End',
+                `${doc.id}-${annotation.id}`,
+              );
+              this.pdfiumModule.FORM_ForceToKillFocus(formHandle);
+              this.pdfiumModule.FPDFPage_CloseAnnot(annotationPtr);
+              this.pdfiumModule.FORM_OnBeforeClosePage(pageCtx.pagePtr, formHandle);
+              pageCtx.release();
+              this.pdfiumModule.PDFiumExt_ExitFormFillEnvironment(formHandle);
+              this.pdfiumModule.PDFiumExt_CloseFormFillInfo(formFillInfoPtr);
 
-            return PdfTaskHelper.reject({
-              code: PdfErrorCode.CantCheckField,
-              message: 'failed to set field checked',
-            });
+              return PdfTaskHelper.reject({
+                code: PdfErrorCode.CantCheckField,
+                message: 'failed to set field checked',
+              });
+            }
           }
         }
         break;
@@ -7710,49 +7715,73 @@ export class PdfiumNative implements IPdfiumExecutor {
       this.pdfiumModule.pdfium.UTF16ToString,
     );
 
-    const options: PdfWidgetAnnoOption[] = [];
-    if (type === PDF_FORM_FIELD_TYPE.COMBOBOX || type === PDF_FORM_FIELD_TYPE.LISTBOX) {
-      const count = this.pdfiumModule.FPDFAnnot_GetOptionCount(formHandle, annotationPtr);
-      for (let i = 0; i < count; i++) {
-        const label = readString(
-          this.pdfiumModule.pdfium,
-          (buffer: number, bufferLength) => {
-            return this.pdfiumModule.FPDFAnnot_GetOptionLabel(
-              formHandle,
-              annotationPtr,
-              i,
-              buffer,
-              bufferLength,
-            );
-          },
-          this.pdfiumModule.pdfium.UTF16ToString,
-        );
-        const isSelected = this.pdfiumModule.FPDFAnnot_IsOptionSelected(
-          formHandle,
-          annotationPtr,
-          i,
-        );
-        options.push({
-          label,
-          isSelected,
-        });
+    const base = { flag, name, alternateName, value };
+
+    switch (type) {
+      case PDF_FORM_FIELD_TYPE.TEXTFIELD: {
+        let maxLen: number | undefined;
+        const floatPtr = this.memoryManager.malloc(4);
+        const ok = this.pdfiumModule.FPDFAnnot_GetNumberValue(annotationPtr, 'MaxLen', floatPtr);
+        if (ok) {
+          maxLen = this.pdfiumModule.pdfium.getValue(floatPtr, 'float');
+        }
+        this.memoryManager.free(floatPtr);
+        return { ...base, type, maxLen };
       }
-    }
 
-    let isChecked = false;
-    if (type === PDF_FORM_FIELD_TYPE.CHECKBOX || type === PDF_FORM_FIELD_TYPE.RADIOBUTTON) {
-      isChecked = this.pdfiumModule.FPDFAnnot_IsChecked(formHandle, annotationPtr);
-    }
+      case PDF_FORM_FIELD_TYPE.CHECKBOX:
+        return {
+          ...base,
+          type,
+          isChecked: this.pdfiumModule.FPDFAnnot_IsChecked(formHandle, annotationPtr),
+        };
 
-    return {
-      flag,
-      type,
-      name,
-      alternateName,
-      value,
-      isChecked,
-      options,
-    };
+      case PDF_FORM_FIELD_TYPE.RADIOBUTTON:
+        return {
+          ...base,
+          type,
+          isChecked: this.pdfiumModule.FPDFAnnot_IsChecked(formHandle, annotationPtr),
+          options: this.readWidgetOptions(formHandle, annotationPtr),
+        };
+
+      case PDF_FORM_FIELD_TYPE.COMBOBOX:
+        return { ...base, type, options: this.readWidgetOptions(formHandle, annotationPtr) };
+
+      case PDF_FORM_FIELD_TYPE.LISTBOX:
+        return { ...base, type, options: this.readWidgetOptions(formHandle, annotationPtr) };
+
+      case PDF_FORM_FIELD_TYPE.PUSHBUTTON:
+        return { ...base, type };
+
+      case PDF_FORM_FIELD_TYPE.SIGNATURE:
+        return { ...base, type };
+
+      default:
+        return { ...base, type: type as PdfUnknownWidgetAnnoField['type'] };
+    }
+  }
+
+  private readWidgetOptions(formHandle: number, annotationPtr: number): PdfWidgetAnnoOption[] {
+    const options: PdfWidgetAnnoOption[] = [];
+    const count = this.pdfiumModule.FPDFAnnot_GetOptionCount(formHandle, annotationPtr);
+    for (let i = 0; i < count; i++) {
+      const label = readString(
+        this.pdfiumModule.pdfium,
+        (buffer: number, bufferLength) => {
+          return this.pdfiumModule.FPDFAnnot_GetOptionLabel(
+            formHandle,
+            annotationPtr,
+            i,
+            buffer,
+            bufferLength,
+          );
+        },
+        this.pdfiumModule.pdfium.UTF16ToString,
+      );
+      const isSelected = this.pdfiumModule.FPDFAnnot_IsOptionSelected(formHandle, annotationPtr, i);
+      options.push({ label, isSelected });
+    }
+    return options;
   }
 
   /**
@@ -7819,6 +7848,22 @@ export class PdfiumNative implements IPdfiumExecutor {
       );
       pageCtx.release();
       return PdfTaskHelper.reject({ code: PdfErrorCode.NotFound, message: 'annotation not found' });
+    }
+
+    // 1b) pre-check: does this annotation have a renderable appearance for the requested mode?
+    const hasAP = !!this.pdfiumModule.EPDFAnnot_HasAppearanceStream(annotPtr, mode);
+    if (!hasAP) {
+      this.pdfiumModule.FPDFPage_CloseAnnot(annotPtr);
+      pageCtx.release();
+      this.logger.perf(
+        LOG_SOURCE,
+        LOG_CATEGORY,
+        `RenderPageAnnotation`,
+        'End',
+        `${doc.id}-${page.index}-${annotation.id}`,
+      );
+      task.resolve({ data: new Uint8ClampedArray(4), width: 1, height: 1 });
+      return task;
     }
 
     // 2) device size (rotation-aware) → integer pixels
@@ -8048,6 +8093,10 @@ export class PdfiumNative implements IPdfiumExecutor {
     rotation: Rotation,
     finalScale: number,
   ): AnnotationAppearanceImage | null {
+    if (!this.pdfiumModule.EPDFAnnot_HasAppearanceStream(annotPtr, mode)) {
+      return null;
+    }
+
     // Read rect using EPDFAnnot_GetRect (normalized) and convert to device coords
     const pageRect = this.readPageAnnoRect(annotPtr);
     const annotRect = this.convertPageRectToDeviceRect(doc, page, pageRect);
