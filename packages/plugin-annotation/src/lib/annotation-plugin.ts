@@ -319,6 +319,11 @@ export class AnnotationPlugin extends BasePlugin<
     this.selection?.onEndSelection(({ documentId }) => {
       // Prevent creating annotations from text selection if no permission
       if (!this.checkPermission(documentId, PdfPermissionFlag.ModifyAnnotations)) {
+        this.logger.debug(
+          'AnnotationPlugin',
+          'EndSelection',
+          `No permission to create annotations for document: ${documentId}`,
+        );
         return;
       }
 
@@ -331,9 +336,9 @@ export class AnnotationPlugin extends BasePlugin<
       if (!formattedSelection || !selectionText) return;
 
       for (const selection of formattedSelection) {
-        selectionText.wait((text) => {
-          const annotationId = uuidV4();
-          // Create an annotation using the defaults from the active text tool
+        const annotationId = uuidV4();
+
+        const createWithText = (text?: string) => {
           this.createAnnotation(
             selection.pageIndex,
             {
@@ -343,9 +348,7 @@ export class AnnotationPlugin extends BasePlugin<
               pageIndex: selection.pageIndex,
               created: new Date(),
               id: annotationId,
-              custom: {
-                text: text.join('\n'),
-              },
+              ...(text != null && { custom: { text } }),
             } as PdfAnnotationObject,
             undefined,
             documentId,
@@ -357,7 +360,12 @@ export class AnnotationPlugin extends BasePlugin<
           if (activeTool.behavior?.selectAfterCreate) {
             this.selectAnnotation(selection.pageIndex, annotationId, documentId);
           }
-        }, ignore);
+        };
+
+        selectionText.wait(
+          (text) => createWithText(text.join('\n')),
+          () => createWithText(),
+        );
       }
 
       this.selection?.clear();

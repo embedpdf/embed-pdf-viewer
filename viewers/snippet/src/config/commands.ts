@@ -919,8 +919,8 @@ export const commands: Record<string, Command<State>> = {
       // If there's a selection, create highlights for it
       if (formattedSelection.length > 0) {
         for (const sel of formattedSelection) {
-          selectionText.wait((text) => {
-            const annotationId = uuidV4();
+          const annotationId = uuidV4();
+          const createWithText = (text?: string) => {
             annotationScope.createAnnotation(sel.pageIndex, {
               id: annotationId,
               created: new Date(),
@@ -932,13 +932,15 @@ export const commands: Record<string, Command<State>> = {
               pageIndex: sel.pageIndex,
               rect: sel.rect,
               segmentRects: sel.segmentRects,
-              custom: {
-                text: text.join('\n'),
-              },
+              ...(text != null && { custom: { text } }),
             });
 
             annotationScope.selectAnnotation(sel.pageIndex, annotationId);
-          }, ignore);
+          };
+          selectionText.wait(
+            (text) => createWithText(text.join('\n')),
+            () => createWithText(),
+          );
         }
         selectionScope.clear();
         annotationScope.setActiveTool('highlight');
@@ -993,8 +995,8 @@ export const commands: Record<string, Command<State>> = {
       // If there's a selection, create underlines for it
       if (formattedSelection.length > 0) {
         for (const sel of formattedSelection) {
-          selectionText.wait((text) => {
-            const annotationId = uuidV4();
+          const annotationId = uuidV4();
+          const createWithText = (text?: string) => {
             annotationScope.createAnnotation(sel.pageIndex, {
               id: annotationId,
               created: new Date(),
@@ -1005,13 +1007,15 @@ export const commands: Record<string, Command<State>> = {
               pageIndex: sel.pageIndex,
               rect: sel.rect,
               segmentRects: sel.segmentRects,
-              custom: {
-                text: text.join('\n'),
-              },
+              ...(text != null && { custom: { text } }),
             });
 
             annotationScope.selectAnnotation(sel.pageIndex, annotationId);
-          }, ignore);
+          };
+          selectionText.wait(
+            (text) => createWithText(text.join('\n')),
+            () => createWithText(),
+          );
         }
         selectionScope.clear();
         annotationScope.setActiveTool('underline');
@@ -1066,8 +1070,8 @@ export const commands: Record<string, Command<State>> = {
       // If there's a selection, create strikeouts for it
       if (formattedSelection.length > 0) {
         for (const sel of formattedSelection) {
-          selectionText.wait((text) => {
-            const annotationId = uuidV4();
+          const annotationId = uuidV4();
+          const createWithText = (text?: string) => {
             annotationScope.createAnnotation(sel.pageIndex, {
               id: annotationId,
               created: new Date(),
@@ -1078,13 +1082,15 @@ export const commands: Record<string, Command<State>> = {
               pageIndex: sel.pageIndex,
               rect: sel.rect,
               segmentRects: sel.segmentRects,
-              custom: {
-                text: text.join('\n'),
-              },
+              ...(text != null && { custom: { text } }),
             });
 
             annotationScope.selectAnnotation(sel.pageIndex, annotationId);
-          }, ignore);
+          };
+          selectionText.wait(
+            (text) => createWithText(text.join('\n')),
+            () => createWithText(),
+          );
         }
         selectionScope.clear();
         annotationScope.setActiveTool('strikeout');
@@ -1139,8 +1145,8 @@ export const commands: Record<string, Command<State>> = {
       // If there's a selection, create squiggly annotations for it
       if (formattedSelection.length > 0) {
         for (const sel of formattedSelection) {
-          selectionText.wait((text) => {
-            const annotationId = uuidV4();
+          const annotationId = uuidV4();
+          const createWithText = (text?: string) => {
             annotationScope.createAnnotation(sel.pageIndex, {
               id: annotationId,
               created: new Date(),
@@ -1151,13 +1157,15 @@ export const commands: Record<string, Command<State>> = {
               pageIndex: sel.pageIndex,
               rect: sel.rect,
               segmentRects: sel.segmentRects,
-              custom: {
-                text: text.join('\n'),
-              },
+              ...(text != null && { custom: { text } }),
             });
 
             annotationScope.selectAnnotation(sel.pageIndex, annotationId);
-          }, ignore);
+          };
+          selectionText.wait(
+            (text) => createWithText(text.join('\n')),
+            () => createWithText(),
+          );
         }
         selectionScope.clear();
         annotationScope.setActiveTool('squiggly');
