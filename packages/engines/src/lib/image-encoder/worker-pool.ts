@@ -1,5 +1,6 @@
 import { Logger, NoopLogger } from '@embedpdf/models';
 import type { EncodeImageRequest, EncodeImageResponse } from './image-encoder-worker';
+import { collectTransferables } from '../transferables';
 
 const LOG_SOURCE = 'ImageEncoderPool';
 const LOG_CATEGORY = 'Encoder';
@@ -149,7 +150,7 @@ export class ImageEncoderWorkerPool {
       );
 
       // Transfer the buffer for better performance
-      worker.postMessage(request, [imageData.data.buffer]);
+      worker.postMessage(request, { transfer: collectTransferables(request) });
     });
   }
 

@@ -189,7 +189,7 @@ export class RemoteExecutor implements IPdfiumExecutor {
         this.pendingRequests.set(id, task);
         this.logger.debug(LOG_SOURCE, LOG_CATEGORY, `Sending ${method} request:`, id);
         const transferables = collectTransferables(args);
-        this.worker.postMessage(request, transferables);
+        this.worker.postMessage(request, { transfer: transferables });
       },
       (error) => {
         this.logger.error(

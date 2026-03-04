@@ -254,7 +254,7 @@ export class WebWorkerEngine implements PdfEngine {
     const task = new WorkerTask<PdfDocumentObject>(this.worker, requestId);
 
     const request: ExecuteRequest = createRequest(requestId, 'openDocumentBuffer', [file, options]);
-    this.proxy(task, request, collectTransferables([file]));
+    this.proxy(task, request);
 
     return task;
   }
@@ -757,7 +757,7 @@ export class WebWorkerEngine implements PdfEngine {
     const task = new WorkerTask<boolean>(this.worker, requestId);
 
     const request: ExecuteRequest = createRequest(requestId, 'addAttachment', [doc, params]);
-    this.proxy(task, request, collectTransferables([params]));
+    this.proxy(task, request);
 
     return task;
   }
@@ -1029,7 +1029,7 @@ export class WebWorkerEngine implements PdfEngine {
     const task = new WorkerTask<PdfFile>(this.worker, requestId);
 
     const request: ExecuteRequest = createRequest(requestId, 'merge', [files]);
-    this.proxy(task, request, collectTransferables(files));
+    this.proxy(task, request);
 
     return task;
   }
@@ -1202,19 +1202,19 @@ export class WebWorkerEngine implements PdfEngine {
    *
    * @internal
    */
-  proxy<R>(task: WorkerTask<R>, request: ExecuteRequest, transferables: any[] = []) {
+  proxy<R>(task: WorkerTask<R>, request: ExecuteRequest) {
     this.logger.debug(
       LOG_SOURCE,
       LOG_CATEGORY,
       'send request to worker',
       task,
       request,
-      transferables,
     );
     this.logger.perf(LOG_SOURCE, LOG_CATEGORY, `${request.data.name}`, 'Begin', request.id);
     this.readyTask.wait(
       () => {
-        this.worker.postMessage(request, transferables);
+        const transferables = collectTransferables(request.data.args);
+        this.worker.postMessage(request, { transfer: transferables });
         task.wait(
           () => {
             this.logger.perf(LOG_SOURCE, LOG_CATEGORY, `${request.data.name}`, 'End', request.id);
