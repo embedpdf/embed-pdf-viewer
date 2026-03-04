@@ -13,7 +13,7 @@
     strokeWidth: number;
     scale: number;
     isSelected: boolean;
-    onClick?: (e: MouseEvent | TouchEvent) => void;
+    onClick?: (e: MouseEvent) => void;
     lineEndings?: LineEndings;
     appearanceActive?: boolean;
   }
@@ -93,7 +93,6 @@
     stroke="transparent"
     stroke-width={hitStrokeWidth}
     onpointerdown={onClick}
-    ontouchstart={onClick}
     style:cursor={isSelected ? 'move' : 'pointer'}
     style:pointer-events={isSelected ? 'none' : 'visibleStroke'}
     style:stroke-linecap="butt"
@@ -108,7 +107,6 @@
       stroke="transparent"
       stroke-width={hitStrokeWidth}
       onpointerdown={onClick}
-      ontouchstart={onClick}
       style:cursor={isSelected ? 'move' : 'pointer'}
       style:pointer-events={isSelected
         ? 'none'
@@ -127,7 +125,6 @@
       stroke="transparent"
       stroke-width={hitStrokeWidth}
       onpointerdown={onClick}
-      ontouchstart={onClick}
       style:cursor={isSelected ? 'move' : 'pointer'}
       style:pointer-events={isSelected ? 'none' : endings.end.filled ? 'visible' : 'visibleStroke'}
       style:stroke-linecap="butt"

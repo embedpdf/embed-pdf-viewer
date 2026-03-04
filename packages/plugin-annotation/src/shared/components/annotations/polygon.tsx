@@ -1,4 +1,4 @@
-import { useMemo, MouseEvent, TouchEvent } from '@framework';
+import { useMemo, MouseEvent } from '@framework';
 import { Rect, Position, PdfAnnotationBorderStyle } from '@embedpdf/models';
 
 const MIN_HIT_AREA_SCREEN_PX = 20;
@@ -14,7 +14,7 @@ interface PolygonProps {
   strokeDashArray?: number[];
   scale: number;
   isSelected: boolean;
-  onClick?: (e: MouseEvent<SVGElement> | TouchEvent<SVGElement>) => void;
+  onClick?: (e: MouseEvent<SVGElement>) => void;
   currentVertex?: Position;
   handleSize?: number;
   /** When true, AP canvas provides the visual; only render hit area */
@@ -82,7 +82,6 @@ export function Polygon({
         stroke="transparent"
         strokeWidth={hitStrokeWidth}
         onPointerDown={onClick}
-        onTouchStart={onClick}
         style={{
           cursor: isSelected ? 'move' : 'pointer',
           pointerEvents: isSelected

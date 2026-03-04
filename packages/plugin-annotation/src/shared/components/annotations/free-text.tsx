@@ -1,6 +1,5 @@
 import {
   MouseEvent,
-  TouchEvent,
   useEffect,
   useLayoutEffect,
   useRef,
@@ -23,7 +22,7 @@ interface FreeTextProps {
   annotation: TrackedAnnotation<PdfFreeTextAnnoObject>;
   pageIndex: number;
   scale: number;
-  onClick?: (e: MouseEvent<HTMLDivElement> | TouchEvent<HTMLDivElement>) => void;
+  onClick?: (e: MouseEvent<HTMLDivElement>) => void;
   onDoubleClick?: (event: MouseEvent<HTMLDivElement>) => void;
   /** When true, AP canvas provides the visual; hide text content */
   appearanceActive?: boolean;
@@ -105,7 +104,6 @@ export function FreeText({
         opacity: appearanceActive ? 0 : 1,
       }}
       onPointerDown={onClick}
-      onTouchStart={onClick}
     >
       <span
         ref={editorRef}

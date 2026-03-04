@@ -206,8 +206,8 @@ const props = withDefaults(
     selectionMenu?: AnnotationSelectionMenuRenderFn;
     /** @deprecated Use `selectionOutline.offset` instead */
     outlineOffset?: number;
-    onDoubleClick?: (event: PointerEvent | MouseEvent | TouchEvent) => void;
-    onSelect: (event: PointerEvent | MouseEvent | TouchEvent) => void;
+    onDoubleClick?: (event: PointerEvent | MouseEvent) => void;
+    onSelect: (event: PointerEvent | MouseEvent) => void;
     /** Pre-rendered appearance stream images for AP mode rendering */
     appearance?: AnnotationAppearances<Blob> | null;
     zIndex?: number;

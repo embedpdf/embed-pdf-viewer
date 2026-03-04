@@ -17,7 +17,7 @@
     /** Current page zoom factor */
     scale: number;
     /** Click handler (used for selection) */
-    onClick?: (e: MouseEvent | TouchEvent) => void;
+    onClick?: (e: MouseEvent) => void;
     /** Whether this link has an IRT (In Reply To) reference - disables direct interaction */
     hasIRT?: boolean;
   }
@@ -73,7 +73,6 @@
     {height}
     fill="transparent"
     onpointerdown={hasIRT ? undefined : onClick}
-    ontouchstart={hasIRT ? undefined : onClick}
     style:cursor={hitAreaCursor}
     style:pointer-events={hitAreaPointerEvents}
   />

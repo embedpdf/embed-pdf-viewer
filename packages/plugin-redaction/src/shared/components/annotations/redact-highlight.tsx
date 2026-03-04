@@ -1,4 +1,4 @@
-import { CSSProperties, MouseEvent, TouchEvent, useState } from '@framework';
+import { CSSProperties, MouseEvent, useState } from '@framework';
 import {
   PdfRedactAnnoObject,
   PdfStandardFont,
@@ -14,7 +14,7 @@ export interface RedactHighlightProps {
   isSelected: boolean;
   scale: number;
   pageIndex: number;
-  onClick: (e: MouseEvent<Element> | TouchEvent<Element>) => void;
+  onClick: (e: MouseEvent<Element>) => void;
   style?: CSSProperties;
 }
 
@@ -71,7 +71,6 @@ export function RedactHighlight({
         <div
           key={i}
           onPointerDown={onClick}
-          onTouchStart={onClick}
           style={{
             position: 'absolute',
             left: (rect ? b.origin.x - rect.origin.x : b.origin.x) * scale,

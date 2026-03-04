@@ -15,7 +15,7 @@
     annotation: TrackedAnnotation<PdfFreeTextAnnoObject>;
     pageIndex: number;
     scale: number;
-    onClick?: (e: MouseEvent | TouchEvent) => void;
+    onClick?: (e: MouseEvent) => void;
     onDoubleClick?: (e: MouseEvent) => void;
     appearanceActive?: boolean;
   }
@@ -111,7 +111,6 @@
   style:pointer-events={isSelected && !isEditing ? 'none' : 'auto'}
   style:opacity={appearanceActive ? 0 : 1}
   onpointerdown={onClick}
-  ontouchstart={onClick}
 >
   <span
     bind:this={editorRef}

@@ -54,9 +54,6 @@
   onpointerdown={(e) => {
     if (!isSelected) onClick(e);
   }}
-  ontouchstart={(e) => {
-    if (!isSelected) onClick(e);
-  }}
   onmouseenter={() => (isHovered = true)}
   onmouseleave={() => (isHovered = false)}
   style:position="absolute"
