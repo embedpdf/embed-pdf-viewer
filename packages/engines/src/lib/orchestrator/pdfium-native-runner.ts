@@ -256,13 +256,9 @@ export class PdfiumNativeRunner {
   /**
    * Send response back to main thread
    */
-  private respond(response: WorkerResponse, transferables?: Transferable[]): void {
+  private respond(response: WorkerResponse, transferables: Transferable[] = []): void {
     this.logger.debug(LOG_SOURCE, LOG_CATEGORY, 'Sending response:', response.type);
-    if (transferables && transferables.length > 0) {
-      self.postMessage(response, { transfer: transferables });
-    } else {
-      self.postMessage(response);
-    }
+    self.postMessage(response, { transfer: transferables });
   }
 
   /**

@@ -472,12 +472,8 @@ export class EngineRunner {
    *
    * @protected
    */
-  respond(response: Response, transferables?: Transferable[]) {
+  respond(response: Response, transferables: Transferable[] = []) {
     this.logger.debug(LOG_SOURCE, LOG_CATEGORY, 'runner respond: ', response);
-    if (transferables && transferables.length > 0) {
-      self.postMessage(response, { transfer: transferables });
-    } else {
-      self.postMessage(response);
-    }
+    self.postMessage(response, { transfer: transferables });
   }
 }

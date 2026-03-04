@@ -150,7 +150,7 @@ export class ImageEncoderWorkerPool {
       );
 
       // Transfer the buffer for better performance
-      worker.postMessage(request, { transfer: collectTransferables(request) });
+      worker.postMessage(request, { transfer: collectTransferables(request.data) });
     });
   }
 

@@ -1197,7 +1197,6 @@ export class WebWorkerEngine implements PdfEngine {
    * Send the request to webworker inside and register the task
    * @param task - task that waiting for the response
    * @param request - request that needs send to web worker
-   * @param transferables - transferables that need to transfer to webworker
    * @returns
    *
    * @internal

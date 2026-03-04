@@ -10,10 +10,13 @@ function walk(value: unknown, seen: Set<ArrayBuffer>, depth: number): void {
     return;
   }
 
+  // SharedArrayBuffer is not transferable — skip
+  if (typeof SharedArrayBuffer !== 'undefined' && value instanceof SharedArrayBuffer) {
+    return;
+  }
+
   if (ArrayBuffer.isView(value)) {
-    if (value.buffer instanceof ArrayBuffer) {
-      seen.add(value.buffer);
-    }
+    seen.add(value.buffer as ArrayBuffer);
     return;
   }
 
@@ -24,15 +27,12 @@ function walk(value: unknown, seen: Set<ArrayBuffer>, depth: number): void {
     return;
   }
 
-  const obj = value as Record<string, unknown>;
-  for (const key in obj) {
-    if (Object.prototype.hasOwnProperty.call(obj, key)) {
-      walk(obj[key], seen, depth + 1);
-    }
+  for (const key of Object.keys(value as Record<string, unknown>)) {
+    walk((value as Record<string, unknown>)[key], seen, depth + 1);
   }
 }
 
-export function collectTransferables(value: unknown): ArrayBuffer[] {
+export function collectTransferables(value: unknown): Transferable[] {
   const seen = new Set<ArrayBuffer>();
   walk(value, seen, 0);
   return Array.from(seen);
