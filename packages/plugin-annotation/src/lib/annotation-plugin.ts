@@ -102,7 +102,7 @@ import {
   inkHandlerFactory,
   freeTextHandlerFactory,
 } from './handlers';
-import { rectsIntersect, isLink } from './helpers';
+import { rectsIntersect, isSidebarAnnotation } from './helpers';
 import { PatchRegistry, TransformContext } from './patching/patch-registry';
 import {
   patchInk,
@@ -291,7 +291,7 @@ export class AnnotationPlugin extends BasePlugin<
       const pageAnnotations = (docState.pages[pageIndex] ?? [])
         .map((uid) => docState.byUid[uid])
         .filter((ta): ta is TrackedAnnotation => ta !== undefined)
-        .filter((ta) => !isLink(ta));
+        .filter((ta) => isSidebarAnnotation(ta));
 
       // Find annotations that intersect with the marquee rect
       const selectedIds = pageAnnotations
