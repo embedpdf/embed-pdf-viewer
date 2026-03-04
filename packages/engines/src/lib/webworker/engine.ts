@@ -44,6 +44,7 @@ import {
   ImageDataLike,
 } from '@embedpdf/models';
 import { ExecuteRequest, Response, SpecificExecuteRequest } from './runner';
+import { collectTransferables } from '../transferables';
 
 const LOG_SOURCE = 'WebWorkerEngine';
 const LOG_CATEGORY = 'Engine';
@@ -253,7 +254,7 @@ export class WebWorkerEngine implements PdfEngine {
     const task = new WorkerTask<PdfDocumentObject>(this.worker, requestId);
 
     const request: ExecuteRequest = createRequest(requestId, 'openDocumentBuffer', [file, options]);
-    this.proxy(task, request);
+    this.proxy(task, request, collectTransferables([file]));
 
     return task;
   }
@@ -756,7 +757,7 @@ export class WebWorkerEngine implements PdfEngine {
     const task = new WorkerTask<boolean>(this.worker, requestId);
 
     const request: ExecuteRequest = createRequest(requestId, 'addAttachment', [doc, params]);
-    this.proxy(task, request);
+    this.proxy(task, request, collectTransferables([params]));
 
     return task;
   }
@@ -1028,7 +1029,7 @@ export class WebWorkerEngine implements PdfEngine {
     const task = new WorkerTask<PdfFile>(this.worker, requestId);
 
     const request: ExecuteRequest = createRequest(requestId, 'merge', [files]);
-    this.proxy(task, request);
+    this.proxy(task, request, collectTransferables(files));
 
     return task;
   }
