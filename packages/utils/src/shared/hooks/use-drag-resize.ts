@@ -1,7 +1,7 @@
-import { useRef, useCallback, useEffect, PointerEvent } from '@framework';
+import { PointerEvent, useCallback, useEffect, useRef } from '@framework';
 import {
-  DragResizeController,
   DragResizeConfig,
+  DragResizeController,
   InteractionEvent,
   ResizeHandle,
 } from '../plugin-interaction-primitives';
@@ -142,7 +142,7 @@ export function useDragResize(options: UseDragResizeOptions) {
       e.stopPropagation();
       const activePointerId = activePointerIdRef.current;
       if (activePointerId !== null && e.pointerId !== activePointerId) return;
-      controllerRef.current?.move(e.clientX, e.clientY, e.buttons);
+      controllerRef.current?.move(e.clientX, e.clientY, e.buttons, e.shiftKey);
 
       // Extra guard for environments where pointerup gets swallowed.
       if (activePointerIdRef.current === e.pointerId && e.buttons === 0) {
