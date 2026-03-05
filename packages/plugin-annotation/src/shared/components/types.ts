@@ -5,7 +5,7 @@ import {
   SelectionMenuPropsBase,
   SelectionMenuRenderFn,
 } from '@embedpdf/utils/@framework';
-import { JSX, CSSProperties, MouseEvent, TouchEvent } from '@framework';
+import { JSX, CSSProperties, MouseEvent } from '@framework';
 import { VertexConfig } from '../types';
 
 export type ResizeDirection = 'top-left' | 'top-right' | 'bottom-left' | 'bottom-right' | 'none';
@@ -132,7 +132,7 @@ export type CustomAnnotationRenderer<T extends PdfAnnotationObject> = (
 /**
  * Properly typed event for annotation interactions (click, select, etc.)
  */
-export type AnnotationInteractionEvent = MouseEvent<Element> | TouchEvent<Element>;
+export type AnnotationInteractionEvent = MouseEvent<Element>;
 
 /**
  * Props for an annotation renderer entry

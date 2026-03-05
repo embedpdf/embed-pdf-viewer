@@ -58,3 +58,5 @@ export { default as LinkIcon } from './LinkIcon.vue';
 export { default as LinkOffIcon } from './LinkOffIcon.vue';
 export { default as GroupIcon } from './GroupIcon.vue';
 export { default as UngroupIcon } from './UngroupIcon.vue';
+export { default as InsertTextIcon } from './InsertTextIcon.vue';
+export { default as ReplaceTextIcon } from './ReplaceTextIcon.vue';

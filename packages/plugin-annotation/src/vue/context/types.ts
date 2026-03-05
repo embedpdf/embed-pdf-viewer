@@ -5,7 +5,7 @@ import { VertexConfig } from '../../shared/types';
 /**
  * Properly typed event for annotation interactions (click, select, etc.)
  */
-export type AnnotationInteractionEvent = PointerEvent | MouseEvent | TouchEvent;
+export type AnnotationInteractionEvent = PointerEvent | MouseEvent;
 
 /**
  * Props passed to custom annotation renderer components

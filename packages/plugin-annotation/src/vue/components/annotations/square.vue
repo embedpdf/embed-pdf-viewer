@@ -22,7 +22,6 @@
       stroke="transparent"
       :stroke-width="hitStrokeWidth"
       @pointerdown="onClick"
-      @touchstart="onClick"
       :style="{
         cursor: isSelected ? 'move' : 'pointer',
         pointerEvents: isSelected ? 'none' : color === 'transparent' ? 'visibleStroke' : 'visible',
@@ -70,7 +69,7 @@ const props = withDefaults(
     strokeDashArray?: number[];
     rect: Rect;
     scale: number;
-    onClick?: (e: PointerEvent | TouchEvent) => void;
+    onClick?: (e: PointerEvent) => void;
     appearanceActive?: boolean;
   }>(),
   {
