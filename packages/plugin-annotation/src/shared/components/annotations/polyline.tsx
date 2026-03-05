@@ -1,5 +1,5 @@
 import { MouseEvent, TouchEvent, useMemo } from '@framework';
-import { Rect, Position, LineEndings } from '@embedpdf/models';
+import { Rect, Position, LineEndings, PdfAnnotationBorderStyle } from '@embedpdf/models';
 import { patching } from '@embedpdf/plugin-annotation';
 
 const MIN_HIT_AREA_SCREEN_PX = 20;
@@ -11,6 +11,10 @@ interface PolylineProps {
   strokeColor?: string;
   opacity?: number;
   strokeWidth: number;
+  /** Stroke style */
+  strokeStyle?: PdfAnnotationBorderStyle;
+  /** Stroke dash array */
+  strokeDashArray?: number[];
   scale: number;
   isSelected: boolean;
   onClick?: (e: MouseEvent<SVGElement> | TouchEvent<SVGElement>) => void;
@@ -27,6 +31,8 @@ export function Polyline({
   strokeColor = '#000000',
   opacity = 1,
   strokeWidth,
+  strokeStyle = PdfAnnotationBorderStyle.SOLID,
+  strokeDashArray,
   scale,
   isSelected,
   onClick,
@@ -153,6 +159,9 @@ export function Polyline({
               pointerEvents: 'none',
               strokeLinecap: 'butt',
               strokeLinejoin: 'miter',
+              ...(strokeStyle === PdfAnnotationBorderStyle.DASHED && {
+                strokeDasharray: strokeDashArray?.join(','),
+              }),
             }}
           />
           {endings.start && (
@@ -165,6 +174,9 @@ export function Polyline({
                 pointerEvents: 'none',
                 strokeWidth,
                 strokeLinecap: 'butt',
+                ...(strokeStyle === PdfAnnotationBorderStyle.DASHED && {
+                  strokeDasharray: strokeDashArray?.join(','),
+                }),
               }}
             />
           )}
@@ -178,6 +190,9 @@ export function Polyline({
                 pointerEvents: 'none',
                 strokeWidth,
                 strokeLinecap: 'butt',
+                ...(strokeStyle === PdfAnnotationBorderStyle.DASHED && {
+                  strokeDasharray: strokeDashArray?.join(','),
+                }),
               }}
             />
           )}
