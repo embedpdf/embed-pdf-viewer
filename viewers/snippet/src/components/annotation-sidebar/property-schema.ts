@@ -210,6 +210,8 @@ export const ANNOTATION_PROPERTIES: Partial<Record<PdfAnnotationSubtype, string[
     'color',
     'rotation',
   ],
+  [PdfAnnotationSubtype.CARET]: ['color', 'opacity'],
+
   [PdfAnnotationSubtype.REDACT]: [
     'strokeColor',
     'color',

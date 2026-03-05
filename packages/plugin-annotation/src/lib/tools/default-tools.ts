@@ -94,6 +94,58 @@ export const defaultTools = [
     },
   },
 
+  // Insert Text (Caret with intent Insert)
+  {
+    id: 'insertText' as const,
+    name: 'Insert Text',
+    matchScore: (a) => {
+      if (a.type !== PdfAnnotationSubtype.CARET) return 0;
+      return a.intent?.includes('Insert') ? 2 : 1;
+    },
+    interaction: {
+      exclusive: false,
+      textSelection: true,
+      isDraggable: false,
+      isResizable: false,
+      isRotatable: false,
+      isGroupDraggable: false,
+      isGroupResizable: false,
+    },
+    defaults: {
+      type: PdfAnnotationSubtype.CARET,
+      color: '#E44234',
+      opacity: 1,
+      intent: 'Insert',
+    },
+  },
+
+  // Replace Text (StrikeOut + Caret group)
+  {
+    id: 'replaceText' as const,
+    name: 'Replace Text',
+    matchScore: (a) => {
+      if (a.type === PdfAnnotationSubtype.STRIKEOUT && a.intent?.includes('StrikeOutTextEdit'))
+        return 2;
+      if (a.type === PdfAnnotationSubtype.CARET && a.intent?.includes('Replace')) return 2;
+      return 0;
+    },
+    interaction: {
+      exclusive: false,
+      textSelection: true,
+      isDraggable: false,
+      isResizable: false,
+      isRotatable: false,
+      isGroupDraggable: false,
+      isGroupResizable: false,
+    },
+    defaults: {
+      type: PdfAnnotationSubtype.STRIKEOUT,
+      strokeColor: '#E44234',
+      opacity: 1,
+      intent: 'StrikeOutTextEdit',
+    },
+  },
+
   // Drawing Tools
   {
     id: 'ink' as const,

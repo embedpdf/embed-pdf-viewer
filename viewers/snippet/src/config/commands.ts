@@ -1188,6 +1188,56 @@ export const commands: Record<string, Command<State>> = {
     },
   },
 
+  'annotation:add-insert-text': {
+    id: 'annotation:add-insert-text',
+    labelKey: 'annotation.insertText',
+    icon: 'text',
+    categories: ['annotation', 'annotation-markup', 'annotation-insert-text'],
+    action: ({ registry, documentId }) => {
+      const annotation = registry.getPlugin<AnnotationPlugin>(ANNOTATION_PLUGIN_ID)?.provides();
+      const annotationScope = annotation?.forDocument(documentId);
+      if (!annotationScope) return;
+
+      if (annotationScope.getActiveTool()?.id === 'insertText') {
+        annotationScope.setActiveTool(null);
+      } else {
+        annotationScope.setActiveTool('insertText');
+      }
+    },
+    active: ({ state, documentId }) => {
+      const annotation = state.plugins[ANNOTATION_PLUGIN_ID]?.documents[documentId];
+      return annotation?.activeToolId === 'insertText';
+    },
+    disabled: ({ state, documentId }) => {
+      return lacksPermission(state, documentId, PdfPermissionFlag.ModifyAnnotations);
+    },
+  },
+
+  'annotation:add-replace-text': {
+    id: 'annotation:add-replace-text',
+    labelKey: 'annotation.replaceText',
+    icon: 'text',
+    categories: ['annotation', 'annotation-markup', 'annotation-replace-text'],
+    action: ({ registry, documentId }) => {
+      const annotation = registry.getPlugin<AnnotationPlugin>(ANNOTATION_PLUGIN_ID)?.provides();
+      const annotationScope = annotation?.forDocument(documentId);
+      if (!annotationScope) return;
+
+      if (annotationScope.getActiveTool()?.id === 'replaceText') {
+        annotationScope.setActiveTool(null);
+      } else {
+        annotationScope.setActiveTool('replaceText');
+      }
+    },
+    active: ({ state, documentId }) => {
+      const annotation = state.plugins[ANNOTATION_PLUGIN_ID]?.documents[documentId];
+      return annotation?.activeToolId === 'replaceText';
+    },
+    disabled: ({ state, documentId }) => {
+      return lacksPermission(state, documentId, PdfPermissionFlag.ModifyAnnotations);
+    },
+  },
+
   'annotation:add-ink': {
     id: 'annotation:add-ink',
     labelKey: 'annotation.ink',

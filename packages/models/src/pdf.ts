@@ -2062,6 +2062,20 @@ export interface PdfStrikeOutAnnoObject extends PdfAnnotationObjectBase {
 export interface PdfCaretAnnoObject extends PdfAnnotationObjectBase {
   /** {@inheritDoc PdfAnnotationObjectBase.type} */
   type: PdfAnnotationSubtype.CARET;
+  /** Stroke/fill color of the caret symbol */
+  color?: string;
+  /** Opacity (0-1) */
+  opacity?: number;
+  /**
+   * Rectangle Differences (/RD) - inset padding from Rect to the drawn area.
+   * Typical value: \{ left: 0.5, top: 0.5, right: 0.5, bottom: 0.5 \}
+   */
+  rectangleDifferences?: {
+    left: number;
+    top: number;
+    right: number;
+    bottom: number;
+  };
 }
 
 /**

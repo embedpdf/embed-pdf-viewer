@@ -91,7 +91,14 @@ import {
 } from './selectors';
 import { initialDocumentState } from './reducer';
 import { AnnotationTool } from './tools/types';
-import { AnyPreviewState, HandlerContext, HandlerFactory, HandlerServices } from './handlers/types';
+import {
+  AnyPreviewState,
+  HandlerContext,
+  HandlerFactory,
+  HandlerServices,
+  SelectionHandlerContext,
+  SelectionHandlerFactory,
+} from './handlers/types';
 import {
   circleHandlerFactory,
   squareHandlerFactory,
@@ -101,6 +108,9 @@ import {
   lineHandlerFactory,
   inkHandlerFactory,
   freeTextHandlerFactory,
+  textMarkupSelectionHandler,
+  insertTextSelectionHandler,
+  replaceTextSelectionHandler,
 } from './handlers';
 import { rectsIntersect, isSidebarAnnotation } from './helpers';
 import { PatchRegistry, TransformContext } from './patching/patch-registry';
@@ -143,6 +153,7 @@ export class AnnotationPlugin extends BasePlugin<
   private commitInProgress = new Map<string, boolean>(); // Guard against concurrent commits
 
   private handlerFactories = new Map<PdfAnnotationSubtype, HandlerFactory<any>>();
+  private selectionHandlerFactories = new Map<string, SelectionHandlerFactory>();
   private readonly activeTool$ = createBehaviorEmitter<AnnotationActiveToolChangeEvent>();
   private readonly events$ = createBehaviorEmitter<AnnotationEvent>();
   private readonly toolsChange$ = createBehaviorEmitter<AnnotationToolsChangeEvent>();
@@ -173,6 +184,7 @@ export class AnnotationPlugin extends BasePlugin<
       registry.getPlugin<InteractionManagerPlugin>('interaction-manager')?.provides() ?? null;
 
     this.registerHandlerFactories();
+    this.registerSelectionHandlerFactories();
     this.registerBuiltInPatches();
   }
 
@@ -243,6 +255,11 @@ export class AnnotationPlugin extends BasePlugin<
     this.handlerFactories.set(PdfAnnotationSubtype.LINE, lineHandlerFactory);
     this.handlerFactories.set(PdfAnnotationSubtype.INK, inkHandlerFactory);
     this.handlerFactories.set(PdfAnnotationSubtype.FREETEXT, freeTextHandlerFactory);
+  }
+
+  private registerSelectionHandlerFactories() {
+    this.selectionHandlerFactories.set('insertText', insertTextSelectionHandler);
+    this.selectionHandlerFactories.set('replaceText', replaceTextSelectionHandler);
   }
 
   private registerBuiltInPatches() {
@@ -317,57 +334,40 @@ export class AnnotationPlugin extends BasePlugin<
     });
 
     this.selection?.onEndSelection(({ documentId }) => {
-      // Prevent creating annotations from text selection if no permission
-      if (!this.checkPermission(documentId, PdfPermissionFlag.ModifyAnnotations)) {
-        this.logger.debug(
-          'AnnotationPlugin',
-          'EndSelection',
-          `No permission to create annotations for document: ${documentId}`,
-        );
-        return;
-      }
+      if (!this.checkPermission(documentId, PdfPermissionFlag.ModifyAnnotations)) return;
 
       const activeTool = this.getActiveTool(documentId);
       if (!activeTool || !activeTool.interaction.textSelection) return;
 
       const formattedSelection = this.selection?.getFormattedSelection();
       const selectionText = this.selection?.getSelectedText();
-
       if (!formattedSelection || !selectionText) return;
 
-      for (const selection of formattedSelection) {
-        const annotationId = uuidV4();
-
-        const createWithText = (text?: string) => {
-          this.createAnnotation(
-            selection.pageIndex,
-            {
-              ...activeTool.defaults,
-              rect: selection.rect,
-              segmentRects: selection.segmentRects,
-              pageIndex: selection.pageIndex,
-              created: new Date(),
-              id: annotationId,
-              ...(text != null && { custom: { text } }),
-            } as PdfAnnotationObject,
-            undefined,
-            documentId,
+      const getText = () =>
+        new Promise<string | undefined>((resolve) => {
+          selectionText.wait(
+            (text) => resolve(text.join('\n')),
+            () => resolve(undefined),
           );
+        });
 
-          if (activeTool.behavior?.deactivateToolAfterCreate) {
-            this.setActiveTool(null, documentId);
-          }
-          if (activeTool.behavior?.selectAfterCreate) {
-            this.selectAnnotation(selection.pageIndex, annotationId, documentId);
-          }
-        };
+      const context: SelectionHandlerContext = {
+        toolId: activeTool.id,
+        documentId,
+        getTool: () => this.getActiveTool(documentId) ?? null,
+        createAnnotation: (pageIndex, annotation) =>
+          this.createAnnotation(pageIndex, annotation, undefined, documentId),
+        selectAnnotation: (pageIndex, id) => this.selectAnnotation(pageIndex, id, documentId),
+      };
 
-        selectionText.wait(
-          (text) => createWithText(text.join('\n')),
-          () => createWithText(),
-        );
+      const handler =
+        this.selectionHandlerFactories.get(activeTool.id) ?? textMarkupSelectionHandler;
+
+      handler.handle(context, formattedSelection, getText);
+
+      if (activeTool.behavior?.deactivateToolAfterCreate) {
+        this.setActiveTool(null, documentId);
       }
-
       this.selection?.clear();
     });
   }

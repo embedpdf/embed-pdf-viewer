@@ -1047,6 +1047,15 @@ export class PdfiumNative implements IPdfiumExecutor {
           saveAnnotation as PdfLinkAnnoObject,
         );
         break;
+      case PdfAnnotationSubtype.CARET:
+        isSucceed = this.addCaretContent(
+          doc,
+          page,
+          pageCtx.pagePtr,
+          annotationPtr,
+          saveAnnotation as PdfCaretAnnoObject,
+        );
+        break;
       case PdfAnnotationSubtype.REDACT:
         isSucceed = this.addRedactContent(
           doc,
@@ -1281,6 +1290,18 @@ export class PdfiumNative implements IPdfiumExecutor {
           pageCtx.pagePtr,
           annotPtr,
           saveAnnotation as PdfLinkAnnoObject,
+        );
+        break;
+      }
+
+      /* ── Caret ────────────────────────────────────────────────────────────── */
+      case PdfAnnotationSubtype.CARET: {
+        ok = this.addCaretContent(
+          doc,
+          page,
+          pageCtx.pagePtr,
+          annotPtr,
+          saveAnnotation as PdfCaretAnnoObject,
         );
         break;
       }
@@ -2508,6 +2529,46 @@ export class PdfiumNative implements IPdfiumExecutor {
     }
 
     // Apply base annotation properties (author, contents, dates, flags, custom, IRT, RT)
+    return this.applyBaseAnnotationProperties(doc, page, pagePtr, annotationPtr, annotation);
+  }
+
+  /**
+   * Add caret content to annotation
+   * @param doc - document object
+   * @param page - page info
+   * @param pagePtr - pointer to page object
+   * @param annotationPtr - pointer to caret annotation
+   * @param annotation - caret annotation
+   * @returns whether caret content is added to annotation
+   *
+   * @private
+   */
+  private addCaretContent(
+    doc: PdfDocumentObject,
+    page: PdfPageObject,
+    pagePtr: number,
+    annotationPtr: number,
+    annotation: PdfCaretAnnoObject,
+  ) {
+    if (annotation.color) {
+      this.setAnnotationColor(annotationPtr, annotation.color, PdfAnnotationColorType.Color);
+    }
+    if (annotation.opacity !== undefined) {
+      this.setAnnotationOpacity(annotationPtr, annotation.opacity);
+    }
+    if (annotation.intent) {
+      this.setAnnotIntent(annotationPtr, annotation.intent);
+    }
+    if (annotation.rectangleDifferences) {
+      const rd = annotation.rectangleDifferences;
+      this.pdfiumModule.EPDFAnnot_SetRectangleDifferences(
+        annotationPtr,
+        rd.left,
+        rd.top,
+        rd.right,
+        rd.bottom,
+      );
+    }
     return this.applyBaseAnnotationProperties(doc, page, pagePtr, annotationPtr, annotation);
   }
 
@@ -6461,12 +6522,27 @@ export class PdfiumNative implements IPdfiumExecutor {
   ): PdfCaretAnnoObject | undefined {
     const pageRect = this.readPageAnnoRect(annotationPtr);
     const rect = this.convertPageRectToDeviceRect(doc, page, pageRect);
+    const color = this.getAnnotationColor(annotationPtr);
+    const opacity = this.getAnnotationOpacity(annotationPtr);
+    const intent = this.getAnnotIntent(annotationPtr);
+    const rd = this.getRectangleDifferences(annotationPtr);
 
     return {
       pageIndex: page.index,
       id: index,
       type: PdfAnnotationSubtype.CARET,
       rect,
+      color,
+      opacity,
+      intent,
+      ...(rd.ok && {
+        rectangleDifferences: {
+          left: rd.left,
+          top: rd.top,
+          right: rd.right,
+          bottom: rd.bottom,
+        },
+      }),
       ...this.readBaseAnnotationProperties(doc, page, annotationPtr),
     };
   }
@@ -6951,7 +7027,14 @@ export class PdfiumNative implements IPdfiumExecutor {
     const parentPtr = this.pdfiumModule.FPDFAnnot_GetLinkedAnnot(annotationPtr, 'IRT');
     if (!parentPtr) return;
 
-    return this.getAnnotString(parentPtr, 'NM');
+    let nm = this.getAnnotString(parentPtr, 'NM');
+    if (!nm || !isUuidV4(nm)) {
+      nm = uuidV4();
+      this.setAnnotString(parentPtr, 'NM', nm);
+    }
+
+    this.pdfiumModule.FPDFPage_CloseAnnot(parentPtr);
+    return nm;
   }
 
   /**

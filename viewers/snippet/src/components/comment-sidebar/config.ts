@@ -118,6 +118,14 @@ export const annotationConfigs: Record<SidebarSubtype, AnnotationConfig> = {
       primaryColor: '#dc2626',
     }),
   },
+  [PdfAnnotationSubtype.CARET]: {
+    label: 'Caret',
+    labelKey: 'annotation.caret',
+    icon: 'text',
+    iconProps: (annotation: any) => ({
+      primaryColor: annotation.color || '#E44234',
+    }),
+  },
   [PdfAnnotationSubtype.REDACT]: {
     label: 'Redact',
     labelKey: 'annotation.redact',
