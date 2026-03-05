@@ -1191,7 +1191,10 @@ export const commands: Record<string, Command<State>> = {
   'annotation:add-insert-text': {
     id: 'annotation:add-insert-text',
     labelKey: 'annotation.insertText',
-    icon: 'text',
+    icon: 'insertText',
+    iconProps: ({ state }) => ({
+      primaryColor: getToolDefaultsById(state.plugins.annotation, 'insertText')?.strokeColor,
+    }),
     categories: ['annotation', 'annotation-markup', 'annotation-insert-text'],
     action: ({ registry, documentId }) => {
       const annotation = registry.getPlugin<AnnotationPlugin>(ANNOTATION_PLUGIN_ID)?.provides();
@@ -1216,7 +1219,10 @@ export const commands: Record<string, Command<State>> = {
   'annotation:add-replace-text': {
     id: 'annotation:add-replace-text',
     labelKey: 'annotation.replaceText',
-    icon: 'text',
+    icon: 'replaceText',
+    iconProps: ({ state }) => ({
+      primaryColor: getToolDefaultsById(state.plugins.annotation, 'replaceText')?.strokeColor,
+    }),
     categories: ['annotation', 'annotation-markup', 'annotation-replace-text'],
     action: ({ registry, documentId }) => {
       const annotation = registry.getPlugin<AnnotationPlugin>(ANNOTATION_PLUGIN_ID)?.provides();
@@ -1269,7 +1275,7 @@ export const commands: Record<string, Command<State>> = {
   'annotation:add-text': {
     id: 'annotation:add-text',
     labelKey: 'annotation.text',
-    icon: 'text',
+    icon: 'freeText',
     iconProps: ({ state }) => ({
       primaryColor: getToolDefaultsById(state.plugins.annotation, 'freeText')?.fontColor,
     }),

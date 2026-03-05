@@ -105,6 +105,7 @@ export const defaultTools = [
     interaction: {
       exclusive: false,
       textSelection: true,
+      showSelectionRects: true,
       isDraggable: false,
       isResizable: false,
       isRotatable: false,
@@ -113,7 +114,7 @@ export const defaultTools = [
     },
     defaults: {
       type: PdfAnnotationSubtype.CARET,
-      color: '#E44234',
+      strokeColor: '#E44234',
       opacity: 1,
       intent: 'Insert',
     },

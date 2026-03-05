@@ -40,7 +40,7 @@ export const replaceTextSelectionHandler: SelectionHandlerFactory<PdfStrikeOutAn
           id: caretId,
           pageIndex: selection.pageIndex,
           rect: caretRect,
-          color: defaults.strokeColor,
+          strokeColor: defaults.strokeColor,
           opacity: defaults.opacity,
           intent: 'Replace',
           rectangleDifferences: { left: 0.5, top: 0.5, right: 0.5, bottom: 0.5 },

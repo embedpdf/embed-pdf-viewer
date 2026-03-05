@@ -220,7 +220,7 @@ export class AnnotationPlugin extends BasePlugin<
         if (tool.interaction.textSelection) {
           // Text markup tools render their own highlight preview, so suppress selection layer rects
           this.selection.enableForMode(tool.interaction.mode ?? tool.id, {
-            showSelectionRects: false,
+            showSelectionRects: tool.interaction.showSelectionRects ?? false,
             enableSelection: true,
             enableMarquee: false,
           });

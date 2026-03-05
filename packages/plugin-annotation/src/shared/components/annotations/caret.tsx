@@ -4,8 +4,8 @@ import { Rect } from '@embedpdf/models';
 interface CaretProps {
   /** Whether the annotation is selected */
   isSelected: boolean;
-  /** Fill/stroke colour */
-  color?: string;
+  /** Stroke colour */
+  strokeColor?: string;
   /** 0 – 1 */
   opacity?: number;
   /** Bounding box of the annotation (PDF units) */
@@ -24,7 +24,7 @@ interface CaretProps {
  */
 export function Caret({
   isSelected,
-  color = '#000000',
+  strokeColor = '#000000',
   opacity = 1,
   rect,
   scale,
@@ -80,8 +80,8 @@ export function Caret({
       {!appearanceActive && (
         <path
           d={path}
-          fill={color}
-          stroke={color}
+          fill={strokeColor}
+          stroke={strokeColor}
           strokeWidth={0.5}
           opacity={opacity}
           fillRule="evenodd"

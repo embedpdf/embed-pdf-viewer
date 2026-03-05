@@ -390,20 +390,6 @@ export const viewerUISchema: UISchema = {
             },
             {
               type: 'command-button',
-              id: 'add-insert-text',
-              commandId: 'annotation:add-insert-text',
-              variant: 'icon',
-              categories: ['annotation', 'annotation-markup', 'annotation-insert-text'],
-            },
-            {
-              type: 'command-button',
-              id: 'add-replace-text',
-              commandId: 'annotation:add-replace-text',
-              variant: 'icon',
-              categories: ['annotation', 'annotation-markup', 'annotation-replace-text'],
-            },
-            {
-              type: 'command-button',
               id: 'add-ink',
               commandId: 'annotation:add-ink',
               variant: 'icon',
@@ -415,6 +401,20 @@ export const viewerUISchema: UISchema = {
               commandId: 'annotation:add-text',
               variant: 'icon',
               categories: ['annotation', 'annotation-text'],
+            },
+            {
+              type: 'command-button',
+              id: 'add-insert-text',
+              commandId: 'annotation:add-insert-text',
+              variant: 'icon',
+              categories: ['annotation', 'annotation-markup', 'annotation-insert-text'],
+            },
+            {
+              type: 'command-button',
+              id: 'add-replace-text',
+              commandId: 'annotation:add-replace-text',
+              variant: 'icon',
+              categories: ['annotation', 'annotation-markup', 'annotation-replace-text'],
             },
             {
               type: 'command-button',
@@ -1039,18 +1039,6 @@ export const viewerUISchema: UISchema = {
       items: [
         {
           type: 'command',
-          id: 'annotation:add-insert-text',
-          commandId: 'annotation:add-insert-text',
-          categories: ['annotation', 'annotation-markup', 'annotation-insert-text'],
-        },
-        {
-          type: 'command',
-          id: 'annotation:add-replace-text',
-          commandId: 'annotation:add-replace-text',
-          categories: ['annotation', 'annotation-markup', 'annotation-replace-text'],
-        },
-        {
-          type: 'command',
           id: 'annotation:add-ink',
           commandId: 'annotation:add-ink',
           categories: ['annotation', 'annotation-ink'],
@@ -1060,6 +1048,18 @@ export const viewerUISchema: UISchema = {
           id: 'annotation:add-text',
           commandId: 'annotation:add-text',
           categories: ['annotation', 'annotation-text'],
+        },
+        {
+          type: 'command',
+          id: 'annotation:add-insert-text',
+          commandId: 'annotation:add-insert-text',
+          categories: ['annotation', 'annotation-markup', 'annotation-insert-text'],
+        },
+        {
+          type: 'command',
+          id: 'annotation:add-replace-text',
+          commandId: 'annotation:add-replace-text',
+          categories: ['annotation', 'annotation-markup', 'annotation-replace-text'],
         },
         {
           type: 'command',

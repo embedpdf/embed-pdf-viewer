@@ -14,7 +14,7 @@ export const insertTextSelectionHandler: SelectionHandlerFactory<PdfCaretAnnoObj
     if (!tool) return;
 
     const getDefaults = () => ({
-      color: tool.defaults.color ?? '#E44234',
+      strokeColor: tool.defaults.strokeColor ?? '#E44234',
       opacity: tool.defaults.opacity ?? 1,
       flags: tool.defaults.flags ?? ['print'],
     });
@@ -33,7 +33,7 @@ export const insertTextSelectionHandler: SelectionHandlerFactory<PdfCaretAnnoObj
           id: caretId,
           pageIndex: selection.pageIndex,
           rect: caretRect,
-          color: defaults.color,
+          strokeColor: defaults.strokeColor,
           opacity: defaults.opacity,
           intent: 'Insert',
           rectangleDifferences: { left: 0.5, top: 0.5, right: 0.5, bottom: 0.5 },
