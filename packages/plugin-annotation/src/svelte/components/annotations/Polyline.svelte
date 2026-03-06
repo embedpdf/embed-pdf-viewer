@@ -1,5 +1,6 @@
 <script lang="ts">
   import type { Rect, Position, LineEndings } from '@embedpdf/models';
+  import { PdfAnnotationBorderStyle } from '@embedpdf/models';
   import { patching } from '@embedpdf/plugin-annotation';
 
   const MIN_HIT_AREA_SCREEN_PX = 20;
@@ -11,6 +12,8 @@
     strokeColor?: string;
     opacity?: number;
     strokeWidth: number;
+    strokeStyle?: PdfAnnotationBorderStyle;
+    strokeDashArray?: number[];
     scale: number;
     isSelected: boolean;
     onClick?: (e: MouseEvent) => void;
@@ -25,6 +28,8 @@
     strokeColor = '#000000',
     opacity = 1,
     strokeWidth,
+    strokeStyle = PdfAnnotationBorderStyle.SOLID,
+    strokeDashArray,
     scale,
     isSelected,
     onClick,
@@ -75,6 +80,9 @@
   const width = $derived(rect.size.width * scale);
   const height = $derived(rect.size.height * scale);
   const hitStrokeWidth = $derived(Math.max(strokeWidth, MIN_HIT_AREA_SCREEN_PX / scale));
+  const dash = $derived(
+    strokeStyle === PdfAnnotationBorderStyle.DASHED ? strokeDashArray?.join(',') : undefined,
+  );
 </script>
 
 <svg
@@ -142,6 +150,7 @@
       style:pointer-events="none"
       style:stroke-linecap="butt"
       style:stroke-linejoin="miter"
+      style:stroke-dasharray={dash}
     />
     {#if endings.start}
       <path
@@ -152,6 +161,7 @@
         style:pointer-events="none"
         style:stroke-width={strokeWidth}
         style:stroke-linecap="butt"
+        style:stroke-dasharray={dash}
       />
     {/if}
     {#if endings.end}
@@ -163,6 +173,7 @@
         style:pointer-events="none"
         style:stroke-width={strokeWidth}
         style:stroke-linecap="butt"
+        style:stroke-dasharray={dash}
       />
     {/if}
   {/if}
