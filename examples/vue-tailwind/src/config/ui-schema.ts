@@ -286,6 +286,18 @@ export const viewerUISchema: UISchema = {
             },
             {
               type: 'command-button',
+              id: 'add-insert-text',
+              commandId: 'annotation:add-insert-text',
+              variant: 'icon',
+            },
+            {
+              type: 'command-button',
+              id: 'add-replace-text',
+              commandId: 'annotation:add-replace-text',
+              variant: 'icon',
+            },
+            {
+              type: 'command-button',
               id: 'add-stamp',
               commandId: 'annotation:add-stamp',
               variant: 'icon',
@@ -639,6 +651,16 @@ export const viewerUISchema: UISchema = {
           type: 'command',
           id: 'annotation:add-text',
           commandId: 'annotation:add-text',
+        },
+        {
+          type: 'command',
+          id: 'annotation:add-insert-text',
+          commandId: 'annotation:add-insert-text',
+        },
+        {
+          type: 'command',
+          id: 'annotation:add-replace-text',
+          commandId: 'annotation:add-replace-text',
         },
         {
           type: 'command',

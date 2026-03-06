@@ -1,4 +1,4 @@
-import { Fragment, useEffect, useState, useCallback, MouseEvent, TouchEvent } from '@framework';
+import { Fragment, useEffect, useState, useCallback, MouseEvent } from '@framework';
 import { CounterRotate } from '@embedpdf/utils/@framework';
 import { useRedactionCapability } from '../hooks';
 import { RedactionItem } from '@embedpdf/plugin-redaction';
@@ -57,7 +57,7 @@ export function PendingRedactions({
   }, [redaction, documentId, pageIndex]);
 
   const select = useCallback(
-    (e: MouseEvent | TouchEvent, id: string) => {
+    (e: MouseEvent, id: string) => {
       e.stopPropagation();
       if (!redaction) return;
       redaction.forDocument(documentId).selectPending(pageIndex, id);
@@ -89,7 +89,6 @@ export function PendingRedactions({
                   cursor: 'pointer',
                 }}
                 onPointerDown={(e) => select(e, it.id)}
-                onTouchStart={(e) => select(e, it.id)}
               />
               {selectionMenu && (
                 <CounterRotate

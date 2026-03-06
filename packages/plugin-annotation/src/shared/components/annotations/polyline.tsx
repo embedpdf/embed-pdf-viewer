@@ -1,5 +1,5 @@
-import { MouseEvent, TouchEvent, useMemo } from '@framework';
-import { Rect, Position, LineEndings } from '@embedpdf/models';
+import { MouseEvent, useMemo } from '@framework';
+import { Rect, Position, LineEndings, PdfAnnotationBorderStyle } from '@embedpdf/models';
 import { patching } from '@embedpdf/plugin-annotation';
 
 const MIN_HIT_AREA_SCREEN_PX = 20;
@@ -11,9 +11,13 @@ interface PolylineProps {
   strokeColor?: string;
   opacity?: number;
   strokeWidth: number;
+  /** Stroke style */
+  strokeStyle?: PdfAnnotationBorderStyle;
+  /** Stroke dash array */
+  strokeDashArray?: number[];
   scale: number;
   isSelected: boolean;
-  onClick?: (e: MouseEvent<SVGElement> | TouchEvent<SVGElement>) => void;
+  onClick?: (e: MouseEvent<SVGElement>) => void;
   /** Optional start & end endings */
   lineEndings?: LineEndings;
   /** When true, AP canvas provides the visual; only render hit area */
@@ -27,6 +31,8 @@ export function Polyline({
   strokeColor = '#000000',
   opacity = 1,
   strokeWidth,
+  strokeStyle = PdfAnnotationBorderStyle.SOLID,
+  strokeDashArray,
   scale,
   isSelected,
   onClick,
@@ -99,7 +105,6 @@ export function Polyline({
         stroke="transparent"
         strokeWidth={hitStrokeWidth}
         onPointerDown={onClick}
-        onTouchStart={onClick}
         style={{
           cursor: isSelected ? 'move' : 'pointer',
           pointerEvents: isSelected ? 'none' : 'visibleStroke',
@@ -115,7 +120,6 @@ export function Polyline({
           stroke="transparent"
           strokeWidth={hitStrokeWidth}
           onPointerDown={onClick}
-          onTouchStart={onClick}
           style={{
             cursor: isSelected ? 'move' : 'pointer',
             pointerEvents: isSelected ? 'none' : endings.start.filled ? 'visible' : 'visibleStroke',
@@ -131,7 +135,6 @@ export function Polyline({
           stroke="transparent"
           strokeWidth={hitStrokeWidth}
           onPointerDown={onClick}
-          onTouchStart={onClick}
           style={{
             cursor: isSelected ? 'move' : 'pointer',
             pointerEvents: isSelected ? 'none' : endings.end.filled ? 'visible' : 'visibleStroke',
@@ -153,6 +156,9 @@ export function Polyline({
               pointerEvents: 'none',
               strokeLinecap: 'butt',
               strokeLinejoin: 'miter',
+              ...(strokeStyle === PdfAnnotationBorderStyle.DASHED && {
+                strokeDasharray: strokeDashArray?.join(','),
+              }),
             }}
           />
           {endings.start && (
@@ -165,6 +171,9 @@ export function Polyline({
                 pointerEvents: 'none',
                 strokeWidth,
                 strokeLinecap: 'butt',
+                ...(strokeStyle === PdfAnnotationBorderStyle.DASHED && {
+                  strokeDasharray: strokeDashArray?.join(','),
+                }),
               }}
             />
           )}
@@ -178,6 +187,9 @@ export function Polyline({
                 pointerEvents: 'none',
                 strokeWidth,
                 strokeLinecap: 'butt',
+                ...(strokeStyle === PdfAnnotationBorderStyle.DASHED && {
+                  strokeDasharray: strokeDashArray?.join(','),
+                }),
               }}
             />
           )}

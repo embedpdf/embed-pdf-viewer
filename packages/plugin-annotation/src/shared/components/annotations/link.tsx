@@ -1,4 +1,4 @@
-import { useMemo, MouseEvent, TouchEvent } from '@framework';
+import { useMemo, MouseEvent } from '@framework';
 import { PdfAnnotationBorderStyle, Rect } from '@embedpdf/models';
 
 /* ---------------------------------------------------------------- *\
@@ -21,7 +21,7 @@ interface LinkProps {
   /** Current page zoom factor */
   scale: number;
   /** Click handler (used for selection) */
-  onClick?: (e: MouseEvent<SVGElement> | TouchEvent<SVGElement>) => void;
+  onClick?: (e: MouseEvent<SVGElement>) => void;
   /** Whether this link has an IRT (In Reply To) reference - disables direct interaction */
   hasIRT?: boolean;
 }
@@ -85,7 +85,6 @@ export function Link({
         height={height}
         fill="transparent"
         onPointerDown={hasIRT ? undefined : onClick}
-        onTouchStart={hasIRT ? undefined : onClick}
         style={{
           cursor: hasIRT ? 'default' : isSelected ? 'move' : 'pointer',
           pointerEvents: hasIRT ? 'none' : isSelected ? 'none' : 'visible',

@@ -18,7 +18,6 @@
             cursor: 'pointer',
           }"
           @pointerdown="(e: PointerEvent) => select(e, item.id)"
-          @touchstart="(e: TouchEvent) => select(e, item.id)"
         />
 
         <!-- Selection Menu: Supports BOTH render function and slot -->
@@ -73,7 +72,7 @@
             color="transparent"
             border="1px solid red"
             :scale="scale"
-            :on-click="(e: PointerEvent | TouchEvent) => select(e, item.id)"
+            :on-click="(e: PointerEvent) => select(e, item.id)"
           />
         </div>
 
@@ -183,7 +182,7 @@ watch(
   { immediate: true },
 );
 
-const select = (e: PointerEvent | TouchEvent, id: string) => {
+const select = (e: PointerEvent, id: string) => {
   e.stopPropagation();
   const redactionValue = redaction.value;
   if (!redactionValue) return;

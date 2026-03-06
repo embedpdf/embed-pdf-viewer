@@ -16,6 +16,7 @@ import {
   PdfUnderlineAnnoObject,
   PdfStrikeOutAnnoObject,
   PdfSquigglyAnnoObject,
+  PdfCaretAnnoObject,
   blendModeToCss,
 } from '@embedpdf/models';
 import { Fragment } from '@framework';
@@ -34,6 +35,7 @@ import { Highlight } from './text-markup/highlight';
 import { Underline } from './text-markup/underline';
 import { Strikeout } from './text-markup/strikeout';
 import { Squiggly } from './text-markup/squiggly';
+import { Caret } from './annotations/caret';
 
 export const builtInRenderers: BoxedAnnotationRenderer[] = [
   // --- Drawing ---
@@ -233,6 +235,23 @@ export const builtInRenderers: BoxedAnnotationRenderer[] = [
       />
     ),
     interactionDefaults: { isDraggable: true, isResizable: false, isRotatable: false },
+  }),
+
+  // --- Caret ---
+
+  createRenderer<PdfCaretAnnoObject>({
+    id: 'caret',
+    matches: (a): a is PdfCaretAnnoObject => a.type === PdfAnnotationSubtype.CARET,
+    render: ({ currentObject, isSelected, scale, onClick, appearanceActive }) => (
+      <Caret
+        {...currentObject}
+        isSelected={isSelected}
+        scale={scale}
+        onClick={onClick}
+        appearanceActive={appearanceActive}
+      />
+    ),
+    interactionDefaults: { isDraggable: false, isResizable: false, isRotatable: false },
   }),
 
   // --- FreeText ---

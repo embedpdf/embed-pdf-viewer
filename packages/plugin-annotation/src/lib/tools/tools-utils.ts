@@ -34,3 +34,5 @@ export const isPolylineTool = createToolPredicate('polyline');
 export const isPolygonTool = createToolPredicate('polygon');
 export const isFreeTextTool = createToolPredicate('freeText');
 export const isStampTool = createToolPredicate('stamp');
+export const isInsertTextTool = createToolPredicate('insertText');
+export const isReplaceTextTool = createToolPredicate('replaceText');

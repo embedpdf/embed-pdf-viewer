@@ -19,7 +19,6 @@
       stroke="transparent"
       :stroke-width="hitStrokeWidth"
       @pointerdown="onClick"
-      @touchstart="onClick"
       :style="{
         cursor: isSelected ? 'move' : 'pointer',
         pointerEvents: isSelected ? 'none' : 'visibleStroke',
@@ -35,7 +34,6 @@
       stroke="transparent"
       :stroke-width="hitStrokeWidth"
       @pointerdown="onClick"
-      @touchstart="onClick"
       :style="{
         cursor: isSelected ? 'move' : 'pointer',
         pointerEvents: isSelected ? 'none' : endings.start.filled ? 'visible' : 'visibleStroke',
@@ -50,7 +48,6 @@
       stroke="transparent"
       :stroke-width="hitStrokeWidth"
       @pointerdown="onClick"
-      @touchstart="onClick"
       :style="{
         cursor: isSelected ? 'move' : 'pointer',
         pointerEvents: isSelected ? 'none' : endings.end.filled ? 'visible' : 'visibleStroke',
@@ -70,6 +67,9 @@
           pointerEvents: 'none',
           strokeLinecap: 'butt',
           strokeLinejoin: 'miter',
+          ...(strokeStyle === PdfAnnotationBorderStyle.DASHED && {
+            strokeDasharray: strokeDashArray?.join(','),
+          }),
         }"
       />
       <path
@@ -82,6 +82,9 @@
           pointerEvents: 'none',
           strokeWidth,
           strokeLinecap: 'butt',
+          ...(strokeStyle === PdfAnnotationBorderStyle.DASHED && {
+            strokeDasharray: strokeDashArray?.join(','),
+          }),
         }"
       />
       <path
@@ -94,6 +97,9 @@
           pointerEvents: 'none',
           strokeWidth,
           strokeLinecap: 'butt',
+          ...(strokeStyle === PdfAnnotationBorderStyle.DASHED && {
+            strokeDasharray: strokeDashArray?.join(','),
+          }),
         }"
       />
     </template>
@@ -106,7 +112,7 @@ export default { inheritAttrs: false };
 
 <script setup lang="ts">
 import { computed } from 'vue';
-import { Rect, Position, LineEndings } from '@embedpdf/models';
+import { Rect, Position, LineEndings, PdfAnnotationBorderStyle } from '@embedpdf/models';
 import { patching } from '@embedpdf/plugin-annotation';
 
 const MIN_HIT_AREA_SCREEN_PX = 20;
@@ -119,9 +125,11 @@ const props = withDefaults(
     strokeColor?: string;
     opacity?: number;
     strokeWidth: number;
+    strokeStyle?: PdfAnnotationBorderStyle;
+    strokeDashArray?: number[];
     scale: number;
     isSelected: boolean;
-    onClick?: (e: PointerEvent | TouchEvent) => void;
+    onClick?: (e: PointerEvent) => void;
     lineEndings?: LineEndings;
     appearanceActive?: boolean;
   }>(),
@@ -129,6 +137,7 @@ const props = withDefaults(
     color: 'transparent',
     strokeColor: '#000000',
     opacity: 1,
+    strokeStyle: PdfAnnotationBorderStyle.SOLID,
     appearanceActive: false,
   },
 );

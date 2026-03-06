@@ -147,6 +147,8 @@ export type AnnotationTool<T extends PdfAnnotationObject = PdfAnnotationObject> 
     cursor?: string;
     /** If true, this interaction mode is activated by selecting text. */
     textSelection?: boolean;
+    /** Whether to show the native text selection rectangles. Only relevant when textSelection is true. Defaults to false. */
+    showSelectionRects?: boolean;
 
     // Single annotation behaviors
     /** Whether this annotation can be dragged when selected individually. Can be dynamic based on annotation. */

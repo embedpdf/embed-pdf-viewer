@@ -6,3 +6,6 @@ export * from './polygon.handler';
 export * from './square.handler';
 export * from './stamp.handler';
 export * from './circle.handler';
+export * from './text-markup.handler';
+export * from './insert-text.handler';
+export * from './replace-text.handler';

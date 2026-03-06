@@ -433,6 +433,7 @@ export interface SidebarAnnotationEntry {
   page: number;
   annotation: TrackedAnnotation;
   replies: TrackedAnnotation<PdfTextAnnoObject>[];
+  groupMembers?: TrackedAnnotation[];
 }
 
 // ─────────────────────────────────────────────────────────

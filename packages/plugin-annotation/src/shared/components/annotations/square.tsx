@@ -1,4 +1,4 @@
-import { useMemo, MouseEvent, TouchEvent } from '@framework';
+import { useMemo, MouseEvent } from '@framework';
 import { PdfAnnotationBorderStyle, Rect } from '@embedpdf/models';
 
 const MIN_HIT_AREA_SCREEN_PX = 20;
@@ -23,7 +23,7 @@ interface SquareProps {
   /** Current page zoom factor */
   scale: number;
   /** Click handler (used for selection) */
-  onClick?: (e: MouseEvent<SVGElement> | TouchEvent<SVGElement>) => void;
+  onClick?: (e: MouseEvent<SVGElement>) => void;
   /** When true, AP canvas provides the visual; only render hit area */
   appearanceActive?: boolean;
 }
@@ -86,7 +86,6 @@ export function Square({
         stroke="transparent"
         strokeWidth={hitStrokeWidth}
         onPointerDown={onClick}
-        onTouchStart={onClick}
         style={{
           cursor: isSelected ? 'move' : 'pointer',
           pointerEvents: isSelected
