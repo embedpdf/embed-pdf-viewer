@@ -305,8 +305,31 @@ export function GroupSelectionBox({
     return null;
   }
 
-  const groupBoxWidth = previewGroupBox.size.width * scale;
-  const groupBoxHeight = previewGroupBox.size.height * scale;
+  // Compute visual right/bottom edges in screen pixels, accounting for noZoom annotations.
+  // noZoom annotations have a fixed pixel size independent of zoom level.
+  let visualRight = -Infinity;
+  let visualBottom = -Infinity;
+  for (const ta of selectedAnnotations) {
+    const rect = ta.object.rect;
+    const isNoZoom = (ta.object.flags ?? []).includes('noZoom');
+    visualRight = Math.max(
+      visualRight,
+      isNoZoom
+        ? rect.origin.x * scale + rect.size.width
+        : (rect.origin.x + rect.size.width) * scale,
+    );
+    visualBottom = Math.max(
+      visualBottom,
+      isNoZoom
+        ? rect.origin.y * scale + rect.size.height
+        : (rect.origin.y + rect.size.height) * scale,
+    );
+  }
+  const initialLogicalRight = (groupBox.origin.x + groupBox.size.width) * scale;
+  const initialLogicalBottom = (groupBox.origin.y + groupBox.size.height) * scale;
+  const groupBoxWidth = previewGroupBox.size.width * scale + (visualRight - initialLogicalRight);
+  const groupBoxHeight =
+    previewGroupBox.size.height * scale + (visualBottom - initialLogicalBottom);
   const groupCenterX = groupBoxWidth / 2;
   const groupCenterY = groupBoxHeight / 2;
   const groupGuideLength = Math.max(300, Math.max(groupBoxWidth, groupBoxHeight) + 80);

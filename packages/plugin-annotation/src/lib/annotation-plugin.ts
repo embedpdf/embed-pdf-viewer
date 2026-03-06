@@ -108,6 +108,7 @@ import {
   lineHandlerFactory,
   inkHandlerFactory,
   freeTextHandlerFactory,
+  textHandlerFactory,
   textMarkupSelectionHandler,
   insertTextSelectionHandler,
   replaceTextSelectionHandler,
@@ -255,6 +256,7 @@ export class AnnotationPlugin extends BasePlugin<
     this.handlerFactories.set(PdfAnnotationSubtype.LINE, lineHandlerFactory);
     this.handlerFactories.set(PdfAnnotationSubtype.INK, inkHandlerFactory);
     this.handlerFactories.set(PdfAnnotationSubtype.FREETEXT, freeTextHandlerFactory);
+    this.handlerFactories.set(PdfAnnotationSubtype.TEXT, textHandlerFactory);
   }
 
   private registerSelectionHandlerFactories() {

@@ -84,6 +84,7 @@ import { RedactionSidebarIcon } from './redaction-sidebar';
 import { FreeTextIcon } from './free-text';
 import { InsertTextIcon } from './insert-text';
 import { ReplaceTextIcon } from './replace-text';
+import { MessageIcon } from './message';
 
 export type Icons = {
   [key: string]: IconComponent;
@@ -175,4 +176,5 @@ export const icons: Icons = {
   freeText: FreeTextIcon,
   insertText: InsertTextIcon,
   replaceText: ReplaceTextIcon,
+  message: MessageIcon,
 };

@@ -1300,6 +1300,35 @@ export const commands: Record<string, Command<State>> = {
     },
   },
 
+  'annotation:add-comment': {
+    id: 'annotation:add-comment',
+    labelKey: 'annotation.comment',
+    icon: 'message',
+    iconProps: ({ state }) => ({
+      primaryColor: getToolDefaultsById(state.plugins.annotation, 'textComment')?.color,
+    }),
+    categories: ['annotation', 'annotation-comment-tool'],
+    action: ({ registry, documentId }) => {
+      const annotation = registry.getPlugin<AnnotationPlugin>(ANNOTATION_PLUGIN_ID)?.provides();
+      const annotationScope = annotation?.forDocument(documentId);
+      if (!annotationScope) return;
+
+      if (annotationScope.getActiveTool()?.id === 'textComment') {
+        annotationScope.setActiveTool(null);
+      } else {
+        annotationScope.setActiveTool('textComment');
+      }
+    },
+    active: ({ state, documentId }) => {
+      return (
+        state.plugins[ANNOTATION_PLUGIN_ID]?.documents[documentId]?.activeToolId === 'textComment'
+      );
+    },
+    disabled: ({ state, documentId }) => {
+      return lacksPermission(state, documentId, PdfPermissionFlag.ModifyAnnotations);
+    },
+  },
+
   'annotation:add-stamp': {
     id: 'annotation:add-stamp',
     labelKey: 'annotation.stamp',

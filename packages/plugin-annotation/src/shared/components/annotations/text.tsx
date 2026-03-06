@@ -1,10 +1,10 @@
-import { MouseEvent, TouchEvent } from '@framework';
+import { MouseEvent } from '@framework';
 
 interface TextProps {
   isSelected: boolean;
   color?: string;
   opacity?: number;
-  onClick?: (e: MouseEvent<HTMLDivElement> | TouchEvent<HTMLDivElement>) => void;
+  onClick?: (e: MouseEvent<HTMLDivElement>) => void;
   appearanceActive?: boolean;
 }
 
@@ -78,7 +78,6 @@ export function Text({
         cursor: isSelected ? 'move' : 'pointer',
       }}
       onPointerDown={onClick}
-      onTouchStart={onClick}
     >
       {!appearanceActive && (
         <svg

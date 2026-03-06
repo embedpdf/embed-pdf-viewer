@@ -1,4 +1,5 @@
 export * from './ink.handler';
+export * from './text.handler';
 export * from './free-text.handler';
 export * from './line.handler';
 export * from './polyline.handler';
