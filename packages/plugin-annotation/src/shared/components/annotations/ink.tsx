@@ -1,4 +1,4 @@
-import { useMemo, MouseEvent, TouchEvent } from '@framework';
+import { useMemo, MouseEvent } from '@framework';
 import { PdfInkListObject, Rect } from '@embedpdf/models';
 
 const MIN_HIT_AREA_SCREEN_PX = 20;
@@ -19,7 +19,7 @@ interface InkProps {
   /** Page zoom factor */
   scale: number;
   /** Callback for when the annotation is clicked */
-  onClick?: (e: MouseEvent<SVGPathElement> | TouchEvent<SVGPathElement>) => void;
+  onClick?: (e: MouseEvent<SVGPathElement>) => void;
   /** When true, AP canvas provides the visual; only render hit area */
   appearanceActive?: boolean;
 }
@@ -79,7 +79,6 @@ export function Ink({
           stroke="transparent"
           strokeWidth={hitStrokeWidth}
           onPointerDown={onClick}
-          onTouchStart={onClick}
           style={{
             cursor: isSelected ? 'move' : 'pointer',
             pointerEvents: isSelected ? 'none' : 'visibleStroke',

@@ -20,7 +20,6 @@
       :height="height"
       fill="transparent"
       @pointerdown="hasIRT ? undefined : onClick"
-      @touchstart="hasIRT ? undefined : onClick"
       :style="{
         cursor: hitAreaCursor,
         pointerEvents: hitAreaPointerEvents,
@@ -81,7 +80,7 @@ const props = withDefaults(
     /** Current page zoom factor */
     scale: number;
     /** Click handler (used for selection) */
-    onClick?: (e: PointerEvent | MouseEvent | TouchEvent) => void;
+    onClick?: (e: PointerEvent | MouseEvent) => void;
     /** Whether this link has an IRT (In Reply To) reference - disables direct interaction */
     hasIRT?: boolean;
   }>(),

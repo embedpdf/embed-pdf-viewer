@@ -28,6 +28,7 @@ const ANNOTATION_TYPE_KEYS: Record<number, string> = {
   11: 'annotation.squiggly',
   12: 'annotation.strikeout',
   13: 'annotation.stamp',
+  14: 'annotation.caret',
   15: 'annotation.ink',
   28: 'annotation.redact',
 };

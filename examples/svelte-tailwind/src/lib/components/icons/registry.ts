@@ -63,6 +63,8 @@ import LinkIcon from './LinkIcon.svelte';
 import LinkOffIcon from './LinkOffIcon.svelte';
 import GroupIcon from './GroupIcon.svelte';
 import UngroupIcon from './UngroupIcon.svelte';
+import InsertTextIcon from './InsertTextIcon.svelte';
+import ReplaceTextIcon from './ReplaceTextIcon.svelte';
 
 // Define the standard Prop type for your icons for consistency
 export interface IconProps extends SVGAttributes<SVGSVGElement> {
@@ -132,6 +134,8 @@ export const iconRegistry = {
   'link-off': LinkOffIcon,
   group: GroupIcon,
   ungroup: UngroupIcon,
+  'insert-text': InsertTextIcon,
+  'replace-text': ReplaceTextIcon,
 } as const;
 
 // Extract valid keys for Type Safety

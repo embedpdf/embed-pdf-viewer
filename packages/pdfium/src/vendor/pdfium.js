@@ -52,6 +52,7 @@ var createPdfium = (() => {
       '_EPDFAction_CreateURI',
       '_EPDFAnnot_ApplyRedaction',
       '_EPDFAnnot_ClearColor',
+      '_EPDFAnnot_ClearRectangleDifferences',
       '_EPDFAnnot_Flatten',
       '_EPDFAnnot_GenerateAppearance',
       '_EPDFAnnot_GenerateAppearanceWithBlend',
@@ -79,6 +80,7 @@ var createPdfium = (() => {
       '_EPDFAnnot_GetTextAlignment',
       '_EPDFAnnot_GetUnrotatedRect',
       '_EPDFAnnot_GetVerticalAlignment',
+      '_EPDFAnnot_HasAppearanceStream',
       '_EPDFAnnot_SetAction',
       '_EPDFAnnot_SetAPMatrix',
       '_EPDFAnnot_SetBorderDashPattern',
@@ -94,6 +96,7 @@ var createPdfium = (() => {
       '_EPDFAnnot_SetOpacity',
       '_EPDFAnnot_SetOverlayText',
       '_EPDFAnnot_SetOverlayTextRepeat',
+      '_EPDFAnnot_SetRectangleDifferences',
       '_EPDFAnnot_SetReplyType',
       '_EPDFAnnot_SetRotate',
       '_EPDFAnnot_SetTextAlignment',
@@ -6147,6 +6150,10 @@ var createPdfium = (() => {
     ));
     var _EPDFAnnot_GetRectangleDifferences = (Module['_EPDFAnnot_GetRectangleDifferences'] =
       createExportWrapper('EPDFAnnot_GetRectangleDifferences', 5));
+    var _EPDFAnnot_SetRectangleDifferences = (Module['_EPDFAnnot_SetRectangleDifferences'] =
+      createExportWrapper('EPDFAnnot_SetRectangleDifferences', 5));
+    var _EPDFAnnot_ClearRectangleDifferences = (Module['_EPDFAnnot_ClearRectangleDifferences'] =
+      createExportWrapper('EPDFAnnot_ClearRectangleDifferences', 1));
     var _EPDFAnnot_GetBorderDashPatternCount = (Module['_EPDFAnnot_GetBorderDashPatternCount'] =
       createExportWrapper('EPDFAnnot_GetBorderDashPatternCount', 1));
     var _EPDFAnnot_GetBorderDashPattern = (Module['_EPDFAnnot_GetBorderDashPattern'] =
@@ -6317,6 +6324,8 @@ var createPdfium = (() => {
     ));
     var _EPDFAnnot_GetAvailableAppearanceModes = (Module['_EPDFAnnot_GetAvailableAppearanceModes'] =
       createExportWrapper('EPDFAnnot_GetAvailableAppearanceModes', 1));
+    var _EPDFAnnot_HasAppearanceStream = (Module['_EPDFAnnot_HasAppearanceStream'] =
+      createExportWrapper('EPDFAnnot_HasAppearanceStream', 2));
     var _FPDFDoc_GetAttachmentCount = (Module['_FPDFDoc_GetAttachmentCount'] = createExportWrapper(
       'FPDFDoc_GetAttachmentCount',
       1,

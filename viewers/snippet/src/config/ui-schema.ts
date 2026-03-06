@@ -340,13 +340,13 @@ export const viewerUISchema: UISchema = {
         breakpoints: {
           sm: {
             maxWidth: 640,
-            hide: ['add-text', 'add-stamp', 'add-ink'],
+            hide: ['add-text', 'add-stamp', 'add-ink', 'add-insert-text', 'add-replace-text'],
             show: ['overflow-annotation-tools'],
           },
           md: {
             minWidth: 640,
             hide: ['overflow-annotation-tools'],
-            show: ['add-text', 'add-stamp', 'add-ink'],
+            show: ['add-text', 'add-stamp', 'add-ink', 'add-insert-text', 'add-replace-text'],
           },
         },
       },
@@ -401,6 +401,20 @@ export const viewerUISchema: UISchema = {
               commandId: 'annotation:add-text',
               variant: 'icon',
               categories: ['annotation', 'annotation-text'],
+            },
+            {
+              type: 'command-button',
+              id: 'add-insert-text',
+              commandId: 'annotation:add-insert-text',
+              variant: 'icon',
+              categories: ['annotation', 'annotation-markup', 'annotation-insert-text'],
+            },
+            {
+              type: 'command-button',
+              id: 'add-replace-text',
+              commandId: 'annotation:add-replace-text',
+              variant: 'icon',
+              categories: ['annotation', 'annotation-markup', 'annotation-replace-text'],
             },
             {
               type: 'command-button',
@@ -1037,6 +1051,18 @@ export const viewerUISchema: UISchema = {
         },
         {
           type: 'command',
+          id: 'annotation:add-insert-text',
+          commandId: 'annotation:add-insert-text',
+          categories: ['annotation', 'annotation-markup', 'annotation-insert-text'],
+        },
+        {
+          type: 'command',
+          id: 'annotation:add-replace-text',
+          commandId: 'annotation:add-replace-text',
+          categories: ['annotation', 'annotation-markup', 'annotation-replace-text'],
+        },
+        {
+          type: 'command',
           id: 'annotation:add-stamp',
           commandId: 'annotation:add-stamp',
           categories: ['annotation', 'annotation-stamp'],
@@ -1391,6 +1417,13 @@ export const viewerUISchema: UISchema = {
       id: 'groupAnnotation',
       categories: ['annotation', 'annotation-group'],
       items: [
+        {
+          type: 'command-button',
+          id: 'comment-button',
+          commandId: 'annotation:toggle-comment',
+          variant: 'icon',
+          categories: ['annotation', 'annotation-comment'],
+        },
         {
           type: 'command-button',
           id: 'toggle-group-annotations',

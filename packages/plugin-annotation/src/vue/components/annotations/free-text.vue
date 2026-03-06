@@ -10,7 +10,6 @@
       opacity: appearanceActive ? 0 : 1,
     }"
     @pointerdown="onClick"
-    @touchstart="onClick"
   >
     <span
       ref="editorRef"
@@ -46,7 +45,7 @@ const props = withDefaults(
     annotation: TrackedAnnotation<PdfFreeTextAnnoObject>;
     pageIndex: number;
     scale: number;
-    onClick?: (e: PointerEvent | TouchEvent) => void;
+    onClick?: (e: PointerEvent) => void;
     appearanceActive?: boolean;
   }>(),
   {
