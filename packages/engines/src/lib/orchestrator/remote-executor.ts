@@ -42,6 +42,7 @@ import {
 } from '@embedpdf/models';
 import type { WorkerRequest, WorkerResponse } from './pdfium-native-runner';
 import type { FontFallbackConfig } from '../pdfium/font-fallback';
+import { collectTransferables } from '../transferables';
 
 /**
  * Options for creating a RemoteExecutor
@@ -187,7 +188,8 @@ export class RemoteExecutor implements IPdfiumExecutor {
       () => {
         this.pendingRequests.set(id, task);
         this.logger.debug(LOG_SOURCE, LOG_CATEGORY, `Sending ${method} request:`, id);
-        this.worker.postMessage(request);
+        const transferables = collectTransferables(args);
+        this.worker.postMessage(request, { transfer: transferables });
       },
       (error) => {
         this.logger.error(
