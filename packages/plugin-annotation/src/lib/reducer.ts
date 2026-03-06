@@ -347,7 +347,7 @@ export const reducer: Reducer<AnnotationState, AnnotationAction> = (state, actio
             },
             byUid: {
               ...docState.byUid,
-              [uid]: { commitState: 'new', object: annotation },
+              [uid]: { commitState: 'new', object: annotation, dictMode: true },
             },
             hasPendingChanges: true,
           },
