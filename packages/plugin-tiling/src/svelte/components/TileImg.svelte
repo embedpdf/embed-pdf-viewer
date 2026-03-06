@@ -2,7 +2,7 @@
   import type { Tile } from '@embedpdf/plugin-tiling';
   import { useTilingCapability } from '../hooks';
   import { ignore, PdfErrorCode } from '@embedpdf/models';
-  import { untrack } from 'svelte';
+  import { untrack, onDestroy } from 'svelte';
 
   interface TileImgProps {
     documentId: string;
@@ -18,9 +18,9 @@
   // Derived scoped capability for the specific document
   const scope = $derived(tilingCapability.provides?.forDocument(documentId) ?? null);
 
-  let url = $state<string>('');
-  // urlRef is NOT reactive - similar to React's useRef
-  let urlRef: string | null = null;
+  let canvasEl: HTMLCanvasElement | undefined = $state(undefined);
+  let hasContent = $state(false);
+  let currentBitmap: ImageBitmap | null = null;
 
   // Capture these values once per tile change
   const tileId = $derived(tile.id);
@@ -40,14 +40,26 @@
     },
   });
 
+  function paintBitmap(bitmap: ImageBitmap) {
+    if (!canvasEl) return;
+    try {
+      canvasEl.width = bitmap.width;
+      canvasEl.height = bitmap.height;
+      canvasEl.getContext('bitmaprenderer')!.transferFromImageBitmap(bitmap);
+      hasContent = true;
+    } catch {
+      // Bitmap was detached
+    }
+  }
+
   /* kick off render exactly once per tile */
   $effect(() => {
-    // Track only tileId and pageIndex as dependencies (like React's [pageIndex, tile.id])
+    // Track only tileId and pageIndex as dependencies
     const _tileId = tileId;
     const _pageIndex = pageIndex;
 
-    // Check if we already have a URL for this tile (already rendered)
-    if (urlRef) return;
+    // Check if we already have content for this tile
+    if (currentBitmap) return;
 
     if (!scope) return;
 
@@ -58,43 +70,43 @@
       tile: plainTile,
       dpr,
     });
-    task.wait((blob) => {
-      const objectUrl = URL.createObjectURL(blob);
-      urlRef = objectUrl;
-      url = objectUrl;
+    task.wait((bitmap) => {
+      if (currentBitmap) {
+        currentBitmap.close();
+      }
+      currentBitmap = bitmap;
+      paintBitmap(bitmap);
+      currentBitmap = null; // transferred to canvas, don't close
     }, ignore);
 
     return () => {
-      if (urlRef) {
-        URL.revokeObjectURL(urlRef);
-        urlRef = null;
-      } else {
-        task.abort({
-          code: PdfErrorCode.Cancelled,
-          message: 'canceled render task',
-        });
+      task.abort({
+        code: PdfErrorCode.Cancelled,
+        message: 'canceled render task',
+      });
+      // Clean up bitmap when tile changes
+      if (currentBitmap) {
+        currentBitmap.close();
+        currentBitmap = null;
+        hasContent = false;
       }
     };
   });
 
-  const handleImageLoad = () => {
-    if (urlRef) {
-      URL.revokeObjectURL(urlRef);
-      urlRef = null;
+  onDestroy(() => {
+    if (currentBitmap) {
+      currentBitmap.close();
+      currentBitmap = null;
     }
-  };
+  });
 </script>
 
-{#if url}
-  <img
-    src={url}
-    alt=""
-    onload={handleImageLoad}
-    style:position="absolute"
-    style:left={`${tileScreenRect.origin.x * relativeScale}px`}
-    style:top={`${tileScreenRect.origin.y * relativeScale}px`}
-    style:width={`${tileScreenRect.size.width * relativeScale}px`}
-    style:height={`${tileScreenRect.size.height * relativeScale}px`}
-    style:display="block"
-  />
-{/if}
+<canvas
+  bind:this={canvasEl}
+  style:position="absolute"
+  style:left={`${tileScreenRect.origin.x * relativeScale}px`}
+  style:top={`${tileScreenRect.origin.y * relativeScale}px`}
+  style:width={`${tileScreenRect.size.width * relativeScale}px`}
+  style:height={`${tileScreenRect.size.height * relativeScale}px`}
+  style:display={hasContent ? 'block' : 'none'}
+></canvas>

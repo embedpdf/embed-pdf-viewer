@@ -42,12 +42,23 @@ export interface TilingEvent {
 }
 
 export interface TilingScope {
-  renderTile: (options: RenderTileOptions) => Task<Blob, PdfErrorReason>;
+  /**
+   * Render a single tile as an `ImageBitmap`.
+   *
+   * Returns a fresh (uncached) bitmap per call — no deduplication.
+   * **Caller owns the bitmap** — transfer it to a canvas or call
+   * `bitmap.close()` to free GPU memory.
+   */
+  renderTile: (options: RenderTileOptions) => Task<ImageBitmap, PdfErrorReason>;
   onTileRendering: EventHook<Record<number, Tile[]>>;
 }
 
 export interface TilingCapability {
-  renderTile: (options: RenderTileOptions, documentId?: string) => Task<Blob, PdfErrorReason>;
+  /** {@inheritDoc TilingScope.renderTile} */
+  renderTile: (
+    options: RenderTileOptions,
+    documentId?: string,
+  ) => Task<ImageBitmap, PdfErrorReason>;
   forDocument(documentId: string): TilingScope;
   onTileRendering: EventHook<TilingEvent>;
 }

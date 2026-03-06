@@ -1,10 +1,11 @@
 <script lang="ts">
-  import type { HTMLImgAttributes } from 'svelte/elements';
-  import { ignore, PdfErrorCode } from '@embedpdf/models';
+  import type { HTMLCanvasAttributes } from 'svelte/elements';
+  import { ignore, PdfErrorCode} from '@embedpdf/models';
   import { useDocumentState } from '@embedpdf/core/svelte';
   import { useRenderCapability } from '../hooks';
+  import { onDestroy } from 'svelte';
 
-  interface RenderLayerProps extends Omit<HTMLImgAttributes, 'style'> {
+  interface RenderLayerProps extends Omit<HTMLCanvasAttributes, 'style'> {
     /**
      * The ID of the document to render from
      */
@@ -54,8 +55,8 @@
   // Make document state follow the (reactive) documentId
   const documentState = useDocumentState(() => documentId);
 
-  let imageUrl = $state<string | null>(null);
-  let urlRef: string | null = null;
+  let canvasEl: HTMLCanvasElement | undefined = $state(undefined);
+  let currentBitmap: ImageBitmap | null = null;
 
   // Track page refreshes from core
   const refreshVersion = $derived(documentState.current?.pageRefreshVersions?.[pageIndex] ?? 0);
@@ -66,6 +67,17 @@
   );
 
   const actualDpr = $derived(dprOverride !== undefined ? dprOverride : window.devicePixelRatio);
+
+  function paintBitmap(bitmap: ImageBitmap) {
+    if (!canvasEl) return;
+    try {
+      canvasEl.width = bitmap.width;
+      canvasEl.height = bitmap.height;
+      canvasEl.getContext('bitmaprenderer')!.transferFromImageBitmap(bitmap);
+    } catch {
+      // Bitmap was detached
+    }
+  }
 
   // Effect: reruns when:
   // - documentId changes
@@ -84,17 +96,15 @@
 
     if (!capability || !docId) {
       // Cleanup if no capability/doc
-      if (urlRef) {
-        URL.revokeObjectURL(urlRef);
-        urlRef = null;
+      if (canvasEl) {
+        canvasEl.width = canvasEl.width; // clears the canvas
       }
-      imageUrl = null;
       return;
     }
 
     const scoped = capability.forDocument(docId);
 
-    const task = scoped.renderPage({
+    const task = scoped.renderPageBitmap({
       pageIndex: page,
       options: {
         scaleFactor: scale,
@@ -102,50 +112,38 @@
       },
     });
 
-    task.wait((blob) => {
-      const url = URL.createObjectURL(blob);
-
-      // Revoke previous URL if it existed
-      if (urlRef) {
-        URL.revokeObjectURL(urlRef);
+    task.wait((bitmap) => {
+      if (currentBitmap) {
+        currentBitmap.close();
       }
-
-      urlRef = url;
-      imageUrl = url;
+      currentBitmap = bitmap;
+      paintBitmap(bitmap);
+      currentBitmap = null; // transferred to canvas, don't close
     }, ignore);
 
     return () => {
-      // Cleanup for this render run
-      if (urlRef) {
-        URL.revokeObjectURL(urlRef);
-        urlRef = null;
-        imageUrl = null;
-      } else {
-        // If render not finished, abort task
-        task.abort({
-          code: PdfErrorCode.Cancelled,
-          message: 'canceled render task',
-        });
+      task.abort({
+        code: PdfErrorCode.Cancelled,
+        message: 'canceled render task',
+      });
+      if (currentBitmap) {
+        currentBitmap.close();
+        currentBitmap = null;
       }
     };
   });
 
-  function handleImageLoad() {
-    // Once image is loaded, we can drop the objectURL reference
-    if (urlRef) {
-      URL.revokeObjectURL(urlRef);
-      urlRef = null;
+  onDestroy(() => {
+    if (currentBitmap) {
+      currentBitmap.close();
+      currentBitmap = null;
     }
-  }
+  });
 </script>
 
-{#if imageUrl}
-  <img
-    src={imageUrl}
-    onload={handleImageLoad}
-    style={`width: 100%; height: 100%; ${propsStyle ?? ''}`}
-    {...attrs}
-    class={propsClass}
-    alt=""
-  />
-{/if}
+<canvas
+  bind:this={canvasEl}
+  style={`width: 100%; height: 100%; ${propsStyle ?? ''}`}
+  {...attrs}
+  class={propsClass}
+></canvas>

@@ -9,6 +9,7 @@ import {
   PdfErrorCode,
   TaskReturn,
 } from '@embedpdf/models';
+import { collectTransferables } from '../collect-transferables';
 
 /**
  * Request body that represent method calls of PdfEngine, it contains the
@@ -472,6 +473,6 @@ export class EngineRunner {
    */
   respond(response: Response) {
     this.logger.debug(LOG_SOURCE, LOG_CATEGORY, 'runner respond: ', response);
-    self.postMessage(response);
+    self.postMessage(response, { transfer: collectTransferables(response) });
   }
 }

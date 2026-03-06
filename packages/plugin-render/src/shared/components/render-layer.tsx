@@ -1,12 +1,12 @@
-import { Fragment, useEffect, useRef, useState, useMemo } from '@framework';
+import { useEffect, useRef, useMemo } from '@framework';
 import type { CSSProperties, HTMLAttributes } from '@framework';
 
-import { ignore, PdfErrorCode, Rotation } from '@embedpdf/models';
+import { ignore, PdfErrorCode } from '@embedpdf/models';
 
 import { useRenderCapability } from '../hooks/use-render';
 import { useDocumentState } from '@embedpdf/core/@framework';
 
-type RenderLayerProps = Omit<HTMLAttributes<HTMLImageElement>, 'style'> & {
+type RenderLayerProps = Omit<HTMLAttributes<HTMLCanvasElement>, 'style'> & {
   /**
    * The ID of the document to render from
    */
@@ -24,10 +24,20 @@ type RenderLayerProps = Omit<HTMLAttributes<HTMLImageElement>, 'style'> & {
    */
   dpr?: number;
   /**
-   * Additional styles for the image element
+   * Additional styles for the canvas element
    */
   style?: CSSProperties;
 };
+
+function paintBitmap(canvas: HTMLCanvasElement, bitmap: ImageBitmap) {
+  try {
+    canvas.width = bitmap.width;
+    canvas.height = bitmap.height;
+    canvas.getContext('bitmaprenderer')!.transferFromImageBitmap(bitmap);
+  } catch {
+    // Bitmap was detached
+  }
+}
 
 /**
  * RenderLayer Component
@@ -50,8 +60,7 @@ export function RenderLayer({
   const { provides: renderProvides } = useRenderCapability();
   const documentState = useDocumentState(documentId);
 
-  const [imageUrl, setImageUrl] = useState<string | null>(null);
-  const urlRef = useRef<string | null>(null);
+  const canvasRef = useRef<HTMLCanvasElement | null>(null);
 
   // Get refresh version from core state
   const refreshVersion = useMemo(() => {
@@ -73,7 +82,8 @@ export function RenderLayer({
   useEffect(() => {
     if (!renderProvides) return;
 
-    const task = renderProvides.forDocument(documentId).renderPage({
+    let currentBitmap: ImageBitmap | null = null;
+    const task = renderProvides.forDocument(documentId).renderPageBitmap({
       pageIndex,
       options: {
         scaleFactor: actualScale,
@@ -81,46 +91,32 @@ export function RenderLayer({
       },
     });
 
-    task.wait((blob) => {
-      const url = URL.createObjectURL(blob);
-      setImageUrl(url);
-      urlRef.current = url;
+    task.wait((output) => {
+      currentBitmap = output;
+      const canvas = canvasRef.current;
+      if (canvas) {
+        paintBitmap(canvas, output);
+        currentBitmap = null; // transferred to canvas
+      }
     }, ignore);
 
     return () => {
-      if (urlRef.current) {
-        URL.revokeObjectURL(urlRef.current);
-        urlRef.current = null;
-      } else {
-        task.abort({
-          code: PdfErrorCode.Cancelled,
-          message: 'canceled render task',
-        });
+      task.abort({
+        code: PdfErrorCode.Cancelled,
+        message: 'canceled render task',
+      });
+      if (currentBitmap) {
+        currentBitmap.close();
+        currentBitmap = null;
       }
     };
   }, [documentId, pageIndex, actualScale, actualDpr, renderProvides, refreshVersion]);
 
-  const handleImageLoad = () => {
-    if (urlRef.current) {
-      URL.revokeObjectURL(urlRef.current);
-      urlRef.current = null;
-    }
+  const elementStyle: CSSProperties = {
+    width: '100%',
+    height: '100%',
+    ...(style || {}),
   };
 
-  return (
-    <Fragment>
-      {imageUrl && (
-        <img
-          src={imageUrl}
-          onLoad={handleImageLoad}
-          {...props}
-          style={{
-            width: '100%',
-            height: '100%',
-            ...(style || {}),
-          }}
-        />
-      )}
-    </Fragment>
-  );
+  return <canvas ref={canvasRef} {...props} style={elementStyle} />;
 }
