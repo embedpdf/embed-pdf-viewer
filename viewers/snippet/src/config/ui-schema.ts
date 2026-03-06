@@ -616,6 +616,13 @@ export const viewerUISchema: UISchema = {
               categories: ['redaction', 'redaction-combined'],
             },
             {
+              type: 'command-button',
+              id: 'redact-search',
+              commandId: 'redaction:redact-search',
+              variant: 'icon',
+              categories: ['redaction', 'redaction-search'],
+            },
+            {
               type: 'divider',
               id: 'redaction-tools-divider-1',
               orientation: 'vertical',
@@ -1314,6 +1321,13 @@ export const viewerUISchema: UISchema = {
       closeOnClickOutside: true,
       closeOnEscape: true,
     },
+    'search-redaction-modal': {
+      id: 'search-redaction-modal',
+      content: {
+        type: 'component',
+        componentId: 'search-redaction-modal',
+      },
+      maxWidth: '32rem',
     'link-modal': {
       id: 'link-modal',
       content: {
