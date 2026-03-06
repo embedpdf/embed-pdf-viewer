@@ -2521,6 +2521,15 @@ export class PdfiumNative implements IPdfiumExecutor {
       return false;
     }
 
+    if (!this.setAnnotationOpacity(annotationPtr, annotation.opacity ?? 1)) {
+      return false;
+    }
+    // Prefer strokeColor, fall back to deprecated color
+    const strokeColor = annotation.strokeColor ?? annotation.color ?? '#FFFF00';
+    if (!this.setAnnotationColor(annotationPtr, strokeColor, PdfAnnotationColorType.Color)) {
+      return false;
+    }
+
     // Text annotations have default flags if not specified
     if (!annotation.flags) {
       if (!this.setAnnotationFlags(annotationPtr, ['print', 'noZoom', 'noRotate'])) {
@@ -5984,6 +5993,7 @@ export class PdfiumNative implements IPdfiumExecutor {
       id: index,
       type: PdfAnnotationSubtype.TEXT,
       rect,
+      strokeColor: color ?? '#FFFF00',
       color: color ?? '#FFFF00',
       opacity,
       state,

@@ -1,4 +1,4 @@
-import { Rect, boundingRectOrEmpty } from '@embedpdf/models';
+import { Rect, boundingRectOrEmpty, Rotation } from '@embedpdf/models';
 import { useInteractionHandles, CounterRotate } from '@embedpdf/utils/@framework';
 import { TrackedAnnotation } from '@embedpdf/plugin-annotation';
 import { useState, useMemo, useCallback, useRef, useEffect, createPortal } from '@framework';
@@ -11,6 +11,82 @@ import {
   GroupSelectionMenuRenderFn,
   SelectionOutline,
 } from './types';
+
+interface ScreenBounds {
+  left: number;
+  top: number;
+  right: number;
+  bottom: number;
+}
+
+function mapCounterRotatePoint(
+  x: number,
+  y: number,
+  width: number,
+  height: number,
+  rotation: Rotation,
+): { x: number; y: number } {
+  switch (rotation) {
+    case 1:
+      return { x: y, y: height - x };
+    case 2:
+      return { x: width - x, y: height - y };
+    case 3:
+      return { x: width - y, y: x };
+    default:
+      return { x, y };
+  }
+}
+
+function getAnnotationScreenBounds(
+  annotation: TrackedAnnotation,
+  scale: number,
+  rotation: Rotation,
+): ScreenBounds {
+  const flags = annotation.object.flags ?? [];
+  const hasNoZoom = flags.includes('noZoom');
+  const hasNoRotate = flags.includes('noRotate');
+
+  const left = annotation.object.rect.origin.x * scale;
+  const top = annotation.object.rect.origin.y * scale;
+  const width = annotation.object.rect.size.width * (hasNoZoom ? 1 : scale);
+  const height = annotation.object.rect.size.height * (hasNoZoom ? 1 : scale);
+
+  if (!hasNoRotate || rotation === 0) {
+    return {
+      left,
+      top,
+      right: left + width,
+      bottom: top + height,
+    };
+  }
+
+  const corners = [
+    mapCounterRotatePoint(0, 0, width, height, rotation),
+    mapCounterRotatePoint(width, 0, width, height, rotation),
+    mapCounterRotatePoint(0, height, width, height, rotation),
+    mapCounterRotatePoint(width, height, width, height, rotation),
+  ];
+
+  let minX = Infinity;
+  let minY = Infinity;
+  let maxX = -Infinity;
+  let maxY = -Infinity;
+
+  for (const corner of corners) {
+    if (corner.x < minX) minX = corner.x;
+    if (corner.y < minY) minY = corner.y;
+    if (corner.x > maxX) maxX = corner.x;
+    if (corner.y > maxY) maxY = corner.y;
+  }
+
+  return {
+    left: left + minX,
+    top: top + minY,
+    right: left + maxX,
+    bottom: top + maxY,
+  };
+}
 
 interface GroupSelectionBoxProps {
   documentId: string;
@@ -305,31 +381,31 @@ export function GroupSelectionBox({
     return null;
   }
 
-  // Compute visual right/bottom edges in screen pixels, accounting for noZoom annotations.
-  // noZoom annotations have a fixed pixel size independent of zoom level.
+  // Compute visual bounds in screen pixels, including mixed noZoom/noRotate selections.
+  let visualLeft = Infinity;
+  let visualTop = Infinity;
   let visualRight = -Infinity;
   let visualBottom = -Infinity;
   for (const ta of selectedAnnotations) {
-    const rect = ta.object.rect;
-    const isNoZoom = (ta.object.flags ?? []).includes('noZoom');
-    visualRight = Math.max(
-      visualRight,
-      isNoZoom
-        ? rect.origin.x * scale + rect.size.width
-        : (rect.origin.x + rect.size.width) * scale,
-    );
-    visualBottom = Math.max(
-      visualBottom,
-      isNoZoom
-        ? rect.origin.y * scale + rect.size.height
-        : (rect.origin.y + rect.size.height) * scale,
-    );
+    const bounds = getAnnotationScreenBounds(ta, scale, rotation as Rotation);
+    visualLeft = Math.min(visualLeft, bounds.left);
+    visualTop = Math.min(visualTop, bounds.top);
+    visualRight = Math.max(visualRight, bounds.right);
+    visualBottom = Math.max(visualBottom, bounds.bottom);
   }
+  const initialLogicalLeft = groupBox.origin.x * scale;
+  const initialLogicalTop = groupBox.origin.y * scale;
   const initialLogicalRight = (groupBox.origin.x + groupBox.size.width) * scale;
   const initialLogicalBottom = (groupBox.origin.y + groupBox.size.height) * scale;
-  const groupBoxWidth = previewGroupBox.size.width * scale + (visualRight - initialLogicalRight);
-  const groupBoxHeight =
-    previewGroupBox.size.height * scale + (visualBottom - initialLogicalBottom);
+  const leftCorrection = visualLeft - initialLogicalLeft;
+  const topCorrection = visualTop - initialLogicalTop;
+  const rightCorrection = visualRight - initialLogicalRight;
+  const bottomCorrection = visualBottom - initialLogicalBottom;
+
+  const groupBoxLeft = previewGroupBox.origin.x * scale + leftCorrection;
+  const groupBoxTop = previewGroupBox.origin.y * scale + topCorrection;
+  const groupBoxWidth = previewGroupBox.size.width * scale + (rightCorrection - leftCorrection);
+  const groupBoxHeight = previewGroupBox.size.height * scale + (bottomCorrection - topCorrection);
   const groupCenterX = groupBoxWidth / 2;
   const groupCenterY = groupBoxHeight / 2;
   const groupGuideLength = Math.max(300, Math.max(groupBoxWidth, groupBoxHeight) + 80);
@@ -340,8 +416,8 @@ export function GroupSelectionBox({
       <div
         style={{
           position: 'absolute',
-          left: previewGroupBox.origin.x * scale,
-          top: previewGroupBox.origin.y * scale,
+          left: groupBoxLeft,
+          top: groupBoxTop,
           width: groupBoxWidth,
           height: groupBoxHeight,
           pointerEvents: 'none',
@@ -554,12 +630,12 @@ export function GroupSelectionBox({
         <CounterRotate
           rect={{
             origin: {
-              x: previewGroupBox.origin.x * scale,
-              y: previewGroupBox.origin.y * scale,
+              x: groupBoxLeft,
+              y: groupBoxTop,
             },
             size: {
-              width: previewGroupBox.size.width * scale,
-              height: previewGroupBox.size.height * scale,
+              width: groupBoxWidth,
+              height: groupBoxHeight,
             },
           }}
           rotation={rotation}

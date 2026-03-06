@@ -224,11 +224,11 @@ export const builtInRenderers: BoxedAnnotationRenderer[] = [
 
   createRenderer<PdfTextAnnoObject>({
     id: 'text',
-    matches: (a): a is PdfTextAnnoObject => a.type === PdfAnnotationSubtype.TEXT,
+    matches: (a): a is PdfTextAnnoObject => a.type === PdfAnnotationSubtype.TEXT && !a.inReplyToId,
     render: ({ currentObject, isSelected, onClick, appearanceActive }) => (
       <Text
         isSelected={isSelected}
-        color={currentObject.color}
+        color={currentObject.strokeColor ?? currentObject.color}
         opacity={currentObject.opacity}
         onClick={onClick}
         appearanceActive={appearanceActive}

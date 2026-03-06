@@ -384,7 +384,7 @@ export const defaultTools = [
     },
     defaults: {
       type: PdfAnnotationSubtype.TEXT,
-      color: '#facc15',
+      strokeColor: '#FFCD45',
       opacity: 1,
     },
     behavior: {

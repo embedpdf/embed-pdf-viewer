@@ -144,7 +144,7 @@ export const PROPERTY_CONFIGS: Record<string, PropertyConfig> = {
  */
 export const ANNOTATION_PROPERTIES: Partial<Record<PdfAnnotationSubtype, string[]>> = {
   // Text comments: fill color drives the icon color, opacity affects the whole icon
-  [PdfAnnotationSubtype.TEXT]: ['color', 'opacity'],
+  [PdfAnnotationSubtype.TEXT]: ['strokeColor', 'opacity'],
 
   // Ink uses strokeColor (was: color)
   [PdfAnnotationSubtype.INK]: ['strokeColor', 'opacity', 'strokeWidth', 'rotation'],

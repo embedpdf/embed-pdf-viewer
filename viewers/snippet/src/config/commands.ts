@@ -1305,7 +1305,7 @@ export const commands: Record<string, Command<State>> = {
     labelKey: 'annotation.comment',
     icon: 'message',
     iconProps: ({ state }) => ({
-      primaryColor: getToolDefaultsById(state.plugins.annotation, 'textComment')?.color,
+      primaryColor: getToolDefaultsById(state.plugins.annotation, 'textComment')?.strokeColor,
     }),
     categories: ['annotation', 'annotation-comment-tool'],
     action: ({ registry, documentId }) => {
