@@ -13,7 +13,7 @@
     strokeDashArray?: number[];
     rect: Rect;
     scale: number;
-    onClick?: (e: PointerEvent | TouchEvent) => void;
+    onClick?: (e: PointerEvent) => void;
     appearanceActive?: boolean;
   }
 
@@ -78,7 +78,6 @@
     stroke="transparent"
     stroke-width={hitStrokeWidth}
     onpointerdown={(e) => onClick?.(e)}
-    ontouchstart={(e) => onClick?.(e)}
     style:cursor={isSelected ? 'move' : 'pointer'}
     pointer-events={peValue}
   />

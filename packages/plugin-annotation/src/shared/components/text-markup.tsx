@@ -118,6 +118,8 @@ export function TextMarkup({ documentId, pageIndex, scale }: TextMarkupProps) {
           />
         </div>
       );
+    case PdfAnnotationSubtype.CARET:
+      return null;
     default:
       return null;
   }

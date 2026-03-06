@@ -9,7 +9,6 @@
       cursor: 'pointer',
     }"
     @pointerdown="onClick"
-    @touchstart="onClick"
   >
     <RenderAnnotation
       :documentId="documentId"
@@ -37,7 +36,7 @@ const props = defineProps<{
   documentId: string;
   pageIndex: number;
   scale: number;
-  onClick: (e: PointerEvent | TouchEvent) => void;
+  onClick: (e: PointerEvent) => void;
 }>();
 
 const unrotated = computed(

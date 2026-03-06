@@ -21,7 +21,6 @@
       stroke="transparent"
       :stroke-width="hitStrokeWidth"
       @pointerdown="onClick"
-      @touchstart="onClick"
       :style="{
         cursor: isSelected ? 'move' : 'pointer',
         pointerEvents: isSelected ? 'none' : 'visibleStroke',
@@ -68,7 +67,7 @@ const props = withDefaults(
     inkList: PdfInkListObject[];
     rect: Rect;
     scale: number;
-    onClick?: (e: PointerEvent | TouchEvent) => void;
+    onClick?: (e: PointerEvent) => void;
     appearanceActive?: boolean;
   }>(),
   {

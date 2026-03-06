@@ -14,15 +14,7 @@ import {
 import { PointerEventHandlers, EmbedPdfPointerEvent } from '@embedpdf/plugin-interaction-manager';
 import { usePointerHandlers } from '@embedpdf/plugin-interaction-manager/@framework';
 import { useSelectionCapability } from '@embedpdf/plugin-selection/@framework';
-import {
-  useMemo,
-  useState,
-  useEffect,
-  useCallback,
-  MouseEvent,
-  TouchEvent,
-  useRef,
-} from '@framework';
+import { useMemo, useState, useEffect, useCallback, MouseEvent, useRef } from '@framework';
 
 import { useAnnotationCapability } from '../hooks';
 import { AnnotationContainer } from './annotation-container';
@@ -122,7 +114,7 @@ export function Annotations(annotationsProps: AnnotationsProps) {
   );
 
   const handleClick = useCallback(
-    (e: MouseEvent | TouchEvent, annotation: TrackedAnnotation) => {
+    (e: MouseEvent, annotation: TrackedAnnotation) => {
       e.stopPropagation();
       if (annotationProvides && selectionProvides) {
         selectionProvides.clear();

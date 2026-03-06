@@ -1012,6 +1012,19 @@ export enum PdfAnnotationReplyType {
 }
 
 /**
+ * Rectangle differences (/RD) defining the inset between an annotation's
+ * /Rect and the actual drawn appearance.
+ *
+ * @public
+ */
+export interface PdfRectDifferences {
+  left: number;
+  top: number;
+  right: number;
+  bottom: number;
+}
+
+/**
  * Basic information of pdf annotation
  *
  * @public
@@ -1585,6 +1598,10 @@ export interface PdfPolygonAnnoObject extends PdfAnnotationObjectBase {
    * stroke dash array of polygon annotation
    */
   strokeDashArray?: number[];
+  /**
+   * Rectangle Differences (/RD) - inset padding from Rect to the drawn area.
+   */
+  rectangleDifferences?: PdfRectDifferences;
 }
 
 /**
@@ -1904,9 +1921,9 @@ export interface PdfCircleAnnoObject extends PdfAnnotationObjectBase {
    */
   cloudyBorderIntensity?: number;
   /**
-   * cloudy border inset of circle annotation
+   * Rectangle Differences (/RD) - inset padding from Rect to the drawn area.
    */
-  cloudyBorderInset?: number[];
+  rectangleDifferences?: PdfRectDifferences;
 }
 
 /**
@@ -1954,9 +1971,9 @@ export interface PdfSquareAnnoObject extends PdfAnnotationObjectBase {
    */
   cloudyBorderIntensity?: number;
   /**
-   * cloudy border inset of circle annotation
+   * Rectangle Differences (/RD) - inset padding from Rect to the drawn area.
    */
-  cloudyBorderInset?: number[];
+  rectangleDifferences?: PdfRectDifferences;
 }
 
 /**
@@ -2062,6 +2079,14 @@ export interface PdfStrikeOutAnnoObject extends PdfAnnotationObjectBase {
 export interface PdfCaretAnnoObject extends PdfAnnotationObjectBase {
   /** {@inheritDoc PdfAnnotationObjectBase.type} */
   type: PdfAnnotationSubtype.CARET;
+  /** Stroke color of the caret symbol */
+  strokeColor?: string;
+  /** Opacity (0-1) */
+  opacity?: number;
+  /**
+   * Rectangle Differences (/RD) - inset padding from Rect to the drawn area.
+   */
+  rectangleDifferences?: PdfRectDifferences;
 }
 
 /**
@@ -2116,6 +2141,10 @@ export interface PdfFreeTextAnnoObject extends PdfAnnotationObjectBase {
    * Rich content of the free text annotation
    */
   richContent?: string;
+  /**
+   * Rectangle Differences (/RD) - inset padding from Rect to the drawn area.
+   */
+  rectangleDifferences?: PdfRectDifferences;
 }
 
 /**

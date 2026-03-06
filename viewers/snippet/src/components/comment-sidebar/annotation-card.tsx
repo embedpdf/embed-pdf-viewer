@@ -32,10 +32,12 @@ export const AnnotationCard = ({
   documentId,
   isReadOnly = false,
 }: AnnotationCardProps) => {
-  const { annotation, replies } = entry;
+  const { annotation, replies, groupMembers } = entry;
   const [isMenuOpen, setMenuOpen] = useState(false);
   const [isEditing, setEditing] = useState(false);
+  const [isGroupExpanded, setGroupExpanded] = useState(false);
   const { translate } = useTranslations(documentId);
+  const hasGroupMembers = groupMembers != null && groupMembers.length > 0;
 
   const config = getAnnotationConfig(annotation);
   const hasContent = !!annotation.object.contents;
@@ -150,6 +152,78 @@ export const AnnotationCard = ({
                 isReadOnly={isReadOnly}
               />
             ))}
+          </div>
+        )}
+
+        {hasGroupMembers && (
+          <div className="border-border-subtle mt-4 border-t pt-3">
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                setGroupExpanded((prev) => !prev);
+              }}
+              className="text-accent hover:text-accent-hover flex w-full items-center justify-center gap-1 text-sm font-medium"
+            >
+              {isGroupExpanded
+                ? translate('comments.closeAllAnnotations', {
+                    fallback: 'Close All Annotations',
+                  })
+                : translate('comments.showAllAnnotations', {
+                    fallback: 'Show All Annotations',
+                  })}
+              <svg
+                className={`h-4 w-4 transition-transform ${isGroupExpanded ? 'rotate-180' : ''}`}
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+                strokeWidth={2}
+              >
+                <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
+              </svg>
+            </button>
+            {isGroupExpanded && (
+              <div className="mt-3 space-y-3">
+                {groupMembers!.map((member) => {
+                  const memberConfig = getAnnotationConfig(member);
+                  if (!memberConfig) return null;
+                  const memberAuthor = member.object.author || 'Guest';
+                  return (
+                    <div key={member.object.id} className="flex items-start gap-2">
+                      <AnnotationIcon
+                        annotation={member}
+                        config={memberConfig}
+                        title={translate(memberConfig.labelKey, {
+                          fallback: memberConfig.label,
+                        })}
+                        className="h-6 w-6"
+                      />
+                      <div className="min-w-0 flex-1">
+                        <div className="leading-none">
+                          <span className="text-fg-primary text-sm font-medium">
+                            {memberAuthor}
+                          </span>
+                          <span className="text-fg-disabled ml-2 text-xs">
+                            {formatDate(member.object.modified || member.object.created)}
+                            {` (${translate('comments.page', { params: { page: member.object.pageIndex + 1 } })})`}
+                          </span>
+                        </div>
+                        {member.object.custom?.text && (
+                          <TruncatedText
+                            text={member.object.custom.text}
+                            maxWords={14}
+                            className="text-fg-muted mt-1 text-sm"
+                            documentId={documentId}
+                          />
+                        )}
+                        {member.object.contents && (
+                          <p className="text-fg-primary mt-1 text-sm">{member.object.contents}</p>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
           </div>
         )}
 

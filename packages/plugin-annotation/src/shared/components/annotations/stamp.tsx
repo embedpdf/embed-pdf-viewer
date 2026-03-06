@@ -1,4 +1,4 @@
-import { MouseEvent, TouchEvent } from '@framework';
+import { MouseEvent } from '@framework';
 import { PdfStampAnnoObject } from '@embedpdf/models';
 import { TrackedAnnotation } from '@embedpdf/plugin-annotation';
 import { RenderAnnotation } from '../render-annotation';
@@ -9,7 +9,7 @@ interface StampProps {
   documentId: string;
   pageIndex: number;
   scale: number;
-  onClick: (e: MouseEvent<HTMLDivElement> | TouchEvent<HTMLDivElement>) => void;
+  onClick: (e: MouseEvent<HTMLDivElement>) => void;
 }
 
 export function Stamp({
@@ -33,7 +33,6 @@ export function Stamp({
         cursor: 'pointer',
       }}
       onPointerDown={onClick}
-      onTouchStart={onClick}
     >
       <RenderAnnotation
         documentId={documentId}
