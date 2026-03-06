@@ -1,5 +1,12 @@
 # @embedpdf/engines
 
+## 2.8.0
+
+### Minor Changes
+
+- [#495](https://github.com/embedpdf/embed-pdf-viewer/pull/495) by [@bobsingor](https://github.com/bobsingor) – Added support for reading and writing Caret annotations (`PdfCaretAnnoObject`).
+  Added support for reading and writing Rectangle Differences (`/RD`) for annotations that support it.
+
 ## 2.7.0
 
 ### Minor Changes

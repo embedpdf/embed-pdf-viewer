@@ -1,5 +1,13 @@
 # @embedpdf/utils
 
+## 2.8.0
+
+### Patch Changes
+
+- [#504](https://github.com/embedpdf/embed-pdf-viewer/pull/504) by [@danielbayerlein](https://github.com/danielbayerlein) – Support shift-key to temporarily lock aspect ratio during resize across all framework adapters (React, Preact, Vue, Svelte). Thanks to @danielbayerlein
+
+- [#495](https://github.com/embedpdf/embed-pdf-viewer/pull/495) by [@bobsingor](https://github.com/bobsingor) – Mark `touchstart` listener in `CounterRotateContainer` as passive to eliminate Chrome scroll-blocking violation.
+
 ## 2.7.0
 
 ## 2.6.2

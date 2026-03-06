@@ -1,5 +1,7 @@
 # @embedpdf/react-pdf-viewer
 
+## 2.8.0
+
 ## 2.7.0
 
 ## 2.6.2
