@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed, watch } from 'vue';
+import { ref, computed, watch, onBeforeUnmount } from 'vue';
 import { ignore, PdfErrorCode } from '@embedpdf/models';
 import { useDocumentState } from '@embedpdf/core/vue';
 import { useRenderCapability } from '../hooks';
@@ -28,9 +28,8 @@ const props = defineProps<RenderLayerProps>();
 const { provides: renderProvides } = useRenderCapability();
 const documentState = useDocumentState(() => props.documentId);
 
-const imageUrl = ref<string | null>(null);
-let urlRef: string | null = null;
-let hasLoaded = false;
+const canvasRef = ref<HTMLCanvasElement | null>(null);
+let currentBitmap: ImageBitmap | null = null;
 
 // Get refresh version from core state
 const refreshVersion = computed(() => {
@@ -49,6 +48,18 @@ const actualDpr = computed(() => {
   return window.devicePixelRatio;
 });
 
+function paintBitmap(bitmap: ImageBitmap) {
+  if (!canvasRef.value) return;
+  try {
+    const canvas = canvasRef.value;
+    canvas.width = bitmap.width;
+    canvas.height = bitmap.height;
+    canvas.getContext('bitmaprenderer')!.transferFromImageBitmap(bitmap);
+  } catch {
+    // Bitmap was detached
+  }
+}
+
 // Render page when dependencies change
 watch(
   [
@@ -61,28 +72,22 @@ watch(
   ],
   ([docId, pageIdx, scale, dpr, capability], [prevDocId], onCleanup) => {
     if (!capability) {
-      imageUrl.value = null;
+      if (canvasRef.value) {
+        const canvas = canvasRef.value;
+        canvas.width = canvas.width; // clears the canvas
+      }
       return;
     }
 
-    // CRITICAL: Clear image immediately when documentId changes (not for zoom/scale)
+    // CRITICAL: Clear canvas immediately when documentId changes (not for zoom/scale)
     if (prevDocId !== undefined && prevDocId !== docId) {
-      imageUrl.value = null;
-      if (urlRef && hasLoaded) {
-        URL.revokeObjectURL(urlRef);
-        urlRef = null;
-        hasLoaded = false;
+      if (canvasRef.value) {
+        const canvas = canvasRef.value;
+        canvas.width = canvas.width; // clears the canvas
       }
     }
 
-    // Revoke old URL before creating new one (if it's been loaded)
-    if (urlRef && hasLoaded && prevDocId === docId) {
-      URL.revokeObjectURL(urlRef);
-      urlRef = null;
-      hasLoaded = false;
-    }
-
-    const task = capability.forDocument(docId).renderPage({
+    const task = capability.forDocument(docId).renderPageBitmap({
       pageIndex: pageIdx,
       options: {
         scaleFactor: scale,
@@ -90,44 +95,41 @@ watch(
       },
     });
 
-    task.wait((blob) => {
-      const objectUrl = URL.createObjectURL(blob);
-      urlRef = objectUrl;
-      imageUrl.value = objectUrl;
-      hasLoaded = false;
+    task.wait((bitmap) => {
+      if (currentBitmap) {
+        currentBitmap.close();
+      }
+      currentBitmap = bitmap;
+      paintBitmap(bitmap);
+      currentBitmap = null; // transferred to canvas, don't close
     }, ignore);
 
     onCleanup(() => {
-      if (urlRef) {
-        // Only revoke if image has loaded
-        if (hasLoaded) {
-          URL.revokeObjectURL(urlRef);
-          urlRef = null;
-          hasLoaded = false;
-        }
-      } else {
-        // Task still in progress, abort it
-        task.abort({
-          code: PdfErrorCode.Cancelled,
-          message: 'canceled render task',
-        });
+      task.abort({
+        code: PdfErrorCode.Cancelled,
+        message: 'canceled render task',
+      });
+      if (currentBitmap) {
+        currentBitmap.close();
+        currentBitmap = null;
       }
     });
   },
   { immediate: true },
 );
 
-function handleImageLoad() {
-  hasLoaded = true;
-}
+onBeforeUnmount(() => {
+  if (currentBitmap) {
+    currentBitmap.close();
+    currentBitmap = null;
+  }
+});
 </script>
 
 <template>
-  <img
-    v-if="imageUrl"
-    :src="imageUrl"
+  <canvas
+    ref="canvasRef"
     :style="{ width: '100%', height: '100%' }"
-    @load="handleImageLoad"
     v-bind="$attrs"
   />
 </template>

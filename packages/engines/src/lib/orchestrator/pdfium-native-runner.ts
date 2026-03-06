@@ -1,7 +1,7 @@
 import { Logger, NoopLogger, Task, TaskError, PdfErrorCode } from '@embedpdf/models';
 import { PdfiumNative } from '../pdfium/engine';
 import { init } from '@embedpdf/pdfium';
-import { extractTransferables } from '../extract-transferables';
+import { collectTransferables } from '../collect-transferables';
 
 const LOG_SOURCE = 'PdfiumNativeRunner';
 const LOG_CATEGORY = 'Worker';
@@ -256,7 +256,7 @@ export class PdfiumNativeRunner {
    */
   private respond(response: WorkerResponse): void {
     this.logger.debug(LOG_SOURCE, LOG_CATEGORY, 'Sending response:', response.type);
-    self.postMessage(response, { transfer: extractTransferables(response) });
+    self.postMessage(response, { transfer: collectTransferables(response) });
   }
 
   /**

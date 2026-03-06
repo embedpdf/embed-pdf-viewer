@@ -1,5 +1,13 @@
 import { BasePlugin, PluginRegistry } from '@embedpdf/core';
-import { PdfDocumentObject, PdfPageObject, PdfRenderPageOptions } from '@embedpdf/models';
+import {
+  PdfDocumentObject,
+  PdfErrorCode,
+  PdfPageObject,
+  PdfRenderPageOptions,
+  RenderPriority,
+  TaskStage,
+} from '@embedpdf/models';
+import type { ImageDataLike, PdfTask } from '@embedpdf/models';
 import {
   RenderCapability,
   RenderPageOptions,
@@ -35,7 +43,6 @@ export class RenderPlugin extends BasePlugin<RenderPluginConfig, RenderCapabilit
       renderPageRectRaw: (options: RenderPageRectOptions) => this.renderPageRectRaw(options),
       renderPageBitmap: (options: RenderPageOptions) => this.renderPageBitmap(options),
       renderPageRectBitmap: (options: RenderPageRectOptions) => this.renderPageRectBitmap(options),
-      renderMode: this.config.renderMode ?? 'blob',
 
       // Document-scoped operations
       forDocument: (documentId: string) => this.createRenderScope(documentId),
@@ -56,7 +63,6 @@ export class RenderPlugin extends BasePlugin<RenderPluginConfig, RenderCapabilit
       renderPageBitmap: (options: RenderPageOptions) => this.renderPageBitmap(options, documentId),
       renderPageRectBitmap: (options: RenderPageRectOptions) =>
         this.renderPageRectBitmap(options, documentId),
-      renderMode: this.config.renderMode ?? 'blob',
     };
   }
 
@@ -133,23 +139,37 @@ export class RenderPlugin extends BasePlugin<RenderPluginConfig, RenderCapabilit
   }
 
   // ─────────────────────────────────────────────────────────
-  // Bitmap Rendering (raw → createImageBitmap on main thread)
+  // Bitmap Rendering
   // ─────────────────────────────────────────────────────────
+
+  /**
+   * Convert a raw render task to an ImageBitmap task.
+   * After `createImageBitmap` resolves, we check whether the derived task
+   * was aborted/rejected while the async conversion was in progress.
+   * If so, close the bitmap immediately to avoid leaking GPU memory.
+   */
+  private rawToBitmap(rawTask: PdfTask<ImageDataLike>) {
+    const derived = rawTask.map(
+      async (raw) => {
+        const bitmap = await createImageBitmap(new ImageData(raw.data, raw.width, raw.height));
+        if (derived.state.stage !== TaskStage.Pending) {
+          bitmap.close();
+        }
+        return bitmap;
+      },
+      (err: unknown) => ({ code: PdfErrorCode.Unknown, message: String(err) }),
+    );
+    return derived;
+  }
 
   private renderPageBitmap({ pageIndex, options }: RenderPageOptions, documentId?: string) {
     const { doc, page } = this.resolveDocAndPage(pageIndex, documentId);
-    return this.engine
-      .renderPageRaw(doc, page, {
+    return this.rawToBitmap(
+      this.engine.renderPageRaw(doc, page, {
         ...this.mergeRawOptions(options),
-        priority: 3,
-      })
-      .map(async (raw) => {
-        const sizeLabel = `${raw.width}x${raw.height}`;
-        this.logger.perf('RenderPlugin', 'createImageBitmap', 'call', 'Begin', sizeLabel);
-        const bmp = await createImageBitmap(new ImageData(raw.data, raw.width, raw.height));
-        this.logger.perf('RenderPlugin', 'createImageBitmap', 'call', 'End', sizeLabel);
-        return bmp;
-      });
+        priority: RenderPriority.CRITICAL,
+      }),
+    );
   }
 
   private renderPageRectBitmap(
@@ -157,15 +177,12 @@ export class RenderPlugin extends BasePlugin<RenderPluginConfig, RenderCapabilit
     documentId?: string,
   ) {
     const { doc, page } = this.resolveDocAndPage(pageIndex, documentId);
-    return this.engine
-      .renderPageRectRaw(doc, page, rect, this.mergeRawOptions(options))
-      .map(async (raw) => {
-        const sizeLabel = `${raw.width}x${raw.height}`;
-        this.logger.perf('RenderPlugin', 'createImageBitmap', 'call', 'Begin', sizeLabel);
-        const bmp = await createImageBitmap(new ImageData(raw.data, raw.width, raw.height));
-        this.logger.perf('RenderPlugin', 'createImageBitmap', 'call', 'End', sizeLabel);
-        return bmp;
-      });
+    return this.rawToBitmap(
+      this.engine.renderPageRectRaw(doc, page, rect, {
+        ...this.mergeRawOptions(options),
+        priority: RenderPriority.HIGH,
+      }),
+    );
   }
 
   // ─────────────────────────────────────────────────────────

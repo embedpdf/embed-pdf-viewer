@@ -1,47 +1,32 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="en">
-  <head>
-    <meta charset="UTF-8" />
-    <meta
-      name="viewport"
-      content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"
-    />
-    <title>EmbedPDF</title>
-    <style>
-      html,
-      body {
-        overscroll-behavior: none;
-      }
-      body {
-        margin: 0;
-        padding: 0;
-        touch-action: manipulation;
-      }
-    </style>
-  </head>
-  <body>
-    <div id="pdf-viewer" style="height: 100dvh"></div>
-    <script>
-      document.addEventListener('gesturestart', (e) => e.preventDefault());
-      document.addEventListener('gesturechange', (e) => e.preventDefault());
-    </script>
-    <script async type="module">
-      import EmbedPDF from './embedpdf.js';
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>EmbedPDF</title>
+  <style>
+    html, body { overscroll-behavior: none; }
+    body {
+      margin: 0;
+      padding: 0;
+    }
+  </style>
+</head>
+<body>
+  <div id="pdf-viewer" style="height: 100dvh"></div>
+  <script async type="module">
+    import EmbedPDF from './embedpdf.js';
 
-      const viewer = EmbedPDF.init({
-        type: 'container',
-        target: document.getElementById('pdf-viewer'),
-        src: 'https://www.nasa.gov/wp-content/uploads/2024/11/kennedy-space-center-annual-report-fy24-508.pdf',
-        worker: true,
-        tabBar: 'always',
-        render: {
-          renderMode: location.search.includes('bitmap') ? 'bitmap' : 'blob',
-        },
-        log: true,
-        theme: {
-          preference: 'system',
-        },
-      });
-    </script>
-  </body>
+    const viewer = EmbedPDF.init({
+      type: 'container',
+      target: document.getElementById('pdf-viewer'),
+      src: 'https://snippet.embedpdf.com/ebook.pdf',
+      worker: true,
+      tabBar: 'always',
+      theme: {
+        preference: 'system'
+      }
+    })
+  </script>
+</body>
 </html>

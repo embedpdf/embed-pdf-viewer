@@ -15,4 +15,3 @@ config/tsup.frameworks.config.bundled*
 publish-summary.json
 **/.svelte-kit
 **/*/*.tgz
-.envrc

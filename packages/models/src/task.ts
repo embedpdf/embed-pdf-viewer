@@ -274,19 +274,24 @@ export class Task<R, D, P = unknown> {
   /**
    * Transform the result of this task using a mapping function.
    * Returns a new Task that resolves with the mapped value.
-   * Aborting the derived task also aborts the source task.
    *
-   * @param fn - mapping function (may return a value or a Promise)
+   * Aborting the derived task also aborts the source task, and source errors
+   * are forwarded to the derived task directly (bypassing `errMap`).
+   *
+   * Note: progress events from the source task are **not** forwarded
+   * to the derived task.
+   *
+   * @param fn - mapping function that transforms the source result
+   * @param errMap - maps errors from `fn` (sync throws or rejected promises)
+   *   into the error type `D`. Source task errors are forwarded as-is.
    * @returns a new Task that resolves with the mapped result
    */
-  map<U>(fn: (result: R) => U | Promise<U>): Task<U, D> {
+  map<U>(fn: (result: R) => U | Promise<U>, errMap: (err: unknown) => D): Task<U, D> {
     const derived = new Task<U, D>();
-
-    // Wire abort propagation: aborting derived aborts source
-    const originalAbort = derived.abort.bind(derived);
+    const origAbort = derived.abort.bind(derived);
     derived.abort = (reason: D) => {
       this.abort(reason);
-      originalAbort(reason);
+      origAbort(reason);
     };
 
     this.wait(
@@ -303,7 +308,7 @@ export class Task<R, D, P = unknown> {
               },
               (err) => {
                 if (derived.state.stage === TaskStage.Pending) {
-                  derived.reject(err);
+                  derived.reject(errMap(err));
                 }
               },
             );
@@ -312,7 +317,7 @@ export class Task<R, D, P = unknown> {
           }
         } catch (err) {
           if (derived.state.stage === TaskStage.Pending) {
-            derived.reject(err as D);
+            derived.reject(errMap(err));
           }
         }
       },
