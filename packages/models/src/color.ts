@@ -51,6 +51,20 @@ export function webColorToPdfColor(color: WebColor): PdfColor {
   };
 }
 
+/**
+ * Return `#fff` or `#000` as a contrasting stroke color for the given fill color,
+ * based on relative luminance (threshold 0.45).
+ */
+export function getContrastStrokeColor(fillColor: string): string {
+  try {
+    const { red, green, blue } = webColorToPdfColor(fillColor);
+    const luminance = (0.299 * red + 0.587 * green + 0.114 * blue) / 255;
+    return luminance < 0.45 ? '#fff' : '#000';
+  } catch {
+    return '#000';
+  }
+}
+
 // === Alpha utility functions ===
 
 /**

@@ -1,4 +1,4 @@
-import { Rect, boundingRectOrEmpty } from '@embedpdf/models';
+import { Rect, boundingRectOrEmpty, Rotation } from '@embedpdf/models';
 import { useInteractionHandles, CounterRotate } from '@embedpdf/utils/@framework';
 import { TrackedAnnotation } from '@embedpdf/plugin-annotation';
 import { useState, useMemo, useCallback, useRef, useEffect, createPortal } from '@framework';
@@ -11,6 +11,7 @@ import {
   GroupSelectionMenuRenderFn,
   SelectionOutline,
 } from './types';
+import { getAnnotationScreenBounds } from '../annotation-bounds';
 
 interface GroupSelectionBoxProps {
   documentId: string;
@@ -305,8 +306,31 @@ export function GroupSelectionBox({
     return null;
   }
 
-  const groupBoxWidth = previewGroupBox.size.width * scale;
-  const groupBoxHeight = previewGroupBox.size.height * scale;
+  // Compute visual bounds in screen pixels, including mixed noZoom/noRotate selections.
+  let visualLeft = Infinity;
+  let visualTop = Infinity;
+  let visualRight = -Infinity;
+  let visualBottom = -Infinity;
+  for (const ta of selectedAnnotations) {
+    const bounds = getAnnotationScreenBounds(ta, scale, rotation as Rotation);
+    visualLeft = Math.min(visualLeft, bounds.left);
+    visualTop = Math.min(visualTop, bounds.top);
+    visualRight = Math.max(visualRight, bounds.right);
+    visualBottom = Math.max(visualBottom, bounds.bottom);
+  }
+  const initialLogicalLeft = groupBox.origin.x * scale;
+  const initialLogicalTop = groupBox.origin.y * scale;
+  const initialLogicalRight = (groupBox.origin.x + groupBox.size.width) * scale;
+  const initialLogicalBottom = (groupBox.origin.y + groupBox.size.height) * scale;
+  const leftCorrection = visualLeft - initialLogicalLeft;
+  const topCorrection = visualTop - initialLogicalTop;
+  const rightCorrection = visualRight - initialLogicalRight;
+  const bottomCorrection = visualBottom - initialLogicalBottom;
+
+  const groupBoxLeft = previewGroupBox.origin.x * scale + leftCorrection;
+  const groupBoxTop = previewGroupBox.origin.y * scale + topCorrection;
+  const groupBoxWidth = previewGroupBox.size.width * scale + (rightCorrection - leftCorrection);
+  const groupBoxHeight = previewGroupBox.size.height * scale + (bottomCorrection - topCorrection);
   const groupCenterX = groupBoxWidth / 2;
   const groupCenterY = groupBoxHeight / 2;
   const groupGuideLength = Math.max(300, Math.max(groupBoxWidth, groupBoxHeight) + 80);
@@ -317,8 +341,8 @@ export function GroupSelectionBox({
       <div
         style={{
           position: 'absolute',
-          left: previewGroupBox.origin.x * scale,
-          top: previewGroupBox.origin.y * scale,
+          left: groupBoxLeft,
+          top: groupBoxTop,
           width: groupBoxWidth,
           height: groupBoxHeight,
           pointerEvents: 'none',
@@ -531,12 +555,12 @@ export function GroupSelectionBox({
         <CounterRotate
           rect={{
             origin: {
-              x: previewGroupBox.origin.x * scale,
-              y: previewGroupBox.origin.y * scale,
+              x: groupBoxLeft,
+              y: groupBoxTop,
             },
             size: {
-              width: previewGroupBox.size.width * scale,
-              height: previewGroupBox.size.height * scale,
+              width: groupBoxWidth,
+              height: groupBoxHeight,
             },
           }}
           rotation={rotation}

@@ -372,6 +372,26 @@ export const defaultTools = [
 
   // Text & Stamp
   {
+    id: 'textComment' as const,
+    name: 'Comment',
+    matchScore: (a) => (a.type === PdfAnnotationSubtype.TEXT && !a.inReplyToId ? 1 : 0),
+    interaction: {
+      exclusive: false,
+      cursor: 'crosshair',
+      isDraggable: true,
+      isResizable: false,
+      isRotatable: false,
+    },
+    defaults: {
+      type: PdfAnnotationSubtype.TEXT,
+      strokeColor: '#FFCD45',
+      opacity: 1,
+    },
+    behavior: {
+      selectAfterCreate: true,
+    },
+  },
+  {
     id: 'freeText' as const,
     name: 'Free Text',
     matchScore: (a) => (a.type === PdfAnnotationSubtype.FREETEXT ? 1 : 0),

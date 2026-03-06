@@ -19,6 +19,14 @@ export interface AnnotationConfig {
 }
 
 export const annotationConfigs: Record<SidebarSubtype, AnnotationConfig> = {
+  [PdfAnnotationSubtype.TEXT]: {
+    label: 'Comment',
+    labelKey: 'annotation.comment',
+    icon: 'message',
+    iconProps: (annotation: any) => ({
+      primaryColor: annotation.strokeColor || annotation.color || '#6b7280',
+    }),
+  },
   [PdfAnnotationSubtype.HIGHLIGHT]: {
     label: 'Highlight',
     labelKey: 'annotation.highlight',

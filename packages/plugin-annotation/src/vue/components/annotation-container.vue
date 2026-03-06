@@ -161,6 +161,7 @@ import {
   type VNode,
 } from 'vue';
 import { PdfAnnotationObject, Rect, AnnotationAppearances } from '@embedpdf/models';
+import { getCounterRotation } from '@embedpdf/utils';
 import AppearanceImageVue from './appearance-image.vue';
 import { inferRotationCenterFromRects } from '@embedpdf/plugin-annotation';
 import {
@@ -297,6 +298,16 @@ const currentObject = computed<T>(
   () => ({ ...toRaw(props.trackedAnnotation.object), ...toRaw(preview.value) }) as T,
 );
 
+// Annotation flags
+const hasNoZoom = computed(() => (props.trackedAnnotation.object.flags ?? []).includes('noZoom'));
+const hasNoRotate = computed(() =>
+  (props.trackedAnnotation.object.flags ?? []).includes('noRotate'),
+);
+// noZoom: maintain constant screen-pixel size regardless of zoom level.
+const visualScale = computed(() => (hasNoZoom.value ? 1 : props.scale));
+// noRotate: stay visually upright regardless of page rotation.
+const effectivePageRotation = computed(() => (hasNoRotate.value ? 0 : props.rotation));
+
 // Get annotation's current rotation
 // During drag, use liveRotation if available; otherwise use the annotation's rotation
 const annotationRotation = computed(
@@ -360,8 +371,8 @@ const menuRect = computed<Rect>(() => ({
     y: currentObject.value.rect.origin.y * props.scale,
   },
   size: {
-    width: currentObject.value.rect.size.width * props.scale,
-    height: currentObject.value.rect.size.height * props.scale,
+    width: currentObject.value.rect.size.width * visualScale.value,
+    height: currentObject.value.rect.size.height * visualScale.value,
   },
 }));
 
@@ -374,7 +385,8 @@ const menuContext = computed<AnnotationSelectionContext>(() => ({
 
 // Placement hints - calculate suggestTop based on rotation handle position
 const menuPlacement = computed<SelectionMenuPlacement>(() => {
-  const effectiveAngle = (((annotationRotation.value + props.rotation * 90) % 360) + 360) % 360;
+  const effectiveAngle =
+    (((annotationRotation.value + effectivePageRotation.value * 90) % 360) + 360) % 360;
   const handleNearMenuSide =
     effectiveIsRotatable.value && effectiveAngle > 90 && effectiveAngle < 270;
   return {
@@ -595,40 +607,53 @@ watchEffect((onCleanup) => {
 });
 
 // ─── Layout computations ───────────────────────────────────────────────
-const aabbWidth = computed(() => currentObject.value.rect.size.width * props.scale);
-const aabbHeight = computed(() => currentObject.value.rect.size.height * props.scale);
-const innerWidth = computed(() => effectiveUnrotatedRect.value.size.width * props.scale);
-const innerHeight = computed(() => effectiveUnrotatedRect.value.size.height * props.scale);
+// noZoom: use visualScale (=1) so the annotation keeps a constant screen-pixel size.
+// noRotate: counter-rotate the outer div so the annotation stays upright on rotated pages.
+const aabbWidth = computed(() => currentObject.value.rect.size.width * visualScale.value);
+const aabbHeight = computed(() => currentObject.value.rect.size.height * visualScale.value);
+const innerWidth = computed(() => effectiveUnrotatedRect.value.size.width * visualScale.value);
+const innerHeight = computed(() => effectiveUnrotatedRect.value.size.height * visualScale.value);
 const usesCustomPivot = computed(
   () => Boolean(explicitUnrotatedRect.value) && annotationRotation.value !== 0,
 );
 const innerLeft = computed(() =>
   usesCustomPivot.value
-    ? (effectiveUnrotatedRect.value.origin.x - currentObject.value.rect.origin.x) * props.scale
+    ? (effectiveUnrotatedRect.value.origin.x - currentObject.value.rect.origin.x) *
+      visualScale.value
     : (aabbWidth.value - innerWidth.value) / 2,
 );
 const innerTop = computed(() =>
   usesCustomPivot.value
-    ? (effectiveUnrotatedRect.value.origin.y - currentObject.value.rect.origin.y) * props.scale
+    ? (effectiveUnrotatedRect.value.origin.y - currentObject.value.rect.origin.y) *
+      visualScale.value
     : (aabbHeight.value - innerHeight.value) / 2,
 );
 const innerTransformOrigin = computed(() => {
   if (usesCustomPivot.value && rotationPivot.value) {
-    return `${(rotationPivot.value.x - effectiveUnrotatedRect.value.origin.x) * props.scale}px ${(rotationPivot.value.y - effectiveUnrotatedRect.value.origin.y) * props.scale}px`;
+    return `${(rotationPivot.value.x - effectiveUnrotatedRect.value.origin.x) * visualScale.value}px ${(rotationPivot.value.y - effectiveUnrotatedRect.value.origin.y) * visualScale.value}px`;
   }
   return 'center center';
 });
 const centerX = computed(() =>
   rotationPivot.value
-    ? (rotationPivot.value.x - currentObject.value.rect.origin.x) * props.scale
+    ? (rotationPivot.value.x - currentObject.value.rect.origin.x) * visualScale.value
     : aabbWidth.value / 2,
 );
 const centerY = computed(() =>
   rotationPivot.value
-    ? (rotationPivot.value.y - currentObject.value.rect.origin.y) * props.scale
+    ? (rotationPivot.value.y - currentObject.value.rect.origin.y) * visualScale.value
     : aabbHeight.value / 2,
 );
 const guideLength = computed(() => Math.max(300, Math.max(aabbWidth.value, aabbHeight.value) + 80));
+// noRotate: compute counter-rotation to undo page rotation on this annotation's outer div.
+const counterRot = computed(() =>
+  hasNoRotate.value
+    ? getCounterRotation(
+        { origin: { x: 0, y: 0 }, size: { width: aabbWidth.value, height: aabbHeight.value } },
+        props.rotation,
+      )
+    : null,
+);
 const rotationIconSize = computed(() => Math.round(ROTATION_SIZE.value * 0.6));
 
 const apActive = computed(
@@ -646,10 +671,11 @@ const outerAABBStyle = computed<CSSProperties>(() => ({
   position: 'absolute',
   left: `${currentObject.value.rect.origin.x * props.scale}px`,
   top: `${currentObject.value.rect.origin.y * props.scale}px`,
-  width: `${aabbWidth.value}px`,
-  height: `${aabbHeight.value}px`,
+  width: `${counterRot.value ? counterRot.value.width : aabbWidth.value}px`,
+  height: `${counterRot.value ? counterRot.value.height : aabbHeight.value}px`,
   pointerEvents: 'none',
   zIndex: props.zIndex,
+  ...(counterRot.value ? { transform: counterRot.value.matrix, transformOrigin: '0 0' } : {}),
   ...(props.style ?? {}),
 }));
 

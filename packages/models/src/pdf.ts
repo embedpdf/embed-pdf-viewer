@@ -1188,7 +1188,12 @@ export interface PdfTextAnnoObject extends PdfAnnotationObjectBase {
   contents: string;
 
   /**
-   * color of text annotation
+   * Color of the text annotation (preferred over deprecated `color`)
+   */
+  strokeColor?: string;
+
+  /**
+   * @deprecated Use strokeColor instead. Will be removed in next major version.
    */
   color?: string;
 

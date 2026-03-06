@@ -340,13 +340,27 @@ export const viewerUISchema: UISchema = {
         breakpoints: {
           sm: {
             maxWidth: 640,
-            hide: ['add-text', 'add-stamp', 'add-ink', 'add-insert-text', 'add-replace-text'],
+            hide: [
+              'add-text',
+              'add-stamp',
+              'add-ink',
+              'add-insert-text',
+              'add-replace-text',
+              'add-comment',
+            ],
             show: ['overflow-annotation-tools'],
           },
           md: {
             minWidth: 640,
             hide: ['overflow-annotation-tools'],
-            show: ['add-text', 'add-stamp', 'add-ink', 'add-insert-text', 'add-replace-text'],
+            show: [
+              'add-text',
+              'add-stamp',
+              'add-ink',
+              'add-insert-text',
+              'add-replace-text',
+              'add-comment',
+            ],
           },
         },
       },
@@ -415,6 +429,13 @@ export const viewerUISchema: UISchema = {
               commandId: 'annotation:add-replace-text',
               variant: 'icon',
               categories: ['annotation', 'annotation-markup', 'annotation-replace-text'],
+            },
+            {
+              type: 'command-button',
+              id: 'add-comment',
+              commandId: 'annotation:add-comment',
+              variant: 'icon',
+              categories: ['annotation', 'annotation-comment-tool'],
             },
             {
               type: 'command-button',
@@ -1060,6 +1081,12 @@ export const viewerUISchema: UISchema = {
           id: 'annotation:add-replace-text',
           commandId: 'annotation:add-replace-text',
           categories: ['annotation', 'annotation-markup', 'annotation-replace-text'],
+        },
+        {
+          type: 'command',
+          id: 'annotation:add-comment',
+          commandId: 'annotation:add-comment',
+          categories: ['annotation', 'annotation-comment-tool'],
         },
         {
           type: 'command',

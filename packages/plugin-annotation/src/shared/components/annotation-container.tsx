@@ -4,6 +4,7 @@ import {
   useDoublePressProps,
   useInteractionHandles,
 } from '@embedpdf/utils/@framework';
+import { getCounterRotation } from '@embedpdf/utils';
 import { TrackedAnnotation } from '@embedpdf/plugin-annotation';
 import {
   useState,
@@ -141,6 +142,19 @@ export function AnnotationContainer<T extends PdfAnnotationObject>({
   const currentObject = preview
     ? { ...trackedAnnotation.object, ...preview }
     : trackedAnnotation.object;
+
+  // Annotation flags
+  const annoFlags = trackedAnnotation.object.flags ?? [];
+  const hasNoZoom = annoFlags.includes('noZoom');
+  const hasNoRotate = annoFlags.includes('noRotate');
+
+  // visualScale: noZoom annotations maintain constant screen-pixel size regardless of zoom.
+  // Sizing uses visualScale; page-space position (left/top) still uses scale.
+  const visualScale = hasNoZoom ? 1 : scale;
+
+  // effectivePageRotation: noRotate annotations stay visually upright regardless of page rotation.
+  // The interaction controller and selection menu use this value.
+  const effectivePageRotation = (hasNoRotate ? 0 : rotation) as typeof rotation;
 
   // UI constants
   const HANDLE_COLOR = resizeUI?.color ?? '#007ACC';
@@ -388,28 +402,38 @@ export function AnnotationContainer<T extends PdfAnnotationObject>({
   const showOutline = isSelected && !isMultiSelected;
 
   // Three-layer model: outer div (AABB) + inner rotated div (unrotatedRect) + content
-  const aabbWidth = currentObject.rect.size.width * scale;
-  const aabbHeight = currentObject.rect.size.height * scale;
-  const innerWidth = effectiveUnrotatedRect.size.width * scale;
-  const innerHeight = effectiveUnrotatedRect.size.height * scale;
+  // noZoom: use visualScale (=1) for sizing so the annotation keeps a constant screen-pixel size.
+  // noRotate: counter-rotate the outer div so the annotation stays upright on rotated pages.
+  const aabbWidth = currentObject.rect.size.width * visualScale;
+  const aabbHeight = currentObject.rect.size.height * visualScale;
+  const innerWidth = effectiveUnrotatedRect.size.width * visualScale;
+  const innerHeight = effectiveUnrotatedRect.size.height * visualScale;
   const usesCustomPivot = Boolean(explicitUnrotatedRect) && annotationRotation !== 0;
   const innerLeft = usesCustomPivot
-    ? (effectiveUnrotatedRect.origin.x - currentObject.rect.origin.x) * scale
+    ? (effectiveUnrotatedRect.origin.x - currentObject.rect.origin.x) * visualScale
     : (aabbWidth - innerWidth) / 2;
   const innerTop = usesCustomPivot
-    ? (effectiveUnrotatedRect.origin.y - currentObject.rect.origin.y) * scale
+    ? (effectiveUnrotatedRect.origin.y - currentObject.rect.origin.y) * visualScale
     : (aabbHeight - innerHeight) / 2;
   const innerTransformOrigin =
     usesCustomPivot && rotationPivot
-      ? `${(rotationPivot.x - effectiveUnrotatedRect.origin.x) * scale}px ${(rotationPivot.y - effectiveUnrotatedRect.origin.y) * scale}px`
+      ? `${(rotationPivot.x - effectiveUnrotatedRect.origin.x) * visualScale}px ${(rotationPivot.y - effectiveUnrotatedRect.origin.y) * visualScale}px`
       : 'center center';
   const centerX = rotationPivot
-    ? (rotationPivot.x - currentObject.rect.origin.x) * scale
+    ? (rotationPivot.x - currentObject.rect.origin.x) * visualScale
     : aabbWidth / 2;
   const centerY = rotationPivot
-    ? (rotationPivot.y - currentObject.rect.origin.y) * scale
+    ? (rotationPivot.y - currentObject.rect.origin.y) * visualScale
     : aabbHeight / 2;
   const guideLength = Math.max(300, Math.max(aabbWidth, aabbHeight) + 80);
+
+  // noRotate: compute counter-rotation to undo page rotation on this annotation's outer div.
+  const counterRot = hasNoRotate
+    ? getCounterRotation(
+        { origin: { x: 0, y: 0 }, size: { width: aabbWidth, height: aabbHeight } },
+        rotation,
+      )
+    : null;
 
   // For children, override rect to use unrotatedRect so content renders in unrotated space
   const childObject = useMemo(() => {
@@ -430,10 +454,15 @@ export function AnnotationContainer<T extends PdfAnnotationObject>({
           position: 'absolute',
           left: currentObject.rect.origin.x * scale,
           top: currentObject.rect.origin.y * scale,
-          width: aabbWidth,
-          height: aabbHeight,
+          width: counterRot ? counterRot.width : aabbWidth,
+          height: counterRot ? counterRot.height : aabbHeight,
           pointerEvents: 'none',
           zIndex,
+          // noRotate: apply counter-rotation matrix so the annotation stays upright
+          ...(counterRot && {
+            transform: counterRot.matrix,
+            transformOrigin: '0 0',
+          }),
           ...style,
         }}
         {...props}
@@ -672,8 +701,8 @@ export function AnnotationContainer<T extends PdfAnnotationObject>({
               y: currentObject.rect.origin.y * scale,
             },
             size: {
-              width: currentObject.rect.size.width * scale,
-              height: currentObject.rect.size.height * scale,
+              width: currentObject.rect.size.width * visualScale,
+              height: currentObject.rect.size.height * visualScale,
             },
           }}
           rotation={rotation}
@@ -684,7 +713,8 @@ export function AnnotationContainer<T extends PdfAnnotationObject>({
             // The menu (suggestTop: false) renders at the visual bottom (180deg).
             // Flip the menu to the top when the handle is in the bottom visual hemisphere
             // to prevent it from overlapping with the rotation handle.
-            const effectiveAngle = (((annotationRotation + rotation * 90) % 360) + 360) % 360;
+            const effectiveAngle =
+              (((annotationRotation + effectivePageRotation * 90) % 360) + 360) % 360;
             const handleNearMenuSide =
               effectiveIsRotatable && effectiveAngle > 90 && effectiveAngle < 270;
 

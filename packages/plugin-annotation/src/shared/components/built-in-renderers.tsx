@@ -8,6 +8,7 @@ import {
   PdfLineAnnoObject,
   PdfPolylineAnnoObject,
   PdfPolygonAnnoObject,
+  PdfTextAnnoObject,
   PdfFreeTextAnnoObject,
   PdfStampAnnoObject,
   PdfLinkAnnoObject,
@@ -26,6 +27,7 @@ import { Circle } from './annotations/circle';
 import { Line } from './annotations/line';
 import { Polyline } from './annotations/polyline';
 import { Polygon } from './annotations/polygon';
+import { Text } from './annotations/text';
 import { FreeText } from './annotations/free-text';
 import { Stamp } from './annotations/stamp';
 import { Link } from './annotations/link';
@@ -216,6 +218,23 @@ export const builtInRenderers: BoxedAnnotationRenderer[] = [
     ),
     zIndex: 0,
     interactionDefaults: { isDraggable: false, isResizable: false, isRotatable: false },
+  }),
+
+  // --- Text Comment ---
+
+  createRenderer<PdfTextAnnoObject>({
+    id: 'text',
+    matches: (a): a is PdfTextAnnoObject => a.type === PdfAnnotationSubtype.TEXT && !a.inReplyToId,
+    render: ({ currentObject, isSelected, onClick, appearanceActive }) => (
+      <Text
+        isSelected={isSelected}
+        color={currentObject.strokeColor ?? currentObject.color}
+        opacity={currentObject.opacity}
+        onClick={onClick}
+        appearanceActive={appearanceActive}
+      />
+    ),
+    interactionDefaults: { isDraggable: true, isResizable: false, isRotatable: false },
   }),
 
   // --- Caret ---
