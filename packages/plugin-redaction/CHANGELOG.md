@@ -1,5 +1,11 @@
 # @embedpdf/plugin-redaction
 
+## 2.8.0
+
+### Patch Changes
+
+- [#495](https://github.com/embedpdf/embed-pdf-viewer/pull/495) by [@bobsingor](https://github.com/bobsingor) – Remove redundant `onTouchStart` handlers from redaction renderers. `onPointerDown` already covers touch input on all modern browsers, so the duplicate handler caused non-passive event listener violations and double-fired on touch devices.
+
 ## 2.7.0
 
 ### Patch Changes
