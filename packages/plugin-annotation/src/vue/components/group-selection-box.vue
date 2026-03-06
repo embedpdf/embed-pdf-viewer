@@ -124,7 +124,7 @@ import {
   watch,
   Teleport,
 } from 'vue';
-import { Rect, boundingRectOrEmpty } from '@embedpdf/models';
+import { Rect, Rotation, boundingRectOrEmpty } from '@embedpdf/models';
 import {
   CounterRotate,
   MenuWrapperProps,
@@ -132,6 +132,7 @@ import {
   useInteractionHandles,
 } from '@embedpdf/utils/vue';
 import { TrackedAnnotation } from '@embedpdf/plugin-annotation';
+import { getAnnotationScreenBounds } from '../../shared/annotation-bounds';
 import { useDocumentPermissions } from '@embedpdf/core/vue';
 import { useAnnotationPlugin } from '../hooks';
 import {
@@ -273,8 +274,48 @@ watch(
 );
 
 // Layout computations
-const groupBoxWidth = computed(() => previewGroupBox.value.size.width * props.scale);
-const groupBoxHeight = computed(() => previewGroupBox.value.size.height * props.scale);
+// Compute visual bounds correction to account for mixed noZoom/noRotate selections.
+const visualBoundsCorrection = computed(() => {
+  let visualLeft = Infinity;
+  let visualTop = Infinity;
+  let visualRight = -Infinity;
+  let visualBottom = -Infinity;
+  for (const ta of props.selectedAnnotations) {
+    const bounds = getAnnotationScreenBounds(ta, props.scale, props.rotation as Rotation);
+    if (bounds.left < visualLeft) visualLeft = bounds.left;
+    if (bounds.top < visualTop) visualTop = bounds.top;
+    if (bounds.right > visualRight) visualRight = bounds.right;
+    if (bounds.bottom > visualBottom) visualBottom = bounds.bottom;
+  }
+  const gb = groupBox.value;
+  const logicalLeft = gb.origin.x * props.scale;
+  const logicalTop = gb.origin.y * props.scale;
+  const logicalRight = (gb.origin.x + gb.size.width) * props.scale;
+  const logicalBottom = (gb.origin.y + gb.size.height) * props.scale;
+  return {
+    left: visualLeft - logicalLeft,
+    top: visualTop - logicalTop,
+    right: visualRight - logicalRight,
+    bottom: visualBottom - logicalBottom,
+  };
+});
+
+const groupBoxLeft = computed(
+  () => previewGroupBox.value.origin.x * props.scale + visualBoundsCorrection.value.left,
+);
+const groupBoxTop = computed(
+  () => previewGroupBox.value.origin.y * props.scale + visualBoundsCorrection.value.top,
+);
+const groupBoxWidth = computed(
+  () =>
+    previewGroupBox.value.size.width * props.scale +
+    (visualBoundsCorrection.value.right - visualBoundsCorrection.value.left),
+);
+const groupBoxHeight = computed(
+  () =>
+    previewGroupBox.value.size.height * props.scale +
+    (visualBoundsCorrection.value.bottom - visualBoundsCorrection.value.top),
+);
 const groupCenterX = computed(() => groupBoxWidth.value / 2);
 const groupCenterY = computed(() => groupBoxHeight.value / 2);
 const groupGuideLength = computed(() =>
@@ -286,8 +327,8 @@ const contentsStyle: CSSProperties = { display: 'contents' };
 
 const outerStyle = computed<CSSProperties>(() => ({
   position: 'absolute',
-  left: `${previewGroupBox.value.origin.x * props.scale}px`,
-  top: `${previewGroupBox.value.origin.y * props.scale}px`,
+  left: `${groupBoxLeft.value}px`,
+  top: `${groupBoxTop.value}px`,
   width: `${groupBoxWidth.value}px`,
   height: `${groupBoxHeight.value}px`,
   pointerEvents: 'none',
@@ -403,12 +444,12 @@ const tooltipStyle = computed<CSSProperties>(() => ({
 // Menu rect for counter-rotate component
 const menuRect = computed<Rect>(() => ({
   origin: {
-    x: previewGroupBox.value.origin.x * props.scale,
-    y: previewGroupBox.value.origin.y * props.scale,
+    x: groupBoxLeft.value,
+    y: groupBoxTop.value,
   },
   size: {
-    width: previewGroupBox.value.size.width * props.scale,
-    height: previewGroupBox.value.size.height * props.scale,
+    width: groupBoxWidth.value,
+    height: groupBoxHeight.value,
   },
 }));
 

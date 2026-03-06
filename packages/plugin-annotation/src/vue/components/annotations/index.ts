@@ -7,3 +7,4 @@ export { default as Polygon } from './polygon.vue';
 export { default as Polyline } from './polyline.vue';
 export { default as Square } from './square.vue';
 export { default as Stamp } from './stamp.vue';
+export { default as Text } from './text.vue';

@@ -1,7 +1,8 @@
 <!-- GroupSelectionBox.svelte -->
 <script lang="ts">
-  import { boundingRectOrEmpty, type Rect } from '@embedpdf/models';
+  import { boundingRectOrEmpty, type Rect, type Rotation } from '@embedpdf/models';
   import type { TrackedAnnotation } from '@embedpdf/plugin-annotation';
+  import { getAnnotationScreenBounds } from '../../shared/annotation-bounds';
   import {
     useInteractionHandles,
     CounterRotate,
@@ -156,9 +157,44 @@
     Number.isFinite(groupRotationDisplay) ? Math.round(groupRotationDisplay * 10) / 10 : 0,
   );
 
+  // Compute visual bounds in screen pixels, accounting for mixed noZoom/noRotate selections.
+  // The correction offsets let us adjust the previewGroupBox position/size during drag/resize
+  // without re-running the per-annotation loop.
+  const visualBoundsCorrection = $derived.by(() => {
+    let visualLeft = Infinity;
+    let visualTop = Infinity;
+    let visualRight = -Infinity;
+    let visualBottom = -Infinity;
+    for (const ta of selectedAnnotations) {
+      const bounds = getAnnotationScreenBounds(ta, scale, rotation as Rotation);
+      if (bounds.left < visualLeft) visualLeft = bounds.left;
+      if (bounds.top < visualTop) visualTop = bounds.top;
+      if (bounds.right > visualRight) visualRight = bounds.right;
+      if (bounds.bottom > visualBottom) visualBottom = bounds.bottom;
+    }
+    const logicalLeft = groupBox.origin.x * scale;
+    const logicalTop = groupBox.origin.y * scale;
+    const logicalRight = (groupBox.origin.x + groupBox.size.width) * scale;
+    const logicalBottom = (groupBox.origin.y + groupBox.size.height) * scale;
+    return {
+      left: visualLeft - logicalLeft,
+      top: visualTop - logicalTop,
+      right: visualRight - logicalRight,
+      bottom: visualBottom - logicalBottom,
+    };
+  });
+
   // Group box dimensions for guide lines and rotation handle positioning
-  const groupBoxWidth = $derived(previewGroupBox.size.width * scale);
-  const groupBoxHeight = $derived(previewGroupBox.size.height * scale);
+  const groupBoxLeft = $derived(previewGroupBox.origin.x * scale + visualBoundsCorrection.left);
+  const groupBoxTop = $derived(previewGroupBox.origin.y * scale + visualBoundsCorrection.top);
+  const groupBoxWidth = $derived(
+    previewGroupBox.size.width * scale +
+      (visualBoundsCorrection.right - visualBoundsCorrection.left),
+  );
+  const groupBoxHeight = $derived(
+    previewGroupBox.size.height * scale +
+      (visualBoundsCorrection.bottom - visualBoundsCorrection.top),
+  );
   const groupCenterX = $derived(groupBoxWidth / 2);
   const groupCenterY = $derived(groupBoxHeight / 2);
   const groupGuideLength = $derived(Math.max(300, Math.max(groupBoxWidth, groupBoxHeight) + 80));
@@ -361,8 +397,8 @@
     <!-- Outer div: AABB container - stable center for help lines and rotation handle -->
     <div
       style:position="absolute"
-      style:left="{previewGroupBox.origin.x * scale}px"
-      style:top="{previewGroupBox.origin.y * scale}px"
+      style:left="{groupBoxLeft}px"
+      style:top="{groupBoxTop}px"
       style:width="{groupBoxWidth}px"
       style:height="{groupBoxHeight}px"
       style:pointer-events="none"
@@ -550,12 +586,12 @@
       <CounterRotate
         rect={{
           origin: {
-            x: previewGroupBox.origin.x * scale,
-            y: previewGroupBox.origin.y * scale,
+            x: groupBoxLeft,
+            y: groupBoxTop,
           },
           size: {
-            width: previewGroupBox.size.width * scale,
-            height: previewGroupBox.size.height * scale,
+            width: groupBoxWidth,
+            height: groupBoxHeight,
           },
         }}
         {rotation}

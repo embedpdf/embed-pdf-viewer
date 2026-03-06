@@ -60,3 +60,4 @@ export { default as GroupIcon } from './GroupIcon.vue';
 export { default as UngroupIcon } from './UngroupIcon.vue';
 export { default as InsertTextIcon } from './InsertTextIcon.vue';
 export { default as ReplaceTextIcon } from './ReplaceTextIcon.vue';
+export { default as MessageIcon } from './MessageIcon.vue';
