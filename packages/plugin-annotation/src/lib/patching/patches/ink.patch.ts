@@ -2,7 +2,6 @@ import { expandRect, PdfInkAnnoObject, Rect, rectFromPoints } from '@embedpdf/mo
 
 import { PatchFunction } from '../patch-registry';
 import {
-  calculateRotatedRectAABB,
   calculateRotatedRectAABBAroundPoint,
   resolveAnnotationRotationCenter,
 } from '../patch-utils';
@@ -48,12 +47,24 @@ export const patchInk: PatchFunction<PdfInkAnnoObject> = (original, ctx) => {
         },
       });
 
-      const widthScale = resolvedRect.size.width / Math.max(oldRect.size.width, 1e-6);
-      const heightScale = resolvedRect.size.height / Math.max(oldRect.size.height, 1e-6);
-      // Area-based stroke scaling keeps side-handle resize reversible:
-      // shrinking on one axis thins the stroke, and growing that axis restores it.
-      const strokeScale = Math.sqrt(Math.max(widthScale, 1e-6) * Math.max(heightScale, 1e-6));
-      const newStrokeWidth = Math.max(1, original.strokeWidth * strokeScale);
+      // Side handles should scale stroke width on that axis directly; corner
+      // resize keeps previous min-axis behavior for non-uniform scaling.
+      const resizeEpsilon = 1e-3;
+      const widthChanged = Math.abs(scaleX - 1) > resizeEpsilon;
+      const heightChanged = Math.abs(scaleY - 1) > resizeEpsilon;
+      const strokeScale =
+        widthChanged && !heightChanged
+          ? scaleX
+          : !widthChanged && heightChanged
+            ? scaleY
+            : Math.min(scaleX, scaleY);
+      const rawStrokeWidth = Math.max(1, original.strokeWidth * strokeScale);
+      const maxStrokeWidth = Math.max(
+        1,
+        Math.min(resolvedRect.size.width, resolvedRect.size.height),
+      );
+      const clampedStrokeWidth = Math.min(rawStrokeWidth, maxStrokeWidth);
+      const newStrokeWidth = Number(clampedStrokeWidth.toFixed(1));
 
       const innerOld = inset(oldRect, original.strokeWidth / 2);
       const innerNew = inset(resolvedRect, newStrokeWidth / 2);
