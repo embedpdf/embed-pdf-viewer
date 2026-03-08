@@ -15,7 +15,8 @@
         :onSelect="getOnSelect(annotation, renderer)"
         :onDoubleClick="getOnDoubleClick(renderer, annotation)"
         :zIndex="renderer.zIndex"
-        :style="getContainerStyle(annotation, renderer)"
+        :blendMode="getBlendMode(annotation, renderer)"
+        :style="renderer.containerStyle?.(annotation.object)"
         :appearance="getAppearance(annotation, renderer)"
         v-bind="containerProps"
       >
@@ -82,11 +83,12 @@
 </template>
 
 <script setup lang="ts">
-import { ref, shallowRef, computed, watch, type CSSProperties } from 'vue';
+import { ref, shallowRef, computed, watch } from 'vue';
 import {
   blendModeToCss,
   PdfAnnotationObject,
   PdfBlendMode,
+  type CssBlendMode,
   Position,
   AnnotationAppearanceMap,
   AnnotationAppearances,
@@ -425,14 +427,12 @@ const getOnDoubleClick = (renderer: BoxedAnnotationRenderer, annotation: Tracked
   };
 };
 
-const getContainerStyle = (
+const getBlendMode = (
   annotation: TrackedAnnotation,
   renderer: BoxedAnnotationRenderer,
-): CSSProperties => {
-  return (
-    renderer.containerStyle?.(annotation.object) ?? {
-      mixBlendMode: blendModeToCss(annotation.object.blendMode ?? PdfBlendMode.Normal),
-    }
+): CssBlendMode => {
+  return blendModeToCss(
+    annotation.object.blendMode ?? renderer.defaultBlendMode ?? PdfBlendMode.Normal,
   );
 };
 

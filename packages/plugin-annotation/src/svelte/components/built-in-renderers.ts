@@ -17,7 +17,6 @@ import {
   PdfSquigglyAnnoObject,
   PdfCaretAnnoObject,
   PdfTextAnnoObject,
-  blendModeToCss,
 } from '@embedpdf/models';
 import type {
   BoxedAnnotationRenderer,
@@ -106,8 +105,7 @@ export const builtInRenderers: BoxedAnnotationRenderer[] = [
     component: HighlightWrapper,
     zIndex: 0,
     interactionDefaults: { isDraggable: false, isResizable: false, isRotatable: false },
-    containerStyle: (a) =>
-      `mix-blend-mode: ${blendModeToCss(a.blendMode ?? PdfBlendMode.Multiply)}`,
+    defaultBlendMode: PdfBlendMode.Multiply,
   }),
 
   createRenderer<PdfUnderlineAnnoObject>({

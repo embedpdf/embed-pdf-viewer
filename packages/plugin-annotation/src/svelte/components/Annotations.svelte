@@ -337,8 +337,10 @@
           }
         : undefined}
       zIndex={renderer.zIndex}
-      style={renderer.containerStyle?.(annotation.object) ??
-        `mix-blend-mode: ${blendModeToCss(annotation.object.blendMode ?? PdfBlendMode.Normal)}`}
+      blendMode={blendModeToCss(
+        annotation.object.blendMode ?? renderer.defaultBlendMode ?? PdfBlendMode.Normal,
+      )}
+      style={renderer.containerStyle?.(annotation.object)}
       appearance={useAP ? getAppearanceForAnnotation(annotation) : undefined}
       {...annotationsProps}
     >

@@ -118,6 +118,39 @@ type InsertUprightBehaviorFor<T extends PdfAnnotationObject> =
       };
 
 /**
+ * Ink-specific behavior settings. Only available on tools whose annotation
+ * type is PdfAnnotationSubtype.INK (i.e. 'ink' and 'inkHighlighter').
+ */
+export interface InkBehavior {
+  /** ms of pointer inactivity before the accumulated strokes are committed. Default: 800. */
+  commitDelay?: number;
+  /** When true, line-like strokes are snapped to a clean 2-point straight line on pointerUp. */
+  smartLineRecognition?: boolean;
+  /**
+   * Maximum allowed perpendicular-deviation ratio (maxDeviation / strokeLength) for a stroke
+   * to qualify as a straight line. Lower = stricter. Default: 0.15.
+   */
+  smartLineThreshold?: number;
+  /**
+   * How many degrees from horizontal or vertical a recognised straight line may deviate
+   * before axis-snapping is skipped. Default: 15.
+   */
+  snapAngleDeg?: number;
+}
+
+/**
+ * Non-distributive conditional: wrapping both sides in [...] prevents TypeScript from
+ * distributing over a union. [PdfAnnotationObject] extends [PdfInkAnnoObject] is false
+ * (the full union is not a subtype of the specific ink type), so InkBehavior is only added
+ * when T is specifically the INK annotation type.
+ */
+type InkBehaviorFor<T extends PdfAnnotationObject> = [T] extends [
+  Extract<PdfAnnotationObject, { type: PdfAnnotationSubtype.INK }>,
+]
+  ? InkBehavior
+  : {};
+
+/**
  * The primary interface for defining an annotation tool.
  * Uses a type alias to properly combine the base interface with conditional properties.
  */
@@ -179,5 +212,6 @@ export type AnnotationTool<T extends PdfAnnotationObject = PdfAnnotationObject> 
     selectAfterCreate?: boolean;
     /** Override whether this annotation type uses AP rendering before editing (default: true) */
     useAppearanceStream?: boolean;
-  } & InsertUprightBehaviorFor<T>;
+  } & InsertUprightBehaviorFor<T> &
+    InkBehaviorFor<T>;
 } & ClickBehaviorFor<T>;

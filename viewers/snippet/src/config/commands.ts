@@ -1272,6 +1272,34 @@ export const commands: Record<string, Command<State>> = {
     },
   },
 
+  'annotation:add-ink-highlighter': {
+    id: 'annotation:add-ink-highlighter',
+    labelKey: 'annotation.inkHighlighter',
+    icon: 'inkHighlighter',
+    iconProps: ({ state }) => ({
+      primaryColor: getToolDefaultsById(state.plugins.annotation, 'inkHighlighter')?.strokeColor,
+    }),
+    categories: ['annotation', 'annotation-ink'],
+    action: ({ registry, documentId }) => {
+      const annotation = registry.getPlugin<AnnotationPlugin>(ANNOTATION_PLUGIN_ID)?.provides();
+      const annotationScope = annotation?.forDocument(documentId);
+      if (!annotationScope) return;
+
+      if (annotationScope.getActiveTool()?.id === 'inkHighlighter') {
+        annotationScope.setActiveTool(null);
+      } else {
+        annotationScope.setActiveTool('inkHighlighter');
+      }
+    },
+    active: ({ state, documentId }) => {
+      const annotation = state.plugins[ANNOTATION_PLUGIN_ID]?.documents[documentId];
+      return annotation?.activeToolId === 'inkHighlighter';
+    },
+    disabled: ({ state, documentId }) => {
+      return lacksPermission(state, documentId, PdfPermissionFlag.ModifyAnnotations);
+    },
+  },
+
   'annotation:add-text': {
     id: 'annotation:add-text',
     labelKey: 'annotation.text',

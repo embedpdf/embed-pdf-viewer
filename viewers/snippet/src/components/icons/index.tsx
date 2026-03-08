@@ -85,6 +85,7 @@ import { FreeTextIcon } from './free-text';
 import { InsertTextIcon } from './insert-text';
 import { ReplaceTextIcon } from './replace-text';
 import { MessageIcon } from './message';
+import { InkHighlighterIcon } from './ink-highlighter';
 
 export type Icons = {
   [key: string]: IconComponent;
@@ -177,4 +178,5 @@ export const icons: Icons = {
   insertText: InsertTextIcon,
   replaceText: ReplaceTextIcon,
   message: MessageIcon,
+  inkHighlighter: InkHighlighterIcon,
 };

@@ -14,6 +14,7 @@ import {
   PdfStandardFont,
   PdfTextAlignment,
   PdfVerticalAlignment,
+  PdfBlendMode,
 } from '@embedpdf/models';
 import { FormattedSelection } from '@embedpdf/plugin-selection';
 import { AnnotationTool } from '../tools/types';
@@ -71,6 +72,7 @@ export interface InkPreviewData {
   strokeWidth: number;
   strokeColor: string;
   opacity: number;
+  blendMode?: PdfBlendMode;
 }
 
 export interface FreeTextPreviewData {

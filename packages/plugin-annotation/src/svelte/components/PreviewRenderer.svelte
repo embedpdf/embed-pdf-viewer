@@ -1,6 +1,6 @@
 <script lang="ts">
   import type { AnyPreviewState } from '@embedpdf/plugin-annotation';
-  import { PdfAnnotationSubtype } from '@embedpdf/models';
+  import { blendModeToCss, PdfAnnotationSubtype, PdfBlendMode } from '@embedpdf/models';
   import Circle from './annotations/Circle.svelte';
   import Square from './annotations/Square.svelte';
   import Polygon from './annotations/Polygon.svelte';
@@ -94,6 +94,7 @@
     style:height="{style.height}px"
     style:pointer-events="none"
     style:z-index="10"
+    style:mix-blend-mode={blendModeToCss(preview.data.blendMode ?? PdfBlendMode.Normal)}
   >
     <Ink isSelected={false} {scale} {...preview.data} />
   </div>

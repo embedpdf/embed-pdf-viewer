@@ -2,7 +2,7 @@ import { AnyPreviewState } from '@embedpdf/plugin-annotation';
 import { Circle } from './annotations/circle';
 import { Square } from './annotations/square';
 import { Polygon } from './annotations/polygon';
-import { PdfAnnotationSubtype } from '@embedpdf/models';
+import { blendModeToCss, PdfAnnotationSubtype, PdfBlendMode } from '@embedpdf/models';
 import { Polyline } from './annotations/polyline';
 import { Line } from './annotations/line';
 import { Ink } from './annotations/ink';
@@ -68,7 +68,12 @@ export function PreviewRenderer({ preview, scale }: Props) {
 
   if (preview.type === PdfAnnotationSubtype.INK) {
     return (
-      <div style={style}>
+      <div
+        style={{
+          ...style,
+          mixBlendMode: blendModeToCss(preview.data.blendMode ?? PdfBlendMode.Normal),
+        }}
+      >
         <Ink isSelected={false} scale={scale} {...preview.data} />
       </div>
     );

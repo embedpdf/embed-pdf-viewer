@@ -1,4 +1,4 @@
-import { PdfAnnotationObject } from '@embedpdf/models';
+import { PdfAnnotationObject, PdfBlendMode } from '@embedpdf/models';
 import { TrackedAnnotation } from '@embedpdf/plugin-annotation';
 import {
   HandleElementProps,
@@ -182,7 +182,10 @@ export interface AnnotationRendererEntry<T extends PdfAnnotationObject = PdfAnno
   /** z-index for the annotation container (default: 1, text markup uses 0) */
   zIndex?: number;
 
-  /** Style applied to the annotation container (overrides default blendMode style) */
+  /** Default blend mode for this annotation type (used when annotation.blendMode is not set) */
+  defaultBlendMode?: PdfBlendMode;
+
+  /** Style applied to the annotation container — overrides the default blend-mode style. */
   containerStyle?: (annotation: T) => CSSProperties;
 
   /** Type-specific interaction fallbacks used when the tool doesn't define a property */
@@ -223,6 +226,8 @@ export interface BoxedAnnotationRenderer {
   render: (props: AnnotationRendererProps) => JSX.Element;
   vertexConfig?: VertexConfig<PdfAnnotationObject>;
   zIndex?: number;
+  defaultBlendMode?: PdfBlendMode;
+  /** Style applied to the annotation container — overrides the default blend-mode style. */
   containerStyle?: (annotation: PdfAnnotationObject) => CSSProperties;
   interactionDefaults?: {
     isDraggable?: boolean;
@@ -254,6 +259,7 @@ export function createRenderer<T extends PdfAnnotationObject>(
     render: (props) => entry.render(props as AnnotationRendererProps<T>),
     vertexConfig: entry.vertexConfig as VertexConfig<PdfAnnotationObject> | undefined,
     zIndex: entry.zIndex,
+    defaultBlendMode: entry.defaultBlendMode,
     containerStyle: entry.containerStyle as
       | ((annotation: PdfAnnotationObject) => CSSProperties)
       | undefined,
