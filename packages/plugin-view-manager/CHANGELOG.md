@@ -1,5 +1,7 @@
 # @embedpdf/plugin-view-manager
 
+## 2.8.1
+
 ## 2.8.0
 
 ## 2.7.0
