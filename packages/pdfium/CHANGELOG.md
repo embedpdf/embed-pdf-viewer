@@ -1,5 +1,19 @@
 # @embedpdf/pdfium
 
+## 2.8.0
+
+### Minor Changes
+
+- [#495](https://github.com/embedpdf/embed-pdf-viewer/pull/495) by [@bobsingor](https://github.com/bobsingor) – Exposed `EPDFAnnot_SetRectangleDifferences`, `EPDFAnnot_ClearRectangleDifferences`, and `EPDFAnnot_HasAppearanceStream` functions.
+
+### Patch Changes
+
+- [#510](https://github.com/embedpdf/embed-pdf-viewer/pull/510) by [@bobsingor](https://github.com/bobsingor) – Fix redact annotations leaving orphan indirect objects in the PDF cross-reference table. `EPDFAnnot_ApplyRedaction` and `EPDFPage_ApplyRedactions` now call `DeleteIndirectObject` after removing each annotation from the `/Annots` array, ensuring the underlying PDF object is fully removed from the xref rather than left as an unreachable orphan.
+
+  Thanks to @JanSlabon for reporting this bug.
+
+## 2.7.0
+
 ## 2.6.2
 
 ## 2.6.1

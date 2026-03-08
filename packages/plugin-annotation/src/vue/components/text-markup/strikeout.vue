@@ -3,7 +3,6 @@
     v-for="(r, i) in segmentRects"
     :key="i"
     @pointerdown="onClick"
-    @touchstart="onClick"
     :style="{
       position: 'absolute',
       left: `${(rect ? r.origin.x - rect.origin.x : r.origin.x) * scale}px`,
@@ -50,7 +49,7 @@ const props = withDefaults(
     segmentRects: Rect[];
     rect?: Rect;
     scale: number;
-    onClick?: (e: PointerEvent | TouchEvent) => void;
+    onClick?: (e: PointerEvent) => void;
     /** When true, AP image provides the visual; only render hit area */
     appearanceActive?: boolean;
   }>(),

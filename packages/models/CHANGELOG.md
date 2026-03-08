@@ -1,5 +1,18 @@
 # @embedpdf/models
 
+## 2.8.0
+
+### Minor Changes
+
+- [#495](https://github.com/embedpdf/embed-pdf-viewer/pull/495) by [@bobsingor](https://github.com/bobsingor) – Added `PdfCaretAnnoObject` definition for Caret annotations.
+  Added `PdfRectDifferences` interface and `rectangleDifferences` property to `PdfCircleAnnoObject`, `PdfSquareAnnoObject`, `PdfPolygonAnnoObject`, `PdfFreeTextAnnoObject`, and `PdfCaretAnnoObject` to support the PDF `/RD` entry.
+
+## 2.7.0
+
+### Minor Changes
+
+- [#467](https://github.com/embedpdf/embed-pdf-viewer/pull/467) by [@bobsingor](https://github.com/bobsingor) – Added types and interfaces for annotation appearance streams (`AnnotationAppearanceMap`, `AnnotationAppearances`, `AnnotationAppearanceImage`) and updated `PdfEngine` interface with `renderPageAnnotationsRaw`.
+
 ## 2.6.2
 
 ### Patch Changes

@@ -15,6 +15,7 @@ import {
   PdfTextAlignment,
   PdfVerticalAlignment,
 } from '@embedpdf/models';
+import { FormattedSelection } from '@embedpdf/plugin-selection';
 import { AnnotationTool } from '../tools/types';
 
 export interface CirclePreviewData {
@@ -157,4 +158,28 @@ export interface HandlerContext<A extends PdfAnnotationObject> {
   services: HandlerServices;
   onPreview: (state: AnyPreviewState | null) => void;
   onCommit: (annotation: A, context?: AnnotationCreateContext<A>) => void;
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+ * Selection-based handler types
+ *
+ * Mirrors the HandlerFactory pattern but for text-selection-based tools
+ * (highlight, underline, strikeout, squiggly, insertText, replaceText).
+ * ═══════════════════════════════════════════════════════════════════════════ */
+
+export interface SelectionHandlerContext<A extends PdfAnnotationObject = PdfAnnotationObject> {
+  toolId: string;
+  documentId: string;
+  getTool: () => AnnotationTool<A> | null;
+  createAnnotation: (pageIndex: number, annotation: PdfAnnotationObject) => void;
+  selectAnnotation: (pageIndex: number, id: string) => void;
+}
+
+export interface SelectionHandlerFactory<A extends PdfAnnotationObject = PdfAnnotationObject> {
+  toolId: string;
+  handle(
+    context: SelectionHandlerContext<A>,
+    selections: FormattedSelection[],
+    getText: () => Promise<string | undefined>,
+  ): void;
 }

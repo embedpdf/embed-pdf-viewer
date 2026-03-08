@@ -1,5 +1,43 @@
 # @embedpdf/plugin-annotation
 
+## 2.8.0
+
+### Minor Changes
+
+- [#509](https://github.com/embedpdf/embed-pdf-viewer/pull/509) by [@bobsingor](https://github.com/bobsingor) – Implement noZoom and noRotate annotation flag rendering. Annotations with noZoom now maintain a constant screen-pixel size regardless of zoom level, and annotations with noRotate stay visually upright regardless of page rotation.
+
+- [#495](https://github.com/embedpdf/embed-pdf-viewer/pull/495) by [@bobsingor](https://github.com/bobsingor) – Added "Insert Text" and "Replace Text" annotation tools.
+  Added renderer for Caret annotations.
+  Added support for grouped annotations in selectors (e.g. for Replace Text where a Caret and Strikeout are grouped).
+
+- [#509](https://github.com/embedpdf/embed-pdf-viewer/pull/509) by [@bobsingor](https://github.com/bobsingor) – Add Text (comment) annotation tool with handler, tool definition, and renderer support. thanks to @JoackimPennerup
+
+### Patch Changes
+
+- [#502](https://github.com/embedpdf/embed-pdf-viewer/pull/502) by [@danielbayerlein](https://github.com/danielbayerlein) – Add dashed stroke support to Polyline component for React, Vue and Svelte frameworks. Thanks @danielbayerlein!
+
+- [#495](https://github.com/embedpdf/embed-pdf-viewer/pull/495) by [@bobsingor](https://github.com/bobsingor) – Fix markup annotations (highlight, underline, strikethrough) not being created on PDFs that lack `CopyContents` permission. Annotations are now created without extracted text metadata when text extraction is denied.
+
+- [#495](https://github.com/embedpdf/embed-pdf-viewer/pull/495) by [@bobsingor](https://github.com/bobsingor) – Add `isRotatable: false` to text markup annotation tools (highlight, underline, strikeout, squiggly) to explicitly prevent rotation on these text-anchored annotations.
+
+- [#495](https://github.com/embedpdf/embed-pdf-viewer/pull/495) by [@bobsingor](https://github.com/bobsingor) – Fix marquee selection selecting non-rendered annotation types (e.g. POPUP, TEXT, WIDGET). Only annotations with a visual renderer are now included in marquee selection results.
+
+- [#508](https://github.com/embedpdf/embed-pdf-viewer/pull/508) by [@bobsingor](https://github.com/bobsingor) – Fix newly created annotations showing their appearance stream instead of dict-based rendering. New annotations now consistently start with `dictMode: true` across all framework wrappers (React, Vue, Svelte).
+
+- [#509](https://github.com/embedpdf/embed-pdf-viewer/pull/509) by [@bobsingor](https://github.com/bobsingor) – Fix group selection box outline when selected annotations use `noZoom` and/or `noRotate` flags. The multi-select group outline now correctly encloses mixed selections (flagged + normal annotations), including rotated pages and non-square noRotate annotations.
+
+- [#495](https://github.com/embedpdf/embed-pdf-viewer/pull/495) by [@bobsingor](https://github.com/bobsingor) – Remove redundant `onTouchStart` handlers from annotation renderers. `onPointerDown` already covers touch input on all modern browsers, so the duplicate handler caused non-passive event listener violations and double-fired on touch devices.
+
+## 2.7.0
+
+### Minor Changes
+
+- [#467](https://github.com/embedpdf/embed-pdf-viewer/pull/467) by [@bobsingor](https://github.com/bobsingor) –
+  - Added support for rendering annotation appearance streams (AP) for better visual fidelity with other PDF viewers.
+  - Refactored annotation rendering to use a registry-based system, allowing for easier extensibility.
+  - Introduced `moveAnnotation` API to update annotation positions without regenerating their appearance streams.
+  - Added caching for rendered appearance streams.
+
 ## 2.6.2
 
 ## 2.6.1

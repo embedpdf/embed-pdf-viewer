@@ -1,5 +1,18 @@
 # @embedpdf/engines
 
+## 2.8.0
+
+### Minor Changes
+
+- [#495](https://github.com/embedpdf/embed-pdf-viewer/pull/495) by [@bobsingor](https://github.com/bobsingor) – Added support for reading and writing Caret annotations (`PdfCaretAnnoObject`).
+  Added support for reading and writing Rectangle Differences (`/RD`) for annotations that support it.
+
+## 2.7.0
+
+### Minor Changes
+
+- [#467](https://github.com/embedpdf/embed-pdf-viewer/pull/467) by [@bobsingor](https://github.com/bobsingor) – Implemented `renderPageAnnotationsRaw` to batch render annotation appearance streams and updated `updatePageAnnotation` to support skipping appearance regeneration.
+
 ## 2.6.2
 
 ### Patch Changes

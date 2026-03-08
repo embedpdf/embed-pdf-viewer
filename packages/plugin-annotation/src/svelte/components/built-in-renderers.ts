@@ -15,6 +15,8 @@ import {
   PdfUnderlineAnnoObject,
   PdfStrikeOutAnnoObject,
   PdfSquigglyAnnoObject,
+  PdfCaretAnnoObject,
+  PdfTextAnnoObject,
   blendModeToCss,
 } from '@embedpdf/models';
 import type {
@@ -37,6 +39,8 @@ import HighlightWrapper from './renderers/HighlightRenderer.svelte';
 import UnderlineWrapper from './renderers/UnderlineRenderer.svelte';
 import StrikeoutWrapper from './renderers/StrikeoutRenderer.svelte';
 import SquigglyWrapper from './renderers/SquigglyRenderer.svelte';
+import CaretWrapper from './renderers/CaretRenderer.svelte';
+import TextWrapper from './renderers/TextRenderer.svelte';
 
 export const builtInRenderers: BoxedAnnotationRenderer[] = [
   createRenderer<PdfInkAnnoObject>({
@@ -127,6 +131,20 @@ export const builtInRenderers: BoxedAnnotationRenderer[] = [
     matches: (a): a is PdfSquigglyAnnoObject => a.type === PdfAnnotationSubtype.SQUIGGLY,
     component: SquigglyWrapper,
     zIndex: 0,
+    interactionDefaults: { isDraggable: false, isResizable: false, isRotatable: false },
+  }),
+
+  createRenderer<PdfTextAnnoObject>({
+    id: 'text',
+    matches: (a): a is PdfTextAnnoObject => a.type === PdfAnnotationSubtype.TEXT && !a.inReplyToId,
+    component: TextWrapper,
+    interactionDefaults: { isDraggable: true, isResizable: false, isRotatable: false },
+  }),
+
+  createRenderer<PdfCaretAnnoObject>({
+    id: 'caret',
+    matches: (a): a is PdfCaretAnnoObject => a.type === PdfAnnotationSubtype.CARET,
+    component: CaretWrapper,
     interactionDefaults: { isDraggable: false, isResizable: false, isRotatable: false },
   }),
 

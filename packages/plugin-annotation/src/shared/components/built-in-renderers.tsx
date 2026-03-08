@@ -8,6 +8,7 @@ import {
   PdfLineAnnoObject,
   PdfPolylineAnnoObject,
   PdfPolygonAnnoObject,
+  PdfTextAnnoObject,
   PdfFreeTextAnnoObject,
   PdfStampAnnoObject,
   PdfLinkAnnoObject,
@@ -15,6 +16,7 @@ import {
   PdfUnderlineAnnoObject,
   PdfStrikeOutAnnoObject,
   PdfSquigglyAnnoObject,
+  PdfCaretAnnoObject,
   blendModeToCss,
 } from '@embedpdf/models';
 import { Fragment } from '@framework';
@@ -25,6 +27,7 @@ import { Circle } from './annotations/circle';
 import { Line } from './annotations/line';
 import { Polyline } from './annotations/polyline';
 import { Polygon } from './annotations/polygon';
+import { Text } from './annotations/text';
 import { FreeText } from './annotations/free-text';
 import { Stamp } from './annotations/stamp';
 import { Link } from './annotations/link';
@@ -32,6 +35,7 @@ import { Highlight } from './text-markup/highlight';
 import { Underline } from './text-markup/underline';
 import { Strikeout } from './text-markup/strikeout';
 import { Squiggly } from './text-markup/squiggly';
+import { Caret } from './annotations/caret';
 
 export const builtInRenderers: BoxedAnnotationRenderer[] = [
   // --- Drawing ---
@@ -213,6 +217,40 @@ export const builtInRenderers: BoxedAnnotationRenderer[] = [
       />
     ),
     zIndex: 0,
+    interactionDefaults: { isDraggable: false, isResizable: false, isRotatable: false },
+  }),
+
+  // --- Text Comment ---
+
+  createRenderer<PdfTextAnnoObject>({
+    id: 'text',
+    matches: (a): a is PdfTextAnnoObject => a.type === PdfAnnotationSubtype.TEXT && !a.inReplyToId,
+    render: ({ currentObject, isSelected, onClick, appearanceActive }) => (
+      <Text
+        isSelected={isSelected}
+        color={currentObject.strokeColor ?? currentObject.color}
+        opacity={currentObject.opacity}
+        onClick={onClick}
+        appearanceActive={appearanceActive}
+      />
+    ),
+    interactionDefaults: { isDraggable: true, isResizable: false, isRotatable: false },
+  }),
+
+  // --- Caret ---
+
+  createRenderer<PdfCaretAnnoObject>({
+    id: 'caret',
+    matches: (a): a is PdfCaretAnnoObject => a.type === PdfAnnotationSubtype.CARET,
+    render: ({ currentObject, isSelected, scale, onClick, appearanceActive }) => (
+      <Caret
+        {...currentObject}
+        isSelected={isSelected}
+        scale={scale}
+        onClick={onClick}
+        appearanceActive={appearanceActive}
+      />
+    ),
     interactionDefaults: { isDraggable: false, isResizable: false, isRotatable: false },
   }),
 

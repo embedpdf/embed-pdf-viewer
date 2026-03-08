@@ -741,6 +741,84 @@ export const commands: Record<string, Command<State>> = {
     },
   },
 
+  'annotation:add-insert-text': {
+    id: 'annotation:add-insert-text',
+    labelKey: 'annotation.insertText',
+    icon: 'insert-text',
+    iconProps: ({ state }) => ({
+      primaryColor: getToolDefaultsById(state.plugins.annotation, 'insertText')?.strokeColor,
+    }),
+    categories: ['annotation'],
+    action: ({ registry, documentId }) => {
+      const annotation = registry.getPlugin<AnnotationPlugin>(ANNOTATION_PLUGIN_ID)?.provides();
+      const annotationScope = annotation?.forDocument(documentId);
+      if (!annotationScope) return;
+
+      if (annotationScope.getActiveTool()?.id === 'insertText') {
+        annotationScope.setActiveTool(null);
+      } else {
+        annotationScope.setActiveTool('insertText');
+      }
+    },
+    active: ({ state, documentId }) => {
+      const annotation = state.plugins[ANNOTATION_PLUGIN_ID]?.documents[documentId];
+      return annotation?.activeToolId === 'insertText';
+    },
+  },
+
+  'annotation:add-replace-text': {
+    id: 'annotation:add-replace-text',
+    labelKey: 'annotation.replaceText',
+    icon: 'replace-text',
+    iconProps: ({ state }) => ({
+      primaryColor: getToolDefaultsById(state.plugins.annotation, 'replaceText')?.strokeColor,
+    }),
+    categories: ['annotation'],
+    action: ({ registry, documentId }) => {
+      const annotation = registry.getPlugin<AnnotationPlugin>(ANNOTATION_PLUGIN_ID)?.provides();
+      const annotationScope = annotation?.forDocument(documentId);
+      if (!annotationScope) return;
+
+      if (annotationScope.getActiveTool()?.id === 'replaceText') {
+        annotationScope.setActiveTool(null);
+      } else {
+        annotationScope.setActiveTool('replaceText');
+      }
+    },
+    active: ({ state, documentId }) => {
+      const annotation = state.plugins[ANNOTATION_PLUGIN_ID]?.documents[documentId];
+      return annotation?.activeToolId === 'replaceText';
+    },
+  },
+
+  'annotation:add-comment': {
+    id: 'annotation:add-comment',
+    labelKey: 'annotation.comment',
+    icon: 'message',
+    iconProps: ({ state }) => ({
+      primaryColor: getToolDefaultsById(state.plugins.annotation, 'textComment')?.strokeColor,
+    }),
+    categories: ['annotation'],
+    action: ({ registry, documentId }) => {
+      const annotation = registry.getPlugin<AnnotationPlugin>(ANNOTATION_PLUGIN_ID)?.provides();
+      const annotationScope = annotation?.forDocument(documentId);
+      if (!annotationScope) return;
+
+      if (annotationScope.getActiveTool()?.id === 'textComment') {
+        annotationScope.setActiveTool(null);
+      } else {
+        annotationScope.setActiveTool('textComment');
+      }
+    },
+    active: ({ state, documentId }) => {
+      const annotation = state.plugins[ANNOTATION_PLUGIN_ID]?.documents[documentId];
+      return annotation?.activeToolId === 'textComment';
+    },
+    disabled: ({ state, documentId }) => {
+      return lacksPermission(state, documentId, PdfPermissionFlag.ModifyAnnotations);
+    },
+  },
+
   'annotation:add-highlight': {
     id: 'annotation:add-highlight',
     labelKey: 'annotation.highlight',

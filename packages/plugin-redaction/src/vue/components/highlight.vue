@@ -3,7 +3,6 @@
     v-for="(rect, i) in rects"
     :key="i"
     @pointerdown="onClick"
-    @touchstart="onClick"
     :style="{
       position: 'absolute',
       border,
@@ -31,7 +30,7 @@ interface HighlightProps {
   rects: Rect[];
   rect?: Rect;
   scale: number;
-  onClick?: (e: PointerEvent | TouchEvent) => void;
+  onClick?: (e: PointerEvent) => void;
 }
 
 const props = withDefaults(defineProps<HighlightProps>(), {

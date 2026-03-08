@@ -1,4 +1,4 @@
-import { CSSProperties, MouseEvent, TouchEvent, useState } from '@framework';
+import { CSSProperties, MouseEvent, useState } from '@framework';
 import {
   PdfRedactAnnoObject,
   PdfStandardFont,
@@ -13,7 +13,7 @@ export interface RedactAreaProps {
   isSelected: boolean;
   scale: number;
   pageIndex: number;
-  onClick: (e: MouseEvent<Element> | TouchEvent<Element>) => void;
+  onClick: (e: MouseEvent<Element>) => void;
   style?: CSSProperties;
 }
 
@@ -54,7 +54,6 @@ export function RedactArea({ annotation, isSelected, scale, onClick, style }: Re
   return (
     <div
       onPointerDown={!isSelected ? onClick : undefined}
-      onTouchStart={!isSelected ? onClick : undefined}
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}
       style={{

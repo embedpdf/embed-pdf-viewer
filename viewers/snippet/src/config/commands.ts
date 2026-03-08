@@ -919,8 +919,8 @@ export const commands: Record<string, Command<State>> = {
       // If there's a selection, create highlights for it
       if (formattedSelection.length > 0) {
         for (const sel of formattedSelection) {
-          selectionText.wait((text) => {
-            const annotationId = uuidV4();
+          const annotationId = uuidV4();
+          const createWithText = (text?: string) => {
             annotationScope.createAnnotation(sel.pageIndex, {
               id: annotationId,
               created: new Date(),
@@ -932,13 +932,15 @@ export const commands: Record<string, Command<State>> = {
               pageIndex: sel.pageIndex,
               rect: sel.rect,
               segmentRects: sel.segmentRects,
-              custom: {
-                text: text.join('\n'),
-              },
+              ...(text != null && { custom: { text } }),
             });
 
             annotationScope.selectAnnotation(sel.pageIndex, annotationId);
-          }, ignore);
+          };
+          selectionText.wait(
+            (text) => createWithText(text.join('\n')),
+            () => createWithText(),
+          );
         }
         selectionScope.clear();
         annotationScope.setActiveTool('highlight');
@@ -993,8 +995,8 @@ export const commands: Record<string, Command<State>> = {
       // If there's a selection, create underlines for it
       if (formattedSelection.length > 0) {
         for (const sel of formattedSelection) {
-          selectionText.wait((text) => {
-            const annotationId = uuidV4();
+          const annotationId = uuidV4();
+          const createWithText = (text?: string) => {
             annotationScope.createAnnotation(sel.pageIndex, {
               id: annotationId,
               created: new Date(),
@@ -1005,13 +1007,15 @@ export const commands: Record<string, Command<State>> = {
               pageIndex: sel.pageIndex,
               rect: sel.rect,
               segmentRects: sel.segmentRects,
-              custom: {
-                text: text.join('\n'),
-              },
+              ...(text != null && { custom: { text } }),
             });
 
             annotationScope.selectAnnotation(sel.pageIndex, annotationId);
-          }, ignore);
+          };
+          selectionText.wait(
+            (text) => createWithText(text.join('\n')),
+            () => createWithText(),
+          );
         }
         selectionScope.clear();
         annotationScope.setActiveTool('underline');
@@ -1066,8 +1070,8 @@ export const commands: Record<string, Command<State>> = {
       // If there's a selection, create strikeouts for it
       if (formattedSelection.length > 0) {
         for (const sel of formattedSelection) {
-          selectionText.wait((text) => {
-            const annotationId = uuidV4();
+          const annotationId = uuidV4();
+          const createWithText = (text?: string) => {
             annotationScope.createAnnotation(sel.pageIndex, {
               id: annotationId,
               created: new Date(),
@@ -1078,13 +1082,15 @@ export const commands: Record<string, Command<State>> = {
               pageIndex: sel.pageIndex,
               rect: sel.rect,
               segmentRects: sel.segmentRects,
-              custom: {
-                text: text.join('\n'),
-              },
+              ...(text != null && { custom: { text } }),
             });
 
             annotationScope.selectAnnotation(sel.pageIndex, annotationId);
-          }, ignore);
+          };
+          selectionText.wait(
+            (text) => createWithText(text.join('\n')),
+            () => createWithText(),
+          );
         }
         selectionScope.clear();
         annotationScope.setActiveTool('strikeout');
@@ -1139,8 +1145,8 @@ export const commands: Record<string, Command<State>> = {
       // If there's a selection, create squiggly annotations for it
       if (formattedSelection.length > 0) {
         for (const sel of formattedSelection) {
-          selectionText.wait((text) => {
-            const annotationId = uuidV4();
+          const annotationId = uuidV4();
+          const createWithText = (text?: string) => {
             annotationScope.createAnnotation(sel.pageIndex, {
               id: annotationId,
               created: new Date(),
@@ -1151,13 +1157,15 @@ export const commands: Record<string, Command<State>> = {
               pageIndex: sel.pageIndex,
               rect: sel.rect,
               segmentRects: sel.segmentRects,
-              custom: {
-                text: text.join('\n'),
-              },
+              ...(text != null && { custom: { text } }),
             });
 
             annotationScope.selectAnnotation(sel.pageIndex, annotationId);
-          }, ignore);
+          };
+          selectionText.wait(
+            (text) => createWithText(text.join('\n')),
+            () => createWithText(),
+          );
         }
         selectionScope.clear();
         annotationScope.setActiveTool('squiggly');
@@ -1174,6 +1182,62 @@ export const commands: Record<string, Command<State>> = {
     active: ({ state, documentId }) => {
       const annotation = state.plugins[ANNOTATION_PLUGIN_ID]?.documents[documentId];
       return annotation?.activeToolId === 'squiggly';
+    },
+    disabled: ({ state, documentId }) => {
+      return lacksPermission(state, documentId, PdfPermissionFlag.ModifyAnnotations);
+    },
+  },
+
+  'annotation:add-insert-text': {
+    id: 'annotation:add-insert-text',
+    labelKey: 'annotation.insertText',
+    icon: 'insertText',
+    iconProps: ({ state }) => ({
+      primaryColor: getToolDefaultsById(state.plugins.annotation, 'insertText')?.strokeColor,
+    }),
+    categories: ['annotation', 'annotation-markup', 'annotation-insert-text'],
+    action: ({ registry, documentId }) => {
+      const annotation = registry.getPlugin<AnnotationPlugin>(ANNOTATION_PLUGIN_ID)?.provides();
+      const annotationScope = annotation?.forDocument(documentId);
+      if (!annotationScope) return;
+
+      if (annotationScope.getActiveTool()?.id === 'insertText') {
+        annotationScope.setActiveTool(null);
+      } else {
+        annotationScope.setActiveTool('insertText');
+      }
+    },
+    active: ({ state, documentId }) => {
+      const annotation = state.plugins[ANNOTATION_PLUGIN_ID]?.documents[documentId];
+      return annotation?.activeToolId === 'insertText';
+    },
+    disabled: ({ state, documentId }) => {
+      return lacksPermission(state, documentId, PdfPermissionFlag.ModifyAnnotations);
+    },
+  },
+
+  'annotation:add-replace-text': {
+    id: 'annotation:add-replace-text',
+    labelKey: 'annotation.replaceText',
+    icon: 'replaceText',
+    iconProps: ({ state }) => ({
+      primaryColor: getToolDefaultsById(state.plugins.annotation, 'replaceText')?.strokeColor,
+    }),
+    categories: ['annotation', 'annotation-markup', 'annotation-replace-text'],
+    action: ({ registry, documentId }) => {
+      const annotation = registry.getPlugin<AnnotationPlugin>(ANNOTATION_PLUGIN_ID)?.provides();
+      const annotationScope = annotation?.forDocument(documentId);
+      if (!annotationScope) return;
+
+      if (annotationScope.getActiveTool()?.id === 'replaceText') {
+        annotationScope.setActiveTool(null);
+      } else {
+        annotationScope.setActiveTool('replaceText');
+      }
+    },
+    active: ({ state, documentId }) => {
+      const annotation = state.plugins[ANNOTATION_PLUGIN_ID]?.documents[documentId];
+      return annotation?.activeToolId === 'replaceText';
     },
     disabled: ({ state, documentId }) => {
       return lacksPermission(state, documentId, PdfPermissionFlag.ModifyAnnotations);
@@ -1211,7 +1275,7 @@ export const commands: Record<string, Command<State>> = {
   'annotation:add-text': {
     id: 'annotation:add-text',
     labelKey: 'annotation.text',
-    icon: 'text',
+    icon: 'freeText',
     iconProps: ({ state }) => ({
       primaryColor: getToolDefaultsById(state.plugins.annotation, 'freeText')?.fontColor,
     }),
@@ -1230,6 +1294,35 @@ export const commands: Record<string, Command<State>> = {
     active: ({ state, documentId }) => {
       const annotation = state.plugins[ANNOTATION_PLUGIN_ID]?.documents[documentId];
       return annotation?.activeToolId === 'freeText';
+    },
+    disabled: ({ state, documentId }) => {
+      return lacksPermission(state, documentId, PdfPermissionFlag.ModifyAnnotations);
+    },
+  },
+
+  'annotation:add-comment': {
+    id: 'annotation:add-comment',
+    labelKey: 'annotation.comment',
+    icon: 'message',
+    iconProps: ({ state }) => ({
+      primaryColor: getToolDefaultsById(state.plugins.annotation, 'textComment')?.strokeColor,
+    }),
+    categories: ['annotation', 'annotation-comment-tool'],
+    action: ({ registry, documentId }) => {
+      const annotation = registry.getPlugin<AnnotationPlugin>(ANNOTATION_PLUGIN_ID)?.provides();
+      const annotationScope = annotation?.forDocument(documentId);
+      if (!annotationScope) return;
+
+      if (annotationScope.getActiveTool()?.id === 'textComment') {
+        annotationScope.setActiveTool(null);
+      } else {
+        annotationScope.setActiveTool('textComment');
+      }
+    },
+    active: ({ state, documentId }) => {
+      return (
+        state.plugins[ANNOTATION_PLUGIN_ID]?.documents[documentId]?.activeToolId === 'textComment'
+      );
     },
     disabled: ({ state, documentId }) => {
       return lacksPermission(state, documentId, PdfPermissionFlag.ModifyAnnotations);

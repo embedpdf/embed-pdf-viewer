@@ -143,6 +143,9 @@ export const PROPERTY_CONFIGS: Record<string, PropertyConfig> = {
  * The order determines the display order in the sidebar.
  */
 export const ANNOTATION_PROPERTIES: Partial<Record<PdfAnnotationSubtype, string[]>> = {
+  // Text comments: fill color drives the icon color, opacity affects the whole icon
+  [PdfAnnotationSubtype.TEXT]: ['strokeColor', 'opacity'],
+
   // Ink uses strokeColor (was: color)
   [PdfAnnotationSubtype.INK]: ['strokeColor', 'opacity', 'strokeWidth', 'rotation'],
 
@@ -210,6 +213,8 @@ export const ANNOTATION_PROPERTIES: Partial<Record<PdfAnnotationSubtype, string[
     'color',
     'rotation',
   ],
+  [PdfAnnotationSubtype.CARET]: ['strokeColor', 'opacity'],
+
   [PdfAnnotationSubtype.REDACT]: [
     'strokeColor',
     'color',

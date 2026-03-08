@@ -1,5 +1,30 @@
 # @embedpdf/snippet
 
+## 2.8.0
+
+### Minor Changes
+
+- [#495](https://github.com/embedpdf/embed-pdf-viewer/pull/495) by [@bobsingor](https://github.com/bobsingor) – Added UI controls and commands for "Insert Text" and "Replace Text" tools.
+  Added support for rendering Caret annotations and grouped annotations (like Replace Text) in the comment sidebar.
+
+- [#509](https://github.com/embedpdf/embed-pdf-viewer/pull/509) by [@bobsingor](https://github.com/bobsingor) – Add comment annotation toolbar button with message icon, command, and UI schema entry.
+
+### Patch Changes
+
+- [#495](https://github.com/embedpdf/embed-pdf-viewer/pull/495) by [@bobsingor](https://github.com/bobsingor) – Fix markup annotation commands (highlight, underline, strikeout, squiggly) not creating annotations on PDFs that lack `CopyContents` permission. Annotations are now created without extracted text metadata when text extraction is denied.
+
+## 2.7.0
+
+### Patch Changes
+
+- [#486](https://github.com/embedpdf/embed-pdf-viewer/pull/486) by [@shunyy](https://github.com/shunyy) – Add Japanese (`ja`) translations to the snippet viewer. Thanks to @shunyy !
+
+- [#478](https://github.com/embedpdf/embed-pdf-viewer/pull/478) by [@phreyah](https://github.com/phreyah) – Add Swedish (`sv`) translations to the snippet viewer.
+
+- [#487](https://github.com/embedpdf/embed-pdf-viewer/pull/487) by [@shunyy](https://github.com/shunyy) – Expose `fontFallback` configuration option in the snippet viewer.
+
+- [#467](https://github.com/embedpdf/embed-pdf-viewer/pull/467) by [@bobsingor](https://github.com/bobsingor) – Fixed color matching case insensitivity and rotation debounce logic in the annotation sidebar.
+
 ## 2.6.2
 
 ## 2.6.1

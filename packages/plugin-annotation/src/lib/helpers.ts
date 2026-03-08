@@ -39,6 +39,7 @@ export type TextMarkupSubtype =
   | PdfAnnotationSubtype.SQUIGGLY;
 export type SidebarSubtype =
   | TextMarkupSubtype
+  | PdfAnnotationSubtype.TEXT
   | PdfAnnotationSubtype.INK
   | PdfAnnotationSubtype.SQUARE
   | PdfAnnotationSubtype.CIRCLE
@@ -47,7 +48,8 @@ export type SidebarSubtype =
   | PdfAnnotationSubtype.POLYLINE
   | PdfAnnotationSubtype.FREETEXT
   | PdfAnnotationSubtype.STAMP
-  | PdfAnnotationSubtype.REDACT;
+  | PdfAnnotationSubtype.REDACT
+  | PdfAnnotationSubtype.CARET;
 
 /* ------------------------------------------------------------------ */
 /* 2. Narrowing type‑guards (add more as needed)                      */
@@ -151,10 +153,17 @@ export function isRedact(
   return a.object.type === PdfAnnotationSubtype.REDACT;
 }
 
+export function isCaret(
+  a: TrackedAnnotation,
+): a is TrackedAnnotation<AnnoOf<PdfAnnotationSubtype.CARET>> {
+  return a.object.type === PdfAnnotationSubtype.CARET;
+}
+
 export function isSidebarAnnotation(
   a: TrackedAnnotation,
 ): a is TrackedAnnotation<AnnoOf<SidebarSubtype>> {
   return (
+    (isText(a) && !a.object.inReplyToId) ||
     isTextMarkup(a) ||
     isInk(a) ||
     isSquare(a) ||
@@ -164,6 +173,7 @@ export function isSidebarAnnotation(
     isPolyline(a) ||
     isFreeText(a) ||
     isStamp(a) ||
-    isRedact(a)
+    isRedact(a) ||
+    isCaret(a)
   );
 }
