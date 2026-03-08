@@ -48,11 +48,12 @@ export const patchInk: PatchFunction<PdfInkAnnoObject> = (original, ctx) => {
         },
       });
 
-      const strokeScale = Math.min(
-        resolvedRect.size.width / oldRect.size.width,
-        resolvedRect.size.height / oldRect.size.height,
-      );
-      const newStrokeWidth = Math.max(1, Math.round(original.strokeWidth * strokeScale));
+      const widthScale = resolvedRect.size.width / Math.max(oldRect.size.width, 1e-6);
+      const heightScale = resolvedRect.size.height / Math.max(oldRect.size.height, 1e-6);
+      // Area-based stroke scaling keeps side-handle resize reversible:
+      // shrinking on one axis thins the stroke, and growing that axis restores it.
+      const strokeScale = Math.sqrt(Math.max(widthScale, 1e-6) * Math.max(heightScale, 1e-6));
+      const newStrokeWidth = Math.max(1, original.strokeWidth * strokeScale);
 
       const innerOld = inset(oldRect, original.strokeWidth / 2);
       const innerNew = inset(resolvedRect, newStrokeWidth / 2);
