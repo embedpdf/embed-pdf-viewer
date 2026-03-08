@@ -1,5 +1,7 @@
 # @embedpdf/plugin-redaction
 
+## 2.8.1
+
 ## 2.8.0
 
 ### Patch Changes

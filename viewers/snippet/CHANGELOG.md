@@ -1,5 +1,13 @@
 # @embedpdf/snippet
 
+## 2.8.1
+
+### Patch Changes
+
+- [#512](https://github.com/embedpdf/embed-pdf-viewer/pull/512) by [@bobsingor](https://github.com/bobsingor) – Add `annotation:add-ink-highlighter` command and toolbar button for the ink highlighter tool.
+
+  The command toggles the `inkHighlighter` tool, respects the `ModifyAnnotations` permission, and is registered under the `annotation` and `annotation-ink` categories. The corresponding button is inserted into all relevant toolbar and mobile-menu slots next to the existing ink pen button.
+
 ## 2.8.0
 
 ### Minor Changes
