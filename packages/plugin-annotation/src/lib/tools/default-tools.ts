@@ -7,7 +7,65 @@ import {
   PdfTextAlignment,
   PdfVerticalAlignment,
 } from '@embedpdf/models';
+import { AnnoOf } from '../helpers';
 import { AnnotationTool } from './types';
+
+const inkTools: readonly AnnotationTool<AnnoOf<PdfAnnotationSubtype.INK>>[] = [
+  {
+    id: 'ink' as const,
+    name: 'Pen',
+    matchScore: (a) => (a.type === PdfAnnotationSubtype.INK && a.intent !== 'InkHighlight' ? 5 : 0),
+    interaction: {
+      exclusive: false,
+      cursor: 'crosshair',
+      isDraggable: true,
+      isResizable: true,
+      lockAspectRatio: false,
+    },
+    defaults: {
+      type: PdfAnnotationSubtype.INK,
+      strokeColor: '#E44234',
+      color: '#E44234', // deprecated alias
+      opacity: 1,
+      strokeWidth: 6,
+    },
+    behavior: {
+      commitDelay: 800,
+    },
+  },
+  {
+    id: 'inkHighlighter' as const,
+    name: 'Ink Highlighter',
+    matchScore: (a) =>
+      a.type === PdfAnnotationSubtype.INK && a.intent === 'InkHighlight' ? 10 : 0,
+    interaction: {
+      exclusive: false,
+      cursor: 'crosshair',
+      isDraggable: true,
+      isResizable: true,
+      lockAspectRatio: false,
+      lockGroupAspectRatio: (a) => {
+        // Lock aspect ratio when rotation is not near an orthogonal angle (within 6°)
+        const r = (((a.rotation ?? 0) % 90) + 90) % 90;
+        return r >= 6 && r <= 84;
+      },
+    },
+    defaults: {
+      type: PdfAnnotationSubtype.INK,
+      intent: 'InkHighlight',
+      strokeColor: '#FFCD45',
+      color: '#FFCD45', // deprecated alias
+      opacity: 1,
+      strokeWidth: 14,
+      blendMode: PdfBlendMode.Multiply,
+    },
+    behavior: {
+      commitDelay: 800,
+      smartLineRecognition: true,
+      smartLineThreshold: 0.15,
+    },
+  },
+];
 
 export const defaultTools = [
   // Text Markup Tools
@@ -148,52 +206,7 @@ export const defaultTools = [
   },
 
   // Drawing Tools
-  {
-    id: 'ink' as const,
-    name: 'Pen',
-    matchScore: (a) => (a.type === PdfAnnotationSubtype.INK && a.intent !== 'InkHighlight' ? 5 : 0),
-    interaction: {
-      exclusive: false,
-      cursor: 'crosshair',
-      isDraggable: true,
-      isResizable: true,
-      lockAspectRatio: false,
-    },
-    defaults: {
-      type: PdfAnnotationSubtype.INK,
-      strokeColor: '#E44234',
-      color: '#E44234', // deprecated alias
-      opacity: 1,
-      strokeWidth: 6,
-    },
-  },
-  {
-    id: 'inkHighlighter' as const,
-    name: 'Ink Highlighter',
-    matchScore: (a) =>
-      a.type === PdfAnnotationSubtype.INK && a.intent === 'InkHighlight' ? 10 : 0,
-    interaction: {
-      exclusive: false,
-      cursor: 'crosshair',
-      isDraggable: true,
-      isResizable: true,
-      lockAspectRatio: false,
-      lockGroupAspectRatio: (a) => {
-        // Lock aspect ratio when rotation is not near an orthogonal angle (within 6°)
-        const r = (((a.rotation ?? 0) % 90) + 90) % 90;
-        return r >= 6 && r <= 84;
-      },
-    },
-    defaults: {
-      type: PdfAnnotationSubtype.INK,
-      intent: 'InkHighlight',
-      strokeColor: '#FFCD45',
-      color: '#FFCD45', // deprecated alias
-      opacity: 1,
-      strokeWidth: 14,
-      blendMode: PdfBlendMode.Multiply,
-    },
-  },
+  ...inkTools,
 
   // Shape Tools
   {

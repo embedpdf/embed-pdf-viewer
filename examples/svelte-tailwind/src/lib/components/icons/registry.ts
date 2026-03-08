@@ -66,6 +66,7 @@ import UngroupIcon from './UngroupIcon.svelte';
 import InsertTextIcon from './InsertTextIcon.svelte';
 import ReplaceTextIcon from './ReplaceTextIcon.svelte';
 import MessageIcon from './MessageIcon.svelte';
+import InkHighlighterIcon from './InkHighlighterIcon.svelte';
 
 // Define the standard Prop type for your icons for consistency
 export interface IconProps extends SVGAttributes<SVGSVGElement> {
@@ -138,6 +139,7 @@ export const iconRegistry = {
   'insert-text': InsertTextIcon,
   'replace-text': ReplaceTextIcon,
   message: MessageIcon,
+  'ink-highlighter': InkHighlighterIcon,
 } as const;
 
 // Extract valid keys for Type Safety

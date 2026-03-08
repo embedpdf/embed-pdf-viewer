@@ -51,7 +51,7 @@
 <script setup lang="ts">
 import { computed, CSSProperties } from 'vue';
 import { AnyPreviewState } from '@embedpdf/plugin-annotation';
-import { PdfAnnotationSubtype } from '@embedpdf/models';
+import { blendModeToCss, PdfAnnotationSubtype, PdfBlendMode } from '@embedpdf/models';
 import { Circle, Square, Polygon, Polyline, Line, Ink } from './annotations';
 
 const props = defineProps<{
@@ -59,13 +59,21 @@ const props = defineProps<{
   scale: number;
 }>();
 
-const style = computed<CSSProperties>(() => ({
-  position: 'absolute',
-  left: `${props.preview.bounds.origin.x * props.scale}px`,
-  top: `${props.preview.bounds.origin.y * props.scale}px`,
-  width: `${props.preview.bounds.size.width * props.scale}px`,
-  height: `${props.preview.bounds.size.height * props.scale}px`,
-  pointerEvents: 'none',
-  zIndex: 10,
-}));
+const style = computed<CSSProperties>(() => {
+  const base: CSSProperties = {
+    position: 'absolute',
+    left: `${props.preview.bounds.origin.x * props.scale}px`,
+    top: `${props.preview.bounds.origin.y * props.scale}px`,
+    width: `${props.preview.bounds.size.width * props.scale}px`,
+    height: `${props.preview.bounds.size.height * props.scale}px`,
+    pointerEvents: 'none',
+    zIndex: 10,
+  };
+
+  if (props.preview.type === PdfAnnotationSubtype.INK) {
+    base.mixBlendMode = blendModeToCss(props.preview.data.blendMode ?? PdfBlendMode.Normal);
+  }
+
+  return base;
+});
 </script>

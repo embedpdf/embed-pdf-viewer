@@ -86,6 +86,7 @@ export function createRenderer<T extends PdfAnnotationObject>(
     component: markRaw(entry.component) as Component<AnnotationRendererProps>,
     vertexConfig: entry.vertexConfig as VertexConfig<PdfAnnotationObject> | undefined,
     zIndex: entry.zIndex,
+    defaultBlendMode: entry.defaultBlendMode,
     containerStyle: entry.containerStyle as
       | ((annotation: PdfAnnotationObject) => CSSProperties)
       | undefined,

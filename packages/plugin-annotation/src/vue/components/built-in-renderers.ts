@@ -16,9 +16,7 @@ import {
   PdfSquigglyAnnoObject,
   PdfCaretAnnoObject,
   PdfTextAnnoObject,
-  blendModeToCss,
 } from '@embedpdf/models';
-import type { CSSProperties } from 'vue';
 import type { BoxedAnnotationRenderer } from '../context';
 import { createRenderer } from '../context/renderer-registry';
 
@@ -102,9 +100,7 @@ export const builtInRenderers: BoxedAnnotationRenderer[] = [
     component: HighlightRenderer,
     zIndex: 0,
     interactionDefaults: { isDraggable: false, isResizable: false, isRotatable: false },
-    containerStyle: (a) => ({
-      mixBlendMode: blendModeToCss(a.blendMode ?? PdfBlendMode.Multiply),
-    }),
+    defaultBlendMode: PdfBlendMode.Multiply,
   }),
 
   createRenderer<PdfUnderlineAnnoObject>({
