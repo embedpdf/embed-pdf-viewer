@@ -33,6 +33,7 @@ export interface AnnotationContainerProps<T extends PdfAnnotationObject> {
   isRotatable?: boolean;
   lockAspectRatio?: boolean;
   class?: string;
+  style?: string;
   blendMode?: CssBlendMode;
   vertexConfig?: VertexConfig<T>;
   selectionMenu?: AnnotationSelectionMenuRenderFn;

@@ -7,6 +7,7 @@ import {
   type InjectionKey,
   type ShallowRef,
   type Component,
+  type CSSProperties,
 } from 'vue';
 import type {
   BoxedAnnotationRenderer,
@@ -86,6 +87,9 @@ export function createRenderer<T extends PdfAnnotationObject>(
     vertexConfig: entry.vertexConfig as VertexConfig<PdfAnnotationObject> | undefined,
     zIndex: entry.zIndex,
     defaultBlendMode: entry.defaultBlendMode,
+    containerStyle: entry.containerStyle as
+      | ((annotation: PdfAnnotationObject) => CSSProperties)
+      | undefined,
     interactionDefaults: entry.interactionDefaults,
     useAppearanceStream: entry.useAppearanceStream,
     isDraggable: entry.isDraggable,

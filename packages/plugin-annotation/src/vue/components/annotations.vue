@@ -16,6 +16,7 @@
         :onDoubleClick="getOnDoubleClick(renderer, annotation)"
         :zIndex="renderer.zIndex"
         :blendMode="getBlendMode(annotation, renderer)"
+        :style="renderer.containerStyle?.(annotation.object)"
         :appearance="getAppearance(annotation, renderer)"
         v-bind="containerProps"
       >

@@ -229,6 +229,7 @@ const props = withDefaults(
     /** Customize rotation handle appearance */
     rotationUi?: RotationHandleUI;
     blendMode?: CssBlendMode;
+    style?: CSSProperties;
   }>(),
   {
     lockAspectRatio: false,
@@ -687,6 +688,7 @@ const layerBaseStyle = computed<CSSProperties>(() => ({
 const visualLayerStyle = computed<CSSProperties>(() => ({
   ...layerBaseStyle.value,
   ...(props.blendMode ? { mixBlendMode: props.blendMode } : {}),
+  ...props.style,
 }));
 
 const outerAABBStyle = computed<CSSProperties>(() => layerBaseStyle.value);

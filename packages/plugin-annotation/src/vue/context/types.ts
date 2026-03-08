@@ -1,4 +1,4 @@
-import type { Component } from 'vue';
+import type { Component, CSSProperties } from 'vue';
 import type { PdfAnnotationObject, PdfBlendMode } from '@embedpdf/models';
 import type { TrackedAnnotation } from '@embedpdf/plugin-annotation';
 import { VertexConfig } from '../../shared/types';
@@ -52,6 +52,8 @@ export interface AnnotationRendererEntry<T extends PdfAnnotationObject = PdfAnno
   zIndex?: number;
   /** Default blend mode for this annotation type (used when the annotation object has no blendMode set) */
   defaultBlendMode?: PdfBlendMode;
+  /** Style applied to the annotation container — overrides the default blend-mode style. */
+  containerStyle?: (annotation: T) => CSSProperties;
   /** Type-specific interaction fallbacks used when the tool doesn't define a property */
   interactionDefaults?: {
     isDraggable?: boolean;
@@ -85,6 +87,8 @@ export interface BoxedAnnotationRenderer {
   vertexConfig?: VertexConfig<PdfAnnotationObject>;
   zIndex?: number;
   defaultBlendMode?: PdfBlendMode;
+  /** Style applied to the annotation container — overrides the default blend-mode style. */
+  containerStyle?: (annotation: PdfAnnotationObject) => CSSProperties;
   interactionDefaults?: {
     isDraggable?: boolean;
     isResizable?: boolean;

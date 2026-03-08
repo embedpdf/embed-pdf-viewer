@@ -63,6 +63,9 @@ export function createRenderer<T extends PdfAnnotationObject>(
     vertexConfig: entry.vertexConfig as VertexConfig<PdfAnnotationObject> | undefined,
     zIndex: entry.zIndex,
     defaultBlendMode: entry.defaultBlendMode,
+    containerStyle: entry.containerStyle as
+      | ((annotation: PdfAnnotationObject) => string)
+      | undefined,
     interactionDefaults: entry.interactionDefaults,
     useAppearanceStream: entry.useAppearanceStream,
     isDraggable: entry.isDraggable,

@@ -35,6 +35,7 @@
     isRotatable = true,
     lockAspectRatio = false,
     blendMode,
+    style: propsStyle,
     class: propsClass = '',
     vertexConfig,
     selectionMenu,
@@ -452,6 +453,7 @@
     style:transform={counterRot ? counterRot.matrix : undefined}
     style:transform-origin={counterRot ? '0 0' : undefined}
     style:mix-blend-mode={blendMode}
+    style={propsStyle}
   >
     <!-- Inner div: rotated visual content - no pointer events -->
     <div

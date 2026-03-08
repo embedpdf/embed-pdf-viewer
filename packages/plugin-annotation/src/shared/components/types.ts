@@ -185,6 +185,9 @@ export interface AnnotationRendererEntry<T extends PdfAnnotationObject = PdfAnno
   /** Default blend mode for this annotation type (used when annotation.blendMode is not set) */
   defaultBlendMode?: PdfBlendMode;
 
+  /** Style applied to the annotation container — overrides the default blend-mode style. */
+  containerStyle?: (annotation: T) => CSSProperties;
+
   /** Type-specific interaction fallbacks used when the tool doesn't define a property */
   interactionDefaults?: {
     isDraggable?: boolean;
@@ -224,6 +227,8 @@ export interface BoxedAnnotationRenderer {
   vertexConfig?: VertexConfig<PdfAnnotationObject>;
   zIndex?: number;
   defaultBlendMode?: PdfBlendMode;
+  /** Style applied to the annotation container — overrides the default blend-mode style. */
+  containerStyle?: (annotation: PdfAnnotationObject) => CSSProperties;
   interactionDefaults?: {
     isDraggable?: boolean;
     isResizable?: boolean;
@@ -255,6 +260,9 @@ export function createRenderer<T extends PdfAnnotationObject>(
     vertexConfig: entry.vertexConfig as VertexConfig<PdfAnnotationObject> | undefined,
     zIndex: entry.zIndex,
     defaultBlendMode: entry.defaultBlendMode,
+    containerStyle: entry.containerStyle as
+      | ((annotation: PdfAnnotationObject) => CSSProperties)
+      | undefined,
     interactionDefaults: entry.interactionDefaults,
     useAppearanceStream: entry.useAppearanceStream,
     isDraggable: entry.isDraggable,

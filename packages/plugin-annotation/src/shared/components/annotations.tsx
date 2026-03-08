@@ -330,6 +330,7 @@ export function Annotations(annotationsProps: AnnotationsProps) {
             blendMode={blendModeToCss(
               annotation.object.blendMode ?? renderer.defaultBlendMode ?? PdfBlendMode.Normal,
             )}
+            style={renderer.containerStyle?.(annotation.object)}
             appearance={useAP ? getAppearanceForAnnotation(annotation) : undefined}
             {...annotationsProps}
           >
