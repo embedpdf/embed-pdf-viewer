@@ -105,7 +105,7 @@ export const inkHandlerFactory: HandlerFactory<PdfInkAnnoObject> = {
           const threshold = behavior.smartLineThreshold ?? 0.15;
           const strokes = getStrokes();
           const last = strokes[strokes.length - 1];
-          if (last && isLineLike(last.points, threshold)) {
+          if (last && last.points.length > 1 && isLineLike(last.points, threshold)) {
             const first = last.points[0];
             const end = last.points[last.points.length - 1];
             const dx = end.x - first.x;
