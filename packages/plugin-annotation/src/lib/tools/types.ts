@@ -131,7 +131,24 @@ export interface InkBehavior {
    * to qualify as a straight line. Lower = stricter. Default: 0.15.
    */
   smartLineThreshold?: number;
+  /**
+   * How many degrees from horizontal or vertical a recognised straight line may deviate
+   * before axis-snapping is skipped. Default: 15.
+   */
+  snapAngleDeg?: number;
 }
+
+/**
+ * Non-distributive conditional: wrapping both sides in [...] prevents TypeScript from
+ * distributing over a union. [PdfAnnotationObject] extends [PdfInkAnnoObject] is false
+ * (the full union is not a subtype of the specific ink type), so InkBehavior is only added
+ * when T is specifically the INK annotation type.
+ */
+type InkBehaviorFor<T extends PdfAnnotationObject> = [T] extends [
+  Extract<PdfAnnotationObject, { type: PdfAnnotationSubtype.INK }>,
+]
+  ? InkBehavior
+  : {};
 
 /**
  * The primary interface for defining an annotation tool.
@@ -196,5 +213,5 @@ export type AnnotationTool<T extends PdfAnnotationObject = PdfAnnotationObject> 
     /** Override whether this annotation type uses AP rendering before editing (default: true) */
     useAppearanceStream?: boolean;
   } & InsertUprightBehaviorFor<T> &
-    InkBehavior;
+    InkBehaviorFor<T>;
 } & ClickBehaviorFor<T>;

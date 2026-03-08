@@ -106,7 +106,31 @@ export const inkHandlerFactory: HandlerFactory<PdfInkAnnoObject> = {
           const strokes = getStrokes();
           const last = strokes[strokes.length - 1];
           if (last && isLineLike(last.points, threshold)) {
-            last.points = [last.points[0], last.points[last.points.length - 1]];
+            const first = last.points[0];
+            const end = last.points[last.points.length - 1];
+            const dx = end.x - first.x;
+            const dy = end.y - first.y;
+            // Angle from horizontal in degrees (0° = horizontal, 90° = vertical)
+            const angleDeg = Math.atan2(Math.abs(dy), Math.abs(dx)) * (180 / Math.PI);
+            const snapAngleDeg = behavior.snapAngleDeg ?? 15;
+
+            if (angleDeg <= snapAngleDeg) {
+              // Close enough to horizontal — use average Y across all points
+              const avgY = last.points.reduce((sum, p) => sum + p.y, 0) / last.points.length;
+              last.points = [
+                { x: first.x, y: avgY },
+                { x: end.x, y: avgY },
+              ];
+            } else if (angleDeg >= 90 - snapAngleDeg) {
+              // Close enough to vertical — use average X across all points
+              const avgX = last.points.reduce((sum, p) => sum + p.x, 0) / last.points.length;
+              last.points = [
+                { x: avgX, y: first.y },
+                { x: avgX, y: end.y },
+              ];
+            }
+            // Diagonal straight line — leave the original stroke points intact
+
             setStrokes([...strokes]);
             onPreview(getPreview());
           }
