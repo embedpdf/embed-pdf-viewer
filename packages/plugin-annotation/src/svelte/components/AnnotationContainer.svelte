@@ -1,5 +1,5 @@
 <script lang="ts" generics="T extends PdfAnnotationObject">
-  import type { PdfAnnotationObject, Rect } from '@embedpdf/models';
+  import type { PdfAnnotationObject, Rect, CssBlendMode } from '@embedpdf/models';
   import { getCounterRotation } from '@embedpdf/utils';
   import { useDocumentPermissions } from '@embedpdf/core/svelte';
   import { useAnnotationCapability, useAnnotationPlugin } from '../hooks';
@@ -34,7 +34,7 @@
     isResizable,
     isRotatable = true,
     lockAspectRatio = false,
-    style,
+    blendMode,
     class: propsClass = '',
     vertexConfig,
     selectionMenu,
@@ -440,8 +440,7 @@
 </script>
 
 <div data-no-interaction>
-  <!-- svelte-ignore a11y_no_static_element_interactions -->
-  <!-- Outer div: AABB container - stable center for help lines and rotation handle -->
+  <!-- Visual Layer: blend mode applied here, contains only annotation content -->
   <div
     style:position="absolute"
     style:left="{currentObject.rect.origin.x * scale}px"
@@ -452,7 +451,58 @@
     style:z-index={zIndex}
     style:transform={counterRot ? counterRot.matrix : undefined}
     style:transform-origin={counterRot ? '0 0' : undefined}
-    style={style || ''}
+    style:mix-blend-mode={blendMode}
+  >
+    <!-- Inner div: rotated visual content - no pointer events -->
+    <div
+      style:position="absolute"
+      style:left="{innerLeft}px"
+      style:top="{innerTop}px"
+      style:width="{innerWidth}px"
+      style:height="{innerHeight}px"
+      style:transform={annotationRotation !== 0 ? `rotate(${annotationRotation}deg)` : undefined}
+      style:transform-origin={innerTransformOrigin}
+      style:pointer-events="none"
+    >
+      <!-- Annotation content - renders in unrotated coordinate space -->
+      {#if customAnnotationRenderer}
+        {@render customAnnotationRenderer?.({
+          annotation: childObject,
+          children: children as Snippet,
+          isSelected,
+          scale,
+          rotation,
+          pageWidth,
+          pageHeight,
+          pageIndex,
+          onSelect,
+        })}
+      {:else}
+        {@render children(childObject, { appearanceActive: apActive })}
+      {/if}
+
+      <!-- AP overlay canvas (always in DOM, toggled via display) -->
+      {#if appearance?.normal}
+        <AppearanceImage
+          appearance={appearance.normal}
+          style="display: {apActive ? 'block' : 'none'};"
+        />
+      {/if}
+    </div>
+  </div>
+
+  <!-- Interaction Layer: no blend mode, contains rotation guides, handles, and drag/resize/vertex -->
+  <!-- svelte-ignore a11y_no_static_element_interactions -->
+  <div
+    style:position="absolute"
+    style:left="{currentObject.rect.origin.x * scale}px"
+    style:top="{currentObject.rect.origin.y * scale}px"
+    style:width="{counterRot ? counterRot.width : aabbWidth}px"
+    style:height="{counterRot ? counterRot.height : aabbHeight}px"
+    style:pointer-events="none"
+    style:z-index={zIndex}
+    style:transform={counterRot ? counterRot.matrix : undefined}
+    style:transform-origin={counterRot ? '0 0' : undefined}
     class={propsClass}
     {...restProps}
   >
@@ -574,7 +624,7 @@
       {/if}
     {/if}
 
-    <!-- Inner div: rotated content area - holds content, resize handles, vertex handles -->
+    <!-- Inner div: drag/resize/vertex interaction -->
     <div
       {...effectiveIsDraggable && isSelected ? interactionHandles.dragProps : {}}
       use:doublePress={{ onDouble: guardedOnDoubleClick }}
@@ -591,31 +641,6 @@
       style:touch-action="none"
       style:cursor={isSelected && effectiveIsDraggable ? 'move' : 'default'}
     >
-      <!-- Annotation content - renders in unrotated coordinate space -->
-      {#if customAnnotationRenderer}
-        {@render customAnnotationRenderer?.({
-          annotation: childObject,
-          children: children as Snippet,
-          isSelected,
-          scale,
-          rotation,
-          pageWidth,
-          pageHeight,
-          pageIndex,
-          onSelect,
-        })}
-      {:else}
-        {@render children(childObject, { appearanceActive: apActive })}
-      {/if}
-
-      <!-- AP overlay canvas (always in DOM, toggled via display) -->
-      {#if appearance?.normal}
-        <AppearanceImage
-          appearance={appearance.normal}
-          style="display: {apActive ? 'block' : 'none'};"
-        />
-      {/if}
-
       <!-- Resize handles - rotate with the shape -->
       {#if isSelected && effectiveIsResizable && !rotationActive}
         {#each resizeHandles as { key, style: handleStyle, ...hProps } (key)}

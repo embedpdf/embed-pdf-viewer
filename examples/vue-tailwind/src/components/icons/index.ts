@@ -61,3 +61,4 @@ export { default as UngroupIcon } from './UngroupIcon.vue';
 export { default as InsertTextIcon } from './InsertTextIcon.vue';
 export { default as ReplaceTextIcon } from './ReplaceTextIcon.vue';
 export { default as MessageIcon } from './MessageIcon.vue';
+export { default as InkHighlighterIcon } from './InkHighlighterIcon.vue';

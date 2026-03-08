@@ -10,7 +10,7 @@ import {
   GroupSelectionMenuRenderFn,
 } from '../types';
 import { VertexConfig } from '../../shared/types';
-import { PdfAnnotationObject, AnnotationAppearances } from '@embedpdf/models';
+import { PdfAnnotationObject, AnnotationAppearances, CssBlendMode } from '@embedpdf/models';
 import { TrackedAnnotation } from '@embedpdf/plugin-annotation';
 import type { BoxedAnnotationRenderer } from '../context';
 
@@ -33,7 +33,7 @@ export interface AnnotationContainerProps<T extends PdfAnnotationObject> {
   isRotatable?: boolean;
   lockAspectRatio?: boolean;
   class?: string;
-  style?: string;
+  blendMode?: CssBlendMode;
   vertexConfig?: VertexConfig<T>;
   selectionMenu?: AnnotationSelectionMenuRenderFn;
   selectionMenuSnippet?: Snippet<[AnnotationSelectionMenuProps]>;

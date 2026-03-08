@@ -65,3 +65,4 @@ export { default as UngroupIcon } from './UngroupIcon.svelte';
 export { default as InsertTextIcon } from './InsertTextIcon.svelte';
 export { default as ReplaceTextIcon } from './ReplaceTextIcon.svelte';
 export { default as MessageIcon } from './MessageIcon.svelte';
+export { default as InkHighlighterIcon } from './InkHighlighterIcon.svelte';

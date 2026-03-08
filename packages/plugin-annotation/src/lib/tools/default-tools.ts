@@ -166,6 +166,9 @@ export const defaultTools = [
       opacity: 1,
       strokeWidth: 6,
     },
+    behavior: {
+      commitDelay: 800,
+    },
   },
   {
     id: 'inkHighlighter' as const,
@@ -192,6 +195,9 @@ export const defaultTools = [
       opacity: 1,
       strokeWidth: 14,
       blendMode: PdfBlendMode.Multiply,
+    },
+    behavior: {
+      commitDelay: 800,
     },
   },
 

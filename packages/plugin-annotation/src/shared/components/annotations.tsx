@@ -327,11 +327,9 @@ export function Annotations(annotationsProps: AnnotationsProps) {
                 : undefined
             }
             zIndex={renderer.zIndex}
-            style={
-              renderer.containerStyle?.(annotation.object) ?? {
-                mixBlendMode: blendModeToCss(annotation.object.blendMode ?? PdfBlendMode.Normal),
-              }
-            }
+            blendMode={blendModeToCss(
+              annotation.object.blendMode ?? renderer.defaultBlendMode ?? PdfBlendMode.Normal,
+            )}
             appearance={useAP ? getAppearanceForAnnotation(annotation) : undefined}
             {...annotationsProps}
           >

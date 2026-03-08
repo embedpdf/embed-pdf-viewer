@@ -9,6 +9,23 @@ import { HandlerFactory, PreviewState } from './types';
 import { useState } from '../utils/use-state';
 import { clamp } from '@embedpdf/core';
 
+/**
+ * Returns true when the given points form a sufficiently straight line.
+ * Uses the ratio of max perpendicular deviation to stroke length.
+ */
+function isLineLike(points: { x: number; y: number }[], threshold: number): boolean {
+  if (points.length < 3) return true;
+  const A = points[0];
+  const B = points[points.length - 1];
+  const len = Math.hypot(B.x - A.x, B.y - A.y);
+  if (len < 5) return false; // ignore tiny marks
+  const maxDev = points.reduce((max, P) => {
+    const d = Math.abs((B.x - A.x) * (A.y - P.y) - (A.x - P.x) * (B.y - A.y)) / len;
+    return Math.max(max, d);
+  }, 0);
+  return maxDev / len < threshold;
+}
+
 export const inkHandlerFactory: HandlerFactory<PdfInkAnnoObject> = {
   annotationType: PdfAnnotationSubtype.INK,
   create(context) {
@@ -51,6 +68,7 @@ export const inkHandlerFactory: HandlerFactory<PdfInkAnnoObject> = {
           ...defaults,
           rect: bounds,
           inkList: strokes,
+          blendMode: defaults.blendMode,
         },
       };
     };
@@ -80,6 +98,21 @@ export const inkHandlerFactory: HandlerFactory<PdfInkAnnoObject> = {
         setIsDrawing(false);
         evt.releasePointerCapture?.();
 
+        // Per-stroke smart line recognition — runs immediately on pointerUp
+        const tool = getTool();
+        const behavior = tool?.behavior;
+        if (behavior?.smartLineRecognition) {
+          const threshold = behavior.smartLineThreshold ?? 0.15;
+          const strokes = getStrokes();
+          const last = strokes[strokes.length - 1];
+          if (last && isLineLike(last.points, threshold)) {
+            last.points = [last.points[0], last.points[last.points.length - 1]];
+            setStrokes([...strokes]);
+            onPreview(getPreview());
+          }
+        }
+
+        const commitDelay = behavior?.commitDelay ?? 800;
         if (timerRef.current) clearTimeout(timerRef.current);
         timerRef.current = setTimeout(() => {
           const strokes = getStrokes();
@@ -102,7 +135,7 @@ export const inkHandlerFactory: HandlerFactory<PdfInkAnnoObject> = {
           }
           setStrokes([]);
           onPreview(null);
-        }, 800); // Commit after 800ms of inactivity
+        }, commitDelay);
       },
       onPointerCancel: (_, evt) => {
         setStrokes([]);

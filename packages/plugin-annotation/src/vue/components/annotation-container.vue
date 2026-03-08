@@ -1,6 +1,22 @@
 <template>
   <div data-no-interaction :style="contentsStyle">
-    <!-- Outer div: AABB container - stable center for guide lines and rotation handle -->
+    <!-- Visual Layer: blend mode applied here, contains only annotation content -->
+    <div :style="visualLayerStyle">
+      <!-- Inner div: rotated visual content - no pointer events -->
+      <div :style="visualInnerStyle">
+        <!-- Annotation content - renders in unrotated coordinate space -->
+        <slot :annotation="childObject" :appearanceActive="apActive"></slot>
+
+        <!-- AP overlay canvas (always in DOM, toggled via display) -->
+        <AppearanceImageVue
+          v-if="appearance?.normal"
+          :appearance="appearance.normal"
+          :style="{ display: apActive ? 'block' : 'none' }"
+        />
+      </div>
+    </div>
+
+    <!-- Interaction Layer: no blend mode, contains rotation guides, handles, drag/resize/vertex -->
     <div :style="outerAABBStyle">
       <!-- Rotation guide lines - anchored at stable AABB center -->
       <template v-if="rotationActive">
@@ -62,21 +78,11 @@
         </div>
       </template>
 
-      <!-- Inner div: rotated content area - holds content, resize handles, vertex handles -->
+      <!-- Inner div: drag/resize/vertex interaction -->
       <div
         v-bind="{ ...(effectiveIsDraggable && isSelected ? dragProps : {}), ...doubleProps }"
         :style="innerRotatedStyle"
       >
-        <!-- Annotation content - renders in unrotated coordinate space -->
-        <slot :annotation="childObject" :appearanceActive="apActive"></slot>
-
-        <!-- AP overlay canvas (always in DOM, toggled via display) -->
-        <AppearanceImageVue
-          v-if="appearance?.normal"
-          :appearance="appearance.normal"
-          :style="{ display: apActive ? 'block' : 'none' }"
-        />
-
         <!-- Resize handles - rotate with the shape -->
         <template v-if="isSelected && effectiveIsResizable && !rotationActive">
           <template v-for="{ key, style, ...handle } in resize" :key="key">
@@ -160,7 +166,7 @@ import {
   type CSSProperties,
   type VNode,
 } from 'vue';
-import { PdfAnnotationObject, Rect, AnnotationAppearances } from '@embedpdf/models';
+import { PdfAnnotationObject, Rect, AnnotationAppearances, CssBlendMode } from '@embedpdf/models';
 import { getCounterRotation } from '@embedpdf/utils';
 import AppearanceImageVue from './appearance-image.vue';
 import { inferRotationCenterFromRects } from '@embedpdf/plugin-annotation';
@@ -222,7 +228,7 @@ const props = withDefaults(
     vertexUi?: VertexHandleUI;
     /** Customize rotation handle appearance */
     rotationUi?: RotationHandleUI;
-    style?: CSSProperties;
+    blendMode?: CssBlendMode;
   }>(),
   {
     lockAspectRatio: false,
@@ -667,7 +673,7 @@ const apActive = computed(
 // ─── Extracted style computations ──────────────────────────────────────
 const contentsStyle: CSSProperties = { display: 'contents' };
 
-const outerAABBStyle = computed<CSSProperties>(() => ({
+const layerBaseStyle = computed<CSSProperties>(() => ({
   position: 'absolute',
   left: `${currentObject.value.rect.origin.x * props.scale}px`,
   top: `${currentObject.value.rect.origin.y * props.scale}px`,
@@ -676,7 +682,24 @@ const outerAABBStyle = computed<CSSProperties>(() => ({
   pointerEvents: 'none',
   zIndex: props.zIndex,
   ...(counterRot.value ? { transform: counterRot.value.matrix, transformOrigin: '0 0' } : {}),
-  ...(props.style ?? {}),
+}));
+
+const visualLayerStyle = computed<CSSProperties>(() => ({
+  ...layerBaseStyle.value,
+  ...(props.blendMode ? { mixBlendMode: props.blendMode } : {}),
+}));
+
+const outerAABBStyle = computed<CSSProperties>(() => layerBaseStyle.value);
+
+const visualInnerStyle = computed<CSSProperties>(() => ({
+  position: 'absolute',
+  left: `${innerLeft.value}px`,
+  top: `${innerTop.value}px`,
+  width: `${innerWidth.value}px`,
+  height: `${innerHeight.value}px`,
+  transform: annotationRotation.value !== 0 ? `rotate(${annotationRotation.value}deg)` : undefined,
+  transformOrigin: innerTransformOrigin.value,
+  pointerEvents: 'none',
 }));
 
 const innerRotatedStyle = computed<CSSProperties>(() => ({

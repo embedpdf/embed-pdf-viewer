@@ -1,5 +1,5 @@
 import type { Component } from 'svelte';
-import type { PdfAnnotationObject } from '@embedpdf/models';
+import type { PdfAnnotationObject, PdfBlendMode } from '@embedpdf/models';
 import type { TrackedAnnotation } from '@embedpdf/plugin-annotation';
 import type { VertexConfig } from '../../shared/types';
 
@@ -51,8 +51,8 @@ export interface AnnotationRendererEntry<T extends PdfAnnotationObject = PdfAnno
   vertexConfig?: VertexConfig<T>;
   /** z-index for the annotation container (default: 1, text markup uses 0) */
   zIndex?: number;
-  /** Style applied to the annotation container (overrides default blendMode style) */
-  containerStyle?: (annotation: T) => string;
+  /** Default blend mode for this annotation type (used when the annotation object has no blendMode set) */
+  defaultBlendMode?: PdfBlendMode;
   /** Type-specific interaction fallbacks used when the tool doesn't define a property */
   interactionDefaults?: {
     isDraggable?: boolean;
@@ -85,7 +85,7 @@ export interface BoxedAnnotationRenderer {
   component: Component<AnnotationRendererProps>;
   vertexConfig?: VertexConfig<PdfAnnotationObject>;
   zIndex?: number;
-  containerStyle?: (annotation: PdfAnnotationObject) => string;
+  defaultBlendMode?: PdfBlendMode;
   interactionDefaults?: {
     isDraggable?: boolean;
     isResizable?: boolean;
