@@ -17,8 +17,8 @@ const props = defineProps<ThumbImgProps>();
 const { provides: thumbs } = useThumbnailCapability();
 const { plugin: thumbnailPlugin } = useThumbnailPlugin();
 
-const url = ref<string | null>(null);
-let urlToRevoke: string | null = null;
+const canvasRef = ref<HTMLCanvasElement | null>(null);
+const hasContent = ref(false);
 const refreshTick = ref(0);
 
 // Watch for refresh events for this specific document
@@ -39,53 +39,41 @@ watch(
   { immediate: true },
 );
 
-function revoke() {
-  if (urlToRevoke) {
-    URL.revokeObjectURL(urlToRevoke);
-    urlToRevoke = null;
+function paintBitmap(bitmap: ImageBitmap) {
+  if (!canvasRef.value) return;
+  try {
+    const canvas = canvasRef.value;
+    canvas.width = bitmap.width;
+    canvas.height = bitmap.height;
+    canvas.getContext('2d')!.drawImage(bitmap, 0, 0);
+    hasContent.value = true;
+  } catch {
+    // Bitmap was closed
   }
 }
-
-let abortTask: (() => void) | null = null;
 
 // Render thumbnail when dependencies change
 watch(
   [() => thumbs.value, () => props.documentId, () => props.meta.pageIndex, refreshTick],
   ([capability, docId, pageIdx], _, onCleanup) => {
-    // Cancel previous task
-    if (abortTask) {
-      abortTask();
-      abortTask = null;
-    }
-
     if (!capability) {
-      url.value = null;
+      hasContent.value = false;
       return;
     }
 
     const scope = capability.forDocument(docId);
     const task = scope.renderThumb(pageIdx, window.devicePixelRatio);
 
-    abortTask = () =>
+    task.wait((bitmap) => {
+      paintBitmap(bitmap);
+      // Do NOT close bitmap — LRU cache owns lifecycle
+    }, ignore);
+
+    onCleanup(() => {
       task.abort({
         code: PdfErrorCode.Cancelled,
         message: 'canceled render task',
       });
-
-    task.wait((blob) => {
-      revoke();
-      const objectUrl = URL.createObjectURL(blob);
-      urlToRevoke = objectUrl;
-      url.value = objectUrl;
-      abortTask = null;
-    }, ignore);
-
-    onCleanup(() => {
-      if (abortTask) {
-        abortTask();
-        abortTask = null;
-      }
-      revoke();
     });
   },
   { immediate: true },
@@ -93,5 +81,5 @@ watch(
 </script>
 
 <template>
-  <img v-if="url" :src="url" v-bind="$attrs" @load="revoke" />
+  <canvas ref="canvasRef" :style="{ visibility: hasContent ? 'visible' : 'hidden' }" v-bind="$attrs" />
 </template>

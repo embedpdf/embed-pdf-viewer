@@ -1,12 +1,4 @@
-import {
-  BasePlugin,
-  createBehaviorEmitter,
-  createEmitter,
-  createScopedEmitter,
-  Listener,
-  PluginRegistry,
-  REFRESH_PAGES,
-} from '@embedpdf/core';
+import { BasePlugin, createScopedEmitter, PluginRegistry, REFRESH_PAGES } from '@embedpdf/core';
 import {
   ScrollToOptions,
   ThumbMeta,
@@ -20,7 +12,7 @@ import {
   ThumbnailState,
   ThumbnailDocumentState,
 } from './types';
-import { ignore, PdfErrorReason, Task } from '@embedpdf/models';
+import { ignore, PdfErrorReason, Task, TaskStage } from '@embedpdf/models';
 import { RenderCapability, RenderPlugin } from '@embedpdf/plugin-render';
 import { ScrollCapability, ScrollPlugin } from '@embedpdf/plugin-scroll';
 import {
@@ -31,6 +23,9 @@ import {
   ThumbnailAction,
 } from './actions';
 import { initialDocumentState } from './reducer';
+
+// LRU cache size - should this be a config option?
+const THUMBNAIL_CACHE_SIZE = 30;
 
 export class ThumbnailPlugin extends BasePlugin<
   ThumbnailPluginConfig,
@@ -43,8 +38,10 @@ export class ThumbnailPlugin extends BasePlugin<
   private renderCapability: RenderCapability;
   private scrollCapability: ScrollCapability | null = null;
 
-  // Per-document task caches
-  private readonly taskCaches = new Map<string, Map<number, Task<Blob, PdfErrorReason>>>();
+  // Per-document LRU task cache (serves both dedup and caching)
+  // In-flight tasks dedup concurrent requests; resolved tasks serve cached bitmaps.
+  // Map insertion-order is used for LRU eviction.
+  private readonly thumbCaches = new Map<string, Map<number, Task<ImageBitmap, PdfErrorReason>>>();
 
   // Per-document auto-scroll tracking
   private readonly canAutoScroll = new Map<string, boolean>();
@@ -76,10 +73,11 @@ export class ThumbnailPlugin extends BasePlugin<
 
       this.refreshPages$.emit(documentId, pages);
 
-      const taskCache = this.taskCaches.get(documentId);
-      if (taskCache) {
+      // Evict affected pages from cache (close resolved bitmaps to free GPU memory)
+      const cache = this.thumbCaches.get(documentId);
+      if (cache) {
         for (const pageIndex of pages) {
-          taskCache.delete(pageIndex);
+          this.evictEntry(cache, pageIndex);
         }
       }
     });
@@ -112,8 +110,8 @@ export class ThumbnailPlugin extends BasePlugin<
       }),
     );
 
-    // Initialize task cache
-    this.taskCaches.set(documentId, new Map());
+    // Initialize cache
+    this.thumbCaches.set(documentId, new Map());
     this.canAutoScroll.set(documentId, true);
 
     this.logger.debug(
@@ -132,17 +130,14 @@ export class ThumbnailPlugin extends BasePlugin<
     // Cleanup state
     this.dispatch(cleanupThumbnailState(documentId));
 
-    // Cleanup task cache
-    const taskCache = this.taskCaches.get(documentId);
-    if (taskCache) {
-      taskCache.forEach((task) => {
-        task.abort({
-          code: 'cancelled' as any,
-          message: 'Document closed',
-        });
+    // Cleanup cache (abort in-flight, close resolved bitmaps)
+    const cache = this.thumbCaches.get(documentId);
+    if (cache) {
+      cache.forEach((task) => {
+        this.closeCacheEntry(task);
       });
-      taskCache.clear();
-      this.taskCaches.delete(documentId);
+      cache.clear();
+      this.thumbCaches.delete(documentId);
     }
 
     this.canAutoScroll.delete(documentId);
@@ -206,6 +201,51 @@ export class ThumbnailPlugin extends BasePlugin<
   private getDocumentState(documentId?: string): ThumbnailDocumentState | null {
     const id = documentId ?? this.getActiveDocumentId();
     return this.state.documents[id] ?? null;
+  }
+
+  // ─────────────────────────────────────────────────────────
+  // LRU Cache Helpers
+  // ─────────────────────────────────────────────────────────
+
+  /** Touch an entry to mark it as most-recently-used (re-insert at end). */
+  private lruTouch(
+    cache: Map<number, Task<ImageBitmap, PdfErrorReason>>,
+    key: number,
+    task: Task<ImageBitmap, PdfErrorReason>,
+  ): void {
+    cache.delete(key);
+    cache.set(key, task);
+  }
+
+  /** Evict oldest entries until the cache is within capacity. */
+  private lruEvict(cache: Map<number, Task<ImageBitmap, PdfErrorReason>>): void {
+    while (cache.size > THUMBNAIL_CACHE_SIZE) {
+      const oldest = cache.keys().next().value!;
+      const task = cache.get(oldest)!;
+      cache.delete(oldest);
+      this.closeCacheEntry(task);
+    }
+  }
+
+  /**
+   * Close the bitmap inside a resolved task, or abort if still pending.
+   * Rejected tasks need no cleanup — no bitmap was produced.
+   */
+  private closeCacheEntry(task: Task<ImageBitmap, PdfErrorReason>): void {
+    if (task.state.stage === TaskStage.Resolved) {
+      task.state.result.close();
+    } else if (task.state.stage === TaskStage.Pending) {
+      task.abort({ code: 'cancelled' as any, message: 'evicted' });
+    }
+  }
+
+  /** Remove a single entry from the cache, closing its bitmap. */
+  private evictEntry(cache: Map<number, Task<ImageBitmap, PdfErrorReason>>, key: number): void {
+    const task = cache.get(key);
+    if (task) {
+      this.closeCacheEntry(task);
+      cache.delete(key);
+    }
   }
 
   // ─────────────────────────────────────────────────────────
@@ -362,15 +402,26 @@ export class ThumbnailPlugin extends BasePlugin<
     }
   }
 
+  /**
+   * Return a cached (or newly created) thumbnail render task.
+   * Deduplicates concurrent requests: in-flight tasks are reused.
+   * Resolved tasks serve cached bitmaps until LRU-evicted.
+   */
   private renderThumb(idx: number, dpr: number, documentId?: string) {
     const id = documentId ?? this.getActiveDocumentId();
-    const taskCache = this.taskCaches.get(id);
-    if (!taskCache) {
-      throw new Error(`Task cache not found for document: ${id}`);
+    const cache = this.thumbCaches.get(id);
+    if (!cache) {
+      throw new Error(`Thumb cache not found for document: ${id}`);
     }
 
-    if (taskCache.has(idx)) return taskCache.get(idx)!;
+    // Cache hit (in-flight or resolved) — touch for LRU and return
+    const existing = cache.get(idx);
+    if (existing) {
+      this.lruTouch(cache, idx, existing);
+      return existing;
+    }
 
+    // Cache miss — render
     const coreDoc = this.coreState.core.documents[id];
     if (!coreDoc?.document) {
       throw new Error(`Document not found: ${id}`);
@@ -387,7 +438,7 @@ export class ThumbnailPlugin extends BasePlugin<
 
     const scale = INNER_W / page.size.width;
 
-    const task = this.renderCapability.forDocument(id).renderPageRect({
+    const task = this.renderCapability.forDocument(id).renderPageRectBitmap({
       pageIndex: idx,
       rect: { origin: { x: 0, y: 0 }, size: page.size },
       options: {
@@ -397,8 +448,11 @@ export class ThumbnailPlugin extends BasePlugin<
       },
     });
 
-    taskCache.set(idx, task);
-    task.wait(ignore, () => taskCache.delete(idx));
+    cache.set(idx, task);
+    // On failure, remove so next request retries
+    task.wait(ignore, () => cache.delete(idx));
+    // Evict oldest if over capacity
+    this.lruEvict(cache);
     return task;
   }
 
@@ -415,17 +469,15 @@ export class ThumbnailPlugin extends BasePlugin<
     this.refreshPages$.clear();
     this.scrollTo$.clear();
 
-    // Cleanup all task caches
-    this.taskCaches.forEach((cache) => {
+    // Cleanup all caches (abort in-flight, close resolved bitmaps)
+    this.thumbCaches.forEach((cache) => {
       cache.forEach((task) => {
-        task.abort({
-          code: 'cancelled' as any,
-          message: 'Plugin destroyed',
-        });
+        this.closeCacheEntry(task);
       });
       cache.clear();
     });
-    this.taskCaches.clear();
+    this.thumbCaches.clear();
+
     this.canAutoScroll.clear();
 
     super.destroy();

@@ -48,6 +48,24 @@ export interface RenderScope {
   renderPageRect(options: RenderPageRectOptions): Task<Blob, PdfErrorReason>;
   renderPageRaw(options: RenderPageOptions): Task<ImageDataLike, PdfErrorReason>;
   renderPageRectRaw(options: RenderPageRectOptions): Task<ImageDataLike, PdfErrorReason>;
+  /**
+   * Render a full page as an `ImageBitmap`.
+   *
+   * Returns a fresh (uncached) bitmap wrapped in a `Task`.
+   * **Caller owns the bitmap** — transfer it to a canvas via
+   * `bitmaprenderer` context, or call `bitmap.close()` to free GPU memory.
+   * If the task is aborted before resolution, the bitmap is closed internally.
+   */
+  renderPageBitmap(options: RenderPageOptions): Task<ImageBitmap, PdfErrorReason>;
+  /**
+   * Render a rectangular region of a page as an `ImageBitmap`.
+   *
+   * Returns a fresh (uncached) bitmap wrapped in a `Task`.
+   * **Caller owns the bitmap** — transfer it to a canvas via
+   * `bitmaprenderer` context, or call `bitmap.close()` to free GPU memory.
+   * If the task is aborted before resolution, the bitmap is closed internally.
+   */
+  renderPageRectBitmap(options: RenderPageRectOptions): Task<ImageBitmap, PdfErrorReason>;
 }
 
 export interface RenderCapability {
@@ -56,6 +74,10 @@ export interface RenderCapability {
   renderPageRect(options: RenderPageRectOptions): Task<Blob, PdfErrorReason>;
   renderPageRaw(options: RenderPageOptions): Task<ImageDataLike, PdfErrorReason>;
   renderPageRectRaw(options: RenderPageRectOptions): Task<ImageDataLike, PdfErrorReason>;
+  /** {@inheritDoc RenderScope.renderPageBitmap} */
+  renderPageBitmap(options: RenderPageOptions): Task<ImageBitmap, PdfErrorReason>;
+  /** {@inheritDoc RenderScope.renderPageRectBitmap} */
+  renderPageRectBitmap(options: RenderPageRectOptions): Task<ImageBitmap, PdfErrorReason>;
 
   // Document-scoped operations
   forDocument(documentId: string): RenderScope;

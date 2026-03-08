@@ -272,6 +272,66 @@ export class Task<R, D, P = unknown> {
   }
 
   /**
+   * Transform the result of this task using a mapping function.
+   * Returns a new Task that resolves with the mapped value.
+   *
+   * Aborting the derived task also aborts the source task, and source errors
+   * are forwarded to the derived task directly (bypassing `errMap`).
+   *
+   * Note: progress events from the source task are **not** forwarded
+   * to the derived task.
+   *
+   * @param fn - mapping function that transforms the source result
+   * @param errMap - maps errors from `fn` (sync throws or rejected promises)
+   *   into the error type `D`. Source task errors are forwarded as-is.
+   * @returns a new Task that resolves with the mapped result
+   */
+  map<U>(fn: (result: R) => U | Promise<U>, errMap: (err: unknown) => D): Task<U, D> {
+    const derived = new Task<U, D>();
+    const origAbort = derived.abort.bind(derived);
+    derived.abort = (reason: D) => {
+      this.abort(reason);
+      origAbort(reason);
+    };
+
+    this.wait(
+      (result) => {
+        if (derived.state.stage !== TaskStage.Pending) return;
+        try {
+          const mapped = fn(result);
+          if (mapped instanceof Promise) {
+            mapped.then(
+              (value) => {
+                if (derived.state.stage === TaskStage.Pending) {
+                  derived.resolve(value);
+                }
+              },
+              (err) => {
+                if (derived.state.stage === TaskStage.Pending) {
+                  derived.reject(errMap(err));
+                }
+              },
+            );
+          } else {
+            derived.resolve(mapped);
+          }
+        } catch (err) {
+          if (derived.state.stage === TaskStage.Pending) {
+            derived.reject(errMap(err));
+          }
+        }
+      },
+      (error) => {
+        if (derived.state.stage === TaskStage.Pending) {
+          derived.fail(error);
+        }
+      },
+    );
+
+    return derived;
+  }
+
+  /**
    * add a progress callback
    * @param cb - progress callback
    */
