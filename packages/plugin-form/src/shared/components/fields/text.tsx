@@ -1,5 +1,5 @@
 import { PDF_FORM_FIELD_FLAG } from '@embedpdf/models';
-import { CSSProperties, FormEvent, useCallback, useEffect, useMemo, useState } from '@framework';
+import { CSSProperties, FormEvent, useCallback, useEffect, useState } from '@framework';
 
 import { TextFieldProps } from '../types';
 import { inputStyle, textareaStyle } from './style';
@@ -129,28 +129,19 @@ function CombField(props: CombFieldProps) {
 }
 
 export function TextField(props: TextFieldProps) {
-  const { field, isEditable, values, onChangeValues, onBlur, inputRef } = props;
+  const { annotation, isEditable, onChangeField, onBlur, inputRef } = props;
+  const field = annotation.field;
 
   const { flag } = field;
   const name = field.name;
-  const value = useMemo(() => {
-    if (values && values[0] && values[0].kind === 'text') {
-      return values[0].text;
-    }
-    return field.value;
-  }, [values, field.value]);
+  const value = field.value;
 
   const changeValue = useCallback(
     (evt: FormEvent) => {
-      const value = (evt.target as HTMLInputElement).value;
-      onChangeValues?.([
-        {
-          kind: 'text',
-          text: value,
-        },
-      ]);
+      const newValue = (evt.target as HTMLInputElement).value;
+      onChangeField?.({ ...field, value: newValue });
     },
-    [onChangeValues],
+    [onChangeField, field],
   );
 
   const isDisabled = !isEditable || !!(flag & PDF_FORM_FIELD_FLAG.READONLY);
@@ -161,7 +152,7 @@ export function TextField(props: TextFieldProps) {
   const maxLen = field.maxLen;
 
   if (isComb && maxLen) {
-    const cellWidth = (props.annotation.rect.size.width * props.scale) / maxLen;
+    const cellWidth = (annotation.rect.size.width * props.scale) / maxLen;
     const chars = (value || '').split('');
     const caretIndex = chars.length;
 

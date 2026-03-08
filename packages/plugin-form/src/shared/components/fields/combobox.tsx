@@ -1,21 +1,15 @@
-import { PdfWidgetAnnoOption, PDF_FORM_FIELD_FLAG, FormFieldValue } from '@embedpdf/models';
-import { FormEvent, useCallback, useMemo, selectProps, optionProps } from '@framework';
+import { PdfWidgetAnnoOption, PDF_FORM_FIELD_FLAG } from '@embedpdf/models';
+import { FormEvent, useCallback, selectProps, optionProps } from '@framework';
 
 import { ComboboxFieldProps } from '../types';
 import { selectStyle } from './style';
 
 export function ComboboxField(props: ComboboxFieldProps) {
-  const { field, isEditable, values, onChangeValues, onBlur, inputRef } = props;
+  const { annotation, isEditable, onChangeField, onBlur, inputRef } = props;
+  const field = annotation.field;
 
   const { flag, options } = field;
   const name = field.alternateName || field.name;
-  const defaultValues = useMemo(() => {
-    return options.flatMap<FormFieldValue>((option, index) =>
-      option.isSelected ? [{ kind: 'selection', index, isSelected: true }] : [],
-    );
-  }, [options]);
-
-  const selectedValues = values && values.length > 0 ? values : defaultValues;
 
   const isDisabled = !isEditable || !!(flag & PDF_FORM_FIELD_FLAG.READONLY);
   const isRequired = !!(flag & PDF_FORM_FIELD_FLAG.REQUIRED);
@@ -24,26 +18,16 @@ export function ComboboxField(props: ComboboxFieldProps) {
   const handleChange = useCallback(
     (evt: FormEvent) => {
       const select = evt.target as HTMLSelectElement;
-      if (isMultipleChoice) {
-        const selected: FormFieldValue[] = [];
-        for (let i = 0; i < select.options.length; i++) {
-          if (select.options[i].selected) {
-            selected.push({ kind: 'selection', index: i, isSelected: true });
-          }
-        }
-        onChangeValues?.(selected);
-      } else {
-        onChangeValues?.([{ kind: 'selection', index: select.selectedIndex, isSelected: true }]);
-      }
+      const updatedOptions = options.map((opt, i) => ({
+        ...opt,
+        isSelected: isMultipleChoice ? select.options[i].selected : i === select.selectedIndex,
+      }));
+      onChangeField?.({ ...field, options: updatedOptions });
     },
-    [onChangeValues, isMultipleChoice],
+    [onChangeField, isMultipleChoice, field, options],
   );
 
-  const selectedTexts = selectedValues.map((value) => {
-    if (value.kind === 'selection') return options[value.index]?.label ?? '';
-    if (value.kind === 'text') return value.text;
-    return '';
-  });
+  const selectedTexts = options.filter((opt) => opt.isSelected).map((opt) => opt.label);
 
   return (
     <select

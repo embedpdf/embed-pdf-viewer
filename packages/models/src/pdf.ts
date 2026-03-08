@@ -3503,6 +3503,21 @@ export interface PdfEngine<T = Blob> {
     value: FormFieldValue,
   ) => PdfTask<boolean>;
   /**
+   * Restore a widget annotation to the full field state described by `field`.
+   * Unlike `setFormFieldValue`, this accepts a complete `PdfWidgetAnnoField`
+   * snapshot and applies all writable state in a single call.
+   * @param doc - pdf document
+   * @param page - pdf page
+   * @param annotation - pdf widget annotation
+   * @param field - the desired field state to apply
+   */
+  setFormFieldState: (
+    doc: PdfDocumentObject,
+    page: PdfPageObject,
+    annotation: PdfWidgetAnnoObject,
+    field: PdfWidgetAnnoField,
+  ) => PdfTask<boolean>;
+  /**
    * Flatten annotations and form fields into the page contents.
    * @param doc - pdf document
    * @param page - pdf page
@@ -3816,6 +3831,12 @@ export interface IPdfiumExecutor {
     page: PdfPageObject,
     annotation: PdfWidgetAnnoObject,
     value: FormFieldValue,
+  ): PdfTask<boolean>;
+  setFormFieldState(
+    doc: PdfDocumentObject,
+    page: PdfPageObject,
+    annotation: PdfWidgetAnnoObject,
+    field: PdfWidgetAnnoField,
   ): PdfTask<boolean>;
   flattenPage(
     doc: PdfDocumentObject,

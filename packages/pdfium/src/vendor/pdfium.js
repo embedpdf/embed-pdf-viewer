@@ -52,6 +52,7 @@ var createPdfium = (() => {
       '_EPDFAction_CreateURI',
       '_EPDFAnnot_ApplyRedaction',
       '_EPDFAnnot_ClearColor',
+      '_EPDFAnnot_ClearRectangleDifferences',
       '_EPDFAnnot_Flatten',
       '_EPDFAnnot_GenerateAppearance',
       '_EPDFAnnot_GenerateAppearanceWithBlend',
@@ -95,6 +96,7 @@ var createPdfium = (() => {
       '_EPDFAnnot_SetOpacity',
       '_EPDFAnnot_SetOverlayText',
       '_EPDFAnnot_SetOverlayTextRepeat',
+      '_EPDFAnnot_SetRectangleDifferences',
       '_EPDFAnnot_SetReplyType',
       '_EPDFAnnot_SetRotate',
       '_EPDFAnnot_SetTextAlignment',
@@ -6148,6 +6150,10 @@ var createPdfium = (() => {
     ));
     var _EPDFAnnot_GetRectangleDifferences = (Module['_EPDFAnnot_GetRectangleDifferences'] =
       createExportWrapper('EPDFAnnot_GetRectangleDifferences', 5));
+    var _EPDFAnnot_SetRectangleDifferences = (Module['_EPDFAnnot_SetRectangleDifferences'] =
+      createExportWrapper('EPDFAnnot_SetRectangleDifferences', 5));
+    var _EPDFAnnot_ClearRectangleDifferences = (Module['_EPDFAnnot_ClearRectangleDifferences'] =
+      createExportWrapper('EPDFAnnot_ClearRectangleDifferences', 1));
     var _EPDFAnnot_GetBorderDashPatternCount = (Module['_EPDFAnnot_GetBorderDashPatternCount'] =
       createExportWrapper('EPDFAnnot_GetBorderDashPatternCount', 1));
     var _EPDFAnnot_GetBorderDashPattern = (Module['_EPDFAnnot_GetBorderDashPattern'] =

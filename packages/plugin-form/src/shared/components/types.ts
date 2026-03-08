@@ -1,5 +1,4 @@
 import {
-  FormFieldValue,
   PdfWidgetAnnoField,
   PdfWidgetAnnoObject,
   PdfTextWidgetAnnoField,
@@ -14,30 +13,30 @@ export interface FieldProps {
   annotation: PdfWidgetAnnoObject;
   scale: number;
   pageIndex: number;
-  field: PdfWidgetAnnoField;
   isEditable: boolean;
-  values: FormFieldValue[];
-  onChangeValues?: (values: FormFieldValue[]) => void;
+  onChangeField?: (field: PdfWidgetAnnoField) => void;
   onBlur?: () => void;
   inputRef?: (el: HTMLElement | null) => void;
 }
 
-export type TextFieldProps = Omit<FieldProps, 'field'> & {
-  field: PdfTextWidgetAnnoField;
+export type TextFieldProps = Omit<FieldProps, 'annotation'> & {
+  annotation: PdfWidgetAnnoObject & { field: PdfTextWidgetAnnoField };
 };
 
-export type CheckboxFieldProps = Omit<FieldProps, 'field'> & {
-  field: PdfCheckboxWidgetAnnoField;
+export type CheckboxFieldProps = Omit<FieldProps, 'annotation'> & {
+  annotation: PdfWidgetAnnoObject & { field: PdfCheckboxWidgetAnnoField };
 };
 
-export type RadioButtonFieldProps = Omit<FieldProps, 'field'> & {
-  field: PdfRadioButtonWidgetAnnoField;
+export type RadioButtonFieldProps = Omit<FieldProps, 'annotation'> & {
+  annotation: PdfWidgetAnnoObject & { field: PdfRadioButtonWidgetAnnoField };
 };
 
-export type ComboboxFieldProps = Omit<FieldProps, 'field'> & {
-  field: PdfComboboxWidgetAnnoField | PdfListboxWidgetAnnoField;
+export type ComboboxFieldProps = Omit<FieldProps, 'annotation'> & {
+  annotation: PdfWidgetAnnoObject & {
+    field: PdfComboboxWidgetAnnoField | PdfListboxWidgetAnnoField;
+  };
 };
 
-export type PushButtonFieldProps = Omit<FieldProps, 'field'> & {
-  field: PdfPushButtonWidgetAnnoField;
+export type PushButtonFieldProps = Omit<FieldProps, 'annotation'> & {
+  annotation: PdfWidgetAnnoObject & { field: PdfPushButtonWidgetAnnoField };
 };

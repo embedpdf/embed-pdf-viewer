@@ -1396,6 +1396,9 @@ importers:
       '@embedpdf/plugin-annotation':
         specifier: workspace:*
         version: link:../plugin-annotation
+      '@embedpdf/plugin-history':
+        specifier: workspace:*
+        version: link:../plugin-history
       '@types/react':
         specifier: ^18.2.0
         version: 18.3.28

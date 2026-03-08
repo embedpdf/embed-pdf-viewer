@@ -3,7 +3,8 @@ import { PushButtonFieldProps } from '../types';
 import { buttonStyle } from './style';
 
 export function PushButtonField(props: PushButtonFieldProps) {
-  const { field, isEditable } = props;
+  const { annotation, isEditable } = props;
+  const field = annotation.field;
 
   const { flag } = field;
   const name = field.alternateName || field.name;

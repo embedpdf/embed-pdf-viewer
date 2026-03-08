@@ -37,6 +37,7 @@ export const functions = {
   EPDFAction_CreateURI: [['number', 'string'] as const, 'number'] as const,
   EPDFAnnot_ApplyRedaction: [['number', 'number'] as const, 'boolean'] as const,
   EPDFAnnot_ClearColor: [['number', 'number'] as const, 'boolean'] as const,
+  EPDFAnnot_ClearRectangleDifferences: [['number'] as const, 'boolean'] as const,
   EPDFAnnot_Flatten: [['number', 'number'] as const, 'boolean'] as const,
   EPDFAnnot_GenerateAppearance: [['number'] as const, 'boolean'] as const,
   EPDFAnnot_GenerateAppearanceWithBlend: [['number', 'number'] as const, 'boolean'] as const,
@@ -95,6 +96,10 @@ export const functions = {
   EPDFAnnot_SetOpacity: [['number', 'number'] as const, 'boolean'] as const,
   EPDFAnnot_SetOverlayText: [['number', 'number'] as const, 'boolean'] as const,
   EPDFAnnot_SetOverlayTextRepeat: [['number', 'boolean'] as const, 'boolean'] as const,
+  EPDFAnnot_SetRectangleDifferences: [
+    ['number', 'number', 'number', 'number', 'number'] as const,
+    'boolean',
+  ] as const,
   EPDFAnnot_SetReplyType: [['number', 'number'] as const, 'boolean'] as const,
   EPDFAnnot_SetRotate: [['number', 'number'] as const, 'boolean'] as const,
   EPDFAnnot_SetTextAlignment: [['number', 'number'] as const, 'boolean'] as const,

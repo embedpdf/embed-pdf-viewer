@@ -1,55 +1,62 @@
-import { useCallback, useState } from '@framework';
-import { PDF_FORM_FIELD_FLAG, PDF_FORM_FIELD_TYPE, FormFieldValue } from '@embedpdf/models';
-import { FieldProps } from './types';
+import { useCallback, useEffect, useState } from '@framework';
+import { PDF_FORM_FIELD_FLAG, PDF_FORM_FIELD_TYPE, PdfWidgetAnnoField } from '@embedpdf/models';
+import { FieldProps, TextFieldProps, ComboboxFieldProps, PushButtonFieldProps } from './types';
 import { TextField } from './fields/text';
 import { ComboboxField } from './fields/combobox';
 import { PushButtonField } from './fields/push-button';
 import { RenderWidget } from './render-widget';
+import { useFormCapability } from '../hooks/use-form';
 
 function isToggleType(type: PDF_FORM_FIELD_TYPE): boolean {
   return type === PDF_FORM_FIELD_TYPE.CHECKBOX || type === PDF_FORM_FIELD_TYPE.RADIOBUTTON;
 }
 
 export function Field(props: FieldProps) {
-  const { field, isEditable, onChangeValues } = props;
+  const { annotation, isEditable, onChangeField } = props;
+  const field = annotation.field;
+  const { provides: formProvides } = useFormCapability();
   const [editing, setEditing] = useState(false);
   const [renderKey, setRenderKey] = useState(0);
 
   const isReadOnly = !isEditable || !!(field.flag & PDF_FORM_FIELD_FLAG.READONLY);
 
-  const isToggleChecked =
-    isToggleType(field.type) &&
-    (props.values?.[0]?.kind === 'checked'
-      ? props.values[0].isChecked
-      : 'isChecked' in field && field.isChecked);
+  // Subscribe to the plugin's field value change events. When the plugin notifies
+  // that this annotation changed (e.g. a sibling radio button was selected, causing
+  // this one to be unchecked), bump renderKey so RenderWidget re-fetches the
+  // appearance bitmap from the engine.
+  useEffect(() => {
+    if (!formProvides) return;
+    return formProvides.onFieldValueChange((event) => {
+      if (event.annotationId === annotation.id) {
+        setRenderKey((k) => k + 1);
+      }
+    });
+  }, [formProvides, annotation.id]);
 
   const handleClick = useCallback(() => {
     if (isReadOnly) return;
 
-    if (isToggleType(field.type)) {
-      const currentChecked =
-        props.values?.[0]?.kind === 'checked'
-          ? props.values[0].isChecked
-          : 'isChecked' in field && field.isChecked;
-      onChangeValues?.([{ kind: 'checked', isChecked: !currentChecked }]);
-      setRenderKey((k) => k + 1);
+    if (isToggleType(field.type) && 'isChecked' in field) {
+      onChangeField?.({ ...field, isChecked: !field.isChecked } as PdfWidgetAnnoField);
+      // renderKey will be bumped by the onFieldValueChange event after engine settles
       return;
     }
 
     setEditing(true);
-  }, [isReadOnly, field, props.values, onChangeValues]);
+  }, [isReadOnly, field, onChangeField]);
 
   const handleBlur = useCallback(() => {
     setEditing(false);
-    setRenderKey((k) => k + 1);
   }, []);
 
-  const handleChangeValues = useCallback(
-    (values: FormFieldValue[]) => {
-      onChangeValues?.(values);
-    },
-    [onChangeValues],
-  );
+  const common = {
+    annotation: props.annotation,
+    scale: props.scale,
+    pageIndex: props.pageIndex,
+    isEditable: props.isEditable,
+    onBlur: handleBlur,
+    inputRef: undefined as FieldProps['inputRef'],
+  };
 
   const focusRef = useCallback((el: HTMLElement | null) => {
     if (el) {
@@ -64,29 +71,38 @@ export function Field(props: FieldProps) {
     }
   }, []);
 
-  const common = {
-    annotation: props.annotation,
-    scale: props.scale,
-    pageIndex: props.pageIndex,
-    isEditable: props.isEditable,
-    values: props.values,
-    onBlur: handleBlur,
-    inputRef: focusRef,
-  };
-
   const { type } = field;
   let content = null;
 
   switch (type) {
     case PDF_FORM_FIELD_TYPE.TEXTFIELD:
-      content = <TextField {...common} field={field} onChangeValues={handleChangeValues} />;
+      content = (
+        <TextField
+          {...common}
+          annotation={annotation as TextFieldProps['annotation']}
+          onChangeField={onChangeField}
+          inputRef={focusRef}
+        />
+      );
       break;
     case PDF_FORM_FIELD_TYPE.COMBOBOX:
     case PDF_FORM_FIELD_TYPE.LISTBOX:
-      content = <ComboboxField {...common} field={field} onChangeValues={handleChangeValues} />;
+      content = (
+        <ComboboxField
+          {...common}
+          annotation={annotation as ComboboxFieldProps['annotation']}
+          onChangeField={onChangeField}
+          inputRef={focusRef}
+        />
+      );
       break;
     case PDF_FORM_FIELD_TYPE.PUSHBUTTON:
-      content = <PushButtonField {...common} field={field} />;
+      content = (
+        <PushButtonField
+          {...common}
+          annotation={annotation as PushButtonFieldProps['annotation']}
+        />
+      );
       break;
     default:
       break;
@@ -96,20 +112,20 @@ export function Field(props: FieldProps) {
     <div
       onClick={handleClick}
       style={{
-        left: props.annotation.rect.origin.x * props.scale,
-        top: props.annotation.rect.origin.y * props.scale,
-        width: props.annotation.rect.size.width * props.scale,
-        height: props.annotation.rect.size.height * props.scale,
+        left: annotation.rect.origin.x * props.scale,
+        top: annotation.rect.origin.y * props.scale,
+        width: annotation.rect.size.width * props.scale,
+        height: annotation.rect.size.height * props.scale,
         fontSize: 10 * props.scale,
         position: 'absolute',
         overflow: 'hidden',
         cursor: isReadOnly ? 'default' : 'pointer',
       }}
     >
-      {!editing && (!isToggleType(field.type) || isToggleChecked) && (
+      {!editing && (
         <RenderWidget
           pageIndex={props.pageIndex}
-          annotation={props.annotation}
+          annotation={annotation}
           scaleFactor={props.scale}
           renderKey={renderKey}
           style={{ pointerEvents: 'none' }}

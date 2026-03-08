@@ -19,6 +19,7 @@ import {
   PdfAttachmentObject,
   PdfAddAttachmentParams,
   PdfWidgetAnnoObject,
+  PdfWidgetAnnoField,
   FormFieldValue,
   PdfFlattenPageOptions,
   PdfPageFlattenResult,
@@ -98,6 +99,7 @@ type MessageType =
   | 'readAttachmentContent'
   | 'getPageAnnoWidgets'
   | 'setFormFieldValue'
+  | 'setFormFieldState'
   | 'flattenPage'
   | 'extractPages'
   | 'extractText'
@@ -466,6 +468,15 @@ export class RemoteExecutor implements IPdfiumExecutor {
     value: FormFieldValue,
   ): PdfTask<boolean> {
     return this.send<boolean>('setFormFieldValue', [doc, page, annotation, value]);
+  }
+
+  setFormFieldState(
+    doc: PdfDocumentObject,
+    page: PdfPageObject,
+    annotation: PdfWidgetAnnoObject,
+    field: PdfWidgetAnnoField,
+  ): PdfTask<boolean> {
+    return this.send<boolean>('setFormFieldState', [doc, page, annotation, field]);
   }
 
   flattenPage(

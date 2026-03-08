@@ -1,5 +1,6 @@
 import {
   FormFieldValue,
+  PdfWidgetAnnoField,
   PdfAttachmentObject,
   PdfFile,
   PdfMetadataObject,
@@ -833,6 +834,32 @@ export class WebWorkerEngine implements PdfEngine {
       page,
       annotation,
       value,
+    ]);
+    this.proxy(task, request);
+
+    return task;
+  }
+
+  /**
+   * {@inheritDoc @embedpdf/models!PdfEngine.setFormFieldState}
+   *
+   * @public
+   */
+  setFormFieldState(
+    doc: PdfDocumentObject,
+    page: PdfPageObject,
+    annotation: PdfWidgetAnnoObject,
+    field: PdfWidgetAnnoField,
+  ) {
+    this.logger.debug(LOG_SOURCE, LOG_CATEGORY, 'setFormFieldState', doc, annotation, field);
+    const requestId = this.generateRequestId(doc.id);
+    const task = new WorkerTask<boolean>(this.worker, requestId);
+
+    const request: ExecuteRequest = createRequest(requestId, 'setFormFieldState', [
+      doc,
+      page,
+      annotation,
+      field,
     ]);
     this.proxy(task, request);
 

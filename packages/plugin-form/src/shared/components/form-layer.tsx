@@ -1,10 +1,10 @@
 import { useCallback, useEffect, useMemo, useState } from '@framework';
 import type { CSSProperties, HTMLAttributes } from '@framework';
 
-import { FormFieldValue, ignore, PdfWidgetAnnoObject } from '@embedpdf/models';
+import { ignore, PdfWidgetAnnoObject, PdfWidgetAnnoField } from '@embedpdf/models';
 import { useDocumentState } from '@embedpdf/core/@framework';
 
-import { useFormCapability } from '../hooks/use-form';
+import { useFormCapability, useFormDocumentState } from '../hooks/use-form';
 import { Field } from './field';
 
 type FormLayerProps = Omit<HTMLAttributes<HTMLDivElement>, 'style'> & {
@@ -26,6 +26,7 @@ export function FormLayer({
 }: FormLayerProps) {
   const { provides: formProvides } = useFormCapability();
   const documentState = useDocumentState(documentId);
+  const formDocState = useFormDocumentState(documentId);
 
   const actualScale = useMemo(() => {
     if (overrideScale !== undefined) return overrideScale;
@@ -35,7 +36,6 @@ export function FormLayer({
   const scope = useMemo(() => formProvides?.forDocument(documentId), [formProvides, documentId]);
 
   const [annoWidgets, setAnnoWidgets] = useState<PdfWidgetAnnoObject[]>([]);
-  const [fieldValues, setFieldValues] = useState<Record<string, FormFieldValue[]>>({});
 
   useEffect(() => {
     if (!scope) return;
@@ -43,30 +43,31 @@ export function FormLayer({
     task.wait(setAnnoWidgets, ignore);
   }, [scope, pageIndex]);
 
-  const onChangeValues = useCallback(
-    (annotation: PdfWidgetAnnoObject, values: FormFieldValue[]) => {
+  const onChangeField = useCallback(
+    (annotation: PdfWidgetAnnoObject, newField: PdfWidgetAnnoField) => {
       if (!scope) return;
-      setFieldValues((prev) => ({ ...prev, [annotation.id]: values }));
-      const task = scope.setFormFieldValues(pageIndex, annotation, values);
-      task.wait(ignore, ignore);
+      scope.setFormFieldValues(pageIndex, annotation, newField).wait(ignore, ignore);
     },
     [scope, pageIndex],
   );
 
   return (
     <div style={style} {...props}>
-      {annoWidgets.map((annoWidget) => (
-        <Field
-          key={annoWidget.id}
-          scale={actualScale}
-          pageIndex={pageIndex}
-          annotation={annoWidget}
-          field={annoWidget.field}
-          isEditable={true}
-          values={fieldValues[annoWidget.id] ?? []}
-          onChangeValues={(values) => onChangeValues(annoWidget, values)}
-        />
-      ))}
+      {annoWidgets.map((annoWidget) => {
+        // Use the latest widget snapshot from plugin state if available,
+        // falling back to the originally-loaded widget.
+        const currentWidget = formDocState.fieldWidgets[annoWidget.id] ?? annoWidget;
+        return (
+          <Field
+            key={annoWidget.id}
+            scale={actualScale}
+            pageIndex={pageIndex}
+            annotation={currentWidget}
+            isEditable={true}
+            onChangeField={(newField) => onChangeField(annoWidget, newField)}
+          />
+        );
+      })}
     </div>
   );
 }

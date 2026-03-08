@@ -1984,6 +1984,228 @@ export class PdfiumNative implements IPdfiumExecutor {
   }
 
   /**
+   * {@inheritDoc @embedpdf/models!PdfEngine.setFormFieldState}
+   *
+   * @public
+   */
+  setFormFieldState(
+    doc: PdfDocumentObject,
+    page: PdfPageObject,
+    annotation: PdfWidgetAnnoObject,
+    field: PdfWidgetAnnoField,
+  ) {
+    this.logger.debug(LOG_SOURCE, LOG_CATEGORY, 'SetFormFieldState', doc, annotation, field);
+    this.logger.perf(
+      LOG_SOURCE,
+      LOG_CATEGORY,
+      `SetFormFieldState`,
+      'Begin',
+      `${doc.id}-${annotation.id}`,
+    );
+
+    const ctx = this.cache.getContext(doc.id);
+
+    if (!ctx) {
+      this.logger.debug(LOG_SOURCE, LOG_CATEGORY, 'SetFormFieldState', 'document is not opened');
+      this.logger.perf(
+        LOG_SOURCE,
+        LOG_CATEGORY,
+        `SetFormFieldState`,
+        'End',
+        `${doc.id}-${annotation.id}`,
+      );
+      return PdfTaskHelper.reject({
+        code: PdfErrorCode.DocNotOpen,
+        message: 'document does not open',
+      });
+    }
+
+    const formFillInfoPtr = this.pdfiumModule.PDFiumExt_OpenFormFillInfo();
+    const formHandle = this.pdfiumModule.PDFiumExt_InitFormFillEnvironment(
+      ctx.docPtr,
+      formFillInfoPtr,
+    );
+
+    const pageCtx = ctx.acquirePage(page.index);
+    this.pdfiumModule.FORM_OnAfterLoadPage(pageCtx.pagePtr, formHandle);
+
+    const annotationPtr = this.getAnnotationByName(pageCtx.pagePtr, annotation.id);
+
+    if (!annotationPtr) {
+      pageCtx.release();
+      this.logger.perf(
+        LOG_SOURCE,
+        LOG_CATEGORY,
+        'SetFormFieldState',
+        'End',
+        `${doc.id}-${page.index}`,
+      );
+      return PdfTaskHelper.reject({ code: PdfErrorCode.NotFound, message: 'annotation not found' });
+    }
+
+    if (!this.pdfiumModule.FORM_SetFocusedAnnot(formHandle, annotationPtr)) {
+      this.logger.debug(
+        LOG_SOURCE,
+        LOG_CATEGORY,
+        'SetFormFieldState',
+        'failed to set focused annotation',
+      );
+      this.logger.perf(
+        LOG_SOURCE,
+        LOG_CATEGORY,
+        `SetFormFieldState`,
+        'End',
+        `${doc.id}-${annotation.id}`,
+      );
+      this.pdfiumModule.FPDFPage_CloseAnnot(annotationPtr);
+      this.pdfiumModule.FORM_OnBeforeClosePage(pageCtx.pagePtr, formHandle);
+      pageCtx.release();
+      this.pdfiumModule.PDFiumExt_ExitFormFillEnvironment(formHandle);
+      this.pdfiumModule.PDFiumExt_CloseFormFillInfo(formFillInfoPtr);
+
+      return PdfTaskHelper.reject({
+        code: PdfErrorCode.CantFocusAnnot,
+        message: 'failed to set focused annotation',
+      });
+    }
+
+    switch (field.type) {
+      case PDF_FORM_FIELD_TYPE.TEXTFIELD: {
+        if (!this.pdfiumModule.FORM_SelectAllText(formHandle, pageCtx.pagePtr)) {
+          this.logger.debug(
+            LOG_SOURCE,
+            LOG_CATEGORY,
+            'SetFormFieldState',
+            'failed to select all text',
+          );
+          this.logger.perf(
+            LOG_SOURCE,
+            LOG_CATEGORY,
+            `SetFormFieldState`,
+            'End',
+            `${doc.id}-${annotation.id}`,
+          );
+          this.pdfiumModule.FORM_ForceToKillFocus(formHandle);
+          this.pdfiumModule.FPDFPage_CloseAnnot(annotationPtr);
+          this.pdfiumModule.FORM_OnBeforeClosePage(pageCtx.pagePtr, formHandle);
+          pageCtx.release();
+          this.pdfiumModule.PDFiumExt_ExitFormFillEnvironment(formHandle);
+          this.pdfiumModule.PDFiumExt_CloseFormFillInfo(formFillInfoPtr);
+
+          return PdfTaskHelper.reject({
+            code: PdfErrorCode.CantSelectText,
+            message: 'failed to select all text',
+          });
+        }
+        const length = 2 * (field.value.length + 1);
+        const textPtr = this.memoryManager.malloc(length);
+        this.pdfiumModule.pdfium.stringToUTF16(field.value, textPtr, length);
+        this.pdfiumModule.FORM_ReplaceSelection(formHandle, pageCtx.pagePtr, textPtr);
+        this.memoryManager.free(textPtr);
+        break;
+      }
+
+      case PDF_FORM_FIELD_TYPE.CHECKBOX:
+      case PDF_FORM_FIELD_TYPE.RADIOBUTTON: {
+        const rawChecked = this.pdfiumModule.FPDFAnnot_IsChecked(formHandle, annotationPtr);
+        const currentlyChecked = !!rawChecked;
+        if (currentlyChecked !== field.isChecked) {
+          const kReturn = 0x0d;
+          if (!this.pdfiumModule.FORM_OnChar(formHandle, pageCtx.pagePtr, kReturn, 0)) {
+            this.logger.debug(
+              LOG_SOURCE,
+              LOG_CATEGORY,
+              'SetFormFieldState',
+              'failed to set field checked',
+            );
+            this.logger.perf(
+              LOG_SOURCE,
+              LOG_CATEGORY,
+              `SetFormFieldState`,
+              'End',
+              `${doc.id}-${annotation.id}`,
+            );
+            this.pdfiumModule.FORM_ForceToKillFocus(formHandle);
+            this.pdfiumModule.FPDFPage_CloseAnnot(annotationPtr);
+            this.pdfiumModule.FORM_OnBeforeClosePage(pageCtx.pagePtr, formHandle);
+            pageCtx.release();
+            this.pdfiumModule.PDFiumExt_ExitFormFillEnvironment(formHandle);
+            this.pdfiumModule.PDFiumExt_CloseFormFillInfo(formFillInfoPtr);
+
+            return PdfTaskHelper.reject({
+              code: PdfErrorCode.CantCheckField,
+              message: 'failed to set field checked',
+            });
+          }
+        }
+        break;
+      }
+
+      case PDF_FORM_FIELD_TYPE.COMBOBOX:
+      case PDF_FORM_FIELD_TYPE.LISTBOX: {
+        for (let i = 0; i < field.options.length; i++) {
+          if (
+            !this.pdfiumModule.FORM_SetIndexSelected(
+              formHandle,
+              pageCtx.pagePtr,
+              i,
+              field.options[i].isSelected,
+            )
+          ) {
+            this.logger.debug(
+              LOG_SOURCE,
+              LOG_CATEGORY,
+              'SetFormFieldState',
+              'failed to set index selected',
+            );
+            this.logger.perf(
+              LOG_SOURCE,
+              LOG_CATEGORY,
+              `SetFormFieldState`,
+              'End',
+              `${doc.id}-${annotation.id}`,
+            );
+            this.pdfiumModule.FORM_ForceToKillFocus(formHandle);
+            this.pdfiumModule.FPDFPage_CloseAnnot(annotationPtr);
+            this.pdfiumModule.FORM_OnBeforeClosePage(pageCtx.pagePtr, formHandle);
+            pageCtx.release();
+            this.pdfiumModule.PDFiumExt_ExitFormFillEnvironment(formHandle);
+            this.pdfiumModule.PDFiumExt_CloseFormFillInfo(formFillInfoPtr);
+
+            return PdfTaskHelper.reject({
+              code: PdfErrorCode.CantSelectOption,
+              message: 'failed to set index selected',
+            });
+          }
+        }
+        break;
+      }
+
+      default:
+        // PUSHBUTTON, SIGNATURE, UNKNOWN, XFA variants — no writable state
+        break;
+    }
+
+    this.pdfiumModule.FORM_ForceToKillFocus(formHandle);
+    this.pdfiumModule.FPDFPage_CloseAnnot(annotationPtr);
+    this.pdfiumModule.FORM_OnBeforeClosePage(pageCtx.pagePtr, formHandle);
+    pageCtx.release();
+
+    this.pdfiumModule.PDFiumExt_ExitFormFillEnvironment(formHandle);
+    this.pdfiumModule.PDFiumExt_CloseFormFillInfo(formFillInfoPtr);
+
+    this.logger.perf(
+      LOG_SOURCE,
+      LOG_CATEGORY,
+      `SetFormFieldState`,
+      'End',
+      `${doc.id}-${annotation.id}`,
+    );
+
+    return PdfTaskHelper.resolve<boolean>(true);
+  }
+
+  /**
    * {@inheritDoc @embedpdf/models!PdfEngine.flattenPage}
    *
    * @public

@@ -354,6 +354,9 @@ export class EngineRunner {
       case 'setFormFieldValue':
         task = engine.setFormFieldValue!(...args);
         break;
+      case 'setFormFieldState':
+        task = engine.setFormFieldState!(...args);
+        break;
       case 'flattenPage':
         task = engine.flattenPage!(...args);
         break;

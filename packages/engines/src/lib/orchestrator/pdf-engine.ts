@@ -26,6 +26,7 @@ import {
   PdfAttachmentObject,
   PdfAddAttachmentParams,
   PdfWidgetAnnoObject,
+  PdfWidgetAnnoField,
   FormFieldValue,
   PdfFlattenPageOptions,
   PdfPageFlattenResult,
@@ -795,6 +796,21 @@ export class PdfEngine<T = Blob> implements IPdfEngine<T> {
       {
         execute: () => this.executor.setFormFieldValue(doc, page, annotation, value),
         meta: { docId: doc.id, pageIndex: page.index, operation: 'setFormFieldValue' },
+      },
+      { priority: Priority.MEDIUM },
+    );
+  }
+
+  setFormFieldState(
+    doc: PdfDocumentObject,
+    page: PdfPageObject,
+    annotation: PdfWidgetAnnoObject,
+    field: PdfWidgetAnnoField,
+  ): PdfTask<boolean> {
+    return this.workerQueue.enqueue(
+      {
+        execute: () => this.executor.setFormFieldState(doc, page, annotation, field),
+        meta: { docId: doc.id, pageIndex: page.index, operation: 'setFormFieldState' },
       },
       { priority: Priority.MEDIUM },
     );
