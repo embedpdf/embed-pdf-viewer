@@ -8,67 +8,20 @@ import {
   PdfVerticalAlignment,
 } from '@embedpdf/models';
 import { AnnoOf } from '../helpers';
-import { AnnotationTool } from './types';
+import { AnnotationTool, ToolMapFromList } from './types';
+import { insertTextSelectionHandler, replaceTextSelectionHandler } from '../handlers';
+import {
+  patchInk,
+  patchLine,
+  patchPolyline,
+  patchPolygon,
+  patchCircle,
+  patchSquare,
+  patchFreeText,
+  patchStamp,
+} from '../patching/patches';
 
-const inkTools: readonly AnnotationTool<AnnoOf<PdfAnnotationSubtype.INK>>[] = [
-  {
-    id: 'ink' as const,
-    name: 'Pen',
-    matchScore: (a) => (a.type === PdfAnnotationSubtype.INK && a.intent !== 'InkHighlight' ? 5 : 0),
-    interaction: {
-      exclusive: false,
-      cursor: 'crosshair',
-      isDraggable: true,
-      isResizable: true,
-      lockAspectRatio: false,
-    },
-    defaults: {
-      type: PdfAnnotationSubtype.INK,
-      strokeColor: '#E44234',
-      color: '#E44234', // deprecated alias
-      opacity: 1,
-      strokeWidth: 6,
-    },
-    behavior: {
-      commitDelay: 800,
-    },
-  },
-  {
-    id: 'inkHighlighter' as const,
-    name: 'Ink Highlighter',
-    matchScore: (a) =>
-      a.type === PdfAnnotationSubtype.INK && a.intent === 'InkHighlight' ? 10 : 0,
-    interaction: {
-      exclusive: false,
-      cursor: 'crosshair',
-      isDraggable: true,
-      isResizable: true,
-      lockAspectRatio: false,
-      lockGroupAspectRatio: (a) => {
-        // Lock aspect ratio when rotation is not near an orthogonal angle (within 6°)
-        const r = (((a.rotation ?? 0) % 90) + 90) % 90;
-        return r >= 6 && r <= 84;
-      },
-    },
-    defaults: {
-      type: PdfAnnotationSubtype.INK,
-      intent: 'InkHighlight',
-      strokeColor: '#FFCD45',
-      color: '#FFCD45', // deprecated alias
-      opacity: 1,
-      strokeWidth: 14,
-      blendMode: PdfBlendMode.Multiply,
-    },
-    behavior: {
-      commitDelay: 800,
-      smartLineRecognition: true,
-      smartLineThreshold: 0.15,
-    },
-  },
-];
-
-export const defaultTools = [
-  // Text Markup Tools
+const textMarkupTools = [
   {
     id: 'highlight' as const,
     name: 'Highlight',
@@ -151,8 +104,9 @@ export const defaultTools = [
       opacity: 1,
     },
   },
+] satisfies readonly AnnotationTool[];
 
-  // Insert Text (Caret with intent Insert)
+const insertTextTools = [
   {
     id: 'insertText' as const,
     name: 'Insert Text',
@@ -176,9 +130,11 @@ export const defaultTools = [
       opacity: 1,
       intent: 'Insert',
     },
+    selectionHandler: insertTextSelectionHandler,
   },
+] satisfies readonly AnnotationTool<AnnoOf<PdfAnnotationSubtype.CARET>>[];
 
-  // Replace Text (StrikeOut + Caret group)
+const replaceTextTools = [
   {
     id: 'replaceText' as const,
     name: 'Replace Text',
@@ -203,12 +159,70 @@ export const defaultTools = [
       opacity: 1,
       intent: 'StrikeOutTextEdit',
     },
+    selectionHandler: replaceTextSelectionHandler,
   },
+] satisfies readonly AnnotationTool<AnnoOf<PdfAnnotationSubtype.STRIKEOUT>>[];
 
-  // Drawing Tools
-  ...inkTools,
+const inkTools = [
+  {
+    id: 'ink' as const,
+    name: 'Pen',
+    matchScore: (a) => (a.type === PdfAnnotationSubtype.INK && a.intent !== 'InkHighlight' ? 5 : 0),
+    interaction: {
+      exclusive: false,
+      cursor: 'crosshair',
+      isDraggable: true,
+      isResizable: true,
+      lockAspectRatio: false,
+    },
+    defaults: {
+      type: PdfAnnotationSubtype.INK,
+      strokeColor: '#E44234',
+      color: '#E44234', // deprecated alias
+      opacity: 1,
+      strokeWidth: 6,
+    },
+    behavior: {
+      commitDelay: 800,
+    },
+    transform: patchInk,
+  },
+  {
+    id: 'inkHighlighter' as const,
+    name: 'Ink Highlighter',
+    matchScore: (a) =>
+      a.type === PdfAnnotationSubtype.INK && a.intent === 'InkHighlight' ? 10 : 0,
+    interaction: {
+      exclusive: false,
+      cursor: 'crosshair',
+      isDraggable: true,
+      isResizable: true,
+      lockAspectRatio: false,
+      lockGroupAspectRatio: (a) => {
+        // Lock aspect ratio when rotation is not near an orthogonal angle (within 6°)
+        const r = (((a.rotation ?? 0) % 90) + 90) % 90;
+        return r >= 6 && r <= 84;
+      },
+    },
+    defaults: {
+      type: PdfAnnotationSubtype.INK,
+      intent: 'InkHighlight',
+      strokeColor: '#FFCD45',
+      color: '#FFCD45', // deprecated alias
+      opacity: 1,
+      strokeWidth: 14,
+      blendMode: PdfBlendMode.Multiply,
+    },
+    behavior: {
+      commitDelay: 800,
+      smartLineRecognition: true,
+      smartLineThreshold: 0.15,
+    },
+    transform: patchInk,
+  },
+] satisfies readonly AnnotationTool<AnnoOf<PdfAnnotationSubtype.INK>>[];
 
-  // Shape Tools
+const circleTools = [
   {
     id: 'circle' as const,
     name: 'Circle',
@@ -237,7 +251,11 @@ export const defaultTools = [
       enabled: true,
       defaultSize: { width: 100, height: 100 },
     },
+    transform: patchCircle,
   },
+] satisfies readonly AnnotationTool<AnnoOf<PdfAnnotationSubtype.CIRCLE>>[];
+
+const squareTools = [
   {
     id: 'square' as const,
     name: 'Square',
@@ -266,7 +284,11 @@ export const defaultTools = [
       enabled: true,
       defaultSize: { width: 100, height: 100 },
     },
+    transform: patchSquare,
   },
+] satisfies readonly AnnotationTool<AnnoOf<PdfAnnotationSubtype.SQUARE>>[];
+
+const lineTools = [
   {
     id: 'line' as const,
     name: 'Line',
@@ -296,6 +318,7 @@ export const defaultTools = [
       defaultLength: 100,
       defaultAngle: 0,
     },
+    transform: patchLine,
   },
   {
     id: 'lineArrow' as const,
@@ -331,7 +354,11 @@ export const defaultTools = [
       defaultLength: 100,
       defaultAngle: 0,
     },
+    transform: patchLine,
   },
+] satisfies readonly AnnotationTool<AnnoOf<PdfAnnotationSubtype.LINE>>[];
+
+const polylineTools = [
   {
     id: 'polyline' as const,
     name: 'Polyline',
@@ -356,7 +383,11 @@ export const defaultTools = [
       strokeWidth: 6,
       strokeColor: '#E44234',
     },
+    transform: patchPolyline,
   },
+] satisfies readonly AnnotationTool<AnnoOf<PdfAnnotationSubtype.POLYLINE>>[];
+
+const polygonTools = [
   {
     id: 'polygon' as const,
     name: 'Polygon',
@@ -381,9 +412,11 @@ export const defaultTools = [
       strokeWidth: 6,
       strokeColor: '#E44234',
     },
+    transform: patchPolygon,
   },
+] satisfies readonly AnnotationTool<AnnoOf<PdfAnnotationSubtype.POLYGON>>[];
 
-  // Text & Stamp
+const textCommentTools = [
   {
     id: 'textComment' as const,
     name: 'Comment',
@@ -404,6 +437,9 @@ export const defaultTools = [
       selectAfterCreate: true,
     },
   },
+] satisfies readonly AnnotationTool<AnnoOf<PdfAnnotationSubtype.TEXT>>[];
+
+const freeTextTools = [
   {
     id: 'freeText' as const,
     name: 'Free Text',
@@ -440,7 +476,11 @@ export const defaultTools = [
     behavior: {
       insertUpright: true,
     },
+    transform: patchFreeText,
   },
+] satisfies readonly AnnotationTool<AnnoOf<PdfAnnotationSubtype.FREETEXT>>[];
+
+const stampTools = [
   {
     id: 'stamp' as const,
     name: 'Image',
@@ -461,5 +501,24 @@ export const defaultTools = [
       insertUpright: true,
       useAppearanceStream: false,
     },
+    transform: patchStamp,
   },
-] satisfies readonly AnnotationTool[];
+] satisfies readonly AnnotationTool<AnnoOf<PdfAnnotationSubtype.STAMP>>[];
+
+export const defaultTools = [
+  ...textMarkupTools,
+  ...insertTextTools,
+  ...replaceTextTools,
+  ...inkTools,
+  ...circleTools,
+  ...squareTools,
+  ...lineTools,
+  ...polylineTools,
+  ...polygonTools,
+  ...textCommentTools,
+  ...freeTextTools,
+  ...stampTools,
+];
+
+export type DefaultAnnotationTool = (typeof defaultTools)[number];
+export type DefaultAnnotationToolMap = ToolMapFromList<typeof defaultTools>;

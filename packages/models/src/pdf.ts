@@ -1592,6 +1592,14 @@ export interface PdfWidgetAnnoObject extends PdfAnnotationObjectBase {
    * font color of pdf widget object
    */
   fontColor: string;
+  /**
+   * MK border color (BC) as web hex string, e.g. '#FF0000'
+   */
+  borderColor?: string;
+  /**
+   * MK background color (BG) as web hex string, e.g. '#FFFFFF'
+   */
+  backgroundColor?: string;
 }
 
 /**
@@ -2352,6 +2360,16 @@ export interface PdfUnsupportedAnnoObject extends PdfAnnotationObjectBase {
  * @public
  */
 export type PdfAnnotationObject = PdfSupportedAnnoObject | PdfUnsupportedAnnoObject;
+
+/**
+ * Extracts the concrete annotation object type for a specific subtype.
+ *
+ * @public
+ */
+export type PdfAnnotationOf<S extends PdfAnnotationSubtype> = Extract<
+  PdfAnnotationObject,
+  { type: S }
+>;
 
 /**
  * Pdf attachment

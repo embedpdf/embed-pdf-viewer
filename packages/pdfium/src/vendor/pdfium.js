@@ -52,10 +52,12 @@ var createPdfium = (() => {
       '_EPDFAction_CreateURI',
       '_EPDFAnnot_ApplyRedaction',
       '_EPDFAnnot_ClearColor',
+      '_EPDFAnnot_ClearMKColor',
       '_EPDFAnnot_ClearRectangleDifferences',
       '_EPDFAnnot_Flatten',
       '_EPDFAnnot_GenerateAppearance',
       '_EPDFAnnot_GenerateAppearanceWithBlend',
+      '_EPDFAnnot_GenerateFormFieldAP',
       '_EPDFAnnot_GetAPMatrix',
       '_EPDFAnnot_GetAvailableAppearanceModes',
       '_EPDFAnnot_GetBlendMode',
@@ -69,6 +71,7 @@ var createPdfium = (() => {
       '_EPDFAnnot_GetIcon',
       '_EPDFAnnot_GetIntent',
       '_EPDFAnnot_GetLineEndings',
+      '_EPDFAnnot_GetMKColor',
       '_EPDFAnnot_GetOpacity',
       '_EPDFAnnot_GetOverlayText',
       '_EPDFAnnot_GetOverlayTextRepeat',
@@ -93,6 +96,7 @@ var createPdfium = (() => {
       '_EPDFAnnot_SetLine',
       '_EPDFAnnot_SetLineEndings',
       '_EPDFAnnot_SetLinkedAnnot',
+      '_EPDFAnnot_SetMKColor',
       '_EPDFAnnot_SetOpacity',
       '_EPDFAnnot_SetOverlayText',
       '_EPDFAnnot_SetOverlayTextRepeat',
@@ -126,6 +130,7 @@ var createPdfium = (() => {
       '_EPDFNamedDest_SetDest',
       '_EPDFPage_ApplyRedactions',
       '_EPDFPage_CreateAnnot',
+      '_EPDFPage_CreateFormField',
       '_EPDFPage_GetAnnotByName',
       '_EPDFPage_GetAnnotCountRaw',
       '_EPDFPage_GetAnnotRaw',
@@ -6326,6 +6331,24 @@ var createPdfium = (() => {
       createExportWrapper('EPDFAnnot_GetAvailableAppearanceModes', 1));
     var _EPDFAnnot_HasAppearanceStream = (Module['_EPDFAnnot_HasAppearanceStream'] =
       createExportWrapper('EPDFAnnot_HasAppearanceStream', 2));
+    var _EPDFAnnot_SetMKColor = (Module['_EPDFAnnot_SetMKColor'] = createExportWrapper(
+      'EPDFAnnot_SetMKColor',
+      5,
+    ));
+    var _EPDFAnnot_GetMKColor = (Module['_EPDFAnnot_GetMKColor'] = createExportWrapper(
+      'EPDFAnnot_GetMKColor',
+      5,
+    ));
+    var _EPDFAnnot_ClearMKColor = (Module['_EPDFAnnot_ClearMKColor'] = createExportWrapper(
+      'EPDFAnnot_ClearMKColor',
+      2,
+    ));
+    var _EPDFPage_CreateFormField = (Module['_EPDFPage_CreateFormField'] = createExportWrapper(
+      'EPDFPage_CreateFormField',
+      4,
+    ));
+    var _EPDFAnnot_GenerateFormFieldAP = (Module['_EPDFAnnot_GenerateFormFieldAP'] =
+      createExportWrapper('EPDFAnnot_GenerateFormFieldAP', 1));
     var _FPDFDoc_GetAttachmentCount = (Module['_FPDFDoc_GetAttachmentCount'] = createExportWrapper(
       'FPDFDoc_GetAttachmentCount',
       1,

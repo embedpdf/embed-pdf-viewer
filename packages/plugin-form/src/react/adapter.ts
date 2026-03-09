@@ -1,5 +1,5 @@
 export { Fragment, useEffect, useRef, useCallback, useState, useMemo } from 'react';
-export type { ReactNode, HTMLAttributes, CSSProperties, FormEvent } from 'react';
+export type { ReactNode, HTMLAttributes, CSSProperties, FormEvent, MouseEvent } from 'react';
 
 // React-specific select props
 export const selectProps = (isMultiple: boolean, selectedValues: string[]) => ({

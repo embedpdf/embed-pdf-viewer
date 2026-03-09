@@ -1,5 +1,5 @@
 <script lang="ts">
-  import type { AnyPreviewState } from '@embedpdf/plugin-annotation';
+  import type { PreviewState } from '@embedpdf/plugin-annotation';
   import { blendModeToCss, PdfAnnotationSubtype, PdfBlendMode } from '@embedpdf/models';
   import Circle from './annotations/Circle.svelte';
   import Square from './annotations/Square.svelte';
@@ -9,7 +9,7 @@
   import Ink from './annotations/Ink.svelte';
 
   interface PreviewRendererProps {
-    preview: AnyPreviewState;
+    preview: PreviewState;
     scale: number;
   }
 

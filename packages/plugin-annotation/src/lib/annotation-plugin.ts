@@ -90,14 +90,13 @@ import {
   getSelectionGroupingAction,
 } from './selectors';
 import { initialDocumentState } from './reducer';
-import { AnnotationTool } from './tools/types';
+import { AnnotationTool, AnnotationToolMap, ToolById, ToolId } from './tools/types';
 import {
-  AnyPreviewState,
+  PreviewState,
   HandlerContext,
   HandlerFactory,
   HandlerServices,
   SelectionHandlerContext,
-  SelectionHandlerFactory,
 } from './handlers/types';
 import {
   circleHandlerFactory,
@@ -110,21 +109,9 @@ import {
   freeTextHandlerFactory,
   textHandlerFactory,
   textMarkupSelectionHandler,
-  insertTextSelectionHandler,
-  replaceTextSelectionHandler,
 } from './handlers';
 import { rectsIntersect, isSidebarAnnotation } from './helpers';
-import { PatchRegistry, TransformContext } from './patching/patch-registry';
-import {
-  patchInk,
-  patchLine,
-  patchPolyline,
-  patchPolygon,
-  patchCircle,
-  patchSquare,
-  patchFreeText,
-  patchStamp,
-} from './patching/patches';
+import { TransformContext } from './patching/patch-registry';
 import {
   getRectCenter,
   resolveAnnotationRotationCenter,
@@ -154,11 +141,9 @@ export class AnnotationPlugin extends BasePlugin<
   private commitInProgress = new Map<string, boolean>(); // Guard against concurrent commits
 
   private handlerFactories = new Map<PdfAnnotationSubtype, HandlerFactory<any>>();
-  private selectionHandlerFactories = new Map<string, SelectionHandlerFactory>();
   private readonly activeTool$ = createBehaviorEmitter<AnnotationActiveToolChangeEvent>();
   private readonly events$ = createBehaviorEmitter<AnnotationEvent>();
   private readonly toolsChange$ = createBehaviorEmitter<AnnotationToolsChangeEvent>();
-  private readonly patchRegistry = new PatchRegistry();
 
   // Appearance stream cache: documentId -> pageIndex -> AnnotationAppearanceMap<Blob>
   private readonly appearanceCache = new Map<string, Map<number, AnnotationAppearanceMap<Blob>>>();
@@ -185,8 +170,6 @@ export class AnnotationPlugin extends BasePlugin<
       registry.getPlugin<InteractionManagerPlugin>('interaction-manager')?.provides() ?? null;
 
     this.registerHandlerFactories();
-    this.registerSelectionHandlerFactories();
-    this.registerBuiltInPatches();
   }
 
   // ─────────────────────────────────────────────────────────
@@ -257,22 +240,6 @@ export class AnnotationPlugin extends BasePlugin<
     this.handlerFactories.set(PdfAnnotationSubtype.INK, inkHandlerFactory);
     this.handlerFactories.set(PdfAnnotationSubtype.FREETEXT, freeTextHandlerFactory);
     this.handlerFactories.set(PdfAnnotationSubtype.TEXT, textHandlerFactory);
-  }
-
-  private registerSelectionHandlerFactories() {
-    this.selectionHandlerFactories.set('insertText', insertTextSelectionHandler);
-    this.selectionHandlerFactories.set('replaceText', replaceTextSelectionHandler);
-  }
-
-  private registerBuiltInPatches() {
-    this.patchRegistry.register(PdfAnnotationSubtype.INK, patchInk);
-    this.patchRegistry.register(PdfAnnotationSubtype.LINE, patchLine);
-    this.patchRegistry.register(PdfAnnotationSubtype.POLYLINE, patchPolyline);
-    this.patchRegistry.register(PdfAnnotationSubtype.POLYGON, patchPolygon);
-    this.patchRegistry.register(PdfAnnotationSubtype.CIRCLE, patchCircle);
-    this.patchRegistry.register(PdfAnnotationSubtype.SQUARE, patchSquare);
-    this.patchRegistry.register(PdfAnnotationSubtype.FREETEXT, patchFreeText);
-    this.patchRegistry.register(PdfAnnotationSubtype.STAMP, patchStamp);
   }
 
   async initialize(): Promise<void> {
@@ -362,8 +329,7 @@ export class AnnotationPlugin extends BasePlugin<
         selectAnnotation: (pageIndex, id) => this.selectAnnotation(pageIndex, id, documentId),
       };
 
-      const handler =
-        this.selectionHandlerFactories.get(activeTool.id) ?? textMarkupSelectionHandler;
+      const handler = activeTool.selectionHandler ?? textMarkupSelectionHandler;
 
       handler.handle(context, formattedSelection, getText);
 
@@ -387,7 +353,7 @@ export class AnnotationPlugin extends BasePlugin<
     return {
       // Active document operations
       getActiveTool: () => this.getActiveTool(),
-      setActiveTool: (toolId) => this.setActiveTool(toolId),
+      setActiveTool: (toolId: string | null) => this.setActiveTool(toolId),
       getState: () => this.getDocumentState(),
       getPageAnnotations: (options) => this.getPageAnnotations(options),
       getSelectedAnnotation: () => this.getSelectedAnnotation(),
@@ -434,17 +400,19 @@ export class AnnotationPlugin extends BasePlugin<
 
       // Global operations
       getTools: () => this.state.tools,
-      getTool: (toolId) => this.getTool(toolId),
-      addTool: (tool) => {
+      getTool: (toolId: string) => this.getTool(toolId),
+      addTool: (tool: AnnotationTool<any>) => {
         this.dispatch(addTool(tool));
         this.registerInteractionForTool(tool);
       },
       findToolForAnnotation: (anno) => this.findToolForAnnotation(anno),
-      setToolDefaults: (toolId, patch) => this.dispatch(setToolDefaults(toolId, patch)),
+      setToolDefaults: (
+        toolId: string,
+        patch: Partial<PdfAnnotationObject> & Record<string, unknown>,
+      ) => this.dispatch(setToolDefaults(toolId, patch)),
       getColorPresets: () => [...this.state.colorPresets],
       addColorPreset: (color) => this.dispatch(addColorPreset(color)),
       transformAnnotation: (annotation, options) => this.transformAnnotation(annotation, options),
-      registerPatchFunction: (type, patchFn) => this.registerPatchFunction(type, patchFn),
 
       // Events
       onStateChange: this.state$.on,
@@ -458,7 +426,7 @@ export class AnnotationPlugin extends BasePlugin<
   // Document Scoping
   // ─────────────────────────────────────────────────────────
 
-  private createAnnotationScope(documentId: string): AnnotationScope {
+  private createAnnotationScope(documentId: string): AnnotationScope<AnnotationToolMap> {
     return {
       getState: () => this.getDocumentState(documentId),
       getPageAnnotations: (options) => this.getPageAnnotations(options, documentId),
@@ -473,7 +441,7 @@ export class AnnotationPlugin extends BasePlugin<
       setSelection: (ids) => this.setSelectionMethod(ids, documentId),
       deselectAnnotation: () => this.deselectAnnotation(documentId),
       getActiveTool: () => this.getActiveTool(documentId),
-      setActiveTool: (toolId) => this.setActiveTool(toolId, documentId),
+      setActiveTool: (toolId: string | null) => this.setActiveTool(toolId, documentId),
       findToolForAnnotation: (anno) => this.findToolForAnnotation(anno),
       importAnnotations: (items) => this.importAnnotations(items, documentId),
       createAnnotation: (pageIndex, anno, ctx) =>
@@ -558,13 +526,6 @@ export class AnnotationPlugin extends BasePlugin<
     }
   }
 
-  private registerPatchFunction<T extends PdfAnnotationObject>(
-    type: PdfAnnotationSubtype,
-    patchFn: (original: T, context: TransformContext<T>) => Partial<T>,
-  ) {
-    this.patchRegistry.register(type, patchFn);
-  }
-
   private transformAnnotation<T extends PdfAnnotationObject>(
     annotation: T,
     options: TransformOptions<T>,
@@ -575,7 +536,12 @@ export class AnnotationPlugin extends BasePlugin<
       metadata: options.metadata,
     };
 
-    return this.patchRegistry.transform(annotation, context);
+    const tool = this.findToolForAnnotation(annotation);
+    if (tool?.transform) {
+      return tool.transform(annotation, context) as Partial<T>;
+    }
+
+    return context.changes;
   }
 
   public registerPageHandlers(
@@ -584,7 +550,7 @@ export class AnnotationPlugin extends BasePlugin<
     scale: number,
     callbacks: {
       services: HandlerServices;
-      onPreview: (toolId: string, state: AnyPreviewState | null) => void;
+      onPreview: (toolId: string, state: PreviewState | null) => void;
     },
   ) {
     const docState = this.getCoreDocument(documentId);
@@ -599,8 +565,9 @@ export class AnnotationPlugin extends BasePlugin<
       4) as Rotation;
 
     for (const tool of this.state.tools) {
-      if (!tool.defaults.type) continue;
-      const factory = this.handlerFactories.get(tool.defaults.type);
+      const factory =
+        tool.pointerHandler ??
+        (tool.defaults.type ? this.handlerFactories.get(tool.defaults.type) : undefined);
       if (!factory) continue;
 
       const context: HandlerContext<PdfAnnotationObject> = {
@@ -2444,8 +2411,12 @@ export class AnnotationPlugin extends BasePlugin<
     }
   }
 
-  public getTool<T extends AnnotationTool>(toolId: string): T | undefined {
-    return this.state.tools.find((t) => t.id === toolId) as T | undefined;
+  public getTool<TId extends ToolId<AnnotationToolMap>>(
+    toolId: TId,
+  ): (ToolById<AnnotationToolMap, TId> & AnnotationTool) | undefined;
+  public getTool(toolId: string): AnnotationTool | undefined;
+  public getTool(toolId: string): AnnotationTool | undefined {
+    return this.state.tools.find((t) => t.id === toolId);
   }
 
   public findToolForAnnotation(annotation: PdfAnnotationObject): AnnotationTool | null {

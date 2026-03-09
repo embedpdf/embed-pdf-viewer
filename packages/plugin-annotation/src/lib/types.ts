@@ -3,7 +3,6 @@ import {
   AnnotationCreateContext,
   AnnotationAppearanceMap,
   PdfAnnotationObject,
-  PdfAnnotationSubtype,
   PdfErrorReason,
   PdfRenderPageAnnotationOptions,
   PdfTextAnnoObject,
@@ -12,7 +11,7 @@ import {
   Size,
   Task,
 } from '@embedpdf/models';
-import { AnnotationTool } from './tools/types';
+import { AnnotationTool, AnnotationToolMap, ToolById, ToolId } from './tools/types';
 
 /**
  * Metadata attached to annotation history commands for filtering/purging.
@@ -177,14 +176,6 @@ export interface TransformOptions<T extends PdfAnnotationObject = PdfAnnotationO
   };
 }
 
-/**
- * Function type for custom patch functions
- */
-export type PatchFunction<T extends PdfAnnotationObject> = (
-  original: T,
-  context: TransformOptions<T>,
-) => Partial<T>;
-
 export type ImportAnnotationItem<T extends PdfAnnotationObject = PdfAnnotationObject> = {
   annotation: T;
   ctx?: AnnotationCreateContext<T>;
@@ -208,8 +199,15 @@ export interface AnnotationActiveToolChangeEvent {
  */
 export type GroupingAction = 'group' | 'ungroup' | 'disabled';
 
+type ToolUnion<TTools extends AnnotationToolMap> = TTools[ToolId<TTools>] & AnnotationTool;
+type ToolEntry<TTools extends AnnotationToolMap, TId extends ToolId<TTools>> = ToolById<
+  TTools,
+  TId
+> &
+  AnnotationTool;
+
 // Scoped annotation capability for a specific document
-export interface AnnotationScope {
+export interface AnnotationScope<TTools extends AnnotationToolMap = AnnotationToolMap> {
   getState(): AnnotationDocumentState;
   getPageAnnotations(
     options: GetPageAnnotationsOptions,
@@ -233,9 +231,10 @@ export interface AnnotationScope {
   setSelection(ids: string[]): void;
   /** Clear all selection */
   deselectAnnotation(): void;
-  getActiveTool(): AnnotationTool | null;
+  getActiveTool(): ToolUnion<TTools> | null;
+  setActiveTool<TId extends ToolId<TTools>>(toolId: TId | null): void;
   setActiveTool(toolId: string | null): void;
-  findToolForAnnotation(annotation: PdfAnnotationObject): AnnotationTool | null;
+  findToolForAnnotation(annotation: PdfAnnotationObject): ToolUnion<TTools> | null;
   importAnnotations(items: ImportAnnotationItem<PdfAnnotationObject>[]): void;
   createAnnotation<A extends PdfAnnotationObject>(
     pageIndex: number,
@@ -295,10 +294,10 @@ export interface AnnotationScope {
 
   onStateChange: EventHook<AnnotationDocumentState>;
   onAnnotationEvent: EventHook<AnnotationEvent>;
-  onActiveToolChange: EventHook<AnnotationTool | null>;
+  onActiveToolChange: EventHook<ToolUnion<TTools> | null>;
 }
 
-export interface AnnotationCapability {
+export interface AnnotationCapability<TTools extends AnnotationToolMap = AnnotationToolMap> {
   // Active document operations
   getState: () => AnnotationDocumentState;
   getPageAnnotations: (
@@ -387,16 +386,28 @@ export interface AnnotationCapability {
   isInGroup: (annotationId: string, documentId?: string) => boolean;
 
   // Document-scoped operations
-  forDocument: (documentId: string) => AnnotationScope;
+  forDocument: (documentId: string) => AnnotationScope<TTools>;
 
   // Global operations (shared across documents)
-  getActiveTool: () => AnnotationTool | null;
-  setActiveTool: (toolId: string | null) => void;
-  getTools: () => AnnotationTool[];
-  getTool: <T extends AnnotationTool>(toolId: string) => T | undefined;
-  addTool: <T extends AnnotationTool>(tool: T) => void;
-  findToolForAnnotation: (annotation: PdfAnnotationObject) => AnnotationTool | null;
-  setToolDefaults: (toolId: string, patch: Partial<any>) => void;
+  getActiveTool: () => ToolUnion<TTools> | null;
+  setActiveTool: {
+    <TId extends ToolId<TTools>>(toolId: TId | null): void;
+    (toolId: string | null): void;
+  };
+  getTools: () => Array<ToolUnion<TTools>>;
+  getTool: {
+    <TId extends ToolId<TTools>>(toolId: TId): ToolEntry<TTools, TId> | undefined;
+    (toolId: string): AnnotationTool | undefined;
+  };
+  addTool: (tool: AnnotationTool<any>) => void;
+  findToolForAnnotation: (annotation: PdfAnnotationObject) => ToolUnion<TTools> | null;
+  setToolDefaults: {
+    <TId extends ToolId<TTools>>(
+      toolId: TId,
+      patch: Partial<ToolById<TTools, TId>['defaults']>,
+    ): void;
+    (toolId: string, patch: Partial<PdfAnnotationObject> & Record<string, unknown>): void;
+  };
 
   getColorPresets: () => string[];
   addColorPreset: (color: string) => void;
@@ -409,14 +420,6 @@ export interface AnnotationCapability {
     annotation: T,
     options: TransformOptions<T>,
   ) => Partial<T>;
-  /**
-   * Register a custom patch function for a specific annotation type.
-   * This allows extending the transformation logic for custom annotations.
-   */
-  registerPatchFunction: <T extends PdfAnnotationObject>(
-    type: PdfAnnotationSubtype,
-    patchFn: PatchFunction<T>,
-  ) => void;
 
   // Events (include documentId)
   onStateChange: EventHook<AnnotationStateChangeEvent>;

@@ -1,4 +1,6 @@
 import { PdfAnnotationObject, PdfAnnotationSubtype, Size } from '@embedpdf/models';
+import type { HandlerFactory, SelectionHandlerFactory } from '../handlers/types';
+import type { PatchFunction } from '../patching/patch-registry';
 
 /**
  * A dynamic boolean property that can be either a static boolean
@@ -81,6 +83,7 @@ export interface ClickBehaviorMap {
   [PdfAnnotationSubtype.SQUARE]: ShapeClickBehavior;
   [PdfAnnotationSubtype.LINE]: LineClickBehavior;
   [PdfAnnotationSubtype.FREETEXT]: FreeTextClickBehavior;
+  [PdfAnnotationSubtype.WIDGET]: ShapeClickBehavior;
 }
 
 // Helper type to get tool config
@@ -154,9 +157,12 @@ type InkBehaviorFor<T extends PdfAnnotationObject> = [T] extends [
  * The primary interface for defining an annotation tool.
  * Uses a type alias to properly combine the base interface with conditional properties.
  */
-export type AnnotationTool<T extends PdfAnnotationObject = PdfAnnotationObject> = {
+export type AnnotationTool<
+  T extends PdfAnnotationObject = PdfAnnotationObject,
+  TId extends string = string,
+> = {
   /** A unique identifier, e.g., 'ink', 'arrow' */
-  id: string;
+  id: TId;
 
   /** A user-facing name for UI elements, e.g., 'Pen' */
   name: string;
@@ -214,4 +220,41 @@ export type AnnotationTool<T extends PdfAnnotationObject = PdfAnnotationObject> 
     useAppearanceStream?: boolean;
   } & InsertUprightBehaviorFor<T> &
     InkBehaviorFor<T>;
+
+  /** Pointer-based creation handler (drag-to-create, click-to-place). */
+  pointerHandler?: HandlerFactory<T>;
+
+  /** Text-selection-based creation handler. */
+  selectionHandler?: SelectionHandlerFactory<T>;
+
+  /** Transform function for move, resize, rotate, and property-update operations. */
+  transform?: PatchFunction<T>;
 } & ClickBehaviorFor<T>;
+
+export interface AnnotationToolRecord {
+  id: string;
+  defaults: Record<string, unknown>;
+}
+
+export type AnnotationToolMap = Record<string, AnnotationToolRecord>;
+
+export type ToolId<TMap extends AnnotationToolMap> = Extract<keyof TMap, string>;
+
+export type ToolById<TMap extends AnnotationToolMap, TId extends ToolId<TMap>> = TMap[TId];
+
+export type ToolMapFromList<TTools extends readonly { id: string }[]> = {
+  [T in TTools[number] as T['id']]: T;
+};
+
+export type UpsertToolMap<TMap extends AnnotationToolMap, TTool extends AnnotationTool> = Omit<
+  TMap,
+  TTool['id']
+> & {
+  [K in TTool['id']]: TTool;
+};
+
+/**
+ * Helper to preserve literal IDs and concrete tool typing.
+ */
+export const defineAnnotationTool = <const TTool extends AnnotationTool<any>>(tool: TTool): TTool =>
+  tool;

@@ -10,6 +10,9 @@ export type FormEvent<T extends EventTarget = Element> = import('preact').JSX.Ta
   T,
   Event
 >;
+export type MouseEvent<T = Element> = import('preact').JSX.TargetedMouseEvent<
+  T extends EventTarget ? T : never
+>;
 
 // Preact-specific select props
 export const selectProps = (isMultiple: boolean, selectedValues: string[]) => ({

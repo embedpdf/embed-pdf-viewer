@@ -1,4 +1,4 @@
-import { AnyPreviewState } from '@embedpdf/plugin-annotation';
+import { PreviewState } from '@embedpdf/plugin-annotation';
 import { Circle } from './annotations/circle';
 import { Square } from './annotations/square';
 import { Polygon } from './annotations/polygon';
@@ -6,14 +6,17 @@ import { blendModeToCss, PdfAnnotationSubtype, PdfBlendMode } from '@embedpdf/mo
 import { Polyline } from './annotations/polyline';
 import { Line } from './annotations/line';
 import { Ink } from './annotations/ink';
+import { useRegisteredRenderers } from '../context/renderer-registry';
 
 interface Props {
-  preview: AnyPreviewState;
+  toolId: string;
+  preview: PreviewState;
   scale: number;
 }
 
-export function PreviewRenderer({ preview, scale }: Props) {
+export function PreviewRenderer({ toolId, preview, scale }: Props) {
   const { bounds } = preview;
+  const registeredRenderers = useRegisteredRenderers();
 
   const style = {
     position: 'absolute' as const,
@@ -25,7 +28,6 @@ export function PreviewRenderer({ preview, scale }: Props) {
     zIndex: 10,
   };
 
-  // Use type guards for proper type narrowing
   if (preview.type === PdfAnnotationSubtype.CIRCLE) {
     return (
       <div style={style}>
@@ -82,7 +84,6 @@ export function PreviewRenderer({ preview, scale }: Props) {
   if (preview.type === PdfAnnotationSubtype.FREETEXT) {
     return (
       <div style={style}>
-        {/* Render a simple dashed border preview */}
         <div
           style={{
             width: '100%',
@@ -91,6 +92,15 @@ export function PreviewRenderer({ preview, scale }: Props) {
             backgroundColor: 'transparent',
           }}
         />
+      </div>
+    );
+  }
+
+  const match = registeredRenderers.find((r) => r.id === toolId && r.renderPreview);
+  if (match?.renderPreview) {
+    return (
+      <div style={style}>
+        {match.renderPreview({ data: preview.data, bounds: preview.bounds, scale })}
       </div>
     );
   }

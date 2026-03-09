@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from '@framework';
 import { useAnnotationPlugin } from '../hooks';
-import { AnyPreviewState, HandlerServices } from '@embedpdf/plugin-annotation';
+import { PreviewState, HandlerServices } from '@embedpdf/plugin-annotation';
 import { PreviewRenderer } from './preview-renderer';
 
 interface Props {
@@ -11,7 +11,7 @@ interface Props {
 
 export function AnnotationPaintLayer({ documentId, pageIndex, scale }: Props) {
   const { plugin: annotationPlugin } = useAnnotationPlugin();
-  const [previews, setPreviews] = useState<Map<string, AnyPreviewState>>(new Map());
+  const [previews, setPreviews] = useState<Map<string, PreviewState>>(new Map());
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -93,7 +93,7 @@ export function AnnotationPaintLayer({ documentId, pageIndex, scale }: Props) {
 
       {/* Render any active previews from any tool */}
       {Array.from(previews.entries()).map(([toolId, preview]) => (
-        <PreviewRenderer key={toolId} preview={preview} scale={scale} />
+        <PreviewRenderer key={toolId} toolId={toolId} preview={preview} scale={scale} />
       ))}
     </>
   );

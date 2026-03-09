@@ -1,13 +1,8 @@
-import { AnnotationTool } from './types';
+import { ToolMapFromList } from './types';
 import { defaultTools } from './default-tools';
 
-// Infer the exact union type of all tool objects.
-type DefaultTool = (typeof defaultTools)[number];
-
 // Create a map from a tool's ID to its specific type.
-export type ToolMap = {
-  [T in DefaultTool as T['id']]: T;
-};
+export type ToolMap = ToolMapFromList<typeof defaultTools>;
 
 /**
  * A factory that creates a type-safe predicate function for a specific tool ID.
@@ -15,7 +10,7 @@ export type ToolMap = {
  */
 export function createToolPredicate<K extends keyof ToolMap>(id: K) {
   // This function returns ANOTHER function, which is the actual type predicate.
-  return (tool: AnnotationTool<any> | undefined): tool is ToolMap[K] => {
+  return (tool: { id: string } | undefined): tool is ToolMap[K] => {
     return tool?.id === id;
   };
 }

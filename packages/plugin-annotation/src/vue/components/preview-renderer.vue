@@ -50,12 +50,12 @@
 
 <script setup lang="ts">
 import { computed, CSSProperties } from 'vue';
-import { AnyPreviewState } from '@embedpdf/plugin-annotation';
+import { PreviewState } from '@embedpdf/plugin-annotation';
 import { blendModeToCss, PdfAnnotationSubtype, PdfBlendMode } from '@embedpdf/models';
 import { Circle, Square, Polygon, Polyline, Line, Ink } from './annotations';
 
 const props = defineProps<{
-  preview: AnyPreviewState;
+  preview: PreviewState;
   scale: number;
 }>();
 

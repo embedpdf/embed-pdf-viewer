@@ -1,6 +1,7 @@
 import {
   PdfAnnotationSubtype,
   PdfAnnotationObject,
+  PdfAnnotationOf,
   PdfSquigglyAnnoObject,
   PdfStrikeOutAnnoObject,
   PdfUnderlineAnnoObject,
@@ -30,7 +31,7 @@ export function rectsIntersect(a: Rect, b: Rect): boolean {
 /* 1. Generic “subtype‑to‑object” mapper                              */
 /* ------------------------------------------------------------------ */
 
-export type AnnoOf<S extends PdfAnnotationSubtype> = Extract<PdfAnnotationObject, { type: S }>;
+export type AnnoOf<S extends PdfAnnotationSubtype> = PdfAnnotationOf<S>;
 
 export type TextMarkupSubtype =
   | PdfAnnotationSubtype.HIGHLIGHT

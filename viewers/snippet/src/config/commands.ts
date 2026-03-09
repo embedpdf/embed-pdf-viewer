@@ -844,6 +844,78 @@ export const commands: Record<string, Command<State>> = {
     },
   },
 
+  'mode:form': {
+    id: 'mode:form',
+    labelKey: 'mode.form',
+    categories: ['mode', 'mode-form', 'annotation', 'form'],
+    action: ({ registry, documentId }) => {
+      const ui = registry.getPlugin<UIPlugin>('ui')?.provides();
+      if (!ui) return;
+
+      ui.setActiveToolbar('top', 'secondary', 'form-toolbar', documentId);
+    },
+    active: ({ state, documentId }) => {
+      return isToolbarOpen(state.plugins, documentId, 'top', 'secondary', 'form-toolbar');
+    },
+  },
+
+  // ─────────────────────────────────────────────────────────
+  // Form Commands
+  // ─────────────────────────────────────────────────────────
+  'form:add-textfield': {
+    id: 'form:add-textfield',
+    labelKey: 'form.textfield',
+    icon: 'formTextfield',
+    categories: ['form', 'form-textfield'],
+    action: ({ registry, documentId }) => {
+      const annotation = registry.getPlugin<AnnotationPlugin>(ANNOTATION_PLUGIN_ID)?.provides();
+      const annotationScope = annotation?.forDocument(documentId);
+      if (!annotationScope) return;
+
+      if (annotationScope.getActiveTool()?.id === 'formTextField') {
+        annotationScope.setActiveTool(null);
+      } else {
+        annotationScope.setActiveTool('formTextField');
+      }
+    },
+    active: ({ state, documentId }) => {
+      const annotation = state.plugins[ANNOTATION_PLUGIN_ID]?.documents[documentId];
+      return annotation?.activeToolId === 'formTextField';
+    },
+  },
+
+  'form:add-checkbox': {
+    id: 'form:add-checkbox',
+    labelKey: 'form.checkbox',
+    icon: 'formCheckbox',
+    categories: ['form', 'form-checkbox'],
+    action: () => {},
+  },
+
+  'form:add-radio': {
+    id: 'form:add-radio',
+    labelKey: 'form.radio',
+    icon: 'formRadio',
+    categories: ['form', 'form-radio'],
+    action: () => {},
+  },
+
+  'form:add-select': {
+    id: 'form:add-select',
+    labelKey: 'form.select',
+    icon: 'formSelect',
+    categories: ['form', 'form-select'],
+    action: () => {},
+  },
+
+  'form:add-listbox': {
+    id: 'form:add-listbox',
+    labelKey: 'form.listbox',
+    icon: 'formListbox',
+    categories: ['form', 'form-listbox'],
+    action: () => {},
+  },
+
   'mode:redact': {
     id: 'mode:redact',
     labelKey: 'mode.redact',

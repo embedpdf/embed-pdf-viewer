@@ -118,11 +118,11 @@ export interface AddColorPresetAction extends Action {
 }
 export interface SetToolDefaultsAction extends Action {
   type: typeof SET_TOOL_DEFAULTS;
-  payload: { toolId: string; patch: Partial<any> };
+  payload: { toolId: string; patch: Partial<PdfAnnotationObject> & Record<string, unknown> };
 }
 export interface AddToolAction extends Action {
   type: typeof ADD_TOOL;
-  payload: AnnotationTool;
+  payload: AnnotationTool<any>;
 }
 
 export type AnnotationAction =
@@ -273,12 +273,15 @@ export const addColorPreset = (c: string): AddColorPresetAction => ({
   payload: c,
 });
 
-export const setToolDefaults = (toolId: string, patch: Partial<any>): SetToolDefaultsAction => ({
+export const setToolDefaults = (
+  toolId: string,
+  patch: Partial<PdfAnnotationObject> & Record<string, unknown>,
+): SetToolDefaultsAction => ({
   type: SET_TOOL_DEFAULTS,
   payload: { toolId, patch },
 });
 
-export const addTool = (tool: AnnotationTool): AddToolAction => ({
+export const addTool = (tool: AnnotationTool<any>): AddToolAction => ({
   type: ADD_TOOL,
   payload: tool,
 });

@@ -158,7 +158,7 @@ export interface HandlerContext<A extends PdfAnnotationObject> {
   pageRotation: Rotation;
   scale: number;
   services: HandlerServices;
-  onPreview: (state: AnyPreviewState | null) => void;
+  onPreview: (state: PreviewState<A['type']> | null) => void;
   onCommit: (annotation: A, context?: AnnotationCreateContext<A>) => void;
 }
 

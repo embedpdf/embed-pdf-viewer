@@ -1,6 +1,6 @@
 <script lang="ts">
   import { useAnnotationPlugin } from '../hooks';
-  import type { AnyPreviewState, HandlerServices } from '@embedpdf/plugin-annotation';
+  import type { PreviewState, HandlerServices } from '@embedpdf/plugin-annotation';
   import PreviewRenderer from './PreviewRenderer.svelte';
 
   interface AnnotationPaintLayerProps {
@@ -12,7 +12,7 @@
   let { documentId, pageIndex, scale }: AnnotationPaintLayerProps = $props();
 
   const annotationPlugin = useAnnotationPlugin();
-  let previews = $state<Map<string, AnyPreviewState>>(new Map());
+  let previews = $state<Map<string, PreviewState>>(new Map());
 
   let fileInputRef: HTMLInputElement | null = $state(null);
   let canvasRef: HTMLCanvasElement | null = $state(null);

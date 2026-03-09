@@ -37,6 +37,7 @@ import {
 import { AnnotationCapability, AnnotationPlugin } from '@embedpdf/plugin-annotation';
 import { Command, HistoryCapability, HistoryPlugin } from '@embedpdf/plugin-history';
 import { initialDocumentState } from './reducer';
+import { formTools } from './tools';
 
 export class FormPlugin extends BasePlugin<
   FormPluginConfig,
@@ -59,6 +60,12 @@ export class FormPlugin extends BasePlugin<
 
     this.annotation = registry.getPlugin<AnnotationPlugin>('annotation')?.provides() ?? null;
     this.history = registry.getPlugin<HistoryPlugin>(HistoryPlugin.id)?.provides() ?? null;
+
+    if (this.annotation) {
+      for (const tool of formTools) {
+        this.annotation.addTool(tool);
+      }
+    }
   }
 
   async initialize(): Promise<void> {}
