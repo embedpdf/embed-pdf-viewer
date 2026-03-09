@@ -280,6 +280,12 @@ export const viewerUISchema: UISchema = {
             },
             {
               type: 'command-button',
+              id: 'add-ink-highlighter',
+              commandId: 'annotation:add-ink-highlighter',
+              variant: 'icon',
+            },
+            {
+              type: 'command-button',
               id: 'add-text',
               commandId: 'annotation:add-text',
               variant: 'icon',
@@ -726,6 +732,11 @@ export const viewerUISchema: UISchema = {
           type: 'command',
           id: 'annotation:add-ink',
           commandId: 'annotation:add-ink',
+        },
+        {
+          type: 'command',
+          id: 'annotation:add-ink-highlighter',
+          commandId: 'annotation:add-ink-highlighter',
         },
         {
           type: 'command',

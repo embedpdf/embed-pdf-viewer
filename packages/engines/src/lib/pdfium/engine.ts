@@ -125,6 +125,7 @@ import {
   PdfTextRun,
   PdfPageTextRuns,
   PdfAlphaColor,
+  PdfBlendMode,
 } from '@embedpdf/models';
 import { computeFormDrawParams, isValidCustomKey, readArrayBuffer, readString } from './helper';
 import { WrappedPdfiumModule } from '@embedpdf/pdfium';
@@ -6548,7 +6549,6 @@ export class PdfiumNative implements IPdfiumExecutor {
     const opacity = this.getAnnotationOpacity(annotationPtr);
     const { width: strokeWidth } = this.getBorderStyle(annotationPtr);
     const inkList = this.getInkList(doc, page, annotationPtr);
-    const blendMode = this.pdfiumModule.EPDFAnnot_GetBlendMode(annotationPtr);
     const intent = this.getAnnotIntent(annotationPtr);
 
     return {
@@ -6557,7 +6557,6 @@ export class PdfiumNative implements IPdfiumExecutor {
       type: PdfAnnotationSubtype.INK,
       rect,
       ...(intent && { intent }),
-      blendMode,
       strokeColor,
       color: strokeColor, // deprecated alias
       opacity,
@@ -6771,14 +6770,12 @@ export class PdfiumNative implements IPdfiumExecutor {
     const segmentRects = this.getQuadPointsAnno(doc, page, annotationPtr);
     const strokeColor = this.getAnnotationColor(annotationPtr) ?? '#FFFF00';
     const opacity = this.getAnnotationOpacity(annotationPtr);
-    const blendMode = this.pdfiumModule.EPDFAnnot_GetBlendMode(annotationPtr);
 
     return {
       pageIndex: page.index,
       id: index,
       type: PdfAnnotationSubtype.HIGHLIGHT,
       rect,
-      blendMode,
       segmentRects,
       strokeColor,
       color: strokeColor, // deprecated alias
@@ -6809,14 +6806,12 @@ export class PdfiumNative implements IPdfiumExecutor {
     const segmentRects = this.getQuadPointsAnno(doc, page, annotationPtr);
     const strokeColor = this.getAnnotationColor(annotationPtr) ?? '#FF0000';
     const opacity = this.getAnnotationOpacity(annotationPtr);
-    const blendMode = this.pdfiumModule.EPDFAnnot_GetBlendMode(annotationPtr);
 
     return {
       pageIndex: page.index,
       id: index,
       type: PdfAnnotationSubtype.UNDERLINE,
       rect,
-      blendMode,
       segmentRects,
       strokeColor,
       color: strokeColor, // deprecated alias
@@ -6847,14 +6842,12 @@ export class PdfiumNative implements IPdfiumExecutor {
     const segmentRects = this.getQuadPointsAnno(doc, page, annotationPtr);
     const strokeColor = this.getAnnotationColor(annotationPtr) ?? '#FF0000';
     const opacity = this.getAnnotationOpacity(annotationPtr);
-    const blendMode = this.pdfiumModule.EPDFAnnot_GetBlendMode(annotationPtr);
 
     return {
       pageIndex: page.index,
       id: index,
       type: PdfAnnotationSubtype.STRIKEOUT,
       rect,
-      blendMode,
       segmentRects,
       strokeColor,
       color: strokeColor, // deprecated alias
@@ -6885,14 +6878,12 @@ export class PdfiumNative implements IPdfiumExecutor {
     const segmentRects = this.getQuadPointsAnno(doc, page, annotationPtr);
     const strokeColor = this.getAnnotationColor(annotationPtr) ?? '#FF0000';
     const opacity = this.getAnnotationOpacity(annotationPtr);
-    const blendMode = this.pdfiumModule.EPDFAnnot_GetBlendMode(annotationPtr);
 
     return {
       pageIndex: page.index,
       id: index,
       type: PdfAnnotationSubtype.SQUIGGLY,
       rect,
-      blendMode,
       segmentRects,
       strokeColor,
       color: strokeColor, // deprecated alias
@@ -7671,6 +7662,7 @@ export class PdfiumNative implements IPdfiumExecutor {
     created: Date | undefined;
     flags: PdfAnnotationFlagName[];
     custom: unknown;
+    blendMode: PdfBlendMode;
     inReplyToId?: string;
     replyType?: PdfAnnotationReplyType;
   } {
@@ -7682,6 +7674,7 @@ export class PdfiumNative implements IPdfiumExecutor {
     const custom = this.getAnnotCustom(annotationPtr);
     const inReplyToId = this.getInReplyToId(annotationPtr);
     const replyType = this.getReplyType(annotationPtr);
+    const blendMode = this.pdfiumModule.EPDFAnnot_GetBlendMode(annotationPtr);
 
     // Read EmbedPDF extended rotation and convert from PDF CCW to UI CW convention
     const pdfRotation = this.getAnnotExtendedRotation(annotationPtr);
@@ -7700,6 +7693,7 @@ export class PdfiumNative implements IPdfiumExecutor {
       created,
       flags,
       custom,
+      blendMode,
       // Only include IRT if present
       ...(inReplyToId && { inReplyToId }),
       // Only include RT if present and not the default (Reply)
