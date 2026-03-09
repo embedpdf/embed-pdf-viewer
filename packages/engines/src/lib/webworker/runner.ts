@@ -9,6 +9,7 @@ import {
   PdfErrorCode,
   TaskReturn,
 } from '@embedpdf/models';
+import { collectTransferables } from '../transferables';
 
 /**
  * Request body that represent method calls of PdfEngine, it contains the
@@ -440,6 +441,7 @@ export class EngineRunner {
 
     task.wait(
       (result) => {
+        const transferables = collectTransferables(result);
         const response: ExecuteResponse = {
           id: request.id,
           type: 'ExecuteResponse',
@@ -448,7 +450,7 @@ export class EngineRunner {
             value: result,
           },
         };
-        this.respond(response);
+        this.respond(response, transferables);
       },
       (error) => {
         const response: ExecuteResponse = {
@@ -470,8 +472,8 @@ export class EngineRunner {
    *
    * @protected
    */
-  respond(response: Response) {
+  respond(response: Response, transferables: Transferable[] = []) {
     this.logger.debug(LOG_SOURCE, LOG_CATEGORY, 'runner respond: ', response);
-    self.postMessage(response);
+    self.postMessage(response, { transfer: transferables });
   }
 }

@@ -44,6 +44,7 @@ import {
   ImageDataLike,
 } from '@embedpdf/models';
 import { ExecuteRequest, Response, SpecificExecuteRequest } from './runner';
+import { collectTransferables } from '../transferables';
 
 const LOG_SOURCE = 'WebWorkerEngine';
 const LOG_CATEGORY = 'Engine';
@@ -1196,24 +1197,23 @@ export class WebWorkerEngine implements PdfEngine {
    * Send the request to webworker inside and register the task
    * @param task - task that waiting for the response
    * @param request - request that needs send to web worker
-   * @param transferables - transferables that need to transfer to webworker
    * @returns
    *
    * @internal
    */
-  proxy<R>(task: WorkerTask<R>, request: ExecuteRequest, transferables: any[] = []) {
+  proxy<R>(task: WorkerTask<R>, request: ExecuteRequest) {
     this.logger.debug(
       LOG_SOURCE,
       LOG_CATEGORY,
       'send request to worker',
       task,
       request,
-      transferables,
     );
     this.logger.perf(LOG_SOURCE, LOG_CATEGORY, `${request.data.name}`, 'Begin', request.id);
     this.readyTask.wait(
       () => {
-        this.worker.postMessage(request, transferables);
+        const transferables = collectTransferables(request.data.args);
+        this.worker.postMessage(request, { transfer: transferables });
         task.wait(
           () => {
             this.logger.perf(LOG_SOURCE, LOG_CATEGORY, `${request.data.name}`, 'End', request.id);

@@ -1,6 +1,7 @@
 import { Logger, NoopLogger, Task, TaskError, PdfErrorCode } from '@embedpdf/models';
 import { PdfiumNative } from '../pdfium/engine';
 import { init } from '@embedpdf/pdfium';
+import { collectTransferables } from '../transferables';
 
 const LOG_SOURCE = 'PdfiumNativeRunner';
 const LOG_CATEGORY = 'Worker';
@@ -212,11 +213,12 @@ export class PdfiumNativeRunner {
         task.wait(
           (data) => {
             this.logger.debug(LOG_SOURCE, LOG_CATEGORY, `Method ${method} resolved`);
+            const transferables = collectTransferables(data);
             this.respond({
               id: request.id,
               type: 'result',
               data,
-            });
+            }, transferables);
             this.activeTasks.delete(request.id);
           },
           (error) => {
@@ -231,11 +233,12 @@ export class PdfiumNativeRunner {
         );
       } else {
         // Synchronous result
+        const transferables = collectTransferables(result);
         this.respond({
           id: request.id,
           type: 'result',
           data: result,
-        });
+        }, transferables);
       }
     } catch (error) {
       this.logger.error(LOG_SOURCE, LOG_CATEGORY, `Error executing ${method}:`, error);
@@ -253,9 +256,9 @@ export class PdfiumNativeRunner {
   /**
    * Send response back to main thread
    */
-  private respond(response: WorkerResponse): void {
+  private respond(response: WorkerResponse, transferables: Transferable[] = []): void {
     this.logger.debug(LOG_SOURCE, LOG_CATEGORY, 'Sending response:', response.type);
-    self.postMessage(response);
+    self.postMessage(response, { transfer: transferables });
   }
 
   /**
