@@ -1,11 +1,11 @@
 import { h, Fragment } from 'preact';
 
-import { PdfAnnotationObject, PdfAnnotationSubtype } from '@embedpdf/models';
+import { PdfAnnotationObject } from '@embedpdf/models';
 import { AnnotationTool, TrackedAnnotation } from '@embedpdf/plugin-annotation';
 import { useAnnotationCapability } from '@embedpdf/plugin-annotation/preact';
 import { useTranslations } from '@embedpdf/plugin-i18n/preact';
 
-import { PROPERTY_CONFIGS, ANNOTATION_PROPERTIES, getSharedProperties } from './property-schema';
+import { PROPERTY_CONFIGS, getSharedProperties } from './property-schema';
 import { PropertySection } from './property-sections';
 
 /* ═══════════════════════════════════════════════════════════════════════════
@@ -31,6 +31,8 @@ interface DynamicSidebarProps {
  * - Tool defaults editing
  *
  * Dynamically renders property controls based on the property schema.
+ * Uses tool matching (via matchScore) to resolve which properties to show,
+ * enabling distinct property lists for tools sharing the same annotation subtype.
  * ═══════════════════════════════════════════════════════════════════════════ */
 
 export function DynamicSidebar({
@@ -47,25 +49,20 @@ export function DynamicSidebar({
   // Determine mode
   const isEditing = annotations.length > 0;
 
-  // Compute which properties to show based on annotation types
-  const types: PdfAnnotationSubtype[] = isEditing
-    ? [
-        ...new Set(
-          annotations
-            .map((a) => a.object.type)
-            .filter((t): t is PdfAnnotationSubtype => t !== undefined),
-        ),
-      ]
-    : activeTool?.defaults.type !== undefined
-      ? [activeTool.defaults.type]
+  // Resolve tool IDs: match each annotation to its best tool, or use the active tool
+  const toolIds: string[] = isEditing
+    ? annotations
+        .map((a) => annotation.findToolForAnnotation(a.object)?.id)
+        .filter((id): id is string => id !== undefined)
+    : activeTool
+      ? [activeTool.id]
       : [];
 
-  // If we can't determine any types, don't render
-  if (types.length === 0) return null;
+  if (toolIds.length === 0) return null;
 
-  // Get shared properties for the selected types, filtering out
+  // Get shared properties for the matched tools, filtering out
   // edit-only properties (e.g. rotation) when editing tool defaults
-  const sharedProperties = getSharedProperties(types);
+  const sharedProperties = getSharedProperties(toolIds);
   const properties = isEditing
     ? sharedProperties
     : sharedProperties.filter((p) => !PROPERTY_CONFIGS[p]?.editOnly);

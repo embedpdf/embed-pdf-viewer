@@ -35,8 +35,9 @@ export const textFieldHandlerFactory: HandlerFactory<PdfWidgetAnnoObject> = {
         fontFamily: tool.defaults.fontFamily ?? PdfStandardFont.Helvetica,
         fontSize: tool.defaults.fontSize ?? 12,
         fontColor: tool.defaults.fontColor ?? '#000000',
-        borderColor: tool.defaults.borderColor ?? '#000000',
-        backgroundColor: tool.defaults.backgroundColor ?? '#FFFFFF',
+        strokeColor: tool.defaults.strokeColor ?? '#000000',
+        color: tool.defaults.color ?? '#FFFFFF',
+        strokeWidth: tool.defaults.strokeWidth ?? 1,
         field: tool.defaults.field,
       };
     };
@@ -65,8 +66,9 @@ export const textFieldHandlerFactory: HandlerFactory<PdfWidgetAnnoObject> = {
         fontFamily: defaults.fontFamily,
         fontSize: defaults.fontSize,
         fontColor: defaults.fontColor,
-        borderColor: defaults.borderColor,
-        backgroundColor: defaults.backgroundColor,
+        strokeColor: defaults.strokeColor,
+        color: defaults.color,
+        strokeWidth: defaults.strokeWidth,
         field: {
           type: PDF_FORM_FIELD_TYPE.TEXTFIELD,
           flag: defaults.field?.flag ?? PDF_FORM_FIELD_FLAG.NONE,

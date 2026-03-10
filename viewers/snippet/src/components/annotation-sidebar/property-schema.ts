@@ -1,5 +1,3 @@
-import { PdfAnnotationSubtype } from '@embedpdf/models';
-
 /**
  * Configuration for a single editable property in the sidebar.
  */
@@ -88,7 +86,7 @@ export const PROPERTY_CONFIGS: Record<string, PropertyConfig> = {
     labelKey: 'annotation.lineEndings',
   },
 
-  // FreeText font properties
+  // Font properties
   fontFamily: {
     key: 'fontFamily',
     type: 'fontFamily',
@@ -139,42 +137,29 @@ export const PROPERTY_CONFIGS: Record<string, PropertyConfig> = {
 };
 
 /**
- * Maps annotation types to their ordered list of editable properties.
+ * Maps tool IDs to their ordered list of editable properties.
  * The order determines the display order in the sidebar.
+ *
+ * Keyed by tool ID (matching AnnotationTool.id) rather than annotation subtype,
+ * so tools sharing the same subtype (e.g. ink vs inkHighlighter, line vs lineArrow,
+ * or different widget field types) can define distinct property lists.
  */
-export const ANNOTATION_PROPERTIES: Partial<Record<PdfAnnotationSubtype, string[]>> = {
-  // Text comments: fill color drives the icon color, opacity affects the whole icon
-  [PdfAnnotationSubtype.TEXT]: ['strokeColor', 'opacity'],
+export const TOOL_PROPERTIES: Record<string, string[]> = {
+  // Text markup
+  highlight: ['strokeColor', 'opacity', 'blendMode'],
+  underline: ['strokeColor', 'opacity', 'blendMode'],
+  strikeout: ['strokeColor', 'opacity', 'blendMode'],
+  squiggly: ['strokeColor', 'opacity', 'blendMode'],
 
-  // Ink uses strokeColor (was: color)
-  [PdfAnnotationSubtype.INK]: ['strokeColor', 'opacity', 'strokeWidth', 'rotation'],
+  // Ink (distinct from inkHighlighter which adds blendMode)
+  ink: ['strokeColor', 'opacity', 'strokeWidth', 'rotation'],
+  inkHighlighter: ['strokeColor', 'opacity', 'strokeWidth', 'blendMode', 'rotation'],
 
-  // Shapes: color for interior fill, strokeColor for border
-  [PdfAnnotationSubtype.CIRCLE]: [
-    'color',
-    'opacity',
-    'strokeColor',
-    'strokeStyle',
-    'strokeWidth',
-    'rotation',
-  ],
-  [PdfAnnotationSubtype.SQUARE]: [
-    'color',
-    'opacity',
-    'strokeColor',
-    'strokeStyle',
-    'strokeWidth',
-    'rotation',
-  ],
-  [PdfAnnotationSubtype.POLYGON]: [
-    'strokeColor',
-    'opacity',
-    'strokeStyle',
-    'strokeWidth',
-    'color',
-    'rotation',
-  ],
-  [PdfAnnotationSubtype.LINE]: [
+  // Shapes
+  circle: ['color', 'opacity', 'strokeColor', 'strokeStyle', 'strokeWidth', 'rotation'],
+  square: ['color', 'opacity', 'strokeColor', 'strokeStyle', 'strokeWidth', 'rotation'],
+  polygon: ['strokeColor', 'opacity', 'strokeStyle', 'strokeWidth', 'color', 'rotation'],
+  line: [
     'strokeColor',
     'opacity',
     'strokeStyle',
@@ -183,7 +168,16 @@ export const ANNOTATION_PROPERTIES: Partial<Record<PdfAnnotationSubtype, string[
     'color',
     'rotation',
   ],
-  [PdfAnnotationSubtype.POLYLINE]: [
+  lineArrow: [
+    'strokeColor',
+    'opacity',
+    'strokeStyle',
+    'strokeWidth',
+    'lineEndings',
+    'color',
+    'rotation',
+  ],
+  polyline: [
     'strokeColor',
     'opacity',
     'strokeStyle',
@@ -193,17 +187,11 @@ export const ANNOTATION_PROPERTIES: Partial<Record<PdfAnnotationSubtype, string[
     'rotation',
   ],
 
-  // Text markup uses strokeColor (was: color) - the color of the markup stroke
-  [PdfAnnotationSubtype.HIGHLIGHT]: ['strokeColor', 'opacity', 'blendMode'],
-  [PdfAnnotationSubtype.UNDERLINE]: ['strokeColor', 'opacity', 'blendMode'],
-  [PdfAnnotationSubtype.STRIKEOUT]: ['strokeColor', 'opacity', 'blendMode'],
-  [PdfAnnotationSubtype.SQUIGGLY]: ['strokeColor', 'opacity', 'blendMode'],
-
-  // Stamp
-  [PdfAnnotationSubtype.STAMP]: ['rotation'],
-
-  // FreeText: color for fill (was: backgroundColor), plus font properties
-  [PdfAnnotationSubtype.FREETEXT]: [
+  // Text annotations
+  textComment: ['strokeColor', 'opacity'],
+  insertText: ['strokeColor', 'opacity'],
+  replaceText: ['strokeColor', 'opacity'],
+  freeText: [
     'fontFamily',
     'fontSize',
     'fontColor',
@@ -213,41 +201,36 @@ export const ANNOTATION_PROPERTIES: Partial<Record<PdfAnnotationSubtype, string[
     'color',
     'rotation',
   ],
-  [PdfAnnotationSubtype.CARET]: ['strokeColor', 'opacity'],
 
-  [PdfAnnotationSubtype.REDACT]: [
-    'strokeColor',
-    'color',
-    'opacity',
-    //'overlayText',
-    //'overlayTextRepeat',
-    //'fontFamily',
-    //'fontSize',
-    //'fontColor',
-    //'textAlign',
-  ],
+  // Stamp
+  stamp: ['rotation'],
+
+  // Redact
+  redact: ['strokeColor', 'color', 'opacity'],
+
+  // Form widgets
+  formTextField: ['fontSize', 'fontColor', 'strokeColor', 'color', 'strokeWidth'],
 };
 
 /**
- * Computes the intersection of editable properties for the given annotation types.
- * Returns properties in the order they appear in the first type's property list.
+ * Computes the intersection of editable properties for the given tool IDs.
+ * Returns properties in the order they appear in the first tool's property list.
  *
- * @param types - Array of annotation subtypes to compute intersection for
- * @returns Array of property keys that are shared by ALL given types
+ * @param toolIds - Array of tool IDs to compute intersection for
+ * @returns Array of property keys that are shared by ALL given tools
  */
-export function getSharedProperties(types: PdfAnnotationSubtype[]): string[] {
-  if (types.length === 0) return [];
+export function getSharedProperties(toolIds: string[]): string[] {
+  if (toolIds.length === 0) return [];
 
-  const sets = types.map((t) => new Set(ANNOTATION_PROPERTIES[t] ?? []));
+  const unique = [...new Set(toolIds)];
+  const sets = unique.map((id) => new Set(TOOL_PROPERTIES[id] ?? []));
   const first = sets[0];
 
-  // Remove properties not present in all sets
   for (let i = 1; i < sets.length; i++) {
     for (const p of first) {
       if (!sets[i].has(p)) first.delete(p);
     }
   }
 
-  // Return in order of first type's properties
-  return (ANNOTATION_PROPERTIES[types[0]] ?? []).filter((p) => first.has(p));
+  return (TOOL_PROPERTIES[unique[0]] ?? []).filter((p) => first.has(p));
 }

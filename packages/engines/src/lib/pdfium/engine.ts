@@ -2956,17 +2956,23 @@ export class PdfiumNative implements IPdfiumExecutor {
       return false;
     }
 
-    // 2. BS (border style / width) -- default to solid 1pt
-    if (!this.setBorderStyle(annotationPtr, PdfAnnotationBorderStyle.SOLID, 1)) {
+    // 2. BS (border style / width)
+    if (
+      !this.setBorderStyle(
+        annotationPtr,
+        PdfAnnotationBorderStyle.SOLID,
+        annotation.strokeWidth ?? 1,
+      )
+    ) {
       return false;
     }
 
     // 3. MK colors (border / background)
-    if (annotation.borderColor) {
-      this.setMKColor(annotationPtr, 0, annotation.borderColor); // EPDF_MK_COLOR_BC
+    if (annotation.strokeColor) {
+      this.setMKColor(annotationPtr, 0, annotation.strokeColor); // EPDF_MK_COLOR_BC
     }
-    if (annotation.backgroundColor) {
-      this.setMKColor(annotationPtr, 1, annotation.backgroundColor); // EPDF_MK_COLOR_BG
+    if (annotation.color) {
+      this.setMKColor(annotationPtr, 1, annotation.color); // EPDF_MK_COLOR_BG
     }
 
     // 4. Form field flags
@@ -6603,8 +6609,11 @@ export class PdfiumNative implements IPdfiumExecutor {
     const field = this.readPdfWidgetAnnoField(formHandle, annotationPtr);
 
     // MK dictionary colors
-    const borderColor = this.getMKColor(annotationPtr, 0); // EPDF_MK_COLOR_BC
-    const backgroundColor = this.getMKColor(annotationPtr, 1); // EPDF_MK_COLOR_BG
+    const strokeColor = this.getMKColor(annotationPtr, 0); // EPDF_MK_COLOR_BC
+    const color = this.getMKColor(annotationPtr, 1); // EPDF_MK_COLOR_BG
+
+    // Border width
+    const { width: strokeWidth } = this.getBorderStyle(annotationPtr);
 
     return {
       pageIndex: page.index,
@@ -6615,8 +6624,9 @@ export class PdfiumNative implements IPdfiumExecutor {
       fontColor: da?.fontColor ?? '#000000',
       rect,
       field,
-      ...(borderColor !== undefined && { borderColor }),
-      ...(backgroundColor !== undefined && { backgroundColor }),
+      strokeWidth,
+      ...(strokeColor !== undefined && { strokeColor }),
+      ...(color !== undefined && { color }),
       ...this.readBaseAnnotationProperties(doc, page, annotationPtr),
     };
   }

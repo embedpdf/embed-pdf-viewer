@@ -91,6 +91,7 @@ import { FormRadioIcon } from './form-radio';
 import { FormSelectIcon } from './form-select';
 import { FormListboxIcon } from './form-listbox';
 import { FormTextfieldIcon } from './form-textfield';
+import { WidgetEditIcon } from './widget-edit';
 
 export type Icons = {
   [key: string]: IconComponent;
@@ -189,4 +190,5 @@ export const icons: Icons = {
   formSelect: FormSelectIcon,
   formListbox: FormListboxIcon,
   formTextfield: FormTextfieldIcon,
+  widgetEdit: WidgetEditIcon,
 };

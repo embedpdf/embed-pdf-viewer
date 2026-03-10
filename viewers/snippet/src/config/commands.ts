@@ -1869,11 +1869,42 @@ export const commands: Record<string, Command<State>> = {
       if (!selected) return true;
       return (
         selected.object.type !== PdfAnnotationSubtype.LINK &&
-        selected.object.type !== PdfAnnotationSubtype.REDACT
+        selected.object.type !== PdfAnnotationSubtype.REDACT &&
+        selected.object.type !== PdfAnnotationSubtype.WIDGET
       );
     },
     disabled: ({ state, documentId }) => {
       return lacksPermission(state, documentId, PdfPermissionFlag.ModifyAnnotations);
+    },
+  },
+
+  'annotation:toggle-widget-edit': {
+    id: 'annotation:toggle-widget-edit',
+    labelKey: 'annotation.widgetEdit',
+    icon: 'widgetEdit',
+    categories: ['annotation', 'annotation-widget-edit'],
+    action: ({ registry, documentId }) => {
+      const annotation = registry.getPlugin<AnnotationPlugin>(ANNOTATION_PLUGIN_ID)?.provides();
+      const ui = registry.getPlugin<UIPlugin>('ui')?.provides();
+      if (!annotation || !ui) return;
+
+      const scope = annotation.forDocument(documentId);
+      const selected = scope.getSelectedAnnotation();
+      if (!selected) return;
+
+      ui.forDocument(documentId).toggleSidebar('right', 'main', 'widget-edit-panel');
+    },
+    active: ({ state, documentId }) => {
+      return isSidebarOpen(state.plugins, documentId, 'right', 'main', 'widget-edit-panel');
+    },
+    visible: ({ registry, documentId }) => {
+      const scope = registry
+        .getPlugin<AnnotationPlugin>(ANNOTATION_PLUGIN_ID)
+        ?.provides()
+        .forDocument(documentId);
+      const selected = scope?.getSelectedAnnotation();
+      if (!selected) return true;
+      return selected.object.type === PdfAnnotationSubtype.WIDGET;
     },
   },
 
@@ -1902,7 +1933,10 @@ export const commands: Record<string, Command<State>> = {
         .forDocument(documentId);
       const selected = scope?.getSelectedAnnotation();
       if (!selected) return true;
-      return selected.object.type !== PdfAnnotationSubtype.LINK;
+      return (
+        selected.object.type !== PdfAnnotationSubtype.LINK &&
+        selected.object.type !== PdfAnnotationSubtype.WIDGET
+      );
     },
   },
 

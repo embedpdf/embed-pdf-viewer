@@ -25,6 +25,7 @@ const textMarkupTools = [
   {
     id: 'highlight' as const,
     name: 'Highlight',
+    labelKey: 'annotation.highlight',
     matchScore: (a) => (a.type === PdfAnnotationSubtype.HIGHLIGHT ? 1 : 0),
     interaction: {
       exclusive: false,
@@ -47,6 +48,7 @@ const textMarkupTools = [
   {
     id: 'underline' as const,
     name: 'Underline',
+    labelKey: 'annotation.underline',
     matchScore: (a) => (a.type === PdfAnnotationSubtype.UNDERLINE ? 1 : 0),
     interaction: {
       exclusive: false,
@@ -67,6 +69,7 @@ const textMarkupTools = [
   {
     id: 'strikeout' as const,
     name: 'Strikeout',
+    labelKey: 'annotation.strikeout',
     matchScore: (a) => (a.type === PdfAnnotationSubtype.STRIKEOUT ? 1 : 0),
     interaction: {
       exclusive: false,
@@ -87,6 +90,7 @@ const textMarkupTools = [
   {
     id: 'squiggly' as const,
     name: 'Squiggly',
+    labelKey: 'annotation.squiggly',
     matchScore: (a) => (a.type === PdfAnnotationSubtype.SQUIGGLY ? 1 : 0),
     interaction: {
       exclusive: false,
@@ -110,6 +114,7 @@ const insertTextTools = [
   {
     id: 'insertText' as const,
     name: 'Insert Text',
+    labelKey: 'annotation.insertText',
     matchScore: (a) => {
       if (a.type !== PdfAnnotationSubtype.CARET) return 0;
       return a.intent?.includes('Insert') ? 2 : 1;
@@ -138,6 +143,7 @@ const replaceTextTools = [
   {
     id: 'replaceText' as const,
     name: 'Replace Text',
+    labelKey: 'annotation.replaceText',
     matchScore: (a) => {
       if (a.type === PdfAnnotationSubtype.STRIKEOUT && a.intent?.includes('StrikeOutTextEdit'))
         return 2;
@@ -167,6 +173,7 @@ const inkTools = [
   {
     id: 'ink' as const,
     name: 'Pen',
+    labelKey: 'annotation.ink',
     matchScore: (a) => (a.type === PdfAnnotationSubtype.INK && a.intent !== 'InkHighlight' ? 5 : 0),
     interaction: {
       exclusive: false,
@@ -190,6 +197,7 @@ const inkTools = [
   {
     id: 'inkHighlighter' as const,
     name: 'Ink Highlighter',
+    labelKey: 'annotation.inkHighlighter',
     matchScore: (a) =>
       a.type === PdfAnnotationSubtype.INK && a.intent === 'InkHighlight' ? 10 : 0,
     interaction: {
@@ -226,6 +234,7 @@ const circleTools = [
   {
     id: 'circle' as const,
     name: 'Circle',
+    labelKey: 'annotation.circle',
     matchScore: (a) => (a.type === PdfAnnotationSubtype.CIRCLE ? 1 : 0),
     interaction: {
       exclusive: false,
@@ -259,6 +268,7 @@ const squareTools = [
   {
     id: 'square' as const,
     name: 'Square',
+    labelKey: 'annotation.square',
     matchScore: (a) => (a.type === PdfAnnotationSubtype.SQUARE ? 1 : 0),
     interaction: {
       exclusive: false,
@@ -292,6 +302,7 @@ const lineTools = [
   {
     id: 'line' as const,
     name: 'Line',
+    labelKey: 'annotation.line',
     matchScore: (a) => (a.type === PdfAnnotationSubtype.LINE && a.intent !== 'LineArrow' ? 5 : 0),
     interaction: {
       exclusive: false,
@@ -323,6 +334,7 @@ const lineTools = [
   {
     id: 'lineArrow' as const,
     name: 'Arrow',
+    labelKey: 'annotation.arrow',
     matchScore: (a) => (a.type === PdfAnnotationSubtype.LINE && a.intent === 'LineArrow' ? 10 : 0),
     interaction: {
       exclusive: false,
@@ -362,6 +374,7 @@ const polylineTools = [
   {
     id: 'polyline' as const,
     name: 'Polyline',
+    labelKey: 'annotation.polyline',
     matchScore: (a) => (a.type === PdfAnnotationSubtype.POLYLINE ? 1 : 0),
     interaction: {
       exclusive: false,
@@ -391,6 +404,7 @@ const polygonTools = [
   {
     id: 'polygon' as const,
     name: 'Polygon',
+    labelKey: 'annotation.polygon',
     matchScore: (a) => (a.type === PdfAnnotationSubtype.POLYGON ? 1 : 0),
     interaction: {
       exclusive: false,
@@ -420,6 +434,7 @@ const textCommentTools = [
   {
     id: 'textComment' as const,
     name: 'Comment',
+    labelKey: 'annotation.text',
     matchScore: (a) => (a.type === PdfAnnotationSubtype.TEXT && !a.inReplyToId ? 1 : 0),
     interaction: {
       exclusive: false,
@@ -443,6 +458,7 @@ const freeTextTools = [
   {
     id: 'freeText' as const,
     name: 'Free Text',
+    labelKey: 'annotation.freeText',
     matchScore: (a) => (a.type === PdfAnnotationSubtype.FREETEXT ? 1 : 0),
     interaction: {
       exclusive: false,
@@ -484,6 +500,7 @@ const stampTools = [
   {
     id: 'stamp' as const,
     name: 'Image',
+    labelKey: 'annotation.stamp',
     matchScore: (a) => (a.type === PdfAnnotationSubtype.STAMP ? 1 : 0),
     interaction: {
       exclusive: false,

@@ -1595,11 +1595,15 @@ export interface PdfWidgetAnnoObject extends PdfAnnotationObjectBase {
   /**
    * MK border color (BC) as web hex string, e.g. '#FF0000'
    */
-  borderColor?: string;
+  strokeColor?: string;
   /**
    * MK background color (BG) as web hex string, e.g. '#FFFFFF'
    */
-  backgroundColor?: string;
+  color?: string;
+  /**
+   * Border width in points (BS width)
+   */
+  strokeWidth?: number;
 }
 
 /**

@@ -167,6 +167,9 @@ export type AnnotationTool<
   /** A user-facing name for UI elements, e.g., 'Pen' */
   name: string;
 
+  /** Translation key for the tool label, e.g., 'annotation.ink'. Used by the UI for i18n. */
+  labelKey?: string;
+
   /**
    * Determines how well this tool matches an existing annotation.
    * Higher numbers indicate a more specific match.

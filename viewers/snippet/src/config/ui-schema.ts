@@ -689,6 +689,18 @@ export const viewerUISchema: UISchema = {
             },
             {
               type: 'command-button',
+              id: 'toggle-annotation-style',
+              commandId: 'panel:toggle-annotation-style',
+              variant: 'icon',
+              categories: ['panel', 'panel-annotation-style'],
+            },
+            {
+              type: 'divider',
+              id: 'form-tools-divider-2',
+              orientation: 'vertical',
+            },
+            {
+              type: 'command-button',
               id: 'undo-button',
               commandId: 'history:undo',
               variant: 'icon',
@@ -1381,6 +1393,22 @@ export const viewerUISchema: UISchema = {
       defaultOpen: false,
     },
 
+    'widget-edit-panel': {
+      id: 'widget-edit-panel',
+      position: {
+        placement: 'right',
+        slot: 'main',
+        order: 0,
+      },
+      content: {
+        type: 'component',
+        componentId: 'widget-edit-sidebar',
+      },
+      width: '250px',
+      collapsible: true,
+      defaultOpen: false,
+    },
+
     'comment-panel': {
       id: 'comment-panel',
       position: {
@@ -1517,6 +1545,13 @@ export const viewerUISchema: UISchema = {
           commandId: 'annotation:toggle-link',
           variant: 'icon',
           categories: ['annotation', 'annotation-link'],
+        },
+        {
+          type: 'command-button',
+          id: 'toggle-annotation-widget-edit',
+          commandId: 'annotation:toggle-widget-edit',
+          variant: 'icon',
+          categories: ['annotation', 'annotation-widget-edit'],
         },
         {
           type: 'command-button',

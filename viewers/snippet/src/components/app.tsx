@@ -117,6 +117,7 @@ import { CommentSidebar } from '@/components/comment-sidebar';
 import { CustomZoomToolbar } from '@/components/custom-zoom-toolbar';
 import { AnnotationSidebar } from '@/components/annotation-sidebar';
 import { RedactionSidebar } from '@/components/redaction-sidebar';
+import { WidgetEditSidebar } from '@/components/widget-edit-sidebar';
 import { SchemaSelectionMenu } from '@/ui/schema-selection-menu';
 import { SchemaOverlay } from '@/ui/schema-overlay';
 import { PrintModal } from '@/components/print-modal';
@@ -490,6 +491,7 @@ export function PDFViewer({ config, onRegistryReady }: PDFViewerProps) {
       'search-sidebar': SearchSidebar,
       'outline-sidebar': OutlineSidebar,
       'comment-sidebar': CommentSidebar,
+      'widget-edit-sidebar': WidgetEditSidebar,
       'print-modal': PrintModal,
       'link-modal': LinkModal,
       'protect-modal': ProtectModal,

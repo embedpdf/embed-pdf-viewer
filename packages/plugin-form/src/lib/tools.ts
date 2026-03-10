@@ -12,6 +12,7 @@ import { textFieldHandlerFactory } from './handlers';
 export const formTextFieldTool = defineAnnotationTool({
   id: 'formTextField' as const,
   name: 'Text Field',
+  labelKey: 'form.textfield',
   matchScore: (a: PdfAnnotationObject) => {
     if (a.type !== PdfAnnotationSubtype.WIDGET) return 0;
     const widget = a;
@@ -32,8 +33,9 @@ export const formTextFieldTool = defineAnnotationTool({
     fontFamily: PdfStandardFont.Helvetica,
     fontSize: 12,
     fontColor: '#000000',
-    borderColor: '#000000',
-    backgroundColor: '#FFFFFF',
+    strokeColor: '#000000',
+    color: '#FFFFFF',
+    strokeWidth: 1,
     field: {
       flag: PDF_FORM_FIELD_FLAG.NONE,
       name: 'TextField',

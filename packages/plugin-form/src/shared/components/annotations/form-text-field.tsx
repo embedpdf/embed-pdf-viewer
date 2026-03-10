@@ -37,12 +37,10 @@ export function FormTextField({
       style={{
         position: 'absolute',
         inset: 0,
-        background:
-          isHovered || isSelected ? 'rgba(66, 133, 244, 0.08)' : 'rgba(255, 255, 255, 0.9)',
-        border:
-          isHovered || isSelected
-            ? '1px solid rgba(66, 133, 244, 0.5)'
-            : '1px solid rgba(0, 0, 0, 0.2)',
+        background: object.color ?? 'rgba(255, 255, 255, 0.9)',
+        border: `${(object.strokeWidth ?? 1) * scale}px solid ${object.strokeColor ?? 'rgba(0, 0, 0, 0.2)'}`,
+        outline: isHovered || isSelected ? '1px solid rgba(66, 133, 244, 0.5)' : 'none',
+        outlineOffset: -1,
         boxSizing: 'border-box',
         pointerEvents: 'auto',
         cursor: isSelected ? 'move' : 'pointer',
