@@ -19,7 +19,7 @@
       :width="width"
       :height="height"
       fill="transparent"
-      @pointerdown="hasIRT ? undefined : onClick"
+      @pointerdown="hasIRT ? undefined : onClick?.($event)"
       :style="{
         cursor: hitAreaCursor,
         pointerEvents: hitAreaPointerEvents,
