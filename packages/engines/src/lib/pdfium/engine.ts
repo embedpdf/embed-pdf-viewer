@@ -353,17 +353,14 @@ export class PdfiumNative implements IPdfiumExecutor {
     const pages: PdfPageObject[] = [];
     const sizePtr = this.memoryManager.malloc(8);
     for (let index = 0; index < pageCount; index++) {
-      // Use normalized size function when normalizeRotation is enabled
-      const result = normalizeRotation
-        ? this.pdfiumModule.EPDF_GetPageSizeByIndexNormalized(docPtr, index, sizePtr)
-        : this.pdfiumModule.FPDF_GetPageSizeByIndexF(docPtr, index, sizePtr);
+      const result = this.pdfiumModule.FPDF_GetPageSizeByIndexF(docPtr, index, sizePtr);
 
       if (!result) {
         const lastError = this.pdfiumModule.FPDF_GetLastError();
         this.logger.error(
           LOG_SOURCE,
           LOG_CATEGORY,
-          `${normalizeRotation ? 'EPDF_GetPageSizeByIndexNormalized' : 'FPDF_GetPageSizeByIndexF'} failed with ${lastError}`,
+          `FPDF_GetPageSizeByIndexF failed with ${lastError}`,
         );
         this.memoryManager.free(sizePtr);
         this.pdfiumModule.FPDF_CloseDocument(docPtr);
@@ -371,18 +368,24 @@ export class PdfiumNative implements IPdfiumExecutor {
         this.logger.perf(LOG_SOURCE, LOG_CATEGORY, `OpenDocumentBuffer`, 'End', file.id);
         return PdfTaskHelper.reject<PdfDocumentObject>({
           code: lastError,
-          message: `${normalizeRotation ? 'EPDF_GetPageSizeByIndexNormalized' : 'FPDF_GetPageSizeByIndexF'} failed`,
+          message: `FPDF_GetPageSizeByIndexF failed`,
         });
       }
 
       const rotation = this.pdfiumModule.EPDF_GetPageRotationByIndex(docPtr, index) as Rotation;
 
+      // FPDF_GetPageSizeByIndexF returns rotation-applied size.
+      // When normalizeRotation is enabled, we need the raw (unrotated) size
+      // to match the coordinate space used by EPDF_LoadPageNormalized.
+      let width = this.pdfiumModule.pdfium.getValue(sizePtr, 'float');
+      let height = this.pdfiumModule.pdfium.getValue(sizePtr + 4, 'float');
+      if (normalizeRotation && (rotation & 1) === 1) {
+        [width, height] = [height, width];
+      }
+
       const page = {
         index,
-        size: {
-          width: this.pdfiumModule.pdfium.getValue(sizePtr, 'float'),
-          height: this.pdfiumModule.pdfium.getValue(sizePtr + 4, 'float'),
-        },
+        size: { width, height },
         rotation,
       };
 
