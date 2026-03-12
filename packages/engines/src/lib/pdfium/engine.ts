@@ -1140,6 +1140,9 @@ export class PdfiumNative implements IPdfiumExecutor {
           case PDF_FORM_FIELD_TYPE.TEXTFIELD:
             isSucceed = this.addTextFieldContent(pageCtx, annotationPtr, widget);
             break;
+          case PDF_FORM_FIELD_TYPE.CHECKBOX:
+            isSucceed = this.addCheckboxContent(pageCtx, annotationPtr, widget);
+            break;
         }
         break;
       }
@@ -1398,6 +1401,20 @@ export class PdfiumNative implements IPdfiumExecutor {
         break;
       }
 
+      /* ── Widget (form field) ─────────────────────────────────────────────── */
+      case PdfAnnotationSubtype.WIDGET: {
+        const widget = saveAnnotation as PdfWidgetAnnoObject;
+        switch (widget.field.type) {
+          case PDF_FORM_FIELD_TYPE.TEXTFIELD:
+            ok = this.addTextFieldContent(pageCtx, annotPtr, widget);
+            break;
+          case PDF_FORM_FIELD_TYPE.CHECKBOX:
+            ok = this.addCheckboxContent(pageCtx, annotPtr, widget);
+            break;
+        }
+        break;
+      }
+
       /* ── Unsupported edits – fall through to error ───────────────────────── */
       default:
         ok = false;
@@ -1405,7 +1422,9 @@ export class PdfiumNative implements IPdfiumExecutor {
 
     /* 4 ── regenerate appearance if payload was changed ───────────────────── */
     if (ok && options?.regenerateAppearance !== false) {
-      if (annotation.blendMode !== undefined) {
+      if (annotation.type === PdfAnnotationSubtype.WIDGET) {
+        this.pdfiumModule.EPDFAnnot_GenerateFormFieldAP(annotPtr);
+      } else if (annotation.blendMode !== undefined) {
         this.pdfiumModule.EPDFAnnot_GenerateAppearanceWithBlend(annotPtr, annotation.blendMode);
       } else {
         this.pdfiumModule.EPDFAnnot_GenerateAppearance(annotPtr);
@@ -2001,6 +2020,7 @@ export class PdfiumNative implements IPdfiumExecutor {
     }
 
     this.pdfiumModule.FORM_ForceToKillFocus(formHandle);
+    this.pdfiumModule.EPDFAnnot_GenerateFormFieldAP(annotationPtr);
 
     this.pdfiumModule.FPDFPage_CloseAnnot(annotationPtr);
     this.pdfiumModule.FORM_OnBeforeClosePage(pageCtx.pagePtr, formHandle);
@@ -2216,6 +2236,7 @@ export class PdfiumNative implements IPdfiumExecutor {
     }
 
     this.pdfiumModule.FORM_ForceToKillFocus(formHandle);
+    this.pdfiumModule.EPDFAnnot_GenerateFormFieldAP(annotationPtr);
     this.pdfiumModule.FPDFPage_CloseAnnot(annotationPtr);
     this.pdfiumModule.FORM_OnBeforeClosePage(pageCtx.pagePtr, formHandle);
     pageCtx.release();
@@ -2970,15 +2991,74 @@ export class PdfiumNative implements IPdfiumExecutor {
     // 3. MK colors (border / background)
     if (annotation.strokeColor) {
       this.setMKColor(annotationPtr, 0, annotation.strokeColor); // EPDF_MK_COLOR_BC
+    } else {
+      this.clearMKColor(annotationPtr, 0);
     }
     if (annotation.color) {
       this.setMKColor(annotationPtr, 1, annotation.color); // EPDF_MK_COLOR_BG
+    } else {
+      this.clearMKColor(annotationPtr, 1);
     }
 
     // 4. Form field flags
     const formHandle = pageCtx.getFormHandle();
     const userFlags = annotation.field.flag ?? PDF_FORM_FIELD_FLAG.NONE;
     this.pdfiumModule.FPDFAnnot_SetFormFieldFlags(formHandle, annotationPtr, userFlags);
+
+    // 5. Field name
+    if (annotation.field.name) {
+      this.withWString(annotation.field.name, (namePtr) =>
+        this.pdfiumModule.EPDFAnnot_SetFormFieldName(formHandle, annotationPtr, namePtr),
+      );
+    }
+
+    // 6. Field value
+    this.withWString(annotation.field.value ?? '', (valuePtr) =>
+      this.pdfiumModule.EPDFAnnot_SetFormFieldValue(formHandle, annotationPtr, valuePtr),
+    );
+
+    return true;
+  }
+
+  private addCheckboxContent(
+    pageCtx: PageContext,
+    annotationPtr: number,
+    annotation: PdfWidgetAnnoObject,
+  ): boolean {
+    // 1. BS (border style / width)
+    if (
+      !this.setBorderStyle(
+        annotationPtr,
+        PdfAnnotationBorderStyle.SOLID,
+        annotation.strokeWidth ?? 1,
+      )
+    ) {
+      return false;
+    }
+
+    // 2. MK colors (border / background)
+    if (annotation.strokeColor) {
+      this.setMKColor(annotationPtr, 0, annotation.strokeColor);
+    } else {
+      this.clearMKColor(annotationPtr, 0);
+    }
+    if (annotation.color) {
+      this.setMKColor(annotationPtr, 1, annotation.color);
+    } else {
+      this.clearMKColor(annotationPtr, 1);
+    }
+
+    // 3. Form field flags
+    const formHandle = pageCtx.getFormHandle();
+    const userFlags = annotation.field.flag ?? PDF_FORM_FIELD_FLAG.NONE;
+    this.pdfiumModule.FPDFAnnot_SetFormFieldFlags(formHandle, annotationPtr, userFlags);
+
+    // 4. Field name
+    if (annotation.field.name) {
+      this.withWString(annotation.field.name, (namePtr) =>
+        this.pdfiumModule.EPDFAnnot_SetFormFieldName(formHandle, annotationPtr, namePtr),
+      );
+    }
 
     return true;
   }
@@ -2992,6 +3072,10 @@ export class PdfiumNative implements IPdfiumExecutor {
       green & 0xff,
       blue & 0xff,
     );
+  }
+
+  private clearMKColor(annotationPtr: number, mkType: number): boolean {
+    return this.pdfiumModule.EPDFAnnot_ClearMKColor(annotationPtr, mkType);
   }
 
   private getMKColor(annotationPtr: number, mkType: number): string | undefined {

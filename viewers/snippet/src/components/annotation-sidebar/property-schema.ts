@@ -210,6 +210,7 @@ export const TOOL_PROPERTIES: Record<string, string[]> = {
 
   // Form widgets
   formTextField: ['fontSize', 'fontColor', 'strokeColor', 'color', 'strokeWidth'],
+  formCheckbox: ['strokeColor', 'color', 'strokeWidth'],
 };
 
 /**

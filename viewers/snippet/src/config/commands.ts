@@ -889,7 +889,21 @@ export const commands: Record<string, Command<State>> = {
     labelKey: 'form.checkbox',
     icon: 'formCheckbox',
     categories: ['form', 'form-checkbox'],
-    action: () => {},
+    action: ({ registry, documentId }) => {
+      const annotation = registry.getPlugin<AnnotationPlugin>(ANNOTATION_PLUGIN_ID)?.provides();
+      const annotationScope = annotation?.forDocument(documentId);
+      if (!annotationScope) return;
+
+      if (annotationScope.getActiveTool()?.id === 'formCheckbox') {
+        annotationScope.setActiveTool(null);
+      } else {
+        annotationScope.setActiveTool('formCheckbox');
+      }
+    },
+    active: ({ state, documentId }) => {
+      const annotation = state.plugins[ANNOTATION_PLUGIN_ID]?.documents[documentId];
+      return annotation?.activeToolId === 'formCheckbox';
+    },
   },
 
   'form:add-radio': {
