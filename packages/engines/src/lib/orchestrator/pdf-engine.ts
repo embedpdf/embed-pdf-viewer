@@ -12,6 +12,7 @@ import {
   PdfOpenDocumentUrlOptions,
   PdfOpenDocumentBufferOptions,
   PdfMetadataObject,
+  PdfObjectSpec,
   PdfBookmarksObject,
   PdfBookmarkObject,
   PdfRenderPageOptions,
@@ -217,6 +218,37 @@ export class PdfEngine<T = Blob> implements IPdfEngine<T> {
       {
         execute: () => this.executor.setMetadata(doc, metadata),
         meta: { docId: doc.id, operation: 'setMetadata' },
+      },
+      { priority: Priority.MEDIUM },
+    );
+  }
+
+  setPageDictValue(
+    doc: PdfDocumentObject,
+    page: PdfPageObject,
+    key: string,
+    value: PdfObjectSpec,
+  ): PdfTask<boolean> {
+    return this.workerQueue.enqueue(
+      {
+        execute: () => this.executor.setPageDictValue(doc, page, key, value),
+        meta: { docId: doc.id, pageIndex: page.index, operation: 'setPageDictValue' },
+      },
+      { priority: Priority.MEDIUM },
+    );
+  }
+
+  setAnnotationDictValue(
+    doc: PdfDocumentObject,
+    page: PdfPageObject,
+    annotationId: string,
+    key: string,
+    value: PdfObjectSpec,
+  ): PdfTask<boolean> {
+    return this.workerQueue.enqueue(
+      {
+        execute: () => this.executor.setAnnotationDictValue(doc, page, annotationId, key, value),
+        meta: { docId: doc.id, pageIndex: page.index, operation: 'setAnnotationDictValue' },
       },
       { priority: Priority.MEDIUM },
     );
