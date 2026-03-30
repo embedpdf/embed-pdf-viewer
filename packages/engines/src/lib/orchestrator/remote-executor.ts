@@ -9,6 +9,7 @@ import {
   PdfFile,
   PdfOpenDocumentBufferOptions,
   PdfMetadataObject,
+  PdfObjectSpec,
   PdfBookmarksObject,
   PdfBookmarkObject,
   PdfRenderPageOptions,
@@ -75,6 +76,8 @@ type MessageType =
   | 'openDocumentBuffer'
   | 'getMetadata'
   | 'setMetadata'
+  | 'setPageDictValue'
+  | 'setAnnotationDictValue'
   | 'getDocPermissions'
   | 'getDocUserPermissions'
   | 'getSignatures'
@@ -303,6 +306,25 @@ export class RemoteExecutor implements IPdfiumExecutor {
 
   setMetadata(doc: PdfDocumentObject, metadata: Partial<PdfMetadataObject>): PdfTask<boolean> {
     return this.send<boolean>('setMetadata', [doc, metadata]);
+  }
+
+  setPageDictValue(
+    doc: PdfDocumentObject,
+    page: PdfPageObject,
+    key: string,
+    value: PdfObjectSpec,
+  ): PdfTask<boolean> {
+    return this.send<boolean>('setPageDictValue', [doc, page, key, value]);
+  }
+
+  setAnnotationDictValue(
+    doc: PdfDocumentObject,
+    page: PdfPageObject,
+    annotationId: string,
+    key: string,
+    value: PdfObjectSpec,
+  ): PdfTask<boolean> {
+    return this.send<boolean>('setAnnotationDictValue', [doc, page, annotationId, key, value]);
   }
 
   getDocPermissions(doc: PdfDocumentObject): PdfTask<number> {

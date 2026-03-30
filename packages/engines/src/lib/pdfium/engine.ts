@@ -132,8 +132,17 @@ import {
   PdfPageTextRuns,
   PdfAlphaColor,
   PdfBlendMode,
+  PdfObjectSpec,
 } from '@embedpdf/models';
-import { computeFormDrawParams, isValidCustomKey, readArrayBuffer, readString } from './helper';
+import {
+  computeFormDrawParams,
+  isValidCustomKey,
+  isValidPdfDictKey,
+  readArrayBuffer,
+  readString,
+  serializePdfObjectSpec,
+  shouldRegenerateAnnotationAppearanceForKey,
+} from './helper';
 import { WrappedPdfiumModule } from '@embedpdf/pdfium';
 import { DocumentContext, PageContext, PdfCache } from './cache';
 import { MemoryManager } from './core/memory-manager';
@@ -537,6 +546,131 @@ export class PdfiumNative implements IPdfiumExecutor {
       : PdfTaskHelper.reject({
           code: PdfErrorCode.Unknown,
           message: 'one or more metadata fields could not be written',
+        });
+  }
+
+  setPageDictValue(
+    doc: PdfDocumentObject,
+    page: PdfPageObject,
+    key: string,
+    value: PdfObjectSpec,
+  ): PdfTask<boolean> {
+    this.logger.debug(LOG_SOURCE, LOG_CATEGORY, 'setPageDictValue', doc, page, key, value);
+
+    const ctx = this.cache.getContext(doc.id);
+    if (!ctx) {
+      return PdfTaskHelper.reject({
+        code: PdfErrorCode.DocNotOpen,
+        message: 'document does not open',
+      });
+    }
+
+    if (!isValidPdfDictKey(key)) {
+      return PdfTaskHelper.reject({
+        code: PdfErrorCode.Unknown,
+        message: `invalid page dictionary key: ${key}`,
+      });
+    }
+
+    let serialized: string;
+    try {
+      serialized = serializePdfObjectSpec(value);
+    } catch (error) {
+      return PdfTaskHelper.reject({
+        code: PdfErrorCode.Unknown,
+        message: String(error),
+      });
+    }
+
+    const ok = ctx.borrowPage(page.index, (pageCtx) => {
+      return !!this.pdfiumModule.EPDFPage_SetDictValue(pageCtx.pagePtr, key, serialized);
+    });
+
+    return ok
+      ? PdfTaskHelper.resolve(true)
+      : PdfTaskHelper.reject({
+          code: PdfErrorCode.Unknown,
+          message: `failed to set page dictionary key ${key}`,
+        });
+  }
+
+  setAnnotationDictValue(
+    doc: PdfDocumentObject,
+    page: PdfPageObject,
+    annotationId: string,
+    key: string,
+    value: PdfObjectSpec,
+  ): PdfTask<boolean> {
+    this.logger.debug(
+      LOG_SOURCE,
+      LOG_CATEGORY,
+      'setAnnotationDictValue',
+      doc,
+      page,
+      annotationId,
+      key,
+      value,
+    );
+
+    const ctx = this.cache.getContext(doc.id);
+    if (!ctx) {
+      return PdfTaskHelper.reject({
+        code: PdfErrorCode.DocNotOpen,
+        message: 'document does not open',
+      });
+    }
+
+    if (!isValidPdfDictKey(key)) {
+      return PdfTaskHelper.reject({
+        code: PdfErrorCode.Unknown,
+        message: `invalid annotation dictionary key: ${key}`,
+      });
+    }
+
+    let serialized: string;
+    try {
+      serialized = serializePdfObjectSpec(value);
+    } catch (error) {
+      return PdfTaskHelper.reject({
+        code: PdfErrorCode.Unknown,
+        message: String(error),
+      });
+    }
+
+    const pageCtx = ctx.acquirePage(page.index);
+    const annotationPtr = this.getAnnotationByName(pageCtx.pagePtr, annotationId);
+    if (!annotationPtr) {
+      pageCtx.release();
+      return PdfTaskHelper.reject({
+        code: PdfErrorCode.NotFound,
+        message: 'annotation not found',
+      });
+    }
+
+    const ok = !!this.pdfiumModule.EPDFAnnot_SetDictValue(annotationPtr, key, serialized);
+    if (ok && shouldRegenerateAnnotationAppearanceForKey(key)) {
+      const subtype = this.pdfiumModule.FPDFAnnot_GetSubtype(annotationPtr);
+      if (subtype === PdfAnnotationSubtype.WIDGET) {
+        this.pdfiumModule.EPDFAnnot_GenerateFormFieldAP(annotationPtr);
+      } else {
+        const blendMode = this.pdfiumModule.EPDFAnnot_GetBlendMode(annotationPtr);
+        if (blendMode !== PdfBlendMode.Normal) {
+          this.pdfiumModule.EPDFAnnot_GenerateAppearanceWithBlend(annotationPtr, blendMode);
+        } else {
+          this.pdfiumModule.EPDFAnnot_GenerateAppearance(annotationPtr);
+        }
+      }
+      this.pdfiumModule.FPDFPage_GenerateContent(pageCtx.pagePtr);
+    }
+
+    this.pdfiumModule.FPDFPage_CloseAnnot(annotationPtr);
+    pageCtx.release();
+
+    return ok
+      ? PdfTaskHelper.resolve(true)
+      : PdfTaskHelper.reject({
+          code: PdfErrorCode.CantSetAnnotContent,
+          message: `failed to set annotation dictionary key ${key}`,
         });
   }
 

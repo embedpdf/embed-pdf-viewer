@@ -3,7 +3,7 @@
 
 export interface WasmExports {
   malloc: (size: number) => number;
-  free: (ptr: number) => void;
+  free:   (ptr:  number) => void;
 }
 
 /**
@@ -25,15 +25,15 @@ export interface PdfiumRuntimeMethods {
 }
 
 export const exportedRuntimeMethods = [
-  'wasmExports',
-  'UTF16ToString',
-  'UTF8ToString',
-  'addFunction',
-  'ccall',
-  'cwrap',
-  'getValue',
-  'removeFunction',
-  'setValue',
-  'stringToUTF16',
-  'stringToUTF8',
+  "wasmExports",
+  "UTF16ToString",
+  "UTF8ToString",
+  "addFunction",
+  "ccall",
+  "cwrap",
+  "getValue",
+  "removeFunction",
+  "setValue",
+  "stringToUTF16",
+  "stringToUTF8"
 ] as const;

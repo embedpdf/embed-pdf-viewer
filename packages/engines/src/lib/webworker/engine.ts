@@ -5,6 +5,7 @@ import {
   PdfDocumentJavaScriptActionObject,
   PdfFile,
   PdfMetadataObject,
+  PdfObjectSpec,
   PdfSignatureObject,
   PdfTextRectObject,
   PdfWidgetAnnoObject,
@@ -288,6 +289,54 @@ export class WebWorkerEngine implements PdfEngine {
     const task = new WorkerTask<boolean>(this.worker, requestId);
 
     const request: ExecuteRequest = createRequest(requestId, 'setMetadata', [doc, metadata]);
+    this.proxy(task, request);
+
+    return task;
+  }
+
+  setPageDictValue(
+    doc: PdfDocumentObject,
+    page: PdfPageObject,
+    key: string,
+    value: PdfObjectSpec,
+  ) {
+    this.logger.debug(LOG_SOURCE, LOG_CATEGORY, 'setPageDictValue', doc, page, key, value);
+    const requestId = this.generateRequestId(doc.id);
+    const task = new WorkerTask<boolean>(this.worker, requestId);
+
+    const request: ExecuteRequest = createRequest(requestId, 'setPageDictValue', [doc, page, key, value]);
+    this.proxy(task, request);
+
+    return task;
+  }
+
+  setAnnotationDictValue(
+    doc: PdfDocumentObject,
+    page: PdfPageObject,
+    annotationId: string,
+    key: string,
+    value: PdfObjectSpec,
+  ) {
+    this.logger.debug(
+      LOG_SOURCE,
+      LOG_CATEGORY,
+      'setAnnotationDictValue',
+      doc,
+      page,
+      annotationId,
+      key,
+      value,
+    );
+    const requestId = this.generateRequestId(doc.id);
+    const task = new WorkerTask<boolean>(this.worker, requestId);
+
+    const request: ExecuteRequest = createRequest(requestId, 'setAnnotationDictValue', [
+      doc,
+      page,
+      annotationId,
+      key,
+      value,
+    ]);
     this.proxy(task, request);
 
     return task;

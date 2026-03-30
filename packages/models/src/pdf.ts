@@ -129,6 +129,21 @@ export interface PdfMetadataObject {
 }
 
 /**
+ * Transport-safe recursive PDF object specification used by low-level
+ * dictionary writer APIs.
+ *
+ * @public
+ */
+export type PdfObjectSpec =
+  | { type: 'null' }
+  | { type: 'boolean'; value: boolean }
+  | { type: 'number'; value: number }
+  | { type: 'string'; value: string }
+  | { type: 'name'; value: string }
+  | { type: 'array'; value: PdfObjectSpec[] }
+  | { type: 'dict'; value: Record<string, PdfObjectSpec> };
+
+/**
  * Unicode **soft-hyphen** marker (`U+00AD`).
  * Often embedded by PDF generators as discretionary hyphens.
  *
@@ -3361,6 +3376,27 @@ export interface PdfEngine<T = Blob> {
    */
   setMetadata: (doc: PdfDocumentObject, metadata: Partial<PdfMetadataObject>) => PdfTask<boolean>;
   /**
+   * Set or delete a direct page-dictionary value.
+   * A top-level `{ type: 'null' }` deletes the target key.
+   */
+  setPageDictValue: (
+    doc: PdfDocumentObject,
+    page: PdfPageObject,
+    key: string,
+    value: PdfObjectSpec,
+  ) => PdfTask<boolean>;
+  /**
+   * Set or delete a direct annotation-dictionary value.
+   * A top-level `{ type: 'null' }` deletes the target key.
+   */
+  setAnnotationDictValue: (
+    doc: PdfDocumentObject,
+    page: PdfPageObject,
+    annotationId: string,
+    key: string,
+    value: PdfObjectSpec,
+  ) => PdfTask<boolean>;
+  /**
    * Get permissions of the file
    * @param doc - pdf document
    * @returns task that contains a 32-bit integer indicating permission flags
@@ -3931,6 +3967,19 @@ export interface IPdfiumExecutor {
   ): PdfTask<PdfDocumentObject>;
   getMetadata(doc: PdfDocumentObject): PdfTask<PdfMetadataObject>;
   setMetadata(doc: PdfDocumentObject, metadata: Partial<PdfMetadataObject>): PdfTask<boolean>;
+  setPageDictValue(
+    doc: PdfDocumentObject,
+    page: PdfPageObject,
+    key: string,
+    value: PdfObjectSpec,
+  ): PdfTask<boolean>;
+  setAnnotationDictValue(
+    doc: PdfDocumentObject,
+    page: PdfPageObject,
+    annotationId: string,
+    key: string,
+    value: PdfObjectSpec,
+  ): PdfTask<boolean>;
   getDocPermissions(doc: PdfDocumentObject): PdfTask<number>;
   getDocUserPermissions(doc: PdfDocumentObject): PdfTask<number>;
   getSignatures(doc: PdfDocumentObject): PdfTask<PdfSignatureObject[]>;
