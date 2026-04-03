@@ -30,6 +30,7 @@ var createPdfium = (() => {
       '_EPDF_GetMetaKeyCount',
       '_EPDF_GetMetaKeyName',
       '_EPDF_GetMetaTrapped',
+      '_EPDF_GetPageObjNum',
       '_EPDF_GetPageRotationByIndex',
       '_EPDF_GetPageSizeByIndexNormalized',
       '_EPDF_HasMetaText',
@@ -7709,6 +7710,8 @@ var createPdfium = (() => {
       'FPDF_GetPageSizeByIndexF',
       3,
     ));
+    var _EPDF_GetPageObjNum = (Module['_EPDF_GetPageObjNum'] =
+      createExportWrapper('EPDF_GetPageObjNum', 2));
     var _EPDF_GetPageRotationByIndex = (Module['_EPDF_GetPageRotationByIndex'] =
       createExportWrapper('EPDF_GetPageRotationByIndex', 2));
     var _EPDF_GetPageSizeByIndexNormalized = (Module['_EPDF_GetPageSizeByIndexNormalized'] =

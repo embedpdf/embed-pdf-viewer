@@ -13,6 +13,7 @@ em++ $(ls ./code/cpp/*.cpp) \
   -sEXPORTED_FUNCTIONS=$(cat ./wasm/exported-functions.txt) \
   -lpdfium \
   -L/workspace/packages/pdfium/pdfium-src/out/wasm/obj \
+  -I/workspace/packages/pdfium/pdfium-src \
   -I/workspace/packages/pdfium/pdfium-src/public \
   -std=c++11 \
   -Wall \

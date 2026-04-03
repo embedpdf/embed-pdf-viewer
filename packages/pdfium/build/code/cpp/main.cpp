@@ -3,6 +3,9 @@
 #include <emscripten.h>
 #include "filewriter.h"
 #include "string.h"
+#include "fpdfsdk/cpdfsdk_helpers.h"
+#include "core/fpdfapi/parser/cpdf_document.h"
+#include "core/fpdfapi/parser/cpdf_dictionary.h"
 
 #ifdef __cplusplus
 extern "C"
@@ -22,6 +25,8 @@ extern "C"
     EMSCRIPTEN_KEEPALIVE void PDFiumExt_ExitFormFillEnvironment(void *form_handle);
 
     EMSCRIPTEN_KEEPALIVE int PDFiumExt_SaveAsCopy(void *document, void *writer);
+
+    EMSCRIPTEN_KEEPALIVE int EPDF_GetPageObjNum(FPDF_DOCUMENT document, int page_index);
 
 #ifdef __cplusplus
 }
@@ -90,4 +95,15 @@ void *PDFiumExt_InitFormFillEnvironment(void *document, void *form_fill_info)
 void PDFiumExt_ExitFormFillEnvironment(void *form_handle)
 {
     FPDFDOC_ExitFormFillEnvironment(static_cast<FPDF_FORMHANDLE>(form_handle));
+}
+
+int EPDF_GetPageObjNum(FPDF_DOCUMENT document, int page_index)
+{
+    CPDF_Document *pDoc = CPDFDocumentFromFPDFDocument(document);
+    if (!pDoc)
+        return -1;
+    RetainPtr<const CPDF_Dictionary> pDict = pDoc->GetPageDictionary(page_index);
+    if (!pDict)
+        return -1;
+    return static_cast<int>(pDict->GetObjNum());
 }

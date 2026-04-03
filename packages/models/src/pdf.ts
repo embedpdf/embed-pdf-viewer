@@ -13,6 +13,21 @@ export interface PdfPageObject {
   index: number;
 
   /**
+   * PDF page dictionary indirect object number.
+   *
+   * Populated by the engine at document open time when the underlying WASM
+   * build exports `EPDF_GetPageObjNum`. Undefined when that export is absent
+   * (e.g. older builds) or when the page dictionary has no valid object number.
+   *
+   * This value is stable across page reorder / insert / delete operations on
+   * the same file, making it suitable as a permanent page reference for
+   * annotations, citations, and similar features.
+   *
+   * @public
+   */
+  objectNumber?: number;
+
+  /**
    * Orignal size of this page
    */
   size: Size;

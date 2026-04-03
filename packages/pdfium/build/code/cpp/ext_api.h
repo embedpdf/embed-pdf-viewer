@@ -21,6 +21,8 @@ void        PDFiumExt_ExitFormFillEnvironment(void* formHandle);
 
 int         PDFiumExt_SaveAsCopy(void* document, void* writer);
 
+int         EPDF_GetPageObjNum(void* document, int page_index);
+
 #ifdef __cplusplus
 }
 #endif

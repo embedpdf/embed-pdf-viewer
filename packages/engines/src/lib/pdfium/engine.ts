@@ -385,13 +385,23 @@ export class PdfiumNative implements IPdfiumExecutor {
 
       const rotation = this.pdfiumModule.EPDF_GetPageRotationByIndex(docPtr, index) as Rotation;
 
-      const page = {
+      let objectNumber: number | undefined;
+      const epdfGetPageObjNum = this.pdfiumModule.EPDF_GetPageObjNum;
+      if (typeof epdfGetPageObjNum === 'function') {
+        const objNum = epdfGetPageObjNum(docPtr, index);
+        if (objNum > 0) {
+          objectNumber = objNum;
+        }
+      }
+
+      const page: PdfPageObject = {
         index,
         size: {
           width: this.pdfiumModule.pdfium.getValue(sizePtr, 'float'),
           height: this.pdfiumModule.pdfium.getValue(sizePtr + 4, 'float'),
         },
         rotation,
+        ...(objectNumber !== undefined ? { objectNumber } : {}),
       };
 
       pages.push(page);
