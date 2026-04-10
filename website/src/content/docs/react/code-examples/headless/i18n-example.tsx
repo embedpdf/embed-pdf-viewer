@@ -27,6 +27,7 @@ import {
   ParamResolvers,
   useTranslations,
   useI18nCapability,
+  useStaticTranslation,
 } from '@embedpdf/plugin-i18n/react'
 import { GlobalStoreState } from '@embedpdf/core'
 import {
@@ -56,6 +57,10 @@ const englishLocale: Locale = {
     toolbar: {
       language: 'Language',
     },
+    viewer: {
+      initializingPlugins: 'Initializing plugins...',
+      initializingEngine: 'Initializing PDF engine...',
+    },
   },
 }
 
@@ -76,6 +81,10 @@ const spanishLocale: Locale = {
     toolbar: {
       language: 'Idioma',
     },
+    viewer: {
+      initializingPlugins: 'Inicializando plugins...',
+      initializingEngine: 'Inicializando motor de PDF...',
+    },
   },
 }
 
@@ -95,6 +104,10 @@ const germanLocale: Locale = {
     },
     toolbar: {
       language: 'Sprache',
+    },
+    viewer: {
+      initializingPlugins: 'Plugins werden initialisiert...',
+      initializingEngine: 'PDF-Engine wird initialisiert...',
     },
   },
 }
@@ -232,13 +245,22 @@ export const PDFViewer = () => {
     [],
   )
 
+  const { provides } = useI18nCapability()
+  const currentLocale = provides?.getLocale() ?? 'en'
+  const staticTranslate = useStaticTranslation({
+    locales: [englishLocale, spanishLocale, germanLocale],
+    defaultLocale: currentLocale,
+  })
+
   if (isLoading || !engine) {
     return (
       <div className="overflow-hidden rounded-lg border border-gray-300 bg-white dark:border-gray-700 dark:bg-gray-900">
         <div className="flex h-[400px] items-center justify-center">
           <div className="flex items-center gap-2 text-gray-500">
             <Loader2 size={20} className="animate-spin" />
-            <span className="text-sm">Loading PDF Engine...</span>
+            <span className="text-sm">
+              {staticTranslate('viewer.initializingEngine')}
+            </span>
           </div>
         </div>
       </div>
@@ -307,7 +329,9 @@ export const PDFViewer = () => {
               <div className="flex h-[400px] items-center justify-center">
                 <div className="flex items-center gap-2 text-gray-500">
                   <Loader2 size={20} className="animate-spin" />
-                  <span className="text-sm">Initializing plugins...</span>
+                  <span className="text-sm">
+                    {staticTranslate('viewer.initializingPlugins')}
+                  </span>
                 </div>
               </div>
             </div>

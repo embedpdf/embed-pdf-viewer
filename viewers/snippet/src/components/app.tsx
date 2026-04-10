@@ -38,7 +38,12 @@ import {
   useActiveDocument,
 } from '@embedpdf/plugin-document-manager/preact';
 import { CommandsPluginPackage, CommandsPluginConfig } from '@embedpdf/plugin-commands/preact';
-import { I18nPluginPackage, I18nPluginConfig, useTranslations } from '@embedpdf/plugin-i18n/preact';
+import {
+  I18nPluginPackage,
+  I18nPluginConfig,
+  useTranslations,
+  useStaticTranslation,
+} from '@embedpdf/plugin-i18n/preact';
 import {
   MarqueeZoom,
   ZoomMode,
@@ -544,12 +549,15 @@ export function PDFViewer({ config, onRegistryReady }: PDFViewerProps) {
     [],
   );
 
+  const i18nConfig = useMemo(() => ({ ...DEFAULTS.i18n, ...config.i18n }), [config.i18n]);
+  const staticTranslate = useStaticTranslation(i18nConfig);
+
   if (!engine || isLoading)
     return (
       <>
         <style>{styles}</style>
         <div className="flex h-full w-full items-center justify-center">
-          <LoadingIndicator size="lg" text="Initializing PDF engine..." />
+          <LoadingIndicator size="lg" text={staticTranslate('viewer.initializingEngine')} />
         </div>
       </>
     );
@@ -689,7 +697,7 @@ export function PDFViewer({ config, onRegistryReady }: PDFViewerProps) {
               </>
             ) : (
               <div className="flex h-full items-center justify-center">
-                <LoadingIndicator size="lg" text="Initializing plugins..." />
+                <LoadingIndicator size="lg" text={staticTranslate('viewer.initializingPlugins')} />
               </div>
             )}
           </>
