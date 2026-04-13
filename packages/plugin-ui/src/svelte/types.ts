@@ -44,6 +44,7 @@ export interface SidebarRendererProps {
   isOpen: boolean;
   onClose: () => void;
   className?: string;
+  sidebarProps?: Record<string, unknown>;
 }
 
 export type SidebarRenderer = Component<SidebarRendererProps>;

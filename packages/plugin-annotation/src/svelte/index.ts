@@ -1,6 +1,7 @@
 import { createPluginPackage } from '@embedpdf/core';
 import { AnnotationPluginPackage as BaseAnnotationPackage } from '@embedpdf/plugin-annotation';
 import RendererRegistryProvider from './components/RendererRegistryProvider.svelte';
+import AnnotationNavigationHandler from './components/AnnotationNavigationHandler.svelte';
 
 export * from './hooks';
 export * from './components';
@@ -10,4 +11,5 @@ export * from '@embedpdf/plugin-annotation';
 
 export const AnnotationPluginPackage = createPluginPackage(BaseAnnotationPackage)
   .addWrapper(RendererRegistryProvider)
+  .addUtility(AnnotationNavigationHandler)
   .build();

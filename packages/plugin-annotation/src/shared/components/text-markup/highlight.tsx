@@ -1,4 +1,4 @@
-import { CSSProperties, MouseEvent, TouchEvent } from '@framework';
+import { CSSProperties, MouseEvent } from '@framework';
 import { Rect } from '@embedpdf/models';
 
 type HighlightProps = {
@@ -8,7 +8,7 @@ type HighlightProps = {
   segmentRects: Rect[];
   rect?: Rect;
   scale: number;
-  onClick?: (e: MouseEvent<HTMLDivElement> | TouchEvent<HTMLDivElement>) => void;
+  onClick?: (e: MouseEvent<HTMLDivElement>) => void;
   style?: CSSProperties;
   /** When true, AP image provides the visual; only render hit area */
   appearanceActive?: boolean;
@@ -32,7 +32,6 @@ export function Highlight({
         <div
           key={i}
           onPointerDown={onClick}
-          onTouchStart={onClick}
           style={{
             position: 'absolute',
             left: (rect ? b.origin.x - rect.origin.x : b.origin.x) * scale,

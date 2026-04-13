@@ -19,6 +19,9 @@ import {
   PdfAttachmentObject,
   PdfAddAttachmentParams,
   PdfWidgetAnnoObject,
+  PdfWidgetAnnoField,
+  PdfDocumentJavaScriptActionObject,
+  PdfWidgetJavaScriptActionObject,
   FormFieldValue,
   PdfFlattenPageOptions,
   PdfPageFlattenResult,
@@ -96,14 +99,26 @@ type MessageType =
   | 'addAttachment'
   | 'removeAttachment'
   | 'readAttachmentContent'
+  | 'getDocumentJavaScriptActions'
+  | 'getPageAnnoWidgets'
+  | 'getPageWidgetJavaScriptActions'
   | 'setFormFieldValue'
+  | 'setFormFieldState'
+  | 'renameWidgetField'
+  | 'shareWidgetField'
+  | 'regenerateWidgetAppearances'
   | 'flattenPage'
   | 'extractPages'
+  | 'createDocument'
+  | 'importPages'
+  | 'deletePage'
   | 'extractText'
   | 'redactTextInRects'
   | 'applyRedaction'
   | 'applyAllRedactions'
   | 'flattenAnnotation'
+  | 'exportAnnotationAppearanceAsPdf'
+  | 'exportAnnotationsAppearanceAsPdf'
   | 'getTextSlices'
   | 'getPageGlyphs'
   | 'getPageGeometry'
@@ -454,6 +469,26 @@ export class RemoteExecutor implements IPdfiumExecutor {
     return this.send<ArrayBuffer>('readAttachmentContent', [doc, attachment]);
   }
 
+  getDocumentJavaScriptActions(
+    doc: PdfDocumentObject,
+  ): PdfTask<PdfDocumentJavaScriptActionObject[]> {
+    return this.send<PdfDocumentJavaScriptActionObject[]>('getDocumentJavaScriptActions', [doc]);
+  }
+
+  getPageAnnoWidgets(doc: PdfDocumentObject, page: PdfPageObject): PdfTask<PdfWidgetAnnoObject[]> {
+    return this.send<PdfWidgetAnnoObject[]>('getPageAnnoWidgets', [doc, page]);
+  }
+
+  getPageWidgetJavaScriptActions(
+    doc: PdfDocumentObject,
+    page: PdfPageObject,
+  ): PdfTask<PdfWidgetJavaScriptActionObject[]> {
+    return this.send<PdfWidgetJavaScriptActionObject[]>('getPageWidgetJavaScriptActions', [
+      doc,
+      page,
+    ]);
+  }
+
   setFormFieldValue(
     doc: PdfDocumentObject,
     page: PdfPageObject,
@@ -461,6 +496,48 @@ export class RemoteExecutor implements IPdfiumExecutor {
     value: FormFieldValue,
   ): PdfTask<boolean> {
     return this.send<boolean>('setFormFieldValue', [doc, page, annotation, value]);
+  }
+
+  setFormFieldState(
+    doc: PdfDocumentObject,
+    page: PdfPageObject,
+    annotation: PdfWidgetAnnoObject,
+    field: PdfWidgetAnnoField,
+  ): PdfTask<boolean> {
+    return this.send<boolean>('setFormFieldState', [doc, page, annotation, field]);
+  }
+
+  renameWidgetField(
+    doc: PdfDocumentObject,
+    page: PdfPageObject,
+    annotation: PdfWidgetAnnoObject,
+    name: string,
+  ): PdfTask<boolean> {
+    return this.send<boolean>('renameWidgetField', [doc, page, annotation, name]);
+  }
+
+  shareWidgetField(
+    doc: PdfDocumentObject,
+    sourcePage: PdfPageObject,
+    sourceAnnotation: PdfWidgetAnnoObject,
+    targetPage: PdfPageObject,
+    targetAnnotation: PdfWidgetAnnoObject,
+  ): PdfTask<boolean> {
+    return this.send<boolean>('shareWidgetField', [
+      doc,
+      sourcePage,
+      sourceAnnotation,
+      targetPage,
+      targetAnnotation,
+    ]);
+  }
+
+  regenerateWidgetAppearances(
+    doc: PdfDocumentObject,
+    page: PdfPageObject,
+    annotationIds: string[],
+  ): PdfTask<boolean> {
+    return this.send<boolean>('regenerateWidgetAppearances', [doc, page, annotationIds]);
   }
 
   flattenPage(
@@ -473,6 +550,28 @@ export class RemoteExecutor implements IPdfiumExecutor {
 
   extractPages(doc: PdfDocumentObject, pageIndexes: number[]): PdfTask<ArrayBuffer> {
     return this.send<ArrayBuffer>('extractPages', [doc, pageIndexes]);
+  }
+
+  createDocument(id: string): PdfTask<PdfDocumentObject> {
+    return this.send<PdfDocumentObject>('createDocument', [id]);
+  }
+
+  importPages(
+    destDoc: PdfDocumentObject,
+    srcDoc: PdfDocumentObject,
+    srcPageIndices: number[],
+    insertIndex?: number,
+  ): PdfTask<PdfPageObject[]> {
+    return this.send<PdfPageObject[]>('importPages', [
+      destDoc,
+      srcDoc,
+      srcPageIndices,
+      insertIndex,
+    ]);
+  }
+
+  deletePage(doc: PdfDocumentObject, pageIndex: number): PdfTask<boolean> {
+    return this.send<boolean>('deletePage', [doc, pageIndex]);
   }
 
   extractText(doc: PdfDocumentObject, pageIndexes: number[]): PdfTask<string> {
@@ -506,6 +605,22 @@ export class RemoteExecutor implements IPdfiumExecutor {
     annotation: PdfAnnotationObject,
   ): PdfTask<boolean> {
     return this.send<boolean>('flattenAnnotation', [doc, page, annotation]);
+  }
+
+  exportAnnotationAppearanceAsPdf(
+    doc: PdfDocumentObject,
+    page: PdfPageObject,
+    annotation: PdfAnnotationObject,
+  ): PdfTask<ArrayBuffer> {
+    return this.send<ArrayBuffer>('exportAnnotationAppearanceAsPdf', [doc, page, annotation]);
+  }
+
+  exportAnnotationsAppearanceAsPdf(
+    doc: PdfDocumentObject,
+    page: PdfPageObject,
+    annotations: PdfAnnotationObject[],
+  ): PdfTask<ArrayBuffer> {
+    return this.send<ArrayBuffer>('exportAnnotationsAppearanceAsPdf', [doc, page, annotations]);
   }
 
   getTextSlices(doc: PdfDocumentObject, slices: PageTextSlice[]): PdfTask<string[]> {

@@ -63,6 +63,19 @@ import LinkIcon from './LinkIcon.svelte';
 import LinkOffIcon from './LinkOffIcon.svelte';
 import GroupIcon from './GroupIcon.svelte';
 import UngroupIcon from './UngroupIcon.svelte';
+import InsertTextIcon from './InsertTextIcon.svelte';
+import ReplaceTextIcon from './ReplaceTextIcon.svelte';
+import MessageIcon from './MessageIcon.svelte';
+import InkHighlighterIcon from './InkHighlighterIcon.svelte';
+import FormTextfieldIcon from './FormTextfieldIcon.svelte';
+import FormCheckboxIcon from './FormCheckboxIcon.svelte';
+import FormRadioIcon from './FormRadioIcon.svelte';
+import FormSelectIcon from './FormSelectIcon.svelte';
+import FormListboxIcon from './FormListboxIcon.svelte';
+import WidgetEditIcon from './WidgetEditIcon.svelte';
+import RubberStampIcon from './RubberStampIcon.svelte';
+import SignatureIcon from './SignatureIcon.svelte';
+import CalloutIcon from './CalloutIcon.svelte';
 
 // Define the standard Prop type for your icons for consistency
 export interface IconProps extends SVGAttributes<SVGSVGElement> {
@@ -132,6 +145,19 @@ export const iconRegistry = {
   'link-off': LinkOffIcon,
   group: GroupIcon,
   ungroup: UngroupIcon,
+  'insert-text': InsertTextIcon,
+  'replace-text': ReplaceTextIcon,
+  message: MessageIcon,
+  'ink-highlighter': InkHighlighterIcon,
+  'form-textfield': FormTextfieldIcon,
+  'form-checkbox': FormCheckboxIcon,
+  'form-radio': FormRadioIcon,
+  'form-select': FormSelectIcon,
+  'form-listbox': FormListboxIcon,
+  'widget-edit': WidgetEditIcon,
+  'rubber-stamp': RubberStampIcon,
+  signature: SignatureIcon,
+  callout: CalloutIcon,
 } as const;
 
 // Extract valid keys for Type Safety

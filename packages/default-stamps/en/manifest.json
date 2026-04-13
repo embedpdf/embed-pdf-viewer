@@ -1,0 +1,45 @@
+{
+  "id": "standard",
+  "name": "Standard Stamps",
+  "categories": ["sidebar"],
+  "pdf": "stamps.pdf",
+  "stamps": [
+    { "id": "approved", "pageIndex": 0, "name": "Approved", "subject": "Approved" },
+    { "id": "not-approved", "pageIndex": 1, "name": "NotApproved", "subject": "Not Approved" },
+    { "id": "draft", "pageIndex": 2, "name": "Draft", "subject": "Draft" },
+    { "id": "final", "pageIndex": 3, "name": "Final", "subject": "Final" },
+    { "id": "completed", "pageIndex": 4, "name": "Completed", "subject": "Completed" },
+    { "id": "confidential", "pageIndex": 5, "name": "Confidential", "subject": "Confidential" },
+    {
+      "id": "for-public-release",
+      "pageIndex": 6,
+      "name": "ForPublicRelease",
+      "subject": "For Public Release"
+    },
+    {
+      "id": "not-for-public-release",
+      "pageIndex": 7,
+      "name": "NotForPublicRelease",
+      "subject": "Not for Public Release"
+    },
+    { "id": "for-comment", "pageIndex": 8, "name": "ForComment", "subject": "For Comment" },
+    { "id": "void", "pageIndex": 9, "name": "Void", "subject": "Void" },
+    {
+      "id": "preliminary-results",
+      "pageIndex": 10,
+      "name": "PreliminaryResults",
+      "subject": "Preliminary Results"
+    },
+    {
+      "id": "information-only",
+      "pageIndex": 11,
+      "name": "InformationOnly",
+      "subject": "Information Only"
+    },
+    { "id": "witness", "pageIndex": 12, "name": "Witness", "subject": "Witness" },
+    { "id": "initial-here", "pageIndex": 13, "name": "InitialHere", "subject": "Initial Here" },
+    { "id": "sign-here", "pageIndex": 14, "name": "SignHere", "subject": "Sign Here" },
+    { "id": "accepted", "pageIndex": 15, "name": "Accepted", "subject": "Accepted" },
+    { "id": "rejected", "pageIndex": 16, "name": "Rejected", "subject": "Rejected" }
+  ]
+}

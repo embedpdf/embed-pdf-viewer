@@ -1,0 +1,126 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>EmbedPDF Document Loading Example</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="min-h-screen bg-slate-100 p-6 text-slate-900">
+  <div class="mx-auto flex max-w-7xl flex-col gap-4">
+    <section class="flex flex-wrap items-center justify-between gap-4 rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+      <div class="flex flex-wrap gap-2">
+        <button
+          id="load-url-btn"
+          type="button"
+          class="rounded-md bg-white px-3 py-2 text-sm font-medium shadow-sm ring-1 ring-slate-200 hover:bg-slate-50"
+        >
+          Load URL
+        </button>
+
+        <label
+          class="cursor-pointer rounded-md bg-white px-3 py-2 text-sm font-medium shadow-sm ring-1 ring-slate-200 hover:bg-slate-50"
+        >
+          Upload Local
+          <input id="file-input" type="file" class="hidden" accept=".pdf" />
+        </label>
+      </div>
+
+      <div class="flex items-center gap-2">
+        <span class="text-sm text-slate-500">Active document:</span>
+        <select
+          id="document-select"
+          class="rounded-md border border-slate-300 bg-white px-3 py-1.5 text-sm"
+          disabled
+        >
+          <option value="">Select Document...</option>
+        </select>
+      </div>
+    </section>
+
+    <div class="h-[700px] overflow-hidden rounded-xl border border-slate-300 bg-white shadow-lg">
+      <div id="pdf-viewer" class="h-full w-full"></div>
+    </div>
+  </div>
+
+  <script type="module">
+    import EmbedPDF from 'https://cdn.jsdelivr.net/npm/@embedpdf/snippet/dist/embedpdf.js';
+
+    const loadUrlButton = document.getElementById('load-url-btn');
+    const fileInput = document.getElementById('file-input');
+    const documentSelect = document.getElementById('document-select');
+
+    const viewer = EmbedPDF.init({
+      type: 'container',
+      target: document.getElementById('pdf-viewer'),
+      theme: { preference: 'system' },
+      tabBar: 'always',
+      documentManager: {
+        maxDocuments: 5,
+      },
+    });
+
+    const registry = await viewer.registry;
+    const docManager = registry.getPlugin('document-manager')?.provides();
+
+    if (!docManager) {
+      throw new Error('Document manager plugin not available');
+    }
+
+    function renderDocumentSelect() {
+      const docs = docManager.getOpenDocuments();
+      const activeDocumentId = docManager.getActiveDocumentId();
+
+      documentSelect.innerHTML = '';
+
+      const placeholder = document.createElement('option');
+      placeholder.value = '';
+      placeholder.textContent = docs.length === 0 ? 'Select Document...' : 'Choose a document';
+      placeholder.disabled = true;
+      documentSelect.append(placeholder);
+
+      for (const doc of docs) {
+        const option = document.createElement('option');
+        option.value = doc.id;
+        option.textContent = doc.name || 'Untitled';
+        documentSelect.append(option);
+      }
+
+      documentSelect.disabled = docs.length === 0;
+      documentSelect.value = activeDocumentId || '';
+    }
+
+    docManager.onDocumentOpened(renderDocumentSelect);
+    docManager.onDocumentClosed(renderDocumentSelect);
+    docManager.onActiveDocumentChanged(renderDocumentSelect);
+    renderDocumentSelect();
+
+    loadUrlButton.addEventListener('click', async () => {
+      await docManager.openDocumentUrl({
+        url: 'https://snippet.embedpdf.com/ebook.pdf',
+        documentId: 'ebook-demo',
+      });
+    });
+
+    fileInput.addEventListener('change', async (event) => {
+      const file = event.target.files?.[0];
+      if (!file) return;
+
+      const buffer = await file.arrayBuffer();
+      await docManager.openDocumentBuffer({
+        buffer,
+        name: file.name,
+        autoActivate: true,
+      });
+
+      event.target.value = '';
+    });
+
+    documentSelect.addEventListener('change', async (event) => {
+      const documentId = event.target.value;
+      if (!documentId) return;
+      await docManager.setActiveDocument(documentId);
+    });
+  </script>
+</body>
+</html>

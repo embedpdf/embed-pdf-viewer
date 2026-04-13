@@ -1,5 +1,117 @@
 # @embedpdf/plugin-annotation
 
+## 2.14.0
+
+### Minor Changes
+
+- [#581](https://github.com/embedpdf/embed-pdf-viewer/pull/581) by [@bobsingor](https://github.com/bobsingor) – Add callout free text (`FreeTextCallout`): creation handler and preview data, vertex config and patch pipeline, default `freeTextCallout` tool, and built-in renderers for React, Vue, and Svelte (including preview components and shared `calloutVertexConfig`).
+
+## 2.13.0
+
+### Patch Changes
+
+- [#579](https://github.com/embedpdf/embed-pdf-viewer/pull/579) by [@bobsingor](https://github.com/bobsingor) – Re-export patching utilities from `./patching` so dependent plugins (for example signature placement) can reuse the shared patch helpers.
+
+## 2.12.1
+
+### Patch Changes
+
+- [#571](https://github.com/embedpdf/embed-pdf-viewer/pull/571) by [@bobsingor](https://github.com/bobsingor) – Add `getAnnotations(options?)` method to retrieve all tracked annotations, optionally filtered by page index. Available on both `AnnotationCapability` and `AnnotationScope`.
+
+## 2.12.0
+
+### Minor Changes
+
+- [#569](https://github.com/embedpdf/embed-pdf-viewer/pull/569) by [@bobsingor](https://github.com/bobsingor) – Add symmetric annotation import/export API using a unified `AnnotationTransferItem` type. `exportAnnotations()` produces the same format that `importAnnotations()` consumes — zero remapping needed for round-tripping. Stamp appearances are automatically exported as PDF buffers in `ctx.data`. On import, stamps can be created from PNG, JPEG, or PDF buffers via `ctx: { data: ArrayBuffer }` — the engine auto-detects the format from magic bytes. Also adds `deleteAllAnnotations()` convenience method.
+
+## 2.11.1
+
+### Patch Changes
+
+- [#566](https://github.com/embedpdf/embed-pdf-viewer/pull/566) by [@bobsingor](https://github.com/bobsingor) – Fix Vue and Svelte renderer registration typing so custom preview container styles build correctly.
+
+## 2.11.0
+
+### Minor Changes
+
+- [#562](https://github.com/embedpdf/embed-pdf-viewer/pull/562) by [@bobsingor](https://github.com/bobsingor) – Add `ToolContextMap` to support typed context injection for active tools. Introduce preview renderers and bounding-box components for annotations (`CirclePreview`, `SquarePreview`, `InkPreview`, etc.) to support drag-to-create or stamp hover previews.
+
+## 2.10.1
+
+### Patch Changes
+
+- [#556](https://github.com/embedpdf/embed-pdf-viewer/pull/556) by [@bobsingor](https://github.com/bobsingor) – Fix stamp (and other annotation type) handlers not working for custom tools added via `addTool()`.
+
+  The #537 merge moved handler factory lookup from a centralized subtype-based registry to a `pointerHandler` property on each tool object. Custom tools that didn't specify `pointerHandler` lost their pointer interaction entirely. This restores a default handler registry as a fallback so tools without an explicit `pointerHandler` automatically get the canonical handler for their annotation subtype.
+
+## 2.10.0
+
+### Minor Changes
+
+- [#537](https://github.com/embedpdf/embed-pdf-viewer/pull/537) by [@bobsingor](https://github.com/bobsingor) –
+  - Add annotation lock modes, scoped navigation/state events, richer tool metadata, and locked-mode renderer support so annotations can switch cleanly between authoring and fill interactions.
+  - Add link previews and locked link navigation support plus shared React, Svelte, and Vue updates for the new renderer and interaction APIs.
+
+## 2.9.1
+
+### Patch Changes
+
+- [#532](https://github.com/embedpdf/embed-pdf-viewer/pull/532) by [@bobsingor](https://github.com/bobsingor) – FreeText annotation improvements:
+  - Fix FreeText editing blocked by interaction layer after the visual/interaction layer split. When `isEditing` is true, pointer events now correctly reach the text content in the visual layer while the interaction layer becomes passive.
+  - Add `editAfterCreate` tool behavior: FreeText annotations automatically enter editing mode after creation, with the default text fully selected so typing immediately replaces it.
+  - Prevent accidental annotation creation when exiting FreeText editing mode by clicking the page background (`stopImmediatePropagation`).
+  - Normalize NBSP characters (`\u00A0`) to regular spaces when reading text from contenteditable on blur.
+  - Fix Vue FreeText editing initialization timing so `editAfterCreate` works correctly on first mount.
+
+## 2.9.0
+
+### Minor Changes
+
+- [#529](https://github.com/embedpdf/embed-pdf-viewer/pull/529) by [@bobsingor](https://github.com/bobsingor) – Add cloudy border support for Circle, Square, and Polygon annotations across React, Vue, and Svelte renderers. Includes a framework-agnostic SVG path generator (`cloudy-border.ts`), conditional rendering of scalloped `<path>` elements with `stroke-linejoin: round`, cloudy-aware hit areas, rectangle differences computation in handlers and patch functions, and polygon preview support.
+
+### Patch Changes
+
+- [#517](https://github.com/embedpdf/embed-pdf-viewer/pull/517) by [@sebabal](https://github.com/sebabal) – Fix link annotation click not working in the Vue build.
+
+  The template expression `@pointerdown="hasIRT ? undefined : onClick"` compiled to a function that returned the `onClick` reference instead of invoking it. Changed to `onClick?.($event)` so the handler is actually called on pointer down, restoring link selection and navigation. Thanks to @sebabal
+
+- [#530](https://github.com/embedpdf/embed-pdf-viewer/pull/530) by [@bobsingor](https://github.com/bobsingor) – Hide the group selection menu while group rotation is active. Previously the menu remained visible during rotation, which could overlap with rotation guide lines and the tooltip. This aligns the group selection box behavior with the single-annotation container, which already hides its menu during rotation.
+
+- [#512](https://github.com/embedpdf/embed-pdf-viewer/pull/512) by [@bobsingor](https://github.com/bobsingor) – Add smart line recognition to the ink handler with horizontal/vertical axis snapping.
+
+  When `smartLineRecognition` is enabled on an ink tool, straight strokes drawn close to a horizontal or vertical axis are automatically snapped to a clean two-point line after `pointerUp`. The snapped line is centred on the average position of all recorded points rather than being anchored to the start point. Diagonal straight strokes (outside the snap cone) are left untouched with their original points intact.
+
+  New `InkBehavior` fields on `AnnotationTool`:
+  - `snapAngleDeg` — degrees from horizontal/vertical within which snapping is applied (default `15`). Strokes whose angle falls outside both snap zones are not reduced to two points.
+
+## 2.8.0
+
+### Minor Changes
+
+- [#509](https://github.com/embedpdf/embed-pdf-viewer/pull/509) by [@bobsingor](https://github.com/bobsingor) – Implement noZoom and noRotate annotation flag rendering. Annotations with noZoom now maintain a constant screen-pixel size regardless of zoom level, and annotations with noRotate stay visually upright regardless of page rotation.
+
+- [#495](https://github.com/embedpdf/embed-pdf-viewer/pull/495) by [@bobsingor](https://github.com/bobsingor) – Added "Insert Text" and "Replace Text" annotation tools.
+  Added renderer for Caret annotations.
+  Added support for grouped annotations in selectors (e.g. for Replace Text where a Caret and Strikeout are grouped).
+
+- [#509](https://github.com/embedpdf/embed-pdf-viewer/pull/509) by [@bobsingor](https://github.com/bobsingor) – Add Text (comment) annotation tool with handler, tool definition, and renderer support. thanks to @JoackimPennerup
+
+### Patch Changes
+
+- [#502](https://github.com/embedpdf/embed-pdf-viewer/pull/502) by [@danielbayerlein](https://github.com/danielbayerlein) – Add dashed stroke support to Polyline component for React, Vue and Svelte frameworks. Thanks @danielbayerlein!
+
+- [#495](https://github.com/embedpdf/embed-pdf-viewer/pull/495) by [@bobsingor](https://github.com/bobsingor) – Fix markup annotations (highlight, underline, strikethrough) not being created on PDFs that lack `CopyContents` permission. Annotations are now created without extracted text metadata when text extraction is denied.
+
+- [#495](https://github.com/embedpdf/embed-pdf-viewer/pull/495) by [@bobsingor](https://github.com/bobsingor) – Add `isRotatable: false` to text markup annotation tools (highlight, underline, strikeout, squiggly) to explicitly prevent rotation on these text-anchored annotations.
+
+- [#495](https://github.com/embedpdf/embed-pdf-viewer/pull/495) by [@bobsingor](https://github.com/bobsingor) – Fix marquee selection selecting non-rendered annotation types (e.g. POPUP, TEXT, WIDGET). Only annotations with a visual renderer are now included in marquee selection results.
+
+- [#508](https://github.com/embedpdf/embed-pdf-viewer/pull/508) by [@bobsingor](https://github.com/bobsingor) – Fix newly created annotations showing their appearance stream instead of dict-based rendering. New annotations now consistently start with `dictMode: true` across all framework wrappers (React, Vue, Svelte).
+
+- [#509](https://github.com/embedpdf/embed-pdf-viewer/pull/509) by [@bobsingor](https://github.com/bobsingor) – Fix group selection box outline when selected annotations use `noZoom` and/or `noRotate` flags. The multi-select group outline now correctly encloses mixed selections (flagged + normal annotations), including rotated pages and non-square noRotate annotations.
+
+- [#495](https://github.com/embedpdf/embed-pdf-viewer/pull/495) by [@bobsingor](https://github.com/bobsingor) – Remove redundant `onTouchStart` handlers from annotation renderers. `onPointerDown` already covers touch input on all modern browsers, so the duplicate handler caused non-passive event listener violations and double-fired on touch devices.
+
 ## 2.7.0
 
 ### Minor Changes

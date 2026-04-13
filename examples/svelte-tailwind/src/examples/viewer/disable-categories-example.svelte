@@ -45,6 +45,7 @@
 
   const categories = [
     { id: 'annotation', label: 'Annotations' },
+    { id: 'form', label: 'Forms' },
     { id: 'redaction', label: 'Redaction' },
     { id: 'zoom', label: 'Zoom' },
     { id: 'document-print', label: 'Print' },

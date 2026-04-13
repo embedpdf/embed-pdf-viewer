@@ -9,6 +9,7 @@ import {
 import { HandlerFactory, PreviewState } from './types';
 import { useState } from '../utils/use-state';
 import { clamp } from '@embedpdf/core';
+import { getCloudyBorderExtent } from '../geometry';
 
 const HANDLE_SIZE_PX = 14;
 
@@ -57,7 +58,13 @@ export const polygonHandlerFactory: HandlerFactory<PdfPolygonAnnoObject> = {
       const defaults = getDefaults();
       if (!defaults) return;
 
-      const rect = expandRect(rectFromPoints(vertices), defaults.strokeWidth / 2);
+      const intensity = defaults.cloudyBorderIntensity ?? 0;
+      const pad =
+        intensity > 0
+          ? getCloudyBorderExtent(intensity, defaults.strokeWidth, false)
+          : defaults.strokeWidth / 2;
+
+      const rect = expandRect(rectFromPoints(vertices), pad);
       const anno: PdfPolygonAnnoObject = {
         ...defaults,
         vertices,
@@ -66,6 +73,9 @@ export const polygonHandlerFactory: HandlerFactory<PdfPolygonAnnoObject> = {
         pageIndex: context.pageIndex,
         id: uuidV4(),
         created: new Date(),
+        ...(intensity > 0 && {
+          rectangleDifferences: { left: pad, top: pad, right: pad, bottom: pad },
+        }),
       };
       onCommit(anno);
 
@@ -82,8 +92,14 @@ export const polygonHandlerFactory: HandlerFactory<PdfPolygonAnnoObject> = {
       const defaults = getDefaults();
       if (!defaults) return null;
 
+      const intensity = defaults.cloudyBorderIntensity ?? 0;
+      const pad =
+        intensity > 0
+          ? getCloudyBorderExtent(intensity, defaults.strokeWidth, false)
+          : defaults.strokeWidth / 2;
+
       const allPoints = [...vertices, currentPos];
-      const bounds = expandRect(rectFromPoints(allPoints), defaults.strokeWidth / 2);
+      const bounds = expandRect(rectFromPoints(allPoints), pad);
 
       return {
         type: PdfAnnotationSubtype.POLYGON,

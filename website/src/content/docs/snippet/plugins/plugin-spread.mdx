@@ -1,0 +1,104 @@
+---
+title: Spread Layouts
+description: Display pages individually or in a two-page, book-like spread layout.
+---
+
+import SpreadExample from '../code-examples/spread-example';
+import { ExampleWrapper } from '@/components/example-wrapper';
+
+# Spread Layouts
+
+The EmbedPDF Snippet supports switching between single-page view and two-page spread views. This is ideal for reading magazines, books, or any content designed to be viewed side-by-side.
+
+## Configuration
+
+You can configure the initial layout mode using the `spread` config object.
+
+```javascript
+import EmbedPDF, { SpreadMode } from '__EMBEDPDF_JS_URL__';
+
+const viewer = EmbedPDF.init({
+  type: 'container',
+  target: document.getElementById('pdf-viewer'),
+  spread: {
+    defaultSpreadMode: SpreadMode.Odd
+  }
+});
+```
+
+### Understanding Spread Modes
+
+| Mode | Description | Page Grouping |
+| :--- | :--- | :--- |
+| `SpreadMode.None` | **Default**. Each page is displayed individually in a vertical list. | `[1], [2], [3], [4]` |
+| `SpreadMode.Odd` | Pages are paired starting from page 1. Good for content where page 1 is the left side of a spread. | `[1, 2], [3, 4]` |
+| `SpreadMode.Even` | The first page is standalone, and subsequent pages are paired. | `[1], [2, 3], [4, 5]` |
+
+## Programmatic Control
+
+You can dynamically change the layout mode using the plugin API.
+
+<CodeExample
+  codePaths={[
+    "../../examples/vanilla-tailwind/src/examples/spread.html"
+  ]}
+>
+  <ExampleWrapper>
+    <SpreadExample />
+  </ExampleWrapper>
+</CodeExample>
+
+### Changing the Mode
+
+```javascript
+import EmbedPDF, { SpreadMode } from '__EMBEDPDF_JS_URL__';
+
+const viewer = EmbedPDF.init({
+  type: 'container',
+  target: document.getElementById('pdf-viewer'),
+  documentManager: {
+    initialDocuments: [
+      {
+        url: 'https://snippet.embedpdf.com/ebook.pdf',
+        documentId: 'my-doc-id'
+      }
+    ]
+  }
+});
+
+const registry = await viewer.registry;
+const spreadPlugin = registry.getPlugin('spread').provides();
+const docSpread = spreadPlugin.forDocument('my-doc-id');
+
+// Switch to book view (cover page separate)
+docSpread.setSpreadMode(SpreadMode.Even);
+
+// Switch back to single page
+docSpread.setSpreadMode(SpreadMode.None);
+```
+
+### Reading Current Mode
+
+```javascript
+const currentMode = docSpread.getSpreadMode();
+```
+
+## Listening for Changes
+
+You can listen for layout changes to keep your external UI in sync.
+
+```javascript
+const registry = await viewer.registry;
+const spreadPlugin = registry.getPlugin('spread').provides();
+
+// Subscribe to global spread changes (any document)
+spreadPlugin.onSpreadChange(({ documentId, spreadMode }) => {
+  console.log(`Document ${documentId} layout changed to ${spreadMode}`);
+});
+
+// Or subscribe to a specific document
+const docSpread = spreadPlugin.forDocument('my-doc');
+docSpread.onSpreadChange((spreadMode) => {
+  console.log(`My doc is now in ${spreadMode} mode`);
+});
+```

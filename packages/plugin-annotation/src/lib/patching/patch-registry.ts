@@ -1,5 +1,3 @@
-// packages/plugin-annotation/src/lib/patching/patch-registry.ts
-
 import { PdfAnnotationObject, PdfAnnotationSubtype } from '@embedpdf/models';
 
 export interface TransformContext<T extends PdfAnnotationObject = PdfAnnotationObject> {

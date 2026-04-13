@@ -42,7 +42,7 @@
 
     // Use capture phase to intercept before synthetic events
     node.addEventListener('pointerdown', handlePointerDown, { capture: true });
-    node.addEventListener('touchstart', handleTouchStart, { capture: true });
+    node.addEventListener('touchstart', handleTouchStart, { capture: true, passive: true });
 
     return {
       destroy() {

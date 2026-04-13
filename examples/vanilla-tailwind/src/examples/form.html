@@ -1,0 +1,109 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>EmbedPDF Form State Example</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="min-h-screen bg-slate-100 p-6 text-slate-900">
+  <div class="mx-auto flex max-w-7xl flex-col gap-4">
+    <div class="grid gap-4 lg:grid-cols-[minmax(0,1fr)_320px]">
+      <div class="h-[700px] overflow-hidden rounded-xl border border-slate-300 bg-white shadow-lg">
+        <div id="pdf-viewer" class="h-full w-full"></div>
+      </div>
+
+      <div class="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
+        <div class="border-b border-slate-200 bg-slate-50 px-4 py-3">
+          <h4 class="text-sm font-semibold text-slate-900">Form State</h4>
+          <p class="mt-1 text-xs text-slate-500">
+            Fill the PDF on the left to watch the values update live.
+          </p>
+        </div>
+
+        <div class="grid grid-cols-3 border-b border-slate-200 bg-slate-50 text-xs">
+          <div class="px-4 py-3">
+            <div class="text-slate-500">Fields</div>
+            <div id="field-count" class="mt-1 text-sm font-semibold text-slate-900">0</div>
+          </div>
+          <div class="border-x border-slate-200 px-4 py-3">
+            <div class="text-slate-500">Filled</div>
+            <div id="filled-count" class="mt-1 text-sm font-semibold text-slate-900">0</div>
+          </div>
+          <div class="px-4 py-3">
+            <div class="text-slate-500">Changes</div>
+            <div id="change-count" class="mt-1 text-sm font-semibold text-slate-900">0</div>
+          </div>
+        </div>
+
+        <div class="max-h-[540px] overflow-auto p-4">
+          <pre id="form-values" class="text-xs text-slate-800">Waiting for form fields...</pre>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script type="module">
+    import EmbedPDF from 'https://cdn.jsdelivr.net/npm/@embedpdf/snippet/dist/embedpdf.js';
+
+    const documentId = 'form-doc';
+    const fieldCount = document.getElementById('field-count');
+    const filledCount = document.getElementById('filled-count');
+    const changeCount = document.getElementById('change-count');
+    const formValuesElement = document.getElementById('form-values');
+
+    let changes = 0;
+
+    const viewer = EmbedPDF.init({
+      type: 'container',
+      target: document.getElementById('pdf-viewer'),
+      theme: { preference: 'system' },
+      documentManager: {
+        initialDocuments: [
+          {
+            url: 'https://www.embedpdf.com/form.pdf',
+            documentId,
+          },
+        ],
+      },
+      export: {
+        defaultFileName: 'filled-form.pdf',
+      },
+    });
+
+    const registry = await viewer.registry;
+    const formScope = registry.getPlugin('form')?.provides()?.forDocument(documentId);
+
+    if (!formScope) {
+      throw new Error('Form plugin not available');
+    }
+
+    function renderValues() {
+      const values = formScope.getFormValues();
+      const filled = Object.values(values).filter(
+        (value) => value !== '' && value !== 'Off',
+      ).length;
+
+      filledCount.textContent = String(filled);
+      formValuesElement.textContent =
+        Object.keys(values).length > 0
+          ? JSON.stringify(values, null, 2)
+          : 'Waiting for form fields...';
+    }
+
+    fieldCount.textContent = String(formScope.getFormFields().length);
+    renderValues();
+
+    formScope.onFormReady((fields) => {
+      fieldCount.textContent = String(fields.length);
+      renderValues();
+    });
+
+    formScope.onFieldValueChange(() => {
+      changes += 1;
+      changeCount.textContent = String(changes);
+      renderValues();
+    });
+  </script>
+</body>
+</html>

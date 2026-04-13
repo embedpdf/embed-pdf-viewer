@@ -57,6 +57,7 @@ export interface SetActiveSidebarAction extends Action {
     slot: string;
     sidebarId: string;
     activeTab?: string;
+    props?: Record<string, unknown>;
   };
 }
 
@@ -172,9 +173,10 @@ export const setActiveSidebar = (
   slot: string,
   sidebarId: string,
   activeTab?: string,
+  props?: Record<string, unknown>,
 ): SetActiveSidebarAction => ({
   type: SET_ACTIVE_SIDEBAR,
-  payload: { documentId, placement, slot, sidebarId, activeTab },
+  payload: { documentId, placement, slot, sidebarId, activeTab, props },
 });
 
 export const closeSidebarSlot = (

@@ -233,7 +233,7 @@ export const ColorSwatch = ({
  */
 
 // —— Stroke-style picker ────────────────────────────────────────────
-type StrokeItem = { id: PdfAnnotationBorderStyle; dash?: number[] };
+type StrokeItem = { id: PdfAnnotationBorderStyle; dash?: number[]; cloudyIntensity?: number };
 
 const STROKES: StrokeItem[] = [
   { id: PdfAnnotationBorderStyle.SOLID },
@@ -243,36 +243,77 @@ const STROKES: StrokeItem[] = [
   { id: PdfAnnotationBorderStyle.DASHED, dash: [1, 2] },
   { id: PdfAnnotationBorderStyle.DASHED, dash: [4, 2, 1, 2] },
   { id: PdfAnnotationBorderStyle.DASHED, dash: [8, 4, 1, 4] },
+  { id: PdfAnnotationBorderStyle.SOLID, cloudyIntensity: 1 },
+  { id: PdfAnnotationBorderStyle.SOLID, cloudyIntensity: 2 },
 ];
 
-const renderStrokeSvg = (dash?: number[]) => (
-  <svg width="80" height="8" viewBox="0 0 80 8">
-    <line
-      x1="0"
-      y1="4"
-      x2="80"
-      y2="4"
-      style={{
-        strokeDasharray: dash?.join(' '),
-        stroke: 'currentColor',
-        strokeWidth: '2',
-      }}
-    />
-  </svg>
-);
+const renderStrokeSvg = (item: StrokeItem) => {
+  if (item.cloudyIntensity) {
+    const r = item.cloudyIntensity === 1 ? 3 : 5;
+    const n = Math.ceil(80 / (r * 2));
+    const step = 80 / n;
+    const baseline = r + 1;
+    const viewH = r * 2 + 2;
+    const parts = [`M 0 ${baseline}`];
+    for (let i = 0; i < n; i++) {
+      parts.push(`A ${r} ${r} 0 0 1 ${step * (i + 1)} ${baseline}`);
+    }
+    return (
+      <svg width="80" height={viewH} viewBox={`0 0 80 ${viewH}`}>
+        <path
+          d={parts.join(' ')}
+          fill="none"
+          stroke="currentColor"
+          stroke-width="1.5"
+          stroke-linejoin="round"
+          stroke-linecap="round"
+        />
+      </svg>
+    );
+  }
+  return (
+    <svg width="80" height="8" viewBox="0 0 80 8">
+      <line
+        x1="0"
+        y1="4"
+        x2="80"
+        y2="4"
+        style={{
+          strokeDasharray: item.dash?.join(' '),
+          stroke: 'currentColor',
+          strokeWidth: '2',
+        }}
+      />
+    </svg>
+  );
+};
 
-export const StrokeStyleSelect = (props: {
+function strokeOptionKey(s: StrokeItem): string {
+  if (s.cloudyIntensity) return `cloudy-${s.cloudyIntensity}`;
+  return s.id + (s.dash?.join('-') || '');
+}
+
+export const StrokeStyleSelect = ({
+  value,
+  onChange,
+  showCloudy,
+}: {
   value: StrokeItem;
   onChange: (s: StrokeItem) => void;
-}) => (
-  <GenericSelect
-    {...props}
-    options={STROKES}
-    getOptionKey={(s) => s.id + (s.dash?.join('-') || '')}
-    renderValue={(v) => renderStrokeSvg(v.dash)}
-    renderOption={(s) => <div class="px-1 py-2">{renderStrokeSvg(s.dash)}</div>}
-  />
-);
+  showCloudy?: boolean;
+}) => {
+  const options = showCloudy ? STROKES : STROKES.filter((s) => !s.cloudyIntensity);
+  return (
+    <GenericSelect
+      value={value}
+      onChange={onChange}
+      options={options}
+      getOptionKey={strokeOptionKey}
+      renderValue={(v) => renderStrokeSvg(v)}
+      renderOption={(s) => <div class="px-1 py-2">{renderStrokeSvg(s)}</div>}
+    />
+  );
+};
 
 // —— Line-ending picker ─────────────────────────────────────────────
 const ENDINGS: PdfAnnotationLineEnding[] = [

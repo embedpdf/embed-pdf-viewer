@@ -1,19 +1,11 @@
-import {
-  MouseEvent,
-  TouchEvent,
-  useEffect,
-  useLayoutEffect,
-  useRef,
-  useState,
-  suppressContentEditableWarningProps,
-} from '@framework';
+import { MouseEvent, useEffect, useRef, suppressContentEditableWarningProps } from '@framework';
 import {
   PdfFreeTextAnnoObject,
   PdfVerticalAlignment,
   standardFontCssProperties,
   textAlignmentToCss,
 } from '@embedpdf/models';
-import { useAnnotationCapability } from '../..';
+import { useAnnotationCapability, useIOSZoomPrevention } from '../..';
 import { TrackedAnnotation } from '@embedpdf/plugin-annotation';
 
 interface FreeTextProps {
@@ -23,7 +15,7 @@ interface FreeTextProps {
   annotation: TrackedAnnotation<PdfFreeTextAnnoObject>;
   pageIndex: number;
   scale: number;
-  onClick?: (e: MouseEvent<HTMLDivElement> | TouchEvent<HTMLDivElement>) => void;
+  onClick?: (e: MouseEvent<HTMLDivElement>) => void;
   onDoubleClick?: (event: MouseEvent<HTMLDivElement>) => void;
   /** When true, AP canvas provides the visual; hide text content */
   appearanceActive?: boolean;
@@ -43,7 +35,10 @@ export function FreeText({
   const editingRef = useRef(false);
   const { provides: annotationCapability } = useAnnotationCapability();
   const annotationProvides = annotationCapability?.forDocument(documentId) ?? null;
-  const [isIOS, setIsIOS] = useState(false);
+  const { adjustedFontPx, wrapperStyle } = useIOSZoomPrevention(
+    annotation.object.fontSize * scale,
+    isEditing,
+  );
 
   useEffect(() => {
     if (isEditing && editorRef.current) {
@@ -51,28 +46,22 @@ export function FreeText({
       const editor = editorRef.current;
       editor.focus();
 
+      const tool = annotationProvides?.findToolForAnnotation(annotation.object);
+      const isDefaultContent =
+        tool?.defaults?.contents != null && annotation.object.contents === tool.defaults.contents;
+
       const selection = window.getSelection();
       if (selection) {
         const range = document.createRange();
         range.selectNodeContents(editor);
-        range.collapse(false);
+        if (!isDefaultContent) {
+          range.collapse(false);
+        }
         selection.removeAllRanges();
         selection.addRange(range);
       }
     }
   }, [isEditing]);
-
-  useLayoutEffect(() => {
-    try {
-      const nav = navigator as any;
-      const ios =
-        /iPad|iPhone|iPod/.test(navigator.userAgent) ||
-        (navigator.platform === 'MacIntel' && nav?.maxTouchPoints > 1);
-      setIsIOS(ios);
-    } catch {
-      setIsIOS(false);
-    }
-  }, []);
 
   const handleBlur = () => {
     if (!editingRef.current) return;
@@ -80,18 +69,9 @@ export function FreeText({
     if (!annotationProvides) return;
     if (!editorRef.current) return;
     annotationProvides.updateAnnotation(pageIndex, annotation.object.id, {
-      contents: editorRef.current.innerText,
+      contents: editorRef.current.innerText.replace(/\u00A0/g, ' '),
     });
   };
-
-  // iOS zoom prevention: keep focused font-size >= 16px, visually scale down if needed.
-  const computedFontPx = annotation.object.fontSize * scale;
-  const MIN_IOS_FOCUS_FONT_PX = 16;
-  const needsComp =
-    isIOS && isEditing && computedFontPx > 0 && computedFontPx < MIN_IOS_FOCUS_FONT_PX;
-  const adjustedFontPx = needsComp ? MIN_IOS_FOCUS_FONT_PX : computedFontPx;
-  const scaleComp = needsComp ? computedFontPx / MIN_IOS_FOCUS_FONT_PX : 1;
-  const invScalePercent = needsComp ? 100 / scaleComp : 100;
 
   return (
     <div
@@ -100,12 +80,11 @@ export function FreeText({
         width: annotation.object.rect.size.width * scale,
         height: annotation.object.rect.size.height * scale,
         cursor: isSelected && !isEditing ? 'move' : 'default',
-        pointerEvents: isSelected && !isEditing ? 'none' : 'auto',
+        pointerEvents: !onClick ? 'none' : isSelected && !isEditing ? 'none' : 'auto',
         zIndex: 2,
         opacity: appearanceActive ? 0 : 1,
       }}
       onPointerDown={onClick}
-      onTouchStart={onClick}
     >
       <span
         ref={editorRef}
@@ -126,14 +105,13 @@ export function FreeText({
           display: 'flex',
           backgroundColor: annotation.object.color ?? annotation.object.backgroundColor,
           opacity: annotation.object.opacity,
-          width: needsComp ? `${invScalePercent}%` : '100%',
-          height: needsComp ? `${invScalePercent}%` : '100%',
+          width: '100%',
+          height: '100%',
           lineHeight: '1.18',
           overflow: 'hidden',
-          cursor: isEditing ? 'text' : 'pointer',
+          cursor: isEditing ? 'text' : onClick ? 'pointer' : 'default',
           outline: 'none',
-          transform: needsComp ? `scale(${scaleComp})` : undefined,
-          transformOrigin: 'top left',
+          ...wrapperStyle,
         }}
         contentEditable={isEditing}
         {...suppressContentEditableWarningProps}

@@ -8,7 +8,7 @@
     segmentRects: Rect[];
     rect?: Rect;
     scale: number;
-    onClick?: (e: MouseEvent | TouchEvent) => void;
+    onClick?: (e: MouseEvent) => void;
     style?: Record<string, string | number | undefined>;
     /** When true, AP image provides the visual; only render hit area */
     appearanceActive?: boolean;
@@ -44,7 +44,6 @@
     role="button"
     tabindex={onClick ? 0 : -1}
     onpointerdown={onClick}
-    ontouchstart={onClick}
     style:position="absolute"
     style:left="{(rect ? r.origin.x - rect.origin.x : r.origin.x) * scale}px"
     style:top="{(rect ? r.origin.y - rect.origin.y : r.origin.y) * scale}px"

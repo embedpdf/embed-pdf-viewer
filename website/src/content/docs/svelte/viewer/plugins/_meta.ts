@@ -5,9 +5,11 @@ export default {
   'plugin-spread': 'Spread Layouts',
   'plugin-pan': 'Pan Tool',
   'plugin-annotation': 'Annotations',
+  'plugin-form': 'Forms',
   'plugin-selection': 'Text Selection',
   'plugin-rotate': 'Rotation',
   'plugin-print': 'Printing',
   'plugin-i18n': 'Internationalization',
   'plugin-export': 'Export & Save',
+  'plugin-signature': 'Signatures',
 }

@@ -145,6 +145,75 @@ const handleDelete = (pageIndex: number, id: number) => {
 
 The `menuWrapperProps` provides a `style` string and an `action` for your wrapper element—the style handles positioning relative to page rotation, while the action handles event propagation to prevent interaction conflicts with underlying layers.
 
+## Importing and Exporting Annotations
+
+The annotation plugin provides a symmetric API for round-tripping annotations. Both `exportAnnotations()` and `importAnnotations()` use the same `AnnotationTransferItem` type, so you can export and re-import with zero mapping.
+
+**Why stamps need special handling:** Most annotations (highlights, ink, shapes) are fully described by their object properties and round-trip with no extra data. Stamp annotations, however, contain visual content (a raster image or a vector graphic) that lives in a separate appearance stream. The `exportAnnotations()` method automatically exports each stamp's appearance as a PDF buffer in `ctx.data`.
+
+### Export
+
+```svelte
+<script lang="ts">
+  import { useAnnotation } from '@embedpdf/plugin-annotation/svelte';
+
+  let { documentId }: { documentId: string } = $props();
+  const annotation = useAnnotation(() => documentId);
+
+  const handleExport = () => {
+    annotation.provides?.exportAnnotations().wait(
+      (exported) => {
+        // exported: AnnotationTransferItem[]
+        // Each entry has: { annotation, ctx? }
+        // Stamps include ctx: { data: ArrayBuffer, mimeType: 'application/pdf' }
+        console.log(`Exported ${exported.length} annotations`);
+      },
+      (error) => console.error('Export failed', error),
+    );
+  };
+</script>
+```
+
+You can also export a single page:
+
+```typescript
+annotation.provides?.exportAnnotations({ pageIndex: 0 }).wait(
+  (exported) => { /* ... */ },
+  (error) => { /* ... */ },
+);
+```
+
+### Import
+
+Pass the exported array directly to `importAnnotations()` — no remapping needed:
+
+```typescript
+annotation.provides?.importAnnotations(exported);
+```
+
+#### Importing stamps from image files
+
+Stamps can be created directly from PNG or JPEG buffers using `ctx: { data }`. The engine auto-detects the format from magic bytes, so no `mimeType` is needed:
+
+```typescript
+const response = await fetch('/my-stamp.png');
+const buffer = await response.arrayBuffer();
+
+annotation.provides?.importAnnotations([
+  { annotation: myStampAnnotation, ctx: { data: buffer } },
+]);
+```
+
+This works with any supported format — PNG, JPEG, or PDF appearance buffers (as produced by `exportAnnotations()`).
+
+For programmatic stamp creation from raw pixel data, `ctx: { imageData }` is also supported:
+
+```typescript
+annotation.provides?.importAnnotations([
+  { annotation: myStampAnnotation, ctx: { imageData: myImageData } },
+]);
+```
+
 ## Live Example
 
 Try using the annotation tools below. Select a tool from the toolbar to start creating annotations. Click on an annotation to select it, and use the delete button or the contextual menu to remove it.
@@ -436,7 +505,9 @@ A selection of key methods available on the `provides` object:
 | **`deleteAnnotation(..)`** | Deletes an annotation from a page. |
 | **`selectAnnotation(..)`** | Programmatically selects an annotation. |
 | **`getSelectedAnnotation()`** | Returns the currently selected `TrackedAnnotation` object, or `null`. |
+| **`exportAnnotations(..)`** | Exports annotations as `AnnotationTransferItem[]` (stamps include `ctx.data`). |
 | **`importAnnotations(..)`**| Imports an array of annotations into the viewer. |
+| **`deleteAllAnnotations()`** | Removes every annotation from the current document. |
 | **`commit()`** | Manually saves all pending annotation changes to the PDF document. |
 | **`onStateChange(cb)`** | Subscribes to any change in the annotation state. |
 | **`onAnnotationEvent(cb)`**| Subscribes to events like annotation creation, updates, or deletion. |

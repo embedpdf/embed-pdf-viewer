@@ -1,6 +1,6 @@
-import { Position, Rect, rotatePointAround, normalizeAngle } from '@embedpdf/models';
+import { normalizeAngle, Position, Rect, rotatePointAround } from '@embedpdf/models';
+import { applyConstraints, computeResizedRect } from './resize-geometry';
 import { ROTATION_HANDLE_MARGIN } from './utils';
-import { computeResizedRect, applyConstraints } from './resize-geometry';
 
 export interface DragResizeConfig {
   element: Rect;
@@ -223,7 +223,7 @@ export class DragResizeController {
   // Gesture move
   // ---------------------------------------------------------------------------
 
-  move(clientX: number, clientY: number, buttons?: number) {
+  move(clientX: number, clientY: number, buttons?: number, lockAspectRatio?: boolean) {
     if (this.state === 'idle' || !this.startPoint) return;
 
     // Safety net: if the button is no longer pressed but we never received
@@ -246,7 +246,7 @@ export class DragResizeController {
       const delta = this.calculateLocalDelta(clientX, clientY);
       const position = computeResizedRect(delta, this.activeHandle, {
         startRect: this.startElement,
-        maintainAspectRatio: this.config.maintainAspectRatio,
+        maintainAspectRatio: this.config.maintainAspectRatio || !!lockAspectRatio,
         annotationRotation: this.config.annotationRotation,
         constraints: this.config.constraints,
       });
@@ -259,7 +259,7 @@ export class DragResizeController {
           changes: { rect: position },
           metadata: {
             handle: this.activeHandle,
-            maintainAspectRatio: this.config.maintainAspectRatio,
+            maintainAspectRatio: this.config.maintainAspectRatio || !!lockAspectRatio,
           },
         },
       });

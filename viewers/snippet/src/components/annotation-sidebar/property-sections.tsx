@@ -199,10 +199,9 @@ function SliderSection({ config, value, onChange, translate }: PropertySectionPr
 
 /* ─── Stroke Style Section ──────────────────────────────────────────────── */
 
-type StrokeItem = { id: PdfAnnotationBorderStyle; dash?: number[] };
+type StrokeItem = { id: PdfAnnotationBorderStyle; dash?: number[]; cloudyIntensity?: number };
 
 function StrokeStyleSection({ config, value, onChange, translate }: PropertySectionProps) {
-  // Value could be just the style ID or the full object with dash array
   const currentStyle: StrokeItem =
     typeof value === 'object' && value !== null
       ? value
@@ -220,14 +219,17 @@ function StrokeStyleSection({ config, value, onChange, translate }: PropertySect
 
   const handleChange = (s: StrokeItem) => {
     setStyle(s);
-    // Pass both style and dash array
-    onChange({ strokeStyle: s.id, strokeDashArray: s.dash });
+    onChange({
+      strokeStyle: s.id,
+      strokeDashArray: s.dash,
+      cloudyBorderIntensity: s.cloudyIntensity ?? 0,
+    });
   };
 
   return (
     <Section>
       <SectionLabel className="mb-3">{translate(config.labelKey)}</SectionLabel>
-      <StrokeStyleSelect value={style} onChange={handleChange} />
+      <StrokeStyleSelect value={style} onChange={handleChange} showCloudy={config.showCloudy} />
     </Section>
   );
 }

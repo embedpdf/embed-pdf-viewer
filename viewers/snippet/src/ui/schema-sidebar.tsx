@@ -30,7 +30,13 @@ type DrawerState = 'closed' | 'half' | 'full';
  * On large containers: Traditional sidebar (left/right)
  * On small containers: Bottom drawer with drag-to-resize
  */
-export function SchemaSidebar({ schema, documentId, isOpen, onClose }: SidebarRendererProps) {
+export function SchemaSidebar({
+  schema,
+  documentId,
+  isOpen,
+  onClose,
+  sidebarProps,
+}: SidebarRendererProps) {
   const { getContainer } = useUIContainer();
 
   // Get initial size synchronously to prevent flicker on mount
@@ -73,6 +79,7 @@ export function SchemaSidebar({ schema, documentId, isOpen, onClose }: SidebarRe
         renderCustomComponent={renderCustomComponent}
         content={content}
         rootElement={container}
+        sidebarProps={sidebarProps}
       />,
       container,
     );
@@ -100,7 +107,7 @@ export function SchemaSidebar({ schema, documentId, isOpen, onClose }: SidebarRe
           />
         )}
         {content.type === 'component' && (
-          <>{renderCustomComponent(content.componentId, documentId, {})}</>
+          <>{renderCustomComponent(content.componentId, documentId, sidebarProps ?? {})}</>
         )}
       </div>
     </div>
@@ -119,6 +126,7 @@ function BottomDrawer({
   renderCustomComponent,
   content,
   rootElement,
+  sidebarProps,
 }: {
   schema: SidebarRendererProps['schema'];
   documentId: string;
@@ -127,6 +135,7 @@ function BottomDrawer({
   renderCustomComponent: (componentId: string, documentId: string, props: any) => any;
   content: SidebarRendererProps['schema']['content'];
   rootElement: HTMLElement;
+  sidebarProps?: Record<string, unknown>;
 }) {
   // Track the visual state separately from isOpen to allow animations
   const [drawerState, setDrawerState] = useState<DrawerState>('closed');
@@ -404,7 +413,7 @@ function BottomDrawer({
             />
           )}
           {content.type === 'component' && (
-            <>{renderCustomComponent(content.componentId, documentId, {})}</>
+            <>{renderCustomComponent(content.componentId, documentId, sidebarProps ?? {})}</>
           )}
         </div>
       </div>

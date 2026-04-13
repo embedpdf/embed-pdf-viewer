@@ -1,5 +1,68 @@
 # @embedpdf/engines
 
+## 2.14.0
+
+### Minor Changes
+
+- [#581](https://github.com/embedpdf/embed-pdf-viewer/pull/581) by [@bobsingor](https://github.com/bobsingor) – Support callout free text in the PDFium executor: read/write `/CL`, `/LE`, `/IT`, stroke width and colors, `/TextColor`, and remap rectangle differences (`/RD`) between native PDFium order and the model shape.
+
+## 2.13.0
+
+## 2.12.1
+
+## 2.12.0
+
+## 2.11.1
+
+### Patch Changes
+
+- [#557](https://github.com/embedpdf/embed-pdf-viewer/pull/557) by [@jonashaag](https://github.com/jonashaag) – Add BMP encoding support as an optional image format
+
+  BMP encoding bypasses canvas.toBlob() entirely by prepending a 66-byte header to the raw RGBA pixel data. This eliminates the dominant rendering bottleneck — in benchmarks, encoding dropped from ~76ms average (PNG via canvas.toBlob) to <1ms, reducing total tile render time by ~60%.
+
+  The BMP uses BI_BITFIELDS with channel masks matching PDFium's RGBA output byte order, so no per-pixel conversion is needed. Top-down row order avoids row flipping. The result is a valid BMP that all modern browsers decode natively in `<img>` elements.
+
+  Users who want to opt into the faster BMP path can set `defaultImageType: 'image/bmp'` in the render plugin config, while PNG remains the default output format.
+
+- [#566](https://github.com/embedpdf/embed-pdf-viewer/pull/566) by [@bobsingor](https://github.com/bobsingor) – Fix custom stamp annotations with `imageSize` so predefined image stamps render correctly while preserving the original embedded bitmap quality.
+
+## 2.11.0
+
+### Minor Changes
+
+- [#562](https://github.com/embedpdf/embed-pdf-viewer/pull/562) by [@bobsingor](https://github.com/bobsingor) – Implement new PDF manipulation and annotation appearance export methods: `createDocument`, `importPages`, `deletePage`, `exportAnnotationAppearanceAsPdf`, and `exportAnnotationsAppearanceAsPdf`.
+
+## 2.10.1
+
+## 2.10.0
+
+### Minor Changes
+
+- [#537](https://github.com/embedpdf/embed-pdf-viewer/pull/537) by [@bobsingor](https://github.com/bobsingor) –
+  - Add engine APIs for reading page widgets and form/document JavaScript actions, setting full widget state, renaming and sharing widget fields, and regenerating widget appearances.
+  - Route the new widget and form operations through the PDFium and web worker layers to support form authoring and fill-mode workflows.
+
+## 2.9.1
+
+## 2.9.0
+
+### Minor Changes
+
+- [#529](https://github.com/embedpdf/embed-pdf-viewer/pull/529) by [@bobsingor](https://github.com/bobsingor) – Integrate cloudy border effect reading and writing in the PDFium engine. Annotations with `/BE /S /C` dictionaries now include `cloudyBorderIntensity` in their parsed objects, and creating/updating annotations writes the border effect dictionary via `setBorderEffect`.
+
+### Patch Changes
+
+- [#514](https://github.com/embedpdf/embed-pdf-viewer/pull/514) by [@bobsingor](https://github.com/bobsingor) – Expose PDF annotation blend mode in base PDFium annotation properties.
+
+  `PdfiumNative` now reads `EPDFAnnot_GetBlendMode` and includes `blendMode` in the shared base annotation payload, so all annotation types parsed through the PDFium engine consistently receive their blend mode metadata.
+
+## 2.8.0
+
+### Minor Changes
+
+- [#495](https://github.com/embedpdf/embed-pdf-viewer/pull/495) by [@bobsingor](https://github.com/bobsingor) – Added support for reading and writing Caret annotations (`PdfCaretAnnoObject`).
+  Added support for reading and writing Rectangle Differences (`/RD`) for annotations that support it.
+
 ## 2.7.0
 
 ### Minor Changes

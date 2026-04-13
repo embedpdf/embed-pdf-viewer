@@ -1,0 +1,337 @@
+---
+title: Form Plugin
+description: Enable users to interact with PDF form fields (AcroForm), fill out text, dropdowns, and checkboxes, and extract or set form values programmatically.
+searchable: true
+---
+
+import { Callout } from '@/components/callout'
+import { CodeExample } from '@/components/code-example'
+
+# Form Plugin
+
+The Form Plugin adds interactive support for PDF forms (AcroForm). It allows users to fill out text fields, select options from dropdowns (combo boxes) and list boxes, and toggle checkboxes and radio buttons. It also provides a robust programmatic API to extract form data or set field values programmatically.
+
+The form fields are rendered through the **Annotation Plugin's** `<AnnotationLayer />`. The Form Plugin registers its own widget renderers into the annotation layer, so form fields appear seamlessly alongside other annotation types.
+
+## Installation
+
+This plugin relies on the Annotation Plugin (and its own dependencies) to render and interact with form widgets.
+
+```sh npm2yarn
+npm install @embedpdf/plugin-form @embedpdf/plugin-annotation @embedpdf/plugin-interaction-manager @embedpdf/plugin-selection @embedpdf/plugin-history
+````
+
+## Registration
+
+Import `FormPluginPackage` and the required Annotation Plugin dependencies. Register the annotation plugin dependencies *before* both the Annotation and Form plugins.
+
+```tsx {8, 23-24}
+import { createPluginRegistration } from '@embedpdf/core'
+import { EmbedPDF } from '@embedpdf/core/react'
+// ... other imports
+import { InteractionManagerPluginPackage } from '@embedpdf/plugin-interaction-manager/react'
+import { SelectionPluginPackage } from '@embedpdf/plugin-selection/react'
+import { HistoryPluginPackage } from '@embedpdf/plugin-history/react'
+import { AnnotationPluginPackage } from '@embedpdf/plugin-annotation/react'
+import { FormPluginPackage } from '@embedpdf/plugin-form/react'
+
+const plugins = [
+  // ... other essential plugins like DocumentManager, Render, Scroll, Viewport
+  createPluginRegistration(DocumentManagerPluginPackage, { /* ... */ }),
+  createPluginRegistration(RenderPluginPackage),
+
+  // Annotation plugin dependencies
+  createPluginRegistration(InteractionManagerPluginPackage),
+  createPluginRegistration(SelectionPluginPackage),
+  createPluginRegistration(HistoryPluginPackage),
+
+  // Annotation plugin (required by the form plugin)
+  createPluginRegistration(AnnotationPluginPackage),
+
+  // Form plugin — registers form field renderers into the AnnotationLayer
+  createPluginRegistration(FormPluginPackage),
+]
+```
+
+<Callout type="info" title="No separate FormLayer needed">
+  The Form Plugin registers its renderers into the existing `AnnotationLayer`. There is no separate `FormLayer` component. Once you register both plugins, form widgets will automatically render and be interactive inside the `AnnotationLayer`.
+</Callout>
+
+## Usage
+
+### 1. Rendering Form Fields
+
+Form fields are rendered through the `<AnnotationLayer />` component. Place it inside the `<Scroller />`'s `renderPage` prop, wrapped by a `<PagePointerProvider>`. This is the same setup as the Annotation Plugin.
+
+```tsx {2-3, 16-19}
+import { PagePointerProvider } from '@embedpdf/plugin-interaction-manager/react';
+import { AnnotationLayer } from '@embedpdf/plugin-annotation/react';
+// FormPluginPackage must be registered — no additional import needed for rendering
+
+// ...
+<Scroller
+  documentId={activeDocumentId}
+  renderPage={({ pageIndex }) => (
+    <PagePointerProvider 
+      documentId={activeDocumentId}
+      pageIndex={pageIndex} 
+    >
+      <RenderLayer documentId={activeDocumentId} pageIndex={pageIndex} />
+      <SelectionLayer documentId={activeDocumentId} pageIndex={pageIndex} />
+      {/* AnnotationLayer renders both annotations AND form fields */}
+      <AnnotationLayer
+        documentId={activeDocumentId}
+        pageIndex={pageIndex}
+      />
+    </PagePointerProvider>
+  )}
+/>
+```
+
+When the document is in **locked mode** (the default when no annotation tool is active), form fields become interactive — users can type in text fields, toggle checkboxes and radio buttons, and select options from dropdowns.
+
+### 2. Reading Form State
+
+You can hook into the form's state using `useFormCapability` to listen to changes or to read the current values of all fields as a `Record<string, string>`. This is useful for mirroring form state to your backend, validating input, or displaying a live preview.
+
+```tsx
+import { useFormCapability } from '@embedpdf/plugin-form/react';
+
+const FormStateLogger = ({ documentId }: { documentId: string }) => {
+  const { provides: formCapability } = useFormCapability();
+
+  useEffect(() => {
+    if (!formCapability) return;
+    const scope = formCapability.forDocument(documentId);
+
+    // Subscribe to field value changes
+    const unsub = scope.onFieldValueChange((event) => {
+      const allValues = scope.getFormValues();
+      console.log('Field changed:', event.annotationId);
+      console.log('All values:', allValues);
+    });
+
+    return unsub;
+  }, [formCapability, documentId]);
+
+  return null;
+};
+```
+
+### 3. Programmatically Setting Values
+
+You can pre-fill a form with data from a database or API using the `setFormValues` method. Pass an object where the keys are the PDF field names and the values are their new text values.
+
+```tsx
+import { useFormCapability } from '@embedpdf/plugin-form/react';
+
+const AutoFillButton = ({ documentId }: { documentId: string }) => {
+  const { provides: formCapability } = useFormCapability();
+
+  const handleFill = () => {
+    const scope = formCapability?.forDocument(documentId);
+    scope?.setFormValues({
+      'First Name': 'Jane Doe',
+      'Email': 'jane@example.com',
+      'Department': 'Engineering',
+    });
+  };
+
+  return <button onClick={handleFill}>Fill Form</button>;
+};
+```
+
+<Callout type="info" title="Checkbox and Radio Button Values">
+  Radio buttons still expect the exact **export value** defined in the PDF. Checkboxes are more forgiving: pass `"Off"` to uncheck them, and any other string will be normalized to the widget's actual checked export value.
+</Callout>
+
+### 4. Listening to Form Ready
+
+The `onFormReady` event fires when the form fields have been fully parsed from the document. It provides an array of `FormFieldInfo` objects describing every field in the PDF.
+
+```tsx
+import { useFormCapability, FormFieldInfo } from '@embedpdf/plugin-form/react';
+
+const FormFieldList = ({ documentId }: { documentId: string }) => {
+  const { provides: formCapability } = useFormCapability();
+  const [fields, setFields] = useState<FormFieldInfo[]>([]);
+
+  useEffect(() => {
+    if (!formCapability) return;
+    const scope = formCapability.forDocument(documentId);
+
+    const unsub = scope.onFormReady((fieldList) => {
+      setFields(fieldList);
+    });
+
+    return unsub;
+  }, [formCapability, documentId]);
+
+  return (
+    <ul>
+      {fields.map((f) => (
+        <li key={f.name}>{f.name} ({f.type}) = {f.value}</li>
+      ))}
+    </ul>
+  );
+};
+```
+
+### 5. Fill Mode vs. Design Mode
+
+Form widgets are rendered by the Annotation Plugin, which means their behavior depends on the current annotation lock mode:
+
+- In **fill mode**, keep the `form` category locked so widgets stay fillable and cannot be transformed.
+- In **design mode**, unlock annotations so the same widgets can be selected, moved, and resized like regular annotations.
+
+```tsx
+import { useAnnotation, LockModeType } from '@embedpdf/plugin-annotation/react';
+
+const fillModeLock = { type: LockModeType.Include, categories: ['form'] } as const;
+
+const FormModeToggle = ({ documentId }: { documentId: string }) => {
+  const { state, provides } = useAnnotation(documentId);
+
+  const fillMode =
+    state.locked.type === LockModeType.Include &&
+    state.locked.categories.includes('form');
+
+  return (
+    <button
+      onClick={() =>
+        provides?.setLocked(fillMode ? { type: LockModeType.None } : fillModeLock)
+      }
+    >
+      {fillMode ? 'Switch to Design Mode' : 'Switch to Fill Mode'}
+    </button>
+  );
+};
+```
+
+When the form category is locked, users can type, toggle, and select values. When unlocked, the widgets behave like annotations again, which is useful if you want to let users adjust placement or size in a custom authoring workflow.
+
+## Live Example — Switching Between Fill and Design Mode
+
+This example shows how to toggle between fill mode and design mode by switching the Annotation Plugin lock state.
+
+import { FormEditModeViewer } from '../../code-examples/headless/form-edit-mode-example';
+
+<CodeExample
+  codePaths={[
+    "content/docs/react/code-examples/headless/form-edit-mode-example.tsx"
+  ]}
+>
+  <FormEditModeViewer />
+</CodeExample>
+
+## Live Example — Reading Form State
+
+The example below displays a PDF form on the left and a live JSON view of all field values on the right. It also includes a download button so you can save the filled PDF with its current form state.
+
+import { FormViewer } from '../../code-examples/headless/form-example';
+
+<CodeExample
+  codePaths={[
+    "content/docs/react/code-examples/headless/form-example.tsx"
+  ]}
+>
+  <FormViewer />
+</CodeExample>
+
+## Live Example — Programmatic Auto Fill
+
+This example adds an "Auto Fill Data" button that uses `setFormValues` to programmatically populate the form, and a "Clear Form" button that resets all fields. This demonstrates how easy it is to integrate form data from an external source.
+
+import { FormImportViewer } from '../../code-examples/headless/form-import-example';
+
+<CodeExample
+  codePaths={[
+    "content/docs/react/code-examples/headless/form-import-example.tsx"
+  ]}
+>
+  <FormImportViewer />
+</CodeExample>
+
+
+## Supported Field Types
+
+The following PDF form field types are supported out of the box:
+
+- **Text Field** — Single-line and multi-line text inputs, including comb fields
+- **Checkbox** — Toggle between checked/unchecked states
+- **Radio Button** — Select one option from a group
+- **Combo Box** — Dropdown select (single-select)
+- **List Box** — Scrollable list of options
+
+## API Reference
+
+### Configuration (`FormPluginConfig`)
+
+The Form Plugin currently does not require any configuration options. Simply register it alongside the Annotation Plugin.
+
+### Hook: `useFormCapability()`
+
+Provides access to the Form Plugin's capability object.
+
+#### Returns
+
+| Property | Type | Description |
+| :--- | :--- | :--- |
+| **`provides`** | `FormCapability \| null` | The form capability object, or `null` if not yet initialized. |
+
+### `FormCapability` Methods
+
+The `FormCapability` interface provides document-scoped operations. Most methods accept an optional `documentId` parameter; if omitted, the active document is used.
+
+| Method | Description |
+| :--- | :--- |
+| **`getFormValues(documentId?)`** | Returns a `Record<string, string>` of all field names and their current values. |
+| **`getFormFields(documentId?)`** | Returns an array of `FormFieldInfo` objects describing every field. |
+| **`setFormValues(values, documentId?)`** | Sets multiple field values at once. Keys are field names, values are strings. |
+| **`setFormFieldValues(pageIndex, annotation, newField, documentId?)`** | Updates the field data for a specific widget annotation. |
+| **`selectField(annotationId, documentId?)`** | Focuses a specific field. |
+| **`deselectField(documentId?)`** | Removes focus from the currently selected field. |
+| **`selectNextField(documentId?)`** | Moves focus to the next field in tab order. |
+| **`selectPreviousField(documentId?)`** | Moves focus to the previous field in tab order. |
+| **`getFieldGroup(annotationId, documentId?)`** | Returns all widget entries sharing the same logical field (including the given annotation). |
+| **`getFieldSiblings(annotationId, documentId?)`** | Returns sibling widget entries sharing the same logical field (excluding the given annotation). |
+| **`forDocument(documentId)`** | Returns a `FormScope` bound to a specific document. |
+
+### `FormScope` (Document-Scoped)
+
+Returned by `formCapability.forDocument(documentId)`. Same methods as `FormCapability` but without the `documentId` parameter.
+
+#### Events
+
+| Event | Callback Signature | Description |
+| :--- | :--- | :--- |
+| **`onStateChange`** | `(state: FormDocumentState) => void` | Fires when the form plugin's internal state changes (e.g. field selection). |
+| **`onFieldValueChange`** | `(event: FieldValueChangeEvent) => void` | Fires when a form field value is updated (by user interaction or programmatically). |
+| **`onFormReady`** | `(fields: FormFieldInfo[]) => void` | Fires when the form fields have been fully parsed from the PDF. |
+
+### `FormFieldInfo`
+
+Describes a single form field in the document.
+
+```typescript
+interface FormFieldInfo {
+  name: string;
+  type: PDF_FORM_FIELD_TYPE;
+  value: string;
+  readOnly: boolean;
+  options?: PdfWidgetAnnoOption[];
+}
+```
+
+### `FieldValueChangeEvent`
+
+Passed to the `onFieldValueChange` callback.
+
+```typescript
+interface FieldValueChangeEvent {
+  documentId: string;
+  pageIndex: number;
+  annotationId: string;
+  widget: PdfWidgetAnnoObject;
+}
+```

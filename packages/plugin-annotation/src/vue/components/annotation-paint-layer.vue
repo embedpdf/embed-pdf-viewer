@@ -1,9 +1,9 @@
 <template>
   <input ref="fileInputRef" type="file" style="display: none" />
-  <canvas ref="canvasRef" style="display: none"></canvas>
   <PreviewRenderer
     v-for="[toolId, preview] in previews.entries()"
     :key="toolId"
+    :toolId="toolId"
     :preview="preview"
     :scale="scale"
   />
@@ -12,7 +12,7 @@
 <script setup lang="ts">
 import { ref, watchEffect, computed } from 'vue';
 import { useAnnotationPlugin } from '../hooks';
-import { AnyPreviewState, HandlerServices } from '@embedpdf/plugin-annotation';
+import { PreviewState, HandlerServices } from '@embedpdf/plugin-annotation';
 import PreviewRenderer from './preview-renderer.vue';
 
 const props = defineProps<{
@@ -22,9 +22,8 @@ const props = defineProps<{
 }>();
 
 const { plugin: annotationPlugin } = useAnnotationPlugin();
-const previews = ref<Map<string, AnyPreviewState>>(new Map());
+const previews = ref<Map<string, PreviewState>>(new Map());
 const fileInputRef = ref<HTMLInputElement | null>(null);
-const canvasRef = ref<HTMLCanvasElement | null>(null);
 
 const services = computed<HandlerServices>(() => ({
   requestFile: ({ accept, onFile }) => {
@@ -39,33 +38,6 @@ const services = computed<HandlerServices>(() => ({
       }
     };
     input.click();
-  },
-  processImage: ({ source, maxWidth, maxHeight, onComplete }) => {
-    const canvas = canvasRef.value;
-    if (!canvas || !canvas.getContext) return;
-    const ctx = canvas.getContext('2d');
-    if (!ctx) return;
-
-    const img = new Image();
-    img.crossOrigin = 'Anonymous';
-    img.onload = () => {
-      let { naturalWidth: width, naturalHeight: height } = img;
-      const scaleX = maxWidth ? maxWidth / width : 1;
-      const scaleY = maxHeight ? maxHeight / height : 1;
-      const scaleFactor = Math.min(scaleX, scaleY, 1);
-      const finalWidth = width * scaleFactor;
-      const finalHeight = height * scaleFactor;
-
-      canvas.width = finalWidth;
-      canvas.height = finalHeight;
-      ctx.drawImage(img, 0, 0, finalWidth, finalHeight);
-
-      const imageData = ctx.getImageData(0, 0, finalWidth, finalHeight);
-      if (typeof source !== 'string') URL.revokeObjectURL(img.src);
-
-      onComplete({ imageData, width: finalWidth, height: finalHeight });
-    };
-    img.src = typeof source === 'string' ? source : URL.createObjectURL(source);
   },
 }));
 

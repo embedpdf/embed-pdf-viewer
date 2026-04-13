@@ -1,0 +1,148 @@
+---
+title: Signatures
+description: Let users draw, type, or upload signatures and persist them across sessions.
+---
+
+import SignatureExample from '../../code-examples/viewer/signature-example';
+import { ExampleWrapper } from '@/components/example-wrapper';
+import { Callout } from '@/components/callout';
+
+# Signatures
+
+The `PDFViewer` includes the signature plugin by default. Users can create signatures by drawing, typing, or uploading an image, and then place them anywhere on the document. The built-in sidebar and modal UI handles creation and placement automatically.
+
+On top of the built-in experience, you can access the `signature` plugin through the viewer registry to persist entries across sessions, pre-load signatures, or react to changes programmatically.
+
+## Configuration
+
+You can configure the signature mode and default placement size through the `signature` config key:
+
+```tsx
+import { SignatureMode } from '@embedpdf/react-pdf-viewer'
+
+<PDFViewer
+  config={{
+    signature: {
+      mode: SignatureMode.SignatureAndInitials,
+      defaultSize: { width: 150, height: 50 },
+    },
+  }}
+/>
+```
+
+<Callout type="info" title="Signature Modes">
+  Set `mode` to `SignatureMode.SignatureOnly` (default) for just signatures, or `SignatureMode.SignatureAndInitials` to let users create a paired signature and initials entry.
+</Callout>
+
+## Persisting Signatures
+
+Signatures live in memory by default and are lost when the page reloads. The example below shows how to persist them to `localStorage` using the built-in serialization utilities and the `onEntriesChange` event hook.
+
+<CodeExample
+  codePaths={[
+    "content/docs/react/code-examples/viewer/signature-example.tsx"
+  ]}
+>
+  <ExampleWrapper>
+    <SignatureExample />
+  </ExampleWrapper>
+</CodeExample>
+
+### Auto-Save with `onEntriesChange`
+
+Subscribe to entry changes and write to storage whenever a signature is added, removed, or loaded:
+
+```tsx
+import {
+  SignaturePlugin,
+  serializeEntries,
+  deserializeEntries,
+} from '@embedpdf/react-pdf-viewer'
+
+const STORAGE_KEY = 'my-signatures'
+
+const setup = async (viewerRef) => {
+  const registry = await viewerRef.current?.registry
+  const api = registry?.getPlugin<SignaturePlugin>('signature')?.provides()
+  if (!api) return
+
+  // Load saved entries on startup
+  const raw = localStorage.getItem(STORAGE_KEY)
+  if (raw) {
+    api.loadEntries(deserializeEntries(JSON.parse(raw)))
+  }
+
+  // Auto-save whenever entries change
+  api.onEntriesChange((entries) => {
+    localStorage.setItem(
+      STORAGE_KEY,
+      JSON.stringify(serializeEntries(entries)),
+    )
+  })
+}
+```
+
+<Callout type="info" title="Serialization">
+  `serializeEntries` converts `ArrayBuffer` image data to base64 strings so the result is safe for `JSON.stringify`. `deserializeEntries` reverses the process. Both handle ink (draw) and stamp (type/upload) entries.
+</Callout>
+
+## Programmatic Access
+
+### Accessing the Signature Plugin
+
+Use the viewer registry to get the signature capability:
+
+```tsx
+import { SignaturePlugin } from '@embedpdf/react-pdf-viewer'
+
+const registry = await viewerRef.current?.registry
+const signatureApi = registry
+  ?.getPlugin<SignaturePlugin>('signature')
+  ?.provides()
+```
+
+### Reading Entries
+
+```tsx
+const entries = signatureApi?.getEntries()
+console.log(`${entries?.length} signatures available`)
+```
+
+### Placing a Signature
+
+Arm a signature for placement on a specific document. The user then clicks the document to position it:
+
+```tsx
+const scope = signatureApi?.forDocument('my-doc')
+
+// Place signature
+scope?.activateSignaturePlacement(entryId)
+
+// Place initials (when using signatureAndInitials mode)
+scope?.activateInitialsPlacement(entryId)
+
+// Cancel placement
+scope?.deactivatePlacement()
+```
+
+## API Reference
+
+### `SignatureCapability` Methods
+
+| Method | Description |
+| :--- | :--- |
+| **`getEntries()`** | Returns all saved `SignatureEntry` objects. |
+| **`addEntry(entry)`** | Saves a new signature entry. Returns the generated UUID. |
+| **`removeEntry(id)`** | Deletes a signature entry. |
+| **`exportEntries()`** | Returns all entries including binary data. Use with `serializeEntries()` for persistence. |
+| **`loadEntries(entries)`** | Hydrates the plugin with previously exported entries. Use with `deserializeEntries()` when loading from JSON. |
+| **`onEntriesChange`** | Event hook fired whenever entries change. Subscribe with `onEntriesChange((entries) => { ... })` — returns an unsubscribe function. |
+| **`forDocument(documentId)`** | Returns a `SignatureScope` for placement actions on the given document. |
+
+### `SignatureScope` Methods
+
+| Method | Description |
+| :--- | :--- |
+| **`activateSignaturePlacement(entryId)`** | Arms a signature entry for placement on the PDF. |
+| **`activateInitialsPlacement(entryId)`** | Arms an initials entry for placement on the PDF. |
+| **`deactivatePlacement()`** | Cancels placement mode. |

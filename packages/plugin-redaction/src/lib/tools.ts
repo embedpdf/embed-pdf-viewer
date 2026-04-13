@@ -1,14 +1,15 @@
-import { PdfAnnotationObject, PdfAnnotationSubtype, PdfRedactAnnoObject } from '@embedpdf/models';
-import { AnnotationTool } from '@embedpdf/plugin-annotation';
+import { PdfAnnotationObject, PdfAnnotationSubtype } from '@embedpdf/models';
+import { AnnotationTool, defineAnnotationTool } from '@embedpdf/plugin-annotation';
 import { RedactionMode } from './types';
 
 /**
  * Unified Redact tool - handles both text-based and area-based redactions.
  * Dynamically determines isDraggable/isResizable based on whether it has segmentRects.
  */
-export const redactTool: AnnotationTool<PdfRedactAnnoObject> = {
+export const redactTool = defineAnnotationTool({
   id: 'redact',
   name: 'Redact',
+  categories: ['annotation', 'redaction'],
   matchScore: (a: PdfAnnotationObject) => (a.type === PdfAnnotationSubtype.REDACT ? 10 : 0),
   interaction: {
     mode: RedactionMode.Redact,
@@ -40,6 +41,6 @@ export const redactTool: AnnotationTool<PdfRedactAnnoObject> = {
   behavior: {
     useAppearanceStream: false,
   },
-};
+} satisfies AnnotationTool);
 
 export const redactTools = [redactTool];

@@ -21,7 +21,7 @@ export interface RenderPluginConfig extends BasePluginConfig {
   withAnnotations?: boolean;
   /**
    * The image type to use for rendering.
-   * Defaults to `'image/webp'`.
+   * Defaults to `'image/png'`.
    */
   defaultImageType?: ImageConversionTypes;
   /**

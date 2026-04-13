@@ -9,11 +9,30 @@
     }"
     :width="svgWidth"
     :height="svgHeight"
-    :viewBox="`0 0 ${geometry.width + strokeWidth} ${geometry.height + strokeWidth}`"
+    :viewBox="`0 0 ${rect.size.width} ${rect.size.height}`"
     overflow="visible"
   >
     <!-- Hit area -- always rendered, transparent, wider stroke for mobile -->
+    <path
+      v-if="isCloudy && cloudyPath"
+      :d="cloudyPath.path"
+      fill="transparent"
+      stroke="transparent"
+      :stroke-width="hitStrokeWidth"
+      @pointerdown="onClick"
+      :style="{
+        cursor: isSelected ? 'move' : onClick ? 'pointer' : 'default',
+        pointerEvents: !onClick
+          ? 'none'
+          : isSelected
+            ? 'none'
+            : color === 'transparent'
+              ? 'visibleStroke'
+              : 'visible',
+      }"
+    />
     <rect
+      v-else
       :x="geometry.x"
       :y="geometry.y"
       :width="geometry.width"
@@ -22,30 +41,49 @@
       stroke="transparent"
       :stroke-width="hitStrokeWidth"
       @pointerdown="onClick"
-      @touchstart="onClick"
       :style="{
-        cursor: isSelected ? 'move' : 'pointer',
-        pointerEvents: isSelected ? 'none' : color === 'transparent' ? 'visibleStroke' : 'visible',
+        cursor: isSelected ? 'move' : onClick ? 'pointer' : 'default',
+        pointerEvents: !onClick
+          ? 'none'
+          : isSelected
+            ? 'none'
+            : color === 'transparent'
+              ? 'visibleStroke'
+              : 'visible',
       }"
     />
     <!-- Visual -- hidden when AP active, never interactive -->
-    <rect
-      v-if="!appearanceActive"
-      :x="geometry.x"
-      :y="geometry.y"
-      :width="geometry.width"
-      :height="geometry.height"
-      :fill="color"
-      :opacity="opacity"
-      :style="{
-        pointerEvents: 'none',
-        stroke: strokeColor ?? color,
-        strokeWidth: strokeWidth,
-        ...(strokeStyle === PdfAnnotationBorderStyle.DASHED && {
-          strokeDasharray: strokeDashArray?.join(','),
-        }),
-      }"
-    />
+    <template v-if="!appearanceActive">
+      <path
+        v-if="isCloudy && cloudyPath"
+        :d="cloudyPath.path"
+        :fill="color"
+        :opacity="opacity"
+        :style="{
+          pointerEvents: 'none',
+          stroke: strokeColor ?? color,
+          strokeWidth: strokeWidth,
+          strokeLinejoin: 'round',
+        }"
+      />
+      <rect
+        v-else
+        :x="geometry.x"
+        :y="geometry.y"
+        :width="geometry.width"
+        :height="geometry.height"
+        :fill="color"
+        :opacity="opacity"
+        :style="{
+          pointerEvents: 'none',
+          stroke: strokeColor ?? color,
+          strokeWidth: strokeWidth,
+          ...(strokeStyle === PdfAnnotationBorderStyle.DASHED && {
+            strokeDasharray: strokeDashArray?.join(','),
+          }),
+        }"
+      />
+    </template>
   </svg>
 </template>
 
@@ -55,7 +93,8 @@ export default { inheritAttrs: false };
 
 <script setup lang="ts">
 import { computed } from 'vue';
-import { PdfAnnotationBorderStyle, Rect } from '@embedpdf/models';
+import { PdfAnnotationBorderStyle, PdfRectDifferences, Rect } from '@embedpdf/models';
+import { generateCloudyRectanglePath } from '@embedpdf/plugin-annotation';
 
 const MIN_HIT_AREA_SCREEN_PX = 20;
 
@@ -70,8 +109,10 @@ const props = withDefaults(
     strokeDashArray?: number[];
     rect: Rect;
     scale: number;
-    onClick?: (e: PointerEvent | TouchEvent) => void;
+    onClick?: (e: PointerEvent) => void;
     appearanceActive?: boolean;
+    cloudyBorderIntensity?: number;
+    rectangleDifferences?: PdfRectDifferences;
   }>(),
   {
     color: '#000000',
@@ -80,6 +121,8 @@ const props = withDefaults(
     appearanceActive: false,
   },
 );
+
+const isCloudy = computed(() => (props.cloudyBorderIntensity ?? 0) > 0);
 
 const geometry = computed(() => {
   const outerW = props.rect.size.width;
@@ -95,8 +138,18 @@ const geometry = computed(() => {
   };
 });
 
-const svgWidth = computed(() => (geometry.value.width + props.strokeWidth) * props.scale);
-const svgHeight = computed(() => (geometry.value.height + props.strokeWidth) * props.scale);
+const cloudyPath = computed(() => {
+  if (!isCloudy.value) return null;
+  return generateCloudyRectanglePath(
+    { x: 0, y: 0, width: props.rect.size.width, height: props.rect.size.height },
+    props.rectangleDifferences,
+    props.cloudyBorderIntensity!,
+    props.strokeWidth,
+  );
+});
+
+const svgWidth = computed(() => props.rect.size.width * props.scale);
+const svgHeight = computed(() => props.rect.size.height * props.scale);
 const hitStrokeWidth = computed(() =>
   Math.max(props.strokeWidth, MIN_HIT_AREA_SCREEN_PX / props.scale),
 );

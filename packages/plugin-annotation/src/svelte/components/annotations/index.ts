@@ -7,3 +7,4 @@ export { default as Polygon } from './Polygon.svelte';
 export { default as Polyline } from './Polyline.svelte';
 export { default as Square } from './Square.svelte';
 export { default as Stamp } from './Stamp.svelte';
+export { default as Text } from './Text.svelte';

@@ -71,6 +71,11 @@ export {
   type AnnotationCapability,
   type AnnotationScope,
   type AnnotationEvent,
+  type AnnotationTool,
+  type AnnotationTransferItem,
+  type ExportAnnotationsOptions,
+  type GetAnnotationsOptions,
+  type TrackedAnnotation,
 } from '@embedpdf/plugin-annotation/preact';
 export {
   SearchPlugin,
@@ -84,6 +89,15 @@ export {
   type SelectionCapability,
   type SelectionScope,
 } from '@embedpdf/plugin-selection/preact';
+export {
+  FormPlugin,
+  type FormPluginConfig,
+  type FormCapability,
+  type FormScope,
+  type FormFieldInfo,
+  type FormReadyEvent,
+  type FieldValueChangeEvent,
+} from '@embedpdf/plugin-form/preact';
 export {
   CapturePlugin,
   type CapturePluginConfig,
@@ -238,9 +252,21 @@ export {
   type InteractionManagerCapability,
   type InteractionManagerScope,
 } from '@embedpdf/plugin-interaction-manager/preact';
+export {
+  SignaturePlugin,
+  SignatureMode,
+  type SignaturePluginConfig,
+  type SignatureCapability,
+  type SignatureEntry,
+  type SignatureFieldDefinition,
+  type SignatureFieldKind,
+  serializeEntries,
+  deserializeEntries,
+  type SerializedSignatureEntry,
+} from '@embedpdf/plugin-signature/preact';
 
 // Re-export from models
-export { Rotation, ignore } from '@embedpdf/models';
+export { Rotation, ignore, PdfAnnotationSubtype, type PdfStampAnnoObject } from '@embedpdf/models';
 
 // Re-export PluginRegistry for typing
 export type { PluginRegistry } from '@embedpdf/core';

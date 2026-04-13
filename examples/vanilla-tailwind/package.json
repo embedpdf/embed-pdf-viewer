@@ -1,0 +1,10 @@
+{
+  "name": "@embedpdf/example-vanilla-tailwind",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "license": "MIT",
+  "scripts": {
+    "dev": "python3 -m http.server 4173"
+  }
+}

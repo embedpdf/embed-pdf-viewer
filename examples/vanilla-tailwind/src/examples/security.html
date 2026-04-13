@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>EmbedPDF Security Example</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="min-h-screen bg-slate-100 p-6 text-slate-900">
+  <div class="mx-auto flex max-w-7xl flex-col gap-4">
+    <section class="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+      <h1 class="text-lg font-semibold">Security & Permissions</h1>
+      <p class="mt-1 text-sm text-slate-600">
+        Switch between the document tabs to compare how different permission
+        overrides affect the viewer UI.
+      </p>
+
+      <ul class="mt-4 space-y-2 text-sm text-slate-700">
+        <li><strong>Full Access:</strong> Ignores PDF restrictions.</li>
+        <li><strong>Print Disabled:</strong> Printing is blocked, but text selection still works.</li>
+        <li><strong>Read-Only:</strong> Printing, copying, and modifications are blocked.</li>
+      </ul>
+    </section>
+
+    <div class="h-[700px] overflow-hidden rounded-xl border border-slate-300 bg-white shadow-lg">
+      <div id="pdf-viewer" class="h-full w-full"></div>
+    </div>
+  </div>
+
+  <script type="module">
+    import EmbedPDF from 'https://cdn.jsdelivr.net/npm/@embedpdf/snippet/dist/embedpdf.js';
+
+    EmbedPDF.init({
+      type: 'container',
+      target: document.getElementById('pdf-viewer'),
+      tabBar: 'always',
+      documentManager: {
+        initialDocuments: [
+          {
+            url: 'https://snippet.embedpdf.com/ebook.pdf',
+            name: 'Full Access',
+            permissions: {
+              enforceDocumentPermissions: false,
+            },
+          },
+          {
+            url: 'https://snippet.embedpdf.com/ebook.pdf',
+            name: 'Print Disabled',
+            autoActivate: false,
+            permissions: {
+              enforceDocumentPermissions: false,
+              overrides: {
+                print: false,
+                printHighQuality: false,
+              },
+            },
+          },
+          {
+            url: 'https://snippet.embedpdf.com/ebook.pdf',
+            name: 'Read-Only',
+            autoActivate: false,
+            permissions: {
+              enforceDocumentPermissions: false,
+              overrides: {
+                print: false,
+                printHighQuality: false,
+                copyContents: false,
+                modifyContents: false,
+                modifyAnnotations: false,
+              },
+            },
+          },
+        ],
+      },
+    });
+  </script>
+</body>
+</html>

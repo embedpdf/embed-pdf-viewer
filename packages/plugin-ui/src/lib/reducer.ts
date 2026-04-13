@@ -141,7 +141,7 @@ export const uiReducer = (state = initialState, action: UIAction): UIState => {
     // ─────────────────────────────────────────────────────────
 
     case SET_ACTIVE_SIDEBAR: {
-      const { documentId, placement, slot, sidebarId, activeTab } = action.payload;
+      const { documentId, placement, slot, sidebarId, activeTab, props } = action.payload;
       const docState = state.documents[documentId] || initialDocumentState;
       const slotKey = `${placement}-${slot}`;
 
@@ -156,6 +156,7 @@ export const uiReducer = (state = initialState, action: UIAction): UIState => {
               [slotKey]: {
                 sidebarId,
                 isOpen: true,
+                props,
               },
             },
             ...(activeTab && {

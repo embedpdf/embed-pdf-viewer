@@ -114,6 +114,7 @@ export function useSchemaRenderer(getDocumentId: () => string | null) {
         documentId,
         isOpen: sidebarSlot.isOpen,
         onClose: handleClose,
+        sidebarProps: sidebarSlot.props,
       };
     },
 

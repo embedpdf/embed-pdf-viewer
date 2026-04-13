@@ -1,0 +1,174 @@
+---
+title: Form Plugin
+description: Enable users to fill PDF form fields, inspect form state, and import values programmatically in Svelte.
+searchable: true
+---
+
+import { CodeExample } from '@/components/code-example'
+
+# Form Plugin
+
+The Form Plugin adds interactive support for PDF AcroForm widgets. It lets users type into text fields, toggle checkboxes and radio buttons, work with dropdowns and list boxes, and read or set form values programmatically.
+
+Form widgets render through the Annotation Plugin's `<AnnotationLayer />`, so the form plugin must be registered alongside the annotation plugin and its interaction dependencies.
+
+## Installation
+
+```sh npm2yarn
+npm install @embedpdf/plugin-form @embedpdf/plugin-annotation @embedpdf/plugin-interaction-manager @embedpdf/plugin-selection @embedpdf/plugin-history
+````
+
+## Registration
+
+Register the annotation dependencies first, then the annotation plugin, then the form plugin:
+
+```svelte
+<script lang="ts">
+import { createPluginRegistration } from '@embedpdf/core';
+import { EmbedPDF } from '@embedpdf/core/svelte';
+import { DocumentManagerPluginPackage } from '@embedpdf/plugin-document-manager/svelte';
+import { ViewportPluginPackage } from '@embedpdf/plugin-viewport/svelte';
+import { ScrollPluginPackage } from '@embedpdf/plugin-scroll/svelte';
+import { RenderPluginPackage } from '@embedpdf/plugin-render/svelte';
+import { ZoomPluginPackage, ZoomMode } from '@embedpdf/plugin-zoom/svelte';
+import { InteractionManagerPluginPackage } from '@embedpdf/plugin-interaction-manager/svelte';
+import { SelectionPluginPackage } from '@embedpdf/plugin-selection/svelte';
+import { HistoryPluginPackage } from '@embedpdf/plugin-history/svelte';
+import { AnnotationPluginPackage, LockModeType } from '@embedpdf/plugin-annotation/svelte';
+import { FormPluginPackage } from '@embedpdf/plugin-form/svelte';
+
+const plugins = [
+  createPluginRegistration(DocumentManagerPluginPackage, {
+    initialDocuments: [{ url: '/form.pdf' }],
+  }),
+  createPluginRegistration(ViewportPluginPackage),
+  createPluginRegistration(ScrollPluginPackage),
+  createPluginRegistration(RenderPluginPackage),
+  createPluginRegistration(ZoomPluginPackage, {
+    defaultZoomLevel: ZoomMode.FitPage,
+  }),
+  createPluginRegistration(InteractionManagerPluginPackage),
+  createPluginRegistration(SelectionPluginPackage),
+  createPluginRegistration(HistoryPluginPackage),
+  createPluginRegistration(AnnotationPluginPackage, {
+    locked: { type: LockModeType.Include, categories: ['form'] },
+  }),
+  createPluginRegistration(FormPluginPackage),
+];
+</script>
+```
+
+## Usage
+
+### Render form fields
+
+Form widgets appear through `<AnnotationLayer />`:
+
+```svelte
+<script lang="ts">
+import { PagePointerProvider } from '@embedpdf/plugin-interaction-manager/svelte';
+import { AnnotationLayer } from '@embedpdf/plugin-annotation/svelte';
+
+let { documentId }: { documentId: string } = $props();
+</script>
+
+{#snippet renderPage(page)}
+  <PagePointerProvider {documentId} pageIndex={page.pageIndex}>
+    <RenderLayer {documentId} pageIndex={page.pageIndex} />
+    <SelectionLayer {documentId} pageIndex={page.pageIndex} />
+    <AnnotationLayer {documentId} pageIndex={page.pageIndex} />
+  </PagePointerProvider>
+{/snippet}
+```
+
+### Read current form values
+
+```svelte
+<script lang="ts">
+  import { useFormCapability } from '@embedpdf/plugin-form/svelte';
+
+  let { documentId }: { documentId: string } = $props();
+  const formCapability = useFormCapability();
+  let formValues = $state<Record<string, string>>({});
+
+  $effect(() => {
+    if (!formCapability.provides) return;
+    const scope = formCapability.provides.forDocument(documentId);
+    formValues = scope.getFormValues();
+
+    const unsubReady = scope.onFormReady(() => {
+      formValues = scope.getFormValues();
+    });
+    const unsubChange = scope.onFieldValueChange(() => {
+      formValues = scope.getFormValues();
+    });
+
+    return () => {
+      unsubReady();
+      unsubChange();
+    };
+  });
+</script>
+```
+
+### Set values programmatically
+
+```svelte
+<script lang="ts">
+  import { useFormCapability } from '@embedpdf/plugin-form/svelte';
+
+  let { documentId }: { documentId: string } = $props();
+  const formCapability = useFormCapability();
+
+  function autofill() {
+    const scope = formCapability.provides?.forDocument(documentId);
+    scope?.setFormValues({
+      First_Name: 'Jane',
+      Last_Name: 'Doe',
+      Email_Address: 'jane.doe@example.com',
+    });
+  }
+</script>
+```
+
+### Fill mode vs. design mode
+
+In fill mode, the form category stays locked so widgets remain interactive. In design mode, you unlock annotations so the same widgets can be selected, moved, and resized.
+
+```svelte
+<script lang="ts">
+  import { LockModeType, useAnnotation } from '@embedpdf/plugin-annotation/svelte';
+
+  let { documentId }: { documentId: string } = $props();
+  const annotation = useAnnotation(() => documentId);
+
+  const fillModeLock = {
+    type: LockModeType.Include,
+    categories: ['form'],
+  };
+
+  const fillMode = $derived(
+    annotation.state.locked.type === LockModeType.Include &&
+      annotation.state.locked.categories?.includes('form'),
+  );
+
+  function toggleMode() {
+    annotation.provides?.setLocked(fillMode ? { type: LockModeType.None } : fillModeLock);
+  }
+</script>
+```
+
+## Live Example - Form State and Programmatic Auto Fill
+
+This single example combines live form state inspection with programmatic value import so the page only mounts one Svelte example at a time.
+
+import { FormStateImportExample } from '../../code-examples/headless/form-state-import-example'
+
+<CodeExample
+  codePaths={[
+    "../../examples/svelte-tailwind/src/examples/headless/form-state-import-example.svelte",
+    "../../examples/svelte-tailwind/src/examples/headless/form-state-import-example-content.svelte"
+  ]}
+>
+  <FormStateImportExample />
+</CodeExample>

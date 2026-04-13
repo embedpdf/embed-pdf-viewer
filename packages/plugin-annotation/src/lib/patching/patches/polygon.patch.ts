@@ -13,12 +13,20 @@ import {
   baseResizeScaling,
   rotateOrbitDelta,
 } from '../base-patch';
+import { getCloudyBorderExtent } from '../../geometry';
+
+function getPolygonPad(intensity: number | undefined, strokeWidth: number): number {
+  if ((intensity ?? 0) > 0) {
+    return getCloudyBorderExtent(intensity!, strokeWidth, false);
+  }
+  return strokeWidth / 2;
+}
 
 export const patchPolygon: PatchFunction<PdfPolygonAnnoObject> = (orig, ctx) => {
   switch (ctx.type) {
     case 'vertex-edit':
       if (ctx.changes.vertices && ctx.changes.vertices.length) {
-        const pad = orig.strokeWidth / 2;
+        const pad = getPolygonPad(orig.cloudyBorderIntensity, orig.strokeWidth);
         const rawVertices = ctx.changes.vertices;
         const rawRect = expandRect(rectFromPoints(rawVertices), pad);
         const compensated = compensateRotatedVertexEdit(orig, rawVertices, rawRect);
@@ -66,18 +74,37 @@ export const patchPolygon: PatchFunction<PdfPolygonAnnoObject> = (orig, ctx) => 
     }
 
     case 'property-update': {
+      const cloudyChanged = ctx.changes.cloudyBorderIntensity !== undefined;
       const needsRectUpdate =
-        ctx.changes.strokeWidth !== undefined || ctx.changes.rotation !== undefined;
+        ctx.changes.strokeWidth !== undefined ||
+        ctx.changes.rotation !== undefined ||
+        cloudyChanged;
       if (!needsRectUpdate) return ctx.changes;
 
       const merged = { ...orig, ...ctx.changes };
-      const pad = merged.strokeWidth / 2;
+      const pad = getPolygonPad(merged.cloudyBorderIntensity, merged.strokeWidth);
       const tightRect = expandRect(rectFromPoints(merged.vertices), pad);
+
+      let patch: Partial<PdfPolygonAnnoObject> = ctx.changes;
+
+      const hasCloudy = (orig.cloudyBorderIntensity ?? 0) > 0;
+      if (cloudyChanged || (ctx.changes.strokeWidth !== undefined && hasCloudy)) {
+        const intensity = merged.cloudyBorderIntensity ?? 0;
+        if (intensity > 0) {
+          const extent = getCloudyBorderExtent(intensity, merged.strokeWidth, false);
+          patch = {
+            ...patch,
+            rectangleDifferences: { left: extent, top: extent, right: extent, bottom: extent },
+          };
+        } else {
+          patch = { ...patch, rectangleDifferences: undefined };
+        }
+      }
 
       const effectiveRotation = ctx.changes.rotation ?? orig.rotation ?? 0;
       if (orig.unrotatedRect || ctx.changes.rotation !== undefined) {
         return {
-          ...ctx.changes,
+          ...patch,
           unrotatedRect: tightRect,
           rect: calculateRotatedRectAABBAroundPoint(
             tightRect,
@@ -86,7 +113,7 @@ export const patchPolygon: PatchFunction<PdfPolygonAnnoObject> = (orig, ctx) => 
           ),
         };
       }
-      return { ...ctx.changes, rect: tightRect };
+      return { ...patch, rect: tightRect };
     }
 
     default:

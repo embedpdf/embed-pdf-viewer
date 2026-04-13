@@ -40,6 +40,7 @@ export interface ToolbarSlotState {
 export interface SidebarSlotState {
   sidebarId: string;
   isOpen: boolean;
+  props?: Record<string, unknown>;
 }
 
 /**
@@ -175,10 +176,22 @@ export interface UIScope {
   isToolbarOpen(placement: string, slot: string, toolbarId?: string): boolean;
 
   // Sidebars
-  setActiveSidebar(placement: string, slot: string, sidebarId: string, activeTab?: string): void;
+  setActiveSidebar(
+    placement: string,
+    slot: string,
+    sidebarId: string,
+    activeTab?: string,
+    props?: Record<string, unknown>,
+  ): void;
   getActiveSidebar(placement: string, slot: string): string | null;
   closeSidebarSlot(placement: string, slot: string): void;
-  toggleSidebar(placement: string, slot: string, sidebarId: string, activeTab?: string): void;
+  toggleSidebar(
+    placement: string,
+    slot: string,
+    sidebarId: string,
+    activeTab?: string,
+    props?: Record<string, unknown>,
+  ): void;
   setSidebarTab(sidebarId: string, tabId: string): void;
   getSidebarTab(sidebarId: string): string | null;
   isSidebarOpen(placement: string, slot: string, sidebarId?: string): boolean;
@@ -228,6 +241,7 @@ export interface UICapability {
     sidebarId: string,
     documentId?: string,
     activeTab?: string,
+    props?: Record<string, unknown>,
   ): void;
   toggleSidebar(
     placement: string,
@@ -235,6 +249,7 @@ export interface UICapability {
     sidebarId: string,
     documentId?: string,
     activeTab?: string,
+    props?: Record<string, unknown>,
   ): void;
   openModal(modalId: string, props?: Record<string, unknown>, documentId?: string): void;
   openMenu(

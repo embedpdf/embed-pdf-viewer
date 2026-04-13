@@ -1,6 +1,7 @@
 <script lang="ts">
   import type { Rect, Position } from '@embedpdf/models';
   import { PdfAnnotationBorderStyle } from '@embedpdf/models';
+  import { generateCloudyPolygonPath } from '@embedpdf/plugin-annotation';
 
   const MIN_HIT_AREA_SCREEN_PX = 20;
 
@@ -15,10 +16,11 @@
     strokeDashArray?: number[];
     scale: number;
     isSelected: boolean;
-    onClick?: (e: MouseEvent | TouchEvent) => void;
+    onClick?: (e: MouseEvent) => void;
     currentVertex?: Position;
     handleSize?: number;
     appearanceActive?: boolean;
+    cloudyBorderIntensity?: number;
   }
 
   let {
@@ -36,7 +38,10 @@
     currentVertex,
     handleSize = 14,
     appearanceActive = false,
+    cloudyBorderIntensity,
   }: PolygonProps = $props();
+
+  const isCloudy = $derived((cloudyBorderIntensity ?? 0) > 0);
 
   const allPoints = $derived(currentVertex ? [...vertices, currentVertex] : vertices);
 
@@ -53,6 +58,11 @@
       rest.map((p) => `L ${p.x} ${p.y}`).join(' ') +
       (isPreview ? '' : ' Z')
     ).trim();
+  });
+
+  const cloudyPath = $derived.by(() => {
+    if (!isCloudy || allPoints.length < 3) return null;
+    return generateCloudyPolygonPath(allPoints, rect.origin, cloudyBorderIntensity!, strokeWidth);
   });
 
   const isPreviewing = $derived(!!currentVertex && vertices.length > 0);
@@ -77,60 +87,73 @@
   <!-- Hit area -- always rendered, transparent, wider stroke for mobile -->
   <!-- svelte-ignore a11y_no_static_element_interactions -->
   <path
-    d={pathData}
+    d={isCloudy && cloudyPath ? cloudyPath.path : pathData}
     fill="transparent"
     stroke="transparent"
     stroke-width={hitStrokeWidth}
     onpointerdown={onClick}
-    ontouchstart={onClick}
-    style:cursor={isSelected ? 'move' : 'pointer'}
-    style:pointer-events={isSelected
+    style:cursor={isSelected ? 'move' : onClick ? 'pointer' : 'default'}
+    style:pointer-events={!onClick
       ? 'none'
-      : color === 'transparent'
-        ? 'visibleStroke'
-        : 'visible'}
+      : isSelected
+        ? 'none'
+        : color === 'transparent'
+          ? 'visibleStroke'
+          : 'visible'}
     style:stroke-linecap="butt"
     style:stroke-linejoin="miter"
   />
 
   <!-- Visual -- hidden when AP active, never interactive -->
   {#if !appearanceActive}
-    <path
-      d={pathData}
-      {opacity}
-      style:fill={currentVertex ? 'none' : color}
-      style:stroke={strokeColor ?? color}
-      style:stroke-width={strokeWidth}
-      style:pointer-events="none"
-      style:stroke-linecap="butt"
-      style:stroke-linejoin="miter"
-      style:stroke-dasharray={dash}
-    />
-
-    {#if isPreviewing && vertices.length > 1}
+    {#if isCloudy && cloudyPath}
       <path
-        d={`M ${localPts[localPts.length - 1].x} ${localPts[localPts.length - 1].y} L ${localPts[0].x} ${localPts[0].y}`}
-        fill="none"
-        style:stroke={strokeColor}
+        d={cloudyPath.path}
+        {opacity}
+        style:fill={color}
+        style:stroke={strokeColor ?? color}
         style:stroke-width={strokeWidth}
-        style:stroke-dasharray={'4,4'}
-        style:opacity={0.7}
         style:pointer-events="none"
+        style:stroke-linejoin="round"
       />
-    {/if}
+    {:else}
+      <path
+        d={pathData}
+        {opacity}
+        style:fill={currentVertex ? 'none' : color}
+        style:stroke={strokeColor ?? color}
+        style:stroke-width={strokeWidth}
+        style:pointer-events="none"
+        style:stroke-linecap="butt"
+        style:stroke-linejoin="miter"
+        style:stroke-dasharray={dash}
+      />
 
-    {#if isPreviewing && vertices.length >= 2}
-      <rect
-        x={localPts[0].x - handleSize / scale / 2}
-        y={localPts[0].y - handleSize / scale / 2}
-        width={handleSize / scale}
-        height={handleSize / scale}
-        fill={strokeColor}
-        opacity={0.4}
-        stroke={strokeColor}
-        stroke-width={strokeWidth / 2}
-        style:pointer-events="none"
-      />
+      {#if isPreviewing && vertices.length > 1}
+        <path
+          d={`M ${localPts[localPts.length - 1].x} ${localPts[localPts.length - 1].y} L ${localPts[0].x} ${localPts[0].y}`}
+          fill="none"
+          style:stroke={strokeColor}
+          style:stroke-width={strokeWidth}
+          style:stroke-dasharray={'4,4'}
+          style:opacity={0.7}
+          style:pointer-events="none"
+        />
+      {/if}
+
+      {#if isPreviewing && vertices.length >= 2}
+        <rect
+          x={localPts[0].x - handleSize / scale / 2}
+          y={localPts[0].y - handleSize / scale / 2}
+          width={handleSize / scale}
+          height={handleSize / scale}
+          fill={strokeColor}
+          opacity={0.4}
+          stroke={strokeColor}
+          stroke-width={strokeWidth / 2}
+          style:pointer-events="none"
+        />
+      {/if}
     {/if}
   {/if}
 </svg>

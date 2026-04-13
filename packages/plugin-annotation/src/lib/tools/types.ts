@@ -1,4 +1,6 @@
 import { PdfAnnotationObject, PdfAnnotationSubtype, Size } from '@embedpdf/models';
+import type { HandlerFactory, SelectionHandlerFactory } from '../handlers/types';
+import type { PatchFunction } from '../patching/patch-registry';
 
 /**
  * A dynamic boolean property that can be either a static boolean
@@ -81,6 +83,8 @@ export interface ClickBehaviorMap {
   [PdfAnnotationSubtype.SQUARE]: ShapeClickBehavior;
   [PdfAnnotationSubtype.LINE]: LineClickBehavior;
   [PdfAnnotationSubtype.FREETEXT]: FreeTextClickBehavior;
+  [PdfAnnotationSubtype.WIDGET]: ShapeClickBehavior;
+  [PdfAnnotationSubtype.LINK]: ShapeClickBehavior;
 }
 
 // Helper type to get tool config
@@ -118,15 +122,57 @@ type InsertUprightBehaviorFor<T extends PdfAnnotationObject> =
       };
 
 /**
+ * Ink-specific behavior settings. Only available on tools whose annotation
+ * type is PdfAnnotationSubtype.INK (i.e. 'ink' and 'inkHighlighter').
+ */
+export interface InkBehavior {
+  /** ms of pointer inactivity before the accumulated strokes are committed. Default: 800. */
+  commitDelay?: number;
+  /** When true, line-like strokes are snapped to a clean 2-point straight line on pointerUp. */
+  smartLineRecognition?: boolean;
+  /**
+   * Maximum allowed perpendicular-deviation ratio (maxDeviation / strokeLength) for a stroke
+   * to qualify as a straight line. Lower = stricter. Default: 0.15.
+   */
+  smartLineThreshold?: number;
+  /**
+   * How many degrees from horizontal or vertical a recognised straight line may deviate
+   * before axis-snapping is skipped. Default: 15.
+   */
+  snapAngleDeg?: number;
+}
+
+/**
+ * Non-distributive conditional: wrapping both sides in [...] prevents TypeScript from
+ * distributing over a union. [PdfAnnotationObject] extends [PdfInkAnnoObject] is false
+ * (the full union is not a subtype of the specific ink type), so InkBehavior is only added
+ * when T is specifically the INK annotation type.
+ */
+type InkBehaviorFor<T extends PdfAnnotationObject> = [T] extends [
+  Extract<PdfAnnotationObject, { type: PdfAnnotationSubtype.INK }>,
+]
+  ? InkBehavior
+  : {};
+
+/**
  * The primary interface for defining an annotation tool.
  * Uses a type alias to properly combine the base interface with conditional properties.
  */
-export type AnnotationTool<T extends PdfAnnotationObject = PdfAnnotationObject> = {
+export type AnnotationTool<
+  T extends PdfAnnotationObject = PdfAnnotationObject,
+  TId extends string = string,
+> = {
   /** A unique identifier, e.g., 'ink', 'arrow' */
-  id: string;
+  id: TId;
 
   /** A user-facing name for UI elements, e.g., 'Pen' */
   name: string;
+
+  /** Translation key for the tool label, e.g., 'annotation.ink'. Used by the UI for i18n. */
+  labelKey?: string;
+
+  /** Category tags for authoring mode control, e.g., `['annotation', 'form']`. */
+  categories?: string[];
 
   /**
    * Determines how well this tool matches an existing annotation.
@@ -147,6 +193,8 @@ export type AnnotationTool<T extends PdfAnnotationObject = PdfAnnotationObject> 
     cursor?: string;
     /** If true, this interaction mode is activated by selecting text. */
     textSelection?: boolean;
+    /** Whether to show the native text selection rectangles. Only relevant when textSelection is true. Defaults to false. */
+    showSelectionRects?: boolean;
 
     // Single annotation behaviors
     /** Whether this annotation can be dragged when selected individually. Can be dynamic based on annotation. */
@@ -175,7 +223,49 @@ export type AnnotationTool<T extends PdfAnnotationObject = PdfAnnotationObject> 
     deactivateToolAfterCreate?: boolean;
     /** When true, select the annotation immediately after creation. Overrides plugin config. */
     selectAfterCreate?: boolean;
+    /** When true, automatically enter editing mode after creating the annotation. Implies selectAfterCreate. */
+    editAfterCreate?: boolean;
     /** Override whether this annotation type uses AP rendering before editing (default: true) */
     useAppearanceStream?: boolean;
-  } & InsertUprightBehaviorFor<T>;
+    /** Show a ghost image preview following the cursor. Defaults to false. */
+    showGhost?: boolean;
+  } & InsertUprightBehaviorFor<T> &
+    InkBehaviorFor<T>;
+
+  /** Pointer-based creation handler (drag-to-create, click-to-place). */
+  pointerHandler?: HandlerFactory<T, TId>;
+
+  /** Text-selection-based creation handler. */
+  selectionHandler?: SelectionHandlerFactory<T>;
+
+  /** Transform function for move, resize, rotate, and property-update operations. */
+  transform?: PatchFunction<T>;
 } & ClickBehaviorFor<T>;
+
+export interface AnnotationToolRecord {
+  id: string;
+  defaults: Record<string, unknown>;
+}
+
+export type AnnotationToolMap = Record<string, AnnotationToolRecord>;
+
+export type ToolId<TMap extends AnnotationToolMap> = Extract<keyof TMap, string>;
+
+export type ToolById<TMap extends AnnotationToolMap, TId extends ToolId<TMap>> = TMap[TId];
+
+export type ToolMapFromList<TTools extends readonly { id: string }[]> = {
+  [T in TTools[number] as T['id']]: T;
+};
+
+export type UpsertToolMap<TMap extends AnnotationToolMap, TTool extends AnnotationTool> = Omit<
+  TMap,
+  TTool['id']
+> & {
+  [K in TTool['id']]: TTool;
+};
+
+/**
+ * Helper to preserve literal IDs and concrete tool typing.
+ */
+export const defineAnnotationTool = <const TTool extends AnnotationTool<any>>(tool: TTool): TTool =>
+  tool;

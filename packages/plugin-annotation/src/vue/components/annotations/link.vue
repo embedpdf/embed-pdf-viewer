@@ -19,8 +19,7 @@
       :width="width"
       :height="height"
       fill="transparent"
-      @pointerdown="hasIRT ? undefined : onClick"
-      @touchstart="hasIRT ? undefined : onClick"
+      @pointerdown="hasIRT ? undefined : onClick?.($event)"
       :style="{
         cursor: hitAreaCursor,
         pointerEvents: hitAreaPointerEvents,
@@ -81,7 +80,7 @@ const props = withDefaults(
     /** Current page zoom factor */
     scale: number;
     /** Click handler (used for selection) */
-    onClick?: (e: PointerEvent | MouseEvent | TouchEvent) => void;
+    onClick?: (e: PointerEvent | MouseEvent) => void;
     /** Whether this link has an IRT (In Reply To) reference - disables direct interaction */
     hasIRT?: boolean;
   }>(),
@@ -111,9 +110,9 @@ const dashArray = computed(() => {
 const isUnderline = computed(() => props.strokeStyle === PdfAnnotationBorderStyle.UNDERLINE);
 
 const hitAreaCursor = computed(() =>
-  props.hasIRT ? 'default' : props.isSelected ? 'move' : 'pointer',
+  props.hasIRT || !props.onClick ? 'default' : props.isSelected ? 'move' : 'pointer',
 );
 const hitAreaPointerEvents = computed(() =>
-  props.hasIRT ? 'none' : props.isSelected ? 'none' : 'visible',
+  props.hasIRT || !props.onClick ? 'none' : props.isSelected ? 'none' : 'visible',
 );
 </script>

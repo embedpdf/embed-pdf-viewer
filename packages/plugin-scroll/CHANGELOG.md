@@ -1,5 +1,33 @@
 # @embedpdf/plugin-scroll
 
+## 2.14.0
+
+## 2.13.0
+
+## 2.12.1
+
+## 2.12.0
+
+## 2.11.1
+
+## 2.11.0
+
+## 2.10.1
+
+### Patch Changes
+
+- [#541](https://github.com/embedpdf/embed-pdf-viewer/pull/541) by [@luissardon](https://github.com/luissardon) – Fix horizontal scrolling layout calculations and page navigation state updates in `@embedpdf/plugin-scroll`.
+
+  This corrects horizontal visible-range and end-spacing math, preserves the optimistic `currentPage` during smooth next/previous navigation, and fixes page-coordinate targeting for mixed-height pages in horizontal mode by matching the scroller's vertical centering.
+
+## 2.10.0
+
+## 2.9.1
+
+## 2.9.0
+
+## 2.8.0
+
 ## 2.7.0
 
 ## 2.6.2

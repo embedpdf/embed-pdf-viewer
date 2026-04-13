@@ -21,10 +21,9 @@
       stroke="transparent"
       :stroke-width="hitStrokeWidth"
       @pointerdown="onClick"
-      @touchstart="onClick"
       :style="{
-        cursor: isSelected ? 'move' : 'pointer',
-        pointerEvents: isSelected ? 'none' : 'visibleStroke',
+        cursor: isSelected ? 'move' : onClick ? 'pointer' : 'default',
+        pointerEvents: !onClick ? 'none' : isSelected ? 'none' : 'visibleStroke',
         strokeLinecap: 'butt',
       }"
     />
@@ -36,10 +35,15 @@
       stroke="transparent"
       :stroke-width="hitStrokeWidth"
       @pointerdown="onClick"
-      @touchstart="onClick"
       :style="{
-        cursor: isSelected ? 'move' : 'pointer',
-        pointerEvents: isSelected ? 'none' : endings.start.filled ? 'visible' : 'visibleStroke',
+        cursor: isSelected ? 'move' : onClick ? 'pointer' : 'default',
+        pointerEvents: !onClick
+          ? 'none'
+          : isSelected
+            ? 'none'
+            : endings.start.filled
+              ? 'visible'
+              : 'visibleStroke',
         strokeLinecap: 'butt',
       }"
     />
@@ -51,10 +55,15 @@
       stroke="transparent"
       :stroke-width="hitStrokeWidth"
       @pointerdown="onClick"
-      @touchstart="onClick"
       :style="{
-        cursor: isSelected ? 'move' : 'pointer',
-        pointerEvents: isSelected ? 'none' : endings.end.filled ? 'visible' : 'visibleStroke',
+        cursor: isSelected ? 'move' : onClick ? 'pointer' : 'default',
+        pointerEvents: !onClick
+          ? 'none'
+          : isSelected
+            ? 'none'
+            : endings.end.filled
+              ? 'visible'
+              : 'visibleStroke',
         strokeLinecap: 'butt',
       }"
     />
@@ -134,7 +143,7 @@ const props = withDefaults(
     linePoints: LinePoints;
     lineEndings?: LineEndings;
     scale: number;
-    onClick?: (e: PointerEvent | TouchEvent) => void;
+    onClick?: (e: PointerEvent) => void;
     isSelected: boolean;
     appearanceActive?: boolean;
   }>(),

@@ -206,6 +206,9 @@ export class TilingPlugin extends BasePlugin<TilingPluginConfig, TilingCapabilit
       options: {
         scaleFactor: options.tile.srcScale,
         dpr: options.dpr,
+        ...(options.imageType || this.config.defaultImageType
+          ? { imageType: options.imageType ?? this.config.defaultImageType }
+          : {}),
       },
     });
 

@@ -9,6 +9,23 @@ import { HandlerFactory, PreviewState } from './types';
 import { useState } from '../utils/use-state';
 import { clamp } from '@embedpdf/core';
 
+/**
+ * Returns true when the given points form a sufficiently straight line.
+ * Uses the ratio of max perpendicular deviation to stroke length.
+ */
+function isLineLike(points: { x: number; y: number }[], threshold: number): boolean {
+  if (points.length < 3) return true;
+  const A = points[0];
+  const B = points[points.length - 1];
+  const len = Math.hypot(B.x - A.x, B.y - A.y);
+  if (len < 5) return false; // ignore tiny marks
+  const maxDev = points.reduce((max, P) => {
+    const d = Math.abs((B.x - A.x) * (A.y - P.y) - (A.x - P.x) * (B.y - A.y)) / len;
+    return Math.max(max, d);
+  }, 0);
+  return maxDev / len < threshold;
+}
+
 export const inkHandlerFactory: HandlerFactory<PdfInkAnnoObject> = {
   annotationType: PdfAnnotationSubtype.INK,
   create(context) {
@@ -51,6 +68,7 @@ export const inkHandlerFactory: HandlerFactory<PdfInkAnnoObject> = {
           ...defaults,
           rect: bounds,
           inkList: strokes,
+          blendMode: defaults.blendMode,
         },
       };
     };
@@ -80,6 +98,45 @@ export const inkHandlerFactory: HandlerFactory<PdfInkAnnoObject> = {
         setIsDrawing(false);
         evt.releasePointerCapture?.();
 
+        // Per-stroke smart line recognition — runs immediately on pointerUp
+        const tool = getTool();
+        const behavior = tool?.behavior;
+        if (behavior?.smartLineRecognition) {
+          const threshold = behavior.smartLineThreshold ?? 0.15;
+          const strokes = getStrokes();
+          const last = strokes[strokes.length - 1];
+          if (last && last.points.length > 1 && isLineLike(last.points, threshold)) {
+            const first = last.points[0];
+            const end = last.points[last.points.length - 1];
+            const dx = end.x - first.x;
+            const dy = end.y - first.y;
+            // Angle from horizontal in degrees (0° = horizontal, 90° = vertical)
+            const angleDeg = Math.atan2(Math.abs(dy), Math.abs(dx)) * (180 / Math.PI);
+            const snapAngleDeg = behavior.snapAngleDeg ?? 15;
+
+            if (angleDeg <= snapAngleDeg) {
+              // Close enough to horizontal — use average Y across all points
+              const avgY = last.points.reduce((sum, p) => sum + p.y, 0) / last.points.length;
+              last.points = [
+                { x: first.x, y: avgY },
+                { x: end.x, y: avgY },
+              ];
+            } else if (angleDeg >= 90 - snapAngleDeg) {
+              // Close enough to vertical — use average X across all points
+              const avgX = last.points.reduce((sum, p) => sum + p.x, 0) / last.points.length;
+              last.points = [
+                { x: avgX, y: first.y },
+                { x: avgX, y: end.y },
+              ];
+            }
+            // Diagonal straight line — leave the original stroke points intact
+
+            setStrokes([...strokes]);
+            onPreview(getPreview());
+          }
+        }
+
+        const commitDelay = behavior?.commitDelay ?? 800;
         if (timerRef.current) clearTimeout(timerRef.current);
         timerRef.current = setTimeout(() => {
           const strokes = getStrokes();
@@ -102,7 +159,7 @@ export const inkHandlerFactory: HandlerFactory<PdfInkAnnoObject> = {
           }
           setStrokes([]);
           onPreview(null);
-        }, 800); // Commit after 800ms of inactivity
+        }, commitDelay);
       },
       onPointerCancel: (_, evt) => {
         setStrokes([]);

@@ -1,63 +1,40 @@
 <template>
-  <div :style="style">
-    <Circle
-      v-if="preview.type === PdfAnnotationSubtype.CIRCLE"
-      :isSelected="false"
+  <div v-if="match?.renderPreview" :style="style">
+    <component
+      :is="match.renderPreview"
+      :data="preview.data"
+      :bounds="preview.bounds"
       :scale="scale"
-      v-bind="preview.data"
-    />
-    <Square
-      v-else-if="preview.type === PdfAnnotationSubtype.SQUARE"
-      :isSelected="false"
-      :scale="scale"
-      v-bind="preview.data"
-    />
-    <Polygon
-      v-else-if="preview.type === PdfAnnotationSubtype.POLYGON"
-      :isSelected="false"
-      :scale="scale"
-      v-bind="preview.data"
-    />
-    <Polyline
-      v-else-if="preview.type === PdfAnnotationSubtype.POLYLINE"
-      :isSelected="false"
-      :scale="scale"
-      v-bind="preview.data"
-    />
-    <Line
-      v-else-if="preview.type === PdfAnnotationSubtype.LINE"
-      :isSelected="false"
-      :scale="scale"
-      v-bind="preview.data"
-    />
-    <Ink
-      v-else-if="preview.type === PdfAnnotationSubtype.INK"
-      :isSelected="false"
-      :scale="scale"
-      v-bind="preview.data"
-    />
-    <div
-      v-else-if="preview.type === PdfAnnotationSubtype.FREETEXT"
-      :style="{
-        width: '100%',
-        height: '100%',
-        border: `1px dashed ${preview.data.fontColor || '#000000'}`,
-        backgroundColor: 'transparent',
-      }"
     />
   </div>
 </template>
 
 <script setup lang="ts">
 import { computed, CSSProperties } from 'vue';
-import { AnyPreviewState } from '@embedpdf/plugin-annotation';
-import { PdfAnnotationSubtype } from '@embedpdf/models';
-import { Circle, Square, Polygon, Polyline, Line, Ink } from './annotations';
+import { PreviewState } from '@embedpdf/plugin-annotation';
+import { useRendererRegistry } from '../context/renderer-registry';
+import { builtInRenderers } from './built-in-renderers';
 
 const props = defineProps<{
-  preview: AnyPreviewState;
+  toolId: string;
+  preview: PreviewState;
   scale: number;
 }>();
+
+const registry = useRendererRegistry();
+
+const allRenderers = computed(() => {
+  const external = registry?.getAll() ?? [];
+  const externalIds = new Set(external.map((r) => r.id));
+  return [...external, ...builtInRenderers.filter((r) => !externalIds.has(r.id))];
+});
+
+const match = computed(
+  () =>
+    allRenderers.value.find((r) => r.matchesPreview?.(props.preview) && r.renderPreview) ??
+    allRenderers.value.find((r) => r.id === props.toolId && r.renderPreview) ??
+    null,
+);
 
 const style = computed<CSSProperties>(() => ({
   position: 'absolute',
@@ -67,5 +44,10 @@ const style = computed<CSSProperties>(() => ({
   height: `${props.preview.bounds.size.height * props.scale}px`,
   pointerEvents: 'none',
   zIndex: 10,
+  ...match.value?.previewContainerStyle?.({
+    data: props.preview.data,
+    bounds: props.preview.bounds,
+    scale: props.scale,
+  }),
 }));
 </script>

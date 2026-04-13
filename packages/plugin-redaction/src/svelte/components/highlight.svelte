@@ -8,7 +8,7 @@
     rects: Rect[];
     rect?: Rect;
     scale: number;
-    onClick?: (e: MouseEvent | TouchEvent) => void;
+    onClick?: (e: MouseEvent) => void;
     style?: string;
   }
 
@@ -30,7 +30,6 @@
 {#each rects as b, i (i)}
   <div
     onpointerdown={onClick}
-    ontouchstart={onClick}
     style:position="absolute"
     style:border
     style:left={`${(boundingRect ? b.origin.x - boundingRect.origin.x : b.origin.x) * scale}px`}

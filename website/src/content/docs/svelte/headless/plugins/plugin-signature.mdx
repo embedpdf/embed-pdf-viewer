@@ -1,0 +1,294 @@
+---
+title: Signature Plugin
+description: Add, manage, and place electronic signatures and initials in your PDF viewer.
+searchable: true
+---
+
+import { Callout } from '@/components/callout'
+import { CodeExample } from '@/components/code-example'
+
+# Signature Plugin
+
+The Signature Plugin extends the Annotation Plugin to provide a dedicated workflow for electronic signatures. It includes ready-to-use UI components for drawing and typing signatures, helper composables for image uploads, and an API for saving them as reusable entries.
+
+Once a signature is saved as an entry, users can easily click to arm the tool and stamp their signature anywhere on the PDF document.
+
+<Callout type="info" title="No separate layer needed">
+  Signatures are placed as standard PDF annotations (Ink for drawn signatures, Stamps for typed/uploaded signatures). They render automatically through your existing `<AnnotationLayer />`.
+</Callout>
+
+## Installation
+
+This plugin depends on the Annotation Plugin and its interaction dependencies.
+
+```sh npm2yarn
+npm install @embedpdf/plugin-signature @embedpdf/plugin-annotation @embedpdf/plugin-interaction-manager @embedpdf/plugin-selection @embedpdf/plugin-history
+```
+
+## Registration
+
+Import `SignaturePluginPackage` and add it to your plugins array **after** the Annotation Plugin dependencies and the Annotation Plugin itself.
+
+```tsx {8, 22-26}
+import { createPluginRegistration } from '@embedpdf/core'
+import { EmbedPDF } from '@embedpdf/core/svelte'
+// ... other imports
+import { InteractionManagerPluginPackage } from '@embedpdf/plugin-interaction-manager/svelte'
+import { SelectionPluginPackage } from '@embedpdf/plugin-selection/svelte'
+import { HistoryPluginPackage } from '@embedpdf/plugin-history/svelte'
+import { AnnotationPluginPackage } from '@embedpdf/plugin-annotation/svelte'
+import { SignaturePluginPackage, SignatureMode } from '@embedpdf/plugin-signature/svelte'
+
+const plugins = [
+  // ... essential viewer plugins (DocumentManager, Viewport, Render, Scroll)
+  createPluginRegistration(DocumentManagerPluginPackage, { /* ... */ }),
+
+  // Annotation dependencies
+  createPluginRegistration(InteractionManagerPluginPackage),
+  createPluginRegistration(SelectionPluginPackage),
+  createPluginRegistration(HistoryPluginPackage),
+
+  // Annotation plugin
+  createPluginRegistration(AnnotationPluginPackage),
+
+  // Signature plugin
+  createPluginRegistration(SignaturePluginPackage, {
+    mode: SignatureMode.SignatureOnly, // or SignatureAndInitials
+    defaultSize: { width: 150, height: 50 }, // Default placement size
+  }),
+]
+```
+
+## Usage
+
+### 1. Rendering Signatures
+
+Because signatures are specialized annotations, you do not need a special layer. Simply render the `<AnnotationLayer />` inside your page scroller.
+
+```svelte {3, 11}
+<script lang="ts">
+  import { PagePointerProvider } from '@embedpdf/plugin-interaction-manager/svelte'
+  import { AnnotationLayer } from '@embedpdf/plugin-annotation/svelte'
+</script>
+
+<Scroller {documentId}>
+  {#snippet renderPage(page)}
+    <PagePointerProvider {documentId} pageIndex={page.pageIndex}>
+      <RenderLayer {documentId} pageIndex={page.pageIndex} />
+      <SelectionLayer {documentId} pageIndex={page.pageIndex} />
+      <AnnotationLayer {documentId} pageIndex={page.pageIndex} />
+    </PagePointerProvider>
+  {/snippet}
+</Scroller>
+```
+
+### 2. Creating Signatures (The UI Pads)
+
+The plugin exports `<SignatureDrawPad />` and `<SignatureTypePad />` components. These handle the complexities of tracking pointer events, rendering canvas strokes, applying fonts, and auto-cropping the results to remove transparent whitespace.
+
+You can place these inside modals or sidebars.
+
+```svelte
+<script lang="ts">
+import { SignatureDrawPad, SignatureTypePad } from '@embedpdf/plugin-signature/svelte'
+
+function handleResult(result) {
+  // result is either SignatureInkFieldDefinition or SignatureStampFieldDefinition
+}
+</script>
+
+<SignatureDrawPad 
+  strokeColor="#0000FF"
+  strokeWidth={3}
+  onResult={handleResult}
+/>
+
+<SignatureTypePad 
+  color="#0000FF"
+  fontFamily="'Dancing Script', cursive"
+  onResult={handleResult}
+/>
+```
+
+### 3. Uploading Signatures
+
+For image uploads, use the `useSignatureUpload` hook to handle the file picker, drag-and-drop, and automatic image-to-canvas extraction.
+
+```svelte
+<script lang="ts">
+import { useSignatureUpload } from '@embedpdf/plugin-signature/svelte'
+
+const upload = useSignatureUpload({
+  onResult: (result) => {
+    // Save to the capability (see step 4)
+  },
+})
+</script>
+
+<button type="button" onclick={upload.openFilePicker}>
+  Upload Image
+</button>
+<input
+  type="file"
+  bind:this={upload.inputRef.current}
+  accept="image/png,image/jpeg,image/svg+xml"
+  class="hidden"
+  onchange={upload.handleFileInputChange}
+/>
+```
+
+### 4. Saving and Placing Signatures
+
+Once you have a result from one of the pads or the upload hook, save it to the plugin's state using `useSignatureCapability`.
+
+```svelte
+<script lang="ts">
+import { useSignatureCapability, useSignatureEntries, useActivePlacement } from '@embedpdf/plugin-signature/svelte'
+
+let { documentId } = $props();
+
+const signatureEntries = useSignatureEntries();
+const signatureCapability = useSignatureCapability();
+const activePlacementState = useActivePlacement(() => documentId);
+
+const handleSaveNew = (result) => {
+  signatureCapability.provides?.addEntry({ signature: result });
+}
+</script>
+
+<div>
+  {#each signatureEntries.entries as entry (entry.id)}
+    {@const isActive = activePlacementState.activePlacement?.entryId === entry.id}
+    <div class={isActive ? 'ring-2 ring-blue-500' : ''}>
+      <img src={entry.signature.previewDataUrl} alt="Signature" />
+      <button onclick={() => signatureCapability.provides?.forDocument(documentId).activateSignaturePlacement(entry.id)}>
+        Use
+      </button>
+      <button onclick={() => signatureCapability.provides?.removeEntry(entry.id)}>
+        Delete
+      </button>
+    </div>
+  {/each}
+</div>
+```
+
+### 5. Persisting Signatures (localStorage / Backend)
+
+The plugin ships with `serializeEntries` and `deserializeEntries` utilities that convert entries to and from a JSON-safe format, and an `onEntriesChange` event hook that fires whenever entries are added, removed, or loaded. Together they make auto-persisting signatures trivial.
+
+```svelte
+<script lang="ts">
+import {
+  useSignatureCapability,
+  serializeEntries,
+  deserializeEntries,
+} from '@embedpdf/plugin-signature/svelte'
+
+const STORAGE_KEY = 'my-signatures'
+const signatureCapability = useSignatureCapability()
+
+$effect(() => {
+  if (!signatureCapability.provides) return
+
+  // Load previously saved entries on mount
+  const raw = localStorage.getItem(STORAGE_KEY)
+  if (raw) {
+    signatureCapability.provides.loadEntries(deserializeEntries(JSON.parse(raw)))
+  }
+
+  // Auto-save whenever entries change — returns an unsubscribe function
+  return signatureCapability.provides.onEntriesChange((entries) => {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(serializeEntries(entries)))
+  })
+})
+</script>
+```
+
+## Live Example
+
+This example demonstrates the full signature workflow: drawing, typing, and uploading signatures, saving them to your collection, and placing them on the document.
+
+import { SignatureExample } from '../../code-examples/headless/signature-example';
+
+<CodeExample 
+  codePaths={[
+    "../../examples/svelte-tailwind/src/examples/headless/signature-example.svelte",
+    "../../examples/svelte-tailwind/src/examples/headless/signature-example-content.svelte"
+  ]}
+>
+  <SignatureExample />
+</CodeExample>
+
+## API Reference
+
+### Configuration (`SignaturePluginConfig`)
+
+| Option | Type | Description |
+| :--- | :--- | :--- |
+| **`mode`** | `SignatureMode` | Determines if the plugin tracks only signatures (`SignatureMode.SignatureOnly`) or both signatures and initials (`SignatureMode.SignatureAndInitials`). |
+| **`defaultSize`** | `{ width: number, height: number }` | The default bounding box size applied when placing a signature. **Default**: `{ width: 150, height: 50 }` |
+
+### Hook: `useSignatureCapability()`
+
+Returns the global plugin API.
+
+#### `SignatureCapability` Methods
+
+| Method | Description |
+| :--- | :--- |
+| **`getEntries()`** | Returns all saved `SignatureEntry` objects. |
+| **`addEntry(entry)`** | Saves a new signature entry. Returns the generated UUID. |
+| **`removeEntry(id)`** | Deletes a signature entry. |
+| **`exportEntries()`** | Returns all `SignatureEntry` objects including their binary data. Use with `serializeEntries()` for persistence. |
+| **`loadEntries(entries)`** | Hydrates the plugin with previously exported entries. Use with `deserializeEntries()` when loading from JSON. |
+| **`onEntriesChange`** | Event hook that fires whenever entries are added, removed, or loaded. Subscribe with `onEntriesChange((entries) => { ... })` — returns an unsubscribe function. |
+| **`forDocument(documentId)`** | Returns a `SignatureScope` scoped to the current document for placement actions. |
+
+### Hook: `useSignatureEntries()`
+
+Reactive hook that returns an object containing `entries`. The `entries` array automatically updates when signatures are added or removed.
+
+### Hook: `useActivePlacement(getDocumentId)`
+
+Reactive hook that takes a getter for the document ID and returns an object containing `activePlacement` (`ActivePlacementInfo | null`).
+
+```tsx
+interface ActivePlacementInfo {
+  entryId: string;
+  kind: SignatureFieldKind; // 'signature' | 'initials'
+}
+```
+
+### `SignatureScope` Methods (Returned by `forDocument`)
+
+| Method | Description |
+| :--- | :--- |
+| **`activateSignaturePlacement(entryId)`** | Arms a specific signature entry for placement on the PDF. |
+| **`activateInitialsPlacement(entryId)`** | Arms a specific initials entry for placement on the PDF. |
+| **`deactivatePlacement()`** | Cancels placement mode. |
+
+### Component: `<SignatureDrawPad />`
+
+An auto-cropping canvas component that tracks pointer events to capture hand-drawn signatures.
+
+| Prop/Event | Type | Description |
+| :--- | :--- | :--- |
+| **`onResult`** | `(result) => void` | Fires whenever the user draws on the canvas. Provides the `SignatureInkFieldDefinition`. |
+| **`strokeColor`** | `string` | The color of the ink line. |
+| **`strokeWidth`** | `number` | The thickness of the ink line. |
+
+*You can call `.clear()` on the exported component instance to reset it.*
+
+### Component: `<SignatureTypePad />`
+
+An auto-cropping text input component that converts typed text into a high-resolution stamp image.
+
+| Prop/Event | Type | Description |
+| :--- | :--- | :--- |
+| **`onResult`** | `(result) => void` | Fires when text changes. Provides a `SignatureStampFieldDefinition` including `imageData`. |
+| **`fontFamily`** | `string` | The CSS font-family to use (e.g. `'Dancing Script', cursive`). |
+| **`color`** | `string` | The text color. |
+| **`fontSize`** | `number` | The base font size used for the canvas generation. |
+| **`placeholder`** | `string` | The placeholder text. |
+
+*You can call `.clear()` on the exported component instance to reset it.*

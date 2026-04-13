@@ -114,6 +114,7 @@ export function useSchemaRenderer(documentId: MaybeRefOrGetter<string>) {
         documentId: toValue(documentId),
         isOpen: sidebarSlot.isOpen,
         onClose: handleClose,
+        sidebarProps: sidebarSlot.props,
       });
     },
 

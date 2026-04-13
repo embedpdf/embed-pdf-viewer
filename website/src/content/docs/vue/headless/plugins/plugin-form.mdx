@@ -1,0 +1,203 @@
+---
+title: Form Plugin
+description: Enable users to fill PDF form fields, inspect form state, import values, and switch between fill mode and design mode in Vue.
+searchable: true
+---
+
+import { CodeExample } from '@/components/code-example'
+
+# Form Plugin
+
+The Form Plugin adds interactive support for PDF AcroForm widgets. It lets users type into text fields, toggle checkboxes and radio buttons, work with dropdowns and list boxes, and read or set form values programmatically.
+
+Form widgets render through the Annotation Plugin's `<AnnotationLayer />`, so the form plugin must be registered alongside the annotation plugin and its interaction dependencies.
+
+## Installation
+
+```sh npm2yarn
+npm install @embedpdf/plugin-form @embedpdf/plugin-annotation @embedpdf/plugin-interaction-manager @embedpdf/plugin-selection @embedpdf/plugin-history
+````
+
+## Registration
+
+Register the annotation dependencies first, then the annotation plugin, then the form plugin:
+
+```vue
+<script setup lang="ts">
+import { createPluginRegistration } from '@embedpdf/core';
+import { EmbedPDF } from '@embedpdf/core/vue';
+import { DocumentManagerPluginPackage } from '@embedpdf/plugin-document-manager/vue';
+import { ViewportPluginPackage } from '@embedpdf/plugin-viewport/vue';
+import { ScrollPluginPackage } from '@embedpdf/plugin-scroll/vue';
+import { RenderPluginPackage } from '@embedpdf/plugin-render/vue';
+import { ZoomPluginPackage, ZoomMode } from '@embedpdf/plugin-zoom/vue';
+import { InteractionManagerPluginPackage } from '@embedpdf/plugin-interaction-manager/vue';
+import { SelectionPluginPackage } from '@embedpdf/plugin-selection/vue';
+import { HistoryPluginPackage } from '@embedpdf/plugin-history/vue';
+import { AnnotationPluginPackage, LockModeType } from '@embedpdf/plugin-annotation/vue';
+import { FormPluginPackage } from '@embedpdf/plugin-form/vue';
+
+const plugins = [
+  createPluginRegistration(DocumentManagerPluginPackage, {
+    initialDocuments: [{ url: '/form.pdf' }],
+  }),
+  createPluginRegistration(ViewportPluginPackage),
+  createPluginRegistration(ScrollPluginPackage),
+  createPluginRegistration(RenderPluginPackage),
+  createPluginRegistration(ZoomPluginPackage, {
+    defaultZoomLevel: ZoomMode.FitPage,
+  }),
+  createPluginRegistration(InteractionManagerPluginPackage),
+  createPluginRegistration(SelectionPluginPackage),
+  createPluginRegistration(HistoryPluginPackage),
+  createPluginRegistration(AnnotationPluginPackage, {
+    locked: { type: LockModeType.Include, categories: ['form'] },
+  }),
+  createPluginRegistration(FormPluginPackage),
+];
+</script>
+```
+
+## Usage
+
+### Render form fields
+
+Form widgets appear through `<AnnotationLayer />`:
+
+```vue
+<template>
+  <Scroller :document-id="documentId">
+    <template #default="{ page }">
+      <PagePointerProvider :document-id="documentId" :page-index="page.pageIndex">
+        <RenderLayer :document-id="documentId" :page-index="page.pageIndex" />
+        <SelectionLayer :document-id="documentId" :page-index="page.pageIndex" />
+        <AnnotationLayer :document-id="documentId" :page-index="page.pageIndex" />
+      </PagePointerProvider>
+    </template>
+  </Scroller>
+</template>
+```
+
+### Read current form values
+
+```vue
+<script setup lang="ts">
+import { ref, onMounted, onUnmounted } from 'vue';
+import { useFormCapability } from '@embedpdf/plugin-form/vue';
+
+const props = defineProps<{ documentId: string }>();
+const { provides: formCapability } = useFormCapability();
+const formValues = ref<Record<string, string>>({});
+
+let unsubscribeReady: (() => void) | undefined;
+let unsubscribeChange: (() => void) | undefined;
+
+onMounted(() => {
+  const provides = formCapability.value;
+  if (!provides) return;
+
+  const scope = provides.forDocument(props.documentId);
+  formValues.value = scope.getFormValues();
+
+  unsubscribeReady = scope.onFormReady(() => {
+    formValues.value = scope.getFormValues();
+  });
+  unsubscribeChange = scope.onFieldValueChange(() => {
+    formValues.value = scope.getFormValues();
+  });
+});
+
+onUnmounted(() => {
+  unsubscribeReady?.();
+  unsubscribeChange?.();
+});
+</script>
+```
+
+### Set values programmatically
+
+```vue
+<script setup lang="ts">
+import { useFormCapability } from '@embedpdf/plugin-form/vue';
+
+const props = defineProps<{ documentId: string }>();
+const { provides: formCapability } = useFormCapability();
+
+const autofill = () => {
+  const scope = formCapability.value?.forDocument(props.documentId);
+  scope?.setFormValues({
+    First_Name: 'Jane',
+    Last_Name: 'Doe',
+    Email_Address: 'jane.doe@example.com',
+  });
+};
+</script>
+```
+
+### Fill mode vs. design mode
+
+In fill mode, the form category stays locked so widgets remain interactive. In design mode, you unlock annotations so the same widgets can be selected, moved, and resized.
+
+```vue
+<script setup lang="ts">
+import { computed } from 'vue';
+import { LockModeType, useAnnotation } from '@embedpdf/plugin-annotation/vue';
+
+const props = defineProps<{ documentId: string }>();
+const annotation = useAnnotation(() => props.documentId);
+
+const fillModeLock = {
+  type: LockModeType.Include,
+  categories: ['form'],
+};
+
+const fillMode = computed(
+  () =>
+    annotation.state.value.locked.type === LockModeType.Include &&
+    annotation.state.value.locked.categories?.includes('form'),
+);
+
+const toggleMode = () => {
+  annotation.provides.value?.setLocked(fillMode.value ? { type: LockModeType.None } : fillModeLock);
+};
+</script>
+```
+
+## Live Example - Switching Between Fill and Design Mode
+
+import { FormEditModeExample } from '../../code-examples/headless/form-edit-mode-example'
+
+<CodeExample
+  codePaths={[
+    "../../examples/vue-tailwind/src/examples/headless/form-edit-mode-example.vue",
+    "../../examples/vue-tailwind/src/examples/headless/form-edit-mode-example-content.vue"
+  ]}
+>
+  <FormEditModeExample />
+</CodeExample>
+
+## Live Example - Reading Form State
+
+import { FormExample } from '../../code-examples/headless/form-example'
+
+<CodeExample
+  codePaths={[
+    "../../examples/vue-tailwind/src/examples/headless/form-example.vue",
+    "../../examples/vue-tailwind/src/examples/headless/form-example-content.vue"
+  ]}
+>
+  <FormExample />
+</CodeExample>
+
+## Live Example - Programmatic Auto Fill
+
+import { FormImportExample } from '../../code-examples/headless/form-import-example'
+
+<CodeExample
+  codePaths={[
+    "../../examples/vue-tailwind/src/examples/headless/form-import-example.vue",
+    "../../examples/vue-tailwind/src/examples/headless/form-import-example-content.vue"
+  ]}
+>
+  <FormImportExample />
+</CodeExample>

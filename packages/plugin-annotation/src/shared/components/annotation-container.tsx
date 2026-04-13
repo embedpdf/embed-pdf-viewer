@@ -1,9 +1,10 @@
-import { PdfAnnotationObject, Rect, AnnotationAppearances } from '@embedpdf/models';
+import { PdfAnnotationObject, Rect, AnnotationAppearances, CssBlendMode } from '@embedpdf/models';
 import {
   CounterRotate,
   useDoublePressProps,
   useInteractionHandles,
 } from '@embedpdf/utils/@framework';
+import { getCounterRotation } from '@embedpdf/utils';
 import { TrackedAnnotation } from '@embedpdf/plugin-annotation';
 import {
   useState,
@@ -60,6 +61,8 @@ interface AnnotationContainerProps<T extends PdfAnnotationObject> {
   onSelect: (event: AnnotationInteractionEvent) => void;
   /** Pre-rendered appearance stream images for AP mode rendering */
   appearance?: AnnotationAppearances<Blob> | null;
+  /** Blend mode applied only to the visual content (children + AP image), not to interaction handles */
+  blendMode?: CssBlendMode;
   zIndex?: number;
   resizeUI?: ResizeHandleUI;
   vertexUI?: VertexHandleUI;
@@ -99,6 +102,7 @@ export function AnnotationContainer<T extends PdfAnnotationObject>({
   isRotatable = true,
   lockAspectRatio = false,
   style = {},
+  blendMode,
   vertexConfig,
   selectionMenu,
   outlineOffset = 1,
@@ -141,6 +145,19 @@ export function AnnotationContainer<T extends PdfAnnotationObject>({
   const currentObject = preview
     ? { ...trackedAnnotation.object, ...preview }
     : trackedAnnotation.object;
+
+  // Annotation flags
+  const annoFlags = trackedAnnotation.object.flags ?? [];
+  const hasNoZoom = annoFlags.includes('noZoom');
+  const hasNoRotate = annoFlags.includes('noRotate');
+
+  // visualScale: noZoom annotations maintain constant screen-pixel size regardless of zoom.
+  // Sizing uses visualScale; page-space position (left/top) still uses scale.
+  const visualScale = hasNoZoom ? 1 : scale;
+
+  // effectivePageRotation: noRotate annotations stay visually upright regardless of page rotation.
+  // The interaction controller and selection menu use this value.
+  const effectivePageRotation = (hasNoRotate ? 0 : rotation) as typeof rotation;
 
   // UI constants
   const HANDLE_COLOR = resizeUI?.color ?? '#007ACC';
@@ -388,28 +405,38 @@ export function AnnotationContainer<T extends PdfAnnotationObject>({
   const showOutline = isSelected && !isMultiSelected;
 
   // Three-layer model: outer div (AABB) + inner rotated div (unrotatedRect) + content
-  const aabbWidth = currentObject.rect.size.width * scale;
-  const aabbHeight = currentObject.rect.size.height * scale;
-  const innerWidth = effectiveUnrotatedRect.size.width * scale;
-  const innerHeight = effectiveUnrotatedRect.size.height * scale;
+  // noZoom: use visualScale (=1) for sizing so the annotation keeps a constant screen-pixel size.
+  // noRotate: counter-rotate the outer div so the annotation stays upright on rotated pages.
+  const aabbWidth = currentObject.rect.size.width * visualScale;
+  const aabbHeight = currentObject.rect.size.height * visualScale;
+  const innerWidth = effectiveUnrotatedRect.size.width * visualScale;
+  const innerHeight = effectiveUnrotatedRect.size.height * visualScale;
   const usesCustomPivot = Boolean(explicitUnrotatedRect) && annotationRotation !== 0;
   const innerLeft = usesCustomPivot
-    ? (effectiveUnrotatedRect.origin.x - currentObject.rect.origin.x) * scale
+    ? (effectiveUnrotatedRect.origin.x - currentObject.rect.origin.x) * visualScale
     : (aabbWidth - innerWidth) / 2;
   const innerTop = usesCustomPivot
-    ? (effectiveUnrotatedRect.origin.y - currentObject.rect.origin.y) * scale
+    ? (effectiveUnrotatedRect.origin.y - currentObject.rect.origin.y) * visualScale
     : (aabbHeight - innerHeight) / 2;
   const innerTransformOrigin =
     usesCustomPivot && rotationPivot
-      ? `${(rotationPivot.x - effectiveUnrotatedRect.origin.x) * scale}px ${(rotationPivot.y - effectiveUnrotatedRect.origin.y) * scale}px`
+      ? `${(rotationPivot.x - effectiveUnrotatedRect.origin.x) * visualScale}px ${(rotationPivot.y - effectiveUnrotatedRect.origin.y) * visualScale}px`
       : 'center center';
   const centerX = rotationPivot
-    ? (rotationPivot.x - currentObject.rect.origin.x) * scale
+    ? (rotationPivot.x - currentObject.rect.origin.x) * visualScale
     : aabbWidth / 2;
   const centerY = rotationPivot
-    ? (rotationPivot.y - currentObject.rect.origin.y) * scale
+    ? (rotationPivot.y - currentObject.rect.origin.y) * visualScale
     : aabbHeight / 2;
   const guideLength = Math.max(300, Math.max(aabbWidth, aabbHeight) + 80);
+
+  // noRotate: compute counter-rotation to undo page rotation on this annotation's outer div.
+  const counterRot = hasNoRotate
+    ? getCounterRotation(
+        { origin: { x: 0, y: 0 }, size: { width: aabbWidth, height: aabbHeight } },
+        rotation,
+      )
+    : null;
 
   // For children, override rect to use unrotatedRect so content renders in unrotated space
   const childObject = useMemo(() => {
@@ -422,22 +449,85 @@ export function AnnotationContainer<T extends PdfAnnotationObject>({
   const apActive =
     !!appearance?.normal && !gestureActive && !isEditing && !trackedAnnotation.dictMode;
 
+  // Shared positioning for both layers
+  const layerBaseStyle = {
+    position: 'absolute' as const,
+    left: currentObject.rect.origin.x * scale,
+    top: currentObject.rect.origin.y * scale,
+    width: counterRot ? counterRot.width : aabbWidth,
+    height: counterRot ? counterRot.height : aabbHeight,
+    pointerEvents: 'none' as const,
+    zIndex,
+    // noRotate: apply counter-rotation matrix so the annotation stays upright
+    ...(counterRot && {
+      transform: counterRot.matrix,
+      transformOrigin: '0 0',
+    }),
+  };
+
+  // Shared inner div positioning/rotation (used in both layers)
+  const innerDivBaseStyle = {
+    position: 'absolute' as const,
+    left: innerLeft,
+    top: innerTop,
+    width: innerWidth,
+    height: innerHeight,
+    transform: annotationRotation !== 0 ? `rotate(${annotationRotation}deg)` : undefined,
+    transformOrigin: innerTransformOrigin,
+  };
+
   return (
     <div data-no-interaction>
-      {/* Outer div: AABB container - stable center, holds help lines + rotation handle */}
+      {/*
+       * VISUAL LAYER — has blend mode applied at this level so it blends against the PDF
+       * canvas (in the parent stacking context), not against a transparent inner background.
+       * Contains only the annotation content and AP image — no interaction handles.
+       */}
       <div
         style={{
-          position: 'absolute',
-          left: currentObject.rect.origin.x * scale,
-          top: currentObject.rect.origin.y * scale,
-          width: aabbWidth,
-          height: aabbHeight,
-          pointerEvents: 'none',
-          zIndex,
+          ...layerBaseStyle,
+          ...(blendMode && { mixBlendMode: blendMode }),
           ...style,
         }}
-        {...props}
       >
+        {/* Inner div: rotated content — visual only, no drag/interaction */}
+        <div style={{ ...innerDivBaseStyle, pointerEvents: isEditing ? 'auto' : 'none' }}>
+          {/* Dict content -- always in DOM so hit area handles clicks */}
+          {(() => {
+            const childrenRender =
+              typeof children === 'function'
+                ? children(childObject, { appearanceActive: apActive })
+                : children;
+            const customRender = customAnnotationRenderer?.({
+              annotation: childObject,
+              children: childrenRender,
+              isSelected,
+              scale,
+              rotation,
+              pageWidth,
+              pageHeight,
+              pageIndex,
+              onSelect,
+            });
+            return customRender ?? childrenRender;
+          })()}
+
+          {/* AP canvas -- purely visual, never interactive */}
+          {appearance?.normal && (
+            <AppearanceImage
+              appearance={appearance.normal}
+              style={{ display: apActive ? 'block' : 'none' }}
+            />
+          )}
+        </div>
+      </div>
+
+      {/*
+       * INTERACTION LAYER — no blend mode so handles render at full fidelity.
+       * Same position/size as visual layer; rendered after it in DOM so it sits on top.
+       * Contains rotation guides, rotation handle, resize/vertex handles.
+       */}
+      <div style={layerBaseStyle} {...props}>
         {/* Rotation guide lines - anchored at stable AABB center */}
         {rotationActive && (
           <>
@@ -573,53 +663,19 @@ export function AnnotationContainer<T extends PdfAnnotationObject>({
             </div>
           ))}
 
-        {/* Inner div: rotated content area - holds content, resize handles, vertex handles */}
+        {/* Inner div: drag/resize/vertex interaction — no blend mode */}
         <div
           {...(effectiveIsDraggable && isSelected ? dragProps : {})}
           {...doubleProps}
           style={{
-            position: 'absolute',
-            left: innerLeft,
-            top: innerTop,
-            width: innerWidth,
-            height: innerHeight,
-            transform: annotationRotation !== 0 ? `rotate(${annotationRotation}deg)` : undefined,
-            transformOrigin: innerTransformOrigin,
+            ...innerDivBaseStyle,
             outline: showOutline ? `${outlineWidth}px ${outlineStyle} ${outlineColor}` : 'none',
             outlineOffset: showOutline ? `${outlineOff}px` : '0px',
-            pointerEvents: isSelected && !isMultiSelected ? 'auto' : 'none',
+            pointerEvents: isSelected && !isMultiSelected && !isEditing ? 'auto' : 'none',
             touchAction: 'none',
             cursor: isSelected && effectiveIsDraggable ? 'move' : 'default',
           }}
         >
-          {/* Dict content -- always in DOM so hit area handles clicks and vertex handles keep pointer capture */}
-          {(() => {
-            const childrenRender =
-              typeof children === 'function'
-                ? children(childObject, { appearanceActive: apActive })
-                : children;
-            const customRender = customAnnotationRenderer?.({
-              annotation: childObject,
-              children: childrenRender,
-              isSelected,
-              scale,
-              rotation,
-              pageWidth,
-              pageHeight,
-              pageIndex,
-              onSelect,
-            });
-            return customRender ?? childrenRender;
-          })()}
-
-          {/* AP canvas -- purely visual, never interactive */}
-          {appearance?.normal && (
-            <AppearanceImage
-              appearance={appearance.normal}
-              style={{ display: apActive ? 'block' : 'none' }}
-            />
-          )}
-
           {/* Resize handles - rotate with the shape */}
           {isSelected &&
             effectiveIsResizable &&
@@ -672,8 +728,8 @@ export function AnnotationContainer<T extends PdfAnnotationObject>({
               y: currentObject.rect.origin.y * scale,
             },
             size: {
-              width: currentObject.rect.size.width * scale,
-              height: currentObject.rect.size.height * scale,
+              width: currentObject.rect.size.width * visualScale,
+              height: currentObject.rect.size.height * visualScale,
             },
           }}
           rotation={rotation}
@@ -684,7 +740,8 @@ export function AnnotationContainer<T extends PdfAnnotationObject>({
             // The menu (suggestTop: false) renders at the visual bottom (180deg).
             // Flip the menu to the top when the handle is in the bottom visual hemisphere
             // to prevent it from overlapping with the rotation handle.
-            const effectiveAngle = (((annotationRotation + rotation * 90) % 360) + 360) % 360;
+            const effectiveAngle =
+              (((annotationRotation + effectivePageRotation * 90) % 360) + 360) % 360;
             const handleNearMenuSide =
               effectiveIsRotatable && effectiveAngle > 90 && effectiveAngle < 270;
 

@@ -1,0 +1,222 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>EmbedPDF Annotation Import/Export Example</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="min-h-screen bg-slate-100 p-6 text-slate-900">
+  <div class="mx-auto flex max-w-7xl flex-col gap-4">
+    <!-- Toolbar -->
+    <div class="flex flex-col gap-3 rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
+      <!-- Annotation tools -->
+      <div class="flex flex-wrap items-center gap-3">
+        <span class="text-xs font-medium uppercase tracking-wide text-slate-500">Tools</span>
+        <div class="h-4 w-px bg-slate-300"></div>
+        <div id="tool-buttons" class="flex flex-wrap items-center gap-1.5"></div>
+      </div>
+
+      <!-- Import/Export actions -->
+      <div class="flex flex-wrap items-center gap-3">
+        <span class="text-xs font-medium uppercase tracking-wide text-slate-500">Import / Export</span>
+        <div class="h-4 w-px bg-slate-300"></div>
+        <div class="flex items-center gap-1.5">
+          <button
+            id="export-btn"
+            type="button"
+            disabled
+            class="inline-flex items-center gap-1.5 rounded-md bg-emerald-500 px-3 py-2 text-sm font-medium text-white hover:bg-emerald-600 disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            Export (<span id="annotation-count">0</span>)
+          </button>
+          <button
+            id="clear-btn"
+            type="button"
+            disabled
+            class="inline-flex items-center gap-1.5 rounded-md bg-red-500 px-3 py-2 text-sm font-medium text-white hover:bg-red-600 disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            Clear All
+          </button>
+          <button
+            id="import-btn"
+            type="button"
+            disabled
+            class="inline-flex items-center gap-1.5 rounded-md bg-blue-500 px-3 py-2 text-sm font-medium text-white hover:bg-blue-600 disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            Import
+          </button>
+        </div>
+        <span id="status" class="text-xs text-slate-500"></span>
+      </div>
+    </div>
+
+    <!-- Viewer -->
+    <div class="h-[700px] overflow-hidden rounded-xl border border-slate-300 bg-white shadow-lg">
+      <div id="pdf-viewer" class="h-full w-full"></div>
+    </div>
+  </div>
+
+  <script type="module">
+    import EmbedPDF from 'https://cdn.jsdelivr.net/npm/@embedpdf/snippet/dist/embedpdf.js';
+
+    const documentId = 'annotation-doc';
+
+    const viewer = EmbedPDF.init({
+      type: 'container',
+      target: document.getElementById('pdf-viewer'),
+      theme: { preference: 'system' },
+      annotations: {
+        annotationAuthor: 'Guest User',
+        selectAfterCreate: true,
+      },
+      documentManager: {
+        initialDocuments: [
+          {
+            url: 'https://snippet.embedpdf.com/ebook.pdf',
+            documentId,
+          },
+        ],
+      },
+    });
+
+    const registry = await viewer.registry;
+    const annotationApi = registry.getPlugin('annotation')?.provides();
+
+    if (!annotationApi) {
+      throw new Error('Annotation plugin not available');
+    }
+
+    // Register custom stamp tools
+    annotationApi.addTool({
+      id: 'stampCheckmark',
+      name: 'Checkmark',
+      interaction: { exclusive: true, cursor: 'crosshair' },
+      matchScore: () => 0,
+      defaults: {
+        type: 26, // PdfAnnotationSubtype.STAMP
+        imageSrc: '/circle-checkmark.png',
+        imageSize: { width: 30, height: 30 },
+      },
+      behavior: {
+        showGhost: true,
+        deactivateToolAfterCreate: true,
+        selectAfterCreate: true,
+      },
+    });
+
+    annotationApi.addTool({
+      id: 'stampCross',
+      name: 'Cross',
+      interaction: { exclusive: true, cursor: 'crosshair' },
+      matchScore: () => 0,
+      defaults: {
+        type: 26, // PdfAnnotationSubtype.STAMP
+        imageSrc: '/circle-cross.png',
+        imageSize: { width: 30, height: 30 },
+      },
+      behavior: {
+        showGhost: true,
+        deactivateToolAfterCreate: true,
+        selectAfterCreate: true,
+      },
+    });
+
+    // ── UI References ──────────────────────────────────────────────────────
+    const toolButtonsContainer = document.getElementById('tool-buttons');
+    const exportBtn = document.getElementById('export-btn');
+    const clearBtn = document.getElementById('clear-btn');
+    const importBtn = document.getElementById('import-btn');
+    const countEl = document.getElementById('annotation-count');
+    const statusEl = document.getElementById('status');
+
+    let exported = null;
+    let activeTool = null;
+
+    const tools = [
+      { id: null, name: 'Select' },
+      { id: 'stampCheckmark', name: 'Checkmark' },
+      { id: 'stampCross', name: 'Cross' },
+      { id: 'ink', name: 'Pen' },
+      { id: 'square', name: 'Square' },
+      { id: 'highlight', name: 'Highlight' },
+      { id: 'freeText', name: 'Text' },
+    ];
+
+    // Build tool buttons
+    const toolButtons = new Map();
+    for (const tool of tools) {
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.textContent = tool.name;
+      btn.className = 'rounded-md px-2.5 py-1.5 text-xs font-medium shadow-sm transition-all';
+      btn.addEventListener('click', () => {
+        const next = activeTool === tool.id && tool.id !== null ? null : tool.id;
+        annotationApi.setActiveTool(next);
+      });
+      toolButtonsContainer.appendChild(btn);
+      toolButtons.set(tool.id, btn);
+    }
+
+    function updateToolButtons() {
+      for (const [id, btn] of toolButtons) {
+        if (id === activeTool) {
+          btn.className =
+            'rounded-md px-2.5 py-1.5 text-xs font-medium shadow-sm transition-all bg-blue-500 text-white ring-1 ring-blue-600';
+        } else {
+          btn.className =
+            'rounded-md px-2.5 py-1.5 text-xs font-medium shadow-sm transition-all bg-white text-slate-600 ring-1 ring-slate-300 hover:bg-slate-50 hover:text-slate-900';
+        }
+      }
+    }
+
+    function updateCount() {
+      const count = annotationApi.getAnnotations().length;
+      countEl.textContent = String(count);
+      exportBtn.disabled = count === 0;
+      clearBtn.disabled = count === 0;
+    }
+
+    // Initial render
+    updateToolButtons();
+    updateCount();
+
+    // ── Event Listeners ────────────────────────────────────────────────────
+    annotationApi.onActiveToolChange(({ tool }) => {
+      activeTool = tool?.id || null;
+      updateToolButtons();
+    });
+
+    annotationApi.onAnnotationEvent((event) => {
+      if (event.type === 'create' || event.type === 'delete' || event.type === 'loaded') {
+        updateCount();
+      }
+    });
+
+    exportBtn.addEventListener('click', () => {
+      annotationApi.exportAnnotations().wait(
+        (result) => {
+          exported = result;
+          importBtn.disabled = false;
+          importBtn.textContent = `Import (${result.length})`;
+          statusEl.textContent = `Exported ${result.length} annotation${result.length !== 1 ? 's' : ''}`;
+        },
+        () => {
+          statusEl.textContent = 'Export failed';
+        },
+      );
+    });
+
+    clearBtn.addEventListener('click', () => {
+      annotationApi.deleteAllAnnotations();
+      statusEl.textContent = 'Cleared all annotations';
+    });
+
+    importBtn.addEventListener('click', () => {
+      if (!exported) return;
+      annotationApi.importAnnotations(exported);
+      statusEl.textContent = `Imported ${exported.length} annotation${exported.length !== 1 ? 's' : ''}`;
+    });
+  </script>
+</body>
+</html>

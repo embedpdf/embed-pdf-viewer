@@ -280,10 +280,10 @@ export class UIPlugin extends BasePlugin<UIPluginConfig, UICapability, UIState, 
       // Active document operations
       setActiveToolbar: (placement, slot, toolbarId, documentId) =>
         this.setToolbarForDocument(placement, slot, toolbarId, documentId),
-      setActiveSidebar: (placement, slot, sidebarId, documentId, activeTab) =>
-        this.setSidebarForDocument(placement, slot, sidebarId, documentId, activeTab),
-      toggleSidebar: (placement, slot, sidebarId, documentId, activeTab) =>
-        this.toggleSidebarForDocument(placement, slot, sidebarId, documentId, activeTab),
+      setActiveSidebar: (placement, slot, sidebarId, documentId, activeTab, props) =>
+        this.setSidebarForDocument(placement, slot, sidebarId, documentId, activeTab, props),
+      toggleSidebar: (placement, slot, sidebarId, documentId, activeTab, props) =>
+        this.toggleSidebarForDocument(placement, slot, sidebarId, documentId, activeTab, props),
       openModal: (modalId, props, documentId) =>
         this.openModalForDocument(modalId, props, documentId),
       openMenu: (menuId, triggeredByCommandId, triggeredByItemId, documentId) =>
@@ -344,14 +344,14 @@ export class UIPlugin extends BasePlugin<UIPluginConfig, UICapability, UIState, 
         this.isToolbarOpenForDocument(placement, slot, toolbarId, documentId),
 
       // ───── Sidebars ─────
-      setActiveSidebar: (placement, slot, sidebarId, activeTab) =>
-        this.setSidebarForDocument(placement, slot, sidebarId, documentId, activeTab),
+      setActiveSidebar: (placement, slot, sidebarId, activeTab, props) =>
+        this.setSidebarForDocument(placement, slot, sidebarId, documentId, activeTab, props),
       getActiveSidebar: (placement, slot) =>
         this.getSidebarForDocument(placement, slot, documentId),
       closeSidebarSlot: (placement, slot) =>
         this.closeSidebarForDocument(placement, slot, documentId),
-      toggleSidebar: (placement, slot, sidebarId, activeTab) =>
-        this.toggleSidebarForDocument(placement, slot, sidebarId, documentId, activeTab),
+      toggleSidebar: (placement, slot, sidebarId, activeTab, props) =>
+        this.toggleSidebarForDocument(placement, slot, sidebarId, documentId, activeTab, props),
       isSidebarOpen: (placement, slot, sidebarId) =>
         this.isSidebarOpenForDocument(placement, slot, sidebarId, documentId),
 
@@ -467,9 +467,10 @@ export class UIPlugin extends BasePlugin<UIPluginConfig, UICapability, UIState, 
     sidebarId: string,
     documentId?: string,
     activeTab?: string,
+    props?: Record<string, unknown>,
   ): void {
     const id = documentId ?? this.getActiveDocumentId();
-    this.dispatch(setActiveSidebar(id, placement, slot, sidebarId, activeTab));
+    this.dispatch(setActiveSidebar(id, placement, slot, sidebarId, activeTab, props));
     this.sidebarChanged$.emit(id, { placement, slot, sidebarId });
   }
 
@@ -495,6 +496,7 @@ export class UIPlugin extends BasePlugin<UIPluginConfig, UICapability, UIState, 
     sidebarId: string,
     documentId?: string,
     activeTab?: string,
+    props?: Record<string, unknown>,
   ): void {
     const id = documentId ?? this.getActiveDocumentId();
     const slotKey = `${placement}-${slot}`;
@@ -504,7 +506,7 @@ export class UIPlugin extends BasePlugin<UIPluginConfig, UICapability, UIState, 
       this.dispatch(closeSidebarSlot(id, placement, slot));
       this.sidebarChanged$.emit(id, { placement, slot, sidebarId: '' });
     } else {
-      this.dispatch(setActiveSidebar(id, placement, slot, sidebarId, activeTab));
+      this.dispatch(setActiveSidebar(id, placement, slot, sidebarId, activeTab, props));
       this.sidebarChanged$.emit(id, { placement, slot, sidebarId });
     }
   }

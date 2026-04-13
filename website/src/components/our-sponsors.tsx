@@ -38,6 +38,11 @@ const bronzeSponsors: Sponsor[] = [
     url: 'https://www.accrual.com?utm_source=embedpdf&utm_campaign=oss',
   },
   {
+    name: 'Layer',
+    logo: '/sponsors/sponsor-layer.png',
+    url: 'https://layer.team/?utm_source=embedpdf&utm_campaign=oss',
+  },
+  {
     name: 'Lefebvre',
     logo: '/sponsors/sponsor-lefebvre.png',
     url: 'https://www.lefebvre-group.com?utm_source=embedpdf&utm_campaign=oss',

@@ -9,6 +9,7 @@ import { HandlerFactory, PreviewState } from './types';
 import { useState } from '../utils/use-state';
 import { clamp } from '@embedpdf/core';
 import { useClickDetector } from './click-detector';
+import { getCloudyBorderExtent } from '../geometry';
 
 export const squareHandlerFactory: HandlerFactory<PdfSquareAnnoObject> = {
   annotationType: PdfAnnotationSubtype.SQUARE,
@@ -56,11 +57,13 @@ export const squareHandlerFactory: HandlerFactory<PdfSquareAnnoObject> = {
         const y = clamp(pos.y - halfHeight, 0, pageSize.height - height);
 
         const strokeWidth = defaults.strokeWidth;
-        const halfStroke = strokeWidth / 2;
+        const intensity = defaults.cloudyBorderIntensity ?? 0;
+        const pad =
+          intensity > 0 ? getCloudyBorderExtent(intensity, strokeWidth, false) : strokeWidth / 2;
 
         const rect: Rect = {
-          origin: { x: x - halfStroke, y: y - halfStroke },
-          size: { width: width + strokeWidth, height: height + strokeWidth },
+          origin: { x: x - pad, y: y - pad },
+          size: { width: width + 2 * pad, height: height + 2 * pad },
         };
 
         const anno: PdfSquareAnnoObject = {
@@ -70,6 +73,9 @@ export const squareHandlerFactory: HandlerFactory<PdfSquareAnnoObject> = {
           id: uuidV4(),
           pageIndex,
           rect,
+          ...(intensity > 0 && {
+            rectangleDifferences: { left: pad, top: pad, right: pad, bottom: pad },
+          }),
         };
 
         onCommit(anno);
@@ -92,11 +98,13 @@ export const squareHandlerFactory: HandlerFactory<PdfSquareAnnoObject> = {
       if (!defaults) return null;
 
       const strokeWidth = defaults.strokeWidth;
-      const halfStroke = strokeWidth / 2;
+      const intensity = defaults.cloudyBorderIntensity ?? 0;
+      const pad =
+        intensity > 0 ? getCloudyBorderExtent(intensity, strokeWidth, false) : strokeWidth / 2;
 
       const rect: Rect = {
-        origin: { x: minX - halfStroke, y: minY - halfStroke },
-        size: { width: width + strokeWidth, height: height + strokeWidth },
+        origin: { x: minX - pad, y: minY - pad },
+        size: { width: width + 2 * pad, height: height + 2 * pad },
       };
 
       return {
@@ -105,6 +113,9 @@ export const squareHandlerFactory: HandlerFactory<PdfSquareAnnoObject> = {
         data: {
           rect,
           ...defaults,
+          ...(intensity > 0 && {
+            rectangleDifferences: { left: pad, top: pad, right: pad, bottom: pad },
+          }),
         },
       };
     };
@@ -142,6 +153,11 @@ export const squareHandlerFactory: HandlerFactory<PdfSquareAnnoObject> = {
 
           const preview = getPreview(clampedPos);
           if (preview) {
+            const intensity = defaults.cloudyBorderIntensity ?? 0;
+            const pad =
+              intensity > 0
+                ? getCloudyBorderExtent(intensity, defaults.strokeWidth, false)
+                : undefined;
             const anno: PdfSquareAnnoObject = {
               ...defaults,
               type: PdfAnnotationSubtype.SQUARE,
@@ -149,6 +165,9 @@ export const squareHandlerFactory: HandlerFactory<PdfSquareAnnoObject> = {
               id: uuidV4(),
               pageIndex,
               rect: preview.data.rect,
+              ...(pad !== undefined && {
+                rectangleDifferences: { left: pad, top: pad, right: pad, bottom: pad },
+              }),
             };
             onCommit(anno);
           }

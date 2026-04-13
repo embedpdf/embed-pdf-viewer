@@ -7,6 +7,7 @@ import { RotatePlugin } from '@embedpdf/plugin-rotate/vue';
 import {
   ANNOTATION_PLUGIN_ID,
   AnnotationPlugin,
+  LockModeType,
   getToolDefaultsById,
 } from '@embedpdf/plugin-annotation/vue';
 import {
@@ -638,9 +639,14 @@ export const commands: Record<string, Command<State>> = {
       const ui = registry.getPlugin<UIPlugin>('ui')?.provides();
       if (!ui) return;
       ui.forDocument(documentId).closeToolbarSlot('top', 'secondary');
+
+      registry
+        .getPlugin<AnnotationPlugin>(ANNOTATION_PLUGIN_ID)
+        ?.provides()
+        .forDocument(documentId)
+        .setLocked({ type: LockModeType.Include, categories: ['form'] });
     },
     active: ({ state, documentId }) => {
-      // Active if no secondary toolbar is shown
       return !isToolbarOpen(state.plugins, documentId, 'top', 'secondary');
     },
   },
@@ -653,8 +659,13 @@ export const commands: Record<string, Command<State>> = {
       const ui = registry.getPlugin<UIPlugin>('ui')?.provides();
       if (!ui) return;
 
-      // Show the annotation toolbar
       ui.setActiveToolbar('top', 'secondary', 'annotation-toolbar', documentId);
+
+      registry
+        .getPlugin<AnnotationPlugin>(ANNOTATION_PLUGIN_ID)
+        ?.provides()
+        .forDocument(documentId)
+        .setLocked({ type: LockModeType.Include, categories: ['form'] });
     },
     active: ({ state, documentId }) => {
       return isToolbarOpen(state.plugins, documentId, 'top', 'secondary', 'annotation-toolbar');
@@ -669,11 +680,58 @@ export const commands: Record<string, Command<State>> = {
       const ui = registry.getPlugin<UIPlugin>('ui')?.provides();
       if (!ui) return;
 
-      // Show the annotation toolbar (shapes use the same toolbar)
       ui.setActiveToolbar('top', 'secondary', 'shapes-toolbar', documentId);
+
+      registry
+        .getPlugin<AnnotationPlugin>(ANNOTATION_PLUGIN_ID)
+        ?.provides()
+        .forDocument(documentId)
+        .setLocked({ type: LockModeType.Include, categories: ['form'] });
     },
     active: ({ state, documentId }) => {
       return isToolbarOpen(state.plugins, documentId, 'top', 'secondary', 'shapes-toolbar');
+    },
+  },
+
+  'mode:insert': {
+    id: 'mode:insert',
+    labelKey: 'mode.insert',
+    categories: ['mode'],
+    action: ({ registry, documentId }) => {
+      const ui = registry.getPlugin<UIPlugin>('ui')?.provides();
+      if (!ui) return;
+
+      ui.setActiveToolbar('top', 'secondary', 'insert-toolbar', documentId);
+
+      registry
+        .getPlugin<AnnotationPlugin>(ANNOTATION_PLUGIN_ID)
+        ?.provides()
+        .forDocument(documentId)
+        .setLocked({ type: LockModeType.None });
+    },
+    active: ({ state, documentId }) => {
+      return isToolbarOpen(state.plugins, documentId, 'top', 'secondary', 'insert-toolbar');
+    },
+  },
+
+  'mode:form': {
+    id: 'mode:form',
+    labelKey: 'mode.form',
+    categories: ['mode'],
+    action: ({ registry, documentId }) => {
+      const ui = registry.getPlugin<UIPlugin>('ui')?.provides();
+      if (!ui) return;
+
+      ui.setActiveToolbar('top', 'secondary', 'form-toolbar', documentId);
+
+      registry
+        .getPlugin<AnnotationPlugin>(ANNOTATION_PLUGIN_ID)
+        ?.provides()
+        .forDocument(documentId)
+        .setLocked({ type: LockModeType.None });
+    },
+    active: ({ state, documentId }) => {
+      return isToolbarOpen(state.plugins, documentId, 'top', 'secondary', 'form-toolbar');
     },
   },
 
@@ -685,11 +743,15 @@ export const commands: Record<string, Command<State>> = {
       const ui = registry.getPlugin<UIPlugin>('ui')?.provides();
       if (!ui) return;
 
-      // Show the redaction toolbar
       ui.setActiveToolbar('top', 'secondary', 'redaction-toolbar', documentId);
+
+      registry
+        .getPlugin<AnnotationPlugin>(ANNOTATION_PLUGIN_ID)
+        ?.provides()
+        .forDocument(documentId)
+        .setLocked({ type: LockModeType.Include, categories: ['form'] });
     },
     active: ({ state, documentId }) => {
-      // Active when redaction toolbar is shown
       return isToolbarOpen(state.plugins, documentId, 'top', 'secondary', 'redaction-toolbar');
     },
   },
@@ -738,6 +800,115 @@ export const commands: Record<string, Command<State>> = {
     active: ({ state, documentId }) => {
       const annotation = state.plugins[ANNOTATION_PLUGIN_ID]?.documents[documentId];
       return annotation?.activeToolId === 'freeText';
+    },
+  },
+
+  'annotation:add-insert-text': {
+    id: 'annotation:add-insert-text',
+    labelKey: 'annotation.insertText',
+    icon: 'InsertText',
+    iconProps: ({ state }) => ({
+      primaryColor: getToolDefaultsById(state.plugins.annotation, 'insertText')?.strokeColor,
+    }),
+    categories: ['annotation'],
+    action: ({ registry, documentId }) => {
+      const annotation = registry.getPlugin<AnnotationPlugin>(ANNOTATION_PLUGIN_ID)?.provides();
+      const annotationScope = annotation?.forDocument(documentId);
+      if (!annotationScope) return;
+
+      if (annotationScope.getActiveTool()?.id === 'insertText') {
+        annotationScope.setActiveTool(null);
+      } else {
+        annotationScope.setActiveTool('insertText');
+      }
+    },
+    active: ({ state, documentId }) => {
+      const annotation = state.plugins[ANNOTATION_PLUGIN_ID]?.documents[documentId];
+      return annotation?.activeToolId === 'insertText';
+    },
+  },
+
+  'annotation:add-replace-text': {
+    id: 'annotation:add-replace-text',
+    labelKey: 'annotation.replaceText',
+    icon: 'ReplaceText',
+    iconProps: ({ state }) => ({
+      primaryColor: getToolDefaultsById(state.plugins.annotation, 'replaceText')?.strokeColor,
+    }),
+    categories: ['annotation'],
+    action: ({ registry, documentId }) => {
+      const annotation = registry.getPlugin<AnnotationPlugin>(ANNOTATION_PLUGIN_ID)?.provides();
+      const annotationScope = annotation?.forDocument(documentId);
+      if (!annotationScope) return;
+
+      if (annotationScope.getActiveTool()?.id === 'replaceText') {
+        annotationScope.setActiveTool(null);
+      } else {
+        annotationScope.setActiveTool('replaceText');
+      }
+    },
+    active: ({ state, documentId }) => {
+      const annotation = state.plugins[ANNOTATION_PLUGIN_ID]?.documents[documentId];
+      return annotation?.activeToolId === 'replaceText';
+    },
+  },
+
+  'annotation:add-comment': {
+    id: 'annotation:add-comment',
+    labelKey: 'annotation.comment',
+    icon: 'Message',
+    iconProps: ({ state }) => ({
+      primaryColor: getToolDefaultsById(state.plugins.annotation, 'textComment')?.strokeColor,
+    }),
+    categories: ['annotation'],
+    action: ({ registry, documentId }) => {
+      const annotation = registry.getPlugin<AnnotationPlugin>(ANNOTATION_PLUGIN_ID)?.provides();
+      const annotationScope = annotation?.forDocument(documentId);
+      if (!annotationScope) return;
+
+      if (annotationScope.getActiveTool()?.id === 'textComment') {
+        annotationScope.setActiveTool(null);
+      } else {
+        annotationScope.setActiveTool('textComment');
+      }
+    },
+    active: ({ state, documentId }) => {
+      const annotation = state.plugins[ANNOTATION_PLUGIN_ID]?.documents[documentId];
+      return annotation?.activeToolId === 'textComment';
+    },
+    disabled: ({ state, documentId }) => {
+      return lacksPermission(state, documentId, PdfPermissionFlag.ModifyAnnotations);
+    },
+  },
+
+  'annotation:add-callout': {
+    id: 'annotation:add-callout',
+    labelKey: 'annotation.callout',
+    icon: 'Callout',
+    iconProps: ({ state }) => ({
+      primaryColor: getToolDefaultsById(state.plugins.annotation, 'freeTextCallout')?.strokeColor,
+      secondaryColor: getToolDefaultsById(state.plugins.annotation, 'freeTextCallout')?.color,
+    }),
+    categories: ['annotation', 'annotation-text'],
+    action: ({ registry, documentId }) => {
+      const annotation = registry.getPlugin<AnnotationPlugin>(ANNOTATION_PLUGIN_ID)?.provides();
+      const annotationScope = annotation?.forDocument(documentId);
+      if (!annotationScope) return;
+
+      if (annotationScope.getActiveTool()?.id === 'freeTextCallout') {
+        annotationScope.setActiveTool(null);
+      } else {
+        annotationScope.setActiveTool('freeTextCallout');
+      }
+    },
+    active: ({ state, documentId }) => {
+      return (
+        state.plugins[ANNOTATION_PLUGIN_ID]?.documents[documentId]?.activeToolId ===
+        'freeTextCallout'
+      );
+    },
+    disabled: ({ state, documentId }) => {
+      return lacksPermission(state, documentId, PdfPermissionFlag.ModifyAnnotations);
     },
   },
 
@@ -994,25 +1165,28 @@ export const commands: Record<string, Command<State>> = {
     },
   },
 
-  'annotation:add-stamp': {
-    id: 'annotation:add-stamp',
-    labelKey: 'annotation.stamp',
-    icon: 'Photo',
+  'annotation:add-ink-highlighter': {
+    id: 'annotation:add-ink-highlighter',
+    labelKey: 'annotation.inkHighlighter',
+    icon: 'InkHighlighter',
+    iconProps: ({ state }) => ({
+      primaryColor: getToolDefaultsById(state.plugins.annotation, 'inkHighlighter')?.strokeColor,
+    }),
     categories: ['annotation'],
     action: ({ registry, documentId }) => {
       const annotation = registry.getPlugin<AnnotationPlugin>(ANNOTATION_PLUGIN_ID)?.provides();
       const annotationScope = annotation?.forDocument(documentId);
       if (!annotationScope) return;
 
-      if (annotationScope.getActiveTool()?.id === 'stamp') {
+      if (annotationScope.getActiveTool()?.id === 'inkHighlighter') {
         annotationScope.setActiveTool(null);
       } else {
-        annotationScope.setActiveTool('stamp');
+        annotationScope.setActiveTool('inkHighlighter');
       }
     },
     active: ({ state, documentId }) => {
       const annotation = state.plugins[ANNOTATION_PLUGIN_ID]?.documents[documentId];
-      return annotation?.activeToolId === 'stamp';
+      return annotation?.activeToolId === 'inkHighlighter';
     },
   },
 
@@ -1408,6 +1582,222 @@ export const commands: Record<string, Command<State>> = {
     },
     disabled: ({ state, documentId }) => {
       return lacksPermission(state, documentId, PdfPermissionFlag.ModifyAnnotations);
+    },
+  },
+
+  // ─────────────────────────────────────────────────────────
+  // Form Commands
+  // ─────────────────────────────────────────────────────────
+  'form:add-textfield': {
+    id: 'form:add-textfield',
+    labelKey: 'form.textfield',
+    icon: 'FormTextfield',
+    categories: ['form'],
+    action: ({ registry, documentId }) => {
+      const annotation = registry.getPlugin<AnnotationPlugin>(ANNOTATION_PLUGIN_ID)?.provides();
+      const annotationScope = annotation?.forDocument(documentId);
+      if (!annotationScope) return;
+
+      if (annotationScope.getActiveTool()?.id === 'formTextField') {
+        annotationScope.setActiveTool(null);
+      } else {
+        annotationScope.setActiveTool('formTextField');
+      }
+    },
+    active: ({ state, documentId }) => {
+      const annotation = state.plugins[ANNOTATION_PLUGIN_ID]?.documents[documentId];
+      return annotation?.activeToolId === 'formTextField';
+    },
+  },
+
+  'form:add-checkbox': {
+    id: 'form:add-checkbox',
+    labelKey: 'form.checkbox',
+    icon: 'FormCheckbox',
+    categories: ['form'],
+    action: ({ registry, documentId }) => {
+      const annotation = registry.getPlugin<AnnotationPlugin>(ANNOTATION_PLUGIN_ID)?.provides();
+      const annotationScope = annotation?.forDocument(documentId);
+      if (!annotationScope) return;
+
+      if (annotationScope.getActiveTool()?.id === 'formCheckbox') {
+        annotationScope.setActiveTool(null);
+      } else {
+        annotationScope.setActiveTool('formCheckbox');
+      }
+    },
+    active: ({ state, documentId }) => {
+      const annotation = state.plugins[ANNOTATION_PLUGIN_ID]?.documents[documentId];
+      return annotation?.activeToolId === 'formCheckbox';
+    },
+  },
+
+  'form:add-radio': {
+    id: 'form:add-radio',
+    labelKey: 'form.radio',
+    icon: 'FormRadio',
+    categories: ['form'],
+    action: ({ registry, documentId }) => {
+      const annotation = registry.getPlugin<AnnotationPlugin>(ANNOTATION_PLUGIN_ID)?.provides();
+      const annotationScope = annotation?.forDocument(documentId);
+      if (!annotationScope) return;
+
+      if (annotationScope.getActiveTool()?.id === 'formRadioButton') {
+        annotationScope.setActiveTool(null);
+      } else {
+        annotationScope.setActiveTool('formRadioButton');
+      }
+    },
+    active: ({ state, documentId }) => {
+      const annotation = state.plugins[ANNOTATION_PLUGIN_ID]?.documents[documentId];
+      return annotation?.activeToolId === 'formRadioButton';
+    },
+  },
+
+  'form:add-select': {
+    id: 'form:add-select',
+    labelKey: 'form.select',
+    icon: 'FormSelect',
+    categories: ['form'],
+    action: ({ registry, documentId }) => {
+      const annotation = registry.getPlugin<AnnotationPlugin>(ANNOTATION_PLUGIN_ID)?.provides();
+      const annotationScope = annotation?.forDocument(documentId);
+      if (!annotationScope) return;
+
+      if (annotationScope.getActiveTool()?.id === 'formCombobox') {
+        annotationScope.setActiveTool(null);
+      } else {
+        annotationScope.setActiveTool('formCombobox');
+      }
+    },
+    active: ({ state, documentId }) => {
+      const annotation = state.plugins[ANNOTATION_PLUGIN_ID]?.documents[documentId];
+      return annotation?.activeToolId === 'formCombobox';
+    },
+  },
+
+  'form:add-listbox': {
+    id: 'form:add-listbox',
+    labelKey: 'form.listbox',
+    icon: 'FormListbox',
+    categories: ['form'],
+    action: ({ registry, documentId }) => {
+      const annotation = registry.getPlugin<AnnotationPlugin>(ANNOTATION_PLUGIN_ID)?.provides();
+      const annotationScope = annotation?.forDocument(documentId);
+      if (!annotationScope) return;
+
+      if (annotationScope.getActiveTool()?.id === 'formListbox') {
+        annotationScope.setActiveTool(null);
+      } else {
+        annotationScope.setActiveTool('formListbox');
+      }
+    },
+    active: ({ state, documentId }) => {
+      const annotation = state.plugins[ANNOTATION_PLUGIN_ID]?.documents[documentId];
+      return annotation?.activeToolId === 'formListbox';
+    },
+  },
+
+  'form:toggle-fill-mode': {
+    id: 'form:toggle-fill-mode',
+    labelKey: 'form.toggleFillMode',
+    icon: 'WidgetEdit',
+    categories: ['form'],
+    action: ({ registry, documentId }) => {
+      const scope = registry
+        .getPlugin<AnnotationPlugin>(ANNOTATION_PLUGIN_ID)
+        ?.provides()
+        .forDocument(documentId);
+      if (!scope) return;
+      if (scope.isCategoryLocked('form')) {
+        scope.setLocked({ type: LockModeType.None });
+      } else {
+        scope.setLocked({ type: LockModeType.Include, categories: ['form'] });
+      }
+    },
+    active: ({ registry, documentId }) => {
+      const scope = registry
+        .getPlugin<AnnotationPlugin>(ANNOTATION_PLUGIN_ID)
+        ?.provides()
+        .forDocument(documentId);
+      return !(scope?.isCategoryLocked('form') ?? true);
+    },
+  },
+
+  // ─────────────────────────────────────────────────────────
+  // Insert Commands
+  // ─────────────────────────────────────────────────────────
+  'insert:add-rubber-stamp': {
+    id: 'insert:add-rubber-stamp',
+    labelKey: 'insert.rubberStamp',
+    icon: 'RubberStamp',
+    categories: ['insert'],
+    action: ({ registry, documentId }) => {
+      const uiPlugin = registry.getPlugin<UIPlugin>(UI_PLUGIN_ID);
+      if (!uiPlugin || !uiPlugin.provides) return;
+
+      const uiCapability = uiPlugin.provides();
+      if (!uiCapability) return;
+
+      const scope = uiCapability.forDocument(documentId);
+      scope.toggleSidebar('left', 'main', 'rubber-stamp-panel');
+    },
+    active: ({ state, documentId }) => {
+      return isSidebarOpen(state.plugins, documentId, 'left', 'main', 'rubber-stamp-panel');
+    },
+  },
+
+  'insert:add-signature': {
+    id: 'insert:add-signature',
+    labelKey: 'signature.title',
+    icon: 'Signature',
+    categories: ['insert'],
+    action: ({ registry, documentId }) => {
+      const uiPlugin = registry.getPlugin<UIPlugin>(UI_PLUGIN_ID);
+      if (!uiPlugin || !uiPlugin.provides) return;
+
+      const uiCapability = uiPlugin.provides();
+      if (!uiCapability) return;
+
+      const scope = uiCapability.forDocument(documentId);
+      scope.toggleSidebar('left', 'main', 'signature-panel');
+    },
+    active: ({ state, documentId }) => {
+      return isSidebarOpen(state.plugins, documentId, 'left', 'main', 'signature-panel');
+    },
+  },
+
+  'signature:create': {
+    id: 'signature:create',
+    labelKey: 'signature.create.title',
+    icon: 'Signature',
+    categories: ['insert'],
+    action: ({ registry, documentId }) => {
+      const ui = registry.getPlugin<UIPlugin>(UI_PLUGIN_ID)?.provides();
+      if (!ui) return;
+      ui.forDocument(documentId).openModal('signature-create-modal');
+    },
+  },
+
+  'insert:add-image': {
+    id: 'insert:add-image',
+    labelKey: 'insert.image',
+    icon: 'Photo',
+    categories: ['insert'],
+    action: ({ registry, documentId }) => {
+      const annotation = registry.getPlugin<AnnotationPlugin>(ANNOTATION_PLUGIN_ID)?.provides();
+      const annotationScope = annotation?.forDocument(documentId);
+      if (!annotationScope) return;
+
+      if (annotationScope.getActiveTool()?.id === 'stamp') {
+        annotationScope.setActiveTool(null);
+      } else {
+        annotationScope.setActiveTool('stamp');
+      }
+    },
+    active: ({ state, documentId }) => {
+      const annotation = state.plugins[ANNOTATION_PLUGIN_ID]?.documents[documentId];
+      return annotation?.activeToolId === 'stamp';
     },
   },
 };

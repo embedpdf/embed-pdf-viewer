@@ -1,0 +1,107 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>EmbedPDF Scroll Example</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="min-h-screen bg-slate-100 p-6 text-slate-900">
+  <div class="mx-auto flex max-w-7xl flex-col gap-4">
+    <section class="flex flex-wrap items-center justify-between gap-4 rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+      <div class="flex items-center gap-2">
+        <button
+          id="prev-page-btn"
+          type="button"
+          class="rounded p-2 hover:bg-slate-100 disabled:opacity-50"
+        >
+          Previous
+        </button>
+
+        <span id="page-status" class="font-mono text-sm font-medium">
+          Page 1 / 1
+        </span>
+
+        <button
+          id="next-page-btn"
+          type="button"
+          class="rounded p-2 hover:bg-slate-100 disabled:opacity-50"
+        >
+          Next
+        </button>
+      </div>
+    </section>
+
+    <div class="h-[700px] overflow-hidden rounded-xl border border-slate-300 bg-white shadow-lg">
+      <div id="pdf-viewer" class="h-full w-full"></div>
+    </div>
+  </div>
+
+  <script type="module">
+    import EmbedPDF from 'https://cdn.jsdelivr.net/npm/@embedpdf/snippet/dist/embedpdf.js';
+
+    const prevPageButton = document.getElementById('prev-page-btn');
+    const nextPageButton = document.getElementById('next-page-btn');
+    const pageStatus = document.getElementById('page-status');
+
+    let currentPage = 1;
+    let totalPages = 1;
+
+    function renderPageStatus() {
+      pageStatus.textContent = `Page ${currentPage} / ${totalPages}`;
+      prevPageButton.disabled = currentPage <= 1;
+      nextPageButton.disabled = currentPage >= totalPages;
+    }
+
+    const viewer = EmbedPDF.init({
+      type: 'container',
+      target: document.getElementById('pdf-viewer'),
+      theme: { preference: 'system' },
+      documentManager: {
+        initialDocuments: [
+          {
+            url: 'https://snippet.embedpdf.com/ebook.pdf',
+            documentId: 'ebook',
+          },
+        ],
+      },
+      scroll: {
+        defaultPageGap: 20,
+      },
+    });
+
+    const registry = await viewer.registry;
+    const scroll = registry.getPlugin('scroll')?.provides();
+
+    if (!scroll) {
+      throw new Error('Scroll plugin not available');
+    }
+
+    const doc = scroll.forDocument('ebook');
+
+    scroll.onLayoutReady((event) => {
+      if (event.documentId !== 'ebook') return;
+      currentPage = event.pageNumber;
+      totalPages = event.totalPages;
+      renderPageStatus();
+    });
+
+    scroll.onPageChange((event) => {
+      if (event.documentId !== 'ebook') return;
+      currentPage = event.pageNumber;
+      totalPages = event.totalPages;
+      renderPageStatus();
+    });
+
+    prevPageButton.addEventListener('click', () => {
+      doc.scrollToPreviousPage();
+    });
+
+    nextPageButton.addEventListener('click', () => {
+      doc.scrollToNextPage();
+    });
+
+    renderPageStatus();
+  </script>
+</body>
+</html>

@@ -1,0 +1,183 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>EmbedPDF Form Import Example</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="min-h-screen bg-slate-100 p-6 text-slate-900">
+  <div class="mx-auto flex max-w-7xl flex-col gap-4">
+    <div class="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
+      <div class="flex flex-wrap items-center gap-2">
+        <button
+          id="autofill-btn"
+          type="button"
+          class="inline-flex items-center gap-1.5 rounded-md bg-blue-600 px-3 py-2 text-sm font-medium text-white hover:bg-blue-700"
+        >
+          Auto Fill Data
+        </button>
+
+        <button
+          id="clear-btn"
+          type="button"
+          class="inline-flex items-center gap-1.5 rounded-md border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
+        >
+          Clear Form
+        </button>
+      </div>
+
+      <div class="flex flex-wrap items-center gap-2">
+        <button
+          id="download-btn"
+          type="button"
+          class="inline-flex items-center gap-1.5 rounded-md border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
+        >
+          Download PDF
+        </button>
+
+        <button
+          id="save-btn"
+          type="button"
+          class="inline-flex items-center gap-1.5 rounded-md bg-emerald-600 px-3 py-2 text-sm font-medium text-white hover:bg-emerald-700"
+        >
+          Save Copy
+        </button>
+      </div>
+    </div>
+
+    <div class="h-[700px] overflow-hidden rounded-xl border border-slate-300 bg-white shadow-lg">
+      <div id="pdf-viewer" class="h-full w-full"></div>
+    </div>
+  </div>
+
+  <script type="module">
+    import EmbedPDF from 'https://cdn.jsdelivr.net/npm/@embedpdf/snippet/dist/embedpdf.js';
+
+    const documentId = 'form-doc';
+
+    const demoData = {
+      First_Name: 'Jane',
+      Last_Name: 'Doe',
+      Email_Address: 'jane.doe@example.com',
+      Phone_Number: '+1 (555) 123-4567',
+      Home_Address: '123 Main Street',
+      City: 'San Francisco',
+      State: 'CA',
+      Postal_Code: '94102',
+      Department: 'Design',
+      Employment_Type: 'Contract',
+      Office_Location: 'San Francisco',
+      Start_Date: '2026-04-01',
+      Programming_Languages: 'TypeScript, Rust, Go',
+      Framework_Tools: 'React, Node.js, Docker',
+      Comments: 'I would like to have a standing desk and a dual monitor setup.',
+      Equipment_Laptop: 'Yes',
+      Equipment_Monitor: 'Yes',
+      Equipment_Keyboard: 'Yes',
+      Equipment_Desk: 'Yes',
+      Access_Repository: 'Yes',
+      Access_Cloud: 'Yes',
+      Access_Internal: 'Yes',
+      Access_VPN: 'Yes',
+      Terms: 'Yes',
+      Preferred_Shift: '4f803c06-508d-4232-bd84-82452b6561f1',
+      Work_Arrangement: 'd43ec6d3-9e8c-403f-98d7-e2c818070ac4',
+    };
+
+    const emptyData = {
+      First_Name: '',
+      Last_Name: '',
+      Email_Address: '',
+      Phone_Number: '',
+      Home_Address: '',
+      City: '',
+      State: '',
+      Postal_Code: '',
+      Department: 'Engineering',
+      Employment_Type: 'Full-time',
+      Office_Location: 'New York',
+      Start_Date: '',
+      Programming_Languages: '',
+      Framework_Tools: '',
+      Comments: '',
+      Equipment_Laptop: 'Off',
+      Equipment_Monitor: 'Off',
+      Equipment_Keyboard: 'Off',
+      Equipment_Desk: 'Off',
+      Access_Repository: 'Off',
+      Access_Cloud: 'Off',
+      Access_Internal: 'Off',
+      Access_VPN: 'Off',
+      Terms: 'Off',
+      Preferred_Shift: '1a5963ac-8d1e-4c83-9a8b-da53700e46c1',
+      Work_Arrangement: 'e424be12-71f7-4458-b1a3-a71a0b100729',
+    };
+
+    const autofillButton = document.getElementById('autofill-btn');
+    const clearButton = document.getElementById('clear-btn');
+    const downloadButton = document.getElementById('download-btn');
+    const saveButton = document.getElementById('save-btn');
+
+    const viewer = EmbedPDF.init({
+      type: 'container',
+      target: document.getElementById('pdf-viewer'),
+      theme: { preference: 'system' },
+      documentManager: {
+        initialDocuments: [
+          {
+            url: 'https://www.embedpdf.com/form.pdf',
+            documentId,
+          },
+        ],
+      },
+      export: {
+        defaultFileName: 'filled-form.pdf',
+      },
+    });
+
+    const registry = await viewer.registry;
+    const formScope = registry.getPlugin('form')?.provides()?.forDocument(documentId);
+    const exportScope = registry.getPlugin('export')?.provides()?.forDocument(documentId);
+
+    if (!formScope || !exportScope) {
+      throw new Error('Form or export plugin not available');
+    }
+
+    async function applyFormValues(values) {
+      autofillButton.disabled = true;
+      clearButton.disabled = true;
+      saveButton.disabled = true;
+
+      await formScope.setFormValues(values).toPromise();
+
+      autofillButton.disabled = false;
+      clearButton.disabled = false;
+      saveButton.disabled = false;
+    }
+
+    autofillButton.addEventListener('click', () => applyFormValues(demoData));
+    clearButton.addEventListener('click', () => applyFormValues(emptyData));
+    downloadButton.addEventListener('click', () => exportScope.download());
+
+    saveButton.addEventListener('click', async () => {
+      saveButton.disabled = true;
+      saveButton.textContent = 'Working...';
+
+      const arrayBuffer = await exportScope.saveAsCopy().toPromise();
+      const blob = new Blob([arrayBuffer], { type: 'application/pdf' });
+      const file = new File([blob], 'filled-form.pdf');
+
+      await new Promise((resolve) => setTimeout(resolve, 1000));
+
+      console.log(`Prepared ${file.size} bytes for upload.`);
+      saveButton.textContent = 'Saved!';
+
+      window.setTimeout(() => {
+        saveButton.disabled = false;
+        saveButton.textContent = 'Save Copy';
+      }, 2500);
+    });
+  </script>
+</body>
+</html>

@@ -15,6 +15,7 @@
       "@embedpdf/plugin-document-manager",
       "@embedpdf/plugin-export",
       "@embedpdf/plugin-fullscreen",
+      "@embedpdf/plugin-form",
       "@embedpdf/plugin-history",
       "@embedpdf/plugin-i18n",
       "@embedpdf/plugin-interaction-manager",
@@ -26,7 +27,9 @@
       "@embedpdf/plugin-scroll",
       "@embedpdf/plugin-search",
       "@embedpdf/plugin-selection",
+      "@embedpdf/plugin-signature",
       "@embedpdf/plugin-spread",
+      "@embedpdf/plugin-stamp",
       "@embedpdf/plugin-thumbnail",
       "@embedpdf/plugin-tiling",
       "@embedpdf/plugin-ui",
@@ -56,6 +59,7 @@
     "@embedpdf/example-pdfium-node",
     "@embedpdf/ai",
     "@embedpdf/plugin-ai-manager",
-    "@embedpdf/plugin-layout-analysis"
+    "@embedpdf/plugin-layout-analysis",
+    "@embedpdf/default-stamps"
   ]
 }

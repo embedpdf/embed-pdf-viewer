@@ -2,7 +2,6 @@ import { PdfPageObjectWithRotatedSize } from '@embedpdf/models';
 import { ViewportMetrics } from '@embedpdf/plugin-viewport';
 import { BaseScrollStrategy, ScrollStrategyConfig } from './base-strategy';
 import { VirtualItem, PageLayout } from '../types/virtual-item';
-import { ScrollMetrics } from '../types';
 
 export class VerticalScrollStrategy extends BaseScrollStrategy {
   constructor(config: ScrollStrategyConfig) {
@@ -23,6 +22,7 @@ export class VerticalScrollStrategy extends BaseScrollStrategy {
           height: page.size.height,
           rotatedWidth: page.rotatedSize.width,
           rotatedHeight: page.rotatedSize.height,
+          elevated: false,
         };
         pageX += page.rotatedSize.width + this.pageGap;
         return layout;
@@ -66,5 +66,10 @@ export class VerticalScrollStrategy extends BaseScrollStrategy {
 
   protected getClientSize(viewport: ViewportMetrics): number {
     return viewport.clientHeight;
+  }
+
+  /** Vertical scroll: extent along scroll axis is height. */
+  protected getItemSizeAlongScrollAxis(item: VirtualItem): number {
+    return item.height;
   }
 }

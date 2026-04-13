@@ -18,6 +18,7 @@ export * from './uuid';
 export * from './compound-task';
 export * from './task-sequence';
 export * from './fonts';
+export * from './image-metadata';
 
 /**
  * ignore will do nothing when called.

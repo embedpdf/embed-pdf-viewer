@@ -43,6 +43,8 @@ export const viewerUISchema: UISchema = {
             hide: [
               'annotate-mode',
               'shapes-mode',
+              'insert-mode',
+              'form-mode',
               'redact-mode',
               'zoom-toolbar',
               'pan-button',
@@ -54,7 +56,7 @@ export const viewerUISchema: UISchema = {
           sm: {
             minWidth: 640,
             maxWidth: 768,
-            hide: ['shapes-mode', 'redact-mode', 'zoom-toolbar'],
+            hide: ['shapes-mode', 'insert-mode', 'form-mode', 'redact-mode', 'zoom-toolbar'],
             show: [
               'annotate-mode',
               'overflow-tabs-button',
@@ -70,7 +72,7 @@ export const viewerUISchema: UISchema = {
           },
           lg: {
             minWidth: 1024,
-            show: ['shapes-mode', 'redact-mode'],
+            show: ['shapes-mode', 'insert-mode', 'form-mode', 'redact-mode'],
             hide: ['overflow-tabs-button'],
           },
         },
@@ -180,6 +182,16 @@ export const viewerUISchema: UISchema = {
               variant: 'text',
             },
             {
+              id: 'insert-mode',
+              commandId: 'mode:insert',
+              variant: 'text',
+            },
+            {
+              id: 'form-mode',
+              commandId: 'mode:form',
+              variant: 'text',
+            },
+            {
               id: 'redact-mode',
               commandId: 'mode:redact',
               variant: 'text',
@@ -280,14 +292,38 @@ export const viewerUISchema: UISchema = {
             },
             {
               type: 'command-button',
+              id: 'add-ink-highlighter',
+              commandId: 'annotation:add-ink-highlighter',
+              variant: 'icon',
+            },
+            {
+              type: 'command-button',
               id: 'add-text',
               commandId: 'annotation:add-text',
               variant: 'icon',
             },
             {
               type: 'command-button',
-              id: 'add-stamp',
-              commandId: 'annotation:add-stamp',
+              id: 'add-insert-text',
+              commandId: 'annotation:add-insert-text',
+              variant: 'icon',
+            },
+            {
+              type: 'command-button',
+              id: 'add-replace-text',
+              commandId: 'annotation:add-replace-text',
+              variant: 'icon',
+            },
+            {
+              type: 'command-button',
+              id: 'add-comment',
+              commandId: 'annotation:add-comment',
+              variant: 'icon',
+            },
+            {
+              type: 'command-button',
+              id: 'add-callout',
+              commandId: 'annotation:add-callout',
               variant: 'icon',
             },
             {
@@ -394,6 +430,145 @@ export const viewerUISchema: UISchema = {
       ],
     },
 
+    // Insert toolbar (shown when in insert mode)
+    'insert-toolbar': {
+      id: 'insert-toolbar',
+      position: {
+        placement: 'top',
+        slot: 'secondary',
+        order: 0,
+      },
+      permanent: false,
+      items: [
+        { type: 'spacer', id: 'spacer-insert-1', flex: true },
+        {
+          type: 'group',
+          id: 'insert-tools',
+          alignment: 'start',
+          gap: 2,
+          items: [
+            {
+              type: 'command-button',
+              id: 'add-rubber-stamp',
+              commandId: 'insert:add-rubber-stamp',
+              variant: 'icon',
+            },
+            {
+              type: 'command-button',
+              id: 'add-signature',
+              commandId: 'insert:add-signature',
+              variant: 'icon',
+            },
+            {
+              type: 'command-button',
+              id: 'add-image',
+              commandId: 'insert:add-image',
+              variant: 'icon',
+            },
+            {
+              type: 'divider',
+              id: 'insert-tools-divider-1',
+              orientation: 'vertical',
+            },
+            {
+              type: 'command-button',
+              id: 'undo-button',
+              commandId: 'history:undo',
+              variant: 'icon',
+            },
+            {
+              type: 'command-button',
+              id: 'redo-button',
+              commandId: 'history:redo',
+              variant: 'icon',
+            },
+          ],
+        },
+        { type: 'spacer', id: 'spacer-insert-2', flex: true },
+      ],
+    },
+
+    // Form toolbar (shown when in form mode)
+    'form-toolbar': {
+      id: 'form-toolbar',
+      position: {
+        placement: 'top',
+        slot: 'secondary',
+        order: 0,
+      },
+      permanent: false,
+      items: [
+        { type: 'spacer', id: 'spacer-form-1', flex: true },
+        {
+          type: 'group',
+          id: 'form-tools',
+          alignment: 'start',
+          gap: 2,
+          items: [
+            {
+              type: 'command-button',
+              id: 'add-form-textfield',
+              commandId: 'form:add-textfield',
+              variant: 'icon',
+            },
+            {
+              type: 'command-button',
+              id: 'add-form-checkbox',
+              commandId: 'form:add-checkbox',
+              variant: 'icon',
+            },
+            {
+              type: 'command-button',
+              id: 'add-form-radio',
+              commandId: 'form:add-radio',
+              variant: 'icon',
+            },
+            {
+              type: 'command-button',
+              id: 'add-form-select',
+              commandId: 'form:add-select',
+              variant: 'icon',
+            },
+            {
+              type: 'command-button',
+              id: 'add-form-listbox',
+              commandId: 'form:add-listbox',
+              variant: 'icon',
+            },
+            {
+              type: 'divider',
+              id: 'form-tools-divider-1',
+              orientation: 'vertical',
+            },
+            {
+              type: 'command-button',
+              id: 'toggle-form-fill-mode',
+              commandId: 'form:toggle-fill-mode',
+              variant: 'icon',
+            },
+            {
+              type: 'divider',
+              id: 'form-tools-divider-2',
+              orientation: 'vertical',
+            },
+            {
+              type: 'command-button',
+              id: 'undo-button',
+              commandId: 'history:undo',
+              variant: 'icon',
+            },
+            {
+              type: 'command-button',
+              id: 'redo-button',
+              commandId: 'history:redo',
+              variant: 'icon',
+            },
+          ],
+        },
+        { type: 'spacer', id: 'spacer-form-2', flex: true },
+      ],
+    },
+
     // Redaction toolbar (shown when in redact mode)
     'redaction-toolbar': {
       id: 'redaction-toolbar',
@@ -466,6 +641,16 @@ export const viewerUISchema: UISchema = {
         },
         {
           type: 'command',
+          id: 'mode:insert',
+          commandId: 'mode:insert',
+        },
+        {
+          type: 'command',
+          id: 'mode:form',
+          commandId: 'mode:form',
+        },
+        {
+          type: 'command',
           id: 'mode:redact',
           commandId: 'mode:redact',
         },
@@ -474,7 +659,7 @@ export const viewerUISchema: UISchema = {
         breakpoints: {
           xs: {
             maxWidth: 640,
-            show: ['mode:annotate', 'mode:shapes', 'mode:redact'],
+            show: ['mode:annotate', 'mode:shapes', 'mode:insert', 'mode:form', 'mode:redact'],
           },
           md: {
             minWidth: 640,
@@ -642,6 +827,26 @@ export const viewerUISchema: UISchema = {
         },
         {
           type: 'command',
+          id: 'annotation:add-insert-text',
+          commandId: 'annotation:add-insert-text',
+        },
+        {
+          type: 'command',
+          id: 'annotation:add-replace-text',
+          commandId: 'annotation:add-replace-text',
+        },
+        {
+          type: 'command',
+          id: 'annotation:add-comment',
+          commandId: 'annotation:add-comment',
+        },
+        {
+          type: 'command',
+          id: 'annotation:add-callout',
+          commandId: 'annotation:add-callout',
+        },
+        {
+          type: 'command',
           id: 'annotation:add-highlight',
           commandId: 'annotation:add-highlight',
         },
@@ -693,6 +898,11 @@ export const viewerUISchema: UISchema = {
           type: 'command',
           id: 'annotation:add-ink',
           commandId: 'annotation:add-ink',
+        },
+        {
+          type: 'command',
+          id: 'annotation:add-ink-highlighter',
+          commandId: 'annotation:add-ink-highlighter',
         },
         {
           type: 'command',
@@ -835,6 +1045,38 @@ export const viewerUISchema: UISchema = {
       collapsible: true,
       defaultOpen: false,
     },
+
+    'rubber-stamp-panel': {
+      id: 'rubber-stamp-panel',
+      position: {
+        placement: 'left',
+        slot: 'main',
+        order: 0,
+      },
+      content: {
+        type: 'component',
+        componentId: 'rubber-stamp-sidebar',
+      },
+      width: '250px',
+      collapsible: true,
+      defaultOpen: false,
+    },
+
+    'signature-panel': {
+      id: 'signature-panel',
+      position: {
+        placement: 'left',
+        slot: 'main',
+        order: 0,
+      },
+      content: {
+        type: 'component',
+        componentId: 'signature-sidebar',
+      },
+      width: '280px',
+      collapsible: true,
+      defaultOpen: false,
+    },
   },
 
   // ─────────────────────────────────────────────────────────
@@ -848,6 +1090,16 @@ export const viewerUISchema: UISchema = {
         componentId: 'link-modal',
       },
       maxWidth: '28rem',
+      closeOnClickOutside: true,
+      closeOnEscape: true,
+    },
+    'signature-create-modal': {
+      id: 'signature-create-modal',
+      content: {
+        type: 'component',
+        componentId: 'signature-create-modal',
+      },
+      maxWidth: '40rem',
       closeOnClickOutside: true,
       closeOnEscape: true,
     },

@@ -17,7 +17,7 @@
     /** Current page zoom factor */
     scale: number;
     /** Click handler (used for selection) */
-    onClick?: (e: MouseEvent | TouchEvent) => void;
+    onClick?: (e: MouseEvent) => void;
     /** Whether this link has an IRT (In Reply To) reference - disables direct interaction */
     hasIRT?: boolean;
   }
@@ -51,8 +51,10 @@
   // For solid/dashed, render a rectangle border
   const isUnderline = $derived(strokeStyle === PdfAnnotationBorderStyle.UNDERLINE);
 
-  const hitAreaCursor = $derived(hasIRT ? 'default' : isSelected ? 'move' : 'pointer');
-  const hitAreaPointerEvents = $derived(hasIRT ? 'none' : isSelected ? 'none' : 'visible');
+  const hitAreaCursor = $derived(hasIRT || !onClick ? 'default' : isSelected ? 'move' : 'pointer');
+  const hitAreaPointerEvents = $derived(
+    hasIRT || !onClick ? 'none' : isSelected ? 'none' : 'visible',
+  );
 </script>
 
 <svg
@@ -73,7 +75,6 @@
     {height}
     fill="transparent"
     onpointerdown={hasIRT ? undefined : onClick}
-    ontouchstart={hasIRT ? undefined : onClick}
     style:cursor={hitAreaCursor}
     style:pointer-events={hitAreaPointerEvents}
   />

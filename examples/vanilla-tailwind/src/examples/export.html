@@ -1,0 +1,99 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>EmbedPDF Export Example</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="min-h-screen bg-slate-100 p-6 text-slate-900">
+  <div class="mx-auto flex max-w-7xl flex-col gap-4">
+    <section class="flex flex-wrap items-center gap-2 rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+      <button
+        id="download-btn"
+        type="button"
+        class="rounded-md bg-white px-3 py-2 text-sm font-medium text-slate-700 shadow-sm ring-1 ring-slate-200 hover:bg-slate-50"
+      >
+        Download PDF
+      </button>
+
+      <div class="h-6 w-px bg-slate-300"></div>
+
+      <button
+        id="save-btn"
+        type="button"
+        class="rounded-md bg-blue-600 px-3 py-2 text-sm font-medium text-white shadow-sm hover:bg-blue-700"
+      >
+        Save to Server
+      </button>
+
+      <span id="save-status" class="text-sm text-slate-500"></span>
+    </section>
+
+    <div class="h-[700px] overflow-hidden rounded-xl border border-slate-300 bg-white shadow-lg">
+      <div id="pdf-viewer" class="h-full w-full"></div>
+    </div>
+  </div>
+
+  <script type="module">
+    import EmbedPDF from 'https://cdn.jsdelivr.net/npm/@embedpdf/snippet/dist/embedpdf.js';
+
+    const downloadButton = document.getElementById('download-btn');
+    const saveButton = document.getElementById('save-btn');
+    const saveStatus = document.getElementById('save-status');
+
+    const viewer = EmbedPDF.init({
+      type: 'container',
+      target: document.getElementById('pdf-viewer'),
+      documentManager: {
+        initialDocuments: [
+          {
+            url: 'https://snippet.embedpdf.com/ebook.pdf',
+            documentId: 'ebook',
+          },
+        ],
+      },
+      export: {
+        defaultFileName: 'my-ebook.pdf',
+      },
+    });
+
+    const registry = await viewer.registry;
+    const exportPlugin = registry.getPlugin('export')?.provides();
+
+    if (!exportPlugin) {
+      throw new Error('Export plugin not available');
+    }
+
+    function getExportScope() {
+      return exportPlugin.forDocument('ebook');
+    }
+
+    downloadButton.addEventListener('click', () => {
+      getExportScope().download();
+    });
+
+    saveButton.addEventListener('click', async () => {
+      saveButton.disabled = true;
+      saveButton.textContent = 'Saving...';
+      saveStatus.textContent = '';
+
+      const arrayBuffer = await getExportScope().saveAsCopy().toPromise();
+      const blob = new Blob([arrayBuffer], { type: 'application/pdf' });
+      const file = new File([blob], 'saved-document.pdf');
+
+      await new Promise((resolve) => window.setTimeout(resolve, 1500));
+
+      console.log(`Successfully prepared ${file.size} bytes for upload.`);
+      saveStatus.textContent = `Prepared ${file.size.toLocaleString()} bytes for upload.`;
+      saveButton.disabled = false;
+      saveButton.textContent = 'Saved!';
+
+      window.setTimeout(() => {
+        saveButton.textContent = 'Save to Server';
+        saveStatus.textContent = '';
+      }, 3000);
+    });
+  </script>
+</body>
+</html>

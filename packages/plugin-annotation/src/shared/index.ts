@@ -1,6 +1,7 @@
 import { createPluginPackage } from '@embedpdf/core';
 import { AnnotationPluginPackage as BaseAnnotationPackage } from '@embedpdf/plugin-annotation';
 import { AnnotationRendererProvider } from './context/renderer-registry';
+import { AnnotationNavigationHandler } from './components/annotation-navigation-handler';
 
 export * from './hooks';
 export * from './components';
@@ -8,7 +9,8 @@ export * from './components/types';
 export * from './context';
 export * from '@embedpdf/plugin-annotation';
 
-// Automatically wrap with AnnotationRendererProvider
+// Automatically wrap with AnnotationRendererProvider and navigation handler utility
 export const AnnotationPluginPackage = createPluginPackage(BaseAnnotationPackage)
   .addWrapper(AnnotationRendererProvider)
+  .addUtility(AnnotationNavigationHandler)
   .build();

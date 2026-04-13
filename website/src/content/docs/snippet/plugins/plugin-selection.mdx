@@ -1,0 +1,112 @@
+---
+title: Text Selection
+description: Control text selection programmatically and listen for selection events.
+---
+
+import SelectionExample from '../code-examples/selection-example';
+import SelectionTextExample from '../code-examples/selection-text-example';
+import { ExampleWrapper } from '@/components/example-wrapper';
+
+# Text Selection
+
+The EmbedPDF Snippet enables users to select text naturally, just like on a webpage. While the viewer provides built-in context menus for selection, you can also interact with the selection state programmatically to build custom features like "Copy to Clipboard" buttons or extract selected text.
+
+## Programmatic Control
+
+You can control selection behavior using the `selection` plugin API.
+
+<CodeExample
+  codePaths={[
+    "../../examples/vanilla-tailwind/src/examples/selection.html"
+  ]}
+>
+  <ExampleWrapper>
+    <SelectionExample />
+  </ExampleWrapper>
+</CodeExample>
+
+### Interacting with Selection
+
+To perform actions on the current text selection:
+
+```javascript
+const viewer = EmbedPDF.init({
+  type: 'container',
+  target: document.getElementById('pdf-viewer'),
+  documentManager: {
+    initialDocuments: [
+      {
+        url: 'https://snippet.embedpdf.com/ebook.pdf',
+        documentId: 'my-doc'
+      }
+    ]
+  }
+});
+
+const registry = await viewer.registry;
+const selection = registry.getPlugin('selection').provides();
+const scope = selection.forDocument('my-doc');
+
+// Copy selected text to system clipboard
+scope.copyToClipboard();
+
+// Clear the current selection highlighting
+scope.clear();
+```
+
+## Reading Selected Text
+
+You can also retrieve the actual text content that the user has selected. This is useful for features like "Quote Selection" or custom search actions.
+
+<CodeExample
+  codePaths={[
+    "../../examples/vanilla-tailwind/src/examples/selection-text.html"
+  ]}
+>
+  <ExampleWrapper>
+    <SelectionTextExample />
+  </ExampleWrapper>
+</CodeExample>
+
+```javascript
+const registry = await viewer.registry;
+const selection = registry.getPlugin('selection').provides();
+const scope = selection.forDocument('my-doc');
+
+// Get the selected text content
+const text = await scope.getSelectedText().toPromise();
+console.log('Selected text:', text.join(' '));
+```
+
+## Listening for Changes
+
+You can listen for selection events to update your UI (e.g., enabling a "Copy" button only when text is selected).
+
+```javascript
+const registry = await viewer.registry;
+const selection = registry.getPlugin('selection').provides();
+const scope = selection.forDocument('my-doc');
+
+// Subscribe to selection changes
+const unsubscribe = scope.onSelectionChange((selectionRange) => {
+  if (selectionRange) {
+    console.log('Text selected!');
+  } else {
+    console.log('Selection cleared');
+  }
+});
+```
+
+### Getting Selection Details
+
+The `selectionRange` object (or `scope.getFormattedSelection()`) provides detailed information about the selection:
+
+```javascript
+const selections = scope.getFormattedSelection();
+
+selections.forEach((sel) => {
+  console.log(`Page: ${sel.pageIndex}`);
+  console.log('Bounding Box:', sel.rect);
+  console.log('Text lines:', sel.textLines);
+});
+```

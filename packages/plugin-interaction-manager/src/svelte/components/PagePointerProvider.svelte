@@ -30,7 +30,7 @@
   let ref = $state<HTMLDivElement | null>(null);
 
   const interactionManagerCapability = useInteractionManagerCapability();
-  const isPageExclusive = useIsPageExclusive(documentId);
+  const isPageExclusive = useIsPageExclusive(() => documentId);
   const documentState = useDocumentState(() => documentId);
 
   // Get page dimensions and transformations from document state

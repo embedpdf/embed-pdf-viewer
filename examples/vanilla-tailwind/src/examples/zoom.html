@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>EmbedPDF Zoom Example</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="min-h-screen bg-slate-100 p-6 text-slate-900">
+  <div class="mx-auto flex max-w-7xl flex-col gap-4">
+    <section class="flex flex-wrap items-center gap-2 rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+      <span class="px-2 text-sm font-medium text-slate-600">External Controls:</span>
+      <div class="flex gap-1">
+        <button
+          id="zoom-in-btn"
+          type="button"
+          class="rounded p-2 hover:bg-slate-100"
+          title="Zoom In"
+        >
+          Zoom In
+        </button>
+        <button
+          id="zoom-out-btn"
+          type="button"
+          class="rounded p-2 hover:bg-slate-100"
+          title="Zoom Out"
+        >
+          Zoom Out
+        </button>
+        <div class="mx-2 h-6 w-px self-center bg-slate-300"></div>
+        <button
+          id="fit-width-btn"
+          type="button"
+          class="rounded px-3 py-1.5 text-sm font-medium hover:bg-slate-100"
+        >
+          Fit Width
+        </button>
+        <button
+          id="fit-page-btn"
+          type="button"
+          class="rounded px-3 py-1.5 text-sm font-medium hover:bg-slate-100"
+        >
+          Fit Page
+        </button>
+      </div>
+    </section>
+
+    <div class="h-[700px] overflow-hidden rounded-xl border border-slate-300 bg-white shadow-lg">
+      <div id="pdf-viewer" class="h-full w-full"></div>
+    </div>
+  </div>
+
+  <script type="module">
+    import EmbedPDF, { ZoomMode } from 'https://cdn.jsdelivr.net/npm/@embedpdf/snippet/dist/embedpdf.js';
+
+    const viewer = EmbedPDF.init({
+      type: 'container',
+      target: document.getElementById('pdf-viewer'),
+      theme: { preference: 'system' },
+      zoom: {
+        defaultZoomLevel: ZoomMode.FitPage,
+      },
+      documentManager: {
+        initialDocuments: [
+          {
+            url: 'https://snippet.embedpdf.com/ebook.pdf',
+            documentId: 'zoom-doc',
+          },
+        ],
+      },
+    });
+
+    const registry = await viewer.registry;
+    const zoom = registry.getPlugin('zoom')?.provides()?.forDocument('zoom-doc');
+
+    if (!zoom) {
+      throw new Error('Zoom plugin not available');
+    }
+
+    document.getElementById('zoom-in-btn').addEventListener('click', () => {
+      zoom.zoomIn();
+    });
+
+    document.getElementById('zoom-out-btn').addEventListener('click', () => {
+      zoom.zoomOut();
+    });
+
+    document.getElementById('fit-width-btn').addEventListener('click', () => {
+      zoom.requestZoom(ZoomMode.FitWidth);
+    });
+
+    document.getElementById('fit-page-btn').addEventListener('click', () => {
+      zoom.requestZoom(ZoomMode.FitPage);
+    });
+  </script>
+</body>
+</html>

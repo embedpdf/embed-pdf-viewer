@@ -19,6 +19,14 @@ export interface AnnotationConfig {
 }
 
 export const annotationConfigs: Record<SidebarSubtype, AnnotationConfig> = {
+  [PdfAnnotationSubtype.TEXT]: {
+    label: 'Comment',
+    labelKey: 'annotation.comment',
+    icon: 'message',
+    iconProps: (annotation: any) => ({
+      primaryColor: annotation.strokeColor || annotation.color || '#6b7280',
+    }),
+  },
   [PdfAnnotationSubtype.HIGHLIGHT]: {
     label: 'Highlight',
     labelKey: 'annotation.highlight',
@@ -88,7 +96,7 @@ export const annotationConfigs: Record<SidebarSubtype, AnnotationConfig> = {
   [PdfAnnotationSubtype.FREETEXT]: {
     label: 'Text',
     labelKey: 'annotation.freeText',
-    icon: 'text',
+    icon: 'freeText',
     iconProps: (annotation: any) => ({
       primaryColor: annotation.fontColor || '#000000',
     }),
@@ -113,9 +121,17 @@ export const annotationConfigs: Record<SidebarSubtype, AnnotationConfig> = {
   [PdfAnnotationSubtype.STAMP]: {
     label: 'Stamp',
     labelKey: 'annotation.stamp',
-    icon: 'deviceFloppy',
+    icon: 'rubberStamp',
     iconProps: () => ({
-      primaryColor: '#dc2626',
+      primaryColor: '#000000',
+    }),
+  },
+  [PdfAnnotationSubtype.CARET]: {
+    label: 'Caret',
+    labelKey: 'annotation.caret',
+    icon: 'insertText',
+    iconProps: (annotation: any) => ({
+      primaryColor: annotation.strokeColor || '#E44234',
     }),
   },
   [PdfAnnotationSubtype.REDACT]: {

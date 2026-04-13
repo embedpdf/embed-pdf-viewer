@@ -18,6 +18,7 @@ import { ChevronRightIcon } from './chevron-right';
 import { ChevronLeftIcon } from './chevron-left';
 import { ChevronDownIcon } from './chevron-down';
 import { SearchIcon } from './search';
+import { CalloutIcon } from './callout';
 import { CommentIcon } from './comment';
 import { SidebarIcon } from './sidebar';
 import { DotsIcon } from './dots';
@@ -31,6 +32,8 @@ import { Book2Icon } from './book2';
 import { SquaresIcon } from './squares';
 import { ListTreeIcon } from './list-tree';
 import { PaperclipIcon } from './paperclip';
+import { RubberStampIcon } from './rubber-stamp';
+import { RubberStampPlusIcon } from './rubber-stamp-plus';
 import { UnderlineIcon } from './underline';
 import { SquigglyIcon } from './squiggly';
 import { StrikethroughIcon } from './strikethrough';
@@ -81,6 +84,18 @@ import { MarqueeSelectIcon } from './marquee-select';
 import { GroupIcon } from './group';
 import { UngroupIcon } from './ungroup';
 import { RedactionSidebarIcon } from './redaction-sidebar';
+import { FreeTextIcon } from './free-text';
+import { InsertTextIcon } from './insert-text';
+import { ReplaceTextIcon } from './replace-text';
+import { MessageIcon } from './message';
+import { InkHighlighterIcon } from './ink-highlighter';
+import { FormCheckboxIcon } from './form-checkbox';
+import { FormRadioIcon } from './form-radio';
+import { FormSelectIcon } from './form-select';
+import { FormListboxIcon } from './form-listbox';
+import { FormTextfieldIcon } from './form-textfield';
+import { WidgetEditIcon } from './widget-edit';
+import { SignatureIcon } from './signature';
 
 export type Icons = {
   [key: string]: IconComponent;
@@ -107,6 +122,7 @@ export const icons: Icons = {
   chevronLeft: ChevronLeftIcon,
   chevronDown: ChevronDownIcon,
   search: SearchIcon,
+  callout: CalloutIcon,
   comment: CommentIcon,
   sidebar: SidebarIcon,
   dots: DotsIcon,
@@ -117,6 +133,8 @@ export const icons: Icons = {
   squares: SquaresIcon,
   listTree: ListTreeIcon,
   paperclip: PaperclipIcon,
+  rubberStamp: RubberStampIcon,
+  rubberStampPlus: RubberStampPlusIcon,
   copy: CopyIcon,
   underline: UnderlineIcon,
   squiggly: SquigglyIcon,
@@ -169,4 +187,16 @@ export const icons: Icons = {
   group: GroupIcon,
   ungroup: UngroupIcon,
   redactionSidebar: RedactionSidebarIcon,
+  freeText: FreeTextIcon,
+  insertText: InsertTextIcon,
+  replaceText: ReplaceTextIcon,
+  message: MessageIcon,
+  inkHighlighter: InkHighlighterIcon,
+  formCheckbox: FormCheckboxIcon,
+  formRadio: FormRadioIcon,
+  formSelect: FormSelectIcon,
+  formListbox: FormListboxIcon,
+  formTextfield: FormTextfieldIcon,
+  widgetEdit: WidgetEditIcon,
+  signature: SignatureIcon,
 };

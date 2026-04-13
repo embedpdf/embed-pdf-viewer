@@ -4,13 +4,7 @@
     @mouseleave="isHovered = false"
     :style="{ position: 'absolute', inset: 0 }"
   >
-    <div
-      v-for="(b, i) in segmentRects"
-      :key="i"
-      @pointerdown="onClick"
-      @touchstart="onClick"
-      :style="getSegmentStyle(b)"
-    >
+    <div v-for="(b, i) in segmentRects" :key="i" @pointerdown="onClick" :style="getSegmentStyle(b)">
       <span v-if="isHovered && overlayText" :style="getTextStyle(b)">
         {{ renderedOverlayText }}
       </span>

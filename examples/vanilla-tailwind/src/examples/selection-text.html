@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>EmbedPDF Selected Text Example</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="min-h-screen bg-slate-100 p-6 text-slate-900">
+  <div class="mx-auto flex max-w-7xl flex-col gap-4">
+    <section class="flex flex-col gap-2 rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+      <span class="tracking-wider text-xs font-medium uppercase text-slate-500">
+        Selected Text
+      </span>
+      <div id="selected-text" class="min-h-[3rem] text-sm text-slate-800">
+        <span class="italic text-slate-400">
+          Select text in the PDF to see it here...
+        </span>
+      </div>
+    </section>
+
+    <div class="h-[700px] overflow-hidden rounded-xl border border-slate-300 bg-white shadow-lg">
+      <div id="pdf-viewer" class="h-full w-full"></div>
+    </div>
+  </div>
+
+  <script type="module">
+    import EmbedPDF from 'https://cdn.jsdelivr.net/npm/@embedpdf/snippet/dist/embedpdf.js';
+
+    const selectedText = document.getElementById('selected-text');
+
+    const viewer = EmbedPDF.init({
+      type: 'container',
+      target: document.getElementById('pdf-viewer'),
+      theme: { preference: 'system' },
+      documentManager: {
+        initialDocuments: [
+          {
+            url: 'https://snippet.embedpdf.com/ebook.pdf',
+            documentId: 'ebook',
+          },
+        ],
+      },
+    });
+
+    const registry = await viewer.registry;
+    const selection = registry.getPlugin('selection')?.provides()?.forDocument('ebook');
+
+    if (!selection) {
+      throw new Error('Selection plugin not available');
+    }
+
+    selection.onSelectionChange((currentSelection) => {
+      if (!currentSelection) {
+        selectedText.innerHTML =
+          '<span class="italic text-slate-400">Select text in the PDF to see it here...</span>';
+        return;
+      }
+
+      selection.getSelectedText().wait((lines) => {
+        selectedText.textContent = lines.join(' ');
+      }, console.error);
+    });
+  </script>
+</body>
+</html>

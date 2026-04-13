@@ -1,0 +1,110 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>EmbedPDF Disable Categories Example</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="min-h-screen bg-slate-100 p-6 text-slate-900">
+  <div class="mx-auto flex max-w-7xl flex-col gap-4">
+    <section class="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+      <h1 class="text-lg font-semibold">Disable Categories</h1>
+      <p class="mt-1 text-sm text-slate-600">
+        Toggle categories below to disable features in the viewer at runtime.
+      </p>
+
+      <div id="category-controls" class="mt-4 flex flex-wrap gap-4"></div>
+
+      <p class="mt-4 text-xs text-slate-500">
+        Selected:
+        <span id="selected-categories">(none)</span>
+      </p>
+    </section>
+
+    <div class="h-[700px] overflow-hidden rounded-xl border border-slate-300 bg-white shadow-lg">
+      <div id="pdf-viewer" class="h-full w-full"></div>
+    </div>
+  </div>
+
+  <script type="module">
+    import EmbedPDF from 'https://cdn.jsdelivr.net/npm/@embedpdf/snippet/dist/embedpdf.js';
+
+    const categories = [
+      { id: 'annotation', label: 'Annotations' },
+      { id: 'form', label: 'Forms' },
+      { id: 'redaction', label: 'Redaction' },
+      { id: 'zoom', label: 'Zoom' },
+      { id: 'document-print', label: 'Print' },
+      { id: 'document-export', label: 'Export' },
+      { id: 'panel', label: 'Sidebars' },
+    ];
+
+    const disabledCategories = new Set();
+    const controls = document.getElementById('category-controls');
+    const selectedCategories = document.getElementById('selected-categories');
+    const target = document.getElementById('pdf-viewer');
+
+    const viewer = EmbedPDF.init({
+      type: 'container',
+      target,
+      src: 'https://snippet.embedpdf.com/ebook.pdf',
+      theme: { preference: 'system' },
+      disabledCategories: [],
+    });
+
+    const registry = await viewer.registry;
+    const commands = registry.getPlugin('commands')?.provides();
+    const ui = registry.getPlugin('ui')?.provides();
+
+    function getDisabledCategories() {
+      return Array.from(disabledCategories);
+    }
+
+    function renderSelectedCategories() {
+      const selected = getDisabledCategories();
+      selectedCategories.textContent =
+        selected.length > 0 ? selected.join(', ') : '(none)';
+    }
+
+    function syncDisabledCategories() {
+      const selected = getDisabledCategories();
+      commands?.setDisabledCategories(selected);
+      ui?.setDisabledCategories(selected);
+      renderSelectedCategories();
+    }
+
+    function toggleCategory(categoryId) {
+      if (disabledCategories.has(categoryId)) {
+        disabledCategories.delete(categoryId);
+      } else {
+        disabledCategories.add(categoryId);
+      }
+
+      syncDisabledCategories();
+    }
+
+    function createCategoryControl(category) {
+      const label = document.createElement('label');
+      label.className = 'flex cursor-pointer items-center gap-2 text-sm text-slate-700';
+
+      const input = document.createElement('input');
+      input.type = 'checkbox';
+      input.className = 'h-4 w-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500';
+      input.addEventListener('change', () => toggleCategory(category.id));
+
+      const text = document.createElement('span');
+      text.textContent = category.label;
+
+      label.append(input, text);
+      return label;
+    }
+
+    for (const category of categories) {
+      controls.append(createCategoryControl(category));
+    }
+
+    renderSelectedCategories();
+  </script>
+</body>
+</html>

@@ -3,6 +3,8 @@
  * Offloads OffscreenCanvas.convertToBlob() from the main PDFium worker
  */
 
+import { rgbaToBmpBlob } from './bmp';
+
 export interface EncodeImageRequest {
   id: string;
   type: 'encode';
@@ -12,7 +14,7 @@ export interface EncodeImageRequest {
       width: number;
       height: number;
     };
-    imageType: 'image/png' | 'image/jpeg' | 'image/webp';
+    imageType: 'image/png' | 'image/jpeg' | 'image/webp' | 'image/bmp';
     quality?: number;
   };
 }
@@ -24,13 +26,18 @@ export interface EncodeImageResponse {
 }
 
 /**
- * Encode ImageData to Blob using OffscreenCanvas
+ * Encode ImageData to Blob using OffscreenCanvas (or BMP fast path)
  */
 async function encodeImage(
   imageData: { data: Uint8ClampedArray; width: number; height: number },
-  imageType: 'image/png' | 'image/jpeg' | 'image/webp',
+  imageType: 'image/png' | 'image/jpeg' | 'image/webp' | 'image/bmp',
   quality?: number,
 ): Promise<Blob> {
+  // Fast path: BMP needs no canvas
+  if (imageType === 'image/bmp') {
+    return rgbaToBmpBlob(imageData.data, imageData.width, imageData.height);
+  }
+
   if (typeof OffscreenCanvas === 'undefined') {
     throw new Error('OffscreenCanvas is not available in this worker environment');
   }

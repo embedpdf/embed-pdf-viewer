@@ -13,7 +13,8 @@ export function buildShortcutString(event: KeyboardEvent): string | null {
   if (event.metaKey) modifiers.push('meta');
 
   // Only add non-modifier keys
-  const key = event.key.toLowerCase();
+  let key = event.key.toLowerCase();
+  if (key === ' ') key = 'space';
   const isModifier = ['control', 'shift', 'alt', 'meta'].includes(key);
 
   if (isModifier) {
@@ -34,8 +35,9 @@ export function createKeyDownHandler(commands: CommandsCapability) {
     const target = (composedPath[0] || event.target) as HTMLElement;
 
     // Don't handle shortcuts if target is an input, textarea, or contentEditable
+    // Exception: allow Tab/Shift+Tab through for form field navigation
     if (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable) {
-      return;
+      if (event.key !== 'Tab') return;
     }
 
     const shortcut = buildShortcutString(event);

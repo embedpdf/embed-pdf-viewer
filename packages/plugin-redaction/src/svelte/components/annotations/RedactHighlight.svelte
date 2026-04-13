@@ -68,7 +68,6 @@
       role="button"
       tabindex="0"
       onpointerdown={onClick}
-      ontouchstart={onClick}
       style:position="absolute"
       style:left="{left}px"
       style:top="{top}px"

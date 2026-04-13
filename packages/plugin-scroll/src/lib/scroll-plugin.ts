@@ -435,7 +435,18 @@ export class ScrollPlugin extends BasePlugin<
       startTime: Date.now(),
     };
 
-    this.dispatch(updateDocumentScrollState(documentId, { pageChangeState }));
+    // Optimistic update: set currentPage immediately so UI reflects target during smooth scroll
+    this.dispatch(
+      updateDocumentScrollState(documentId, {
+        pageChangeState,
+        currentPage: targetPage,
+      }),
+    );
+    this.pageChange$.emit({
+      documentId,
+      pageNumber: targetPage,
+      totalPages: docState.totalPages,
+    });
 
     if (behavior === 'instant') {
       this.completePageChange(documentId);
@@ -494,14 +505,22 @@ export class ScrollPlugin extends BasePlugin<
     const docState = this.getDocumentState(documentId);
     if (!docState) return;
 
-    // Update state
-    this.dispatch(updateDocumentScrollState(documentId, metrics));
+    // During smooth scroll (Next/Previous), viewport fires before scroll completes.
+    // Metrics would derive currentPage from old viewport position and revert the optimistic update.
+    const isProgrammaticScroll = docState.pageChangeState.isChanging;
+    // Preserve optimistic currentPage during programmatic scroll; use viewport-derived value otherwise
+    const metricsToCommit =
+      isProgrammaticScroll && metrics.currentPage !== docState.currentPage
+        ? { ...metrics, currentPage: docState.currentPage }
+        : metrics;
 
-    // Emit scroll event
-    this.scroll$.emit({ documentId, metrics });
+    // Update state before emitting scroll event,
+    // so any scroll$ listener that reads state sees metricsToCommit; then notify
+    this.dispatch(updateDocumentScrollState(documentId, metricsToCommit));
+    this.scroll$.emit({ documentId, metrics: metricsToCommit });
 
-    // Emit page change if current page changed
-    if (metrics.currentPage !== docState.currentPage) {
+    // Only emit pageChange$ for user-driven scroll; programmatic scroll already emitted in startPageChange
+    if (!isProgrammaticScroll && metrics.currentPage !== docState.currentPage) {
       this.pageChange$.emit({
         documentId,
         pageNumber: metrics.currentPage,

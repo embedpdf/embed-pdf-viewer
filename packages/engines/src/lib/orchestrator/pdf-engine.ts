@@ -25,7 +25,10 @@ import {
   PdfAnnotationsProgress,
   PdfAttachmentObject,
   PdfAddAttachmentParams,
+  PdfDocumentJavaScriptActionObject,
   PdfWidgetAnnoObject,
+  PdfWidgetAnnoField,
+  PdfWidgetJavaScriptActionObject,
   FormFieldValue,
   PdfFlattenPageOptions,
   PdfPageFlattenResult,
@@ -478,7 +481,7 @@ export class PdfEngine<T = Blob> implements IPdfEngine<T> {
     options: any,
     resultTask: Task<T, PdfErrorReason>,
   ): void {
-    const imageType = options?.imageType ?? 'image/webp';
+    const imageType = options?.imageType ?? 'image/png';
     const quality = options?.quality;
 
     // Convert to plain object for encoding
@@ -502,7 +505,7 @@ export class PdfEngine<T = Blob> implements IPdfEngine<T> {
     options: PdfRenderPageAnnotationOptions | undefined,
     resultTask: Task<AnnotationAppearanceMap<T>, PdfErrorReason>,
   ): void {
-    const imageType = options?.imageType ?? 'image/webp';
+    const imageType = options?.imageType ?? 'image/png';
     const quality = options?.imageQuality;
 
     const convertImage = (rawImageData: ImageDataLike): Promise<T> => {
@@ -775,6 +778,41 @@ export class PdfEngine<T = Blob> implements IPdfEngine<T> {
 
   // ========== Forms ==========
 
+  getDocumentJavaScriptActions(
+    doc: PdfDocumentObject,
+  ): PdfTask<PdfDocumentJavaScriptActionObject[]> {
+    return this.workerQueue.enqueue(
+      {
+        execute: () => this.executor.getDocumentJavaScriptActions(doc),
+        meta: { docId: doc.id, operation: 'getDocumentJavaScriptActions' },
+      },
+      { priority: Priority.MEDIUM },
+    );
+  }
+
+  getPageAnnoWidgets(doc: PdfDocumentObject, page: PdfPageObject): PdfTask<PdfWidgetAnnoObject[]> {
+    return this.workerQueue.enqueue(
+      {
+        execute: () => this.executor.getPageAnnoWidgets(doc, page),
+        meta: { docId: doc.id, pageIndex: page.index, operation: 'getPageAnnoWidgets' },
+      },
+      { priority: Priority.MEDIUM },
+    );
+  }
+
+  getPageWidgetJavaScriptActions(
+    doc: PdfDocumentObject,
+    page: PdfPageObject,
+  ): PdfTask<PdfWidgetJavaScriptActionObject[]> {
+    return this.workerQueue.enqueue(
+      {
+        execute: () => this.executor.getPageWidgetJavaScriptActions(doc, page),
+        meta: { docId: doc.id, pageIndex: page.index, operation: 'getPageWidgetJavaScriptActions' },
+      },
+      { priority: Priority.MEDIUM },
+    );
+  }
+
   setFormFieldValue(
     doc: PdfDocumentObject,
     page: PdfPageObject,
@@ -785,6 +823,77 @@ export class PdfEngine<T = Blob> implements IPdfEngine<T> {
       {
         execute: () => this.executor.setFormFieldValue(doc, page, annotation, value),
         meta: { docId: doc.id, pageIndex: page.index, operation: 'setFormFieldValue' },
+      },
+      { priority: Priority.MEDIUM },
+    );
+  }
+
+  setFormFieldState(
+    doc: PdfDocumentObject,
+    page: PdfPageObject,
+    annotation: PdfWidgetAnnoObject,
+    field: PdfWidgetAnnoField,
+  ): PdfTask<boolean> {
+    return this.workerQueue.enqueue(
+      {
+        execute: () => this.executor.setFormFieldState(doc, page, annotation, field),
+        meta: { docId: doc.id, pageIndex: page.index, operation: 'setFormFieldState' },
+      },
+      { priority: Priority.MEDIUM },
+    );
+  }
+
+  renameWidgetField(
+    doc: PdfDocumentObject,
+    page: PdfPageObject,
+    annotation: PdfWidgetAnnoObject,
+    name: string,
+  ): PdfTask<boolean> {
+    return this.workerQueue.enqueue(
+      {
+        execute: () => this.executor.renameWidgetField(doc, page, annotation, name),
+        meta: { docId: doc.id, pageIndex: page.index, operation: 'renameWidgetField' },
+      },
+      { priority: Priority.MEDIUM },
+    );
+  }
+
+  shareWidgetField(
+    doc: PdfDocumentObject,
+    sourcePage: PdfPageObject,
+    sourceAnnotation: PdfWidgetAnnoObject,
+    targetPage: PdfPageObject,
+    targetAnnotation: PdfWidgetAnnoObject,
+  ): PdfTask<boolean> {
+    return this.workerQueue.enqueue(
+      {
+        execute: () =>
+          this.executor.shareWidgetField(
+            doc,
+            sourcePage,
+            sourceAnnotation,
+            targetPage,
+            targetAnnotation,
+          ),
+        meta: {
+          docId: doc.id,
+          pageIndex: sourcePage.index,
+          operation: 'shareWidgetField',
+        },
+      },
+      { priority: Priority.MEDIUM },
+    );
+  }
+
+  regenerateWidgetAppearances(
+    doc: PdfDocumentObject,
+    page: PdfPageObject,
+    annotationIds: string[],
+  ): PdfTask<boolean> {
+    return this.workerQueue.enqueue(
+      {
+        execute: () => this.executor.regenerateWidgetAppearances(doc, page, annotationIds),
+        meta: { docId: doc.id, pageIndex: page.index, operation: 'regenerateWidgetAppearances' },
       },
       { priority: Priority.MEDIUM },
     );
@@ -811,6 +920,41 @@ export class PdfEngine<T = Blob> implements IPdfEngine<T> {
       {
         execute: () => this.executor.extractPages(doc, pageIndexes),
         meta: { docId: doc.id, pageIndexes: pageIndexes, operation: 'extractPages' },
+      },
+      { priority: Priority.MEDIUM },
+    );
+  }
+
+  createDocument(id: string): PdfTask<PdfDocumentObject> {
+    return this.workerQueue.enqueue(
+      {
+        execute: () => this.executor.createDocument(id),
+        meta: { docId: id, operation: 'createDocument' },
+      },
+      { priority: Priority.MEDIUM },
+    );
+  }
+
+  importPages(
+    destDoc: PdfDocumentObject,
+    srcDoc: PdfDocumentObject,
+    srcPageIndices: number[],
+    insertIndex?: number,
+  ): PdfTask<PdfPageObject[]> {
+    return this.workerQueue.enqueue(
+      {
+        execute: () => this.executor.importPages(destDoc, srcDoc, srcPageIndices, insertIndex),
+        meta: { docId: destDoc.id, operation: 'importPages' },
+      },
+      { priority: Priority.MEDIUM },
+    );
+  }
+
+  deletePage(doc: PdfDocumentObject, pageIndex: number): PdfTask<boolean> {
+    return this.workerQueue.enqueue(
+      {
+        execute: () => this.executor.deletePage(doc, pageIndex),
+        meta: { docId: doc.id, operation: 'deletePage' },
       },
       { priority: Priority.MEDIUM },
     );
@@ -874,6 +1018,42 @@ export class PdfEngine<T = Blob> implements IPdfEngine<T> {
       {
         execute: () => this.executor.flattenAnnotation(doc, page, annotation),
         meta: { docId: doc.id, pageIndex: page.index, operation: 'flattenAnnotation' },
+      },
+      { priority: Priority.MEDIUM },
+    );
+  }
+
+  exportAnnotationAppearanceAsPdf(
+    doc: PdfDocumentObject,
+    page: PdfPageObject,
+    annotation: PdfAnnotationObject,
+  ): PdfTask<ArrayBuffer> {
+    return this.workerQueue.enqueue(
+      {
+        execute: () => this.executor.exportAnnotationAppearanceAsPdf(doc, page, annotation),
+        meta: {
+          docId: doc.id,
+          pageIndex: page.index,
+          operation: 'exportAnnotationAppearanceAsPdf',
+        },
+      },
+      { priority: Priority.MEDIUM },
+    );
+  }
+
+  exportAnnotationsAppearanceAsPdf(
+    doc: PdfDocumentObject,
+    page: PdfPageObject,
+    annotations: PdfAnnotationObject[],
+  ): PdfTask<ArrayBuffer> {
+    return this.workerQueue.enqueue(
+      {
+        execute: () => this.executor.exportAnnotationsAppearanceAsPdf(doc, page, annotations),
+        meta: {
+          docId: doc.id,
+          pageIndex: page.index,
+          operation: 'exportAnnotationsAppearanceAsPdf',
+        },
       },
       { priority: Priority.MEDIUM },
     );

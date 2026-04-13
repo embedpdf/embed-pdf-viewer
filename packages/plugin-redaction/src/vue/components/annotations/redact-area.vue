@@ -2,12 +2,7 @@
   <div
     @pointerdown="
       (e) => {
-        if (!isSelected) onClick(e);
-      }
-    "
-    @touchstart="
-      (e) => {
-        if (!isSelected) onClick(e);
+        if (!isSelected) onClick?.(e);
       }
     "
     @mouseenter="isHovered = true"

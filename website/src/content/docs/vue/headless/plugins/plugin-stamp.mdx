@@ -1,0 +1,418 @@
+---
+title: Stamp Plugin
+description: Add reusable rubber-stamp libraries in Vue, place built-in stamps, and let users turn annotations into custom stamps.
+searchable: true
+---
+
+import { Callout } from '@/components/callout'
+import { CodeExample } from '@/components/code-example'
+
+# Stamp Plugin
+
+The Stamp Plugin extends the Annotation Plugin with reusable rubber-stamp libraries. Instead of treating every stamp as a one-off image, you can preload curated stamp sets, let users browse and place them, and even turn annotations they create in the viewer into reusable stamps at runtime.
+
+Out of the box, the plugin is designed around two workflows:
+
+- **Using preloaded libraries** for common review stamps like Approved, Draft, or Confidential.
+- **Creating custom libraries** from annotations or imported PDFs, then exporting those libraries for later reuse.
+
+<Callout type="info" title="No separate StampLayer needed">
+  Stamps render through the existing `AnnotationLayer`. In Vue, `StampPluginPackage` already registers the preview renderer used while the user is hovering a stamp over the page, so you do not need to add a separate layer component.
+</Callout>
+
+## Installation
+
+The Stamp Plugin builds on top of the Annotation Plugin and its interaction dependencies. The `i18n` plugin is optional, but recommended if you want the default manifest-backed stamp library to follow the active locale.
+
+```sh npm2yarn
+npm install @embedpdf/plugin-stamp @embedpdf/plugin-annotation @embedpdf/plugin-interaction-manager @embedpdf/plugin-selection @embedpdf/plugin-history
+```
+
+Optional localization support:
+
+```sh npm2yarn
+npm install @embedpdf/plugin-i18n
+```
+
+## Registration
+
+Import `StampPluginPackage`, the Annotation Plugin, and the Annotation Plugin dependencies. Register the dependencies first, then the annotation plugin, then the stamp plugin.
+
+By default, the stamp plugin:
+
+- Loads a localized standard stamp manifest from `@embedpdf/default-stamps`.
+- Creates a writable `custom` library the first time you save a user-generated stamp.
+
+```vue
+<script setup lang="ts">
+import { createPluginRegistration } from '@embedpdf/core';
+import { EmbedPDF } from '@embedpdf/core/vue';
+import { DocumentManagerPluginPackage } from '@embedpdf/plugin-document-manager/vue';
+import { ViewportPluginPackage } from '@embedpdf/plugin-viewport/vue';
+import { ScrollPluginPackage } from '@embedpdf/plugin-scroll/vue';
+import { RenderPluginPackage } from '@embedpdf/plugin-render/vue';
+import { InteractionManagerPluginPackage } from '@embedpdf/plugin-interaction-manager/vue';
+import { SelectionPluginPackage } from '@embedpdf/plugin-selection/vue';
+import { HistoryPluginPackage } from '@embedpdf/plugin-history/vue';
+import { AnnotationPluginPackage } from '@embedpdf/plugin-annotation/vue';
+import { StampPluginPackage } from '@embedpdf/plugin-stamp/vue';
+
+const plugins = [
+  createPluginRegistration(DocumentManagerPluginPackage, {
+    initialDocuments: [{ url: '/document.pdf' }],
+  }),
+  createPluginRegistration(ViewportPluginPackage),
+  createPluginRegistration(ScrollPluginPackage),
+  createPluginRegistration(RenderPluginPackage),
+  createPluginRegistration(InteractionManagerPluginPackage),
+  createPluginRegistration(SelectionPluginPackage),
+  createPluginRegistration(HistoryPluginPackage),
+  createPluginRegistration(AnnotationPluginPackage, {
+    annotationAuthor: 'Jane Doe',
+  }),
+  createPluginRegistration(StampPluginPackage, {
+    defaultLibrary: {
+      id: 'custom',
+      name: 'Custom Stamps',
+      categories: ['custom', 'sidebar'],
+    },
+  }),
+];
+</script>
+```
+
+## Usage
+
+### 1. Render Stamps Through `<AnnotationLayer />`
+
+Stamp annotations are created, previewed, and selected through the Annotation Plugin. That means your page renderer should look just like a normal annotation-enabled viewer: wrap the page in `PagePointerProvider`, render the document, then render `SelectionLayer` and `AnnotationLayer`.
+
+```vue
+<template>
+  <Scroller :document-id="documentId">
+    <template #default="{ page }">
+      <PagePointerProvider :document-id="documentId" :page-index="page.pageIndex">
+        <RenderLayer :document-id="documentId" :page-index="page.pageIndex" />
+        <SelectionLayer :document-id="documentId" :page-index="page.pageIndex" />
+        <AnnotationLayer :document-id="documentId" :page-index="page.pageIndex" />
+      </PagePointerProvider>
+    </template>
+  </Scroller>
+</template>
+```
+
+### 2. Build a Stamp Sidebar
+
+The Vue package includes composables and components for building your own stamp browser:
+
+- `useStampLibraries()` gives you the loaded libraries.
+- `useStampsByLibrary(libraryId, category)` returns the stamps you want to display.
+- `useActiveStamp(documentId)` tells you which stamp is currently armed for placement.
+- `useStampCapability()` gives you the plugin API.
+- `StampImg` renders a stamp thumbnail from a library page.
+
+```vue
+<script setup lang="ts">
+import { ref } from 'vue';
+import {
+  StampImg,
+  useActiveStamp,
+  useStampCapability,
+  useStampLibraries,
+  useStampsByLibrary,
+  type StampDefinition,
+} from '@embedpdf/plugin-stamp/vue';
+
+const props = defineProps<{ documentId: string }>();
+
+const selectedLibraryId = ref('all');
+const { libraries } = useStampLibraries();
+const { provides: stampCapability } = useStampCapability();
+const stamps = useStampsByLibrary(() => selectedLibraryId.value, () => 'sidebar');
+const activeStamp = useActiveStamp(() => props.documentId);
+
+const handleStampClick = (libraryId: string, stamp: StampDefinition) => {
+  stampCapability.value
+    ?.forDocument(props.documentId)
+    .activateStampPlacement(libraryId, stamp);
+};
+</script>
+
+<template>
+  <button
+    v-for="{ library, stamp } in stamps"
+    :key="`${library.id}-${stamp.id}`"
+    type="button"
+    @click="handleStampClick(library.id, stamp)"
+  >
+    <StampImg :libraryId="library.id" :pageIndex="stamp.pageIndex" :width="120" />
+    <span>{{ stamp.subject }}</span>
+    <span v-if="activeStamp?.libraryId === library.id && activeStamp?.stamp.id === stamp.id">
+      placing
+    </span>
+  </button>
+</template>
+```
+
+When a user clicks a stamp in your sidebar, the plugin switches the annotation tool to the rubber-stamp tool and shows a live preview as they move the pointer over the page.
+
+### 3. Create a Custom Stamp From an Existing Annotation
+
+If your users can draw annotations, you can turn those annotations into reusable stamps. This is a good fit for approval marks, signatures, custom seals, or reusable review graphics.
+
+```vue
+<script setup lang="ts">
+import { computed } from 'vue';
+import { PdfAnnotationName } from '@embedpdf/models';
+import { useAnnotation } from '@embedpdf/plugin-annotation/vue';
+import { useStampCapability } from '@embedpdf/plugin-stamp/vue';
+
+const props = defineProps<{ documentId: string }>();
+
+const annotation = useAnnotation(() => props.documentId);
+const { provides: stampCapability } = useStampCapability();
+
+const selectedAnnotation = computed(() => {
+  annotation.state.value.selectedUid;
+  return annotation.provides.value?.getSelectedAnnotation() ?? null;
+});
+
+const handleCreateStamp = () => {
+  if (!selectedAnnotation.value || !stampCapability.value) return;
+
+  stampCapability.value
+    .forDocument(props.documentId)
+    .createStampFromAnnotation(
+      selectedAnnotation.value.object,
+      {
+        name: PdfAnnotationName.Custom,
+        subject: 'Reviewed by Legal',
+        categories: ['custom', 'sidebar'],
+      },
+      'custom',
+    );
+};
+</script>
+```
+
+The plugin exports the selected annotation’s appearance into a one-page PDF and stores that page in the target library. If the target library does not exist yet, the configured `defaultLibrary` is created automatically.
+
+### 4. Export a Custom Library
+
+Once users have built up a custom library, you can export it as a PDF and persist the accompanying metadata however you like.
+
+```vue
+<script setup lang="ts">
+import { useStampCapability } from '@embedpdf/plugin-stamp/vue';
+
+const { provides: stampCapability } = useStampCapability();
+
+const handleExport = () => {
+  stampCapability.value?.exportLibrary('custom').wait((exported) => {
+    console.log(exported.name);   // "Custom Stamps"
+    console.log(exported.pdf);    // ArrayBuffer with one page per stamp
+    console.log(exported.stamps); // Stamp metadata for each page
+  });
+};
+</script>
+```
+
+`exportLibrary()` returns both the rendered PDF and the stamp metadata. That makes it easy to save runtime-created libraries to your backend and later reload them with `loadLibrary()` or by publishing a manifest.
+
+## Live Example
+
+The example below demonstrates both main workflows on one screen:
+
+- Browse the built-in stamp libraries and place a stamp.
+- Draw a square annotation, select it, save it into the custom library, and export that library as a PDF.
+
+import { StampExample } from '../../code-examples/headless/stamp-example'
+
+<CodeExample
+  codePaths={[
+    "../../examples/vue-tailwind/src/examples/headless/stamp-example.vue",
+    "../../examples/vue-tailwind/src/examples/headless/stamp-example-content.vue"
+  ]}
+>
+  <StampExample />
+</CodeExample>
+
+## Bring Your Own Stamp Library
+
+Stamp libraries are intentionally simple:
+
+- Each stamp is one page in a PDF.
+- Each entry in `stamps[]` points at a `pageIndex` in that PDF.
+- Library-level `categories` apply to all stamps in the library.
+- Stamp-level `categories` let you filter or organize specific stamps differently.
+
+### Manifest Format
+
+The manifest format is designed for publishing a library alongside a PDF file. Relative `pdf` paths are resolved relative to the manifest URL.
+
+```json
+{
+  "id": "standard",
+  "name": "Standard Stamps",
+  "categories": ["sidebar"],
+  "pdf": "stamps.pdf",
+  "stamps": [
+    { "id": "approved", "pageIndex": 0, "name": "Approved", "subject": "Approved" },
+    { "id": "draft", "pageIndex": 1, "name": "Draft", "subject": "Draft" },
+    { "id": "confidential", "pageIndex": 2, "name": "Confidential", "subject": "Confidential" }
+  ]
+}
+```
+
+### Option A: Load Libraries From Manifests
+
+Use `manifests` when you want to host a reusable library as static files:
+
+```vue
+<script setup lang="ts">
+createPluginRegistration(StampPluginPackage, {
+  manifests: [
+    {
+      url: '/stamps/en/manifest.json',
+      fallbackLocale: 'en',
+    },
+  ],
+});
+</script>
+```
+
+You can also load the same thing later at runtime with `stampCapability.value?.loadLibraryFromManifest(url)`.
+
+### Option B: Preload Libraries Inline
+
+Use `libraries` when you already have the PDF URL or `ArrayBuffer` and the metadata available in your app:
+
+```vue
+<script setup lang="ts">
+import { PdfAnnotationName } from '@embedpdf/models';
+
+createPluginRegistration(StampPluginPackage, {
+  libraries: [
+    {
+      id: 'review',
+      name: 'Review Stamps',
+      pdf: '/stamps/review-stamps.pdf',
+      readonly: true,
+      categories: ['sidebar'],
+      stamps: [
+        {
+          id: 'approved',
+          pageIndex: 0,
+          name: PdfAnnotationName.Approved,
+          subject: 'Approved',
+        },
+        {
+          id: 'rejected',
+          pageIndex: 1,
+          name: PdfAnnotationName.Rejected,
+          subject: 'Rejected',
+        },
+      ],
+    },
+  ],
+});
+</script>
+```
+
+You can load the same shape dynamically through the capability API:
+
+```vue
+stampCapability.value?.loadLibrary({
+  name: 'Uploaded Stamps',
+  pdf: uploadedPdfBytes,
+  stamps: uploadedStampDefinitions,
+});
+```
+
+### Persist Runtime-Created Libraries
+
+If users create their own libraries in the browser, a common pattern is:
+
+1. Let them build or edit stamps at runtime.
+2. Call `exportLibrary()` to get the PDF and `stamps[]` metadata.
+3. Save both to your backend.
+4. Reload the same library later with `loadLibrary()` or publish it as a manifest-backed library.
+
+If you want to create an empty library first, use `createNewLibrary(name, options)` and then add stamp pages later with `addStampToLibrary(libraryId, stamp, pdf)`.
+
+## API Reference
+
+### Configuration (`StampPluginConfig`)
+
+| Option | Type | Description |
+| :--- | :--- | :--- |
+| **`libraries`** | `StampLibraryConfig[]` | Preloads one or more libraries from a PDF URL or `ArrayBuffer` plus stamp metadata. |
+| **`manifests`** | `StampManifestSource[]` | Loads one or more manifest-backed libraries. If the URL contains `{locale}`, the plugin replaces it with the current locale when the `i18n` plugin is available. |
+| **`defaultLibrary`** | `DefaultLibraryConfig \| false` | Configures the writable library used for runtime-created stamps. Set it to `false` to disable automatic default-library creation. |
+
+### Composable: `useStampCapability()`
+
+Connects your component to the global Stamp Plugin capability.
+
+#### Returns
+
+| Property | Type | Description |
+| :--- | :--- | :--- |
+| **`provides`** | `Ref<StampCapability \| null>` | The stamp API object, or `null` until the plugin is ready. |
+
+### Composable: `useStampLibraries()`
+
+Keeps your component in sync with the currently loaded stamp libraries.
+
+#### Returns
+
+| Property | Type | Description |
+| :--- | :--- | :--- |
+| **`libraries`** | `Ref<StampLibrary[]>` | The loaded libraries, including manifest-backed and runtime-created libraries. |
+
+### Composable: `useStampsByLibrary(libraryId?, category?)`
+
+Returns a flattened array of stamps filtered by library and optional category.
+
+| Argument | Type | Description |
+| :--- | :--- | :--- |
+| **`libraryId`** | `MaybeRefOrGetter<string \| undefined>` | The library ID to filter by. Use `'all'` or `undefined` to include every library. |
+| **`category`** | `MaybeRefOrGetter<string \| undefined>` | Optional category filter applied to both library-level and stamp-level categories. |
+
+#### Returns
+
+| Return Type | Description |
+| :--- | :--- |
+| **`Ref<ResolvedStamp[]>`** | The matching stamps, each paired with the library that owns it. |
+
+### Composable: `useActiveStamp(documentId)`
+
+Returns the stamp currently armed for placement in the specified document.
+
+| Return Type | Description |
+| :--- | :--- |
+| **`Ref<ActiveStampInfo \| null>`** | Includes the `libraryId` and `stamp` being placed, or `null` if no stamp is active. |
+
+### Component: `<StampImg />`
+
+Renders a thumbnail of a stamp by rasterizing the matching page from its library.
+
+| Prop | Type | Description |
+| :--- | :--- | :--- |
+| **`libraryId`** | `string` | **Required.** The library that owns the stamp page. |
+| **`pageIndex`** | `number` | **Required.** The page index within the library PDF. |
+| **`width`** | `number` | **Required.** The target thumbnail width in CSS pixels. |
+| **`dpr`** | `number` | Optional device pixel ratio override for sharper previews. |
+
+### `StampCapability` Methods
+
+| Method | Description |
+| :--- | :--- |
+| **`getLibraries()`** | Returns every currently loaded library. |
+| **`loadLibrary(config)`** | Loads a library from a `StampLibraryConfig`. |
+| **`loadLibraryFromManifest(url)`** | Loads a library from a manifest URL at runtime. |
+| **`createNewLibrary(name, options)`** | Creates an empty library that can be populated later. |
+| **`addStampToLibrary(libraryId, stamp, pdf)`** | Adds a new one-page stamp PDF to an editable library. |
+| **`exportLibrary(id)`** | Exports a library as `{ name, pdf, stamps, categories }`. |
+| **`forDocument(documentId).activateStampPlacement(libraryId, stamp)`** | Arms a stamp so the next click in the document places it. |
+| **`forDocument(documentId).createStampFromAnnotation(annotation, stamp, libraryId?)`** | Converts an annotation into a reusable one-page stamp and stores it in a library. |

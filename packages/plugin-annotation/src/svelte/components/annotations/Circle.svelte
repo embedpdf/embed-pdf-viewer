@@ -1,5 +1,6 @@
 <script lang="ts">
-  import { PdfAnnotationBorderStyle, type Rect } from '@embedpdf/models';
+  import { PdfAnnotationBorderStyle, type PdfRectDifferences, type Rect } from '@embedpdf/models';
+  import { generateCloudyEllipsePath } from '@embedpdf/plugin-annotation';
 
   const MIN_HIT_AREA_SCREEN_PX = 20;
 
@@ -13,8 +14,10 @@
     strokeDashArray?: number[];
     rect: Rect;
     scale: number;
-    onClick?: (e: PointerEvent | TouchEvent) => void;
+    onClick?: (e: PointerEvent) => void;
     appearanceActive?: boolean;
+    cloudyBorderIntensity?: number;
+    rectangleDifferences?: PdfRectDifferences;
   }
 
   let {
@@ -29,7 +32,11 @@
     scale,
     onClick,
     appearanceActive = false,
+    cloudyBorderIntensity,
+    rectangleDifferences,
   }: CircleProps = $props();
+
+  const isCloudy = $derived((cloudyBorderIntensity ?? 0) > 0);
 
   const { width, height, cx, cy, rx, ry } = $derived.by(() => {
     const outerW = rect.size.width;
@@ -47,12 +54,22 @@
     };
   });
 
+  const cloudyPath = $derived.by(() => {
+    if (!isCloudy) return null;
+    return generateCloudyEllipsePath(
+      { x: 0, y: 0, width: rect.size.width, height: rect.size.height },
+      rectangleDifferences,
+      cloudyBorderIntensity!,
+      strokeWidth,
+    );
+  });
+
   let svgWidth = $derived(width * scale);
   let svgHeight = $derived(height * scale);
   let hitStrokeWidth = $derived(Math.max(strokeWidth, MIN_HIT_AREA_SCREEN_PX / scale));
 
   let peValue = $derived(
-    isSelected ? 'none' : color === 'transparent' ? 'visibleStroke' : 'visible',
+    !onClick ? 'none' : isSelected ? 'none' : color === 'transparent' ? 'visibleStroke' : 'visible',
   );
 </script>
 
@@ -69,34 +86,57 @@
 >
   <!-- Hit area -- always rendered, transparent, wider stroke for mobile -->
   <!-- svelte-ignore a11y_no_static_element_interactions -->
-  <ellipse
-    {cx}
-    {cy}
-    {rx}
-    {ry}
-    fill="transparent"
-    stroke="transparent"
-    stroke-width={hitStrokeWidth}
-    onpointerdown={(e) => onClick?.(e)}
-    ontouchstart={(e) => onClick?.(e)}
-    style:cursor={isSelected ? 'move' : 'pointer'}
-    pointer-events={peValue}
-  />
-  <!-- Visual -- hidden when AP active, never interactive -->
-  {#if !appearanceActive}
+  {#if isCloudy && cloudyPath}
+    <path
+      d={cloudyPath.path}
+      fill="transparent"
+      stroke="transparent"
+      stroke-width={hitStrokeWidth}
+      onpointerdown={(e) => onClick?.(e)}
+      style:cursor={isSelected ? 'move' : onClick ? 'pointer' : 'default'}
+      pointer-events={peValue}
+    />
+  {:else}
     <ellipse
       {cx}
       {cy}
       {rx}
       {ry}
-      fill={color}
-      {opacity}
-      style:pointer-events="none"
-      stroke={strokeColor ?? color}
-      stroke-width={strokeWidth}
-      stroke-dasharray={strokeStyle === PdfAnnotationBorderStyle.DASHED
-        ? strokeDashArray?.join(',')
-        : undefined}
+      fill="transparent"
+      stroke="transparent"
+      stroke-width={hitStrokeWidth}
+      onpointerdown={(e) => onClick?.(e)}
+      style:cursor={isSelected ? 'move' : onClick ? 'pointer' : 'default'}
+      pointer-events={peValue}
     />
+  {/if}
+  <!-- Visual -- hidden when AP active, never interactive -->
+  {#if !appearanceActive}
+    {#if isCloudy && cloudyPath}
+      <path
+        d={cloudyPath.path}
+        fill={color}
+        {opacity}
+        style:pointer-events="none"
+        stroke={strokeColor ?? color}
+        stroke-width={strokeWidth}
+        stroke-linejoin="round"
+      />
+    {:else}
+      <ellipse
+        {cx}
+        {cy}
+        {rx}
+        {ry}
+        fill={color}
+        {opacity}
+        style:pointer-events="none"
+        stroke={strokeColor ?? color}
+        stroke-width={strokeWidth}
+        stroke-dasharray={strokeStyle === PdfAnnotationBorderStyle.DASHED
+          ? strokeDashArray?.join(',')
+          : undefined}
+      />
+    {/if}
   {/if}
 </svg>

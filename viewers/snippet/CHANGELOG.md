@@ -1,5 +1,80 @@
 # @embedpdf/snippet
 
+## 2.14.0
+
+### Minor Changes
+
+- [#581](https://github.com/embedpdf/embed-pdf-viewer/pull/581) by [@bobsingor](https://github.com/bobsingor) – Wire callout into the snippet viewer: callout icon, `annotation:add-callout` command, annotation toolbar and overflow menu entries, translations, and sidebar property schema for `freeTextCallout` (including opaque stroke color control).
+
+## 2.13.0
+
+### Patch Changes
+
+- [#579](https://github.com/embedpdf/embed-pdf-viewer/pull/579) by [@bobsingor](https://github.com/bobsingor) – Register the Signature plugin in the snippet viewer, add a create-signature modal and wire the signature sidebar to real entries, placement, and translations.
+
+## 2.12.1
+
+### Patch Changes
+
+- [#571](https://github.com/embedpdf/embed-pdf-viewer/pull/571) by [@bobsingor](https://github.com/bobsingor) – Export missing annotation types from the snippet package: `AnnotationTransferItem`, `ExportAnnotationsOptions`, `GetAnnotationsOptions`, `TrackedAnnotation`, `AnnotationTool`, `PdfAnnotationSubtype`, and `PdfStampAnnoObject`.
+
+## 2.12.0
+
+## 2.11.1
+
+### Patch Changes
+
+- [#566](https://github.com/embedpdf/embed-pdf-viewer/pull/566) by [@bobsingor](https://github.com/bobsingor) – Disable the snippet rubber stamp insert command when the active document does not allow annotation modifications.
+
+## 2.11.0
+
+### Minor Changes
+
+- [#562](https://github.com/embedpdf/embed-pdf-viewer/pull/562) by [@bobsingor](https://github.com/bobsingor) – Integrate `@embedpdf/plugin-stamp` with the default viewer. Add the Rubber Stamp sidebar, Signature sidebar, and Insert tools to the default UI schema. Include standard stamp/insert translations.
+
+## 2.10.1
+
+### Patch Changes
+
+- [#553](https://github.com/embedpdf/embed-pdf-viewer/pull/553) by [@bobsingor](https://github.com/bobsingor) – Add form plugin support to the snippet API and expand the snippet documentation with standalone vanilla HTML examples.
+
+  This includes exporting the form plugin types from `@embedpdf/snippet`, updating form-related command/category behavior, and adding vanilla Tailwind examples plus new plugin docs for forms.
+
+## 2.10.0
+
+### Minor Changes
+
+- [#537](https://github.com/embedpdf/embed-pdf-viewer/pull/537) by [@bobsingor](https://github.com/bobsingor) –
+  - Add full form authoring and fill-mode support to the snippet viewer, including new commands, toolbar items, translations, icons, and widget editing controls.
+  - Wire form mode into the viewer schema and sidebars so widgets can be created, configured, filled, and previewed in the example app.
+
+## 2.9.1
+
+## 2.9.0
+
+### Minor Changes
+
+- [#529](https://github.com/embedpdf/embed-pdf-viewer/pull/529) by [@bobsingor](https://github.com/bobsingor) – Add cloudy border intensity options to the stroke style picker in the annotation sidebar for Circle, Square, and Polygon tools. Includes realistic semicircular arc SVG previews for intensity 1 and 2.
+
+### Patch Changes
+
+- [#512](https://github.com/embedpdf/embed-pdf-viewer/pull/512) by [@bobsingor](https://github.com/bobsingor) – Add `annotation:add-ink-highlighter` command and toolbar button for the ink highlighter tool.
+
+  The command toggles the `inkHighlighter` tool, respects the `ModifyAnnotations` permission, and is registered under the `annotation` and `annotation-ink` categories. The corresponding button is inserted into all relevant toolbar and mobile-menu slots next to the existing ink pen button.
+
+## 2.8.0
+
+### Minor Changes
+
+- [#495](https://github.com/embedpdf/embed-pdf-viewer/pull/495) by [@bobsingor](https://github.com/bobsingor) – Added UI controls and commands for "Insert Text" and "Replace Text" tools.
+  Added support for rendering Caret annotations and grouped annotations (like Replace Text) in the comment sidebar.
+
+- [#509](https://github.com/embedpdf/embed-pdf-viewer/pull/509) by [@bobsingor](https://github.com/bobsingor) – Add comment annotation toolbar button with message icon, command, and UI schema entry.
+
+### Patch Changes
+
+- [#495](https://github.com/embedpdf/embed-pdf-viewer/pull/495) by [@bobsingor](https://github.com/bobsingor) – Fix markup annotation commands (highlight, underline, strikeout, squiggly) not creating annotations on PDFs that lack `CopyContents` permission. Annotations are now created without extracted text metadata when text extraction is denied.
+
 ## 2.7.0
 
 ### Patch Changes

@@ -1,6 +1,8 @@
 import {
   FormFieldValue,
+  PdfWidgetAnnoField,
   PdfAttachmentObject,
+  PdfDocumentJavaScriptActionObject,
   PdfFile,
   PdfMetadataObject,
   PdfSignatureObject,
@@ -39,6 +41,7 @@ import {
   PdfAnnotationsProgress,
   PdfPrintOptions,
   PdfBookmarkObject,
+  PdfWidgetJavaScriptActionObject,
   PdfAddAttachmentParams,
   AnnotationAppearanceMap,
   ImageDataLike,
@@ -571,6 +574,48 @@ export class WebWorkerEngine implements PdfEngine {
   }
 
   /**
+   *
+   * {@inheritDoc @embedpdf/models!PdfEngine.getPageFormFields}
+   *
+   * @public
+   */
+  getPageAnnoWidgets(doc: PdfDocumentObject, page: PdfPageObject) {
+    this.logger.debug(LOG_SOURCE, LOG_CATEGORY, 'getPageAnnoWidgets', doc, page);
+    const requestId = this.generateRequestId(doc.id);
+    const task = new WorkerTask<PdfWidgetAnnoObject[]>(this.worker, requestId);
+
+    const request: ExecuteRequest = createRequest(requestId, 'getPageAnnoWidgets', [doc, page]);
+    this.proxy(task, request);
+
+    return task;
+  }
+
+  getDocumentJavaScriptActions(doc: PdfDocumentObject) {
+    this.logger.debug(LOG_SOURCE, LOG_CATEGORY, 'getDocumentJavaScriptActions', doc);
+    const requestId = this.generateRequestId(doc.id);
+    const task = new WorkerTask<PdfDocumentJavaScriptActionObject[]>(this.worker, requestId);
+
+    const request: ExecuteRequest = createRequest(requestId, 'getDocumentJavaScriptActions', [doc]);
+    this.proxy(task, request);
+
+    return task;
+  }
+
+  getPageWidgetJavaScriptActions(doc: PdfDocumentObject, page: PdfPageObject) {
+    this.logger.debug(LOG_SOURCE, LOG_CATEGORY, 'getPageWidgetJavaScriptActions', doc, page);
+    const requestId = this.generateRequestId(doc.id);
+    const task = new WorkerTask<PdfWidgetJavaScriptActionObject[]>(this.worker, requestId);
+
+    const request: ExecuteRequest = createRequest(requestId, 'getPageWidgetJavaScriptActions', [
+      doc,
+      page,
+    ]);
+    this.proxy(task, request);
+
+    return task;
+  }
+
+  /**
    * {@inheritDoc @embedpdf/models!PdfEngine.createPageAnnotation}
    *
    * @public
@@ -823,6 +868,109 @@ export class WebWorkerEngine implements PdfEngine {
   }
 
   /**
+   * {@inheritDoc @embedpdf/models!PdfEngine.setFormFieldState}
+   *
+   * @public
+   */
+  setFormFieldState(
+    doc: PdfDocumentObject,
+    page: PdfPageObject,
+    annotation: PdfWidgetAnnoObject,
+    field: PdfWidgetAnnoField,
+  ) {
+    this.logger.debug(LOG_SOURCE, LOG_CATEGORY, 'setFormFieldState', doc, annotation, field);
+    const requestId = this.generateRequestId(doc.id);
+    const task = new WorkerTask<boolean>(this.worker, requestId);
+
+    const request: ExecuteRequest = createRequest(requestId, 'setFormFieldState', [
+      doc,
+      page,
+      annotation,
+      field,
+    ]);
+    this.proxy(task, request);
+
+    return task;
+  }
+
+  renameWidgetField(
+    doc: PdfDocumentObject,
+    page: PdfPageObject,
+    annotation: PdfWidgetAnnoObject,
+    name: string,
+  ) {
+    this.logger.debug(LOG_SOURCE, LOG_CATEGORY, 'renameWidgetField', doc, annotation, name);
+    const requestId = this.generateRequestId(doc.id);
+    const task = new WorkerTask<boolean>(this.worker, requestId);
+
+    const request: ExecuteRequest = createRequest(requestId, 'renameWidgetField', [
+      doc,
+      page,
+      annotation,
+      name,
+    ]);
+    this.proxy(task, request);
+
+    return task;
+  }
+
+  shareWidgetField(
+    doc: PdfDocumentObject,
+    sourcePage: PdfPageObject,
+    sourceAnnotation: PdfWidgetAnnoObject,
+    targetPage: PdfPageObject,
+    targetAnnotation: PdfWidgetAnnoObject,
+  ) {
+    this.logger.debug(
+      LOG_SOURCE,
+      LOG_CATEGORY,
+      'shareWidgetField',
+      doc,
+      sourceAnnotation,
+      targetAnnotation,
+    );
+    const requestId = this.generateRequestId(doc.id);
+    const task = new WorkerTask<boolean>(this.worker, requestId);
+
+    const request: ExecuteRequest = createRequest(requestId, 'shareWidgetField', [
+      doc,
+      sourcePage,
+      sourceAnnotation,
+      targetPage,
+      targetAnnotation,
+    ]);
+    this.proxy(task, request);
+
+    return task;
+  }
+
+  regenerateWidgetAppearances(
+    doc: PdfDocumentObject,
+    page: PdfPageObject,
+    annotationIds: string[],
+  ) {
+    this.logger.debug(
+      LOG_SOURCE,
+      LOG_CATEGORY,
+      'regenerateWidgetAppearances',
+      doc,
+      page,
+      annotationIds,
+    );
+    const requestId = this.generateRequestId(doc.id);
+    const task = new WorkerTask<boolean>(this.worker, requestId);
+
+    const request: ExecuteRequest = createRequest(requestId, 'regenerateWidgetAppearances', [
+      doc,
+      page,
+      annotationIds,
+    ]);
+    this.proxy(task, request);
+
+    return task;
+  }
+
+  /**
    * {@inheritDoc @embedpdf/models!PdfEngine.flattenPage}
    *
    * @public
@@ -849,6 +997,56 @@ export class WebWorkerEngine implements PdfEngine {
     const task = new WorkerTask<ArrayBuffer>(this.worker, requestId);
 
     const request: ExecuteRequest = createRequest(requestId, 'extractPages', [doc, pageIndexes]);
+    this.proxy(task, request);
+
+    return task;
+  }
+
+  createDocument(id: string) {
+    this.logger.debug(LOG_SOURCE, LOG_CATEGORY, 'createDocument', id);
+    const requestId = this.generateRequestId(id);
+    const task = new WorkerTask<PdfDocumentObject>(this.worker, requestId);
+
+    const request: ExecuteRequest = createRequest(requestId, 'createDocument', [id]);
+    this.proxy(task, request);
+
+    return task;
+  }
+
+  importPages(
+    destDoc: PdfDocumentObject,
+    srcDoc: PdfDocumentObject,
+    srcPageIndices: number[],
+    insertIndex?: number,
+  ) {
+    this.logger.debug(
+      LOG_SOURCE,
+      LOG_CATEGORY,
+      'importPages',
+      destDoc.id,
+      srcDoc.id,
+      srcPageIndices,
+    );
+    const requestId = this.generateRequestId(destDoc.id);
+    const task = new WorkerTask<PdfPageObject[]>(this.worker, requestId);
+
+    const request: ExecuteRequest = createRequest(requestId, 'importPages', [
+      destDoc,
+      srcDoc,
+      srcPageIndices,
+      insertIndex,
+    ]);
+    this.proxy(task, request);
+
+    return task;
+  }
+
+  deletePage(doc: PdfDocumentObject, pageIndex: number) {
+    this.logger.debug(LOG_SOURCE, LOG_CATEGORY, 'deletePage', doc.id, pageIndex);
+    const requestId = this.generateRequestId(doc.id);
+    const task = new WorkerTask<boolean>(this.worker, requestId);
+
+    const request: ExecuteRequest = createRequest(requestId, 'deletePage', [doc, pageIndex]);
     this.proxy(task, request);
 
     return task;
@@ -930,6 +1128,63 @@ export class WebWorkerEngine implements PdfEngine {
       doc,
       page,
       annotation,
+    ]);
+    this.proxy(task, request);
+
+    return task;
+  }
+
+  /**
+   * {@inheritDoc @embedpdf/models!PdfEngine.exportAnnotationAppearanceAsPdf}
+   *
+   * @public
+   */
+  exportAnnotationAppearanceAsPdf(
+    doc: PdfDocumentObject,
+    page: PdfPageObject,
+    annotation: PdfAnnotationObject,
+  ) {
+    this.logger.debug(
+      LOG_SOURCE,
+      LOG_CATEGORY,
+      'exportAnnotationAppearanceAsPdf',
+      doc,
+      page,
+      annotation,
+    );
+    const requestId = this.generateRequestId(doc.id);
+    const task = new WorkerTask<ArrayBuffer>(this.worker, requestId);
+
+    const request: ExecuteRequest = createRequest(requestId, 'exportAnnotationAppearanceAsPdf', [
+      doc,
+      page,
+      annotation,
+    ]);
+    this.proxy(task, request);
+
+    return task;
+  }
+
+  exportAnnotationsAppearanceAsPdf(
+    doc: PdfDocumentObject,
+    page: PdfPageObject,
+    annotations: PdfAnnotationObject[],
+  ) {
+    this.logger.debug(
+      LOG_SOURCE,
+      LOG_CATEGORY,
+      'exportAnnotationsAppearanceAsPdf',
+      doc,
+      page,
+      annotations,
+    );
+    const requestId = this.generateRequestId(doc.id);
+    const task = new WorkerTask<ArrayBuffer>(this.worker, requestId);
+
+    const request: ExecuteRequest = createRequest(requestId, 'exportAnnotationsAppearanceAsPdf', [
+      doc,
+      page,
+      annotations,
     ]);
     this.proxy(task, request);
 

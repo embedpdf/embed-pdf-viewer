@@ -37,9 +37,16 @@ export type SpecificExecuteRequest<M extends PdfEngineMethodName> = {
 /**
  * Response body that represent return value of PdfEngine
  */
-export type PdfEngineMethodResponseBody = {
-  [P in PdfEngineMethodName]: TaskReturn<PdfEngineMethodReturnType<P>>;
-}[PdfEngineMethodName];
+type PdfEngineMethodResultValue = Extract<
+  {
+    [P in PdfEngineMethodName]: TaskReturn<PdfEngineMethodReturnType<P>>;
+  }[PdfEngineMethodName],
+  { type: 'result' }
+>['value'];
+
+export type PdfEngineMethodResponseBody =
+  | { type: 'result'; value: PdfEngineMethodResultValue }
+  | { type: 'error'; value: PdfEngineError };
 
 /**
  * Request that abort the specified task
@@ -74,7 +81,7 @@ export interface ExecuteRequest {
 /**
  * Response that execute pdf engine method
  */
-export interface ExecuteResponse {
+export type ExecuteResponse = {
   /**
    * message id
    */
@@ -87,7 +94,7 @@ export interface ExecuteResponse {
    * response body
    */
   data: PdfEngineMethodResponseBody;
-}
+};
 
 /**
  * Response that indicate progress of the task
@@ -194,6 +201,48 @@ export class EngineRunner {
   }
 
   /**
+   * Bind task progress and completion handlers to worker responses.
+   */
+  private handleTask<T extends PdfEngineMethodReturnType<PdfEngineMethodName>>(
+    requestId: string,
+    task: T,
+  ) {
+    task.onProgress((progress) => {
+      const response: ExecuteProgress = {
+        id: requestId,
+        type: 'ExecuteProgress',
+        data: progress,
+      };
+      this.respond(response);
+    });
+
+    task.wait(
+      (result) => {
+        const response: ExecuteResponse = {
+          id: requestId,
+          type: 'ExecuteResponse',
+          data: {
+            type: 'result',
+            value: result,
+          },
+        };
+        this.respond(response);
+      },
+      (error) => {
+        const response: ExecuteResponse = {
+          id: requestId,
+          type: 'ExecuteResponse',
+          data: {
+            type: 'error',
+            value: error,
+          },
+        };
+        this.respond(response);
+      },
+    );
+  }
+
+  /**
    * Execute the request
    * @param request - request that represent the pdf engine call
    * @returns
@@ -244,170 +293,202 @@ export class EngineRunner {
       return;
     }
 
-    let task: PdfEngineMethodReturnType<typeof name>;
     switch (name) {
       case 'isSupport':
-        task = engine.isSupport!(...args);
-        break;
+        this.handleTask(request.id, engine.isSupport!(...args));
+        return;
       case 'destroy':
-        task = engine.destroy!(...args);
-        break;
+        this.handleTask(request.id, engine.destroy!(...args));
+        return;
       case 'openDocumentUrl':
-        task = engine.openDocumentUrl!(...args);
-        break;
+        this.handleTask(request.id, engine.openDocumentUrl!(...args));
+        return;
       case 'openDocumentBuffer':
-        task = engine.openDocumentBuffer!(...args);
-        break;
+        this.handleTask(request.id, engine.openDocumentBuffer!(...args));
+        return;
       case 'getDocPermissions':
-        task = engine.getDocPermissions!(...args);
-        break;
+        this.handleTask(request.id, engine.getDocPermissions!(...args));
+        return;
       case 'getDocUserPermissions':
-        task = engine.getDocUserPermissions!(...args);
-        break;
+        this.handleTask(request.id, engine.getDocUserPermissions!(...args));
+        return;
       case 'getMetadata':
-        task = engine.getMetadata!(...args);
-        break;
+        this.handleTask(request.id, engine.getMetadata!(...args));
+        return;
       case 'setMetadata':
-        task = engine.setMetadata!(...args);
-        break;
+        this.handleTask(request.id, engine.setMetadata!(...args));
+        return;
       case 'getBookmarks':
-        task = engine.getBookmarks!(...args);
-        break;
+        this.handleTask(request.id, engine.getBookmarks!(...args));
+        return;
       case 'setBookmarks':
-        task = engine.setBookmarks!(...args);
-        break;
+        this.handleTask(request.id, engine.setBookmarks!(...args));
+        return;
       case 'deleteBookmarks':
-        task = engine.deleteBookmarks!(...args);
-        break;
+        this.handleTask(request.id, engine.deleteBookmarks!(...args));
+        return;
       case 'getSignatures':
-        task = engine.getSignatures!(...args);
-        break;
+        this.handleTask(request.id, engine.getSignatures!(...args));
+        return;
       case 'renderPage':
-        task = engine.renderPage!(...args);
-        break;
+        this.handleTask(request.id, engine.renderPage!(...args));
+        return;
       case 'renderPageRect':
-        task = engine.renderPageRect!(...args);
-        break;
+        this.handleTask(request.id, engine.renderPageRect!(...args));
+        return;
       case 'renderPageRaw':
-        task = engine.renderPageRaw!(...args);
-        break;
+        this.handleTask(request.id, engine.renderPageRaw!(...args));
+        return;
       case 'renderPageRectRaw':
-        task = engine.renderPageRectRaw!(...args);
-        break;
+        this.handleTask(request.id, engine.renderPageRectRaw!(...args));
+        return;
       case 'renderPageAnnotation':
-        task = engine.renderPageAnnotation!(...args);
-        break;
+        this.handleTask(request.id, engine.renderPageAnnotation!(...args));
+        return;
       case 'renderPageAnnotations':
-        task = engine.renderPageAnnotations!(...args);
-        break;
+        this.handleTask(request.id, engine.renderPageAnnotations!(...args));
+        return;
       case 'renderPageAnnotationsRaw':
-        task = engine.renderPageAnnotationsRaw!(...args);
-        break;
+        this.handleTask(request.id, engine.renderPageAnnotationsRaw!(...args));
+        return;
       case 'renderThumbnail':
-        task = engine.renderThumbnail!(...args);
-        break;
+        this.handleTask(request.id, engine.renderThumbnail!(...args));
+        return;
       case 'getAllAnnotations':
-        task = engine.getAllAnnotations!(...args);
-        break;
+        this.handleTask(request.id, engine.getAllAnnotations!(...args));
+        return;
       case 'getPageAnnotations':
-        task = engine.getPageAnnotations!(...args);
-        break;
+        this.handleTask(request.id, engine.getPageAnnotations!(...args));
+        return;
+      case 'getDocumentJavaScriptActions':
+        this.handleTask(request.id, engine.getDocumentJavaScriptActions!(...args));
+        return;
+      case 'getPageAnnoWidgets':
+        this.handleTask(request.id, engine.getPageAnnoWidgets!(...args));
+        return;
+      case 'getPageWidgetJavaScriptActions':
+        this.handleTask(request.id, engine.getPageWidgetJavaScriptActions!(...args));
+        return;
       case 'createPageAnnotation':
-        task = engine.createPageAnnotation!(...args);
-        break;
+        this.handleTask(request.id, engine.createPageAnnotation!(...args));
+        return;
       case 'updatePageAnnotation':
-        task = engine.updatePageAnnotation!(...args);
-        break;
+        this.handleTask(request.id, engine.updatePageAnnotation!(...args));
+        return;
       case 'removePageAnnotation':
-        task = engine.removePageAnnotation!(...args);
-        break;
+        this.handleTask(request.id, engine.removePageAnnotation!(...args));
+        return;
       case 'getPageTextRects':
-        task = engine.getPageTextRects!(...args);
-        break;
+        this.handleTask(request.id, engine.getPageTextRects!(...args));
+        return;
       case 'searchAllPages':
-        task = engine.searchAllPages!(...args);
-        break;
+        this.handleTask(request.id, engine.searchAllPages!(...args));
+        return;
       case 'closeDocument':
-        task = engine.closeDocument!(...args);
-        break;
+        this.handleTask(request.id, engine.closeDocument!(...args));
+        return;
       case 'closeAllDocuments':
-        task = engine.closeAllDocuments!(...args);
-        break;
+        this.handleTask(request.id, engine.closeAllDocuments!(...args));
+        return;
       case 'saveAsCopy':
-        task = engine.saveAsCopy!(...args);
-        break;
+        this.handleTask(request.id, engine.saveAsCopy!(...args));
+        return;
       case 'getAttachments':
-        task = engine.getAttachments!(...args);
-        break;
+        this.handleTask(request.id, engine.getAttachments!(...args));
+        return;
       case 'addAttachment':
-        task = engine.addAttachment!(...args);
-        break;
+        this.handleTask(request.id, engine.addAttachment!(...args));
+        return;
       case 'removeAttachment':
-        task = engine.removeAttachment!(...args);
-        break;
+        this.handleTask(request.id, engine.removeAttachment!(...args));
+        return;
       case 'readAttachmentContent':
-        task = engine.readAttachmentContent!(...args);
-        break;
+        this.handleTask(request.id, engine.readAttachmentContent!(...args));
+        return;
       case 'setFormFieldValue':
-        task = engine.setFormFieldValue!(...args);
-        break;
+        this.handleTask(request.id, engine.setFormFieldValue!(...args));
+        return;
+      case 'setFormFieldState':
+        this.handleTask(request.id, engine.setFormFieldState!(...args));
+        return;
+      case 'renameWidgetField':
+        this.handleTask(request.id, engine.renameWidgetField!(...args));
+        return;
+      case 'shareWidgetField':
+        this.handleTask(request.id, engine.shareWidgetField!(...args));
+        return;
       case 'flattenPage':
-        task = engine.flattenPage!(...args);
-        break;
+        this.handleTask(request.id, engine.flattenPage!(...args));
+        return;
       case 'extractPages':
-        task = engine.extractPages!(...args);
-        break;
+        this.handleTask(request.id, engine.extractPages!(...args));
+        return;
+      case 'createDocument':
+        this.handleTask(request.id, engine.createDocument!(...args));
+        return;
+      case 'importPages':
+        this.handleTask(request.id, engine.importPages!(...args));
+        return;
+      case 'deletePage':
+        this.handleTask(request.id, engine.deletePage!(...args));
+        return;
       case 'extractText':
-        task = engine.extractText!(...args);
-        break;
+        this.handleTask(request.id, engine.extractText!(...args));
+        return;
       case 'redactTextInRects':
-        task = engine.redactTextInRects!(...args);
-        break;
+        this.handleTask(request.id, engine.redactTextInRects!(...args));
+        return;
       case 'applyRedaction':
-        task = engine.applyRedaction!(...args);
-        break;
+        this.handleTask(request.id, engine.applyRedaction!(...args));
+        return;
       case 'applyAllRedactions':
-        task = engine.applyAllRedactions!(...args);
-        break;
+        this.handleTask(request.id, engine.applyAllRedactions!(...args));
+        return;
       case 'flattenAnnotation':
-        task = engine.flattenAnnotation!(...args);
-        break;
+        this.handleTask(request.id, engine.flattenAnnotation!(...args));
+        return;
+      case 'exportAnnotationAppearanceAsPdf':
+        this.handleTask(request.id, engine.exportAnnotationAppearanceAsPdf!(...args));
+        return;
+      case 'exportAnnotationsAppearanceAsPdf':
+        this.handleTask(request.id, engine.exportAnnotationsAppearanceAsPdf!(...args));
+        return;
       case 'getTextSlices':
-        task = engine.getTextSlices!(...args);
-        break;
+        this.handleTask(request.id, engine.getTextSlices!(...args));
+        return;
       case 'getPageGlyphs':
-        task = engine.getPageGlyphs!(...args);
-        break;
+        this.handleTask(request.id, engine.getPageGlyphs!(...args));
+        return;
       case 'getPageGeometry':
-        task = engine.getPageGeometry!(...args);
-        break;
+        this.handleTask(request.id, engine.getPageGeometry!(...args));
+        return;
       case 'getPageTextRuns':
-        task = engine.getPageTextRuns!(...args);
-        break;
+        this.handleTask(request.id, engine.getPageTextRuns!(...args));
+        return;
       case 'merge':
-        task = engine.merge!(...args);
-        break;
+        this.handleTask(request.id, engine.merge!(...args));
+        return;
       case 'mergePages':
-        task = engine.mergePages!(...args);
-        break;
+        this.handleTask(request.id, engine.mergePages!(...args));
+        return;
       case 'preparePrintDocument':
-        task = engine.preparePrintDocument!(...args);
-        break;
+        this.handleTask(request.id, engine.preparePrintDocument!(...args));
+        return;
       case 'setDocumentEncryption':
-        task = engine.setDocumentEncryption(...args);
-        break;
+        this.handleTask(request.id, engine.setDocumentEncryption(...args));
+        return;
       case 'removeEncryption':
-        task = engine.removeEncryption(...args);
-        break;
+        this.handleTask(request.id, engine.removeEncryption(...args));
+        return;
       case 'unlockOwnerPermissions':
-        task = engine.unlockOwnerPermissions(...args);
-        break;
+        this.handleTask(request.id, engine.unlockOwnerPermissions(...args));
+        return;
       case 'isEncrypted':
-        task = engine.isEncrypted(...args);
-        break;
+        this.handleTask(request.id, engine.isEncrypted(...args));
+        return;
       case 'isOwnerUnlocked':
-        task = engine.isOwnerUnlocked(...args);
-        break;
+        this.handleTask(request.id, engine.isOwnerUnlocked(...args));
+        return;
       default:
         // This should never be reached due to the earlier check, but provides exhaustiveness
         const error: PdfEngineError = {
@@ -428,40 +509,6 @@ export class EngineRunner {
         this.respond(response);
         return;
     }
-
-    task.onProgress((progress) => {
-      const response: ExecuteProgress = {
-        id: request.id,
-        type: 'ExecuteProgress',
-        data: progress,
-      };
-      this.respond(response);
-    });
-
-    task.wait(
-      (result) => {
-        const response: ExecuteResponse = {
-          id: request.id,
-          type: 'ExecuteResponse',
-          data: {
-            type: 'result',
-            value: result,
-          },
-        };
-        this.respond(response);
-      },
-      (error) => {
-        const response: ExecuteResponse = {
-          id: request.id,
-          type: 'ExecuteResponse',
-          data: {
-            type: 'error',
-            value: error,
-          },
-        };
-        this.respond(response);
-      },
-    );
   };
 
   /**

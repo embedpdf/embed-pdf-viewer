@@ -1,11 +1,23 @@
 import { BasePluginConfig, EventHook } from '@embedpdf/core';
-import { PdfErrorReason, PdfPageObject, Rect, Rotation, Task } from '@embedpdf/models';
+import {
+  ImageConversionTypes,
+  PdfErrorReason,
+  PdfPageObject,
+  Rect,
+  Rotation,
+  Task,
+} from '@embedpdf/models';
 import { PageVisibilityMetrics } from '@embedpdf/plugin-scroll';
 
 export interface TilingPluginConfig extends BasePluginConfig {
   tileSize: number;
   overlapPx: number;
   extraRings: number;
+  /**
+   * Optional image type override for tile rendering.
+   * When omitted, tile rendering falls back to the render plugin defaults.
+   */
+  defaultImageType?: ImageConversionTypes;
 }
 
 export interface VisibleRect {
@@ -66,4 +78,9 @@ export interface RenderTileOptions {
   pageIndex: number;
   tile: Tile;
   dpr: number;
+  /**
+   * Optional image type override for this tile render.
+   * Falls back to the tiling plugin config, then to the render plugin default.
+   */
+  imageType?: ImageConversionTypes;
 }

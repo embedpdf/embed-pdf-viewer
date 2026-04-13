@@ -4,6 +4,7 @@ description: Enable users to highlight, draw, and add notes to documents.
 ---
 
 import { AnnotationExample } from '../../code-examples/viewer/annotation-example';
+import { AnnotationImportExportExample } from '../../code-examples/viewer/annotation-import-export-example';
 
 # Annotations
 
@@ -19,8 +20,6 @@ You can configure annotation defaults like the author name using the `annotation
     :config="{
       annotation: {
         annotationAuthor: 'John Doe',
-        autoCommit: true,
-        selectAfterCreate: true
       }
     }"
   />
@@ -121,3 +120,98 @@ const handleReady = (registry: PluginRegistry) => {
 </template>
 ```
 
+## Importing and Exporting Annotations
+
+You can export all annotations from a document and re-import them later. This is useful for saving annotation state to a backend or transferring annotations between sessions.
+
+<CodeExample
+  codePaths={[
+    "../../examples/vue-tailwind/src/examples/viewer/annotation-import-export-example.vue"
+  ]}
+>
+  <AnnotationImportExportExample />
+</CodeExample>
+
+### Exporting Annotations
+
+`exportAnnotations()` returns a `Task` that resolves to an array of `AnnotationTransferItem` objects. Each item contains the annotation object and, for stamps, a `ctx` with the appearance data as an `ArrayBuffer`.
+
+```vue
+<script setup lang="ts">
+import { ref } from 'vue';
+import {
+  PDFViewer,
+  type PluginRegistry,
+  type AnnotationPlugin,
+  type AnnotationTransferItem,
+} from '@embedpdf/vue-pdf-viewer';
+
+const exported = ref<AnnotationTransferItem[] | null>(null);
+
+const handleReady = (registry: PluginRegistry) => {
+  const api = registry.getPlugin<AnnotationPlugin>('annotation')?.provides();
+
+  api?.exportAnnotations().wait(
+    (items) => {
+      exported.value = items;
+      console.log(`Exported ${items.length} annotations`);
+    },
+    (error) => console.error('Export failed', error),
+  );
+};
+</script>
+```
+
+### Importing Annotations
+
+`importAnnotations()` accepts the same `AnnotationTransferItem[]` format returned by `exportAnnotations()`, making the round-trip seamless.
+
+```vue
+<script setup lang="ts">
+api?.importAnnotations(exported.value);
+</script>
+```
+
+For stamps, the `ctx.data` field accepts a raw `ArrayBuffer` containing PNG, JPEG, or PDF data — the engine detects the format automatically via magic bytes.
+
+### Adding Custom Stamp Tools
+
+You can register custom stamp tools that place images with a single click. Access the annotation API in the `@ready` handler:
+
+```vue
+<script setup lang="ts">
+import {
+  PDFViewer,
+  type PluginRegistry,
+  type AnnotationPlugin,
+  type AnnotationTool,
+  PdfAnnotationSubtype,
+  type PdfStampAnnoObject,
+} from '@embedpdf/vue-pdf-viewer';
+
+const handleReady = (registry: PluginRegistry) => {
+  const api = registry.getPlugin<AnnotationPlugin>('annotation')?.provides();
+
+  api?.addTool<AnnotationTool<PdfStampAnnoObject>>({
+    id: 'stampCheckmark',
+    name: 'Checkmark',
+    interaction: { exclusive: true, cursor: 'crosshair' },
+    matchScore: () => 0,
+    defaults: {
+      type: PdfAnnotationSubtype.STAMP,
+      imageSrc: '/circle-checkmark.png',
+      imageSize: { width: 30, height: 30 },
+    },
+    behavior: {
+      showGhost: true,
+      deactivateToolAfterCreate: true,
+      selectAfterCreate: true,
+    },
+  });
+};
+</script>
+
+<template>
+  <PDFViewer @ready="handleReady" :config="{ src: '/doc.pdf' }" />
+</template>
+``

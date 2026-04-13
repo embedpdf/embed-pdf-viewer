@@ -52,10 +52,7 @@
   role="button"
   tabindex="0"
   onpointerdown={(e) => {
-    if (!isSelected) onClick(e);
-  }}
-  ontouchstart={(e) => {
-    if (!isSelected) onClick(e);
+    if (!isSelected) onClick?.(e);
   }}
   onmouseenter={() => (isHovered = true)}
   onmouseleave={() => (isHovered = false)}

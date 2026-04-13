@@ -11,7 +11,7 @@
     inkList: PdfInkListObject[];
     rect: Rect;
     scale: number;
-    onClick?: (e: MouseEvent | TouchEvent) => void;
+    onClick?: (e: MouseEvent) => void;
     appearanceActive?: boolean;
   }
 
@@ -64,9 +64,8 @@
       stroke="transparent"
       stroke-width={hitStrokeWidth}
       onpointerdown={onClick}
-      ontouchstart={onClick}
-      style:cursor={isSelected ? 'move' : 'pointer'}
-      style:pointer-events={isSelected ? 'none' : 'visibleStroke'}
+      style:cursor={isSelected ? 'move' : onClick ? 'pointer' : 'default'}
+      style:pointer-events={!onClick ? 'none' : isSelected ? 'none' : 'visibleStroke'}
       style:stroke-linecap="round"
       style:stroke-linejoin="round"
     />

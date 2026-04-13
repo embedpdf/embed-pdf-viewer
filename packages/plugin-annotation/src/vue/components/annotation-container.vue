@@ -1,6 +1,22 @@
 <template>
   <div data-no-interaction :style="contentsStyle">
-    <!-- Outer div: AABB container - stable center for guide lines and rotation handle -->
+    <!-- Visual Layer: blend mode applied here, contains only annotation content -->
+    <div :style="visualLayerStyle">
+      <!-- Inner div: rotated visual content - no pointer events -->
+      <div :style="visualInnerStyle">
+        <!-- Annotation content - renders in unrotated coordinate space -->
+        <slot :annotation="childObject" :appearanceActive="apActive"></slot>
+
+        <!-- AP overlay canvas (always in DOM, toggled via display) -->
+        <AppearanceImageVue
+          v-if="appearance?.normal"
+          :appearance="appearance.normal"
+          :style="{ display: apActive ? 'block' : 'none' }"
+        />
+      </div>
+    </div>
+
+    <!-- Interaction Layer: no blend mode, contains rotation guides, handles, drag/resize/vertex -->
     <div :style="outerAABBStyle">
       <!-- Rotation guide lines - anchored at stable AABB center -->
       <template v-if="rotationActive">
@@ -62,21 +78,11 @@
         </div>
       </template>
 
-      <!-- Inner div: rotated content area - holds content, resize handles, vertex handles -->
+      <!-- Inner div: drag/resize/vertex interaction -->
       <div
         v-bind="{ ...(effectiveIsDraggable && isSelected ? dragProps : {}), ...doubleProps }"
         :style="innerRotatedStyle"
       >
-        <!-- Annotation content - renders in unrotated coordinate space -->
-        <slot :annotation="childObject" :appearanceActive="apActive"></slot>
-
-        <!-- AP overlay canvas (always in DOM, toggled via display) -->
-        <AppearanceImageVue
-          v-if="appearance?.normal"
-          :appearance="appearance.normal"
-          :style="{ display: apActive ? 'block' : 'none' }"
-        />
-
         <!-- Resize handles - rotate with the shape -->
         <template v-if="isSelected && effectiveIsResizable && !rotationActive">
           <template v-for="{ key, style, ...handle } in resize" :key="key">
@@ -160,7 +166,8 @@ import {
   type CSSProperties,
   type VNode,
 } from 'vue';
-import { PdfAnnotationObject, Rect, AnnotationAppearances } from '@embedpdf/models';
+import { PdfAnnotationObject, Rect, AnnotationAppearances, CssBlendMode } from '@embedpdf/models';
+import { getCounterRotation } from '@embedpdf/utils';
 import AppearanceImageVue from './appearance-image.vue';
 import { inferRotationCenterFromRects } from '@embedpdf/plugin-annotation';
 import {
@@ -206,8 +213,8 @@ const props = withDefaults(
     selectionMenu?: AnnotationSelectionMenuRenderFn;
     /** @deprecated Use `selectionOutline.offset` instead */
     outlineOffset?: number;
-    onDoubleClick?: (event: PointerEvent | MouseEvent | TouchEvent) => void;
-    onSelect: (event: PointerEvent | MouseEvent | TouchEvent) => void;
+    onDoubleClick?: (event: PointerEvent | MouseEvent) => void;
+    onSelect: (event: PointerEvent | MouseEvent) => void;
     /** Pre-rendered appearance stream images for AP mode rendering */
     appearance?: AnnotationAppearances<Blob> | null;
     zIndex?: number;
@@ -221,6 +228,7 @@ const props = withDefaults(
     vertexUi?: VertexHandleUI;
     /** Customize rotation handle appearance */
     rotationUi?: RotationHandleUI;
+    blendMode?: CssBlendMode;
     style?: CSSProperties;
   }>(),
   {
@@ -297,6 +305,16 @@ const currentObject = computed<T>(
   () => ({ ...toRaw(props.trackedAnnotation.object), ...toRaw(preview.value) }) as T,
 );
 
+// Annotation flags
+const hasNoZoom = computed(() => (props.trackedAnnotation.object.flags ?? []).includes('noZoom'));
+const hasNoRotate = computed(() =>
+  (props.trackedAnnotation.object.flags ?? []).includes('noRotate'),
+);
+// noZoom: maintain constant screen-pixel size regardless of zoom level.
+const visualScale = computed(() => (hasNoZoom.value ? 1 : props.scale));
+// noRotate: stay visually upright regardless of page rotation.
+const effectivePageRotation = computed(() => (hasNoRotate.value ? 0 : props.rotation));
+
 // Get annotation's current rotation
 // During drag, use liveRotation if available; otherwise use the annotation's rotation
 const annotationRotation = computed(
@@ -360,8 +378,8 @@ const menuRect = computed<Rect>(() => ({
     y: currentObject.value.rect.origin.y * props.scale,
   },
   size: {
-    width: currentObject.value.rect.size.width * props.scale,
-    height: currentObject.value.rect.size.height * props.scale,
+    width: currentObject.value.rect.size.width * visualScale.value,
+    height: currentObject.value.rect.size.height * visualScale.value,
   },
 }));
 
@@ -374,7 +392,8 @@ const menuContext = computed<AnnotationSelectionContext>(() => ({
 
 // Placement hints - calculate suggestTop based on rotation handle position
 const menuPlacement = computed<SelectionMenuPlacement>(() => {
-  const effectiveAngle = (((annotationRotation.value + props.rotation * 90) % 360) + 360) % 360;
+  const effectiveAngle =
+    (((annotationRotation.value + effectivePageRotation.value * 90) % 360) + 360) % 360;
   const handleNearMenuSide =
     effectiveIsRotatable.value && effectiveAngle > 90 && effectiveAngle < 270;
   return {
@@ -595,40 +614,53 @@ watchEffect((onCleanup) => {
 });
 
 // ─── Layout computations ───────────────────────────────────────────────
-const aabbWidth = computed(() => currentObject.value.rect.size.width * props.scale);
-const aabbHeight = computed(() => currentObject.value.rect.size.height * props.scale);
-const innerWidth = computed(() => effectiveUnrotatedRect.value.size.width * props.scale);
-const innerHeight = computed(() => effectiveUnrotatedRect.value.size.height * props.scale);
+// noZoom: use visualScale (=1) so the annotation keeps a constant screen-pixel size.
+// noRotate: counter-rotate the outer div so the annotation stays upright on rotated pages.
+const aabbWidth = computed(() => currentObject.value.rect.size.width * visualScale.value);
+const aabbHeight = computed(() => currentObject.value.rect.size.height * visualScale.value);
+const innerWidth = computed(() => effectiveUnrotatedRect.value.size.width * visualScale.value);
+const innerHeight = computed(() => effectiveUnrotatedRect.value.size.height * visualScale.value);
 const usesCustomPivot = computed(
   () => Boolean(explicitUnrotatedRect.value) && annotationRotation.value !== 0,
 );
 const innerLeft = computed(() =>
   usesCustomPivot.value
-    ? (effectiveUnrotatedRect.value.origin.x - currentObject.value.rect.origin.x) * props.scale
+    ? (effectiveUnrotatedRect.value.origin.x - currentObject.value.rect.origin.x) *
+      visualScale.value
     : (aabbWidth.value - innerWidth.value) / 2,
 );
 const innerTop = computed(() =>
   usesCustomPivot.value
-    ? (effectiveUnrotatedRect.value.origin.y - currentObject.value.rect.origin.y) * props.scale
+    ? (effectiveUnrotatedRect.value.origin.y - currentObject.value.rect.origin.y) *
+      visualScale.value
     : (aabbHeight.value - innerHeight.value) / 2,
 );
 const innerTransformOrigin = computed(() => {
   if (usesCustomPivot.value && rotationPivot.value) {
-    return `${(rotationPivot.value.x - effectiveUnrotatedRect.value.origin.x) * props.scale}px ${(rotationPivot.value.y - effectiveUnrotatedRect.value.origin.y) * props.scale}px`;
+    return `${(rotationPivot.value.x - effectiveUnrotatedRect.value.origin.x) * visualScale.value}px ${(rotationPivot.value.y - effectiveUnrotatedRect.value.origin.y) * visualScale.value}px`;
   }
   return 'center center';
 });
 const centerX = computed(() =>
   rotationPivot.value
-    ? (rotationPivot.value.x - currentObject.value.rect.origin.x) * props.scale
+    ? (rotationPivot.value.x - currentObject.value.rect.origin.x) * visualScale.value
     : aabbWidth.value / 2,
 );
 const centerY = computed(() =>
   rotationPivot.value
-    ? (rotationPivot.value.y - currentObject.value.rect.origin.y) * props.scale
+    ? (rotationPivot.value.y - currentObject.value.rect.origin.y) * visualScale.value
     : aabbHeight.value / 2,
 );
 const guideLength = computed(() => Math.max(300, Math.max(aabbWidth.value, aabbHeight.value) + 80));
+// noRotate: compute counter-rotation to undo page rotation on this annotation's outer div.
+const counterRot = computed(() =>
+  hasNoRotate.value
+    ? getCounterRotation(
+        { origin: { x: 0, y: 0 }, size: { width: aabbWidth.value, height: aabbHeight.value } },
+        props.rotation,
+      )
+    : null,
+);
 const rotationIconSize = computed(() => Math.round(ROTATION_SIZE.value * 0.6));
 
 const apActive = computed(
@@ -642,15 +674,34 @@ const apActive = computed(
 // ─── Extracted style computations ──────────────────────────────────────
 const contentsStyle: CSSProperties = { display: 'contents' };
 
-const outerAABBStyle = computed<CSSProperties>(() => ({
+const layerBaseStyle = computed<CSSProperties>(() => ({
   position: 'absolute',
   left: `${currentObject.value.rect.origin.x * props.scale}px`,
   top: `${currentObject.value.rect.origin.y * props.scale}px`,
-  width: `${aabbWidth.value}px`,
-  height: `${aabbHeight.value}px`,
+  width: `${counterRot.value ? counterRot.value.width : aabbWidth.value}px`,
+  height: `${counterRot.value ? counterRot.value.height : aabbHeight.value}px`,
   pointerEvents: 'none',
   zIndex: props.zIndex,
-  ...(props.style ?? {}),
+  ...(counterRot.value ? { transform: counterRot.value.matrix, transformOrigin: '0 0' } : {}),
+}));
+
+const visualLayerStyle = computed<CSSProperties>(() => ({
+  ...layerBaseStyle.value,
+  ...(props.blendMode ? { mixBlendMode: props.blendMode } : {}),
+  ...props.style,
+}));
+
+const outerAABBStyle = computed<CSSProperties>(() => layerBaseStyle.value);
+
+const visualInnerStyle = computed<CSSProperties>(() => ({
+  position: 'absolute',
+  left: `${innerLeft.value}px`,
+  top: `${innerTop.value}px`,
+  width: `${innerWidth.value}px`,
+  height: `${innerHeight.value}px`,
+  transform: annotationRotation.value !== 0 ? `rotate(${annotationRotation.value}deg)` : undefined,
+  transformOrigin: innerTransformOrigin.value,
+  pointerEvents: props.isEditing ? 'auto' : 'none',
 }));
 
 const innerRotatedStyle = computed<CSSProperties>(() => ({
@@ -665,7 +716,7 @@ const innerRotatedStyle = computed<CSSProperties>(() => ({
     ? `${outlineWidth.value}px ${outlineStyle.value} ${outlineColor.value}`
     : 'none',
   outlineOffset: showOutline.value ? `${outlineOff.value}px` : '0px',
-  pointerEvents: props.isSelected && !props.isMultiSelected ? 'auto' : 'none',
+  pointerEvents: props.isSelected && !props.isMultiSelected && !props.isEditing ? 'auto' : 'none',
   touchAction: 'none',
   cursor: props.isSelected && effectiveIsDraggable.value ? 'move' : 'default',
 }));

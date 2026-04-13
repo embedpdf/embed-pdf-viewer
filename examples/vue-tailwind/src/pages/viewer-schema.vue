@@ -69,7 +69,10 @@ import { ThumbnailPluginPackage } from '@embedpdf/plugin-thumbnail/vue';
 import { CapturePluginPackage } from '@embedpdf/plugin-capture/vue';
 import { FullscreenPluginPackage } from '@embedpdf/plugin-fullscreen/vue';
 import { HistoryPluginPackage } from '@embedpdf/plugin-history/vue';
-import { AnnotationPluginPackage } from '@embedpdf/plugin-annotation/vue';
+import { AnnotationPluginPackage, LockModeType } from '@embedpdf/plugin-annotation/vue';
+import { FormPluginPackage } from '@embedpdf/plugin-form/vue';
+import { StampPluginPackage } from '@embedpdf/plugin-stamp/vue';
+import { SignaturePluginPackage, SignatureMode } from '@embedpdf/plugin-signature/vue';
 import { CommandsPluginPackage } from '@embedpdf/plugin-commands/vue';
 import { I18nPluginPackage } from '@embedpdf/plugin-i18n/vue';
 import { UIPluginPackage, UIProvider } from '@embedpdf/plugin-ui/vue';
@@ -86,6 +89,9 @@ import ZoomToolbar from '../components/ZoomToolbar.vue';
 import ThumbnailsSidebar from '../components/ThumbnailsSidebar.vue';
 import SearchSidebar from '../components/SearchSidebar.vue';
 import OutlineSidebar from '../components/OutlineSidebar.vue';
+import RubberStampSidebar from '../components/RubberStampSidebar.vue';
+import SignatureSidebar from '../components/SignatureSidebar.vue';
+import SignatureCreateModal from '../components/SignatureCreateModal.vue';
 import {
   dutchTranslations,
   englishTranslations,
@@ -126,6 +132,9 @@ const uiComponents = computed(() => ({
   'search-sidebar': markRaw(SearchSidebar),
   'outline-sidebar': markRaw(OutlineSidebar),
   'link-modal': markRaw(LinkModal),
+  'rubber-stamp-sidebar': markRaw(RubberStampSidebar),
+  'signature-sidebar': markRaw(SignatureSidebar),
+  'signature-create-modal': markRaw(SignatureCreateModal),
 }));
 
 const uiRenderers = computed(() => ({
@@ -168,7 +177,14 @@ const plugins = computed(() => [
   }),
   createPluginRegistration(CapturePluginPackage),
   createPluginRegistration(HistoryPluginPackage),
-  createPluginRegistration(AnnotationPluginPackage),
+  createPluginRegistration(AnnotationPluginPackage, {
+    locked: { type: LockModeType.Include, categories: ['form'] },
+  }),
+  createPluginRegistration(FormPluginPackage),
+  createPluginRegistration(StampPluginPackage),
+  createPluginRegistration(SignaturePluginPackage, {
+    mode: SignatureMode.SignatureAndInitials,
+  }),
   createPluginRegistration(FullscreenPluginPackage),
   createPluginRegistration(ThumbnailPluginPackage, {
     width: 120,

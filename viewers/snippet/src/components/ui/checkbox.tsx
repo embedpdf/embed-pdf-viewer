@@ -4,16 +4,19 @@ interface CheckboxProps {
   label: string;
   checked: boolean;
   onChange: (v: boolean) => void;
+  disabled?: boolean;
 }
 
-export const Checkbox = ({ label, checked, onChange }: CheckboxProps) => (
-  <label className="text-fg-secondary inline-flex cursor-pointer select-none items-center gap-2 text-xs font-medium">
-    {/* 1️⃣ the real checkbox (still visible so we keep keyboard a11y) */}
+export const Checkbox = ({ label, checked, onChange, disabled }: CheckboxProps) => (
+  <label
+    className={`text-fg-secondary inline-flex select-none items-center gap-2 text-xs font-medium ${disabled ? 'cursor-not-allowed opacity-50' : 'cursor-pointer'}`}
+  >
     <input
       type="checkbox"
       checked={checked}
+      disabled={disabled}
       onChange={(e) => onChange((e.target as HTMLInputElement).checked)}
-      className="border-border-default bg-bg-input checked:border-accent checked:bg-accent peer h-4 w-4 shrink-0 appearance-none rounded-[3px] border transition-all"
+      className="border-border-default bg-bg-input checked:border-accent checked:bg-accent peer h-4 w-4 shrink-0 appearance-none rounded-[3px] border transition-all disabled:cursor-not-allowed"
     />
 
     {/* 2️⃣ overlayed check icon that fades in only when checked */}

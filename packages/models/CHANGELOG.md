@@ -1,5 +1,60 @@
 # @embedpdf/models
 
+## 2.14.0
+
+### Minor Changes
+
+- [#581](https://github.com/embedpdf/embed-pdf-viewer/pull/581) by [@bobsingor](https://github.com/bobsingor) – Extend free text annotation typing for callouts: add `PdfAnnotationColorType.TextColor` and optional `calloutLine`, `lineEnding`, `strokeWidth`, and `strokeColor` on `PdfFreeTextAnnoObject`.
+
+## 2.13.0
+
+## 2.12.1
+
+## 2.12.0
+
+## 2.11.1
+
+### Patch Changes
+
+- [#557](https://github.com/embedpdf/embed-pdf-viewer/pull/557) by [@jonashaag](https://github.com/jonashaag) – Add BMP encoding support as an optional image format
+
+  BMP encoding bypasses canvas.toBlob() entirely by prepending a 66-byte header to the raw RGBA pixel data. This eliminates the dominant rendering bottleneck — in benchmarks, encoding dropped from ~76ms average (PNG via canvas.toBlob) to <1ms, reducing total tile render time by ~60%.
+
+  The BMP uses BI_BITFIELDS with channel masks matching PDFium's RGBA output byte order, so no per-pixel conversion is needed. Top-down row order avoids row flipping. The result is a valid BMP that all modern browsers decode natively in `<img>` elements.
+
+  Users who want to opt into the faster BMP path can set `defaultImageType: 'image/bmp'` in the render plugin config, while PNG remains the default output format.
+
+## 2.11.0
+
+### Minor Changes
+
+- [#562](https://github.com/embedpdf/embed-pdf-viewer/pull/562) by [@bobsingor](https://github.com/bobsingor) – Add `PdfAnnotationName` enum (deprecating `PdfAnnotationIcon`). Extend `PdfEngine` and `IPdfiumExecutor` interfaces with new document manipulation capabilities (`createDocument`, `importPages`, `deletePage`) and annotation appearance export methods.
+
+## 2.10.1
+
+## 2.10.0
+
+### Minor Changes
+
+- [#537](https://github.com/embedpdf/embed-pdf-viewer/pull/537) by [@bobsingor](https://github.com/bobsingor) –
+  - Expand form and widget models with typed field unions, widget appearance/style metadata, export values, and JavaScript action types.
+  - Add helper utilities and engine interface updates for widget discovery, field state updates, shared fields, and appearance regeneration.
+
+## 2.9.1
+
+## 2.9.0
+
+### Minor Changes
+
+- [#529](https://github.com/embedpdf/embed-pdf-viewer/pull/529) by [@bobsingor](https://github.com/bobsingor) – Add `cloudyBorderIntensity` property to `PdfPolygonAnnoObject` for cloudy border support on polygon annotations.
+
+## 2.8.0
+
+### Minor Changes
+
+- [#495](https://github.com/embedpdf/embed-pdf-viewer/pull/495) by [@bobsingor](https://github.com/bobsingor) – Added `PdfCaretAnnoObject` definition for Caret annotations.
+  Added `PdfRectDifferences` interface and `rectangleDifferences` property to `PdfCircleAnnoObject`, `PdfSquareAnnoObject`, `PdfPolygonAnnoObject`, `PdfFreeTextAnnoObject`, and `PdfCaretAnnoObject` to support the PDF `/RD` entry.
+
 ## 2.7.0
 
 ### Minor Changes

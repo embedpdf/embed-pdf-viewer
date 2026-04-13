@@ -720,8 +720,16 @@ export const PdfAnnotationSubtypeName: Record<PdfAnnotationSubtype, string> = {
  * @public
  */
 export interface AnnotationContextMap {
-  [PdfAnnotationSubtype.STAMP]: { imageData: ImageData };
-  // add more sub-types here if they ever need extra data
+  [PdfAnnotationSubtype.STAMP]:
+    | {
+        data: ArrayBuffer;
+        mimeType?: import('./image-metadata').ImageMimeType;
+        imageData?: never;
+        appearance?: never;
+      }
+    | { imageData: ImageData; data?: never; mimeType?: never; appearance?: never }
+    /** @deprecated Use `{ data: ArrayBuffer }` instead. */
+    | { appearance: ArrayBuffer; imageData?: never; data?: never; mimeType?: never };
 }
 
 /**
@@ -812,124 +820,57 @@ export enum PdfAnnotationStateModel {
 }
 
 /**
- * Icon of pdf annotation
+ * Name (/Name entry) of a pdf annotation — identifies the icon for text/sound/file
+ * annotations and the stamp type for stamp annotations.
  *
  * @public
  */
-export enum PdfAnnotationIcon {
-  /**
-   * Unknown icon
-   */
+export enum PdfAnnotationName {
   Unknown = -1,
-  /**
-   * Comment icon
-   */
   Comment = 0,
-  /**
-   * Key icon
-   */
   Key = 1,
-  /**
-   * Note icon
-   */
   Note = 2,
-  /**
-   * Help icon
-   */
   Help = 3,
-  /**
-   * New paragraph icon
-   */
   NewParagraph = 4,
-  /**
-   * Paragraph icon
-   */
   Paragraph = 5,
-  /**
-   * Insert icon
-   */
   Insert = 6,
-  /**
-   * Graph icon
-   */
   Graph = 7,
-  /**
-   * Push pin icon
-   */
   PushPin = 8,
-  /**
-   * Paperclip icon
-   */
   Paperclip = 9,
-  /**
-   * Tag icon
-   */
   Tag = 10,
-  /**
-   * Speaker icon
-   */
   Speaker = 11,
-  /**
-   * Mic icon
-   */
   Mic = 12,
-  /**
-   * Approved icon
-   */
   Approved = 13,
-  /**
-   * Experimental icon
-   */
   Experimental = 14,
-  /**
-   * Not approved icon
-   */
   NotApproved = 15,
-  /**
-   * As is icon
-   */
   AsIs = 16,
-  /**
-   * Expired icon
-   */
   Expired = 17,
-  /**
-   * Not for public release icon
-   */
   NotForPublicRelease = 18,
-  /**
-   * Confidential icon
-   */
   Confidential = 19,
-  /**
-   * Final icon
-   */
   Final = 20,
-  /**
-   * Sold icon
-   */
   Sold = 21,
-  /**
-   * Departmental icon
-   */
   Departmental = 22,
-  /**
-   * For comment icon
-   */
   ForComment = 23,
-  /**
-   * Top secret icon
-   */
   TopSecret = 24,
-  /**
-   * Draft icon
-   */
   Draft = 25,
-  /**
-   * For public release icon
-   */
   ForPublicRelease = 26,
+  Completed = 27,
+  Void = 28,
+  PreliminaryResults = 29,
+  InformationOnly = 30,
+  Rejected = 31,
+  Witness = 32,
+  InitialHere = 33,
+  SignHere = 34,
+  Accepted = 35,
+  Custom = 36,
+  Image = 37,
 }
+
+/** @deprecated Use PdfAnnotationName instead */
+export type PdfAnnotationIcon = PdfAnnotationName;
+/** @deprecated Use PdfAnnotationName instead */
+export const PdfAnnotationIcon = PdfAnnotationName;
 
 /**
  * Line ending of annotation
@@ -1009,6 +950,19 @@ export enum PdfAnnotationReplyType {
    * act as one unit (e.g., visual shape + metadata/label).
    */
   Group = 2,
+}
+
+/**
+ * Rectangle differences (/RD) defining the inset between an annotation's
+ * /Rect and the actual drawn appearance.
+ *
+ * @public
+ */
+export interface PdfRectDifferences {
+  left: number;
+  top: number;
+  right: number;
+  bottom: number;
 }
 
 /**
@@ -1106,6 +1060,11 @@ export interface PdfAnnotationObjectBase {
    * Reply type (how this annotation relates to the parent via IRT)
    */
   replyType?: PdfAnnotationReplyType;
+
+  /**
+   * Subject of the annotation
+   */
+  subject?: string;
 }
 
 /**
@@ -1175,7 +1134,12 @@ export interface PdfTextAnnoObject extends PdfAnnotationObjectBase {
   contents: string;
 
   /**
-   * color of text annotation
+   * Color of the text annotation (preferred over deprecated `color`)
+   */
+  strokeColor?: string;
+
+  /**
+   * @deprecated Use strokeColor instead. Will be removed in next major version.
    */
   color?: string;
 
@@ -1195,8 +1159,11 @@ export interface PdfTextAnnoObject extends PdfAnnotationObjectBase {
   stateModel?: PdfAnnotationStateModel;
 
   /**
-   * Icon of the text annotation
+   * Name (/Name entry) of the text annotation
    */
+  name?: PdfAnnotationName;
+
+  /** @deprecated Use name instead */
   icon?: PdfAnnotationIcon;
 }
 
@@ -1276,6 +1243,7 @@ export enum PdfAnnotationColorType {
   Color = 0,
   InteriorColor = 1,
   OverlayColor = 2,
+  TextColor = 3,
 }
 
 /**
@@ -1318,14 +1286,30 @@ export enum PdfAnnotationFlags {
  */
 export enum PDF_FORM_FIELD_FLAG {
   NONE = 0,
+  // Common flags (PDF 1.7 Table 8.70)
   READONLY = 1 << 0,
   REQUIRED = 1 << 1,
   NOEXPORT = 1 << 2,
+  // Text field flags (PDF 1.7 Table 8.77)
   TEXT_MULTIPLINE = 1 << 12,
   TEXT_PASSWORD = 1 << 13,
+  TEXT_FILESELECT = 1 << 20,
+  TEXT_DONOTSPELLCHECK = 1 << 22,
+  TEXT_DONOTSCROLL = 1 << 23,
+  TEXT_COMB = 1 << 24,
+  TEXT_RICHTEXT = 1 << 25,
+  // Button field flags (PDF 1.7 Table 8.75)
+  BUTTON_NOTOGGLETOOFF = 1 << 14,
+  BUTTON_RADIO = 1 << 15,
+  BUTTON_PUSHBUTTON = 1 << 16,
+  BUTTON_RADIOSINUNISON = 1 << 25,
+  // Choice field flags (PDF 1.7 Table 8.79)
   CHOICE_COMBO = 1 << 17,
   CHOICE_EDIT = 1 << 18,
+  CHOICE_SORT = 1 << 19,
   CHOICE_MULTL_SELECT = 1 << 21,
+  CHOICE_DONOTSPELLCHECK = 1 << 22,
+  CHOICE_COMMITONSELCHANGE = 1 << 26,
 }
 
 /**
@@ -1437,40 +1421,101 @@ export function namesToFlags(names: readonly PdfAnnotationFlagName[]): PdfAnnota
 }
 
 /**
- * Field of PDF widget annotation
+ * Shared properties across all widget annotation field types
  *
  * @public
  */
-export interface PdfWidgetAnnoField {
-  /**
-   * flag of field
-   */
+export interface PdfWidgetAnnoFieldBase {
   flag: PDF_FORM_FIELD_FLAG;
-  /**
-   * name of field
-   */
   name: string;
-  /**
-   * alternate name of field
-   */
   alternateName: string;
-  /**
-   * type of field
-   */
-  type: PDF_FORM_FIELD_TYPE;
-  /**
-   * value of field
-   */
   value: string;
-  /**
-   * whether field is checked
-   */
-  isChecked: boolean;
-  /**
-   * options of field
-   */
+  fieldObjectId?: number;
+}
+
+/**
+ * @public
+ */
+export interface PdfTextWidgetAnnoField extends PdfWidgetAnnoFieldBase {
+  type: PDF_FORM_FIELD_TYPE.TEXTFIELD;
+  maxLen?: number;
+}
+
+/**
+ * @public
+ */
+export interface PdfCheckboxWidgetAnnoField extends PdfWidgetAnnoFieldBase {
+  type: PDF_FORM_FIELD_TYPE.CHECKBOX;
+}
+
+/**
+ * @public
+ */
+export interface PdfRadioButtonWidgetAnnoField extends PdfWidgetAnnoFieldBase {
+  type: PDF_FORM_FIELD_TYPE.RADIOBUTTON;
   options: PdfWidgetAnnoOption[];
 }
+
+/**
+ * @public
+ */
+export interface PdfComboboxWidgetAnnoField extends PdfWidgetAnnoFieldBase {
+  type: PDF_FORM_FIELD_TYPE.COMBOBOX;
+  options: PdfWidgetAnnoOption[];
+}
+
+/**
+ * @public
+ */
+export interface PdfListboxWidgetAnnoField extends PdfWidgetAnnoFieldBase {
+  type: PDF_FORM_FIELD_TYPE.LISTBOX;
+  options: PdfWidgetAnnoOption[];
+}
+
+/**
+ * @public
+ */
+export interface PdfPushButtonWidgetAnnoField extends PdfWidgetAnnoFieldBase {
+  type: PDF_FORM_FIELD_TYPE.PUSHBUTTON;
+}
+
+/**
+ * @public
+ */
+export interface PdfSignatureWidgetAnnoField extends PdfWidgetAnnoFieldBase {
+  type: PDF_FORM_FIELD_TYPE.SIGNATURE;
+}
+
+/**
+ * @public
+ */
+export interface PdfUnknownWidgetAnnoField extends PdfWidgetAnnoFieldBase {
+  type:
+    | PDF_FORM_FIELD_TYPE.UNKNOWN
+    | PDF_FORM_FIELD_TYPE.XFA
+    | PDF_FORM_FIELD_TYPE.XFA_CHECKBOX
+    | PDF_FORM_FIELD_TYPE.XFA_COMBOBOX
+    | PDF_FORM_FIELD_TYPE.XFA_IMAGEFIELD
+    | PDF_FORM_FIELD_TYPE.XFA_LISTBOX
+    | PDF_FORM_FIELD_TYPE.XFA_PUSHBUTTON
+    | PDF_FORM_FIELD_TYPE.XFA_SIGNATURE
+    | PDF_FORM_FIELD_TYPE.XFA_TEXTFIELD;
+}
+
+/**
+ * Discriminated union of all widget annotation field types
+ *
+ * @public
+ */
+export type PdfWidgetAnnoField =
+  | PdfTextWidgetAnnoField
+  | PdfCheckboxWidgetAnnoField
+  | PdfRadioButtonWidgetAnnoField
+  | PdfComboboxWidgetAnnoField
+  | PdfListboxWidgetAnnoField
+  | PdfPushButtonWidgetAnnoField
+  | PdfSignatureWidgetAnnoField
+  | PdfUnknownWidgetAnnoField;
 
 /**
  * PDF widget object
@@ -1484,7 +1529,142 @@ export interface PdfWidgetAnnoObject extends PdfAnnotationObjectBase {
    * Field of pdf widget object
    */
   field: PdfWidgetAnnoField;
+  /**
+   * The non-"Off" appearance state key from the widget's /AP/N dictionary.
+   * For checkboxes this is typically "Yes"; for radio buttons it is a unique
+   * identifier (usually the widget's NM). Checked state is derived:
+   * `field.value === exportValue`.
+   */
+  exportValue?: string;
+  /**
+   * font family of pdf widget object
+   */
+  fontFamily: PdfStandardFont;
+  /**
+   * font size of pdf widget object
+   */
+  fontSize: number;
+  /**
+   * font color of pdf widget object
+   */
+  fontColor: string;
+  /**
+   * MK border color (BC) as web hex string, e.g. '#FF0000'
+   */
+  strokeColor?: string;
+  /**
+   * MK background color (BG) as web hex string, e.g. '#FFFFFF'
+   */
+  color?: string;
+  /**
+   * Border width in points (BS width)
+   */
+  strokeWidth?: number;
 }
+
+/**
+ * Returns whether a toggle widget (checkbox / radio button) is currently
+ * in its "on" state by comparing the shared field value against this
+ * widget's unique export value from the /AP/N dictionary.
+ *
+ * @public
+ */
+export function isWidgetChecked(widget: PdfWidgetAnnoObject): boolean {
+  return widget.exportValue != null && widget.field.value === widget.exportValue;
+}
+
+/**
+ * Widget additional-action event types exposed by PDFium.
+ *
+ * @public
+ */
+export enum PDF_ANNOT_AACTION_EVENT {
+  KEY_STROKE = 12,
+  FORMAT = 13,
+  VALIDATE = 14,
+  CALCULATE = 15,
+}
+
+/**
+ * Normalized widget JavaScript trigger names.
+ *
+ * @public
+ */
+export enum PdfJavaScriptWidgetEventType {
+  Keystroke = 'keystroke',
+  Format = 'format',
+  Validate = 'validate',
+  Calculate = 'calculate',
+}
+
+/**
+ * Normalized JavaScript action trigger names.
+ *
+ * @public
+ */
+export enum PdfJavaScriptActionTrigger {
+  DocumentNamed = 'document_named',
+  WidgetKeystroke = 'widget_keystroke',
+  WidgetFormat = 'widget_format',
+  WidgetValidate = 'widget_validate',
+  WidgetCalculate = 'widget_calculate',
+}
+
+/**
+ * Base shape shared by extracted PDF JavaScript actions.
+ *
+ * @public
+ */
+export interface PdfJavaScriptActionObjectBase {
+  /**
+   * Stable identifier for the extracted action within the current document snapshot.
+   */
+  id: string;
+  /**
+   * Normalized trigger classification used by higher layers.
+   */
+  trigger: PdfJavaScriptActionTrigger;
+  /**
+   * Raw JavaScript source extracted from the PDF.
+   */
+  script: string;
+}
+
+/**
+ * A named document-level JavaScript action from the document JavaScript name tree.
+ *
+ * @public
+ */
+export interface PdfDocumentJavaScriptActionObject extends PdfJavaScriptActionObjectBase {
+  trigger: PdfJavaScriptActionTrigger.DocumentNamed;
+  name: string;
+}
+
+/**
+ * A widget-level JavaScript additional action.
+ *
+ * @public
+ */
+export interface PdfWidgetJavaScriptActionObject extends PdfJavaScriptActionObjectBase {
+  trigger:
+    | PdfJavaScriptActionTrigger.WidgetKeystroke
+    | PdfJavaScriptActionTrigger.WidgetFormat
+    | PdfJavaScriptActionTrigger.WidgetValidate
+    | PdfJavaScriptActionTrigger.WidgetCalculate;
+  eventType: PdfJavaScriptWidgetEventType;
+  pageIndex: number;
+  annotationId: string;
+  fieldName: string;
+}
+
+/**
+ * Discriminated union of supported extracted PDF JavaScript actions.
+ *
+ * @public
+ */
+export type PdfJavaScriptActionObject =
+  | PdfDocumentJavaScriptActionObject
+  | PdfWidgetJavaScriptActionObject;
 
 /**
  * Pdf file attachments annotation
@@ -1585,6 +1765,14 @@ export interface PdfPolygonAnnoObject extends PdfAnnotationObjectBase {
    * stroke dash array of polygon annotation
    */
   strokeDashArray?: number[];
+  /**
+   * cloudy border intensity of polygon annotation
+   */
+  cloudyBorderIntensity?: number;
+  /**
+   * Rectangle Differences (/RD) - inset padding from Rect to the drawn area.
+   */
+  rectangleDifferences?: PdfRectDifferences;
 }
 
 /**
@@ -1850,13 +2038,12 @@ export interface PdfStampAnnoObject extends PdfAnnotationObjectBase {
   /** {@inheritDoc PdfAnnotationObjectBase.type} */
   type: PdfAnnotationSubtype.STAMP;
   /**
-   * Icon of the stamp annotation
+   * Name (/Name entry) of the stamp annotation
    */
+  name?: PdfAnnotationName;
+
+  /** @deprecated Use name instead */
   icon?: PdfAnnotationIcon;
-  /**
-   * Subject of the stamp annotation
-   */
-  subject?: string;
 }
 
 /**
@@ -1904,9 +2091,9 @@ export interface PdfCircleAnnoObject extends PdfAnnotationObjectBase {
    */
   cloudyBorderIntensity?: number;
   /**
-   * cloudy border inset of circle annotation
+   * Rectangle Differences (/RD) - inset padding from Rect to the drawn area.
    */
-  cloudyBorderInset?: number[];
+  rectangleDifferences?: PdfRectDifferences;
 }
 
 /**
@@ -1954,9 +2141,9 @@ export interface PdfSquareAnnoObject extends PdfAnnotationObjectBase {
    */
   cloudyBorderIntensity?: number;
   /**
-   * cloudy border inset of circle annotation
+   * Rectangle Differences (/RD) - inset padding from Rect to the drawn area.
    */
-  cloudyBorderInset?: number[];
+  rectangleDifferences?: PdfRectDifferences;
 }
 
 /**
@@ -2062,6 +2249,14 @@ export interface PdfStrikeOutAnnoObject extends PdfAnnotationObjectBase {
 export interface PdfCaretAnnoObject extends PdfAnnotationObjectBase {
   /** {@inheritDoc PdfAnnotationObjectBase.type} */
   type: PdfAnnotationSubtype.CARET;
+  /** Stroke color of the caret symbol */
+  strokeColor?: string;
+  /** Opacity (0-1) */
+  opacity?: number;
+  /**
+   * Rectangle Differences (/RD) - inset padding from Rect to the drawn area.
+   */
+  rectangleDifferences?: PdfRectDifferences;
 }
 
 /**
@@ -2116,6 +2311,30 @@ export interface PdfFreeTextAnnoObject extends PdfAnnotationObjectBase {
    * Rich content of the free text annotation
    */
   richContent?: string;
+  /**
+   * Rectangle Differences (/RD) - inset padding from Rect to the drawn area.
+   */
+  rectangleDifferences?: PdfRectDifferences;
+  /**
+   * Callout line points (PDF /CL array).
+   * 2 points for a simple leader line, 3 points for a knee-jointed leader line.
+   * Points are in device coordinates (same as rect/vertices).
+   * Present only when intent is 'FreeTextCallout'.
+   */
+  calloutLine?: Position[];
+  /**
+   * Line ending style for the callout leader line (PDF /LE).
+   * Only meaningful when calloutLine is present.
+   */
+  lineEnding?: PdfAnnotationLineEnding;
+  /**
+   * Border / callout line stroke width (from /BS -> W).
+   */
+  strokeWidth?: number;
+  /**
+   * Border / callout line stroke color (from /DA rg color).
+   */
+  strokeColor?: string;
 }
 
 /**
@@ -2230,6 +2449,16 @@ export interface PdfUnsupportedAnnoObject extends PdfAnnotationObjectBase {
 export type PdfAnnotationObject = PdfSupportedAnnoObject | PdfUnsupportedAnnoObject;
 
 /**
+ * Extracts the concrete annotation object type for a specific subtype.
+ *
+ * @public
+ */
+export type PdfAnnotationOf<S extends PdfAnnotationSubtype> = Extract<
+  PdfAnnotationObject,
+  { type: S }
+>;
+
+/**
  * Pdf attachment
  *
  * @public
@@ -2336,7 +2565,7 @@ export function unionFlags(flags: MatchFlag[]) {
  *
  * @public
  */
-export type ImageConversionTypes = 'image/webp' | 'image/png' | 'image/jpeg';
+export type ImageConversionTypes = 'image/webp' | 'image/png' | 'image/jpeg' | 'image/bmp';
 
 /**
  * Targe for searching
@@ -2614,7 +2843,7 @@ export interface PdfPageTextRuns {
 export type FormFieldValue =
   | { kind: 'text'; text: string }
   | { kind: 'selection'; index: number; isSelected: boolean }
-  | { kind: 'checked'; isChecked: boolean };
+  | { kind: 'checked'; checked: boolean };
 
 /**
  * Transformation that will be applied to annotation
@@ -2813,6 +3042,7 @@ export enum PdfErrorCode {
   CantSelectOption = 27,
   CantCheckField = 28,
   CantSetAnnotString = 29,
+  CantDeletePage = 30,
 }
 
 export interface PdfErrorReason {
@@ -2962,6 +3192,11 @@ export interface PdfRenderPageOptions extends PdfRenderOptions {
    * Whether to render interactive form widgets
    */
   withForms?: boolean;
+  /**
+   * When true, the background is transparent instead of white.
+   * Useful for rendering stamp thumbnails or overlay content.
+   */
+  transparentBackground?: boolean;
 }
 
 export interface PdfRenderPageAnnotationOptions extends PdfRenderOptions {
@@ -3257,6 +3492,46 @@ export interface PdfEngine<T = Blob> {
     page: PdfPageObject,
   ) => PdfTask<PdfAnnotationObject[]>;
   /**
+   * Extract named document JavaScript actions without executing them.
+   * @param doc - pdf document
+   * @returns task that contains all named document JavaScript actions
+   */
+  getDocumentJavaScriptActions: (
+    doc: PdfDocumentObject,
+  ) => PdfTask<PdfDocumentJavaScriptActionObject[]>;
+  /**
+   * Get form fields of pdf page
+   * @param doc - pdf document
+   * @param page - pdf page
+   * @returns task contains the form fields or error
+   */
+  getPageAnnoWidgets: (
+    doc: PdfDocumentObject,
+    page: PdfPageObject,
+  ) => PdfTask<PdfWidgetAnnoObject[]>;
+  /**
+   * Extract widget additional JavaScript actions for a page without executing them.
+   * @param doc - pdf document
+   * @param page - pdf page
+   * @returns task containing page widget JavaScript actions
+   */
+  getPageWidgetJavaScriptActions: (
+    doc: PdfDocumentObject,
+    page: PdfPageObject,
+  ) => PdfTask<PdfWidgetJavaScriptActionObject[]>;
+  /**
+   * Regenerate appearance streams for specific widget annotations on a page.
+   * @param doc - pdf document
+   * @param page - pdf page
+   * @param annotationIds - NM values of the annotations to regenerate
+   * @returns task indicating whether any appearances were regenerated
+   */
+  regenerateWidgetAppearances: (
+    doc: PdfDocumentObject,
+    page: PdfPageObject,
+    annotationIds: string[],
+  ) => PdfTask<boolean>;
+  /**
    * Create a annotation on specified page
    * @param doc - pdf document
    * @param page - pdf page
@@ -3369,6 +3644,51 @@ export interface PdfEngine<T = Blob> {
     value: FormFieldValue,
   ) => PdfTask<boolean>;
   /**
+   * Restore a widget annotation to the full field state described by `field`.
+   * Unlike `setFormFieldValue`, this accepts a complete `PdfWidgetAnnoField`
+   * snapshot and applies all writable state in a single call.
+   * @param doc - pdf document
+   * @param page - pdf page
+   * @param annotation - pdf widget annotation
+   * @param field - the desired field state to apply
+   */
+  setFormFieldState: (
+    doc: PdfDocumentObject,
+    page: PdfPageObject,
+    annotation: PdfWidgetAnnoObject,
+    field: PdfWidgetAnnoField,
+  ) => PdfTask<boolean>;
+  /**
+   * Rename the logical form field associated with a widget annotation.
+   * This updates the field dictionary rather than patching only a single widget snapshot.
+   * @param doc - pdf document
+   * @param page - pdf page containing the widget annotation
+   * @param annotation - pdf widget annotation
+   * @param name - the desired partial field name (/T)
+   */
+  renameWidgetField: (
+    doc: PdfDocumentObject,
+    page: PdfPageObject,
+    annotation: PdfWidgetAnnoObject,
+    name: string,
+  ) => PdfTask<boolean>;
+  /**
+   * Attach the source widget's logical field to the target widget's logical field.
+   * This is a structural field operation and may merge multiple widget kids under one parent.
+   * @param doc - pdf document
+   * @param sourcePage - page containing the source widget annotation
+   * @param sourceAnnotation - widget whose field should be shared into the target field
+   * @param targetPage - page containing the target widget annotation
+   * @param targetAnnotation - widget whose logical field should be reused
+   */
+  shareWidgetField: (
+    doc: PdfDocumentObject,
+    sourcePage: PdfPageObject,
+    sourceAnnotation: PdfWidgetAnnoObject,
+    targetPage: PdfPageObject,
+    targetAnnotation: PdfWidgetAnnoObject,
+  ) => PdfTask<boolean>;
+  /**
    * Flatten annotations and form fields into the page contents.
    * @param doc - pdf document
    * @param page - pdf page
@@ -3386,6 +3706,33 @@ export interface PdfEngine<T = Blob> {
    * @returns task contains the new pdf file content
    */
   extractPages: (doc: PdfDocumentObject, pageIndexes: number[]) => PdfTask<ArrayBuffer>;
+  /**
+   * Create a new empty PDF document
+   * @param id - unique document identifier
+   * @returns task contains the empty document object
+   */
+  createDocument: (id: string) => PdfTask<PdfDocumentObject>;
+  /**
+   * Import pages from a source document into a destination document
+   * @param destDoc - destination document
+   * @param srcDoc - source document
+   * @param srcPageIndices - zero-based page indices in the source document
+   * @param insertIndex - position to insert at (defaults to end)
+   * @returns task contains the newly added page objects
+   */
+  importPages: (
+    destDoc: PdfDocumentObject,
+    srcDoc: PdfDocumentObject,
+    srcPageIndices: number[],
+    insertIndex?: number,
+  ) => PdfTask<PdfPageObject[]>;
+  /**
+   * Delete a page from a document
+   * @param doc - pdf document
+   * @param pageIndex - zero-based index of the page to delete
+   * @returns task contains the result
+   */
+  deletePage: (doc: PdfDocumentObject, pageIndex: number) => PdfTask<boolean>;
   /**
    * Extract text on specified pdf pages
    * @param doc - pdf document
@@ -3438,6 +3785,30 @@ export interface PdfEngine<T = Blob> {
     page: PdfPageObject,
     annotation: PdfAnnotationObject,
   ) => PdfTask<boolean>;
+  /**
+   * Export an annotation's appearance as a standalone PDF document
+   * @param doc - pdf document
+   * @param page - pdf page
+   * @param annotation - the annotation to export
+   * @returns task contains the exported PDF as ArrayBuffer
+   */
+  exportAnnotationAppearanceAsPdf: (
+    doc: PdfDocumentObject,
+    page: PdfPageObject,
+    annotation: PdfAnnotationObject,
+  ) => PdfTask<ArrayBuffer>;
+  /**
+   * Export multiple annotations' appearances as a standalone single-page PDF
+   * @param doc - pdf document
+   * @param page - pdf page
+   * @param annotations - the annotations to export
+   * @returns task contains the exported PDF as ArrayBuffer
+   */
+  exportAnnotationsAppearanceAsPdf: (
+    doc: PdfDocumentObject,
+    page: PdfPageObject,
+    annotations: PdfAnnotationObject[],
+  ) => PdfTask<ArrayBuffer>;
   /**
    * Extract text on specified pdf pages
    * @param doc - pdf document
@@ -3676,11 +4047,43 @@ export interface IPdfiumExecutor {
     doc: PdfDocumentObject,
     attachment: PdfAttachmentObject,
   ): PdfTask<ArrayBuffer>;
+  getDocumentJavaScriptActions(
+    doc: PdfDocumentObject,
+  ): PdfTask<PdfDocumentJavaScriptActionObject[]>;
+  getPageAnnoWidgets(doc: PdfDocumentObject, page: PdfPageObject): PdfTask<PdfWidgetAnnoObject[]>;
+  getPageWidgetJavaScriptActions(
+    doc: PdfDocumentObject,
+    page: PdfPageObject,
+  ): PdfTask<PdfWidgetJavaScriptActionObject[]>;
+  regenerateWidgetAppearances(
+    doc: PdfDocumentObject,
+    page: PdfPageObject,
+    annotationIds: string[],
+  ): PdfTask<boolean>;
   setFormFieldValue(
     doc: PdfDocumentObject,
     page: PdfPageObject,
     annotation: PdfWidgetAnnoObject,
     value: FormFieldValue,
+  ): PdfTask<boolean>;
+  setFormFieldState(
+    doc: PdfDocumentObject,
+    page: PdfPageObject,
+    annotation: PdfWidgetAnnoObject,
+    field: PdfWidgetAnnoField,
+  ): PdfTask<boolean>;
+  renameWidgetField(
+    doc: PdfDocumentObject,
+    page: PdfPageObject,
+    annotation: PdfWidgetAnnoObject,
+    name: string,
+  ): PdfTask<boolean>;
+  shareWidgetField(
+    doc: PdfDocumentObject,
+    sourcePage: PdfPageObject,
+    sourceAnnotation: PdfWidgetAnnoObject,
+    targetPage: PdfPageObject,
+    targetAnnotation: PdfWidgetAnnoObject,
   ): PdfTask<boolean>;
   flattenPage(
     doc: PdfDocumentObject,
@@ -3688,6 +4091,13 @@ export interface IPdfiumExecutor {
     options?: PdfFlattenPageOptions,
   ): PdfTask<PdfPageFlattenResult>;
   extractPages(doc: PdfDocumentObject, pageIndexes: number[]): PdfTask<ArrayBuffer>;
+  createDocument(id: string): PdfTask<PdfDocumentObject>;
+  importPages(
+    destDoc: PdfDocumentObject,
+    srcDoc: PdfDocumentObject,
+    srcPageIndices: number[],
+    insertIndex?: number,
+  ): PdfTask<PdfPageObject[]>;
   extractText(doc: PdfDocumentObject, pageIndexes: number[]): PdfTask<string>;
   redactTextInRects(
     doc: PdfDocumentObject,
@@ -3706,6 +4116,16 @@ export interface IPdfiumExecutor {
     page: PdfPageObject,
     annotation: PdfAnnotationObject,
   ): PdfTask<boolean>;
+  exportAnnotationAppearanceAsPdf(
+    doc: PdfDocumentObject,
+    page: PdfPageObject,
+    annotation: PdfAnnotationObject,
+  ): PdfTask<ArrayBuffer>;
+  exportAnnotationsAppearanceAsPdf(
+    doc: PdfDocumentObject,
+    page: PdfPageObject,
+    annotations: PdfAnnotationObject[],
+  ): PdfTask<ArrayBuffer>;
   getTextSlices(doc: PdfDocumentObject, slices: PageTextSlice[]): PdfTask<string[]>;
   getPageGlyphs(doc: PdfDocumentObject, page: PdfPageObject): PdfTask<PdfGlyphObject[]>;
   getPageGeometry(doc: PdfDocumentObject, page: PdfPageObject): PdfTask<PdfPageGeometry>;
@@ -3713,6 +4133,7 @@ export interface IPdfiumExecutor {
   merge(files: PdfFile[]): PdfTask<PdfFile>;
   mergePages(mergeConfigs: Array<{ docId: string; pageIndices: number[] }>): PdfTask<PdfFile>;
   preparePrintDocument(doc: PdfDocumentObject, options?: PdfPrintOptions): PdfTask<ArrayBuffer>;
+  deletePage(doc: PdfDocumentObject, pageIndex: number): PdfTask<boolean>;
   saveAsCopy(doc: PdfDocumentObject): PdfTask<ArrayBuffer>;
   closeDocument(doc: PdfDocumentObject): PdfTask<boolean>;
   closeAllDocuments(): PdfTask<boolean>;

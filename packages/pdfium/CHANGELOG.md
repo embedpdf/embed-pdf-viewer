@@ -1,5 +1,63 @@
 # @embedpdf/pdfium
 
+## 2.14.0
+
+### Minor Changes
+
+- [#581](https://github.com/embedpdf/embed-pdf-viewer/pull/581) by [@bobsingor](https://github.com/bobsingor) – Expose EmbedPDF callout line helpers in the WASM bindings (`EPDFAnnot_GetCalloutLineCount`, `EPDFAnnot_GetCalloutLine`, `EPDFAnnot_SetCalloutLine`) and refresh bundled `pdfium.js` / `pdfium.cjs` / `pdfium.wasm`.
+
+## 2.13.0
+
+## 2.12.1
+
+## 2.12.0
+
+## 2.11.1
+
+## 2.11.0
+
+### Minor Changes
+
+- [#562](https://github.com/embedpdf/embed-pdf-viewer/pull/562) by [@bobsingor](https://github.com/bobsingor) – Expose new PDFium functions for annotation appearance generation and export (`EPDFAnnot_ExportAppearanceAsDocument`, `EPDFAnnot_ExportMultipleAppearancesAsDocument`, `EPDFAnnot_SetAppearanceFromPage`, `EPDFAnnot_GetName`, `EPDFAnnot_SetName`).
+
+## 2.10.1
+
+## 2.10.0
+
+### Minor Changes
+
+- [#537](https://github.com/embedpdf/embed-pdf-viewer/pull/537) by [@bobsingor](https://github.com/bobsingor) –
+  - Add PDFium bindings and wasm exports for creating and editing form widgets, reading widget metadata and JavaScript actions, sharing fields, and regenerating widget appearance streams.
+  - Improve form handle lifecycle management so widget reads, writes, and appearance generation work more reliably across repeated operations.
+
+## 2.9.1
+
+## 2.9.0
+
+### Minor Changes
+
+- [#529](https://github.com/embedpdf/embed-pdf-viewer/pull/529) by [@bobsingor](https://github.com/bobsingor) – Add cloudy border AP generation in PDFium C++. New `cpdf_cloudy_border.cpp/.h` generates scalloped border paths for Square, Circle, and Polygon annotations via the `/BE` border effect dictionary. Exposes `EPDFAnnot_SetBorderEffect` and `EPDFAnnot_ClearBorderEffect` bindings.
+
+### Patch Changes
+
+- [#526](https://github.com/embedpdf/embed-pdf-viewer/pull/526) by [@bobsingor](https://github.com/bobsingor) – Fix `EPDF_GetPageSizeByIndexNormalized` returning incorrect dimensions for PDFs with inherited MediaBox/CropBox.
+
+  The function read `/MediaBox` and `/CropBox` directly from the page dictionary via `dict->GetRectFor()`, which does not resolve PDF page tree attribute inheritance. Pages that inherit these attributes from a parent `/Pages` node would silently fall back to the default 612x792 (US Letter) size.
+
+  Replaced the direct dictionary lookups with a `GetInheritedRect` helper that walks the `/Parent` chain, mirroring the inheritance logic used by `CPDF_Page::GetPageAttr`. The function remains lightweight (no `CPDF_Page` construction) while correctly resolving inherited attributes.
+
+## 2.8.0
+
+### Minor Changes
+
+- [#495](https://github.com/embedpdf/embed-pdf-viewer/pull/495) by [@bobsingor](https://github.com/bobsingor) – Exposed `EPDFAnnot_SetRectangleDifferences`, `EPDFAnnot_ClearRectangleDifferences`, and `EPDFAnnot_HasAppearanceStream` functions.
+
+### Patch Changes
+
+- [#510](https://github.com/embedpdf/embed-pdf-viewer/pull/510) by [@bobsingor](https://github.com/bobsingor) – Fix redact annotations leaving orphan indirect objects in the PDF cross-reference table. `EPDFAnnot_ApplyRedaction` and `EPDFPage_ApplyRedactions` now call `DeleteIndirectObject` after removing each annotation from the `/Annots` array, ensuring the underlying PDF object is fully removed from the xref rather than left as an unreachable orphan.
+
+  Thanks to @JanSlabon for reporting this bug.
+
 ## 2.7.0
 
 ## 2.6.2

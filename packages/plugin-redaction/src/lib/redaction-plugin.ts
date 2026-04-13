@@ -48,6 +48,7 @@ import {
   AnnotationCommandMetadata,
   AnnotationPlugin,
   AnnotationTool,
+  AnnotationToolMap,
 } from '@embedpdf/plugin-annotation';
 import { HistoryCapability, HistoryPlugin } from '@embedpdf/plugin-history';
 import {
@@ -64,7 +65,7 @@ import {
   RedactionAction,
 } from './actions';
 import { initialDocumentState } from './reducer';
-import { redactTools } from './tools';
+import { redactTool, redactTools } from './tools';
 
 export class RedactionPlugin extends BasePlugin<
   RedactionPluginConfig,
@@ -136,9 +137,9 @@ export class RedactionPlugin extends BasePlugin<
     }
 
     // Register redact tools with annotation plugin if in annotation mode
-    if (this.useAnnotationMode) {
+    if (this.useAnnotationMode && this.annotationCapability) {
       for (const tool of redactTools) {
-        this.annotationCapability!.addTool(tool);
+        this.annotationCapability.addTool(tool);
       }
     }
 
@@ -592,6 +593,15 @@ export class RedactionPlugin extends BasePlugin<
     return state;
   }
 
+  private isRedactTool(tool: AnnotationTool | undefined): tool is typeof redactTool {
+    return tool?.id === redactTool.id && tool.defaults.type === PdfAnnotationSubtype.REDACT;
+  }
+
+  private getRedactTool(): typeof redactTool | undefined {
+    const tool = this.annotationCapability?.getTool('redact');
+    return this.isRedactTool(tool) ? tool : undefined;
+  }
+
   // ─────────────────────────────────────────────────────────
   // Annotation Mode State Sync
   // ─────────────────────────────────────────────────────────
@@ -712,7 +722,8 @@ export class RedactionPlugin extends BasePlugin<
 
     if (this.useAnnotationMode) {
       // ANNOTATION MODE: Create REDACT annotations via annotation plugin
-      const annoScope = this.annotationCapability!.forDocument(id);
+      if (!this.annotationCapability) return;
+      const annoScope = this.annotationCapability.forDocument(id);
       for (const item of items) {
         const annotation = this.redactionItemToAnnotation(item);
         annoScope.createAnnotation(item.page, annotation);
@@ -959,9 +970,8 @@ export class RedactionPlugin extends BasePlugin<
    * In legacy mode: returns hardcoded red
    */
   public getPreviewStrokeColor(): string {
-    if (this.useAnnotationMode && this.annotationCapability) {
-      const tool = this.annotationCapability.getTool<AnnotationTool<PdfRedactAnnoObject>>('redact');
-      return tool?.defaults.strokeColor ?? '#FF0000';
+    if (this.useAnnotationMode) {
+      return this.getRedactTool()?.defaults.strokeColor ?? '#FF0000';
     }
     return '#FF0000';
   }
@@ -1301,8 +1311,16 @@ export class RedactionPlugin extends BasePlugin<
     docId: string,
     doc: PdfDocumentObject,
   ): Task<boolean, PdfErrorReason> {
+    const annotationCapability = this.annotationCapability;
+    if (!annotationCapability) {
+      return PdfTaskHelper.reject({
+        code: PdfErrorCode.NotFound,
+        message: 'Annotation capability not found',
+      });
+    }
+
     // Collect all REDACT annotation IDs per page (for purging after apply)
-    const annoState = this.annotationCapability!.forDocument(docId).getState();
+    const annoState = annotationCapability.forDocument(docId).getState();
     const redactAnnotationsByPage = new Map<number, string[]>();
 
     for (const ta of Object.values(annoState.byUid)) {
@@ -1330,12 +1348,12 @@ export class RedactionPlugin extends BasePlugin<
     Task.all(tasks).wait(
       () => {
         // Purge all REDACT annotations from state (engine already removed them from PDF)
-        const annoScope = this.annotationCapability?.forDocument(docId);
+        const annoScope = annotationCapability.forDocument(docId);
         const allPurgedIds: string[] = [];
 
         for (const [pageIndex, ids] of redactAnnotationsByPage) {
           for (const id of ids) {
-            annoScope?.purgeAnnotation(pageIndex, id);
+            annoScope.purgeAnnotation(pageIndex, id);
             // Remove from internal pending state (purgeAnnotation doesn't emit events)
             this.dispatch(removePending(docId, pageIndex, id));
             allPurgedIds.push(id);
@@ -1386,8 +1404,7 @@ export class RedactionPlugin extends BasePlugin<
     if (!this.annotationCapability) return [];
 
     const annoScope = this.annotationCapability.forDocument(documentId);
-    const tool = this.annotationCapability.getTool<AnnotationTool<PdfRedactAnnoObject>>('redact');
-    const defaults = tool?.defaults;
+    const defaults = this.getRedactTool()?.defaults;
     const annotationIds: string[] = [];
 
     for (const selection of formattedSelection) {
@@ -1476,8 +1493,7 @@ export class RedactionPlugin extends BasePlugin<
     if (!this.annotationCapability) return;
 
     const annoScope = this.annotationCapability.forDocument(documentId);
-    const tool = this.annotationCapability.getTool<AnnotationTool<PdfRedactAnnoObject>>('redact');
-    const defaults = tool?.defaults;
+    const defaults = this.getRedactTool()?.defaults;
     const annotationId = uuidV4();
 
     const annotation: PdfRedactAnnoObject = {
@@ -1498,8 +1514,7 @@ export class RedactionPlugin extends BasePlugin<
    * Convert a RedactionItem to a PdfRedactAnnoObject
    */
   private redactionItemToAnnotation(item: RedactionItem): PdfRedactAnnoObject {
-    const tool = this.annotationCapability?.getTool('redact');
-    const defaults = tool?.defaults ?? {};
+    const defaults = this.getRedactTool()?.defaults ?? {};
 
     return {
       ...defaults,

@@ -72,6 +72,7 @@ import {
   AnnotationLayer,
   AnnotationPluginPackage,
   AnnotationPluginConfig,
+  LockModeType,
 } from '@embedpdf/plugin-annotation/preact';
 import { PrintPluginPackage, PrintPluginConfig } from '@embedpdf/plugin-print/preact';
 import {
@@ -102,6 +103,13 @@ import {
   AttachmentPluginPackage,
   AttachmentPluginConfig,
 } from '@embedpdf/plugin-attachment/preact';
+import { FormPluginPackage, FormPluginConfig } from '@embedpdf/plugin-form/preact';
+import { StampPluginPackage, StampPluginConfig } from '@embedpdf/plugin-stamp/preact';
+import {
+  SignaturePluginPackage,
+  SignaturePluginConfig,
+  SignatureMode,
+} from '@embedpdf/plugin-signature/preact';
 
 import { SchemaToolbar } from '@/ui/schema-toolbar';
 import { SchemaSidebar } from '@/ui/schema-sidebar';
@@ -116,6 +124,10 @@ import { CommentSidebar } from '@/components/comment-sidebar';
 import { CustomZoomToolbar } from '@/components/custom-zoom-toolbar';
 import { AnnotationSidebar } from '@/components/annotation-sidebar';
 import { RedactionSidebar } from '@/components/redaction-sidebar';
+import { WidgetEditSidebar } from '@/components/widget-edit-sidebar';
+import { RubberStampSidebar } from '@/components/rubber-stamp-sidebar';
+import { SignatureSidebar } from '@/components/signature-sidebar';
+import { SignatureCreateModal } from '@/components/signature-create-modal';
 import { SchemaSelectionMenu } from '@/ui/schema-selection-menu';
 import { SchemaOverlay } from '@/ui/schema-overlay';
 import { PrintModal } from '@/components/print-modal';
@@ -227,7 +239,8 @@ export interface PDFViewerConfig {
   i18n?: Partial<I18nPluginConfig>;
   /** UI schema options (schema, disabledCategories) */
   ui?: Partial<UIPluginConfig>;
-
+  /** Form options (withForms, withAnnotations) */
+  form?: Partial<FormPluginConfig>;
   // Viewport & Navigation
   /** Viewport options (viewportGap, scrollEndDelay) */
   viewport?: Partial<ViewportPluginConfig>;
@@ -274,6 +287,14 @@ export interface PDFViewerConfig {
   /** Fullscreen options (targetElement) */
   fullscreen?: Partial<FullscreenPluginConfig>;
 
+  // Stamps
+  /** Stamp options (libraries) */
+  stamp?: Partial<StampPluginConfig>;
+
+  // Signatures
+  /** Signature options (mode, default size) */
+  signature?: Partial<SignaturePluginConfig>;
+
   // Infrastructure
   /** History/undo options */
   history?: Partial<HistoryPluginConfig>;
@@ -317,7 +338,9 @@ const DEFAULTS = {
   thumbnails: { width: 150, gap: 10, buffer: 3, labelHeight: 30 } as ThumbnailPluginConfig,
 
   // Content features
-  annotations: {} as AnnotationPluginConfig,
+  annotations: {
+    locked: { type: LockModeType.Include, categories: ['form'] },
+  } as AnnotationPluginConfig,
   search: {} as SearchPluginConfig,
   selection: {} as SelectionPluginConfig,
   bookmarks: {} as BookmarkPluginConfig,
@@ -330,9 +353,16 @@ const DEFAULTS = {
   export: { defaultFileName: 'document.pdf' } as ExportPluginConfig,
   fullscreen: {} as FullscreenPluginConfig,
 
+  // Stamps
+  stamp: {} as StampPluginConfig,
+
+  // Signatures
+  signature: { mode: SignatureMode.SignatureAndInitials } as SignaturePluginConfig,
+
   // Infrastructure
   history: {} as HistoryPluginConfig,
   interactionManager: {} as InteractionManagerPluginConfig,
+  form: {} as FormPluginConfig,
 };
 
 // Props for the PDFViewer Component
@@ -482,12 +512,16 @@ export function PDFViewer({ config, onRegistryReady }: PDFViewerProps) {
     () => ({
       'thumbnails-sidebar': ThumbnailsSidebar,
       'annotation-sidebar': AnnotationSidebar,
+      'rubber-stamp-sidebar': RubberStampSidebar,
+      'signature-sidebar': SignatureSidebar,
       'zoom-toolbar': CustomZoomToolbar,
       'search-sidebar': SearchSidebar,
       'outline-sidebar': OutlineSidebar,
       'comment-sidebar': CommentSidebar,
+      'widget-edit-sidebar': WidgetEditSidebar,
       'print-modal': PrintModal,
       'link-modal': LinkModal,
+      'signature-create-modal': SignatureCreateModal,
       'protect-modal': ProtectModal,
       'unlock-owner-overlay': UnlockOwnerOverlay,
       'page-controls': PageControls,
@@ -621,6 +655,16 @@ export function PDFViewer({ config, onRegistryReady }: PDFViewerProps) {
           createPluginRegistration(InteractionManagerPluginPackage, {
             ...DEFAULTS.interactionManager,
             ...config.interactionManager,
+          }),
+          createPluginRegistration(FormPluginPackage, { ...DEFAULTS.form, ...config.form }),
+
+          // Stamps
+          createPluginRegistration(StampPluginPackage, { ...DEFAULTS.stamp, ...config.stamp }),
+
+          // Signatures
+          createPluginRegistration(SignaturePluginPackage, {
+            ...DEFAULTS.signature,
+            ...config.signature,
           }),
         ]}
       >

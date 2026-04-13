@@ -180,7 +180,10 @@ export const rehypeCodeExample: Plugin<[], Root> = () => {
 
           // Extract inner HTML from <code>...</code>
           const innerMatch = highlighted.match(/<code[^>]*>([\s\S]*)<\/code>/)
-          const innerHtml = innerMatch ? innerMatch[1] : highlighted
+          const innerHtml = (innerMatch ? innerMatch[1] : highlighted).replace(
+            /<span class="line"><\/span>/g,
+            '<span class="line">\n</span>',
+          )
 
           highlightedFiles.push({
             ...file,

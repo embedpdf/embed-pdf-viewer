@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>EmbedPDF i18n Example</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="min-h-screen bg-slate-100 p-6 text-slate-900">
+  <div class="mx-auto flex max-w-7xl flex-col gap-4">
+    <section class="flex flex-wrap items-center gap-4 rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+      <label for="locale-select" class="text-sm font-medium text-slate-700">
+        Language:
+      </label>
+
+      <select
+        id="locale-select"
+        class="cursor-pointer rounded-md border border-slate-300 bg-white px-3 py-1.5 text-sm font-medium text-slate-700 shadow-sm hover:bg-slate-50"
+      >
+        <option value="en">English</option>
+        <option value="nl">Dutch</option>
+        <option value="de">German</option>
+        <option value="fr">French</option>
+        <option value="es">Spanish</option>
+        <option value="zh-CN">Chinese</option>
+        <option value="ja">Japanese</option>
+        <option value="sv">Swedish</option>
+      </select>
+
+      <span id="locale-status" class="text-xs text-slate-500">
+        Changing language updates tooltips, menus, and labels instantly.
+      </span>
+    </section>
+
+    <div class="h-[700px] overflow-hidden rounded-xl border border-slate-300 bg-white shadow-lg">
+      <div id="pdf-viewer" class="h-full w-full"></div>
+    </div>
+  </div>
+
+  <script type="module">
+    import EmbedPDF from 'https://cdn.jsdelivr.net/npm/@embedpdf/snippet/dist/embedpdf.js';
+
+    const localeSelect = document.getElementById('locale-select');
+    const localeStatus = document.getElementById('locale-status');
+
+    const viewer = EmbedPDF.init({
+      type: 'container',
+      target: document.getElementById('pdf-viewer'),
+      src: 'https://snippet.embedpdf.com/ebook.pdf',
+      theme: { preference: 'system' },
+      i18n: {
+        defaultLocale: 'en',
+      },
+    });
+
+    const registry = await viewer.registry;
+    const i18n = registry.getPlugin('i18n')?.provides();
+
+    if (!i18n) {
+      throw new Error('i18n plugin not available');
+    }
+
+    i18n.onLocaleChange((event) => {
+      localeSelect.value = event.currentLocale;
+      localeStatus.textContent = `Current locale: ${event.currentLocale}`;
+    });
+
+    localeSelect.addEventListener('change', () => {
+      i18n.setLocale(localeSelect.value);
+    });
+  </script>
+</body>
+</html>

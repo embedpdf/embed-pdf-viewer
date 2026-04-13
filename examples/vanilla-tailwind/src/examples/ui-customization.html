@@ -1,0 +1,167 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>EmbedPDF UI Customization Example</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="min-h-screen bg-slate-100 p-6 text-slate-900">
+  <div class="mx-auto flex max-w-7xl flex-col gap-4">
+    <section class="flex flex-wrap items-center gap-4 rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+      <div class="flex items-center gap-2">
+        <span id="status-dot" class="inline-block h-2 w-2 rounded-full bg-amber-500"></span>
+        <span id="status-text" class="text-sm text-slate-600">Loading...</span>
+      </div>
+
+      <div
+        id="last-action"
+        class="hidden rounded bg-emerald-100 px-3 py-1 text-sm font-medium text-emerald-800"
+      ></div>
+
+      <div id="status-detail" class="ml-auto hidden text-xs text-slate-400">
+        😊 replaced comment button • ⭐ added to document menu
+      </div>
+    </section>
+
+    <div class="h-[700px] overflow-hidden rounded-xl border border-slate-300 bg-white shadow-lg">
+      <div id="pdf-viewer" class="h-full w-full"></div>
+    </div>
+  </div>
+
+  <script type="module">
+    import EmbedPDF from 'https://cdn.jsdelivr.net/npm/@embedpdf/snippet/dist/embedpdf.js';
+
+    const target = document.getElementById('pdf-viewer');
+    const statusDot = document.getElementById('status-dot');
+    const statusText = document.getElementById('status-text');
+    const statusDetail = document.getElementById('status-detail');
+    const lastAction = document.getElementById('last-action');
+
+    function showAction(message) {
+      lastAction.textContent = message;
+      lastAction.classList.remove('hidden');
+
+      window.clearTimeout(showAction.timeoutId);
+      showAction.timeoutId = window.setTimeout(() => {
+        lastAction.classList.add('hidden');
+        lastAction.textContent = '';
+      }, 2000);
+    }
+
+    const viewer = EmbedPDF.init({
+      type: 'container',
+      target,
+      src: 'https://snippet.embedpdf.com/ebook.pdf',
+      theme: { preference: 'system' },
+    });
+
+    const registry = await viewer.registry;
+    const commands = registry.getPlugin('commands')?.provides();
+    const ui = registry.getPlugin('ui')?.provides();
+
+    if (!commands || !ui) {
+      statusDot.className = 'inline-block h-2 w-2 rounded-full bg-red-500';
+      statusText.textContent = 'Unable to load UI plugins.';
+      throw new Error('Commands or UI plugin not available');
+    }
+
+    viewer.registerIcons({
+      customSmiley: {
+        viewBox: '0 0 24 24',
+        paths: [
+          {
+            d: 'M3 12a9 9 0 1 0 18 0a9 9 0 1 0 -18 0',
+            stroke: 'currentColor',
+            fill: 'none',
+          },
+          { d: 'M9 10l.01 0', stroke: 'currentColor', fill: 'none' },
+          { d: 'M15 10l.01 0', stroke: 'currentColor', fill: 'none' },
+          {
+            d: 'M9.5 15a3.5 3.5 0 0 0 5 0',
+            stroke: 'currentColor',
+            fill: 'none',
+          },
+        ],
+      },
+      customStar: {
+        viewBox: '0 0 24 24',
+        paths: [
+          {
+            d: 'M12 17.75l-6.172 3.245l1.179 -6.873l-5 -4.867l6.9 -1l3.086 -6.253l3.086 6.253l6.9 1l-5 4.867l1.179 6.873z',
+            stroke: 'currentColor',
+            fill: 'none',
+          },
+        ],
+      },
+    });
+
+    commands.registerCommand({
+      id: 'custom.smiley',
+      label: 'Say Hello',
+      icon: 'customSmiley',
+      action: () => showAction('Hello! 👋'),
+    });
+
+    commands.registerCommand({
+      id: 'custom.star',
+      label: 'Add to Favorites',
+      icon: 'customStar',
+      action: () => showAction('Added to favorites! ⭐'),
+    });
+
+    const currentSchema = ui.getSchema();
+    const mainToolbar = currentSchema.toolbars['main-toolbar'];
+
+    if (mainToolbar) {
+      const items = structuredClone(mainToolbar.items);
+      const rightGroup = items.find((item) => item.id === 'right-group');
+
+      if (rightGroup && Array.isArray(rightGroup.items)) {
+        const commentIndex = rightGroup.items.findIndex(
+          (item) => item.id === 'comment-button',
+        );
+
+        if (commentIndex !== -1) {
+          rightGroup.items[commentIndex] = {
+            type: 'command-button',
+            id: 'smiley-button',
+            commandId: 'custom.smiley',
+            variant: 'icon',
+          };
+        }
+      }
+
+      ui.mergeSchema({
+        toolbars: {
+          'main-toolbar': {
+            ...mainToolbar,
+            items,
+          },
+        },
+      });
+    }
+
+    const documentMenu = currentSchema.menus['document-menu'];
+
+    if (documentMenu) {
+      ui.mergeSchema({
+        menus: {
+          'document-menu': {
+            ...documentMenu,
+            items: [
+              ...documentMenu.items,
+              { type: 'divider', id: 'custom-divider' },
+              { type: 'command', id: 'star-menu-item', commandId: 'custom.star' },
+            ],
+          },
+        },
+      });
+    }
+
+    statusDot.className = 'inline-block h-2 w-2 rounded-full bg-emerald-500';
+    statusText.textContent = 'UI customized!';
+    statusDetail.classList.remove('hidden');
+  </script>
+</body>
+</html>

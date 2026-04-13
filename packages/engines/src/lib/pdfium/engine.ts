@@ -54,6 +54,8 @@ import {
   PdfHighlightAnnoObject,
   PdfStampAnnoObjectContents,
   PdfWidgetAnnoField,
+  PdfTextWidgetAnnoField,
+  PdfUnknownWidgetAnnoField,
   PdfTransformMatrix,
   FormFieldValue,
   PdfErrorCode,
@@ -71,6 +73,11 @@ import {
   PdfPageGeometry,
   PdfRun,
   toIntRect,
+  PdfDocumentJavaScriptActionObject,
+  PdfWidgetJavaScriptActionObject,
+  PdfJavaScriptActionTrigger,
+  PdfJavaScriptWidgetEventType,
+  PDF_ANNOT_AACTION_EVENT,
   Quad,
   PdfAnnotationState,
   PdfAnnotationStateModel,
@@ -98,9 +105,10 @@ import {
   PdfTextAlignment,
   PdfVerticalAlignment,
   AnnotationCreateContext,
+  getImageMetadata,
   isUuidV4,
   uuidV4,
-  PdfAnnotationIcon,
+  PdfAnnotationName,
   PdfAnnotationReplyType,
   PdfRenderPageAnnotationOptions,
   PdfRedactTextOptions,
@@ -124,6 +132,7 @@ import {
   PdfTextRun,
   PdfPageTextRuns,
   PdfAlphaColor,
+  PdfBlendMode,
 } from '@embedpdf/models';
 import { computeFormDrawParams, isValidCustomKey, readArrayBuffer, readString } from './helper';
 import { WrappedPdfiumModule } from '@embedpdf/pdfium';
@@ -408,6 +417,41 @@ export class PdfiumNative implements IPdfiumExecutor {
 
     this.logger.perf(LOG_SOURCE, LOG_CATEGORY, `OpenDocumentBuffer`, 'End', file.id);
 
+    return PdfTaskHelper.resolve(pdfDoc);
+  }
+
+  /**
+   * Create a new empty PDF document and register it in the cache.
+   *
+   * @param id - unique document identifier
+   * @returns task containing the empty PdfDocumentObject
+   */
+  public createDocument(id: string): PdfTask<PdfDocumentObject> {
+    this.logger.debug(LOG_SOURCE, LOG_CATEGORY, 'createDocument', id);
+    this.logger.perf(LOG_SOURCE, LOG_CATEGORY, 'CreateDocument', 'Begin', id);
+
+    const docPtr = this.pdfiumModule.FPDF_CreateNewDocument();
+    if (!docPtr) {
+      this.logger.perf(LOG_SOURCE, LOG_CATEGORY, 'CreateDocument', 'End', id);
+      return PdfTaskHelper.reject<PdfDocumentObject>({
+        code: PdfErrorCode.CantCreateNewDoc,
+        message: 'can not create new document',
+      });
+    }
+
+    const pdfDoc: PdfDocumentObject = {
+      id,
+      pageCount: 0,
+      pages: [],
+      isEncrypted: false,
+      isOwnerUnlocked: true,
+      permissions: 0xffffffff,
+      normalizedRotation: false,
+    };
+
+    this.cache.setDocument(id, 0, docPtr, false);
+
+    this.logger.perf(LOG_SOURCE, LOG_CATEGORY, 'CreateDocument', 'End', id);
     return PdfTaskHelper.resolve(pdfDoc);
   }
 
@@ -824,6 +868,251 @@ export class PdfiumNative implements IPdfiumExecutor {
     return task;
   }
 
+  getDocumentJavaScriptActions(
+    doc: PdfDocumentObject,
+  ): PdfTask<PdfDocumentJavaScriptActionObject[], PdfErrorReason> {
+    this.logger.debug(LOG_SOURCE, LOG_CATEGORY, 'getDocumentJavaScriptActions', doc);
+
+    const ctx = this.cache.getContext(doc.id);
+    if (!ctx) {
+      return PdfTaskHelper.reject({
+        code: PdfErrorCode.DocNotOpen,
+        message: 'document does not open',
+      });
+    }
+
+    const count = this.pdfiumModule.FPDFDoc_GetJavaScriptActionCount(ctx.docPtr);
+    if (count < 0) {
+      return PdfTaskHelper.reject({
+        code: PdfErrorCode.Unknown,
+        message: 'failed to read document javascript actions',
+      });
+    }
+
+    const actions: PdfDocumentJavaScriptActionObject[] = [];
+    for (let index = 0; index < count; index++) {
+      const actionPtr = this.pdfiumModule.FPDFDoc_GetJavaScriptAction(ctx.docPtr, index);
+      if (!actionPtr) continue;
+
+      try {
+        const name =
+          readString(
+            this.pdfiumModule.pdfium,
+            (buffer: number, bufferLength) =>
+              this.pdfiumModule.FPDFJavaScriptAction_GetName(actionPtr, buffer, bufferLength),
+            this.pdfiumModule.pdfium.UTF16ToString,
+          ) ?? '';
+        const script =
+          readString(
+            this.pdfiumModule.pdfium,
+            (buffer: number, bufferLength) =>
+              this.pdfiumModule.FPDFJavaScriptAction_GetScript(actionPtr, buffer, bufferLength),
+            this.pdfiumModule.pdfium.UTF16ToString,
+          ) ?? '';
+
+        if (!script) continue;
+
+        actions.push({
+          id: `document:${index}:${name}`,
+          trigger: PdfJavaScriptActionTrigger.DocumentNamed,
+          name,
+          script,
+        });
+      } finally {
+        this.pdfiumModule.FPDFDoc_CloseJavaScriptAction(actionPtr);
+      }
+    }
+
+    return PdfTaskHelper.resolve(actions);
+  }
+
+  getPageAnnoWidgets(
+    doc: PdfDocumentObject,
+    page: PdfPageObject,
+  ): PdfTask<PdfWidgetAnnoObject[], PdfErrorReason> {
+    this.logger.debug(LOG_SOURCE, LOG_CATEGORY, 'getPageAnnoWidgets', doc, page);
+    this.logger.perf(
+      LOG_SOURCE,
+      LOG_CATEGORY,
+      `GetPageAnnoWidgets`,
+      'Begin',
+      `${doc.id}-${page.index}`,
+    );
+
+    const ctx = this.cache.getContext(doc.id);
+
+    if (!ctx) {
+      this.logger.perf(
+        LOG_SOURCE,
+        LOG_CATEGORY,
+        `GetPageAnnoWidgets`,
+        'End',
+        `${doc.id}-${page.index}`,
+      );
+      return PdfTaskHelper.reject({
+        code: PdfErrorCode.DocNotOpen,
+        message: 'document does not open',
+      });
+    }
+
+    const annotationWidgets = this.readPageAnnoWidgets(doc, ctx, page);
+
+    this.logger.perf(
+      LOG_SOURCE,
+      LOG_CATEGORY,
+      `GetPageAnnoWidgets`,
+      'End',
+      `${doc.id}-${page.index}`,
+    );
+
+    this.logger.debug(
+      LOG_SOURCE,
+      LOG_CATEGORY,
+      `GetPageAnnoWidgets`,
+      `${doc.id}-${page.index}`,
+      annotationWidgets,
+    );
+
+    return PdfTaskHelper.resolve(annotationWidgets);
+  }
+
+  getPageWidgetJavaScriptActions(
+    doc: PdfDocumentObject,
+    page: PdfPageObject,
+  ): PdfTask<PdfWidgetJavaScriptActionObject[], PdfErrorReason> {
+    this.logger.debug(LOG_SOURCE, LOG_CATEGORY, 'getPageWidgetJavaScriptActions', doc, page);
+
+    const ctx = this.cache.getContext(doc.id);
+    if (!ctx) {
+      return PdfTaskHelper.reject({
+        code: PdfErrorCode.DocNotOpen,
+        message: 'document does not open',
+      });
+    }
+
+    const actions: PdfWidgetJavaScriptActionObject[] = [];
+    ctx.borrowPage(page.index, (pageCtx) => {
+      pageCtx.withFormHandle((formHandle) => {
+        const annotCount = this.pdfiumModule.FPDFPage_GetAnnotCount(pageCtx.pagePtr);
+        for (let i = 0; i < annotCount; i++) {
+          pageCtx.withAnnotation(i, (annotPtr) => {
+            const subtype = this.pdfiumModule.FPDFAnnot_GetSubtype(
+              annotPtr,
+            ) as PdfAnnotationObject['type'];
+            if (subtype !== PdfAnnotationSubtype.WIDGET) return;
+
+            let annotationId = this.getAnnotString(annotPtr, 'NM');
+            if (!annotationId || !isUuidV4(annotationId)) {
+              annotationId = uuidV4();
+              this.setAnnotString(annotPtr, 'NM', annotationId);
+            }
+
+            const fieldName =
+              readString(
+                this.pdfiumModule.pdfium,
+                (buffer: number, bufferLength) =>
+                  this.pdfiumModule.FPDFAnnot_GetFormFieldName(
+                    formHandle,
+                    annotPtr,
+                    buffer,
+                    bufferLength,
+                  ),
+                this.pdfiumModule.pdfium.UTF16ToString,
+              ) ?? '';
+
+            const eventConfigs = [
+              {
+                event: PDF_ANNOT_AACTION_EVENT.KEY_STROKE,
+                eventType: PdfJavaScriptWidgetEventType.Keystroke,
+                trigger: PdfJavaScriptActionTrigger.WidgetKeystroke,
+              },
+              {
+                event: PDF_ANNOT_AACTION_EVENT.FORMAT,
+                eventType: PdfJavaScriptWidgetEventType.Format,
+                trigger: PdfJavaScriptActionTrigger.WidgetFormat,
+              },
+              {
+                event: PDF_ANNOT_AACTION_EVENT.VALIDATE,
+                eventType: PdfJavaScriptWidgetEventType.Validate,
+                trigger: PdfJavaScriptActionTrigger.WidgetValidate,
+              },
+              {
+                event: PDF_ANNOT_AACTION_EVENT.CALCULATE,
+                eventType: PdfJavaScriptWidgetEventType.Calculate,
+                trigger: PdfJavaScriptActionTrigger.WidgetCalculate,
+              },
+            ] as const;
+
+            for (const config of eventConfigs) {
+              const script =
+                readString(
+                  this.pdfiumModule.pdfium,
+                  (buffer: number, bufferLength) =>
+                    this.pdfiumModule.FPDFAnnot_GetFormAdditionalActionJavaScript(
+                      formHandle,
+                      annotPtr,
+                      config.event,
+                      buffer,
+                      bufferLength,
+                    ),
+                  this.pdfiumModule.pdfium.UTF16ToString,
+                ) ?? '';
+
+              if (!script) continue;
+
+              actions.push({
+                id: `widget:${page.index}:${annotationId}:${config.eventType}`,
+                trigger: config.trigger,
+                eventType: config.eventType,
+                pageIndex: page.index,
+                annotationId,
+                fieldName,
+                script,
+              });
+            }
+          });
+        }
+      });
+    });
+
+    return PdfTaskHelper.resolve(actions);
+  }
+
+  regenerateWidgetAppearances(
+    doc: PdfDocumentObject,
+    page: PdfPageObject,
+    annotationIds: string[],
+  ): PdfTask<boolean> {
+    const ctx = this.cache.getContext(doc.id);
+    if (!ctx) {
+      return PdfTaskHelper.reject({
+        code: PdfErrorCode.DocNotOpen,
+        message: 'document does not open',
+      });
+    }
+
+    const idSet = new Set(annotationIds);
+    let regenerated = 0;
+
+    ctx.borrowPage(page.index, (pageCtx) => {
+      const count = this.pdfiumModule.FPDFPage_GetAnnotCount(pageCtx.pagePtr);
+      for (let i = 0; i < count; i++) {
+        pageCtx.withAnnotation(i, (annotPtr) => {
+          const nm = this.getAnnotString(annotPtr, 'NM');
+          if (nm && idSet.has(nm)) {
+            this.pdfiumModule.EPDFAnnot_GenerateFormFieldAP(annotPtr);
+            regenerated++;
+          }
+        });
+      }
+      if (regenerated > 0) {
+        this.pdfiumModule.FPDFPage_GenerateContent(pageCtx.pagePtr);
+      }
+    });
+
+    return PdfTaskHelper.resolve(regenerated > 0);
+  }
+
   /**
    * {@inheritDoc @embedpdf/models!PdfEngine.getPageAnnotations}
    *
@@ -913,7 +1202,31 @@ export class PdfiumNative implements IPdfiumExecutor {
     }
 
     const pageCtx = ctx.acquirePage(page.index);
-    const annotationPtr = this.pdfiumModule.EPDFPage_CreateAnnot(pageCtx.pagePtr, annotation.type);
+
+    let annotationPtr: number;
+    let widgetFormInfoPtr: number | undefined;
+    let widgetFormHandle: number | undefined;
+    if (annotation.type === PdfAnnotationSubtype.WIDGET) {
+      const widget = annotation as unknown as PdfWidgetAnnoObject;
+      widgetFormInfoPtr = this.pdfiumModule.PDFiumExt_OpenFormFillInfo();
+      widgetFormHandle = this.pdfiumModule.PDFiumExt_InitFormFillEnvironment(
+        ctx.docPtr,
+        widgetFormInfoPtr,
+      );
+      this.pdfiumModule.FORM_OnAfterLoadPage(pageCtx.pagePtr, widgetFormHandle);
+      const fieldName = widget.field?.name ?? '';
+      annotationPtr = this.withWString(fieldName, (namePtr) =>
+        this.pdfiumModule.EPDFPage_CreateFormField(
+          pageCtx.pagePtr,
+          widgetFormHandle!,
+          widget.field.type,
+          namePtr,
+        ),
+      );
+    } else {
+      annotationPtr = this.pdfiumModule.EPDFPage_CreateAnnot(pageCtx.pagePtr, annotation.type);
+    }
+
     if (!annotationPtr) {
       this.logger.perf(
         LOG_SOURCE,
@@ -981,7 +1294,7 @@ export class PdfiumNative implements IPdfiumExecutor {
           pageCtx.pagePtr,
           annotationPtr,
           saveAnnotation as PdfStampAnnoObject,
-          context?.imageData,
+          context,
         );
         break;
       case PdfAnnotationSubtype.TEXT:
@@ -1047,6 +1360,15 @@ export class PdfiumNative implements IPdfiumExecutor {
           saveAnnotation as PdfLinkAnnoObject,
         );
         break;
+      case PdfAnnotationSubtype.CARET:
+        isSucceed = this.addCaretContent(
+          doc,
+          page,
+          pageCtx.pagePtr,
+          annotationPtr,
+          saveAnnotation as PdfCaretAnnoObject,
+        );
+        break;
       case PdfAnnotationSubtype.REDACT:
         isSucceed = this.addRedactContent(
           doc,
@@ -1056,6 +1378,33 @@ export class PdfiumNative implements IPdfiumExecutor {
           saveAnnotation as PdfRedactAnnoObject,
         );
         break;
+      case PdfAnnotationSubtype.WIDGET: {
+        const widget = saveAnnotation as PdfWidgetAnnoObject;
+        if (widgetFormHandle !== undefined) {
+          switch (widget.field.type) {
+            case PDF_FORM_FIELD_TYPE.TEXTFIELD:
+              isSucceed = this.addTextFieldContent(widgetFormHandle, annotationPtr, widget);
+              break;
+            case PDF_FORM_FIELD_TYPE.CHECKBOX:
+            case PDF_FORM_FIELD_TYPE.RADIOBUTTON:
+              isSucceed = this.addToggleFieldContent(widgetFormHandle, annotationPtr, widget);
+              break;
+            case PDF_FORM_FIELD_TYPE.COMBOBOX:
+            case PDF_FORM_FIELD_TYPE.LISTBOX:
+              isSucceed = this.addChoiceFieldContent(widgetFormHandle, annotationPtr, widget);
+              break;
+          }
+        }
+        break;
+      }
+    }
+
+    if (widgetFormHandle !== undefined) {
+      this.pdfiumModule.FORM_OnBeforeClosePage(pageCtx.pagePtr, widgetFormHandle);
+      this.pdfiumModule.PDFiumExt_ExitFormFillEnvironment(widgetFormHandle);
+    }
+    if (widgetFormInfoPtr !== undefined) {
+      this.pdfiumModule.PDFiumExt_CloseFormFillInfo(widgetFormInfoPtr);
     }
 
     if (!isSucceed) {
@@ -1075,7 +1424,9 @@ export class PdfiumNative implements IPdfiumExecutor {
       });
     }
 
-    if (annotation.blendMode !== undefined) {
+    if (annotation.type === PdfAnnotationSubtype.WIDGET) {
+      this.pdfiumModule.EPDFAnnot_GenerateFormFieldAP(annotationPtr);
+    } else if (annotation.blendMode !== undefined) {
       this.pdfiumModule.EPDFAnnot_GenerateAppearanceWithBlend(annotationPtr, annotation.blendMode);
     } else {
       this.pdfiumModule.EPDFAnnot_GenerateAppearance(annotationPtr);
@@ -1167,8 +1518,6 @@ export class PdfiumNative implements IPdfiumExecutor {
     }
 
     /* 2 ── For rotated vertex types, rotate vertices for PDF storage ────────── */
-    // PDF stores physically rotated vertices so other viewers render correctly.
-    // Our viewer stores unrotated vertices + rotation metadata in EPDFCustom.
     const saveAnnotation = this.prepareAnnotationForSave(annotation);
 
     /* 3 ── wipe previous payload and rebuild fresh one ─────────────────────── */
@@ -1261,7 +1610,6 @@ export class PdfiumNative implements IPdfiumExecutor {
       case PdfAnnotationSubtype.UNDERLINE:
       case PdfAnnotationSubtype.STRIKEOUT:
       case PdfAnnotationSubtype.SQUIGGLY: {
-        /* replace quad-points / colour / strings in one go */
         ok = this.addTextMarkupContent(
           doc,
           page,
@@ -1285,6 +1633,18 @@ export class PdfiumNative implements IPdfiumExecutor {
         break;
       }
 
+      /* ── Caret ────────────────────────────────────────────────────────────── */
+      case PdfAnnotationSubtype.CARET: {
+        ok = this.addCaretContent(
+          doc,
+          page,
+          pageCtx.pagePtr,
+          annotPtr,
+          saveAnnotation as PdfCaretAnnoObject,
+        );
+        break;
+      }
+
       /* ── Redact ───────────────────────────────────────────────────────────── */
       case PdfAnnotationSubtype.REDACT: {
         ok = this.addRedactContent(
@@ -1297,6 +1657,27 @@ export class PdfiumNative implements IPdfiumExecutor {
         break;
       }
 
+      /* ── Widget (form field) ─────────────────────────────────────────────── */
+      case PdfAnnotationSubtype.WIDGET: {
+        const widget = saveAnnotation as PdfWidgetAnnoObject;
+        pageCtx.withFormHandle((formHandle) => {
+          switch (widget.field.type) {
+            case PDF_FORM_FIELD_TYPE.TEXTFIELD:
+              ok = this.addTextFieldContent(formHandle, annotPtr, widget);
+              break;
+            case PDF_FORM_FIELD_TYPE.CHECKBOX:
+            case PDF_FORM_FIELD_TYPE.RADIOBUTTON:
+              ok = this.addToggleFieldContent(formHandle, annotPtr, widget);
+              break;
+            case PDF_FORM_FIELD_TYPE.COMBOBOX:
+            case PDF_FORM_FIELD_TYPE.LISTBOX:
+              ok = this.addChoiceFieldContent(formHandle, annotPtr, widget);
+              break;
+          }
+        });
+        break;
+      }
+
       /* ── Unsupported edits – fall through to error ───────────────────────── */
       default:
         ok = false;
@@ -1304,7 +1685,9 @@ export class PdfiumNative implements IPdfiumExecutor {
 
     /* 4 ── regenerate appearance if payload was changed ───────────────────── */
     if (ok && options?.regenerateAppearance !== false) {
-      if (annotation.blendMode !== undefined) {
+      if (annotation.type === PdfAnnotationSubtype.WIDGET) {
+        this.pdfiumModule.EPDFAnnot_GenerateFormFieldAP(annotPtr);
+      } else if (annotation.blendMode !== undefined) {
         this.pdfiumModule.EPDFAnnot_GenerateAppearanceWithBlend(annotPtr, annotation.blendMode);
       } else {
         this.pdfiumModule.EPDFAnnot_GenerateAppearance(annotPtr);
@@ -1739,172 +2122,431 @@ export class PdfiumNative implements IPdfiumExecutor {
       });
     }
 
-    const formFillInfoPtr = this.pdfiumModule.PDFiumExt_OpenFormFillInfo();
-    const formHandle = this.pdfiumModule.PDFiumExt_InitFormFillEnvironment(
-      ctx.docPtr,
-      formFillInfoPtr,
+    const pageCtx = ctx.acquirePage(page.index);
+    try {
+      return pageCtx.withFormHandle((formHandle) => {
+        const annotationPtr = this.getAnnotationByName(pageCtx.pagePtr, annotation.id);
+        if (!annotationPtr) {
+          return PdfTaskHelper.reject({
+            code: PdfErrorCode.NotFound,
+            message: 'annotation not found',
+          });
+        }
+
+        try {
+          if (!this.pdfiumModule.FORM_SetFocusedAnnot(formHandle, annotationPtr)) {
+            return PdfTaskHelper.reject({
+              code: PdfErrorCode.CantFocusAnnot,
+              message: 'failed to set focused annotation',
+            });
+          }
+
+          switch (value.kind) {
+            case 'text': {
+              if (!this.pdfiumModule.FORM_SelectAllText(formHandle, pageCtx.pagePtr)) {
+                this.pdfiumModule.FORM_ForceToKillFocus(formHandle);
+                return PdfTaskHelper.reject({
+                  code: PdfErrorCode.CantSelectText,
+                  message: 'failed to select all text',
+                });
+              }
+              const length = 2 * (value.text.length + 1);
+              const textPtr = this.memoryManager.malloc(length);
+              this.pdfiumModule.pdfium.stringToUTF16(value.text, textPtr, length);
+              this.pdfiumModule.FORM_ReplaceSelection(formHandle, pageCtx.pagePtr, textPtr);
+              this.memoryManager.free(textPtr);
+              break;
+            }
+            case 'selection': {
+              if (
+                !this.pdfiumModule.FORM_SetIndexSelected(
+                  formHandle,
+                  pageCtx.pagePtr,
+                  value.index,
+                  value.isSelected,
+                )
+              ) {
+                this.pdfiumModule.FORM_ForceToKillFocus(formHandle);
+                return PdfTaskHelper.reject({
+                  code: PdfErrorCode.CantSelectOption,
+                  message: 'failed to set index selected',
+                });
+              }
+              break;
+            }
+            case 'checked': {
+              const rawChecked = this.pdfiumModule.FPDFAnnot_IsChecked(formHandle, annotationPtr);
+              const currentlyChecked = !!rawChecked;
+              if (currentlyChecked !== value.checked) {
+                const kReturn = 0x0d;
+                if (!this.pdfiumModule.FORM_OnChar(formHandle, pageCtx.pagePtr, kReturn, 0)) {
+                  this.pdfiumModule.FORM_ForceToKillFocus(formHandle);
+                  return PdfTaskHelper.reject({
+                    code: PdfErrorCode.CantCheckField,
+                    message: 'failed to set field checked',
+                  });
+                }
+              }
+              break;
+            }
+          }
+
+          this.pdfiumModule.FORM_ForceToKillFocus(formHandle);
+          this.pdfiumModule.EPDFAnnot_GenerateFormFieldAP(annotationPtr);
+          return PdfTaskHelper.resolve<boolean>(true);
+        } finally {
+          this.pdfiumModule.FPDFPage_CloseAnnot(annotationPtr);
+        }
+      });
+    } finally {
+      pageCtx.release();
+    }
+  }
+
+  /**
+   * {@inheritDoc @embedpdf/models!PdfEngine.setFormFieldState}
+   *
+   * @public
+   */
+  setFormFieldState(
+    doc: PdfDocumentObject,
+    page: PdfPageObject,
+    annotation: PdfWidgetAnnoObject,
+    field: PdfWidgetAnnoField,
+  ) {
+    this.logger.debug(LOG_SOURCE, LOG_CATEGORY, 'SetFormFieldState', doc, annotation, field);
+    this.logger.perf(
+      LOG_SOURCE,
+      LOG_CATEGORY,
+      `SetFormFieldState`,
+      'Begin',
+      `${doc.id}-${annotation.id}`,
     );
 
-    const pageCtx = ctx.acquirePage(page.index);
+    const ctx = this.cache.getContext(doc.id);
 
-    this.pdfiumModule.FORM_OnAfterLoadPage(pageCtx.pagePtr, formHandle);
-
-    const annotationPtr = this.getAnnotationByName(pageCtx.pagePtr, annotation.id);
-
-    if (!annotationPtr) {
-      pageCtx.release();
+    if (!ctx) {
+      this.logger.debug(LOG_SOURCE, LOG_CATEGORY, 'SetFormFieldState', 'document is not opened');
       this.logger.perf(
         LOG_SOURCE,
         LOG_CATEGORY,
-        'SetFormFieldValue',
-        'End',
-        `${doc.id}-${page.index}`,
-      );
-      return PdfTaskHelper.reject({ code: PdfErrorCode.NotFound, message: 'annotation not found' });
-    }
-
-    if (!this.pdfiumModule.FORM_SetFocusedAnnot(formHandle, annotationPtr)) {
-      this.logger.debug(
-        LOG_SOURCE,
-        LOG_CATEGORY,
-        'SetFormFieldValue',
-        'failed to set focused annotation',
-      );
-      this.logger.perf(
-        LOG_SOURCE,
-        LOG_CATEGORY,
-        `SetFormFieldValue`,
+        `SetFormFieldState`,
         'End',
         `${doc.id}-${annotation.id}`,
       );
-      this.pdfiumModule.FPDFPage_CloseAnnot(annotationPtr);
-      this.pdfiumModule.FORM_OnBeforeClosePage(pageCtx.pagePtr, formHandle);
-      pageCtx.release();
-      this.pdfiumModule.PDFiumExt_ExitFormFillEnvironment(formHandle);
-      this.pdfiumModule.PDFiumExt_CloseFormFillInfo(formFillInfoPtr);
-
       return PdfTaskHelper.reject({
-        code: PdfErrorCode.CantFocusAnnot,
-        message: 'failed to set focused annotation',
+        code: PdfErrorCode.DocNotOpen,
+        message: 'document does not open',
       });
     }
 
-    switch (value.kind) {
-      case 'text':
-        {
-          if (!this.pdfiumModule.FORM_SelectAllText(formHandle, pageCtx.pagePtr)) {
-            this.logger.debug(
-              LOG_SOURCE,
-              LOG_CATEGORY,
-              'SetFormFieldValue',
-              'failed to select all text',
-            );
-            this.logger.perf(
-              LOG_SOURCE,
-              LOG_CATEGORY,
-              `SetFormFieldValue`,
-              'End',
-              `${doc.id}-${annotation.id}`,
-            );
-            this.pdfiumModule.FORM_ForceToKillFocus(formHandle);
-            this.pdfiumModule.FPDFPage_CloseAnnot(annotationPtr);
-            this.pdfiumModule.FORM_OnBeforeClosePage(pageCtx.pagePtr, formHandle);
-            pageCtx.release();
-            this.pdfiumModule.PDFiumExt_ExitFormFillEnvironment(formHandle);
-            this.pdfiumModule.PDFiumExt_CloseFormFillInfo(formFillInfoPtr);
+    const pageCtx = ctx.acquirePage(page.index);
+    try {
+      return pageCtx.withFormHandle((formHandle) => {
+        const annotationPtr = this.getAnnotationByName(pageCtx.pagePtr, annotation.id);
+        if (!annotationPtr) {
+          return PdfTaskHelper.reject({
+            code: PdfErrorCode.NotFound,
+            message: 'annotation not found',
+          });
+        }
 
+        try {
+          if (!this.pdfiumModule.FORM_SetFocusedAnnot(formHandle, annotationPtr)) {
             return PdfTaskHelper.reject({
-              code: PdfErrorCode.CantSelectText,
-              message: 'failed to select all text',
+              code: PdfErrorCode.CantFocusAnnot,
+              message: 'failed to set focused annotation',
             });
           }
-          const length = 2 * (value.text.length + 1);
-          const textPtr = this.memoryManager.malloc(length);
-          this.pdfiumModule.pdfium.stringToUTF16(value.text, textPtr, length);
-          this.pdfiumModule.FORM_ReplaceSelection(formHandle, pageCtx.pagePtr, textPtr);
-          this.memoryManager.free(textPtr);
-        }
-        break;
-      case 'selection':
-        {
+
+          switch (field.type) {
+            case PDF_FORM_FIELD_TYPE.TEXTFIELD: {
+              if (!this.pdfiumModule.FORM_SelectAllText(formHandle, pageCtx.pagePtr)) {
+                this.pdfiumModule.FORM_ForceToKillFocus(formHandle);
+                return PdfTaskHelper.reject({
+                  code: PdfErrorCode.CantSelectText,
+                  message: 'failed to select all text',
+                });
+              }
+              const length = 2 * (field.value.length + 1);
+              const textPtr = this.memoryManager.malloc(length);
+              this.pdfiumModule.pdfium.stringToUTF16(field.value, textPtr, length);
+              this.pdfiumModule.FORM_ReplaceSelection(formHandle, pageCtx.pagePtr, textPtr);
+              this.memoryManager.free(textPtr);
+              break;
+            }
+
+            case PDF_FORM_FIELD_TYPE.CHECKBOX:
+            case PDF_FORM_FIELD_TYPE.RADIOBUTTON: {
+              const currentlyChecked = !!this.pdfiumModule.FPDFAnnot_IsChecked(
+                formHandle,
+                annotationPtr,
+              );
+              const desiredChecked =
+                annotation.exportValue != null && field.value === annotation.exportValue;
+              if (currentlyChecked !== desiredChecked) {
+                const kReturn = 0x0d;
+                if (!this.pdfiumModule.FORM_OnChar(formHandle, pageCtx.pagePtr, kReturn, 0)) {
+                  this.pdfiumModule.FORM_ForceToKillFocus(formHandle);
+                  return PdfTaskHelper.reject({
+                    code: PdfErrorCode.CantCheckField,
+                    message: 'failed to set field checked',
+                  });
+                }
+              }
+              break;
+            }
+
+            case PDF_FORM_FIELD_TYPE.COMBOBOX: {
+              const selectedIndex = field.options.findIndex((opt) => opt.isSelected);
+              if (selectedIndex >= 0) {
+                if (
+                  !this.pdfiumModule.FORM_SetIndexSelected(
+                    formHandle,
+                    pageCtx.pagePtr,
+                    selectedIndex,
+                    true,
+                  )
+                ) {
+                  this.pdfiumModule.FORM_ForceToKillFocus(formHandle);
+                  return PdfTaskHelper.reject({
+                    code: PdfErrorCode.CantSelectOption,
+                    message: 'failed to set index selected',
+                  });
+                }
+              }
+              break;
+            }
+
+            case PDF_FORM_FIELD_TYPE.LISTBOX: {
+              for (let i = 0; i < field.options.length; i++) {
+                if (
+                  !this.pdfiumModule.FORM_SetIndexSelected(
+                    formHandle,
+                    pageCtx.pagePtr,
+                    i,
+                    field.options[i].isSelected,
+                  )
+                ) {
+                  this.pdfiumModule.FORM_ForceToKillFocus(formHandle);
+                  return PdfTaskHelper.reject({
+                    code: PdfErrorCode.CantSelectOption,
+                    message: 'failed to set index selected',
+                  });
+                }
+              }
+              break;
+            }
+
+            default:
+              break;
+          }
+
+          this.pdfiumModule.FORM_ForceToKillFocus(formHandle);
+
           if (
-            !this.pdfiumModule.FORM_SetIndexSelected(
-              formHandle,
-              pageCtx.pagePtr,
-              value.index,
-              value.isSelected,
-            )
+            field.type !== PDF_FORM_FIELD_TYPE.CHECKBOX &&
+            field.type !== PDF_FORM_FIELD_TYPE.RADIOBUTTON
           ) {
-            this.logger.debug(
-              LOG_SOURCE,
-              LOG_CATEGORY,
-              'SetFormFieldValue',
-              'failed to set index selected',
-            );
-            this.logger.perf(
-              LOG_SOURCE,
-              LOG_CATEGORY,
-              `SetFormFieldValue`,
-              'End',
-              `${doc.id}-${annotation.id}`,
-            );
-            this.pdfiumModule.FORM_ForceToKillFocus(formHandle);
-            this.pdfiumModule.FPDFPage_CloseAnnot(annotationPtr);
-            this.pdfiumModule.FORM_OnBeforeClosePage(pageCtx.pagePtr, formHandle);
-            pageCtx.release();
-            this.pdfiumModule.PDFiumExt_ExitFormFillEnvironment(formHandle);
-            this.pdfiumModule.PDFiumExt_CloseFormFillInfo(formFillInfoPtr);
-
-            return PdfTaskHelper.reject({
-              code: PdfErrorCode.CantSelectOption,
-              message: 'failed to set index selected',
-            });
+            this.pdfiumModule.EPDFAnnot_GenerateFormFieldAP(annotationPtr);
           }
-        }
-        break;
-      case 'checked':
-        {
-          const kReturn = 0x0d;
-          if (!this.pdfiumModule.FORM_OnChar(formHandle, pageCtx.pagePtr, kReturn, 0)) {
-            this.logger.debug(
-              LOG_SOURCE,
-              LOG_CATEGORY,
-              'SetFormFieldValue',
-              'failed to set field checked',
-            );
-            this.logger.perf(
-              LOG_SOURCE,
-              LOG_CATEGORY,
-              `SetFormFieldValue`,
-              'End',
-              `${doc.id}-${annotation.id}`,
-            );
-            this.pdfiumModule.FORM_ForceToKillFocus(formHandle);
-            this.pdfiumModule.FPDFPage_CloseAnnot(annotationPtr);
-            this.pdfiumModule.FORM_OnBeforeClosePage(pageCtx.pagePtr, formHandle);
-            pageCtx.release();
-            this.pdfiumModule.PDFiumExt_ExitFormFillEnvironment(formHandle);
-            this.pdfiumModule.PDFiumExt_CloseFormFillInfo(formFillInfoPtr);
 
-            return PdfTaskHelper.reject({
-              code: PdfErrorCode.CantCheckField,
-              message: 'failed to set field checked',
-            });
-          }
+          this.logger.perf(
+            LOG_SOURCE,
+            LOG_CATEGORY,
+            `SetFormFieldState`,
+            'End',
+            `${doc.id}-${annotation.id}`,
+          );
+
+          return PdfTaskHelper.resolve<boolean>(true);
+        } finally {
+          this.pdfiumModule.FPDFPage_CloseAnnot(annotationPtr);
         }
-        break;
+      });
+    } finally {
+      pageCtx.release();
+    }
+  }
+
+  renameWidgetField(
+    doc: PdfDocumentObject,
+    page: PdfPageObject,
+    annotation: PdfWidgetAnnoObject,
+    name: string,
+  ): PdfTask<boolean> {
+    this.logger.debug(LOG_SOURCE, LOG_CATEGORY, 'RenameWidgetField', doc, annotation, name);
+    this.logger.perf(
+      LOG_SOURCE,
+      LOG_CATEGORY,
+      `RenameWidgetField`,
+      'Begin',
+      `${doc.id}-${annotation.id}`,
+    );
+
+    const ctx = this.cache.getContext(doc.id);
+    if (!ctx) {
+      this.logger.perf(
+        LOG_SOURCE,
+        LOG_CATEGORY,
+        `RenameWidgetField`,
+        'End',
+        `${doc.id}-${annotation.id}`,
+      );
+      return PdfTaskHelper.reject({
+        code: PdfErrorCode.DocNotOpen,
+        message: 'document does not open',
+      });
     }
 
-    this.pdfiumModule.FORM_ForceToKillFocus(formHandle);
+    const pageCtx = ctx.acquirePage(page.index);
+    try {
+      return pageCtx.withFormHandle((formHandle) => {
+        const annotationPtr = this.getAnnotationByName(pageCtx.pagePtr, annotation.id);
+        if (!annotationPtr) {
+          return PdfTaskHelper.reject({
+            code: PdfErrorCode.NotFound,
+            message: 'annotation not found',
+          });
+        }
 
-    this.pdfiumModule.FPDFPage_CloseAnnot(annotationPtr);
-    this.pdfiumModule.FORM_OnBeforeClosePage(pageCtx.pagePtr, formHandle);
-    pageCtx.release();
+        try {
+          const ok = this.withWString(name, (namePtr) =>
+            this.pdfiumModule.EPDFAnnot_SetFormFieldName(formHandle, annotationPtr, namePtr),
+          );
+          if (!ok) {
+            return PdfTaskHelper.reject({
+              code: PdfErrorCode.CantSetAnnotString,
+              message: 'failed to rename widget field',
+            });
+          }
 
-    this.pdfiumModule.PDFiumExt_ExitFormFillEnvironment(formHandle);
-    this.pdfiumModule.PDFiumExt_CloseFormFillInfo(formFillInfoPtr);
+          this.logger.perf(
+            LOG_SOURCE,
+            LOG_CATEGORY,
+            `RenameWidgetField`,
+            'End',
+            `${doc.id}-${annotation.id}`,
+          );
+          return PdfTaskHelper.resolve<boolean>(true);
+        } finally {
+          this.pdfiumModule.FPDFPage_CloseAnnot(annotationPtr);
+        }
+      });
+    } finally {
+      pageCtx.release();
+    }
+  }
 
-    return PdfTaskHelper.resolve<boolean>(true);
+  shareWidgetField(
+    doc: PdfDocumentObject,
+    sourcePage: PdfPageObject,
+    sourceAnnotation: PdfWidgetAnnoObject,
+    targetPage: PdfPageObject,
+    targetAnnotation: PdfWidgetAnnoObject,
+  ): PdfTask<boolean> {
+    this.logger.debug(
+      LOG_SOURCE,
+      LOG_CATEGORY,
+      'ShareWidgetField',
+      doc,
+      sourceAnnotation,
+      targetAnnotation,
+    );
+    this.logger.perf(
+      LOG_SOURCE,
+      LOG_CATEGORY,
+      `ShareWidgetField`,
+      'Begin',
+      `${doc.id}-${sourceAnnotation.id}-${targetAnnotation.id}`,
+    );
+
+    const ctx = this.cache.getContext(doc.id);
+    if (!ctx) {
+      this.logger.perf(
+        LOG_SOURCE,
+        LOG_CATEGORY,
+        `ShareWidgetField`,
+        'End',
+        `${doc.id}-${sourceAnnotation.id}-${targetAnnotation.id}`,
+      );
+      return PdfTaskHelper.reject({
+        code: PdfErrorCode.DocNotOpen,
+        message: 'document does not open',
+      });
+    }
+
+    const sourcePageCtx = ctx.acquirePage(sourcePage.index);
+    const targetPageCtx =
+      targetPage.index === sourcePage.index ? sourcePageCtx : ctx.acquirePage(targetPage.index);
+
+    try {
+      return sourcePageCtx.withFormHandle((formHandle) => {
+        let targetPageLoaded = false;
+        if (targetPageCtx !== sourcePageCtx) {
+          this.pdfiumModule.FORM_OnAfterLoadPage(targetPageCtx.pagePtr, formHandle);
+          targetPageLoaded = true;
+        }
+
+        const sourceAnnotationPtr = this.getAnnotationByName(
+          sourcePageCtx.pagePtr,
+          sourceAnnotation.id,
+        );
+        const targetAnnotationPtr = this.getAnnotationByName(
+          targetPageCtx.pagePtr,
+          targetAnnotation.id,
+        );
+        if (!sourceAnnotationPtr || !targetAnnotationPtr) {
+          if (sourceAnnotationPtr) {
+            this.pdfiumModule.FPDFPage_CloseAnnot(sourceAnnotationPtr);
+          }
+          if (targetAnnotationPtr) {
+            this.pdfiumModule.FPDFPage_CloseAnnot(targetAnnotationPtr);
+          }
+          if (targetPageLoaded) {
+            this.pdfiumModule.FORM_OnBeforeClosePage(targetPageCtx.pagePtr, formHandle);
+          }
+          return PdfTaskHelper.reject({
+            code: PdfErrorCode.NotFound,
+            message: 'annotation not found',
+          });
+        }
+
+        try {
+          const ok = this.pdfiumModule.EPDFAnnot_ShareFormField(
+            formHandle,
+            sourceAnnotationPtr,
+            targetAnnotationPtr,
+          );
+          if (!ok) {
+            return PdfTaskHelper.reject({
+              code: PdfErrorCode.Unknown,
+              message: 'failed to share widget field',
+            });
+          }
+
+          this.logger.perf(
+            LOG_SOURCE,
+            LOG_CATEGORY,
+            `ShareWidgetField`,
+            'End',
+            `${doc.id}-${sourceAnnotation.id}-${targetAnnotation.id}`,
+          );
+          return PdfTaskHelper.resolve<boolean>(true);
+        } finally {
+          this.pdfiumModule.FPDFPage_CloseAnnot(sourceAnnotationPtr);
+          this.pdfiumModule.FPDFPage_CloseAnnot(targetAnnotationPtr);
+          if (targetPageLoaded) {
+            this.pdfiumModule.FORM_OnBeforeClosePage(targetPageCtx.pagePtr, formHandle);
+          }
+        }
+      });
+    } finally {
+      sourcePageCtx.release();
+      if (targetPageCtx !== sourcePageCtx) {
+        targetPageCtx.release();
+      }
+    }
   }
 
   /**
@@ -1996,6 +2638,142 @@ export class PdfiumNative implements IPdfiumExecutor {
 
     this.logger.perf(LOG_SOURCE, LOG_CATEGORY, `ExtractPages`, 'End', doc.id);
     return PdfTaskHelper.resolve(buffer);
+  }
+
+  /**
+   * Import pages from a source document into a destination document.
+   *
+   * @param destDoc - destination document (must be open in cache)
+   * @param srcDoc - source document (must be open in cache)
+   * @param srcPageIndices - zero-based page indices in the source document
+   * @param insertIndex - position to insert at in destination (defaults to end)
+   * @returns task containing the newly added PdfPageObjects
+   */
+  public importPages(
+    destDoc: PdfDocumentObject,
+    srcDoc: PdfDocumentObject,
+    srcPageIndices: number[],
+    insertIndex?: number,
+  ): PdfTask<PdfPageObject[]> {
+    this.logger.debug(
+      LOG_SOURCE,
+      LOG_CATEGORY,
+      'importPages',
+      destDoc.id,
+      srcDoc.id,
+      srcPageIndices,
+    );
+    this.logger.perf(LOG_SOURCE, LOG_CATEGORY, 'ImportPages', 'Begin', destDoc.id);
+
+    const destCtx = this.cache.getContext(destDoc.id);
+    if (!destCtx) {
+      this.logger.perf(LOG_SOURCE, LOG_CATEGORY, 'ImportPages', 'End', destDoc.id);
+      return PdfTaskHelper.reject({
+        code: PdfErrorCode.DocNotOpen,
+        message: 'destination document is not open',
+      });
+    }
+
+    const srcCtx = this.cache.getContext(srcDoc.id);
+    if (!srcCtx) {
+      this.logger.perf(LOG_SOURCE, LOG_CATEGORY, 'ImportPages', 'End', destDoc.id);
+      return PdfTaskHelper.reject({
+        code: PdfErrorCode.DocNotOpen,
+        message: 'source document is not open',
+      });
+    }
+
+    const destInsertIndex = insertIndex ?? this.pdfiumModule.FPDF_GetPageCount(destCtx.docPtr);
+
+    const indicesPtr = this.memoryManager.malloc(srcPageIndices.length * 4);
+    for (let i = 0; i < srcPageIndices.length; i++) {
+      this.pdfiumModule.pdfium.setValue(indicesPtr + i * 4, srcPageIndices[i], 'i32');
+    }
+
+    if (
+      !this.pdfiumModule.FPDF_ImportPagesByIndex(
+        destCtx.docPtr,
+        srcCtx.docPtr,
+        indicesPtr,
+        srcPageIndices.length,
+        destInsertIndex,
+      )
+    ) {
+      this.memoryManager.free(indicesPtr);
+      this.logger.perf(LOG_SOURCE, LOG_CATEGORY, 'ImportPages', 'End', destDoc.id);
+      return PdfTaskHelper.reject({
+        code: PdfErrorCode.CantImportPages,
+        message: 'can not import pages into destination document',
+      });
+    }
+
+    this.memoryManager.free(indicesPtr);
+
+    const newPages: PdfPageObject[] = [];
+    const sizePtr = this.memoryManager.malloc(8);
+    const normalizeRotation = destCtx.normalizeRotation;
+
+    for (let i = 0; i < srcPageIndices.length; i++) {
+      const newPageIndex = destInsertIndex + i;
+      const result = normalizeRotation
+        ? this.pdfiumModule.EPDF_GetPageSizeByIndexNormalized(destCtx.docPtr, newPageIndex, sizePtr)
+        : this.pdfiumModule.FPDF_GetPageSizeByIndexF(destCtx.docPtr, newPageIndex, sizePtr);
+
+      if (!result) {
+        this.memoryManager.free(sizePtr);
+        this.logger.perf(LOG_SOURCE, LOG_CATEGORY, 'ImportPages', 'End', destDoc.id);
+        return PdfTaskHelper.reject({
+          code: PdfErrorCode.Unknown,
+          message: `failed to read metadata for imported page ${newPageIndex}`,
+        });
+      }
+
+      const rotation = this.pdfiumModule.EPDF_GetPageRotationByIndex(
+        destCtx.docPtr,
+        newPageIndex,
+      ) as Rotation;
+
+      newPages.push({
+        index: newPageIndex,
+        size: {
+          width: this.pdfiumModule.pdfium.getValue(sizePtr, 'float'),
+          height: this.pdfiumModule.pdfium.getValue(sizePtr + 4, 'float'),
+        },
+        rotation,
+      });
+    }
+
+    this.memoryManager.free(sizePtr);
+    this.logger.perf(LOG_SOURCE, LOG_CATEGORY, 'ImportPages', 'End', destDoc.id);
+    return PdfTaskHelper.resolve(newPages);
+  }
+
+  public deletePage(doc: PdfDocumentObject, pageIndex: number): PdfTask<boolean> {
+    this.logger.debug(LOG_SOURCE, LOG_CATEGORY, 'deletePage', doc.id, pageIndex);
+    this.logger.perf(LOG_SOURCE, LOG_CATEGORY, 'DeletePage', 'Begin', doc.id);
+
+    const ctx = this.cache.getContext(doc.id);
+    if (!ctx) {
+      this.logger.perf(LOG_SOURCE, LOG_CATEGORY, 'DeletePage', 'End', doc.id);
+      return PdfTaskHelper.reject({
+        code: PdfErrorCode.DocNotOpen,
+        message: 'document is not open',
+      });
+    }
+
+    const pageCount = this.pdfiumModule.FPDF_GetPageCount(ctx.docPtr);
+    if (pageIndex < 0 || pageIndex >= pageCount) {
+      this.logger.perf(LOG_SOURCE, LOG_CATEGORY, 'DeletePage', 'End', doc.id);
+      return PdfTaskHelper.reject({
+        code: PdfErrorCode.CantDeletePage,
+        message: `page index ${pageIndex} out of range (0..${pageCount - 1})`,
+      });
+    }
+
+    this.pdfiumModule.FPDFPage_Delete(ctx.docPtr, pageIndex);
+
+    this.logger.perf(LOG_SOURCE, LOG_CATEGORY, 'DeletePage', 'End', doc.id);
+    return PdfTaskHelper.resolve(true);
   }
 
   /**
@@ -2447,11 +3225,8 @@ export class PdfiumNative implements IPdfiumExecutor {
     this.logger.debug(LOG_SOURCE, LOG_CATEGORY, 'closeDocument', doc);
     this.logger.perf(LOG_SOURCE, LOG_CATEGORY, `CloseDocument`, 'Begin', doc.id);
 
-    const ctx = this.cache.getContext(doc.id);
+    this.cache.closeDocument(doc.id);
 
-    if (!ctx) return PdfTaskHelper.resolve(true);
-
-    ctx.dispose();
     this.logger.perf(LOG_SOURCE, LOG_CATEGORY, `CloseDocument`, 'End', doc.id);
     return PdfTaskHelper.resolve(true);
   }
@@ -2487,7 +3262,12 @@ export class PdfiumNative implements IPdfiumExecutor {
     annotation: PdfTextAnnoObject,
   ) {
     // Type-specific properties
-    if (!this.setAnnotationIcon(annotationPtr, annotation.icon || PdfAnnotationIcon.Comment)) {
+    if (
+      !this.setAnnotationName(
+        annotationPtr,
+        annotation.name ?? annotation.icon ?? PdfAnnotationName.Comment,
+      )
+    ) {
       return false;
     }
     if (annotation.state && !this.setAnnotString(annotationPtr, 'State', annotation.state)) {
@@ -2500,6 +3280,15 @@ export class PdfiumNative implements IPdfiumExecutor {
       return false;
     }
 
+    if (!this.setAnnotationOpacity(annotationPtr, annotation.opacity ?? 1)) {
+      return false;
+    }
+    // Prefer strokeColor, fall back to deprecated color
+    const strokeColor = annotation.strokeColor ?? annotation.color ?? '#FFFF00';
+    if (!this.setAnnotationColor(annotationPtr, strokeColor, PdfAnnotationColorType.Color)) {
+      return false;
+    }
+
     // Text annotations have default flags if not specified
     if (!annotation.flags) {
       if (!this.setAnnotationFlags(annotationPtr, ['print', 'noZoom', 'noRotate'])) {
@@ -2508,6 +3297,37 @@ export class PdfiumNative implements IPdfiumExecutor {
     }
 
     // Apply base annotation properties (author, contents, dates, flags, custom, IRT, RT)
+    return this.applyBaseAnnotationProperties(doc, page, pagePtr, annotationPtr, annotation);
+  }
+
+  /**
+   * Add caret content to annotation
+   * @param doc - document object
+   * @param page - page info
+   * @param pagePtr - pointer to page object
+   * @param annotationPtr - pointer to caret annotation
+   * @param annotation - caret annotation
+   * @returns whether caret content is added to annotation
+   *
+   * @private
+   */
+  private addCaretContent(
+    doc: PdfDocumentObject,
+    page: PdfPageObject,
+    pagePtr: number,
+    annotationPtr: number,
+    annotation: PdfCaretAnnoObject,
+  ) {
+    if (annotation.strokeColor) {
+      this.setAnnotationColor(annotationPtr, annotation.strokeColor, PdfAnnotationColorType.Color);
+    }
+    if (annotation.opacity !== undefined) {
+      this.setAnnotationOpacity(annotationPtr, annotation.opacity);
+    }
+    if (annotation.intent) {
+      this.setAnnotIntent(annotationPtr, annotation.intent);
+    }
+    this.setRectangleDifferences(annotationPtr, annotation.rectangleDifferences);
     return this.applyBaseAnnotationProperties(doc, page, pagePtr, annotationPtr, annotation);
   }
 
@@ -2529,7 +3349,13 @@ export class PdfiumNative implements IPdfiumExecutor {
     annotation: PdfFreeTextAnnoObject,
   ) {
     // Type-specific properties
-    if (!this.setBorderStyle(annotationPtr, PdfAnnotationBorderStyle.SOLID, 0)) {
+    if (
+      !this.setBorderStyle(
+        annotationPtr,
+        PdfAnnotationBorderStyle.SOLID,
+        annotation.strokeWidth ?? 0,
+      )
+    ) {
       return false;
     }
     if (!this.setAnnotationOpacity(annotationPtr, annotation.opacity ?? 1)) {
@@ -2541,17 +3367,40 @@ export class PdfiumNative implements IPdfiumExecutor {
     if (!this.setAnnotationVerticalAlignment(annotationPtr, annotation.verticalAlign)) {
       return false;
     }
+    const daColor = annotation.strokeColor ?? annotation.fontColor;
     if (
       !this.setAnnotationDefaultAppearance(
         annotationPtr,
-        annotation.fontFamily,
+        annotation.fontFamily === PdfStandardFont.Unknown
+          ? PdfStandardFont.Helvetica
+          : annotation.fontFamily,
         annotation.fontSize,
-        annotation.fontColor,
+        daColor,
       )
     ) {
       return false;
     }
+    if (annotation.strokeColor && annotation.strokeColor !== annotation.fontColor) {
+      this.setAnnotationColor(
+        annotationPtr,
+        annotation.fontColor,
+        PdfAnnotationColorType.TextColor,
+      );
+    }
     if (annotation.intent && !this.setAnnotIntent(annotationPtr, annotation.intent)) {
+      return false;
+    }
+    if (
+      annotation.calloutLine &&
+      annotation.calloutLine.length >= 2 &&
+      !this.setCalloutLine(doc, page, annotationPtr, annotation.calloutLine)
+    ) {
+      return false;
+    }
+    if (
+      annotation.lineEnding !== undefined &&
+      !this.setLineEndings(annotationPtr, PdfAnnotationLineEnding.None, annotation.lineEnding)
+    ) {
       return false;
     }
     // Prefer color, fall back to deprecated backgroundColor
@@ -2566,8 +3415,247 @@ export class PdfiumNative implements IPdfiumExecutor {
       return false;
     }
 
+    this.setRectangleDifferences(annotationPtr, annotation.rectangleDifferences);
+
     // Apply base annotation properties (author, contents, dates, flags, custom, IRT, RT)
     return this.applyBaseAnnotationProperties(doc, page, pagePtr, annotationPtr, annotation);
+  }
+
+  private addTextFieldContent(
+    formHandle: number,
+    annotationPtr: number,
+    annotation: PdfWidgetAnnoObject,
+  ): boolean {
+    // 1. DA (font, size, color)
+    if (
+      !this.setAnnotationDefaultAppearance(
+        annotationPtr,
+        annotation.fontFamily,
+        annotation.fontSize,
+        annotation.fontColor,
+      )
+    ) {
+      return false;
+    }
+
+    // 2. BS (border style / width)
+    if (
+      !this.setBorderStyle(
+        annotationPtr,
+        PdfAnnotationBorderStyle.SOLID,
+        annotation.strokeWidth ?? 1,
+      )
+    ) {
+      return false;
+    }
+
+    // 3. MK colors (border / background)
+    if (annotation.strokeColor && annotation.strokeColor !== 'transparent') {
+      this.setMKColor(annotationPtr, 0, annotation.strokeColor); // EPDF_MK_COLOR_BC
+    } else {
+      this.clearMKColor(annotationPtr, 0);
+    }
+    if (annotation.color && annotation.color !== 'transparent') {
+      this.setMKColor(annotationPtr, 1, annotation.color); // EPDF_MK_COLOR_BG
+    } else {
+      this.clearMKColor(annotationPtr, 1);
+    }
+
+    // 4. Form field flags
+    const userFlags = annotation.field.flag ?? PDF_FORM_FIELD_FLAG.NONE;
+    this.pdfiumModule.FPDFAnnot_SetFormFieldFlags(formHandle, annotationPtr, userFlags);
+
+    // 5. Field name
+    if (annotation.field.name) {
+      this.withWString(annotation.field.name, (namePtr) =>
+        this.pdfiumModule.EPDFAnnot_SetFormFieldName(formHandle, annotationPtr, namePtr),
+      );
+    }
+
+    // 6. Field value
+    this.withWString(annotation.field.value ?? '', (valuePtr) =>
+      this.pdfiumModule.EPDFAnnot_SetFormFieldValue(formHandle, annotationPtr, valuePtr),
+    );
+
+    // 7. MaxLen
+    const textField = annotation.field as PdfTextWidgetAnnoField;
+    if (textField.maxLen != null && textField.maxLen > 0) {
+      this.pdfiumModule.EPDFAnnot_SetNumberValue(annotationPtr, 'MaxLen', textField.maxLen);
+    }
+
+    return true;
+  }
+
+  private addToggleFieldContent(
+    formHandle: number,
+    annotationPtr: number,
+    annotation: PdfWidgetAnnoObject,
+  ): boolean {
+    // 1. BS (border style / width)
+    if (
+      !this.setBorderStyle(
+        annotationPtr,
+        PdfAnnotationBorderStyle.SOLID,
+        annotation.strokeWidth ?? 1,
+      )
+    ) {
+      return false;
+    }
+
+    // 2. MK colors (border / background)
+    if (annotation.strokeColor && annotation.strokeColor !== 'transparent') {
+      this.setMKColor(annotationPtr, 0, annotation.strokeColor);
+    } else {
+      this.clearMKColor(annotationPtr, 0);
+    }
+    if (annotation.color && annotation.color !== 'transparent') {
+      this.setMKColor(annotationPtr, 1, annotation.color);
+    } else {
+      this.clearMKColor(annotationPtr, 1);
+    }
+
+    // 3. Form field flags (preserve structural bits for radio buttons)
+    let finalFlags = annotation.field.flag ?? PDF_FORM_FIELD_FLAG.NONE;
+    if (annotation.field.type === PDF_FORM_FIELD_TYPE.RADIOBUTTON) {
+      finalFlags |= PDF_FORM_FIELD_FLAG.BUTTON_RADIO | PDF_FORM_FIELD_FLAG.BUTTON_NOTOGGLETOOFF;
+    }
+    this.pdfiumModule.FPDFAnnot_SetFormFieldFlags(formHandle, annotationPtr, finalFlags);
+
+    // 4. Field name
+    if (annotation.field.name) {
+      this.withWString(annotation.field.name, (namePtr) =>
+        this.pdfiumModule.EPDFAnnot_SetFormFieldName(formHandle, annotationPtr, namePtr),
+      );
+    }
+
+    return true;
+  }
+
+  private addChoiceFieldContent(
+    formHandle: number,
+    annotationPtr: number,
+    annotation: PdfWidgetAnnoObject,
+  ): boolean {
+    // 1. DA (font, size, color)
+    if (
+      !this.setAnnotationDefaultAppearance(
+        annotationPtr,
+        annotation.fontFamily,
+        annotation.fontSize,
+        annotation.fontColor,
+      )
+    ) {
+      return false;
+    }
+
+    // 2. BS (border style / width)
+    if (
+      !this.setBorderStyle(
+        annotationPtr,
+        PdfAnnotationBorderStyle.SOLID,
+        annotation.strokeWidth ?? 1,
+      )
+    ) {
+      return false;
+    }
+
+    // 3. MK colors (border / background)
+    if (annotation.strokeColor && annotation.strokeColor !== 'transparent') {
+      this.setMKColor(annotationPtr, 0, annotation.strokeColor);
+    } else {
+      this.clearMKColor(annotationPtr, 0);
+    }
+    if (annotation.color && annotation.color !== 'transparent') {
+      this.setMKColor(annotationPtr, 1, annotation.color);
+    } else {
+      this.clearMKColor(annotationPtr, 1);
+    }
+
+    // 4. Form field flags -- preserve the base type bit for combobox (bit 17 = Combo)
+    let choiceFlags = annotation.field.flag ?? PDF_FORM_FIELD_FLAG.NONE;
+    if (annotation.field.type === PDF_FORM_FIELD_TYPE.COMBOBOX) {
+      choiceFlags |= 1 << 17;
+    }
+    this.pdfiumModule.FPDFAnnot_SetFormFieldFlags(formHandle, annotationPtr, choiceFlags);
+
+    // 5. Field name
+    if (annotation.field.name) {
+      this.withWString(annotation.field.name, (namePtr) =>
+        this.pdfiumModule.EPDFAnnot_SetFormFieldName(formHandle, annotationPtr, namePtr),
+      );
+    }
+
+    // 6. Options (/Opt array)
+    const field = annotation.field as { options?: { label: string; isSelected: boolean }[] };
+    const options = field.options ?? [];
+    if (options.length > 0) {
+      const ptrSize = 4;
+      const arrayPtr = this.memoryManager.malloc(options.length * ptrSize);
+      const labelPtrs: number[] = [];
+      try {
+        for (let i = 0; i < options.length; i++) {
+          const label = options[i].label;
+          const byteLen = (label.length + 1) * 2;
+          const labelPtr = this.memoryManager.malloc(byteLen);
+          this.pdfiumModule.pdfium.stringToUTF16(label, labelPtr, byteLen);
+          labelPtrs.push(labelPtr);
+          this.pdfiumModule.pdfium.setValue(arrayPtr + i * ptrSize, labelPtr, '*');
+        }
+        this.pdfiumModule.EPDFAnnot_SetFormFieldOptions(
+          formHandle,
+          annotationPtr,
+          arrayPtr,
+          options.length,
+        );
+      } finally {
+        for (const ptr of labelPtrs) {
+          this.memoryManager.free(WasmPointer(ptr));
+        }
+        this.memoryManager.free(arrayPtr);
+      }
+    }
+
+    // 7. Field value (/V) — set to the first selected option or empty
+    const selectedOption = options.find((opt) => opt.isSelected);
+    const value = selectedOption?.label ?? annotation.field.value ?? '';
+    this.withWString(value, (valuePtr) =>
+      this.pdfiumModule.EPDFAnnot_SetFormFieldValue(formHandle, annotationPtr, valuePtr),
+    );
+
+    return true;
+  }
+
+  private setMKColor(annotationPtr: number, mkType: number, webColor: string): boolean {
+    const { red, green, blue } = webColorToPdfColor(webColor);
+    return this.pdfiumModule.EPDFAnnot_SetMKColor(
+      annotationPtr,
+      mkType,
+      red & 0xff,
+      green & 0xff,
+      blue & 0xff,
+    );
+  }
+
+  private clearMKColor(annotationPtr: number, mkType: number): boolean {
+    return this.pdfiumModule.EPDFAnnot_ClearMKColor(annotationPtr, mkType);
+  }
+
+  private getMKColor(annotationPtr: number, mkType: number): string | undefined {
+    const rPtr = this.memoryManager.malloc(4);
+    const gPtr = this.memoryManager.malloc(4);
+    const bPtr = this.memoryManager.malloc(4);
+    try {
+      const ok = this.pdfiumModule.EPDFAnnot_GetMKColor(annotationPtr, mkType, rPtr, gPtr, bPtr);
+      if (!ok) return undefined;
+      const r = this.pdfiumModule.pdfium.getValue(rPtr, 'i32') & 0xff;
+      const g = this.pdfiumModule.pdfium.getValue(gPtr, 'i32') & 0xff;
+      const b = this.pdfiumModule.pdfium.getValue(bPtr, 'i32') & 0xff;
+      return pdfColorToWebColor({ red: r, green: g, blue: b });
+    } finally {
+      this.memoryManager.free(bPtr);
+      this.memoryManager.free(gPtr);
+      this.memoryManager.free(rPtr);
+    }
   }
 
   /**
@@ -2756,6 +3844,12 @@ export class PdfiumNative implements IPdfiumExecutor {
       return false;
     }
 
+    if (annotation.type === PdfAnnotationSubtype.POLYGON) {
+      const poly = annotation as PdfPolygonAnnoObject;
+      this.setRectangleDifferences(annotationPtr, poly.rectangleDifferences);
+      this.setBorderEffect(annotationPtr, poly.cloudyBorderIntensity);
+    }
+
     // Apply base annotation properties (author, contents, dates, flags, custom, IRT, RT)
     return this.applyBaseAnnotationProperties(doc, page, pagePtr, annotationPtr, annotation);
   }
@@ -2867,6 +3961,9 @@ export class PdfiumNative implements IPdfiumExecutor {
     ) {
       return false;
     }
+
+    this.setRectangleDifferences(annotationPtr, annotation.rectangleDifferences);
+    this.setBorderEffect(annotationPtr, annotation.cloudyBorderIntensity);
 
     // Apply base annotation properties (author, contents, dates, flags, custom, IRT, RT)
     return this.applyBaseAnnotationProperties(doc, page, pagePtr, annotationPtr, annotation);
@@ -2996,10 +4093,14 @@ export class PdfiumNative implements IPdfiumExecutor {
 
     // Set font properties via default appearance (DA) if provided
     if (annotation.fontFamily !== undefined || annotation.fontSize !== undefined) {
+      const font =
+        annotation.fontFamily == null || annotation.fontFamily === PdfStandardFont.Unknown
+          ? PdfStandardFont.Helvetica
+          : annotation.fontFamily;
       if (
         !this.setAnnotationDefaultAppearance(
           annotationPtr,
-          annotation.fontFamily ?? PdfStandardFont.Helvetica,
+          font,
           annotation.fontSize ?? 12,
           annotation.fontColor ?? '#000000',
         )
@@ -3040,23 +4141,77 @@ export class PdfiumNative implements IPdfiumExecutor {
     pagePtr: number,
     annotationPtr: number,
     annotation: PdfStampAnnoObject,
-    imageData?: ImageData,
+    context?: AnnotationCreateContext<PdfStampAnnoObject>,
   ) {
-    // Type-specific properties
-    if (annotation.icon && !this.setAnnotationIcon(annotationPtr, annotation.icon)) {
+    const stampName = annotation.name ?? annotation.icon;
+    if (stampName && !this.setAnnotationName(annotationPtr, stampName)) {
       return false;
     }
-    if (annotation.subject && !this.setAnnotString(annotationPtr, 'Subj', annotation.subject)) {
-      return false;
-    }
-    if (imageData) {
+
+    if (context && 'data' in context && context.data) {
+      const meta = getImageMetadata(context.data);
+      if (!meta) return false;
+
+      if (meta.mimeType === 'application/pdf') {
+        if (!this.setAppearanceFromPdf(docPtr, annotationPtr, context.data)) {
+          return false;
+        }
+      } else {
+        for (let i = this.pdfiumModule.FPDFAnnot_GetObjectCount(annotationPtr) - 1; i >= 0; i--) {
+          this.pdfiumModule.FPDFAnnot_RemoveObject(annotationPtr, i);
+        }
+
+        if (meta.mimeType === 'image/png') {
+          if (
+            !this.addPngImageObject(
+              doc,
+              docPtr,
+              page,
+              pagePtr,
+              annotationPtr,
+              annotation.rect,
+              context.data,
+            )
+          ) {
+            return false;
+          }
+        } else if (meta.mimeType === 'image/jpeg') {
+          if (
+            !this.addJpegImageObject(
+              doc,
+              docPtr,
+              page,
+              pagePtr,
+              annotationPtr,
+              annotation.rect,
+              context.data,
+            )
+          ) {
+            return false;
+          }
+        }
+      }
+    } else if (context && 'imageData' in context && context.imageData) {
       for (let i = this.pdfiumModule.FPDFAnnot_GetObjectCount(annotationPtr) - 1; i >= 0; i--) {
         this.pdfiumModule.FPDFAnnot_RemoveObject(annotationPtr, i);
       }
 
       if (
-        !this.addImageObject(doc, docPtr, page, pagePtr, annotationPtr, annotation.rect, imageData)
+        !this.addImageObject(
+          doc,
+          docPtr,
+          page,
+          pagePtr,
+          annotationPtr,
+          annotation.rect,
+          context.imageData,
+        )
       ) {
+        return false;
+      }
+    } else if (context && 'appearance' in context && context.appearance) {
+      /** @deprecated Use { data } instead */
+      if (!this.setAppearanceFromPdf(docPtr, annotationPtr, context.appearance)) {
         return false;
       }
     }
@@ -3068,6 +4223,33 @@ export class PdfiumNative implements IPdfiumExecutor {
     }
 
     return !!this.pdfiumModule.EPDFAnnot_UpdateAppearanceToRect(annotationPtr, PdfStampFit.Cover);
+  }
+
+  /**
+   * Set an annotation's appearance from a single-page PDF document.
+   * Loads the PDF into WASM memory, calls the native SetAppearanceFromPage,
+   * then cleans up.
+   */
+  private setAppearanceFromPdf(
+    docPtr: number,
+    annotationPtr: number,
+    appearance: ArrayBuffer,
+  ): boolean {
+    const data = new Uint8Array(appearance);
+    const filePtr = this.memoryManager.malloc(data.byteLength);
+    this.pdfiumModule.pdfium.HEAPU8.set(data, filePtr);
+
+    const tempDocPtr = this.pdfiumModule.FPDF_LoadMemDocument(filePtr, data.byteLength, '');
+    if (!tempDocPtr) {
+      this.memoryManager.free(filePtr);
+      return false;
+    }
+
+    const ok = this.pdfiumModule.EPDFAnnot_SetAppearanceFromPage(annotationPtr, tempDocPtr, 0);
+
+    this.pdfiumModule.FPDF_CloseDocument(tempDocPtr);
+    this.memoryManager.free(filePtr);
+    return !!ok;
   }
 
   /**
@@ -3140,10 +4322,12 @@ export class PdfiumNative implements IPdfiumExecutor {
     }
 
     const matrixPtr = this.memoryManager.malloc(6 * 4);
-    this.pdfiumModule.pdfium.setValue(matrixPtr, imageData.width, 'float');
+    // Preserve the original bitmap, but author the image object using the
+    // annotation rect so AP resizing works with custom display sizes.
+    this.pdfiumModule.pdfium.setValue(matrixPtr, rect.size.width, 'float');
     this.pdfiumModule.pdfium.setValue(matrixPtr + 4, 0, 'float');
     this.pdfiumModule.pdfium.setValue(matrixPtr + 8, 0, 'float');
-    this.pdfiumModule.pdfium.setValue(matrixPtr + 12, imageData.height, 'float');
+    this.pdfiumModule.pdfium.setValue(matrixPtr + 12, rect.size.height, 'float');
     this.pdfiumModule.pdfium.setValue(matrixPtr + 16, 0, 'float');
     this.pdfiumModule.pdfium.setValue(matrixPtr + 20, 0, 'float');
     if (!this.pdfiumModule.FPDFPageObj_SetMatrix(imageObjectPtr, matrixPtr)) {
@@ -3157,7 +4341,7 @@ export class PdfiumNative implements IPdfiumExecutor {
 
     const pagePos = this.convertDevicePointToPagePoint(doc, page, {
       x: rect.origin.x,
-      y: rect.origin.y + imageData.height, // shift down by the image height
+      y: rect.origin.y + rect.size.height, // shift down by the authored display height
     });
     this.pdfiumModule.FPDFPageObj_Transform(imageObjectPtr, 1, 0, 0, 1, pagePos.x, pagePos.y);
 
@@ -3170,6 +4354,150 @@ export class PdfiumNative implements IPdfiumExecutor {
 
     this.pdfiumModule.FPDFBitmap_Destroy(bitmapPtr);
     this.memoryManager.free(bitmapBufferPtr);
+
+    return true;
+  }
+
+  /**
+   * Add PNG image object to annotation using native PNG import.
+   * Passes raw PNG bytes to PDFium which decodes and stores them with
+   * FlateDecode + PNG prediction filters for optimal compression.
+   *
+   * @private
+   */
+  addPngImageObject(
+    doc: PdfDocumentObject,
+    docPtr: number,
+    page: PdfPageObject,
+    pagePtr: number,
+    annotationPtr: number,
+    rect: Rect,
+    pngData: ArrayBuffer,
+  ) {
+    const imageObjectPtr = this.pdfiumModule.FPDFPageObj_NewImageObj(docPtr);
+    if (!imageObjectPtr) {
+      return false;
+    }
+
+    const pngBytes = new Uint8Array(pngData);
+    const pngPtr = this.memoryManager.malloc(pngBytes.byteLength);
+    if (!pngPtr) {
+      this.pdfiumModule.FPDFPageObj_Destroy(imageObjectPtr);
+      return false;
+    }
+    this.pdfiumModule.pdfium.HEAPU8.set(pngBytes, pngPtr);
+
+    if (
+      !this.pdfiumModule.EPDFImageObj_SetPng(
+        pagePtr,
+        0,
+        imageObjectPtr,
+        pngPtr,
+        pngBytes.byteLength,
+      )
+    ) {
+      this.memoryManager.free(pngPtr);
+      this.pdfiumModule.FPDFPageObj_Destroy(imageObjectPtr);
+      return false;
+    }
+    this.memoryManager.free(pngPtr);
+
+    const matrixPtr = this.memoryManager.malloc(6 * 4);
+    this.pdfiumModule.pdfium.setValue(matrixPtr, rect.size.width, 'float');
+    this.pdfiumModule.pdfium.setValue(matrixPtr + 4, 0, 'float');
+    this.pdfiumModule.pdfium.setValue(matrixPtr + 8, 0, 'float');
+    this.pdfiumModule.pdfium.setValue(matrixPtr + 12, rect.size.height, 'float');
+    this.pdfiumModule.pdfium.setValue(matrixPtr + 16, 0, 'float');
+    this.pdfiumModule.pdfium.setValue(matrixPtr + 20, 0, 'float');
+    if (!this.pdfiumModule.FPDFPageObj_SetMatrix(imageObjectPtr, matrixPtr)) {
+      this.memoryManager.free(matrixPtr);
+      this.pdfiumModule.FPDFPageObj_Destroy(imageObjectPtr);
+      return false;
+    }
+    this.memoryManager.free(matrixPtr);
+
+    const pagePos = this.convertDevicePointToPagePoint(doc, page, {
+      x: rect.origin.x,
+      y: rect.origin.y + rect.size.height,
+    });
+    this.pdfiumModule.FPDFPageObj_Transform(imageObjectPtr, 1, 0, 0, 1, pagePos.x, pagePos.y);
+
+    if (!this.pdfiumModule.FPDFAnnot_AppendObject(annotationPtr, imageObjectPtr)) {
+      this.pdfiumModule.FPDFPageObj_Destroy(imageObjectPtr);
+      return false;
+    }
+
+    return true;
+  }
+
+  /**
+   * Add JPEG image object to annotation using native JPEG pass-through.
+   * Passes raw JPEG bytes to PDFium which embeds them as a DCTDecode
+   * stream — no decode/re-encode roundtrip.
+   *
+   * @private
+   */
+  addJpegImageObject(
+    doc: PdfDocumentObject,
+    docPtr: number,
+    page: PdfPageObject,
+    pagePtr: number,
+    annotationPtr: number,
+    rect: Rect,
+    jpegData: ArrayBuffer,
+  ) {
+    const imageObjectPtr = this.pdfiumModule.FPDFPageObj_NewImageObj(docPtr);
+    if (!imageObjectPtr) {
+      return false;
+    }
+
+    const jpegBytes = new Uint8Array(jpegData);
+    const jpegPtr = this.memoryManager.malloc(jpegBytes.byteLength);
+    if (!jpegPtr) {
+      this.pdfiumModule.FPDFPageObj_Destroy(imageObjectPtr);
+      return false;
+    }
+    this.pdfiumModule.pdfium.HEAPU8.set(jpegBytes, jpegPtr);
+
+    if (
+      !this.pdfiumModule.EPDFImageObj_SetJpeg(
+        pagePtr,
+        0,
+        imageObjectPtr,
+        jpegPtr,
+        jpegBytes.byteLength,
+      )
+    ) {
+      this.memoryManager.free(jpegPtr);
+      this.pdfiumModule.FPDFPageObj_Destroy(imageObjectPtr);
+      return false;
+    }
+    this.memoryManager.free(jpegPtr);
+
+    const matrixPtr = this.memoryManager.malloc(6 * 4);
+    this.pdfiumModule.pdfium.setValue(matrixPtr, rect.size.width, 'float');
+    this.pdfiumModule.pdfium.setValue(matrixPtr + 4, 0, 'float');
+    this.pdfiumModule.pdfium.setValue(matrixPtr + 8, 0, 'float');
+    this.pdfiumModule.pdfium.setValue(matrixPtr + 12, rect.size.height, 'float');
+    this.pdfiumModule.pdfium.setValue(matrixPtr + 16, 0, 'float');
+    this.pdfiumModule.pdfium.setValue(matrixPtr + 20, 0, 'float');
+    if (!this.pdfiumModule.FPDFPageObj_SetMatrix(imageObjectPtr, matrixPtr)) {
+      this.memoryManager.free(matrixPtr);
+      this.pdfiumModule.FPDFPageObj_Destroy(imageObjectPtr);
+      return false;
+    }
+    this.memoryManager.free(matrixPtr);
+
+    const pagePos = this.convertDevicePointToPagePoint(doc, page, {
+      x: rect.origin.x,
+      y: rect.origin.y + rect.size.height,
+    });
+    this.pdfiumModule.FPDFPageObj_Transform(imageObjectPtr, 1, 0, 0, 1, pagePos.x, pagePos.y);
+
+    if (!this.pdfiumModule.FPDFAnnot_AppendObject(annotationPtr, imageObjectPtr)) {
+      this.pdfiumModule.FPDFPageObj_Destroy(imageObjectPtr);
+      return false;
+    }
 
     return true;
   }
@@ -4231,20 +5559,53 @@ export class PdfiumNative implements IPdfiumExecutor {
    */
   private readPageAnnotations(doc: PdfDocumentObject, ctx: DocumentContext, page: PdfPageObject) {
     return ctx.borrowPage(page.index, (pageCtx) => {
-      const annotationCount = this.pdfiumModule.FPDFPage_GetAnnotCount(pageCtx.pagePtr);
+      return pageCtx.withFormHandle((formHandle) => {
+        const annotationCount = this.pdfiumModule.FPDFPage_GetAnnotCount(pageCtx.pagePtr);
 
-      const annotations: PdfAnnotationObject[] = [];
-      for (let i = 0; i < annotationCount; i++) {
-        pageCtx.withAnnotation(i, (annotPtr) => {
-          const anno = this.readPageAnnotation(doc, ctx.docPtr, page, annotPtr, pageCtx);
-          if (anno) annotations.push(anno);
-        });
-      }
-      return annotations;
+        const annotations: PdfAnnotationObject[] = [];
+        for (let i = 0; i < annotationCount; i++) {
+          pageCtx.withAnnotation(i, (annotPtr) => {
+            const anno = this.readPageAnnotation(doc, ctx.docPtr, page, annotPtr, formHandle);
+            if (anno) annotations.push(anno);
+          });
+        }
+        return annotations;
+      });
     });
   }
 
   /**
+   *
+   *
+   * @param ctx - document context
+   * @param page - page info
+   * @returns form fields on the pdf page
+   *
+   * @private
+   */
+  private readPageAnnoWidgets(
+    doc: PdfDocumentObject,
+    ctx: DocumentContext,
+    page: PdfPageObject,
+  ): PdfWidgetAnnoObject[] {
+    return ctx.borrowPage(page.index, (pageCtx) => {
+      return pageCtx.withFormHandle((formHandle) => {
+        const annotationCount = this.pdfiumModule.FPDFPage_GetAnnotCount(pageCtx.pagePtr);
+
+        const annotations: PdfWidgetAnnoObject[] = [];
+        for (let i = 0; i < annotationCount; i++) {
+          pageCtx.withAnnotation(i, (annotPtr) => {
+            const anno = this.readPageAnnoWidget(doc, page, annotPtr, formHandle);
+            if (anno) annotations.push(anno);
+          });
+        }
+        return annotations;
+      });
+    });
+  }
+
+  /**
+   * Read page annotations
    * Read page annotations without loading the page (raw approach)
    *
    * @param doc - pdf document object
@@ -4258,6 +5619,7 @@ export class PdfiumNative implements IPdfiumExecutor {
     doc: PdfDocumentObject,
     ctx: DocumentContext,
     page: PdfPageObject,
+    formHandle?: number,
   ): PdfAnnotationObject[] {
     const count = this.pdfiumModule.EPDFPage_GetAnnotCountRaw(ctx.docPtr, page.index);
     if (count <= 0) return [];
@@ -4269,7 +5631,7 @@ export class PdfiumNative implements IPdfiumExecutor {
       if (!annotPtr) continue;
 
       try {
-        const anno = this.readPageAnnotation(doc, ctx.docPtr, page, annotPtr);
+        const anno = this.readPageAnnotation(doc, ctx.docPtr, page, annotPtr, formHandle);
         if (anno) out.push(anno);
       } finally {
         this.pdfiumModule.FPDFPage_CloseAnnot(annotPtr);
@@ -4279,6 +5641,37 @@ export class PdfiumNative implements IPdfiumExecutor {
   }
 
   /**
+   * Read page form field
+   *
+   * @param ctx - document context
+   * @param page - page info
+   * @param annotationPtr - pointer to pdf annotation
+   * @param pageCtx - page context
+   * @returns form field
+   *
+   * @private
+   */
+  private readPageAnnoWidget(
+    doc: PdfDocumentObject,
+    page: PdfPageObject,
+    annotationPtr: number,
+    formHandle: number,
+  ): PdfWidgetAnnoObject | undefined {
+    let index = this.getAnnotString(annotationPtr, 'NM');
+    if (!index || !isUuidV4(index)) {
+      index = uuidV4();
+      this.setAnnotString(annotationPtr, 'NM', index);
+    }
+    const subType = this.pdfiumModule.FPDFAnnot_GetSubtype(
+      annotationPtr,
+    ) as PdfAnnotationObject['type'];
+
+    if (subType !== PdfAnnotationSubtype.WIDGET) return;
+
+    return this.readPdfWidgetAnno(doc, page, annotationPtr, formHandle, index);
+  }
+
+  /*
    * Get page annotations (public API, returns Task)
    *
    * @param doc - pdf document
@@ -4308,23 +5701,31 @@ export class PdfiumNative implements IPdfiumExecutor {
       });
     }
 
-    const out = this.readPageAnnotationsRaw(doc, ctx, page);
+    const formInfoPtr = this.pdfiumModule.PDFiumExt_OpenFormFillInfo();
+    const formHandle = this.pdfiumModule.PDFiumExt_InitFormFillEnvironment(ctx.docPtr, formInfoPtr);
 
-    this.logger.perf(
-      LOG_SOURCE,
-      LOG_CATEGORY,
-      `GetPageAnnotationsRaw`,
-      'End',
-      `${doc.id}-${page.index}`,
-    );
-    this.logger.debug(
-      LOG_SOURCE,
-      LOG_CATEGORY,
-      'getPageAnnotationsRaw',
-      `${doc.id}-${page.index}`,
-      out,
-    );
-    return PdfTaskHelper.resolve(out);
+    try {
+      const out = this.readPageAnnotationsRaw(doc, ctx, page, formHandle);
+
+      this.logger.perf(
+        LOG_SOURCE,
+        LOG_CATEGORY,
+        `GetPageAnnotationsRaw`,
+        'End',
+        `${doc.id}-${page.index}`,
+      );
+      this.logger.debug(
+        LOG_SOURCE,
+        LOG_CATEGORY,
+        'getPageAnnotationsRaw',
+        `${doc.id}-${page.index}`,
+        out,
+      );
+      return PdfTaskHelper.resolve(out);
+    } finally {
+      this.pdfiumModule.PDFiumExt_ExitFormFillEnvironment(formHandle);
+      this.pdfiumModule.PDFiumExt_CloseFormFillInfo(formInfoPtr);
+    }
   }
 
   /**
@@ -4334,7 +5735,7 @@ export class PdfiumNative implements IPdfiumExecutor {
    * @param docPtr - pointer to pdf document
    * @param page - page info
    * @param annotationPtr - pointer to pdf annotation
-   * @param pageCtx - page context
+   * @param formHandle - optional form fill handle for widget annotations
    * @returns pdf annotation
    *
    * @private
@@ -4344,7 +5745,7 @@ export class PdfiumNative implements IPdfiumExecutor {
     docPtr: number,
     page: PdfPageObject,
     annotationPtr: number,
-    pageCtx?: PageContext,
+    formHandle?: number,
   ) {
     let index = this.getAnnotString(annotationPtr, 'NM');
     if (!index || !isUuidV4(index)) {
@@ -4372,9 +5773,12 @@ export class PdfiumNative implements IPdfiumExecutor {
         }
         break;
       case PdfAnnotationSubtype.WIDGET:
-        if (pageCtx) {
-          return this.readPdfWidgetAnno(doc, page, annotationPtr, pageCtx.getFormHandle(), index);
+        {
+          if (formHandle !== undefined) {
+            return this.readPdfWidgetAnno(doc, page, annotationPtr, formHandle, index);
+          }
         }
+        break;
       case PdfAnnotationSubtype.FILEATTACHMENT:
         {
           annotation = this.readPdfFileAttachmentAnno(doc, page, annotationPtr, index);
@@ -4751,13 +6155,12 @@ export class PdfiumNative implements IPdfiumExecutor {
     annotPtr: number,
     rect: Rect,
   ): boolean {
-    // Snap device edges the same way setPageAnnoRect does
-    const x0d = Math.floor(rect.origin.x);
-    const y0d = Math.floor(rect.origin.y);
-    const x1d = Math.floor(rect.origin.x + rect.size.width);
-    const y1d = Math.floor(rect.origin.y + rect.size.height);
+    const x0d = rect.origin.x;
+    const y0d = rect.origin.y;
+    const x1d = rect.origin.x + rect.size.width;
+    const y1d = rect.origin.y + rect.size.height;
 
-    // Map all 4 integer corners to page space (handles any /Rotate)
+    // Map all 4 corners to page space (handles any /Rotate)
     const TL = this.convertDevicePointToPagePoint(doc, page, { x: x0d, y: y0d });
     const TR = this.convertDevicePointToPagePoint(doc, page, { x: x1d, y: y0d });
     const BR = this.convertDevicePointToPagePoint(doc, page, { x: x1d, y: y1d });
@@ -4960,13 +6363,11 @@ export class PdfiumNative implements IPdfiumExecutor {
     fontSize: number,
     color: WebColor,
   ): boolean {
-    // Fallback unknown / non-standard fonts to Helvetica so the write never fails.
-    const resolvedFont = font === PdfStandardFont.Unknown ? PdfStandardFont.Helvetica : font;
-    const { red, green, blue } = webColorToPdfColor(color); // 0-255 ints
+    const { red, green, blue } = webColorToPdfColor(color);
 
     return !!this.pdfiumModule.EPDFAnnot_SetDefaultAppearance(
       annotationPtr,
-      resolvedFont,
+      font,
       fontSize,
       red & 0xff,
       green & 0xff,
@@ -5013,24 +6414,24 @@ export class PdfiumNative implements IPdfiumExecutor {
   }
 
   /**
-   * Get the icon of the annotation
+   * Get the /Name entry of the annotation
    *
    * @param annotationPtr - pointer to an `FPDF_ANNOTATION`
-   * @returns `PdfAnnotationIcon`
+   * @returns `PdfAnnotationName`
    */
-  private getAnnotationIcon(annotationPtr: number): PdfAnnotationIcon {
-    return this.pdfiumModule.EPDFAnnot_GetIcon(annotationPtr);
+  private getAnnotationName(annotationPtr: number): PdfAnnotationName {
+    return this.pdfiumModule.EPDFAnnot_GetName(annotationPtr);
   }
 
   /**
-   * Set the icon of the annotation
+   * Set the /Name entry of the annotation
    *
    * @param annotationPtr - pointer to an `FPDF_ANNOTATION`
-   * @param icon - `PdfAnnotationIcon`
+   * @param name - `PdfAnnotationName`
    * @returns `true` on success
    */
-  private setAnnotationIcon(annotationPtr: number, icon: PdfAnnotationIcon): boolean {
-    return this.pdfiumModule.EPDFAnnot_SetIcon(annotationPtr, icon);
+  private setAnnotationName(annotationPtr: number, name: PdfAnnotationName): boolean {
+    return this.pdfiumModule.EPDFAnnot_SetName(annotationPtr, name);
   }
 
   /**
@@ -5089,6 +6490,9 @@ export class PdfiumNative implements IPdfiumExecutor {
    * @returns `{ ok, left, top, right, bottom }`
    *          • `ok`     – `true` when the annotation *has* an /RD entry
    *          • the four floats are 0 when `ok` is false
+   *
+   * Native PDFium exposes /RD as [left, bottom, right, top]. We remap it here
+   * to the model's stable { left, top, right, bottom } shape.
    */
   private getRectangleDifferences(annotationPtr: number): {
     ok: boolean;
@@ -5099,31 +6503,68 @@ export class PdfiumNative implements IPdfiumExecutor {
   } {
     /* tmp storage ─────────────────────────────────────────── */
     const lPtr = this.memoryManager.malloc(4);
-    const tPtr = this.memoryManager.malloc(4);
-    const rPtr = this.memoryManager.malloc(4);
     const bPtr = this.memoryManager.malloc(4);
+    const rPtr = this.memoryManager.malloc(4);
+    const tPtr = this.memoryManager.malloc(4);
 
     const ok = !!this.pdfiumModule.EPDFAnnot_GetRectangleDifferences(
       annotationPtr,
       lPtr,
-      tPtr,
-      rPtr,
       bPtr,
+      rPtr,
+      tPtr,
     );
 
     const pdf = this.pdfiumModule.pdfium;
     const left = pdf.getValue(lPtr, 'float');
-    const top = pdf.getValue(tPtr, 'float');
-    const right = pdf.getValue(rPtr, 'float');
     const bottom = pdf.getValue(bPtr, 'float');
+    const right = pdf.getValue(rPtr, 'float');
+    const top = pdf.getValue(tPtr, 'float');
 
     /* cleanup ─────────────────────────────────────────────── */
     this.memoryManager.free(lPtr);
-    this.memoryManager.free(tPtr);
-    this.memoryManager.free(rPtr);
     this.memoryManager.free(bPtr);
+    this.memoryManager.free(rPtr);
+    this.memoryManager.free(tPtr);
 
     return { ok, left, top, right, bottom };
+  }
+
+  /**
+   * Sets the /RD array on an annotation.
+   *
+   * @param annotationPtr  pointer to an `FPDF_ANNOTATION`
+   * @param rd  the four inset values, or `undefined` to clear
+   * @returns `true` on success
+   */
+  private setRectangleDifferences(
+    annotationPtr: number,
+    rd: { left: number; top: number; right: number; bottom: number } | undefined,
+  ): boolean {
+    if (!rd) {
+      return this.pdfiumModule.EPDFAnnot_ClearRectangleDifferences(annotationPtr);
+    }
+    return this.pdfiumModule.EPDFAnnot_SetRectangleDifferences(
+      annotationPtr,
+      rd.left,
+      rd.bottom,
+      rd.right,
+      rd.top,
+    );
+  }
+
+  /**
+   * Sets or clears the /BE (border effect) dictionary on an annotation.
+   *
+   * @param annotationPtr  pointer to an `FPDF_ANNOTATION`
+   * @param intensity  cloudy border intensity, or `undefined` to clear
+   * @returns `true` on success
+   */
+  private setBorderEffect(annotationPtr: number, intensity: number | undefined): boolean {
+    if (intensity === undefined || intensity <= 0) {
+      return this.pdfiumModule.EPDFAnnot_ClearBorderEffect(annotationPtr);
+    }
+    return this.pdfiumModule.EPDFAnnot_SetBorderEffect(annotationPtr, intensity);
   }
 
   /**
@@ -5742,6 +7183,167 @@ export class PdfiumNative implements IPdfiumExecutor {
     return PdfTaskHelper.resolve<boolean>(!!ok);
   }
 
+  /**
+   * Export an annotation's appearance as a standalone single-page PDF.
+   *
+   * @param doc - document object
+   * @param page - page object
+   * @param annotation - the annotation to export
+   * @returns a PDF buffer containing the annotation appearance
+   */
+  public exportAnnotationAppearanceAsPdf(
+    doc: PdfDocumentObject,
+    page: PdfPageObject,
+    annotation: PdfAnnotationObject,
+  ): PdfTask<ArrayBuffer> {
+    this.logger.debug(
+      LOG_SOURCE,
+      LOG_CATEGORY,
+      'exportAnnotationAppearanceAsPdf',
+      doc.id,
+      page.index,
+      annotation.id,
+    );
+    const label = 'ExportAnnotationAppearanceAsPdf';
+    this.logger.perf(LOG_SOURCE, LOG_CATEGORY, label, 'Begin', `${doc.id}-${page.index}`);
+
+    const ctx = this.cache.getContext(doc.id);
+    if (!ctx) {
+      this.logger.perf(LOG_SOURCE, LOG_CATEGORY, label, 'End', `${doc.id}-${page.index}`);
+      return PdfTaskHelper.reject<ArrayBuffer>({
+        code: PdfErrorCode.DocNotOpen,
+        message: 'document does not open',
+      });
+    }
+
+    const pageCtx = ctx.acquirePage(page.index);
+    const annotPtr = this.getAnnotationByName(pageCtx.pagePtr, annotation.id);
+    if (!annotPtr) {
+      pageCtx.release();
+      this.logger.perf(LOG_SOURCE, LOG_CATEGORY, label, 'End', `${doc.id}-${page.index}`);
+      return PdfTaskHelper.reject<ArrayBuffer>({
+        code: PdfErrorCode.NotFound,
+        message: 'annotation not found',
+      });
+    }
+
+    const exportedDocPtr = this.pdfiumModule.EPDFAnnot_ExportAppearanceAsDocument(annotPtr);
+    this.pdfiumModule.FPDFPage_CloseAnnot(annotPtr);
+
+    if (!exportedDocPtr) {
+      pageCtx.release();
+      this.logger.perf(LOG_SOURCE, LOG_CATEGORY, label, 'End', `${doc.id}-${page.index}`);
+      return PdfTaskHelper.reject<ArrayBuffer>({
+        code: PdfErrorCode.CantCreateNewDoc,
+        message: 'can not export annotation as pdf',
+      });
+    }
+
+    try {
+      return PdfTaskHelper.resolve(this.saveDocument(exportedDocPtr));
+    } finally {
+      this.pdfiumModule.FPDF_CloseDocument(exportedDocPtr);
+      pageCtx.release();
+      this.logger.perf(LOG_SOURCE, LOG_CATEGORY, label, 'End', `${doc.id}-${page.index}`);
+    }
+  }
+
+  /**
+   * Export multiple annotations' appearances as a standalone single-page PDF.
+   * All annotations must be on the same page. The resulting page is sized to
+   * the union of all annotation rects, with each appearance positioned correctly.
+   *
+   * @param doc - document object
+   * @param page - page object
+   * @param annotations - the annotations to export
+   * @returns a PDF buffer containing the combined appearances
+   */
+  public exportAnnotationsAppearanceAsPdf(
+    doc: PdfDocumentObject,
+    page: PdfPageObject,
+    annotations: PdfAnnotationObject[],
+  ): PdfTask<ArrayBuffer> {
+    this.logger.debug(
+      LOG_SOURCE,
+      LOG_CATEGORY,
+      'exportAnnotationsAppearanceAsPdf',
+      doc.id,
+      page.index,
+      annotations.map((a) => a.id),
+    );
+    const label = 'ExportAnnotationsAppearanceAsPdf';
+    this.logger.perf(LOG_SOURCE, LOG_CATEGORY, label, 'Begin', `${doc.id}-${page.index}`);
+
+    const ctx = this.cache.getContext(doc.id);
+    if (!ctx) {
+      this.logger.perf(LOG_SOURCE, LOG_CATEGORY, label, 'End', `${doc.id}-${page.index}`);
+      return PdfTaskHelper.reject<ArrayBuffer>({
+        code: PdfErrorCode.DocNotOpen,
+        message: 'document does not open',
+      });
+    }
+
+    if (annotations.length === 0) {
+      this.logger.perf(LOG_SOURCE, LOG_CATEGORY, label, 'End', `${doc.id}-${page.index}`);
+      return PdfTaskHelper.reject<ArrayBuffer>({
+        code: PdfErrorCode.NotFound,
+        message: 'no annotations provided',
+      });
+    }
+
+    const pageCtx = ctx.acquirePage(page.index);
+
+    const annotPtrs: number[] = [];
+    for (const annotation of annotations) {
+      const annotPtr = this.getAnnotationByName(pageCtx.pagePtr, annotation.id);
+      if (!annotPtr) {
+        for (const ptr of annotPtrs) {
+          this.pdfiumModule.FPDFPage_CloseAnnot(ptr);
+        }
+        pageCtx.release();
+        this.logger.perf(LOG_SOURCE, LOG_CATEGORY, label, 'End', `${doc.id}-${page.index}`);
+        return PdfTaskHelper.reject<ArrayBuffer>({
+          code: PdfErrorCode.NotFound,
+          message: `annotation not found: ${annotation.id}`,
+        });
+      }
+      annotPtrs.push(annotPtr);
+    }
+
+    const ptrArraySize = annotPtrs.length * 4;
+    const ptrArrayPtr = this.memoryManager.malloc(ptrArraySize);
+    for (let i = 0; i < annotPtrs.length; i++) {
+      this.pdfiumModule.pdfium.setValue(ptrArrayPtr + i * 4, annotPtrs[i], 'i32');
+    }
+
+    const exportedDocPtr = this.pdfiumModule.EPDFAnnot_ExportMultipleAppearancesAsDocument(
+      ptrArrayPtr,
+      annotPtrs.length,
+    );
+
+    this.memoryManager.free(ptrArrayPtr);
+    for (const ptr of annotPtrs) {
+      this.pdfiumModule.FPDFPage_CloseAnnot(ptr);
+    }
+
+    if (!exportedDocPtr) {
+      pageCtx.release();
+      this.logger.perf(LOG_SOURCE, LOG_CATEGORY, label, 'End', `${doc.id}-${page.index}`);
+      return PdfTaskHelper.reject<ArrayBuffer>({
+        code: PdfErrorCode.CantCreateNewDoc,
+        message: 'can not export annotations as pdf',
+      });
+    }
+
+    try {
+      return PdfTaskHelper.resolve(this.saveDocument(exportedDocPtr));
+    } finally {
+      this.pdfiumModule.FPDF_CloseDocument(exportedDocPtr);
+      pageCtx.release();
+      this.logger.perf(LOG_SOURCE, LOG_CATEGORY, label, 'End', `${doc.id}-${page.index}`);
+    }
+  }
+
   /** Pack device-space Rects into an FS_QUADPOINTSF[] buffer (page space). */
   private allocFSQuadsBufferFromRects(doc: PdfDocumentObject, page: PdfPageObject, rects: Rect[]) {
     const STRIDE = 32; // 8 floats × 4 bytes
@@ -5891,18 +7493,20 @@ export class PdfiumNative implements IPdfiumExecutor {
     const stateModel = this.getAnnotString(annotationPtr, 'StateModel') as PdfAnnotationStateModel;
     const color = this.getAnnotationColor(annotationPtr);
     const opacity = this.getAnnotationOpacity(annotationPtr);
-    const icon = this.getAnnotationIcon(annotationPtr);
+    const name = this.getAnnotationName(annotationPtr);
 
     return {
       pageIndex: page.index,
       id: index,
       type: PdfAnnotationSubtype.TEXT,
       rect,
+      strokeColor: color ?? '#FFFF00',
       color: color ?? '#FFFF00',
       opacity,
       state,
       stateModel,
-      icon,
+      name,
+      icon: name,
       ...this.readBaseAnnotationProperties(doc, page, annotationPtr),
     };
   }
@@ -5929,10 +7533,16 @@ export class PdfiumNative implements IPdfiumExecutor {
     const defaultStyle = this.getAnnotString(annotationPtr, 'DS');
     const da = this.getAnnotationDefaultAppearance(annotationPtr);
     const bgColor = this.getAnnotationColor(annotationPtr);
+    const textColor = this.getAnnotationColor(annotationPtr, PdfAnnotationColorType.TextColor);
+    const borderStyle = this.getBorderStyle(annotationPtr);
     const textAlign = this.getAnnotationTextAlignment(annotationPtr);
     const verticalAlign = this.getAnnotationVerticalAlignment(annotationPtr);
     const opacity = this.getAnnotationOpacity(annotationPtr);
     const richContent = this.getAnnotRichContent(annotationPtr);
+    const rd = this.getRectangleDifferences(annotationPtr);
+    const intent = this.getAnnotIntent(annotationPtr);
+    const calloutLine = this.getCalloutLine(doc, page, annotationPtr);
+    const lineEndings = this.getLineEndings(annotationPtr);
 
     return {
       pageIndex: page.index,
@@ -5941,14 +7551,30 @@ export class PdfiumNative implements IPdfiumExecutor {
       rect,
       fontFamily: da?.fontFamily ?? PdfStandardFont.Unknown,
       fontSize: da?.fontSize ?? 12,
-      fontColor: da?.fontColor ?? '#000000',
+      fontColor: textColor ?? da?.fontColor ?? '#000000',
       verticalAlign,
-      color: bgColor, // fill color (matches shape convention)
-      backgroundColor: bgColor, // deprecated alias
+      color: bgColor,
+      backgroundColor: bgColor,
       opacity,
       textAlign,
       defaultStyle,
       richContent,
+      ...(rd.ok && {
+        rectangleDifferences: {
+          left: rd.left,
+          top: rd.top,
+          right: rd.right,
+          bottom: rd.bottom,
+        },
+      }),
+      ...(intent && { intent }),
+      ...(calloutLine && { calloutLine }),
+      ...(lineEndings && { lineEnding: lineEndings.end }),
+      ...(borderStyle.width > 0
+        ? { strokeWidth: borderStyle.width, strokeColor: da?.fontColor ?? '#000000' }
+        : intent === 'FreeTextCallout'
+          ? { strokeWidth: 1, strokeColor: da?.fontColor ?? '#000000' }
+          : {}),
       ...this.readBaseAnnotationProperties(doc, page, annotationPtr),
     };
   }
@@ -6036,17 +7662,36 @@ export class PdfiumNative implements IPdfiumExecutor {
     index: string,
   ): PdfWidgetAnnoObject | undefined {
     const pageRect = this.readPageAnnoRect(annotationPtr);
+    const flags = this.getAnnotationFlags(annotationPtr);
+    const da = this.getAnnotationDefaultAppearance(annotationPtr);
     const rect = this.convertPageRectToDeviceRect(doc, page, pageRect);
 
     // Type-specific properties
     const field = this.readPdfWidgetAnnoField(formHandle, annotationPtr);
 
+    // Stable export value for toggle widgets (non-"Off" key from AP/N dict)
+    const exportValue = this.readButtonExportValue(annotationPtr);
+
+    // MK dictionary colors
+    const strokeColor = this.getMKColor(annotationPtr, 0); // EPDF_MK_COLOR_BC
+    const color = this.getMKColor(annotationPtr, 1); // EPDF_MK_COLOR_BG
+
+    // Border width
+    const { width: strokeWidth } = this.getBorderStyle(annotationPtr);
+
     return {
       pageIndex: page.index,
       id: index,
       type: PdfAnnotationSubtype.WIDGET,
+      fontFamily: da?.fontFamily ?? PdfStandardFont.Unknown,
+      fontSize: da?.fontSize ?? 12,
+      fontColor: da?.fontColor ?? '#000000',
       rect,
       field,
+      ...(exportValue !== undefined && { exportValue }),
+      strokeWidth,
+      strokeColor: strokeColor ?? 'transparent',
+      color: color ?? 'transparent',
       ...this.readBaseAnnotationProperties(doc, page, annotationPtr),
     };
   }
@@ -6101,7 +7746,6 @@ export class PdfiumNative implements IPdfiumExecutor {
     const opacity = this.getAnnotationOpacity(annotationPtr);
     const { width: strokeWidth } = this.getBorderStyle(annotationPtr);
     const inkList = this.getInkList(doc, page, annotationPtr);
-    const blendMode = this.pdfiumModule.EPDFAnnot_GetBlendMode(annotationPtr);
     const intent = this.getAnnotIntent(annotationPtr);
 
     return {
@@ -6110,7 +7754,6 @@ export class PdfiumNative implements IPdfiumExecutor {
       type: PdfAnnotationSubtype.INK,
       rect,
       ...(intent && { intent }),
-      blendMode,
       strokeColor,
       color: strokeColor, // deprecated alias
       opacity,
@@ -6165,6 +7808,9 @@ export class PdfiumNative implements IPdfiumExecutor {
       }
     }
 
+    const rd = this.getRectangleDifferences(annotationPtr);
+    const be = this.getBorderEffect(annotationPtr);
+
     return {
       pageIndex: page.index,
       id: index,
@@ -6177,6 +7823,15 @@ export class PdfiumNative implements IPdfiumExecutor {
       strokeStyle,
       strokeDashArray,
       vertices,
+      ...(be.ok && { cloudyBorderIntensity: be.intensity }),
+      ...(rd.ok && {
+        rectangleDifferences: {
+          left: rd.left,
+          top: rd.top,
+          right: rd.right,
+          bottom: rd.bottom,
+        },
+      }),
       ...this.readBaseAnnotationProperties(doc, page, annotationPtr),
     };
   }
@@ -6314,14 +7969,12 @@ export class PdfiumNative implements IPdfiumExecutor {
     const segmentRects = this.getQuadPointsAnno(doc, page, annotationPtr);
     const strokeColor = this.getAnnotationColor(annotationPtr) ?? '#FFFF00';
     const opacity = this.getAnnotationOpacity(annotationPtr);
-    const blendMode = this.pdfiumModule.EPDFAnnot_GetBlendMode(annotationPtr);
 
     return {
       pageIndex: page.index,
       id: index,
       type: PdfAnnotationSubtype.HIGHLIGHT,
       rect,
-      blendMode,
       segmentRects,
       strokeColor,
       color: strokeColor, // deprecated alias
@@ -6352,14 +8005,12 @@ export class PdfiumNative implements IPdfiumExecutor {
     const segmentRects = this.getQuadPointsAnno(doc, page, annotationPtr);
     const strokeColor = this.getAnnotationColor(annotationPtr) ?? '#FF0000';
     const opacity = this.getAnnotationOpacity(annotationPtr);
-    const blendMode = this.pdfiumModule.EPDFAnnot_GetBlendMode(annotationPtr);
 
     return {
       pageIndex: page.index,
       id: index,
       type: PdfAnnotationSubtype.UNDERLINE,
       rect,
-      blendMode,
       segmentRects,
       strokeColor,
       color: strokeColor, // deprecated alias
@@ -6390,14 +8041,12 @@ export class PdfiumNative implements IPdfiumExecutor {
     const segmentRects = this.getQuadPointsAnno(doc, page, annotationPtr);
     const strokeColor = this.getAnnotationColor(annotationPtr) ?? '#FF0000';
     const opacity = this.getAnnotationOpacity(annotationPtr);
-    const blendMode = this.pdfiumModule.EPDFAnnot_GetBlendMode(annotationPtr);
 
     return {
       pageIndex: page.index,
       id: index,
       type: PdfAnnotationSubtype.STRIKEOUT,
       rect,
-      blendMode,
       segmentRects,
       strokeColor,
       color: strokeColor, // deprecated alias
@@ -6428,14 +8077,12 @@ export class PdfiumNative implements IPdfiumExecutor {
     const segmentRects = this.getQuadPointsAnno(doc, page, annotationPtr);
     const strokeColor = this.getAnnotationColor(annotationPtr) ?? '#FF0000';
     const opacity = this.getAnnotationOpacity(annotationPtr);
-    const blendMode = this.pdfiumModule.EPDFAnnot_GetBlendMode(annotationPtr);
 
     return {
       pageIndex: page.index,
       id: index,
       type: PdfAnnotationSubtype.SQUIGGLY,
       rect,
-      blendMode,
       segmentRects,
       strokeColor,
       color: strokeColor, // deprecated alias
@@ -6461,12 +8108,27 @@ export class PdfiumNative implements IPdfiumExecutor {
   ): PdfCaretAnnoObject | undefined {
     const pageRect = this.readPageAnnoRect(annotationPtr);
     const rect = this.convertPageRectToDeviceRect(doc, page, pageRect);
+    const strokeColor = this.getAnnotationColor(annotationPtr);
+    const opacity = this.getAnnotationOpacity(annotationPtr);
+    const intent = this.getAnnotIntent(annotationPtr);
+    const rd = this.getRectangleDifferences(annotationPtr);
 
     return {
       pageIndex: page.index,
       id: index,
       type: PdfAnnotationSubtype.CARET,
       rect,
+      strokeColor,
+      opacity,
+      intent,
+      ...(rd.ok && {
+        rectangleDifferences: {
+          left: rd.left,
+          top: rd.top,
+          right: rd.right,
+          bottom: rd.bottom,
+        },
+      }),
       ...this.readBaseAnnotationProperties(doc, page, annotationPtr),
     };
   }
@@ -6546,12 +8208,15 @@ export class PdfiumNative implements IPdfiumExecutor {
   ): PdfStampAnnoObject | undefined {
     const pageRect = this.readPageAnnoRect(annotationPtr);
     const rect = this.convertPageRectToDeviceRect(doc, page, pageRect);
+    const name = this.getAnnotationName(annotationPtr);
 
     return {
       pageIndex: page.index,
       id: index,
       type: PdfAnnotationSubtype.STAMP,
       rect,
+      name,
+      icon: name,
       ...this.readBaseAnnotationProperties(doc, page, annotationPtr),
     };
   }
@@ -6844,6 +8509,9 @@ export class PdfiumNative implements IPdfiumExecutor {
       }
     }
 
+    const rd = this.getRectangleDifferences(annotationPtr);
+    const be = this.getBorderEffect(annotationPtr);
+
     return {
       pageIndex: page.index,
       id: index,
@@ -6855,6 +8523,15 @@ export class PdfiumNative implements IPdfiumExecutor {
       strokeColor: strokeColor ?? '#FF0000',
       strokeStyle,
       ...(strokeDashArray !== undefined && { strokeDashArray }),
+      ...(be.ok && { cloudyBorderIntensity: be.intensity }),
+      ...(rd.ok && {
+        rectangleDifferences: {
+          left: rd.left,
+          top: rd.top,
+          right: rd.right,
+          bottom: rd.bottom,
+        },
+      }),
       ...this.readBaseAnnotationProperties(doc, page, annotationPtr),
     };
   }
@@ -6894,6 +8571,9 @@ export class PdfiumNative implements IPdfiumExecutor {
       }
     }
 
+    const rd = this.getRectangleDifferences(annotationPtr);
+    const be = this.getBorderEffect(annotationPtr);
+
     return {
       pageIndex: page.index,
       id: index,
@@ -6905,6 +8585,15 @@ export class PdfiumNative implements IPdfiumExecutor {
       strokeWidth,
       strokeStyle,
       ...(strokeDashArray !== undefined && { strokeDashArray }),
+      ...(be.ok && { cloudyBorderIntensity: be.intensity }),
+      ...(rd.ok && {
+        rectangleDifferences: {
+          left: rd.left,
+          top: rd.top,
+          right: rd.right,
+          bottom: rd.bottom,
+        },
+      }),
       ...this.readBaseAnnotationProperties(doc, page, annotationPtr),
     };
   }
@@ -6951,7 +8640,14 @@ export class PdfiumNative implements IPdfiumExecutor {
     const parentPtr = this.pdfiumModule.FPDFAnnot_GetLinkedAnnot(annotationPtr, 'IRT');
     if (!parentPtr) return;
 
-    return this.getAnnotString(parentPtr, 'NM');
+    let nm = this.getAnnotString(parentPtr, 'NM');
+    if (!nm || !isUuidV4(nm)) {
+      nm = uuidV4();
+      this.setAnnotString(parentPtr, 'NM', nm);
+    }
+
+    this.pdfiumModule.FPDFPage_CloseAnnot(parentPtr);
+    return nm;
   }
 
   /**
@@ -7079,6 +8775,10 @@ export class PdfiumNative implements IPdfiumExecutor {
       return false;
     }
 
+    if (annotation.subject && !this.setAnnotString(annotationPtr, 'Subj', annotation.subject)) {
+      return false;
+    }
+
     // Modified date (M)
     if (annotation.modified) {
       if (!this.setAnnotationDate(annotationPtr, 'M', annotation.modified)) {
@@ -7172,6 +8872,7 @@ export class PdfiumNative implements IPdfiumExecutor {
     created: Date | undefined;
     flags: PdfAnnotationFlagName[];
     custom: unknown;
+    blendMode: PdfBlendMode;
     inReplyToId?: string;
     replyType?: PdfAnnotationReplyType;
   } {
@@ -7179,10 +8880,12 @@ export class PdfiumNative implements IPdfiumExecutor {
     const contents = this.getAnnotString(annotationPtr, 'Contents') || '';
     const modified = this.getAnnotationDate(annotationPtr, 'M');
     const created = this.getAnnotationDate(annotationPtr, 'CreationDate');
+    const subject = this.getAnnotString(annotationPtr, 'Subj');
     const flags = this.getAnnotationFlags(annotationPtr);
     const custom = this.getAnnotCustom(annotationPtr);
     const inReplyToId = this.getInReplyToId(annotationPtr);
     const replyType = this.getReplyType(annotationPtr);
+    const blendMode = this.pdfiumModule.EPDFAnnot_GetBlendMode(annotationPtr);
 
     // Read EmbedPDF extended rotation and convert from PDF CCW to UI CW convention
     const pdfRotation = this.getAnnotExtendedRotation(annotationPtr);
@@ -7201,6 +8904,8 @@ export class PdfiumNative implements IPdfiumExecutor {
       created,
       flags,
       custom,
+      blendMode,
+      ...(subject && { subject }),
       // Only include IRT if present
       ...(inReplyToId && { inReplyToId }),
       // Only include RT if present and not the default (Reply)
@@ -7225,6 +8930,20 @@ export class PdfiumNative implements IPdfiumExecutor {
     const ptr = this.memoryManager.malloc(bytes);
 
     this.pdfiumModule.FPDFAnnot_GetStringValue(annotationPtr, key, ptr, bytes);
+    const value = this.pdfiumModule.pdfium.UTF16ToString(ptr);
+    this.memoryManager.free(ptr);
+
+    return value || undefined;
+  }
+
+  private readButtonExportValue(annotationPtr: number): string | undefined {
+    const len = this.pdfiumModule.EPDFAnnot_GetButtonExportValue(annotationPtr, 0, 0);
+    if (len === 0) return;
+
+    const bytes = (len + 1) * 2;
+    const ptr = this.memoryManager.malloc(bytes);
+
+    this.pdfiumModule.EPDFAnnot_GetButtonExportValue(annotationPtr, ptr, bytes);
     const value = this.pdfiumModule.pdfium.UTF16ToString(ptr);
     this.memoryManager.free(ptr);
 
@@ -7503,6 +9222,67 @@ export class PdfiumNative implements IPdfiumExecutor {
   }
 
   /**
+   * Read the callout line points (/CL) from a FreeText annotation.
+   * Returns an array of 2 or 3 Position points in device coords, or undefined.
+   *
+   * @private
+   */
+  private getCalloutLine(
+    doc: PdfDocumentObject,
+    page: PdfPageObject,
+    annotationPtr: number,
+  ): Position[] | undefined {
+    const count = this.pdfiumModule.EPDFAnnot_GetCalloutLineCount(annotationPtr);
+    if (count === 0) {
+      return undefined;
+    }
+
+    const FS_POINTF_SIZE = 8;
+    const pointsPtr = this.memoryManager.malloc(count * FS_POINTF_SIZE);
+    const result = this.pdfiumModule.EPDFAnnot_GetCalloutLine(annotationPtr, pointsPtr, count);
+    if (result === 0) {
+      this.memoryManager.free(pointsPtr);
+      return undefined;
+    }
+
+    const points: Position[] = [];
+    for (let i = 0; i < count; i++) {
+      const px = this.pdfiumModule.pdfium.getValue(pointsPtr + i * FS_POINTF_SIZE, 'float');
+      const py = this.pdfiumModule.pdfium.getValue(pointsPtr + i * FS_POINTF_SIZE + 4, 'float');
+      points.push(this.convertPagePointToDevicePoint(doc, page, { x: px, y: py }));
+    }
+    this.memoryManager.free(pointsPtr);
+    return points;
+  }
+
+  /**
+   * Set the callout line points (/CL) on a FreeText annotation.
+   * Converts from device coords to page coords before writing.
+   *
+   * @private
+   */
+  private setCalloutLine(
+    doc: PdfDocumentObject,
+    page: PdfPageObject,
+    annotPtr: number,
+    points: Position[],
+  ): boolean {
+    const pdf = this.pdfiumModule.pdfium;
+    const FS_POINTF_SIZE = 8;
+
+    const buf = this.memoryManager.malloc(FS_POINTF_SIZE * points.length);
+    points.forEach((v, i) => {
+      const pagePt = this.convertDevicePointToPagePoint(doc, page, v);
+      pdf.setValue(buf + i * FS_POINTF_SIZE + 0, pagePt.x, 'float');
+      pdf.setValue(buf + i * FS_POINTF_SIZE + 4, pagePt.y, 'float');
+    });
+
+    const ok = this.pdfiumModule.EPDFAnnot_SetCalloutLine(annotPtr, buf, points.length);
+    this.memoryManager.free(buf);
+    return ok;
+  }
+
+  /**
    * Read the target of pdf bookmark
    * @param docPtr - pointer to pdf document object
    * @param getActionPtr - callback function to retrive the pointer of action
@@ -7585,7 +9365,7 @@ export class PdfiumNative implements IPdfiumExecutor {
     const value = readString(
       this.pdfiumModule.pdfium,
       (buffer: number, bufferLength) => {
-        return this.pdfiumModule.FPDFAnnot_GetFormFieldValue(
+        return this.pdfiumModule.EPDFAnnot_GetFormFieldRawValue(
           formHandle,
           annotationPtr,
           buffer,
@@ -7595,49 +9375,79 @@ export class PdfiumNative implements IPdfiumExecutor {
       this.pdfiumModule.pdfium.UTF16ToString,
     );
 
-    const options: PdfWidgetAnnoOption[] = [];
-    if (type === PDF_FORM_FIELD_TYPE.COMBOBOX || type === PDF_FORM_FIELD_TYPE.LISTBOX) {
-      const count = this.pdfiumModule.FPDFAnnot_GetOptionCount(formHandle, annotationPtr);
-      for (let i = 0; i < count; i++) {
-        const label = readString(
-          this.pdfiumModule.pdfium,
-          (buffer: number, bufferLength) => {
-            return this.pdfiumModule.FPDFAnnot_GetOptionLabel(
-              formHandle,
-              annotationPtr,
-              i,
-              buffer,
-              bufferLength,
-            );
-          },
-          this.pdfiumModule.pdfium.UTF16ToString,
-        );
-        const isSelected = this.pdfiumModule.FPDFAnnot_IsOptionSelected(
-          formHandle,
-          annotationPtr,
-          i,
-        );
-        options.push({
-          label,
-          isSelected,
-        });
-      }
-    }
+    const fieldObjectId = this.pdfiumModule.EPDFAnnot_GetFormFieldObjectNumber(
+      formHandle,
+      annotationPtr,
+    );
 
-    let isChecked = false;
-    if (type === PDF_FORM_FIELD_TYPE.CHECKBOX || type === PDF_FORM_FIELD_TYPE.RADIOBUTTON) {
-      isChecked = this.pdfiumModule.FPDFAnnot_IsChecked(formHandle, annotationPtr);
-    }
-
-    return {
+    const base = {
       flag,
-      type,
       name,
       alternateName,
       value,
-      isChecked,
-      options,
+      fieldObjectId: fieldObjectId > 0 ? fieldObjectId : undefined,
     };
+
+    switch (type) {
+      case PDF_FORM_FIELD_TYPE.TEXTFIELD: {
+        let maxLen: number | undefined;
+        const floatPtr = this.memoryManager.malloc(4);
+        const ok = this.pdfiumModule.FPDFAnnot_GetNumberValue(annotationPtr, 'MaxLen', floatPtr);
+        if (ok) {
+          maxLen = this.pdfiumModule.pdfium.getValue(floatPtr, 'float');
+        }
+        this.memoryManager.free(floatPtr);
+        return { ...base, type, maxLen };
+      }
+
+      case PDF_FORM_FIELD_TYPE.CHECKBOX:
+        return { ...base, type };
+
+      case PDF_FORM_FIELD_TYPE.RADIOBUTTON:
+        return {
+          ...base,
+          type,
+          options: this.readWidgetOptions(formHandle, annotationPtr),
+        };
+
+      case PDF_FORM_FIELD_TYPE.COMBOBOX:
+        return { ...base, type, options: this.readWidgetOptions(formHandle, annotationPtr) };
+
+      case PDF_FORM_FIELD_TYPE.LISTBOX:
+        return { ...base, type, options: this.readWidgetOptions(formHandle, annotationPtr) };
+
+      case PDF_FORM_FIELD_TYPE.PUSHBUTTON:
+        return { ...base, type };
+
+      case PDF_FORM_FIELD_TYPE.SIGNATURE:
+        return { ...base, type };
+
+      default:
+        return { ...base, type: type as PdfUnknownWidgetAnnoField['type'] };
+    }
+  }
+
+  private readWidgetOptions(formHandle: number, annotationPtr: number): PdfWidgetAnnoOption[] {
+    const options: PdfWidgetAnnoOption[] = [];
+    const count = this.pdfiumModule.FPDFAnnot_GetOptionCount(formHandle, annotationPtr);
+    for (let i = 0; i < count; i++) {
+      const label = readString(
+        this.pdfiumModule.pdfium,
+        (buffer: number, bufferLength) => {
+          return this.pdfiumModule.FPDFAnnot_GetOptionLabel(
+            formHandle,
+            annotationPtr,
+            i,
+            buffer,
+            bufferLength,
+          );
+        },
+        this.pdfiumModule.pdfium.UTF16ToString,
+      );
+      const isSelected = this.pdfiumModule.FPDFAnnot_IsOptionSelected(formHandle, annotationPtr, i);
+      options.push({ label, isSelected });
+    }
+    return options;
   }
 
   /**
@@ -7706,6 +9516,28 @@ export class PdfiumNative implements IPdfiumExecutor {
       return PdfTaskHelper.reject({ code: PdfErrorCode.NotFound, message: 'annotation not found' });
     }
 
+    // 1b) pre-check: does this annotation have a renderable appearance for the requested mode?
+    let hasAP = !!this.pdfiumModule.EPDFAnnot_HasAppearanceStream(annotPtr, mode);
+    if (!hasAP && annotation.type === PdfAnnotationSubtype.WIDGET) {
+      if (!this.pdfiumModule.FPDFAnnot_HasKey(annotPtr, 'AP')) {
+        this.pdfiumModule.EPDFAnnot_GenerateFormFieldAP(annotPtr);
+        hasAP = !!this.pdfiumModule.EPDFAnnot_HasAppearanceStream(annotPtr, mode);
+      }
+    }
+    if (!hasAP) {
+      this.pdfiumModule.FPDFPage_CloseAnnot(annotPtr);
+      pageCtx.release();
+      this.logger.perf(
+        LOG_SOURCE,
+        LOG_CATEGORY,
+        `RenderPageAnnotation`,
+        'End',
+        `${doc.id}-${page.index}-${annotation.id}`,
+      );
+      task.resolve({ data: new Uint8ClampedArray(4), width: 1, height: 1 });
+      return task;
+    }
+
     // 2) device size (rotation-aware) → integer pixels
     const finalScale = Math.max(0.01, scaleFactor * dpr);
 
@@ -7714,8 +9546,7 @@ export class PdfiumNative implements IPdfiumExecutor {
     const unrotated = !!options?.unrotated && !!annotation.unrotatedRect;
     const renderRect = unrotated ? annotation.unrotatedRect! : annotation.rect;
 
-    const rect = toIntRect(renderRect);
-    const devRect = toIntRect(transformRect(page.size, rect, rotation, finalScale));
+    const devRect = toIntRect(transformRect(page.size, renderRect, rotation, finalScale));
 
     const wDev = Math.max(1, devRect.size.width);
     const hDev = Math.max(1, devRect.size.height);
@@ -7734,12 +9565,7 @@ export class PdfiumNative implements IPdfiumExecutor {
     this.pdfiumModule.FPDFBitmap_FillRect(bitmapPtr, 0, 0, wDev, hDev, 0x00000000);
 
     // 4) user matrix (no Y-flip; includes -origin translate)
-    const M = buildUserToDeviceMatrix(
-      rect, // {origin:{L,B}, size:{W,H}}
-      rotation,
-      wDev,
-      hDev,
-    );
+    const M = buildUserToDeviceMatrix(renderRect, rotation, wDev, hDev);
     const mPtr = this.memoryManager.malloc(6 * 4);
     const mView = new Float32Array(this.pdfiumModule.pdfium.HEAPF32.buffer, mPtr, 6);
     mView.set([M.a, M.b, M.c, M.d, M.e, M.f]);
@@ -7933,12 +9759,26 @@ export class PdfiumNative implements IPdfiumExecutor {
     rotation: Rotation,
     finalScale: number,
   ): AnnotationAppearanceImage | null {
+    if (!this.pdfiumModule.EPDFAnnot_HasAppearanceStream(annotPtr, mode)) {
+      const subtype = this.pdfiumModule.FPDFAnnot_GetSubtype(annotPtr);
+      if (
+        subtype === PdfAnnotationSubtype.WIDGET &&
+        !this.pdfiumModule.FPDFAnnot_HasKey(annotPtr, 'AP')
+      ) {
+        this.pdfiumModule.EPDFAnnot_GenerateFormFieldAP(annotPtr);
+        if (!this.pdfiumModule.EPDFAnnot_HasAppearanceStream(annotPtr, mode)) {
+          return null;
+        }
+      } else {
+        return null;
+      }
+    }
+
     // Read rect using EPDFAnnot_GetRect (normalized) and convert to device coords
     const pageRect = this.readPageAnnoRect(annotPtr);
     const annotRect = this.convertPageRectToDeviceRect(doc, page, pageRect);
 
-    const rect = toIntRect(annotRect);
-    const devRect = toIntRect(transformRect(page.size, rect, rotation, finalScale));
+    const devRect = toIntRect(transformRect(page.size, annotRect, rotation, finalScale));
     const wDev = Math.max(1, devRect.size.width);
     const hDev = Math.max(1, devRect.size.height);
     const stride = wDev * 4;
@@ -7954,7 +9794,7 @@ export class PdfiumNative implements IPdfiumExecutor {
     );
     this.pdfiumModule.FPDFBitmap_FillRect(bitmapPtr, 0, 0, wDev, hDev, 0x00000000);
 
-    const M = buildUserToDeviceMatrix(rect, rotation, wDev, hDev);
+    const M = buildUserToDeviceMatrix(annotRect, rotation, wDev, hDev);
     const mPtr = this.memoryManager.malloc(6 * 4);
     const mView = new Float32Array(this.pdfiumModule.pdfium.HEAPF32.buffer, mPtr, 6);
     mView.set([M.a, M.b, M.c, M.d, M.e, M.f]);
@@ -8024,7 +9864,6 @@ export class PdfiumNative implements IPdfiumExecutor {
 
     const pageCtx = ctx.acquirePage(page.index);
     const shouldRenderForms = options?.withForms ?? false;
-    const formHandle = shouldRenderForms ? pageCtx.getFormHandle() : undefined;
 
     // ---- 2) allocate a BGRA bitmap in WASM
     const heapPtr = this.memoryManager.malloc(bytes);
@@ -8035,8 +9874,8 @@ export class PdfiumNative implements IPdfiumExecutor {
       heapPtr,
       stride,
     );
-    // white background like page renderers typically do
-    this.pdfiumModule.FPDFBitmap_FillRect(bitmapPtr, 0, 0, wDev, hDev, 0xffffffff);
+    const bgColor = options?.transparentBackground ? 0x00000000 : 0xffffffff;
+    this.pdfiumModule.FPDFBitmap_FillRect(bitmapPtr, 0, 0, wDev, hDev, bgColor);
 
     const M = buildUserToDeviceMatrix(rect, rotation, wDev, hDev);
 
@@ -8062,22 +9901,23 @@ export class PdfiumNative implements IPdfiumExecutor {
         flags,
       );
 
-      if (formHandle !== undefined) {
-        const formParams = computeFormDrawParams(M, rect, page.size, rotation);
-        const { startX, startY, formsWidth, formsHeight, scaleX, scaleY } = formParams;
+      if (shouldRenderForms) {
+        pageCtx.withFormHandle((formHandle) => {
+          const formParams = computeFormDrawParams(M, rect, page.size, rotation);
+          const { startX, startY, formsWidth, formsHeight } = formParams;
 
-        // Draw form elements using the same effective transform as the page bitmap.
-        this.pdfiumModule.FPDF_FFLDraw(
-          formHandle,
-          bitmapPtr,
-          pageCtx.pagePtr,
-          startX,
-          startY,
-          formsWidth,
-          formsHeight,
-          rotation,
-          flags,
-        );
+          this.pdfiumModule.FPDF_FFLDraw(
+            formHandle,
+            bitmapPtr,
+            pageCtx.pagePtr,
+            startX,
+            startY,
+            formsWidth,
+            formsHeight,
+            rotation,
+            flags,
+          );
+        });
       }
     } finally {
       pageCtx.release();
@@ -8760,13 +10600,12 @@ export class PdfiumNative implements IPdfiumExecutor {
     annotPtr: number,
     rect: Rect,
   ): boolean {
-    // Snap device edges the same way FPDF_DeviceToPage(int,int,...) did (truncate → floor for ≥0)
-    const x0d = Math.floor(rect.origin.x);
-    const y0d = Math.floor(rect.origin.y);
-    const x1d = Math.floor(rect.origin.x + rect.size.width);
-    const y1d = Math.floor(rect.origin.y + rect.size.height);
+    const x0d = rect.origin.x;
+    const y0d = rect.origin.y;
+    const x1d = rect.origin.x + rect.size.width;
+    const y1d = rect.origin.y + rect.size.height;
 
-    // Map all 4 integer corners to page space (handles any /Rotate)
+    // Map all 4 corners to page space (handles any /Rotate)
     const TL = this.convertDevicePointToPagePoint(doc, page, { x: x0d, y: y0d });
     const TR = this.convertDevicePointToPagePoint(doc, page, { x: x1d, y: y0d });
     const BR = this.convertDevicePointToPagePoint(doc, page, { x: x1d, y: y1d });
@@ -8957,19 +10796,29 @@ export class PdfiumNative implements IPdfiumExecutor {
       const results: Record<number, PdfAnnotationObject[]> = {};
       const total = pages.length;
 
-      // Process all pages in a tight loop - no queue overhead!
-      for (let i = 0; i < pages.length; i++) {
-        const page = pages[i];
-        const annotations = this.readPageAnnotationsRaw(doc, ctx, page);
-        results[page.index] = annotations;
+      const formInfoPtr = this.pdfiumModule.PDFiumExt_OpenFormFillInfo();
+      const formHandle = this.pdfiumModule.PDFiumExt_InitFormFillEnvironment(
+        ctx.docPtr,
+        formInfoPtr,
+      );
 
-        // Stream progress per page
-        task.progress({
-          pageIndex: page.index,
-          result: annotations,
-          completed: i + 1,
-          total,
-        });
+      try {
+        for (let i = 0; i < pages.length; i++) {
+          const page = pages[i];
+          const annotations = this.readPageAnnotationsRaw(doc, ctx, page, formHandle);
+          results[page.index] = annotations;
+
+          // Stream progress per page
+          task.progress({
+            pageIndex: page.index,
+            result: annotations,
+            completed: i + 1,
+            total,
+          });
+        }
+      } finally {
+        this.pdfiumModule.PDFiumExt_ExitFormFillEnvironment(formHandle);
+        this.pdfiumModule.PDFiumExt_CloseFormFillInfo(formInfoPtr);
       }
 
       this.logger.perf(LOG_SOURCE, LOG_CATEGORY, 'GetAnnotationsBatch', 'End', doc.id);

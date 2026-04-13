@@ -114,7 +114,7 @@ export class ImageEncoderWorkerPool {
    */
   encode(
     imageData: { data: Uint8ClampedArray; width: number; height: number },
-    imageType: 'image/png' | 'image/jpeg' | 'image/webp' = 'image/webp',
+    imageType: 'image/png' | 'image/jpeg' | 'image/webp' | 'image/bmp' = 'image/png',
     quality?: number,
   ): Promise<Blob> {
     return new Promise((resolve, reject) => {

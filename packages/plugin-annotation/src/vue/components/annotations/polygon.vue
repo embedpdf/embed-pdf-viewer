@@ -14,15 +14,20 @@
   >
     <!-- Hit area -- always rendered, transparent, wider stroke for mobile -->
     <path
-      :d="pathData"
+      :d="isCloudy && cloudyPath ? cloudyPath.path : pathData"
       fill="transparent"
       stroke="transparent"
       :stroke-width="hitStrokeWidth"
       @pointerdown="onClick"
-      @touchstart="onClick"
       :style="{
-        cursor: isSelected ? 'move' : 'pointer',
-        pointerEvents: isSelected ? 'none' : color === 'transparent' ? 'visibleStroke' : 'visible',
+        cursor: isSelected ? 'move' : onClick ? 'pointer' : 'default',
+        pointerEvents: !onClick
+          ? 'none'
+          : isSelected
+            ? 'none'
+            : color === 'transparent'
+              ? 'visibleStroke'
+              : 'visible',
         strokeLinecap: 'butt',
         strokeLinejoin: 'miter',
       }"
@@ -31,46 +36,60 @@
     <!-- Visual -- hidden when AP active, never interactive -->
     <template v-if="!appearanceActive">
       <path
-        :d="pathData"
+        v-if="isCloudy && cloudyPath"
+        :d="cloudyPath.path"
         :opacity="opacity"
         :style="{
-          fill: currentVertex ? 'none' : color,
+          fill: color,
           stroke: strokeColor ?? color,
           strokeWidth,
           pointerEvents: 'none',
-          strokeLinecap: 'butt',
-          strokeLinejoin: 'miter',
-          ...(strokeStyle === PdfAnnotationBorderStyle.DASHED && {
-            strokeDasharray: strokeDashArray?.join(','),
-          }),
+          strokeLinejoin: 'round',
         }"
       />
-      <path
-        v-if="isPreviewing && localPts.length > 1"
-        :d="`M ${localPts[localPts.length - 1].x} ${
-          localPts[localPts.length - 1].y
-        } L ${localPts[0].x} ${localPts[0].y}`"
-        fill="none"
-        :style="{
-          stroke: strokeColor,
-          strokeWidth,
-          strokeDasharray: '4,4',
-          opacity: 0.7,
-          pointerEvents: 'none',
-        }"
-      />
-      <rect
-        v-if="isPreviewing && localPts.length >= 2"
-        :x="localPts[0].x - handleSize / scale / 2"
-        :y="localPts[0].y - handleSize / scale / 2"
-        :width="handleSize / scale"
-        :height="handleSize / scale"
-        :fill="strokeColor"
-        :opacity="0.4"
-        :stroke="strokeColor"
-        :stroke-width="strokeWidth / 2"
-        style="pointer-events: none"
-      />
+      <template v-else>
+        <path
+          :d="pathData"
+          :opacity="opacity"
+          :style="{
+            fill: currentVertex ? 'none' : color,
+            stroke: strokeColor ?? color,
+            strokeWidth,
+            pointerEvents: 'none',
+            strokeLinecap: 'butt',
+            strokeLinejoin: 'miter',
+            ...(strokeStyle === PdfAnnotationBorderStyle.DASHED && {
+              strokeDasharray: strokeDashArray?.join(','),
+            }),
+          }"
+        />
+        <path
+          v-if="isPreviewing && localPts.length > 1"
+          :d="`M ${localPts[localPts.length - 1].x} ${
+            localPts[localPts.length - 1].y
+          } L ${localPts[0].x} ${localPts[0].y}`"
+          fill="none"
+          :style="{
+            stroke: strokeColor,
+            strokeWidth,
+            strokeDasharray: '4,4',
+            opacity: 0.7,
+            pointerEvents: 'none',
+          }"
+        />
+        <rect
+          v-if="isPreviewing && localPts.length >= 2"
+          :x="localPts[0].x - handleSize / scale / 2"
+          :y="localPts[0].y - handleSize / scale / 2"
+          :width="handleSize / scale"
+          :height="handleSize / scale"
+          :fill="strokeColor"
+          :opacity="0.4"
+          :stroke="strokeColor"
+          :stroke-width="strokeWidth / 2"
+          style="pointer-events: none"
+        />
+      </template>
     </template>
   </svg>
 </template>
@@ -82,6 +101,7 @@ export default { inheritAttrs: false };
 <script setup lang="ts">
 import { computed } from 'vue';
 import { Rect, Position, PdfAnnotationBorderStyle } from '@embedpdf/models';
+import { generateCloudyPolygonPath } from '@embedpdf/plugin-annotation';
 
 const MIN_HIT_AREA_SCREEN_PX = 20;
 
@@ -97,10 +117,11 @@ const props = withDefaults(
     strokeDashArray?: number[];
     scale: number;
     isSelected: boolean;
-    onClick?: (e: PointerEvent | TouchEvent) => void;
+    onClick?: (e: PointerEvent) => void;
     currentVertex?: Position;
     handleSize?: number;
     appearanceActive?: boolean;
+    cloudyBorderIntensity?: number;
   }>(),
   {
     color: 'transparent',
@@ -111,6 +132,8 @@ const props = withDefaults(
     appearanceActive: false,
   },
 );
+
+const isCloudy = computed(() => (props.cloudyBorderIntensity ?? 0) > 0);
 
 const allPoints = computed(() =>
   props.currentVertex ? [...props.vertices, props.currentVertex] : props.vertices,
@@ -132,6 +155,16 @@ const pathData = computed(() => {
     rest.map((p) => `L ${p.x} ${p.y}`).join(' ') +
     (isPreview ? '' : ' Z')
   ).trim();
+});
+
+const cloudyPath = computed(() => {
+  if (!isCloudy.value || allPoints.value.length < 3) return null;
+  return generateCloudyPolygonPath(
+    allPoints.value,
+    props.rect.origin,
+    props.cloudyBorderIntensity!,
+    props.strokeWidth,
+  );
 });
 
 const isPreviewing = computed(() => props.currentVertex && props.vertices.length > 0);

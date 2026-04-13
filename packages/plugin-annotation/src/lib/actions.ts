@@ -1,7 +1,7 @@
 import { Action } from '@embedpdf/core';
 import { PdfAnnotationObject } from '@embedpdf/models';
 import { AnnotationTool } from './tools/types';
-import { AnnotationDocumentState } from './types';
+import { AnnotationDocumentState, LockMode } from './types';
 
 // Document lifecycle
 export const INIT_ANNOTATION_STATE = 'ANNOTATION/INIT_STATE';
@@ -22,6 +22,8 @@ export const MOVE_ANNOTATION = 'ANNOTATION/MOVE_ANNOTATION';
 export const DELETE_ANNOTATION = 'ANNOTATION/DELETE_ANNOTATION';
 export const COMMIT_PENDING_CHANGES = 'ANNOTATION/COMMIT';
 export const PURGE_ANNOTATION = 'ANNOTATION/PURGE_ANNOTATION';
+export const SET_LOCKED = 'ANNOTATION/SET_LOCKED';
+export const SYNC_ANNOTATION_OBJECT = 'ANNOTATION/SYNC_OBJECT';
 
 // Global actions
 export const ADD_COLOR_PRESET = 'ANNOTATION/ADD_COLOR_PRESET';
@@ -74,7 +76,7 @@ export interface SetSelectionAction extends Action {
 }
 export interface SetActiveToolIdAction extends Action {
   type: typeof SET_ACTIVE_TOOL_ID;
-  payload: { documentId: string; toolId: string | null };
+  payload: { documentId: string; toolId: string | null; context?: Record<string, unknown> };
 }
 export interface CreateAnnotationAction extends Action {
   type: typeof CREATE_ANNOTATION;
@@ -110,6 +112,14 @@ export interface PurgeAnnotationAction extends Action {
   type: typeof PURGE_ANNOTATION;
   payload: { documentId: string; pageIndex: number; uid: string };
 }
+export interface SetLockedAction extends Action {
+  type: typeof SET_LOCKED;
+  payload: { documentId: string; mode: LockMode };
+}
+export interface SyncAnnotationObjectAction extends Action {
+  type: typeof SYNC_ANNOTATION_OBJECT;
+  payload: { documentId: string; id: string; patch: Partial<PdfAnnotationObject> };
+}
 
 // Global actions
 export interface AddColorPresetAction extends Action {
@@ -118,11 +128,11 @@ export interface AddColorPresetAction extends Action {
 }
 export interface SetToolDefaultsAction extends Action {
   type: typeof SET_TOOL_DEFAULTS;
-  payload: { toolId: string; patch: Partial<any> };
+  payload: { toolId: string; patch: Partial<PdfAnnotationObject> & Record<string, unknown> };
 }
 export interface AddToolAction extends Action {
   type: typeof ADD_TOOL;
-  payload: AnnotationTool;
+  payload: AnnotationTool<any>;
 }
 
 export type AnnotationAction =
@@ -142,6 +152,8 @@ export type AnnotationAction =
   | DeleteAnnotationAction
   | CommitAction
   | PurgeAnnotationAction
+  | SetLockedAction
+  | SyncAnnotationObjectAction
   | AddColorPresetAction
   | SetToolDefaultsAction
   | AddToolAction;
@@ -207,9 +219,10 @@ export const setSelection = (documentId: string, ids: string[]): SetSelectionAct
 export const setActiveToolId = (
   documentId: string,
   toolId: string | null,
+  context?: Record<string, unknown>,
 ): SetActiveToolIdAction => ({
   type: SET_ACTIVE_TOOL_ID,
-  payload: { documentId, toolId },
+  payload: { documentId, toolId, context },
 });
 
 export const createAnnotation = (
@@ -267,18 +280,35 @@ export const purgeAnnotation = (
   payload: { documentId, pageIndex, uid },
 });
 
+export const setLockedAction = (documentId: string, mode: LockMode): SetLockedAction => ({
+  type: SET_LOCKED,
+  payload: { documentId, mode },
+});
+
+export const syncAnnotationObject = (
+  documentId: string,
+  id: string,
+  patch: Partial<PdfAnnotationObject>,
+): SyncAnnotationObjectAction => ({
+  type: SYNC_ANNOTATION_OBJECT,
+  payload: { documentId, id, patch },
+});
+
 // Global action creators
 export const addColorPreset = (c: string): AddColorPresetAction => ({
   type: ADD_COLOR_PRESET,
   payload: c,
 });
 
-export const setToolDefaults = (toolId: string, patch: Partial<any>): SetToolDefaultsAction => ({
+export const setToolDefaults = (
+  toolId: string,
+  patch: Partial<PdfAnnotationObject> & Record<string, unknown>,
+): SetToolDefaultsAction => ({
   type: SET_TOOL_DEFAULTS,
   payload: { toolId, patch },
 });
 
-export const addTool = (tool: AnnotationTool): AddToolAction => ({
+export const addTool = (tool: AnnotationTool<any>): AddToolAction => ({
   type: ADD_TOOL,
   payload: tool,
 });

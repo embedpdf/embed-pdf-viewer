@@ -212,6 +212,91 @@ onUnmounted(() => {
 </script>
 ```
 
+## Importing and Exporting Annotations
+
+The annotation plugin provides a symmetric API for round-tripping annotations. Both `exportAnnotations()` and `importAnnotations()` use the same `AnnotationTransferItem` type, so you can export and re-import with zero mapping.
+
+**Why stamps need special handling:** Most annotations (highlights, ink, shapes) are fully described by their object properties and round-trip with no extra data. Stamp annotations, however, contain visual content (a raster image or a vector graphic) that lives in a separate appearance stream. The `exportAnnotations()` method automatically exports each stamp's appearance as a PDF buffer in `ctx.data`.
+
+### Export
+
+```vue
+<script setup lang="ts">
+import { useAnnotation } from '@embedpdf/plugin-annotation/vue';
+
+const props = defineProps<{ documentId: string }>();
+const { provides: annotationApi } = useAnnotation(() => props.documentId);
+
+const handleExport = () => {
+  annotationApi.value?.exportAnnotations().wait(
+    (exported) => {
+      // exported: AnnotationTransferItem[]
+      // Each entry has: { annotation, ctx? }
+      // Stamps include ctx: { data: ArrayBuffer, mimeType: 'application/pdf' }
+      console.log(`Exported ${exported.length} annotations`);
+    },
+    (error) => console.error('Export failed', error),
+  );
+};
+</script>
+```
+
+You can also export a single page:
+
+```typescript
+annotationApi.value?.exportAnnotations({ pageIndex: 0 }).wait(
+  (exported) => { /* ... */ },
+  (error) => { /* ... */ },
+);
+```
+
+### Import
+
+Pass the exported array directly to `importAnnotations()` — no remapping needed:
+
+```typescript
+annotationApi.value?.importAnnotations(exported);
+```
+
+#### Importing stamps from image files
+
+Stamps can be created directly from PNG or JPEG buffers using `ctx: { data }`. The engine auto-detects the format from magic bytes, so no `mimeType` is needed:
+
+```typescript
+// From a PNG or JPEG file
+const response = await fetch('/my-stamp.png');
+const buffer = await response.arrayBuffer();
+
+annotationApi.value?.importAnnotations([
+  { annotation: myStampAnnotation, ctx: { data: buffer } },
+]);
+```
+
+This works with any supported format — PNG, JPEG, or PDF appearance buffers (as produced by `exportAnnotations()`).
+
+For programmatic stamp creation from raw pixel data, `ctx: { imageData }` is also supported:
+
+```typescript
+annotationApi.value?.importAnnotations([
+  { annotation: myStampAnnotation, ctx: { imageData: myImageData } },
+]);
+```
+
+### Live Example — Import/Export
+
+The example below demonstrates the full round-trip flow. Add some annotations (including stamps), click **Export** to save them to memory, **Clear All** to remove everything, then **Import** to restore them.
+
+import { ImportExportExample } from '../../code-examples/headless/annotation-import-export-example';
+
+<CodeExample
+  codePaths={[
+    "../../examples/vue-tailwind/src/examples/headless/annotation-import-export-example.vue",
+    "../../examples/vue-tailwind/src/examples/headless/annotation-import-export-example-content.vue"
+  ]}
+>
+  <ImportExportExample />
+</CodeExample>
+
 ## Default Annotation Tools
 
 The plugin comes with a set of pre-configured tools. You can activate any of these tools by passing its `id` to the `setActiveTool` method. You can also override their default properties by providing a modified `AnnotationTool` object with a matching `id` in the plugin configuration.

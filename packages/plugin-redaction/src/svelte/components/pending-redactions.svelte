@@ -67,7 +67,7 @@
     };
   });
 
-  function select(e: MouseEvent | TouchEvent, id: string) {
+  function select(e: MouseEvent, id: string) {
     e.stopPropagation();
     if (!redactionCapability.provides) return;
     redactionCapability.provides.forDocument(documentId).selectPending(pageIndex, id);
@@ -122,7 +122,6 @@
             cursor: pointer;
           "
           onpointerdown={(e) => select(e, item.id)}
-          ontouchstart={(e) => select(e, item.id)}
         ></div>
 
         {#if shouldShowMenu(item.id)}

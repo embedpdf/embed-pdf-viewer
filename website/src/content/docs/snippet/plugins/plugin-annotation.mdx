@@ -1,0 +1,153 @@
+---
+title: Annotations
+description: Add, export, and import annotations programmatically with the EmbedPDF Snippet.
+---
+
+import AnnotationImportExportExample from '../code-examples/annotation-import-export-example';
+import { ExampleWrapper } from '@/components/example-wrapper';
+
+# Annotations
+
+The EmbedPDF Snippet includes the annotation plugin by default, giving users a full set of built-in annotation tools (highlights, ink, shapes, text, stamps, and more) through the toolbar UI. You can also control the annotation system programmatically through the viewer registry.
+
+## Configuration
+
+Configure annotation defaults like the author name using the `annotations` config key:
+
+```javascript
+const viewer = EmbedPDF.init({
+  type: 'container',
+  target: document.getElementById('pdf-viewer'),
+  annotations: {
+    annotationAuthor: 'Jane Doe',
+    selectAfterCreate: true,
+  },
+});
+```
+
+## Programmatic Control
+
+Access the annotation plugin through the registry to switch tools, export/import annotations, and more.
+
+```javascript
+const registry = await viewer.registry;
+const annotationApi = registry.getPlugin('annotation')?.provides();
+```
+
+### Setting the Active Tool
+
+Use `setActiveTool` to switch between tools. Pass `null` to switch back to the default selection cursor.
+
+```javascript
+annotationApi.setActiveTool('highlight');
+annotationApi.setActiveTool('ink');
+annotationApi.setActiveTool(null);
+```
+
+### Common Tool IDs
+
+| Tool | ID | Description |
+| :--- | :--- | :--- |
+| Highlight | `'highlight'` | Text highlighter |
+| Underline | `'underline'` | Text underline |
+| Ink (Pen) | `'ink'` | Freehand drawing |
+| Rectangle | `'square'` | Square/Rectangle shape |
+| Circle | `'circle'` | Circle/Ellipse shape |
+| Text | `'freeText'` | Free text box |
+| Note | `'text'` | Sticky note |
+
+## Importing and Exporting Annotations
+
+You can export all annotations from a document and re-import them later. This is useful for saving annotation state to a backend or transferring annotations between sessions.
+
+<CodeExample
+  codePaths={[
+    "../../examples/vanilla-tailwind/src/examples/annotation-import-export.html"
+  ]}
+>
+  <ExampleWrapper>
+    <AnnotationImportExportExample />
+  </ExampleWrapper>
+</CodeExample>
+
+### Exporting Annotations
+
+`exportAnnotations()` returns a `Task` that resolves to an array of transfer items. Each item contains the annotation object and, for stamps, a `ctx` with the appearance data as an `ArrayBuffer`.
+
+```javascript
+annotationApi.exportAnnotations().wait(
+  (items) => {
+    console.log(`Exported ${items.length} annotations`);
+    // items can be serialized and stored
+  },
+  (error) => console.error('Export failed', error),
+);
+```
+
+### Importing Annotations
+
+`importAnnotations()` accepts the same format returned by `exportAnnotations()`, making the round-trip seamless.
+
+```javascript
+annotationApi.importAnnotations(savedItems);
+```
+
+For stamps, the `ctx.data` field accepts a raw `ArrayBuffer` containing PNG, JPEG, or PDF data — the engine detects the format automatically via magic bytes.
+
+```javascript
+const pngBuffer = await fetch('/my-stamp.png').then(r => r.arrayBuffer());
+
+annotationApi.importAnnotations([
+  {
+    annotation: {
+      type: 26, // PdfAnnotationSubtype.STAMP
+      rect: { origin: { x: 100, y: 200 }, size: { width: 50, height: 50 } },
+      // ... other annotation properties
+    },
+    ctx: { data: pngBuffer },
+  },
+]);
+```
+
+### Adding Custom Stamp Tools
+
+You can register custom stamp tools that place images with a single click:
+
+```javascript
+annotationApi.addTool({
+  id: 'stampCheckmark',
+  name: 'Checkmark',
+  interaction: { exclusive: true, cursor: 'crosshair' },
+  matchScore: () => 0,
+  defaults: {
+    type: 26, // PdfAnnotationSubtype.STAMP
+    imageSrc: '/circle-checkmark.png',
+    imageSize: { width: 30, height: 30 },
+  },
+  behavior: {
+    showGhost: true,
+    deactivateToolAfterCreate: true,
+    selectAfterCreate: true,
+  },
+});
+```
+
+## Listening for Changes
+
+You can listen for annotation events (creation, deletion, updates) to sync with a backend or update your UI.
+
+```javascript
+annotationApi.onAnnotationEvent((event) => {
+  const { type, annotation, pageIndex } = event;
+
+  if (type === 'create') {
+    console.log('Created annotation:', annotation.id);
+  } else if (type === 'delete') {
+    console.log('Deleted annotation:', annotation.id);
+  }
+});
+
+annotationApi.onActiveToolChange(({ tool }) => {
+  console.log('Active tool:', tool ? tool.name : 'Selection');
+});
+```

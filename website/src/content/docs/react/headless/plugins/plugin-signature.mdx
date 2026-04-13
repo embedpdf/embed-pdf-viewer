@@ -1,0 +1,308 @@
+---
+title: Signature Plugin
+description: Add, manage, and place electronic signatures and initials in your PDF viewer.
+searchable: true
+---
+
+import { Callout } from '@/components/callout'
+import { CodeExample } from '@/components/code-example'
+
+# Signature Plugin
+
+The Signature Plugin extends the Annotation Plugin to provide a dedicated workflow for electronic signatures. It includes ready-to-use UI components for drawing and typing signatures, helper hooks for image uploads, and an API for saving them as reusable entries.
+
+Once a signature is saved as an entry, users can easily click to arm the tool and stamp their signature anywhere on the PDF document.
+
+<Callout type="info" title="No separate layer needed">
+  Signatures are placed as standard PDF annotations (Ink for drawn signatures, Stamps for typed/uploaded signatures). They render automatically through your existing `<AnnotationLayer />`.
+</Callout>
+
+## Installation
+
+This plugin depends on the Annotation Plugin and its interaction dependencies.
+
+```sh npm2yarn
+npm install @embedpdf/plugin-signature @embedpdf/plugin-annotation @embedpdf/plugin-interaction-manager @embedpdf/plugin-selection @embedpdf/plugin-history
+```
+
+## Registration
+
+Import `SignaturePluginPackage` and add it to your plugins array **after** the Annotation Plugin dependencies and the Annotation Plugin itself.
+
+```tsx {9, 28-32}
+import { createPluginRegistration } from '@embedpdf/core'
+import { EmbedPDF } from '@embedpdf/core/react'
+// ... other imports
+import { InteractionManagerPluginPackage } from '@embedpdf/plugin-interaction-manager/react'
+import { SelectionPluginPackage } from '@embedpdf/plugin-selection/react'
+import { HistoryPluginPackage } from '@embedpdf/plugin-history/react'
+import { AnnotationPluginPackage } from '@embedpdf/plugin-annotation/react'
+import { ZoomMode, ZoomPluginPackage } from '@embedpdf/plugin-zoom/react'
+import { SignaturePluginPackage, SignatureMode } from '@embedpdf/plugin-signature/react'
+
+const plugins = [
+  // ... essential viewer plugins (DocumentManager, Viewport, Render, Scroll)
+  createPluginRegistration(DocumentManagerPluginPackage, { /* ... */ }),
+
+  // Annotation dependencies
+  createPluginRegistration(InteractionManagerPluginPackage),
+  createPluginRegistration(SelectionPluginPackage),
+  createPluginRegistration(HistoryPluginPackage),
+
+  // Zoom (recommended so the page fits the viewport when signing)
+  createPluginRegistration(ZoomPluginPackage, {
+    defaultZoomLevel: ZoomMode.FitPage,
+  }),
+
+  // Annotation plugin
+  createPluginRegistration(AnnotationPluginPackage),
+
+  // Signature plugin
+  createPluginRegistration(SignaturePluginPackage, {
+    mode: SignatureMode.SignatureOnly, // or SignatureAndInitials
+    defaultSize: { width: 150, height: 50 }, // Default placement size
+  }),
+]
+```
+
+## Usage
+
+### 1. Rendering Signatures
+
+Because signatures are specialized annotations, you do not need a special layer. Simply render the `<AnnotationLayer />` inside your page scroller.
+
+```tsx {2, 11}
+import { PagePointerProvider } from '@embedpdf/plugin-interaction-manager/react'
+import { AnnotationLayer } from '@embedpdf/plugin-annotation/react'
+
+<Scroller
+  documentId={activeDocumentId}
+  renderPage={({ pageIndex }) => (
+    <PagePointerProvider documentId={activeDocumentId} pageIndex={pageIndex}>
+      <RenderLayer documentId={activeDocumentId} pageIndex={pageIndex} />
+      <SelectionLayer documentId={activeDocumentId} pageIndex={pageIndex} />
+      {/* Both regular annotations and signatures render here */}
+      <AnnotationLayer documentId={activeDocumentId} pageIndex={pageIndex} />
+    </PagePointerProvider>
+  )}
+/>
+```
+
+### 2. Creating Signatures (The UI Pads)
+
+The plugin exports `<SignatureDrawPad />` and `<SignatureTypePad />` components. These handle the complexities of tracking pointer events, rendering canvas strokes, applying fonts, and auto-cropping the results to remove transparent whitespace.
+
+You can place these inside modals or sidebars.
+
+```tsx
+import { SignatureDrawPad, SignatureTypePad } from '@embedpdf/plugin-signature/react'
+
+// Drawing Pad
+<SignatureDrawPad 
+  strokeColor="#0000FF"
+  strokeWidth={3}
+  onResult={(result) => {
+    // result is a SignatureInkFieldDefinition | null
+    setTempSignature(result)
+  }} 
+/>
+
+// Typing Pad
+<SignatureTypePad 
+  color="#0000FF"
+  fontFamily="'Dancing Script', cursive"
+  onResult={(result) => {
+    // result is a SignatureStampFieldDefinition | null
+    setTempSignature(result)
+  }} 
+/>
+```
+
+### 3. Uploading Signatures
+
+For image uploads, use the `useSignatureUpload` hook to handle the file picker, drag-and-drop, and automatic image-to-canvas extraction.
+
+```tsx
+import { useSignatureUpload } from '@embedpdf/plugin-signature/react'
+
+const { openFilePicker, inputRef, handleFileInputChange } = useSignatureUpload({
+  onResult: (result) => {
+    // Save to the capability (see step 4)
+  },
+})
+
+return (
+  <>
+    <button type="button" onClick={openFilePicker}>
+      Upload Image
+    </button>
+    <input
+      type="file"
+      ref={inputRef}
+      accept="image/png,image/jpeg,image/svg+xml"
+      className="hidden"
+      onChange={(e) => handleFileInputChange(e.nativeEvent)}
+    />
+  </>
+)
+```
+
+### 4. Saving and Placing Signatures
+
+Once you have a result from one of the pads or the upload hook, save it to the plugin's state using `useSignatureCapability`.
+
+```tsx
+import { useSignatureCapability, useSignatureEntries, useActivePlacement } from '@embedpdf/plugin-signature/react'
+
+const MySignaturesList = ({ documentId }) => {
+  const { entries, provides: signatureCapability } = useSignatureEntries();
+  const activePlacement = useActivePlacement(documentId);
+
+  const handleSaveNew = (result) => {
+    signatureCapability?.addEntry({ signature: result });
+  }
+
+  return (
+    <div>
+      {entries.map(entry => {
+        const isActive = activePlacement?.entryId === entry.id;
+        
+        return (
+          <div key={entry.id} className={isActive ? 'ring-2 ring-blue-500' : ''}>
+            <img src={entry.signature.previewDataUrl} alt="Signature" />
+            <button onClick={() => {
+              // Arm the signature for placement on the document
+              signatureCapability?.forDocument(documentId).activateSignaturePlacement(entry.id)
+            }}>
+              Use
+            </button>
+            <button onClick={() => signatureCapability?.removeEntry(entry.id)}>
+              Delete
+            </button>
+          </div>
+        )
+      })}
+    </div>
+  )
+}
+```
+
+### 5. Persisting Signatures (localStorage / Backend)
+
+The plugin ships with `serializeEntries` and `deserializeEntries` utilities that convert entries to and from a JSON-safe format, and an `onEntriesChange` event hook that fires whenever entries are added, removed, or loaded. Together they make auto-persisting signatures trivial.
+
+```tsx
+import { useEffect } from 'react'
+import {
+  useSignatureCapability,
+  serializeEntries,
+  deserializeEntries,
+} from '@embedpdf/plugin-signature/react'
+
+const STORAGE_KEY = 'my-signatures'
+
+function useSignaturePersistence() {
+  const { provides: signatureCapability } = useSignatureCapability()
+
+  useEffect(() => {
+    if (!signatureCapability) return
+
+    // Load previously saved entries on mount
+    const raw = localStorage.getItem(STORAGE_KEY)
+    if (raw) {
+      signatureCapability.loadEntries(deserializeEntries(JSON.parse(raw)))
+    }
+
+    // Auto-save whenever entries change
+    return signatureCapability.onEntriesChange((entries) => {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(serializeEntries(entries)))
+    })
+  }, [signatureCapability])
+}
+```
+
+## Live Example
+
+This example demonstrates the full signature workflow: drawing, typing, and uploading signatures, saving them to your collection, and placing them on the document.
+
+import { SignatureViewer } from '../../code-examples/headless/signature-example';
+
+<CodeExample 
+  codePaths={[
+    "content/docs/react/code-examples/headless/signature-example.tsx"
+  ]}
+>
+  <SignatureViewer />
+</CodeExample>
+
+## API Reference
+
+### Configuration (`SignaturePluginConfig`)
+
+| Option | Type | Description |
+| :--- | :--- | :--- |
+| **`mode`** | `SignatureMode` | Determines if the plugin tracks only signatures (`SignatureMode.SignatureOnly`) or both signatures and initials (`SignatureMode.SignatureAndInitials`). |
+| **`defaultSize`** | `{ width: number, height: number }` | The default bounding box size applied when placing a signature. **Default**: `{ width: 150, height: 50 }` |
+
+### Hook: `useSignatureCapability()`
+
+Returns the global plugin API.
+
+#### `SignatureCapability` Methods
+
+| Method | Description |
+| :--- | :--- |
+| **`getEntries()`** | Returns all saved `SignatureEntry` objects. |
+| **`addEntry(entry)`** | Saves a new signature entry. Returns the generated UUID. |
+| **`removeEntry(id)`** | Deletes a signature entry. |
+| **`exportEntries()`** | Returns all `SignatureEntry` objects including their binary data. Use with `serializeEntries()` for persistence. |
+| **`loadEntries(entries)`** | Hydrates the plugin with previously exported entries. Use with `deserializeEntries()` when loading from JSON. |
+| **`onEntriesChange`** | Event hook that fires whenever entries are added, removed, or loaded. Subscribe with `onEntriesChange((entries) => { ... })` — returns an unsubscribe function. |
+| **`forDocument(documentId)`** | Returns a `SignatureScope` scoped to the current document for placement actions. |
+
+### Hook: `useSignatureEntries()`
+
+Reactive hook that returns `{ entries, provides }`. The `entries` array automatically updates when signatures are added or removed.
+
+### Hook: `useActivePlacement(documentId)`
+
+Reactive hook that returns an `ActivePlacementInfo` object if a signature is currently armed for placement, or `null`.
+
+```tsx
+interface ActivePlacementInfo {
+  entryId: string;
+  kind: SignatureFieldKind; // 'signature' | 'initials'
+}
+```
+
+### `SignatureScope` Methods (Returned by `forDocument`)
+
+| Method | Description |
+| :--- | :--- |
+| **`activateSignaturePlacement(entryId)`** | Arms a specific signature entry for placement on the PDF. |
+| **`activateInitialsPlacement(entryId)`** | Arms a specific initials entry for placement on the PDF. |
+| **`deactivatePlacement()`** | Cancels placement mode. |
+
+### Component: `<SignatureDrawPad />`
+
+An auto-cropping canvas component that tracks pointer events to capture hand-drawn signatures.
+
+| Prop | Type | Description |
+| :--- | :--- | :--- |
+| **`onResult`** | `(result) => void` | Fires whenever the user draws on the canvas. Provides the `SignatureInkFieldDefinition`. |
+| **`strokeColor`** | `string` | The color of the ink line. |
+| **`strokeWidth`** | `number` | The thickness of the ink line. |
+| **`padRef`** | `(handle) => void` | Provides a ref handle with a `clear()` method to reset the canvas. |
+
+### Component: `<SignatureTypePad />`
+
+An auto-cropping text input component that converts typed text into a high-resolution stamp image.
+
+| Prop | Type | Description |
+| :--- | :--- | :--- |
+| **`onResult`** | `(result) => void` | Fires when text changes. Provides a `SignatureStampFieldDefinition` including `imageData`. |
+| **`fontFamily`** | `string` | The CSS font-family to use (e.g. `'Dancing Script', cursive`). |
+| **`color`** | `string` | The text color. |
+| **`fontSize`** | `number` | The base font size used for the canvas generation. |
+| **`placeholder`** | `string` | The placeholder text. |
+| **`padRef`** | `(handle) => void` | Provides a ref handle with a `clear()` method. |

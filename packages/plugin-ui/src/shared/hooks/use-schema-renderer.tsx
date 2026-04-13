@@ -111,6 +111,7 @@ export function useSchemaRenderer(documentId: string) {
               documentId={documentId}
               isOpen={sidebarSlot.isOpen}
               onClose={handleClose}
+              sidebarProps={sidebarSlot.props}
             />
           )}
         </Fragment>

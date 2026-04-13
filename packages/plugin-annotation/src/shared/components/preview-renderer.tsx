@@ -1,19 +1,22 @@
-import { AnyPreviewState } from '@embedpdf/plugin-annotation';
-import { Circle } from './annotations/circle';
-import { Square } from './annotations/square';
-import { Polygon } from './annotations/polygon';
-import { PdfAnnotationSubtype } from '@embedpdf/models';
-import { Polyline } from './annotations/polyline';
-import { Line } from './annotations/line';
-import { Ink } from './annotations/ink';
+import { useMemo } from '@framework';
+import { PreviewState } from '@embedpdf/plugin-annotation';
+import { useRegisteredRenderers } from '../context/renderer-registry';
+import { builtInRenderers } from './built-in-renderers';
 
 interface Props {
-  preview: AnyPreviewState;
+  toolId: string;
+  preview: PreviewState;
   scale: number;
 }
 
-export function PreviewRenderer({ preview, scale }: Props) {
+export function PreviewRenderer({ toolId, preview, scale }: Props) {
   const { bounds } = preview;
+  const registeredRenderers = useRegisteredRenderers();
+
+  const allRenderers = useMemo(() => {
+    const externalIds = new Set(registeredRenderers.map((r) => r.id));
+    return [...registeredRenderers, ...builtInRenderers.filter((r) => !externalIds.has(r.id))];
+  }, [registeredRenderers]);
 
   const style = {
     position: 'absolute' as const,
@@ -25,67 +28,19 @@ export function PreviewRenderer({ preview, scale }: Props) {
     zIndex: 10,
   };
 
-  // Use type guards for proper type narrowing
-  if (preview.type === PdfAnnotationSubtype.CIRCLE) {
-    return (
-      <div style={style}>
-        <Circle isSelected={false} scale={scale} {...preview.data} />
-      </div>
-    );
-  }
+  const match =
+    allRenderers.find((r) => r.matchesPreview?.(preview) && r.renderPreview) ??
+    allRenderers.find((r) => r.id === toolId && r.renderPreview);
 
-  if (preview.type === PdfAnnotationSubtype.SQUARE) {
+  if (match?.renderPreview) {
+    const containerExtra = match.previewContainerStyle?.({
+      data: preview.data,
+      bounds: preview.bounds,
+      scale,
+    });
     return (
-      <div style={style}>
-        <Square isSelected={false} scale={scale} {...preview.data} />
-      </div>
-    );
-  }
-
-  if (preview.type === PdfAnnotationSubtype.POLYGON) {
-    return (
-      <div style={style}>
-        <Polygon isSelected={false} scale={scale} {...preview.data} />
-      </div>
-    );
-  }
-
-  if (preview.type === PdfAnnotationSubtype.POLYLINE) {
-    return (
-      <div style={style}>
-        <Polyline isSelected={false} scale={scale} {...preview.data} />
-      </div>
-    );
-  }
-
-  if (preview.type === PdfAnnotationSubtype.LINE) {
-    return (
-      <div style={style}>
-        <Line isSelected={false} scale={scale} {...preview.data} />
-      </div>
-    );
-  }
-
-  if (preview.type === PdfAnnotationSubtype.INK) {
-    return (
-      <div style={style}>
-        <Ink isSelected={false} scale={scale} {...preview.data} />
-      </div>
-    );
-  }
-
-  if (preview.type === PdfAnnotationSubtype.FREETEXT) {
-    return (
-      <div style={style}>
-        {/* Render a simple dashed border preview */}
-        <div
-          style={{
-            width: '100%',
-            height: '100%',
-            border: `1px dashed ${preview.data.fontColor || '#000000'}`,
-            backgroundColor: 'transparent',
-          }}
-        />
+      <div style={{ ...style, ...containerExtra }}>
+        {match.renderPreview({ data: preview.data, bounds: preview.bounds, scale })}
       </div>
     );
   }

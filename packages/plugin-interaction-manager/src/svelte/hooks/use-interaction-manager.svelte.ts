@@ -11,13 +11,12 @@ export const useInteractionManagerPlugin = () =>
 export const useInteractionManagerCapability = () =>
   useCapability<InteractionManagerPlugin>(InteractionManagerPlugin.id);
 
-export function useInteractionManager(documentId: string) {
+export function useInteractionManager(getDocumentId: () => string) {
   const capability = useInteractionManagerCapability();
 
   let state = $state<InteractionDocumentState>(initialDocumentState);
 
-  // Derived scoped capability for the specific document
-  const scopedProvides = $derived(capability.provides?.forDocument(documentId) ?? null);
+  const scopedProvides = $derived(capability.provides?.forDocument(getDocumentId()) ?? null);
 
   $effect(() => {
     if (!capability.provides) {
@@ -25,7 +24,7 @@ export function useInteractionManager(documentId: string) {
       return;
     }
 
-    const scope = capability.provides.forDocument(documentId);
+    const scope = capability.provides.forDocument(getDocumentId());
 
     // Get initial state
     state = scope.getState();
@@ -45,18 +44,18 @@ export function useInteractionManager(documentId: string) {
   };
 }
 
-export function useCursor(documentId: string) {
+export function useCursor(getDocumentId: () => string) {
   const capability = useInteractionManagerCapability();
 
   return {
     setCursor: (token: string, cursor: string, prio = 0) => {
       if (!capability.provides) return;
-      const scope = capability.provides.forDocument(documentId);
+      const scope = capability.provides.forDocument(getDocumentId());
       scope.setCursor(token, cursor, prio);
     },
     removeCursor: (token: string) => {
       if (!capability.provides) return;
-      const scope = capability.provides.forDocument(documentId);
+      const scope = capability.provides.forDocument(getDocumentId());
       scope.removeCursor(token);
     },
   };
@@ -65,7 +64,7 @@ export function useCursor(documentId: string) {
 interface UsePointerHandlersOptions {
   modeId?: string | string[];
   pageIndex?: number;
-  documentId: string;
+  documentId: () => string;
 }
 
 export function usePointerHandlers({ modeId, pageIndex, documentId }: UsePointerHandlersOptions) {
@@ -76,10 +75,9 @@ export function usePointerHandlers({ modeId, pageIndex, documentId }: UsePointer
       handlers: PointerEventHandlersWithLifecycle,
       options?: { modeId?: string | string[]; pageIndex?: number; documentId?: string },
     ) => {
-      // Use provided options or fall back to hook-level options
       const finalModeId = options?.modeId ?? modeId;
       const finalPageIndex = options?.pageIndex ?? pageIndex;
-      const finalDocumentId = options?.documentId ?? documentId;
+      const finalDocumentId = options?.documentId ?? documentId();
 
       return finalModeId
         ? capability.provides?.registerHandlers({
@@ -99,7 +97,7 @@ export function usePointerHandlers({ modeId, pageIndex, documentId }: UsePointer
   };
 }
 
-export function useIsPageExclusive(documentId: string) {
+export function useIsPageExclusive(getDocumentId: () => string) {
   const capability = useInteractionManagerCapability();
 
   let isPageExclusive = $state<boolean>(false);
@@ -110,7 +108,7 @@ export function useIsPageExclusive(documentId: string) {
       return;
     }
 
-    const scope = capability.provides.forDocument(documentId);
+    const scope = capability.provides.forDocument(getDocumentId());
 
     // Get initial state
     const m = scope.getActiveInteractionMode();

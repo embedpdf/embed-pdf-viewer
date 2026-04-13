@@ -791,3 +791,18 @@ export function buildUserToDeviceMatrix(
       return { a: 0, b: sy90, c: -sx90, d: 0, e: sx90 * (B + H), f: -sy90 * L };
   }
 }
+
+/**
+ * Scale `size` to fit within `bounds` while preserving aspect ratio.
+ * Never scales up — returns the original size if it already fits.
+ *
+ * @param size - the intrinsic size to fit
+ * @param bounds - the maximum allowed size
+ * @returns the fitted size
+ *
+ * @public
+ */
+export function fitSizeWithin(size: Size, bounds: Size): Size {
+  const scale = Math.min(bounds.width / size.width, bounds.height / size.height, 1);
+  return { width: size.width * scale, height: size.height * scale };
+}

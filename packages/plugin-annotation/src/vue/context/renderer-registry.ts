@@ -16,7 +16,7 @@ import type {
   AnnotationInteractionEvent,
   SelectOverrideHelpers,
 } from './types';
-import type { PdfAnnotationObject } from '@embedpdf/models';
+import type { PdfAnnotationObject, Rect } from '@embedpdf/models';
 import type { VertexConfig } from '../../shared/types';
 
 /**
@@ -77,15 +77,22 @@ export function useRegisterRenderers(entries: BoxedAnnotationRenderer[]) {
  * Factory to create a boxed renderer from a typed entry.
  * Wraps component in markRaw to prevent reactivity overhead.
  */
-export function createRenderer<T extends PdfAnnotationObject>(
-  entry: AnnotationRendererEntry<T>,
+export function createRenderer<T extends PdfAnnotationObject, P = never>(
+  entry: AnnotationRendererEntry<T, P>,
 ): BoxedAnnotationRenderer {
   return {
     id: entry.id,
-    matches: entry.matches,
-    component: markRaw(entry.component) as Component<AnnotationRendererProps>,
+    matches: entry.matches ?? (() => false),
+    component: (entry.component
+      ? markRaw(entry.component)
+      : () => null) as Component<AnnotationRendererProps>,
+    matchesPreview: entry.matchesPreview,
+    previewContainerStyle: entry.previewContainerStyle
+      ? (props) => entry.previewContainerStyle!(props as { data: P; bounds: Rect; scale: number })
+      : undefined,
     vertexConfig: entry.vertexConfig as VertexConfig<PdfAnnotationObject> | undefined,
     zIndex: entry.zIndex,
+    defaultBlendMode: entry.defaultBlendMode,
     containerStyle: entry.containerStyle as
       | ((annotation: PdfAnnotationObject) => CSSProperties)
       | undefined,
@@ -97,6 +104,13 @@ export function createRenderer<T extends PdfAnnotationObject>(
     hideSelectionMenu: entry.hideSelectionMenu as
       | ((annotation: PdfAnnotationObject) => boolean)
       | undefined,
+    renderPreview: entry.renderPreview
+      ? (markRaw(entry.renderPreview) as BoxedAnnotationRenderer['renderPreview'])
+      : undefined,
+    hiddenWhenLocked: entry.hiddenWhenLocked,
+    renderLocked: entry.renderLocked
+      ? (markRaw(entry.renderLocked) as BoxedAnnotationRenderer['renderLocked'])
+      : undefined,
   };
 }
 

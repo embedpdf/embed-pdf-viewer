@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>EmbedPDF Selection Example</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="min-h-screen bg-slate-100 p-6 text-slate-900">
+  <div class="mx-auto flex max-w-7xl flex-col gap-4">
+    <section class="flex flex-wrap items-center justify-between gap-4 rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+      <div class="flex items-center gap-4">
+        <div class="flex items-center gap-2">
+          <button
+            id="copy-btn"
+            type="button"
+            disabled
+            class="rounded bg-blue-600 px-3 py-1.5 text-sm font-medium text-white disabled:bg-slate-300 disabled:text-slate-500"
+          >
+            Copy
+          </button>
+          <button
+            id="clear-btn"
+            type="button"
+            disabled
+            class="rounded bg-slate-200 px-3 py-1.5 text-sm font-medium text-slate-700 disabled:opacity-50"
+          >
+            Clear
+          </button>
+        </div>
+
+        <span id="last-action" class="text-sm text-green-600"></span>
+      </div>
+
+      <div class="text-xs text-slate-500">
+        Select text in the PDF to enable buttons
+      </div>
+    </section>
+
+    <div class="h-[700px] overflow-hidden rounded-xl border border-slate-300 bg-white shadow-lg">
+      <div id="pdf-viewer" class="h-full w-full"></div>
+    </div>
+  </div>
+
+  <script type="module">
+    import EmbedPDF from 'https://cdn.jsdelivr.net/npm/@embedpdf/snippet/dist/embedpdf.js';
+
+    const copyButton = document.getElementById('copy-btn');
+    const clearButton = document.getElementById('clear-btn');
+    const lastAction = document.getElementById('last-action');
+
+    const viewer = EmbedPDF.init({
+      type: 'container',
+      target: document.getElementById('pdf-viewer'),
+      theme: { preference: 'system' },
+      documentManager: {
+        initialDocuments: [
+          {
+            url: 'https://snippet.embedpdf.com/ebook.pdf',
+            documentId: 'ebook',
+          },
+        ],
+      },
+    });
+
+    const registry = await viewer.registry;
+    const selection = registry.getPlugin('selection')?.provides()?.forDocument('ebook');
+
+    if (!selection) {
+      throw new Error('Selection plugin not available');
+    }
+
+    function showAction(message) {
+      lastAction.textContent = message;
+      window.clearTimeout(showAction.timeoutId);
+      showAction.timeoutId = window.setTimeout(() => {
+        lastAction.textContent = '';
+      }, 2000);
+    }
+
+    selection.onSelectionChange((currentSelection) => {
+      const hasSelection = !!currentSelection;
+      copyButton.disabled = !hasSelection;
+      clearButton.disabled = !hasSelection;
+    });
+
+    copyButton.addEventListener('click', () => {
+      selection.copyToClipboard();
+      showAction('Copied to clipboard!');
+    });
+
+    clearButton.addEventListener('click', () => {
+      selection.clear();
+      showAction('Selection cleared');
+    });
+  </script>
+</body>
+</html>

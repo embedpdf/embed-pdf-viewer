@@ -1,13 +1,14 @@
 import {
   PdfAnnotationSubtype,
   PdfAnnotationObject,
+  PdfAnnotationOf,
   PdfSquigglyAnnoObject,
   PdfStrikeOutAnnoObject,
   PdfUnderlineAnnoObject,
   PdfHighlightAnnoObject,
   Rect,
 } from '@embedpdf/models';
-import { TrackedAnnotation } from './types';
+import { LockMode, LockModeType, TrackedAnnotation } from './types';
 import { AnnotationTool } from './tools/types';
 
 /* ------------------------------------------------------------------ */
@@ -30,7 +31,7 @@ export function rectsIntersect(a: Rect, b: Rect): boolean {
 /* 1. Generic “subtype‑to‑object” mapper                              */
 /* ------------------------------------------------------------------ */
 
-export type AnnoOf<S extends PdfAnnotationSubtype> = Extract<PdfAnnotationObject, { type: S }>;
+export type AnnoOf<S extends PdfAnnotationSubtype> = PdfAnnotationOf<S>;
 
 export type TextMarkupSubtype =
   | PdfAnnotationSubtype.HIGHLIGHT
@@ -39,6 +40,7 @@ export type TextMarkupSubtype =
   | PdfAnnotationSubtype.SQUIGGLY;
 export type SidebarSubtype =
   | TextMarkupSubtype
+  | PdfAnnotationSubtype.TEXT
   | PdfAnnotationSubtype.INK
   | PdfAnnotationSubtype.SQUARE
   | PdfAnnotationSubtype.CIRCLE
@@ -47,7 +49,8 @@ export type SidebarSubtype =
   | PdfAnnotationSubtype.POLYLINE
   | PdfAnnotationSubtype.FREETEXT
   | PdfAnnotationSubtype.STAMP
-  | PdfAnnotationSubtype.REDACT;
+  | PdfAnnotationSubtype.REDACT
+  | PdfAnnotationSubtype.CARET;
 
 /* ------------------------------------------------------------------ */
 /* 2. Narrowing type‑guards (add more as needed)                      */
@@ -151,10 +154,23 @@ export function isRedact(
   return a.object.type === PdfAnnotationSubtype.REDACT;
 }
 
+export function isCaret(
+  a: TrackedAnnotation,
+): a is TrackedAnnotation<AnnoOf<PdfAnnotationSubtype.CARET>> {
+  return a.object.type === PdfAnnotationSubtype.CARET;
+}
+
+export function isWidget(
+  a: TrackedAnnotation,
+): a is TrackedAnnotation<AnnoOf<PdfAnnotationSubtype.WIDGET>> {
+  return a.object.type === PdfAnnotationSubtype.WIDGET;
+}
+
 export function isSidebarAnnotation(
   a: TrackedAnnotation,
 ): a is TrackedAnnotation<AnnoOf<SidebarSubtype>> {
   return (
+    (isText(a) && !a.object.inReplyToId) ||
     isTextMarkup(a) ||
     isInk(a) ||
     isSquare(a) ||
@@ -164,6 +180,41 @@ export function isSidebarAnnotation(
     isPolyline(a) ||
     isFreeText(a) ||
     isStamp(a) ||
-    isRedact(a)
+    isRedact(a) ||
+    isCaret(a)
   );
+}
+
+export function isSelectableAnnotation(a: TrackedAnnotation): boolean {
+  return isSidebarAnnotation(a) || isWidget(a);
+}
+
+/* ------------------------------------------------------------------ */
+/* Locking Helpers                                                     */
+/* ------------------------------------------------------------------ */
+
+/** Extract the category tags from a tool (returns `[]` for uncategorized). */
+export function getAnnotationCategories(tool: AnnotationTool | null): string[] {
+  return tool?.categories ?? [];
+}
+
+/** Check if the category-based LockMode locks annotations with these categories. */
+export function isCategoryLocked(categories: string[], mode: LockMode): boolean {
+  switch (mode.type) {
+    case LockModeType.None:
+      return false;
+    case LockModeType.All:
+      return true;
+    case LockModeType.Include:
+      if (categories.length === 0) return false;
+      return categories.some((cat) => mode.categories.includes(cat));
+    case LockModeType.Exclude:
+      if (categories.length === 0) return true;
+      return !categories.some((cat) => mode.categories.includes(cat));
+  }
+}
+
+/** Check if the annotation itself has the PDF 'locked' flag (bit 7). */
+export function hasLockedFlag(annotation: PdfAnnotationObject): boolean {
+  return annotation.flags?.includes('locked') ?? false;
 }

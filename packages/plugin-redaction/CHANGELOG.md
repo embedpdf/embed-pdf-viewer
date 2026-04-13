@@ -1,5 +1,37 @@
 # @embedpdf/plugin-redaction
 
+## 2.14.0
+
+## 2.13.0
+
+## 2.12.1
+
+## 2.12.0
+
+## 2.11.1
+
+## 2.11.0
+
+## 2.10.1
+
+## 2.10.0
+
+### Patch Changes
+
+- [#537](https://github.com/embedpdf/embed-pdf-viewer/pull/537) by [@bobsingor](https://github.com/bobsingor) –
+  - Update redaction tool integration to work with typed annotation tool definitions and the newer annotation capability access patterns.
+  - Guard annotation capability usage during redaction flows and resolve defaults from the active tool configuration for more consistent behavior.
+
+## 2.9.1
+
+## 2.9.0
+
+## 2.8.0
+
+### Patch Changes
+
+- [#495](https://github.com/embedpdf/embed-pdf-viewer/pull/495) by [@bobsingor](https://github.com/bobsingor) – Remove redundant `onTouchStart` handlers from redaction renderers. `onPointerDown` already covers touch input on all modern browsers, so the duplicate handler caused non-passive event listener violations and double-fired on touch devices.
+
 ## 2.7.0
 
 ### Patch Changes

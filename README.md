@@ -47,6 +47,7 @@ We are grateful for the support of our sponsors!
 
 <div align="left">
   <a href="https://www.accrual.com?utm_source=embedpdf&utm_campaign=oss" target="_blank"><img src=".github/assets/sponsor-accrual.jpg" alt="Accrual" height="64"></a>
+  &nbsp;&nbsp;<a href="https://layer.team/?utm_source=embedpdf&utm_campaign=oss" target="_blank"><img src=".github/assets/sponsor-layer.png" alt="Layer" height="64"></a>
   &nbsp;&nbsp;<a href="https://www.lefebvre-group.com?utm_source=embedpdf&utm_campaign=oss" target="_blank"><img src=".github/assets/sponsor-lefebvre.png" alt="Lefebvre" height="64"></a>
   &nbsp;&nbsp;<a href="https://forml.eu?utm_source=embedpdf&utm_campaign=oss" target="_blank"><img src=".github/assets/sponsor-forml.png" alt="forml" height="64"></a>
 </div>

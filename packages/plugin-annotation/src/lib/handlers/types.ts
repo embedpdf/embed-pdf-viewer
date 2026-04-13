@@ -14,7 +14,10 @@ import {
   PdfStandardFont,
   PdfTextAlignment,
   PdfVerticalAlignment,
+  PdfBlendMode,
+  PdfAnnotationLineEnding,
 } from '@embedpdf/models';
+import { FormattedSelection } from '@embedpdf/plugin-selection';
 import { AnnotationTool } from '../tools/types';
 
 export interface CirclePreviewData {
@@ -27,7 +30,7 @@ export interface CirclePreviewData {
   strokeDashArray: number[];
 }
 
-interface SquarePreviewData extends CirclePreviewData {}
+export interface SquarePreviewData extends CirclePreviewData {}
 
 export interface PolygonPreviewData {
   rect: Rect;
@@ -70,6 +73,7 @@ export interface InkPreviewData {
   strokeWidth: number;
   strokeColor: string;
   opacity: number;
+  blendMode?: PdfBlendMode;
 }
 
 export interface FreeTextPreviewData {
@@ -82,6 +86,26 @@ export interface FreeTextPreviewData {
   textAlign?: PdfTextAlignment;
   verticalAlign?: PdfVerticalAlignment;
   contents?: string;
+  calloutLine?: Position[];
+  textBox?: Rect;
+  strokeColor?: string;
+  strokeWidth?: number;
+  lineEnding?: PdfAnnotationLineEnding;
+  color?: string;
+}
+
+export interface LinkPreviewData {
+  rect: Rect;
+  strokeColor: string;
+  strokeWidth: number;
+  strokeStyle: PdfAnnotationBorderStyle;
+  strokeDashArray: number[];
+}
+
+export interface StampPreviewData {
+  rect: Rect;
+  ghostUrl: string;
+  pageRotation: Rotation;
 }
 
 /**
@@ -95,7 +119,8 @@ export interface PreviewDataMap {
   [PdfAnnotationSubtype.LINE]: LinePreviewData;
   [PdfAnnotationSubtype.INK]: InkPreviewData;
   [PdfAnnotationSubtype.FREETEXT]: FreeTextPreviewData;
-  // Add other types as you implement them
+  [PdfAnnotationSubtype.LINK]: LinkPreviewData;
+  [PdfAnnotationSubtype.STAMP]: StampPreviewData;
 }
 
 /**
@@ -129,32 +154,66 @@ export interface PreviewState<T extends PdfAnnotationSubtype = PdfAnnotationSubt
  */
 export interface HandlerServices {
   requestFile(options: { accept: string; onFile: (file: File) => void }): void;
-
-  processImage(options: {
-    source: string | File;
-    maxWidth?: number;
-    maxHeight?: number;
-    onComplete: (result: { imageData: ImageData; width: number; height: number }) => void;
-  }): void;
 }
+
+/**
+ * Extensible map from tool ID to per-activation context data.
+ * Plugins extend this via declaration merging to provide typed context
+ * for their custom tools (e.g. stamp appearance data, ghost image URL).
+ */
+// eslint-disable-next-line @typescript-eslint/no-empty-interface
+export interface ToolContextMap {}
+
+/**
+ * Resolves the tool context type for a given tool ID.
+ * Returns the mapped type if known, otherwise a generic record.
+ */
+export type ResolvedToolContext<TId extends string> = TId extends keyof ToolContextMap
+  ? ToolContextMap[TId]
+  : Record<string, unknown>;
 
 /**
  * The context object passed to a handler factory when creating a handler.
  * It contains all the necessary information and callbacks.
  */
-export interface HandlerFactory<A extends PdfAnnotationObject> {
+export interface HandlerFactory<A extends PdfAnnotationObject, TId extends string = string> {
   annotationType: PdfAnnotationSubtype;
-  create(context: HandlerContext<A>): PointerEventHandlersWithLifecycle;
+  create(context: HandlerContext<A, TId>): PointerEventHandlersWithLifecycle;
 }
 
-export interface HandlerContext<A extends PdfAnnotationObject> {
+export interface HandlerContext<A extends PdfAnnotationObject, TId extends string = string> {
   getTool: () => AnnotationTool<A> | undefined;
+  getToolContext: () => ResolvedToolContext<TId> | undefined;
   pageIndex: number;
   pageSize: Size;
   /** Effective page rotation (page intrinsic + document rotation), as a quarter-turn value (0-3). */
   pageRotation: Rotation;
   scale: number;
   services: HandlerServices;
-  onPreview: (state: AnyPreviewState | null) => void;
+  onPreview: (state: PreviewState<A['type']> | null) => void;
   onCommit: (annotation: A, context?: AnnotationCreateContext<A>) => void;
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+ * Selection-based handler types
+ *
+ * Mirrors the HandlerFactory pattern but for text-selection-based tools
+ * (highlight, underline, strikeout, squiggly, insertText, replaceText).
+ * ═══════════════════════════════════════════════════════════════════════════ */
+
+export interface SelectionHandlerContext<A extends PdfAnnotationObject = PdfAnnotationObject> {
+  toolId: string;
+  documentId: string;
+  getTool: () => AnnotationTool<A> | null;
+  createAnnotation: (pageIndex: number, annotation: PdfAnnotationObject) => void;
+  selectAnnotation: (pageIndex: number, id: string) => void;
+}
+
+export interface SelectionHandlerFactory<A extends PdfAnnotationObject = PdfAnnotationObject> {
+  toolId: string;
+  handle(
+    context: SelectionHandlerContext<A>,
+    selections: FormattedSelection[],
+    getText: () => Promise<string | undefined>,
+  ): void;
 }

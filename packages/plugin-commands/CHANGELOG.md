@@ -1,5 +1,33 @@
 # @embedpdf/plugin-commands
 
+## 2.14.0
+
+## 2.13.0
+
+## 2.12.1
+
+## 2.12.0
+
+## 2.11.1
+
+## 2.11.0
+
+## 2.10.1
+
+## 2.10.0
+
+### Patch Changes
+
+- [#537](https://github.com/embedpdf/embed-pdf-viewer/pull/537) by [@bobsingor](https://github.com/bobsingor) –
+  - Allow `Tab` and `Shift+Tab` keyboard handling to continue working inside form inputs so field navigation is not blocked.
+  - Normalize spacebar shortcut parsing so commands can consistently match the `space` key.
+
+## 2.9.1
+
+## 2.9.0
+
+## 2.8.0
+
 ## 2.7.0
 
 ## 2.6.2

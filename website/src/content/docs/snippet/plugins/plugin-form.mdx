@@ -1,0 +1,118 @@
+---
+title: Forms
+description: Fill PDF forms, inspect field values, and update them programmatically.
+---
+
+import FormExample from '../code-examples/form-example';
+import FormImportExample from '../code-examples/form-import-example';
+import { ExampleWrapper } from '@/components/example-wrapper';
+import { Callout } from '@/components/callout';
+
+# Forms
+
+The EmbedPDF Snippet includes the form plugin by default, so PDFs with AcroForm fields become interactive automatically. Users can type into text fields, toggle checkboxes, select radio buttons, and choose dropdown values directly in the built-in viewer UI.
+
+On top of that built-in experience, you can access the `form` plugin through the viewer registry to read field values, react to changes, or populate the form from your own application data.
+
+## Configuration
+
+There is no special `form` configuration required right now. If you load a PDF that contains form fields, the viewer will render them automatically.
+
+```javascript
+const viewer = EmbedPDF.init({
+  type: 'container',
+  target: document.getElementById('pdf-viewer'),
+  src: '/form.pdf',
+  export: {
+    defaultFileName: 'filled-form.pdf',
+  },
+});
+```
+
+<Callout type="info" title="Fill Mode by Default">
+  The built-in viewer keeps the `form` category locked by default, which makes widgets immediately fillable. If you switch into form authoring mode from the viewer UI, the lock is lifted so widgets can be selected and edited like annotations.
+</Callout>
+
+## Reading Form State
+
+You can subscribe to form lifecycle events and inspect the current field values through the `form` plugin API.
+
+<CodeExample
+  codePaths={[
+    "../../examples/vanilla-tailwind/src/examples/form.html"
+  ]}
+>
+  <ExampleWrapper>
+    <FormExample />
+  </ExampleWrapper>
+</CodeExample>
+
+### Accessing the Form Plugin
+
+Use the viewer registry to get the form capability for a specific document:
+
+```javascript
+const registry = await viewer.registry;
+const formPlugin = registry.getPlugin('form')?.provides();
+const scope = formPlugin?.forDocument('form-doc');
+```
+
+### Listening for Field Changes
+
+Once you have a document-scoped form API, you can read all values and subscribe to updates:
+
+```javascript
+const unsubscribeReady = scope.onFormReady((fields) => {
+  console.log('Fields discovered:', fields.length);
+  console.log('Initial values:', scope.getFormValues());
+});
+
+const unsubscribeChange = scope.onFieldValueChange((event) => {
+  console.log('Changed widget:', event.annotationId);
+  console.log('Updated values:', scope.getFormValues());
+});
+```
+
+## Programmatically Setting Values
+
+The same API can be used to pre-fill a form from external data, restore saved values, or clear a form back to a known state.
+
+<CodeExample
+  codePaths={[
+    "../../examples/vanilla-tailwind/src/examples/form-import.html"
+  ]}
+>
+  <ExampleWrapper>
+    <FormImportExample />
+  </ExampleWrapper>
+</CodeExample>
+
+### Auto Fill and Reset
+
+Pass a field-name-to-value map to `setFormValues()`:
+
+```javascript
+const scope = formPlugin?.forDocument('form-doc');
+
+await scope?.setFormValues({
+  First_Name: 'Jane',
+  Last_Name: 'Doe',
+  Email_Address: 'jane.doe@example.com',
+}).toPromise();
+```
+
+### Saving the Filled PDF
+
+Filled form values are included when you export the document:
+
+```javascript
+const exportPlugin = registry?.getPlugin('export')?.provides();
+const pdfBytes = await exportPlugin
+  ?.forDocument('form-doc')
+  .saveAsCopy()
+  .toPromise();
+```
+
+<Callout type="info" title="Checkbox and Radio Values">
+  Radio buttons still expect the exact export value defined in the PDF. Checkboxes are more forgiving: pass `"Off"` to clear them, and any other string will be normalized to the widget's checked export value.
+</Callout>

@@ -1,0 +1,27 @@
+{
+  "name": "@embedpdf/default-stamps",
+  "version": "0.0.1",
+  "description": "Default stamp assets for @embedpdf/plugin-stamp",
+  "files": [
+    "en",
+    "de",
+    "nl",
+    "fr",
+    "es",
+    "zh-CN",
+    "sv",
+    "ja"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/embedpdf/embed-pdf-viewer",
+    "directory": "packages/default-stamps"
+  },
+  "homepage": "https://www.embedpdf.com/docs",
+  "bugs": {
+    "url": "https://github.com/embedpdf/embed-pdf-viewer/issues"
+  },
+  "publishConfig": {
+    "access": "public"
+  }
+}

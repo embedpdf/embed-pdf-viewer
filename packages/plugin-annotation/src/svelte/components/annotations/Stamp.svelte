@@ -9,7 +9,7 @@
     annotation: TrackedAnnotation<PdfStampAnnoObject>;
     pageIndex: number;
     scale: number;
-    onClick: (e: MouseEvent | TouchEvent) => void;
+    onClick?: (e: MouseEvent) => void;
   }
 
   let { documentId, isSelected, annotation, pageIndex, scale, onClick }: StampProps = $props();
@@ -22,10 +22,9 @@
   role="button"
   tabindex={-1}
   style="position: absolute; width: 100%; height: 100%; z-index: 2;"
-  style:pointer-events={isSelected ? 'none' : 'auto'}
-  style:cursor="pointer"
+  style:pointer-events={!onClick ? 'none' : isSelected ? 'none' : 'auto'}
+  style:cursor={isSelected ? 'move' : onClick ? 'pointer' : 'default'}
   onpointerdown={onClick}
-  ontouchstart={onClick}
 >
   <RenderAnnotation
     {documentId}

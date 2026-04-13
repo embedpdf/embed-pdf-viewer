@@ -75,7 +75,7 @@ importers:
         version: 6.1.3
       turbo:
         specifier: latest
-        version: 2.8.9
+        version: 2.8.20
       turbowatch:
         specifier: ^2.29.4
         version: 2.30.0
@@ -388,6 +388,9 @@ importers:
       '@embedpdf/plugin-export':
         specifier: workspace:*
         version: link:../../packages/plugin-export
+      '@embedpdf/plugin-form':
+        specifier: workspace:*
+        version: link:../../packages/plugin-form
       '@embedpdf/plugin-fullscreen':
         specifier: workspace:*
         version: link:../../packages/plugin-fullscreen
@@ -427,9 +430,15 @@ importers:
       '@embedpdf/plugin-selection':
         specifier: workspace:*
         version: link:../../packages/plugin-selection
+      '@embedpdf/plugin-signature':
+        specifier: workspace:*
+        version: link:../../packages/plugin-signature
       '@embedpdf/plugin-spread':
         specifier: workspace:*
         version: link:../../packages/plugin-spread
+      '@embedpdf/plugin-stamp':
+        specifier: workspace:*
+        version: link:../../packages/plugin-stamp
       '@embedpdf/plugin-thumbnail':
         specifier: workspace:*
         version: link:../../packages/plugin-thumbnail
@@ -494,6 +503,8 @@ importers:
         specifier: ^4.5.4
         version: 4.5.4(@types/node@22.19.11)(rollup@4.57.1)(typescript@5.9.3)(vite@7.3.1(@types/node@22.19.11)(jiti@2.6.1)(lightningcss@1.30.2)(sass-embedded@1.97.3)(sass@1.97.3)(terser@5.46.0)(tsx@4.21.0)(yaml@2.8.2))
 
+  examples/vanilla-tailwind: {}
+
   examples/vue-tailwind:
     dependencies:
       '@embedpdf/ai':
@@ -529,6 +540,9 @@ importers:
       '@embedpdf/plugin-export':
         specifier: workspace:*
         version: link:../../packages/plugin-export
+      '@embedpdf/plugin-form':
+        specifier: workspace:*
+        version: link:../../packages/plugin-form
       '@embedpdf/plugin-fullscreen':
         specifier: workspace:*
         version: link:../../packages/plugin-fullscreen
@@ -568,9 +582,15 @@ importers:
       '@embedpdf/plugin-selection':
         specifier: workspace:*
         version: link:../../packages/plugin-selection
+      '@embedpdf/plugin-signature':
+        specifier: workspace:*
+        version: link:../../packages/plugin-signature
       '@embedpdf/plugin-spread':
         specifier: workspace:*
         version: link:../../packages/plugin-spread
+      '@embedpdf/plugin-stamp':
+        specifier: workspace:*
+        version: link:../../packages/plugin-stamp
       '@embedpdf/plugin-thumbnail':
         specifier: workspace:*
         version: link:../../packages/plugin-thumbnail
@@ -849,6 +869,8 @@ importers:
       typescript:
         specifier: ^5.0.0
         version: 5.9.3
+
+  packages/default-stamps: {}
 
   packages/engines:
     dependencies:
@@ -1143,6 +1165,9 @@ importers:
       '@embedpdf/plugin-interaction-manager':
         specifier: workspace:*
         version: link:../plugin-interaction-manager
+      '@embedpdf/plugin-scroll':
+        specifier: workspace:*
+        version: link:../plugin-scroll
       '@embedpdf/plugin-selection':
         specifier: workspace:*
         version: link:../plugin-selection
@@ -1362,6 +1387,49 @@ importers:
       '@embedpdf/core':
         specifier: workspace:*
         version: link:../core
+      '@types/react':
+        specifier: ^18.2.0
+        version: 18.3.28
+      typescript:
+        specifier: ^5.0.0
+        version: 5.9.3
+
+  packages/plugin-form:
+    dependencies:
+      '@embedpdf/models':
+        specifier: workspace:*
+        version: link:../models
+      '@embedpdf/utils':
+        specifier: workspace:*
+        version: link:../utils
+      preact:
+        specifier: ^10.26.4
+        version: 10.28.3
+      react:
+        specifier: '>=16.8.0'
+        version: 18.3.1
+      react-dom:
+        specifier: '>=16.8.0'
+        version: 18.3.1(react@18.3.1)
+      svelte:
+        specifier: '>=5 <6'
+        version: 5.50.1
+      vue:
+        specifier: '>=3.2.0'
+        version: 3.5.28(typescript@5.9.3)
+    devDependencies:
+      '@embedpdf/build':
+        specifier: workspace:*
+        version: link:../build
+      '@embedpdf/core':
+        specifier: workspace:*
+        version: link:../core
+      '@embedpdf/plugin-annotation':
+        specifier: workspace:*
+        version: link:../plugin-annotation
+      '@embedpdf/plugin-history':
+        specifier: workspace:*
+        version: link:../plugin-history
       '@types/react':
         specifier: ^18.2.0
         version: 18.3.28
@@ -1868,6 +1936,43 @@ importers:
         specifier: ^5.0.0
         version: 5.9.3
 
+  packages/plugin-signature:
+    dependencies:
+      '@embedpdf/models':
+        specifier: workspace:*
+        version: link:../models
+      preact:
+        specifier: ^10.26.4
+        version: 10.28.3
+      react:
+        specifier: '>=16.8.0'
+        version: 18.3.1
+      react-dom:
+        specifier: '>=16.8.0'
+        version: 18.3.1(react@18.3.1)
+      svelte:
+        specifier: '>=5 <6'
+        version: 5.50.1
+      vue:
+        specifier: '>=3.2.0'
+        version: 3.5.28(typescript@5.9.3)
+    devDependencies:
+      '@embedpdf/build':
+        specifier: workspace:*
+        version: link:../build
+      '@embedpdf/core':
+        specifier: workspace:*
+        version: link:../core
+      '@embedpdf/plugin-annotation':
+        specifier: workspace:*
+        version: link:../plugin-annotation
+      '@types/react':
+        specifier: ^18.2.0
+        version: 18.3.28
+      typescript:
+        specifier: ^5.0.0
+        version: 5.9.3
+
   packages/plugin-spread:
     dependencies:
       '@embedpdf/models':
@@ -1898,6 +2003,46 @@ importers:
       '@embedpdf/plugin-viewport':
         specifier: workspace:*
         version: link:../plugin-viewport
+      '@types/react':
+        specifier: ^18.2.0
+        version: 18.3.28
+      typescript:
+        specifier: ^5.0.0
+        version: 5.9.3
+
+  packages/plugin-stamp:
+    dependencies:
+      '@embedpdf/models':
+        specifier: workspace:*
+        version: link:../models
+      preact:
+        specifier: ^10.26.4
+        version: 10.28.3
+      react:
+        specifier: '>=16.8.0'
+        version: 18.3.1
+      react-dom:
+        specifier: '>=16.8.0'
+        version: 18.3.1(react@18.3.1)
+      svelte:
+        specifier: '>=5 <6'
+        version: 5.50.1
+      vue:
+        specifier: '>=3.2.0'
+        version: 3.5.28(typescript@5.9.3)
+    devDependencies:
+      '@embedpdf/build':
+        specifier: workspace:*
+        version: link:../build
+      '@embedpdf/core':
+        specifier: workspace:*
+        version: link:../core
+      '@embedpdf/plugin-annotation':
+        specifier: workspace:*
+        version: link:../plugin-annotation
+      '@embedpdf/plugin-i18n':
+        specifier: workspace:*
+        version: link:../plugin-i18n
       '@types/react':
         specifier: ^18.2.0
         version: 18.3.28
@@ -2251,6 +2396,9 @@ importers:
       '@embedpdf/plugin-export':
         specifier: workspace:*
         version: link:../../packages/plugin-export
+      '@embedpdf/plugin-form':
+        specifier: workspace:*
+        version: link:../../packages/plugin-form
       '@embedpdf/plugin-fullscreen':
         specifier: workspace:*
         version: link:../../packages/plugin-fullscreen
@@ -2287,9 +2435,15 @@ importers:
       '@embedpdf/plugin-selection':
         specifier: workspace:*
         version: link:../../packages/plugin-selection
+      '@embedpdf/plugin-signature':
+        specifier: workspace:*
+        version: link:../../packages/plugin-signature
       '@embedpdf/plugin-spread':
         specifier: workspace:*
         version: link:../../packages/plugin-spread
+      '@embedpdf/plugin-stamp':
+        specifier: workspace:*
+        version: link:../../packages/plugin-stamp
       '@embedpdf/plugin-thumbnail':
         specifier: workspace:*
         version: link:../../packages/plugin-thumbnail
@@ -2500,6 +2654,9 @@ importers:
       '@embedpdf/plugin-export':
         specifier: workspace:*
         version: link:../packages/plugin-export
+      '@embedpdf/plugin-form':
+        specifier: workspace:*
+        version: link:../packages/plugin-form
       '@embedpdf/plugin-history':
         specifier: workspace:*
         version: link:../packages/plugin-history
@@ -2533,9 +2690,15 @@ importers:
       '@embedpdf/plugin-selection':
         specifier: workspace:*
         version: link:../packages/plugin-selection
+      '@embedpdf/plugin-signature':
+        specifier: workspace:*
+        version: link:../packages/plugin-signature
       '@embedpdf/plugin-spread':
         specifier: workspace:*
         version: link:../packages/plugin-spread
+      '@embedpdf/plugin-stamp':
+        specifier: workspace:*
+        version: link:../packages/plugin-stamp
       '@embedpdf/plugin-thumbnail':
         specifier: workspace:*
         version: link:../packages/plugin-thumbnail
@@ -5276,6 +5439,36 @@ packages:
 
   '@tsconfig/node22@22.0.5':
     resolution: {integrity: sha512-hLf2ld+sYN/BtOJjHUWOk568dvjFQkHnLNa6zce25GIH+vxKfvTgm3qpaH6ToF5tu/NN0IH66s+Bb5wElHrLcw==}
+
+  '@turbo/darwin-64@2.8.20':
+    resolution: {integrity: sha512-FQ9EX1xMU5nbwjxXxM3yU88AQQ6Sqc6S44exPRroMcx9XZHqqppl5ymJF0Ig/z3nvQNwDmz1Gsnvxubo+nXWjQ==}
+    cpu: [x64]
+    os: [darwin]
+
+  '@turbo/darwin-arm64@2.8.20':
+    resolution: {integrity: sha512-Gpyh9ATFGThD6/s9L95YWY54cizg/VRWl2B67h0yofG8BpHf67DFAh9nuJVKG7bY0+SBJDAo5cMur+wOl9YOYw==}
+    cpu: [arm64]
+    os: [darwin]
+
+  '@turbo/linux-64@2.8.20':
+    resolution: {integrity: sha512-p2QxWUYyYUgUFG0b0kR+pPi8t7c9uaVlRtjTTI1AbCvVqkpjUfCcReBn6DgG/Hu8xrWdKLuyQFaLYFzQskZbcA==}
+    cpu: [x64]
+    os: [linux]
+
+  '@turbo/linux-arm64@2.8.20':
+    resolution: {integrity: sha512-Gn5yjlZGLRZWarLWqdQzv0wMqyBNIdq1QLi48F1oY5Lo9kiohuf7BPQWtWxeNVS2NgJ1+nb/DzK1JduYC4AWOA==}
+    cpu: [arm64]
+    os: [linux]
+
+  '@turbo/windows-64@2.8.20':
+    resolution: {integrity: sha512-vyaDpYk/8T6Qz5V/X+ihKvKFEZFUoC0oxYpC1sZanK6gaESJlmV3cMRT3Qhcg4D2VxvtC2Jjs9IRkrZGL+exLw==}
+    cpu: [x64]
+    os: [win32]
+
+  '@turbo/windows-arm64@2.8.20':
+    resolution: {integrity: sha512-voicVULvUV5yaGXo0Iue13BcHGYW3u0VgqSbfQwBaHbpj1zLjYV4KIe+7fYIo6DO8FVUJzxFps3ODCQG/Wy2Qw==}
+    cpu: [arm64]
+    os: [win32]
 
   '@tybys/wasm-util@0.10.1':
     resolution: {integrity: sha512-9tTaPJLSiejZKx+Bmog4uSubteqTvFrVrURwkmHixBo0G4seD0zUxp98E1DzUBJxLQ3NPwXrGKDiVjwx/DpPsg==}
@@ -10620,38 +10813,8 @@ packages:
     engines: {node: '>=18.0.0'}
     hasBin: true
 
-  turbo-darwin-64@2.8.9:
-    resolution: {integrity: sha512-KnCw1ZI9KTnEAhdI9avZrnZ/z4wsM++flMA1w8s8PKOqi5daGpFV36qoPafg4S8TmYMe52JPWEoFr0L+lQ5JIw==}
-    cpu: [x64]
-    os: [darwin]
-
-  turbo-darwin-arm64@2.8.9:
-    resolution: {integrity: sha512-CbD5Y2NKJKBXTOZ7z7Cc7vGlFPZkYjApA7ri9lH4iFwKV1X7MoZswh9gyRLetXYWImVX1BqIvP8KftulJg/wIA==}
-    cpu: [arm64]
-    os: [darwin]
-
-  turbo-linux-64@2.8.9:
-    resolution: {integrity: sha512-OXC9HdCtsHvyH+5KUoH8ds+p5WU13vdif0OPbsFzZca4cUXMwKA3HWwUuCgQetk0iAE4cscXpi/t8A263n3VTg==}
-    cpu: [x64]
-    os: [linux]
-
-  turbo-linux-arm64@2.8.9:
-    resolution: {integrity: sha512-yI5n8jNXiFA6+CxnXG0gO7h5ZF1+19K8uO3/kXPQmyl37AdiA7ehKJQOvf9OPAnmkGDHcF2HSCPltabERNRmug==}
-    cpu: [arm64]
-    os: [linux]
-
-  turbo-windows-64@2.8.9:
-    resolution: {integrity: sha512-/OztzeGftJAg258M/9vK2ZCkUKUzqrWXJIikiD2pm8TlqHcIYUmepDbyZSDfOiUjMy6NzrLFahpNLnY7b5vNgg==}
-    cpu: [x64]
-    os: [win32]
-
-  turbo-windows-arm64@2.8.9:
-    resolution: {integrity: sha512-xZ2VTwVTjIqpFZKN4UBxDHCPM3oJ2J5cpRzCBSmRpJ/Pn33wpiYjs+9FB2E03svKaD04/lSSLlEUej0UYsugfg==}
-    cpu: [arm64]
-    os: [win32]
-
-  turbo@2.8.9:
-    resolution: {integrity: sha512-G+Mq8VVQAlpz/0HTsxiNNk/xywaHGl+dk1oiBREgOEVCCDjXInDlONWUn5srRnC9s5tdHTFD1bx1N19eR4hI+g==}
+  turbo@2.8.20:
+    resolution: {integrity: sha512-Rb4qk5YT8RUwwdXtkLpkVhNEe/lor6+WV7S5tTlLpxSz6MjV5Qi8jGNn4gS6NAvrYGA/rNrE6YUQM85sCZUDbQ==}
     hasBin: true
 
   turbowatch@2.30.0:
@@ -14195,6 +14358,24 @@ snapshots:
   '@tsconfig/node16@1.0.4': {}
 
   '@tsconfig/node22@22.0.5': {}
+
+  '@turbo/darwin-64@2.8.20':
+    optional: true
+
+  '@turbo/darwin-arm64@2.8.20':
+    optional: true
+
+  '@turbo/linux-64@2.8.20':
+    optional: true
+
+  '@turbo/linux-arm64@2.8.20':
+    optional: true
+
+  '@turbo/windows-64@2.8.20':
+    optional: true
+
+  '@turbo/windows-arm64@2.8.20':
+    optional: true
 
   '@tybys/wasm-util@0.10.1':
     dependencies:
@@ -20884,32 +21065,14 @@ snapshots:
     optionalDependencies:
       fsevents: 2.3.3
 
-  turbo-darwin-64@2.8.9:
-    optional: true
-
-  turbo-darwin-arm64@2.8.9:
-    optional: true
-
-  turbo-linux-64@2.8.9:
-    optional: true
-
-  turbo-linux-arm64@2.8.9:
-    optional: true
-
-  turbo-windows-64@2.8.9:
-    optional: true
-
-  turbo-windows-arm64@2.8.9:
-    optional: true
-
-  turbo@2.8.9:
+  turbo@2.8.20:
     optionalDependencies:
-      turbo-darwin-64: 2.8.9
-      turbo-darwin-arm64: 2.8.9
-      turbo-linux-64: 2.8.9
-      turbo-linux-arm64: 2.8.9
-      turbo-windows-64: 2.8.9
-      turbo-windows-arm64: 2.8.9
+      '@turbo/darwin-64': 2.8.20
+      '@turbo/darwin-arm64': 2.8.20
+      '@turbo/linux-64': 2.8.20
+      '@turbo/linux-arm64': 2.8.20
+      '@turbo/windows-64': 2.8.20
+      '@turbo/windows-arm64': 2.8.20
 
   turbowatch@2.30.0:
     dependencies:

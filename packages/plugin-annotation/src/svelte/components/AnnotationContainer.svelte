@@ -1,5 +1,6 @@
 <script lang="ts" generics="T extends PdfAnnotationObject">
-  import type { PdfAnnotationObject, Rect } from '@embedpdf/models';
+  import type { PdfAnnotationObject, Rect, CssBlendMode } from '@embedpdf/models';
+  import { getCounterRotation } from '@embedpdf/utils';
   import { useDocumentPermissions } from '@embedpdf/core/svelte';
   import { useAnnotationCapability, useAnnotationPlugin } from '../hooks';
   import type { AnnotationContainerProps } from './types';
@@ -33,7 +34,8 @@
     isResizable,
     isRotatable = true,
     lockAspectRatio = false,
-    style,
+    blendMode,
+    style: propsStyle,
     class: propsClass = '',
     vertexConfig,
     selectionMenu,
@@ -92,6 +94,15 @@
     preview ? { ...trackedAnnotation.object, ...preview } : trackedAnnotation.object,
   );
 
+  // Annotation flags
+  const annoFlags = $derived(trackedAnnotation.object.flags ?? []);
+  const hasNoZoom = $derived(annoFlags.includes('noZoom'));
+  const hasNoRotate = $derived(annoFlags.includes('noRotate'));
+  // noZoom: maintain constant screen-pixel size regardless of zoom level.
+  const visualScale = $derived(hasNoZoom ? 1 : scale);
+  // noRotate: stay visually upright regardless of page rotation.
+  const effectivePageRotation = $derived((hasNoRotate ? 0 : rotation) as typeof rotation);
+
   // UI constants
   const HANDLE_COLOR = $derived(resizeUI?.color ?? '#007ACC');
   const VERTEX_COLOR = $derived(vertexUI?.color ?? '#007ACC');
@@ -139,33 +150,44 @@
   const controllerElement = $derived(effectiveUnrotatedRect);
 
   // Three-layer model dimensions
-  const aabbWidth = $derived(currentObject.rect.size.width * scale);
-  const aabbHeight = $derived(currentObject.rect.size.height * scale);
-  const innerWidth = $derived(effectiveUnrotatedRect.size.width * scale);
-  const innerHeight = $derived(effectiveUnrotatedRect.size.height * scale);
+  // noZoom: use visualScale (=1) so the annotation keeps a constant screen-pixel size.
+  // noRotate: counter-rotate the outer div so the annotation stays upright on rotated pages.
+  const aabbWidth = $derived(currentObject.rect.size.width * visualScale);
+  const aabbHeight = $derived(currentObject.rect.size.height * visualScale);
+  const innerWidth = $derived(effectiveUnrotatedRect.size.width * visualScale);
+  const innerHeight = $derived(effectiveUnrotatedRect.size.height * visualScale);
   const usesCustomPivot = $derived(Boolean(explicitUnrotatedRect) && annotationRotation !== 0);
   const innerLeft = $derived(
     usesCustomPivot
-      ? (effectiveUnrotatedRect.origin.x - currentObject.rect.origin.x) * scale
+      ? (effectiveUnrotatedRect.origin.x - currentObject.rect.origin.x) * visualScale
       : (aabbWidth - innerWidth) / 2,
   );
   const innerTop = $derived(
     usesCustomPivot
-      ? (effectiveUnrotatedRect.origin.y - currentObject.rect.origin.y) * scale
+      ? (effectiveUnrotatedRect.origin.y - currentObject.rect.origin.y) * visualScale
       : (aabbHeight - innerHeight) / 2,
   );
   const innerTransformOrigin = $derived(
     usesCustomPivot && rotationPivot
-      ? `${(rotationPivot.x - effectiveUnrotatedRect.origin.x) * scale}px ${(rotationPivot.y - effectiveUnrotatedRect.origin.y) * scale}px`
+      ? `${(rotationPivot.x - effectiveUnrotatedRect.origin.x) * visualScale}px ${(rotationPivot.y - effectiveUnrotatedRect.origin.y) * visualScale}px`
       : 'center center',
   );
   const centerX = $derived(
-    rotationPivot ? (rotationPivot.x - currentObject.rect.origin.x) * scale : aabbWidth / 2,
+    rotationPivot ? (rotationPivot.x - currentObject.rect.origin.x) * visualScale : aabbWidth / 2,
   );
   const centerY = $derived(
-    rotationPivot ? (rotationPivot.y - currentObject.rect.origin.y) * scale : aabbHeight / 2,
+    rotationPivot ? (rotationPivot.y - currentObject.rect.origin.y) * visualScale : aabbHeight / 2,
   );
   const guideLength = $derived(Math.max(300, Math.max(aabbWidth, aabbHeight) + 80));
+  // noRotate: compute counter-rotation to undo page rotation on this annotation's outer div.
+  const counterRot = $derived(
+    hasNoRotate
+      ? getCounterRotation(
+          { origin: { x: 0, y: 0 }, size: { width: aabbWidth, height: aabbHeight } },
+          rotation,
+        )
+      : null,
+  );
 
   const apActive = $derived(
     !!appearance?.normal && !gestureActive && !isEditing && !trackedAnnotation.dictMode,
@@ -389,7 +411,7 @@
     // The menu (suggestTop: false) renders at the visual bottom (180deg).
     // Flip the menu to the top when the handle is in the bottom visual hemisphere
     // to prevent it from overlapping with the rotation handle.
-    const effectiveAngle = (((annotationRotation + rotation * 90) % 360) + 360) % 360;
+    const effectiveAngle = (((annotationRotation + effectivePageRotation * 90) % 360) + 360) % 360;
     const handleNearMenuSide = effectiveIsRotatable && effectiveAngle > 90 && effectiveAngle < 270;
 
     return {
@@ -419,17 +441,70 @@
 </script>
 
 <div data-no-interaction>
-  <!-- svelte-ignore a11y_no_static_element_interactions -->
-  <!-- Outer div: AABB container - stable center for help lines and rotation handle -->
+  <!-- Visual Layer: blend mode applied here, contains only annotation content -->
   <div
     style:position="absolute"
     style:left="{currentObject.rect.origin.x * scale}px"
     style:top="{currentObject.rect.origin.y * scale}px"
-    style:width="{aabbWidth}px"
-    style:height="{aabbHeight}px"
+    style:width="{counterRot ? counterRot.width : aabbWidth}px"
+    style:height="{counterRot ? counterRot.height : aabbHeight}px"
     style:pointer-events="none"
     style:z-index={zIndex}
-    style={style || ''}
+    style:transform={counterRot ? counterRot.matrix : undefined}
+    style:transform-origin={counterRot ? '0 0' : undefined}
+    style:mix-blend-mode={blendMode}
+    style={propsStyle}
+  >
+    <!-- Inner div: rotated visual content - no pointer events -->
+    <div
+      style:position="absolute"
+      style:left="{innerLeft}px"
+      style:top="{innerTop}px"
+      style:width="{innerWidth}px"
+      style:height="{innerHeight}px"
+      style:transform={annotationRotation !== 0 ? `rotate(${annotationRotation}deg)` : undefined}
+      style:transform-origin={innerTransformOrigin}
+      style:pointer-events={isEditing ? 'auto' : 'none'}
+    >
+      <!-- Annotation content - renders in unrotated coordinate space -->
+      {#if customAnnotationRenderer}
+        {@render customAnnotationRenderer?.({
+          annotation: childObject,
+          children: children as Snippet,
+          isSelected,
+          scale,
+          rotation,
+          pageWidth,
+          pageHeight,
+          pageIndex,
+          onSelect,
+        })}
+      {:else}
+        {@render children(childObject, { appearanceActive: apActive })}
+      {/if}
+
+      <!-- AP overlay canvas (always in DOM, toggled via display) -->
+      {#if appearance?.normal}
+        <AppearanceImage
+          appearance={appearance.normal}
+          style="display: {apActive ? 'block' : 'none'};"
+        />
+      {/if}
+    </div>
+  </div>
+
+  <!-- Interaction Layer: no blend mode, contains rotation guides, handles, and drag/resize/vertex -->
+  <!-- svelte-ignore a11y_no_static_element_interactions -->
+  <div
+    style:position="absolute"
+    style:left="{currentObject.rect.origin.x * scale}px"
+    style:top="{currentObject.rect.origin.y * scale}px"
+    style:width="{counterRot ? counterRot.width : aabbWidth}px"
+    style:height="{counterRot ? counterRot.height : aabbHeight}px"
+    style:pointer-events="none"
+    style:z-index={zIndex}
+    style:transform={counterRot ? counterRot.matrix : undefined}
+    style:transform-origin={counterRot ? '0 0' : undefined}
     class={propsClass}
     {...restProps}
   >
@@ -551,7 +626,7 @@
       {/if}
     {/if}
 
-    <!-- Inner div: rotated content area - holds content, resize handles, vertex handles -->
+    <!-- Inner div: drag/resize/vertex interaction -->
     <div
       {...effectiveIsDraggable && isSelected ? interactionHandles.dragProps : {}}
       use:doublePress={{ onDouble: guardedOnDoubleClick }}
@@ -564,35 +639,10 @@
       style:transform-origin={innerTransformOrigin}
       style:outline={showOutline ? `${outlineWidth}px ${outlineStyleVal} ${outlineColor}` : 'none'}
       style:outline-offset={showOutline ? `${outlineOff}px` : '0px'}
-      style:pointer-events={isSelected && !isMultiSelected ? 'auto' : 'none'}
+      style:pointer-events={isSelected && !isMultiSelected && !isEditing ? 'auto' : 'none'}
       style:touch-action="none"
       style:cursor={isSelected && effectiveIsDraggable ? 'move' : 'default'}
     >
-      <!-- Annotation content - renders in unrotated coordinate space -->
-      {#if customAnnotationRenderer}
-        {@render customAnnotationRenderer?.({
-          annotation: childObject,
-          children: children as Snippet,
-          isSelected,
-          scale,
-          rotation,
-          pageWidth,
-          pageHeight,
-          pageIndex,
-          onSelect,
-        })}
-      {:else}
-        {@render children(childObject, { appearanceActive: apActive })}
-      {/if}
-
-      <!-- AP overlay canvas (always in DOM, toggled via display) -->
-      {#if appearance?.normal}
-        <AppearanceImage
-          appearance={appearance.normal}
-          style="display: {apActive ? 'block' : 'none'};"
-        />
-      {/if}
-
       <!-- Resize handles - rotate with the shape -->
       {#if isSelected && effectiveIsResizable && !rotationActive}
         {#each resizeHandles as { key, style: handleStyle, ...hProps } (key)}
@@ -634,8 +684,8 @@
           y: currentObject.rect.origin.y * scale,
         },
         size: {
-          width: currentObject.rect.size.width * scale,
-          height: currentObject.rect.size.height * scale,
+          width: currentObject.rect.size.width * visualScale,
+          height: currentObject.rect.size.height * visualScale,
         },
       }}
       {rotation}

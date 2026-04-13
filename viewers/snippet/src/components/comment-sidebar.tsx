@@ -1,7 +1,8 @@
 import { h } from 'preact';
 import { useRef, useEffect } from 'preact/hooks';
 import {
-  getAnnotationByUid,
+  getGroupLeaderId,
+  getSelectedAnnotations,
   getSidebarAnnotationsWithRepliesGroupedByPage,
   useAnnotation,
   useAnnotationCapability,
@@ -10,7 +11,7 @@ import { useScrollCapability } from '@embedpdf/plugin-scroll/preact';
 import { useTranslations } from '@embedpdf/plugin-i18n/preact';
 import { useDocumentPermissions } from '@embedpdf/core/preact';
 import { TrackedAnnotation } from '@embedpdf/plugin-annotation';
-import { uuidV4, PdfAnnotationSubtype, PdfAnnotationIcon } from '@embedpdf/models';
+import { uuidV4, PdfAnnotationSubtype, PdfAnnotationName } from '@embedpdf/models';
 import { AnnotationCard } from './comment-sidebar/annotation-card';
 import { EmptyState } from './comment-sidebar/empty-state';
 
@@ -30,35 +31,34 @@ export const CommentSidebar = ({ documentId }: CommentSidebarProps) => {
   // isReadOnly is the inverse of canModifyAnnotations
   const isReadOnly = !canModifyAnnotations;
 
-  const selectedAnnotation = state.selectedUid
-    ? getAnnotationByUid(state, state.selectedUid)
-    : null;
+  const selectedAnnotations = getSelectedAnnotations(state);
   const sidebarAnnotations = getSidebarAnnotationsWithRepliesGroupedByPage(state);
+
+  const effectiveSelectedIds = new Set(
+    selectedAnnotations.map((ta) => getGroupLeaderId(state, ta.object.id) ?? ta.object.id),
+  );
 
   // Effect to scroll to the selected annotation
   useEffect(() => {
-    if (selectedAnnotation && scrollContainerRef.current) {
-      const element = annotationRefs.current[selectedAnnotation.object.id];
+    const firstId = effectiveSelectedIds.values().next().value;
+    if (!firstId || !scrollContainerRef.current) return;
 
-      if (element && scrollContainerRef.current) {
-        const container = scrollContainerRef.current;
-        const containerRect = container.getBoundingClientRect();
-        const elementRect = element.getBoundingClientRect();
+    const element = annotationRefs.current[firstId];
+    if (!element) return;
 
-        // Calculate element's position relative to container's scrollable content
-        const elementTopInScrollContent = elementRect.top - containerRect.top + container.scrollTop;
+    const container = scrollContainerRef.current;
+    const containerRect = container.getBoundingClientRect();
+    const elementRect = element.getBoundingClientRect();
 
-        // Calculate centered scroll position
-        const targetScroll =
-          elementTopInScrollContent - container.clientHeight / 2 + elementRect.height / 2;
+    const elementTopInScrollContent = elementRect.top - containerRect.top + container.scrollTop;
+    const targetScroll =
+      elementTopInScrollContent - container.clientHeight / 2 + elementRect.height / 2;
 
-        container.scrollTo({
-          top: targetScroll,
-          behavior: 'smooth',
-        });
-      }
-    }
-  }, [selectedAnnotation]);
+    container.scrollTo({
+      top: targetScroll,
+      behavior: 'smooth',
+    });
+  }, [state.selectedUids]);
 
   const handleSelect = (ann: TrackedAnnotation) => {
     annotationApi?.selectAnnotation(ann.object.pageIndex, ann.object.id);
@@ -107,7 +107,7 @@ export const CommentSidebar = ({ documentId }: CommentSidebarProps) => {
         contents,
         inReplyToId: parentAnn.object.id,
         flags: ['noRotate', 'noZoom', 'print'],
-        icon: PdfAnnotationIcon.Comment,
+        name: PdfAnnotationName.Comment,
       });
     }
   };
@@ -166,7 +166,7 @@ export const CommentSidebar = ({ documentId }: CommentSidebarProps) => {
                 >
                   <AnnotationCard
                     entry={entry}
-                    isSelected={selectedAnnotation?.object.id === entry.annotation.object.id}
+                    isSelected={effectiveSelectedIds.has(entry.annotation.object.id)}
                     onSelect={() => handleSelect(entry.annotation)}
                     onUpdate={handleUpdate}
                     onDelete={handleDelete}

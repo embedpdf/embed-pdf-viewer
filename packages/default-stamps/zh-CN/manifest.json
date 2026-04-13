@@ -1,0 +1,40 @@
+{
+  "id": "standard",
+  "name": "标准印章",
+  "categories": ["sidebar"],
+  "pdf": "stamps.pdf",
+  "stamps": [
+    { "id": "approved", "pageIndex": 0, "name": "Approved", "subject": "已批准" },
+    { "id": "not-approved", "pageIndex": 1, "name": "NotApproved", "subject": "未批准" },
+    { "id": "draft", "pageIndex": 2, "name": "Draft", "subject": "草稿" },
+    { "id": "final", "pageIndex": 3, "name": "Final", "subject": "最终版" },
+    { "id": "completed", "pageIndex": 4, "name": "Completed", "subject": "已完成" },
+    { "id": "confidential", "pageIndex": 5, "name": "Confidential", "subject": "机密" },
+    {
+      "id": "for-public-release",
+      "pageIndex": 6,
+      "name": "ForPublicRelease",
+      "subject": "可公开发布"
+    },
+    {
+      "id": "not-for-public-release",
+      "pageIndex": 7,
+      "name": "NotForPublicRelease",
+      "subject": "不可公开发布"
+    },
+    { "id": "for-comment", "pageIndex": 8, "name": "ForComment", "subject": "待评论" },
+    { "id": "void", "pageIndex": 9, "name": "Void", "subject": "作废" },
+    {
+      "id": "preliminary-results",
+      "pageIndex": 10,
+      "name": "PreliminaryResults",
+      "subject": "初步结果"
+    },
+    { "id": "information-only", "pageIndex": 11, "name": "InformationOnly", "subject": "仅供参考" },
+    { "id": "witness", "pageIndex": 12, "name": "Witness", "subject": "见证人" },
+    { "id": "initial-here", "pageIndex": 13, "name": "InitialHere", "subject": "在此签名缩写" },
+    { "id": "sign-here", "pageIndex": 14, "name": "SignHere", "subject": "在此签名" },
+    { "id": "accepted", "pageIndex": 15, "name": "Accepted", "subject": "已接受" },
+    { "id": "rejected", "pageIndex": 16, "name": "Rejected", "subject": "已拒绝" }
+  ]
+}

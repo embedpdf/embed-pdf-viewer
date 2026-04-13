@@ -1,6 +1,7 @@
 import type { ImageConversionTypes } from '@embedpdf/models';
 import type { ImageDataConverter, LazyImageData } from './types';
 import { ImageEncoderWorkerPool } from '../image-encoder';
+import { rgbaToBmpBlob } from '../image-encoder/bmp';
 
 // ============================================================================
 // Error Classes
@@ -25,9 +26,16 @@ export class ImageConverterError extends Error {
  */
 export const browserImageDataToBlobConverter: ImageDataConverter<Blob> = (
   getImageData: LazyImageData,
-  imageType: ImageConversionTypes = 'image/webp',
+  imageType: ImageConversionTypes = 'image/png',
   quality?: number,
 ): Promise<Blob> => {
+  const pdfImage = getImageData();
+
+  // Fast path: BMP needs no canvas — just a header prepended to raw pixels
+  if (imageType === 'image/bmp') {
+    return Promise.resolve(rgbaToBmpBlob(pdfImage.data, pdfImage.width, pdfImage.height));
+  }
+
   if (typeof document === 'undefined') {
     return Promise.reject(
       new ImageConverterError(
@@ -36,7 +44,6 @@ export const browserImageDataToBlobConverter: ImageDataConverter<Blob> = (
     );
   }
 
-  const pdfImage = getImageData();
   const imageData = new ImageData(pdfImage.data, pdfImage.width, pdfImage.height);
 
   return new Promise((resolve, reject) => {
@@ -73,10 +80,15 @@ export function createWorkerPoolImageConverter(
 ): ImageDataConverter<Blob> {
   const converter: ImageDataConverter<Blob> = (
     getImageData: LazyImageData,
-    imageType: ImageConversionTypes = 'image/webp',
+    imageType: ImageConversionTypes = 'image/png',
     quality?: number,
   ): Promise<Blob> => {
     const pdfImage = getImageData();
+
+    // Fast path: BMP needs no worker round-trip
+    if (imageType === 'image/bmp') {
+      return Promise.resolve(rgbaToBmpBlob(pdfImage.data, pdfImage.width, pdfImage.height));
+    }
 
     // Copy the data since we'll transfer it to another worker
     const dataCopy = new Uint8ClampedArray(pdfImage.data);
@@ -113,12 +125,18 @@ export function createHybridImageConverter(
 ): ImageDataConverter<Blob> {
   const converter: ImageDataConverter<Blob> = async (
     getImageData: LazyImageData,
-    imageType: ImageConversionTypes = 'image/webp',
+    imageType: ImageConversionTypes = 'image/png',
     quality?: number,
   ): Promise<Blob> => {
+    const pdfImage = getImageData();
+
+    // Fast path: BMP needs no worker round-trip
+    if (imageType === 'image/bmp') {
+      return rgbaToBmpBlob(pdfImage.data, pdfImage.width, pdfImage.height);
+    }
+
     try {
       // Try worker pool encoding first (OffscreenCanvas in worker)
-      const pdfImage = getImageData();
       const dataCopy = new Uint8ClampedArray(pdfImage.data);
 
       return await workerPool.encode(

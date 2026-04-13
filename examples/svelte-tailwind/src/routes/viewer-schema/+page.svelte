@@ -34,7 +34,14 @@
   import { MarqueeCapture, CapturePluginPackage } from '@embedpdf/plugin-capture/svelte';
   import { FullscreenPluginPackage } from '@embedpdf/plugin-fullscreen/svelte';
   import { HistoryPluginPackage } from '@embedpdf/plugin-history/svelte';
-  import { AnnotationPluginPackage, AnnotationLayer } from '@embedpdf/plugin-annotation/svelte';
+  import {
+    AnnotationPluginPackage,
+    AnnotationLayer,
+    LockModeType,
+  } from '@embedpdf/plugin-annotation/svelte';
+  import { FormPluginPackage } from '@embedpdf/plugin-form/svelte';
+  import { StampPluginPackage } from '@embedpdf/plugin-stamp/svelte';
+  import { SignaturePluginPackage } from '@embedpdf/plugin-signature/svelte';
   import { CommandsPluginPackage } from '@embedpdf/plugin-commands/svelte';
   import { I18nPluginPackage } from '@embedpdf/plugin-i18n/svelte';
   import {
@@ -56,6 +63,9 @@
   import CustomZoomToolbar from '$lib/components/CustomZoomToolbar.svelte';
   import OutlineSidebar from '$lib/components/OutlineSidebar.svelte';
   import CommentSidebar from '$lib/components/CommentSidebar.svelte';
+  import RubberStampSidebar from '$lib/components/RubberStampSidebar.svelte';
+  import SignatureSidebar from '$lib/components/SignatureSidebar.svelte';
+  import SignatureCreateModal from '$lib/components/SignatureCreateModal.svelte';
   import {
     SchemaToolbar,
     SchemaPanel,
@@ -88,6 +98,9 @@
     'search-sidebar': SearchSidebar,
     'outline-sidebar': OutlineSidebar,
     'comment-sidebar': CommentSidebar,
+    'rubber-stamp-sidebar': RubberStampSidebar,
+    'signature-sidebar': SignatureSidebar,
+    'signature-create-modal': SignatureCreateModal,
     'link-modal': LinkModal,
   }; // Type assertion needed due to component prop variations
 
@@ -130,7 +143,14 @@
     createPluginRegistration(SearchPluginPackage),
     createPluginRegistration(CapturePluginPackage),
     createPluginRegistration(HistoryPluginPackage),
-    createPluginRegistration(AnnotationPluginPackage),
+    createPluginRegistration(AnnotationPluginPackage, {
+      locked: { type: LockModeType.Include, categories: ['form'] },
+    }),
+    createPluginRegistration(FormPluginPackage),
+    createPluginRegistration(StampPluginPackage),
+    createPluginRegistration(SignaturePluginPackage, {
+      mode: 'signature-and-initials',
+    }),
     createPluginRegistration(FullscreenPluginPackage),
     createPluginRegistration(RedactionPluginPackage, {
       useAnnotationMode: true,

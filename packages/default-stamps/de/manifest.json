@@ -1,0 +1,45 @@
+{
+  "id": "standard",
+  "name": "Standardstempel",
+  "categories": ["sidebar"],
+  "pdf": "stamps.pdf",
+  "stamps": [
+    { "id": "approved", "pageIndex": 0, "name": "Approved", "subject": "Genehmigt" },
+    { "id": "not-approved", "pageIndex": 1, "name": "NotApproved", "subject": "Nicht genehmigt" },
+    { "id": "draft", "pageIndex": 2, "name": "Draft", "subject": "Entwurf" },
+    { "id": "final", "pageIndex": 3, "name": "Final", "subject": "Endgültig" },
+    { "id": "completed", "pageIndex": 4, "name": "Completed", "subject": "Abgeschlossen" },
+    { "id": "confidential", "pageIndex": 5, "name": "Confidential", "subject": "Vertraulich" },
+    {
+      "id": "for-public-release",
+      "pageIndex": 6,
+      "name": "ForPublicRelease",
+      "subject": "Zur Veröffentlichung"
+    },
+    {
+      "id": "not-for-public-release",
+      "pageIndex": 7,
+      "name": "NotForPublicRelease",
+      "subject": "Nicht zur Veröffentlichung"
+    },
+    { "id": "for-comment", "pageIndex": 8, "name": "ForComment", "subject": "Zur Stellungnahme" },
+    { "id": "void", "pageIndex": 9, "name": "Void", "subject": "Ungültig" },
+    {
+      "id": "preliminary-results",
+      "pageIndex": 10,
+      "name": "PreliminaryResults",
+      "subject": "Vorläufige Ergebnisse"
+    },
+    {
+      "id": "information-only",
+      "pageIndex": 11,
+      "name": "InformationOnly",
+      "subject": "Nur zur Information"
+    },
+    { "id": "witness", "pageIndex": 12, "name": "Witness", "subject": "Zeuge" },
+    { "id": "initial-here", "pageIndex": 13, "name": "InitialHere", "subject": "Initialen hier" },
+    { "id": "sign-here", "pageIndex": 14, "name": "SignHere", "subject": "Hier unterschreiben" },
+    { "id": "accepted", "pageIndex": 15, "name": "Accepted", "subject": "Akzeptiert" },
+    { "id": "rejected", "pageIndex": 16, "name": "Rejected", "subject": "Abgelehnt" }
+  ]
+}

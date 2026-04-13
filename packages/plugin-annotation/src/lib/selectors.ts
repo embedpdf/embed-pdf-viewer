@@ -110,9 +110,14 @@ export function getToolDefaultsById<K extends keyof ToolMap>(
  * Collect every sidebar-eligible annotation and attach its TEXT replies,
  * grouped by page for efficient rendering.
  *
+ * Annotations linked via IRT / RT=Group are collapsed: the group leader
+ * becomes the sidebar entry and its non-LINK group members are attached
+ * as `groupMembers`. This keeps the sidebar compact for tools like
+ * Replace Text (Caret + StrikeOut pair).
+ *
  * Result shape:
  * {
- *   0: [{ page: 0, annotation: <TrackedAnnotation>, replies: [ … ] }, ...],
+ *   0: [{ page: 0, annotation: <TrackedAnnotation>, replies: [ … ], groupMembers: [ … ] }, ...],
  *   1: [{ page: 1, annotation: <TrackedAnnotation>, replies: [ … ] }, ...],
  *   …
  * }
@@ -136,7 +141,32 @@ export const getSidebarAnnotationsWithRepliesGroupedByPage = (
   }
 
   /* ------------------------------------------------------------
-   * 2.  Gather sidebar annotations and group them by page
+   * 2.  Build a map of group leader → sidebar-eligible members
+   *     and track which IDs are consumed as group members.
+   * ------------------------------------------------------------ */
+  const membersByLeader: Record<string, TrackedAnnotation[]> = {};
+  const consumedAsGroupMember = new Set<string>();
+
+  for (const uidList of Object.values(s.pages)) {
+    for (const uid of uidList) {
+      const ta = s.byUid[uid];
+      if (
+        ta &&
+        ta.object.inReplyToId &&
+        ta.object.replyType === PdfAnnotationReplyType.Group &&
+        ta.object.type !== PdfAnnotationSubtype.LINK &&
+        isSidebarAnnotation(ta)
+      ) {
+        const leaderId = ta.object.inReplyToId;
+        (membersByLeader[leaderId] ||= []).push(ta);
+        consumedAsGroupMember.add(ta.object.id);
+      }
+    }
+  }
+
+  /* ------------------------------------------------------------
+   * 3.  Gather sidebar annotations and group them by page,
+   *     skipping annotations already consumed as group members.
    * ------------------------------------------------------------ */
   const out: Record<number, SidebarAnnotationEntry[]> = {};
 
@@ -146,16 +176,18 @@ export const getSidebarAnnotationsWithRepliesGroupedByPage = (
 
     for (const uid of uidList) {
       const ta = s.byUid[uid];
-      if (ta && isSidebarAnnotation(ta)) {
-        pageAnnotations.push({
-          page,
-          annotation: ta,
-          replies: repliesByParent[ta.object.id] ?? [],
-        });
-      }
+      if (!ta || !isSidebarAnnotation(ta)) continue;
+      if (consumedAsGroupMember.has(ta.object.id)) continue;
+
+      const members = membersByLeader[ta.object.id];
+      pageAnnotations.push({
+        page,
+        annotation: ta,
+        replies: repliesByParent[ta.object.id] ?? [],
+        ...(members && members.length > 0 ? { groupMembers: members } : {}),
+      });
     }
 
-    // Only add pages that have annotations
     if (pageAnnotations.length > 0) {
       out[page] = pageAnnotations;
     }

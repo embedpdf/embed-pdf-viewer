@@ -54,8 +54,8 @@ export class PdfCache {
   closeDocument(docId: string): boolean {
     const ctx = this.docs.get(docId);
     if (!ctx) return false;
-    ctx.dispose(); // tears down pages first, then FPDF_CloseDocument, free()
     this.docs.delete(docId);
+    ctx.dispose();
     return true;
   }
 
@@ -102,6 +102,7 @@ export class PdfCache {
 export class DocumentContext {
   private readonly pageCache: PageCache;
   public readonly normalizeRotation: boolean;
+  private disposed = false;
 
   constructor(
     public readonly filePtr: number,
@@ -136,6 +137,9 @@ export class DocumentContext {
 
   /** Tear down all pages + this document */
   dispose(): void {
+    if (this.disposed) return;
+    this.disposed = true;
+
     // 1️⃣ release all pages (with their TTL or immediate)
     this.pageCache.forceReleaseAll();
 
@@ -283,8 +287,6 @@ export class PageContext {
 
   // lazy helpers
   private textPagePtr?: number;
-  private formInfoPtr?: number;
-  private formHandle?: number;
 
   constructor(
     private readonly pdf: WrappedPdfiumModule,
@@ -349,19 +351,10 @@ export class PageContext {
       this.pdf.FPDFText_ClosePage(this.textPagePtr);
     }
 
-    // 3️⃣ close form-fill if opened
-    if (this.formHandle !== undefined) {
-      this.pdf.FORM_OnBeforeClosePage(this.pagePtr, this.formHandle);
-      this.pdf.PDFiumExt_ExitFormFillEnvironment(this.formHandle);
-    }
-    if (this.formInfoPtr !== undefined) {
-      this.pdf.PDFiumExt_CloseFormFillInfo(this.formInfoPtr);
-    }
-
-    // 4️⃣ finally close the page itself
+    // 3️⃣ finally close the page itself
     this.pdf.FPDF_ClosePage(this.pagePtr);
 
-    // 5️⃣ remove from the cache
+    // 4️⃣ remove from the cache
     this.onFinalDispose();
   }
 
@@ -376,17 +369,6 @@ export class PageContext {
     return this.textPagePtr;
   }
 
-  /** Always safe: opens (once) and returns the form-fill handle. */
-  getFormHandle(): number {
-    this.ensureAlive();
-    if (this.formHandle === undefined) {
-      this.formInfoPtr = this.pdf.PDFiumExt_OpenFormFillInfo();
-      this.formHandle = this.pdf.PDFiumExt_InitFormFillEnvironment(this.docPtr, this.formInfoPtr);
-      this.pdf.FORM_OnAfterLoadPage(this.pagePtr, this.formHandle);
-    }
-    return this.formHandle;
-  }
-
   /**
    * Safely execute `fn` with an annotation pointer.
    * Pointer is ALWAYS closed afterwards.
@@ -398,6 +380,24 @@ export class PageContext {
       return fn(annotPtr);
     } finally {
       this.pdf.FPDFPage_CloseAnnot(annotPtr);
+    }
+  }
+
+  /**
+   * Safely execute `fn` with a fresh form-fill handle.
+   * Handle is ALWAYS torn down afterwards — no caching, no stale state.
+   */
+  withFormHandle<T>(fn: (formHandle: number) => T): T {
+    this.ensureAlive();
+    const formInfoPtr = this.pdf.PDFiumExt_OpenFormFillInfo();
+    const formHandle = this.pdf.PDFiumExt_InitFormFillEnvironment(this.docPtr, formInfoPtr);
+    this.pdf.FORM_OnAfterLoadPage(this.pagePtr, formHandle);
+    try {
+      return fn(formHandle);
+    } finally {
+      this.pdf.FORM_OnBeforeClosePage(this.pagePtr, formHandle);
+      this.pdf.PDFiumExt_ExitFormFillEnvironment(formHandle);
+      this.pdf.PDFiumExt_CloseFormFillInfo(formInfoPtr);
     }
   }
 

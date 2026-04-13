@@ -48,7 +48,7 @@ export function CounterRotate({ children, ...props }: CounterRotateComponentProp
 
     // Use capture phase to intercept before synthetic events
     element.addEventListener('pointerdown', handlePointerDown, { capture: true });
-    element.addEventListener('touchstart', handleTouchStart, { capture: true });
+    element.addEventListener('touchstart', handleTouchStart, { capture: true, passive: true });
 
     return () => {
       element.removeEventListener('pointerdown', handlePointerDown, { capture: true });

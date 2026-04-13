@@ -1,6 +1,7 @@
 <script lang="ts">
-  import type { Rect } from '@embedpdf/models';
+  import type { Rect, PdfRectDifferences } from '@embedpdf/models';
   import { PdfAnnotationBorderStyle } from '@embedpdf/models';
+  import { generateCloudyRectanglePath } from '@embedpdf/plugin-annotation';
 
   const MIN_HIT_AREA_SCREEN_PX = 20;
 
@@ -14,8 +15,10 @@
     strokeDashArray?: number[];
     rect: Rect;
     scale: number;
-    onClick?: (e: MouseEvent | TouchEvent) => void;
+    onClick?: (e: MouseEvent) => void;
     appearanceActive?: boolean;
+    cloudyBorderIntensity?: number;
+    rectangleDifferences?: PdfRectDifferences;
   }
 
   let {
@@ -30,7 +33,11 @@
     scale,
     onClick,
     appearanceActive = false,
+    cloudyBorderIntensity,
+    rectangleDifferences,
   }: SquareProps = $props();
+
+  const isCloudy = $derived((cloudyBorderIntensity ?? 0) > 0);
 
   const { width, height, x, y } = $derived.by(() => {
     const outerW = rect.size.width;
@@ -43,6 +50,16 @@
       x: strokeWidth / 2,
       y: strokeWidth / 2,
     };
+  });
+
+  const cloudyPath = $derived.by(() => {
+    if (!isCloudy) return null;
+    return generateCloudyRectanglePath(
+      { x: 0, y: 0, width: rect.size.width, height: rect.size.height },
+      rectangleDifferences,
+      cloudyBorderIntensity!,
+      strokeWidth,
+    );
   });
 
   const svgWidth = $derived((width + strokeWidth) * scale);
@@ -65,36 +82,67 @@
 >
   <!-- Hit area -- always rendered, transparent, wider stroke for mobile -->
   <!-- svelte-ignore a11y_no_static_element_interactions -->
-  <rect
-    {x}
-    {y}
-    {width}
-    {height}
-    fill="transparent"
-    stroke="transparent"
-    stroke-width={hitStrokeWidth}
-    onpointerdown={onClick}
-    ontouchstart={onClick}
-    style:cursor={isSelected ? 'move' : 'pointer'}
-    style:pointer-events={isSelected
-      ? 'none'
-      : color === 'transparent'
-        ? 'visibleStroke'
-        : 'visible'}
-  />
-  <!-- Visual -- hidden when AP active, never interactive -->
-  {#if !appearanceActive}
+  {#if isCloudy && cloudyPath}
+    <path
+      d={cloudyPath.path}
+      fill="transparent"
+      stroke="transparent"
+      stroke-width={hitStrokeWidth}
+      onpointerdown={onClick}
+      style:cursor={isSelected ? 'move' : onClick ? 'pointer' : 'default'}
+      style:pointer-events={!onClick
+        ? 'none'
+        : isSelected
+          ? 'none'
+          : color === 'transparent'
+            ? 'visibleStroke'
+            : 'visible'}
+    />
+  {:else}
     <rect
       {x}
       {y}
       {width}
       {height}
-      fill={color}
-      {opacity}
-      style:pointer-events="none"
-      style:stroke={strokeColor ?? color}
-      style:stroke-width={strokeWidth}
-      style:stroke-dasharray={dash}
+      fill="transparent"
+      stroke="transparent"
+      stroke-width={hitStrokeWidth}
+      onpointerdown={onClick}
+      style:cursor={isSelected ? 'move' : onClick ? 'pointer' : 'default'}
+      style:pointer-events={!onClick
+        ? 'none'
+        : isSelected
+          ? 'none'
+          : color === 'transparent'
+            ? 'visibleStroke'
+            : 'visible'}
     />
+  {/if}
+  <!-- Visual -- hidden when AP active, never interactive -->
+  {#if !appearanceActive}
+    {#if isCloudy && cloudyPath}
+      <path
+        d={cloudyPath.path}
+        fill={color}
+        {opacity}
+        style:pointer-events="none"
+        style:stroke={strokeColor ?? color}
+        style:stroke-width={strokeWidth}
+        stroke-linejoin="round"
+      />
+    {:else}
+      <rect
+        {x}
+        {y}
+        {width}
+        {height}
+        fill={color}
+        {opacity}
+        style:pointer-events="none"
+        style:stroke={strokeColor ?? color}
+        style:stroke-width={strokeWidth}
+        style:stroke-dasharray={dash}
+      />
+    {/if}
   {/if}
 </svg>
