@@ -53,6 +53,7 @@ export default function DisableCategoriesExample({
     { id: 'document-print', label: 'Print' },
     { id: 'document-export', label: 'Export' },
     { id: 'panel', label: 'Sidebars' },
+    { id: 'insert', label: 'Insert' },
   ]
 
   const toggleCategory = (categoryId: string) => {
