@@ -243,6 +243,29 @@ The primary store for translating text in components. Automatically updates when
 | **`params`** | `Record<string, string \| number>` | Parameters to interpolate into the translation (e.g., `{ level: 150 }`). |
 | **`fallback`** | `string` | Fallback text if translation is not found. |
 
+### Function: `useStaticTranslation(config?)`
+
+Returns a static translation function for use before the i18n system is fully ready. Useful for early loading states.
+
+#### Parameters
+
+| Parameter | Type | Description |
+| :--- | :--- | :--- |
+| **`config`** | `{ locales?: Locale[]; defaultLocale?: string }` | **(Optional)** Configuration for static translation resolution. |
+
+#### Returns
+
+A translation function `(key: string, fallback?: string) => string`.
+
+```svelte
+<script lang="ts">
+import { useStaticTranslation } from '@embedpdf/plugin-i18n/svelte'
+
+const translate = useStaticTranslation({ locales, defaultLocale: 'en' })
+const loadingText = translate('loading.label', 'Loading...')
+</script>
+```
+
 ### Store: `useI18nCapability()`
 
 Provides access to all i18n operations.

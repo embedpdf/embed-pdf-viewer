@@ -316,6 +316,25 @@ A convenience hook for translating a single key. Useful for derived state or sim
 const zoomLabel = useTranslation('zoom.in', undefined, documentId)
 ```
 
+### Hook: `useStaticTranslation(config?)`
+
+Returns a static translation function for use before the i18n system is fully ready. Useful for early loading states.
+
+#### Parameters
+
+| Parameter | Type | Description |
+| :--- | :--- | :--- |
+| **`config`** | `{ locales?: Locale[]; defaultLocale?: string }` | **(Optional)** Configuration for static translation resolution. |
+
+#### Returns
+
+A translation function `(key: string, fallback?: string) => string`.
+
+```tsx
+const translate = useStaticTranslation({ locales, defaultLocale: 'en' })
+const loadingText = translate('loading.label', 'Loading...')
+```
+
 ### Hook: `useLocale()`
 
 Returns the current locale code. Updates automatically when locale changes.

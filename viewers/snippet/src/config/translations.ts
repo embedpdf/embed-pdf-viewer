@@ -6,6 +6,10 @@ export const englishTranslations: Locale = {
   code: 'en',
   name: 'English',
   translations: {
+    viewer: {
+      initializingPlugins: 'Initializing plugins...',
+      initializingEngine: 'Initializing PDF engine...',
+    },
     search: {
       placeholder: 'Search',
       caseSensitive: 'Case sensitive',
@@ -400,6 +404,10 @@ export const germanTranslations: Locale = {
   code: 'de',
   name: 'Deutsch',
   translations: {
+    viewer: {
+      initializingPlugins: 'Plugins werden initialisiert...',
+      initializingEngine: 'PDF-Engine wird initialisiert...',
+    },
     search: {
       placeholder: 'Suchen',
       caseSensitive: 'Groß-/Kleinschreibung',
@@ -795,6 +803,10 @@ export const dutchTranslations: Locale = {
   code: 'nl',
   name: 'Nederlands',
   translations: {
+    viewer: {
+      initializingPlugins: 'Plugins initialiseren...',
+      initializingEngine: 'PDF-engine initialiseren...',
+    },
     search: {
       placeholder: 'Zoeken',
       caseSensitive: 'Hoofdlettergevoelig',
@@ -1190,6 +1202,10 @@ export const frenchTranslations: Locale = {
   code: 'fr',
   name: 'Français',
   translations: {
+    viewer: {
+      initializingPlugins: 'Initialisation des plugins...',
+      initializingEngine: 'Initialisation du moteur PDF...',
+    },
     search: {
       placeholder: 'Rechercher',
       caseSensitive: 'Respecter la casse',
@@ -1585,6 +1601,10 @@ export const spanishTranslations: Locale = {
   code: 'es',
   name: 'Español',
   translations: {
+    viewer: {
+      initializingPlugins: 'Inicializando plugins...',
+      initializingEngine: 'Inicializando motor PDF...',
+    },
     search: {
       placeholder: 'Buscar',
       caseSensitive: 'Distinguir mayúsculas',
@@ -1980,6 +2000,10 @@ export const simplifiedChineseTranslations: Locale = {
   code: 'zh-CN',
   name: '简体中文',
   translations: {
+    viewer: {
+      initializingPlugins: '正在初始化插件...',
+      initializingEngine: '正在初始化PDF引擎...',
+    },
     search: {
       placeholder: '搜索',
       caseSensitive: '大小写敏感',
@@ -2369,6 +2393,10 @@ export const swedishTranslations: Locale = {
   code: 'sv',
   name: 'Svenska',
   translations: {
+    viewer: {
+      initializingPlugins: 'Initialiserar plugins...',
+      initializingEngine: 'Initialiserar PDF-motor...',
+    },
     search: {
       placeholder: 'Sök',
       caseSensitive: 'Skiftlägeskänslig',
@@ -2760,6 +2788,10 @@ export const japaneseTranslations: Locale = {
   code: 'ja',
   name: '日本語',
   translations: {
+    viewer: {
+      initializingPlugins: 'プラグインを初期化中...',
+      initializingEngine: 'PDFエンジンを初期化中...',
+    },
     search: {
       placeholder: '検索',
       caseSensitive: '大文字小文字を区別',

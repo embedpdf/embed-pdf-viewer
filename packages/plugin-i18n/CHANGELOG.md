@@ -73,6 +73,7 @@
   - **useTranslation Hook**:
     - Now supports optional `documentId` parameter for document-scoped translations
     - `useTranslations(documentId?)` hook for getting document-scoped translation function
+    - `useStaticTranslation(config?)` hook/composable for static translation resolution before plugin initialization
 
   ### New Features
   - Locale registration and management
@@ -117,6 +118,7 @@
   - **useTranslation Hook**:
     - Now supports optional `documentId` parameter for document-scoped translations
     - `useTranslations(documentId?)` hook for getting document-scoped translation function
+    - `useStaticTranslation(config?)` hook/composable for static translation resolution before plugin initialization
 
   ### New Features
   - Locale registration and management
