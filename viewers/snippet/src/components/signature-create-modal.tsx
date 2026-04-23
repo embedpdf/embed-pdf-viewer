@@ -13,14 +13,26 @@ import {
 } from '@embedpdf/plugin-signature/preact';
 import { Dialog } from './ui/dialog';
 
-const SIGNATURE_FONTS_URL =
+export interface SignatureFont {
+  name: string;
+  family: string;
+}
+
+export const DEFAULT_SIGNATURE_FONTS_URL =
   'https://fonts.googleapis.com/css2?family=Caveat&family=Dancing+Script&family=Great+Vibes&family=Pacifico&display=swap';
 
-function ensureSignatureFonts() {
-  if (document.querySelector(`link[href="${SIGNATURE_FONTS_URL}"]`)) return;
+export const DEFAULT_SIGNATURE_FONTS: SignatureFont[] = [
+  { name: 'Dancing Script', family: "'Dancing Script', cursive" },
+  { name: 'Great Vibes', family: "'Great Vibes', cursive" },
+  { name: 'Pacifico', family: "'Pacifico', cursive" },
+  { name: 'Caveat', family: "'Caveat', cursive" },
+];
+
+function ensureSignatureFonts(url: string) {
+  if (document.querySelector(`link[href="${url}"]`)) return;
   const link = document.createElement('link');
   link.rel = 'stylesheet';
-  link.href = SIGNATURE_FONTS_URL;
+  link.href = url;
   document.head.appendChild(link);
 }
 
@@ -29,6 +41,8 @@ interface SignatureCreateModalProps {
   isOpen?: boolean;
   onClose?: () => void;
   onExited?: () => void;
+  fonts?: SignatureFont[];
+  fontsStylesheetUrl?: string | null;
 }
 
 type CreationTab = 'draw' | 'type' | 'upload';
@@ -36,13 +50,6 @@ type CreationTab = 'draw' | 'type' | 'upload';
 interface FieldResult {
   field: SignatureFieldDefinition;
 }
-
-const FONTS = [
-  { name: 'Dancing Script', family: "'Dancing Script', cursive" },
-  { name: 'Great Vibes', family: "'Great Vibes', cursive" },
-  { name: 'Pacifico', family: "'Pacifico', cursive" },
-  { name: 'Caveat', family: "'Caveat', cursive" },
-];
 
 const COLORS = [
   { name: 'Black', value: '#000000' },
@@ -55,6 +62,8 @@ export function SignatureCreateModal({
   isOpen,
   onClose,
   onExited,
+  fonts = DEFAULT_SIGNATURE_FONTS,
+  fontsStylesheetUrl = DEFAULT_SIGNATURE_FONTS_URL,
 }: SignatureCreateModalProps) {
   const { translate } = useTranslations(documentId);
   const { provides: signatureCapability } = useSignatureCapability();
@@ -63,7 +72,7 @@ export function SignatureCreateModal({
   const needsInitials = mode === SignatureMode.SignatureAndInitials;
 
   const [activeTab, setActiveTab] = useState<CreationTab>('draw');
-  const [selectedFont, setSelectedFont] = useState(FONTS[0].family);
+  const [selectedFont, setSelectedFont] = useState(fonts[0]?.family ?? '');
   const [selectedColor, setSelectedColor] = useState(COLORS[0].value);
   const [sigResult, setSigResult] = useState<FieldResult | null>(null);
   const [iniResult, setIniResult] = useState<FieldResult | null>(null);
@@ -74,8 +83,8 @@ export function SignatureCreateModal({
   const iniTypeRef = useRef<SignatureTypePadHandle | null>(null);
 
   useEffect(() => {
-    if (isOpen) ensureSignatureFonts();
-  }, [isOpen]);
+    if (isOpen && fontsStylesheetUrl) ensureSignatureFonts(fontsStylesheetUrl);
+  }, [isOpen, fontsStylesheetUrl]);
 
   const handleSigResult = useCallback((result: SignatureFieldDefinition | null) => {
     setSigResult(result ? { field: result } : null);
@@ -101,10 +110,10 @@ export function SignatureCreateModal({
 
   const resetState = useCallback(() => {
     setActiveTab('draw');
-    setSelectedFont(FONTS[0].family);
+    setSelectedFont(fonts[0]?.family ?? '');
     setSelectedColor(COLORS[0].value);
     clearAll();
-  }, [clearAll]);
+  }, [clearAll, fonts]);
 
   const handleTabChange = useCallback(
     (tab: CreationTab) => {
@@ -297,7 +306,7 @@ export function SignatureCreateModal({
                     setSelectedFont((e.target as HTMLSelectElement).value);
                   }}
                 >
-                  {FONTS.map((f) => (
+                  {fonts.map((f) => (
                     <option key={f.family} value={f.family} style={{ fontFamily: f.family }}>
                       {f.name}
                     </option>

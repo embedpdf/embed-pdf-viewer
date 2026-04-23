@@ -127,7 +127,10 @@ import { RedactionSidebar } from '@/components/redaction-sidebar';
 import { WidgetEditSidebar } from '@/components/widget-edit-sidebar';
 import { RubberStampSidebar } from '@/components/rubber-stamp-sidebar';
 import { SignatureSidebar } from '@/components/signature-sidebar';
-import { SignatureCreateModal } from '@/components/signature-create-modal';
+import {
+  SignatureCreateModal,
+  SignatureFont,
+} from '@/components/signature-create-modal';
 import { SchemaSelectionMenu } from '@/ui/schema-selection-menu';
 import { SchemaOverlay } from '@/ui/schema-overlay';
 import { PrintModal } from '@/components/print-modal';
@@ -295,6 +298,39 @@ export interface PDFViewerConfig {
   // Signatures
   /** Signature options (mode, default size) */
   signature?: Partial<SignaturePluginConfig>;
+  /**
+   * Signature creation modal options.
+   *
+   * Use this to customize the fonts shown in the "Type" tab and control how the
+   * fonts stylesheet is loaded. By default, a Google Fonts stylesheet is injected
+   * for Dancing Script, Great Vibes, Pacifico, and Caveat.
+   *
+   * @example
+   * // Self-hosted fonts — skip the Google Fonts stylesheet entirely
+   * signatureCreate: {
+   *   fonts: [
+   *     { name: 'My Script', family: "'My Script', cursive" },
+   *   ],
+   *   fontsStylesheetUrl: null,
+   * }
+   *
+   * @example
+   * // Custom stylesheet URL
+   * signatureCreate: {
+   *   fonts: [{ name: 'Inter', family: "'Inter', sans-serif" }],
+   *   fontsStylesheetUrl: 'https://example.com/fonts.css',
+   * }
+   */
+  signatureCreate?: {
+    /** Fonts available in the "Type" tab. Defaults to Dancing Script, Great Vibes, Pacifico, Caveat. */
+    fonts?: SignatureFont[];
+    /**
+     * URL to a stylesheet to inject when the modal opens. Set to `null` to skip
+     * injection (e.g. when fonts are loaded via your own CSS). Defaults to a
+     * Google Fonts URL matching the default fonts.
+     */
+    fontsStylesheetUrl?: string | null;
+  };
 
   // Infrastructure
   /** History/undo options */
@@ -509,6 +545,9 @@ export function PDFViewer({ config, onRegistryReady }: PDFViewerProps) {
     logger: config.log ? logger : undefined,
   });
 
+  const signatureCreateFonts = config.signatureCreate?.fonts;
+  const signatureCreateFontsStylesheetUrl = config.signatureCreate?.fontsStylesheetUrl;
+
   // Memoize UIProvider props to prevent unnecessary remounts
   const uiComponents: UIComponents = useMemo(
     () => ({
@@ -523,7 +562,16 @@ export function PDFViewer({ config, onRegistryReady }: PDFViewerProps) {
       'widget-edit-sidebar': WidgetEditSidebar,
       'print-modal': PrintModal,
       'link-modal': LinkModal,
-      'signature-create-modal': SignatureCreateModal,
+      'signature-create-modal': (props) => (
+        <SignatureCreateModal
+          documentId={props.documentId}
+          isOpen={props.isOpen as boolean | undefined}
+          onClose={props.onClose as (() => void) | undefined}
+          onExited={props.onExited as (() => void) | undefined}
+          fonts={signatureCreateFonts}
+          fontsStylesheetUrl={signatureCreateFontsStylesheetUrl}
+        />
+      ),
       'protect-modal': ProtectModal,
       'unlock-owner-overlay': UnlockOwnerOverlay,
       'page-controls': PageControls,
@@ -531,7 +579,7 @@ export function PDFViewer({ config, onRegistryReady }: PDFViewerProps) {
       'view-permissions-modal': ViewPermissionsModal,
       'redaction-sidebar': RedactionSidebar,
     }),
-    [],
+    [signatureCreateFonts, signatureCreateFontsStylesheetUrl],
   );
 
   const uiRenderers = useMemo(
