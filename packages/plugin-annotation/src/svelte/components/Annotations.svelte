@@ -10,9 +10,8 @@
   import {
     getAnnotationsByPageIndex,
     getSelectedAnnotationIds,
-    getAnnotationCategories,
-    isCategoryLocked,
-    hasLockedFlag,
+    hasNoViewFlag,
+    hasHiddenFlag,
     type LockMode,
     LockModeType,
     type TrackedAnnotation,
@@ -86,6 +85,9 @@
   let allSelectedIds = $state<string[]>([]);
   let editingId = $state<string | null>(null);
   let appearanceMap = $state<AnnotationAppearanceMap<Blob>>({});
+  // Locked mode is tracked to force re-renders when it changes; the predicates on
+  // `annotationProvides` (isAnnotationInteractive/StructurallyLocked/ContentLocked)
+  // read document state internally.
   let lockedMode = $state<LockMode>({ type: LockModeType.None });
   let prevScale: number = annotationsProps.scale;
 
@@ -291,21 +293,28 @@
 
 {#each annotations as annotation (annotation.object.id)}
   {@const renderer = resolveRenderer(annotation)}
-  {#if renderer}
+  {#if renderer && !hasNoViewFlag(annotation.object) && !hasHiddenFlag(annotation.object)}
     {@const tool = annotationProvides?.findToolForAnnotation(annotation.object) ?? null}
-    {@const categories = getAnnotationCategories(tool)}
-    {@const locked = hasLockedFlag(annotation.object) || isCategoryLocked(categories, lockedMode)}
-    {#if !(locked && renderer.hiddenWhenLocked)}
-      {@const hasRenderLocked = locked && !!renderer.renderLocked}
-      {@const isSelected = locked ? false : allSelectedIds.includes(annotation.object.id)}
-      {@const isEditing = locked ? false : editingId === annotation.object.id}
+    {@const nonInteractive = annotationProvides
+      ? !annotationProvides.isAnnotationInteractive(annotation.object)
+      : false}
+    {@const structurallyLocked = annotationProvides
+      ? annotationProvides.isAnnotationStructurallyLocked(annotation.object)
+      : false}
+    {@const contentLocked = annotationProvides
+      ? annotationProvides.isAnnotationContentLocked(annotation.object)
+      : false}
+    {#if !(nonInteractive && renderer.hiddenWhenLocked)}
+      {@const hasRenderLocked = nonInteractive && !!renderer.renderLocked}
+      {@const isSelected = nonInteractive ? false : allSelectedIds.includes(annotation.object.id)}
+      {@const isEditing = nonInteractive ? false : editingId === annotation.object.id}
       {@const defaults = renderer.interactionDefaults}
       {@const resolvedDraggable = resolveInteractionProp(
         tool?.interaction.isDraggable,
         annotation.object,
         defaults?.isDraggable ?? true,
       )}
-      {@const finalDraggable = locked
+      {@const finalDraggable = structurallyLocked
         ? false
         : renderer.isDraggable
           ? renderer.isDraggable(resolvedDraggable, { isEditing })
@@ -326,7 +335,7 @@
       {@const noopSelect = (e: AnnotationInteractionEvent) => {
         e.stopPropagation();
       }}
-      {@const onSelect = locked
+      {@const onSelect = nonInteractive
         ? noopSelect
         : renderer.selectOverride
           ? (e: AnnotationInteractionEvent) =>
@@ -338,9 +347,9 @@
         trackedAnnotation={annotation}
         {isSelected}
         {isEditing}
-        isMultiSelected={locked ? false : isMultiSelected}
+        isMultiSelected={nonInteractive ? false : isMultiSelected}
         isDraggable={finalDraggable}
-        isResizable={locked
+        isResizable={structurallyLocked
           ? false
           : resolveInteractionProp(
               tool?.interaction.isResizable,
@@ -352,30 +361,32 @@
           annotation.object,
           defaults?.lockAspectRatio ?? false,
         )}
-        isRotatable={locked
+        isRotatable={structurallyLocked
           ? false
           : resolveInteractionProp(
               tool?.interaction.isRotatable,
               annotation.object,
               defaults?.isRotatable ?? false,
             )}
-        vertexConfig={locked ? undefined : renderer.vertexConfig}
-        selectionMenu={locked
+        vertexConfig={structurallyLocked ? undefined : renderer.vertexConfig}
+        selectionMenu={nonInteractive
           ? undefined
           : renderer.hideSelectionMenu?.(annotation.object)
             ? undefined
             : isMultiSelected
               ? undefined
               : annotationsProps.selectionMenu}
-        selectionMenuSnippet={locked
+        selectionMenuSnippet={nonInteractive
           ? undefined
           : renderer.hideSelectionMenu?.(annotation.object)
             ? undefined
             : isMultiSelected
               ? undefined
               : annotationsProps.selectionMenuSnippet}
+        {structurallyLocked}
+        {contentLocked}
         {onSelect}
-        onDoubleClick={locked
+        onDoubleClick={nonInteractive || contentLocked
           ? undefined
           : renderer.onDoubleClick
             ? (e) => {
@@ -400,7 +411,7 @@
             scale={annotationsProps.scale}
             pageIndex={annotationsProps.pageIndex}
             documentId={annotationsProps.documentId}
-            onClick={locked ? undefined : onSelect}
+            onClick={nonInteractive ? undefined : onSelect}
             {appearanceActive}
           />
         {/snippet}

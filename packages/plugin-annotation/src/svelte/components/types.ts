@@ -38,6 +38,18 @@ export interface AnnotationContainerProps<T extends PdfAnnotationObject> {
   vertexConfig?: VertexConfig<T>;
   selectionMenu?: AnnotationSelectionMenuRenderFn;
   selectionMenuSnippet?: Snippet<[AnnotationSelectionMenuProps]>;
+  /**
+   * Derived: PDF `locked` flag is set OR the annotation is non-interactive.
+   * Threaded into the selection menu context so custom menus can disable move/
+   * resize/rotate/delete/property-change items without recomputing flags.
+   */
+  structurallyLocked?: boolean;
+  /**
+   * Derived: PDF `lockedContents` flag is set OR the annotation is non-interactive.
+   * Threaded into the selection menu context so custom menus can disable content
+   * edit items without recomputing flags.
+   */
+  contentLocked?: boolean;
   /** @deprecated Use `selectionOutline.offset` instead */
   outlineOffset?: number;
   onDoubleClick?: (event: any) => void;

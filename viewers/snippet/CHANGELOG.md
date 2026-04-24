@@ -1,5 +1,13 @@
 # @embedpdf/snippet
 
+## 2.14.1
+
+### Patch Changes
+
+- [#601](https://github.com/embedpdf/embed-pdf-viewer/pull/601) by [@bobsingor](https://github.com/bobsingor) – Align annotation fill-mode toolbar commands with plugin-configured default lock state via `getDefaultAnnotationLock`, and swap unlock vs form-only lock behavior so defaults match the intended modes. Re-export `LockModeType` from the snippet’s public `embedpdf` entry for consumers.
+
+- [#598](https://github.com/embedpdf/embed-pdf-viewer/pull/598) by [@ngivanyh](https://github.com/ngivanyh) – Add Traditional Chinese (`zh-TW`) locale strings to the snippet viewer, register them in the default translation bundle, and expose `zh-TW` in the CJK language group of the UI schema so users can select 繁體中文 in the viewer.
+
 ## 2.14.0
 
 ### Minor Changes

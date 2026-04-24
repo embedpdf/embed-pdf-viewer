@@ -1,5 +1,11 @@
 # @embedpdf/plugin-annotation
 
+## 2.14.1
+
+### Patch Changes
+
+- [#601](https://github.com/embedpdf/embed-pdf-viewer/pull/601) by [@bobsingor](https://github.com/bobsingor) – Add PDF `LOCKED_CONTENTS` flag handling and granular lock helpers (`hasNoViewFlag`, `hasHiddenFlag`, `hasReadOnlyFlag`, `hasLockedContentsFlag`). Expose `isAnnotationInteractive`, `isAnnotationStructurallyLocked`, `isAnnotationContentLocked`, and `isAnnotationSelectable` on the plugin API. Update annotation rendering across React/Preact, Svelte, and Vue to skip `noView`/`hidden` annotations and gate interactions using the new predicates. Thread `structurallyLocked` and `contentLocked` through the selection menu context on all three stacks so custom menus can disable structural or content edits without re-reading flag arrays.
+
 ## 2.14.0
 
 ### Minor Changes

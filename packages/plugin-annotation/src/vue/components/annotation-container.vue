@@ -211,6 +211,18 @@ const props = withDefaults(
     lockAspectRatio?: boolean;
     vertexConfig?: VertexConfig<T>;
     selectionMenu?: AnnotationSelectionMenuRenderFn;
+    /**
+     * Derived: PDF `locked` flag is set OR the annotation is non-interactive.
+     * Threaded into the selection menu context so custom menus can disable move/
+     * resize/rotate/delete/property-change items without recomputing flags.
+     */
+    structurallyLocked?: boolean;
+    /**
+     * Derived: PDF `lockedContents` flag is set OR the annotation is non-interactive.
+     * Threaded into the selection menu context so custom menus can disable content
+     * edit items without recomputing flags.
+     */
+    contentLocked?: boolean;
     /** @deprecated Use `selectionOutline.offset` instead */
     outlineOffset?: number;
     onDoubleClick?: (event: PointerEvent | MouseEvent) => void;
@@ -236,6 +248,8 @@ const props = withDefaults(
     isEditing: false,
     isMultiSelected: false,
     isRotatable: true,
+    structurallyLocked: false,
+    contentLocked: false,
     outlineOffset: 1,
     zIndex: 1,
     selectionOutlineColor: '#007ACC',
@@ -388,6 +402,8 @@ const menuContext = computed<AnnotationSelectionContext>(() => ({
   type: 'annotation',
   annotation: props.trackedAnnotation,
   pageIndex: props.pageIndex,
+  structurallyLocked: props.structurallyLocked,
+  contentLocked: props.contentLocked,
 }));
 
 // Placement hints - calculate suggestTop based on rotation handle position

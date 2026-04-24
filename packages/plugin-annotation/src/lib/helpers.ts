@@ -218,3 +218,23 @@ export function isCategoryLocked(categories: string[], mode: LockMode): boolean 
 export function hasLockedFlag(annotation: PdfAnnotationObject): boolean {
   return annotation.flags?.includes('locked') ?? false;
 }
+
+/** Check if the annotation has the PDF 'noView' flag (bit 6). */
+export function hasNoViewFlag(annotation: PdfAnnotationObject): boolean {
+  return annotation.flags?.includes('noView') ?? false;
+}
+
+/** Check if the annotation has the PDF 'hidden' flag (bit 2): do not render, do not interact, do not print. */
+export function hasHiddenFlag(annotation: PdfAnnotationObject): boolean {
+  return annotation.flags?.includes('hidden') ?? false;
+}
+
+/** Check if the annotation has the PDF 'readOnly' flag (bit 7): do not allow user interaction. Ignored for widgets per spec. */
+export function hasReadOnlyFlag(annotation: PdfAnnotationObject): boolean {
+  return annotation.flags?.includes('readOnly') ?? false;
+}
+
+/** Check if the annotation has the PDF 'lockedContents' flag (bit 10): content cannot be modified by the user. */
+export function hasLockedContentsFlag(annotation: PdfAnnotationObject): boolean {
+  return annotation.flags?.includes('lockedContents') ?? false;
+}

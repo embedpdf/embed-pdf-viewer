@@ -317,6 +317,69 @@ The plugin comes with a set of pre-configured tools. You can activate any of the
 | **Image** | `stamp` | Adds an image stamp. Opens a file picker by default. |
 
 
+## Annotation Flags
+
+Every PDF annotation carries a bitfield of spec-defined flags that control how it
+is displayed and whether the user can interact with it. EmbedPDF exposes them as a
+string array on `annotation.flags` (see `PdfAnnotationFlagName` in `@embedpdf/models`)
+and honors them in the React viewer:
+
+- `hidden` — do not render on screen, do not allow interaction, and do not print.
+- `noView` — do not render on screen and do not allow interaction, but still include
+  in print output.
+- `readOnly` — render the annotation but block all user interaction (no selection,
+  no handles, no menu). Per spec this flag is ignored for widget (form field)
+  annotations, which go through the form-filling layer.
+- `locked` — the annotation remains selectable and the selection menu is shown, but
+  the user cannot move, resize, rotate, or change its properties.
+- `lockedContents` — the annotation can still be moved / resized / rotated, but its
+  content cannot be modified (e.g. double-click-to-edit on a FreeText is disabled).
+
+### Reading and updating flags
+
+Flags live on the annotation object itself as a string array, so you can read
+them directly and drive your own UI from them:
+
+```tsx
+const { provides: annotationApi } = useAnnotation(documentId)
+const annotation = annotationApi?.getAnnotationById(id)?.object
+const isLocked = annotation?.flags?.includes('locked') ?? false
+```
+
+To toggle a flag, pass the full updated array back through `updateAnnotation` —
+the plugin re-renders the layer and wires the new semantics through automatically:
+
+```tsx
+const current = annotation?.flags ?? []
+const next = current.includes('locked')
+  ? current.filter((f) => f !== 'locked')
+  : [...current, 'locked']
+
+annotationApi?.updateAnnotation(pageIndex, id, { flags: next })
+```
+
+Custom selection menus also receive `structurallyLocked` and `contentLocked` on
+the `context` argument so they can disable destructive or content-editing items
+without reading the flags array themselves. The same two booleans are exposed as
+`isAnnotationStructurallyLocked(annotation)` and `isAnnotationContentLocked(annotation)`
+on the annotation capability if you need them outside of a selection menu.
+
+The example below seeds a few annotations and lets you toggle each flag on the
+currently selected annotation to observe the behavior in real time. Use
+**Reset demo** to recover after setting `hidden` or `noView` (both of which
+remove the annotation from the view entirely).
+
+import { PDFViewer as FlagsViewer } from '../../code-examples/headless/annotation-flags-example';
+
+<CodeExample
+  codePaths={[
+    "content/docs/react/code-examples/headless/annotation-flags-example.tsx"
+  ]}
+>
+  <FlagsViewer />
+</CodeExample>
+
+
 ## Live Example
 
 The example below includes a toolbar for selecting different annotation tools (highlight, ink pen, square) and a delete button. When you select an annotation, a contextual menu appears with a delete option—demonstrating the `selectionMenu` prop.
@@ -542,6 +605,26 @@ A selection of key methods available on the `provides` object:
 | **`commit()`** | Manually saves all pending annotation changes to the PDF document. |
 | **`onStateChange(cb)`** | Subscribes to any change in the annotation state. |
 | **`onAnnotationEvent(cb)`**| Subscribes to events like annotation creation, updates, or deletion. |
+
+### `PdfAnnotationFlagName` Values
+
+The `flags` property on every annotation is an array of string identifiers drawn
+from the `PdfAnnotationFlagName` union exported by `@embedpdf/models`. The table
+below lists every supported value and how it affects the React viewer. See the
+[Annotation Flags](#annotation-flags) section above for a live demo.
+
+| Flag | Description | Render | Select | Move / Resize | Content Edit |
+| :--- | :--- | :---: | :---: | :---: | :---: |
+| **`hidden`** | Annotation is hidden everywhere including print. | No | No | No | No |
+| **`noView`** | Not drawn on screen, still included in print output. | No | No | No | No |
+| **`readOnly`** | Rendered but fully inert in the UI. Ignored for widgets. | Yes | No | No | No |
+| **`locked`** | Rendered and selectable, but structural edits are blocked. | Yes | Yes | No | Yes |
+| **`lockedContents`** | Rendered, selectable, movable; content editing is blocked. | Yes | Yes | Yes | No |
+| **`print`** | Include the annotation when printing. | — | — | — | — |
+| **`invisible`** | Hide annotations of unknown subtypes. | — | — | — | — |
+| **`noZoom`** | Keep a fixed screen-pixel size regardless of zoom. | — | — | — | — |
+| **`noRotate`** | Keep the annotation upright when the page is rotated. | — | — | — | — |
+| **`toggleNoView`** | Toggle `noView` on hover (used by some viewers). | — | — | — | — |
 
 ### The `AnnotationEvent` Object
 

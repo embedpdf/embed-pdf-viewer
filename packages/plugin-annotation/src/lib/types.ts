@@ -387,8 +387,19 @@ export interface AnnotationScope<TTools extends AnnotationToolMap = AnnotationTo
   setLocked(mode: LockMode): void;
   /** Get the current lock mode for this document */
   getLocked(): LockMode;
-  /** Check if a specific annotation is locked (category-based or per-annotation flag) */
+  /** Check if a specific annotation is locked (category-based or per-annotation flag).
+   * Legacy predicate kept for backward compatibility. Use `isAnnotationInteractive`,
+   * `isAnnotationStructurallyLocked`, or `isAnnotationContentLocked` for spec-aligned checks. */
   isAnnotationLocked(annotation: PdfAnnotationObject): boolean;
+  /** Whether the annotation can be interacted with at all. False for `noView`, `hidden`,
+   * `readOnly`, or category-locked annotations. */
+  isAnnotationInteractive(annotation: PdfAnnotationObject): boolean;
+  /** Whether the annotation's structure (move/resize/rotate/vertex) is locked. True if
+   * non-interactive or the PDF `locked` flag is set. */
+  isAnnotationStructurallyLocked(annotation: PdfAnnotationObject): boolean;
+  /** Whether the annotation's content (e.g. FreeText text) is locked. True if
+   * non-interactive or the PDF `lockedContents` flag is set. */
+  isAnnotationContentLocked(annotation: PdfAnnotationObject): boolean;
   /** Check if a single category is locked under the current mode */
   isCategoryLocked(category: string): boolean;
   /** Check if a tool (by ID) is locked under the current mode (resolves tool categories) */
@@ -507,8 +518,16 @@ export interface AnnotationCapability<TTools extends AnnotationToolMap = Annotat
   setLocked: (mode: LockMode, documentId?: string) => void;
   /** Get the current lock mode */
   getLocked: (documentId?: string) => LockMode;
-  /** Check if a specific annotation is locked (category-based or per-annotation flag) */
+  /** Check if a specific annotation is locked (category-based or per-annotation flag).
+   * Legacy predicate kept for backward compatibility. */
   isAnnotationLocked: (annotation: PdfAnnotationObject, documentId?: string) => boolean;
+  /** Whether the annotation can be interacted with at all. False for `noView`, `hidden`,
+   * `readOnly`, or category-locked annotations. */
+  isAnnotationInteractive: (annotation: PdfAnnotationObject, documentId?: string) => boolean;
+  /** Whether the annotation's structure (move/resize/rotate/vertex) is locked. */
+  isAnnotationStructurallyLocked: (annotation: PdfAnnotationObject, documentId?: string) => boolean;
+  /** Whether the annotation's content (e.g. FreeText text) is locked. */
+  isAnnotationContentLocked: (annotation: PdfAnnotationObject, documentId?: string) => boolean;
   /** Check if a single category is locked under the current mode */
   isCategoryLocked: (category: string, documentId?: string) => boolean;
   /** Check if a tool (by ID) is locked under the current mode (resolves tool categories) */

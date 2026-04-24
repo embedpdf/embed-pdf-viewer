@@ -214,6 +214,65 @@ annotation.provides?.importAnnotations([
 ]);
 ```
 
+## Annotation Flags
+
+Every PDF annotation carries a bitfield of spec-defined flags that control how it
+is displayed and whether the user can interact with it. EmbedPDF exposes them as a
+string array on `annotation.flags` (see `PdfAnnotationFlagName` in `@embedpdf/models`)
+and honors them in the Svelte viewer:
+
+- `hidden` — do not render on screen, do not allow interaction, and do not print.
+- `noView` — do not render on screen and do not allow interaction, but still include
+  in print output.
+- `readOnly` — render the annotation but block all user interaction (no selection,
+  no handles, no menu). Per spec this flag is ignored for widget (form field)
+  annotations, which go through the form-filling layer.
+- `locked` — the annotation remains selectable and the selection menu is shown, but
+  the user cannot move, resize, rotate, or change its properties.
+- `lockedContents` — the annotation can still be moved / resized / rotated, but its
+  content cannot be modified (e.g. double-click-to-edit on a FreeText is disabled).
+
+### Reading and updating flags
+
+Flags live on the annotation object itself as a string array, so you can read
+them directly and drive your own UI from them. The Svelte store returns a
+reactive object with getters — keep it whole and read through `annotation.provides`
+rather than destructuring (which would snapshot the getter value and lose
+reactivity):
+
+```svelte
+<script lang="ts">
+  import { useAnnotation } from '@embedpdf/plugin-annotation/svelte';
+
+  let { documentId, id }: { documentId: string; id: string } = $props();
+  const annotation = useAnnotation(() => documentId);
+
+  const flags = $derived(
+    annotation.provides?.getAnnotationById(id)?.object.flags ?? [],
+  );
+  const isLocked = $derived(flags.includes('locked'));
+</script>
+```
+
+To toggle a flag, pass the full updated array back through `updateAnnotation` —
+the plugin re-renders the layer and wires the new semantics through automatically:
+
+```ts
+const current = annotation.provides?.getAnnotationById(id)?.object.flags ?? [];
+const next = current.includes('locked')
+  ? current.filter((f) => f !== 'locked')
+  : [...current, 'locked'];
+
+annotation.provides?.updateAnnotation(pageIndex, id, { flags: next });
+```
+
+Custom `selectionMenuSnippet` snippets also receive `structurallyLocked` and
+`contentLocked` on the `context` argument so they can disable destructive or
+content-editing menu items without reading the flags array themselves. The same
+two booleans are exposed as `isAnnotationStructurallyLocked(annotation)` and
+`isAnnotationContentLocked(annotation)` on the annotation capability if you need
+them outside of a selection menu.
+
 ## Live Example
 
 Try using the annotation tools below. Select a tool from the toolbar to start creating annotations. Click on an annotation to select it, and use the delete button or the contextual menu to remove it.

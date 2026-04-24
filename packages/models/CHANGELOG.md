@@ -1,5 +1,11 @@
 # @embedpdf/models
 
+## 2.14.1
+
+### Patch Changes
+
+- [#601](https://github.com/embedpdf/embed-pdf-viewer/pull/601) by [@bobsingor](https://github.com/bobsingor) – Add `PdfAnnotationFlags.LOCKED_CONTENTS` (`1 << 9`) and map it to the `'lockedContents'` `PdfAnnotationFlagName`, extending flag parsing helpers (`flagsToNames`, `namesToFlags`) accordingly.
+
 ## 2.14.0
 
 ### Minor Changes

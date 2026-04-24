@@ -135,6 +135,10 @@ import {
   getAnnotationCategories,
   isCategoryLocked,
   hasLockedFlag,
+  hasNoViewFlag,
+  hasHiddenFlag,
+  hasReadOnlyFlag,
+  hasLockedContentsFlag,
 } from './helpers';
 import { TransformContext } from './patching/patch-registry';
 import {
@@ -330,10 +334,10 @@ export class AnnotationPlugin extends BasePlugin<
         .filter((ta): ta is TrackedAnnotation => ta !== undefined)
         .filter((ta) => isSelectableAnnotation(ta));
 
-      // Find annotations that intersect with the marquee rect (excluding locked)
+      // Find annotations that intersect with the marquee rect (excluding locked and noView)
       const selectedIds = pageAnnotations
         .filter((ta) => rectsIntersect(rect, ta.object.rect))
-        .filter((ta) => !this.isAnnotationLocked(ta.object, documentId))
+        .filter((ta) => this.isAnnotationSelectable(ta.object, documentId))
         .map((ta) => ta.object.id);
 
       // Expand selection to include full groups
@@ -456,6 +460,12 @@ export class AnnotationPlugin extends BasePlugin<
       getLocked: (documentId) => this.getLocked(documentId),
       isAnnotationLocked: (annotation, documentId) =>
         this.isAnnotationLocked(annotation, documentId),
+      isAnnotationInteractive: (annotation, documentId) =>
+        this.isAnnotationInteractive(annotation, documentId),
+      isAnnotationStructurallyLocked: (annotation, documentId) =>
+        this.isAnnotationStructurallyLocked(annotation, documentId),
+      isAnnotationContentLocked: (annotation, documentId) =>
+        this.isAnnotationContentLocked(annotation, documentId),
       isCategoryLocked: (category, documentId) => this.isCategoryLockedMethod(category, documentId),
       isToolLocked: (toolId, documentId) => this.isToolLockedMethod(toolId, documentId),
 
@@ -547,6 +557,11 @@ export class AnnotationPlugin extends BasePlugin<
       setLocked: (mode) => this.setLocked(mode, documentId),
       getLocked: () => this.getLocked(documentId),
       isAnnotationLocked: (annotation) => this.isAnnotationLocked(annotation, documentId),
+      isAnnotationInteractive: (annotation) => this.isAnnotationInteractive(annotation, documentId),
+      isAnnotationStructurallyLocked: (annotation) =>
+        this.isAnnotationStructurallyLocked(annotation, documentId),
+      isAnnotationContentLocked: (annotation) =>
+        this.isAnnotationContentLocked(annotation, documentId),
       isCategoryLocked: (category) => this.isCategoryLockedMethod(category, documentId),
       isToolLocked: (toolId) => this.isToolLockedMethod(toolId, documentId),
       syncAnnotationObject: (id, patch) => this.syncAnnotationObject(id, patch, documentId),
@@ -1246,7 +1261,7 @@ export class AnnotationPlugin extends BasePlugin<
     const docId = documentId ?? this.getActiveDocumentId();
 
     const ta = this.getAnnotationById(id, docId);
-    if (ta && this.isAnnotationLocked(ta.object, docId)) return;
+    if (ta && !this.isAnnotationSelectable(ta.object, docId)) return;
 
     // Check if the annotation is part of a group
     if (this.isInGroupMethod(id, docId)) {
@@ -1306,7 +1321,7 @@ export class AnnotationPlugin extends BasePlugin<
     const docId = documentId ?? this.getActiveDocumentId();
 
     const ta = this.getAnnotationById(id, docId);
-    if (ta && this.isAnnotationLocked(ta.object, docId)) return;
+    if (ta && !this.isAnnotationSelectable(ta.object, docId)) return;
 
     const docState = this.getDocumentState(docId);
 
@@ -1330,7 +1345,7 @@ export class AnnotationPlugin extends BasePlugin<
     const docId = documentId ?? this.getActiveDocumentId();
 
     const ta = this.getAnnotationById(id, docId);
-    if (ta && this.isAnnotationLocked(ta.object, docId)) return;
+    if (ta && !this.isAnnotationInteractive(ta.object, docId)) return;
 
     this.dispatch(addToSelection(docId, pageIndex, id));
   }
@@ -1345,7 +1360,7 @@ export class AnnotationPlugin extends BasePlugin<
     const docState = this.getDocumentState(docId);
     const filtered = ids.filter((id) => {
       const ta = docState.byUid[id];
-      return !ta || !this.isAnnotationLocked(ta.object, docId);
+      return !ta || this.isAnnotationInteractive(ta.object, docId);
     });
     this.dispatch(setSelection(docId, filtered));
   }
@@ -2648,12 +2663,13 @@ export class AnnotationPlugin extends BasePlugin<
     const docId = documentId ?? this.getActiveDocumentId();
     this.dispatch(setLockedAction(docId, mode));
 
-    // Deselect any annotations that are now locked
+    // Deselect any annotations that are now non-interactive (e.g. category-locked,
+    // readOnly, hidden, noView). PDF `locked`-only annotations remain selectable.
     const updatedDocState = this.getDocumentState(docId);
     const lockedSelected = updatedDocState.selectedUids.filter((uid) => {
       const ta = updatedDocState.byUid[uid];
       if (!ta) return false;
-      return this.isAnnotationLocked(ta.object, docId);
+      return !this.isAnnotationInteractive(ta.object, docId);
     });
     if (lockedSelected.length > 0) {
       const remaining = updatedDocState.selectedUids.filter((uid) => !lockedSelected.includes(uid));
@@ -2670,6 +2686,54 @@ export class AnnotationPlugin extends BasePlugin<
     const tool = this.findToolForAnnotation(annotation);
     const categories = getAnnotationCategories(tool);
     return isCategoryLocked(categories, this.getLocked(documentId));
+  }
+
+  /**
+   * Whether the annotation can be interacted with at all (selected, edited, menu shown).
+   * Returns false for `noView`, `hidden`, `readOnly`, or category-locked annotations.
+   * This is the spec-compliant "can the user do anything with this?" predicate.
+   */
+  public isAnnotationInteractive(annotation: PdfAnnotationObject, documentId?: string): boolean {
+    if (hasNoViewFlag(annotation)) return false;
+    if (hasHiddenFlag(annotation)) return false;
+    if (hasReadOnlyFlag(annotation)) return false;
+    const tool = this.findToolForAnnotation(annotation);
+    const categories = getAnnotationCategories(tool);
+    if (isCategoryLocked(categories, this.getLocked(documentId))) return false;
+    return true;
+  }
+
+  /**
+   * Whether the annotation's structure (position, size, rotation, vertices) is locked.
+   * Non-interactive annotations are treated as structurally locked. PDF `locked` flag
+   * makes an otherwise-interactive annotation structurally locked while still selectable.
+   */
+  public isAnnotationStructurallyLocked(
+    annotation: PdfAnnotationObject,
+    documentId?: string,
+  ): boolean {
+    if (!this.isAnnotationInteractive(annotation, documentId)) return true;
+    return hasLockedFlag(annotation);
+  }
+
+  /**
+   * Whether the annotation's content (e.g. FreeText text) is locked.
+   * Non-interactive annotations are treated as content-locked. PDF `lockedContents`
+   * flag blocks content edits while still allowing move/resize.
+   */
+  public isAnnotationContentLocked(annotation: PdfAnnotationObject, documentId?: string): boolean {
+    if (!this.isAnnotationInteractive(annotation, documentId)) return true;
+    return hasLockedContentsFlag(annotation);
+  }
+
+  /**
+   * Whether a specific annotation is eligible to be added to the selection store.
+   * Differs from the subtype-based `isSelectableAnnotation` helper: that answers
+   * "is this subtype ever selectable?", while this answers "is this specific
+   * annotation selectable right now given its flags and document lock state?".
+   */
+  private isAnnotationSelectable(annotation: PdfAnnotationObject, documentId?: string): boolean {
+    return this.isAnnotationInteractive(annotation, documentId);
   }
 
   public isCategoryLockedMethod(category: string, documentId?: string): boolean {

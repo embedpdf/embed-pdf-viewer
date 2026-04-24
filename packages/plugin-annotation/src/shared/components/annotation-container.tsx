@@ -55,6 +55,18 @@ interface AnnotationContainerProps<T extends PdfAnnotationObject> {
   style?: CSSProperties;
   vertexConfig?: VertexConfig<T>;
   selectionMenu?: AnnotationSelectionMenuRenderFn;
+  /**
+   * Derived: PDF `locked` flag is set OR the annotation is non-interactive.
+   * Threaded into the selection menu context so custom menus can disable move/
+   * resize/rotate/delete/property-change items without recomputing flags.
+   */
+  structurallyLocked?: boolean;
+  /**
+   * Derived: PDF `lockedContents` flag is set OR the annotation is non-interactive.
+   * Threaded into the selection menu context so custom menus can disable content
+   * edit items without recomputing flags.
+   */
+  contentLocked?: boolean;
   /** @deprecated Use `selectionOutline.offset` instead */
   outlineOffset?: number;
   onDoubleClick?: (event: any) => void;
@@ -105,6 +117,8 @@ export function AnnotationContainer<T extends PdfAnnotationObject>({
   blendMode,
   vertexConfig,
   selectionMenu,
+  structurallyLocked = false,
+  contentLocked = false,
   outlineOffset = 1,
   onDoubleClick,
   onSelect,
@@ -438,7 +452,7 @@ export function AnnotationContainer<T extends PdfAnnotationObject>({
       )
     : null;
 
-  // For children, override rect to use unrotatedRect so content renders in unrotated space
+  // For children, override rect to use unrotatedRect so content renders in unrotated space.
   const childObject = useMemo(() => {
     if (explicitUnrotatedRect) {
       return { ...currentObject, rect: explicitUnrotatedRect };
@@ -751,6 +765,8 @@ export function AnnotationContainer<T extends PdfAnnotationObject>({
                 type: 'annotation',
                 annotation: trackedAnnotation,
                 pageIndex,
+                structurallyLocked,
+                contentLocked,
               },
               selected: isSelected,
               placement: {

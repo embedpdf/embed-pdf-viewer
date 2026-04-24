@@ -40,6 +40,8 @@
     vertexConfig,
     selectionMenu,
     selectionMenuSnippet,
+    structurallyLocked = false,
+    contentLocked = false,
     outlineOffset = 1,
     onDoubleClick,
     onSelect,
@@ -398,6 +400,8 @@
       type: 'annotation',
       annotation: trackedAnnotation,
       pageIndex,
+      structurallyLocked,
+      contentLocked,
     };
   }
 

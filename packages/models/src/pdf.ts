@@ -1277,6 +1277,7 @@ export enum PdfAnnotationFlags {
   READ_ONLY = 1 << 6,
   LOCKED = 1 << 7,
   TOGGLE_NOVIEW = 1 << 8,
+  LOCKED_CONTENTS = 1 << 9,
 }
 
 /**
@@ -1365,7 +1366,8 @@ export type PdfAnnotationFlagName =
   | 'noView'
   | 'readOnly'
   | 'locked'
-  | 'toggleNoView';
+  | 'toggleNoView'
+  | 'lockedContents';
 
 type FlagMap = Partial<
   Record<Exclude<PdfAnnotationFlags, PdfAnnotationFlags.NONE>, PdfAnnotationFlagName>
@@ -1381,6 +1383,7 @@ export const PdfAnnotationFlagName: Readonly<FlagMap> = Object.freeze({
   [PdfAnnotationFlags.READ_ONLY]: 'readOnly',
   [PdfAnnotationFlags.LOCKED]: 'locked',
   [PdfAnnotationFlags.TOGGLE_NOVIEW]: 'toggleNoView',
+  [PdfAnnotationFlags.LOCKED_CONTENTS]: 'lockedContents',
 } as const);
 
 /** Build a reverse map once so look-ups are O(1)                      */

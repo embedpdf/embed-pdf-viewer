@@ -318,6 +318,78 @@ The plugin comes with a set of pre-configured tools. You can activate any of the
 | **Free Text** | `freeText` | Adds a text box annotation. |
 | **Image** | `stamp` | Adds an image stamp. Opens a file picker by default. |
 
+## Annotation Flags
+
+Every PDF annotation carries a bitfield of spec-defined flags that control how it
+is displayed and whether the user can interact with it. EmbedPDF exposes them as a
+string array on `annotation.flags` (see `PdfAnnotationFlagName` in `@embedpdf/models`)
+and honors them in the Vue viewer:
+
+- `hidden` — do not render on screen, do not allow interaction, and do not print.
+- `noView` — do not render on screen and do not allow interaction, but still include
+  in print output.
+- `readOnly` — render the annotation but block all user interaction (no selection,
+  no handles, no menu). Per spec this flag is ignored for widget (form field)
+  annotations, which go through the form-filling layer.
+- `locked` — the annotation remains selectable and the selection menu is shown, but
+  the user cannot move, resize, rotate, or change its properties.
+- `lockedContents` — the annotation can still be moved / resized / rotated, but its
+  content cannot be modified (e.g. double-click-to-edit on a FreeText is disabled).
+
+### Reading and updating flags
+
+Flags live on the annotation object itself as a string array, so you can read
+them directly and drive your own UI from them:
+
+```vue
+<script setup lang="ts">
+import { computed } from 'vue';
+import { useAnnotation } from '@embedpdf/plugin-annotation/vue';
+
+const props = defineProps<{ documentId: string; id: string }>();
+const { provides: annotationApi } = useAnnotation(() => props.documentId);
+
+const annotation = computed(
+  () => annotationApi.value?.getAnnotationById(props.id)?.object ?? null,
+);
+const isLocked = computed(() => annotation.value?.flags?.includes('locked') ?? false);
+</script>
+```
+
+To toggle a flag, pass the full updated array back through `updateAnnotation` —
+the plugin re-renders the layer and wires the new semantics through automatically:
+
+```ts
+const current = annotation.value?.flags ?? [];
+const next = current.includes('locked')
+  ? current.filter((f) => f !== 'locked')
+  : [...current, 'locked'];
+
+annotationApi.value?.updateAnnotation(pageIndex, id, { flags: next });
+```
+
+Custom `#selection-menu` slots also receive `structurallyLocked` and `contentLocked`
+on the `context` argument so they can disable destructive or content-editing items
+without reading the flags array themselves. The same two booleans are exposed as
+`isAnnotationStructurallyLocked(annotation)` and `isAnnotationContentLocked(annotation)`
+on the annotation capability if you need them outside of a selection menu.
+
+The example below seeds a few annotations and lets you toggle each flag on the
+currently selected annotation to observe the behavior in real time. Use
+**Reset demo** to recover after setting `hidden` or `noView` (both of which
+remove the annotation from the view entirely).
+
+import { AnnotationFlagsExample } from '../../code-examples/headless/annotation-flags-example';
+
+<CodeExample
+  codePaths={[
+    "../../examples/vue-tailwind/src/examples/headless/annotation-flags-example.vue",
+    "../../examples/vue-tailwind/src/examples/headless/annotation-flags-example-content.vue"
+  ]}
+>
+  <AnnotationFlagsExample />
+</CodeExample>
+
 ## Live Example
 
 The example below includes a toolbar for selecting different annotation tools (highlight, ink pen, square) and a delete button. When you select an annotation, a contextual menu appears with a delete option—demonstrating the `selection-menu` scoped slot.

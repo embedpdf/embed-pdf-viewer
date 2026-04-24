@@ -7,6 +7,7 @@ import { RotatePlugin } from '@embedpdf/plugin-rotate/preact';
 import {
   ANNOTATION_PLUGIN_ID,
   AnnotationPlugin,
+  type AnnotationPluginConfig,
   LockModeType,
   getToolDefaultsById,
   isHighlightTool,
@@ -39,7 +40,7 @@ import {
   uuidV4,
   PdfAnnotationName,
 } from '@embedpdf/models';
-import { getEffectivePermission } from '@embedpdf/core';
+import { getEffectivePermission, type PluginRegistry } from '@embedpdf/core';
 
 /**
  * Helper to check if the document has a specific permission flag (after applying overrides).
@@ -55,6 +56,11 @@ const hasPermission = (state: State, documentId: string, flag: PdfPermissionFlag
  */
 const lacksPermission = (state: State, documentId: string, flag: PdfPermissionFlag): boolean => {
   return !hasPermission(state, documentId, flag);
+};
+
+const getDefaultAnnotationLock = (registry: PluginRegistry) => {
+  const config = registry.getPluginConfig<AnnotationPluginConfig>(ANNOTATION_PLUGIN_ID);
+  return config.locked ?? { type: LockModeType.None };
 };
 
 export const commands: Record<string, Command<State>> = {
@@ -815,7 +821,7 @@ export const commands: Record<string, Command<State>> = {
         .getPlugin<AnnotationPlugin>(ANNOTATION_PLUGIN_ID)
         ?.provides()
         .forDocument(documentId)
-        .setLocked({ type: LockModeType.Include, categories: ['form'] });
+        .setLocked(getDefaultAnnotationLock(registry));
     },
     active: ({ state, documentId }) => {
       return !isToolbarOpen(state.plugins, documentId, 'top', 'secondary');
@@ -878,7 +884,7 @@ export const commands: Record<string, Command<State>> = {
         .getPlugin<AnnotationPlugin>(ANNOTATION_PLUGIN_ID)
         ?.provides()
         .forDocument(documentId)
-        .setLocked({ type: LockModeType.None });
+        .setLocked({ type: LockModeType.Include, categories: ['form'] });
     },
     active: ({ state, documentId }) => {
       return isToolbarOpen(state.plugins, documentId, 'top', 'secondary', 'insert-toolbar');

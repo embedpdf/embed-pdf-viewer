@@ -1,5 +1,7 @@
 # @embedpdf/engines
 
+## 2.14.1
+
 ## 2.14.0
 
 ### Minor Changes

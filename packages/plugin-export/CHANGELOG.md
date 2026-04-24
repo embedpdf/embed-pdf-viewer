@@ -1,5 +1,7 @@
 # @embedpdf/plugin-export
 
+## 2.14.1
+
 ## 2.14.0
 
 ## 2.13.0

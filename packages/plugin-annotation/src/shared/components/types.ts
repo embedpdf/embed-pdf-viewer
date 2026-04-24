@@ -14,6 +14,18 @@ export interface AnnotationSelectionContext {
   type: 'annotation';
   annotation: TrackedAnnotation;
   pageIndex: number;
+  /**
+   * Derived: PDF `locked` flag is set OR the annotation is non-interactive.
+   * Consumers should disable move/resize/rotate/delete/property-change menu items
+   * when this is true.
+   */
+  structurallyLocked: boolean;
+  /**
+   * Derived: PDF `lockedContents` flag is set OR the annotation is non-interactive.
+   * Consumers should disable content-editing menu items (e.g. FreeText text edit)
+   * when this is true.
+   */
+  contentLocked: boolean;
 }
 
 export type AnnotationSelectionMenuProps = SelectionMenuPropsBase<AnnotationSelectionContext>;

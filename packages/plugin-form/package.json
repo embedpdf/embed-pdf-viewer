@@ -1,6 +1,6 @@
 {
   "name": "@embedpdf/plugin-form",
-  "version": "2.14.0",
+  "version": "2.14.1",
   "type": "module",
   "main": "./dist/index.cjs",
   "module": "./dist/index.js",

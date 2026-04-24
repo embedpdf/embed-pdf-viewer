@@ -76,6 +76,7 @@ export {
   type ExportAnnotationsOptions,
   type GetAnnotationsOptions,
   type TrackedAnnotation,
+  LockModeType,
 } from '@embedpdf/plugin-annotation/preact';
 export {
   SearchPlugin,
