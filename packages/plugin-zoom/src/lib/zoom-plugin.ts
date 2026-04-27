@@ -529,14 +529,7 @@ export class ZoomPlugin extends BasePlugin<
   private recalcAuto(documentId: string, focus?: VerticalZoomFocus) {
     const docState = this.getDocumentState(documentId);
     if (!docState) return;
-
-    if (
-      docState.zoomLevel === ZoomMode.Automatic ||
-      docState.zoomLevel === ZoomMode.FitPage ||
-      docState.zoomLevel === ZoomMode.FitWidth
-    ) {
-      this.handleRequest({ level: docState.zoomLevel, focus }, documentId);
-    }
+    this.handleRequest({ level: docState.zoomLevel, focus }, documentId);
   }
 
   // ─────────────────────────────────────────────────────────
