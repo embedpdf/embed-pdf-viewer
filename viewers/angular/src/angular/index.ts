@@ -1,2 +1,2 @@
 export * from '../shared';
-export * from './scratch-label.component';
+export * from './smoke.component';

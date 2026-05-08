@@ -46,7 +46,7 @@ const exists = (rel: string) =>
 export interface ConfigOptions {
   tsconfigPath: string;
   entryPath: string | Record<string, string>;
-  outputPrefix?: string;           
+  outputPrefix?: string;
   external?: (string | RegExp)[];
   additionalPlugins?: any[];
   esbuildOptions?: UserConfig['esbuild'];
@@ -55,6 +55,10 @@ export interface ConfigOptions {
   globals?: Record<string, string>;
   optimizeDeps?: UserConfig['optimizeDeps'];
   dtsEnabled?: boolean;
+  minify?: NonNullable<UserConfig['build']>['minify'];
+  target?: NonNullable<UserConfig['build']>['target'];
+  mainFields?: NonNullable<UserConfig['resolve']>['mainFields'];
+  preserveModules?: boolean;
 }
 
 export function createConfig(opts: ConfigOptions): UserConfig {
@@ -69,6 +73,10 @@ export function createConfig(opts: ConfigOptions): UserConfig {
     dtsOptions = {},
     optimizeDeps,
     dtsEnabled = true,
+    minify = 'terser',
+    target,
+    mainFields,
+    preserveModules,
   } = opts;
 
   const pkgRoot = process.cwd();
@@ -88,7 +96,10 @@ export function createConfig(opts: ConfigOptions): UserConfig {
   const filePrefix = outputPrefix ? `${outputPrefix}/` : '';
 
   return {
-    resolve: { alias: aliasFromTsconfig(tsconfigAbs) },
+    resolve: {
+      alias: aliasFromTsconfig(tsconfigAbs),
+      ...(mainFields ? { mainFields } : {}),
+    },
     esbuild: esbuildOptions,
     optimizeDeps,
     plugins: [
@@ -106,6 +117,7 @@ export function createConfig(opts: ConfigOptions): UserConfig {
     build: {
       emptyOutDir: false,
       sourcemap: true,
+      ...(target ? { target } : {}),
       lib: {
         entry,
         formats: ['es', 'cjs'],
@@ -116,10 +128,13 @@ export function createConfig(opts: ConfigOptions): UserConfig {
           return `${filePrefix}index.${fmt === 'es' ? 'js' : 'cjs'}`;
         },
       },
-      minify: 'terser',
+      minify,
       rollupOptions: {
         external: [...external, ...sharedExternal],
-        output: { dir: path.resolve(pkgRoot, 'dist') },
+        output: {
+          dir: path.resolve(pkgRoot, 'dist'),
+          ...(preserveModules !== undefined ? { preserveModules } : {}),
+        },
       },
     },
   };
@@ -181,14 +196,24 @@ export function defineLibrary() {
 
       case 'angular':
         if (!exists('angular/index.ts')) throw new Error('No Angular adapter');
+        // Angular library output settings follow Analog's guidance
+        // (https://analogjs.org/docs/guides/libraries): keep output un-minified
+        // and target esnext so the consumer's Angular CLI / AOT pipeline can
+        // optimize and downlevel as needed.
         return createConfig({
           tsconfigPath: 'angular/tsconfig.angular.json',
           entryPath: 'angular/index.ts',
           outputPrefix: 'angular',
           external: [/^@angular($|\/)/, /^rxjs($|\/)/, 'tslib'],
-          additionalPlugins: angular({
-            tsconfig: path.resolve(process.cwd(), 'src', 'angular', 'tsconfig.angular.json'),
-          }),
+          additionalPlugins: [
+            ...angular({
+              tsconfig: path.resolve(process.cwd(), 'src', 'angular', 'tsconfig.angular.json'),
+            }),
+          ],
+          minify: false,
+          target: ['esnext'],
+          mainFields: ['module'],
+          preserveModules: false,
         });
 
       default: // base
