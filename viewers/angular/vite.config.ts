@@ -1,3 +1,4 @@
+/// <reference types="vitest" />
 import { defineConfig } from 'vite';
 import { resolve } from 'path';
 import angular from '@analogjs/vite-plugin-angular';
@@ -13,6 +14,7 @@ export default defineConfig({
     }),
     dts({
       tsconfigPath: resolve(__dirname, 'tsconfig.json'),
+      exclude: ['**/*.spec.ts', '**/test-setup.ts'],
     }),
   ],
   build: {
@@ -30,5 +32,11 @@ export default defineConfig({
         preserveModules: false,
       },
     },
+  },
+  test: {
+    globals: true,
+    environment: 'jsdom',
+    setupFiles: ['src/test-setup.ts'],
+    include: ['src/**/*.{test,spec}.ts'],
   },
 });
