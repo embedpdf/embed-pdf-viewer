@@ -1,8 +1,9 @@
 import fs from 'node:fs';
 import path from 'node:path';
+import angular from '@analogjs/vite-plugin-angular';
+import { svelte } from '@sveltejs/vite-plugin-svelte';
 import { defineConfig, type UserConfig } from 'vite';
 import vue from '@vitejs/plugin-vue';
-import { svelte } from '@sveltejs/vite-plugin-svelte';
 import dts from 'unplugin-dts/vite';
 import { SvelteDtsResolver } from './svelte-dts-resolver.js';
 
@@ -178,11 +179,23 @@ export function defineLibrary() {
           additionalPlugins: [svelte()]
         });
 
+      case 'angular':
+        if (!exists('angular/index.ts')) throw new Error('No Angular adapter');
+        return createConfig({
+          tsconfigPath: 'angular/tsconfig.angular.json',
+          entryPath: 'angular/index.ts',
+          outputPrefix: 'angular',
+          external: [/^@angular($|\/)/, /^rxjs($|\/)/, 'tslib'],
+          additionalPlugins: angular({
+            tsconfig: path.resolve(process.cwd(), 'src', 'angular', 'tsconfig.angular.json'),
+          }),
+        });
+
       default: // base
         return createConfig({
           tsconfigPath: './tsconfig.json',
           entryPath: 'index.ts',
-          dtsExclude: ['**/react/**', '**/preact/**', '**/vue/**', '**/svelte/**'],
+          dtsExclude: ['**/react/**', '**/preact/**', '**/vue/**', '**/svelte/**', '**/angular/**'],
         });
     }
   });

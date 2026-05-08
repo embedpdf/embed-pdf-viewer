@@ -1,0 +1,15 @@
+{
+  "extends": "../../tsconfig.json",
+  "compilerOptions": {
+    "baseUrl": "../..",
+    "experimentalDecorators": true,
+    "useDefineForClassFields": false,
+    "paths": {
+      "@embedpdf/build-angular-scratch": ["src/index.ts"]
+    }
+  },
+  "angularCompilerOptions": {
+    "strictTemplates": true
+  },
+  "include": ["./**/*.ts"]
+}
