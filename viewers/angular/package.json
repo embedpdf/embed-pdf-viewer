@@ -1,13 +1,12 @@
 {
   "name": "@embedpdf/angular-pdf-viewer",
-  "private": true,
   "version": "0.0.0",
   "description": "Angular component for embedding PDF documents",
-  "type": "module",
-  "main": "./dist/index.cjs",
-  "module": "./dist/index.js",
-  "types": "./dist/index.d.ts",
+  "main": "dist/index.cjs",
+  "module": "dist/index.js",
+  "types": "dist/index.d.ts",
   "license": "MIT",
+  "type": "module",
   "sideEffects": false,
   "homepage": "https://www.embedpdf.com/angular-pdf-viewer",
   "exports": {
@@ -15,11 +14,6 @@
       "types": "./dist/index.d.ts",
       "import": "./dist/index.js",
       "require": "./dist/index.cjs"
-    },
-    "./angular": {
-      "types": "./dist/angular/index.d.ts",
-      "import": "./dist/angular/index.js",
-      "require": "./dist/angular/index.cjs"
     }
   },
   "files": [
@@ -28,20 +22,29 @@
   ],
   "scripts": {
     "clean": "rimraf dist",
-    "build:base": "vite build --mode base",
-    "build:angular": "vite build --mode angular",
-    "build": "pnpm run clean && vite build --mode base && vite build --mode angular"
+    "build": "pnpm run clean && vite build",
+    "test": "vitest run",
+    "test:watch": "vitest"
+  },
+  "dependencies": {
+    "@embedpdf/snippet": "workspace:*"
   },
   "devDependencies": {
+    "@analogjs/vite-plugin-angular": "^2.5.0",
+    "@analogjs/vitest-angular": "^2.5.0",
     "@angular/build": "^21.2.10",
     "@angular/compiler": "^21.2.12",
     "@angular/compiler-cli": "^21.2.12",
     "@angular/core": "^21.2.12",
-    "@embedpdf/build": "workspace:*",
+    "@angular/platform-browser": "^21.2.12",
+    "jsdom": "^25.0.1",
     "rimraf": "^6.1.2",
     "rxjs": "^7.8.2",
     "tslib": "^2.8.1",
-    "typescript": "^5.0.0"
+    "typescript": "^5.1.6",
+    "unplugin-dts": "1.0.0-beta.6",
+    "vite": "^6.3.5",
+    "vitest": "^4.0.8"
   },
   "peerDependencies": {
     "@angular/core": ">=21.0.0"
