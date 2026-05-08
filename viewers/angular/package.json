@@ -1,11 +1,15 @@
 {
-  "name": "@embedpdf/build-angular-scratch",
+  "name": "@embedpdf/angular-pdf-viewer",
   "private": true,
   "version": "0.0.0",
+  "description": "Angular component for embedding PDF documents",
   "type": "module",
   "main": "./dist/index.cjs",
   "module": "./dist/index.js",
   "types": "./dist/index.d.ts",
+  "license": "MIT",
+  "sideEffects": false,
+  "homepage": "https://www.embedpdf.com/angular-pdf-viewer",
   "exports": {
     ".": {
       "types": "./dist/index.d.ts",
@@ -36,5 +40,10 @@
   },
   "peerDependencies": {
     "@angular/core": ">=21.0.0"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/embedpdf/embed-pdf-viewer.git",
+    "directory": "viewers/angular"
   }
 }
