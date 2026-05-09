@@ -39,6 +39,7 @@
   "license": "MIT",
   "devDependencies": {
     "@embedpdf/build": "workspace:*",
+    "@embedpdf/vitest-config": "workspace:*",
     "typescript": "^5.0.0",
     "vite": "^6.3.5",
     "vitest": "^4.0.8"

@@ -34,6 +34,7 @@
     "vite": ">=6.0.0"
   },
   "devDependencies": {
+    "@embedpdf/vitest-config": "workspace:*",
     "@vue/language-core": "^3.0.6",
     "vitest": "^4.0.8"
   }

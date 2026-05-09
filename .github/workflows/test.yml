@@ -22,10 +22,8 @@ jobs:
           node-version: 22
           cache: pnpm
       - run: pnpm install --frozen-lockfile
-      - name: Build packages (turbo, cached)
-        run: pnpm build:packages
-      - name: Run Node-mode tests
-        run: pnpm test:node
+      - name: Run Node-mode + jsdom tests
+        run: pnpm test
 
   detect-angular-changes:
     name: Detect Angular touchpoints
@@ -64,7 +62,5 @@ jobs:
           key: playwright-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}
       - name: Install Playwright Chromium
         run: pnpm --filter @embedpdf/angular-pdf-viewer exec playwright install --with-deps chromium
-      - name: Build packages (turbo, cached)
-        run: pnpm build:packages
       - name: Run browser-mode tests
-        run: pnpm --filter @embedpdf/angular-pdf-viewer test:browser
+        run: pnpm test:browser

@@ -33,6 +33,7 @@
   "devDependencies": {
     "@analogjs/vite-plugin-angular": "^2.5.0",
     "@analogjs/vitest-angular": "^2.5.0",
+    "@embedpdf/vitest-config": "workspace:*",
     "@angular/build": "^21.2.10",
     "@angular/compiler": "^21.2.12",
     "@angular/compiler-cli": "^21.2.12",

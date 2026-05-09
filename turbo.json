@@ -10,14 +10,29 @@
       "dependsOn": ["^check-types"]
     },
     "test": {
-      "dependsOn": ["build", "^build"],
-      "outputs": [],
+      "dependsOn": ["^test"],
+      "outputs": ["coverage/**"],
       "inputs": [
         "src/**",
         "test/**",
         "vite.config.ts",
         "vitest.config.ts",
         "vitest.browser.config.ts",
+        "tsconfig.json",
+        "package.json"
+      ]
+    },
+    "test:watch": {
+      "cache": false,
+      "persistent": true
+    },
+    "@embedpdf/build#test": {
+      "dependsOn": ["build", "^test"],
+      "outputs": ["coverage/**"],
+      "inputs": [
+        "src/**",
+        "test/**",
+        "vitest.config.ts",
         "tsconfig.json",
         "package.json"
       ]
