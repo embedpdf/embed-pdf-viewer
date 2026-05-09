@@ -3,6 +3,16 @@ node_modules
 **/node_modules/
 **/dist
 **/.turbo
+**/coverage
+**/.vercel
+**/playwright-report
+**/test-results
+**/blob-report
+**/vitest-results
+**/storybook-static
+**/public/_pagefind/
+.env
+.env*.local
 config/tsup.config.bundled*
 config/tsup.frameworks.config.bundled*
 .next

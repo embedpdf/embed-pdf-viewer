@@ -1,4 +1,3 @@
-/// <reference types="vitest" />
 import { defineConfig } from 'vite';
 import { resolve } from 'path';
 import angular from '@analogjs/vite-plugin-angular';
@@ -32,11 +31,5 @@ export default defineConfig({
         preserveModules: false,
       },
     },
-  },
-  test: {
-    globals: true,
-    environment: 'jsdom',
-    setupFiles: ['src/test-setup.ts'],
-    include: ['src/**/*.{test,spec}.ts'],
   },
 });

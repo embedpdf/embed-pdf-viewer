@@ -9,7 +9,6 @@ const stableScreenshotOptions = {
 const integrationSnapshotTolerance = {
   maxDiffPixels: 250,
 } as const;
-
 test('applies Angular config-driven theme and category customization', async ({ page }) => {
   await page.goto('/');
 

@@ -41,7 +41,6 @@ const VIEW_OPTIONS = [
 ] as const;
 
 type ViewOptionCategory = (typeof VIEW_OPTIONS)[number]['category'];
-
 @Component({
   selector: 'app-root',
   standalone: true,
@@ -213,7 +212,6 @@ type ViewOptionCategory = (typeof VIEW_OPTIONS)[number]['category'];
       position: relative;
       overflow: hidden;
     }
-
     .title-group {
       display: grid;
       gap: 4px;
@@ -457,7 +455,6 @@ export class AppComponent {
   readonly showConfigPanel = signal(false);
   readonly themePreference = signal<NonNullable<ThemeConfig['preference']>>('light');
   readonly disabledCategories = signal<string[]>(['annotation']);
-  readonly annotationsDisabled = computed(() => this.disabledCategories().includes('annotation'));
   readonly nextThemeLabel = computed(() => (this.themePreference() === 'light' ? 'dark' : 'light'));
   readonly disabledCategoriesLabel = computed(() => {
     const labels = this.disabledCategories().map((category) => this.getCategoryLabel(category));
@@ -474,20 +471,25 @@ export class AppComponent {
     disabledCategories: ['annotation'],
     theme: {
       preference: 'light',
+      ...ANGULAR_THEME,
     },
   } satisfies PDFViewerConfig;
 
   onInit(container: EmbedPdfContainer) {
     this.container = container;
   }
-
   onReady(registry: PluginRegistry) {
     this.ready.set(true);
 
     if (this.toolbarCustomized) return;
 
-    const commands = registry.getPlugin('commands')?.provides() as CommandsCapability | undefined;
-    const ui = registry.getPlugin('ui')?.provides() as UICapability | undefined;
+    const commandsPlugin = registry.getPlugin('commands');
+    const uiPlugin = registry.getPlugin('ui');
+
+    if (!commandsPlugin?.provides || !uiPlugin?.provides) return;
+
+    const commands = commandsPlugin.provides() as CommandsCapability | undefined;
+    const ui = uiPlugin.provides() as UICapability | undefined;
 
     if (!commands || !ui) return;
 
@@ -504,7 +506,7 @@ export class AppComponent {
     const toolbar = schema.toolbars['main-toolbar'];
     if (!toolbar) return;
 
-    const items = globalThis.structuredClone(toolbar.items);
+    const items = structuredClone(toolbar.items);
     const rightGroup = items.find(
       (item): item is GroupItem => item.type === 'group' && item.id === 'right-group',
     );

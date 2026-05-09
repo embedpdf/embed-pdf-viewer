@@ -1,11 +1,12 @@
 # PRD — Angular integration (v1.0)
 
 > **Status**: Draft, ready for upstream discussion
-> **Date**: 2026-05-08 (revised: scope expanded to 17 plugins for read-only viewing parity; Playwright dropped in favour of Vitest browser mode; A0 added for build-tooling fix + test pipeline)
+> **Date**: 2026-05-09 (revised: A2 design grilling locked in API contract for `provideEmbedPdf`, `<embedpdf-provider>`, `bridgeScopeState`, `bridgeCoreSignal`, two-registry detection rule, engine ownership model, and `afterNextRender` bootstrap; auto-mount deferred post-v1.4)
 > **Domain context**: [`CONTEXT.md`](../../CONTEXT.md)
 > **Related ADRs**:
 > - [0001 — Angular packages publish via AnalogJS Vite, not ng-packagr](../adr/0001-angular-publishing-via-analogjs-vite.md)
 > - [0002 — Angular Headless registry context: provider primary, component secondary](../adr/0002-angular-headless-registry-via-provider-function.md)
+> - [0003 — Angular Headless bootstrap via `afterNextRender`, not eager factory](../adr/0003-angular-headless-bootstrap-via-after-next-render.md)
 
 ## Problem Statement
 
@@ -230,32 +231,41 @@ Extends `defineLibrary()` in the build preset with a fifth case alongside the ex
 
 ### Module 2 — `@embedpdf/core/angular` registry context
 
-Exports `provideEmbedPdf()`, `provideEmbedPdfEngine()` (re-export), `<embedpdf-provider>`, `injectRegistry()`, `injectPlugin<T>(id)`, `injectCapability<T>(id)`, document-state helpers (`injectActiveDocument`, `injectDocumentStates`, `injectCoreState`), **and the shared adapter utilities `bridgeScopeState` and `bridgeCoreSignal` consumed by every per-plugin `inject*` hook**. Both registry surfaces resolve a single private `InjectionToken<PluginRegistry>` so all `injectXxx` helpers consume the same registry regardless of how it was provided. See [ADR 0002](../adr/0002-angular-headless-registry-via-provider-function.md).
+Exports `provideEmbedPdf()`, `provideEmbedPdfEngine()` (re-export from engines/angular), `<embedpdf-provider>`, the `injectXxx()` helper family, **and the shared adapter utilities `bridgeScopeState` and `bridgeCoreSignal` consumed by every per-plugin `inject*` hook**. Both registry surfaces resolve a single internal `EMBEDPDF_CONTEXT` `InjectionToken` (never exported) so all `injectXxx` helpers consume the same registry regardless of how it was provided. See [ADR 0002](../adr/0002-angular-headless-registry-via-provider-function.md) and [ADR 0003](../adr/0003-angular-headless-bootstrap-via-after-next-render.md).
 
-API contract:
+#### API contract (locked)
 
 ```ts
+// Providers — function form takes EngineConfig, component form takes PdfEngine instance
 function provideEmbedPdf(opts: {
   engine?: { wasmUrl?: string; worker?: boolean; fontFallback?: FontFallbackConfig };
   plugins: PluginBatchRegistrations;
   config?: PluginRegistryConfig;
-  onInitialized?: (registry: PluginRegistry) => Promise<void>;
+  onInitialized?: (registry: PluginRegistry) => void | Promise<void>;
 }): EnvironmentProviders;
 
 function provideEmbedPdfEngine(opts: {
   wasmUrl?: string; worker?: boolean; fontFallback?: FontFallbackConfig;
-}): EnvironmentProviders;
+}): EnvironmentProviders;  // implementation in @embedpdf/engines/angular; re-exported from core/angular
 
-@Component({ selector: 'embedpdf-provider', standalone: true /* … */ })
+@Component({
+  selector: 'embedpdf-provider',
+  changeDetection: ChangeDetectionStrategy.OnPush,
+  template: `<ng-content />`,
+})
 class EmbedpdfProvider {
-  engine = input<PdfEngine | undefined>();
+  engine = input<PdfEngine | undefined>();              // instance, not config
   plugins = input.required<PluginBatchRegistrations>();
   config = input<PluginRegistryConfig | undefined>();
-  init = output<PluginRegistry>();
-  ready = output<PluginRegistry>();
+  onInitialized = input<((reg: PluginRegistry) => void | Promise<void>) | undefined>();
+  init = output<PluginRegistry>();    // fires after reg.initialize() & store wired (pre-pluginsReady)
+  ready = output<PluginRegistry>();   // fires after pluginsReady() AND onInitialized resolve
 }
 
+// Injection helpers — every helper opens with assertInInjectionContext(self).
+// All returned signals are .asReadonly().
 function injectRegistry(): Signal<PluginRegistry | null>;
+function injectRegistryReady(): Signal<boolean>;
 function injectPlugin<T extends BasePlugin>(id: T['id']): {
   plugin: Signal<T | null>;
   isLoading: Signal<boolean>;
@@ -266,22 +276,66 @@ function injectCapability<T extends BasePlugin>(id: T['id']): {
 };
 function injectActiveDocument(): Signal<DocumentState | null>;
 function injectDocumentStates(): Signal<DocumentState[]>;
-function injectRegistryReady(): Signal<boolean>;
+function injectCoreState(): Signal<CoreState | null>;
 
-// Shared adapter utilities — used by every per-plugin `inject*` hook
+// Shared adapter utilities — consumed by every per-plugin /angular package
 function bridgeScopeState<P extends BasePlugin, S>(
   pluginId: P['id'],
-  documentId: Signal<string> | string | (() => string),
+  documentId: Signal<string>,                            // Signal-only; consumers wrap literals via signal(...)
   initialState: S,
 ): {
   state: Signal<S>;
   provides: Signal<Scope<P> | null>;
+  isLoading: Signal<boolean>;
 };
 
-function bridgeCoreSignal<T>(selector: (state: CoreState) => T): Signal<T>;
+function bridgeCoreSignal<T>(selector: (state: CoreState) => T): Signal<T | null>;
+
+// Errors (public-exported so test harnesses can match by class)
+class EmbedpdfDuplicateRegistryError extends Error;
+class EmbedpdfDuplicateEngineError extends Error;
 ```
 
-Internal signal wiring uses `effect()` to subscribe to `registry.getStore().subscribe(...)` and update a `WritableSignal`. Cleanup hooks into `inject(DestroyRef)` so the registry is destroyed when the providing scope tears down. The registry lives behind an `InjectionToken`, **not** a module-level `$state` singleton — Svelte's approach can't host two viewers in one app; Angular DI scoping fixes this for free.
+#### Bootstrap timing — `afterNextRender`
+
+Every provider's `useFactory` returns immediately with placeholder signals (registry/ready/coreState all null). The actual bootstrap (engine creation, WASM fetch, `new PluginRegistry`, store subscription, `pluginsReady()`) runs inside `afterNextRender(async () => {...})`. SSR is clean by construction: server platform never fires `afterNextRender`, signals stay null, components render their `@if (registry()) { ... } @else { <loading /> }` branches. See [ADR 0003](../adr/0003-angular-headless-bootstrap-via-after-next-render.md) for the rejected eager and lazy alternatives.
+
+#### Two-registry detection rule
+
+A scope is invalid if it would create a second `EMBEDPDF_CONTEXT` when one is already provided by an ancestor. Check fires synchronously at factory/constructor time (SSR-safe) on both `provideEmbedPdf` and `<embedpdf-provider>`:
+
+```ts
+const existing = inject(EMBEDPDF_CONTEXT, { optional: true, skipSelf: true });
+if (existing) throw new EmbedpdfDuplicateRegistryError(/* helpful message */);
+```
+
+Engine-side parallel rule via `PDF_ENGINE_TOKEN` and `EmbedpdfDuplicateEngineError`. The legitimate "engine shared, registry per child" pattern — `provideEmbedPdfEngine({...})` at root + multiple `provideEmbedPdf({plugins})` at children — is allowed because root only registers `PDF_ENGINE_TOKEN`, not `EMBEDPDF_CONTEXT`.
+
+#### Engine ownership and teardown
+
+A scope destroys what it created.
+
+| Flavor | Engine source | Registry teardown | Engine teardown |
+|---|---|---|---|
+| `provideEmbedPdf({engine: cfg, plugins})` standalone | created inline | `registry.destroy()` | `engine.closeAllDocuments(); engine.destroy()` |
+| `provideEmbedPdfEngine({cfg})` + `provideEmbedPdf({plugins})` (inner is destroyed) | injected from outer | `registry.destroy()` | leave alone (engine outlives this scope) |
+| Same as above but the OUTER scope tears down | injected from outer | already destroyed by its own teardown | `engine.closeAllDocuments(); engine.destroy()` |
+| `<embedpdf-provider [engine]="instance" [plugins]="...">` destroyed | `@Input` instance | `registry.destroy()` | leave alone — host owns it |
+
+`registry.destroy()` always runs before `engine.destroy()` — registry has plugin-side state that may issue final commands.
+
+#### Bridge implementation pattern
+
+`bridgeScopeState` uses `effect((onCleanup) => …)` to bridge `scope.onStateChange` (imperative API) into a `Signal<S>`. Writes inside the effect are wrapped in `untracked()` to avoid cycle hazards. Effect cleanup auto-fires before each re-run AND on `DestroyRef` destroy (effect was created in injection context).
+
+`bridgeCoreSignal` uses pure `computed()` — no effect — because reading core-state slices is state derivation, not external-API bridging.
+
+Both helpers expose returned signals as `.asReadonly()`.
+
+#### Out of scope (deferred)
+
+- **Auto-mount surface** — zero v1.0 plugins emit `autoMountElements`. Defer until first plugin needs it (likely v1.1 `plugin-ui`); when shipped, the shape is a structural directive `*embedpdfAutoMount` (not a setting, not a wrapping component) — matches Angular's `cdkScrollable`/`routerLink` "decorate existing element" idiom.
+- **Deprecated `logger` prop** — Svelte/Vue carry `logger?` for back-compat with `config.logger`. New API has no legacy carrier; consumers use `config.logger` from day one.
 
 ### Module 3 — `@embedpdf/engines/angular`
 

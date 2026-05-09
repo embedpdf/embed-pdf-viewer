@@ -24,7 +24,8 @@
     "clean": "rimraf dist",
     "build": "pnpm run clean && vite build",
     "test": "vitest run",
-    "test:watch": "vitest"
+    "test:watch": "vitest",
+    "test:browser": "vitest run --config vitest.browser.config.ts"
   },
   "dependencies": {
     "@embedpdf/snippet": "workspace:*"
@@ -32,11 +33,15 @@
   "devDependencies": {
     "@analogjs/vite-plugin-angular": "^2.5.0",
     "@analogjs/vitest-angular": "^2.5.0",
+    "@embedpdf/vitest-config": "workspace:*",
     "@angular/build": "^21.2.10",
     "@angular/compiler": "^21.2.12",
     "@angular/compiler-cli": "^21.2.12",
     "@angular/core": "^21.2.12",
     "@angular/platform-browser": "^21.2.12",
+    "@vitest/browser": "^4.0.8",
+    "@vitest/browser-playwright": "^4.0.8",
+    "playwright": "^1.50.0",
     "jsdom": "^25.0.1",
     "rimraf": "^6.1.2",
     "rxjs": "^7.8.2",
