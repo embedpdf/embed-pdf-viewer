@@ -1,5 +1,10 @@
 import { defineConfig, devices } from '@playwright/test';
 
+const stableViewport = {
+  width: 1440,
+  height: 1200,
+} as const;
+
 export default defineConfig({
   testDir: './e2e',
   fullyParallel: true,
@@ -21,7 +26,13 @@ export default defineConfig({
   projects: [
     {
       name: 'chromium',
-      use: { ...devices['Desktop Chrome'] },
+      use: {
+        ...devices['Desktop Chrome'],
+        viewport: stableViewport,
+        deviceScaleFactor: 1,
+        colorScheme: 'light',
+        locale: 'en-US',
+      },
     },
   ],
 });
