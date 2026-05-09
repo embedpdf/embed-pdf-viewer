@@ -4,10 +4,10 @@ import {
   DestroyRef,
   ElementRef,
   afterNextRender,
+  afterRenderEffect,
   inject,
   input,
   output,
-  viewChild,
 } from '@angular/core';
 import EmbedPDF, {
   type EmbedPdfContainer,
@@ -29,8 +29,12 @@ import EmbedPDF, {
  */
 @Component({
   selector: 'embedpdf-pdf-viewer',
-  template: `<div #container style="width:100%;height:100%"></div>`,
-  styles: `:host { display: block; }`,
+  template: '',
+  styles: `
+    :host {
+      display: block;
+    }
+  `,
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class PDFViewer {
@@ -43,42 +47,53 @@ export class PDFViewer {
   /** Emitted when the plugin registry is ready */
   readonly ready = output<PluginRegistry>();
 
-  private readonly containerRef =
-    viewChild.required<ElementRef<HTMLDivElement>>('container');
+  private readonly hostRef = inject<ElementRef<HTMLElement>>(ElementRef);
   private readonly destroyRef = inject(DestroyRef);
-  private hostElement: HTMLDivElement | null = null;
+  private targetElement: HTMLElement | null = null;
 
   /** The active EmbedPdfContainer, or null when destroyed/uninitialized */
   container: EmbedPdfContainer | null = null;
 
   constructor() {
-    afterNextRender(() => {
-      if (this.destroyRef.destroyed) return;
+    afterRenderEffect({
+      write: () => {
+        const config = this.config();
 
-      const target = this.containerRef().nativeElement;
-      this.hostElement = target;
+        if (!this.container || this.destroyRef.destroyed) return;
 
-      const viewer = EmbedPDF.init({
-        type: 'container',
-        target,
-        ...this.config(),
-      });
+        this.container.config = config;
+      },
+    });
 
-      if (!viewer || this.destroyRef.destroyed) return;
+    afterNextRender({
+      write: () => {
+        if (this.destroyRef.destroyed) return;
 
-      this.container = viewer;
-      this.init.emit(viewer);
+        const target = this.hostRef.nativeElement;
+        this.targetElement = target;
 
-      void viewer.registry.then((registry) => {
-        if (!this.destroyRef.destroyed) {
-          this.ready.emit(registry);
-        }
-      });
+        const viewer = EmbedPDF.init({
+          type: 'container',
+          target,
+          ...this.config(),
+        });
+
+        if (!viewer || this.destroyRef.destroyed) return;
+
+        this.container = viewer;
+        this.init.emit(viewer);
+
+        void viewer.registry.then((registry) => {
+          if (!this.destroyRef.destroyed) {
+            this.ready.emit(registry);
+          }
+        });
+      },
     });
 
     this.destroyRef.onDestroy(() => {
-      this.hostElement?.replaceChildren();
-      this.hostElement = null;
+      this.targetElement?.replaceChildren();
+      this.targetElement = null;
       this.container = null;
     });
   }
