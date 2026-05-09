@@ -1,9 +1,10 @@
 import {
-  AfterViewInit,
   ChangeDetectionStrategy,
   Component,
+  DestroyRef,
   ElementRef,
-  OnDestroy,
+  afterNextRender,
+  inject,
   input,
   output,
   viewChild,
@@ -32,7 +33,7 @@ import EmbedPDF, {
   styles: `:host { display: block; }`,
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
-export class PDFViewer implements AfterViewInit, OnDestroy {
+export class PDFViewer {
   /** Full configuration for the PDF viewer */
   readonly config = input<PDFViewerConfig>({});
 
@@ -44,33 +45,42 @@ export class PDFViewer implements AfterViewInit, OnDestroy {
 
   private readonly containerRef =
     viewChild.required<ElementRef<HTMLDivElement>>('container');
+  private readonly destroyRef = inject(DestroyRef);
+  private hostElement: HTMLDivElement | null = null;
 
   /** The active EmbedPdfContainer, or null when destroyed/uninitialized */
   container: EmbedPdfContainer | null = null;
 
-  ngAfterViewInit(): void {
-    const target = this.containerRef().nativeElement;
+  constructor() {
+    afterNextRender(() => {
+      if (this.destroyRef.destroyed) return;
 
-    const viewer = EmbedPDF.init({
-      type: 'container',
-      target,
-      ...this.config(),
+      const target = this.containerRef().nativeElement;
+      this.hostElement = target;
+
+      const viewer = EmbedPDF.init({
+        type: 'container',
+        target,
+        ...this.config(),
+      });
+
+      if (!viewer || this.destroyRef.destroyed) return;
+
+      this.container = viewer;
+      this.init.emit(viewer);
+
+      void viewer.registry.then((registry) => {
+        if (!this.destroyRef.destroyed) {
+          this.ready.emit(registry);
+        }
+      });
     });
 
-    if (!viewer) return;
-
-    this.container = viewer;
-    this.init.emit(viewer);
-
-    viewer.registry.then((registry) => {
-      this.ready.emit(registry);
+    this.destroyRef.onDestroy(() => {
+      this.hostElement?.replaceChildren();
+      this.hostElement = null;
+      this.container = null;
     });
-  }
-
-  ngOnDestroy(): void {
-    const target = this.containerRef()?.nativeElement;
-    target?.replaceChildren();
-    this.container = null;
   }
 
   /** Promise that resolves to the PluginRegistry */
