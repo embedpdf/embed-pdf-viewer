@@ -34,9 +34,11 @@ export default defineConfig({
     },
   },
   test: {
+    name: 'angular',
     globals: true,
     environment: 'jsdom',
     setupFiles: ['src/test-setup.ts'],
     include: ['src/**/*.{test,spec}.ts'],
+    exclude: ['**/*.browser.spec.ts', 'node_modules/**'],
   },
 });

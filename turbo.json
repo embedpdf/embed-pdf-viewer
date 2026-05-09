@@ -9,6 +9,19 @@
     "check-types": {
       "dependsOn": ["^check-types"]
     },
+    "test": {
+      "dependsOn": ["build", "^build"],
+      "outputs": [],
+      "inputs": [
+        "src/**",
+        "test/**",
+        "vite.config.ts",
+        "vitest.config.ts",
+        "vitest.browser.config.ts",
+        "tsconfig.json",
+        "package.json"
+      ]
+    },
     "dev": {
       "persistent": true,
       "cache": false

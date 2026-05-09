@@ -19,6 +19,9 @@
     "build:watch": "ROARR_LOG=true turbowatch ./config/turbowatch.config.ts | roarr",
     "watch": "turbo watch",
     "watch:packages": "turbo watch build --filter=\"./packages/*\"",
+    "test": "turbo run test",
+    "test:node": "turbo run test --filter=\"!@embedpdf/angular-pdf-viewer\"",
+    "test:browser": "turbo run test --filter=\"@embedpdf/angular-pdf-viewer\"",
     "format": "prettier --write \"**/*.{ts,tsx,js,mjs,jsx,json,css,md}\"",
     "format:check": "prettier --check \"**/*.{ts,tsx,js,mjs,jsx,json,css,md}\"",
     "changeset": "changeset",
@@ -48,7 +51,8 @@
     "turbo": "latest",
     "turbowatch": "^2.29.4",
     "typescript": "latest",
-    "vite": "^6.3.5"
+    "vite": "^6.3.5",
+    "vitest": "^4.0.8"
   },
   "lint-staged": {
     "**/*.{ts,tsx,js,jsx,json,css,md,vue,svelte}": "prettier --write"

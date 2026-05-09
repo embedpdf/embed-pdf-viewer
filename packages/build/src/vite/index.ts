@@ -2,10 +2,11 @@ import fs from 'node:fs';
 import path from 'node:path';
 import angular from '@analogjs/vite-plugin-angular';
 import { svelte } from '@sveltejs/vite-plugin-svelte';
-import { defineConfig, type UserConfig } from 'vite';
+import { defineConfig, type Plugin, type UserConfig } from 'vite';
 import vue from '@vitejs/plugin-vue';
 import dts from 'unplugin-dts/vite';
 import { SvelteDtsResolver } from './svelte-dts-resolver.js';
+import { validatePackageExports } from './validate-package-exports.js';
 
 const sharedExternal = [/^@embedpdf\/(?!.*\/@framework$)/];
 
@@ -110,10 +111,15 @@ export function createConfig(opts: ConfigOptions): UserConfig {
             exclude: dtsExclude,
             beforeWriteFile: beforeWriteFile(outputPrefix),
             resolvers: [SvelteDtsResolver()],
+            // Force a types entry file (e.g. dist/index.d.ts) even when the
+            // source entry is a pure `export *` re-export. Without this,
+            // unplugin-dts silently emits no d.ts for that shape — see #27.
+            insertTypesEntry: true,
             ...dtsOptions,
           })]
         : []),
-    ],
+      validatePackageExports({ outputPrefix }),
+    ] as Plugin[],
     build: {
       emptyOutDir: false,
       sourcemap: true,
@@ -220,7 +226,15 @@ export function defineLibrary() {
         return createConfig({
           tsconfigPath: './tsconfig.json',
           entryPath: 'index.ts',
-          dtsExclude: ['**/react/**', '**/preact/**', '**/vue/**', '**/svelte/**', '**/angular/**'],
+          dtsExclude: [
+            '**/react/**',
+            '**/preact/**',
+            '**/vue/**',
+            '**/svelte/**',
+            '**/angular/**',
+            '**/*.test.ts',
+            '**/*.spec.ts',
+          ],
         });
     }
   });
