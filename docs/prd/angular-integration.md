@@ -1,7 +1,7 @@
-# PRD — Angular integration (v1.0)
+# PRD — Angular integration
 
 > **Status**: Draft, ready for upstream discussion
-> **Date**: 2026-05-09 (revised: A2 design grilling locked in API contract for `provideEmbedPdf`, `<embedpdf-provider>`, `bridgeScopeState`, `bridgeCoreSignal`, two-registry detection rule, engine ownership model, and `afterNextRender` bootstrap; auto-mount deferred post-v1.4)
+> **Date**: 2026-05-09 (revised: scope re-cut — v1.0 = drop-in Wrapper viewer; Headless tier defers to v1.1+. Previous "headless-first" plan reframed as v1.1 / v1.2.)
 > **Domain context**: [`CONTEXT.md`](../../CONTEXT.md)
 > **Related ADRs**:
 > - [0001 — Angular packages publish via AnalogJS Vite, not ng-packagr](../adr/0001-angular-publishing-via-analogjs-vite.md)
@@ -20,397 +20,207 @@ A senior Angular developer evaluating PDF libraries today picks `ngx-extended-pd
 
 ## Solution
 
-Ship a two-tier Angular integration that mirrors the React/Vue/Svelte pattern *plus* takes advantage of Angular-specific primitives. **Build the headless layer first** so the customisation power is available from day one, then layer the battery-included Wrapper viewer on top (Phase E may ship in parallel with B–D since it depends only on Phase A's foundation, not the per-plugin adapters).
+Ship a two-tier Angular integration in two releases:
 
-- **Headless layer** — per-package `/angular` subpath exports across `@embedpdf/core`, `@embedpdf/engines`, and 15 plugins covering read-only viewing. Angular consumers configure the registry via `provideEmbedPdf({ engine, plugins })` at app or route scope (idiomatic Angular, like `provideRouter`), then read state via `injectXxx()` injection-context functions returning Signals. Layer components like `<embedpdf-viewport>`, `<embedpdf-scroller>`, `<embedpdf-render-layer>` slot into custom layouts. A `<ng-template embedpdfPage let-page>` directive carries the per-page render context (Angular's idiomatic translation of Svelte's `renderPage` snippet / React's render-prop).
-- **Headless proof-of-life example** — `examples/angular-custom` exercises the headless layer end-to-end with a floating Adobe-style vertical toolbar over the viewer (zoom, pan, rotate, search, thumbnail toggle, fullscreen, print, save).
-- **Wrapper viewer (`@embedpdf/angular-pdf-viewer`)** — a single standalone component, `<embedpdf-viewer>` exported as the class `PDFViewer`, that drops into any Angular 21 app and renders the full snippet with theme/icon/i18n/plugin support already wired in. One import, one tag, one `config` input. **Drop-in consumers get the full feature set on day one** — annotation, redaction, signature, forms, AI etc. — because the Wrapper wraps the Snippet's Web Component which bakes in every plugin internally. The v1.0 17-plugin scope only constrains custom-viewer authors who want to compose with the headless layer.
-- **Schematic** — `ng add @embedpdf/angular-pdf-viewer` ships **two flows**: drop-in (default) only adds the PDFium WASM glob to `angular.json`; `--headless` additionally inserts `provideEmbedPdf({...})` into `app.config.ts`.
-- **Documentation** — `/docs/angular/*` mirrors the React/Vue/Svelte sections of the existing docs site, plus a single migration page targeted at `ngx-extended-pdf-viewer` shops.
-- **Testing pipeline (new)** — Vitest is wired in as part of A0. Hooks/utilities run as Node-mode unit tests; standalone components and directives run under Vitest browser mode (chromium) via `@analogjs/vitest-angular`. No Playwright in v1.0.
+- **v1.0 — Drop-in Wrapper viewer.** `@embedpdf/angular-pdf-viewer` exporting a single standalone `PDFViewer` component (selector `<embedpdf-viewer>`) that wraps the EmbedPDF Snippet's Web Component. One import, one tag, one `config` input. Drop-in consumers get the **full Snippet feature set on day one** — annotation, redaction, signature, forms, search, AI, etc. — because the Snippet bakes every plugin in internally. Plus full Vue/Svelte-shaped docs at `website/src/content/docs/angular/viewer/*` and a marketing landing at `website/src/app/angular-pdf-viewer/`. v1.0 is the upstream-publishable "Angular shop can use EmbedPDF today" deliverable.
 
-Angular consumers get the same "works in 60 seconds" Wrapper story as React/Vue/Svelte, and Angular shops that want a custom UI get a Signals-native, zoneless-clean, route-scopable headless API that reads like idiomatic Angular 21 code.
+- **v1.1 — Headless Foundation.** `@embedpdf/core/angular` and `@embedpdf/engines/angular` plus the six minimum-viable-render plugin adapters (`document-manager`, `viewport`, `scroll`, `render`, `tiling`, `interaction-manager`). Angular consumers configure the registry via `provideEmbedPdf({ engine, plugins })` at app or route scope (idiomatic Angular, like `provideRouter`), then read state via `injectXxx()` injection-context functions returning Signals. Layer components like `<embedpdf-viewport>`, `<embedpdf-scroller>`, `<embedpdf-render-layer>` slot into custom layouts. A `<ng-template embedpdfPage let-page>` directive carries the per-page render context (Angular's idiomatic translation of Svelte's `renderPage` snippet / React's render-prop). End-to-end `examples/angular-custom` proof-of-life example with a floating toolbar.
+
+- **v1.2 — Headless Essentials.** The 11 viewing-essentials plugin adapters: `zoom`, `pan`, `rotate`, `selection`, `search`, `spread`, `thumbnail`, `fullscreen`, `i18n`, `print`, `export`. Read-only headless parity with Vue/Svelte/React.
+
+- **v1.x — beyond.** Editing surface (annotation, redaction, signature, stamp, plugin-ui), forms (Forms ↔ Signal Forms bridge), bookmark/attachment/history/capture/commands, AI/layout-analysis/view-manager.
+
+Angular shops get a **batteries-included drop-in viewer immediately** (v1.0), and headless customisation arrives in subsequent point releases without blocking adoption.
+
+## Why this re-cut (was: headless-first)
+
+The original PRD ordered the Headless layer first ("validate the API earlier; Wrapper parallel-shippable"). The re-cut to **Wrapper-v1.0-first** is driven by three observations after the early PR work:
+
+1. **The Wrapper is 95% built already.** PR #34 lands a working `@embedpdf/angular-pdf-viewer` (lifecycle-correct, Playwright-tested, with a `provideEmbedPdfViewerConfig` defaults pattern) on `feature/angular`. Pushing that out as v1.0 is a fast adoption win; holding it until the headless tier finishes adds months of delay for a deliverable that's already done.
+2. **Headless API design benefits from real-world wrapper context.** Shipping the wrapper exposes how Angular shops actually consume EmbedPDF — what config they configure, what theming they want, where SSR pinch-points are. v1.1's headless API can absorb that learning.
+3. **Smaller upstream PR is easier to review.** A 25-file Wrapper PR with docs is much easier for upstream maintainers to LGTM than a 17-package "complete Angular tier" PR. Reduces review friction and proves the upstream-merge process before the bigger v1.1 PR follows.
+
+## v1.0 deliverable shape
+
+Concrete artifacts that ship in the v1.0 upstream PR (`the-ult:feature/angular` → `embedpdf:main`):
+
+| Slot | Source | Issue |
+|---|---|---|
+| `viewers/angular/` (`@embedpdf/angular-pdf-viewer`) | PR #34 + conformance fixes | #21, #34 |
+| `examples/angular-pdf-viewer/` (Playwright demo + screenshots) | PR #34 | #34 |
+| `examples/angular-tailwind/` (live-demo source for docs, 5–7 demos) | new in v1.0 docs PR | #23 |
+| `website/src/content/docs/angular/viewer/*` (8 top-level + 13 plugin mdx pages, full Vue parity) | new in v1.0 docs PR | #23 |
+| `website/src/content/docs/angular/headless/introduction.mdx` (placeholder linking to v1.1) | new in v1.0 docs PR | #23 |
+| `website/src/content/docs/angular/code-examples/use-angular-mount.tsx` + per-demo wrappers | new in v1.0 docs PR | #23 |
+| `website/src/app/angular-pdf-viewer/page.tsx` + landing component | new | #37 |
+| Homepage Angular sections (hero, paths, CodeShowcase, headless chips) | new | #35, #36 |
+| ADR 0001 / 0002 / 0003 | already on `feature/angular` | — |
+| `defineLibrary()` `'angular'` mode + dts validator | already on `feature/angular` (A0 / #28) | — |
+
+`ng add` schematic is **out of v1.0** — deferred to v1.0.x or v1.1. Manual setup steps in `getting-started.mdx` cover the same ground until the schematic ships.
 
 ## v1.0 plugin scope
 
-The v1.0 cut is **read-only viewing only**. Anything that creates content, edits, or tracks edits defers to v1.x.
+The wrapper bakes in **every plugin** the Snippet ships with. Drop-in consumers get the full feature set on day one — annotation, redaction, signature, forms, AI, etc. — even though their per-plugin headless `/angular` adapters defer to v1.1+.
 
-**In scope (17 packages — `@embedpdf/{core,engines}` plus 15 plugins):**
+The v1.0 wrapper docs ship full pages for the 13 user-facing plugins consumers configure via the `config` object: `annotation`, `document-manager`, `export`, `form`, `i18n`, `pan`, `print`, `rotate`, `scroll`, `selection`, `signature`, `spread`, `zoom`. Mirrors `vue/viewer/plugins/` exactly.
 
-| Phase | Plugin | Purpose |
-|---|---|---|
-| A | `core` | Registry / DI |
-| A | `engines` | PDFium bootstrap |
-| B | `document-manager` | Open / close docs |
-| B | `viewport` | Scrollable host |
-| B | `scroll` | Page virtualization |
-| B | `render` | Page rasterization |
-| B | `tiling` | High-res tiles on zoom |
-| B | `interaction-manager` | Pointer events |
-| C | `zoom` | + / − / fit / marquee |
-| C | `pan` | Hand tool |
-| C | `rotate` | Rotate page |
-| C | `search` | Find in document |
-| C | `selection` | Text select / copy |
-| C | `spread` | Single / double / cover |
-| C | `thumbnail` | Sidebar strip |
-| C | `fullscreen` | F11 / Esc |
-| C | `i18n` | Translatable labels |
-| C | `print` | Ctrl+P / dialog |
-| C | `export` | Download / Save As |
+## User Stories — by milestone
 
-**Deferred to v1.x:**
+### v1.0 — Drop-in Wrapper
 
-- **v1.1 — editing surface**: `annotation`, `redaction`, `signature`, `stamp`, `plugin-ui` (schema-driven toolbar/sidebar engine).
-- **v1.2 — forms + navigation + history**: `form` (Signal Forms ↔ AcroForms bridge — Signal Forms is production-ready in Angular 21+, no version block), `bookmark` (PDF outline TOC), `attachment`, `history` (undo/redo), `capture` (marquee screenshot), `commands`.
-- **v2.0 — heavy / specialised**: `ai-manager`, `layout-analysis`, `view-manager`.
+1. As an Angular developer evaluating PDF libraries, I want to install `@embedpdf/angular-pdf-viewer` and render a PDF in under five minutes with zero plugin choices, so that EmbedPDF beats my time-to-first-render bar before I evaluate features.
+2. As an Angular developer, I want to import a single `PDFViewer` standalone class (selector `<embedpdf-viewer>`), so that I can drop it into any standalone-component app without an NgModule. The class name preserves cross-framework symmetry with `@embedpdf/{react,vue,svelte}-pdf-viewer`.
+3. As an Angular developer, I want to pass the same flat `PDFViewerConfig` object I see in the React/Vue docs, so that cross-framework documentation translates one-to-one.
+4. As an Angular developer with multiple wrappers in a single app, I want `provideEmbedPdfViewerConfig({ ... })` at app/route/component scope so that defaults like theme preference cascade into every nested `<embedpdf-viewer>` without prop-drilling.
+5. As an Angular developer, I want signal-based outputs for `init`, `ready`, and `themechange` plus `container: signal<EmbedPdfContainer | null>` and `registry: signal<PluginRegistry | null>`, so that I can react to viewer lifecycle events and read state via `effect()` / `computed()` without RxJS bridging.
+6. As an Angular SSR developer, I want the viewer to render an empty placeholder on the server and mount the actual viewer in the browser via `afterNextRender`, so that my app boots cleanly under Angular Universal without hydration mismatches.
+7. As an Angular developer, I want the wrapper to clean up on `DestroyRef.onDestroy()`, so that route changes don't leak workers or WASM memory.
+8. As an Angular developer reading `https://www.embedpdf.com/docs/angular/`, I want full viewer-tier docs at parity with `/docs/vue/viewer/*` (introduction, getting-started, engine, customizing-ui, theme, security + 13 plugin pages), so that I can adopt EmbedPDF without cross-referencing the Vue docs.
+9. As a developer landing on `https://www.embedpdf.com`, I want Angular at parity in the hero, paths, CodeShowcase, and Headless callout sections, so that EmbedPDF's marketing surface treats Angular as a first-class supported framework.
+10. As an Angular developer browsing `/docs/angular/headless`, I want a clear "Coming in v1.1" placeholder linking to the v1.1 milestone, so that I know headless is on the roadmap without waiting on undocumented APIs.
 
-The Wrapper viewer is **not** subject to this scope. Drop-in consumers get every plugin via the Snippet on day one.
+### v1.1 — Headless Foundation
 
-## User Stories
+11. As an Angular architect, I want to call `provideEmbedPdf({ engine, plugins })` inside a route's `providers` array, so that the engine and registry live for the route's lifetime and don't tear down on intra-route navigation.
+12. As an Angular architect, I want to call `provideEmbedPdfEngine({...})` separately for advanced cases where one engine instance is shared across multiple registries, so that I can render multiple PDFs with separate plugin sets without re-downloading WASM.
+13. As an Angular developer, I want a `<embedpdf-provider [engine] [plugins]>` standalone component as an alternative to the provider function, so that I can scope two viewers within the same component template (one engine each).
+14. As an Angular developer, the `<embedpdf-provider>` component should detect a registry already in scope and refuse to create a duplicate, so that I can't accidentally double-bootstrap and waste a worker.
+15. As an Angular developer, I want `injectPdfiumEngine({ wasmUrl, worker, fontFallback })` to return signals for engine, isLoading, and error, so that my UI can render loading and error states directly from the template.
+16. As an Angular developer, I want `injectRegistry()`, `injectPlugin<T>(id)`, `injectCapability<T>(id)`, `injectActiveDocument()`, `injectDocumentStates()`, `injectCoreState()` returning signals, so that I can derive computed values reactively without manual subscriptions.
+17. As a per-plugin adapter author, I want a single shared `bridgeScopeState(pluginId, documentId, initialState)` utility exported from `@embedpdf/core/angular`, so that every `inject*` hook is one mechanical call rather than 17 hand-written subscription bridges.
+18. As an Angular developer following the getting-started guide, I want to register `DocumentManager`, `Viewport`, `Scroll`, `Render`, `Tiling`, and `InteractionManager` plugins and see a PDF render in my app, so that the tracer bullet works end-to-end before I add any chrome.
+19. As an Angular developer evaluating EmbedPDF for a custom design system, I want a working `examples/angular-custom` app demonstrating a floating Adobe-style vertical toolbar over the headless viewer with v1.1 actions, so that I can copy the integration pattern without importing a UI library.
+20. As an Angular developer reading `/docs/angular/headless/`, I want full headless docs at parity with `/docs/vue/headless/*` (introduction, getting-started, engine, full-example, security, understanding-plugins + per-plugin pages for shipped adapters), so that the headless tier is documented when it ships.
 
-### Phase A0 — foundation tooling (pre-flight)
+### v1.2 — Headless Essentials
 
-1. As an EmbedPDF maintainer, I want bug #27 (`unplugin-dts` silently skips pure `export *` re-export base entries) fixed in `@embedpdf/build` before any plugin's `/angular` subpath ships, so that 17 packages don't silently miss their `dist/index.d.ts`.
-2. As an EmbedPDF maintainer, I want a build-time validator that fails the build if a `package.json`-advertised `types` entry is missing from `dist/`, so that future regressions of #27 are caught automatically.
-3. As an EmbedPDF maintainer, I want Vitest wired into the repo (root `vitest.workspace.ts`, `test` task in `turbo.json`, `test` scripts per package, a `.github/workflows/test.yml`), so that the dormant `packages/models/src/*.test.ts` files become live and the new Angular packages have a real quality gate.
-4. As an EmbedPDF maintainer, I want CI-gating split between fast Node-mode tests (every PR) and slower browser-mode tests (path-filtered to PRs touching `packages/*/src/angular/**`, `viewers/angular/**`, or `examples/angular-custom/**`), so that Angular work is fully tested without slowing every unrelated PR.
+21. As an Angular developer, I want `injectZoom(documentId)` returning `{ state, provides }` as signals, so that I can wire +, −, fit-page, fit-width, zoom-to-mode buttons in my own toolbar, plus `<embedpdf-marquee-zoom>` for drag-to-zoom-region UX.
+22. As an Angular developer, I want `injectPan(documentId)`, `injectRotate(documentId)`, `injectSelection(documentId)` (with `<embedpdf-selection-layer>` projecting a selection-menu template), `injectSearch(documentId)` (with `<embedpdf-search-layer>`), `injectSpread(documentId)`, `injectThumbnail(documentId)`, `injectFullscreen(documentId)`, `injectI18n()`, `injectPrint(documentId)`, `injectExport(documentId)`, so that I can wire all read-only viewing actions in my own toolbar.
 
-### Phase A — registry & engine foundation
+### v1.x — beyond v1.2
 
-5. As an Angular architect, I want to call `provideEmbedPdf({ engine, plugins })` inside a route's `providers` array, so that the engine and registry live for the route's lifetime and don't tear down on intra-route navigation.
-6. As an Angular architect, I want to call `provideEmbedPdfEngine({...})` separately for advanced cases where one engine instance is shared across multiple registries, so that I can render multiple PDFs with separate plugin sets without re-downloading WASM.
-7. As an Angular developer, I want a `<embedpdf-provider [engine] [plugins]>` standalone component as an alternative to the provider function, so that I can scope two viewers within the same component template (one engine each).
-8. As an Angular developer, the `<embedpdf-provider>` component should detect a registry already in scope and refuse to create a duplicate, so that I can't accidentally double-bootstrap and waste a worker.
-9. As an Angular developer, I want `injectPdfiumEngine({ wasmUrl, worker, fontFallback })` to return signals for engine, isLoading, and error, so that my UI can render loading and error states directly from the template.
-10. As an Angular developer, I want `injectRegistry()`, `injectPlugin<T>(id)`, `injectCapability<T>(id)`, `injectActiveDocument()`, `injectDocumentStates()`, `injectCoreState()` returning signals, so that I can derive computed values reactively without manual subscriptions.
-11. As a per-plugin adapter author, I want a single shared `bridgeScopeState(pluginId, documentId, initialState)` utility exported from `@embedpdf/core/angular`, so that every `inject*` hook is one mechanical call rather than 17 hand-written subscription bridges.
-12. As an Angular SSR developer, I want all browser-API touches (engine creation, WASM fetch, `customElements` lookup) deferred to `afterNextRender`, so that server rendering doesn't crash on missing browser globals.
-
-### Phase B — minimum viable render
-
-13. As an Angular developer following the getting-started guide, I want to register `DocumentManager`, `Viewport`, `Scroll`, `Render`, `Tiling`, and `InteractionManager` plugins and see a PDF render in my app, so that the tracer bullet works end-to-end before I add any chrome.
-14. As an Angular developer, I want `<embedpdf-document-content [documentId]>` exposing `isLoading`, `isError`, `isLoaded` signals via template context, so that I can render loading skeletons and password prompts using `@if` / `@switch` blocks.
-15. As an Angular developer, I want `<embedpdf-viewport [documentId]>` with content projection as the scrollable host, so that I can apply my own classes/styles and project the scroller inside.
-16. As an Angular developer, I want `<embedpdf-scroller [documentId]>` to virtualize page layout and expose a `*embedpdfPage="let page"` template directive, so that I render each visible page through a typed template context.
-17. As an Angular developer, I want strict template type-checking on the `*embedpdfPage` context via `ngTemplateContextGuard`, so that the compiler catches typos in my `let-page` bindings.
-18. As an Angular developer, I want `<embedpdf-render-layer>` and `<embedpdf-tiling-layer>` to render PDFium output and high-resolution tiles, so that pages stay sharp at any zoom level.
-19. As an Angular developer, I want `<embedpdf-global-pointer-provider>` and `<embedpdf-page-pointer-provider>` as scope wrappers, so that interaction-manager-aware children (zoom, pan, capture, selection) receive pointer events.
-
-### Phase C — viewing essentials
-
-20. As an Angular developer, I want `injectZoom(documentId)` returning `{ state, provides }` as signals, so that I can wire +, −, fit-page, fit-width, zoom-to-mode buttons in my own toolbar, plus `<embedpdf-marquee-zoom>` for drag-to-zoom-region UX.
-21. As an Angular developer, I want `injectPan(documentId)` so that I can implement a hand-tool toggle.
-22. As an Angular developer, I want `injectRotate(documentId)` and `<embedpdf-rotate>` so that I can rotate a page (the wrapper component) and read current rotation as a signal (the helper).
-23. As an Angular developer, I want `injectSelection(documentId)` plus `<embedpdf-selection-layer>` projecting a selection-menu template, so that I can show context menus over a text selection with my own button styles.
-24. As an Angular developer, I want `injectSearch(documentId)` returning current matches and active match index as signals, plus `<embedpdf-search-layer>` overlaying highlights on matched text.
-25. As an Angular developer, I want `injectSpread(documentId)` so that I can offer single / double / cover spread modes.
-26. As an Angular developer, I want `injectThumbnail(documentId)` returning a signal over the thumbnail strip data, so that I can render thumbnails in a sidebar with `@for`.
-27. As an Angular developer, I want `injectFullscreen(documentId)` returning `{ isFullscreen, enter, exit, toggle }`, so that I can wire an F11 / fullscreen button.
-28. As an Angular developer, I want `injectI18n()` returning `{ locale, t, setLocale }` as signals, so that translatable strings used by every other plugin's helpers and components are reactively translated.
-29. As an Angular developer, I want `injectPrint(documentId)` exposing the print capability, so that I can wire a Ctrl+P flow on any custom toolbar.
-30. As an Angular developer, I want `injectExport(documentId)` returning `{ download, saveAsCopy }`, so that consumers can download the current PDF or grab the bytes as `ArrayBuffer` for further processing.
-
-### Phase D — custom example
-
-31. As an Angular developer evaluating EmbedPDF for a custom design system, I want a working example app demonstrating a floating Adobe-style vertical toolbar over the headless viewer with all v1.0 actions (zoom, pan, rotate, search, thumbnails, fullscreen, print, save), so that I can copy the integration pattern without importing a UI library.
-32. As an Angular developer learning the headless API, I want the example to follow the same composition pattern as the Svelte and React examples (`DocumentContent → GlobalPointerProvider → Viewport → Scroller → Rotate → PagePointerProvider → render layers`), so that cross-framework documentation is one-to-one.
-33. As an Angular developer reviewing the example, I want the example app to ship a single Vitest browser-mode smoke test that asserts the page mounts and a `<canvas>` appears, so that the example doesn't silently break on dependency bumps.
-
-### Phase E — battery-included Wrapper viewer (parallel-shippable)
-
-34. As an Angular developer evaluating PDF libraries, I want to install `@embedpdf/angular-pdf-viewer` and render a PDF in under five minutes with zero plugin choices, so that EmbedPDF beats my time-to-first-render bar before I evaluate features.
-35. As an Angular developer, I want to import a single `PDFViewer` standalone class (selector `<embedpdf-viewer>`), so that I can drop it into any standalone-component app without an NgModule. The class name preserves cross-framework symmetry with `@embedpdf/{react,vue,svelte}-pdf-viewer` and is the one explicit exception to the Angular-style "no ALLCAPS in identifiers" rule.
-36. As an Angular developer, I want to pass the same flat `PDFViewerConfig` object I see in the React/Vue docs, so that cross-framework documentation translates one-to-one.
-37. As an Angular developer, I want signal-based outputs for `init`, `ready`, and `themechange`, so that I can react to viewer lifecycle events from a `computed()` or `effect()` without RxJS bridging.
-38. As an Angular SSR developer, I want the viewer to render an empty placeholder on the server and mount the actual viewer in the browser, so that my app boots cleanly under Angular Universal without hydration mismatches.
-39. As an Angular developer, I want the Wrapper viewer to clean up on `ngOnDestroy` / `DestroyRef`, so that route changes don't leak workers or WASM memory.
-
-### Phase F — `ng add` schematic (split flows)
-
-40. As an Angular developer setting up a new project, I want to run `ng add @embedpdf/angular-pdf-viewer` and have the package installed plus the PDFium WASM glob added to `angular.json` `assets[]`, so that `<embedpdf-viewer>` works on the next reload with no further setup. **No `provideEmbedPdf` is inserted on the drop-in path** — the Snippet handles WASM loading internally.
-41. As an Angular developer building a custom viewer, I want `ng add @embedpdf/angular-pdf-viewer --headless` to additionally insert a `provideEmbedPdf({ engine, plugins: [/* defaults */] })` block into `app.config.ts`, so that the headless layer works out of the box.
-42. As an Angular developer, I want both schematic flows to be idempotent (no duplicate inserts on second run), so that re-running after a `ng update` is safe.
-43. As an Angular developer, I want the schematic to prompt before overwriting any existing EmbedPDF configuration, so that I don't lose customisations.
-
-### Phase G — documentation
-
-44. As a developer searching for PDF libraries, I want documentation pages at `https://www.embedpdf.com/docs/angular/*` mirroring the React/Vue/Svelte sections, so that the integration is discoverable through the marketing site.
-45. As an Angular developer reading the docs, I want the page structure to follow the existing per-framework hierarchy (Setup → Headless Introduction → Layers → Plugin pages → Recipes → Viewer → Code Examples), so that I learn EmbedPDF the same way React/Vue developers do.
-46. As an Angular shop migrating from `ngx-extended-pdf-viewer`, I want a single `docs/angular/migrating-from-ngx-extended-pdf-viewer.md` page mapping common APIs, so that switching costs are visible and small.
-47. As an EmbedPDF maintainer, I want the docs site to render Angular code samples with proper syntax highlighting (TypeScript + signal-form template syntax + Angular control-flow `@if`/`@for`), so that the examples don't look broken.
-
-### Build, packaging, distribution (cross-cutting)
-
-48. As an EmbedPDF maintainer, I want the Angular packages to build via the existing `@embedpdf/build` `defineLibrary()` pipeline with the existing `'angular'` mode, so that I don't have to maintain a second build system.
-49. As an EmbedPDF maintainer, I want each Angular subpath (`@embedpdf/core/angular`, etc.) to land in `dist/angular/index.{js,cjs,d.ts}` mirroring the existing `dist/<framework>/` shape, so that the publish flow is identical to React/Vue/Svelte.
-50. As an EmbedPDF maintainer, I want each touched package's `exports` map to gain a `"./angular"` entry, so that consumers import via `@embedpdf/<pkg>/angular` per the existing convention.
-51. As an Angular consumer, I want each package to declare `peerDependencies: { '@angular/core': '>=21.0.0' }`, so that npm/pnpm warns me at install time if I'm on an older Angular version.
-52. As an Angular consumer, I want the published packages to ship as ESM-first FESM2022 with CJS fallback, so that they work in both modern `ng build` and legacy bundlers.
-53. As a zoneless Angular consumer, I want all components to use `ChangeDetectionStrategy.OnPush` and signal-based state, so that the integration cooperates with `provideZonelessChangeDetection()` out of the box.
-54. As an EmbedPDF maintainer, I want every plugin PR landing on `feature/angular` to ship a `minor` bump changeset, so that the upstream merge consolidates them through the existing changesets release flow without manual version juggling.
+- Editing surface (`annotation`, `redaction`, `signature`, `stamp`, `plugin-ui`) — v1.3
+- Forms ↔ Signal Forms bridge (`form`, plus `bookmark`, `attachment`, `history`, `capture`, `commands`) — v1.4
+- Heavy / specialised (`ai-manager`, `layout-analysis`, `view-manager`) — v2.0
+- UI-library examples (`examples/angular-material`, `examples/angular-tailwind` extended) — rolling
 
 ## Implementation Decisions
 
-### Standard issue preamble (non-negotiable for every plugin issue)
+### Standard issue preamble (non-negotiable for every v1.1+ plugin issue)
 
-Every B/C and E1 issue body opens with a required review pass. The PRD does **not** spell out implementation specifics per plugin — those are derived by the implementer from the existing framework adapters during this preamble. The preamble:
+Every B/C and headless-tier plugin issue body opens with a required review pass. The PRD does **not** spell out implementation specifics per plugin — those are derived by the implementer from the existing framework adapters during this preamble. The preamble:
 
 > ## Before implementation — required review pass
 >
 > Do not start coding until this is done. Implementation choices should be derived from the existing framework adapters, not from the PRD or this issue body in isolation.
 >
-> 1. **Read the framework-neutral surface** — `packages/<this-plugin>/src/lib/`. Understand the capability, scope, state shape, store actions, and lifecycle hooks. This is the contract; the Angular adapter is one of multiple consumers.
-> 2. **Read the Svelte adapter** — `packages/<this-plugin>/src/svelte/`. Note hooks, components, snippets/render-props, effect ordering (`$effect` vs `$effect.pre`), cleanup behavior, and any guards (stale-data, race conditions, scope re-resolution on documentId change).
-> 3. **Read the Vue adapter** — `packages/<this-plugin>/src/vue/`. Note differences from Svelte (refs vs runes, `watch` immediate, `onCleanup`, `MaybeRefOrGetter` accepts plain values).
-> 4. **Read the React/Preact adapter** — `packages/<this-plugin>/src/react/` and `src/preact/`. Note JSX ergonomics that influenced the framework-neutral surface.
+> 1. **Read the framework-neutral surface** — `packages/<this-plugin>/src/lib/`. Understand the capability, scope, state shape, store actions, and lifecycle hooks.
+> 2. **Read the Svelte adapter** — `packages/<this-plugin>/src/svelte/`. Note hooks, components, snippets/render-props, effect ordering (`$effect` vs `$effect.pre`), cleanup, and any guards (stale-data, race conditions, scope re-resolution).
+> 3. **Read the Vue adapter** — `packages/<this-plugin>/src/vue/`. Note differences from Svelte (refs vs runes, `watch` immediate, `onCleanup`, `MaybeRefOrGetter`).
+> 4. **Read the React/Preact adapter** — `packages/<this-plugin>/src/react/` and `src/preact/`.
 > 5. **Write a one-page implementation plan** as a comment on this issue covering:
->     - Mapping table: Svelte primitive → Angular 21 primitive (`$state` → `signal`, `$effect.pre` → `effect()` pre-render, `Snippet<[T]>` → `*embedpdfPage` structural directive, `bind:` → `model()` two-way input, `dispatch` → `output()`).
->     - Where signal-based state is bridged via `bridgeScopeState` from `@embedpdf/core/angular`. Do not invent new bridges; if the shared utility doesn't fit, raise it as a question on A2 first.
->     - SSR posture: which work goes inside `afterNextRender`, which is safe in `effect()`.
->     - Cleanup: `DestroyRef` wiring for every subscription returned by `scope.onStateChange` / `onScrollerData` / etc.
->     - Strict template type-check guards (`ngTemplateContextGuard`) for any structural directive.
->     - Tests: Node-mode Vitest for hooks, browser-mode Vitest (chromium) via `@analogjs/vitest-angular` for components.
+>    - Mapping table: Svelte primitive → Angular 21 primitive (`$state` → `signal`, `$effect.pre` → `effect()`, `Snippet<[T]>` → `*embedpdfPage` structural directive, `bind:` → `model()` two-way, `dispatch` → `output()`).
+>    - Where signal-based state is bridged via `bridgeScopeState` from `@embedpdf/core/angular`.
+>    - SSR posture: which work goes inside `afterNextRender`, which is safe in `effect()`.
+>    - Cleanup: `DestroyRef` wiring for every subscription returned by `scope.onStateChange`.
+>    - Strict template type-check guards (`ngTemplateContextGuard`) for any structural directive.
+>    - Tests: Node-mode Vitest for hooks, browser-mode Vitest (chromium) via `@analogjs/vitest-angular` for components.
 > 6. **Get the plan ack'd** in the issue thread before opening the implementation PR.
 >
-> **Standards to follow:**
-> - Angular 21 best practices: standalone-only, `OnPush`, signal inputs (`input()` / `input.required()` / `model()`), signal outputs (`output()`), no decorators with `@Input()/@Output()`, no NgModules, no `Component`/`Service`/`Directive`/`Pipe` class suffixes (single exception: `PDFViewer` for cross-framework symmetry), `inject()` over constructor injection.
-> - Modern TypeScript (5.9+): prefer `satisfies` over annotations where it adds inference, no `any` (use `unknown` and narrow), exact-optional types, exhaustive `switch` checks via `never`.
-> - Reactivity: signals only. Consumers needing observables call `toObservable()` themselves; we do not ship a parallel observable surface.
-> - SSR-safe: never touch `document`, `window`, `customElements`, or fetch WASM at module scope. All browser-API touches go through `afterNextRender`.
+> **Standards (Angular 21):** standalone-only (no `standalone: true` flag — it's the default), `OnPush`, signal inputs (`input()` / `input.required()` / `model()`), signal outputs (`output()`), no NgModules, no `Component` / `Service` / `Directive` / `Pipe` class suffixes (single exception: `PDFViewer` for cross-framework symmetry), `inject()` over constructor injection, `signal.asReadonly()` on every public-returned signal, `assertInInjectionContext` first line of every `injectXxx()` helper.
 
-### Composition pattern — `embedpdfPage` template directive
+### Module 1 — `@embedpdf/build` `'angular'` mode (already shipped)
 
-The Svelte `Scroller` uses a `Snippet<[PageLayout]>` (`{#snippet renderPage(page)}…{/snippet}`); React uses a render-prop (`renderPage={({pageIndex}) => …}`). Angular's idiomatic translation is a structural directive on `<ng-template>` with a typed context guard:
+Extends `defineLibrary()` in the build preset with a fifth case alongside `react`/`preact`/`vue`/`svelte`. Inputs per consuming package are `src/angular/index.ts` and `src/angular/tsconfig.angular.json`. Output goes to `dist/angular/index.{js,cjs}` and emits typings via `unplugin-dts`. The mode loads `@analogjs/vite-plugin-angular` and externalizes `@angular/*`, `rxjs`, `tslib`, and the existing `@embedpdf/*` peer pattern. See [ADR 0001](../adr/0001-angular-publishing-via-analogjs-vite.md). A0 closed bug #27 (silently-skipped pure `export *` re-exports) and added a build-time validator.
 
-```ts
-interface EmbedpdfPageContext {
-  $implicit: PageLayout;
-  page: PageLayout;
-}
-
-@Directive({ selector: 'ng-template[embedpdfPage]', standalone: true })
-class EmbedpdfPageTemplate {
-  static ngTemplateContextGuard(_dir: EmbedpdfPageTemplate, ctx: any): ctx is EmbedpdfPageContext {
-    return true;
-  }
-}
-
-// Consumer:
-<embedpdf-scroller [documentId]="docId">
-  <ng-template embedpdfPage let-page>
-    <embedpdf-rotate [documentId]="docId" [pageIndex]="page.pageIndex">
-      <embedpdf-page-pointer-provider [documentId]="docId" [pageIndex]="page.pageIndex">
-        <embedpdf-render-layer [documentId]="docId" [pageIndex]="page.pageIndex" />
-      </embedpdf-page-pointer-provider>
-    </embedpdf-rotate>
-  </ng-template>
-</embedpdf-scroller>
-```
-
-The `Scroller` queries the projected `EmbedpdfPageTemplate` via `contentChild(EmbedpdfPageTemplate)` and instantiates one view per visible page using `ViewContainerRef.createEmbeddedView(template, { $implicit: page, page })`. `setLayoutReady(documentId)` fires inside `effect()` (matching Svelte's `$effect.pre` semantics — `setLayoutReady` does not read DOM).
-
-### Phase ordering
-
-| Phase | Scope | Independently usable? |
-|---|---|---|
-| **A0 — pre-flight** | Bug #27 fix in `defineLibrary()`; Vitest pipeline (root config, turbo task, CI workflow); revive dormant `packages/models/src/*.test.ts` | n/a — blocks everything else |
-| **A — Foundation** | `@embedpdf/core/angular`; `@embedpdf/engines/angular`; `bridgeScopeState` + `bridgeCoreSignal` shared utilities | `provideEmbedPdf()` resolves with a fake plugin in tests; no UI yet |
-| **B — Minimum viable render** | `plugin-{document-manager,viewport,scroll,render,tiling,interaction-manager}/angular` (6 packages) | Consumer can render a PDF with no toolbar |
-| **C — Viewing essentials** | `plugin-{zoom,pan,rotate,selection,search,spread,thumbnail,fullscreen,i18n,print,export}/angular` (11 packages) | All v1.0 helpers and layer components — parallelisable across contributors |
-| **D — Custom example** | `examples/angular-custom` (floating Adobe-style toolbar) | End-to-end demo with v1.0 features only |
-| **E — Wrapper viewer** | `viewers/angular` → `@embedpdf/angular-pdf-viewer` | Drop-in `<embedpdf-viewer>`. **May ship in parallel with B–D** — depends only on Phase A0+A1 (build mode + dts fix) and `@embedpdf/snippet`, *not* on the per-plugin `/angular` adapters |
-| **F — Schematic** | `ng add @embedpdf/angular-pdf-viewer` (drop-in flow) and `--headless` flow | One-command setup, two flows |
-| **G — Documentation** | `website/docs/angular/*` plus migration page from `ngx-extended-pdf-viewer` | Public-facing docs |
-
-### Module 1 — `@embedpdf/build` `'angular'` mode (already shipped — A0 fixes its dts gap)
-
-Extends `defineLibrary()` in the build preset with a fifth case alongside the existing `react`/`preact`/`vue`/`svelte` modes. Inputs per consuming package are `src/angular/index.ts` and `src/angular/tsconfig.angular.json`. Output goes to `dist/angular/index.{js,cjs}` and emits typings via `unplugin-dts`. The mode loads `@analogjs/vite-plugin-angular` and externalizes `@angular/*`, `rxjs`, `tslib`, and the existing `@embedpdf/*` peer pattern. See [ADR 0001](../adr/0001-angular-publishing-via-analogjs-vite.md).
-
-**A0 closes a gap in this module**: `unplugin-dts` silently skips pure `export *` re-export base entries (issue #27). Fix in `defineLibrary()` plus a build-time validator that fails when a `package.json`-advertised `types` entry is missing from `dist/`.
-
-### Module 2 — `@embedpdf/core/angular` registry context
-
-Exports `provideEmbedPdf()`, `provideEmbedPdfEngine()` (re-export from engines/angular), `<embedpdf-provider>`, the `injectXxx()` helper family, **and the shared adapter utilities `bridgeScopeState` and `bridgeCoreSignal` consumed by every per-plugin `inject*` hook**. Both registry surfaces resolve a single internal `EMBEDPDF_CONTEXT` `InjectionToken` (never exported) so all `injectXxx` helpers consume the same registry regardless of how it was provided. See [ADR 0002](../adr/0002-angular-headless-registry-via-provider-function.md) and [ADR 0003](../adr/0003-angular-headless-bootstrap-via-after-next-render.md).
-
-#### API contract (locked)
-
-```ts
-// Providers — function form takes EngineConfig, component form takes PdfEngine instance
-function provideEmbedPdf(opts: {
-  engine?: { wasmUrl?: string; worker?: boolean; fontFallback?: FontFallbackConfig };
-  plugins: PluginBatchRegistrations;
-  config?: PluginRegistryConfig;
-  onInitialized?: (registry: PluginRegistry) => void | Promise<void>;
-}): EnvironmentProviders;
-
-function provideEmbedPdfEngine(opts: {
-  wasmUrl?: string; worker?: boolean; fontFallback?: FontFallbackConfig;
-}): EnvironmentProviders;  // implementation in @embedpdf/engines/angular; re-exported from core/angular
-
-@Component({
-  selector: 'embedpdf-provider',
-  changeDetection: ChangeDetectionStrategy.OnPush,
-  template: `<ng-content />`,
-})
-class EmbedpdfProvider {
-  engine = input<PdfEngine | undefined>();              // instance, not config
-  plugins = input.required<PluginBatchRegistrations>();
-  config = input<PluginRegistryConfig | undefined>();
-  onInitialized = input<((reg: PluginRegistry) => void | Promise<void>) | undefined>();
-  init = output<PluginRegistry>();    // fires after reg.initialize() & store wired (pre-pluginsReady)
-  ready = output<PluginRegistry>();   // fires after pluginsReady() AND onInitialized resolve
-}
-
-// Injection helpers — every helper opens with assertInInjectionContext(self).
-// All returned signals are .asReadonly().
-function injectRegistry(): Signal<PluginRegistry | null>;
-function injectRegistryReady(): Signal<boolean>;
-function injectPlugin<T extends BasePlugin>(id: T['id']): {
-  plugin: Signal<T | null>;
-  isLoading: Signal<boolean>;
-};
-function injectCapability<T extends BasePlugin>(id: T['id']): {
-  provides: Signal<ReturnType<NonNullable<T['provides']>> | null>;
-  isLoading: Signal<boolean>;
-};
-function injectActiveDocument(): Signal<DocumentState | null>;
-function injectDocumentStates(): Signal<DocumentState[]>;
-function injectCoreState(): Signal<CoreState | null>;
-
-// Shared adapter utilities — consumed by every per-plugin /angular package
-function bridgeScopeState<P extends BasePlugin, S>(
-  pluginId: P['id'],
-  documentId: Signal<string>,                            // Signal-only; consumers wrap literals via signal(...)
-  initialState: S,
-): {
-  state: Signal<S>;
-  provides: Signal<Scope<P> | null>;
-  isLoading: Signal<boolean>;
-};
-
-function bridgeCoreSignal<T>(selector: (state: CoreState) => T): Signal<T | null>;
-
-// Errors (public-exported so test harnesses can match by class)
-class EmbedpdfDuplicateRegistryError extends Error;
-class EmbedpdfDuplicateEngineError extends Error;
-```
-
-#### Bootstrap timing — `afterNextRender`
-
-Every provider's `useFactory` returns immediately with placeholder signals (registry/ready/coreState all null). The actual bootstrap (engine creation, WASM fetch, `new PluginRegistry`, store subscription, `pluginsReady()`) runs inside `afterNextRender(async () => {...})`. SSR is clean by construction: server platform never fires `afterNextRender`, signals stay null, components render their `@if (registry()) { ... } @else { <loading /> }` branches. See [ADR 0003](../adr/0003-angular-headless-bootstrap-via-after-next-render.md) for the rejected eager and lazy alternatives.
-
-#### Two-registry detection rule
-
-A scope is invalid if it would create a second `EMBEDPDF_CONTEXT` when one is already provided by an ancestor. Check fires synchronously at factory/constructor time (SSR-safe) on both `provideEmbedPdf` and `<embedpdf-provider>`:
-
-```ts
-const existing = inject(EMBEDPDF_CONTEXT, { optional: true, skipSelf: true });
-if (existing) throw new EmbedpdfDuplicateRegistryError(/* helpful message */);
-```
-
-Engine-side parallel rule via `PDF_ENGINE_TOKEN` and `EmbedpdfDuplicateEngineError`. The legitimate "engine shared, registry per child" pattern — `provideEmbedPdfEngine({...})` at root + multiple `provideEmbedPdf({plugins})` at children — is allowed because root only registers `PDF_ENGINE_TOKEN`, not `EMBEDPDF_CONTEXT`.
-
-#### Engine ownership and teardown
-
-A scope destroys what it created.
-
-| Flavor | Engine source | Registry teardown | Engine teardown |
-|---|---|---|---|
-| `provideEmbedPdf({engine: cfg, plugins})` standalone | created inline | `registry.destroy()` | `engine.closeAllDocuments(); engine.destroy()` |
-| `provideEmbedPdfEngine({cfg})` + `provideEmbedPdf({plugins})` (inner is destroyed) | injected from outer | `registry.destroy()` | leave alone (engine outlives this scope) |
-| Same as above but the OUTER scope tears down | injected from outer | already destroyed by its own teardown | `engine.closeAllDocuments(); engine.destroy()` |
-| `<embedpdf-provider [engine]="instance" [plugins]="...">` destroyed | `@Input` instance | `registry.destroy()` | leave alone — host owns it |
-
-`registry.destroy()` always runs before `engine.destroy()` — registry has plugin-side state that may issue final commands.
-
-#### Bridge implementation pattern
-
-`bridgeScopeState` uses `effect((onCleanup) => …)` to bridge `scope.onStateChange` (imperative API) into a `Signal<S>`. Writes inside the effect are wrapped in `untracked()` to avoid cycle hazards. Effect cleanup auto-fires before each re-run AND on `DestroyRef` destroy (effect was created in injection context).
-
-`bridgeCoreSignal` uses pure `computed()` — no effect — because reading core-state slices is state derivation, not external-API bridging.
-
-Both helpers expose returned signals as `.asReadonly()`.
-
-#### Out of scope (deferred)
-
-- **Auto-mount surface** — zero v1.0 plugins emit `autoMountElements`. Defer until first plugin needs it (likely v1.1 `plugin-ui`); when shipped, the shape is a structural directive `*embedpdfAutoMount` (not a setting, not a wrapping component) — matches Angular's `cdkScrollable`/`routerLink` "decorate existing element" idiom.
-- **Deprecated `logger` prop** — Svelte/Vue carry `logger?` for back-compat with `config.logger`. New API has no legacy carrier; consumers use `config.logger` from day one.
-
-### Module 3 — `@embedpdf/engines/angular`
-
-Exports `provideEmbedPdfEngine()` and `injectPdfiumEngine({...})`. The injection function dynamically imports `@embedpdf/engines/pdfium-worker-engine` or `@embedpdf/engines/pdfium-direct-engine` based on the `worker` flag, mirroring the existing Vue/Svelte hooks. Returns `{ engine: Signal<PdfEngine | null>; isLoading: Signal<boolean>; error: Signal<Error | null> }`. Cleanup goes through `DestroyRef` and calls `engine.closeAllDocuments()` then `engine.destroy()`.
-
-### Module 4 — Per-plugin `/angular` adapter pattern
-
-Each of the 15 plugins shipped in v1.0 follows the same shape:
-
-- `src/angular/index.ts` re-exports `inject*` helpers, layer components, and the base plugin's framework-neutral exports.
-- `src/angular/inject-<name>.ts` per plugin: takes `documentId: Signal<string> | string | (() => string)`, returns `{ state: Signal<XxxDocumentState>; provides: Signal<XxxScope | null> }`. **The body is a single `bridgeScopeState` call** — no hand-written subscription bridges.
-- Layer components (`Viewport`, `Scroller`, `RenderLayer`, `TilingLayer`, `SelectionLayer`, `SearchLayer`, `Rotate`, `MarqueeZoom`, etc.) are standalone components mirroring the existing Svelte layer components in `packages/plugin-*/src/svelte/components/`. Signal inputs, content projection, `afterNextRender` mounting where needed.
-
-Each plugin's package.json gains `"./angular": { types, import, require }` in the `exports` map. Each PR ships a `minor` bump changeset for that package.
-
-### Module 5 — Wrapper viewer (`@embedpdf/angular-pdf-viewer`)
+### Module 5 — Wrapper viewer (`@embedpdf/angular-pdf-viewer`) — v1.0
 
 Single standalone component, exported as the class **`PDFViewer`** (cross-framework symmetry — explicit exception to the Angular ALLCAPS-in-identifiers rule):
 
 ```ts
-@Component({ selector: 'embedpdf-viewer', standalone: true, changeDetection: OnPush })
+@Component({
+  selector: 'embedpdf-viewer',
+  template: '',
+  styles: ':host { display: block; }',
+  changeDetection: ChangeDetectionStrategy.OnPush,
+})
 export class PDFViewer {
-  config = input<PDFViewerConfig>({});
-  init = output<EmbedPdfContainer>();
-  ready = output<PluginRegistry>();
-  themechange = output<{ preference: ThemePreference; colorScheme: 'light' | 'dark'; theme: Theme }>();
-  container = signal<EmbedPdfContainer | null>(null);
-  registry = signal<PluginRegistry | null>(null);
+  readonly config = input<PDFViewerConfig>({});
+  readonly init = output<EmbedPdfContainer>();
+  readonly ready = output<PluginRegistry>();
+  readonly themechange = output<{ preference: ThemePreference; colorScheme: 'light' | 'dark'; theme: Theme }>();
+  readonly container = signal<EmbedPdfContainer | null>(null);
+  readonly registry = signal<PluginRegistry | null>(null);
+  // ... afterNextRender mounting + DestroyRef cleanup ...
 }
 ```
 
-Mount lifecycle:
-1. `afterNextRender` calls `EmbedPDF.init({ type: 'container', target: hostElement, ...config() })`.
-2. Subscribes to the container's `themechange` custom event and forwards via the output.
-3. When `container.registry` resolves, sets `registry()` signal and emits `ready`.
-4. `inject(DestroyRef).onDestroy()` empties the host element to trigger the Web Component's `disconnectedCallback`.
+Mount lifecycle (per [ADR 0003](../adr/0003-angular-headless-bootstrap-via-after-next-render.md)):
 
-The component depends only on `@embedpdf/snippet`. **It does not import any per-plugin `/angular` package**, so it's unaffected by the v1.0 plugin scope and can ship in parallel with B–D. Drop-in consumers get the full Snippet feature set on day one — annotation, redaction, signature, forms, AI etc. — even though those plugins' `/angular` headless adapters defer to v1.x.
+1. `afterNextRender` calls `EmbedPDF.init({ type: 'container', target: hostElement, ...resolvedConfig })`.
+2. Subscribes to the container's `themechange` custom event and forwards via the `themechange` output.
+3. When `container.registry` resolves, sets `registry()` signal and emits `(ready)`.
+4. `inject(DestroyRef).onDestroy()` removes the listener, empties the host element to trigger the Web Component's `disconnectedCallback`, and resets `container` / `registry` signals.
 
-### Module 6 — `ng add` schematic (split flows)
+#### Default config DI — `provideEmbedPdfViewerConfig`
 
-Schematic shipped from `@embedpdf/angular-pdf-viewer`. Two flows.
+Locked in v1.0 alongside the wrapper component:
 
-**Drop-in flow (`ng add @embedpdf/angular-pdf-viewer`):**
-1. Update `package.json`: install `@embedpdf/angular-pdf-viewer`.
-2. Modify `angular.json`: append `{ "glob": "pdfium.wasm", "input": "node_modules/@embedpdf/pdfium/dist", "output": "/assets" }` to the application's `assets` array.
-3. Print a one-paragraph next-steps message linking to `/docs/angular/setup`.
+```ts
+function provideEmbedPdfViewerConfig(config: PDFViewerConfig): EnvironmentProviders | Provider;
+const EMBEDPDF_VIEWER_DEFAULT_CONFIG: InjectionToken<PDFViewerConfig>;
+```
 
-**Headless flow (`ng add @embedpdf/angular-pdf-viewer --headless`):**
-1. Same as drop-in flow.
-2. Additionally AST-modifies `src/app/app.config.ts`: adds `import { provideEmbedPdf } from '@embedpdf/core/angular'` and appends `provideEmbedPdf({ engine: { wasmUrl: '/assets/pdfium.wasm' }, plugins: [/* defaults */] })` to the `providers` array.
+The wrapper resolves config via `mergeViewerConfigs(injected ?? null, this.config())`. App-scoped (`app.config.ts`), route-scoped (`Route.providers`), or component-scoped (`Component.providers`) — same pattern as `provideHttpClient` etc. Documented under `customizing-ui.mdx`.
 
-Both flows are idempotent — the AST step skips if `provideEmbedPdf` is already present; the `angular.json` step skips if a glob with the same `input` is already present.
+The component depends only on `@embedpdf/snippet`. **It does not import any per-plugin `/angular` package**, so it's unaffected by the v1.x plugin scope. Drop-in consumers get the full Snippet feature set on day one — annotation, redaction, signature, forms, AI, etc. — even though those plugins' `/angular` headless adapters defer to v1.1+.
 
-### Module 7 — Custom example (`examples/angular-custom`)
+### Module 2 — `@embedpdf/core/angular` (v1.1)
 
-Angular 21 application with no UI library. Single route. Floating vertical toolbar absolutely-positioned over the headless viewer; toolbar buttons styled with plain CSS. Uses only Phase A–C deliverables.
+Exports `provideEmbedPdf()`, `provideEmbedPdfEngine()` (re-export), `<embedpdf-provider>`, `injectRegistry()`, `injectPlugin<T>(id)`, `injectCapability<T>(id)`, document-state helpers (`injectActiveDocument`, `injectDocumentStates`, `injectCoreState`), **and the shared adapter utilities `bridgeScopeState` and `bridgeCoreSignal` consumed by every per-plugin `inject*` hook**. Both registry surfaces resolve a single private `EMBEDPDF_CONTEXT` `InjectionToken` so all `injectXxx` helpers consume the same registry regardless of how it was provided. See [ADR 0002](../adr/0002-angular-headless-registry-via-provider-function.md).
 
-Composition mirrors the Svelte tracer: `<embedpdf-document-content>` → `<embedpdf-global-pointer-provider>` → `<embedpdf-viewport>` → `<embedpdf-scroller>` with `*embedpdfPage="let page"` template → `<embedpdf-rotate>` → `<embedpdf-page-pointer-provider>` → render/tiling/search layers.
+Full API contract locked in `CONTEXT.md` under "Angular integration" and the design grilling output. Implementation issue: #3.
 
-Toolbar actions wired through `injectZoom`, `injectRotate`, `injectSearch`, `injectThumbnail`, `injectFullscreen`, `injectI18n`, `injectPrint`, `injectExport`.
+### Module 3 — `@embedpdf/engines/angular` (v1.1)
 
-A single Vitest browser-mode smoke test asserts the page mounts and a `<canvas>` appears.
+Exports `provideEmbedPdfEngine()` and `injectPdfiumEngine({...})`. Dynamic-imports `@embedpdf/engines/pdfium-worker-engine` or `@embedpdf/engines/pdfium-direct-engine` based on `worker`. Returns `{ engine: Signal<PdfEngine | null>; isLoading: Signal<boolean>; error: Signal<Error | null> }`. Cleanup via `DestroyRef`. Implementation issue: #4.
 
-### Module 8 — Test pipeline (new in this revision)
+### Module 4 — Per-plugin `/angular` adapter pattern (v1.1 + v1.2)
 
-A0 establishes the repo's first real test pipeline.
+Each plugin shipped under `/angular` follows the same shape:
 
-- **Stack**: Vitest. Node mode for hooks/utilities, browser mode (chromium) via `@analogjs/vitest-angular` for standalone components and directives.
-- **Workspace**: root `vitest.workspace.ts` glues per-package configs.
-- **Turbo**: a `test` task with `dependsOn: ["^build"]`.
-- **CI**: a `.github/workflows/test.yml` that runs `pnpm test` on PR + push to `feature/angular`/`main`. Node-mode tests run on every PR; browser-mode tests path-filtered to PRs touching `packages/*/src/angular/**`, `viewers/angular/**`, or `examples/angular-custom/**`.
-- **Legacy**: dormant `packages/models/src/*.test.ts` files become live; A0 verifies they pass and fixes them if not.
+- `src/angular/index.ts` re-exports `inject*` helpers, layer components, and the base plugin's framework-neutral exports.
+- `src/angular/inject-<name>.ts`: takes `documentId: Signal<string> | string | (() => string)`, returns `{ state: Signal<XxxDocumentState>; provides: Signal<XxxScope | null> }`. **Body is a single `bridgeScopeState` call.**
+- Layer components mirror Svelte components in `packages/plugin-*/src/svelte/components/`. Signal inputs, content projection, `afterNextRender` mounting where needed.
 
-### Locked technical decisions
+Each plugin's package.json gains `"./angular": { types, import, require }` in the `exports` map. Each PR ships a `minor` bump changeset for that package. v1.1 covers 6 plugins (Phase B from the original plan); v1.2 covers 11 plugins (Phase C).
+
+### Module 6 — `ng add` schematic (deferred to v1.0.x or v1.1)
+
+Two flows planned. **Drop-in flow** (`ng add @embedpdf/angular-pdf-viewer`): install package + add PDFium WASM glob to `angular.json` `assets[]`. **Headless flow** (`--headless`, ships once v1.1's headless tier exists): also AST-modify `app.config.ts` to insert `provideEmbedPdf({ engine: { wasmUrl: '/assets/pdfium.wasm' }, plugins: [/* defaults */] })`. Both idempotent. Implementation issue: #22.
+
+### Module 7 — Custom example (`examples/angular-custom`) — v1.1
+
+Angular 21 application with no UI library. Single route. Floating vertical toolbar absolutely-positioned over the headless viewer; toolbar buttons styled with plain CSS. Uses only v1.1 / v1.2 deliverables. Composition mirrors the Svelte tracer (`<embedpdf-document-content>` → `<embedpdf-global-pointer-provider>` → `<embedpdf-viewport>` → `<embedpdf-scroller>` with `*embedpdfPage` template → `<embedpdf-rotate>` → `<embedpdf-page-pointer-provider>` → render/tiling/search layers). Toolbar actions wired through `injectZoom`, `injectRotate`, `injectSearch`, `injectThumbnail`, `injectFullscreen`, `injectI18n`, `injectPrint`, `injectExport`. Single Vitest browser-mode smoke test asserts the page mounts and a `<canvas>` appears.
+
+### Module 8 — Test pipeline (already shipped via A0)
+
+Vitest. Node mode for hooks/utilities, browser mode (chromium) via `@analogjs/vitest-angular` for standalone components and directives. Root `vitest.workspace.ts`, `test` task in `turbo.json`, `.github/workflows/test.yml`. Node-mode tests run on every PR; browser-mode tests path-filtered to PRs touching `packages/*/src/angular/**`, `viewers/angular/**`, or `examples/angular-*/**`.
+
+**Playwright** is allowed for the v1.0 wrapper's e2e demo (`examples/angular-pdf-viewer/`) where Shadow-DOM-spanning real-browser testing genuinely benefits the wrapper. The previous "no Playwright in v1.0" rule is scoped to **headless v1.1+** packages — the headless tier has no Shadow DOM and Vitest browser-mode covers its test gap.
+
+## Phase ordering
+
+| Milestone | Scope | Notes |
+|---|---|---|
+| **Pre-flight (already done)** | Bug #27 fix in `defineLibrary()`; Vitest pipeline; revive dormant `packages/models/src/*.test.ts` | n/a — closed via A0 / #28, #33 |
+| **v1.0 — Drop-in Wrapper** | `viewers/angular/` (#34 + #21), `examples/angular-pdf-viewer/` (#34), `examples/angular-tailwind/` + docs + landing + headless placeholder (#23, #37, #35, #36), upstream Discussion (#19), upstream PR (#24) | One upstream PR. Drop-in feature parity with Snippet-wrapper users on day one. |
+| **v1.1 — Headless Foundation** | `@embedpdf/{core,engines}/angular` (#3, #4); `plugin-{document-manager,viewport,scroll,render,tiling,interaction-manager}/angular` (#5–#10); `examples/angular-custom` tracer (#11) and final (#20); full headless docs (#39); `ng add` schematic (#22) | Branched on `feature/angular-v1.1` for parallel work during v1.0 review. |
+| **v1.2 — Headless Essentials** | `plugin-{zoom,pan,rotate,selection,search,spread,thumbnail,fullscreen,i18n,print,export}/angular` (#12–#18, #29–#32) | Parallelisable across contributors. |
+| **v1.3+** | Editing surface; Forms ↔ Signal Forms; bookmark/attachment/history/capture/commands; AI/layout-analysis/view-manager; UI-library examples | Tentative; ordering TBD. |
+
+## Locked technical decisions
 
 | Area | Decision |
 |---|---|
@@ -421,111 +231,85 @@ A0 establishes the repo's first real test pipeline.
 | Class naming | No `Component`/`Service`/`Pipe`/`Directive` suffixes; `Pdf` casing not `PDF` — single exception `PDFViewer` for cross-framework symmetry |
 | Selector prefix | `embedpdf-` |
 | Wrapper selector | `embedpdf-viewer` (class `PDFViewer`) |
+| Standalone | Default per Angular 19+; do **not** add `standalone: true` flag |
 | Render-prop equivalent | Structural directive `*embedpdfPage="let page"` with `ngTemplateContextGuard` |
-| SSR | `afterNextRender` mounting; never touch browser APIs server-side |
+| SSR | `afterNextRender` mounting; never touch browser APIs server-side (ADR 0003) |
 | Modules | Standalone-only; no NgModules |
 | Change detection | `OnPush` everywhere |
-| Registry scoping | Angular DI per-injector — *not* a module-level singleton (deliberate divergence from Svelte) |
-| Testing | Vitest unit + Vitest browser mode; no Playwright in v1.0 |
-| Schematic | Two flows: drop-in (default) and `--headless` |
+| Registry scoping | Angular DI per-injector — *not* a module-level singleton (deliberate divergence from Svelte; ADR 0002) |
+| Wrapper default-config DI | `provideEmbedPdfViewerConfig({ ... })` + `EMBEDPDF_VIEWER_DEFAULT_CONFIG` token (v1.0) |
+| Testing | Vitest unit + Vitest browser mode for packages; **Playwright allowed for the wrapper e2e demo** (`examples/angular-pdf-viewer/`); no Playwright in headless v1.1+ packages |
+| Schematic | Two flows: drop-in (default, v1.0.x or v1.1) and `--headless` (v1.1+) |
 
-### Branch & PR strategy
+## Branch & PR strategy
 
-A long-running integration branch `feature/angular` lives on `the-ult/embed-pdf-viewer`. **All implementation PRs target `feature/angular`, not `main`.** Each issue (A0, A2, A3, B1–B6, C1–C11, D, E, F, G) opens its own focused PR. Each plugin PR ships a `minor` bump changeset for that package.
+A long-running integration branch `feature/angular` lives on `the-ult/embed-pdf-viewer`. **All v1.0 implementation PRs target `feature/angular`.** PR #34 is the wrapper-package PR; #23 stacks the docs + landing + placeholder; #37 the marketing landing; #35/#36 the homepage updates.
 
-When all v1.0 phases (A0 + A–G) have merged into `feature/angular`, a **single upstream PR** opens from `the-ult:feature/angular` → `embedpdf:main`, consolidating every changeset for one release.
+**Parallel v1.1 work** lives on `feature/angular-v1.1`, branched off `feature/angular` *during* v1.0 review. v1.1 PRs (A2, A3, B1–B6, …) target this branch. File-tree overlap with v1.0 is essentially zero (`packages/*/src/angular/*` for v1.1 vs. `viewers/angular/*` + `website/*` for v1.0), so the rebase onto post-merge `feature/angular` is mechanical.
 
-A heads-up GitHub Discussion on `embedpdf/embed-pdf-viewer` opens *before* Phase B1 starts (after A0 + the B7 tracer demo) so maintainers can object to scope, naming, or build-pipeline decisions before mass implementation begins.
+When v1.0 lands on `feature/angular` and the upstream Discussion (#19) has had its 48h soak, a **single upstream PR** opens from `the-ult:feature/angular` → `embedpdf:main` (#24). Once that merges, `feature/angular-v1.1` rebases and the v1.1 upstream PR follows the same pattern.
 
 ## Testing Decisions
 
-A good test for this work exercises the **public API surface** the way a consumer would, asserts on **observable outputs** (signal values, emitted outputs, rendered DOM), and never reaches into private internals. Tests should fail when consumer-visible behaviour changes, regardless of how the implementation is refactored.
+A good test for this work exercises the **public API surface** the way a consumer would, asserts on **observable outputs** (signal values, emitted outputs, rendered DOM), and never reaches into private internals.
 
-### Module 2 — `@embedpdf/core/angular` (Vitest Node + Browser)
+### Module 5 (v1.0) — Wrapper viewer
 
-Test the public surface:
+- **Vitest unit (`viewers/angular/src/pdf-viewer.component.spec.ts`)**: TestBed instantiation under zoneless. Assertions on signal-based `container`/`registry`/`themechange`, `(init)`/`(ready)`/`(themechange)` outputs, `provideEmbedPdfViewerConfig` merge correctness, `DestroyRef` cleanup.
+- **Playwright e2e (`examples/angular-pdf-viewer/e2e/viewer.spec.ts`)**: real-browser test of the demo app — toolbar interactions inside the Web Component's Shadow DOM, theme toggle, config-panel toggles, smoke-render of a known PDF. Snapshot-asserts on visual stability.
+
+### Module 2 (v1.1) — `@embedpdf/core/angular`
+
 - `provideEmbedPdf({ engine: <fake>, plugins: [<fake plugin>] })` provides a registry that `injectRegistry()` returns once `pluginsReady()` resolves.
-- `injectCapability<T>(id)` initially returns `provides: null`, then transitions to a non-null capability after the registry resolves, observed via reading the signal in a `flushEffects()`-style test.
-- A registered plugin's state changes (via the fake plugin's store action) propagate to `injectCapability(...).provides()` consumers within one signal-flush cycle.
-- `<embedpdf-provider>` (browser mode) rendered within an outer `provideEmbedPdf()` scope throws when `[engine]` is also supplied (two-registry detection).
+- `injectCapability<T>(id)` initially returns `provides: null`, then transitions to a non-null capability after the registry resolves.
+- `<embedpdf-provider>` (browser mode) rendered within an outer `provideEmbedPdf()` scope throws when nested registry creation would conflict (two-registry detection).
 - `bridgeScopeState` returns initial state immediately and re-bridges on `documentId` change.
 - `DestroyRef` cleanup: tearing down the providing scope calls `registry.destroy()` exactly once.
 
-Use a minimal fake `PdfEngine` and a fake `IPlugin` from `@embedpdf/core` test fixtures; do not load WASM.
+### Module 4 (v1.1+) — `injectZoom` + `injectScroll` exemplar tests
 
-### Module 4 — `injectZoom` + `injectScroll` exemplar tests
-
-The adapter pattern is uniform across 15 plugins; if these two pass, the rest are mechanical.
-
-- `injectZoom(documentId)` initially returns `state.zoomLevel = initialDocumentState.zoomLevel` and `provides: null`.
-- After the registry resolves, `provides` becomes a `ZoomScope`. Calling `provides()?.zoomIn()` updates the state signal on the next flush.
-- Changing the `documentId` (signal or value) re-resolves the scope to the new document and re-bridges state subscriptions.
-- `DestroyRef` cleanup: subscription returned by `scope.onStateChange` is disposed when the host component is destroyed.
-
-Browser-mode tests cover `<embedpdf-marquee-zoom>` and `<embedpdf-scroller>`'s page virtualization.
-
-### Module 5 — Wrapper viewer (Vitest browser mode)
-
-Mount `<embedpdf-viewer [config]="{ src: <data-uri PDF> }">`, await `(ready)`, assert a `<canvas>` rendered with non-zero dimensions inside the Web Component's shadow root. Tear down the host fixture; assert the WASM worker is terminated within 2 seconds.
-
-### Module 7 — Custom example (Vitest browser mode smoke)
-
-Single test in `examples/angular-custom/src/__tests__/`: bootstrap the example app against a known PDF, assert a `<canvas>` renders. Heavier interaction tests (zoom, search, thumbnail toggle) live alongside their plugin packages, not in the example.
+If these two pass, the rest of the per-plugin adapters are mechanical. Tests cover initial state, post-resolve state, `documentId` change re-resolution, `DestroyRef` cleanup.
 
 ## Out of Scope
 
-- **`/angular` subpaths for non-v1.0 plugins**: see "v1.0 plugin scope" above. The 13 deferred plugins ship across v1.1, v1.2, and v2.0 in mechanical follow-ups using the Module 4 adapter pattern.
-- **Material and Tailwind example apps**. `examples/angular-material` and `examples/angular-tailwind` deferred to v1.x. The `angular-custom` example covers the headless story for v1.0; UI-library wrappers come once the API is locked.
-- **Cross-framework code-tabs in docs**. The Angular section mirrors the existing per-framework structure (independent MDX trees, like `docs/vue/`); a unified "see in React/Vue/Svelte/Angular" tab component is its own initiative, not part of this PRD.
-- **Cross-framework e2e parity**. Vitest browser mode covers Angular's quality gate. Hoisting a unified e2e harness to repo root and adding React/Vue/Svelte tests is its own initiative.
-- **Angular Material adapter package** (e.g. `@embedpdf/angular-material` for sidenav/snackbar wiring). Considered for a later release.
+- **`/angular` subpaths for non-shipped plugins**: see "v1.0 plugin scope" + milestone tables.
+- **Material and extra Tailwind example apps**. `examples/angular-material` and full `examples/angular-tailwind` plugin-by-plugin coverage deferred to v1.x.
+- **Cross-framework code-tabs in docs**. The Angular section mirrors the existing per-framework structure (independent MDX trees); a unified "see in React/Vue/Svelte/Angular" tab is its own initiative.
+- **Cross-framework e2e parity**. Playwright (v1.0 wrapper) + Vitest browser mode (v1.1+ headless) covers Angular's quality gate.
 - **`ng update` migration schematics**. The first version of the schematic only handles `ng add`; migration support waits until there's a breaking change worth migrating across.
-- **NgModule support / pre-Angular-21 compatibility**. The peer range is `>=21.0.0`. Consumers on Angular ≤20 are not supported by these packages.
-- **Rewriting the Wrapper viewer to use the headless layer internally**. The Wrapper continues to wrap `<embedpdf-container>` (the Snippet); rebuilding it on top of the headless components is a far larger project that loses Shadow-DOM style isolation and is not justified by v1.0's goals.
+- **NgModule support / pre-Angular-21 compatibility**. The peer range is `>=21.0.0`.
+- **Rewriting the Wrapper viewer to use the headless layer internally**. Wrapper continues to wrap `<embedpdf-container>`; rebuilding it on the headless tier is a far larger project that loses Shadow-DOM style isolation.
 - **Observable APIs**. Consumers needing `Observable<T>` use `toObservable()` from `@angular/core/rxjs-interop`. No parallel observable surface.
-- **Server-rendered PDFs**. Angular Universal renders an empty placeholder; the viewer mounts client-side. Pre-rendering server-side is a future possibility, not a v1.0 commitment.
+- **Server-rendered PDFs**. Angular Universal renders an empty placeholder; the viewer mounts client-side.
 
 ## Forward-compatibility — v1.x roadmap
 
-The 13 deferred plugins ship in mechanical follow-ups using the same Module 4 adapter pattern. Tentative grouping by feature affinity:
-
-- **v1.1 — editing surface**: `plugin-{annotation,redaction,signature,stamp,plugin-ui}/angular`. The schema-driven `plugin-ui` lands here so consumers who want a Snippet-like declarative toolbar at the headless layer have one.
-- **v1.2 — forms + navigation + history**: `plugin-{form,bookmark,attachment,history,capture,commands}/angular`. The Forms ↔ Signal Forms bridge: `injectForm(documentId, { schema? })` returns a Signal Forms `FormTree` whose model is auto-derived from the PDF's discovered AcroForm fields and bidirectionally synced with `FormCapability`. Signal Forms is production-ready in Angular 21+; no version block.
+- **v1.3 — editing surface**: `plugin-{annotation,redaction,signature,stamp,plugin-ui}/angular`.
+- **v1.4 — forms + navigation + history**: `plugin-{form,bookmark,attachment,history,capture,commands}/angular`. Forms ↔ Signal Forms bridge: `injectForm(documentId, { schema? })` returns a Signal Forms `FormTree` whose model is auto-derived from the PDF's discovered AcroForm fields and bidirectionally synced with `FormCapability`. Signal Forms is production-ready in Angular 21+.
 - **v2.0 — heavy / specialised**: `plugin-{ai-manager,layout-analysis,view-manager}/angular`.
-- **v1.x examples**: `examples/angular-tailwind` and `examples/angular-material` once the API is locked.
+- **Examples**: `examples/angular-material`, full `examples/angular-tailwind` once the API is locked.
+- **Schematic**: post-v1.0 enhancement covering the headless flow (#22 once v1.1 lands).
+- **Auto-mount**: `*embedpdfAutoMount` structural directive (#38) when first consumer plugin needs it (post-v1.4).
 
 ## Further Notes
 
-### Why this matters
+### Why this re-cut is the right call
 
-Every quarter EmbedPDF loses a meaningful number of evaluators to Angular-native PDF libraries because the integration story is bad. Closing this gap unblocks Angular shops that already chose React/Vue/Svelte sister apps to use EmbedPDF — and brings in net-new logo wins.
-
-### Why headless-first ordering (with parallel Wrapper)
-
-The original PRD ordered Wrapper-viewer first. The current order (headless first; Wrapper parallel-shippable) is better for three reasons:
-
-1. **Validates the API earlier**. The Wrapper viewer is a thin wrapper around an existing Web Component; it can't surface design problems in the headless layer because it doesn't use it. Building the headless layer first, with the custom example as the proof-of-life, exposes API mistakes while they're still cheap to fix.
-2. **Parallel shipping unblocks evaluators**. Because the Wrapper depends only on Phase A0+A1 (build mode + dts fix) and the existing Snippet, it can ship at any point during B–C — giving Angular shops *something* immediately while the headless work continues.
-3. **Smaller tracer bullet**. Phase A0 + A + B is 9 packages; once they compile and render a PDF, every subsequent phase is mechanical layering.
+The original PRD optimised for "validate the API earlier" — build headless first, then layer the wrapper. That's defensible if no wrapper exists yet. But the wrapper exists today (PR #34), polished beyond MVP, with a real Playwright-tested demo and a `provideEmbedPdfViewerConfig` ergonomics layer that emerged from real Angular usage patterns. Holding it for headless adds delay without changing the headless API design — wrapper code doesn't constrain headless code. Shipping v1.0 now closes the Angular adoption gap immediately and gives the v1.1 headless work real-world wrapper-context evidence to design against.
 
 ### Risks to watch during implementation
 
-1. **Bug #27 dts gap** — addressed by A0, but it's the highest-risk single item because it silently fails. Build-time validator is the safety net.
-2. **Angular CLI esbuild worker bundling**. Verify in a real `ng build --configuration production` that dynamic imports of `@embedpdf/engines/pdfium-worker-engine` produce a separate chunk loadable by the Web Worker constructor. If not, document the workaround.
-3. **AnalogJS plugin lag behind Angular minor releases**. Pin the version in `@embedpdf/build`, smoke-test against a fresh `ng new` app on each Angular minor bump.
-4. **Web Component upgrade timing under strict CSP**. Some `'unsafe-eval'`-free CSPs reject the snippet's bundled minifier output. Document CSP requirements early.
-5. **Two-registry mistake**. `<embedpdf-provider>` nested inside a `provideEmbedPdf()` scope must throw clearly; lint-rule or runtime check, not silent duplication.
-6. **`Scroller` virtualization timing**. The Svelte component owns layout and uses `setLayoutReady` after `$effect.pre`. Angular equivalent calls it from `effect()` — fine because `setLayoutReady` does not read DOM. Document the reasoning in the B3 implementation plan to avoid future contributors translating word-for-word into `afterNextRender`.
-7. **Vitest browser mode flake**. Browser-mode tests are slower and occasionally flaky on first introduction. CI path-filtering keeps the blast radius contained; flakes only affect Angular-touching PRs.
+1. **`embedpdf-viewer` selector lock-in.** v1.0 publishes a public selector to upstream npm. Renaming later is a breaking change — apply Delta 1 from #21 *before* PR #34 merges.
+2. **Angular CLI esbuild worker bundling.** Verify in a real `ng build --configuration production` that PDFium worker chunks load via the Web Worker constructor.
+3. **AnalogJS plugin lag behind Angular minor releases.** Pin in `@embedpdf/build`, smoke-test against fresh `ng new` per Angular minor.
+4. **Web Component upgrade timing under strict CSP.** Some `'unsafe-eval'`-free CSPs reject the snippet's bundled minifier output. Document CSP requirements in `customizing-ui.mdx`.
+5. **Playwright snapshot drift.** v1.0's e2e uses chromium-darwin snapshots. CI must run on the same OS or regenerate; document snapshot maintenance in `examples/angular-pdf-viewer/README.md`.
+6. **v1.1 rebase complexity.** `feature/angular-v1.1` rebases onto post-merge `feature/angular` once v1.0 ships. Keep v1.1 PRs out of `viewers/angular/`, `website/src/content/docs/angular/viewer/`, `website/src/app/angular-pdf-viewer/`, and `examples/angular-pdf-viewer/` — the rebase-overlap zone.
 
 ### Recommended rollout cadence
 
-- Week 1: A0 (bug #27 + Vitest pipeline) lands. Heads-up Discussion drafted upstream.
-- Week 2: Phase A (modules 2–3 + `bridgeScopeState`). Phase E (Wrapper) starts in parallel.
-- Weeks 3–4: Phase B (six packages, mostly mechanical once A is stable).
-- Week 5: Phase C (eleven packages, parallelisable across contributors).
-- Week 6: Phase D (`angular-custom` example) — flushes out any final API issues. Phase E (Wrapper) lands if not already done.
-- Week 7: Phase F (schematic — both flows) + Phase G (docs incl. migration page).
-- Week 8: upstream PR `the-ult:feature/angular` → `embedpdf:main`.
-
-This sequence assumes the upstream Discussion lands during Week 2 and gets an OK from maintainers before Week 3 starts.
+- Week 1 (current): #21 conformance fixes land on PR #34. PR #34 merges to `feature/angular`.
+- Week 2: #23 docs + landing PR + #37 + #35/#36 land on `feature/angular`. `feature/angular-v1.1` branched.
+- Week 3: #19 upstream Discussion fires; 48h soak. v1.1 work begins on the parallel branch (#3, #4 first).
+- Week 4: #24 upstream PR opens. Maintainer review; merge.
+- Week 5+: v1.1 development continues on `feature/angular-v1.1`. Rebase onto post-merge `feature/angular` once v1.0 lands upstream.
