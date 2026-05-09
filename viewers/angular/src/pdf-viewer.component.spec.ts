@@ -272,8 +272,11 @@ describe('PDFViewer', () => {
 
   it('does not emit ready after the component is destroyed', async () => {
     const fixture = createViewerFixture();
-    const registryControl = Promise.withResolvers<PluginRegistry>();
-    const viewer = { registry: registryControl.promise };
+    let resolveRegistry!: (value: PluginRegistry) => void;
+    const registryPromise = new Promise<PluginRegistry>((resolve) => {
+      resolveRegistry = resolve;
+    });
+    const viewer = { registry: registryPromise };
     initSpy.mockReturnValue(viewer as never);
 
     const readyEvents: unknown[] = [];
@@ -283,7 +286,7 @@ describe('PDFViewer', () => {
     await fixture.whenStable();
 
     fixture.destroy();
-    registryControl.resolve({ token: 'late-registry' } as never);
+    resolveRegistry({ token: 'late-registry' } as never);
     await Promise.resolve();
 
     expect(readyEvents).toEqual([]);
