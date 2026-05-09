@@ -34,10 +34,6 @@ It is designed to be the fastest way to get a high-quality PDF viewer into your 
 - **Responsive** — Adapts seamlessly to mobile and desktop screens.
 - **Themable** — Built-in light/dark modes and support for custom brand colors.
 - **App-wide defaults** — Configure viewer defaults once with Angular providers, then override per viewer when needed.
-- **App-wide defaults** — Configure viewer defaults once with Angular providers,
-  then override per viewer when needed.
-  The `@embedpdf/angular-pdf-viewer` package provides a complete,
-  production-ready PDF viewing experience for Angular 21+ applications.
 - **Configurable** — Easily disable features you don't need (e.g., printing or downloading).
 - **TypeScript** — Fully typed for a great developer experience.
 - **Standalone** — Pure standalone component; no NgModules needed.
@@ -189,9 +185,6 @@ viewer option objects.
 ### Theme
 
 The viewer includes a robust theming system. You can set the preference to `'light'`, `'dark'`, or `'system'`, and even override specific colors to match your brand.
-The viewer includes a robust theming system. You can set the preference to
-`'light'`, `'dark'`, or `'system'`, and even override specific colors to match
-your brand.
 
 ```ts
 @Component({
@@ -215,8 +208,6 @@ your brand.
 ### Disabling Features
 
 Easily customize the UI by disabling features you don't need via the `disabledCategories` option:
-Easily customize the UI by disabling features you don't need via the
-`disabledCategories` option:
 
 ```ts
 config = {
