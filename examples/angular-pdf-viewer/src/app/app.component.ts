@@ -70,7 +70,7 @@ type ViewOptionCategory = (typeof VIEW_OPTIONS)[number]['category'];
       </header>
 
       <section class="workspace" [class.has-config]="showConfigPanel()">
-        <embedpdf-pdf-viewer
+        <embedpdf-viewer
           class="viewer"
           [config]="viewerConfig"
           (init)="onInit($event)"

@@ -43,7 +43,7 @@ const CHILD_DEFAULT_CONFIG = {
 @Component({
   imports: [PDFViewer],
   providers: [...provideEmbedPdfViewerConfig(ROOT_DEFAULT_CONFIG)],
-  template: ` <embedpdf-pdf-viewer [config]="config" /> `,
+  template: ` <embedpdf-viewer [config]="config" /> `,
 })
 class ViewerWithDefaultsHost {
   config: PDFViewerConfig = {
@@ -58,7 +58,7 @@ class ViewerWithDefaultsHost {
   selector: 'test-nested-viewer-defaults',
   imports: [PDFViewer],
   providers: [...provideEmbedPdfViewerConfig(CHILD_DEFAULT_CONFIG)],
-  template: ` <embedpdf-pdf-viewer [config]="config" /> `,
+  template: ` <embedpdf-viewer [config]="config" /> `,
 })
 class ViewerWithNestedDefaultsChild {
   config: PDFViewerConfig = {
@@ -119,10 +119,11 @@ describe('PDFViewer', () => {
 
   it('emits init and ready when the snippet returns a viewer', async () => {
     const fixture = createViewerFixture();
-    const viewer = {
-      registry: Promise.resolve({ token: 'test-registry' } as never),
-    };
-    initSpy.mockReturnValue(viewer as never);
+    const viewer = globalThis.document.createElement('div') as unknown as EmbedPdfContainer;
+    (viewer as { registry: Promise<PluginRegistry> }).registry = Promise.resolve(
+      { token: 'test-registry' } as never,
+    );
+    initSpy.mockReturnValue(viewer);
 
     const initEvents: unknown[] = [];
     const readyEvents: unknown[] = [];
@@ -134,15 +135,16 @@ describe('PDFViewer', () => {
 
     expect(initEvents).toEqual([viewer]);
     expect(readyEvents).toHaveLength(1);
-    expect(fixture.componentInstance.container).toBe(viewer);
+    expect(fixture.componentInstance.container()).toBe(viewer);
+    expect(fixture.componentInstance.registry()).toEqual({ token: 'test-registry' });
   });
 
   it('forwards config changes to the initialized viewer', async () => {
     const fixture = createViewerFixture();
-    const viewer = {
-      registry: Promise.resolve({ token: 'test-registry' } as never),
-      config: {},
-    } as unknown as EmbedPdfContainer;
+    const viewer = globalThis.document.createElement('div') as unknown as EmbedPdfContainer;
+    (viewer as { registry: Promise<PluginRegistry>; config: PDFViewerConfig }).registry =
+      Promise.resolve({ token: 'test-registry' } as never);
+    (viewer as { config: PDFViewerConfig }).config = {};
     const initialConfig = { src: '/initial.pdf' } satisfies PDFViewerConfig;
     const nextConfig = { src: '/next.pdf' } satisfies PDFViewerConfig;
 
@@ -226,10 +228,10 @@ describe('PDFViewer', () => {
     });
 
     const fixture = createViewerFixture();
-    const viewer = {
-      registry: Promise.resolve({ token: 'test-registry' } as never),
-      config: {},
-    } as unknown as EmbedPdfContainer;
+    const viewer = globalThis.document.createElement('div') as unknown as EmbedPdfContainer;
+    (viewer as { registry: Promise<PluginRegistry>; config: PDFViewerConfig }).registry =
+      Promise.resolve({ token: 'test-registry' } as never);
+    (viewer as { config: PDFViewerConfig }).config = {};
     initSpy.mockReturnValue(viewer);
 
     fixture.componentRef.setInput('config', {
@@ -276,8 +278,9 @@ describe('PDFViewer', () => {
     const registryPromise = new Promise<PluginRegistry>((resolve) => {
       resolveRegistry = resolve;
     });
-    const viewer = { registry: registryPromise };
-    initSpy.mockReturnValue(viewer as never);
+    const viewer = globalThis.document.createElement('div') as unknown as EmbedPdfContainer;
+    (viewer as { registry: Promise<PluginRegistry> }).registry = registryPromise;
+    initSpy.mockReturnValue(viewer);
 
     const readyEvents: unknown[] = [];
     fixture.componentInstance.ready.subscribe((value) => readyEvents.push(value));
@@ -295,7 +298,8 @@ describe('PDFViewer', () => {
   it('can be destroyed before the view query resolves', () => {
     const fixture = createViewerFixture();
     expect(() => fixture.destroy()).not.toThrow();
-    expect(fixture.componentInstance.container).toBeNull();
+    expect(fixture.componentInstance.container()).toBeNull();
+    expect(fixture.componentInstance.registry()).toBeNull();
   });
 
   it('clears the container on destroy', () => {
@@ -308,6 +312,65 @@ describe('PDFViewer', () => {
 
     fixture.destroy();
     expect(host.childElementCount).toBe(0);
-    expect(fixture.componentInstance.container).toBeNull();
+    expect(fixture.componentInstance.container()).toBeNull();
+    expect(fixture.componentInstance.registry()).toBeNull();
+  });
+
+  it('forwards themechange events emitted by the viewer container', async () => {
+    const fixture = createViewerFixture();
+    const viewer = globalThis.document.createElement('div') as unknown as EmbedPdfContainer & {
+      registry: Promise<PluginRegistry>;
+    };
+    (viewer as { registry: Promise<PluginRegistry> }).registry = Promise.resolve(
+      { token: 'test-registry' } as never,
+    );
+    initSpy.mockReturnValue(viewer);
+
+    const themechangeEvents: unknown[] = [];
+    fixture.componentInstance.themechange.subscribe((detail) => themechangeEvents.push(detail));
+
+    fixture.detectChanges();
+    await fixture.whenStable();
+
+    const detail = {
+      preference: 'dark' as const,
+      colorScheme: 'dark' as const,
+      theme: { name: 'test-theme' } as never,
+    };
+    (viewer as unknown as EventTarget).dispatchEvent(
+      new CustomEvent('themechange', { detail }),
+    );
+
+    expect(themechangeEvents).toEqual([detail]);
+  });
+
+  it('does not emit themechange after the component is destroyed', async () => {
+    const fixture = createViewerFixture();
+    const viewer = globalThis.document.createElement('div') as unknown as EmbedPdfContainer & {
+      registry: Promise<PluginRegistry>;
+    };
+    (viewer as { registry: Promise<PluginRegistry> }).registry = Promise.resolve(
+      { token: 'test-registry' } as never,
+    );
+    initSpy.mockReturnValue(viewer);
+
+    const themechangeEvents: unknown[] = [];
+    fixture.componentInstance.themechange.subscribe((detail) => themechangeEvents.push(detail));
+
+    fixture.detectChanges();
+    await fixture.whenStable();
+    fixture.destroy();
+
+    (viewer as unknown as EventTarget).dispatchEvent(
+      new CustomEvent('themechange', {
+        detail: {
+          preference: 'dark',
+          colorScheme: 'dark',
+          theme: {} as never,
+        },
+      }),
+    );
+
+    expect(themechangeEvents).toEqual([]);
   });
 });

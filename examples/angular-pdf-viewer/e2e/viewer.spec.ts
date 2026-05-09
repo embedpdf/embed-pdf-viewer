@@ -18,13 +18,13 @@ test('applies Angular config-driven theme and category customization', async ({ 
       'Light theme, Angular red accent, annotation tools disabled, custom config panel added at runtime',
     ),
   ).toBeVisible();
-  await expect(page.locator('embedpdf-pdf-viewer')).toBeVisible();
+  await expect(page.locator('embedpdf-viewer')).toBeVisible();
 
   await expect(page.getByTestId('viewer-status')).toHaveText('ready', {
     timeout: 30_000,
   });
 
-  const container = page.locator('embedpdf-pdf-viewer embedpdf-container');
+  const container = page.locator('embedpdf-viewer embedpdf-container');
   await expect(container).toHaveCount(1);
   await expect(container).toHaveAttribute('data-color-scheme', 'light');
 
@@ -54,7 +54,7 @@ test('applies Angular config-driven theme and category customization', async ({ 
   const configPanelShell = page.getByTestId('angular-config-panel-shell');
   await expect(configPanel).toBeVisible();
 
-  const viewerBounds = await page.locator('embedpdf-pdf-viewer').boundingBox();
+  const viewerBounds = await page.locator('embedpdf-viewer').boundingBox();
   expect(viewerBounds).not.toBeNull();
   expect(viewerBounds!.width).toBeGreaterThanOrEqual(320);
   expect(viewerBounds!.height).toBeGreaterThanOrEqual(320);

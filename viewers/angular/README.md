@@ -67,7 +67,7 @@ import { PDFViewer } from '@embedpdf/angular-pdf-viewer';
   selector: 'app-root',
   imports: [PDFViewer],
   template: `
-    <embedpdf-pdf-viewer
+    <embedpdf-viewer
       [config]="{
         src: 'https://snippet.embedpdf.com/ebook.pdf',
         theme: { preference: 'light' },
@@ -131,7 +131,7 @@ import { PDFViewer } from '@embedpdf/angular-pdf-viewer';
   selector: 'app-root',
   imports: [PDFViewer],
   template: `
-    <embedpdf-pdf-viewer
+    <embedpdf-viewer
       [config]="{
         src: '/document.pdf',
         theme: { preference: 'light' },
@@ -189,7 +189,7 @@ The viewer includes a robust theming system. You can set the preference to `'lig
 ```ts
 @Component({
   template: `
-    <embedpdf-pdf-viewer
+    <embedpdf-viewer
       [config]="{
         src: '/document.pdf',
         theme: {
@@ -260,7 +260,7 @@ import {
   selector: 'app-root',
   imports: [PDFViewer],
   template: `
-    <embedpdf-pdf-viewer
+    <embedpdf-viewer
       [config]="{ src: '/doc.pdf' }"
       (ready)="onReady($event)"
       style="display:block;height:100vh"
@@ -279,6 +279,36 @@ export class AppComponent {
 
 - `(init)` — Emitted when the viewer container is initialized.
 - `(ready)` — Emitted when the plugin registry is ready and plugins are loaded.
+- `(themechange)` — Emitted when the active theme changes. The payload is `{ preference: 'light' | 'dark' | 'system'; colorScheme: 'light' | 'dark'; theme: Theme }`, forwarded from the snippet's underlying `themechange` custom event.
+
+### Reactive State Signals
+
+In addition to outputs, the component exposes two state signals you can read or compose with `effect()` / `computed()`:
+
+- `container: Signal<EmbedPdfContainer | null>` — the active container element (or `null` before mount / after destroy).
+- `registry: Signal<PluginRegistry | null>` — the resolved plugin registry (or `null` before the registry promise settles).
+
+```ts
+import { Component, ViewChild, effect } from '@angular/core';
+import { PDFViewer } from '@embedpdf/angular-pdf-viewer';
+
+@Component({
+  imports: [PDFViewer],
+  template: `<embedpdf-viewer #viewer [config]="{ src: '/doc.pdf' }" />`,
+})
+export class AppComponent {
+  @ViewChild('viewer') viewer!: PDFViewer;
+
+  constructor() {
+    effect(() => {
+      const registry = this.viewer?.registry();
+      if (registry) {
+        // ... use the registry reactively ...
+      }
+    });
+  }
+}
+```
 
 ---
 
