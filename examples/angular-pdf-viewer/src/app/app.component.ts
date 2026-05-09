@@ -11,26 +11,7 @@ import {
   type UICapability,
 } from '@embedpdf/angular-pdf-viewer';
 
-const ANGULAR_THEME = {
-  light: {
-    accent: {
-      primary: '#dd0031',
-      primaryHover: '#c3002f',
-      primaryActive: '#a8002a',
-      primaryLight: '#ffe5eb',
-      primaryForeground: '#ffffff',
-    },
-  },
-  dark: {
-    accent: {
-      primary: '#ff5c7c',
-      primaryHover: '#ff7a94',
-      primaryActive: '#ff4568',
-      primaryLight: '#55111f',
-      primaryForeground: '#17050a',
-    },
-  },
-} satisfies Omit<ThemeConfig, 'preference'>;
+import { ANGULAR_THEME } from './viewer-config';
 
 const VIEW_OPTIONS = [
   {
@@ -71,8 +52,8 @@ type ViewOptionCategory = (typeof VIEW_OPTIONS)[number]['category'];
         <div class="title-group">
           <h1>EmbedPDF Angular Viewer Demo</h1>
           <p class="details">
-            Light theme, Angular red accent, annotation tools disabled, custom config
-            panel added at runtime
+            Light theme, Angular red accent, annotation tools disabled, custom config panel added at
+            runtime
           </p>
         </div>
         <div class="header-actions">
@@ -99,15 +80,19 @@ type ViewOptionCategory = (typeof VIEW_OPTIONS)[number]['category'];
         />
 
         @if (showConfigPanel()) {
-          <section class="config-panel-shell" data-testid="angular-config-panel-shell" (keydown.escape)="closeConfigPanel()">
+          <section
+            class="config-panel-shell"
+            data-testid="angular-config-panel-shell"
+            (keydown.escape)="closeConfigPanel()"
+          >
             <div class="config-panel" data-testid="angular-config-panel">
               <div class="config-copy">
                 <div class="config-copy-header">
                   <h2>Angular config panel</h2>
                 </div>
                 <p>
-                  This example combines Angular-owned defaults via <code>[config]</code>
-                  with runtime customization through <code>(ready)</code>,
+                  This example combines Angular-owned defaults via <code>[config]</code> with
+                  runtime customization through <code>(ready)</code>,
                   <code>commands.registerCommand()</code>, and <code>ui.mergeSchema()</code>.
                 </p>
               </div>
@@ -192,8 +177,16 @@ type ViewOptionCategory = (typeof VIEW_OPTIONS)[number]['category'];
       padding: 12px;
       background: #0f172a;
       color: #e2e8f0;
-      font-family: Inter, ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto,
-        Helvetica, Arial, sans-serif;
+      font-family:
+        Inter,
+        ui-sans-serif,
+        system-ui,
+        -apple-system,
+        Segoe UI,
+        Roboto,
+        Helvetica,
+        Arial,
+        sans-serif;
       overflow: hidden;
     }
 
@@ -464,12 +457,8 @@ export class AppComponent {
   readonly showConfigPanel = signal(false);
   readonly themePreference = signal<NonNullable<ThemeConfig['preference']>>('light');
   readonly disabledCategories = signal<string[]>(['annotation']);
-  readonly annotationsDisabled = computed(() =>
-    this.disabledCategories().includes('annotation'),
-  );
-  readonly nextThemeLabel = computed(() =>
-    this.themePreference() === 'light' ? 'dark' : 'light',
-  );
+  readonly annotationsDisabled = computed(() => this.disabledCategories().includes('annotation'));
+  readonly nextThemeLabel = computed(() => (this.themePreference() === 'light' ? 'dark' : 'light'));
   readonly disabledCategoriesLabel = computed(() => {
     const labels = this.disabledCategories().map((category) => this.getCategoryLabel(category));
     return labels.length > 0 ? labels.join(', ') : 'none';
@@ -485,7 +474,6 @@ export class AppComponent {
     disabledCategories: ['annotation'],
     theme: {
       preference: 'light',
-      ...ANGULAR_THEME,
     },
   } satisfies PDFViewerConfig;
 
@@ -516,7 +504,7 @@ export class AppComponent {
     const toolbar = schema.toolbars['main-toolbar'];
     if (!toolbar) return;
 
-    const items = structuredClone(toolbar.items);
+    const items = globalThis.structuredClone(toolbar.items);
     const rightGroup = items.find(
       (item): item is GroupItem => item.type === 'group' && item.id === 'right-group',
     );

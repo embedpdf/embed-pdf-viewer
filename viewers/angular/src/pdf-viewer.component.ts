@@ -5,6 +5,7 @@ import {
   ElementRef,
   afterNextRender,
   afterRenderEffect,
+  computed,
   inject,
   input,
   output,
@@ -14,6 +15,8 @@ import EmbedPDF, {
   type PDFViewerConfig,
   type PluginRegistry,
 } from '@embedpdf/snippet';
+
+import { EMBEDPDF_VIEWER_DEFAULT_CONFIG, mergeViewerConfigs } from './pdf-viewer.config';
 
 /**
  * Angular component for embedding PDF documents.
@@ -49,6 +52,11 @@ export class PDFViewer {
 
   private readonly hostRef = inject<ElementRef<HTMLElement>>(ElementRef);
   private readonly destroyRef = inject(DestroyRef);
+  private readonly defaultConfig =
+    inject(EMBEDPDF_VIEWER_DEFAULT_CONFIG, { optional: true }) ?? null;
+  private readonly resolvedConfig = computed(() =>
+    mergeViewerConfigs(this.defaultConfig, this.config()),
+  );
   private targetElement: HTMLElement | null = null;
 
   /** The active EmbedPdfContainer, or null when destroyed/uninitialized */
@@ -57,7 +65,7 @@ export class PDFViewer {
   constructor() {
     afterRenderEffect({
       write: () => {
-        const config = this.config();
+        const config = this.resolvedConfig();
 
         if (!this.container || this.destroyRef.destroyed) return;
 
@@ -75,7 +83,7 @@ export class PDFViewer {
         const viewer = EmbedPDF.init({
           type: 'container',
           target,
-          ...this.config(),
+          ...this.resolvedConfig(),
         });
 
         if (!viewer || this.destroyRef.destroyed) return;

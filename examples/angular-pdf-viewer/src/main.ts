@@ -1,11 +1,17 @@
 import '@angular/compiler';
-import { bootstrapApplication } from '@angular/platform-browser';
 import { provideZonelessChangeDetection } from '@angular/core';
+import { bootstrapApplication } from '@angular/platform-browser';
+import { provideEmbedPdfViewerConfig } from '@embedpdf/angular-pdf-viewer';
+
 import { AppComponent } from './app/app.component';
+import { ANGULAR_VIEWER_DEFAULT_CONFIG } from './app/viewer-config';
 import './styles.css';
 
 bootstrapApplication(AppComponent, {
-  providers: [provideZonelessChangeDetection()],
+  providers: [
+    provideZonelessChangeDetection(),
+    ...provideEmbedPdfViewerConfig(ANGULAR_VIEWER_DEFAULT_CONFIG),
+  ],
 }).catch((error: unknown) => {
-  console.error(error);
+  globalThis.console.error(error);
 });
