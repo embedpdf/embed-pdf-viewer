@@ -40,6 +40,7 @@
   "devDependencies": {
     "@embedpdf/build": "workspace:*",
     "typescript": "^5.0.0",
+    "vite": "^6.3.5",
     "vitest": "^4.0.8"
   },
   "publishConfig": {
