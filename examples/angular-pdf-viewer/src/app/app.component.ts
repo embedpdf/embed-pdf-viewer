@@ -43,7 +43,6 @@ const VIEW_OPTIONS = [
 type ViewOptionCategory = (typeof VIEW_OPTIONS)[number]['category'];
 @Component({
   selector: 'app-root',
-  standalone: true,
   imports: [PDFViewer],
   template: `
     <main class="page" data-testid="angular-demo-shell">
@@ -449,7 +448,7 @@ type ViewOptionCategory = (typeof VIEW_OPTIONS)[number]['category'];
   `,
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
-export class AppComponent {
+export class App {
   readonly viewOptions = VIEW_OPTIONS;
   readonly ready = signal(false);
   readonly showConfigPanel = signal(false);
