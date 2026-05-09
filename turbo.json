@@ -10,7 +10,7 @@
       "dependsOn": ["^check-types"]
     },
     "test": {
-      "dependsOn": ["^test"],
+      "dependsOn": ["^build"],
       "outputs": ["coverage/**"],
       "inputs": [
         "src/**",
@@ -27,7 +27,7 @@
       "persistent": true
     },
     "@embedpdf/build#test": {
-      "dependsOn": ["build", "^test"],
+      "dependsOn": ["build", "^build"],
       "outputs": ["coverage/**"],
       "inputs": [
         "src/**",
