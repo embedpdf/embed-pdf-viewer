@@ -17,3 +17,5 @@ publish-summary.json
 **/*/*.tgz
 .env
 .env.*
+**/playwright-report
+**/test-results

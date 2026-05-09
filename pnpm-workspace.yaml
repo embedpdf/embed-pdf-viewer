@@ -2,6 +2,7 @@ packages:
   # include packages in subfolders (change as required)
   - 'packages/**'
   - 'examples/**'
+  - '!examples/**/.vercel/**'
   - 'viewers/*'
   - 'website'
     # exclude the git submodule (and everything inside it)

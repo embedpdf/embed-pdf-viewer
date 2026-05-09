@@ -16,6 +16,8 @@
     "build:packages": "turbo run build --filter=\"./packages/*\"",
     "build:viewers": "turbo run build --filter=\"./packages/*\" --filter=\"./viewers/*\"",
     "build:snippet": "turbo run build --filter=\"./packages/*\" --filter=\"./viewers/snippet\"",
+    "e2e": "turbo run e2e",
+    "e2e:angular-pdf-viewer": "turbo run e2e --filter=@embedpdf/example-angular-pdf-viewer --only",
     "build:watch": "ROARR_LOG=true turbowatch ./config/turbowatch.config.ts | roarr",
     "watch": "turbo watch",
     "watch:packages": "turbo watch build --filter=\"./packages/*\"",

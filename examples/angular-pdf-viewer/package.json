@@ -7,7 +7,8 @@
   "scripts": {
     "dev": "vite --host 127.0.0.1 --port 4300",
     "build": "vite build",
-    "preview": "vite preview --host 127.0.0.1 --port 4300"
+    "preview": "vite preview --host 127.0.0.1 --port 4300",
+    "e2e": "playwright test"
   },
   "dependencies": {
     "@embedpdf/angular-pdf-viewer": "workspace:*",
@@ -22,6 +23,7 @@
     "@angular/build": "^21.2.10",
     "@angular/compiler": "^21.2.12",
     "@angular/compiler-cli": "^21.2.12",
+    "@playwright/test": "^1.54.2",
     "typescript": "^5.9.3",
     "vite": "^6.4.1"
   }
