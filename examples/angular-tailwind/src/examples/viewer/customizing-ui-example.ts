@@ -15,8 +15,10 @@ import {
   createThemePreferenceSignal,
 } from '../../example-support';
 
+export const selector = 'customizing-ui-example';
+
 @Component({
-  selector: 'customizing-ui-example',
+  selector,
   imports: [PDFViewer],
   providers: [
     ...provideEmbedPdfViewerConfig({

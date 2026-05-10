@@ -7,8 +7,10 @@ import {
 
 import { createDefaultViewerConfig, createThemePreferenceSignal } from '../../example-support';
 
+export const selector = 'engine-example';
+
 @Component({
-  selector: 'engine-example',
+  selector,
   imports: [PDFViewer],
   template: `
     <section class="flex flex-col gap-4">

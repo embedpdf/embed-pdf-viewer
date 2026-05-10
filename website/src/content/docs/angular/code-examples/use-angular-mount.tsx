@@ -1,7 +1,9 @@
 'use client'
 import { useEffect, useRef, useState } from 'react'
 
-export function useAngularMount(loader: () => Promise<{ default: any }>) {
+export function useAngularMount(
+  loader: () => Promise<{ default: any; selector?: string }>,
+) {
   const containerRef = useRef<HTMLDivElement>(null)
   const angularAppRef = useRef<any>(null)
   const loaderRef = useRef(loader)
@@ -32,7 +34,7 @@ export function useAngularMount(loader: () => Promise<{ default: any }>) {
             import('@angular/platform-browser'),
           ])
 
-        const selector = mod.default?.ɵcmp?.selectors?.[0]?.[0]
+        const selector = mod.selector ?? mod.default?.ɵcmp?.selectors?.[0]?.[0]
         if (!selector || typeof selector !== 'string') {
           throw new Error(
             'Angular demo component selector could not be resolved',

@@ -44,9 +44,7 @@ export default defineConfig({
       external: (id: string) => {
         if (/^@angular($|\/)/.test(id)) return true;
         if (/^rxjs($|\/)/.test(id) || id === 'tslib') return true;
-        if (/^@embedpdf\//.test(id) && !id.startsWith('@embedpdf/angular-pdf-viewer')) {
-          return true;
-        }
+        if (/^@embedpdf\/(?!angular-pdf-viewer)/.test(id)) return true;
         return false;
       },
       output: {

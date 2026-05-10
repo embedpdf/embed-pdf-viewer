@@ -8,8 +8,10 @@ import {
 
 import { createThemeConfig, createThemePreferenceSignal } from '../../example-support';
 
+export const selector = 'zoom-example';
+
 @Component({
-  selector: 'zoom-example',
+  selector,
   imports: [PDFViewer],
   template: `
     <section class="flex flex-col gap-4">

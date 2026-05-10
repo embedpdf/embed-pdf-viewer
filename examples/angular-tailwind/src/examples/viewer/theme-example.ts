@@ -33,8 +33,10 @@ const PALETTES = [
   },
 ] as const;
 
+export const selector = 'theme-example';
+
 @Component({
-  selector: 'theme-example',
+  selector,
   imports: [PDFViewer],
   template: `
     <section class="flex flex-col gap-4">

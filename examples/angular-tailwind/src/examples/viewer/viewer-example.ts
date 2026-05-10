@@ -3,8 +3,10 @@ import { PDFViewer } from '@embedpdf/angular-pdf-viewer';
 
 import { createDefaultViewerConfig, createThemePreferenceSignal } from '../../example-support';
 
+export const selector = 'viewer-example';
+
 @Component({
-  selector: 'viewer-example',
+  selector,
   imports: [PDFViewer],
   template: `
     <section class="flex flex-col gap-4">

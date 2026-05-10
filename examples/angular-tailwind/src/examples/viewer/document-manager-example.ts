@@ -14,8 +14,10 @@ import {
 
 import { createThemeConfig, createThemePreferenceSignal } from '../../example-support';
 
+export const selector = 'document-manager-example';
+
 @Component({
-  selector: 'document-manager-example',
+  selector,
   imports: [PDFViewer],
   template: `
     <section class="flex flex-col gap-4">
