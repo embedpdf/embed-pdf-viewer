@@ -76,6 +76,8 @@ const tabs: Tab[] = [
   },
 ]
 
+const ANGULAR_TEMPLATE = `<embedpdf-viewer [config]="{ src: '/demo.pdf' }" style="height: 500px" />`
+
 const codeSnippets: Record<Framework, string> = {
   snippet: `<div id="pdf-viewer" style="height: 500px"></div>
 <script async type="module">
@@ -134,7 +136,7 @@ import { PDFViewer } from '@embedpdf/angular-pdf-viewer'
 @Component({
   selector: 'app-root',
   imports: [PDFViewer],
-  template: \`<embedpdf-viewer [config]="{ src: '/demo.pdf' }" style="height: 500px" />\`,
+  template: \`${ANGULAR_TEMPLATE}\`,
 })
 export class App {}`,
 }
@@ -397,12 +399,7 @@ const AngularCode = () => (
     <span className="text-cyan-300">]</span>,{'\n'}
     {'  '}
     <span className="text-red-300">template</span>:{' '}
-    <span className="text-yellow-300">
-      {
-        '`<embedpdf-viewer [config]="{ src: \'/demo.pdf\' }" style="height: 500px" />`'
-      }
-    </span>
-    ,{'\n'}
+    <span className="text-yellow-300">{`\`${ANGULAR_TEMPLATE}\``}</span>,{'\n'}
     {'}'}){'\n'}
     <span className="text-purple-400">export class</span>{' '}
     <span className="text-blue-300">App</span> {'{}'}
