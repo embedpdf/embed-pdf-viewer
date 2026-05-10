@@ -1,24 +1,18 @@
 'use client'
 import { useEffect, useRef, useState } from 'react'
 
-const angularRuntimePromise = Promise.all([
-  import('@angular/compiler'),
-  import('@angular/core'),
-  import('@angular/platform-browser'),
-])
-
-export function useAngularMount(
-  loader: () => Promise<{ default: any; selector?: string }>,
-) {
+export function useAngularMount(loader: () => Promise<{ default: any }>) {
   const containerRef = useRef<HTMLDivElement>(null)
   const angularAppRef = useRef<any>(null)
   const loaderRef = useRef(loader)
   const [isMounted, setIsMounted] = useState(false)
 
+  // Keep latest loader without triggering unmount/remount on rerenders
   useEffect(() => {
     loaderRef.current = loader
   }, [loader])
 
+  // Ensure we only render on client
   useEffect(() => {
     setIsMounted(true)
   }, [])
@@ -32,22 +26,17 @@ export function useAngularMount(
       if (!containerRef.current || angularAppRef.current) return
 
       try {
-        const [mod, [_compiler, angularCore, platformBrowser]] = await Promise.all([
-          loaderRef.current(),
-          angularRuntimePromise,
-        ])
+        const [mod, _compiler, angularCore, platformBrowser] =
+          await Promise.all([
+            loaderRef.current(),
+            import('@angular/compiler'),
+            import('@angular/core'),
+            import('@angular/platform-browser'),
+          ])
 
-        const selector = mod.selector
-        if (!selector || typeof selector !== 'string') {
-          throw new Error(
-            'Angular demo component selector could not be resolved',
-          )
-        }
+        if (!mounted || !containerRef.current) return
 
-        const host = document.createElement(selector)
-        containerRef.current.replaceChildren(host)
-
-        const appRef = await platformBrowser.bootstrapApplication(mod.default, {
+        const appRef = await platformBrowser.createApplication({
           providers: [angularCore.provideZonelessChangeDetection()],
         })
 
@@ -56,6 +45,7 @@ export function useAngularMount(
           return
         }
 
+        appRef.bootstrap(mod.default, containerRef.current)
         angularAppRef.current = appRef
       } catch (error) {
         console.error('Failed to mount Angular component:', error)

@@ -2719,6 +2719,9 @@ importers:
       '@embedpdf/ai':
         specifier: workspace:*
         version: link:../packages/ai
+      '@embedpdf/angular-pdf-viewer':
+        specifier: workspace:*
+        version: link:../viewers/angular
       '@embedpdf/core':
         specifier: workspace:*
         version: link:../packages/core
