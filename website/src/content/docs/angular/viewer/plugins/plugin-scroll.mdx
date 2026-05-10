@@ -82,8 +82,8 @@ const onReady = (registry: PluginRegistry) => {
   const scroll = registry.getPlugin('scroll')?.provides();
 
   scroll?.onLayoutReady((event) => {
-      if (event.documentId === 'my-doc' && event.isInitial) {
-      scroll.forDocument('my-doc').scrollToPage({ 
+    if (event.documentId === 'my-doc' && event.isInitial) {
+      scroll.forDocument('my-doc')?.scrollToPage({ 
         pageNumber: 3, 
         behavior: 'instant' // Instant jump for initial load
       });
