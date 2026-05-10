@@ -1,0 +1,115 @@
+---
+title: Scrolling & Navigation
+description: Configure layout directions, render gaps, and control navigation programmatically.
+---
+
+# Scrolling & Navigation
+
+The PDFViewer includes a powerful scroll engine capable of handling large documents with ease. It supports vertical and horizontal layouts, smooth scrolling animations, and programmatic navigation control.
+
+## Configuration
+
+You can configure global scroll settings via the `scroll` property.
+
+```ts
+import { EmbedPdfViewerComponent, ScrollStrategy } from '@embedpdf/angular-pdf-viewer';
+
+<embedpdf-viewer
+    [config]="{
+      documentManager: {
+        initialDocuments: [{ 
+          url: 'https://snippet.embedpdf.com/ebook.pdf',
+          documentId: 'my-doc'
+        }]
+      },
+      scroll: {
+        defaultStrategy: ScrollStrategy.Vertical,
+        defaultPageGap: 20
+      }
+    }"
+  />
+```
+
+## Controlling Navigation Programmatically
+
+You can control the viewer from your own application logic.
+
+### Targeting the Active Document
+
+```ts
+import { signal } from '@angular/core';
+import { EmbedPdfViewerComponent, type PluginRegistry } from '@embedpdf/angular-pdf-viewer';
+
+const registry = signal<PluginRegistry | null>(null);
+
+const onReady = (r: PluginRegistry) => {
+  registry.set(r);
+};
+
+const nextPage = () => {
+  const scroll = registry()?.getPlugin('scroll')?.provides();
+  scroll?.scrollToNextPage();
+};
+
+const goToPage = (pageNumber: number) => {
+  const scroll = registry()?.getPlugin('scroll')?.provides();
+  scroll?.scrollToPage({ pageNumber });
+};
+
+<embedpdf-viewer (ready)="onReady($event)" [config]="{ src: '/doc.pdf' }" />
+```
+
+### Targeting a Specific Document
+
+If you have multiple documents open, you can target a specific one using its ID.
+
+```ts
+const goToPage10 = () => {
+  const scroll = registry()?.getPlugin('scroll')?.provides();
+  const docScroll = scroll?.forDocument('my-doc');
+  docScroll?.scrollToPage({ pageNumber: 10 });
+};
+```
+
+## Scrolling on Load
+
+Because documents load asynchronously, you cannot simply call `scrollToPage` immediately after initialization. Instead, you should listen for the `onLayoutReady` event. This event fires when the document structure is calculated and the viewer is ready to scroll.
+
+```ts
+import { EmbedPdfViewerComponent, type PluginRegistry } from '@embedpdf/angular-pdf-viewer';
+
+const onReady = (registry: PluginRegistry) => {
+  const scroll = registry.getPlugin('scroll')?.provides();
+
+  scroll?.onLayoutReady((event) => {
+      if (event.documentId === 'my-doc' && event.isInitial) {
+      scroll.forDocument('my-doc').scrollToPage({ 
+        pageNumber: 3, 
+        behavior: 'instant' // Instant jump for initial load
+      });
+    }
+  });
+};
+
+<embedpdf-viewer (ready)="onReady($event)" [config]="{ src: '/doc.pdf' }" />
+```
+
+## Listening for Page Changes
+
+You can listen for page change events to keep your application UI in sync.
+
+```ts
+import { EmbedPdfViewerComponent, type PluginRegistry } from '@embedpdf/angular-pdf-viewer';
+
+const onReady = (registry: PluginRegistry) => {
+  const scroll = registry.getPlugin('scroll')?.provides();
+
+  scroll?.onPageChange((event) => {
+    console.log(`Doc: ${event.documentId}`);
+    console.log(`Current Page: ${event.pageNumber}`);
+    console.log(`Total Pages: ${event.totalPages}`);
+  });
+};
+
+<embedpdf-viewer (ready)="onReady($event)" [config]="{ src: '/doc.pdf' }" />
+```

@@ -7,12 +7,12 @@ export default {
     title: 'Vue',
     type: 'page',
   },
-  svelte: {
-    title: 'Svelte',
-    type: 'page',
-  },
   angular: {
     title: 'Angular',
+    type: 'page',
+  },
+  svelte: {
+    title: 'Svelte',
     type: 'page',
   },
   snippet: {

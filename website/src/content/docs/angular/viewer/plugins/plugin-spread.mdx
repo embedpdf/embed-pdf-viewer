@@ -1,0 +1,98 @@
+---
+title: Spread Layouts
+description: Display pages individually or in a two-page, book-like spread layout.
+---
+
+# Spread Layouts
+
+The PDFViewer supports switching between single-page view and two-page "spread" views. This is ideal for reading magazines, books, or any content designed to be viewed side-by-side.
+
+## Configuration
+
+You can configure the initial layout mode using the `spread` config object.
+
+```ts
+import { EmbedPdfViewerComponent, SpreadMode } from '@embedpdf/angular-pdf-viewer';
+
+<embedpdf-viewer
+    [config]="{
+      spread: {
+        defaultSpreadMode: SpreadMode.Odd
+      }
+    }"
+  />
+```
+
+### Understanding Spread Modes
+
+| Mode | Description | Page Grouping |
+| :--- | :--- | :--- |
+| `SpreadMode.None` | **Default**. Each page is displayed individually in a vertical list. | `[1], [2], [3], [4]` |
+| `SpreadMode.Odd` | Pages are paired starting from page 1. Good for content where page 1 is the left side of a spread. | `[1, 2], [3, 4]` |
+| `SpreadMode.Even` | The first page is standalone (e.g., a cover), and subsequent pages are paired. | `[1], [2, 3], [4, 5]` |
+
+## Programmatic Control
+
+You can dynamically change the layout mode using the plugin API.
+
+### Changing the Mode
+
+```ts
+import { signal } from '@angular/core';
+import { EmbedPdfViewerComponent, SpreadMode, type PluginRegistry, type SpreadPlugin } from '@embedpdf/angular-pdf-viewer';
+
+const registry = signal<PluginRegistry | null>(null);
+
+const onReady = (r: PluginRegistry) => {
+  registry.set(r);
+};
+
+const setBookView = () => {
+  const spreadPlugin = registry()?.getPlugin<SpreadPlugin>('spread')?.provides();
+  const docSpread = spreadPlugin?.forDocument('my-doc-id');
+  docSpread?.setSpreadMode(SpreadMode.Even);
+};
+
+const setSinglePage = () => {
+  const spreadPlugin = registry()?.getPlugin<SpreadPlugin>('spread')?.provides();
+  const docSpread = spreadPlugin?.forDocument('my-doc-id');
+  docSpread?.setSpreadMode(SpreadMode.None);
+};
+
+<embedpdf-viewer (ready)="onReady($event)" [config]="{ src: '/doc.pdf' }" />
+```
+
+### Reading Current Mode
+
+```ts
+const getCurrentMode = () => {
+  const spreadPlugin = registry()?.getPlugin<SpreadPlugin>('spread')?.provides();
+  const docSpread = spreadPlugin?.forDocument('my-doc-id');
+  return docSpread?.getSpreadMode();
+};
+```
+
+## Listening for Changes
+
+You can listen for layout changes to keep your external UI in sync.
+
+```ts
+import { EmbedPdfViewerComponent, type PluginRegistry } from '@embedpdf/angular-pdf-viewer';
+
+const onReady = (registry: PluginRegistry) => {
+  const spreadPlugin = registry.getPlugin('spread')?.provides();
+
+  // Subscribe to global spread changes (any document)
+  spreadPlugin?.onSpreadChange(({ documentId, spreadMode }) => {
+    console.log(`Document ${documentId} layout changed to ${spreadMode}`);
+  });
+
+  const docSpread = spreadPlugin?.forDocument('my-doc');
+  docSpread?.onSpreadChange((spreadMode) => {
+    console.log(`My doc is now in ${spreadMode} mode`);
+  });
+};
+
+<embedpdf-viewer (ready)="onReady($event)" [config]="{ src: '/doc.pdf' }" />
+```
+

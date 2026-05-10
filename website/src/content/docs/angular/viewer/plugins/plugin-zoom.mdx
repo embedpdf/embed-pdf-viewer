@@ -1,0 +1,93 @@
+---
+title: Zoom
+description: Configure initial zoom levels and control zooming programmatically.
+---
+
+# Zoom
+
+The PDFViewer comes with a built-in zoom toolbar, but you can also control zoom behavior through configuration and the plugin API.
+
+## Configuration
+
+You can set the default zoom level and limits in the `config` prop.
+
+```ts
+import { EmbedPdfViewerComponent, ZoomMode } from '@embedpdf/angular-pdf-viewer';
+
+<embedpdf-viewer
+    [config]="{
+      zoom: {
+        defaultZoomLevel: ZoomMode.FitPage,
+        minZoom: 0.5,
+        maxZoom: 3.0
+      }
+    }"
+  />
+```
+
+### Available Zoom Modes
+
+The `ZoomMode` enum provides standard presets:
+
+| Mode | Description |
+| :--- | :--- |
+| `ZoomMode.Automatic` | Tries to find the best fit for the screen. |
+| `ZoomMode.FitPage` | Fits the entire page within the view. |
+| `ZoomMode.FitWidth` | Fits the page width to the view width. |
+
+## Programmatic Control
+
+You can control the zoom level from outside the viewer using the plugin registry.
+
+### Accessing the API
+
+```ts
+import { signal } from '@angular/core';
+import { EmbedPdfViewerComponent, ZoomMode, type PluginRegistry, type ZoomPlugin } from '@embedpdf/angular-pdf-viewer';
+
+const registry = signal<PluginRegistry | null>(null);
+
+const onReady = (r: PluginRegistry) => {
+  registry.set(r);
+};
+
+const zoomIn = () => {
+  const zoomPlugin = registry()?.getPlugin<ZoomPlugin>('zoom')?.provides();
+  const docZoom = zoomPlugin?.forDocument('my-document-id');
+  docZoom?.zoomIn();
+};
+
+const zoomOut = () => {
+  const zoomPlugin = registry()?.getPlugin<ZoomPlugin>('zoom')?.provides();
+  const docZoom = zoomPlugin?.forDocument('my-document-id');
+  docZoom?.zoomOut();
+};
+
+const fitWidth = () => {
+  const zoomPlugin = registry()?.getPlugin<ZoomPlugin>('zoom')?.provides();
+  const docZoom = zoomPlugin?.forDocument('my-document-id');
+  docZoom?.requestZoom(ZoomMode.FitWidth);
+};
+
+<embedpdf-viewer (ready)="onReady($event)" [config]="{ src: '/doc.pdf' }" />
+```
+
+### Listening to Zoom Changes
+
+You can listen for zoom changes using the event system.
+
+```ts
+import { EmbedPdfViewerComponent, type PluginRegistry } from '@embedpdf/angular-pdf-viewer';
+
+const onReady = (registry: PluginRegistry) => {
+  const zoomPlugin = registry.getPlugin('zoom')?.provides();
+  const docZoom = zoomPlugin?.forDocument('my-document-id');
+
+  docZoom?.onStateChange((state) => {
+    console.log('Current Zoom:', state.currentZoomLevel);
+  });
+};
+
+<embedpdf-viewer (ready)="onReady($event)" [config]="{ src: '/doc.pdf' }" />
+```
+
