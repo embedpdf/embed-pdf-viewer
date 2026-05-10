@@ -80,7 +80,12 @@
     "vue": "^3.5.26",
     "vue-loader": "^17.4.2",
     "webpack": "^5.98.0",
-    "zustand": "^5.0.9"
+    "zustand": "^5.0.9",
+    "@angular/compiler": "^21.2.12",
+    "@angular/core": "^21.2.12",
+    "@angular/platform-browser": "^21.2.12",
+    "@embedpdf/angular-pdf-viewer": "workspace:*",
+    "@embedpdf/example-angular-tailwind": "workspace:*"
   },
   "devDependencies": {
     "@types/fs-extra": "^11.0.4",

@@ -28,18 +28,6 @@ export type EmbedPdfThemeChangeEvent = {
   theme: Theme;
 };
 
-/**
- * Angular component for embedding PDF documents.
- *
- * @example
- * ```html
- * <embedpdf-viewer
- *   [config]="{ src: '/document.pdf', theme: { preference: 'system' } }"
- *   (ready)="onReady($event)"
- *   style="display:block;width:100%;height:100vh"
- * />
- * ```
- */
 @Component({
   selector: 'embedpdf-viewer',
   template: '',
@@ -51,22 +39,11 @@ export type EmbedPdfThemeChangeEvent = {
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class PDFViewer {
-  /** Full configuration for the PDF viewer */
   readonly config = input<PDFViewerConfig>({});
-
-  /** Emitted when the viewer container is initialized */
   readonly init = output<EmbedPdfContainer>();
-
-  /** Emitted when the plugin registry is ready */
   readonly ready = output<PluginRegistry>();
-
-  /** Emitted when the active theme changes (forwards the snippet's `themechange` custom event) */
   readonly themechange = output<EmbedPdfThemeChangeEvent>();
-
-  /** The active EmbedPdfContainer, or null when destroyed/uninitialized */
   readonly container = signal<EmbedPdfContainer | null>(null);
-
-  /** The active PluginRegistry, or null until the viewer's registry promise resolves */
   readonly registry = signal<PluginRegistry | null>(null);
 
   private readonly hostRef = inject<ElementRef<HTMLElement>>(ElementRef);
