@@ -1,3 +1,5 @@
+import { useId } from 'react'
+
 export const ReactIcon = ({ className }: { className?: string }) => (
   <svg
     xmlns="http://www.w3.org/2000/svg"
@@ -54,15 +56,47 @@ export const SvelteIcon = ({ className }: { className?: string }) => (
   </svg>
 )
 
-export const AngularIcon = ({ className }: { className?: string }) => (
-  <svg
-    xmlns="http://www.w3.org/2000/svg"
-    width="24"
-    height="24"
-    viewBox="0 0 24 24"
-    fill="currentColor"
-    className={className}
-  >
-    <path d="M14.692 0 24 3.36l-1.42 12.1L12 24 1.42 15.46 0 3.36 9.308 0h5.384ZM12 6.396 8.903 13.93h6.194L12 6.396Zm-4.712 11.315H16.71l1.206 2.916L12 24l-5.916-3.373 1.204-2.916Z" />
-  </svg>
-)
+export const AngularIcon = ({ className }: { className?: string }) => {
+  const gradientId = useId()
+
+  return (
+    <svg
+      xmlns="http://www.w3.org/2000/svg"
+      width="24"
+      height="24"
+      viewBox="0 0 24 24"
+      fill="none"
+      className={className}
+      aria-hidden="true"
+    >
+      <defs>
+        <linearGradient
+          id={gradientId}
+          x1="2.5"
+          y1="20.5"
+          x2="21.5"
+          y2="4"
+          gradientUnits="userSpaceOnUse"
+        >
+          <stop offset="0" stopColor="#FF0057" />
+          <stop offset="0.55" stopColor="#E940D5" />
+          <stop offset="1" stopColor="#8B5CF6" />
+        </linearGradient>
+      </defs>
+
+      <path
+        fill={`url(#${gradientId})`}
+        d="M3.3 7.45L10.03 3.95L5.75 13.52L4.04 16.9L3.3 7.45Z"
+      />
+      <path
+        fill={`url(#${gradientId})`}
+        d="M13.97 3.95L20.7 7.45L19.96 16.9L18.25 13.52L13.97 3.95Z"
+      />
+      <path fill={`url(#${gradientId})`} d="M12 8.08L14.42 13.96H9.58L12 8.08Z" />
+      <path
+        fill={`url(#${gradientId})`}
+        d="M8.3 16.9H15.7L16.65 19.92L12 22.58L7.35 19.92L8.3 16.9Z"
+      />
+    </svg>
+  )
+}

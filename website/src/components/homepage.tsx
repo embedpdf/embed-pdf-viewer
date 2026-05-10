@@ -163,14 +163,14 @@ const Hero = () => {
                   </div>
                 </Link>
                 <Link
-                  href="/angular-pdf-viewer"
+                  href="/docs/angular"
                   className="flex flex-col items-center gap-2 transition-transform hover:-translate-y-1"
                 >
                   <div
                     className="flex h-10 w-10 items-center justify-center rounded-xl bg-white shadow-sm ring-1 ring-gray-900/5 dark:bg-gray-800 dark:ring-white/10 md:h-12 md:w-12 md:rounded-2xl"
                     title="Angular"
                   >
-                    <AngularIcon className="h-5 w-5 text-[#DE002D] md:h-6 md:w-6" />
+                    <AngularIcon className="h-5 w-5 md:h-6 md:w-6" />
                     <span className="sr-only">Angular</span>
                   </div>
                 </Link>
@@ -228,7 +228,7 @@ const paths = [
       },
       {
         href: '/docs/angular/viewer/introduction',
-        icon: <AngularIcon className="h-5 w-5 text-[#DE002D]" />,
+        icon: <AngularIcon className="h-5 w-5" />,
         text: 'Angular',
       },
     ],
@@ -265,11 +265,6 @@ const paths = [
         href: '/docs/svelte/headless/introduction',
         icon: <SvelteIcon className="h-5 w-5 text-[#FF3E00]" />,
         text: 'Svelte',
-      },
-      {
-        href: '/docs/angular/headless/introduction',
-        icon: <AngularIcon className="h-5 w-5 text-[#DE002D]" />,
-        text: 'Angular',
       },
     ],
   },
@@ -569,13 +564,6 @@ const HeadlessSection = () => {
           >
             <SvelteIcon className="h-5 w-5 text-[#FF3E00]" />
             <span>Svelte Docs</span>
-          </Link>
-          <Link
-            href="/docs/angular"
-            className="group flex w-full items-center justify-center gap-3 rounded-full border border-gray-200 bg-white px-6 py-3 text-sm font-medium text-gray-700 shadow-sm transition-all hover:border-red-300 hover:shadow-md dark:border-gray-800 dark:bg-gray-900 dark:text-gray-300 dark:hover:border-red-700 sm:w-auto"
-          >
-            <AngularIcon className="h-5 w-5 text-[#DE002D]" />
-            <span>Angular Docs</span>
           </Link>
         </div>
       </div>

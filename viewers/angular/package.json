@@ -1,0 +1,62 @@
+{
+  "name": "@embedpdf/angular-pdf-viewer",
+  "version": "0.0.0",
+  "description": "Angular component for embedding PDF documents",
+  "main": "dist/index.cjs",
+  "module": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "license": "MIT",
+  "type": "module",
+  "sideEffects": false,
+  "homepage": "https://www.embedpdf.com/angular-pdf-viewer",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "require": "./dist/index.cjs"
+    }
+  },
+  "files": [
+    "dist",
+    "README.md"
+  ],
+  "scripts": {
+    "clean": "rimraf dist",
+    "build": "pnpm run clean && vite build"
+  },
+  "dependencies": {
+    "@embedpdf/snippet": "workspace:*"
+  },
+  "devDependencies": {
+    "@analogjs/vite-plugin-angular": "^2.5.0",
+    "@angular/build": "^21.2.10",
+    "@angular/compiler": "^21.2.12",
+    "@angular/compiler-cli": "^21.2.12",
+    "@angular/core": "^21.2.12",
+    "@angular/platform-browser": "^21.2.12",
+    "rimraf": "^6.1.2",
+    "rxjs": "^7.8.2",
+    "tslib": "^2.8.1",
+    "typescript": "^5.1.6",
+    "unplugin-dts": "1.0.0-beta.6",
+    "vite": "^6.3.5"
+  },
+  "peerDependencies": {
+    "@angular/core": ">=21.0.0"
+  },
+  "keywords": [
+    "angular",
+    "pdf",
+    "viewer",
+    "embed",
+    "document"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/embedpdf/embed-pdf-viewer.git",
+    "directory": "viewers/angular"
+  },
+  "publishConfig": {
+    "access": "public"
+  }
+}

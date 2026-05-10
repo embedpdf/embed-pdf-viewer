@@ -1,0 +1,71 @@
+---
+title: Getting Started
+description: Add the EmbedPDF Angular viewer to a standalone Angular app.
+searchable: true
+---
+
+# Getting Started with the Angular Viewer
+
+The Angular package exposes a standalone `PDFViewer` component plus helper providers for sharing default configuration.
+
+## Installation
+
+```sh npm2yarn
+npm install @embedpdf/angular-pdf-viewer
+```
+
+## Bootstrap shared defaults
+
+```ts copy filename="src/main.ts"
+import '@angular/compiler';
+import { provideZonelessChangeDetection } from '@angular/core';
+import { bootstrapApplication } from '@angular/platform-browser';
+import { provideEmbedPdfViewerConfig } from '@embedpdf/angular-pdf-viewer';
+
+import { App } from './app/app.component';
+
+bootstrapApplication(App, {
+  providers: [
+    provideZonelessChangeDetection(),
+    ...provideEmbedPdfViewerConfig({
+      theme: {
+        preference: 'dark',
+      },
+    }),
+  ],
+});
+```
+
+## Render the viewer
+
+```ts copy filename="src/app/app.component.ts"
+import { ChangeDetectionStrategy, Component } from '@angular/core';
+import { PDFViewer, type PDFViewerConfig } from '@embedpdf/angular-pdf-viewer';
+
+@Component({
+  selector: 'app-root',
+  imports: [PDFViewer],
+  template: `
+    <embedpdf-viewer
+      style="display:block;height:100vh"
+      [config]="viewerConfig"
+    />
+  `,
+  changeDetection: ChangeDetectionStrategy.OnPush,
+})
+export class App {
+  readonly viewerConfig: PDFViewerConfig = {
+    src: 'https://snippet.embedpdf.com/ebook.pdf',
+  };
+}
+```
+
+## Useful events
+
+The component exposes Angular outputs for common lifecycle moments:
+
+- `(init)` — fired when the underlying viewer container is created.
+- `(ready)` — fired when the plugin registry resolves.
+- `(themechange)` — fired when the active theme changes.
+
+These hooks make it easy to register commands, tweak UI schema, or sync viewer state with your Angular app.

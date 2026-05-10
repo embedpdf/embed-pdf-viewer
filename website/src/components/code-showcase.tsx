@@ -71,8 +71,8 @@ const tabs: Tab[] = [
     label: 'Angular',
     filename: 'app.component.ts',
     icon: <AngularIcon className="h-4 w-4" />,
-    color: 'text-red-500',
-    hoverColor: 'group-hover:text-red-400',
+    color: 'text-fuchsia-400',
+    hoverColor: 'group-hover:text-fuchsia-300',
   },
 ]
 
@@ -83,7 +83,7 @@ const tabIndicatorGradients: Record<Framework, string> = {
   react: 'from-cyan-500 to-blue-400',
   vue: 'from-emerald-500 to-green-400',
   svelte: 'from-orange-600 to-red-500',
-  angular: 'from-red-600 to-rose-500',
+  angular: 'from-pink-500 via-fuchsia-500 to-violet-500',
 }
 
 const codeSnippets: Record<Framework, string> = {
@@ -95,7 +95,7 @@ const codeSnippets: Record<Framework, string> = {
     type: 'container',
     target: document.getElementById('pdf-viewer'),
     src: '${DEMO_PDF_URL}'
-  }) 
+  })
 </script>`,
   react: `import { PDFViewer } from '@embedpdf/react-pdf-viewer';
 
