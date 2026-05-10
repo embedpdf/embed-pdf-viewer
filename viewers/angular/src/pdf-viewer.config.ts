@@ -4,12 +4,12 @@ import {
   Provider,
   inject,
   makeEnvironmentProviders,
-} from '@angular/core'
-import type { PDFViewerConfig } from '@embedpdf/snippet'
+} from '@angular/core';
+import type { PDFViewerConfig } from '@embedpdf/snippet';
 
-type ConfigRecord = Record<string, unknown>
+type ConfigRecord = Record<string, unknown>;
 
-const EMPTY_CONFIG: ConfigRecord = {}
+const EMPTY_CONFIG: ConfigRecord = {};
 
 /**
  * Hierarchical token that stores the default viewer config for the current injector.
@@ -19,7 +19,7 @@ const EMPTY_CONFIG: ConfigRecord = {}
  */
 export const EMBEDPDF_VIEWER_DEFAULT_CONFIG = new InjectionToken<PDFViewerConfig>(
   'EMBEDPDF_VIEWER_DEFAULT_CONFIG',
-)
+);
 
 /**
  * Provides default viewer config for the current injector.
@@ -46,7 +46,7 @@ export function provideEmbedPdfViewerConfig(config: PDFViewerConfig): Provider[]
           config,
         ),
     },
-  ]
+  ];
 }
 
 /**
@@ -57,10 +57,8 @@ export function provideEmbedPdfViewerConfig(config: PDFViewerConfig): Provider[]
  * environment-provider API. Use {@link provideEmbedPdfViewerConfig} when you need
  * the same merging behavior inside a component or another local injector.
  */
-export function provideEmbedPdfViewerDefaults(
-  config: PDFViewerConfig,
-): EnvironmentProviders {
-  return makeEnvironmentProviders(provideEmbedPdfViewerConfig(config))
+export function provideEmbedPdfViewerDefaults(config: PDFViewerConfig): EnvironmentProviders {
+  return makeEnvironmentProviders(provideEmbedPdfViewerConfig(config));
 }
 
 /**
@@ -76,38 +74,38 @@ export function mergeViewerConfigs(
   return mergeRecord(
     (baseConfig ?? EMPTY_CONFIG) as ConfigRecord,
     (overrideConfig ?? EMPTY_CONFIG) as ConfigRecord,
-  ) as PDFViewerConfig
+  ) as PDFViewerConfig;
 }
 
 function mergeRecord(baseValue: ConfigRecord, overrideValue: ConfigRecord): ConfigRecord {
-  const merged: ConfigRecord = { ...baseValue }
+  const merged: ConfigRecord = { ...baseValue };
 
   for (const [key, value] of Object.entries(overrideValue)) {
-    if (value === undefined) continue
+    if (value === undefined) continue;
 
-    const existingValue = merged[key]
+    const existingValue = merged[key];
 
     if (isPlainObject(existingValue) && isPlainObject(value)) {
-      merged[key] = mergeRecord(existingValue, value)
-      continue
+      merged[key] = mergeRecord(existingValue, value);
+      continue;
     }
 
     if (Array.isArray(value)) {
-      merged[key] = [...value]
-      continue
+      merged[key] = [...value];
+      continue;
     }
 
-    merged[key] = value
+    merged[key] = value;
   }
 
-  return merged
+  return merged;
 }
 
 function isPlainObject(value: unknown): value is Record<string, unknown> {
   if (value === null || typeof value !== 'object' || Array.isArray(value)) {
-    return false
+    return false;
   }
 
-  const prototype = Object.getPrototypeOf(value)
-  return prototype === Object.prototype || prototype === null
+  const prototype = Object.getPrototypeOf(value);
+  return prototype === Object.prototype || prototype === null;
 }

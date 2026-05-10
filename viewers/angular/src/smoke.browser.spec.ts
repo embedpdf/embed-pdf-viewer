@@ -8,7 +8,10 @@ import { describe, expect, it } from 'vitest';
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
 class BrowserSmokeComponent {
-  readonly name = (() => () => 'Browser')();
+  readonly name = (
+    () => () =>
+      'Browser'
+  )();
 }
 
 describe('Angular browser-mode smoke', () => {

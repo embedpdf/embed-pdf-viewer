@@ -489,11 +489,11 @@ export const CodeShowcase = ({ framework, onTabChange }: CodeShowcaseProps) => {
                   }`}
                 >
                   {/* Active tab indicator */}
-                    {activeTab === tab.id && (
-                      <div
-                        className={`absolute bottom-0 left-0 right-0 h-0.5 bg-gradient-to-r ${tabIndicatorGradients[tab.id]}`}
-                      />
-                    )}
+                  {activeTab === tab.id && (
+                    <div
+                      className={`absolute bottom-0 left-0 right-0 h-0.5 bg-gradient-to-r ${tabIndicatorGradients[tab.id]}`}
+                    />
+                  )}
                   <span
                     className={
                       activeTab === tab.id ? tab.color : tab.hoverColor

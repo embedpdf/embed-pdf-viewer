@@ -120,9 +120,9 @@ describe('PDFViewer', () => {
   it('emits init and ready when the snippet returns a viewer', async () => {
     const fixture = createViewerFixture();
     const viewer = globalThis.document.createElement('div') as unknown as EmbedPdfContainer;
-    (viewer as { registry: Promise<PluginRegistry> }).registry = Promise.resolve(
-      { token: 'test-registry' } as never,
-    );
+    (viewer as { registry: Promise<PluginRegistry> }).registry = Promise.resolve({
+      token: 'test-registry',
+    } as never);
     initSpy.mockReturnValue(viewer);
 
     const initEvents: unknown[] = [];
@@ -321,9 +321,9 @@ describe('PDFViewer', () => {
     const viewer = globalThis.document.createElement('div') as unknown as EmbedPdfContainer & {
       registry: Promise<PluginRegistry>;
     };
-    (viewer as { registry: Promise<PluginRegistry> }).registry = Promise.resolve(
-      { token: 'test-registry' } as never,
-    );
+    (viewer as { registry: Promise<PluginRegistry> }).registry = Promise.resolve({
+      token: 'test-registry',
+    } as never);
     initSpy.mockReturnValue(viewer);
 
     const themechangeEvents: unknown[] = [];
@@ -337,9 +337,7 @@ describe('PDFViewer', () => {
       colorScheme: 'dark' as const,
       theme: { name: 'test-theme' } as never,
     };
-    (viewer as unknown as EventTarget).dispatchEvent(
-      new CustomEvent('themechange', { detail }),
-    );
+    (viewer as unknown as EventTarget).dispatchEvent(new CustomEvent('themechange', { detail }));
 
     expect(themechangeEvents).toEqual([detail]);
   });
@@ -349,9 +347,9 @@ describe('PDFViewer', () => {
     const viewer = globalThis.document.createElement('div') as unknown as EmbedPdfContainer & {
       registry: Promise<PluginRegistry>;
     };
-    (viewer as { registry: Promise<PluginRegistry> }).registry = Promise.resolve(
-      { token: 'test-registry' } as never,
-    );
+    (viewer as { registry: Promise<PluginRegistry> }).registry = Promise.resolve({
+      token: 'test-registry',
+    } as never);
     initSpy.mockReturnValue(viewer);
 
     const themechangeEvents: unknown[] = [];
