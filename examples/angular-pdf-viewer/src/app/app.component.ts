@@ -466,7 +466,7 @@ export class App {
   private ui: UICapability | null = null;
 
   readonly viewerConfig = {
-    src: 'https://snippet.embedpdf.com/ebook.pdf',
+    src: '/ebook.pdf',
     disabledCategories: ['annotation'],
     theme: {
       preference: 'light',
