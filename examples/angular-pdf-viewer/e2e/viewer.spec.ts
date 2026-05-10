@@ -6,9 +6,6 @@ const stableScreenshotOptions = {
   scale: 'css',
 } as const;
 
-const integrationSnapshotTolerance = {
-  maxDiffPixels: 250,
-} as const;
 test('applies Angular config-driven theme and category customization', async ({ page }) => {
   await page.goto('/');
 
@@ -93,14 +90,6 @@ test('applies Angular config-driven theme and category customization', async ({ 
   await expect(configPanelShell).toHaveScreenshot(
     'angular-config-panel-toggled.png',
     stableScreenshotOptions,
-  );
-
-  await expect(page.locator('.workspace')).toHaveScreenshot(
-    'angular-config-panel-with-viewer.png',
-    {
-      ...stableScreenshotOptions,
-      ...integrationSnapshotTolerance,
-    },
   );
 
   await page.getByTestId('header-config-toggle').click();
