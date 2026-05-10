@@ -289,7 +289,7 @@ In addition to outputs, the component exposes two state signals you can read or 
 - `registry: Signal<PluginRegistry | null>` — the resolved plugin registry (or `null` before the registry promise settles).
 
 ```ts
-import { Component, ViewChild, effect } from '@angular/core';
+import { Component, effect, viewChild } from '@angular/core';
 import { PDFViewer } from '@embedpdf/angular-pdf-viewer';
 
 @Component({
@@ -297,11 +297,11 @@ import { PDFViewer } from '@embedpdf/angular-pdf-viewer';
   template: `<embedpdf-viewer #viewer [config]="{ src: '/doc.pdf' }" />`,
 })
 export class AppComponent {
-  @ViewChild('viewer') viewer!: PDFViewer;
+  readonly viewer = viewChild.required(PDFViewer);
 
   constructor() {
     effect(() => {
-      const registry = this.viewer?.registry();
+      const registry = this.viewer().registry();
       if (registry) {
         // ... use the registry reactively ...
       }
