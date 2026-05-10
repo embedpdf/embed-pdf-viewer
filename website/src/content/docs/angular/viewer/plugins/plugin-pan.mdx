@@ -13,11 +13,11 @@ You can configure when the pan tool should be active by default using the `pan` 
 
 ```ts
 <embedpdf-viewer
-    [config]="{
-      pan: {
-                defaultMode: 'mobile' 
-      }
-    }"
+      [config]="{
+        pan: {
+          defaultMode: 'mobile' 
+        }
+      }"
   />
 ```
 
@@ -101,4 +101,3 @@ const onReady = (registry: PluginRegistry) => {
 
 <embedpdf-viewer (ready)="onReady($event)" [config]="{ src: '/doc.pdf' }" />
 ```
-
