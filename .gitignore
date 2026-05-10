@@ -25,3 +25,7 @@ config/tsup.frameworks.config.bundled*
 publish-summary.json
 **/.svelte-kit
 **/*/*.tgz
+.env
+.env.*
+**/playwright-report
+**/test-results

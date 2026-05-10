@@ -33,6 +33,7 @@ It is designed to be the fastest way to get a high-quality PDF viewer into your 
 - **Ready-to-use UI** — Includes a polished toolbar, sidebar, and thumbnails.
 - **Responsive** — Adapts seamlessly to mobile and desktop screens.
 - **Themable** — Built-in light/dark modes and support for custom brand colors.
+- **App-wide defaults** — Configure viewer defaults once with Angular providers, then override per viewer when needed.
 - **Configurable** — Easily disable features you don't need (e.g., printing or downloading).
 - **TypeScript** — Fully typed for a great developer experience.
 - **Standalone** — Pure standalone component; no NgModules needed.
@@ -66,10 +67,10 @@ import { PDFViewer } from '@embedpdf/angular-pdf-viewer';
   selector: 'app-root',
   imports: [PDFViewer],
   template: `
-    <embedpdf-pdf-viewer
+    <embedpdf-viewer
       [config]="{
         src: 'https://snippet.embedpdf.com/ebook.pdf',
-        theme: { preference: 'light' }
+        theme: { preference: 'light' },
       }"
       style="display:block;height:100vh"
     />
@@ -82,6 +83,103 @@ That's it! You now have a fully functional PDF viewer.
 
 ---
 
+## 🧱 Global Defaults with Angular Providers
+
+If your app renders multiple viewers, you can configure shared defaults once with
+`provideEmbedPdfViewerConfig()` and still override them per component via `[config]`.
+
+This is the Angular-idiomatic way to define viewer defaults at the app, route, or
+component subtree level.
+
+For almost all apps, prefer `provideEmbedPdfViewerConfig(...)`. The lower-level
+`EMBEDPDF_VIEWER_DEFAULT_CONFIG` token is also exported for advanced DI scenarios,
+but the provider function is the recommended public API.
+
+```ts
+import { bootstrapApplication } from '@angular/platform-browser';
+import {
+  provideEmbedPdfViewerConfig,
+  type PDFViewerConfig,
+} from '@embedpdf/angular-pdf-viewer';
+import { AppComponent } from './app/app.component';
+
+const viewerDefaults = {
+  disabledCategories: ['annotation'],
+  theme: {
+    preference: 'dark',
+    light: {
+      accent: { primary: '#dd0031' },
+    },
+    dark: {
+      accent: { primary: '#ff5c7c' },
+    },
+  },
+} satisfies PDFViewerConfig;
+
+bootstrapApplication(AppComponent, {
+  providers: [...provideEmbedPdfViewerConfig(viewerDefaults)],
+});
+```
+
+Then each viewer can provide only its instance-specific config:
+
+```ts
+import { Component } from '@angular/core';
+import { PDFViewer } from '@embedpdf/angular-pdf-viewer';
+
+@Component({
+  selector: 'app-root',
+  imports: [PDFViewer],
+  template: `
+    <embedpdf-viewer
+      [config]="{
+        src: '/document.pdf',
+        theme: { preference: 'light' },
+      }"
+      style="display:block;height:100vh"
+    />
+  `,
+})
+export class AppComponent {}
+```
+
+### Scoped Defaults
+
+Because this uses Angular DI, you can scope different defaults to different parts of
+your app:
+
+- **Application scope** — add the provider in `bootstrapApplication()`
+- **Route scope** — add the provider in a route's `providers` array
+- **Component subtree scope** — add the provider in a component's `providers` array
+
+Nested providers merge with parent defaults, so a feature area can refine the app-wide
+defaults without replacing them entirely.
+
+### Precedence
+
+Configuration is resolved in this order:
+
+1. EmbedPDF built-in defaults
+2. Parent `provideEmbedPdfViewerConfig(...)` defaults
+3. Nearest `provideEmbedPdfViewerConfig(...)` defaults
+4. The component's `[config]` input
+
+The closest value wins.
+
+### Merge Behavior
+
+Provider defaults and local `[config]` are merged using predictable rules:
+
+- **Objects** are deep-merged
+- **Arrays** are replaced, not concatenated
+- **Primitive values** (`string`, `number`, `boolean`, etc.) replace parent values
+- **`undefined`** means “inherit the parent/default value”
+
+This is especially useful for nested configuration like `theme`, `i18n`, and other
+viewer option objects.
+
+---
+
 ## 🎨 Customization
 
 ### Theme
@@ -91,7 +189,7 @@ The viewer includes a robust theming system. You can set the preference to `'lig
 ```ts
 @Component({
   template: `
-    <embedpdf-pdf-viewer
+    <embedpdf-viewer
       [config]="{
         src: '/document.pdf',
         theme: {
@@ -120,6 +218,10 @@ config = {
 
 Available categories include: `zoom`, `annotation`, `redaction`, `document`, `page`, `panel`, `tools`, `selection`, and `history`.
 
+If you're using `provideEmbedPdfViewerConfig(...)`, `disabledCategories` is a good
+candidate for shared defaults. You can define a baseline set globally and replace it
+per viewer when a specific screen needs a different UI surface.
+
 ---
 
 ## ⚙️ Configuration Options
@@ -136,6 +238,9 @@ The `config` input accepts the following top-level options:
 | `annotations`        | `object`                            | Configure annotation defaults (author, tools). |
 | `zoom`               | `object`                            | Configure default zoom levels and limits.      |
 | `scroll`             | `object`                            | Configure scroll direction and logic.          |
+
+When used together, `provideEmbedPdfViewerConfig(...)` supplies the defaults and the
+`config` input provides per-instance overrides.
 
 ---
 
@@ -155,7 +260,7 @@ import {
   selector: 'app-root',
   imports: [PDFViewer],
   template: `
-    <embedpdf-pdf-viewer
+    <embedpdf-viewer
       [config]="{ src: '/doc.pdf' }"
       (ready)="onReady($event)"
       style="display:block;height:100vh"
@@ -174,6 +279,36 @@ export class AppComponent {
 
 - `(init)` — Emitted when the viewer container is initialized.
 - `(ready)` — Emitted when the plugin registry is ready and plugins are loaded.
+- `(themechange)` — Emitted when the active theme changes. The payload is `{ preference: 'light' | 'dark' | 'system'; colorScheme: 'light' | 'dark'; theme: Theme }`, forwarded from the snippet's underlying `themechange` custom event.
+
+### Reactive State Signals
+
+In addition to outputs, the component exposes two state signals you can read or compose with `effect()` / `computed()`:
+
+- `container: Signal<EmbedPdfContainer | null>` — the active container element (or `null` before mount / after destroy).
+- `registry: Signal<PluginRegistry | null>` — the resolved plugin registry (or `null` before the registry promise settles).
+
+```ts
+import { Component, effect, viewChild } from '@angular/core';
+import { PDFViewer } from '@embedpdf/angular-pdf-viewer';
+
+@Component({
+  imports: [PDFViewer],
+  template: `<embedpdf-viewer #viewer [config]="{ src: '/doc.pdf' }" />`,
+})
+export class AppComponent {
+  readonly viewer = viewChild.required(PDFViewer);
+
+  constructor() {
+    effect(() => {
+      const registry = this.viewer().registry();
+      if (registry) {
+        // ... use the registry reactively ...
+      }
+    });
+  }
+}
+```
 
 ---
 

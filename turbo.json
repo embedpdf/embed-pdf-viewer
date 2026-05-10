@@ -6,6 +6,11 @@
       "dependsOn": ["^build"],
       "outputs": ["dist/**"]
     },
+    "e2e": {
+      "dependsOn": ["^build"],
+      "passThroughEnv": ["PLAYWRIGHT_*"],
+      "outputs": ["playwright-report/**", "test-results/**"]
+    },
     "check-types": {
       "dependsOn": ["^check-types"]
     },

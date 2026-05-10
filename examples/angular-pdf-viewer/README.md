@@ -13,6 +13,7 @@ It serves two purposes:
 - `theme.preference: 'light'` for deterministic color mode
 - A custom Angular-red accent via `theme.light.accent`
 - A runtime toolbar customization via `(ready)`, `commands.registerCommand()`, and `ui.mergeSchema()`
+- An Angular-owned config panel, toggled by a runtime-injected `Config` button, that can animate open/closed, live-toggle theme mode, and expose up to four checkbox-based view options for annotations, search, sidebar, and zoom controls
 
 ## Scripts
 

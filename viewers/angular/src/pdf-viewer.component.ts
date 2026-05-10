@@ -1,25 +1,39 @@
 import {
-  AfterViewInit,
   ChangeDetectionStrategy,
   Component,
+  DestroyRef,
   ElementRef,
-  OnDestroy,
+  afterNextRender,
+  afterRenderEffect,
+  computed,
+  inject,
   input,
   output,
-  viewChild,
+  signal,
+  untracked,
 } from '@angular/core';
 import EmbedPDF, {
   type EmbedPdfContainer,
   type PDFViewerConfig,
   type PluginRegistry,
+  type Theme,
+  type ThemePreference,
 } from '@embedpdf/snippet';
+
+import { EMBEDPDF_VIEWER_DEFAULT_CONFIG, mergeViewerConfigs } from './pdf-viewer.config';
+
+export type EmbedPdfThemeChangeEvent = {
+  preference: ThemePreference;
+  colorScheme: 'light' | 'dark';
+  theme: Theme;
+};
 
 /**
  * Angular component for embedding PDF documents.
  *
  * @example
  * ```html
- * <embedpdf-pdf-viewer
+ * <embedpdf-viewer
  *   [config]="{ src: '/document.pdf', theme: { preference: 'system' } }"
  *   (ready)="onReady($event)"
  *   style="display:block;width:100%;height:100vh"
@@ -27,12 +41,16 @@ import EmbedPDF, {
  * ```
  */
 @Component({
-  selector: 'embedpdf-pdf-viewer',
-  template: `<div #container style="width:100%;height:100%"></div>`,
-  styles: `:host { display: block; }`,
+  selector: 'embedpdf-viewer',
+  template: '',
+  styles: `
+    :host {
+      display: block;
+    }
+  `,
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
-export class PDFViewer implements AfterViewInit, OnDestroy {
+export class PDFViewer {
   /** Full configuration for the PDF viewer */
   readonly config = input<PDFViewerConfig>({});
 
@@ -42,39 +60,81 @@ export class PDFViewer implements AfterViewInit, OnDestroy {
   /** Emitted when the plugin registry is ready */
   readonly ready = output<PluginRegistry>();
 
-  private readonly containerRef =
-    viewChild.required<ElementRef<HTMLDivElement>>('container');
+  /** Emitted when the active theme changes (forwards the snippet's `themechange` custom event) */
+  readonly themechange = output<EmbedPdfThemeChangeEvent>();
 
   /** The active EmbedPdfContainer, or null when destroyed/uninitialized */
-  container: EmbedPdfContainer | null = null;
+  readonly container = signal<EmbedPdfContainer | null>(null);
 
-  ngAfterViewInit(): void {
-    const target = this.containerRef().nativeElement;
+  /** The active PluginRegistry, or null until the viewer's registry promise resolves */
+  readonly registry = signal<PluginRegistry | null>(null);
 
-    const viewer = EmbedPDF.init({
-      type: 'container',
-      target,
-      ...this.config(),
+  private readonly hostRef = inject<ElementRef<HTMLElement>>(ElementRef);
+  private readonly destroyRef = inject(DestroyRef);
+  private readonly defaultConfig =
+    inject(EMBEDPDF_VIEWER_DEFAULT_CONFIG, { optional: true }) ?? null;
+  private readonly resolvedConfig = computed(() =>
+    mergeViewerConfigs(this.defaultConfig, this.config()),
+  );
+  private targetElement: HTMLElement | null = null;
+  private themechangeHandler: ((event: Event) => void) | null = null;
+
+  constructor() {
+    afterRenderEffect({
+      write: () => {
+        const config = this.resolvedConfig();
+        const viewer = untracked(() => this.container());
+
+        if (!viewer || this.destroyRef.destroyed) return;
+
+        viewer.config = config;
+      },
     });
 
-    if (!viewer) return;
+    afterNextRender({
+      write: () => {
+        if (this.destroyRef.destroyed) return;
 
-    this.container = viewer;
-    this.init.emit(viewer);
+        const target = this.hostRef.nativeElement;
+        this.targetElement = target;
 
-    viewer.registry.then((registry) => {
-      this.ready.emit(registry);
+        const viewer = EmbedPDF.init({
+          type: 'container',
+          target,
+          ...this.resolvedConfig(),
+        });
+
+        if (!viewer || this.destroyRef.destroyed) return;
+
+        const themechangeHandler = (event: Event) => {
+          if (this.destroyRef.destroyed) return;
+          const detail = (event as CustomEvent<EmbedPdfThemeChangeEvent>).detail;
+          if (detail) this.themechange.emit(detail);
+        };
+        viewer.addEventListener('themechange', themechangeHandler);
+        this.themechangeHandler = themechangeHandler;
+
+        this.container.set(viewer);
+        this.init.emit(viewer);
+
+        void viewer.registry.then((registry) => {
+          if (this.destroyRef.destroyed) return;
+          this.registry.set(registry);
+          this.ready.emit(registry);
+        });
+      },
     });
-  }
 
-  ngOnDestroy(): void {
-    const target = this.containerRef()?.nativeElement;
-    target?.replaceChildren();
-    this.container = null;
-  }
-
-  /** Promise that resolves to the PluginRegistry */
-  get registry(): Promise<PluginRegistry> | null {
-    return this.container?.registry ?? null;
+    this.destroyRef.onDestroy(() => {
+      const viewer = this.container();
+      if (viewer && this.themechangeHandler) {
+        viewer.removeEventListener('themechange', this.themechangeHandler);
+      }
+      this.themechangeHandler = null;
+      this.targetElement?.replaceChildren();
+      this.targetElement = null;
+      this.container.set(null);
+      this.registry.set(null);
+    });
   }
 }
