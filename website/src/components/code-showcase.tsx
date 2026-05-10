@@ -76,7 +76,15 @@ const tabs: Tab[] = [
   },
 ]
 
-const ANGULAR_TEMPLATE = `<embedpdf-viewer [config]="{ src: '/demo.pdf' }" style="height: 500px" />`
+const angularTemplate = `<embedpdf-viewer [config]="{ src: '/demo.pdf' }" style="height: 500px" />`
+
+const tabIndicatorGradients: Record<Framework, string> = {
+  snippet: 'from-orange-500 to-amber-400',
+  react: 'from-cyan-500 to-blue-400',
+  vue: 'from-emerald-500 to-green-400',
+  svelte: 'from-orange-600 to-red-500',
+  angular: 'from-red-600 to-rose-500',
+}
 
 const codeSnippets: Record<Framework, string> = {
   snippet: `<div id="pdf-viewer" style="height: 500px"></div>
@@ -136,7 +144,7 @@ import { PDFViewer } from '@embedpdf/angular-pdf-viewer'
 @Component({
   selector: 'app-root',
   imports: [PDFViewer],
-  template: \`${ANGULAR_TEMPLATE}\`,
+  template: \`${angularTemplate}\`,
 })
 export class App {}`,
 }
@@ -399,7 +407,7 @@ const AngularCode = () => (
     <span className="text-cyan-300">]</span>,{'\n'}
     {'  '}
     <span className="text-red-300">template</span>:{' '}
-    <span className="text-yellow-300">{`\`${ANGULAR_TEMPLATE}\``}</span>,{'\n'}
+    <span className="text-yellow-300">{`\`${angularTemplate}\``}</span>,{'\n'}
     {'}'}){'\n'}
     <span className="text-purple-400">export class</span>{' '}
     <span className="text-blue-300">App</span> {'{}'}
@@ -481,21 +489,11 @@ export const CodeShowcase = ({ framework, onTabChange }: CodeShowcaseProps) => {
                   }`}
                 >
                   {/* Active tab indicator */}
-                  {activeTab === tab.id && (
-                    <div
-                      className={`absolute bottom-0 left-0 right-0 h-0.5 bg-gradient-to-r ${
-                        tab.id === 'snippet'
-                          ? 'from-orange-500 to-amber-400'
-                          : tab.id === 'react'
-                            ? 'from-cyan-500 to-blue-400'
-                            : tab.id === 'vue'
-                              ? 'from-emerald-500 to-green-400'
-                              : tab.id === 'svelte'
-                                ? 'from-orange-600 to-red-500'
-                                : 'from-red-600 to-rose-500'
-                      }`}
-                    />
-                  )}
+                    {activeTab === tab.id && (
+                      <div
+                        className={`absolute bottom-0 left-0 right-0 h-0.5 bg-gradient-to-r ${tabIndicatorGradients[tab.id]}`}
+                      />
+                    )}
                   <span
                     className={
                       activeTab === tab.id ? tab.color : tab.hoverColor
