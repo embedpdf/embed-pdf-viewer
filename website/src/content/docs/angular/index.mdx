@@ -30,7 +30,7 @@ The Angular package wraps the EmbedPDF viewer in a standalone component that fee
 ## What ships today?
 
 - **Standalone Angular component** — import `PDFViewer` directly into your component.
-- **Provider defaults** — share a default viewer config via `provideEmbedPdfViewerConfig(...)`.
+- **Provider defaults** — share app-wide defaults via `provideEmbedPdfViewerDefaults(...)` and override them locally with `provideEmbedPdfViewerConfig(...)`.
 - **Runtime hooks** — respond to `(init)`, `(ready)`, and `(themechange)`.
 - **Angular-first theming** — define viewer defaults in one place and override per instance.
 

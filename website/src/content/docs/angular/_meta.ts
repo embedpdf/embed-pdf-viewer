@@ -1,5 +1,8 @@
 export default {
-  index: 'Overview',
-  viewer: 'Drop-in Viewer',
-  headless: 'Custom Integrations',
+  index: {
+    title: 'Overview',
+    type: 'doc',
+  },
+  viewer: 'Viewer',
+  headless: 'Headless',
 }

@@ -11,7 +11,7 @@ Today, Angular support focuses on the drop-in `@embedpdf/angular-pdf-viewer` pac
 That means the recommended Angular path is:
 
 1. render the standalone `PDFViewer` component,
-2. provide shared defaults with `provideEmbedPdfViewerConfig(...)`,
+2. provide shared defaults with `provideEmbedPdfViewerDefaults(...)`,
 3. customize behavior at runtime through `(ready)` and `(init)`.
 
 ## What you can customize
@@ -19,6 +19,7 @@ That means the recommended Angular path is:
 Even without a separate Angular-specific headless package, you can still build richer experiences by:
 
 - injecting shared viewer defaults with Angular providers,
+- overriding defaults locally with `provideEmbedPdfViewerConfig(...)` when a specific subtree needs different behavior,
 - listening for the viewer registry in `(ready)`,
 - registering commands or UI schema updates after initialization,
 - and coordinating theme or layout choices from Angular state.

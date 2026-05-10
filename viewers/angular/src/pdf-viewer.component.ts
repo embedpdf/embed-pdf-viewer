@@ -30,7 +30,6 @@ export type EmbedPdfThemeChangeEvent = {
 
 @Component({
   selector: 'embedpdf-viewer',
-  standalone: true,
   template: '',
   styles: `
     :host {

@@ -44,7 +44,6 @@ type ViewOptionCategory = (typeof VIEW_OPTIONS)[number]['category'];
 
 @Component({
   selector: 'app-root',
-  standalone: true,
   imports: [PDFViewer],
   template: `
     <main class="page" data-testid="angular-demo-shell">
@@ -91,8 +90,9 @@ type ViewOptionCategory = (typeof VIEW_OPTIONS)[number]['category'];
                   <h2>Angular config panel</h2>
                 </div>
                 <p>
-                  This example combines Angular-owned defaults via <code>[config]</code> with
-                  runtime customization through <code>(ready)</code>,
+                  This example combines app-wide defaults from
+                  <code>provideEmbedPdfViewerDefaults(...)</code> with per-viewer overrides via
+                  <code>[config]</code> and runtime customization through <code>(ready)</code>,
                   <code>commands.registerCommand()</code>, and <code>ui.mergeSchema()</code>.
                 </p>
               </div>

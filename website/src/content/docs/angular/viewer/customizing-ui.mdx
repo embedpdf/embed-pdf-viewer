@@ -1,0 +1,141 @@
+---
+title: Customizing the UI
+description: Disable features, register commands, and customize the Angular viewer toolbar.
+searchable: true
+---
+
+# Customizing the UI
+
+The Angular `PDFViewer` component supports both simple configuration-based UI changes and deeper runtime customization through the viewer registry.
+
+## Disabling Features
+
+The quickest way to simplify the UI is to use `disabledCategories`.
+
+```ts copy filename="src/app/app.component.ts"
+import {
+  ChangeDetectionStrategy,
+  Component,
+  type PDFViewerConfig,
+  PDFViewer,
+} from '@embedpdf/angular-pdf-viewer';
+
+@Component({
+  selector: 'app-root',
+  imports: [PDFViewer],
+  template: `<embedpdf-viewer class="viewer" [config]="viewerConfig" />`,
+  styles: `
+    .viewer {
+      height: 100vh;
+    }
+  `,
+  changeDetection: ChangeDetectionStrategy.OnPush,
+})
+export class App {
+  readonly viewerConfig = {
+    src: 'https://snippet.embedpdf.com/ebook.pdf',
+    disabledCategories: ['annotation', 'document-print', 'document-export'],
+  } satisfies PDFViewerConfig;
+}
+```
+
+## Common Category Groups
+
+Categories are hierarchical, so disabling a parent category disables its children too.
+
+| Group | Categories |
+| :--- | :--- |
+| **Zoom** | `zoom`, `zoom-in`, `zoom-out`, `zoom-fit-page`, `zoom-fit-width`, `zoom-marquee`, `zoom-level` |
+| **Annotation** | `annotation`, `annotation-markup`, `annotation-highlight`, `annotation-underline`, `annotation-strikeout`, `annotation-squiggly`, `annotation-ink`, `annotation-text`, `annotation-stamp` |
+| **Form** | `form`, `form-textfield`, `form-checkbox`, `form-radio`, `form-select`, `form-listbox`, `form-fill-mode` |
+| **Redaction** | `redaction`, `redaction-area`, `redaction-text`, `redaction-apply`, `redaction-clear` |
+| **Document** | `document`, `document-open`, `document-close`, `document-print`, `document-capture`, `document-export`, `document-fullscreen`, `document-protect` |
+| **Panel** | `panel`, `panel-sidebar`, `panel-search`, `panel-comment` |
+| **Selection** | `selection`, `selection-copy` |
+
+## Runtime UI Customization
+
+Use the `(ready)` output to access the registry, register commands, and modify the toolbar schema.
+
+```ts copy filename="src/app/app.component.ts"
+import { ChangeDetectionStrategy, Component } from '@angular/core';
+import {
+  type CommandButtonItem,
+  type CommandsCapability,
+  type GroupItem,
+  type PDFViewerConfig,
+  PDFViewer,
+  type PluginRegistry,
+  type UICapability,
+} from '@embedpdf/angular-pdf-viewer';
+
+@Component({
+  selector: 'app-root',
+  imports: [PDFViewer],
+  template: `<embedpdf-viewer class="viewer" [config]="viewerConfig" (ready)="onReady($event)" />`,
+  styles: `
+    .viewer {
+      height: 100vh;
+    }
+  `,
+  changeDetection: ChangeDetectionStrategy.OnPush,
+})
+export class App {
+  readonly viewerConfig = {
+    src: 'https://snippet.embedpdf.com/ebook.pdf',
+  } satisfies PDFViewerConfig;
+
+  onReady(registry: PluginRegistry) {
+    const commandsPlugin = registry.getPlugin('commands');
+    const uiPlugin = registry.getPlugin('ui');
+
+    if (!commandsPlugin?.provides || !uiPlugin?.provides) return;
+
+    const commands = commandsPlugin.provides() as CommandsCapability | undefined;
+    const ui = uiPlugin.provides() as UICapability | undefined;
+
+    if (!commands || !ui) return;
+
+    commands.registerCommand({
+      id: 'custom.angular-help',
+      label: 'Help',
+      action: () => globalThis.alert('Open your Angular help panel here.'),
+    });
+
+    const schema = ui.getSchema();
+    const toolbar = schema.toolbars['main-toolbar'];
+    if (!toolbar) return;
+
+    const items = structuredClone(toolbar.items);
+    const rightGroup = items.find(
+      (item): item is GroupItem => item.type === 'group' && item.id === 'right-group',
+    );
+
+    if (!rightGroup) return;
+
+    rightGroup.items.push({
+      type: 'command-button',
+      id: 'angular-help-button',
+      commandId: 'custom.angular-help',
+      variant: 'text',
+    } satisfies CommandButtonItem);
+
+    ui.mergeSchema({
+      toolbars: {
+        'main-toolbar': {
+          ...toolbar,
+          items,
+        },
+      },
+    });
+  }
+}
+```
+
+## Choosing the Right Level
+
+- Use `disabledCategories` when you want broad, declarative feature toggles.
+- Use `commands.registerCommand(...)` when you want Angular-owned actions inside the viewer.
+- Use `ui.mergeSchema(...)` when you need to add, remove, or replace toolbar and menu items.
+
+If you want to build a completely custom interface from scratch, start with the Angular [Headless](/docs/angular/headless/introduction) path and coordinate the viewer at runtime through the registry.

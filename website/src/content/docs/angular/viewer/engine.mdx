@@ -1,0 +1,111 @@
+---
+title: Accessing the Engine
+description: Access the underlying PDF engine from the Angular viewer for advanced read-only operations.
+searchable: true
+---
+
+import { Callout } from '@/components/callout'
+
+# Accessing the Engine
+
+The Angular `PDFViewer` component is powered by the same PDFium-based engine used throughout EmbedPDF. When you need low-level document operations, use the `(ready)` output to access the registry and then get the engine from there.
+
+<Callout type="warning">
+**The engine is stateless.** Direct engine operations do not update the viewer UI. Use plugins for actions that should stay in sync with the visible viewer state.
+
+The engine is best for:
+- read-only document inspection,
+- export or rendering workflows,
+- advanced operations not exposed through a viewer plugin.
+</Callout>
+
+## Getting the Engine Reference
+
+Use the registry from `(ready)` and the document manager plugin to access the active document:
+
+```ts copy filename="src/app/app.component.ts"
+import { ChangeDetectionStrategy, Component, signal } from '@angular/core';
+import {
+  type DocumentManagerPlugin,
+  type PDFViewerConfig,
+  PDFViewer,
+  type PluginRegistry,
+} from '@embedpdf/angular-pdf-viewer';
+
+@Component({
+  selector: 'app-root',
+  imports: [PDFViewer],
+  template: `
+    <button type="button" (click)="getDocumentMetadata()">Get Metadata</button>
+    <pre>{{ metadata() }}</pre>
+
+    <embedpdf-viewer
+      class="viewer"
+      [config]="viewerConfig"
+      (ready)="onReady($event)"
+    />
+  `,
+  styles: `
+    .viewer {
+      height: calc(100vh - 8rem);
+    }
+  `,
+  changeDetection: ChangeDetectionStrategy.OnPush,
+})
+export class App {
+  readonly viewerConfig = {
+    src: 'https://snippet.embedpdf.com/ebook.pdf',
+  } satisfies PDFViewerConfig;
+
+  readonly metadata = signal('');
+
+  private registry: PluginRegistry | null = null;
+
+  onReady(registry: PluginRegistry) {
+    this.registry = registry;
+  }
+
+  async getDocumentMetadata() {
+    if (!this.registry) return;
+
+    const engine = this.registry.getEngine();
+    const documentManager = this.registry
+      .getPlugin<DocumentManagerPlugin>('document-manager')
+      ?.provides();
+    const document = documentManager?.getActiveDocument();
+
+    if (!engine || !document) return;
+
+    const metadata = await engine.getMetadata(document).toPromise();
+    this.metadata.set(JSON.stringify(metadata, null, 2));
+  }
+}
+```
+
+## Common Engine Methods
+
+These methods are especially useful for read-only or export-oriented workflows:
+
+| Method | Description |
+| :--- | :--- |
+| `getMetadata(document)` | Read document metadata such as title, author, and dates |
+| `renderPage(document, page, options?)` | Render a page to an image for export or analysis |
+| `getPageText(document, pageIndex)` | Extract text from a page |
+| `getPageAnnotations(document, pageIndex)` | Read annotations on a page |
+| `saveAsCopy(document)` | Save the current document into a new buffer |
+
+All engine methods return an Observable-like task that you can await with `.toPromise()`.
+
+<Callout type="info">
+Need viewer-aware state changes instead?
+
+- Use the annotation plugin for annotation editing.
+- Use the zoom plugin for zoom changes.
+- Use the scroll/document manager plugins for navigation and document switching.
+
+Those plugin APIs keep the UI and internal state in sync.
+</Callout>
+
+## Full Engine Documentation
+
+For the complete engine API, see the shared [@embedpdf/engines documentation](/docs/engines/introduction).
