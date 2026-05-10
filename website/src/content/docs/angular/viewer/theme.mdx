@@ -8,6 +8,8 @@ searchable: true
 
 The Angular `PDFViewer` component uses the same theme system as the rest of the EmbedPDF viewer stack. You can choose a light, dark, or system-aware color mode and override only the theme values you care about.
 
+Use `[config]` when a specific viewer instance needs its own theme. Use `provideEmbedPdfViewerDefaults(...)` when you want the same theme defaults to apply across multiple viewers in your app.
+
 ## Basic Configuration
 
 Set the initial color mode with `theme.preference`:
@@ -64,6 +66,8 @@ bootstrapApplication(App, {
   ],
 });
 ```
+
+Any viewer can still override those shared defaults locally through its own `[config]` input.
 
 ## Overriding Theme Colors
 

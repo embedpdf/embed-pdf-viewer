@@ -8,6 +8,8 @@ searchable: true
 
 The Angular `PDFViewer` component supports both simple configuration-based UI changes and deeper runtime customization through the viewer registry.
 
+Use `[config]` when UI changes are specific to one viewer instance. If the same defaults should apply across many viewers, provide them once with `provideEmbedPdfViewerDefaults(...)` and reserve `[config]` for local exceptions.
+
 ## Disabling Features
 
 The quickest way to simplify the UI is to use `disabledCategories`.
@@ -134,6 +136,7 @@ export class App {
 
 ## Choosing the Right Level
 
+- Use `provideEmbedPdfViewerDefaults(...)` when the same UI defaults should apply across multiple viewers.
 - Use `disabledCategories` when you want broad, declarative feature toggles.
 - Use `commands.registerCommand(...)` when you want Angular-owned actions inside the viewer.
 - Use `ui.mergeSchema(...)` when you need to add, remove, or replace toolbar and menu items.

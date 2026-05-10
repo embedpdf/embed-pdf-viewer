@@ -10,6 +10,8 @@ import { Callout } from '@/components/callout'
 
 The Angular `PDFViewer` component is powered by the same PDFium-based engine used throughout EmbedPDF. When you need low-level document operations, use the `(ready)` output to access the registry and then get the engine from there.
 
+In practice, keep document-specific values like `src` on `[config]`, and use providers only for shared viewer defaults such as theme or permissions.
+
 <Callout type="warning">
 **The engine is stateless.** Direct engine operations do not update the viewer UI. Use plugins for actions that should stay in sync with the visible viewer state.
 

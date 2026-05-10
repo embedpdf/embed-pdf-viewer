@@ -35,7 +35,7 @@ Permission flags are best treated as **viewer policy**, not as a security bounda
 
 ## Quick Start
 
-Configure global permission behavior inside `viewerConfig.permissions`:
+Configure permission behavior inside `viewerConfig.permissions` when it is specific to one viewer instance:
 
 ```ts copy filename="src/app/app.component.ts"
 import {
@@ -69,6 +69,8 @@ export class App {
   } satisfies PDFViewerConfig;
 }
 ```
+
+If you want the same permission policy across multiple viewers, provide it once with `provideEmbedPdfViewerDefaults(...)` and let individual viewers override it with `[config]` only when needed.
 
 ## How Permission Resolution Works
 
