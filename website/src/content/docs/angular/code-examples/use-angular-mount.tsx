@@ -1,6 +1,12 @@
 'use client'
 import { useEffect, useRef, useState } from 'react'
 
+const angularRuntimePromise = Promise.all([
+  import('@angular/compiler'),
+  import('@angular/core'),
+  import('@angular/platform-browser'),
+])
+
 export function useAngularMount(
   loader: () => Promise<{ default: any; selector?: string }>,
 ) {
@@ -26,15 +32,12 @@ export function useAngularMount(
       if (!containerRef.current || angularAppRef.current) return
 
       try {
-        const [mod, _compiler, angularCore, platformBrowser] =
-          await Promise.all([
-            loaderRef.current(),
-            import('@angular/compiler'),
-            import('@angular/core'),
-            import('@angular/platform-browser'),
-          ])
+        const [mod, [_compiler, angularCore, platformBrowser]] = await Promise.all([
+          loaderRef.current(),
+          angularRuntimePromise,
+        ])
 
-        const selector = mod.selector ?? mod.default?.ɵcmp?.selectors?.[0]?.[0]
+        const selector = mod.selector
         if (!selector || typeof selector !== 'string') {
           throw new Error(
             'Angular demo component selector could not be resolved',
