@@ -7,8 +7,7 @@
     "declaration": true,
     "esModuleInterop": true,
     "skipLibCheck": true,
-    "outDir": "dist",
-    "types": ["node", "vitest/globals"]
+    "outDir": "dist"
   },
   "include": ["src"],
   "exclude": ["node_modules", "dist"]

@@ -41,7 +41,6 @@ const VIEW_OPTIONS = [
 ] as const;
 
 type ViewOptionCategory = (typeof VIEW_OPTIONS)[number]['category'];
-
 @Component({
   selector: 'app-root',
   imports: [PDFViewer],
@@ -90,9 +89,8 @@ type ViewOptionCategory = (typeof VIEW_OPTIONS)[number]['category'];
                   <h2>Angular config panel</h2>
                 </div>
                 <p>
-                  This example combines app-wide defaults from
-                  <code>provideEmbedPdfViewerDefaults(...)</code> with per-viewer overrides via
-                  <code>[config]</code> and runtime customization through <code>(ready)</code>,
+                  This example combines Angular-owned defaults via <code>[config]</code> with
+                  runtime customization through <code>(ready)</code>,
                   <code>commands.registerCommand()</code>, and <code>ui.mergeSchema()</code>.
                 </p>
               </div>
@@ -213,7 +211,6 @@ type ViewOptionCategory = (typeof VIEW_OPTIONS)[number]['category'];
       position: relative;
       overflow: hidden;
     }
-
     .title-group {
       display: grid;
       gap: 4px;
@@ -469,7 +466,7 @@ export class App {
   private ui: UICapability | null = null;
 
   readonly viewerConfig = {
-    src: 'https://snippet.embedpdf.com/ebook.pdf',
+    src: '/ebook.pdf',
     disabledCategories: ['annotation'],
     theme: {
       preference: 'light',
@@ -480,7 +477,6 @@ export class App {
   onInit(container: EmbedPdfContainer) {
     this.container = container;
   }
-
   onReady(registry: PluginRegistry) {
     this.ready.set(true);
 

@@ -1,9 +1,9 @@
-import { defineConfig, devices } from '@playwright/test'
+import { defineConfig, devices } from '@playwright/test';
 
 const stableViewport = {
   width: 1440,
   height: 1200,
-} as const
+} as const;
 
 export default defineConfig({
   testDir: './e2e',
@@ -35,4 +35,4 @@ export default defineConfig({
       },
     },
   ],
-})
+});

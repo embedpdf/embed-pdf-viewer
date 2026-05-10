@@ -7,7 +7,13 @@
   "scripts": {
     "dev": "turbo run dev --parallel",
     "dev:angular": "pnpm --filter @embedpdf/example-angular-pdf-viewer run dev",
-    "dev:vanilla": "pnpm --filter @embedpdf/example-vanilla run dev",
+    "dev:react-mui": "pnpm --filter @embedpdf/example-react-mui run dev",
+    "dev:react-tailwind": "pnpm --filter @embedpdf/example-react-tailwind run dev",
+    "dev:svelte-tailwind": "pnpm --filter @embedpdf/example-svelte-tailwind run dev",
+    "dev:vanilla": "pnpm --filter @embedpdf/example-vanilla-tailwind run dev",
+    "dev:vanilla-tailwind": "pnpm --filter @embedpdf/example-vanilla-tailwind run dev",
+    "dev:vue-tailwind": "pnpm --filter @embedpdf/example-vue-tailwind run dev",
+    "dev:vue-vuetify": "pnpm --filter @embedpdf/example-vue-vuetify run dev",
     "clean": "turbo run clean && rimraf .turbo/cache",
     "build:fresh": "pnpm clean && turbo run build",
     "build": "turbo run build",
@@ -22,6 +28,9 @@
     "build:watch": "ROARR_LOG=true turbowatch ./config/turbowatch.config.ts | roarr",
     "watch": "turbo watch",
     "watch:packages": "turbo watch build --filter=\"./packages/*\"",
+    "test": "turbo run test",
+    "test:watch": "turbo run test:watch",
+    "test:browser": "pnpm --filter @embedpdf/angular-pdf-viewer test:browser",
     "format": "prettier --write \"**/*.{ts,tsx,js,mjs,jsx,json,css,md}\"",
     "format:check": "prettier --check \"**/*.{ts,tsx,js,mjs,jsx,json,css,md}\"",
     "changeset": "changeset",
@@ -51,7 +60,8 @@
     "turbo": "latest",
     "turbowatch": "^2.29.4",
     "typescript": "latest",
-    "vite": "^6.3.5"
+    "vite": "^6.3.5",
+    "vitest": "^4.0.8"
   },
   "lint-staged": {
     "**/*.{ts,tsx,js,jsx,json,css,md,vue,svelte}": "prettier --write"

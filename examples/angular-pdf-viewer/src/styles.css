@@ -5,10 +5,6 @@ body {
   height: 100%;
 }
 
-body {
-  background: #020617;
-}
-
 app-root {
   display: block;
   width: 100%;

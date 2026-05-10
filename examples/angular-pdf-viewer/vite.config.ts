@@ -1,6 +1,6 @@
-import angular from '@analogjs/vite-plugin-angular'
-import { resolve } from 'node:path'
-import { defineConfig } from 'vite'
+import { defineConfig } from 'vite';
+import { resolve } from 'node:path';
+import angular from '@analogjs/vite-plugin-angular';
 
 export default defineConfig({
   plugins: [
@@ -19,4 +19,4 @@ export default defineConfig({
   optimizeDeps: {
     exclude: ['@embedpdf/engines'],
   },
-})
+});

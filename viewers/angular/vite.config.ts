@@ -1,7 +1,7 @@
-import angular from '@analogjs/vite-plugin-angular'
-import { resolve } from 'path'
-import dts from 'unplugin-dts/vite'
-import { defineConfig } from 'vite'
+import { defineConfig } from 'vite';
+import { resolve } from 'path';
+import angular from '@analogjs/vite-plugin-angular';
+import dts from 'unplugin-dts/vite';
 
 export default defineConfig({
   resolve: {
@@ -13,6 +13,7 @@ export default defineConfig({
     }),
     dts({
       tsconfigPath: resolve(__dirname, 'tsconfig.json'),
+      exclude: ['**/*.spec.ts', '**/test-setup.ts'],
     }),
   ],
   build: {
@@ -31,4 +32,4 @@ export default defineConfig({
       },
     },
   },
-})
+});
