@@ -22,7 +22,7 @@ import EmbedPDF, {
 
 import { EMBEDPDF_VIEWER_DEFAULT_CONFIG, mergeViewerConfigs } from './pdf-viewer.config';
 
-export type EmbedpdfThemeChangeEvent = {
+export type EmbedPdfThemeChangeEvent = {
   preference: ThemePreference;
   colorScheme: 'light' | 'dark';
   theme: Theme;
@@ -61,7 +61,7 @@ export class PDFViewer {
   readonly ready = output<PluginRegistry>();
 
   /** Emitted when the active theme changes (forwards the snippet's `themechange` custom event) */
-  readonly themechange = output<EmbedpdfThemeChangeEvent>();
+  readonly themechange = output<EmbedPdfThemeChangeEvent>();
 
   /** The active EmbedPdfContainer, or null when destroyed/uninitialized */
   readonly container = signal<EmbedPdfContainer | null>(null);
@@ -108,7 +108,7 @@ export class PDFViewer {
 
         const themechangeHandler = (event: Event) => {
           if (this.destroyRef.destroyed) return;
-          const detail = (event as CustomEvent<EmbedpdfThemeChangeEvent>).detail;
+          const detail = (event as CustomEvent<EmbedPdfThemeChangeEvent>).detail;
           if (detail) this.themechange.emit(detail);
         };
         viewer.addEventListener('themechange', themechangeHandler);
