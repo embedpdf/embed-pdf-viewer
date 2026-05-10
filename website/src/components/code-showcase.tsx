@@ -1,10 +1,10 @@
 'use client'
 
 import React, { useState } from 'react'
-import { ReactIcon, VueIcon, SvelteIcon } from './framework-icons'
+import { AngularIcon, ReactIcon, VueIcon, SvelteIcon } from './framework-icons'
 import { EMBEDPDF_JS_URL, DEMO_PDF_URL } from './cdn-snippet'
 
-export type Framework = 'snippet' | 'react' | 'vue' | 'svelte'
+export type Framework = 'snippet' | 'react' | 'vue' | 'svelte' | 'angular'
 
 interface Tab {
   id: Framework
@@ -66,6 +66,14 @@ const tabs: Tab[] = [
     color: 'text-orange-500',
     hoverColor: 'group-hover:text-orange-400',
   },
+  {
+    id: 'angular',
+    label: 'Angular',
+    filename: 'app.component.ts',
+    icon: <AngularIcon className="h-4 w-4" />,
+    color: 'text-red-500',
+    hoverColor: 'group-hover:text-red-400',
+  },
 ]
 
 const codeSnippets: Record<Framework, string> = {
@@ -120,6 +128,15 @@ function onReady(registry) {
   style="height: 500px"
   {onready}
 />`,
+  angular: `import { Component } from '@angular/core'
+import { PDFViewer } from '@embedpdf/angular-pdf-viewer'
+
+@Component({
+  selector: 'app-root',
+  imports: [PDFViewer],
+  template: \`<embedpdf-viewer [config]="{ src: '/demo.pdf' }" style="height: 500px" />\`,
+})
+export class App {}`,
 }
 
 // Syntax highlighting components for each framework
@@ -353,11 +370,51 @@ const SvelteCode = () => (
   </code>
 )
 
+const AngularCode = () => (
+  <code className="text-gray-300">
+    <span className="text-purple-400">import</span> {'{ '}
+    <span className="text-white">Component</span>
+    {' }'} <span className="text-purple-400">from</span>{' '}
+    <span className="text-yellow-300">&apos;@angular/core&apos;</span>
+    {'\n'}
+    <span className="text-purple-400">import</span> {'{ '}
+    <span className="text-white">PDFViewer</span>
+    {' }'} <span className="text-purple-400">from</span>{' '}
+    <span className="text-yellow-300">
+      &apos;@embedpdf/angular-pdf-viewer&apos;
+    </span>
+    {'\n\n'}
+    <span className="text-cyan-300">@</span>
+    <span className="text-yellow-300">Component</span>({'{'}
+    {'\n'}
+    {'  '}
+    <span className="text-red-300">selector</span>:{' '}
+    <span className="text-yellow-300">&apos;app-root&apos;</span>,{'\n'}
+    {'  '}
+    <span className="text-red-300">imports</span>:{' '}
+    <span className="text-cyan-300">[</span>
+    <span className="text-white">PDFViewer</span>
+    <span className="text-cyan-300">]</span>,{'\n'}
+    {'  '}
+    <span className="text-red-300">template</span>:{' '}
+    <span className="text-yellow-300">
+      {
+        '`<embedpdf-viewer [config]="{ src: \'/demo.pdf\' }" style="height: 500px" />`'
+      }
+    </span>
+    ,{'\n'}
+    {'}'}){'\n'}
+    <span className="text-purple-400">export class</span>{' '}
+    <span className="text-blue-300">App</span> {'{}'}
+  </code>
+)
+
 const codeComponents: Record<Framework, React.FC> = {
   snippet: SnippetCode,
   react: ReactCode,
   vue: VueCode,
   svelte: SvelteCode,
+  angular: AngularCode,
 }
 
 export const CodeShowcase = ({ framework, onTabChange }: CodeShowcaseProps) => {
@@ -436,7 +493,9 @@ export const CodeShowcase = ({ framework, onTabChange }: CodeShowcaseProps) => {
                             ? 'from-cyan-500 to-blue-400'
                             : tab.id === 'vue'
                               ? 'from-emerald-500 to-green-400'
-                              : 'from-orange-600 to-red-500'
+                              : tab.id === 'svelte'
+                                ? 'from-orange-600 to-red-500'
+                                : 'from-red-600 to-rose-500'
                       }`}
                     />
                   )}
