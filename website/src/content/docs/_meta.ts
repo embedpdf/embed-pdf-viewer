@@ -11,6 +11,10 @@ export default {
     title: 'Svelte',
     type: 'page',
   },
+  angular: {
+    title: 'Angular',
+    type: 'page',
+  },
   snippet: {
     title: 'EmbedPDF Snippet',
     type: 'page',

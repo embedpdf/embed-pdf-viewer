@@ -1,0 +1,111 @@
+---
+title: Security & Permissions
+description: Configure permission handling and document security behavior in the Angular viewer.
+searchable: true
+---
+
+import { Callout } from '@/components/callout'
+
+# Security & Permissions
+
+The Angular `PDFViewer` component exposes the same high-level `permissions` config as the underlying viewer. By default, it respects the permission flags embedded in a PDF, but you can override or ignore those flags when your app needs different behavior.
+
+## Understanding PDF Security
+
+PDF documents combine two concepts that are often confused: **encryption** and **permissions**.
+
+### Document Encryption
+
+Encryption protects access to the raw document bytes.
+
+- **User password** — required to open the document
+- **Owner password** — also opens the document and grants full access in compliant viewers
+
+Encryption answers the question: **who can open this file?**
+
+### Permission Flags
+
+Permission flags describe what a compliant viewer should allow after the document is opened: printing, copying, annotation changes, and similar actions.
+
+<Callout type="warning">
+**Critical:** Permission flags are not cryptographic enforcement. Once a user can view the unencrypted content, they can still screenshot, print, or re-save it with another tool.
+</Callout>
+
+Permission flags are best treated as **viewer policy**, not as a security boundary.
+
+## Quick Start
+
+Configure permission behavior inside `viewerConfig.permissions` when it is specific to one viewer instance:
+
+```ts copy filename="src/app/app.component.ts"
+import {
+  ChangeDetectionStrategy,
+  Component,
+  type PDFViewerConfig,
+  PDFViewer,
+} from '@embedpdf/angular-pdf-viewer';
+
+@Component({
+  selector: 'app-root',
+  imports: [PDFViewer],
+  template: `<embedpdf-viewer class="viewer" [config]="viewerConfig" />`,
+  styles: `
+    .viewer {
+      height: 100vh;
+    }
+  `,
+  changeDetection: ChangeDetectionStrategy.OnPush,
+})
+export class App {
+  readonly viewerConfig = {
+    src: 'https://snippet.embedpdf.com/ebook.pdf',
+    permissions: {
+      enforceDocumentPermissions: false,
+      overrides: {
+        print: false,
+        copyContents: true,
+      },
+    },
+  } satisfies PDFViewerConfig;
+}
+```
+
+If you want the same permission policy across multiple viewers, provide it once with `provideEmbedPdfViewerDefaults(...)` and let individual viewers override it with `[config]` only when needed.
+
+## How Permission Resolution Works
+
+The effective permissions for a document are resolved in this order:
+
+1. **Overrides** in `permissions.overrides`
+2. **Enforcement mode** via `enforceDocumentPermissions`
+3. **PDF document flags** embedded in the file itself
+
+If enforcement is off, EmbedPDF treats the document as “allow all” first and then applies your overrides on top.
+
+The UI responds automatically to those effective permissions. For example:
+
+- denying `print` disables or hides print actions,
+- denying `copyContents` blocks text-copy behavior,
+- denying `modifyAnnotations` disables annotation tooling.
+
+## API Reference
+
+### `PDFViewerConfig.permissions`
+
+| Property | Type | Default | Description |
+| :--- | :--- | :--- | :--- |
+| `enforceDocumentPermissions` | `boolean` | `true` | If `false`, ignore the PDF's internal permission flags as the base policy. |
+| `overrides` | `object` | `undefined` | Map of permission names to booleans (`true` = allow, `false` = deny). |
+
+### Supported Permission Names
+
+| Name | Description |
+| :--- | :--- |
+| `print` | Printing the document |
+| `printHighQuality` | High-quality printing |
+| `modifyContents` | Editing or altering document contents |
+| `copyContents` | Selecting and copying text or images |
+| `modifyAnnotations` | Adding, editing, or deleting annotations |
+| `fillForms` | Filling interactive form fields |
+| `extractForAccessibility` | Extracting content for screen readers |
+| `assembleDocument` | Inserting, rotating, or deleting pages |

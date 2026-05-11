@@ -4,6 +4,7 @@
   "scripts": {
     "dev": "next dev",
     "dev:clean": "rm -rf .next && next dev",
+    "test": "node --import tsx --test \"src/**/*.test.ts\"",
     "prebuild": "tsx tools/update-version-marker.ts",
     "build": "next build",
     "postbuild": "pagefind --site .next/server/app --output-path public/_pagefind",

@@ -1,0 +1,31 @@
+---
+title: Custom Integrations
+description: Extend the Angular viewer using providers, events, and runtime registry access.
+searchable: true
+---
+
+# Custom Integrations in Angular
+
+Today, Angular support focuses on the drop-in `@embedpdf/angular-pdf-viewer` package.
+
+That means the recommended Angular path is:
+
+1. render the standalone `PDFViewer` component,
+2. provide shared defaults with `provideEmbedPdfViewerDefaults(...)`,
+3. customize behavior at runtime through `(ready)` and `(init)`.
+
+## What you can customize
+
+Even without a separate Angular-specific headless package, you can still build richer experiences by:
+
+- injecting shared viewer defaults with Angular providers,
+- overriding defaults locally with `provideEmbedPdfViewerConfig(...)` when a specific subtree needs different behavior,
+- listening for the viewer registry in `(ready)`,
+- registering commands or UI schema updates after initialization,
+- and coordinating theme or layout choices from Angular state.
+
+## Best current path
+
+For most Angular apps, the best approach is to start with the [Drop-in Viewer](/docs/angular/viewer/getting-started) and add runtime customization from there.
+
+If you only need a trustworthy Angular integration today, that route will keep you moving without inventing a custom wrapper from scratch.

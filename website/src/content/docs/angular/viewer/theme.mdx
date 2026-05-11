@@ -1,0 +1,179 @@
+---
+title: Theme
+description: Configure light, dark, and custom theme values for the Angular PDF viewer.
+searchable: true
+---
+
+# Customizing the Theme
+
+The Angular `PDFViewer` component uses the same theme system as the rest of the EmbedPDF viewer stack. You can choose a light, dark, or system-aware color mode and override only the theme values you care about.
+
+Use `[config]` when a specific viewer instance needs its own theme. Use `provideEmbedPdfViewerDefaults(...)` when you want the same theme defaults to apply across multiple viewers in your app.
+
+## Basic Configuration
+
+Set the initial color mode with `theme.preference`:
+
+```ts copy filename="src/app/app.component.ts"
+import {
+  ChangeDetectionStrategy,
+  Component,
+  type PDFViewerConfig,
+  PDFViewer,
+} from '@embedpdf/angular-pdf-viewer';
+
+@Component({
+  selector: 'app-root',
+  imports: [PDFViewer],
+  template: `<embedpdf-viewer class="viewer" [config]="viewerConfig" />`,
+  styles: `
+    .viewer {
+      height: 100vh;
+    }
+  `,
+  changeDetection: ChangeDetectionStrategy.OnPush,
+})
+export class App {
+  readonly viewerConfig = {
+    src: 'https://snippet.embedpdf.com/ebook.pdf',
+    theme: {
+      preference: 'dark',
+    },
+  } satisfies PDFViewerConfig;
+}
+```
+
+## App-Wide Theme Defaults
+
+If you want the same theme defaults across your entire Angular application, provide them once during bootstrap:
+
+```ts copy filename="src/main.ts"
+import '@angular/compiler';
+import { provideZonelessChangeDetection } from '@angular/core';
+import { bootstrapApplication } from '@angular/platform-browser';
+import { provideEmbedPdfViewerDefaults } from '@embedpdf/angular-pdf-viewer';
+
+import { App } from './app/app.component';
+
+bootstrapApplication(App, {
+  providers: [
+    provideZonelessChangeDetection(),
+    provideEmbedPdfViewerDefaults({
+      theme: {
+        preference: 'system',
+      },
+    }),
+  ],
+});
+```
+
+Any viewer can still override those shared defaults locally through its own `[config]` input.
+
+## Overriding Theme Colors
+
+Theme objects are merged deeply, so you only need to provide the colors you want to change.
+
+```ts copy filename="src/app/app.component.ts"
+import {
+  ChangeDetectionStrategy,
+  Component,
+  type PDFViewerConfig,
+  PDFViewer,
+} from '@embedpdf/angular-pdf-viewer';
+
+@Component({
+  selector: 'app-root',
+  imports: [PDFViewer],
+  template: `<embedpdf-viewer class="viewer" [config]="viewerConfig" />`,
+  styles: `
+    .viewer {
+      height: 100vh;
+    }
+  `,
+  changeDetection: ChangeDetectionStrategy.OnPush,
+})
+export class App {
+  readonly viewerConfig = {
+    src: 'https://snippet.embedpdf.com/ebook.pdf',
+    theme: {
+      preference: 'system',
+      light: {
+        accent: {
+          primary: '#dd0031',
+          primaryHover: '#c3002f',
+          primaryActive: '#a8002a',
+          primaryLight: '#ffe5eb',
+          primaryForeground: '#ffffff',
+        },
+      },
+      dark: {
+        accent: {
+          primary: '#ff5c7c',
+          primaryHover: '#ff7a94',
+          primaryActive: '#ff4568',
+          primaryLight: '#55111f',
+          primaryForeground: '#17050a',
+        },
+      },
+    },
+  } satisfies PDFViewerConfig;
+}
+```
+
+## Updating Theme at Runtime
+
+Use the `(init)` output to keep a reference to the container and call `setTheme(...)` when your Angular state changes.
+
+```ts copy filename="src/app/app.component.ts"
+import { ChangeDetectionStrategy, Component, signal } from '@angular/core';
+import {
+  type EmbedPdfContainer,
+  type PDFViewerConfig,
+  PDFViewer,
+} from '@embedpdf/angular-pdf-viewer';
+
+@Component({
+  selector: 'app-root',
+  imports: [PDFViewer],
+  template: `
+    <button type="button" (click)="toggleTheme()">
+      Switch to {{ themePreference() === 'light' ? 'dark' : 'light' }} mode
+    </button>
+
+    <embedpdf-viewer
+      class="viewer"
+      [config]="viewerConfig"
+      (init)="onInit($event)"
+    />
+  `,
+  styles: `
+    .viewer {
+      height: calc(100vh - 3rem);
+    }
+  `,
+  changeDetection: ChangeDetectionStrategy.OnPush,
+})
+export class App {
+  readonly themePreference = signal<'light' | 'dark'>('light');
+  readonly viewerConfig = {
+    src: 'https://snippet.embedpdf.com/ebook.pdf',
+    theme: {
+      preference: 'light',
+    },
+  } satisfies PDFViewerConfig;
+
+  private container: EmbedPdfContainer | null = null;
+
+  onInit(container: EmbedPdfContainer) {
+    this.container = container;
+  }
+
+  toggleTheme() {
+    const nextPreference = this.themePreference() === 'light' ? 'dark' : 'light';
+    this.themePreference.set(nextPreference);
+    this.container?.setTheme({ preference: nextPreference });
+  }
+}
+```
+
+The `(themechange)` output is useful when the rest of your Angular app needs to react to the viewer's resolved light/dark mode.

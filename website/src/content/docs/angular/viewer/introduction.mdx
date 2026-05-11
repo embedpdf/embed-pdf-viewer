@@ -1,0 +1,35 @@
+---
+title: Viewer Introduction
+description: A complete, production-ready PDF viewer component for Angular.
+searchable: true
+---
+
+# Drop-in Viewer
+
+The `@embedpdf/angular-pdf-viewer` package provides a complete, production-ready PDF viewing experience for Angular applications.
+
+It is designed to be the fastest way to get a high-quality PDF viewer into your app. You don't need to build toolbars, handle layout logic, or worry about CSS—it just works, while still fitting naturally into Angular's standalone component model.
+
+## Key Features
+
+- **Ready-to-use UI** — Includes a polished toolbar, sidebar, and thumbnails.
+- **Responsive** — Adapts cleanly to mobile and desktop layouts.
+- **Angular-native API** — Import the standalone `PDFViewer` component directly into Angular components.
+- **Provider-based defaults** — Use `provideEmbedPdfViewerDefaults(...)` at bootstrap and `provideEmbedPdfViewerConfig(...)` for local overrides.
+- **Themable** — Configure light, dark, or system-aware themes and update them at runtime.
+- **TypeScript** — `PDFViewerConfig`, Angular outputs, and registry access are fully typed.
+
+## When to Use
+
+Choose the **Drop-in Viewer** if:
+
+- You need a standard PDF viewer (like Acrobat or Chrome's viewer).
+- You want to save development time and avoid building UI from scratch.
+- You prefer Angular-native composition over imperative container setup.
+- You want shared defaults through providers plus subtree or per-instance overrides.
+
+If you need deeper customization, head to [Custom Integrations](/docs/angular/headless/introduction) to extend the drop-in viewer with providers, events, and runtime registry access.
+
+## Quick Start
+
+Ready to dive in? [Get started in minutes](/docs/angular/viewer/getting-started).

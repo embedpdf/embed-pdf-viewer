@@ -18,6 +18,7 @@ config/tsup.frameworks.config.bundled*
 .next
 .cursor
 .DS_Store
+.env
 .gcs_entries
 .gclient*
 .cipd
@@ -29,3 +30,4 @@ publish-summary.json
 .env.*
 **/playwright-report
 **/test-results
+CLAUDE.md
