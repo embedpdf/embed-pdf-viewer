@@ -29,9 +29,9 @@ export const EMBEDPDF_VIEWER_DEFAULT_CONFIG = new InjectionToken<PDFViewerConfig
  * app to define shared defaults once and override them for a specific viewer subtree
  * when needed.
  *
- * The supplied config is merged with the closest inherited config using
- * {@link mergeViewerConfigs}. Plain objects are merged deeply, `undefined` values are
- * ignored, and arrays are replaced by the most local value.
+ * The supplied config is merged with the closest inherited config: plain
+ * objects are merged deeply, `undefined` values are ignored, and arrays are
+ * replaced by the most local value.
  */
 export function provideEmbedPdfViewerConfig(config: PDFViewerConfig): Provider[] {
   return [
