@@ -12,7 +12,7 @@ The PDFViewer supports switching between single-page view and two-page "spread" 
 You can configure the initial layout mode using the `spread` config object.
 
 ```ts
-import { EmbedPdfViewerComponent, SpreadMode } from '@embedpdf/angular-pdf-viewer';
+import { PDFViewer, SpreadMode } from '@embedpdf/angular-pdf-viewer';
 
 <embedpdf-viewer
     [config]="{
@@ -39,7 +39,7 @@ You can dynamically change the layout mode using the plugin API.
 
 ```ts
 import { signal } from '@angular/core';
-import { EmbedPdfViewerComponent, SpreadMode, type PluginRegistry, type SpreadPlugin } from '@embedpdf/angular-pdf-viewer';
+import { PDFViewer, SpreadMode, type PluginRegistry, type SpreadPlugin } from '@embedpdf/angular-pdf-viewer';
 
 const registry = signal<PluginRegistry | null>(null);
 
@@ -77,7 +77,7 @@ const getCurrentMode = () => {
 You can listen for layout changes to keep your external UI in sync.
 
 ```ts
-import { EmbedPdfViewerComponent, type PluginRegistry } from '@embedpdf/angular-pdf-viewer';
+import { PDFViewer, type PluginRegistry } from '@embedpdf/angular-pdf-viewer';
 
 const onReady = (registry: PluginRegistry) => {
   const spreadPlugin = registry.getPlugin('spread')?.provides();

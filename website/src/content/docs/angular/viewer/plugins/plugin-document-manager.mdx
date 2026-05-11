@@ -44,7 +44,7 @@ Use `openDocumentUrl` to load remote files.
 
 ```ts
 import { signal } from '@angular/core';
-import { EmbedPdfViewerComponent, type PluginRegistry } from '@embedpdf/angular-pdf-viewer';
+import { PDFViewer, type PluginRegistry } from '@embedpdf/angular-pdf-viewer';
 
 const registry = signal<PluginRegistry | null>(null);
 
@@ -71,7 +71,7 @@ To load a file selected by the user or fetched via a custom API request, use `op
 
 ```ts
 import { signal } from '@angular/core';
-import { EmbedPdfViewerComponent, type PluginRegistry } from '@embedpdf/angular-pdf-viewer';
+import { PDFViewer, type PluginRegistry } from '@embedpdf/angular-pdf-viewer';
 
 const registry = signal<PluginRegistry | null>(null);
 
@@ -143,7 +143,7 @@ You can listen for document lifecycle events to sync your external UI with the v
 | **`onDocumentError`** | `{ documentId, error }` | Fired if a document fails to load. |
 
 ```ts
-import { EmbedPdfViewerComponent, type PluginRegistry } from '@embedpdf/angular-pdf-viewer';
+import { PDFViewer, type PluginRegistry } from '@embedpdf/angular-pdf-viewer';
 
 const onReady = (registry: PluginRegistry) => {
   const docManager = registry.getPlugin('document-manager')?.provides();

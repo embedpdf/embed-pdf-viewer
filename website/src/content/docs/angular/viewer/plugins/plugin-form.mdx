@@ -40,7 +40,7 @@ Use the viewer registry to get the form capability for a specific document:
 
 ```ts
 import { signal } from '@angular/core';
-import { EmbedPdfViewerComponent, type PluginRegistry, type FormPlugin } from '@embedpdf/angular-pdf-viewer';
+import { PDFViewer, type PluginRegistry, type FormPlugin } from '@embedpdf/angular-pdf-viewer';
 
 const registry = signal<PluginRegistry | null>(null);
 

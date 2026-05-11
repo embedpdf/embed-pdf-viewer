@@ -37,7 +37,7 @@ You can toggle the pan mode programmatically, for example, to build a custom too
 
 ```ts
 import { signal } from '@angular/core';
-import { EmbedPdfViewerComponent, type PluginRegistry, type PanPlugin } from '@embedpdf/angular-pdf-viewer';
+import { PDFViewer, type PluginRegistry, type PanPlugin } from '@embedpdf/angular-pdf-viewer';
 
 const registry = signal<PluginRegistry | null>(null);
 
@@ -82,7 +82,7 @@ You can listen for changes in the interaction mode to update your UI.
 
 ```ts
 import { signal } from '@angular/core';
-import { EmbedPdfViewerComponent, type PluginRegistry } from '@embedpdf/angular-pdf-viewer';
+import { PDFViewer, type PluginRegistry } from '@embedpdf/angular-pdf-viewer';
 
 const toolState = signal<'hand' | 'cursor'>('cursor');
 

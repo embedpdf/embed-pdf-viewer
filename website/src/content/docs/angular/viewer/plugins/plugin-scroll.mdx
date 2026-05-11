@@ -12,7 +12,7 @@ The PDFViewer includes a powerful scroll engine capable of handling large docume
 You can configure global scroll settings via the `scroll` property.
 
 ```ts
-import { EmbedPdfViewerComponent, ScrollStrategy } from '@embedpdf/angular-pdf-viewer';
+import { PDFViewer, ScrollStrategy } from '@embedpdf/angular-pdf-viewer';
 
 <embedpdf-viewer
     [config]="{
@@ -38,7 +38,7 @@ You can control the viewer from your own application logic.
 
 ```ts
 import { signal } from '@angular/core';
-import { EmbedPdfViewerComponent, type PluginRegistry } from '@embedpdf/angular-pdf-viewer';
+import { PDFViewer, type PluginRegistry } from '@embedpdf/angular-pdf-viewer';
 
 const registry = signal<PluginRegistry | null>(null);
 
@@ -76,7 +76,7 @@ const goToPage10 = () => {
 Because documents load asynchronously, you cannot simply call `scrollToPage` immediately after initialization. Instead, you should listen for the `onLayoutReady` event. This event fires when the document structure is calculated and the viewer is ready to scroll.
 
 ```ts
-import { EmbedPdfViewerComponent, type PluginRegistry } from '@embedpdf/angular-pdf-viewer';
+import { PDFViewer, type PluginRegistry } from '@embedpdf/angular-pdf-viewer';
 
 const onReady = (registry: PluginRegistry) => {
   const scroll = registry.getPlugin('scroll')?.provides();
@@ -99,7 +99,7 @@ const onReady = (registry: PluginRegistry) => {
 You can listen for page change events to keep your application UI in sync.
 
 ```ts
-import { EmbedPdfViewerComponent, type PluginRegistry } from '@embedpdf/angular-pdf-viewer';
+import { PDFViewer, type PluginRegistry } from '@embedpdf/angular-pdf-viewer';
 
 const onReady = (registry: PluginRegistry) => {
   const scroll = registry.getPlugin('scroll')?.provides();

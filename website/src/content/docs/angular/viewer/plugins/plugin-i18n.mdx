@@ -43,7 +43,7 @@ You can switch languages dynamically without reloading the viewer.
 
 ```ts
 import { signal } from '@angular/core';
-import { EmbedPdfViewerComponent, type PluginRegistry } from '@embedpdf/angular-pdf-viewer';
+import { PDFViewer, type PluginRegistry } from '@embedpdf/angular-pdf-viewer';
 
 const registry = signal<PluginRegistry | null>(null);
 
@@ -66,7 +66,7 @@ const changeLanguage = (locale: string) => {
 ## Listening for Language Changes
 
 ```ts
-import { EmbedPdfViewerComponent, type PluginRegistry } from '@embedpdf/angular-pdf-viewer';
+import { PDFViewer, type PluginRegistry } from '@embedpdf/angular-pdf-viewer';
 
 const onReady = (registry: PluginRegistry) => {
   const i18n = registry.getPlugin('i18n')?.provides();
@@ -84,7 +84,7 @@ const onReady = (registry: PluginRegistry) => {
 If you need to support a language not included by default, you can provide your own translation objects.
 
 ```ts
-import { EmbedPdfViewerComponent } from '@embedpdf/angular-pdf-viewer';
+import { PDFViewer } from '@embedpdf/angular-pdf-viewer';
 
 const customSpanish = {
   code: 'es',

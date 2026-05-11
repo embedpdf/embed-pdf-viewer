@@ -16,7 +16,7 @@ On top of the built-in experience, you can access the `signature` plugin through
 You can configure the signature mode and default placement size through the `signature` config key:
 
 ```ts
-import { EmbedPdfViewerComponent, SignatureMode } from '@embedpdf/angular-pdf-viewer';
+import { PDFViewer, SignatureMode } from '@embedpdf/angular-pdf-viewer';
 
 <embedpdf-viewer
     [config]="{
@@ -42,7 +42,7 @@ Subscribe to entry changes and write to storage whenever a signature is added, r
 
 ```ts
 import {
-  EmbedPdfViewerComponent,
+  PDFViewer,
   type PluginRegistry,
   type SignaturePlugin,
   serializeEntries,
@@ -88,7 +88,7 @@ Use the viewer registry to get the signature capability:
 ```ts
 import { signal } from '@angular/core';
 import {
-  EmbedPdfViewerComponent,
+  PDFViewer,
   type PluginRegistry,
   type SignaturePlugin,
 } from '@embedpdf/angular-pdf-viewer';

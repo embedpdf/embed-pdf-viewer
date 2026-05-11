@@ -9,10 +9,10 @@ The PDFViewer comes with a built-in zoom toolbar, but you can also control zoom 
 
 ## Configuration
 
-You can set the default zoom level and limits in the `config` prop.
+You can set the default zoom level and limits via the `[config]` input.
 
 ```ts
-import { EmbedPdfViewerComponent, ZoomMode } from '@embedpdf/angular-pdf-viewer';
+import { PDFViewer, ZoomMode } from '@embedpdf/angular-pdf-viewer';
 
 <embedpdf-viewer
     [config]="{
@@ -43,7 +43,7 @@ You can control the zoom level from outside the viewer using the plugin registry
 
 ```ts
 import { signal } from '@angular/core';
-import { EmbedPdfViewerComponent, ZoomMode, type PluginRegistry, type ZoomPlugin } from '@embedpdf/angular-pdf-viewer';
+import { PDFViewer, ZoomMode, type PluginRegistry, type ZoomPlugin } from '@embedpdf/angular-pdf-viewer';
 
 const registry = signal<PluginRegistry | null>(null);
 
@@ -77,7 +77,7 @@ const fitWidth = () => {
 You can listen for zoom changes using the event system.
 
 ```ts
-import { EmbedPdfViewerComponent, type PluginRegistry } from '@embedpdf/angular-pdf-viewer';
+import { PDFViewer, type PluginRegistry } from '@embedpdf/angular-pdf-viewer';
 
 const onReady = (registry: PluginRegistry) => {
   const zoomPlugin = registry.getPlugin('zoom')?.provides();
