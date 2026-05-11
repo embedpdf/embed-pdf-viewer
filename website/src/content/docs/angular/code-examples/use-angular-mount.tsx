@@ -26,13 +26,12 @@ export function useAngularMount(loader: () => Promise<{ default: any }>) {
       if (!containerRef.current || angularAppRef.current) return
 
       try {
-        const [mod, _compiler, angularCore, platformBrowser] =
-          await Promise.all([
-            loaderRef.current(),
-            import('@angular/compiler'),
-            import('@angular/core'),
-            import('@angular/platform-browser'),
-          ])
+        const [mod, angularCore, platformBrowser] = await Promise.all([
+          loaderRef.current(),
+          import('@angular/core'),
+          import('@angular/platform-browser'),
+          import('@angular/compiler'),
+        ])
 
         if (!mounted || !containerRef.current) return
 

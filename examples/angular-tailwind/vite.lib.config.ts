@@ -20,7 +20,7 @@ export default defineConfig({
       rollupTypes: false,
       entryRoot: 'src/examples',
       outDir: 'dist/examples',
-      include: ['src/examples/**/*.ts'],
+      include: ['src/examples/**/*.ts', 'src/example-support.ts'],
     }),
   ],
   build: {

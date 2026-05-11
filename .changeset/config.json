@@ -55,6 +55,8 @@
     "@embedpdf/example-vue-tailwind",
     "@embedpdf/example-vue-vuetify",
     "@embedpdf/example-svelte-tailwind",
+    "@embedpdf/example-angular-pdf-viewer",
+    "@embedpdf/example-angular-tailwind",
     "@embedpdf/example-engines-node",
     "@embedpdf/example-pdfium-node",
     "@embedpdf/ai",
