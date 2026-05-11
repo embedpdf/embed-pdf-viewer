@@ -1,19 +1,29 @@
 import { ChangeDetectionStrategy, Component, effect, signal } from '@angular/core';
 
+import DisableCategoriesExample from './examples/viewer/disable-categories-example';
 import DocumentManagerExample from './examples/viewer/document-manager-example';
+import DocumentLoadingExample from './examples/viewer/document-loading-example';
 import EngineExample from './examples/viewer/engine-example';
+import RotateExample from './examples/viewer/rotate-example';
+import ScrollInitialPageExample from './examples/viewer/scroll-initial-page-example';
+import SpreadExample from './examples/viewer/spread-example';
 import ThemeExample from './examples/viewer/theme-example';
 import UiCustomizationExample from './examples/viewer/ui-customization-example';
 import ViewerExample from './examples/viewer/viewer-example';
 import ZoomExample from './examples/viewer/zoom-example';
 
 const DEMOS = [
-  { id: 'viewer', label: 'Viewer', component: ViewerExample },
-  { id: 'theme', label: 'Theme', component: ThemeExample },
-  { id: 'ui-customization', label: 'UI Customization', component: UiCustomizationExample },
-  { id: 'engine', label: 'Engine', component: EngineExample },
-  { id: 'zoom', label: 'Zoom', component: ZoomExample },
-  { id: 'document-manager', label: 'Document Manager', component: DocumentManagerExample },
+  { id: 'viewer', label: 'Viewer' },
+  { id: 'theme', label: 'Theme' },
+  { id: 'ui-customization', label: 'UI Customization' },
+  { id: 'engine', label: 'Engine' },
+  { id: 'zoom', label: 'Zoom' },
+  { id: 'rotate', label: 'Rotate' },
+  { id: 'spread', label: 'Spread' },
+  { id: 'document-loading', label: 'Document Loading' },
+  { id: 'scroll-initial-page', label: 'Scroll Initial Page' },
+  { id: 'disable-categories', label: 'Disable Categories' },
+  { id: 'document-manager', label: 'Document Manager' },
 ] as const;
 
 type DemoId = (typeof DEMOS)[number]['id'];
@@ -24,8 +34,13 @@ type DemoId = (typeof DEMOS)[number]['id'];
     ViewerExample,
     ThemeExample,
     UiCustomizationExample,
+    DisableCategoriesExample,
+    DocumentLoadingExample,
     EngineExample,
     ZoomExample,
+    RotateExample,
+    ScrollInitialPageExample,
+    SpreadExample,
     DocumentManagerExample,
   ],
   template: `
@@ -80,19 +95,114 @@ type DemoId = (typeof DEMOS)[number]['id'];
               <viewer-example />
             }
             @case ('theme') {
-              <theme-example />
+              @defer (on immediate) {
+                <theme-example />
+              } @placeholder (minimum 150ms) {
+                <div
+                  class="flex min-h-[600px] items-center justify-center rounded-xl border border-dashed border-white/10 bg-slate-950/40 px-6 text-sm text-slate-400"
+                >
+                  Loading theme demo…
+                </div>
+              }
             }
             @case ('ui-customization') {
-              <ui-customization-example />
+              @defer (on immediate) {
+                <ui-customization-example />
+              } @placeholder (minimum 150ms) {
+                <div
+                  class="flex min-h-[600px] items-center justify-center rounded-xl border border-dashed border-white/10 bg-slate-950/40 px-6 text-sm text-slate-400"
+                >
+                  Loading UI customization demo…
+                </div>
+              }
             }
             @case ('engine') {
-              <engine-example />
+              @defer (on immediate) {
+                <engine-example />
+              } @placeholder (minimum 150ms) {
+                <div
+                  class="flex min-h-[600px] items-center justify-center rounded-xl border border-dashed border-white/10 bg-slate-950/40 px-6 text-sm text-slate-400"
+                >
+                  Loading engine demo…
+                </div>
+              }
             }
             @case ('zoom') {
-              <zoom-example />
+              @defer (on immediate) {
+                <zoom-example />
+              } @placeholder (minimum 150ms) {
+                <div
+                  class="flex min-h-[600px] items-center justify-center rounded-xl border border-dashed border-white/10 bg-slate-950/40 px-6 text-sm text-slate-400"
+                >
+                  Loading zoom demo…
+                </div>
+              }
+            }
+            @case ('rotate') {
+              @defer (on immediate) {
+                <rotate-example />
+              } @placeholder (minimum 150ms) {
+                <div
+                  class="flex min-h-[600px] items-center justify-center rounded-xl border border-dashed border-white/10 bg-slate-950/40 px-6 text-sm text-slate-400"
+                >
+                  Loading rotate demo…
+                </div>
+              }
+            }
+            @case ('spread') {
+              @defer (on immediate) {
+                <spread-example />
+              } @placeholder (minimum 150ms) {
+                <div
+                  class="flex min-h-[600px] items-center justify-center rounded-xl border border-dashed border-white/10 bg-slate-950/40 px-6 text-sm text-slate-400"
+                >
+                  Loading spread demo…
+                </div>
+              }
+            }
+            @case ('document-loading') {
+              @defer (on immediate) {
+                <document-loading-example />
+              } @placeholder (minimum 150ms) {
+                <div
+                  class="flex min-h-[600px] items-center justify-center rounded-xl border border-dashed border-white/10 bg-slate-950/40 px-6 text-sm text-slate-400"
+                >
+                  Loading document loading demo…
+                </div>
+              }
+            }
+            @case ('scroll-initial-page') {
+              @defer (on immediate) {
+                <scroll-initial-page-example />
+              } @placeholder (minimum 150ms) {
+                <div
+                  class="flex min-h-[600px] items-center justify-center rounded-xl border border-dashed border-white/10 bg-slate-950/40 px-6 text-sm text-slate-400"
+                >
+                  Loading initial page demo…
+                </div>
+              }
+            }
+            @case ('disable-categories') {
+              @defer (on immediate) {
+                <disable-categories-example />
+              } @placeholder (minimum 150ms) {
+                <div
+                  class="flex min-h-[600px] items-center justify-center rounded-xl border border-dashed border-white/10 bg-slate-950/40 px-6 text-sm text-slate-400"
+                >
+                  Loading disable categories demo…
+                </div>
+              }
             }
             @case ('document-manager') {
-              <document-manager-example />
+              @defer (on immediate) {
+                <document-manager-example />
+              } @placeholder (minimum 150ms) {
+                <div
+                  class="flex min-h-[600px] items-center justify-center rounded-xl border border-dashed border-white/10 bg-slate-950/40 px-6 text-sm text-slate-400"
+                >
+                  Loading document manager demo…
+                </div>
+              }
             }
           }
         </section>

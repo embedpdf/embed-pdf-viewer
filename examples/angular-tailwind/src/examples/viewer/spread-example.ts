@@ -37,7 +37,9 @@ export const selector = 'spread-example';
           @for (option of options; track option.mode) {
             <button
               type="button"
+              [attr.aria-pressed]="currentMode() === option.mode"
               class="flex items-center gap-2 rounded px-3 py-1.5 text-sm font-medium transition-colors"
+              [disabled]="!docSpread()"
               [class.bg-white]="currentMode() === option.mode"
               [class.text-blue-600]="currentMode() === option.mode"
               [class.shadow-sm]="currentMode() === option.mode"

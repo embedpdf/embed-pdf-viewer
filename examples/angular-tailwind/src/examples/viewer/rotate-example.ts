@@ -36,6 +36,7 @@ export const selector = 'rotate-example';
               aria-label="Rotate counter-clockwise"
               title="Rotate Counter-Clockwise"
               class="rounded p-2 hover:bg-gray-200 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600 disabled:opacity-50 dark:hover:bg-gray-700 dark:focus-visible:outline-blue-400"
+              [disabled]="!rotate()"
               (click)="rotateCcw()"
             >
               ↺
@@ -45,6 +46,7 @@ export const selector = 'rotate-example';
               aria-label="Rotate clockwise"
               title="Rotate Clockwise"
               class="rounded p-2 hover:bg-gray-200 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600 disabled:opacity-50 dark:hover:bg-gray-700 dark:focus-visible:outline-blue-400"
+              [disabled]="!rotate()"
               (click)="rotateCw()"
             >
               ↻
