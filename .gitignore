@@ -30,3 +30,4 @@ publish-summary.json
 .env.*
 **/playwright-report
 **/test-results
+CLAUDE.md
