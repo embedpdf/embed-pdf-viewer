@@ -1,5 +1,5 @@
 import { TestBed } from '@angular/core/testing';
-import { ChangeDetectionStrategy, Component } from '@angular/core';
+import { ChangeDetectionStrategy, Component, signal } from '@angular/core';
 import { describe, expect, it } from 'vitest';
 
 @Component({
@@ -8,10 +8,7 @@ import { describe, expect, it } from 'vitest';
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
 class BrowserSmokeComponent {
-  readonly name = (
-    () => () =>
-      'Browser'
-  )();
+  readonly name = signal('Browser');
 }
 
 describe('Angular browser-mode smoke', () => {
