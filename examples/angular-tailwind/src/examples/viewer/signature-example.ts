@@ -1,18 +1,16 @@
 import {
   ChangeDetectionStrategy,
   Component,
-  DestroyRef,
   computed,
   effect,
-  inject,
   signal,
 } from '@angular/core';
 import {
+  createPluginCapabilitySignal,
   deserializeEntries,
   PDFViewer,
   type PluginRegistry,
   serializeEntries,
-  type SignatureCapability,
   type SignaturePlugin,
 } from '@embedpdf/angular-pdf-viewer';
 
@@ -112,10 +110,10 @@ export const selector = 'signature-example';
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export default class SignatureExample {
-  private readonly destroyRef = inject(DestroyRef);
   readonly themePreference = createThemePreferenceSignal();
   readonly theme = createThemeConfig(this.themePreference);
-  readonly signatureApi = signal<SignatureCapability | null>(null);
+  readonly registry = signal<PluginRegistry | null>(null);
+  readonly signatureApi = createPluginCapabilitySignal<SignaturePlugin>(this.registry, 'signature');
   readonly entryCount = signal(0);
   readonly storedCount = signal(readStoredCount());
   readonly autoSave = signal(true);
@@ -132,55 +130,52 @@ export default class SignatureExample {
     },
   }));
 
-  private autoSaveCleanup: (() => void) | null = null;
-
   constructor() {
-    effect(() => {
+    effect((onCleanup) => {
+      const api = this.signatureApi();
+      if (!api) {
+        this.entryCount.set(0);
+        return;
+      }
+
+      const raw = typeof localStorage !== 'undefined' ? localStorage.getItem(STORAGE_KEY) : null;
+      if (raw) {
+        try {
+          const entries = deserializeEntries(JSON.parse(raw));
+          api.loadEntries(entries);
+          this.status.set(
+            `Loaded ${entries.length} signature${entries.length !== 1 ? 's' : ''} from storage`,
+          );
+        } catch {
+          this.status.set('Failed to load saved signatures');
+        }
+      }
+
+      this.entryCount.set(api.getEntries().length);
+      const cleanup = api.onEntriesChange((entries) => {
+        this.entryCount.set(entries.length);
+      });
+      onCleanup(cleanup);
+    });
+
+    effect((onCleanup) => {
       const api = this.signatureApi();
       const enabled = this.autoSave();
-      this.autoSaveCleanup?.();
-      this.autoSaveCleanup = null;
-      if (!api || !enabled) return;
+      if (!api || !enabled || typeof localStorage === 'undefined') return;
 
-      this.autoSaveCleanup = api.onEntriesChange((entries) => {
+      const cleanup = api.onEntriesChange((entries) => {
         localStorage.setItem(STORAGE_KEY, JSON.stringify(serializeEntries(entries)));
         this.storedCount.set(entries.length);
         this.status.set(
           `Auto-saved ${entries.length} signature${entries.length !== 1 ? 's' : ''}`,
         );
       });
-    });
-
-    this.destroyRef.onDestroy(() => {
-      this.autoSaveCleanup?.();
-      this.autoSaveCleanup = null;
+      onCleanup(cleanup);
     });
   }
 
   onReady(registry: PluginRegistry) {
-    const api = registry.getPlugin<SignaturePlugin>('signature')?.provides();
-    if (!api) return;
-
-    this.signatureApi.set(api);
-
-    const raw = typeof localStorage !== 'undefined' ? localStorage.getItem(STORAGE_KEY) : null;
-    if (raw) {
-      try {
-        const entries = deserializeEntries(JSON.parse(raw));
-        api.loadEntries(entries);
-        this.status.set(
-          `Loaded ${entries.length} signature${entries.length !== 1 ? 's' : ''} from storage`,
-        );
-      } catch {
-        this.status.set('Failed to load saved signatures');
-      }
-    }
-
-    this.entryCount.set(api.getEntries().length);
-    const cleanup = api.onEntriesChange((entries) => {
-      this.entryCount.set(entries.length);
-    });
-    this.destroyRef.onDestroy(cleanup);
+    this.registry.set(registry);
   }
 
   save() {

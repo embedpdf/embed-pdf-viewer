@@ -4,8 +4,8 @@ import {
   DestroyRef,
   ElementRef,
   afterNextRender,
-  afterRenderEffect,
   computed,
+  effect,
   inject,
   input,
   output,
@@ -61,34 +61,31 @@ export class PDFViewer {
   readonly ready = output<PluginRegistry>();
 
   /** Emitted when the active theme changes (forwards the snippet's `themechange` custom event) */
-  readonly themechange = output<EmbedPdfThemeChangeEvent>();
+  readonly themeChange = output<EmbedPdfThemeChangeEvent>();
 
+  private readonly _container = signal<EmbedPdfContainer | null>(null);
   /** The active EmbedPdfContainer, or null when destroyed/uninitialized */
-  readonly container = signal<EmbedPdfContainer | null>(null);
+  readonly container = this._container.asReadonly();
 
+  private readonly _registry = signal<PluginRegistry | null>(null);
   /** The active PluginRegistry, or null until the viewer's registry promise resolves */
-  readonly registry = signal<PluginRegistry | null>(null);
+  readonly registry = this._registry.asReadonly();
 
   private readonly hostRef = inject<ElementRef<HTMLElement>>(ElementRef);
   private readonly destroyRef = inject(DestroyRef);
-  private readonly defaultConfig =
-    inject(EMBEDPDF_VIEWER_DEFAULT_CONFIG, { optional: true }) ?? null;
+  private readonly defaultConfig = inject(EMBEDPDF_VIEWER_DEFAULT_CONFIG, { optional: true });
   private readonly resolvedConfig = computed(() =>
     mergeViewerConfigs(this.defaultConfig, this.config()),
   );
-  private targetElement: HTMLElement | null = null;
-  private themechangeHandler: ((event: Event) => void) | null = null;
 
   constructor() {
-    afterRenderEffect({
-      write: () => {
-        const config = this.resolvedConfig();
-        const viewer = untracked(() => this.container());
+    effect(() => {
+      const config = this.resolvedConfig();
+      const viewer = untracked(() => this._container());
 
-        if (!viewer || this.destroyRef.destroyed) return;
+      if (!viewer || this.destroyRef.destroyed) return;
 
-        viewer.config = config;
-      },
+      viewer.config = config;
     });
 
     afterNextRender({
@@ -96,7 +93,6 @@ export class PDFViewer {
         if (this.destroyRef.destroyed) return;
 
         const target = this.hostRef.nativeElement;
-        this.targetElement = target;
 
         const viewer = EmbedPDF.init({
           type: 'container',
@@ -106,35 +102,33 @@ export class PDFViewer {
 
         if (!viewer || this.destroyRef.destroyed) return;
 
-        const themechangeHandler = (event: Event) => {
-          if (this.destroyRef.destroyed) return;
-          const detail = (event as CustomEvent<EmbedPdfThemeChangeEvent>).detail;
-          if (detail) this.themechange.emit(detail);
-        };
-        viewer.addEventListener('themechange', themechangeHandler);
-        this.themechangeHandler = themechangeHandler;
+        const listenerController = new AbortController();
+        viewer.addEventListener(
+          'themechange',
+          (event: Event) => {
+            const detail = (event as CustomEvent<EmbedPdfThemeChangeEvent>).detail;
+            if (detail) this.themeChange.emit(detail);
+          },
+          { signal: listenerController.signal },
+        );
 
-        this.container.set(viewer);
+        this.destroyRef.onDestroy(() => listenerController.abort());
+
+        this._container.set(viewer);
         this.init.emit(viewer);
 
         void viewer.registry.then((registry) => {
           if (this.destroyRef.destroyed) return;
-          this.registry.set(registry);
+          this._registry.set(registry);
           this.ready.emit(registry);
         });
       },
     });
 
     this.destroyRef.onDestroy(() => {
-      const viewer = this.container();
-      if (viewer && this.themechangeHandler) {
-        viewer.removeEventListener('themechange', this.themechangeHandler);
-      }
-      this.themechangeHandler = null;
-      this.targetElement?.replaceChildren();
-      this.targetElement = null;
-      this.container.set(null);
-      this.registry.set(null);
+      this.hostRef.nativeElement.replaceChildren();
+      this._container.set(null);
+      this._registry.set(null);
     });
   }
 }

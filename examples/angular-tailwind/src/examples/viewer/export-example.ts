@@ -1,7 +1,8 @@
 import { ChangeDetectionStrategy, Component, computed, signal } from '@angular/core';
 import {
+  createDocumentScopeSignal,
+  createPluginCapabilitySignal,
   type ExportPlugin,
-  type ExportScope,
   PDFViewer,
   type PluginRegistry,
 } from '@embedpdf/angular-pdf-viewer';
@@ -62,7 +63,9 @@ export const selector = 'export-example';
 export default class ExportExample {
   readonly themePreference = createThemePreferenceSignal();
   readonly theme = createThemeConfig(this.themePreference);
-  readonly exportScope = signal<ExportScope | null>(null);
+  readonly registry = signal<PluginRegistry | null>(null);
+  readonly exportPlugin = createPluginCapabilitySignal<ExportPlugin>(this.registry, 'export');
+  readonly exportScope = createDocumentScopeSignal(this.exportPlugin, 'export-doc');
   readonly isSaving = signal(false);
   readonly saveStatus = signal<SaveStatus>('idle');
   readonly viewerConfig = computed(() => ({
@@ -81,11 +84,7 @@ export default class ExportExample {
   }));
 
   onReady(registry: PluginRegistry) {
-    const scope = registry
-      .getPlugin<ExportPlugin>('export')
-      ?.provides()
-      ?.forDocument('export-doc');
-    if (scope) this.exportScope.set(scope);
+    this.registry.set(registry);
   }
 
   download() {

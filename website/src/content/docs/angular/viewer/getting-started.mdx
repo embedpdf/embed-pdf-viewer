@@ -102,7 +102,7 @@ import {
   selector: 'app-invoice-viewer',
   imports: [PDFViewer],
   providers: [
-    ...provideEmbedPdfViewerConfig({
+    provideEmbedPdfViewerConfig({
       theme: {
         preference: 'light',
       },
@@ -134,7 +134,7 @@ The component exposes Angular outputs for common lifecycle moments:
 
 - `(init)` — fired when the underlying viewer container is created.
 - `(ready)` — fired when the plugin registry resolves.
-- `(themechange)` — fired when the active theme changes.
+- `(themeChange)` — fired when the active theme changes.
 
 These hooks make it easy to register commands, tweak UI schema, or sync viewer state with your Angular app.
 

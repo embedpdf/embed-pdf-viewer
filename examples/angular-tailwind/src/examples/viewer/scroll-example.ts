@@ -1,12 +1,13 @@
 import {
   ChangeDetectionStrategy,
   Component,
-  DestroyRef,
   computed,
-  inject,
+  effect,
   signal,
 } from '@angular/core';
 import {
+  createDocumentScopeSignal,
+  createPluginCapabilitySignal,
   PDFViewer,
   type PluginRegistry,
   type ScrollCapability,
@@ -66,10 +67,11 @@ export const selector = 'scroll-example';
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export default class ScrollExample {
-  private readonly destroyRef = inject(DestroyRef);
   readonly themePreference = createThemePreferenceSignal();
   readonly theme = createThemeConfig(this.themePreference);
-  readonly scroll = signal<ScrollCapability | null>(null);
+  readonly registry = signal<PluginRegistry | null>(null);
+  readonly scroll = createPluginCapabilitySignal<ScrollPlugin>(this.registry, 'scroll');
+  readonly docScroll = createDocumentScopeSignal<ScrollCapability>(this.scroll, 'scroll-doc');
   readonly currentPage = signal(1);
   readonly totalPages = signal(1);
   readonly viewerConfig = computed(() => ({
@@ -87,30 +89,38 @@ export default class ScrollExample {
     },
   }));
 
+  constructor() {
+    effect((onCleanup) => {
+      const scrollCapability = this.scroll();
+      if (!scrollCapability) {
+        this.currentPage.set(1);
+        this.totalPages.set(1);
+        return;
+      }
+
+      const cleanups = [
+        scrollCapability.onLayoutReady((event) => {
+          this.currentPage.set(event.pageNumber);
+          this.totalPages.set(event.totalPages);
+        }),
+        scrollCapability.onPageChange((event) => {
+          this.currentPage.set(event.pageNumber);
+          this.totalPages.set(event.totalPages);
+        }),
+      ];
+      onCleanup(() => cleanups.forEach((cleanup) => cleanup()));
+    });
+  }
+
   onReady(registry: PluginRegistry) {
-    const scrollCapability = registry.getPlugin<ScrollPlugin>('scroll')?.provides();
-    if (!scrollCapability) return;
-
-    this.scroll.set(scrollCapability);
-
-    const cleanups = [
-      scrollCapability.onLayoutReady((event) => {
-        this.currentPage.set(event.pageNumber);
-        this.totalPages.set(event.totalPages);
-      }),
-      scrollCapability.onPageChange((event) => {
-        this.currentPage.set(event.pageNumber);
-        this.totalPages.set(event.totalPages);
-      }),
-    ];
-    this.destroyRef.onDestroy(() => cleanups.forEach((cleanup) => cleanup()));
+    this.registry.set(registry);
   }
 
   previousPage() {
-    this.scroll()?.forDocument('scroll-doc').scrollToPreviousPage();
+    this.docScroll()?.scrollToPreviousPage();
   }
 
   nextPage() {
-    this.scroll()?.forDocument('scroll-doc').scrollToNextPage();
+    this.docScroll()?.scrollToNextPage();
   }
 }

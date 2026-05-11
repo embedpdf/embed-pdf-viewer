@@ -1,12 +1,12 @@
 import {
   ChangeDetectionStrategy,
   Component,
-  DestroyRef,
   computed,
-  inject,
+  effect,
   signal,
 } from '@angular/core';
 import {
+  createPluginCapabilitySignal,
   type I18nCapability,
   type I18nPlugin,
   PDFViewer,
@@ -69,12 +69,12 @@ export const selector = 'i18n-example';
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export default class I18nExample {
-  private readonly destroyRef = inject(DestroyRef);
   readonly themePreference = createThemePreferenceSignal();
   readonly theme = createThemeConfig(this.themePreference);
   readonly locales = LOCALES;
   readonly currentLocale = signal<string>('en');
-  readonly i18n = signal<I18nCapability | null>(null);
+  readonly registry = signal<PluginRegistry | null>(null);
+  readonly i18n = createPluginCapabilitySignal<I18nPlugin>(this.registry, 'i18n');
   readonly viewerConfig = computed(() => ({
     src: DEMO_DOCUMENT_URL,
     theme: this.theme(),
@@ -83,15 +83,23 @@ export default class I18nExample {
     },
   }));
 
-  onReady(registry: PluginRegistry) {
-    const capability = registry.getPlugin<I18nPlugin>('i18n')?.provides();
-    if (!capability) return;
+  constructor() {
+    effect((onCleanup) => {
+      const capability = this.i18n();
+      if (!capability) {
+        this.currentLocale.set('en');
+        return;
+      }
 
-    this.i18n.set(capability);
-    const cleanup = capability.onLocaleChange((event) => {
-      this.currentLocale.set(event.currentLocale);
+      const cleanup = capability.onLocaleChange((event) => {
+        this.currentLocale.set(event.currentLocale);
+      });
+      onCleanup(cleanup);
     });
-    this.destroyRef.onDestroy(cleanup);
+  }
+
+  onReady(registry: PluginRegistry) {
+    this.registry.set(registry);
   }
 
   onLocaleChange(event: Event) {

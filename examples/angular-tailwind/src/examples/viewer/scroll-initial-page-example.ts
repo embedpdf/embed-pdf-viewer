@@ -1,12 +1,13 @@
 import {
   ChangeDetectionStrategy,
   Component,
-  DestroyRef,
   computed,
-  inject,
+  effect,
   signal,
 } from '@angular/core';
 import {
+  createDocumentScopeSignal,
+  createPluginCapabilitySignal,
   PDFViewer,
   type PluginRegistry,
   type ScrollPlugin,
@@ -53,9 +54,11 @@ export const selector = 'scroll-initial-page-example';
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export default class ScrollInitialPageExample {
-  private readonly destroyRef = inject(DestroyRef);
   readonly themePreference = createThemePreferenceSignal();
   readonly theme = createThemeConfig(this.themePreference);
+  readonly registry = signal<PluginRegistry | null>(null);
+  readonly scroll = createPluginCapabilitySignal<ScrollPlugin>(this.registry, 'scroll');
+  readonly docScroll = createDocumentScopeSignal(this.scroll, 'scroll-initial-page-doc');
   readonly status = signal('Loading layout…');
   readonly viewerConfig = computed(() => ({
     theme: this.theme(),
@@ -69,23 +72,30 @@ export default class ScrollInitialPageExample {
     },
   }));
 
-  onReady(registry: PluginRegistry) {
-    const scrollCapability = registry.getPlugin<ScrollPlugin>('scroll')?.provides();
-    if (!scrollCapability) return;
+  constructor() {
+    effect((onCleanup) => {
+      const scrollCapability = this.scroll();
+      const docScroll = this.docScroll();
+      if (!scrollCapability || !docScroll) return;
 
-    const cleanup = scrollCapability.onLayoutReady((event) => {
-      if (event.documentId !== 'scroll-initial-page-doc' || !event.isInitial) return;
+      const cleanup = scrollCapability.onLayoutReady((event) => {
+        if (event.documentId !== 'scroll-initial-page-doc' || !event.isInitial) return;
 
-      this.status.set('Layout ready. Jumping to page 3…');
-      setTimeout(() => {
-        scrollCapability.forDocument('scroll-initial-page-doc').scrollToPage({
-          pageNumber: 3,
-          behavior: 'instant',
-        });
-        this.status.set('Scrolled to page 3');
-      }, 0);
+        this.status.set('Layout ready. Jumping to page 3…');
+        setTimeout(() => {
+          docScroll.scrollToPage({
+            pageNumber: 3,
+            behavior: 'instant',
+          });
+          this.status.set('Scrolled to page 3');
+        }, 0);
+      });
+
+      onCleanup(cleanup);
     });
+  }
 
-    this.destroyRef.onDestroy(cleanup);
+  onReady(registry: PluginRegistry) {
+    this.registry.set(registry);
   }
 }

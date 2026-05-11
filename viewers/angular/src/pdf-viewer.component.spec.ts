@@ -46,7 +46,7 @@ const CHILD_DEFAULT_CONFIG = {
 
 @Component({
   imports: [PDFViewer],
-  providers: [...provideEmbedPdfViewerConfig(ROOT_DEFAULT_CONFIG)],
+  providers: [provideEmbedPdfViewerConfig(ROOT_DEFAULT_CONFIG)],
   template: ` <embedpdf-viewer [config]="config" /> `,
 })
 class ViewerWithDefaultsHost {
@@ -61,7 +61,7 @@ class ViewerWithDefaultsHost {
 @Component({
   selector: 'test-nested-viewer-defaults',
   imports: [PDFViewer],
-  providers: [...provideEmbedPdfViewerConfig(CHILD_DEFAULT_CONFIG)],
+  providers: [provideEmbedPdfViewerConfig(CHILD_DEFAULT_CONFIG)],
   template: ` <embedpdf-viewer [config]="config" /> `,
 })
 class ViewerWithNestedDefaultsChild {
@@ -75,7 +75,7 @@ class ViewerWithNestedDefaultsChild {
 
 @Component({
   imports: [ViewerWithNestedDefaultsChild],
-  providers: [...provideEmbedPdfViewerConfig(ROOT_DEFAULT_CONFIG)],
+  providers: [provideEmbedPdfViewerConfig(ROOT_DEFAULT_CONFIG)],
   template: ` <test-nested-viewer-defaults /> `,
 })
 class ViewerWithNestedDefaultsHost {}
@@ -237,7 +237,7 @@ describe('PDFViewer', () => {
     TestBed.resetTestingModule();
     TestBed.configureTestingModule({
       imports: [PDFViewer],
-      providers: [...provideEmbedPdfViewerConfig(ROOT_DEFAULT_CONFIG)],
+      providers: [provideEmbedPdfViewerConfig(ROOT_DEFAULT_CONFIG)],
     });
 
     const fixture = createViewerFixture();
@@ -329,7 +329,7 @@ describe('PDFViewer', () => {
     expect(fixture.componentInstance.registry()).toBeNull();
   });
 
-  it('forwards themechange events emitted by the viewer container', async () => {
+  it('forwards themeChange events emitted by the viewer container', async () => {
     const fixture = createViewerFixture();
     const viewer = globalThis.document.createElement('div') as unknown as EmbedPdfContainer & {
       registry: Promise<PluginRegistry>;
@@ -339,8 +339,8 @@ describe('PDFViewer', () => {
     } as never);
     initSpy.mockReturnValue(viewer);
 
-    const themechangeEvents: unknown[] = [];
-    fixture.componentInstance.themechange.subscribe((detail) => themechangeEvents.push(detail));
+    const themeChangeEvents: unknown[] = [];
+    fixture.componentInstance.themeChange.subscribe((detail) => themeChangeEvents.push(detail));
 
     fixture.detectChanges();
     await fixture.whenStable();
@@ -352,10 +352,10 @@ describe('PDFViewer', () => {
     };
     (viewer as unknown as EventTarget).dispatchEvent(new CustomEvent('themechange', { detail }));
 
-    expect(themechangeEvents).toEqual([detail]);
+    expect(themeChangeEvents).toEqual([detail]);
   });
 
-  it('does not emit themechange after the component is destroyed', async () => {
+  it('does not emit themeChange after the component is destroyed', async () => {
     const fixture = createViewerFixture();
     const viewer = globalThis.document.createElement('div') as unknown as EmbedPdfContainer & {
       registry: Promise<PluginRegistry>;
@@ -365,8 +365,8 @@ describe('PDFViewer', () => {
     } as never);
     initSpy.mockReturnValue(viewer);
 
-    const themechangeEvents: unknown[] = [];
-    fixture.componentInstance.themechange.subscribe((detail) => themechangeEvents.push(detail));
+    const themeChangeEvents: unknown[] = [];
+    fixture.componentInstance.themeChange.subscribe((detail) => themeChangeEvents.push(detail));
 
     fixture.detectChanges();
     await fixture.whenStable();
@@ -382,6 +382,6 @@ describe('PDFViewer', () => {
       }),
     );
 
-    expect(themechangeEvents).toEqual([]);
+    expect(themeChangeEvents).toEqual([]);
   });
 });

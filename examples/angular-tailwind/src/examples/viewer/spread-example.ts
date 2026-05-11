@@ -1,17 +1,17 @@
 import {
   ChangeDetectionStrategy,
   Component,
-  DestroyRef,
   computed,
-  inject,
+  effect,
   signal,
 } from '@angular/core';
 import {
+  createDocumentScopeSignal,
+  createPluginCapabilitySignal,
   PDFViewer,
   type PluginRegistry,
   SpreadMode,
   type SpreadPlugin,
-  type SpreadScope,
 } from '@embedpdf/angular-pdf-viewer';
 
 import {
@@ -71,10 +71,11 @@ export const selector = 'spread-example';
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export default class SpreadExample {
-  private readonly destroyRef = inject(DestroyRef);
   readonly themePreference = createThemePreferenceSignal();
   readonly theme = createThemeConfig(this.themePreference);
-  readonly docSpread = signal<SpreadScope | null>(null);
+  readonly registry = signal<PluginRegistry | null>(null);
+  readonly spread = createPluginCapabilitySignal<SpreadPlugin>(this.registry, 'spread');
+  readonly docSpread = createDocumentScopeSignal(this.spread, 'spread-doc');
   readonly currentMode = signal<SpreadMode>(SpreadMode.None);
   readonly options = [
     { mode: SpreadMode.None, label: 'Single Page' },
@@ -96,20 +97,25 @@ export default class SpreadExample {
     },
   }));
 
-  onReady(registry: PluginRegistry) {
-    const spreadScope = registry
-      .getPlugin<SpreadPlugin>('spread')
-      ?.provides()
-      ?.forDocument('spread-doc');
-    if (!spreadScope) return;
+  constructor() {
+    effect((onCleanup) => {
+      const spreadScope = this.docSpread();
+      if (!spreadScope) {
+        this.currentMode.set(SpreadMode.None);
+        return;
+      }
 
-    this.docSpread.set(spreadScope);
-    this.currentMode.set(spreadScope.getSpreadMode());
+      this.currentMode.set(spreadScope.getSpreadMode());
 
-    const cleanup = spreadScope.onSpreadChange((mode) => {
-      this.currentMode.set(mode);
+      const cleanup = spreadScope.onSpreadChange((mode) => {
+        this.currentMode.set(mode);
+      });
+      onCleanup(cleanup);
     });
-    this.destroyRef.onDestroy(cleanup);
+  }
+
+  onReady(registry: PluginRegistry) {
+    this.registry.set(registry);
   }
 
   setMode(mode: SpreadMode) {

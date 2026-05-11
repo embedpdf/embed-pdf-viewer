@@ -24,29 +24,27 @@ export const EMBEDPDF_VIEWER_DEFAULT_CONFIG = new InjectionToken<PDFViewerConfig
 /**
  * Provides default viewer config for the current injector.
  *
- * The returned providers intentionally use Angular's regular `Provider[]` shape so
- * the helper can be used at application, route, or component scope. That allows an
- * app to define shared defaults once and override them for a specific viewer subtree
+ * The returned provider intentionally uses Angular's regular `Provider` shape so the
+ * helper can be used at application, route, or component scope. That allows an app
+ * to define shared defaults once and override them for a specific viewer subtree
  * when needed.
  *
  * The supplied config is merged with the closest inherited config: plain
  * objects are merged deeply, `undefined` values are ignored, and arrays are
  * replaced by the most local value.
  */
-export function provideEmbedPdfViewerConfig(config: PDFViewerConfig): Provider[] {
-  return [
-    {
-      provide: EMBEDPDF_VIEWER_DEFAULT_CONFIG,
-      useFactory: () =>
-        mergeViewerConfigs(
-          inject(EMBEDPDF_VIEWER_DEFAULT_CONFIG, {
-            optional: true,
-            skipSelf: true,
-          }),
-          config,
-        ),
-    },
-  ];
+export function provideEmbedPdfViewerConfig(config: PDFViewerConfig): Provider {
+  return {
+    provide: EMBEDPDF_VIEWER_DEFAULT_CONFIG,
+    useFactory: () =>
+      mergeViewerConfigs(
+        inject(EMBEDPDF_VIEWER_DEFAULT_CONFIG, {
+          optional: true,
+          skipSelf: true,
+        }),
+        config,
+      ),
+  };
 }
 
 /**
@@ -58,7 +56,7 @@ export function provideEmbedPdfViewerConfig(config: PDFViewerConfig): Provider[]
  * the same merging behavior inside a component or another local injector.
  */
 export function provideEmbedPdfViewerDefaults(config: PDFViewerConfig): EnvironmentProviders {
-  return makeEnvironmentProviders(provideEmbedPdfViewerConfig(config));
+  return makeEnvironmentProviders([provideEmbedPdfViewerConfig(config)]);
 }
 
 /**

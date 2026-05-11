@@ -1,14 +1,15 @@
-import { ChangeDetectionStrategy, Component, computed, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, computed, effect, signal } from '@angular/core';
 import {
   type CommandButtonItem,
-  type CommandsCapability,
+  createPluginCapabilitySignal,
   type EmbedPdfContainer,
   type GroupItem,
   type ThemeConfig,
+  type CommandsPlugin,
   PDFViewer,
   type PDFViewerConfig,
   type PluginRegistry,
-  type UICapability,
+  type UIPlugin,
 } from '@embedpdf/angular-pdf-viewer';
 
 import { ANGULAR_THEME } from './viewer-config';
@@ -452,6 +453,9 @@ export class App {
   readonly viewOptions = VIEW_OPTIONS;
   readonly ready = signal(false);
   readonly showConfigPanel = signal(false);
+  readonly registry = signal<PluginRegistry | null>(null);
+  readonly commands = createPluginCapabilitySignal<CommandsPlugin>(this.registry, 'commands');
+  readonly ui = createPluginCapabilitySignal<UIPlugin>(this.registry, 'ui');
   readonly themePreference = signal<NonNullable<ThemeConfig['preference']>>('light');
   readonly disabledCategories = signal<string[]>(['annotation']);
   readonly nextThemeLabel = computed(() => (this.themePreference() === 'light' ? 'dark' : 'light'));
@@ -462,8 +466,6 @@ export class App {
 
   private toolbarCustomized = false;
   private container: EmbedPdfContainer | null = null;
-  private commands: CommandsCapability | null = null;
-  private ui: UICapability | null = null;
 
   readonly viewerConfig = {
     src: '/ebook.pdf',
@@ -474,71 +476,68 @@ export class App {
     },
   } satisfies PDFViewerConfig;
 
+  constructor() {
+    effect(() => {
+      if (this.toolbarCustomized) return;
+
+      const commands = this.commands();
+      const ui = this.ui();
+      if (!commands || !ui) return;
+
+      commands.registerCommand({
+        id: 'custom.angular-config',
+        label: 'Config',
+        action: () => this.toggleConfigPanel(),
+      });
+
+      const schema = ui.getSchema();
+      const toolbar = schema.toolbars['main-toolbar'];
+      if (!toolbar) return;
+
+      const items = structuredClone(toolbar.items);
+      const rightGroup = items.find(
+        (item): item is GroupItem => item.type === 'group' && item.id === 'right-group',
+      );
+
+      if (!rightGroup) return;
+
+      const angularButton = {
+        type: 'command-button',
+        id: 'angular-config-button',
+        commandId: 'custom.angular-config',
+        variant: 'text',
+      } satisfies CommandButtonItem;
+
+      const commentButtonIndex = rightGroup.items.findIndex(
+        (item) => item.type === 'command-button' && item.id === 'comment-button',
+      );
+
+      if (commentButtonIndex >= 0) {
+        rightGroup.items[commentButtonIndex] = angularButton;
+      } else {
+        rightGroup.items.push(angularButton);
+      }
+
+      ui.mergeSchema({
+        toolbars: {
+          'main-toolbar': {
+            ...toolbar,
+            items,
+          },
+        },
+      });
+
+      this.toolbarCustomized = true;
+    });
+  }
+
   onInit(container: EmbedPdfContainer) {
     this.container = container;
   }
+
   onReady(registry: PluginRegistry) {
     this.ready.set(true);
-
-    if (this.toolbarCustomized) return;
-
-    const commandsPlugin = registry.getPlugin('commands');
-    const uiPlugin = registry.getPlugin('ui');
-
-    if (!commandsPlugin?.provides || !uiPlugin?.provides) return;
-
-    const commands = commandsPlugin.provides() as CommandsCapability | undefined;
-    const ui = uiPlugin.provides() as UICapability | undefined;
-
-    if (!commands || !ui) return;
-
-    this.commands = commands;
-    this.ui = ui;
-
-    commands.registerCommand({
-      id: 'custom.angular-config',
-      label: 'Config',
-      action: () => this.toggleConfigPanel(),
-    });
-
-    const schema = ui.getSchema();
-    const toolbar = schema.toolbars['main-toolbar'];
-    if (!toolbar) return;
-
-    const items = structuredClone(toolbar.items);
-    const rightGroup = items.find(
-      (item): item is GroupItem => item.type === 'group' && item.id === 'right-group',
-    );
-
-    if (!rightGroup) return;
-
-    const angularButton = {
-      type: 'command-button',
-      id: 'angular-config-button',
-      commandId: 'custom.angular-config',
-      variant: 'text',
-    } satisfies CommandButtonItem;
-
-    const commentButtonIndex = rightGroup.items.findIndex(
-      (item) => item.type === 'command-button' && item.id === 'comment-button',
-    );
-
-    if (commentButtonIndex >= 0) {
-      rightGroup.items[commentButtonIndex] = angularButton;
-    } else {
-      rightGroup.items.push(angularButton);
-    }
-
-    ui.mergeSchema({
-      toolbars: {
-        'main-toolbar': {
-          ...toolbar,
-          items,
-        },
-      },
-    });
-
-    this.toolbarCustomized = true;
+    this.registry.set(registry);
   }
 
   toggleTheme() {
@@ -580,8 +579,8 @@ export class App {
 
   private applyDisabledCategories(categories: string[]) {
     this.disabledCategories.set(categories);
-    this.commands?.setDisabledCategories(categories);
-    this.ui?.setDisabledCategories(categories);
+    this.commands()?.setDisabledCategories(categories);
+    this.ui()?.setDisabledCategories(categories);
   }
 
   private applyThemePreference(preference: NonNullable<ThemeConfig['preference']>) {

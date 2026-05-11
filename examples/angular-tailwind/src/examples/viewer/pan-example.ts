@@ -1,14 +1,14 @@
 import {
   ChangeDetectionStrategy,
   Component,
-  DestroyRef,
   computed,
-  inject,
+  effect,
   signal,
 } from '@angular/core';
 import {
+  createDocumentScopeSignal,
+  createPluginCapabilitySignal,
   type PanPlugin,
-  type PanScope,
   PDFViewer,
   type PluginRegistry,
 } from '@embedpdf/angular-pdf-viewer';
@@ -80,10 +80,11 @@ export const selector = 'pan-example';
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export default class PanExample {
-  private readonly destroyRef = inject(DestroyRef);
   readonly themePreference = createThemePreferenceSignal();
   readonly theme = createThemeConfig(this.themePreference);
-  readonly docPan = signal<PanScope | null>(null);
+  readonly registry = signal<PluginRegistry | null>(null);
+  readonly pan = createPluginCapabilitySignal<PanPlugin>(this.registry, 'pan');
+  readonly docPan = createDocumentScopeSignal(this.pan, 'pan-doc');
   readonly isPanMode = signal(false);
   readonly viewerConfig = computed(() => ({
     theme: this.theme(),
@@ -100,17 +101,25 @@ export default class PanExample {
     },
   }));
 
-  onReady(registry: PluginRegistry) {
-    const panScope = registry.getPlugin<PanPlugin>('pan')?.provides()?.forDocument('pan-doc');
-    if (!panScope) return;
+  constructor() {
+    effect((onCleanup) => {
+      const panScope = this.docPan();
+      if (!panScope) {
+        this.isPanMode.set(false);
+        return;
+      }
 
-    this.docPan.set(panScope);
-    this.isPanMode.set(panScope.isPanMode());
+      this.isPanMode.set(panScope.isPanMode());
 
-    const cleanup = panScope.onPanModeChange((isActive) => {
-      this.isPanMode.set(isActive);
+      const cleanup = panScope.onPanModeChange((isActive) => {
+        this.isPanMode.set(isActive);
+      });
+      onCleanup(cleanup);
     });
-    this.destroyRef.onDestroy(cleanup);
+  }
+
+  onReady(registry: PluginRegistry) {
+    this.registry.set(registry);
   }
 
   togglePanMode() {

@@ -1,12 +1,13 @@
 import {
   ChangeDetectionStrategy,
   Component,
-  DestroyRef,
   computed,
-  inject,
+  effect,
   signal,
 } from '@angular/core';
 import {
+  createDocumentScopeSignal,
+  createPluginCapabilitySignal,
   type FormFieldInfo,
   type FormPlugin,
   PDFViewer,
@@ -86,9 +87,11 @@ export const selector = 'form-example';
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export default class FormExample {
-  private readonly destroyRef = inject(DestroyRef);
   readonly themePreference = createThemePreferenceSignal();
   readonly theme = createThemeConfig(this.themePreference);
+  readonly registry = signal<PluginRegistry | null>(null);
+  readonly form = createPluginCapabilitySignal<FormPlugin>(this.registry, 'form');
+  readonly formScope = createDocumentScopeSignal(this.form, DOCUMENT_ID);
   readonly fields = signal<FormFieldInfo[]>([]);
   readonly formValues = signal<Record<string, string>>({});
   readonly changeCount = signal(0);
@@ -113,27 +116,37 @@ export default class FormExample {
     },
   }));
 
+  constructor() {
+    effect((onCleanup) => {
+      const scope = this.formScope();
+      if (!scope) {
+        this.fields.set([]);
+        this.formValues.set({});
+        return;
+      }
+
+      const syncValues = () => {
+        this.formValues.set(scope.getFormValues());
+      };
+
+      this.fields.set(scope.getFormFields());
+      syncValues();
+
+      const cleanups = [
+        scope.onFormReady((nextFields) => {
+          this.fields.set(nextFields);
+          syncValues();
+        }),
+        scope.onFieldValueChange(() => {
+          syncValues();
+          this.changeCount.update((n) => n + 1);
+        }),
+      ];
+      onCleanup(() => cleanups.forEach((cleanup) => cleanup()));
+    });
+  }
+
   onReady(registry: PluginRegistry) {
-    const scope = registry.getPlugin<FormPlugin>('form')?.provides()?.forDocument(DOCUMENT_ID);
-    if (!scope) return;
-
-    const syncValues = () => {
-      this.formValues.set(scope.getFormValues());
-    };
-
-    this.fields.set(scope.getFormFields());
-    syncValues();
-
-    const cleanups = [
-      scope.onFormReady((nextFields) => {
-        this.fields.set(nextFields);
-        syncValues();
-      }),
-      scope.onFieldValueChange(() => {
-        syncValues();
-        this.changeCount.update((n) => n + 1);
-      }),
-    ];
-    this.destroyRef.onDestroy(() => cleanups.forEach((cleanup) => cleanup()));
+    this.registry.set(registry);
   }
 }

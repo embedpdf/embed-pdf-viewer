@@ -1,14 +1,14 @@
 import {
   ChangeDetectionStrategy,
   Component,
-  DestroyRef,
   computed,
-  inject,
+  effect,
   signal,
 } from '@angular/core';
 import {
   type AnnotationCapability,
   type AnnotationPlugin,
+  createPluginCapabilitySignal,
   PDFViewer,
   type PluginRegistry,
 } from '@embedpdf/angular-pdf-viewer';
@@ -79,11 +79,14 @@ export const selector = 'annotation-example';
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export default class AnnotationExample {
-  private readonly destroyRef = inject(DestroyRef);
   readonly themePreference = createThemePreferenceSignal();
   readonly theme = createThemeConfig(this.themePreference);
+  readonly registry = signal<PluginRegistry | null>(null);
   readonly tools = TOOLS;
-  readonly annotationCapability = signal<AnnotationCapability | null>(null);
+  readonly annotationCapability = createPluginCapabilitySignal<AnnotationPlugin>(
+    this.registry,
+    'annotation',
+  );
   readonly activeTool = signal<string | null>(null);
   readonly lastEvent = signal('Ready');
   readonly viewerConfig = computed(() => ({
@@ -102,25 +105,32 @@ export default class AnnotationExample {
     },
   }));
 
+  constructor() {
+    effect((onCleanup) => {
+      const capability = this.annotationCapability();
+      if (!capability) {
+        this.activeTool.set(null);
+        return;
+      }
+
+      const cleanups = [
+        capability.onActiveToolChange(({ tool }) => {
+          this.activeTool.set(tool?.id ?? null);
+        }),
+        capability.onAnnotationEvent((event) => {
+          if (event.type === 'create') {
+            this.lastEvent.set(`Created annotation on page ${event.pageIndex + 1}`);
+          } else if (event.type === 'delete') {
+            this.lastEvent.set(`Deleted annotation from page ${event.pageIndex + 1}`);
+          }
+        }),
+      ];
+      onCleanup(() => cleanups.forEach((cleanup) => cleanup()));
+    });
+  }
+
   onReady(registry: PluginRegistry) {
-    const capability = registry.getPlugin<AnnotationPlugin>('annotation')?.provides();
-    if (!capability) return;
-
-    this.annotationCapability.set(capability);
-
-    const cleanups = [
-      capability.onActiveToolChange(({ tool }) => {
-        this.activeTool.set(tool?.id ?? null);
-      }),
-      capability.onAnnotationEvent((event) => {
-        if (event.type === 'create') {
-          this.lastEvent.set(`Created annotation on page ${event.pageIndex + 1}`);
-        } else if (event.type === 'delete') {
-          this.lastEvent.set(`Deleted annotation from page ${event.pageIndex + 1}`);
-        }
-      }),
-    ];
-    this.destroyRef.onDestroy(() => cleanups.forEach((cleanup) => cleanup()));
+    this.registry.set(registry);
   }
 
   setTool(toolId: string | null) {

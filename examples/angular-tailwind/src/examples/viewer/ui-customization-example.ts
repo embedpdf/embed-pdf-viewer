@@ -1,5 +1,6 @@
-import { ChangeDetectionStrategy, Component, computed, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, computed, effect, signal } from '@angular/core';
 import {
+  createPluginCapabilitySignal,
   type CommandsPlugin,
   type GroupItem,
   type PluginRegistry,
@@ -20,10 +21,12 @@ export const selector = 'ui-customization-example';
 @Component({
   selector,
   imports: [PDFViewer],
-  providers: provideEmbedPdfViewerConfig({
-    src: DEMO_DOCUMENT_URL,
-    theme: ANGULAR_TAILWIND_THEME,
-  }),
+  providers: [
+    provideEmbedPdfViewerConfig({
+      src: DEMO_DOCUMENT_URL,
+      theme: ANGULAR_TAILWIND_THEME,
+    }),
+  ],
   template: `
     <div class="flex flex-col gap-4">
       <div
@@ -63,6 +66,9 @@ export const selector = 'ui-customization-example';
 })
 export default class UiCustomizationExample {
   readonly themePreference = createThemePreferenceSignal();
+  readonly registry = signal<PluginRegistry | null>(null);
+  readonly commands = createPluginCapabilitySignal<CommandsPlugin>(this.registry, 'commands');
+  readonly ui = createPluginCapabilitySignal<UIPlugin>(this.registry, 'ui');
   readonly isReady = signal(false);
   readonly lastAction = signal<string | null>(null);
   readonly viewerConfig = computed(() => ({
@@ -71,49 +77,63 @@ export default class UiCustomizationExample {
     },
   }));
 
-  onReady(registry: PluginRegistry) {
-    const commands = registry.getPlugin<CommandsPlugin>('commands')?.provides();
-    const ui = registry.getPlugin<UIPlugin>('ui')?.provides();
+  private toolbarCustomized = false;
 
-    if (!commands || !ui) return;
+  constructor() {
+    effect(() => {
+      const commands = this.commands();
+      const ui = this.ui();
+      if (!commands || !ui) return;
 
-    commands.registerCommand({
-      id: 'angular.docs.welcome',
-      label: 'Celebrate Angular',
-      action: () => {
-        this.lastAction.set('Angular command executed ✨');
-        globalThis.setTimeout(() => this.lastAction.set(null), 1800);
-      },
-    });
-
-    const schema = ui.getSchema();
-    const mainToolbar = schema.toolbars['main-toolbar'];
-
-    if (mainToolbar) {
-      const items = structuredClone(mainToolbar.items) as ToolbarItem[];
-      const rightGroup = items.find(
-        (item): item is GroupItem => item.type === 'group' && item.id === 'right-group',
-      );
-
-      if (rightGroup && !rightGroup.items.some((item) => item.id === 'angular-command-button')) {
-        rightGroup.items.unshift({
-          type: 'command-button',
-          id: 'angular-command-button',
-          commandId: 'angular.docs.welcome',
-          variant: 'icon',
+      if (!this.toolbarCustomized) {
+        commands.registerCommand({
+          id: 'angular.docs.welcome',
+          label: 'Celebrate Angular',
+          action: () => {
+            this.lastAction.set('Angular command executed ✨');
+            globalThis.setTimeout(() => this.lastAction.set(null), 1800);
+          },
         });
+
+        const schema = ui.getSchema();
+        const mainToolbar = schema.toolbars['main-toolbar'];
+
+        if (mainToolbar) {
+          const items = structuredClone(mainToolbar.items) as ToolbarItem[];
+          const rightGroup = items.find(
+            (item): item is GroupItem => item.type === 'group' && item.id === 'right-group',
+          );
+
+          if (
+            rightGroup &&
+            !rightGroup.items.some((item) => item.id === 'angular-command-button')
+          ) {
+            rightGroup.items.unshift({
+              type: 'command-button',
+              id: 'angular-command-button',
+              commandId: 'angular.docs.welcome',
+              variant: 'icon',
+            });
+          }
+
+          ui.mergeSchema({
+            toolbars: {
+              'main-toolbar': {
+                ...mainToolbar,
+                items,
+              },
+            },
+          });
+        }
+
+        this.toolbarCustomized = true;
       }
 
-      ui.mergeSchema({
-        toolbars: {
-          'main-toolbar': {
-            ...mainToolbar,
-            items,
-          },
-        },
-      });
-    }
+      this.isReady.set(true);
+    });
+  }
 
-    this.isReady.set(true);
+  onReady(registry: PluginRegistry) {
+    this.registry.set(registry);
   }
 }

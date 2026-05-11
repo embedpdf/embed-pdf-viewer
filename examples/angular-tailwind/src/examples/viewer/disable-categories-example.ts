@@ -6,6 +6,7 @@ import {
   signal,
 } from '@angular/core';
 import {
+  createPluginCapabilitySignal,
   type CommandsPlugin,
   PDFViewer,
   type PluginRegistry,
@@ -81,6 +82,8 @@ export default class DisableCategoriesExample {
   readonly themePreference = createThemePreferenceSignal();
   readonly theme = createThemeConfig(this.themePreference);
   readonly registry = signal<PluginRegistry | null>(null);
+  readonly commands = createPluginCapabilitySignal<CommandsPlugin>(this.registry, 'commands');
+  readonly ui = createPluginCapabilitySignal<UIPlugin>(this.registry, 'ui');
   readonly disabledCategories = signal<string[]>([]);
   readonly viewerConfig = computed(() => ({
     src: DEMO_DOCUMENT_URL,
@@ -90,12 +93,10 @@ export default class DisableCategoriesExample {
 
   constructor() {
     effect(() => {
-      const registry = this.registry();
       const categories = this.disabledCategories();
-      if (!registry) return;
 
-      registry.getPlugin<CommandsPlugin>('commands')?.provides()?.setDisabledCategories(categories);
-      registry.getPlugin<UIPlugin>('ui')?.provides()?.setDisabledCategories(categories);
+      this.commands()?.setDisabledCategories(categories);
+      this.ui()?.setDisabledCategories(categories);
     });
   }
 

@@ -117,7 +117,7 @@ const viewerDefaults = {
 } satisfies PDFViewerConfig;
 
 bootstrapApplication(AppComponent, {
-  providers: [...provideEmbedPdfViewerConfig(viewerDefaults)],
+  providers: [provideEmbedPdfViewerConfig(viewerDefaults)],
 });
 ```
 
@@ -279,7 +279,7 @@ export class AppComponent {
 
 - `(init)` — Emitted when the viewer container is initialized.
 - `(ready)` — Emitted when the plugin registry is ready and plugins are loaded.
-- `(themechange)` — Emitted when the active theme changes. The payload is `{ preference: 'light' | 'dark' | 'system'; colorScheme: 'light' | 'dark'; theme: Theme }`, forwarded from the snippet's underlying `themechange` custom event.
+- `(themeChange)` — Emitted when the active theme changes. The payload is `{ preference: 'light' | 'dark' | 'system'; colorScheme: 'light' | 'dark'; theme: Theme }`, forwarded from the snippet's underlying `themechange` custom event.
 
 ### Reactive State Signals
 

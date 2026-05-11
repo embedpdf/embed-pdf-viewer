@@ -1,16 +1,16 @@
 import {
   ChangeDetectionStrategy,
   Component,
-  DestroyRef,
   computed,
-  inject,
+  effect,
   signal,
 } from '@angular/core';
 import {
+  createDocumentScopeSignal,
+  createPluginCapabilitySignal,
   PDFViewer,
   type PluginRegistry,
   type SelectionPlugin,
-  type SelectionScope,
 } from '@embedpdf/angular-pdf-viewer';
 
 import {
@@ -69,10 +69,14 @@ export const selector = 'selection-example';
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export default class SelectionExample {
-  private readonly destroyRef = inject(DestroyRef);
   readonly themePreference = createThemePreferenceSignal();
   readonly theme = createThemeConfig(this.themePreference);
-  readonly selection = signal<SelectionScope | null>(null);
+  readonly registry = signal<PluginRegistry | null>(null);
+  readonly selectionPlugin = createPluginCapabilitySignal<SelectionPlugin>(
+    this.registry,
+    'selection',
+  );
+  readonly selection = createDocumentScopeSignal(this.selectionPlugin, 'selection-doc');
   readonly hasSelection = signal(false);
   readonly lastAction = signal<string | null>(null);
   readonly viewerConfig = computed(() => ({
@@ -87,18 +91,23 @@ export default class SelectionExample {
     },
   }));
 
-  onReady(registry: PluginRegistry) {
-    const scope = registry
-      .getPlugin<SelectionPlugin>('selection')
-      ?.provides()
-      ?.forDocument('selection-doc');
-    if (!scope) return;
+  constructor() {
+    effect((onCleanup) => {
+      const scope = this.selection();
+      if (!scope) {
+        this.hasSelection.set(false);
+        return;
+      }
 
-    this.selection.set(scope);
-    const cleanup = scope.onSelectionChange((current) => {
-      this.hasSelection.set(!!current);
+      const cleanup = scope.onSelectionChange((current) => {
+        this.hasSelection.set(!!current);
+      });
+      onCleanup(cleanup);
     });
-    this.destroyRef.onDestroy(cleanup);
+  }
+
+  onReady(registry: PluginRegistry) {
+    this.registry.set(registry);
   }
 
   copy() {

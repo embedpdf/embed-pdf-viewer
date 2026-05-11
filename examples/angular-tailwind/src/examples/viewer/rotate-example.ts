@@ -1,16 +1,16 @@
 import {
   ChangeDetectionStrategy,
   Component,
-  DestroyRef,
   computed,
-  inject,
+  effect,
   signal,
 } from '@angular/core';
 import {
+  createDocumentScopeSignal,
+  createPluginCapabilitySignal,
   PDFViewer,
   type PluginRegistry,
   type RotatePlugin,
-  type RotateScope,
 } from '@embedpdf/angular-pdf-viewer';
 
 import {
@@ -72,10 +72,11 @@ export const selector = 'rotate-example';
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export default class RotateExample {
-  private readonly destroyRef = inject(DestroyRef);
   readonly themePreference = createThemePreferenceSignal();
   readonly theme = createThemeConfig(this.themePreference);
-  readonly rotate = signal<RotateScope | null>(null);
+  readonly registry = signal<PluginRegistry | null>(null);
+  readonly rotatePlugin = createPluginCapabilitySignal<RotatePlugin>(this.registry, 'rotate');
+  readonly rotate = createDocumentScopeSignal(this.rotatePlugin, 'rotate-doc');
   readonly currentRotation = signal(0);
   readonly viewerConfig = computed(() => ({
     theme: this.theme(),
@@ -89,20 +90,25 @@ export default class RotateExample {
     },
   }));
 
-  onReady(registry: PluginRegistry) {
-    const docRotate = registry
-      .getPlugin<RotatePlugin>('rotate')
-      ?.provides()
-      ?.forDocument('rotate-doc');
-    if (!docRotate) return;
+  constructor() {
+    effect((onCleanup) => {
+      const docRotate = this.rotate();
+      if (!docRotate) {
+        this.currentRotation.set(0);
+        return;
+      }
 
-    this.rotate.set(docRotate);
-    this.currentRotation.set(docRotate.getRotation());
+      this.currentRotation.set(docRotate.getRotation());
 
-    const cleanup = docRotate.onRotateChange((rotation) => {
-      this.currentRotation.set(rotation);
+      const cleanup = docRotate.onRotateChange((rotation) => {
+        this.currentRotation.set(rotation);
+      });
+      onCleanup(cleanup);
     });
-    this.destroyRef.onDestroy(cleanup);
+  }
+
+  onReady(registry: PluginRegistry) {
+    this.registry.set(registry);
   }
 
   rotateCw() {

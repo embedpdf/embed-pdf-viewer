@@ -1,9 +1,10 @@
 import { ChangeDetectionStrategy, Component, computed, signal } from '@angular/core';
 import {
+  createDocumentScopeSignal,
+  createPluginCapabilitySignal,
   PDFViewer,
   type PluginRegistry,
   type PrintPlugin,
-  type PrintScope,
 } from '@embedpdf/angular-pdf-viewer';
 
 import {
@@ -56,7 +57,9 @@ export const selector = 'print-example';
 export default class PrintExample {
   readonly themePreference = createThemePreferenceSignal();
   readonly theme = createThemeConfig(this.themePreference);
-  readonly docPrint = signal<PrintScope | null>(null);
+  readonly registry = signal<PluginRegistry | null>(null);
+  readonly printPlugin = createPluginCapabilitySignal<PrintPlugin>(this.registry, 'print');
+  readonly docPrint = createDocumentScopeSignal(this.printPlugin, 'print-doc');
   readonly isPrinting = signal(false);
   readonly viewerConfig = computed(() => ({
     theme: this.theme(),
@@ -71,11 +74,7 @@ export default class PrintExample {
   }));
 
   onReady(registry: PluginRegistry) {
-    const printScope = registry
-      .getPlugin<PrintPlugin>('print')
-      ?.provides()
-      ?.forDocument('print-doc');
-    if (printScope) this.docPrint.set(printScope);
+    this.registry.set(registry);
   }
 
   print() {

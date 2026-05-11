@@ -1,5 +1,6 @@
-import { ChangeDetectionStrategy, Component, resource, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, computed, resource, signal } from '@angular/core';
 import {
+  createPluginCapabilitySignal,
   type DocumentManagerPlugin,
   type PluginRegistry,
   PDFViewer,
@@ -65,7 +66,11 @@ export default class EngineExample {
   readonly themePreference = createThemePreferenceSignal();
   readonly viewerConfig = createDefaultViewerConfig(this.themePreference);
   readonly registry = signal<PluginRegistry | null>(null);
-  readonly registryReady = signal(false);
+  readonly documentManager = createPluginCapabilitySignal<DocumentManagerPlugin>(
+    this.registry,
+    'document-manager',
+  );
+  readonly registryReady = computed(() => this.documentManager() !== null);
 
   // Bumped on each click to re-trigger the resource loader.
   private readonly inspectionToken = signal(0);
@@ -74,15 +79,13 @@ export default class EngineExample {
     params: () => ({
       token: this.inspectionToken(),
       registry: this.registry(),
+      documentManager: this.documentManager(),
     }),
     loader: async ({ params }) => {
-      if (params.token === 0 || !params.registry) return null;
+      if (params.token === 0 || !params.registry || !params.documentManager) return null;
 
-      const documentManager = params.registry
-        .getPlugin<DocumentManagerPlugin>('document-manager')
-        ?.provides();
       const engine = params.registry.getEngine();
-      const document = documentManager?.getActiveDocument();
+      const document = params.documentManager.getActiveDocument();
 
       if (!engine || !document) return null;
 
@@ -95,7 +98,6 @@ export default class EngineExample {
 
   onReady(registry: PluginRegistry) {
     this.registry.set(registry);
-    this.registryReady.set(true);
   }
 
   inspect() {
