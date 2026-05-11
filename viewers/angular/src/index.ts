@@ -1,4 +1,9 @@
-export { DocumentManagerPlugin, EmbedPdfContainer } from '@embedpdf/snippet';
+export {
+  DocumentManagerPlugin,
+  EmbedPdfContainer,
+  ScrollStrategy,
+  ZoomMode,
+} from '@embedpdf/snippet';
 export type {
   CommandButtonItem,
   CommandsCapability,
