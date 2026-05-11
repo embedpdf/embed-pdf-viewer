@@ -1,6 +1,6 @@
 import type { Framework } from './code-showcase'
 
-export const getDocumentationLink = (framework: Framework) => {
+export const getDocumentationLink = (framework: Framework): string => {
   switch (framework) {
     case 'react':
       return '/docs/react/viewer/introduction'
@@ -11,12 +11,11 @@ export const getDocumentationLink = (framework: Framework) => {
     case 'angular':
       return '/docs/angular/viewer/introduction'
     case 'snippet':
-    default:
       return '/docs/snippet/introduction'
   }
 }
 
-export const getButtonText = (framework: Framework) => {
+export const getButtonText = (framework: Framework): string => {
   switch (framework) {
     case 'react':
       return 'Read React Documentation'
@@ -27,7 +26,6 @@ export const getButtonText = (framework: Framework) => {
     case 'angular':
       return 'Read Angular Documentation'
     case 'snippet':
-    default:
       return 'Read Snippet Documentation'
   }
 }
