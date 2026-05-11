@@ -15,26 +15,21 @@ import {
   createThemePreferenceSignal,
 } from '../../example-support';
 
-export const selector = 'customizing-ui-example';
+export const selector = 'ui-customization-example';
 
 @Component({
   selector,
   imports: [PDFViewer],
-  providers: [
-    ...provideEmbedPdfViewerConfig({
-      src: DEMO_DOCUMENT_URL,
-      theme: {
-        preference: 'light',
-        ...ANGULAR_TAILWIND_THEME,
-      },
-    }),
-  ],
+  providers: provideEmbedPdfViewerConfig({
+    src: DEMO_DOCUMENT_URL,
+    theme: ANGULAR_TAILWIND_THEME,
+  }),
   template: `
-    <section class="flex flex-col gap-4">
+    <div class="flex flex-col gap-4">
       <div
-        class="flex flex-wrap items-center gap-4 rounded-2xl border border-slate-200 bg-white/90 p-4 shadow-sm dark:border-slate-700 dark:bg-slate-900/80"
+        class="flex flex-wrap items-center gap-3 rounded-lg border border-gray-200 bg-gray-50 p-4 dark:border-gray-700 dark:bg-gray-800"
       >
-        <div class="flex items-center gap-2 text-sm text-slate-700 dark:text-slate-200">
+        <div class="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-300">
           <span
             class="inline-block h-2.5 w-2.5 rounded-full"
             [class.bg-emerald-500]="isReady()"
@@ -54,19 +49,19 @@ export const selector = 'customizing-ui-example';
       </div>
 
       <div
-        class="h-[620px] overflow-hidden rounded-2xl border border-slate-300 bg-white shadow-lg dark:border-slate-700 dark:bg-slate-950"
+        class="h-[600px] w-full overflow-hidden rounded-xl border border-gray-300 shadow-lg dark:border-gray-600"
       >
         <embedpdf-viewer
-          class="h-full w-full"
+          class="block h-full w-full"
           [config]="viewerConfig()"
           (ready)="onReady($event)"
         />
       </div>
-    </section>
+    </div>
   `,
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
-export default class CustomizingUiExample {
+export default class UiCustomizationExample {
   readonly themePreference = createThemePreferenceSignal();
   readonly isReady = signal(false);
   readonly lastAction = signal<string | null>(null);
@@ -85,7 +80,6 @@ export default class CustomizingUiExample {
     commands.registerCommand({
       id: 'angular.docs.welcome',
       label: 'Celebrate Angular',
-      icon: 'help-circle',
       action: () => {
         this.lastAction.set('Angular command executed ✨');
         globalThis.setTimeout(() => this.lastAction.set(null), 1800);

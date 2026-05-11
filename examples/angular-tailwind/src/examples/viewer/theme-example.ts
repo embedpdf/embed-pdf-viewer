@@ -1,35 +1,48 @@
 import { ChangeDetectionStrategy, Component, computed, signal } from '@angular/core';
 import { type PDFViewerConfig, PDFViewer } from '@embedpdf/angular-pdf-viewer';
 
-import { createThemePreferenceSignal } from '../../example-support';
+import { DEMO_DOCUMENT_URL, createThemePreferenceSignal } from '../../example-support';
 
-const PALETTES = [
+const BRAND_COLORS = [
   {
-    id: 'teal',
-    label: 'Teal',
-    light: '#0f766e',
-    hover: '#115e59',
-    active: '#134e4a',
-    lightSoft: '#ccfbf1',
-    darkSoft: '#134e4a',
+    name: 'Purple',
+    primary: '#9333ea',
+    hover: '#7e22ce',
+    active: '#6b21a8',
+    light: '#f3e8ff',
+    darkLight: '#3b0764',
   },
   {
-    id: 'violet',
-    label: 'Violet',
-    light: '#7c3aed',
-    hover: '#6d28d9',
-    active: '#5b21b6',
-    lightSoft: '#ede9fe',
-    darkSoft: '#312e81',
+    name: 'Blue',
+    primary: '#2563eb',
+    hover: '#1d4ed8',
+    active: '#1e40af',
+    light: '#dbeafe',
+    darkLight: '#1e3a8a',
   },
   {
-    id: 'rose',
-    label: 'Rose',
-    light: '#e11d48',
-    hover: '#be123c',
-    active: '#9f1239',
-    lightSoft: '#ffe4e6',
-    darkSoft: '#4c0519',
+    name: 'Green',
+    primary: '#16a34a',
+    hover: '#15803d',
+    active: '#166534',
+    light: '#dcfce7',
+    darkLight: '#14532d',
+  },
+  {
+    name: 'Orange',
+    primary: '#ea580c',
+    hover: '#c2410c',
+    active: '#9a3412',
+    light: '#ffedd5',
+    darkLight: '#7c2d12',
+  },
+  {
+    name: 'Pink',
+    primary: '#db2777',
+    hover: '#be185d',
+    active: '#9d174d',
+    light: '#fce7f3',
+    darkLight: '#831843',
   },
 ] as const;
 
@@ -39,68 +52,70 @@ export const selector = 'theme-example';
   selector,
   imports: [PDFViewer],
   template: `
-    <section class="flex flex-col gap-4">
+    <div class="flex flex-col gap-4">
       <div
-        class="flex flex-wrap items-center gap-3 rounded-2xl border border-slate-200 bg-white/90 p-4 shadow-sm dark:border-slate-700 dark:bg-slate-900/80"
+        class="flex flex-wrap items-center gap-3 rounded-lg border border-gray-200 bg-gray-50 p-4 dark:border-gray-700 dark:bg-gray-800"
       >
-        <div>
-          <p class="text-sm font-medium text-slate-900 dark:text-slate-100">Theme tokens</p>
-          <p class="text-sm text-slate-600 dark:text-slate-300">
-            Swap the viewer accent palette without remounting the Angular component.
-          </p>
-        </div>
-        <div class="ml-auto flex flex-wrap gap-2">
-          @for (palette of palettes; track palette.id) {
+        <span class="text-sm font-medium text-gray-700 dark:text-gray-300">
+          Choose brand color:
+        </span>
+        <div class="flex gap-2">
+          @for (color of brandColors; track color.name) {
             <button
               type="button"
-              class="inline-flex items-center gap-2 rounded-full border px-3 py-1.5 text-sm font-medium transition"
-              [class.border-slate-900]="selectedPalette().id === palette.id"
-              [class.border-transparent]="selectedPalette().id !== palette.id"
-              [class.ring-2]="selectedPalette().id === palette.id"
-              [class.ring-slate-400]="selectedPalette().id === palette.id"
-              [style.backgroundColor]="palette.lightSoft"
-              [style.color]="palette.active"
-              (click)="selectedPalette.set(palette)"
-            >
-              <span class="h-2.5 w-2.5 rounded-full" [style.backgroundColor]="palette.light"></span>
-              {{ palette.label }}
-            </button>
+              [attr.aria-label]="'Use ' + color.name + ' theme accent'"
+              [attr.aria-pressed]="selectedColor().name === color.name"
+              [title]="color.name"
+              class="h-8 w-8 rounded-full border-2 transition-transform hover:scale-110 focus-visible:scale-110 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600 dark:focus-visible:outline-blue-400"
+              [class.border-gray-900]="selectedColor().name === color.name"
+              [class.dark:border-white]="selectedColor().name === color.name"
+              [class.ring-2]="selectedColor().name === color.name"
+              [class.ring-offset-2]="selectedColor().name === color.name"
+              [class.ring-offset-gray-50]="selectedColor().name === color.name"
+              [class.dark:ring-offset-gray-800]="selectedColor().name === color.name"
+              [class.border-transparent]="selectedColor().name !== color.name"
+              [style.backgroundColor]="color.primary"
+              (click)="selectedColor.set(color)"
+            ></button>
           }
         </div>
+        <span class="text-sm text-gray-500 dark:text-gray-400">
+          Selected: <strong>{{ selectedColor().name }}</strong>
+        </span>
       </div>
 
       <div
-        class="h-[620px] overflow-hidden rounded-2xl border border-slate-300 bg-white shadow-lg dark:border-slate-700 dark:bg-slate-950"
+        class="h-[600px] w-full overflow-hidden rounded-xl border border-gray-300 shadow-lg dark:border-gray-600"
       >
-        <embedpdf-viewer class="h-full w-full" [config]="viewerConfig()" />
+        <embedpdf-viewer class="block h-full w-full" [config]="viewerConfig()" />
       </div>
-    </section>
+    </div>
   `,
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export default class ThemeExample {
-  readonly palettes = PALETTES;
-  readonly selectedPalette = signal(PALETTES[0]);
+  readonly brandColors = BRAND_COLORS;
+  readonly selectedColor = signal<(typeof BRAND_COLORS)[number]>(BRAND_COLORS[0]);
   readonly themePreference = createThemePreferenceSignal();
   readonly viewerConfig = computed<PDFViewerConfig>(() => ({
-    src: 'https://snippet.embedpdf.com/ebook.pdf',
+    src: DEMO_DOCUMENT_URL,
     theme: {
       preference: this.themePreference(),
       light: {
         accent: {
-          primary: this.selectedPalette().light,
-          primaryHover: this.selectedPalette().hover,
-          primaryActive: this.selectedPalette().active,
-          primaryLight: this.selectedPalette().lightSoft,
+          primary: this.selectedColor().primary,
+          primaryHover: this.selectedColor().hover,
+          primaryActive: this.selectedColor().active,
+          primaryLight: this.selectedColor().light,
           primaryForeground: '#ffffff',
         },
       },
       dark: {
         accent: {
-          primary: this.selectedPalette().light,
-          primaryHover: this.selectedPalette().hover,
-          primaryActive: this.selectedPalette().active,
-          primaryLight: this.selectedPalette().darkSoft,
+          primary: this.selectedColor().primary,
+          primaryHover: this.selectedColor().hover,
+          primaryActive: this.selectedColor().active,
+          primaryLight: this.selectedColor().darkLight,
           primaryForeground: '#ffffff',
         },
       },

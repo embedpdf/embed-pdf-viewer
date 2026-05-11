@@ -12,7 +12,11 @@ import {
   type PluginRegistry,
 } from '@embedpdf/angular-pdf-viewer';
 
-import { createThemeConfig, createThemePreferenceSignal } from '../../example-support';
+import {
+  DEMO_DOCUMENT_URL,
+  createThemeConfig,
+  createThemePreferenceSignal,
+} from '../../example-support';
 
 export const selector = 'document-manager-example';
 
@@ -20,31 +24,31 @@ export const selector = 'document-manager-example';
   selector,
   imports: [PDFViewer],
   template: `
-    <section class="flex flex-col gap-4">
+    <div class="flex flex-col gap-4">
       <div
-        class="flex flex-wrap items-center justify-between gap-4 rounded-2xl border border-slate-200 bg-white/90 p-4 shadow-sm dark:border-slate-700 dark:bg-slate-900/80"
+        class="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-gray-200 bg-gray-50 p-4 dark:border-gray-700 dark:bg-gray-800"
       >
         <div class="flex flex-wrap items-center gap-2">
           <button
             type="button"
-            class="rounded-full bg-teal-600 px-4 py-2 text-sm font-medium text-white transition hover:bg-teal-500 disabled:cursor-not-allowed disabled:opacity-60"
+            class="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
             [disabled]="!isReady()"
             (click)="openRemoteDocument()"
           >
             Open remote sample
           </button>
           <label
-            class="rounded-full bg-slate-200 px-4 py-2 text-sm font-medium text-slate-900 transition hover:bg-slate-300 dark:bg-slate-800 dark:text-slate-100 dark:hover:bg-slate-700"
+            class="cursor-pointer rounded-lg bg-white px-4 py-2 text-sm font-medium text-gray-700 shadow-sm ring-1 ring-gray-200 transition-colors hover:bg-gray-100 dark:bg-gray-700 dark:text-gray-200 dark:ring-gray-600 dark:hover:bg-gray-600"
           >
             Upload local PDF
             <input type="file" class="hidden" accept=".pdf" (change)="onFileSelected($event)" />
           </label>
         </div>
 
-        <label class="flex items-center gap-2 text-sm text-slate-700 dark:text-slate-200">
+        <label class="flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300">
           Active document
           <select
-            class="rounded-full border border-slate-300 bg-white px-3 py-1.5 text-sm dark:border-slate-700 dark:bg-slate-950"
+            class="rounded-md border border-gray-300 bg-white px-3 py-1.5 text-sm dark:border-gray-600 dark:bg-gray-700"
             [value]="activeDocumentId() || ''"
             [disabled]="documents().length === 0"
             (change)="setActiveDocument($event)"
@@ -58,34 +62,34 @@ export const selector = 'document-manager-example';
       </div>
 
       <div
-        class="h-[620px] overflow-hidden rounded-2xl border border-slate-300 bg-white shadow-lg dark:border-slate-700 dark:bg-slate-950"
+        class="h-[600px] w-full overflow-hidden rounded-xl border border-gray-300 shadow-lg dark:border-gray-600"
       >
         <embedpdf-viewer
-          class="h-full w-full"
+          class="block h-full w-full"
           [config]="viewerConfig()"
           (ready)="onReady($event)"
         />
       </div>
-    </section>
+    </div>
   `,
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export default class DocumentManagerExample {
   readonly themePreference = createThemePreferenceSignal();
   readonly theme = createThemeConfig(this.themePreference);
-  readonly destroyRef = inject(DestroyRef);
+  private readonly destroyRef = inject(DestroyRef);
   readonly documents = signal<Array<{ id: string; name: string }>>([]);
   readonly activeDocumentId = signal<string | null>(null);
   readonly registry = signal<PluginRegistry | null>(null);
   readonly isReady = computed(() => this.registry() !== null);
   readonly viewerConfig = computed(() => ({
     theme: this.theme(),
-    tabBar: 'always',
+    tabBar: 'always' as const,
     documentManager: {
       maxDocuments: 5,
       initialDocuments: [
         {
-          url: 'https://snippet.embedpdf.com/ebook.pdf',
+          url: DEMO_DOCUMENT_URL,
           documentId: 'ebook-demo',
           name: 'EmbedPDF ebook',
         },
@@ -125,7 +129,7 @@ export default class DocumentManagerExample {
       ?.getPlugin<DocumentManagerPlugin>('document-manager')
       ?.provides()
       .openDocumentUrl({
-        url: 'https://snippet.embedpdf.com/ebook.pdf',
+        url: DEMO_DOCUMENT_URL,
         documentId: `ebook-copy-${Date.now()}`,
         name: 'Remote ebook copy',
       });

@@ -1,10 +1,9 @@
 'use client'
 import { useAngularMount } from '../use-angular-mount'
 
-export const CustomizingUiExample = () => {
+export const FormExample = () => {
   const { containerRef } = useAngularMount(
-    () =>
-      import('@embedpdf/example-angular-tailwind/viewer/customizing-ui-example'),
+    () => import('@embedpdf/example-angular-tailwind/viewer/form-example'),
   )
 
   return <div ref={containerRef} suppressHydrationWarning />

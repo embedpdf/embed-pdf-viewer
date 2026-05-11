@@ -3,9 +3,19 @@ title: Text Selection
 description: Control text selection programmatically and listen for selection events.
 ---
 
+import { SelectionExample } from '../../code-examples/viewer/selection-example';
+
 # Text Selection
 
 The PDFViewer enables users to select text naturally, just like on a webpage. While the viewer provides built-in context menus for selection, you can also interact with the selection state programmatically to build custom features like "Copy to Clipboard" buttons or extract selected text.
+
+<CodeExample
+  codePaths={[
+    "../../examples/angular-tailwind/src/examples/viewer/selection-example.ts"
+  ]}
+>
+  <SelectionExample />
+</CodeExample>
 
 ## Programmatic Control
 

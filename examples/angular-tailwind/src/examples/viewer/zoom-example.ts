@@ -6,7 +6,11 @@ import {
   ZoomMode,
 } from '@embedpdf/angular-pdf-viewer';
 
-import { createThemeConfig, createThemePreferenceSignal } from '../../example-support';
+import {
+  DEMO_DOCUMENT_URL,
+  createThemeConfig,
+  createThemePreferenceSignal,
+} from '../../example-support';
 
 export const selector = 'zoom-example';
 
@@ -14,37 +18,37 @@ export const selector = 'zoom-example';
   selector,
   imports: [PDFViewer],
   template: `
-    <section class="flex flex-col gap-4">
+    <div class="flex flex-col gap-4">
       <div
-        class="flex flex-wrap items-center gap-2 rounded-2xl border border-slate-200 bg-white/90 p-4 shadow-sm dark:border-slate-700 dark:bg-slate-900/80"
+        class="flex flex-wrap items-center gap-2 rounded-lg border border-gray-200 bg-gray-50 p-2 dark:border-gray-700 dark:bg-gray-800"
       >
-        <span class="mr-2 text-sm font-medium text-slate-700 dark:text-slate-200"
-          >External zoom controls</span
-        >
+        <span class="px-2 text-sm font-medium text-gray-600 dark:text-gray-300">
+          External zoom controls:
+        </span>
         <button
           type="button"
-          class="rounded-full bg-slate-200 px-3 py-1.5 text-sm font-medium text-slate-900 transition hover:bg-slate-300 dark:bg-slate-800 dark:text-slate-100 dark:hover:bg-slate-700"
+          class="rounded px-3 py-1.5 text-sm font-medium hover:bg-gray-200 dark:hover:bg-gray-700"
           (click)="zoomOut()"
         >
           Zoom out
         </button>
         <button
           type="button"
-          class="rounded-full bg-slate-200 px-3 py-1.5 text-sm font-medium text-slate-900 transition hover:bg-slate-300 dark:bg-slate-800 dark:text-slate-100 dark:hover:bg-slate-700"
+          class="rounded px-3 py-1.5 text-sm font-medium hover:bg-gray-200 dark:hover:bg-gray-700"
           (click)="zoomIn()"
         >
           Zoom in
         </button>
         <button
           type="button"
-          class="rounded-full bg-slate-200 px-3 py-1.5 text-sm font-medium text-slate-900 transition hover:bg-slate-300 dark:bg-slate-800 dark:text-slate-100 dark:hover:bg-slate-700"
+          class="rounded px-3 py-1.5 text-sm font-medium hover:bg-gray-200 dark:hover:bg-gray-700"
           (click)="fitWidth()"
         >
           Fit width
         </button>
         <button
           type="button"
-          class="rounded-full bg-slate-200 px-3 py-1.5 text-sm font-medium text-slate-900 transition hover:bg-slate-300 dark:bg-slate-800 dark:text-slate-100 dark:hover:bg-slate-700"
+          class="rounded px-3 py-1.5 text-sm font-medium hover:bg-gray-200 dark:hover:bg-gray-700"
           (click)="fitPage()"
         >
           Fit page
@@ -52,15 +56,15 @@ export const selector = 'zoom-example';
       </div>
 
       <div
-        class="h-[620px] overflow-hidden rounded-2xl border border-slate-300 bg-white shadow-lg dark:border-slate-700 dark:bg-slate-950"
+        class="h-[600px] w-full overflow-hidden rounded-xl border border-gray-300 shadow-lg dark:border-gray-600"
       >
         <embedpdf-viewer
-          class="h-full w-full"
+          class="block h-full w-full"
           [config]="viewerConfig()"
           (ready)="onReady($event)"
         />
       </div>
-    </section>
+    </div>
   `,
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
@@ -76,7 +80,7 @@ export default class ZoomExample {
     documentManager: {
       initialDocuments: [
         {
-          url: 'https://snippet.embedpdf.com/ebook.pdf',
+          url: DEMO_DOCUMENT_URL,
           documentId: 'zoom-doc',
         },
       ],

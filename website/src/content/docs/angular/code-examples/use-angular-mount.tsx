@@ -1,9 +1,12 @@
 'use client'
+import type { ApplicationRef, Type } from '@angular/core'
 import { useEffect, useRef, useState } from 'react'
 
-export function useAngularMount(loader: () => Promise<{ default: any }>) {
+type AngularComponentModule = { default: Type<unknown> }
+
+export function useAngularMount(loader: () => Promise<AngularComponentModule>) {
   const containerRef = useRef<HTMLDivElement>(null)
-  const angularAppRef = useRef<any>(null)
+  const angularAppRef = useRef<ApplicationRef | null>(null)
   const loaderRef = useRef(loader)
   const [isMounted, setIsMounted] = useState(false)
 
@@ -26,6 +29,7 @@ export function useAngularMount(loader: () => Promise<{ default: any }>) {
       if (!containerRef.current || angularAppRef.current) return
 
       try {
+        // @angular/compiler is imported for its JIT side effects only
         const [mod, angularCore, platformBrowser] = await Promise.all([
           loaderRef.current(),
           import('@angular/core'),
@@ -59,6 +63,8 @@ export function useAngularMount(loader: () => Promise<{ default: any }>) {
         angularAppRef.current.destroy()
         angularAppRef.current = null
       }
+      // Belt-and-suspenders: Angular's destroy may leave a stray comment node
+      // behind on the React-owned container.
       containerRef.current?.replaceChildren()
     }
   }, [isMounted])

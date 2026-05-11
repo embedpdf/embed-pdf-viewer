@@ -1,4 +1,4 @@
-import { ChangeDetectionStrategy, Component, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, resource, signal } from '@angular/core';
 import {
   type DocumentManagerPlugin,
   type PluginRegistry,
@@ -15,44 +15,44 @@ export const selector = 'engine-example';
   template: `
     <section class="flex flex-col gap-4">
       <div
-        class="flex flex-wrap items-center gap-4 rounded-2xl border border-slate-200 bg-white/90 p-4 shadow-sm dark:border-slate-700 dark:bg-slate-900/80"
+        class="flex flex-wrap items-center gap-4 rounded-lg border border-gray-200 bg-gray-50 p-4 dark:border-gray-700 dark:bg-gray-800"
       >
         <button
           type="button"
           class="rounded-full bg-teal-600 px-4 py-2 text-sm font-medium text-white transition hover:bg-teal-500 disabled:cursor-not-allowed disabled:opacity-60"
-          [disabled]="loading() || !registryReady()"
-          (click)="loadMetadata()"
+          [disabled]="inspection.isLoading() || !registryReady()"
+          (click)="inspect()"
         >
-          {{ loading() ? 'Loading…' : 'Inspect active document' }}
+          {{ inspection.isLoading() ? 'Loading…' : 'Inspect active document' }}
         </button>
 
         <div
-          class="grid gap-1 text-sm text-slate-600 sm:grid-cols-2 sm:gap-x-6 dark:text-slate-300"
+          class="grid gap-1 text-sm text-gray-600 sm:grid-cols-2 sm:gap-x-6 dark:text-gray-300"
         >
           <p>
-            <span class="font-medium text-slate-900 dark:text-slate-100">Pages:</span>
-            {{ pageCount() ?? '—' }}
+            <span class="font-medium text-gray-900 dark:text-gray-100">Pages:</span>
+            {{ inspection.value()?.pageCount ?? '—' }}
           </p>
           <p>
-            <span class="font-medium text-slate-900 dark:text-slate-100">Title:</span>
-            {{ metadata()?.title || '—' }}
+            <span class="font-medium text-gray-900 dark:text-gray-100">Title:</span>
+            {{ inspection.value()?.metadata?.title || '—' }}
           </p>
           <p>
-            <span class="font-medium text-slate-900 dark:text-slate-100">Author:</span>
-            {{ metadata()?.author || '—' }}
+            <span class="font-medium text-gray-900 dark:text-gray-100">Author:</span>
+            {{ inspection.value()?.metadata?.author || '—' }}
           </p>
           <p>
-            <span class="font-medium text-slate-900 dark:text-slate-100">Created:</span>
-            {{ formatDate(metadata()?.creationDate) }}
+            <span class="font-medium text-gray-900 dark:text-gray-100">Created:</span>
+            {{ formatDate(inspection.value()?.metadata?.creationDate) }}
           </p>
         </div>
       </div>
 
       <div
-        class="h-[620px] overflow-hidden rounded-2xl border border-slate-300 bg-white shadow-lg dark:border-slate-700 dark:bg-slate-950"
+        class="h-[600px] w-full overflow-hidden rounded-xl border border-gray-300 shadow-lg dark:border-gray-600"
       >
         <embedpdf-viewer
-          class="h-full w-full"
+          class="block h-full w-full"
           [config]="viewerConfig()"
           (ready)="onReady($event)"
         />
@@ -64,41 +64,42 @@ export const selector = 'engine-example';
 export default class EngineExample {
   readonly themePreference = createThemePreferenceSignal();
   readonly viewerConfig = createDefaultViewerConfig(this.themePreference);
-  readonly registryReady = signal(false);
   readonly registry = signal<PluginRegistry | null>(null);
-  readonly loading = signal(false);
-  readonly pageCount = signal<number | null>(null);
-  readonly metadata = signal<{
-    title?: string | null;
-    author?: string | null;
-    creationDate?: Date | null;
-  } | null>(null);
+  readonly registryReady = signal(false);
+
+  // Bumped on each click to re-trigger the resource loader.
+  private readonly inspectionToken = signal(0);
+
+  readonly inspection = resource({
+    params: () => ({
+      token: this.inspectionToken(),
+      registry: this.registry(),
+    }),
+    loader: async ({ params }) => {
+      if (params.token === 0 || !params.registry) return null;
+
+      const documentManager = params.registry
+        .getPlugin<DocumentManagerPlugin>('document-manager')
+        ?.provides();
+      const engine = params.registry.getEngine();
+      const document = documentManager?.getActiveDocument();
+
+      if (!engine || !document) return null;
+
+      return {
+        pageCount: document.pageCount,
+        metadata: await engine.getMetadata(document).toPromise(),
+      };
+    },
+  });
 
   onReady(registry: PluginRegistry) {
     this.registry.set(registry);
     this.registryReady.set(true);
   }
 
-  async loadMetadata() {
-    const registry = this.registry();
-    if (!registry) return;
-
-    this.loading.set(true);
-
-    try {
-      const documentManager = registry
-        .getPlugin<DocumentManagerPlugin>('document-manager')
-        ?.provides();
-      const engine = registry.getEngine();
-      const document = documentManager?.getActiveDocument();
-
-      if (engine && document) {
-        this.pageCount.set(document.pageCount);
-        this.metadata.set(await engine.getMetadata(document).toPromise());
-      }
-    } finally {
-      this.loading.set(false);
-    }
+  inspect() {
+    this.inspectionToken.update((n) => n + 1);
   }
 
   formatDate(date?: Date | null) {

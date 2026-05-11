@@ -3,9 +3,19 @@ title: Loading & Documents
 description: Open PDFs from URLs, local files (buffers), and manage multi-document tabs programmatically.
 ---
 
+import { DocumentManagerExample } from '../../code-examples/viewer/document-manager-example';
+
 # Loading & Managing Documents
 
 The PDFViewer includes a robust `document-manager` that handles file loading, error states, and tab management. While the viewer provides a built-in "Open File" button, you often need to trigger these actions from your own application logic—for example, loading a file when a user clicks a link in your dashboard.
+
+<CodeExample
+  codePaths={[
+    "../../examples/angular-tailwind/src/examples/viewer/document-manager-example.ts"
+  ]}
+>
+  <DocumentManagerExample />
+</CodeExample>
 
 ## Configuration
 

@@ -1,16 +1,16 @@
 import { ChangeDetectionStrategy, Component, effect, signal } from '@angular/core';
 
-import CustomizingUiExample from './examples/viewer/customizing-ui-example';
 import DocumentManagerExample from './examples/viewer/document-manager-example';
 import EngineExample from './examples/viewer/engine-example';
 import ThemeExample from './examples/viewer/theme-example';
+import UiCustomizationExample from './examples/viewer/ui-customization-example';
 import ViewerExample from './examples/viewer/viewer-example';
 import ZoomExample from './examples/viewer/zoom-example';
 
 const DEMOS = [
   { id: 'viewer', label: 'Viewer', component: ViewerExample },
   { id: 'theme', label: 'Theme', component: ThemeExample },
-  { id: 'customizing-ui', label: 'Customizing UI', component: CustomizingUiExample },
+  { id: 'ui-customization', label: 'UI Customization', component: UiCustomizationExample },
   { id: 'engine', label: 'Engine', component: EngineExample },
   { id: 'zoom', label: 'Zoom', component: ZoomExample },
   { id: 'document-manager', label: 'Document Manager', component: DocumentManagerExample },
@@ -23,7 +23,7 @@ type DemoId = (typeof DEMOS)[number]['id'];
   imports: [
     ViewerExample,
     ThemeExample,
-    CustomizingUiExample,
+    UiCustomizationExample,
     EngineExample,
     ZoomExample,
     DocumentManagerExample,
@@ -82,8 +82,8 @@ type DemoId = (typeof DEMOS)[number]['id'];
             @case ('theme') {
               <theme-example />
             }
-            @case ('customizing-ui') {
-              <customizing-ui-example />
+            @case ('ui-customization') {
+              <ui-customization-example />
             }
             @case ('engine') {
               <engine-example />
