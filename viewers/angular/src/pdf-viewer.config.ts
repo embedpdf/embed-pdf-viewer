@@ -9,7 +9,7 @@ import type { PDFViewerConfig } from '@embedpdf/snippet';
 
 type ConfigRecord = Record<string, unknown>;
 
-const EMPTY_CONFIG: ConfigRecord = {};
+const EMPTY_CONFIG: ConfigRecord = Object.freeze({}) as ConfigRecord;
 
 /**
  * Hierarchical token that stores the default viewer config for the current injector.
