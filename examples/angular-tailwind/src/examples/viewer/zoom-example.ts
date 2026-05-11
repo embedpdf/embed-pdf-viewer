@@ -1,5 +1,7 @@
 import { ChangeDetectionStrategy, Component, computed, signal } from '@angular/core';
 import {
+  createDocumentScopeSignal,
+  createPluginCapabilitySignal,
   type PluginRegistry,
   PDFViewer,
   type ZoomPlugin,
@@ -72,6 +74,8 @@ export default class ZoomExample {
   readonly themePreference = createThemePreferenceSignal();
   readonly theme = createThemeConfig(this.themePreference);
   readonly registry = signal<PluginRegistry | null>(null);
+  readonly zoom = createPluginCapabilitySignal<ZoomPlugin>(this.registry, 'zoom');
+  readonly zoomScope = createDocumentScopeSignal(this.zoom, 'zoom-doc');
   readonly viewerConfig = computed(() => ({
     theme: this.theme(),
     zoom: {
@@ -91,23 +95,19 @@ export default class ZoomExample {
     this.registry.set(registry);
   }
 
-  private zoomPlugin() {
-    return this.registry()?.getPlugin<ZoomPlugin>('zoom')?.provides();
-  }
-
   zoomIn() {
-    this.zoomPlugin()?.forDocument('zoom-doc').zoomIn();
+    this.zoomScope()?.zoomIn();
   }
 
   zoomOut() {
-    this.zoomPlugin()?.forDocument('zoom-doc').zoomOut();
+    this.zoomScope()?.zoomOut();
   }
 
   fitWidth() {
-    this.zoomPlugin()?.forDocument('zoom-doc').requestZoom(ZoomMode.FitWidth);
+    this.zoomScope()?.requestZoom(ZoomMode.FitWidth);
   }
 
   fitPage() {
-    this.zoomPlugin()?.forDocument('zoom-doc').requestZoom(ZoomMode.FitPage);
+    this.zoomScope()?.requestZoom(ZoomMode.FitPage);
   }
 }

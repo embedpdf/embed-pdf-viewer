@@ -310,6 +310,40 @@ export class AppComponent {
 }
 ```
 
+### Capability Signals
+
+If you're using the wrapper viewer today and want a bit more reusable signal composition,
+the package also exports lightweight helpers for deriving plugin capabilities from the
+viewer registry. These are intentionally small bridges for wrapper-based integrations —
+they do **not** replace the planned headless `inject*()` APIs.
+
+```ts
+import { Component, viewChild } from '@angular/core';
+import {
+  createDocumentScopeSignal,
+  createPluginCapabilitySignal,
+  PDFViewer,
+  type ZoomPlugin,
+} from '@embedpdf/angular-pdf-viewer';
+
+@Component({
+  imports: [PDFViewer],
+  template: `<embedpdf-viewer #viewer [config]="{ src: '/doc.pdf' }" />`,
+})
+export class AppComponent {
+  readonly viewer = viewChild.required(PDFViewer);
+  readonly zoom = createPluginCapabilitySignal<ZoomPlugin>(
+    () => this.viewer().registry(),
+    'zoom',
+  );
+  readonly zoomScope = createDocumentScopeSignal(this.zoom, 'ebook');
+
+  zoomIn() {
+    this.zoomScope()?.zoomIn();
+  }
+}
+```
+
 ---
 
 ## 🧩 Headless Mode

@@ -1,12 +1,12 @@
 import {
   ChangeDetectionStrategy,
   Component,
-  DestroyRef,
   computed,
-  inject,
+  effect,
   signal,
 } from '@angular/core';
 import {
+  createPluginCapabilitySignal,
   type DocumentManagerPlugin,
   PDFViewer,
   type PluginRegistry,
@@ -77,11 +77,14 @@ export const selector = 'document-manager-example';
 export default class DocumentManagerExample {
   readonly themePreference = createThemePreferenceSignal();
   readonly theme = createThemeConfig(this.themePreference);
-  private readonly destroyRef = inject(DestroyRef);
   readonly documents = signal<Array<{ id: string; name: string }>>([]);
   readonly activeDocumentId = signal<string | null>(null);
   readonly registry = signal<PluginRegistry | null>(null);
-  readonly isReady = computed(() => this.registry() !== null);
+  readonly documentManager = createPluginCapabilitySignal<DocumentManagerPlugin>(
+    this.registry,
+    'document-manager',
+  );
+  readonly isReady = computed(() => this.documentManager() !== null);
   readonly viewerConfig = computed(() => ({
     theme: this.theme(),
     tabBar: 'always' as const,
@@ -97,38 +100,42 @@ export default class DocumentManagerExample {
     },
   }));
 
+  constructor() {
+    effect((onCleanup) => {
+      const documentManager = this.documentManager();
+      if (!documentManager) {
+        this.documents.set([]);
+        this.activeDocumentId.set(null);
+        return;
+      }
+
+      const updateDocuments = () => {
+        const openDocuments = documentManager.getOpenDocuments();
+        this.documents.set(
+          openDocuments.map((document) => ({ id: document.id, name: document.name || 'Untitled' })),
+        );
+        this.activeDocumentId.set(documentManager.getActiveDocumentId());
+      };
+
+      const cleanups = [
+        documentManager.onDocumentOpened(updateDocuments),
+        documentManager.onDocumentClosed(updateDocuments),
+        documentManager.onActiveDocumentChanged((event) => {
+          this.activeDocumentId.set(event.currentDocumentId);
+        }),
+      ];
+
+      updateDocuments();
+      onCleanup(() => cleanups.forEach((cleanup) => cleanup()));
+    });
+  }
+
   onReady(registry: PluginRegistry) {
     this.registry.set(registry);
-    const documentManager = registry
-      .getPlugin<DocumentManagerPlugin>('document-manager')
-      ?.provides();
-    if (!documentManager) return;
-
-    const updateDocuments = () => {
-      const openDocuments = documentManager.getOpenDocuments();
-      this.documents.set(
-        openDocuments.map((document) => ({ id: document.id, name: document.name || 'Untitled' })),
-      );
-      this.activeDocumentId.set(documentManager.getActiveDocumentId());
-    };
-
-    const cleanups = [
-      documentManager.onDocumentOpened(updateDocuments),
-      documentManager.onDocumentClosed(updateDocuments),
-      documentManager.onActiveDocumentChanged((event) => {
-        this.activeDocumentId.set(event.currentDocumentId);
-      }),
-    ];
-
-    updateDocuments();
-    this.destroyRef.onDestroy(() => cleanups.forEach((cleanup) => cleanup()));
   }
 
   openRemoteDocument() {
-    this.registry()
-      ?.getPlugin<DocumentManagerPlugin>('document-manager')
-      ?.provides()
-      .openDocumentUrl({
+    this.documentManager()?.openDocumentUrl({
         url: DEMO_DOCUMENT_URL,
         documentId: `ebook-copy-${Date.now()}`,
         name: 'Remote ebook copy',
@@ -140,10 +147,7 @@ export default class DocumentManagerExample {
     if (!file) return;
 
     const buffer = await file.arrayBuffer();
-    this.registry()
-      ?.getPlugin<DocumentManagerPlugin>('document-manager')
-      ?.provides()
-      .openDocumentBuffer({
+    this.documentManager()?.openDocumentBuffer({
         buffer,
         name: file.name,
         autoActivate: true,
@@ -154,9 +158,6 @@ export default class DocumentManagerExample {
 
   setActiveDocument(event: Event) {
     const documentId = (event.target as HTMLSelectElement).value;
-    this.registry()
-      ?.getPlugin<DocumentManagerPlugin>('document-manager')
-      ?.provides()
-      .setActiveDocument(documentId);
+    this.documentManager()?.setActiveDocument(documentId);
   }
 }
