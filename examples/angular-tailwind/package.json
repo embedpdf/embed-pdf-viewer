@@ -22,7 +22,8 @@
     "build": "pnpm build:app && pnpm build:examples",
     "build:app": "vite build",
     "build:examples": "vite --config vite.lib.config.ts build",
-    "preview": "vite preview --host 127.0.0.1 --port 4301"
+    "preview": "vite preview --host 127.0.0.1 --port 4301",
+    "e2e": "playwright test"
   },
   "dependencies": {
     "@angular/compiler": "^21.2.12",
@@ -39,6 +40,7 @@
     "@angular/build": "^21.2.10",
     "@angular/compiler-cli": "^21.2.12",
     "@embedpdf/angular-pdf-viewer": "workspace:*",
+    "@playwright/test": "^1.59.1",
     "@tailwindcss/vite": "^4.1.18",
     "glob": "^13.0.0",
     "tailwindcss": "^4.1.11",
