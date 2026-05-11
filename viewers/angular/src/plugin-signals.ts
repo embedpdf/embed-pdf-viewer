@@ -2,7 +2,7 @@ import { computed, type Signal } from '@angular/core';
 import type { PluginRegistry } from '@embedpdf/snippet';
 
 type ValueOrSignal<T> = T | (() => T);
-type PluginWithProvides = { provides(): unknown };
+type PluginWithProvides = { id: string; provides(): unknown };
 type DocumentScopedCapability = { forDocument(documentId: string): unknown };
 
 export type PluginCapability<TPlugin extends PluginWithProvides> = TPlugin extends {
@@ -28,9 +28,10 @@ export function createPluginCapabilitySignal<TPlugin extends PluginWithProvides>
   registry: ValueOrSignal<PluginRegistry | null | undefined>,
   pluginId: string,
 ): Signal<PluginCapability<TPlugin> | null> {
-  return computed(
-    () => readValue(registry)?.getPlugin<TPlugin>(pluginId)?.provides() ?? null,
-  );
+  return computed<PluginCapability<TPlugin> | null>(() => {
+    const plugin = readValue(registry)?.getPlugin<TPlugin>(pluginId);
+    return (plugin?.provides() ?? null) as PluginCapability<TPlugin> | null;
+  });
 }
 
 /**

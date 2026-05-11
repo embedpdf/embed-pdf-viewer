@@ -15,6 +15,7 @@ type MockZoomCapability = {
 };
 
 type MockZoomPlugin = {
+  id: string;
   provides(): MockZoomCapability;
 };
 
@@ -35,6 +36,7 @@ describe('plugin signal helpers', () => {
         }
 
         return {
+          id: 'zoom',
           provides: () => zoomCapability,
         } as TPlugin;
       },
