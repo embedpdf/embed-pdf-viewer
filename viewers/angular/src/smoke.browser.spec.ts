@@ -7,14 +7,14 @@ import { describe, expect, it } from 'vitest';
   template: `<span data-testid="hello">Hello {{ name() }}</span>`,
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
-class BrowserSmokeComponent {
+class BrowserSmoke {
   readonly name = signal('Browser');
 }
 
 describe('Angular browser-mode smoke', () => {
   it('mounts a standalone component in real chromium', () => {
-    TestBed.configureTestingModule({ imports: [BrowserSmokeComponent] });
-    const fixture = TestBed.createComponent(BrowserSmokeComponent);
+    TestBed.configureTestingModule({ imports: [BrowserSmoke] });
+    const fixture = TestBed.createComponent(BrowserSmoke);
     fixture.detectChanges();
 
     const host = fixture.nativeElement as HTMLElement;
