@@ -1,0 +1,93 @@
+---
+title: Export & Save
+description: Configure downloads and learn how to save modified PDFs (with annotations) to your server.
+---
+
+# Export & Save
+
+The PDFViewer includes built-in functionality to export the current PDF. This isn't just downloading the original file; the export plugin generates a **new PDF file** that includes any changes the user has made, such as:
+* Annotations (Highlights, Ink, Shapes)
+* Redactions (Applied and burned in)
+* Form filled data
+
+## Configuration
+
+You can configure the default filename via the `export` config property.
+
+```ts
+<embedpdf-viewer
+    [config]="{
+      export: {
+        defaultFileName: 'exported-document.pdf' 
+      }
+    }"
+  />
+```
+
+## Programmatic Control
+
+While the default toolbar includes a download button, you often need to trigger these actions from your own UI or handle the file data directly.
+
+### Triggering a Download
+
+To programmatically trigger the browser's download dialog:
+
+```ts
+import { signal } from '@angular/core';
+import { PDFViewer, type PluginRegistry } from '@embedpdf/angular-pdf-viewer';
+
+const registry = signal<PluginRegistry | null>(null);
+
+const onReady = (r: PluginRegistry) => {
+  registry.set(r);
+};
+
+const triggerDownload = () => {
+  const exportPlugin = registry()?.getPlugin('export')?.provides();
+
+  exportPlugin?.download();
+
+  // exportPlugin?.forDocument(documentId).download();
+};
+
+<embedpdf-viewer (ready)="onReady($event)" [config]="{ src: '/doc.pdf' }" />
+```
+
+### Saving to a Server
+
+A common requirement is to save the modified PDF back to your server instead of downloading it.
+
+```ts
+import { signal } from '@angular/core';
+import { PDFViewer, type PluginRegistry } from '@embedpdf/angular-pdf-viewer';
+
+const registry = signal<PluginRegistry | null>(null);
+
+const onReady = (r: PluginRegistry) => {
+  registry.set(r);
+};
+
+const handleSave = async () => {
+  const exportPlugin = registry()?.getPlugin('export')?.provides();
+
+  const arrayBuffer = await exportPlugin?.saveAsCopy().toPromise();
+  if (!arrayBuffer) return;
+
+  const blob = new Blob([arrayBuffer], { type: 'application/pdf' });
+  const file = new File([blob], 'updated-doc.pdf');
+
+  const formData = new FormData();
+  formData.append('file', file);
+  formData.append('id', '12345');
+
+  await fetch('/api/documents/save', {
+    method: 'POST',
+    body: formData
+  });
+
+  console.log('Document saved successfully!');
+};
+
+<embedpdf-viewer (ready)="onReady($event)" [config]="{ src: '/doc.pdf' }" />
+```
+

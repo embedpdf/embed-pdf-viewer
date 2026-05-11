@@ -1,0 +1,158 @@
+---
+title: Loading & Documents
+description: Open PDFs from URLs, local files (buffers), and manage multi-document tabs programmatically.
+---
+
+# Loading & Managing Documents
+
+The PDFViewer includes a robust `document-manager` that handles file loading, error states, and tab management. While the viewer provides a built-in "Open File" button, you often need to trigger these actions from your own application logic—for example, loading a file when a user clicks a link in your dashboard.
+
+## Configuration
+
+You can configure initial documents and limits via the `documentManager` config property.
+
+```ts
+<embedpdf-viewer
+    [config]="{
+      documentManager: {
+        // Load these files on startup
+        initialDocuments: [
+          { 
+            url: 'https://snippet.embedpdf.com/ebook.pdf',
+            autoActivate: true,
+            documentId: 'ebook-embedpdf',
+          },
+          { 
+            url: 'https://snippet.embedpdf.com/ebook.pdf',
+            autoActivate: false 
+          }
+        ],
+        maxDocuments: 10
+      },
+      tabBar: 'multiple'
+    }"
+  />
+```
+
+## Programmatic Loading
+
+You can control document loading using the `document-manager` plugin API.
+
+### Loading from URL
+
+Use `openDocumentUrl` to load remote files.
+
+```ts
+import { signal } from '@angular/core';
+import { PDFViewer, type PluginRegistry } from '@embedpdf/angular-pdf-viewer';
+
+const registry = signal<PluginRegistry | null>(null);
+
+const onReady = (r: PluginRegistry) => {
+  registry.set(r);
+};
+
+const openRemotePdf = () => {
+  const docManager = registry()?.getPlugin('document-manager')?.provides();
+
+  docManager?.openDocumentUrl({
+    url: 'https://snippet.embedpdf.com/ebook.pdf',
+    documentId: 'invoice-123',
+    autoActivate: true
+  });
+};
+
+<embedpdf-viewer (ready)="onReady($event)" [config]="{ src: '/doc.pdf' }" />
+```
+
+### Loading from Buffer (Local Files)
+
+To load a file selected by the user or fetched via a custom API request, use `openDocumentBuffer`.
+
+```ts
+import { signal } from '@angular/core';
+import { PDFViewer, type PluginRegistry } from '@embedpdf/angular-pdf-viewer';
+
+const registry = signal<PluginRegistry | null>(null);
+
+const onReady = (r: PluginRegistry) => {
+  registry.set(r);
+};
+
+const handleFileSelect = async (event: Event) => {
+  const target = event.target as HTMLInputElement;
+  const file = target.files?.[0];
+  if (!file) return;
+  
+  const buffer = await file.arrayBuffer();
+
+  const docManager = registry()?.getPlugin('document-manager')?.provides();
+
+  docManager?.openDocumentBuffer({
+    buffer: buffer,
+    name: file.name,
+    autoActivate: true
+  });
+};
+
+<input type="file" accept=".pdf" (change)="handleFileSelect($event)" />
+<embedpdf-viewer (ready)="onReady($event)" [config]="{ src: '/doc.pdf' }" />
+```
+
+### Native File Picker
+
+You can also trigger the browser's native file picker dialog directly through the viewer API.
+
+```ts
+const openFilePicker = () => {
+  const docManager = registry()?.getPlugin('document-manager')?.provides();
+  docManager?.openFileDialog();
+};
+```
+
+## Managing Active Documents
+
+You can switch tabs or close documents programmatically.
+
+```ts
+const switchDocument = () => {
+  const docManager = registry()?.getPlugin('document-manager')?.provides();
+  docManager?.setActiveDocument('invoice-123');
+};
+
+const closeDocument = () => {
+  const docManager = registry()?.getPlugin('document-manager')?.provides();
+  docManager?.closeDocument('invoice-123');
+};
+
+const closeAll = () => {
+  const docManager = registry()?.getPlugin('document-manager')?.provides();
+  docManager?.closeAllDocuments();
+};
+```
+
+## Events
+
+You can listen for document lifecycle events to sync your external UI with the viewer state.
+
+| Event | Payload | Description |
+| --- | --- | --- |
+| **`onDocumentOpened`** | `DocumentState` | Fired when a document successfully loads. |
+| **`onDocumentClosed`** | `documentId` | Fired when a document tab is closed. |
+| **`onActiveDocumentChanged`** | `{ previous, current }` | Fired when the user switches tabs. |
+| **`onDocumentError`** | `{ documentId, error }` | Fired if a document fails to load. |
+
+```ts
+import { PDFViewer, type PluginRegistry } from '@embedpdf/angular-pdf-viewer';
+
+const onReady = (registry: PluginRegistry) => {
+  const docManager = registry.getPlugin('document-manager')?.provides();
+
+  docManager?.onDocumentOpened((doc) => {
+    console.log(`Opened: ${doc.name} (${doc.id})`);
+  });
+};
+
+<embedpdf-viewer (ready)="onReady($event)" [config]="{ src: '/doc.pdf' }" />
+```
+

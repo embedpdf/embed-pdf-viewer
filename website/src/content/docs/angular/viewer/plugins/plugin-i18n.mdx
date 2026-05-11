@@ -1,0 +1,112 @@
+---
+title: Internationalization
+description: Localize your PDF viewer with built-in multi-language support.
+---
+
+# Internationalization (i18n)
+
+The PDFViewer comes with built-in support for multiple languages. It allows you to translate the entire user interface—including tooltips, menus, and button labels—to match your application's locale.
+
+## Built-in Locales
+
+We provide out-of-the-box support for several languages, including:
+- English (`en`) - Default
+- Dutch (`nl`)
+- German (`de`)
+- French (`fr`)
+- Spanish (`es`)
+- Simplified Chinese (`zh-CN`)
+- Traditional Chinese (`zh-TW`)
+- Japanese (`ja`)
+- Swedish (`sv`)
+
+## Configuration
+
+You can configure the initial language and available locales via the `i18n` property.
+
+```ts
+<embedpdf-viewer
+    [config]="{
+      i18n: {
+        defaultLocale: 'de',
+        fallbackLocale: 'en'
+      }
+    }"
+  />
+```
+
+## Changing Language at Runtime
+
+You can switch languages dynamically without reloading the viewer.
+
+### How to Switch Language
+
+```ts
+import { signal } from '@angular/core';
+import { PDFViewer, type PluginRegistry } from '@embedpdf/angular-pdf-viewer';
+
+const registry = signal<PluginRegistry | null>(null);
+
+const onReady = (r: PluginRegistry) => {
+  registry.set(r);
+};
+
+const changeLanguage = (locale: string) => {
+  const i18n = registry()?.getPlugin('i18n')?.provides();
+  i18n?.setLocale(locale);
+};
+
+<button (click)="changeLanguage('de')">German</button>
+<button (click)="changeLanguage('fr')">French</button>
+<button (click)="changeLanguage('en')">English</button>
+
+<embedpdf-viewer (ready)="onReady($event)" [config]="{ src: '/doc.pdf' }" />
+```
+
+## Listening for Language Changes
+
+```ts
+import { PDFViewer, type PluginRegistry } from '@embedpdf/angular-pdf-viewer';
+
+const onReady = (registry: PluginRegistry) => {
+  const i18n = registry.getPlugin('i18n')?.provides();
+
+  i18n?.onLocaleChange(({ previousLocale, currentLocale }) => {
+    console.log(`Language changed from ${previousLocale} to ${currentLocale}`);
+  });
+};
+
+<embedpdf-viewer (ready)="onReady($event)" [config]="{ src: '/doc.pdf' }" />
+```
+
+## Custom Translations
+
+If you need to support a language not included by default, you can provide your own translation objects.
+
+```ts
+import { PDFViewer } from '@embedpdf/angular-pdf-viewer';
+
+const customSpanish = {
+  code: 'es',
+  name: 'Español',
+  translations: {
+    zoom: {
+      in: 'Acercar',
+      out: 'Alejar',
+    },
+    document: {
+      open: 'Abrir Documento',
+    }
+  }
+};
+
+<embedpdf-viewer
+    [config]="{
+      i18n: {
+        defaultLocale: 'es',
+        locales: [customSpanish] 
+      }
+    }"
+  />
+```
+

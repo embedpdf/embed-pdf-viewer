@@ -5,4 +5,5 @@ export default {
   'customizing-ui': 'Customizing the UI',
   security: 'Security & Permissions',
   engine: 'Accessing the Engine',
+  plugins: 'Plugins',
 }
