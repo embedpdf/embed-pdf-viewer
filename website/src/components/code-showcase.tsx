@@ -76,7 +76,7 @@ const tabs: Tab[] = [
   },
 ]
 
-const angularTemplate = `<embedpdf-viewer [config]="{ src: '/demo.pdf' }" style="height: 500px" />`
+const angularTemplate = `<embedpdf-viewer [config]="{ src: '/demo.pdf' }" (ready)="onReady($event)" style="height: 500px" />`
 
 const tabIndicatorGradients: Record<Framework, string> = {
   snippet: 'from-orange-500 to-amber-400',
@@ -139,14 +139,18 @@ function onReady(registry) {
   {onready}
 />`,
   angular: `import { Component } from '@angular/core'
-import { PDFViewer } from '@embedpdf/angular-pdf-viewer'
+import { PDFViewer, type PluginRegistry } from '@embedpdf/angular-pdf-viewer'
 
 @Component({
   selector: 'app-root',
   imports: [PDFViewer],
   template: \`${angularTemplate}\`,
 })
-export class App {}`,
+export class App {
+  onReady(registry: PluginRegistry) {
+    console.log('PDF viewer ready!', registry)
+  }
+}`,
 }
 
 // Syntax highlighting components for each framework
@@ -388,7 +392,9 @@ const AngularCode = () => (
     <span className="text-yellow-300">&apos;@angular/core&apos;</span>
     {'\n'}
     <span className="text-purple-400">import</span> {'{ '}
-    <span className="text-white">PDFViewer</span>
+    <span className="text-white">PDFViewer</span>,{' '}
+    <span className="text-purple-400">type</span>{' '}
+    <span className="text-white">PluginRegistry</span>
     {' }'} <span className="text-purple-400">from</span>{' '}
     <span className="text-yellow-300">
       &apos;@embedpdf/angular-pdf-viewer&apos;
@@ -410,7 +416,23 @@ const AngularCode = () => (
     <span className="text-yellow-300">{`\`${angularTemplate}\``}</span>,{'\n'}
     {'}'}){'\n'}
     <span className="text-purple-400">export class</span>{' '}
-    <span className="text-blue-300">App</span> {'{}'}
+    <span className="text-blue-300">App</span> {'{'}
+    {'\n'}
+    {'  '}
+    <span className="text-blue-300">onReady</span>(
+    <span className="text-orange-300">registry</span>:
+    <span className="text-white"> PluginRegistry</span>) {'{'}
+    {'\n'}
+    {'    '}
+    <span className="text-white">console</span>.
+    <span className="text-blue-300">log</span>(
+    <span className="text-yellow-300">&apos;PDF viewer ready!&apos;</span>,{' '}
+    <span className="text-orange-300">registry</span>)
+    {'\n'}
+    {'  '}
+    {'}'}
+    {'\n'}
+    {'}'}
   </code>
 )
 

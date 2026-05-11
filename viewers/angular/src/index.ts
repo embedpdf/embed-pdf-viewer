@@ -1,4 +1,15 @@
-export * from '@embedpdf/snippet';
+export { DocumentManagerPlugin, EmbedPdfContainer } from '@embedpdf/snippet';
+export type {
+  CommandButtonItem,
+  CommandsCapability,
+  GroupItem,
+  PDFViewerConfig,
+  PluginRegistry,
+  Theme,
+  ThemeConfig,
+  ThemePreference,
+  UICapability,
+} from '@embedpdf/snippet';
 export {
   EMBEDPDF_VIEWER_DEFAULT_CONFIG,
   provideEmbedPdfViewerConfig,
