@@ -5,7 +5,11 @@ import type { EmbedPdfContainer, PDFViewerConfig, PluginRegistry } from '@embedp
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { PDFViewer } from './pdf-viewer.component';
-import { provideEmbedPdfViewerConfig } from './pdf-viewer.config';
+import {
+  EMBEDPDF_VIEWER_DEFAULT_CONFIG,
+  provideEmbedPdfViewerConfig,
+  provideEmbedPdfViewerDefaults,
+} from './pdf-viewer.config';
 
 vi.mock('@embedpdf/snippet', () => ({
   default: { init: vi.fn() },
@@ -189,6 +193,15 @@ describe('PDFViewer', () => {
         },
       },
     });
+  });
+
+  it('exposes EnvironmentProviders via provideEmbedPdfViewerDefaults', () => {
+    TestBed.resetTestingModule();
+    TestBed.configureTestingModule({
+      providers: [provideEmbedPdfViewerDefaults(ROOT_DEFAULT_CONFIG)],
+    });
+
+    expect(TestBed.inject(EMBEDPDF_VIEWER_DEFAULT_CONFIG)).toEqual(ROOT_DEFAULT_CONFIG);
   });
 
   it('merges nested provider defaults with per-component config', async () => {
