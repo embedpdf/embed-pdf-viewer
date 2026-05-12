@@ -455,7 +455,7 @@ const featurePlugins = [
 
 // Headless "coming soon" callout (locked decision #3: do NOT render an
 // aspirational headless-API snippet; API may drift before ship).
-const HeadlessV11Callout = () => (
+const HeadlessComingSoonCallout = () => (
   <div className="overflow-hidden rounded-2xl bg-gray-950 shadow-2xl ring-1 ring-white/10">
     {/* Header */}
     <div className="flex items-center justify-between border-b border-gray-800 bg-gray-900/50 px-4 py-3">
@@ -467,7 +467,7 @@ const HeadlessV11Callout = () => (
       <span className="text-xs text-gray-500">headless-preview.ts</span>
     </div>
 
-    {/* Coming-soon body */}
+    {/* coming-soon body */}
     <div className="px-8 py-12 text-center">
       <div className="mx-auto mb-5 inline-flex h-14 w-14 items-center justify-center rounded-2xl bg-blue-500/10 text-blue-400 ring-1 ring-blue-500/30">
         <Construction size={26} aria-hidden="true" />
@@ -601,9 +601,9 @@ const HeadlessShowcase = () => {
             </div>
           </div>
 
-          {/* Right: headless Coming-soon callout */}
+          {/* Right: headless coming-soon callout */}
           <div className="order-2 min-w-0">
-            <HeadlessV11Callout />
+            <HeadlessComingSoonCallout />
             <div className="mt-6 rounded-xl border border-blue-100 bg-blue-50/50 p-4 dark:border-blue-900/30 dark:bg-blue-900/10">
               <div className="flex items-start gap-3">
                 <div className="mt-0.5 rounded-full bg-blue-100 p-1 dark:bg-blue-900/50">
