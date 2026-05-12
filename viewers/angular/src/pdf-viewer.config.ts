@@ -80,6 +80,10 @@ function mergeRecord(baseValue: ConfigRecord, overrideValue: ConfigRecord): Conf
 
   for (const [key, value] of Object.entries(overrideValue)) {
     if (value === undefined) continue;
+    // Defensive: skip prototype-pollution keys even though Object.entries()
+    // already omits non-enumerable `__proto__` from object literals. Cheap and
+    // protects us if config was parsed from untrusted JSON.
+    if (key === '__proto__' || key === 'constructor' || key === 'prototype') continue;
 
     const existingValue = merged[key];
 

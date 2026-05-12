@@ -85,6 +85,12 @@ export class PDFViewer {
 
       if (!viewer || this.destroyRef.destroyed) return;
 
+      // Setting `viewer.config` triggers a full re-render in the snippet container.
+      // Skip the write when the resolved config is the exact reference already on
+      // the container — defensive guard against rare cases where the effect runs
+      // again with an unchanged resolvedConfig (e.g. across HMR boundaries).
+      if (viewer.config === config) return;
+
       viewer.config = config;
     });
 
