@@ -245,7 +245,7 @@ const paths = [
     features: [
       '100% UI Control',
       'Tiny bundle size',
-      'React, Vue, Svelte hooks',
+      'React, Vue, Svelte, Angular support',
     ],
     checkColor: 'text-blue-500',
     npmCommand: 'npm install @embedpdf/core',
@@ -265,6 +265,11 @@ const paths = [
         href: '/docs/svelte/headless/introduction',
         icon: <SvelteIcon className="h-5 w-5 text-[#FF3E00]" />,
         text: 'Svelte',
+      },
+      {
+        href: '/docs/angular/headless/introduction',
+        icon: <AngularIcon className="h-5 w-5" />,
+        text: 'Angular',
       },
     ],
   },
@@ -564,6 +569,13 @@ const HeadlessSection = () => {
           >
             <SvelteIcon className="h-5 w-5 text-[#FF3E00]" />
             <span>Svelte Docs</span>
+          </Link>
+          <Link
+            href="/docs/angular"
+            className="group flex w-full items-center justify-center gap-3 rounded-full border border-gray-200 bg-white px-6 py-3 text-sm font-medium text-gray-700 shadow-sm transition-all hover:border-fuchsia-300 hover:shadow-md dark:border-gray-800 dark:bg-gray-900 dark:text-gray-300 dark:hover:border-fuchsia-700 sm:w-auto"
+          >
+            <AngularIcon className="h-5 w-5" />
+            <span>Angular Docs</span>
           </Link>
         </div>
       </div>
