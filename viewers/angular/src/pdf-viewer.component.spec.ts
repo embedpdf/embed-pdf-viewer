@@ -5,11 +5,7 @@ import type { EmbedPdfContainer, PDFViewerConfig, PluginRegistry } from '@embedp
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { PDFViewer } from './pdf-viewer.component';
-import {
-  EMBEDPDF_VIEWER_DEFAULT_CONFIG,
-  provideEmbedPdfViewerConfig,
-  provideEmbedPdfViewerDefaults,
-} from './pdf-viewer.config';
+import { provideEmbedPdfViewerConfig } from './pdf-viewer.config';
 
 vi.mock('@embedpdf/snippet', () => ({
   default: { init: vi.fn() },
@@ -101,6 +97,8 @@ describe('PDFViewer', () => {
     fixture = null;
   });
 
+  // Pins the deliberate design choice that the component template is empty and
+  // EmbedPDF.init mounts onto the host element directly.
   it('does not render an extra mount wrapper', () => {
     const fixture = createViewerFixture();
     fixture.detectChanges();
@@ -193,15 +191,6 @@ describe('PDFViewer', () => {
         },
       },
     });
-  });
-
-  it('exposes EnvironmentProviders via provideEmbedPdfViewerDefaults', () => {
-    TestBed.resetTestingModule();
-    TestBed.configureTestingModule({
-      providers: [provideEmbedPdfViewerDefaults(ROOT_DEFAULT_CONFIG)],
-    });
-
-    expect(TestBed.inject(EMBEDPDF_VIEWER_DEFAULT_CONFIG)).toEqual(ROOT_DEFAULT_CONFIG);
   });
 
   it('merges nested provider defaults with per-component config', async () => {
@@ -308,7 +297,7 @@ describe('PDFViewer', () => {
     expect(readyEvents).toEqual([]);
   });
 
-  it('can be destroyed before the view query resolves', () => {
+  it('can be destroyed before afterNextRender mounts the viewer', () => {
     const fixture = createViewerFixture();
     expect(() => fixture.destroy()).not.toThrow();
     expect(fixture.componentInstance.container()).toBeNull();

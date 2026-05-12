@@ -4,11 +4,13 @@ import { join, relative } from 'node:path'
 import test from 'node:test'
 import { fileURLToPath } from 'node:url'
 
-const viewerDocsDir = fileURLToPath(new URL('./', import.meta.url))
+// Docs-lint: ensures every `createPluginCapabilitySignal` /
+// `createDocumentScopeSignal` helper shown in Angular viewer docs is invoked
+// as a signal (`name()`) before member access. Catches the common
+// copy-paste error of writing `docZoom?.zoomIn()` instead of
+// `docZoom()?.zoomIn()` in published examples.
 
-const readDoc = async (relativePath: string) => {
-  return readFile(new URL(relativePath, import.meta.url), 'utf8')
-}
+const viewerDocsDir = fileURLToPath(new URL('./', import.meta.url))
 
 const collectMdxFiles = async (dir: string): Promise<string[]> => {
   const entries = await readdir(dir, { withFileTypes: true })
@@ -37,30 +39,10 @@ const tsCodeBlocks = (content: string) => {
   return [...content.matchAll(/```ts[\s\S]*?```/g)].map((match) => match[0])
 }
 
-test('customizing-ui helper example derives commands and ui from signals', async () => {
-  const content = await readDoc('./customizing-ui.mdx')
-
-  assert.match(
-    content,
-    /readonly commands = createPluginCapabilitySignal<CommandsPlugin>\(this\.registry, 'commands'\);/,
-  )
-  assert.match(content, /const commands = this\.commands\(\);/)
-  assert.match(content, /const ui = this\.ui\(\);/)
-})
-
-test('document-manager helper snippets invoke the capability signal before calling methods', async () => {
-  const content = await readDoc('./plugins/plugin-document-manager.mdx')
-
-  assert.match(
-    content,
-    /const docManager = createPluginCapabilitySignal<DocumentManagerPlugin>\(registry, 'document-manager'\);/,
-  )
-  assert.match(content, /docManager\(\)\?\.openDocumentUrl\(\{/)
-  assert.match(content, /docManager\(\)\?\.openDocumentBuffer\(\{/)
-})
-
+// One representative pinned snippet so a failure points at a concrete example
+// of the rule the general sweep below enforces.
 test('zoom helper snippets invoke the document-scoped signal before calling zoom actions', async () => {
-  const content = await readDoc('./plugins/plugin-zoom.mdx')
+  const content = await readFile(new URL('./plugins/plugin-zoom.mdx', import.meta.url), 'utf8')
 
   assert.match(
     content,

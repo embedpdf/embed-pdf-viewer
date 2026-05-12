@@ -1,5 +1,14 @@
 import { expect, test, type Page } from '@playwright/test';
 
+// Scope: e2e covers demos in the angular-tailwind workspace picker whose
+// behavior depends on plugin state machines or runtime config mutation
+// (theme, ui-customization, rotate, spread, document-loading,
+// scroll-initial-page, disable-categories, engine). Trivial demos
+// (viewer, zoom, document-manager) are validated via the unit tests and
+// production build; per-plugin demos rendered only inside the docs site
+// (annotation, export, form, i18n, pan, print, scroll, selection,
+// signature) are exercised by their MDX pages in the website tests.
+
 async function openDemo(page: Page, label: string) {
   await page.goto('/');
   await expect(page.getByRole('heading', { name: 'Live EmbedPDF Angular demos' })).toBeVisible();
@@ -83,6 +92,19 @@ test('scroll initial page demo jumps to page 3 after layout is ready', async ({ 
   await openDemo(page, 'Scroll Initial Page');
 
   await expect(page.getByText('Scrolled to page 3')).toBeVisible({ timeout: 30_000 });
+});
+
+test('engine demo loads page count via the resource API', async ({ page }) => {
+  await openDemo(page, 'Engine');
+
+  const pagesRow = page.locator('p', { hasText: 'Pages:' });
+  await expect(pagesRow).toContainText('—');
+
+  const inspectButton = page.getByRole('button', { name: /Inspect active document/ });
+  await expect(inspectButton).toBeEnabled({ timeout: 30_000 });
+  await inspectButton.click();
+
+  await expect(pagesRow).toContainText(/Pages:\s*\d+/, { timeout: 30_000 });
 });
 
 test('disable categories demo reflects checkbox selection', async ({ page }) => {
