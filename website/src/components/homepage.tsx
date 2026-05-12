@@ -245,7 +245,7 @@ const paths = [
     features: [
       '100% UI Control',
       'Tiny bundle size',
-      'React, Vue, Svelte hooks',
+      'React, Vue, Svelte, Angular support',
     ],
     checkColor: 'text-blue-500',
     npmCommand: 'npm install @embedpdf/core',
