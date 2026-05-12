@@ -10,7 +10,13 @@ import { fileURLToPath } from 'node:url'
 // copy-paste error of writing `docZoom?.zoomIn()` instead of
 // `docZoom()?.zoomIn()` in published examples.
 
-const viewerDocsDir = fileURLToPath(new URL('./', import.meta.url))
+// Lives under src/__tests__/ rather than co-located inside src/content/docs/
+// because nextra's webpack sync-require context (./src/content/ sync ^\.\/.*.*$)
+// pulls every file under content/ into the docs bundle, which broke the Next.js
+// build when this file used `new URL('./', import.meta.url)`.
+const viewerDocsDir = fileURLToPath(
+  new URL('../content/docs/angular/viewer/', import.meta.url),
+)
 
 const collectMdxFiles = async (dir: string): Promise<string[]> => {
   const entries = await readdir(dir, { withFileTypes: true })
@@ -29,20 +35,29 @@ const collectMdxFiles = async (dir: string): Promise<string[]> => {
   return files.flat()
 }
 
-const escapeRegExp = (value: string) => value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+const escapeRegExp = (value: string) =>
+  value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
 
 const helperSignalNames = (content: string, pattern: RegExp) => {
   return [...content.matchAll(pattern)].map((match) => match[1])
 }
 
 const tsCodeBlocks = (content: string) => {
-  return [...content.matchAll(/```ts[\s\S]*?```/g)].map((match) => match[0])
+  return [...content.matchAll(/```(?:ts|tsx|typescript)\b[\s\S]*?```/g)].map(
+    (match) => match[0],
+  )
 }
 
 // One representative pinned snippet so a failure points at a concrete example
 // of the rule the general sweep below enforces.
 test('zoom helper snippets invoke the document-scoped signal before calling zoom actions', async () => {
-  const content = await readFile(new URL('./plugins/plugin-zoom.mdx', import.meta.url), 'utf8')
+  const content = await readFile(
+    new URL(
+      '../content/docs/angular/viewer/plugins/plugin-zoom.mdx',
+      import.meta.url,
+    ),
+    'utf8',
+  )
 
   assert.match(
     content,

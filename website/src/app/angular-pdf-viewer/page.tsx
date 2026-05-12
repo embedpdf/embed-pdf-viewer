@@ -1,11 +1,21 @@
-import { redirect } from 'next/navigation'
+import Footer from '@/components/footer'
+import AngularPDFViewer from '@/components/angular-pdf-viewer'
+import Navbar from '@/components/navbar'
+import { ConfigProvider } from '@/components/stores/config'
+import { getPageMap } from 'nextra/page-map'
 
 export const metadata = {
-  title: 'Angular PDF Viewer – EmbedPDF',
+  title: 'Angular PDF Viewer – Open Source, Headless & Customizable | EmbedPDF',
   description:
-    'Angular documentation and setup guide for the EmbedPDF drop-in viewer.',
+    'Build your Angular PDF viewer your way. Choose a drop-in standalone component today, with headless Angular injectables landing in v1.1. Open source, TypeScript-first, signals and zoneless ready, works with Angular Material, PrimeNG, Spartan/ng and Tailwind.',
 }
 
-export default function AngularPDFViewerPage() {
-  redirect('/docs/angular')
+export default async function AngularPDFViewerPage() {
+  const pageMap = await getPageMap()
+
+  return (
+    <ConfigProvider navbar={<Navbar />} pageMap={pageMap} footer={<Footer />}>
+      <AngularPDFViewer />
+    </ConfigProvider>
+  )
 }
