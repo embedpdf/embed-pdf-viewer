@@ -43,7 +43,9 @@ const helperSignalNames = (content: string, pattern: RegExp) => {
 }
 
 const tsCodeBlocks = (content: string) => {
-  return [...content.matchAll(/```ts[\s\S]*?```/g)].map((match) => match[0])
+  return [...content.matchAll(/```(?:ts|tsx|typescript)\b[\s\S]*?```/g)].map(
+    (match) => match[0],
+  )
 }
 
 // One representative pinned snippet so a failure points at a concrete example

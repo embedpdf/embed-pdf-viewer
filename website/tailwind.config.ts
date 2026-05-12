@@ -18,6 +18,7 @@ export default {
     },
     letterSpacing: {
       tight: '-0.015em',
+      wider: '0.05em',
     },
     extend: {
       colors: {
@@ -36,6 +37,7 @@ export default {
           700: '#374151',
           800: '#1f2937',
           900: '#111827',
+          950: '#030712',
         },
         primary: {
           50: '#f4f1f8',

@@ -141,7 +141,7 @@ const Hero = () => {
 
             {/* UI library ecosystem badges (logos-only, no toggle — decision #2) */}
             <div className="mt-16 md:mt-24">
-              <p className="tracking-wider mb-8 text-xs font-semibold uppercase text-gray-500 dark:text-gray-400 md:text-sm">
+              <p className="mb-8 text-xs font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400 md:text-sm">
                 Works seamlessly with your favorite Angular libraries
               </p>
               <div className="mx-auto flex max-w-5xl flex-wrap justify-center gap-6 md:gap-8">
@@ -319,13 +319,7 @@ const AngularPdfDemoMount = () => {
   const { containerRef } = useAngularMount(
     () => import('@embedpdf/example-angular-tailwind/viewer/viewer-example'),
   )
-  return (
-    <div
-      ref={containerRef}
-      suppressHydrationWarning
-      className="h-[500px] w-full md:h-[700px]"
-    />
-  )
+  return <div ref={containerRef} className="h-[500px] w-full md:h-[700px]" />
 }
 
 // Defer the Angular bootstrap (and its ~MB of @angular/core +
@@ -337,13 +331,18 @@ const LazyAngularDemo = () => {
   const [inView, setInView] = useState(false)
 
   useEffect(() => {
-    if (typeof IntersectionObserver === 'undefined') {
+    const node = placeholderRef.current
+    // SSR / jsdom / older browsers: no IO support → mount eagerly so docs
+    // tests and non-browser environments still exercise the real Angular path.
+    if (!node || typeof IntersectionObserver === 'undefined') {
       setInView(true)
       return
     }
-    const node = placeholderRef.current
-    if (!node) return
 
+    // One-shot: once the demo enters view, we flip to inView=true forever and
+    // disconnect the observer. The Angular app then owns its own lifecycle and
+    // keeps running even if the user scrolls away — avoids JIT recompile churn
+    // from mount/unmount thrash on long pages.
     const observer = new IntersectionObserver(
       (entries) => {
         if (entries.some((entry) => entry.isIntersecting)) {
@@ -362,6 +361,8 @@ const LazyAngularDemo = () => {
   return (
     <div
       ref={placeholderRef}
+      role="status"
+      aria-live="polite"
       aria-label="Angular viewer demo (loads when visible)"
       className="flex h-[500px] w-full items-center justify-center rounded-lg border border-dashed border-fuchsia-200 bg-fuchsia-50/30 text-fuchsia-700 dark:border-fuchsia-800/40 dark:bg-fuchsia-900/10 dark:text-fuchsia-300 md:h-[700px]"
     >
@@ -471,7 +472,7 @@ const HeadlessV11Callout = () => (
       <div className="mx-auto mb-5 inline-flex h-14 w-14 items-center justify-center rounded-2xl bg-blue-500/10 text-blue-400 ring-1 ring-blue-500/30">
         <Construction size={26} aria-hidden="true" />
       </div>
-      <div className="tracking-wider mx-auto mb-3 inline-flex items-center gap-2 rounded-full border border-blue-500/30 bg-blue-500/10 px-3 py-1 text-xs font-semibold uppercase text-blue-300">
+      <div className="mx-auto mb-3 inline-flex items-center gap-2 rounded-full border border-blue-500/30 bg-blue-500/10 px-3 py-1 text-xs font-semibold uppercase tracking-wider text-blue-300">
         Coming in v1.1
       </div>
       <h3 className="text-xl font-bold text-white md:text-2xl">
@@ -535,7 +536,7 @@ const HeadlessShowcase = () => {
             <div className="mb-6">
               <div className="mb-3 flex items-center gap-2">
                 <div className="h-px flex-1 bg-gradient-to-r from-gray-200 to-transparent dark:from-gray-700"></div>
-                <span className="tracking-wider text-xs font-semibold uppercase text-gray-500 dark:text-gray-400">
+                <span className="text-xs font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400">
                   Core Foundation
                 </span>
                 <div className="h-px flex-1 bg-gradient-to-l from-gray-200 to-transparent dark:from-gray-700"></div>
@@ -566,7 +567,7 @@ const HeadlessShowcase = () => {
             <div>
               <div className="mb-3 flex items-center gap-2">
                 <div className="h-px flex-1 bg-gradient-to-r from-blue-200 to-transparent dark:from-blue-900"></div>
-                <span className="tracking-wider text-xs font-semibold uppercase text-blue-600 dark:text-blue-400">
+                <span className="text-xs font-semibold uppercase tracking-wider text-blue-600 dark:text-blue-400">
                   Feature Plugins
                 </span>
                 <div className="h-px flex-1 bg-gradient-to-l from-blue-200 to-transparent dark:from-blue-900"></div>
