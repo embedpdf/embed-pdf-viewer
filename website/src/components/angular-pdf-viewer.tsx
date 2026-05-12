@@ -454,7 +454,7 @@ const featurePlugins = [
 ]
 
 // Headless "coming soon" callout (locked decision #3: do NOT render an
-// aspirational headless-API snippet; API may drift before ship).
+// aspirational headless-API snippet; API may drift before it ships).
 const HeadlessComingSoonCallout = () => (
   <div className="overflow-hidden rounded-2xl bg-gray-950 shadow-2xl ring-1 ring-white/10">
     {/* Header */}
