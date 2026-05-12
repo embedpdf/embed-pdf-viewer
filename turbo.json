@@ -27,6 +27,16 @@
         "package.json"
       ]
     },
+    "test:browser": {
+      "dependsOn": ["^build"],
+      "outputs": [],
+      "inputs": [
+        "src/**",
+        "vitest.browser.config.ts",
+        "tsconfig.json",
+        "package.json"
+      ]
+    },
     "test:watch": {
       "cache": false,
       "persistent": true

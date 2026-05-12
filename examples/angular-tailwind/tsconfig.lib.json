@@ -1,0 +1,14 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "declaration": true,
+    "declarationMap": true,
+    "emitDeclarationOnly": false,
+    "noEmit": false,
+    "outDir": "dist/examples",
+    "rootDir": "src",
+    "types": ["vite/client"]
+  },
+  "include": ["src/examples/**/*.ts", "src/example-support.ts"],
+  "exclude": ["node_modules", "dist"]
+}

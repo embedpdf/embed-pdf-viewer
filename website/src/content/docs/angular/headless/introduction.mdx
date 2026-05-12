@@ -14,6 +14,8 @@ That means the recommended Angular path is:
 2. provide shared defaults with `provideEmbedPdfViewerDefaults(...)`,
 3. customize behavior at runtime through `(ready)` and `(init)`.
 
+For wrapper-based integrations that still want a more Angular-friendly signal composition style, `@embedpdf/angular-pdf-viewer` also exports lightweight helpers such as `createPluginCapabilitySignal(...)` and `createDocumentScopeSignal(...)`. They sit between bare `(ready)` handlers and the future headless `inject*()` APIs.
+
 ## What you can customize
 
 Even without a separate Angular-specific headless package, you can still build richer experiences by:
@@ -21,6 +23,7 @@ Even without a separate Angular-specific headless package, you can still build r
 - injecting shared viewer defaults with Angular providers,
 - overriding defaults locally with `provideEmbedPdfViewerConfig(...)` when a specific subtree needs different behavior,
 - listening for the viewer registry in `(ready)`,
+- deriving capability signals from that registry for cleaner composition in Angular state,
 - registering commands or UI schema updates after initialization,
 - and coordinating theme or layout choices from Angular state.
 

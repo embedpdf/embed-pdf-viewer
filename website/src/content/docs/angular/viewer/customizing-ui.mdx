@@ -10,6 +10,8 @@ The Angular `PDFViewer` component supports both simple configuration-based UI ch
 
 Use `[config]` when UI changes are specific to one viewer instance. If the same defaults should apply across many viewers, provide them once with `provideEmbedPdfViewerDefaults(...)` and reserve `[config]` for local exceptions.
 
+If you want to keep runtime customization in Angular signal-land, the wrapper package also exports `createPluginCapabilitySignal(...)`. It is especially handy for commands, UI schema updates, and document-scoped plugin actions that would otherwise repeat `registry()?.getPlugin(...)?` lookups.
+
 ## Disabling Features
 
 The quickest way to simplify the UI is to use `disabledCategories`.
@@ -57,7 +59,88 @@ Categories are hierarchical, so disabling a parent category disables its childre
 
 ## Runtime UI Customization
 
-Use the `(ready)` output to access the registry, register commands, and modify the toolbar schema.
+Use the `(ready)` output to populate the registry signal, then derive the commands/UI capabilities from it.
+
+```ts copy filename="src/app/app.component.ts"
+import { ChangeDetectionStrategy, Component, effect, signal } from '@angular/core';
+import {
+  type CommandButtonItem,
+  createPluginCapabilitySignal,
+  type GroupItem,
+  type CommandsPlugin,
+  type PDFViewerConfig,
+  PDFViewer,
+  type PluginRegistry,
+  type UIPlugin,
+} from '@embedpdf/angular-pdf-viewer';
+
+@Component({
+  selector: 'app-root',
+  imports: [PDFViewer],
+  template: `<embedpdf-viewer class="viewer" [config]="viewerConfig" (ready)="onReady($event)" />`,
+  styles: `
+    .viewer {
+      height: 100vh;
+    }
+  `,
+  changeDetection: ChangeDetectionStrategy.OnPush,
+})
+export class App {
+  readonly registry = signal<PluginRegistry | null>(null);
+  readonly commands = createPluginCapabilitySignal<CommandsPlugin>(this.registry, 'commands');
+  readonly ui = createPluginCapabilitySignal<UIPlugin>(this.registry, 'ui');
+  readonly viewerConfig = {
+    src: 'https://snippet.embedpdf.com/ebook.pdf',
+  } satisfies PDFViewerConfig;
+
+  constructor() {
+    effect(() => {
+      const commands = this.commands();
+      const ui = this.ui();
+      if (!commands || !ui) return;
+
+      commands.registerCommand({
+        id: 'custom.angular-help',
+        label: 'Help',
+        action: () => globalThis.alert('Open your Angular help panel here.'),
+      });
+
+      const schema = ui.getSchema();
+      const toolbar = schema.toolbars['main-toolbar'];
+      if (!toolbar) return;
+
+      const items = structuredClone(toolbar.items);
+      const rightGroup = items.find(
+        (item): item is GroupItem => item.type === 'group' && item.id === 'right-group',
+      );
+
+      if (!rightGroup) return;
+
+      rightGroup.items.push({
+        type: 'command-button',
+        id: 'angular-help-button',
+        commandId: 'custom.angular-help',
+        variant: 'text',
+      } satisfies CommandButtonItem);
+
+      ui.mergeSchema({
+        toolbars: {
+          'main-toolbar': {
+            ...toolbar,
+            items,
+          },
+        },
+      });
+    });
+  }
+
+  onReady(registry: PluginRegistry) {
+    this.registry.set(registry);
+  }
+}
+```
+
+If you only need a one-off customization, accessing the registry directly inside `(ready)` is still perfectly valid. The helper is mainly about reducing repetition across richer Angular examples.
 
 ```ts copy filename="src/app/app.component.ts"
 import { ChangeDetectionStrategy, Component } from '@angular/core';

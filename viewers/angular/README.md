@@ -117,7 +117,7 @@ const viewerDefaults = {
 } satisfies PDFViewerConfig;
 
 bootstrapApplication(AppComponent, {
-  providers: [...provideEmbedPdfViewerConfig(viewerDefaults)],
+  providers: [provideEmbedPdfViewerConfig(viewerDefaults)],
 });
 ```
 
@@ -279,7 +279,7 @@ export class AppComponent {
 
 - `(init)` — Emitted when the viewer container is initialized.
 - `(ready)` — Emitted when the plugin registry is ready and plugins are loaded.
-- `(themechange)` — Emitted when the active theme changes. The payload is `{ preference: 'light' | 'dark' | 'system'; colorScheme: 'light' | 'dark'; theme: Theme }`, forwarded from the snippet's underlying `themechange` custom event.
+- `(themeChange)` — Emitted when the active theme changes. The payload is `{ preference: 'light' | 'dark' | 'system'; colorScheme: 'light' | 'dark'; theme: Theme }`, forwarded from the snippet's underlying `themechange` custom event.
 
 ### Reactive State Signals
 
@@ -306,6 +306,40 @@ export class AppComponent {
         // ... use the registry reactively ...
       }
     });
+  }
+}
+```
+
+### Capability Signals
+
+If you're using the wrapper viewer today and want a bit more reusable signal composition,
+the package also exports lightweight helpers for deriving plugin capabilities from the
+viewer registry. These are intentionally small bridges for wrapper-based integrations —
+they do **not** replace the planned headless `inject*()` APIs.
+
+```ts
+import { Component, viewChild } from '@angular/core';
+import {
+  createDocumentScopeSignal,
+  createPluginCapabilitySignal,
+  PDFViewer,
+  type ZoomPlugin,
+} from '@embedpdf/angular-pdf-viewer';
+
+@Component({
+  imports: [PDFViewer],
+  template: `<embedpdf-viewer #viewer [config]="{ src: '/doc.pdf' }" />`,
+})
+export class AppComponent {
+  readonly viewer = viewChild.required(PDFViewer);
+  readonly zoom = createPluginCapabilitySignal<ZoomPlugin>(
+    () => this.viewer().registry(),
+    'zoom',
+  );
+  readonly zoomScope = createDocumentScopeSignal(this.zoom, 'ebook');
+
+  zoomIn() {
+    this.zoomScope()?.zoomIn();
   }
 }
 ```

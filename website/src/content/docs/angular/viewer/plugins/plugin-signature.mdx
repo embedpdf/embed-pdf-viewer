@@ -4,12 +4,21 @@ description: Let users draw, type, or upload signatures and persist them across 
 ---
 
 import { Callout } from '@/components/callout';
+import { SignatureExample } from '../../code-examples/viewer/signature-example';
 
 # Signatures
 
 The `PDFViewer` includes the signature plugin by default. Users can create signatures by drawing, typing, or uploading an image, and then place them anywhere on the document. The built-in sidebar and modal UI handles creation and placement automatically.
 
 On top of the built-in experience, you can access the `signature` plugin through the viewer registry to persist entries across sessions, pre-load signatures, or react to changes programmatically.
+
+<CodeExample
+  codePaths={[
+    "../../examples/angular-tailwind/src/examples/viewer/signature-example.ts"
+  ]}
+>
+  <SignatureExample />
+</CodeExample>
 
 ## Configuration
 

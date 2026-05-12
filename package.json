@@ -30,7 +30,7 @@
     "watch:packages": "turbo watch build --filter=\"./packages/*\"",
     "test": "turbo run test",
     "test:watch": "turbo run test:watch",
-    "test:browser": "pnpm --filter @embedpdf/angular-pdf-viewer test:browser",
+    "test:browser": "turbo run test:browser --filter=@embedpdf/angular-pdf-viewer",
     "format": "prettier --write \"**/*.{ts,tsx,js,mjs,jsx,json,css,md}\"",
     "format:check": "prettier --check \"**/*.{ts,tsx,js,mjs,jsx,json,css,md}\"",
     "changeset": "changeset",

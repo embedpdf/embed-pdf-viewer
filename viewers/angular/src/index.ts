@@ -4,4 +4,10 @@ export {
   provideEmbedPdfViewerConfig,
   provideEmbedPdfViewerDefaults,
 } from './pdf-viewer.config';
-export { PDFViewer } from './pdf-viewer.component';
+export { PDFViewer, type EmbedPdfThemeChangeEvent } from './pdf-viewer.component';
+export {
+  createDocumentScopeSignal,
+  createPluginCapabilitySignal,
+  type DocumentScope,
+  type PluginCapability,
+} from './plugin-signals';

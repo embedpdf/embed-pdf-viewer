@@ -3,12 +3,22 @@ title: Export & Save
 description: Configure downloads and learn how to save modified PDFs (with annotations) to your server.
 ---
 
+import { ExportExample } from '../../code-examples/viewer/export-example';
+
 # Export & Save
 
 The PDFViewer includes built-in functionality to export the current PDF. This isn't just downloading the original file; the export plugin generates a **new PDF file** that includes any changes the user has made, such as:
 * Annotations (Highlights, Ink, Shapes)
 * Redactions (Applied and burned in)
 * Form filled data
+
+<CodeExample
+  codePaths={[
+    "../../examples/angular-tailwind/src/examples/viewer/export-example.ts"
+  ]}
+>
+  <ExportExample />
+</CodeExample>
 
 ## Configuration
 

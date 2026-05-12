@@ -4,12 +4,21 @@ description: Fill PDF forms, inspect field values, and update them programmatica
 ---
 
 import { Callout } from '@/components/callout';
+import { FormExample } from '../../code-examples/viewer/form-example';
 
 # Forms
 
 The `PDFViewer` includes the form plugin by default, so PDFs with AcroForm fields become interactive automatically. Users can type into text fields, toggle checkboxes, select radio buttons, and choose dropdown values directly in the built-in viewer UI.
 
 You can also access the `form` plugin through the viewer registry to read field values, react to changes, or populate the form from your own application data.
+
+<CodeExample
+  codePaths={[
+    "../../examples/angular-tailwind/src/examples/viewer/form-example.ts"
+  ]}
+>
+  <FormExample />
+</CodeExample>
 
 ## Configuration
 
