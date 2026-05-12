@@ -1,6 +1,6 @@
 'use client'
 
-import React from 'react'
+import React, { useEffect, useRef, useState } from 'react'
 import {
   AngularMaterialLogo,
   PrimeNGLogo,
@@ -47,7 +47,7 @@ const AnimatedBackground = () => {
   return (
     <div className="pointer-events-none absolute inset-0 -z-10 overflow-hidden">
       {/* Fuchsia blob */}
-      <div className="top-70 animate-blob absolute left-8 h-64 w-64 rounded-full bg-fuchsia-500 opacity-10 mix-blend-multiply blur-3xl filter dark:opacity-20 dark:mix-blend-normal"></div>
+      <div className="animate-blob absolute left-8 top-72 h-64 w-64 rounded-full bg-fuchsia-500 opacity-10 mix-blend-multiply blur-3xl filter dark:opacity-20 dark:mix-blend-normal"></div>
 
       {/* Pink blob */}
       <div className="animate-blob animation-delay-2000 absolute -right-8 top-32 h-80 w-80 rounded-full bg-pink-500 opacity-10 mix-blend-multiply blur-3xl filter dark:opacity-20 dark:mix-blend-normal"></div>
@@ -88,7 +88,7 @@ const Hero = () => {
               <span>Angular PDF Viewer Open Source Library</span>
             </div>
 
-            <h1 className="md:text-7xl text-4xl font-black leading-tight tracking-tight text-gray-900 dark:text-white sm:text-6xl">
+            <h1 className="text-4xl font-black leading-tight tracking-tight text-gray-900 dark:text-white sm:text-6xl">
               <span className="relative inline-block">
                 <span className="relative z-10">Angular PDF Viewer</span>
                 <div className="absolute bottom-1 left-0 right-0 -z-10 h-3 -rotate-1 transform text-fuchsia-400 opacity-50 dark:text-fuchsia-500 md:h-4">
@@ -122,7 +122,7 @@ const Hero = () => {
                 href="https://app.embedpdf.com"
                 target="_blank"
                 rel="noreferrer"
-                className="dark:hover:bg-gray-750 group inline-flex w-full items-center justify-center rounded-full bg-white px-8 py-3.5 text-base font-medium text-gray-700 shadow-md transition-all hover:bg-gray-50 hover:text-gray-900 hover:shadow-lg dark:bg-gray-800 dark:text-gray-200 dark:hover:text-white sm:w-auto md:py-4"
+                className="group inline-flex w-full items-center justify-center rounded-full bg-white px-8 py-3.5 text-base font-medium text-gray-700 shadow-md transition-all hover:bg-gray-50 hover:text-gray-900 hover:shadow-lg dark:bg-gray-800 dark:text-gray-200 dark:hover:bg-gray-700 dark:hover:text-white sm:w-auto md:py-4"
               >
                 <Play className="mr-2 h-4 w-4 fill-current text-fuchsia-600 transition-transform group-hover:scale-110 dark:text-fuchsia-400" />
                 Live Demo
@@ -328,6 +328,51 @@ const AngularPdfDemoMount = () => {
   )
 }
 
+// Defer the Angular bootstrap (and its ~MB of @angular/core +
+// @angular/platform-browser + @angular/compiler JIT chunks) until the demo
+// section enters the viewport. The marketing page above the fold should not
+// pay the cost of an Angular app a visitor may never scroll to.
+const LazyAngularDemo = () => {
+  const placeholderRef = useRef<HTMLDivElement | null>(null)
+  const [inView, setInView] = useState(false)
+
+  useEffect(() => {
+    if (typeof IntersectionObserver === 'undefined') {
+      setInView(true)
+      return
+    }
+    const node = placeholderRef.current
+    if (!node) return
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries.some((entry) => entry.isIntersecting)) {
+          setInView(true)
+          observer.disconnect()
+        }
+      },
+      { rootMargin: '200px' },
+    )
+    observer.observe(node)
+    return () => observer.disconnect()
+  }, [])
+
+  if (inView) return <AngularPdfDemoMount />
+
+  return (
+    <div
+      ref={placeholderRef}
+      aria-label="Angular viewer demo (loads when visible)"
+      className="flex h-[500px] w-full items-center justify-center rounded-lg border border-dashed border-fuchsia-200 bg-fuchsia-50/30 text-fuchsia-700 dark:border-fuchsia-800/40 dark:bg-fuchsia-900/10 dark:text-fuchsia-300 md:h-[700px]"
+    >
+      <div className="flex items-center gap-2 text-sm font-medium">
+        <AngularIcon className="h-5 w-5" />
+        <span>Angular demo loads on scroll…</span>
+      </div>
+    </div>
+  )
+}
+
 const FullUiDemo = () => {
   return (
     <div className="mt-24">
@@ -352,7 +397,7 @@ const FullUiDemo = () => {
         {/* Angular demo with enhanced styling */}
         <div className="group relative">
           <div className="relative overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-2xl dark:border-gray-700 dark:bg-gray-900">
-            <AngularPdfDemoMount />
+            <LazyAngularDemo />
           </div>
         </div>
       </div>
