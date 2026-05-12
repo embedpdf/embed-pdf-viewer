@@ -16,11 +16,14 @@ export default {
       '5xl': '3rem',
       '6xl': '4rem',
     },
-    letterSpacing: {
-      tight: '-0.015em',
-      wider: '0.05em',
-    },
     extend: {
+      letterSpacing: {
+        // Override Tailwind's default `tight` (-0.025em) with a slightly less
+        // aggressive value; keep all other defaults (`tighter`, `normal`,
+        // `wide`, `widest`) and our `wider` available.
+        tight: '-0.015em',
+        wider: '0.05em',
+      },
       colors: {
         transparent: 'transparent',
         current: 'currentColor',
