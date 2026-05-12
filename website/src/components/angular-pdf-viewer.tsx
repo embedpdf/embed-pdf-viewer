@@ -103,7 +103,7 @@ const Hero = () => {
               The ultimate <strong>Angular PDF viewer</strong> for your next
               project. Drop in a polished <code>&lt;embedpdf-viewer&gt;</code>{' '}
               today — powered by signals, zoneless-ready, and TypeScript-first.{' '}
-              <strong>Headless Angular injectables</strong> arrive in v1.1.
+              <strong>Headless Angular injectables</strong> are coming soon.
             </p>
 
             <div className="mt-8 flex flex-col items-center justify-center gap-3 sm:flex-row md:mt-10 md:gap-4">
@@ -195,7 +195,7 @@ const IntegrationPaths = () => {
               Full-UI Viewer
             </h3>
             <div className="mb-4 inline-flex w-fit rounded-full bg-fuchsia-100 px-2.5 py-0.5 text-xs font-medium text-fuchsia-800 dark:bg-fuchsia-900/30 dark:text-fuchsia-300">
-              Available today (v1.0)
+              Available today
             </div>
             <p className="mb-6 min-h-[3rem] text-gray-600 dark:text-gray-400">
               A complete, polished PDF viewer with toolbar and thumbnails. Drop
@@ -240,7 +240,7 @@ const IntegrationPaths = () => {
               Headless Injectables
             </h3>
             <div className="mb-4 inline-flex w-fit rounded-full bg-blue-100 px-2.5 py-0.5 text-xs font-medium text-blue-800 dark:bg-blue-900/30 dark:text-blue-300">
-              Coming in v1.1
+              Coming soon
             </div>
             <p className="mb-6 min-h-[3rem] text-gray-600 dark:text-gray-400">
               Build a viewer that perfectly matches your design system with
@@ -268,7 +268,7 @@ const IntegrationPaths = () => {
                 className="group/btn flex items-center justify-center gap-2 rounded-lg border-2 border-gray-200 bg-transparent px-4 py-3 font-medium text-gray-900 transition-all hover:border-gray-900 dark:border-gray-700 dark:text-white dark:hover:border-white"
               >
                 <Code className="h-5 w-5" />
-                <span>Preview v1.1 Plan</span>
+                <span>Preview the headless plan</span>
                 <ArrowRight className="ml-1 h-4 w-4 transition-transform group-hover/btn:translate-x-1" />
               </Link>
             </div>
@@ -390,7 +390,7 @@ const FullUiDemo = () => {
             component — running below as a real Angular application.
             <br />
             <span className="text-sm opacity-80">
-              Want a different look? Scroll down for our v1.1 headless plan.
+              Want a different look? Scroll down for our headless plan.
             </span>
           </p>
         </div>
@@ -453,9 +453,9 @@ const featurePlugins = [
   { name: 'i18n', icon: <Zap size={18} />, pkg: 'plugin-i18n' },
 ]
 
-// Headless v1.1-coming callout (locked decision #3: do NOT render an
-// aspirational v1.1-API snippet; API may drift before ship).
-const HeadlessV11Callout = () => (
+// Headless "coming soon" callout (locked decision #3: do NOT render an
+// aspirational headless-API snippet; API may drift before it ships).
+const HeadlessComingSoonCallout = () => (
   <div className="overflow-hidden rounded-2xl bg-gray-950 shadow-2xl ring-1 ring-white/10">
     {/* Header */}
     <div className="flex items-center justify-between border-b border-gray-800 bg-gray-900/50 px-4 py-3">
@@ -464,22 +464,22 @@ const HeadlessV11Callout = () => (
         <div className="h-3 w-3 rounded-full bg-yellow-500"></div>
         <div className="h-3 w-3 rounded-full bg-green-500"></div>
       </div>
-      <span className="text-xs text-gray-500">v1.1-preview.ts</span>
+      <span className="text-xs text-gray-500">headless-preview.ts</span>
     </div>
 
-    {/* Coming-soon body */}
+    {/* coming-soon body */}
     <div className="px-8 py-12 text-center">
       <div className="mx-auto mb-5 inline-flex h-14 w-14 items-center justify-center rounded-2xl bg-blue-500/10 text-blue-400 ring-1 ring-blue-500/30">
         <Construction size={26} aria-hidden="true" />
       </div>
       <div className="mx-auto mb-3 inline-flex items-center gap-2 rounded-full border border-blue-500/30 bg-blue-500/10 px-3 py-1 text-xs font-semibold uppercase tracking-wider text-blue-300">
-        Coming in v1.1
+        Coming soon
       </div>
       <h3 className="text-xl font-bold text-white md:text-2xl">
         Headless Angular bindings are on the way
       </h3>
       <p className="mx-auto mt-3 max-w-md text-sm leading-relaxed text-gray-400">
-        v1.1 of the EmbedPDF Angular integration introduces{' '}
+        The next release of the EmbedPDF Angular integration introduces{' '}
         <code className="rounded bg-gray-800 px-1.5 py-0.5 text-xs text-gray-200">
           @embedpdf/core/angular
         </code>{' '}
@@ -601,9 +601,9 @@ const HeadlessShowcase = () => {
             </div>
           </div>
 
-          {/* Right: v1.1 Coming-soon callout */}
+          {/* Right: headless coming-soon callout */}
           <div className="order-2 min-w-0">
-            <HeadlessV11Callout />
+            <HeadlessComingSoonCallout />
             <div className="mt-6 rounded-xl border border-blue-100 bg-blue-50/50 p-4 dark:border-blue-900/30 dark:bg-blue-900/10">
               <div className="flex items-start gap-3">
                 <div className="mt-0.5 rounded-full bg-blue-100 p-1 dark:bg-blue-900/50">
@@ -611,7 +611,7 @@ const HeadlessShowcase = () => {
                 </div>
                 <div>
                   <div className="text-sm font-semibold text-gray-900 dark:text-white">
-                    v1.0 ships drop-in, v1.1 ships headless
+                    Drop-in today, headless next
                   </div>
                   <p className="mt-1 text-sm text-gray-600 dark:text-gray-400">
                     Today you can import{' '}
@@ -622,8 +622,8 @@ const HeadlessShowcase = () => {
                     <code className="rounded bg-gray-200 px-1 py-0.5 text-xs dark:bg-gray-800">
                       @embedpdf/angular-pdf-viewer
                     </code>
-                    . v1.1 unlocks the full headless plugin surface as Angular
-                    injectables.
+                    . The next release unlocks the full headless plugin surface
+                    as Angular injectables.
                   </p>
                 </div>
               </div>
@@ -781,7 +781,7 @@ const faqs = [
   {
     question: 'Can I use it with Angular Material, PrimeNG, or Spartan/ng?',
     answer:
-      "Absolutely. The drop-in viewer is unopinionated about your chrome — it renders its own surface inside <embedpdf-viewer>. Wrap it with Angular Material, PrimeNG, or Spartan/ng components for your toolbars, dialogs and layout. Once v1.1 ships, the headless injectables give you total control over the viewer's UI too.",
+      "Absolutely. The drop-in viewer is unopinionated about your chrome — it renders its own surface inside <embedpdf-viewer>. Wrap it with Angular Material, PrimeNG, or Spartan/ng components for your toolbars, dialogs and layout. Once the headless release ships, the injectables give you total control over the viewer's UI too.",
   },
   {
     question: 'What about SSR — does it work with Angular Universal?',
@@ -796,7 +796,7 @@ const faqs = [
   {
     question: 'When does the headless Angular package ship?',
     answer:
-      'The drop-in PDFViewer ships today as v1.0. Headless Angular bindings (@embedpdf/core/angular plus injectXxx() helpers for every plugin) are scheduled for the v1.1 release. Track progress on the Angular integration discussion on GitHub.',
+      'The drop-in PDFViewer is available today. Headless Angular bindings (@embedpdf/core/angular plus injectXxx() helpers for every plugin) are scheduled for the next release. Track progress on the Angular integration discussion on GitHub.',
   },
 ]
 
@@ -889,7 +889,7 @@ export default function AngularPDFViewerPage() {
       {/* Demo of the Full UI — real Angular wrapper via useAngularMount */}
       <FullUiDemo />
 
-      {/* Headless Architecture Section — v1.1-coming callout */}
+      {/* Headless Architecture Section — coming-soon callout */}
       <HeadlessShowcase />
 
       {/* Tech Specs / Why Choose */}
