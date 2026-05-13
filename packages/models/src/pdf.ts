@@ -21,6 +21,12 @@ export interface PdfPageObject {
    * Rotation of this page
    */
   rotation: Rotation;
+
+  /**
+   * Origin of the page bounding box in PDF user space (MediaBox/CropBox lower-left corner).
+   * Defaults to { x: 0, y: 0 } for pages whose MediaBox starts at the origin.
+   */
+  origin?: Position;
 }
 
 /**

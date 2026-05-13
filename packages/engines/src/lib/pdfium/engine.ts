@@ -385,13 +385,32 @@ export class PdfiumNative implements IPdfiumExecutor {
 
       const rotation = this.pdfiumModule.EPDF_GetPageRotationByIndex(docPtr, index) as Rotation;
 
+      const width = this.pdfiumModule.pdfium.getValue(sizePtr, 'float');
+      const height = this.pdfiumModule.pdfium.getValue(sizePtr + 4, 'float');
+
+      // Get the page bounding box to determine the MediaBox/CropBox origin.
+      // Most pages have origin (0,0), but some PDFs have non-zero origins which
+      // causes annotation coordinates to be offset.
+      let originX = 0;
+      let originY = 0;
+      const pagePtr = this.pdfiumModule.FPDF_LoadPage(docPtr, index);
+      if (pagePtr) {
+        const boxPtr = this.memoryManager.malloc(4 * 4);
+        if (this.pdfiumModule.FPDF_GetPageBoundingBox(pagePtr, boxPtr)) {
+          // FS_RECTF layout: left, top, right, bottom (in PDF user space, y-up)
+          // origin.x = left (min x), origin.y = bottom (min y)
+          originX = this.pdfiumModule.pdfium.getValue(boxPtr, 'float');      // left
+          originY = this.pdfiumModule.pdfium.getValue(boxPtr + 12, 'float'); // bottom
+        }
+        this.memoryManager.free(boxPtr);
+        this.pdfiumModule.FPDF_ClosePage(pagePtr);
+      }
+
       const page = {
         index,
-        size: {
-          width: this.pdfiumModule.pdfium.getValue(sizePtr, 'float'),
-          height: this.pdfiumModule.pdfium.getValue(sizePtr + 4, 'float'),
-        },
+        size: { width, height },
         rotation,
+        origin: { x: originX, y: originY },
       };
 
       pages.push(page);
@@ -10427,24 +10446,24 @@ export class PdfiumNative implements IPdfiumExecutor {
     // so we must also use 0° for coordinate transformations
     const r = doc.normalizedRotation ? 0 : page.rotation & 3;
 
-    if (r === 0) {
-      // 0°
-      return { x: position.x, y: DH - position.y };
+    // Annotation coordinates (from EPDFAnnot_GetRect / FPDFAnnot_GetRect) are in the
+    // PDF page's pre-rotation user space (y-up). The origin of this space is the
+    // lower-left corner of the MediaBox/CropBox, stored in page.origin.
+    // The CSS "device" space used here is the pre-CSS-Rotate layout space of the
+    // PagePointerProvider container, which always has origin at the top-left and
+    // dimensions DW × DH.
+    // This is the INVERSE of convertPagePointToDevicePoint:
+    //   device_x = PDF.x - ox  →  PDF.x = device_x + ox
+    //   device_y = DH - (PDF.y - oy)  →  PDF.y = oy + DH - device_y
+    const ox = page.origin?.x ?? 0;
+    const oy = page.origin?.y ?? 0;
+    if (r === 1 || r === 3) {
+      // 90° CW or 270° CW: x-axis is flipped in pre-Rotate CSS space
+      // device_x = DW - (PDF.x - ox)  →  PDF.x = DW - device_x + ox
+      return { x: DW - position.x + ox, y: oy + DH - position.y };
     }
-    if (r === 1) {
-      // 90° CW
-      // x_d = sx*y, y_d = sy*x  =>  x = y_d/sy, y = x_d/sx
-      return { x: position.y, y: position.x };
-    }
-    if (r === 2) {
-      // 180°
-      return { x: DW - position.x, y: position.y };
-    }
-    {
-      // 270° CW
-      // x_d = DW - sx*y, y_d = DH - sy*x
-      return { x: DH - position.y, y: DW - position.x };
-    }
+    // 0° or 180°: x-axis is not flipped
+    return { x: position.x + ox, y: oy + DH - position.y };
   }
 
   /**
@@ -10467,22 +10486,20 @@ export class PdfiumNative implements IPdfiumExecutor {
     // so we must also use 0° for coordinate transformations
     const r = doc.normalizedRotation ? 0 : page.rotation & 3;
 
-    if (r === 0) {
-      // 0°
-      return { x: position.x, y: DH - position.y };
+    // Annotation coordinates (from EPDFAnnot_GetRect / FPDFAnnot_GetRect) are in the
+    // PDF page's pre-rotation user space (y-up). The origin of this space is the
+    // lower-left corner of the MediaBox/CropBox, stored in page.origin.
+    // The CSS "device" space is the pre-CSS-Rotate layout space of the PagePointerProvider
+    // container (y-down, origin at top-left, dimensions DW × DH).
+    // Conversion: device_x = (PDF.x - origin.x); device_y = DH - (PDF.y - origin.y)
+    const ox = page.origin?.x ?? 0;
+    const oy = page.origin?.y ?? 0;
+    if (r === 1 || r === 3) {
+      // 90° CW or 270° CW: x-axis is flipped
+      return { x: DW - (position.x - ox), y: DH - (position.y - oy) };
     }
-    if (r === 1) {
-      // 90° CW
-      return { x: position.y, y: position.x };
-    }
-    if (r === 2) {
-      // 180°
-      return { x: DW - position.x, y: position.y };
-    }
-    {
-      // 270° CW
-      return { x: DW - position.y, y: DH - position.x };
-    }
+    // 0° or 180°: no x-axis flip
+    return { x: position.x - ox, y: DH - (position.y - oy) };
   }
 
   /**
@@ -10505,8 +10522,13 @@ export class PdfiumNative implements IPdfiumExecutor {
       bottom: number;
     },
   ): Rect {
+    const r = doc.normalizedRotation ? 0 : page.rotation & 3;
+    // For r=1 and r=3 the x-axis is flipped in the pre-CSS-Rotate layout space, so the
+    // CSS top-left corner of the annotation corresponds to (right, top) in PDF space
+    // (the rightmost PDF x maps to the smallest CSS x after the flip).
+    const anchorX = r === 1 || r === 3 ? pageRect.right : pageRect.left;
     const { x, y } = this.convertPagePointToDevicePoint(doc, page, {
-      x: pageRect.left,
+      x: anchorX,
       y: pageRect.top,
     });
     const rect = {
