@@ -1,5 +1,13 @@
 import type { Framework } from './code-showcase'
 
+/**
+ * Runtime safeguard for unexpected values and compile-time exhaustiveness check
+ * when the Framework union grows.
+ */
+const assertUnreachable = (framework: never): never => {
+  throw new Error(`Unsupported framework: ${String(framework)}`)
+}
+
 export const getDocumentationLink = (framework: Framework): string => {
   switch (framework) {
     case 'react':
@@ -13,6 +21,9 @@ export const getDocumentationLink = (framework: Framework): string => {
     case 'snippet':
       return '/docs/snippet/introduction'
   }
+
+  // Keep the switch exhaustive without hiding future additions behind a default.
+  return assertUnreachable(framework)
 }
 
 export const getButtonText = (framework: Framework): string => {
@@ -28,4 +39,7 @@ export const getButtonText = (framework: Framework): string => {
     case 'snippet':
       return 'Read Snippet Documentation'
   }
+
+  // Keep the switch exhaustive without hiding future additions behind a default.
+  return assertUnreachable(framework)
 }
