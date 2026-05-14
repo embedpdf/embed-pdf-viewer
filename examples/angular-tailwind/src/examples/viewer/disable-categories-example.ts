@@ -1,10 +1,4 @@
-import {
-  ChangeDetectionStrategy,
-  Component,
-  computed,
-  effect,
-  signal,
-} from '@angular/core';
+import { ChangeDetectionStrategy, Component, computed, effect, signal } from '@angular/core';
 import {
   createPluginCapabilitySignal,
   type CommandsPlugin,
@@ -71,7 +65,11 @@ const VIEWER_CATEGORIES = [
       <div
         class="h-[600px] w-full overflow-hidden rounded-xl border border-gray-300 shadow-lg dark:border-gray-600"
       >
-        <embedpdf-viewer class="block h-full w-full" [config]="viewerConfig()" (ready)="onReady($event)" />
+        <embedpdf-viewer
+          class="block h-full w-full"
+          [config]="viewerConfig()"
+          (ready)="onReady($event)"
+        />
       </div>
     </div>
   `,

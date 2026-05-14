@@ -1,8 +1,8 @@
 import { ChangeDetectionStrategy, Component, effect, signal } from '@angular/core';
 
 import DisableCategoriesExample from './examples/viewer/disable-categories-example';
-import DocumentManagerExample from './examples/viewer/document-manager-example';
 import DocumentLoadingExample from './examples/viewer/document-loading-example';
+import DocumentManagerExample from './examples/viewer/document-manager-example';
 import EngineExample from './examples/viewer/engine-example';
 import RotateExample from './examples/viewer/rotate-example';
 import ScrollInitialPageExample from './examples/viewer/scroll-initial-page-example';

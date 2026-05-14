@@ -1,10 +1,4 @@
-import {
-  ChangeDetectionStrategy,
-  Component,
-  computed,
-  effect,
-  signal,
-} from '@angular/core';
+import { ChangeDetectionStrategy, Component, computed, effect, signal } from '@angular/core';
 import {
   createPluginCapabilitySignal,
   deserializeEntries,
@@ -43,7 +37,9 @@ export const selector = 'signature-example';
         class="flex flex-col gap-3 rounded-lg border border-gray-200 bg-gray-50 p-3 dark:border-gray-700 dark:bg-gray-800"
       >
         <div class="flex flex-wrap items-center gap-3">
-          <span class="text-xs font-medium uppercase tracking-wide text-gray-600 dark:text-gray-300">
+          <span
+            class="text-xs font-medium uppercase tracking-wide text-gray-600 dark:text-gray-300"
+          >
             Persistence
           </span>
           <div class="h-4 w-px bg-gray-300 dark:bg-gray-600"></div>
@@ -166,9 +162,7 @@ export default class SignatureExample {
       const cleanup = api.onEntriesChange((entries) => {
         localStorage.setItem(STORAGE_KEY, JSON.stringify(serializeEntries(entries)));
         this.storedCount.set(entries.length);
-        this.status.set(
-          `Auto-saved ${entries.length} signature${entries.length !== 1 ? 's' : ''}`,
-        );
+        this.status.set(`Auto-saved ${entries.length} signature${entries.length !== 1 ? 's' : ''}`);
       });
       onCleanup(cleanup);
     });

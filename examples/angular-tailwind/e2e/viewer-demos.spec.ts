@@ -32,7 +32,9 @@ test('theme demo updates selected brand color', async ({ page }) => {
   await expect(page.locator('div:has-text("Selected:") strong')).toHaveText('Blue');
 });
 
-test('ui customization demo registers the custom toolbar action without icon warnings', async ({ page }) => {
+test('ui customization demo registers the custom toolbar action without icon warnings', async ({
+  page,
+}) => {
   const consoleWarnings: string[] = [];
   page.on('console', (message) => {
     const text = message.text();

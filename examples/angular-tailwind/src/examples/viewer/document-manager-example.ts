@@ -1,10 +1,4 @@
-import {
-  ChangeDetectionStrategy,
-  Component,
-  computed,
-  effect,
-  signal,
-} from '@angular/core';
+import { ChangeDetectionStrategy, Component, computed, effect, signal } from '@angular/core';
 import {
   createPluginCapabilitySignal,
   type DocumentManagerPlugin,
@@ -136,10 +130,10 @@ export default class DocumentManagerExample {
 
   openRemoteDocument() {
     this.documentManager()?.openDocumentUrl({
-        url: DEMO_DOCUMENT_URL,
-        documentId: `ebook-copy-${Date.now()}`,
-        name: 'Remote ebook copy',
-      });
+      url: DEMO_DOCUMENT_URL,
+      documentId: `ebook-copy-${Date.now()}`,
+      name: 'Remote ebook copy',
+    });
   }
 
   async onFileSelected(event: Event) {
@@ -148,10 +142,10 @@ export default class DocumentManagerExample {
 
     const buffer = await file.arrayBuffer();
     this.documentManager()?.openDocumentBuffer({
-        buffer,
-        name: file.name,
-        autoActivate: true,
-      });
+      buffer,
+      name: file.name,
+      autoActivate: true,
+    });
 
     (event.target as HTMLInputElement).value = '';
   }

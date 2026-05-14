@@ -1,13 +1,6 @@
-import {
-  ChangeDetectionStrategy,
-  Component,
-  computed,
-  effect,
-  signal,
-} from '@angular/core';
+import { ChangeDetectionStrategy, Component, computed, effect, signal } from '@angular/core';
 import {
   createPluginCapabilitySignal,
-  type I18nCapability,
   type I18nPlugin,
   PDFViewer,
   type PluginRegistry,

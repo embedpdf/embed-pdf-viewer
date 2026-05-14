@@ -27,9 +27,7 @@ export const selector = 'engine-example';
           {{ inspection.isLoading() ? 'Loading…' : 'Inspect active document' }}
         </button>
 
-        <div
-          class="grid gap-1 text-sm text-gray-600 sm:grid-cols-2 sm:gap-x-6 dark:text-gray-300"
-        >
+        <div class="grid gap-1 text-sm text-gray-600 sm:grid-cols-2 sm:gap-x-6 dark:text-gray-300">
           <p>
             <span class="font-medium text-gray-900 dark:text-gray-100">Pages:</span>
             {{ inspection.value()?.pageCount ?? '—' }}

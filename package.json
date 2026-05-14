@@ -31,8 +31,8 @@
     "test": "turbo run test",
     "test:watch": "turbo run test:watch",
     "test:browser": "turbo run test:browser --filter=@embedpdf/angular-pdf-viewer",
-    "format": "prettier --write \"**/*.{ts,tsx,js,mjs,jsx,json,css,md}\"",
-    "format:check": "prettier --check \"**/*.{ts,tsx,js,mjs,jsx,json,css,md}\"",
+    "format": "prettier --write \"**/*.{ts,tsx,js,mjs,cjs,jsx,json,css,scss,html,md}\"",
+    "format:check": "prettier --check \"**/*.{ts,tsx,js,mjs,cjs,jsx,json,css,scss,html,md}\"",
     "changeset": "changeset",
     "ci:publish": "pnpm publish -r --access public --report-summary $GITHUB_WORKSPACE/publish-summary.json",
     "ci:publish:next": "pnpm publish -r --access public --tag next --publish-branch next --report-summary $GITHUB_WORKSPACE/publish-summary.json"
@@ -64,7 +64,7 @@
     "vitest": "^4.0.8"
   },
   "lint-staged": {
-    "**/*.{ts,tsx,js,jsx,json,css,md,vue,svelte}": "prettier --write"
+    "**/*.{ts,tsx,js,cjs,jsx,json,css,scss,html,md,vue,svelte}": "prettier --write"
   },
   "pnpm": {
     "overrides": {

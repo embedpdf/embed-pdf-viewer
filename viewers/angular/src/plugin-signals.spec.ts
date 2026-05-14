@@ -11,7 +11,7 @@ type MockZoomScope = {
 };
 
 type MockZoomCapability = {
-  forDocument(documentId: string): MockZoomScope;
+  forDocument(_documentId: string): MockZoomScope;
 };
 
 type MockZoomPlugin = {

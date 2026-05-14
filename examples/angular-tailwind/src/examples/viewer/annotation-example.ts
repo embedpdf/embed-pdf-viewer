@@ -1,12 +1,5 @@
+import { ChangeDetectionStrategy, Component, computed, effect, signal } from '@angular/core';
 import {
-  ChangeDetectionStrategy,
-  Component,
-  computed,
-  effect,
-  signal,
-} from '@angular/core';
-import {
-  type AnnotationCapability,
   type AnnotationPlugin,
   createPluginCapabilitySignal,
   PDFViewer,

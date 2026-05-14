@@ -3,7 +3,7 @@ import type { PluginRegistry } from '@embedpdf/snippet';
 
 type ValueOrSignal<T> = T | (() => T);
 type PluginWithProvides = { id: string; provides(): unknown };
-type DocumentScopedCapability = { forDocument(documentId: string): unknown };
+type DocumentScopedCapability = { forDocument(_documentId: string): unknown };
 
 export type PluginCapability<TPlugin extends PluginWithProvides> = TPlugin extends {
   provides(): infer TCapability;
@@ -12,7 +12,7 @@ export type PluginCapability<TPlugin extends PluginWithProvides> = TPlugin exten
   : never;
 
 export type DocumentScope<TCapability extends DocumentScopedCapability> = TCapability extends {
-  forDocument(documentId: string): infer TScope;
+  forDocument(_documentId: string): infer TScope;
 }
   ? TScope
   : never;
