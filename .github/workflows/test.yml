@@ -159,8 +159,13 @@ jobs:
         with:
           path: ~/.cache/ms-playwright
           key: playwright-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}
-      - name: Install Playwright Chromium
-        run: pnpm --filter @embedpdf/example-angular-pdf-viewer exec playwright install --with-deps chromium
+      - name: Install Playwright Chromium (angular-pdf-viewer + angular-tailwind)
+        # Both examples use only Chromium; installing via one package writes to the
+        # shared ~/.cache/ms-playwright path, so a second install for angular-tailwind
+        # is a fast no-op that makes the dependency explicit.
+        run: |
+          pnpm --filter @embedpdf/example-angular-pdf-viewer exec playwright install --with-deps chromium
+          pnpm --filter @embedpdf/example-angular-tailwind exec playwright install --with-deps chromium
       - name: Run Angular example e2e suites
         run: |
           pnpm --filter @embedpdf/example-angular-pdf-viewer run e2e

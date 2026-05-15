@@ -14,6 +14,9 @@ interface Options {
   outputPrefix?: string;
 }
 
+// Must mirror the framework cases in defineLibrary() (packages/build/src/vite/index.ts).
+// When a new framework mode is added there, add its outputPrefix here so the
+// base-mode validator correctly skips those dist/ entries.
 const FRAMEWORK_PREFIXES = ['react', 'preact', 'vue', 'svelte', 'angular'];
 
 interface PackageJsonExports {
