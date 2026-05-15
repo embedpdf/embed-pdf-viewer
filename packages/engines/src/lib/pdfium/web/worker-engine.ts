@@ -29,6 +29,27 @@ export interface CreatePdfiumEngineOptions {
    * when it encounters text that requires fonts not embedded in the PDF.
    */
   fontFallback?: FontFallbackConfig;
+  /**
+   * URL to the PDFium worker script.
+   * When provided, the worker is loaded from this URL instead of a blob: URL,
+   * allowing strict CSP without `worker-src blob:`.
+   *
+   * @example
+   * // Vite
+   * workerUrl: new URL('@embedpdf/engines/pdfium-worker', import.meta.url).href
+   * // Or a static asset
+   * workerUrl: '/assets/embedpdf-worker.js'
+   */
+  workerUrl?: string;
+  /**
+   * URL to the image encoder worker script.
+   * When provided, the encoder pool workers are loaded from this URL instead
+   * of a blob: URL, allowing strict CSP without `worker-src blob:`.
+   *
+   * @example
+   * encoderWorkerUrl: '/assets/embedpdf-encoder-worker.js'
+   */
+  encoderWorkerUrl?: string;
 }
 
 /**
@@ -70,22 +91,20 @@ export function createPdfiumEngine(
       ? { logger: options as Logger }
       : (options as CreatePdfiumEngineOptions) || {};
 
-  const { logger, encoderPoolSize, fontFallback } = config;
+  const { logger, encoderPoolSize, fontFallback, workerUrl, encoderWorkerUrl } = config;
 
-  // Create PDFium worker
-  const worker = new Worker(
-    URL.createObjectURL(new Blob([__WEBWORKER_BODY__], { type: 'application/javascript' })),
-    {
-      type: 'module',
-    },
-  );
+  // Create PDFium worker — use a static URL when provided to avoid blob: in CSP
+  const resolvedWorkerUrl =
+    workerUrl ??
+    URL.createObjectURL(new Blob([__WEBWORKER_BODY__], { type: 'application/javascript' }));
+  const worker = new Worker(resolvedWorkerUrl, { type: 'module' });
 
   // Create RemoteExecutor (proxy to worker) - handles wasmInit internally
   const remoteExecutor = new RemoteExecutor(worker, { wasmUrl, logger, fontFallback });
 
-  const finalEncoderWorkerUrl = URL.createObjectURL(
-    new Blob([__ENCODER_WORKER_BODY__], { type: 'application/javascript' }),
-  );
+  const finalEncoderWorkerUrl =
+    encoderWorkerUrl ??
+    URL.createObjectURL(new Blob([__ENCODER_WORKER_BODY__], { type: 'application/javascript' }));
   const encoderPool = new ImageEncoderWorkerPool(
     encoderPoolSize ?? 2,
     finalEncoderWorkerUrl,
