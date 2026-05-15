@@ -86,7 +86,10 @@ jobs:
           tmp_dir=$(mktemp -d)
           pnpm --dir viewers/angular pack --pack-destination "$tmp_dir"
           tarball=$(ls -1 "$tmp_dir"/*.tgz | head -n 1)
-          npx -y @angular/cli@21 new "$tmp_dir/consumer-app" --defaults --standalone --skip-git --package-manager pnpm --routing false --style css
+          (
+            cd "$tmp_dir"
+            npx -y @angular/cli@21 new consumer-app --defaults --standalone --skip-git --package-manager pnpm --routing false --style css
+          )
           cd "$tmp_dir/consumer-app"
           pnpm add "$tarball"
           cat > src/app/app.ts <<'EOF'
