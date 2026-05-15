@@ -1,0 +1,23 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "declaration": true,
+    "declarationMap": true,
+    "target": "ES2022",
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "types": []
+  },
+  "exclude": [
+    "src/**/*.spec.ts",
+    "src/**/*.browser.spec.ts",
+    "src/**/*.test-d.ts",
+    "src/**/test-setup.ts"
+  ],
+  "angularCompilerOptions": {
+    "compilationMode": "partial",
+    "strictTemplates": true,
+    "strictInjectionParameters": true,
+    "strictInputAccessModifiers": true
+  }
+}

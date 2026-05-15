@@ -123,7 +123,7 @@ export class PDFViewer {
         this._container.set(viewer);
         this.init.emit(viewer);
 
-        void viewer.registry.then((registry) => {
+        void viewer.registry.then((registry: PluginRegistry) => {
           if (this.destroyRef.destroyed) return;
           this._registry.set(registry);
           this.ready.emit(registry);

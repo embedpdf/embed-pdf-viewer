@@ -17,13 +17,15 @@ export default defineConfig({
     }),
   ],
   build: {
+    outDir: 'dist-vite',
     target: ['esnext'],
     sourcemap: true,
+    emptyOutDir: true,
     minify: false,
     lib: {
-      entry: resolve(__dirname, 'src/index.ts'),
-      formats: ['es', 'cjs'],
-      fileName: (format) => `index.${format === 'es' ? 'js' : 'cjs'}`,
+      entry: resolve(__dirname, 'src/public-api.ts'),
+      formats: ['es'],
+      fileName: () => 'index.js',
     },
     rollupOptions: {
       external: [/^@angular($|\/)/, /^rxjs($|\/)/, 'tslib', /^@embedpdf\//],

@@ -78,9 +78,41 @@ jobs:
           pnpm --dir examples/angular-tailwind exec eslint src --ext .ts --color
       - name: Build Angular viewer and examples
         run: |
-          pnpm --filter @embedpdf/angular-pdf-viewer run build
+          pnpm build:viewers
           pnpm --filter @embedpdf/example-angular-pdf-viewer run build
           pnpm --filter @embedpdf/example-angular-tailwind run build
+      - name: Smoke test packed Angular viewer
+        run: |
+          tmp_dir=$(mktemp -d)
+          pnpm --dir viewers/angular pack --pack-destination "$tmp_dir"
+          tarball=$(ls -1 "$tmp_dir"/*.tgz | head -n 1)
+          npx -y @angular/cli@21 new "$tmp_dir/consumer-app" --defaults --standalone --skip-git --package-manager pnpm --routing false --style css
+          cd "$tmp_dir/consumer-app"
+          pnpm add "$tarball"
+          cat > src/app/app.ts <<'EOF'
+          import { Component } from '@angular/core';
+          import { PDFViewer, type PDFViewerConfig } from '@embedpdf/angular-pdf-viewer';
+
+          @Component({
+            selector: 'app-root',
+            imports: [PDFViewer],
+            templateUrl: './app.html',
+            styleUrl: './app.css'
+          })
+          export class App {
+            protected readonly config: PDFViewerConfig = {
+              src: 'https://snippet.embedpdf.com/ebook.pdf',
+              theme: { preference: 'light' },
+            };
+          }
+          EOF
+          cat > src/app/app.html <<'EOF'
+          <embedpdf-viewer
+            [config]="config"
+            style="display: block; height: 100vh"
+          />
+          EOF
+          pnpm exec ng build --configuration development
 
   test-browser:
     name: Browser-mode tests (Angular viewer)
