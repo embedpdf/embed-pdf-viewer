@@ -13,10 +13,14 @@ export interface UsePdfiumEngineProps {
    * Set to `null` to disable the fallback entirely (no external font requests).
    */
   fontFallback?: FontFallbackConfig | null;
+  /** URL to the PDFium worker script. Avoids `worker-src blob:` in strict CSP. */
+  workerUrl?: string;
+  /** URL to the image encoder worker script. Avoids `worker-src blob:` in strict CSP. */
+  encoderWorkerUrl?: string;
 }
 
 export function usePdfiumEngine(config?: UsePdfiumEngineProps) {
-  const { wasmUrl = defaultWasmUrl, worker = true, logger, fontFallback } = config ?? {};
+  const { wasmUrl = defaultWasmUrl, worker = true, logger, fontFallback, workerUrl, encoderWorkerUrl } = config ?? {};
 
   // Create a reactive state object
   const state = $state({
@@ -39,7 +43,7 @@ export function usePdfiumEngine(config?: UsePdfiumEngineProps) {
             ? await import('@embedpdf/engines/pdfium-worker-engine')
             : await import('@embedpdf/engines/pdfium-direct-engine');
 
-          const pdfEngine = await createPdfiumEngine(wasmUrl, { logger, fontFallback });
+          const pdfEngine = await createPdfiumEngine(wasmUrl, { logger, fontFallback, workerUrl, encoderWorkerUrl });
           engineRef = pdfEngine;
           state.engine = pdfEngine;
           state.isLoading = false;

@@ -14,6 +14,10 @@ interface UsePdfiumEngineProps {
    * Set to `null` to disable the fallback entirely (no external font requests).
    */
   fontFallback?: FontFallbackConfig | null;
+  /** URL to the PDFium worker script. Avoids `worker-src blob:` in strict CSP. */
+  workerUrl?: string;
+  /** URL to the image encoder worker script. Avoids `worker-src blob:` in strict CSP. */
+  encoderWorkerUrl?: string;
 }
 
 export function usePdfiumEngine(config?: UsePdfiumEngineProps) {
@@ -23,6 +27,8 @@ export function usePdfiumEngine(config?: UsePdfiumEngineProps) {
     logger,
     encoderPoolSize,
     fontFallback,
+    workerUrl,
+    encoderWorkerUrl,
   } = config ?? {};
 
   const [engine, setEngine] = useState<PdfEngine | null>(null);
@@ -43,6 +49,8 @@ export function usePdfiumEngine(config?: UsePdfiumEngineProps) {
           logger,
           encoderPoolSize,
           fontFallback,
+          workerUrl,
+          encoderWorkerUrl,
         });
         engineRef.current = pdfEngine;
         setEngine(pdfEngine);
@@ -62,7 +70,7 @@ export function usePdfiumEngine(config?: UsePdfiumEngineProps) {
         engineRef.current = null;
       }, ignore);
     };
-  }, [wasmUrl, worker, logger, fontFallback]);
+  }, [wasmUrl, worker, logger, fontFallback, workerUrl, encoderWorkerUrl]);
 
   return { engine, isLoading: loading, error };
 }

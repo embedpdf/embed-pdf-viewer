@@ -24,6 +24,16 @@ export interface CreatePdfiumEngineOptions {
    * Set to `null` to disable the fallback entirely (no external font requests).
    */
   fontFallback?: FontFallbackConfig | null;
+  /**
+   * URL to the PDFium worker script (worker mode only).
+   * Avoids `worker-src blob:` in strict CSP environments.
+   */
+  workerUrl?: string;
+  /**
+   * URL to the image encoder worker script (worker mode only).
+   * Avoids `worker-src blob:` in strict CSP environments.
+   */
+  encoderWorkerUrl?: string;
 }
 
 /**
