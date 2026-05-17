@@ -132,6 +132,8 @@ jobs:
           node-version: 22
           cache: pnpm
       - run: pnpm install --frozen-lockfile
+      - name: Build viewer workspace dependencies for example dev servers
+        run: pnpm build:viewers
       - name: Cache Playwright browsers
         uses: actions/cache@v4
         with:
