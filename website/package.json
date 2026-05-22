@@ -9,7 +9,8 @@
     "postbuild": "pagefind --site .next/server/app --output-path public/_pagefind",
     "start": "next start",
     "clean": "rm -rf .next node_modules/.cache",
-    "copy-wasm": "ts-node tools/copy-wasm.ts"
+    "copy-wasm": "ts-node tools/copy-wasm.ts",
+    "generate-embeddings": "node scripts/generate-embeddings.mjs"
   },
   "dependencies": {
     "@dnd-kit/core": "^6.3.1",

@@ -1,0 +1,49 @@
+{
+  "name": "@embedpdf/cli",
+  "version": "2.14.3",
+  "private": false,
+  "description": "CLI for searching and reading EmbedPDF documentation.",
+  "type": "module",
+  "bin": {
+    "embedpdf": "./dist/bin.js"
+  },
+  "main": "./dist/bin.cjs",
+  "module": "./dist/bin.js",
+  "exports": {
+    ".": {
+      "types": "./dist/bin.d.ts",
+      "import": "./dist/bin.js",
+      "require": "./dist/bin.cjs"
+    }
+  },
+  "scripts": {
+    "generate-manifest": "node scripts/generate-manifest.mjs",
+    "build": "pnpm run generate-manifest && pnpm run clean && vite build",
+    "clean": "rimraf dist"
+  },
+  "files": [
+    "dist",
+    "README.md"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/embedpdf/embed-pdf-viewer",
+    "directory": "packages/cli"
+  },
+  "homepage": "https://www.embedpdf.com/docs",
+  "bugs": {
+    "url": "https://github.com/embedpdf/embed-pdf-viewer/issues"
+  },
+  "author": "EmbedPDF",
+  "license": "MIT",
+  "dependencies": {
+    "commander": "^13.1.0"
+  },
+  "devDependencies": {
+    "@embedpdf/build": "workspace:*",
+    "typescript": "^5.0.0"
+  },
+  "publishConfig": {
+    "access": "public"
+  }
+}
