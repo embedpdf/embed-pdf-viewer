@@ -1,6 +1,6 @@
 <script lang="ts">
   import type { HTMLImgAttributes } from 'svelte/elements';
-  import { ignore, PdfErrorCode } from '@embedpdf/models';
+  import { ignore, PdfErrorCode, Rotation } from '@embedpdf/models';
   import { useDocumentState } from '@embedpdf/core/svelte';
   import { useRenderCapability } from '../hooks';
 
@@ -21,6 +21,10 @@
      * Optional device pixel ratio override. If not provided, uses window.devicePixelRatio.
      */
     dpr?: number;
+    /**
+     * Optional rotation override. If not provided, uses page rotation plus document rotation.
+     */
+    rotation?: Rotation;
     class?: string;
     style?: string;
   }
@@ -33,6 +37,7 @@
     documentId,
     scale: scaleOverride,
     dpr: dprOverride,
+    rotation: rotationOverride,
     class: propsClass,
     style: propsStyle,
     pageIndex,
@@ -67,6 +72,15 @@
 
   const actualDpr = $derived(dprOverride !== undefined ? dprOverride : window.devicePixelRatio);
 
+  const actualRotation = $derived.by(() => {
+    if (rotationOverride !== undefined) return rotationOverride;
+    const pageRotation =
+      documentState.current?.document?.pages.find((page) => page.index === pageIndex)?.rotation ??
+      Rotation.Degree0;
+    const documentRotation = documentState.current?.rotation ?? Rotation.Degree0;
+    return ((pageRotation + documentRotation) % 4) as Rotation;
+  });
+
   // Effect: reruns when:
   // - documentId changes
   // - actualScale changes
@@ -79,6 +93,7 @@
     const docId = documentId;
     const scale = actualScale;
     const dpr = actualDpr;
+    const rotation = actualRotation;
     const refresh = refreshVersion;
     const page = localPageIndex;
 
@@ -99,6 +114,7 @@
       options: {
         scaleFactor: scale,
         dpr,
+        rotation,
       },
     });
 

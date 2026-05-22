@@ -20,9 +20,13 @@ type RenderLayerProps = Omit<HTMLAttributes<HTMLImageElement>, 'style'> & {
    */
   scale?: number;
   /**
-   * Optional device pixel ratio override. If not provided, uses window.devicePixelRatio.
+   * Optional device pixel ratio override. If not provided, uses the browser device pixel ratio.
    */
   dpr?: number;
+  /**
+   * Optional rotation override. If not provided, uses page rotation plus document rotation.
+   */
+  rotation?: Rotation;
   /**
    * Additional styles for the image element
    */
@@ -44,6 +48,7 @@ export function RenderLayer({
   pageIndex,
   scale: scaleOverride,
   dpr: dprOverride,
+  rotation: rotationOverride,
   style,
   ...props
 }: RenderLayerProps) {
@@ -67,8 +72,17 @@ export function RenderLayer({
 
   const actualDpr = useMemo(() => {
     if (dprOverride !== undefined) return dprOverride;
-    return window.devicePixelRatio;
+    return globalThis.devicePixelRatio ?? 1;
   }, [dprOverride]);
+
+  const actualRotation = useMemo(() => {
+    if (rotationOverride !== undefined) return rotationOverride;
+    const pageRotation =
+      documentState?.document?.pages.find((page) => page.index === pageIndex)?.rotation ??
+      Rotation.Degree0;
+    const documentRotation = documentState?.rotation ?? Rotation.Degree0;
+    return ((pageRotation + documentRotation) % 4) as Rotation;
+  }, [rotationOverride, documentState?.document, documentState?.rotation, pageIndex]);
 
   useEffect(() => {
     if (!renderProvides) return;
@@ -78,6 +92,7 @@ export function RenderLayer({
       options: {
         scaleFactor: actualScale,
         dpr: actualDpr,
+        rotation: actualRotation,
       },
     });
 
@@ -98,7 +113,15 @@ export function RenderLayer({
         });
       }
     };
-  }, [documentId, pageIndex, actualScale, actualDpr, renderProvides, refreshVersion]);
+  }, [
+    documentId,
+    pageIndex,
+    actualScale,
+    actualDpr,
+    actualRotation,
+    renderProvides,
+    refreshVersion,
+  ]);
 
   const handleImageLoad = () => {
     if (urlRef.current) {
