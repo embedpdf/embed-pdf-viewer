@@ -447,6 +447,9 @@ export class EngineRunner {
       case 'flattenAnnotation':
         this.handleTask(request.id, engine.flattenAnnotation!(...args));
         return;
+      case 'flattenAnnotationBehind':
+        this.handleTask(request.id, engine.flattenAnnotationBehind!(...args));
+        return;
       case 'exportAnnotationAppearanceAsPdf':
         this.handleTask(request.id, engine.exportAnnotationAppearanceAsPdf!(...args));
         return;

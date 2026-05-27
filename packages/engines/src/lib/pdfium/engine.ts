@@ -7209,6 +7209,98 @@ export class PdfiumNative implements IPdfiumExecutor {
   }
 
   /**
+   * Flatten an annotation's appearance to page content, inserting it BEHIND
+   * all existing page objects (at z-index 0). This is useful for watermarks
+   * that should appear underneath the document's text and images.
+   *
+   * Approach: count existing objects, flatten (appends at end), then move
+   * the newly created objects to index 0.
+   *
+   * @param doc - document object
+   * @param page - page object
+   * @param annotation - the annotation to flatten behind content
+   * @returns true if successful
+   */
+  public flattenAnnotationBehind(
+    doc: PdfDocumentObject,
+    page: PdfPageObject,
+    annotation: PdfAnnotationObject,
+  ): PdfTask<boolean> {
+    this.logger.debug(
+      LOG_SOURCE,
+      LOG_CATEGORY,
+      'flattenAnnotationBehind',
+      doc.id,
+      page.index,
+      annotation.id,
+    );
+    const label = 'FlattenAnnotationBehind';
+    this.logger.perf(LOG_SOURCE, LOG_CATEGORY, label, 'Begin', `${doc.id}-${page.index}`);
+
+    const ctx = this.cache.getContext(doc.id);
+    if (!ctx) {
+      this.logger.perf(LOG_SOURCE, LOG_CATEGORY, label, 'End', `${doc.id}-${page.index}`);
+      return PdfTaskHelper.reject<boolean>({
+        code: PdfErrorCode.DocNotOpen,
+        message: 'document does not open',
+      });
+    }
+
+    const pageCtx = ctx.acquirePage(page.index);
+    const annotPtr = this.getAnnotationByName(pageCtx.pagePtr, annotation.id);
+    if (!annotPtr) {
+      pageCtx.release();
+      this.logger.perf(LOG_SOURCE, LOG_CATEGORY, label, 'End', `${doc.id}-${page.index}`);
+      return PdfTaskHelper.reject<boolean>({
+        code: PdfErrorCode.NotFound,
+        message: 'annotation not found',
+      });
+    }
+
+    const beforeCount = this.pdfiumModule.FPDFPage_CountObjects(pageCtx.pagePtr);
+
+    // Place watermark beneath existing text, but not necessarily beneath every
+    // object (some PDFs have a background fill/image at index 0).
+    let insertionIndex = beforeCount;
+    for (let i = 0; i < beforeCount; i++) {
+      const objectPtr = this.pdfiumModule.FPDFPage_GetObject(pageCtx.pagePtr, i);
+      if (!objectPtr) continue;
+      const type = this.pdfiumModule.FPDFPageObj_GetType(objectPtr) as PdfPageObjectType;
+      if (type === PdfPageObjectType.TEXT) {
+        insertionIndex = i;
+        break;
+      }
+    }
+
+    // Flatten annotation to page content (same robust primitive as flattenAnnotation).
+    const ok = this.pdfiumModule.EPDFAnnot_Flatten(pageCtx.pagePtr, annotPtr);
+    this.pdfiumModule.FPDFPage_CloseAnnot(annotPtr);
+
+    if (ok) {
+      const afterCount = this.pdfiumModule.FPDFPage_CountObjects(pageCtx.pagePtr);
+      const addedCount = Math.max(0, afterCount - beforeCount);
+
+      // Move newly appended objects to the insertion index so watermark renders
+      // behind text while remaining above potential background objects.
+      // Move from tail to head so relative order of added objects is preserved.
+      for (let moved = 0; moved < addedCount; moved++) {
+        const sourceIndex = afterCount - 1 - moved;
+        const objectPtr = this.pdfiumModule.FPDFPage_GetObject(pageCtx.pagePtr, sourceIndex);
+        if (!objectPtr) continue;
+        this.pdfiumModule.FPDFPage_RemoveObject(pageCtx.pagePtr, objectPtr);
+        this.pdfiumModule.FPDFPage_InsertObjectAtIndex(pageCtx.pagePtr, objectPtr, insertionIndex);
+      }
+
+      this.pdfiumModule.FPDFPage_GenerateContent(pageCtx.pagePtr);
+    }
+
+    pageCtx.disposeImmediate();
+    this.logger.perf(LOG_SOURCE, LOG_CATEGORY, label, 'End', `${doc.id}-${page.index}`);
+
+    return PdfTaskHelper.resolve<boolean>(!!ok);
+  }
+
+  /**
    * Export an annotation's appearance as a standalone single-page PDF.
    *
    * @param doc - document object

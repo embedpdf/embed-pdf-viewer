@@ -3797,6 +3797,19 @@ export interface PdfEngine<T = Blob> {
     annotation: PdfAnnotationObject,
   ) => PdfTask<boolean>;
   /**
+   * Flatten an annotation's appearance behind existing page content (at z-index 0).
+   * The annotation is removed after flattening.
+   * @param doc - pdf document
+   * @param page - pdf page
+   * @param annotation - the annotation to flatten behind content
+   * @returns task contains the result
+   */
+  flattenAnnotationBehind: (
+    doc: PdfDocumentObject,
+    page: PdfPageObject,
+    annotation: PdfAnnotationObject,
+  ) => PdfTask<boolean>;
+  /**
    * Export an annotation's appearance as a standalone PDF document
    * @param doc - pdf document
    * @param page - pdf page
@@ -4123,6 +4136,11 @@ export interface IPdfiumExecutor {
   ): PdfTask<boolean>;
   applyAllRedactions(doc: PdfDocumentObject, page: PdfPageObject): PdfTask<boolean>;
   flattenAnnotation(
+    doc: PdfDocumentObject,
+    page: PdfPageObject,
+    annotation: PdfAnnotationObject,
+  ): PdfTask<boolean>;
+  flattenAnnotationBehind(
     doc: PdfDocumentObject,
     page: PdfPageObject,
     annotation: PdfAnnotationObject,

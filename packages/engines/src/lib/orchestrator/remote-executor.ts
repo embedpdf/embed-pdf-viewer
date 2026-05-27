@@ -117,6 +117,7 @@ type MessageType =
   | 'applyRedaction'
   | 'applyAllRedactions'
   | 'flattenAnnotation'
+  | 'flattenAnnotationBehind'
   | 'exportAnnotationAppearanceAsPdf'
   | 'exportAnnotationsAppearanceAsPdf'
   | 'getTextSlices'
@@ -605,6 +606,14 @@ export class RemoteExecutor implements IPdfiumExecutor {
     annotation: PdfAnnotationObject,
   ): PdfTask<boolean> {
     return this.send<boolean>('flattenAnnotation', [doc, page, annotation]);
+  }
+
+  flattenAnnotationBehind(
+    doc: PdfDocumentObject,
+    page: PdfPageObject,
+    annotation: PdfAnnotationObject,
+  ): PdfTask<boolean> {
+    return this.send<boolean>('flattenAnnotationBehind', [doc, page, annotation]);
   }
 
   exportAnnotationAppearanceAsPdf(

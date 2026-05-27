@@ -37,8 +37,10 @@ import {
   AnnotationPluginPackage,
   AnnotationTool,
 } from '@embedpdf/plugin-annotation/react';
+import { WatermarkPluginPackage } from '@embedpdf/plugin-watermark';
 import { CircularProgress, Box, Alert } from '@mui/material';
 import SearchOutlinedIcon from '@mui/icons-material/SearchOutlined';
+import BrandingWatermarkOutlinedIcon from '@mui/icons-material/BrandingWatermarkOutlined';
 import { useMemo, useRef } from 'react';
 
 import { PageControls } from './components/page-controls';
@@ -49,6 +51,7 @@ import { Toolbar } from './components/toolbar';
 import { ViewSidebarReverseIcon } from './icons';
 import { AnnotationSelectionMenu } from './components/annotation-selection-menu';
 import { RedactionSelectionMenu } from './components/redaction-selection-menu';
+import { WatermarkPanel } from './components/watermark-panel';
 
 const consoleLogger = new ConsoleLogger();
 
@@ -98,6 +101,7 @@ function App() {
         width: 120,
         paddingY: 10,
       }),
+      createPluginRegistration(WatermarkPluginPackage),
     ],
     [],
   );
@@ -187,6 +191,14 @@ function App() {
                     icon: ViewSidebarReverseIcon,
                     label: 'Sidebar',
                     position: 'left',
+                    props: { documentId: activeDocumentId },
+                  },
+                  {
+                    id: 'watermark',
+                    component: WatermarkPanel,
+                    icon: BrandingWatermarkOutlinedIcon,
+                    label: 'Watermark',
+                    position: 'right',
                     props: { documentId: activeDocumentId },
                   },
                 ];

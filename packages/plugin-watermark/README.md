@@ -1,0 +1,136 @@
+# @embedpdf/plugin-watermark
+
+A plugin for [EmbedPDF](https://www.embedpdf.com) that allows embedding text or image watermarks into PDF pages at specific coordinates.
+
+## Features
+
+- **Text watermarks** — customisable font, size, colour, and opacity
+- **Image watermarks** — supports PNG and JPEG data
+- **Image rotation** — rotation is applied consistently for image watermarks
+- **Precise positioning** — place watermarks at exact PDF coordinates
+- **Repeat tiling** — repeat watermarks horizontally, vertically, or both
+- **Page range control** — apply to all pages or specific page indices
+- **Configurable flags** — read-only, printable, rotation support
+- **Auto-apply** — optionally apply watermarks automatically when documents load
+
+## Installation
+
+```bash
+pnpm add @embedpdf/plugin-watermark
+```
+
+## Usage
+
+```typescript
+import { WatermarkPluginPackage } from '@embedpdf/plugin-watermark';
+
+// Register with your viewer
+const viewer = createViewer({
+  plugins: [
+    // ... other plugins
+    [WatermarkPluginPackage, {
+      autoApply: true,
+      watermarks: [
+        {
+          type: 'text',
+          textOptions: {
+            text: 'CONFIDENTIAL',
+            fontSize: 60,
+            colour: '#FF0000',
+          },
+          position: { x: 100, y: 400 },
+          size: { width: 400, height: 80 },
+          opacity: 0.3,
+          rotation: -45,
+          repeat: 'both',
+          repeatSpacing: { x: 40, y: 80 },
+          pageRange: 'all',
+          readOnly: true,
+          printable: true,
+        },
+      ],
+    }],
+  ],
+});
+```
+
+### Adding watermarks programmatically
+
+```typescript
+const watermark = viewer.getCapability('watermark');
+
+// Text watermark
+watermark.addWatermark({
+  type: 'text',
+  textOptions: { text: 'DRAFT', fontSize: 48, colour: '#888888' },
+  position: { x: 150, y: 300 },
+  size: { width: 300, height: 60 },
+  opacity: 0.2,
+  rotation: -30,
+  repeat: 'horizontal',
+  repeatSpacing: { x: 60 },
+  pageRange: 'all',
+});
+
+// Image watermark
+watermark.addWatermark({
+  type: 'image',
+  imageOptions: { data: logoArrayBuffer, mimeType: 'image/png' },
+  position: { x: 50, y: 700 },
+  size: { width: 100, height: 100 },
+  opacity: 0.4,
+  rotation: -25,
+  repeat: 'vertical',
+  repeatSpacing: { y: 40 },
+  pageRange: [0, 1, 2], // first three pages only
+});
+```
+
+### Removing watermarks
+
+`removeWatermark(id)` removes the **definition** so it no longer applies to future loads/applies.
+
+Because this plugin flattens watermarks into page content, already-applied watermark visuals are permanent in the modified PDF and cannot be removed in-place.
+
+```typescript
+watermark.removeWatermark(watermarkId);
+```
+
+### Clearing watermarks from a document
+
+```typescript
+watermark.clearFromDocument(documentId);
+```
+
+## API
+
+### `WatermarkCapability`
+
+| Method | Description |
+|--------|-------------|
+| `addWatermark(input)` | Add and apply a watermark; returns the generated ID |
+| `removeWatermark(id)` | Remove a watermark definition (already-flattened content remains) |
+| `getWatermarks()` | Get all registered watermark definitions |
+| `applyToDocument(documentId)` | Apply all watermarks to a specific document |
+| `clearFromDocument(documentId)` | Remove all watermark annotations from a document |
+| `onWatermarkChange` | Event hook for watermark definition changes |
+
+## Configuration
+
+| Option | Type | Default | Description |
+|--------|------|---------|-------------|
+| `watermarks` | `WatermarkInput[]` | `[]` | Watermarks to register on initialisation |
+| `autoApply` | `boolean` | `true` | Auto-apply watermarks when a document loads |
+
+### `WatermarkInput` repeat options
+
+| Option | Type | Default | Description |
+|--------|------|---------|-------------|
+| `repeat` | `'none' \| 'horizontal' \| 'vertical' \| 'both'` | `'none'` | Repeat the watermark across each target page |
+| `repeatSpacing` | `{ x?: number; y?: number }` | `{ x: 0, y: 0 }` | Spacing (PDF points) between repeated instances |
+
+## Licence
+
+MIT
+
+

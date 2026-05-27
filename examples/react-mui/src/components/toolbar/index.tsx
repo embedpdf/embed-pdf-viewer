@@ -303,6 +303,7 @@ export const Toolbar = ({ documentId }: ToolbarProps) => {
               <Tab label="Redact" value="redact" />
             </Tabs>
           </Box>
+          <DrawerToggleButton componentId="watermark" />
           <DrawerToggleButton componentId="search" />
         </MuiToolbar>
       </AppBar>

@@ -1135,6 +1135,26 @@ export class WebWorkerEngine implements PdfEngine {
   }
 
   /**
+   * {@inheritDoc @embedpdf/models!PdfEngine.flattenAnnotationBehind}
+   *
+   * @public
+   */
+  flattenAnnotationBehind(doc: PdfDocumentObject, page: PdfPageObject, annotation: PdfAnnotationObject) {
+    this.logger.debug(LOG_SOURCE, LOG_CATEGORY, 'flattenAnnotationBehind', doc, page, annotation);
+    const requestId = this.generateRequestId(doc.id);
+    const task = new WorkerTask<boolean>(this.worker, requestId);
+
+    const request: ExecuteRequest = createRequest(requestId, 'flattenAnnotationBehind', [
+      doc,
+      page,
+      annotation,
+    ]);
+    this.proxy(task, request);
+
+    return task;
+  }
+
+  /**
    * {@inheritDoc @embedpdf/models!PdfEngine.exportAnnotationAppearanceAsPdf}
    *
    * @public
