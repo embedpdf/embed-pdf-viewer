@@ -239,18 +239,33 @@ export class WatermarkPlugin extends BasePlugin<
 
     const pageCount = docState.document.pageCount;
     const pageIndices = this.resolvePageRange(def.pageRange, pageCount);
-    const pageMap: Map<number, { index: number; size: { width: number; height: number } }> =
+    const pageMap: Map<
+      number,
+      { index: number; size: { width: number; height: number }; rotation: number }
+    > =
       new Map(
         docState.document.pages.map(
-          (page: { index: number; size: { width: number; height: number } }) =>
+          (page: { index: number; size: { width: number; height: number }; rotation: number }) =>
             [page.index, page] as const,
         ),
       );
 
     if (def.type === 'text') {
-      this.applyTextWatermark(def, documentId, pageIndices, pageMap, task);
+      this.applyTextWatermark(
+        def,
+        documentId,
+        pageIndices,
+        pageMap,
+        task,
+      );
     } else {
-      this.applyImageWatermark(def, documentId, pageIndices, pageMap, task);
+      this.applyImageWatermark(
+        def,
+        documentId,
+        pageIndices,
+        pageMap,
+        task,
+      );
     }
 
     return task;
@@ -264,7 +279,10 @@ export class WatermarkPlugin extends BasePlugin<
     def: WatermarkDefinition,
     documentId: string,
     pageIndices: number[],
-    pageMap: Map<number, { index: number; size: { width: number; height: number } }>,
+    pageMap: Map<
+      number,
+      { index: number; size: { width: number; height: number }; rotation: number }
+    >,
     task: Task<void, PdfErrorReason>,
   ): void {
     if (!this.annotation) {
@@ -273,7 +291,12 @@ export class WatermarkPlugin extends BasePlugin<
     }
 
     const { pdfString, rect } = this.generateTextAppearance(def);
-    const placementTargets = this.buildPlacementTargets(def, pageIndices, pageMap, rect);
+    const placementTargets = this.buildPlacementTargets(
+      def,
+      pageIndices,
+      pageMap,
+      rect,
+    );
     const placements: WatermarkPlacement[] = [];
     const annotationScope = this.annotation.forDocument(documentId);
 
@@ -345,7 +368,10 @@ export class WatermarkPlugin extends BasePlugin<
     def: WatermarkDefinition,
     documentId: string,
     pageIndices: number[],
-    pageMap: Map<number, { index: number; size: { width: number; height: number } }>,
+    pageMap: Map<
+      number,
+      { index: number; size: { width: number; height: number }; rotation: number }
+    >,
     task: Task<void, PdfErrorReason>,
   ): void {
     if (!this.annotation) {
@@ -364,7 +390,12 @@ export class WatermarkPlugin extends BasePlugin<
     const opacity = def.opacity ?? 0.5;
     const rotation = def.rotation ?? 0;
     const baseRect = this.computePlacementRect(def.position, def.size, rotation);
-    const placementTargets = this.buildPlacementTargets(def, pageIndices, pageMap, baseRect);
+    const placementTargets = this.buildPlacementTargets(
+      def,
+      pageIndices,
+      pageMap,
+      baseRect,
+    );
 
     // Pre-process image to bake in opacity/rotation, then proceed.
     this.applyOpacityAndRotationToImage(def.imageOptions.data, opacity, rotation).then(
@@ -518,7 +549,10 @@ export class WatermarkPlugin extends BasePlugin<
   private buildPlacementTargets(
     def: WatermarkDefinition,
     pageIndices: number[],
-    pageMap: Map<number, { index: number; size: { width: number; height: number } }>,
+    pageMap: Map<
+      number,
+      { index: number; size: { width: number; height: number }; rotation: number }
+    >,
     baseRect: WatermarkRect,
   ): PlacementTarget[] {
     const targets: PlacementTarget[] = [];
@@ -530,15 +564,17 @@ export class WatermarkPlugin extends BasePlugin<
       const page = pageMap.get(pageIndex);
       if (!page) continue;
 
+      const baseOrigin = this.resolveBaseOrigin(def, page, baseRect);
+
       const xOrigins = this.expandAxisOrigins(
-        baseRect.origin.x,
+        baseOrigin.x,
         baseRect.size.width,
         page.size.width,
         mode === 'horizontal' || mode === 'both',
         spacingX,
       );
       const yOrigins = this.expandAxisOrigins(
-        baseRect.origin.y,
+        baseOrigin.y,
         baseRect.size.height,
         page.size.height,
         mode === 'vertical' || mode === 'both',
@@ -559,6 +595,141 @@ export class WatermarkPlugin extends BasePlugin<
     }
 
     return targets;
+  }
+
+  private resolveBaseOrigin(
+    def: WatermarkDefinition,
+    page: { size: { width: number; height: number }; rotation: number },
+    baseRect: WatermarkRect,
+  ): { x: number; y: number } {
+    if (!def.alignment) {
+      return baseRect.origin;
+    }
+
+    const rotation = page.rotation & 3;
+    const { horizontal: horizontalAlignment, vertical: verticalAlignment } =
+      this.resolveAlignmentForPageRotation(def.alignment.horizontal, def.alignment.vertical, rotation);
+
+    const x = this.resolveHorizontalAxisOrigin(
+      horizontalAlignment,
+      page.size.width,
+      baseRect.size.width,
+    );
+    const y = this.resolveVerticalAxisOrigin(
+      verticalAlignment,
+      page.size.height,
+      baseRect.size.height,
+    );
+
+    return { x, y };
+  }
+
+  private resolveAlignmentForPageRotation(
+    horizontal: 'left' | 'center' | 'right',
+    vertical: 'top' | 'center' | 'bottom',
+    rotation: number,
+  ): { horizontal: 'left' | 'center' | 'right'; vertical: 'top' | 'center' | 'bottom' } {
+    if (rotation === 0) {
+      return { horizontal, vertical };
+    }
+
+    if (rotation === 1) {
+      return {
+        horizontal: this.rotateVerticalIntoHorizontal(vertical, true),
+        vertical: this.rotateHorizontalIntoVertical(horizontal, true),
+      };
+    }
+
+    if (rotation === 2) {
+      return {
+        horizontal: this.flipHorizontal(horizontal),
+        vertical: this.flipVertical(vertical),
+      };
+    }
+
+    // 270° pages swap semantic axes; map vertical -> page-x and horizontal -> page-y.
+    return {
+      horizontal: this.rotateVerticalIntoHorizontal(vertical, false),
+      vertical: this.rotateHorizontalIntoVertical(horizontal, false),
+    };
+  }
+
+  private rotateVerticalIntoHorizontal(
+    vertical: 'top' | 'center' | 'bottom',
+    clockwise: boolean,
+  ): 'left' | 'center' | 'right' {
+    if (vertical === 'center') {
+      return 'center';
+    }
+
+    if (clockwise) {
+      return vertical === 'top' ? 'left' : 'right';
+    }
+
+    return vertical === 'top' ? 'right' : 'left';
+  }
+
+  private rotateHorizontalIntoVertical(
+    horizontal: 'left' | 'center' | 'right',
+    clockwise: boolean,
+  ): 'top' | 'center' | 'bottom' {
+    if (horizontal === 'center') {
+      return 'center';
+    }
+
+    if (clockwise) {
+      return horizontal === 'left' ? 'bottom' : 'top';
+    }
+
+    return horizontal === 'left' ? 'top' : 'bottom';
+  }
+
+  private flipHorizontal(alignment: 'left' | 'center' | 'right'): 'left' | 'center' | 'right' {
+    if (alignment === 'center') {
+      return 'center';
+    }
+
+    return alignment === 'left' ? 'right' : 'left';
+  }
+
+  private flipVertical(alignment: 'top' | 'center' | 'bottom'): 'top' | 'center' | 'bottom' {
+    if (alignment === 'center') {
+      return 'center';
+    }
+
+    return alignment === 'top' ? 'bottom' : 'top';
+  }
+
+  private resolveHorizontalAxisOrigin(
+    alignment: 'left' | 'center' | 'right',
+    pageSize: number,
+    itemSize: number,
+  ): number {
+    if (alignment === 'left') {
+      return 0;
+    }
+
+    if (alignment === 'center') {
+      return (pageSize - itemSize) / 2;
+    }
+
+    return pageSize - itemSize;
+  }
+
+  private resolveVerticalAxisOrigin(
+    alignment: 'top' | 'center' | 'bottom',
+    pageSize: number,
+    itemSize: number,
+  ): number {
+    if (alignment === 'top') {
+      return 0;
+    }
+
+    if (alignment === 'center') {
+      return (pageSize - itemSize) / 2;
+    }
+
+    return pageSize - itemSize;
   }
 
   private expandAxisOrigins(

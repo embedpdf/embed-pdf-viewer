@@ -14,6 +14,18 @@ export interface WatermarkPosition {
   y: number;
 }
 
+export type WatermarkVerticalAlignment = 'top' | 'center' | 'bottom';
+
+export type WatermarkHorizontalAlignment = 'left' | 'center' | 'right';
+
+/**
+ * Optional semantic page alignment for a watermark bounding box.
+ */
+export interface WatermarkAlignment {
+  vertical: WatermarkVerticalAlignment;
+  horizontal: WatermarkHorizontalAlignment;
+}
+
 /**
  * Size in PDF points.
  */
@@ -80,6 +92,8 @@ export interface WatermarkDefinition {
   imageOptions?: WatermarkImageOptions;
   /** Position of the watermark's bottom-left corner in PDF points */
   position: WatermarkPosition;
+  /** Optional semantic page alignment for placement */
+  alignment?: WatermarkAlignment;
   /** Size of the watermark bounding box in PDF points */
   size: WatermarkSize;
   /** Opacity from 0.0 (fully transparent) to 1.0 (fully opaque). Default: 0.5 */

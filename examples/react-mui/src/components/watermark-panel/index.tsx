@@ -25,8 +25,45 @@ interface WatermarkPanelProps {
 }
 
 const FONT_OPTIONS = ['Helvetica', 'Times-Roman', 'Courier'];
+type WatermarkVerticalAlignment = 'top' | 'center' | 'bottom';
+type WatermarkHorizontalAlignment = 'left' | 'center' | 'right';
+const VERTICAL_POSITION_OPTIONS: { value: WatermarkVerticalAlignment; label: string }[] = [
+  { value: 'top', label: 'Top' },
+  { value: 'center', label: 'Centre' },
+  { value: 'bottom', label: 'Bottom' },
+];
+const HORIZONTAL_POSITION_OPTIONS: { value: WatermarkHorizontalAlignment; label: string }[] = [
+  { value: 'left', label: 'Left' },
+  { value: 'center', label: 'Centre' },
+  { value: 'right', label: 'Right' },
+];
+const DEFAULT_PAGE_SIZE = { width: 595, height: 842 };
 
-export const WatermarkPanel = (_props: WatermarkPanelProps) => {
+function getAlignedOrigin(
+  horizontal: WatermarkHorizontalAlignment,
+  vertical: WatermarkVerticalAlignment,
+  pageSize: { width: number; height: number },
+  watermarkSize: { width: number; height: number },
+): { x: number; y: number } {
+  const x =
+    horizontal === 'left'
+      ? 0
+      : horizontal === 'center'
+        ? (pageSize.width - watermarkSize.width) / 2
+        : pageSize.width - watermarkSize.width;
+
+  const y =
+    vertical === 'top'
+      ? 0
+      : vertical === 'center'
+        ? (pageSize.height - watermarkSize.height) / 2
+        : pageSize.height - watermarkSize.height;
+
+  return { x, y };
+}
+
+export const WatermarkPanel = ({ documentId }: WatermarkPanelProps) => {
+  void documentId;
   const { provides: watermarkCapability } = useCapability<WatermarkPlugin>(WatermarkPlugin.id);
 
   // Form state
@@ -36,8 +73,9 @@ export const WatermarkPanel = (_props: WatermarkPanelProps) => {
   const [fontFamily, setFontFamily] = useState('Helvetica');
   const [colour, setColour] = useState('#FF0000');
   const [opacity, setOpacity] = useState(0.3);
-  const [posX, setPosX] = useState(100);
-  const [posY, setPosY] = useState(400);
+  const [verticalPosition, setVerticalPosition] = useState<WatermarkVerticalAlignment>('center');
+  const [horizontalPosition, setHorizontalPosition] =
+    useState<WatermarkHorizontalAlignment>('center');
   const [width, setWidth] = useState(400);
   const [height, setHeight] = useState(80);
   const [rotation, setRotation] = useState(-45);
@@ -73,12 +111,20 @@ export const WatermarkPanel = (_props: WatermarkPanelProps) => {
     if (watermarkType === 'text' && !text.trim()) return;
     if (watermarkType === 'image' && !imageData) return;
 
+    const alignedOrigin = getAlignedOrigin(
+      horizontalPosition,
+      verticalPosition,
+      DEFAULT_PAGE_SIZE,
+      { width, height },
+    );
+
     const input =
       watermarkType === 'text'
         ? {
             type: 'text' as const,
             textOptions: { text, fontSize, fontFamily, colour },
-            position: { x: posX, y: posY },
+            position: alignedOrigin,
+            alignment: { vertical: verticalPosition, horizontal: horizontalPosition },
             size: { width, height },
             opacity,
             rotation,
@@ -89,7 +135,8 @@ export const WatermarkPanel = (_props: WatermarkPanelProps) => {
         : {
             type: 'image' as const,
             imageOptions: { data: imageData!, mimeType: imageMimeType },
-            position: { x: posX, y: posY },
+            position: alignedOrigin,
+            alignment: { vertical: verticalPosition, horizontal: horizontalPosition },
             size: { width, height },
             opacity,
             rotation,
@@ -116,8 +163,8 @@ export const WatermarkPanel = (_props: WatermarkPanelProps) => {
     fontFamily,
     colour,
     opacity,
-    posX,
-    posY,
+    verticalPosition,
+    horizontalPosition,
     width,
     height,
     rotation,
@@ -249,23 +296,39 @@ export const WatermarkPanel = (_props: WatermarkPanelProps) => {
         </Box>
 
         <Typography variant="subtitle2" color="text.secondary">
-          Position (PDF points)
+          Position
         </Typography>
         <Stack direction="row" spacing={1}>
-          <TextField
-            label="X"
-            type="number"
-            value={posX}
-            onChange={(e) => setPosX(Number(e.target.value))}
-            size="small"
-          />
-          <TextField
-            label="Y"
-            type="number"
-            value={posY}
-            onChange={(e) => setPosY(Number(e.target.value))}
-            size="small"
-          />
+          <FormControl size="small" fullWidth>
+            <InputLabel>Vertical</InputLabel>
+            <Select
+              value={verticalPosition}
+              label="Vertical"
+              onChange={(e) => setVerticalPosition(e.target.value as WatermarkVerticalAlignment)}
+            >
+              {VERTICAL_POSITION_OPTIONS.map((option) => (
+                <MenuItem key={option.value} value={option.value}>
+                  {option.label}
+                </MenuItem>
+              ))}
+            </Select>
+          </FormControl>
+          <FormControl size="small" fullWidth>
+            <InputLabel>Horizontal</InputLabel>
+            <Select
+              value={horizontalPosition}
+              label="Horizontal"
+              onChange={(e) =>
+                setHorizontalPosition(e.target.value as WatermarkHorizontalAlignment)
+              }
+            >
+              {HORIZONTAL_POSITION_OPTIONS.map((option) => (
+                <MenuItem key={option.value} value={option.value}>
+                  {option.label}
+                </MenuItem>
+              ))}
+            </Select>
+          </FormControl>
         </Stack>
 
         <Typography variant="subtitle2" color="text.secondary">
