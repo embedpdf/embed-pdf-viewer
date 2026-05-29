@@ -5,9 +5,10 @@ A plugin for [EmbedPDF](https://www.embedpdf.com) that allows embedding text or 
 ## Features
 
 - **Text watermarks** — customisable font, size, colour, and opacity
-- **Image watermarks** — supports PNG and JPEG data
+- **Image watermarks** — accepts PNG and JPEG input data
 - **Image rotation** — rotation is applied consistently for image watermarks
 - **Precise positioning** — place watermarks at exact PDF coordinates
+- **Alignment-aware placement** — optional top/centre/bottom + left/centre/right alignment, including rotated pages
 - **Repeat tiling** — repeat watermarks horizontally, vertically, or both
 - **Optimised tiling** — one watermark appearance object is reused across all tiles via XObject references
 - **Page range control** — apply to all pages or specific page indices
@@ -104,6 +105,9 @@ watermark.removeWatermark(watermarkId);
 watermark.clearFromDocument(documentId);
 ```
 
+`clearFromDocument(documentId)` clears internal placement tracking for that document.
+It does **not** remove already-flattened watermark visuals from page content.
+
 ## API
 
 ### `WatermarkCapability`
@@ -114,7 +118,7 @@ watermark.clearFromDocument(documentId);
 | `removeWatermark(id)` | Remove a watermark definition from the active document (already-flattened content remains) |
 | `getWatermarks()` | Get watermark definitions for the active document |
 | `applyToDocument(documentId)` | Apply all watermarks registered for that document |
-| `clearFromDocument(documentId)` | Remove all watermark annotations from a document |
+| `clearFromDocument(documentId)` | Clear placement tracking for that document (flattened content remains) |
 | `onWatermarkChange` | Event hook for watermark definition changes |
 
 ## Configuration
@@ -130,6 +134,15 @@ watermark.clearFromDocument(documentId);
 |--------|------|---------|-------------|
 | `repeat` | `'none' \| 'horizontal' \| 'vertical' \| 'both'` | `'none'` | Repeat the watermark across each target page |
 | `repeatSpacing` | `{ x?: number; y?: number }` | `{ x: 0, y: 0 }` | Spacing (PDF points) between repeated instances |
+
+### `WatermarkInput` alignment options
+
+| Option | Type | Default | Description |
+|--------|------|---------|-------------|
+| `alignment.horizontal` | `'left' \| 'center' \| 'right'` | _unset_ | Horizontal anchor within each page |
+| `alignment.vertical` | `'top' \| 'center' \| 'bottom'` | _unset_ | Vertical anchor within each page |
+
+When `alignment` is set, it determines the base origin before repeat expansion. If `alignment` is omitted, `position` is used directly.
 
 ## Tiling strategy
 
@@ -160,5 +173,3 @@ Additional checks:
 ## Licence
 
 MIT
-
-
