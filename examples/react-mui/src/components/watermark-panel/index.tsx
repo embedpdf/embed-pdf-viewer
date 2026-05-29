@@ -1,4 +1,4 @@
-import { useCallback, useRef, useState } from 'react';
+import { useCallback, useMemo, useRef, useState } from 'react';
 import {
   Alert,
   Box,
@@ -133,9 +133,13 @@ export const WatermarkPanel = ({
   );
 
   // Applied watermarks
-  const [appliedWatermarks, setAppliedWatermarks] = useState<
-    { id: string; label: string }[]
-  >([]);
+  const [appliedWatermarksByDocument, setAppliedWatermarksByDocument] = useState<
+    Record<string, { id: string; label: string }[]>
+  >({});
+  const appliedWatermarks = useMemo(
+    () => appliedWatermarksByDocument[documentId] ?? [],
+    [appliedWatermarksByDocument, documentId],
+  );
 
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -219,7 +223,10 @@ export const WatermarkPanel = ({
         settled = true;
         const baseLabel = watermarkType === 'text' ? `Text: "${text}"` : `Image: ${imageName}`;
         const label = repeat === 'none' ? baseLabel : `${baseLabel} (${repeat})`;
-        setAppliedWatermarks((prev) => [...prev, { id, label }]);
+        setAppliedWatermarksByDocument((prev) => ({
+          ...prev,
+          [documentId]: [...(prev[documentId] ?? []), { id, label }],
+        }));
         updateApplyState(false, '', false);
       },
       (error: { type: string; reason: { message: string } }) => {
@@ -249,9 +256,9 @@ export const WatermarkPanel = ({
     imageData,
     imageName,
     imageMimeType,
+    documentId,
     documentManager,
     updateApplyState,
-    documentId,
     takeoverPlacementThreshold,
   ]);
 

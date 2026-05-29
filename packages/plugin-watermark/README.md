@@ -13,6 +13,7 @@ A plugin for [EmbedPDF](https://www.embedpdf.com) that allows embedding text or 
 - **Page range control** — apply to all pages or specific page indices
 - **Configurable flags** — read-only, printable, rotation support
 - **Auto-apply** — optionally apply watermarks automatically when documents load
+- **Per-document scope** — watermarks added in one document are not applied to other open documents
 
 ## Installation
 
@@ -89,7 +90,7 @@ watermark.addWatermark({
 
 ### Removing watermarks
 
-`removeWatermark(id)` removes the **definition** so it no longer applies to future loads/applies.
+`removeWatermark(id)` removes the **definition from the active document only**.
 
 Because this plugin flattens watermarks into page content, already-applied watermark visuals are permanent in the modified PDF and cannot be removed in-place.
 
@@ -109,10 +110,10 @@ watermark.clearFromDocument(documentId);
 
 | Method | Description |
 |--------|-------------|
-| `addWatermark(input)` | Add and apply a watermark; returns the generated ID |
-| `removeWatermark(id)` | Remove a watermark definition (already-flattened content remains) |
-| `getWatermarks()` | Get all registered watermark definitions |
-| `applyToDocument(documentId)` | Apply all watermarks to a specific document |
+| `addWatermark(input)` | Add and apply a watermark to the active document; returns the generated ID |
+| `removeWatermark(id)` | Remove a watermark definition from the active document (already-flattened content remains) |
+| `getWatermarks()` | Get watermark definitions for the active document |
+| `applyToDocument(documentId)` | Apply all watermarks registered for that document |
 | `clearFromDocument(documentId)` | Remove all watermark annotations from a document |
 | `onWatermarkChange` | Event hook for watermark definition changes |
 

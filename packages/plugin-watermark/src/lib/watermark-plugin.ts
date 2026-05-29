@@ -24,6 +24,7 @@ import {
   removeWatermark,
   addPlacements,
   clearPlacements,
+  clearDocument,
   WatermarkAction,
 } from './actions';
 import { WATERMARK_PLUGIN_ID } from './manifest';
@@ -39,7 +40,7 @@ export class WatermarkPlugin extends BasePlugin<
 > {
   static readonly id = WATERMARK_PLUGIN_ID;
 
-  private readonly definitions = new Map<string, WatermarkDefinition>();
+  private readonly definitionsByDocument = new Map<string, Map<string, WatermarkDefinition>>();
   private readonly watermarkChange$ = createEmitter<WatermarkChangeEvent>();
   private annotation: AnnotationCapability | null = null;
   private config!: WatermarkPluginConfig;
@@ -52,14 +53,7 @@ export class WatermarkPlugin extends BasePlugin<
   }
 
   async initialize(): Promise<void> {
-    if (this.config.watermarks) {
-      for (const input of this.config.watermarks) {
-        const def = this.createDefinition(input);
-        this.definitions.set(def.id, def);
-        this.dispatch(addWatermark(def));
-      }
-      this.emitChange();
-    }
+    // Watermarks are scoped per document and seeded when each document loads.
   }
 
   protected buildCapability(): WatermarkCapability {
@@ -78,15 +72,17 @@ export class WatermarkPlugin extends BasePlugin<
   // ─────────────────────────────────────────────────────────
 
   protected override onDocumentLoaded(documentId: string): void {
-    if (this.config.autoApply !== false && this.definitions.size > 0) {
+    this.seedConfiguredWatermarksForDocument(documentId);
+
+    if (this.config.autoApply !== false && this.getDocumentDefinitions(documentId).size > 0) {
       this.applyToDocument(documentId);
     }
   }
 
   protected override onDocumentClosed(documentId: string): void {
-    for (const def of this.definitions.values()) {
-      this.dispatch(clearPlacements(def.id, documentId));
-    }
+    this.definitionsByDocument.delete(documentId);
+    this.dispatch(clearDocument(documentId));
+    this.emitChange();
   }
 
   // ─────────────────────────────────────────────────────────
@@ -95,36 +91,47 @@ export class WatermarkPlugin extends BasePlugin<
 
   private addWatermarkPublic(input: WatermarkInput): Task<string, PdfErrorReason> {
     const task = new Task<string, PdfErrorReason>();
+    const activeDocId = this.getActiveDocumentIdOrNull();
+    if (!activeDocId) {
+      task.reject({
+        code: PdfErrorCode.DocNotOpen,
+        message: 'No active document to apply watermark',
+      });
+      return task;
+    }
 
     const def = this.createDefinition(input);
-    this.definitions.set(def.id, def);
-    this.dispatch(addWatermark(def));
+    const documentDefinitions = this.getOrCreateDocumentDefinitions(activeDocId);
+    documentDefinitions.set(def.id, def);
+    this.dispatch(addWatermark(activeDocId, def));
     this.emitChange();
 
-    const activeDocId = this.getActiveDocumentIdOrNull();
-    if (activeDocId) {
-      this.applyWatermarkToDocument(def, activeDocId).wait(
-        () => task.resolve(def.id),
-        (error: { type: string; reason: PdfErrorReason }) => {
-          this.logger.warn(
-            'WatermarkPlugin',
-            'AddWatermark',
-            `Watermark registered but failed to apply: ${error.reason.message}`,
-          );
-          task.reject(error.reason);
-        },
-      );
-    } else {
-      task.resolve(def.id);
-    }
+    this.applyWatermarkToDocument(def, activeDocId).wait(
+      () => task.resolve(def.id),
+      (error: { type: string; reason: PdfErrorReason }) => {
+        this.logger.warn(
+          'WatermarkPlugin',
+          'AddWatermark',
+          `Watermark registered but failed to apply: ${error.reason.message}`,
+        );
+        task.reject(error.reason);
+      },
+    );
 
     return task;
   }
 
   private removeWatermarkPublic(id: string): Task<void, PdfErrorReason> {
     const task = new Task<void, PdfErrorReason>();
+    const activeDocId = this.getActiveDocumentIdOrNull();
+    if (!activeDocId) {
+      task.reject({ code: PdfErrorCode.DocNotOpen, message: 'No active document' });
+      return task;
+    }
 
-    const def = this.definitions.get(id);
+    const documentDefinitions = this.getDocumentDefinitions(activeDocId);
+
+    const def = documentDefinitions.get(id);
     if (!def) {
       task.reject({
         code: PdfErrorCode.NotFound,
@@ -135,8 +142,8 @@ export class WatermarkPlugin extends BasePlugin<
 
     // Flattened watermarks are permanent — just remove the definition.
     // The watermark content is already part of the page and cannot be reversed.
-    this.definitions.delete(id);
-    this.dispatch(removeWatermark(id));
+    documentDefinitions.delete(id);
+    this.dispatch(removeWatermark(activeDocId, id));
     this.emitChange();
     task.resolve();
 
@@ -144,7 +151,11 @@ export class WatermarkPlugin extends BasePlugin<
   }
 
   private getWatermarks(): WatermarkDefinition[] {
-    return Array.from(this.definitions.values());
+    const activeDocId = this.getActiveDocumentIdOrNull();
+    if (!activeDocId) {
+      return [];
+    }
+    return Array.from(this.getDocumentDefinitions(activeDocId).values());
   }
 
   /**
@@ -167,7 +178,7 @@ export class WatermarkPlugin extends BasePlugin<
       return task;
     }
 
-    const definitions = Array.from(this.definitions.values());
+    const definitions = Array.from(this.getDocumentDefinitions(documentId).values());
     let pending = definitions.length;
 
     if (pending === 0) {
@@ -210,8 +221,8 @@ export class WatermarkPlugin extends BasePlugin<
   private clearFromDocument(documentId: string): Task<void, PdfErrorReason> {
     const task = new Task<void, PdfErrorReason>();
 
-    for (const def of this.definitions.values()) {
-      this.dispatch(clearPlacements(def.id, documentId));
+    for (const def of this.getDocumentDefinitions(documentId).values()) {
+      this.dispatch(clearPlacements(documentId, def.id));
     }
 
     task.resolve();
@@ -388,7 +399,7 @@ export class WatermarkPlugin extends BasePlugin<
           annotationId: `xobj-${def.id}-${index}`,
         }));
 
-        this.dispatch(addPlacements(def.id, placementRecords));
+        this.dispatch(addPlacements(documentId, def.id, placementRecords));
         const pagesToRefresh = Array.from(new Set(placementTargets.map((target) => target.pageIndex)));
         this.dispatchCoreAction(refreshPages(documentId, pagesToRefresh));
         task.resolve();
@@ -497,7 +508,7 @@ export class WatermarkPlugin extends BasePlugin<
 
     const createNext = (index: number) => {
       if (index >= placementTargets.length) {
-        this.dispatch(addPlacements(def.id, placements));
+        this.dispatch(addPlacements(documentId, def.id, placements));
         task.resolve();
         return;
       }
@@ -631,7 +642,7 @@ export class WatermarkPlugin extends BasePlugin<
 
     const createNext = (index: number) => {
       if (index >= placementTargets.length) {
-        this.dispatch(addPlacements(def.id, placements));
+        this.dispatch(addPlacements(documentId, def.id, placements));
         task.resolve();
         return;
       }
@@ -1193,6 +1204,35 @@ export class WatermarkPlugin extends BasePlugin<
     };
   }
 
+  private getDocumentDefinitions(documentId: string): Map<string, WatermarkDefinition> {
+    return this.definitionsByDocument.get(documentId) ?? new Map<string, WatermarkDefinition>();
+  }
+
+  private getOrCreateDocumentDefinitions(documentId: string): Map<string, WatermarkDefinition> {
+    const existing = this.definitionsByDocument.get(documentId);
+    if (existing) {
+      return existing;
+    }
+    const created = new Map<string, WatermarkDefinition>();
+    this.definitionsByDocument.set(documentId, created);
+    return created;
+  }
+
+  private seedConfiguredWatermarksForDocument(documentId: string): void {
+    if (!this.config.watermarks || this.getDocumentDefinitions(documentId).size > 0) {
+      return;
+    }
+
+    const documentDefinitions = this.getOrCreateDocumentDefinitions(documentId);
+    for (const input of this.config.watermarks) {
+      const def = this.createDefinition(input);
+      documentDefinitions.set(def.id, def);
+      this.dispatch(addWatermark(documentId, def));
+    }
+
+    this.emitChange();
+  }
+
   /**
    * Emit the watermark change event to subscribers.
    */
@@ -1202,7 +1242,7 @@ export class WatermarkPlugin extends BasePlugin<
 
   override destroy(): void {
     this.watermarkChange$.clear();
-    this.definitions.clear();
+    this.definitionsByDocument.clear();
     super.destroy();
   }
 }

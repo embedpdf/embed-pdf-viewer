@@ -121,7 +121,7 @@ export type WatermarkInput = Omit<WatermarkDefinition, 'id'>;
  * Configuration for the watermark plugin.
  */
 export interface WatermarkPluginConfig extends BasePluginConfig {
-  /** Watermarks to apply automatically when a document is loaded */
+  /** Watermarks seeded per document and optionally auto-applied when loaded */
   watermarks?: WatermarkInput[];
   /** Whether to auto-apply configured watermarks on document load. Default: true */
   autoApply?: boolean;
@@ -131,10 +131,10 @@ export interface WatermarkPluginConfig extends BasePluginConfig {
  * Internal state tracked by the watermark plugin's reducer.
  */
 export interface WatermarkState {
-  /** IDs of all registered watermark definitions */
-  watermarkIds: string[];
-  /** Maps watermark definition ID → array of placed annotation IDs per document */
-  placements: Record<string, WatermarkPlacement[]>;
+  /** Maps document ID -> watermark definition IDs registered for that document */
+  watermarkIdsByDocument: Record<string, string[]>;
+  /** Maps document ID -> watermark definition ID -> placed instances */
+  placementsByDocument: Record<string, Record<string, WatermarkPlacement[]>>;
 }
 
 /**
@@ -162,23 +162,25 @@ export interface WatermarkChangeEvent {
 export interface WatermarkCapability {
   /**
    * Add a watermark definition and immediately apply it to the active document.
+   * Watermarks are scoped per document and do not affect other open documents.
    * @returns The generated watermark ID.
    */
   addWatermark(input: WatermarkInput): PdfTask<string>;
 
   /**
-   * Remove a watermark definition. Note: already-flattened watermarks
-   * are permanent in the PDF and cannot be visually removed.
+   * Remove a watermark definition from the active document.
+   * Note: already-flattened watermarks are permanent in the PDF and
+   * cannot be visually removed.
    */
   removeWatermark(id: string): PdfTask<void>;
 
   /**
-   * Get all registered watermark definitions.
+   * Get watermark definitions for the active document.
    */
   getWatermarks(): WatermarkDefinition[];
 
   /**
-   * Apply all registered watermarks to a specific document.
+   * Apply all watermarks registered for a specific document.
    * Each watermark is flattened into the page content stream.
    */
   applyToDocument(documentId: string): PdfTask<void>;

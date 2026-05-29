@@ -5,12 +5,13 @@ import {
   REMOVE_WATERMARK,
   ADD_PLACEMENTS,
   CLEAR_PLACEMENTS,
+  CLEAR_DOCUMENT,
 } from './actions';
 import { WatermarkState } from './types';
 
 export const initialState: WatermarkState = {
-  watermarkIds: [],
-  placements: {},
+  watermarkIdsByDocument: {},
+  placementsByDocument: {},
 };
 
 export const watermarkReducer: Reducer<WatermarkState, WatermarkAction> = (
@@ -18,47 +19,79 @@ export const watermarkReducer: Reducer<WatermarkState, WatermarkAction> = (
   action,
 ) => {
   switch (action.type) {
-    case ADD_WATERMARK:
+    case ADD_WATERMARK: {
+      const { documentId, definition } = action.payload;
+      const currentIds = state.watermarkIdsByDocument[documentId] ?? [];
+      const currentPlacements = state.placementsByDocument[documentId] ?? {};
       return {
         ...state,
-        watermarkIds: [...state.watermarkIds, action.payload.id],
-        placements: { ...state.placements, [action.payload.id]: [] },
+        watermarkIdsByDocument: {
+          ...state.watermarkIdsByDocument,
+          [documentId]: [...currentIds, definition.id],
+        },
+        placementsByDocument: {
+          ...state.placementsByDocument,
+          [documentId]: { ...currentPlacements, [definition.id]: [] },
+        },
       };
+    }
 
-    case REMOVE_WATERMARK:
+    case REMOVE_WATERMARK: {
+      const { documentId, watermarkId } = action.payload;
+      const currentIds = state.watermarkIdsByDocument[documentId] ?? [];
+      const currentPlacements = state.placementsByDocument[documentId] ?? {};
       return {
         ...state,
-        watermarkIds: state.watermarkIds.filter((id) => id !== action.payload),
-        placements: Object.fromEntries(
-          Object.entries(state.placements).filter(([key]) => key !== action.payload),
-        ),
+        watermarkIdsByDocument: {
+          ...state.watermarkIdsByDocument,
+          [documentId]: currentIds.filter((id) => id !== watermarkId),
+        },
+        placementsByDocument: {
+          ...state.placementsByDocument,
+          [documentId]: Object.fromEntries(
+            Object.entries(currentPlacements).filter(([key]) => key !== watermarkId),
+          ),
+        },
       };
+    }
 
     case ADD_PLACEMENTS: {
-      const existing = state.placements[action.payload.watermarkId] ?? [];
+      const { documentId, watermarkId, placements } = action.payload;
+      const docPlacements = state.placementsByDocument[documentId] ?? {};
+      const existing = docPlacements[watermarkId] ?? [];
       return {
         ...state,
-        placements: {
-          ...state.placements,
-          [action.payload.watermarkId]: [...existing, ...action.payload.placements],
+        placementsByDocument: {
+          ...state.placementsByDocument,
+          [documentId]: {
+            ...docPlacements,
+            [watermarkId]: [...existing, ...placements],
+          },
         },
       };
     }
 
     case CLEAR_PLACEMENTS: {
       const { watermarkId, documentId } = action.payload;
-      if (!documentId) {
-        return {
-          ...state,
-          placements: { ...state.placements, [watermarkId]: [] },
-        };
-      }
-      const filtered = (state.placements[watermarkId] ?? []).filter(
-        (p) => p.documentId !== documentId,
-      );
+      const docPlacements = state.placementsByDocument[documentId] ?? {};
       return {
         ...state,
-        placements: { ...state.placements, [watermarkId]: filtered },
+        placementsByDocument: {
+          ...state.placementsByDocument,
+          [documentId]: { ...docPlacements, [watermarkId]: [] },
+        },
+      };
+    }
+
+    case CLEAR_DOCUMENT: {
+      const { documentId } = action.payload;
+      const { [documentId]: _removedIds, ...remainingIds } = state.watermarkIdsByDocument;
+      const { [documentId]: _removedPlacements, ...remainingPlacements } =
+        state.placementsByDocument;
+      return {
+        ...state,
+        watermarkIdsByDocument: remainingIds,
+        placementsByDocument: remainingPlacements,
       };
     }
 
