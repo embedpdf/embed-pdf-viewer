@@ -3810,6 +3810,15 @@ export interface PdfEngine<T = Blob> {
     annotation: PdfAnnotationObject,
   ) => PdfTask<boolean>;
   /**
+   * Place a single appearance PDF many times using XObject form references.
+   * This reuses one source object across all placements to minimise output size.
+   */
+  tileAppearanceXObjectBehind: (
+    doc: PdfDocumentObject,
+    placements: Array<{ pageIndex: number; rect: Rect }>,
+    appearancePdf: ArrayBuffer,
+  ) => PdfTask<boolean>;
+  /**
    * Export an annotation's appearance as a standalone PDF document
    * @param doc - pdf document
    * @param page - pdf page
@@ -4144,6 +4153,11 @@ export interface IPdfiumExecutor {
     doc: PdfDocumentObject,
     page: PdfPageObject,
     annotation: PdfAnnotationObject,
+  ): PdfTask<boolean>;
+  tileAppearanceXObjectBehind(
+    doc: PdfDocumentObject,
+    placements: Array<{ pageIndex: number; rect: Rect }>,
+    appearancePdf: ArrayBuffer,
   ): PdfTask<boolean>;
   exportAnnotationAppearanceAsPdf(
     doc: PdfDocumentObject,

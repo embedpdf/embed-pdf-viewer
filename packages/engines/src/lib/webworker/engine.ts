@@ -1155,6 +1155,36 @@ export class WebWorkerEngine implements PdfEngine {
   }
 
   /**
+   * {@inheritDoc @embedpdf/models!PdfEngine.tileAppearanceXObjectBehind}
+   *
+   * @public
+   */
+  tileAppearanceXObjectBehind(
+    doc: PdfDocumentObject,
+    placements: Array<{ pageIndex: number; rect: Rect }>,
+    appearancePdf: ArrayBuffer,
+  ) {
+    this.logger.debug(
+      LOG_SOURCE,
+      LOG_CATEGORY,
+      'tileAppearanceXObjectBehind',
+      doc,
+      placements.length,
+    );
+    const requestId = this.generateRequestId(doc.id);
+    const task = new WorkerTask<boolean>(this.worker, requestId);
+
+    const request: ExecuteRequest = createRequest(requestId, 'tileAppearanceXObjectBehind', [
+      doc,
+      placements,
+      appearancePdf,
+    ]);
+    this.proxy(task, request);
+
+    return task;
+  }
+
+  /**
    * {@inheritDoc @embedpdf/models!PdfEngine.exportAnnotationAppearanceAsPdf}
    *
    * @public

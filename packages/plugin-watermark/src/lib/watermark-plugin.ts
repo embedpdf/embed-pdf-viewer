@@ -111,7 +111,7 @@ export class WatermarkPlugin extends BasePlugin<
             'AddWatermark',
             `Watermark registered but failed to apply: ${error.reason.message}`,
           );
-          task.resolve(def.id);
+          task.reject(error.reason);
         },
       );
     } else {
@@ -194,7 +194,7 @@ export class WatermarkPlugin extends BasePlugin<
               `Failed to apply watermark ${def.id}`,
               error,
             );
-            task.fail(error);
+            task.reject(error.reason);
           }
         },
       );
@@ -251,7 +251,7 @@ export class WatermarkPlugin extends BasePlugin<
       );
 
     if (def.type === 'text') {
-      this.applyTextWatermark(
+      this.applyTextWatermarkOptimized(
         def,
         documentId,
         pageIndices,
@@ -259,7 +259,7 @@ export class WatermarkPlugin extends BasePlugin<
         task,
       );
     } else {
-      this.applyImageWatermark(
+      this.applyImageWatermarkOptimized(
         def,
         documentId,
         pageIndices,
@@ -267,6 +267,201 @@ export class WatermarkPlugin extends BasePlugin<
         task,
       );
     }
+
+    return task;
+  }
+
+  private applyTextWatermarkOptimized(
+    def: WatermarkDefinition,
+    documentId: string,
+    pageIndices: number[],
+    pageMap: Map<
+      number,
+      { index: number; size: { width: number; height: number }; rotation: number }
+    >,
+    task: Task<void, PdfErrorReason>,
+  ): void {
+    const { pdfString, rect } = this.generateTextAppearance(def);
+    const placementTargets = this.buildPlacementTargets(def, pageIndices, pageMap, rect);
+    if (placementTargets.length === 0) {
+      task.resolve();
+      return;
+    }
+
+    const appearancePdf = new TextEncoder().encode(pdfString).buffer;
+    this.applyAppearanceWithXObjectTiling(def, documentId, placementTargets, appearancePdf, task, () =>
+      this.applyTextWatermark(def, documentId, pageIndices, pageMap, task),
+    );
+  }
+
+  private applyImageWatermarkOptimized(
+    def: WatermarkDefinition,
+    documentId: string,
+    pageIndices: number[],
+    pageMap: Map<
+      number,
+      { index: number; size: { width: number; height: number }; rotation: number }
+    >,
+    task: Task<void, PdfErrorReason>,
+  ): void {
+    if (!def.imageOptions) {
+      task.reject({
+        code: PdfErrorCode.NotFound,
+        message: 'Image options are required for image watermarks',
+      });
+      return;
+    }
+
+    const opacity = def.opacity ?? 0.5;
+    const rotation = def.rotation ?? 0;
+    const baseRect = this.computePlacementRect(def.position, def.size, rotation);
+    const placementTargets = this.buildPlacementTargets(def, pageIndices, pageMap, baseRect);
+    if (placementTargets.length === 0) {
+      task.resolve();
+      return;
+    }
+
+    const fallbackSequential = () => {
+      this.applyImageWatermark(def, documentId, pageIndices, pageMap, task);
+    };
+
+    const tryXObjectWithData = (imageData: ArrayBuffer, mimeType: 'image/png' | 'image/jpeg') => {
+      this.createImageAppearancePdfFromStamp(documentId, placementTargets[0], imageData, mimeType).wait(
+        (appearancePdf: ArrayBuffer) => {
+          this.applyAppearanceWithXObjectTiling(
+            def,
+            documentId,
+            placementTargets,
+            appearancePdf,
+            task,
+            fallbackSequential,
+          );
+        },
+        fallbackSequential,
+      );
+    };
+
+    this.applyOpacityAndRotationToImage(def.imageOptions.data, opacity, rotation).then(
+      (processedData) => {
+        tryXObjectWithData(processedData, 'image/png');
+      },
+      () => {
+        tryXObjectWithData(def.imageOptions!.data, def.imageOptions!.mimeType);
+      },
+    );
+  }
+
+  private applyAppearanceWithXObjectTiling(
+    def: WatermarkDefinition,
+    documentId: string,
+    placementTargets: PlacementTarget[],
+    appearancePdf: ArrayBuffer,
+    task: Task<void, PdfErrorReason>,
+    fallback: () => void,
+  ): void {
+    const docState = this.getCoreDocument(documentId);
+    if (!docState?.document) {
+      fallback();
+      return;
+    }
+
+    const placements: Array<{ pageIndex: number; rect: WatermarkRect }> = placementTargets.map((target) => ({
+      pageIndex: target.pageIndex,
+      rect: target.rect,
+    }));
+
+    this.engine.tileAppearanceXObjectBehind(docState.document, placements, appearancePdf).wait(
+      (ok: boolean) => {
+        if (!ok) {
+          this.logger.warn(
+            'WatermarkPlugin',
+            'XObjectTiling',
+            `XObject tiling returned false for watermark ${def.id}, falling back to sequential mode`,
+          );
+          fallback();
+          return;
+        }
+
+        const placementRecords: WatermarkPlacement[] = placementTargets.map((target, index) => ({
+          documentId,
+          pageIndex: target.pageIndex,
+          annotationId: `xobj-${def.id}-${index}`,
+        }));
+
+        this.dispatch(addPlacements(def.id, placementRecords));
+        const pagesToRefresh = Array.from(new Set(placementTargets.map((target) => target.pageIndex)));
+        this.dispatchCoreAction(refreshPages(documentId, pagesToRefresh));
+        task.resolve();
+      },
+      () => fallback(),
+    );
+  }
+
+  private createImageAppearancePdfFromStamp(
+    documentId: string,
+    sourceTarget: PlacementTarget,
+    imageData: ArrayBuffer,
+    mimeType: 'image/png' | 'image/jpeg',
+  ): Task<ArrayBuffer, PdfErrorReason> {
+    const task = new Task<ArrayBuffer, PdfErrorReason>();
+
+    if (!this.annotation) {
+      task.reject({ code: PdfErrorCode.NotSupport, message: 'Annotation plugin unavailable' });
+      return task;
+    }
+
+    const docState = this.getCoreDocument(documentId);
+    const doc = docState?.document;
+    if (!doc) {
+      task.reject({ code: PdfErrorCode.DocNotOpen, message: 'Document is not open' });
+      return task;
+    }
+
+    const page = doc.pages.find((p: { index: number }) => p.index === sourceTarget.pageIndex);
+    if (!page) {
+      task.reject({ code: PdfErrorCode.NotFound, message: `Page ${sourceTarget.pageIndex} not found` });
+      return task;
+    }
+
+    const annotationScope = this.annotation.forDocument(documentId);
+    const tempAnnotationId = uuidV4();
+    const tempAnnotation: PdfStampAnnoObject = {
+      id: tempAnnotationId,
+      type: PdfAnnotationSubtype.STAMP,
+      pageIndex: sourceTarget.pageIndex,
+      rect: sourceTarget.rect,
+      flags: ['hidden', 'noView'],
+      subject: 'Watermark-Source',
+    };
+
+    const cleanupAndContinue = (cb: () => void) => {
+      annotationScope.deleteAnnotation(sourceTarget.pageIndex, tempAnnotationId);
+      annotationScope.commit().wait(
+        () => cb(),
+        () => cb(),
+      );
+    };
+
+    annotationScope.createAnnotation(sourceTarget.pageIndex, tempAnnotation, {
+      data: imageData,
+      mimeType,
+    });
+
+    annotationScope.commit().wait(
+      () => {
+        this.engine.exportAnnotationAppearanceAsPdf(doc, page, tempAnnotation).wait(
+          (appearancePdf: ArrayBuffer) => {
+            cleanupAndContinue(() => task.resolve(appearancePdf));
+          },
+          (error: { type: string; reason: PdfErrorReason }) => {
+            cleanupAndContinue(() => task.reject(error.reason));
+          },
+        );
+      },
+      (error: { type: string; reason: PdfErrorReason }) => {
+        task.reject(error.reason);
+      },
+    );
 
     return task;
   }

@@ -7301,6 +7301,188 @@ export class PdfiumNative implements IPdfiumExecutor {
   }
 
   /**
+   * Place one appearance PDF many times as form XObject references.
+   * This keeps the source appearance shared, reducing output size.
+   */
+  public tileAppearanceXObjectBehind(
+    doc: PdfDocumentObject,
+    placements: Array<{ pageIndex: number; rect: Rect }>,
+    appearancePdf: ArrayBuffer,
+  ): PdfTask<boolean> {
+    this.logger.debug(
+      LOG_SOURCE,
+      LOG_CATEGORY,
+      'tileAppearanceXObjectBehind',
+      doc.id,
+      placements.length,
+    );
+    const label = 'TileAppearanceXObjectBehind';
+    this.logger.perf(LOG_SOURCE, LOG_CATEGORY, label, 'Begin', doc.id);
+
+    const ctx = this.cache.getContext(doc.id);
+    if (!ctx) {
+      this.logger.perf(LOG_SOURCE, LOG_CATEGORY, label, 'End', doc.id);
+      return PdfTaskHelper.reject<boolean>({
+        code: PdfErrorCode.DocNotOpen,
+        message: 'document does not open',
+      });
+    }
+
+    if (placements.length === 0) {
+      this.logger.perf(LOG_SOURCE, LOG_CATEGORY, label, 'End', doc.id);
+      return PdfTaskHelper.resolve<boolean>(true);
+    }
+
+    const data = new Uint8Array(appearancePdf);
+    const filePtr = this.memoryManager.malloc(data.byteLength);
+    if (!filePtr) {
+      this.logger.perf(LOG_SOURCE, LOG_CATEGORY, label, 'End', doc.id);
+      return PdfTaskHelper.reject<boolean>({
+        code: PdfErrorCode.CantCreateNewDoc,
+        message: 'failed to allocate appearance buffer',
+      });
+    }
+    this.pdfiumModule.pdfium.HEAPU8.set(data, filePtr);
+
+    const appearanceDocPtr = this.pdfiumModule.FPDF_LoadMemDocument(filePtr, data.byteLength, '');
+    if (!appearanceDocPtr) {
+      this.memoryManager.free(filePtr);
+      this.logger.perf(LOG_SOURCE, LOG_CATEGORY, label, 'End', doc.id);
+      return PdfTaskHelper.reject<boolean>({
+        code: PdfErrorCode.CantCreateNewDoc,
+        message: 'failed to load appearance PDF',
+      });
+    }
+
+    const sourcePagePtr = this.pdfiumModule.FPDF_LoadPage(appearanceDocPtr, 0);
+    if (!sourcePagePtr) {
+      this.pdfiumModule.FPDF_CloseDocument(appearanceDocPtr);
+      this.memoryManager.free(filePtr);
+      this.logger.perf(LOG_SOURCE, LOG_CATEGORY, label, 'End', doc.id);
+      return PdfTaskHelper.reject<boolean>({
+        code: PdfErrorCode.CantCreateNewDoc,
+        message: 'appearance PDF has no first page',
+      });
+    }
+
+    const sourceWidth = this.pdfiumModule.FPDF_GetPageWidthF(sourcePagePtr);
+    const sourceHeight = this.pdfiumModule.FPDF_GetPageHeightF(sourcePagePtr);
+    this.pdfiumModule.FPDF_ClosePage(sourcePagePtr);
+
+    if (sourceWidth <= 0 || sourceHeight <= 0) {
+      this.pdfiumModule.FPDF_CloseDocument(appearanceDocPtr);
+      this.memoryManager.free(filePtr);
+      this.logger.perf(LOG_SOURCE, LOG_CATEGORY, label, 'End', doc.id);
+      return PdfTaskHelper.reject<boolean>({
+        code: PdfErrorCode.CantCreateNewDoc,
+        message: 'appearance PDF has invalid page size',
+      });
+    }
+
+    const xObjectPtr = this.pdfiumModule.FPDF_NewXObjectFromPage(ctx.docPtr, appearanceDocPtr, 0);
+    if (!xObjectPtr) {
+      this.pdfiumModule.FPDF_CloseDocument(appearanceDocPtr);
+      this.memoryManager.free(filePtr);
+      this.logger.perf(LOG_SOURCE, LOG_CATEGORY, label, 'End', doc.id);
+      return PdfTaskHelper.reject<boolean>({
+        code: PdfErrorCode.CantCreateNewDoc,
+        message: 'failed to create watermark XObject',
+      });
+    }
+
+    const grouped = new Map<number, Rect[]>();
+    for (const placement of placements) {
+      const pageRects = grouped.get(placement.pageIndex);
+      if (pageRects) {
+        pageRects.push(placement.rect);
+      } else {
+        grouped.set(placement.pageIndex, [placement.rect]);
+      }
+    }
+
+    const pageByIndex = new Map<number, PdfPageObject>(doc.pages.map((p) => [p.index, p] as const));
+
+    let totalInserted = 0;
+    try {
+      for (const [pageIndex, rects] of grouped.entries()) {
+        const page = pageByIndex.get(pageIndex);
+        if (!page || rects.length === 0) continue;
+
+        ctx.borrowPage(pageIndex, (pageCtx) => {
+          const beforeCount = this.pdfiumModule.FPDFPage_CountObjects(pageCtx.pagePtr);
+          let insertionIndex = beforeCount;
+          for (let i = 0; i < beforeCount; i++) {
+            const objectPtr = this.pdfiumModule.FPDFPage_GetObject(pageCtx.pagePtr, i);
+            if (!objectPtr) continue;
+            const type = this.pdfiumModule.FPDFPageObj_GetType(objectPtr) as PdfPageObjectType;
+            if (type === PdfPageObjectType.TEXT) {
+              insertionIndex = i;
+              break;
+            }
+          }
+
+          let inserted = 0;
+          for (const rect of rects) {
+            const formObjectPtr = this.pdfiumModule.FPDF_NewFormObjectFromXObject(xObjectPtr);
+            if (!formObjectPtr) continue;
+
+            const matrixPtr = this.memoryManager.malloc(6 * 4);
+            if (!matrixPtr) {
+              this.pdfiumModule.FPDFPageObj_Destroy(formObjectPtr);
+              continue;
+            }
+
+            this.pdfiumModule.pdfium.setValue(matrixPtr, rect.size.width / sourceWidth, 'float');
+            this.pdfiumModule.pdfium.setValue(matrixPtr + 4, 0, 'float');
+            this.pdfiumModule.pdfium.setValue(matrixPtr + 8, 0, 'float');
+            this.pdfiumModule.pdfium.setValue(matrixPtr + 12, rect.size.height / sourceHeight, 'float');
+            this.pdfiumModule.pdfium.setValue(matrixPtr + 16, 0, 'float');
+            this.pdfiumModule.pdfium.setValue(matrixPtr + 20, 0, 'float');
+
+            if (!this.pdfiumModule.FPDFPageObj_SetMatrix(formObjectPtr, matrixPtr)) {
+              this.memoryManager.free(matrixPtr);
+              this.pdfiumModule.FPDFPageObj_Destroy(formObjectPtr);
+              continue;
+            }
+            this.memoryManager.free(matrixPtr);
+
+            const pagePos = this.convertDevicePointToPagePoint(doc, page, {
+              x: rect.origin.x,
+              y: rect.origin.y + rect.size.height,
+            });
+            this.pdfiumModule.FPDFPageObj_Transform(formObjectPtr, 1, 0, 0, 1, pagePos.x, pagePos.y);
+
+            this.pdfiumModule.FPDFPage_InsertObjectAtIndex(
+              pageCtx.pagePtr,
+              formObjectPtr,
+              insertionIndex,
+            );
+            insertionIndex++;
+            inserted++;
+          }
+
+          if (inserted > 0) {
+            this.pdfiumModule.FPDFPage_GenerateContent(pageCtx.pagePtr);
+            totalInserted += inserted;
+          }
+        });
+      }
+    } catch {
+      this.pdfiumModule.FPDF_CloseXObject(xObjectPtr);
+      this.pdfiumModule.FPDF_CloseDocument(appearanceDocPtr);
+      this.memoryManager.free(filePtr);
+      this.logger.perf(LOG_SOURCE, LOG_CATEGORY, label, 'End', doc.id);
+      return PdfTaskHelper.resolve<boolean>(false);
+    }
+
+    this.pdfiumModule.FPDF_CloseXObject(xObjectPtr);
+    this.pdfiumModule.FPDF_CloseDocument(appearanceDocPtr);
+    this.memoryManager.free(filePtr);
+    this.logger.perf(LOG_SOURCE, LOG_CATEGORY, label, 'End', doc.id);
+    return PdfTaskHelper.resolve<boolean>(totalInserted > 0);
+  }
+
+  /**
    * Export an annotation's appearance as a standalone single-page PDF.
    *
    * @param doc - document object

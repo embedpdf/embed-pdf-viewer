@@ -118,6 +118,7 @@ type MessageType =
   | 'applyAllRedactions'
   | 'flattenAnnotation'
   | 'flattenAnnotationBehind'
+  | 'tileAppearanceXObjectBehind'
   | 'exportAnnotationAppearanceAsPdf'
   | 'exportAnnotationsAppearanceAsPdf'
   | 'getTextSlices'
@@ -614,6 +615,14 @@ export class RemoteExecutor implements IPdfiumExecutor {
     annotation: PdfAnnotationObject,
   ): PdfTask<boolean> {
     return this.send<boolean>('flattenAnnotationBehind', [doc, page, annotation]);
+  }
+
+  tileAppearanceXObjectBehind(
+    doc: PdfDocumentObject,
+    placements: Array<{ pageIndex: number; rect: Rect }>,
+    appearancePdf: ArrayBuffer,
+  ): PdfTask<boolean> {
+    return this.send<boolean>('tileAppearanceXObjectBehind', [doc, placements, appearancePdf]);
   }
 
   exportAnnotationAppearanceAsPdf(

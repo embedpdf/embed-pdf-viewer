@@ -41,7 +41,7 @@ import { WatermarkPluginPackage } from '@embedpdf/plugin-watermark';
 import { CircularProgress, Box, Alert } from '@mui/material';
 import SearchOutlinedIcon from '@mui/icons-material/SearchOutlined';
 import BrandingWatermarkOutlinedIcon from '@mui/icons-material/BrandingWatermarkOutlined';
-import { useMemo, useRef } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import { PageControls } from './components/page-controls';
 import { Search } from './components/search';
@@ -54,6 +54,7 @@ import { RedactionSelectionMenu } from './components/redaction-selection-menu';
 import { WatermarkPanel } from './components/watermark-panel';
 
 const consoleLogger = new ConsoleLogger();
+const WATERMARK_TAKEOVER_PLACEMENT_THRESHOLD = 500;
 
 function App() {
   const isDev = useMemo(
@@ -63,6 +64,47 @@ function App() {
 
   const { engine, isLoading, error } = usePdfiumEngine(isDev ? { logger: consoleLogger } : {});
   const popperContainerRef = useRef<HTMLDivElement>(null);
+  const [watermarkBusy, setWatermarkBusy] = useState<{
+    isApplying: boolean;
+    status: string;
+    fullPageTakeover: boolean;
+    startedAt: number;
+  }>({
+    isApplying: false,
+    status: '',
+    fullPageTakeover: false,
+    startedAt: 0,
+  });
+  const [watermarkBusyElapsedSeconds, setWatermarkBusyElapsedSeconds] = useState(0);
+
+  const handleWatermarkApplyStateChange = useCallback(
+    (state: { isApplying: boolean; status: string; fullPageTakeover: boolean }) => {
+      setWatermarkBusy((prev) => ({
+        isApplying: state.isApplying,
+        status: state.status,
+        fullPageTakeover: state.fullPageTakeover,
+        startedAt: state.isApplying ? (prev.isApplying ? prev.startedAt : Date.now()) : 0,
+      }));
+    },
+    [],
+  );
+
+  useEffect(() => {
+    if (!watermarkBusy.isApplying || watermarkBusy.startedAt === 0) {
+      setWatermarkBusyElapsedSeconds(0);
+      return;
+    }
+
+    const tick = () => {
+      setWatermarkBusyElapsedSeconds(
+        Math.max(0, Math.floor((Date.now() - watermarkBusy.startedAt) / 1000)),
+      );
+    };
+
+    tick();
+    const intervalId = globalThis.setInterval(tick, 1000);
+    return () => globalThis.clearInterval(intervalId);
+  }, [watermarkBusy.isApplying, watermarkBusy.startedAt]);
 
   const plugins = useMemo(
     () => [
@@ -199,7 +241,11 @@ function App() {
                     icon: BrandingWatermarkOutlinedIcon,
                     label: 'Watermark',
                     position: 'right',
-                    props: { documentId: activeDocumentId },
+                    props: {
+                      documentId: activeDocumentId,
+                      takeoverPlacementThreshold: WATERMARK_TAKEOVER_PLACEMENT_THRESHOLD,
+                      onApplyStateChange: handleWatermarkApplyStateChange,
+                    },
                   },
                 ];
 
@@ -340,6 +386,52 @@ function App() {
                         {/* Right Sidebar */}
                         <Drawer position="right" />
                       </Box>
+
+                      {watermarkBusy.isApplying && watermarkBusy.fullPageTakeover && (
+                        <Box
+                          sx={{
+                            position: 'absolute',
+                            inset: 0,
+                            zIndex: 2500,
+                            backgroundColor: 'rgba(17, 24, 39, 0.45)',
+                            backdropFilter: 'blur(2px)',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            p: 3,
+                          }}
+                        >
+                          <Box
+                            sx={{
+                              width: 'min(560px, 92vw)',
+                              bgcolor: 'background.paper',
+                              borderRadius: 2,
+                              boxShadow: 6,
+                              p: 3,
+                              display: 'flex',
+                              flexDirection: 'column',
+                              alignItems: 'center',
+                              gap: 1.25,
+                              textAlign: 'center',
+                            }}
+                          >
+                            <CircularProgress size={34} />
+                            <Alert severity="info" sx={{ width: '100%' }}>
+                              {watermarkBusy.status || 'Applying watermark across pages...'}
+                            </Alert>
+                            <Box>
+                              <Box sx={{ fontSize: 13, color: 'text.secondary' }}>
+                                Viewer interactions are paused while watermark processing is in progress.
+                              </Box>
+                              {watermarkBusyElapsedSeconds >= 15 && (
+                                <Box sx={{ fontSize: 13, color: 'text.secondary', mt: 0.5 }}>
+                                  Still running ({watermarkBusyElapsedSeconds}s). Large documents can take a while.
+                                </Box>
+                              )}
+                            </Box>
+                          </Box>
+                        </Box>
+                      )}
                     </Box>
                   </DrawerProvider>
                 );

@@ -273,6 +273,35 @@ export class EngineRunner {
 
     const engine = this.engine;
     const { name, args } = request.data;
+
+    // Temporary dynamic branch so worker can serve new methods before all type unions refresh.
+    if (name === 'tileAppearanceXObjectBehind') {
+      const tileFn = (engine as PdfEngine<Blob> & {
+        tileAppearanceXObjectBehind?: (...a: unknown[]) => PdfEngineMethodReturnType<PdfEngineMethodName>;
+      }).tileAppearanceXObjectBehind;
+      if (!tileFn) {
+        const error: PdfEngineError = {
+          type: 'reject',
+          reason: {
+            code: PdfErrorCode.NotSupport,
+            message: `engine method ${name} is not supported yet`,
+          },
+        };
+        const response: ExecuteResponse = {
+          id: request.id,
+          type: 'ExecuteResponse',
+          data: {
+            type: 'error',
+            value: error,
+          },
+        };
+        this.respond(response);
+        return;
+      }
+      this.handleTask(request.id, tileFn(...(args as unknown[])));
+      return;
+    }
+
     if (!engine[name]) {
       const error: PdfEngineError = {
         type: 'reject',
