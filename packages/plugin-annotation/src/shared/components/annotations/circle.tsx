@@ -1,6 +1,14 @@
 import { useMemo, MouseEvent } from '@framework';
-import { PdfAnnotationBorderStyle, PdfRectDifferences, Rect } from '@embedpdf/models';
+import {
+  PdfAnnotationBorderStyle,
+  PdfRectDifferences,
+  Rect,
+  PdfMeasurementInfo,
+  formatMeasurement,
+  ellipseArea,
+} from '@embedpdf/models';
 import { generateCloudyEllipsePath } from '@embedpdf/plugin-annotation';
+import { MeasurementLabel } from './measurement-label';
 
 const MIN_HIT_AREA_SCREEN_PX = 20;
 
@@ -31,6 +39,8 @@ interface CircleProps {
   cloudyBorderIntensity?: number;
   /** Rectangle differences – inset from Rect to drawn area */
   rectangleDifferences?: PdfRectDifferences;
+  /** Measurement metadata; when present an ellipse-area label is drawn. */
+  measurement?: PdfMeasurementInfo;
 }
 
 /**
@@ -50,6 +60,7 @@ export function Circle({
   appearanceActive = false,
   cloudyBorderIntensity,
   rectangleDifferences,
+  measurement,
 }: CircleProps): JSX.Element {
   const isCloudy = (cloudyBorderIntensity ?? 0) > 0;
 
@@ -78,6 +89,11 @@ export function Circle({
       strokeWidth,
     );
   }, [isCloudy, rect, rectangleDifferences, cloudyBorderIntensity, strokeWidth]);
+
+  const measureText = useMemo(
+    () => (measurement ? formatMeasurement(ellipseArea(rect), measurement) : null),
+    [measurement, rect],
+  );
 
   const svgWidth = width * scale;
   const svgHeight = height * scale;
@@ -170,6 +186,15 @@ export function Circle({
             }}
           />
         ))}
+
+      {measureText && (
+        <MeasurementLabel
+          text={measureText}
+          center={{ x: width / 2, y: height / 2 }}
+          scale={scale}
+          background={strokeColor ?? '#2962FF'}
+        />
+      )}
     </svg>
   );
 }

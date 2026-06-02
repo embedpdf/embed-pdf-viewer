@@ -51,6 +51,8 @@ import {
   PdfPolygonAnnoObject,
   PdfPolylineAnnoObject,
   PdfLineAnnoObject,
+  PdfMeasurementInfo,
+  MEASUREMENT_CUSTOM_KEY,
   PdfHighlightAnnoObject,
   PdfStampAnnoObjectContents,
   PdfWidgetAnnoField,
@@ -3977,6 +3979,11 @@ export class PdfiumNative implements IPdfiumExecutor {
     this.setRectangleDifferences(annotationPtr, annotation.rectangleDifferences);
     this.setBorderEffect(annotationPtr, annotation.cloudyBorderIntensity);
 
+    // Persist the /IT intent (e.g. measurement annotations use 'PolygonDimension').
+    if (annotation.intent && !this.setAnnotIntent(annotationPtr, annotation.intent)) {
+      return false;
+    }
+
     // Apply base annotation properties (author, contents, dates, flags, custom, IRT, RT)
     return this.applyBaseAnnotationProperties(doc, page, pagePtr, annotationPtr, annotation);
   }
@@ -5870,6 +5877,9 @@ export class PdfiumNative implements IPdfiumExecutor {
     if (annotation) {
       annotation = this.reverseRotateAnnotationOnLoad(annotation);
 
+      // Hydrate measurement metadata out of the reserved custom-data slot.
+      annotation = this.hydrateMeasurementOnLoad(annotation);
+
       // Populate available appearance stream modes bitmask
       const apModes = this.pdfiumModule.EPDFAnnot_GetAvailableAppearanceModes(annotationPtr);
       if (apModes) {
@@ -5939,6 +5949,59 @@ export class PdfiumNative implements IPdfiumExecutor {
       default:
         return annotation;
     }
+  }
+
+  /**
+   * On load, lift measurement metadata out of the reserved custom-data slot
+   * (`custom[MEASUREMENT_CUSTOM_KEY]`) onto the typed `measurement` field of a
+   * geometry annotation and strip it from the exposed `custom`.
+   *
+   * For the three subtypes the PDF spec actually sanctions as measurement
+   * annotations (Line / PolyLine / Polygon) we also re-derive the spec `/IT`
+   * intent. Circle (ellipse) and Square (rectangle) area measurements are an
+   * EmbedPDF extension — ISO 32000 defines no measurement intent for those
+   * subtypes — so we hydrate their measurement metadata but deliberately do
+   * NOT stamp a (non-spec) dimension intent on them.
+   *
+   * @private
+   */
+  private hydrateMeasurementOnLoad(annotation: PdfAnnotationObject): PdfAnnotationObject {
+    let intent: 'LineDimension' | 'PolyLineDimension' | 'PolygonDimension' | undefined;
+    switch (annotation.type) {
+      case PdfAnnotationSubtype.LINE:
+        intent = 'LineDimension';
+        break;
+      case PdfAnnotationSubtype.POLYLINE:
+        intent = 'PolyLineDimension';
+        break;
+      case PdfAnnotationSubtype.POLYGON:
+        intent = 'PolygonDimension';
+        break;
+      case PdfAnnotationSubtype.CIRCLE:
+      case PdfAnnotationSubtype.SQUARE:
+        intent = undefined; // non-spec extension: no dimension intent
+        break;
+      default:
+        return annotation;
+    }
+
+    const custom = annotation.custom as Record<string, unknown> | undefined;
+    if (!custom || typeof custom !== 'object' || !(MEASUREMENT_CUSTOM_KEY in custom)) {
+      return annotation;
+    }
+
+    const measurement = custom[MEASUREMENT_CUSTOM_KEY] as PdfMeasurementInfo | undefined;
+    if (!measurement || typeof measurement !== 'object') {
+      return annotation;
+    }
+
+    const { [MEASUREMENT_CUSTOM_KEY]: _omit, ...restCustom } = custom;
+    return {
+      ...annotation,
+      measurement,
+      ...(intent ? { intent } : {}),
+      custom: Object.keys(restCustom).length ? restCustom : undefined,
+    };
   }
 
   /**
@@ -8836,6 +8899,17 @@ export class PdfiumNative implements IPdfiumExecutor {
     // Remove legacy rotation fields from custom data if present
     delete customData.unrotatedRect;
     delete customData.rotation;
+
+    // Measurement annotations carry their calibration/formatting metadata on a
+    // typed `measurement` field. Persist it through the reserved custom-data
+    // slot (a real /EPDFCustom entry) so it round-trips through save/reload.
+    // The spec /IT intent is written separately via the per-subtype writers.
+    const measurement = (annotation as { measurement?: PdfMeasurementInfo }).measurement;
+    if (measurement) {
+      customData[MEASUREMENT_CUSTOM_KEY] = measurement;
+    } else {
+      delete customData[MEASUREMENT_CUSTOM_KEY];
+    }
 
     const hasCustomData = Object.keys(customData).length > 0;
     if (hasCustomData) {

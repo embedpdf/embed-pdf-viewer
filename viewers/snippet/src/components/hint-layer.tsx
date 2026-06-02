@@ -5,9 +5,13 @@ import { useTranslations } from '@embedpdf/plugin-i18n/preact';
 
 interface HintState {
   show: boolean;
-  mode: 'marqueeZoom' | 'marqueeCapture' | null;
+  mode: 'marqueeZoom' | 'marqueeCapture' | 'polyDraw' | null;
   isAnimating: boolean;
 }
+
+/** Multi-click drawing modes (polyline/polygon, incl. measurement variants)
+ *  that finish on double-click — surfaced via a hint for discoverability. */
+const POLY_DRAW_MODES = ['polyline', 'polygon', 'measurePerimeter', 'measureAreaPolygon'];
 
 export interface HintLayerProps {
   documentId: string;
@@ -40,6 +44,13 @@ export const HintLayer = ({ documentId }: HintLayerProps) => {
         }, 3000);
 
         return () => clearTimeout(timeout);
+      } else if (activeMode && POLY_DRAW_MODES.includes(activeMode)) {
+        // Multi-click draw: nudge the user that double-click finishes.
+        setHint({ show: true, mode: 'polyDraw', isAnimating: true });
+        const timeout = setTimeout(() => {
+          setHint((prev) => ({ ...prev, show: false }));
+        }, 4000);
+        return () => clearTimeout(timeout);
       } else {
         // Hide hint immediately when switching away from these modes
         setHint({
@@ -60,9 +71,14 @@ export const HintLayer = ({ documentId }: HintLayerProps) => {
   if (!hint.show && !hint.isAnimating) return null;
 
   const hintText =
-    hint.mode === 'marqueeZoom' ? translate('zoom.dragTip') : translate('capture.dragTip');
+    hint.mode === 'marqueeZoom'
+      ? translate('zoom.dragTip')
+      : hint.mode === 'marqueeCapture'
+        ? translate('capture.dragTip')
+        : translate('measurement.drawHint');
 
-  const hintColor = hint.mode === 'marqueeZoom' ? 'rgba(33,150,243,0.8)' : 'rgba(76,175,80,0.8)';
+  const hintColor =
+    hint.mode === 'marqueeCapture' ? 'rgba(76,175,80,0.8)' : 'rgba(33,150,243,0.8)';
 
   return (
     <div
@@ -100,15 +116,16 @@ export const HintLayer = ({ documentId }: HintLayerProps) => {
         {hintText}
       </div>
 
-      {/* Animated drag demonstration */}
-      <div
-        className="drag-demo"
-        style={{
-          position: 'relative',
-          width: '150px',
-          height: '100px',
-        }}
-      >
+      {/* Animated drag demonstration (only for marquee drag modes) */}
+      {hint.mode !== 'polyDraw' && (
+        <div
+          className="drag-demo"
+          style={{
+            position: 'relative',
+            width: '150px',
+            height: '100px',
+          }}
+        >
         {/* Static rectangle outline */}
         <div
           style={{
@@ -164,7 +181,8 @@ export const HintLayer = ({ documentId }: HintLayerProps) => {
             <path d="M4 3.5L13.5 9.5L9.5 10.5L7.5 14L4 3.5Z" fill="rgba(255,255,255,0.8)" />
           </svg>
         </div>
-      </div>
+        </div>
+      )}
 
       <style jsx>{`
         .hint-overlay {

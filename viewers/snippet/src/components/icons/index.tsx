@@ -96,6 +96,14 @@ import { FormListboxIcon } from './form-listbox';
 import { FormTextfieldIcon } from './form-textfield';
 import { WidgetEditIcon } from './widget-edit';
 import { SignatureIcon } from './signature';
+import {
+  RulerIcon,
+  MeasureDistanceIcon,
+  MeasurePerimeterIcon,
+  MeasureAreaPolygonIcon,
+  MeasureAreaRectIcon,
+  MeasureAreaEllipseIcon,
+} from './measurement';
 
 export type Icons = {
   [key: string]: IconComponent;
@@ -157,6 +165,12 @@ export const icons: Icons = {
   lineArrow: LineArrowIcon,
   polygon: PolygonIcon,
   zigzag: ZigzagIcon,
+  ruler: RulerIcon,
+  measureDistance: MeasureDistanceIcon,
+  measurePerimeter: MeasurePerimeterIcon,
+  measureAreaPolygon: MeasureAreaPolygonIcon,
+  measureAreaRect: MeasureAreaRectIcon,
+  measureAreaEllipse: MeasureAreaEllipseIcon,
   text: TextIcon,
   italic: ItalicIcon,
   bold: BoldIcon,

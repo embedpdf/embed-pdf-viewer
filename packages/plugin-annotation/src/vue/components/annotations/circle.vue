@@ -84,6 +84,14 @@
         }"
       />
     </template>
+
+    <MeasurementLabel
+      v-if="measureText"
+      :text="measureText"
+      :center="{ x: geometry.width / 2, y: geometry.height / 2 }"
+      :scale="scale"
+      :background="strokeColor ?? '#2962FF'"
+    />
   </svg>
 </template>
 
@@ -93,8 +101,16 @@ export default { inheritAttrs: false };
 
 <script setup lang="ts">
 import { computed } from 'vue';
-import { PdfAnnotationBorderStyle, PdfRectDifferences, Rect } from '@embedpdf/models';
+import {
+  PdfAnnotationBorderStyle,
+  PdfRectDifferences,
+  Rect,
+  PdfMeasurementInfo,
+  formatMeasurement,
+  ellipseArea,
+} from '@embedpdf/models';
 import { generateCloudyEllipsePath } from '@embedpdf/plugin-annotation';
+import MeasurementLabel from './measurement-label.vue';
 
 const MIN_HIT_AREA_SCREEN_PX = 20;
 
@@ -113,6 +129,7 @@ const props = withDefaults(
     appearanceActive?: boolean;
     cloudyBorderIntensity?: number;
     rectangleDifferences?: PdfRectDifferences;
+    measurement?: PdfMeasurementInfo;
   }>(),
   {
     color: '#000000',
@@ -123,6 +140,10 @@ const props = withDefaults(
 );
 
 const isCloudy = computed(() => (props.cloudyBorderIntensity ?? 0) > 0);
+
+const measureText = computed(() =>
+  props.measurement ? formatMeasurement(ellipseArea(props.rect), props.measurement) : null,
+);
 
 const geometry = computed(() => {
   const outerW = props.rect.size.width;

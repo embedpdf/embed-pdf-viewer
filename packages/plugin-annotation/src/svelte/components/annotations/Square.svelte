@@ -1,7 +1,8 @@
 <script lang="ts">
-  import type { Rect, PdfRectDifferences } from '@embedpdf/models';
-  import { PdfAnnotationBorderStyle } from '@embedpdf/models';
+  import type { Rect, PdfRectDifferences, PdfMeasurementInfo } from '@embedpdf/models';
+  import { PdfAnnotationBorderStyle, formatMeasurement, rectArea } from '@embedpdf/models';
   import { generateCloudyRectanglePath } from '@embedpdf/plugin-annotation';
+  import MeasurementLabel from './MeasurementLabel.svelte';
 
   const MIN_HIT_AREA_SCREEN_PX = 20;
 
@@ -19,6 +20,7 @@
     appearanceActive?: boolean;
     cloudyBorderIntensity?: number;
     rectangleDifferences?: PdfRectDifferences;
+    measurement?: PdfMeasurementInfo;
   }
 
   let {
@@ -35,6 +37,7 @@
     appearanceActive = false,
     cloudyBorderIntensity,
     rectangleDifferences,
+    measurement,
   }: SquareProps = $props();
 
   const isCloudy = $derived((cloudyBorderIntensity ?? 0) > 0);
@@ -69,6 +72,8 @@
   const dash = $derived(
     strokeStyle === PdfAnnotationBorderStyle.DASHED ? strokeDashArray?.join(',') : undefined,
   );
+
+  const measureText = $derived(measurement ? formatMeasurement(rectArea(rect), measurement) : null);
 </script>
 
 <svg
@@ -144,5 +149,14 @@
         style:stroke-dasharray={dash}
       />
     {/if}
+  {/if}
+
+  {#if measureText}
+    <MeasurementLabel
+      text={measureText}
+      center={{ x: rect.size.width / 2, y: rect.size.height / 2 }}
+      {scale}
+      background={strokeColor ?? '#2962FF'}
+    />
   {/if}
 </svg>

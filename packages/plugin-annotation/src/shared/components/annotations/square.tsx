@@ -1,6 +1,14 @@
 import { useMemo, MouseEvent } from '@framework';
-import { PdfAnnotationBorderStyle, PdfRectDifferences, Rect } from '@embedpdf/models';
+import {
+  PdfAnnotationBorderStyle,
+  PdfRectDifferences,
+  Rect,
+  PdfMeasurementInfo,
+  formatMeasurement,
+  rectArea,
+} from '@embedpdf/models';
 import { generateCloudyRectanglePath } from '@embedpdf/plugin-annotation';
+import { MeasurementLabel } from './measurement-label';
 
 const MIN_HIT_AREA_SCREEN_PX = 20;
 
@@ -31,6 +39,8 @@ interface SquareProps {
   cloudyBorderIntensity?: number;
   /** Rectangle differences – inset from Rect to drawn area */
   rectangleDifferences?: PdfRectDifferences;
+  /** Measurement metadata; when present a rectangle-area label is drawn. */
+  measurement?: PdfMeasurementInfo;
 }
 
 /**
@@ -50,6 +60,7 @@ export function Square({
   appearanceActive = false,
   cloudyBorderIntensity,
   rectangleDifferences,
+  measurement,
 }: SquareProps): JSX.Element {
   const isCloudy = (cloudyBorderIntensity ?? 0) > 0;
 
@@ -76,6 +87,11 @@ export function Square({
       strokeWidth,
     );
   }, [isCloudy, rect, rectangleDifferences, cloudyBorderIntensity, strokeWidth]);
+
+  const measureText = useMemo(
+    () => (measurement ? formatMeasurement(rectArea(rect), measurement) : null),
+    [measurement, rect],
+  );
 
   const svgWidth = rect.size.width * scale;
   const svgHeight = rect.size.height * scale;
@@ -168,6 +184,15 @@ export function Square({
             }}
           />
         ))}
+
+      {measureText && (
+        <MeasurementLabel
+          text={measureText}
+          center={{ x: rect.size.width / 2, y: rect.size.height / 2 }}
+          scale={scale}
+          background={strokeColor ?? '#2962FF'}
+        />
+      )}
     </svg>
   );
 }

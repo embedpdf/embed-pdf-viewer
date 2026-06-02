@@ -2154,6 +2154,187 @@ export const commands: Record<string, Command<State>> = {
     },
   },
 
+  // ─────────────────────────────────────────────────────────
+  // Measurement tools
+  // ─────────────────────────────────────────────────────────
+  'mode:measure': {
+    id: 'mode:measure',
+    labelKey: 'mode.measure',
+    categories: ['mode', 'mode-measure', 'measurement'],
+    action: ({ registry, documentId }) => {
+      const ui = registry.getPlugin<UIPlugin>('ui')?.provides();
+      if (!ui) return;
+
+      ui.setActiveToolbar('top', 'secondary', 'measure-toolbar', documentId);
+
+      registry
+        .getPlugin<AnnotationPlugin>(ANNOTATION_PLUGIN_ID)
+        ?.provides()
+        .forDocument(documentId)
+        .setLocked({ type: LockModeType.Include, categories: ['form'] });
+    },
+    active: ({ state, documentId }) => {
+      return isToolbarOpen(state.plugins, documentId, 'top', 'secondary', 'measure-toolbar');
+    },
+  },
+
+  'measurement:distance': {
+    id: 'measurement:distance',
+    labelKey: 'measurement.distance',
+    icon: 'measureDistance',
+    iconProps: ({ state }) => ({
+      primaryColor: getToolDefaultsById(state.plugins.annotation, 'measureDistance')?.strokeColor,
+    }),
+    categories: ['measurement', 'measurement-distance'],
+    action: ({ registry, documentId }) => {
+      const scope = registry
+        .getPlugin<AnnotationPlugin>(ANNOTATION_PLUGIN_ID)
+        ?.provides()
+        ?.forDocument(documentId);
+      if (!scope) return;
+      scope.setActiveTool(scope.getActiveTool()?.id === 'measureDistance' ? null : 'measureDistance');
+    },
+    active: ({ state, documentId }) =>
+      state.plugins[ANNOTATION_PLUGIN_ID]?.documents[documentId]?.activeToolId === 'measureDistance',
+    disabled: ({ state, documentId }) =>
+      lacksPermission(state, documentId, PdfPermissionFlag.ModifyAnnotations),
+  },
+
+  'measurement:perimeter': {
+    id: 'measurement:perimeter',
+    labelKey: 'measurement.perimeter',
+    icon: 'measurePerimeter',
+    iconProps: ({ state }) => ({
+      primaryColor: getToolDefaultsById(state.plugins.annotation, 'measurePerimeter')?.strokeColor,
+    }),
+    categories: ['measurement', 'measurement-perimeter'],
+    action: ({ registry, documentId }) => {
+      const scope = registry
+        .getPlugin<AnnotationPlugin>(ANNOTATION_PLUGIN_ID)
+        ?.provides()
+        ?.forDocument(documentId);
+      if (!scope) return;
+      scope.setActiveTool(
+        scope.getActiveTool()?.id === 'measurePerimeter' ? null : 'measurePerimeter',
+      );
+    },
+    active: ({ state, documentId }) =>
+      state.plugins[ANNOTATION_PLUGIN_ID]?.documents[documentId]?.activeToolId === 'measurePerimeter',
+    disabled: ({ state, documentId }) =>
+      lacksPermission(state, documentId, PdfPermissionFlag.ModifyAnnotations),
+  },
+
+  'measurement:area-polygon': {
+    id: 'measurement:area-polygon',
+    labelKey: 'measurement.areaPolygon',
+    icon: 'measureAreaPolygon',
+    iconProps: ({ state }) => ({
+      primaryColor: getToolDefaultsById(state.plugins.annotation, 'measureAreaPolygon')?.strokeColor,
+    }),
+    categories: ['measurement', 'measurement-area'],
+    action: ({ registry, documentId }) => {
+      const scope = registry
+        .getPlugin<AnnotationPlugin>(ANNOTATION_PLUGIN_ID)
+        ?.provides()
+        ?.forDocument(documentId);
+      if (!scope) return;
+      scope.setActiveTool(
+        scope.getActiveTool()?.id === 'measureAreaPolygon' ? null : 'measureAreaPolygon',
+      );
+    },
+    active: ({ state, documentId }) =>
+      state.plugins[ANNOTATION_PLUGIN_ID]?.documents[documentId]?.activeToolId ===
+      'measureAreaPolygon',
+    disabled: ({ state, documentId }) =>
+      lacksPermission(state, documentId, PdfPermissionFlag.ModifyAnnotations),
+  },
+
+  'measurement:area-rect': {
+    id: 'measurement:area-rect',
+    labelKey: 'measurement.areaRect',
+    icon: 'measureAreaRect',
+    iconProps: ({ state }) => ({
+      primaryColor: getToolDefaultsById(state.plugins.annotation, 'measureAreaRect')?.strokeColor,
+    }),
+    categories: ['measurement', 'measurement-area'],
+    action: ({ registry, documentId }) => {
+      const scope = registry
+        .getPlugin<AnnotationPlugin>(ANNOTATION_PLUGIN_ID)
+        ?.provides()
+        ?.forDocument(documentId);
+      if (!scope) return;
+      scope.setActiveTool(scope.getActiveTool()?.id === 'measureAreaRect' ? null : 'measureAreaRect');
+    },
+    active: ({ state, documentId }) =>
+      state.plugins[ANNOTATION_PLUGIN_ID]?.documents[documentId]?.activeToolId === 'measureAreaRect',
+    disabled: ({ state, documentId }) =>
+      lacksPermission(state, documentId, PdfPermissionFlag.ModifyAnnotations),
+  },
+
+  'measurement:area-ellipse': {
+    id: 'measurement:area-ellipse',
+    labelKey: 'measurement.areaEllipse',
+    icon: 'measureAreaEllipse',
+    iconProps: ({ state }) => ({
+      primaryColor: getToolDefaultsById(state.plugins.annotation, 'measureAreaEllipse')?.strokeColor,
+    }),
+    categories: ['measurement', 'measurement-area'],
+    action: ({ registry, documentId }) => {
+      const scope = registry
+        .getPlugin<AnnotationPlugin>(ANNOTATION_PLUGIN_ID)
+        ?.provides()
+        ?.forDocument(documentId);
+      if (!scope) return;
+      scope.setActiveTool(
+        scope.getActiveTool()?.id === 'measureAreaEllipse' ? null : 'measureAreaEllipse',
+      );
+    },
+    active: ({ state, documentId }) =>
+      state.plugins[ANNOTATION_PLUGIN_ID]?.documents[documentId]?.activeToolId ===
+      'measureAreaEllipse',
+    disabled: ({ state, documentId }) =>
+      lacksPermission(state, documentId, PdfPermissionFlag.ModifyAnnotations),
+  },
+
+  'measurement:calibrate': {
+    id: 'measurement:calibrate',
+    labelKey: 'measurement.calibrate',
+    icon: 'ruler',
+    categories: ['measurement', 'measurement-calibrate'],
+    // Enter draw-to-calibrate mode: the user drags a line over a known
+    // distance; CalibrationController then opens the dialog prefilled.
+    action: ({ registry, documentId }) => {
+      const scope = registry
+        .getPlugin<AnnotationPlugin>(ANNOTATION_PLUGIN_ID)
+        ?.provides()
+        ?.forDocument(documentId);
+      if (!scope) return;
+      scope.setActiveTool(scope.getActiveTool()?.id === 'calibrate' ? null : 'calibrate');
+    },
+    active: ({ state, documentId }) =>
+      state.plugins[ANNOTATION_PLUGIN_ID]?.documents[documentId]?.activeToolId === 'calibrate',
+    disabled: ({ state, documentId }) =>
+      lacksPermission(state, documentId, PdfPermissionFlag.ModifyAnnotations),
+  },
+
+  'measurement:overflow-tools': {
+    id: 'measurement:overflow-tools',
+    labelKey: 'measurement.moreTools',
+    icon: 'dots',
+    categories: ['measurement', 'measurement-overflow'],
+    action: ({ registry, documentId }) => {
+      const scope = registry.getPlugin<UIPlugin>('ui')?.provides()?.forDocument(documentId);
+      if (!scope) return;
+      scope.toggleMenu('measure-tools-menu', 'measurement:overflow-tools', 'overflow-measure-tools');
+    },
+    active: ({ state, documentId }) => {
+      const ui = state.plugins['ui']?.documents[documentId];
+      return ui?.openMenus['measure-tools-menu'] !== undefined;
+    },
+    disabled: ({ state, documentId }) =>
+      lacksPermission(state, documentId, PdfPermissionFlag.ModifyAnnotations),
+  },
+
   'form:overflow-tools': {
     id: 'form:overflow-tools',
     labelKey: 'annotation.moreTools',

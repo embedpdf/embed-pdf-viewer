@@ -1,4 +1,9 @@
-import { PdfAnnotationObject, PdfAnnotationSubtype } from '@embedpdf/models';
+import {
+  MeasurableAnnotation,
+  measurePagePtValue,
+  PdfAnnotationObject,
+  PdfAnnotationSubtype,
+} from '@embedpdf/models';
 
 export interface TransformContext<T extends PdfAnnotationObject = PdfAnnotationObject> {
   /** The type of transformation being applied */
@@ -50,13 +55,33 @@ export class PatchRegistry {
   ): Partial<T> {
     const patchFn = this.patches.get(annotation.type);
 
-    // If there's a specific patch function, use it
-    if (patchFn) {
-      return patchFn(annotation, context);
-    }
+    // Use the type-specific patch if present, otherwise the raw changes.
+    const changes: Partial<T> = patchFn ? patchFn(annotation, context) : context.changes;
 
-    // Default behavior: just return the changes for simple annotations
-    return context.changes;
+    return this.refreshMeasurement(annotation, changes);
+  }
+
+  /**
+   * Keep a measurement annotation's cached `computedValue` in sync after any
+   * transform. Recomputes from the merged annotation so it reflects both
+   * geometry edits (vertex-edit/move/resize/rotate) and calibration changes
+   * (unit/scale property-updates). No-op for non-measurement annotations.
+   */
+  private refreshMeasurement<T extends PdfAnnotationObject>(
+    annotation: T,
+    changes: Partial<T>,
+  ): Partial<T> {
+    const measurement = (annotation as { measurement?: unknown }).measurement;
+    const changedMeasurement = (changes as { measurement?: unknown }).measurement;
+    if (!measurement && !changedMeasurement) return changes;
+
+    const merged = { ...annotation, ...changes } as MeasurableAnnotation;
+    if (!merged.measurement) return changes;
+
+    return {
+      ...changes,
+      measurement: { ...merged.measurement, computedValue: measurePagePtValue(merged) },
+    } as Partial<T>;
   }
 }
 

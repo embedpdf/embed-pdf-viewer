@@ -34,6 +34,12 @@ import {
 } from './ui';
 import { Icon } from '../ui/icon';
 import { ToggleButton } from '../ui/toggle-button';
+import {
+  UnitSelectSection,
+  PrecisionControlSection,
+  SecondaryUnitSection,
+  ScaleDisplaySection,
+} from './measurement-sections';
 
 /* ═══════════════════════════════════════════════════════════════════════════
  * Types
@@ -84,6 +90,14 @@ export function PropertySection(props: PropertySectionProps) {
       return <TextSection {...props} />;
     case 'rotation':
       return <RotationSection {...props} />;
+    case 'unitSelect':
+      return <UnitSelectSection {...props} />;
+    case 'precisionControl':
+      return <PrecisionControlSection {...props} />;
+    case 'secondaryUnit':
+      return <SecondaryUnitSection {...props} />;
+    case 'scaleDisplay':
+      return <ScaleDisplaySection {...props} />;
     default:
       return null;
   }

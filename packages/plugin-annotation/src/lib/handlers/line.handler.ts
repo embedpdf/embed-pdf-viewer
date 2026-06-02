@@ -3,6 +3,7 @@ import {
   PdfAnnotationLineEnding,
   PdfAnnotationSubtype,
   PdfLineAnnoObject,
+  pointDistance,
   uuidV4,
 } from '@embedpdf/models';
 import { HandlerFactory, PreviewState } from './types';
@@ -10,6 +11,7 @@ import { useState } from '../utils/use-state';
 import * as patching from '../patching';
 import { clamp } from '@embedpdf/core';
 import { useClickDetector } from './click-detector';
+import { snapAngle } from '../geometry';
 
 export const lineHandlerFactory: HandlerFactory<PdfLineAnnoObject> = {
   annotationType: PdfAnnotationSubtype.LINE,
@@ -83,6 +85,9 @@ export const lineHandlerFactory: HandlerFactory<PdfLineAnnoObject> = {
           id: uuidV4(),
           created: new Date(),
           type: PdfAnnotationSubtype.LINE,
+          ...(defaults.measurement && {
+            measurement: { ...defaults.measurement, computedValue: pointDistance(start, end) },
+          }),
         });
       },
     });
@@ -122,11 +127,14 @@ export const lineHandlerFactory: HandlerFactory<PdfLineAnnoObject> = {
         onPreview(getPreview(clampedPos));
         evt.setPointerCapture?.();
       },
-      onPointerMove: (pos) => {
-        const clampedPos = clampToPage(pos);
+      onPointerMove: (pos, evt) => {
+        let clampedPos = clampToPage(pos);
         clickDetector.onMove(clampedPos);
 
-        if (getStart() && clickDetector.hasMoved()) {
+        const start = getStart();
+        if (start && clickDetector.hasMoved()) {
+          // Hold Shift to constrain the line to 15° angle increments.
+          if (evt?.shiftKey) clampedPos = clampToPage(snapAngle(start, clampedPos));
           onPreview(getPreview(clampedPos));
         }
       },
@@ -134,7 +142,8 @@ export const lineHandlerFactory: HandlerFactory<PdfLineAnnoObject> = {
         const start = getStart();
         if (!start) return;
 
-        const clampedPos = clampToPage(pos);
+        let clampedPos = clampToPage(pos);
+        if (evt?.shiftKey) clampedPos = clampToPage(snapAngle(start, clampedPos));
 
         if (!clickDetector.hasMoved()) {
           clickDetector.onEnd(clampedPos);
@@ -158,6 +167,12 @@ export const lineHandlerFactory: HandlerFactory<PdfLineAnnoObject> = {
               flags: ['print'],
               created: new Date(),
               type: PdfAnnotationSubtype.LINE,
+              ...(defaults.measurement && {
+                measurement: {
+                  ...defaults.measurement,
+                  computedValue: pointDistance(start, clampedPos),
+                },
+              }),
             });
           }
         }

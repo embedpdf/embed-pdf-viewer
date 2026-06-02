@@ -16,6 +16,7 @@ import {
   PdfVerticalAlignment,
   PdfBlendMode,
   PdfAnnotationLineEnding,
+  PdfMeasurementInfo,
 } from '@embedpdf/models';
 import { FormattedSelection } from '@embedpdf/plugin-selection';
 import { AnnotationTool } from '../tools/types';
@@ -28,6 +29,8 @@ export interface CirclePreviewData {
   strokeColor: string;
   strokeStyle: PdfAnnotationBorderStyle;
   strokeDashArray: number[];
+  /** Measurement calibration/formatting active for this preview, if any. */
+  measurement?: PdfMeasurementInfo;
 }
 
 export interface SquarePreviewData extends CirclePreviewData {}
@@ -42,6 +45,8 @@ export interface PolygonPreviewData {
   strokeColor?: string;
   strokeStyle?: PdfAnnotationBorderStyle;
   strokeDashArray?: number[];
+  /** Measurement calibration/formatting active for this preview, if any. */
+  measurement?: PdfMeasurementInfo;
 }
 
 export interface PolylinePreviewData {
@@ -53,6 +58,8 @@ export interface PolylinePreviewData {
   opacity: number;
   strokeWidth: number;
   lineEndings?: LineEndings;
+  /** Measurement calibration/formatting active for this preview, if any. */
+  measurement?: PdfMeasurementInfo;
 }
 
 export interface LinePreviewData {
@@ -65,6 +72,8 @@ export interface LinePreviewData {
   lineEndings?: LineEndings;
   strokeStyle: PdfAnnotationBorderStyle;
   strokeDashArray: number[];
+  /** Measurement calibration/formatting active for this preview, if any. */
+  measurement?: PdfMeasurementInfo;
 }
 
 export interface InkPreviewData {
@@ -192,6 +201,13 @@ export interface HandlerContext<A extends PdfAnnotationObject, TId extends strin
   services: HandlerServices;
   onPreview: (state: PreviewState<A['type']> | null) => void;
   onCommit: (annotation: A, context?: AnnotationCreateContext<A>) => void;
+  /**
+   * Report a drawn calibration segment (two page-space points) WITHOUT
+   * creating an annotation. Only used by the `calibrate` tool; the plugin
+   * forwards it to the `onCalibrationDraw` event so the UI can prompt for the
+   * real-world length.
+   */
+  onCalibrate?: (start: Position, end: Position) => void;
 }
 
 /* ═══════════════════════════════════════════════════════════════════════════

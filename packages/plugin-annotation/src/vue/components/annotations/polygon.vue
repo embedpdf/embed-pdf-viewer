@@ -91,6 +91,14 @@
         />
       </template>
     </template>
+
+    <MeasurementLabel
+      v-if="measure"
+      :text="measure.text"
+      :center="measure.center"
+      :scale="scale"
+      :background="strokeColor"
+    />
   </svg>
 </template>
 
@@ -100,8 +108,17 @@ export default { inheritAttrs: false };
 
 <script setup lang="ts">
 import { computed } from 'vue';
-import { Rect, Position, PdfAnnotationBorderStyle } from '@embedpdf/models';
+import {
+  Rect,
+  Position,
+  PdfAnnotationBorderStyle,
+  PdfMeasurementInfo,
+  formatMeasurement,
+  polygonArea,
+  polygonPerimeter,
+} from '@embedpdf/models';
 import { generateCloudyPolygonPath } from '@embedpdf/plugin-annotation';
+import MeasurementLabel from './measurement-label.vue';
 
 const MIN_HIT_AREA_SCREEN_PX = 20;
 
@@ -122,6 +139,7 @@ const props = withDefaults(
     handleSize?: number;
     appearanceActive?: boolean;
     cloudyBorderIntensity?: number;
+    measurement?: PdfMeasurementInfo;
   }>(),
   {
     color: 'transparent',
@@ -174,4 +192,19 @@ const height = computed(() => props.rect.size.height * props.scale);
 const hitStrokeWidth = computed(() =>
   Math.max(props.strokeWidth, MIN_HIT_AREA_SCREEN_PX / props.scale),
 );
+
+const measure = computed(() => {
+  const pts = localPts.value;
+  if (!props.measurement || pts.length === 0 || (props.currentVertex && allPoints.value.length < 3))
+    return null;
+  const value =
+    props.measurement.mode === 'perimeter'
+      ? polygonPerimeter(allPoints.value)
+      : polygonArea(allPoints.value);
+  const center = pts.reduce(
+    (acc, p) => ({ x: acc.x + p.x / pts.length, y: acc.y + p.y / pts.length }),
+    { x: 0, y: 0 },
+  );
+  return { text: formatMeasurement(value, props.measurement), center };
+});
 </script>

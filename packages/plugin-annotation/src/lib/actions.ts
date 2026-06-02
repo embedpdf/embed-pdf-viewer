@@ -1,5 +1,5 @@
 import { Action } from '@embedpdf/core';
-import { PdfAnnotationObject } from '@embedpdf/models';
+import { PdfAnnotationObject, PdfMeasurementScale } from '@embedpdf/models';
 import { AnnotationTool } from './tools/types';
 import { AnnotationDocumentState, LockMode } from './types';
 
@@ -29,6 +29,7 @@ export const SYNC_ANNOTATION_OBJECT = 'ANNOTATION/SYNC_OBJECT';
 export const ADD_COLOR_PRESET = 'ANNOTATION/ADD_COLOR_PRESET';
 export const SET_TOOL_DEFAULTS = 'ANNOTATION/SET_TOOL_DEFAULTS';
 export const ADD_TOOL = 'ANNOTATION/ADD_TOOL';
+export const SET_MEASUREMENT_SCALE = 'ANNOTATION/SET_MEASUREMENT_SCALE';
 
 // Document lifecycle actions
 export interface InitAnnotationStateAction extends Action {
@@ -134,6 +135,10 @@ export interface AddToolAction extends Action {
   type: typeof ADD_TOOL;
   payload: AnnotationTool<any>;
 }
+export interface SetMeasurementScaleAction extends Action {
+  type: typeof SET_MEASUREMENT_SCALE;
+  payload: { scale: PdfMeasurementScale };
+}
 
 export type AnnotationAction =
   | InitAnnotationStateAction
@@ -156,7 +161,8 @@ export type AnnotationAction =
   | SyncAnnotationObjectAction
   | AddColorPresetAction
   | SetToolDefaultsAction
-  | AddToolAction;
+  | AddToolAction
+  | SetMeasurementScaleAction;
 
 // Document lifecycle action creators
 export function initAnnotationState(
@@ -311,4 +317,11 @@ export const setToolDefaults = (
 export const addTool = (tool: AnnotationTool<any>): AddToolAction => ({
   type: ADD_TOOL,
   payload: tool,
+});
+
+export const setMeasurementScaleAction = (
+  scale: PdfMeasurementScale,
+): SetMeasurementScaleAction => ({
+  type: SET_MEASUREMENT_SCALE,
+  payload: { scale },
 });

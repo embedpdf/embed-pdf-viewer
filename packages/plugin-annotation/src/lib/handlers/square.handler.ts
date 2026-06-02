@@ -3,6 +3,7 @@ import {
   PdfAnnotationSubtype,
   PdfSquareAnnoObject,
   Rect,
+  rectArea,
   uuidV4,
 } from '@embedpdf/models';
 import { HandlerFactory, PreviewState } from './types';
@@ -75,6 +76,9 @@ export const squareHandlerFactory: HandlerFactory<PdfSquareAnnoObject> = {
           rect,
           ...(intensity > 0 && {
             rectangleDifferences: { left: pad, top: pad, right: pad, bottom: pad },
+          }),
+          ...(defaults.measurement && {
+            measurement: { ...defaults.measurement, computedValue: rectArea(rect) },
           }),
         };
 
@@ -167,6 +171,12 @@ export const squareHandlerFactory: HandlerFactory<PdfSquareAnnoObject> = {
               rect: preview.data.rect,
               ...(pad !== undefined && {
                 rectangleDifferences: { left: pad, top: pad, right: pad, bottom: pad },
+              }),
+              ...(defaults.measurement && {
+                measurement: {
+                  ...defaults.measurement,
+                  computedValue: rectArea(preview.data.rect),
+                },
               }),
             };
             onCommit(anno);

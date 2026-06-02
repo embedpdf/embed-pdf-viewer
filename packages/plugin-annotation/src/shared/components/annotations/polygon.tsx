@@ -1,6 +1,15 @@
 import { useMemo, MouseEvent } from '@framework';
-import { Rect, Position, PdfAnnotationBorderStyle } from '@embedpdf/models';
+import {
+  Rect,
+  Position,
+  PdfAnnotationBorderStyle,
+  PdfMeasurementInfo,
+  formatMeasurement,
+  polygonArea,
+  polygonPerimeter,
+} from '@embedpdf/models';
 import { generateCloudyPolygonPath } from '@embedpdf/plugin-annotation';
+import { MeasurementLabel } from './measurement-label';
 
 const MIN_HIT_AREA_SCREEN_PX = 20;
 
@@ -22,6 +31,8 @@ interface PolygonProps {
   appearanceActive?: boolean;
   /** Cloudy border intensity (0 = no cloud, typically 1 or 2) */
   cloudyBorderIntensity?: number;
+  /** Measurement metadata; when present an area/perimeter label is drawn. */
+  measurement?: PdfMeasurementInfo;
 }
 
 export function Polygon({
@@ -40,6 +51,7 @@ export function Polygon({
   handleSize = 14,
   appearanceActive = false,
   cloudyBorderIntensity,
+  measurement,
 }: PolygonProps): JSX.Element {
   const isCloudy = (cloudyBorderIntensity ?? 0) > 0;
   const allPoints = currentVertex ? [...vertices, currentVertex] : vertices;
@@ -66,6 +78,20 @@ export function Polygon({
   }, [isCloudy, allPoints, rect.origin, cloudyBorderIntensity, strokeWidth]);
 
   const isPreviewing = currentVertex && vertices.length > 0;
+
+  const measure = useMemo(() => {
+    // A polygon needs >= 3 points to be meaningful; skip the label while the
+    // rubber-band preview still has fewer (avoids a nonsensical 2-point value).
+    if (!measurement || localPts.length === 0 || (currentVertex && allPoints.length < 3))
+      return null;
+    const value =
+      measurement.mode === 'perimeter' ? polygonPerimeter(allPoints) : polygonArea(allPoints);
+    const center = localPts.reduce(
+      (acc, p) => ({ x: acc.x + p.x / localPts.length, y: acc.y + p.y / localPts.length }),
+      { x: 0, y: 0 },
+    );
+    return { text: formatMeasurement(value, measurement), center };
+  }, [measurement, allPoints, localPts]);
 
   const width = rect.size.width * scale;
   const height = rect.size.height * scale;
@@ -167,6 +193,15 @@ export function Polygon({
             </>
           )}
         </>
+      )}
+
+      {measure && (
+        <MeasurementLabel
+          text={measure.text}
+          center={measure.center}
+          scale={scale}
+          background={strokeColor}
+        />
       )}
     </svg>
   );

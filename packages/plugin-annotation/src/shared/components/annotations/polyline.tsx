@@ -1,6 +1,16 @@
 import { MouseEvent, useMemo } from '@framework';
-import { Rect, Position, LineEndings, PdfAnnotationBorderStyle } from '@embedpdf/models';
+import {
+  Rect,
+  Position,
+  LineEndings,
+  PdfAnnotationBorderStyle,
+  PdfMeasurementInfo,
+  formatMeasurement,
+  polygonArea,
+  polylineLength,
+} from '@embedpdf/models';
 import { patching } from '@embedpdf/plugin-annotation';
+import { MeasurementLabel } from './measurement-label';
 
 const MIN_HIT_AREA_SCREEN_PX = 20;
 
@@ -22,6 +32,8 @@ interface PolylineProps {
   lineEndings?: LineEndings;
   /** When true, AP canvas provides the visual; only render hit area */
   appearanceActive?: boolean;
+  /** Measurement metadata; when present a path-length label is drawn. */
+  measurement?: PdfMeasurementInfo;
 }
 
 export function Polyline({
@@ -38,6 +50,7 @@ export function Polyline({
   onClick,
   lineEndings,
   appearanceActive = false,
+  measurement,
 }: PolylineProps): JSX.Element {
   const localPts = useMemo(
     () => vertices.map(({ x, y }) => ({ x: x - rect.origin.x, y: y - rect.origin.y })),
@@ -79,6 +92,17 @@ export function Polyline({
     );
     return { start, end };
   }, [localPts, lineEndings, strokeWidth]);
+
+  const measure = useMemo(() => {
+    if (!measurement || localPts.length === 0) return null;
+    const value =
+      measurement.mode === 'area' ? polygonArea(vertices) : polylineLength(vertices);
+    const center = localPts.reduce(
+      (acc, p) => ({ x: acc.x + p.x / localPts.length, y: acc.y + p.y / localPts.length }),
+      { x: 0, y: 0 },
+    );
+    return { text: formatMeasurement(value, measurement), center };
+  }, [measurement, vertices, localPts]);
 
   const width = rect.size.width * scale;
   const height = rect.size.height * scale;
@@ -206,6 +230,15 @@ export function Polyline({
             />
           )}
         </>
+      )}
+
+      {measure && (
+        <MeasurementLabel
+          text={measure.text}
+          center={measure.center}
+          scale={scale}
+          background={strokeColor}
+        />
       )}
     </svg>
   );

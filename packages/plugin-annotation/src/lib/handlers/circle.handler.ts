@@ -4,6 +4,7 @@ import {
   PdfAnnotationSubtype,
   PdfCircleAnnoObject,
   Rect,
+  ellipseArea,
   uuidV4,
 } from '@embedpdf/models';
 import { HandlerFactory, PreviewState } from './types';
@@ -75,6 +76,9 @@ export const circleHandlerFactory: HandlerFactory<PdfCircleAnnoObject> = {
           rect,
           ...(intensity > 0 && {
             rectangleDifferences: { left: pad, top: pad, right: pad, bottom: pad },
+          }),
+          ...(defaults.measurement && {
+            measurement: { ...defaults.measurement, computedValue: ellipseArea(rect) },
           }),
         };
 
@@ -168,6 +172,12 @@ export const circleHandlerFactory: HandlerFactory<PdfCircleAnnoObject> = {
               rect: preview.data.rect,
               ...(pad !== undefined && {
                 rectangleDifferences: { left: pad, top: pad, right: pad, bottom: pad },
+              }),
+              ...(defaults.measurement && {
+                measurement: {
+                  ...defaults.measurement,
+                  computedValue: ellipseArea(preview.data.rect),
+                },
               }),
             };
             onCommit(anno);

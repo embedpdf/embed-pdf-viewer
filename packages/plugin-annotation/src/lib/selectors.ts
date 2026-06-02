@@ -10,9 +10,15 @@ import {
   PdfTextAnnoObject,
   PdfAnnotationReplyType,
   PdfAnnotationObject,
+  PdfMeasurementScale,
+  DEFAULT_MEASUREMENT_SCALE,
 } from '@embedpdf/models';
 import { isSidebarAnnotation, isText } from './helpers';
 import { ToolMap } from './tools/tools-utils';
+
+/** The canonical measurement calibration (falls back to the 1:1 default). */
+export const getMeasurementScale = (s: AnnotationState): PdfMeasurementScale =>
+  s.measurementScale ?? DEFAULT_MEASUREMENT_SCALE;
 
 /* ─────────── document state selectors ─────────── */
 

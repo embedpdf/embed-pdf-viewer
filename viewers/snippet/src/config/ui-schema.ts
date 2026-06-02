@@ -281,6 +281,7 @@ export const viewerUISchema: UISchema = {
                 itemIds: [
                   'annotate-mode',
                   'shapes-mode',
+                  'measure-mode',
                   'insert-mode',
                   'form-mode',
                   'redact-mode',
@@ -298,6 +299,12 @@ export const viewerUISchema: UISchema = {
               commandId: 'mode:shapes',
               variant: 'text',
               categories: ['mode', 'mode-shapes', 'annotation'],
+            },
+            {
+              id: 'measure-mode',
+              commandId: 'mode:measure',
+              variant: 'text',
+              categories: ['mode', 'mode-measure', 'measurement'],
             },
             {
               id: 'insert-mode',
@@ -654,6 +661,127 @@ export const viewerUISchema: UISchema = {
       ],
     },
 
+    // Measure toolbar (shown when in measure mode)
+    'measure-toolbar': {
+      id: 'measure-toolbar',
+      position: {
+        placement: 'top',
+        slot: 'secondary',
+        order: 0,
+      },
+      responsive: {
+        breakpoints: {
+          sm: {
+            maxWidth: 640,
+            hide: ['add-measure-area-polygon', 'add-measure-perimeter'],
+            show: ['overflow-measure-tools'],
+          },
+          md: {
+            minWidth: 640,
+            hide: ['overflow-measure-tools'],
+            show: ['add-measure-area-polygon', 'add-measure-perimeter'],
+          },
+        },
+      },
+      permanent: false,
+      categories: ['measurement'],
+      items: [
+        { type: 'spacer', id: 'spacer-measure-start', flex: true },
+        {
+          type: 'group',
+          id: 'measure-tools',
+          alignment: 'start',
+          gap: 2,
+          items: [
+            {
+              type: 'command-button',
+              id: 'add-measure-distance',
+              commandId: 'measurement:distance',
+              variant: 'icon',
+              categories: ['measurement', 'measurement-distance'],
+            },
+            {
+              type: 'command-button',
+              id: 'add-measure-perimeter',
+              commandId: 'measurement:perimeter',
+              variant: 'icon',
+              categories: ['measurement', 'measurement-perimeter'],
+            },
+            {
+              type: 'command-button',
+              id: 'add-measure-area-rect',
+              commandId: 'measurement:area-rect',
+              variant: 'icon',
+              categories: ['measurement', 'measurement-area'],
+            },
+            {
+              type: 'command-button',
+              id: 'add-measure-area-ellipse',
+              commandId: 'measurement:area-ellipse',
+              variant: 'icon',
+              categories: ['measurement', 'measurement-area'],
+            },
+            {
+              type: 'command-button',
+              id: 'add-measure-area-polygon',
+              commandId: 'measurement:area-polygon',
+              variant: 'icon',
+              categories: ['measurement', 'measurement-area'],
+            },
+            {
+              type: 'command-button',
+              id: 'overflow-measure-tools',
+              commandId: 'measurement:overflow-tools',
+              variant: 'icon',
+              categories: ['measurement', 'measurement-overflow'],
+            },
+            {
+              type: 'divider',
+              id: 'measure-tools-divider-0',
+              orientation: 'vertical',
+            },
+            {
+              type: 'command-button',
+              id: 'measure-calibrate',
+              commandId: 'measurement:calibrate',
+              variant: 'icon',
+              categories: ['measurement', 'measurement-calibrate'],
+            },
+            {
+              type: 'command-button',
+              id: 'measure-toggle-annotation-style',
+              commandId: 'panel:toggle-annotation-style',
+              variant: 'icon',
+              categories: ['panel', 'panel-annotation-style'],
+            },
+            {
+              type: 'divider',
+              id: 'measure-tools-divider-1',
+              orientation: 'vertical',
+              visibilityDependsOn: {
+                itemIds: ['measure-toggle-annotation-style'],
+              },
+            },
+            {
+              type: 'command-button',
+              id: 'measure-undo-button',
+              commandId: 'history:undo',
+              variant: 'icon',
+              categories: ['history', 'history-undo'],
+            },
+            {
+              type: 'command-button',
+              id: 'measure-redo-button',
+              commandId: 'history:redo',
+              variant: 'icon',
+              categories: ['history', 'history-redo'],
+            },
+          ],
+        },
+        { type: 'spacer', id: 'spacer-measure-end', flex: true },
+      ],
+    },
+
     // Form toolbar (shown when in form mode)
     'form-toolbar': {
       id: 'form-toolbar',
@@ -999,6 +1127,12 @@ export const viewerUISchema: UISchema = {
         },
         {
           type: 'command',
+          id: 'mode:measure',
+          commandId: 'mode:measure',
+          categories: ['mode', 'mode-measure', 'measurement'],
+        },
+        {
+          type: 'command',
           id: 'mode:insert',
           commandId: 'mode:insert',
           categories: ['mode', 'mode-insert', 'insert'],
@@ -1024,6 +1158,7 @@ export const viewerUISchema: UISchema = {
               'mode:view',
               'mode:annotate',
               'mode:shapes',
+              'mode:measure',
               'mode:insert',
               'mode:form',
               'mode:redact',
@@ -1036,7 +1171,7 @@ export const viewerUISchema: UISchema = {
           },
           md: {
             minWidth: 768,
-            hide: ['mode:view', 'mode:annotate', 'mode:shapes'],
+            hide: ['mode:view', 'mode:annotate', 'mode:shapes', 'mode:measure'],
           },
         },
         localeOverrides: {
@@ -1401,6 +1536,24 @@ export const viewerUISchema: UISchema = {
         },
       ],
     },
+    'measure-tools-menu': {
+      id: 'measure-tools-menu',
+      categories: ['measurement'],
+      items: [
+        {
+          type: 'command',
+          id: 'measurement:perimeter',
+          commandId: 'measurement:perimeter',
+          categories: ['measurement', 'measurement-perimeter'],
+        },
+        {
+          type: 'command',
+          id: 'measurement:area-polygon',
+          commandId: 'measurement:area-polygon',
+          categories: ['measurement', 'measurement-area'],
+        },
+      ],
+    },
     'form-tools-menu': {
       id: 'form-tools-menu',
       categories: ['form'],
@@ -1673,6 +1826,16 @@ export const viewerUISchema: UISchema = {
         componentId: 'print-modal',
       },
       maxWidth: '28rem',
+      closeOnClickOutside: true,
+      closeOnEscape: true,
+    },
+    'calibration-modal': {
+      id: 'calibration-modal',
+      content: {
+        type: 'component',
+        componentId: 'calibration-modal',
+      },
+      maxWidth: '32rem',
       closeOnClickOutside: true,
       closeOnEscape: true,
     },

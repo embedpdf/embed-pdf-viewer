@@ -9,6 +9,7 @@ import {
   PdfLinkTarget,
   PdfRenderPageAnnotationOptions,
   PdfTextAnnoObject,
+  PdfMeasurementScale,
   Position,
   Rect,
   Size,
@@ -150,6 +151,13 @@ export interface AnnotationState {
   /** The complete list of available tools, including any user modifications. */
   tools: AnnotationTool[];
   colorPresets: string[];
+  /**
+   * Canonical measurement calibration applied to new measurement annotations.
+   * Single source of truth for the active scale (the per-tool
+   * `defaults.measurement.scale` values are a projection of this). Like
+   * `tools`, this is global/shared across documents.
+   */
+  measurementScale?: PdfMeasurementScale;
 }
 
 /**
@@ -286,6 +294,18 @@ export interface NavigateEvent {
   target: PdfLinkTarget;
 }
 
+/**
+ * Emitted when the user finishes drawing a calibration line (via the
+ * `calibrate` tool). Carries the two page-space points so the UI can derive
+ * the page-point distance and prompt for the real-world length.
+ */
+export interface CalibrationDrawEvent {
+  documentId: string;
+  pageIndex: number;
+  start: Position;
+  end: Position;
+}
+
 // Scoped annotation capability for a specific document
 export interface AnnotationScope<TTools extends AnnotationToolMap = AnnotationToolMap> {
   getState(): AnnotationDocumentState;
@@ -415,6 +435,7 @@ export interface AnnotationScope<TTools extends AnnotationToolMap = AnnotationTo
   onAnnotationEvent: EventHook<AnnotationEvent>;
   onActiveToolChange: EventHook<ToolUnion<TTools> | null>;
   onNavigate: EventHook<NavigateEvent>;
+  onCalibrationDraw: EventHook<CalibrationDrawEvent>;
 }
 
 export interface AnnotationCapability<TTools extends AnnotationToolMap = AnnotationToolMap> {
@@ -570,6 +591,20 @@ export interface AnnotationCapability<TTools extends AnnotationToolMap = Annotat
     (toolId: string, patch: Partial<PdfAnnotationObject> & Record<string, unknown>): void;
   };
 
+  /**
+   * Set the page-unit ⇄ real-world calibration on every measurement tool's
+   * defaults at once, so newly drawn measurements use the given scale. The
+   * display unit is also defaulted to `scale.unit` (calibrating "72pt = 10ft"
+   * implies feet); override it afterwards via `setToolDefaults` if needed.
+   * Tools without measurement defaults are left untouched.
+   */
+  setMeasurementScale: (scale: PdfMeasurementScale) => void;
+  /**
+   * Read the canonical measurement calibration (the single source of truth set
+   * by {@link setMeasurementScale}). Falls back to the 1:1 default scale.
+   */
+  getMeasurementScale: () => PdfMeasurementScale;
+
   getColorPresets: () => string[];
   addColorPreset: (color: string) => void;
 
@@ -588,6 +623,7 @@ export interface AnnotationCapability<TTools extends AnnotationToolMap = Annotat
   onAnnotationEvent: EventHook<AnnotationEvent>;
   onToolsChange: EventHook<AnnotationToolsChangeEvent>;
   onNavigate: EventHook<NavigateEvent>;
+  onCalibrationDraw: EventHook<CalibrationDrawEvent>;
 }
 
 export interface GetPageAnnotationsOptions {

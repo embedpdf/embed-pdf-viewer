@@ -1,6 +1,15 @@
 import { useMemo, MouseEvent } from '@framework';
-import { Rect, LinePoints, LineEndings, PdfAnnotationBorderStyle } from '@embedpdf/models';
+import {
+  Rect,
+  LinePoints,
+  LineEndings,
+  PdfAnnotationBorderStyle,
+  PdfMeasurementInfo,
+  formatMeasurement,
+  pointDistance,
+} from '@embedpdf/models';
 import { patching } from '@embedpdf/plugin-annotation';
+import { MeasurementLabel } from './measurement-label';
 
 const MIN_HIT_AREA_SCREEN_PX = 20;
 
@@ -31,6 +40,8 @@ interface LineProps {
   isSelected: boolean;
   /** When true, AP canvas provides the visual; only render hit area */
   appearanceActive?: boolean;
+  /** Measurement metadata; when present a distance label is drawn. */
+  measurement?: PdfMeasurementInfo;
 }
 
 /**
@@ -50,6 +61,7 @@ export function Line({
   onClick,
   isSelected,
   appearanceActive = false,
+  measurement,
 }: LineProps): JSX.Element {
   const { x1, y1, x2, y2 } = useMemo(() => {
     return {
@@ -67,6 +79,15 @@ export function Line({
       end: patching.createEnding(lineEndings?.end, strokeWidth, angle, x2, y2),
     };
   }, [lineEndings, strokeWidth, x1, y1, x2, y2]);
+
+  const measureText = useMemo(() => {
+    if (!measurement) return null;
+    return formatMeasurement(
+      pointDistance(linePoints.start, linePoints.end),
+      measurement,
+      false,
+    );
+  }, [measurement, linePoints]);
 
   const width = rect.size.width * scale;
   const height = rect.size.height * scale;
@@ -196,6 +217,15 @@ export function Line({
             />
           )}
         </>
+      )}
+
+      {measureText && (
+        <MeasurementLabel
+          text={measureText}
+          center={{ x: (x1 + x2) / 2, y: (y1 + y2) / 2 }}
+          scale={scale}
+          background={strokeColor}
+        />
       )}
     </svg>
   );
