@@ -80,7 +80,7 @@ const onReady = (r: PluginRegistry) => {
 const handleSave = async () => {
   const exportPlugin = registry()?.getPlugin('export')?.provides();
 
-  const arrayBuffer = await exportPlugin?.saveAsCopy().toPromise();
+  const arrayBuffer = await exportPlugin?.saveAsCopy()?.toPromise();
   if (!arrayBuffer) return;
 
   const blob = new Blob([arrayBuffer], { type: 'application/pdf' });
@@ -100,4 +100,3 @@ const handleSave = async () => {
 
 <embedpdf-viewer (ready)="onReady($event)" [config]="{ src: '/doc.pdf' }" />
 ```
-

@@ -99,7 +99,7 @@ const fillForm = async () => {
     First_Name: 'Jane',
     Last_Name: 'Doe',
     Email_Address: 'jane.doe@example.com',
-  }).toPromise();
+  })?.toPromise();
 };
 ```
 
@@ -112,8 +112,8 @@ const saveFilledPdf = async () => {
   const exportPlugin = registry()?.getPlugin('export')?.provides();
   const pdfBytes = await exportPlugin
     ?.forDocument('form-doc')
-    .saveAsCopy()
-    .toPromise();
+    ?.saveAsCopy()
+    ?.toPromise();
 };
 ```
 

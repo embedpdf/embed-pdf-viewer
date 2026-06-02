@@ -52,7 +52,7 @@ const printDocument = () => {
   const printPlugin = registry()?.getPlugin('print')?.provides();
   const docPrint = printPlugin?.forDocument('invoice-123');
 
-  docPrint?.print().wait(
+  docPrint?.print()?.wait(
     () => console.log('Print dialog opened'),
     (error) => console.error('Print failed', error)
   );
@@ -75,4 +75,3 @@ const printWithOptions = () => {
   });
 };
 ```
-

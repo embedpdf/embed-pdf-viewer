@@ -59,7 +59,7 @@ const getSelectedText = async () => {
   const selection = registry()?.getPlugin('selection')?.provides();
   const scope = selection?.forDocument('my-doc');
   
-  const text = await scope?.getSelectedText().toPromise();
+  const text = await scope?.getSelectedText()?.toPromise();
   console.log('Selected text:', text?.join(' '));
 };
 ```
@@ -109,4 +109,3 @@ const getSelectionDetails = () => {
   });
 };
 ```
-

@@ -1,3 +1,5 @@
+import { useId } from 'react'
+
 export const MUILogo = () => (
   <svg
     xmlns="http://www.w3.org/2000/svg"
@@ -478,26 +480,30 @@ export const AngularMaterialLogo = () => (
   </svg>
 )
 
-export const PrimeNGLogo = () => (
-  <svg
-    xmlns="http://www.w3.org/2000/svg"
-    viewBox="0 0 40 40"
-    className="h-10 w-10"
-    aria-hidden="true"
-  >
-    {/* PrimeNG-style triangle prism mark with red/orange accent */}
-    <defs>
-      <linearGradient id="primeng_grad" x1="0" y1="0" x2="1" y2="1">
-        <stop offset="0" stopColor="#dd0031" />
-        <stop offset="1" stopColor="#fe2c55" />
-      </linearGradient>
-    </defs>
-    <path
-      fill="url(#primeng_grad)"
-      d="M20 3 4 11v18l16 8 16-8V11L20 3Zm0 3.5L33.5 13 20 19.5 6.5 13 20 6.5ZM6 15.6l13 6.5v11.7L6 27.3V15.6Zm15 18.2V22.1l13-6.5v11.7l-13 6.5Z"
-    />
-  </svg>
-)
+export const PrimeNGLogo = () => {
+  const gradientId = useId()
+
+  return (
+    <svg
+      xmlns="http://www.w3.org/2000/svg"
+      viewBox="0 0 40 40"
+      className="h-10 w-10"
+      aria-hidden="true"
+    >
+      {/* PrimeNG-style triangle prism mark with red/orange accent */}
+      <defs>
+        <linearGradient id={gradientId} x1="0" y1="0" x2="1" y2="1">
+          <stop offset="0" stopColor="#dd0031" />
+          <stop offset="1" stopColor="#fe2c55" />
+        </linearGradient>
+      </defs>
+      <path
+        fill={`url(#${gradientId})`}
+        d="M20 3 4 11v18l16 8 16-8V11L20 3Zm0 3.5L33.5 13 20 19.5 6.5 13 20 6.5ZM6 15.6l13 6.5v11.7L6 27.3V15.6Zm15 18.2V22.1l13-6.5v11.7l-13 6.5Z"
+      />
+    </svg>
+  )
+}
 
 export const SpartanNgLogo = () => (
   <svg
