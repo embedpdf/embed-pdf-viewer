@@ -9,6 +9,7 @@ import {
 } from '@embedpdf/models';
 import { generateCloudyEllipsePath } from '@embedpdf/plugin-annotation';
 import { MeasurementLabel } from './measurement-label';
+import { AreaHatch } from './area-hatch';
 
 const MIN_HIT_AREA_SCREEN_PX = 20;
 
@@ -95,6 +96,12 @@ export function Circle({
     [measurement, rect],
   );
 
+  // Area measurements get a light diagonal-hatch fill to mark the region.
+  const isAreaMeasure = measurement?.mode === 'area';
+  const hatchId = useMemo(() => 'mhatch-' + Math.random().toString(36).slice(2, 9), []);
+  const fillValue = isAreaMeasure ? `url(#${hatchId})` : color;
+  const hatchColor = strokeColor ?? '#2962FF';
+
   const svgWidth = width * scale;
   const svgHeight = height * scale;
   const hitStrokeWidth = Math.max(strokeWidth, MIN_HIT_AREA_SCREEN_PX / scale);
@@ -155,11 +162,14 @@ export function Circle({
         />
       )}
       {/* Visual -- hidden when AP active, never interactive */}
+      {!appearanceActive && isAreaMeasure && (
+        <AreaHatch id={hatchId} color={hatchColor} scale={scale} />
+      )}
       {!appearanceActive &&
         (isCloudy && cloudyPath ? (
           <path
             d={cloudyPath.path}
-            fill={color}
+            fill={fillValue}
             opacity={opacity}
             style={{
               pointerEvents: 'none',
@@ -174,7 +184,7 @@ export function Circle({
             cy={cy}
             rx={rx}
             ry={ry}
-            fill={color}
+            fill={fillValue}
             opacity={opacity}
             style={{
               pointerEvents: 'none',

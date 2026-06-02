@@ -54,10 +54,11 @@
     />
     <!-- Visual -- hidden when AP active, never interactive -->
     <template v-if="!appearanceActive">
+      <AreaHatch v-if="isAreaMeasure" :id="hatchId" :color="strokeColor ?? '#2962FF'" :scale="scale" />
       <path
         v-if="isCloudy && cloudyPath"
         :d="cloudyPath.path"
-        :fill="color"
+        :fill="fillValue"
         :opacity="opacity"
         :style="{
           pointerEvents: 'none',
@@ -72,7 +73,7 @@
         :y="geometry.y"
         :width="geometry.width"
         :height="geometry.height"
-        :fill="color"
+        :fill="fillValue"
         :opacity="opacity"
         :style="{
           pointerEvents: 'none',
@@ -111,8 +112,10 @@ import {
 } from '@embedpdf/models';
 import { generateCloudyRectanglePath } from '@embedpdf/plugin-annotation';
 import MeasurementLabel from './measurement-label.vue';
+import AreaHatch from './area-hatch.vue';
 
 const MIN_HIT_AREA_SCREEN_PX = 20;
+const hatchId = 'mhatch-' + Math.random().toString(36).slice(2, 9);
 
 const props = withDefaults(
   defineProps<{
@@ -144,6 +147,9 @@ const isCloudy = computed(() => (props.cloudyBorderIntensity ?? 0) > 0);
 const measureText = computed(() =>
   props.measurement ? formatMeasurement(rectArea(props.rect), props.measurement) : null,
 );
+
+const isAreaMeasure = computed(() => props.measurement?.mode === 'area');
+const fillValue = computed(() => (isAreaMeasure.value ? `url(#${hatchId})` : props.color));
 
 const geometry = computed(() => {
   const outerW = props.rect.size.width;

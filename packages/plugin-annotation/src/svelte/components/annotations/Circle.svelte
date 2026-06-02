@@ -9,6 +9,7 @@
   } from '@embedpdf/models';
   import { generateCloudyEllipsePath } from '@embedpdf/plugin-annotation';
   import MeasurementLabel from './MeasurementLabel.svelte';
+  import AreaHatch from './AreaHatch.svelte';
 
   const MIN_HIT_AREA_SCREEN_PX = 20;
 
@@ -85,6 +86,9 @@
   const measureText = $derived(
     measurement ? formatMeasurement(ellipseArea(rect), measurement) : null,
   );
+  const isAreaMeasure = $derived(measurement?.mode === 'area');
+  const hatchId = 'mhatch-' + Math.random().toString(36).slice(2, 9);
+  const fillValue = $derived(isAreaMeasure ? `url(#${hatchId})` : color);
 </script>
 
 <svg
@@ -126,10 +130,13 @@
   {/if}
   <!-- Visual -- hidden when AP active, never interactive -->
   {#if !appearanceActive}
+    {#if isAreaMeasure}
+      <AreaHatch id={hatchId} color={strokeColor ?? '#2962FF'} {scale} />
+    {/if}
     {#if isCloudy && cloudyPath}
       <path
         d={cloudyPath.path}
-        fill={color}
+        fill={fillValue}
         {opacity}
         style:pointer-events="none"
         stroke={strokeColor ?? color}
@@ -142,7 +149,7 @@
         {cy}
         {rx}
         {ry}
-        fill={color}
+        fill={fillValue}
         {opacity}
         style:pointer-events="none"
         stroke={strokeColor ?? color}

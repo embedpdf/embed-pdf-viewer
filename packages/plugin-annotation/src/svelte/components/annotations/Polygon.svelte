@@ -8,6 +8,7 @@
   } from '@embedpdf/models';
   import { generateCloudyPolygonPath } from '@embedpdf/plugin-annotation';
   import MeasurementLabel from './MeasurementLabel.svelte';
+  import AreaHatch from './AreaHatch.svelte';
 
   const MIN_HIT_AREA_SCREEN_PX = 20;
 
@@ -94,6 +95,9 @@
     );
     return { text: formatMeasurement(value, measurement), center };
   });
+
+  const isAreaMeasure = $derived(measurement?.mode === 'area');
+  const hatchId = 'mhatch-' + Math.random().toString(36).slice(2, 9);
 </script>
 
 <svg
@@ -126,11 +130,14 @@
 
   <!-- Visual -- hidden when AP active, never interactive -->
   {#if !appearanceActive}
+    {#if isAreaMeasure}
+      <AreaHatch id={hatchId} color={strokeColor ?? '#2962FF'} {scale} />
+    {/if}
     {#if isCloudy && cloudyPath}
       <path
         d={cloudyPath.path}
         {opacity}
-        style:fill={color}
+        style:fill={isAreaMeasure ? `url(#${hatchId})` : color}
         style:stroke={strokeColor ?? color}
         style:stroke-width={strokeWidth}
         style:pointer-events="none"
@@ -140,7 +147,7 @@
       <path
         d={pathData}
         {opacity}
-        style:fill={currentVertex ? 'none' : color}
+        style:fill={currentVertex ? 'none' : isAreaMeasure ? `url(#${hatchId})` : color}
         style:stroke={strokeColor ?? color}
         style:stroke-width={strokeWidth}
         style:pointer-events="none"

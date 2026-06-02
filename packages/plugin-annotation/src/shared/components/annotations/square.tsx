@@ -9,6 +9,7 @@ import {
 } from '@embedpdf/models';
 import { generateCloudyRectanglePath } from '@embedpdf/plugin-annotation';
 import { MeasurementLabel } from './measurement-label';
+import { AreaHatch } from './area-hatch';
 
 const MIN_HIT_AREA_SCREEN_PX = 20;
 
@@ -93,6 +94,12 @@ export function Square({
     [measurement, rect],
   );
 
+  // Area measurements get a light diagonal-hatch fill to mark the region.
+  const isAreaMeasure = measurement?.mode === 'area';
+  const hatchId = useMemo(() => 'mhatch-' + Math.random().toString(36).slice(2, 9), []);
+  const fillValue = isAreaMeasure ? `url(#${hatchId})` : color;
+  const hatchColor = strokeColor ?? '#2962FF';
+
   const svgWidth = rect.size.width * scale;
   const svgHeight = rect.size.height * scale;
   const hitStrokeWidth = Math.max(strokeWidth, MIN_HIT_AREA_SCREEN_PX / scale);
@@ -153,37 +160,41 @@ export function Square({
         />
       )}
       {/* Visual -- hidden when AP active, never interactive */}
-      {!appearanceActive &&
-        (isCloudy && cloudyPath ? (
-          <path
-            d={cloudyPath.path}
-            fill={color}
-            opacity={opacity}
-            style={{
-              pointerEvents: 'none',
-              stroke: strokeColor ?? color,
-              strokeWidth,
-              strokeLinejoin: 'round',
-            }}
-          />
-        ) : (
-          <rect
-            x={x}
-            y={y}
-            width={width}
-            height={height}
-            fill={color}
-            opacity={opacity}
-            style={{
-              pointerEvents: 'none',
-              stroke: strokeColor ?? color,
-              strokeWidth,
-              ...(strokeStyle === PdfAnnotationBorderStyle.DASHED && {
-                strokeDasharray: strokeDashArray?.join(','),
-              }),
-            }}
-          />
-        ))}
+      {!appearanceActive && (
+        <>
+          {isAreaMeasure && <AreaHatch id={hatchId} color={hatchColor} scale={scale} />}
+          {isCloudy && cloudyPath ? (
+            <path
+              d={cloudyPath.path}
+              fill={fillValue}
+              opacity={opacity}
+              style={{
+                pointerEvents: 'none',
+                stroke: strokeColor ?? color,
+                strokeWidth,
+                strokeLinejoin: 'round',
+              }}
+            />
+          ) : (
+            <rect
+              x={x}
+              y={y}
+              width={width}
+              height={height}
+              fill={fillValue}
+              opacity={opacity}
+              style={{
+                pointerEvents: 'none',
+                stroke: strokeColor ?? color,
+                strokeWidth,
+                ...(strokeStyle === PdfAnnotationBorderStyle.DASHED && {
+                  strokeDasharray: strokeDashArray?.join(','),
+                }),
+              }}
+            />
+          )}
+        </>
+      )}
 
       {measureText && (
         <MeasurementLabel

@@ -10,6 +10,7 @@ import {
 } from '@embedpdf/models';
 import { generateCloudyPolygonPath } from '@embedpdf/plugin-annotation';
 import { MeasurementLabel } from './measurement-label';
+import { AreaHatch } from './area-hatch';
 
 const MIN_HIT_AREA_SCREEN_PX = 20;
 
@@ -93,6 +94,12 @@ export function Polygon({
     return { text: formatMeasurement(value, measurement), center };
   }, [measurement, allPoints, localPts]);
 
+  // Area measurements get a light diagonal-hatch fill to mark the region.
+  const isAreaMeasure = measurement?.mode === 'area';
+  const hatchId = useMemo(() => 'mhatch-' + Math.random().toString(36).slice(2, 9), []);
+  const hatchColor = strokeColor ?? '#2962FF';
+  const hatchUrl = `url(#${hatchId})`;
+
   const width = rect.size.width * scale;
   const height = rect.size.height * scale;
   const hitStrokeWidth = Math.max(strokeWidth, MIN_HIT_AREA_SCREEN_PX / scale);
@@ -135,12 +142,13 @@ export function Polygon({
       {/* Visual -- hidden when AP active, never interactive */}
       {!appearanceActive && (
         <>
+          {isAreaMeasure && <AreaHatch id={hatchId} color={hatchColor} scale={scale} />}
           {isCloudy && cloudyPath ? (
             <path
               d={cloudyPath.path}
               opacity={opacity}
               style={{
-                fill: color,
+                fill: isAreaMeasure ? hatchUrl : color,
                 stroke: strokeColor ?? color,
                 strokeWidth,
                 pointerEvents: 'none',
@@ -153,7 +161,7 @@ export function Polygon({
                 d={pathData}
                 opacity={opacity}
                 style={{
-                  fill: currentVertex ? 'none' : color,
+                  fill: currentVertex ? 'none' : isAreaMeasure ? hatchUrl : color,
                   stroke: strokeColor ?? color,
                   strokeWidth,
                   pointerEvents: 'none',
