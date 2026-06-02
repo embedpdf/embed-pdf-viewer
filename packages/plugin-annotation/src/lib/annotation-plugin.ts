@@ -434,6 +434,7 @@ export class AnnotationPlugin extends BasePlugin<
       deleteAnnotation: (pageIndex, id) => this.deleteAnnotation(pageIndex, id),
       deleteAnnotations: (annotations, documentId) =>
         this.deleteAnnotationsMethod(annotations, documentId),
+      deleteSelectedAnnotations: (documentId) => this.deleteSelectedAnnotationsMethod(documentId),
       deleteAllAnnotations: (documentId) => this.deleteAllAnnotationsMethod(documentId),
       purgeAnnotation: (pageIndex, id, documentId) =>
         this.purgeAnnotationMethod(pageIndex, id, documentId),
@@ -538,6 +539,7 @@ export class AnnotationPlugin extends BasePlugin<
         this.moveAnnotationMethod(pageIndex, id, position, mode, documentId),
       deleteAnnotation: (pageIndex, id) => this.deleteAnnotation(pageIndex, id, documentId),
       deleteAnnotations: (annotations) => this.deleteAnnotationsMethod(annotations, documentId),
+      deleteSelectedAnnotations: () => this.deleteSelectedAnnotationsMethod(documentId),
       deleteAllAnnotations: () => this.deleteAllAnnotationsMethod(documentId),
       purgeAnnotation: (pageIndex, id) => this.purgeAnnotationMethod(pageIndex, id, documentId),
       renderAnnotation: (options) => this.renderAnnotation(options, documentId),
@@ -1250,6 +1252,17 @@ export class AnnotationPlugin extends BasePlugin<
     if (toDelete.length > 0) {
       this.deleteAnnotationsMethod(toDelete, docId);
     }
+  }
+
+  private deleteSelectedAnnotationsMethod(documentId?: string): void {
+    const docId = documentId ?? this.getActiveDocumentId();
+    const selected = this.getSelectedAnnotationsMethod(docId);
+    if (selected.length === 0) return;
+    const toDelete = selected.map((ta) => ({
+      pageIndex: ta.object.pageIndex,
+      id: ta.object.id,
+    }));
+    this.deleteAnnotationsMethod(toDelete, docId);
   }
 
   private purgeAnnotationMethod(pageIndex: number, id: string, documentId?: string): void {

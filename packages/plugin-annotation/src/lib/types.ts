@@ -348,6 +348,8 @@ export interface AnnotationScope<TTools extends AnnotationToolMap = AnnotationTo
   deleteAnnotation(pageIndex: number, annotationId: string): void;
   /** Delete multiple annotations in batch */
   deleteAnnotations(annotations: Array<{ pageIndex: number; id: string }>): void;
+  /** Delete every currently selected annotation (no-op if the selection is empty) */
+  deleteSelectedAnnotations(): void;
   /** Delete all annotations from the document */
   deleteAllAnnotations(): void;
   /** Remove an annotation from state without calling the engine (no PDF modification) */
@@ -477,6 +479,8 @@ export interface AnnotationCapability<TTools extends AnnotationToolMap = Annotat
     annotations: Array<{ pageIndex: number; id: string }>,
     documentId?: string,
   ) => void;
+  /** Delete every currently selected annotation (no-op if the selection is empty) */
+  deleteSelectedAnnotations: (documentId?: string) => void;
   /** Delete all annotations from the document */
   deleteAllAnnotations: (documentId?: string) => void;
   /** Remove an annotation from state without calling the engine (no PDF modification) */
