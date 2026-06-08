@@ -23,6 +23,16 @@ export interface CreatePdfiumEngineOptions {
    * when it encounters text that requires fonts not embedded in the PDF.
    */
   fontFallback?: FontFallbackConfig;
+  /**
+   * URL to the PDFium worker script (worker mode only).
+   * Avoids `worker-src blob:` in strict CSP environments.
+   */
+  workerUrl?: string;
+  /**
+   * URL to the image encoder worker script (worker mode only).
+   * Avoids `worker-src blob:` in strict CSP environments.
+   */
+  encoderWorkerUrl?: string;
 }
 
 /**
