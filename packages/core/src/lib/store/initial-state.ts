@@ -32,6 +32,10 @@ export interface DocumentState {
   // When a page is refreshed, its version is incremented
   pageRefreshVersions: Record<number, number>;
 
+  // Visual/export page order expressed as source page indexes.
+  // Example: [2, 0, 1] displays source page 3 first, then 1, then 2.
+  pageOrder?: number[];
+
   // Per-document permission overrides (optional)
   permissions?: PermissionConfig;
 

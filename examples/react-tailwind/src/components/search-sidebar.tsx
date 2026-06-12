@@ -1,3 +1,5 @@
+import { getDocumentPageOrder } from '@embedpdf/core';
+import { useDocumentState } from '@embedpdf/core/react';
 import { useSearch } from '@embedpdf/plugin-search/react';
 import { useScrollCapability } from '@embedpdf/plugin-scroll/react';
 import { useState, useRef, useEffect } from 'react';
@@ -52,9 +54,12 @@ type SearchSidebarProps = {
 export function SearchSidebar({ documentId, onClose }: SearchSidebarProps) {
   const { state, provides } = useSearch(documentId);
   const { provides: scroll } = useScrollCapability();
+  const documentState = useDocumentState(documentId);
   const { translate } = useTranslations(documentId);
   const inputRef = useRef<HTMLInputElement>(null);
   const [inputValue, setInputValue] = useState('');
+  const pageOrder = getDocumentPageOrder(documentState);
+  const pageOrderKey = pageOrder.join(',');
 
   // Sync inputValue with persisted state.query when state loads
   useEffect(() => {
@@ -71,7 +76,7 @@ export function SearchSidebar({ documentId, onClose }: SearchSidebarProps) {
     if (state.activeResultIndex !== undefined && state.activeResultIndex >= 0 && !state.loading) {
       scrollToItem(state.activeResultIndex);
     }
-  }, [state.activeResultIndex, state.loading, state.query, state.flags]);
+  }, [state.activeResultIndex, state.loading, state.query, state.flags, pageOrderKey]);
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const value = e.target.value;
@@ -113,12 +118,17 @@ export function SearchSidebar({ documentId, onClose }: SearchSidebarProps) {
       { x: Infinity, y: Infinity },
     );
 
+    const visualPageNumber = getVisualPageNumber(item.pageIndex);
+
     scroll?.forDocument(documentId).scrollToPage({
-      pageNumber: item.pageIndex + 1,
+      pageNumber: visualPageNumber > 0 ? visualPageNumber : item.pageIndex + 1,
       pageCoordinates: minCoordinates,
-      center: true,
+      alignX: 50,
+      alignY: 50,
     });
   };
+
+  const getVisualPageNumber = (sourcePageIndex: number) => pageOrder.indexOf(sourcePageIndex) + 1;
 
   const groupByPage = (results: typeof state.results) => {
     return results.reduce<Record<number, { hit: (typeof results)[0]; index: number }[]>>(
@@ -230,23 +240,40 @@ export function SearchSidebar({ documentId, onClose }: SearchSidebarProps) {
           </div>
         ) : (
           <div className="space-y-4">
-            {Object.entries(grouped).map(([page, hits]) => (
-              <div key={page}>
-                <div className="mb-2 text-xs font-semibold text-gray-500">
-                  {translate('search.page', { params: { number: Number(page) + 1 } })}
-                </div>
-                <div className="space-y-2">
-                  {hits.map(({ hit, index }) => (
-                    <HitLine
-                      key={index}
-                      hit={hit}
-                      active={index === state.activeResultIndex}
-                      onClick={() => provides.goToResult(index)}
-                    />
-                  ))}
-                </div>
-              </div>
-            ))}
+            {Object.entries(grouped)
+              .sort(([pageA], [pageB]) => {
+                const visualPageA = getVisualPageNumber(Number(pageA));
+                const visualPageB = getVisualPageNumber(Number(pageB));
+                return (
+                  (visualPageA > 0 ? visualPageA : Number(pageA) + 1) -
+                  (visualPageB > 0 ? visualPageB : Number(pageB) + 1)
+                );
+              })
+              .map(([page, hits]) => {
+                const visualPageNumber = getVisualPageNumber(Number(page));
+
+                return (
+                  <div key={page}>
+                    <div className="mb-2 text-xs font-semibold text-gray-500">
+                      {translate('search.page', {
+                        params: {
+                          number: visualPageNumber > 0 ? visualPageNumber : Number(page) + 1,
+                        },
+                      })}
+                    </div>
+                    <div className="space-y-2">
+                      {hits.map(({ hit, index }) => (
+                        <HitLine
+                          key={index}
+                          hit={hit}
+                          active={index === state.activeResultIndex}
+                          onClick={() => provides.goToResult(index)}
+                        />
+                      ))}
+                    </div>
+                  </div>
+                );
+              })}
           </div>
         )}
       </div>

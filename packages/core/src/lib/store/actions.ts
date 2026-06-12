@@ -21,6 +21,7 @@ export const UPDATE_DOCUMENT_SECURITY = 'UPDATE_DOCUMENT_SECURITY';
 export const REFRESH_DOCUMENT = 'REFRESH_DOCUMENT';
 export const REFRESH_PAGES = 'REFRESH_PAGES';
 export const SET_PAGES = 'SET_PAGES';
+export const SET_PAGE_ORDER = 'SET_PAGE_ORDER';
 export const SET_SCALE = 'SET_SCALE';
 export const SET_ROTATION = 'SET_ROTATION';
 
@@ -39,6 +40,7 @@ export const CORE_ACTION_TYPES = [
   REFRESH_DOCUMENT,
   REFRESH_PAGES,
   SET_PAGES,
+  SET_PAGE_ORDER,
   SET_SCALE,
   SET_ROTATION,
   SET_DEFAULT_SCALE,
@@ -166,6 +168,14 @@ export interface SetPagesAction {
   };
 }
 
+export interface SetPageOrderAction {
+  type: typeof SET_PAGE_ORDER;
+  payload: {
+    documentId: string;
+    pageOrder: number[];
+  };
+}
+
 export interface SetScaleAction {
   type: typeof SET_SCALE;
   payload: {
@@ -207,6 +217,7 @@ export type DocumentAction =
   | RefreshDocumentAction
   | RefreshPagesAction
   | SetPagesAction
+  | SetPageOrderAction
   | SetScaleAction
   | SetRotationAction
   | SetDefaultScaleAction
@@ -291,6 +302,11 @@ export const refreshPages = (documentId: string, pageIndexes: number[]): CoreAct
 export const setPages = (documentId: string, pages: PdfPageObject[][]): CoreAction => ({
   type: SET_PAGES,
   payload: { documentId, pages },
+});
+
+export const setPageOrder = (documentId: string, pageOrder: number[]): CoreAction => ({
+  type: SET_PAGE_ORDER,
+  payload: { documentId, pageOrder },
 });
 
 export const setScale = (scale: number, documentId?: string): CoreAction => ({

@@ -98,12 +98,10 @@ export class TilingPlugin extends BasePlugin<TilingPluginConfig, TilingCapabilit
     const scale = coreDoc.scale;
 
     for (const pageIndex of pageIndexes) {
-      const metric = currentMetrics.pageVisibilityMetrics.find(
-        (m) => m.pageNumber === pageIndex + 1,
-      );
+      const metric = currentMetrics.pageVisibilityMetrics.find((m) => m.pageIndex === pageIndex);
       if (!metric) continue;
 
-      const page = coreDoc.document.pages[pageIndex];
+      const page = coreDoc.document.pages.find((candidate) => candidate.index === pageIndex);
       if (!page) continue;
 
       // Calculate effective rotation for this page (page intrinsic + document rotation)
@@ -140,8 +138,8 @@ export class TilingPlugin extends BasePlugin<TilingPluginConfig, TilingCapabilit
     const visibleTiles: { [pageIndex: number]: Tile[] } = {};
 
     for (const scrollMetric of scrollMetrics.pageVisibilityMetrics) {
-      const pageIndex = scrollMetric.pageNumber - 1; // Convert to 0-based index
-      const page = coreDoc.document.pages[pageIndex];
+      const pageIndex = scrollMetric.pageIndex;
+      const page = coreDoc.document.pages.find((candidate) => candidate.index === pageIndex);
       if (!page) continue;
 
       // Calculate effective rotation for this page (page intrinsic + document rotation)

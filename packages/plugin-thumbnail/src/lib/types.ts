@@ -34,7 +34,10 @@ export interface ScrollToOptions {
 }
 
 export interface ThumbMeta {
+  /** Source page index in the PDF document. */
   pageIndex: number;
+  /** One-based visual page number after page reordering. */
+  pageNumber: number;
   /** Inner bitmap size (excludes padding). */
   width: number;
   height: number;

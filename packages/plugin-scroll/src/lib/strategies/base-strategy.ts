@@ -169,6 +169,7 @@ export abstract class BaseScrollStrategy {
           const visibleArea = visibleWidth * visibleHeight;
 
           visibilityMetrics.push({
+            pageIndex: page.pageIndex,
             pageNumber: page.pageNumber,
             viewportX: intersectionLeft - viewportLeft,
             viewportY: intersectionTop - viewportTop,

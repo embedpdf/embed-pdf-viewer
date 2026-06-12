@@ -142,6 +142,52 @@ export function ChevronDownIcon({ className, title }: IconProps) {
   );
 }
 
+export function PageMoveDownIcon({ className, title }: IconProps) {
+  return (
+    <svg
+      className={className}
+      fill="none"
+      stroke="currentColor"
+      viewBox="0 0 24 24"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      strokeWidth={2}
+      aria-hidden={!title}
+      role={title ? 'img' : 'presentation'}
+    >
+      {title ? <title>{title}</title> : null}
+      <path d="M6 3h8l4 4v5" />
+      <path d="M14 3v5h5" />
+      <path d="M12 12v7" />
+      <path d="M9 16l3 3 3-3" />
+      <path d="M7 21h10" />
+    </svg>
+  );
+}
+
+export function PageMoveUpIcon({ className, title }: IconProps) {
+  return (
+    <svg
+      className={className}
+      fill="none"
+      stroke="currentColor"
+      viewBox="0 0 24 24"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      strokeWidth={2}
+      aria-hidden={!title}
+      role={title ? 'img' : 'presentation'}
+    >
+      {title ? <title>{title}</title> : null}
+      <path d="M6 3h8l4 4v5" />
+      <path d="M14 3v5h5" />
+      <path d="M12 19v-7" />
+      <path d="M9 15l3-3 3 3" />
+      <path d="M7 21h10" />
+    </svg>
+  );
+}
+
 export function ZoomChevronDownIcon({ className, title }: IconProps) {
   return (
     <svg

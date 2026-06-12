@@ -10,11 +10,13 @@ export class VerticalScrollStrategy extends BaseScrollStrategy {
 
   createVirtualItems(pdfPageObject: PdfPageObjectWithRotatedSize[][]): VirtualItem[] {
     let yOffset = 0;
+    let nextPageNumber = 1;
     return pdfPageObject.map((pagesInSpread, index) => {
       let pageX = 0;
       const pageLayouts: PageLayout[] = pagesInSpread.map((page) => {
+        const pageNumber = nextPageNumber++;
         const layout: PageLayout = {
-          pageNumber: page.index + 1,
+          pageNumber,
           pageIndex: page.index,
           x: pageX,
           y: 0,
@@ -41,7 +43,7 @@ export class VerticalScrollStrategy extends BaseScrollStrategy {
         width,
         height,
         pageLayouts,
-        pageNumbers: pagesInSpread.map((p) => p.index + 1),
+        pageNumbers: pageLayouts.map((layout) => layout.pageNumber),
         index,
       };
       yOffset += height + this.pageGap;

@@ -1,4 +1,11 @@
-import { BasePlugin, createEmitter, Listener, PluginRegistry } from '@embedpdf/core';
+import {
+  BasePlugin,
+  createEmitter,
+  getDocumentPageOrder,
+  isPageOrderChanged,
+  Listener,
+  PluginRegistry,
+} from '@embedpdf/core';
 import { PdfErrorCode, PdfErrorReason, PdfTaskHelper, Task } from '@embedpdf/models';
 
 import {
@@ -64,6 +71,10 @@ export class ExportPlugin extends BasePlugin<ExportPluginConfig, ExportCapabilit
         code: PdfErrorCode.DocNotOpen,
         message: `Document ${id} not found`,
       });
+    }
+
+    if (isPageOrderChanged(coreDoc)) {
+      return this.engine.extractPages(coreDoc.document, getDocumentPageOrder(coreDoc));
     }
 
     return this.engine.saveAsCopy(coreDoc.document);

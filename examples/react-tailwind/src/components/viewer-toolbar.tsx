@@ -1,5 +1,6 @@
 import { ZoomToolbar } from './zoom-toolbar';
 import { PanToggleButton } from './pan-toggle';
+import { PageMoveDownButton, PageMoveUpButton } from './page-move-down-button';
 import { PageSettingsMenu } from './page-settings-menu';
 import { DocumentMenu } from './document-menu';
 import { SearchIcon, ThumbnailsIcon } from './icons';
@@ -51,6 +52,8 @@ export function ViewerToolbar({
         <ToolbarDivider />
 
         <PanToggleButton documentId={documentId} />
+        <PageMoveUpButton documentId={documentId} />
+        <PageMoveDownButton documentId={documentId} />
 
         {/* Mode Tabs */}
         <div className="mx-4 flex flex-1 items-center justify-center">

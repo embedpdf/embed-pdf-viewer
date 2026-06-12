@@ -11,12 +11,41 @@ import {
   SET_ACTIVE_DOCUMENT,
   SET_ROTATION,
   SET_SCALE,
+  SET_PAGE_ORDER,
   REFRESH_PAGES,
   REORDER_DOCUMENTS,
   MOVE_DOCUMENT,
   UPDATE_DOCUMENT_SECURITY,
 } from './actions';
 import { calculateNextActiveDocument, moveDocumentInOrder } from './reducer-helpers';
+
+const createDefaultPageOrder = (pageCount: number): number[] =>
+  Array.from({ length: pageCount }, (_, index) => index);
+
+const normalizePageOrder = (incoming: number[], pageCount: number): number[] => {
+  const seen = new Set<number>();
+  const order: number[] = [];
+
+  for (const pageIndex of incoming) {
+    if (
+      Number.isInteger(pageIndex) &&
+      pageIndex >= 0 &&
+      pageIndex < pageCount &&
+      !seen.has(pageIndex)
+    ) {
+      seen.add(pageIndex);
+      order.push(pageIndex);
+    }
+  }
+
+  for (let pageIndex = 0; pageIndex < pageCount; pageIndex++) {
+    if (!seen.has(pageIndex)) {
+      order.push(pageIndex);
+    }
+  }
+
+  return order;
+};
 
 export const coreReducer: Reducer<CoreState, CoreAction> = (state, action): CoreState => {
   switch (action.type) {
@@ -95,6 +124,7 @@ export const coreReducer: Reducer<CoreState, CoreAction> = (state, action): Core
             errorCode: undefined,
             errorDetails: undefined,
             passwordProvided: undefined,
+            pageOrder: createDefaultPageOrder(document.pageCount),
             loadedAt: Date.now(),
           },
         },
@@ -246,6 +276,24 @@ export const coreReducer: Reducer<CoreState, CoreAction> = (state, action): Core
           [documentId]: {
             ...docState,
             pageRefreshVersions: newVersions,
+          },
+        },
+      };
+    }
+
+    case SET_PAGE_ORDER: {
+      const { documentId, pageOrder } = action.payload;
+      const docState = state.documents[documentId];
+
+      if (!docState?.document) return state;
+
+      return {
+        ...state,
+        documents: {
+          ...state.documents,
+          [documentId]: {
+            ...docState,
+            pageOrder: normalizePageOrder(pageOrder, docState.document.pageCount),
           },
         },
       };

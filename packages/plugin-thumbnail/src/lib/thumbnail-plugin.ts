@@ -6,6 +6,8 @@ import {
   Listener,
   PluginRegistry,
   REFRESH_PAGES,
+  SET_PAGE_ORDER,
+  getOrderedPages,
 } from '@embedpdf/core';
 import {
   ScrollToOptions,
@@ -82,6 +84,10 @@ export class ThumbnailPlugin extends BasePlugin<
           taskCache.delete(pageIndex);
         }
       }
+    });
+
+    this.coreStore.onAction(SET_PAGE_ORDER, (action) => {
+      this.calculateWindowState(action.payload.documentId);
     });
 
     // Auto-scroll thumbnails when the main scroller's current page changes
@@ -226,7 +232,7 @@ export class ThumbnailPlugin extends BasePlugin<
     const INNER_W = Math.max(1, OUTER_W - 2 * P);
 
     let offset = PADDING_Y; // Start with top padding
-    const thumbs: ThumbMeta[] = coreDoc.document.pages.map((p) => {
+    const thumbs: ThumbMeta[] = getOrderedPages(coreDoc).map((p, visualIndex) => {
       // Apply page rotation to get correct dimensions (90° or 270° swaps width/height)
       const isRotated90or270 = p.rotation % 2 === 1;
       const effectiveWidth = isRotated90or270 ? p.size.height : p.size.width;
@@ -237,6 +243,7 @@ export class ThumbnailPlugin extends BasePlugin<
 
       const meta: ThumbMeta = {
         pageIndex: p.index,
+        pageNumber: visualIndex + 1,
         width: INNER_W, // bitmap width (for <img> size)
         height: imgH, // bitmap height (for <img> size)
         wrapperHeight: wrapH, // full row height used by virtualizer
@@ -376,7 +383,7 @@ export class ThumbnailPlugin extends BasePlugin<
       throw new Error(`Document not found: ${id}`);
     }
 
-    const page = coreDoc.document.pages[idx];
+    const page = coreDoc.document.pages.find((candidate) => candidate.index === idx);
     if (!page) {
       throw new Error(`Page ${idx} not found in document: ${id}`);
     }

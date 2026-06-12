@@ -1,4 +1,4 @@
-import { PdfPermissionFlag } from '@embedpdf/models';
+import { PdfPageObject, PdfPermissionFlag } from '@embedpdf/models';
 import { CoreState, DocumentState } from './initial-state';
 import { ALL_PERMISSION_FLAGS, getPermissionOverride } from '../types/permissions';
 
@@ -36,6 +36,61 @@ export const isDocumentLoaded = (state: CoreState, documentId: string): boolean 
  */
 export const getDocumentCount = (state: CoreState): number => {
   return Object.keys(state.documents).length;
+};
+
+/**
+ * Get a complete visual/export page order for a document.
+ * Missing, duplicate, or stale entries are repaired against the current page count.
+ */
+export const getDocumentPageOrder = (documentState: DocumentState | null): number[] => {
+  const pageCount = documentState?.document?.pageCount ?? 0;
+  const incoming = documentState?.pageOrder ?? [];
+  const seen = new Set<number>();
+  const order: number[] = [];
+
+  for (const pageIndex of incoming) {
+    if (
+      Number.isInteger(pageIndex) &&
+      pageIndex >= 0 &&
+      pageIndex < pageCount &&
+      !seen.has(pageIndex)
+    ) {
+      seen.add(pageIndex);
+      order.push(pageIndex);
+    }
+  }
+
+  for (let pageIndex = 0; pageIndex < pageCount; pageIndex++) {
+    if (!seen.has(pageIndex)) {
+      order.push(pageIndex);
+    }
+  }
+
+  return order;
+};
+
+/**
+ * Get page objects in their current visual/export order.
+ */
+export const getOrderedPages = (documentState: DocumentState | null): PdfPageObject[] => {
+  if (!documentState?.document) return [];
+
+  const pagesBySourceIndex = new Map(
+    documentState.document.pages.map((page) => [page.index, page] as const),
+  );
+
+  return getDocumentPageOrder(documentState)
+    .map((pageIndex) => pagesBySourceIndex.get(pageIndex))
+    .filter((page): page is PdfPageObject => Boolean(page));
+};
+
+/**
+ * Whether the current visual/export order differs from the source PDF order.
+ */
+export const isPageOrderChanged = (documentState: DocumentState | null): boolean => {
+  return getDocumentPageOrder(documentState).some(
+    (pageIndex, visualIndex) => pageIndex !== visualIndex,
+  );
 };
 
 // ─────────────────────────────────────────────────────────

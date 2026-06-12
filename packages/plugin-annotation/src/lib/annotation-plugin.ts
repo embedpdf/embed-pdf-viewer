@@ -2,6 +2,7 @@ import {
   BasePlugin,
   createBehaviorEmitter,
   createScopedEmitter,
+  getDocumentPageOrder,
   PluginRegistry,
 } from '@embedpdf/core';
 import {
@@ -2795,13 +2796,16 @@ export class AnnotationPlugin extends BasePlugin<
     }
 
     const scrollScope = this.scroll.forDocument(docId);
+    const pageOrder = getDocumentPageOrder(this.getCoreDocument(docId));
+    const visualPageNumber = pageOrder.indexOf(destination.pageIndex) + 1;
+    const pageNumber = visualPageNumber > 0 ? visualPageNumber : destination.pageIndex + 1;
 
     if (destination.zoom.mode === PdfZoomMode.XYZ) {
       const coreDoc = this.getCoreDocument(docId);
       const page = coreDoc?.document?.pages.find((p) => p.index === destination.pageIndex);
 
       scrollScope.scrollToPage({
-        pageNumber: destination.pageIndex + 1,
+        pageNumber,
         pageCoordinates:
           page && destination.zoom.params
             ? { x: destination.zoom.params.x, y: page.size.height - destination.zoom.params.y }
@@ -2810,7 +2814,7 @@ export class AnnotationPlugin extends BasePlugin<
       });
     } else {
       scrollScope.scrollToPage({
-        pageNumber: destination.pageIndex + 1,
+        pageNumber,
         behavior: 'smooth',
       });
     }

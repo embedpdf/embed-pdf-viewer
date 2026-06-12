@@ -1,4 +1,10 @@
-import { BasePlugin, createBehaviorEmitter, Listener, PluginRegistry } from '@embedpdf/core';
+import {
+  BasePlugin,
+  createBehaviorEmitter,
+  getOrderedPages,
+  Listener,
+  PluginRegistry,
+} from '@embedpdf/core';
 import { PdfPageObject } from '@embedpdf/models';
 import {
   SpreadCapability,
@@ -212,7 +218,7 @@ export class SpreadPlugin extends BasePlugin<
     }
 
     const grouping = spreadState.pageGrouping ?? [];
-    const pages = coreDoc.document.pages;
+    const pages = getOrderedPages(coreDoc);
 
     // Map indices to actual page objects
     return grouping.map((indices) => indices.map((idx) => pages[idx]).filter(Boolean));

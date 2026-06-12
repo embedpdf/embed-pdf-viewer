@@ -58,6 +58,7 @@ export enum ScrollStrategy {
 }
 
 export interface PageVisibilityMetrics {
+  pageIndex: number;
   pageNumber: number;
   viewportX: number;
   viewportY: number;
