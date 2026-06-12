@@ -12,6 +12,7 @@ import { ZoomState, ZoomDocumentState, ZoomMode } from './types';
 export const initialDocumentState: ZoomDocumentState = {
   zoomLevel: ZoomMode.Automatic,
   currentZoomLevel: 1,
+  currentUserZoomLevel: 1,
   isMarqueeZoomActive: false,
 };
 
@@ -53,7 +54,7 @@ export const zoomReducer: Reducer<ZoomState, ZoomAction> = (state = initialState
     }
 
     case SET_ZOOM_LEVEL: {
-      const { documentId, zoomLevel, currentZoomLevel } = action.payload;
+      const { documentId, zoomLevel, currentZoomLevel, currentUserZoomLevel } = action.payload;
       const docState = state.documents[documentId];
       if (!docState) return state;
 
@@ -65,6 +66,7 @@ export const zoomReducer: Reducer<ZoomState, ZoomAction> = (state = initialState
             ...docState,
             zoomLevel,
             currentZoomLevel,
+            currentUserZoomLevel,
           },
         },
       };

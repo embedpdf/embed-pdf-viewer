@@ -2292,9 +2292,15 @@ importers:
       '@embedpdf/plugin-viewport':
         specifier: workspace:*
         version: link:../plugin-viewport
+      '@types/jest':
+        specifier: ^30.0.0
+        version: 30.0.0
       '@types/react':
         specifier: ^18.2.0
         version: 18.3.28
+      jest:
+        specifier: ^30.2.0
+        version: 30.2.0(@types/node@22.19.11)(babel-plugin-macros@3.1.0)(ts-node@10.9.2(@types/node@22.19.11)(typescript@5.9.3))
       typescript:
         specifier: ^5.0.0
         version: 5.9.3

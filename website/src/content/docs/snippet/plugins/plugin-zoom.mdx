@@ -28,6 +28,19 @@ const viewer = EmbedPDF.init({
 });
 ```
 
+To render pages at their true physical size — where 100 % zoom makes an A4 page roughly its real-world width on screen — enable `usePhysicalScaling`:
+
+```javascript
+const viewer = EmbedPDF.init({
+  type: 'container',
+  target: document.getElementById('pdf-viewer'),
+  zoom: {
+    defaultZoomLevel: ZoomMode.FitPage,
+    usePhysicalScaling: true
+  }
+});
+```
+
 ### Available Zoom Modes
 
 The `ZoomMode` enum provides standard presets:
@@ -94,6 +107,6 @@ const docZoom = zoomPlugin.forDocument('my-document-id');
 
 // Subscribe to state changes
 docZoom.onStateChange((state) => {
-  console.log('Current Zoom:', state.currentZoomLevel);
+  console.log('Current Zoom:', state.currentUserZoomLevel);
 });
 ```

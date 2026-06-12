@@ -3938,7 +3938,7 @@ export const brazilianPortugueseTranslations: Locale = {
 export const paramResolvers: ParamResolvers<State> = {
   'zoom.level': ({ state, documentId }) => {
     const zoomLevel = documentId
-      ? (state.plugins[ZOOM_PLUGIN_ID]?.documents[documentId]?.currentZoomLevel ?? 1)
+      ? (state.plugins[ZOOM_PLUGIN_ID]?.documents[documentId]?.currentUserZoomLevel ?? 1)
       : 1;
     return {
       level: Math.round(zoomLevel * 100),

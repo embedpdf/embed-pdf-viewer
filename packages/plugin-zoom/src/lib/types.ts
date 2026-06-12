@@ -56,7 +56,10 @@ export interface RegisterMarqueeOnPageOptions {
 // Per-document zoom state
 export interface ZoomDocumentState {
   zoomLevel: ZoomLevel; // last **requested** level
-  currentZoomLevel: number; // actual numeric factor
+  currentZoomLevel: number; // actual numeric factor (effective / render scale)
+  // user-space scale = currentZoomLevel / DPR
+  // equals currentZoomLevel when usePhysicalScaling is off
+  currentUserZoomLevel: number;
   isMarqueeZoomActive: boolean; // whether marquee zoom mode is active
 }
 
@@ -72,6 +75,12 @@ export interface ZoomScope {
   toggleMarqueeZoom(): void;
   isMarqueeZoomActive(): boolean;
   getState(): ZoomDocumentState;
+  /**
+   * The combined physical-scale multiplier currently in effect:
+   * `(96 / 72) × devicePixelRatio` — the pt-to-CSS-px constant times the
+   * device pixel ratio. Returns 1 when `usePhysicalScaling` is disabled.
+   */
+  getDpr(): number;
   onZoomChange: EventHook<ZoomChangeEvent>;
   onStateChange: EventHook<ZoomDocumentState>;
 }
@@ -88,6 +97,12 @@ export interface ZoomCapability {
   toggleMarqueeZoom(): void;
   isMarqueeZoomActive(): boolean;
   getState(): ZoomDocumentState;
+  /**
+   * The combined physical-scale multiplier currently in effect:
+   * `(96 / 72) × devicePixelRatio` — the pt-to-CSS-px constant times the
+   * device pixel ratio. Returns 1 when `usePhysicalScaling` is disabled.
+   */
+  getDpr(): number;
 
   // Document-scoped operations
   forDocument(documentId: string): ZoomScope;
@@ -124,6 +139,24 @@ export interface ZoomPluginConfig extends BasePluginConfig {
   zoomStep?: number;
   zoomRanges?: ZoomRangeStep[];
   presets?: ZoomPreset[];
+  /**
+   * When true, treat all numeric zoom values as logical / user-space values
+   * and multiply them by `(96 / 72) × devicePixelRatio` to obtain the actual
+   * render scale. The `96/72` factor converts PDF points to CSS pixels
+   * (1 CSS inch = 96 px, 1 PDF point = 1/72 inch), ensuring 100 % maps to
+   * the display's physical DPI. The `devicePixelRatio` factor then keeps the
+   * rendered size correct as the OS display scale changes.
+   *
+   * At 100 % zoom on a standard 96 DPI, DPR=1 screen, an A4 page is ~794 CSS
+   * pixels wide — its true physical width — matching Acrobat's "Use system
+   * setting" behaviour.
+   *
+   * Fit modes (`fit-width`, `fit-page`, `automatic`) are unaffected — they
+   * continue to fit the viewport in CSS-pixel space.
+   *
+   * Default: `false` (1 PDF point = 1 CSS pixel — CSS-spec behaviour).
+   */
+  usePhysicalScaling?: boolean;
 }
 
 export interface ZoomState {

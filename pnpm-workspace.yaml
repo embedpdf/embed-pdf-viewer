@@ -6,3 +6,5 @@ packages:
   - 'website'
     # exclude the git submodule (and everything inside it)
   - '!packages/pdfium/pdfium-src/**'
+  # exclude Vercel build output artifacts (contain nested package.json files)
+  - '!examples/**/.vercel/**'

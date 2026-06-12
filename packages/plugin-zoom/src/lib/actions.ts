@@ -35,6 +35,7 @@ export interface SetZoomLevelAction extends Action {
     documentId: string;
     zoomLevel: ZoomLevel;
     currentZoomLevel: number;
+    currentUserZoomLevel: number;
   };
 }
 
@@ -70,8 +71,12 @@ export function setZoomLevel(
   documentId: string,
   zoomLevel: ZoomLevel,
   currentZoomLevel: number,
+  currentUserZoomLevel: number,
 ): SetZoomLevelAction {
-  return { type: SET_ZOOM_LEVEL, payload: { documentId, zoomLevel, currentZoomLevel } };
+  return {
+    type: SET_ZOOM_LEVEL,
+    payload: { documentId, zoomLevel, currentZoomLevel, currentUserZoomLevel },
+  };
 }
 
 export function setMarqueeZoomActive(
