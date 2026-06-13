@@ -3355,6 +3355,8 @@ export interface SanitizeOptions {
   embeddedThumbnails?: boolean;
   /** Remove all embedded-file attachments. Default true. */
   attachments?: boolean;
+  /** Remove content governed by hidden optional-content groups (layers). Default true. */
+  optionalContentGroups?: boolean;
 }
 
 /**

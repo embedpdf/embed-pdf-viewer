@@ -3262,6 +3262,7 @@ export class PdfiumNative implements IPdfiumExecutor {
       javascript: true,
       embeddedThumbnails: true,
       attachments: true,
+      optionalContentGroups: true,
       ...options,
     };
 
@@ -3273,6 +3274,9 @@ export class PdfiumNative implements IPdfiumExecutor {
     }
     if (opts.embeddedThumbnails) {
       this.pdfiumModule.EPDF_RemoveEmbeddedThumbnails(ctx.docPtr);
+    }
+    if (opts.optionalContentGroups) {
+      this.pdfiumModule.EPDF_RemoveOptionalContentGroups(ctx.docPtr);
     }
     if (opts.attachments) {
       // Delete from the end so earlier indices stay valid as entries are removed.

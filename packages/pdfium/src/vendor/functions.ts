@@ -14,6 +14,7 @@ export const functions = {
   EPDF_RemoveAllJavaScript: [["number"] as const, 'boolean'] as const,
   EPDF_RemoveEmbeddedThumbnails: [["number"] as const, 'boolean'] as const,
   EPDF_RemoveEncryption: [["number"] as const, 'boolean'] as const,
+  EPDF_RemoveOptionalContentGroups: [["number"] as const, 'boolean'] as const,
   EPDF_RemoveXMPMetadata: [["number"] as const, 'boolean'] as const,
   EPDF_RenderAnnotBitmap: [["number","number","number","number","number","number"] as const, 'boolean'] as const,
   EPDF_RenderAnnotBitmapUnrotated: [["number","number","number","number","number","number"] as const, 'boolean'] as const,
