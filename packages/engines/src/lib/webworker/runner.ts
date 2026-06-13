@@ -393,6 +393,9 @@ export class EngineRunner {
       case 'saveAsCopy':
         this.handleTask(request.id, engine.saveAsCopy!(...args));
         return;
+      case 'sanitizeDocument':
+        this.handleTask(request.id, engine.sanitizeDocument!(...args));
+        return;
       case 'getAttachments':
         this.handleTask(request.id, engine.getAttachments!(...args));
         return;

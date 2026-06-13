@@ -1,0 +1,13 @@
+import { readFileSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
+import { loadDoc, catalogHas, namesSubtree, anyPageHasThumb, assert } from './assert-helpers.mjs';
+const bytes = readFileSync(fileURLToPath(new URL('./dirty.pdf', import.meta.url)));
+const doc = await loadDoc(bytes);
+assert(catalogHas(doc, 'Metadata'), 'XMP /Metadata present');
+assert(catalogHas(doc, 'OpenAction'), '/OpenAction present');
+assert(namesSubtree(doc, 'JavaScript') !== undefined, '/Names /JavaScript present');
+assert(namesSubtree(doc, 'EmbeddedFiles') !== undefined, '/Names /EmbeddedFiles present');
+assert(anyPageHasThumb(doc), 'page /Thumb present');
+const info = doc.getAuthor();
+assert(info === 'Jane Privileged', 'Info author present, got: ' + info);
+console.log('FIXTURE OK: all vectors present (XMP, OpenAction, JS name tree, EmbeddedFiles, Thumb, Info author)');
