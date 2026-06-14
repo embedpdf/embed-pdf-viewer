@@ -66,6 +66,7 @@ provide<PDFContextState>(pdfKey, {
   documentStates,
 });
 
+let unsubscribe: () => void | undefined;
 onMounted(async () => {
   // Merge deprecated logger prop into config (config.logger takes precedence)
   const finalConfig: PluginRegistryConfig = {
@@ -83,7 +84,7 @@ onMounted(async () => {
   const store = reg.getStore();
   coreState.value = store.getState().core;
 
-  const unsubscribe = store.subscribe((action, newState, oldState) => {
+  unsubscribe = store.subscribe((action, newState, oldState) => {
     // Only update if it's a core action and the core state changed
     if (store.isCoreAction(action) && newState.core !== oldState.core) {
       coreState.value = newState.core;
@@ -105,12 +106,13 @@ onMounted(async () => {
       pluginsOk.value = true;
     }
   });
-
-  onBeforeUnmount(() => {
-    unsubscribe();
-    registry.value?.destroy();
-  });
 });
+
+onBeforeUnmount(() => {
+  unsubscribe?.();
+  registry.value?.destroy();
+});
+
 </script>
 
 <template>
