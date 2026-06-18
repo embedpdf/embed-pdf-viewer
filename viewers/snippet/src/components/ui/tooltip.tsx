@@ -49,23 +49,31 @@ export function Tooltip({
     if (!reference.current?.base || !floating.current) return;
 
     return autoUpdate(reference.current.base, floating.current, () => {
-      computePosition(reference.current!.base, floating.current!, {
+      const referenceEl = reference.current?.base;
+      const floatingEl = floating.current;
+      const arrowEl = arrow.current;
+
+      if (!referenceEl || !floatingEl || !arrowEl) return;
+
+      computePosition(referenceEl, floatingEl, {
         placement: position,
         middleware: [
           offset(8),
           flip(),
           shift({ padding: 8 }),
-          arrowMw({ element: arrow.current!, padding: 6 }),
+          arrowMw({ element: arrowEl, padding: 6 }),
         ],
       }).then(({ x, y, placement, middlewareData }) => {
-        Object.assign(floating.current!.style, { left: `${x}px`, top: `${y}px` });
+        if (!floating.current || !arrow.current) return;
+
+        Object.assign(floating.current.style, { left: `${x}px`, top: `${y}px` });
 
         const { x: ax, y: ay } = middlewareData.arrow ?? {};
         const side = placement.split('-')[0] as 'top' | 'bottom' | 'left' | 'right';
         const staticSide = { top: 'bottom', bottom: 'top', left: 'right', right: 'left' }[side];
 
         /* --- **critical change**: clear the axis we don't use --- */
-        Object.assign(arrow.current!.style, {
+        Object.assign(arrow.current.style, {
           left: ax != null ? `${ax}px` : '',
           top: ay != null ? `${ay}px` : '',
           right: '',
