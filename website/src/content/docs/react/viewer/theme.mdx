@@ -184,7 +184,7 @@ export default function ThemeSync() {
   const viewerRef = useRef<PDFViewerRef>(null);
 
   useEffect(() => {
-    viewerRef.current?.setTheme(theme);
+    viewerRef.current?.container?.setTheme(theme);
   }, [theme]);
 
   return (
