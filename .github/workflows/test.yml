@@ -177,3 +177,12 @@ jobs:
         run: |
           pnpm --filter @embedpdf/example-angular-pdf-viewer run e2e
           pnpm --filter @embedpdf/example-angular-tailwind run e2e
+      - name: Upload Angular e2e failure outputs
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: angular-e2e-failure-outputs
+          path: |
+            examples/angular-pdf-viewer/test-results
+            examples/angular-tailwind/test-results
+          if-no-files-found: ignore
