@@ -578,7 +578,7 @@ const HeadlessShowcase = () => {
                     key={idx}
                     className="group flex flex-col items-center rounded-lg border border-gray-100 bg-white p-3 text-center transition-all hover:-translate-y-0.5 hover:border-blue-200 hover:shadow-md dark:border-gray-800 dark:bg-gray-900 dark:hover:border-blue-700"
                   >
-                    <div className="mb-1.5 rounded-md bg-gray-50 p-1.5 text-gray-500 transition-colors group-hover:bg-blue-50 group-hover:text-blue-600 dark:bg-gray-800 dark:text-gray-500 dark:group-hover:bg-blue-900/30 dark:group-hover:text-blue-400">
+                    <div className="mb-1.5 rounded-md bg-blue-50 p-1.5 text-blue-700 transition-colors group-hover:bg-blue-100 group-hover:text-blue-800 dark:bg-blue-900/20 dark:text-blue-300 dark:group-hover:bg-blue-900/40 dark:group-hover:text-blue-200">
                       {plugin.icon}
                     </div>
                     <span className="text-[11px] font-medium text-gray-700 dark:text-gray-300">
@@ -776,7 +776,7 @@ const faqs = [
   {
     question: 'Does it work with the latest Angular and zoneless mode?',
     answer:
-      'Yes. The viewer is built and tested against Angular 21, ships as a standalone component, and works under provideZonelessChangeDetection(). Change detection is driven by signals — there is no NgZone dependency.',
+      'Yes. The viewer is built and tested against Angular 22, ships as a standalone component, and works under provideZonelessChangeDetection(). Change detection is driven by signals — there is no NgZone dependency.',
   },
   {
     question: 'Can I use it with Angular Material, PrimeNG, or Spartan/ng?',

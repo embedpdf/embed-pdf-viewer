@@ -1,4 +1,4 @@
-import { Component } from '@angular/core';
+import { Component, PLATFORM_ID } from '@angular/core';
 import { TestBed, type ComponentFixture } from '@angular/core/testing';
 import EmbedPDF from '@embedpdf/snippet';
 import type { EmbedPdfContainer, PDFViewerConfig, PluginRegistry } from '@embedpdf/snippet';
@@ -117,6 +117,21 @@ describe('PDFViewer', () => {
     const callArg = initSpy.mock.calls[0]![0];
     expect(callArg.type).toBe('container');
     expect(callArg.target).toBe(fixture.nativeElement);
+  });
+
+  it('does not initialize EmbedPDF when rendered under the server platform id', async () => {
+    TestBed.resetTestingModule();
+    TestBed.configureTestingModule({
+      imports: [PDFViewer],
+      providers: [{ provide: PLATFORM_ID, useValue: 'server' }],
+    });
+
+    const fixture = createViewerFixture();
+    initSpy.mockReturnValue(undefined);
+    fixture.detectChanges();
+    await fixture.whenStable();
+
+    expect(initSpy).not.toHaveBeenCalled();
   });
 
   it('emits init and ready when the snippet returns a viewer', async () => {

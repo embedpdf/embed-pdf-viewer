@@ -84,7 +84,7 @@ export default class PrintExample {
     this.isPrinting.set(true);
     scope.print().wait(
       () => this.isPrinting.set(false),
-      (error) => {
+      (error: unknown) => {
         console.error('Print failed', error);
         this.isPrinting.set(false);
       },

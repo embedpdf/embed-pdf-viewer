@@ -1,8 +1,10 @@
+import { isPlatformBrowser } from '@angular/common';
 import {
   ChangeDetectionStrategy,
   Component,
   DestroyRef,
   ElementRef,
+  PLATFORM_ID,
   afterNextRender,
   computed,
   effect,
@@ -73,12 +75,15 @@ export class PDFViewer {
 
   private readonly hostRef = inject<ElementRef<HTMLElement>>(ElementRef);
   private readonly destroyRef = inject(DestroyRef);
+  private readonly platformId = inject(PLATFORM_ID);
   private readonly defaultConfig = inject(EMBEDPDF_VIEWER_DEFAULT_CONFIG, { optional: true });
   private readonly resolvedConfig = computed(() =>
     mergeViewerConfigs(this.defaultConfig, this.config()),
   );
 
   constructor() {
+    if (!isPlatformBrowser(this.platformId)) return;
+
     effect(() => {
       const config = this.resolvedConfig();
       const viewer = untracked(() => this._container());

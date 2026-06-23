@@ -26,9 +26,10 @@
     "e2e": "playwright test"
   },
   "dependencies": {
-    "@angular/compiler": "^21.2.12",
-    "@angular/core": "^21.2.12",
-    "@angular/platform-browser": "^21.2.12",
+    "@angular/common": "^22.0.2",
+    "@angular/compiler": "^22.0.2",
+    "@angular/core": "^22.0.2",
+    "@angular/platform-browser": "^22.0.2",
     "rxjs": "^7.8.2",
     "tslib": "^2.8.1"
   },
@@ -36,15 +37,15 @@
     "@embedpdf/angular-pdf-viewer": "*"
   },
   "devDependencies": {
-    "@analogjs/vite-plugin-angular": "^2.5.0",
-    "@angular/build": "^21.2.10",
-    "@angular/compiler-cli": "^21.2.12",
+    "@analogjs/vite-plugin-angular": "^2.6.1",
+    "@angular/build": "^22.0.3",
+    "@angular/compiler-cli": "^22.0.2",
     "@embedpdf/angular-pdf-viewer": "workspace:*",
     "@playwright/test": "^1.59.1",
     "@tailwindcss/vite": "^4.1.18",
     "glob": "^13.0.0",
     "tailwindcss": "^4.1.11",
-    "typescript": "^5.9.3",
+    "typescript": "^6.0.3",
     "vite": "^6.4.1",
     "vite-plugin-dts": "^4.5.4"
   }

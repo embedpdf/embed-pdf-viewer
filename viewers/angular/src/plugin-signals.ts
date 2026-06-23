@@ -45,7 +45,7 @@ export function createDocumentScopeSignal<TCapability extends DocumentScopedCapa
     const resolvedCapability = readValue(capability);
     const resolvedDocumentId = readValue(documentId);
 
-    if (!resolvedCapability || !resolvedDocumentId) {
+    if (!resolvedCapability || resolvedDocumentId == null) {
       return null;
     }
 

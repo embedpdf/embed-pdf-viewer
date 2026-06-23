@@ -9,15 +9,21 @@
     "./angular-browser": "./src/angular-browser.ts"
   },
   "peerDependencies": {
-    "@analogjs/vite-plugin-angular": ">=2.5.0",
+    "@analogjs/vite-plugin-angular": ">=2.6.0",
     "@vitest/browser": ">=4.0.0",
     "@vitest/browser-playwright": ">=4.0.0",
     "vite": ">=6.0.0",
     "vitest": ">=4.0.0"
   },
   "peerDependenciesMeta": {
-    "@analogjs/vite-plugin-angular": { "optional": true },
-    "@vitest/browser": { "optional": true },
-    "@vitest/browser-playwright": { "optional": true }
+    "@analogjs/vite-plugin-angular": {
+      "optional": true
+    },
+    "@vitest/browser": {
+      "optional": true
+    },
+    "@vitest/browser-playwright": {
+      "optional": true
+    }
   }
 }

@@ -2,7 +2,7 @@
 '@embedpdf/angular-pdf-viewer': minor
 ---
 
-Initial release of `@embedpdf/angular-pdf-viewer`. Provides an Angular 21+ standalone `PDFViewer` component (selector `<embedpdf-viewer>`) that wraps `@embedpdf/snippet`, mirroring the contract of the existing Vue/React/Svelte wrapper viewers:
+Initial release of `@embedpdf/angular-pdf-viewer`. Provides an Angular 22+ standalone `PDFViewer` component (selector `<embedpdf-viewer>`) that wraps `@embedpdf/snippet`, mirroring the contract of the existing Vue/React/Svelte wrapper viewers:
 
 - Signal-based `config` input
 - Signal-based outputs: `(init)`, `(ready)`, `(themeChange)` (forwards the snippet's `themechange` custom event)

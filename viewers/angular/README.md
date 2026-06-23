@@ -4,7 +4,7 @@
   </a>
 
   <h1>Angular PDF Viewer</h1>
-  <p>The easiest way to embed PDF files in your Angular 21+ application with a complete, ready‑to‑use interface.</p>
+  <p>The easiest way to embed PDF files in your Angular 22+ application with a complete, ready‑to‑use interface.</p>
 
 <a href="https://www.embedpdf.com/angular-pdf-viewer"><img alt="Documentation" src="https://img.shields.io/badge/View%20Docs-0af?style=for-the-badge&labelColor=000000"></a>
 <a href="https://app.embedpdf.com/"><img alt="Live Demo" src="https://img.shields.io/badge/Try%20Live%20Demo-ff1493.svg?style=for-the-badge&labelColor=000000"></a>
@@ -24,7 +24,7 @@ The full walkthrough, advanced examples, and API reference live in our docs site
 
 ## 🚀 Introduction
 
-The `@embedpdf/angular-pdf-viewer` package provides a complete, production-ready PDF viewing experience for Angular 21+ applications.
+The `@embedpdf/angular-pdf-viewer` package provides a complete, production-ready PDF viewing experience for Angular 22+ applications.
 
 It is designed to be the fastest way to get a high-quality PDF viewer into your app. You don't need to build toolbars, handle layout logic, or worry about CSS—it just works.
 
@@ -51,7 +51,7 @@ pnpm add @embedpdf/angular-pdf-viewer
 yarn add @embedpdf/angular-pdf-viewer
 ```
 
-Requires Angular `>=21.0.0` as a peer dependency.
+Requires Angular `>=22.0.0` as a peer dependency.
 
 ---
 

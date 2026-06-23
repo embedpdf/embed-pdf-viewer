@@ -88,7 +88,7 @@ jobs:
           tarball=$(ls -1 "$tmp_dir"/*.tgz | head -n 1)
           (
             cd "$tmp_dir"
-            npx -y @angular/cli@21 new consumer-app --defaults --standalone --skip-git --package-manager pnpm --routing false --style css
+            npx -y @angular/cli@22 new consumer-app --defaults --standalone --skip-git --package-manager pnpm --routing false --style css
           )
           cd "$tmp_dir/consumer-app"
           pnpm add "$tarball"
