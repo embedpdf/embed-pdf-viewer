@@ -1,10 +1,10 @@
 'use client'
 
 import React, { useState } from 'react'
-import { ReactIcon, VueIcon, SvelteIcon } from './framework-icons'
+import { AngularIcon, ReactIcon, VueIcon, SvelteIcon } from './framework-icons'
 import { EMBEDPDF_JS_URL, DEMO_PDF_URL } from './cdn-snippet'
 
-export type Framework = 'snippet' | 'react' | 'vue' | 'svelte'
+export type Framework = 'snippet' | 'react' | 'vue' | 'svelte' | 'angular'
 
 interface Tab {
   id: Framework
@@ -66,7 +66,25 @@ const tabs: Tab[] = [
     color: 'text-orange-500',
     hoverColor: 'group-hover:text-orange-400',
   },
+  {
+    id: 'angular',
+    label: 'Angular',
+    filename: 'app.component.ts',
+    icon: <AngularIcon className="h-4 w-4" />,
+    color: 'text-fuchsia-400',
+    hoverColor: 'group-hover:text-fuchsia-300',
+  },
 ]
+
+const angularTemplate = `<embedpdf-viewer [config]="{ src: '/demo.pdf' }" (ready)="onReady($event)" style="height: 500px" />`
+
+const tabIndicatorGradients: Record<Framework, string> = {
+  snippet: 'from-orange-500 to-amber-400',
+  react: 'from-cyan-500 to-blue-400',
+  vue: 'from-emerald-500 to-green-400',
+  svelte: 'from-orange-600 to-red-500',
+  angular: 'from-pink-500 via-fuchsia-500 to-violet-500',
+}
 
 const codeSnippets: Record<Framework, string> = {
   snippet: `<div id="pdf-viewer" style="height: 500px"></div>
@@ -77,7 +95,7 @@ const codeSnippets: Record<Framework, string> = {
     type: 'container',
     target: document.getElementById('pdf-viewer'),
     src: '${DEMO_PDF_URL}'
-  }) 
+  })
 </script>`,
   react: `import { PDFViewer } from '@embedpdf/react-pdf-viewer';
 
@@ -120,6 +138,19 @@ function onReady(registry) {
   style="height: 500px"
   {onready}
 />`,
+  angular: `import { Component } from '@angular/core'
+import { PDFViewer, type PluginRegistry } from '@embedpdf/angular-pdf-viewer'
+
+@Component({
+  selector: 'app-root',
+  imports: [PDFViewer],
+  template: \`${angularTemplate}\`,
+})
+export class App {
+  onReady(registry: PluginRegistry) {
+    console.log('PDF viewer ready!', registry)
+  }
+}`,
 }
 
 // Syntax highlighting components for each framework
@@ -353,11 +384,64 @@ const SvelteCode = () => (
   </code>
 )
 
+const AngularCode = () => (
+  <code className="text-gray-300">
+    <span className="text-purple-400">import</span> {'{ '}
+    <span className="text-white">Component</span>
+    {' }'} <span className="text-purple-400">from</span>{' '}
+    <span className="text-yellow-300">&apos;@angular/core&apos;</span>
+    {'\n'}
+    <span className="text-purple-400">import</span> {'{ '}
+    <span className="text-white">PDFViewer</span>,{' '}
+    <span className="text-purple-400">type</span>{' '}
+    <span className="text-white">PluginRegistry</span>
+    {' }'} <span className="text-purple-400">from</span>{' '}
+    <span className="text-yellow-300">
+      &apos;@embedpdf/angular-pdf-viewer&apos;
+    </span>
+    {'\n\n'}
+    <span className="text-cyan-300">@</span>
+    <span className="text-yellow-300">Component</span>({'{'}
+    {'\n'}
+    {'  '}
+    <span className="text-red-300">selector</span>:{' '}
+    <span className="text-yellow-300">&apos;app-root&apos;</span>,{'\n'}
+    {'  '}
+    <span className="text-red-300">imports</span>:{' '}
+    <span className="text-cyan-300">[</span>
+    <span className="text-white">PDFViewer</span>
+    <span className="text-cyan-300">]</span>,{'\n'}
+    {'  '}
+    <span className="text-red-300">template</span>:{' '}
+    <span className="text-yellow-300">{`\`${angularTemplate}\``}</span>,{'\n'}
+    {'}'}){'\n'}
+    <span className="text-purple-400">export class</span>{' '}
+    <span className="text-blue-300">App</span> {'{'}
+    {'\n'}
+    {'  '}
+    <span className="text-blue-300">onReady</span>(
+    <span className="text-orange-300">registry</span>:
+    <span className="text-white"> PluginRegistry</span>) {'{'}
+    {'\n'}
+    {'    '}
+    <span className="text-white">console</span>.
+    <span className="text-blue-300">log</span>(
+    <span className="text-yellow-300">&apos;PDF viewer ready!&apos;</span>,{' '}
+    <span className="text-orange-300">registry</span>)
+    {'\n'}
+    {'  '}
+    {'}'}
+    {'\n'}
+    {'}'}
+  </code>
+)
+
 const codeComponents: Record<Framework, React.FC> = {
   snippet: SnippetCode,
   react: ReactCode,
   vue: VueCode,
   svelte: SvelteCode,
+  angular: AngularCode,
 }
 
 export const CodeShowcase = ({ framework, onTabChange }: CodeShowcaseProps) => {
@@ -429,15 +513,7 @@ export const CodeShowcase = ({ framework, onTabChange }: CodeShowcaseProps) => {
                   {/* Active tab indicator */}
                   {activeTab === tab.id && (
                     <div
-                      className={`absolute bottom-0 left-0 right-0 h-0.5 bg-gradient-to-r ${
-                        tab.id === 'snippet'
-                          ? 'from-orange-500 to-amber-400'
-                          : tab.id === 'react'
-                            ? 'from-cyan-500 to-blue-400'
-                            : tab.id === 'vue'
-                              ? 'from-emerald-500 to-green-400'
-                              : 'from-orange-600 to-red-500'
-                      }`}
+                      className={`absolute bottom-0 left-0 right-0 h-0.5 bg-gradient-to-r ${tabIndicatorGradients[tab.id]}`}
                     />
                   )}
                   <span

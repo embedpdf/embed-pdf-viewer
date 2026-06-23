@@ -1,0 +1,217 @@
+---
+title: Getting Started
+description: Add a complete PDF viewer to your Angular app in under 5 minutes.
+searchable: true
+---
+
+# Getting Started with the Drop-in Viewer
+
+The `@embedpdf/angular-pdf-viewer` package provides a complete, production-ready PDF viewer component. It includes a toolbar, sidebar with thumbnails, and all the features you'd expect—right out of the box.
+
+In Angular, the viewer is exposed as a standalone component and can share app-wide defaults through `provideEmbedPdfViewerDefaults(...)`.
+
+## Installation
+
+```sh npm2yarn
+npm install @embedpdf/angular-pdf-viewer
+```
+
+## Bootstrap Shared Defaults
+
+```ts copy filename="src/main.ts"
+import '@angular/compiler';
+import { provideZonelessChangeDetection } from '@angular/core';
+import { bootstrapApplication } from '@angular/platform-browser';
+import { provideEmbedPdfViewerDefaults } from '@embedpdf/angular-pdf-viewer';
+
+import { App } from './app/app.component';
+
+bootstrapApplication(App, {
+  providers: [
+    provideZonelessChangeDetection(),
+    provideEmbedPdfViewerDefaults({
+      theme: {
+        preference: 'dark',
+      },
+    }),
+  ],
+});
+```
+
+`provideEmbedPdfViewerDefaults()` returns Angular `EnvironmentProviders`, so it can be used directly in `bootstrapApplication(...)` or route-level `providers`.
+
+If you want to override defaults for a specific component subtree, use `provideEmbedPdfViewerConfig()`. That helper returns a `Provider[]` on purpose so it can be used in local injectors such as `@Component({ providers: [...] })`.
+
+## Config layers at a glance
+
+Angular viewer config is designed to layer naturally:
+
+1. **Application defaults** — use `provideEmbedPdfViewerDefaults(...)` at bootstrap.
+2. **Component or subtree defaults** — use `provideEmbedPdfViewerConfig(...)` in local `providers`.
+3. **Viewer instance overrides** — pass `[config]` directly to `<embedpdf-viewer>`.
+
+The most local value wins. Plain objects are merged deeply, `undefined` values are ignored, and arrays are replaced.
+
+If a provider already supplies everything a viewer needs, you can render `<embedpdf-viewer />` without `[config]`. Use `[config]` when a specific viewer instance needs its own `src` or other local overrides.
+
+## Basic Usage
+
+Import the `PDFViewer` component and render it with a PDF source:
+
+```ts copy filename="src/app/app.component.ts"
+import { ChangeDetectionStrategy, Component } from '@angular/core';
+import { PDFViewer, type PDFViewerConfig } from '@embedpdf/angular-pdf-viewer';
+
+@Component({
+  selector: 'app-root',
+  imports: [PDFViewer],
+  template: `
+    <embedpdf-viewer class="viewer" [config]="viewerConfig" />
+  `,
+  styles: `
+    .viewer {
+      height: 100vh;
+    }
+  `,
+  changeDetection: ChangeDetectionStrategy.OnPush,
+})
+export class App {
+  readonly viewerConfig = {
+    src: 'https://snippet.embedpdf.com/ebook.pdf',
+  } satisfies PDFViewerConfig;
+}
+```
+
+That's it! You now have a fully functional PDF viewer.
+
+## Component-level override example
+
+If your app already provides shared defaults, a specific component can override them for just its own subtree.
+
+In this example, the application can keep a global dark theme, while this one viewer subtree switches to a light theme and hides annotations.
+
+```ts copy filename="src/app/invoice-viewer.component.ts"
+import { ChangeDetectionStrategy, Component } from '@angular/core';
+import {
+  PDFViewer,
+  provideEmbedPdfViewerConfig,
+  type PDFViewerConfig,
+} from '@embedpdf/angular-pdf-viewer';
+
+@Component({
+  selector: 'app-invoice-viewer',
+  imports: [PDFViewer],
+  providers: [
+    provideEmbedPdfViewerConfig({
+      theme: {
+        preference: 'light',
+      },
+      disabledCategories: ['annotation'],
+    }),
+  ],
+  template: `
+    <embedpdf-viewer class="viewer" [config]="viewerConfig" />
+  `,
+  styles: `
+    .viewer {
+      height: 100vh;
+    }
+  `,
+  changeDetection: ChangeDetectionStrategy.OnPush,
+})
+export class InvoiceViewer {
+  readonly viewerConfig = {
+    src: 'https://snippet.embedpdf.com/ebook.pdf',
+  } satisfies PDFViewerConfig;
+}
+```
+
+That component inherits any app-level defaults you already registered, then applies its own local defaults, and finally merges the `[config]` input for the individual viewer instance.
+
+## Useful events
+
+The component exposes Angular outputs for common lifecycle moments:
+
+- `(init)` — fired when the underlying viewer container is created.
+- `(ready)` — fired when the plugin registry resolves.
+- `(themeChange)` — fired when the active theme changes.
+
+These hooks make it easy to register commands, tweak UI schema, or sync viewer state with your Angular app.
+
+## Configuration Options
+
+The `[config]` input accepts a `PDFViewerConfig` object. The shape is intentionally flat at the top level:
+
+- document and engine settings live at the root,
+- appearance and global feature toggles also live at the root,
+- and plugin-specific overrides use keys that match the plugin name, such as `zoom`, `scroll`, `annotations`, or `documentManager`.
+
+In Angular, shared defaults from `provideEmbedPdfViewerDefaults(...)` or `provideEmbedPdfViewerConfig(...)` are merged with each component's `[config]` input. Plain objects are merged deeply, `undefined` values are ignored, and arrays are replaced by the most local value.
+
+That means you can keep app-wide defaults in providers, override them for a subtree when needed, and still customize what changes per viewer instance.
+
+### Common config example
+
+```ts copy filename="src/app/app.component.ts"
+import {
+  type PDFViewerConfig,
+  ScrollStrategy,
+  ZoomMode,
+} from '@embedpdf/angular-pdf-viewer';
+
+readonly viewerConfig = {
+  src: 'https://snippet.embedpdf.com/ebook.pdf',
+  theme: {
+    preference: 'light',
+  },
+  disabledCategories: ['annotation'],
+  zoom: {
+    defaultZoomLevel: ZoomMode.FitPage,
+  },
+  scroll: {
+    defaultStrategy: ScrollStrategy.Vertical,
+  },
+} satisfies PDFViewerConfig;
+```
+
+### Root-level options
+
+These options control document loading, engine behavior, permissions, and high-level viewer behavior:
+
+| Option | Type | Description |
+| :--- | :--- | :--- |
+| `src` | `string` | URL or path to the PDF document |
+| `worker` | `boolean` | Enable the PDF worker. Defaults to `true` |
+| `wasmUrl` | `string` | Override the PDFium WebAssembly asset URL |
+| `log` | `boolean` | Enable debug logging |
+| `fontFallback` | `object` | Configure engine-level fallback fonts |
+| `permissions` | `object` | Control document permissions such as printing and editing. See [Security & Permissions](/docs/angular/viewer/security) |
+| `theme` | `object` | Theme configuration for light, dark, or system-aware display. See [Theme](/docs/angular/viewer/theme) |
+| `icons` | `object` | Register custom icons for the viewer UI |
+| `fonts` | `object` | Control snippet UI/signature webfont loading |
+| `tabBar` | `'always' \| 'multiple' \| 'never'` | Control visibility of the document tab bar. **Default**: `'multiple'` |
+| `disabledCategories` | `string[]` | Hide specific UI features such as annotation or search actions. See [Customizing the UI](/docs/angular/viewer/customizing-ui) |
+
+### Plugin option groups
+
+Each plugin-specific config is a `Partial<...>` of the underlying plugin config, so you can override only the fields you care about.
+
+| Group | Keys | What they control |
+| :--- | :--- | :--- |
+| Core viewer plugins | `documentManager`, `commands`, `i18n`, `ui`, `form` | Multi-document loading, command registry, translations, UI schema, and form support |
+| Viewing and navigation | `viewport`, `scroll`, `zoom`, `spread`, `rotation`, `pan` | Layout, page flow, zoom levels, spread mode, rotation, and hand-tool behavior |
+| Rendering and document features | `render`, `tiling`, `thumbnails`, `annotations`, `search`, `selection`, `bookmarks`, `attachments` | Page rendering, thumbnails, annotations, text search, text selection, bookmarks, and file attachments |
+| Tools and export | `capture`, `redaction`, `print`, `export`, `fullscreen` | Capture, redact, print, save/export, and fullscreen behavior |
+| Advanced and infrastructure | `stamp`, `signature`, `history`, `interactionManager` | Stamps, signature workflows, undo/redo history, and pointer/interaction coordination |
+
+### A few useful rules of thumb
+
+- Use `src` when you just want to open one document quickly.
+- Use `documentManager` when you need advanced loading or multiple documents.
+- Use `disabledCategories` for broad feature switches that should affect both commands and UI. See [Customizing the UI](/docs/angular/viewer/customizing-ui).
+- Use `ui` and `commands` when you need more targeted runtime customization. See [Customizing the UI](/docs/angular/viewer/customizing-ui).
+- Keep provider defaults for shared app-wide settings like theme, permissions, and localization.
+
+## Need More Control?
+
+If you want to coordinate viewer defaults with Angular providers, react to `(ready)` and `(init)`, or customize behavior at runtime, check out [Custom Integrations](/docs/angular/headless/introduction).

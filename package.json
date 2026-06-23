@@ -6,7 +6,14 @@
   "license": "MIT",
   "scripts": {
     "dev": "turbo run dev --parallel",
-    "dev:vanilla": "pnpm --filter @embedpdf/example-vanilla run dev",
+    "dev:angular": "pnpm --filter @embedpdf/example-angular-pdf-viewer run dev",
+    "dev:react-mui": "pnpm --filter @embedpdf/example-react-mui run dev",
+    "dev:react-tailwind": "pnpm --filter @embedpdf/example-react-tailwind run dev",
+    "dev:svelte-tailwind": "pnpm --filter @embedpdf/example-svelte-tailwind run dev",
+    "dev:vanilla": "pnpm --filter @embedpdf/example-vanilla-tailwind run dev",
+    "dev:vanilla-tailwind": "pnpm --filter @embedpdf/example-vanilla-tailwind run dev",
+    "dev:vue-tailwind": "pnpm --filter @embedpdf/example-vue-tailwind run dev",
+    "dev:vue-vuetify": "pnpm --filter @embedpdf/example-vue-vuetify run dev",
     "clean": "turbo run clean && rimraf .turbo/cache",
     "build:fresh": "pnpm clean && turbo run build",
     "build": "turbo run build",
@@ -16,11 +23,16 @@
     "build:packages": "turbo run build --filter=\"./packages/*\"",
     "build:viewers": "turbo run build --filter=\"./packages/*\" --filter=\"./viewers/*\"",
     "build:snippet": "turbo run build --filter=\"./packages/*\" --filter=\"./viewers/snippet\"",
+    "e2e": "turbo run e2e",
+    "e2e:angular-pdf-viewer": "turbo run e2e --filter=@embedpdf/example-angular-pdf-viewer --only",
     "build:watch": "ROARR_LOG=true turbowatch ./config/turbowatch.config.ts | roarr",
     "watch": "turbo watch",
     "watch:packages": "turbo watch build --filter=\"./packages/*\"",
-    "format": "prettier --write \"**/*.{ts,tsx,js,mjs,jsx,json,css,md}\"",
-    "format:check": "prettier --check \"**/*.{ts,tsx,js,mjs,jsx,json,css,md}\"",
+    "test": "turbo run test",
+    "test:watch": "turbo run test:watch",
+    "test:browser": "turbo run test:browser --filter=@embedpdf/angular-pdf-viewer",
+    "format": "prettier --write \"**/*.{ts,tsx,js,mjs,cjs,jsx,json,css,scss,html,md}\"",
+    "format:check": "prettier --check \"**/*.{ts,tsx,js,mjs,cjs,jsx,json,css,scss,html,md}\"",
     "changeset": "changeset",
     "ci:publish": "pnpm publish -r --access public --report-summary $GITHUB_WORKSPACE/publish-summary.json",
     "ci:publish:next": "pnpm publish -r --access public --tag next --publish-branch next --report-summary $GITHUB_WORKSPACE/publish-summary.json"
@@ -30,8 +42,8 @@
     "@changesets/get-github-info": "^0.6.0",
     "@roarr/cli": "^5.12.4",
     "@types/node": "latest",
-    "@typescript-eslint/eslint-plugin": "^8.32.1",
-    "@typescript-eslint/parser": "^8.32.1",
+    "@typescript-eslint/eslint-plugin": "^8.62.0",
+    "@typescript-eslint/parser": "^8.62.0",
     "concurrently": "^9.2.0",
     "dotenv": "^17.2.3",
     "eslint": "^9.39.2",
@@ -47,11 +59,12 @@
     "rimraf": "latest",
     "turbo": "latest",
     "turbowatch": "^2.29.4",
-    "typescript": "latest",
-    "vite": "^6.3.5"
+    "typescript": "^6.0.3",
+    "vite": "^6.3.5",
+    "vitest": "^4.0.8"
   },
   "lint-staged": {
-    "**/*.{ts,tsx,js,jsx,json,css,md,vue,svelte}": "prettier --write"
+    "**/*.{ts,tsx,js,cjs,jsx,json,css,scss,html,md,vue,svelte}": "prettier --write"
   },
   "pnpm": {
     "overrides": {

@@ -1,0 +1,49 @@
+---
+title: Angular PDF Viewer
+description: Add the EmbedPDF Angular viewer to your app with standalone components and provider-based defaults.
+searchable: true
+---
+
+import { Cards } from '@/components/cards'
+
+# Angular PDF Viewer
+
+Angular support is now available through `@embedpdf/angular-pdf-viewer`.
+
+The Angular package wraps the EmbedPDF viewer in a standalone component that feels natural in modern Angular apps, including provider-based defaults and zoneless bootstrap support.
+
+<Cards num={2}>
+  <Cards.Card
+    title="Drop-in Viewer"
+    description="Use the standalone `PDFViewer` component for the fastest path to a production-ready Angular PDF viewer."
+    href="/docs/angular/viewer/introduction"
+    arrow
+  />
+  <Cards.Card
+    title="Custom Integrations"
+    description="Need more control? Use Angular events, runtime registry access, and shared config providers to shape the experience."
+    href="/docs/angular/headless/introduction"
+    arrow
+  />
+</Cards>
+
+## What ships today?
+
+- **Standalone Angular component** — import `PDFViewer` directly into your component.
+- **Provider defaults** — share app-wide defaults via `provideEmbedPdfViewerDefaults(...)` and override them locally with `provideEmbedPdfViewerConfig(...)`.
+- **Runtime hooks** — respond to `(init)`, `(ready)`, and `(themeChange)`.
+- **Capability-signal helpers** — derive plugin capabilities from the viewer registry with `createPluginCapabilitySignal(...)` and `createDocumentScopeSignal(...)`.
+- **Angular-first theming** — define viewer defaults in one place and override per instance.
+
+## Example apps in this repo
+
+If you're browsing the EmbedPDF monorepo, there are two Angular example workspaces with different jobs:
+
+- **`examples/angular-pdf-viewer`** — the consumer-style demo app for the drop-in Angular package. It now also shows the lightweight capability-signal helper pattern for runtime customization.
+- **`examples/angular-tailwind`** — the live-example workspace that powers the Angular demos embedded throughout these docs. The runtime-control demos are being migrated to the same helper pattern where it reduces repetitive registry glue.
+
+Both are useful, but if your goal is to integrate the package into your own app, the drop-in demo is the better starting point.
+
+## Recommended route
+
+If you want the quickest, most reliable setup, start with the [Drop-in Viewer](/docs/angular/viewer/getting-started).

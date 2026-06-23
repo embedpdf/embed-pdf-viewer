@@ -55,6 +55,13 @@ export default {
       timestamp: false,
     },
   },
+  ['angular-pdf-viewer']: {
+    title: 'Angular PDF Viewer',
+    type: 'page',
+    theme: {
+      timestamp: false,
+    },
+  },
   ['layout-analysis']: {
     title: 'Layout Analysis',
     type: 'page',

@@ -1,0 +1,30 @@
+{
+  "name": "@embedpdf/example-angular-pdf-viewer",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "license": "MIT",
+  "scripts": {
+    "dev": "vite --host 127.0.0.1 --port 4300",
+    "build": "vite build",
+    "preview": "vite preview --host 127.0.0.1 --port 4300",
+    "e2e": "playwright test"
+  },
+  "dependencies": {
+    "@embedpdf/angular-pdf-viewer": "workspace:*",
+    "@angular/common": "^22.0.2",
+    "@angular/compiler": "^22.0.2",
+    "@angular/core": "^22.0.2",
+    "@angular/platform-browser": "^22.0.2",
+    "rxjs": "^7.8.2",
+    "tslib": "^2.8.1"
+  },
+  "devDependencies": {
+    "@analogjs/vite-plugin-angular": "^2.6.1",
+    "@angular/build": "^22.0.3",
+    "@angular/compiler-cli": "^22.0.2",
+    "@playwright/test": "^1.54.2",
+    "typescript": "^6.0.3",
+    "vite": "^6.4.1"
+  }
+}

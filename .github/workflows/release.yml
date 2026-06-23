@@ -4,10 +4,10 @@ on:
   push:
     branches: [main]
     paths:
-      - "packages/**"
-      - "viewers/**"
-      - ".changeset/**"
-      - "pnpm-lock.yaml"
+      - 'packages/**'
+      - 'viewers/**'
+      - '.changeset/**'
+      - 'pnpm-lock.yaml'
   workflow_dispatch: {}
 
 concurrency:
@@ -27,7 +27,7 @@ jobs:
     runs-on: ubuntu-latest
     env:
       GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      NPM_TOKEN:    ${{ secrets.NPM_TOKEN }}
+      NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
 
     steps:
       - name: Checkout
@@ -46,7 +46,7 @@ jobs:
         with:
           node-version: 20
           cache: pnpm
-          registry-url: "https://registry.npmjs.org"
+          registry-url: 'https://registry.npmjs.org'
 
       - name: Install deps
         run: pnpm install --frozen-lockfile
@@ -59,8 +59,8 @@ jobs:
         id: changesets
         uses: changesets/action@v1
         with:
-          commit: "chore: version packages"
-          title:  "chore: version packages"
+          commit: 'chore: version packages'
+          title: 'chore: version packages'
           publish: pnpm ci:publish
           createGithubReleases: false
 
@@ -108,10 +108,11 @@ jobs:
           mkdir -p release-assets
           echo "$PUBLISHED_JSON" | jq -r '.[].name' | while read name; do
             short=$(echo "$name" | sed 's!.*/!!')
-            # Handle viewers (snippet, react, vue, svelte) which are in viewers/
-            if [ "$short" = "snippet" ] || [ "$short" = "react-pdf-viewer" ] || [ "$short" = "vue-pdf-viewer" ] || [ "$short" = "svelte-pdf-viewer" ]; then
+            # Handle viewers (snippet, angular, react, vue, svelte) which are in viewers/
+            if [ "$short" = "snippet" ] || [ "$short" = "angular-pdf-viewer" ] || [ "$short" = "react-pdf-viewer" ] || [ "$short" = "vue-pdf-viewer" ] || [ "$short" = "svelte-pdf-viewer" ]; then
               # Map package name to directory name
               case "$short" in
+                "angular-pdf-viewer") dir="viewers/angular" ;;
                 "react-pdf-viewer") dir="viewers/react" ;;
                 "vue-pdf-viewer") dir="viewers/vue" ;;
                 "svelte-pdf-viewer") dir="viewers/svelte" ;;

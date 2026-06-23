@@ -4,6 +4,7 @@
   "scripts": {
     "dev": "next dev",
     "dev:clean": "rm -rf .next && next dev",
+    "test": "node --import tsx --test \"src/**/*.test.ts\"",
     "prebuild": "tsx tools/update-version-marker.ts",
     "build": "next build",
     "postbuild": "pagefind --site .next/server/app --output-path public/_pagefind",
@@ -12,13 +13,19 @@
     "copy-wasm": "ts-node tools/copy-wasm.ts"
   },
   "dependencies": {
+    "@angular/common": "^22.0.2",
+    "@angular/compiler": "^22.0.2",
+    "@angular/core": "^22.0.2",
+    "@angular/platform-browser": "^22.0.2",
     "@dnd-kit/core": "^6.3.1",
     "@dnd-kit/modifiers": "^9.0.0",
     "@dnd-kit/sortable": "^10.0.0",
     "@dnd-kit/utilities": "^3.2.2",
+    "@embedpdf/ai": "workspace:*",
+    "@embedpdf/angular-pdf-viewer": "workspace:*",
     "@embedpdf/core": "workspace:*",
     "@embedpdf/engines": "workspace:*",
-    "@embedpdf/ai": "workspace:*",
+    "@embedpdf/example-angular-tailwind": "workspace:*",
     "@embedpdf/example-svelte-tailwind": "workspace:*",
     "@embedpdf/example-vue-tailwind": "workspace:*",
     "@embedpdf/models": "workspace:*",

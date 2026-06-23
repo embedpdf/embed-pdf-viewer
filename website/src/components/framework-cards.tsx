@@ -1,8 +1,13 @@
-import { ReactIcon, VueIcon, SvelteIcon } from '@/components/framework-icons'
+import {
+  AngularIcon,
+  ReactIcon,
+  VueIcon,
+  SvelteIcon,
+} from '@/components/framework-icons'
 import Link from 'next/link'
 
 export const FrameworkCards = () => (
-  <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+  <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
     <Link
       href="/docs/react/viewer/introduction"
       className="group flex flex-col items-center rounded-xl border border-gray-200 bg-white p-6 shadow-sm transition-all hover:-translate-y-1 hover:border-cyan-200 hover:shadow-md dark:border-gray-800 dark:bg-gray-900 dark:hover:border-cyan-800"
@@ -26,6 +31,19 @@ export const FrameworkCards = () => (
       <h3 className="font-semibold text-gray-900 dark:text-white">Vue.js</h3>
       <code className="mt-2 rounded bg-gray-100 px-2 py-1 text-xs text-gray-600 dark:bg-gray-800 dark:text-gray-400">
         @embedpdf/vue-pdf-viewer
+      </code>
+    </Link>
+
+    <Link
+      href="/docs/angular/viewer/introduction"
+      className="group flex flex-col items-center rounded-xl border border-gray-200 bg-white p-6 shadow-sm transition-all hover:-translate-y-1 hover:border-fuchsia-200 hover:shadow-md dark:border-gray-800 dark:bg-gray-900 dark:hover:border-fuchsia-800"
+    >
+      <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-fuchsia-50 text-fuchsia-500 group-hover:bg-fuchsia-100 dark:bg-fuchsia-900/30 dark:text-fuchsia-400 dark:group-hover:bg-fuchsia-900/50">
+        <AngularIcon className="h-6 w-6" />
+      </div>
+      <h3 className="font-semibold text-gray-900 dark:text-white">Angular</h3>
+      <code className="mt-2 rounded bg-gray-100 px-2 py-1 text-xs text-gray-600 dark:bg-gray-800 dark:text-gray-400">
+        @embedpdf/angular-pdf-viewer
       </code>
     </Link>
 

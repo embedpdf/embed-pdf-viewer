@@ -1,0 +1,77 @@
+---
+title: Printing
+description: Programmatically trigger high-quality document printing.
+---
+
+import { PrintExample } from '../../code-examples/viewer/print-example';
+
+# Printing
+
+The PDFViewer includes a high-quality print engine that prepares documents for the browser's native print dialog. While a print button is included in the default toolbar, you may want to trigger printing from your own UI.
+
+<CodeExample
+  codePaths={[
+    "../../examples/angular-tailwind/src/examples/viewer/print-example.ts"
+  ]}
+>
+  <PrintExample />
+</CodeExample>
+
+## Programmatic Control
+
+You can control printing using the `print` plugin API.
+
+### Printing the Active Document
+
+To print whatever document is currently visible:
+
+```ts
+import { signal } from '@angular/core';
+import { PDFViewer, type PluginRegistry } from '@embedpdf/angular-pdf-viewer';
+
+const registry = signal<PluginRegistry | null>(null);
+
+const onReady = (r: PluginRegistry) => {
+  registry.set(r);
+};
+
+const print = () => {
+  const printPlugin = registry()?.getPlugin('print')?.provides();
+  printPlugin?.print();
+};
+
+<embedpdf-viewer (ready)="onReady($event)" [config]="{ src: '/doc.pdf' }" />
+```
+
+### Printing a Specific Document
+
+To target a specific document:
+
+```ts
+const printDocument = () => {
+  const printPlugin = registry()?.getPlugin('print')?.provides();
+  const docPrint = printPlugin?.forDocument('invoice-123');
+
+  docPrint?.print()?.wait(
+    () => console.log('Print dialog opened'),
+    (error) => console.error('Print failed', error)
+  );
+};
+```
+
+### Print Options
+
+You can pass options to the `print` method to control what gets printed:
+
+```ts
+const printWithOptions = () => {
+  const printPlugin = registry()?.getPlugin('print')?.provides();
+  const docPrint = printPlugin?.forDocument('invoice-123');
+
+  docPrint?.print({
+    // Print specific pages
+    pageRanges: '1-3, 5, 8',
+    includeAnnotations: true
+  });
+};
+```

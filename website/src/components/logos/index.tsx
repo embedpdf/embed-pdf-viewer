@@ -1,3 +1,5 @@
+import { useId } from 'react'
+
 export const MUILogo = () => (
   <svg
     xmlns="http://www.w3.org/2000/svg"
@@ -455,5 +457,65 @@ export const FlowbiteSvelteLogo = () => (
         <stop offset="1" stopColor="#F83C00" stopOpacity="0.52" />
       </linearGradient>
     </defs>
+  </svg>
+)
+
+// Angular Ecosystem Logos
+export const AngularMaterialLogo = () => (
+  <svg
+    xmlns="http://www.w3.org/2000/svg"
+    viewBox="0 0 32 32"
+    className="h-10 w-10"
+    aria-hidden="true"
+  >
+    {/* Angular shield silhouette with Material color palette */}
+    <path
+      fill="#1976d2"
+      d="M16 2 3 6.5l2 17L16 30l11-6.5 2-17L16 2Zm0 2.4 11.1 3.9-1.7 14.6L16 27.6 6.6 22.9 4.9 8.3 16 4.4Z"
+    />
+    <path
+      fill="#42a5f5"
+      d="M16 6.5 7.2 22h2.6l1.8-4.3h8.8L22.2 22h2.6L16 6.5Zm0 4.2 3.3 7.3h-6.6L16 10.7Z"
+    />
+  </svg>
+)
+
+export const PrimeNGLogo = () => {
+  const gradientId = useId()
+
+  return (
+    <svg
+      xmlns="http://www.w3.org/2000/svg"
+      viewBox="0 0 40 40"
+      className="h-10 w-10"
+      aria-hidden="true"
+    >
+      {/* PrimeNG-style triangle prism mark with red/orange accent */}
+      <defs>
+        <linearGradient id={gradientId} x1="0" y1="0" x2="1" y2="1">
+          <stop offset="0" stopColor="#dd0031" />
+          <stop offset="1" stopColor="#fe2c55" />
+        </linearGradient>
+      </defs>
+      <path
+        fill={`url(#${gradientId})`}
+        d="M20 3 4 11v18l16 8 16-8V11L20 3Zm0 3.5L33.5 13 20 19.5 6.5 13 20 6.5ZM6 15.6l13 6.5v11.7L6 27.3V15.6Zm15 18.2V22.1l13-6.5v11.7l-13 6.5Z"
+      />
+    </svg>
+  )
+}
+
+export const SpartanNgLogo = () => (
+  <svg
+    xmlns="http://www.w3.org/2000/svg"
+    viewBox="0 0 40 40"
+    className="h-10 w-10"
+    aria-hidden="true"
+  >
+    {/* Spartan/ng isometric cube mark (shadcn-for-Angular) */}
+    <path
+      fill="currentColor"
+      d="M20 3 4 12v16l16 9 16-9V12L20 3Zm0 2.6 12.6 7.1L20 19.9 7.4 12.7 20 5.6ZM6 14.6l13 7.4v12.2L6 26.8V14.6Zm15 19.6V22L34 14.6v12.2L21 34.2Z"
+    />
   </svg>
 )

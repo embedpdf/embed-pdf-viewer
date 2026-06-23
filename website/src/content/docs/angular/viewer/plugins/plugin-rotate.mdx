@@ -1,0 +1,85 @@
+---
+title: Rotation
+description: Programmatically rotate documents and listen for rotation changes.
+---
+
+import { RotateExample } from '../../code-examples/viewer/rotate-example';
+
+# Rotation
+
+The PDFViewer includes built-in support for rotating documents in 90-degree increments. While the default toolbar includes rotation buttons, you may want to build custom controls or trigger rotation programmatically.
+
+<CodeExample
+  codePaths={[
+    "../../examples/angular-tailwind/src/examples/viewer/rotate-example.ts"
+  ]}
+>
+  <RotateExample />
+</CodeExample>
+
+## Programmatic Control
+
+You can control rotation using the `rotate` plugin API.
+
+### Rotating the Active Document
+
+To rotate whatever document is currently visible:
+
+```ts
+import { signal } from '@angular/core';
+import { PDFViewer, type PluginRegistry } from '@embedpdf/angular-pdf-viewer';
+
+const registry = signal<PluginRegistry | null>(null);
+
+const onReady = (r: PluginRegistry) => {
+  registry.set(r);
+};
+
+const rotateForward = () => {
+  const rotate = registry()?.getPlugin('rotate')?.provides();
+  rotate?.rotateForward();
+};
+
+const rotateBackward = () => {
+  const rotate = registry()?.getPlugin('rotate')?.provides();
+  rotate?.rotateBackward();
+};
+
+<embedpdf-viewer (ready)="onReady($event)" [config]="{ src: '/doc.pdf' }" />
+```
+
+### Rotating a Specific Document
+
+To target a specific document:
+
+```ts
+const setRotation = (rotation: number) => {
+  const rotate = registry()?.getPlugin('rotate')?.provides();
+  const docRotate = rotate?.forDocument('invoice-123');
+  docRotate?.setRotation(rotation);
+};
+```
+
+## Listening for Changes
+
+You can listen for rotation changes to keep your external UI in sync.
+
+```ts
+import { PDFViewer, type PluginRegistry } from '@embedpdf/angular-pdf-viewer';
+
+const onReady = (registry: PluginRegistry) => {
+  const rotate = registry.getPlugin('rotate')?.provides();
+
+  // Subscribe to global rotation changes (any document)
+  rotate?.onRotateChange(({ documentId, rotation }) => {
+    console.log(`Document ${documentId} rotated to ${rotation * 90}°`);
+  });
+
+  const docRotate = rotate?.forDocument('my-doc');
+  docRotate?.onRotateChange((rotation) => {
+    console.log(`My doc is now at ${rotation * 90}°`);
+  });
+};
+
+<embedpdf-viewer (ready)="onReady($event)" [config]="{ src: '/doc.pdf' }" />
+```

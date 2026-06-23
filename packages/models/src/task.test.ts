@@ -1,3 +1,4 @@
+import { vi } from 'vitest';
 import { Task, TaskError, TaskStage } from './task';
 
 describe('Task', () => {
@@ -8,8 +9,8 @@ describe('Task', () => {
 
   test('resolve should update state to resolved and call resolved callback', () => {
     const task = new Task<string, string>();
-    const resolved = jest.fn();
-    const rejected = jest.fn();
+    const resolved = vi.fn();
+    const rejected = vi.fn();
     task.wait(resolved, rejected);
     task.resolve('hello');
     expect(task.state.stage).toBe(TaskStage.Resolved);
@@ -22,8 +23,8 @@ describe('Task', () => {
 
   test('reject should update state to rejected and call rejected callback', () => {
     const task = new Task<string, string>();
-    const resolved = jest.fn();
-    const rejected = jest.fn();
+    const resolved = vi.fn();
+    const rejected = vi.fn();
     task.wait(resolved, rejected);
     const reason = 'hello';
     task.reject(reason);
@@ -37,8 +38,8 @@ describe('Task', () => {
 
   test('abort should update state to aborted and call rejected callback', () => {
     const task = new Task<string, string>();
-    const resolved = jest.fn();
-    const rejected = jest.fn();
+    const resolved = vi.fn();
+    const rejected = vi.fn();
     task.wait(resolved, rejected);
     const reason = 'hello';
     task.abort(reason);

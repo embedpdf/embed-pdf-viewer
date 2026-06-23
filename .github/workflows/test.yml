@@ -1,0 +1,177 @@
+name: Test
+
+on:
+  pull_request:
+    branches: [main, feature/angular]
+  push:
+    branches: [main, feature/angular]
+
+concurrency:
+  group: test-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  test-node:
+    name: Node-mode tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Run Node-mode + jsdom tests
+        run: pnpm test
+
+  detect-angular-changes:
+    name: Detect Angular touchpoints
+    runs-on: ubuntu-latest
+    outputs:
+      changed: ${{ steps.filter.outputs.angular }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dorny/paths-filter@v3
+        id: filter
+        with:
+          filters: |
+            angular:
+              # Keep Angular-only gates path-filtered so unrelated monorepo lint
+              # debt does not block every PR, while Angular wrapper/example
+              # regressions still fail fast whenever Angular code or its CI
+              # plumbing changes.
+              - '.github/workflows/test.yml'
+              - 'eslint.config.js'
+              - 'package.json'
+              - 'pnpm-lock.yaml'
+              - 'pnpm-workspace.yaml'
+              - 'packages/*/src/angular/**'
+              - 'viewers/angular/**'
+              - 'examples/angular-pdf-viewer/**'
+              - 'examples/angular-tailwind/**'
+              - 'packages/build/src/vite/**'
+
+  check-angular-quality:
+    name: Angular format, lint, and build checks
+    runs-on: ubuntu-latest
+    needs: detect-angular-changes
+    if: needs.detect-angular-changes.outputs.changed == 'true'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Check Angular formatting
+        run: |
+          pnpm exec prettier --check \
+            "viewers/angular/**/*.{ts,css,html,md,json}" \
+            "examples/angular-pdf-viewer/**/*.{ts,css,html,md,json}" \
+            "examples/angular-tailwind/**/*.{ts,css,html,md,json}"
+      - name: Lint Angular sources with project-local overrides
+        run: |
+          pnpm --dir viewers/angular exec eslint src --ext .ts --color
+          pnpm --dir examples/angular-pdf-viewer exec eslint src --ext .ts --color
+          pnpm --dir examples/angular-tailwind exec eslint src --ext .ts --color
+      - name: Build Angular viewer and examples
+        run: |
+          pnpm build:viewers
+          pnpm --filter @embedpdf/example-angular-pdf-viewer run build
+          pnpm --filter @embedpdf/example-angular-tailwind run build
+      - name: Smoke test packed Angular viewer
+        run: |
+          tmp_dir=$(mktemp -d)
+          pnpm --dir viewers/angular pack --pack-destination "$tmp_dir"
+          tarball=$(ls -1 "$tmp_dir"/*.tgz | head -n 1)
+          (
+            cd "$tmp_dir"
+            npx -y @angular/cli@22 new consumer-app --defaults --standalone --skip-git --package-manager pnpm --routing false --style css
+          )
+          cd "$tmp_dir/consumer-app"
+          pnpm add "$tarball"
+          cat > src/app/app.ts <<'EOF'
+          import { Component } from '@angular/core';
+          import { PDFViewer, type PDFViewerConfig } from '@embedpdf/angular-pdf-viewer';
+
+          @Component({
+            selector: 'app-root',
+            imports: [PDFViewer],
+            templateUrl: './app.html',
+            styleUrl: './app.css'
+          })
+          export class App {
+            protected readonly config: PDFViewerConfig = {
+              src: 'https://snippet.embedpdf.com/ebook.pdf',
+              theme: { preference: 'light' },
+            };
+          }
+          EOF
+          cat > src/app/app.html <<'EOF'
+          <embedpdf-viewer
+            [config]="config"
+            style="display: block; height: 100vh"
+          />
+          EOF
+          pnpm exec ng build --configuration development
+
+  test-browser:
+    name: Browser-mode tests (Angular viewer)
+    runs-on: ubuntu-latest
+    needs:
+      - detect-angular-changes
+      - check-angular-quality
+    if: needs.detect-angular-changes.outputs.changed == 'true'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Cache Playwright browsers
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}
+      - name: Install Playwright Chromium
+        run: pnpm --filter @embedpdf/angular-pdf-viewer exec playwright install --with-deps chromium
+      - name: Run browser-mode tests
+        run: pnpm test:browser
+
+  test-angular-e2e:
+    name: E2E tests (Angular examples)
+    runs-on: ubuntu-latest
+    needs:
+      - detect-angular-changes
+      - check-angular-quality
+    if: needs.detect-angular-changes.outputs.changed == 'true'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Build viewer workspace dependencies for example dev servers
+        run: pnpm build:viewers
+      - name: Cache Playwright browsers
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}
+      - name: Install Playwright Chromium (angular-pdf-viewer + angular-tailwind)
+        # Both examples use only Chromium; installing via one package writes to the
+        # shared ~/.cache/ms-playwright path, so a second install for angular-tailwind
+        # is a fast no-op that makes the dependency explicit.
+        run: |
+          pnpm --filter @embedpdf/example-angular-pdf-viewer exec playwright install --with-deps chromium
+          pnpm --filter @embedpdf/example-angular-tailwind exec playwright install --with-deps chromium
+      - name: Run Angular example e2e suites
+        run: |
+          pnpm --filter @embedpdf/example-angular-pdf-viewer run e2e
+          pnpm --filter @embedpdf/example-angular-tailwind run e2e
