@@ -1,9 +1,17 @@
 import { expect, test } from '@playwright/test';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
+
+const stableScreenshotStylePath = path.join(
+  path.dirname(fileURLToPath(import.meta.url)),
+  'screenshot-stable.css',
+);
 
 const stableScreenshotOptions = {
   animations: 'disabled',
   caret: 'hide',
   scale: 'css',
+  stylePath: stableScreenshotStylePath,
 } as const;
 
 test('applies Angular config-driven theme and category customization', async ({ page }) => {
