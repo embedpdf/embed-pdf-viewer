@@ -136,6 +136,10 @@ export function CalloutFreeText({
     });
   };
 
+  const handleInput = () => {
+    editingRef.current = true;
+  };
+
   const width = rect.size.width * scale;
   const height = rect.size.height * scale;
   const hitStrokeWidth = Math.max(strokeWidth, MIN_HIT_AREA_SCREEN_PX / scale);
@@ -261,6 +265,7 @@ export function CalloutFreeText({
       <span
         ref={editorRef}
         onBlur={handleBlur}
+        onInput={handleInput}
         tabIndex={0}
         style={{
           position: 'absolute',

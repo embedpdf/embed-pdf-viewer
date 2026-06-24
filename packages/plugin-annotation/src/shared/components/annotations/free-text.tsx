@@ -73,6 +73,10 @@ export function FreeText({
     });
   };
 
+  const handleInput = () => {
+    editingRef.current = true;
+  };
+
   return (
     <div
       style={{
@@ -89,6 +93,7 @@ export function FreeText({
       <span
         ref={editorRef}
         onBlur={handleBlur}
+        onInput={handleInput}
         tabIndex={0}
         style={{
           color: annotation.object.fontColor,
