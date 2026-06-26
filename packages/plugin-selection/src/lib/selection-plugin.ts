@@ -11,6 +11,7 @@ import {
   PdfTask,
   PdfTaskHelper,
   PdfErrorCode,
+  PdfErrorReason,
   PdfPermissionFlag,
   ignore,
   PageTextSlice,
@@ -45,6 +46,7 @@ import {
   SelectionCapability,
   SelectionPluginConfig,
   SelectionRangeX,
+  GlyphPointer,
   SelectionState,
   RegisterSelectionOnPageOptions,
   RegisterMarqueeOnPageOptions,
@@ -291,6 +293,7 @@ export class SelectionPlugin extends BasePlugin<
       getBoundingRects: (docId) =>
         selector.selectBoundingRectsForAllPages(this.getDocumentState(getDocId(docId))),
       getSelectedText: (docId) => this.getSelectedText(getDocId(docId)),
+      setSelection: (range, docId) => this.applySelection(getDocId(docId), range),
       clear: (docId) => this.clearSelection(getDocId(docId)),
       copyToClipboard: (docId) => this.copyToClipboard(getDocId(docId)),
       getState: (docId) => this.getDocumentState(getDocId(docId)),
@@ -334,6 +337,7 @@ export class SelectionPlugin extends BasePlugin<
       getBoundingRects: () =>
         selector.selectBoundingRectsForAllPages(this.getDocumentState(documentId)),
       getSelectedText: () => this.getSelectedText(documentId),
+      setSelection: (range) => this.applySelection(documentId, range),
       clear: () => this.clearSelection(documentId),
       copyToClipboard: () => this.copyToClipboard(documentId),
       getState: () => this.getDocumentState(documentId),
@@ -794,6 +798,194 @@ export class SelectionPlugin extends BasePlugin<
     this.selChange$.emit(documentId, null);
     this.emitMenuPlacement(documentId, null);
     this.notifyAllPages(documentId);
+  }
+
+  /**
+   * Programmatically apply (or restore) a text selection without going through
+   * the pointer drag flow. Useful for restoring a previously persisted selection
+   * or driving selection from code (e.g. search results).
+   *
+   * Geometry for every page spanned by the range is loaded on demand (the data
+   * comes from the WASM engine), so the returned task settles only once the
+   * selection rects have actually been computed.
+   *
+   * Passing `null` is equivalent to calling {@link clearSelection}.
+   *
+   * @returns a task that resolves once the selection has been applied.
+   */
+  private applySelection(
+    documentId: string,
+    range: SelectionRangeX | null,
+  ): PdfTask<void> {
+    // Ensure the document state exists before doing anything.
+    if (!this.state.documents[documentId]) {
+      return PdfTaskHelper.reject({
+        code: PdfErrorCode.NotFound,
+        message: `Selection state not found for document: ${documentId}`,
+      });
+    }
+
+    // Null clears the selection.
+    if (range === null) {
+      this.clearSelection(documentId);
+      return PdfTaskHelper.resolve(undefined);
+    }
+
+    // Validate the shape and page bounds of the requested range up-front so we
+    // never hand a bogus page to the engine (getPageGeometry assumes the page
+    // exists). Glyph indices are range-checked later, once geometry is known.
+    const validationError = this.validateRange(documentId, range);
+    if (validationError) {
+      return PdfTaskHelper.reject(validationError);
+    }
+
+    // Normalize the range so start <= end regardless of how the caller built it.
+    const normalized = this.normalizeRange(range);
+
+    // Load geometry for every page the selection spans. These may not be cached
+    // yet (e.g. when restoring a selection on a freshly opened document), so we
+    // wait for the WASM engine to provide them before computing rects.
+    const pages: number[] = [];
+    for (let p = normalized.start.page; p <= normalized.end.page; p++) {
+      pages.push(p);
+    }
+
+    const geoTasks = pages.map((p) => this.getOrLoadGeometry(documentId, p));
+    const result = PdfTaskHelper.create<void>();
+
+    Task.all(geoTasks).wait(() => {
+      // The document may have been closed while geometry was loading.
+      if (!this.state.documents[documentId]) {
+        result.reject({
+          code: PdfErrorCode.NotFound,
+          message: `Selection state not found for document: ${documentId}`,
+        });
+        return;
+      }
+
+      // Clamp glyph indices to the actual glyph counts now that geometry is
+      // available. This keeps a persisted selection usable even if the caller
+      // passed an index past the end of a (possibly changed) page.
+      const clamped = this.clampRangeToGeometry(documentId, normalized);
+      if (!clamped) {
+        result.reject({
+          code: PdfErrorCode.NotFound,
+          message: `Cannot apply selection: page(s) ${normalized.start.page}-${normalized.end.page} have no text geometry`,
+        });
+        return;
+      }
+
+      this.selecting.set(documentId, false);
+      this.anchor.set(documentId, undefined);
+
+      // Remember which pages currently render highlights so we can repaint
+      // them too. Otherwise a previous selection on pages outside the new
+      // range would leave stale highlight rects on screen.
+      const previouslyHighlighted = Object.keys(this.getDocumentState(documentId).rects).map(
+        Number,
+      );
+
+      this.dispatch(startSelection(documentId));
+      this.dispatch(setSelection(documentId, clamped));
+      this.updateRectsAndSlices(documentId, clamped);
+      this.dispatch(endSelection(documentId));
+
+      this.selChange$.emit(documentId, clamped);
+
+      // Notify the union of previously-highlighted pages and the new range so
+      // deselected pages clear their rects and newly-selected pages paint.
+      const pagesToNotify = new Set<number>(previouslyHighlighted);
+      for (let p = clamped.start.page; p <= clamped.end.page; p++) {
+        pagesToNotify.add(p);
+      }
+      pagesToNotify.forEach((p) => this.notifyPage(documentId, p));
+
+      this.recalculateMenuPlacement(documentId);
+
+      result.resolve(undefined);
+    }, (error) => result.reject(error.reason));
+
+    return result;
+  }
+
+  /**
+   * Validate the structure and page bounds of a programmatic selection range.
+   * Returns a rejection reason when the input is invalid, or null when it is
+   * structurally sound. Glyph-index bounds are enforced separately, after the
+   * page geometry has loaded (see {@link clampRangeToGeometry}).
+   */
+  private validateRange(documentId: string, range: SelectionRangeX): PdfErrorReason | null {
+    const isValidPointer = (g: unknown): g is GlyphPointer =>
+      !!g &&
+      typeof g === 'object' &&
+      Number.isInteger((g as GlyphPointer).page) &&
+      Number.isInteger((g as GlyphPointer).index);
+
+    if (!range || typeof range !== 'object' || !range.start || !range.end) {
+      return { code: PdfErrorCode.Unknown, message: 'Invalid selection range: expected { start, end }' };
+    }
+    if (!isValidPointer(range.start) || !isValidPointer(range.end)) {
+      return {
+        code: PdfErrorCode.Unknown,
+        message: 'Invalid selection range: start/end must have integer page and index',
+      };
+    }
+    if (range.start.index < 0 || range.end.index < 0) {
+      return { code: PdfErrorCode.Unknown, message: 'Invalid selection range: glyph index cannot be negative' };
+    }
+
+    const pageCount = this.getCoreDocument(documentId)?.document?.pageCount ?? 0;
+    const minPage = Math.min(range.start.page, range.end.page);
+    const maxPage = Math.max(range.start.page, range.end.page);
+    if (minPage < 0 || maxPage >= pageCount) {
+      return {
+        code: PdfErrorCode.NotFound,
+        message: `Invalid selection range: page ${minPage < 0 ? minPage : maxPage} out of bounds [0, ${pageCount})`,
+      };
+    }
+
+    return null;
+  }
+
+  /**
+   * Clamp the glyph indices of a (normalized) range to the number of glyphs
+   * available on the corresponding pages. Returns null when none of the
+   * spanned pages have any text geometry to select.
+   */
+  private clampRangeToGeometry(
+    documentId: string,
+    range: SelectionRangeX,
+  ): SelectionRangeX | null {
+    const docState = this.getDocumentState(documentId);
+
+    const lastGlyphIndex = (page: number): number => {
+      const geo = docState.geometry[page];
+      if (!geo || geo.runs.length === 0) return -1;
+      const lastRun = geo.runs[geo.runs.length - 1];
+      return lastRun.charStart + lastRun.glyphs.length - 1;
+    };
+
+    const startMax = lastGlyphIndex(range.start.page);
+    const endMax = lastGlyphIndex(range.end.page);
+
+    // If neither endpoint page has any selectable glyphs, there is nothing to do.
+    if (startMax < 0 && endMax < 0) return null;
+
+    const clampIndex = (index: number, max: number) =>
+      max < 0 ? 0 : Math.min(Math.max(index, 0), max);
+
+    return {
+      start: { page: range.start.page, index: clampIndex(range.start.index, startMax) },
+      end: { page: range.end.page, index: clampIndex(range.end.index, endMax) },
+    };
+  }
+
+  /** Order a range so that `start` never comes after `end`. */
+  private normalizeRange(range: SelectionRangeX): SelectionRangeX {
+    const { start, end } = range;
+    const forward =
+      end.page > start.page || (end.page === start.page && end.index >= start.index);
+    return forward ? { start, end } : { start: end, end: start };
   }
 
   private selectWord(documentId: string, page: number, charIndex: number, modeId: string) {
