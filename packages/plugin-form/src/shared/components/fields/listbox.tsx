@@ -23,7 +23,10 @@ export function ListboxField(props: ListboxFieldProps) {
       left: 0,
       width: '100%',
       height: '100%',
-      background: annotation.color ?? '#FFFFFF',
+      // The overlay redraws the option list itself, so it must fully cover the
+      // appearance-stream image behind it — treat 'transparent' as opaque white.
+      background:
+        !annotation.color || annotation.color === 'transparent' ? '#FFFFFF' : annotation.color,
       borderStyle: 'solid',
       borderColor: annotation.strokeColor ?? '#000000',
       borderWidth: bw,
@@ -63,6 +66,7 @@ export function ListboxField(props: ListboxFieldProps) {
           key={i}
           onClick={() => handleOptionClick(i)}
           style={{
+            flexShrink: 0,
             padding: `0 ${4 * scale}px`,
             fontSize,
             lineHeight: `${lineHeight}px`,
