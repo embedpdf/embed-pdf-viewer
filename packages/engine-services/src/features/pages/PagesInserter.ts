@@ -4,7 +4,8 @@ import {
   type PageInsertResult,
   type PageObjectNumber,
 } from '@embedpdf/engine-core/runtime';
-import type { PdfRuntimeModule } from '@embedpdf/pdf-runtime';
+import { NULL_PTR } from '@embedpdf/pdf-runtime';
+import type { PdfRuntimeModule, Ptr } from '@embedpdf/pdf-runtime';
 
 import { PagesReader } from './PagesReader';
 import type { DocumentSession } from '../../document-session/DocumentSession';
@@ -41,36 +42,44 @@ export class PagesInserter {
       );
     }
 
-    // The source buffer must stay alive until the temp document closes
-    // (same rule as the stamp /AP path in writeStampAnnotation).
+    // FPDF_ImportPagesByIndex does NOT fully detach imported objects from
+    // their source document (imported streams still read through it), so
+    // the source doc and its buffer must outlive every future save of the
+    // destination. On failure they are released immediately; on success
+    // they are parked on the session and released at session close.
+    // TODO(fork): a deep-detaching import would let this close eagerly.
     const dataPtr = mem.alloc(bytes.byteLength);
+    let srcPtr: Ptr | null = null;
     let insertedCount = 0;
     try {
       mem.writeBytes(dataPtr, new Uint8Array(bytes));
-      const srcPtr = fn.FPDF_LoadMemDocument(dataPtr, bytes.byteLength, '');
+      srcPtr = fn.FPDF_LoadMemDocument(dataPtr, bytes.byteLength, '');
       if (!srcPtr) {
         throw new EngineError(
           EngineErrorCode.MalformedPdf,
           'pages.insert source PDF could not be opened',
         );
       }
-      try {
-        insertedCount = fn.FPDF_GetPageCount(srcPtr);
-        if (insertedCount <= 0) {
-          throw new EngineError(EngineErrorCode.InvalidArg, 'pages.insert source PDF has no pages');
-        }
-        // Null index array + count 0 = "import every page", in order.
-        if (!fn.FPDF_ImportPagesByIndex(destPtr, srcPtr, 0, 0, at)) {
-          throw new EngineError(
-            EngineErrorCode.Unknown,
-            `FPDF_ImportPagesByIndex rejected the insert at index ${at}`,
-          );
-        }
-      } finally {
-        fn.FPDF_CloseDocument(srcPtr);
+      insertedCount = fn.FPDF_GetPageCount(srcPtr);
+      if (insertedCount <= 0) {
+        throw new EngineError(EngineErrorCode.InvalidArg, 'pages.insert source PDF has no pages');
       }
-    } finally {
+      // Null index array + count 0 = "import every page", in order.
+      if (!fn.FPDF_ImportPagesByIndex(destPtr, srcPtr, NULL_PTR, 0, at)) {
+        throw new EngineError(
+          EngineErrorCode.Unknown,
+          `FPDF_ImportPagesByIndex rejected the insert at index ${at}`,
+        );
+      }
+      const retainedSrc = srcPtr;
+      this.session.retainUntilClose(() => {
+        fn.FPDF_CloseDocument(retainedSrc);
+        mem.free(dataPtr);
+      });
+    } catch (error) {
+      if (srcPtr) fn.FPDF_CloseDocument(srcPtr);
       mem.free(dataPtr);
+      throw error;
     }
 
     // Page count and order changed; rebuild the index<->pon map. Existing

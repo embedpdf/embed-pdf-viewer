@@ -65,12 +65,24 @@ export interface PdfFunctions {
   EPDF_SetRuntimeOwnerPermissions: (arg0: Ptr, arg1: boolean) => boolean;
   EPDF_ShutdownThread: () => void;
   EPDF_UnlockOwnerPermissions: (arg0: Ptr, arg1: string) => boolean;
+  EPDFAction_CloseModel: (arg0: Ptr) => void;
   EPDFAction_CreateGoTo: (arg0: Ptr, arg1: Ptr) => Ptr;
   EPDFAction_CreateGoToNamed: (arg0: Ptr, arg1: string) => Ptr;
   EPDFAction_CreateLaunch: (arg0: Ptr, arg1: Ptr) => Ptr;
   EPDFAction_CreateRemoteGoToByName: (arg0: Ptr, arg1: Ptr, arg2: Ptr) => Ptr;
   EPDFAction_CreateRemoteGoToDest: (arg0: Ptr, arg1: Ptr, arg2: Ptr) => Ptr;
   EPDFAction_CreateURI: (arg0: Ptr, arg1: string) => Ptr;
+  EPDFAction_GetNextAt: (arg0: Ptr, arg1: number, arg2: number) => number;
+  EPDFAction_GetNextCount: (arg0: Ptr, arg1: number) => number;
+  EPDFAction_GetNodeCount: (arg0: Ptr) => number;
+  EPDFAction_GetNodeJavaScript: (arg0: Ptr, arg1: number, arg2: Ptr, arg3: number) => number;
+  EPDFAction_GetNodeSubtype: (arg0: Ptr, arg1: number, arg2: Ptr, arg3: number) => number;
+  EPDFAction_GetNodeType: (arg0: Ptr, arg1: number) => number;
+  EPDFAction_GetRootNode: (arg0: Ptr) => number;
+  EPDFAction_GetWarningFlags: (arg0: Ptr) => number;
+  EPDFAction_IsComplete: (arg0: Ptr) => boolean;
+  EPDFAction_LoadModel: (arg0: Ptr) => Ptr;
+  EPDFAction_NodeHasJavaScript: (arg0: Ptr, arg1: number) => boolean;
   EPDFAnnot_ApplyRedaction: (arg0: Ptr, arg1: Ptr) => boolean;
   EPDFAnnot_ApplyRedactionWithReport: (
     arg0: Ptr,
@@ -95,6 +107,7 @@ export interface PdfFunctions {
   EPDFAnnot_GenerateAppearance: (arg0: Ptr) => boolean;
   EPDFAnnot_GenerateAppearanceWithBlend: (arg0: Ptr, arg1: number) => boolean;
   EPDFAnnot_GenerateFormFieldAP: (arg0: Ptr) => boolean;
+  EPDFAnnot_GetActionModel: (arg0: Ptr, arg1: number) => Ptr;
   EPDFAnnot_GetAPMatrix: (arg0: Ptr, arg1: number, arg2: Ptr) => boolean;
   EPDFAnnot_GetAvailableAppearanceModes: (arg0: Ptr) => number;
   EPDFAnnot_GetBlendMode: (arg0: Ptr) => number;
@@ -255,7 +268,11 @@ export interface PdfFunctions {
   EPDFDoc_ClearPieceInfoEntry: (arg0: Ptr, arg1: string) => boolean;
   EPDFDoc_ClearPieceInfoKey: (arg0: Ptr, arg1: string, arg2: string, arg3: Ptr) => boolean;
   EPDFDoc_DeletePageByObjectNumber: (arg0: Ptr, arg1: number) => boolean;
+  EPDFDoc_GetAdditionalActionModel: (arg0: Ptr, arg1: number) => Ptr;
   EPDFDoc_GetLastModified: (arg0: Ptr, arg1: Ptr, arg2: number) => number;
+  EPDFDoc_GetNamedJavaScriptActionModel: (arg0: Ptr, arg1: number) => Ptr;
+  EPDFDoc_GetOpenActionModel: (arg0: Ptr) => Ptr;
+  EPDFDoc_GetPageActionModel: (arg0: Ptr, arg1: number, arg2: number) => Ptr;
   EPDFDoc_GetPageLastModified: (arg0: Ptr, arg1: number, arg2: Ptr, arg3: number) => number;
   EPDFDoc_GetPageObjectNumberByIndex: (arg0: Ptr, arg1: number) => number;
   EPDFDoc_GetPagePieceInfoBoolean: (
@@ -473,6 +490,7 @@ export interface PdfFunctions {
   ) => number;
   EPDFForm_AttachWidget: (arg0: Ptr, arg1: number, arg2: number, arg3: string) => boolean;
   EPDFForm_CloseModel: (arg0: Ptr) => void;
+  EPDFForm_CountCalculationOrder: (arg0: Ptr) => number;
   EPDFForm_CountFieldOptions: (arg0: Ptr, arg1: number) => number;
   EPDFForm_CountFields: (arg0: Ptr) => number;
   EPDFForm_CountFieldWidgets: (arg0: Ptr, arg1: number) => number;
@@ -481,6 +499,8 @@ export interface PdfFunctions {
   EPDFForm_DetachWidget: (arg0: Ptr, arg1: number, arg2: number) => boolean;
   EPDFForm_ExportFDF: (arg0: Ptr, arg1: Ptr, arg2: number, arg3: Ptr, arg4: number) => number;
   EPDFForm_ExportXFDF: (arg0: Ptr, arg1: Ptr, arg2: number, arg3: Ptr, arg4: number) => number;
+  EPDFForm_GetCalculationOrderFieldIndex: (arg0: Ptr, arg1: number) => number;
+  EPDFForm_GetFieldActionModel: (arg0: Ptr, arg1: number, arg2: number) => Ptr;
   EPDFForm_GetFieldAlternateName: (arg0: Ptr, arg1: number, arg2: Ptr, arg3: number) => number;
   EPDFForm_GetFieldDefaultValue: (arg0: Ptr, arg1: number, arg2: Ptr, arg3: number) => number;
   EPDFForm_GetFieldFamily: (arg0: Ptr, arg1: number) => number;
@@ -542,7 +562,23 @@ export interface PdfFunctions {
     arg6: Ptr,
   ) => boolean;
   EPDFForm_SetFieldAlternateName: (arg0: Ptr, arg1: number, arg2: Ptr) => boolean;
+  EPDFForm_SetFieldAppearanceText: (
+    arg0: Ptr,
+    arg1: number,
+    arg2: Ptr,
+    arg3: Ptr,
+    arg4: number,
+    arg5: Ptr,
+  ) => boolean;
   EPDFForm_SetFieldDefaultValue: (arg0: Ptr, arg1: number, arg2: Ptr) => boolean;
+  EPDFForm_SetFieldDisplay: (
+    arg0: Ptr,
+    arg1: number,
+    arg2: number,
+    arg3: Ptr,
+    arg4: number,
+    arg5: Ptr,
+  ) => boolean;
   EPDFForm_SetFieldFlags: (arg0: Ptr, arg1: number, arg2: number, arg3: number) => boolean;
   EPDFForm_SetFieldMappingName: (arg0: Ptr, arg1: number, arg2: Ptr) => boolean;
   EPDFForm_SetFieldMaxLen: (arg0: Ptr, arg1: number, arg2: number) => boolean;
@@ -2057,6 +2093,16 @@ export const pdfFunctionSignatures = {
       native: { kind: 'bool', cwrap: 'boolean' },
     },
   },
+  EPDFAction_CloseModel: {
+    params: [
+      {
+        ts: 'Ptr',
+        wasm: { kind: 'pointer', cwrap: 'number' },
+        native: { kind: 'pointer', cwrap: 'bigint' },
+      },
+    ],
+    result: null,
+  },
   EPDFAction_CreateGoTo: {
     params: [
       {
@@ -2179,6 +2225,215 @@ export const pdfFunctionSignatures = {
       ts: 'Ptr',
       wasm: { kind: 'pointer', cwrap: 'number' },
       native: { kind: 'pointer', cwrap: 'bigint' },
+    },
+  },
+  EPDFAction_GetNextAt: {
+    params: [
+      {
+        ts: 'Ptr',
+        wasm: { kind: 'pointer', cwrap: 'number' },
+        native: { kind: 'pointer', cwrap: 'bigint' },
+      },
+      {
+        ts: 'number',
+        wasm: { kind: 'i32', cwrap: 'number' },
+        native: { kind: 'i32', cwrap: 'number' },
+      },
+      {
+        ts: 'number',
+        wasm: { kind: 'i32', cwrap: 'number' },
+        native: { kind: 'i32', cwrap: 'number' },
+      },
+    ],
+    result: {
+      ts: 'number',
+      wasm: { kind: 'i32', cwrap: 'number' },
+      native: { kind: 'i32', cwrap: 'number' },
+    },
+  },
+  EPDFAction_GetNextCount: {
+    params: [
+      {
+        ts: 'Ptr',
+        wasm: { kind: 'pointer', cwrap: 'number' },
+        native: { kind: 'pointer', cwrap: 'bigint' },
+      },
+      {
+        ts: 'number',
+        wasm: { kind: 'i32', cwrap: 'number' },
+        native: { kind: 'i32', cwrap: 'number' },
+      },
+    ],
+    result: {
+      ts: 'number',
+      wasm: { kind: 'i32', cwrap: 'number' },
+      native: { kind: 'i32', cwrap: 'number' },
+    },
+  },
+  EPDFAction_GetNodeCount: {
+    params: [
+      {
+        ts: 'Ptr',
+        wasm: { kind: 'pointer', cwrap: 'number' },
+        native: { kind: 'pointer', cwrap: 'bigint' },
+      },
+    ],
+    result: {
+      ts: 'number',
+      wasm: { kind: 'i32', cwrap: 'number' },
+      native: { kind: 'i32', cwrap: 'number' },
+    },
+  },
+  EPDFAction_GetNodeJavaScript: {
+    params: [
+      {
+        ts: 'Ptr',
+        wasm: { kind: 'pointer', cwrap: 'number' },
+        native: { kind: 'pointer', cwrap: 'bigint' },
+      },
+      {
+        ts: 'number',
+        wasm: { kind: 'i32', cwrap: 'number' },
+        native: { kind: 'i32', cwrap: 'number' },
+      },
+      {
+        ts: 'Ptr',
+        wasm: { kind: 'utf16ptr', cwrap: 'number' },
+        native: { kind: 'utf16ptr', cwrap: 'bigint' },
+      },
+      {
+        ts: 'number',
+        wasm: { kind: 'i32', cwrap: 'number' },
+        native: { kind: 'i32', cwrap: 'number' },
+      },
+    ],
+    result: {
+      ts: 'number',
+      wasm: { kind: 'i32', cwrap: 'number' },
+      native: { kind: 'i32', cwrap: 'number' },
+    },
+  },
+  EPDFAction_GetNodeSubtype: {
+    params: [
+      {
+        ts: 'Ptr',
+        wasm: { kind: 'pointer', cwrap: 'number' },
+        native: { kind: 'pointer', cwrap: 'bigint' },
+      },
+      {
+        ts: 'number',
+        wasm: { kind: 'i32', cwrap: 'number' },
+        native: { kind: 'i32', cwrap: 'number' },
+      },
+      {
+        ts: 'Ptr',
+        wasm: { kind: 'cstring', cwrap: 'number' },
+        native: { kind: 'cstring', cwrap: 'bigint' },
+      },
+      {
+        ts: 'number',
+        wasm: { kind: 'i32', cwrap: 'number' },
+        native: { kind: 'i32', cwrap: 'number' },
+      },
+    ],
+    result: {
+      ts: 'number',
+      wasm: { kind: 'i32', cwrap: 'number' },
+      native: { kind: 'i32', cwrap: 'number' },
+    },
+  },
+  EPDFAction_GetNodeType: {
+    params: [
+      {
+        ts: 'Ptr',
+        wasm: { kind: 'pointer', cwrap: 'number' },
+        native: { kind: 'pointer', cwrap: 'bigint' },
+      },
+      {
+        ts: 'number',
+        wasm: { kind: 'i32', cwrap: 'number' },
+        native: { kind: 'i32', cwrap: 'number' },
+      },
+    ],
+    result: {
+      ts: 'number',
+      wasm: { kind: 'i32', cwrap: 'number' },
+      native: { kind: 'i32', cwrap: 'number' },
+    },
+  },
+  EPDFAction_GetRootNode: {
+    params: [
+      {
+        ts: 'Ptr',
+        wasm: { kind: 'pointer', cwrap: 'number' },
+        native: { kind: 'pointer', cwrap: 'bigint' },
+      },
+    ],
+    result: {
+      ts: 'number',
+      wasm: { kind: 'i32', cwrap: 'number' },
+      native: { kind: 'i32', cwrap: 'number' },
+    },
+  },
+  EPDFAction_GetWarningFlags: {
+    params: [
+      {
+        ts: 'Ptr',
+        wasm: { kind: 'pointer', cwrap: 'number' },
+        native: { kind: 'pointer', cwrap: 'bigint' },
+      },
+    ],
+    result: {
+      ts: 'number',
+      wasm: { kind: 'i32', cwrap: 'number' },
+      native: { kind: 'i32', cwrap: 'number' },
+    },
+  },
+  EPDFAction_IsComplete: {
+    params: [
+      {
+        ts: 'Ptr',
+        wasm: { kind: 'pointer', cwrap: 'number' },
+        native: { kind: 'pointer', cwrap: 'bigint' },
+      },
+    ],
+    result: {
+      ts: 'boolean',
+      wasm: { kind: 'bool', cwrap: 'boolean' },
+      native: { kind: 'bool', cwrap: 'boolean' },
+    },
+  },
+  EPDFAction_LoadModel: {
+    params: [
+      {
+        ts: 'Ptr',
+        wasm: { kind: 'pointer', cwrap: 'number' },
+        native: { kind: 'pointer', cwrap: 'bigint' },
+      },
+    ],
+    result: {
+      ts: 'Ptr',
+      wasm: { kind: 'pointer', cwrap: 'number' },
+      native: { kind: 'pointer', cwrap: 'bigint' },
+    },
+  },
+  EPDFAction_NodeHasJavaScript: {
+    params: [
+      {
+        ts: 'Ptr',
+        wasm: { kind: 'pointer', cwrap: 'number' },
+        native: { kind: 'pointer', cwrap: 'bigint' },
+      },
+      {
+        ts: 'number',
+        wasm: { kind: 'i32', cwrap: 'number' },
+        native: { kind: 'i32', cwrap: 'number' },
+      },
+    ],
+    result: {
+      ts: 'boolean',
+      wasm: { kind: 'bool', cwrap: 'boolean' },
+      native: { kind: 'bool', cwrap: 'boolean' },
     },
   },
   EPDFAnnot_ApplyRedaction: {
@@ -2450,6 +2705,25 @@ export const pdfFunctionSignatures = {
       ts: 'boolean',
       wasm: { kind: 'bool', cwrap: 'boolean' },
       native: { kind: 'bool', cwrap: 'boolean' },
+    },
+  },
+  EPDFAnnot_GetActionModel: {
+    params: [
+      {
+        ts: 'Ptr',
+        wasm: { kind: 'pointer', cwrap: 'number' },
+        native: { kind: 'pointer', cwrap: 'bigint' },
+      },
+      {
+        ts: 'number',
+        wasm: { kind: 'i32', cwrap: 'number' },
+        native: { kind: 'i32', cwrap: 'number' },
+      },
+    ],
+    result: {
+      ts: 'Ptr',
+      wasm: { kind: 'pointer', cwrap: 'number' },
+      native: { kind: 'pointer', cwrap: 'bigint' },
     },
   },
   EPDFAnnot_GetAPMatrix: {
@@ -4461,6 +4735,25 @@ export const pdfFunctionSignatures = {
       native: { kind: 'bool', cwrap: 'boolean' },
     },
   },
+  EPDFDoc_GetAdditionalActionModel: {
+    params: [
+      {
+        ts: 'Ptr',
+        wasm: { kind: 'pointer', cwrap: 'number' },
+        native: { kind: 'pointer', cwrap: 'bigint' },
+      },
+      {
+        ts: 'number',
+        wasm: { kind: 'i32', cwrap: 'number' },
+        native: { kind: 'i32', cwrap: 'number' },
+      },
+    ],
+    result: {
+      ts: 'Ptr',
+      wasm: { kind: 'pointer', cwrap: 'number' },
+      native: { kind: 'pointer', cwrap: 'bigint' },
+    },
+  },
   EPDFDoc_GetLastModified: {
     params: [
       {
@@ -4483,6 +4776,63 @@ export const pdfFunctionSignatures = {
       ts: 'number',
       wasm: { kind: 'i32', cwrap: 'number' },
       native: { kind: 'i32', cwrap: 'number' },
+    },
+  },
+  EPDFDoc_GetNamedJavaScriptActionModel: {
+    params: [
+      {
+        ts: 'Ptr',
+        wasm: { kind: 'pointer', cwrap: 'number' },
+        native: { kind: 'pointer', cwrap: 'bigint' },
+      },
+      {
+        ts: 'number',
+        wasm: { kind: 'i32', cwrap: 'number' },
+        native: { kind: 'i32', cwrap: 'number' },
+      },
+    ],
+    result: {
+      ts: 'Ptr',
+      wasm: { kind: 'pointer', cwrap: 'number' },
+      native: { kind: 'pointer', cwrap: 'bigint' },
+    },
+  },
+  EPDFDoc_GetOpenActionModel: {
+    params: [
+      {
+        ts: 'Ptr',
+        wasm: { kind: 'pointer', cwrap: 'number' },
+        native: { kind: 'pointer', cwrap: 'bigint' },
+      },
+    ],
+    result: {
+      ts: 'Ptr',
+      wasm: { kind: 'pointer', cwrap: 'number' },
+      native: { kind: 'pointer', cwrap: 'bigint' },
+    },
+  },
+  EPDFDoc_GetPageActionModel: {
+    params: [
+      {
+        ts: 'Ptr',
+        wasm: { kind: 'pointer', cwrap: 'number' },
+        native: { kind: 'pointer', cwrap: 'bigint' },
+      },
+      {
+        ts: 'number',
+        wasm: { kind: 'i32', cwrap: 'number' },
+        native: { kind: 'i32', cwrap: 'number' },
+      },
+      {
+        ts: 'number',
+        wasm: { kind: 'i32', cwrap: 'number' },
+        native: { kind: 'i32', cwrap: 'number' },
+      },
+    ],
+    result: {
+      ts: 'Ptr',
+      wasm: { kind: 'pointer', cwrap: 'number' },
+      native: { kind: 'pointer', cwrap: 'bigint' },
     },
   },
   EPDFDoc_GetPageLastModified: {
@@ -5915,6 +6265,20 @@ export const pdfFunctionSignatures = {
     ],
     result: null,
   },
+  EPDFForm_CountCalculationOrder: {
+    params: [
+      {
+        ts: 'Ptr',
+        wasm: { kind: 'pointer', cwrap: 'number' },
+        native: { kind: 'pointer', cwrap: 'bigint' },
+      },
+    ],
+    result: {
+      ts: 'number',
+      wasm: { kind: 'i32', cwrap: 'number' },
+      native: { kind: 'i32', cwrap: 'number' },
+    },
+  },
   EPDFForm_CountFieldOptions: {
     params: [
       {
@@ -6115,6 +6479,49 @@ export const pdfFunctionSignatures = {
       ts: 'number',
       wasm: { kind: 'i32', cwrap: 'number' },
       native: { kind: 'i32', cwrap: 'number' },
+    },
+  },
+  EPDFForm_GetCalculationOrderFieldIndex: {
+    params: [
+      {
+        ts: 'Ptr',
+        wasm: { kind: 'pointer', cwrap: 'number' },
+        native: { kind: 'pointer', cwrap: 'bigint' },
+      },
+      {
+        ts: 'number',
+        wasm: { kind: 'i32', cwrap: 'number' },
+        native: { kind: 'i32', cwrap: 'number' },
+      },
+    ],
+    result: {
+      ts: 'number',
+      wasm: { kind: 'i32', cwrap: 'number' },
+      native: { kind: 'i32', cwrap: 'number' },
+    },
+  },
+  EPDFForm_GetFieldActionModel: {
+    params: [
+      {
+        ts: 'Ptr',
+        wasm: { kind: 'pointer', cwrap: 'number' },
+        native: { kind: 'pointer', cwrap: 'bigint' },
+      },
+      {
+        ts: 'number',
+        wasm: { kind: 'i32', cwrap: 'number' },
+        native: { kind: 'i32', cwrap: 'number' },
+      },
+      {
+        ts: 'number',
+        wasm: { kind: 'i32', cwrap: 'number' },
+        native: { kind: 'i32', cwrap: 'number' },
+      },
+    ],
+    result: {
+      ts: 'Ptr',
+      wasm: { kind: 'pointer', cwrap: 'number' },
+      native: { kind: 'pointer', cwrap: 'bigint' },
     },
   },
   EPDFForm_GetFieldAlternateName: {
@@ -6853,8 +7260,86 @@ export const pdfFunctionSignatures = {
       native: { kind: 'bool', cwrap: 'boolean' },
     },
   },
+  EPDFForm_SetFieldAppearanceText: {
+    params: [
+      {
+        ts: 'Ptr',
+        wasm: { kind: 'pointer', cwrap: 'number' },
+        native: { kind: 'pointer', cwrap: 'bigint' },
+      },
+      {
+        ts: 'number',
+        wasm: { kind: 'i32', cwrap: 'number' },
+        native: { kind: 'i32', cwrap: 'number' },
+      },
+      {
+        ts: 'Ptr',
+        wasm: { kind: 'pointer', cwrap: 'number' },
+        native: { kind: 'pointer', cwrap: 'bigint' },
+      },
+      {
+        ts: 'Ptr',
+        wasm: { kind: 'pointer', cwrap: 'number' },
+        native: { kind: 'pointer', cwrap: 'bigint' },
+      },
+      {
+        ts: 'number',
+        wasm: { kind: 'i32', cwrap: 'number' },
+        native: { kind: 'i32', cwrap: 'number' },
+      },
+      {
+        ts: 'Ptr',
+        wasm: { kind: 'pointer', cwrap: 'number' },
+        native: { kind: 'pointer', cwrap: 'bigint' },
+      },
+    ],
+    result: {
+      ts: 'boolean',
+      wasm: { kind: 'bool', cwrap: 'boolean' },
+      native: { kind: 'bool', cwrap: 'boolean' },
+    },
+  },
   EPDFForm_SetFieldDefaultValue: {
     params: [
+      {
+        ts: 'Ptr',
+        wasm: { kind: 'pointer', cwrap: 'number' },
+        native: { kind: 'pointer', cwrap: 'bigint' },
+      },
+      {
+        ts: 'number',
+        wasm: { kind: 'i32', cwrap: 'number' },
+        native: { kind: 'i32', cwrap: 'number' },
+      },
+      {
+        ts: 'Ptr',
+        wasm: { kind: 'pointer', cwrap: 'number' },
+        native: { kind: 'pointer', cwrap: 'bigint' },
+      },
+    ],
+    result: {
+      ts: 'boolean',
+      wasm: { kind: 'bool', cwrap: 'boolean' },
+      native: { kind: 'bool', cwrap: 'boolean' },
+    },
+  },
+  EPDFForm_SetFieldDisplay: {
+    params: [
+      {
+        ts: 'Ptr',
+        wasm: { kind: 'pointer', cwrap: 'number' },
+        native: { kind: 'pointer', cwrap: 'bigint' },
+      },
+      {
+        ts: 'number',
+        wasm: { kind: 'i32', cwrap: 'number' },
+        native: { kind: 'i32', cwrap: 'number' },
+      },
+      {
+        ts: 'number',
+        wasm: { kind: 'i32', cwrap: 'number' },
+        native: { kind: 'i32', cwrap: 'number' },
+      },
       {
         ts: 'Ptr',
         wasm: { kind: 'pointer', cwrap: 'number' },

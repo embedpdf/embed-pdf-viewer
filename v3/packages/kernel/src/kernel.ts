@@ -38,6 +38,7 @@ function layoutFromEvent(event: DocumentEvent) {
     case 'pages.moved':
     case 'pages.rotated':
     case 'pages.deleted':
+    case 'pages.inserted':
       return event.layout;
     default:
       return null;

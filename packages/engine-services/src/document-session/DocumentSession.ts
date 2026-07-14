@@ -249,6 +249,20 @@ export class DocumentSession {
     return this.docPtr;
   }
 
+  /**
+   * Park a disposer to run when THIS session closes. Used by operations
+   * whose native side leaves the session document referencing another
+   * resource — e.g. `pages.insert`: `FPDF_ImportPagesByIndex` does not
+   * fully detach imported objects from their source document, so the
+   * source doc + its byte buffer must stay alive until the destination
+   * can no longer be saved (i.e. until this session closes).
+   */
+  retainUntilClose(dispose: () => void): void {
+    this.retained.push(dispose);
+  }
+
+  private readonly retained: Array<() => void> = [];
+
   close(): void {
     let firstError: unknown = null;
     try {
@@ -273,6 +287,17 @@ export class DocumentSession {
       this.recordsByObjectNumber.clear();
       this.fullyEnumerated = false;
     }
+
+    // Retained resources go LAST (reverse order): the session doc that
+    // referenced them is closed above, so they are safe to release now.
+    for (let i = this.retained.length - 1; i >= 0; i--) {
+      try {
+        this.retained[i]();
+      } catch (error) {
+        firstError ??= error;
+      }
+    }
+    this.retained.length = 0;
 
     if (firstError) throw firstError;
   }
