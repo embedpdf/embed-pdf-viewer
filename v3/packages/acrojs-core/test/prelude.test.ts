@@ -207,6 +207,27 @@ describe('AcroJS prelude', () => {
     ]);
   });
 
+  it('restores an original non-default value after resetting the field', () => {
+    const vm = createVm();
+    const fields = [field('total', '$680.00', { defaultValue: '$0.00' })];
+    const out = plain(
+      vm.__acrojsRun(
+        `this.resetForm(['total']);
+         this.getField('total').value = '$680.00';`,
+        input(fields, { kind: 'name-tree-boot' }),
+      ),
+    );
+
+    expect(out.formEffects).toEqual([
+      { kind: 'reset', refs: [ref('total')] },
+      {
+        kind: 'setValue',
+        ref: ref('total'),
+        value: { type: 'text', value: '$680.00' },
+      },
+    ]);
+  });
+
   it('implements the common AFSimple_Calculate helper', () => {
     const vm = createVm();
     const fields = [field('a', '$10.50'), field('b', '2'), field('total', '0')];

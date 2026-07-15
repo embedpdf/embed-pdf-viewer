@@ -5,7 +5,12 @@ import { describe, expect, it } from 'vitest';
 
 import { createQuickJsSandbox } from '@embedpdf-x/js-sandbox';
 import { createLocalEngine } from '../../../../packages/engine/src';
-import type { DocumentHandle, FormFieldDTO, PdfActionTree } from '@embedpdf/engine-core/runtime';
+import type {
+  DocumentHandle,
+  FormFieldDTO,
+  FormSnapshot,
+  PdfActionTree,
+} from '@embedpdf/engine-core/runtime';
 
 import { createFormScriptingController } from '../src/scripting';
 
@@ -33,8 +38,39 @@ async function activationFor(doc: DocumentHandle, field: FormFieldDTO): Promise<
   return action;
 }
 
+function expectAdobeResetState(snapshot: FormSnapshot): void {
+  expect(snapshot.fields.find(({ name }) => name === 'package')).toMatchObject({
+    family: 'combobox',
+    value: 'Studio - $500',
+  });
+  expect(snapshot.fields.find(({ name }) => name === 'recording')).toMatchObject({
+    family: 'checkbox',
+    checked: false,
+  });
+  expect(snapshot.fields.find(({ name }) => name === 'catering')).toMatchObject({
+    family: 'checkbox',
+    checked: false,
+  });
+  expect(snapshot.fields.find(({ name }) => name === 'base_amount')).toMatchObject({
+    family: 'text',
+    value: '$500.00',
+  });
+  expect(snapshot.fields.find(({ name }) => name === 'guest_amount')).toMatchObject({
+    family: 'text',
+    value: '$180.00',
+  });
+  expect(snapshot.fields.find(({ name }) => name === 'extras_amount')).toMatchObject({
+    family: 'text',
+    value: '$0.00',
+  });
+  expect(snapshot.fields.find(({ name }) => name === 'total_amount')).toMatchObject({
+    family: 'text',
+    value: '$680.00',
+  });
+}
+
 describe('interactive form JavaScript acceptance', () => {
-  it('executes the demo PDF summary and print buttons through the form transaction', async () => {
+  it('executes the demo PDF buttons through the form transaction', async () => {
     const engine = await createLocalEngine({ runtime: { prefer: 'wasm' } });
     const doc = await engine.open(
       {
@@ -74,8 +110,6 @@ describe('interactive form JavaScript acceptance', () => {
         await activationFor(doc, summaryButton),
       );
 
-      console.log(JSON.stringify(summaryResult, null, 2));
-
       expect(summaryResult.status).toBe('applied');
       expect(summaryResult.uiEffects).toContainEqual({ kind: 'gotoPage', page: 1 });
       const afterSummary = await doc.forms.list();
@@ -97,6 +131,73 @@ describe('interactive form JavaScript acceptance', () => {
         status: 'unchanged',
         effectsResult: null,
         uiEffects: [{ kind: 'print' }],
+      });
+
+      const packageField = afterSummary.fields.find(({ name }) => name === 'package');
+      const recording = afterSummary.fields.find(({ name }) => name === 'recording');
+      if (packageField?.family !== 'combobox' || recording?.family !== 'checkbox') {
+        throw new Error('demo package/recording fields are missing');
+      }
+      const premium = packageField.options.find(({ label }) => label === 'Premium - $900');
+      if (!premium) throw new Error('Premium package option is missing');
+
+      await controller.commit(await doc.forms.list(), packageField.ref, {
+        type: 'choice',
+        values: [premium.value],
+      });
+      await controller.commit(await doc.forms.list(), recording.ref, {
+        type: 'toggle',
+        state: recording.exportValue,
+      });
+
+      const beforeReset = await doc.forms.list();
+      const resetButton = beforeReset.fields.find(({ name }) => name === 'btn_reset');
+      if (!resetButton) throw new Error('reset button is missing');
+      const resetResult = await controller.activate(
+        beforeReset,
+        resetButton.ref,
+        await activationFor(doc, resetButton),
+      );
+      expect(resetResult.status).toBe('applied');
+
+      let afterReset = await doc.forms.list();
+      expectAdobeResetState(afterReset);
+
+      for (let attempt = 0; attempt < 2; attempt++) {
+        const repeatedResetButton = afterReset.fields.find(({ name }) => name === 'btn_reset');
+        if (!repeatedResetButton) throw new Error('reset button is missing after reset');
+        const repeatedResetResult = await controller.activate(
+          afterReset,
+          repeatedResetButton.ref,
+          await activationFor(doc, repeatedResetButton),
+        );
+        expect(repeatedResetResult.status).toBe('unchanged');
+        afterReset = await doc.forms.list();
+        expectAdobeResetState(afterReset);
+      }
+
+      const confirmation = afterReset.fields.find(({ name }) => name === 'confirmation');
+      if (confirmation?.family !== 'text') throw new Error('confirmation field is missing');
+      await controller.commit(afterReset, confirmation.ref, { type: 'text', value: 'CONFIRM' });
+
+      const beforeConfirm = await doc.forms.list();
+      const confirmButton = beforeConfirm.fields.find(({ name }) => name === 'btn_confirm');
+      if (!confirmButton) throw new Error('confirm button is missing');
+      const confirmResult = await controller.activate(
+        beforeConfirm,
+        confirmButton.ref,
+        await activationFor(doc, confirmButton),
+      );
+      expect(confirmResult.uiEffects).toContainEqual({
+        kind: 'alert',
+        message: 'Event confirmed. This alert was launched by embedded PDF JavaScript.',
+        icon: 3,
+      });
+
+      const afterConfirm = await doc.forms.list();
+      expect(afterConfirm.fields.find(({ name }) => name === 'confirmation_result')).toMatchObject({
+        family: 'text',
+        value: expect.stringContaining('Confirmed on '),
       });
     } finally {
       controller.dispose();

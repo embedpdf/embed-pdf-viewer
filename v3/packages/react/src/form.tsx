@@ -227,6 +227,7 @@ function ButtonWidget({ fill, item, page, appearance }: WidgetProps<'button'>) {
         border: 0,
         background: 'transparent',
         cursor: fill.disabled ? 'default' : 'pointer',
+        pointerEvents: fill.disabled ? 'none' : 'auto',
       }}
     >
       <Picture page={page} appearance={appearance} apBox={item.apBox} frame={b} />

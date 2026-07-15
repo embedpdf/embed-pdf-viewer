@@ -367,9 +367,13 @@ export function installAcroJs(g: Record<string, unknown>): void {
     if (state.resetRefs.length > 0) formEffects.push({ kind: 'reset', refs: [...state.resetRefs] });
     for (const field of state.fields) {
       const key = refKey(field.input.ref);
-      const resetToDefault =
-        state.resetKeys.has(key) && sameValue(field.value, field.input.defaultValue);
-      if (!sameValue(field.value, field.originalValue) && !resetToDefault) {
+      // A reset effect is replayed before the value effects below, so reset
+      // fields start from their default rather than the transaction input.
+      // This preserves reset -> rewrite-to-original sequences.
+      const valueBaseline = state.resetKeys.has(key)
+        ? field.input.defaultValue
+        : field.originalValue;
+      if (!sameValue(field.value, valueBaseline)) {
         const value = formValue(field, field.value);
         if (value) formEffects.push({ kind: 'setValue', ref: field.input.ref, value });
       }
