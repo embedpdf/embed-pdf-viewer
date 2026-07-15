@@ -87,6 +87,10 @@ import {
   PageTextSlice,
   stripPdfUnwantedMarkers,
   rectToQuad,
+  orientedQuadFromPageBoxAndMatrix,
+  pdfAttachmentPointsToQuad,
+  quadToPdfAttachmentPoints,
+  quadsToRects,
   dateToPdfDate,
   pdfDateToDate,
   PdfAnnotationColorType,
@@ -4011,7 +4015,15 @@ export class PdfiumNative implements IPdfiumExecutor {
       | PdfSquigglyAnnoObject,
   ) {
     // Type-specific properties
-    if (!this.syncQuadPointsAnno(doc, page, annotationPtr, annotation.segmentRects)) {
+    if (
+      !this.syncQuadPointsAnno(
+        doc,
+        page,
+        annotationPtr,
+        annotation.segmentRects,
+        annotation.segmentQuads,
+      )
+    ) {
       return false;
     }
     if (!this.setAnnotationOpacity(annotationPtr, annotation.opacity ?? 1)) {
@@ -5027,6 +5039,9 @@ export class PdfiumNative implements IPdfiumExecutor {
         flags: g.isEmpty ? 2 : g.isSpace ? 1 : 0,
         ...(g.tightOrigin && { tightX: g.tightOrigin.x, tightY: g.tightOrigin.y }),
         ...(g.tightSize && { tightWidth: g.tightSize.width, tightHeight: g.tightSize.height }),
+        ...(g.matrix && { matrix: g.matrix }),
+        ...(g.pageOrigin && { pageOrigin: g.pageOrigin }),
+        ...(g.quad && { quad: g.quad }),
       });
 
       /* 4 — expand the run's bounding rect */
@@ -5298,6 +5313,9 @@ export class PdfiumNative implements IPdfiumExecutor {
     const tRightPtr = this.memoryManager.malloc(8);
     const tBottomPtr = this.memoryManager.malloc(8);
     const tTopPtr = this.memoryManager.malloc(8);
+    const matrixPtr = this.memoryManager.malloc(24);
+    const originXPtr = this.memoryManager.malloc(8);
+    const originYPtr = this.memoryManager.malloc(8);
 
     const allPtrs = [
       rectPtr,
@@ -5309,6 +5327,9 @@ export class PdfiumNative implements IPdfiumExecutor {
       tRightPtr,
       tBottomPtr,
       tTopPtr,
+      matrixPtr,
+      originXPtr,
+      originYPtr,
     ];
 
     let x = 0,
@@ -5318,15 +5339,22 @@ export class PdfiumNative implements IPdfiumExecutor {
       isSpace = false;
     let tightOrigin: { x: number; y: number } | undefined;
     let tightSize: { width: number; height: number } | undefined;
+    let matrix: PdfTransformMatrix | undefined;
+    let pageOrigin: { x: number; y: number } | undefined;
+    let quad: Quad | undefined;
+    let pageLeft = 0;
+    let pageTop = 0;
+    let pageRight = 0;
+    let pageBottom = 0;
 
     // ── 1) loose glyph bbox (FPDFText_GetLooseCharBox) ──────────
     if (this.pdfiumModule.FPDFText_GetLooseCharBox(textPagePtr, charIndex, rectPtr)) {
-      const left = this.pdfiumModule.pdfium.getValue(rectPtr, 'float');
-      const top = this.pdfiumModule.pdfium.getValue(rectPtr + 4, 'float');
-      const right = this.pdfiumModule.pdfium.getValue(rectPtr + 8, 'float');
-      const bottom = this.pdfiumModule.pdfium.getValue(rectPtr + 12, 'float');
+      pageLeft = this.pdfiumModule.pdfium.getValue(rectPtr, 'float');
+      pageTop = this.pdfiumModule.pdfium.getValue(rectPtr + 4, 'float');
+      pageRight = this.pdfiumModule.pdfium.getValue(rectPtr + 8, 'float');
+      pageBottom = this.pdfiumModule.pdfium.getValue(rectPtr + 12, 'float');
 
-      if (left === right || top === bottom) {
+      if (pageLeft === pageRight || pageTop === pageBottom) {
         allPtrs.forEach((p) => this.memoryManager.free(p));
 
         return {
@@ -5344,8 +5372,8 @@ export class PdfiumNative implements IPdfiumExecutor {
         page.size.width,
         page.size.height,
         0,
-        left,
-        top,
+        pageLeft,
+        pageTop,
         dx1Ptr,
         dy1Ptr,
       );
@@ -5356,8 +5384,8 @@ export class PdfiumNative implements IPdfiumExecutor {
         page.size.width,
         page.size.height,
         0,
-        right,
-        bottom,
+        pageRight,
+        pageBottom,
         dx2Ptr,
         dy2Ptr,
       );
@@ -5425,7 +5453,67 @@ export class PdfiumNative implements IPdfiumExecutor {
         };
       }
 
-      // ── 4) extra flags ────────────────────────────────────────
+      // ── 4) glyph matrix + origin ──────────────────────────────
+      if (this.pdfiumModule.FPDFText_GetMatrix(textPagePtr, charIndex, matrixPtr)) {
+        matrix = {
+          a: this.pdfiumModule.pdfium.getValue(matrixPtr, 'float'),
+          b: this.pdfiumModule.pdfium.getValue(matrixPtr + 4, 'float'),
+          c: this.pdfiumModule.pdfium.getValue(matrixPtr + 8, 'float'),
+          d: this.pdfiumModule.pdfium.getValue(matrixPtr + 12, 'float'),
+          e: this.pdfiumModule.pdfium.getValue(matrixPtr + 16, 'float'),
+          f: this.pdfiumModule.pdfium.getValue(matrixPtr + 20, 'float'),
+        };
+      }
+
+      if (
+        this.pdfiumModule.FPDFText_GetCharOrigin(
+          textPagePtr,
+          charIndex,
+          originXPtr,
+          originYPtr,
+        )
+      ) {
+        pageOrigin = {
+          x: this.pdfiumModule.pdfium.getValue(originXPtr, 'double'),
+          y: this.pdfiumModule.pdfium.getValue(originYPtr, 'double'),
+        };
+      }
+
+      if (matrix) {
+        const pageQuad = orientedQuadFromPageBoxAndMatrix(
+          pageLeft,
+          pageTop,
+          pageRight,
+          pageBottom,
+          matrix,
+        );
+        const pageToDevice = (point: Position): Position => {
+          this.pdfiumModule.FPDF_PageToDevice(
+            pagePtr,
+            0,
+            0,
+            page.size.width,
+            page.size.height,
+            0,
+            point.x,
+            point.y,
+            dx1Ptr,
+            dy1Ptr,
+          );
+          return {
+            x: this.pdfiumModule.pdfium.getValue(dx1Ptr, 'i32'),
+            y: this.pdfiumModule.pdfium.getValue(dy1Ptr, 'i32'),
+          };
+        };
+        quad = {
+          p1: pageToDevice(pageQuad.p1),
+          p2: pageToDevice(pageQuad.p2),
+          p3: pageToDevice(pageQuad.p3),
+          p4: pageToDevice(pageQuad.p4),
+        };
+      }
+
+      // ── 5) extra flags ────────────────────────────────────────
       const uc = this.pdfiumModule.FPDFText_GetUnicode(textPagePtr, charIndex);
       isSpace = uc === 32;
     }
@@ -5436,6 +5524,9 @@ export class PdfiumNative implements IPdfiumExecutor {
     return {
       origin: { x, y },
       size: { width, height },
+      ...(matrix && { matrix }),
+      ...(pageOrigin && { pageOrigin }),
+      ...(quad && { quad }),
       ...(tightOrigin && { tightOrigin }),
       ...(tightSize && { tightSize }),
       ...(isSpace && { isSpace }),
@@ -6874,9 +6965,9 @@ export class PdfiumNative implements IPdfiumExecutor {
     doc: PdfDocumentObject,
     page: PdfPageObject,
     annotationPtr: number,
-  ): Rect[] {
+  ): { quads: Quad[]; rects: Rect[] } {
     const quadCount = this.pdfiumModule.FPDFAnnot_CountAttachmentPoints(annotationPtr);
-    if (quadCount === 0) return [];
+    if (quadCount === 0) return { quads: [], rects: [] };
 
     const FS_QUADPOINTSF_SIZE = 8 * 4; // eight floats, 32 bytes
     const quads: Quad[] = [];
@@ -6887,7 +6978,6 @@ export class PdfiumNative implements IPdfiumExecutor {
       const ok = this.pdfiumModule.FPDFAnnot_GetAttachmentPoints(annotationPtr, qi, quadPtr);
 
       if (ok) {
-        // read the eight floats
         const xs: number[] = [];
         const ys: number[] = [];
         for (let i = 0; i < 4; i++) {
@@ -6896,19 +6986,18 @@ export class PdfiumNative implements IPdfiumExecutor {
           ys.push(this.pdfiumModule.pdfium.getValue(base + 4, 'float'));
         }
 
-        // convert to device-space
-        const p1 = this.convertPagePointToDevicePoint(doc, page, { x: xs[0], y: ys[0] });
-        const p2 = this.convertPagePointToDevicePoint(doc, page, { x: xs[1], y: ys[1] });
-        const p3 = this.convertPagePointToDevicePoint(doc, page, { x: xs[2], y: ys[2] });
-        const p4 = this.convertPagePointToDevicePoint(doc, page, { x: xs[3], y: ys[3] });
+        const bl = this.convertPagePointToDevicePoint(doc, page, { x: xs[0], y: ys[0] });
+        const br = this.convertPagePointToDevicePoint(doc, page, { x: xs[1], y: ys[1] });
+        const tl = this.convertPagePointToDevicePoint(doc, page, { x: xs[2], y: ys[2] });
+        const tr = this.convertPagePointToDevicePoint(doc, page, { x: xs[3], y: ys[3] });
 
-        quads.push({ p1, p2, p3, p4 });
+        quads.push(pdfAttachmentPointsToQuad(bl, br, tl, tr));
       }
 
       this.memoryManager.free(quadPtr);
     }
 
-    return quads.map(quadToRect);
+    return { quads, rects: quadsToRects(quads) };
   }
 
   /**
@@ -6927,48 +7016,47 @@ export class PdfiumNative implements IPdfiumExecutor {
     page: PdfPageObject,
     annotPtr: number,
     rects: Rect[],
+    quads?: Quad[],
   ): boolean {
     const FS_QUADPOINTSF_SIZE = 8 * 4; // eight floats, 32 bytes
     const pdf = this.pdfiumModule.pdfium;
     const count = this.pdfiumModule.FPDFAnnot_CountAttachmentPoints(annotPtr);
     const buf = this.memoryManager.malloc(FS_QUADPOINTSF_SIZE);
+    const segments = quads && quads.length > 0 ? quads : rects.map(rectToQuad);
 
     /** write one quad into `buf` in annotation space */
-    const writeQuad = (r: Rect) => {
-      const q = rectToQuad(r); // TL, TR, BR, BL
-      const p1 = this.convertDevicePointToPagePoint(doc, page, q.p1);
-      const p2 = this.convertDevicePointToPagePoint(doc, page, q.p2);
-      const p3 = this.convertDevicePointToPagePoint(doc, page, q.p3); // BR
-      const p4 = this.convertDevicePointToPagePoint(doc, page, q.p4); // BL
+    const writeQuad = (q: Quad) => {
+      const [bl, br, tl, tr] = quadToPdfAttachmentPoints(q);
+      const pBl = this.convertDevicePointToPagePoint(doc, page, bl);
+      const pBr = this.convertDevicePointToPagePoint(doc, page, br);
+      const pTl = this.convertDevicePointToPagePoint(doc, page, tl);
+      const pTr = this.convertDevicePointToPagePoint(doc, page, tr);
 
-      // PDF QuadPoints order: BL, BR, TL, TR (bottom-left, bottom-right, top-left, top-right)
-      pdf.setValue(buf + 0, p1.x, 'float'); // BL (bottom-left)
-      pdf.setValue(buf + 4, p1.y, 'float');
-
-      pdf.setValue(buf + 8, p2.x, 'float'); // BR (bottom-right)
-      pdf.setValue(buf + 12, p2.y, 'float');
-
-      pdf.setValue(buf + 16, p4.x, 'float'); // TL (top-left)
-      pdf.setValue(buf + 20, p4.y, 'float');
-
-      pdf.setValue(buf + 24, p3.x, 'float'); // TR (top-right)
-      pdf.setValue(buf + 28, p3.y, 'float');
+      // PDF QuadPoints order: BL, BR, TL, TR
+      pdf.setValue(buf + 0, pBl.x, 'float');
+      pdf.setValue(buf + 4, pBl.y, 'float');
+      pdf.setValue(buf + 8, pBr.x, 'float');
+      pdf.setValue(buf + 12, pBr.y, 'float');
+      pdf.setValue(buf + 16, pTl.x, 'float');
+      pdf.setValue(buf + 20, pTl.y, 'float');
+      pdf.setValue(buf + 24, pTr.x, 'float');
+      pdf.setValue(buf + 28, pTr.y, 'float');
     };
 
     /* ----------------------------------------------------------------------- */
     /* 1. overwrite the quads that already exist                               */
-    const min = Math.min(count, rects.length);
+    const min = Math.min(count, segments.length);
     for (let i = 0; i < min; i++) {
-      writeQuad(rects[i]);
+      writeQuad(segments[i]);
       if (!this.pdfiumModule.FPDFAnnot_SetAttachmentPoints(annotPtr, i, buf)) {
         this.memoryManager.free(buf);
         return false;
       }
     }
 
-    /* 2. append new quads if rects.length > count                             */
-    for (let i = count; i < rects.length; i++) {
-      writeQuad(rects[i]);
+    /* 2. append new quads if segments.length > count                             */
+    for (let i = count; i < segments.length; i++) {
+      writeQuad(segments[i]);
       if (!this.pdfiumModule.FPDFAnnot_AppendAttachmentPoints(annotPtr, buf)) {
         this.memoryManager.free(buf);
         return false;
@@ -8000,7 +8088,11 @@ export class PdfiumNative implements IPdfiumExecutor {
     const rect = this.convertPageRectToDeviceRect(doc, page, pageRect);
 
     // Type-specific properties
-    const segmentRects = this.getQuadPointsAnno(doc, page, annotationPtr);
+    const { quads: segmentQuads, rects: segmentRects } = this.getQuadPointsAnno(
+      doc,
+      page,
+      annotationPtr,
+    );
     const strokeColor = this.getAnnotationColor(annotationPtr) ?? '#FFFF00';
     const opacity = this.getAnnotationOpacity(annotationPtr);
 
@@ -8010,6 +8102,7 @@ export class PdfiumNative implements IPdfiumExecutor {
       type: PdfAnnotationSubtype.HIGHLIGHT,
       rect,
       segmentRects,
+      ...(segmentQuads.length > 0 && { segmentQuads }),
       strokeColor,
       color: strokeColor, // deprecated alias
       opacity,
@@ -8036,7 +8129,11 @@ export class PdfiumNative implements IPdfiumExecutor {
     const rect = this.convertPageRectToDeviceRect(doc, page, pageRect);
 
     // Type-specific properties
-    const segmentRects = this.getQuadPointsAnno(doc, page, annotationPtr);
+    const { quads: segmentQuads, rects: segmentRects } = this.getQuadPointsAnno(
+      doc,
+      page,
+      annotationPtr,
+    );
     const strokeColor = this.getAnnotationColor(annotationPtr) ?? '#FF0000';
     const opacity = this.getAnnotationOpacity(annotationPtr);
 
@@ -8046,6 +8143,7 @@ export class PdfiumNative implements IPdfiumExecutor {
       type: PdfAnnotationSubtype.UNDERLINE,
       rect,
       segmentRects,
+      ...(segmentQuads.length > 0 && { segmentQuads }),
       strokeColor,
       color: strokeColor, // deprecated alias
       opacity,
@@ -8072,7 +8170,11 @@ export class PdfiumNative implements IPdfiumExecutor {
     const rect = this.convertPageRectToDeviceRect(doc, page, pageRect);
 
     // Type-specific properties
-    const segmentRects = this.getQuadPointsAnno(doc, page, annotationPtr);
+    const { quads: segmentQuads, rects: segmentRects } = this.getQuadPointsAnno(
+      doc,
+      page,
+      annotationPtr,
+    );
     const strokeColor = this.getAnnotationColor(annotationPtr) ?? '#FF0000';
     const opacity = this.getAnnotationOpacity(annotationPtr);
 
@@ -8082,6 +8184,7 @@ export class PdfiumNative implements IPdfiumExecutor {
       type: PdfAnnotationSubtype.STRIKEOUT,
       rect,
       segmentRects,
+      ...(segmentQuads.length > 0 && { segmentQuads }),
       strokeColor,
       color: strokeColor, // deprecated alias
       opacity,
@@ -8108,7 +8211,11 @@ export class PdfiumNative implements IPdfiumExecutor {
     const rect = this.convertPageRectToDeviceRect(doc, page, pageRect);
 
     // Type-specific properties
-    const segmentRects = this.getQuadPointsAnno(doc, page, annotationPtr);
+    const { quads: segmentQuads, rects: segmentRects } = this.getQuadPointsAnno(
+      doc,
+      page,
+      annotationPtr,
+    );
     const strokeColor = this.getAnnotationColor(annotationPtr) ?? '#FF0000';
     const opacity = this.getAnnotationOpacity(annotationPtr);
 
@@ -8118,6 +8225,7 @@ export class PdfiumNative implements IPdfiumExecutor {
       type: PdfAnnotationSubtype.SQUIGGLY,
       rect,
       segmentRects,
+      ...(segmentQuads.length > 0 && { segmentQuads }),
       strokeColor,
       color: strokeColor, // deprecated alias
       opacity,
@@ -8185,8 +8293,8 @@ export class PdfiumNative implements IPdfiumExecutor {
     const pageRect = this.readPageAnnoRect(annotationPtr);
     const rect = this.convertPageRectToDeviceRect(doc, page, pageRect);
 
-    // QuadPoints for redaction areas
-    const segmentRects = this.getQuadPointsAnno(doc, page, annotationPtr);
+    // QuadPoints for redaction areas (rect-only; no oriented segmentQuads)
+    const { rects: segmentRects } = this.getQuadPointsAnno(doc, page, annotationPtr);
 
     // Colors: IC = interior/preview, OC = overlay, C = stroke
     const color = this.getAnnotationColor(annotationPtr, PdfAnnotationColorType.InteriorColor);

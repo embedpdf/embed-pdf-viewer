@@ -1,4 +1,16 @@
-import { PdfPageGeometry, PdfRun, Position, Rect } from '@embedpdf/models';
+import {
+  buildSegmentQuadFromGlyphQuads,
+  matricesCompatible,
+  matrixBaselineDirection,
+  PdfPageGeometry,
+  PdfRun,
+  Position,
+  projectOnDirection,
+  Quad,
+  quadToRect,
+  quadsToRects,
+  Rect,
+} from '@embedpdf/models';
 import { SelectionRangeX } from './types';
 
 /**
@@ -143,6 +155,160 @@ export function sliceBounds(
 }
 
 /**
+ * Helper: build oriented quads and derived rects for a slice of the page.
+ */
+export function quadsWithinSlice(
+  geo: PdfPageGeometry,
+  from: number,
+  to: number,
+  merge: boolean = true,
+): { quads: Quad[]; rects: Rect[] } {
+  const segmentQuads: Quad[] = [];
+  const textRuns: TextRunInfo[] = [];
+
+  const CHAR_DISTANCE_FACTOR = 2.5;
+
+  for (const run of geo.runs) {
+    const runStart = run.charStart;
+    const runEnd = runStart + run.glyphs.length - 1;
+    if (runEnd < from || runStart > to) continue;
+
+    const sIdx = Math.max(from, runStart) - runStart;
+    const eIdx = Math.min(to, runEnd) - runStart;
+
+    let segmentGlyphs: Array<(typeof run.glyphs)[number]> = [];
+    let widthSum = 0;
+    let prevTrailing = -Infinity;
+    let segmentOrigin: Position | null = null;
+    let segmentDir: Position | null = null;
+
+    const flushSegment = () => {
+      if (segmentGlyphs.length === 0) return;
+
+      const first = segmentGlyphs[0];
+      const last = segmentGlyphs[segmentGlyphs.length - 1];
+
+      if (first.quad && last.quad) {
+        const quad = buildSegmentQuadFromGlyphQuads(first.quad, last.quad);
+        segmentQuads.push(quad);
+        textRuns.push({
+          rect: quadToRect(quad),
+          charCount: segmentGlyphs.length,
+          fontSize: run.fontSize,
+        });
+      } else {
+        let minX = Infinity,
+          maxX = -Infinity;
+        let minY = Infinity,
+          maxY = -Infinity;
+
+        for (const g of segmentGlyphs) {
+          minX = Math.min(minX, g.x);
+          maxX = Math.max(maxX, g.x + g.width);
+          minY = Math.min(minY, g.y);
+          maxY = Math.max(maxY, g.y + g.height);
+        }
+
+        if (minX !== Infinity) {
+          const rect = {
+            origin: { x: minX, y: minY },
+            size: { width: maxX - minX, height: maxY - minY },
+          };
+          textRuns.push({
+            rect,
+            charCount: segmentGlyphs.length,
+            fontSize: run.fontSize,
+          });
+        }
+      }
+
+      segmentGlyphs = [];
+      widthSum = 0;
+      prevTrailing = -Infinity;
+      segmentOrigin = null;
+      segmentDir = null;
+    };
+
+    for (let i = sIdx; i <= eIdx; i++) {
+      const g = run.glyphs[i];
+      if (g.flags === 2) continue;
+
+      const dir = g.matrix ? matrixBaselineDirection(g.matrix) : { x: 1, y: 0 };
+      const origin = g.pageOrigin ?? { x: g.x, y: g.y + g.height };
+
+      if (segmentGlyphs.length > 0) {
+        const prev = segmentGlyphs[segmentGlyphs.length - 1];
+        const compatible =
+          !prev.matrix || !g.matrix || matricesCompatible(prev.matrix, g.matrix);
+
+        if (!compatible) {
+          flushSegment();
+        } else if (prevTrailing > -Infinity && segmentDir) {
+          const leading = projectOnDirection(
+            { x: g.x, y: g.y },
+            segmentOrigin!,
+            segmentDir,
+          );
+          const gap = Math.abs(leading - prevTrailing);
+          const avgWidth = widthSum / segmentGlyphs.length;
+          if (avgWidth > 0 && gap > CHAR_DISTANCE_FACTOR * avgWidth) {
+            flushSegment();
+          }
+        }
+      }
+
+      if (segmentGlyphs.length === 0) {
+        segmentOrigin = origin;
+        segmentDir = dir;
+      }
+
+      segmentGlyphs.push(g);
+      widthSum += g.width;
+
+      if (g.quad) {
+        prevTrailing = Math.max(
+          projectOnDirection(g.quad.p2, segmentOrigin!, segmentDir!),
+          projectOnDirection(g.quad.p3, segmentOrigin!, segmentDir!),
+        );
+      } else {
+        prevTrailing = projectOnDirection(
+          { x: g.x + g.width, y: g.y + g.height / 2 },
+          segmentOrigin!,
+          segmentDir!,
+        );
+      }
+    }
+
+    flushSegment();
+  }
+
+  if (!merge) {
+    return {
+      quads: segmentQuads,
+      rects: textRuns.map((run) => run.rect),
+    };
+  }
+
+  const mergedRects = mergeAdjacentRects(textRuns);
+  if (segmentQuads.length === textRuns.length) {
+    return { quads: segmentQuads, rects: mergedRects };
+  }
+
+  return {
+    quads: segmentQuads,
+    rects: quadsToRects(segmentQuads.length > 0 ? segmentQuads : textRuns.map((r) => ({
+      p1: { x: r.rect.origin.x, y: r.rect.origin.y },
+      p2: { x: r.rect.origin.x + r.rect.size.width, y: r.rect.origin.y },
+      p3: {
+        x: r.rect.origin.x + r.rect.size.width,
+        y: r.rect.origin.y + r.rect.size.height,
+      },
+      p4: { x: r.rect.origin.x, y: r.rect.origin.y + r.rect.size.height },
+    }))),
+  };
+}
+
+/**
  * Helper: build rects for a slice of the page
  * @param geo - page geometry
  * @param from - from index
@@ -156,78 +322,7 @@ export function rectsWithinSlice(
   to: number,
   merge: boolean = true,
 ): Rect[] {
-  const textRuns: TextRunInfo[] = [];
-
-  const CHAR_DISTANCE_FACTOR = 2.5;
-
-  for (const run of geo.runs) {
-    const runStart = run.charStart;
-    const runEnd = runStart + run.glyphs.length - 1;
-    if (runEnd < from || runStart > to) continue;
-
-    const sIdx = Math.max(from, runStart) - runStart;
-    const eIdx = Math.min(to, runEnd) - runStart;
-
-    let minX = Infinity,
-      maxX = -Infinity;
-    let minY = Infinity,
-      maxY = -Infinity;
-    let charCount = 0;
-    let widthSum = 0;
-    let prevRight = -Infinity;
-
-    const flushSubRun = () => {
-      if (minX !== Infinity && charCount > 0) {
-        textRuns.push({
-          rect: {
-            origin: { x: minX, y: minY },
-            size: { width: maxX - minX, height: maxY - minY },
-          },
-          charCount,
-          fontSize: run.fontSize,
-        });
-      }
-      minX = Infinity;
-      maxX = -Infinity;
-      minY = Infinity;
-      maxY = -Infinity;
-      charCount = 0;
-      widthSum = 0;
-      prevRight = -Infinity;
-    };
-
-    for (let i = sIdx; i <= eIdx; i++) {
-      const g = run.glyphs[i];
-      if (g.flags === 2) continue;
-
-      if (charCount > 0 && prevRight > -Infinity) {
-        const gap = Math.abs(g.x - prevRight);
-        const avgWidth = widthSum / charCount;
-        if (avgWidth > 0 && gap > CHAR_DISTANCE_FACTOR * avgWidth) {
-          flushSubRun();
-        }
-      }
-
-      minX = Math.min(minX, g.x);
-      maxX = Math.max(maxX, g.x + g.width);
-      minY = Math.min(minY, g.y);
-      maxY = Math.max(maxY, g.y + g.height);
-
-      charCount++;
-      widthSum += g.width;
-      prevRight = g.x + g.width;
-    }
-
-    flushSubRun();
-  }
-
-  // If merge is false, just return the individual rects
-  if (!merge) {
-    return textRuns.map((run) => run.rect);
-  }
-
-  // Otherwise merge adjacent rects
-  return mergeAdjacentRects(textRuns);
+  return quadsWithinSlice(geo, from, to, merge).rects;
 }
 
 /**

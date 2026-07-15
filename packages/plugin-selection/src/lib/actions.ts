@@ -1,5 +1,5 @@
 import { Action } from '@embedpdf/core';
-import { PdfPageGeometry, Rect } from '@embedpdf/models';
+import { PdfPageGeometry, Quad, Rect } from '@embedpdf/models';
 import { SelectionDocumentState, SelectionRangeX } from './types';
 
 export const INIT_SELECTION_STATE = 'SELECTION/INIT_STATE';
@@ -10,6 +10,7 @@ export const START_SELECTION = 'SELECTION/START_SELECTION';
 export const END_SELECTION = 'SELECTION/END_SELECTION';
 export const CLEAR_SELECTION = 'SELECTION/CLEAR_SELECTION';
 export const SET_RECTS = 'SELECTION/SET_RECTS';
+export const SET_QUADS = 'SELECTION/SET_QUADS';
 export const SET_SLICES = 'SELECTION/SET_SLICES';
 export const EVICT_PAGE_GEOMETRY = 'SELECTION/EVICT_PAGE_GEOMETRY';
 export const RESET = 'SELECTION/RESET'; // This might be obsolete, but we'll keep it for now
@@ -56,6 +57,11 @@ export interface SetRectsAction extends Action {
   payload: { documentId: string; rects: Record<number, Rect[]> };
 }
 
+export interface SetQuadsAction extends Action {
+  type: typeof SET_QUADS;
+  payload: { documentId: string; quads: Record<number, Quad[]> };
+}
+
 export interface SetSlicesAction extends Action {
   type: typeof SET_SLICES;
   payload: { documentId: string; slices: Record<number, { start: number; count: number }> };
@@ -80,6 +86,7 @@ export type SelectionAction =
   | EndSelectionAction
   | ClearSelectionAction
   | SetRectsAction
+  | SetQuadsAction
   | SetSlicesAction
   | EvictPageGeometryAction
   | ResetAction;
@@ -132,6 +139,11 @@ export const clearSelection = (documentId: string): ClearSelectionAction => ({
 export const setRects = (documentId: string, allRects: Record<number, Rect[]>): SetRectsAction => ({
   type: SET_RECTS,
   payload: { documentId, rects: allRects },
+});
+
+export const setQuads = (documentId: string, allQuads: Record<number, Quad[]>): SetQuadsAction => ({
+  type: SET_QUADS,
+  payload: { documentId, quads: allQuads },
 });
 
 export const setSlices = (

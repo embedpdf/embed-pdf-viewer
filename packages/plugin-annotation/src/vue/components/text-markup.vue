@@ -13,6 +13,7 @@
       :strokeColor="activeTool.defaults.strokeColor"
       :opacity="activeTool.defaults.opacity"
       :segmentRects="rects"
+      :segmentQuads="quads"
       :scale="scale"
     />
     <Underline
@@ -20,6 +21,7 @@
       :strokeColor="activeTool.defaults.strokeColor"
       :opacity="activeTool.defaults.opacity"
       :segmentRects="rects"
+      :segmentQuads="quads"
       :scale="scale"
     />
     <Strikeout
@@ -27,6 +29,7 @@
       :strokeColor="activeTool.defaults.strokeColor"
       :opacity="activeTool.defaults.opacity"
       :segmentRects="rects"
+      :segmentQuads="quads"
       :scale="scale"
     />
     <Squiggly
@@ -34,6 +37,7 @@
       :strokeColor="activeTool.defaults.strokeColor"
       :opacity="activeTool.defaults.opacity"
       :segmentRects="rects"
+      :segmentQuads="quads"
       :scale="scale"
     />
   </div>
@@ -41,7 +45,7 @@
 
 <script setup lang="ts">
 import { ref, onUnmounted, watchEffect, computed } from 'vue';
-import { blendModeToCss, PdfAnnotationSubtype, PdfBlendMode, Rect } from '@embedpdf/models';
+import { blendModeToCss, PdfAnnotationSubtype, PdfBlendMode, Quad, Rect } from '@embedpdf/models';
 import { AnnotationTool } from '@embedpdf/plugin-annotation';
 import { useSelectionCapability } from '@embedpdf/plugin-selection/vue';
 import { useAnnotationCapability } from '../hooks';
@@ -59,6 +63,7 @@ const props = defineProps<{
 const { provides: selectionProvides } = useSelectionCapability();
 const { provides: annotationProvides } = useAnnotationCapability();
 const rects = ref<Rect[]>([]);
+const quads = ref<Quad[]>([]);
 const boundingRect = ref<Rect | null>(null);
 const activeTool = ref<AnnotationTool | null>(null);
 
@@ -69,6 +74,7 @@ watchEffect((onCleanup) => {
     const scoped = selectionProvides.value.forDocument(props.documentId);
     const off = scoped.onSelectionChange(() => {
       rects.value = scoped.getHighlightRectsForPage(props.pageIndex);
+      quads.value = scoped.getHighlightQuadsForPage(props.pageIndex);
       boundingRect.value = scoped.getBoundingRectForPage(props.pageIndex);
     });
     unsubscribers.push(off);

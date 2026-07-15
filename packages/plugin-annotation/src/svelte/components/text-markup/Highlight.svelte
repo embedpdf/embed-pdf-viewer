@@ -1,16 +1,20 @@
 <script lang="ts">
-  import type { Rect } from '@embedpdf/models';
+  import type { Quad, Rect } from '@embedpdf/models';
+  import {
+    quadBoundsRelativeToContainer,
+    quadClipPath,
+    resolveTextMarkupSegments,
+  } from '../../../shared/components/text-markup/quad-geometry';
 
   interface HighlightProps {
-    /** Stroke/markup color */
     strokeColor?: string;
     opacity?: number;
     segmentRects: Rect[];
+    segmentQuads?: Quad[];
     rect?: Rect;
     scale: number;
     onClick?: (e: MouseEvent) => void;
     style?: Record<string, string | number | undefined>;
-    /** When true, AP image provides the visual; only render hit area */
     appearanceActive?: boolean;
   }
 
@@ -18,6 +22,7 @@
     strokeColor,
     opacity = 0.5,
     segmentRects,
+    segmentQuads,
     rect,
     scale,
     onClick,
@@ -26,20 +31,23 @@
   }: HighlightProps = $props();
 
   const resolvedColor = $derived(strokeColor ?? '#FFFF00');
+  const segments = $derived(resolveTextMarkupSegments(segmentRects, segmentQuads));
 </script>
 
-{#each segmentRects as b, i (i)}
+{#each segments as segment, i (i)}
+  {@const bounds = quadBoundsRelativeToContainer(segment, rect, scale)}
   <div
     role="button"
     tabindex={onClick ? 0 : -1}
     onpointerdown={onClick}
     style:position="absolute"
-    style:left="{(rect ? b.origin.x - rect.origin.x : b.origin.x) * scale}px"
-    style:top="{(rect ? b.origin.y - rect.origin.y : b.origin.y) * scale}px"
-    style:width="{b.size.width * scale}px"
-    style:height="{b.size.height * scale}px"
+    style:left="{bounds.left}px"
+    style:top="{bounds.top}px"
+    style:width="{bounds.width}px"
+    style:height="{bounds.height}px"
     style:background={appearanceActive ? 'transparent' : resolvedColor}
     style:opacity={appearanceActive ? undefined : opacity}
+    style:clip-path={appearanceActive ? undefined : quadClipPath(segment, rect, scale)}
     style:pointer-events={onClick ? 'auto' : 'none'}
     style:cursor={onClick ? 'pointer' : 'default'}
     style:z-index={onClick ? 1 : undefined}

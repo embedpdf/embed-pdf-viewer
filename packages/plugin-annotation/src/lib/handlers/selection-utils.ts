@@ -1,19 +1,20 @@
-import { Rect } from '@embedpdf/models';
+import { getQuadBaselineEnd, Quad, Rect, rectToQuad } from '@embedpdf/models';
 
 /**
  * Compute a caret annotation rect at the end of a text selection.
- * The caret is half the line height, bottom-aligned with the line,
- * and horizontally centered on the line's end edge.
+ * Uses the oriented segment quad baseline when available.
  */
-export function computeCaretRect(lastSegRect: Rect): Rect {
+export function computeCaretRect(lastSegRect: Rect, lastSegQuad?: Quad): Rect {
+  const quad = lastSegQuad ?? rectToQuad(lastSegRect);
+  const baselineEnd = getQuadBaselineEnd(quad);
   const lineHeight = lastSegRect.size.height;
   const height = lineHeight / 2;
   const width = height;
-  const lineEndX = lastSegRect.origin.x + lastSegRect.size.width;
+
   return {
     origin: {
-      x: lineEndX - width / 2,
-      y: lastSegRect.origin.y + lineHeight / 2,
+      x: baselineEnd.x - width / 2,
+      y: baselineEnd.y - height,
     },
     size: { width, height },
   };

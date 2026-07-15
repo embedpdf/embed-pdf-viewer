@@ -1,4 +1,4 @@
-import { blendModeToCss, PdfAnnotationSubtype, PdfBlendMode, Rect } from '@embedpdf/models';
+import { blendModeToCss, PdfAnnotationSubtype, PdfBlendMode, Quad, Rect } from '@embedpdf/models';
 import { AnnotationTool } from '@embedpdf/plugin-annotation';
 import { useSelectionCapability } from '@embedpdf/plugin-selection/@framework';
 
@@ -19,6 +19,7 @@ export function TextMarkup({ documentId, pageIndex, scale }: TextMarkupProps) {
   const { provides: selectionProvides } = useSelectionCapability();
   const { provides: annotationProvides } = useAnnotationCapability();
   const [rects, setRects] = useState<Array<Rect>>([]);
+  const [quads, setQuads] = useState<Array<Quad>>([]);
   const [boundingRect, setBoundingRect] = useState<Rect | null>(null);
   const [activeTool, setActiveTool] = useState<AnnotationTool | null>(null);
 
@@ -26,8 +27,10 @@ export function TextMarkup({ documentId, pageIndex, scale }: TextMarkupProps) {
     if (!selectionProvides) return;
 
     return selectionProvides.forDocument(documentId).onSelectionChange(() => {
-      setRects(selectionProvides.forDocument(documentId).getHighlightRectsForPage(pageIndex));
-      setBoundingRect(selectionProvides.forDocument(documentId).getBoundingRectForPage(pageIndex));
+      const scope = selectionProvides.forDocument(documentId);
+      setRects(scope.getHighlightRectsForPage(pageIndex));
+      setQuads(scope.getHighlightQuadsForPage(pageIndex));
+      setBoundingRect(scope.getBoundingRectForPage(pageIndex));
     });
   }, [selectionProvides, documentId, pageIndex]);
 
@@ -60,6 +63,7 @@ export function TextMarkup({ documentId, pageIndex, scale }: TextMarkupProps) {
             strokeColor={activeTool.defaults?.strokeColor}
             opacity={activeTool.defaults?.opacity}
             segmentRects={rects}
+            segmentQuads={quads}
             scale={scale}
           />
         </div>
@@ -78,6 +82,7 @@ export function TextMarkup({ documentId, pageIndex, scale }: TextMarkupProps) {
             strokeColor={activeTool.defaults?.strokeColor}
             opacity={activeTool.defaults?.opacity}
             segmentRects={rects}
+            segmentQuads={quads}
             scale={scale}
           />
         </div>
@@ -96,6 +101,7 @@ export function TextMarkup({ documentId, pageIndex, scale }: TextMarkupProps) {
             strokeColor={activeTool.defaults?.strokeColor}
             opacity={activeTool.defaults?.opacity}
             segmentRects={rects}
+            segmentQuads={quads}
             scale={scale}
           />
         </div>
@@ -114,6 +120,7 @@ export function TextMarkup({ documentId, pageIndex, scale }: TextMarkupProps) {
             strokeColor={activeTool.defaults?.strokeColor}
             opacity={activeTool.defaults?.opacity}
             segmentRects={rects}
+            segmentQuads={quads}
             scale={scale}
           />
         </div>

@@ -21,9 +21,10 @@ export const insertTextSelectionHandler: SelectionHandlerFactory<PdfCaretAnnoObj
 
     for (const selection of selections) {
       const lastSegRect = selection.segmentRects[selection.segmentRects.length - 1];
+      const lastSegQuad = selection.segmentQuads?.[selection.segmentQuads.length - 1];
       if (!lastSegRect) continue;
 
-      const caretRect = computeCaretRect(lastSegRect);
+      const caretRect = computeCaretRect(lastSegRect, lastSegQuad);
       const caretId = uuidV4();
       const defaults = getDefaults();
 

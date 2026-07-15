@@ -1,4 +1,8 @@
-import { PdfAnnotationObject, uuidV4 } from '@embedpdf/models';
+import {
+  PdfAnnotationObject,
+  Quad,
+  uuidV4,
+} from '@embedpdf/models';
 import { SelectionHandlerFactory } from './types';
 
 /**
@@ -20,6 +24,7 @@ export const textMarkupSelectionHandler: SelectionHandlerFactory = {
           ...tool.defaults,
           rect: selection.rect,
           segmentRects: selection.segmentRects,
+          ...(selection.segmentQuads && { segmentQuads: selection.segmentQuads }),
           pageIndex: selection.pageIndex,
           created: new Date(),
           id,

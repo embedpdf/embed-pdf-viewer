@@ -16,6 +16,7 @@ import {
   PageTextSlice,
   Task,
   Position,
+  Quad,
 } from '@embedpdf/models';
 import {
   InteractionManagerCapability,
@@ -35,6 +36,7 @@ import {
   startSelection,
   clearSelection,
   setRects,
+  setQuads,
   setSlices,
   initSelectionState,
   cleanupSelectionState,
@@ -66,7 +68,7 @@ import {
   EmptySpaceClickEvent,
   EmptySpaceClickScopeEvent,
 } from './types';
-import { sliceBounds, rectsWithinSlice, expandToWordBoundary, expandToLineBoundary } from './utils';
+import { sliceBounds, quadsWithinSlice, expandToWordBoundary, expandToLineBoundary } from './utils';
 import { createTextSelectionHandler } from './handlers/text-selection.handler';
 import { createMarqueeSelectionHandler } from './handlers/marquee-selection.handler';
 
@@ -285,6 +287,8 @@ export class SelectionPlugin extends BasePlugin<
         selector.getFormattedSelectionForPage(this.getDocumentState(getDocId(docId)), p),
       getHighlightRectsForPage: (p, docId) =>
         selector.selectRectsForPage(this.getDocumentState(getDocId(docId)), p),
+      getHighlightQuadsForPage: (p, docId) =>
+        selector.selectQuadsForPage(this.getDocumentState(getDocId(docId)), p),
       getHighlightRects: (docId) => this.getDocumentState(getDocId(docId)).rects,
       getBoundingRectForPage: (p, docId) =>
         selector.selectBoundingRectForPage(this.getDocumentState(getDocId(docId)), p),
@@ -328,6 +332,8 @@ export class SelectionPlugin extends BasePlugin<
         selector.getFormattedSelectionForPage(this.getDocumentState(documentId), p),
       getHighlightRectsForPage: (p) =>
         selector.selectRectsForPage(this.getDocumentState(documentId), p),
+      getHighlightQuadsForPage: (p) =>
+        selector.selectQuadsForPage(this.getDocumentState(documentId), p),
       getHighlightRects: () => this.getDocumentState(documentId).rects,
       getBoundingRectForPage: (p) =>
         selector.selectBoundingRectForPage(this.getDocumentState(documentId), p),
@@ -411,8 +417,9 @@ export class SelectionPlugin extends BasePlugin<
       const sb = sliceBounds(sel, geo, pageIndex);
       if (!sb) return;
 
-      const pageRects = rectsWithinSlice(geo, sb.from, sb.to);
+      const { quads: pageQuads, rects: pageRects } = quadsWithinSlice(geo, sb.from, sb.to);
       this.dispatch(setRects(documentId, { ...currentState.rects, [pageIndex]: pageRects }));
+      this.dispatch(setQuads(documentId, { ...currentState.quads, [pageIndex]: pageQuads }));
       this.dispatch(
         setSlices(documentId, {
           ...currentState.slices,
@@ -872,6 +879,7 @@ export class SelectionPlugin extends BasePlugin<
   private updateRectsAndSlices(documentId: string, range: SelectionRangeX) {
     const docState = this.getDocumentState(documentId);
     const allRects: Record<number, Rect[]> = {};
+    const allQuads: Record<number, Quad[]> = {};
     const allSlices: Record<number, { start: number; count: number }> = {};
 
     for (let p = range.start.page; p <= range.end.page; p++) {
@@ -879,11 +887,14 @@ export class SelectionPlugin extends BasePlugin<
       const sb = sliceBounds(range, geo, p);
       if (!sb) continue;
 
-      allRects[p] = rectsWithinSlice(geo!, sb.from, sb.to);
+      const { quads, rects } = quadsWithinSlice(geo!, sb.from, sb.to);
+      allRects[p] = rects;
+      allQuads[p] = quads;
       allSlices[p] = { start: sb.from, count: sb.to - sb.from + 1 };
     }
 
     this.dispatch(setRects(documentId, allRects));
+    this.dispatch(setQuads(documentId, allQuads));
     this.dispatch(setSlices(documentId, allSlices));
   }
 

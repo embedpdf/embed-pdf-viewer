@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { blendModeToCss, PdfAnnotationSubtype, PdfBlendMode, type Rect } from '@embedpdf/models';
+  import { blendModeToCss, PdfAnnotationSubtype, PdfBlendMode, type Quad, type Rect } from '@embedpdf/models';
   import type { AnnotationTool } from '@embedpdf/plugin-annotation';
   import { useSelectionCapability } from '@embedpdf/plugin-selection/svelte';
 
@@ -21,6 +21,7 @@
   const annotationCapability = useAnnotationCapability();
 
   let rects = $state<Rect[]>([]);
+  let quads = $state<Quad[]>([]);
   let boundingRect = $state<Rect | null>(null);
   let activeTool = $state<AnnotationTool | null>(null);
 
@@ -38,6 +39,7 @@
 
     const off = selectionProvides.onSelectionChange(() => {
       rects = selectionProvides.getHighlightRectsForPage(pageIndex);
+      quads = selectionProvides.getHighlightQuadsForPage(pageIndex);
       boundingRect = selectionProvides.getBoundingRectForPage(pageIndex);
     });
     return off;
@@ -77,6 +79,7 @@
         strokeColor={activeTool.defaults?.strokeColor}
         opacity={activeTool.defaults?.opacity}
         segmentRects={rects}
+        segmentQuads={quads}
         {scale}
       />
     </div>
@@ -91,6 +94,7 @@
         strokeColor={activeTool.defaults?.strokeColor}
         opacity={activeTool.defaults?.opacity}
         segmentRects={rects}
+        segmentQuads={quads}
         {scale}
       />
     </div>
@@ -105,6 +109,7 @@
         strokeColor={activeTool.defaults?.strokeColor}
         opacity={activeTool.defaults?.opacity}
         segmentRects={rects}
+        segmentQuads={quads}
         {scale}
       />
     </div>
@@ -119,6 +124,7 @@
         strokeColor={activeTool.defaults?.strokeColor}
         opacity={activeTool.defaults?.opacity}
         segmentRects={rects}
+        segmentQuads={quads}
         {scale}
       />
     </div>
