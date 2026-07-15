@@ -974,12 +974,49 @@ export function getQuadMidline(q: Quad): { start: Position; end: Position } {
 }
 
 /**
- * Baseline endpoint at the trailing edge of a segment quad.
+ * Trailing baseline corner of a segment quad (end of the bottom edge in reading order).
  *
  * @public
  */
 export function getQuadBaselineEnd(q: Quad): Position {
-  return { x: (q.p2.x + q.p3.x) / 2, y: (q.p2.y + q.p3.y) / 2 };
+  return q.p3;
+}
+
+/**
+ * Perpendicular ink height of a quad (distance between top and bottom edges).
+ *
+ * @public
+ */
+export function getQuadInkExtent(q: Quad): number {
+  const midTop = { x: (q.p1.x + q.p2.x) / 2, y: (q.p1.y + q.p2.y) / 2 };
+  const midBottom = { x: (q.p4.x + q.p3.x) / 2, y: (q.p4.y + q.p3.y) / 2 };
+  return Math.hypot(midTop.x - midBottom.x, midTop.y - midBottom.y);
+}
+
+/**
+ * Baseline direction angle in degrees, measured counter-clockwise from +X.
+ * Matches the rotation convention used by {@link calculateRotatedRectAABBAroundPoint}.
+ *
+ * @public
+ */
+export function getQuadBaselineAngleDegrees(q: Quad): number {
+  const { start, end } = getQuadBottomEdge(q);
+  const dx = end.x - start.x;
+  const dy = end.y - start.y;
+  if (Math.hypot(dx, dy) < 1e-10) return 0;
+  return (Math.atan2(dy, dx) * 180) / Math.PI;
+}
+
+/**
+ * Bottom-center point of a rectangle (baseline attachment for carets).
+ *
+ * @public
+ */
+export function getRectBottomCenter(rect: Rect): Position {
+  return {
+    x: rect.origin.x + rect.size.width / 2,
+    y: rect.origin.y + rect.size.height,
+  };
 }
 
 /**

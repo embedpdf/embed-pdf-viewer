@@ -14,6 +14,10 @@ import {
   quadToRect,
   getQuadBottomEdge,
   getQuadMidline,
+  getQuadInkExtent,
+  getQuadBaselineAngleDegrees,
+  getQuadBaselineEnd,
+  getRectBottomCenter,
 } from './geometry';
 
 describe('Geometry', () => {
@@ -237,5 +241,32 @@ describe('Oriented quad helpers', () => {
       start: { x: 0, y: 2 },
       end: { x: 10, y: 2 },
     });
+    expect(getQuadBaselineEnd(quad)).toEqual({ x: 10, y: 4 });
+    expect(getQuadInkExtent(quad)).toBeCloseTo(4, 5);
+    expect(getQuadBaselineAngleDegrees(quad)).toBeCloseTo(0, 5);
+  });
+
+  test('ink extent and baseline angle follow oriented glyph quads', () => {
+    const quad = orientedQuadFromPageBoxAndMatrix(0, 20, 10, 0, {
+      a: 0,
+      b: 1,
+      c: -1,
+      d: 0,
+      e: 0,
+      f: 0,
+    });
+
+    expect(getQuadInkExtent(quad)).toBeCloseTo(10, 5);
+    expect(quadToRect(quad).size.height).toBeCloseTo(20, 5);
+    expect(getQuadBaselineAngleDegrees(quad)).toBeCloseTo(90, 5);
+  });
+
+  test('getRectBottomCenter returns the bottom edge midpoint', () => {
+    expect(
+      getRectBottomCenter({
+        origin: { x: 4, y: 6 },
+        size: { width: 8, height: 10 },
+      }),
+    ).toEqual({ x: 8, y: 16 });
   });
 });

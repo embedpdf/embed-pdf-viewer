@@ -5,7 +5,7 @@ import {
   uuidV4,
 } from '@embedpdf/models';
 import { SelectionHandlerFactory } from './types';
-import { computeCaretRect } from './selection-utils';
+import { computeCaretGeometry } from './selection-utils';
 
 /**
  * Selection handler for the "Replace Text" tool.
@@ -30,7 +30,7 @@ export const replaceTextSelectionHandler: SelectionHandlerFactory<PdfStrikeOutAn
       const lastSegQuad = selection.segmentQuads?.[selection.segmentQuads.length - 1];
       if (!lastSegRect) continue;
 
-      const caretRect = computeCaretRect(lastSegRect, lastSegQuad);
+      const caretGeometry = computeCaretGeometry(lastSegRect, lastSegQuad);
       const caretId = uuidV4();
       const strikeoutId = uuidV4();
       const defaults = getDefaults();
@@ -40,7 +40,11 @@ export const replaceTextSelectionHandler: SelectionHandlerFactory<PdfStrikeOutAn
           type: PdfAnnotationSubtype.CARET,
           id: caretId,
           pageIndex: selection.pageIndex,
-          rect: caretRect,
+          rect: caretGeometry.rect,
+          ...(caretGeometry.unrotatedRect !== undefined && {
+            unrotatedRect: caretGeometry.unrotatedRect,
+          }),
+          ...(caretGeometry.rotation !== undefined && { rotation: caretGeometry.rotation }),
           strokeColor: defaults.strokeColor,
           opacity: defaults.opacity,
           intent: 'Replace',
