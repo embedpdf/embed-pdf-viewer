@@ -218,12 +218,7 @@ export class FormMutator {
       this.applyOptions(fieldObjectNumber, draft.options);
     }
     if ('defaultValue' in draft && draft.defaultValue !== undefined) {
-      this.applyWideSetter(
-        fn.EPDFForm_SetFieldDefaultValue,
-        fieldObjectNumber,
-        draft.defaultValue,
-        'default value rejected',
-      );
+      this.applyDefaultValues(fieldObjectNumber, [draft.defaultValue]);
     }
     if ('maxLength' in draft && draft.maxLength !== undefined) {
       if (!fn.EPDFForm_SetFieldMaxLen(docPtr, fieldObjectNumber, draft.maxLength)) {
@@ -309,12 +304,13 @@ export class FormMutator {
       }
     }
     if ('defaultValue' in patch && patch.defaultValue !== undefined) {
-      this.applyWideSetter(
-        fn.EPDFForm_SetFieldDefaultValue,
-        fieldObjectNumber,
-        patch.defaultValue ?? '',
-        'default value rejected',
-      );
+      if (patch.defaultValue === null) {
+        if (!fn.EPDFForm_RemoveFieldDefaultValue(docPtr, fieldObjectNumber)) {
+          throw new EngineError(EngineErrorCode.InvalidArg, 'default value removal rejected');
+        }
+      } else {
+        this.applyDefaultValues(fieldObjectNumber, [patch.defaultValue]);
+      }
     }
     if (patch.alternateName !== undefined) {
       this.applyWideSetter(
@@ -484,6 +480,17 @@ export class FormMutator {
       }
     } finally {
       mem.free(valuePtr);
+    }
+  }
+
+  private applyDefaultValues(fieldObjectNumber: number, values: readonly string[]): void {
+    const { fn } = this.runtime;
+    const docPtr = this.session.requireDocPtr();
+    const ok = withWideStringArray(this.runtime, values, (valuesPtr, count) =>
+      fn.EPDFForm_SetFieldDefaultValues(docPtr, fieldObjectNumber, valuesPtr, count),
+    );
+    if (!ok) {
+      throw new EngineError(EngineErrorCode.InvalidArg, 'default value rejected');
     }
   }
 

@@ -15,7 +15,9 @@ export interface ConformanceTestRunner {
 export interface ConformanceExpect {
   (actual: unknown): {
     toBe(expected: unknown): void;
+    toBeNull(): void;
     toEqual(expected: unknown): void;
+    toHaveLength(expected: number): void;
     toMatch(re: RegExp): void;
     toMatchObject(shape: Record<string, unknown>): void;
     toBeInstanceOf(ctor: Function): void;

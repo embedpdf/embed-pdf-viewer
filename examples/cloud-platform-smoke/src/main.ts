@@ -58,6 +58,7 @@ const PREVIEW_RESOURCES: ReadonlyArray<{ id: DocResourceId; label: string }> = [
   },
   { id: 'annotations-read', label: 'annotations/pages/N/items@annotationVersion' },
   { id: 'layer-metadata', label: 'layers/L/metadata@metadataVersion (layer-level)' },
+  { id: 'layer-actions', label: 'layers/L/actions@actionsVersion (layer-level)' },
   { id: 'download-current', label: 'download (origin-only)' },
   { id: 'download-versioned', label: 'download@docVersion' },
 ];
@@ -243,6 +244,7 @@ app.innerHTML = `
         </div>
 
         <div class="actions">
+          <button id="readDocumentActions" type="button">Read Document Actions</button>
           <button id="readText" type="button">Read Text</button>
           <button id="readGeometry" type="button">Read Geometry</button>
           <button id="listAnnots" type="button">List Annotations</button>
@@ -403,6 +405,7 @@ app.innerHTML = `
         <label>docVersion <input id="previewDocVer" inputmode="numeric" value="1" /></label>
         <label>contentVersion <input id="previewContentVer" inputmode="numeric" value="1" /></label>
         <label>annotationVersion <input id="previewAnnotVer" inputmode="numeric" value="1" /></label>
+        <label>actionsVersion <input id="previewActionsVer" inputmode="numeric" value="1" /></label>
         <button id="previewBuild" type="button">Build URL</button>
       </div>
       <pre id="cdnPreviewOutput" class="cdn-preview-output">(Pick a resource and click Build URL.)</pre>
@@ -440,6 +443,7 @@ const els = {
   securityState: must<HTMLDivElement>('securityState'),
   pageObjectNumber: must<HTMLInputElement>('pageObjectNumber'),
   listPages: must<HTMLButtonElement>('listPages'),
+  readDocumentActions: must<HTMLButtonElement>('readDocumentActions'),
   readText: must<HTMLButtonElement>('readText'),
   readGeometry: must<HTMLButtonElement>('readGeometry'),
   listAnnots: must<HTMLButtonElement>('listAnnots'),
@@ -490,6 +494,7 @@ const els = {
   previewDocVer: must<HTMLInputElement>('previewDocVer'),
   previewContentVer: must<HTMLInputElement>('previewContentVer'),
   previewAnnotVer: must<HTMLInputElement>('previewAnnotVer'),
+  previewActionsVer: must<HTMLInputElement>('previewActionsVer'),
   previewBuild: must<HTMLButtonElement>('previewBuild'),
   cdnPreviewOutput: must<HTMLPreElement>('cdnPreviewOutput'),
 };
@@ -523,6 +528,7 @@ els.openToken.addEventListener('click', () => void run(openToken));
 els.showSecurity.addEventListener('click', () => void run(showSecurity));
 els.unlockDocument.addEventListener('click', () => void run(unlockDocument));
 els.listPages.addEventListener('click', () => void run(listPages));
+els.readDocumentActions.addEventListener('click', () => void run(readDocumentActions));
 els.readText.addEventListener('click', () => void run(readText));
 els.readGeometry.addEventListener('click', () => void run(readGeometry));
 els.listAnnots.addEventListener('click', () => void run(listAnnotations));
@@ -672,6 +678,12 @@ async function listPages(): Promise<void> {
     els.pageObjectNumber.value = String(first.pageObjectNumber);
   }
   setOutput(pages);
+}
+
+async function readDocumentActions(): Promise<void> {
+  const actions = requireDoc().actions;
+  if (!actions) throw new Error('This engine does not expose document actions.');
+  setOutput(await actions.read());
 }
 
 async function readText(): Promise<void> {
@@ -1315,6 +1327,7 @@ function exampleRequestPath(
     docVersion: number;
     layoutVersion: number;
     metadataVersion: number;
+    actionsVersion: number;
     contentVersion: number;
     annotationVersion: number;
   },
@@ -1330,6 +1343,8 @@ function exampleRequestPath(
       return wirePaths.layerLayout(ctx.docId, ctx.layerName, ctx.layoutVersion);
     case 'layer-metadata':
       return wirePaths.layerMetadata(ctx.docId, ctx.layerName, ctx.metadataVersion);
+    case 'layer-actions':
+      return wirePaths.layerActions(ctx.docId, ctx.layerName, ctx.actionsVersion);
     case 'page-render':
       return wirePaths.docPageRender(ctx.docId, ctx.pageObjectNumber, {
         contentVersion: ctx.contentVersion,
@@ -1370,6 +1385,8 @@ function exampleRequestPath(
         docVersion: ctx.docVersion,
         mode: 'incremental',
       });
+    default:
+      throw new Error(`The CDN inspector cannot preview resource ${resourceId}.`);
   }
 }
 
@@ -1387,6 +1404,7 @@ function buildPreview(): Promise<void> {
     docVersion: Number(els.previewDocVer.value) || 1,
     layoutVersion: Number(els.previewDocVer.value) || 1,
     metadataVersion: Number(els.previewDocVer.value) || 1,
+    actionsVersion: Number(els.previewActionsVer.value) || 1,
     contentVersion: Number(els.previewContentVer.value) || 1,
     annotationVersion: Number(els.previewAnnotVer.value) || 1,
   };

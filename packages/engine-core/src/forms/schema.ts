@@ -8,6 +8,8 @@ import type { FormFieldPatch } from './patch';
 import type { FormFieldDTO, FormFieldFlags, FormFieldOption, ToggleFieldWidget } from './field';
 import type { FormKind, FormSnapshot } from './snapshot';
 import type { FormDataFormat, FormFieldValue } from './value';
+import type { FormValueEntry } from './value-entry';
+import { PdfFieldActionsSchema } from '../dto/PdfAction.schema';
 
 export const FormFieldRefSchema: z.ZodType<FormFieldRef> = z.discriminatedUnion('kind', [
   z.object({
@@ -48,6 +50,13 @@ export const FormFieldOptionSchema: z.ZodType<FormFieldOption> = z.object({
   selected: z.boolean(),
 });
 
+export const FormValueEntrySchema: z.ZodType<FormValueEntry> = z.discriminatedUnion('kind', [
+  z.object({ kind: z.literal('none') }),
+  z.object({ kind: z.literal('scalar'), value: z.string() }),
+  z.object({ kind: z.literal('array'), values: z.array(z.string()) }),
+  z.object({ kind: z.literal('unsupported') }),
+]);
+
 const FormFieldBaseShape = {
   ref: FormFieldRefSchema,
   fieldObjectNumber: z.number().int().nonnegative(),
@@ -56,6 +65,9 @@ const FormFieldBaseShape = {
   flags: FormFieldFlagsSchema,
   alternateName: z.string().nullable(),
   mappingName: z.string().nullable(),
+  valueEntry: FormValueEntrySchema,
+  defaultValueEntry: FormValueEntrySchema,
+  actions: PdfFieldActionsSchema.optional(),
   widgets: z.array(FormWidgetRefSchema),
 };
 
@@ -121,6 +133,7 @@ export const FormSnapshotSchema: z.ZodType<FormSnapshot> = z.object({
   formKind: FormKindSchema,
   needsAppearances: z.boolean(),
   fields: z.array(FormFieldDTOSchema),
+  calculationOrder: z.array(FormFieldRefSchema.nullable()),
 });
 
 export const FormFieldValueSchema: z.ZodType<FormFieldValue> = z.discriminatedUnion('type', [

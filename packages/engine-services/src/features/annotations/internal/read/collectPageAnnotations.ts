@@ -10,6 +10,7 @@ import { joinWidgetFieldNumbers } from './joinWidgetField';
 import { readAnnotationBase } from './readAnnotationBase';
 import type { DocumentSession } from '../../../../document-session/DocumentSession';
 import { throwIfAborted } from '../../../../shared/abort';
+import { ActionReadBudgetTracker } from '../../../actions/ActionModelReader';
 
 /**
  * Shared per-page annotation read loop, used by both read paths. The raw
@@ -36,13 +37,22 @@ export function collectPageAnnotations(input: {
   const annotations: AnnotationDTO[] = [];
   let hasWeak = false;
   const revision = session.pageState(pageObjectNumber).revision;
+  const actionBudget = new ActionReadBudgetTracker();
 
   for (let i = 0; i < count; i++) {
     throwIfAborted(signal);
     const annotPtr = getAnnotPtrAt(i);
     if (!annotPtr) continue;
     try {
-      const base = readAnnotationBase(fn, mem, annotPtr, pageObjectNumber, i, revision);
+      const base = readAnnotationBase(
+        fn,
+        mem,
+        annotPtr,
+        pageObjectNumber,
+        i,
+        revision,
+        actionBudget,
+      );
       const subtypeCode = fn.FPDFAnnot_GetSubtype(annotPtr);
       const { reader } = pickReader(subtypeCode);
       const dto = reader(fn, mem, annotPtr, base, subtypeCode);

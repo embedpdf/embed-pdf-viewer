@@ -4,6 +4,7 @@ import {
   EngineErrorCode,
   decodeFieldRefKey,
   type FormDataFormat,
+  type FormEffect,
   type FormFieldDraft,
   type FormFieldPatch,
   type FormFieldRef,
@@ -12,6 +13,7 @@ import {
 } from '@embedpdf/engine-core/runtime';
 import {
   FormDataFormatSchema,
+  FormEffectSchema,
   FormFieldDraftSchema,
   FormFieldPatchSchema,
   FormFieldValueSchema,
@@ -216,6 +218,25 @@ export async function registerFormRoutes(app: FastifyInstance, deps: FormRouteDe
     const ctx = requireLayerCapability(req, docId, layerName, 'doc.forms.fill', pdfBits);
     setNoStore(reply);
     return layerService.resetFormField(ctx, { docId, layerName, ref }, abortSignalFromRequest(req));
+  });
+
+  app.post('/v1/docs/:docId/layers/:layerName/form/effects', async (req, reply) => {
+    const { docId, layerName } = layerParams(req);
+    const accessCtx = requireLayerDocAccessOnly(req, docId, layerName);
+    const pdfBits = await documentService.getEffectivePdfBits(accessCtx, docId, layerName);
+    const ctx = requireLayerCapability(req, docId, layerName, 'doc.forms.fill', pdfBits);
+    const body = (req.body ?? {}) as { effects?: unknown };
+    const effects = parseOrInvalidArg<FormEffect[]>(
+      FormEffectSchema.array() as unknown as SchemaLike<FormEffect[]>,
+      body.effects,
+      'body.effects',
+    );
+    setNoStore(reply);
+    return layerService.applyFormEffects(
+      ctx,
+      { docId, layerName, effects },
+      abortSignalFromRequest(req),
+    );
   });
 
   app.post(

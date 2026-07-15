@@ -9,6 +9,7 @@ export type AuditMutationKind =
   | 'pages.move'
   | 'pages.rotate'
   | 'pages.delete'
+  | 'pages.flatten'
   | 'metadata.update'
   | 'form.setValue'
   | 'form.reset'
@@ -18,7 +19,8 @@ export type AuditMutationKind =
   | 'form.updateField'
   | 'form.deleteField'
   | 'form.attachWidget'
-  | 'form.detachWidget';
+  | 'form.detachWidget'
+  | 'form.applyEffects';
 
 export interface AppendAuditLogInput {
   tenantId: string;

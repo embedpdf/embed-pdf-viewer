@@ -47,6 +47,7 @@
 import {
   encodeAnnotationAppearancesRenderToken,
   encodeAnnotationToken,
+  encodeActionsToken,
   encodeContentToken,
   encodeDocToken,
   encodeDownloadToken,
@@ -125,6 +126,10 @@ export const wirePaths = {
 
   layerMetadataCurrent: (docId: string, layerName: string) =>
     `/v1/docs/${encodeURIComponent(docId)}/layers/${encodeURIComponent(layerName)}/metadata`,
+
+  /** Immutable catalog-owned actions, independently pinned in the manifest. */
+  layerActions: (docId: string, layerName: string, actionsVersion: number) =>
+    `/v1/docs/${encodeURIComponent(docId)}/layers/${encodeURIComponent(layerName)}/actions@${encodeActionsToken(actionsVersion)}`,
 
   /** POST: rewrite the document Info dict for the layer (metadata edit). */
   layerMetadataUpdate: (docId: string, layerName: string) =>
@@ -298,6 +303,9 @@ export const wirePaths = {
   layerFormRepair: (docId: string, layerName: string) =>
     `/v1/docs/${encodeURIComponent(docId)}/layers/${encodeURIComponent(layerName)}/form/repair`,
 
+  layerFormEffects: (docId: string, layerName: string) =>
+    `/v1/docs/${encodeURIComponent(docId)}/layers/${encodeURIComponent(layerName)}/form/effects`,
+
   /**
    * GET: one budgeted search slice, versioned form. The token
    * (`encodeSearchToken`) IS the cache key: content epoch + query +
@@ -331,6 +339,9 @@ export const wirePaths = {
 
   layerPagesDelete: (docId: string, layerName: string) =>
     `/v1/docs/${encodeURIComponent(docId)}/layers/${encodeURIComponent(layerName)}/pages/delete`,
+
+  layerPagesFlatten: (docId: string, layerName: string) =>
+    `/v1/docs/${encodeURIComponent(docId)}/layers/${encodeURIComponent(layerName)}/pages/flatten`,
 
   layerEvents: (docId: string, layerName: string) =>
     `/v1/docs/${encodeURIComponent(docId)}/layers/${encodeURIComponent(layerName)}/events`,

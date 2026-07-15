@@ -273,6 +273,7 @@ describe('cdnCoverageForScope', () => {
         'layer-manifest',
         'layer-layout',
         'layer-metadata',
+        'layer-actions',
         'page-render',
         'layer-page-render',
         'page-text',

@@ -6,6 +6,11 @@ export type {
   ConformanceOptions,
 } from './conformance/runMetadataConformance';
 export { runAnnotationReadConformance } from './conformance/runAnnotationReadConformance';
+export { runActionsConformance } from './conformance/runActionsConformance';
+export type {
+  ActionsConformanceFixtures,
+  ActionsConformanceOptions,
+} from './conformance/runActionsConformance';
 export type {
   AnnotationReadConformanceFixture,
   AnnotationConformanceOptions,
@@ -32,6 +37,7 @@ export type {
 } from './conformance/runPageReorderConformance';
 export { runPageRotateConformance } from './conformance/runPageRotateConformance';
 export { runPageDeleteConformance } from './conformance/runPageDeleteConformance';
+export { runPageFlattenConformance } from './conformance/runPageFlattenConformance';
 export { runPageExtractConformance } from './conformance/runPageExtractConformance';
 export { runPageInsertConformance } from './conformance/runPageInsertConformance';
 export { runPieceInfoConformance } from './conformance/runPieceInfoConformance';

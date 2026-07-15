@@ -5,6 +5,7 @@ import {
   EngineError,
   EngineErrorCode,
   type DocumentAnnotationsService,
+  type DocumentActionsService,
   type DocumentEvent,
   type DocumentEventStream,
   type DocumentFormsService,
@@ -32,6 +33,7 @@ import { auditRowToEvent } from '../realtime/auditRowToEvent';
 import type { HttpClient } from '../transport/HttpClient';
 import { CloudMetadataService } from './CloudMetadataService';
 import { CloudDocumentAnnotationsService } from './CloudDocumentAnnotationsService';
+import { CloudDocumentActionsService } from './CloudDocumentActionsService';
 import { CloudDocumentFormsService } from './CloudDocumentFormsService';
 import { CloudDocumentPagesService } from './CloudDocumentPagesService';
 import { CloudDocumentSearchService } from './CloudDocumentSearchService';
@@ -69,6 +71,7 @@ export class CloudDocumentHandle implements DocumentHandle {
   } as const;
   readonly metadata: CloudMetadataService;
   readonly annotations: DocumentAnnotationsService;
+  readonly actions: DocumentActionsService;
   readonly forms: DocumentFormsService;
   readonly search: CloudDocumentSearchService;
   readonly pages: DocumentPagesService;
@@ -166,6 +169,13 @@ export class CloudDocumentHandle implements DocumentHandle {
       this.publisher,
     );
     this.annotations = new CloudDocumentAnnotationsService(
+      http,
+      id,
+      layerName,
+      () => this.closed,
+      this.manifestAccessor,
+    );
+    this.actions = new CloudDocumentActionsService(
       http,
       id,
       layerName,
@@ -546,6 +556,12 @@ export class CloudDocumentHandle implements DocumentHandle {
         // Form mutations ship the same MutationMeta rails as annotations:
         // affected pages are the ones whose widget appearances changed.
         this.absorbMutation(event.meta);
+        return;
+      case 'form.effectsApplied':
+      case 'pages.flattened':
+        // No-op batches are never audited, but keep the nullable guard at
+        // the consumer boundary for forward/backward wire compatibility.
+        if (event.meta) this.absorbMutation(event.meta);
         return;
     }
   }

@@ -20,6 +20,8 @@ const RADIO: FormFieldDTO = {
   ref: { kind: 'objectNumber', fieldObjectNumber: 6 },
   name: 'gender',
   family: 'radio',
+  valueEntry: { kind: 'scalar', value: 'male' },
+  defaultValueEntry: { kind: 'none' },
   value: 'male',
   radiosInUnison: false,
   noToggleToOff: false,
@@ -47,6 +49,8 @@ const LISTBOX: FormFieldDTO = {
   fieldObjectNumber: 9,
   name: 'fruits',
   family: 'listbox',
+  valueEntry: { kind: 'array', values: ['Apple', 'Cherry'] },
+  defaultValueEntry: { kind: 'array', values: ['Apple'] },
   selectedValues: ['Apple', 'Cherry'],
   multiSelect: true,
   options: [
@@ -75,6 +79,7 @@ describe('form schemas', () => {
       formKind: 'acroform',
       needsAppearances: false,
       fields: [RADIO, LISTBOX],
+      calculationOrder: [RADIO.ref, null, LISTBOX.ref],
     };
     expect(FormSnapshotSchema.parse(snapshot)).toEqual(snapshot);
   });

@@ -10,6 +10,7 @@ import {
   decodeDocToken,
   decodeDownloadToken,
   decodeLayoutToken,
+  decodeActionsToken,
   PdfSaveModeSchema,
   wirePaths,
 } from '@embedpdf/engine-core/wire';
@@ -174,6 +175,34 @@ export async function registerDocsRoutes(app: FastifyInstance, deps: DocsRouteDe
       abortSignalFromRequest(req),
     );
     setNoStore(reply);
+    return snapshot;
+  });
+
+  app.get('/v1/docs/:docId/layers/:layerName/actions@:token', async (req, reply) => {
+    const { docId, layerName, token } = req.params as {
+      docId: string;
+      layerName: string;
+      token: string;
+    };
+    const accessCtx = requireLayerDocAccessOnly(req, docId, layerName);
+    const pdfBits = await bitsForLayer(accessCtx, docId, layerName);
+    const ctx = requireLayerResource(req, docId, layerName, 'layer-actions', pdfBits);
+    const requested = parseTokenOrInvalidArg(decodeActionsToken, token, 'actionsVersion token');
+    const manifest = await service.getLayerManifest(ctx, docId, layerName);
+    if (requested !== manifest.actionsVersion) {
+      setNoStore(reply);
+      throw new EngineError(
+        EngineErrorCode.NotFound,
+        `actions version ${requested} no longer current (current=${manifest.actionsVersion})`,
+      );
+    }
+    const snapshot = await service.getLayerActions(
+      ctx,
+      docId,
+      layerName,
+      abortSignalFromRequest(req),
+    );
+    setImmutableCache(reply);
     return snapshot;
   });
 

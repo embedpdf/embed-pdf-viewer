@@ -95,6 +95,7 @@ export class LayerStateService {
       // Likewise the base Info dict is never edited (metadata writes always
       // target a layer), so its metadata pointer is the initial epoch.
       metadataVersion: BASE_METADATA_VERSION,
+      actionsVersion: 1,
       // No layer writes have happened on the base view; a fresh subscriber's
       // gapless cursor starts at 0 ("everything in the log is new to me").
       auditHead: 0,
@@ -114,6 +115,7 @@ export class LayerStateService {
       docVersion: layer.docVersion,
       layoutVersion: layer.layoutVersion,
       metadataVersion: layer.metadataVersion,
+      actionsVersion: 1,
       // Written in the same transaction as the audit append, so a client
       // subscribing from this manifest can never miss a row (gapless cursor).
       auditHead: layer.lastAuditId,

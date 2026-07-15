@@ -1,4 +1,5 @@
 import type { DocumentAnnotationsService } from './DocumentAnnotationsService';
+import type { DocumentActionsService } from './DocumentActionsService';
 import type { DocumentFormsService } from './DocumentFormsService';
 import type { DocumentPagesService } from './DocumentPagesService';
 import type { DocumentSearchService } from './DocumentSearchService';
@@ -22,6 +23,8 @@ export interface DocumentHandle {
   readonly security: DocumentSecurityService;
   readonly metadata: MetadataService;
   readonly annotations: DocumentAnnotationsService;
+  /** Lazy catalog-owned action extraction. The engine never executes scripts. */
+  readonly actions?: DocumentActionsService;
   /** The document's interactive form (AcroForm): fields, values, interchange. */
   readonly forms: DocumentFormsService;
   /**

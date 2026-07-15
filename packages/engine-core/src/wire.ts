@@ -53,6 +53,10 @@ export {
   PageRotateResultSchema,
   PageDeleteInputSchema,
   PageDeleteResultSchema,
+  FormEffectSchema,
+  FormEffectsResultSchema,
+  PageFlattenInputSchema,
+  PageFlattenResultSchema,
   WeakAnnotationSessionResponseSchema,
   WeakAnnotationSessionPagesRequestSchema,
   SearchQuerySchema,
@@ -62,6 +66,15 @@ export {
   SearchMatchSchema,
   SearchSliceSchema,
 } from './wire/schemas';
+export {
+  PdfActionTypeSchema,
+  PdfActionNodeSchema,
+  PdfActionTreeSchema,
+  PdfFieldActionsSchema,
+  PdfPageActionsSchema,
+  PdfAnnotationActionsSchema,
+  DocumentActionsSnapshotSchema,
+} from './dto/PdfAction.schema';
 export type {
   OpenDocumentResponse,
   AccessRequest,
@@ -90,6 +103,7 @@ export {
   FormFieldOptionInputSchema,
   FormFieldDraftSchema,
   FormFieldPatchSchema,
+  FormValueEntrySchema,
 } from './forms/schema';
 export { DEFAULT_LAYER_NAME, wirePaths } from './wire/paths';
 // General resource catalog + route-guard helper (server uses this for
@@ -120,6 +134,7 @@ export type { TokenInput, TokenQuery, TokenScalar, TokenSchema } from './wire/to
 export {
   AnnotationAppearancesRenderTokenSchema,
   AnnotationTokenSchema,
+  ActionsTokenSchema,
   ContentTokenSchema,
   DocTokenSchema,
   LayoutTokenSchema,
@@ -130,6 +145,7 @@ export {
 export {
   decodeAnnotationAppearancesRenderToken,
   decodeAnnotationToken,
+  decodeActionsToken,
   decodeContentToken,
   decodeDocToken,
   decodeDownloadToken,
@@ -138,6 +154,7 @@ export {
   decodeRenderToken,
   encodeAnnotationAppearancesRenderToken,
   encodeAnnotationToken,
+  encodeActionsToken,
   encodeContentToken,
   encodeDocToken,
   encodeDownloadToken,

@@ -7,10 +7,13 @@ import type {
   FormSnapshot,
   FormWidgetRef,
   ToggleFieldWidget,
+  FormValueEntry,
+  PdfFieldActions,
 } from '@embedpdf/engine-core/runtime';
 import type { PdfRuntimeModule, Ptr } from '@embedpdf/pdf-runtime';
 
 import { readUtf16String, readUtf8String } from '../../../runtime/memory/strings';
+import { ActionReadBudgetTracker, readActionModel } from '../../actions/ActionModelReader';
 
 // Mirrors EPDF_FORMFIELD_FAMILY_* in public/epdf_form.h.
 export const FAMILY_BY_CODE: Record<number, FormFieldFamily> = {
@@ -119,6 +122,7 @@ export function readFieldAt(
   runtime: PdfRuntimeModule,
   model: Ptr,
   fieldIndex: number,
+  actionBudget = new ActionReadBudgetTracker(),
 ): FormFieldDTO {
   const { fn } = runtime;
   const fieldObjectNumber = fn.EPDFForm_GetFieldObjNum(model, fieldIndex);
@@ -127,6 +131,9 @@ export function readFieldAt(
   );
   const rawFlags = fn.EPDFForm_GetFieldFlags(model, fieldIndex);
   const family = FAMILY_BY_CODE[fn.EPDFForm_GetFieldFamily(model, fieldIndex)] ?? 'unknown';
+  const valueEntry = readValueEntry(runtime, model, fieldIndex, false);
+  const defaultValueEntry = readValueEntry(runtime, model, fieldIndex, true);
+  const actions = readFieldActions(runtime, model, fieldIndex, actionBudget);
 
   const base: FormFieldBase = {
     ref:
@@ -147,13 +154,13 @@ export function readFieldAt(
     mappingName: readWideOrNull(runtime, (buf, cap) =>
       fn.EPDFForm_GetFieldMappingName(model, fieldIndex, buf, cap),
     ),
+    valueEntry,
+    defaultValueEntry,
+    ...(actions ? { actions } : {}),
     widgets: [],
   };
-
-  const value = () =>
-    readWide(runtime, (buf, cap) => fn.EPDFForm_GetFieldValue(model, fieldIndex, buf, cap));
-  const defaultValue = () =>
-    readWide(runtime, (buf, cap) => fn.EPDFForm_GetFieldDefaultValue(model, fieldIndex, buf, cap));
+  const scalarValue = entryScalar(valueEntry);
+  const scalarDefault = entryScalar(defaultValueEntry);
 
   switch (family) {
     case 'text': {
@@ -161,8 +168,8 @@ export function readFieldAt(
       return {
         ...base,
         family,
-        value: value(),
-        defaultValue: defaultValue(),
+        value: scalarValue,
+        defaultValue: scalarDefault,
         maxLength: maxLen > 0 ? maxLen : null,
         multiline: (rawFlags & FF_MULTILINE) !== 0,
         password: (rawFlags & FF_PASSWORD) !== 0,
@@ -181,21 +188,22 @@ export function readFieldAt(
       };
     }
     case 'radio': {
+      const widgets = readToggleWidgets(runtime, model, fieldIndex);
       return {
         ...base,
         family,
-        value: value(),
+        value: widgets.find((widget) => widget.checked)?.exportValue ?? 'Off',
         radiosInUnison: (rawFlags & FF_RADIOS_IN_UNISON) !== 0,
         noToggleToOff: (rawFlags & FF_NO_TOGGLE_TO_OFF) !== 0,
-        widgets: readToggleWidgets(runtime, model, fieldIndex),
+        widgets,
       };
     }
     case 'combobox': {
       return {
         ...base,
         family,
-        value: value(),
-        defaultValue: defaultValue(),
+        value: scalarValue,
+        defaultValue: scalarDefault,
         edit: (rawFlags & FF_EDIT) !== 0,
         options: readOptions(runtime, model, fieldIndex),
         widgets: readPlainWidgets(runtime, model, fieldIndex),
@@ -220,7 +228,8 @@ export function readFieldAt(
       return {
         ...base,
         family: 'unknown',
-        rawValue: value(),
+        rawValue:
+          valueEntry.kind === 'array' ? valueEntry.values.join(',') : entryScalar(valueEntry),
         widgets: readPlainWidgets(runtime, model, fieldIndex),
       };
     }
@@ -232,12 +241,83 @@ export function readFormSnapshot(runtime: PdfRuntimeModule, model: Ptr): FormSna
   const { fn } = runtime;
   const count = fn.EPDFForm_CountFields(model);
   const fields: FormFieldDTO[] = [];
+  const actionBudget = new ActionReadBudgetTracker();
   for (let i = 0; i < count; i++) {
-    fields.push(readFieldAt(runtime, model, i));
+    fields.push(readFieldAt(runtime, model, i, actionBudget));
+  }
+  const calculationOrder: FormSnapshot['calculationOrder'] = [];
+  const calculationCount = fn.EPDFForm_CountCalculationOrder(model);
+  for (let index = 0; index < calculationCount; index++) {
+    const fieldIndex = fn.EPDFForm_GetCalculationOrderFieldIndex(model, index);
+    calculationOrder.push(
+      fieldIndex >= 0 && fieldIndex < fields.length ? fields[fieldIndex].ref : null,
+    );
   }
   return {
     formKind: FORM_KIND_BY_CODE[fn.EPDFForm_GetFormKind(model)] ?? 'none',
     needsAppearances: fn.EPDFForm_GetNeedAppearances(model),
     fields,
+    calculationOrder,
   };
+}
+
+function readValueEntry(
+  runtime: PdfRuntimeModule,
+  model: Ptr,
+  fieldIndex: number,
+  isDefault: boolean,
+): FormValueEntry {
+  const { fn } = runtime;
+  const kind = isDefault
+    ? fn.EPDFForm_GetFieldDefaultValueKind(model, fieldIndex)
+    : fn.EPDFForm_GetFieldValueKind(model, fieldIndex);
+  if (kind === 0) return { kind: 'none' };
+  if (kind === 3) return { kind: 'unsupported' };
+  if (kind !== 1 && kind !== 2) return { kind: 'unsupported' };
+  const count = isDefault
+    ? fn.EPDFForm_CountFieldDefaultValues(model, fieldIndex)
+    : fn.EPDFForm_CountFieldValues(model, fieldIndex);
+  const values: string[] = [];
+  for (let index = 0; index < count; index++) {
+    values.push(
+      readWide(runtime, (buf, capacity) =>
+        isDefault
+          ? fn.EPDFForm_GetFieldDefaultValueAt(model, fieldIndex, index, buf, capacity)
+          : fn.EPDFForm_GetFieldValueAt(model, fieldIndex, index, buf, capacity),
+      ),
+    );
+  }
+  return kind === 1 ? { kind: 'scalar', value: values[0] ?? '' } : { kind: 'array', values };
+}
+
+function entryScalar(entry: FormValueEntry): string {
+  if (entry.kind === 'scalar') return entry.value;
+  if (entry.kind === 'array') return entry.values[0] ?? '';
+  return '';
+}
+
+function readFieldActions(
+  runtime: PdfRuntimeModule,
+  model: Ptr,
+  fieldIndex: number,
+  budget: ActionReadBudgetTracker,
+): PdfFieldActions | undefined {
+  const { fn, mem } = runtime;
+  const entries = [
+    ['keystroke', 0],
+    ['format', 1],
+    ['validate', 2],
+    ['calculate', 3],
+  ] as const;
+  const actions: PdfFieldActions = {};
+  for (const [key, event] of entries) {
+    const action = readActionModel(
+      fn,
+      mem,
+      fn.EPDFForm_GetFieldActionModel(model, fieldIndex, event),
+      budget,
+    );
+    if (action) actions[key] = action;
+  }
+  return Object.keys(actions).length > 0 ? actions : undefined;
 }

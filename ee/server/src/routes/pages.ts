@@ -6,6 +6,7 @@ import {
   type PageImageOptions,
   type PageNetworkRenderFormat,
   type PageDeleteInput,
+  type PageFlattenInput,
   type PageMoveInput,
   type PageRotateInput,
   type WorkerJobId,
@@ -15,6 +16,7 @@ import {
   decodeRenderToken,
   pageRenderOptionsFromImageOptions,
   PageDeleteInputSchema,
+  PageFlattenInputSchema,
   PageMoveInputSchema,
   PageNetworkRenderFormatSchema,
   PageRotateInputSchema,
@@ -356,6 +358,35 @@ export async function registerPageRoutes(app: FastifyInstance, deps: PageRouteDe
         docId,
         layerName,
         pageObjectNumbers: body.pageObjectNumbers,
+      },
+      abortSignalFromRequest(req),
+    );
+  });
+
+  app.post('/v1/docs/:docId/layers/:layerName/pages/flatten', async (req, reply) => {
+    const { docId, layerName } = req.params as { docId: string; layerName: string };
+    const accessCtx = requireLayerDocAccessOnly(req, docId, layerName);
+    const pdfBits = await documentService.getEffectivePdfBits(accessCtx, docId, layerName);
+    const ctx = requireLayerCapability(req, docId, layerName, 'doc.pages.modify', pdfBits);
+    // Flatten deletes page annotations as it paints them, so page-content
+    // authority alone is insufficient. This deliberately excludes collab-
+    // scoped annotation writers from the bulk page endpoint.
+    requireLayerCapability(req, docId, layerName, 'doc.annotate.modify', pdfBits);
+    const raw = (req.body ?? {}) as { pageObjectNumbers?: unknown; usage?: unknown };
+    const body = parseOrInvalidArg<PageFlattenInput>(
+      PageFlattenInputSchema as unknown as SchemaLike<PageFlattenInput>,
+      { pageObjectNumbers: raw.pageObjectNumbers, usage: raw.usage ?? 'display' },
+      'request body',
+    );
+
+    setNoStore(reply);
+    return layerService.flattenPages(
+      ctx,
+      {
+        docId,
+        layerName,
+        pageObjectNumbers: body.pageObjectNumbers,
+        usage: body.usage,
       },
       abortSignalFromRequest(req),
     );

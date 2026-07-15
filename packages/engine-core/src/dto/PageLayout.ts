@@ -1,5 +1,6 @@
 import type { PdfRect, PdfRotation, PdfSize } from '../geometry/primitives';
 import type { PageObjectNumber } from '../identity/PageObjectNumber';
+import type { PdfPageActions } from './PdfAction';
 
 /**
  * @deprecated The page boxes are now `PdfRect` objects (`{ left, bottom,
@@ -35,7 +36,7 @@ export interface PageBoxes {
 }
 
 /**
- * Pure geometry for one page. This is the per-page element returned by
+ * Static attributes for one page. This is the per-page element returned by
  * `pages.list()`. It carries NO annotation liveness (`revision`,
  * `weakAnnotationState`) — that lives on annotation reads and the cloud
  * manifest only.
@@ -62,4 +63,6 @@ export interface PageLayout {
   /** `/UserUnit`; defaults to the PDF default of 1. */
   userUnit: number;
   boxes: PageBoxes;
+  /** Page-owned `/AA` actions; absent for the usual script-less page. */
+  actions?: PdfPageActions;
 }

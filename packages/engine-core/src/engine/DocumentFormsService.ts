@@ -3,6 +3,7 @@ import type { FormFieldDTO } from '../forms/field';
 import type { FormFieldPatch } from '../forms/patch';
 import type { FormSnapshot } from '../forms/snapshot';
 import type { FormDataFormat, FormFieldValue } from '../forms/value';
+import type { FormEffect, FormEffectsResult } from '../forms/effects';
 import type { FormFieldRef, FormWidgetRef } from '../identity/FormFieldRef';
 import type {
   FormDataExport,
@@ -68,6 +69,14 @@ export interface DocumentFormsService {
    * default exists. Emits `form.valueChanged`.
    */
   reset(ref: FormFieldRef): AbortablePromise<FormSetValueResult>;
+
+  /**
+   * Apply one script run's ordered effects as one worker/cloud job. The batch
+   * is not rollback-atomic. All references are preflighted before writes;
+   * after a post-preflight internal failure the remaining effects are marked
+   * skipped and any landed state is finalized as one artifact/event/version.
+   */
+  applyEffects?(effects: FormEffect[]): AbortablePromise<FormEffectsResult>;
 
   /**
    * Serialize the form data for interchange. Defaults to `'xfdf'` (the

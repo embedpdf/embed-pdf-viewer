@@ -21,6 +21,8 @@ import {
   type FormRepairResult,
   type FormSetValueResult,
   type FormSnapshot,
+  type FormEffect,
+  type FormEffectsResult,
 } from '@embedpdf/engine-core/runtime';
 
 import type { SessionEventPublisher } from '@embedpdf/engine-services';
@@ -112,6 +114,25 @@ export class LocalDocumentFormsService implements DocumentFormsService {
     );
     return this.await(submission, 'forms.reset', (payload) => {
       this.publisher.publishLocal({ type: 'form.valueChanged', ...payload.result });
+      return payload.result;
+    });
+  }
+
+  applyEffects(effects: FormEffect[]): AbortablePromise<FormEffectsResult> {
+    const rejected = this.gate('doc.forms.fill');
+    if (rejected) return rejected;
+    const docId = this.docId;
+    const submission = this.queue.enqueue<WorkerResultPayload>(
+      {
+        buildPack: (jobId: JobId) =>
+          wirePack({ kind: 'forms.applyEffects', jobId, docId, effects }),
+      },
+      { priority: Priority.HIGH },
+    );
+    return this.await(submission, 'forms.applyEffects', (payload) => {
+      if (payload.result.meta !== null) {
+        this.publisher.publishLocal({ type: 'form.effectsApplied', ...payload.result });
+      }
       return payload.result;
     });
   }

@@ -35,6 +35,7 @@ import {
   type CloseWorkerRequest,
   type MetadataReadWorkerRequest,
   type MetadataUpdateWorkerRequest,
+  type ActionsReadWorkerRequest,
   type OpenWorkerRequest,
   type PagesListWorkerRequest,
   type PagesGeometryWorkerRequest,
@@ -43,6 +44,7 @@ import {
   type PagesDeleteWorkerRequest,
   type PagesExtractWorkerRequest,
   type PagesInsertWorkerRequest,
+  type PagesFlattenWorkerRequest,
   type PieceInfoApplicationsWorkerRequest,
   type PieceInfoClearWorkerRequest,
   type PieceInfoReadWorkerRequest,
@@ -50,6 +52,7 @@ import {
   type PagesRenderWorkerRequest,
   type PagesTextWorkerRequest,
   type SearchQueryWorkerRequest,
+  type FormsApplyEffectsWorkerRequest,
   type SerializedEngineError,
   type ShutdownWorkerRequest,
   type WirePack,
@@ -73,11 +76,18 @@ import {
   AnnotationMutator,
   RawAnnotationReader,
 } from '../features/annotations';
-import { FormMutator, FormReader, disposeFormModel } from '../features/forms';
+import { FormMutator, FormReader, FormsEffectsApplier, disposeFormModel } from '../features/forms';
 import { FontRegistrar, type StartupFontSpec } from '../features/fonts';
 import { PageGeometryReader } from '../features/geometry';
 import { MetadataMutator, MetadataReader } from '../features/metadata';
-import { PagesExtractor, PagesInserter, PagesMutator, PagesReader } from '../features/pages';
+import {
+  PagesExtractor,
+  PagesFlattener,
+  PagesInserter,
+  PagesMutator,
+  PagesReader,
+} from '../features/pages';
+import { DocumentActionsReader } from '../features/actions';
 import { PieceInfoAccessor } from '../features/pieceinfo';
 import { PageRenderReader } from '../features/render';
 import { DocumentSaver } from '../features/save';
@@ -166,6 +176,9 @@ export class WorkerHost {
         case 'metadata.update':
           resultPack = this.handleMetadataUpdate(msg, ctrl.signal);
           break;
+        case 'actions.read':
+          resultPack = this.handleActionsRead(msg, ctrl.signal);
+          break;
         case 'annotations.listRawAll':
           resultPack = this.handleAnnotationsListRawAll(msg, ctrl.signal);
           break;
@@ -198,6 +211,9 @@ export class WorkerHost {
           break;
         case 'forms.reset':
           resultPack = this.handleFormsReset(msg, ctrl.signal);
+          break;
+        case 'forms.applyEffects':
+          resultPack = this.handleFormsApplyEffects(msg, ctrl.signal);
           break;
         case 'forms.export':
           resultPack = this.handleFormsExport(msg, ctrl.signal);
@@ -234,6 +250,9 @@ export class WorkerHost {
           break;
         case 'pages.delete':
           resultPack = this.handlePagesDelete(msg, ctrl.signal);
+          break;
+        case 'pages.flatten':
+          resultPack = this.handlePagesFlatten(msg, ctrl.signal);
           break;
         case 'pages.extract':
           resultPack = this.handlePagesExtract(msg, ctrl.signal);
@@ -378,6 +397,15 @@ export class WorkerHost {
     return this.finishMutation(session, { tag: 'metadata.update', result }, req.artifactPath);
   }
 
+  private handleActionsRead(
+    req: ActionsReadWorkerRequest,
+    signal: AbortSignal,
+  ): WirePack<WorkerResultPayload> {
+    const session = this.requireSession(req);
+    const snapshot = new DocumentActionsReader(this.runtime, session).read(signal);
+    return wirePack({ tag: 'actions.read', snapshot });
+  }
+
   private handleAnnotationsListRawAll(
     req: AnnotationsListRawAllWorkerRequest,
     signal: AbortSignal,
@@ -504,6 +532,20 @@ export class WorkerHost {
     const mutator = new PagesMutator(this.runtime, session);
     const result = mutator.delete(req.pageObjectNumbers, signal);
     return this.finishMutation(session, { tag: 'pages.delete', result }, req.artifactPath);
+  }
+
+  private handlePagesFlatten(
+    req: PagesFlattenWorkerRequest,
+    signal: AbortSignal,
+  ): WirePack<WorkerResultPayload> {
+    const session = this.requireSession(req);
+    const result = new PagesFlattener(this.runtime, session).flatten(
+      req.pageObjectNumbers,
+      req.usage,
+      signal,
+    );
+    if (result.meta === null) return wirePack({ tag: 'pages.flatten', result });
+    return this.finishMutation(session, { tag: 'pages.flatten', result }, req.artifactPath);
   }
 
   private handlePagesExtract(
@@ -767,6 +809,16 @@ export class WorkerHost {
     return this.finishMutation(session, { tag: 'forms.reset', result }, req.artifactPath);
   }
 
+  private handleFormsApplyEffects(
+    req: FormsApplyEffectsWorkerRequest,
+    signal: AbortSignal,
+  ): WirePack<WorkerResultPayload> {
+    const session = this.requireSession(req);
+    const result = new FormsEffectsApplier(this.runtime, session).apply(req.effects, signal);
+    if (result.meta === null) return wirePack({ tag: 'forms.applyEffects', result });
+    return this.finishMutation(session, { tag: 'forms.applyEffects', result }, req.artifactPath);
+  }
+
   private handleFormsExport(
     req: FormsExportWorkerRequest,
     signal: AbortSignal,
@@ -905,7 +957,7 @@ export class WorkerHost {
     // invalidates version-keyed caches (the forms model). Forms mutators
     // bump themselves before reading back, so their tags are skipped to
     // avoid rebuilding the model cache twice per write.
-    if (!payload.tag.startsWith('forms.')) {
+    if (!payload.tag.startsWith('forms.') && payload.tag !== 'pages.flatten') {
       session.noteMutation();
     }
     if (session.kind !== 'layer') {

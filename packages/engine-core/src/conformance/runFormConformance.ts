@@ -89,6 +89,8 @@ export function runFormConformance(
         const text = fieldByName(snapshot.fields, 'maxlen_text');
         if (text.family !== 'text') throw new Error('expected text family');
         expect(text.value).toBe('abc');
+        expect(text.valueEntry).toEqual({ kind: 'scalar', value: 'abc' });
+        expect(text.defaultValueEntry).toEqual({ kind: 'none' });
         expect(text.maxLength).toBe(5);
         expect(text.widgets.length).toBe(1);
 
@@ -96,6 +98,8 @@ export function runFormConformance(
         if (radio.family !== 'radio') throw new Error('expected radio family');
         expect(radio.noToggleToOff).toBe(true);
         expect(radio.value).toBe('x');
+        expect(radio.valueEntry).toEqual({ kind: 'scalar', value: 'x' });
+        expect(radio.defaultValueEntry).toEqual({ kind: 'scalar', value: 'x' });
         expect(radio.widgets.map((w) => w.onState)).toEqual(['x', 'y']);
         expect(radio.widgets.map((w) => w.checked)).toEqual([true, false]);
 
@@ -111,6 +115,7 @@ export function runFormConformance(
         // Hierarchical fields surface under their fully qualified name.
         const nested = fieldByName(snapshot.fields, 'billing.name');
         expect(nested.family).toBe('text');
+        expect(snapshot.calculationOrder).toEqual([]);
       } finally {
         await doc.close();
       }
@@ -189,6 +194,58 @@ export function runFormConformance(
       }
     });
 
+    test('applies ordered script effects once and produces zero churn for a no-op batch', async () => {
+      const doc = await open(opts.fixtures.toggleFields);
+      if (!doc.forms.applyEffects) {
+        await doc.close();
+        return;
+      }
+      try {
+        const events: DocumentEvent[] = [];
+        const unsubscribe = doc.events.subscribe((event) => {
+          if (event.type === 'form.effectsApplied') events.push(event);
+        });
+        const result = await doc.forms.applyEffects([
+          {
+            kind: 'setValue',
+            ref: { kind: 'fqn', name: 'maxlen_text' },
+            value: { type: 'text', value: 'fx' },
+          },
+          {
+            kind: 'setValue',
+            ref: { kind: 'fqn', name: 'missing.effect.field' },
+            value: { type: 'text', value: 'ignored' },
+          },
+          {
+            kind: 'setValue',
+            ref: { kind: 'fqn', name: 'maxlen_text' },
+            value: { type: 'text', value: 'fx' },
+          },
+        ]);
+        expect(result.results.map((entry) => entry.status)).toEqual([
+          'applied',
+          'rejected',
+          'unchanged',
+        ]);
+        expect(result.meta === null).toBe(false);
+        expect(events).toHaveLength(1);
+
+        const noOp = await doc.forms.applyEffects([
+          {
+            kind: 'setValue',
+            ref: { kind: 'fqn', name: 'maxlen_text' },
+            value: { type: 'text', value: 'fx' },
+          },
+        ]);
+        expect(noOp.results.map((entry) => entry.status)).toEqual(['unchanged']);
+        expect(noOp.meta).toBeNull();
+        expect(events).toHaveLength(1);
+        unsubscribe();
+      } finally {
+        await doc.close();
+      }
+    });
+
     test('selects multi-select list box options by export value', async () => {
       const doc = await open(opts.fixtures.choiceFields);
       try {
@@ -200,6 +257,7 @@ export function runFormConformance(
         if (result.field.family !== 'listbox') throw new Error('expected listbox family');
         // Option order, not input order.
         expect(result.field.selectedValues).toEqual(['Apple', 'Cherry']);
+        expect(result.field.valueEntry.kind).toBe('array');
 
         // Multiple values on a single-select list box is a validation error.
         await expect(

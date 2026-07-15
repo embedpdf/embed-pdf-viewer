@@ -45,6 +45,7 @@ export type DocResourceId =
   | 'layer-manifest'
   | 'layer-layout'
   | 'layer-metadata'
+  | 'layer-actions'
   | 'layer-page-render'
   | 'layer-page-text'
   | 'layer-page-geometry'
@@ -203,6 +204,18 @@ export const DOC_RESOURCES: Readonly<Record<DocResourceId, DocResourceDescriptor
       `/v1/docs/${docId}/layers/${layerName}/metadata@`,
     // Metadata is the same session-level read as the manifest; gate it
     // behind `doc.open` just like `layer-manifest` / `layer-layout`.
+    requirement: { kind: 'single', capability: 'doc.open' },
+    routeKind: 'versioned-read',
+    cdnCacheable: true,
+  },
+  'layer-actions': {
+    id: 'layer-actions',
+    pathPattern: '/v1/docs/{docId}/layers/{layerName}/actions@*',
+    resolvePathPattern: (docId, layerName = 'default') =>
+      `/v1/docs/${docId}/layers/${layerName}/actions@*`,
+    pathPrefix: '/v1/docs/{docId}/layers/{layerName}/actions@',
+    resolvePathPrefix: (docId, layerName = 'default') =>
+      `/v1/docs/${docId}/layers/${layerName}/actions@`,
     requirement: { kind: 'single', capability: 'doc.open' },
     routeKind: 'versioned-read',
     cdnCacheable: true,

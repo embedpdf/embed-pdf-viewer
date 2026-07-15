@@ -11,6 +11,8 @@ import {
   type PageObjectNumber,
   type PageRotateResult,
   type PageRotation,
+  type PageFlattenResult,
+  type PageFlattenUsage,
 } from '@embedpdf/engine-core/runtime';
 import type { SessionEventPublisher } from '@embedpdf/engine-services';
 
@@ -212,6 +214,50 @@ export class LocalDocumentPagesService implements DocumentPagesService {
         pageObjectNumbers,
         ...payload.result,
       });
+      return payload.result;
+    });
+  }
+
+  flatten(
+    pageObjectNumbers: PageObjectNumber[],
+    usage: PageFlattenUsage = 'display',
+  ): AbortablePromise<PageFlattenResult> {
+    if (this.view.isClosed()) {
+      return AbortablePromise.rejectReason(
+        new EngineError(EngineErrorCode.DocNotOpen, `document not open: ${this.docId}`),
+      );
+    }
+    try {
+      // Flatten rewrites page content and removes painted annotations. Broad
+      // annotation authority is deliberate; collab-scoped deletion cannot be
+      // safely enforced by a whole-page verb.
+      this.guard.assertCapability('doc.pages.modify');
+      this.guard.assertCapability('doc.annotate.modify');
+    } catch (error) {
+      return AbortablePromise.rejectReason(error);
+    }
+    const docId = this.docId;
+    const submission = this.queue.enqueue<WorkerResultPayload>(
+      {
+        buildPack: (jobId: JobId) =>
+          wirePack({ kind: 'pages.flatten', jobId, docId, pageObjectNumbers, usage }),
+      },
+      { priority: Priority.HIGH },
+    );
+    return AbortablePromise.run<PageFlattenResult>(async (signal) => {
+      const onAbort = () => submission.abort(signal.reason);
+      if (signal.aborted) onAbort();
+      else signal.addEventListener('abort', onAbort, { once: true });
+      const payload = await submission;
+      if (payload.tag !== 'pages.flatten') {
+        throw new EngineError(EngineErrorCode.WireFormat, `unexpected payload tag: ${payload.tag}`);
+      }
+      if (payload.result.meta !== null) {
+        this.publisher.publishLocal({
+          type: 'pages.flattened',
+          ...payload.result,
+        });
+      }
       return payload.result;
     });
   }

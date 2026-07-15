@@ -18,6 +18,8 @@ import {
   type AnnotationRef,
   type AnnotationUpdateResult,
   type FormDataFormat,
+  type FormEffect,
+  type FormEffectsResult,
   type FormFieldCreateResult,
   type FormFieldDeleteResult,
   type FormFieldDraft,
@@ -36,6 +38,8 @@ import {
   type MetadataUpdateResult,
   type MutationMeta,
   type PageDeleteResult,
+  type PageFlattenResult,
+  type PageFlattenUsage,
   type PageListSnapshot,
   type PageMoveResult,
   type PageObjectNumber,
@@ -88,6 +92,15 @@ interface FormPageImpact {
 /** The durable state a form commit produced inside its transaction. Forms
  *  are document-scoped, so 0..N pages may have been touched. */
 interface CommittedFormMutation {
+  pages: DurablePageRow[];
+  previousLayerDocVersion: number;
+  layerDocVersion: number;
+}
+
+/** Flatten has form-like multi-page persistence, but with explicit content
+ * and annotation-list bumps on every page whose native outcome may have
+ * changed the document. */
+interface CommittedPageFlatten {
   pages: DurablePageRow[];
   previousLayerDocVersion: number;
   layerDocVersion: number;
@@ -596,6 +609,58 @@ export class LayerService {
     });
   }
 
+  async flattenPages(
+    ctx: LayerWriteContext,
+    input: {
+      docId: string;
+      layerName: string;
+      pageObjectNumbers: PageObjectNumber[];
+      usage: PageFlattenUsage;
+    },
+    signal?: AbortSignal,
+  ): Promise<PageFlattenResult> {
+    return this.enqueueLayerWrite(ctx, input.docId, input.layerName, async () => {
+      const { layer } = await this.prepareLayerMutation(ctx, input.docId, input.layerName);
+      // Eligible annotations are removed from /Annots. Protect weak index
+      // editors before the worker can shift any target page's index space.
+      for (const pageObjectNumber of input.pageObjectNumbers) {
+        await this.assertWeakAnnotationStructuralEditAllowed(ctx, {
+          docId: input.docId,
+          layerName: input.layerName,
+          layer,
+          pageObjectNumber,
+        });
+      }
+      return this.withTempWorkerFile('layer-artifact', 'artifact.layer', async (artifactPath) => {
+        const payload = await this.requirePool().run(
+          input.docId,
+          (jobId) =>
+            wirePack({
+              kind: 'pages.flatten' as const,
+              jobId,
+              docId: input.docId,
+              layerName: input.layerName,
+              pageObjectNumbers: input.pageObjectNumbers,
+              usage: input.usage,
+              artifactPath,
+            }),
+          signal,
+        );
+        if (payload.tag !== 'pages.flatten') {
+          throw new EngineError(
+            EngineErrorCode.WireFormat,
+            `unexpected pages.flatten payload: ${payload.tag}`,
+          );
+        }
+        if (payload.result.meta === null) return payload.result;
+        return this.persistPageFlatten(ctx, input.docId, input.layerName, layer, {
+          result: payload.result as PageFlattenResult & { meta: MutationMeta },
+          artifact: requireLayerArtifact(payload as unknown),
+        });
+      });
+    });
+  }
+
   async updateMetadata(
     ctx: LayerWriteContext,
     input: {
@@ -748,6 +813,64 @@ export class LayerService {
       },
       signal,
     );
+  }
+
+  async applyFormEffects(
+    ctx: LayerWriteContext,
+    input: { docId: string; layerName: string; effects: FormEffect[] },
+    signal?: AbortSignal,
+  ): Promise<FormEffectsResult> {
+    return this.enqueueLayerWrite(ctx, input.docId, input.layerName, async () => {
+      const materialized = await this.prepareLayerMutation(ctx, input.docId, input.layerName);
+      const { layer } = materialized;
+      return this.withTempWorkerFile('layer-artifact', 'artifact.layer', async (artifactPath) => {
+        const payload = await this.requirePool().run(
+          input.docId,
+          (jobId) =>
+            wirePack({
+              kind: 'forms.applyEffects' as const,
+              jobId,
+              docId: input.docId,
+              layerName: input.layerName,
+              effects: input.effects,
+              artifactPath,
+            }),
+          signal,
+        );
+        if (payload.tag !== 'forms.applyEffects') {
+          throw new EngineError(
+            EngineErrorCode.WireFormat,
+            `unexpected forms.applyEffects payload: ${payload.tag}`,
+          );
+        }
+        const result = payload.result;
+        if (result.meta === null) return result;
+
+        const impacts = widgetImpacts(result.changedWidgets, 'update');
+        const failed = result.results.filter((entry) => entry.status === 'failed');
+        for (const entry of failed) {
+          impacts.push(
+            ...widgetImpacts(
+              entry.fields.flatMap((field) => field.widgets),
+              'update',
+            ),
+          );
+        }
+        // A failed native call is outcome-indeterminate. If its field could
+        // not be re-read, invalidate every page rather than under-reporting
+        // a possibly changed widget appearance.
+        const conservativeImpacts = failed.some((entry) => entry.fields.length === 0)
+          ? allPageImpacts(materialized)
+          : impacts;
+
+        return this.persistFormMutation(ctx, input.docId, input.layerName, layer, {
+          auditKind: 'form.applyEffects',
+          impacts: conservativeImpacts,
+          result: result as FormEffectsResult & { meta: MutationMeta },
+          artifact: requireLayerArtifact(payload as unknown),
+        });
+      });
+    });
   }
 
   async importFormData(
@@ -1338,6 +1461,34 @@ export class LayerService {
     return committed.result;
   }
 
+  private async persistPageFlatten(
+    ctx: LayerWriteContext,
+    docId: string,
+    layerName: string,
+    layer: LayerRow,
+    input: {
+      result: PageFlattenResult & { meta: MutationMeta };
+      artifact: LayerArtifactInput;
+    },
+  ): Promise<PageFlattenResult> {
+    const nextVersion = layer.currentVersion + 1;
+    const artifactKey = StorageKeys.layerArtifact(ctx.tenantId, docId, layerName, nextVersion);
+    const uploaded = await this.uploadLayerArtifact(artifactKey, input.artifact);
+    const committed = await this.commitPageFlatten({
+      ctx,
+      docId,
+      layerName,
+      layer,
+      raw: input.result,
+      artifactKey,
+      artifactSha: uploaded.sha256,
+      artifactSize: uploaded.size,
+      nextVersion,
+    });
+    this.publishMutation(ctx, docId, committed.auditId);
+    return committed.result;
+  }
+
   private async persistPageDelete(
     ctx: LayerWriteContext,
     docId: string,
@@ -1882,6 +2033,136 @@ export class LayerService {
           auditId,
           now,
         );
+
+        return { result, auditId };
+      });
+  }
+
+  /**
+   * Flatten commit: the page registry/layout stays intact, while every page
+   * whose native outcome may have changed advances both cache planes and the
+   * annotation index generation. Unknown post-failure weak state preserves
+   * the prior durable `true`/`false` conservatively.
+   */
+  private async commitPageFlatten(input: {
+    ctx: LayerWriteContext;
+    docId: string;
+    layerName: string;
+    layer: LayerRow;
+    raw: PageFlattenResult & { meta: MutationMeta };
+    artifactKey: string;
+    artifactSha: string;
+    artifactSize: number;
+    nextVersion: number;
+  }): Promise<{ result: PageFlattenResult; auditId: number }> {
+    return this.requireDb()
+      .transaction()
+      .execute(async (trx) => {
+        const now = Date.now();
+        const currentLayer = await this.requireUnchangedLayer(trx, input.layer);
+        const weakStateByPage = new Map(
+          input.raw.meta.affectedPages.map((page) => [
+            page.pageObjectNumber,
+            page.weakAnnotationState,
+          ]),
+        );
+        const affected = [...weakStateByPage.keys()];
+        if (affected.length === 0) {
+          throw new EngineError(
+            EngineErrorCode.WireFormat,
+            'pages.flatten returned mutation metadata without an affected page',
+          );
+        }
+
+        const nextPages: DurablePageRow[] = [];
+        for (const pageObjectNumber of affected) {
+          const row = await trx
+            .selectFrom('layer_pages')
+            .selectAll()
+            .where('layer_id', '=', input.layer.id)
+            .where('page_object_number', '=', pageObjectNumber)
+            .executeTakeFirst();
+          if (!row) {
+            throw new EngineError(
+              EngineErrorCode.WireFormat,
+              `pages.flatten reported unknown page object number ${pageObjectNumber}`,
+            );
+          }
+          const weakState = weakStateByPage.get(pageObjectNumber);
+          nextPages.push({
+            pageObjectNumber,
+            contentVersion: Number(row.content_version) + 1,
+            annotationVersion: Number(row.annotation_version) + 1,
+            annotationGeneration: Number(row.annotation_generation) + 1,
+            hasWeakAnnotations:
+              weakState?.kind === 'known'
+                ? weakState.hasAnyWeakAnnotations
+                : Boolean(row.has_weak_annotations),
+            updatedAt: now,
+          });
+        }
+
+        const previousLayerDocVersion = Number(currentLayer.doc_version);
+        const durable: CommittedPageFlatten = {
+          pages: nextPages,
+          previousLayerDocVersion,
+          layerDocVersion: previousLayerDocVersion + 1,
+        };
+        const result: PageFlattenResult = {
+          ...input.raw,
+          meta: {
+            ...input.raw.meta,
+            affectedPages: nextPages.map((page) =>
+              this.layerState.decorateLayerPageState(input.docId, input.layerName, page),
+            ),
+            cacheDelta: this.layerState.buildCacheDelta({
+              docId: input.docId,
+              layerName: input.layerName,
+              previousDocVersion: durable.previousLayerDocVersion,
+              docVersion: durable.layerDocVersion,
+              pages: nextPages,
+            }),
+          },
+        };
+
+        const auditEvent = makeAuditEvent({
+          ctx: input.ctx,
+          docId: input.docId,
+          layer: input.layer,
+          layerName: input.layerName,
+          kind: 'pages.flatten',
+          pageObjectNumber: null,
+          affectedPages: affected,
+          artifactVersion: input.nextVersion,
+          artifactKey: input.artifactKey,
+          artifactSha: input.artifactSha,
+          artifactSize: input.artifactSize,
+          payload: result,
+          ts: now,
+        });
+        const auditId = (await this.eventLog?.appendDb(trx, auditEvent)) ?? 0;
+
+        await this.writeLayerAdvance(
+          trx,
+          input,
+          { doc_version: durable.layerDocVersion },
+          auditId,
+          now,
+        );
+        for (const page of nextPages) {
+          await trx
+            .updateTable('layer_pages')
+            .set({
+              content_version: page.contentVersion,
+              annotation_version: page.annotationVersion,
+              annotation_generation: page.annotationGeneration,
+              has_weak_annotations: page.hasWeakAnnotations ? 1 : 0,
+              updated_at: now,
+            })
+            .where('layer_id', '=', input.layer.id)
+            .where('page_object_number', '=', page.pageObjectNumber)
+            .execute();
+        }
 
         return { result, auditId };
       });

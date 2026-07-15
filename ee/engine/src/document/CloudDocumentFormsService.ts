@@ -7,6 +7,8 @@ import {
   type DocumentFormsService,
   type FormDataExport,
   type FormDataFormat,
+  type FormEffect,
+  type FormEffectsResult,
   type FormFieldCreateResult,
   type FormFieldDeleteResult,
   type FormFieldDraft,
@@ -29,6 +31,7 @@ import {
   FormFieldDeleteResultSchema,
   FormFieldDTOSchema,
   FormFieldUpdateResultSchema,
+  FormEffectsResultSchema,
   FormImportResultSchema,
   FormRepairResultSchema,
   FormSetValueResultSchema,
@@ -117,6 +120,25 @@ export class CloudDocumentFormsService implements DocumentFormsService {
         signal,
       );
       return this.absorbMutation(result, 'form.valueChanged');
+    });
+  }
+
+  applyEffects(effects: FormEffect[]): AbortablePromise<FormEffectsResult> {
+    const rejected = this.rejectIfClosed<FormEffectsResult>();
+    if (rejected) return rejected;
+    return AbortablePromise.run<FormEffectsResult>(async (signal) => {
+      const result = await this.http.postJson(
+        wirePaths.layerFormEffects(this.docId, this.layerName),
+        { effects },
+        (raw) => FormEffectsResultSchema.parse(raw),
+        signal,
+      );
+      // An all-no-op/all-preflight-rejected batch deliberately has no
+      // artifact, cache advance, or event.
+      if (result.meta === null) return result;
+      this.manifest.apply(result.meta);
+      this.publisher.publishLocal({ type: 'form.effectsApplied', ...result });
+      return result;
     });
   }
 

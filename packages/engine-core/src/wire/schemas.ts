@@ -65,6 +65,10 @@ import type { PageStructureCache } from '../mutation/PageStructureCache';
 import type { RefetchReason } from '../mutation/RefetchReason';
 import type { PageState } from '../revision/PageState';
 import type { WeakAnnotationState } from '../revision/WeakAnnotationState';
+import { PdfPageActionsSchema } from '../dto/PdfAction.schema';
+import type { FormEffectsResult, FormEffect } from '../forms/effects';
+import { FormFieldRefSchema, FormFieldValueSchema } from '../forms/schema';
+import type { PageFlattenInput, PageFlattenResult } from '../mutation/PageFlattenResult';
 export type { CacheDelta, MutationMeta } from '../mutation/MutationMeta';
 
 export const DocumentMetadataSchema: z.ZodType<DocumentMetadata> = z.object({
@@ -349,14 +353,15 @@ export type { ManifestPage } from '../dto/DocumentManifest';
  * by `docVersion`; safe to cache with `Cache-Control: public,
  * max-age=31536000, immutable`.
  */
-export const DocumentManifestSchema: z.ZodType<DocumentManifest> = z.object({
+export const DocumentManifestSchema = z.object({
   docVersion: z.number().int().positive(),
   layoutVersion: z.number().int().positive(),
   metadataVersion: z.number().int().positive(),
+  actionsVersion: z.number().int().positive().default(1),
   auditHead: z.number().int().nonnegative(),
   baseSha: z.string(),
   pages: z.array(ManifestPageSchema),
-});
+}) as unknown as z.ZodType<DocumentManifest>;
 export type { DocumentManifest } from '../dto/DocumentManifest';
 
 export const AnnotationListPageSnapshotSchema: z.ZodType<AnnotationListPageSnapshot> = z.object({
@@ -733,6 +738,31 @@ export const FormSetValueResultSchema: z.ZodType<FormSetValueResult> = z.object(
   meta: MutationMetaSchema,
 });
 
+export const FormEffectSchema: z.ZodType<FormEffect> = z.discriminatedUnion('kind', [
+  z.object({ kind: z.literal('setValue'), ref: FormFieldRefSchema, value: FormFieldValueSchema }),
+  z.object({
+    kind: z.literal('setDisplay'),
+    ref: FormFieldRefSchema,
+    display: z.enum(['visible', 'hidden', 'noPrint', 'noView']),
+  }),
+  z.object({ kind: z.literal('setAppearanceText'), ref: FormFieldRefSchema, text: z.string() }),
+  z.object({ kind: z.literal('reset'), refs: z.array(FormFieldRefSchema) }),
+]);
+
+export const FormEffectsResultSchema: z.ZodType<FormEffectsResult> = z.object({
+  results: z.array(
+    z.object({
+      index: z.number().int().nonnegative(),
+      status: z.enum(['applied', 'unchanged', 'rejected', 'failed', 'skipped']),
+      fields: z.array(FormFieldDTOSchema),
+      changedWidgets: z.array(FormWidgetRefSchema),
+      error: EngineErrorPayloadSchema.optional(),
+    }),
+  ),
+  changedWidgets: z.array(FormWidgetRefSchema),
+  meta: MutationMetaSchema.nullable(),
+});
+
 export const FormImportResultSchema: z.ZodType<FormImportResult> = z.object({
   fieldsTotal: z.number().int().nonnegative(),
   fieldsApplied: z.number().int().nonnegative(),
@@ -800,6 +830,25 @@ export const PageLayoutSchema: z.ZodType<PageLayout> = z.object({
   rotation: PdfRotationSchema,
   userUnit: z.number().positive(),
   boxes: PageBoxesSchema,
+  actions: PdfPageActionsSchema.optional(),
+});
+
+export const PageFlattenResultSchema: z.ZodType<PageFlattenResult> = z.object({
+  pageObjectNumbers: z.array(z.number().int().positive()),
+  usage: z.enum(['display', 'print']),
+  results: z.array(
+    z.object({
+      pageObjectNumber: z.number().int().positive(),
+      status: z.enum(['applied', 'unchanged', 'failed', 'skipped']),
+      error: EngineErrorPayloadSchema.optional(),
+    }),
+  ),
+  meta: MutationMetaSchema.nullable(),
+});
+
+export const PageFlattenInputSchema: z.ZodType<PageFlattenInput> = z.object({
+  pageObjectNumbers: z.array(z.number().int().positive()),
+  usage: z.enum(['display', 'print']),
 });
 
 /**

@@ -5,6 +5,7 @@ import type { PageDeleteResult } from '../mutation/PageDeleteResult';
 import type { PageInsertResult } from '../mutation/PageInsertResult';
 import type { PageMoveResult } from '../mutation/PageMoveResult';
 import type { PageRotateResult } from '../mutation/PageRotateResult';
+import type { PageFlattenResult, PageFlattenUsage } from '../mutation/PageFlattenResult';
 import { AbortablePromise } from '../promise/AbortablePromise';
 
 /**
@@ -59,6 +60,16 @@ export interface DocumentPagesService {
    * recycled; surviving pages keep their identity and revisions.
    */
   delete(pageObjectNumbers: PageObjectNumber[]): AbortablePromise<PageDeleteResult>;
+
+  /**
+   * Paint eligible annotation appearances into page content and remove only
+   * those annotations that were painted. This changes content and annotation
+   * liveness, not layout. The default usage is normal display.
+   */
+  flatten?(
+    pageObjectNumbers: PageObjectNumber[],
+    usage?: PageFlattenUsage,
+  ): AbortablePromise<PageFlattenResult>;
 
   /**
    * Export the given pages, in the supplied order, as a standalone PDF

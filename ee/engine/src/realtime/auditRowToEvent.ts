@@ -8,12 +8,14 @@ import type {
   FormFieldCreateResult,
   FormFieldDeleteResult,
   FormFieldUpdateResult,
+  FormEffectsResult,
   FormImportResult,
   FormRepairResult,
   FormSetValueResult,
   FormWidgetLinkResult,
   MetadataUpdateResult,
   PageDeleteResult,
+  PageFlattenResult,
   PageMoveResult,
   PageRotateResult,
   PageRotation,
@@ -114,6 +116,12 @@ export function auditRowToEvent(row: AuditEventRow, mySessionId: string): Docume
         origin,
         ...(row.payload as PageDeleteResult),
       };
+    case 'pages.flatten':
+      return {
+        type: 'pages.flattened',
+        origin,
+        ...(row.payload as PageFlattenResult),
+      };
     case 'metadata.update':
       return {
         type: 'metadata.updated',
@@ -140,6 +148,8 @@ export function auditRowToEvent(row: AuditEventRow, mySessionId: string): Docume
       return { type: 'form.widgetAttached', origin, ...(row.payload as FormWidgetLinkResult) };
     case 'form.detachWidget':
       return { type: 'form.widgetDetached', origin, ...(row.payload as FormWidgetLinkResult) };
+    case 'form.applyEffects':
+      return { type: 'form.effectsApplied', origin, ...(row.payload as FormEffectsResult) };
     default:
       return null;
   }

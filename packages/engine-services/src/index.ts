@@ -58,6 +58,7 @@ export * from './features/save';
 export * from './features/fonts';
 export * from './features/forms';
 export * from './features/search';
+export * from './features/actions';
 
 // Tier 4: worker host
 export { WorkerHost } from './worker-host/WorkerHost';

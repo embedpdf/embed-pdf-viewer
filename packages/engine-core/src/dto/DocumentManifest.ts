@@ -33,6 +33,8 @@ export interface DocumentManifest {
   docVersion: number;
   layoutVersion: number;
   metadataVersion: number;
+  /** Catalog action resource pin. Derived as 1 until action writing exists. */
+  actionsVersion: number;
   /**
    * Audit-log head at this manifest's state — written in the same
    * transaction as the version bumps, so an event subscriber that starts

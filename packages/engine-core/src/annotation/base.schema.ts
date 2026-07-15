@@ -20,6 +20,7 @@ import { PdfPointSchema, PdfRectSchema, PdfQuadSchema } from '../geometry/schema
 import type { AnnotationRef } from '../identity/AnnotationRef';
 import type { AnnotationStableId } from '../identity/AnnotationStableId';
 import type { RevisionToken } from '../revision/RevisionToken';
+import { PdfAnnotationActionsSchema } from '../dto/PdfAction.schema';
 
 /** @deprecated Use `PdfPointSchema` from `../geometry/schemas`. */
 export const PointSchema = PdfPointSchema;
@@ -209,6 +210,7 @@ export const AnnotationBaseShape = {
   groupId: z.string().optional(),
   createdBy: z.string().optional(),
   updatedBy: z.string().optional(),
+  actions: PdfAnnotationActionsSchema.optional(),
 } as const;
 
 /**

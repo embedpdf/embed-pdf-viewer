@@ -3,6 +3,7 @@ import type { PdfRect } from '../geometry/primitives';
 import type { AnnotationIdentityQuality } from '../identity/AnnotationIdentityQuality';
 import type { AnnotationRef } from '../identity/AnnotationRef';
 import type { PageObjectNumber } from '../identity/PageObjectNumber';
+import type { PdfAnnotationActions } from '../dto/PdfAction';
 
 /**
  * Identity + provenance shell every annotation DTO extends.
@@ -78,4 +79,6 @@ export interface AnnotationBase {
   groupId?: string;
   createdBy?: string;
   updatedBy?: string;
+  /** `/A` and annotation `/AA`, available for every annotation subtype. */
+  actions?: PdfAnnotationActions;
 }

@@ -3,6 +3,7 @@ import type {
   PageLayout,
   PageListSnapshot,
   PdfRect,
+  PdfPageActions,
 } from '@embedpdf/engine-core/runtime';
 import { normalizePdfRect } from '@embedpdf/engine-core/runtime';
 import type { PdfFunctions, PdfRuntimeMemory, PdfRuntimeModule, Ptr } from '@embedpdf/pdf-runtime';
@@ -19,6 +20,7 @@ import {
   readSizeF,
 } from '../../runtime/memory/structs';
 import { throwIfAborted } from '../../shared/abort';
+import { ActionReadBudgetTracker, readActionModel } from '../actions/ActionModelReader';
 
 // EPDF_PAGE_BOX_TYPE (public/fpdfview.h).
 const BOX_MEDIA = 0;
@@ -45,6 +47,7 @@ export class PagesReader {
     const { fn, mem } = this.runtime;
     const docPtr = this.session.requireDocPtr();
     const records = this.session.allRecords();
+    const actionBudget = new ActionReadBudgetTracker();
 
     // One scratch buffer per struct kind, reused across every page.
     return withScratchN(
@@ -54,6 +57,7 @@ export class PagesReader {
         const pages: PageLayout[] = records.map((record) => {
           throwIfAborted(signal);
           const index = record.pageIndex;
+          const actions = readPageActions(fn, mem, docPtr, record.pageObjectNumber, actionBudget);
           return {
             index,
             pageObjectNumber: record.pageObjectNumber,
@@ -62,12 +66,38 @@ export class PagesReader {
             rotation: readRotation(fn, docPtr, index),
             userUnit: readUserUnit(fn, mem, docPtr, index, userUnitPtr),
             boxes: readBoxes(fn, mem, docPtr, index, rectPtr),
+            ...(actions ? { actions } : {}),
           };
         });
         return { pageCount: pages.length, pages };
       },
     );
   }
+}
+
+function readPageActions(
+  fn: PdfFunctions,
+  mem: PdfRuntimeMemory,
+  docPtr: Ptr,
+  pageObjectNumber: number,
+  budget: ActionReadBudgetTracker,
+): PdfPageActions | undefined {
+  const actions: PdfPageActions = {};
+  const open = readActionModel(
+    fn,
+    mem,
+    fn.EPDFDoc_GetPageActionModel(docPtr, pageObjectNumber, 0),
+    budget,
+  );
+  const close = readActionModel(
+    fn,
+    mem,
+    fn.EPDFDoc_GetPageActionModel(docPtr, pageObjectNumber, 1),
+    budget,
+  );
+  if (open) actions.open = open;
+  if (close) actions.close = close;
+  return open || close ? actions : undefined;
 }
 
 /**

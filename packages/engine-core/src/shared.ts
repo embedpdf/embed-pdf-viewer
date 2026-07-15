@@ -21,6 +21,18 @@ export type { DocumentMetadata, DocumentMetadataTrapped } from './dto/DocumentMe
 export type { MetadataPatch } from './dto/MetadataPatch';
 export type { PageListSnapshot } from './dto/PageListSnapshot';
 export type { PageLayout, PageBoxes, PageRotation } from './dto/PageLayout';
+export type {
+  PdfActionType,
+  PdfActionNode,
+  PdfActionWarning,
+  PdfActionTree,
+  PdfFieldActions,
+  PdfPageActions,
+  PdfAnnotationActions,
+  NamedJavaScriptAction,
+  DocumentActionsSnapshot,
+  ActionReadBudget,
+} from './dto/PdfAction';
 
 // Canonical PDF-document geometry vocabulary (y-up, edges, browser-free).
 export type {
@@ -280,6 +292,7 @@ export type {
   UnknownFieldDTO,
   FormFieldDTO,
 } from './forms/field';
+export type { FormValueEntry } from './forms/value-entry';
 export type {
   WidgetStyleFields,
   WidgetStyleDraftFields,
@@ -306,6 +319,13 @@ export type {
   FormFieldPatch,
 } from './forms/patch';
 export type { FormFieldValue, FormDataFormat } from './forms/value';
+export type {
+  FormFieldDisplay,
+  FormEffect,
+  FormEffectStatus,
+  FormEffectResult,
+  FormEffectsResult,
+} from './forms/effects';
 export type {
   FormSetValueResult,
   FormImportResult,
@@ -357,6 +377,13 @@ export type { PageRotateResult } from './mutation/PageRotateResult';
 export type { PageDeleteInput } from './mutation/PageDeleteInput';
 export type { PageDeleteResult } from './mutation/PageDeleteResult';
 export type { PageInsertResult } from './mutation/PageInsertResult';
+export type {
+  PageFlattenInput,
+  PageFlattenUsage,
+  PageFlattenStatus,
+  PageFlattenItemResult,
+  PageFlattenResult,
+} from './mutation/PageFlattenResult';
 export type { MetadataUpdateResult, MetadataCache } from './mutation/MetadataUpdateResult';
 
 export type {

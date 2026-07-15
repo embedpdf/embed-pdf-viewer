@@ -51,6 +51,7 @@ export type { DocumentCapabilities } from './engine/DocumentHandle';
 export type { MetadataService } from './engine/MetadataService';
 export type { PageHandle } from './engine/PageHandle';
 export type { DocumentAnnotationsService } from './engine/DocumentAnnotationsService';
+export type { DocumentActionsService } from './engine/DocumentActionsService';
 export type { DocumentFormsService, FormRepairOptions } from './engine/DocumentFormsService';
 export type { DocumentSearchService } from './engine/DocumentSearchService';
 export type { WeakAnnotationEditSession } from './engine/DocumentAnnotationsService';
@@ -83,6 +84,7 @@ export type {
   LayerOpenSource,
   MetadataReadWorkerRequest,
   MetadataUpdateWorkerRequest,
+  ActionsReadWorkerRequest,
   AnnotationsListRawAllWorkerRequest,
   AnnotationsListRawPageWorkerRequest,
   AnnotationsListFullPageWorkerRequest,
@@ -103,6 +105,7 @@ export type {
   PagesDeleteWorkerRequest,
   PagesExtractWorkerRequest,
   PagesInsertWorkerRequest,
+  PagesFlattenWorkerRequest,
   PieceInfoReadWorkerRequest,
   PieceInfoUpdateWorkerRequest,
   PieceInfoApplicationsWorkerRequest,
@@ -114,6 +117,7 @@ export type {
   FormsListWorkerRequest,
   FormsSetValueWorkerRequest,
   FormsResetWorkerRequest,
+  FormsApplyEffectsWorkerRequest,
   FormsExportWorkerRequest,
   FormsImportWorkerRequest,
   FormsRepairWorkerRequest,

@@ -3,6 +3,8 @@ import {
   EngineError,
   EngineErrorCode,
   type DocumentPagesService,
+  type PageFlattenResult,
+  type PageFlattenUsage,
   type PageDeleteResult,
   type PageListSnapshot,
   type PageMoveResult,
@@ -12,6 +14,7 @@ import {
 } from '@embedpdf/engine-core/runtime';
 import {
   PageDeleteResultSchema,
+  PageFlattenResultSchema,
   PageListSnapshotSchema,
   PageMoveResultSchema,
   PageRotateResultSchema,
@@ -146,6 +149,33 @@ export class CloudDocumentPagesService implements DocumentPagesService {
       // rows — a retired PON must not be buildable from the local cache.
       if (result.cache) this.manifest.applyPageDelete(result.cache, pageObjectNumbers);
       this.publisher.publishLocal({ type: 'pages.deleted', pageObjectNumbers, ...result });
+      return result;
+    });
+  }
+
+  flatten(
+    pageObjectNumbers: PageObjectNumber[],
+    usage: PageFlattenUsage = 'display',
+  ): AbortablePromise<PageFlattenResult> {
+    if (this.isClosed()) {
+      return AbortablePromise.rejectReason(
+        new EngineError(EngineErrorCode.DocNotOpen, `document ${this.docId} is closed`),
+      );
+    }
+    return AbortablePromise.run<PageFlattenResult>(async (signal) => {
+      const result = await this.http.postJson(
+        wirePaths.layerPagesFlatten(this.docId, this.layerName),
+        { pageObjectNumbers, usage },
+        (raw) => PageFlattenResultSchema.parse(raw),
+        signal,
+      );
+      // Nothing flattened means no artifact and therefore no coherence bump.
+      if (result.meta === null) return result;
+      this.manifest.apply(result.meta);
+      this.publisher.publishLocal({
+        type: 'pages.flattened',
+        ...result,
+      });
       return result;
     });
   }

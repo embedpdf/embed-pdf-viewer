@@ -107,6 +107,7 @@ function annotation(index: number) {
     author: null,
     created: null,
     modified: null,
+    blendMode: 'normal',
     inReplyTo: null,
     replyType: null,
     rawSubtypeCode: 0,

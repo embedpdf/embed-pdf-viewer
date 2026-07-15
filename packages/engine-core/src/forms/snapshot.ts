@@ -1,4 +1,5 @@
 import type { FormFieldDTO } from './field';
+import type { FormFieldRef } from '../identity/FormFieldRef';
 
 /**
  * What kind of interactive form the document declares.
@@ -29,4 +30,6 @@ export interface FormSnapshot {
    */
   needsAppearances: boolean;
   fields: FormFieldDTO[];
+  /** `/AcroForm /CO` order; null preserves each malformed/unresolved slot. */
+  calculationOrder: Array<FormFieldRef | null>;
 }

@@ -15,6 +15,8 @@ import type {
   FormSetValueResult,
   FormWidgetLinkResult,
 } from '../mutation/FormMutationResults';
+import type { FormEffectsResult } from '../forms/effects';
+import type { PageFlattenResult, PageFlattenUsage } from '../mutation/PageFlattenResult';
 import type { MetadataUpdateResult } from '../mutation/MetadataUpdateResult';
 import type { PageDeleteResult } from '../mutation/PageDeleteResult';
 import type { PageInsertResult } from '../mutation/PageInsertResult';
@@ -125,7 +127,14 @@ export type DocumentEvent =
   | ({ type: 'form.fieldUpdated'; origin: EventOrigin } & FormFieldUpdateResult)
   | ({ type: 'form.fieldDeleted'; origin: EventOrigin } & FormFieldDeleteResult)
   | ({ type: 'form.widgetAttached'; origin: EventOrigin } & FormWidgetLinkResult)
-  | ({ type: 'form.widgetDetached'; origin: EventOrigin } & FormWidgetLinkResult);
+  | ({ type: 'form.widgetDetached'; origin: EventOrigin } & FormWidgetLinkResult)
+  | ({ type: 'form.effectsApplied'; origin: EventOrigin } & FormEffectsResult)
+  | ({
+      type: 'pages.flattened';
+      pageObjectNumbers: PageObjectNumber[];
+      usage: PageFlattenUsage;
+      origin: EventOrigin;
+    } & PageFlattenResult);
 
 export type DocumentEventType = DocumentEvent['type'];
 

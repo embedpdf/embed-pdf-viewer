@@ -103,7 +103,7 @@ export interface PdfFunctions {
   EPDFAnnot_ClearRectangleDifferences: (arg0: Ptr) => boolean;
   EPDFAnnot_ExportAppearanceAsDocument: (arg0: Ptr) => Ptr;
   EPDFAnnot_ExportMultipleAppearancesAsDocument: (arg0: Ptr, arg1: number) => Ptr;
-  EPDFAnnot_Flatten: (arg0: Ptr, arg1: Ptr) => boolean;
+  EPDFAnnot_Flatten: (arg0: Ptr, arg1: Ptr, arg2: number) => number;
   EPDFAnnot_GenerateAppearance: (arg0: Ptr) => boolean;
   EPDFAnnot_GenerateAppearanceWithBlend: (arg0: Ptr, arg1: number) => boolean;
   EPDFAnnot_GenerateFormFieldAP: (arg0: Ptr) => boolean;
@@ -491,8 +491,10 @@ export interface PdfFunctions {
   EPDFForm_AttachWidget: (arg0: Ptr, arg1: number, arg2: number, arg3: string) => boolean;
   EPDFForm_CloseModel: (arg0: Ptr) => void;
   EPDFForm_CountCalculationOrder: (arg0: Ptr) => number;
+  EPDFForm_CountFieldDefaultValues: (arg0: Ptr, arg1: number) => number;
   EPDFForm_CountFieldOptions: (arg0: Ptr, arg1: number) => number;
   EPDFForm_CountFields: (arg0: Ptr) => number;
+  EPDFForm_CountFieldValues: (arg0: Ptr, arg1: number) => number;
   EPDFForm_CountFieldWidgets: (arg0: Ptr, arg1: number) => number;
   EPDFForm_CreateField: (arg0: Ptr, arg1: number, arg2: Ptr) => number;
   EPDFForm_DeleteField: (arg0: Ptr, arg1: number, arg2: Ptr, arg3: number, arg4: Ptr) => boolean;
@@ -502,7 +504,14 @@ export interface PdfFunctions {
   EPDFForm_GetCalculationOrderFieldIndex: (arg0: Ptr, arg1: number) => number;
   EPDFForm_GetFieldActionModel: (arg0: Ptr, arg1: number, arg2: number) => Ptr;
   EPDFForm_GetFieldAlternateName: (arg0: Ptr, arg1: number, arg2: Ptr, arg3: number) => number;
-  EPDFForm_GetFieldDefaultValue: (arg0: Ptr, arg1: number, arg2: Ptr, arg3: number) => number;
+  EPDFForm_GetFieldDefaultValueAt: (
+    arg0: Ptr,
+    arg1: number,
+    arg2: number,
+    arg3: Ptr,
+    arg4: number,
+  ) => number;
+  EPDFForm_GetFieldDefaultValueKind: (arg0: Ptr, arg1: number) => number;
   EPDFForm_GetFieldFamily: (arg0: Ptr, arg1: number) => number;
   EPDFForm_GetFieldFlags: (arg0: Ptr, arg1: number) => number;
   EPDFForm_GetFieldIndexByObjNum: (arg0: Ptr, arg1: number) => number;
@@ -526,7 +535,14 @@ export interface PdfFunctions {
     arg4: number,
   ) => number;
   EPDFForm_GetFieldOrigin: (arg0: Ptr, arg1: number) => number;
-  EPDFForm_GetFieldValue: (arg0: Ptr, arg1: number, arg2: Ptr, arg3: number) => number;
+  EPDFForm_GetFieldValueAt: (
+    arg0: Ptr,
+    arg1: number,
+    arg2: number,
+    arg3: Ptr,
+    arg4: number,
+  ) => number;
+  EPDFForm_GetFieldValueKind: (arg0: Ptr, arg1: number) => number;
   EPDFForm_GetFieldWidgetExportValue: (
     arg0: Ptr,
     arg1: number,
@@ -550,6 +566,7 @@ export interface PdfFunctions {
   EPDFForm_IsFieldOptionSelected: (arg0: Ptr, arg1: number, arg2: number) => boolean;
   EPDFForm_IsFieldWidgetChecked: (arg0: Ptr, arg1: number, arg2: number) => boolean;
   EPDFForm_LoadModel: (arg0: Ptr) => Ptr;
+  EPDFForm_RemoveFieldDefaultValue: (arg0: Ptr, arg1: number) => boolean;
   EPDFForm_Repair: (arg0: Ptr, arg1: number, arg2: Ptr) => boolean;
   EPDFForm_ResetField: (arg0: Ptr, arg1: number, arg2: Ptr, arg3: number, arg4: Ptr) => boolean;
   EPDFForm_SetChoiceValues: (
@@ -570,7 +587,8 @@ export interface PdfFunctions {
     arg4: number,
     arg5: Ptr,
   ) => boolean;
-  EPDFForm_SetFieldDefaultValue: (arg0: Ptr, arg1: number, arg2: Ptr) => boolean;
+  EPDFForm_SetFieldDefaultToggle: (arg0: Ptr, arg1: number, arg2: string) => boolean;
+  EPDFForm_SetFieldDefaultValues: (arg0: Ptr, arg1: number, arg2: Ptr, arg3: number) => boolean;
   EPDFForm_SetFieldDisplay: (
     arg0: Ptr,
     arg1: number,
@@ -631,6 +649,7 @@ export interface PdfFunctions {
     arg7: Ptr,
   ) => boolean;
   EPDFPage_CreateAnnot: (arg0: Ptr, arg1: number) => Ptr;
+  EPDFPage_Flatten: (arg0: Ptr, arg1: number) => number;
   EPDFPage_GetAnnotByName: (arg0: Ptr, arg1: Ptr) => Ptr;
   EPDFPage_GetAnnotByObjectNumber: (arg0: Ptr, arg1: number) => Ptr;
   EPDFPage_GetAnnotCountRaw: (arg0: Ptr, arg1: number) => number;
@@ -2653,11 +2672,16 @@ export const pdfFunctionSignatures = {
         wasm: { kind: 'pointer', cwrap: 'number' },
         native: { kind: 'pointer', cwrap: 'bigint' },
       },
+      {
+        ts: 'number',
+        wasm: { kind: 'i32', cwrap: 'number' },
+        native: { kind: 'i32', cwrap: 'number' },
+      },
     ],
     result: {
-      ts: 'boolean',
-      wasm: { kind: 'bool', cwrap: 'boolean' },
-      native: { kind: 'bool', cwrap: 'boolean' },
+      ts: 'number',
+      wasm: { kind: 'i32', cwrap: 'number' },
+      native: { kind: 'i32', cwrap: 'number' },
     },
   },
   EPDFAnnot_GenerateAppearance: {
@@ -6279,6 +6303,25 @@ export const pdfFunctionSignatures = {
       native: { kind: 'i32', cwrap: 'number' },
     },
   },
+  EPDFForm_CountFieldDefaultValues: {
+    params: [
+      {
+        ts: 'Ptr',
+        wasm: { kind: 'pointer', cwrap: 'number' },
+        native: { kind: 'pointer', cwrap: 'bigint' },
+      },
+      {
+        ts: 'number',
+        wasm: { kind: 'i32', cwrap: 'number' },
+        native: { kind: 'i32', cwrap: 'number' },
+      },
+    ],
+    result: {
+      ts: 'number',
+      wasm: { kind: 'i32', cwrap: 'number' },
+      native: { kind: 'i32', cwrap: 'number' },
+    },
+  },
   EPDFForm_CountFieldOptions: {
     params: [
       {
@@ -6304,6 +6347,25 @@ export const pdfFunctionSignatures = {
         ts: 'Ptr',
         wasm: { kind: 'pointer', cwrap: 'number' },
         native: { kind: 'pointer', cwrap: 'bigint' },
+      },
+    ],
+    result: {
+      ts: 'number',
+      wasm: { kind: 'i32', cwrap: 'number' },
+      native: { kind: 'i32', cwrap: 'number' },
+    },
+  },
+  EPDFForm_CountFieldValues: {
+    params: [
+      {
+        ts: 'Ptr',
+        wasm: { kind: 'pointer', cwrap: 'number' },
+        native: { kind: 'pointer', cwrap: 'bigint' },
+      },
+      {
+        ts: 'number',
+        wasm: { kind: 'i32', cwrap: 'number' },
+        native: { kind: 'i32', cwrap: 'number' },
       },
     ],
     result: {
@@ -6553,7 +6615,7 @@ export const pdfFunctionSignatures = {
       native: { kind: 'i32', cwrap: 'number' },
     },
   },
-  EPDFForm_GetFieldDefaultValue: {
+  EPDFForm_GetFieldDefaultValueAt: {
     params: [
       {
         ts: 'Ptr',
@@ -6566,9 +6628,33 @@ export const pdfFunctionSignatures = {
         native: { kind: 'i32', cwrap: 'number' },
       },
       {
+        ts: 'number',
+        wasm: { kind: 'i32', cwrap: 'number' },
+        native: { kind: 'i32', cwrap: 'number' },
+      },
+      {
         ts: 'Ptr',
         wasm: { kind: 'utf16ptr', cwrap: 'number' },
         native: { kind: 'utf16ptr', cwrap: 'bigint' },
+      },
+      {
+        ts: 'number',
+        wasm: { kind: 'i32', cwrap: 'number' },
+        native: { kind: 'i32', cwrap: 'number' },
+      },
+    ],
+    result: {
+      ts: 'number',
+      wasm: { kind: 'i32', cwrap: 'number' },
+      native: { kind: 'i32', cwrap: 'number' },
+    },
+  },
+  EPDFForm_GetFieldDefaultValueKind: {
+    params: [
+      {
+        ts: 'Ptr',
+        wasm: { kind: 'pointer', cwrap: 'number' },
+        native: { kind: 'pointer', cwrap: 'bigint' },
       },
       {
         ts: 'number',
@@ -6841,7 +6927,7 @@ export const pdfFunctionSignatures = {
       native: { kind: 'i32', cwrap: 'number' },
     },
   },
-  EPDFForm_GetFieldValue: {
+  EPDFForm_GetFieldValueAt: {
     params: [
       {
         ts: 'Ptr',
@@ -6854,9 +6940,33 @@ export const pdfFunctionSignatures = {
         native: { kind: 'i32', cwrap: 'number' },
       },
       {
+        ts: 'number',
+        wasm: { kind: 'i32', cwrap: 'number' },
+        native: { kind: 'i32', cwrap: 'number' },
+      },
+      {
         ts: 'Ptr',
         wasm: { kind: 'utf16ptr', cwrap: 'number' },
         native: { kind: 'utf16ptr', cwrap: 'bigint' },
+      },
+      {
+        ts: 'number',
+        wasm: { kind: 'i32', cwrap: 'number' },
+        native: { kind: 'i32', cwrap: 'number' },
+      },
+    ],
+    result: {
+      ts: 'number',
+      wasm: { kind: 'i32', cwrap: 'number' },
+      native: { kind: 'i32', cwrap: 'number' },
+    },
+  },
+  EPDFForm_GetFieldValueKind: {
+    params: [
+      {
+        ts: 'Ptr',
+        wasm: { kind: 'pointer', cwrap: 'number' },
+        native: { kind: 'pointer', cwrap: 'bigint' },
       },
       {
         ts: 'number',
@@ -7134,6 +7244,25 @@ export const pdfFunctionSignatures = {
       native: { kind: 'pointer', cwrap: 'bigint' },
     },
   },
+  EPDFForm_RemoveFieldDefaultValue: {
+    params: [
+      {
+        ts: 'Ptr',
+        wasm: { kind: 'pointer', cwrap: 'number' },
+        native: { kind: 'pointer', cwrap: 'bigint' },
+      },
+      {
+        ts: 'number',
+        wasm: { kind: 'i32', cwrap: 'number' },
+        native: { kind: 'i32', cwrap: 'number' },
+      },
+    ],
+    result: {
+      ts: 'boolean',
+      wasm: { kind: 'bool', cwrap: 'boolean' },
+      native: { kind: 'bool', cwrap: 'boolean' },
+    },
+  },
   EPDFForm_Repair: {
     params: [
       {
@@ -7299,7 +7428,31 @@ export const pdfFunctionSignatures = {
       native: { kind: 'bool', cwrap: 'boolean' },
     },
   },
-  EPDFForm_SetFieldDefaultValue: {
+  EPDFForm_SetFieldDefaultToggle: {
+    params: [
+      {
+        ts: 'Ptr',
+        wasm: { kind: 'pointer', cwrap: 'number' },
+        native: { kind: 'pointer', cwrap: 'bigint' },
+      },
+      {
+        ts: 'number',
+        wasm: { kind: 'i32', cwrap: 'number' },
+        native: { kind: 'i32', cwrap: 'number' },
+      },
+      {
+        ts: 'string',
+        wasm: { kind: 'cstring', cwrap: 'string' },
+        native: { kind: 'cstring', cwrap: 'string' },
+      },
+    ],
+    result: {
+      ts: 'boolean',
+      wasm: { kind: 'bool', cwrap: 'boolean' },
+      native: { kind: 'bool', cwrap: 'boolean' },
+    },
+  },
+  EPDFForm_SetFieldDefaultValues: {
     params: [
       {
         ts: 'Ptr',
@@ -7313,8 +7466,13 @@ export const pdfFunctionSignatures = {
       },
       {
         ts: 'Ptr',
-        wasm: { kind: 'pointer', cwrap: 'number' },
-        native: { kind: 'pointer', cwrap: 'bigint' },
+        wasm: { kind: 'utf16ptr', cwrap: 'number' },
+        native: { kind: 'utf16ptr', cwrap: 'bigint' },
+      },
+      {
+        ts: 'number',
+        wasm: { kind: 'i32', cwrap: 'number' },
+        native: { kind: 'i32', cwrap: 'number' },
       },
     ],
     result: {
@@ -7967,6 +8125,25 @@ export const pdfFunctionSignatures = {
       ts: 'Ptr',
       wasm: { kind: 'pointer', cwrap: 'number' },
       native: { kind: 'pointer', cwrap: 'bigint' },
+    },
+  },
+  EPDFPage_Flatten: {
+    params: [
+      {
+        ts: 'Ptr',
+        wasm: { kind: 'pointer', cwrap: 'number' },
+        native: { kind: 'pointer', cwrap: 'bigint' },
+      },
+      {
+        ts: 'number',
+        wasm: { kind: 'i32', cwrap: 'number' },
+        native: { kind: 'i32', cwrap: 'number' },
+      },
+    ],
+    result: {
+      ts: 'number',
+      wasm: { kind: 'i32', cwrap: 'number' },
+      native: { kind: 'i32', cwrap: 'number' },
     },
   },
   EPDFPage_GetAnnotByName: {

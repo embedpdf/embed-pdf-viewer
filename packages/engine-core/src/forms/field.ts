@@ -1,4 +1,6 @@
 import type { FormFieldRef, FormWidgetRef } from '../identity/FormFieldRef';
+import type { PdfFieldActions } from '../dto/PdfAction';
+import type { FormValueEntry } from './value-entry';
 
 /**
  * The field family — the discriminant of {@link FormFieldDTO}. Narrowing on
@@ -95,6 +97,12 @@ export interface FormFieldBase {
   alternateName: string | null;
   /** /TM — the export mapping name. */
   mappingName: string | null;
+  /** Exact effective `/V` object shape; family conveniences below are derived. */
+  valueEntry: FormValueEntry;
+  /** Exact effective `/DV` object shape, including absent and malformed values. */
+  defaultValueEntry: FormValueEntry;
+  /** Effective inherited field `/AA` actions. */
+  actions?: PdfFieldActions;
   /** The field's widget annotations, in control order. May be empty ("unplaced"). */
   widgets: FormWidgetRef[];
 }

@@ -9,6 +9,7 @@ import {
   wirePack,
   type DocumentSecurityState,
   type DocumentMetadata,
+  type DocumentActionsSnapshot,
   type DocumentSecurityProbeInfo,
   type PageListSnapshot,
   type PageState,
@@ -422,6 +423,27 @@ export class DocumentService {
       throw new EngineError(
         EngineErrorCode.WireFormat,
         `unexpected pages.list payload: ${result.tag}`,
+      );
+    }
+    return result.snapshot;
+  }
+
+  async getLayerActions(
+    ctx: OpenContext,
+    docId: string,
+    layerName: string,
+    signal?: AbortSignal,
+  ): Promise<DocumentActionsSnapshot> {
+    await this.ensureLayerOnPool(ctx, docId, layerName);
+    const result = await this.pool.run(
+      docId,
+      (jobId) => wirePack({ kind: 'actions.read' as const, jobId, docId, layerName }),
+      signal,
+    );
+    if (result.tag !== 'actions.read') {
+      throw new EngineError(
+        EngineErrorCode.WireFormat,
+        `unexpected actions.read payload: ${result.tag}`,
       );
     }
     return result.snapshot;

@@ -20,6 +20,10 @@ export const AnnotationTokenSchema = {
   fields: ['annotationVersion'],
 } as const satisfies TokenSchema;
 
+export const ActionsTokenSchema = {
+  fields: ['actionsVersion'],
+} as const satisfies TokenSchema;
+
 export const DownloadTokenSchema = {
   fields: ['docVersion', 'mode'],
   maxLength: 128,

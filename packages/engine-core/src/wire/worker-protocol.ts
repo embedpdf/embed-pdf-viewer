@@ -47,6 +47,9 @@ import type { PageDeleteResult } from '../mutation/PageDeleteResult';
 import type { PageInsertResult } from '../mutation/PageInsertResult';
 import type { PageMoveResult } from '../mutation/PageMoveResult';
 import type { PageRotateResult } from '../mutation/PageRotateResult';
+import type { DocumentActionsSnapshot } from '../dto/PdfAction';
+import type { FormEffect, FormEffectsResult } from '../forms/effects';
+import type { PageFlattenResult, PageFlattenUsage } from '../mutation/PageFlattenResult';
 
 /**
  * Wire protocol used between an Engine-side queue and any Worker host
@@ -123,6 +126,13 @@ export interface MetadataUpdateWorkerRequest {
   layerName?: string;
   patch: MetadataPatch;
   artifactPath?: string;
+}
+
+export interface ActionsReadWorkerRequest {
+  kind: 'actions.read';
+  jobId: WorkerJobId;
+  docId: string;
+  layerName?: string;
 }
 
 export interface AnnotationsListRawAllWorkerRequest {
@@ -261,6 +271,15 @@ export interface FormsResetWorkerRequest {
   docId: string;
   layerName?: string;
   ref: FormFieldRef;
+  artifactPath?: string;
+}
+
+export interface FormsApplyEffectsWorkerRequest {
+  kind: 'forms.applyEffects';
+  jobId: WorkerJobId;
+  docId: string;
+  layerName?: string;
+  effects: FormEffect[];
   artifactPath?: string;
 }
 
@@ -420,6 +439,16 @@ export interface PagesDeleteWorkerRequest {
   docId: string;
   layerName?: string;
   pageObjectNumbers: PageObjectNumber[];
+  artifactPath?: string;
+}
+
+export interface PagesFlattenWorkerRequest {
+  kind: 'pages.flatten';
+  jobId: WorkerJobId;
+  docId: string;
+  layerName?: string;
+  pageObjectNumbers: PageObjectNumber[];
+  usage: PageFlattenUsage;
   artifactPath?: string;
 }
 
@@ -608,6 +637,7 @@ export type WorkerRequest =
   | OpenWorkerRequest
   | MetadataReadWorkerRequest
   | MetadataUpdateWorkerRequest
+  | ActionsReadWorkerRequest
   | AnnotationsListRawAllWorkerRequest
   | AnnotationsListRawPageWorkerRequest
   | AnnotationsListFullPageWorkerRequest
@@ -619,6 +649,7 @@ export type WorkerRequest =
   | FormsListWorkerRequest
   | FormsSetValueWorkerRequest
   | FormsResetWorkerRequest
+  | FormsApplyEffectsWorkerRequest
   | FormsExportWorkerRequest
   | FormsImportWorkerRequest
   | FormsRepairWorkerRequest
@@ -631,6 +662,7 @@ export type WorkerRequest =
   | PagesMoveWorkerRequest
   | PagesRotateWorkerRequest
   | PagesDeleteWorkerRequest
+  | PagesFlattenWorkerRequest
   | PagesExtractWorkerRequest
   | PagesInsertWorkerRequest
   | PieceInfoReadWorkerRequest
@@ -657,6 +689,7 @@ export type WorkerRequest =
 export type WorkerResultPayload =
   | { tag: 'open'; docId: string; security: DocumentSecurityProbeInfo }
   | { tag: 'metadata.read'; metadata: DocumentMetadata }
+  | { tag: 'actions.read'; snapshot: DocumentActionsSnapshot }
   | {
       tag: 'metadata.update';
       result: MetadataUpdateResult;
@@ -701,6 +734,12 @@ export type WorkerResultPayload =
   | {
       tag: 'forms.reset';
       result: FormSetValueResult;
+      artifact?: LayerArtifactWorkerPayload;
+      artifactFile?: LayerArtifactFileWorkerPayload;
+    }
+  | {
+      tag: 'forms.applyEffects';
+      result: FormEffectsResult;
       artifact?: LayerArtifactWorkerPayload;
       artifactFile?: LayerArtifactFileWorkerPayload;
     }
@@ -763,6 +802,12 @@ export type WorkerResultPayload =
   | {
       tag: 'pages.delete';
       result: PageDeleteResult;
+      artifact?: LayerArtifactWorkerPayload;
+      artifactFile?: LayerArtifactFileWorkerPayload;
+    }
+  | {
+      tag: 'pages.flatten';
+      result: PageFlattenResult;
       artifact?: LayerArtifactWorkerPayload;
       artifactFile?: LayerArtifactFileWorkerPayload;
     }
