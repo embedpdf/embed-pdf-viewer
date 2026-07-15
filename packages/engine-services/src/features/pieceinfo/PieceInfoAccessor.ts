@@ -28,7 +28,7 @@ const OBJ_ARRAY = 5;
  * shape, so the worker host has a single code path for both levels.
  *
  * Writes stamp `content_last_modified` once per job (the worker is
- * single-threaded, so one job = one atomic patch = one revision date);
+ * single-threaded, so every key written by one job gets one revision date);
  * the native side fans it out to the application dict, the page dict,
  * and — for catalog writes — /Info /ModDate.
  */
@@ -91,24 +91,23 @@ export class PieceInfoAccessor {
   update(application: string, patch: PieceInfoPatch, signal: AbortSignal): void {
     throwIfAborted(signal);
     requireApplication(application);
+    requirePatch(patch);
     const keys = Object.keys(patch);
     if (keys.length === 0) return;
-    for (const key of keys) {
-      if (key.length === 0) {
-        throw new EngineError(EngineErrorCode.InvalidArg, 'pieceInfo keys must be non-empty');
-      }
-    }
+    validatePatch(patch, keys);
 
-    const { fn, mem } = this.runtime;
-    const docPtr = this.session.requireDocPtr();
-    const pon = this.pageObjectNumber;
-    // ONE revision date per job: the patch is one atomic edit of the
-    // application data, however many keys it touches.
+    // This is the apply boundary. No caller-controlled validation and no
+    // cancellation check belongs below it: once the first native setter runs,
+    // this deliberately non-rollback-atomic patch may be partially written if
+    // a native invariant fails on a later key.
+    throwIfAborted(signal);
+
+    const { mem } = this.runtime;
+    // One revision date per job, however many keys the patch touches.
     const lastModified = formatPdfDate(new Date());
     const lmPtr = mem.writeU16String(lastModified);
     try {
       for (const key of keys) {
-        throwIfAborted(signal);
         const value = patch[key];
         const ok = this.writeEntry(application, key, value, lmPtr);
         if (!ok) {
@@ -275,12 +274,6 @@ export class PieceInfoAccessor {
       );
     }
     if (typeof value === 'number') {
-      if (!Number.isFinite(value)) {
-        throw new EngineError(
-          EngineErrorCode.InvalidArg,
-          `pieceInfo number for '${key}' must be finite`,
-        );
-      }
       return pon === undefined
         ? fn.EPDFDoc_SetPieceInfoNumber(docPtr, application, key, value, lmPtr)
         : fn.EPDFDoc_SetPagePieceInfoNumber(docPtr, pon, application, key, value, lmPtr);
@@ -291,7 +284,7 @@ export class PieceInfoAccessor {
         : fn.EPDFDoc_SetPagePieceInfoBoolean(docPtr, pon, application, key, value, lmPtr);
     }
     if (Array.isArray(value)) {
-      return withWideStringArray(this.runtime, value as string[], (arrayPtr, count) =>
+      return withWideStringArray(this.runtime, value, (arrayPtr, count) =>
         pon === undefined
           ? fn.EPDFDoc_SetPieceInfoStringArray(docPtr, application, key, arrayPtr, count, lmPtr)
           : fn.EPDFDoc_SetPagePieceInfoStringArray(
@@ -310,15 +303,68 @@ export class PieceInfoAccessor {
         ? fn.EPDFDoc_SetPieceInfoName(docPtr, application, key, value.name, lmPtr)
         : fn.EPDFDoc_SetPagePieceInfoName(docPtr, pon, application, key, value.name, lmPtr);
     }
-    throw new EngineError(
-      EngineErrorCode.InvalidArg,
-      `unsupported pieceInfo value for '${key}': string | number | boolean | string[] | { name } | null`,
-    );
+    // validatePatch() makes this unreachable. Keep a loud invariant failure
+    // rather than silently ignoring a new wire value if the vocabulary grows.
+    throw new EngineError(EngineErrorCode.Unknown, `unvalidated pieceInfo value for '${key}'`);
   }
 }
 
 function requireApplication(application: string): void {
-  if (!application) {
+  if (typeof application !== 'string' || application.length === 0) {
     throw new EngineError(EngineErrorCode.InvalidArg, 'pieceInfo application must be non-empty');
   }
+}
+
+function requirePatch(patch: PieceInfoPatch): void {
+  if (typeof patch !== 'object' || patch === null || Array.isArray(patch)) {
+    throw new EngineError(EngineErrorCode.InvalidArg, 'pieceInfo patch must be an object');
+  }
+}
+
+function validatePatch(patch: PieceInfoPatch, keys: string[]): void {
+  for (const key of keys) {
+    if (key.length === 0) {
+      throw new EngineError(EngineErrorCode.InvalidArg, 'pieceInfo keys must be non-empty');
+    }
+    validatePatchValue(key, patch[key]);
+  }
+}
+
+function validatePatchValue(key: string, value: PieceInfoPatch[string]): void {
+  if (value === null || typeof value === 'string' || typeof value === 'boolean') return;
+
+  if (typeof value === 'number') {
+    if (!Number.isFinite(value)) {
+      throw new EngineError(
+        EngineErrorCode.InvalidArg,
+        `pieceInfo number for '${key}' must be finite`,
+      );
+    }
+    return;
+  }
+
+  if (Array.isArray(value)) {
+    if (!value.every((item) => typeof item === 'string')) {
+      throw new EngineError(
+        EngineErrorCode.InvalidArg,
+        `pieceInfo string array for '${key}' must contain only strings`,
+      );
+    }
+    return;
+  }
+
+  if (typeof value === 'object' && value !== null && 'name' in value) {
+    if (typeof value.name !== 'string' || value.name.length === 0) {
+      throw new EngineError(
+        EngineErrorCode.InvalidArg,
+        `pieceInfo PDF name for '${key}' must be a non-empty string`,
+      );
+    }
+    return;
+  }
+
+  throw new EngineError(
+    EngineErrorCode.InvalidArg,
+    `unsupported pieceInfo value for '${key}': string | number | boolean | string[] | { name } | null`,
+  );
 }

@@ -20,26 +20,31 @@ import {
 } from '@embedpdf/engine-core/runtime';
 import type { PdfRuntimeModule, Ptr } from '@embedpdf/pdf-runtime';
 
+import { blendModeFromCode, blendModeToCode } from './internal/blendMode';
 import type { DocumentSession } from '../../document-session/DocumentSession';
 import { throwIfAborted } from '../../shared/abort';
 import type { FontRegistrar } from '../fonts';
-import type { AnnotationWriteContext } from './internal/write/annotationWriteContext';
 import { captureOrStampStableId } from './internal/identity/captureOrStampStableId';
 import { resolveAnnotPtr } from './internal/identity/resolveAnnotationPointer';
 import { computeMutationImpact } from './internal/mutations/computeMutationImpact';
 import { readAnnotString } from './internal/read/annotationReadPrimitives';
-import { readAnnotationFromPtr } from './internal/read/readAnnotationFromPtr';
 import {
   joinWidgetFieldNumbers,
   resolveWidgetFieldObjectNumber,
 } from './internal/read/joinWidgetField';
-import { applyDraft, applyPatch } from './internal/write/annotationWriterRegistry';
+import { readAnnotationFromPtr } from './internal/read/readAnnotationFromPtr';
+import type { AnnotationWriteContext } from './internal/write/annotationWriteContext';
+import {
+  applyDraft,
+  applyPatch,
+  preflightDraft,
+  preflightPatch,
+} from './internal/write/annotationWriterRegistry';
 import {
   writeAnnotationAuthor,
   writeAnnotationModified,
 } from './internal/write/writeAnnotationBase';
 import { writeAnnotationRelationship } from './internal/write/writeAnnotationRelationship';
-import { blendModeFromCode, blendModeToCode } from './internal/blendMode';
 import {
   applyEmbedMetadataOnCreate,
   applyEmbedMetadataOnUpdate,
@@ -113,6 +118,8 @@ export class AnnotationMutator {
     const pagePtr = pool.acquire(pageObjectNumber);
     try {
       this.ensureKnownWeakStateFromPage(pageObjectNumber, pagePtr);
+      const writeCtx = this.writeContext(pagePtr, resources);
+      preflightDraft(draft, writeCtx);
       // `create` is append-only: PDFium drops the new annotation at
       // `index = previousCount`, so no existing index ever shifts. Per
       // the locked rule in `computeMutationImpact`, that means create is
@@ -136,7 +143,7 @@ export class AnnotationMutator {
       let newIndex: number;
       let linkedParentId: AnnotationStableId | null = null;
       try {
-        applyDraft(fn, mem, annotPtr, draft, this.writeContext(pagePtr, resources));
+        applyDraft(fn, mem, annotPtr, draft, writeCtx);
         // Link to an /IRT parent when the draft asks for one. This may
         // promote a weak/direct parent to an indirect object (non-structural,
         // no index shift); the strengthened parent id is folded into
@@ -165,7 +172,6 @@ export class AnnotationMutator {
         // written, so the new annotation ships with a standard-compliant
         // appearance (matches the v2 engine).
         this.regenerateAppearance(annotPtr, pagePtr, draft.blendMode);
-        throwIfAborted(signal);
 
         newObjNum = fn.EPDFAnnot_GetObjectNumber(annotPtr);
         if (newObjNum <= 0) {
@@ -231,8 +237,15 @@ export class AnnotationMutator {
       annotPtr = resolveAnnotPtr(this.runtime, this.session, pagePtr, ref);
       throwIfAborted(signal);
 
+      const writeCtx = this.writeContext(pagePtr, resources);
+      preflightPatch(patch, writeCtx);
+
       this.ensureKnownWeakStateFromPage(ref.pageObjectNumber, pagePtr);
       const pageStateBefore = this.session.pageState(ref.pageObjectNumber);
+
+      // Apply boundary: validation and cancellation are complete before the
+      // first possible document write (weak-id strengthening below).
+      throwIfAborted(signal);
 
       // Opportunistic /NM stamp for weak annotations + capture the
       // resulting stable id for `meta.changed`. Same monotonic /NM
@@ -246,7 +259,7 @@ export class AnnotationMutator {
       const previousBlendMode = blendModeFromCode(fn.EPDFAnnot_GetBlendMode(annotPtr));
 
       // Apply caller-supplied subtype-specific writes.
-      applyPatch(fn, mem, annotPtr, patch, this.writeContext(pagePtr, resources));
+      applyPatch(fn, mem, annotPtr, patch, writeCtx);
       // Apply /IRT + /RT changes (set/relink/clear, or RT-only). Setting a
       // link may promote a weak parent to indirect (non-structural); the
       // strengthened parent id is folded into `meta.changed` below.
@@ -270,7 +283,6 @@ export class AnnotationMutator {
       // Re-bake the /AP appearance stream from the patched properties so
       // the rendered appearance stays in sync with the dictionary.
       this.regenerateAppearance(annotPtr, pagePtr, patch.blendMode ?? previousBlendMode);
-      throwIfAborted(signal);
 
       // PDFium caches the parsed appearance form on an annotation context. A
       // regenerated /AP is persisted immediately, but reading blend mode through

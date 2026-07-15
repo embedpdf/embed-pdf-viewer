@@ -41,6 +41,7 @@ export function annotatedPons(
     // A field's widgets can live on several pages; the results name exactly
     // the widgets whose appearance changed, each with its page.
     case 'form.valueChanged':
+    case 'form.effectsApplied':
       return event.changedWidgets.map((w) => w.pageObjectNumber);
     case 'form.fieldDeleted':
       return event.removedWidgets.map((w) => w.pageObjectNumber);

@@ -42,6 +42,8 @@ export function createPluginContext(
     engine,
     documentId,
     doc: services.documentHandle(documentId),
+    documentHandle: (requestedDocumentId) =>
+      services.documentHandle(requestedDocumentId ?? documentId),
     getState: () => store.getSlice(key),
     dispatch: (action: Action) => store.dispatchTo(key, action),
     subscribe: store.subscribe,
@@ -60,6 +62,7 @@ export function createPluginContext(
         return null;
       }
     },
+    cleanup: (teardown) => services.registerTeardown(teardown, documentId),
   };
 }
 
@@ -92,6 +95,5 @@ export function createEffectContext(
       services.registerTeardown(unsubscribe, documentId);
       return unsubscribe;
     },
-    cleanup: (teardown) => services.registerTeardown(teardown, documentId),
   };
 }

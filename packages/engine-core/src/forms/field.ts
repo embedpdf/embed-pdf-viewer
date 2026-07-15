@@ -113,7 +113,7 @@ export interface TextFieldDTO extends FormFieldBase {
   value: string;
   /** /DV — restored by `reset()`. */
   defaultValue: string;
-  /** /MaxLen; `null` when unlimited. Writes beyond it are rejected. */
+  /** /MaxLen; `null` when unlimited. Longer writes are truncated to this length. */
   maxLength: number | null;
   multiline: boolean;
   password: boolean;

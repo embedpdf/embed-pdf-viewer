@@ -121,7 +121,7 @@ export function runFormConformance(
       }
     });
 
-    test('writes text values and enforces /MaxLen', async () => {
+    test('writes text values and truncates to /MaxLen', async () => {
       const doc = await open(opts.fixtures.toggleFields);
       try {
         const result = await doc.forms.setValue(
@@ -133,12 +133,13 @@ export function runFormConformance(
         if (result.field.family === 'text') expect(result.field.value).toBe('abcde');
         expect(result.changedWidgets.length).toBe(1);
 
-        await expect(
-          doc.forms.setValue(
-            { kind: 'fqn', name: 'maxlen_text' },
-            { type: 'text', value: 'abcdef' },
-          ),
-        ).rejects.toMatchObject({ code: EngineErrorCode.InvalidArg });
+        const truncated = await doc.forms.setValue(
+          { kind: 'fqn', name: 'maxlen_text' },
+          { type: 'text', value: 'abcdef' },
+        );
+        if (truncated.field.family !== 'text') throw new Error('expected text family');
+        expect(truncated.field.value).toBe('abcde');
+        expect(truncated.changedWidgets).toHaveLength(0);
 
         // Re-read through the (invalidated) snapshot: the write is visible.
         const after = await doc.forms.get({ kind: 'fqn', name: 'maxlen_text' });
@@ -209,7 +210,7 @@ export function runFormConformance(
           {
             kind: 'setValue',
             ref: { kind: 'fqn', name: 'maxlen_text' },
-            value: { type: 'text', value: 'fx' },
+            value: { type: 'text', value: 'abcdef' },
           },
           {
             kind: 'setValue',
@@ -219,7 +220,7 @@ export function runFormConformance(
           {
             kind: 'setValue',
             ref: { kind: 'fqn', name: 'maxlen_text' },
-            value: { type: 'text', value: 'fx' },
+            value: { type: 'text', value: 'abcde' },
           },
         ]);
         expect(result.results.map((entry) => entry.status)).toEqual([
@@ -229,12 +230,15 @@ export function runFormConformance(
         ]);
         expect(result.meta === null).toBe(false);
         expect(events).toHaveLength(1);
+        const appliedText = result.results[0]?.fields[0];
+        if (appliedText?.family !== 'text') throw new Error('expected text family');
+        expect(appliedText.value).toBe('abcde');
 
         const noOp = await doc.forms.applyEffects([
           {
             kind: 'setValue',
             ref: { kind: 'fqn', name: 'maxlen_text' },
-            value: { type: 'text', value: 'fx' },
+            value: { type: 'text', value: 'abcde' },
           },
         ]);
         expect(noOp.results.map((entry) => entry.status)).toEqual(['unchanged']);

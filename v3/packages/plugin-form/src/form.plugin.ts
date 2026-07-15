@@ -1,17 +1,17 @@
 import { definePlugin } from '@embedpdf-x/kernel';
-import { InteractionToken } from '@embedpdf-x/plugin-interaction';
 import { AnnotationToken } from '@embedpdf-x/plugin-annotation';
 // Behavior registration lives on the HOST capability (framework/plugin
 // surface) — same runtime token, wider type.
 import { AnnotationToken as AnnotationHostToken } from '@embedpdf-x/plugin-annotation/internal';
+import { InteractionToken } from '@embedpdf-x/plugin-interaction';
 
 import { createFormCapability } from './capability';
-import { createPlaceHandler } from './handler';
 import { registerFormEffects } from './effects';
+import { createPlaceHandler } from './handler';
 import { formReducer, initialFormState } from './reducer';
 import { FORM_TOOLS, PLACE_TAGS } from './tools';
 import { FormToken } from './types';
-import type { FormAction, FormCapability, FormState } from './types';
+import type { FormAction, FormCapability, FormPluginOptions, FormState } from './types';
 
 /**
  * The form plugin: the FIELD plane. Document-scoped; requires the
@@ -24,7 +24,7 @@ import type { FormAction, FormCapability, FormState } from './types';
  * Design mode = the 'form-edit' / palette tools: no 'form-fill' tag, so
  * widgets become ordinary editable annotations.
  */
-export const formPlugin = () =>
+export const formPlugin = (options: FormPluginOptions = {}) =>
   definePlugin<FormState, FormAction, FormCapability>({
     id: 'form',
     token: FormToken,
@@ -33,7 +33,7 @@ export const formPlugin = () =>
     optional: [AnnotationToken],
     initialState: initialFormState,
     reduce: formReducer,
-    capability: createFormCapability,
+    capability: (ctx) => createFormCapability(ctx, options),
     effects: registerFormEffects,
     init: (ctx) => {
       const interaction = ctx.get(InteractionToken);

@@ -46,10 +46,11 @@ export function registerAnnotationEffects(
 
   const unsubscribe = doc.events.subscribe((event: DocumentEvent) => {
     // Widget appearances are re-baked by FORM value writes — a plane this
-    // plugin doesn't own, so no remote-only filter: our own fills flow
-    // through the form capability and never touch this model. The bump tells
-    // the render layer to re-fetch exactly the repainted widgets' rasters.
-    if (event.type === 'form.valueChanged') {
+    // plugin doesn't own, so no remote-only filter: direct fills emit
+    // `form.valueChanged`, while scripted batches emit `form.effectsApplied`.
+    // Neither path touches this model directly. The bump tells the render
+    // layer to re-fetch exactly the repainted widgets' rasters.
+    if (event.type === 'form.valueChanged' || event.type === 'form.effectsApplied') {
       apply({
         t: 'bumpAp',
         ids: event.changedWidgets

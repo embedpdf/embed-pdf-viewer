@@ -124,6 +124,8 @@ function createFakeRuntime(): PdfRuntimeModule & {
       EPDF_GetPageRotationByIndex: () => 0,
       EPDF_GetPageUserUnitByIndex: () => 0,
       FPDF_GetPageLabel: () => 0,
+      // No page-level actions in this ownership/routing fixture.
+      EPDFDoc_GetPageActionModel: () => ptr(0),
       EPDF_LoadMemBaseDocument64: (dataPtr: Ptr, size: number, password: string) => {
         calls.loadMemBases.push({ ptr: dataPtr, size, password });
         return ptr(201);

@@ -2,7 +2,7 @@
   "name": "@embedpdf-x/plugin-stamp",
   "version": "0.0.0",
   "private": true,
-  "description": "Stamp asset libraries: import a PDF as a library of vector stamps (one page per stamp), keep per-asset bytes + cached previews, and place them through the annotation plugin's armed-stamp flow. The substrate the signature plugin builds on.",
+  "description": "Stamp asset libraries: retain imported PDFs as canonical PieceInfo-backed libraries, derive per-page vector assets and previews, materialize opt-in dynamic stamps, and place them through the annotation plugin's armed-stamp flow.",
   "type": "module",
   "main": "./src/index.ts",
   "module": "./src/index.ts",
@@ -35,7 +35,9 @@
   },
   "dependencies": {
     "@embedpdf-x/kernel": "workspace:*",
+    "@embedpdf-x/js-sandbox": "workspace:*",
     "@embedpdf-x/plugin-annotation": "workspace:*",
+    "@embedpdf-x/plugin-form": "workspace:*",
     "@embedpdf/engine-core": "workspace:*"
   },
   "devDependencies": {

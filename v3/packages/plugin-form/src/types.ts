@@ -1,5 +1,5 @@
-import { createCapabilityToken } from '@embedpdf-x/kernel';
 import type {
+  AnnotationRef,
   FormDataExport,
   FormDataFormat,
   FormFieldDTO,
@@ -11,9 +11,19 @@ import type {
   FormRepairOptions,
   FormRepairResult,
   FormSetValueResult,
+  FormEffectsResult,
   FormSnapshot,
   WidgetAppearance,
 } from '@embedpdf/engine-core/runtime';
+import type {
+  ScriptBudget,
+  ScriptDiagnostic,
+  ScriptExecutionError,
+  ScriptIdentity,
+  ScriptUiEffect,
+} from '@embedpdf-x/acrojs-core';
+import type { ScriptSandboxFactory } from '@embedpdf-x/js-sandbox';
+import { createCapabilityToken } from '@embedpdf-x/kernel';
 
 import type { FillItem } from './core/fill-items';
 import type { Box, FieldKey, Model } from './core/model';
@@ -21,6 +31,47 @@ import type { Box, FieldKey, Model } from './core/model';
 export interface FormState {
   model: Model;
 }
+
+export interface FormScriptingOptions {
+  /** Explicit opt-in. PDF JavaScript remains inert when false/omitted. */
+  enabled: boolean;
+  /** Override the lazy QuickJS factory (tests or another isolated VM). */
+  sandboxFactory?: ScriptSandboxFactory;
+  /** Optional embedder identity fields layered over engine/JWT identity. */
+  identity?: Partial<ScriptIdentity> | (() => Partial<ScriptIdentity>);
+  /** Target document filename exposed as `this.documentFileName`. */
+  fileName?: () => string;
+  /** Injected deterministic transaction environment. */
+  now?: () => number;
+  utcOffsetMinutes?: () => number;
+  randomSeed?: () => number;
+  budget?: ScriptBudget;
+  /** Framework/application port for app.alert, print, and page navigation. */
+  onUiEffect?: (effect: ScriptUiEffect) => void;
+  onDiagnostic?: (diagnostic: ScriptDiagnostic) => void;
+  onError?: (error: ScriptExecutionError) => void;
+}
+
+export interface FormPluginOptions {
+  scripting?: FormScriptingOptions;
+}
+
+export type FormCommitStatus = 'applied' | 'unchanged' | 'rejected' | 'failed';
+
+export interface FormCommitResult {
+  status: FormCommitStatus;
+  scripted: boolean;
+  effectsResult: FormEffectsResult | null;
+  uiEffects: ScriptUiEffect[];
+  diagnostics: ScriptDiagnostic[];
+  error?: ScriptExecutionError;
+}
+
+/** One DOM-free UI request produced by the curated Acrobat scripting surface. */
+export type FormUiEffect = ScriptUiEffect;
+
+/** Runtime adapter for alerts, print requests, and zero-based page navigation. */
+export type FormUiEffectProvider = (effect: FormUiEffect) => void;
 
 /** Input for {@link FormCapability.placeField}. */
 export interface PlaceFieldInput {
@@ -76,6 +127,12 @@ export interface FormCapability {
   toggle(key: FieldKey, onState: string | null): Promise<void>;
   /** Select choice options by export value. */
   choose(key: FieldKey, values: string[]): Promise<void>;
+  /** Commit one originating-client value transaction, including K/V/C/F scripts when enabled. */
+  commitValue(ref: FormFieldRef, value: FormFieldValue): Promise<FormCommitResult>;
+  /** Execute one widget's `/A` activation action (and `/Next`) when scripting is enabled. */
+  activateWidget(key: FieldKey, annotationRef: AnnotationRef): Promise<FormCommitResult>;
+  /** Install the framework/application adapter for script-produced UI requests. */
+  setUiEffectProvider(provider: FormUiEffectProvider | null): void;
   /** Restore a field to its /DV default. */
   reset(key: FieldKey): Promise<void>;
   /** Raw engine passthrough for anything the sugar above doesn't cover. */

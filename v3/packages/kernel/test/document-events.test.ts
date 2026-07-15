@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { AbortablePromise } from '@embedpdf/engine-core/runtime';
 import type {
   DocumentEvent,
@@ -178,5 +178,50 @@ describe('kernel: document events → page registry', () => {
     // A late event (e.g. a slow worker) must be a no-op, not a crash.
     expect(() => events.emit(rotatedEvent([1], 90, [page(1, 0, 90), page(2, 1)]))).not.toThrow();
     expect(kernel.documents.activeId()).toBeNull();
+  });
+
+  it('runs cleanup registered by a document capability when its document closes', async () => {
+    const { engine } = fakeEngine([page(1, 0)]);
+    const teardown = vi.fn();
+    const token = { name: 'resource' };
+    const plugin = {
+      id: 'resource',
+      scope: 'document' as const,
+      token,
+      capability: (ctx: PluginContext<unknown>) => {
+        ctx.cleanup(teardown);
+        return {};
+      },
+    };
+    const kernel = createKernel({ engine, plugins: [plugin] });
+    const docId = await kernel.documents.open({
+      kind: 'bytes',
+      id: 'doc-1',
+      bytes: new Uint8Array(),
+    });
+    kernel.capability(token, docId);
+
+    await kernel.documents.close(docId);
+
+    expect(teardown).toHaveBeenCalledTimes(1);
+  });
+
+  it('runs cleanup registered by a workspace capability when the kernel is destroyed', () => {
+    const { engine } = fakeEngine([]);
+    const teardown = vi.fn();
+    const token = { name: 'workspace-resource' };
+    const plugin = {
+      id: 'workspace-resource',
+      token,
+      capability: (ctx: PluginContext<unknown>) => {
+        ctx.cleanup(teardown);
+        return {};
+      },
+    };
+    const kernel = createKernel({ engine, plugins: [plugin] });
+
+    kernel.destroy();
+
+    expect(teardown).toHaveBeenCalledTimes(1);
   });
 });

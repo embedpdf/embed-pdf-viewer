@@ -62,7 +62,7 @@ const plugins = [
   }),
   // Forms: fillable under the default pointer/pan (widgets render as fill
   // controls), editable under the Form tab's 'form-edit' + palette tools.
-  formPlugin(),
+  formPlugin({ scripting: { enabled: true } }),
   searchPlugin(),
   demoToolsPlugin(),
   i18nPlugin({

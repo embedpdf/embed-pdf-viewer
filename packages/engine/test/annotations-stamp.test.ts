@@ -4,7 +4,7 @@ import { fileURLToPath } from 'node:url';
 import { deflateSync } from 'node:zlib';
 import { afterAll, beforeAll, describe, expect, test } from 'vitest';
 import type { DocumentHandle, Engine, StampAnnotationDTO } from '@embedpdf/engine-core/runtime';
-import { sniffBinaryMetadata } from '@embedpdf/engine-core/runtime';
+import { EngineErrorCode, sniffBinaryMetadata } from '@embedpdf/engine-core/runtime';
 import { createLocalEngine } from '../src/index';
 
 const here = dirname(fileURLToPath(import.meta.url));
@@ -328,5 +328,47 @@ describe('stamp annotations: engine-local (inline transport, wasm runtime)', () 
         source: new Uint8Array([1, 2, 3, 4, 5, 6, 7, 8]),
       }),
     ).rejects.toMatchObject({ code: expect.anything() });
+  });
+
+  test('invalid stamp name rejects before create or base-patch writes', async () => {
+    const page = handle.page(PAGE_OBJECT_NUMBER);
+    const beforeCreate = await page.annotations.list();
+
+    await expect(
+      page.annotations.create({
+        subtype: 'stamp',
+        rect: { left: 20, bottom: 100, right: 80, top: 130 },
+        source: makePng(2, 1, [255, 0, 0, 255]),
+        name: 'DefinitelyNotAStandardStampName',
+      }),
+    ).rejects.toMatchObject({ code: EngineErrorCode.InvalidArg });
+
+    const afterRejectedCreate = await page.annotations.list();
+    expect(afterRejectedCreate.annotations).toHaveLength(beforeCreate.annotations.length);
+
+    const { created } = await page.annotations.create({
+      subtype: 'stamp',
+      rect: { left: 20, bottom: 100, right: 80, top: 130 },
+      source: makePng(2, 1, [0, 128, 0, 255]),
+      name: 'Approved',
+      contents: 'before',
+    });
+
+    await expect(
+      page.annotations.update(created.ref, {
+        subtype: 'stamp',
+        contents: 'must-not-land',
+        name: 'DefinitelyNotAStandardStampName',
+      }),
+    ).rejects.toMatchObject({ code: EngineErrorCode.InvalidArg });
+
+    const afterRejectedUpdate = await page.annotations.list();
+    const reread = afterRejectedUpdate.annotations.find(
+      (annotation) =>
+        annotation.ref.kind === 'objectNumber' &&
+        created.ref.kind === 'objectNumber' &&
+        annotation.ref.annotObjectNumber === created.ref.annotObjectNumber,
+    );
+    expect(reread?.contents).toBe('before');
   });
 });

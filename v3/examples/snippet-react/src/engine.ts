@@ -60,5 +60,13 @@ export async function loadInitialDocuments(): Promise<InitialDocument[]> {
       source: { kind: 'bytes', id: 'form', bytes: await fetchBytes('/form.pdf') } as OpenInput,
       name: 'Form',
     },
+    {
+      source: {
+        kind: 'bytes',
+        id: 'interactive',
+        bytes: await fetchBytes('/interactive_pdf_forms_javascript_demo.pdf'),
+      } as OpenInput,
+      name: 'Interactive PDF Forms JavaScript Demo',
+    },
   ];
 }

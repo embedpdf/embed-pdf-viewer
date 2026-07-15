@@ -346,9 +346,6 @@ function validateEffect(effect: FormEffect, fields: FormFieldDTO[]): void {
 function validateValue(field: FormFieldDTO, value: FormFieldValue): void {
   if (value.type === 'text') {
     if (field.family !== 'text') mismatch(field, value);
-    if (field.maxLength !== null && value.value.length > field.maxLength) {
-      throw new EngineError(EngineErrorCode.InvalidArg, 'text value exceeds field maxLength');
-    }
     return;
   }
   if (value.type === 'toggle') {

@@ -116,6 +116,8 @@ export interface PluginContext<S, A extends Action = Action> {
   readonly documentId?: string;
   /** The bound document's engine handle; for workspace plugins, the active doc's handle, or null. */
   readonly doc: DocumentHandle | null;
+  /** Resolve a live engine handle by document id; omitted follows this context's normal active/bound rule. */
+  documentHandle(documentId?: string): DocumentHandle | null;
   getState(): S;
   dispatch(action: A): void;
   subscribe(listener: () => void): Unsubscribe;
@@ -125,6 +127,13 @@ export interface PluginContext<S, A extends Action = Action> {
   get<T>(token: CapabilityToken<T>): T;
   forDocument<T>(token: CapabilityToken<T>, documentId: string): T;
   tryGet<T>(token: CapabilityToken<T>): T | null;
+  /**
+   * Register a resource teardown owned by this plugin instance. Document-
+   * scoped callbacks run when that document closes; workspace callbacks run
+   * when the kernel is destroyed. Safe for capability-held timers, runtimes,
+   * subscriptions, object URLs, and binary caches.
+   */
+  cleanup(fn: () => void): void;
 }
 
 /** Side-effect context: the only place async/IO/cross-plugin reactions live. */
@@ -135,7 +144,6 @@ export interface EffectContext<S, A extends Action = Action> extends PluginConte
     isEqual?: (a: R, b: R) => boolean,
   ): Unsubscribe;
   onAction(type: string, handler: (action: Action) => void): Unsubscribe;
-  cleanup(fn: () => void): void;
 }
 
 /**

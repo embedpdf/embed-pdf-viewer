@@ -72,6 +72,19 @@ server worker threads. It should own:
 
 Feature behavior belongs in `features/`, not in worker adapters.
 
+## Mutation safety
+
+- Multi-step mutators validate all caller-controlled input and check cancellation before the first
+  native write. After that apply boundary, caller validation and abort checks must not introduce a
+  throw path: these mutations are not rollback-atomic.
+- Ordered batch verbs do not throw after a write may have occurred. They record the current item as
+  `failed`, mark remaining items `skipped`, and finalize whenever state changed or a native outcome
+  is indeterminate. They return no mutation artifact only when every outcome is known not to have
+  changed the document.
+- A non-batch native failure after the apply boundary is an internal-invariant path, not a validation
+  outcome. Never describe a multi-call mutation as atomic unless the native layer provides an actual
+  transaction or rollback guarantee.
+
 ## Adding a feature
 
 When adding a new worker capability:

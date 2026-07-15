@@ -1,17 +1,17 @@
 import {
-  samplePointOn,
-  type InteractionCapability,
-  type InteractionHandler,
-} from '@embedpdf-x/plugin-interaction';
-import {
   MIN_DRAG,
   resolveClickPlacement,
   widgetAppearanceFromProps,
 } from '@embedpdf-x/plugin-annotation';
 import type { AnnotationHostCapability } from '@embedpdf-x/plugin-annotation/internal';
+import {
+  samplePointOn,
+  type InteractionCapability,
+  type InteractionHandler,
+} from '@embedpdf-x/plugin-interaction';
 
-import { FORM_TOOL_BY_ID } from './tools';
 import type { Box } from './core/model';
+import { FORM_TOOL_BY_ID } from './tools';
 import type { FormCapability } from './types';
 
 type Vec = { x: number; y: number };
@@ -116,7 +116,7 @@ export function createPlaceHandler(
           });
         })
         .catch((err) => {
-          console.error('[form] placeField failed:', err);
+          globalThis.console?.error('[form] placeField failed:', err);
         });
     },
   };

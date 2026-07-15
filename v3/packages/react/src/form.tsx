@@ -19,7 +19,8 @@
  *               value; the re-baked appearance shows the new check state.
  *      choice → an invisible native <select> over the picture (v2's trick):
  *               the browser owns the dropdown, the engine owns the pixels.
- *      button → picture only (PDF actions are not executed).
+ *      button → native keyboard/click target over the picture; activation is
+ *               delegated to the form plugin's isolated scripting pipeline.
  *
  * 2. `<FormLayer />` — the annotation-less path (fill-only viewers with no
  *    annotation plugin): synthetic HTML controls positioned from the form
@@ -36,13 +37,25 @@ export * from '@embedpdf-x/plugin-form';
 import * as React from 'react';
 import { useEffect, useRef, useState } from 'react';
 import { FormToken } from '@embedpdf-x/plugin-form';
-import type { FillItem, FormFieldDTO } from '@embedpdf-x/plugin-form';
+import type {
+  FillItem,
+  FormFieldDTO,
+  FormUiEffect,
+  FormUiEffectProvider,
+} from '@embedpdf-x/plugin-form';
 import { InteractionToken } from '@embedpdf-x/plugin-interaction';
+import { StageToken } from '@embedpdf-x/plugin-stage';
 import type { Rect } from '@embedpdf-x/annotation-core';
 
 import { useAnnotationSelected } from './annotation';
 import type { AnnotationRenderer, AnnotationRendererProps } from './annotation';
-import { shallowArray, useCapability, usePage, useSelector } from './runtime';
+import {
+  shallowArray,
+  useCapability,
+  useOptionalCapability,
+  usePage,
+  useSelector,
+} from './runtime';
 import type { PageContextValue } from './runtime';
 
 /** Content rect → a view-px box (the page wrapper's own coordinate space). */
@@ -67,6 +80,53 @@ function useIsolated<T extends HTMLElement>() {
     return () => el.removeEventListener('pointerdown', stop);
   }, []);
   return ref;
+}
+
+export interface FormScriptingUiHandlers {
+  alert?: (message: string, effect: Extract<FormUiEffect, { kind: 'alert' }>) => void;
+  print?: (effect: Extract<FormUiEffect, { kind: 'print' }>) => void;
+  gotoPage?: (page: number, effect: Extract<FormUiEffect, { kind: 'gotoPage' }>) => void;
+}
+
+/**
+ * Fulfil form-script UI requests for the active document. By default alerts use
+ * the browser dialog, page navigation uses the main Stage, and print delegates
+ * to the browser. Pass handlers (or one raw provider) to replace that policy.
+ */
+export function useFormScriptingProvider(
+  adapter?: FormScriptingUiHandlers | FormUiEffectProvider,
+): void {
+  const form = useOptionalCapability(FormToken);
+  const stage = useOptionalCapability(StageToken);
+  const adapterRef = useRef(adapter);
+  adapterRef.current = adapter;
+
+  useEffect(() => {
+    if (!form) return;
+    const provider: FormUiEffectProvider = (effect) => {
+      const current = adapterRef.current;
+      if (typeof current === 'function') {
+        current(effect);
+        return;
+      }
+      switch (effect.kind) {
+        case 'alert':
+          if (current?.alert) current.alert(effect.message, effect);
+          else if (typeof globalThis.alert === 'function') globalThis.alert(effect.message);
+          break;
+        case 'gotoPage':
+          if (current?.gotoPage) current.gotoPage(effect.page, effect);
+          else stage?.goToPage(effect.page);
+          break;
+        case 'print':
+          if (current?.print) current.print(effect);
+          else if (typeof globalThis.print === 'function') globalThis.print();
+          break;
+      }
+    };
+    form.setUiEffectProvider(provider);
+    return () => form.setUiEffectProvider(null);
+  }, [form, stage]);
 }
 
 /* ══════════════════════════ behavior widgets ══════════════════════════ */
@@ -139,8 +199,39 @@ function FormWidget({ item, page, appearance }: AnnotationRendererProps) {
     case 'choice':
       return <ChoiceWidget fill={fill} item={item} page={page} appearance={appearance} />;
     case 'button':
-      return <Picture page={page} appearance={appearance} apBox={item.apBox} />;
+      return <ButtonWidget fill={fill} item={item} page={page} appearance={appearance} />;
   }
+}
+
+function ButtonWidget({ fill, item, page, appearance }: WidgetProps<'button'>) {
+  const form = useCapability(FormToken);
+  const wrap = useIsolated<HTMLButtonElement>();
+  const b = viewBox(item.box, page);
+  return (
+    <button
+      ref={wrap}
+      type="button"
+      aria-label={fill.label}
+      disabled={fill.disabled}
+      onClick={() => {
+        if (item.ref) void form.activateWidget(fill.key, item.ref);
+      }}
+      style={{
+        position: 'absolute',
+        left: b.left,
+        top: b.top,
+        width: b.width,
+        height: b.height,
+        boxSizing: 'border-box',
+        padding: 0,
+        border: 0,
+        background: 'transparent',
+        cursor: fill.disabled ? 'default' : 'pointer',
+      }}
+    >
+      <Picture page={page} appearance={appearance} apBox={item.apBox} frame={b} />
+    </button>
+  );
 }
 
 function TextWidget({ fill, item, page, appearance }: WidgetProps<'text'>) {
@@ -487,6 +578,39 @@ function FillChoice({
   );
 }
 
+function FillButton({
+  item,
+  page,
+}: {
+  item: Extract<FillItem, { control: 'button' }>;
+  page: PageContextValue;
+}) {
+  const form = useCapability(FormToken);
+  const css = fillBox(item, page);
+  return (
+    <button
+      type="button"
+      aria-label={item.label}
+      disabled={item.disabled}
+      onClick={() =>
+        void form.activateWidget(item.key, {
+          kind: 'objectNumber',
+          pageObjectNumber: page.pon,
+          annotObjectNumber: item.annotObjectNumber,
+        })
+      }
+      style={{
+        ...controlBase,
+        ...css,
+        padding: 0,
+        border: 0,
+        background: 'transparent',
+        cursor: item.disabled ? 'default' : 'pointer',
+      }}
+    />
+  );
+}
+
 /**
  * Fill-mode form controls for one page, positioned from the form model's own
  * widget geometry — the ANNOTATION-LESS path (a fill-only viewer whose page
@@ -516,6 +640,8 @@ export function FormLayer() {
           <FillToggle key={`${item.key}:${item.annotObjectNumber}`} item={item} page={page} />
         ) : item.control === 'choice' ? (
           <FillChoice key={`${item.key}:${item.annotObjectNumber}`} item={item} page={page} />
+        ) : item.control === 'button' ? (
+          <FillButton key={`${item.key}:${item.annotObjectNumber}`} item={item} page={page} />
         ) : null,
       )}
     </div>

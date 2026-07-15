@@ -44,10 +44,13 @@ describe('annotatedPons — the built-in event→pages map', () => {
     },
   );
 
-  it('form.valueChanged invalidates every page a changed widget lives on', () => {
-    const e = event({ type: 'form.valueChanged', changedWidgets: [widget(11), widget(33)] });
-    expect(annotatedPons(e, allPons)).toEqual([11, 33]);
-  });
+  it.each(['form.valueChanged', 'form.effectsApplied'])(
+    '%s invalidates every page a changed widget lives on',
+    (type) => {
+      const e = event({ type, changedWidgets: [widget(11), widget(33)] });
+      expect(annotatedPons(e, allPons)).toEqual([11, 33]);
+    },
+  );
 
   it('form.fieldDeleted invalidates the removed widgets’ pages', () => {
     const e = event({ type: 'form.fieldDeleted', removedWidgets: [widget(22)] });

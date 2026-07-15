@@ -1,5 +1,5 @@
-import type { PluginContext } from '@embedpdf-x/kernel';
 import type {
+  AnnotationRef,
   FormDataFormat,
   FormFieldDraft,
   FormFieldPatch,
@@ -7,6 +7,7 @@ import type {
   FormFieldValue,
   PdfRect,
 } from '@embedpdf/engine-core/runtime';
+import type { PluginContext } from '@embedpdf-x/kernel';
 import { AnnotationToken as AnnotationHostToken } from '@embedpdf-x/plugin-annotation/internal';
 
 import {
@@ -23,7 +24,18 @@ import {
   type Model,
   type Msg,
 } from './core/model';
-import type { FormAction, FormCapability, FormState, PlacedField, PlaceFieldInput } from './types';
+import { createSerialMutationQueue } from './mutationQueue';
+import { createFormScriptingController } from './scripting';
+import type {
+  FormAction,
+  FormCapability,
+  FormCommitResult,
+  FormPluginOptions,
+  FormState,
+  FormUiEffectProvider,
+  PlacedField,
+  PlaceFieldInput,
+} from './types';
 
 /** PDF user-space rect (y-up) → content-space box (y-down, crop-relative). */
 const toBox = (rect: PdfRect, crop: PdfRect): Box => ({
@@ -33,12 +45,29 @@ const toBox = (rect: PdfRect, crop: PdfRect): Box => ({
   height: rect.top - rect.bottom,
 });
 
+const sameAnnotationRef = (left: AnnotationRef, right: AnnotationRef): boolean => {
+  if (left.kind !== right.kind || left.pageObjectNumber !== right.pageObjectNumber) return false;
+  if (left.kind === 'objectNumber' && right.kind === 'objectNumber') {
+    return left.annotObjectNumber === right.annotObjectNumber;
+  }
+  if (left.kind === 'nm' && right.kind === 'nm') return left.nm === right.nm;
+  return (
+    left.kind === 'index' &&
+    right.kind === 'index' &&
+    left.index === right.index &&
+    left.revision === right.revision
+  );
+};
+
 /**
  * The form shell. Pure `update` runs here; the resulting model is dispatched
  * to the store; engine calls happen around it. Every read the frameworks do
  * goes through memoized projections keyed on `model.seq`.
  */
-export function createFormCapability(ctx: PluginContext<FormState, FormAction>): FormCapability {
+export function createFormCapability(
+  ctx: PluginContext<FormState, FormAction>,
+  options: FormPluginOptions = {},
+): FormCapability {
   const model = (): Model => ctx.getState().model;
   const apply = (msg: Msg): void => {
     ctx.dispatch({ type: 'SET_MODEL', model: update(model(), msg) });
@@ -50,19 +79,71 @@ export function createFormCapability(ctx: PluginContext<FormState, FormAction>):
     }
     return { kind: 'fqn', name: key.slice(4) };
   };
+  const enqueueMutation = createSerialMutationQueue();
+
+  const scripting =
+    options.scripting?.enabled && ctx.doc
+      ? createFormScriptingController({
+          doc: ctx.doc,
+          document: () => ctx.document(),
+          config: options.scripting,
+          sandboxFactory:
+            options.scripting.sandboxFactory ??
+            (() =>
+              import('@embedpdf-x/js-sandbox').then(({ createQuickJsSandbox }) =>
+                createQuickJsSandbox(),
+              )),
+        })
+      : null;
+  if (scripting) ctx.cleanup(() => scripting.dispose());
+
+  let uiEffectProvider: FormUiEffectProvider | null = null;
+
+  const surfaceScriptingResult = (result: FormCommitResult): void => {
+    const observe = (callback: (() => void) | undefined): void => {
+      if (!callback) return;
+      try {
+        callback();
+      } catch (error) {
+        globalThis.console?.error('[form] scripting observer failed:', error);
+      }
+    };
+    for (const effect of result.uiEffects) {
+      observe(
+        options.scripting?.onUiEffect ? () => options.scripting!.onUiEffect!(effect) : undefined,
+      );
+      observe(uiEffectProvider ? () => uiEffectProvider!(effect) : undefined);
+    }
+    for (const diagnostic of result.diagnostics) {
+      observe(
+        options.scripting?.onDiagnostic
+          ? () => options.scripting!.onDiagnostic!(diagnostic)
+          : undefined,
+      );
+    }
+    if (result.error) {
+      observe(
+        options.scripting?.onError ? () => options.scripting!.onError!(result.error!) : undefined,
+      );
+    }
+  };
 
   // ── snapshot loading ────────────────────────────────────────────────────
-  let loading = false;
-  const refresh = async (): Promise<void> => {
+  let refreshPromise: Promise<void> | null = null;
+  const refresh = async (force = false): Promise<void> => {
     const doc = ctx.doc;
-    if (!doc || loading) return;
-    loading = true;
-    try {
-      const snapshot = await doc.forms.list();
-      apply({ t: 'snapshot', snapshot });
-    } finally {
-      loading = false;
+    if (!doc) return;
+    if (refreshPromise) {
+      await refreshPromise;
+      if (!force) return;
     }
+    refreshPromise = doc.forms
+      .list()
+      .then((snapshot) => apply({ t: 'snapshot', snapshot }))
+      .finally(() => {
+        refreshPromise = null;
+      });
+    return refreshPromise;
   };
 
   // ── widget geometry (from the WIDGET plane: one annotations read/page) ──
@@ -114,18 +195,49 @@ export function createFormCapability(ctx: PluginContext<FormState, FormAction>):
   };
 
   // ── typed writes: writeStart → engine → writeDone/writeFailed ──────────
-  const write = async (key: FieldKey, value: FormFieldValue): Promise<void> => {
+  const commitValueNow = async (
+    ref: FormFieldRef,
+    value: FormFieldValue,
+  ): Promise<FormCommitResult> => {
     const doc = ctx.doc;
-    if (!doc) return;
-    apply({ t: 'writeStart', key });
-    try {
-      const result = await doc.forms.setValue(refKeyOf(key), value);
-      apply({ t: 'writeDone', key, field: result.field });
-    } catch (err) {
-      apply({ t: 'writeFailed', key });
-      throw err;
+    if (!doc) throw new Error('no document');
+    if (scripting) {
+      const result = await scripting.commit(await doc.forms.list(), ref, value);
+      surfaceScriptingResult(result);
+      // A native partial/failed effects result can still have mutated state.
+      if (result.effectsResult !== null) await refresh(true);
+      return result;
     }
+
+    const result = await doc.forms.setValue(ref, value);
+    await refresh(true);
+    return {
+      status: result.changedWidgets.length > 0 ? 'applied' : 'unchanged',
+      scripted: false,
+      effectsResult: null,
+      uiEffects: [],
+      diagnostics: [],
+    };
   };
+
+  const write = (key: FieldKey, value: FormFieldValue): Promise<void> =>
+    enqueueMutation(async () => {
+      const doc = ctx.doc;
+      if (!doc) return;
+      apply({ t: 'writeStart', key });
+      try {
+        const result = await commitValueNow(refKeyOf(key), value);
+        if (result.status === 'rejected' || result.status === 'failed') {
+          apply({ t: 'writeFailed', key });
+        } else if (result.effectsResult === null && result.scripted) {
+          // A scripted no-op has no engine read-back to clear the spinner.
+          apply({ t: 'writeFailed', key });
+        }
+      } catch (err) {
+        apply({ t: 'writeFailed', key });
+        throw err;
+      }
+    });
 
   const can = (cap: 'doc.forms.fill' | 'doc.forms.modify'): boolean =>
     ctx.doc?.security.allows(cap) ?? false;
@@ -135,6 +247,48 @@ export function createFormCapability(ctx: PluginContext<FormState, FormAction>):
   // underneath it (created/deleted widgets); optional — fill-only setups
   // simply have no annotation plugin to nudge.
   const annotationHost = ctx.tryGet(AnnotationHostToken);
+
+  const annotationActivation = async (ref: AnnotationRef) => {
+    const doc = ctx.doc;
+    if (!doc) return null;
+    const loaded = annotationHost?.get(ref);
+    if (loaded?.subtype === 'widget') return loaded.actions?.activate ?? null;
+    const { annotations } = await doc.page(ref.pageObjectNumber).annotations.list();
+    const annotation = annotations.find((candidate) => sameAnnotationRef(candidate.ref, ref));
+    return annotation?.subtype === 'widget' ? (annotation.actions?.activate ?? null) : null;
+  };
+
+  const activateWidgetNow = async (
+    key: FieldKey,
+    annotationRef: AnnotationRef,
+  ): Promise<FormCommitResult> => {
+    const doc = ctx.doc;
+    if (!doc) throw new Error('no document');
+    if (!scripting) {
+      return {
+        status: 'unchanged',
+        scripted: false,
+        effectsResult: null,
+        uiEffects: [],
+        diagnostics: [],
+      };
+    }
+    const action = await annotationActivation(annotationRef);
+    if (!action) {
+      return {
+        status: 'unchanged',
+        scripted: true,
+        effectsResult: null,
+        uiEffects: [],
+        diagnostics: [],
+      };
+    }
+    const result = await scripting.activate(await doc.forms.list(), refKeyOf(key), action);
+    surfaceScriptingResult(result);
+    if (result.effectsResult !== null) await refresh(true);
+    return result;
+  };
+
   const nudgeAnnotations = (pons: Iterable<number>): void => {
     if (!annotationHost) return;
     for (const pon of new Set(pons)) void annotationHost.reloadPage(pon);
@@ -168,7 +322,7 @@ export function createFormCapability(ctx: PluginContext<FormState, FormAction>):
     return `${family}_${n}`;
   };
 
-  const placeField = async (input: PlaceFieldInput): Promise<PlacedField> => {
+  const placeFieldNow = async (input: PlaceFieldInput): Promise<PlacedField> => {
     const doc = ctx.doc;
     const pon = input.pageObjectNumber;
     const crop = ctx.document()?.pages.find((p) => p.pageObjectNumber === pon)?.boxes.crop;
@@ -210,7 +364,7 @@ export function createFormCapability(ctx: PluginContext<FormState, FormAction>):
             }
           : { family, name, widget: placement };
     const result = await doc.forms.createField(draft);
-    await refresh();
+    await refresh(true);
     apply({ t: 'clearGeom', pageObjectNumber: pon });
     // AWAIT the annotation-plane reload so the returned widget ref is already
     // selectable — the caller's auto-select needs the model to know it.
@@ -219,25 +373,25 @@ export function createFormCapability(ctx: PluginContext<FormState, FormAction>):
     return { field: result.field, widget };
   };
 
-  const updateField = async (key: FieldKey, patch: FormFieldPatch): Promise<void> => {
+  const updateFieldNow = async (key: FieldKey, patch: FormFieldPatch): Promise<void> => {
     const doc = ctx.doc;
     if (!doc) return;
     await doc.forms.updateField(refKeyOf(key), patch);
-    await refresh();
+    await refresh(true);
   };
 
-  const deleteField = async (key: FieldKey): Promise<void> => {
+  const deleteFieldNow = async (key: FieldKey): Promise<void> => {
     const doc = ctx.doc;
     if (!doc) return;
     const field = fieldByKey(model(), key);
     const pons = field?.widgets.map((w) => w.pageObjectNumber).filter((p) => p > 0) ?? [];
     await doc.forms.deleteField(refKeyOf(key));
-    await refresh();
+    await refresh(true);
     for (const pon of new Set(pons)) apply({ t: 'clearGeom', pageObjectNumber: pon });
     nudgeAnnotations(pons);
   };
 
-  const detachWidget = async (key: FieldKey, annotObjectNumber: number): Promise<void> => {
+  const detachWidgetNow = async (key: FieldKey, annotObjectNumber: number): Promise<void> => {
     const doc = ctx.doc;
     if (!doc) return;
     const field = fieldByKey(model(), key);
@@ -246,7 +400,7 @@ export function createFormCapability(ctx: PluginContext<FormState, FormAction>):
       annotObjectNumber,
       pageObjectNumber: widget?.pageObjectNumber ?? 0,
     });
-    await refresh();
+    await refresh(true);
     if (widget && widget.pageObjectNumber > 0) {
       apply({ t: 'clearGeom', pageObjectNumber: widget.pageObjectNumber });
       nudgeAnnotations([widget.pageObjectNumber]);
@@ -266,49 +420,60 @@ export function createFormCapability(ctx: PluginContext<FormState, FormAction>):
     setText: (key, value) => write(key, { type: 'text', value }),
     toggle: (key, onState) => write(key, { type: 'toggle', state: onState }),
     choose: (key, values) => write(key, { type: 'choice', values }),
-    reset: async (key) => {
-      const doc = ctx.doc;
-      if (!doc) return;
-      apply({ t: 'writeStart', key });
-      try {
-        const result = await doc.forms.reset(refKeyOf(key));
-        apply({ t: 'writeDone', key, field: result.field });
-      } catch (err) {
-        apply({ t: 'writeFailed', key });
-        throw err;
-      }
+    reset: (key) =>
+      enqueueMutation(async () => {
+        const doc = ctx.doc;
+        if (!doc) return;
+        apply({ t: 'writeStart', key });
+        try {
+          const result = await doc.forms.reset(refKeyOf(key));
+          apply({ t: 'writeDone', key, field: result.field });
+        } catch (err) {
+          apply({ t: 'writeFailed', key });
+          throw err;
+        }
+      }),
+    commitValue: (ref, value) => enqueueMutation(() => commitValueNow(ref, value)),
+    activateWidget: (key, annotationRef) =>
+      enqueueMutation(() => activateWidgetNow(key, annotationRef)),
+    setUiEffectProvider: (provider) => {
+      uiEffectProvider = provider;
     },
-    setValue: async (ref, value) => {
-      const doc = ctx.doc;
-      if (!doc) throw new Error('no document');
-      const result = await doc.forms.setValue(ref, value);
-      await refresh();
-      return result;
-    },
+    setValue: (ref, value) =>
+      enqueueMutation(async () => {
+        const doc = ctx.doc;
+        if (!doc) throw new Error('no document');
+        const result = await doc.forms.setValue(ref, value);
+        await refresh(true);
+        return result;
+      }),
     exportData: async (format: FormDataFormat = 'xfdf') => {
       const doc = ctx.doc;
       if (!doc) throw new Error('no document');
       return doc.forms.exportData(format);
     },
-    importData: async (data, format) => {
-      const doc = ctx.doc;
-      if (!doc) throw new Error('no document');
-      const result = await doc.forms.importData(data, format);
-      apply({ t: 'snapshot', snapshot: result.snapshot });
-      return result;
-    },
-    repair: async (options) => {
-      const doc = ctx.doc;
-      if (!doc) throw new Error('no document');
-      const result = await doc.forms.repair(options);
-      await refresh();
-      return result;
-    },
-    placeField,
+    importData: (data, format) =>
+      enqueueMutation(async () => {
+        const doc = ctx.doc;
+        if (!doc) throw new Error('no document');
+        const result = await doc.forms.importData(data, format);
+        apply({ t: 'snapshot', snapshot: result.snapshot });
+        return result;
+      }),
+    repair: (repairOptions) =>
+      enqueueMutation(async () => {
+        const doc = ctx.doc;
+        if (!doc) throw new Error('no document');
+        const result = await doc.forms.repair(repairOptions);
+        await refresh(true);
+        return result;
+      }),
+    placeField: (input) => enqueueMutation(() => placeFieldNow(input)),
     pageBox,
-    updateField,
-    deleteField,
-    detachWidget,
+    updateField: (key, patch) => enqueueMutation(() => updateFieldNow(key, patch)),
+    deleteField: (key) => enqueueMutation(() => deleteFieldNow(key)),
+    detachWidget: (key, annotObjectNumber) =>
+      enqueueMutation(() => detachWidgetNow(key, annotObjectNumber)),
     canFill: () => can('doc.forms.fill'),
     canModify: () => can('doc.forms.modify'),
   };

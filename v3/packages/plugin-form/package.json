@@ -34,6 +34,8 @@
     "test": "vitest run"
   },
   "dependencies": {
+    "@embedpdf-x/acrojs-core": "workspace:*",
+    "@embedpdf-x/js-sandbox": "workspace:*",
     "@embedpdf-x/kernel": "workspace:*",
     "@embedpdf-x/plugin-interaction": "workspace:*",
     "@embedpdf-x/plugin-annotation": "workspace:*",

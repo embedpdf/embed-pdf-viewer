@@ -28,6 +28,23 @@ const STAMP_FIT_TO_CODE: Record<StampFit, number> = {
 };
 
 /**
+ * Validate every caller-controlled stamp input before the mutation owner
+ * performs its first native write. AnnotationMutator invokes these before
+ * creating an annotation or strengthening a weak annotation id.
+ */
+export function preflightStampDraft(draft: StampWireDraft, ctx?: AnnotationWriteContext): void {
+  if (draft.name !== undefined) requireStampNameCode(draft.name);
+  requireStampFit(draft.fit ?? 'contain');
+  requireStampContent(draft.source, ctx);
+}
+
+export function preflightStampPatch(patch: StampWirePatch, ctx?: AnnotationWriteContext): void {
+  if (patch.name !== undefined) requireStampNameCode(patch.name);
+  requireStampFit(patch.fit ?? 'contain');
+  if (patch.source !== undefined) requireStampContent(patch.source, ctx);
+}
+
+/**
  * Apply a stamp draft. Order mirrors the other writers (base → subtype
  * fields), then the appearance pipeline via {@link authorStampAppearance}:
  *   1. resolve the `{ resource }` ref against the mutation's binary payloads
@@ -124,13 +141,30 @@ export function isStampSubtype(subtype: string): subtype is 'stamp' {
 function setStampName(fn: PdfFunctions, annotPtr: Ptr, name: string): void {
   const code = STAMP_NAME_TO_CODE[name];
   if (code === undefined) {
+    throw new EngineError(EngineErrorCode.Unknown, 'stamp name preflight invariant broken');
+  }
+  if (!fn.EPDFAnnot_SetName(annotPtr, code)) {
+    throw new EngineError(EngineErrorCode.Unknown, 'EPDFAnnot_SetName returned false');
+  }
+}
+
+function requireStampNameCode(name: string): number {
+  const code = STAMP_NAME_TO_CODE[name];
+  if (code === undefined) {
     throw new EngineError(
       EngineErrorCode.InvalidArg,
       `unknown stamp name '${name}'; supported names: ${Object.keys(STAMP_NAME_TO_CODE).join(', ')}`,
     );
   }
-  if (!fn.EPDFAnnot_SetName(annotPtr, code)) {
-    throw new EngineError(EngineErrorCode.Unknown, 'EPDFAnnot_SetName returned false');
+  return code;
+}
+
+function requireStampFit(fit: StampFit): void {
+  if (STAMP_FIT_TO_CODE[fit] === undefined) {
+    throw new EngineError(
+      EngineErrorCode.InvalidArg,
+      `unknown stamp fit '${String(fit)}'; expected contain, cover, or fill`,
+    );
   }
 }
 
@@ -146,6 +180,22 @@ function requireStampResource(
     );
   }
   return resource;
+}
+
+function requireStampContent(ref: ResourceRef, ctx: AnnotationWriteContext | undefined): void {
+  const resource = requireStampResource(ref, ctx);
+  if (!(resource.bytes instanceof ArrayBuffer) || !sniffBinaryMetadata(resource.bytes)) {
+    throw new EngineError(
+      EngineErrorCode.InvalidArg,
+      'stamp source must be PNG, JPEG, or single-page PDF bytes',
+    );
+  }
+  if (ctx?.docPtr === undefined || ctx.pagePtr === undefined) {
+    throw new EngineError(
+      EngineErrorCode.Unknown,
+      'stamp writer requires docPtr/pagePtr on the write context',
+    );
+  }
 }
 
 /** The box transform a stamp draft/patch carries (the box-kind rotation split). */
@@ -217,19 +267,10 @@ function setStampContent(
   rect: PdfRect,
   ctx: AnnotationWriteContext | undefined,
 ): void {
-  const resource = requireStampResource(ref, ctx);
-  const meta = sniffBinaryMetadata(resource.bytes);
-  if (!meta) {
-    throw new EngineError(
-      EngineErrorCode.InvalidArg,
-      'stamp source must be PNG, JPEG, or single-page PDF bytes',
-    );
-  }
-  if (ctx?.docPtr === undefined || ctx?.pagePtr === undefined) {
-    throw new EngineError(
-      EngineErrorCode.Unknown,
-      'stamp writer requires docPtr/pagePtr on the write context',
-    );
+  const resource = ctx?.resources?.[ref.resource];
+  const meta = resource ? sniffBinaryMetadata(resource.bytes) : null;
+  if (!resource || !meta || ctx?.docPtr === undefined || ctx.pagePtr === undefined) {
+    throw new EngineError(EngineErrorCode.Unknown, 'stamp content preflight invariant broken');
   }
 
   // Replace, not merge: drop any existing appearance objects (no-op on create).

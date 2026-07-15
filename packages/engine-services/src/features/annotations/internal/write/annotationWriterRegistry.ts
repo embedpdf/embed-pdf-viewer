@@ -32,7 +32,6 @@ import {
   isFreeTextSubtype,
 } from './writeFreeTextAnnotation';
 import { applyInkDraft, applyInkPatch, isInkSubtype } from './writeInkAnnotation';
-import { applyStampDraft, applyStampPatch, isStampSubtype } from './writeStampAnnotation';
 import { applyLineDraft, applyLinePatch, isLineSubtype } from './writeLineAnnotation';
 import {
   applyShapeDraft,
@@ -41,6 +40,13 @@ import {
   type ShapeDraft,
   type ShapePatch,
 } from './writeShapeAnnotation';
+import {
+  applyStampDraft,
+  applyStampPatch,
+  isStampSubtype,
+  preflightStampDraft,
+  preflightStampPatch,
+} from './writeStampAnnotation';
 import {
   applyTextMarkupDraft,
   applyTextMarkupPatch,
@@ -56,6 +62,20 @@ import {
   isVertexSubtype,
 } from './writeVertexAnnotation';
 import { applyWidgetDraft, applyWidgetPatch, isWidgetSubtype } from './writeWidgetAnnotation';
+
+/** Validate subtype inputs before AnnotationMutator performs any native write. */
+export function preflightDraft(draft: WireAnnotationDraft, ctx?: AnnotationWriteContext): void {
+  if (isStampSubtype(draft.subtype)) {
+    preflightStampDraft(draft as StampWireDraft, ctx);
+  }
+}
+
+/** Validate subtype inputs before AnnotationMutator performs any native write. */
+export function preflightPatch(patch: WireAnnotationPatch, ctx?: AnnotationWriteContext): void {
+  if (isStampSubtype(patch.subtype)) {
+    preflightStampPatch(patch as StampWirePatch, ctx);
+  }
+}
 
 /**
  * Per-subtype write dispatch, mirroring the read-side registry. Adding a

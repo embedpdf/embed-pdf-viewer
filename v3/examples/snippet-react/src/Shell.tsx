@@ -25,7 +25,7 @@ import { RenderLayer } from '@embedpdf-x/react/render';
 import { SelectionLayer } from '@embedpdf-x/react/selection';
 import { AnnotationLayer, ToolBadge, useStampProvider } from '@embedpdf-x/react/annotation';
 import type { AnnotationRenderer } from '@embedpdf-x/react/annotation';
-import { formWidgetRenderer } from '@embedpdf-x/react/form';
+import { formWidgetRenderer, useFormScriptingProvider } from '@embedpdf-x/react/form';
 import { SearchLayer } from '@embedpdf-x/react/search';
 import { useCommandShortcuts } from '@embedpdf-x/react/commands';
 import { ShellToken } from '@embedpdf-x/react/shell';
@@ -79,6 +79,9 @@ export function Shell() {
   // One line: the default provider is the built-in file picker (swap it for a
   // custom picker, or pass null to disable). The plugin stays DOM-free.
   useStampProvider();
+  // Form scripts stay inside the isolated form pipeline; this hook fulfils the
+  // resulting alert, page-navigation, and print UI requests in the React shell.
+  useFormScriptingProvider();
   return (
     <div className="bg-app text-fg flex h-full flex-col">
       <Header />
