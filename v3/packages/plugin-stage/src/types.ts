@@ -366,6 +366,8 @@ export interface StageCapability {
     scale: number;
     /** The hit page's TOTAL display rotation (document /Rotate + view rotation). */
     rotation: PageRotation;
+    /** The hit page's zoom relative to its 100% baseline (`transform.zoom`). */
+    zoom: number;
   } | null;
   /**
    * Screen point → `pon`'s content space, UNCLAMPED — valid even when the point

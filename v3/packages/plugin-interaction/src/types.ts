@@ -48,8 +48,18 @@ export interface PointerSample {
    *  zones stay screen-constant across zoom. `rotation` is the hit page's TOTAL
    *  display rotation (document /Rotate + view rotation) — per-event
    *  environmental context like `scale`, for placement rules that depend on how
-   *  the page is DISPLAYED (an upright stamp). Absent when the source can't say. */
-  page?: { pon: PageObjectNumber; point: Point; scale?: number; rotation?: PageRotation };
+   *  the page is DISPLAYED (an upright stamp). `zoom` is the page's zoom
+   *  RELATIVE to its 100% baseline (`transform.zoom` — dimensionless, 1 =
+   *  Acrobat's 100%), for zoom-relative policies (the `/F` NoZoom exemption);
+   *  distinct from `scale`, which is a units conversion. Absent when the
+   *  source can't say. */
+  page?: {
+    pon: PageObjectNumber;
+    point: Point;
+    scale?: number;
+    rotation?: PageRotation;
+    zoom?: number;
+  };
   modifiers: Modifiers;
   /**
    * Click count for a `down` (1 = single, 2 = double, 3 = triple), from the

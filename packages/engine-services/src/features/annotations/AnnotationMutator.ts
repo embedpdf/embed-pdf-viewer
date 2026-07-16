@@ -51,6 +51,30 @@ import {
 } from './internal/write/writeEmbedMetadata';
 
 /**
+ * Does this patch touch anything the `/AP` appearance stream depends on?
+ *
+ * The metadata-only keys — the `/F` flags, the `/IRT`+`/RT` relationship,
+ * `/EMBD_Metadata/GroupID` — change how an annotation BEHAVES, never how it
+ * PAINTS, so a patch carrying only those (plus the `subtype` discriminator
+ * every patch has) must not trigger a re-bake. Everything else — geometry,
+ * style, contents, blend mode, subtype-specific fields — is treated as
+ * appearance-affecting, conservatively: an unknown key re-bakes.
+ */
+const APPEARANCE_INERT_PATCH_KEYS: ReadonlySet<string> = new Set([
+  'subtype',
+  'flags',
+  'inReplyTo',
+  'replyType',
+  'groupId',
+]);
+
+function patchAffectsAppearance(patch: WireAnnotationPatch): boolean {
+  return Object.entries(patch).some(
+    ([key, value]) => value !== undefined && !APPEARANCE_INERT_PATCH_KEYS.has(key),
+  );
+}
+
+/**
  * Synchronous orchestrator for `create` / `update` / `delete` annotation
  * mutations. Owns the dance between PDFium calls, identity bookkeeping,
  * revision bumping (only for structural ops), and the
@@ -280,9 +304,19 @@ export class AnnotationMutator {
       // UserID/GroupID/CreatedBy are preserved across updates.
       writeAnnotationModified(fn, mem, annotPtr);
       applyEmbedMetadataOnUpdate(fn, mem, annotPtr, actor);
-      // Re-bake the /AP appearance stream from the patched properties so
-      // the rendered appearance stays in sync with the dictionary.
-      this.regenerateAppearance(annotPtr, pagePtr, patch.blendMode ?? previousBlendMode);
+      // Re-bake the /AP appearance stream from the patched properties so the
+      // rendered appearance stays in sync with the dictionary — but ONLY when
+      // the patch touched something the appearance depends on. A
+      // metadata-only patch (`/F` flags, `/IRT`+`/RT` relationships, group
+      // reassignment) must NOT re-bake: the stream could only come out
+      // byte-identical, and regenerating would REPLACE a foreign-authored
+      // appearance (Acrobat's rich /AP) with PDFium's cruder synthesis —
+      // visual data loss from toggling a flag. This also makes the engine
+      // honor what the client already promises ("grouping never re-bakes an
+      // appearance").
+      if (patchAffectsAppearance(patch)) {
+        this.regenerateAppearance(annotPtr, pagePtr, patch.blendMode ?? previousBlendMode);
+      }
 
       // PDFium caches the parsed appearance form on an annotation context. A
       // regenerated /AP is persisted immediately, but reading blend mode through

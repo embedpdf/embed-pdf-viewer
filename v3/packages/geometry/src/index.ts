@@ -160,6 +160,19 @@ export interface PageTransform {
   /** VIEW px per PDF point (uniform, device-snapped) — the one factor for
    *  screen-constant chrome: content units = CSS px ÷ `viewScale`. */
   readonly viewScale: number;
+  /**
+   * View px per PDF point at 100% ZOOM — the page's physical baseline:
+   * `viewUnitsPerPoint × userUnit` (web: 96/72 × `/UserUnit`, so 100% maps to
+   * inches on screen, Acrobat-style). What "100%" MEANS for this page.
+   */
+  readonly baseScale: number;
+  /**
+   * The page's zoom RELATIVE to its 100% baseline (`viewScale / baseScale`,
+   * dimensionless; exactly 1 at 100% for any `userUnit`). THE number
+   * zoom-relative policies consume — e.g. the `/F` NoZoom exemption clamps
+   * its body to `zoom ≤ 1`. Distinct from `viewScale` (a units conversion).
+   */
+  readonly zoom: number;
   /** Content point → UN-rotated content view px. For overlays INSIDE the rotated
    *  content wrapper (markers, annotations) — they ride the wrapper's rotation,
    *  so they place in content space and only scale here. */
@@ -190,6 +203,13 @@ export function pageTransform(input: {
   rotation: PageRotation;
   /** View px per PDF point = viewUnitsPerPoint × contentScale × zoom. */
   scale: number;
+  /**
+   * View px per PDF point at 100% zoom (`viewUnitsPerPoint × userUnit`) — the
+   * page's physical baseline, so `zoom = viewScale / baseScale` reads as
+   * "percent of Acrobat's 100%". Default = `scale`, i.e. zoom ≈ 1: headless /
+   * standalone callers stay neutral unless they declare a baseline.
+   */
+  baseScale?: number;
   /** Device px per view px (web: devicePixelRatio). */
   dpr: number;
 }): PageTransform {
@@ -206,6 +226,8 @@ export function pageTransform(input: {
   // from it (not the raw `scale`) so `pageToView(pageWidth) === content edge`.
   const content: Size = { width: deviceWidth / dpr, height: deviceHeight / dpr };
   const viewScale = content.width / pageSize.width;
+  const baseScale = input.baseScale ?? scale;
+  const zoom = baseScale > 0 ? viewScale / baseScale : 1;
 
   const footprint = displaySize(content, rotation);
 
@@ -235,6 +257,8 @@ export function pageTransform(input: {
     deviceHeight,
     renderScale,
     viewScale,
+    baseScale,
+    zoom,
     pageToContent,
     pageToView,
     pageToViewRect,

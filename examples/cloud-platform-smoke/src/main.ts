@@ -105,6 +105,7 @@ const DEFAULT_SCOPE = [
   'doc.text.copy',
   'doc.annotate.read',
   'doc.annotate.modify',
+  'doc.forms.read',
   'doc.metadata.modify',
   'doc.pages.assemble',
   'doc.download',
@@ -245,6 +246,7 @@ app.innerHTML = `
 
         <div class="actions">
           <button id="readDocumentActions" type="button">Read Document Actions</button>
+          <button id="readForm" type="button">Read Form</button>
           <button id="readText" type="button">Read Text</button>
           <button id="readGeometry" type="button">Read Geometry</button>
           <button id="listAnnots" type="button">List Annotations</button>
@@ -444,6 +446,7 @@ const els = {
   pageObjectNumber: must<HTMLInputElement>('pageObjectNumber'),
   listPages: must<HTMLButtonElement>('listPages'),
   readDocumentActions: must<HTMLButtonElement>('readDocumentActions'),
+  readForm: must<HTMLButtonElement>('readForm'),
   readText: must<HTMLButtonElement>('readText'),
   readGeometry: must<HTMLButtonElement>('readGeometry'),
   listAnnots: must<HTMLButtonElement>('listAnnots'),
@@ -529,6 +532,7 @@ els.showSecurity.addEventListener('click', () => void run(showSecurity));
 els.unlockDocument.addEventListener('click', () => void run(unlockDocument));
 els.listPages.addEventListener('click', () => void run(listPages));
 els.readDocumentActions.addEventListener('click', () => void run(readDocumentActions));
+els.readForm.addEventListener('click', () => void run(readForm));
 els.readText.addEventListener('click', () => void run(readText));
 els.readGeometry.addEventListener('click', () => void run(readGeometry));
 els.listAnnots.addEventListener('click', () => void run(listAnnotations));
@@ -684,6 +688,10 @@ async function readDocumentActions(): Promise<void> {
   const actions = requireDoc().actions;
   if (!actions) throw new Error('This engine does not expose document actions.');
   setOutput(await actions.read());
+}
+
+async function readForm(): Promise<void> {
+  setOutput(await requireDoc().forms.list());
 }
 
 async function readText(): Promise<void> {

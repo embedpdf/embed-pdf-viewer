@@ -8,7 +8,7 @@ import type {
   CalloutLine,
   PdfRect,
 } from '@embedpdf/engine-core/runtime';
-import type { Annot } from '@embedpdf-x/annotation-core';
+import { DRAWN_FLAGS, type Annot } from '@embedpdf-x/annotation-core';
 import { fromDTO, refKey, toCreateDraft, toPatch } from './repository';
 
 const CROP: PdfRect = { left: 0, bottom: 0, right: 600, top: 800 };
@@ -152,7 +152,7 @@ describe('repository — Replace Text authoring', () => {
       intent: 'replace',
       geom: { t: 'caret', rect: { x: 90, y: 40, width: 10, height: 10 } },
       style,
-      locked: false,
+      flags: DRAWN_FLAGS,
       source: 'vector',
     };
     const strikeout: Annot = {
@@ -173,7 +173,7 @@ describe('repository — Replace Text authoring', () => {
         ],
       },
       style,
-      locked: false,
+      flags: DRAWN_FLAGS,
       source: 'vector',
       irt: caret.id,
       group: caret.id,

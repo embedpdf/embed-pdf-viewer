@@ -1,5 +1,6 @@
 import type {
   AnnotationDTO,
+  AnnotationFlags,
   AnnotationRef,
   BlendMode,
   CaretIntent,
@@ -27,6 +28,23 @@ export type Quad = [Vec, Vec, Vec, Vec];
 export type Id = string;
 export type Cursor = string;
 export type PolySubtype = 'polygon' | 'polyline';
+
+/**
+ * The per-page view environment the screen-anchor projection consumes:
+ * `zoom` — the page's zoom RELATIVE to its 100% baseline (dimensionless;
+ * 1 = Acrobat's 100% = `viewUnitsPerPoint × userUnit` view px per point) —
+ * and the TOTAL display rotation (document /Rotate + view rotation).
+ * Deliberately NOT a px-per-point scale: `noZoom` means "hold the body at its
+ * 100%-zoom size", a statement about zoom, so feeding it a units conversion
+ * (the old mistake) shrank bodies at 100%. Per-event / per-call context (the
+ * `pageBox` pattern) — never stored on the model; the pointer drafts capture
+ * it at DOWN so anchored gestures project and commit with the view they
+ * started under. See anchor.ts.
+ */
+export interface ViewEnv {
+  zoom: number;
+  rotation: PageRotation;
+}
 
 export type Subtype =
   | 'highlight'
@@ -158,7 +176,14 @@ export interface Annot {
   /** Text styling — present only for text-editable kinds (free text). Like
    *  `style`, a content-space projection of `data`, editable via `setProps`. */
   text?: TextStyle;
-  locked: boolean;
+  /**
+   * The `/F` annotation flags, verbatim from the DTO (freshly drawn annotations
+   * start at {@link DRAWN_FLAGS} — `print` set). NEVER read individual keys to
+   * gate behavior — the predicates in `flags.ts` (`annotInteractive`,
+   * `annotTransformable`, `annotContentsEditable`, `viewable`) are the one
+   * interpretation of the spec, and `anchorModeOf` owns `noZoom`/`noRotate`.
+   */
+  flags: AnnotationFlags;
   source: 'baked' | 'vector';
   /**
    * Content-space box of the engine appearance raster (the AP `/Rect`), set when
@@ -264,6 +289,9 @@ export type Draft =
       upright?: boolean;
       /** The tool's click-create policy, captured at DOWN like `upright`. */
       clickCreate?: ClickCreate | false;
+      /** The tool's `/F` seed, captured at DOWN like `upright` — merged over
+       *  {@link DRAWN_FLAGS} at commit (a note tool sets noZoom/noRotate). */
+      flags?: Partial<AnnotationFlags>;
     }
   | {
       g: 'create-line';
@@ -274,6 +302,8 @@ export type Draft =
       to: Vec;
       /** The tool's click-create policy, captured at DOWN like `upright`. */
       clickCreate?: ClickCreate | false;
+      /** The tool's `/F` seed, captured at DOWN (see the rect draft). */
+      flags?: Partial<AnnotationFlags>;
     }
   | {
       g: 'create-poly';
@@ -283,6 +313,8 @@ export type Draft =
       points: Vec[];
       cur: Vec;
       closed: boolean;
+      /** The tool's `/F` seed, captured at DOWN (see the rect draft). */
+      flags?: Partial<AnnotationFlags>;
     }
   | {
       g: 'create-ink';
@@ -291,6 +323,8 @@ export type Draft =
       pon: PageObjectNumber;
       strokes: Vec[][];
       intent?: InkIntent;
+      /** The tool's `/F` seed, captured at DOWN (see the rect draft). */
+      flags?: Partial<AnnotationFlags>;
     }
   | {
       // Free-text callout, built in clicks: click 1 sets `tip`, click 2 sets
@@ -307,22 +341,33 @@ export type Draft =
       cur: Vec;
       boxFrom?: Vec;
       boxTo?: Vec;
+      /** The tool's `/F` seed, captured at DOWN (see the rect draft). */
+      flags?: Partial<AnnotationFlags>;
     }
   // `guides` are the live alignment guides of a snapped move (empty when
   // snapping is off, bypassed, or nothing is in range) — drawn by `chrome`.
   | { g: 'move'; ids: Id[]; start: Vec; delta: Vec; guides: Guide[] }
-  | { g: 'handle'; id: Id; handle: string; base: Geom; cur: Geom }
+  // Single-shape resize / vertex drag. For a screen-anchored (`noZoom`/
+  // `noRotate`) target, `base`/`cur` live in VIEW space — the projected
+  // geometry the user actually grabbed — and the commit maps `cur` back to
+  // stored space through `unanchoredGeom` with the captured `view`. For every
+  // other target the projection is the identity and `base` IS the stored geom.
+  | { g: 'handle'; id: Id; handle: string; base: Geom; cur: Geom; view?: ViewEnv }
   // Rotate gesture (single OR multi-target). `pivot` is the rotation centre
-  // (a single shape's own centre / the union-box centre for a group); `ids` are
-  // the members being turned; `start`/`cur` are the pointer at grab and now, so
-  // the live angle is `angle(cur - pivot) - angle(start - pivot)`. The base
-  // geometry stays in `m.byId` until commit, so `effGeom` rotates from there.
-  // `free` (shift held) bypasses rotation snapping for this sample.
-  | { g: 'rotate'; ids: Id[]; pivot: Vec; start: Vec; cur: Vec; free?: boolean }
+  // in VIEW space (a single shape's projected centre / the projected union-box
+  // centre for a group); `ids` are the members being turned; `start`/`cur` are
+  // the pointer at grab and now, so the live angle is
+  // `angle(cur - pivot) - angle(start - pivot)`. The base geometry stays in
+  // `m.byId` until commit, so `effGeom` rotates from there. `free` (shift
+  // held) bypasses rotation snapping for this sample. `view` (captured at
+  // DOWN) projects screen-anchored members for preview + commit.
+  | { g: 'rotate'; ids: Id[]; pivot: Vec; start: Vec; cur: Vec; free?: boolean; view?: ViewEnv }
   // Multi-target box transform (move/resize) computed as one Mat2D about the
   // union box. `anchor` is the fixed point of a resize (the opposite corner);
   // `sx`/`sy` the live scale; for `move` the scale is 1 and `delta` carries the
   // translation. Single-shape resize keeps using the `handle` draft above.
+  // `anchor`/`base`/`cur` live in VIEW space (the union box is computed from
+  // projected quads); `view` as on the rotate draft.
   | {
       g: 'group';
       op: 'resize';
@@ -331,6 +376,7 @@ export type Draft =
       anchor: Vec;
       base: Rect;
       cur: Rect;
+      view?: ViewEnv;
     }
   | { g: 'marquee'; pon: PageObjectNumber; from: Vec; to: Vec };
 
@@ -413,12 +459,21 @@ export interface PointerInput {
   chrome?: ChromeGeom;
   /**
    * The page's TOTAL display rotation (document /Rotate + view rotation) at the
-   * gesture — per-event environmental context like `pageBox`. Read on the DOWN
-   * of a creation gesture (captured on the draft; later phases ignore it) so an
-   * `upright` commit can counter-rotate against how the page was DISPLAYED when
-   * the author placed the annotation. Content space itself never rotates.
+   * gesture — per-event environmental context like `pageBox`. A creation DOWN
+   * captures it on the draft (an `upright` commit counter-rotates against how
+   * the page was DISPLAYED); edit gestures read it per sample, paired with
+   * `scale`, so screen-anchored (`noZoom`/`noRotate`) annotations hit-test and
+   * clamp at their EFFECTIVE geometry. Content space itself never rotates.
    */
   displayRotation?: PageRotation;
+  /**
+   * The page's zoom RELATIVE to its 100% baseline at the event — the other
+   * half of the {@link ViewEnv} pair with `displayRotation` (dimensionless,
+   * `transform.zoom`; NOT the px-per-point scale the caller uses for its
+   * CSS-px chrome conversion). Absent → 1 (headless callers; screen-anchored
+   * bodies then hit-test at rect size).
+   */
+  zoom?: number;
   /**
    * Counter-rotate the created annotation so it reads upright at
    * `displayRotation` — the authoring TOOL's `upright` policy, resolved by the
@@ -466,6 +521,9 @@ export type Msg =
       intent?: InkIntent;
       /** The tool's click-create policy (see {@link ClickCreate}). */
       clickCreate?: ClickCreate | false;
+      /** The tool's `/F` seed — merged over {@link DRAWN_FLAGS} at commit (a
+       *  note tool passes `{ noZoom: true, noRotate: true }`). */
+      flags?: Partial<AnnotationFlags>;
       /** Keep a completed ink stroke in the draft until `finishInkDraft`. */
       deferInkCommit?: boolean;
       /** Optional pure straight-line recognition applied to each completed stroke. */
@@ -474,7 +532,7 @@ export type Msg =
     }
   | { t: 'finishInkDraft' }
   | { t: 'finishCreationDraft' }
-  | { t: 'createCaret'; pon: PageObjectNumber; rect: Rect }
+  | { t: 'createCaret'; pon: PageObjectNumber; rect: Rect; flags?: Partial<AnnotationFlags> }
   | {
       t: 'createReplaceText';
       pon: PageObjectNumber;
@@ -490,6 +548,8 @@ export type Msg =
       pon: PageObjectNumber;
       rects: Rect[];
       preset?: string;
+      /** The tool's `/F` seed — merged over {@link DRAWN_FLAGS} at commit. */
+      flags?: Partial<AnnotationFlags>;
     }
   // live markup preview (the selection rendered as the markup it will become)
   | {
@@ -511,6 +571,13 @@ export type Msg =
   // keys its KIND declares (`propsFor`) and ignores the rest, so one message
   // restyles a mixed selection. Members flip to `vector`; one patch effect each.
   | { t: 'setProps'; patch: AnnotationPropsPatch }
+  // Merge a `/F` flags patch into the selection (or explicit ids). Flags are
+  // NOT appearance: members keep their render `source` (no /AP re-bake), and —
+  // deliberately — the write is NOT gated by `locked`: this is how you unlock
+  // (Acrobat keeps its Locked checkbox live on a locked annotation). One
+  // `flags` effect per changed COMMITTED member; an uncommitted draft just
+  // merges (its create draft carries the flags when it commits).
+  | { t: 'setFlags'; patch: Partial<AnnotationFlags>; ids?: Id[] }
   | { t: 'setDefaults'; subtype: Subtype; patch: AnnotationPropsPatch }
   // Live-adjust snapping (a UI toggle) — merges into `Model.snap`.
   | { t: 'setSnap'; patch: Partial<SnapSettings> }
@@ -559,6 +626,10 @@ export type Effect =
    *  `vector` (it renders live; the raster stops mattering) — so those keep the
    *  bare `{ fx, id }` shape and trigger no appearance re-fetch. */
   | { fx: 'patch'; id: Id; apChanged?: true }
+  /** A `/F`-only engine write for one committed annotation: the shell emits a
+   *  flags-only patch (the model already holds the merged flags) and re-syncs
+   *  PRESERVING the render source — flags never re-bake an appearance. */
+  | { fx: 'flags'; id: Id }
   | { fx: 'delete'; ref: AnnotationRef };
 
 /** Per-annotation render data — its content geometry + style + live state. */

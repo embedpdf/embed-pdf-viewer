@@ -63,9 +63,13 @@ export function PageView({
           : { width: 1, height: 1 },
         rotation,
         scale: base ? width / base.size.width : 1,
+        // Physical 100% on the web: 1pt = 96/72 CSS px, times the page's
+        // /UserUnit — so `transform.zoom` is meaningful even without a Stage
+        // (a thumbnail-sized PageView reads as zoomed out, as it should).
+        baseScale: (96 / 72) * (base?.userUnit ?? 1),
         dpr,
       }),
-    [base?.size.width, base?.size.height, rotation, width, dpr],
+    [base?.size.width, base?.size.height, base?.userUnit, rotation, width, dpr],
   );
   const ctx = useMemo(
     () =>

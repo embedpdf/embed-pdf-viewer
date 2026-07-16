@@ -8,6 +8,7 @@
  * the set of annotations pointing at it plus the primary itself.
  */
 import { capsFor } from './kinds';
+import { annotTransformable } from './flags';
 import type { Id, Model } from './types';
 
 /**
@@ -28,7 +29,7 @@ export function groupCaps(m: Model, ids: Id[]): GroupCaps {
   const members = ids.map((id) => m.byId[id]).filter((a): a is NonNullable<typeof a> => !!a);
   if (members.length === 0) return { movable: false, resizable: false, rotatable: false };
   const ok = (pick: (c: ReturnType<typeof capsFor>) => boolean): boolean =>
-    members.every((a) => !a.locked && pick(capsFor(a.subtype)));
+    members.every((a) => annotTransformable(a) && pick(capsFor(a.subtype)));
   return {
     movable: ok((c) => c.groupMovable),
     resizable: ok((c) => c.groupResizable),

@@ -175,7 +175,9 @@ export function fromDTO(
     ref: dto.ref,
     pon: dto.pageObjectNumber,
     subtype: dto.subtype === 'widget' ? widgetKindOf(dto.fieldFamily) : dto.subtype,
-    locked: dto.flags.locked || dto.flags.readOnly,
+    // `/F` verbatim — every behavioral question (visible? selectable? frozen?)
+    // is answered by the core's flag predicates, never derived here.
+    flags: dto.flags,
     source,
     // Carry the canonical DTO; geom/style below are derived projections of it.
     data: dto,
@@ -607,6 +609,14 @@ const boxEmit = (a: Annot, crop: PdfRect) => {
 
 /** Content Annot → engine create draft (square/circle/line in v1; null otherwise). */
 export function toCreateDraft(a: Annot, crop: PdfRect): AnnotationDraft | null {
+  const draft = baseCreateDraft(a, crop);
+  // Emit the model's `/F` verbatim, once, for every kind: a fresh draw carries
+  // DRAWN_FLAGS (print — Acrobat parity) plus any tool seed. Create starts
+  // from `/F 0`, so the full set writes exactly these bits.
+  return draft ? ({ ...draft, flags: a.flags } as AnnotationDraft) : null;
+}
+
+function baseCreateDraft(a: Annot, crop: PdfRect): AnnotationDraft | null {
   const f = geomFields(a, crop);
   const sf = strokeFill(a.style);
   if (a.subtype === 'square' && f && 'rect' in f)
@@ -676,7 +686,9 @@ export function toCreateDraft(a: Annot, crop: PdfRect): AnnotationDraft | null {
       subtype: 'caret',
       rect: f.rect,
       ...caretStyle(a.style),
-      ...(a.intent === 'replace' ? { intent: a.intent, flags: { print: true } } : {}),
+      // `/F` rides the wrapper (`toCreateDraft`) for every kind — the old
+      // replace-text-only `print` special case is covered by DRAWN_FLAGS.
+      ...(a.intent === 'replace' ? { intent: a.intent } : {}),
       ...(a.data?.contents != null ? { contents: a.data.contents } : {}),
     };
   const quads = quadPointsFor(a, crop);
@@ -686,7 +698,7 @@ export function toCreateDraft(a: Annot, crop: PdfRect): AnnotationDraft | null {
       quadPoints: quads,
       ...markupColor(a.style),
       ...(a.subtype === 'strikeout' && a.intent === 'strikeout-text-edit'
-        ? { intent: a.intent, flags: { print: true } }
+        ? { intent: a.intent }
         : {}),
     } as AnnotationDraft;
   return null;

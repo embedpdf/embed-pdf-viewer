@@ -38,8 +38,8 @@ export function AnnotationMenu({ children, gap = 15, placement = 'top' }: Annota
     (c) => {
       const a = c.selectionAnchor();
       if (!a) return null;
-      const scale = stage.pageRect(a.pon)?.transform.viewScale;
-      return scale ? c.selectionAnchor(scale) : a;
+      const t = stage.pageRect(a.pon)?.transform;
+      return t?.viewScale ? c.selectionAnchor(t.viewScale, t.rotation, t.zoom) : a;
     },
     sameAnchor,
   );

@@ -11,10 +11,13 @@ import {
 } from './geometry';
 import { capsFor, isMarkup } from './kinds';
 import { groupCaps } from './group';
+import { annotInteractive, annotTransformable, viewable } from './flags';
+import { anchoredGeom, anchoredStrokeWidth, anchorModeOf, type ViewEnv } from './anchor';
 import {
   type Annot,
   type ChromeGeom,
   type Cursor,
+  type Geom,
   type Id,
   type Model,
   type Rect,
@@ -34,35 +37,55 @@ export type Target =
 
 /** Page annotation ids in PAINT order (back→front): text-layer markups first
  *  (always beneath), then every other kind, each group preserving creation
- *  z-order. The ONE z-order shared by rendering (`pageItems`) and hit-testing. */
+ *  z-order. The ONE z-order shared by rendering (`pageItems`) and hit-testing —
+ *  and the ONE visibility cull: what `/F` hides (hidden / un-engaged noView)
+ *  neither paints nor hits, so an invisible annotation can never eat a click. */
 export function paintOrder(m: Model, pon: number): Id[] {
   const markup: Id[] = [];
   const other: Id[] = [];
   for (const id of m.order) {
     const a = m.byId[id];
     if (!a || a.pon !== pon) continue;
+    if (!viewable(a.flags, m.selected.includes(id))) continue;
     (isMarkup(a.subtype) ? markup : other).push(id);
   }
   return [...markup, ...other];
 }
 
-/** Can this annotation be clicked to select? (locked overrides all caps.) */
+/** Can this annotation be clicked to select? (`/F` interaction flags override
+ *  all caps — hidden/noView/readOnly are inert; LOCKED stays selectable, it
+ *  just won't transform.) */
 export const isSelectable = (m: Model, id: Id): boolean => {
   const a = m.byId[id];
-  return !!a && !a.locked && capsFor(a.subtype).selectable;
+  return !!a && annotInteractive(a) && capsFor(a.subtype).selectable;
 };
 
-/** Can this annotation be dragged by its body to move? */
+/** Can this annotation be dragged by its body to move? (`locked` freezes it.) */
 export const canMove = (m: Model, id: Id): boolean => {
   const a = m.byId[id];
-  return !!a && !a.locked && capsFor(a.subtype).movable;
+  return !!a && annotTransformable(a) && capsFor(a.subtype).movable;
 };
 
-/** Does this kind expose drag handles (box resize OR per-vertex)? */
-const hasHandles = (subtype: string): boolean => {
-  const c = capsFor(subtype);
+/** Does this kind expose drag handles (box resize OR per-vertex)? Only
+ *  `locked` (and inert `/F` states) suppress them at runtime — a
+ *  screen-anchored body keeps its handles: `noZoom`/`noRotate` exempt it from
+ *  the display transform, they don't freeze its size or vertices. */
+const hasHandles = (a: Annot): boolean => {
+  if (!annotTransformable(a)) return false;
+  const c = capsFor(a.subtype);
   return c.resizable || c.vertexEditable;
 };
+
+/** The geometry a pointer actually meets: the anchored (screen-constant)
+ *  projection for `noZoom`/`noRotate` annotations, the stored geom otherwise.
+ *  The SAME projection `pageItems` renders, so click matches paint. */
+const hitGeomOf = (a: Annot, view: ViewEnv | undefined): Geom =>
+  anchoredGeom(a.geom, anchorModeOf(a), view);
+
+/** Stroke width in EFFECTIVE content units (a noZoom body's line weight scales
+ *  with its geometry). */
+const hitStrokeOf = (a: Annot, view: ViewEnv | undefined): number =>
+  anchoredStrokeWidth(a.style.strokeWidth, anchorModeOf(a), view);
 
 // `opaqueBody` kinds (stamp images) are visible across their whole box, so they
 // hit like a filled shape. NOT keyed on `source: 'baked'` — every annotation
@@ -76,8 +99,8 @@ const inRect = (b: Rect, p: Vec): boolean =>
 // SAME oriented quad the chrome outlines — so the grab area matches what you see
 // highlighted, tilt included (a rotated box is grabbable across its tilted body, not
 // just its unrotated footprint; a thin arrow's whole outline box, arrowhead and all).
-const inBounds = (a: Annot, p: Vec): boolean =>
-  pointInQuad(p, selectionQuad(a.geom, a.style.strokeWidth, a.style.border));
+const inBounds = (a: Annot, p: Vec, view: ViewEnv | undefined): boolean =>
+  pointInQuad(p, selectionQuad(hitGeomOf(a, view), hitStrokeOf(a, view), a.style.border));
 
 /**
  * The union of the SELECTION bounds of every selected, movable annotation on a
@@ -86,7 +109,7 @@ const inBounds = (a: Annot, p: Vec): boolean =>
  * BETWEEN grouped/multi-selected annotations, so dragging the whole selection
  * works from anywhere inside its visible outline (not only on a member).
  */
-function selectionUnionBounds(m: Model, pon: number): Rect | null {
+function selectionUnionBounds(m: Model, pon: number, view: ViewEnv | undefined): Rect | null {
   const sel = m.selected.filter(
     (id) => m.byId[id]?.pon === pon && isSelectable(m, id) && canMove(m, id),
   );
@@ -94,19 +117,19 @@ function selectionUnionBounds(m: Model, pon: number): Rect | null {
   const corners: Vec[] = [];
   for (const id of sel) {
     const a = m.byId[id];
-    corners.push(...selectionQuad(a.geom, a.style.strokeWidth, a.style.border));
+    corners.push(...selectionQuad(hitGeomOf(a, view), hitStrokeOf(a, view), a.style.border));
   }
   return unionRect(corners);
 }
 
 /** The axis-aligned union of the SELECTION bounds of every selected annotation on
  *  a page (no movable/lock filter) — the box group chrome + group rotate use. */
-export function groupUnionBounds(m: Model, pon: number): Rect | null {
+export function groupUnionBounds(m: Model, pon: number, view?: ViewEnv): Rect | null {
   const corners: Vec[] = [];
   for (const id of m.selected) {
     const a = m.byId[id];
     if (!a || a.pon !== pon) continue;
-    corners.push(...selectionQuad(a.geom, a.style.strokeWidth, a.style.border));
+    corners.push(...selectionQuad(hitGeomOf(a, view), hitStrokeOf(a, view), a.style.border));
   }
   return corners.length ? unionRect(corners) : null;
 }
@@ -127,15 +150,20 @@ export function hitTest(
   strokeMargin: number,
   pageBox?: Rect,
   inert?: ReadonlySet<Id>,
+  view?: ViewEnv,
 ): Target {
   if (m.selected.length === 1 && isSelectable(m, m.selected[0])) {
     const a = m.byId[m.selected[0]];
     if (a.pon === pon) {
-      // The rotate knob (checked first — it floats outside the box, clear of the
-      // handles). Only for kinds whose `caps.rotatable` is on. `placeRotateKnob`
-      // keeps it inside `pageBox` — the SAME placement `chrome` draws.
-      if (capsFor(a.subtype).rotatable) {
-        const obb = obbFromGeom(a.geom, a.style.strokeWidth, a.style.border);
+      // The rotate knob (checked first — it floats outside the box, clear of
+      // the handles), placed on the PROJECTED geometry so it sits exactly
+      // where the chrome drew it — a screen-anchored body rotates too (the
+      // gesture edits its authored tilt; `noRotate` only exempts it from the
+      // PAGE's rotation). Locked suppresses it. `placeRotateKnob` keeps it
+      // inside `pageBox`.
+      if (capsFor(a.subtype).rotatable && annotTransformable(a)) {
+        const hg = hitGeomOf(a, view);
+        const obb = obbFromGeom(hg, hitStrokeOf(a, view), a.style.border);
         if (obb) {
           const knob = placeRotateKnob(obb.corners, geom.knobOffset, pageBox);
           if (
@@ -145,13 +173,17 @@ export function hitTest(
             return {
               t: 'rotate',
               ids: [a.id],
-              pivot: selectionCenter(a.geom, a.style.strokeWidth),
+              // VIEW-space pivot: the projected shape's centre — the point the
+              // user sees the shape turn about (the commit conjugates back).
+              pivot: selectionCenter(hg, hitStrokeOf(a, view)),
             };
           }
         }
       }
-      if (hasHandles(a.subtype)) {
-        for (const h of geomHandles(a.geom)) {
+      if (hasHandles(a)) {
+        // Handles live on the PROJECTED geometry — the handle gesture then
+        // runs entirely in view space (see the `handle` draft).
+        for (const h of geomHandles(hitGeomOf(a, view))) {
           if (
             Math.abs(h.at.x - p.x) <= geom.handleTol &&
             Math.abs(h.at.y - p.y) <= geom.handleTol
@@ -163,10 +195,11 @@ export function hitTest(
     }
   } else if (m.selected.length > 1) {
     // Multi-target group: a rotate knob hanging off the union box, gated by the
-    // group caps (every member rotatable + none locked).
+    // group caps (every member rotatable + none locked). Screen-anchored
+    // members rotate WYSIWYG like everyone else (their authored tilt turns).
     const gc = groupCaps(m, m.selected);
     if (gc.rotatable) {
-      const union = groupUnionBounds(m, pon);
+      const union = groupUnionBounds(m, pon, view);
       if (union) {
         const corners: [Vec, Vec, Vec, Vec] = [
           { x: union.x, y: union.y },
@@ -185,7 +218,7 @@ export function hitTest(
       }
     }
     if (gc.resizable) {
-      const union = groupUnionBounds(m, pon);
+      const union = groupUnionBounds(m, pon, view);
       if (union) {
         for (const h of rectHandlesFor(union)) {
           if (
@@ -216,15 +249,15 @@ export function hitTest(
     // an unselected one (so a selectable-but-anchored kind still re-selects cleanly).
     const hit =
       m.selected.includes(id) && canMove(m, id)
-        ? inBounds(a, p)
-        : geomHit(a.geom, p, strokeMargin, isFilled(a), a.style.strokeWidth);
+        ? inBounds(a, p, view)
+        : geomHit(hitGeomOf(a, view), p, strokeMargin, isFilled(a), hitStrokeOf(a, view));
     if (hit) return { t: 'annot', id };
   }
   // Nothing under the point directly — but a multi-selection is grabbable across
   // its WHOLE union box (the gaps between members included), so a drag there moves
   // the group as a unit instead of clearing it. Resolve to the top-most selected
   // member so `editDown` keeps the selection and arms the move.
-  const union = selectionUnionBounds(m, pon);
+  const union = selectionUnionBounds(m, pon, view);
   if (union && inRect(union, p)) {
     for (let i = order.length - 1; i >= 0; i--) {
       if (m.selected.includes(order[i]) && canMove(m, order[i]))
@@ -243,8 +276,9 @@ export function cursorAt(
   strokeMargin: number,
   pageBox?: Rect,
   inert?: ReadonlySet<Id>,
+  view?: ViewEnv,
 ): Cursor | null {
-  const t = hitTest(m, pon, p, geom, strokeMargin, pageBox, inert);
+  const t = hitTest(m, pon, p, geom, strokeMargin, pageBox, inert, view);
   if (t.t === 'handle') return t.cursor;
   if (t.t === 'group-handle') return t.cursor;
   if (t.t === 'rotate') return 'grab';

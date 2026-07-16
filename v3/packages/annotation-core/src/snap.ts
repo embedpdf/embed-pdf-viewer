@@ -5,6 +5,7 @@
  * and reports a guide line to draw. One snap per axis — the closest wins.
  * Threshold is in content units (the `hitMargin` convention).
  */
+import { anchorModeOf } from './anchor';
 import { selectionQuad, unionRect } from './geometry';
 import { isSelectable } from './hit';
 import type { Guide, Id, Model, Rect, Vec } from './types';
@@ -53,13 +54,28 @@ export function computeMoveSnap(
   pageBox: Rect | undefined,
 ): SnapResult {
   const moving = new Set(ids);
+  // Screen-anchored (`noZoom`/`noRotate`) annotations sit OUTSIDE the snapping
+  // system, both ways: their content-space footprint depends on the view, so
+  // an alignment made at one zoom is a lie at every other zoom. A selection
+  // that contains one doesn't snap; one that's parked on the page is never a
+  // reference edge. (The page-edge CLAMP is unaffected — it uses projected
+  // bounds per event.)
+  if (ids.some((id) => m.byId[id] && anchorModeOf(m.byId[id]))) {
+    return { delta: raw, guides: [] };
+  }
   const base = toBounds(unionRect(ids.flatMap((id) => annotQuad(m, id))));
   const movingBox = shift(base, raw);
 
   const targets: Bounds[] = [
     ...(pageBox ? [toBounds(pageBox)] : []),
     ...m.order
-      .filter((id) => !moving.has(id) && m.byId[id].pon === pon && isSelectable(m, id))
+      .filter(
+        (id) =>
+          !moving.has(id) &&
+          m.byId[id].pon === pon &&
+          isSelectable(m, id) &&
+          !anchorModeOf(m.byId[id]),
+      )
       .map((id) => toBounds(unionRect(annotQuad(m, id)))),
   ];
 

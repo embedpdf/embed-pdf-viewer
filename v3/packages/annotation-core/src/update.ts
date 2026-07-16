@@ -5,10 +5,18 @@
  * handler `createPointer`). Geometry lives in the `Geom` union; all the per-kind
  * math is in geometry.ts. Effects (create/patch/delete) are the only impurities.
  */
-import type { AnnotationRef, InkIntent } from '@embedpdf/engine-core/runtime';
+import type { AnnotationFlags, AnnotationRef, InkIntent } from '@embedpdf/engine-core/runtime';
 import { expandGroups, groupMembers } from './group';
 import { canMove, groupUnionBounds, hitTest, isSelectable } from './hit';
 import { capsFor } from './kinds';
+import {
+  annotContentsEditable,
+  annotTransformable,
+  DRAWN_FLAGS,
+  flagsEqual,
+  mergeFlags,
+} from './flags';
+import { anchoredGeom, anchorModeOf, unanchoredGeom, type ViewEnv } from './anchor';
 import {
   apSizeChanged,
   caretRectFromTextEnd,
@@ -146,6 +154,19 @@ const patchFx = (id: Id, next: Annot, before: Geom): Effect =>
 const sub = (a: Vec, b: Vec): Vec => ({ x: a.x - b.x, y: a.y - b.y });
 const translateRect = (r: Rect, d: Vec): Rect => ({ ...r, x: r.x + d.x, y: r.y + d.y });
 
+/**
+ * Commit a VIEW-space gesture result for one annotation: apply `op` to the
+ * PROJECTED geometry (the identity for un-flagged annotations — `op` then
+ * simply runs on the stored geom) and map the result back to stored space
+ * through `unanchoredGeom`. The exact composition `effGeom` previewed, so a
+ * released gesture commits what it showed — for screen-anchored and plain
+ * annotations alike, through ONE code path.
+ */
+const commitViewGesture = (a: Annot, view: ViewEnv | undefined, op: (g: Geom) => Geom): Geom => {
+  const mode = anchorModeOf(a);
+  return unanchoredGeom(op(anchoredGeom(a.geom, mode, view)), mode, view);
+};
+
 /* ── page-bound gestures ──────────────────────────────────────────────────────
  * Annotations are page-bound; the pointer isn't. Two rules keep them apart:
  *  1. FRAME: a gesture is anchored to the page it started on. A sample resolved
@@ -166,14 +187,25 @@ const clampPointToBox = (p: Vec, box: Rect | undefined): Vec =>
       }
     : p;
 
+/** The pointer sample's view environment (relative zoom + display rotation),
+ *  when the caller supplied one — screen-anchored annotations hit-test and
+ *  page-clamp at their EFFECTIVE geometry with it. Absent → stored geometry
+ *  (headless). */
+const viewOf = (input: PointerInput): ViewEnv | undefined =>
+  input.zoom != null || input.displayRotation != null
+    ? { zoom: input.zoom ?? 1, rotation: input.displayRotation ?? 0 }
+    : undefined;
+
 /** The union of the ids' SELECTION bounds (the outline the user sees) — the box
- *  the page-clamp keeps inside the page during a move. */
-function unionBoundsOf(m: Model, ids: Id[]): Rect | null {
+ *  the page-clamp keeps inside the page during a move. Screen-anchored members
+ *  count at their effective (view-projected) footprint. */
+function unionBoundsOf(m: Model, ids: Id[], view?: ViewEnv): Rect | null {
   const corners: Vec[] = [];
   for (const id of ids) {
     const a = m.byId[id];
     if (!a) continue;
-    corners.push(...selectionQuad(a.geom, a.style.strokeWidth, a.style.border));
+    const g = anchoredGeom(a.geom, anchorModeOf(a), view);
+    corners.push(...selectionQuad(g, a.style.strokeWidth, a.style.border));
   }
   return corners.length ? unionRect(corners) : null;
 }
@@ -181,9 +213,15 @@ function unionBoundsOf(m: Model, ids: Id[]): Rect | null {
 /** Clamp a move delta so the selection's union bounds stay inside the page.
  *  Per-axis, so a pointer past the bottom edge still slides the selection
  *  horizontally along that edge. */
-function clampMoveDelta(m: Model, ids: Id[], delta: Vec, page: Rect | undefined): Vec {
+function clampMoveDelta(
+  m: Model,
+  ids: Id[],
+  delta: Vec,
+  page: Rect | undefined,
+  view?: ViewEnv,
+): Vec {
   if (!page) return delta;
-  const b = unionBoundsOf(m, ids);
+  const b = unionBoundsOf(m, ids, view);
   if (!b) return delta;
   return {
     x: clampAxis(delta.x, page.x - b.x, page.x + page.width - (b.x + b.width)),
@@ -219,7 +257,10 @@ export function rotateDraftDelta(
 ): { delta: number; angle: number; snapped: boolean } {
   const raw = angleAt(d.pivot, d.cur) - angleAt(d.pivot, d.start);
   const one = d.ids.length === 1 ? m.byId[d.ids[0]] : null;
-  const base = one ? geomRotation(one.geom) : 0;
+  // The absolute angle is read off the PROJECTED geometry (identity when
+  // un-flagged): the chip and the snap targets speak about what the user SEES
+  // — a noRotate shape's on-screen tilt, not its stored one.
+  const base = one ? geomRotation(anchoredGeom(one.geom, anchorModeOf(one), d.view)) : 0;
   const angle = normalizeDeg(base + raw);
   if (!m.snap.rotation || d.free) return { delta: raw, angle, snapped: false };
   for (const target of m.snap.rotationAngles) {
@@ -253,17 +294,18 @@ export function update(m: Model, msg: Msg): [Model, Effect[]] {
         msg.deferInkCommit,
         msg.straightenInk,
         msg.clickCreate,
+        msg.flags,
       );
     case 'finishInkDraft':
       return finishInkCreate(m);
     case 'finishCreationDraft':
       return finishPolyCreate(m);
     case 'createCaret':
-      return createCaret(m, msg.pon, msg.rect);
+      return createCaret(m, msg.pon, msg.rect, msg.flags);
     case 'createReplaceText':
       return createReplaceText(m, msg.pon, msg.rects, msg.endRect, msg.preset);
     case 'createMarkup':
-      return createMarkup(m, msg.subtype, msg.pon, msg.rects, msg.preset);
+      return createMarkup(m, msg.subtype, msg.pon, msg.rects, msg.preset, msg.flags);
     case 'setMarkupPreview':
       return setMarkupPreview(m, msg.subtype, msg.rectsByPage, msg.preset);
     case 'clearMarkupPreview':
@@ -288,6 +330,8 @@ export function update(m: Model, msg: Msg): [Model, Effect[]] {
     }
     case 'setProps':
       return setProps(m, msg.patch);
+    case 'setFlags':
+      return setFlags(m, msg.patch, msg.ids);
     case 'setDefaults':
       return setDefaults(m, msg.subtype, msg.patch);
     case 'setSnap':
@@ -313,7 +357,9 @@ export function update(m: Model, msg: Msg): [Model, Effect[]] {
     case 'remove':
       return [removeAnnots(m, msg.ids), []];
     case 'beginTextEdit':
-      return m.byId[msg.id]
+      // `lockedContents` (or an inert `/F` state) blocks entering text edit —
+      // the geometry gates don't apply here: locked-only contents still edit.
+      return m.byId[msg.id] && annotContentsEditable(m.byId[msg.id])
         ? [{ ...m, editing: msg.id, selected: [msg.id], draft: null }, []]
         : [m, []];
     case 'setText':
@@ -347,7 +393,8 @@ function editPointer(
 function editDown(m: Model, input: PointerInput): [Model, Effect[]] {
   // `pageBox` + `chrome` reach the hit-test so the page-bound rotate knob
   // (flipped / clamped near an edge) is grabbed exactly where the chrome drew
-  // it, with the caller's (screen-constant) grab zones.
+  // it, with the caller's (screen-constant) grab zones. The view env rides
+  // along so screen-anchored annotations are grabbed where they're PAINTED.
   const hit = hitTest(
     m,
     input.pon,
@@ -356,12 +403,32 @@ function editDown(m: Model, input: PointerInput): [Model, Effect[]] {
     m.hitMargin,
     input.pageBox,
     input.inert,
+    viewOf(input),
   );
   if (hit.t === 'handle') {
-    const base = m.byId[hit.id].geom;
-    return [{ ...m, draft: { g: 'handle', id: hit.id, handle: hit.handle, base, cur: base } }, []];
+    // The handle gesture runs in VIEW space: `base` is the PROJECTED geometry
+    // the user grabbed (identity for un-flagged annotations), and the commit
+    // maps the result back via `unanchoredGeom` with the SAME captured view.
+    const a = m.byId[hit.id];
+    const view = viewOf(input);
+    const base = anchoredGeom(a.geom, anchorModeOf(a), view);
+    return [
+      {
+        ...m,
+        draft: {
+          g: 'handle',
+          id: hit.id,
+          handle: hit.handle,
+          base,
+          cur: base,
+          ...(view ? { view } : {}),
+        },
+      },
+      [],
+    ];
   }
   if (hit.t === 'rotate') {
+    const view = viewOf(input);
     return [
       {
         ...m,
@@ -371,12 +438,14 @@ function editDown(m: Model, input: PointerInput): [Model, Effect[]] {
           pivot: hit.pivot,
           start: input.point,
           cur: input.point,
+          ...(view ? { view } : {}),
         },
       },
       [],
     ];
   }
   if (hit.t === 'group-handle') {
+    const view = viewOf(input);
     return [
       {
         ...m,
@@ -388,6 +457,7 @@ function editDown(m: Model, input: PointerInput): [Model, Effect[]] {
           anchor: groupResizeAnchor(hit.box, hit.handle),
           base: hit.box,
           cur: hit.box,
+          ...(view ? { view } : {}),
         },
       },
       [],
@@ -421,13 +491,16 @@ function editMove(m: Model, input: PointerInput): [Model, Effect[]] {
   const home = editDraftPon(m, d);
   if (home != null && input.pon !== home) return [m, []];
   if (d.g === 'move') {
-    const raw = clampMoveDelta(m, d.ids, sub(input.point, d.start), input.pageBox);
+    const view = viewOf(input);
+    const raw = clampMoveDelta(m, d.ids, sub(input.point, d.start), input.pageBox, view);
     if (!m.snap.guides || input.shift)
       return [{ ...m, draft: { ...d, delta: raw, guides: [] } }, []];
+    // Snap guides read STORED geometry (an anchored mover aligns by its /Rect
+    // box) — a deliberate simplification; the clamp above is view-exact.
     const snap = computeMoveSnap(m, d.ids, input.pon, raw, m.snap.guideThreshold, input.pageBox);
     // A snap adjusts by ≤ threshold, but never past the page edge: re-clamp, and
     // drop the guide on an axis the clamp took back (its line would be a lie).
-    const delta = clampMoveDelta(m, d.ids, snap.delta, input.pageBox);
+    const delta = clampMoveDelta(m, d.ids, snap.delta, input.pageBox, view);
     const guides = snap.guides.filter((g) =>
       g.axis === 'x' ? delta.x === snap.delta.x : delta.y === snap.delta.y,
     );
@@ -455,8 +528,12 @@ function editUp(m: Model): [Model, Effect[]] {
     if (geomEqual(d.base, d.cur)) return [{ ...m, draft: null }, []];
     // A resize changes the appearance: we own it now → live (vector) render
     // (opaque-body kinds stay baked; the engine re-fits their AP natively).
-    const a = ownGeometry({ ...m.byId[d.id], geom: d.cur });
-    return [{ ...m, byId: { ...m.byId, [d.id]: a }, draft: null }, [patchFx(d.id, a, d.base)]];
+    // `cur` is VIEW-space (the projected geometry the user dragged); the
+    // commit maps it back to stored space — the identity when un-flagged.
+    const before = m.byId[d.id];
+    const stored = unanchoredGeom(d.cur, anchorModeOf(before), d.view);
+    const a = ownGeometry({ ...before, geom: stored });
+    return [{ ...m, byId: { ...m.byId, [d.id]: a }, draft: null }, [patchFx(d.id, a, before.geom)]];
   }
   if (d.g === 'rotate') {
     const { delta } = rotateDraftDelta(m, d);
@@ -466,8 +543,12 @@ function editUp(m: Model): [Model, Effect[]] {
     for (const id of d.ids) {
       const a = byId[id];
       if (!a) continue;
-      // rotation re-bakes the appearance → live (vector) render + patch.
-      byId[id] = ownGeometry({ ...a, geom: geomRotateAbout(a.geom, d.pivot, delta) });
+      // rotation re-bakes the appearance → live (vector) render + patch. The
+      // gesture composed in VIEW space (`effGeom`); the commit replays the
+      // same composition and unprojects — a screen-anchored member's AUTHORED
+      // tilt turns WYSIWYG, exactly as previewed.
+      const geom = commitViewGesture(a, d.view, (g) => geomRotateAbout(g, d.pivot, delta));
+      byId[id] = ownGeometry({ ...a, geom });
       fx.push(patchFx(id, byId[id], a.geom));
     }
     return [{ ...m, byId, draft: null }, fx];
@@ -480,7 +561,8 @@ function editUp(m: Model): [Model, Effect[]] {
     for (const id of d.ids) {
       const a = byId[id];
       if (!a) continue;
-      byId[id] = ownGeometry({ ...a, geom: geomScaleAbout(a.geom, d.anchor, sx, sy) });
+      const geom = commitViewGesture(a, d.view, (g) => geomScaleAbout(g, d.anchor, sx, sy));
+      byId[id] = ownGeometry({ ...a, geom });
       fx.push(patchFx(id, byId[id], a.geom));
     }
     return [{ ...m, byId, draft: null }, fx];
@@ -522,7 +604,10 @@ function marqueePointer(
   }
 
   // A marquee that touches one member takes the whole group with it.
-  const hits = expandGroups(m, annotsInBox(m, m.draft.pon, m.draft.from, point, input.inert));
+  const hits = expandGroups(
+    m,
+    annotsInBox(m, m.draft.pon, m.draft.from, point, input.inert, viewOf(input)),
+  );
   const selected = input.shift ? toggleSelection(m.selected, hits) : hits;
   return [{ ...m, selected, draft: null }, []];
 }
@@ -546,6 +631,7 @@ function createPointer(
   deferInkCommit = false,
   straightenInk?: InkStraightenOptions,
   clickCreate?: ClickCreate | false,
+  flags?: Partial<AnnotationFlags>,
 ): [Model, Effect[]] {
   // An in-progress creation is anchored to its page: a move/up sample from
   // another page is a foreign frame — ignore it. (A DOWN on another page is a
@@ -553,7 +639,7 @@ function createPointer(
   if (phase !== 'down' && m.draft && 'pon' in m.draft && m.draft.pon !== input.pon) return [m, []];
   // Shapes can't be drawn past the page edge — the pointer pins to it.
   if (input.pageBox) input = { ...input, point: clampPointToBox(input.point, input.pageBox) };
-  if (subtype === 'free-text-callout') return calloutPointer(m, phase, input, preset);
+  if (subtype === 'free-text-callout') return calloutPointer(m, phase, input, preset, flags);
   if (phase === 'down') {
     if (isPolySubtype(subtype)) {
       if (input.finish) return finishPolyCreate(m);
@@ -582,6 +668,7 @@ function createPointer(
             points: [input.point],
             cur: input.point,
             closed: subtype === 'polygon',
+            ...(flags ? { flags } : {}),
           },
         },
         [],
@@ -597,6 +684,7 @@ function createPointer(
             from: input.point,
             to: input.point,
             ...(clickCreate !== undefined ? { clickCreate } : {}),
+            ...(flags ? { flags } : {}),
           }
         : subtype === 'ink'
           ? m.draft?.g === 'create-ink' &&
@@ -604,7 +692,15 @@ function createPointer(
             m.draft.preset === preset &&
             m.draft.pon === input.pon
             ? { ...m.draft, strokes: [...m.draft.strokes, [input.point]] }
-            : { g: 'create-ink', subtype, preset, pon: input.pon, strokes: [[input.point]], intent }
+            : {
+                g: 'create-ink',
+                subtype,
+                preset,
+                pon: input.pon,
+                strokes: [[input.point]],
+                intent,
+                ...(flags ? { flags } : {}),
+              }
           : subtype === 'square' || subtype === 'circle' || subtype === 'free-text'
             ? {
                 g: 'create-rect',
@@ -620,6 +716,7 @@ function createPointer(
                   ? { displayRotation: input.displayRotation, upright: true }
                   : {}),
                 ...(clickCreate !== undefined ? { clickCreate } : {}),
+                ...(flags ? { flags } : {}),
               }
             : null;
     return draft ? [{ ...m, selected: [], draft }, []] : [m, []];
@@ -731,7 +828,7 @@ function createPointer(
     // A text kind carries its text styling from birth, so the tool's font
     // defaults actually apply to what you draw.
     ...(geom.t === 'text' ? { text: textStyleFromProps(def) } : {}),
-    locked: false,
+    flags: { ...DRAWN_FLAGS, ...d.flags },
     source: 'vector',
   };
   return [
@@ -768,7 +865,7 @@ function finishInkCreate(m: Model): [Model, Effect[]] {
     geom: { t: 'ink', strokes: d.strokes },
     style: styleFromProps(defaultsFor(m, d.preset ?? d.subtype)),
     ...(d.intent ? { intent: d.intent } : {}),
-    locked: false,
+    flags: { ...DRAWN_FLAGS, ...d.flags },
     source: 'vector',
   };
   return [
@@ -818,6 +915,7 @@ function calloutPointer(
   phase: 'down' | 'move' | 'up',
   input: PointerInput,
   preset: string = 'free-text-callout',
+  flags?: Partial<AnnotationFlags>,
 ): [Model, Effect[]] {
   const d = m.draft;
   if (phase === 'down') {
@@ -834,6 +932,7 @@ function calloutPointer(
             step: 'knee',
             tip: input.point,
             cur: input.point,
+            ...(flags ? { flags } : {}),
           },
         },
         [],
@@ -864,7 +963,7 @@ function calloutPointer(
     geom: { t: 'text', rect, callout: { tip: d.tip, knee: d.knee, ending } },
     style: styleFromProps(def),
     text: textStyleFromProps(def),
-    locked: false,
+    flags: { ...DRAWN_FLAGS, ...d.flags },
     source: 'vector',
   };
   return [
@@ -902,7 +1001,7 @@ function finishPolyCreate(m: Model): [Model, Effect[]] {
     subtype: d.subtype,
     geom,
     style: styleFromProps(def),
-    locked: false,
+    flags: { ...DRAWN_FLAGS, ...d.flags },
     source: 'vector',
   };
   return [
@@ -941,6 +1040,7 @@ function createMarkup(
   pon: Annot['pon'],
   rects: Rect[],
   preset: string = subtype,
+  flags?: Partial<AnnotationFlags>,
 ): [Model, Effect[]] {
   const quads = rectsToQuads(rects);
   if (!quads.length) return [m, []];
@@ -952,7 +1052,7 @@ function createMarkup(
     subtype,
     geom: { t: 'quads', quads },
     style: styleFromProps(defaultsFor(m, preset)),
-    locked: false,
+    flags: { ...DRAWN_FLAGS, ...flags },
     source: 'vector',
   };
   return [
@@ -995,7 +1095,7 @@ function createReplaceText(
     intent: 'replace',
     geom: { t: 'caret', rect: caretRectFromTextEnd(textEndRect) },
     style,
-    locked: false,
+    flags: DRAWN_FLAGS,
     source: 'vector',
   };
   const strikeout: Annot = {
@@ -1006,7 +1106,7 @@ function createReplaceText(
     intent: 'strikeout-text-edit',
     geom: { t: 'quads', quads },
     style,
-    locked: false,
+    flags: DRAWN_FLAGS,
     source: 'vector',
     irt: primaryId,
     group: primaryId,
@@ -1025,7 +1125,12 @@ function createReplaceText(
   ];
 }
 
-function createCaret(m: Model, pon: Annot['pon'], textEndRect: Rect): [Model, Effect[]] {
+function createCaret(
+  m: Model,
+  pon: Annot['pon'],
+  textEndRect: Rect,
+  flags?: Partial<AnnotationFlags>,
+): [Model, Effect[]] {
   if (textEndRect.width <= 0 || textEndRect.height <= 0) return [m, []];
   const id = `tmp:${m.seq + 1}`;
   const def = defaultsFor(m, 'caret');
@@ -1036,7 +1141,7 @@ function createCaret(m: Model, pon: Annot['pon'], textEndRect: Rect): [Model, Ef
     subtype: 'caret',
     geom: { t: 'caret', rect: caretRectFromTextEnd(textEndRect) },
     style: styleFromProps(def),
-    locked: false,
+    flags: { ...DRAWN_FLAGS, ...flags },
     source: 'vector',
   };
   return [
@@ -1096,6 +1201,32 @@ function setProps(m: Model, patch: AnnotationPropsPatch): [Model, Effect[]] {
   return fx.length ? [{ ...m, byId }, fx] : [m, []];
 }
 
+/**
+ * Merge a `/F` flags patch into the selection (or explicit ids). NOT the props
+ * path, on purpose: flags aren't appearance — members keep their render
+ * `source` (a baked raster stays valid; nothing re-bakes) — and the write is
+ * NOT gated by `locked`, because unlocking a locked annotation is the whole
+ * point (Acrobat's Locked checkbox stays live). One `flags` effect per changed
+ * COMMITTED member; uncommitted drafts just merge (their create draft carries
+ * the flags when it commits).
+ */
+function setFlags(m: Model, patch: Partial<AnnotationFlags>, ids?: Id[]): [Model, Effect[]] {
+  const targets = ids ?? m.selected;
+  if (!targets.length) return [m, []];
+  const fx: Effect[] = [];
+  let byId: Model['byId'] | null = null;
+  for (const id of targets) {
+    const a = (byId ?? m.byId)[id];
+    if (!a) continue;
+    const flags = mergeFlags(a.flags, patch);
+    if (flagsEqual(flags, a.flags)) continue; // no spurious engine writes
+    byId ??= { ...m.byId };
+    byId[id] = { ...a, flags };
+    if (a.ref) fx.push({ fx: 'flags', id });
+  }
+  return byId ? [{ ...m, byId }, fx] : [m, []];
+}
+
 function setDefaults(m: Model, subtype: Subtype, patch: AnnotationPropsPatch): [Model, Effect[]] {
   const prev = m.defaults[subtype] ?? {};
   const next: AnnotationPropsPatch = { ...prev, ...patch };
@@ -1113,11 +1244,16 @@ function setDefaults(m: Model, subtype: Subtype, patch: AnnotationPropsPatch): [
 function rotateSelection(m: Model, deltaDeg: number): [Model, Effect[]] {
   const ids = m.selected.filter((id) => {
     const a = m.byId[id];
-    return a && !a.locked && capsFor(a.subtype).rotatable;
+    return a && annotTransformable(a) && capsFor(a.subtype).rotatable;
   });
   if (!ids.length) return [m, []];
   // pivot: a single shape's own selection-rect centre (so vertex kinds spin in
   // place, not about their off-centre vertex mean); a group's union-box centre.
+  // Stored space throughout — a screen-anchored member's AUTHORED tilt turns,
+  // which is exactly its on-screen tilt (the display adds nothing to it); at
+  // high zoom the anchor may re-seat by a hair, which the toolbar action
+  // accepts (the knob gesture, which is pointer-exact, goes through the
+  // view-space commit instead).
   let pivot: Vec;
   if (ids.length === 1) {
     const a = m.byId[ids[0]];
@@ -1131,20 +1267,23 @@ function rotateSelection(m: Model, deltaDeg: number): [Model, Effect[]] {
   const byId = { ...m.byId };
   const fx: Effect[] = [];
   for (const id of ids) {
-    const before = byId[id].geom;
-    byId[id] = ownGeometry({ ...byId[id], geom: geomRotateAbout(before, pivot, deltaDeg) });
+    const a = byId[id];
+    const before = a.geom;
+    byId[id] = ownGeometry({ ...a, geom: geomRotateAbout(before, pivot, deltaDeg) });
     fx.push(patchFx(id, byId[id], before));
   }
   return [{ ...m, byId }, fx];
 }
 
-/** Reset rotation on the selection to the as-authored orientation. */
+/** Reset rotation on the selection to the as-authored orientation. For a
+ *  screen-anchored annotation that IS its on-screen orientation, so reset is
+ *  as meaningful as for anyone else. */
 function resetRotation(m: Model): [Model, Effect[]] {
   const byId = { ...m.byId };
   const fx: Effect[] = [];
   for (const id of m.selected) {
     const a = byId[id];
-    if (!a || a.locked || geomRotation(a.geom) === 0) continue;
+    if (!a || !annotTransformable(a) || geomRotation(a.geom) === 0) continue;
     byId[id] = ownGeometry({ ...a, geom: geomResetRotation(a.geom) });
     fx.push(patchFx(id, byId[id], a.geom));
   }
@@ -1152,33 +1291,44 @@ function resetRotation(m: Model): [Model, Effect[]] {
 }
 
 function deleteSelection(m: Model): [Model, Effect[]] {
-  if (!m.selected.length) return [m, []];
+  // `locked` (and inert `/F` states) protect against deletion — only the
+  // transformable members go; the rest keep their selection, so a mixed
+  // selection deletes what it may and leaves the frozen ones visibly selected.
+  const deletable = m.selected.filter((id) => {
+    const a = m.byId[id];
+    return !!a && annotTransformable(a);
+  });
+  if (!deletable.length) return [m, []];
   const fx: Effect[] = [];
-  for (const id of m.selected) {
+  for (const id of deletable) {
     const ref = m.byId[id]?.ref;
     if (ref) fx.push({ fx: 'delete', ref });
   }
-  return [removeAnnots(m, m.selected), fx];
+  return [removeAnnots(m, deletable), fx];
 }
 
 /* ── marquee helper; exported for tests ───────────────────────────────────── */
-export function annotsInBox(m: Model, pon: number, a: Vec, b: Vec, inert?: ReadonlySet<Id>): Id[] {
+export function annotsInBox(
+  m: Model,
+  pon: number,
+  a: Vec,
+  b: Vec,
+  inert?: ReadonlySet<Id>,
+  view?: ViewEnv,
+): Id[] {
   const box = rectFromPoints(a, b);
-  return m.order.filter(
-    (id) =>
-      m.byId[id]?.pon === pon &&
-      !inert?.has(id) &&
-      isSelectable(m, id) &&
-      // intersect against what is actually DRAWN: the oriented selection quad
-      // (exact, via SAT) — the SAME quad the chrome outlines and the grab region
-      // uses. Its AABB is a coarse superset whose empty corners cover most of a
-      // tilted shape's unrotated footprint, so testing the AABB selected shapes
-      // the marquee never touched.
-      quadIntersectsRect(
-        selectionQuad(m.byId[id].geom, m.byId[id].style.strokeWidth, m.byId[id].style.border),
-        box,
-      ),
-  );
+  return m.order.filter((id) => {
+    const annot = m.byId[id];
+    if (annot?.pon !== pon || inert?.has(id) || !isSelectable(m, id)) return false;
+    // intersect against what is actually DRAWN: the oriented selection quad
+    // (exact, via SAT) — the SAME quad the chrome outlines and the grab region
+    // uses (screen-anchored bodies at their view-projected footprint). Its
+    // AABB is a coarse superset whose empty corners cover most of a tilted
+    // shape's unrotated footprint, so testing the AABB selected shapes the
+    // marquee never touched.
+    const g = anchoredGeom(annot.geom, anchorModeOf(annot), view);
+    return quadIntersectsRect(selectionQuad(g, annot.style.strokeWidth, annot.style.border), box);
+  });
 }
 
 /* ── store maintenance ───────────────────────────────────────────────────── */

@@ -43,6 +43,7 @@ export type {
   Behavior,
   ChromeSettings,
   ChromeSettingsPatch,
+  SelectionFlags,
   SelectionProps,
   StampProvider,
   StampPromptRequest,
@@ -54,6 +55,7 @@ export type {
 // app code building property UIs needs only this package).
 export { propsFor } from '@embedpdf-x/annotation-core';
 export type {
+  AnnotationFlags,
   AnnotationProps,
   AnnotationPropsPatch,
   BlendMode,

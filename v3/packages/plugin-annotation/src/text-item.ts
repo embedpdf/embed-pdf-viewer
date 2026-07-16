@@ -5,7 +5,7 @@
  * the plugin (not the portable core) because the font→CSS stack mapping and the
  * engine `Color`→CSS seam are web concerns, shared across every web framework.
  */
-import { initialTextStyle, textBoxes, type Model } from '@embedpdf-x/annotation-core';
+import { initialTextStyle, textBoxes, type Model, type ViewEnv } from '@embedpdf-x/annotation-core';
 import type { TextItem } from './types';
 
 /** Map a free-text `/DA` font to a CSS font-family. A standard PDF font → a web
@@ -24,8 +24,8 @@ const cssFontFor = (font: string): string => STANDARD_FONT_CSS[font] ?? `"${font
 /** Project the model's free-text boxes into render-ready {@link TextItem}s — the
  *  core geometry (`textBoxes`) joined with the DTO-derived CSS. Pure; memoized by
  *  model identity at the call site so selectors get a stable reference. */
-export function buildTextItems(m: Model, pon: number): TextItem[] {
-  return textBoxes(m, pon).map((tb) => {
+export function buildTextItems(m: Model, pon: number, view?: ViewEnv): TextItem[] {
+  return textBoxes(m, pon, view).map((tb) => {
     const a = m.byId[tb.id];
     // `text`/`style` are the OPTIMISTIC content projections (a props edit lands
     // here before the engine round-trips), so the editor restyles instantly.

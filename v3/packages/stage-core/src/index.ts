@@ -40,6 +40,14 @@ export interface PageGeom {
   /** Total display rotation. Layout swaps w↔h for 90/270 so the box is the
    *  on-screen footprint; the renderer rotates the content into it. */
   rotation?: PageRotation;
+  /**
+   * PDF `/UserUnit` (§14.11.6): how many 1/72" units one point of THIS page
+   * spans — the page is physically `userUnit ×` larger than its point size
+   * says. Folded into the layout (a userUnit-5 page lays out 5× bigger, like
+   * Acrobat) AND into its `contentScale`, so "world per content point" stays
+   * true per page. Default 1 (virtually every document).
+   */
+  userUnit?: number;
 }
 export interface PageBox {
   pageIndex: number;
@@ -62,10 +70,14 @@ export interface PageBox {
 }
 
 /** The page's on-screen footprint: w↔h swapped for quarter-turns (via the shared
- *  geometry primitive). Everything the layout packs uses these display dims; the
- *  content scale (isotropic) and the renderer's transform recover the content. */
+ *  geometry primitive), scaled by its `/UserUnit` (the page's PHYSICAL size — a
+ *  userUnit-5 page measures 5× its point size). Everything the layout packs uses
+ *  these display dims; the content scale (isotropic) and the renderer's
+ *  transform recover the content. */
 function displayDims(pg: PageGeom): Size {
-  return displaySize(pg.size, pg.rotation ?? 0);
+  const u = pg.userUnit ?? 1;
+  const d = displaySize(pg.size, pg.rotation ?? 0);
+  return u === 1 ? d : { width: d.width * u, height: d.height * u };
 }
 export interface SceneItem {
   index: number;
@@ -542,6 +554,9 @@ interface LocalBox {
   w: number;
   h: number;
   rotation: PageRotation;
+  /** The page's `/UserUnit` — folded into ITS `contentScale` at placement, so
+   *  "world units per content point" stays true for every page of a spread. */
+  userUnit: number;
 }
 
 /** Intrinsic item dimensions (pages only, no margins) — the `uniform` reference.
@@ -591,6 +606,7 @@ function packScaledItem(
       w,
       h,
       rotation: pages[group[j]].rotation ?? 0,
+      userUnit: pages[group[j]].userUnit ?? 1,
     });
     lx += frame.left + w + frame.right + gap * scale;
   }
@@ -612,7 +628,10 @@ function placePages(item: SceneItem, local: LocalBox[], contentScale: number): P
     width: b.w,
     height: b.h,
     rotation: b.rotation,
-    contentScale,
+    // Per PAGE, not per item: the box was measured at `size × userUnit`, so
+    // the world-per-content-point factor must carry the same userUnit — every
+    // content→world mapping downstream divides/multiplies by exactly this.
+    contentScale: contentScale * b.userUnit,
   }));
 }
 

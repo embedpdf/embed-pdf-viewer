@@ -3,6 +3,7 @@ import type {
   InteractionHandler,
   PointerSample,
 } from '@embedpdf-x/plugin-interaction';
+import type { PageRotation } from '@embedpdf-x/geometry';
 import type { Subtype, Vec } from '@embedpdf-x/annotation-core';
 import type { AnnotationHostCapability } from './types';
 
@@ -103,7 +104,10 @@ export function createEditHandler(
       // relying on a DOM blur, which races the focus-steal of the entering gesture.
       const wasEditing = anno.currentEditing() != null;
       if (wasEditing) anno.endTextEdit();
-      if (anno.hitKind(s.page.pon, s.page.point, s.page.scale) === 'empty') {
+      if (
+        anno.hitKind(s.page.pon, s.page.point, s.page.scale, s.page.rotation, s.page.zoom) ===
+        'empty'
+      ) {
         // Plain empty click drops the selection. Shift-empty preserves it so the
         // lower-priority marquee handler can additive/toggle-select.
         if (!s.modifiers.shift) anno.deselect();
@@ -115,10 +119,18 @@ export function createEditHandler(
       }
       // Double-click over a free-text box → enter text edit (not a move).
       if ((s.clickCount ?? 1) >= 2) {
-        anno.beginTextEditAt(s.page.pon, s.page.point, s.page.scale);
+        anno.beginTextEditAt(s.page.pon, s.page.point, s.page.scale, s.page.rotation, s.page.zoom);
         return true;
       }
-      anno.editPointer('down', s.page.pon, s.page.point, s.modifiers.shift, s.page.scale);
+      anno.editPointer(
+        'down',
+        s.page.pon,
+        s.page.point,
+        s.modifiers.shift,
+        s.page.scale,
+        s.page.rotation,
+        s.page.zoom,
+      );
       origin = { pon: s.page.pon, point: s.page.point };
       return true;
     },
@@ -127,7 +139,17 @@ export function createEditHandler(
       const point = pointOn(s, origin.pon);
       if (!point) return;
       origin.point = point;
-      anno.editPointer('move', origin.pon, point, s.modifiers.shift);
+      // The sample's scale/rotation ride along (uniform across pages), so a
+      // screen-anchored member page-clamps at its effective footprint mid-drag.
+      anno.editPointer(
+        'move',
+        origin.pon,
+        point,
+        s.modifiers.shift,
+        s.page?.scale,
+        s.page?.rotation,
+        s.page?.zoom,
+      );
     },
     onUp: (s) => {
       if (!origin) return;
@@ -141,7 +163,9 @@ export function createEditHandler(
       // priority 20 → beats text-select's 'text' (10) over an annotation; null clears.
       interaction.setCursor(
         'annotation',
-        s.page ? anno.cursorAt(s.page.pon, s.page.point, s.page.scale) : null,
+        s.page
+          ? anno.cursorAt(s.page.pon, s.page.point, s.page.scale, s.page.rotation, s.page.zoom)
+          : null,
         20,
       );
     },
@@ -163,6 +187,9 @@ export function createMarqueeHandler(anno: AnnotationHostCapability): Interactio
   let last: { pon: number; point: Vec } | null = null;
   let dragging = false;
 
+  // The marquee page's view env at the down sample — the `up` intersects
+  // screen-anchored annotations at their effective footprint with it.
+  let view: { scale?: number; rotation?: PageRotation; zoom?: number } = {};
   return {
     id: 'annotation-marquee',
     priority: 50,
@@ -177,6 +204,7 @@ export function createMarqueeHandler(anno: AnnotationHostCapability): Interactio
         shift: s.modifiers.shift,
       };
       last = { pon: s.page.pon, point: s.page.point };
+      view = { scale: s.page.scale, rotation: s.page.rotation, zoom: s.page.zoom };
       dragging = false;
       return true;
     },
@@ -195,13 +223,37 @@ export function createMarqueeHandler(anno: AnnotationHostCapability): Interactio
           return;
         }
         dragging = true;
-        anno.marqueePointer('down', anchor.pon, anchor.point, anchor.shift);
+        anno.marqueePointer(
+          'down',
+          anchor.pon,
+          anchor.point,
+          anchor.shift,
+          view.scale,
+          view.rotation,
+          view.zoom,
+        );
       }
-      anno.marqueePointer('move', anchor.pon, point, anchor.shift);
+      anno.marqueePointer(
+        'move',
+        anchor.pon,
+        point,
+        anchor.shift,
+        view.scale,
+        view.rotation,
+        view.zoom,
+      );
     },
     onUp: () => {
       if (dragging && anchor && last) {
-        anno.marqueePointer('up', anchor.pon, last.point, anchor.shift);
+        anno.marqueePointer(
+          'up',
+          anchor.pon,
+          last.point,
+          anchor.shift,
+          view.scale,
+          view.rotation,
+          view.zoom,
+        );
       }
       anchor = null;
       last = null;

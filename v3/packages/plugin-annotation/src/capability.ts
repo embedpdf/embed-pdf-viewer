@@ -17,6 +17,7 @@ import {
   cursorAt,
   defaultsFor,
   expandGroups,
+  FLAG_KEYS,
   fitStampBox,
   geomVisualBounds,
   groupKeyOf,
@@ -46,6 +47,7 @@ import {
   type RenderItem,
   type Subtype,
   type Vec,
+  type ViewEnv,
 } from '@embedpdf-x/annotation-core';
 import { boxGeomFields, fromDTO, refKey, toCreateDraft, toPatch } from './repository';
 import { buildTextItems } from './text-item';
@@ -59,12 +61,21 @@ import type {
   ArmedStampPreview,
   Behavior,
   ChromeSettings,
+  SelectionFlags,
   SelectionProps,
   StampProvider,
   StampPromptRequest,
   StampToolInput,
   TextItem,
 } from './types';
+
+/** Fold `zoom`/`rotation` host args into the core's ViewEnv (or none).
+ *  `zoom` is the page's RELATIVE zoom (`transform.zoom`) — never the
+ *  px-per-point `scale` (that one only converts CSS-px chrome settings). */
+const viewEnv = (zoom?: number, rotation?: number): ViewEnv | undefined =>
+  zoom != null || rotation != null
+    ? { zoom: zoom ?? 1, rotation: (rotation ?? 0) as ViewEnv['rotation'] }
+    : undefined;
 
 /** Broad annotate-write capability (PDF bit 6). The engine independently
  *  enforces this AND the per-owner collab rules; `canEdit`/`canDelete` are the
@@ -139,18 +150,38 @@ export function createAnnotationCapability(
   // on the settings object + the page scale it was projected with).
   const itemsCache = new Map<
     number,
-    { model: Model; ghost: AnnotationState['toolGhost']; v: RenderItem[] }
+    {
+      model: Model;
+      ghost: AnnotationState['toolGhost'];
+      zoom: number | undefined;
+      rotation: number | undefined;
+      v: RenderItem[];
+    }
   >();
   const chromeCache = new Map<
     number,
-    { model: Model; cs: ChromeSettings; scale: number | undefined; v: ChromeNode[] }
+    {
+      model: Model;
+      cs: ChromeSettings;
+      scale: number | undefined;
+      rotation: number | undefined;
+      zoom: number | undefined;
+      v: ChromeNode[];
+    }
   >();
-  const memoItems = (pon: number): RenderItem[] => {
+  const memoItems = (pon: number, view?: ViewEnv): RenderItem[] => {
     const m = model();
     const g = ctx.getState().toolGhost;
     const c = itemsCache.get(pon);
-    if (c && c.model === m && c.ghost === g) return c.v;
-    const v = corePageItems(m, pon);
+    if (
+      c &&
+      c.model === m &&
+      c.ghost === g &&
+      c.zoom === view?.zoom &&
+      c.rotation === view?.rotation
+    )
+      return c.v;
+    const v = corePageItems(m, pon, view);
     // The armed tool's VECTOR footprint ghost rides the same items pipeline as
     // every draft preview (image ghosts blit through the framework instead).
     if (g && g.pon === pon && g.kind === 'vector') {
@@ -167,19 +198,38 @@ export function createAnnotationCapability(
         selected: false,
       });
     }
-    itemsCache.set(pon, { model: m, ghost: g, v });
+    itemsCache.set(pon, { model: m, ghost: g, zoom: view?.zoom, rotation: view?.rotation, v });
     return v;
   };
-  const memoChrome = (pon: number, scale?: number): ChromeNode[] => {
+  const memoChrome = (
+    pon: number,
+    scale?: number,
+    rotation?: number,
+    zoom?: number,
+  ): ChromeNode[] => {
     const m = model();
     const cs = chromeSettings();
     const c = chromeCache.get(pon);
-    if (c && c.model === m && c.cs === cs && c.scale === scale) return c.v;
-    let v = coreChrome(m, pon, pageBoxOf(pon), chromeGeomAt(scale).knobOffset);
+    if (
+      c &&
+      c.model === m &&
+      c.cs === cs &&
+      c.scale === scale &&
+      c.rotation === rotation &&
+      c.zoom === zoom
+    )
+      return c.v;
+    let v = coreChrome(
+      m,
+      pon,
+      pageBoxOf(pon),
+      chromeGeomAt(scale).knobOffset,
+      viewEnv(zoom, rotation),
+    );
     // `guides.enabled` is presentation config, filtered HERE so the emitted
     // chrome stays authoritative for every painter (default and headless alike).
     if (!cs.guides.enabled) v = v.filter((n) => n.kind !== 'rotate-guides');
-    chromeCache.set(pon, { model: m, cs, scale, v });
+    chromeCache.set(pon, { model: m, cs, scale, rotation, zoom, v });
     return v;
   };
   // Anchor for the selection menu — memoized by input identity so the selector
@@ -188,20 +238,33 @@ export function createAnnotationCapability(
     model: Model;
     cs: ChromeSettings;
     scale: number | undefined;
+    rotation: number | undefined;
+    zoom: number | undefined;
     v: { pon: number; bounds: Rect; knob?: Vec } | null;
   } | null = null;
-  const memoAnchor = (scale?: number): { pon: number; bounds: Rect; knob?: Vec } | null => {
+  const memoAnchor = (
+    scale?: number,
+    rotation?: number,
+    zoom?: number,
+  ): { pon: number; bounds: Rect; knob?: Vec } | null => {
     const m = model();
     const cs = chromeSettings();
     if (
       anchorCache &&
       anchorCache.model === m &&
       anchorCache.cs === cs &&
-      anchorCache.scale === scale
+      anchorCache.scale === scale &&
+      anchorCache.rotation === rotation &&
+      anchorCache.zoom === zoom
     )
       return anchorCache.v;
-    const v = coreSelectionAnchor(m, pageBoxOf, () => chromeGeomAt(scale).knobOffset);
-    anchorCache = { model: m, cs, scale, v };
+    const v = coreSelectionAnchor(
+      m,
+      pageBoxOf,
+      () => chromeGeomAt(scale).knobOffset,
+      () => viewEnv(zoom, rotation),
+    );
+    anchorCache = { model: m, cs, scale, rotation, zoom, v };
     return v;
   };
   let draftAnchorCache: { model: Model; v: CreationDraftAnchor | null } | null = null;
@@ -233,13 +296,33 @@ export function createAnnotationCapability(
     selPropsCache = { model: m, v };
     return v;
   };
-  const textsCache = new Map<number, { model: Model; v: TextItem[] }>();
-  const memoTexts = (pon: number): TextItem[] => {
+  const textsCache = new Map<
+    number,
+    { model: Model; zoom: number | undefined; rotation: number | undefined; v: TextItem[] }
+  >();
+  const memoTexts = (pon: number, view?: ViewEnv): TextItem[] => {
     const m = model();
     const c = textsCache.get(pon);
-    if (c && c.model === m) return c.v;
-    const v = buildTextItems(m, pon);
-    textsCache.set(pon, { model: m, v });
+    if (c && c.model === m && c.zoom === view?.zoom && c.rotation === view?.rotation) return c.v;
+    const v = buildTextItems(m, pon, view);
+    textsCache.set(pon, { model: m, zoom: view?.zoom, rotation: view?.rotation, v });
+    return v;
+  };
+  // The selection's `/F` state — per-flag value, `null` where members disagree.
+  let selFlagsCache: { model: Model; v: SelectionFlags | null } | null = null;
+  const memoSelectionFlags = (): SelectionFlags | null => {
+    const m = model();
+    if (selFlagsCache && selFlagsCache.model === m) return selFlagsCache.v;
+    const members = m.selected.map((id) => m.byId[id]).filter((a): a is Annot => !!a);
+    let v: SelectionFlags | null = null;
+    if (members.length) {
+      v = {} as SelectionFlags;
+      for (const key of FLAG_KEYS) {
+        const first = members[0].flags[key];
+        v[key] = members.every((a) => a.flags[key] === first) ? first : null;
+      }
+    }
+    selFlagsCache = { model: m, v };
     return v;
   };
   const cropOf = (pon: number) =>
@@ -693,6 +776,24 @@ export function createAnnotationCapability(
           },
           () => apply({ t: 'createFailed', tempId: fx.id }),
         );
+    } else if (fx.fx === 'flags') {
+      // A `/F`-only write: the model already holds the MERGED flags, so emit
+      // the full set (create/update both land on exactly these bits). The
+      // re-sync PRESERVES the render source — flags never change an
+      // appearance, so a baked raster stays authoritative and nothing
+      // re-fetches.
+      const a = m.byId[fx.id];
+      if (!a || !a.ref || !a.data) return;
+      doc
+        .page(a.pon)
+        .annotations.update(a.ref, {
+          subtype: a.data.subtype,
+          flags: a.flags,
+        } as AnnotationPatch)
+        .then(
+          (res) => syncDTO(res.updated, a.source),
+          (err) => console.error('[annotation] flags write failed:', err),
+        );
     } else if (fx.fx === 'patch') {
       const a = m.byId[fx.id];
       const crop = a && cropOf(a.pon);
@@ -735,7 +836,12 @@ export function createAnnotationCapability(
     create: async (pon, draft: AnnotationDraft): Promise<AnnotationRef> => {
       const doc = ctx.doc;
       if (!doc) throw new Error('[annotation] no document bound');
-      const res = await doc.page(pon).annotations.create(draft);
+      // Default `/F` to `print` (Acrobat parity — without it the annotation
+      // disappears when printed). An EXPLICIT `flags` is respected verbatim.
+      const withFlags = (
+        draft.flags ? draft : { ...draft, flags: { print: true } }
+      ) as AnnotationDraft;
+      const res = await doc.page(pon).annotations.create(withFlags);
       // Stamps have no vector render — their engine-baked /AP is the visual.
       syncDTO(res.created, res.created.subtype === 'stamp' ? 'baked' : 'vector');
       return res.created.ref;
@@ -784,6 +890,11 @@ export function createAnnotationCapability(
     // member takes the keys its kind declares and ignores the rest; the model
     // updates optimistically, the engine writes fire per member and re-sync.
     updateSelection: (patch) => apply({ t: 'setProps', patch }),
+    // Flag writes take their own message (NOT the props path): they must never
+    // flip a member to vector or re-bake its /AP, and they must work on a
+    // LOCKED annotation — unlocking is the point.
+    updateSelectionFlags: (patch) => apply({ t: 'setFlags', patch }),
+    getSelectionFlags: () => memoSelectionFlags(),
     delete: async (ref: AnnotationRef): Promise<void> => {
       const doc = ctx.doc;
       if (!doc) throw new Error('[annotation] no document bound');
@@ -825,12 +936,12 @@ export function createAnnotationCapability(
     propsForTool: (toolId) => propsFor(registry.get(toolId)?.propsKind ?? toolId),
 
     // selectors
-    pageItems: (pon) => memoItems(pon),
-    chrome: (pon, scale) => memoChrome(pon, scale),
-    selectionAnchor: (scale) => memoAnchor(scale),
+    pageItems: (pon, view) => memoItems(pon, view),
+    chrome: (pon, scale, rotation, zoom) => memoChrome(pon, scale, rotation, zoom),
+    selectionAnchor: (scale, rotation, zoom) => memoAnchor(scale, rotation, zoom),
     creationDraftAnchor: () => memoDraftAnchor(),
     selection: () => model().selected,
-    hitKind: (pon, point, scale) =>
+    hitKind: (pon, point, scale, rotation, zoom) =>
       hitTest(
         model(),
         pon,
@@ -839,8 +950,9 @@ export function createAnnotationCapability(
         model().hitMargin,
         pageBoxOf(pon),
         inertIdsAt(pon),
+        viewEnv(zoom, rotation),
       ).t,
-    cursorAt: (pon, point, scale) =>
+    cursorAt: (pon, point, scale, rotation, zoom) =>
       cursorAt(
         model(),
         pon,
@@ -849,6 +961,7 @@ export function createAnnotationCapability(
         model().hitMargin,
         pageBoxOf(pon),
         inertIdsAt(pon),
+        viewEnv(zoom, rotation),
       ),
     behaviorFor: (a) => behaviors.find((b) => b.matches(a) && b.engaged()) ?? null,
 
@@ -889,7 +1002,7 @@ export function createAnnotationCapability(
     },
 
     // intents
-    editPointer: (phase, pon, point, shift, scale) =>
+    editPointer: (phase, pon, point, shift, scale, rotation, zoom) =>
       apply({
         t: 'editPointer',
         phase,
@@ -900,13 +1013,24 @@ export function createAnnotationCapability(
           pageBox: pageBoxOf(pon),
           chrome: chromeGeomAt(scale),
           inert: inertIdsAt(pon),
+          // the view env (screen-anchored bodies hit/clamp at their footprint)
+          ...(zoom != null ? { zoom } : {}),
+          ...(rotation != null ? { displayRotation: rotation } : {}),
         },
       }),
-    marqueePointer: (phase, pon, point, shift) =>
+    marqueePointer: (phase, pon, point, shift, scale, rotation, zoom) =>
       apply({
         t: 'marqueePointer',
         phase,
-        in: { pon, point, shift, pageBox: pageBoxOf(pon), inert: inertIdsAt(pon) },
+        in: {
+          pon,
+          point,
+          shift,
+          pageBox: pageBoxOf(pon),
+          inert: inertIdsAt(pon),
+          ...(zoom != null ? { zoom } : {}),
+          ...(rotation != null ? { displayRotation: rotation } : {}),
+        },
       }),
     createPointer: (tool, phase, pon, point, finish = false, displayRotation) => {
       // Resolve the authoring TOOL to its routing subtype + defaults key. Two
@@ -922,6 +1046,7 @@ export function createAnnotationCapability(
         preset: t?.preset ?? tool,
         intent: t?.intent,
         clickCreate: t?.clickCreate,
+        flags: t?.flags,
         deferInkCommit: (t?.ink?.groupStrokesMs ?? 0) > 0,
         straightenInk: t?.ink?.straighten,
         in: {
@@ -939,7 +1064,15 @@ export function createAnnotationCapability(
     finishInkDraft: () => apply({ t: 'finishInkDraft' }),
     cancelCreationDraft: () => apply({ t: 'cancel' }),
     createMarkup: (subtype, pon, rects, preset) =>
-      apply({ t: 'createMarkup', subtype, pon, rects, preset }),
+      // A markup tool's `/F` seed rides along (the preset IS the tool id).
+      apply({
+        t: 'createMarkup',
+        subtype,
+        pon,
+        rects,
+        preset,
+        flags: preset ? registry.get(preset)?.flags : undefined,
+      }),
     createCaret: (pon, textEndRect) => apply({ t: 'createCaret', pon, rect: textEndRect }),
     createReplaceText: (pon, rects, textEndRect, preset) =>
       apply({ t: 'createReplaceText', pon, rects, endRect: textEndRect, preset }),
@@ -1060,12 +1193,21 @@ export function createAnnotationCapability(
     },
 
     // ── free-text (the editable-element layer) ──
-    textItems: (pon) => memoTexts(pon),
+    textItems: (pon, view) => memoTexts(pon, view),
     currentEditing: () => model().editing,
     beginTextEdit: (ref) => apply({ t: 'beginTextEdit', id: refKey(ref) }),
-    beginTextEditAt: (pon, point, scale) => {
+    beginTextEditAt: (pon, point, scale, rotation, zoom) => {
       const m = model();
-      const h = hitTest(m, pon, point, chromeGeomAt(scale), m.hitMargin, pageBoxOf(pon));
+      const h = hitTest(
+        m,
+        pon,
+        point,
+        chromeGeomAt(scale),
+        m.hitMargin,
+        pageBoxOf(pon),
+        undefined,
+        viewEnv(zoom, rotation),
+      );
       // A double-click on the box body OR one of its resize handles both target the
       // same annotation; either should open it for editing.
       const id = h.t === 'annot' || h.t === 'handle' ? h.id : null;

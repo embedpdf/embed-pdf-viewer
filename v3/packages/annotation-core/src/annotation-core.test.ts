@@ -19,6 +19,7 @@ import {
 } from './view';
 import { cursorAt, groupUnionBounds, hitTest } from './hit';
 import { capsFor } from './kinds';
+import { DRAWN_FLAGS } from './flags';
 import {
   chordThrough,
   geomBounds,
@@ -539,7 +540,7 @@ describe('annotation-core', () => {
         blendMode: 'normal',
         border: { kind: 'solid' },
       },
-      locked: false,
+      flags: DRAWN_FLAGS,
       source: 'vector',
     };
     const corner = { x: 290, y: 110 }; // inside the bbox, far from the diagonal stroke
@@ -609,22 +610,33 @@ describe('annotation-core', () => {
     expect(m.selected).toEqual([b, a]);
   });
 
-  it('marquee ignores locked or otherwise unselectable annotations', () => {
-    const locked: Annot = {
-      id: 'locked',
+  it('marquee ignores INERT annotations (readOnly) but still takes locked ones', () => {
+    const square = (id: string, flags: Annot['flags']): Annot => ({
+      id,
       ref: null,
       pon: PON,
       subtype: 'square',
       geom: { t: 'rect', rect: { x: 10, y: 10, width: 50, height: 50 }, ellipse: false },
       style: initialModel.style,
-      locked: true,
+      flags,
       source: 'vector',
-    };
-    let m = update(initialModel, { t: 'loaded', annots: [locked] })[0];
-
+    });
+    // readOnly = no interaction at all (ISO 32000): the marquee skips it.
+    let m = update(initialModel, {
+      t: 'loaded',
+      annots: [square('ro', { ...DRAWN_FLAGS, readOnly: true })],
+    })[0];
     m = run(m, [marqueePtr('down', 0, 0), marqueePtr('move', 80, 80), marqueePtr('up', 80, 80)]);
-
     expect(m.selected).toEqual([]);
+
+    // locked = frozen, NOT inert: it selects (so you can inspect/unlock it) —
+    // it just won't move/resize/delete.
+    m = update(initialModel, {
+      t: 'loaded',
+      annots: [square('lk', { ...DRAWN_FLAGS, locked: true })],
+    })[0];
+    m = run(m, [marqueePtr('down', 0, 0), marqueePtr('move', 80, 80), marqueePtr('up', 80, 80)]);
+    expect(m.selected).toEqual(['lk']);
   });
 
   it('active marquee draft emits a marquee chrome node', () => {
@@ -689,7 +701,7 @@ describe('annotation-core', () => {
         blendMode: 'normal',
         border: { kind: 'solid' },
       },
-      locked: false,
+      flags: DRAWN_FLAGS,
       source: 'vector',
     };
     const m = update(initialModel, { t: 'loaded', annots: [line] })[0];
@@ -723,7 +735,7 @@ describe('annotation-core', () => {
         blendMode: 'normal',
         border: { kind: 'solid' },
       },
-      locked: false,
+      flags: DRAWN_FLAGS,
       source: 'vector',
     };
     const m = update(initialModel, { t: 'loaded', annots: [line] })[0];
@@ -1108,7 +1120,7 @@ describe('annotation-core', () => {
         blendMode: 'normal',
         border: { kind: 'solid' },
       },
-      locked: false,
+      flags: DRAWN_FLAGS,
       source: 'vector',
     };
     let m = update(initialModel, { t: 'loaded', annots: [ink] })[0];
@@ -1177,12 +1189,15 @@ describe('annotation-core', () => {
       createPtr('square', 'up', 60, 60),
     ]);
     const id = m.order[0];
-    m = { ...m, byId: { ...m.byId, [id]: { ...m.byId[id], locked: true } } };
+    m = {
+      ...m,
+      byId: { ...m.byId, [id]: { ...m.byId[id], flags: { ...DRAWN_FLAGS, locked: true } } },
+    };
     const [locked, lockedFx] = update(m, { t: 'setProps', patch: { color: '#00ff00' } });
     expect(locked.byId[id].style.color).not.toBe('#00ff00');
     expect(lockedFx).toEqual([]);
     // a font key on a square: not declared → no change, no effect
-    m = { ...m, byId: { ...m.byId, [id]: { ...m.byId[id], locked: false } } };
+    m = { ...m, byId: { ...m.byId, [id]: { ...m.byId[id], flags: DRAWN_FLAGS } } };
     const [next, fx] = update(m, { t: 'setProps', patch: { fontSize: 24 } });
     expect(next).toBe(m);
     expect(fx).toEqual([]);
@@ -1231,7 +1246,7 @@ describe('annotation-core', () => {
         blendMode: 'multiply',
         border: { kind: 'solid' },
       },
-      locked: false,
+      flags: DRAWN_FLAGS,
       source: 'baked',
     };
     const m0 = update(initialModel, { t: 'loaded', annots: [hl] })[0];
@@ -1264,7 +1279,7 @@ describe('annotation-core', () => {
       blendMode: 'normal',
       border: { kind: 'solid' },
     },
-    locked: false,
+    flags: DRAWN_FLAGS,
     source: 'vector',
     ...(group ? { group } : {}),
   });
@@ -1387,7 +1402,7 @@ describe('annotation-core', () => {
         blendMode: 'normal',
         border: { kind: 'solid' },
       },
-      locked: false,
+      flags: DRAWN_FLAGS,
       source: 'vector',
     };
     const highlight: Annot = {
@@ -1414,7 +1429,7 @@ describe('annotation-core', () => {
         blendMode: 'multiply',
         border: { kind: 'solid' },
       },
-      locked: false,
+      flags: DRAWN_FLAGS,
       source: 'vector',
     };
     // square added FIRST, highlight SECOND — naive creation order would paint the
@@ -1646,7 +1661,7 @@ describe('annotation-core — rotation', () => {
     subtype: 'square',
     geom: { t: 'rect', rect, ellipse: false },
     style: initialModel.style,
-    locked: false,
+    flags: DRAWN_FLAGS,
     source: 'baked',
   });
 
@@ -1775,7 +1790,7 @@ describe('annotation-core — rotation-aware selection (grab + menu + group)', (
     subtype: 'square',
     geom,
     style: initialModel.style,
-    locked: false,
+    flags: DRAWN_FLAGS,
     source: 'baked',
   });
   const rect = (x: number, y: number, width: number, height: number): Geom => ({
@@ -1858,7 +1873,7 @@ describe('annotation-core — rotation pivots about the rect centre', () => {
     subtype: 'square',
     geom,
     style: initialModel.style,
-    locked: false,
+    flags: DRAWN_FLAGS,
     source: 'baked',
   });
 
@@ -1970,7 +1985,7 @@ describe('annotation-core — selectionAnchor carries the knob alongside a centr
     subtype: 'square',
     geom,
     style: initialModel.style,
-    locked: false,
+    flags: DRAWN_FLAGS,
     source: 'baked',
   });
   const rect = (x: number, y: number, width: number, height: number): Geom => ({
@@ -2204,7 +2219,7 @@ describe('annotation-core opaqueBody (stamp) gestures', () => {
       blendMode: 'normal',
       border: { kind: 'solid' },
     },
-    locked: false,
+    flags: DRAWN_FLAGS,
     source: 'baked',
     apBox: { ...STAMP_RECT },
   });
@@ -2424,7 +2439,7 @@ describe('annotation-core — snapping', () => {
     subtype: 'square',
     geom: { t: 'rect', rect, ellipse: false, ...(rot ? { rot } : {}) },
     style: initialModel.style,
-    locked: false,
+    flags: DRAWN_FLAGS,
     source: 'baked',
   });
   const seeded = (...annots: Annot[]): Model => update(initialModel, { t: 'loaded', annots })[0];
@@ -2667,7 +2682,7 @@ describe('page-bound rotate knob', () => {
       blendMode: 'normal',
       border: { kind: 'solid' },
     },
-    locked: false,
+    flags: DRAWN_FLAGS,
     source: 'baked',
     apBox: { ...rect },
   });
@@ -2850,7 +2865,7 @@ describe('rotate guides (live rotate chrome mode)', () => {
       blendMode: 'normal',
       border: { kind: 'solid' },
     },
-    locked: false,
+    flags: DRAWN_FLAGS,
     source: 'baked',
     apBox: { ...rect },
   });
@@ -2959,7 +2974,7 @@ describe('group chrome rides live gestures', () => {
       blendMode: 'normal',
       border: { kind: 'solid' },
     },
-    locked: false,
+    flags: DRAWN_FLAGS,
     source: 'baked',
     apBox: { ...rect },
   });
@@ -3068,7 +3083,7 @@ describe('marquee vs rotated shapes', () => {
       blendMode: 'normal',
       border: { kind: 'solid' },
     },
-    locked: false,
+    flags: DRAWN_FLAGS,
     source: 'vector',
   };
   const m = update(initialModel, { t: 'loaded', annots: [bar] })[0];
@@ -3337,7 +3352,7 @@ describe('apVersion: baked /AP content versioning (what re-fetches a raster)', (
       subtype,
       geom: { t: 'rect', rect: { x: 100, y: 100, width: 100, height: 60 }, ellipse: false },
       style: initialStyle,
-      locked: false,
+      flags: DRAWN_FLAGS,
       source: 'baked',
       apBox: { x: 100, y: 100, width: 100, height: 60 },
     };
@@ -3419,7 +3434,7 @@ describe('apVersion: baked /AP content versioning (what re-fetches a raster)', (
       subtype: 'widget-text',
       geom: { t: 'rect', rect: { x: 10, y: 10, width: 120, height: 24 }, ellipse: false },
       style: initialStyle,
-      locked: false,
+      flags: DRAWN_FLAGS,
       source: 'baked',
       apBox: { x: 10, y: 10, width: 120, height: 24 },
     };

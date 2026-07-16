@@ -7,6 +7,7 @@
  * mixed selection.
  */
 import { propsFor, type PropSpec } from './kinds';
+import { annotTransformable } from './flags';
 import type {
   Annot,
   AnnotationProps,
@@ -87,11 +88,14 @@ export function readProp<K extends PropKey>(a: Annot, key: K): AnnotationProps[K
 
 /**
  * Apply a property patch to one annotation, honouring its kind's declared keys.
- * Returns the changed annotation, or `null` when nothing applied (locked, or no
- * declared key in the patch) — so the caller emits no spurious engine write.
+ * Returns the changed annotation, or `null` when nothing applied (locked /
+ * read-only per its `/F` flags, or no declared key in the patch) — so the
+ * caller emits no spurious engine write. Flags themselves are NOT props: they
+ * write through the `setFlags` message, which is deliberately not gated here
+ * (unlocking must work on a locked annotation).
  */
 export function applyProps(a: Annot, patch: AnnotationPropsPatch): Annot | null {
-  if (a.locked) return null;
+  if (!annotTransformable(a)) return null;
   const takes = new Set<PropKey>(propsFor(a.subtype).map((s) => s.key));
   let next = a;
 

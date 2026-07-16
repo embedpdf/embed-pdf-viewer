@@ -82,7 +82,9 @@ const strikeoutDTO = (): AnnotationDTO => {
 function harness() {
   let state = initialAnnotationState();
   const create = vi.fn();
+  const update = vi.fn();
   const remove = vi.fn(async () => ({}));
+  const list = vi.fn();
   const ctx = {
     getState: () => state,
     dispatch: (action: AnnotationAction) => {
@@ -90,14 +92,16 @@ function harness() {
     },
     document: () => ({ pages: [{ pageObjectNumber: PON, boxes: { crop: CROP } }] }),
     doc: {
-      page: () => ({ annotations: { create, delete: remove } }),
+      page: () => ({ annotations: { create, update, delete: remove, list } }),
     },
     tryGet: () => null,
   } as unknown as PluginContext<AnnotationState, AnnotationAction>;
   return {
     capability: createAnnotationCapability(ctx),
     create,
+    update,
     remove,
+    list,
     state: () => state,
   };
 }
@@ -146,5 +150,84 @@ describe('Replace Text grouped persistence', () => {
     h.capability.createReplaceText(PON, [rect], rect, 'replace-text');
     await vi.waitFor(() => expect(h.remove).toHaveBeenCalledWith(ref(10)));
     await vi.waitFor(() => expect(h.state().model.order).toHaveLength(0));
+  });
+});
+
+describe('annotation flags', () => {
+  const squareDTO = (n: number, flags: Partial<AnnotationFlags> = {}): AnnotationDTO =>
+    ({
+      ...base(n),
+      flags: { ...NO_FLAGS, ...flags },
+      subtype: 'square',
+      rect: { left: 100, bottom: 700, right: 180, top: 760 },
+      color: { r: 0, g: 0, b: 0 },
+      opacity: 1,
+      strokeWidth: 2,
+      inReplyTo: null,
+      replyType: null,
+    }) as AnnotationDTO;
+
+  /** Load one page of DTOs into the model through the real `ensurePage` path. */
+  const loadPage = async (h: ReturnType<typeof harness>, dtos: AnnotationDTO[]) => {
+    h.list.mockResolvedValueOnce({ annotations: dtos });
+    h.capability.ensurePage(PON);
+    await vi.waitFor(() => expect(h.state().model.order.length).toBe(dtos.length));
+  };
+
+  it('updateSelectionFlags writes a flags-only engine patch and keeps the render source', async () => {
+    const h = harness();
+    await loadPage(h, [squareDTO(20)]);
+    const id = h.state().model.order[0];
+    h.capability.select(ref(20));
+    h.update.mockResolvedValueOnce({ updated: squareDTO(20, { locked: true }) });
+
+    h.capability.updateSelectionFlags({ locked: true });
+    // optimistic: the model flips immediately, source untouched (still baked)
+    expect(h.state().model.byId[id].flags.locked).toBe(true);
+    expect(h.state().model.byId[id].source).toBe('baked');
+
+    await vi.waitFor(() => expect(h.update).toHaveBeenCalledTimes(1));
+    const [wref, patch] = h.update.mock.calls[0]!;
+    expect(wref).toEqual(ref(20));
+    // a flags-ONLY patch: no geometry/style keys ride along, so nothing re-bakes
+    expect(patch).toEqual({
+      subtype: 'square',
+      flags: { ...NO_FLAGS, locked: true },
+    });
+    // the re-sync preserves 'baked'
+    await vi.waitFor(() => expect(h.state().model.byId[id].source).toBe('baked'));
+  });
+
+  it('getSelectionFlags reports uniform values and null for mixed', async () => {
+    const h = harness();
+    await loadPage(h, [squareDTO(21, { locked: true }), squareDTO(22)]);
+    expect(h.capability.getSelectionFlags()).toBeNull(); // nothing selected
+    h.capability.select(ref(21));
+    h.capability.select(ref(22), { add: true });
+    const flags = h.capability.getSelectionFlags();
+    expect(flags?.print).toBe(true); // uniform
+    expect(flags?.locked).toBeNull(); // mixed
+    expect(flags?.hidden).toBe(false);
+  });
+
+  it('unlocking works on a locked annotation (setFlags bypasses the locked gate)', async () => {
+    const h = harness();
+    await loadPage(h, [squareDTO(23, { locked: true })]);
+    const id = h.state().model.order[0];
+    h.capability.select(ref(23));
+    h.update.mockResolvedValueOnce({ updated: squareDTO(23) });
+    h.capability.updateSelectionFlags({ locked: false });
+    expect(h.state().model.byId[id].flags.locked).toBe(false);
+    await vi.waitFor(() => expect(h.update).toHaveBeenCalledTimes(1));
+  });
+
+  it('the data-API create defaults /F to print when the caller omits flags', async () => {
+    const h = harness();
+    h.create.mockResolvedValueOnce({ created: squareDTO(24) });
+    await h.capability.create(PON, {
+      subtype: 'square',
+      rect: { left: 0, bottom: 0, right: 10, top: 10 },
+    } as Parameters<typeof h.capability.create>[1]);
+    expect(h.create.mock.calls[0]![0]).toMatchObject({ flags: { print: true } });
   });
 });

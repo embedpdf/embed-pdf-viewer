@@ -34,6 +34,34 @@ export {
 export type { TextBox } from './view';
 export { hitTest, cursorAt, isSelectable, canMove, type Target } from './hit';
 export { groupKeyOf, groupMembers, expandGroups, groupCaps, type GroupCaps } from './group';
+// `/F` annotation flags: the predicates are the ONE spec interpretation.
+export {
+  DRAWN_FLAGS,
+  FLAG_KEYS,
+  NO_ANNOTATION_FLAGS,
+  annotContentsEditable,
+  annotInteractive,
+  annotTransformable,
+  flagsEqual,
+  interactive,
+  mergeFlags,
+  viewable,
+  type AnnotationFlags,
+  type FlagBearer,
+} from './flags';
+// Screen-anchored (`noZoom`/`noRotate`) bodies: display-transform exemptions.
+// One projection (`anchoredGeom`) + its exact inverse (`unanchoredGeom`),
+// shared by render / hit / chrome / gestures.
+export {
+  anchorModeOf,
+  anchorOf,
+  anchoredBox,
+  anchoredGeom,
+  anchoredStrokeWidth,
+  unanchoredGeom,
+  type AnchorMode,
+  type ViewEnv,
+} from './anchor';
 export {
   KINDS,
   capsFor,

@@ -12,6 +12,7 @@
  * existing tool's subtype/cursor/tags so a preset is one line.
  */
 import type {
+  AnnotationFlags,
   AnnotationPropsPatch,
   ClickCreate,
   InkStraightenOptions,
@@ -162,6 +163,13 @@ export interface AnnotationToolDef<K extends ToolAuthoringKind = ToolAuthoringKi
   /** Seed defaults for newly drawn annotations — the flat AnnotationProps patch,
    *  merged over any inherited defaults (line endings merge per side). */
   defaults?: ToolDefaultsFor<K>;
+  /**
+   * `/F` annotation flags seeded on everything this tool creates, merged over
+   * the drawn default (`print` set — Acrobat parity) and any inherited seed.
+   * A note tool passes `{ noZoom: true, noRotate: true }` so its icons stay
+   * screen-sized and upright (the spec's rule for Text annotations).
+   */
+  flags?: Partial<AnnotationFlags>;
   /** The pointer cursor while this tool is active. Defaults inherited / `crosshair`. */
   cursor?: string;
   /** Interaction capability tags this tool enables (which handlers wake up). */
@@ -260,6 +268,8 @@ export interface ResolvedTool {
   cursor: string;
   enables: ReadonlySet<string>;
   defaults?: AnnotationPropsPatch;
+  /** `/F` seed for created annotations (see {@link AnnotationToolDef.flags}). */
+  flags?: Partial<AnnotationFlags>;
   source?: StampSourceSpec;
   selection?: SelectionAuthoring;
   intent?: InkIntent;
@@ -457,6 +467,7 @@ function mergeDef(base: AnnotationToolDef, over: AnnotationToolDef): AnnotationT
     enables: over.enables ?? base.enables,
     meta: base.meta || over.meta ? { ...base.meta, ...over.meta } : undefined,
     defaults: mergeDefaults(base.defaults, over.defaults),
+    flags: base.flags || over.flags ? { ...base.flags, ...over.flags } : undefined,
     ink: base.ink || over.ink ? { ...base.ink, ...over.ink } : undefined,
   };
 }
@@ -514,6 +525,7 @@ export function buildToolRegistry(
       cursor: def.cursor ?? base?.cursor ?? 'crosshair',
       enables: new Set(def.enables ?? (base ? [...base.enables] : [])),
       defaults: mergeDefaults(base?.defaults, def.defaults),
+      flags: base?.flags || def.flags ? { ...base?.flags, ...def.flags } : undefined,
       source: def.source ?? base?.source,
       selection: def.selection ?? base?.selection,
       intent: def.intent ?? base?.intent,

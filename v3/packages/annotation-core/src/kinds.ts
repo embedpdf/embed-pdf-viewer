@@ -42,8 +42,9 @@ export type PropSpec =
   | { key: 'textAlign'; label: string }
   | { key: 'blendMode'; label: string };
 
-/** Orthogonal capability flags. Static data — `locked` is the one runtime override
- *  (a locked annotation is never editable regardless of these). */
+/** Orthogonal capability flags. Static data — the annotation's `/F` flags are
+ *  the runtime overrides (a locked annotation is never transformable, a hidden
+ *  one never renders, regardless of these — see flags.ts). */
 export interface KindCaps {
   /** Can be clicked to select. */
   selectable: boolean;
@@ -80,6 +81,16 @@ export interface KindCaps {
   /** The whole body is visible content, so hit-testing grabs anywhere inside
    *  the box (stamp images) — NOT just the stroke/fill like outline shapes. */
   opaqueBody: boolean;
+  /** The `/F` ReadOnly flag is IGNORED for this kind (ISO 32000: widgets — a
+   *  ReadOnly form FIELD must still be movable by a form designer; the
+   *  form-filling layer enforces field ReadOnly itself). */
+  ignoresReadOnly: boolean;
+  /** Behaves as if `/F` NoZoom is always set (screen-constant size — the
+   *  spec's rule for Text/note icons). See anchor.ts. */
+  noZoom: boolean;
+  /** Behaves as if `/F` NoRotate is always set (screen-upright — the spec's
+   *  rule for Text/note icons). See anchor.ts. */
+  noRotate: boolean;
 }
 
 export interface AnnotationKind {
@@ -169,6 +180,9 @@ const caps = (c: Partial<KindCaps>): KindCaps => ({
   hasEndings: false,
   hasCloudy: false,
   opaqueBody: false,
+  ignoresReadOnly: false,
+  noZoom: false,
+  noRotate: false,
   ...c,
 });
 
@@ -188,6 +202,7 @@ export const KINDS: Record<string, AnnotationKind> = {
       groupMovable: true,
       hasFill: true,
       opaqueBody: true,
+      ignoresReadOnly: true,
     }),
     props: WIDGET_TEXT_PROPS,
   },
@@ -201,6 +216,7 @@ export const KINDS: Record<string, AnnotationKind> = {
       groupMovable: true,
       hasFill: true,
       opaqueBody: true,
+      ignoresReadOnly: true,
     }),
     props: WIDGET_TEXT_PROPS,
   },
@@ -214,6 +230,7 @@ export const KINDS: Record<string, AnnotationKind> = {
       groupMovable: true,
       hasFill: true,
       opaqueBody: true,
+      ignoresReadOnly: true,
     }),
     props: WIDGET_TEXT_PROPS,
   },
@@ -227,6 +244,7 @@ export const KINDS: Record<string, AnnotationKind> = {
       groupMovable: true,
       hasFill: true,
       opaqueBody: true,
+      ignoresReadOnly: true,
     }),
     props: WIDGET_BOX_PROPS,
   },
@@ -240,6 +258,7 @@ export const KINDS: Record<string, AnnotationKind> = {
       groupMovable: true,
       hasFill: true,
       opaqueBody: true,
+      ignoresReadOnly: true,
     }),
     props: WIDGET_BOX_PROPS,
   },

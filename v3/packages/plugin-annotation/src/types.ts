@@ -11,6 +11,7 @@ import type {
 } from '@embedpdf/engine-core/runtime';
 import type { AnnotationToolInput, ResolvedTool } from './tools';
 import type {
+  AnnotationFlags,
   AnnotationProps,
   AnnotationPropsPatch,
   ChromeNode,
@@ -25,6 +26,7 @@ import type {
   SnapSettings,
   Subtype,
   Vec,
+  ViewEnv,
 } from '@embedpdf-x/annotation-core';
 
 /**
@@ -184,6 +186,14 @@ export interface SelectionProps {
 }
 
 /**
+ * The selection's `/F` flag state, ready for a menu/sidebar: one value per
+ * flag — `true`/`false` when every selected annotation agrees, `null` when
+ * they differ (render an indeterminate control). The read half of
+ * {@link AnnotationCapability.updateSelectionFlags}.
+ */
+export type SelectionFlags = { [K in keyof AnnotationFlags]: boolean | null };
+
+/**
  * A free-text annotation projected for the framework: the box (content space,
  * live gesture applied) + the plain text + an `editing` flag + a ready-to-spread
  * CSS style. The framework renders ONE editable element from this and nothing
@@ -248,6 +258,21 @@ export interface AnnotationCapability {
    * write per changed member re-syncs from the authoritative DTO.
    */
   updateSelection(patch: AnnotationPropsPatch): void;
+  /**
+   * Merge a `/F` flags patch into the current selection — the write half of
+   * {@link getSelectionFlags}. Optimistic; one flags-only engine write per
+   * changed member, which never re-bakes an appearance. Deliberately NOT
+   * blocked by `locked`: this is how you unlock (Acrobat's Locked checkbox
+   * stays live on a locked annotation). E.g. `{ locked: true }`,
+   * `{ print: false }`, `{ hidden: true }`.
+   */
+  updateSelectionFlags(patch: Partial<AnnotationFlags>): void;
+  /**
+   * The selection's `/F` flag state: per-flag `true`/`false`, or `null` when
+   * the selected annotations disagree (indeterminate). `null` overall when
+   * nothing is selected. Stable reference between model changes.
+   */
+  getSelectionFlags(): SelectionFlags | null;
 
   // ── property introspection (the machine-readable "what can I edit here") ──
   /**
@@ -423,16 +448,32 @@ export type StampProvider = (req: StampPromptRequest) => Promise<BinarySource | 
  */
 export interface AnnotationHostCapability extends AnnotationCapability {
   // ── render projection (consumed by the framework render layer) ──
-  pageItems(pon: PageObjectNumber): RenderItem[];
+  /** `view` (the page's scale + total display rotation, from its transform)
+   *  projects screen-anchored (`noZoom`/`noRotate`) bodies to their effective
+   *  footprint. Pass it from the page context; absent → stored geometry. */
+  pageItems(pon: PageObjectNumber, view?: ViewEnv): RenderItem[];
   /** `scale` (view px per content unit, from the page's transform) converts the
    *  px chrome settings into content units — pass it so the knob stalk and grab
-   *  zones are screen-constant. Absent → settings are read as content units. */
-  chrome(pon: PageObjectNumber, scale?: number): ChromeNode[];
+   *  zones are screen-constant. `rotation` (the page's total display rotation)
+   *  and `zoom` (the page's zoom RELATIVE to its 100% baseline —
+   *  `transform.zoom`, NOT `viewScale`) complete the view env for
+   *  screen-anchored bodies. Absent scale → settings are read as content
+   *  units. */
+  chrome(
+    pon: PageObjectNumber,
+    scale?: number,
+    rotation?: PageRotation,
+    zoom?: number,
+  ): ChromeNode[];
   /** The anchor for a selection-aware floating menu: the primary page + the
    *  selection's union box on that page (content space), or null when nothing
    *  selectable is selected. One anchor regardless of cross-page selection.
-   *  `scale` as in {@link chrome} (the anchor page's view scale). */
-  selectionAnchor(scale?: number): { pon: PageObjectNumber; bounds: Rect; knob?: Vec } | null;
+   *  `scale`/`rotation`/`zoom` as in {@link chrome} (the anchor page's view). */
+  selectionAnchor(
+    scale?: number,
+    rotation?: PageRotation,
+    zoom?: number,
+  ): { pon: PageObjectNumber; bounds: Rect; knob?: Vec } | null;
   /** The anchor + action state for a live multi-click creation draft, or null. */
   creationDraftAnchor(): CreationDraftAnchor | null;
   /** Cache key for a page's baked appearances: the COMMITTED id + AP box of every
@@ -460,8 +501,9 @@ export interface AnnotationHostCapability extends AnnotationCapability {
    */
   reloadPage(pon: PageObjectNumber): Promise<void>;
   // ── free-text (the editable-element layer) ──
-  /** The free-text boxes on a page, ready to render as editable elements. */
-  textItems(pon: PageObjectNumber): TextItem[];
+  /** The free-text boxes on a page, ready to render as editable elements.
+   *  `view` as in {@link pageItems}. */
+  textItems(pon: PageObjectNumber, view?: ViewEnv): TextItem[];
   /** The id of the annotation currently being text-edited, or null. Read live (not
    *  from a stale render) so the editor can tell a real exit from a focus-steal. */
   currentEditing(): Id | null;
@@ -469,7 +511,13 @@ export interface AnnotationHostCapability extends AnnotationCapability {
   beginTextEdit(ref: AnnotationRef): void;
   /** Enter text-edit on whatever free-text box is under a content point — wired
    *  to a double-click by the interaction edit handler. */
-  beginTextEditAt(pon: PageObjectNumber, point: Vec, scale?: number): void;
+  beginTextEditAt(
+    pon: PageObjectNumber,
+    point: Vec,
+    scale?: number,
+    rotation?: PageRotation,
+    zoom?: number,
+  ): void;
   /** Apply the editor's plain text — optimistic locally, debounced to the engine. */
   setContents(ref: AnnotationRef, text: string): void;
   /** Leave text-edit (flush any pending write). */
@@ -477,14 +525,24 @@ export interface AnnotationHostCapability extends AnnotationCapability {
   // ── hit-testing & cursor (consumed by the interaction edit handler) ──
   /** What's under a content point — for the edit handler's capture decision.
    *  `scale` (the page's view px per content unit) keeps grab zones
-   *  screen-constant; pass it from the pointer sample. */
+   *  screen-constant; `rotation` + `zoom` (relative, `transform.zoom`)
+   *  complete the view env for screen-anchored bodies. Pass all three from
+   *  the pointer sample. */
   hitKind(
     pon: PageObjectNumber,
     point: Vec,
     scale?: number,
+    rotation?: PageRotation,
+    zoom?: number,
   ): 'handle' | 'rotate' | 'group-handle' | 'annot' | 'empty';
   /** The cursor to show at a content point (resize over a handle, move/pointer over a body, else null). */
-  cursorAt(pon: PageObjectNumber, point: Vec, scale?: number): string | null;
+  cursorAt(
+    pon: PageObjectNumber,
+    point: Vec,
+    scale?: number,
+    rotation?: PageRotation,
+    zoom?: number,
+  ): string | null;
   behaviorFor(a: { subtype: Subtype; ref: AnnotationRef | null }): Behavior | null;
   /** Drop selected annotations whose Behavior is currently ENGAGED — inert
    *  things cannot stay selected. Call after anything that flips engagement
@@ -497,12 +555,17 @@ export interface AnnotationHostCapability extends AnnotationCapability {
     point: Vec,
     shift: boolean,
     scale?: number,
+    rotation?: PageRotation,
+    zoom?: number,
   ): void;
   marqueePointer(
     phase: 'down' | 'move' | 'up',
     pon: PageObjectNumber,
     point: Vec,
     shift: boolean,
+    scale?: number,
+    rotation?: PageRotation,
+    zoom?: number,
   ): void;
   /** Run the draw gesture for an authoring TOOL (by id). The plugin resolves it
    *  to a routing subtype + defaults preset; a bare subtype also works (headless).

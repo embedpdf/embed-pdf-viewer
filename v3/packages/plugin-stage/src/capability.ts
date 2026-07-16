@@ -621,6 +621,10 @@ export function createStageCapability(
         pageSize,
         rotation: box.rotation,
         scale: box.contentScale * c.zoom,
+        // The page's PHYSICAL 100%: platform unit factor × its /UserUnit — so
+        // `transform.zoom` reads as "percent of Acrobat's 100%" per page,
+        // independent of sizing mode or camera state.
+        baseScale: ctx.getState().viewUnitsPerPoint * (reg?.userUnit ?? 1),
         dpr: ratio,
       }),
     };
@@ -725,6 +729,7 @@ export function createStageCapability(
             point: p.transform.viewToPage({ x: lx, y: ly }),
             scale: p.transform.viewScale,
             rotation: p.rotation,
+            zoom: p.transform.zoom,
           };
         }
       }

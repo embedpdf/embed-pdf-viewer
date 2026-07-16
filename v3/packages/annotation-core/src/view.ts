@@ -16,6 +16,7 @@ import {
   placeRotateKnob,
   rectFromPoints,
   rectHandlesFor,
+  normalizeDeg,
   rotatePoint,
   selectionBounds,
   selectionQuad,
@@ -26,10 +27,19 @@ import {
 import { groupCaps } from './group';
 import { isSelectable, paintOrder } from './hit';
 import { capsFor } from './kinds';
+import { annotTransformable, viewable } from './flags';
+import {
+  anchoredBox,
+  anchoredGeom,
+  anchoredStrokeWidth,
+  anchorModeOf,
+  anchorOf,
+  type ViewEnv,
+} from './anchor';
 import { blendFor } from './scene';
 import { styleFromProps } from './props';
 import { calloutBox, defaultsFor, rotateDraftDelta } from './update';
-import type { ChromeNode, Geom, Id, Model, Rect, RenderItem, Vec } from './types';
+import type { Annot, ChromeNode, Geom, Id, Model, Rect, RenderItem, Style, Vec } from './types';
 import type { CreationDraftAnchor } from './types';
 
 const DRAFT_ID = '__draft__';
@@ -40,43 +50,73 @@ const polyPreviewPoints = (points: Vec[], cur: Vec): Vec[] => {
   return last && (cur.x !== last.x || cur.y !== last.y) ? [...points, cur] : points;
 };
 
-function effGeom(m: Model, id: Id): Geom {
+/**
+ * The gesture-effective geometry, in VIEW space: PROJECT FIRST (screen-
+ * anchored bodies to their effective footprint — the identity for everyone
+ * else), then apply the live gesture. Gestures compose in view space: the
+ * pointer, the drafts' pivots/boxes, and a `handle` draft's geometry all live
+ * there already, so ONE code path serves flagged and unflagged annotations —
+ * and the commit (`editUp`) maps the same composition back through
+ * `unanchoredGeom`, so preview ≡ commit by construction. THE geometry every
+ * selector below hands out, so render/chrome/bounds agree with hit.
+ */
+function effGeom(m: Model, id: Id, view: ViewEnv | undefined): Geom {
   const a = m.byId[id];
+  const g = anchoredGeom(a.geom, anchorModeOf(a), view);
   const d = m.draft;
   if (d) {
-    if (d.g === 'move' && d.ids.includes(id)) return geomTranslate(a.geom, d.delta);
-    if (d.g === 'handle' && d.id === id) return d.cur;
+    if (d.g === 'move' && d.ids.includes(id)) return geomTranslate(g, d.delta);
+    if (d.g === 'handle' && d.id === id) return d.cur; // already view space
     if (d.g === 'rotate' && d.ids.includes(id)) {
       // The SAME snapped angle rule the commit uses (see `rotateDraftDelta`).
-      return geomRotateAbout(a.geom, d.pivot, rotateDraftDelta(m, d).delta);
+      return geomRotateAbout(g, d.pivot, rotateDraftDelta(m, d).delta);
     }
     if (d.g === 'group' && d.ids.includes(id)) {
       const { sx, sy } = groupResizeFactors(d.base, d.cur);
-      return geomScaleAbout(a.geom, d.anchor, sx, sy);
+      return geomScaleAbout(g, d.anchor, sx, sy);
     }
   }
-  return a.geom;
+  return g;
 }
 
-/** The annotation's AP-raster box with the live move applied, so a baked bitmap
- *  follows a drag. Undefined for non-baked annotations.
+/** Style with the stroke width an anchored VECTOR body renders at (screen-
+ *  constant line weight); everyone else keeps their style verbatim. */
+function effStyle(a: Annot, view: ViewEnv | undefined): Style {
+  const mode = anchorModeOf(a);
+  if (!mode?.zoom || !view) return a.style;
+  return { ...a.style, strokeWidth: anchoredStrokeWidth(a.style.strokeWidth, mode, view) };
+}
+
+/** The blit placement for a baked raster: its box (view space, live move
+ *  applied) + the rotation to re-apply about the box centre.
  *
- *  `opaqueBody` kinds (stamp images) go further: their raster IS the visual, so
- *  the box follows EVERY live gesture — the unrotated rect of the effective
- *  geometry covers move, resize, and group-scale in one rule (rotation is a
- *  separate view transform via `RenderItem.rot`; rasters render unrotated). */
-function effApBox(m: Model, id: Id): Rect | undefined {
+ *  `opaqueBody` kinds (stamp images): the raster IS the visual, so the box
+ *  follows EVERY live gesture — the unrotated rect of the effective geometry
+ *  covers move, resize, and group-scale in one rule, and the effective
+ *  rotation drives the blit transform (a stamp spins with the gesture).
+ *
+ *  Everyone else blits by the AP `/Rect`: for a screen-anchored annotation
+ *  that box rides the SAME similarity the geometry projects through
+ *  (`anchoredBox`), composing its counter-rotation with any engine-stripped
+ *  `apRot` — so a baked noZoom/noRotate body renders screen-constant too. */
+function effAp(m: Model, id: Id, view: ViewEnv | undefined): { box?: Rect; rot?: number } {
   const a = m.byId[id];
-  if (!a.apBox) return undefined;
   if (capsFor(a.subtype).opaqueBody) {
-    const g = effGeom(m, id);
-    return 'rect' in g ? g.rect : a.apBox;
+    const g = effGeom(m, id, view);
+    return {
+      box: 'rect' in g ? g.rect : a.apBox,
+      rot: geomRotation(g) || undefined,
+    };
   }
+  if (!a.apBox) return { rot: a.apRot };
+  const projected = anchoredBox(a.apBox, anchorOf(a.geom), anchorModeOf(a), view);
+  let box = projected?.box ?? a.apBox;
+  const rot = normalizeDeg((a.apRot ?? 0) + (projected?.rot ?? 0)) || undefined;
   const d = m.draft;
   if (d?.g === 'move' && d.ids.includes(id)) {
-    return { ...a.apBox, x: a.apBox.x + d.delta.x, y: a.apBox.y + d.delta.y };
+    box = { ...box, x: box.x + d.delta.x, y: box.y + d.delta.y };
   }
-  return a.apBox;
+  return { box, rot };
 }
 
 /** Render source for one annotation: an in-progress resize renders LIVE (the
@@ -103,11 +143,12 @@ function textIsLive(m: Model, id: Id): boolean {
   return m.editing === id || effSource(m, id) === 'vector';
 }
 
-export function pageItems(m: Model, pon: number): RenderItem[] {
+export function pageItems(m: Model, pon: number, view?: ViewEnv): RenderItem[] {
   const items: RenderItem[] = [];
   // `paintOrder` puts text-layer markups beneath every other kind (back→front),
-  // so a highlight drawn after a circle still paints under it. The SAME order
-  // hit-testing uses, so what you click matches what you see.
+  // so a highlight drawn after a circle still paints under it — and culls what
+  // `/F` hides. The SAME order hit-testing uses, so what you click matches
+  // what you see.
   for (const id of paintOrder(m, pon)) {
     const a = m.byId[id];
     // Live (editing / resizing) free-text is rendered by the framework as an editable
@@ -116,26 +157,26 @@ export function pageItems(m: Model, pon: number): RenderItem[] {
     // exception: even while live, its leader/arrow/box-border draw via the vector
     // scene (only its TEXT is the DOM element), so it stays in the render list.
     if (a.geom.t === 'text' && !a.geom.callout && textIsLive(m, id)) continue;
-    const geom = effGeom(m, id);
-    // Blit rotation for the baked raster: opaqueBody kinds render their AP
-    // rotation-free by construction, so the LIVE geometry rotation drives the
-    // view transform (a stamp spins with the rotate gesture). Other kinds
-    // re-apply exactly what the engine stripped (`apRot` from the DTO) —
-    // vertex kinds have none, their rasters already contain the rotation.
-    const apRot = capsFor(a.subtype).opaqueBody ? geomRotation(geom) : a.apRot;
+    const geom = effGeom(m, id, view);
+    const style = effStyle(a, view);
+    // Blit box + rotation for the baked raster (see `effAp`): opaqueBody kinds
+    // follow the live effective geometry; everyone else blits by the AP /Rect,
+    // projected through the anchor similarity for screen-anchored bodies and
+    // composed with any engine-stripped `apRot`.
+    const ap = effAp(m, id, view);
     items.push({
       id,
       ref: a.ref,
       subtype: a.subtype,
       geom,
-      box: geomVisualBounds(geom, a.style.strokeWidth, a.style.border),
-      apBox: effApBox(m, id),
-      style: a.style,
+      box: geomVisualBounds(geom, style.strokeWidth, style.border),
+      apBox: ap.box,
+      style,
       ...(a.text ? { text: a.text } : {}),
       source: effSource(m, id),
       selected: m.selected.includes(id),
       rot: geomRotation(geom),
-      ...(apRot ? { apRot } : {}),
+      ...(ap.rot ? { apRot: ap.rot } : {}),
       blend: blendFor(a.style),
     });
   }
@@ -234,13 +275,14 @@ export interface TextBox {
 }
 
 /** The free-text boxes on a page — the text counterpart of `pageItems`. */
-export function textBoxes(m: Model, pon: number): TextBox[] {
+export function textBoxes(m: Model, pon: number, view?: ViewEnv): TextBox[] {
   const out: TextBox[] = [];
   for (const id of m.order) {
     const a = m.byId[id];
     if (a.pon !== pon || a.geom.t !== 'text') continue;
+    if (!viewable(a.flags, m.selected.includes(id))) continue; // `/F`-hidden
     if (!textIsLive(m, id)) continue; // baked → rendered as the /AP image instead
-    const g = effGeom(m, id);
+    const g = effGeom(m, id, view);
     if (g.t !== 'text') continue;
     out.push({ id, box: g.rect, editing: m.editing === id, rot: geomRotation(g) });
   }
@@ -249,19 +291,20 @@ export function textBoxes(m: Model, pon: number): TextBox[] {
 
 /** The currently selected annotations as render items (live gesture applied) —
  *  cross-page, for selection-aware toolbars (style + line-ending editing). */
-export function selectedItems(m: Model): RenderItem[] {
+export function selectedItems(m: Model, view?: ViewEnv): RenderItem[] {
   const items: RenderItem[] = [];
   for (const id of m.selected) {
     const a = m.byId[id];
     if (!a) continue;
-    const geom = effGeom(m, id);
+    const geom = effGeom(m, id, view);
+    const style = effStyle(a, view);
     items.push({
       id,
       ref: a.ref,
       subtype: a.subtype,
       geom,
-      box: geomVisualBounds(geom, a.style.strokeWidth, a.style.border),
-      style: a.style,
+      box: geomVisualBounds(geom, style.strokeWidth, style.border),
+      style,
       source: a.source,
       selected: true,
       rot: geomRotation(geom),
@@ -285,12 +328,17 @@ const boxCorners = (r: Rect): [Vec, Vec, Vec, Vec] => [
  * committed union (hit.ts `groupUnionBounds`): hits only happen between
  * gestures, where the two are identical.
  */
-function unionBoundsOf(m: Model, pon: number, geomOf: (id: Id) => Geom): Rect | null {
+function unionBoundsOf(
+  m: Model,
+  pon: number,
+  geomOf: (id: Id) => Geom,
+  view?: ViewEnv,
+): Rect | null {
   const corners: Vec[] = [];
   for (const id of m.selected) {
     const a = m.byId[id];
     if (!a || a.pon !== pon) continue;
-    corners.push(...selectionQuad(geomOf(id), a.style.strokeWidth, a.style.border));
+    corners.push(...selectionQuad(geomOf(id), effStyle(a, view).strokeWidth, a.style.border));
   }
   return corners.length ? unionRect(corners) : null;
 }
@@ -304,16 +352,23 @@ function placeSelectionKnob(
   pageBox: Rect | undefined,
   knobOffset: number,
   geomOf: (id: Id) => Geom,
+  view?: ViewEnv,
 ): { at: Vec; from: Vec } | null {
   const sel = m.selected.filter((id) => isSelectable(m, id) && m.byId[id].pon === pon);
   if (sel.length === 1) {
     const a = m.byId[sel[0]];
-    if (!capsFor(a.subtype).rotatable) return null;
-    const obb = obbFromGeom(geomOf(sel[0]), a.style.strokeWidth, a.style.border);
+    // No knob for a locked (frozen) annotation — the SAME gate hitTest
+    // applies, so the drawn knob is always grabbable and vice versa. A
+    // screen-anchored body keeps its knob: rotating edits its AUTHORED tilt
+    // (`noRotate` only exempts it from the page's rotation). The obb takes
+    // the PROJECTED stroke width (`effStyle`) — with the raw width, the knob
+    // drifts off the outline as zoom grows.
+    if (!capsFor(a.subtype).rotatable || !annotTransformable(a)) return null;
+    const obb = obbFromGeom(geomOf(sel[0]), effStyle(a, view).strokeWidth, a.style.border);
     return obb ? placeRotateKnob(obb.corners, knobOffset, pageBox) : null;
   }
   if (sel.length > 1 && groupCaps(m, sel).rotatable) {
-    const union = unionBoundsOf(m, pon, geomOf);
+    const union = unionBoundsOf(m, pon, geomOf, view);
     if (union) return placeRotateKnob(boxCorners(union), knobOffset, pageBox);
   }
   return null;
@@ -340,10 +395,18 @@ export function selectionKnob(
   pon: number,
   pageBox?: Rect,
   knobOffset: number = ROTATE_KNOB_OFFSET,
+  view?: ViewEnv,
 ): { at: Vec; from: Vec } | null {
   const d = m.draft;
   if (d?.g === 'rotate' && m.byId[d.ids[0]]?.pon === pon) {
-    const rest = placeSelectionKnob(m, pon, pageBox, knobOffset, (id) => m.byId[id].geom);
+    const rest = placeSelectionKnob(
+      m,
+      pon,
+      pageBox,
+      knobOffset,
+      (id) => anchoredGeom(m.byId[id].geom, anchorModeOf(m.byId[id]), view),
+      view,
+    );
     if (!rest) return null;
     const { delta } = rotateDraftDelta(m, d);
     return {
@@ -351,7 +414,7 @@ export function selectionKnob(
       from: rotatePoint(rest.from, d.pivot, delta),
     };
   }
-  return placeSelectionKnob(m, pon, pageBox, knobOffset, (id) => effGeom(m, id));
+  return placeSelectionKnob(m, pon, pageBox, knobOffset, (id) => effGeom(m, id, view), view);
 }
 
 export function chrome(
@@ -359,6 +422,7 @@ export function chrome(
   pon: number,
   pageBox?: Rect,
   knobOffset: number = ROTATE_KNOB_OFFSET,
+  view?: ViewEnv,
 ): ChromeNode[] {
   const nodes: ChromeNode[] = [];
   if (m.draft?.g === 'marquee' && m.draft.pon === pon) {
@@ -397,24 +461,28 @@ export function chrome(
   const sel = m.selected.filter((id) => isSelectable(m, id) && m.byId[id].pon === pon);
   if (sel.length === 1) {
     const a = m.byId[sel[0]];
-    const g = effGeom(m, sel[0]);
+    const g = effGeom(m, sel[0], view);
+    const style = effStyle(a, view);
     const caps = capsFor(a.subtype);
     const rot = geomRotation(g);
-    const obb = caps.rotatable ? obbFromGeom(g, a.style.strokeWidth, a.style.border) : null;
+    const obb = caps.rotatable ? obbFromGeom(g, style.strokeWidth, a.style.border) : null;
     if (obb && rot !== 0) {
       // a tilted shape: draw the oriented box + the rotate knob off its top edge.
       nodes.push({ kind: 'obb', corners: obb.corners, angle: obb.angle });
     } else {
       nodes.push({
         kind: 'outline',
-        rect: selectionBounds(g, a.style.strokeWidth, a.style.border),
+        rect: selectionBounds(g, style.strokeWidth, a.style.border),
       });
     }
-    // handles for kinds that resize (box) or vertex-edit; anchored/markup show a
-    // bare outline. `geomHandles` already places them on the rotated box; `rot`
+    // handles for kinds that resize (box) or vertex-edit; anchored/markup show
+    // a bare outline — and so do locked (frozen) annotations, the SAME gate
+    // hitTest applies. Screen-anchored bodies keep their handles, placed on
+    // the PROJECTED geometry (`g`), so they sit exactly where hitTest grabs
+    // them. `geomHandles` already places them on the rotated box; `rot`
     // additionally tilts each handle GLYPH so it rides the box's orientation.
     // Suppressed during a live rotate (`rd`) — guides own that mode.
-    if (!rd && (caps.resizable || caps.vertexEditable)) {
+    if (!rd && annotTransformable(a) && (caps.resizable || caps.vertexEditable)) {
       for (const h of geomHandles(g))
         nodes.push({ kind: 'handle', at: h.at, cursor: h.cursor, ...(rot ? { rot } : {}) });
     }
@@ -423,7 +491,7 @@ export function chrome(
     // ride a group move/scale exactly like single-selection chrome. During a
     // live rotate the members spin away from any axis-aligned box, so the
     // whole block is suppressed — the guides own that mode.
-    const union = unionBoundsOf(m, pon, (id) => effGeom(m, id));
+    const union = unionBoundsOf(m, pon, (id) => effGeom(m, id, view), view);
     if (union) {
       nodes.push({ kind: 'outline', rect: union });
       const gc = groupCaps(m, sel);
@@ -437,7 +505,7 @@ export function chrome(
   // anchor, so the menu is always pushed clear of exactly this point. Hidden
   // while a rotate runs (the gesture holds capture; the guides own the mode).
   if (!rd) {
-    const knob = selectionKnob(m, pon, pageBox, knobOffset);
+    const knob = selectionKnob(m, pon, pageBox, knobOffset, view);
     if (knob) nodes.push({ kind: 'rotate-knob', at: knob.at, from: knob.from });
   }
   return nodes;
@@ -446,14 +514,18 @@ export function chrome(
 /** The content-space union of the selectable selected items on `pon`, or null if
  *  the page holds none. This is the SAME box the chrome outline draws, so a
  *  floating menu sits exactly on the selection. */
-export function selectionBoundsOnPage(m: Model, pon: number): Rect | null {
+export function selectionBoundsOnPage(m: Model, pon: number, view?: ViewEnv): Rect | null {
   const sel = m.selected.filter((id) => isSelectable(m, id) && m.byId[id].pon === pon);
   if (sel.length === 0) return null;
   // The rotated AABB: the axis-aligned box that encloses the ORIENTED selection
   // quad. For a tilted shape this tracks the live `rot`, so the upright floating
   // menu floats above the whole tilted shape instead of the (fixed) unrotated box.
   const corners = sel.flatMap((id) =>
-    selectionQuad(effGeom(m, id), m.byId[id].style.strokeWidth, m.byId[id].style.border),
+    selectionQuad(
+      effGeom(m, id, view),
+      effStyle(m.byId[id], view).strokeWidth,
+      m.byId[id].style.border,
+    ),
   );
   return unionRect(corners);
 }
@@ -468,6 +540,7 @@ export function selectionAnchor(
   m: Model,
   pageBoxOf?: (pon: number) => Rect | undefined,
   knobOffsetOf?: (pon: number) => number | undefined,
+  viewOf?: (pon: number) => ViewEnv | undefined,
 ): { pon: number; bounds: Rect; knob?: Vec } | null {
   // No menu while a rotate gesture runs (v2 behaviour): the chrome is in
   // guides mode and a floating menu chasing a spinning box is pure noise.
@@ -475,12 +548,19 @@ export function selectionAnchor(
   const id = m.selected.find((x) => isSelectable(m, x));
   if (id == null) return null;
   const pon = m.byId[id].pon;
-  const bounds = selectionBoundsOnPage(m, pon);
+  const view = viewOf?.(pon);
+  const bounds = selectionBoundsOnPage(m, pon, view);
   if (!bounds) return null;
   // `bounds` is the plain selection box (the menu stays centred on it). The knob
   // rides ALONGSIDE it so the menu can nudge ONLY the edge it sits on, and only
   // when the handle would otherwise hide under it — never shifting the centre.
-  const knob = selectionKnob(m, pon, pageBoxOf?.(pon), knobOffsetOf?.(pon) ?? ROTATE_KNOB_OFFSET);
+  const knob = selectionKnob(
+    m,
+    pon,
+    pageBoxOf?.(pon),
+    knobOffsetOf?.(pon) ?? ROTATE_KNOB_OFFSET,
+    view,
+  );
   return knob ? { pon, bounds, knob: knob.at } : { pon, bounds };
 }
 

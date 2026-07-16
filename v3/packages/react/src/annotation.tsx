@@ -18,6 +18,7 @@ import {
   AnnotationToken,
   refKey,
   type Behavior,
+  type SelectionFlags,
   type SelectionProps,
   type StampProvider,
   type TextItem,
@@ -46,6 +47,7 @@ export type {
   LineEndings,
   Border,
   Style,
+  AnnotationFlags,
   AnnotationProps,
   AnnotationPropsPatch,
   PropKey,
@@ -53,7 +55,7 @@ export type {
   TextAlign,
   TextStyle,
 } from '@embedpdf-x/annotation-core';
-export type { SelectionProps } from '@embedpdf-x/plugin-annotation';
+export type { SelectionFlags, SelectionProps } from '@embedpdf-x/plugin-annotation';
 import {
   shallowArray,
   useCapability,
@@ -339,7 +341,13 @@ function Chrome({ page }: { page: PageContextValue }) {
   // zoom. The painter's own px values (handle glyphs, dot radius) are drawn in
   // screen space and need no conversion.
   const scale = page.transform.viewScale;
-  const nodes = useSelector(AnnotationHostToken, (c) => c.chrome(page.pon, scale), shallowArray);
+  const rotation = page.transform.rotation;
+  const zoom = page.transform.zoom;
+  const nodes = useSelector(
+    AnnotationHostToken,
+    (c) => c.chrome(page.pon, scale, rotation, zoom),
+    shallowArray,
+  );
   const cs = useSelector(AnnotationHostToken, (c) => c.chromeSettings());
   // The accent cascade: each piece's color falls back to the one accent.
   const outlineStroke = cs.outline.color ?? cs.accent;
@@ -690,8 +698,22 @@ const INERT = { inert: '' } as Record<string, string>;
 export function AnnotationLayer({ renderers }: AnnotationLayerProps = {}) {
   const page = usePage();
   const anno = useCapability(AnnotationHostToken);
-  const items = useSelector(AnnotationHostToken, (c) => c.pageItems(page.pon), shallowArray);
-  const texts = useSelector(AnnotationHostToken, (c) => c.textItems(page.pon), shallowArray);
+  // The page's view env (RELATIVE zoom + total display rotation) projects
+  // screen-anchored (`noZoom`/`noRotate`) annotations to their effective
+  // footprint INSIDE the plugin — no flag logic lives in the framework.
+  // `transform.zoom` (not `viewScale`): 1 = the page's physical 100%.
+  const viewZoom = page.transform.zoom;
+  const viewRotation = page.transform.rotation;
+  const items = useSelector(
+    AnnotationHostToken,
+    (c) => c.pageItems(page.pon, { zoom: viewZoom, rotation: viewRotation }),
+    shallowArray,
+  );
+  const texts = useSelector(
+    AnnotationHostToken,
+    (c) => c.textItems(page.pon, { zoom: viewZoom, rotation: viewRotation }),
+    shallowArray,
+  );
   const [urls, setUrls] = useState<Record<string, { url: string; box: Rect }>>({});
   useAutoBehaviors(anno, renderers);
 
@@ -882,6 +904,17 @@ export function useSelectionProps(): SelectionProps {
   return useSelector(AnnotationToken, (c) => c.getSelectionProps());
 }
 
+/**
+ * The selection's `/F` annotation flags — per-flag `true`/`false`, `null` where
+ * the selected annotations disagree (render an indeterminate control), `null`
+ * overall when nothing is selected. Write back with
+ * `useAnnotation().updateSelectionFlags({ locked: true })`. Reference-stable
+ * between model changes, like {@link useSelectionProps}.
+ */
+export function useSelectionFlags(): SelectionFlags | null {
+  return useSelector(AnnotationToken, (c) => c.getSelectionFlags());
+}
+
 // ── Selection menu ────────────────────────────────────────────────────────────
 // A headless, render-prop menu that floats over the current selection. The
 // content-space anchor (`selectionAnchor`) is shared by BOTH flavors: the default
@@ -987,7 +1020,8 @@ export function PageAnnotationMenu({ children, gap = 8, placement = 'top' }: Ann
   // for another page the value is unused (the `here` guard below bails).
   const anchor = useSelector(
     AnnotationHostToken,
-    (c) => c.selectionAnchor(page.transform.viewScale),
+    (c) =>
+      c.selectionAnchor(page.transform.viewScale, page.transform.rotation, page.transform.zoom),
     sameAnchor,
   );
   const selected = useAnnotationSelected();

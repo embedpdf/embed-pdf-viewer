@@ -63,14 +63,15 @@ export function PagePointerSource() {
       return {
         phase,
         viewport: { x: e.clientX - r.left, y: e.clientY - r.top },
-        // `scale`/`rotation` carry the same per-page environmental context the
-        // Stage source resolves via `pageAt` — read off the page transform so a
-        // standalone <PageView> drives handlers identically.
+        // `scale`/`rotation`/`zoom` carry the same per-page environmental
+        // context the Stage source resolves via `pageAt` — read off the page
+        // transform so a standalone <PageView> drives handlers identically.
         page: {
           pon: page.pon,
           point: page.toPagePoint(e.clientX, e.clientY),
           scale: page.transform.viewScale,
           rotation: page.transform.rotation,
+          zoom: page.transform.zoom,
         },
         // A per-page source can only project onto its OWN page — toPagePoint is
         // already unclamped (the drag listener lives on window), so a gesture
