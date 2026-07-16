@@ -24,6 +24,10 @@ export const ActionsTokenSchema = {
   fields: ['actionsVersion'],
 } as const satisfies TokenSchema;
 
+export const AttachmentsTokenSchema = {
+  fields: ['attachmentsVersion'],
+} as const satisfies TokenSchema;
+
 export const DownloadTokenSchema = {
   fields: ['docVersion', 'mode'],
   maxLength: 128,

@@ -54,6 +54,8 @@ describe('DOC_RESOURCES — structural invariants', () => {
       'page-geometry',
       'layer-page-geometry',
       'annotations-read',
+      'layer-attachments',
+      'layer-attachment-files',
       'download-versioned',
     ];
     for (const id of cacheable) {
@@ -284,6 +286,9 @@ describe('cdnCoverageForScope', () => {
         'layer-search-rects',
         'layer-search-full',
         'annotations-read',
+        // doc.open (session establishment) also covers the attachments
+        // METADATA listing; attachment BYTES stay behind doc.download.
+        'layer-attachments',
       ]),
     );
     // download is cloud-only — not granted by pdf.permissions

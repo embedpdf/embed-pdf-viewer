@@ -48,6 +48,9 @@ export const caps = {
     metadata: {
       modify: () => 'doc.metadata.modify' as const,
     },
+    attachments: {
+      modify: () => 'doc.attachments.modify' as const,
+    },
     redact: () => 'doc.redact' as const,
   },
 } as const;
@@ -161,6 +164,7 @@ export function materializePdfPermissions(b: PdfBits): DocCapability[] {
     out.add('doc.pages.modify');
     out.add('doc.redact');
     out.add('doc.metadata.modify');
+    out.add('doc.attachments.modify');
   }
   if (b.bit11) out.add('doc.pages.assemble');
   if (b.bit6) out.add('doc.annotate.modify');

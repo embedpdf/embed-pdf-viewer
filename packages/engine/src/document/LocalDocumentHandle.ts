@@ -20,8 +20,9 @@ import { EventHub, SessionEventPublisher } from '@embedpdf/engine-services';
 
 import type { LocalImageEncoder } from '../render/BrowserImageEncoder';
 import type { ScopeGuard } from '../scope';
-import { LocalDocumentAnnotationsService } from './LocalDocumentAnnotationsService';
 import { LocalDocumentActionsService } from './LocalDocumentActionsService';
+import { LocalDocumentAnnotationsService } from './LocalDocumentAnnotationsService';
+import { LocalDocumentAttachmentsService } from './LocalDocumentAttachmentsService';
 import { LocalDocumentFormsService } from './LocalDocumentFormsService';
 import { LocalDocumentPagesService } from './LocalDocumentPagesService';
 import { LocalDocumentSearchService } from './LocalDocumentSearchService';
@@ -41,6 +42,7 @@ export class LocalDocumentHandle implements DocumentHandle {
   readonly metadata: MetadataService;
   readonly pieceInfo: LocalPieceInfoService;
   readonly annotations: DocumentAnnotationsService;
+  readonly attachments: LocalDocumentAttachmentsService;
   readonly actions: DocumentActionsService;
   readonly forms: LocalDocumentFormsService;
   readonly search: LocalDocumentSearchService;
@@ -69,6 +71,7 @@ export class LocalDocumentHandle implements DocumentHandle {
     // Catalog-level /PieceInfo (no pon); page-level lives on each page handle.
     this.pieceInfo = new LocalPieceInfoService(id, queue, view, guard);
     this.annotations = new LocalDocumentAnnotationsService(id, queue, view, guard);
+    this.attachments = new LocalDocumentAttachmentsService(id, queue, view, guard, this.publisher);
     this.actions = new LocalDocumentActionsService(id, queue, view, guard);
     this.forms = new LocalDocumentFormsService(id, queue, view, guard, this.publisher);
     this.search = new LocalDocumentSearchService(id, queue, view, guard);

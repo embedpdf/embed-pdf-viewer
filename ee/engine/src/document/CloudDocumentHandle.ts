@@ -4,8 +4,10 @@ import {
   DEFAULT_PDF_SAVE_MODE,
   EngineError,
   EngineErrorCode,
+  type AttachmentsCache,
   type DocumentAnnotationsService,
   type DocumentActionsService,
+  type DocumentAttachmentsService,
   type DocumentEvent,
   type DocumentEventStream,
   type DocumentFormsService,
@@ -28,17 +30,19 @@ import {
   type DocumentManifest,
 } from '@embedpdf/engine-core/wire';
 import { EventHub, SessionEventPublisher } from '@embedpdf/engine-services';
-import { SseClient } from '../realtime/SseClient';
-import { auditRowToEvent } from '../realtime/auditRowToEvent';
-import type { HttpClient } from '../transport/HttpClient';
-import { CloudMetadataService } from './CloudMetadataService';
-import { CloudDocumentAnnotationsService } from './CloudDocumentAnnotationsService';
+
 import { CloudDocumentActionsService } from './CloudDocumentActionsService';
+import { CloudDocumentAnnotationsService } from './CloudDocumentAnnotationsService';
+import { CloudDocumentAttachmentsService } from './CloudDocumentAttachmentsService';
 import { CloudDocumentFormsService } from './CloudDocumentFormsService';
 import { CloudDocumentPagesService } from './CloudDocumentPagesService';
 import { CloudDocumentSearchService } from './CloudDocumentSearchService';
-import { CloudPageHandle } from './CloudPageHandle';
 import { CloudDocumentSecurityService } from './CloudDocumentSecurityService';
+import { CloudMetadataService } from './CloudMetadataService';
+import { CloudPageHandle } from './CloudPageHandle';
+import { auditRowToEvent } from '../realtime/auditRowToEvent';
+import { SseClient } from '../realtime/SseClient';
+import type { HttpClient } from '../transport/HttpClient';
 
 /**
  * Read accessor handed to every `CloudPage…Service`. The closure
@@ -61,6 +65,9 @@ export interface ManifestAccessor {
   applyPageDelete(cache: PageStructureCache, deletedPages: PageObjectNumber[]): void;
   /** Advance the cached manifest's docVersion + metadataVersion after a metadata write. */
   applyMetadata(cache: MetadataCache): void;
+  /** Advance the cached manifest's docVersion + attachmentsVersion after an
+   *  attachment create/delete. */
+  applyAttachments(cache: AttachmentsCache): void;
 }
 
 export class CloudDocumentHandle implements DocumentHandle {
@@ -72,6 +79,7 @@ export class CloudDocumentHandle implements DocumentHandle {
   readonly metadata: CloudMetadataService;
   readonly annotations: DocumentAnnotationsService;
   readonly actions: DocumentActionsService;
+  readonly attachments: DocumentAttachmentsService;
   readonly forms: DocumentFormsService;
   readonly search: CloudDocumentSearchService;
   readonly pages: DocumentPagesService;
@@ -159,6 +167,7 @@ export class CloudDocumentHandle implements DocumentHandle {
       applyPageStructure: (cache) => this.absorbPageStructure(cache),
       applyPageDelete: (cache, deletedPages) => this.absorbPageDelete(cache, deletedPages),
       applyMetadata: (cache) => this.absorbMetadata(cache),
+      applyAttachments: (cache) => this.absorbAttachments(cache),
     };
     this.metadata = new CloudMetadataService(
       http,
@@ -181,6 +190,14 @@ export class CloudDocumentHandle implements DocumentHandle {
       layerName,
       () => this.closed,
       this.manifestAccessor,
+    );
+    this.attachments = new CloudDocumentAttachmentsService(
+      http,
+      id,
+      layerName,
+      () => this.closed,
+      this.manifestAccessor,
+      this.publisher,
     );
     this.forms = new CloudDocumentFormsService(
       http,
@@ -404,6 +421,32 @@ export class CloudDocumentHandle implements DocumentHandle {
     };
   }
 
+  /**
+   * Patch the cached manifest after an attachment create/delete. Symmetric
+   * with {@link absorbMetadata}: an attachment write advances `docVersion`
+   * (so leaf URLs re-resolve) and `attachmentsVersion` (so the /attachments
+   * listing and /attachment-files leaves re-fetch), but leaves
+   * `layoutVersion` and every per-page pin untouched. Raise the floor
+   * unconditionally and, when our cache is exactly one version behind,
+   * advance it in place; otherwise drop it and refetch lazily.
+   */
+  private absorbAttachments(cache: AttachmentsCache): void {
+    this.manifestFloorVersion = Math.max(this.manifestFloorVersion, cache.docVersion);
+    this.inflightManifest = null;
+
+    if (!this.manifestCache) return;
+    if (cache.docVersion <= this.manifestCache.docVersion) return;
+    if (cache.previousDocVersion !== this.manifestCache.docVersion) {
+      this.manifestCache = null;
+      return;
+    }
+    this.manifestCache = {
+      ...this.manifestCache,
+      docVersion: cache.docVersion,
+      attachmentsVersion: cache.attachmentsVersion,
+    };
+  }
+
   private startManifestFetch(opts: { allowInitialHead: boolean }): Promise<DocumentManifest> {
     const ctrl = new AbortController();
     const promise = this.fetchManifest(ctrl.signal, opts);
@@ -544,6 +587,10 @@ export class CloudDocumentHandle implements DocumentHandle {
         return;
       case 'metadata.updated':
         if (event.cache) this.absorbMetadata(event.cache);
+        return;
+      case 'attachment.created':
+      case 'attachment.deleted':
+        if (event.cache) this.absorbAttachments(event.cache);
         return;
       case 'form.valueChanged':
       case 'form.imported':

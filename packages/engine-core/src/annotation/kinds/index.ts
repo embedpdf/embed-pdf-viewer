@@ -3,6 +3,8 @@ import { z } from 'zod';
 import type { AnnotationKindModule } from '../registry';
 import { CaretKind } from './caret';
 import { CircleKind } from './circle';
+import type { FileAttachmentDraft, FileAttachmentWireDraft } from './file-attachment';
+import { FileAttachmentKind } from './file-attachment';
 import { FreeTextKind } from './free-text';
 import { HighlightKind } from './highlight';
 import { InkKind } from './ink';
@@ -10,13 +12,14 @@ import { LineKind } from './line';
 import { PolygonKind } from './polygon';
 import { PolylineKind } from './polyline';
 import { SquareKind } from './square';
-import { WidgetKind } from './widget';
 import { SquigglyKind } from './squiggly';
 import type { StampDraft, StampPatch, StampWireDraft, StampWirePatch } from './stamp';
 import { StampKind } from './stamp';
 import { StrikeoutKind } from './strikeout';
+import { TextKind } from './text';
 import { UnderlineKind } from './underline';
 import { UnsupportedKind } from './unsupported';
+import { WidgetKind } from './widget';
 
 export * from './highlight';
 export * from './underline';
@@ -30,7 +33,9 @@ export * from './line';
 export * from './ink';
 export * from './free-text';
 export * from './caret';
+export * from './text';
 export * from './stamp';
+export * from './file-attachment';
 export * from './widget';
 export * from './unsupported';
 export * from './text-markup.shared';
@@ -65,7 +70,9 @@ export const ANNOTATION_KINDS = [
   InkKind,
   FreeTextKind,
   CaretKind,
+  TextKind,
   StampKind,
+  FileAttachmentKind,
   WidgetKind,
   UnsupportedKind,
 ] as const;
@@ -112,7 +119,10 @@ export type WireAnnotationPatch = Exclude<PatchFromKind<AnnotationKind>, never>;
  * bridge the two via `annotation/normalize.ts` — see that module for the
  * uniform binary rule.
  */
-export type AnnotationDraft = Exclude<WireAnnotationDraft, StampWireDraft> | StampDraft;
+export type AnnotationDraft =
+  | Exclude<WireAnnotationDraft, StampWireDraft | FileAttachmentWireDraft>
+  | StampDraft
+  | FileAttachmentDraft;
 export type AnnotationPatch = Exclude<WireAnnotationPatch, StampWirePatch> | StampPatch;
 
 /**
@@ -134,7 +144,9 @@ export const AnnotationDTOSchema: z.ZodType<AnnotationDTO> = z.discriminatedUnio
   InkKind.dtoSchema,
   FreeTextKind.dtoSchema,
   CaretKind.dtoSchema,
+  TextKind.dtoSchema,
   StampKind.dtoSchema,
+  FileAttachmentKind.dtoSchema,
   WidgetKind.dtoSchema,
   UnsupportedKind.dtoSchema,
 ] as unknown as [
@@ -161,7 +173,9 @@ export const AnnotationDraftSchema: z.ZodType<WireAnnotationDraft> = z.discrimin
     InkKind.draftSchema,
     FreeTextKind.draftSchema,
     CaretKind.draftSchema,
+    TextKind.draftSchema,
     StampKind.draftSchema,
+    FileAttachmentKind.draftSchema,
     WidgetKind.draftSchema,
   ] as unknown as [
     z.ZodDiscriminatedUnionOption<'subtype'>,
@@ -185,7 +199,9 @@ export const AnnotationPatchSchema: z.ZodType<WireAnnotationPatch> = z.discrimin
     InkKind.patchSchema,
     FreeTextKind.patchSchema,
     CaretKind.patchSchema,
+    TextKind.patchSchema,
     StampKind.patchSchema,
+    FileAttachmentKind.patchSchema,
     WidgetKind.patchSchema,
   ] as unknown as [
     z.ZodDiscriminatedUnionOption<'subtype'>,

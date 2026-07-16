@@ -48,6 +48,16 @@ export interface CdnBinding {
   readonly layerName: string;
 }
 
+/**
+ * A raw-bytes response plus its headers. The attachment-file leaves carry
+ * their metadata as headers (`Content-Type`, `X-EmbedPDF-File-Name`), so
+ * unlike `getBytes` the caller needs the `Headers` object back.
+ */
+export interface HttpFileResponse {
+  bytes: Uint8Array;
+  headers: Headers;
+}
+
 export class HttpClient {
   private readonly baseUrl: string;
   private readonly tokenFn: (() => string | Promise<string>) | null;
@@ -110,14 +120,14 @@ export class HttpClient {
    */
   setCdnAccess(binding: CdnBinding | null): void {
     this.cdnBinding = binding;
-    if (binding?.cdn?.signedCookies && typeof document !== 'undefined') {
+    if (binding?.cdn?.signedCookies && typeof globalThis.document !== 'undefined') {
       for (const cookie of binding.cdn.signedCookies) {
         const parts = [`${cookie.name}=${cookie.value}`];
         parts.push(`Path=${cookie.path ?? '/'}`);
         if (cookie.domain) parts.push(`Domain=${cookie.domain}`);
         if (cookie.expires) parts.push(`Expires=${new Date(cookie.expires * 1000).toUTCString()}`);
         parts.push('SameSite=None', 'Secure');
-        document.cookie = parts.join('; ');
+        globalThis.document.cookie = parts.join('; ');
       }
     }
   }
@@ -229,6 +239,34 @@ export class HttpClient {
       await onStaleVersion(signal);
       const retryPath = await buildPath(signal);
       return await this.getFormData(retryPath, signal);
+    }
+  }
+
+  /** GET raw bytes plus the response headers (attachment-file leaves). */
+  async getFile(path: string, signal: AbortSignal): Promise<HttpFileResponse> {
+    const res = await this.request(path, { method: 'GET', signal });
+    if (!res.ok) await this.throwFromBody(res);
+    return { bytes: new Uint8Array(await res.arrayBuffer()), headers: res.headers };
+  }
+
+  /**
+   * `getFile` with the same single-retry stale-version recovery as
+   * {@link getJsonWithRefresh}: a 404 on a versioned URL triggers
+   * `onStaleVersion` (a manifest refresh) and one re-resolve + retry.
+   */
+  async getFileWithRefresh(
+    buildPath: (signal: AbortSignal) => Promise<string>,
+    onStaleVersion: (signal: AbortSignal) => Promise<void>,
+    signal: AbortSignal,
+  ): Promise<HttpFileResponse> {
+    const initialPath = await buildPath(signal);
+    try {
+      return await this.getFile(initialPath, signal);
+    } catch (err) {
+      if (!EngineError.is(err, EngineErrorCode.NotFound)) throw err;
+      await onStaleVersion(signal);
+      const retryPath = await buildPath(signal);
+      return await this.getFile(retryPath, signal);
     }
   }
 

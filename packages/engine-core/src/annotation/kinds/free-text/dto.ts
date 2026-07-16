@@ -59,7 +59,10 @@ export type FreeTextAnnotationDTO = AnnotationBase & {
   /** `/LE` ending drawn at the called-out end of the leader line. */
   lineEnding?: LineEnding;
 
-  // rotation (box kind — same model as square/circle)
+  // rotation (box kind — same model as square/circle). For a CALLOUT the pair
+  // describes the text BOX only: `unrotatedRect` is the logical text box and
+  // the rotation is baked as an INLINE matrix in the /AP (the /CL leader stays
+  // page-space, so the form /Matrix is identity and /Rect places the raster).
   /** `/EMBD_Metadata/Rotation` — degrees, normalized `[0,360)`. */
   rotation?: number;
   /** `/EMBD_Metadata/UnrotatedRect` — the logical box (required when rotation != 0). */

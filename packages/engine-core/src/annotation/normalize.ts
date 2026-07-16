@@ -1,12 +1,13 @@
-import type { WireResourceMap } from '../resource/BinarySource';
 import type {
   AnnotationDraft,
   AnnotationPatch,
   WireAnnotationDraft,
   WireAnnotationPatch,
 } from './kinds';
-// Deep import (not the kind barrel): keeps this module — and the zod-free
-// `shared` entrypoint that re-exports it — free of the stamp Zod schemas.
+import type { WireResourceMap } from '../resource/BinarySource';
+// Deep imports (not the kind barrels): keeps this module — and the zod-free
+// `shared` entrypoint that re-exports it — free of the kinds' Zod schemas.
+import { normalizeFileAttachmentDraft } from './kinds/file-attachment/normalize';
 import { normalizeStampDraft, normalizeStampPatch } from './kinds/stamp/normalize';
 
 /**
@@ -42,6 +43,8 @@ export async function normalizeAnnotationDraft(draft: AnnotationDraft): Promise<
   switch (draft.subtype) {
     case 'stamp':
       return normalizeStampDraft(draft, createResourceKeyAllocator());
+    case 'file-attachment':
+      return normalizeFileAttachmentDraft(draft, createResourceKeyAllocator());
     default:
       return { wire: draft, resources: {} };
   }

@@ -216,6 +216,14 @@ export interface PdfFunctions {
   EPDFAnnot_SetTextAlignment: (arg0: Ptr, arg1: number) => boolean;
   EPDFAnnot_SetVertices: (arg0: Ptr, arg1: Ptr, arg2: number) => boolean;
   EPDFAnnot_UpdateAppearanceToRect: (arg0: Ptr, arg1: number) => boolean;
+  EPDFAttachment_ExtractFile: (arg0: Ptr, arg1: Ptr, arg2: bigint, arg3: Ptr, arg4: Ptr) => boolean;
+  EPDFAttachment_ExtractFileToOwnedBuffer: (
+    arg0: Ptr,
+    arg1: bigint,
+    arg2: Ptr,
+    arg3: Ptr,
+    arg4: Ptr,
+  ) => boolean;
   EPDFAttachment_GetDescription: (arg0: Ptr, arg1: Ptr, arg2: number) => number;
   EPDFAttachment_GetIntegerValue: (arg0: Ptr, arg1: string, arg2: Ptr) => boolean;
   EPDFAttachment_SetDescription: (arg0: Ptr, arg1: Ptr) => boolean;
@@ -269,6 +277,8 @@ export interface PdfFunctions {
   EPDFDoc_ClearPieceInfoKey: (arg0: Ptr, arg1: string, arg2: string, arg3: Ptr) => boolean;
   EPDFDoc_DeletePageByObjectNumber: (arg0: Ptr, arg1: number) => boolean;
   EPDFDoc_GetAdditionalActionModel: (arg0: Ptr, arg1: number) => Ptr;
+  EPDFDoc_GetAttachmentIndexByKey: (arg0: Ptr, arg1: Ptr) => number;
+  EPDFDoc_GetAttachmentKey: (arg0: Ptr, arg1: number, arg2: Ptr, arg3: number) => number;
   EPDFDoc_GetLastModified: (arg0: Ptr, arg1: Ptr, arg2: number) => number;
   EPDFDoc_GetNamedJavaScriptActionModel: (arg0: Ptr, arg1: number) => Ptr;
   EPDFDoc_GetOpenActionModel: (arg0: Ptr) => Ptr;
@@ -4182,6 +4192,74 @@ export const pdfFunctionSignatures = {
       native: { kind: 'bool', cwrap: 'boolean' },
     },
   },
+  EPDFAttachment_ExtractFile: {
+    params: [
+      {
+        ts: 'Ptr',
+        wasm: { kind: 'pointer', cwrap: 'number' },
+        native: { kind: 'pointer', cwrap: 'bigint' },
+      },
+      {
+        ts: 'Ptr',
+        wasm: { kind: 'pointer', cwrap: 'number' },
+        native: { kind: 'pointer', cwrap: 'bigint' },
+      },
+      {
+        ts: 'bigint',
+        wasm: { kind: 'i64', cwrap: 'bigint' },
+        native: { kind: 'i64', cwrap: 'bigint' },
+      },
+      {
+        ts: 'Ptr',
+        wasm: { kind: 'pointer', cwrap: 'number' },
+        native: { kind: 'pointer', cwrap: 'bigint' },
+      },
+      {
+        ts: 'Ptr',
+        wasm: { kind: 'pointer', cwrap: 'number' },
+        native: { kind: 'pointer', cwrap: 'bigint' },
+      },
+    ],
+    result: {
+      ts: 'boolean',
+      wasm: { kind: 'bool', cwrap: 'boolean' },
+      native: { kind: 'bool', cwrap: 'boolean' },
+    },
+  },
+  EPDFAttachment_ExtractFileToOwnedBuffer: {
+    params: [
+      {
+        ts: 'Ptr',
+        wasm: { kind: 'pointer', cwrap: 'number' },
+        native: { kind: 'pointer', cwrap: 'bigint' },
+      },
+      {
+        ts: 'bigint',
+        wasm: { kind: 'i64', cwrap: 'bigint' },
+        native: { kind: 'i64', cwrap: 'bigint' },
+      },
+      {
+        ts: 'Ptr',
+        wasm: { kind: 'pointer', cwrap: 'number' },
+        native: { kind: 'pointer', cwrap: 'bigint' },
+      },
+      {
+        ts: 'Ptr',
+        wasm: { kind: 'pointer', cwrap: 'number' },
+        native: { kind: 'pointer', cwrap: 'bigint' },
+      },
+      {
+        ts: 'Ptr',
+        wasm: { kind: 'pointer', cwrap: 'number' },
+        native: { kind: 'pointer', cwrap: 'bigint' },
+      },
+    ],
+    result: {
+      ts: 'boolean',
+      wasm: { kind: 'bool', cwrap: 'boolean' },
+      native: { kind: 'bool', cwrap: 'boolean' },
+    },
+  },
   EPDFAttachment_GetDescription: {
     params: [
       {
@@ -4776,6 +4854,54 @@ export const pdfFunctionSignatures = {
       ts: 'Ptr',
       wasm: { kind: 'pointer', cwrap: 'number' },
       native: { kind: 'pointer', cwrap: 'bigint' },
+    },
+  },
+  EPDFDoc_GetAttachmentIndexByKey: {
+    params: [
+      {
+        ts: 'Ptr',
+        wasm: { kind: 'pointer', cwrap: 'number' },
+        native: { kind: 'pointer', cwrap: 'bigint' },
+      },
+      {
+        ts: 'Ptr',
+        wasm: { kind: 'pointer', cwrap: 'number' },
+        native: { kind: 'pointer', cwrap: 'bigint' },
+      },
+    ],
+    result: {
+      ts: 'number',
+      wasm: { kind: 'i32', cwrap: 'number' },
+      native: { kind: 'i32', cwrap: 'number' },
+    },
+  },
+  EPDFDoc_GetAttachmentKey: {
+    params: [
+      {
+        ts: 'Ptr',
+        wasm: { kind: 'pointer', cwrap: 'number' },
+        native: { kind: 'pointer', cwrap: 'bigint' },
+      },
+      {
+        ts: 'number',
+        wasm: { kind: 'i32', cwrap: 'number' },
+        native: { kind: 'i32', cwrap: 'number' },
+      },
+      {
+        ts: 'Ptr',
+        wasm: { kind: 'utf16ptr', cwrap: 'number' },
+        native: { kind: 'utf16ptr', cwrap: 'bigint' },
+      },
+      {
+        ts: 'number',
+        wasm: { kind: 'i32', cwrap: 'number' },
+        native: { kind: 'i32', cwrap: 'number' },
+      },
+    ],
+    result: {
+      ts: 'number',
+      wasm: { kind: 'i32', cwrap: 'number' },
+      native: { kind: 'i32', cwrap: 'number' },
     },
   },
   EPDFDoc_GetLastModified: {

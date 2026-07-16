@@ -45,15 +45,17 @@
  * collection; `items/{key}` is one annotation inside it.
  */
 import {
+  encodeActionsToken,
   encodeAnnotationAppearancesRenderToken,
   encodeAnnotationToken,
-  encodeActionsToken,
+  encodeAttachmentsToken,
   encodeContentToken,
   encodeDocToken,
   encodeDownloadToken,
   encodeLayoutToken,
   encodeMetadataToken,
   encodeRenderToken,
+  encodeTokenText,
   type DownloadToken,
   type TokenInput,
 } from './tokens';
@@ -134,6 +136,42 @@ export const wirePaths = {
   /** POST: rewrite the document Info dict for the layer (metadata edit). */
   layerMetadataUpdate: (docId: string, layerName: string) =>
     `/v1/docs/${encodeURIComponent(docId)}/layers/${encodeURIComponent(layerName)}/metadata`,
+
+  /** Immutable /EmbeddedFiles listing, pinned by `attachmentsVersion`. */
+  layerAttachments: (docId: string, layerName: string, attachmentsVersion: number) =>
+    `/v1/docs/${encodeURIComponent(docId)}/layers/${encodeURIComponent(layerName)}/attachments@${encodeAttachmentsToken(attachmentsVersion)}`,
+
+  /** POST: create a document-level embedded file (multipart mutation envelope). */
+  layerAttachmentsCollection: (docId: string, layerName: string) =>
+    `/v1/docs/${encodeURIComponent(docId)}/layers/${encodeURIComponent(layerName)}/attachments`,
+
+  /** DELETE: remove a document-level embedded file by name-tree key. */
+  layerAttachmentItem: (docId: string, layerName: string, key: string) =>
+    `/v1/docs/${encodeURIComponent(docId)}/layers/${encodeURIComponent(layerName)}/attachments/${encodeTokenText(key)}`,
+
+  /**
+   * Immutable decoded bytes of one document-level embedded file. Lives
+   * under its own `attachment-files` prefix — a stronger capability tier
+   * than the metadata listing, so a CDN credential for one can never
+   * authorize the other (the search-rects/search-full rule).
+   */
+  layerAttachmentFile: (
+    docId: string,
+    layerName: string,
+    key: string,
+    attachmentsVersion: number,
+  ) =>
+    `/v1/docs/${encodeURIComponent(docId)}/layers/${encodeURIComponent(layerName)}/attachment-files/${encodeTokenText(key)}/data@${encodeAttachmentsToken(attachmentsVersion)}`,
+
+  /** Immutable decoded bytes of a FileAttachment annotation's embedded file. */
+  layerAnnotationFile: (
+    docId: string,
+    layerName: string,
+    pageObjectNumber: number,
+    annotKey: string,
+    attachmentsVersion: number,
+  ) =>
+    `/v1/docs/${encodeURIComponent(docId)}/layers/${encodeURIComponent(layerName)}/attachment-files/pages/${pageObjectNumber}/items/${encodeURIComponent(annotKey)}/data@${encodeAttachmentsToken(attachmentsVersion)}`,
 
   /**
    * GET: full plain-text extraction for a single page at a specific

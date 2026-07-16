@@ -167,7 +167,25 @@ export { resolveBinarySource } from './resource/BinarySource';
 export type { BinaryMetadata, BinaryMimeType } from './resource/binaryMetadata';
 export { sniffBinaryMetadata } from './resource/binaryMetadata';
 export { normalizeAnnotationDraft, normalizeAnnotationPatch } from './annotation/normalize';
+// Deep import keeps `shared` zod-free (the kind barrel pulls schemas).
+export { normalizeAttachmentFileSource } from './annotation/kinds/file-attachment/normalize';
 export type { NormalizedDraft, NormalizedPatch } from './annotation/normalize';
+
+// Attachment vocabulary — one set of file metadata fields shared by the
+// file-attachment kind and the document-level EmbeddedFiles service.
+export type {
+  AttachmentFileBase,
+  AttachmentFileSource,
+  AttachmentFileInfo,
+  EmbeddedFileItem,
+  EmbeddedFileRef,
+  AttachmentContent,
+} from './dto/Attachment';
+export type {
+  AttachmentCreateResult,
+  AttachmentDeleteResult,
+  AttachmentsCache,
+} from './mutation/AttachmentMutationResults';
 
 export type {
   AnnotationKindModule,
@@ -219,12 +237,22 @@ export type {
   CaretAnnotationDTO,
   CaretDraft,
   CaretPatch,
+  TextAnnotationDTO,
+  TextDraft,
+  TextPatch,
+  NoteIcon,
   StampAnnotationDTO,
   StampDraft,
   StampPatch,
   StampWireDraft,
   StampWirePatch,
   StampFit,
+  FileAttachmentAnnotationDTO,
+  FileAttachmentDraft,
+  FileAttachmentWireDraft,
+  FileAttachmentPatch,
+  FileAttachmentIcon,
+  WireAttachmentFile,
   ShapeAnnotationFields,
   ShapeDraftFields,
   ShapePatchFields,

@@ -21,11 +21,21 @@ import type {
   PolylinePatch,
   StampWireDraft,
   StampWirePatch,
+  TextDraft,
+  TextPatch,
+  FileAttachmentWireDraft,
+  FileAttachmentPatch,
 } from '@embedpdf/engine-core/runtime';
 import type { PdfFunctions, PdfRuntimeMemory, Ptr } from '@embedpdf/pdf-runtime';
 
 import type { AnnotationWriteContext } from './annotationWriteContext';
 import { applyCaretDraft, applyCaretPatch, isCaretSubtype } from './writeCaretAnnotation';
+import {
+  applyFileAttachmentDraft,
+  applyFileAttachmentPatch,
+  isFileAttachmentSubtype,
+  preflightFileAttachmentDraft,
+} from './writeFileAttachmentAnnotation';
 import {
   applyFreeTextDraft,
   applyFreeTextPatch,
@@ -47,6 +57,7 @@ import {
   preflightStampDraft,
   preflightStampPatch,
 } from './writeStampAnnotation';
+import { applyTextDraft, applyTextPatch, isTextSubtype } from './writeTextAnnotation';
 import {
   applyTextMarkupDraft,
   applyTextMarkupPatch,
@@ -67,6 +78,9 @@ import { applyWidgetDraft, applyWidgetPatch, isWidgetSubtype } from './writeWidg
 export function preflightDraft(draft: WireAnnotationDraft, ctx?: AnnotationWriteContext): void {
   if (isStampSubtype(draft.subtype)) {
     preflightStampDraft(draft as StampWireDraft, ctx);
+  }
+  if (isFileAttachmentSubtype(draft.subtype)) {
+    preflightFileAttachmentDraft(draft as FileAttachmentWireDraft, ctx);
   }
 }
 
@@ -125,8 +139,16 @@ export function applyDraft(
     applyCaretDraft(fn, mem, annotPtr, draft as CaretDraft);
     return;
   }
+  if (isTextSubtype(draft.subtype)) {
+    applyTextDraft(fn, mem, annotPtr, draft as TextDraft);
+    return;
+  }
   if (isStampSubtype(draft.subtype)) {
     applyStampDraft(fn, mem, annotPtr, draft as StampWireDraft, ctx);
+    return;
+  }
+  if (isFileAttachmentSubtype(draft.subtype)) {
+    applyFileAttachmentDraft(fn, mem, annotPtr, draft as FileAttachmentWireDraft, ctx);
     return;
   }
   if (isWidgetSubtype(draft.subtype)) {
@@ -183,8 +205,16 @@ export function applyPatch(
     applyCaretPatch(fn, mem, annotPtr, patch as CaretPatch);
     return;
   }
+  if (isTextSubtype(patch.subtype)) {
+    applyTextPatch(fn, mem, annotPtr, patch as TextPatch);
+    return;
+  }
   if (isStampSubtype(patch.subtype)) {
     applyStampPatch(fn, mem, annotPtr, patch as StampWirePatch, ctx);
+    return;
+  }
+  if (isFileAttachmentSubtype(patch.subtype)) {
+    applyFileAttachmentPatch(fn, mem, annotPtr, patch as FileAttachmentPatch);
     return;
   }
   if (isWidgetSubtype(patch.subtype)) {

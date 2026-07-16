@@ -129,8 +129,10 @@ export function applyFreeTextDraft(
   if (draft.lineEnding !== undefined) {
     setLineEndings(fn, annotPtr, { start: 'none', end: draft.lineEnding });
   }
-  // A plain text box rotates like square/circle (box model); a callout carries
-  // no rotation, so its absent fields simply clear the keys.
+  // A plain text box rotates like square/circle (box model). A callout's
+  // rotation applies to its text BOX only (`unrotatedRect` = the logical text
+  // box; the /CL leader stays page-space) — the AP generator bakes it as an
+  // inline matrix, not the form /Matrix. Absent fields simply clear the keys.
   writeBoxTransformMetadata(fn, mem, annotPtr, {
     rotation: draft.rotation,
     unrotatedRect: draft.unrotatedRect,

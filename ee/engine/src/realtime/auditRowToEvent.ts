@@ -3,6 +3,8 @@ import type {
   AnnotationDeleteResult,
   AnnotationMoveResult,
   AnnotationUpdateResult,
+  AttachmentCreateResult,
+  AttachmentDeleteResult,
   DocumentEvent,
   EventOrigin,
   FormFieldCreateResult,
@@ -127,6 +129,18 @@ export function auditRowToEvent(row: AuditEventRow, mySessionId: string): Docume
         type: 'metadata.updated',
         origin,
         ...(row.payload as MetadataUpdateResult),
+      };
+    case 'attachment.create':
+      return {
+        type: 'attachment.created',
+        origin,
+        ...(row.payload as AttachmentCreateResult),
+      };
+    case 'attachment.delete':
+      return {
+        type: 'attachment.deleted',
+        origin,
+        ...(row.payload as AttachmentDeleteResult),
       };
     // Form mutations: two audit kinds share the `form.valueChanged` event
     // (setValue and reset produce the same result shape) — the audit log

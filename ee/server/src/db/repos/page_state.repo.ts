@@ -1,4 +1,5 @@
 import type { Kysely } from 'kysely';
+
 import type { Database as Schema } from '../schema';
 
 export interface DurablePageRow {
@@ -132,6 +133,7 @@ export interface LayerRow {
   docVersion: number;
   layoutVersion: number;
   metadataVersion: number;
+  attachmentsVersion: number;
   /** Audit-log head at this layer's state — the manifest's `auditHead`. */
   lastAuditId: number;
   currentVersion: number;
@@ -172,6 +174,7 @@ export class LayersRepo {
         tenant_id: input.tenantId,
         name: input.name,
         doc_version: 1,
+        attachments_version: 1,
         layout_version: 1,
         metadata_version: 1,
         last_audit_id: 0,
@@ -291,6 +294,7 @@ function mapLayerRow(row: {
   doc_version: number;
   layout_version: number;
   metadata_version: number;
+  attachments_version: number;
   current_version: number;
   current_artifact_key: string | null;
   current_artifact_sha: string | null;
@@ -307,6 +311,7 @@ function mapLayerRow(row: {
     docVersion: Number(row.doc_version),
     layoutVersion: Number(row.layout_version),
     metadataVersion: Number(row.metadata_version),
+    attachmentsVersion: Number(row.attachments_version),
     lastAuditId: Number(row.last_audit_id ?? 0),
     currentVersion: Number(row.current_version),
     currentArtifactKey: row.current_artifact_key,

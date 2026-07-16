@@ -3,7 +3,7 @@ import { createReadStream } from 'node:fs';
 import { mkdtemp, rm, stat } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import type { Kysely, Transaction } from 'kysely';
+
 import {
   EngineError,
   EngineErrorCode,
@@ -50,21 +50,27 @@ import {
   type WirePack,
   type WorkerJobId,
   type WorkerRequest,
+  type WireAttachmentFile,
+  type EmbeddedFileRef,
+  type AttachmentCreateResult,
+  type AttachmentDeleteResult,
 } from '@embedpdf/engine-core/runtime';
-import type { Database as Schema } from '../db/schema';
-import type { DocumentsRepo } from '../db/repos/documents.repo';
-import type { DurablePageRow, LayerRow } from '../db/repos/page_state.repo';
-import type { WorkerThreadPool } from '../runtime/WorkerThreadPool';
-import type { ObjectStore } from '../storage/ObjectStore';
-import { StorageKeys } from '../storage/keys';
-import type { RealtimeBus } from '../realtime/RealtimeBus';
+import type { Kysely, Transaction } from 'kysely';
+
 import type { CloudRevisionBridge } from './CloudRevisionBridge';
 import type { DocumentService, OpenContext } from './DocumentService';
-import type { AuditMutationKind } from '../db/repos/audit_log.repo';
 import type { AuditEvent, EventLogService } from './EventLogService';
 import type { LayerStateService } from './LayerStateService';
 import type { MutationImpactKind } from './LayerStateService';
 import type { WeakAnnotationSessionService } from './WeakAnnotationSessionService';
+import type { AuditMutationKind } from '../db/repos/audit_log.repo';
+import type { DocumentsRepo } from '../db/repos/documents.repo';
+import type { DurablePageRow, LayerRow } from '../db/repos/page_state.repo';
+import type { Database as Schema } from '../db/schema';
+import type { RealtimeBus } from '../realtime/RealtimeBus';
+import type { WorkerThreadPool } from '../runtime/WorkerThreadPool';
+import { StorageKeys } from '../storage/keys';
+import type { ObjectStore } from '../storage/ObjectStore';
 
 type LayerArtifactInput = { bytes: ArrayBuffer; size: number } | { path: string };
 
@@ -690,6 +696,93 @@ export class LayerService {
           );
         }
         return this.persistMetadataUpdate(ctx, input.docId, input.layerName, layer, {
+          result: payload.result,
+          artifact: requireLayerArtifact(payload as unknown),
+        });
+      });
+    });
+  }
+
+  // ── Attachments ──────────────────────────────────────────────────────
+  //
+  // Document-scoped like metadata: the /EmbeddedFiles name tree lives on
+  // the catalog, so mutations touch no page rows — they advance the layer
+  // doc version plus the dedicated `attachments_version` pin that keys
+  // the immutable /attachments@… and /attachment-files/…@… leaves.
+  // Identity is the name-tree KEY (unique by construction) — no weak
+  // refs, no revision bookkeeping.
+
+  /** Create a document-level embedded file (multipart mutation envelope). */
+  async createAttachment(
+    ctx: LayerWriteContext,
+    input: {
+      docId: string;
+      layerName: string;
+      file: WireAttachmentFile;
+      resources: WireResourceMap;
+    },
+    signal?: AbortSignal,
+  ): Promise<AttachmentCreateResult> {
+    return this.enqueueLayerWrite(ctx, input.docId, input.layerName, async () => {
+      const { layer } = await this.prepareLayerMutation(ctx, input.docId, input.layerName);
+      return this.withTempWorkerFile('layer-artifact', 'artifact.layer', async (artifactPath) => {
+        const build = (jobId: WorkerJobId) =>
+          wirePack({
+            kind: 'attachments.create' as const,
+            jobId,
+            docId: input.docId,
+            layerName: input.layerName,
+            file: input.file,
+            resources: input.resources,
+            artifactPath,
+          });
+        const payload = await this.requirePool().run(input.docId, build, signal);
+        if (payload.tag !== 'attachments.create') {
+          throw new EngineError(
+            EngineErrorCode.WireFormat,
+            `unexpected attachments.create payload: ${payload.tag}`,
+          );
+        }
+        return this.persistAttachmentMutation(ctx, input.docId, input.layerName, layer, {
+          kind: 'attachment.create',
+          result: payload.result,
+          artifact: requireLayerArtifact(payload as unknown),
+        });
+      });
+    });
+  }
+
+  /** Delete a document-level embedded file by name-tree key. */
+  async deleteAttachment(
+    ctx: LayerWriteContext,
+    input: {
+      docId: string;
+      layerName: string;
+      ref: EmbeddedFileRef;
+    },
+    signal?: AbortSignal,
+  ): Promise<AttachmentDeleteResult> {
+    return this.enqueueLayerWrite(ctx, input.docId, input.layerName, async () => {
+      const { layer } = await this.prepareLayerMutation(ctx, input.docId, input.layerName);
+      return this.withTempWorkerFile('layer-artifact', 'artifact.layer', async (artifactPath) => {
+        const build = (jobId: WorkerJobId) =>
+          wirePack({
+            kind: 'attachments.delete' as const,
+            jobId,
+            docId: input.docId,
+            layerName: input.layerName,
+            ref: input.ref,
+            artifactPath,
+          });
+        const payload = await this.requirePool().run(input.docId, build, signal);
+        if (payload.tag !== 'attachments.delete') {
+          throw new EngineError(
+            EngineErrorCode.WireFormat,
+            `unexpected attachments.delete payload: ${payload.tag}`,
+          );
+        }
+        return this.persistAttachmentMutation(ctx, input.docId, input.layerName, layer, {
+          kind: 'attachment.delete',
           result: payload.result,
           artifact: requireLayerArtifact(payload as unknown),
         });
@@ -2204,7 +2297,12 @@ export class LayerService {
       artifactSha: string;
       artifactSize: number;
     },
-    versions: { doc_version: number; layout_version?: number; metadata_version?: number },
+    versions: {
+      doc_version: number;
+      layout_version?: number;
+      metadata_version?: number;
+      attachments_version?: number;
+    },
     lastAuditId: number,
     now: number,
   ): Promise<void> {
@@ -2311,6 +2409,92 @@ export class LayerService {
 
         return { result, auditId };
       });
+  }
+
+  private async persistAttachmentMutation<
+    R extends AttachmentCreateResult | AttachmentDeleteResult,
+  >(
+    ctx: LayerWriteContext,
+    docId: string,
+    layerName: string,
+    layer: LayerRow,
+    input: {
+      kind: 'attachment.create' | 'attachment.delete';
+      result: R;
+      artifact: LayerArtifactInput;
+    },
+  ): Promise<R> {
+    const nextVersion = layer.currentVersion + 1;
+    const artifactKey = StorageKeys.layerArtifact(ctx.tenantId, docId, layerName, nextVersion);
+    const uploaded = await this.uploadLayerArtifact(artifactKey, input.artifact);
+    const committed = await this.requireDb()
+      .transaction()
+      .execute(async (trx) => {
+        const now = Date.now();
+        const currentLayer = await trx
+          .selectFrom('layers')
+          .select(['current_version', 'doc_version', 'attachments_version'])
+          .where('id', '=', layer.id)
+          .executeTakeFirst();
+        if (!currentLayer) {
+          throw new EngineError(EngineErrorCode.NotFound, `layer not found: ${layer.id}`);
+        }
+        if (Number(currentLayer.current_version) !== layer.currentVersion) {
+          throw new EngineError(
+            EngineErrorCode.Aborted,
+            `layer version changed while saving artifact for ${layer.id}`,
+          );
+        }
+
+        // Attachment writes touch only the catalog's name tree — no page
+        // rows, no per-page versions. Advance the layer doc version plus
+        // the dedicated attachments pin (the metadata_version design).
+        const previousDocVersion = Number(currentLayer.doc_version);
+        const docVersion = previousDocVersion + 1;
+        const attachmentsVersion = Number(currentLayer.attachments_version) + 1;
+
+        // The finalized result — audited and returned IDENTICALLY: what we
+        // tell the caller is what we tell history (and remote subscribers).
+        const result = {
+          ...input.result,
+          cache: { previousDocVersion, docVersion, attachmentsVersion },
+        } as R;
+
+        const auditEvent = makeAuditEvent({
+          ctx,
+          docId,
+          layer,
+          layerName,
+          kind: input.kind,
+          pageObjectNumber: null,
+          affectedPages: [],
+          artifactVersion: nextVersion,
+          artifactKey,
+          artifactSha: uploaded.sha256,
+          artifactSize: uploaded.size,
+          payload: result,
+          ts: now,
+        });
+        const auditId = (await this.eventLog?.appendDb(trx, auditEvent)) ?? 0;
+
+        await this.writeLayerAdvance(
+          trx,
+          {
+            layer,
+            nextVersion,
+            artifactKey,
+            artifactSha: uploaded.sha256,
+            artifactSize: uploaded.size,
+          },
+          { doc_version: docVersion, attachments_version: attachmentsVersion },
+          auditId,
+          now,
+        );
+
+        return { result, auditId };
+      });
+    this.publishMutation(ctx, docId, committed.auditId);
+    return committed.result;
   }
 
   private enqueueLayerWrite<T>(

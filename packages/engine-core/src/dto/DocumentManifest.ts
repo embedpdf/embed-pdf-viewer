@@ -36,6 +36,13 @@ export interface DocumentManifest {
   /** Catalog action resource pin. Derived as 1 until action writing exists. */
   actionsVersion: number;
   /**
+   * Doc-level pin for the immutable `/attachments@…` listing and
+   * `/attachment-files/…@…` byte leaves. Bumps only on attachment
+   * create/delete — a different cadence than `docVersion`, so attachment
+   * caches stay warm across unrelated edits (the `layoutVersion` design).
+   */
+  attachmentsVersion: number;
+  /**
    * Audit-log head at this manifest's state — written in the same
    * transaction as the version bumps, so an event subscriber that starts
    * from `auditHead` can never miss a mutation between manifest fetch and

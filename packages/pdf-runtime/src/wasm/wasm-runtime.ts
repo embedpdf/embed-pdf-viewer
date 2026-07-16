@@ -1,3 +1,9 @@
+import { pdfFunctionSignatures } from '../core/pdf-functions.generated';
+import type {
+  PdfFunctionAbiSlot,
+  PdfFunctionSignature,
+  PdfFunctions,
+} from '../core/pdf-functions.generated';
 import type {
   Callback,
   CallbackFn,
@@ -11,8 +17,6 @@ import type {
   PdfRuntimeModule,
   Ptr,
 } from '../core/pdf-runtime-module';
-import { pdfFunctionSignatures } from '../core/pdf-functions.generated';
-import type { PdfFunctionAbiSlot, PdfFunctions } from '../core/pdf-functions.generated';
 
 type EmscriptenModule = Record<string, any> & {
   HEAPU8: Uint8Array;
@@ -204,20 +208,46 @@ function toJsResult(meta: PdfFunctionAbiSlot | null, value: unknown): unknown {
   return value;
 }
 
+/**
+ * The wasm artifact is built WITHOUT `WASM_BIGINT`, so Emscripten
+ * legalizes every `i64` parameter at the JS boundary into an (i32 low,
+ * i32 high) pair — the export wrapper takes one extra argument per i64
+ * and rejects BigInt values outright. Expand each declared i64 argument
+ * into its legalized pair before calling.
+ */
+function expandI64Args(signature: PdfFunctionSignature, args: unknown[]): unknown[] {
+  const expanded: unknown[] = [];
+  signature.params.forEach((p, i) => {
+    if (p.wasm.kind === 'i64') {
+      const v = BigInt((args[i] ?? 0) as number | bigint);
+      expanded.push(Number(v & 0xffffffffn), Number((v >> 32n) & 0xffffffffn));
+    } else {
+      expanded.push(args[i]);
+    }
+  });
+  return expanded;
+}
+
 function createWasmFunctions(module: EmscriptenModule): PdfFunctions {
   const out: Record<string, (...args: unknown[]) => unknown> = {};
   for (const [name, signature] of Object.entries(pdfFunctionSignatures)) {
+    const hasI64Params = signature.params.some((p) => p.wasm.kind === 'i64');
     const bridge =
       (call: (...args: unknown[]) => unknown) =>
-      (...args: unknown[]) =>
-        toJsResult(
+      (...args: unknown[]) => {
+        const mapped = args.map((arg, i) => fromJsArg(signature.params[i], arg));
+        return toJsResult(
           signature.result,
-          call(...args.map((arg, i) => fromJsArg(signature.params[i], arg))),
+          call(...(hasI64Params ? expandI64Args(signature, mapped) : mapped)),
         );
+      };
 
     if (module.cwrap) {
       // `null` only appears for void return; params never carry it.
-      const paramTypes = signature.params.map((p) => p.wasm.cwrap as string);
+      // i64 params are legalized (see expandI64Args): two i32 slots each.
+      const paramTypes = signature.params.flatMap((p) =>
+        p.wasm.kind === 'i64' ? ['number', 'number'] : [p.wasm.cwrap as string],
+      );
       out[name] = bridge(
         module.cwrap(name, signature.result ? signature.result.wasm.cwrap : null, paramTypes),
       );

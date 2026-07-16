@@ -55,6 +55,13 @@ export type DocResourceId =
   | 'layer-search-rects'
   | 'layer-search-full'
   | 'annotations-read'
+  // Attachments, split by permission tier under DISTINCT prefixes (the
+  // search-rects/search-full rule): the metadata listing rides the base
+  // read capability, while decoded file bytes egress content and gate on
+  // the download capability — an edge credential for the listing prefix
+  // must never authorize the byte prefix.
+  | 'layer-attachments'
+  | 'layer-attachment-files'
   | 'download-current'
   | 'download-versioned';
 
@@ -217,6 +224,30 @@ export const DOC_RESOURCES: Readonly<Record<DocResourceId, DocResourceDescriptor
     resolvePathPrefix: (docId, layerName = 'default') =>
       `/v1/docs/${docId}/layers/${layerName}/actions@`,
     requirement: { kind: 'single', capability: 'doc.open' },
+    routeKind: 'versioned-read',
+    cdnCacheable: true,
+  },
+  'layer-attachments': {
+    id: 'layer-attachments',
+    pathPattern: '/v1/docs/{docId}/layers/{layerName}/attachments@*',
+    resolvePathPattern: (docId, layerName = 'default') =>
+      `/v1/docs/${docId}/layers/${layerName}/attachments@*`,
+    pathPrefix: '/v1/docs/{docId}/layers/{layerName}/attachments@',
+    resolvePathPrefix: (docId, layerName = 'default') =>
+      `/v1/docs/${docId}/layers/${layerName}/attachments@`,
+    requirement: { kind: 'single', capability: 'doc.open' },
+    routeKind: 'versioned-read',
+    cdnCacheable: true,
+  },
+  'layer-attachment-files': {
+    id: 'layer-attachment-files',
+    pathPattern: '/v1/docs/{docId}/layers/{layerName}/attachment-files/*',
+    resolvePathPattern: (docId, layerName = 'default') =>
+      `/v1/docs/${docId}/layers/${layerName}/attachment-files/*`,
+    pathPrefix: '/v1/docs/{docId}/layers/{layerName}/attachment-files/',
+    resolvePathPrefix: (docId, layerName = 'default') =>
+      `/v1/docs/${docId}/layers/${layerName}/attachment-files/`,
+    requirement: { kind: 'single', capability: 'doc.download' },
     routeKind: 'versioned-read',
     cdnCacheable: true,
   },

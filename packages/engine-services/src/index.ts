@@ -53,6 +53,7 @@ export * from './features/text';
 export * from './features/geometry';
 export * from './features/render';
 export * from './features/annotations';
+export * from './features/attachments';
 export * from './features/security';
 export * from './features/save';
 export * from './features/fonts';

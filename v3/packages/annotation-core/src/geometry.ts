@@ -261,7 +261,9 @@ export function geomRotateAbout(g: Geom, pivot: Vec, deltaDeg: number): Geom {
     };
   }
   if (g.t === 'text') {
-    if (g.callout) return g; // callout rotation is out of scope
+    // The rotate GESTURE stays out of scope for callouts (no knob/orbit); the
+    // box may still carry a creation-time `rot` from the upright policy.
+    if (g.callout) return g;
     const c = rotatePoint(rectCenter(g.rect), pivot, deltaDeg);
     return {
       ...g,
@@ -612,8 +614,14 @@ export function placeRotateKnob(
 
 /** The box-edge midpoint the leader connects to: the side `ref` (the knee, else
  *  the tip) points toward, by horizontal/vertical dominance vs the box centre.
- *  Mirror of v2's `computeCalloutConnectionPoint`. */
-export function calloutConnection(box: Rect, ref: Vec): Vec {
+ *  With `rot` (a callout box tilted by the upright policy) the decision runs in
+ *  the box's LOCAL frame and the midpoint lands back on the ROTATED edge — the
+ *  edge the user actually sees. Mirror of v2's `computeCalloutConnectionPoint`. */
+export function calloutConnection(box: Rect, ref: Vec, rot = 0): Vec {
+  if (rot) {
+    const c = rectCenter(box);
+    return rotatePoint(calloutConnection(box, rotatePoint(ref, c, -rot)), c, rot);
+  }
   const cx = box.x + box.width / 2;
   const cy = box.y + box.height / 2;
   const dx = ref.x - cx;
@@ -624,11 +632,12 @@ export function calloutConnection(box: Rect, ref: Vec): Vec {
   return dy >= 0 ? { x: cx, y: box.y + box.height } : { x: cx, y: box.y };
 }
 
-/** The leader polyline `[tip, knee?, conn]`, with `conn` derived from the box. */
+/** The leader polyline `[tip, knee?, conn]`, with `conn` derived from the box
+ *  (its ROTATED footprint when the box carries `rot`). */
 export function calloutLinePoints(g: Extract<Geom, { t: 'text' }>): Vec[] {
   const c = g.callout;
   if (!c) return [];
-  const conn = calloutConnection(g.rect, c.knee ?? c.tip);
+  const conn = calloutConnection(g.rect, c.knee ?? c.tip, g.rot ?? 0);
   return c.knee ? [c.tip, c.knee, conn] : [c.tip, conn];
 }
 
@@ -816,11 +825,15 @@ export function geomVisualBounds(g: Geom, strokeWidth: number, border?: Border):
     );
   }
   if (g.t === 'text' && g.callout) {
-    // The overall /Rect: the union of the text box, the leader points, and the
-    // arrow-ending polygon at the tip (same ending math as line/poly).
+    // The overall /Rect: the union of the text box (its ROTATED corners when the
+    // box carries an upright tilt), the leader points, and the arrow-ending
+    // polygon at the tip (same ending math as line/poly).
     const pts = calloutLinePoints(g);
     const seg = calloutEndingSeg(pts, g.callout.ending);
-    const all = [...rectCornerPoints(g.rect), ...pts];
+    const rot = g.rot ?? 0;
+    const c = rectCenter(g.rect);
+    const corners = rectCornerPoints(g.rect).map((p) => (rot ? rotatePoint(p, c, rot) : p));
+    const all = [...corners, ...pts];
     if (seg) all.push(...endingPoints(seg.tip, seg.angle, seg.ending, strokeWidth));
     return expandRect(unionRect(all), strokeWidth / 2);
   }
@@ -861,9 +874,13 @@ export function geomVisualBounds(g: Geom, strokeWidth: number, border?: Border):
  * they can never drift.
  */
 export function selectionBounds(g: Geom, strokeWidth: number, border?: Border): Rect {
-  return g.t === 'line' || g.t === 'ink' || g.t === 'poly'
-    ? geomVisualBounds(g, strokeWidth, border)
-    : geomBounds(g);
+  if (g.t === 'line' || g.t === 'ink' || g.t === 'poly')
+    return geomVisualBounds(g, strokeWidth, border);
+  // A callout's tilted text box (the upright policy): the selection wraps the box
+  // the user SEES — its rotated footprint. Exact for the quarter-turns upright
+  // produces (the footprint stays axis-aligned), so outline and handles agree.
+  if (g.t === 'text' && g.callout && (g.rot ?? 0) !== 0) return rotatedAabb(g.rect, g.rot!);
+  return geomBounds(g);
 }
 
 /**
@@ -1003,14 +1020,20 @@ export function geomHit(
   const tol = margin + strokeWidth / 2;
   // A rotated box stores its UNROTATED `rect`; inverse-rotate the pointer into
   // that local frame and run the normal axis-aligned tests. Vertex kinds carry
-  // already-rotated points, so they hit-test directly (rot is advisory).
+  // already-rotated points, so they hit-test directly (rot is advisory). A
+  // callout is COMPOUND: only its box rotates (the leader is page-space), so the
+  // inverse rotation applies to the box test alone — see the text branch below.
   if ((g.t === 'rect' || (g.t === 'text' && !g.callout)) && (g.rot ?? 0) !== 0) {
     p = rotatePoint(p, rectCenter(g.rect), -(g.rot ?? 0));
   }
   // A text box is a solid hit target anywhere inside it (+ the click margin).
   if (g.t === 'caret') return rectContains(expandRect(g.rect, margin), p);
   if (g.t === 'text') {
-    if (rectContains(expandRect(g.rect, margin), p)) return true;
+    // Box test in the box's LOCAL frame (a tilted callout box); leader/arrow
+    // tests in the PAGE frame (their points are already where they're drawn).
+    const rot = g.callout ? (g.rot ?? 0) : 0;
+    const pBox = rot ? rotatePoint(p, rectCenter(g.rect), -rot) : p;
+    if (rectContains(expandRect(g.rect, margin), pBox)) return true;
     if (g.callout) {
       const pts = calloutLinePoints(g);
       for (let i = 0; i < pts.length - 1; i++)
@@ -1084,7 +1107,7 @@ export function geomHit(
 
 export function geomHandles(g: Geom): Handle[] {
   if (g.t === 'rect' || g.t === 'text') {
-    const rot = g.t === 'text' && g.callout ? 0 : (g.rot ?? 0);
+    const rot = g.rot ?? 0;
     const c = rectCenter(g.rect);
     const handles: Handle[] = RECT_HANDLES.map((h) => ({
       id: h,
@@ -1214,7 +1237,22 @@ export function geomScene(g: Geom, strokeWidth = 0, border?: Border): RenderNode
     const nodes: RenderNode[] = [{ kind: 'poly', points: pts, closed: false }];
     const seg = calloutEndingSeg(pts, g.callout.ending);
     if (seg) nodes.push(...endingNodes(seg.tip, seg.angle, seg.ending, strokeWidth));
-    if (strokeWidth > 0) nodes.push({ kind: 'rect', rect: g.rect });
+    if (strokeWidth > 0) {
+      // A tilted box (the upright policy) draws as its rotated corner ring —
+      // the scene stays plane-agnostic, so every framework painter gets the
+      // tilt for free (the leader above is page-space and never rotates).
+      const rot = g.rot ?? 0;
+      const c = rectCenter(g.rect);
+      nodes.push(
+        rot
+          ? {
+              kind: 'poly',
+              points: rectCornerPoints(g.rect).map((p) => rotatePoint(p, c, rot)),
+              closed: true,
+            }
+          : { kind: 'rect', rect: g.rect },
+      );
+    }
     return nodes;
   }
   if (g.t === 'caret') {

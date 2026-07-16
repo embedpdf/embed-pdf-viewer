@@ -1,3 +1,4 @@
+import type { FormEffectsResult } from '../forms/effects';
 import type { PdfRotation } from '../geometry/primitives';
 import type { PageObjectNumber } from '../identity/PageObjectNumber';
 import type {
@@ -7,6 +8,10 @@ import type {
   AnnotationUpdateResult,
 } from '../mutation/AnnotationMutationResults';
 import type {
+  AttachmentCreateResult,
+  AttachmentDeleteResult,
+} from '../mutation/AttachmentMutationResults';
+import type {
   FormFieldCreateResult,
   FormFieldDeleteResult,
   FormFieldUpdateResult,
@@ -15,10 +20,9 @@ import type {
   FormSetValueResult,
   FormWidgetLinkResult,
 } from '../mutation/FormMutationResults';
-import type { FormEffectsResult } from '../forms/effects';
-import type { PageFlattenResult, PageFlattenUsage } from '../mutation/PageFlattenResult';
 import type { MetadataUpdateResult } from '../mutation/MetadataUpdateResult';
 import type { PageDeleteResult } from '../mutation/PageDeleteResult';
+import type { PageFlattenResult, PageFlattenUsage } from '../mutation/PageFlattenResult';
 import type { PageInsertResult } from '../mutation/PageInsertResult';
 import type { PageMoveResult } from '../mutation/PageMoveResult';
 import type { PageRotateResult } from '../mutation/PageRotateResult';
@@ -119,6 +123,8 @@ export type DocumentEvent =
       destIndex?: number;
       origin: EventOrigin;
     } & PageInsertResult)
+  | ({ type: 'attachment.created'; origin: EventOrigin } & AttachmentCreateResult)
+  | ({ type: 'attachment.deleted'; origin: EventOrigin } & AttachmentDeleteResult)
   | ({ type: 'metadata.updated'; origin: EventOrigin } & MetadataUpdateResult)
   | ({ type: 'form.valueChanged'; origin: EventOrigin } & FormSetValueResult)
   | ({ type: 'form.imported'; origin: EventOrigin } & FormImportResult)

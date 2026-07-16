@@ -1646,6 +1646,169 @@ describe('annotation-core callout', () => {
   });
 });
 
+describe('annotation-core callout — upright on a rotated page', () => {
+  // The same 3-click flow, but the samples carry the tool's upright policy +
+  // a 90° display rotation (as the draw handler sends on DOWN). upright means
+  // rot = uprightRotation(90) = 270 on the text BOX only.
+  const rotPtr = (phase: 'down' | 'move' | 'up', x: number, y: number): Msg => ({
+    t: 'createPointer',
+    phase,
+    subtype: 'free-text-callout',
+    in: { pon: PON, point: { x, y }, shift: false, displayRotation: 90, upright: true },
+  });
+  // A committed upright callout: box {200,100,120,40} tilted 270° about its
+  // centre (260,120) — its page-space FOOTPRINT is the transposed {240,60,40,120}.
+  const rotCalloutGeom = (): Extract<Geom, { t: 'text' }> => ({
+    t: 'text',
+    rect: { x: 200, y: 100, width: 120, height: 40 },
+    rot: 270,
+    callout: { tip: { x: 40, y: 60 }, knee: { x: 120, y: 120 }, ending: 'open-arrow' },
+  });
+
+  it('calloutConnection lands on the ROTATED edge midpoint (decided in the local frame)', () => {
+    const box = { x: 100, y: 100, width: 100, height: 60 }; // centre (150, 130)
+    // At rot 90 the footprint is the transposed box: x∈[120,180], y∈[80,180].
+    // A ref far right must connect to the footprint's right edge midpoint.
+    expect(calloutConnection(box, { x: 400, y: 130 }, 90)).toMatchObject({ x: 180, y: 130 });
+    // A ref far above → the footprint's top edge midpoint.
+    const above = calloutConnection(box, { x: 150, y: -200 }, 90);
+    expect(above.x).toBeCloseTo(150);
+    expect(above.y).toBeCloseTo(80);
+    // rot 0 keeps the classic rule bit-identically.
+    expect(calloutConnection(box, { x: 400, y: 130 }, 0)).toEqual({ x: 200, y: 130 });
+  });
+
+  it('calloutLinePoints derives conn off the rotated footprint', () => {
+    const pts = calloutLinePoints(rotCalloutGeom());
+    expect(pts).toHaveLength(3);
+    // knee (120,120) sits left of the footprint (x∈[240,280]) → left edge midpoint
+    expect(pts[2].x).toBeCloseTo(240);
+    expect(pts[2].y).toBeCloseTo(120);
+  });
+
+  it('the box drag commits the TRANSPOSED logical box + rot (footprint = what was drawn)', () => {
+    const m = run(initialModel, [
+      rotPtr('down', 40, 60), // tip
+      rotPtr('up', 40, 60),
+      rotPtr('down', 120, 120), // knee
+      rotPtr('up', 120, 120),
+      rotPtr('down', 200, 100), // box drag start
+      rotPtr('move', 320, 140),
+      rotPtr('up', 320, 140), // commit
+    ]);
+    const a = m.byId[m.order[0]];
+    if (a.geom.t !== 'text' || !a.geom.callout) throw new Error('expected callout geom');
+    // dragged {200,100,120,40}, centre (260,120) → transposed logical box
+    expect(a.geom.rect).toMatchObject({ x: 240, y: 60, width: 40, height: 120 });
+    expect(a.geom.rot).toBe(270);
+    // spinning the logical box by rot lands exactly back on the dragged region
+    expect(rotatedAabb(a.geom.rect, a.geom.rot!)).toMatchObject({
+      x: 200,
+      y: 100,
+      width: 120,
+      height: 40,
+    });
+    // the leader anchors never turned
+    expect(a.geom.callout.tip).toEqual({ x: 40, y: 60 });
+    expect(a.geom.callout.knee).toEqual({ x: 120, y: 120 });
+  });
+
+  it('a box CLICK lays the default box upright-anchored at the press point', () => {
+    const m = run(initialModel, [
+      rotPtr('down', 40, 60),
+      rotPtr('up', 40, 60),
+      rotPtr('down', 120, 120),
+      rotPtr('up', 120, 120),
+      rotPtr('down', 200, 100), // box click, no travel
+      rotPtr('up', 200, 100),
+    ]);
+    const a = m.byId[m.order[0]];
+    if (a.geom.t !== 'text') throw new Error('expected text geom');
+    // the SAME box uprightAnchoredRect places (its displayed top-left at the click)
+    expect(a.geom.rect).toMatchObject(uprightAnchoredRect({ x: 200, y: 100 }, 150, 40, 90));
+    expect(a.geom.rot).toBe(270);
+  });
+
+  it('the box-step ghost previews the SAME rot the commit applies', () => {
+    const m = run(initialModel, [
+      rotPtr('down', 40, 60),
+      rotPtr('up', 40, 60),
+      rotPtr('down', 120, 120),
+      rotPtr('up', 120, 120),
+      rotPtr('move', 200, 100), // hover in the box step
+    ]);
+    const ghost = pageItems(m, PON).find((i) => i.source === 'ghost');
+    expect(ghost).toBeDefined();
+    expect(ghost!.geom.t === 'text' && ghost!.geom.rot).toBe(270);
+  });
+
+  it('an unrotated display (or a non-upright caller) keeps the classic commit — no rot', () => {
+    const plainPtr = (phase: 'down' | 'move' | 'up', x: number, y: number): Msg => ({
+      t: 'createPointer',
+      phase,
+      subtype: 'free-text-callout',
+      in: { pon: PON, point: { x, y }, shift: false, displayRotation: 0, upright: true },
+    });
+    const m = run(initialModel, [
+      plainPtr('down', 40, 60),
+      plainPtr('up', 40, 60),
+      plainPtr('down', 120, 120),
+      plainPtr('up', 120, 120),
+      plainPtr('down', 200, 100),
+      plainPtr('up', 200, 100),
+    ]);
+    const a = m.byId[m.order[0]];
+    if (a.geom.t !== 'text') throw new Error('expected text geom');
+    expect(a.geom.rect).toMatchObject({ x: 200, y: 100, width: 150, height: 40 });
+    expect(a.geom.rot).toBeUndefined();
+  });
+
+  it('geomHit tests the box by its FOOTPRINT and the leader in page space', () => {
+    const g = rotCalloutGeom();
+    // inside the footprint (x∈[240,280], y∈[60,180]) but outside the logical rect
+    expect(geomHit(g, { x: 260, y: 70 }, 0, true, 1)).toBe(true);
+    // inside the logical rect but outside the footprint AND off the leader
+    expect(geomHit(g, { x: 210, y: 135 }, 0, true, 1)).toBe(false);
+    // the leader still hits in page space (knee→conn runs along y=120)
+    expect(geomHit(g, { x: 180, y: 120 }, 2, true, 1)).toBe(true);
+  });
+
+  it('geomVisualBounds and selectionBounds wrap the rotated footprint', () => {
+    const g = rotCalloutGeom();
+    const vb = geomVisualBounds(g, 0);
+    // reaches the footprint's top (y=60) and right (x=280) — not just the logical box
+    expect(vb.y).toBeLessThanOrEqual(60);
+    expect(vb.x + vb.width).toBeGreaterThanOrEqual(280);
+    expect(selectionBounds(g, 1)).toMatchObject({ x: 240, y: 60, width: 40, height: 120 });
+  });
+
+  it('geomScene draws the tilted box as a CLOSED corner ring; the leader stays open', () => {
+    const nodes = geomScene(rotCalloutGeom(), 1);
+    const ring = nodes.find((n) => n.kind === 'poly' && n.closed);
+    expect(ring).toBeDefined();
+    if (!ring || ring.kind !== 'poly') throw new Error('expected ring');
+    const xs = ring.points.map((p) => p.x);
+    const ys = ring.points.map((p) => p.y);
+    expect(Math.min(...xs)).toBeCloseTo(240);
+    expect(Math.max(...xs)).toBeCloseTo(280);
+    expect(Math.min(...ys)).toBeCloseTo(60);
+    expect(Math.max(...ys)).toBeCloseTo(180);
+    // no axis-aligned rect node sneaks in for the border
+    expect(nodes.some((n) => n.kind === 'rect')).toBe(false);
+    expect(nodes.some((n) => n.kind === 'poly' && !n.closed)).toBe(true);
+  });
+
+  it('geomHandles rides the rotated box; the tip/knee handles stay page-space', () => {
+    const handles = geomHandles(rotCalloutGeom());
+    const nw = handles.find((h) => h.id === 'nw')!;
+    // the logical nw corner (200,100) spun 270° about (260,120) → (240,180)
+    expect(nw.at.x).toBeCloseTo(240);
+    expect(nw.at.y).toBeCloseTo(180);
+    expect(handles.find((h) => h.id === 'callout-tip')!.at).toEqual({ x: 40, y: 60 });
+    expect(handles.find((h) => h.id === 'callout-knee')!.at).toEqual({ x: 120, y: 120 });
+  });
+});
+
 describe('annotation-core — rotation', () => {
   const seededSquare = (
     id: string,

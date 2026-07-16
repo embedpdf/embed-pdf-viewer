@@ -7,11 +7,13 @@ import { subtypeFromCode } from '@embedpdf/engine-core/runtime';
 import type { PdfFunctions, PdfRuntimeMemory, Ptr } from '@embedpdf/pdf-runtime';
 
 import { readCaret } from './readCaretAnnotation';
+import { readFileAttachment } from './readFileAttachmentAnnotation';
 import { readFreeText } from './readFreeTextAnnotation';
 import { readInk } from './readInkAnnotation';
 import { readLine } from './readLineAnnotation';
 import { readCircle, readSquare } from './readShapeAnnotation';
 import { readStamp } from './readStampAnnotation';
+import { readText } from './readTextAnnotation';
 import {
   readHighlight,
   readSquiggly,
@@ -19,8 +21,8 @@ import {
   readUnderline,
 } from './readTextMarkupAnnotation';
 import { readUnsupported } from './readUnsupportedAnnotation';
-import { readWidget } from './readWidgetAnnotation';
 import { readPolygon, readPolyline } from './readVertexAnnotation';
+import { readWidget } from './readWidgetAnnotation';
 
 /**
  * One reader per `AnnotationSubtype`. Each reader produces the DTO type
@@ -53,7 +55,9 @@ const READER_BY_SUBTYPE: Partial<Record<AnnotationSubtype, AnnotationSubtypeRead
   ink: readInk,
   'free-text': readFreeText,
   caret: readCaret,
+  text: readText,
   stamp: readStamp,
+  'file-attachment': readFileAttachment,
   widget: readWidget,
   unsupported: readUnsupported,
 };

@@ -341,6 +341,12 @@ export type Draft =
       cur: Vec;
       boxFrom?: Vec;
       boxTo?: Vec;
+      /** Display rotation + upright policy captured at the TIP click (the
+       *  gesture's home page) — the text BOX commits counter-rotated so it
+       *  reads upright; the leader (tip/knee) is page-space and never turns.
+       *  Same capture rule as the rect draft. */
+      displayRotation?: PageRotation;
+      upright?: boolean;
       /** The tool's `/F` seed, captured at DOWN (see the rect draft). */
       flags?: Partial<AnnotationFlags>;
     }

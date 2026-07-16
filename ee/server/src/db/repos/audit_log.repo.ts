@@ -1,4 +1,5 @@
 import type { Kysely, Transaction } from 'kysely';
+
 import type { Database as Schema } from '../schema';
 
 export type AuditMutationKind =
@@ -11,6 +12,8 @@ export type AuditMutationKind =
   | 'pages.delete'
   | 'pages.flatten'
   | 'metadata.update'
+  | 'attachment.create'
+  | 'attachment.delete'
   | 'form.setValue'
   | 'form.reset'
   | 'form.import'

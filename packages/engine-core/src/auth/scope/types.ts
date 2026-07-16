@@ -41,6 +41,9 @@ export type DocCapability =
   // Metadata (Info-dict writes, PDF bit 4)
   | 'doc.metadata.modify' // rewrite document metadata / Info dict (PDF bit 4)
 
+  // Attachments (document-level embedded files, PDF bit 4)
+  | 'doc.attachments.modify' // add/remove /EmbeddedFiles entries (PDF bit 4)
+
   // Redaction apply (destructive content modification, PDF bit 4)
   | 'doc.redact';
 

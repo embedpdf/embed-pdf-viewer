@@ -14,15 +14,19 @@ import type { PdfRuntimeModule, Ptr } from '@embedpdf/pdf-runtime';
 import type { DocumentSession } from '../../document-session/DocumentSession';
 import { throwIfAborted } from '../../shared/abort';
 import { FPDF_REVERSE_BYTE_ORDER, rasterize } from '../render/deviceRaster';
-import { readAnnotRect } from './internal/read/annotationReadPrimitives';
+import { readAnnotRect, readIntent } from './internal/read/annotationReadPrimitives';
 import { readAnnotationIdentity } from './internal/read/readAnnotationIdentity';
 import {
   readAnnotationRotation,
   readAnnotationUnrotatedRect,
 } from './internal/read/readAnnotationTransformMetadata';
+import { freeTextIntentFromName } from './internal/freeTextIntent';
 
 /** `FPDF_ANNOT_WIDGET` — form-field annotation subtype code. */
 const ANNOT_SUBTYPE_WIDGET = 20;
+
+/** `FPDF_ANNOT_FREETEXT` — free-text annotation subtype code. */
+const ANNOT_SUBTYPE_FREETEXT = 3;
 
 /**
  * BOX-family subtypes (free-text 3, square 5, circle 6, stamp 13): the kinds
@@ -107,8 +111,16 @@ export class AnnotationAppearanceReader {
           // kinds (rotation pre-baked into their geometry), foreign PDFs with
           // arbitrary AP matrices — renders on the classic path, placed by
           // `/Rect`, bit-identical to before.
+          // A free-text CALLOUT is excluded even with both fields present: only
+          // its text box tilts, via an INLINE `cm` mid-stream (the leader stays
+          // page-space), so the form `/Matrix` is identity — nothing to strip.
+          const subtypeCode = fn.FPDFAnnot_GetSubtype(annotPtr);
+          const isCallout =
+            subtypeCode === ANNOT_SUBTYPE_FREETEXT &&
+            freeTextIntentFromName(readIntent(fn, mem, annotPtr)) === 'free-text-callout';
           const stripRotation =
-            BOX_FAMILY_SUBTYPES.has(fn.FPDFAnnot_GetSubtype(annotPtr)) &&
+            BOX_FAMILY_SUBTYPES.has(subtypeCode) &&
+            !isCallout &&
             readAnnotationRotation(fn, mem, annotPtr) !== undefined;
           const unrotatedRect = stripRotation
             ? readAnnotationUnrotatedRect(fn, mem, annotPtr)

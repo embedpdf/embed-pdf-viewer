@@ -88,6 +88,12 @@ export interface LayersTable {
    * `doc_version` and `layout_version`.
    */
   metadata_version: number;
+  /**
+   * Attachments-pointer epoch for `/attachments@attachmentsVersion` and
+   * `/attachment-files/…@…`. Bumps only on attachment create/delete, a
+   * different cadence than `doc_version` and `metadata_version`.
+   */
+  attachments_version: number;
   /** Audit-log head at this layer's current state — advanced in the same
    *  transaction as every audit append. Published as the manifest's
    *  `auditHead` (the gapless subscribe cursor). */

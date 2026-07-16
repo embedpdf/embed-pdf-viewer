@@ -44,6 +44,11 @@ import {
   type PagesDeleteWorkerRequest,
   type PagesExtractWorkerRequest,
   type PagesInsertWorkerRequest,
+  type AttachmentsListWorkerRequest,
+  type AttachmentsReadFileWorkerRequest,
+  type AttachmentsCreateWorkerRequest,
+  type AttachmentsDeleteWorkerRequest,
+  type AnnotationsReadFileWorkerRequest,
   type PagesFlattenWorkerRequest,
   type PieceInfoApplicationsWorkerRequest,
   type PieceInfoClearWorkerRequest,
@@ -70,14 +75,16 @@ import {
   openFatMemoryDocument,
   openLayerDocument,
 } from '../document-session/lifecycle/PdfDocumentOpener';
+import { DocumentActionsReader } from '../features/actions';
 import {
   AnnotationReader,
   AnnotationAppearanceReader,
   AnnotationMutator,
   RawAnnotationReader,
 } from '../features/annotations';
-import { FormMutator, FormReader, FormsEffectsApplier, disposeFormModel } from '../features/forms';
+import { AttachmentMutator, AttachmentReader } from '../features/attachments';
 import { FontRegistrar, type StartupFontSpec } from '../features/fonts';
+import { FormMutator, FormReader, FormsEffectsApplier, disposeFormModel } from '../features/forms';
 import { PageGeometryReader } from '../features/geometry';
 import { MetadataMutator, MetadataReader } from '../features/metadata';
 import {
@@ -87,7 +94,6 @@ import {
   PagesMutator,
   PagesReader,
 } from '../features/pages';
-import { DocumentActionsReader } from '../features/actions';
 import { PieceInfoAccessor } from '../features/pieceinfo';
 import { PageRenderReader } from '../features/render';
 import { DocumentSaver } from '../features/save';
@@ -259,6 +265,21 @@ export class WorkerHost {
           break;
         case 'pages.insert':
           resultPack = this.handlePagesInsert(msg, ctrl.signal);
+          break;
+        case 'attachments.list':
+          resultPack = this.handleAttachmentsList(msg, ctrl.signal);
+          break;
+        case 'attachments.readFile':
+          resultPack = this.handleAttachmentsReadFile(msg, ctrl.signal);
+          break;
+        case 'attachments.create':
+          resultPack = this.handleAttachmentsCreate(msg, ctrl.signal);
+          break;
+        case 'attachments.delete':
+          resultPack = this.handleAttachmentsDelete(msg, ctrl.signal);
+          break;
+        case 'annotations.readFile':
+          resultPack = this.handleAnnotationsReadFile(msg, ctrl.signal);
           break;
         case 'pieceInfo.read':
           resultPack = this.handlePieceInfoRead(msg, ctrl.signal);
@@ -571,6 +592,72 @@ export class WorkerHost {
     const inserter = new PagesInserter(this.runtime, session);
     const result = inserter.insert(req.bytes, req.destIndex, signal);
     return this.finishMutation(session, { tag: 'pages.insert', result }, req.artifactPath);
+  }
+
+  private handleAttachmentsList(
+    req: AttachmentsListWorkerRequest,
+    signal: AbortSignal,
+  ): WirePack<WorkerResultPayload> {
+    const session = this.requireSession(req);
+    const items = new AttachmentReader(this.runtime, session).list(signal);
+    return wirePack({ tag: 'attachments.list', items });
+  }
+
+  private handleAttachmentsReadFile(
+    req: AttachmentsReadFileWorkerRequest,
+    signal: AbortSignal,
+  ): WirePack<WorkerResultPayload> {
+    const session = this.requireSession(req);
+    const content = new AttachmentReader(this.runtime, session).readFile(
+      req.ref,
+      req.path,
+      req.maxDecodedBytes,
+      signal,
+    );
+    // A read: no finishMutation, no layer artifact. Buffer-mode bytes
+    // transfer zero-copy; path mode carries metadata only.
+    return wirePack(
+      { tag: 'attachments.readFile', content },
+      content.bytes !== undefined ? [content.bytes] : [],
+    );
+  }
+
+  private handleAttachmentsCreate(
+    req: AttachmentsCreateWorkerRequest,
+    signal: AbortSignal,
+  ): WirePack<WorkerResultPayload> {
+    const session = this.requireSession(req);
+    const mutator = new AttachmentMutator(this.runtime, session);
+    const result = mutator.create(req.file, req.resources, signal);
+    return this.finishMutation(session, { tag: 'attachments.create', result }, req.artifactPath);
+  }
+
+  private handleAttachmentsDelete(
+    req: AttachmentsDeleteWorkerRequest,
+    signal: AbortSignal,
+  ): WirePack<WorkerResultPayload> {
+    const session = this.requireSession(req);
+    const mutator = new AttachmentMutator(this.runtime, session);
+    const result = mutator.delete(req.ref, signal);
+    return this.finishMutation(session, { tag: 'attachments.delete', result }, req.artifactPath);
+  }
+
+  private handleAnnotationsReadFile(
+    req: AnnotationsReadFileWorkerRequest,
+    signal: AbortSignal,
+  ): WirePack<WorkerResultPayload> {
+    const session = this.requireSession(req);
+    const content = new AttachmentReader(this.runtime, session).readAnnotationFile(
+      req.pageObjectNumber,
+      req.ref,
+      req.path,
+      req.maxDecodedBytes,
+      signal,
+    );
+    return wirePack(
+      { tag: 'annotations.readFile', content },
+      content.bytes !== undefined ? [content.bytes] : [],
+    );
   }
 
   private handlePieceInfoRead(

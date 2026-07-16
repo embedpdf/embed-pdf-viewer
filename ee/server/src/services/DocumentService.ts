@@ -1,6 +1,7 @@
 import { mkdtemp, rm, stat } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+
 import {
   EngineError,
   EngineErrorCode,
@@ -16,8 +17,16 @@ import {
   type PdfBits,
   type PdfSaveMode,
   type WorkerJobId,
+  type EmbeddedFileItem,
+  type EmbeddedFileRef,
+  type AnnotationRef,
+  type WirePack,
+  type WorkerRequest,
 } from '@embedpdf/engine-core/runtime';
 import type { DocumentManifest } from '@embedpdf/engine-core/wire';
+
+import type { LayerStateService } from './LayerStateService';
+import type { RequestJwtContext } from '../app/jwt-plugin';
 import type { DocumentsRepo, DocumentRow } from '../db/repos/documents.repo';
 import type {
   PasswordSessionFacts,
@@ -27,13 +36,11 @@ import type {
   PasswordVerificationRow,
   PdfPasswordVerificationsRepo,
 } from '../db/repos/pdf_password_verifications.repo';
-import type { RequestJwtContext } from '../app/jwt-plugin';
+import type { WorkerThreadPool } from '../runtime/WorkerThreadPool';
 import { signPasswordGrant, verifyPasswordGrant, type PasswordSessionBinding } from '../security';
 import type { BaseFileCache, LocalFileHandle } from '../storage/BaseFileCache';
-import type { ObjectStore } from '../storage/ObjectStore';
 import { StorageKeys } from '../storage/keys';
-import type { WorkerThreadPool } from '../runtime/WorkerThreadPool';
-import type { LayerStateService } from './LayerStateService';
+import type { ObjectStore } from '../storage/ObjectStore';
 
 /**
  * Public head shape returned by `GET /v1/docs/:docId/head`.
@@ -112,6 +119,20 @@ export interface OpenContext {
 export interface SavedPdfFile {
   path: string;
   size: number;
+  cleanup(): Promise<void>;
+}
+
+/**
+ * A decoded embedded file written to a temp path by the worker
+ * (`EPDFAttachment_ExtractFile` + `FPDF_FILEWRITE` — the payload never
+ * crosses the thread boundary). The route streams it and calls
+ * `cleanup()`; a zero-byte attachment is a valid empty file.
+ */
+export interface SavedAttachmentFile {
+  path: string;
+  size: number;
+  name: string;
+  mimeType?: string;
   cleanup(): Promise<void>;
 }
 
@@ -392,7 +413,13 @@ export class DocumentService {
         docId,
         head.baseSha,
         layerName,
-        { docVersion: head.docVersion, layoutVersion: 1, metadataVersion: 1, lastAuditId: 0 },
+        {
+          docVersion: head.docVersion,
+          layoutVersion: 1,
+          metadataVersion: 1,
+          attachmentsVersion: 1,
+          lastAuditId: 0,
+        },
         pages,
       );
     }
@@ -959,6 +986,126 @@ export class DocumentService {
    * close to the pool's eviction policy — but exposed for tests and
    * for future graceful-shutdown flows.
    */
+
+  /**
+   * Decompression-bomb guard for attachment extraction: the worker's
+   * flate sink stops decoding past this many decoded bytes (on the
+   * thread-confined runtime an unbounded decode would take every doc
+   * pinned to that worker down with it).
+   */
+  private static readonly MAX_DECODED_ATTACHMENT_BYTES = 1 << 30; // 1 GiB
+
+  /** Snapshot of the layer's `/EmbeddedFiles` name tree, in tree order. */
+  async listAttachments(
+    ctx: OpenContext,
+    docId: string,
+    layerName: string,
+    signal?: AbortSignal,
+  ): Promise<EmbeddedFileItem[]> {
+    await this.ensureLayerOnPool(ctx, docId, layerName);
+    const build = (jobId: WorkerJobId) =>
+      wirePack({ kind: 'attachments.list' as const, jobId, docId, layerName });
+    const payload = await this.pool.run(docId, build, signal);
+    if (payload.tag !== 'attachments.list') {
+      throw new EngineError(
+        EngineErrorCode.WireFormat,
+        `unexpected attachments.list payload: ${payload.tag}`,
+      );
+    }
+    return payload.items;
+  }
+
+  /** Decode one document-level embedded file (by key) to a temp path. */
+  async readAttachmentFileToTemp(
+    ctx: OpenContext,
+    docId: string,
+    layerName: string,
+    ref: EmbeddedFileRef,
+    signal?: AbortSignal,
+  ): Promise<SavedAttachmentFile> {
+    return this.readFileToTemp(ctx, docId, layerName, signal, (jobId, path) =>
+      wirePack({
+        kind: 'attachments.readFile' as const,
+        jobId,
+        docId,
+        layerName,
+        ref,
+        path,
+        maxDecodedBytes: DocumentService.MAX_DECODED_ATTACHMENT_BYTES,
+      }),
+    );
+  }
+
+  /** Decode a FileAttachment annotation's embedded file to a temp path. */
+  async readAnnotationFileToTemp(
+    ctx: OpenContext,
+    docId: string,
+    layerName: string,
+    pageObjectNumber: number,
+    ref: AnnotationRef,
+    signal?: AbortSignal,
+  ): Promise<SavedAttachmentFile> {
+    return this.readFileToTemp(ctx, docId, layerName, signal, (jobId, path) =>
+      wirePack({
+        kind: 'annotations.readFile' as const,
+        jobId,
+        docId,
+        layerName,
+        pageObjectNumber,
+        ref,
+        path,
+        maxDecodedBytes: DocumentService.MAX_DECODED_ATTACHMENT_BYTES,
+      }),
+    );
+  }
+
+  private async readFileToTemp(
+    ctx: OpenContext,
+    docId: string,
+    layerName: string,
+    signal: AbortSignal | undefined,
+    buildFor: (jobId: WorkerJobId, path: string) => WirePack<WorkerRequest>,
+  ): Promise<SavedAttachmentFile> {
+    await this.ensureLayerOnPool(ctx, docId, layerName);
+    const dir = await mkdtemp(join(tmpdir(), 'embedpdf-attachment-'));
+    const path = join(dir, 'attachment.bin');
+    try {
+      // Attachment bytes use the file-backed extraction mode so the decoded
+      // payload never crosses the worker boundary as an ArrayBuffer; Fastify
+      // streams this completed temp file with backpressure.
+      const payload = await this.pool.run(docId, (jobId) => buildFor(jobId, path), signal);
+      if (payload.tag !== 'attachments.readFile' && payload.tag !== 'annotations.readFile') {
+        throw new EngineError(
+          EngineErrorCode.WireFormat,
+          `unexpected attachment read payload: ${payload.tag}`,
+        );
+      }
+      const content = payload.content;
+      if (content.path !== path) {
+        throw new EngineError(
+          EngineErrorCode.WireFormat,
+          `worker saved unexpected path: ${content.path}`,
+        );
+      }
+
+      let cleaned = false;
+      return {
+        path,
+        size: content.size,
+        name: content.name,
+        ...(content.mimeType !== undefined ? { mimeType: content.mimeType } : {}),
+        async cleanup() {
+          if (cleaned) return;
+          cleaned = true;
+          await rm(dir, { recursive: true, force: true });
+        },
+      };
+    } catch (err) {
+      await rm(dir, { recursive: true, force: true });
+      throw err;
+    }
+  }
+
   async close(docId: string): Promise<void> {
     this.heads.delete(docId);
     try {

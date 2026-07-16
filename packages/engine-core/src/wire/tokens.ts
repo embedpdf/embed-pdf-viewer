@@ -5,6 +5,7 @@ import {
   AnnotationAppearancesRenderTokenSchema,
   AnnotationTokenSchema,
   ActionsTokenSchema,
+  AttachmentsTokenSchema,
   ContentTokenSchema,
   DocTokenSchema,
   DownloadTokenSchema,
@@ -53,6 +54,14 @@ export const encodeActionsToken = (actionsVersion: number): string =>
   encodeToken(ActionsTokenSchema, { actionsVersion });
 export const decodeActionsToken = (raw: string): number =>
   decodePositiveInteger(decodeToken(ActionsTokenSchema, raw).actionsVersion, 'actionsVersion');
+
+export const encodeAttachmentsToken = (attachmentsVersion: number): string =>
+  encodeToken(AttachmentsTokenSchema, { attachmentsVersion });
+export const decodeAttachmentsToken = (raw: string): number =>
+  decodePositiveInteger(
+    decodeToken(AttachmentsTokenSchema, raw).attachmentsVersion,
+    'attachmentsVersion',
+  );
 
 export const encodeDownloadToken = (input: DownloadToken): string =>
   encodeToken(DownloadTokenSchema, { docVersion: input.docVersion, mode: input.mode });

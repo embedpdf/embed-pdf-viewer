@@ -38,7 +38,7 @@ import {
 } from './anchor';
 import { blendFor } from './scene';
 import { styleFromProps } from './props';
-import { calloutBox, defaultsFor, rotateDraftDelta } from './update';
+import { calloutBox, calloutUprightRot, defaultsFor, rotateDraftDelta } from './update';
 import type { Annot, ChromeNode, Geom, Id, Model, Rect, RenderItem, Style, Vec } from './types';
 import type { CreationDraftAnchor } from './types';
 
@@ -228,10 +228,18 @@ export function pageItems(m: Model, pon: number, view?: ViewEnv): RenderItem[] {
     const def = defaultsFor(m, d.preset ?? d.subtype);
     const style = styleFromProps(def);
     const ending = def.lineEndings.end !== 'none' ? def.lineEndings.end : 'open-arrow';
+    // The box preview carries the SAME upright rot the commit will apply, so
+    // the ghost box (and its leader connection) is what you actually get.
+    const rot = calloutUprightRot(d);
     const geom: Geom =
       d.step === 'knee'
         ? { t: 'line', a: d.tip, b: d.cur, ends: { start: ending, end: 'none' } }
-        : { t: 'text', rect: calloutBox(d), callout: { tip: d.tip, knee: d.knee, ending } };
+        : {
+            t: 'text',
+            rect: calloutBox(d),
+            callout: { tip: d.tip, knee: d.knee, ending },
+            ...(rot ? { rot } : {}),
+          };
     items.push({
       id: DRAFT_ID,
       ref: null,

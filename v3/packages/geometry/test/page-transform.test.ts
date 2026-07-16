@@ -158,3 +158,34 @@ describe('pageTransform', () => {
     }
   });
 });
+
+/*
+ * `baseScale`/`zoom`: the page's PHYSICAL 100% (viewUnitsPerPoint × userUnit)
+ * and its zoom relative to it — the number zoom-relative policies (the /F
+ * NoZoom exemption) consume. Distinct from `viewScale`, a units conversion.
+ */
+describe('pageTransform baseScale/zoom: percent-of-100% semantics', () => {
+  const pageSize = { width: 612, height: 792 };
+
+  it('zoom is 1 exactly at the declared 100% (web: scale = 96/72)', () => {
+    const t = pageTransform({ pageSize, rotation: 0, scale: 96 / 72, baseScale: 96 / 72, dpr: 1 });
+    expect(t.baseScale).toBeCloseTo(96 / 72, 6);
+    expect(t.zoom).toBeCloseTo(1, 3); // device snapping may add ~1e-4
+  });
+
+  it('userUnit folds into the baseline: a userUnit-5 page at physical 100% reads zoom 1', () => {
+    const userUnit = 5;
+    const base = (96 / 72) * userUnit;
+    const t = pageTransform({ pageSize, rotation: 0, scale: base, baseScale: base, dpr: 1 });
+    expect(t.zoom).toBeCloseTo(1, 3);
+    // …and doubling the displayed size reads as 200%.
+    const t2 = pageTransform({ pageSize, rotation: 0, scale: base * 2, baseScale: base, dpr: 1 });
+    expect(t2.zoom).toBeCloseTo(2, 3);
+  });
+
+  it('defaults to a neutral baseline (zoom ≈ 1) when the caller declares none', () => {
+    const t = pageTransform({ pageSize, rotation: 0, scale: 0.42, dpr: 2 });
+    expect(t.baseScale).toBeCloseTo(0.42, 6);
+    expect(t.zoom).toBeCloseTo(1, 2);
+  });
+});

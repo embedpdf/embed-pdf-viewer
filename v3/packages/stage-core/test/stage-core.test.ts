@@ -666,3 +666,39 @@ describe('groupPages', () => {
     expect(S.groupPages(4, 'even')).toEqual([[0], [1, 2], [3]]);
   });
 });
+
+/*
+ * `/UserUnit` (§14.11.6): a userUnit-5 page is PHYSICALLY 5× its point size.
+ * It folds into the page's measured layout size AND its per-page
+ * `contentScale`, so "world units per content point" stays true for every
+ * page — the invariant every content→world mapping depends on.
+ */
+describe('userUnit folds into layout size and per-page contentScale', () => {
+  it('scales the page box and its contentScale together', () => {
+    const scene = S.linearLayout(
+      [{ size: { width: 100, height: 200 } }, { size: { width: 100, height: 200 }, userUnit: 5 }],
+      S.groupPages(2, 'none'),
+      { gap: 0, sizing: 'intrinsic' },
+    );
+    const [plain, big] = scene.items.map((it) => it.pages[0]);
+    expect(plain.width).toBe(100);
+    expect(plain.contentScale).toBe(1);
+    expect(big.width).toBe(500); // lays out 5× larger, like Acrobat
+    expect(big.height).toBe(1000);
+    expect(big.contentScale).toBe(5); // world per content POINT — per page
+    // the invariant: box extent ÷ contentScale recovers the point size
+    expect(big.width / big.contentScale).toBe(100);
+  });
+
+  it('composes with viewUnitsPerPoint (the platform physical factor)', () => {
+    const scene = S.linearLayout(
+      [{ size: { width: 72, height: 72 }, userUnit: 2 }],
+      S.groupPages(1, 'none'),
+      { gap: 0, sizing: 'intrinsic', viewUnitsPerPoint: 96 / 72 },
+    );
+    const box = scene.items[0].pages[0];
+    // 72pt × 2 (userUnit) × 4/3 (96dpi) = 192 world units — two inches
+    expect(box.width).toBeCloseTo(192, 6);
+    expect(box.contentScale).toBeCloseTo((96 / 72) * 2, 6);
+  });
+});

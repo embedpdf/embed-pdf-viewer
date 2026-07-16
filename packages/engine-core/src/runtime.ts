@@ -57,6 +57,7 @@ export type { DocumentSearchService } from './engine/DocumentSearchService';
 export type { WeakAnnotationEditSession } from './engine/DocumentAnnotationsService';
 export type { DocumentPagesService } from './engine/DocumentPagesService';
 export type { PageAnnotationsService } from './engine/PageAnnotationsService';
+export type { DocumentAttachmentsService } from './engine/DocumentAttachmentsService';
 export type { PieceInfoService } from './engine/PieceInfoService';
 export type {
   PieceInfoEntry,
@@ -133,6 +134,12 @@ export type {
   CloseWorkerRequest,
   AbortWorkerRequest,
   ShutdownWorkerRequest,
+  AttachmentsListWorkerRequest,
+  AttachmentsReadFileWorkerRequest,
+  AttachmentsCreateWorkerRequest,
+  AttachmentsDeleteWorkerRequest,
+  AnnotationsReadFileWorkerRequest,
+  AttachmentFileWorkerPayload,
   LayerArtifactWorkerPayload,
   LayerArtifactFileWorkerPayload,
 } from './wire/worker-protocol';

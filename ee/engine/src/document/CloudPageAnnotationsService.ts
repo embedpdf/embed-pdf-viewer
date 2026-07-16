@@ -20,6 +20,7 @@ import {
   type AnnotationDeleteResult,
   type AnnotationMoveResult,
   type AnnotationUpdateResult,
+  type AttachmentContent,
   type DocumentEventInit,
   type MutationMeta,
   type PageAnnotationsService,
@@ -38,8 +39,11 @@ import {
   wirePaths,
 } from '@embedpdf/engine-core/wire';
 import type { SessionEventPublisher } from '@embedpdf/engine-services';
-import type { HttpClient } from '../transport/HttpClient';
+
+import { buildMutationForm, hasResources } from './buildMutationForm';
 import type { ManifestAccessor } from './CloudDocumentHandle';
+import { parseAttachmentContent } from './parseAttachmentContent';
+import type { HttpClient } from '../transport/HttpClient';
 
 /**
  * Cloud-side page annotation service. Mirrors the local wiring: each
@@ -146,6 +150,60 @@ export class CloudPageAnnotationsService implements PageAnnotationsService {
         signal,
       );
       return parseAppearanceForm(form);
+    });
+  }
+
+  /**
+   * Decode and return the file embedded in a FileAttachment annotation.
+   * A read over the immutable `attachment-files` leaf, pinned by the
+   * manifest's `attachmentsVersion` (annotation-level files re-key on the
+   * same pin as document-level ones), with the same stale-404 refresh
+   * retry as {@link list}. Weak `index` refs cannot be spliced into a GET
+   * URL (no body to carry the revision), so bytes reads require a stable
+   * id — the same `:annotKey` routing update()/delete() use.
+   */
+  downloadFile(ref: AnnotationRef): AbortablePromise<AttachmentContent> {
+    if (this.isClosed()) {
+      return AbortablePromise.rejectReason(
+        new EngineError(EngineErrorCode.DocNotOpen, `document ${this.docId} is closed`),
+      );
+    }
+    if (ref.pageObjectNumber !== this.pageObjectNumber) {
+      return AbortablePromise.rejectReason(
+        new EngineError(
+          EngineErrorCode.InvalidArg,
+          `ref.pageObjectNumber ${ref.pageObjectNumber} != page ${this.pageObjectNumber}`,
+        ),
+      );
+    }
+    if (ref.kind === 'index') {
+      return AbortablePromise.rejectReason(
+        new EngineError(
+          EngineErrorCode.InvalidArg,
+          'downloadFile requires a stable ref (objectNumber or nm); index refs cannot address the content-addressed file leaf',
+        ),
+      );
+    }
+    const annotKey = encodeStableIdKey(refToStableId(ref));
+    return AbortablePromise.run<AttachmentContent>(async (signal) => {
+      const buildPath = async (s: AbortSignal): Promise<string> => {
+        const manifest = await this.manifest.get(s);
+        return wirePaths.layerAnnotationFile(
+          this.docId,
+          this.layerName,
+          this.pageObjectNumber,
+          annotKey,
+          manifest.attachmentsVersion,
+        );
+      };
+      const file = await this.http.getFileWithRefresh(
+        buildPath,
+        async (s) => {
+          await this.manifest.refresh(s);
+        },
+        signal,
+      );
+      return parseAttachmentContent(file);
     });
   }
 
@@ -412,27 +470,4 @@ function refToStableId(
     return { kind: 'objectNumber', value: ref.annotObjectNumber };
   }
   return { kind: 'nm', value: ref.nm };
-}
-
-function hasResources(resources: WireResourceMap): boolean {
-  return Object.keys(resources).length > 0;
-}
-
-/**
- * Multipart envelope for mutations that carry binaries: part `body` holds
- * the exact JSON the plain request would have been, plus one
- * `resource:{key}` file part per binary payload. Mirrors the appearance
- * response protocol (`manifest` part + named image parts) in reverse.
- */
-function buildMutationForm(body: unknown, resources: WireResourceMap): FormData {
-  const form = new FormData();
-  form.append('body', JSON.stringify(body));
-  for (const [key, resource] of Object.entries(resources)) {
-    form.append(
-      `resource:${key}`,
-      new Blob([resource.bytes], { type: resource.mimeType ?? 'application/octet-stream' }),
-      resource.name ?? key,
-    );
-  }
-  return form;
 }

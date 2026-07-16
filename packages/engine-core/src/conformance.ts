@@ -39,6 +39,7 @@ export { runPageRotateConformance } from './conformance/runPageRotateConformance
 export { runPageDeleteConformance } from './conformance/runPageDeleteConformance';
 export { runPageFlattenConformance } from './conformance/runPageFlattenConformance';
 export { runPageExtractConformance } from './conformance/runPageExtractConformance';
+export { runAttachmentConformance } from './conformance/runAttachmentConformance';
 export { runPageInsertConformance } from './conformance/runPageInsertConformance';
 export { runPieceInfoConformance } from './conformance/runPieceInfoConformance';
 export { runDocumentEventsConformance } from './conformance/runDocumentEventsConformance';

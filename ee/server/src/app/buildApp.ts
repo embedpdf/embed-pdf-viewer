@@ -1,14 +1,22 @@
-import Fastify, { type FastifyInstance } from 'fastify';
-import multipart from '@fastify/multipart';
-import compress from '@fastify/compress';
-import type { Kysely } from 'kysely';
 import { EngineError, EngineErrorCode } from '@embedpdf/engine-core/runtime';
+import compress from '@fastify/compress';
+import multipart from '@fastify/multipart';
+import Fastify, { type FastifyInstance } from 'fastify';
+import type { Kysely } from 'kysely';
+
+import { registerJwtAuth } from './jwt-plugin';
+import { DbJwksCacheStore } from '../auth/JwksCacheStore';
+import type { JwtVerifierConfig, RevocationCheck, JwksCacheStore } from '../auth/JwtVerifier';
+import { RevokedJtisGuard } from '../auth/RevokedJtisGuard';
+import { NoneCdnSigner } from '../cdn/adapters/NoneCdnSigner';
+import type { CdnSigner } from '../cdn/CdnSigner';
+import { validate as validateMigrations, type MigrationSource } from '../db/migrator/runner';
+import { DocumentsRepo } from '../db/repos/documents.repo';
+import { PdfPasswordSessionsRepo } from '../db/repos/pdf_password_sessions.repo';
+import type { Database as Schema } from '../db/schema';
 import { WorkerThreadPool, type FallbackFontDescriptor } from '../runtime/WorkerThreadPool';
 import { BaseFileCache } from '../storage/BaseFileCache';
 import type { ObjectStoreWithInfo } from '../storage/ObjectStore';
-import type { Database as Schema } from '../db/schema';
-import { DocumentsRepo } from '../db/repos/documents.repo';
-import { PdfPasswordSessionsRepo } from '../db/repos/pdf_password_sessions.repo';
 import { PdfPasswordVerificationsRepo } from '../db/repos/pdf_password_verifications.repo';
 import { TenantsRepo } from '../db/repos/tenants.repo';
 import { DocumentPagesRepo, LayerPagesRepo, LayersRepo } from '../db/repos/page_state.repo';
@@ -21,14 +29,10 @@ import { EventLogService } from '../services/EventLogService';
 import { LayerStateService } from '../services/LayerStateService';
 import { LayerService } from '../services/LayerService';
 import { WeakAnnotationSessionService } from '../services/WeakAnnotationSessionService';
-import { validate as validateMigrations, type MigrationSource } from '../db/migrator/runner';
-import { RevokedJtisGuard } from '../auth/RevokedJtisGuard';
-import { DbJwksCacheStore } from '../auth/JwksCacheStore';
-import type { JwtVerifierConfig, RevocationCheck, JwksCacheStore } from '../auth/JwtVerifier';
-import { registerJwtAuth } from './jwt-plugin';
 import { registerDocsRoutes } from '../routes/docs';
 import { registerAccessRoutes } from '../routes/access';
 import { registerAnnotationRoutes } from '../routes/annotations';
+import { registerAttachmentRoutes } from '../routes/attachments';
 import { registerFormRoutes } from '../routes/forms';
 import { registerMetadataRoutes } from '../routes/metadata';
 import { registerPageRoutes } from '../routes/pages';
@@ -37,8 +41,6 @@ import { registerAdminDocumentsRoutes } from '../routes/admin/documents';
 import { registerAdminTokensRoutes } from '../routes/admin/tokens';
 import { SharpImageEncoder } from '../render/SharpImageEncoder';
 import type { KmsKeyring } from '../security';
-import type { CdnSigner } from '../cdn/CdnSigner';
-import { NoneCdnSigner } from '../cdn/adapters/NoneCdnSigner';
 import { InProcessRealtimeBus, type RealtimeBus } from '../realtime/RealtimeBus';
 import { registerEventsRoutes } from '../routes/events';
 
@@ -437,6 +439,10 @@ export async function buildApp(opts: BuildAppOptions): Promise<AppBundle> {
         weakAnnotationSessions,
       });
       await registerFormRoutes(app, {
+        documentService,
+        layerService,
+      });
+      await registerAttachmentRoutes(app, {
         documentService,
         layerService,
       });

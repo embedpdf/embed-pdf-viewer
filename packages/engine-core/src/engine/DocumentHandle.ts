@@ -1,5 +1,6 @@
-import type { DocumentAnnotationsService } from './DocumentAnnotationsService';
 import type { DocumentActionsService } from './DocumentActionsService';
+import type { DocumentAnnotationsService } from './DocumentAnnotationsService';
+import type { DocumentAttachmentsService } from './DocumentAttachmentsService';
 import type { DocumentFormsService } from './DocumentFormsService';
 import type { DocumentPagesService } from './DocumentPagesService';
 import type { DocumentSearchService } from './DocumentSearchService';
@@ -25,6 +26,13 @@ export interface DocumentHandle {
   readonly annotations: DocumentAnnotationsService;
   /** Lazy catalog-owned action extraction. The engine never executes scripts. */
   readonly actions?: DocumentActionsService;
+  /**
+   * Document-level attachments (the catalog's `/EmbeddedFiles` name tree).
+   * Optional while transports ship (the `downloadLayer?` pattern) —
+   * feature-detect with `doc.attachments !== undefined`. Files attached to
+   * annotations are downloaded via `page(pon).annotations.downloadFile`.
+   */
+  readonly attachments?: DocumentAttachmentsService;
   /** The document's interactive form (AcroForm): fields, values, interchange. */
   readonly forms: DocumentFormsService;
   /**

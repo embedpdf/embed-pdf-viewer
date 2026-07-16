@@ -6,6 +6,7 @@ import type {
   AnnotationAppearanceRenderOptions,
   AnnotationAppearancesResult,
 } from '../dto/AnnotationRender';
+import type { AttachmentContent } from '../dto/Attachment';
 import type { AnnotationRef } from '../identity/AnnotationRef';
 import type {
   AnnotationCreateResult,
@@ -50,6 +51,16 @@ export interface PageAnnotationsService {
   renderAppearanceImages(
     options?: AnnotationAppearanceImageOptions,
   ): AbortablePromise<AnnotationAppearanceImagesResult>;
+  /**
+   * Decode and return the file embedded in a FileAttachment annotation
+   * (its `/FS` filespec). A read — listings carry the file's metadata
+   * (`FileAttachmentAnnotationDTO.file`); this is the explicit bytes-out
+   * call. Optional while the cloud endpoint ships (the `extract?`
+   * pattern); feature-detect with `annotations.downloadFile !== undefined`.
+   * Throws `EngineError(InvalidArg)` when the annotation is not a
+   * file-attachment or has no embedded file stream.
+   */
+  downloadFile?(ref: AnnotationRef): AbortablePromise<AttachmentContent>;
   create(draft: AnnotationDraft): AbortablePromise<AnnotationCreateResult>;
   update(ref: AnnotationRef, patch: AnnotationPatch): AbortablePromise<AnnotationUpdateResult>;
   delete(ref: AnnotationRef): AbortablePromise<AnnotationDeleteResult>;

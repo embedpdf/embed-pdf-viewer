@@ -198,8 +198,14 @@ export function fromDTO(
   // unrotated box, with the stripped rotation re-applied as a view transform
   // (`apRot`). Vertex kinds pre-rotate their geometry and never carry
   // `unrotatedRect` — their rasters stay placed by `/Rect`, untransformed.
+  // A CALLOUT is excluded even when it carries both fields: only its text BOX
+  // tilts, via an INLINE matrix mid-stream (the leader is page-space), so its
+  // /AP form `/Matrix` is identity and the raster stays placed by `/Rect`.
+  const isCallout = dto.subtype === 'free-text' && dto.intent === 'free-text-callout';
   const strippedRect =
-    'unrotatedRect' in dto && 'rotation' in dto && dto.rotation ? dto.unrotatedRect : undefined;
+    !isCallout && 'unrotatedRect' in dto && 'rotation' in dto && dto.rotation
+      ? dto.unrotatedRect
+      : undefined;
   return {
     ...base,
     geom,
@@ -268,17 +274,26 @@ function geomFromDTO(dto: AnnotationDTO, crop: PdfRect): Geom {
       // A callout (`/IT free-text-callout` + a `/CL` leader): the stored `rect` is
       // the TEXT BOX (the overall `/Rect` inset by `/RD`); the leader's tip is
       // `cl[0]` and the elbow `cl[1]` (a 3-point `/CL`). The connection point —
-      // `cl` last — is NOT stored; it's re-derived from the box.
+      // `cl` last — is NOT stored; it's re-derived from the box. A tilted box
+      // (the upright policy) reads back from `unrotatedRect` + `rotation`
+      // instead — `/RD` only recovers its axis-aligned AABB; foreign PDFs
+      // (no EMBD metadata) keep the `/RD` path bit-identically.
       if (dto.intent === 'free-text-callout' && dto.calloutLine && dto.calloutLine.length >= 2) {
         const cl = dto.calloutLine;
+        const rot = dto.rotation ? fromPdfRotation(dto.rotation) : 0;
+        const box =
+          rot && dto.unrotatedRect
+            ? pdfToContentRect(dto.unrotatedRect, crop)
+            : pdfToContentRect(insetPdfRectByRD(dto.rect, dto.rectDifferences), crop);
         return {
           t: 'text',
-          rect: pdfToContentRect(insetPdfRectByRD(dto.rect, dto.rectDifferences), crop),
+          rect: box,
           callout: {
             tip: pdfToContentPoint(cl[0], crop),
             knee: cl.length === 3 ? pdfToContentPoint(cl[1], crop) : undefined,
             ending: dto.lineEnding ?? 'none',
           },
+          ...(rot && dto.unrotatedRect ? { rot } : {}),
         };
       }
       // Plain text box: a box kind — read back the unrotated box + advisory tilt.
@@ -514,6 +529,14 @@ const insetPdfRectByRD = (r: PdfRect, rd?: PdfRectDifferences): PdfRect =>
  * arrow), the `/RD` inset that recovers the text box from it, the `/CL` leader
  * (`[tip, knee, conn]` with the connection point derived), and the `/LE` ending.
  * All in PDF user space (y-up), with every `/RD` inset clamped non-negative.
+ *
+ * A tilted box (the upright policy) additionally emits `rotation` +
+ * `unrotatedRect` (the logical text box) — the engine bakes the box + text
+ * under an INLINE rotation about the box centre while the leader stays
+ * page-space, so (unlike plain boxes) the /AP form `/Matrix` stays identity and
+ * the raster stays placed by `/Rect`. `/RD` then insets to the ROTATED box's
+ * AABB — the best axis-aligned text box a foreign viewer regenerating the AP
+ * can draw (spec-conformant degradation).
  */
 function calloutFields(
   a: Annot,
@@ -523,11 +546,14 @@ function calloutFields(
   rectDifferences: PdfRectDifferences;
   calloutLine: CalloutLine;
   lineEnding: LineEnding;
+  rotation?: number;
+  unrotatedRect?: PdfRect;
 } | null {
   const g = a.geom;
   if (g.t !== 'text' || !g.callout) return null;
+  const rot = geomRotation(g);
   const overall = geomPdfBounds(g, a.style.strokeWidth, crop);
-  const tb = contentToPdfRect(g.rect, crop);
+  const tb = contentToPdfRect(rot ? rotatedAabb(g.rect, rot) : g.rect, crop);
   const nn = (n: number) => Math.max(0, n);
   const pts = calloutLinePoints(g).map((p) => contentToPdfPoint(p, crop));
   const calloutLine = (
@@ -543,6 +569,7 @@ function calloutFields(
     },
     calloutLine,
     lineEnding: g.callout.ending,
+    ...(rot ? { rotation: toPdfRotation(rot), unrotatedRect: contentToPdfRect(g.rect, crop) } : {}),
   };
 }
 
@@ -672,6 +699,10 @@ function baseCreateDraft(a: Annot, crop: PdfRect): AnnotationDraft | null {
         rectDifferences: cf.rectDifferences,
         calloutLine: cf.calloutLine,
         lineEnding: cf.lineEnding,
+        // Upright tilt of the text BOX (leader stays page-space) — absent at rot 0.
+        ...(cf.rotation !== undefined
+          ? { rotation: cf.rotation, unrotatedRect: cf.unrotatedRect }
+          : {}),
         ...text,
       } as AnnotationDraft;
     return {
@@ -780,6 +811,10 @@ export function toPatch(a: Annot, crop: PdfRect): AnnotationPatch | null {
         rectDifferences: cf.rectDifferences,
         calloutLine: cf.calloutLine,
         lineEnding: cf.lineEnding,
+        // Upright tilt of the text BOX (leader stays page-space) — absent at rot 0.
+        ...(cf.rotation !== undefined
+          ? { rotation: cf.rotation, unrotatedRect: cf.unrotatedRect }
+          : {}),
         ...freeTextStyle(a),
       } as AnnotationPatch;
     return { subtype: 'free-text', ...boxEmit(a, crop), ...freeTextStyle(a) } as AnnotationPatch;

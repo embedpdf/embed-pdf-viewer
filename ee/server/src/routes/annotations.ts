@@ -1,5 +1,5 @@
 import { randomBytes } from 'node:crypto';
-import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
+
 import {
   EngineError,
   EngineErrorCode,
@@ -31,19 +31,8 @@ import {
   WeakAnnotationSessionPagesRequestSchema,
   type ManifestPage,
 } from '@embedpdf/engine-core/wire';
-import {
-  requireLayerCapability,
-  requireLayerCollabAction,
-  requireLayerDocAccessOnly,
-  requireLayerResource,
-  type RequestJwtContext,
-} from '../app/jwt-plugin';
-import type { WorkerThreadPool } from '../runtime/WorkerThreadPool';
-import { SharpImageEncoder } from '../render/SharpImageEncoder';
-import type { CloudRevisionBridge } from '../services/CloudRevisionBridge';
-import type { DocumentService, OpenContext } from '../services/DocumentService';
-import type { LayerService } from '../services/LayerService';
-import type { WeakAnnotationSessionService } from '../services/WeakAnnotationSessionService';
+import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
+
 import {
   abortSignalFromRequest,
   parseOrInvalidArg,
@@ -54,7 +43,21 @@ import {
   toPageState,
   type SchemaLike,
 } from './_helpers';
+import { readMutationEnvelope } from './_mutationEnvelope';
 import { assertRefMatchesPage, refFromKey } from './annotation-route-helpers';
+import {
+  requireLayerCapability,
+  requireLayerCollabAction,
+  requireLayerDocAccessOnly,
+  requireLayerResource,
+  type RequestJwtContext,
+} from '../app/jwt-plugin';
+import { SharpImageEncoder } from '../render/SharpImageEncoder';
+import type { WorkerThreadPool } from '../runtime/WorkerThreadPool';
+import type { CloudRevisionBridge } from '../services/CloudRevisionBridge';
+import type { DocumentService, OpenContext } from '../services/DocumentService';
+import type { LayerService } from '../services/LayerService';
+import type { WeakAnnotationSessionService } from '../services/WeakAnnotationSessionService';
 
 interface AnnotationRouteDeps {
   documentService: DocumentService;
@@ -302,7 +305,7 @@ export async function registerAnnotationRoutes(
     // no create-collab filter is present.
     const target = targetForSelfCreate(accessCtx.jwt);
     const ctx = requireLayerCollabAction(req, docId, layerName, 'create', target, pdfBits);
-    const { body, resources } = await readMutationEnvelope(req);
+    const { body, resources } = await readMutationEnvelope(req, annotationBinaryPolicy);
     const draft = parseOrInvalidArg<WireAnnotationDraft>(
       AnnotationDraftSchema as unknown as SchemaLike<WireAnnotationDraft>,
       body,
@@ -552,90 +555,19 @@ function targetForSelfCreate(jwt: RequestJwtContext): CollabTarget {
  * (anonymous tenant tokens) — the worker still stamps /M but skips /T
  * and /EMBD_Metadata.
  */
-/** Hard cap on binary parts per mutation (a stamp carries exactly one). */
-const MAX_MUTATION_RESOURCES = 8;
-
-interface MutationEnvelope {
-  body: unknown;
-  resources?: WireResourceMap;
-}
 
 /**
- * Read a mutation request body in either of its two accepted forms:
- *
- *   - `application/json` — the body IS the JSON payload (unchanged fast
- *     path; `resources` stays undefined).
- *   - `multipart/form-data` — a `body` field holding that exact same JSON,
- *     plus `resource:{key}` file parts carrying binary payloads (stamp
- *     images today). The mirror of the appearance-render response shape.
- *
- * Every resource is magic-byte sniffed here — the declared content type is
- * never trusted, and the sniffed mime type is what travels to the worker.
- * Today's allowlist (PNG/JPEG/PDF) matches the only binary-carrying kind;
- * when file-attachment lands this check moves to a per-kind policy.
- * Oversize parts are rejected by `@fastify/multipart`'s `fileSize` limit
- * (thrown from `toBuffer()`).
+ * The per-kind binary policy the envelope doc long promised: a
+ * file-attachment draft's `file` bytes are exempt from the PNG/JPEG/PDF
+ * allowlist — attaching arbitrary formats is the point of the kind.
+ * Every other resource (stamp `source`) stays strict. Patches carry no
+ * binary fields, so update routes keep the strict default.
  */
-async function readMutationEnvelope(req: FastifyRequest): Promise<MutationEnvelope> {
-  if (!req.isMultipart()) {
-    return { body: req.body };
-  }
-  let body: unknown;
-  let sawBody = false;
-  const resources: WireResourceMap = {};
-  let resourceCount = 0;
-  for await (const part of req.parts()) {
-    if (part.type === 'field') {
-      if (part.fieldname !== 'body') continue;
-      try {
-        body = JSON.parse(String(part.value));
-        sawBody = true;
-      } catch {
-        throw new EngineError(EngineErrorCode.InvalidArg, `multipart 'body' part: invalid JSON`);
-      }
-      continue;
-    }
-    if (!part.fieldname.startsWith('resource:')) {
-      throw new EngineError(
-        EngineErrorCode.InvalidArg,
-        `unexpected multipart file part '${part.fieldname}' (expected 'resource:{key}')`,
-      );
-    }
-    const key = part.fieldname.slice('resource:'.length);
-    if (!key) {
-      throw new EngineError(EngineErrorCode.InvalidArg, 'multipart resource part with empty key');
-    }
-    if (++resourceCount > MAX_MUTATION_RESOURCES) {
-      throw new EngineError(
-        EngineErrorCode.InvalidArg,
-        `too many resource parts (max ${MAX_MUTATION_RESOURCES})`,
-      );
-    }
-    const buf = await part.toBuffer();
-    const bytes = buf.buffer.slice(buf.byteOffset, buf.byteOffset + buf.byteLength) as ArrayBuffer;
-    const meta = sniffBinaryMetadata(bytes);
-    if (!meta) {
-      throw new EngineError(
-        EngineErrorCode.InvalidArg,
-        `resource '${key}': unsupported binary format (expected PNG, JPEG, or PDF)`,
-      );
-    }
-    resources[key] = {
-      bytes,
-      mimeType: meta.mimeType,
-      ...(part.filename ? { name: part.filename } : {}),
-    };
-  }
-  if (!sawBody) {
-    throw new EngineError(
-      EngineErrorCode.InvalidArg,
-      `multipart mutation requires a 'body' JSON part`,
-    );
-  }
-  return {
-    body,
-    ...(resourceCount > 0 ? { resources } : {}),
-  };
+function annotationBinaryPolicy(body: unknown, key: string): 'image-or-pdf' | 'any' {
+  const draft = body as { subtype?: unknown; file?: { resource?: unknown } } | null;
+  return draft?.subtype === 'file-attachment' && draft.file?.resource === key
+    ? 'any'
+    : 'image-or-pdf';
 }
 
 function actorFromJwt(jwt: RequestJwtContext): AnnotationActor | undefined {

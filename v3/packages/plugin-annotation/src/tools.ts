@@ -367,15 +367,16 @@ export const DEFAULT_TOOLS: AnnotationToolInput[] = [
   {
     // Routes on the `free-text-callout` subtype token but authors a `free-text`
     // annotation (leader + box). Its leader defaults to an open arrowhead.
-    // Deliberately NOT `upright`: callout geometry (leader + box) doesn't rotate
-    // in the core (v2 configured it but never applied it — resolved here, not
-    // inherited).
+    // `upright` applies to the text BOX only: on a rotated page it commits
+    // counter-rotated (readable), while the leader tip/knee stay page-space
+    // anchors — see the core's `calloutPointer`.
     id: 'free-text-callout',
     subtype: 'free-text-callout',
     propsKind: 'free-text',
     cursor: 'crosshair',
     enables: DRAW_TAGS,
     defaults: { strokeWidth: 6, lineEndings: { end: 'open-arrow' } },
+    upright: true,
   },
   // text markup — the `text-select` gesture (inert without a selection plugin).
   // Base cursor is the plain arrow: the I-beam appears only where the action is

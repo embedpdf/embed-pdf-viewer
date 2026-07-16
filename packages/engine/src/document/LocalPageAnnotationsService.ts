@@ -19,6 +19,7 @@ import {
   type AnnotationDeleteResult,
   type AnnotationMoveResult,
   type AnnotationUpdateResult,
+  type AttachmentContent,
   type CollabTarget,
   type PageAnnotationsService,
   type PageObjectNumber,
@@ -92,6 +93,58 @@ export class LocalPageAnnotationsService implements PageAnnotationsService {
         throw new EngineError(EngineErrorCode.WireFormat, `unexpected payload tag: ${payload.tag}`);
       }
       return payload.snapshot;
+    });
+  }
+
+  downloadFile(ref: AnnotationRef): AbortablePromise<AttachmentContent> {
+    if (this.view.isClosed()) {
+      return AbortablePromise.rejectReason(
+        new EngineError(EngineErrorCode.DocNotOpen, `document not open: ${this.docId}`),
+      );
+    }
+    // Attachment bytes egress content (a partial download), so like
+    // `pages.extract` this gates on `doc.download` — seeing the annotation
+    // (`doc.annotate.read`) does not imply extracting its file.
+    try {
+      this.guard.assertCapability('doc.download');
+    } catch (err) {
+      return AbortablePromise.rejectReason(err);
+    }
+    const docId = this.docId;
+    const pon = this.pageObjectNumber;
+    const submission = this.queue.enqueue<WorkerResultPayload>(
+      {
+        buildPack: (jobId: JobId) =>
+          wirePack({
+            kind: 'annotations.readFile',
+            jobId,
+            docId,
+            pageObjectNumber: pon,
+            ref,
+          }),
+      },
+      { priority: Priority.MEDIUM },
+    );
+    return AbortablePromise.run<AttachmentContent>(async (signal) => {
+      const onAbort = () => submission.abort(signal.reason);
+      if (signal.aborted) onAbort();
+      else signal.addEventListener('abort', onAbort, { once: true });
+      const payload = await submission;
+      if (payload.tag !== 'annotations.readFile') {
+        throw new EngineError(EngineErrorCode.WireFormat, `unexpected payload tag: ${payload.tag}`);
+      }
+      const { content } = payload;
+      if (content.bytes === undefined) {
+        throw new EngineError(
+          EngineErrorCode.WireFormat,
+          'annotations.readFile returned no bytes (path mode is server-only)',
+        );
+      }
+      return {
+        bytes: new Uint8Array(content.bytes),
+        name: content.name,
+        ...(content.mimeType !== undefined ? { mimeType: content.mimeType } : {}),
+      };
     });
   }
 

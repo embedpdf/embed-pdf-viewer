@@ -15,6 +15,7 @@ import type {
   AnnotationAppearanceManifest,
   AnnotationAppearancesQuery,
 } from '../dto/AnnotationRender';
+import { EmbeddedFileItemSchema, EmbeddedFileRefSchema } from '../dto/Attachment.schema';
 import type { CachePins } from '../dto/CachePins';
 import type { DocumentManifest, ManifestPage } from '../dto/DocumentManifest';
 import type { DocumentMetadata } from '../dto/DocumentMetadata';
@@ -24,10 +25,14 @@ import type { PageBoxes, PageLayout } from '../dto/PageLayout';
 import type { PageListSnapshot } from '../dto/PageListSnapshot';
 import type { PageImageOptions, PageNetworkRenderFormat, PageRenderQuery } from '../dto/PageRender';
 import type { PageTextSnapshot } from '../dto/PageTextSnapshot';
+import { PdfPageActionsSchema } from '../dto/PdfAction.schema';
 import type { PdfSaveMode } from '../dto/PdfSaveMode';
 import type { DocumentSecurityState, PdfPermissionInfo } from '../engine/DocumentSecurityService';
 import type { SerializedEngineError } from '../errors/EngineError';
 import { EngineErrorCode } from '../errors/EngineErrorCode';
+import type { FormEffectsResult, FormEffect } from '../forms/effects';
+import { FormFieldDTOSchema, FormSnapshotSchema, FormWidgetRefSchema } from '../forms/schema';
+import { FormFieldRefSchema, FormFieldValueSchema } from '../forms/schema';
 import { PdfRectSchema, PdfRotationSchema, PdfSizeSchema } from '../geometry/schemas';
 import type { AnnotationListMutationMeta } from '../mutation/AnnotationListMutationMeta';
 import type {
@@ -36,15 +41,11 @@ import type {
   AnnotationMoveResult,
   AnnotationUpdateResult,
 } from '../mutation/AnnotationMutationResults';
-import type { MetadataUpdateResult } from '../mutation/MetadataUpdateResult';
-import type { CacheDelta, MutationMeta } from '../mutation/MutationMeta';
 import type {
-  SearchMatch,
-  SearchQuery,
-  SearchRequest,
-  SearchSlice,
-  SearchSnippet,
-} from '../search/types';
+  AttachmentCreateResult,
+  AttachmentDeleteResult,
+  AttachmentsCache,
+} from '../mutation/AttachmentMutationResults';
 import type {
   FormFieldCreateResult,
   FormFieldDeleteResult,
@@ -54,9 +55,11 @@ import type {
   FormSetValueResult,
   FormWidgetLinkResult,
 } from '../mutation/FormMutationResults';
-import { FormFieldDTOSchema, FormSnapshotSchema, FormWidgetRefSchema } from '../forms/schema';
+import type { MetadataUpdateResult } from '../mutation/MetadataUpdateResult';
+import type { CacheDelta, MutationMeta } from '../mutation/MutationMeta';
 import type { PageDeleteInput } from '../mutation/PageDeleteInput';
 import type { PageDeleteResult } from '../mutation/PageDeleteResult';
+import type { PageFlattenInput, PageFlattenResult } from '../mutation/PageFlattenResult';
 import type { PageMoveInput } from '../mutation/PageMoveInput';
 import type { PageMoveResult } from '../mutation/PageMoveResult';
 import type { PageRotateInput } from '../mutation/PageRotateInput';
@@ -65,10 +68,13 @@ import type { PageStructureCache } from '../mutation/PageStructureCache';
 import type { RefetchReason } from '../mutation/RefetchReason';
 import type { PageState } from '../revision/PageState';
 import type { WeakAnnotationState } from '../revision/WeakAnnotationState';
-import { PdfPageActionsSchema } from '../dto/PdfAction.schema';
-import type { FormEffectsResult, FormEffect } from '../forms/effects';
-import { FormFieldRefSchema, FormFieldValueSchema } from '../forms/schema';
-import type { PageFlattenInput, PageFlattenResult } from '../mutation/PageFlattenResult';
+import type {
+  SearchMatch,
+  SearchQuery,
+  SearchRequest,
+  SearchSlice,
+  SearchSnippet,
+} from '../search/types';
 export type { CacheDelta, MutationMeta } from '../mutation/MutationMeta';
 
 export const DocumentMetadataSchema: z.ZodType<DocumentMetadata> = z.object({
@@ -358,6 +364,7 @@ export const DocumentManifestSchema = z.object({
   layoutVersion: z.number().int().positive(),
   metadataVersion: z.number().int().positive(),
   actionsVersion: z.number().int().positive().default(1),
+  attachmentsVersion: z.number().int().positive().default(1),
   auditHead: z.number().int().nonnegative(),
   baseSha: z.string(),
   pages: z.array(ManifestPageSchema),
@@ -929,6 +936,22 @@ export const PageDeleteResultSchema: z.ZodType<PageDeleteResult> = z.object({
  * `layoutVersion` is touched — a metadata edit bumps only `docVersion`
  * and `metadataVersion`. `cache` is `null` for local engines.
  */
+export const AttachmentsCacheSchema: z.ZodType<AttachmentsCache> = z.object({
+  previousDocVersion: z.number().int().nonnegative(),
+  docVersion: z.number().int().positive(),
+  attachmentsVersion: z.number().int().positive(),
+});
+
+export const AttachmentCreateResultSchema: z.ZodType<AttachmentCreateResult> = z.object({
+  created: EmbeddedFileItemSchema,
+  cache: AttachmentsCacheSchema.nullable(),
+});
+
+export const AttachmentDeleteResultSchema: z.ZodType<AttachmentDeleteResult> = z.object({
+  deleted: EmbeddedFileRefSchema,
+  cache: AttachmentsCacheSchema.nullable(),
+});
+
 export const MetadataUpdateResultSchema: z.ZodType<MetadataUpdateResult> = z.object({
   metadata: DocumentMetadataSchema,
   cache: z

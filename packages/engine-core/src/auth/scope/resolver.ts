@@ -253,7 +253,7 @@ export function filterMatches(
  *   bit 5   → doc.text.{select, copy, search}, doc.content.copy
  *   bit 3   → doc.print
  *   bit 12  → doc.print.high (requires bit 3 also set)
- *   bit 4   → doc.pages.modify, doc.redact, doc.metadata.modify
+ *   bit 4   → doc.pages.modify, doc.redact, doc.metadata.modify, doc.attachments.modify
  *   bit 11  → doc.pages.assemble
  *   bit 6   → doc.annotate.modify
  *   bit 6/9 → doc.forms.fill
@@ -284,6 +284,7 @@ function addPdfPermissions(out: Set<DocCapability>, b: PdfBits): void {
     out.add('doc.pages.modify');
     out.add('doc.redact');
     out.add('doc.metadata.modify');
+    out.add('doc.attachments.modify');
   }
   if (b.bit11) out.add('doc.pages.assemble');
   if (b.bit6) {

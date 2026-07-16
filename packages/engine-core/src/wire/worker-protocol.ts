@@ -2,13 +2,17 @@ import type {
   AnnotationListPageSnapshot,
   AnnotationListSnapshotAllPages,
 } from '../annotation/AnnotationListSnapshot';
-import type { WireAnnotationDraft, WireAnnotationPatch } from '../annotation/kinds';
+import type {
+  WireAnnotationDraft,
+  WireAnnotationPatch,
+  WireAttachmentFile,
+} from '../annotation/kinds';
 import type { AnnotationActor } from '../auth/scope';
-import type { WireResourceMap } from '../resource/BinarySource';
 import type {
   AnnotationAppearanceRenderOptions,
   AnnotationAppearancesResult,
 } from '../dto/AnnotationRender';
+import type { EmbeddedFileItem, EmbeddedFileRef } from '../dto/Attachment';
 import type { DocumentMetadata } from '../dto/DocumentMetadata';
 import type { MetadataPatch } from '../dto/MetadataPatch';
 import type { PageGeometrySnapshot } from '../dto/PageGeometrySnapshot';
@@ -16,15 +20,28 @@ import type { PageRotation } from '../dto/PageLayout';
 import type { PageListSnapshot } from '../dto/PageListSnapshot';
 import type { PageRaster, PageRenderOptions } from '../dto/PageRender';
 import type { PageTextSnapshot } from '../dto/PageTextSnapshot';
+import type { DocumentActionsSnapshot } from '../dto/PdfAction';
 import type { PdfSaveMode } from '../dto/PdfSaveMode';
 import type { PieceInfoPatch, PieceInfoSnapshot } from '../dto/PieceInfo';
 import type { SerializedEngineError } from '../errors/EngineError';
-import type { AnnotationRef } from '../identity/AnnotationRef';
-import type { FormFieldRef, FormWidgetRef } from '../identity/FormFieldRef';
 import type { FormFieldDraft } from '../forms/draft';
+import type { FormEffect, FormEffectsResult } from '../forms/effects';
 import type { FormFieldPatch } from '../forms/patch';
 import type { FormSnapshot } from '../forms/snapshot';
 import type { FormDataFormat, FormFieldValue } from '../forms/value';
+import type { AnnotationRef } from '../identity/AnnotationRef';
+import type { FormFieldRef, FormWidgetRef } from '../identity/FormFieldRef';
+import type { PageObjectNumber } from '../identity/PageObjectNumber';
+import type {
+  AnnotationCreateResult,
+  AnnotationDeleteResult,
+  AnnotationMoveResult,
+  AnnotationUpdateResult,
+} from '../mutation/AnnotationMutationResults';
+import type {
+  AttachmentCreateResult,
+  AttachmentDeleteResult,
+} from '../mutation/AttachmentMutationResults';
 import type {
   FormFieldCreateResult,
   FormFieldDeleteResult,
@@ -34,22 +51,14 @@ import type {
   FormSetValueResult,
   FormWidgetLinkResult,
 } from '../mutation/FormMutationResults';
-import type { PageObjectNumber } from '../identity/PageObjectNumber';
-import type {
-  AnnotationCreateResult,
-  AnnotationDeleteResult,
-  AnnotationMoveResult,
-  AnnotationUpdateResult,
-} from '../mutation/AnnotationMutationResults';
 import type { MetadataUpdateResult } from '../mutation/MetadataUpdateResult';
-import type { SearchRequest, SearchSlice } from '../search/types';
 import type { PageDeleteResult } from '../mutation/PageDeleteResult';
+import type { PageFlattenResult, PageFlattenUsage } from '../mutation/PageFlattenResult';
 import type { PageInsertResult } from '../mutation/PageInsertResult';
 import type { PageMoveResult } from '../mutation/PageMoveResult';
 import type { PageRotateResult } from '../mutation/PageRotateResult';
-import type { DocumentActionsSnapshot } from '../dto/PdfAction';
-import type { FormEffect, FormEffectsResult } from '../forms/effects';
-import type { PageFlattenResult, PageFlattenUsage } from '../mutation/PageFlattenResult';
+import type { WireResourceMap } from '../resource/BinarySource';
+import type { SearchRequest, SearchSlice } from '../search/types';
 
 /**
  * Wire protocol used between an Engine-side queue and any Worker host
@@ -462,6 +471,76 @@ export interface PagesExtractWorkerRequest {
   pageObjectNumbers: PageObjectNumber[];
 }
 
+/** List the document catalog's `/EmbeddedFiles` name tree (a read). */
+export interface AttachmentsListWorkerRequest {
+  kind: 'attachments.list';
+  jobId: WorkerJobId;
+  docId: string;
+  layerName?: string;
+}
+
+/**
+ * Decode one document-level embedded file (a read — no revision bump, no
+ * layer artifact). Two delivery modes, the `artifactPath?` pattern:
+ * `path` absent → browser mode, decoded bytes ride the transfer list;
+ * `path` present → server mode, the worker streams the decoded file to
+ * that path (`EPDFAttachment_ExtractFile` + `FPDF_FILEWRITE`) so the
+ * payload never crosses the thread boundary and HTTP can stream it from
+ * disk with backpressure.
+ */
+export interface AttachmentsReadFileWorkerRequest {
+  kind: 'attachments.readFile';
+  jobId: WorkerJobId;
+  docId: string;
+  layerName?: string;
+  ref: EmbeddedFileRef;
+  path?: string;
+  /** Decompression-bomb cap forwarded to the runtime. Absent/0 = unlimited. */
+  maxDecodedBytes?: number;
+}
+
+/**
+ * Create a document-level embedded file (a MUTATION — layer sessions
+ * persist an artifact). `file` is the same post-normalization wire shape
+ * the file-attachment annotation draft uses: metadata in JSON, bytes
+ * out-of-band under the referenced resource key. `file.name` becomes the
+ * name-tree key.
+ */
+export interface AttachmentsCreateWorkerRequest {
+  kind: 'attachments.create';
+  jobId: WorkerJobId;
+  docId: string;
+  layerName?: string;
+  file: WireAttachmentFile;
+  /** Binary payload referenced by `file.resource` — transfer-list bytes. */
+  resources?: WireResourceMap;
+  artifactPath?: string;
+}
+
+/** Delete a document-level embedded file by key (a MUTATION). */
+export interface AttachmentsDeleteWorkerRequest {
+  kind: 'attachments.delete';
+  jobId: WorkerJobId;
+  docId: string;
+  layerName?: string;
+  ref: EmbeddedFileRef;
+  artifactPath?: string;
+}
+
+/** Decode the file embedded in a FileAttachment annotation's `/FS`.
+ *  Same read semantics and delivery modes as `attachments.readFile`. */
+export interface AnnotationsReadFileWorkerRequest {
+  kind: 'annotations.readFile';
+  jobId: WorkerJobId;
+  docId: string;
+  layerName?: string;
+  pageObjectNumber: PageObjectNumber;
+  ref: AnnotationRef;
+  path?: string;
+  /** Decompression-bomb cap forwarded to the runtime. Absent/0 = unlimited. */
+  maxDecodedBytes?: number;
+}
+
 /** Insert every page of a standalone PDF (transferable `bytes`) at
  *  `destIndex` (omitted → append). A structural MUTATION: layer sessions
  *  persist an artifact like move/rotate/delete. */
@@ -629,6 +708,20 @@ export interface LayerArtifactWorkerPayload {
   size: number;
 }
 
+/**
+ * Result of an attachment file read (`attachments.readFile` /
+ * `annotations.readFile`): the decoded file's metadata plus exactly one
+ * delivery mode, mirroring the request's `path?` — `bytes` on the
+ * transfer list (browser), or the `path` the worker wrote (server).
+ */
+export interface AttachmentFileWorkerPayload {
+  name: string;
+  mimeType?: string;
+  size: number;
+  bytes?: ArrayBuffer;
+  path?: string;
+}
+
 export interface LayerArtifactFileWorkerPayload {
   path: string;
 }
@@ -665,6 +758,11 @@ export type WorkerRequest =
   | PagesFlattenWorkerRequest
   | PagesExtractWorkerRequest
   | PagesInsertWorkerRequest
+  | AttachmentsListWorkerRequest
+  | AttachmentsReadFileWorkerRequest
+  | AttachmentsCreateWorkerRequest
+  | AttachmentsDeleteWorkerRequest
+  | AnnotationsReadFileWorkerRequest
   | PieceInfoReadWorkerRequest
   | PieceInfoUpdateWorkerRequest
   | PieceInfoApplicationsWorkerRequest
@@ -812,6 +910,21 @@ export type WorkerResultPayload =
       artifactFile?: LayerArtifactFileWorkerPayload;
     }
   | { tag: 'pages.extract'; bytes: ArrayBuffer; size: number }
+  | { tag: 'attachments.list'; items: EmbeddedFileItem[] }
+  | { tag: 'attachments.readFile'; content: AttachmentFileWorkerPayload }
+  | {
+      tag: 'attachments.create';
+      result: AttachmentCreateResult;
+      artifact?: LayerArtifactWorkerPayload;
+      artifactFile?: LayerArtifactFileWorkerPayload;
+    }
+  | {
+      tag: 'attachments.delete';
+      result: AttachmentDeleteResult;
+      artifact?: LayerArtifactWorkerPayload;
+      artifactFile?: LayerArtifactFileWorkerPayload;
+    }
+  | { tag: 'annotations.readFile'; content: AttachmentFileWorkerPayload }
   | {
       tag: 'pages.insert';
       result: PageInsertResult;

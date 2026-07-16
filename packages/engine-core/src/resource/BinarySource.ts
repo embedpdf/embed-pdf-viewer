@@ -71,16 +71,37 @@ export async function resolveBinarySource(source: BinarySource): Promise<WireRes
     return { bytes: toStandaloneArrayBuffer(source) };
   }
   if (isBlob(source)) {
-    return { bytes: await source.arrayBuffer(), mimeType: source.type || undefined };
+    const blobName = blobFileName(source);
+    return {
+      bytes: await source.arrayBuffer(),
+      mimeType: source.type || undefined,
+      ...(blobName !== undefined ? { name: blobName } : {}),
+    };
   }
   const { data, mimeType, name } = source;
   const inner =
     data instanceof Uint8Array
-      ? { bytes: toStandaloneArrayBuffer(data), mimeType: undefined as string | undefined }
-      : { bytes: await data.arrayBuffer(), mimeType: data.type || undefined };
+      ? {
+          bytes: toStandaloneArrayBuffer(data),
+          mimeType: undefined as string | undefined,
+          name: undefined as string | undefined,
+        }
+      : {
+          bytes: await data.arrayBuffer(),
+          mimeType: data.type || undefined,
+          name: blobFileName(data),
+        };
+  const resolvedName = name ?? inner.name;
   return {
     bytes: inner.bytes,
     ...((mimeType ?? inner.mimeType) ? { mimeType: mimeType ?? inner.mimeType } : {}),
-    ...(name !== undefined ? { name } : {}),
+    ...(resolvedName !== undefined ? { name: resolvedName } : {}),
   };
+}
+
+/** A browser `File` is a Blob with a `name` — pick it up so attachment
+ *  drafts can pass a `File` directly without repeating the file name. */
+function blobFileName(blob: Blob): string | undefined {
+  const name = (blob as File).name;
+  return typeof name === 'string' && name.length > 0 ? name : undefined;
 }

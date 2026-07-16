@@ -38,6 +38,7 @@ import {
   shapeRectFor,
   transposedAboutCenter,
   unionRect,
+  uprightAnchoredRect,
   uprightRotation,
 } from './geometry';
 import { clickCreateGeom, resolveClickPlacement } from './placement';
@@ -884,6 +885,13 @@ function finishInkCreate(m: Model): [Model, Effect[]] {
 /** Default text-box size for a callout placed with a click (no box drag). */
 const CALLOUT_BOX = { width: 150, height: 40 };
 
+/** The callout draft's upright counter-rotation (deg CW; 0 = none) — the SAME
+ *  rule the rect commit applies, shared by `calloutBox`, the ghost preview and
+ *  the commit so all three agree by construction. */
+export function calloutUprightRot(d: Extract<Draft, { g: 'create-callout' }>): number {
+  return d.upright && d.displayRotation ? uprightRotation(d.displayRotation) : 0;
+}
+
 /**
  * The text-box rect for an in-progress callout's `box` step — the ONE rule both
  * the live preview and the commit use, so what you see is what you get. Only a
@@ -891,14 +899,28 @@ const CALLOUT_BOX = { width: 150, height: 40 };
  * default-size box anchored at the press point, so it never collapses to a sliver
  * while you decide whether you're dragging (the "bounce"). Before the press
  * (hover), the default box tracks the cursor.
+ *
+ * Under `upright` this returns the UNROTATED logical box (the frame text is laid
+ * out in): a DRAGGED box keeps the on-screen footprint the author drew (quarter
+ * turns transpose it about its centre — spinning by `rot` lands exactly back on
+ * the dragged region), and the default box anchors so its DISPLAYED top-left
+ * hangs at the point, down-right of the cursor as the author sees it — the same
+ * two rules the free-text drag/click commits use.
  */
 export function calloutBox(d: Extract<Draft, { g: 'create-callout' }>): Rect {
+  const rot = calloutUprightRot(d);
+  const quarter = rot === 90 || rot === 270;
+  const defaultBox = (at: Vec): Rect =>
+    rot
+      ? uprightAnchoredRect(at, CALLOUT_BOX.width, CALLOUT_BOX.height, d.displayRotation!)
+      : { x: at.x, y: at.y, ...CALLOUT_BOX };
   if (d.boxFrom) {
     const dragged = d.boxTo ? rectFromPoints(d.boxFrom, d.boxTo) : null;
-    if (dragged && (dragged.width >= MIN_DRAG || dragged.height >= MIN_DRAG)) return dragged;
-    return { x: d.boxFrom.x, y: d.boxFrom.y, ...CALLOUT_BOX };
+    if (dragged && (dragged.width >= MIN_DRAG || dragged.height >= MIN_DRAG))
+      return quarter ? transposedAboutCenter(dragged) : dragged;
+    return defaultBox(d.boxFrom);
   }
-  return { x: d.cur.x, y: d.cur.y, ...CALLOUT_BOX };
+  return defaultBox(d.cur);
 }
 
 /**
@@ -932,6 +954,12 @@ function calloutPointer(
             step: 'knee',
             tip: input.point,
             cur: input.point,
+            // Captured at the TIP click (the gesture's home page) — the box
+            // step may span later samples that don't carry the rotation. A
+            // rotation of 0 makes upright a no-op, so the draft stays clean.
+            ...(input.upright && input.displayRotation
+              ? { displayRotation: input.displayRotation, upright: true }
+              : {}),
             ...(flags ? { flags } : {}),
           },
         },
@@ -952,6 +980,9 @@ function calloutPointer(
   // up: only the box step (with a started box) commits; the tip/knee clicks no-op.
   if (d?.g !== 'create-callout' || d.step !== 'box' || !d.boxFrom) return [m, []];
   const rect = calloutBox(d); // the SAME box the preview showed
+  // The upright counter-rotation applies to the text BOX only (about its own
+  // centre) — the leader tip/knee are page-space anchors and never turn.
+  const rot = calloutUprightRot(d);
   const def = defaultsFor(m, d.preset ?? 'free-text-callout');
   const ending = def.lineEndings.end !== 'none' ? def.lineEndings.end : 'open-arrow';
   const id = `tmp:${m.seq + 1}`;
@@ -960,7 +991,12 @@ function calloutPointer(
     ref: null,
     pon: d.pon,
     subtype: 'free-text',
-    geom: { t: 'text', rect, callout: { tip: d.tip, knee: d.knee, ending } },
+    geom: {
+      t: 'text',
+      rect,
+      callout: { tip: d.tip, knee: d.knee, ending },
+      ...(rot ? { rot } : {}),
+    },
     style: styleFromProps(def),
     text: textStyleFromProps(def),
     flags: { ...DRAWN_FLAGS, ...d.flags },

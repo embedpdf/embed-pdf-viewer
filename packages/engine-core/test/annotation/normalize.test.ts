@@ -6,6 +6,8 @@ import {
   normalizeAnnotationDraft,
   normalizeAnnotationPatch,
   sniffBinaryMetadata,
+  type FileAttachmentDraft,
+  type FileAttachmentWireDraft,
   type InkDraft,
   type StampDraft,
   type StampPatch,
@@ -150,5 +152,70 @@ describe('normalizeAnnotationPatch', () => {
     const { wire, resources } = await normalizeAnnotationPatch(patch);
     expect((wire as StampWireDraft).source).toEqual({ resource: 'r0' });
     expect(sniffBinaryMetadata(resources['r0']!.bytes)?.mimeType).toBe('image/png');
+  });
+});
+
+describe('normalizeAnnotationDraft: file-attachment', () => {
+  const rect = { left: 40, bottom: 40, right: 60, top: 60 };
+  const data = new Uint8Array([1, 2, 3, 4, 5]);
+
+  test('splits the file into wire metadata + one resource, validated by the wire schema', async () => {
+    const draft: FileAttachmentDraft = {
+      subtype: 'file-attachment',
+      rect,
+      file: { data, name: 'report.docx', mimeType: 'application/msword', description: 'Q3' },
+      icon: 'paperclip',
+    };
+    const { wire, resources } = await normalizeAnnotationDraft(draft);
+    expect(wire).toEqual({
+      subtype: 'file-attachment',
+      rect,
+      file: {
+        resource: 'r0',
+        name: 'report.docx',
+        mimeType: 'application/msword',
+        description: 'Q3',
+      },
+      icon: 'paperclip',
+    });
+    expect(Object.keys(resources)).toEqual(['r0']);
+    expect(new Uint8Array(resources.r0.bytes)).toEqual(data);
+    expect(resources.r0.name).toBe('report.docx');
+    // The single Zod schema accepts the post-normalization form.
+    expect(AnnotationDraftSchema.parse(wire)).toEqual(wire);
+  });
+
+  test('declared mime type is optional and NOT sniffed — any bytes are a valid attachment', async () => {
+    const draft: FileAttachmentDraft = {
+      subtype: 'file-attachment',
+      rect,
+      file: { data, name: 'blob.bin' },
+    };
+    const { wire } = await normalizeAnnotationDraft(draft);
+    expect((wire as FileAttachmentWireDraft).file).toEqual({ resource: 'r0', name: 'blob.bin' });
+  });
+
+  test('a name is required: from file.name or a File, else InvalidArg', async () => {
+    const nameless: FileAttachmentDraft = {
+      subtype: 'file-attachment',
+      rect,
+      file: { data },
+    };
+    await expect(normalizeAnnotationDraft(nameless)).rejects.toMatchObject({
+      code: EngineErrorCode.InvalidArg,
+    });
+
+    // A browser File carries its own name (also available in Node >= 20).
+    const fromFile: FileAttachmentDraft = {
+      subtype: 'file-attachment',
+      rect,
+      file: { data: new File([data], 'picked.pdf', { type: 'application/pdf' }) },
+    };
+    const { wire } = await normalizeAnnotationDraft(fromFile);
+    expect((wire as FileAttachmentWireDraft).file).toEqual({
+      resource: 'r0',
+      name: 'picked.pdf',
+      mimeType: 'application/pdf',
+    });
   });
 });
