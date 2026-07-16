@@ -27,7 +27,12 @@ export const builtinTools = (): Tool[] => [
     cursor: 'default',
     enables: new Set(['text-select', 'annotation-edit', 'annotation-marquee', 'form-fill']),
   },
-  { id: 'pan', cursor: 'grab', enables: new Set(['scroll', 'annotation-edit', 'form-fill']) },
+  {
+    id: 'pan',
+    cursor: 'grab',
+    gapCursor: 'grab', // pan works anywhere — the open hand doesn't stop at page edges
+    enables: new Set(['scroll', 'annotation-edit', 'form-fill']),
+  },
 ];
 
 /**

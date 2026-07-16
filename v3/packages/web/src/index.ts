@@ -9,3 +9,5 @@
  */
 export { pickImageFile } from './file-picker';
 export type { PickFileOptions } from './file-picker';
+export { svgCursor } from './cursor';
+export type { SvgCursorOptions } from './cursor';

@@ -29,7 +29,6 @@ export type {
   AnnotationToolInput,
   GhostPolicy,
   InkAuthoringOptions,
-  ResolvedGhost,
   ResolvedTool,
   SelectionAuthoring,
   StampSourceSpec,

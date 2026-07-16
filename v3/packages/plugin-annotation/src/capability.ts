@@ -340,7 +340,7 @@ export function createAnnotationCapability(
   ): void => {
     const tool = registry.get(toolId);
     const crop = cropOf(pon);
-    if (!tool || tool.ghost === false || tool.ghost.mode !== 'footprint' || !crop) {
+    if (!tool || tool.ghost === false || !crop) {
       clearGhost();
       return;
     }

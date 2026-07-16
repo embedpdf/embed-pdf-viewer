@@ -38,29 +38,17 @@ export type SelectionAuthoring =
   | { kind: 'text-edit'; operation: 'insert' | 'replace' };
 
 /**
- * The armed tool's cursor-side preview:
- *   - `badge` — a small screen-constant miniature riding the pointer (top-right
- *     by default), so the user always sees WHICH tool is armed. Viewport
- *     chrome: it renders in the stage overlay, never scales with zoom, and
- *     stays alive over page gaps. `size`/`offset` are CSS px.
+ * The armed tool's IN-PAGE preview:
  *   - `footprint` — the EXACT box a click would place, in the page (content
  *     space, page-clamped, WYSIWYG). Meaningful only when the box is
  *     determinable: an armed stamp payload, or a `clickCreate` size.
- *   - `false` — no preview (markup tools: the text cursor already signals).
+ *   - `false` — no preview.
+ * WHICH tool is armed is the CURSOR's job, not a ghost's: give the tool an
+ * image cursor built from your toolbar icon (the hub's `setToolCursor` + the
+ * web package's `svgCursor`), and the hub's claim/gap arbitration keeps it
+ * honest over annotations, form fields, and page gaps.
  */
-export type GhostPolicy =
-  | false
-  | { mode: 'footprint' }
-  | { mode: 'badge'; size?: number; offset?: { x: number; y: number } };
-
-/** A fully-resolved badge policy (defaults filled). */
-export interface ResolvedGhost {
-  mode: 'footprint' | 'badge';
-  size: number;
-  offset: { x: number; y: number };
-}
-
-export const BADGE_DEFAULTS = { size: 18, offset: { x: 14, y: -32 } } as const;
+export type GhostPolicy = false | { mode: 'footprint' };
 
 /** Time/geometry policy for freehand ink authoring. */
 export interface InkAuthoringOptions {
@@ -157,7 +145,7 @@ export interface AnnotationToolDef<K extends ToolAuthoringKind = ToolAuthoringKi
    *  from an existing tool id (a built-in or another entry). Own fields win. */
   extends?: string;
   /** The ROUTING KIND this tool authors — the core's client kind (the geometry
-   *  it draws + the props/badge key). Usually the PDF subtype, but not always:
+   *  it draws + the props key). Usually the PDF subtype, but not always:
    *  `free-text-callout` routes the callout gesture onto a free-text
    *  annotation, and `widget-text`/`widget-choice`/`widget-toggle` are client
    *  views of the ONE PDF `widget` subtype (a form tool's commit goes through
@@ -206,11 +194,11 @@ export interface AnnotationToolDef<K extends ToolAuthoringKind = ToolAuthoringKi
    */
   clickCreate?: ClickCreate | false;
   /**
-   * The armed-tool cursor preview ({@link GhostPolicy}). Defaults: `badge`
-   * for draw-channel tools, `footprint` for the stamp, off for markup tools.
+   * The armed-tool in-page preview ({@link GhostPolicy}). Defaults: inherited,
+   * else off (the built-in stamp declares `footprint`).
    */
   ghost?: GhostPolicy;
-  /** Opaque presentation hints (label/icon…) for a toolbar or badge that builds
+  /** Opaque presentation hints (label/icon…) for a toolbar or cursor that builds
    *  itself from the tool table. Never read by the plugin or the interaction hub. */
   meta?: Record<string, unknown>;
 }
@@ -281,8 +269,8 @@ export interface ResolvedTool {
   upright: boolean;
   /** What a bare click creates, or `false` for drag-only. */
   clickCreate: ClickCreate | false;
-  /** The armed-tool cursor preview, defaults resolved ({@link ResolvedGhost}). */
-  ghost: ResolvedGhost | false;
+  /** The armed-tool in-page preview ({@link GhostPolicy}). */
+  ghost: GhostPolicy;
   meta?: Record<string, unknown>;
 }
 
@@ -298,8 +286,8 @@ const MARKUP_TAGS = ['text-select', 'annotation-edit'];
 export const DEFAULT_TOOLS: AnnotationToolInput[] = [
   // shapes / lines / ink / free text — the `annotation-draw` gesture.
   // Draw tools carry v2's click-create defaults (a bare click places a
-  // default-size annotation); every draw tool badges by default (resolution
-  // fills `ghost` from the draw tag — see `defaultGhostFor`).
+  // default-size annotation); armed-tool identity rides the cursor, so none
+  // of them needs a ghost.
   {
     id: 'square',
     subtype: 'square',
@@ -379,11 +367,14 @@ export const DEFAULT_TOOLS: AnnotationToolInput[] = [
     enables: DRAW_TAGS,
     defaults: { strokeWidth: 6, lineEndings: { end: 'open-arrow' } },
   },
-  // text markup — the `text-select` gesture (inert without a selection plugin)
+  // text markup — the `text-select` gesture (inert without a selection plugin).
+  // Base cursor is the plain arrow: the I-beam appears only where the action is
+  // possible, via the selection handler's over-text claim (which an app can
+  // reskin with the tool's icon — see the hub's ToolCursorSkin).
   {
     id: 'highlight',
     subtype: 'highlight',
-    cursor: 'text',
+    cursor: 'default',
     enables: MARKUP_TAGS,
     defaults: { color: '#ffe16a', blendMode: 'multiply' },
     selection: { kind: 'markup' },
@@ -391,7 +382,7 @@ export const DEFAULT_TOOLS: AnnotationToolInput[] = [
   {
     id: 'underline',
     subtype: 'underline',
-    cursor: 'text',
+    cursor: 'default',
     enables: MARKUP_TAGS,
     defaults: { color: '#ef4444' },
     selection: { kind: 'markup' },
@@ -399,7 +390,7 @@ export const DEFAULT_TOOLS: AnnotationToolInput[] = [
   {
     id: 'strikeout',
     subtype: 'strikeout',
-    cursor: 'text',
+    cursor: 'default',
     enables: MARKUP_TAGS,
     defaults: { color: '#ef4444' },
     selection: { kind: 'markup' },
@@ -407,7 +398,7 @@ export const DEFAULT_TOOLS: AnnotationToolInput[] = [
   {
     id: 'squiggly',
     subtype: 'squiggly',
-    cursor: 'text',
+    cursor: 'default',
     enables: MARKUP_TAGS,
     defaults: { color: '#ef4444' },
     selection: { kind: 'markup' },
@@ -419,7 +410,7 @@ export const DEFAULT_TOOLS: AnnotationToolInput[] = [
     subtype: 'caret',
     propsKind: 'caret',
     preset: 'caret',
-    cursor: 'text',
+    cursor: 'default',
     enables: MARKUP_TAGS,
     defaults: { color: '#ef4444' },
     selection: { kind: 'text-edit', operation: 'insert' },
@@ -428,7 +419,7 @@ export const DEFAULT_TOOLS: AnnotationToolInput[] = [
     id: 'replace-text',
     subtype: 'strikeout',
     propsKind: 'strikeout',
-    cursor: 'text',
+    cursor: 'default',
     enables: MARKUP_TAGS,
     defaults: { color: '#ef4444' },
     selection: { kind: 'text-edit', operation: 'replace' },
@@ -445,22 +436,6 @@ export const DEFAULT_TOOLS: AnnotationToolInput[] = [
     ghost: { mode: 'footprint' },
   },
 ];
-
-/** The default ghost policy when a tool doesn't declare one: draw-channel
- *  tools badge (armed-tool visibility), everything else shows nothing. */
-const defaultGhostFor = (enables: ReadonlySet<string>): GhostPolicy =>
-  enables.has('annotation-draw') ? { mode: 'badge' } : false;
-
-const resolveGhost = (policy: GhostPolicy): ResolvedGhost | false =>
-  policy === false
-    ? false
-    : policy.mode === 'footprint'
-      ? { mode: 'footprint', size: BADGE_DEFAULTS.size, offset: BADGE_DEFAULTS.offset }
-      : {
-          mode: 'badge',
-          size: policy.size ?? BADGE_DEFAULTS.size,
-          offset: policy.offset ?? BADGE_DEFAULTS.offset,
-        };
 
 /** Merge two default patches, `b` over `a`, with line endings merged per side. */
 function mergeDefaults(
@@ -545,9 +520,7 @@ export function buildToolRegistry(
       ink: base?.ink || def.ink ? { ...base?.ink, ...def.ink } : undefined,
       upright: def.upright ?? base?.upright ?? false,
       clickCreate: def.clickCreate ?? base?.clickCreate ?? false,
-      ghost: resolveGhost(
-        def.ghost ?? (base ? base.ghost || false : defaultGhostFor(new Set(def.enables ?? []))),
-      ),
+      ghost: def.ghost ?? base?.ghost ?? false,
       meta: base?.meta || def.meta ? { ...base?.meta, ...def.meta } : undefined,
     };
     validateDefaults(resolved);

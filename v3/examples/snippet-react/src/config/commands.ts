@@ -49,7 +49,7 @@ export interface ToolAccentDefinition {
 /**
  * toolId → the SAME icon + accent definition its toolbar button uses, recorded
  * as a side effect of the `tool()` command definitions below — ONE source of
- * truth, so the cursor badge (ui/tool-badge.tsx) and the button can never
+ * truth, so the tool cursor (ui/tool-cursor.tsx) and the button can never
  * drift apart.
  */
 export const TOOL_ICONS: Record<string, { icon: string; accent?: ToolAccentDefinition }> = {};

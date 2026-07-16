@@ -5,8 +5,8 @@ import type {
   InteractionCapability,
   InteractionHandler,
   InteractionState,
-  PointerSample,
   Tool,
+  ToolCursorSkin,
   ToolId,
 } from './types';
 
@@ -22,6 +22,14 @@ interface Claim {
  * can react to them. The router (`dispatch`) is the heart: on down, the first
  * eligible handler (by priority) to return true OWNS the gesture; move/up route
  * to it; with no owner, move is hover (cursor feedback).
+ *
+ * Cursor arbitration, top to bottom: the highest-priority CLAIM (hover feedback
+ * — 'move' over an annotation, 'text' over text) → over a page, the tool's
+ * declared cursor → over a gap, the tool's `gapCursor` (default the neutral
+ * arrow). The winning KEYWORD (claim or base, never gap) is then restyled
+ * through the armed tool's skin when it maps that keyword. One resolver, so an
+ * image cursor can never shadow hover feedback or outlive the page under the
+ * pointer.
  */
 export function createInteractionCapability(
   ctx: PluginContext<InteractionState, InteractionAction>,
@@ -31,9 +39,12 @@ export function createInteractionCapability(
   for (const t of builtinTools) tools.set(t.id, t);
   const handlers: InteractionHandler[] = [];
   const claims = new Map<string, Claim>();
+  const cursorSkins = new Map<ToolId, ToolCursorSkin>();
   const toolCbs = new Set<() => void>();
-  const pointerCbs = new Set<(sample: PointerSample) => void>();
   let owner: InteractionHandler | null = null;
+  // Whether the last dispatched sample hit a page — the base cursor only
+  // applies where the tool can act; over gaps it falls back to `gapCursor`.
+  let overPage = false;
 
   const toolOf = (id: ToolId): Tool =>
     tools.get(id) ?? { id, cursor: 'default', enables: new Set() };
@@ -42,7 +53,16 @@ export function createInteractionCapability(
   const resolveCursor = (): Cursor => {
     let top: Claim | null = null;
     for (const c of claims.values()) if (!top || c.priority > top.priority) top = c;
-    return top ? top.cursor : active().cursor;
+    const tool = active();
+    const skin = cursorSkins.get(tool.id);
+    // The cursor keeps its MEANING (a keyword — the winning claim's, else the
+    // tool's declared base); the skin may restyle that keyword in the armed
+    // tool's identity (an I-beam + tool icon over text). Unmapped keywords
+    // render as-is — a foreign affordance drops the tool identity — and gaps
+    // resolve before the skin: identity only where the action is possible.
+    if (top) return skin?.[top.cursor] ?? top.cursor;
+    if (!overPage) return tool.gapCursor ?? 'default';
+    return skin?.[tool.cursor] ?? tool.cursor;
   };
   const syncCursor = (): void => {
     const next = resolveCursor();
@@ -74,16 +94,18 @@ export function createInteractionCapability(
       return () => toolCbs.delete(cb);
     },
 
-    onPointer: (cb) => {
-      pointerCbs.add(cb);
-      return () => pointerCbs.delete(cb);
-    },
-
     registerTool: (tool) => {
       tools.set(tool.id, tool);
       return () => {
         tools.delete(tool.id);
+        cursorSkins.delete(tool.id);
       };
+    },
+
+    setToolCursor: (id, skin) => {
+      if (skin === null) cursorSkins.delete(id);
+      else cursorSkins.set(id, skin);
+      syncCursor();
     },
 
     registerHandler: (handler) => {
@@ -102,9 +124,11 @@ export function createInteractionCapability(
     },
 
     dispatch: (sample) => {
-      // Passive observers first (cursor chrome like a tool badge) — they never
-      // capture, so they see every sample regardless of gesture routing.
-      pointerCbs.forEach((cb) => cb(sample));
+      const nowOverPage = sample.page != null;
+      if (nowOverPage !== overPage) {
+        overPage = nowOverPage;
+        syncCursor(); // crossing a page edge re-resolves the base cursor
+      }
       if (sample.phase === 'down') {
         owner = null;
         for (const h of eligible()) {

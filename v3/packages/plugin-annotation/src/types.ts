@@ -543,7 +543,7 @@ export interface AnnotationHostCapability extends AnnotationCapability {
    * fitted image box (same fit + clamp as placement), or a click-create tool's
    * default geometry (same anchor + clamp as the click commit). The ghost IS
    * the placement, never an approximation. Tools without a determinable
-   * footprint (or with a `badge`/`false` ghost policy) clear instead.
+   * footprint (or with a `false` ghost policy) clear instead.
    */
   ghostHoverAt(
     toolId: string,

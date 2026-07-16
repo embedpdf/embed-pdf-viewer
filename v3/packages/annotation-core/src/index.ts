@@ -104,7 +104,6 @@ export {
 } from './geometry';
 export { cloudyPath, cloudyBorderExtent } from './cloudy';
 export { scene } from './scene';
-export { badgeGeom } from './badge';
 export { straightenInkStroke } from './ink';
 export type { BlendMode } from '@embedpdf/engine-core/runtime';
 export type {

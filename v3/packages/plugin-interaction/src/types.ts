@@ -21,6 +21,13 @@ export interface Modifiers {
 export interface Tool {
   id: ToolId;
   cursor: Cursor;
+  /**
+   * Cursor over the viewport's page GAPS. A tool's cursor answers "what would
+   * a click do here" — and most tools act only on pages, so gaps fall back to
+   * the neutral arrow (`'default'`). A tool that works anywhere (pan) declares
+   * its own (`'grab'`). Hover claims still outrank both.
+   */
+  gapCursor?: Cursor;
   enables: ReadonlySet<string>;
 }
 
@@ -81,6 +88,20 @@ export interface InteractionHandler {
   onHover?(sample: PointerSample): void;
 }
 
+/**
+ * A tool's runtime cursor skin: "while THIS tool is armed, keyword X looks
+ * like Y." Everything cursor-shaped in the hub speaks KEYWORDS — a tool
+ * declares its base ('crosshair', 'copy'), hover claims name what is under
+ * the pointer ('text' over text, 'move' over an annotation) — and the skin
+ * restyles those keywords, typically as image cursors carrying the tool's
+ * icon. Applied uniformly to the winning claim and to the declared base, so
+ * same keyword = same meaning = same look. Unmapped keywords render as-is (a
+ * foreign 'move' over an annotation drops the tool identity), and page gaps
+ * are never skinned — the identity appears exactly where the action is
+ * possible, and the skin can only restyle where the tool already acts.
+ */
+export type ToolCursorSkin = Record<Cursor, Cursor>;
+
 export interface InteractionState {
   activeToolId: ToolId;
   cursor: Cursor;
@@ -102,12 +123,12 @@ export interface InteractionCapability {
    *  tool taking over the selection visual). Returns an unsubscribe fn. */
   onToolChange(cb: () => void): () => void;
   /**
-   * Observe every normalized pointer sample the hub routes — the read-only tap
-   * for viewport-space cursor chrome (a tool badge riding the pointer). Called
-   * for all phases, before gesture routing; observers can never capture.
-   * Returns an unsubscribe fn.
+   * Reskin a tool's cursor keywords at runtime — how an app gives the armed
+   * tool an image cursor built from its own toolbar icon (`Cursor` is any CSS
+   * cursor string, `url(data:…) x y, crosshair` included). See
+   * {@link ToolCursorSkin} for what the map means. `null` removes the skin.
    */
-  onPointer(cb: (sample: PointerSample) => void): () => void;
+  setToolCursor(id: ToolId, skin: ToolCursorSkin | null): void;
   // ── registries (return an unregister fn) ──
   registerTool(tool: Tool): () => void;
   registerHandler(handler: InteractionHandler): () => void;

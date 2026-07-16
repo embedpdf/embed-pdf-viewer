@@ -94,3 +94,40 @@ describe('interaction hub', () => {
     expect(cap.cursor()).toBe('default'); // back to the pointer tool's base cursor
   });
 });
+
+describe('tool cursor skins', () => {
+  it('restyles the declared base keyword over a page, never over a gap', () => {
+    const { cap } = harness();
+    cap.setToolCursor('pointer', { default: 'url(x) 1 1, default' });
+    expect(cap.cursor()).toBe('default'); // no sample yet → not over a page
+    cap.dispatch(sample('move')); // over a page → the base keyword is skinned
+    expect(cap.cursor()).toBe('url(x) 1 1, default');
+    cap.dispatch({ ...sample('move'), page: undefined }); // page gap — same keyword, never skinned
+    expect(cap.cursor()).toBe('default');
+  });
+
+  it('restyles a mapped claim; an unmapped (foreign) claim renders as-is', () => {
+    const { cap } = harness();
+    cap.dispatch(sample('move'));
+    cap.setToolCursor('pointer', { default: 'BASE', text: 'TEXT+ICON' });
+    expect(cap.cursor()).toBe('BASE');
+    cap.setCursor('sel', 'text', 10); // over text → same meaning, tool identity
+    expect(cap.cursor()).toBe('TEXT+ICON');
+    cap.setCursor('edit', 'move', 20); // outranks — a foreign affordance drops the identity
+    expect(cap.cursor()).toBe('move');
+    cap.setCursor('edit', null);
+    cap.setCursor('sel', null);
+    expect(cap.cursor()).toBe('BASE');
+  });
+
+  it('skins are per-tool and removable', () => {
+    const { cap } = harness();
+    cap.dispatch(sample('move'));
+    cap.setToolCursor('pan', { grab: 'PAN-SKIN' });
+    expect(cap.cursor()).toBe('default'); // pointer active — pan's skin doesn't apply
+    cap.activateTool('pan');
+    expect(cap.cursor()).toBe('PAN-SKIN');
+    cap.setToolCursor('pan', null);
+    expect(cap.cursor()).toBe('grab'); // back to the declared cursor
+  });
+});

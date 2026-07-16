@@ -18,21 +18,17 @@ import {
   AnnotationToken,
   refKey,
   type Behavior,
-  type ResolvedTool,
   type SelectionProps,
   type StampProvider,
   type TextItem,
 } from '@embedpdf-x/plugin-annotation';
-import { InteractionToken } from '@embedpdf-x/plugin-interaction';
 import { pickImageFile } from '@embedpdf-x/web';
 // The render layer is framework code, so it resolves the FULL host lens
 // (pageItems/chrome/appearances/…). Same runtime token as the public one — only
 // the type differs. App code never imports this.
 import { AnnotationToken as AnnotationHostToken } from '@embedpdf-x/plugin-annotation/internal';
 import {
-  badgeGeom,
   scene,
-  styleFromProps,
   MITER_LIMIT,
   type AnnotationProps,
   type AnnotationPropsPatch,
@@ -195,8 +191,7 @@ function Shape({ item, page }: { item: RenderItem; page: PageContextValue }) {
   );
 }
 
-/** Map a core scene to SVG children — shared by {@link Shape} (page space) and
- *  the tool badge's default glyph (viewport space). */
+/** Map a core scene to SVG children. */
 function sceneNodes(item: RenderItem): React.ReactNode[] {
   return scene(item).map((n, i) => {
     const a = paintAttrs(n.paint);
@@ -818,118 +813,6 @@ export function AnnotationLayer({ renderers }: AnnotationLayerProps = {}) {
       <ToolGhostImage page={page} />
       <Chrome page={page} />
     </div>
-  );
-}
-
-/* ── tool badge (viewport chrome — mount in the Stage OVERLAY, not a page) ── */
-
-/** What a custom badge renders: the armed tool + the policy's size (CSS px).
- *  Apps typically render the SAME icon component their toolbar uses, so the
- *  badge and the button are pixel-identical. */
-export interface ToolBadgeRendererProps {
-  toolId: string;
-  tool: ResolvedTool;
-  size: number;
-}
-
-/**
- * The armed tool's cursor badge: a small screen-constant preview riding the
- * pointer (top-right by default), so the user always sees WHICH tool is armed.
- * Viewport chrome by the placement test — it never scales with zoom and stays
- * alive over page gaps — so it mounts in the Stage overlay slot. Position
- * updates write the transform directly from the hub's pointer tap (no store
- * round-trip, no re-render per move); it hides during gestures (the draft
- * preview owns feedback) and for tools whose ghost policy isn't `badge`.
- */
-export function ToolBadge({
-  renderer,
-}: {
-  /** Custom badge content (your toolbar's icon); omit for the built-in glyph. */
-  renderer?: React.ComponentType<ToolBadgeRendererProps>;
-} = {}) {
-  const interaction = useCapability(InteractionToken);
-  const anno = useCapability(AnnotationHostToken);
-  const [toolId, setToolId] = useState(() => interaction.activeToolId());
-  const ref = React.useRef<HTMLDivElement>(null);
-
-  useEffect(
-    () => interaction.onToolChange(() => setToolId(interaction.activeToolId())),
-    [interaction],
-  );
-
-  const tool = anno.tool(toolId);
-  const ghost = tool && tool.ghost !== false && tool.ghost.mode === 'badge' ? tool.ghost : null;
-
-  useEffect(() => {
-    if (!ghost) return;
-    return interaction.onPointer((s) => {
-      const el = ref.current;
-      if (!el) return;
-      if (s.phase === 'down') {
-        el.style.visibility = 'hidden'; // a gesture starts — the draft preview takes over
-        return;
-      }
-      if (s.phase === 'up') return; // reappear on the next hover move, position fresh
-      el.style.transform = `translate(${s.viewport.x + ghost.offset.x}px, ${s.viewport.y + ghost.offset.y}px)`;
-      el.style.visibility = 'visible';
-    });
-  }, [interaction, ghost]);
-
-  if (!tool || !ghost) return null;
-  const Badge = renderer;
-  return (
-    <div
-      ref={ref}
-      style={{
-        position: 'absolute',
-        left: 0,
-        top: 0,
-        visibility: 'hidden',
-        pointerEvents: 'none',
-        willChange: 'transform',
-        zIndex: 5,
-      }}
-    >
-      {Badge ? (
-        <Badge toolId={toolId} tool={tool} size={ghost.size} />
-      ) : (
-        <BadgeGlyph tool={tool} size={ghost.size} />
-      )}
-    </div>
-  );
-}
-
-/** The zero-config badge: a miniature of what the tool draws (pure core
- *  `badgeGeom` + the SAME scene painter as every annotation), styled from the
- *  tool's LIVE defaults — recolor the tool and the badge follows. */
-function BadgeGlyph({ tool, size }: { tool: ResolvedTool; size: number }) {
-  const props = useSelector(AnnotationToken, (c) => c.currentDefaults(tool.id), sameProps);
-  const box = { x: 0, y: 0, width: size, height: size };
-  // Full-scale stroke widths would blob at badge size — cap, keep the color.
-  const style = styleFromProps({
-    ...props,
-    strokeWidth: Math.min(props.strokeWidth ?? 2, 2.5),
-    opacity: 1,
-  });
-  const item: RenderItem = {
-    id: 'tool-badge',
-    ref: null,
-    subtype: tool.subtype,
-    geom: badgeGeom(tool.subtype, box, props),
-    box,
-    style,
-    source: 'ghost',
-    selected: false,
-  };
-  return (
-    <svg
-      viewBox={`0 0 ${size} ${size}`}
-      width={size}
-      height={size}
-      style={{ display: 'block', overflow: 'visible' }}
-    >
-      {sceneNodes(item)}
-    </svg>
   );
 }
 

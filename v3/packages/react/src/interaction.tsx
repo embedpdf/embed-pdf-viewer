@@ -14,6 +14,8 @@ import * as React from 'react';
 import { useEffect, useRef } from 'react';
 import { InteractionToken } from '@embedpdf-x/plugin-interaction';
 import type { Modifiers, PointerSample } from '@embedpdf-x/plugin-interaction';
+import { svgCursor } from '@embedpdf-x/web';
+import type { SvgCursorOptions } from '@embedpdf-x/web';
 import { useCapability, usePage, useSelector } from './runtime';
 
 const mods = (e: PointerEvent): Modifiers => ({
@@ -126,4 +128,55 @@ export function useTool() {
     activate: interaction.activateTool,
     tools: interaction.tools(),
   };
+}
+
+/** One cursor slot: an SVG image ({@link SvgCursorOptions}) or a plain CSS
+ *  cursor string ('crosshair', 'url(…) 4 4, copy'). */
+export type ToolCursorImage = SvgCursorOptions | string;
+
+/** What {@link useToolCursor} installs: the tool to reskin + its keyword map.
+ *  Apps build `svg` from the SAME icon their toolbar renders, so the cursor
+ *  and the button can never drift apart. */
+export interface ToolCursorSpec {
+  toolId: string;
+  /** keyword → cursor: restyle the keywords this tool can show — its declared
+   *  base ('crosshair', 'copy') and hover claims ('text' over text) — in the
+   *  tool's identity. Keywords the map omits render as-is: a markup tool's
+   *  'default' base stays the bare arrow, a foreign 'move' claim drops the
+   *  icon. An SVG value defaults its keyword `fallback` to the keyword it
+   *  replaces. */
+  cursors: Record<string, ToolCursorImage>;
+}
+
+const toCursor = (img: ToolCursorImage, fallback?: string): string =>
+  typeof img === 'string'
+    ? img
+    : svgCursor(img.fallback === undefined && fallback ? { ...img, fallback } : img);
+
+/**
+ * Give a tool IMAGE cursors — the armed-tool indicator. The cursor is the only
+ * zero-latency pointer-locked pixel the platform has, and the hub already
+ * arbitrates it: unmapped hover claims beat it over annotations/text, page
+ * gaps fall back to the tool's `gapCursor`, and other UI (menus, form fill
+ * controls) carries its own CSS cursor — so nothing chases the pointer in
+ * DOM. `null` installs nothing. A re-render with new content rebuilds the
+ * cursor (live recolor from tool defaults); unmount restores the tool's
+ * declared cursors.
+ */
+export function useToolCursor(spec: ToolCursorSpec | null): void {
+  const interaction = useCapability(InteractionToken);
+  // Key the effect by VALUE: specs are built inline in render, and a
+  // fresh-but-identical object must not thrash the skin.
+  const key = spec && JSON.stringify(spec);
+  const ref = useRef(spec);
+  ref.current = spec;
+  useEffect(() => {
+    const s = ref.current;
+    if (!s) return;
+    interaction.setToolCursor(
+      s.toolId,
+      Object.fromEntries(Object.entries(s.cursors).map(([k, v]) => [k, toCursor(v, k)])),
+    );
+    return () => interaction.setToolCursor(s.toolId, null);
+  }, [interaction, key]);
 }

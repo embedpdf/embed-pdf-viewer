@@ -23,7 +23,7 @@ import { Stage } from '@embedpdf-x/react/stage';
 import { Scrollbar } from '@embedpdf-x/react/scrollbar';
 import { RenderLayer } from '@embedpdf-x/react/render';
 import { SelectionLayer } from '@embedpdf-x/react/selection';
-import { AnnotationLayer, ToolBadge, useStampProvider } from '@embedpdf-x/react/annotation';
+import { AnnotationLayer, useStampProvider } from '@embedpdf-x/react/annotation';
 import type { AnnotationRenderer } from '@embedpdf-x/react/annotation';
 import { formWidgetRenderer, useFormScriptingProvider } from '@embedpdf-x/react/form';
 import { SearchLayer } from '@embedpdf-x/react/search';
@@ -35,7 +35,7 @@ import { MODE_SURFACES } from './config/commands';
 import { AppToolbar } from './ui/toolbar';
 import { AnnotationStrip } from './ui/annotation-strip';
 import { TabBar } from './ui/tab-bar';
-import { ToolBadgeIcon } from './ui/tool-badge';
+import { ArmedToolCursor } from './ui/tool-cursor';
 import { Header, LeftSidebar, RightSidebar, PageControls } from './ui/panels';
 
 // Annotation renderers — module scope, per the AnnotationRenderer identity
@@ -101,14 +101,14 @@ export function Shell() {
         <DocumentGate fallback={<OpeningDocuments />}>
           <LeftSidebar />
           <div className="relative min-w-0 flex-1">
+            {/* the armed tool's cursor: its toolbar icon as a real CSS cursor
+                (zero-lag; the hub hides it over annotations/fields/gaps) */}
+            <ArmedToolCursor />
             <Stage
               interaction
               overlay={
                 <>
                   <AnnotationStrip />
-                  {/* cursor chrome: the armed tool's badge rides the pointer,
-                      rendered with the SAME icon+accent as its toolbar button */}
-                  <ToolBadge renderer={ToolBadgeIcon} />
                   {/* headless scrollbars: geometry/behavior from the stage's
                       scroller contract; the look is index.css (data-attrs) */}
                   <Scrollbar axis="y" />

@@ -1,12 +1,12 @@
 /**
  * THE form-tool table — the single source of truth for the palette. Every
  * derivation reads this one list: interaction registration (annotation-less),
- * annotation tool/style/badge registration (full viewer), active-tool → field
+ * annotation tool/style registration (full viewer), active-tool → field
  * family lookup, click placement, and default appearance.
  *
  * "One tool system, two commit planes": the tools live in the ANNOTATION
- * registry when that plugin is present (defaults, style panel, click-create,
- * badges — the shared authoring infrastructure), but the COMMIT always goes
+ * registry when that plugin is present (defaults, style panel, click-create —
+ * the shared authoring infrastructure), but the COMMIT always goes
  * through `doc.forms.createField` via the form place handler. The tags make
  * that structural: these tools enable `form-place`, never `annotation-draw`,
  * so the annotation draw handler can't wake up for them.
@@ -21,7 +21,7 @@ export interface FormToolDef {
   id: string;
   /** The field family `placeField` commits (the FORM plane's vocabulary). */
   family: AuthorableFormFamily;
-  /** The client kind the ANNOTATION registry routes on (props panel, badge).
+  /** The client kind the ANNOTATION registry routes on (props panel).
    *  Not a PDF subtype — every widget is PDF `widget`; this is the view. */
   visualKind: 'widget-text' | 'widget-choice' | 'widget-toggle';
   /** What a bare click places (box policies only — fields are boxes). */

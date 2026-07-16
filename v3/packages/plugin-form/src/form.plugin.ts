@@ -56,8 +56,8 @@ export const formPlugin = (options: FormPluginOptions = {}) =>
       });
       // Field palette: ONE tool table, two registration paths. With the
       // annotation plugin, palette tools join ITS registry — they gain live
-      // defaults, the schema style panel (`propsForTool`), click-create and
-      // cursor badges, all the shared authoring infrastructure. Without it,
+      // defaults, the schema style panel (`propsForTool`), click-create — all
+      // the shared authoring infrastructure. Without it,
       // the same table registers plain hub tools: drag/click placement and
       // programmatic authoring still work (`placeField` is a pure `doc.forms`
       // call); only INTERACTIVE styling/moving needs the annotation plane.
@@ -73,7 +73,6 @@ export const formPlugin = (options: FormPluginOptions = {}) =>
             cursor: t.cursor,
             enables: [...PLACE_TAGS],
             clickCreate: t.clickCreate,
-            ghost: { mode: 'badge' },
             defaults: t.defaults,
           });
         } else {
