@@ -1,5 +1,9 @@
-import { familySync, GLIBC, MUSL } from 'detect-libc';
-
+/**
+ * Environment-NEUTRAL platform vocabulary. This module must stay importable
+ * from every graph (browser, worker, node) — so it carries no Node imports.
+ * The node-only target detection (detect-libc) lives in `platform.node.ts`;
+ * the browser graph pins `wasm32` in `index.browser.ts`.
+ */
 export type RuntimeTarget =
   | 'wasm32'
   | 'darwin-arm64'
@@ -17,29 +21,6 @@ export function isNodeLike(): boolean {
     !!process.versions?.node &&
     typeof process.platform === 'string'
   );
-}
-
-export function resolveRuntimeTarget(): RuntimeTarget | null {
-  if (!isNodeLike()) return 'wasm32';
-
-  const platform = process.platform;
-  const arch = process.arch;
-
-  if (platform === 'darwin' && arch === 'arm64') return 'darwin-arm64';
-  if (platform === 'darwin' && arch === 'x64') return 'darwin-x64';
-  if (platform === 'win32' && arch === 'arm64') return 'win32-arm64';
-  if (platform === 'win32' && arch === 'x64') return 'win32-x64';
-
-  if (platform === 'linux') {
-    const libc = familySync();
-    const isMusl = libc === MUSL;
-    const isGlibc = libc === GLIBC || libc == null;
-
-    if (arch === 'arm64') return isMusl ? 'linuxmusl-arm64' : isGlibc ? 'linux-arm64' : null;
-    if (arch === 'x64') return isMusl ? 'linuxmusl-x64' : isGlibc ? 'linux-x64' : null;
-  }
-
-  return null;
 }
 
 export function packageNameForTarget(target: RuntimeTarget): string {

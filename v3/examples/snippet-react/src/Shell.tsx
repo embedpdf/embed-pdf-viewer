@@ -37,6 +37,7 @@ import { AnnotationStrip } from './ui/annotation-strip';
 import { TabBar } from './ui/tab-bar';
 import { ArmedToolCursor } from './ui/tool-cursor';
 import { Header, LeftSidebar, RightSidebar, PageControls } from './ui/panels';
+import { RedactConfirmModal } from './ui/redact-confirm';
 
 // Annotation renderers — module scope, per the AnnotationRenderer identity
 // rule. One entry today: form widgets render as fill controls while the form
@@ -135,6 +136,7 @@ export function Shell() {
             <PageControls />
           </div>
           <RightSidebar />
+          <RedactConfirmModal />
         </DocumentGate>
       </div>
     </div>

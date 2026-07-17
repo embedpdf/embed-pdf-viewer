@@ -1,0 +1,56 @@
+{
+  "name": "@embedpdf-x/angular",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Angular adapter for EmbedPDF v3: one generic signal binding + structural components (EpdfViewer, EpdfStage) + headless layers & inject functions. The whole framework surface, one secondary entry point per feature (ADAPTERS.md).",
+  "sideEffects": false,
+  "module": "./dist/fesm2022/embedpdf-x-angular.mjs",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/fesm2022/embedpdf-x-angular.mjs"
+    },
+    "./runtime": {
+      "types": "./dist/runtime/index.d.ts",
+      "default": "./dist/fesm2022/embedpdf-x-angular-runtime.mjs"
+    },
+    "./stage": {
+      "types": "./dist/stage/index.d.ts",
+      "default": "./dist/fesm2022/embedpdf-x-angular-stage.mjs"
+    },
+    "./render": {
+      "types": "./dist/render/index.d.ts",
+      "default": "./dist/fesm2022/embedpdf-x-angular-render.mjs"
+    }
+  },
+  "scripts": {
+    "build": "ng-packagr -p ng-package.json -c tsconfig.lib.json",
+    "clean": "rimraf dist",
+    "test": "node scripts/check-parity.mjs"
+  },
+  "dependencies": {
+    "tslib": "^2.6.0",
+    "@embedpdf-x/geometry": "workspace:*",
+    "@embedpdf-x/kernel": "workspace:*",
+    "@embedpdf-x/stage-core": "workspace:*",
+    "@embedpdf-x/plugin-stage": "workspace:*",
+    "@embedpdf-x/plugin-render": "workspace:*",
+    "@embedpdf-x/plugin-interaction": "workspace:*"
+  },
+  "peerDependencies": {
+    "@angular/common": ">=20.2.0 <23.0.0",
+    "@angular/core": ">=20.2.0 <23.0.0"
+  },
+  "devDependencies": {
+    "@angular/common": "~20.2.0",
+    "@angular/compiler": "~20.2.0",
+    "@angular/compiler-cli": "~20.2.0",
+    "@angular/core": "~20.2.0",
+    "ng-packagr": "~20.2.0",
+    "rimraf": "^5.0.0",
+    "rxjs": "^7.8.0",
+    "typescript": "~5.8.3"
+  },
+  "license": "MIT"
+}

@@ -13,6 +13,7 @@ import { pageEditPlugin } from '@embedpdf-x/react/page-edit';
 import { interactionPlugin } from '@embedpdf-x/react/interaction';
 import { selectionPlugin } from '@embedpdf-x/react/selection';
 import { annotationPlugin } from '@embedpdf-x/react/annotation';
+import { redactionPlugin } from '@embedpdf-x/react/redaction';
 import { formPlugin } from '@embedpdf-x/react/form';
 import { searchPlugin } from '@embedpdf-x/react/search';
 import { i18nPlugin, negotiateLocale, useT } from '@embedpdf-x/react/i18n';
@@ -63,6 +64,9 @@ const plugins = [
   // Forms: fillable under the default pointer/pan (widgets render as fill
   // controls), editable under the Form tab's 'form-edit' + palette tools.
   formPlugin({ scripting: { enabled: true } }),
+  // Redaction: marking is the annotation plane's composed `redact` tool; this
+  // plugin adds the pending-queue view + the destructive apply.
+  redactionPlugin(),
   searchPlugin(),
   demoToolsPlugin(),
   i18nPlugin({

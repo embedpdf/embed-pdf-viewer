@@ -22,6 +22,8 @@ import { InteractionToken } from '@embedpdf-x/react/interaction';
 import { ShellToken } from '@embedpdf-x/react/shell';
 import { AnnotationToken } from '@embedpdf-x/react/annotation';
 import { fieldKeyOf, FormToken } from '@embedpdf-x/react/form';
+import { RedactionToken } from '@embedpdf-x/react/redaction';
+import { SelectionToken } from '@embedpdf-x/react/selection';
 
 // ── helpers ────────────────────────────────────────────────────────────────
 type Ctx = Parameters<NonNullable<CommandDef['run']>>[0];
@@ -29,6 +31,7 @@ type Ctx = Parameters<NonNullable<CommandDef['run']>>[0];
 const stage = (c: Ctx) => c.tryGet(StageToken);
 const interaction = (c: Ctx) => c.tryGet(InteractionToken);
 const anno = (c: Ctx) => c.tryGet(AnnotationToken);
+const redaction = (c: Ctx) => c.tryGet(RedactionToken);
 
 // ── annotation-selection predicates (drive the floating strip's contents) ────
 const hasAnnotationSelection = (c: Ctx) => (anno(c)?.selection().length ?? 0) > 0;
@@ -427,8 +430,47 @@ export const commands: CommandDef[] = [
   tool('form:add-select', 'form-combobox', 'commands.form.select', 'formSelect'),
   tool('form:add-listbox', 'form-listbox', 'commands.form.listbox', 'formListbox'),
 
-  // ── redact tools (inert) ────────────────────────────────────────────────
+  // ── redaction (the real thing: mark → review → destructive apply) ───────
   tool('redaction:redact', 'redact', 'commands.redact.mark', 'redact'),
+  {
+    id: 'redaction:mark-selection',
+    labelKey: 'commands.redact.markSelection',
+    icon: 'redactCombined',
+    categories: ['redaction'],
+    enabled: (c) => c.tryGet(SelectionToken)?.hasSelection() ?? false,
+    run: (c) => void redaction(c)?.queueCurrentSelection(),
+  },
+  {
+    id: 'panel:redaction',
+    labelKey: 'commands.redact.panel',
+    icon: 'redactionSidebar',
+    categories: ['panel'],
+    panel: { id: 'redaction', exclusive: 'right' },
+  },
+  {
+    id: 'redaction:apply-all',
+    labelKey: 'commands.redact.applyAll',
+    icon: 'redactArea',
+    categories: ['redaction'],
+    enabled: (c) => {
+      const r = redaction(c);
+      return !!r && r.canApply() && r.pendingCount() > 0;
+    },
+    modal: 'redact-confirm',
+  },
+  {
+    id: 'redaction:clear-all',
+    labelKey: 'commands.redact.clearAll',
+    icon: 'trash',
+    categories: ['redaction'],
+    enabled: (c) => (redaction(c)?.pendingCount() ?? 0) > 0,
+    run: (c) => {
+      const r = redaction(c);
+      const a = anno(c);
+      if (!r || !a) return;
+      for (const item of r.getPending()) void a.delete(item.ref);
+    },
+  },
 
   // ── annotation selection (the floating strip's verbs) ──────────────────
   {

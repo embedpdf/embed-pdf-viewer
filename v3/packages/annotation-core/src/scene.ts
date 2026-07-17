@@ -10,7 +10,7 @@
  * has its own small painter — but it still emits the same generic SceneNodes.
  */
 import { geomScene } from './geometry';
-import type { Paint, Quad, RenderItem, SceneNode, Style, Subtype } from './types';
+import type { Geom, Paint, Quad, RenderItem, SceneNode, Style, Subtype } from './types';
 
 const num = (n: number): number => Number(n.toFixed(3));
 
@@ -96,8 +96,33 @@ function markupScene(subtype: Subtype, quads: Quad[], style: Style): SceneNode[]
   return nodes;
 }
 
+/** Redaction marks at rest: an outline per region, nothing filled. The applied
+ *  look (fill + tiled label) is a hover/selection preview drawn by the
+ *  framework layer, not by the vector scene. Handles both geometries: quads
+ *  (text marks) and rect (area marks). */
+function redactScene(geom: Geom, style: Style): SceneNode[] {
+  const paint = {
+    stroke: style.color,
+    width: style.strokeWidth || 1.5,
+    opacity: style.opacity,
+  };
+  if (geom.t === 'quads') {
+    const nodes: SceneNode[] = [];
+    for (const q of geom.quads) {
+      const w = q[1].x - q[0].x;
+      const h = q[2].y - q[0].y;
+      if (w <= 0 || h <= 0) continue;
+      nodes.push({ kind: 'rect', rect: { x: q[0].x, y: q[0].y, width: w, height: h }, paint });
+    }
+    return nodes;
+  }
+  if (geom.t === 'rect') return [{ kind: 'rect', rect: geom.rect, paint }];
+  return [];
+}
+
 /** The full painted scene for one annotation. */
 export function scene(item: RenderItem): SceneNode[] {
+  if (item.subtype === 'redact') return redactScene(item.geom, item.style);
   if (item.geom.t === 'quads') return markupScene(item.subtype, item.geom.quads, item.style);
   if (item.geom.t === 'caret') {
     return geomScene(item.geom).map((n) => ({

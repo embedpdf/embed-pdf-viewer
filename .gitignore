@@ -3,6 +3,7 @@ node_modules
 **/node_modules/
 **/dist
 **/.turbo
+**/.angular/
 config/tsup.config.bundled*
 config/tsup.frameworks.config.bundled*
 .next

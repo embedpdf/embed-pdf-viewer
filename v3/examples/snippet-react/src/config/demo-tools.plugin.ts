@@ -15,11 +15,10 @@ import { InteractionToken } from '@embedpdf-x/react/interaction';
  * neither are the form palette tools (the form plugin's draw-to-place).
  */
 const INERT_TOOLS: ReadonlyArray<{ id: string; cursor: string }> = [
-  // insert mode
+  // insert mode (redact is REAL now — plugin-annotation ships the composed
+  // tool and plugin-redaction the destructive apply)
   { id: 'signature', cursor: 'copy' },
   { id: 'image', cursor: 'copy' },
-  // redact mode
-  { id: 'redact', cursor: 'crosshair' },
 ];
 
 export const demoToolsPlugin = () =>

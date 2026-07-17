@@ -66,6 +66,17 @@ export function registerRenderEffects(ctx: EffectContext<RenderState, RenderActi
   if (!doc) return;
   const allPons = () => (ctx.document()?.pages ?? []).map((p) => p.pageObjectNumber);
   const unsubscribe = doc.events.subscribe((event: DocumentEvent) => {
+    // Content-scope facts: the page ITSELF changed. A redaction apply
+    // destroys page content, so every applied page's base raster is stale —
+    // and content strictly contains annotations, so annotated readers bump
+    // too (see reducer.ts). Origin-agnostic like the rest of this map.
+    if (event.type === 'redaction.applied') {
+      const pons = event.results
+        .filter((r) => r.status === 'applied')
+        .map((r) => r.pageObjectNumber);
+      if (pons.length) ctx.dispatch({ type: 'INVALIDATE', scope: 'content', pons });
+      return;
+    }
     const pons = annotatedPons(event, allPons);
     if (pons.length) ctx.dispatch({ type: 'INVALIDATE', scope: 'annotations', pons });
   });

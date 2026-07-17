@@ -69,6 +69,10 @@
       "types": "./src/metadata.ts",
       "import": "./src/metadata.ts"
     },
+    "./redaction": {
+      "types": "./src/redaction.tsx",
+      "import": "./src/redaction.tsx"
+    },
     "./i18n": {
       "types": "./src/i18n.ts",
       "import": "./src/i18n.ts"
@@ -155,6 +159,10 @@
         "types": "./dist/metadata.d.ts",
         "import": "./dist/metadata.js"
       },
+      "./redaction": {
+        "types": "./dist/redaction.d.ts",
+        "import": "./dist/redaction.js"
+      },
       "./i18n": {
         "types": "./dist/i18n.d.ts",
         "import": "./dist/i18n.js"
@@ -206,7 +214,8 @@
     "@embedpdf-x/plugin-commands": "workspace:*",
     "@embedpdf-x/plugin-shell": "workspace:*",
     "@embedpdf-x/ui-core": "workspace:*",
-    "@embedpdf-x/web": "workspace:*"
+    "@embedpdf-x/web": "workspace:*",
+    "@embedpdf-x/plugin-redaction": "workspace:*"
   },
   "peerDependencies": {
     "react": ">=18",

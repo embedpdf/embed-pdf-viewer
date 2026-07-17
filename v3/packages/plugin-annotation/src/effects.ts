@@ -15,6 +15,7 @@ import { encodeStableIdKey } from '@embedpdf/engine-core/runtime';
 import { update, type Annot, type Msg } from '@embedpdf-x/annotation-core';
 
 import { fromDTO } from './repository';
+import { AnnotationToken } from './types';
 import type { AnnotationAction, AnnotationState } from './types';
 
 export function registerAnnotationEffects(
@@ -57,6 +58,22 @@ export function registerAnnotationEffects(
           .filter((w) => w.annotObjectNumber > 0)
           .map((w) => encodeStableIdKey({ kind: 'objectNumber', value: w.annotObjectNumber })),
       });
+      return;
+    }
+    // A redaction apply deleted the consumed marks plus every intersecting
+    // annotation on the applied pages. ORIGIN-AGNOSTIC: our own applies run
+    // through the redaction plugin's doc-level verb, never this plane's
+    // capability paths, so the model is stale either way — reload the
+    // affected pages from the engine. (Works without plugin-redaction
+    // installed: a remote collaborator's apply still reconciles this view.)
+    if (event.type === 'redaction.applied') {
+      const affected = new Set(
+        event.results.filter((r) => r.status === 'applied').map((r) => r.pageObjectNumber),
+      );
+      if (affected.size) {
+        const host = ctx.get(AnnotationToken);
+        for (const pon of affected) void host.reloadPage(pon);
+      }
       return;
     }
     // Only fold in OTHER sessions' edits; our own flow through the capability.

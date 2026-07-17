@@ -213,6 +213,8 @@ export function fromDTO(
     // Text styling is a content projection of the DTO, exactly like `style` —
     // present only for text-editable kinds. The colour seam is crossed HERE.
     ...(dto.subtype === 'free-text' ? { text: textFromDTO(dto) } : {}),
+    // A redaction label is `/DA`-styled exactly like free text.
+    ...(dto.subtype === 'redact' ? { text: redactTextFromDTO(dto) } : {}),
     // The /Name icon is a content projection like `style` — icon kinds only.
     ...(dto.subtype === 'text' || dto.subtype === 'file-attachment' ? { icon: dto.icon } : {}),
     ...(dto.subtype === 'widget' && WIDGET_TEXT_KINDS.has(widgetKindOf(dto.fieldFamily))
@@ -230,6 +232,17 @@ function textFromDTO(dto: Extract<AnnotationDTO, { subtype: 'free-text' }>): Tex
     fontFamily: dto.fontFamily,
     fontSize: dto.fontSize,
     fontColor: colorToCss(dto.fontColor ?? dto.color),
+    textAlign: dto.textAlign,
+  };
+}
+
+/** Redact label `/DA` fields → content {@link TextStyle}. `fontSize` 0 means
+ *  auto-fit and round-trips verbatim (the engine's convention). */
+function redactTextFromDTO(dto: Extract<AnnotationDTO, { subtype: 'redact' }>): TextStyle {
+  return {
+    fontFamily: dto.fontFamily,
+    fontSize: dto.fontSize,
+    fontColor: colorToCss(dto.fontColor),
     textAlign: dto.textAlign,
   };
 }
@@ -319,6 +332,24 @@ function geomFromDTO(dto: AnnotationDTO, crop: PdfRect): Geom {
             ] as Quad,
         ),
       };
+    case 'redact':
+      // Text redaction carries per-line quads; an AREA redaction is rect-only
+      // (`/Rect` IS the removal region per ISO 32000-2), so its geometry is a
+      // box and it moves/resizes like a shape.
+      return dto.quadPoints.length > 0
+        ? {
+            t: 'quads',
+            quads: dto.quadPoints.map(
+              (q) =>
+                [
+                  pdfToContentPoint(q.p1, crop),
+                  pdfToContentPoint(q.p2, crop),
+                  pdfToContentPoint(q.p3, crop),
+                  pdfToContentPoint(q.p4, crop),
+                ] as Quad,
+            ),
+          }
+        : { t: 'rect', rect: pdfToContentRect(dto.rect, crop), ellipse: false };
     case 'caret':
       return { t: 'caret', rect: pdfToContentRect(dto.rect, crop) };
     default:
@@ -374,7 +405,10 @@ export function styleFromDTO(dto: AnnotationDTO): Style {
     };
   }
   if (STROKE_KINDS.has(dto.subtype)) {
-    const d = dto as Extract<AnnotationDTO, { interiorColor: Color | null; opacity: number }>;
+    const d = dto as Extract<
+      AnnotationDTO,
+      { interiorColor: Color | null; opacity: number; strokeWidth: number }
+    >;
     return {
       color: colorToCss(d.color),
       interiorColor: d.interiorColor ? colorToCss(d.interiorColor) : null,
@@ -418,6 +452,19 @@ export function styleFromDTO(dto: AnnotationDTO): Style {
       opacity: d.opacity,
       blendMode: dto.blendMode,
       border: borderFromDTO(d),
+    };
+  }
+  if (dto.subtype === 'redact') {
+    // `/C` is the marking-stage outline; `/IC` the fill painted on apply.
+    // No `/BS` on redact — the outline weight is a client rendering choice.
+    const d = dto as Extract<AnnotationDTO, { subtype: 'redact' }>;
+    return {
+      color: colorToCss(d.color),
+      interiorColor: d.interiorColor ? colorToCss(d.interiorColor) : null,
+      strokeWidth: 1.5,
+      opacity: d.opacity,
+      blendMode: dto.blendMode,
+      border: { kind: 'solid' },
     };
   }
   if (dto.subtype === 'text' || dto.subtype === 'file-attachment') {
@@ -478,6 +525,45 @@ const freeTextStyle = (a: Annot) => {
     textAlign: t.textAlign,
     fontColor: cssToColor(t.fontColor),
   };
+};
+
+/**
+ * Redact styling: `/C` outline + `/CA` opacity + `/IC` fill, plus the label's
+ * full `/DA` triple and `/Q` (always the full triple — the engine's `/DA`
+ * packing rule, same as free text). `overlayText`/`repeat` stay OUT: the label
+ * text is content, written through `capability.update` (the redaction plugin's
+ * `setLabel`), never through geometry/style patches.
+ */
+const redactStyle = (a: Annot) => {
+  const t = a.text ?? initialTextStyle;
+  return {
+    color: cssToColor(a.style.color),
+    opacity: a.style.opacity,
+    interiorColor: a.style.interiorColor ? cssToColor(a.style.interiorColor) : null,
+    fontFamily: t.fontFamily,
+    fontSize: t.fontSize,
+    fontColor: cssToColor(t.fontColor),
+    textAlign: t.textAlign,
+  };
+};
+
+/** PDF-space bounding box of a set of `/QuadPoints` quads — the `/Rect` the
+ *  redact draft must carry alongside its quads. */
+type PdfPt = { x: number; y: number };
+const pdfBoundsOfQuads = (quads: { p1: PdfPt; p2: PdfPt; p3: PdfPt; p4: PdfPt }[]) => {
+  let left = Infinity;
+  let bottom = Infinity;
+  let right = -Infinity;
+  let top = -Infinity;
+  for (const q of quads) {
+    for (const p of [q.p1, q.p2, q.p3, q.p4]) {
+      if (p.x < left) left = p.x;
+      if (p.x > right) right = p.x;
+      if (p.y < bottom) bottom = p.y;
+      if (p.y > top) top = p.y;
+    }
+  }
+  return { left, bottom, right, top };
 };
 
 /** Text markup carries a single `/C` colour (our model keeps stroke==fill) + `/CA`
@@ -736,6 +822,22 @@ function baseCreateDraft(a: Annot, crop: PdfRect): AnnotationDraft | null {
       ...(a.intent === 'replace' ? { intent: a.intent } : {}),
       ...(a.data?.contents != null ? { contents: a.data.contents } : {}),
     };
+  if (a.subtype === 'redact') {
+    // Text redaction: quads + their PDF bounding box as `/Rect` (the engine
+    // requires an explicit rect). Area redaction: rect only — `/Rect` IS the
+    // removal region.
+    const redactQuads = quadPointsFor(a, crop);
+    if (redactQuads)
+      return {
+        subtype: 'redact',
+        rect: pdfBoundsOfQuads(redactQuads),
+        quadPoints: redactQuads,
+        ...redactStyle(a),
+      } as AnnotationDraft;
+    if (f && 'rect' in f)
+      return { subtype: 'redact', rect: f.rect, ...redactStyle(a) } as AnnotationDraft;
+    return null;
+  }
   const quads = quadPointsFor(a, crop);
   if (TEXT_MARKUP.has(a.subtype) && quads)
     return {
@@ -855,6 +957,15 @@ export function toPatch(a: Annot, crop: PdfRect): AnnotationPatch | null {
   // when /Rect changes. Content replacement carries bytes and goes through
   // `capability.update` with an inline `source`, never through this path.
   if (a.subtype === 'stamp' && f && 'rect' in f) return { subtype: 'stamp', ...boxEmit(a, crop) };
+  // redact: an AREA mark's box moves/resizes; a text mark's /QuadPoints are
+  // set at create and never patched (text-bound, like markup). Style + the
+  // label's /DA styling always ride so sidebar edits round-trip; the label
+  // TEXT itself rides `capability.update` (setLabel), never this path.
+  if (a.subtype === 'redact') {
+    if (a.geom.t === 'rect' && f && 'rect' in f)
+      return { subtype: 'redact', rect: f.rect, ...redactStyle(a) } as AnnotationPatch;
+    return { subtype: 'redact', ...redactStyle(a) } as AnnotationPatch;
+  }
   // markup: recolor / opacity only — /QuadPoints geometry isn't edited after create
   if (TEXT_MARKUP.has(a.subtype))
     return {

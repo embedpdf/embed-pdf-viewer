@@ -111,6 +111,7 @@ export const TOOL_DEFAULT_KEYS = {
   strikeout: ['color', 'opacity', 'blendMode'],
   squiggly: ['color', 'opacity', 'blendMode'],
   caret: ['color', 'opacity'],
+  redact: ['color', 'interiorColor', 'opacity', 'fontFamily', 'fontSize', 'fontColor', 'textAlign'],
   stamp: [],
   text: ['icon', 'color', 'opacity'],
   'file-attachment': ['icon', 'color', 'opacity'],
@@ -249,6 +250,7 @@ export interface BuiltinToolKindMap {
   squiggly: 'squiggly';
   'insert-text': 'caret';
   'replace-text': 'strikeout';
+  redact: 'redact';
   stamp: 'stamp';
   note: 'text';
   attachment: 'file-attachment';
@@ -412,6 +414,23 @@ export const DEFAULT_TOOLS: AnnotationToolInput[] = [
     cursor: 'default',
     enables: MARKUP_TAGS,
     defaults: { color: '#ffe16a', blendMode: 'multiply' },
+    selection: { kind: 'markup' },
+  },
+  // Redaction marking — the COMPOSED tool: over text it rides the selection
+  // gesture (per-line quad marks, like a highlight); anywhere else it drag-
+  // draws an area mark. One tool, both modes; the destructive apply lives in
+  // plugin-redaction.
+  {
+    id: 'redact',
+    subtype: 'redact',
+    cursor: 'crosshair',
+    enables: ['text-select', 'annotation-draw', 'annotation-edit'],
+    defaults: {
+      color: '#e44234',
+      interiorColor: '#000000',
+      fontColor: '#ffffff',
+      opacity: 1,
+    },
     selection: { kind: 'markup' },
   },
   {

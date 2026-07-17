@@ -5,22 +5,24 @@
   "description": "Low-level PDF execution runtime for EmbedPDF, backed by EmbedPDF's fork of PDFium and distributed as WASM and native platform packages.",
   "type": "module",
   "license": "Apache-2.0",
-  "main": "./dist/index.cjs",
-  "module": "./dist/index.js",
+  "main": "./dist/index.node.cjs",
+  "module": "./dist/index.browser.js",
   "types": "./dist/index.d.ts",
   "exports": {
     ".": {
-      "browser": {
+      "node": {
+        "import": {
+          "types": "./dist/index.d.ts",
+          "default": "./dist/index.node.js"
+        },
+        "require": {
+          "types": "./dist/index.d.cts",
+          "default": "./dist/index.node.cjs"
+        }
+      },
+      "default": {
         "types": "./dist/index.d.ts",
         "default": "./dist/index.browser.js"
-      },
-      "import": {
-        "types": "./dist/index.d.ts",
-        "default": "./dist/index.js"
-      },
-      "require": {
-        "types": "./dist/index.d.cts",
-        "default": "./dist/index.cjs"
       }
     }
   },
@@ -61,6 +63,7 @@
     "test:pdfium:goldens:linux": "PDFIUM_TEST_SUITE=embedder bash ./scripts/test-pdfium-docker.sh --write-pngs",
     "test:parity": "node --test ./test/*.test.mjs",
     "verify:packages": "bash ./scripts/verify-packages.sh",
+    "verify:browser-purity": "node ./scripts/verify-browser-purity.mjs",
     "dev": "bash ./scripts/dev.sh"
   },
   "files": [
@@ -72,15 +75,15 @@
     "detect-libc": "^2.1.2"
   },
   "optionalDependencies": {
-    "@embedpdf/pdf-runtime-wasm32": "workspace:*",
     "@embedpdf/pdf-runtime-darwin-arm64": "workspace:*",
     "@embedpdf/pdf-runtime-darwin-x64": "workspace:*",
-    "@embedpdf/pdf-runtime-linux-x64": "workspace:*",
     "@embedpdf/pdf-runtime-linux-arm64": "workspace:*",
-    "@embedpdf/pdf-runtime-linuxmusl-x64": "workspace:*",
+    "@embedpdf/pdf-runtime-linux-x64": "workspace:*",
     "@embedpdf/pdf-runtime-linuxmusl-arm64": "workspace:*",
-    "@embedpdf/pdf-runtime-win32-x64": "workspace:*",
-    "@embedpdf/pdf-runtime-win32-arm64": "workspace:*"
+    "@embedpdf/pdf-runtime-linuxmusl-x64": "workspace:*",
+    "@embedpdf/pdf-runtime-wasm32": "workspace:*",
+    "@embedpdf/pdf-runtime-win32-arm64": "workspace:*",
+    "@embedpdf/pdf-runtime-win32-x64": "workspace:*"
   },
   "devDependencies": {
     "@rollup/plugin-commonjs": "^25.0.8",
@@ -91,6 +94,7 @@
     "@types/node": "latest",
     "chokidar-cli": "^3.0.0",
     "cmake-js": "^7.3.1",
+    "esbuild": "^0.28.1",
     "magic-string": "^0.30.17",
     "rollup": "^4.53.5",
     "rollup-plugin-dts": "^6.3.0",

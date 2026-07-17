@@ -61,6 +61,7 @@ export type Subtype =
   | 'stamp'
   | 'text'
   | 'file-attachment'
+  | 'redact'
   | (string & {});
 
 /**

@@ -30,8 +30,9 @@ check_native_deps() {
 check_target() {
   case "$1" in
     wasm32)
-      check npm/wasm32/lib/pdfium.js
-      check npm/wasm32/lib/pdfium.cjs
+      check npm/wasm32/lib/pdfium.browser.js
+      check npm/wasm32/lib/pdfium.node.js
+      check npm/wasm32/lib/pdfium.node.cjs
       check npm/wasm32/lib/pdfium.wasm
       ;;
     win32-*)

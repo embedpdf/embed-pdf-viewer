@@ -702,7 +702,10 @@ function createPointer(
                 intent,
                 ...(flags ? { flags } : {}),
               }
-          : subtype === 'square' || subtype === 'circle' || subtype === 'free-text'
+          : subtype === 'square' ||
+              subtype === 'circle' ||
+              subtype === 'free-text' ||
+              subtype === 'redact'
             ? {
                 g: 'create-rect',
                 subtype,

@@ -1,0 +1,17 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "outDir": "./out-tsc/app"
+  },
+  "files": ["src/main.ts"],
+  "include": [
+    "src/**/*.d.ts",
+    "../../packages/geometry/src/**/*.ts",
+    "../../packages/kernel/src/**/*.ts",
+    "../../packages/stage-core/src/**/*.ts",
+    "../../packages/plugin-stage/src/**/*.ts",
+    "../../packages/plugin-render/src/**/*.ts",
+    "../../packages/plugin-interaction/src/**/*.ts"
+  ],
+  "exclude": ["../../packages/*/src/**/*.test.ts", "../../packages/*/src/**/*.spec.ts"]
+}

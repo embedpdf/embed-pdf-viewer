@@ -1,27 +1,13 @@
-export type {
-  Callback,
-  CallbackFn,
-  CallbackKind,
-  CreatePdfRuntimeOptions,
-  MemoryValueKind,
-  PdfFileAccessHandle,
-  PdfRuntimeFileAccess,
-  PdfRuntimeCallbacks,
-  PdfRuntimeMemory,
-  PdfRuntimeModule,
-  Ptr,
-} from './core/pdf-runtime-module';
-export { NULL_PTR } from './core/pdf-runtime-module';
-export type { PdfFunctions } from './core/pdf-functions.generated';
-export { packageNameForTarget, resolveRuntimeTarget, type RuntimeTarget } from './core/platform';
-export {
-  toLegacyWrappedModule,
-  toWrappedPdfiumModule,
-  type LegacyWrappedPdfiumModule,
-} from './legacy/to-wrapped-pdfium-module';
+/**
+ * NODE entry (the exports map's `node` condition). Full auto-detection:
+ * native addon for the resolved target, WASM as the universal fallback.
+ */
+export * from './shared';
+export { resolveRuntimeTarget } from './core/platform.node';
 
 import type { CreatePdfRuntimeOptions, PdfRuntimeModule } from './core/pdf-runtime-module';
-import { isNodeLike, resolveRuntimeTarget } from './core/platform';
+import { isNodeLike } from './core/platform';
+import { resolveRuntimeTarget } from './core/platform.node';
 import { createNativeRuntime } from './native/native-runtime';
 import { createWasmRuntime } from './wasm/wasm-runtime';
 

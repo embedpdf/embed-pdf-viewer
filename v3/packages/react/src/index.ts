@@ -10,6 +10,7 @@ export * from './annotation-menu';
 export * from './views';
 export * from './page-edit';
 export * from './metadata';
+export * from './redaction';
 export { FormLayer, useForm, useFormField, useFormScriptingProvider } from './form';
 export type { FormScriptingUiHandlers } from './form';
 export { SearchLayer, useSearch, useSearchState } from './search';

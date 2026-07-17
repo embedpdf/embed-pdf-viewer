@@ -15,7 +15,6 @@ node "$ROOT/build/generate-runtime-methods.mjs" "$ROOT/build/generated"
 
 if [[ "$TARGET" == "wasm32" ]]; then
   PDF_RUNTIME_TARGET="$TARGET" bash "$ROOT/build/compile.esm.sh"
-  PDF_RUNTIME_TARGET="$TARGET" bash "$ROOT/build/compile.sh"
   exit 0
 fi
 

@@ -166,6 +166,17 @@ const MARK_PROPS: PropSpec[] = [{ key: 'color', label: 'Color' }, OPACITY, BLEND
 /** Carets are anchored text-edit markers, without a blend-mode control. */
 const CARET_PROPS: PropSpec[] = [{ key: 'color', label: 'Color' }, OPACITY];
 const INK_PROPS: PropSpec[] = [{ key: 'color', label: 'Color' }, OPACITY, STROKE_WIDTH, BLEND_MODE];
+/** Redaction marks: outline at rest; the fill + label are what apply paints.
+ *  Label size 0 = auto-fit to the region (the engine's convention). */
+const REDACT_PROPS: PropSpec[] = [
+  { key: 'color', label: 'Outline' },
+  FILL,
+  OPACITY,
+  { key: 'fontFamily', label: 'Label font' },
+  { key: 'fontSize', label: 'Label size', min: 0, max: 96, step: 1 },
+  { key: 'fontColor', label: 'Label color' },
+  { key: 'textAlign', label: 'Align' },
+];
 /** Free text: font first (the primary surface), then box background + border. */
 const TEXT_PROPS: PropSpec[] = [
   { key: 'fontFamily', label: 'Font' },
@@ -420,6 +431,24 @@ export const KINDS: Record<string, AnnotationKind> = {
     variant: 'quads',
     caps: caps({ selectable: true, anchored: true, commentable: true }),
     props: MARK_PROPS,
+  },
+  // Redaction mark (the non-destructive stage of the two-stage model): created
+  // from a text selection (per-line quads) OR an area drag (rect-only geometry).
+  // Text marks are anchored like markup; area marks move/resize — the
+  // anchored+quads transform gate in hit.ts lets one caps set serve both
+  // geometries.
+  redact: {
+    subtype: 'redact',
+    variant: 'quads',
+    caps: caps({
+      selectable: true,
+      movable: true,
+      resizable: true,
+      anchored: true,
+      commentable: true,
+      hasFill: true,
+    }),
+    props: REDACT_PROPS,
   },
   caret: {
     subtype: 'caret',

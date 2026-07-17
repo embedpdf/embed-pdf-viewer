@@ -14,6 +14,7 @@ import { ThumbsStageToken } from '../config/stage';
 import { Icon } from './icons';
 import { useTheme } from './theme';
 import { AnnotationStylePanel } from './annotation-style';
+import { RedactionPanel } from './redaction-panel';
 import { SearchPanel } from './search-panel';
 
 // ── header ───────────────────────────────────────────────────────────────────
@@ -167,13 +168,16 @@ export function RightSidebar() {
   const search = useSurface('search');
   const comment = useSurface('comment');
   const style = useSurface('annotation-style');
+  const redaction = useSurface('redaction');
   const active = search.isOpen
     ? 'search'
     : comment.isOpen
       ? 'comment'
       : style.isOpen
         ? 'style'
-        : null;
+        : redaction.isOpen
+          ? 'redaction'
+          : null;
   if (!active) return null;
 
   const titleKey =
@@ -181,9 +185,17 @@ export function RightSidebar() {
       ? 'demo.searchTitle'
       : active === 'comment'
         ? 'demo.commentsTitle'
-        : 'demo.styleTitle';
+        : active === 'redaction'
+          ? 'demo.redactionTitle'
+          : 'demo.styleTitle';
   const close =
-    active === 'search' ? search.close : active === 'comment' ? comment.close : style.close;
+    active === 'search'
+      ? search.close
+      : active === 'comment'
+        ? comment.close
+        : active === 'redaction'
+          ? redaction.close
+          : style.close;
 
   return (
     <aside className="border-border-subtle bg-surface flex w-72 shrink-0 flex-col border-l">
@@ -201,6 +213,8 @@ export function RightSidebar() {
         <AnnotationStylePanel />
       ) : active === 'search' ? (
         <SearchPanel key={documentId ?? 'none'} />
+      ) : active === 'redaction' ? (
+        <RedactionPanel />
       ) : (
         <div className="p-3">
           <p className="text-fg-muted text-sm">{t('demo.empty')}</p>

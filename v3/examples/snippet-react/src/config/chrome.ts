@@ -141,7 +141,17 @@ const formBar: BarSchema = {
 const redactBar: BarSchema = {
   id: 'redact',
   sections: {
-    center: [group('redact', { importance: 4 }, ['redaction:redact']), style, history],
+    center: [
+      group('redact', { importance: 4 }, [
+        'redaction:redact',
+        'redaction:mark-selection',
+        'panel:redaction',
+        'redaction:apply-all',
+        'redaction:clear-all',
+      ]),
+      style,
+      history,
+    ],
   },
 };
 

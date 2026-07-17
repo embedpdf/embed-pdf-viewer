@@ -5,7 +5,11 @@ import dts from 'rollup-plugin-dts';
 
 const SRC = 'src';
 const DIST = 'dist';
-const ENTRY = `${SRC}/index.ts`;
+// One package name, one API, TWO physical graphs (see src/shared.ts). The
+// browser entry's graph must contain zero Node imports — enforced by
+// `verify:browser-purity`, not by stubs or dead-code elimination.
+const BROWSER_ENTRY = `${SRC}/index.browser.ts`;
+const NODE_ENTRY = `${SRC}/index.node.ts`;
 
 const optionalRuntimePackages = [
   '@embedpdf/pdf-runtime-wasm32',
@@ -19,57 +23,48 @@ const optionalRuntimePackages = [
   '@embedpdf/pdf-runtime-win32-arm64',
 ];
 
-const external = (id) =>
+const nodeExternal = (id) =>
   id === 'node:module' ||
   id === 'detect-libc' ||
   optionalRuntimePackages.some((pkg) => id === pkg || id.startsWith(`${pkg}/`));
 
-const stubNativeForBrowser = () => ({
-  name: 'stub-native-for-browser',
-  resolveId(source) {
-    if (source === './native/native-runtime') {
-      return '\0virtual:native-runtime-stub';
-    }
-  },
-  load(id) {
-    if (id === '\0virtual:native-runtime-stub') {
-      return `export async function createNativeRuntime() {
-        throw new Error('native runtime not available in browser bundle');
-      }`;
-    }
-  },
-});
+// The browser graph may only reach the wasm package — anything else external
+// appearing here would be a purity leak, so we do NOT silently allow it.
+const browserExternal = (id) =>
+  id === '@embedpdf/pdf-runtime-wasm32' || id.startsWith('@embedpdf/pdf-runtime-wasm32/');
 
-const common = {
-  input: ENTRY,
-  external,
-  plugins: [typescript(), nodeResolve({ extensions: ['.js', '.ts'] })],
-};
+const plugins = () => [typescript(), nodeResolve({ extensions: ['.js', '.ts'] })];
 
 export default [
   {
-    ...common,
-    plugins: [stubNativeForBrowser(), ...common.plugins],
+    input: BROWSER_ENTRY,
+    external: browserExternal,
+    plugins: plugins(),
     output: { file: `${DIST}/index.browser.js`, format: 'esm', sourcemap: true },
   },
   {
-    ...common,
-    output: { file: `${DIST}/index.js`, format: 'esm', sourcemap: true },
+    input: NODE_ENTRY,
+    external: nodeExternal,
+    plugins: plugins(),
+    output: { file: `${DIST}/index.node.js`, format: 'esm', sourcemap: true },
   },
   {
-    ...common,
-    output: { file: `${DIST}/index.cjs`, format: 'cjs', exports: 'named', sourcemap: true },
-    plugins: [...common.plugins, commonjs({ strictRequires: true })],
+    input: NODE_ENTRY,
+    external: nodeExternal,
+    plugins: [...plugins(), commonjs({ strictRequires: true })],
+    output: { file: `${DIST}/index.node.cjs`, format: 'cjs', exports: 'named', sourcemap: true },
   },
+  // Types are generated from the node entry: it is the superset surface and
+  // the browser entry exports the same names with compatible signatures.
   {
-    input: ENTRY,
-    external,
+    input: NODE_ENTRY,
+    external: nodeExternal,
     plugins: [dts()],
     output: { file: `${DIST}/index.d.ts`, format: 'es' },
   },
   {
-    input: ENTRY,
-    external,
+    input: NODE_ENTRY,
+    external: nodeExternal,
     plugins: [dts()],
     output: { file: `${DIST}/index.d.cts`, format: 'es' },
   },

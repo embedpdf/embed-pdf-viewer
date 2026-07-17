@@ -60,10 +60,17 @@ export const isSelectable = (m: Model, id: Id): boolean => {
   return !!a && annotInteractive(a) && capsFor(a.subtype).selectable;
 };
 
+/** An anchored kind's QUAD geometry is bound to underlying text — never moved
+ *  or resized. This is what lets one caps set serve both redaction shapes:
+ *  area marks (rect geometry) keep their transforms, text marks (quads) are
+ *  as fixed as classic markup. Markup kinds themselves have `movable: false`
+ *  and never reach this gate. */
+const textBound = (a: Annot): boolean => capsFor(a.subtype).anchored && a.geom.t === 'quads';
+
 /** Can this annotation be dragged by its body to move? (`locked` freezes it.) */
 export const canMove = (m: Model, id: Id): boolean => {
   const a = m.byId[id];
-  return !!a && annotTransformable(a) && capsFor(a.subtype).movable;
+  return !!a && annotTransformable(a) && capsFor(a.subtype).movable && !textBound(a);
 };
 
 /** Does this kind expose drag handles (box resize OR per-vertex)? Only
@@ -71,7 +78,7 @@ export const canMove = (m: Model, id: Id): boolean => {
  *  screen-anchored body keeps its handles: `noZoom`/`noRotate` exempt it from
  *  the display transform, they don't freeze its size or vertices. */
 const hasHandles = (a: Annot): boolean => {
-  if (!annotTransformable(a)) return false;
+  if (!annotTransformable(a) || textBound(a)) return false;
   const c = capsFor(a.subtype);
   return c.resizable || c.vertexEditable;
 };
