@@ -15,6 +15,8 @@ import type {
   InkPatch,
   LineDraft,
   LinePatch,
+  LinkDraft,
+  LinkPatch,
   PolygonDraft,
   PolygonPatch,
   PolylineDraft,
@@ -43,6 +45,7 @@ import {
 } from './writeFreeTextAnnotation';
 import { applyInkDraft, applyInkPatch, isInkSubtype } from './writeInkAnnotation';
 import { applyLineDraft, applyLinePatch, isLineSubtype } from './writeLineAnnotation';
+import { applyLinkDraft, applyLinkPatch, isLinkSubtype } from './writeLinkAnnotation';
 import {
   applyShapeDraft,
   applyShapePatch,
@@ -127,6 +130,10 @@ export function applyDraft(
     applyLineDraft(fn, mem, annotPtr, draft as LineDraft);
     return;
   }
+  if (isLinkSubtype(draft.subtype)) {
+    applyLinkDraft(fn, mem, annotPtr, draft as LinkDraft, ctx);
+    return;
+  }
   if (isInkSubtype(draft.subtype)) {
     applyInkDraft(fn, mem, annotPtr, draft as InkDraft);
     return;
@@ -191,6 +198,10 @@ export function applyPatch(
   }
   if (isLineSubtype(patch.subtype)) {
     applyLinePatch(fn, mem, annotPtr, patch as LinePatch);
+    return;
+  }
+  if (isLinkSubtype(patch.subtype)) {
+    applyLinkPatch(fn, mem, annotPtr, patch as LinkPatch, ctx);
     return;
   }
   if (isInkSubtype(patch.subtype)) {

@@ -12,6 +12,7 @@ import type {
   HighlightDraft,
   InkDraft,
   LineDraft,
+  LinkDraft,
   PolygonDraft,
   PolylineDraft,
   SquareDraft,
@@ -1441,6 +1442,191 @@ export function runAnnotationMutationConformance(
             a.ref.annotObjectNumber === caret.created.ref.annotObjectNumber,
         );
         expect(readCaret?.replyType).toBe('group');
+      } finally {
+        await doc.close();
+      }
+    });
+
+    // ─────────────────────────────────────────────────────────────────
+    //  Link annotations. Locked rules:
+    //  - `/Dest` and `/A GoTo` both read as the normalized `goto` arm;
+    //    destinations carry page OBJECT NUMBERS on the wire (never
+    //    indices) and raw PDF user-space coordinates.
+    //  - `target: null` creates a dead link (create-then-edit flow).
+    //  - A patch RETARGETS by replacing `/A`; the reader gives `/A`
+    //    precedence so a retarget wins over any stray direct `/Dest`.
+    //  - Grouped links (v2 "attached links") are plain /IRT + /RT
+    //    /Group — nothing link-specific in the relationship plane.
+    // ─────────────────────────────────────────────────────────────────
+
+    test('create link annotations round-trip uri, goto/xyz, goto/fitH, and dead targets', async () => {
+      const doc = await openFixture(engine, opts);
+      try {
+        const page = doc.page(fix.pageObjectNumber);
+
+        const uri = await page.annotations.create({
+          subtype: 'link',
+          rect: shapeRect,
+          target: { kind: 'uri', uri: 'https://www.embedpdf.com/' },
+        } satisfies LinkDraft);
+        expect(AnnotationCreateResultSchema.safeParse(uri).success).toBe(true);
+        expect(uri.created.subtype).toBe('link');
+        if (uri.created.subtype === 'link') {
+          expect(uri.created.target).toEqual({ kind: 'uri', uri: 'https://www.embedpdf.com/' });
+        }
+
+        // /XYZ with a null zoom axis: null means "retain current".
+        const xyz = await page.annotations.create({
+          subtype: 'link',
+          rect: shapeRect,
+          target: {
+            kind: 'goto',
+            destination: {
+              kind: 'xyz',
+              pageObjectNumber: fix.pageObjectNumber,
+              left: 30,
+              top: 500,
+              zoom: null,
+            },
+          },
+        } satisfies LinkDraft);
+        expect(xyz.created.subtype).toBe('link');
+        if (xyz.created.subtype === 'link') {
+          expect(xyz.created.target?.kind).toBe('goto');
+          if (xyz.created.target?.kind === 'goto') {
+            const dest = xyz.created.target.destination;
+            expect(dest.kind).toBe('xyz');
+            if (dest.kind === 'xyz') {
+              expect(dest.pageObjectNumber).toBe(fix.pageObjectNumber);
+              expect(dest.left).toBe(30);
+              expect(dest.top).toBe(500);
+              expect(dest.zoom).toBe(null);
+            }
+          }
+        }
+
+        const fitH = await page.annotations.create({
+          subtype: 'link',
+          rect: shapeRect,
+          target: {
+            kind: 'goto',
+            destination: { kind: 'fitH', pageObjectNumber: fix.pageObjectNumber, top: 420 },
+          },
+        } satisfies LinkDraft);
+        expect(fitH.created.subtype).toBe('link');
+        if (fitH.created.subtype === 'link' && fitH.created.target?.kind === 'goto') {
+          expect(fitH.created.target.destination).toEqual({
+            kind: 'fitH',
+            pageObjectNumber: fix.pageObjectNumber,
+            top: 420,
+          });
+        }
+
+        // Dead link: legal to author, reported as-is.
+        const dead = await page.annotations.create({
+          subtype: 'link',
+          rect: shapeRect,
+          target: null,
+        } satisfies LinkDraft);
+        expect(dead.created.subtype).toBe('link');
+        if (dead.created.subtype === 'link') expect(dead.created.target).toBe(null);
+
+        // All four survive a fresh page read as link DTOs.
+        const after = await page.annotations.list();
+        const links = after.annotations.filter((a) => a.subtype === 'link');
+        expect(links.length >= 4).toBe(true);
+      } finally {
+        await doc.close();
+      }
+    });
+
+    test('a link patch retargets in both directions (uri→goto, goto→uri) and moves the rect', async () => {
+      const doc = await openFixture(engine, opts);
+      try {
+        const page = doc.page(fix.pageObjectNumber);
+        const created = await page.annotations.create({
+          subtype: 'link',
+          rect: shapeRect,
+          target: { kind: 'uri', uri: 'https://old.example/' },
+        } satisfies LinkDraft);
+
+        const toGoto = await page.annotations.update(created.created.ref, {
+          subtype: 'link',
+          target: {
+            kind: 'goto',
+            destination: { kind: 'fit', pageObjectNumber: fix.pageObjectNumber },
+          },
+        });
+        expect(AnnotationUpdateResultSchema.safeParse(toGoto).success).toBe(true);
+        if (toGoto.updated.subtype === 'link') {
+          expect(toGoto.updated.target).toEqual({
+            kind: 'goto',
+            destination: { kind: 'fit', pageObjectNumber: fix.pageObjectNumber },
+          });
+        }
+
+        const movedRect = {
+          left: shapeRect.left + 5,
+          bottom: shapeRect.bottom + 5,
+          right: shapeRect.right + 5,
+          top: shapeRect.top + 5,
+        };
+        const toUri = await page.annotations.update(created.created.ref, {
+          subtype: 'link',
+          rect: movedRect,
+          target: { kind: 'uri', uri: 'https://new.example/' },
+        });
+        if (toUri.updated.subtype === 'link') {
+          expect(toUri.updated.target).toEqual({ kind: 'uri', uri: 'https://new.example/' });
+          expect(Math.round(toUri.updated.rect.left)).toBe(Math.round(movedRect.left));
+        }
+      } finally {
+        await doc.close();
+      }
+    });
+
+    test('a link grouped to a highlight round-trips /IRT + /RT /Group with its target', async () => {
+      const doc = await openFixture(engine, opts);
+      try {
+        const page = doc.page(fix.pageObjectNumber);
+        const parent = await page.annotations.create({
+          subtype: 'highlight',
+          contents: 'linked text',
+          quadPoints: quad,
+        } satisfies HighlightDraft);
+
+        const link = await page.annotations.create({
+          subtype: 'link',
+          rect: shapeRect,
+          target: { kind: 'uri', uri: 'https://www.embedpdf.com/docs' },
+          inReplyTo: parent.created.ref,
+          replyType: 'group',
+        } satisfies LinkDraft);
+        expect(AnnotationCreateResultSchema.safeParse(link).success).toBe(true);
+        expect(link.created.replyType).toBe('group');
+        expect(link.created.inReplyTo === null).toBe(false);
+        if (
+          link.created.inReplyTo?.kind === 'objectNumber' &&
+          parent.created.ref.kind === 'objectNumber'
+        ) {
+          expect(link.created.inReplyTo.annotObjectNumber).toBe(
+            parent.created.ref.annotObjectNumber,
+          );
+        }
+
+        // Both the relationship AND the target survive a fresh read.
+        const after = await page.annotations.list();
+        const readLink = after.annotations.find(
+          (a) =>
+            a.ref.kind === 'objectNumber' &&
+            link.created.ref.kind === 'objectNumber' &&
+            a.ref.annotObjectNumber === link.created.ref.annotObjectNumber,
+        );
+        expect(readLink?.subtype).toBe('link');
+        expect(readLink?.replyType).toBe('group');
+        if (readLink?.subtype === 'link') {
+          expect(readLink.target).toEqual({ kind: 'uri', uri: 'https://www.embedpdf.com/docs' });
+        }
       } finally {
         await doc.close();
       }

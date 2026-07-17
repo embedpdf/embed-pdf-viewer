@@ -6,11 +6,13 @@ import type {
 import { subtypeFromCode } from '@embedpdf/engine-core/runtime';
 import type { PdfFunctions, PdfRuntimeMemory, Ptr } from '@embedpdf/pdf-runtime';
 
+import type { AnnotationReadContext } from './annotationReadContext';
 import { readCaret } from './readCaretAnnotation';
 import { readFileAttachment } from './readFileAttachmentAnnotation';
 import { readFreeText } from './readFreeTextAnnotation';
 import { readInk } from './readInkAnnotation';
 import { readLine } from './readLineAnnotation';
+import { readLink } from './readLinkAnnotation';
 import { readCircle, readSquare } from './readShapeAnnotation';
 import { readStamp } from './readStampAnnotation';
 import { readText } from './readTextAnnotation';
@@ -28,7 +30,9 @@ import { readWidget } from './readWidgetAnnotation';
  * One reader per `AnnotationSubtype`. Each reader produces the DTO type
  * the registry promised: `kinds/<subtype>/dto.ts`. Readers receive the
  * pre-built `AnnotationBase` (identity + flags + rect + dates) so each
- * implementation only has to materialise its own fields.
+ * implementation only has to materialise its own fields, plus the
+ * document-scoped `AnnotationReadContext` — most readers ignore it (they
+ * work off the `annotPtr` alone); the link reader consumes it.
  *
  * The `unsupported` fallback preserves the raw subtype code so a future
  * reader landing for that subtype can replace it without a wire-format
@@ -40,6 +44,7 @@ export type AnnotationSubtypeReader = (
   annotPtr: Ptr,
   base: AnnotationBase,
   rawSubtypeCode: number,
+  ctx: AnnotationReadContext,
 ) => AnnotationDTO;
 
 const READER_BY_SUBTYPE: Partial<Record<AnnotationSubtype, AnnotationSubtypeReader>> = {
@@ -52,6 +57,7 @@ const READER_BY_SUBTYPE: Partial<Record<AnnotationSubtype, AnnotationSubtypeRead
   polygon: readPolygon,
   polyline: readPolyline,
   line: readLine,
+  link: readLink,
   ink: readInk,
   'free-text': readFreeText,
   caret: readCaret,

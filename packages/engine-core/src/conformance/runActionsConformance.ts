@@ -67,7 +67,7 @@ export function runActionsConformance(
       }
     });
 
-    test('attaches activation actions to AnnotationBase, including unsupported links', async () => {
+    test('attaches activation actions to AnnotationBase, including links', async () => {
       const doc = await open(engine, opts, opts.fixtures.annotation);
       try {
         const firstPage = (await doc.pages.list()).pages[0];
@@ -81,8 +81,14 @@ export function runActionsConformance(
             annotation.ref.kind === 'objectNumber' && annotation.ref.annotObjectNumber === 8,
         );
         expect(button?.actions?.activate?.root?.type).toBe('uri');
-        expect(link?.subtype).toBe('unsupported');
+        // A link carries BOTH planes: the base-level scripting action model
+        // (chain shape, for the orchestrator) and its own normalized target
+        // (payload, for navigation). They must agree on the action type.
+        expect(link?.subtype).toBe('link');
         expect(link?.actions?.activate?.root?.type).toBe('uri');
+        if (link?.subtype === 'link') {
+          expect(link.target?.kind).toBe('uri');
+        }
       } finally {
         await doc.close();
       }

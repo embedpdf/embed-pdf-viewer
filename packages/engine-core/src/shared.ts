@@ -228,6 +228,9 @@ export type {
   LineAnnotationDTO,
   LineDraft,
   LinePatch,
+  LinkAnnotationDTO,
+  LinkDraft,
+  LinkPatch,
   InkAnnotationDTO,
   InkDraft,
   InkPatch,
@@ -286,6 +289,7 @@ export type { AnnotationRelationKind, AnnotationThread } from './annotation/rela
 
 export type { DocumentManifest, ManifestPage } from './dto/DocumentManifest';
 export type { PdfDestination } from './dto/PdfDestination';
+export type { PdfLinkTarget, PdfLinkTargetWritable } from './dto/PdfLinkTarget';
 export type { CacheDelta, MutationMeta } from './mutation/MutationMeta';
 export type { AnnotationListMutationMeta } from './mutation/AnnotationListMutationMeta';
 export {

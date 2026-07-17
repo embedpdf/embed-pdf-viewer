@@ -27,6 +27,7 @@ import type { FontRegistrar } from '../fonts';
 import { captureOrStampStableId } from './internal/identity/captureOrStampStableId';
 import { resolveAnnotPtr } from './internal/identity/resolveAnnotationPointer';
 import { computeMutationImpact } from './internal/mutations/computeMutationImpact';
+import { readContextFor } from './internal/read/annotationReadContext';
 import { readAnnotString } from './internal/read/annotationReadPrimitives';
 import {
   joinWidgetFieldNumbers,
@@ -220,6 +221,7 @@ export class AnnotationMutator {
           pageObjectNumber,
           newIndex,
           pageStateBefore.revision,
+          readContextFor(this.session),
         );
         joinWidgetFieldNumbers(this.runtime, this.session, [dto]);
       } finally {
@@ -342,6 +344,7 @@ export class AnnotationMutator {
         ref.pageObjectNumber,
         newIndex,
         pageStateBefore.revision,
+        readContextFor(this.session),
       );
       joinWidgetFieldNumbers(this.runtime, this.session, [dto]);
 
@@ -659,7 +662,15 @@ export class AnnotationMutator {
           );
         }
         try {
-          moved[i] = readAnnotationFromPtr(fn, mem, annotPtr, pageObjectNumber, newIdx, bumpedRev);
+          moved[i] = readAnnotationFromPtr(
+            fn,
+            mem,
+            annotPtr,
+            pageObjectNumber,
+            newIdx,
+            bumpedRev,
+            readContextFor(this.session),
+          );
         } finally {
           fn.FPDFPage_CloseAnnot(annotPtr);
         }

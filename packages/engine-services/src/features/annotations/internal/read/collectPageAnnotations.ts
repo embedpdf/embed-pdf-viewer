@@ -5,6 +5,7 @@ import type {
 } from '@embedpdf/engine-core/runtime';
 import type { PdfRuntimeModule, Ptr } from '@embedpdf/pdf-runtime';
 
+import { readContextFor } from './annotationReadContext';
 import { pickReader } from './annotationReaderRegistry';
 import { joinWidgetFieldNumbers } from './joinWidgetField';
 import { readAnnotationBase } from './readAnnotationBase';
@@ -38,6 +39,7 @@ export function collectPageAnnotations(input: {
   let hasWeak = false;
   const revision = session.pageState(pageObjectNumber).revision;
   const actionBudget = new ActionReadBudgetTracker();
+  const readCtx = readContextFor(session);
 
   for (let i = 0; i < count; i++) {
     throwIfAborted(signal);
@@ -55,7 +57,7 @@ export function collectPageAnnotations(input: {
       );
       const subtypeCode = fn.FPDFAnnot_GetSubtype(annotPtr);
       const { reader } = pickReader(subtypeCode);
-      const dto = reader(fn, mem, annotPtr, base, subtypeCode);
+      const dto = reader(fn, mem, annotPtr, base, subtypeCode, readCtx);
       annotations.push(dto);
       if (dto.identityQuality === 'weak') hasWeak = true;
     } finally {

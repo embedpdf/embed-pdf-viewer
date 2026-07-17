@@ -9,6 +9,7 @@ import { FreeTextKind } from './free-text';
 import { HighlightKind } from './highlight';
 import { InkKind } from './ink';
 import { LineKind } from './line';
+import { LinkKind } from './link';
 import { PolygonKind } from './polygon';
 import { PolylineKind } from './polyline';
 import { SquareKind } from './square';
@@ -30,6 +31,7 @@ export * from './square';
 export * from './polygon';
 export * from './polyline';
 export * from './line';
+export * from './link';
 export * from './ink';
 export * from './free-text';
 export * from './caret';
@@ -67,6 +69,7 @@ export const ANNOTATION_KINDS = [
   PolygonKind,
   PolylineKind,
   LineKind,
+  LinkKind,
   InkKind,
   FreeTextKind,
   CaretKind,
@@ -141,6 +144,7 @@ export const AnnotationDTOSchema: z.ZodType<AnnotationDTO> = z.discriminatedUnio
   PolygonKind.dtoSchema,
   PolylineKind.dtoSchema,
   LineKind.dtoSchema,
+  LinkKind.dtoSchema,
   InkKind.dtoSchema,
   FreeTextKind.dtoSchema,
   CaretKind.dtoSchema,
@@ -170,6 +174,7 @@ export const AnnotationDraftSchema: z.ZodType<WireAnnotationDraft> = z.discrimin
     PolygonKind.draftSchema,
     PolylineKind.draftSchema,
     LineKind.draftSchema,
+    LinkKind.draftSchema,
     InkKind.draftSchema,
     FreeTextKind.draftSchema,
     CaretKind.draftSchema,
@@ -196,6 +201,7 @@ export const AnnotationPatchSchema: z.ZodType<WireAnnotationPatch> = z.discrimin
     PolygonKind.patchSchema,
     PolylineKind.patchSchema,
     LineKind.patchSchema,
+    LinkKind.patchSchema,
     InkKind.patchSchema,
     FreeTextKind.patchSchema,
     CaretKind.patchSchema,

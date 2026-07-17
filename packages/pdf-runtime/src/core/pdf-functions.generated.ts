@@ -265,6 +265,7 @@ export interface PdfFunctions {
     arg5: boolean,
     arg6: number,
   ) => Ptr;
+  EPDFDest_GetPageObjectNumber: (arg0: Ptr, arg1: Ptr) => number;
   EPDFDoc_ClearPagePieceInfoEntry: (arg0: Ptr, arg1: number, arg2: string) => boolean;
   EPDFDoc_ClearPagePieceInfoKey: (
     arg0: Ptr,
@@ -4710,6 +4711,25 @@ export const pdfFunctionSignatures = {
       ts: 'Ptr',
       wasm: { kind: 'pointer', cwrap: 'number' },
       native: { kind: 'pointer', cwrap: 'bigint' },
+    },
+  },
+  EPDFDest_GetPageObjectNumber: {
+    params: [
+      {
+        ts: 'Ptr',
+        wasm: { kind: 'pointer', cwrap: 'number' },
+        native: { kind: 'pointer', cwrap: 'bigint' },
+      },
+      {
+        ts: 'Ptr',
+        wasm: { kind: 'pointer', cwrap: 'number' },
+        native: { kind: 'pointer', cwrap: 'bigint' },
+      },
+    ],
+    result: {
+      ts: 'number',
+      wasm: { kind: 'i32', cwrap: 'number' },
+      native: { kind: 'i32', cwrap: 'number' },
     },
   },
   EPDFDoc_ClearPagePieceInfoEntry: {
