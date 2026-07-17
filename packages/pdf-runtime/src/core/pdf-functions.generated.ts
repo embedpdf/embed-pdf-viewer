@@ -75,9 +75,13 @@ export interface PdfFunctions {
   EPDFAction_GetNextAt: (arg0: Ptr, arg1: number, arg2: number) => number;
   EPDFAction_GetNextCount: (arg0: Ptr, arg1: number) => number;
   EPDFAction_GetNodeCount: (arg0: Ptr) => number;
+  EPDFAction_GetNodeDest: (arg0: Ptr, arg1: Ptr, arg2: number) => Ptr;
+  EPDFAction_GetNodeFilePath: (arg0: Ptr, arg1: number, arg2: Ptr, arg3: number) => number;
   EPDFAction_GetNodeJavaScript: (arg0: Ptr, arg1: number, arg2: Ptr, arg3: number) => number;
+  EPDFAction_GetNodeName: (arg0: Ptr, arg1: number, arg2: Ptr, arg3: number) => number;
   EPDFAction_GetNodeSubtype: (arg0: Ptr, arg1: number, arg2: Ptr, arg3: number) => number;
   EPDFAction_GetNodeType: (arg0: Ptr, arg1: number) => number;
+  EPDFAction_GetNodeURI: (arg0: Ptr, arg1: Ptr, arg2: number, arg3: Ptr, arg4: number) => number;
   EPDFAction_GetRootNode: (arg0: Ptr) => number;
   EPDFAction_GetWarningFlags: (arg0: Ptr) => number;
   EPDFAction_IsComplete: (arg0: Ptr) => boolean;
@@ -153,6 +157,8 @@ export interface PdfFunctions {
   EPDFAnnot_GetTextAlignment: (arg0: Ptr) => number;
   EPDFAnnot_HasAppearanceStream: (arg0: Ptr, arg1: number) => boolean;
   EPDFAnnot_HasEmbedMetadata: (arg0: Ptr) => boolean;
+  EPDFAnnot_RemoveAction: (arg0: Ptr) => boolean;
+  EPDFAnnot_RemoveDest: (arg0: Ptr) => boolean;
   EPDFAnnot_SetAction: (arg0: Ptr, arg1: Ptr) => boolean;
   EPDFAnnot_SetAPMatrix: (arg0: Ptr, arg1: number, arg2: Ptr) => boolean;
   EPDFAnnot_SetAppearanceFromPage: (arg0: Ptr, arg1: Ptr, arg2: number) => boolean;
@@ -2314,6 +2320,59 @@ export const pdfFunctionSignatures = {
       native: { kind: 'i32', cwrap: 'number' },
     },
   },
+  EPDFAction_GetNodeDest: {
+    params: [
+      {
+        ts: 'Ptr',
+        wasm: { kind: 'pointer', cwrap: 'number' },
+        native: { kind: 'pointer', cwrap: 'bigint' },
+      },
+      {
+        ts: 'Ptr',
+        wasm: { kind: 'pointer', cwrap: 'number' },
+        native: { kind: 'pointer', cwrap: 'bigint' },
+      },
+      {
+        ts: 'number',
+        wasm: { kind: 'i32', cwrap: 'number' },
+        native: { kind: 'i32', cwrap: 'number' },
+      },
+    ],
+    result: {
+      ts: 'Ptr',
+      wasm: { kind: 'pointer', cwrap: 'number' },
+      native: { kind: 'pointer', cwrap: 'bigint' },
+    },
+  },
+  EPDFAction_GetNodeFilePath: {
+    params: [
+      {
+        ts: 'Ptr',
+        wasm: { kind: 'pointer', cwrap: 'number' },
+        native: { kind: 'pointer', cwrap: 'bigint' },
+      },
+      {
+        ts: 'number',
+        wasm: { kind: 'i32', cwrap: 'number' },
+        native: { kind: 'i32', cwrap: 'number' },
+      },
+      {
+        ts: 'Ptr',
+        wasm: { kind: 'pointer', cwrap: 'number' },
+        native: { kind: 'pointer', cwrap: 'bigint' },
+      },
+      {
+        ts: 'number',
+        wasm: { kind: 'i32', cwrap: 'number' },
+        native: { kind: 'i32', cwrap: 'number' },
+      },
+    ],
+    result: {
+      ts: 'number',
+      wasm: { kind: 'i32', cwrap: 'number' },
+      native: { kind: 'i32', cwrap: 'number' },
+    },
+  },
   EPDFAction_GetNodeJavaScript: {
     params: [
       {
@@ -2330,6 +2389,35 @@ export const pdfFunctionSignatures = {
         ts: 'Ptr',
         wasm: { kind: 'utf16ptr', cwrap: 'number' },
         native: { kind: 'utf16ptr', cwrap: 'bigint' },
+      },
+      {
+        ts: 'number',
+        wasm: { kind: 'i32', cwrap: 'number' },
+        native: { kind: 'i32', cwrap: 'number' },
+      },
+    ],
+    result: {
+      ts: 'number',
+      wasm: { kind: 'i32', cwrap: 'number' },
+      native: { kind: 'i32', cwrap: 'number' },
+    },
+  },
+  EPDFAction_GetNodeName: {
+    params: [
+      {
+        ts: 'Ptr',
+        wasm: { kind: 'pointer', cwrap: 'number' },
+        native: { kind: 'pointer', cwrap: 'bigint' },
+      },
+      {
+        ts: 'number',
+        wasm: { kind: 'i32', cwrap: 'number' },
+        native: { kind: 'i32', cwrap: 'number' },
+      },
+      {
+        ts: 'Ptr',
+        wasm: { kind: 'pointer', cwrap: 'number' },
+        native: { kind: 'pointer', cwrap: 'bigint' },
       },
       {
         ts: 'number',
@@ -2374,6 +2462,40 @@ export const pdfFunctionSignatures = {
   },
   EPDFAction_GetNodeType: {
     params: [
+      {
+        ts: 'Ptr',
+        wasm: { kind: 'pointer', cwrap: 'number' },
+        native: { kind: 'pointer', cwrap: 'bigint' },
+      },
+      {
+        ts: 'number',
+        wasm: { kind: 'i32', cwrap: 'number' },
+        native: { kind: 'i32', cwrap: 'number' },
+      },
+    ],
+    result: {
+      ts: 'number',
+      wasm: { kind: 'i32', cwrap: 'number' },
+      native: { kind: 'i32', cwrap: 'number' },
+    },
+  },
+  EPDFAction_GetNodeURI: {
+    params: [
+      {
+        ts: 'Ptr',
+        wasm: { kind: 'pointer', cwrap: 'number' },
+        native: { kind: 'pointer', cwrap: 'bigint' },
+      },
+      {
+        ts: 'Ptr',
+        wasm: { kind: 'pointer', cwrap: 'number' },
+        native: { kind: 'pointer', cwrap: 'bigint' },
+      },
+      {
+        ts: 'number',
+        wasm: { kind: 'i32', cwrap: 'number' },
+        native: { kind: 'i32', cwrap: 'number' },
+      },
       {
         ts: 'Ptr',
         wasm: { kind: 'pointer', cwrap: 'number' },
@@ -3436,6 +3558,34 @@ export const pdfFunctionSignatures = {
     },
   },
   EPDFAnnot_HasEmbedMetadata: {
+    params: [
+      {
+        ts: 'Ptr',
+        wasm: { kind: 'pointer', cwrap: 'number' },
+        native: { kind: 'pointer', cwrap: 'bigint' },
+      },
+    ],
+    result: {
+      ts: 'boolean',
+      wasm: { kind: 'bool', cwrap: 'boolean' },
+      native: { kind: 'bool', cwrap: 'boolean' },
+    },
+  },
+  EPDFAnnot_RemoveAction: {
+    params: [
+      {
+        ts: 'Ptr',
+        wasm: { kind: 'pointer', cwrap: 'number' },
+        native: { kind: 'pointer', cwrap: 'bigint' },
+      },
+    ],
+    result: {
+      ts: 'boolean',
+      wasm: { kind: 'bool', cwrap: 'boolean' },
+      native: { kind: 'bool', cwrap: 'boolean' },
+    },
+  },
+  EPDFAnnot_RemoveDest: {
     params: [
       {
         ts: 'Ptr',

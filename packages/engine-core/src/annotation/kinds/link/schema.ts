@@ -46,6 +46,8 @@ export const PdfLinkTargetSchema: z.ZodType<PdfLinkTarget> = z.discriminatedUnio
   UriTargetSchema,
   z.object({ kind: z.literal('goto-remote'), file: z.string() }),
   z.object({ kind: z.literal('launch'), path: z.string() }),
+  z.object({ kind: z.literal('javascript') }),
+  z.object({ kind: z.literal('named'), name: z.string() }),
   z.object({ kind: z.literal('unsupported') }),
 ]) as unknown as z.ZodType<PdfLinkTarget>;
 
@@ -72,6 +74,6 @@ export const LinkPatchSchema: z.ZodType<LinkPatch> = z.object({
   ...AnnotationPatchBaseShape,
   subtype: z.literal('link'),
   rect: PdfRectSchema.optional(),
-  // No `.nullable()`: a target can be replaced but not cleared (see patch.ts).
-  target: PdfLinkTargetWritableSchema.optional(),
+  // Three-state: undefined=leave, value=replace /A, null=clear the target.
+  target: PdfLinkTargetWritableSchema.nullable().optional(),
 }) as unknown as z.ZodType<LinkPatch>;

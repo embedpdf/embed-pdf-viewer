@@ -1585,6 +1585,53 @@ export function runAnnotationMutationConformance(
       }
     });
 
+    test('a link patch clears the target with null — a dead link on re-read', async () => {
+      const doc = await openFixture(engine, opts);
+      try {
+        const page = doc.page(fix.pageObjectNumber);
+        const created = await page.annotations.create({
+          subtype: 'link',
+          rect: shapeRect,
+          target: {
+            kind: 'goto',
+            destination: { kind: 'fit', pageObjectNumber: fix.pageObjectNumber },
+          },
+        } satisfies LinkDraft);
+
+        const cleared = await page.annotations.update(created.created.ref, {
+          subtype: 'link',
+          target: null,
+        });
+        expect(AnnotationUpdateResultSchema.safeParse(cleared).success).toBe(true);
+        if (cleared.updated.subtype === 'link') expect(cleared.updated.target).toBe(null);
+
+        // Truly dead — a fresh page read agrees (both /A and /Dest gone).
+        const after = await page.annotations.list();
+        const readBack = after.annotations.find(
+          (a) =>
+            a.ref.kind === 'objectNumber' &&
+            created.created.ref.kind === 'objectNumber' &&
+            a.ref.annotObjectNumber === created.created.ref.annotObjectNumber,
+        );
+        expect(readBack?.subtype).toBe('link');
+        if (readBack?.subtype === 'link') expect(readBack.target).toBe(null);
+
+        // And a cleared link can be re-targeted afterwards.
+        const revived = await page.annotations.update(created.created.ref, {
+          subtype: 'link',
+          target: { kind: 'uri', uri: 'https://revived.example/' },
+        });
+        if (revived.updated.subtype === 'link') {
+          expect(revived.updated.target).toEqual({
+            kind: 'uri',
+            uri: 'https://revived.example/',
+          });
+        }
+      } finally {
+        await doc.close();
+      }
+    });
+
     test('a link grouped to a highlight round-trips /IRT + /RT /Group with its target', async () => {
       const doc = await openFixture(engine, opts);
       try {

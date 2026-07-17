@@ -49,7 +49,20 @@ export function applyLinkPatch(
 ): void {
   applyAnnotationBasePatch(fn, mem, annotPtr, patch);
   if (patch.rect !== undefined) setAnnotRect(fn, mem, annotPtr, patch.rect);
-  if (patch.target !== undefined) applyLinkTarget(fn, mem, annotPtr, patch.target, ctx);
+  if (patch.target === null) clearLinkTarget(fn, annotPtr);
+  else if (patch.target !== undefined) applyLinkTarget(fn, mem, annotPtr, patch.target, ctx);
+}
+
+/**
+ * `target: null` → a dead link. The model treats the target as ONE concept
+ * with two spellings, so THIS layer composes the two single-purpose
+ * removal primitives — removing only `/A` would resurrect a stale direct
+ * `/Dest` as the live target.
+ */
+function clearLinkTarget(fn: PdfFunctions, annotPtr: Ptr): void {
+  if (!fn.EPDFAnnot_RemoveAction(annotPtr) || !fn.EPDFAnnot_RemoveDest(annotPtr)) {
+    throw new EngineError(EngineErrorCode.Unknown, 'failed to clear link target');
+  }
 }
 
 export function isLinkSubtype(subtype: string): subtype is 'link' {

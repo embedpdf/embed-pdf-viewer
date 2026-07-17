@@ -10,18 +10,28 @@ import type { PdfDestination } from './PdfDestination';
  * documents.
  *
  * Arm names follow the `PdfActionType` vocabulary (`goto`, `uri`,
- * `goto-remote`, `launch`) so the two action-shaped surfaces never drift.
+ * `goto-remote`, `launch`, `javascript`) so the two action-shaped surfaces
+ * never drift.
  *
- * `goto-remote` and `launch` are READ-ONLY in v1: the engine reports them
- * so a client can display/inspect, but never follows or executes them, and
- * refuses to write them (see {@link PdfLinkTargetWritable}). `unsupported`
- * preserves round-trip for action types the reader doesn't model.
+ * `goto-remote`, `launch`, and `javascript` are READ-ONLY in v1: the
+ * engine reports them so a client can display/inspect (or, for
+ * `javascript`, hand the link to the scripting orchestrator), but never
+ * follows or executes them here, and refuses to write them (see
+ * {@link PdfLinkTargetWritable}). `javascript` deliberately carries NO
+ * script payload — the text already rides the base
+ * `actions.activate` model, which is the scripting plane's single home
+ * for action scripts. `unsupported` preserves round-trip for action
+ * types the reader doesn't model.
  */
 export type PdfLinkTarget =
   | { kind: 'goto'; destination: PdfDestination }
   | { kind: 'uri'; uri: string }
   | { kind: 'goto-remote'; file: string }
   | { kind: 'launch'; path: string }
+  | { kind: 'javascript' }
+  /** `/S /Named` — a viewer verb (`NextPage`, `PrevPage`, `FirstPage`,
+   *  `LastPage`, …). Read-only in v1; common in TOC/nav links. */
+  | { kind: 'named'; name: string }
   | { kind: 'unsupported' };
 
 /**

@@ -3,28 +3,37 @@ import type {
   LinkAnnotationDTO,
   PdfLinkTarget,
 } from '@embedpdf/engine-core/runtime';
-import type { PdfFunctions, PdfRuntimeMemory, Ptr } from '@embedpdf/pdf-runtime';
+import {
+  NULL_PTR,
+  type PdfFunctions,
+  type PdfRuntimeMemory,
+  type Ptr,
+} from '@embedpdf/pdf-runtime';
 
+import { readUtf8String } from '../../../../runtime/memory/strings';
+import {
+  ANNOT_ACTION_ACTIVATE,
+  actionTypeFromCode,
+  isValidActionNodeId,
+} from '../../../actions/ActionModelReader';
 import type { AnnotationReadContext } from './annotationReadContext';
 import { readDestination } from './readDestination';
-import { readUtf8String } from '../../../../runtime/memory/strings';
-
-// PDFACTION_* (public/fpdf_doc.h) — FPDFAction_GetType's vocabulary. NOT the
-// EPDF action-model codes (those live in features/actions).
-const ACTION_GOTO = 1;
-const ACTION_REMOTEGOTO = 2;
-const ACTION_URI = 3;
-const ACTION_LAUNCH = 4;
 
 /**
  * Link reader: rect/flags/relationship ride the base (a link grouped to an
  * annotation is plain `inReplyTo` + `replyType: 'group'`); this module only
  * materialises the normalized target.
  *
- * `/A` is read BEFORE `/Dest` — the spec forbids carrying both, and when a
- * malformed file (or our own retarget patch, which cannot remove a stray
- * `/Dest`) has both, Acrobat gives the action precedence. v2 read dest-first
- * and would have resurrected the stale `/Dest` after every retarget.
+ * ONE truth, two views: the target is projected off the SAME fork action
+ * model the scripting plane reads (`base.actions`) — root classification
+ * via the full `EPDF_ACTION_TYPE_*` vocabulary, payloads via the on-demand
+ * node getters. The classic `FPDFAction_*` surface (5 types, JavaScript-
+ * and Named-blind) is deliberately not consulted; `FPDFLink_GetDest`
+ * remains only for the data-only direct `/Dest`, which is not an action.
+ *
+ * `/A` wins over `/Dest` — the spec forbids carrying both, and when a
+ * malformed file has both, Acrobat gives the action precedence. (Our own
+ * writes can't produce that state: `EPDFAnnot_SetAction` strips `/Dest`.)
  */
 export function readLink(
   fn: PdfFunctions,
@@ -43,61 +52,73 @@ function readLinkTarget(
   annotPtr: Ptr,
   ctx: AnnotationReadContext,
 ): PdfLinkTarget | null {
+  // The activate slot (/A). Root-only read: O(1) native calls, no tree
+  // walk — the chain (/Next) rides base.actions for the orchestrator.
+  const modelPtr = fn.EPDFAnnot_GetActionModel(annotPtr, ANNOT_ACTION_ACTIVATE);
+  if (modelPtr !== NULL_PTR) {
+    try {
+      const root = fn.EPDFAction_GetRootNode(modelPtr);
+      if (isValidActionNodeId(root)) {
+        return readRootTarget(fn, mem, modelPtr, root, ctx);
+      }
+    } finally {
+      fn.EPDFAction_CloseModel(modelPtr);
+    }
+  }
+
+  // No usable /A → the direct `/Dest`, normalized onto `goto`.
   const linkPtr = fn.FPDFAnnot_GetLink(annotPtr);
   if (!linkPtr) return null;
-
-  const actionPtr = fn.FPDFLink_GetAction(linkPtr);
-  if (actionPtr) {
-    const target = readActionTarget(fn, mem, actionPtr, ctx);
-    if (target) return target;
-  }
-
-  // No (readable) action → the direct `/Dest`, normalized onto `goto`.
   const destPtr = fn.FPDFLink_GetDest(ctx.docPtr, linkPtr);
-  if (destPtr) {
-    const destination = readDestination(fn, mem, ctx.docPtr, destPtr);
-    return destination ? { kind: 'goto', destination } : { kind: 'unsupported' };
-  }
-
-  // Neither `/A` nor `/Dest`: a dead link. Legal; reported as-is.
-  return actionPtr ? { kind: 'unsupported' } : null;
+  if (!destPtr) return null; // neither /A nor /Dest: a dead link, reported as-is
+  const destination = readDestination(fn, mem, ctx.docPtr, destPtr);
+  return destination ? { kind: 'goto', destination } : { kind: 'unsupported' };
 }
 
-function readActionTarget(
+/** Classify the root action node and fetch its payload — the projection. */
+function readRootTarget(
   fn: PdfFunctions,
   mem: PdfRuntimeMemory,
-  actionPtr: Ptr,
+  modelPtr: Ptr,
+  node: number,
   ctx: AnnotationReadContext,
-): PdfLinkTarget | null {
-  switch (fn.FPDFAction_GetType(actionPtr)) {
-    case ACTION_GOTO: {
-      const destPtr = fn.FPDFAction_GetDest(ctx.docPtr, actionPtr);
-      if (!destPtr) return { kind: 'unsupported' };
-      const destination = readDestination(fn, mem, ctx.docPtr, destPtr);
+): PdfLinkTarget {
+  switch (actionTypeFromCode(fn.EPDFAction_GetNodeType(modelPtr, node))) {
+    case 'goto': {
+      const destPtr = fn.EPDFAction_GetNodeDest(ctx.docPtr, modelPtr, node);
+      const destination = destPtr ? readDestination(fn, mem, ctx.docPtr, destPtr) : null;
       return destination ? { kind: 'goto', destination } : { kind: 'unsupported' };
     }
-    case ACTION_URI: {
+    case 'uri': {
       const uri = readUtf8String(mem, (buf, capacity) =>
-        fn.FPDFAction_GetURIPath(ctx.docPtr, actionPtr, buf, capacity),
+        fn.EPDFAction_GetNodeURI(ctx.docPtr, modelPtr, node, buf, capacity),
       );
       return uri == null ? { kind: 'unsupported' } : { kind: 'uri', uri };
     }
     // Reported, never followed/executed (and never writable — see the DTO).
-    case ACTION_REMOTEGOTO: {
+    case 'goto-remote': {
       const file = readUtf8String(mem, (buf, capacity) =>
-        fn.FPDFAction_GetFilePath(actionPtr, buf, capacity),
+        fn.EPDFAction_GetNodeFilePath(modelPtr, node, buf, capacity),
       );
       return { kind: 'goto-remote', file: file ?? '' };
     }
-    case ACTION_LAUNCH: {
+    case 'launch': {
       const path = readUtf8String(mem, (buf, capacity) =>
-        fn.FPDFAction_GetFilePath(actionPtr, buf, capacity),
+        fn.EPDFAction_GetNodeFilePath(modelPtr, node, buf, capacity),
       );
       return { kind: 'launch', path: path ?? '' };
     }
+    case 'javascript':
+      // No script payload here by design: the text rides base.actions —
+      // the scripting plane's single home.
+      return { kind: 'javascript' };
+    case 'named': {
+      const name = readUtf8String(mem, (buf, capacity) =>
+        fn.EPDFAction_GetNodeName(modelPtr, node, buf, capacity),
+      );
+      return name == null ? { kind: 'unsupported' } : { kind: 'named', name };
+    }
     default:
-      // Unknown action type: let the caller decide (it reports `unsupported`
-      // unless a direct `/Dest` can still resolve the link).
-      return null;
+      return { kind: 'unsupported' };
   }
 }

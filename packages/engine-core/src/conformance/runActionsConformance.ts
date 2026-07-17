@@ -8,6 +8,9 @@ export interface ActionsConformanceFixtures {
   page: ConformanceFixture;
   annotation: ConformanceFixture;
   field: ConformanceFixture;
+  /** A page whose only annotation is a Link with a `/S /JavaScript` action.
+   *  Optional: the javascript-link classification test skips without it. */
+  javascriptLink?: ConformanceFixture;
 }
 
 export interface ActionsConformanceOptions {
@@ -89,6 +92,28 @@ export function runActionsConformance(
         if (link?.subtype === 'link') {
           expect(link.target?.kind).toBe('uri');
         }
+      } finally {
+        await doc.close();
+      }
+    });
+
+    test('classifies a /S /JavaScript link target, script staying on base.actions', async () => {
+      const fixture = opts.fixtures.javascriptLink;
+      if (!fixture) return; // fixture not provided for this engine flavour
+      const doc = await open(engine, opts, fixture);
+      try {
+        const firstPage = (await doc.pages.list()).pages[0];
+        const snapshot = await doc.page(firstPage.pageObjectNumber).annotations.list();
+        const link = snapshot.annotations.find((annotation) => annotation.subtype === 'link');
+        expect(link?.subtype).toBe('link');
+        if (link?.subtype === 'link') {
+          // The navigation vocabulary classifies (FPDFAction_GetType alone
+          // cannot — it has no JavaScript code)…
+          expect(link.target).toEqual({ kind: 'javascript' });
+        }
+        // …while the script text lives ONLY on the scripting plane's model.
+        expect(link?.actions?.activate?.root?.type).toBe('javascript');
+        expect(link?.actions?.activate?.root?.script ?? '').toMatch(/app\.alert/);
       } finally {
         await doc.close();
       }

@@ -46,6 +46,8 @@ describe('link kind schemas', () => {
       { kind: 'uri', uri: 'https://embedpdf.com' },
       { kind: 'goto-remote', file: 'other.pdf' },
       { kind: 'launch', path: 'app.exe' },
+      { kind: 'javascript' },
+      { kind: 'named', name: 'NextPage' },
       { kind: 'unsupported' },
     ];
     for (const target of arms) {
@@ -53,13 +55,14 @@ describe('link kind schemas', () => {
     }
   });
 
-  test('the WRITABLE union refuses goto-remote and launch', () => {
+  test('the WRITABLE union refuses goto-remote, launch, and javascript', () => {
     expect(PdfLinkTargetWritableSchema.safeParse({ kind: 'launch', path: 'app.exe' }).success).toBe(
       false,
     );
     expect(
       PdfLinkTargetWritableSchema.safeParse({ kind: 'goto-remote', file: 'other.pdf' }).success,
     ).toBe(false);
+    expect(PdfLinkTargetWritableSchema.safeParse({ kind: 'javascript' }).success).toBe(false);
     expect(
       PdfLinkTargetWritableSchema.safeParse({ kind: 'uri', uri: 'mailto:hi@embedpdf.com' }).success,
     ).toBe(true);
@@ -91,17 +94,16 @@ describe('link kind schemas', () => {
     ).toBe(false);
   });
 
-  test('a patch retargets or leaves the target; clearing is not writable', () => {
+  test('a patch retargets, clears (null), or leaves (undefined) three-state', () => {
     const retarget: LinkPatch = {
       subtype: 'link',
       target: { kind: 'goto', destination: { kind: 'xyz', pageObjectNumber: 9, top: 700 } },
     };
+    const clear: LinkPatch = { subtype: 'link', target: null };
     const leave: LinkPatch = { subtype: 'link', rect: RECT };
-    for (const patch of [retarget, leave]) {
+    for (const patch of [retarget, clear, leave]) {
       expect(LinkPatchSchema.safeParse(patch).success).toBe(true);
       expect(AnnotationPatchSchema.safeParse(patch).success).toBe(true);
     }
-    // No removal primitive in the runtime → `null` is rejected, not silently dropped.
-    expect(LinkPatchSchema.safeParse({ subtype: 'link', target: null }).success).toBe(false);
   });
 });

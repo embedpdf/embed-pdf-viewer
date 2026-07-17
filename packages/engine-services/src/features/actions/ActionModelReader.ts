@@ -48,6 +48,22 @@ const WARNING_MALFORMED_NEXT = 0x2;
 const WARNING_INCOMPLETE = 0x4;
 const INVALID_NODE_U32 = 0xffff_ffff;
 
+/** `EPDF_ANNOT_ACTION_ACTIVATE` — the `/A` slot of the per-annotation event
+ *  table (the same table `readAnnotationBase` walks). */
+export const ANNOT_ACTION_ACTIVATE = 0;
+
+/** Decode one `EPDF_ACTION_TYPE_*` code — the shared vocabulary consumers
+ *  (the link-target projection) use so the two surfaces cannot drift. */
+export function actionTypeFromCode(code: number): PdfActionType {
+  return ACTION_TYPE_BY_CODE[code] ?? 'unknown';
+}
+
+/** Is this `EPDFAction_GetRootNode`/`GetNextAt` result a real node id?
+ *  (`EPDF_ACTION_NODE_INVALID` may surface as -1 or u32 max via cwrap.) */
+export function isValidActionNodeId(raw: number): boolean {
+  return raw !== -1 && raw >>> 0 !== INVALID_NODE_U32;
+}
+
 /** Mutable aggregate budget shared by every action model in one read job. */
 export class ActionReadBudgetTracker {
   private models = 0;
