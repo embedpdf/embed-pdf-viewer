@@ -7,6 +7,7 @@ import {
   type AnnotationDTO,
   type AnnotationPatch,
   type AnnotationRef,
+  type AttachmentFileSource,
   type BinarySource,
 } from '@embedpdf/engine-core/runtime';
 import { InteractionToken } from '@embedpdf-x/plugin-interaction';
@@ -63,11 +64,12 @@ import type {
   ChromeSettings,
   SelectionFlags,
   SelectionProps,
-  StampProvider,
-  StampPromptRequest,
+  FilePickerProvider,
+  FilePromptRequest,
   StampToolInput,
   TextItem,
 } from './types';
+import { ICON_PLACE_SIZE, iconPlacementDraft, isIconPlaceKind } from './placement';
 
 /** Fold `zoom`/`rotation` host args into the core's ViewEnv (or none).
  *  `zoom` is the page's RELATIVE zoom (`transform.zoom`) — never the
@@ -105,9 +107,10 @@ export function createAnnotationCapability(
   // is kept so `registerTool` can re-resolve `extends` against the same base pool.
   const configTools = config.tools ?? [];
   const registry = buildToolRegistry(configTools);
-  /** The installed stamp `'prompt'` implementation (a DOM file dialog, wired by
-   *  the framework adapter), or null. See {@link StampProvider}. */
-  let stampProvider: StampProvider | null = null;
+  /** The installed file-picker port (a DOM file dialog, wired by the framework
+   *  adapter), or null — every click-then-pick tool resolves through this ONE
+   *  slot. See {@link FilePickerProvider}. */
+  let filePickerProvider: FilePickerProvider | null = null;
 
   const model = (): Model => ctx.getState().model;
   const chromeSettings = (): ChromeSettings => ctx.getState().chrome;
@@ -440,6 +443,14 @@ export function createAnnotationCapability(
       ctx.dispatch({ type: 'SET_TOOL_GHOST', ghost: { pon, box, rot, kind: 'image' } });
       return;
     }
+    // Icon kinds: the fixed 20×20 footprint under the cursor — the SAME box
+    // the click's placement uses (fit + clamp), painted as a vector ghost.
+    if (isIconPlaceKind(tool.subtype)) {
+      const rot = uprightRotFor(displayRotation);
+      const box = fitStampBox(point, ICON_PLACE_SIZE, page, rot);
+      dispatchVectorGhost(pon, toolId, { t: 'rect', rect: box, ellipse: false });
+      return;
+    }
     // A click-create tool: the SHARED placement layer resolves where the click
     // would land (same call the core's commit makes — preview ≡ commit by
     // construction), and the annotation-only conversion paints it as a vector
@@ -534,7 +545,11 @@ export function createAnnotationCapability(
       })
       .then(
         // A stamp has no vector render — the engine-baked /AP IS the visual.
-        (res) => syncDTO(res.created, 'baked'),
+        // Every placement selects its result (the anchor for menus/editing).
+        (res) => {
+          syncDTO(res.created, 'baked');
+          apply({ t: 'select', ids: [refKey(res.created.ref)] });
+        },
         (err) => console.error('[annotation] stamp placement failed:', err),
       );
     return true;
@@ -599,22 +614,110 @@ export function createAnnotationCapability(
       void placeStampSource(pon, point, spec.source, rotCW);
       return true;
     }
-    // kind === 'prompt' — needs the environment. No provider installed → decline
-    // (let a lower-priority handler act) rather than swallow the click.
-    const provider = stampProvider;
+    // kind === 'prompt' — needs the environment: the ONE file-picker port.
+    return promptFileAt(
+      tool,
+      pon,
+      point,
+      (picked) => void placeStampSource(pon, point, picked.data, rotCW),
+    );
+  };
+
+  /**
+   * Run the installed file-picker port for a click-then-pick tool, with the
+   * shared expiry rule: the placement is dropped if the picker cancels, or if
+   * the document or the active tool changed while it was open (the intent
+   * expired with the click). No provider installed → decline the click (let a
+   * lower-priority handler act) rather than swallow it.
+   */
+  const promptFileAt = (
+    tool: ResolvedTool,
+    pon: number,
+    point: Vec,
+    place: (picked: AttachmentFileSource) => void,
+  ): boolean => {
+    const provider = filePickerProvider;
     if (!provider) return false;
-    const req: StampPromptRequest = { toolId: tool.id, pon, point };
+    const spec = tool.source;
+    const req: FilePromptRequest = {
+      toolId: tool.id,
+      subtype: tool.subtype,
+      accept: spec?.kind === 'prompt' ? spec.accept : undefined,
+      pon,
+      point,
+    };
     const docAtClick = ctx.doc;
     provider(req).then(
-      (bytes) => {
-        if (!bytes) return; // cancelled
+      (picked) => {
+        if (!picked) return; // cancelled
         if (ctx.doc !== docAtClick) return; // document changed underneath
         if (ctx.tryGet(InteractionToken)?.activeToolId() !== tool.id) return; // tool changed
-        void placeStampSource(pon, point, bytes, rotCW);
+        place(picked);
       },
-      (err) => console.error('[annotation] stamp provider failed:', err),
+      (err) => console.error('[annotation] file-picker provider failed:', err),
     );
     return true;
+  };
+
+  /** Place a fixed-size ICON annotation (note / file attachment) centred on a
+   *  content point — the icon-kind sibling of {@link createStampAt}. The
+   *  engine bakes the 20×20 /AP from /C + /Name; a successful create selects
+   *  the new annotation (the anchor for its menu / future comment popup). */
+  const createIconAt = (
+    tool: ResolvedTool,
+    pon: number,
+    point: Vec,
+    rotCW: number,
+    file: AttachmentFileSource | null,
+  ): boolean => {
+    const doc = ctx.doc;
+    const crop = cropOf(pon);
+    if (!doc || !crop || !isIconPlaceKind(tool.subtype)) return false;
+    const page = { width: crop.right - crop.left, height: crop.top - crop.bottom };
+    const box: Rect = fitStampBox(point, ICON_PLACE_SIZE, page, rotCW);
+    const draft = iconPlacementDraft(
+      tool.subtype,
+      boxGeomFields(box, rotCW, crop),
+      defaultsFor(model(), tool.preset),
+      tool.flags,
+      file,
+    );
+    doc
+      .page(pon)
+      .annotations.create(draft)
+      .then(
+        (res) => {
+          syncDTO(res.created, 'baked');
+          apply({ t: 'select', ids: [refKey(res.created.ref)] });
+        },
+        (err) => console.error('[annotation] icon placement failed:', err),
+      );
+    return true;
+  };
+
+  /**
+   * The ONE click-to-place entry the place handler forwards every down to —
+   * armed payload first, then the active tool's kind decides:
+   *   - stamp        → the source spec (fixed bytes, or the file-picker port)
+   *   - note (text)  → place immediately (no payload)
+   *   - attachment   → spot first, file second: the file-picker port opens
+   *                    inside the click gesture, and placement lands when it
+   *                    resolves (dropped on cancel, or if the tool/document
+   *                    changed while the picker was open).
+   * Returns whether the click was consumed.
+   */
+  const placeAt = (pon: number, point: Vec, displayRotation?: number): boolean => {
+    if (placeArmedStamp(pon, point, displayRotation)) return true;
+    const ix = ctx.tryGet(InteractionToken);
+    const tool = ix ? registry.get(ix.activeToolId()) : undefined;
+    if (!tool) return false;
+    if (tool.subtype === 'stamp') return requestStampAt(pon, point, displayRotation);
+    if (!isIconPlaceKind(tool.subtype)) return false;
+    const rotCW = tool.upright && displayRotation ? uprightRotation(displayRotation) : 0;
+    if (tool.subtype === 'text') return createIconAt(tool, pon, point, rotCW, null);
+    return promptFileAt(tool, pon, point, (picked) =>
+      createIconAt(tool, pon, point, rotCW, picked),
+    );
   };
 
   /** The page a ref lives on: from the loaded model first (covers obj/nm refs
@@ -850,6 +953,7 @@ export function createAnnotationCapability(
     disarmStamp,
     placeArmedStamp,
     requestStampAt,
+    placeAt,
     hasArmedStamp: () => armedStamp != null,
     ghostHoverAt,
     clearGhost,
@@ -861,8 +965,19 @@ export function createAnnotationCapability(
     },
     armedStampPreview: () => armedStamp?.preview ?? null,
     stampArmEpoch: () => ctx.getState().stampArmEpoch,
-    setStampProvider: (provider) => {
-      stampProvider = provider;
+    setFilePickerProvider: (provider) => {
+      filePickerProvider = provider;
+    },
+    downloadAttachment: async (ref) => {
+      const doc = ctx.doc;
+      if (!doc) throw new Error('[annotation] no document bound');
+      const pon = ponForRef(ref);
+      if (pon == null) throw new Error('[annotation] cannot resolve page for ref');
+      const annotations = doc.page(pon).annotations;
+      if (!annotations.downloadFile) {
+        throw new Error('[annotation] this engine does not support attachment download');
+      }
+      return annotations.downloadFile(ref);
     },
     // ── tool registry ──
     tools: () => [...registry.values()],

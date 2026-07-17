@@ -65,6 +65,7 @@ export const es: Locale = {
         insertText: 'Insertar texto',
         replaceText: 'Reemplazar texto',
         callout: 'Llamada',
+        note: 'Comentario',
         delete: 'Eliminar',
         group: 'Agrupar',
         ungroup: 'Desagrupar',
@@ -78,7 +79,12 @@ export const es: Locale = {
         polygon: 'Polígono',
         polyline: 'Polilínea',
       },
-      insert: { stamp: 'Sello', signature: 'Firma', image: 'Imagen' },
+      insert: {
+        attachment: 'Adjuntar archivo',
+        stamp: 'Sello',
+        signature: 'Firma',
+        image: 'Imagen',
+      },
       form: {
         textfield: 'Campo de texto',
         checkbox: 'Casilla',

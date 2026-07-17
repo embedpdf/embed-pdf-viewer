@@ -38,6 +38,7 @@ export type {
 export { runPageRotateConformance } from './conformance/runPageRotateConformance';
 export { runPageDeleteConformance } from './conformance/runPageDeleteConformance';
 export { runPageFlattenConformance } from './conformance/runPageFlattenConformance';
+export { runRedactionApplyConformance } from './conformance/runRedactionApplyConformance';
 export { runPageExtractConformance } from './conformance/runPageExtractConformance';
 export { runAttachmentConformance } from './conformance/runAttachmentConformance';
 export { runPageInsertConformance } from './conformance/runPageInsertConformance';

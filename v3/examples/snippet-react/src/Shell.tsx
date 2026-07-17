@@ -23,7 +23,7 @@ import { Stage } from '@embedpdf-x/react/stage';
 import { Scrollbar } from '@embedpdf-x/react/scrollbar';
 import { RenderLayer } from '@embedpdf-x/react/render';
 import { SelectionLayer } from '@embedpdf-x/react/selection';
-import { AnnotationLayer, useStampProvider } from '@embedpdf-x/react/annotation';
+import { AnnotationLayer, useFilePickerProvider } from '@embedpdf-x/react/annotation';
 import type { AnnotationRenderer } from '@embedpdf-x/react/annotation';
 import { formWidgetRenderer, useFormScriptingProvider } from '@embedpdf-x/react/form';
 import { SearchLayer } from '@embedpdf-x/react/search';
@@ -75,10 +75,11 @@ function OpeningDocuments() {
 
 export function Shell() {
   useCommandShortcuts();
-  // Stamp tool → click a page → file dialog opens → image lands where you clicked.
-  // One line: the default provider is the built-in file picker (swap it for a
-  // custom picker, or pass null to disable). The plugin stays DOM-free.
-  useStampProvider();
+  // Click-then-pick tools (stamp, file attachment) → click a page → file dialog
+  // opens → the file lands where you clicked. One line: the default provider is
+  // the built-in file picker honouring each tool's `accept` filter (swap it for
+  // a custom picker, or pass null to disable). The plugin stays DOM-free.
+  useFilePickerProvider();
   // Form scripts stay inside the isolated form pipeline; this hook fulfils the
   // resulting alert, page-navigation, and print UI requests in the React shell.
   useFormScriptingProvider();

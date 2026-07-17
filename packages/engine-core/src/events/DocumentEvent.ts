@@ -23,6 +23,7 @@ import type {
 import type { MetadataUpdateResult } from '../mutation/MetadataUpdateResult';
 import type { PageDeleteResult } from '../mutation/PageDeleteResult';
 import type { PageFlattenResult, PageFlattenUsage } from '../mutation/PageFlattenResult';
+import type { RedactionApplyResult } from '../mutation/RedactionApplyResult';
 import type { PageInsertResult } from '../mutation/PageInsertResult';
 import type { PageMoveResult } from '../mutation/PageMoveResult';
 import type { PageRotateResult } from '../mutation/PageRotateResult';
@@ -140,7 +141,11 @@ export type DocumentEvent =
       pageObjectNumbers: PageObjectNumber[];
       usage: PageFlattenUsage;
       origin: EventOrigin;
-    } & PageFlattenResult);
+    } & PageFlattenResult)
+  | ({
+      type: 'redaction.applied';
+      origin: EventOrigin;
+    } & RedactionApplyResult);
 
 export type DocumentEventType = DocumentEvent['type'];
 

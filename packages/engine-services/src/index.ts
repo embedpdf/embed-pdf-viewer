@@ -49,6 +49,7 @@ export type { PageRecord } from './document-session/pages/PageRecord';
 // Tier 3: features
 export * from './features/metadata';
 export * from './features/pages';
+export * from './features/redaction';
 export * from './features/text';
 export * from './features/geometry';
 export * from './features/render';

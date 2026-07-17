@@ -40,6 +40,8 @@ import {
   type PageDeleteResult,
   type PageFlattenResult,
   type PageFlattenUsage,
+  type RedactionApplyResult,
+  type RedactionApplyScope,
   type PageListSnapshot,
   type PageMoveResult,
   type PageObjectNumber,
@@ -661,6 +663,61 @@ export class LayerService {
         if (payload.result.meta === null) return payload.result;
         return this.persistPageFlatten(ctx, input.docId, input.layerName, layer, {
           result: payload.result as PageFlattenResult & { meta: MutationMeta },
+          artifact: requireLayerArtifact(payload as unknown),
+        });
+      });
+    });
+  }
+
+  async applyRedactions(
+    ctx: LayerWriteContext,
+    input: {
+      docId: string;
+      layerName: string;
+      scope: RedactionApplyScope;
+    },
+    signal?: AbortSignal,
+  ): Promise<RedactionApplyResult> {
+    return this.enqueueLayerWrite(ctx, input.docId, input.layerName, async () => {
+      const { layer } = await this.prepareLayerMutation(ctx, input.docId, input.layerName);
+      // Apply removes annotations from /Annots. Protect weak index editors
+      // before the worker can shift any target page's index space — the same
+      // guard flatten takes, over every page the scope can touch.
+      const targetPages =
+        input.scope.kind === 'pages'
+          ? input.scope.pageObjectNumbers
+          : [...new Set(input.scope.refs.map((ref) => ref.pageObjectNumber))];
+      for (const pageObjectNumber of targetPages) {
+        await this.assertWeakAnnotationStructuralEditAllowed(ctx, {
+          docId: input.docId,
+          layerName: input.layerName,
+          layer,
+          pageObjectNumber,
+        });
+      }
+      return this.withTempWorkerFile('layer-artifact', 'artifact.layer', async (artifactPath) => {
+        const payload = await this.requirePool().run(
+          input.docId,
+          (jobId) =>
+            wirePack({
+              kind: 'redaction.apply' as const,
+              jobId,
+              docId: input.docId,
+              layerName: input.layerName,
+              scope: input.scope,
+              artifactPath,
+            }),
+          signal,
+        );
+        if (payload.tag !== 'redaction.apply') {
+          throw new EngineError(
+            EngineErrorCode.WireFormat,
+            `unexpected redaction.apply payload: ${payload.tag}`,
+          );
+        }
+        if (payload.result.meta === null) return payload.result;
+        return this.persistRedactionApply(ctx, input.docId, input.layerName, layer, {
+          result: payload.result as RedactionApplyResult & { meta: MutationMeta },
           artifact: requireLayerArtifact(payload as unknown),
         });
       });
@@ -1582,6 +1639,34 @@ export class LayerService {
     return committed.result;
   }
 
+  private async persistRedactionApply(
+    ctx: LayerWriteContext,
+    docId: string,
+    layerName: string,
+    layer: LayerRow,
+    input: {
+      result: RedactionApplyResult & { meta: MutationMeta };
+      artifact: LayerArtifactInput;
+    },
+  ): Promise<RedactionApplyResult> {
+    const nextVersion = layer.currentVersion + 1;
+    const artifactKey = StorageKeys.layerArtifact(ctx.tenantId, docId, layerName, nextVersion);
+    const uploaded = await this.uploadLayerArtifact(artifactKey, input.artifact);
+    const committed = await this.commitRedactionApply({
+      ctx,
+      docId,
+      layerName,
+      layer,
+      raw: input.result,
+      artifactKey,
+      artifactSha: uploaded.sha256,
+      artifactSize: uploaded.size,
+      nextVersion,
+    });
+    this.publishMutation(ctx, docId, committed.auditId);
+    return committed.result;
+  }
+
   private async persistPageDelete(
     ctx: LayerWriteContext,
     docId: string,
@@ -2242,6 +2327,122 @@ export class LayerService {
           auditId,
           now,
         );
+        for (const page of nextPages) {
+          await trx
+            .updateTable('layer_pages')
+            .set({
+              content_version: page.contentVersion,
+              annotation_version: page.annotationVersion,
+              annotation_generation: page.annotationGeneration,
+              has_weak_annotations: page.hasWeakAnnotations ? 1 : 0,
+              updated_at: now,
+            })
+            .where('layer_id', '=', input.layer.id)
+            .where('page_object_number', '=', page.pageObjectNumber)
+            .execute();
+        }
+
+        return { result, auditId };
+      });
+  }
+
+  private async commitRedactionApply(input: {
+    ctx: LayerWriteContext;
+    docId: string;
+    layerName: string;
+    layer: LayerRow;
+    raw: RedactionApplyResult & { meta: MutationMeta };
+    artifactKey: string;
+    artifactSha: string;
+    artifactSize: number;
+    nextVersion: number;
+  }): Promise<{ result: RedactionApplyResult; auditId: number }> {
+    return this.requireDb()
+      .transaction()
+      .execute(async (trx) => {
+        const now = Date.now();
+        const currentLayer = await this.requireUnchangedLayer(trx, input.layer);
+        const weakStateByPage = new Map(
+          input.raw.meta.affectedPages.map((page) => [
+            page.pageObjectNumber,
+            page.weakAnnotationState,
+          ]),
+        );
+        const affected = [...weakStateByPage.keys()];
+        if (affected.length === 0) {
+          throw new EngineError(
+            EngineErrorCode.WireFormat,
+            'redaction.apply returned mutation metadata without an affected page',
+          );
+        }
+
+        // Content is destroyed and annotations are removed together, so
+        // both version pins bump — identical to flatten.
+        const nextPages: DurablePageRow[] = [];
+        for (const pageObjectNumber of affected) {
+          const row = await trx
+            .selectFrom('layer_pages')
+            .selectAll()
+            .where('layer_id', '=', input.layer.id)
+            .where('page_object_number', '=', pageObjectNumber)
+            .executeTakeFirst();
+          if (!row) {
+            throw new EngineError(
+              EngineErrorCode.WireFormat,
+              `redaction.apply reported unknown page object number ${pageObjectNumber}`,
+            );
+          }
+          const weakState = weakStateByPage.get(pageObjectNumber);
+          nextPages.push({
+            pageObjectNumber,
+            contentVersion: Number(row.content_version) + 1,
+            annotationVersion: Number(row.annotation_version) + 1,
+            annotationGeneration: Number(row.annotation_generation) + 1,
+            hasWeakAnnotations:
+              weakState?.kind === 'known'
+                ? weakState.hasAnyWeakAnnotations
+                : Boolean(row.has_weak_annotations),
+            updatedAt: now,
+          });
+        }
+
+        const previousLayerDocVersion = Number(currentLayer.doc_version);
+        const layerDocVersion = previousLayerDocVersion + 1;
+        const result: RedactionApplyResult = {
+          ...input.raw,
+          meta: {
+            ...input.raw.meta,
+            affectedPages: nextPages.map((page) =>
+              this.layerState.decorateLayerPageState(input.docId, input.layerName, page),
+            ),
+            cacheDelta: this.layerState.buildCacheDelta({
+              docId: input.docId,
+              layerName: input.layerName,
+              previousDocVersion: previousLayerDocVersion,
+              docVersion: layerDocVersion,
+              pages: nextPages,
+            }),
+          },
+        };
+
+        const auditEvent = makeAuditEvent({
+          ctx: input.ctx,
+          docId: input.docId,
+          layer: input.layer,
+          layerName: input.layerName,
+          kind: 'redaction.apply',
+          pageObjectNumber: null,
+          affectedPages: affected,
+          artifactVersion: input.nextVersion,
+          artifactKey: input.artifactKey,
+          artifactSha: input.artifactSha,
+          artifactSize: input.artifactSize,
+          payload: result,
+          ts: now,
+        });
+        const auditId = (await this.eventLog?.appendDb(trx, auditEvent)) ?? 0;
+
+        await this.writeLayerAdvance(trx, input, { doc_version: layerDocVersion }, auditId, now);
         for (const page of nextPages) {
           await trx
             .updateTable('layer_pages')

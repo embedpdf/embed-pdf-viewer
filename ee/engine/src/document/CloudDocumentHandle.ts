@@ -13,6 +13,7 @@ import {
   type DocumentFormsService,
   type DocumentHandle,
   type DocumentPagesService,
+  type DocumentRedactionService,
   type DocumentSecurityService,
   type MetadataCache,
   type MutationMeta,
@@ -36,6 +37,7 @@ import { CloudDocumentAnnotationsService } from './CloudDocumentAnnotationsServi
 import { CloudDocumentAttachmentsService } from './CloudDocumentAttachmentsService';
 import { CloudDocumentFormsService } from './CloudDocumentFormsService';
 import { CloudDocumentPagesService } from './CloudDocumentPagesService';
+import { CloudDocumentRedactionService } from './CloudDocumentRedactionService';
 import { CloudDocumentSearchService } from './CloudDocumentSearchService';
 import { CloudDocumentSecurityService } from './CloudDocumentSecurityService';
 import { CloudMetadataService } from './CloudMetadataService';
@@ -83,6 +85,7 @@ export class CloudDocumentHandle implements DocumentHandle {
   readonly forms: DocumentFormsService;
   readonly search: CloudDocumentSearchService;
   readonly pages: DocumentPagesService;
+  readonly redaction: DocumentRedactionService;
   readonly security: DocumentSecurityService;
   readonly events: DocumentEventStream;
   private readonly publisher: SessionEventPublisher;
@@ -215,6 +218,14 @@ export class CloudDocumentHandle implements DocumentHandle {
       this.manifestAccessor,
     );
     this.pages = new CloudDocumentPagesService(
+      http,
+      id,
+      layerName,
+      () => this.closed,
+      this.manifestAccessor,
+      this.publisher,
+    );
+    this.redaction = new CloudDocumentRedactionService(
       http,
       id,
       layerName,

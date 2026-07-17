@@ -3,6 +3,7 @@ import type { DocumentAnnotationsService } from './DocumentAnnotationsService';
 import type { DocumentAttachmentsService } from './DocumentAttachmentsService';
 import type { DocumentFormsService } from './DocumentFormsService';
 import type { DocumentPagesService } from './DocumentPagesService';
+import type { DocumentRedactionService } from './DocumentRedactionService';
 import type { DocumentSearchService } from './DocumentSearchService';
 import type { DocumentSecurityService } from './DocumentSecurityService';
 import type { MetadataService } from './MetadataService';
@@ -53,6 +54,12 @@ export interface DocumentHandle {
    * Per-page reads/writes still live on `page(pon).annotations`.
    */
   readonly pages: DocumentPagesService;
+  /**
+   * Destructive redaction apply (the second stage of the two-stage model;
+   * marking rides the normal annotation verbs). Optional while engines
+   * ship it — feature-detect with `doc.redaction !== undefined`.
+   */
+  readonly redaction?: DocumentRedactionService;
   /**
    * The document's event stream — every confirmed mutation, exactly once,
    * identical shape on local and cloud engines (see `DocumentEvent`). The

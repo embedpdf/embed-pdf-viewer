@@ -9,6 +9,7 @@ import {
   type DocumentEventStream,
   type DocumentHandle,
   type DocumentPagesService,
+  type DocumentRedactionService,
   type DocumentSecurityProbeInfo,
   type DocumentSecurityService,
   type MetadataService,
@@ -25,6 +26,7 @@ import { LocalDocumentAnnotationsService } from './LocalDocumentAnnotationsServi
 import { LocalDocumentAttachmentsService } from './LocalDocumentAttachmentsService';
 import { LocalDocumentFormsService } from './LocalDocumentFormsService';
 import { LocalDocumentPagesService } from './LocalDocumentPagesService';
+import { LocalDocumentRedactionService } from './LocalDocumentRedactionService';
 import { LocalDocumentSearchService } from './LocalDocumentSearchService';
 import { LocalDocumentSecurityService } from './LocalDocumentSecurityService';
 import { LocalMetadataService } from './LocalMetadataService';
@@ -47,6 +49,7 @@ export class LocalDocumentHandle implements DocumentHandle {
   readonly forms: LocalDocumentFormsService;
   readonly search: LocalDocumentSearchService;
   readonly pages: DocumentPagesService;
+  readonly redaction: DocumentRedactionService;
   readonly security: DocumentSecurityService;
   readonly events: DocumentEventStream;
   private readonly publisher: SessionEventPublisher;
@@ -76,6 +79,7 @@ export class LocalDocumentHandle implements DocumentHandle {
     this.forms = new LocalDocumentFormsService(id, queue, view, guard, this.publisher);
     this.search = new LocalDocumentSearchService(id, queue, view, guard);
     this.pages = new LocalDocumentPagesService(id, queue, view, guard, this.publisher);
+    this.redaction = new LocalDocumentRedactionService(id, queue, view, guard, this.publisher);
   }
 
   /**

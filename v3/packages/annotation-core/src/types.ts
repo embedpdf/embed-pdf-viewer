@@ -59,6 +59,8 @@ export type Subtype =
   | 'caret'
   | 'ink'
   | 'stamp'
+  | 'text'
+  | 'file-attachment'
   | (string & {});
 
 /**
@@ -156,6 +158,13 @@ export interface TextStyle {
 export interface AnnotationProps extends Style, TextStyle {
   /** `/LE` endings (line / polyline). */
   lineEndings: LineEndings;
+  /**
+   * `/Name` icon of an icon kind (text note, file attachment). Optional in
+   * the bag — each kind falls back to its own spec default ('comment',
+   * 'paperclip') at creation, so one flat vocabulary needs no per-kind base
+   * value. Valid values are the `options` of the kind's `icon` PropSpec.
+   */
+  icon?: string;
 }
 
 export type PropKey = keyof AnnotationProps;
@@ -176,6 +185,9 @@ export interface Annot {
   /** Text styling — present only for text-editable kinds (free text). Like
    *  `style`, a content-space projection of `data`, editable via `setProps`. */
   text?: TextStyle;
+  /** `/Name` icon — present only for icon kinds (text note, file attachment).
+   *  Like `style`, a projection of `data`, editable via `setProps`. */
+  icon?: string;
   /**
    * The `/F` annotation flags, verbatim from the DTO (freshly drawn annotations
    * start at {@link DRAWN_FLAGS} — `print` set). NEVER read individual keys to

@@ -21,6 +21,8 @@ import type {
   PolygonPatch,
   PolylineDraft,
   PolylinePatch,
+  RedactDraft,
+  RedactPatch,
   StampWireDraft,
   StampWirePatch,
   TextDraft,
@@ -46,6 +48,7 @@ import {
 import { applyInkDraft, applyInkPatch, isInkSubtype } from './writeInkAnnotation';
 import { applyLineDraft, applyLinePatch, isLineSubtype } from './writeLineAnnotation';
 import { applyLinkDraft, applyLinkPatch, isLinkSubtype } from './writeLinkAnnotation';
+import { applyRedactDraft, applyRedactPatch, isRedactSubtype } from './writeRedactAnnotation';
 import {
   applyShapeDraft,
   applyShapePatch,
@@ -162,6 +165,10 @@ export function applyDraft(
     applyWidgetDraft(fn, mem, annotPtr, draft as WidgetDraft);
     return;
   }
+  if (isRedactSubtype(draft.subtype)) {
+    applyRedactDraft(fn, mem, annotPtr, draft as RedactDraft, ctx);
+    return;
+  }
   // Should be unreachable: AnnotationDraft is the closed union of writable
   // subtypes (which today is exactly the four text-markup kinds — the
   // unsupported kind has Draft = never). The check is here so a future
@@ -230,6 +237,10 @@ export function applyPatch(
   }
   if (isWidgetSubtype(patch.subtype)) {
     applyWidgetPatch(fn, mem, annotPtr, patch as WidgetPatch);
+    return;
+  }
+  if (isRedactSubtype(patch.subtype)) {
+    applyRedactPatch(fn, mem, annotPtr, patch as RedactPatch, ctx);
     return;
   }
   throw new EngineError(

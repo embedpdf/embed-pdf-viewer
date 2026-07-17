@@ -50,6 +50,7 @@ import {
   type AttachmentsDeleteWorkerRequest,
   type AnnotationsReadFileWorkerRequest,
   type PagesFlattenWorkerRequest,
+  type RedactionApplyWorkerRequest,
   type PieceInfoApplicationsWorkerRequest,
   type PieceInfoClearWorkerRequest,
   type PieceInfoReadWorkerRequest,
@@ -95,6 +96,7 @@ import {
   PagesReader,
 } from '../features/pages';
 import { PieceInfoAccessor } from '../features/pieceinfo';
+import { RedactionApplier } from '../features/redaction';
 import { PageRenderReader } from '../features/render';
 import { DocumentSaver } from '../features/save';
 import { SearchReader } from '../features/search';
@@ -259,6 +261,9 @@ export class WorkerHost {
           break;
         case 'pages.flatten':
           resultPack = this.handlePagesFlatten(msg, ctrl.signal);
+          break;
+        case 'redaction.apply':
+          resultPack = this.handleRedactionApply(msg, ctrl.signal);
           break;
         case 'pages.extract':
           resultPack = this.handlePagesExtract(msg, ctrl.signal);
@@ -567,6 +572,16 @@ export class WorkerHost {
     );
     if (result.meta === null) return wirePack({ tag: 'pages.flatten', result });
     return this.finishMutation(session, { tag: 'pages.flatten', result }, req.artifactPath);
+  }
+
+  private handleRedactionApply(
+    req: RedactionApplyWorkerRequest,
+    signal: AbortSignal,
+  ): WirePack<WorkerResultPayload> {
+    const session = this.requireSession(req);
+    const result = new RedactionApplier(this.runtime, session).apply(req.scope, signal);
+    if (result.meta === null) return wirePack({ tag: 'redaction.apply', result });
+    return this.finishMutation(session, { tag: 'redaction.apply', result }, req.artifactPath);
   }
 
   private handlePagesExtract(
@@ -1043,8 +1058,14 @@ export class WorkerHost {
     // Every successful mutation funnels through here; the sequence bump
     // invalidates version-keyed caches (the forms model). Forms mutators
     // bump themselves before reading back, so their tags are skipped to
-    // avoid rebuilding the model cache twice per write.
-    if (!payload.tag.startsWith('forms.') && payload.tag !== 'pages.flatten') {
+    // avoid rebuilding the model cache twice per write — as do the
+    // flattener and redaction applier, which note the mutation before
+    // their post-apply annotation re-read.
+    if (
+      !payload.tag.startsWith('forms.') &&
+      payload.tag !== 'pages.flatten' &&
+      payload.tag !== 'redaction.apply'
+    ) {
       session.noteMutation();
     }
     if (session.kind !== 'layer') {

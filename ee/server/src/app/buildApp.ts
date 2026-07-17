@@ -36,6 +36,7 @@ import { registerAttachmentRoutes } from '../routes/attachments';
 import { registerFormRoutes } from '../routes/forms';
 import { registerMetadataRoutes } from '../routes/metadata';
 import { registerPageRoutes } from '../routes/pages';
+import { registerRedactionRoutes } from '../routes/redactions';
 import { registerSearchRoutes } from '../routes/search';
 import { registerAdminDocumentsRoutes } from '../routes/admin/documents';
 import { registerAdminTokensRoutes } from '../routes/admin/tokens';
@@ -424,6 +425,7 @@ export async function buildApp(opts: BuildAppOptions): Promise<AppBundle> {
         pool,
         imageEncoder: new SharpImageEncoder(),
       });
+      await registerRedactionRoutes(app, { documentService, layerService });
       await registerEventsRoutes(app, {
         db: opts.db,
         documentService,

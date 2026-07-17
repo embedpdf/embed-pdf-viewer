@@ -28,10 +28,21 @@ import type { BinarySource, InkIntent } from '@embedpdf/engine-core/runtime';
  * source:
  *   - `{ kind: 'bytes' }` — fixed bytes: a company rubber-stamp.
  *   - `{ kind: 'prompt' }` — ask the environment for bytes. The plugin does NOT
- *     know how (a file dialog is DOM); a {@link StampProvider} port, installed by
- *     the framework adapter, fulfils it. Resolve `null` there to cancel.
+ *     know how (a file dialog is DOM); the file-picker port (`FilePickerProvider`),
+ *     installed by the framework adapter, fulfils it. Resolve `null` there to cancel.
  */
-export type StampSourceSpec = { kind: 'bytes'; source: BinarySource } | { kind: 'prompt' };
+export type StampSourceSpec = { kind: 'bytes'; source: BinarySource } | PromptSourceSpec;
+
+/**
+ * The ask-the-environment resolution, shared by every click-then-pick tool
+ * (a stamp's `'prompt'` source, the file-attachment tool). `accept` is the
+ * file-dialog filter the picker request carries — a UX hint only, the engine
+ * sniffs/validates the bytes for real. Unset = any file.
+ */
+export interface PromptSourceSpec {
+  kind: 'prompt';
+  accept?: string;
+}
 
 /** Declarative result of committing a text selection while a tool is active. */
 export type SelectionAuthoring =
@@ -101,6 +112,8 @@ export const TOOL_DEFAULT_KEYS = {
   squiggly: ['color', 'opacity', 'blendMode'],
   caret: ['color', 'opacity'],
   stamp: [],
+  text: ['icon', 'color', 'opacity'],
+  'file-attachment': ['icon', 'color', 'opacity'],
   // Widget CLIENT kinds (the form plugin's palette tools): the same key sets
   // the kind table declares — box styling for every family, /DA text styling
   // for the text-bearing ones. The engine maps them onto /MK //BS //DA //Q.
@@ -174,8 +187,17 @@ export interface AnnotationToolDef<K extends ToolAuthoringKind = ToolAuthoringKi
   cursor?: string;
   /** Interaction capability tags this tool enables (which handlers wake up). */
   enables?: string[];
-  /** Stamp-family only: how the click-to-place source resolves ({@link StampSourceSpec}). */
-  source?: StampSourceSpec;
+  /**
+   * How the click-to-place payload resolves. Stamps take the full spec
+   * ({@link StampSourceSpec}: fixed bytes or prompt); file attachments are
+   * prompt-only ({@link PromptSourceSpec} — the file always comes from the
+   * environment). Other kinds carry no payload.
+   */
+  source?: K extends 'stamp'
+    ? StampSourceSpec
+    : K extends 'file-attachment'
+      ? PromptSourceSpec
+      : never;
   /** What a committed text selection authors. Omit for pointer/click tools. */
   selection?: SelectionAuthoring;
   /** PDF `/IT` authored by an intent-bearing ink preset. */
@@ -228,6 +250,8 @@ export interface BuiltinToolKindMap {
   'insert-text': 'caret';
   'replace-text': 'strikeout';
   stamp: 'stamp';
+  note: 'text';
+  attachment: 'file-attachment';
 }
 
 type DirectToolDef = {
@@ -435,14 +459,44 @@ export const DEFAULT_TOOLS: AnnotationToolInput[] = [
     defaults: { color: '#ef4444' },
     selection: { kind: 'text-edit', operation: 'replace' },
   },
-  // stamp — click-to-place; 'prompt' asks the environment (the React adapter wires
-  // a file dialog by default; an embedder can pass fixed bytes instead).
+  // stamp — click-to-place; 'prompt' asks the environment through the ONE
+  // file-picker port (the React adapter wires a file dialog by default; an
+  // embedder can pass fixed bytes instead). `accept` narrows the dialog to
+  // what the engine's stamp sniffer takes anyway.
   {
     id: 'stamp',
     subtype: 'stamp',
     cursor: 'copy',
-    enables: ['annotation-stamp', 'annotation-edit'],
+    enables: ['annotation-place', 'annotation-edit'],
+    source: { kind: 'prompt', accept: 'image/png,image/jpeg,application/pdf' },
+    upright: true,
+    ghost: { mode: 'footprint' },
+  },
+  // sticky note ("comment") — click-to-place, no payload: each click drops a
+  // fixed 20×20 icon (engine-baked /AP from /C + /Name), screen-sized and
+  // upright per the spec's Text-icon rule (the noZoom/noRotate seed).
+  {
+    id: 'note',
+    subtype: 'text',
+    cursor: 'crosshair',
+    enables: ['annotation-place', 'annotation-edit'],
+    defaults: { icon: 'comment', color: '#facc15' },
+    flags: { noZoom: true, noRotate: true },
+    upright: true,
+    ghost: { mode: 'footprint' },
+  },
+  // file attachment — click-to-place with the spot-first-file-second rule:
+  // the click opens the installed file-picker port (a file dialog by
+  // default; `accept` unset = any file — attaching any format is the point);
+  // the picked file embeds at the clicked point.
+  {
+    id: 'attachment',
+    subtype: 'file-attachment',
+    cursor: 'copy',
+    enables: ['annotation-place', 'annotation-edit'],
     source: { kind: 'prompt' },
+    defaults: { icon: 'paperclip', color: '#facc15' },
+    flags: { noZoom: true, noRotate: true },
     upright: true,
     ghost: { mode: 'footprint' },
   },

@@ -15,6 +15,7 @@ import type {
   LinkDraft,
   PolygonDraft,
   PolylineDraft,
+  RedactDraft,
   SquareDraft,
   StrikeoutDraft,
 } from '../annotation/kinds';
@@ -541,6 +542,129 @@ export function runAnnotationMutationConformance(
           before.pageState.revision.generation,
         );
         expect(result.meta.weakRefsInvalidated).toBe(false);
+      } finally {
+        await doc.close();
+      }
+    });
+
+    test('create redact (area + text) round-trips label + colour fields', async () => {
+      const doc = await openFixture(engine, opts);
+      try {
+        const page = doc.page(fix.pageObjectNumber);
+
+        // Area redaction (no quads: /Rect is the removal region) with a
+        // fully-styled label.
+        const areaDraft: RedactDraft = {
+          subtype: 'redact',
+          contents: 'mutation conformance: area redact',
+          rect: shapeRect,
+          color: { r: 228, g: 66, b: 52 },
+          opacity: 1,
+          interiorColor: { r: 0, g: 0, b: 0 },
+          overlayText: 'CONFIDENTIAL',
+          repeat: true,
+          fontFamily: 'helvetica',
+          fontSize: 10,
+          fontColor: { r: 255, g: 255, b: 255 },
+          textAlign: 'center',
+        };
+        const area = await page.annotations.create(areaDraft);
+        expect(AnnotationCreateResultSchema.safeParse(area).success).toBe(true);
+        expect(area.created.subtype).toBe('redact');
+        if (area.created.subtype === 'redact') {
+          expect(area.created.quadPoints.length).toBe(0);
+          expect(area.created.color).toMatchObject({ r: 228, g: 66, b: 52 });
+          expect(area.created.interiorColor).toMatchObject({ r: 0, g: 0, b: 0 });
+          expect(area.created.overlayText).toBe('CONFIDENTIAL');
+          expect(area.created.repeat).toBe(true);
+          expect(area.created.fontFamily).toBe('helvetica');
+          expect(area.created.fontSize).toBe(10);
+          expect(area.created.fontColor).toMatchObject({ r: 255, g: 255, b: 255 });
+          expect(area.created.textAlign).toBe('center');
+        }
+
+        // Text redaction (quads) without a label: everything falls back to
+        // the ISO defaults — transparent fill, no overlay text, no repeat.
+        const textDraft: RedactDraft = {
+          subtype: 'redact',
+          contents: 'mutation conformance: text redact',
+          rect: shapeRect,
+          quadPoints: quad,
+        };
+        const text = await page.annotations.create(textDraft);
+        expect(AnnotationCreateResultSchema.safeParse(text).success).toBe(true);
+        expect(text.created.subtype).toBe('redact');
+        if (text.created.subtype === 'redact') {
+          expect(text.created.quadPoints.length).toBe(quad.length);
+          expect(text.created.interiorColor).toBe(null);
+          expect(text.created.overlayText).toBe(null);
+          expect(text.created.repeat).toBe(false);
+          // Default marking outline is the red redaction convention.
+          expect(text.created.color).toMatchObject({ r: 255, g: 0, b: 0 });
+        }
+      } finally {
+        await doc.close();
+      }
+    });
+
+    test('update a redact patches the label and clears it, non-structurally', async () => {
+      const doc = await openFixture(engine, opts);
+      try {
+        const page = doc.page(fix.pageObjectNumber);
+        const created = await page.annotations.create({
+          subtype: 'redact',
+          contents: 'redact-update-base',
+          rect: shapeRect,
+          interiorColor: { r: 0, g: 0, b: 0 },
+          overlayText: 'DRAFT',
+          fontFamily: 'helvetica',
+          fontSize: 8,
+          fontColor: { r: 255, g: 255, b: 255 },
+        } satisfies RedactDraft);
+        const before = await page.annotations.list();
+
+        // Restyle the label. fontSize 0 is meaningful for a redaction label
+        // (auto-fit) and must round-trip verbatim, unlike free text.
+        const restyled = await page.annotations.update(created.created.ref, {
+          subtype: 'redact',
+          overlayText: 'REDACTED',
+          repeat: true,
+          fontFamily: 'helvetica',
+          fontSize: 0,
+          fontColor: { r: 255, g: 240, b: 240 },
+          textAlign: 'right',
+          interiorColor: { r: 10, g: 10, b: 10 },
+        });
+        expect(AnnotationUpdateResultSchema.safeParse(restyled).success).toBe(true);
+        expect(restyled.updated.subtype).toBe('redact');
+        if (restyled.updated.subtype === 'redact') {
+          expect(restyled.updated.overlayText).toBe('REDACTED');
+          expect(restyled.updated.repeat).toBe(true);
+          expect(restyled.updated.fontSize).toBe(0);
+          expect(restyled.updated.fontColor).toMatchObject({ r: 255, g: 240, b: 240 });
+          expect(restyled.updated.textAlign).toBe('right');
+          expect(restyled.updated.interiorColor).toMatchObject({ r: 10, g: 10, b: 10 });
+        }
+
+        // Clear the label and the fill: null wipes /OverlayText and /IC.
+        const cleared = await page.annotations.update(created.created.ref, {
+          subtype: 'redact',
+          overlayText: null,
+          repeat: false,
+          interiorColor: null,
+        });
+        expect(cleared.updated.subtype).toBe('redact');
+        if (cleared.updated.subtype === 'redact') {
+          expect(cleared.updated.overlayText).toBe(null);
+          expect(cleared.updated.repeat).toBe(false);
+          expect(cleared.updated.interiorColor).toBe(null);
+        }
+
+        // Updates never bump the revision.
+        expect(cleared.meta.affectedPages[0].revision.generation).toBe(
+          before.pageState.revision.generation,
+        );
+        expect(cleared.meta.weakRefsInvalidated).toBe(false);
       } finally {
         await doc.close();
       }

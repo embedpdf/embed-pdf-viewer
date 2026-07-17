@@ -40,7 +40,9 @@ export type PropSpec =
   | { key: 'lineEndings'; label: string }
   | { key: 'fontFamily'; label: string }
   | { key: 'textAlign'; label: string }
-  | { key: 'blendMode'; label: string };
+  | { key: 'blendMode'; label: string }
+  /** `/Name` icon picker for icon kinds; `options` are the legal names. */
+  | { key: 'icon'; label: string; options: readonly string[] };
 
 /** Orthogonal capability flags. Static data — the annotation's `/F` flags are
  *  the runtime overrides (a locked annotation is never transformable, a hidden
@@ -106,6 +108,20 @@ export interface AnnotationKind {
 
 /* Shared spec entries — plain data, spread into the per-kind lists below. */
 const OPACITY: PropSpec = { key: 'opacity', label: 'Opacity', min: 0.1, max: 1, step: 0.05 };
+const ICON_COLOR: PropSpec = { key: 'color', label: 'Color' };
+
+/* `/Name` values per icon kind — mirrors the engine's NoteIcon /
+ * FileAttachmentIcon unions (the appearance generator's vocabulary). */
+const NOTE_ICONS = [
+  'comment',
+  'key',
+  'note',
+  'help',
+  'new-paragraph',
+  'paragraph',
+  'insert',
+] as const;
+const FILE_ATTACHMENT_ICONS = ['push-pin', 'paperclip', 'graph', 'tag'] as const;
 const STROKE: PropSpec = { key: 'color', label: 'Stroke' };
 const FILL: PropSpec = { key: 'interiorColor', label: 'Fill' };
 const STROKE_WIDTH: PropSpec = {
@@ -410,6 +426,41 @@ export const KINDS: Record<string, AnnotationKind> = {
     variant: 'caret',
     caps: caps({ selectable: true, anchored: true, commentable: true }),
     props: CARET_PROPS,
+  },
+  // Sticky note ("comment"): a fixed 20x20 icon whose visual is the
+  // engine-baked /AP (generated from /C + /Name). Screen-constant and
+  // screen-upright per the spec's Text-icon rule (noZoom/noRotate); its
+  // popup thread is the primary surface once comments land.
+  text: {
+    subtype: 'text',
+    variant: 'rect',
+    caps: caps({
+      selectable: true,
+      movable: true,
+      groupMovable: true,
+      commentable: true,
+      hasPopup: true,
+      opaqueBody: true,
+      noZoom: true,
+      noRotate: true,
+    }),
+    props: [{ key: 'icon', label: 'Icon', options: NOTE_ICONS }, ICON_COLOR, OPACITY],
+  },
+  // File attachment: the same fixed-icon shape as the note, but its primary
+  // surface is the embedded FILE (open/download), not a popup.
+  'file-attachment': {
+    subtype: 'file-attachment',
+    variant: 'rect',
+    caps: caps({
+      selectable: true,
+      movable: true,
+      groupMovable: true,
+      commentable: true,
+      opaqueBody: true,
+      noZoom: true,
+      noRotate: true,
+    }),
+    props: [{ key: 'icon', label: 'Icon', options: FILE_ATTACHMENT_ICONS }, ICON_COLOR, OPACITY],
   },
   // Stamp: a rect-variant kind whose visual is ALWAYS the engine-baked /AP
   // (image or vector appearance authored at create time) — never a vector

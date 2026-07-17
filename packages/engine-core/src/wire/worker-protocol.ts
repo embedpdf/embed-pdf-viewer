@@ -54,6 +54,7 @@ import type {
 import type { MetadataUpdateResult } from '../mutation/MetadataUpdateResult';
 import type { PageDeleteResult } from '../mutation/PageDeleteResult';
 import type { PageFlattenResult, PageFlattenUsage } from '../mutation/PageFlattenResult';
+import type { RedactionApplyResult, RedactionApplyScope } from '../mutation/RedactionApplyResult';
 import type { PageInsertResult } from '../mutation/PageInsertResult';
 import type { PageMoveResult } from '../mutation/PageMoveResult';
 import type { PageRotateResult } from '../mutation/PageRotateResult';
@@ -461,6 +462,15 @@ export interface PagesFlattenWorkerRequest {
   artifactPath?: string;
 }
 
+export interface RedactionApplyWorkerRequest {
+  kind: 'redaction.apply';
+  jobId: WorkerJobId;
+  docId: string;
+  layerName?: string;
+  scope: RedactionApplyScope;
+  artifactPath?: string;
+}
+
 /** Export the given pages as a standalone PDF (a read — the source
  *  session is untouched, so no layer artifact rides the result). */
 export interface PagesExtractWorkerRequest {
@@ -756,6 +766,7 @@ export type WorkerRequest =
   | PagesRotateWorkerRequest
   | PagesDeleteWorkerRequest
   | PagesFlattenWorkerRequest
+  | RedactionApplyWorkerRequest
   | PagesExtractWorkerRequest
   | PagesInsertWorkerRequest
   | AttachmentsListWorkerRequest
@@ -906,6 +917,12 @@ export type WorkerResultPayload =
   | {
       tag: 'pages.flatten';
       result: PageFlattenResult;
+      artifact?: LayerArtifactWorkerPayload;
+      artifactFile?: LayerArtifactFileWorkerPayload;
+    }
+  | {
+      tag: 'redaction.apply';
+      result: RedactionApplyResult;
       artifact?: LayerArtifactWorkerPayload;
       artifactFile?: LayerArtifactFileWorkerPayload;
     }

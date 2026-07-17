@@ -136,7 +136,7 @@ export function isTextMarkupSubtype(
   );
 }
 
-function appendQuadPoints(
+export function appendQuadPoints(
   fn: PdfFunctions,
   mem: PdfRuntimeMemory,
   annotPtr: Ptr,
@@ -168,7 +168,7 @@ function appendQuadPoints(
  * the conformance suite covers the "patch must not shrink quadPoints"
  * rule (`patch.quadPoints.length >= existingCount`).
  */
-function replaceQuadPoints(
+export function replaceQuadPoints(
   fn: PdfFunctions,
   mem: PdfRuntimeMemory,
   annotPtr: Ptr,
@@ -222,7 +222,7 @@ function writeQuadPointStruct(mem: PdfRuntimeMemory, buf: Ptr, qp: PdfQuad): voi
   mem.poke(buf, 'f32', qp.p4.y, 28);
 }
 
-function setRectFromQuadPoints(
+export function setRectFromQuadPoints(
   fn: PdfFunctions,
   mem: PdfRuntimeMemory,
   annotPtr: Ptr,

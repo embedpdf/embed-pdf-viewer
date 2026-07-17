@@ -81,6 +81,8 @@ export function readProp<K extends PropKey>(a: Annot, key: K): AnnotationProps[K
         return a.text?.fontColor;
       case 'textAlign':
         return a.text?.textAlign;
+      case 'icon':
+        return a.icon;
     }
   })();
   return out as AnnotationProps[K] | undefined;
@@ -131,6 +133,10 @@ export function applyProps(a: Annot, patch: AnnotationPropsPatch): Annot | null 
   if (patch.lineEndings && takes.has('lineEndings') && endingsGeom(next.geom)) {
     const ends: LineEndings = { ...(next.geom.ends ?? NO_ENDINGS), ...patch.lineEndings };
     next = { ...next, geom: { ...next.geom, ends } };
+  }
+
+  if (patch.icon !== undefined && takes.has('icon')) {
+    next = { ...next, icon: patch.icon };
   }
 
   if (next.text) {

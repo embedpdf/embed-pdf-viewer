@@ -7,7 +7,7 @@
  * exist in their type universe. Anything environmental — file dialogs, clipboard,
  * print — lives here and is consumed by the framework adapters (react, vue, …).
  */
-export { pickImageFile } from './file-picker';
+export { pickImageFile, pickFile, saveFile } from './file-picker';
 export type { PickFileOptions } from './file-picker';
 export { svgCursor } from './cursor';
 export type { SvgCursorOptions } from './cursor';

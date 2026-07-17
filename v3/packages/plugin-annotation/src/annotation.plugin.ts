@@ -8,7 +8,7 @@ import {
   createEditHandler,
   createGhostHandler,
   createMarqueeHandler,
-  createStampHandler,
+  createPlaceHandler,
 } from './handler';
 import { wireMarkup } from './markup';
 import { annotationReducer, initialAnnotationState } from './reducer';
@@ -55,7 +55,7 @@ export const annotationPlugin = (config: AnnotationConfig = {}) =>
         if (tool.defaults) annotation.setDefaults(tool.preset, tool.defaults);
       }
 
-      interaction.registerHandler(createStampHandler(annotation));
+      interaction.registerHandler(createPlaceHandler(annotation));
       interaction.registerHandler(createGhostHandler(annotation, interaction));
       interaction.registerHandler(createEditHandler(annotation, interaction));
       interaction.registerHandler(createMarqueeHandler(annotation));

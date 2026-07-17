@@ -20,10 +20,10 @@ import {
   type Behavior,
   type SelectionFlags,
   type SelectionProps,
-  type StampProvider,
+  type FilePickerProvider,
   type TextItem,
 } from '@embedpdf-x/plugin-annotation';
-import { pickImageFile } from '@embedpdf-x/web';
+import { pickFile } from '@embedpdf-x/web';
 // The render layer is framework code, so it resolves the FULL host lens
 // (pageItems/chrome/appearances/…). Same runtime token as the public one — only
 // the type differs. App code never imports this.
@@ -839,27 +839,35 @@ export function AnnotationLayer({ renderers }: AnnotationLayerProps = {}) {
 }
 
 /**
- * The default stamp `'prompt'` provider: opens the built-in file dialog (from
- * `@embedpdf-x/web`) and returns the picked image. This is the ADAPTER fulfilling
- * the plugin's DOM-free port — the file dialog lives here, in the framework layer,
- * never in the plugin. Swap it out for a custom picker.
+ * The default file-picker provider: the built-in file dialog (from
+ * `@embedpdf-x/web`), honouring the tool's `accept` filter. This is the ADAPTER
+ * fulfilling the plugin's DOM-free port — the dialog lives here, in the
+ * framework layer, never in the plugin. A picked `File` carries its own name
+ * and mime, so it goes straight through as the engine's file source.
  */
-export const fileStampProvider: StampProvider = () => pickImageFile();
+export const filePickerProvider: FilePickerProvider = async (req) => {
+  const file = await pickFile({ accept: req.accept ?? '*/*' });
+  return file ? { data: file } : null;
+};
 
 /**
- * Install a stamp `'prompt'` provider for the active document — how a click-to-
- * place stamp with no fixed bytes fetches them. Call ONCE at a document-scoped
- * spot (not inside `<AnnotationLayer>`, which is per page). Defaults to
- * {@link fileStampProvider}, so a bare `useStampProvider()` is the one line that
- * makes click-then-pick stamps work out of the box; pass a custom provider (asset
- * library, camera…) or `null` to make `'prompt'` tools inert. Cleared on unmount.
+ * Install the file-picker provider for the active document — the ONE port
+ * behind every click-then-pick tool (a stamp `'prompt'` source, the file-
+ * attachment tool). Call ONCE at a document-scoped spot (not inside
+ * `<AnnotationLayer>`, which is per page). Defaults to
+ * {@link filePickerProvider}, so a bare `useFilePickerProvider()` makes all of
+ * them work out of the box; pass a custom provider (asset library, cloud
+ * drive — switch on `req.subtype` / `req.toolId`) or `null` to make
+ * click-then-pick tools inert. Cleared on unmount.
  */
-export function useStampProvider(provider: StampProvider | null = fileStampProvider): void {
+export function useFilePickerProvider(
+  provider: FilePickerProvider | null = filePickerProvider,
+): void {
   const anno = useOptionalCapability(AnnotationToken);
   useEffect(() => {
     if (!anno) return;
-    anno.setStampProvider(provider);
-    return () => anno.setStampProvider(null);
+    anno.setFilePickerProvider(provider);
+    return () => anno.setFilePickerProvider(null);
   }, [anno, provider]);
 }
 

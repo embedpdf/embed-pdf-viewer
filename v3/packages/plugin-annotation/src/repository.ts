@@ -55,7 +55,7 @@ const h2 = (n: number) =>
     .toString(16)
     .padStart(2, '0');
 export const colorToCss = (c: Color): string => `#${h2(c.r)}${h2(c.g)}${h2(c.b)}`;
-function cssToColor(css: string): Color {
+export function cssToColor(css: string): Color {
   const s = css.trim();
   const m6 = /^#?([0-9a-f]{6})$/i.exec(s);
   if (m6) {
@@ -213,6 +213,8 @@ export function fromDTO(
     // Text styling is a content projection of the DTO, exactly like `style` —
     // present only for text-editable kinds. The colour seam is crossed HERE.
     ...(dto.subtype === 'free-text' ? { text: textFromDTO(dto) } : {}),
+    // The /Name icon is a content projection like `style` — icon kinds only.
+    ...(dto.subtype === 'text' || dto.subtype === 'file-attachment' ? { icon: dto.icon } : {}),
     ...(dto.subtype === 'widget' && WIDGET_TEXT_KINDS.has(widgetKindOf(dto.fieldFamily))
       ? { text: widgetTextFromDTO(dto) }
       : {}),
@@ -416,6 +418,18 @@ export function styleFromDTO(dto: AnnotationDTO): Style {
       opacity: d.opacity,
       blendMode: dto.blendMode,
       border: borderFromDTO(d),
+    };
+  }
+  if (dto.subtype === 'text' || dto.subtype === 'file-attachment') {
+    // Icon kinds: /C is the icon fill, /CA its opacity — no stroke/fill split.
+    const d = dto as Extract<AnnotationDTO, { color: Color; opacity: number }>;
+    return {
+      color: colorToCss(d.color),
+      interiorColor: null,
+      strokeWidth: 1,
+      opacity: d.opacity,
+      blendMode: dto.blendMode,
+      border: { kind: 'solid' },
     };
   }
   return {
@@ -826,6 +840,17 @@ export function toPatch(a: Annot, crop: PdfRect): AnnotationPatch | null {
       ...caretStyle(a.style),
       ...(a.intent === 'replace' ? { intent: a.intent } : {}),
     };
+  // icon kinds (note / file attachment): geometry (a move) + /C + /CA +
+  // /Name — the engine re-bakes the fixed-size icon /AP from these. The
+  // attached file is create-only and never rides a patch.
+  if ((a.subtype === 'text' || a.subtype === 'file-attachment') && f && 'rect' in f)
+    return {
+      subtype: a.subtype,
+      rect: f.rect,
+      color: cssToColor(a.style.color),
+      opacity: a.style.opacity,
+      ...(a.icon !== undefined ? { icon: a.icon } : {}),
+    } as AnnotationPatch;
   // stamp: geometry only — the visual is the engine-baked /AP, re-fit natively
   // when /Rect changes. Content replacement carries bytes and goes through
   // `capability.update` with an inline `source`, never through this path.

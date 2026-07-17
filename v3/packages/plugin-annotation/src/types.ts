@@ -2,10 +2,12 @@ import { createCapabilityToken, type PageObjectNumber } from '@embedpdf-x/kernel
 import type { PageRotation } from '@embedpdf-x/geometry';
 import type {
   AnnotationAppearanceImage,
-  AnnotationDraft,
   AnnotationDTO,
+  AnnotationDraft,
   AnnotationPatch,
   AnnotationRef,
+  AttachmentContent,
+  AttachmentFileSource,
   BinarySource,
   PdfRect,
 } from '@embedpdf/engine-core/runtime';
@@ -366,13 +368,22 @@ export interface AnnotationCapability {
   /** Drop the armed stamp payload (a tool change away from 'stamp' does this too). */
   disarmStamp(): void;
   /**
-   * Install the implementation of the stamp `'prompt'` source (see
-   * {@link StampProvider}) — how a click-to-place stamp with no fixed bytes fetches
-   * them. The React adapter (`<AnnotationLayer>`) installs a file-dialog provider
-   * by default; pass your own for a custom picker (asset library, camera…), or
-   * `null` to make `'prompt'` tools inert. One slot; last write wins.
+   * Install the ONE file-picker port every click-then-pick tool resolves
+   * through (see {@link FilePickerProvider}) — the stamp `'prompt'` source and
+   * the file-attachment tool today. The framework adapter installs a
+   * file-dialog provider by default; pass your own (asset library, cloud
+   * drive — switch on `req.subtype` / `req.toolId`), or `null` to make
+   * click-then-pick tools inert. One slot; last write wins.
    */
-  setStampProvider(provider: StampProvider | null): void;
+  setFilePickerProvider(provider: FilePickerProvider | null): void;
+  /**
+   * Decode and return the file embedded in a FileAttachment annotation —
+   * bytes plus the name/mime needed to hand it to the user. Listings carry
+   * only metadata (`FileAttachmentAnnotationDTO.file`); this is the explicit
+   * bytes-out call. Throws when the engine transport has not shipped
+   * attachment download (feature-detected).
+   */
+  downloadAttachment(ref: AnnotationRef): Promise<AttachmentContent>;
 
   // ── tools (add/configure at runtime; the config equivalent is `tools`) ──
   /**
@@ -419,26 +430,39 @@ export interface ArmedStampPreview {
 }
 
 /**
- * What a {@link StampProvider} is asked for: the tool + the page-space point the
- * user clicked, so a fancy provider can position a picker near the click. Pure
+ * What the {@link FilePickerProvider} is asked for: which tool clicked (id +
+ * the kind it creates), the tool's `accept` filter, and the page-space point
+ * the click landed on — enough to route per tool (asset library for stamps,
+ * cloud drive for attachments) or position a picker near the click. Pure
  * data — the request crosses the plugin↔adapter boundary as a message.
  */
-export interface StampPromptRequest {
+export interface FilePromptRequest {
   toolId: string;
+  /** The kind the placement creates — the routing key for per-tool pickers. */
+  subtype: Subtype;
+  /** The tool's file-dialog filter hint (from the tool def). UX only —
+   *  the engine sniffs/validates the bytes for real. */
+  accept?: string;
   pon: PageObjectNumber;
-  /** The content-space point the stamp will be centred on. */
+  /** The content-space point the placement is centred on. */
   point: Vec;
 }
 
 /**
- * The stamp `'prompt'` PORT: given a click, produce the image bytes to place
- * (`null` cancels). The plugin declares this contract but never implements it —
- * "get bytes from the environment" is a DOM concern (a file dialog), so the
- * framework adapter installs the implementation via
- * {@link AnnotationCapability.setStampProvider}. This keeps the plugin DOM-free
- * (Rust-portable) while the zero-config file dialog still works out of the box.
+ * The ONE environment port behind every click-then-pick tool — the stamp
+ * `'prompt'` source and the file-attachment tool (the file is picked AFTER
+ * the spot): given a click, produce the file to place, `null` to cancel. The
+ * plugin declares this contract but never implements it — "get bytes from the
+ * environment" is a DOM concern (a file dialog), so the framework adapter
+ * installs the implementation via
+ * {@link AnnotationCapability.setFilePickerProvider}. This keeps the plugin
+ * DOM-free (Rust-portable) while the zero-config file dialog works out of the
+ * box. The return shape is the engine's file vocabulary: a stamp consumes
+ * only `data`; an attachment embeds the whole thing. A picked `File` carries
+ * its own name and mime — a provider returning raw bytes for an attachment
+ * must supply `name` itself.
  */
-export type StampProvider = (req: StampPromptRequest) => Promise<BinarySource | null>;
+export type FilePickerProvider = (req: FilePromptRequest) => Promise<AttachmentFileSource | null>;
 
 /**
  * The HOST (framework) surface: everything the render layer, the interaction hub,
@@ -599,6 +623,13 @@ export interface AnnotationHostCapability extends AnnotationCapability {
    *  capture) when nothing is armed. `displayRotation` (the click sample's page
    *  rotation) feeds the active tool's `upright` policy. */
   placeArmedStamp(pon: PageObjectNumber, point: Vec, displayRotation?: PageRotation): boolean;
+  /**
+   * The one click-to-place entry for every payload-carrying tool (stamp /
+   * note / file attachment) — the place handler forwards each down here.
+   * Armed payload first, then the active tool's kind routes; returns whether
+   * the click was consumed.
+   */
+  placeAt(pon: PageObjectNumber, point: Vec, displayRotation?: PageRotation): boolean;
   /** Whether a stamp payload is armed — the hover handler's cheap pre-check. */
   hasArmedStamp(): boolean;
   /**
@@ -638,10 +669,11 @@ export interface AnnotationHostCapability extends AnnotationCapability {
   /**
    * Resolve the ACTIVE tool's {@link StampSourceSpec} for a click and place a
    * stamp centred on `point`: fixed `bytes` land immediately; a `'prompt'` source
-   * asks the installed {@link StampProvider} (placement is dropped if it cancels,
-   * or if the tool/document changed while it was open). Returns false (no capture)
-   * when the active tool has no source. The click-then-pick counterpart of
-   * {@link placeArmedStamp}. `displayRotation` as on {@link placeArmedStamp}.
+   * asks the installed {@link FilePickerProvider} (placement is dropped if it
+   * cancels, or if the tool/document changed while it was open). Returns false
+   * (no capture) when the active tool has no source. The click-then-pick
+   * counterpart of {@link placeArmedStamp}. `displayRotation` as on
+   * {@link placeArmedStamp}.
    */
   requestStampAt(pon: PageObjectNumber, point: Vec, displayRotation?: PageRotation): boolean;
   // ── tool registry (consumed by the plugin init + interaction handlers) ──

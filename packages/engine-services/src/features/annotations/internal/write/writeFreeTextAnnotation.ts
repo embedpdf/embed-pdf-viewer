@@ -1,16 +1,8 @@
-import {
-  EngineError,
-  EngineErrorCode,
-  type Color,
-  type FreeTextDraft,
-  type FreeTextFont,
-  type FreeTextPatch,
-} from '@embedpdf/engine-core/runtime';
+import { type Color, type FreeTextDraft, type FreeTextPatch } from '@embedpdf/engine-core/runtime';
 import type { PdfFunctions, PdfRuntimeMemory, Ptr } from '@embedpdf/pdf-runtime';
 
 import { FPDFANNOT_COLORTYPE } from '../colorType';
 import { freeTextIntentToName } from '../freeTextIntent';
-import { isStandardFont, standardFontToCode } from '../standardFont';
 import { textAlignmentToCode } from '../textAlignment';
 import type { AnnotationWriteContext } from './annotationWriteContext';
 import {
@@ -19,14 +11,13 @@ import {
   setAnnotOpacity,
   setAnnotRect,
   setCalloutLine,
-  setDefaultAppearance,
-  setDefaultAppearanceRegisteredFont,
   setIntent,
   setLineEndings,
   setRectangleDifferences,
   setTextAlignment,
 } from './annotationWritePrimitives';
 import { applyAnnotationBaseDraft, applyAnnotationBasePatch } from './writeAnnotationBase';
+import { applyDefaultAppearance } from './writeDefaultAppearance';
 import { applyBorderDraft, applyBorderPatch, DEFAULT_OPACITY } from './writeStyle';
 import { writeBoxTransformMetadata } from './writeAnnotationTransformMetadata';
 
@@ -36,40 +27,6 @@ import { writeBoxTransformMetadata } from './writeAnnotationTransformMetadata';
  * with a black mark.
  */
 const DEFAULT_FREETEXT_COLOR: Color = { r: 0, g: 0, b: 0 };
-
-/**
- * Write `/DA`. A standard font name goes through the native standard-font path;
- * anything else is treated as a registered-font `key` and resolved to this
- * thread's FontId. A key with no resolver wired (e.g. a host without a font
- * registry) is a programming error — fail loud rather than silently downgrade
- * to Helvetica and embed the wrong glyphs.
- */
-function applyDefaultAppearance(
-  fn: PdfFunctions,
-  annotPtr: Ptr,
-  fontFamily: FreeTextFont,
-  fontSize: number,
-  color: Color,
-  ctx: AnnotationWriteContext | undefined,
-): void {
-  if (isStandardFont(fontFamily)) {
-    setDefaultAppearance(fn, annotPtr, standardFontToCode(fontFamily), fontSize, color);
-    return;
-  }
-  if (!ctx?.resolveRegisteredFontId) {
-    throw new EngineError(
-      EngineErrorCode.InvalidArg,
-      `fontFamily '${fontFamily}' is not a standard font and no font registry is available on this host`,
-    );
-  }
-  setDefaultAppearanceRegisteredFont(
-    fn,
-    annotPtr,
-    ctx.resolveRegisteredFontId(fontFamily),
-    fontSize,
-    color,
-  );
-}
 
 /**
  * Apply a free-text draft to a freshly-created annotation. Colour model:

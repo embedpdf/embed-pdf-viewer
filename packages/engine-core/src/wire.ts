@@ -57,6 +57,8 @@ export {
   FormEffectsResultSchema,
   PageFlattenInputSchema,
   PageFlattenResultSchema,
+  RedactionApplyScopeSchema,
+  RedactionApplyResultSchema,
   WeakAnnotationSessionResponseSchema,
   WeakAnnotationSessionPagesRequestSchema,
   SearchQuerySchema,

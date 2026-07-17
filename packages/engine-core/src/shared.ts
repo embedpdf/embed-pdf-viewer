@@ -416,6 +416,12 @@ export type {
   PageFlattenItemResult,
   PageFlattenResult,
 } from './mutation/PageFlattenResult';
+export type {
+  RedactionApplyScope,
+  RedactionApplyStatus,
+  RedactionApplyItemResult,
+  RedactionApplyResult,
+} from './mutation/RedactionApplyResult';
 export type { MetadataUpdateResult, MetadataCache } from './mutation/MetadataUpdateResult';
 
 export type {

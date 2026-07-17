@@ -60,6 +60,7 @@ import type { CacheDelta, MutationMeta } from '../mutation/MutationMeta';
 import type { PageDeleteInput } from '../mutation/PageDeleteInput';
 import type { PageDeleteResult } from '../mutation/PageDeleteResult';
 import type { PageFlattenInput, PageFlattenResult } from '../mutation/PageFlattenResult';
+import type { RedactionApplyResult, RedactionApplyScope } from '../mutation/RedactionApplyResult';
 import type { PageMoveInput } from '../mutation/PageMoveInput';
 import type { PageMoveResult } from '../mutation/PageMoveResult';
 import type { PageRotateInput } from '../mutation/PageRotateInput';
@@ -856,6 +857,34 @@ export const PageFlattenResultSchema: z.ZodType<PageFlattenResult> = z.object({
 export const PageFlattenInputSchema: z.ZodType<PageFlattenInput> = z.object({
   pageObjectNumbers: z.array(z.number().int().positive()),
   usage: z.enum(['display', 'print']),
+});
+
+export const RedactionApplyScopeSchema: z.ZodType<RedactionApplyScope> = z.discriminatedUnion(
+  'kind',
+  [
+    z.object({
+      kind: z.literal('pages'),
+      pageObjectNumbers: z.array(z.number().int().positive()),
+    }),
+    z.object({
+      kind: z.literal('annotations'),
+      refs: z.array(AnnotationRefSchema),
+    }),
+  ],
+) as unknown as z.ZodType<RedactionApplyScope>;
+
+export const RedactionApplyResultSchema: z.ZodType<RedactionApplyResult> = z.object({
+  scope: RedactionApplyScopeSchema,
+  results: z.array(
+    z.object({
+      pageObjectNumber: z.number().int().positive(),
+      status: z.enum(['applied', 'unchanged', 'failed', 'skipped']),
+      removedAnnotationCount: z.number().int().nonnegative(),
+      error: EngineErrorPayloadSchema.optional(),
+    }),
+  ),
+  removedAnnotationCount: z.number().int().nonnegative(),
+  meta: MutationMetaSchema.nullable(),
 });
 
 /**

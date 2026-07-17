@@ -387,6 +387,37 @@ export function setIntent(fn: PdfFunctions, annotPtr: Ptr, name: string): void {
  * (knee-jointed); writes them into a contiguous `count * FS_POINTF` buffer
  * (like {@link setVertices}).
  */
+/**
+ * Write `/OverlayText` of a redact annotation via `EPDFAnnot_SetOverlayText`.
+ * The native setter removes the key for an empty string, so passing `''`
+ * clears the label.
+ */
+export function setOverlayText(
+  fn: PdfFunctions,
+  mem: PdfRuntimeMemory,
+  annotPtr: Ptr,
+  text: string,
+): void {
+  const ptr = mem.writeU16String(text);
+  try {
+    if (!fn.EPDFAnnot_SetOverlayText(annotPtr, ptr)) {
+      throw new EngineError(EngineErrorCode.Unknown, 'EPDFAnnot_SetOverlayText returned false');
+    }
+  } finally {
+    mem.free(ptr);
+  }
+}
+
+/**
+ * Write `/Repeat` of a redact annotation via `EPDFAnnot_SetOverlayTextRepeat`
+ * (`false` removes the key — absent is the PDF default).
+ */
+export function setOverlayTextRepeat(fn: PdfFunctions, annotPtr: Ptr, repeat: boolean): void {
+  if (!fn.EPDFAnnot_SetOverlayTextRepeat(annotPtr, repeat)) {
+    throw new EngineError(EngineErrorCode.Unknown, 'EPDFAnnot_SetOverlayTextRepeat returned false');
+  }
+}
+
 export function setCalloutLine(
   fn: PdfFunctions,
   mem: PdfRuntimeMemory,

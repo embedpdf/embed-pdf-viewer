@@ -50,3 +50,28 @@ export function pickImageFile(options: PickFileOptions = {}): Promise<File | nul
     input.click();
   });
 }
+
+/** The same dialog with NO type filter — any file (attachments). */
+export const pickFile = (options: PickFileOptions = {}): Promise<File | null> =>
+  pickImageFile({ accept: '*/*', ...options });
+
+/**
+ * Hand bytes to the user as a browser download (a one-shot `<a download>`).
+ * The DOM half of "download this attachment" — pair with the annotation
+ * capability's `downloadAttachment` or the document `attachments.download`.
+ */
+export function saveFile(bytes: Uint8Array | Blob, name: string, mimeType?: string): void {
+  const blob =
+    bytes instanceof Blob
+      ? bytes
+      : new Blob([bytes as BlobPart], { type: mimeType ?? 'application/octet-stream' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = name;
+  a.style.display = 'none';
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+}

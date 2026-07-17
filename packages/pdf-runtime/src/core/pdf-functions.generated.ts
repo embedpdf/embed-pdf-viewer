@@ -87,18 +87,7 @@ export interface PdfFunctions {
   EPDFAction_IsComplete: (arg0: Ptr) => boolean;
   EPDFAction_LoadModel: (arg0: Ptr) => Ptr;
   EPDFAction_NodeHasJavaScript: (arg0: Ptr, arg1: number) => boolean;
-  EPDFAnnot_ApplyRedaction: (arg0: Ptr, arg1: Ptr) => boolean;
-  EPDFAnnot_ApplyRedactionWithReport: (
-    arg0: Ptr,
-    arg1: Ptr,
-    arg2: Ptr,
-    arg3: number,
-    arg4: Ptr,
-    arg5: number,
-    arg6: Ptr,
-    arg7: Ptr,
-    arg8: Ptr,
-  ) => boolean;
+  EPDFAnnot_ApplyRedaction: (arg0: Ptr, arg1: Ptr, arg2: Ptr) => boolean;
   EPDFAnnot_ClearBorderEffect: (arg0: Ptr) => boolean;
   EPDFAnnot_ClearColor: (arg0: Ptr, arg1: number) => boolean;
   EPDFAnnot_ClearEmbedMetadata: (arg0: Ptr) => boolean;
@@ -654,17 +643,7 @@ export interface PdfFunctions {
   EPDFLayer_SaveLayerArtifactToOwnedBuffer: (arg0: Ptr, arg1: Ptr, arg2: Ptr) => Ptr;
   EPDFNamedDest_Remove: (arg0: Ptr, arg1: string) => boolean;
   EPDFNamedDest_SetDest: (arg0: Ptr, arg1: string, arg2: Ptr) => boolean;
-  EPDFPage_ApplyRedactions: (arg0: Ptr) => boolean;
-  EPDFPage_ApplyRedactionsWithReport: (
-    arg0: Ptr,
-    arg1: Ptr,
-    arg2: number,
-    arg3: Ptr,
-    arg4: number,
-    arg5: Ptr,
-    arg6: Ptr,
-    arg7: Ptr,
-  ) => boolean;
+  EPDFPage_ApplyRedactions: (arg0: Ptr, arg1: Ptr) => boolean;
   EPDFPage_CreateAnnot: (arg0: Ptr, arg1: number) => Ptr;
   EPDFPage_Flatten: (arg0: Ptr, arg1: number) => number;
   EPDFPage_GetAnnotByName: (arg0: Ptr, arg1: Ptr) => Ptr;
@@ -2590,55 +2569,6 @@ export const pdfFunctionSignatures = {
   },
   EPDFAnnot_ApplyRedaction: {
     params: [
-      {
-        ts: 'Ptr',
-        wasm: { kind: 'pointer', cwrap: 'number' },
-        native: { kind: 'pointer', cwrap: 'bigint' },
-      },
-      {
-        ts: 'Ptr',
-        wasm: { kind: 'pointer', cwrap: 'number' },
-        native: { kind: 'pointer', cwrap: 'bigint' },
-      },
-    ],
-    result: {
-      ts: 'boolean',
-      wasm: { kind: 'bool', cwrap: 'boolean' },
-      native: { kind: 'bool', cwrap: 'boolean' },
-    },
-  },
-  EPDFAnnot_ApplyRedactionWithReport: {
-    params: [
-      {
-        ts: 'Ptr',
-        wasm: { kind: 'pointer', cwrap: 'number' },
-        native: { kind: 'pointer', cwrap: 'bigint' },
-      },
-      {
-        ts: 'Ptr',
-        wasm: { kind: 'pointer', cwrap: 'number' },
-        native: { kind: 'pointer', cwrap: 'bigint' },
-      },
-      {
-        ts: 'Ptr',
-        wasm: { kind: 'pointer', cwrap: 'number' },
-        native: { kind: 'pointer', cwrap: 'bigint' },
-      },
-      {
-        ts: 'number',
-        wasm: { kind: 'i32', cwrap: 'number' },
-        native: { kind: 'i32', cwrap: 'number' },
-      },
-      {
-        ts: 'Ptr',
-        wasm: { kind: 'cstring', cwrap: 'number' },
-        native: { kind: 'cstring', cwrap: 'bigint' },
-      },
-      {
-        ts: 'number',
-        wasm: { kind: 'i32', cwrap: 'number' },
-        native: { kind: 'i32', cwrap: 'number' },
-      },
       {
         ts: 'Ptr',
         wasm: { kind: 'pointer', cwrap: 'number' },
@@ -8343,50 +8273,6 @@ export const pdfFunctionSignatures = {
   },
   EPDFPage_ApplyRedactions: {
     params: [
-      {
-        ts: 'Ptr',
-        wasm: { kind: 'pointer', cwrap: 'number' },
-        native: { kind: 'pointer', cwrap: 'bigint' },
-      },
-    ],
-    result: {
-      ts: 'boolean',
-      wasm: { kind: 'bool', cwrap: 'boolean' },
-      native: { kind: 'bool', cwrap: 'boolean' },
-    },
-  },
-  EPDFPage_ApplyRedactionsWithReport: {
-    params: [
-      {
-        ts: 'Ptr',
-        wasm: { kind: 'pointer', cwrap: 'number' },
-        native: { kind: 'pointer', cwrap: 'bigint' },
-      },
-      {
-        ts: 'Ptr',
-        wasm: { kind: 'pointer', cwrap: 'number' },
-        native: { kind: 'pointer', cwrap: 'bigint' },
-      },
-      {
-        ts: 'number',
-        wasm: { kind: 'i32', cwrap: 'number' },
-        native: { kind: 'i32', cwrap: 'number' },
-      },
-      {
-        ts: 'Ptr',
-        wasm: { kind: 'cstring', cwrap: 'number' },
-        native: { kind: 'cstring', cwrap: 'bigint' },
-      },
-      {
-        ts: 'number',
-        wasm: { kind: 'i32', cwrap: 'number' },
-        native: { kind: 'i32', cwrap: 'number' },
-      },
-      {
-        ts: 'Ptr',
-        wasm: { kind: 'pointer', cwrap: 'number' },
-        native: { kind: 'pointer', cwrap: 'bigint' },
-      },
       {
         ts: 'Ptr',
         wasm: { kind: 'pointer', cwrap: 'number' },

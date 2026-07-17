@@ -386,6 +386,9 @@ export const commands: CommandDef[] = [
     primary: 'color',
     secondary: 'interiorColor',
   }),
+  // Sticky note ("comment") — click-to-place; the icon renders from the
+  // engine-baked /AP in the tool's current color.
+  tool('annotation:add-note', 'note', 'commands.annotate.note', 'message'),
 
   // ── shape tools (real interaction tools) ────────────────────────────────
   tool('annotation:add-rectangle', 'square', 'commands.shapes.rectangle', 'square', {
@@ -410,8 +413,10 @@ export const commands: CommandDef[] = [
     primary: 'color',
   }),
 
-  // ── insert tools (stamp real; signature/image inert) ────────────────────
+  // ── insert tools (stamp/attachment real; signature/image inert) ─────────
   tool('insert:add-stamp', 'stamp', 'commands.insert.stamp', 'rubberStamp'),
+  // File attachment — click the spot, pick the file (the attachment provider).
+  tool('insert:add-attachment', 'attachment', 'commands.insert.attachment', 'paperclip'),
   tool('insert:add-signature', 'signature', 'commands.insert.signature', 'signature'),
   tool('insert:add-image', 'image', 'commands.insert.image', 'photo'),
 

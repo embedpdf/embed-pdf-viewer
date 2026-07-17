@@ -62,6 +62,7 @@ export const en: Locale = {
         insertText: 'Insert Text',
         replaceText: 'Replace Text',
         callout: 'Callout',
+        note: 'Comment',
         delete: 'Delete',
         group: 'Group',
         ungroup: 'Ungroup',
@@ -75,7 +76,12 @@ export const en: Locale = {
         polygon: 'Polygon',
         polyline: 'Polyline',
       },
-      insert: { stamp: 'Rubber Stamp', signature: 'Signature', image: 'Image' },
+      insert: {
+        stamp: 'Rubber Stamp',
+        attachment: 'Attach File',
+        signature: 'Signature',
+        image: 'Image',
+      },
       form: {
         textfield: 'Text Field',
         checkbox: 'Checkbox',

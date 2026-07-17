@@ -318,6 +318,32 @@ export function readTextAlignment(fn: PdfFunctions, annotPtr: Ptr): number {
 }
 
 /**
+ * Read `/OverlayText` of a redact annotation via `EPDFAnnot_GetOverlayText`
+ * (standard UTF-16 byte-length ABI). Returns `null` when the key is absent
+ * (the redaction has no label), otherwise the — possibly empty — label.
+ */
+export function readOverlayText(
+  fn: PdfFunctions,
+  mem: PdfRuntimeMemory,
+  annotPtr: Ptr,
+): string | null {
+  if (!fn.FPDFAnnot_HasKey(annotPtr, 'OverlayText')) return null;
+  return readUtf16String(
+    mem,
+    (buf, capacity) => fn.EPDFAnnot_GetOverlayText(annotPtr, buf, capacity),
+    '',
+  );
+}
+
+/**
+ * Read `/Repeat` of a redact annotation via `EPDFAnnot_GetOverlayTextRepeat`
+ * (an absent key reads as `false`, the PDF default).
+ */
+export function readOverlayTextRepeat(fn: PdfFunctions, annotPtr: Ptr): boolean {
+  return fn.EPDFAnnot_GetOverlayTextRepeat(annotPtr);
+}
+
+/**
  * Read the `/IT` intent name via `EPDFAnnot_GetIntent`. Unlike the standard
  * `FPDFAnnot_GetStringValue` ABI, this getter reports the count of UTF-16
  * code units (excluding the NUL), so we size the buffer as

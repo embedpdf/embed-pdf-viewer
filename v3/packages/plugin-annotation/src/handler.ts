@@ -23,26 +23,29 @@ const pointOn = (s: PointerSample, pon: number): Vec | null =>
   s.project?.(pon) ?? (s.page?.pon === pon ? s.page.point : null);
 
 /**
- * Click-to-place for the stamp tool. Each click places one stamp centred on the
- * point (the tool stays active for repeat placement — v2 rubber-stamp behaviour).
- * Two sources, checked in order: an ARMED payload (`capability.armStamp(...)` —
- * bytes in hand, e.g. a drop) places immediately; otherwise the active tool's
- * configured source resolves — fixed bytes, or a `'prompt'` that asks the
- * environment (pick the spot first, the file second). No drag gesture: a stamp's
- * size comes from its content's intrinsic aspect, not the pointer. Priority above
- * the edit handler so a click over an existing annotation still places.
+ * Click-to-place for every payload-carrying tool (stamp / note / file
+ * attachment). Each click places one annotation centred on the point (the
+ * tool stays active for repeat placement — v2 rubber-stamp behaviour); the
+ * capability's `placeAt` routes by the active tool's kind: armed stamp bytes,
+ * a stamp/attachment prompt (pick the spot first, the payload second), or an
+ * immediate note. No drag gesture — placement size comes from the content
+ * (stamp aspect / the fixed icon box), not the pointer.
+ *
+ * Priority is deliberately BELOW the edit handler (100): a click over an
+ * EXISTING annotation selects it; placement happens on empty page space.
  */
-export function createStampHandler(anno: AnnotationHostCapability): InteractionHandler {
+export function createPlaceHandler(anno: AnnotationHostCapability): InteractionHandler {
   return {
-    id: 'annotation-stamp',
+    id: 'annotation-place',
+    // `annotation-stamp` is honoured as a legacy alias for embedder tool
+    // configs written before the tags were unified.
     priority: 95,
-    enabledFor: (t) => t.enables.has('annotation-stamp'),
+    enabledFor: (t) => t.enables.has('annotation-place') || t.enables.has('annotation-stamp'),
     onDown: (s) => {
       if (!s.page) return false;
       // The click sample's display rotation drives the tool's `upright` policy —
-      // the stamp lands reading horizontally on a rotated page/view.
-      if (anno.placeArmedStamp(s.page.pon, s.page.point, s.page.rotation)) return true;
-      return anno.requestStampAt(s.page.pon, s.page.point, s.page.rotation);
+      // the placement lands reading horizontally on a rotated page/view.
+      return anno.placeAt(s.page.pon, s.page.point, s.page.rotation);
     },
   };
 }

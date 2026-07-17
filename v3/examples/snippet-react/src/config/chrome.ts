@@ -70,6 +70,7 @@ const annotateBar: BarSchema = {
   id: 'annotate',
   sections: {
     center: [
+      group('comment', { importance: 4 }, ['annotation:add-note']),
       group('markup', { importance: 4 }, [
         'annotation:add-highlight',
         'annotation:add-strikeout',
@@ -112,6 +113,7 @@ const insertBar: BarSchema = {
     center: [
       group('stamps', { importance: 4 }, [
         'insert:add-stamp',
+        'insert:add-attachment',
         'insert:add-signature',
         'insert:add-image',
       ]),

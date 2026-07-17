@@ -56,6 +56,7 @@ export type { DocumentFormsService, FormRepairOptions } from './engine/DocumentF
 export type { DocumentSearchService } from './engine/DocumentSearchService';
 export type { WeakAnnotationEditSession } from './engine/DocumentAnnotationsService';
 export type { DocumentPagesService } from './engine/DocumentPagesService';
+export type { DocumentRedactionService } from './engine/DocumentRedactionService';
 export type { PageAnnotationsService } from './engine/PageAnnotationsService';
 export type { DocumentAttachmentsService } from './engine/DocumentAttachmentsService';
 export type { PieceInfoService } from './engine/PieceInfoService';

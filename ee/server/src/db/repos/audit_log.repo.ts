@@ -11,6 +11,7 @@ export type AuditMutationKind =
   | 'pages.rotate'
   | 'pages.delete'
   | 'pages.flatten'
+  | 'redaction.apply'
   | 'metadata.update'
   | 'attachment.create'
   | 'attachment.delete'
