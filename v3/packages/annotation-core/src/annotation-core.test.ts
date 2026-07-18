@@ -3637,3 +3637,89 @@ describe('apVersion: baked /AP content versioning (what re-fetches a raster)', (
     expect(apSizeChanged(box, wider)).toBe(true);
   });
 });
+
+describe('link prop (attached links folded onto their parent)', () => {
+  const REF = { kind: 'objectNumber', pageObjectNumber: 1, annotObjectNumber: 40 } as const;
+  const CHILD_REF = { kind: 'objectNumber', pageObjectNumber: 1, annotObjectNumber: 41 } as const;
+  const URI = { kind: 'uri', uri: 'https://www.embedpdf.com/' } as const;
+
+  const baseStyle = {
+    color: '#1d4ed8',
+    interiorColor: null,
+    strokeWidth: 2,
+    opacity: 1,
+    blendMode: 'normal',
+    border: { kind: 'solid' },
+  } as const;
+
+  const committedSquare = (extra?: Partial<Annot>): Annot => ({
+    id: 'S1',
+    ref: REF,
+    pon: PON,
+    subtype: 'square',
+    geom: { t: 'rect', rect: { x: 10, y: 10, width: 50, height: 40 }, ellipse: false },
+    style: { ...baseStyle },
+    flags: DRAWN_FLAGS,
+    source: 'baked',
+    ...extra,
+  });
+
+  const withSelected = (a: Annot): Model => {
+    const m = update(initialModel, { t: 'loaded', annots: [a] })[0];
+    return { ...m, selected: [a.id] };
+  };
+
+  it('setProps { link } on a non-link kind emits syncLink, no engine patch, and keeps the render source', () => {
+    const m = withSelected(committedSquare());
+    const [next, fx] = update(m, { t: 'setProps', patch: { link: URI } });
+    expect(next.byId['S1'].link).toEqual(URI);
+    // A link-only change is NOT appearance: no patch, no vector flip.
+    expect(next.byId['S1'].source).toBe('baked');
+    expect(fx).toEqual([{ fx: 'syncLink', id: 'S1' }]);
+  });
+
+  it('setProps { link } plus a style key emits both syncLink and a patch', () => {
+    const m = withSelected(committedSquare());
+    const [next, fx] = update(m, { t: 'setProps', patch: { link: URI, color: '#00ff00' } });
+    expect(next.byId['S1'].style.color).toBe('#00ff00');
+    expect(fx).toEqual([
+      { fx: 'patch', id: 'S1' },
+      { fx: 'syncLink', id: 'S1' },
+    ]);
+  });
+
+  it('the link KIND routes its link prop to a plain engine patch (its own /A)', () => {
+    const link = committedSquare({ id: 'L1', subtype: 'link', link: null });
+    const m = withSelected(link);
+    const [next, fx] = update(m, { t: 'setProps', patch: { link: URI } });
+    expect(next.byId['L1'].link).toEqual(URI);
+    expect(fx).toEqual([{ fx: 'patch', id: 'L1' }]);
+  });
+
+  it('widgets do not take the link key: no change, no effect', () => {
+    const widget = committedSquare({ id: 'W1', subtype: 'widget-text' });
+    const m = withSelected(widget);
+    const [next, fx] = update(m, { t: 'setProps', patch: { link: URI } });
+    expect(next).toBe(m);
+    expect(fx).toEqual([]);
+  });
+
+  it('deleting a parent also deletes its attached link children (linkRefs)', () => {
+    const parent = committedSquare({ link: URI, linkRefs: [CHILD_REF] });
+    const m = withSelected(parent);
+    const [next, fx] = update(m, { t: 'delete' });
+    expect(next.byId['S1']).toBeUndefined();
+    expect(fx).toEqual([
+      { fx: 'delete', ref: REF },
+      { fx: 'delete', ref: CHILD_REF },
+    ]);
+  });
+
+  it('the link kind paints nothing (invisible hit rectangle)', () => {
+    const link = committedSquare({ id: 'L1', subtype: 'link', link: URI, source: 'vector' });
+    const m = update(initialModel, { t: 'loaded', annots: [link] })[0];
+    const item = pageItems(m, PON).find((i) => i.id === 'L1');
+    expect(item).toBeTruthy();
+    expect(scene(item!)).toEqual([]);
+  });
+});

@@ -7,6 +7,7 @@ import type {
   InkIntent,
   LineEnding,
   LineEndings,
+  PdfLinkTarget,
   StrikeoutIntent,
 } from '@embedpdf/engine-core/runtime';
 import type { PageObjectNumber } from '@embedpdf-x/kernel';
@@ -62,6 +63,7 @@ export type Subtype =
   | 'text'
   | 'file-attachment'
   | 'redact'
+  | 'link'
   | (string & {});
 
 /**
@@ -166,6 +168,17 @@ export interface AnnotationProps extends Style, TextStyle {
    * value. Valid values are the `options` of the kind's `icon` PropSpec.
    */
   icon?: string;
+  /**
+   * Where this annotation LINKS to, or `null` for none. Optional in the bag
+   * like `icon`. One key, two storages (the props.ts routing rule): on the
+   * link kind it is the annotation's OWN target (`/A`); on every other
+   * linkable kind it is the target of the ATTACHED link child(ren) —
+   * grouped `/Link` annotations the model folds into their parent (the
+   * serialization the PDF spec forces, since only Link annotations are
+   * clickable). Writing it creates/retargets/deletes those children through
+   * the ONE `syncLink` seam.
+   */
+  link?: PdfLinkTarget | null;
 }
 
 export type PropKey = keyof AnnotationProps;
@@ -236,6 +249,21 @@ export interface Annot {
   data?: AnnotationDTO;
   /** Normalized PDF `/IT` for intent-bearing annotations authored before a DTO exists. */
   intent?: CaretIntent | StrikeoutIntent | InkIntent;
+  /**
+   * The `link` prop's value (see {@link AnnotationProps.link}): the link
+   * kind's own target, or — on other linkable kinds — the folded attached
+   * link's target. Editable via `setProps`.
+   */
+  link?: PdfLinkTarget | null;
+  /**
+   * INTERNAL join keys, never a prop: the engine refs of the attached link
+   * child annotation(s) this parent's `link` value is materialized as (one
+   * per visual segment for markup). Maintained by the repository fold and
+   * consumed by the shell's `syncLink` reconciler + delete expansion — the
+   * ONLY code allowed to touch those children. Absent on the link kind
+   * itself and on anything without an attached link.
+   */
+  linkRefs?: AnnotationRef[];
   /**
    * Relationship to another annotation. `irt` ("in reply to") links a child to a
    * parent — a reply in a comment thread, or a caret bound to its strikeout in a
@@ -649,6 +677,13 @@ export type Effect =
    *  flags-only patch (the model already holds the merged flags) and re-syncs
    *  PRESERVING the render source — flags never re-bake an appearance. */
   | { fx: 'flags'; id: Id }
+  /** The parent's `link` prop changed on a NON-link kind: reconcile its
+   *  attached link children (create / retarget / delete) against the desired
+   *  state derived from `link` + the parent's geometry. Declarative — the
+   *  shell's reconciler is the only code that spells out child operations.
+   *  (Geometry commits don't emit this; the shell re-runs the reconciler on
+   *  any `patch` of an annotation that has `linkRefs`.) */
+  | { fx: 'syncLink'; id: Id }
   | { fx: 'delete'; ref: AnnotationRef };
 
 /** Per-annotation render data — its content geometry + style + live state. */

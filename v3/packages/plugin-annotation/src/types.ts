@@ -9,6 +9,7 @@ import type {
   AttachmentContent,
   AttachmentFileSource,
   BinarySource,
+  PdfLinkTarget,
   PdfRect,
 } from '@embedpdf/engine-core/runtime';
 import type { AnnotationToolInput, ResolvedTool } from './tools';
@@ -168,6 +169,18 @@ export type AnnotationAction =
 
 /** A plugin (forms, links) marks some annotations as interactive: while engaged,
  *  they render their own DOM and are NOT geometry-editable. Suspend → editable. */
+/**
+ * One clickable link area on a page (content space): a standalone link
+ * annotation, or one segment of a parent's ATTACHED link. See
+ * {@link AnnotationHostCapability.linkItemsOn}.
+ */
+export interface LinkNavItem {
+  /** Stable per-page key: the annot id, `#n`-suffixed for attached segments. */
+  id: string;
+  rect: Rect;
+  target: PdfLinkTarget;
+}
+
 export interface Behavior {
   id: string;
   matches(a: { subtype: Subtype; ref: AnnotationRef | null }): boolean;
@@ -568,6 +581,15 @@ export interface AnnotationHostCapability extends AnnotationCapability {
     zoom?: number,
   ): string | null;
   behaviorFor(a: { subtype: Subtype; ref: AnnotationRef | null }): Behavior | null;
+  /**
+   * The clickable link areas of a page (content space): standalone link
+   * annotations plus every ATTACHED-link segment (folded children — their
+   * rects derived by the SAME rule the reconciler writes, so the clickable
+   * area and the written `/Rect`s can't disagree). Hidden annotations are
+   * excluded. THE data feed for the navigation plane (plugin-link);
+   * memoized by model identity for selector use.
+   */
+  linkItemsOn(pon: PageObjectNumber): LinkNavItem[];
   /** Drop selected annotations whose Behavior is currently ENGAGED — inert
    *  things cannot stay selected. Call after anything that flips engagement
    *  (the plugin wires it to tool changes). */

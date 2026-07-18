@@ -3209,6 +3209,37 @@ importers:
         specifier: ^2.1.9
         version: 2.1.9(@types/node@22.19.11)(less@4.6.7)(lightningcss@1.30.2)(sass-embedded@1.97.3)(sass@1.97.3)(terser@5.46.0)
 
+  v3/packages/plugin-link:
+    dependencies:
+      '@embedpdf-x/annotation-core':
+        specifier: workspace:*
+        version: link:../annotation-core
+      '@embedpdf-x/geometry':
+        specifier: workspace:*
+        version: link:../geometry
+      '@embedpdf-x/kernel':
+        specifier: workspace:*
+        version: link:../kernel
+      '@embedpdf-x/plugin-annotation':
+        specifier: workspace:*
+        version: link:../plugin-annotation
+      '@embedpdf-x/plugin-interaction':
+        specifier: workspace:*
+        version: link:../plugin-interaction
+      '@embedpdf-x/plugin-stage':
+        specifier: workspace:*
+        version: link:../plugin-stage
+      '@embedpdf/engine-core':
+        specifier: workspace:*
+        version: link:../../../packages/engine-core
+    devDependencies:
+      typescript:
+        specifier: ^5.0.0
+        version: 5.9.3
+      vitest:
+        specifier: ^2.1.9
+        version: 2.1.9(@types/node@22.19.11)(less@4.6.7)(lightningcss@1.30.2)(sass-embedded@1.97.3)(sass@1.97.3)(terser@5.46.0)
+
   v3/packages/plugin-metadata:
     dependencies:
       '@embedpdf-x/kernel':
@@ -3426,6 +3457,9 @@ importers:
       '@embedpdf-x/plugin-interaction':
         specifier: workspace:*
         version: link:../plugin-interaction
+      '@embedpdf-x/plugin-link':
+        specifier: workspace:*
+        version: link:../plugin-link
       '@embedpdf-x/plugin-metadata':
         specifier: workspace:*
         version: link:../plugin-metadata

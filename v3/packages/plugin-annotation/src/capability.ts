@@ -14,6 +14,7 @@ import { InteractionToken } from '@embedpdf-x/plugin-interaction';
 import {
   chrome as coreChrome,
   clickCreateGeom,
+  contentToPdfRect,
   creationDraftAnchor as coreCreationDraftAnchor,
   cursorAt,
   defaultsFor,
@@ -33,6 +34,7 @@ import {
   styleFromProps,
   update,
   uprightRotation,
+  viewable,
   type Annot,
   type AnnotationProps,
   type ChromeGeom,
@@ -50,7 +52,16 @@ import {
   type Vec,
   type ViewEnv,
 } from '@embedpdf-x/annotation-core';
-import { boxGeomFields, fromDTO, refKey, toCreateDraft, toPatch } from './repository';
+import {
+  boxGeomFields,
+  foldAttachedLinks,
+  fromDTO,
+  linkChildRects,
+  refKey,
+  toCreateDraft,
+  toPatch,
+  writableTarget,
+} from './repository';
 import { buildTextItems } from './text-item';
 import { buildToolRegistry } from './tools';
 import type { AnnotationToolInput, ResolvedTool } from './tools';
@@ -66,6 +77,7 @@ import type {
   SelectionProps,
   FilePickerProvider,
   FilePromptRequest,
+  LinkNavItem,
   StampToolInput,
   TextItem,
 } from './types';
@@ -299,6 +311,29 @@ export function createAnnotationCapability(
     selPropsCache = { model: m, v };
     return v;
   };
+  // The navigation plane's feed: clickable link areas per page — standalone
+  // links + attached-link segments (rects derived by the reconciler's own
+  // rule). Memoized by model identity for selector use.
+  const linkItemsCache = new Map<number, { model: Model; v: LinkNavItem[] }>();
+  const memoLinkItems = (pon: number): LinkNavItem[] => {
+    const m = model();
+    const c = linkItemsCache.get(pon);
+    if (c && c.model === m) return c.v;
+    const v: LinkNavItem[] = [];
+    for (const id of m.order) {
+      const a = m.byId[id];
+      if (!a || a.pon !== pon || a.link == null) continue;
+      if (!viewable(a.flags, false)) continue; // hidden links don't navigate
+      if (a.subtype === 'link') {
+        if (a.geom.t === 'rect') v.push({ id, rect: a.geom.rect, target: a.link });
+      } else {
+        linkChildRects(a).forEach((rect, i) => v.push({ id: `${id}#${i}`, rect, target: a.link! }));
+      }
+    }
+    linkItemsCache.set(pon, { model: m, v });
+    return v;
+  };
+
   const textsCache = new Map<
     number,
     { model: Model; zoom: number | undefined; rotation: number | undefined; v: TextItem[] }
@@ -760,6 +795,76 @@ export function createAnnotationCapability(
     for (const fx of effects) perform(fx, next);
   }
 
+  /**
+   * Per-parent serialization of attached-link reconciles: rapid edits chain
+   * instead of interleaving (two overlapping runs could double-create
+   * children). Each run reads the CURRENT model at execution time, so a
+   * chained run converges on the latest desired state.
+   */
+  const linkSyncChains = new Map<Id, Promise<void>>();
+  const scheduleLinkSync = (id: Id): void => {
+    const prev = linkSyncChains.get(id) ?? Promise.resolve();
+    const next = prev.then(() => reconcileLinkChildren(id));
+    linkSyncChains.set(id, next);
+    void next.finally(() => {
+      if (linkSyncChains.get(id) === next) linkSyncChains.delete(id);
+    });
+  };
+
+  /**
+   * THE one place attached link children are created, retargeted, re-rected,
+   * or deleted (the delete-with-parent expansion in the core is the one other
+   * consumer of `linkRefs`). Declarative: desired state is derived fresh from
+   * the parent's `link` value + committed geometry (`linkChildRects`), then
+   * diffed against the join keys the last fold reported. Idempotent — foreign
+   * inconsistencies heal on the next local edit.
+   */
+  const reconcileLinkChildren = async (id: Id): Promise<void> => {
+    const doc = ctx.doc;
+    const a = model().byId[id];
+    if (!doc || !a || !a.ref || a.subtype === 'link') return;
+    const crop = cropOf(a.pon);
+    if (!crop) return;
+    const page = doc.page(a.pon);
+    // Read-only target arms can't be (re)written: children keep their /A and
+    // only their rects follow the parent.
+    const target = writableTarget(a.link);
+    const rects = a.link == null ? [] : linkChildRects(a).map((r) => contentToPdfRect(r, crop));
+    const current = a.linkRefs ?? [];
+    const nextRefs: AnnotationRef[] = [];
+    try {
+      const paired = Math.min(current.length, rects.length);
+      for (let i = 0; i < paired; i++) {
+        const res = await page.annotations.update(current[i], {
+          subtype: 'link',
+          rect: rects[i],
+          ...(target ? { target } : {}),
+        });
+        nextRefs.push(res.updated.ref);
+      }
+      for (let i = current.length; i < rects.length; i++) {
+        const res = await page.annotations.create({
+          subtype: 'link',
+          rect: rects[i],
+          target,
+          inReplyTo: a.ref,
+          replyType: 'group',
+        });
+        nextRefs.push(res.created.ref);
+      }
+      for (let i = rects.length; i < current.length; i++) {
+        await page.annotations.delete(current[i]);
+      }
+    } catch (err) {
+      console.error('[annotation] attached-link sync failed:', err);
+    }
+    // Refresh the join keys on the CURRENT model annot (it may have moved on
+    // since this run was scheduled). Explicit `linkRefs` (possibly []) wins
+    // over the upsert's fold preservation.
+    const cur = model().byId[id];
+    if (cur) apply({ t: 'upsert', annots: [{ ...cur, linkRefs: nextRefs }] });
+  };
+
   /** A relationship-only engine patch (sets/clears `/IRT` + `/RT`) — geometry and
    *  style are left untouched, so grouping never re-bakes an appearance. */
   const relationshipPatch = (
@@ -920,9 +1025,17 @@ export function createAnnotationCapability(
         .page(a.pon)
         .annotations.update(a.ref, patch)
         .then(
-          (res) => syncDTO(res.updated, a.source, fx.apChanged === true || bakedOnly),
+          (res) => {
+            syncDTO(res.updated, a.source, fx.apChanged === true || bakedOnly);
+            // Attached link children follow their parent's COMMITTED geometry
+            // — scheduled after the parent's own write resolves, from ONE
+            // place, so no gesture ever has to know the children exist.
+            if (a.linkRefs?.length) scheduleLinkSync(fx.id);
+          },
           () => {},
         );
+    } else if (fx.fx === 'syncLink') {
+      scheduleLinkSync(fx.id);
     } else {
       doc
         .page(fx.ref.pageObjectNumber)
@@ -1079,6 +1192,7 @@ export function createAnnotationCapability(
         viewEnv(zoom, rotation),
       ),
     behaviorFor: (a) => behaviors.find((b) => b.matches(a) && b.engaged()) ?? null,
+    linkItemsOn: (pon) => memoLinkItems(pon),
 
     appearanceEpoch: (pon) => {
       // What a baked raster DEPENDS on, and nothing else: which annotations are
@@ -1282,7 +1396,11 @@ export function createAnnotationCapability(
         .page(pon)
         .annotations.list()
         .then(
-          (snap) => apply({ t: 'loaded', annots: snap.annotations.map((d) => fromDTO(d, crop)) }),
+          (snap) =>
+            apply({
+              t: 'loaded',
+              annots: foldAttachedLinks(snap.annotations.map((d) => fromDTO(d, crop))),
+            }),
           () => {
             loaded.delete(pon);
           },
@@ -1301,7 +1419,10 @@ export function createAnnotationCapability(
         const m = model();
         const stale = m.order.filter((id) => m.byId[id]?.pon === pon);
         if (stale.length) apply({ t: 'remove', ids: stale });
-        apply({ t: 'loaded', annots: snap.annotations.map((d) => fromDTO(d, crop)) });
+        apply({
+          t: 'loaded',
+          annots: foldAttachedLinks(snap.annotations.map((d) => fromDTO(d, crop))),
+        });
       } catch {
         loaded.delete(pon);
       }

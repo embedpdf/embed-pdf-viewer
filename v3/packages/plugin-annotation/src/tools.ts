@@ -113,6 +113,8 @@ export const TOOL_DEFAULT_KEYS = {
   caret: ['color', 'opacity'],
   redact: ['color', 'interiorColor', 'opacity', 'fontFamily', 'fontSize', 'fontColor', 'textAlign'],
   stamp: [],
+  // A link preset may carry a FIXED target ('docs-link' style one-click links).
+  link: ['link'],
   text: ['icon', 'color', 'opacity'],
   'file-attachment': ['icon', 'color', 'opacity'],
   // Widget CLIENT kinds (the form plugin's palette tools): the same key sets
@@ -254,6 +256,7 @@ export interface BuiltinToolKindMap {
   stamp: 'stamp';
   note: 'text';
   attachment: 'file-attachment';
+  link: 'link';
 }
 
 type DirectToolDef = {
@@ -490,6 +493,17 @@ export const DEFAULT_TOOLS: AnnotationToolInput[] = [
     source: { kind: 'prompt', accept: 'image/png,image/jpeg,application/pdf' },
     upright: true,
     ghost: { mode: 'footprint' },
+  },
+  // link — drag an invisible hit rectangle; the target is set afterwards
+  // through the selection editor (create-then-edit), unless a preset carries
+  // a fixed one (`{ id: 'docs-link', extends: 'link', defaults: { link: … } }`).
+  // While this tool is active the navigation plane stands down (no `link-nav`),
+  // so existing links become plain editable rects.
+  {
+    id: 'link',
+    subtype: 'link',
+    cursor: 'crosshair',
+    enables: DRAW_TAGS,
   },
   // sticky note ("comment") — click-to-place, no payload: each click drops a
   // fixed 20×20 icon (engine-baked /AP from /C + /Name), screen-sized and

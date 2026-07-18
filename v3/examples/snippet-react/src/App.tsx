@@ -15,6 +15,7 @@ import { selectionPlugin } from '@embedpdf-x/react/selection';
 import { annotationPlugin } from '@embedpdf-x/react/annotation';
 import { redactionPlugin } from '@embedpdf-x/react/redaction';
 import { formPlugin } from '@embedpdf-x/react/form';
+import { linkPlugin } from '@embedpdf-x/react/link';
 import { searchPlugin } from '@embedpdf-x/react/search';
 import { i18nPlugin, negotiateLocale, useT } from '@embedpdf-x/react/i18n';
 import { commandsPlugin } from '@embedpdf-x/react/commands';
@@ -64,6 +65,10 @@ const plugins = [
   // Forms: fillable under the default pointer/pan (widgets render as fill
   // controls), editable under the Form tab's 'form-edit' + palette tools.
   formPlugin({ scripting: { enabled: true } }),
+  // Links: navigable under the default pointer/pan ('link-nav'), editable
+  // under the link tool — the annotation plane then owns them (select, move,
+  // retarget via the style panel's Link control).
+  linkPlugin(),
   // Redaction: marking is the annotation plane's composed `redact` tool; this
   // plugin adds the pending-queue view + the destructive apply.
   redactionPlugin(),

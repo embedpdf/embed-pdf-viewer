@@ -24,6 +24,7 @@ import { Scrollbar } from '@embedpdf-x/react/scrollbar';
 import { RenderLayer } from '@embedpdf-x/react/render';
 import { SelectionLayer } from '@embedpdf-x/react/selection';
 import { AnnotationLayer, useFilePickerProvider } from '@embedpdf-x/react/annotation';
+import { LinkLayer } from '@embedpdf-x/react/link';
 import type { AnnotationRenderer } from '@embedpdf-x/react/annotation';
 import { formWidgetRenderer, useFormScriptingProvider } from '@embedpdf-x/react/form';
 import { SearchLayer } from '@embedpdf-x/react/search';
@@ -125,6 +126,14 @@ export function Shell() {
                   <RenderLayer annotations={false} />
                   <SelectionLayer />
                   <SearchLayer />
+                  {/* Clickable links (nav plane): anchors under the default
+                      pointer/pan tools; stands down whenever an authoring
+                      tool is active (the annotation plane owns links then).
+                      Below the AnnotationLayer so an editing free-text box
+                      wins pointer hits; the annotation layer's own surface
+                      is pointer-events: none, so clicks fall through to the
+                      anchors everywhere else. */}
+                  <LinkLayer />
                   {/* Form widgets plug into the annotation stack: engaged
                       (fill mode) they render as fill controls over the baked
                       appearance; under the Form tab they're plain editable

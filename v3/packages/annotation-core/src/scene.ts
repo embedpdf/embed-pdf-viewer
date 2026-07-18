@@ -122,6 +122,10 @@ function redactScene(geom: Geom, style: Style): SceneNode[] {
 
 /** The full painted scene for one annotation. */
 export function scene(item: RenderItem): SceneNode[] {
+  // Links paint NOTHING: an invisible hit rectangle is the norm (any visible
+  // border a PDF authored shows through the page raster). Selection chrome
+  // still outlines it, so an editable link is findable when selected.
+  if (item.subtype === 'link') return [];
   if (item.subtype === 'redact') return redactScene(item.geom, item.style);
   if (item.geom.t === 'quads') return markupScene(item.subtype, item.geom.quads, item.style);
   if (item.geom.t === 'caret') {

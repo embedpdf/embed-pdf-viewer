@@ -44,7 +44,9 @@ export const formPlugin = (options: FormPluginOptions = {}) =>
       interaction.registerTool({
         id: 'form-fill',
         cursor: 'default',
-        enables: new Set(['form-fill']),
+        // `link-nav` rides along: links keep navigating while a form is being
+        // filled (Acrobat behaviour) — inert without the link plugin.
+        enables: new Set(['form-fill', 'link-nav']),
       });
       // Design mode's resting state (the Form tab): no 'form-fill', so the
       // widget Behavior disengages and widgets select/move/resize like any

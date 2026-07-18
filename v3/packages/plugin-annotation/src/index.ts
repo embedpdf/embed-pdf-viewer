@@ -44,6 +44,7 @@ export type {
   Behavior,
   ChromeSettings,
   ChromeSettingsPatch,
+  LinkNavItem,
   SelectionFlags,
   SelectionProps,
   StampToolInput,

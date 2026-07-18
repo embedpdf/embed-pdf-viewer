@@ -83,6 +83,8 @@ export function readProp<K extends PropKey>(a: Annot, key: K): AnnotationProps[K
         return a.text?.textAlign;
       case 'icon':
         return a.icon;
+      case 'link':
+        return a.link;
     }
   })();
   return out as AnnotationProps[K] | undefined;
@@ -137,6 +139,10 @@ export function applyProps(a: Annot, patch: AnnotationPropsPatch): Annot | null 
 
   if (patch.icon !== undefined && takes.has('icon')) {
     next = { ...next, icon: patch.icon };
+  }
+
+  if (patch.link !== undefined && takes.has('link')) {
+    next = { ...next, link: patch.link };
   }
 
   if (next.text) {

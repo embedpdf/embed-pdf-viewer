@@ -12,9 +12,9 @@
  */
 import type { DocumentEvent, EffectContext } from '@embedpdf-x/kernel';
 import { encodeStableIdKey } from '@embedpdf/engine-core/runtime';
-import { update, type Annot, type Msg } from '@embedpdf-x/annotation-core';
+import { propsFor, update, type Annot, type Msg } from '@embedpdf-x/annotation-core';
 
-import { fromDTO } from './repository';
+import { fromDTO, refKey } from './repository';
 import { AnnotationToken } from './types';
 import type { AnnotationAction, AnnotationState } from './types';
 
@@ -36,8 +36,32 @@ export function registerAnnotationEffects(
     const annots: Annot[] = [];
     for (const dto of dtos) {
       const crop = cropOf(dto.pageObjectNumber);
+      if (!crop) continue;
       // Another session authored this — trust the engine's baked AP.
-      if (crop) annots.push(fromDTO(dto, crop, 'baked'));
+      const a = fromDTO(dto, crop, 'baked');
+      // A remote ATTACHED-link child (grouped /Link under a linkable local
+      // parent) folds onto the parent instead of entering the model — the
+      // same rule the page-load fold applies (see foldAttachedLinks).
+      if (a.subtype === 'link' && a.data?.subtype === 'link' && a.data.replyType === 'group') {
+        const parentId = a.data.inReplyTo ? refKey(a.data.inReplyTo) : null;
+        const parent = parentId ? ctx.getState().model.byId[parentId] : null;
+        if (
+          parent &&
+          parent.subtype !== 'link' &&
+          propsFor(parent.subtype).some((s) => s.key === 'link') &&
+          a.ref
+        ) {
+          const refs = parent.linkRefs ?? [];
+          const known = refs.some((r) => refKey(r) === a.id);
+          annots.push({
+            ...parent,
+            link: a.data.target,
+            linkRefs: known ? refs : [...refs, a.ref],
+          });
+          continue;
+        }
+      }
+      annots.push(a);
     }
     // A remote edit may have re-baked the /AP (only the resulting DTO is
     // visible here, not what changed) — advance `apVersion` so the raster
@@ -89,7 +113,30 @@ export function registerAnnotationEffects(
         upsert(event.moved);
         break;
       case 'annotation.deleted':
-        if (event.deleted) apply({ t: 'remove', ids: [encodeStableIdKey(event.deleted)] });
+        if (event.deleted) {
+          const key = encodeStableIdKey(event.deleted);
+          const m = ctx.getState().model;
+          if (m.byId[key]) {
+            apply({ t: 'remove', ids: [key] });
+          } else {
+            // Not in the model → possibly a folded ATTACHED-link child a
+            // remote session deleted: prune it from its parent's join keys
+            // (clearing the parent's link value with the last child).
+            for (const id of m.order) {
+              const a = m.byId[id];
+              const refs = a?.linkRefs;
+              if (!a || !refs?.length || !refs.some((r) => refKey(r) === key)) continue;
+              const remaining = refs.filter((r) => refKey(r) !== key);
+              apply({
+                t: 'upsert',
+                annots: [
+                  { ...a, linkRefs: remaining, ...(remaining.length ? {} : { link: null }) },
+                ],
+              });
+              break;
+            }
+          }
+        }
         break;
       default:
         break;

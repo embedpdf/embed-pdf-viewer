@@ -42,7 +42,12 @@ export type PropSpec =
   | { key: 'textAlign'; label: string }
   | { key: 'blendMode'; label: string }
   /** `/Name` icon picker for icon kinds; `options` are the legal names. */
-  | { key: 'icon'; label: string; options: readonly string[] };
+  | { key: 'icon'; label: string; options: readonly string[] }
+  /** Link-target editor (URL / page destination). Declared by the link kind
+   *  (its own target) and by every kind that may carry an ATTACHED link;
+   *  kinds that omit it (widgets, caret, redact…) simply cannot be links —
+   *  `applyProps` drops the key and menus never show the control. */
+  | { key: 'link'; label: string };
 
 /** Orthogonal capability flags. Static data — the annotation's `/F` flags are
  *  the runtime overrides (a locked annotation is never transformable, a hidden
@@ -136,8 +141,17 @@ const BORDER_PLAIN: PropSpec = { key: 'border', label: 'Border', cloudy: false }
 const LINE_ENDINGS: PropSpec = { key: 'lineEndings', label: 'Line endings' };
 const BLEND_MODE: PropSpec = { key: 'blendMode', label: 'Blend mode' };
 
+/**
+ * "This annotation links somewhere" — one spec, shared by every kind that can
+ * carry an attached link (a grouped `/Link` child; see AnnotationProps.link).
+ * Deliberately absent from: widget-* (a widget's `/A` is forms-plane
+ * behavior, not an attached link), caret (an anchored edit marker),
+ * file-attachment (its click means "open the attachment"), and redact.
+ */
+const LINKABLE: PropSpec = { key: 'link', label: 'Link' };
+
 /** Shapes with a fill + a (possibly cloudy) border: square / circle / polygon. */
-const SHAPE_PROPS: PropSpec[] = [STROKE, FILL, OPACITY, STROKE_WIDTH, BORDER_CLOUDY];
+const SHAPE_PROPS: PropSpec[] = [STROKE, FILL, OPACITY, STROKE_WIDTH, BORDER_CLOUDY, LINKABLE];
 
 // Widget-plane styling: every family has a box; text-bearing families add
 // the /DA vocabulary. Same flat keys as every other kind — the writer maps
@@ -160,12 +174,26 @@ const WIDGET_TEXT_PROPS: PropSpec[] = [
 ];
 /** Stroked vertex kinds with `/LE` endings: line / polyline. The fill colours a
  *  CLOSED ending (closed arrow / circle / square / diamond). */
-const LINE_PROPS: PropSpec[] = [STROKE, FILL, OPACITY, STROKE_WIDTH, BORDER_PLAIN, LINE_ENDINGS];
+const LINE_PROPS: PropSpec[] = [
+  STROKE,
+  FILL,
+  OPACITY,
+  STROKE_WIDTH,
+  BORDER_PLAIN,
+  LINE_ENDINGS,
+  LINKABLE,
+];
 /** Text markup: colour/opacity plus its appearance-stream blend mode. */
-const MARK_PROPS: PropSpec[] = [{ key: 'color', label: 'Color' }, OPACITY, BLEND_MODE];
+const MARK_PROPS: PropSpec[] = [{ key: 'color', label: 'Color' }, OPACITY, BLEND_MODE, LINKABLE];
 /** Carets are anchored text-edit markers, without a blend-mode control. */
 const CARET_PROPS: PropSpec[] = [{ key: 'color', label: 'Color' }, OPACITY];
-const INK_PROPS: PropSpec[] = [{ key: 'color', label: 'Color' }, OPACITY, STROKE_WIDTH, BLEND_MODE];
+const INK_PROPS: PropSpec[] = [
+  { key: 'color', label: 'Color' },
+  OPACITY,
+  STROKE_WIDTH,
+  BLEND_MODE,
+  LINKABLE,
+];
 /** Redaction marks: outline at rest; the fill + label are what apply paints.
  *  Label size 0 = auto-fit to the region (the engine's convention). */
 const REDACT_PROPS: PropSpec[] = [
@@ -187,6 +215,7 @@ const TEXT_PROPS: PropSpec[] = [
   { key: 'interiorColor', label: 'Background' },
   { key: 'color', label: 'Border' },
   { key: 'strokeWidth', label: 'Border width', min: 0, max: 12, step: 0.5 },
+  LINKABLE,
 ];
 
 /** Build caps from a sparse override — everything not named is `false`. */
@@ -473,7 +502,7 @@ export const KINDS: Record<string, AnnotationKind> = {
       noZoom: true,
       noRotate: true,
     }),
-    props: [{ key: 'icon', label: 'Icon', options: NOTE_ICONS }, ICON_COLOR, OPACITY],
+    props: [{ key: 'icon', label: 'Icon', options: NOTE_ICONS }, ICON_COLOR, OPACITY, LINKABLE],
   },
   // File attachment: the same fixed-icon shape as the note, but its primary
   // surface is the embedded FILE (open/download), not a popup.
@@ -509,7 +538,25 @@ export const KINDS: Record<string, AnnotationKind> = {
       commentable: true,
       opaqueBody: true,
     }),
-    props: [],
+    props: [LINKABLE],
+  },
+  // Link: an invisible hit rectangle that navigates somewhere. Paints nothing
+  // of its own (scene() skips it; any /AP a PDF baked shows via the page
+  // raster); `opaqueBody` gives whole-box hit-testing so the invisible rect
+  // is grabbable when the link tool makes it editable. Its `link` prop is
+  // its OWN target (`/A`) — the one kind where the key doesn't route to an
+  // attached child. No rotate: a link has no reading orientation.
+  link: {
+    subtype: 'link',
+    variant: 'rect',
+    caps: caps({
+      selectable: true,
+      movable: true,
+      resizable: true,
+      groupMovable: true,
+      opaqueBody: true,
+    }),
+    props: [LINKABLE],
   },
 };
 

@@ -24,6 +24,7 @@ import { AnnotationToken } from '@embedpdf-x/react/annotation';
 import { fieldKeyOf, FormToken } from '@embedpdf-x/react/form';
 import { RedactionToken } from '@embedpdf-x/react/redaction';
 import { SelectionToken } from '@embedpdf-x/react/selection';
+import { LinkToken, type PdfLinkTarget } from '@embedpdf-x/react/link';
 
 // ── helpers ────────────────────────────────────────────────────────────────
 type Ctx = Parameters<NonNullable<CommandDef['run']>>[0];
@@ -38,6 +39,16 @@ const hasAnnotationSelection = (c: Ctx) => (anno(c)?.selection().length ?? 0) > 
 /** v2 gated strip items per subtype (comment hidden on links/widgets) — here
  *  it's one derivation over the selected DTOs instead of per-command lookups. */
 const selectionSubtypes = (c: Ctx) => new Set((anno(c)?.getSelected() ?? []).map((a) => a.subtype));
+/**
+ * The selection's `link` value: a target, `null` (linkable but none set), or
+ * `undefined` when the selection cannot carry a link at all (widgets, mixed
+ * link states) — the schema decides, never a subtype blocklist.
+ */
+const selectionLink = (c: Ctx): PdfLinkTarget | null | undefined => {
+  const p = anno(c)?.getSelectionProps();
+  if (!p || !p.specs.some((s) => s.key === 'link') || p.mixed.includes('link')) return undefined;
+  return (p.values.link ?? null) as PdfLinkTarget | null;
+};
 
 // ── tool icon accents: THIS viewer's design decision ─────────────────────────
 // A tool declares which drawing default each colored part of its glyph previews.
@@ -392,6 +403,10 @@ export const commands: CommandDef[] = [
   // Sticky note ("comment") — click-to-place; the icon renders from the
   // engine-baked /AP in the tool's current color.
   tool('annotation:add-note', 'note', 'commands.annotate.note', 'message'),
+  // Link — drag an invisible hit rectangle, then set the target in the style
+  // panel's Link control (create-then-edit). While active, existing links
+  // become editable rects instead of navigating.
+  tool('annotation:add-link', 'link', 'commands.annotate.link', 'link'),
 
   // ── shape tools (real interaction tools) ────────────────────────────────
   tool('annotation:add-rectangle', 'square', 'commands.shapes.rectangle', 'square', {
@@ -544,6 +559,38 @@ export const commands: CommandDef[] = [
     categories: ['annotation'],
     run: (c) => void anno(c)?.ungroup(),
     visible: (c) => anno(c)?.canUngroup() ?? false,
+  },
+
+  // ── link strip items (v2's "Link / Go to link / Remove link") ───────────
+  {
+    // Make the selection a link: opens the style panel, whose Link control
+    // sets the target (create-then-edit — the plugin materializes the
+    // attached child annotations).
+    id: 'annotation:link',
+    labelKey: 'commands.annotate.link',
+    icon: 'link',
+    categories: ['annotation'],
+    panel: { id: 'annotation-style', exclusive: 'right' },
+    visible: (c) => selectionLink(c) === null,
+  },
+  {
+    id: 'annotation:goto-link',
+    labelKey: 'commands.annotate.gotoLink',
+    icon: 'externalLink',
+    categories: ['annotation'],
+    run: (c) => {
+      const target = selectionLink(c);
+      if (target) c.tryGet(LinkToken)?.activate(target);
+    },
+    visible: (c) => selectionLink(c) != null,
+  },
+  {
+    id: 'annotation:remove-link',
+    labelKey: 'commands.annotate.removeLink',
+    icon: 'linkOff',
+    categories: ['annotation'],
+    run: (c) => anno(c)?.updateSelection({ link: null }),
+    visible: (c) => selectionLink(c) != null,
   },
 
   // ── history (no plugin yet → disabled, shows the disabled styling) ──────

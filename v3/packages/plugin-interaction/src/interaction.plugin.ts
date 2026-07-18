@@ -19,19 +19,27 @@ import type {
  * Both carry `form-fill`: filling a form is the RESTING state of a viewer
  * (Acrobat's hand tool fills forms too), so widgets are fill-controls under the
  * default tools and only become geometry-editable under a form-design tool.
- * Tags are opaque to the hub — with no form plugin installed the tag is inert.
+ * Both carry `link-nav` for the same reason: links navigate under the default
+ * tools (Acrobat behaviour) and only become geometry-editable under the link
+ * tool. Tags are opaque to the hub — without the form/link plugins they're inert.
  */
 export const builtinTools = (): Tool[] => [
   {
     id: 'pointer',
     cursor: 'default',
-    enables: new Set(['text-select', 'annotation-edit', 'annotation-marquee', 'form-fill']),
+    enables: new Set([
+      'text-select',
+      'annotation-edit',
+      'annotation-marquee',
+      'form-fill',
+      'link-nav',
+    ]),
   },
   {
     id: 'pan',
     cursor: 'grab',
     gapCursor: 'grab', // pan works anywhere — the open hand doesn't stop at page edges
-    enables: new Set(['scroll', 'annotation-edit', 'form-fill']),
+    enables: new Set(['scroll', 'annotation-edit', 'form-fill', 'link-nav']),
   },
 ];
 

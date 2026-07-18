@@ -705,7 +705,8 @@ function createPointer(
           : subtype === 'square' ||
               subtype === 'circle' ||
               subtype === 'free-text' ||
-              subtype === 'redact'
+              subtype === 'redact' ||
+              subtype === 'link'
             ? {
                 g: 'create-rect',
                 subtype,
@@ -832,6 +833,9 @@ function createPointer(
     // A text kind carries its text styling from birth, so the tool's font
     // defaults actually apply to what you draw.
     ...(geom.t === 'text' ? { text: textStyleFromProps(def) } : {}),
+    // A drawn link starts at the tool preset's target ('docs-link' style
+    // presets), or dead (`null` — the create-then-edit flow).
+    ...(d.subtype === 'link' ? { link: def.link ?? null } : {}),
     flags: { ...DRAWN_FLAGS, ...d.flags },
     source: 'vector',
   };
@@ -1229,13 +1233,27 @@ function setProps(m: Model, patch: AnnotationPropsPatch): [Model, Effect[]] {
     if (!a) continue;
     const next = applyProps(a, patch);
     if (!next) continue; // locked, or no declared key in the patch
+    // The `link` slot is NOT appearance: on a non-link kind it is the folded
+    // attached-link target, materialized as separate child annotations. A
+    // link-only change therefore keeps the render source, skips the engine
+    // patch, and emits the declarative `syncLink` instead — the shell's
+    // reconciler owns the child operations. Slot spreads in `applyProps`
+    // make the identity checks exact.
+    const linkChanged = next.link !== a.link;
+    const otherChanged =
+      next.style !== a.style ||
+      next.geom !== a.geom ||
+      next.text !== a.text ||
+      next.icon !== a.icon;
     // A restyle flips to vector (we own the appearance now) — EXCEPT
     // `opaqueBody` kinds (widgets), which have no vector render: they stay
     // baked and the shell re-fetches the engine's re-baked raster on resolve.
     // Flipping them would also drop them out of `appearanceEpoch`, freezing
     // their raster forever.
-    byId[id] = capsFor(a.subtype).opaqueBody ? next : toVector(next);
-    fx.push({ fx: 'patch', id });
+    byId[id] = capsFor(a.subtype).opaqueBody || !otherChanged ? next : toVector(next);
+    // The link KIND's target lives on its own DTO — a plain engine patch.
+    if (otherChanged || (linkChanged && a.subtype === 'link')) fx.push({ fx: 'patch', id });
+    if (linkChanged && a.subtype !== 'link') fx.push({ fx: 'syncLink', id });
   }
   return fx.length ? [{ ...m, byId }, fx] : [m, []];
 }
@@ -1340,8 +1358,12 @@ function deleteSelection(m: Model): [Model, Effect[]] {
   if (!deletable.length) return [m, []];
   const fx: Effect[] = [];
   for (const id of deletable) {
-    const ref = m.byId[id]?.ref;
-    if (ref) fx.push({ fx: 'delete', ref });
+    const a = m.byId[id];
+    if (a?.ref) fx.push({ fx: 'delete', ref: a.ref });
+    // Attached link children die with their parent — besides the shell's
+    // reconciler, this is the ONE other consumer of `linkRefs`. (The
+    // children aren't model annotations, so `removeAnnots` never sees them.)
+    for (const childRef of a?.linkRefs ?? []) fx.push({ fx: 'delete', ref: childRef });
   }
   return [removeAnnots(m, deletable), fx];
 }
@@ -1398,9 +1420,19 @@ function upsertAnnots(m: Model, annots: Annot[], bumpAp = false): Model {
   for (const a of annots) {
     if (dragging.has(a.id)) continue;
     if (!byId[a.id]) order.push(a.id);
+    const prev = byId[a.id];
+    // The attached-link fold (`link` + `linkRefs` on a NON-link kind) is
+    // model-owned, like `apVersion`: a DTO-derived re-sync knows nothing of
+    // it, so an upsert that doesn't carry `linkRefs` PRESERVES the fold.
+    // The reconciler's own refreshes pass `linkRefs` explicitly ([] to
+    // clear), which wins here.
+    const fold =
+      a.linkRefs === undefined && prev?.linkRefs?.length && a.subtype !== 'link'
+        ? { link: a.link !== undefined ? a.link : prev.link, linkRefs: prev.linkRefs }
+        : {};
     // `apVersion` is model-owned, not DTO-derived: carry it across the replace,
     // +1 when this upsert confirms an engine re-bake with new raster content.
-    byId[a.id] = { ...a, apVersion: (byId[a.id]?.apVersion ?? 0) + (bumpAp ? 1 : 0) };
+    byId[a.id] = { ...a, ...fold, apVersion: (prev?.apVersion ?? 0) + (bumpAp ? 1 : 0) };
   }
   return { ...m, byId, order };
 }

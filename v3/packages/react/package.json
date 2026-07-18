@@ -89,6 +89,10 @@
       "types": "./src/form.tsx",
       "import": "./src/form.tsx"
     },
+    "./link": {
+      "types": "./src/link.tsx",
+      "import": "./src/link.tsx"
+    },
     "./toolbar": {
       "types": "./src/toolbar.tsx",
       "import": "./src/toolbar.tsx"
@@ -179,6 +183,10 @@
         "types": "./dist/form.d.ts",
         "import": "./dist/form.js"
       },
+      "./link": {
+        "types": "./dist/link.d.ts",
+        "import": "./dist/link.js"
+      },
       "./toolbar": {
         "types": "./dist/toolbar.d.ts",
         "import": "./dist/toolbar.js"
@@ -211,6 +219,7 @@
     "@embedpdf-x/plugin-search": "workspace:*",
     "@embedpdf-x/plugin-stamp": "workspace:*",
     "@embedpdf-x/plugin-i18n": "workspace:*",
+    "@embedpdf-x/plugin-link": "workspace:*",
     "@embedpdf-x/plugin-commands": "workspace:*",
     "@embedpdf-x/plugin-shell": "workspace:*",
     "@embedpdf-x/ui-core": "workspace:*",

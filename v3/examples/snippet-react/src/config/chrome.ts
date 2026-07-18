@@ -70,7 +70,7 @@ const annotateBar: BarSchema = {
   id: 'annotate',
   sections: {
     center: [
-      group('comment', { importance: 4 }, ['annotation:add-note']),
+      group('comment', { importance: 4 }, ['annotation:add-note', 'annotation:add-link']),
       group('markup', { importance: 4 }, [
         'annotation:add-highlight',
         'annotation:add-strikeout',
@@ -197,6 +197,9 @@ const annotationStrip: BarSchema = {
       group('annotation-actions', { importance: 4 }, [
         'annotation:comment',
         'annotation:style',
+        'annotation:link',
+        'annotation:goto-link',
+        'annotation:remove-link',
         'annotation:group',
         'annotation:ungroup',
       ]),

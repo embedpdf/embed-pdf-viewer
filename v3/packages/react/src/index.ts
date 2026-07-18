@@ -7,6 +7,7 @@ export * from './interaction';
 export * from './selection';
 export * from './annotation';
 export * from './annotation-menu';
+export * from './link';
 export * from './views';
 export * from './page-edit';
 export * from './metadata';

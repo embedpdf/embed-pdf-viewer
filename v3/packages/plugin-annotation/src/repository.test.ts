@@ -9,7 +9,14 @@ import type {
   PdfRect,
 } from '@embedpdf/engine-core/runtime';
 import { DRAWN_FLAGS, type Annot } from '@embedpdf-x/annotation-core';
-import { fromDTO, refKey, toCreateDraft, toPatch } from './repository';
+import {
+  foldAttachedLinks,
+  fromDTO,
+  linkChildRects,
+  refKey,
+  toCreateDraft,
+  toPatch,
+} from './repository';
 
 const CROP: PdfRect = { left: 0, bottom: 0, right: 600, top: 800 };
 
@@ -560,5 +567,108 @@ describe('repository — polygon cloudy border', () => {
     };
     const patch = toPatch(cloudyStyled, CROP) as Extract<AnnotationPatch, { subtype: 'polyline' }>;
     expect(patch).not.toHaveProperty('cloudyIntensity');
+  });
+});
+
+describe('repository — attached links (fold + desired state + link kind mapping)', () => {
+  const linkDTO = (
+    annotObjectNumber: number,
+    target: import('@embedpdf/engine-core/runtime').PdfLinkTarget | null,
+    rel?: { inReplyTo: AnnotationRef; replyType: 'group' | 'reply' },
+  ): AnnotationDTO =>
+    ({
+      ...squareDTO(
+        annotObjectNumber,
+        rel ? { inReplyTo: rel.inReplyTo, replyType: rel.replyType } : undefined,
+      ),
+      subtype: 'link',
+      target,
+    }) as unknown as AnnotationDTO;
+
+  const URI = { kind: 'uri', uri: 'https://www.embedpdf.com/' } as const;
+  const parentRef: AnnotationRef = {
+    kind: 'objectNumber',
+    pageObjectNumber: 1,
+    annotObjectNumber: 10,
+  };
+
+  it('fromDTO maps a link DTO target onto the link slot', () => {
+    const a = fromDTO(linkDTO(20, URI), CROP);
+    expect(a.subtype).toBe('link');
+    expect(a.link).toEqual(URI);
+  });
+
+  it('folds a grouped link child onto its linkable parent and removes it', () => {
+    const parent = fromDTO(squareDTO(10), CROP);
+    const child = fromDTO(linkDTO(11, URI, { inReplyTo: parentRef, replyType: 'group' }), CROP);
+    const out = foldAttachedLinks([parent, child]);
+    expect(out).toHaveLength(1);
+    expect(out[0].id).toBe(parent.id);
+    expect(out[0].link).toEqual(URI);
+    expect(out[0].linkRefs?.map(refKey)).toEqual([refKey(child.ref!)]);
+  });
+
+  it('does NOT fold onto non-linkable parents (widgets) or other links — orphans stay standalone', () => {
+    const widget = { ...fromDTO(squareDTO(10), CROP), subtype: 'widget-text' };
+    const child = fromDTO(linkDTO(11, URI, { inReplyTo: parentRef, replyType: 'group' }), CROP);
+    const orphan = fromDTO(
+      linkDTO(12, URI, {
+        inReplyTo: { kind: 'objectNumber', pageObjectNumber: 1, annotObjectNumber: 99 },
+        replyType: 'group',
+      }),
+      CROP,
+    );
+    const out = foldAttachedLinks([widget, child, orphan]);
+    expect(out).toHaveLength(3); // nothing folded, nothing hidden
+  });
+
+  it('multi-segment: several children fold to ONE link value + all join keys', () => {
+    const parent = fromDTO(squareDTO(10), CROP);
+    const c1 = fromDTO(linkDTO(11, URI, { inReplyTo: parentRef, replyType: 'group' }), CROP);
+    const c2 = fromDTO(linkDTO(12, URI, { inReplyTo: parentRef, replyType: 'group' }), CROP);
+    const out = foldAttachedLinks([parent, c1, c2]);
+    expect(out).toHaveLength(1);
+    expect(out[0].linkRefs).toHaveLength(2);
+  });
+
+  it('linkChildRects: one rect per markup quad, one visual-bounds rect otherwise', () => {
+    const square = fromDTO(squareDTO(10), CROP);
+    expect(linkChildRects(square)).toHaveLength(1);
+    const markup: Annot = {
+      ...square,
+      subtype: 'highlight',
+      geom: {
+        t: 'quads',
+        quads: [
+          [
+            { x: 0, y: 0 },
+            { x: 50, y: 0 },
+            { x: 0, y: 10 },
+            { x: 50, y: 10 },
+          ],
+          [
+            { x: 0, y: 20 },
+            { x: 30, y: 20 },
+            { x: 0, y: 30 },
+            { x: 30, y: 30 },
+          ],
+        ],
+      },
+    };
+    const rects = linkChildRects(markup);
+    expect(rects).toHaveLength(2);
+    expect(rects[0]).toEqual({ x: 0, y: 0, width: 50, height: 10 });
+  });
+
+  it('toPatch on the link kind: writable target rides, null clears, read-only arms leave', () => {
+    const base = { ...fromDTO(linkDTO(20, URI), CROP) };
+    const patched = toPatch(base, CROP);
+    expect(patched && 'target' in patched && patched.target).toEqual(URI);
+
+    const dead = toPatch({ ...base, link: null }, CROP);
+    expect(dead && 'target' in dead && dead.target).toBeNull();
+
+    const js = toPatch({ ...base, link: { kind: 'javascript' } }, CROP);
+    expect(js && !('target' in js)).toBe(true); // geometry-only: foreign /A survives
   });
 });
