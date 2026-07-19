@@ -1,4 +1,4 @@
 [submodule "packages/pdf-runtime/runtime-src"]
-	path = packages/pdf-runtime/runtime-src
+	path = packages/engine/runtime/runtime-src
 	url = https://github.com/embedpdf/pdfium.git
 	branch = embedpdf/main

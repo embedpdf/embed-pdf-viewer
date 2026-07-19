@@ -1,0 +1,44 @@
+{
+  "name": "@embedpdf/example-react",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview",
+    "typecheck": "tsc -p tsconfig.json"
+  },
+  "dependencies": {
+    "@cloudpdf/engine": "workspace:*",
+    "@embedpdf/engine": "workspace:*",
+    "@embedpdf/engine-core": "workspace:*",
+    "@embedpdf/engine-runtime": "workspace:*",
+    "@embedpdf/core": "workspace:*",
+    "@embedpdf/plugin-interaction": "workspace:*",
+    "@embedpdf/plugin-selection": "workspace:*",
+    "@embedpdf/core-annotation": "workspace:*",
+    "@embedpdf/plugin-annotation": "workspace:*",
+    "@embedpdf/plugin-page-edit": "workspace:*",
+    "@embedpdf/plugin-metadata": "workspace:*",
+    "@embedpdf/plugin-persist": "workspace:*",
+    "@embedpdf/plugin-render": "workspace:*",
+    "@embedpdf/plugin-view-manager": "workspace:*",
+    "@embedpdf/react": "workspace:*",
+    "@embedpdf/plugin-stage": "workspace:*",
+    "@embedpdf/core-stage": "workspace:*",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "@embedpdf/plugin-form": "workspace:*",
+    "@embedpdf/plugin-search": "workspace:*",
+    "@embedpdf/plugin-stamp": "workspace:*",
+    "@embedpdf/plugin-i18n": "workspace:*"
+  },
+  "devDependencies": {
+    "@types/react": "^18.3.0",
+    "@types/react-dom": "^18.3.0",
+    "@vitejs/plugin-react": "^4.3.0",
+    "typescript": "^5.0.0",
+    "vite": "^6.0.0"
+  }
+}

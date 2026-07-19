@@ -1,0 +1,20 @@
+{
+  "version": "0.0.0",
+  "license": "MIT",
+  "publishConfig": {
+    "access": "public"
+  },
+  "name": "@embedpdf/engine-runtime-darwin-arm64",
+  "os": [
+    "darwin"
+  ],
+  "cpu": [
+    "arm64"
+  ],
+  "main": "./lib/pdf-runtime.node",
+  "files": [
+    "lib",
+    "README.md",
+    "LICENSE"
+  ]
+}

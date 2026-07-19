@@ -3,10 +3,10 @@
 // if the TS source actually shipped in the tarball (epdf.rawExports + files).
 import { createElement } from 'react';
 import { createRoot } from 'react-dom/client';
-import { Viewer } from '@embedpdf-x/react/runtime';
-import type { Engine } from '@embedpdf-x/react/runtime';
-import { stagePlugin } from '@embedpdf-x/react/stage';
-import { renderPlugin } from '@embedpdf-x/react/render';
+import { Viewer } from '@embedpdf/react/runtime';
+import type { Engine } from '@embedpdf/react/runtime';
+import { stagePlugin } from '@embedpdf/react/stage';
+import { renderPlugin } from '@embedpdf/react/render';
 
 async function createEngine(): Promise<Engine> {
   const { createLocalEngineWithWorker } = await import('@embedpdf/engine');

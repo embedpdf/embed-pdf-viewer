@@ -1,0 +1,180 @@
+{
+  "name": "@embedpdf/react",
+  "version": "0.0.0",
+  "private": true,
+  "description": "React adapter for EmbedPDF v3: one generic reactive binding + structural components (Viewer, Stage, PageView) + headless layers & hooks. The whole framework surface.",
+  "type": "module",
+  "sideEffects": false,
+  "main": "./dist/index.cjs",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.cts",
+  "exports": {
+    ".": "./src/index.ts",
+    "./annotation": "./src/annotation.tsx",
+    "./annotation-menu": "./src/annotation-menu.tsx",
+    "./commands": "./src/commands.ts",
+    "./form": "./src/form.tsx",
+    "./i18n": "./src/i18n.ts",
+    "./interaction": "./src/interaction.tsx",
+    "./link": "./src/link.tsx",
+    "./metadata": "./src/metadata.ts",
+    "./page-edit": "./src/page-edit.ts",
+    "./page-view": "./src/page-view.tsx",
+    "./redaction": "./src/redaction.tsx",
+    "./render": "./src/render.tsx",
+    "./runtime": "./src/runtime.tsx",
+    "./scrollbar": "./src/scrollbar.tsx",
+    "./search": "./src/search.tsx",
+    "./selection": "./src/selection.tsx",
+    "./shell": "./src/shell.ts",
+    "./stage": "./src/stage.tsx",
+    "./stamp": "./src/stamp.tsx",
+    "./toolbar": "./src/toolbar.tsx",
+    "./views": "./src/views.ts",
+    "./package.json": "./package.json"
+  },
+  "publishConfig": {
+    "main": "./dist/index.js",
+    "module": "./dist/index.js",
+    "types": "./dist/index.d.ts",
+    "exports": {
+      ".": {
+        "import": "./dist/index.js",
+        "require": "./dist/index.cjs"
+      },
+      "./annotation": {
+        "import": "./dist/annotation.js",
+        "require": "./dist/annotation.cjs"
+      },
+      "./annotation-menu": {
+        "import": "./dist/annotation-menu.js",
+        "require": "./dist/annotation-menu.cjs"
+      },
+      "./commands": {
+        "import": "./dist/commands.js",
+        "require": "./dist/commands.cjs"
+      },
+      "./form": {
+        "import": "./dist/form.js",
+        "require": "./dist/form.cjs"
+      },
+      "./i18n": {
+        "import": "./dist/i18n.js",
+        "require": "./dist/i18n.cjs"
+      },
+      "./interaction": {
+        "import": "./dist/interaction.js",
+        "require": "./dist/interaction.cjs"
+      },
+      "./link": {
+        "import": "./dist/link.js",
+        "require": "./dist/link.cjs"
+      },
+      "./metadata": {
+        "import": "./dist/metadata.js",
+        "require": "./dist/metadata.cjs"
+      },
+      "./page-edit": {
+        "import": "./dist/page-edit.js",
+        "require": "./dist/page-edit.cjs"
+      },
+      "./page-view": {
+        "import": "./dist/page-view.js",
+        "require": "./dist/page-view.cjs"
+      },
+      "./redaction": {
+        "import": "./dist/redaction.js",
+        "require": "./dist/redaction.cjs"
+      },
+      "./render": {
+        "import": "./dist/render.js",
+        "require": "./dist/render.cjs"
+      },
+      "./runtime": {
+        "import": "./dist/runtime.js",
+        "require": "./dist/runtime.cjs"
+      },
+      "./scrollbar": {
+        "import": "./dist/scrollbar.js",
+        "require": "./dist/scrollbar.cjs"
+      },
+      "./search": {
+        "import": "./dist/search.js",
+        "require": "./dist/search.cjs"
+      },
+      "./selection": {
+        "import": "./dist/selection.js",
+        "require": "./dist/selection.cjs"
+      },
+      "./shell": {
+        "import": "./dist/shell.js",
+        "require": "./dist/shell.cjs"
+      },
+      "./stage": {
+        "import": "./dist/stage.js",
+        "require": "./dist/stage.cjs"
+      },
+      "./stamp": {
+        "import": "./dist/stamp.js",
+        "require": "./dist/stamp.cjs"
+      },
+      "./toolbar": {
+        "import": "./dist/toolbar.js",
+        "require": "./dist/toolbar.cjs"
+      },
+      "./views": {
+        "import": "./dist/views.js",
+        "require": "./dist/views.cjs"
+      },
+      "./package.json": "./package.json"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "epdf-build",
+    "clean": "rimraf dist",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@embedpdf/core-annotation": "workspace:*",
+    "@embedpdf/core-geometry": "workspace:*",
+    "@embedpdf/core": "workspace:*",
+    "@embedpdf/plugin-annotation": "workspace:*",
+    "@embedpdf/plugin-commands": "workspace:*",
+    "@embedpdf/plugin-form": "workspace:*",
+    "@embedpdf/plugin-i18n": "workspace:*",
+    "@embedpdf/plugin-interaction": "workspace:*",
+    "@embedpdf/plugin-link": "workspace:*",
+    "@embedpdf/plugin-metadata": "workspace:*",
+    "@embedpdf/plugin-page-edit": "workspace:*",
+    "@embedpdf/plugin-redaction": "workspace:*",
+    "@embedpdf/plugin-render": "workspace:*",
+    "@embedpdf/plugin-search": "workspace:*",
+    "@embedpdf/plugin-selection": "workspace:*",
+    "@embedpdf/plugin-shell": "workspace:*",
+    "@embedpdf/plugin-stage": "workspace:*",
+    "@embedpdf/plugin-stamp": "workspace:*",
+    "@embedpdf/plugin-view-manager": "workspace:*",
+    "@embedpdf/core-stage": "workspace:*",
+    "@embedpdf/core-ui": "workspace:*",
+    "@embedpdf/web": "workspace:*"
+  },
+  "peerDependencies": {
+    "react": ">=18",
+    "react-dom": ">=18"
+  },
+  "devDependencies": {
+    "@testing-library/dom": "^10.4.1",
+    "@testing-library/react": "^16.3.2",
+    "@types/react": "^18.3.0",
+    "@types/react-dom": "^18.3.0",
+    "happy-dom": "^20.11.0",
+    "typescript": "^5.0.0",
+    "vitest": "^2.1.9",
+    "@embedpdf/tooling-build": "workspace:*"
+  },
+  "license": "MIT"
+}

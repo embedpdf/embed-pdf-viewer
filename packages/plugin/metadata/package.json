@@ -1,0 +1,45 @@
+{
+  "name": "@embedpdf/plugin-metadata",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Document-scoped metadata: reactive Info-dict state fed by the document event stream (own edits + remote SSE), with a three-state update that writes to the layer.",
+  "type": "module",
+  "main": "./dist/index.cjs",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.cts",
+  "exports": {
+    ".": "./src/index.ts",
+    "./package.json": "./package.json"
+  },
+  "publishConfig": {
+    "main": "./dist/index.js",
+    "module": "./dist/index.js",
+    "types": "./dist/index.d.ts",
+    "exports": {
+      ".": {
+        "import": "./dist/index.js",
+        "require": "./dist/index.cjs"
+      },
+      "./package.json": "./package.json"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "epdf-build",
+    "clean": "rimraf dist",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@embedpdf/core": "workspace:*"
+  },
+  "devDependencies": {
+    "typescript": "^5.0.0",
+    "vitest": "^2.1.9",
+    "@embedpdf/tooling-build": "workspace:*"
+  },
+  "license": "MIT",
+  "sideEffects": false
+}

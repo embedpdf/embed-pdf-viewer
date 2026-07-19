@@ -25,10 +25,10 @@ the **handles** we create (pinned per worker) and PDFium's internal **globals**
 
 Per-thread globals are gated behind a real GN arg, **default off**:
 
-- Declared in `packages/pdf-runtime/runtime-src/pdfium.gni`
+- Declared in `packages/engine/runtime/runtime-src/pdfium.gni`
   (`embedpdf_thread_local_globals = false`).
 - Translated to the `EPDF_THREAD_LOCAL_GLOBALS` define in
-  `packages/pdf-runtime/runtime-src/BUILD.gn`, consumed by the `EPDF_TLS` macro
+  `packages/engine/runtime/runtime-src/BUILD.gn`, consumed by the `EPDF_TLS` macro
   (`core/fxcrt/epdf_tls.h`).
 - Turned **on per native target** (and left **off for wasm**) by
   `scripts/embedpdf-runtime/build-target.sh`. wasm needs nothing — each instance
@@ -62,12 +62,12 @@ so a TSAN run surfaces PDFium findings rather than masking them.
 
    ```bash
    # plain build, native target (defaults EMBEDPDF_TLS_GLOBALS=true)
-   packages/pdf-runtime/runtime-src/scripts/embedpdf-runtime/thread-soak-target.sh \
+   packages/engine/runtime/runtime-src/scripts/embedpdf-runtime/thread-soak-target.sh \
      darwin-arm64 path/to/icc-and-font-heavy.pdf -- --threads=8 --iterations=200
 
    # under ThreadSanitizer (the gate)
    EMBEDPDF_TSAN=1 \
-   packages/pdf-runtime/runtime-src/scripts/embedpdf-runtime/thread-soak-target.sh \
+   packages/engine/runtime/runtime-src/scripts/embedpdf-runtime/thread-soak-target.sh \
      linux-x64 path/to/icc-and-font-heavy.pdf -- --threads=8 --iterations=200
    ```
 
@@ -78,10 +78,10 @@ so a TSAN run surfaces PDFium findings rather than masking them.
    `thread_local` variant is still correct single-threaded:
 
    ```bash
-   packages/pdf-runtime/runtime-src/scripts/embedpdf-runtime/test-target.sh linux-x64
+   packages/engine/runtime/runtime-src/scripts/embedpdf-runtime/test-target.sh linux-x64
    # baseline (process-global) comparison:
    EMBEDPDF_TLS_GLOBALS=false \
-     packages/pdf-runtime/runtime-src/scripts/embedpdf-runtime/test-target.sh linux-x64
+     packages/engine/runtime/runtime-src/scripts/embedpdf-runtime/test-target.sh linux-x64
    ```
 
 Only after TSAN + soak are green should you raise the pool size in production.

@@ -7,8 +7,8 @@ import {
   javaScriptProgramFromActionTree,
   scriptFieldsFromSnapshot,
   type ScriptInput,
-} from '../../../v3/packages/acrojs-core/src';
-import { createQuickJsSandbox } from '../../../v3/packages/js-sandbox/src';
+} from '../../../packages/acrojs-core/src';
+import { createQuickJsSandbox } from '../../../packages/js-sandbox/src';
 import { createCloudEngine } from '../src/index';
 import {
   buildDbSeededFixture,

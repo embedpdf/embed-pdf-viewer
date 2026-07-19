@@ -16,7 +16,7 @@
 #   build    (default) fetch the pinned thread-local libpdfium + compile
 #            the N-API addon in-image. Fully self-contained, needs the
 #            C++ toolchain. Used for local/dev builds.
-#   prebuilt reuse a CI-produced packages/pdf-runtime/npm/linux-x64/lib
+#   prebuilt reuse a CI-produced packages/engine/runtime/npm/linux-x64/lib
 #            payload that is staged into the build context before build.
 #            Faster, and pins the image to the exact released binary.
 #
@@ -60,14 +60,14 @@ RUN rm -f .npmrc && pnpm install --frozen-lockfile
 #               (it arrives via the COPY above); just verify it is present.
 RUN set -eux; \
     if [ "$NATIVE_SRC" = "prebuilt" ]; then \
-      test -f packages/pdf-runtime/npm/linux-x64/lib/pdf-runtime.node \
+      test -f packages/engine/runtime/npm/linux-x64/lib/pdf-runtime.node \
         || { echo "NATIVE_SRC=prebuilt but no prebuilt lib in build context" >&2; exit 1; }; \
     else \
       CC=clang CXX=clang++ LDFLAGS=-fuse-ld=lld \
-        pnpm --filter @embedpdf/pdf-runtime build:target linux-x64; \
+        pnpm --filter @embedpdf/engine-runtime build:target linux-x64; \
     fi; \
-    test -f packages/pdf-runtime/npm/linux-x64/lib/pdf-runtime.node; \
-    test -f packages/pdf-runtime/npm/linux-x64/lib/libpdfium.so
+    test -f packages/engine/runtime/npm/linux-x64/lib/pdf-runtime.node; \
+    test -f packages/engine/runtime/npm/linux-x64/lib/libpdfium.so
 
 # Build the server and its workspace dependency closure. The `<pkg>...`
 # suffix selects @cloudpdf/server + everything it depends on, and pnpm runs
@@ -82,7 +82,7 @@ RUN pnpm --filter "@cloudpdf/server..." run build
 # the repo does not set inject-workspace-packages, so the new deploy
 # implementation would refuse to run.
 # The linux-x64 platform package is an optional transitive dependency of
-# @embedpdf/pdf-runtime, so pnpm is not required to root-link it under
+# @embedpdf/engine-runtime, so pnpm is not required to root-link it under
 # /prod/node_modules. Verify the real runtime contract instead: pdf-runtime can
 # resolve its platform addon, and libpdfium.so sits beside the addon for RPATH.
 RUN pnpm --filter=@cloudpdf/server deploy --prod --legacy /prod \
@@ -92,8 +92,8 @@ RUN pnpm --filter=@cloudpdf/server deploy --prod --legacy /prod \
 const fs = require('node:fs'); \
 const path = require('node:path'); \
 const { createRequire } = require('node:module'); \
-const runtimeRequire = createRequire(require.resolve('@embedpdf/pdf-runtime')); \
-const addon = runtimeRequire.resolve('@embedpdf/pdf-runtime-linux-x64'); \
+const runtimeRequire = createRequire(require.resolve('@embedpdf/engine-runtime')); \
+const addon = runtimeRequire.resolve('@embedpdf/engine-runtime-linux-x64'); \
 const so = path.join(path.dirname(addon), 'libpdfium.so'); \
 if (!fs.existsSync(addon)) throw new Error('missing addon: ' + addon); \
 if (!fs.existsSync(so)) throw new Error('missing libpdfium.so: ' + so); \

@@ -1,0 +1,48 @@
+{
+  "name": "@embedpdf/plugin-selection",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Text selection: reads engine text geometry (PDF y-up), bridges it to viewer content space, hit-tests glyphs, and renders highlight rects. The first client of the interaction hub.",
+  "type": "module",
+  "main": "./dist/index.cjs",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.cts",
+  "exports": {
+    ".": "./src/index.ts",
+    "./package.json": "./package.json"
+  },
+  "publishConfig": {
+    "main": "./dist/index.js",
+    "module": "./dist/index.js",
+    "types": "./dist/index.d.ts",
+    "exports": {
+      ".": {
+        "import": "./dist/index.js",
+        "require": "./dist/index.cjs"
+      },
+      "./package.json": "./package.json"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "epdf-build",
+    "clean": "rimraf dist",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@embedpdf/core": "workspace:*",
+    "@embedpdf/core-geometry": "workspace:*",
+    "@embedpdf/plugin-interaction": "workspace:*",
+    "@embedpdf/engine-core": "workspace:*"
+  },
+  "devDependencies": {
+    "typescript": "^5.0.0",
+    "vitest": "^2.1.9",
+    "@embedpdf/tooling-build": "workspace:*"
+  },
+  "license": "MIT",
+  "sideEffects": false
+}

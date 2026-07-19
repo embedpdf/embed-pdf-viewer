@@ -1,21 +1,21 @@
 // Consumer archetype: CJS require() — Jest-on-CJS setups, older Electron.
 const { ok } = require('node:assert');
 
-const geometry = require('@embedpdf-x/geometry');
-const kernel = require('@embedpdf-x/kernel');
-const uiCore = require('@embedpdf-x/ui-core');
-const annotationCore = require('@embedpdf-x/annotation-core');
+const geometry = require('@embedpdf/core-geometry');
+const kernel = require('@embedpdf/core');
+const uiCore = require('@embedpdf/core-ui');
+const annotationCore = require('@embedpdf/core-annotation');
 
 const engineCore = require('@embedpdf/engine-core');
 const engineCoreRuntime = require('@embedpdf/engine-core/runtime');
 const engineServices = require('@embedpdf/engine-services');
 const engine = require('@embedpdf/engine');
 
-const pluginStage = require('@embedpdf-x/plugin-stage');
-const pluginAnnotation = require('@embedpdf-x/plugin-annotation');
+const pluginStage = require('@embedpdf/plugin-stage');
+const pluginAnnotation = require('@embedpdf/plugin-annotation');
 
-const reactAdapter = require('@embedpdf-x/react');
-const reactRuntime = require('@embedpdf-x/react/runtime');
+const reactAdapter = require('@embedpdf/react');
+const reactRuntime = require('@embedpdf/react/runtime');
 
 ok(typeof engineCoreRuntime.AbortablePromise === 'function', 'AbortablePromise via require');
 ok(typeof reactRuntime.Viewer === 'function', 'Viewer via require');

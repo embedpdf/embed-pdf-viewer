@@ -1,0 +1,14 @@
+{
+  "fork": "embedpdf/pdfium",
+  "sha": "local",
+  "artifacts": {
+    "wasm32": {
+      "url": "file:///Users/bobsingor/GitHub/pdf-viewer/packages/engine/runtime/runtime-src/out/embedpdf-runtime-artifacts/libembedpdf-pdf-runtime-wasm32-14d7e7596.tar.gz",
+      "sha256": "f23ba7514032f0d56b75f077768cc0dc5d733756ba5c2b576d58a0e07ce32d03"
+    },
+    "darwin-arm64": {
+      "url": "file:///Users/bobsingor/GitHub/pdf-viewer/packages/engine/runtime/runtime-src/out/embedpdf-runtime-artifacts/libembedpdf-pdf-runtime-darwin-arm64-14d7e7596.tar.gz",
+      "sha256": "07f59ab5d59242780911f66a8f6797306434fa712732c36703fcae52871eb998"
+    }
+  }
+}

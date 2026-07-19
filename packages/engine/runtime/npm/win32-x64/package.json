@@ -1,0 +1,20 @@
+{
+  "version": "0.0.0",
+  "license": "MIT",
+  "publishConfig": {
+    "access": "public"
+  },
+  "name": "@embedpdf/engine-runtime-win32-x64",
+  "os": [
+    "win32"
+  ],
+  "cpu": [
+    "x64"
+  ],
+  "main": "./lib/pdf-runtime.node",
+  "files": [
+    "lib",
+    "README.md",
+    "LICENSE"
+  ]
+}

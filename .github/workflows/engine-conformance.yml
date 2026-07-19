@@ -36,7 +36,7 @@ env:
 
 jobs:
   build-runtime:
-    uses: ./.github/workflows/build-pdf-runtime.yml
+    uses: ./.github/workflows/build-engine-runtime.yml
     secrets: inherit
 
   conformance:
@@ -58,26 +58,26 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
-      - name: Download pdf-runtime artifacts (linux-x64 + wasm32)
+      - name: Download engine-runtime artifacts (linux-x64 + wasm32)
         uses: actions/download-artifact@v7
         with:
-          pattern: pdf-runtime-*
-          path: packages/pdf-runtime/_artifacts
+          pattern: engine-runtime-*
+          path: packages/engine/runtime/_artifacts
 
       - name: Stage runtime payloads
         shell: bash
         run: |
           shopt -s nullglob
-          for dir in packages/pdf-runtime/_artifacts/pdf-runtime-*; do
-            target="${dir##*/pdf-runtime-}"
-            mkdir -p "packages/pdf-runtime/npm/$target"
-            cp -R "$dir/." "packages/pdf-runtime/npm/$target/"
+          for dir in packages/engine/runtime/_artifacts/engine-runtime-*; do
+            target="${dir##*/engine-runtime-}"
+            mkdir -p "packages/engine/runtime/npm/$target"
+            cp -R "$dir/." "packages/engine/runtime/npm/$target/"
           done
-          rm -rf packages/pdf-runtime/_artifacts
+          rm -rf packages/engine/runtime/_artifacts
 
       - name: Build engine packages
         run: |
-          pnpm --filter @embedpdf/pdf-runtime build
+          pnpm --filter @embedpdf/engine-runtime build
           pnpm --filter @embedpdf/engine-core build
           pnpm --filter @embedpdf/engine-services build
           pnpm --filter @embedpdf/engine build
@@ -91,4 +91,4 @@ jobs:
         run: pnpm --filter @cloudpdf/engine test
 
       - name: Engine v3 parity demo (local vs cloud)
-        run: pnpm --filter @embedpdf/example-pdf-runtime-demo run engine:node
+        run: pnpm --filter @embedpdf/example-engine-runtime-demo run engine:node

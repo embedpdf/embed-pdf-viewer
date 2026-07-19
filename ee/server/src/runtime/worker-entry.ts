@@ -8,7 +8,7 @@
  * terminate cleanly.
  */
 import { parentPort, workerData } from 'node:worker_threads';
-import { createPdfRuntime } from '@embedpdf/pdf-runtime';
+import { createPdfRuntime } from '@embedpdf/engine-runtime';
 import { WorkerHost, type StartupFontSpec } from '@embedpdf/engine-services';
 import type { WirePack, WorkerRequest, WorkerResponse } from '@embedpdf/engine-core/runtime';
 import type { WorkerBootstrapData } from './WorkerThreadPool';

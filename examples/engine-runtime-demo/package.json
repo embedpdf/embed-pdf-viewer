@@ -1,0 +1,27 @@
+{
+  "name": "@embedpdf/example-pdf-runtime-demo",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "node": "tsx src/node.ts",
+    "node:wasm": "PDF_RUNTIME_PREFER=wasm tsx src/node.ts",
+    "engine:node": "tsx src/engine-node.ts",
+    "engine:annotations": "tsx src/annotations-node.ts",
+    "engine:mutations": "tsx src/mutations-node.ts",
+    "engine:pages": "tsx src/pages-node.ts"
+  },
+  "dependencies": {
+    "@cloudpdf/engine": "workspace:*",
+    "@cloudpdf/server": "workspace:*",
+    "@embedpdf/engine-core": "workspace:*",
+    "@embedpdf/engine": "workspace:*",
+    "@embedpdf/engine-runtime": "workspace:*"
+  },
+  "devDependencies": {
+    "@types/node": "^22.19.0",
+    "tsx": "^4.19.0",
+    "vite": "^5.4.0"
+  }
+}

@@ -25,7 +25,7 @@ env:
 
 jobs:
   build-runtime:
-    uses: ./.github/workflows/build-pdf-runtime.yml
+    uses: ./.github/workflows/build-engine-runtime.yml
     secrets: inherit
 
   release:
@@ -60,24 +60,24 @@ jobs:
       - name: Install deps
         run: pnpm install --frozen-lockfile
 
-      - name: Download pdf-runtime artifacts
+      - name: Download engine-runtime artifacts
         uses: actions/download-artifact@v7
         with:
-          pattern: pdf-runtime-*
-          path: packages/pdf-runtime/_artifacts
+          pattern: engine-runtime-*
+          path: packages/engine/runtime/_artifacts
 
       - name: Stage runtime payloads
         run: |
           shopt -s nullglob
-          for dir in packages/pdf-runtime/_artifacts/pdf-runtime-*; do
-            target="${dir##*/pdf-runtime-}"
-            mkdir -p "packages/pdf-runtime/npm/$target"
-            cp -R "$dir/." "packages/pdf-runtime/npm/$target/"
+          for dir in packages/engine/runtime/_artifacts/engine-runtime-*; do
+            target="${dir##*/engine-runtime-}"
+            mkdir -p "packages/engine/runtime/npm/$target"
+            cp -R "$dir/." "packages/engine/runtime/npm/$target/"
           done
-          rm -rf packages/pdf-runtime/_artifacts
+          rm -rf packages/engine/runtime/_artifacts
 
-      - name: Verify pdf-runtime packages
-        run: pnpm run verify:pdf-runtime-packages
+      - name: Verify engine-runtime packages
+        run: pnpm run verify:engine-runtime-packages
 
       - name: Build packages
         run: pnpm run build:release
@@ -198,8 +198,8 @@ jobs:
       - name: Download linux-x64 native runtime
         uses: actions/download-artifact@v7
         with:
-          name: pdf-runtime-linux-x64
-          path: packages/pdf-runtime/npm/linux-x64
+          name: engine-runtime-linux-x64
+          path: packages/engine/runtime/npm/linux-x64
 
       - name: Log in to GitHub Container Registry
         uses: docker/login-action@v3

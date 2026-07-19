@@ -5,8 +5,8 @@ on:
     branches: [next]
     paths:
       - "packages/**"
-      - "viewers/**"
       - "ee/**"
+      - "tooling/**"
       - ".changeset/**"
       - "pnpm-lock.yaml"
   workflow_dispatch: {}
@@ -25,7 +25,7 @@ env:
 
 jobs:
   build-runtime:
-    uses: ./.github/workflows/build-pdf-runtime.yml
+    uses: ./.github/workflows/build-engine-runtime.yml
     secrets: inherit
 
   release:
@@ -60,24 +60,24 @@ jobs:
       - name: Install deps
         run: pnpm install --frozen-lockfile
 
-      - name: Download pdf-runtime artifacts
+      - name: Download engine-runtime artifacts
         uses: actions/download-artifact@v7
         with:
-          pattern: pdf-runtime-*
-          path: packages/pdf-runtime/_artifacts
+          pattern: engine-runtime-*
+          path: packages/engine/runtime/_artifacts
 
       - name: Stage runtime payloads
         run: |
           shopt -s nullglob
-          for dir in packages/pdf-runtime/_artifacts/pdf-runtime-*; do
-            target="${dir##*/pdf-runtime-}"
-            mkdir -p "packages/pdf-runtime/npm/$target"
-            cp -R "$dir/." "packages/pdf-runtime/npm/$target/"
+          for dir in packages/engine/runtime/_artifacts/engine-runtime-*; do
+            target="${dir##*/engine-runtime-}"
+            mkdir -p "packages/engine/runtime/npm/$target"
+            cp -R "$dir/." "packages/engine/runtime/npm/$target/"
           done
-          rm -rf packages/pdf-runtime/_artifacts
+          rm -rf packages/engine/runtime/_artifacts
 
-      - name: Verify pdf-runtime packages
-        run: pnpm run verify:pdf-runtime-packages
+      - name: Verify engine-runtime packages
+        run: pnpm run verify:engine-runtime-packages
 
       - name: Build packages
         run: pnpm run build:release
@@ -85,10 +85,9 @@ jobs:
       # The consume gate: packs every publishable into real tarballs and runs
       # them through four consumer fixtures (node-esm, node-cjs, vite-app,
       # tsc-nodenext). A broken artifact can never reach a dist-tag.
+      # (build:release above already built ./packages/**.)
       - name: Consume gate
-        run: |
-          pnpm turbo run build --filter="./v3/packages/*" --filter="./packages/engine*"
-          pnpm run verify:consume
+        run: pnpm run verify:consume
 
       - name: Version / Publish via Changesets
         id: changesets
@@ -147,21 +146,14 @@ jobs:
           mkdir -p release-assets
           echo "$PUBLISHED_JSON" | jq -r '.[].name' | while read name; do
             short=$(echo "$name" | sed 's!.*/!!')
-            # Enterprise packages live in ee/, not packages/.
-            if [[ "$name" == @cloudpdf/* ]]; then
-              dir="ee/$short"
-            # Handle viewers (snippet, react, vue, svelte) which are in viewers/
-            elif [ "$short" = "snippet" ] || [ "$short" = "react-pdf-viewer" ] || [ "$short" = "vue-pdf-viewer" ] || [ "$short" = "svelte-pdf-viewer" ]; then
-              # Map package name to directory name
-              case "$short" in
-                "react-pdf-viewer") dir="viewers/react" ;;
-                "vue-pdf-viewer") dir="viewers/vue" ;;
-                "svelte-pdf-viewer") dir="viewers/svelte" ;;
-                *) dir="viewers/$short" ;;
-              esac
-            else
-              dir="packages/$short"
+            # Resolve the package directory from the workspace itself — the
+            # layered tree (packages/<group>/<member>) makes name→path
+            # mapping non-trivial, and pnpm already knows it.
+            dir=$(pnpm --filter "$name" exec pwd 2>/dev/null | tail -1)
+            if [ -z "$dir" ] || [ ! -d "$dir" ]; then
+              echo "No workspace dir for $name"; continue
             fi
+            dir=$(python3 -c "import os,sys; print(os.path.relpath(sys.argv[1], os.getcwd()))" "$dir")
             if [ -d "$dir/dist" ]; then
               echo "Packaging $short from $dir"
               (cd "$dir" && zip -r "$GITHUB_WORKSPACE/release-assets/${short}-dist.zip" dist >/dev/null)
@@ -205,8 +197,8 @@ jobs:
       - name: Download linux-x64 native runtime
         uses: actions/download-artifact@v7
         with:
-          name: pdf-runtime-linux-x64
-          path: packages/pdf-runtime/npm/linux-x64
+          name: engine-runtime-linux-x64
+          path: packages/engine/runtime/npm/linux-x64
 
       - name: Log in to GitHub Container Registry
         uses: docker/login-action@v3

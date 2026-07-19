@@ -52,13 +52,13 @@ build dirs that contain stray nested `package.json` files. All workspace
 | Value             | Behaviour                                                                 | Used by    |
 | ----------------- | ------------------------------------------------------------------------- | ---------- |
 | `build` (default) | Fetch the pinned thread-local `libpdfium.so` and compile the N-API addon. | local/dev  |
-| `prebuilt`        | Reuse a CI-staged `packages/pdf-runtime/npm/linux-x64/lib` payload.       | CI/release |
+| `prebuilt`        | Reuse a CI-staged `packages/engine/runtime/npm/linux-x64/lib` payload.    | CI/release |
 
 For `prebuilt`, stage the artifact into the build context first:
 
 ```bash
 # CI downloads the build-runtime job's pdf-runtime-linux-x64 artifact into:
-#   packages/pdf-runtime/npm/linux-x64/
+#   packages/engine/runtime/npm/linux-x64/
 docker build -f ee/server/Dockerfile \
   --build-arg NATIVE_SRC=prebuilt -t cloudpdf-server:1.2.3 .
 ```

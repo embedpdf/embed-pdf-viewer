@@ -3,13 +3,11 @@ packages:
   - 'examples/**'
   - 'ee/*'
   - 'tooling/*'
-  # v3 quarantine — dissolved by the restructure commit
-  - 'v3/packages/*'
-  - 'v3/examples/*'
-  # exclude generated framework outputs that can contain nested package.json
-  # copies and confuse pnpm/turbo workspace discovery.
+  # exclude generated outputs that can contain nested package.json copies
+  # (ng-packagr always emits one into dist) and confuse workspace discovery.
+  - '!**/dist/**'
   - '!**/.next/**'
   - '!**/.svelte-kit/**'
   - '!**/.vercel/**'
   # exclude the git submodule (and everything inside it)
-  - '!packages/pdf-runtime/runtime-src/**'
+  - '!packages/engine/runtime/runtime-src/**'
