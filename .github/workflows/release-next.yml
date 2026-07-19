@@ -82,6 +82,14 @@ jobs:
       - name: Build packages
         run: pnpm run build:release
 
+      # The consume gate: packs every publishable into real tarballs and runs
+      # them through four consumer fixtures (node-esm, node-cjs, vite-app,
+      # tsc-nodenext). A broken artifact can never reach a dist-tag.
+      - name: Consume gate
+        run: |
+          pnpm turbo run build --filter="./v3/packages/*" --filter="./packages/engine*"
+          pnpm run verify:consume
+
       - name: Version / Publish via Changesets
         id: changesets
         uses: changesets/action@v1
