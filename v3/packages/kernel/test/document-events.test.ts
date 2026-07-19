@@ -206,7 +206,7 @@ describe('kernel: document events → page registry', () => {
     expect(teardown).toHaveBeenCalledTimes(1);
   });
 
-  it('runs cleanup registered by a workspace capability when the kernel is destroyed', () => {
+  it('runs cleanup registered by a workspace capability when the kernel is destroyed', async () => {
     const { engine } = fakeEngine([]);
     const teardown = vi.fn();
     const token = { name: 'workspace-resource' };
@@ -220,7 +220,7 @@ describe('kernel: document events → page registry', () => {
     };
     const kernel = createKernel({ engine, plugins: [plugin] });
 
-    kernel.destroy();
+    await kernel.destroy();
 
     expect(teardown).toHaveBeenCalledTimes(1);
   });

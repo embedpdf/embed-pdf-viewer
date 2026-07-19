@@ -156,13 +156,10 @@ export class EpdfKernelHost implements OnDestroy {
     if (this.destroyed) return;
     this.destroyed = true;
     this.unsubscribe?.();
-    if (this._kernel) {
-      this._kernel.destroy();
-      // kernel.destroy() runs plugin teardowns but leaves engine document
-      // handles open (kernel contract gap, flagged upstream) — close them so a
-      // route-scoped viewer doesn't leak engine memory.
-      void this._kernel.documents.closeAll().catch(() => {});
-    }
+    // destroy() owns the full teardown now: it joins an in-flight start, closes
+    // every document (engine handles included), and unwinds workspace plugins.
+    // Async + idempotent, so fire-and-forget is safe in a sync ngOnDestroy.
+    if (this._kernel) void this._kernel.destroy();
   }
 }
 

@@ -20,14 +20,28 @@ export interface Store {
   setCore(patch: Partial<CoreState>, action: Action): void;
   subscribe(listener: () => void): Unsubscribe;
   subscribeAction(listener: (action: Action) => void): Unsubscribe;
+  /** Kernel-destroy teardown: reset core, drop every slice/reducer/listener.
+   *  Reads stay legal afterwards (empty state); writes become no-ops. */
+  destroy(): void;
 }
 
-export function createStore(): Store {
+export function createStore(report: (error: unknown) => void = console.error): Store {
   let core: CoreState = { documents: {}, pending: {}, order: [], activeId: null };
   const slices: Record<string, unknown> = {};
   const reducers: Record<string, (s: unknown, a: Action) => unknown> = {};
   const changeListeners = new Set<() => void>();
   const actionListeners = new Set<(a: Action) => void>();
+
+  // Per-listener isolation: one throwing subscriber (a plugin effect, a React
+  // read) must never halt the pass for its siblings, and must never unwind a
+  // kernel lifecycle transition out of setCore/dispatchTo mid-update.
+  const guarded = (fn: () => void) => {
+    try {
+      fn();
+    } catch (error) {
+      report(error);
+    }
+  };
 
   let emitting = false;
   let pending = false;
@@ -40,13 +54,14 @@ export function createStore(): Store {
     try {
       do {
         pending = false;
-        changeListeners.forEach((listener) => listener());
+        changeListeners.forEach((listener) => guarded(listener));
       } while (pending);
     } finally {
       emitting = false;
     }
   };
-  const emitAction = (action: Action) => actionListeners.forEach((listener) => listener(action));
+  const emitAction = (action: Action) =>
+    actionListeners.forEach((listener) => guarded(() => listener(action)));
 
   return {
     registerSlice(key, reducer, initial) {
@@ -83,6 +98,13 @@ export function createStore(): Store {
     subscribeAction(listener) {
       actionListeners.add(listener);
       return () => void actionListeners.delete(listener);
+    },
+    destroy() {
+      core = { documents: {}, pending: {}, order: [], activeId: null };
+      for (const key of Object.keys(slices)) delete slices[key];
+      for (const key of Object.keys(reducers)) delete reducers[key];
+      changeListeners.clear();
+      actionListeners.clear();
     },
   };
 }

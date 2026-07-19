@@ -1,5 +1,6 @@
 export * from './types';
 export * from './kernel';
+export { CancelledError, isCancelled } from './scope';
 
 // Re-export the engine contracts so plugins/adapters import them from @embedpdf-x/kernel.
 export { AbortablePromise, deferredEngine } from '@embedpdf/engine-core/runtime';

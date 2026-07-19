@@ -14,7 +14,6 @@ import {
   createContext,
   useContext,
   useEffect,
-  useMemo,
   useRef,
   useState,
   useSyncExternalStore,
@@ -214,45 +213,104 @@ export function useDocuments() {
 // '@embedpdf-x/kernel'` above) — one shared shape for every adapter.
 
 export interface ViewerProps {
+  /** Init-only: captured on first render; later identity changes are ignored (dev warns). */
   engine: Engine;
+  /** Init-only: captured on first render; later identity changes are ignored (dev warns). */
   plugins: AnyPlugin[];
-  /** Documents to open on startup (with optional tab names). */
+  /** Documents to open on startup (with optional tab names). Init-only. */
   initialDocuments?: InitialDocument[];
   fallback?: React.ReactNode;
+  /** Rendered when kernel construction or `start()` fails. Without it a boot
+   *  failure renders nothing — but never a silent forever-fallback. */
+  renderError?: (error: unknown) => React.ReactNode;
   children: React.ReactNode;
 }
 
+type BootState =
+  | { phase: 'booting'; kernel: Kernel | null }
+  | { phase: 'ready'; kernel: Kernel }
+  | { phase: 'error'; error: unknown };
+
 /**
- * Builds the kernel, starts it, then renders. Children mount as soon as
- * `start()` resolves — which never touches the engine, so the shell (and every
- * workspace capability: i18n, view-manager, …) is alive while WASM compiles or
- * the transport connects. `initialDocuments` open in the BACKGROUND and stream
- * into the registry (`useDocuments()` is reactive); per-document loading UI is
- * the Stage's job, not a root gate. Pair with `deferredEngine()` to make the
- * whole boot non-blocking.
+ * Owns the kernel as an EFFECT-scoped resource: each effect setup creates and
+ * starts exactly one kernel; each cleanup destroys exactly that one. That is
+ * the contract StrictMode exercises (two kernels in dev, the first fully
+ * destroyed) — the kernel itself is never restarted after destroy.
+ *
+ * The kernel is published to context the moment it exists — before `start()`
+ * resolves — so the `fallback` can use workspace capabilities (i18n copy on a
+ * loading screen) exactly as before. The one exception is the very first
+ * render, which happens before the effect: it renders nothing. Children mount
+ * once `start()` resolves — which never touches the engine, so the shell is
+ * alive while WASM compiles or the transport connects. `initialDocuments`
+ * open in the BACKGROUND and stream into the registry (`useDocuments()` is
+ * reactive); per-document loading UI is the Stage's job, not a root gate.
+ * Pair with `deferredEngine()` to make the whole boot non-blocking.
  */
-export function Viewer({ engine, plugins, initialDocuments, fallback, children }: ViewerProps) {
-  const kernel = useMemo(() => createKernel({ engine, plugins }), [engine, plugins]);
-  const [ready, setReady] = useState(false);
+export function Viewer({
+  engine,
+  plugins,
+  initialDocuments,
+  fallback,
+  renderError,
+  children,
+}: ViewerProps) {
+  // Init-only inputs: the kernel's lifetime is the component's lifetime, so a
+  // changed engine/plugins identity cannot mean "rebuild the workspace" —
+  // that would silently drop every open document. Capture once, warn in dev.
+  const initial = useRef({ engine, plugins, initialDocuments });
+  const warned = useRef(false);
+  if (process.env.NODE_ENV !== 'production' && !warned.current) {
+    if (initial.current.engine !== engine || initial.current.plugins !== plugins) {
+      warned.current = true;
+      console.warn(
+        '[embedpdf] <Viewer> engine/plugins are init-only. A changed identity is ignored — ' +
+          'pass stable references (module scope, useState, or useMemo). ' +
+          'An inline `plugins={[...]}` array recreates its identity every render.',
+      );
+    }
+  }
+
+  const [boot, setBoot] = useState<BootState>({ phase: 'booting', kernel: null });
   useEffect(() => {
+    const captured = initial.current;
+    let kernel: Kernel;
+    try {
+      kernel = createKernel({ engine: captured.engine, plugins: captured.plugins });
+    } catch (error) {
+      setBoot({ phase: 'error', error }); // plan/graph errors surface, not throw mid-render
+      return;
+    }
     let alive = true;
-    (async () => {
-      await kernel.start();
-      if (!alive) return; // unmounted mid-boot — don't open anything
-      setReady(true);
-      // Kernel-owned boot policy: all tabs appear immediately in array
-      // order; the `active` entry (else the first) is selected; failures
-      // surface as tab status. See DocumentsCapability.openAll.
-      kernel.documents.openAll(initialDocuments ?? []);
-    })();
+    setBoot({ phase: 'booting', kernel }); // context carries the kernel from this frame on
+    kernel.start().then(
+      () => {
+        if (!alive) return; // unmounted mid-boot — don't open anything
+        setBoot({ phase: 'ready', kernel });
+        // Kernel-owned boot policy: all tabs appear immediately in array
+        // order; the `active` entry (else the first) is selected; failures
+        // surface as tab status. See DocumentsCapability.openAll.
+        kernel.documents.openAll(captured.initialDocuments ?? []);
+      },
+      (error) => {
+        if (alive) setBoot({ phase: 'error', error });
+      },
+    );
     return () => {
       alive = false;
-      kernel.destroy();
+      void kernel.destroy(); // async + idempotent; closes every document handle
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [kernel]);
+  }, []);
+
+  if (boot.phase === 'error') {
+    return <>{renderError ? renderError(boot.error) : null}</>;
+  }
+  if (!boot.kernel) return null; // pre-effect first render only
   return (
-    <KernelCtx.Provider value={kernel}>{ready ? children : (fallback ?? null)}</KernelCtx.Provider>
+    <KernelCtx.Provider value={boot.kernel}>
+      {boot.phase === 'ready' ? children : (fallback ?? null)}
+    </KernelCtx.Provider>
   );
 }
 export const EmbedPDF = Viewer;

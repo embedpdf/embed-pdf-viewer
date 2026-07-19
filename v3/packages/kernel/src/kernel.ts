@@ -4,8 +4,10 @@ import {
   createPluginContext,
   sliceKey,
   type ContextServices,
+  type SessionRef,
 } from './context';
 import { planPlugins } from './order';
+import { createScope, CancelledError, isCancelled, type Scope } from './scope';
 import {
   CORE_ACTIVE_CHANGED,
   CORE_DOCUMENT_ADDED,
@@ -50,6 +52,16 @@ function layoutFromEvent(event: DocumentEvent) {
   }
 }
 
+/** Kernel lifecycle. Monotonic: created → starting → started, then destroying →
+ *  destroyed; `failed` is a terminal branch off starting. */
+export type KernelStatus =
+  | 'created'
+  | 'starting'
+  | 'started'
+  | 'failed'
+  | 'destroying'
+  | 'destroyed';
+
 export interface Kernel {
   readonly engine: Engine;
   readonly documents: DocumentsCapability;
@@ -70,8 +82,15 @@ export interface Kernel {
   scopeOf(token: CapabilityToken<unknown>): PluginScope;
   subscribe(listener: () => void): Unsubscribe;
   getState(): GlobalState;
+  status(): KernelStatus;
+  /** Idempotent: a second call joins the first. Throws after destroy(). */
   start(): Promise<void>;
-  destroy(): void;
+  /**
+   * Idempotent: every call returns the same promise. Joins an in-flight
+   * start(), closes every document (their engine handles included), then
+   * unwinds workspace resources. Never throws.
+   */
+  destroy(): Promise<void>;
 }
 
 const isDocumentScoped = (plugin: AnyPlugin) => plugin.scope === 'document';
@@ -102,89 +121,208 @@ const passwordOfInput = (input: OpenInput): string | null | undefined =>
   'password' in input ? input.password : undefined;
 
 /**
+ * Everything one open document owns, in one place: the engine handle, the
+ * resource scope (event subs, slices, plugin cleanups, the handle's own
+ * close), the capability instances, and the in-flight lifecycle operation.
+ * The session IS the document's lifecycle; the store's `documents`/`pending`
+ * entries are its UI projection.
+ *
+ *   opening — slot reserved; source resolving / engine opening
+ *   locked  — parked on a password; the scope already owns handle.close
+ *   bringup — post-security: slices, inits, effect setup; NOT yet published
+ *   ready   — committed; the only phase adapters resolve capabilities in
+ *   error   — open failed after the slot was reserved; resources disposed
+ *   closing — close() won; unpublished, joining the operation, disposing
+ */
+interface DocumentSession extends SessionRef {
+  name?: string;
+  phase: 'opening' | 'locked' | 'bringup' | 'ready' | 'error' | 'closing';
+  /** In-flight open/unlock — close() cancels, then JOINS this before disposing,
+   *  so "close resolved" means "no producer is still acquiring resources". */
+  operation: Promise<unknown> | null;
+  /** The current engine call, retained so close() can abort real worker-side
+   *  work instead of waiting for it to land at a checkpoint. */
+  engineOp: { abort(reason?: unknown): void } | null;
+  cancel: AbortController;
+  capabilities: Map<AnyPlugin, unknown>;
+  close(): Promise<void>;
+}
+
+/** Engine rejections carry AbortError when close() aborts the live call;
+ *  match structurally so test fakes with plain promises still work. */
+const isAbortLike = (error: unknown): boolean =>
+  error instanceof Error && error.name === 'AbortError';
+
+/**
  * Assemble a kernel from an engine + plugins.
  *
  *   planPlugins        — validate dependencies, order them
  *   resolveCapability  — workspace singletons, or per-document instances built lazily
- *   document lifecycle — open the engine handle, register the page registry, bring up
- *                        document-scoped plugins; tear all of it down on close
- *   start / destroy    — run workspace init+effects; clean everything up
+ *   document lifecycle — one DocumentSession per document: transactional open
+ *                        (publish-last), one idempotent close for every phase
+ *   start / destroy    — explicit status machine; destroy closes everything
+ *
+ * The kernel closes every handle it opened; it never destroys the engine —
+ * ownership follows acquisition, and the engine was handed in by the caller.
  */
-export function createKernel(opts: { engine: Engine; plugins: AnyPlugin[] }): Kernel {
+export function createKernel(opts: {
+  engine: Engine;
+  plugins: AnyPlugin[];
+  /** Observability seam: teardown/effect/join failures land here. Default: console.error. */
+  report?: (error: unknown) => void;
+}): Kernel {
   const { engine, plugins } = opts;
-  const store = createStore();
+  const report = opts.report ?? ((error: unknown) => console.error('[kernel]', error));
+  const store = createStore(report);
   const plan = planPlugins(plugins);
   const documentScopedPlugins = plan.ordered.filter(isDocumentScoped);
 
   const workspaceCapabilities = new Map<CapabilityToken<unknown>, unknown>();
-  const documentCapabilities = new Map<string, unknown>(); // `${pluginId}::${docId}` -> capability
-  const documentHandles = new Map<string, DocumentHandle>(); // live engine handles, by docId
-  // Live handles whose document is password-locked. Parked OUTSIDE
-  // `documentHandles` on purpose: plugins must never reach a locked handle.
-  const lockedHandles = new Map<string, DocumentHandle>();
-  const workspaceTeardowns: Array<() => void> = [];
-  const documentTeardowns = new Map<string, Array<() => void>>();
+  const workspaceScope = createScope(report);
+  const sessions = new Map<string, DocumentSession>();
 
-  const registerTeardown = (teardown: () => void, documentId?: string) => {
-    if (documentId) documentTeardowns.get(documentId)?.push(teardown);
-    else workspaceTeardowns.push(teardown);
-  };
-  const documentHandle = (documentId?: string): DocumentHandle | null => {
-    const id = documentId ?? store.getCore().activeId;
-    return id ? (documentHandles.get(id) ?? null) : null;
+  let status: KernelStatus = 'created';
+  let startPromise: Promise<void> | null = null;
+  let destroyPromise: Promise<void> | null = null;
+
+  const guardUsable = (what: string) => {
+    if (status === 'failed' || status === 'destroying' || status === 'destroyed') {
+      throw new Error(`[kernel] ${what} on a ${status} kernel`);
+    }
   };
 
-  function resolveCapability<T>(token: CapabilityToken<T>, documentId?: string): T {
-    const workspaceCapability = workspaceCapabilities.get(token);
-    if (workspaceCapability) return workspaceCapability as T;
-    const provider = plan.providerOf(token);
-    if (!provider) throw new Error(`No capability "${token.name}".`);
-    const id = documentId ?? store.getCore().activeId;
-    if (!id) throw new Error(`Capability "${token.name}" requires an active document.`);
-    const pending = store.getCore().pending[id];
-    if (pending) {
-      // Fail fast and truthfully: a loading/locked/error document has no
-      // plugin instances yet. `useOptional*` adapters turn this into their
-      // fallback; strict resolution surfaces the real state.
-      throw new Error(
-        `Capability "${token.name}" unavailable: document "${id}" is ${pending.status}.`,
+  // ── sessions ─────────────────────────────────────────────────────────────────
+
+  const checkpoint = (session: DocumentSession) => {
+    if (session.cancel.signal.aborted) {
+      throw new CancelledError(`closed while opening: ${session.id}`);
+    }
+  };
+
+  /**
+   * Await an engine/network call under the session's cancellation:
+   *   - the call is retained so close() can abort real worker-side work
+   *     (`AbortablePromise`), and
+   *   - the await RACES the cancellation, so close()'s join never blocks on a
+   *     call that cannot be aborted (a plain-promise engine, a stuck fetch).
+   * When cancellation wins but the call later lands anyway, `onLateResult`
+   * routes the result into the session scope — whose late-defer rule runs it
+   * immediately after disposal — so a late-arriving resource cannot leak.
+   * (Plugin inits are deliberately NOT raced: they are first-party code that
+   * close() joins to completion; only unbounded external waits are raced.)
+   */
+  async function engineCall<T>(
+    session: DocumentSession,
+    call: Promise<T>,
+    onLateResult?: (value: T) => void | Promise<void>,
+  ): Promise<T> {
+    const abortable = call as Promise<T> & { abort?: (reason?: unknown) => void };
+    session.engineOp = typeof abortable.abort === 'function' ? (abortable as never) : null;
+    const signal = session.cancel.signal;
+    let onAbort: (() => void) | undefined;
+    const cancellation = new Promise<never>((_, reject) => {
+      onAbort = () => reject(new CancelledError(`closed while opening: ${session.id}`));
+      if (signal.aborted) onAbort();
+      else signal.addEventListener('abort', onAbort, { once: true });
+    });
+    try {
+      return await Promise.race([call, cancellation]);
+    } catch (error) {
+      if (isCancelled(error)) {
+        void call.then(
+          (value) => {
+            if (onLateResult) session.scope.defer(() => onLateResult(value));
+          },
+          () => {}, // the abandoned call's own rejection is not separately actionable
+        );
+      }
+      throw error;
+    } finally {
+      if (onAbort) signal.removeEventListener('abort', onAbort);
+      session.engineOp = null;
+    }
+  }
+
+  function createSession(id: string, name: string | undefined): DocumentSession {
+    const session: DocumentSession = {
+      id,
+      name,
+      phase: 'opening',
+      handle: null,
+      stagedMeta: null,
+      scope: createScope(report),
+      operation: null,
+      engineOp: null,
+      cancel: new AbortController(),
+      capabilities: new Map(),
+      close: () => closeSession(session),
+    };
+    return session;
+  }
+
+  /** One transition at a time per session (open, then possibly unlock). */
+  function beginOperation<T>(session: DocumentSession, run: () => Promise<T>): Promise<T> {
+    if (session.operation) {
+      throw new Error(`[documents] "${session.id}" already has an active transition`);
+    }
+    const operation = run().finally(() => {
+      if (session.operation === operation) session.operation = null;
+    });
+    session.operation = operation;
+    return operation;
+  }
+
+  /** Atomic ticket → real-id reconciliation: the sessions map, the store slot,
+   *  order position, and activation all move together, or not at all. */
+  function rekeySession(session: DocumentSession, nextId: string): void {
+    const previousId = session.id;
+    if (previousId === nextId) return;
+    const core = store.getCore();
+    if (sessions.has(nextId) || core.documents[nextId] || core.pending[nextId]) {
+      throw new Error(`[documents] duplicate document id: ${nextId}`);
+    }
+    sessions.delete(previousId);
+    session.id = nextId;
+    sessions.set(nextId, session);
+    const slot = core.pending[previousId];
+    if (slot) {
+      const { [previousId]: _moved, ...pending } = core.pending;
+      store.setCore(
+        {
+          pending: { ...pending, [nextId]: { ...slot, id: nextId } },
+          order: core.order.map((id) => (id === previousId ? nextId : id)),
+          activeId: core.activeId === previousId ? nextId : core.activeId,
+        },
+        { type: CORE_ORDER_CHANGED },
       );
     }
-    return buildDocumentCapability(provider, id) as T;
   }
 
-  /** Total sibling of `resolveCapability` — see `Kernel.tryCapability`. The
-   *  `ready` check is THE lifecycle rule, stated once, kernel-side: adapters
-   *  subscribe to this instead of re-deriving when resolution flips. */
-  function tryResolveCapability<T>(token: CapabilityToken<T>, documentId?: string): T | null {
-    const workspaceCapability = workspaceCapabilities.get(token);
-    if (workspaceCapability) return workspaceCapability as T;
-    const provider = plan.providerOf(token);
-    if (!provider) return null;
-    const id = documentId ?? store.getCore().activeId;
-    if (!id || !store.getCore().documents[id]) return null; // absent, or pending/locked/error
-    return buildDocumentCapability(provider, id) as T;
+  const closingSessions = new WeakMap<DocumentSession, Promise<void>>();
+  function closeSession(session: DocumentSession): Promise<void> {
+    const inFlight = closingSessions.get(session);
+    if (inFlight) return inFlight;
+    const closing = (async () => {
+      session.phase = 'closing';
+      unpublishSlot(session.id); // synchronous: the tab disappears NOW
+      // Cancel, JOIN the producer, then drain its resources — in that order.
+      // After the join, no known producer can register more resources; the
+      // scope's late-defer rule covers anything unknowable.
+      const reason = new CancelledError(`closed while opening: ${session.id}`);
+      session.cancel.abort(reason);
+      session.engineOp?.abort(reason);
+      await session.operation?.catch((error) => {
+        if (!isCancelled(error) && !isAbortLike(error)) report(error);
+      });
+      await session.scope.dispose();
+      if (sessions.get(session.id) === session) sessions.delete(session.id);
+    })();
+    closingSessions.set(session, closing);
+    return closing;
   }
 
-  const services: ContextServices = {
-    engine,
-    store,
-    resolveCapability,
-    registerTeardown,
-    documentHandle,
-  };
+  // ── store projection (publish/unpublish) ─────────────────────────────────────
 
-  function buildDocumentCapability(plugin: AnyPlugin, documentId: string): unknown {
-    const key = sliceKey(plugin.id, documentId);
-    let capability = documentCapabilities.get(key);
-    if (!capability) {
-      capability = plugin.capability!(createPluginContext(services, plugin, documentId));
-      documentCapabilities.set(key, capability);
-    }
-    return capability;
-  }
-
-  // ── document lifecycle ───────────────────────────────────────────────────────
   function nextActiveDocument(core: CoreState, removedId: string): string | null {
     if (core.activeId !== removedId) return core.activeId;
     const index = core.order.indexOf(removedId);
@@ -192,71 +330,190 @@ export function createKernel(opts: { engine: Engine; plugins: AnyPlugin[] }): Ke
     return remaining.length === 0 ? null : (remaining[Math.max(0, index - 1)] ?? remaining[0]);
   }
 
+  function publishPendingSlot(session: DocumentSession, activate: boolean): void {
+    const core = store.getCore();
+    store.setCore(
+      {
+        pending: {
+          ...core.pending,
+          [session.id]: { id: session.id, name: session.name, status: 'loading' },
+        },
+        order: [...core.order, session.id],
+        activeId: activate || core.activeId === null ? session.id : core.activeId,
+      },
+      { type: CORE_DOCUMENT_OPENING },
+    );
+  }
+
+  function publishLocked(session: DocumentSession, passwordProvided: boolean): void {
+    const core = store.getCore();
+    store.setCore(
+      {
+        pending: {
+          ...core.pending,
+          [session.id]: { id: session.id, name: session.name, status: 'locked', passwordProvided },
+        },
+      },
+      { type: CORE_DOCUMENT_LOCKED },
+    );
+  }
+
+  function publishError(session: DocumentSession, error: unknown): void {
+    const core = store.getCore();
+    store.setCore(
+      {
+        pending: {
+          ...core.pending,
+          [session.id]: { id: session.id, name: session.name, status: 'error', error },
+        },
+      },
+      { type: CORE_DOCUMENT_OPEN_FAILED },
+    );
+  }
+
+  function unpublishSlot(id: string): void {
+    const core = store.getCore();
+    if (!core.pending[id] && !core.documents[id]) return;
+    const { [id]: _pending, ...pending } = core.pending;
+    const { [id]: _document, ...documents } = core.documents;
+    store.setCore(
+      {
+        pending,
+        documents,
+        order: core.order.filter((other) => other !== id),
+        activeId: nextActiveDocument(core, id),
+      },
+      { type: CORE_DOCUMENT_REMOVED },
+    );
+  }
+
+  /** The ONE ready transition: swap the pending slot for the staged meta and
+   *  fire CORE_DOCUMENT_ADDED. Everything before this is unpublished and rolls
+   *  back by disposing the session scope; nothing after this can fail. */
+  function commitReady(session: DocumentSession): void {
+    session.phase = 'ready';
+    const meta = session.stagedMeta!;
+    const core = store.getCore();
+    const { [session.id]: _resolved, ...pending } = core.pending;
+    store.setCore(
+      { documents: { ...core.documents, [session.id]: meta }, pending },
+      { type: CORE_DOCUMENT_ADDED },
+    );
+  }
+
+  // ── capability resolution ────────────────────────────────────────────────────
+
+  const sessionOf = (documentId?: string): DocumentSession | null => {
+    const id = documentId ?? store.getCore().activeId;
+    return id ? (sessions.get(id) ?? null) : null;
+  };
+
+  /** The handle plugins may touch: bring-up or ready — never locked, never
+   *  a handle whose close already won. */
+  const documentHandle = (documentId?: string): DocumentHandle | null => {
+    const session = sessionOf(documentId);
+    if (!session) return null;
+    return session.phase === 'bringup' || session.phase === 'ready' ? session.handle : null;
+  };
+
+  function buildDocumentCapability(plugin: AnyPlugin, session: DocumentSession): unknown {
+    let capability = session.capabilities.get(plugin);
+    if (!capability) {
+      capability = plugin.capability!(createPluginContext(services, plugin, session));
+      session.capabilities.set(plugin, capability);
+    }
+    return capability;
+  }
+
+  function resolveCapability<T>(token: CapabilityToken<T>, documentId?: string): T {
+    guardUsable(`capability("${token.name}")`);
+    const workspaceCapability = workspaceCapabilities.get(token);
+    if (workspaceCapability) return workspaceCapability as T;
+    const provider = plan.providerOf(token);
+    if (!provider) throw new Error(`No capability "${token.name}".`);
+    const id = documentId ?? store.getCore().activeId;
+    if (!id) throw new Error(`Capability "${token.name}" requires an active document.`);
+    const session = sessions.get(id);
+    if (!session) throw new Error(`Capability "${token.name}" unavailable: no document "${id}".`);
+    if (session.phase === 'bringup' || session.phase === 'ready') {
+      return buildDocumentCapability(provider, session) as T;
+    }
+    // Fail fast and truthfully: a loading/locked/error document has no
+    // plugin instances yet. `useOptional*` adapters turn this into their
+    // fallback; strict resolution surfaces the real state.
+    const shown = session.phase === 'opening' ? 'loading' : session.phase;
+    throw new Error(`Capability "${token.name}" unavailable: document "${id}" is ${shown}.`);
+  }
+
+  /** Internal total resolver: bring-up counts, so a plugin's `ctx.tryGet`
+   *  works during its own document's init. */
+  function tryResolveInternal<T>(token: CapabilityToken<T>, documentId?: string): T | null {
+    if (status === 'destroying' || status === 'destroyed') return null;
+    const workspaceCapability = workspaceCapabilities.get(token);
+    if (workspaceCapability) return workspaceCapability as T;
+    const provider = plan.providerOf(token);
+    if (!provider) return null;
+    const session = sessionOf(documentId);
+    if (!session || (session.phase !== 'bringup' && session.phase !== 'ready')) return null;
+    return buildDocumentCapability(provider, session) as T;
+  }
+
+  /** Public total resolver — see `Kernel.tryCapability`. `ready` only: the
+   *  null→instance flip at commit time IS the adapters' re-render signal. */
+  function tryResolveCapability<T>(token: CapabilityToken<T>, documentId?: string): T | null {
+    if (status === 'destroying' || status === 'destroyed') return null;
+    const workspaceCapability = workspaceCapabilities.get(token);
+    if (workspaceCapability) return workspaceCapability as T;
+    const provider = plan.providerOf(token);
+    if (!provider) return null;
+    const session = sessionOf(documentId);
+    if (!session || session.phase !== 'ready') return null;
+    return buildDocumentCapability(provider, session) as T;
+  }
+
+  const services: ContextServices = {
+    engine,
+    store,
+    workspaceScope,
+    resolveCapability,
+    tryResolveCapability: tryResolveInternal,
+    documentHandle,
+  };
+
+  // ── document lifecycle ───────────────────────────────────────────────────────
+
   // Tickets for slots whose real id isn't known yet (thunk sources).
   let ticketCounter = 0;
   const nextTicket = () => `pending:${++ticketCounter}`;
 
-  /** Rekey a pending slot in place (ticket -> engine id). Order position and
-   *  activation follow the slot, so the tab never moves or loses selection. */
-  function reconcileSlotId(from: string, to: string): string {
-    if (from === to) return to;
-    const core = store.getCore();
-    if (core.documents[to] || core.pending[to]) {
-      throw new Error(`[documents] duplicate document id: ${to}`);
-    }
-    const slot = core.pending[from];
-    if (!slot) return to; // slot closed mid-flight; caller's stillWanted() handles it
-    const { [from]: _removed, ...pending } = core.pending;
-    store.setCore(
-      {
-        pending: { ...pending, [to]: { ...slot, id: to } },
-        order: core.order.map((id) => (id === from ? to : id)),
-        activeId: core.activeId === from ? to : core.activeId,
-      },
-      { type: CORE_ORDER_CHANGED },
-    );
-    return to;
-  }
-
-  /** Pending -> ready: the ONE place a document becomes real. Registers the
-   *  handle, swaps the slot for a DocumentMeta (same order position), fires
-   *  CORE_DOCUMENT_ADDED, and brings up document-scoped plugins — so plugins
-   *  observe exactly the same lifecycle they always did. */
-  async function promoteToReady(
-    id: string,
-    name: string | undefined,
-    handle: DocumentHandle,
+  /** Slices + event subscription + plugin inits + effect SETUP — every step's
+   *  release deferred into the session scope, every await followed by a
+   *  checkpoint. Runs entirely pre-commit: a failure anywhere rolls the whole
+   *  session back and the document was never `ready`. */
+  async function bringUp(
+    session: DocumentSession,
     snapshot: { pageCount: number; pages: DocumentMeta['pages'] },
   ): Promise<void> {
-    const meta: DocumentMeta = {
-      id,
-      name,
+    session.phase = 'bringup';
+    session.stagedMeta = {
+      id: session.id,
+      name: session.name,
       pageCount: snapshot.pageCount,
       pages: snapshot.pages,
       revision: 0,
     };
-    documentHandles.set(id, handle);
-
-    const core = store.getCore();
-    const { [id]: _resolved, ...pending } = core.pending;
-    store.setCore(
-      { documents: { ...core.documents, [id]: meta }, pending },
-      { type: CORE_DOCUMENT_ADDED },
-    );
 
     // Document mutation events (rotate/move/delete) replace the page
     // registry in place — the snapshot they carry is byte-identical to
-    // pages.list(), so this is a direct swap, no merge. Every document-scoped
-    // plugin (every Stage lens) re-derives from the new registry for free.
-    // Own mutations and remote (collaborator) mutations arrive identically;
-    // the handler is origin-agnostic, as the event model intends.
-    documentTeardowns.set(id, []);
-    const unsubscribeEvents = handle.events.subscribe((event) => {
+    // pages.list(), so this is a direct swap, no merge. Own mutations and
+    // remote (collaborator) mutations arrive identically; the handler is
+    // origin-agnostic, as the event model intends.
+    const unsubscribeEvents = session.handle!.events.subscribe((event) => {
       const layout = layoutFromEvent(event);
       if (!layout) return;
       const now = store.getCore();
-      const existing = now.documents[id];
-      if (!existing) return; // closed mid-flight
+      const existing = now.documents[session.id];
+      if (!existing) return; // pre-commit or closed — registry not published
       const updated: DocumentMeta = {
         ...existing,
         pageCount: layout.pageCount,
@@ -264,154 +521,145 @@ export function createKernel(opts: { engine: Engine; plugins: AnyPlugin[] }): Ke
         revision: existing.revision + 1,
       };
       store.setCore(
-        { documents: { ...now.documents, [id]: updated } },
+        { documents: { ...now.documents, [session.id]: updated } },
         { type: CORE_DOCUMENT_PAGES_UPDATED },
       );
     });
-    documentTeardowns.get(id)!.push(unsubscribeEvents);
+    session.scope.defer(unsubscribeEvents);
 
     for (const plugin of documentScopedPlugins) {
-      store.registerSlice(sliceKey(plugin.id, id), reducerOf(plugin), initialStateOf(plugin));
+      const key = sliceKey(plugin.id, session.id);
+      store.registerSlice(key, reducerOf(plugin), initialStateOf(plugin));
+      session.scope.defer(() => store.removeSlice(key)); // LIFO ⇒ reverse dependency order
     }
     for (const plugin of documentScopedPlugins) {
-      await plugin.init?.(createPluginContext(services, plugin, id));
+      await plugin.init?.(createPluginContext(services, plugin, session));
+      checkpoint(session);
     }
+    // Effect SETUP is part of the transaction (it can throw); the callbacks
+    // it registers fire post-commit and are isolated by the store instead.
     for (const plugin of documentScopedPlugins) {
-      plugin.effects?.(createEffectContext(services, plugin, id));
+      plugin.effects?.(createEffectContext(services, plugin, session));
     }
+    checkpoint(session);
   }
 
   async function openDocument(input: OpenSource, options?: OpenDocumentOptions): Promise<string> {
+    guardUsable('documents.open()');
     const { activate, name, ...engineOptions } = options ?? {};
 
-    // 1. Reserve the tab slot SYNCHRONOUSLY (this runs before the first
-    //    await): id, order position, and activation are decided at request
-    //    time; only the content arrives at completion time. Fire-and-forget
-    //    concurrent opens therefore keep call order as tab order.
-    let id = typeof input === 'function' ? nextTicket() : (idOfInput(input) ?? nextTicket());
-    const reserved = store.getCore();
-    if (reserved.documents[id] || reserved.pending[id]) {
-      throw new Error(`[documents] document already open: ${id}`);
+    // 1. Reserve the tab slot SYNCHRONOUSLY (before the first await): id,
+    //    order position, and activation are decided at request time; only the
+    //    content arrives at completion time. Fire-and-forget concurrent opens
+    //    therefore keep call order as tab order.
+    const requestedId =
+      typeof input === 'function' ? nextTicket() : (idOfInput(input) ?? nextTicket());
+    if (sessions.has(requestedId)) {
+      throw new Error(`[documents] document already open: ${requestedId}`);
     }
-    store.setCore(
-      {
-        pending: { ...reserved.pending, [id]: { id, name, status: 'loading' } },
-        order: [...reserved.order, id],
-        activeId: (activate ?? true) || reserved.activeId === null ? id : reserved.activeId,
-      },
-      { type: CORE_DOCUMENT_OPENING },
-    );
-    const stillWanted = () => store.getCore().pending[id] !== undefined;
+    const session = createSession(requestedId, name);
+    sessions.set(session.id, session);
+    publishPendingSlot(session, activate ?? true);
 
-    try {
-      const source = typeof input === 'function' ? await input() : input;
-      if (!stillWanted()) throw new Error(`[documents] closed while opening: ${id}`);
-      const sourceId = idOfInput(source);
-      if (sourceId) id = reconcileSlotId(id, sourceId);
+    return beginOperation(session, async () => {
+      try {
+        const source =
+          typeof input === 'function'
+            ? await engineCall(session, Promise.resolve(input(session.cancel.signal)))
+            : input;
+        checkpoint(session);
+        const sourceId = idOfInput(source);
+        if (sourceId) rekeySession(session, sourceId);
 
-      const handle = await engine.open(source, engineOptions);
-      if (!stillWanted()) {
-        await handle.close();
-        throw new Error(`[documents] closed while opening: ${id}`);
-      }
-      if (handle.id !== id) id = reconcileSlotId(id, handle.id);
-
-      // 2. A password-locked handle parks here — BEFORE pages.list(), which
-      //    would reject on a locked document. `documents.unlock()` finishes
-      //    the job later. `passwordProvided` records that a supplied password
-      //    was already tried and rejected (drives the "incorrect" copy).
-      if (handle.security?.passwordPrompt?.state === 'required') {
-        const passwordProvided =
-          ('password' in engineOptions && engineOptions.password != null) ||
-          passwordOfInput(source) != null;
-        lockedHandles.set(id, handle);
-        const now = store.getCore();
-        store.setCore(
-          { pending: { ...now.pending, [id]: { id, name, status: 'locked', passwordProvided } } },
-          { type: CORE_DOCUMENT_LOCKED },
+        // A handle that lands after close() won still gets closed — see engineCall.
+        const handle = await engineCall(session, engine.open(source, engineOptions), (late) =>
+          late.close(),
         );
-        return id;
-      }
+        session.handle = handle;
+        session.scope.defer(() => handle.close()); // paired at acquisition — no exit path leaks it
+        checkpoint(session);
+        if (handle.id !== session.id) rekeySession(session, handle.id);
 
-      const snapshot = await handle.pages.list();
-      if (!stillWanted()) {
-        await handle.close();
-        throw new Error(`[documents] closed while opening: ${id}`);
+        // 2. A password-locked handle parks here — BEFORE pages.list(), which
+        //    would reject on a locked document. `documents.unlock()` finishes
+        //    the job later. `passwordProvided` records that a supplied password
+        //    was already tried and rejected (drives the "incorrect" copy).
+        if (handle.security?.passwordPrompt?.state === 'required') {
+          const passwordProvided =
+            ('password' in engineOptions && engineOptions.password != null) ||
+            passwordOfInput(source) != null;
+          session.phase = 'locked';
+          publishLocked(session, passwordProvided);
+          return session.id;
+        }
+
+        const snapshot = await engineCall(session, handle.pages.list());
+        checkpoint(session);
+        await bringUp(session, snapshot);
+        commitReady(session);
+        return session.id;
+      } catch (error) {
+        // Close won the race: close() owns unpublish + disposal; just get out
+        // of its way, rejecting with the typed cancellation either way.
+        if (isCancelled(error)) throw error;
+        if (session.phase === 'closing' || isAbortLike(error)) {
+          throw new CancelledError(`closed while opening: ${session.id}`);
+        }
+        // 3. Real failure: ROLLBACK (scope releases exactly what was acquired,
+        //    however far we got), then park the tab as `error` — closable, and
+        //    reopenable after close. The document was never `ready`.
+        await session.scope.dispose();
+        session.phase = 'error';
+        publishError(session, error);
+        throw error;
       }
-      await promoteToReady(id, name, handle, snapshot);
-      return id;
-    } catch (error) {
-      // 3. The tab stays, flagged — closable, and (later) retryable. Skipped
-      //    when the slot is already gone (user closed the loading tab).
-      if (stillWanted()) {
-        const now = store.getCore();
-        store.setCore(
-          { pending: { ...now.pending, [id]: { id, name, status: 'error', error } } },
-          { type: CORE_DOCUMENT_OPEN_FAILED },
-        );
-      }
-      throw error;
-    }
+    });
   }
 
   async function unlockDocument(id: string, input: { password: string }): Promise<void> {
-    const slot = store.getCore().pending[id];
-    const handle = lockedHandles.get(id);
-    if (!slot || slot.status !== 'locked' || !handle) {
+    guardUsable('documents.unlock()');
+    const session = sessions.get(id);
+    if (!session || session.phase !== 'locked' || !session.handle) {
       throw new Error(`[documents] document is not locked: ${id}`);
     }
-    // Engine-agnostic by design: local loads the parked worker bytes, cloud
-    // POSTs /access — same call, same result. A wrong password rejects here
-    // (DocPasswordIncorrect) and the document simply stays locked.
-    await handle.security.unlock({ password: input.password });
-    if (!store.getCore().pending[id]) return; // closed while unlocking
-    const snapshot = await handle.pages.list();
-    if (!store.getCore().pending[id]) return;
-    lockedHandles.delete(id);
-    await promoteToReady(id, slot.name, handle, snapshot);
+    const handle = session.handle;
+    return beginOperation(session, async () => {
+      // Engine-agnostic by design: local loads the parked worker bytes, cloud
+      // POSTs /access — same call, same result. A WRONG PASSWORD rejects here
+      // and nothing changes: the document stays locked, unlock is retryable.
+      try {
+        await engineCall(session, handle.security.unlock({ password: input.password }));
+      } catch (error) {
+        if (session.phase === 'closing' || isAbortLike(error)) {
+          throw new CancelledError(`closed while opening: ${session.id}`);
+        }
+        throw error; // still locked — deliberately no state change
+      }
+      checkpoint(session);
+      // Past the password: failures from here are REAL open failures — the
+      // same rollback + `error` policy as the open path.
+      try {
+        const snapshot = await engineCall(session, handle.pages.list());
+        checkpoint(session);
+        await bringUp(session, snapshot);
+        commitReady(session);
+      } catch (error) {
+        if (isCancelled(error)) throw error;
+        if (session.phase === 'closing' || isAbortLike(error)) {
+          throw new CancelledError(`closed while opening: ${session.id}`);
+        }
+        await session.scope.dispose();
+        session.phase = 'error';
+        publishError(session, error);
+        throw error;
+      }
+    });
   }
 
   async function closeDocument(documentId: string): Promise<void> {
-    // Pending slot (loading / locked / error): remove the tab; a parked
-    // locked handle is disposed, an in-flight open notices the missing slot
-    // when it lands and closes its own handle.
-    const pendingCore = store.getCore();
-    if (pendingCore.pending[documentId]) {
-      const { [documentId]: _removed, ...pending } = pendingCore.pending;
-      store.setCore(
-        {
-          pending,
-          order: pendingCore.order.filter((id) => id !== documentId),
-          activeId: nextActiveDocument(pendingCore, documentId),
-        },
-        { type: CORE_DOCUMENT_REMOVED },
-      );
-      const locked = lockedHandles.get(documentId);
-      lockedHandles.delete(documentId);
-      await locked?.close();
-      return;
-    }
-
-    (documentTeardowns.get(documentId) ?? []).forEach((teardown) => teardown());
-    documentTeardowns.delete(documentId);
-    for (const plugin of documentScopedPlugins) {
-      documentCapabilities.delete(sliceKey(plugin.id, documentId));
-      store.removeSlice(sliceKey(plugin.id, documentId));
-    }
-    const core = store.getCore();
-    if (!core.documents[documentId]) return;
-    const { [documentId]: _removed, ...documents } = core.documents;
-    store.setCore(
-      {
-        documents,
-        order: core.order.filter((id) => id !== documentId),
-        activeId: nextActiveDocument(core, documentId),
-      },
-      { type: CORE_DOCUMENT_REMOVED },
-    );
-    const handle = documentHandles.get(documentId);
-    documentHandles.delete(documentId);
-    await handle?.close();
+    const session = sessions.get(documentId);
+    if (!session) return; // idempotent — unknown or already closed
+    await session.close();
   }
 
   function reorder(next: string[]) {
@@ -421,6 +669,7 @@ export function createKernel(opts: { engine: Engine; plugins: AnyPlugin[] }): Ke
   const documents: DocumentsCapability = {
     open: openDocument,
     openAll: (docs) => {
+      guardUsable('documents.openAll()');
       // Fire-and-forget on purpose: each open() reserves its tab slot
       // synchronously, so tabs exist immediately in array order; exactly one
       // activation, decided here at request time. Failures are tab state
@@ -525,23 +774,50 @@ export function createKernel(opts: { engine: Engine; plugins: AnyPlugin[] }): Ke
     scopeOf: plan.scopeOf,
     subscribe: store.subscribe,
     getState: store.getState,
-    start: async () => {
-      for (const plugin of plan.ordered) {
-        if (!isDocumentScoped(plugin)) await plugin.init?.(createPluginContext(services, plugin));
+    status: () => status,
+    start: () => {
+      if (status === 'destroying' || status === 'destroyed' || status === 'failed') {
+        return Promise.reject(new Error(`[kernel] start() on a ${status} kernel`));
       }
-      for (const plugin of plan.ordered) {
-        if (!isDocumentScoped(plugin)) plugin.effects?.(createEffectContext(services, plugin));
-      }
+      return (startPromise ??= (async () => {
+        status = 'starting';
+        try {
+          for (const plugin of plan.ordered) {
+            if (status !== 'starting') return; // destroy() raced us — stop within one init
+            if (!isDocumentScoped(plugin))
+              await plugin.init?.(createPluginContext(services, plugin));
+          }
+          if (status !== 'starting') return;
+          for (const plugin of plan.ordered) {
+            if (!isDocumentScoped(plugin)) plugin.effects?.(createEffectContext(services, plugin));
+          }
+          status = 'started';
+        } catch (error) {
+          // Startup failure unwinds everything construction + start registered;
+          // the kernel is terminally failed (destroy() remains legal, and idle).
+          status = 'failed';
+          await workspaceScope.dispose();
+          workspaceCapabilities.clear();
+          throw error;
+        }
+      })());
     },
     destroy: () => {
-      for (const teardowns of documentTeardowns.values())
-        teardowns.forEach((teardown) => teardown());
-      documentTeardowns.clear();
-      // Parked locked handles hold worker-side resources (retained bytes) —
-      // release them; destroy() is sync, so fire-and-forget.
-      for (const handle of lockedHandles.values()) void handle.close();
-      lockedHandles.clear();
-      while (workspaceTeardowns.length) workspaceTeardowns.pop()!();
+      return (destroyPromise ??= (async () => {
+        const wasFailed = status === 'failed';
+        status = 'destroying'; // an in-flight start exits at its next check
+        await startPromise?.catch((error) => {
+          if (!isCancelled(error) && !wasFailed) report(error);
+        });
+        // Close every session — the RESOURCE-owning map, not store.order: a
+        // session mid-close is already unpublished but still needs joining.
+        await Promise.allSettled([...sessions.values()].map((session) => session.close()));
+        sessions.clear();
+        await workspaceScope.dispose();
+        workspaceCapabilities.clear();
+        store.destroy();
+        status = 'destroyed';
+      })());
     },
   };
 }

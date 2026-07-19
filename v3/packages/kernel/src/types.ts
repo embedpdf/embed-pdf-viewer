@@ -157,10 +157,13 @@ export interface PluginContext<S, A extends Action = Action> {
   /**
    * Register a resource teardown owned by this plugin instance. Document-
    * scoped callbacks run when that document closes; workspace callbacks run
-   * when the kernel is destroyed. Safe for capability-held timers, runtimes,
-   * subscriptions, object URLs, and binary caches.
+   * when the kernel is destroyed. Asynchronous teardowns are awaited.
+   * Registering after the owner is already disposed runs the teardown
+   * immediately instead of dropping it — a late registration cannot leak.
+   * Safe for capability-held timers, runtimes, subscriptions, object URLs,
+   * and binary caches.
    */
-  cleanup(fn: () => void): void;
+  cleanup(fn: () => void | Promise<void>): void;
 }
 
 /** Side-effect context: the only place async/IO/cross-plugin reactions live. */
@@ -229,8 +232,12 @@ export type OpenDocumentOptions = OpenOptions & { activate?: boolean; name?: str
  * The thunk form makes the FETCH happen under the loading tab — the slot is
  * reserved synchronously, then the thunk runs (network), then the engine
  * opens. Prefer it for anything that isn't already in memory.
+ *
+ * The thunk receives an AbortSignal that fires if the tab is closed while
+ * the fetch is still running — pass it to `fetch()` so a closed tab stops
+ * the network work. Zero-argument thunks keep working unchanged.
  */
-export type OpenSource = OpenInput | (() => Promise<OpenInput>);
+export type OpenSource = OpenInput | ((signal: AbortSignal) => OpenInput | Promise<OpenInput>);
 
 /**
  * One boot document for `documents.openAll()` — THE shared shape every
