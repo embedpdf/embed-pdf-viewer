@@ -4,7 +4,7 @@
   "version": "0.0.0",
   "type": "module",
   "scripts": {
-    "build:deps": "pnpm --filter @embedpdf/engine-core build && pnpm --filter @cloudpdf/admin-api build && pnpm --filter @cloudpdf/admin build && pnpm --filter @cloudpdf/engine build && pnpm --filter @cloudpdf/server build",
+    "build:deps": "pnpm --filter @embedpdf/engine-core build && pnpm --filter @embedpdf/engine-services build && pnpm --filter @cloudpdf/admin-api build && pnpm --filter @cloudpdf/admin build && pnpm --filter @cloudpdf/engine build && pnpm --filter @cloudpdf/server build",
     "dev": "pnpm run build:deps && concurrently -k -n api,ui \"pnpm run dev:api\" \"pnpm run dev:ui\"",
     "dev:api": "tsx server/dev-server.ts",
     "dev:ui": "vite --host 127.0.0.1 --port 5178",
