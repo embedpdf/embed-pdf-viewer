@@ -251,7 +251,10 @@ export const ICON_PATHS: Record<string, readonly PathSpec[]> = {
     'M3 3l18 18',
   ],
   listTree: ['M9 6h11', 'M12 12h8', 'M15 18h5', 'M5 6v.01', 'M8 12v.01', 'M11 18v.01'],
-  lock: ['M7 11V7a5 5 0 0 1 10 0v4'],
+  lock: [
+    'M5 11h14a2 2 0 0 1 2 2v7a2 2 0 0 1 -2 2H5a2 2 0 0 1 -2 -2v-7a2 2 0 0 1 2 -2z',
+    'M7 11V7a5 5 0 0 1 10 0v4',
+  ],
   marqueeSelect: [
     'M17 20h6',
     'M20 17v6',

@@ -101,6 +101,22 @@ export const en: Locale = {
       undo: 'Undo',
       redo: 'Redo',
     },
+    passwordPrompt: {
+      title: 'Password required',
+      required: 'This document is password protected. Enter the password to open it.',
+      incorrect: 'The password was incorrect. Please try again.',
+      incorrectWarning: 'Incorrect password',
+      label: 'Password',
+      placeholder: 'Enter password',
+      cancel: 'Cancel',
+      open: 'Open',
+      opening: 'Opening…',
+    },
+    documentError: {
+      title: 'Couldn’t open document',
+      unknown: 'The document could not be opened.',
+      close: 'Close document',
+    },
     demo: {
       title: 'EmbedPDF v3',
       subtitle: 'measured toolbar',

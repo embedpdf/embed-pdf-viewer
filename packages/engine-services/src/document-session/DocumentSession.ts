@@ -80,7 +80,36 @@ export class DocumentSession {
     this._kind = handle.kind;
     this.revisions = new LocalRevisionAuthority(this._sessionId);
     this.pages = new PagePtrPool(this.runtime, handle.docPtr);
+    this.parkedBytes = null;
   }
+
+  /**
+   * Park this session in the password-locked state: the document could not
+   * be loaded because a (correct) password is missing, so the session keeps
+   * the already-transferred bytes and waits for an unlock attempt to load
+   * them. A locked session occupies its docId key like an open one — every
+   * operation except the password check rejects with DocPasswordRequired.
+   */
+  parkLocked(bytes: Uint8Array): void {
+    if (this.docPtr) {
+      throw new EngineError(EngineErrorCode.InvalidArg, 'document already open');
+    }
+    this.parkedBytes = bytes;
+  }
+
+  isLocked(): boolean {
+    return this.docPtr === null && this.parkedBytes !== null;
+  }
+
+  /** The bytes retained for a later unlock attempt. Locked sessions only. */
+  lockedBytes(): Uint8Array {
+    if (!this.parkedBytes) {
+      throw new EngineError(EngineErrorCode.DocNotOpen, 'document session is not locked');
+    }
+    return this.parkedBytes;
+  }
+
+  private parkedBytes: Uint8Array | null = null;
 
   /** Number of pages in the document. */
   pageCount(): number {
@@ -281,6 +310,7 @@ export class DocumentSession {
       this.closeDocument = null;
       this.docPtr = null;
       this._kind = null;
+      this.parkedBytes = null;
       this.revisions?.clear();
       this.revisions = null;
       this.recordsByIndex.clear();

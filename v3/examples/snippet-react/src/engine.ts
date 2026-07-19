@@ -9,6 +9,14 @@
 import { deferredEngine } from '@embedpdf-x/react/runtime';
 import type { Engine, OpenInput, InitialDocument } from '@embedpdf-x/react/runtime';
 
+/** A lazy bytes source: the tab appears at t≈0 (named), the fetch runs UNDER
+ *  the loading tab, and all initial fetches run in parallel. */
+const lazyBytes = (id: string, url: string) => async (): Promise<OpenInput> => ({
+  kind: 'bytes',
+  id,
+  bytes: await fetchBytes(`${import.meta.env.BASE_URL}${url}`),
+});
+
 const DROID_FALLBACK_FONT = {
   key: 'droid-sans-fallback-full',
   familyName: 'Droid Sans Fallback',
@@ -49,40 +57,21 @@ export const fetchBytes = async (url: string): Promise<Uint8Array> =>
     return new Uint8Array(await response.arrayBuffer());
   });
 
-/** The default documents — more arrive via the tab bar's open-file button. */
-export async function loadInitialDocuments(): Promise<InitialDocument[]> {
-  return [
-    {
-      source: { kind: 'bytes', id: 'ebook', bytes: await fetchBytes('/ebook.pdf') } as OpenInput,
-      name: 'Ebook',
-    },
-    {
-      source: { kind: 'bytes', id: 'form', bytes: await fetchBytes('/form.pdf') } as OpenInput,
-      name: 'Form',
-    },
-    {
-      source: {
-        kind: 'bytes',
-        id: 'interactive',
-        bytes: await fetchBytes('/interactive_pdf_forms_javascript_demo.pdf'),
-      } as OpenInput,
-      name: 'Interactive PDF Forms JavaScript Demo',
-    },
-    {
-      source: {
-        kind: 'bytes',
-        id: 'i-140',
-        bytes: await fetchBytes('/i-140.pdf'),
-      } as OpenInput,
-      name: 'I-140',
-    },
-    {
-      source: {
-        kind: 'bytes',
-        id: 'f1040',
-        bytes: await fetchBytes('/f1040.pdf'),
-      } as OpenInput,
-      name: 'F1040',
-    },
-  ];
-}
+/**
+ * The default documents — more arrive via the tab bar's open-file button.
+ * A plain synchronous list: every tab renders immediately (named, loading),
+ * `active` picks the selected tab (default: the first), and the protected
+ * document needs NO special config — it opens into the `locked` state and
+ * the shell shows its password prompt.
+ */
+export const initialDocuments: InitialDocument[] = [
+  { name: 'Ebook', source: lazyBytes('ebook', 'ebook.pdf') },
+  { name: 'Form', source: lazyBytes('form', 'form.pdf') },
+  {
+    name: 'Interactive PDF Forms JavaScript Demo',
+    source: lazyBytes('interactive', 'interactive_pdf_forms_javascript_demo.pdf'),
+  },
+  { name: 'I-140', source: lazyBytes('i-140', 'i-140.pdf') },
+  { name: 'F1040', source: lazyBytes('f1040', 'f1040.pdf') },
+  { name: 'Protected', source: lazyBytes('protected', 'demo_protected.pdf') },
+];

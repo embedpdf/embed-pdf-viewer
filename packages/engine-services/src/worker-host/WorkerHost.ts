@@ -375,9 +375,24 @@ export class WorkerHost {
     }
     const session = new DocumentSession(this.runtime);
     if (req.kind === 'open.fatMem') {
-      session.openFromHandle(
-        openFatMemoryDocument(this.runtime, new Uint8Array(req.bytes), req.password),
-      );
+      const bytes = new Uint8Array(req.bytes);
+      try {
+        session.openFromHandle(openFatMemoryDocument(this.runtime, bytes, req.password));
+      } catch (error) {
+        // Password failures are a STATE, not an error: park the session with
+        // the already-transferred bytes and answer with a security probe that
+        // says "password required". The client handle comes up locked
+        // (`security.passwordPrompt === 'required'`); a later
+        // `document.checkPasswordPermissions` performs the actual load.
+        if (!isPasswordOpenError(error)) throw error;
+        session.parkLocked(bytes);
+        this.sessions.set(key, session);
+        return wirePack({
+          tag: 'open',
+          docId: req.docId,
+          security: passwordRequiredProbe(),
+        });
+      }
     } else if (req.kind === 'open.layerMemBase') {
       const base = this.baseDocuments.acquireMemoryBase({
         key: req.baseKey,
@@ -802,7 +817,20 @@ export class WorkerHost {
   private handleDocumentCheckPasswordPermissions(
     req: DocumentCheckPasswordPermissionsWorkerRequest,
   ): WirePack<WorkerResultPayload> {
-    const session = this.requireSession(req);
+    // The one handler that accepts a LOCKED session: on a locked session,
+    // "check this password" means "load the parked bytes with it". A wrong
+    // password throws DocPasswordIncorrect and the session stays parked
+    // (bytes retained) for the next attempt.
+    const parked = this.sessions.get(sessionKey(req.docId));
+    let session: DocumentSession;
+    if (parked?.isLocked()) {
+      parked.openFromHandle(
+        openFatMemoryDocument(this.runtime, parked.lockedBytes(), req.password),
+      );
+      session = parked;
+    } else {
+      session = this.requireSession(req);
+    }
     const security = new SecurityReader(this.runtime).checkPasswordPermissions(
       session,
       req.password,
@@ -868,6 +896,14 @@ export class WorkerHost {
   private requireSession(req: { docId: string; layerName?: string }): DocumentSession {
     const key = sessionKey(req.docId, req.layerName);
     const session = this.sessions.get(key);
+    if (session?.isLocked()) {
+      // Truthful error for any operation reaching a parked session: the
+      // document exists but needs `security.unlock()` first.
+      throw new EngineError(
+        EngineErrorCode.DocPasswordRequired,
+        `document session is password-locked: ${key}`,
+      );
+    }
     if (!session || !session.isOpen()) {
       throw new EngineError(EngineErrorCode.DocNotOpen, `document session not open: ${key}`);
     }
@@ -1102,4 +1138,31 @@ function sessionKey(docId: string, layerName?: string): string {
 
 function sessionKeyBelongsToDoc(key: string, docId: string): boolean {
   return key === sessionKey(docId) || key.startsWith(`${docId}::layer:`);
+}
+
+function isPasswordOpenError(error: unknown): boolean {
+  return (
+    error instanceof EngineError &&
+    (error.code === EngineErrorCode.DocPasswordRequired ||
+      error.code === EngineErrorCode.DocPasswordIncorrect)
+  );
+}
+
+/**
+ * The security probe a locked open answers with — identical to what
+ * `SecurityReader.probeFile` reports for a password-protected file it
+ * couldn't read: encrypted, password required, permissions unknown.
+ * `securityStateFromProbe` + `passwordPromptFromState` on the client
+ * turn this into `passwordPrompt: { state: 'required' }`.
+ */
+function passwordRequiredProbe() {
+  return {
+    encryptionState: 'encrypted' as const,
+    encryptionRequiresPassword: true,
+    securityHandlerRevision: null,
+    pdfPermissionsBits: null,
+    pdfPermissionsAllAllowed: null,
+    pdfOpenedAs: null,
+    securityProbedAt: Date.now(),
+  };
 }

@@ -18,7 +18,13 @@
  * plugin-shell's exclusive 'mode' surface, read null-safely so the band simply
  * doesn't exist without a document.
  */
-import { DocumentGate, useOptionalSelector } from '@embedpdf-x/react/runtime';
+import type { ReactNode } from 'react';
+import {
+  DocumentGate,
+  useDocumentId,
+  useDocumentStatus,
+  useOptionalSelector,
+} from '@embedpdf-x/react/runtime';
 import { Stage } from '@embedpdf-x/react/stage';
 import { Scrollbar } from '@embedpdf-x/react/scrollbar';
 import { RenderLayer } from '@embedpdf-x/react/render';
@@ -39,6 +45,7 @@ import { TabBar } from './ui/tab-bar';
 import { ArmedToolCursor } from './ui/tool-cursor';
 import { Header, LeftSidebar, RightSidebar, PageControls } from './ui/panels';
 import { RedactConfirmModal } from './ui/redact-confirm';
+import { DocumentError, PasswordPrompt } from './ui/document-boot';
 
 // Annotation renderers — module scope, per the AnnotationRenderer identity
 // rule. One entry today: form widgets render as fill controls while the form
@@ -75,6 +82,20 @@ function OpeningDocuments() {
   );
 }
 
+/**
+ * The document area's lifecycle switch. A `locked` tab shows its password
+ * prompt, an `error` tab its error pane — per TAB (keyed by document), so
+ * several can coexist and tab switching stays free. Everything else is the
+ * ready-gated Stage; the gate's fallback covers `loading`.
+ */
+function DocumentArea({ children }: { children: ReactNode }) {
+  const docId = useDocumentId();
+  const status = useDocumentStatus();
+  if (status === 'locked') return <PasswordPrompt key={docId} />;
+  if (status === 'error') return <DocumentError key={docId} />;
+  return <DocumentGate fallback={<OpeningDocuments />}>{children}</DocumentGate>;
+}
+
 export function Shell() {
   useCommandShortcuts();
   // Click-then-pick tools (stamp, file attachment) → click a page → file dialog
@@ -101,7 +122,7 @@ export function Shell() {
       <ModeBand />
 
       <div className="relative flex min-h-0 flex-1">
-        <DocumentGate fallback={<OpeningDocuments />}>
+        <DocumentArea>
           <LeftSidebar />
           <div className="relative min-w-0 flex-1">
             {/* the armed tool's cursor: its toolbar icon as a real CSS cursor
@@ -146,7 +167,7 @@ export function Shell() {
           </div>
           <RightSidebar />
           <RedactConfirmModal />
-        </DocumentGate>
+        </DocumentArea>
       </div>
     </div>
   );

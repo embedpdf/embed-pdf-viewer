@@ -51,6 +51,11 @@ export class CloudEngine implements Engine {
     void options?.scope;
     void options?.identity;
 
+    // Presence-based precedence, same rule the local engine documents: an
+    // options.password key wins (even explicitly null), else input.password.
+    const effectivePassword =
+      options && 'password' in options ? (options.password ?? null) : (input.password ?? null);
+
     if (input.kind === 'token') {
       // Open by doc-scoped JWT. We never verify the token SDK-side
       // (server is the verifier of record); we just decode the
@@ -88,7 +93,7 @@ export class CloudEngine implements Engine {
           token,
           this.sessionId,
         );
-        await maybeAutoEstablishAccess(handle, head, signal);
+        await maybeAutoEstablishAccess(handle, head, signal, effectivePassword);
         return handle;
       });
     }
@@ -131,7 +136,7 @@ export class CloudEngine implements Engine {
           resolvedToken,
           this.sessionId,
         );
-        await maybeAutoEstablishAccess(handle, head, signal);
+        await maybeAutoEstablishAccess(handle, head, signal, effectivePassword);
         return handle;
       });
     }
@@ -153,48 +158,81 @@ export class CloudEngine implements Engine {
 }
 
 /**
- * If `/head` told us the server needs `/v1/access` to be called and
- * the only reason is `'cdn'` (i.e. no password unlock waiting on
- * user input), call it transparently so the SDK picks up CDN-signed
- * URLs and the cookie/header side effects before the dev makes
- * their first render/text/annotation request.
+ * Post-/head access establishment, in two layers:
  *
- * If a password is required, we DON'T auto-call — the dev has to
- * prompt the user and call `doc.security.unlock({ password })`.
- * That code path runs the same /access POST and installs the CDN
- * binding on success.
+ * 1. **Supplied password** — a password given at open is always TRIED
+ *    (PDFium parity: the local engine feeds it to the loader no matter
+ *    what). Two triggers, because `/head` only carries the `password`
+ *    reason when a password is needed to READ:
+ *      - `reasons` has `'password'` → required-to-read case
+ *      - `head.permissions.canUpgradeToOwner` → permission-only encrypted
+ *        doc; the password can still upgrade to owner. Skipping this arm
+ *        would silently drop supplied OWNER passwords — and diverge from
+ *        the local engine on identical input.
+ *    Outcomes follow "a password failure may only block what the password
+ *    was needed for": a rejection in the required case leaves the handle
+ *    locked (the caller's prompt takes over, showing "incorrect"); in the
+ *    upgrade case the document stays readable and the failure is
+ *    non-fatal. The one /access POST also installs the CDN binding, so a
+ *    successful unlock covers the `password + cdn` combined case.
  *
- * Errors here are swallowed by design: a failed auto-establish
- * shouldn't break `open()`. The first real request still tries
- * origin, where the JWT check rejects if the scope is wrong;
- * developers see a regular Forbidden then instead of a confusing
- * open-time crash.
+ * 2. **CDN-only** — unchanged: `/access` without a password, transparently.
+ *    A required password with NO supplied password never auto-calls; the
+ *    dev prompts and `unlock()` runs the same POST.
+ *
+ * Non-password /access failures never break `open()` (the first real
+ * request still tries origin, where the JWT check produces a regular
+ * Forbidden) — but they are also never mistaken for a wrong password:
+ * only a DocPasswordRequired/Incorrect rejection means "wrong password".
  */
 async function maybeAutoEstablishAccess(
   handle: CloudDocumentHandle,
-  head: { access: { required: boolean; reasons: ReadonlyArray<string> } },
+  head: {
+    access: { required: boolean; reasons: ReadonlyArray<string> };
+    permissions: { canUpgradeToOwner: boolean };
+  },
   signal: AbortSignal,
+  password: string | null,
 ): Promise<void> {
-  if (!head.access.required) return;
   const reasons = new Set(head.access.reasons);
-  if (reasons.has('password')) return; // wait for explicit unlock()
-  if (!reasons.has('cdn')) return; // nothing actionable for the SDK
   // CloudDocumentSecurityService exposes `establishAccess()` — the
   // no-password sibling of `unlock()`. The public DocumentSecurityService
   // interface doesn't carry it (unlock = user action), but every
   // CloudDocumentHandle's `.security` is a CloudDocumentSecurityService.
   const security = handle.security as CloudDocumentSecurityService;
-  const pending = security.establishAccess();
-  // Link cancellation: if the outer open() is aborted while /access
-  // is in flight, propagate the abort instead of leaking the request.
+
+  const tryPassword =
+    password != null && (reasons.has('password') || head.permissions.canUpgradeToOwner);
+  if (tryPassword) {
+    const unlocked = await settleLinked(security.unlock({ password, mode: 'any' }), signal);
+    if (unlocked) return; // /access succeeded — CDN binding installed too
+    // Rejected or failed: in the required case the handle stays locked and
+    // the caller's password prompt takes over (retrying re-POSTs /access);
+    // in the upgrade case the document is readable regardless — fall
+    // through so a CDN-only establishment still happens.
+    if (reasons.has('password')) return;
+  }
+
+  if (!head.access.required) return;
+  if (reasons.has('password')) return; // wait for explicit unlock()
+  if (!reasons.has('cdn')) return; // nothing actionable for the SDK
+  await settleLinked(security.establishAccess(), signal);
+}
+
+/** Await an /access attempt with open()-abort linkage. Returns whether it
+ *  succeeded; failures are contained (see maybeAutoEstablishAccess). */
+async function settleLinked(
+  pending: ReturnType<CloudDocumentSecurityService['unlock']>,
+  signal: AbortSignal,
+): Promise<boolean> {
   const onAbort = () => pending.abort(signal.reason ?? new Error('aborted'));
   if (signal.aborted) onAbort();
   else signal.addEventListener('abort', onAbort, { once: true });
   try {
     await pending;
+    return true;
   } catch {
-    // Intentional: a transient /access failure shouldn't block open().
-    // Subsequent requests fall back to origin via the JWT bearer.
+    return false;
   } finally {
     signal.removeEventListener('abort', onAbort);
   }

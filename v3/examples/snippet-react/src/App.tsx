@@ -5,8 +5,8 @@
  */
 // One import line per feature (v3/ADAPTERS.md): each subpath carries the
 // plugin AND its UI; delete a line and the feature leaves the bundle.
-import { useEffect, useMemo } from 'react';
-import { Viewer, useDocuments } from '@embedpdf-x/react/runtime';
+import { useMemo } from 'react';
+import { Viewer } from '@embedpdf-x/react/runtime';
 import { stagePlugin } from '@embedpdf-x/react/stage';
 import { renderPlugin } from '@embedpdf-x/react/render';
 import { pageEditPlugin } from '@embedpdf-x/react/page-edit';
@@ -20,7 +20,7 @@ import { searchPlugin } from '@embedpdf-x/react/search';
 import { i18nPlugin, negotiateLocale, useT } from '@embedpdf-x/react/i18n';
 import { commandsPlugin } from '@embedpdf-x/react/commands';
 import { shellPlugin } from '@embedpdf-x/react/shell';
-import { createDeferredEngine, loadInitialDocuments } from './engine';
+import { createDeferredEngine, initialDocuments } from './engine';
 import { ThumbsStageToken } from './config/stage';
 import { commands } from './config/commands';
 import { demoToolsPlugin } from './config/demo-tools.plugin';
@@ -93,31 +93,16 @@ function Booting() {
   );
 }
 
-/** Opens the sample documents once the kernel is up (bytes fetched lazily). */
-function OpenInitialDocuments() {
-  const { open, docs } = useDocuments();
-  useEffect(() => {
-    if (docs.length > 0) return;
-    let alive = true;
-    (async () => {
-      const initial = await loadInitialDocuments();
-      if (!alive) return;
-      for (const doc of initial) await open(doc.source, { name: doc.name });
-    })();
-    return () => {
-      alive = false;
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-  return null;
-}
-
 export function App() {
   const engine = useMemo(createDeferredEngine, []);
   return (
     <ThemeProvider>
-      <Viewer engine={engine} plugins={plugins} fallback={<Booting />}>
-        <OpenInitialDocuments />
+      <Viewer
+        engine={engine}
+        plugins={plugins}
+        initialDocuments={initialDocuments}
+        fallback={<Booting />}
+      >
         <Shell />
       </Viewer>
     </ThemeProvider>

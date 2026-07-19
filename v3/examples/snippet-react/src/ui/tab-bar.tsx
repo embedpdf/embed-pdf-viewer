@@ -57,6 +57,20 @@ export function TabBar({
                   : 'bg-surface-alt text-fg-secondary hover:bg-hover hover:text-fg'
               }`}
             >
+              {/* lifecycle glyphs — the tab exists from the moment open()
+                  was called; these show what its document is doing */}
+              {doc.status === 'loading' && (
+                <span
+                  className="border-border-subtle border-t-accent h-3 w-3 flex-shrink-0 animate-spin rounded-full border"
+                  aria-label="Loading"
+                />
+              )}
+              {doc.status === 'locked' && (
+                <Icon name="lock" size={13} className="text-fg-muted flex-shrink-0" />
+              )}
+              {doc.status === 'error' && (
+                <Icon name="alertTriangle" size={13} className="flex-shrink-0 text-red-500" />
+              )}
               <span className="min-w-0 flex-1 truncate">
                 {doc.name ?? `Document ${doc.id.slice(0, 8)}`}
               </span>

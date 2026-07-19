@@ -23,7 +23,7 @@ export interface Store {
 }
 
 export function createStore(): Store {
-  let core: CoreState = { documents: {}, order: [], activeId: null };
+  let core: CoreState = { documents: {}, pending: {}, order: [], activeId: null };
   const slices: Record<string, unknown> = {};
   const reducers: Record<string, (s: unknown, a: Action) => unknown> = {};
   const changeListeners = new Set<() => void>();

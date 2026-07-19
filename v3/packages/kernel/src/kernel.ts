@@ -9,6 +9,9 @@ import { planPlugins } from './order';
 import {
   CORE_ACTIVE_CHANGED,
   CORE_DOCUMENT_ADDED,
+  CORE_DOCUMENT_LOCKED,
+  CORE_DOCUMENT_OPENING,
+  CORE_DOCUMENT_OPEN_FAILED,
   CORE_DOCUMENT_PAGES_UPDATED,
   CORE_DOCUMENT_REMOVED,
   CORE_ORDER_CHANGED,
@@ -25,6 +28,8 @@ import {
   type GlobalState,
   type OpenDocumentOptions,
   type OpenInput,
+  type OpenSource,
+  type PendingMeta,
   type PluginScope,
   type Unsubscribe,
 } from './types';
@@ -68,8 +73,22 @@ const reducerOf = (plugin: AnyPlugin) =>
 const toDocInfo = (meta: DocumentMeta): DocInfo => ({
   id: meta.id,
   name: meta.name,
+  status: 'ready',
   pageCount: meta.pageCount,
 });
+const pendingToDocInfo = (meta: PendingMeta): DocInfo => ({
+  id: meta.id,
+  name: meta.name,
+  status: meta.status,
+  pageCount: 0,
+  passwordProvided: meta.passwordProvided,
+});
+
+/** The stable id an input implies, if it carries one ('bytes'/'layerBytes'/'id'). */
+const idOfInput = (input: OpenInput): string | null =>
+  'id' in input && typeof input.id === 'string' ? input.id : null;
+const passwordOfInput = (input: OpenInput): string | null | undefined =>
+  'password' in input ? input.password : undefined;
 
 /**
  * Assemble a kernel from an engine + plugins.
@@ -89,6 +108,9 @@ export function createKernel(opts: { engine: Engine; plugins: AnyPlugin[] }): Ke
   const workspaceCapabilities = new Map<CapabilityToken<unknown>, unknown>();
   const documentCapabilities = new Map<string, unknown>(); // `${pluginId}::${docId}` -> capability
   const documentHandles = new Map<string, DocumentHandle>(); // live engine handles, by docId
+  // Live handles whose document is password-locked. Parked OUTSIDE
+  // `documentHandles` on purpose: plugins must never reach a locked handle.
+  const lockedHandles = new Map<string, DocumentHandle>();
   const workspaceTeardowns: Array<() => void> = [];
   const documentTeardowns = new Map<string, Array<() => void>>();
 
@@ -108,6 +130,15 @@ export function createKernel(opts: { engine: Engine; plugins: AnyPlugin[] }): Ke
     if (!provider) throw new Error(`No capability "${token.name}".`);
     const id = documentId ?? store.getCore().activeId;
     if (!id) throw new Error(`Capability "${token.name}" requires an active document.`);
+    const pending = store.getCore().pending[id];
+    if (pending) {
+      // Fail fast and truthfully: a loading/locked/error document has no
+      // plugin instances yet. `useOptional*` adapters turn this into their
+      // fallback; strict resolution surfaces the real state.
+      throw new Error(
+        `Capability "${token.name}" unavailable: document "${id}" is ${pending.status}.`,
+      );
+    }
     return buildDocumentCapability(provider, id) as T;
   }
 
@@ -137,27 +168,55 @@ export function createKernel(opts: { engine: Engine; plugins: AnyPlugin[] }): Ke
     return remaining.length === 0 ? null : (remaining[Math.max(0, index - 1)] ?? remaining[0]);
   }
 
-  async function openDocument(input: OpenInput, options?: OpenDocumentOptions): Promise<string> {
-    const { activate, name, ...engineOptions } = options ?? {};
-    const handle = await engine.open(input, engineOptions);
-    const snapshot = await handle.pages.list();
+  // Tickets for slots whose real id isn't known yet (thunk sources).
+  let ticketCounter = 0;
+  const nextTicket = () => `pending:${++ticketCounter}`;
+
+  /** Rekey a pending slot in place (ticket -> engine id). Order position and
+   *  activation follow the slot, so the tab never moves or loses selection. */
+  function reconcileSlotId(from: string, to: string): string {
+    if (from === to) return to;
+    const core = store.getCore();
+    if (core.documents[to] || core.pending[to]) {
+      throw new Error(`[documents] duplicate document id: ${to}`);
+    }
+    const slot = core.pending[from];
+    if (!slot) return to; // slot closed mid-flight; caller's stillWanted() handles it
+    const { [from]: _removed, ...pending } = core.pending;
+    store.setCore(
+      {
+        pending: { ...pending, [to]: { ...slot, id: to } },
+        order: core.order.map((id) => (id === from ? to : id)),
+        activeId: core.activeId === from ? to : core.activeId,
+      },
+      { type: CORE_ORDER_CHANGED },
+    );
+    return to;
+  }
+
+  /** Pending -> ready: the ONE place a document becomes real. Registers the
+   *  handle, swaps the slot for a DocumentMeta (same order position), fires
+   *  CORE_DOCUMENT_ADDED, and brings up document-scoped plugins — so plugins
+   *  observe exactly the same lifecycle they always did. */
+  async function promoteToReady(
+    id: string,
+    name: string | undefined,
+    handle: DocumentHandle,
+    snapshot: { pageCount: number; pages: DocumentMeta['pages'] },
+  ): Promise<void> {
     const meta: DocumentMeta = {
-      id: handle.id,
+      id,
       name,
       pageCount: snapshot.pageCount,
       pages: snapshot.pages,
       revision: 0,
     };
-    documentHandles.set(meta.id, handle);
+    documentHandles.set(id, handle);
 
     const core = store.getCore();
-    const willActivate = (activate ?? true) || core.activeId === null;
+    const { [id]: _resolved, ...pending } = core.pending;
     store.setCore(
-      {
-        documents: { ...core.documents, [meta.id]: meta },
-        order: [...core.order, meta.id],
-        activeId: willActivate ? meta.id : core.activeId,
-      },
+      { documents: { ...core.documents, [id]: meta }, pending },
       { type: CORE_DOCUMENT_ADDED },
     );
 
@@ -167,12 +226,12 @@ export function createKernel(opts: { engine: Engine; plugins: AnyPlugin[] }): Ke
     // plugin (every Stage lens) re-derives from the new registry for free.
     // Own mutations and remote (collaborator) mutations arrive identically;
     // the handler is origin-agnostic, as the event model intends.
-    documentTeardowns.set(meta.id, []);
+    documentTeardowns.set(id, []);
     const unsubscribeEvents = handle.events.subscribe((event) => {
       const layout = layoutFromEvent(event);
       if (!layout) return;
       const now = store.getCore();
-      const existing = now.documents[meta.id];
+      const existing = now.documents[id];
       if (!existing) return; // closed mid-flight
       const updated: DocumentMeta = {
         ...existing,
@@ -181,25 +240,134 @@ export function createKernel(opts: { engine: Engine; plugins: AnyPlugin[] }): Ke
         revision: existing.revision + 1,
       };
       store.setCore(
-        { documents: { ...now.documents, [meta.id]: updated } },
+        { documents: { ...now.documents, [id]: updated } },
         { type: CORE_DOCUMENT_PAGES_UPDATED },
       );
     });
-    documentTeardowns.get(meta.id)!.push(unsubscribeEvents);
+    documentTeardowns.get(id)!.push(unsubscribeEvents);
 
     for (const plugin of documentScopedPlugins) {
-      store.registerSlice(sliceKey(plugin.id, meta.id), reducerOf(plugin), initialStateOf(plugin));
+      store.registerSlice(sliceKey(plugin.id, id), reducerOf(plugin), initialStateOf(plugin));
     }
     for (const plugin of documentScopedPlugins) {
-      await plugin.init?.(createPluginContext(services, plugin, meta.id));
+      await plugin.init?.(createPluginContext(services, plugin, id));
     }
     for (const plugin of documentScopedPlugins) {
-      plugin.effects?.(createEffectContext(services, plugin, meta.id));
+      plugin.effects?.(createEffectContext(services, plugin, id));
     }
-    return meta.id;
+  }
+
+  async function openDocument(input: OpenSource, options?: OpenDocumentOptions): Promise<string> {
+    const { activate, name, ...engineOptions } = options ?? {};
+
+    // 1. Reserve the tab slot SYNCHRONOUSLY (this runs before the first
+    //    await): id, order position, and activation are decided at request
+    //    time; only the content arrives at completion time. Fire-and-forget
+    //    concurrent opens therefore keep call order as tab order.
+    let id = typeof input === 'function' ? nextTicket() : (idOfInput(input) ?? nextTicket());
+    const reserved = store.getCore();
+    if (reserved.documents[id] || reserved.pending[id]) {
+      throw new Error(`[documents] document already open: ${id}`);
+    }
+    store.setCore(
+      {
+        pending: { ...reserved.pending, [id]: { id, name, status: 'loading' } },
+        order: [...reserved.order, id],
+        activeId: (activate ?? true) || reserved.activeId === null ? id : reserved.activeId,
+      },
+      { type: CORE_DOCUMENT_OPENING },
+    );
+    const stillWanted = () => store.getCore().pending[id] !== undefined;
+
+    try {
+      const source = typeof input === 'function' ? await input() : input;
+      if (!stillWanted()) throw new Error(`[documents] closed while opening: ${id}`);
+      const sourceId = idOfInput(source);
+      if (sourceId) id = reconcileSlotId(id, sourceId);
+
+      const handle = await engine.open(source, engineOptions);
+      if (!stillWanted()) {
+        await handle.close();
+        throw new Error(`[documents] closed while opening: ${id}`);
+      }
+      if (handle.id !== id) id = reconcileSlotId(id, handle.id);
+
+      // 2. A password-locked handle parks here — BEFORE pages.list(), which
+      //    would reject on a locked document. `documents.unlock()` finishes
+      //    the job later. `passwordProvided` records that a supplied password
+      //    was already tried and rejected (drives the "incorrect" copy).
+      if (handle.security?.passwordPrompt?.state === 'required') {
+        const passwordProvided =
+          ('password' in engineOptions && engineOptions.password != null) ||
+          passwordOfInput(source) != null;
+        lockedHandles.set(id, handle);
+        const now = store.getCore();
+        store.setCore(
+          { pending: { ...now.pending, [id]: { id, name, status: 'locked', passwordProvided } } },
+          { type: CORE_DOCUMENT_LOCKED },
+        );
+        return id;
+      }
+
+      const snapshot = await handle.pages.list();
+      if (!stillWanted()) {
+        await handle.close();
+        throw new Error(`[documents] closed while opening: ${id}`);
+      }
+      await promoteToReady(id, name, handle, snapshot);
+      return id;
+    } catch (error) {
+      // 3. The tab stays, flagged — closable, and (later) retryable. Skipped
+      //    when the slot is already gone (user closed the loading tab).
+      if (stillWanted()) {
+        const now = store.getCore();
+        store.setCore(
+          { pending: { ...now.pending, [id]: { id, name, status: 'error', error } } },
+          { type: CORE_DOCUMENT_OPEN_FAILED },
+        );
+      }
+      throw error;
+    }
+  }
+
+  async function unlockDocument(id: string, input: { password: string }): Promise<void> {
+    const slot = store.getCore().pending[id];
+    const handle = lockedHandles.get(id);
+    if (!slot || slot.status !== 'locked' || !handle) {
+      throw new Error(`[documents] document is not locked: ${id}`);
+    }
+    // Engine-agnostic by design: local loads the parked worker bytes, cloud
+    // POSTs /access — same call, same result. A wrong password rejects here
+    // (DocPasswordIncorrect) and the document simply stays locked.
+    await handle.security.unlock({ password: input.password });
+    if (!store.getCore().pending[id]) return; // closed while unlocking
+    const snapshot = await handle.pages.list();
+    if (!store.getCore().pending[id]) return;
+    lockedHandles.delete(id);
+    await promoteToReady(id, slot.name, handle, snapshot);
   }
 
   async function closeDocument(documentId: string): Promise<void> {
+    // Pending slot (loading / locked / error): remove the tab; a parked
+    // locked handle is disposed, an in-flight open notices the missing slot
+    // when it lands and closes its own handle.
+    const pendingCore = store.getCore();
+    if (pendingCore.pending[documentId]) {
+      const { [documentId]: _removed, ...pending } = pendingCore.pending;
+      store.setCore(
+        {
+          pending,
+          order: pendingCore.order.filter((id) => id !== documentId),
+          activeId: nextActiveDocument(pendingCore, documentId),
+        },
+        { type: CORE_DOCUMENT_REMOVED },
+      );
+      const locked = lockedHandles.get(documentId);
+      lockedHandles.delete(documentId);
+      await locked?.close();
+      return;
+    }
+
     (documentTeardowns.get(documentId) ?? []).forEach((teardown) => teardown());
     documentTeardowns.delete(documentId);
     for (const plugin of documentScopedPlugins) {
@@ -228,27 +396,40 @@ export function createKernel(opts: { engine: Engine; plugins: AnyPlugin[] }): Ke
 
   const documents: DocumentsCapability = {
     open: openDocument,
+    unlock: unlockDocument,
     close: closeDocument,
     closeAll: async () => {
       for (const id of [...store.getCore().order]) await closeDocument(id);
     },
     setActive: (id) => {
-      if (store.getCore().documents[id])
+      const core = store.getCore();
+      // Pending tabs are selectable — a loading or locked tab is a real tab.
+      if (core.documents[id] || core.pending[id])
         store.setCore({ activeId: id }, { type: CORE_ACTIVE_CHANGED });
     },
     activeId: () => store.getCore().activeId,
     list: (): DocInfo[] =>
-      store.getCore().order.map((id) => toDocInfo(store.getCore().documents[id])),
+      store.getCore().order.map((id) => {
+        const core = store.getCore();
+        const meta = core.documents[id];
+        return meta ? toDocInfo(meta) : pendingToDocInfo(core.pending[id]);
+      }),
     get: (id) => {
-      const meta = store.getCore().documents[id];
-      return meta ? toDocInfo(meta) : null;
+      const core = store.getCore();
+      const meta = core.documents[id];
+      if (meta) return toDocInfo(meta);
+      const pending = core.pending[id];
+      return pending ? pendingToDocInfo(pending) : null;
     },
-    has: (id) => store.getCore().documents[id] !== undefined,
+    has: (id) => {
+      const core = store.getCore();
+      return core.documents[id] !== undefined || core.pending[id] !== undefined;
+    },
     count: () => store.getCore().order.length,
     order: () => [...store.getCore().order],
     move: (id, toIndex) => {
       const core = store.getCore();
-      if (!core.documents[id]) return;
+      if (!core.documents[id] && !core.pending[id]) return;
       const without = core.order.filter((x) => x !== id);
       const clamped = Math.max(0, Math.min(toIndex, without.length));
       without.splice(clamped, 0, id);
@@ -318,6 +499,10 @@ export function createKernel(opts: { engine: Engine; plugins: AnyPlugin[] }): Ke
       for (const teardowns of documentTeardowns.values())
         teardowns.forEach((teardown) => teardown());
       documentTeardowns.clear();
+      // Parked locked handles hold worker-side resources (retained bytes) —
+      // release them; destroy() is sync, so fire-and-forget.
+      for (const handle of lockedHandles.values()) void handle.close();
+      lockedHandles.clear();
       while (workspaceTeardowns.length) workspaceTeardowns.pop()!();
     },
   };

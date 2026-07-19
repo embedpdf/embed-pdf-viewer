@@ -4,6 +4,8 @@ import { NULL_PTR } from '@embedpdf/pdf-runtime';
 
 export type OpenedPdfDocumentKind = 'fat-memory' | 'layer';
 
+const FPDF_ERR_PASSWORD = 4;
+
 export interface OpenedPdfDocument {
   readonly kind: OpenedPdfDocumentKind;
   readonly docPtr: Ptr;
@@ -64,6 +66,14 @@ export function openFatMemoryDocument(
     mem.writeBytes(dataPtr, bytes);
     const docPtr = fn.FPDF_LoadMemDocument64(dataPtr, bytes.byteLength, password ?? '');
     if (!docPtr) {
+      // Distinguish "locked" from "broken": a password failure is a
+      // recoverable state the caller can act on (prompt + unlock), never
+      // a generic open failure.
+      if (fn.FPDF_GetLastError() === FPDF_ERR_PASSWORD) {
+        throw password
+          ? new EngineError(EngineErrorCode.DocPasswordIncorrect, 'incorrect document password')
+          : new EngineError(EngineErrorCode.DocPasswordRequired, 'document requires a password');
+      }
       throw new EngineError(EngineErrorCode.DocOpenFailed, 'failed to open document');
     }
     setRuntimeOwnerPermissionsIfEncrypted(runtime, docPtr);

@@ -62,6 +62,12 @@ export const CORE_ACTIVE_CHANGED = '@@core/active-changed';
 export const CORE_ORDER_CHANGED = '@@core/order-changed';
 /** A document's page registry was replaced by a mutation event (rotate/move/delete). */
 export const CORE_DOCUMENT_PAGES_UPDATED = '@@core/document-pages-updated';
+/** A tab slot was reserved: `open()` was called; the document is loading. */
+export const CORE_DOCUMENT_OPENING = '@@core/document-opening';
+/** The engine reports the document needs a password (`documents.unlock`). */
+export const CORE_DOCUMENT_LOCKED = '@@core/document-locked';
+/** The open failed; the tab stays with `status: 'error'` until closed. */
+export const CORE_DOCUMENT_OPEN_FAILED = '@@core/document-open-failed';
 
 /** A typed handle to a capability — typed resolution, no string casts. */
 export interface CapabilityToken<T> {
@@ -90,10 +96,31 @@ export interface DocumentMeta {
   readonly revision: number;
 }
 
+/**
+ * A tab slot whose document is not (yet) real: still opening, waiting for a
+ * password, or failed. Lives beside `documents`, never inside it — plugins
+ * only ever see READY documents; pending slots are pure registry/UI state.
+ * Request-time lifecycle: `open()` reserves the slot (id, order position,
+ * activation) synchronously; only the content arrives at completion time.
+ */
+export interface PendingMeta {
+  readonly id: string;
+  readonly name?: string;
+  readonly status: 'loading' | 'locked' | 'error';
+  /** `locked` only: a password was supplied at open and rejected — the
+   *  prompt should show its "incorrect password" copy, not "required". */
+  readonly passwordProvided?: boolean;
+  /** `error` only: what the open rejected with. Never carries a password. */
+  readonly error?: unknown;
+}
+
 /** The document registry — what document scope is built on. */
 export interface CoreState {
   readonly documents: Readonly<Record<string, DocumentMeta>>;
+  readonly pending: Readonly<Record<string, PendingMeta>>;
+  /** THE tab strip: spans ready docs and pending slots, in request order. */
   readonly order: readonly string[];
+  /** May point at a pending slot (a loading or locked tab can be selected). */
   readonly activeId: string | null;
 }
 
@@ -168,17 +195,40 @@ export type AnyPlugin = PluginDef<any, any, any>;
 
 // ── Built-in: the document registry, exposed as a capability ─────────────────
 
+export type DocStatus = 'loading' | 'locked' | 'ready' | 'error';
+
 export interface DocInfo {
   id: string;
   name?: string;
+  /** Lifecycle state — the tab bar renders directly off this. */
+  status: DocStatus;
+  /** 0 until the document is `ready`. */
   pageCount: number;
+  /** `locked` only: a supplied password was rejected (show "incorrect"). */
+  passwordProvided?: boolean;
 }
 
 /** Options for opening a document: kernel concerns (activate/name) + engine OpenOptions. */
 export type OpenDocumentOptions = OpenOptions & { activate?: boolean; name?: string };
 
+/**
+ * What `open()` accepts: an engine `OpenInput`, or a thunk producing one.
+ * The thunk form makes the FETCH happen under the loading tab — the slot is
+ * reserved synchronously, then the thunk runs (network), then the engine
+ * opens. Prefer it for anything that isn't already in memory.
+ */
+export type OpenSource = OpenInput | (() => Promise<OpenInput>);
+
 export interface DocumentsCapability {
-  open(input: OpenInput, options?: OpenDocumentOptions): Promise<string>;
+  open(input: OpenSource, options?: OpenDocumentOptions): Promise<string>;
+  /**
+   * Unlock a `locked` document with a password and promote it to `ready`.
+   * Rejects with the engine's DocPasswordIncorrect on a wrong password —
+   * the document stays locked and unlock can be called again. Identical
+   * behavior on the local (worker loads the parked bytes) and cloud
+   * (/access grant) engines.
+   */
+  unlock(id: string, input: { password: string }): Promise<void>;
   close(id: string): Promise<void>;
   closeAll(): Promise<void>;
   setActive(id: string): void;

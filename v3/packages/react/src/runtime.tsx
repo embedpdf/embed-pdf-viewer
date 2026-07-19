@@ -20,7 +20,14 @@ import {
   useSyncExternalStore,
 } from 'react';
 import { createKernel } from '@embedpdf-x/kernel';
-import type { AnyPlugin, CapabilityToken, Engine, Kernel, OpenInput } from '@embedpdf-x/kernel';
+import type {
+  AnyPlugin,
+  CapabilityToken,
+  Engine,
+  Kernel,
+  OpenDocumentOptions,
+  OpenSource,
+} from '@embedpdf-x/kernel';
 // Pure coordinate math from the geometry base — NOT from stage-core. The
 // PageContext seam stays stage-agnostic (it must also serve standalone PageView).
 import type { PageFrame, PageTransform, Point, Rect } from '@embedpdf-x/geometry';
@@ -80,17 +87,29 @@ export interface DocumentGateProps {
   children: React.ReactNode;
 }
 /**
- * Render children only while this subtree has a document — the structural way
- * to say "this UI is defined over a document". An empty workspace is a
- * legitimate, designable state (the Viewer no longer blocks on documents so
- * chrome can render at t≈0): workspace-scoped UI (toolbars, commands, i18n)
- * lives OUTSIDE the gate; document-scoped UI (Stage, panels, page chrome)
- * lives inside it, or reads through `useOptionalSelector`. Sibling of
- * <DocumentScope>, which picks WHICH document; this one handles WHETHER.
+ * Render children only while this subtree has a READY document — the
+ * structural way to say "this UI is defined over a document". An empty
+ * workspace is a legitimate, designable state (the Viewer no longer blocks on
+ * documents so chrome can render at t≈0): workspace-scoped UI (toolbars,
+ * commands, i18n) lives OUTSIDE the gate; document-scoped UI (Stage, panels,
+ * page chrome) lives inside it, or reads through `useOptionalSelector`.
+ * A `loading`/`locked`/`error` tab renders `fallback` — so the gate's
+ * fallback doubles as the per-tab boot state; richer chrome (a password
+ * prompt, an error pane) branches on `useDocumentStatus()` beside the gate.
+ * Sibling of <DocumentScope>, which picks WHICH document; this one handles
+ * WHETHER.
  */
 export function DocumentGate({ fallback = null, children }: DocumentGateProps) {
   const docId = useDocumentId();
-  return <>{docId ? children : fallback}</>;
+  const ready = useKernelValue((k) => (docId ? k.documents.get(docId)?.status === 'ready' : false));
+  return <>{ready ? children : fallback}</>;
+}
+
+/** Lifecycle status of this subtree's document (loading/locked/ready/error),
+ *  or null with no document. The password prompt and error panes key off it. */
+export function useDocumentStatus() {
+  const docId = useDocumentId();
+  return useKernelValue((k) => (docId ? (k.documents.get(docId)?.status ?? null) : null));
 }
 
 /** Resolve a capability by token, binding document-scoped ones to this subtree's document. */
@@ -182,13 +201,20 @@ export function useDocuments() {
     (k) => k.documents.list(),
     (a, b) =>
       a.length === b.length &&
-      a.every((d, i) => d.id === b[i].id && d.pageCount === b[i].pageCount),
+      a.every(
+        (d, i) =>
+          d.id === b[i].id &&
+          d.pageCount === b[i].pageCount &&
+          d.status === b[i].status &&
+          d.passwordProvided === b[i].passwordProvided,
+      ),
   );
   const activeId = useActiveDocumentId();
   return {
     docs,
     activeId,
     open: kernel.documents.open,
+    unlock: kernel.documents.unlock,
     close: kernel.documents.close,
     setActive: kernel.documents.setActive,
     move: kernel.documents.move,
@@ -198,10 +224,17 @@ export function useDocuments() {
   };
 }
 
-export interface InitialDocument {
-  source: OpenInput;
-  name?: string;
-}
+/**
+ * One boot document. `source` may be a thunk — then the fetch runs UNDER the
+ * loading tab (the tab appears at t≈0 with `name`, bytes arrive later).
+ * All non-activation open options (password, scope, identity, …) pass
+ * straight through — the shape is shared with `documents.open()`, so the
+ * declarative and imperative paths can never drift.
+ */
+export type InitialDocument = { source: OpenSource; active?: boolean } & Omit<
+  OpenDocumentOptions,
+  'activate'
+>;
 
 export interface ViewerProps {
   engine: Engine;
@@ -228,11 +261,23 @@ export function Viewer({ engine, plugins, initialDocuments, fallback, children }
     let alive = true;
     (async () => {
       await kernel.start();
-      if (alive) setReady(true);
-      for (const doc of initialDocuments ?? []) {
-        if (!alive) return; // unmounted mid-boot — stop opening
-        await kernel.documents.open(doc.source, { name: doc.name });
-      }
+      if (!alive) return; // unmounted mid-boot — don't open anything
+      setReady(true);
+      // Fire ALL opens without awaiting: each reserves its tab slot
+      // synchronously, so every tab exists at t≈0 in array order and fills
+      // in as its document arrives. Exactly ONE document is selected —
+      // the one marked `active`, else the first — decided here, at request
+      // time, so a slow document can never steal focus.
+      const docs = initialDocuments ?? [];
+      const activeIndex = Math.max(
+        0,
+        docs.findIndex((d) => d.active),
+      );
+      docs.forEach(({ source, active: _active, ...options }, index) => {
+        void kernel.documents
+          .open(source, { ...options, activate: index === activeIndex })
+          .catch(() => {}); // failures surface as the tab's error/locked status
+      });
     })();
     return () => {
       alive = false;

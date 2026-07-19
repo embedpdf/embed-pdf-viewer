@@ -104,6 +104,22 @@ export const es: Locale = {
       undo: 'Deshacer',
       redo: 'Rehacer',
     },
+    passwordPrompt: {
+      title: 'Contraseña requerida',
+      required: 'Este documento está protegido con contraseña. Introdúcela para abrirlo.',
+      incorrect: 'La contraseña es incorrecta. Inténtalo de nuevo.',
+      incorrectWarning: 'Contraseña incorrecta',
+      label: 'Contraseña',
+      placeholder: 'Introduce la contraseña',
+      cancel: 'Cancelar',
+      open: 'Abrir',
+      opening: 'Abriendo…',
+    },
+    documentError: {
+      title: 'No se pudo abrir el documento',
+      unknown: 'El documento no se pudo abrir.',
+      close: 'Cerrar documento',
+    },
     demo: {
       title: 'EmbedPDF v3',
       subtitle: 'barra medida',
