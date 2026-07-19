@@ -31,7 +31,12 @@ import {
   type TextAlign,
 } from '@embedpdf-x/react/annotation';
 import { useTool } from '@embedpdf-x/react/interaction';
+import { useKernel, useOptionalCapability } from '@embedpdf-x/react/runtime';
+import { RedactionToken } from '@embedpdf-x/react/redaction';
+import { LinkToken, type PdfLinkTarget } from '@embedpdf-x/react/link';
+import { useT } from '@embedpdf-x/react/i18n';
 import { Icon } from './icons';
+import { AnnotationFlagsSection } from './annotation-flags';
 
 // ── app-level vocabulary (a viewer's decision, like v2's color presets) ──────
 // The engine schema says WHICH controls to show; these lists say what the app
@@ -539,6 +544,115 @@ function Toggle({
   );
 }
 
+/**
+ * The link-target editor — v2's "Link / Go to link / Remove link" menu items,
+ * rebuilt on the schema: any kind whose table declares the `link` spec gets
+ * this control, and every write is the ONE `updateSelection({ link })` path
+ * (the plugin materializes/retargets/deletes the attached children).
+ */
+function LinkTargetControl({
+  label,
+  value,
+  mixed,
+  onChange,
+}: {
+  label: string;
+  value: PdfLinkTarget | null;
+  mixed: boolean;
+  onChange: (patch: AnnotationPropsPatch) => void;
+}) {
+  const kernel = useKernel();
+  const link = useOptionalCapability(LinkToken);
+  const [mode, setMode] = useState<'uri' | 'page'>(value?.kind === 'goto' ? 'page' : 'uri');
+  const [uri, setUri] = useState(value?.kind === 'uri' ? value.uri : '');
+  const [pageNo, setPageNo] = useState('1');
+
+  // Adopt the selection's current target whenever it changes under us.
+  useEffect(() => {
+    setMode(value?.kind === 'goto' ? 'page' : 'uri');
+    if (value?.kind === 'uri') setUri(value.uri);
+  }, [value]);
+
+  const apply = () => {
+    if (mode === 'uri') {
+      const trimmed = uri.trim();
+      if (trimmed) onChange({ link: { kind: 'uri', uri: trimmed } });
+      return;
+    }
+    // Page number (1-based) → the page's OBJECT NUMBER (stable across moves).
+    const activeId = kernel.documents.activeId();
+    const meta = activeId ? kernel.getState().core.documents[activeId] : null;
+    const layout = meta?.pages[Math.max(0, Number(pageNo) - 1)];
+    if (layout) {
+      onChange({
+        link: {
+          kind: 'goto',
+          destination: { kind: 'fit', pageObjectNumber: layout.pageObjectNumber },
+        },
+      });
+    }
+  };
+
+  const inputCls = 'border-border bg-surface text-fg w-full rounded border px-3 py-1.5 text-sm';
+  return (
+    <Field label={label} mixed={mixed}>
+      {value != null && (
+        <div className="mb-2 flex items-center gap-2">
+          <button
+            type="button"
+            className="border-border bg-surface text-fg flex-1 rounded border px-2 py-1.5 text-sm"
+            onClick={() => link?.activate(value)}
+          >
+            Go to link
+          </button>
+          <button
+            type="button"
+            className="border-border bg-surface text-fg flex-1 rounded border px-2 py-1.5 text-sm"
+            onClick={() => onChange({ link: null })}
+          >
+            Remove link
+          </button>
+        </div>
+      )}
+      <div className="mb-2 flex gap-2">
+        <Toggle title="Link to a URL" active={mode === 'uri'} onClick={() => setMode('uri')}>
+          URL
+        </Toggle>
+        <Toggle title="Link to a page" active={mode === 'page'} onClick={() => setMode('page')}>
+          Page
+        </Toggle>
+      </div>
+      {mode === 'uri' ? (
+        <input
+          type="url"
+          className={inputCls}
+          placeholder="https://…"
+          value={uri}
+          onChange={(e) => setUri(e.target.value)}
+          onKeyDown={(e) => e.key === 'Enter' && apply()}
+        />
+      ) : (
+        <input
+          type="number"
+          min={1}
+          className={inputCls}
+          placeholder="Page number"
+          value={pageNo}
+          onChange={(e) => setPageNo(e.target.value)}
+          onKeyDown={(e) => e.key === 'Enter' && apply()}
+        />
+      )}
+      <button
+        type="button"
+        className="border-border bg-surface text-fg mt-2 w-full rounded border px-2 py-1.5 text-sm font-medium"
+        onClick={apply}
+      >
+        {value == null ? 'Add link' : 'Update link'}
+      </button>
+    </Field>
+  );
+}
+
 // ── one control per PropSpec — the entire surface an app customizes ──────────
 function PropControl({
   spec,
@@ -687,6 +801,15 @@ function PropControl({
           />
         </Field>
       );
+    case 'link':
+      return (
+        <LinkTargetControl
+          label={spec.label}
+          value={(value as PdfLinkTarget | null) ?? null}
+          mixed={mixed}
+          onChange={onChange}
+        />
+      );
     default:
       return null;
   }
@@ -721,7 +844,9 @@ export function AnnotationStylePanel() {
   const write = (patch: AnnotationPropsPatch) =>
     hasSel ? annotation.updateSelection(patch) : annotation.setDefaults(activeToolId, patch);
 
-  if (specs.length === 0) return <EmptyState />;
+  // A selection with no editable props (e.g. a stamp, or a LOCKED annotation —
+  // its style is frozen) still shows its flags: that's how you unlock it.
+  if (specs.length === 0 && selected.length === 0) return <EmptyState />;
 
   const context = hasSel ? `${selected.length} selected` : `${activeToolId} defaults`;
 
@@ -739,6 +864,64 @@ export function AnnotationStylePanel() {
           onChange={write}
         />
       ))}
+      {/* Redaction label (`/OverlayText` + `/Repeat`) — kind content, not a
+          style prop, so it writes through the redaction plugin's setLabel. */}
+      <RedactionLabelSection />
+      {/* `/F` flags for whatever is selected — the live flags test surface. */}
+      <AnnotationFlagsSection />
     </div>
   );
+}
+
+/**
+ * Label editor shown when exactly one redaction mark is selected. The text is
+ * what the destructive apply paints over the region (white-on-black by the
+ * tool defaults); `repeat` tiles it. Writes ride the annotation update verb
+ * via the redaction plugin, which preserves the label's `/DA` styling.
+ */
+function RedactionLabelSection() {
+  const t = useT();
+  const redaction = useOptionalCapability(RedactionToken);
+  const selected = useAnnotationSelected();
+  const mark = selected.length === 1 && selected[0]!.subtype === 'redact' ? selected[0]! : null;
+  const [draft, setDraft] = useState<string | null>(null);
+  useEffect(() => setDraft(null), [mark?.ref && refKeyOfRedact(mark.ref)]);
+  if (!redaction || !mark || mark.subtype !== 'redact') return null;
+
+  const value = draft ?? mark.overlayText ?? '';
+  const commit = () => {
+    if (draft === null) return;
+    void redaction.setLabel(mark.ref, { overlayText: draft.length > 0 ? draft : null });
+    setDraft(null);
+  };
+
+  return (
+    <div className="border-border-subtle mt-4 border-t pt-4">
+      <p className="text-fg-muted mb-2 text-[11px] font-semibold uppercase tracking-wide">
+        {t('demo.redactLabelTitle')}
+      </p>
+      <input
+        type="text"
+        value={value}
+        placeholder={t('demo.redactLabelPlaceholder')}
+        onChange={(e) => setDraft(e.target.value)}
+        onBlur={commit}
+        onKeyDown={(e) => e.key === 'Enter' && commit()}
+        className="border-border bg-surface text-fg w-full rounded-md border px-2 py-1.5 text-sm"
+      />
+      <label className="text-fg mt-2 flex items-center gap-2 text-sm">
+        <input
+          type="checkbox"
+          checked={mark.repeat}
+          onChange={(e) => void redaction.setLabel(mark.ref, { repeat: e.target.checked })}
+        />
+        {t('demo.redactLabelRepeat')}
+      </label>
+    </div>
+  );
+}
+
+/** Stable key for the effect dep — mirrors the annotation model's ref keys. */
+function refKeyOfRedact(ref: { kind: string } & Record<string, unknown>): string {
+  return JSON.stringify(ref);
 }
