@@ -631,6 +631,30 @@ describe('repository — attached links (fold + desired state + link kind mappin
     expect(out[0].linkRefs).toHaveLength(2);
   });
 
+  it('linkChildRects: a ROTATED parent gets the AABB of its rotated footprint, not the unrotated box', () => {
+    const square = fromDTO(squareDTO(10), CROP);
+    // 100×100 box (from the DTO rect) with a 45° tilt: the rotated
+    // footprint's AABB is 100·√2 ≈ 141.42 per side, centred on the box
+    // centre — NOT the 100×100 unrotated box. (Stroke handling follows
+    // `selectionQuad`'s own convention — the same envelope the chrome
+    // outlines.)
+    const rotated: Annot = {
+      ...square,
+      geom: {
+        t: 'rect',
+        rect: { x: 100, y: 600, width: 100, height: 100 },
+        ellipse: false,
+        rot: 45,
+      },
+    };
+    const [aabb] = linkChildRects(rotated);
+    const side = 100 * Math.SQRT2;
+    expect(aabb.width).toBeCloseTo(side, 6);
+    expect(aabb.height).toBeCloseTo(side, 6);
+    expect(aabb.x + aabb.width / 2).toBeCloseTo(150, 6); // centre preserved
+    expect(aabb.y + aabb.height / 2).toBeCloseTo(650, 6);
+  });
+
   it('linkChildRects: one rect per markup quad, one visual-bounds rect otherwise', () => {
     const square = fromDTO(squareDTO(10), CROP);
     expect(linkChildRects(square)).toHaveLength(1);

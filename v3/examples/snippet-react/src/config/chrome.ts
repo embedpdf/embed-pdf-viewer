@@ -142,13 +142,7 @@ const redactBar: BarSchema = {
   id: 'redact',
   sections: {
     center: [
-      group('redact', { importance: 4 }, [
-        'redaction:redact',
-        'redaction:mark-selection',
-        'panel:redaction',
-        'redaction:apply-all',
-        'redaction:clear-all',
-      ]),
+      group('redact', { importance: 4 }, ['redaction:redact', 'panel:redaction']),
       style,
       history,
     ],

@@ -97,7 +97,6 @@ export const es: Locale = {
       },
       redact: {
         mark: 'Marcar para redacción',
-        markSelection: 'Marcar selección',
         applyAll: 'Aplicar redacciones',
         clearAll: 'Borrar marcas',
         panel: 'Redacciones',

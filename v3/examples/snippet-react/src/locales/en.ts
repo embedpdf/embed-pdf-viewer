@@ -94,7 +94,6 @@ export const en: Locale = {
       },
       redact: {
         mark: 'Mark for Redaction',
-        markSelection: 'Mark Selection',
         applyAll: 'Apply Redactions',
         clearAll: 'Clear Marks',
         panel: 'Redactions',

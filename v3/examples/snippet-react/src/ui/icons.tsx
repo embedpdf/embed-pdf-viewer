@@ -321,18 +321,22 @@ export const ICON_PATHS: Record<string, readonly PathSpec[]> = {
     'M21 24l12 -12',
     'M25 24l12 -12',
   ],
+  // v2 parity: dashed frame + a SMALL rounded hatched box (v2 clips the
+  // hatch via <clipPath>; this icon system is plain paths, so the hatch
+  // segments are pre-clipped to the 10..22 box analytically).
   redactArea: [
     'M6 20h-1a2 2 0 0 1 -2 -2v-1',
     'M3 13v-3',
     'M3 6v-1a2 2 0 0 1 2 -2h1',
     'M10 3h3',
     'M17 3h1a2 2 0 0 1 2 2v1',
-    'M-2 24l14 -14',
-    'M2 24l14 -14',
-    'M6 24l14 -14',
-    'M10 24l15 -15',
-    'M14 24l15 -15',
-    'M18 24l15 -15',
+    'M12 10h8a2 2 0 0 1 2 2v8a2 2 0 0 1 -2 2h-8a2 2 0 0 1 -2 -2v-8a2 2 0 0 1 2 -2z',
+    'M10 12l2 -2',
+    'M10 16l6 -6',
+    'M10 20l10 -10',
+    'M12 22l10 -10',
+    'M16 22l6 -6',
+    'M20 22l2 -2',
   ],
   redactCombined: [
     'M6 20h-1a2 2 0 0 1 -2 -2v-1',

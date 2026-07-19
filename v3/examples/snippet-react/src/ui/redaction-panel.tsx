@@ -29,7 +29,10 @@ export function RedactionPanel() {
     <div className="flex min-h-0 flex-1 flex-col">
       <div className="min-h-0 flex-1 overflow-y-auto p-2">
         {pending.length === 0 ? (
-          <p className="text-fg-muted p-2 text-sm">{t('demo.redactionEmpty')}</p>
+          <div className="flex flex-col items-center gap-3 px-4 py-10 text-center">
+            <Icon name="redactionSidebar" size={32} className="text-fg-muted" />
+            <p className="text-fg-muted text-sm">{t('demo.redactionEmpty')}</p>
+          </div>
         ) : (
           <ul className="flex flex-col gap-1">
             {pending.map((item) => (

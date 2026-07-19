@@ -301,7 +301,19 @@ export function createDrawHandler(
   });
   return {
     id: 'annotation-draw',
-    priority: 90,
+    // The gesture cascade — relative order IS the composition policy:
+    //   100 annotation-edit     existing annotations own their gestures
+    //    95 annotation-place    click-to-place armed tools
+    //    60 text-select         claims TEXT ONLY (self-gates via isOverText,
+    //                           yields everywhere else)
+    //    55 annotation-draw     drag-create takes whatever text didn't claim
+    //    50 annotation-marquee  empty-space selection, the final fallback
+    // Draw sits BELOW text-select so a COMPOSED tool (redact: text-select +
+    // annotation-draw) lets text claim text — over a paragraph the drag makes
+    // per-line quad marks, anywhere else it drag-creates. Priority only breaks
+    // ties between simultaneously-ELIGIBLE handlers, and draw-only tools
+    // (square/ink/arrow…) never co-enable text-select, so they are unaffected.
+    priority: 55,
     enabledFor: (t) => t.enables.has('annotation-draw'),
     onDown: (s) => {
       if (!s.page) return false;

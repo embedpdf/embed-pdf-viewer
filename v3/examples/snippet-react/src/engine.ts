@@ -68,5 +68,21 @@ export async function loadInitialDocuments(): Promise<InitialDocument[]> {
       } as OpenInput,
       name: 'Interactive PDF Forms JavaScript Demo',
     },
+    {
+      source: {
+        kind: 'bytes',
+        id: 'i-140',
+        bytes: await fetchBytes('/i-140.pdf'),
+      } as OpenInput,
+      name: 'I-140',
+    },
+    {
+      source: {
+        kind: 'bytes',
+        id: 'f1040',
+        bytes: await fetchBytes('/f1040.pdf'),
+      } as OpenInput,
+      name: 'F1040',
+    },
   ];
 }

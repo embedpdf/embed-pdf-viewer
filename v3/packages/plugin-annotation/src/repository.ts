@@ -29,13 +29,13 @@ import {
   contentToPdfRect,
   geomPdfBounds,
   geomRotation,
-  geomVisualBounds,
   initialTextStyle,
   normalizeDeg,
   pdfToContentPoint,
   pdfToContentRect,
   propsFor,
   rotatedAabb,
+  selectionQuad,
   unionRect,
   type Annot,
   type AnnotationPropsPatch,
@@ -548,10 +548,16 @@ const quadBounds = (q: Quad): Rect => unionRect(q);
  * segment behaviour), every other kind one child over its visual bounds.
  * The reconciler and the navigation lens both read THIS, so the clickable
  * area and the written `/Rect`s can never disagree.
+ *
+ * A link's `/Rect` is axis-aligned by spec (no rotation exists for links),
+ * so a ROTATED parent gets the AABB of its rotated footprint — the
+ * `selectionQuad` corners (rotation + stroke included), the same envelope
+ * the selection chrome outlines. Exact rotated hit regions need
+ * `/QuadPoints` (tier 2).
  */
 export function linkChildRects(a: Annot): Rect[] {
   if (a.geom.t === 'quads') return a.geom.quads.map(quadBounds);
-  return [geomVisualBounds(a.geom, a.style.strokeWidth, a.style.border)];
+  return [unionRect(selectionQuad(a.geom, a.style.strokeWidth, a.style.border))];
 }
 
 /** The writable projection of a `link` value: `goto`/`uri` pass through,
