@@ -31,12 +31,11 @@ import {
 } from '@angular/core';
 import { isPlatformBrowser } from '@angular/common';
 import { createKernel } from '@embedpdf-x/kernel';
-import type { AnyPlugin, Engine, Kernel, OpenInput, Unsubscribe } from '@embedpdf-x/kernel';
+import type { AnyPlugin, Engine, InitialDocument, Kernel, Unsubscribe } from '@embedpdf-x/kernel';
 
-export interface EpdfInitialDocument {
-  source: OpenInput;
-  name?: string;
-}
+/** One boot document — the KERNEL's shared `InitialDocument` shape (same as
+ *  the React adapter's), aliased under the package's Epdf naming. */
+export type EpdfInitialDocument = InitialDocument;
 
 export interface EmbedPdfConfig {
   /** The engine, or a factory for it (pair with `deferredEngine()` so route
@@ -75,7 +74,8 @@ export class EpdfKernelHost implements OnDestroy {
 
   /** Boot lifecycle. `ready`/`error` are derived sugar over it. */
   readonly status = signal<EpdfKernelStatus>('starting');
-  /** The startup or background-open failure, if any (`status` tells which). */
+  /** The STARTUP failure, if any. Per-document open failures are tab state
+   *  (`DocInfo.status === 'error'`), not host state. */
   readonly error = signal<unknown>(null);
   /** True once `kernel.start()` resolved — which never touches the engine, so
    *  the shell (and every workspace capability: i18n, view-manager, …) is alive
@@ -131,15 +131,11 @@ export class EpdfKernelHost implements OnDestroy {
       }
       if (this.destroyed) return;
       this.status.set('ready');
-      for (const doc of this.initialDocuments ?? []) {
-        if (this.destroyed) return; // torn down mid-boot — stop opening
-        try {
-          await kernel.documents.open(doc.source, { name: doc.name });
-        } catch (err) {
-          if (this.destroyed) return;
-          this.error.set(err); // recorded; the remaining documents still open
-        }
-      }
+      // Kernel-owned boot policy: all tabs appear immediately in array order;
+      // the `active` entry (else the first) is selected; per-document
+      // failures surface as that tab's `error`/`locked` status (this host's
+      // `error` signal reports only startup failures).
+      kernel.documents.openAll(this.initialDocuments ?? []);
     })();
   }
 

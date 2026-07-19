@@ -208,6 +208,19 @@ export interface DocInfo {
   passwordProvided?: boolean;
 }
 
+/** Field-wise DocInfo equality — the ONE definition every adapter's reactive
+ *  `docs` read keys on, so a new lifecycle field can never silently stop
+ *  re-rendering one framework's tab bar. */
+export const docInfoEquals = (a: DocInfo, b: DocInfo): boolean =>
+  a.id === b.id &&
+  a.name === b.name &&
+  a.status === b.status &&
+  a.pageCount === b.pageCount &&
+  a.passwordProvided === b.passwordProvided;
+
+export const docInfoListEquals = (a: readonly DocInfo[], b: readonly DocInfo[]): boolean =>
+  a === b || (a.length === b.length && a.every((d, i) => docInfoEquals(d, b[i])));
+
 /** Options for opening a document: kernel concerns (activate/name) + engine OpenOptions. */
 export type OpenDocumentOptions = OpenOptions & { activate?: boolean; name?: string };
 
@@ -219,8 +232,30 @@ export type OpenDocumentOptions = OpenOptions & { activate?: boolean; name?: str
  */
 export type OpenSource = OpenInput | (() => Promise<OpenInput>);
 
+/**
+ * One boot document for `documents.openAll()` — THE shared shape every
+ * framework adapter's `initialDocuments` input uses (adapters re-export it,
+ * never redefine it). `active` picks the selected tab (default: the first);
+ * all other open options (name, password, scope, identity, …) pass straight
+ * through to `open()`, so the declarative and imperative paths cannot drift.
+ */
+export type InitialDocument = { source: OpenSource; active?: boolean } & Omit<
+  OpenDocumentOptions,
+  'activate'
+>;
+
 export interface DocumentsCapability {
   open(input: OpenSource, options?: OpenDocumentOptions): Promise<string>;
+  /**
+   * Boot-open a batch: fires every `open()` WITHOUT awaiting, so each tab
+   * slot is reserved synchronously — all tabs exist immediately, in array
+   * order — and exactly ONE is selected (the `active` entry, else the
+   * first), decided at request time so a slow document can never steal
+   * focus. Failures surface as the tab's `error`/`locked` status, never as
+   * unhandled rejections. This is kernel-owned POLICY: adapters call this
+   * one line instead of each re-implementing activation and error handling.
+   */
+  openAll(docs: readonly InitialDocument[]): void;
   /**
    * Unlock a `locked` document with a password and promote it to `ready`.
    * Rejects with the engine's DocPasswordIncorrect on a wrong password —

@@ -19,14 +19,13 @@ import {
   useState,
   useSyncExternalStore,
 } from 'react';
-import { createKernel } from '@embedpdf-x/kernel';
+import { createKernel, docInfoListEquals } from '@embedpdf-x/kernel';
 import type {
   AnyPlugin,
   CapabilityToken,
   Engine,
+  InitialDocument,
   Kernel,
-  OpenDocumentOptions,
-  OpenSource,
 } from '@embedpdf-x/kernel';
 // Pure coordinate math from the geometry base — NOT from stage-core. The
 // PageContext seam stays stage-agnostic (it must also serve standalone PageView).
@@ -112,30 +111,28 @@ export function useDocumentStatus() {
   return useKernelValue((k) => (docId ? (k.documents.get(docId)?.status ?? null) : null));
 }
 
-/** Resolve a capability by token, binding document-scoped ones to this subtree's document. */
+/**
+ * Resolve a capability by token, binding document-scoped ones to this
+ * subtree's document. Resolution is a REACTIVE read (`tryCapability` through
+ * the kernel's one change stream), not a memoized call — under the
+ * request-time lifecycle a document can become resolvable while its id stays
+ * the same, so any id-keyed cache goes stale; subscribing makes staleness
+ * structurally impossible. Fail-fast: while unresolvable, this re-runs the
+ * strict resolver so the kernel's truthful reason (`no capability` / `no
+ * document` / `document is loading|locked`) is what throws.
+ */
 export function useCapability<T>(token: CapabilityToken<T>): T {
   const kernel = useKernel();
   const scoped = useContext(DocumentScopeCtx);
-  const active = useActiveDocumentId();
-  const isDocScoped = kernel.scopeOf(token) === 'document';
-  const docId = isDocScoped ? (scoped ?? active ?? undefined) : undefined;
-  return useMemo(() => kernel.capability(token, docId), [kernel, token, docId]);
+  const cap = useKernelValue((k) => k.tryCapability(token, scoped ?? undefined));
+  return cap ?? kernel.capability(token, scoped ?? undefined);
 }
 
-/** Like `useCapability`, but returns null when no plugin provides the token. */
+/** Like `useCapability`, but null while the token can't resolve (no plugin,
+ *  no document, or a document that isn't ready yet). */
 export function useOptionalCapability<T>(token: CapabilityToken<T>): T | null {
-  const kernel = useKernel();
   const scoped = useContext(DocumentScopeCtx);
-  const active = useActiveDocumentId();
-  return useMemo(() => {
-    try {
-      const docId =
-        kernel.scopeOf(token) === 'document' ? (scoped ?? active ?? undefined) : undefined;
-      return kernel.capability(token, docId);
-    } catch {
-      return null;
-    }
-  }, [kernel, token, scoped, active]);
+  return useKernelValue((k) => k.tryCapability(token, scoped ?? undefined));
 }
 
 /** Subscribe to a selector over a (document-resolved) capability. */
@@ -197,18 +194,7 @@ export function useOptionalSelector<C, R>(
 /** The document registry (open/close/active/list), reactive. */
 export function useDocuments() {
   const kernel = useKernel();
-  const docs = useKernelValue(
-    (k) => k.documents.list(),
-    (a, b) =>
-      a.length === b.length &&
-      a.every(
-        (d, i) =>
-          d.id === b[i].id &&
-          d.pageCount === b[i].pageCount &&
-          d.status === b[i].status &&
-          d.passwordProvided === b[i].passwordProvided,
-      ),
-  );
+  const docs = useKernelValue((k) => k.documents.list(), docInfoListEquals);
   const activeId = useActiveDocumentId();
   return {
     docs,
@@ -224,17 +210,8 @@ export function useDocuments() {
   };
 }
 
-/**
- * One boot document. `source` may be a thunk — then the fetch runs UNDER the
- * loading tab (the tab appears at t≈0 with `name`, bytes arrive later).
- * All non-activation open options (password, scope, identity, …) pass
- * straight through — the shape is shared with `documents.open()`, so the
- * declarative and imperative paths can never drift.
- */
-export type InitialDocument = { source: OpenSource; active?: boolean } & Omit<
-  OpenDocumentOptions,
-  'activate'
->;
+// `InitialDocument` is the KERNEL's type (re-exported via `export * from
+// '@embedpdf-x/kernel'` above) — one shared shape for every adapter.
 
 export interface ViewerProps {
   engine: Engine;
@@ -263,21 +240,10 @@ export function Viewer({ engine, plugins, initialDocuments, fallback, children }
       await kernel.start();
       if (!alive) return; // unmounted mid-boot — don't open anything
       setReady(true);
-      // Fire ALL opens without awaiting: each reserves its tab slot
-      // synchronously, so every tab exists at t≈0 in array order and fills
-      // in as its document arrives. Exactly ONE document is selected —
-      // the one marked `active`, else the first — decided here, at request
-      // time, so a slow document can never steal focus.
-      const docs = initialDocuments ?? [];
-      const activeIndex = Math.max(
-        0,
-        docs.findIndex((d) => d.active),
-      );
-      docs.forEach(({ source, active: _active, ...options }, index) => {
-        void kernel.documents
-          .open(source, { ...options, activate: index === activeIndex })
-          .catch(() => {}); // failures surface as the tab's error/locked status
-      });
+      // Kernel-owned boot policy: all tabs appear immediately in array
+      // order; the `active` entry (else the first) is selected; failures
+      // surface as tab status. See DocumentsCapability.openAll.
+      kernel.documents.openAll(initialDocuments ?? []);
     })();
     return () => {
       alive = false;

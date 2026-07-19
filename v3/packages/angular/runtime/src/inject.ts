@@ -8,6 +8,7 @@
  * component-hosted mode where the kernel materializes after construction.
  */
 import { computed, inject, type Signal } from '@angular/core';
+import { docInfoListEquals } from '@embedpdf-x/kernel';
 import type { CapabilityToken, DocInfo, Kernel } from '@embedpdf-x/kernel';
 import { EpdfKernelHost } from './kernel-host';
 import { EPDF_DOCUMENT_SCOPE } from './tokens';
@@ -54,43 +55,32 @@ export function injectDocumentId(): Signal<string | null> {
 
 /**
  * Resolve a capability against a REACTIVE token — for components that take the
- * token as an input (`injectCapability` is the fixed-token sugar). Document-
- * scoped tokens bind to this subtree's document; the signal re-resolves when
- * the token, the scope, or the active document changes. Fail-fast like React's
- * `useCapability`: reading it with no provider (or no document, for
- * document-scoped tokens) throws.
+ * token as an input (`injectCapability` is the fixed-token sugar). Resolution
+ * is a REACTIVE read (`tryCapability` through the kernel's one change
+ * stream), not a computed over the document id — under the request-time
+ * lifecycle a document can become resolvable while its id stays the same, so
+ * any id-keyed cache goes stale; subscribing makes staleness structurally
+ * impossible. Fail-fast like React's `useCapability`: while unresolvable,
+ * this re-runs the strict resolver so the kernel's truthful reason (`no
+ * capability` / `no document` / `document is loading|locked`) is what throws.
  */
 export function injectCapabilityFor<T>(token: () => CapabilityToken<T>): Signal<T> {
   const host = injectKernelHost();
   const scope = inject(EPDF_DOCUMENT_SCOPE, { optional: true });
-  const active = host.value((k) => k.documents.activeId());
-  return computed(() => {
-    const t = token();
-    const docId =
-      host.kernel.scopeOf(t) === 'document' ? (scope?.id() ?? active() ?? undefined) : undefined;
-    return host.kernel.capability(t, docId);
-  });
+  const cap = host.value((k) => k.tryCapability(token(), scope?.id() ?? undefined));
+  return computed(() => cap() ?? host.kernel.capability(token(), scope?.id() ?? undefined));
 }
 
 export function injectCapability<T>(token: CapabilityToken<T>): Signal<T> {
   return injectCapabilityFor(() => token);
 }
 
-/** Like `injectCapabilityFor`, but `null` when the token can't resolve. */
+/** Like `injectCapabilityFor`, but null while the token can't resolve (no
+ *  plugin, no document, or a document that isn't ready yet). */
 export function injectOptionalCapabilityFor<T>(token: () => CapabilityToken<T>): Signal<T | null> {
   const host = injectKernelHost();
   const scope = inject(EPDF_DOCUMENT_SCOPE, { optional: true });
-  const active = host.value((k) => k.documents.activeId());
-  return computed(() => {
-    try {
-      const t = token();
-      const docId =
-        host.kernel.scopeOf(t) === 'document' ? (scope?.id() ?? active() ?? undefined) : undefined;
-      return host.kernel.capability(t, docId);
-    } catch {
-      return null;
-    }
-  });
+  return host.value((k) => k.tryCapability(token(), scope?.id() ?? undefined));
 }
 
 export function injectOptionalCapability<T>(token: CapabilityToken<T>): Signal<T | null> {
@@ -161,6 +151,7 @@ export interface EpdfDocuments {
   docs: Signal<DocInfo[]>;
   activeId: Signal<string | null>;
   open: Kernel['documents']['open'];
+  unlock: Kernel['documents']['unlock'];
   close: Kernel['documents']['close'];
   setActive: Kernel['documents']['setActive'];
   move: Kernel['documents']['move'];
@@ -172,14 +163,10 @@ export interface EpdfDocuments {
 export function injectDocuments(): EpdfDocuments {
   const host = injectKernelHost();
   return {
-    docs: host.value(
-      (k) => k.documents.list(),
-      (a, b) =>
-        a.length === b.length &&
-        a.every((d, i) => d.id === b[i].id && d.pageCount === b[i].pageCount),
-    ),
+    docs: host.value((k) => k.documents.list(), docInfoListEquals),
     activeId: host.value((k) => k.documents.activeId()),
     open: (input, options) => host.kernel.documents.open(input, options),
+    unlock: (id, input) => host.kernel.documents.unlock(id, input),
     close: (id) => host.kernel.documents.close(id),
     setActive: (id) => host.kernel.documents.setActive(id),
     move: (id, toIndex) => host.kernel.documents.move(id, toIndex),

@@ -55,6 +55,17 @@ export interface Kernel {
   readonly documents: DocumentsCapability;
   /** Resolve a capability. For document-scoped tokens, `documentId` defaults to the active doc. */
   capability<T>(token: CapabilityToken<T>, documentId?: string): T;
+  /**
+   * Total sibling of `capability()`: `null` instead of throwing — no
+   * provider, no document, or a document that isn't `ready` yet. This is the
+   * method adapters subscribe to (`useKernelValue`-style): resolution is a
+   * VALUE derived from kernel state, not a pure function of its arguments —
+   * a pending document's promotion changes the result while the id stays the
+   * same, so caching a `capability()` call by id goes stale. The returned
+   * instance is reference-stable per (plugin, document), so equality-cached
+   * reads don't churn.
+   */
+  tryCapability<T>(token: CapabilityToken<T>, documentId?: string): T | null;
   /** A token's scope — adapters use this to decide whether to bind a document. */
   scopeOf(token: CapabilityToken<unknown>): PluginScope;
   subscribe(listener: () => void): Unsubscribe;
@@ -139,6 +150,19 @@ export function createKernel(opts: { engine: Engine; plugins: AnyPlugin[] }): Ke
         `Capability "${token.name}" unavailable: document "${id}" is ${pending.status}.`,
       );
     }
+    return buildDocumentCapability(provider, id) as T;
+  }
+
+  /** Total sibling of `resolveCapability` — see `Kernel.tryCapability`. The
+   *  `ready` check is THE lifecycle rule, stated once, kernel-side: adapters
+   *  subscribe to this instead of re-deriving when resolution flips. */
+  function tryResolveCapability<T>(token: CapabilityToken<T>, documentId?: string): T | null {
+    const workspaceCapability = workspaceCapabilities.get(token);
+    if (workspaceCapability) return workspaceCapability as T;
+    const provider = plan.providerOf(token);
+    if (!provider) return null;
+    const id = documentId ?? store.getCore().activeId;
+    if (!id || !store.getCore().documents[id]) return null; // absent, or pending/locked/error
     return buildDocumentCapability(provider, id) as T;
   }
 
@@ -396,6 +420,19 @@ export function createKernel(opts: { engine: Engine; plugins: AnyPlugin[] }): Ke
 
   const documents: DocumentsCapability = {
     open: openDocument,
+    openAll: (docs) => {
+      // Fire-and-forget on purpose: each open() reserves its tab slot
+      // synchronously, so tabs exist immediately in array order; exactly one
+      // activation, decided here at request time. Failures are tab state
+      // (`error`/`locked`), never unhandled rejections.
+      const activeIndex = Math.max(
+        0,
+        docs.findIndex((d) => d.active),
+      );
+      docs.forEach(({ source, active: _active, ...options }, index) => {
+        void openDocument(source, { ...options, activate: index === activeIndex }).catch(() => {});
+      });
+    },
     unlock: unlockDocument,
     close: closeDocument,
     closeAll: async () => {
@@ -484,6 +521,7 @@ export function createKernel(opts: { engine: Engine; plugins: AnyPlugin[] }): Ke
     engine,
     documents,
     capability: resolveCapability,
+    tryCapability: tryResolveCapability,
     scopeOf: plan.scopeOf,
     subscribe: store.subscribe,
     getState: store.getState,
