@@ -4,14 +4,12 @@
   "private": true,
   "description": "QuickJS-backed, resource-bounded execution adapter for deterministic Acrobat JavaScript.",
   "type": "module",
-  "main": "./src/index.ts",
-  "module": "./src/index.ts",
-  "types": "./src/index.ts",
+  "main": "./dist/index.cjs",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.cts",
   "exports": {
-    ".": {
-      "types": "./src/index.ts",
-      "import": "./src/index.ts"
-    }
+    ".": "./src/index.ts",
+    "./package.json": "./package.json"
   },
   "imports": {
     "#quickjs-variant": {
@@ -26,16 +24,17 @@
     "types": "./dist/index.d.ts",
     "exports": {
       ".": {
-        "types": "./dist/index.d.ts",
-        "import": "./dist/index.js"
-      }
+        "import": "./dist/index.js",
+        "require": "./dist/index.cjs"
+      },
+      "./package.json": "./package.json"
     }
   },
   "files": [
     "dist"
   ],
   "scripts": {
-    "build": "tsc -p tsconfig.json",
+    "build": "epdf-build",
     "clean": "rimraf dist",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "test": "pnpm --dir ../acrojs-core build && vitest run"
@@ -50,7 +49,12 @@
     "@embedpdf/engine": "workspace:*",
     "typescript": "^5.0.0",
     "vite": "^6.0.0",
-    "vitest": "^2.1.9"
+    "vitest": "^2.1.9",
+    "@embedpdf/tooling-build": "workspace:*"
   },
-  "license": "MIT"
+  "license": "MIT",
+  "sideEffects": false,
+  "inlinedDependencies": {
+    "@jitl/quickjs-wasmfile-release-sync": "0.32.0"
+  }
 }

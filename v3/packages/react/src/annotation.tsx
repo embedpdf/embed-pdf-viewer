@@ -68,9 +68,9 @@ import {
   positionMenuAroundRect,
   type AnnotationMenuPlacement,
   type AnnotationMenuPosition,
-} from './annotation-menu-position';
+} from './internal/annotation-menu-position';
 
-export type { AnnotationMenuPlacement } from './annotation-menu-position';
+export type { AnnotationMenuPlacement } from './internal/annotation-menu-position';
 
 /** `#rrggbb` → `rgba(...)` — the marquee's translucent fill derives from the
  *  accent, so one `setChrome({ accent })` restyles every piece of chrome. */

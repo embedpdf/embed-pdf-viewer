@@ -28,7 +28,7 @@ export type AbortableExecutor<T, P> = (
  *   - abort() after settlement is a no-op.
  */
 export class AbortablePromise<T, P = never> extends Promise<T> {
-  static get [Symbol.species](): PromiseConstructor {
+  static override get [Symbol.species](): PromiseConstructor {
     return Promise;
   }
 

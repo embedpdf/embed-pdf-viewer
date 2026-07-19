@@ -1,5 +1,5 @@
 export class AbortError extends Error {
-  readonly name = 'AbortError';
+  override readonly name = 'AbortError';
   readonly reason: unknown;
 
   constructor(reason?: unknown) {

@@ -15,6 +15,10 @@ export default defineConfig({
   shims: false,
   clean: true,
   sourcemap: true,
+  // engine-core and engine-services are source-first workspace packages
+  // (their exports resolve to TS source in dev), so the server bundle must
+  // inline them; pdf-runtime stays external — it ships built artifacts.
+  noExternal: ['@embedpdf/engine-core', '@embedpdf/engine-services'],
   external: [
     /^@embedpdf\//,
     'fastify',

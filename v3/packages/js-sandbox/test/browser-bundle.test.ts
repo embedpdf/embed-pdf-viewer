@@ -41,8 +41,10 @@ describe('browser bundle', () => {
 
     const resolved = await server.pluginContainer.resolveId('#quickjs-variant', importer);
 
-    expect(resolved?.id).toContain('@jitl/quickjs-singlefile-browser-release-sync');
-    expect(resolved?.id).not.toContain('@jitl/quickjs-wasmfile-release-sync');
+    // Vite's dep optimizer may rewrite the id to .vite/deps/@jitl_quickjs-....js?v=...,
+    // replacing the scope separator, so match the package name without it.
+    expect(resolved?.id).toContain('quickjs-singlefile-browser-release-sync');
+    expect(resolved?.id).not.toContain('quickjs-wasmfile-release-sync');
   });
 
   it('bundles browser QuickJS without an external WebAssembly request', async () => {

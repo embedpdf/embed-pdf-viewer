@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { positionMenuAroundRect } from '../src/annotation-menu-position';
+import { positionMenuAroundRect } from '../src/internal/annotation-menu-position';
 
 /**
  * Pure placement math (no DOM): the menu stays centred on `box` and nudges ONLY

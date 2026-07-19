@@ -6,17 +6,18 @@
   "type": "module",
   "main": "./dist/index.cjs",
   "module": "./dist/index.js",
-  "types": "./dist/index.d.ts",
+  "types": "./dist/index.d.cts",
   "exports": {
     ".": {
-      "types": "./dist/index.d.ts",
+      "development": "./src/index.ts",
       "import": "./dist/index.js",
       "require": "./dist/index.cjs"
     },
+    "./package.json": "./package.json",
     "./worker-entry": "./src/worker/worker-entry.ts"
   },
   "scripts": {
-    "build": "pnpm run clean && vite build",
+    "build": "epdf-build",
     "clean": "rimraf dist",
     "lint": "eslint src --color",
     "lint:fix": "eslint src --color --fix",
@@ -51,12 +52,27 @@
     "@embedpdf/pdf-runtime": "workspace:*"
   },
   "devDependencies": {
-    "@embedpdf/build": "workspace:*",
     "rimraf": "^5.0.0",
     "typescript": "^5.0.0",
-    "vitest": "^2.1.0"
+    "vitest": "^2.1.0",
+    "@embedpdf/tooling-build": "workspace:*"
   },
   "publishConfig": {
-    "access": "public"
-  }
+    "access": "public",
+    "exports": {
+      ".": {
+        "import": "./dist/index.js",
+        "require": "./dist/index.cjs"
+      },
+      "./package.json": "./package.json",
+      "./worker-entry": "./src/worker/worker-entry.ts"
+    }
+  },
+  "epdf": {
+    "rawExports": [
+      "./worker-entry"
+    ],
+    "devExports": "development"
+  },
+  "sideEffects": false
 }

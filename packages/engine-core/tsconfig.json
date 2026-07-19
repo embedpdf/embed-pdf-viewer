@@ -10,7 +10,8 @@
     "outDir": "dist",
     "rootDir": "src",
     "lib": ["ES2022", "DOM"],
-    "types": ["node"]
+    "types": ["node"],
+    "noImplicitOverride": true
   },
   "include": ["src"],
   "exclude": ["node_modules", "dist"]

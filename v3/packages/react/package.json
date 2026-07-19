@@ -5,98 +5,33 @@
   "description": "React adapter for EmbedPDF v3: one generic reactive binding + structural components (Viewer, Stage, PageView) + headless layers & hooks. The whole framework surface.",
   "type": "module",
   "sideEffects": false,
-  "main": "./src/index.ts",
-  "module": "./src/index.ts",
-  "types": "./src/index.ts",
+  "main": "./dist/index.cjs",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.cts",
   "exports": {
-    ".": {
-      "types": "./src/index.ts",
-      "import": "./src/index.ts"
-    },
-    "./runtime": {
-      "types": "./src/runtime.tsx",
-      "import": "./src/runtime.tsx"
-    },
-    "./stage": {
-      "types": "./src/stage.tsx",
-      "import": "./src/stage.tsx"
-    },
-    "./scrollbar": {
-      "types": "./src/scrollbar.tsx",
-      "import": "./src/scrollbar.tsx"
-    },
-    "./page-view": {
-      "types": "./src/page-view.tsx",
-      "import": "./src/page-view.tsx"
-    },
-    "./render": {
-      "types": "./src/render.tsx",
-      "import": "./src/render.tsx"
-    },
-    "./interaction": {
-      "types": "./src/interaction.tsx",
-      "import": "./src/interaction.tsx"
-    },
-    "./selection": {
-      "types": "./src/selection.tsx",
-      "import": "./src/selection.tsx"
-    },
-    "./annotation": {
-      "types": "./src/annotation.tsx",
-      "import": "./src/annotation.tsx"
-    },
-    "./annotation-menu": {
-      "types": "./src/annotation-menu.tsx",
-      "import": "./src/annotation-menu.tsx"
-    },
-    "./search": {
-      "types": "./src/search.tsx",
-      "import": "./src/search.tsx"
-    },
-    "./stamp": {
-      "types": "./src/stamp.tsx",
-      "import": "./src/stamp.tsx"
-    },
-    "./views": {
-      "types": "./src/views.ts",
-      "import": "./src/views.ts"
-    },
-    "./page-edit": {
-      "types": "./src/page-edit.ts",
-      "import": "./src/page-edit.ts"
-    },
-    "./metadata": {
-      "types": "./src/metadata.ts",
-      "import": "./src/metadata.ts"
-    },
-    "./redaction": {
-      "types": "./src/redaction.tsx",
-      "import": "./src/redaction.tsx"
-    },
-    "./i18n": {
-      "types": "./src/i18n.ts",
-      "import": "./src/i18n.ts"
-    },
-    "./commands": {
-      "types": "./src/commands.ts",
-      "import": "./src/commands.ts"
-    },
-    "./shell": {
-      "types": "./src/shell.ts",
-      "import": "./src/shell.ts"
-    },
-    "./form": {
-      "types": "./src/form.tsx",
-      "import": "./src/form.tsx"
-    },
-    "./link": {
-      "types": "./src/link.tsx",
-      "import": "./src/link.tsx"
-    },
-    "./toolbar": {
-      "types": "./src/toolbar.tsx",
-      "import": "./src/toolbar.tsx"
-    }
+    ".": "./src/index.ts",
+    "./annotation": "./src/annotation.tsx",
+    "./annotation-menu": "./src/annotation-menu.tsx",
+    "./commands": "./src/commands.ts",
+    "./form": "./src/form.tsx",
+    "./i18n": "./src/i18n.ts",
+    "./interaction": "./src/interaction.tsx",
+    "./link": "./src/link.tsx",
+    "./metadata": "./src/metadata.ts",
+    "./page-edit": "./src/page-edit.ts",
+    "./page-view": "./src/page-view.tsx",
+    "./redaction": "./src/redaction.tsx",
+    "./render": "./src/render.tsx",
+    "./runtime": "./src/runtime.tsx",
+    "./scrollbar": "./src/scrollbar.tsx",
+    "./search": "./src/search.tsx",
+    "./selection": "./src/selection.tsx",
+    "./shell": "./src/shell.ts",
+    "./stage": "./src/stage.tsx",
+    "./stamp": "./src/stamp.tsx",
+    "./toolbar": "./src/toolbar.tsx",
+    "./views": "./src/views.ts",
+    "./package.json": "./package.json"
   },
   "publishConfig": {
     "main": "./dist/index.js",
@@ -104,100 +39,101 @@
     "types": "./dist/index.d.ts",
     "exports": {
       ".": {
-        "types": "./dist/index.d.ts",
-        "import": "./dist/index.js"
-      },
-      "./runtime": {
-        "types": "./dist/runtime.d.ts",
-        "import": "./dist/runtime.js"
-      },
-      "./stage": {
-        "types": "./dist/stage.d.ts",
-        "import": "./dist/stage.js"
-      },
-      "./scrollbar": {
-        "types": "./dist/scrollbar.d.ts",
-        "import": "./dist/scrollbar.js"
-      },
-      "./page-view": {
-        "types": "./dist/page-view.d.ts",
-        "import": "./dist/page-view.js"
-      },
-      "./render": {
-        "types": "./dist/render.d.ts",
-        "import": "./dist/render.js"
-      },
-      "./interaction": {
-        "types": "./dist/interaction.d.ts",
-        "import": "./dist/interaction.js"
-      },
-      "./selection": {
-        "types": "./dist/selection.d.ts",
-        "import": "./dist/selection.js"
+        "import": "./dist/index.js",
+        "require": "./dist/index.cjs"
       },
       "./annotation": {
-        "types": "./dist/annotation.d.ts",
-        "import": "./dist/annotation.js"
+        "import": "./dist/annotation.js",
+        "require": "./dist/annotation.cjs"
       },
       "./annotation-menu": {
-        "types": "./dist/annotation-menu.d.ts",
-        "import": "./dist/annotation-menu.js"
-      },
-      "./search": {
-        "types": "./dist/search.d.ts",
-        "import": "./dist/search.js"
-      },
-      "./stamp": {
-        "types": "./dist/stamp.d.ts",
-        "import": "./dist/stamp.js"
-      },
-      "./views": {
-        "types": "./dist/views.d.ts",
-        "import": "./dist/views.js"
-      },
-      "./page-edit": {
-        "types": "./dist/page-edit.d.ts",
-        "import": "./dist/page-edit.js"
-      },
-      "./metadata": {
-        "types": "./dist/metadata.d.ts",
-        "import": "./dist/metadata.js"
-      },
-      "./redaction": {
-        "types": "./dist/redaction.d.ts",
-        "import": "./dist/redaction.js"
-      },
-      "./i18n": {
-        "types": "./dist/i18n.d.ts",
-        "import": "./dist/i18n.js"
+        "import": "./dist/annotation-menu.js",
+        "require": "./dist/annotation-menu.cjs"
       },
       "./commands": {
-        "types": "./dist/commands.d.ts",
-        "import": "./dist/commands.js"
-      },
-      "./shell": {
-        "types": "./dist/shell.d.ts",
-        "import": "./dist/shell.js"
+        "import": "./dist/commands.js",
+        "require": "./dist/commands.cjs"
       },
       "./form": {
-        "types": "./dist/form.d.ts",
-        "import": "./dist/form.js"
+        "import": "./dist/form.js",
+        "require": "./dist/form.cjs"
+      },
+      "./i18n": {
+        "import": "./dist/i18n.js",
+        "require": "./dist/i18n.cjs"
+      },
+      "./interaction": {
+        "import": "./dist/interaction.js",
+        "require": "./dist/interaction.cjs"
       },
       "./link": {
-        "types": "./dist/link.d.ts",
-        "import": "./dist/link.js"
+        "import": "./dist/link.js",
+        "require": "./dist/link.cjs"
+      },
+      "./metadata": {
+        "import": "./dist/metadata.js",
+        "require": "./dist/metadata.cjs"
+      },
+      "./page-edit": {
+        "import": "./dist/page-edit.js",
+        "require": "./dist/page-edit.cjs"
+      },
+      "./page-view": {
+        "import": "./dist/page-view.js",
+        "require": "./dist/page-view.cjs"
+      },
+      "./redaction": {
+        "import": "./dist/redaction.js",
+        "require": "./dist/redaction.cjs"
+      },
+      "./render": {
+        "import": "./dist/render.js",
+        "require": "./dist/render.cjs"
+      },
+      "./runtime": {
+        "import": "./dist/runtime.js",
+        "require": "./dist/runtime.cjs"
+      },
+      "./scrollbar": {
+        "import": "./dist/scrollbar.js",
+        "require": "./dist/scrollbar.cjs"
+      },
+      "./search": {
+        "import": "./dist/search.js",
+        "require": "./dist/search.cjs"
+      },
+      "./selection": {
+        "import": "./dist/selection.js",
+        "require": "./dist/selection.cjs"
+      },
+      "./shell": {
+        "import": "./dist/shell.js",
+        "require": "./dist/shell.cjs"
+      },
+      "./stage": {
+        "import": "./dist/stage.js",
+        "require": "./dist/stage.cjs"
+      },
+      "./stamp": {
+        "import": "./dist/stamp.js",
+        "require": "./dist/stamp.cjs"
       },
       "./toolbar": {
-        "types": "./dist/toolbar.d.ts",
-        "import": "./dist/toolbar.js"
-      }
+        "import": "./dist/toolbar.js",
+        "require": "./dist/toolbar.cjs"
+      },
+      "./views": {
+        "import": "./dist/views.js",
+        "require": "./dist/views.cjs"
+      },
+      "./package.json": "./package.json"
     }
   },
   "files": [
     "dist"
   ],
   "scripts": {
-    "build": "tsc -p tsconfig.json",
+    "build": "epdf-build",
     "clean": "rimraf dist",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "test": "vitest run"
@@ -237,7 +173,11 @@
     "@types/react-dom": "^18.3.0",
     "happy-dom": "^20.11.0",
     "typescript": "^5.0.0",
-    "vitest": "^2.1.9"
+    "vitest": "^2.1.9",
+    "@embedpdf/tooling-build": "workspace:*"
   },
-  "license": "MIT"
+  "license": "MIT",
+  "inlinedDependencies": {
+    "zod": "3.25.76"
+  }
 }

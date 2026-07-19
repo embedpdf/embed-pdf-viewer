@@ -4,14 +4,12 @@
   "private": true,
   "description": "Workspace-scoped plugin: arranges open documents into reorderable panes (views). Each view points at a document; the framework adapter renders one <DocumentScope> per view. Ships zero framework code.",
   "type": "module",
-  "main": "./src/index.ts",
-  "module": "./src/index.ts",
-  "types": "./src/index.ts",
+  "main": "./dist/index.cjs",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.cts",
   "exports": {
-    ".": {
-      "types": "./src/index.ts",
-      "import": "./src/index.ts"
-    }
+    ".": "./src/index.ts",
+    "./package.json": "./package.json"
   },
   "publishConfig": {
     "main": "./dist/index.js",
@@ -19,16 +17,17 @@
     "types": "./dist/index.d.ts",
     "exports": {
       ".": {
-        "types": "./dist/index.d.ts",
-        "import": "./dist/index.js"
-      }
+        "import": "./dist/index.js",
+        "require": "./dist/index.cjs"
+      },
+      "./package.json": "./package.json"
     }
   },
   "files": [
     "dist"
   ],
   "scripts": {
-    "build": "tsc -p tsconfig.json",
+    "build": "epdf-build",
     "clean": "rimraf dist",
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },
@@ -36,7 +35,9 @@
     "@embedpdf-x/kernel": "workspace:*"
   },
   "devDependencies": {
-    "typescript": "^5.0.0"
+    "typescript": "^5.0.0",
+    "@embedpdf/tooling-build": "workspace:*"
   },
-  "license": "MIT"
+  "license": "MIT",
+  "sideEffects": false
 }

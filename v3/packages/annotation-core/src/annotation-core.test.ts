@@ -88,6 +88,17 @@ const createPtr = (
 });
 const run = (m: Model, msgs: Msg[]): Model => msgs.reduce((acc, msg) => update(acc, msg)[0], m);
 const rectGeom = (g: Geom) => (g.t === 'rect' ? g.rect : null);
+// rotatedAabb goes through sin/cos, so a quarter-turn carries ~1e-14 fuzz —
+// compare the round-trip footprints field-wise, not with toEqual.
+const expectRectClose = (
+  got: { x: number; y: number; width: number; height: number },
+  want: { x: number; y: number; width: number; height: number },
+) => {
+  expect(got.x).toBeCloseTo(want.x, 6);
+  expect(got.y).toBeCloseTo(want.y, 6);
+  expect(got.width).toBeCloseTo(want.width, 6);
+  expect(got.height).toBeCloseTo(want.height, 6);
+};
 
 describe('resolveClickPlacement — the shared placement layer', () => {
   const PAGE = { x: 0, y: 0, width: 300, height: 400 };
@@ -1702,7 +1713,7 @@ describe('annotation-core callout — upright on a rotated page', () => {
     expect(a.geom.rect).toMatchObject({ x: 240, y: 60, width: 40, height: 120 });
     expect(a.geom.rot).toBe(270);
     // spinning the logical box by rot lands exactly back on the dragged region
-    expect(rotatedAabb(a.geom.rect, a.geom.rot!)).toMatchObject({
+    expectRectClose(rotatedAabb(a.geom.rect, a.geom.rot!), {
       x: 200,
       y: 100,
       width: 120,
@@ -1779,7 +1790,7 @@ describe('annotation-core callout — upright on a rotated page', () => {
     // reaches the footprint's top (y=60) and right (x=280) — not just the logical box
     expect(vb.y).toBeLessThanOrEqual(60);
     expect(vb.x + vb.width).toBeGreaterThanOrEqual(280);
-    expect(selectionBounds(g, 1)).toMatchObject({ x: 240, y: 60, width: 40, height: 120 });
+    expectRectClose(selectionBounds(g, 1), { x: 240, y: 60, width: 40, height: 120 });
   });
 
   it('geomScene draws the tilted box as a CLOSED corner ring; the leader stays open', () => {
@@ -3322,17 +3333,6 @@ describe('upright creation (counter-rotating the display rotation)', () => {
     in: { pon: PON, point: { x, y }, shift: false, ...extra },
   });
   const textGeom = (g: Geom) => (g.t === 'text' ? g : null);
-  // rotatedAabb goes through sin/cos, so a quarter-turn carries ~1e-14 fuzz —
-  // compare the round-trip footprints field-wise, not with toEqual.
-  const expectRectClose = (
-    got: { x: number; y: number; width: number; height: number },
-    want: { x: number; y: number; width: number; height: number },
-  ) => {
-    expect(got.x).toBeCloseTo(want.x, 6);
-    expect(got.y).toBeCloseTo(want.y, 6);
-    expect(got.width).toBeCloseTo(want.width, 6);
-    expect(got.height).toBeCloseTo(want.height, 6);
-  };
 
   it('helpers: a quarter-turn about the centre lands exactly back on the source box', () => {
     const dragged = { x: 50, y: 60, width: 120, height: 40 };

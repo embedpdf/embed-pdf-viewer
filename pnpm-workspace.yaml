@@ -8,6 +8,8 @@ packages:
   # v3 (new architecture) — kept isolated from the v2 packages above
   - 'v3/packages/*'
   - 'v3/examples/*'
+  # internal repo tooling (build preset, package checks)
+  - 'tooling/*'
   # exclude generated framework outputs that can contain nested package.json
   # copies and confuse pnpm/turbo workspace discovery.
   - '!**/.next/**'

@@ -11,7 +11,7 @@ export interface EngineErrorOptions {
  * sniffing message strings.
  */
 export class EngineError extends Error {
-  readonly name = 'EngineError';
+  override readonly name = 'EngineError';
   readonly code: EngineErrorCode;
   readonly details?: Record<string, unknown>;
 

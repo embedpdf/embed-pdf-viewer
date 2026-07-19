@@ -14,7 +14,7 @@ import {
 import { createQuickJsSandbox } from '../src';
 
 const here = dirname(fileURLToPath(import.meta.url));
-const fixturePath = resolve(here, '..', '..', '..', '..', 'EmbedPDF_Dynamic_Approval_Stamp.pdf');
+const fixturePath = resolve(here, 'fixtures', 'EmbedPDF_Dynamic_Approval_Stamp.pdf');
 
 function sameRef(left: FormFieldRef, right: FormFieldRef): boolean {
   return left.kind === 'objectNumber' && right.kind === 'objectNumber'

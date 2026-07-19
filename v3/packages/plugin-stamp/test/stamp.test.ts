@@ -20,14 +20,7 @@ import type { StampAction, StampState } from '../src/types';
 const pdfBytes = () => new TextEncoder().encode('%PDF-1.7\n%fake fixture\n');
 
 const here = dirname(fileURLToPath(import.meta.url));
-const dynamicStampFixture = resolve(
-  here,
-  '..',
-  '..',
-  '..',
-  '..',
-  'EmbedPDF_Dynamic_Approval_Stamp.pdf',
-);
+const dynamicStampFixture = resolve(here, 'fixtures', 'EmbedPDF_Dynamic_Approval_Stamp.pdf');
 
 /** Minimal PNG header: signature + IHDR with width=100, height=50. */
 const pngBytes = () => {

@@ -22,7 +22,7 @@ import {
   type AnnotationDraftMenuProps,
   type AnnotationMenuProps,
 } from './annotation';
-import { positionMenuAroundRect } from './annotation-menu-position';
+import { positionMenuAroundRect } from './internal/annotation-menu-position';
 
 export function AnnotationMenu({ children, gap = 15, placement = 'top' }: AnnotationMenuProps) {
   const stage = useCapability(StageToken);

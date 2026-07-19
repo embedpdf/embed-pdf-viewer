@@ -6,16 +6,17 @@
   "type": "module",
   "main": "./dist/index.cjs",
   "module": "./dist/index.js",
-  "types": "./dist/index.d.ts",
+  "types": "./dist/index.d.cts",
   "exports": {
     ".": {
-      "types": "./dist/index.d.ts",
+      "development": "./src/index.ts",
       "import": "./dist/index.js",
       "require": "./dist/index.cjs"
-    }
+    },
+    "./package.json": "./package.json"
   },
   "scripts": {
-    "build": "pnpm run clean && vite build",
+    "build": "epdf-build",
     "clean": "rimraf dist",
     "lint": "eslint src --color",
     "lint:fix": "eslint src --color --fix",
@@ -48,12 +49,23 @@
   },
   "devDependencies": {
     "@cloudpdf/server": "workspace:*",
-    "@embedpdf/build": "workspace:*",
     "rimraf": "^5.0.0",
     "typescript": "^5.0.0",
-    "vitest": "^2.1.0"
+    "vitest": "^2.1.0",
+    "@embedpdf/tooling-build": "workspace:*"
   },
   "publishConfig": {
-    "access": "public"
+    "access": "public",
+    "exports": {
+      ".": {
+        "import": "./dist/index.js",
+        "require": "./dist/index.cjs"
+      },
+      "./package.json": "./package.json"
+    }
+  },
+  "sideEffects": false,
+  "epdf": {
+    "devExports": "development"
   }
 }

@@ -8,7 +8,7 @@ import { createLocalEngine } from '../../../../packages/engine/src';
 import { createFormScriptingController } from '../src/scripting';
 
 const here = dirname(fileURLToPath(import.meta.url));
-const fixturePath = resolve(here, '..', '..', '..', '..', 'EmbedPDF_Dynamic_Approval_Stamp.pdf');
+const fixturePath = resolve(here, 'fixtures', 'EmbedPDF_Dynamic_Approval_Stamp.pdf');
 
 describe('plugin-form dynamic-stamp acceptance', () => {
   it('routes extracted /C actions through one canonical effects transaction', async () => {
