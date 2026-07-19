@@ -1,0 +1,11 @@
+{
+  "name": "@embedpdf/tooling-consume-fixtures",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "The release gate that tests what users actually download: packs every publishable package into real tarballs, installs them into four consumer-archetype fixtures (node-esm, node-cjs, vite-app, tsc-nodenext) in a temp dir OUTSIDE the workspace, and runs each. Sits before `changeset publish` so a broken artifact can never reach a dist-tag. Requires dist to be built first (turbo run build).",
+  "scripts": {
+    "verify": "node --experimental-strip-types src/run.ts"
+  },
+  "license": "MIT"
+}
