@@ -25,7 +25,7 @@ import {
 import type { ScriptSandbox, ScriptSandboxFactory } from '@embedpdf-x/js-sandbox';
 import type { DocumentMeta } from '@embedpdf-x/kernel';
 
-import type { FormCommitResult, FormScriptingOptions } from './types';
+import type { FormCommitResult, FormScriptingOptions, FormUiEffect } from './types';
 
 interface Overlay {
   original: ScriptFieldInput[];
@@ -227,7 +227,6 @@ export class FormScriptingController {
   private sandboxPromise: Promise<ScriptSandbox> | null = null;
   private booted = false;
   private disposed = false;
-  private fatalError: ScriptExecutionError | null = null;
   private sequence = 0;
 
   constructor(private readonly options: FormScriptingControllerOptions) {}
@@ -280,7 +279,6 @@ export class FormScriptingController {
     activation?: PdfActionTree,
   ): Promise<FormCommitResult> {
     if (this.disposed) throw new Error('Form scripting controller is disposed');
-    if (this.fatalError) return this.failed([], [], this.fatalError);
     const target = snapshotField(snapshot, ref);
     if (!target) {
       return this.failed([], [], scriptError(`Form field '${refKey(ref)}' no longer exists`));
@@ -312,7 +310,7 @@ export class FormScriptingController {
       }
     }
 
-    const uiEffects: ScriptUiEffect[] = [];
+    const uiEffects: FormUiEffect[] = [];
     const diagnostics: ScriptDiagnostic[] = [];
     const meta = this.options.document();
     const nowMs = this.options.config.now?.() ?? Date.now();
@@ -336,9 +334,14 @@ export class FormScriptingController {
     let executionMs = 0;
     let aggregateOutputSize = 0;
 
-    const consume = (output: ScriptOutput): ScriptExecutionError | null => {
+    const consume = (
+      output: ScriptOutput,
+      phase: FormUiEffect['phase'],
+    ): ScriptExecutionError | null => {
       aggregateOutputSize += utf8Length(JSON.stringify(output));
-      uiEffects.push(...output.uiEffects);
+      // Tag every UI request with WHO asked — embedders suppress boot-phase
+      // nags (Adobe's version-check alert) but show user-phase validation.
+      uiEffects.push(...output.uiEffects.map((effect) => ({ ...effect, phase })));
       diagnostics.push(...output.diagnostics);
       if (aggregateOutputSize > budget.maxOutputBytes) {
         return {
@@ -375,35 +378,46 @@ export class FormScriptingController {
           error: scriptError(error instanceof Error ? error.message : String(error)),
         };
       }
-      const error = consume(output);
+      const error = consume(output, kind === 'boot' ? 'boot' : 'user');
       return error ? { error } : { output };
     };
 
     if (!this.booted) {
-      let sources: string[];
+      // Boot runs ONCE and can only ever degrade, never brick: document-open
+      // scripts are Adobe version-check boilerplate and calculation seeds — a
+      // failure there (an API we don't emulate, a broken script, a hostile
+      // one) must NEVER disable interactive filling. On any boot problem we
+      // surface a `script-error` diagnostic, DROP the partial boot state, and
+      // continue this transaction with a clean overlay.
+      this.booted = true;
+      let sources: string[] = [];
+      let bootError: ScriptExecutionError | null = null;
       try {
         const actions = this.options.doc.actions ? await this.options.doc.actions.read() : null;
         sources =
           actions?.nameTreeScripts.map(({ action }) => javaScriptProgramFromActionTree(action)) ??
           [];
       } catch (error) {
-        return this.failed(
-          uiEffects,
-          diagnostics,
-          scriptError(error instanceof Error ? error.message : String(error)),
-        );
+        bootError = scriptError(error instanceof Error ? error.message : String(error));
       }
-      this.booted = true;
-      const boot = await run('boot', sources, {
-        ...inputBase,
-        fields: overlay.fields,
-        event: { kind: 'name-tree-boot' },
-      });
-      if (boot.error) {
-        this.fatalError = boot.error;
-        return this.failed(uiEffects, diagnostics, boot.error);
+      if (!bootError && sources.length > 0) {
+        const boot = await run('boot', sources, {
+          ...inputBase,
+          fields: overlay.fields,
+          event: { kind: 'name-tree-boot' },
+        });
+        if (boot.error) bootError = boot.error;
+        else applyEffects(overlay, boot.output!.formEffects);
       }
-      applyEffects(overlay, boot.output!.formEffects);
+      if (bootError) {
+        // No overlay cleanup needed: effects only apply on SUCCESS, so a
+        // failed boot never touched the overlay — the user's own commit
+        // proceeds from pristine state.
+        diagnostics.push({
+          code: 'script-error',
+          message: `Document boot script failed (continuing without it): ${bootError.message}`,
+        });
+      }
     }
 
     const bootEffects = canonicalEffects(overlay);
@@ -620,7 +634,7 @@ export class FormScriptingController {
   }
 
   private failed(
-    uiEffects: ScriptUiEffect[],
+    uiEffects: FormUiEffect[],
     diagnostics: ScriptDiagnostic[],
     error: ScriptExecutionError,
   ): FormCommitResult {
@@ -636,7 +650,7 @@ export class FormScriptingController {
 
   private async finishRejected(
     bootEffects: FormEffect[],
-    uiEffects: ScriptUiEffect[],
+    uiEffects: FormUiEffect[],
     diagnostics: ScriptDiagnostic[],
   ): Promise<FormCommitResult> {
     if (bootEffects.length === 0) {

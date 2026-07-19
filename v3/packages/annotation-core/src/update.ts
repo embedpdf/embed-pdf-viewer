@@ -88,6 +88,7 @@ export const initialModel: Model = {
   byId: {},
   order: [],
   selected: [],
+  hovered: null,
   draft: null,
   preview: null,
   seq: 0,
@@ -355,8 +356,15 @@ export function update(m: Model, msg: Msg): [Model, Effect[]] {
       return [upsertAnnots(m, msg.annots, msg.bumpAp), []];
     case 'bumpAp':
       return [bumpAp(m, msg.ids), []];
-    case 'remove':
-      return [removeAnnots(m, msg.ids), []];
+    case 'hover':
+      // Pure view-model state; the capability diffs before dispatching, so
+      // this fires at enter/leave cadence only.
+      return m.hovered === msg.id ? [m, []] : [{ ...m, hovered: msg.id }, []];
+    case 'remove': {
+      const next = removeAnnots(m, msg.ids);
+      // A removed annotation can't stay hovered.
+      return [next.hovered && !next.byId[next.hovered] ? { ...next, hovered: null } : next, []];
+    }
     case 'beginTextEdit':
       // `lockedContents` (or an inert `/F` state) blocks entering text edit —
       // the geometry gates don't apply here: locked-only contents still edit.

@@ -580,6 +580,22 @@ export interface AnnotationHostCapability extends AnnotationCapability {
     rotation?: PageRotation,
     zoom?: number,
   ): string | null;
+  /**
+   * Report the pointer's position for hover state (`null` = off every page).
+   * Diffs the topmost hit against the model and dispatches only on CHANGE
+   * (enter/leave cadence) — drives scene-level hover affordances like the
+   * redaction mark's applied-look preview. Called from the edit handler's
+   * onHover, which already samples every move for cursor claims.
+   */
+  hoverAt(
+    at: {
+      pon: PageObjectNumber;
+      point: Vec;
+      scale?: number;
+      rotation?: PageRotation;
+      zoom?: number;
+    } | null,
+  ): void;
   behaviorFor(a: { subtype: Subtype; ref: AnnotationRef | null }): Behavior | null;
   /**
    * The clickable link areas of a page (content space): standalone link

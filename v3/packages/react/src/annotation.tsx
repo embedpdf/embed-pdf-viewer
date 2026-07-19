@@ -222,6 +222,19 @@ function sceneNodes(item: RenderItem): React.ReactNode[] {
     if (n.kind === 'line')
       return <line key={i} x1={n.a.x} y1={n.a.y} x2={n.b.x} y2={n.b.y} {...a} />;
     if (n.kind === 'path') return <path key={i} d={n.d} {...a} />;
+    if (n.kind === 'text')
+      return (
+        <text
+          key={i}
+          x={n.at.x}
+          y={n.at.y}
+          fontSize={n.fontSize}
+          {...(n.fontFamily ? { fontFamily: n.fontFamily } : {})}
+          {...a}
+        >
+          {n.text}
+        </text>
+      );
     const pts = n.points.map((p) => `${p.x},${p.y}`).join(' ');
     return n.closed ? (
       <polygon key={i} points={pts} {...a} />
@@ -827,12 +840,7 @@ export function AnnotationLayer({ renderers }: AnnotationLayerProps = {}) {
             out = native;
           }
         }
-        return (
-          <React.Fragment key={item.id}>
-            {out}
-            {item.subtype === 'redact' ? <RedactPreview item={item} page={page} /> : null}
-          </React.Fragment>
-        );
+        return <React.Fragment key={item.id}>{out}</React.Fragment>;
       })}
       {texts.map((t) => (
         <FreeText key={t.id} item={t} page={page} />
@@ -840,97 +848,6 @@ export function AnnotationLayer({ renderers }: AnnotationLayerProps = {}) {
       <ToolGhostImage page={page} />
       <Chrome page={page} />
     </div>
-  );
-}
-
-/**
- * Applied-look preview for a redaction mark: while the mark is SELECTED its
- * regions fill with `interiorColor` and the label (`/OverlayText`) draws in
- * its `/DA` styling — a live preview of exactly what the destructive apply
- * will paint. At rest the mark stays the vector scene's outline.
- */
-function RedactPreview({ item, page }: { item: RenderItem; page: PageContextValue }) {
-  const anno = useCapability(AnnotationHostToken);
-  const selected = useSelector(AnnotationHostToken, (c) => c.selection()).includes(item.id);
-  if (!selected) return null;
-
-  const dto = item.ref ? anno.get(item.ref) : null;
-  const label = dto && dto.subtype === 'redact' ? dto : null;
-  const fill = item.style.interiorColor;
-  if (!fill && !label?.overlayText) return null;
-
-  const boxes =
-    item.geom.t === 'quads'
-      ? item.geom.quads.map((q) => ({
-          x: q[0].x,
-          y: q[0].y,
-          width: q[1].x - q[0].x,
-          height: q[2].y - q[0].y,
-        }))
-      : item.geom.t === 'rect'
-        ? [item.geom.rect]
-        : [];
-  const fontColor = label
-    ? `rgb(${label.fontColor.r},${label.fontColor.g},${label.fontColor.b})`
-    : '#ffffff';
-
-  return (
-    <>
-      {boxes.map((b, i) => {
-        const css = boxOf(b, page);
-        // /DA size 0 = auto-fit (the engine convention): approximate with the
-        // region height. Screen px = content points × the box's own css scale.
-        const scale = b.height > 0 ? css.height / b.height : 1;
-        const fontPx = Math.max(
-          6,
-          (label && label.fontSize > 0 ? label.fontSize : b.height * 0.6) * scale,
-        );
-        const text = label?.overlayText ?? null;
-        // /Repeat tiles the label; the flex-wrap container clips at the region
-        // edge, which is exactly the ISO "repeated to fill, clipped" reading.
-        const copies =
-          text && label?.repeat
-            ? Math.min(
-                400,
-                Math.max(
-                  1,
-                  Math.ceil(css.width / Math.max(8, fontPx * 0.55 * text.length)) *
-                    Math.ceil(css.height / (fontPx * 1.2)),
-                ),
-              )
-            : 1;
-        return (
-          <div
-            key={i}
-            style={{
-              position: 'absolute',
-              left: css.left,
-              top: css.top,
-              width: css.width,
-              height: css.height,
-              background: fill ?? 'transparent',
-              color: fontColor,
-              fontSize: fontPx,
-              lineHeight: 1.2,
-              overflow: 'hidden',
-              pointerEvents: 'none',
-              display: 'flex',
-              flexWrap: 'wrap',
-              alignContent: 'flex-start',
-              columnGap: fontPx * 0.5,
-              justifyContent:
-                label?.textAlign === 'center'
-                  ? 'center'
-                  : label?.textAlign === 'right'
-                    ? 'flex-end'
-                    : 'flex-start',
-            }}
-          >
-            {text ? Array.from({ length: copies }, (_, j) => <span key={j}>{text}</span>) : null}
-          </div>
-        );
-      })}
-    </>
   );
 }
 

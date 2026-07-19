@@ -171,6 +171,19 @@ export function createEditHandler(
           : null,
         20,
       );
+      // Hover state for scene affordances (redact preview) — rides the same
+      // per-move sample; the capability dispatches on change only.
+      anno.hoverAt(
+        s.page
+          ? {
+              pon: s.page.pon,
+              point: s.page.point,
+              scale: s.page.scale,
+              rotation: s.page.rotation,
+              zoom: s.page.zoom,
+            }
+          : null,
+      );
     },
   };
 }

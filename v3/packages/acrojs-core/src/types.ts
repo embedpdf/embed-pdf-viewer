@@ -84,7 +84,13 @@ export type ScriptUiEffect =
   | { kind: 'print' }
   | { kind: 'gotoPage'; page: number };
 
-export type ScriptDiagnosticCode = 'blocked-network' | 'unsupported-api' | 'invalid-field-value';
+export type ScriptDiagnosticCode =
+  | 'blocked-network'
+  | 'unsupported-api'
+  | 'invalid-field-value'
+  // A document-level script failed and was degraded to a warning (a boot
+  // script error must never disable interactive filling).
+  | 'script-error';
 
 export interface ScriptDiagnostic {
   code: ScriptDiagnosticCode;

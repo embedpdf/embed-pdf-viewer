@@ -204,7 +204,9 @@ describe('form scripting transaction', () => {
     });
 
     expect(result.status).toBe('rejected');
-    expect(result.uiEffects).toEqual([{ kind: 'alert', message: 'Invalid email', icon: 0 }]);
+    expect(result.uiEffects).toEqual([
+      { kind: 'alert', message: 'Invalid email', icon: 0, phase: 'user' },
+    ]);
     expect(fx.applyEffects).not.toHaveBeenCalled();
   });
 
@@ -249,8 +251,8 @@ describe('form scripting transaction', () => {
 
     expect(result.status).toBe('applied');
     expect(result.uiEffects).toEqual([
-      { kind: 'alert', message: 'Summary ready', icon: 0 },
-      { kind: 'gotoPage', page: 1 },
+      { kind: 'alert', message: 'Summary ready', icon: 0, phase: 'user' },
+      { kind: 'gotoPage', page: 1, phase: 'user' },
     ]);
     expect(fx.batches).toEqual([
       [
@@ -263,7 +265,11 @@ describe('form scripting transaction', () => {
     ]);
   });
 
-  it('poisons the document controller after a name-tree boot exception', async () => {
+  it('DEGRADES a name-tree boot exception — the user still fills (never bricks)', async () => {
+    // The i-140 class of bug: Adobe's `!ADBE::…VersChk…` boilerplate throwing
+    // (an API we don't emulate) used to poison every commit. The invariant
+    // now: a boot failure is a `script-error` DIAGNOSTIC; the user's own
+    // value still commits, on this transaction and every later one.
     const snapshot: FormSnapshot = {
       formKind: 'acroform',
       needsAppearances: false,
@@ -275,10 +281,15 @@ describe('form scripting transaction', () => {
     const first = await fx.controller.commit(snapshot, ref(2), { type: 'text', value: 'a' });
     const second = await fx.controller.commit(snapshot, ref(2), { type: 'text', value: 'b' });
 
-    expect(first.error?.message).toBe('boot failed');
-    expect(second.error).toEqual(first.error);
-    expect(fx.readActions).toHaveBeenCalledTimes(1);
-    expect(fx.applyEffects).not.toHaveBeenCalled();
+    expect(first.status).toBe('applied');
+    expect(first.error).toBeUndefined();
+    expect(
+      first.diagnostics.some((d) => d.code === 'script-error' && d.message.includes('boot failed')),
+    ).toBe(true);
+    expect(second.status).toBe('applied');
+    expect(second.diagnostics.some((d) => d.code === 'script-error')).toBe(false);
+    expect(fx.readActions).toHaveBeenCalledTimes(1); // boot never retried
+    expect(fx.applyEffects).toHaveBeenCalledTimes(2); // both user values landed
   });
 });
 

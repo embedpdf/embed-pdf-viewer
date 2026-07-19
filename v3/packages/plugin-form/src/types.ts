@@ -62,13 +62,19 @@ export interface FormCommitResult {
   status: FormCommitStatus;
   scripted: boolean;
   effectsResult: FormEffectsResult | null;
-  uiEffects: ScriptUiEffect[];
+  uiEffects: FormUiEffect[];
   diagnostics: ScriptDiagnostic[];
   error?: ScriptExecutionError;
 }
 
-/** One DOM-free UI request produced by the curated Acrobat scripting surface. */
-export type FormUiEffect = ScriptUiEffect;
+/**
+ * One DOM-free UI request produced by the curated Acrobat scripting surface.
+ * `phase` says WHO asked: `'boot'` = a document-open script (Adobe's
+ * version-check boilerplate lives here — embedders typically suppress these
+ * nags), `'user'` = a script triggered by the user's own interaction (a
+ * validation alert — show it).
+ */
+export type FormUiEffect = ScriptUiEffect & { phase: 'boot' | 'user' };
 
 /** Runtime adapter for alerts, print requests, and zero-based page navigation. */
 export type FormUiEffectProvider = (effect: FormUiEffect) => void;

@@ -218,8 +218,12 @@ export function fromDTO(
     // Text styling is a content projection of the DTO, exactly like `style` —
     // present only for text-editable kinds. The colour seam is crossed HERE.
     ...(dto.subtype === 'free-text' ? { text: textFromDTO(dto) } : {}),
-    // A redaction label is `/DA`-styled exactly like free text.
+    // A redaction label is `/DA`-styled exactly like free text; the label
+    // itself (`/OverlayText` + `/Repeat`) projects for the hover preview.
     ...(dto.subtype === 'redact' ? { text: redactTextFromDTO(dto) } : {}),
+    ...(dto.subtype === 'redact' && dto.overlayText
+      ? { label: { text: dto.overlayText, repeat: dto.repeat } }
+      : {}),
     // The /Name icon is a content projection like `style` — icon kinds only.
     ...(dto.subtype === 'text' || dto.subtype === 'file-attachment' ? { icon: dto.icon } : {}),
     // The link kind's own target — a projection like `style`/`icon`. Attached

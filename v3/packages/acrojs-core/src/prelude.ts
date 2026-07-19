@@ -174,6 +174,17 @@ export function installAcroJs(g: Record<string, unknown>): void {
   doc.getURL = () => blocked('getURL');
 
   const app = {
+    // Viewer identity — the properties Adobe's ubiquitous version-check
+    // boilerplate (`!ADBE::…VersChk…` name-tree scripts) branches on. Honest
+    // values for an emulated modern-Reader-level environment, so those
+    // scripts take their "viewer is current" paths instead of tripping over
+    // `undefined`. Deliberately NO `xfa_installed`: we never claim XFA.
+    platform: 'WIN',
+    language: 'ENU',
+    viewerType: 'Reader',
+    viewerVariation: 'Reader',
+    viewerVersion: 21,
+    formsVersion: 21,
     alert: (message: unknown, icon?: unknown, _type?: unknown, title?: unknown): number => {
       state?.uiEffects.push({
         kind: 'alert',
@@ -189,6 +200,14 @@ export function installAcroJs(g: Record<string, unknown>): void {
       return null;
     },
     launchURL: () => blocked('app.launchURL'),
+    // Acrobat's contract when a viewer component (e.g. the XFA plugin) is not
+    // available is `undefined` — NEVER a throw. A web viewer has no
+    // installable components, so "not available" is always the truthful
+    // answer; Adobe's XFA-check boilerplate calls this after its upgrade nag.
+    findComponent: (): undefined => {
+      diagnostic('unsupported-api', 'app.findComponent: no installable components in this viewer');
+      return undefined;
+    },
   };
 
   const pad = (value: number, length = 2): string => String(value).padStart(length, '0');

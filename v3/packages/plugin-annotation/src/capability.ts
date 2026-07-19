@@ -1191,6 +1191,25 @@ export function createAnnotationCapability(
         inertIdsAt(pon),
         viewEnv(zoom, rotation),
       ),
+    hoverAt: (at) => {
+      const m = model();
+      let id: string | null = null;
+      if (at) {
+        const h = hitTest(
+          m,
+          at.pon,
+          at.point,
+          chromeGeomAt(at.scale),
+          m.hitMargin,
+          pageBoxOf(at.pon),
+          inertIdsAt(at.pon),
+          viewEnv(at.zoom, at.rotation),
+        );
+        if (h.t === 'annot') id = h.id;
+      }
+      // Diff HERE so the reducer sees enter/leave transitions only.
+      if (m.hovered !== id) apply({ t: 'hover', id });
+    },
     behaviorFor: (a) => behaviors.find((b) => b.matches(a) && b.engaged()) ?? null,
     linkItemsOn: (pon) => memoLinkItems(pon),
 

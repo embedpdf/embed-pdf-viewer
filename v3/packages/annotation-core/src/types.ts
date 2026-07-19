@@ -199,6 +199,9 @@ export interface Annot {
   /** Text styling — present only for text-editable kinds (free text). Like
    *  `style`, a content-space projection of `data`, editable via `setProps`. */
   text?: TextStyle;
+  /** Redaction label (`/OverlayText` + `/Repeat`) — redact kind only. A
+   *  projection of `data` like `text`; the hover preview scene draws it. */
+  label?: { text: string; repeat: boolean };
   /** `/Name` icon — present only for icon kinds (text note, file attachment).
    *  Like `style`, a projection of `data`, editable via `setProps`. */
   icon?: string;
@@ -451,6 +454,11 @@ export interface Model {
   byId: Record<Id, Annot>;
   order: Id[];
   selected: Id[];
+  /** The annotation under the pointer (topmost hit), or null. View-model
+   *  state like `selected` — drives hover affordances (a redaction mark's
+   *  applied-look preview) purely from the scene. Updated on CHANGE only
+   *  (enter/leave cadence, never per-move). */
+  hovered: Id | null;
   draft: Draft | null;
   /** Transient ghost of an in-progress markup selection (null when idle). */
   preview: MarkupPreview | null;
@@ -610,6 +618,8 @@ export type Msg =
   // (the shell prunes annotations whose Behavior just ENGAGED — inert things
   // cannot stay selected).
   | { t: 'deselect'; ids?: Id[] }
+  /** Pointer entered/left an annotation (topmost hit id, or null). Pure state. */
+  | { t: 'hover'; id: Id | null }
   // Programmatic selection (the data-API `select(ref)` — e.g. auto-selecting
   // a freshly placed form widget). Unknown/unselectable ids are dropped;
   // selecting a group member takes the whole group, like a click would.
@@ -719,6 +729,11 @@ export interface RenderItem {
   text?: TextStyle;
   source: 'baked' | 'vector' | 'ghost';
   selected: boolean;
+  /** The pointer is over this annotation — scene-level hover affordances
+   *  (e.g. a redaction mark previews its applied look). */
+  hovered?: boolean;
+  /** Redaction label projection (redact kind only) — see {@link Annot.label}. */
+  label?: { text: string; repeat: boolean };
   /**
    * Applied rotation (deg, CW), or 0/undefined. For BOX kinds (`rect`/`text`)
    * `box` is the UNROTATED visual box and the renderer applies this rotation
@@ -774,7 +789,11 @@ export type SceneNode =
   | { kind: 'ellipse'; rect: Rect; paint: Paint }
   | { kind: 'line'; a: Vec; b: Vec; paint: Paint }
   | { kind: 'poly'; points: Vec[]; closed: boolean; paint: Paint }
-  | { kind: 'path'; d: string; paint: Paint };
+  | { kind: 'path'; d: string; paint: Paint }
+  /** Painted (non-interactive) text — `at` is the BASELINE start point in
+   *  content units. Editable text (free text) stays a framework element;
+   *  this is for pure pixels, e.g. a redaction label preview. */
+  | { kind: 'text'; at: Vec; text: string; fontSize: number; fontFamily?: string; paint: Paint };
 
 /** Pure geometry settings for recognising and axis-snapping a freehand stroke. */
 export interface InkStraightenOptions {
