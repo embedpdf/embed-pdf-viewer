@@ -65,7 +65,7 @@ export function Hero() {
               <span className="h-3.5 w-px bg-[#E9EEFF] max-[480px]:hidden" />
               <span className="inline-flex items-center gap-1.5 font-sans text-[13px] font-medium text-[#3D4E75]">
                 <ShieldCheckIcon size={14} className="text-[#22C55E]" />
-                <span>MIT licensed</span>
+                <span>Apache-2.0 licensed</span>
               </span>
             </div>
           </div>

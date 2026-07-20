@@ -98,8 +98,8 @@ export function Footer() {
 
         <div className="mt-[clamp(40px,5vw,64px)] flex flex-wrap items-center justify-between gap-4 border-t border-white/10 pt-6">
           <span className="font-sans text-[13px] text-[#9FB0D8]">
-            © {new Date().getFullYear()} EmbedPDF. MIT licensed core — you own the code. No black
-            boxes.
+            © {new Date().getFullYear()} EmbedPDF. Apache-2.0 licensed core — you own the code. No
+            black boxes.
           </span>
           <span className="font-sans text-[13px] text-[#9FB0D8]">Open. Secure. Powerful.</span>
         </div>

@@ -45,6 +45,6 @@
     "@embedpdf/tooling-build": "workspace:*",
     "@embedpdf/engine": "workspace:*"
   },
-  "license": "MIT",
+  "license": "Apache-2.0",
   "sideEffects": false
 }

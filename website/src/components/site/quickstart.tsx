@@ -471,7 +471,7 @@ const PERKS = [
   {
     tone: 'border-[rgba(8,118,253,0.25)] bg-[rgba(8,118,253,0.14)] text-[#6FB3FF]',
     title: 'Open source',
-    desc: 'MIT licensed and built transparently for the community.',
+    desc: 'Apache-2.0 licensed and built transparently for the community.',
     icon: (
       <svg
         width="20"

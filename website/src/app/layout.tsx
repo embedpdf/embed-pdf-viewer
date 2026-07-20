@@ -24,7 +24,7 @@ const manrope = Manrope({
 export const metadata: Metadata = {
   title: 'EmbedPDF — Open Source PDF Solutions',
   description:
-    'The ultimate Open Source PDF viewer for JavaScript. Choose our drop-in component for instant results, or use our headless library to build a completely custom UI. MIT licensed.',
+    'The ultimate Open Source PDF viewer for JavaScript. Choose our drop-in component for instant results, or use our headless library to build a completely custom UI. Apache-2.0 licensed.',
   icons: { icon: '/embedpdf-icon.svg' },
 };
 

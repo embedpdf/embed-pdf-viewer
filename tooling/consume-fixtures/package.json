@@ -7,5 +7,5 @@
   "scripts": {
     "verify": "node --experimental-strip-types src/run.ts"
   },
-  "license": "MIT"
+  "license": "Apache-2.0"
 }

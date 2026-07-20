@@ -20,5 +20,5 @@
     "tsdown": "^0.22.12",
     "typescript": "^5.9.3"
   },
-  "license": "MIT"
+  "license": "Apache-2.0"
 }

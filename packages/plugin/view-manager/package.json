@@ -38,6 +38,6 @@
     "typescript": "^5.0.0",
     "@embedpdf/tooling-build": "workspace:*"
   },
-  "license": "MIT",
+  "license": "Apache-2.0",
   "sideEffects": false
 }

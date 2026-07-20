@@ -40,6 +40,6 @@
     "vitest": "^2.1.9",
     "@embedpdf/tooling-build": "workspace:*"
   },
-  "license": "MIT",
+  "license": "Apache-2.0",
   "sideEffects": false
 }
