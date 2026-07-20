@@ -8,24 +8,63 @@ on:
       - 'packages/engine/runtime/**'
       - '.github/workflows/build-engine-runtime.yml'
   push:
-    branches:
-      - main
-      - next
-      - feature/engine-runtime
+    # Every branch: payloads are published content-addressed (see payload-key
+    # job), so feature-branch runtime changes get fetchable payloads for
+    # Vercel previews and fresh checkouts without waiting for next/main.
+    branches: ['**']
     paths:
       - 'packages/engine/runtime/**'
       - '.github/workflows/build-engine-runtime.yml'
 
+# contents: write — the jobs attach finished payloads to
+# `runtime-payloads-<hash>` releases (the durable, URL-addressable home that
+# fetch-payload.sh hydrates from).
 permissions:
-  contents: read
+  contents: write
 
 env:
   EMSDK_VERSION: 3.1.72
 
 jobs:
+  # Computes the canonical payload identity (runtime-payload-hash.sh — the
+  # same derivation fetch-payload.sh uses) and ensures the release exists.
+  # If every asset is already published for this hash, builds still run (the
+  # actions/cache makes them cheap) but publishing is skipped.
+  payload-key:
+    name: Payload key
+    runs-on: ubuntu-24.04
+    outputs:
+      hash: ${{ steps.key.outputs.hash }}
+      exists: ${{ steps.key.outputs.exists }}
+    env:
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+    steps:
+      - uses: actions/checkout@v6
+      - id: key
+        shell: bash
+        run: |
+          HASH="$(bash packages/engine/runtime/scripts/runtime-payload-hash.sh)"
+          echo "hash=$HASH" >> "$GITHUB_OUTPUT"
+          if gh release view "runtime-payloads-$HASH" --json assets --jq '[.assets[].name] | length' >/tmp/assets 2>/dev/null; then
+            # 9 targets x 2 files (tar.gz + sha256) = 18 when complete
+            if [[ "$(cat /tmp/assets)" -ge 18 ]]; then
+              echo "exists=true" >> "$GITHUB_OUTPUT"
+            else
+              echo "exists=false" >> "$GITHUB_OUTPUT"
+            fi
+          else
+            echo "exists=false" >> "$GITHUB_OUTPUT"
+            if [[ "${{ github.event_name }}" != "pull_request" ]]; then
+              gh release create "runtime-payloads-$HASH" \
+                --title "Runtime payloads $HASH" \
+                --notes "Content-addressed finished runtime payloads (npm/<target>/lib). Fetched by packages/engine/runtime/scripts/fetch-payload.sh." \
+                --prerelease || true
+            fi
+          fi
   linux:
     name: Linux x64 + musl + WASM
     runs-on: ubuntu-24.04
+    needs: payload-key
     strategy:
       fail-fast: false
       matrix:
@@ -89,6 +128,17 @@ jobs:
       - name: Verify payload
         shell: bash
         run: bash packages/engine/runtime/scripts/verify-packages.sh ${{ matrix.target }}
+      - name: Publish payload
+        if: ${{ github.event_name != 'pull_request' && needs.payload-key.outputs.exists != 'true' }}
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          HASH="${{ needs.payload-key.outputs.hash }}"
+          ASSET="engine-runtime-payload-${{ matrix.target }}.tar.gz"
+          tar -czf "$ASSET" --exclude='.payload-source' -C "packages/engine/runtime/npm/${{ matrix.target }}/lib" .
+          if command -v sha256sum >/dev/null 2>&1; then sha256sum "$ASSET" > "$ASSET.sha256"; else shasum -a 256 "$ASSET" > "$ASSET.sha256"; fi
+          gh release upload "runtime-payloads-$HASH" "$ASSET" "$ASSET.sha256" --clobber
       - uses: actions/upload-artifact@v6
         with:
           name: engine-runtime-${{ matrix.target }}
@@ -97,6 +147,7 @@ jobs:
   linux-arm:
     name: Linux arm64 + musl
     runs-on: ubuntu-24.04-arm
+    needs: payload-key
     strategy:
       fail-fast: false
       matrix:
@@ -152,6 +203,17 @@ jobs:
       - name: Verify payload
         shell: bash
         run: bash packages/engine/runtime/scripts/verify-packages.sh ${{ matrix.target }}
+      - name: Publish payload
+        if: ${{ github.event_name != 'pull_request' && needs.payload-key.outputs.exists != 'true' }}
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          HASH="${{ needs.payload-key.outputs.hash }}"
+          ASSET="engine-runtime-payload-${{ matrix.target }}.tar.gz"
+          tar -czf "$ASSET" --exclude='.payload-source' -C "packages/engine/runtime/npm/${{ matrix.target }}/lib" .
+          if command -v sha256sum >/dev/null 2>&1; then sha256sum "$ASSET" > "$ASSET.sha256"; else shasum -a 256 "$ASSET" > "$ASSET.sha256"; fi
+          gh release upload "runtime-payloads-$HASH" "$ASSET" "$ASSET.sha256" --clobber
       - uses: actions/upload-artifact@v6
         with:
           name: engine-runtime-${{ matrix.target }}
@@ -160,6 +222,7 @@ jobs:
   mac:
     name: macOS
     runs-on: macos-14
+    needs: payload-key
     strategy:
       fail-fast: false
       matrix:
@@ -198,6 +261,17 @@ jobs:
       - name: Verify payload
         shell: bash
         run: bash packages/engine/runtime/scripts/verify-packages.sh ${{ matrix.target }}
+      - name: Publish payload
+        if: ${{ github.event_name != 'pull_request' && needs.payload-key.outputs.exists != 'true' }}
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          HASH="${{ needs.payload-key.outputs.hash }}"
+          ASSET="engine-runtime-payload-${{ matrix.target }}.tar.gz"
+          tar -czf "$ASSET" --exclude='.payload-source' -C "packages/engine/runtime/npm/${{ matrix.target }}/lib" .
+          if command -v sha256sum >/dev/null 2>&1; then sha256sum "$ASSET" > "$ASSET.sha256"; else shasum -a 256 "$ASSET" > "$ASSET.sha256"; fi
+          gh release upload "runtime-payloads-$HASH" "$ASSET" "$ASSET.sha256" --clobber
       - uses: actions/upload-artifact@v6
         with:
           name: engine-runtime-${{ matrix.target }}
@@ -206,6 +280,7 @@ jobs:
   win:
     name: Windows
     runs-on: windows-2022
+    needs: payload-key
     strategy:
       fail-fast: false
       matrix:
@@ -245,6 +320,17 @@ jobs:
       - name: Verify payload
         shell: bash
         run: bash packages/engine/runtime/scripts/verify-packages.sh ${{ matrix.target }}
+      - name: Publish payload
+        if: ${{ github.event_name != 'pull_request' && needs.payload-key.outputs.exists != 'true' }}
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          HASH="${{ needs.payload-key.outputs.hash }}"
+          ASSET="engine-runtime-payload-${{ matrix.target }}.tar.gz"
+          tar -czf "$ASSET" --exclude='.payload-source' -C "packages/engine/runtime/npm/${{ matrix.target }}/lib" .
+          if command -v sha256sum >/dev/null 2>&1; then sha256sum "$ASSET" > "$ASSET.sha256"; else shasum -a 256 "$ASSET" > "$ASSET.sha256"; fi
+          gh release upload "runtime-payloads-$HASH" "$ASSET" "$ASSET.sha256" --clobber
       - uses: actions/upload-artifact@v6
         with:
           name: engine-runtime-${{ matrix.target }}

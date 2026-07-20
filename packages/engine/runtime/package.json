@@ -64,7 +64,8 @@
     "test:parity": "node --test ./test/*.test.mjs",
     "verify:packages": "bash ./scripts/verify-packages.sh",
     "verify:browser-purity": "node ./scripts/verify-browser-purity.mjs",
-    "dev": "bash ./scripts/dev.sh"
+    "dev": "bash ./scripts/dev.sh",
+    "fetch:payload": "bash scripts/fetch-payload.sh"
   },
   "files": [
     "dist",
