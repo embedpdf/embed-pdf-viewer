@@ -13,7 +13,7 @@
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-REPO="${EPDF_PAYLOAD_REPO:-embedpdf/embed-pdf-viewer}"
+REPO="${EPDF_PAYLOAD_REPO:-embedpdf/runtime-payloads}"
 WAIT_MINUTES="${EPDF_PAYLOAD_WAIT_MINUTES:-0}"
 TARGETS=("${@:-wasm32}")
 

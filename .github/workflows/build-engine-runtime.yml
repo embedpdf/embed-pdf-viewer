@@ -16,13 +16,17 @@ on:
       - 'packages/engine/runtime/**'
       - '.github/workflows/build-engine-runtime.yml'
 
-# contents: write — the jobs attach finished payloads to
-# `runtime-payloads-<hash>` releases (the durable, URL-addressable home that
-# fetch-payload.sh hydrates from).
 permissions:
-  contents: write
+  contents: read
 
+# Finished payloads are published as releases on the dedicated public
+# artifacts repo — keeping the main repo's releases feed a status page for
+# humans, and keeping the publish token's blast radius to a shelf of
+# tarballs. Needs the RUNTIME_PAYLOADS_TOKEN secret: fine-grained, Contents
+# R/W on that one repo only. Absent (e.g. fork PRs) → builds run, publish
+# skips.
 env:
+  PAYLOAD_REPO: embedpdf/runtime-payloads
   EMSDK_VERSION: 3.1.72
 
 jobs:
@@ -37,7 +41,7 @@ jobs:
       hash: ${{ steps.key.outputs.hash }}
       exists: ${{ steps.key.outputs.exists }}
     env:
-      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      GH_TOKEN: ${{ secrets.RUNTIME_PAYLOADS_TOKEN }}
     steps:
       - uses: actions/checkout@v6
       - id: key
@@ -45,7 +49,12 @@ jobs:
         run: |
           HASH="$(bash packages/engine/runtime/scripts/runtime-payload-hash.sh)"
           echo "hash=$HASH" >> "$GITHUB_OUTPUT"
-          if gh release view "runtime-payloads-$HASH" --json assets --jq '[.assets[].name] | length' >/tmp/assets 2>/dev/null; then
+          if [[ -z "$GH_TOKEN" ]]; then
+            echo "RUNTIME_PAYLOADS_TOKEN not available — builds run, publishing skipped."
+            echo "exists=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          if gh release view "runtime-payloads-$HASH" --repo "$PAYLOAD_REPO" --json assets --jq '[.assets[].name] | length' >/tmp/assets 2>/dev/null; then
             # 9 targets x 2 files (tar.gz + sha256) = 18 when complete
             if [[ "$(cat /tmp/assets)" -ge 18 ]]; then
               echo "exists=true" >> "$GITHUB_OUTPUT"
@@ -56,6 +65,7 @@ jobs:
             echo "exists=false" >> "$GITHUB_OUTPUT"
             if [[ "${{ github.event_name }}" != "pull_request" ]]; then
               gh release create "runtime-payloads-$HASH" \
+                --repo "$PAYLOAD_REPO" \
                 --title "Runtime payloads $HASH" \
                 --notes "Content-addressed finished runtime payloads (npm/<target>/lib). Fetched by packages/engine/runtime/scripts/fetch-payload.sh." \
                 --prerelease || true
@@ -132,13 +142,13 @@ jobs:
         if: ${{ github.event_name != 'pull_request' && needs.payload-key.outputs.exists != 'true' }}
         shell: bash
         env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_TOKEN: ${{ secrets.RUNTIME_PAYLOADS_TOKEN }}
         run: |
           HASH="${{ needs.payload-key.outputs.hash }}"
           ASSET="engine-runtime-payload-${{ matrix.target }}.tar.gz"
           tar -czf "$ASSET" --exclude='.payload-source' -C "packages/engine/runtime/npm/${{ matrix.target }}/lib" .
           if command -v sha256sum >/dev/null 2>&1; then sha256sum "$ASSET" > "$ASSET.sha256"; else shasum -a 256 "$ASSET" > "$ASSET.sha256"; fi
-          gh release upload "runtime-payloads-$HASH" "$ASSET" "$ASSET.sha256" --clobber
+          gh release upload "runtime-payloads-$HASH" --repo "$PAYLOAD_REPO" "$ASSET" "$ASSET.sha256" --clobber
       - uses: actions/upload-artifact@v6
         with:
           name: engine-runtime-${{ matrix.target }}
@@ -207,13 +217,13 @@ jobs:
         if: ${{ github.event_name != 'pull_request' && needs.payload-key.outputs.exists != 'true' }}
         shell: bash
         env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_TOKEN: ${{ secrets.RUNTIME_PAYLOADS_TOKEN }}
         run: |
           HASH="${{ needs.payload-key.outputs.hash }}"
           ASSET="engine-runtime-payload-${{ matrix.target }}.tar.gz"
           tar -czf "$ASSET" --exclude='.payload-source' -C "packages/engine/runtime/npm/${{ matrix.target }}/lib" .
           if command -v sha256sum >/dev/null 2>&1; then sha256sum "$ASSET" > "$ASSET.sha256"; else shasum -a 256 "$ASSET" > "$ASSET.sha256"; fi
-          gh release upload "runtime-payloads-$HASH" "$ASSET" "$ASSET.sha256" --clobber
+          gh release upload "runtime-payloads-$HASH" --repo "$PAYLOAD_REPO" "$ASSET" "$ASSET.sha256" --clobber
       - uses: actions/upload-artifact@v6
         with:
           name: engine-runtime-${{ matrix.target }}
@@ -265,13 +275,13 @@ jobs:
         if: ${{ github.event_name != 'pull_request' && needs.payload-key.outputs.exists != 'true' }}
         shell: bash
         env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_TOKEN: ${{ secrets.RUNTIME_PAYLOADS_TOKEN }}
         run: |
           HASH="${{ needs.payload-key.outputs.hash }}"
           ASSET="engine-runtime-payload-${{ matrix.target }}.tar.gz"
           tar -czf "$ASSET" --exclude='.payload-source' -C "packages/engine/runtime/npm/${{ matrix.target }}/lib" .
           if command -v sha256sum >/dev/null 2>&1; then sha256sum "$ASSET" > "$ASSET.sha256"; else shasum -a 256 "$ASSET" > "$ASSET.sha256"; fi
-          gh release upload "runtime-payloads-$HASH" "$ASSET" "$ASSET.sha256" --clobber
+          gh release upload "runtime-payloads-$HASH" --repo "$PAYLOAD_REPO" "$ASSET" "$ASSET.sha256" --clobber
       - uses: actions/upload-artifact@v6
         with:
           name: engine-runtime-${{ matrix.target }}
@@ -324,13 +334,13 @@ jobs:
         if: ${{ github.event_name != 'pull_request' && needs.payload-key.outputs.exists != 'true' }}
         shell: bash
         env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_TOKEN: ${{ secrets.RUNTIME_PAYLOADS_TOKEN }}
         run: |
           HASH="${{ needs.payload-key.outputs.hash }}"
           ASSET="engine-runtime-payload-${{ matrix.target }}.tar.gz"
           tar -czf "$ASSET" --exclude='.payload-source' -C "packages/engine/runtime/npm/${{ matrix.target }}/lib" .
           if command -v sha256sum >/dev/null 2>&1; then sha256sum "$ASSET" > "$ASSET.sha256"; else shasum -a 256 "$ASSET" > "$ASSET.sha256"; fi
-          gh release upload "runtime-payloads-$HASH" "$ASSET" "$ASSET.sha256" --clobber
+          gh release upload "runtime-payloads-$HASH" --repo "$PAYLOAD_REPO" "$ASSET" "$ASSET.sha256" --clobber
       - uses: actions/upload-artifact@v6
         with:
           name: engine-runtime-${{ matrix.target }}
