@@ -24,6 +24,7 @@
   "devDependencies": {
     "@changesets/cli": "^2.29.6",
     "@changesets/get-github-info": "^0.6.0",
+    "@next/eslint-plugin-next": "^15.5.12",
     "@roarr/cli": "^5.12.4",
     "@types/node": "latest",
     "@typescript-eslint/eslint-plugin": "^8.32.1",

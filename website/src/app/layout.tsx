@@ -2,8 +2,8 @@ import type { Metadata } from 'next';
 import { Inter, Manrope } from 'next/font/google';
 import type { ReactNode } from 'react';
 
-import { Header } from '@/components/site/header';
 import { Footer } from '@/components/site/footer';
+import { Header } from '@/components/site/header';
 
 import './globals.css';
 

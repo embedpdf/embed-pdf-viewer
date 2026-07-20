@@ -1,13 +1,21 @@
+const path = require('node:path');
+
 const eslintPluginPrettier = require('eslint-plugin-prettier');
 const js = require('@eslint/js');
 const ts = require('@typescript-eslint/eslint-plugin');
 const tsParser = require('@typescript-eslint/parser');
 const importPlugin = require('eslint-plugin-import');
+const nextPlugin = require('@next/eslint-plugin-next');
 
 /** @type {import("eslint").Linter.FlatConfig[]} */
 module.exports = [
   {
     ignores: ['node_modules', 'dist', 'build', '.turbo'],
+  },
+  {
+    plugins: {
+      '@next/next': nextPlugin,
+    },
   },
   js.configs.recommended,
   {
@@ -32,6 +40,7 @@ module.exports = [
     },
     rules: {
       'prettier/prettier': 'error',
+      'no-undef': 'off',
       'no-unused-vars': 'off',
       '@typescript-eslint/no-unused-vars': [
         'warn',
@@ -49,6 +58,18 @@ module.exports = [
         },
       ],
       'spaced-comment': ['error', 'always', { markers: ['/'] }],
+    },
+  },
+  {
+    files: ['website/**/*.{js,jsx,ts,tsx}'],
+    settings: {
+      next: {
+        rootDir: path.join(__dirname, 'website'),
+      },
+    },
+    rules: {
+      ...nextPlugin.configs.recommended.rules,
+      ...nextPlugin.configs['core-web-vitals'].rules,
     },
   },
 ];

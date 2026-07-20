@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { useEffect, useState } from 'react';
 
 import { EpButton } from './button';
-import { ArrowRightIcon, ChevronRightIcon, GitHubIcon, SearchIcon, SparkIcon } from './icons';
+import { ChevronRightIcon, GitHubIcon, SearchIcon, SparkIcon } from './icons';
 import { SearchModal } from './search-modal';
 
 const NAV_ITEMS: { label: string; href: string }[] = [
