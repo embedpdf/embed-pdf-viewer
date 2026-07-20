@@ -1,0 +1,122 @@
+@import 'tailwindcss';
+@config '../../tailwind.config.ts';
+
+html {
+  @apply text-base antialiased;
+  -webkit-tap-highlight-color: transparent;
+  scroll-behavior: smooth;
+}
+
+::selection {
+  background: #e6f0ff;
+  color: #0a1a4d;
+}
+
+:where(button, a, input, select, textarea):focus-visible {
+  outline: 2px solid #0876fd;
+  outline-offset: 2px;
+  border-radius: 8px;
+}
+
+/* ---- Brand gradient text (blue → purple), the kit's <em> treatment ---- */
+.ep-grad {
+  background: linear-gradient(90deg, #0876fd 0%, #9747ff 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  color: transparent;
+}
+.ep-grad-blue {
+  background: linear-gradient(90deg, #0876fd 0%, #4aa3ff 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  color: transparent;
+}
+
+/* ---- Search modal entrances ---- */
+@keyframes epFade {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+@keyframes epSlide {
+  from {
+    transform: translateY(-12px);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+.ep-anim-fade {
+  animation: epFade 0.15s ease-out;
+}
+.ep-anim-slide {
+  animation: epSlide 0.2s ease-out;
+}
+@media (prefers-reduced-motion: reduce) {
+  .ep-anim-fade,
+  .ep-anim-slide {
+    animation: none;
+  }
+}
+
+/* ---- Quick Start section: dark background + arched wave transitions ---- */
+.ep-qs-bg {
+  background:
+    radial-gradient(ellipse 70% 80% at 50% 0%, #0e1a36 0%, transparent 65%),
+    linear-gradient(180deg, #050a18 0%, #07112a 60%, #050a18 100%);
+}
+.ep-qs-glare {
+  position: absolute;
+  right: -180px;
+  bottom: -180px;
+  width: 560px;
+  height: 560px;
+  background: radial-gradient(
+    ellipse 55% 55% at 55% 50%,
+    rgba(151, 71, 255, 0.45) 0%,
+    rgba(151, 71, 255, 0.16) 38%,
+    rgba(151, 71, 255, 0.05) 60%,
+    transparent 75%
+  );
+  filter: blur(30px);
+  z-index: 6;
+  pointer-events: none;
+}
+
+/* ---- Quick Start code tokens (kit palette) ---- */
+.ep-code .tk-tag {
+  color: #6fb3ff;
+}
+.ep-code .tk-attr {
+  color: #c792ea;
+}
+.ep-code .tk-str {
+  color: #95e1a8;
+}
+.ep-code .tk-key {
+  color: #ff8ac2;
+}
+.ep-code .tk-fn {
+  color: #82aaff;
+}
+.ep-code .tk-kw {
+  color: #c792ea;
+  font-style: italic;
+}
+.ep-code .tk-com {
+  color: #4a5980;
+  font-style: italic;
+}
+.ep-code .tk-pun {
+  color: #6b7a99;
+}
+.ep-code .tk-num {
+  color: #f78c6c;
+}

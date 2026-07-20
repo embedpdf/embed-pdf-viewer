@@ -3,6 +3,7 @@ packages:
   - 'examples/**'
   - 'ee/*'
   - 'tooling/*'
+  - 'website'
   # exclude generated outputs that can contain nested package.json copies
   # (ng-packagr always emits one into dist) and confuse workspace discovery.
   - '!**/dist/**'
