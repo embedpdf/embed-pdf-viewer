@@ -1,42 +1,42 @@
 {
   "fork": "embedpdf/pdfium",
-  "sha": "74b6d9c2c5470891db37b384c48fd74ee8a70faf",
+  "sha": "a39fb54dd9f4198128ca1f9d83dc52b7f64e8e9b",
   "artifacts": {
     "darwin-arm64": {
-      "url": "https://github.com/embedpdf/pdfium/releases/download/runtime-74b6d9c2c5470891db37b384c48fd74ee8a70faf/libembedpdf-pdf-runtime-darwin-arm64-74b6d9c2c.tar.gz",
-      "sha256": "5a5389795340c0a65af4e010944891b1d9065b5efde35bd69a18a02159e5a8c8"
+      "url": "https://github.com/embedpdf/pdfium/releases/download/runtime-a39fb54dd9f4198128ca1f9d83dc52b7f64e8e9b/libembedpdf-pdf-runtime-darwin-arm64-a39fb54dd.tar.gz",
+      "sha256": "e02abfc659c9d16140f4f0c00d9f4b92edb4394114c0ff2a6c94040ce57c5e77"
     },
     "darwin-x64": {
-      "url": "https://github.com/embedpdf/pdfium/releases/download/runtime-74b6d9c2c5470891db37b384c48fd74ee8a70faf/libembedpdf-pdf-runtime-darwin-x64-74b6d9c2c.tar.gz",
-      "sha256": "5b97b0c9e1368876fca7bfb519a9bb5ba5ea01de772b190960b7a76ffeafe635"
+      "url": "https://github.com/embedpdf/pdfium/releases/download/runtime-a39fb54dd9f4198128ca1f9d83dc52b7f64e8e9b/libembedpdf-pdf-runtime-darwin-x64-a39fb54dd.tar.gz",
+      "sha256": "95913b794286ed0d200608aac26310222014db0da52c660af3cf01246b6aec24"
     },
     "linux-arm64": {
-      "url": "https://github.com/embedpdf/pdfium/releases/download/runtime-74b6d9c2c5470891db37b384c48fd74ee8a70faf/libembedpdf-pdf-runtime-linux-arm64-74b6d9c2c.tar.gz",
-      "sha256": "a029c25d95403b79a8bd005354c6c332670a2d9fb8136c24af07bb7a06d09abb"
+      "url": "https://github.com/embedpdf/pdfium/releases/download/runtime-a39fb54dd9f4198128ca1f9d83dc52b7f64e8e9b/libembedpdf-pdf-runtime-linux-arm64-a39fb54dd.tar.gz",
+      "sha256": "8d7b1d1209de84866a980705b99a87233e6c7f2c8930c83fdbe6a859332e6533"
     },
     "linux-x64": {
-      "url": "https://github.com/embedpdf/pdfium/releases/download/runtime-74b6d9c2c5470891db37b384c48fd74ee8a70faf/libembedpdf-pdf-runtime-linux-x64-74b6d9c2c.tar.gz",
-      "sha256": "c481459b9a0ac2a58971593bd701f3267520040e704d316b05d7b9a1b22a8913"
+      "url": "https://github.com/embedpdf/pdfium/releases/download/runtime-a39fb54dd9f4198128ca1f9d83dc52b7f64e8e9b/libembedpdf-pdf-runtime-linux-x64-a39fb54dd.tar.gz",
+      "sha256": "bb83eedb47a631e90ea652f90ece8178ca233e195e856dfb16d0da2fadbfbc8e"
     },
     "linuxmusl-arm64": {
-      "url": "https://github.com/embedpdf/pdfium/releases/download/runtime-74b6d9c2c5470891db37b384c48fd74ee8a70faf/libembedpdf-pdf-runtime-linuxmusl-arm64-74b6d9c2c.tar.gz",
-      "sha256": "bcf1a5d3018a52edfaa6a88b1baf24f6cba4d157eefc5381c7e8e74f900ee771"
+      "url": "https://github.com/embedpdf/pdfium/releases/download/runtime-a39fb54dd9f4198128ca1f9d83dc52b7f64e8e9b/libembedpdf-pdf-runtime-linuxmusl-arm64-a39fb54dd.tar.gz",
+      "sha256": "f6b4b6e8b7b9b784ff96a69ec0231000332f30a86cc3d9269860fbbf802c3be8"
     },
     "linuxmusl-x64": {
-      "url": "https://github.com/embedpdf/pdfium/releases/download/runtime-74b6d9c2c5470891db37b384c48fd74ee8a70faf/libembedpdf-pdf-runtime-linuxmusl-x64-74b6d9c2c.tar.gz",
-      "sha256": "ed2ad29a913d85d51aad362183c2cbd7e3ce4fbaf4ab1e79320e3ead1b8e62f2"
+      "url": "https://github.com/embedpdf/pdfium/releases/download/runtime-a39fb54dd9f4198128ca1f9d83dc52b7f64e8e9b/libembedpdf-pdf-runtime-linuxmusl-x64-a39fb54dd.tar.gz",
+      "sha256": "1215bcf660e9be083c9a6c79790f7235d6882194cb121d313c5c14c10e1a5eb5"
     },
     "wasm32": {
-      "url": "https://github.com/embedpdf/pdfium/releases/download/runtime-74b6d9c2c5470891db37b384c48fd74ee8a70faf/libembedpdf-pdf-runtime-wasm32-74b6d9c2c.tar.gz",
-      "sha256": "875c2545d798407274929ddc2f832efb934a1bed19b6dc2c9ab2e88364110ad0"
+      "url": "https://github.com/embedpdf/pdfium/releases/download/runtime-a39fb54dd9f4198128ca1f9d83dc52b7f64e8e9b/libembedpdf-pdf-runtime-wasm32-a39fb54dd.tar.gz",
+      "sha256": "71a83ab203ca35f5490e2886e49a2690b58737397677beb5d0f0fca81b2a1e6e"
     },
     "win32-arm64": {
-      "url": "https://github.com/embedpdf/pdfium/releases/download/runtime-74b6d9c2c5470891db37b384c48fd74ee8a70faf/libembedpdf-pdf-runtime-win32-arm64-74b6d9c2c.tar.gz",
-      "sha256": "ade964ceb55f7e5a113c5be97b19303d7e3151f4cb37f7d02e313e0001e5b1ed"
+      "url": "https://github.com/embedpdf/pdfium/releases/download/runtime-a39fb54dd9f4198128ca1f9d83dc52b7f64e8e9b/libembedpdf-pdf-runtime-win32-arm64-a39fb54dd.tar.gz",
+      "sha256": "38db0ff62f6884b7e7117a23752769445c026635de9c5e7a92ae23ad033e2455"
     },
     "win32-x64": {
-      "url": "https://github.com/embedpdf/pdfium/releases/download/runtime-74b6d9c2c5470891db37b384c48fd74ee8a70faf/libembedpdf-pdf-runtime-win32-x64-74b6d9c2c.tar.gz",
-      "sha256": "3170641aeb26ccce635ab6b2989686d03eeffad4783b247473cf3b82cd0d3984"
+      "url": "https://github.com/embedpdf/pdfium/releases/download/runtime-a39fb54dd9f4198128ca1f9d83dc52b7f64e8e9b/libembedpdf-pdf-runtime-win32-x64-a39fb54dd.tar.gz",
+      "sha256": "e40a1f0addef4c975a405f7cf427476d31648ca4bdc93ee0f6b9e1ca7971e58b"
     }
   }
 }
