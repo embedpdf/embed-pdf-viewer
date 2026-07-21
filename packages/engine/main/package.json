@@ -13,6 +13,11 @@
       "import": "./dist/index.js",
       "require": "./dist/index.cjs"
     },
+    "./default-worker": {
+      "development": "./src/default-worker.ts",
+      "import": "./dist/default-worker.js",
+      "require": "./dist/default-worker.cjs"
+    },
     "./package.json": "./package.json",
     "./worker-entry": "./src/worker/worker-entry.ts"
   },
@@ -27,6 +32,7 @@
   "files": [
     "dist",
     "src/worker/worker-entry.ts",
+    "src/worker/bootstrap.ts",
     "src/worker/protocol.ts",
     "LICENSE",
     "README.md"
@@ -64,6 +70,10 @@
       ".": {
         "import": "./dist/index.js",
         "require": "./dist/index.cjs"
+      },
+      "./default-worker": {
+        "import": "./dist/default-worker.js",
+        "require": "./dist/default-worker.cjs"
       },
       "./package.json": "./package.json",
       "./worker-entry": "./src/worker/worker-entry.ts"

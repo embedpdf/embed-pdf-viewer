@@ -12,7 +12,7 @@ export { AbortablePromise } from './promise/AbortablePromise';
 export type { AbortableExecutor } from './promise/AbortablePromise';
 export { AbortError, isAbortError } from './promise/AbortError';
 
-export type { Engine } from './engine/Engine';
+export type { Engine, EngineFactory } from './engine/Engine';
 export { deferredEngine } from './engine/deferredEngine';
 export type { FontService } from './engine/FontService';
 export type { DocumentHandle } from './engine/DocumentHandle';

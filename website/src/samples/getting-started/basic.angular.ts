@@ -1,18 +1,9 @@
 import { ChangeDetectionStrategy, Component } from '@angular/core';
-import { deferredEngine, EpdfViewer, injectDocumentId } from '@embedpdf/angular/runtime';
-import type { Engine, EpdfInitialDocument, OpenInput } from '@embedpdf/angular/runtime';
+import { localEngine } from '@embedpdf/engine';
+import { EpdfViewer, injectDocumentId } from '@embedpdf/angular/runtime';
+import type { EpdfInitialDocument, OpenInput } from '@embedpdf/angular/runtime';
 import { EpdfPageTemplate, EpdfStage, stagePlugin } from '@embedpdf/angular/stage';
 import { EpdfRenderLayer, renderPlugin } from '@embedpdf/angular/render';
-
-// The engine boots in a worker, in the background — the UI renders at t≈0
-// and only opening a document awaits it.
-function createEngine(): Engine {
-  return deferredEngine(async () => {
-    const { createLocalEngineWithWorker } = await import('@embedpdf/engine');
-    const { default: EngineWorker } = await import('@embedpdf/engine/worker-entry?worker');
-    return createLocalEngineWithWorker({ worker: new EngineWorker() });
-  });
-}
 
 // The local engine opens bytes: fetch lazily, under the loading tab.
 const ebook = async (): Promise<OpenInput> => {
@@ -57,7 +48,10 @@ export class Workspace {
   `,
 })
 export class App {
-  readonly engine = createEngine();
+  // `localEngine()` is a RECIPE — the viewer boots PDFium (in a worker) when
+  // the kernel materializes and destroys it on teardown. The UI renders at t≈0
+  // and only opening a document awaits the boot.
+  readonly engine = localEngine();
   readonly plugins = [stagePlugin(), renderPlugin()];
   readonly initialDocuments: EpdfInitialDocument[] = [{ source: ebook }];
 }

@@ -7,9 +7,10 @@
   let status = $state('Booting engine…');
 
   onMount(async () => {
-    const { createLocalEngineWithWorker } = await import('@embedpdf/engine');
-    const { default: EngineWorker } = await import('@embedpdf/engine/worker-entry?worker');
-    const engine = await createLocalEngineWithWorker({ worker: new EngineWorker() });
+    // `localEngine()` is a recipe; call it to boot a live engine (PDFium in a
+    // worker) — no worker wiring needed. The Svelte adapter will own this for you.
+    const { localEngine } = await import('@embedpdf/engine');
+    const engine = await localEngine()();
 
     status = 'Opening document…';
     const response = await fetch('https://snippet.embedpdf.com/ebook.pdf');

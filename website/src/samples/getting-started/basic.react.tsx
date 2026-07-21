@@ -1,17 +1,15 @@
-import { deferredEngine, DocumentGate, Viewer } from '@embedpdf/react/runtime';
-import type { Engine, OpenInput } from '@embedpdf/react/runtime';
+import { Viewer, DocumentGate } from '@embedpdf/react/runtime';
+import type { OpenInput } from '@embedpdf/react/runtime';
 import { Stage, stagePlugin } from '@embedpdf/react/stage';
 import { RenderLayer, renderPlugin } from '@embedpdf/react/render';
+import { localEngine } from '@embedpdf/engine';
 
-// The engine boots in a worker, in the background — the UI renders at t≈0
-// and only opening a document awaits it.
-async function boot(): Promise<Engine> {
-  const { createLocalEngineWithWorker } = await import('@embedpdf/engine');
-  const { default: EngineWorker } = await import('@embedpdf/engine/worker-entry?worker');
-  return createLocalEngineWithWorker({ worker: new EngineWorker() });
-}
-
-const engine = deferredEngine(() => boot());
+// `localEngine()` is a RECIPE — a description of the engine, not a live one.
+// Hand it to <Viewer> and the viewer boots PDFium (in a worker) on mount and
+// destroys it on unmount: no worker wiring, no lifecycle to manage. The boot
+// runs in the background, so the UI renders at t≈0 and only opening a document
+// awaits it.
+const engine = localEngine();
 const plugins = [stagePlugin(), renderPlugin()];
 
 // The local engine opens bytes: fetch lazily, under the loading tab.

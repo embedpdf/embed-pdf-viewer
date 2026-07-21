@@ -74,7 +74,7 @@ import type {
 } from '@embedpdf/react';
 import type { DocumentMetadata, MetadataPatch, OpenInput, PdfSaveMode } from '@embedpdf/core';
 import {
-  createDeferredEngine,
+  selectedEngine,
   engineMode,
   loadInitialDocuments,
   newDocument,
@@ -2378,11 +2378,13 @@ function Booting() {
   );
 }
 
-// Mount at t=0. The engine boot (wasm worker, fonts) starts in parallel inside
-// createDeferredEngine() and is only awaited by documents.open() — the chrome,
-// its translations, and the locale switcher never wait for it.
+// Mount at t=0. `selectedEngine()` is a RECIPE — the Viewer boots it (wasm
+// worker, fonts) on mount and destroys it on unmount, and the boot is only
+// awaited by documents.open(), so the chrome, its translations, and the locale
+// switcher never wait for it. useMemo keeps the recipe identity stable (Viewer
+// engine is init-only).
 export function App() {
-  const engine = useMemo(createDeferredEngine, []);
+  const engine = useMemo(selectedEngine, []);
   return (
     <Viewer engine={engine} plugins={plugins} fallback={<Booting />}>
       <OpenInitialDocuments />

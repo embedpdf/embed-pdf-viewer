@@ -18,8 +18,15 @@ import {
   useState,
   useSyncExternalStore,
 } from 'react';
-import { createKernel, docInfoListEquals } from '@embedpdf/core';
-import type { AnyPlugin, CapabilityToken, Engine, InitialDocument, Kernel } from '@embedpdf/core';
+import { createKernel, deferredEngine, docInfoListEquals } from '@embedpdf/core';
+import type {
+  AnyPlugin,
+  CapabilityToken,
+  Engine,
+  EngineFactory,
+  InitialDocument,
+  Kernel,
+} from '@embedpdf/core';
 // Pure coordinate math from the geometry base — NOT from stage-core. The
 // PageContext seam stays stage-agnostic (it must also serve standalone PageView).
 import type { PageFrame, PageTransform, Point, Rect } from '@embedpdf/core-geometry';
@@ -207,8 +214,21 @@ export function useDocuments() {
 // '@embedpdf/core'` above) — one shared shape for every adapter.
 
 export interface ViewerProps {
-  /** Init-only: captured on first render; later identity changes are ignored (dev warns). */
-  engine: Engine;
+  /**
+   * The engine, as a live instance OR a recipe ({@link EngineFactory} from
+   * `localEngine()` / `cloudEngine()`). Ownership follows the shape:
+   *
+   *   - A **recipe** (a function) is VIEWER-OWNED: the Viewer calls it on mount
+   *     and `destroy()`s the result on unmount. The 99% path — pass
+   *     `localEngine()` directly and forget about lifecycle.
+   *   - A live **instance** is BORROWED: the Viewer uses it and never destroys
+   *     it, because you acquired it and therefore own it. Use this to share one
+   *     engine across viewers or keep it alive across route changes — wrap a
+   *     recipe with `deferredEngine()` to get such an instance.
+   *
+   * Init-only: captured on first render; later identity changes are ignored (dev warns).
+   */
+  engine: Engine | EngineFactory;
   /** Init-only: captured on first render; later identity changes are ignored (dev warns). */
   plugins: AnyPlugin[];
   /** Documents to open on startup (with optional tab names). Init-only. */
@@ -239,7 +259,15 @@ type BootState =
  * alive while WASM compiles or the transport connects. `initialDocuments`
  * open in the BACKGROUND and stream into the registry (`useDocuments()` is
  * reactive); per-document loading UI is the Stage's job, not a root gate.
- * Pair with `deferredEngine()` to make the whole boot non-blocking.
+ *
+ * ENGINE OWNERSHIP. When `engine` is a recipe (a function — `localEngine()` /
+ * `cloudEngine()`), the Viewer OWNS it: each effect setup boots one engine
+ * (wrapped in `deferredEngine` so boot overlaps first render, never blocking
+ * it) and each cleanup destroys exactly that one — after the kernel, so handles
+ * close first. When `engine` is a live instance it is BORROWED and never
+ * destroyed here. StrictMode's double-mount therefore boots two independent
+ * recipe engines and tears the first fully down, matching the kernel's own
+ * effect-scoped lifecycle.
  */
 export function Viewer({
   engine,
@@ -268,11 +296,22 @@ export function Viewer({
   const [boot, setBoot] = useState<BootState>({ phase: 'booting', kernel: null });
   useEffect(() => {
     const captured = initial.current;
+    // A recipe (function) is viewer-owned: cook it now, destroy on unmount. A
+    // live instance is borrowed: use as-is, never destroy. `deferredEngine`
+    // keeps the recipe's boot off the critical path (it resolves lazily) and
+    // gives us an Engine to destroy without awaiting the boot here.
+    const ownsEngine = typeof captured.engine === 'function';
+    const engine: Engine = ownsEngine
+      ? deferredEngine(captured.engine as EngineFactory)
+      : (captured.engine as Engine);
     let kernel: Kernel;
     try {
-      kernel = createKernel({ engine: captured.engine, plugins: captured.plugins });
+      kernel = createKernel({ engine, plugins: captured.plugins });
     } catch (error) {
       setBoot({ phase: 'error', error }); // plan/graph errors surface, not throw mid-render
+      // deferredEngine never booted (createKernel doesn't open) — destroy is a
+      // no-op, but call it so the contract holds regardless of future changes.
+      if (ownsEngine) void engine.destroy();
       return;
     }
     let alive = true;
@@ -292,7 +331,13 @@ export function Viewer({
     );
     return () => {
       alive = false;
-      void kernel.destroy(); // async + idempotent; closes every document handle
+      // Kernel first (closes every document handle), THEN the engine we own —
+      // ownership follows acquisition. deferredEngine.destroy() joins an
+      // in-flight boot (or no-ops if it never started), so an unmount mid-boot
+      // is safe.
+      void kernel.destroy().then(() => {
+        if (ownsEngine) void engine.destroy();
+      });
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);

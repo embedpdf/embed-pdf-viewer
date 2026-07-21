@@ -59,7 +59,15 @@ npm install @embedpdf/angular @embedpdf/engine
 
 ## Your first viewer
 
-The engine boots in a worker in the background; the stage and render layer
-draw the pages. This is the whole app:
+`localEngine()` is a *recipe*: hand it to `<Viewer>` and the viewer boots the
+engine (PDFium in a worker) on mount and destroys it on unmount — no worker
+wiring, no lifecycle to manage. The boot runs in the background, so the stage
+and render layer draw the pages the moment a document is ready. This is the
+whole app:
 
 <Example name="getting-started/basic" />
+
+Want to own the engine's lifetime — share it across viewers, or keep it across
+route changes? Wrap the recipe with `deferredEngine()` and pass the resulting
+instance instead. See the [Engine getting started](/docs/engine/getting-started)
+for the recipe-vs-instance model, fallback fonts, cloud, and SSR.

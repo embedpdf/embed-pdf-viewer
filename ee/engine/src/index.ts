@@ -21,10 +21,35 @@ export type { HttpClientOptions } from './transport/HttpClient';
 export { decodeUnverifiedClaims } from './transport/decodeUnverifiedClaims';
 export type { UnverifiedClaims } from './transport/decodeUnverifiedClaims';
 
+import type { EngineFactory } from '@embedpdf/engine-core/runtime';
 import { CloudEngine, type CloudEngineOptions } from './CloudEngine';
 
 export function createCloudEngine(opts: CloudEngineOptions): CloudEngine {
   return CloudEngine.fromOptions(opts);
+}
+
+/**
+ * The cloud-engine RECIPE: describe a remote engine and get back an
+ * {@link EngineFactory} you hand to `<Viewer>` (or `provideEmbedPdf`, or
+ * `deferredEngine` to own the lifetime yourself).
+ *
+ * The cloud engine has no WASM to compile and no worker to spawn, so the recipe
+ * is close to instantaneous — the shape exists purely for parity with
+ * `localEngine()`, so swapping local for cloud is a one-import change and the
+ * ownership rules (viewer-owned vs `deferredEngine`-owned) are identical.
+ *
+ * Note the deliberate asymmetry with `localEngine()`: there is no `fonts`
+ * option. Fallback fonts are a SERVER policy on the cloud (`Engine.fonts` is
+ * `undefined` cloud-side), so they cannot be configured from the client. This
+ * is the local-vs-cloud split, surfaced in the API.
+ *
+ * ```ts
+ * const engine = cloudEngine({ baseUrl: 'https://pdf.example.com', token });
+ * <Viewer engine={engine} plugins={[stagePlugin(), renderPlugin()]} />
+ * ```
+ */
+export function cloudEngine(opts: CloudEngineOptions): EngineFactory {
+  return async () => CloudEngine.fromOptions(opts);
 }
 
 // Re-export the shared engine runtime surface so consumers import every
@@ -38,6 +63,7 @@ export {
 } from '@embedpdf/engine-core/runtime';
 export type {
   Engine,
+  EngineFactory,
   DocumentHandle,
   DocumentCapabilities,
   PageHandle,

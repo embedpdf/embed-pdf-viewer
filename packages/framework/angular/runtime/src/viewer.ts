@@ -11,7 +11,7 @@
  * one subtree; this component is sugar over the same host.
  */
 import { ChangeDetectionStrategy, Component, inject, input, type OnInit } from '@angular/core';
-import type { AnyPlugin, Engine } from '@embedpdf/core';
+import type { AnyPlugin, Engine, EngineFactory } from '@embedpdf/core';
 import { EpdfKernelHost, type EpdfInitialDocument } from './kernel-host';
 
 @Component({
@@ -24,9 +24,11 @@ import { EpdfKernelHost, type EpdfInitialDocument } from './kernel-host';
   template: `<ng-content />`,
 })
 export class EpdfViewer implements OnInit {
-  /** Init-only (see EmbedPdfConfig): the kernel is built once from the first
-   *  values; recreate the viewer (e.g. with @if) to swap engines or plugins. */
-  readonly engine = input.required<Engine>();
+  /** The engine, as a live instance OR a recipe ({@link EngineFactory}). A
+   *  recipe is host-owned (booted then destroyed with the viewer); an instance
+   *  is borrowed. See EmbedPdfConfig. Init-only: the kernel is built once from
+   *  the first values; recreate the viewer (e.g. with @if) to swap it. */
+  readonly engine = input.required<Engine | EngineFactory>();
   readonly plugins = input.required<AnyPlugin[]>();
   readonly initialDocuments = input<EpdfInitialDocument[]>();
 

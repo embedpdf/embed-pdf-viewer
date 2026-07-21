@@ -10,6 +10,7 @@
 import type {
   DocumentHandle,
   Engine,
+  EngineFactory,
   OpenInput,
   OpenOptions,
   PageLayout,
@@ -31,6 +32,7 @@ import type {
 export type {
   DocumentHandle,
   Engine,
+  EngineFactory,
   OpenInput,
   OpenOptions,
   PageLayout,

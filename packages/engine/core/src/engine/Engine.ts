@@ -35,3 +35,25 @@ export interface Engine {
    */
   readonly fonts?: FontService;
 }
+
+/**
+ * A *recipe* for an engine: an async factory that boots one and resolves it.
+ *
+ * This is the declarative half of the engine surface. `localEngine()` /
+ * `cloudEngine()` return an {@link EngineFactory} — a description of how to
+ * build an engine, carrying no live resources (no Worker, no WASM, no socket)
+ * until it is called. That is what makes a recipe safe to evaluate at module
+ * scope and on a server: nothing happens until someone cooks it.
+ *
+ * OWNERSHIP FOLLOWS ACQUISITION. Whoever calls the factory owns the engine it
+ * returns and is responsible for `destroy()`. Two first-class consumers:
+ *
+ *   - An adapter (`<Viewer>`, `provideEmbedPdf`) hands a factory: the adapter
+ *     calls it on mount and destroys the result on unmount. Viewer-owned.
+ *   - A caller who wants to own the lifetime themselves (share one engine
+ *     across viewers, keep it across route changes, pre-warm) wraps the recipe
+ *     with {@link deferredEngine} to get a synchronously-usable, caller-owned
+ *     {@link Engine} instance, then passes THAT to the adapter (borrowed —
+ *     never destroyed by the adapter).
+ */
+export type EngineFactory = () => Promise<Engine>;

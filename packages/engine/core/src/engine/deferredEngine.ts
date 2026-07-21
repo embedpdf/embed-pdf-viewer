@@ -1,11 +1,23 @@
-import type { Engine } from './Engine';
+import type { Engine, EngineFactory } from './Engine';
 import type { OpenInput, OpenOptions } from '../dto/OpenInput';
 import type { DocumentHandle } from './DocumentHandle';
 import { AbortablePromise } from '../promise/AbortablePromise';
 import { AbortError } from '../promise/AbortError';
 
 /**
- * Wrap an async engine factory in a synchronously-available {@link Engine}.
+ * Turn an engine *recipe* ({@link EngineFactory}) into a synchronously-available,
+ * CALLER-OWNED {@link Engine} instance.
+ *
+ * This is the bridge for callers who want the ergonomic recipe factories
+ * (`localEngine()` / `cloudEngine()`) AND to own the engine's lifetime
+ * themselves — sharing one engine across viewers, keeping it alive across route
+ * changes, or pre-warming the boot before anything mounts:
+ *
+ * ```ts
+ * const engine = deferredEngine(localEngine({ fallbackFonts: [droid] }));
+ * // usable NOW (boots lazily on first use); YOU call engine.destroy().
+ * <Viewer engine={engine} /> // borrowed — the viewer never destroys it
+ * ```
  *
  * Every method on the Engine contract is async (the boundary was designed that
  * way to serve local-WASM and cloud-HTTP identically), so a facade that exists
@@ -25,12 +37,12 @@ import { AbortError } from '../promise/AbortError';
  *
  * Feature detection and engine-specific setup (e.g. fallback-font
  * registration via `engine.fonts`) belong INSIDE the factory, where the real
- * engine is in hand. The facade deliberately does not expose the optional
- * `fonts` service: whether it exists is unknowable before the factory
- * resolves, and no caller should be probing capabilities on an engine that
- * hasn't booted.
+ * engine is in hand — which is exactly what `localEngine({ fallbackFonts })`
+ * does. The facade deliberately does not expose the optional `fonts` service:
+ * whether it exists is unknowable before the factory resolves, and no caller
+ * should be probing capabilities on an engine that hasn't booted.
  */
-export function deferredEngine(factory: () => Promise<Engine>): Engine {
+export function deferredEngine(factory: EngineFactory): Engine {
   let booting: Promise<Engine> | null = null;
   const engine = () => (booting ??= Promise.resolve(factory()));
 

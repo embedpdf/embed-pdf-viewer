@@ -8,7 +8,7 @@
  *   cloud — @cloudpdf/engine: the same contract over HTTP (needs a running server)
  */
 import { deferredEngine } from '@embedpdf/core';
-import type { Engine, OpenInput } from '@embedpdf/core';
+import type { Engine, EngineFactory, OpenInput } from '@embedpdf/core';
 import type { InitialDocument } from '@embedpdf/react';
 
 export type EngineMode = 'local' | 'cloud';
@@ -22,55 +22,46 @@ const DROID_FALLBACK_FONT = {
   url: `${import.meta.env.BASE_URL}DroidSansFallbackFull.ttf`,
 } as const;
 
-export async function createEngine(): Promise<Engine> {
-  switch (engineMode) {
-    case 'cloud': {
+/**
+ * The engine RECIPE for the selected mode — a description, not a live engine.
+ * Everything above it is engine-agnostic; this is the ONE place local vs cloud
+ * is decided. Hand it straight to `<Viewer engine={...}>` (viewer-owned) or
+ * wrap it with `deferredEngine()` to own the lifetime yourself.
+ *
+ * Note the local/cloud asymmetry the API makes explicit: `localEngine` takes a
+ * `fallbackFonts` recipe (client-side runtime fonts); `cloudEngine` does not —
+ * fallback fonts are a server policy there.
+ */
+export function selectedEngine(): EngineFactory {
+  return async () => {
+    if (engineMode === 'cloud') {
       // Same Engine contract, served over HTTP. Requires ee/server + a token.
-      const { createCloudEngine } = await import('@cloudpdf/engine');
-      return createCloudEngine({
+      const { cloudEngine } = await import('@cloudpdf/engine');
+      return cloudEngine({
         baseUrl: import.meta.env.VITE_CLOUDPDF_URL ?? 'http://127.0.0.1:3000',
         token: import.meta.env.VITE_CLOUDPDF_TOKEN,
-      });
+      })();
     }
-    case 'local':
-    default: {
-      const { createLocalEngineWithWorker } = await import('@embedpdf/engine');
-      const { default: EngineWorker } = await import('@embedpdf/engine/worker-entry?worker');
-      const engine = await createLocalEngineWithWorker({ worker: new EngineWorker() });
-      await registerFallbackFonts(engine);
-      return engine;
-    }
-  }
+    // Local wasm engine in the default worker, CJK fallback font registered at boot.
+    const { localEngine } = await import('@embedpdf/engine');
+    return localEngine({ fallbackFonts: [DROID_FALLBACK_FONT] })();
+  };
+}
+
+/** Boot the selected engine to a live instance (LayerLab / bootstrap use this). */
+export async function createEngine(): Promise<Engine> {
+  return selectedEngine()();
 }
 
 /**
- * The non-blocking boot: kick the real boot off NOW (wasm worker, fonts) and
- * hand back a synchronously-usable facade. The kernel — and the translated
- * shell — never wait for it; the boot overlaps with first render and is only
- * awaited inside `documents.open()`.
+ * The non-blocking, CALLER-OWNED boot: turn the recipe into a synchronously-
+ * usable facade whose real boot (wasm worker, fonts) overlaps first render and
+ * is only awaited inside `documents.open()`. Prefer passing `selectedEngine()`
+ * straight to `<Viewer>` (viewer-owned); this exists for code paths that need
+ * to hold the engine themselves.
  */
 export function createDeferredEngine(): Engine {
-  const booting = createEngine();
-  return deferredEngine(() => booting);
-}
-
-async function registerFallbackFonts(engine: Engine): Promise<void> {
-  if (!engine.fonts) {
-    if (engineMode === 'local') {
-      throw new Error('local engine did not expose engine.fonts for fallback font registration');
-    }
-    return;
-  }
-
-  console.info(`[embedpdf-v3] loading fallback font: ${DROID_FALLBACK_FONT.url}`);
-  const data = await fetchBytes(DROID_FALLBACK_FONT.url);
-  const handle = await engine.fonts.register({
-    key: DROID_FALLBACK_FONT.key,
-    familyName: DROID_FALLBACK_FONT.familyName,
-    data,
-  });
-  await engine.fonts.addFallback(handle);
-  console.info(`[embedpdf-v3] registered fallback font: ${handle.key} (${data.byteLength} bytes)`);
+  return deferredEngine(selectedEngine());
 }
 
 // Sample documents shipped in /public. For cloud they'd address server documents

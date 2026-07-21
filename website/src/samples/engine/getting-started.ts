@@ -1,10 +1,9 @@
-import { createLocalEngineWithWorker } from '@embedpdf/engine';
-import EngineWorker from '@embedpdf/engine/worker-entry?worker';
+import { localEngine } from '@embedpdf/engine';
 
 export async function inspectPdf(url: string) {
-  const engine = await createLocalEngineWithWorker({
-    worker: new EngineWorker(),
-  });
+  // `localEngine()` is a recipe; call it to boot a live engine (PDFium in a
+  // Web Worker). No worker wiring — the default worker is bundler-portable.
+  const engine = await localEngine()();
 
   try {
     const response = await fetch(url);
@@ -29,6 +28,7 @@ export async function inspectPdf(url: string) {
       await document.close();
     }
   } finally {
+    // We created the engine, so we destroy it — ownership follows acquisition.
     await engine.destroy();
   }
 }
