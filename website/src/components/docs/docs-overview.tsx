@@ -6,18 +6,28 @@ import {
   AngularIcon,
   ArrowRightIcon,
   EngineIcon,
+  JsMark,
   ReactIcon,
   SvelteIcon,
   VueIcon,
 } from '@/components/site/icons';
+import {
+  DOCS_INTEGRATION_LABELS,
+  type DocsIntegration,
+  type HeadlessIntegration,
+} from '@/lib/docs-integrations';
 import { DOCS_ENGINE_FOUNDATION, DOCS_OVERVIEW_PATHS } from '@/lib/docs-overview';
-import { FRAMEWORK_LABELS, type Framework } from '@/lib/frameworks';
 
-const FRAMEWORK_ICONS: Record<Framework, ReactNode> = {
+const HEADLESS_INTEGRATION_ICONS: Record<HeadlessIntegration, ReactNode> = {
   react: <ReactIcon size={18} />,
   vue: <VueIcon size={18} />,
   svelte: <SvelteIcon size={17} />,
   angular: <AngularIcon size={18} />,
+};
+
+const INTEGRATION_ICONS: Record<DocsIntegration, ReactNode> = {
+  vanilla: <JsMark small />,
+  ...HEADLESS_INTEGRATION_ICONS,
 };
 
 const TONES = {
@@ -26,14 +36,12 @@ const TONES = {
     card: 'border-[#BFD8FB] bg-[#ECF3FE]',
     badge: 'bg-[#DDEBFF] text-[#075FCB]',
     check: 'bg-[#DCEBFF] text-[#0876FD]',
-    link: 'border-[#BCD8FF] text-[#075FCB] hover:border-[#0876FD] hover:bg-white',
   },
   headless: {
     accent: '#9747FF',
     card: 'border-[#D9C8F8] bg-[#F5F0FE]',
     badge: 'bg-[#ECE2FB] text-[#6A2BC9]',
     check: 'bg-[#EDE3FC] text-[#7C3AED]',
-    link: 'border-[#DACAF5] text-[#6A2BC9] hover:border-[#9747FF] hover:bg-white',
   },
 } as const;
 
@@ -55,14 +63,25 @@ function Check({ tone }: { tone: keyof typeof TONES }) {
   );
 }
 
-function FrameworkLink({ framework }: { framework: Framework }) {
+function IntegrationLink({
+  integration,
+  product,
+}: {
+  integration: DocsIntegration;
+  product: 'viewer' | 'headless';
+}) {
+  const isViewer = product === 'viewer';
   return (
     <Link
-      href={`/docs/headless/${framework}/getting-started`}
-      className="border-ep-border text-ep-navy hover:border-ep-purple group inline-flex items-center gap-2 rounded-[10px] border bg-white px-3 py-2 font-sans text-[13px] font-bold no-underline transition-all hover:-translate-y-0.5 hover:shadow-[0_12px_24px_-16px_rgba(124,58,237,0.55)]"
+      href={`/docs/${product}/${integration}/getting-started`}
+      className={`border-ep-border text-ep-navy group inline-flex items-center gap-2 rounded-[10px] border bg-white px-3 py-2 font-sans text-[13px] font-bold no-underline transition-all hover:-translate-y-0.5 ${
+        isViewer
+          ? 'hover:border-ep-blue hover:shadow-[0_12px_24px_-16px_rgba(8,118,253,0.55)]'
+          : 'hover:border-ep-purple hover:shadow-[0_12px_24px_-16px_rgba(124,58,237,0.55)]'
+      }`}
     >
-      {FRAMEWORK_ICONS[framework]}
-      {FRAMEWORK_LABELS[framework]}
+      {INTEGRATION_ICONS[integration]}
+      {DOCS_INTEGRATION_LABELS[integration]}
       <ArrowRightIcon
         size={13}
         className="text-ep-soft ml-auto transition-transform group-hover:translate-x-0.5"
@@ -115,21 +134,11 @@ function PathCard({ path }: { path: (typeof DOCS_OVERVIEW_PATHS)[number] }) {
         </div>
       </div>
 
-      {path.frameworks ? (
-        <div className="mt-6 grid grid-cols-2 gap-2 border-t border-[rgba(7,32,76,0.08)] pt-5 sm:grid-cols-4 min-[980px]:grid-cols-2">
-          {path.frameworks.map((framework) => (
-            <FrameworkLink key={framework} framework={framework} />
-          ))}
-        </div>
-      ) : (
-        <Link
-          href={path.href}
-          className={`font-display group mt-6 inline-flex items-center justify-center gap-2 rounded-[11px] border bg-white/70 px-4 py-3 text-[14px] font-extrabold no-underline transition-all ${tone.link}`}
-        >
-          {path.cta}
-          <ArrowRightIcon size={16} className="transition-transform group-hover:translate-x-0.5" />
-        </Link>
-      )}
+      <div className="mt-6 grid grid-cols-2 gap-2 border-t border-[rgba(7,32,76,0.08)] pt-5 sm:grid-cols-4 min-[980px]:grid-cols-2">
+        {path.integrations.map((integration) => (
+          <IntegrationLink key={integration} integration={integration} product={path.id} />
+        ))}
+      </div>
     </article>
   );
 }

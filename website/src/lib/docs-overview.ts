@@ -1,4 +1,4 @@
-import { FRAMEWORK_LABELS, type Framework } from './frameworks';
+import { DOCS_INTEGRATION_LABELS, type DocsIntegration } from './docs-integrations';
 
 export type DocsOverviewPath = {
   id: 'viewer' | 'headless';
@@ -9,7 +9,7 @@ export type DocsOverviewPath = {
   cta: string;
   illustration: string;
   features: readonly string[];
-  frameworks?: readonly Framework[];
+  integrations: readonly DocsIntegration[];
 };
 
 export const DOCS_OVERVIEW_PATHS: readonly DocsOverviewPath[] = [
@@ -18,10 +18,11 @@ export const DOCS_OVERVIEW_PATHS: readonly DocsOverviewPath[] = [
     title: 'Ready-made Viewer',
     eyebrow: 'Recommended for speed',
     description: 'Embed a polished, production-ready PDF viewer in minutes.',
-    href: '/docs/viewer/getting-started',
+    href: '/docs/viewer/vanilla/getting-started',
     cta: 'Start with the Viewer',
     illustration: '/illustration-readymade.svg',
     features: ['Drop-in integration', 'Prebuilt toolbar and layout', 'Framework-neutral API'],
+    integrations: ['vanilla', 'react', 'vue', 'svelte', 'angular'],
   },
   {
     id: 'headless',
@@ -32,7 +33,7 @@ export const DOCS_OVERVIEW_PATHS: readonly DocsOverviewPath[] = [
     cta: 'Start with Headless',
     illustration: '/illustration-headless.svg',
     features: ['Own every pixel', 'Composable feature plugins', 'One API across frameworks'],
-    frameworks: ['react', 'vue', 'svelte', 'angular'],
+    integrations: ['react', 'vue', 'svelte', 'angular'],
   },
 ];
 
@@ -48,18 +49,16 @@ export const DOCS_ENGINE_FOUNDATION = {
 
 export function renderDocsOverviewMarkdown() {
   const paths = DOCS_OVERVIEW_PATHS.map((path) => {
-    const frameworks = path.frameworks
-      ? `\n\nFrameworks: ${path.frameworks
-          .map(
-            (framework) =>
-              `[${FRAMEWORK_LABELS[framework]}](/docs/headless/${framework}/getting-started)`,
-          )
-          .join(', ')}.`
-      : '';
+    const integrations = `\n\nIntegrations: ${path.integrations
+      .map(
+        (integration) =>
+          `[${DOCS_INTEGRATION_LABELS[integration]}](/docs/${path.id}/${integration}/getting-started)`,
+      )
+      .join(', ')}.`;
 
     return `### ${path.title}\n\n${path.description}\n\n${path.features
       .map((feature) => `- ${feature}`)
-      .join('\n')}${frameworks}\n\n[${path.cta}](${path.href})`;
+      .join('\n')}${integrations}\n\n[${path.cta}](${path.href})`;
   }).join('\n\n');
 
   return `# EmbedPDF Documentation

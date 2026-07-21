@@ -1,7 +1,7 @@
-# Docs architecture — author once, render per framework
+# Docs architecture — author once, render per integration
 
-The law for how documentation is structured so that four frameworks never mean
-four copies. Companion to `ADAPTERS.md` (which makes this possible: framework
+The law for how documentation is structured so that five integrations never mean
+five copies. Companion to `ADAPTERS.md` (which makes this possible: framework
 parity is enforced by spec, so "one page of prose + per-framework code" is
 rendering, not aspiration).
 
@@ -14,17 +14,24 @@ rendering, not aspiration).
   /engine      → engine choice (local wasm vs cloud), runtime, server
 ```
 
-- **Viewer docs are framework-agnostic by nature** — the snippet's config
-  object IS the API. Framework appears only in tiny install tabs (the wrapper
-  packages). One tree, no switcher, cheapest to write. Ship first.
-- **Headless docs carry the framework switcher.** One source page per
+- **Viewer docs carry the shared integration switcher** for Vanilla JS, React, Vue,
+  Svelte, and Angular. The config API and prose remain shared; installation and
+  code examples resolve from the integration in the URL.
+- **Headless docs carry the same integration switcher**, limited to React, Vue,
+  Svelte, and Angular. One source page per
   vertical (the ADAPTERS.md table is the sitemap: stage, render, selection,
   annotation, form, search, …). Prose is shared; code and API names render
   per framework.
 
-## Author once, render per framework
+Viewer and Headless share one persisted integration preference. Switching
+products carries React, Vue, Svelte, or Angular with you. Vanilla JS falls back
+to React when entering Headless because no Vanilla headless adapter exists.
+The concrete URL remains the source of truth; the preference only resolves
+variant-less courtesy routes.
 
-One MDX file per topic. Framework-specific URLs are GENERATED from it:
+## Author once, render per integration
+
+One MDX file per topic. Integration-specific URLs are GENERATED from it:
 
 ```
 src/content/docs/headless/annotation.mdx
@@ -34,17 +41,28 @@ src/content/docs/headless/annotation.mdx
   → /docs/headless/angular/annotation
 ```
 
-Why per-framework URLs instead of one URL + client switcher: SEO indexes
-framework-specific content, links can pin a framework, analytics see per-
-framework readership. The catch-all route strips the framework segment,
-renders the shared MDX with the framework in context, and
-`generateStaticParams` emits the page × framework matrix. The switcher in the
+Viewer pages use the same fan-out model:
+
+```
+src/content/docs/viewer/getting-started.mdx
+  → /docs/viewer/vanilla/getting-started
+  → /docs/viewer/react/getting-started
+  → /docs/viewer/vue/getting-started
+  → /docs/viewer/svelte/getting-started
+  → /docs/viewer/angular/getting-started
+```
+
+Why per-integration URLs instead of one URL + client switcher: SEO indexes
+integration-specific content, links can pin an integration, analytics see per-
+integration readership. The catch-all route strips the integration segment,
+renders the shared MDX with the integration in context, and
+`generateStaticParams` emits the page × integration matrix. The switcher in the
 docs header just navigates to the sibling route (choice persisted, deep links
 win over persistence).
 
 Inside a page:
 
-- `<FwCode name="annotation/quickstart" />` — renders the framework's sample.
+- `<Example name="annotation/quickstart" />` — renders the active integration's sample.
 - `<Fw react>…</Fw>` — rare prose branches. If a page needs many of these,
   it's a smell: either the wording should be framework-neutral (see
   terminology map) or the page belongs in the per-framework fork set.
@@ -62,7 +80,7 @@ The cure for docs rot: samples never live inline in MDX. They live as real
 files, type-checked against the actual packages:
 
 ```
-website/samples/
+website/src/samples/
   package.json          → depends on @embedpdf/react (etc.), workspace:*
   react/annotation/quickstart.tsx
   vue/annotation/quickstart.vue
@@ -96,7 +114,7 @@ is the same data — one source of truth, surfaced in docs.
 
 ## Rollout order
 
-1. `/docs/viewer` — framework-agnostic, unblocks the launch story.
+1. `/docs/viewer` — launch the ready-made Viewer integrations first.
 2. `/docs/headless/react/*` — the complete vertical set, proving the
    author-once machinery.
 3. Vue/Svelte/Angular routes go live per vertical as adapters land — the

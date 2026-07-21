@@ -5,28 +5,26 @@ description: Drop the EmbedPDF viewer into any page in minutes.
 
 # Getting Started
 
-The ready-made viewer drops into any page — no build step required.
+The ready-made viewer gives you a complete PDF experience with a small
+integration surface. Pick your stack in the sidebar; this page and every
+example will stay on that integration.
 
-## Script tag
+## Installation
 
-```html
-<div id="pdf-viewer" style="height: 500px"></div>
-<script async type="module">
-  import EmbedPDF from 'https://cdn.jsdelivr.net/npm/@embedpdf/snippet@2/dist/embedpdf.js';
+Vanilla JavaScript can load the viewer directly from a CDN. Framework projects
+install their dedicated adapter with pnpm.
 
-  EmbedPDF.init({
-    type: 'container',
-    target: document.getElementById('pdf-viewer'),
-    src: 'https://snippet.embedpdf.com/ebook.pdf',
-  });
-</script>
-```
+<Example name="viewer/getting-started/install" />
 
-## Package managers
+## Add your first viewer
 
-```sh npm2yarn
-npm install @embedpdf/snippet
-```
+Give the viewer a PDF URL and a height. The adapter handles the engine,
+plugins, toolbar, and document lifecycle for you.
 
-> This is the docs-shell starter page — the full viewer documentation lands in
-> the content phase.
+<Example name="viewer/getting-started/basic" />
+
+## Where to go next
+
+- Configure the toolbar and available viewer controls.
+- Listen to the ready event when you need access to the plugin registry.
+- Switch to the Headless docs when you want to build the entire interface yourself.

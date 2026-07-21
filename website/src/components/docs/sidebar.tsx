@@ -5,9 +5,11 @@ import { usePathname } from 'next/navigation';
 import type { ReactNode } from 'react';
 
 import { useConfig } from './config-provider';
-import { FrameworkSwitcher } from './framework';
+import { DocsProductSwitcher } from './docs-product-switcher';
+import { IntegrationSwitcher } from './integration';
 
-import { frameworkFromPath, frameworkHref } from '@/lib/frameworks';
+import { docsIntegrationFromPath, docsIntegrationHref } from '@/lib/docs-integrations';
+import { DOCS_PRODUCTS, docsProductFromPath } from '@/lib/docs-products';
 
 type TreeItem = {
   name: string;
@@ -18,10 +20,10 @@ type TreeItem = {
 
 function SidebarLink({ item, pathname }: { item: TreeItem; pathname: string }) {
   if (!item.route) return null;
-  // Content routes are framework-less; rendered hrefs carry the active
-  // framework so every crawlable link is a concrete destination.
-  const fw = frameworkFromPath(pathname);
-  const href = fw ? frameworkHref(item.route, fw) : item.route;
+  // Content routes are integration-less; rendered hrefs carry the active
+  // integration so every crawlable link is a concrete destination.
+  const integration = docsIntegrationFromPath(pathname);
+  const href = integration ? docsIntegrationHref(item.route, integration) : item.route;
   const active = pathname === href;
 
   return (
@@ -69,17 +71,25 @@ function SidebarTree({ items, pathname }: { items: TreeItem[]; pathname: string 
 export function Sidebar() {
   const { docsDirectories, activeType } = useConfig();
   const pathname = usePathname();
+  const product = docsProductFromPath(pathname);
 
   // Hide the sidebar on standalone pages such as the /docs landing.
   if (activeType === 'page') return null;
+  if (!product) return null;
   if (!docsDirectories || docsDirectories.length === 0) return null;
 
   return (
     <aside className="sticky top-[84px] hidden h-[calc(100vh-84px)] w-[268px] shrink-0 overflow-y-auto pb-16 pr-3.5 pt-[52px] [scrollbar-color:#D5DEEF_transparent] [scrollbar-width:thin] md:block">
-      <FrameworkSwitcher />
-      <nav className="flex flex-col">
-        <SidebarTree items={docsDirectories as TreeItem[]} pathname={pathname} />
-      </nav>
+      <DocsProductSwitcher />
+      <IntegrationSwitcher />
+      <div className="mt-7 border-t border-[#EAEFF7] pt-6 first:mt-0 first:border-t-0 first:pt-0">
+        <p className="font-display text-ep-navy px-3 pb-3 text-[12px] font-extrabold uppercase tracking-[0.11em]">
+          {DOCS_PRODUCTS[product].label}
+        </p>
+        <nav className="ml-3 flex flex-col border-l-[1.5px] border-[#E7EDF6]">
+          <SidebarTree items={docsDirectories as TreeItem[]} pathname={pathname} />
+        </nav>
+      </div>
     </aside>
   );
 }

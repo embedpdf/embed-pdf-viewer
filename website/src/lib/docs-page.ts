@@ -1,8 +1,8 @@
 import type { Metadata } from 'next';
 import { importPage } from 'nextra/pages';
 
+import { DOCS_INTEGRATION_LABELS, type DocsIntegration } from './docs-integrations';
 import { resolveDocsPath, type ResolvedDocsPath } from './docs-route';
-import { FRAMEWORK_LABELS, type Framework } from './frameworks';
 import { SITE_NAME, SITE_ORIGIN } from './site';
 
 export type DocsSocialVariant = 'docs' | 'engine' | 'headless' | 'viewer';
@@ -13,7 +13,7 @@ export type DocsPagePresentation = {
   canonicalPath: string;
   canonicalUrl: string;
   description: string;
-  framework?: Framework;
+  integration?: DocsIntegration;
   imageTitle: string;
   metadata: Metadata;
   section: string;
@@ -73,8 +73,10 @@ export function createDocsPagePresentation({
 }: CreateDocsPagePresentationOptions): DocsPagePresentation {
   const baseTitle = stringValue(metadata.title) ?? titleFromPath(resolved.contentPath);
   const description = stringValue(metadata.description) ?? DEFAULT_DESCRIPTION;
-  const frameworkLabel = resolved.framework ? FRAMEWORK_LABELS[resolved.framework] : undefined;
-  const title = frameworkLabel ? `${baseTitle} — ${frameworkLabel}` : baseTitle;
+  const integrationLabel = resolved.integration
+    ? DOCS_INTEGRATION_LABELS[resolved.integration]
+    : undefined;
+  const title = integrationLabel ? `${baseTitle} — ${integrationLabel}` : baseTitle;
   const canonicalPath = `/${mdxPath.join('/')}`;
   const variant = variantValue(metadata.ogVariant, defaultVariant(resolved.contentPath));
 
@@ -82,7 +84,7 @@ export function createDocsPagePresentation({
     canonicalPath,
     canonicalUrl: `${SITE_ORIGIN}${canonicalPath}`,
     description,
-    framework: resolved.framework,
+    integration: resolved.integration,
     imageTitle: stringValue(metadata.ogTitle) ?? baseTitle,
     metadata: metadata as Metadata,
     section: sectionLabel(variant),

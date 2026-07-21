@@ -10,10 +10,9 @@ import { expandDocsStaticParams, resolveDocsPath } from '@/lib/docs-route';
 const nextraParams = generateStaticParamsFor('mdxPath');
 
 /**
- * One content file per headless topic fans out into a route per framework
- * (DOCS-ARCHITECTURE.md pillar 1): content lives at docs/headless/<topic>,
- * routes are /docs/headless/<fw>/<topic>. The bare content route is not
- * emitted — middleware redirects it by cookie.
+ * Variant-neutral Viewer and Headless content fans out into one concrete
+ * route per integration/framework. Bare content routes are not emitted;
+ * middleware redirects them to the visitor's persisted choice.
  */
 export async function generateStaticParams() {
   const base = await nextraParams();

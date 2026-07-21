@@ -6,9 +6,17 @@ import remarkParse from 'remark-parse';
 import remarkStringify from 'remark-stringify';
 import { unified } from 'unified';
 
+import {
+  DOCS_INTEGRATION_LABELS,
+  docsIntegrationHref,
+  isHeadlessIntegration,
+  type DocsIntegration,
+  type HeadlessIntegration,
+  type IntegrationDocsProduct,
+} from './docs-integrations';
 import { renderDocsOverviewMarkdown } from './docs-overview';
+import { docsProductFromPath } from './docs-products';
 import { collectSampleFiles, readDocsCodeFile, type DocsCodeFile } from './docs-samples';
-import { FRAMEWORK_LABELS, frameworkHref, isFramework, type Framework } from './frameworks';
 import { SITE_ORIGIN } from './site';
 
 type AstNode = {
@@ -37,7 +45,7 @@ type MarkdownMetadata = {
 export type RenderDocsMarkdownOptions = {
   sourceCode: string;
   canonicalPath: string;
-  framework?: Framework;
+  integration?: DocsIntegration;
   metadata?: MarkdownMetadata;
 };
 
@@ -87,12 +95,12 @@ function expressionStrings(attribute: MdxAttribute | undefined): string[] {
   return [];
 }
 
-function frameworkAttribute(node: AstNode): Framework[] {
+function frameworkAttribute(node: AstNode): HeadlessIntegration[] {
   const values = expressionStrings(getAttribute(node, 'only'));
-  if (values.length === 0 || values.some((value) => !isFramework(value))) {
+  if (values.length === 0 || values.some((value) => !isHeadlessIntegration(value))) {
     throw new Error('<Fw> requires a static `only` framework or framework array.');
   }
-  return values as Framework[];
+  return values as HeadlessIntegration[];
 }
 
 function stringAttribute(node: AstNode, name: string) {
@@ -128,7 +136,7 @@ function fileNodes(files: DocsCodeFile[]): AstNode[] {
   ]);
 }
 
-function missingExampleNode(framework: Framework): AstNode {
+function missingExampleNode(label: string): AstNode {
   return {
     type: 'blockquote',
     children: [
@@ -137,7 +145,7 @@ function missingExampleNode(framework: Framework): AstNode {
         children: [
           {
             type: 'text',
-            value: `This example is not available for ${FRAMEWORK_LABELS[framework]} yet.`,
+            value: `This example is not available for ${label} yet.`,
           },
         ],
       },
@@ -145,17 +153,17 @@ function missingExampleNode(framework: Framework): AstNode {
   };
 }
 
-function absoluteContentUrl(url: string, framework?: Framework) {
+function absoluteContentUrl(url: string, integration?: DocsIntegration) {
   if (!url.startsWith('/')) return url;
-
-  const resolved =
-    framework && (url === '/docs/headless' || url.startsWith('/docs/headless/'))
-      ? frameworkHref(url, framework)
-      : url;
+  const resolved = integration ? docsIntegrationHref(url, integration) : url;
   return `${SITE_ORIGIN}${resolved}`;
 }
 
-function resolveNodes(nodes: AstNode[], framework?: Framework): AstNode[] {
+function resolveNodes(
+  nodes: AstNode[],
+  integration: DocsIntegration | undefined,
+  product: IntegrationDocsProduct | null,
+): AstNode[] {
   return nodes.flatMap((originalNode) => {
     const node = { ...originalNode };
 
@@ -164,25 +172,26 @@ function resolveNodes(nodes: AstNode[], framework?: Framework): AstNode[] {
     if (node.type === 'mdxJsxFlowElement' || node.type === 'mdxJsxTextElement') {
       if (node.name === 'DocsOverview') {
         const overview = markdownProcessor.parse(renderDocsOverviewMarkdown()) as AstNode;
-        return resolveNodes(overview.children ?? [], framework);
+        return resolveNodes(overview.children ?? [], integration, product);
       }
 
       if (node.name === 'Fw') {
-        if (!framework) {
+        if (product !== 'headless' || !integration || !isHeadlessIntegration(integration)) {
           throw new Error('<Fw> can only be exported from a framework-specific route.');
         }
-        return frameworkAttribute(node).includes(framework)
-          ? resolveNodes(node.children ?? [], framework)
+        return frameworkAttribute(node).includes(integration)
+          ? resolveNodes(node.children ?? [], integration, product)
           : [];
       }
 
       if (node.name === 'Example') {
-        if (!framework) {
-          throw new Error('<Example> can only be exported from a framework-specific route.');
+        if (!integration) {
+          throw new Error('<Example> can only be exported from a variant-specific route.');
         }
         const name = stringAttribute(node, 'name');
-        const files = collectSampleFiles(name)[framework];
-        return files?.length ? fileNodes(files) : [missingExampleNode(framework)];
+        const files = collectSampleFiles(name)[integration];
+        const label = DOCS_INTEGRATION_LABELS[integration];
+        return files?.length ? fileNodes(files) : [missingExampleNode(label)];
       }
 
       if (node.name === 'CodeExample') {
@@ -216,10 +225,10 @@ function resolveNodes(nodes: AstNode[], framework?: Framework): AstNode[] {
     }
 
     if ((node.type === 'link' || node.type === 'image') && node.url) {
-      node.url = absoluteContentUrl(node.url, framework);
+      node.url = absoluteContentUrl(node.url, integration);
     }
 
-    if (node.children) node.children = resolveNodes(node.children, framework);
+    if (node.children) node.children = resolveNodes(node.children, integration, product);
     return [node];
   });
 }
@@ -231,18 +240,25 @@ function yamlValue(value: string) {
 function markdownFrontmatter(
   metadata: MarkdownMetadata | undefined,
   canonicalPath: string,
-  framework?: Framework,
+  integration: DocsIntegration | undefined,
+  product: IntegrationDocsProduct | null,
 ) {
   const baseTitle = typeof metadata?.title === 'string' ? metadata.title : undefined;
-  const title =
-    baseTitle && framework ? `${baseTitle} — ${FRAMEWORK_LABELS[framework]}` : baseTitle;
+  const integrationLabel = integration ? DOCS_INTEGRATION_LABELS[integration] : undefined;
+  const title = baseTitle && integrationLabel ? `${baseTitle} — ${integrationLabel}` : baseTitle;
   const description = typeof metadata?.description === 'string' ? metadata.description : undefined;
 
   return [
     '---',
     ...(title ? [`title: ${yamlValue(title)}`] : []),
     ...(description ? [`description: ${yamlValue(description)}`] : []),
-    ...(framework ? [`framework: ${yamlValue(FRAMEWORK_LABELS[framework])}`] : []),
+    ...(integration
+      ? [
+          `${product === 'headless' ? 'framework' : 'integration'}: ${yamlValue(
+            DOCS_INTEGRATION_LABELS[integration],
+          )}`,
+        ]
+      : []),
     `source: ${yamlValue(`${SITE_ORIGIN}${canonicalPath}`)}`,
     '---',
     '',
@@ -254,11 +270,12 @@ function markdownFrontmatter(
 export function renderDocsMarkdown({
   sourceCode,
   canonicalPath,
-  framework,
+  integration,
   metadata,
 }: RenderDocsMarkdownOptions) {
+  const product = docsProductFromPath(canonicalPath);
   const tree = markdownProcessor.parse(sourceCode) as AstNode;
-  tree.children = resolveNodes(tree.children ?? [], framework);
+  tree.children = resolveNodes(tree.children ?? [], integration, product);
   const body = markdownProcessor.stringify(tree as never).trimStart();
-  return `${markdownFrontmatter(metadata, canonicalPath, framework)}${body}`;
+  return `${markdownFrontmatter(metadata, canonicalPath, integration, product)}${body}`;
 }

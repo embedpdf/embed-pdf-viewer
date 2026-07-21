@@ -5,14 +5,14 @@ export default {
   },
   viewer: {
     title: 'Viewer',
-    type: 'doc',
+    type: 'page',
   },
   headless: {
     title: 'Headless',
-    type: 'doc',
+    type: 'page',
   },
   engine: {
     title: 'Engine',
-    type: 'doc',
+    type: 'page',
   },
 };

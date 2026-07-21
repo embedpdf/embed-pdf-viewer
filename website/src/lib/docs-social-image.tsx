@@ -1,15 +1,24 @@
 import { ImageResponse } from 'next/og';
 
+import {
+  DOCS_INTEGRATION_LABELS,
+  type DocsIntegration,
+  type HeadlessIntegration,
+} from './docs-integrations';
 import { getDocsPagePresentation, type DocsPagePresentation } from './docs-page';
-import { FRAMEWORK_LABELS, type Framework } from './frameworks';
 
 import { AngularIcon, EngineIcon, ReactIcon, SvelteIcon, VueIcon } from '@/components/site/icons';
 
-const FRAMEWORK_ACCENTS: Record<Framework, string> = {
+const HEADLESS_INTEGRATION_ACCENTS: Record<HeadlessIntegration, string> = {
   react: '#149ECA',
   vue: '#42B883',
   svelte: '#FF3E00',
   angular: '#DD0031',
+};
+
+const INTEGRATION_ACCENTS: Record<DocsIntegration, string> = {
+  vanilla: '#D2B900',
+  ...HEADLESS_INTEGRATION_ACCENTS,
 };
 
 const VARIANT_ACCENTS = {
@@ -19,11 +28,35 @@ const VARIANT_ACCENTS = {
   viewer: '#7C3AED',
 } as const;
 
-function FrameworkMark({ framework, size = 56 }: { framework: Framework; size?: number }) {
-  if (framework === 'react') return <ReactIcon size={size} />;
-  if (framework === 'vue') return <VueIcon size={size} />;
-  if (framework === 'svelte') return <SvelteIcon size={size} />;
-  return <AngularIcon size={size} />;
+function IntegrationMark({
+  integration,
+  size = 56,
+}: {
+  integration: DocsIntegration;
+  size?: number;
+}) {
+  if (integration === 'react') return <ReactIcon size={size} />;
+  if (integration === 'vue') return <VueIcon size={size} />;
+  if (integration === 'svelte') return <SvelteIcon size={size} />;
+  if (integration === 'angular') return <AngularIcon size={size} />;
+  return (
+    <div
+      style={{
+        alignItems: 'center',
+        backgroundColor: '#F7DF1E',
+        borderRadius: Math.round(size * 0.18),
+        color: '#111111',
+        display: 'flex',
+        fontSize: Math.round(size * 0.42),
+        fontWeight: 800,
+        height: size,
+        justifyContent: 'center',
+        width: size,
+      }}
+    >
+      JS
+    </div>
+  );
 }
 
 function BrandMark({ size }: { size: number }) {
@@ -72,10 +105,23 @@ function truncate(value: string, maximum: number) {
 }
 
 function SocialCard({ page }: { page: DocsPagePresentation }) {
-  const accent = page.framework ? FRAMEWORK_ACCENTS[page.framework] : VARIANT_ACCENTS[page.variant];
+  const accent = page.integration
+    ? INTEGRATION_ACCENTS[page.integration]
+    : VARIANT_ACCENTS[page.variant];
   const titleSize = page.imageTitle.length > 56 ? 56 : page.imageTitle.length > 38 ? 64 : 72;
   const routeLabel = page.canonicalPath.replace(/^\//, '');
-  const codeLabel = page.variant === 'engine' ? 'engine.ts' : 'viewer.tsx';
+  const codeLabel =
+    page.variant === 'engine'
+      ? 'engine.ts'
+      : page.integration === 'vanilla'
+        ? 'viewer.html'
+        : page.integration === 'vue'
+          ? 'viewer.vue'
+          : page.integration === 'svelte'
+            ? 'viewer.svelte'
+            : page.integration === 'angular'
+              ? 'viewer.ts'
+              : 'viewer.tsx';
 
   return (
     <div
@@ -157,7 +203,7 @@ function SocialCard({ page }: { page: DocsPagePresentation }) {
           >
             {page.section}
           </div>
-          {page.framework ? (
+          {page.integration ? (
             <div
               style={{
                 alignItems: 'center',
@@ -169,7 +215,7 @@ function SocialCard({ page }: { page: DocsPagePresentation }) {
                 padding: '8px 15px 8px 11px',
               }}
             >
-              <FrameworkMark framework={page.framework} size={25} />
+              <IntegrationMark integration={page.integration} size={25} />
               <div
                 style={{
                   color: '#263760',
@@ -179,7 +225,7 @@ function SocialCard({ page }: { page: DocsPagePresentation }) {
                   marginLeft: 9,
                 }}
               >
-                {FRAMEWORK_LABELS[page.framework]}
+                {DOCS_INTEGRATION_LABELS[page.integration]}
               </div>
             </div>
           ) : null}
@@ -341,8 +387,8 @@ function SocialCard({ page }: { page: DocsPagePresentation }) {
                 width: 138,
               }}
             >
-              {page.framework ? (
-                <FrameworkMark framework={page.framework} size={74} />
+              {page.integration ? (
+                <IntegrationMark integration={page.integration} size={74} />
               ) : page.variant === 'engine' ? (
                 <EngineIcon size={74} color={accent} />
               ) : (

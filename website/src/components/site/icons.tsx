@@ -341,8 +341,10 @@ export function SvelteIcon({
 export function AngularIcon({ size = 18, ...props }: IconProps) {
   // Single evenodd path: the "A" is a transparent cutout (not white fill), so
   // the mark sits on any background like the other stroke-based framework icons.
+  // viewBox matches the shield bounds (not the original 250² artboard) so the
+  // mark fills the icon box like the other framework icons.
   return (
-    <svg width={size} height={size} viewBox="0 0 250 250" {...props}>
+    <svg width={size} height={size} viewBox="31.9 30 186.2 200" {...props}>
       <path
         fill="#DD0031"
         fillRule="evenodd"

@@ -1,13 +1,18 @@
 'use client';
 
 import Link from 'next/link';
+import { usePathname } from 'next/navigation';
 import { useEffect, useRef, useState } from 'react';
 
 import { CheckIcon, CopyIcon, ExternalLink } from '@/components/site/icons';
-import { DEFAULT_FRAMEWORK, FRAMEWORK_LABELS, frameworkHref } from '@/lib/frameworks';
-import { usePathname } from 'next/navigation';
-
-import { useFramework } from './framework';
+import {
+  DEFAULT_PRODUCT_INTEGRATION,
+  DOCS_INTEGRATION_LABELS,
+  docsIntegrationFromPath,
+  docsIntegrationHref,
+  isDocsIntegration,
+} from '@/lib/docs-integrations';
+import { docsProductFromPath } from '@/lib/docs-products';
 
 type ExampleFile = {
   filename: string;
@@ -18,9 +23,9 @@ type ExampleFile = {
 };
 
 /**
- * The framework-resolved sample display (DOCS-ARCHITECTURE.md pillar 3).
- * Receives every framework's highlighted files from the build pipeline and
- * renders only the active framework's — or the honest "not yet ported"
+ * The route-variant-resolved sample display (DOCS-ARCHITECTURE.md pillar 3).
+ * Receives every variant's highlighted files from the build pipeline and
+ * renders only the active integration's — or the honest "not yet ported"
  * callout, driven purely by file presence.
  */
 /** Mounts a built demo module (public/demos/…) via a NATIVE dynamic import —
@@ -61,36 +66,44 @@ export function Example({
   filesByFramework?: string;
   demosByFramework?: string;
 }) {
-  const fw = useFramework();
   const pathname = usePathname();
   const [copied, setCopied] = useState(false);
   const [activeFile, setActiveFile] = useState(0);
+  const product = docsProductFromPath(pathname);
+  const integration = docsIntegrationFromPath(pathname);
+  const defaultIntegration =
+    product === 'viewer'
+      ? DEFAULT_PRODUCT_INTEGRATION.viewer
+      : DEFAULT_PRODUCT_INTEGRATION.headless;
+  const variant = integration ?? defaultIntegration;
+  const label = DOCS_INTEGRATION_LABELS[variant];
 
   const byFramework: Record<string, ExampleFile[]> = filesByFramework
     ? JSON.parse(filesByFramework)
     : {};
-  const files = byFramework[fw];
+  const files = byFramework[variant];
 
   if (!files || files.length === 0) {
-    const fallback = byFramework[DEFAULT_FRAMEWORK]?.length
-      ? DEFAULT_FRAMEWORK
+    const fallback = byFramework[defaultIntegration]?.length
+      ? defaultIntegration
       : Object.keys(byFramework)[0];
+    const fallbackIntegration = isDocsIntegration(fallback) ? fallback : null;
+    const fallbackLabel = fallbackIntegration ? DOCS_INTEGRATION_LABELS[fallbackIntegration] : null;
+    const fallbackHref = fallbackIntegration
+      ? docsIntegrationHref(pathname, fallbackIntegration)
+      : null;
     return (
       <div className="mt-6 max-w-[72ch] rounded-[14px] border border-[#E5D6FB] bg-[#F8F4FE] px-[18px] py-4 font-sans text-[15px] leading-[1.6] text-[#4A3A74]">
-        This example isn&rsquo;t available for <b>{FRAMEWORK_LABELS[fw]}</b> yet — it arrives with
-        the {FRAMEWORK_LABELS[fw]} adapter.
-        {fallback ? (
+        This example isn&rsquo;t available for <b>{label}</b> yet.
+        {fallback && fallbackHref && fallbackLabel ? (
           <>
             {' '}
             You can read the{' '}
             <Link
-              href={frameworkHref(
-                pathname.replace(`/headless/${fw}`, '/headless'),
-                fallback as never,
-              )}
+              href={fallbackHref}
               className="text-ep-blue font-semibold underline-offset-[3px] hover:underline"
             >
-              {FRAMEWORK_LABELS[fallback as never]} version
+              {fallbackLabel} version
             </Link>{' '}
             in the meantime.
           </>
@@ -100,7 +113,7 @@ export function Example({
   }
 
   const demos: Record<string, string> = demosByFramework ? JSON.parse(demosByFramework) : {};
-  const demoUrl = demos[fw];
+  const demoUrl = demos[variant];
 
   const file = files[Math.min(activeFile, files.length - 1)];
 

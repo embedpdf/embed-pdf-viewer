@@ -27,7 +27,7 @@ export async function GET(_request: Request, props: RouteProps) {
   const markdown = renderDocsMarkdown({
     sourceCode,
     metadata,
-    framework: resolved.framework,
+    integration: resolved.integration,
     canonicalPath: `/${mdxPath.join('/')}`,
   });
   const filename = `${mdxPath.at(-1) ?? 'documentation'}.md`;

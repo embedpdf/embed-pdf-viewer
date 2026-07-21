@@ -1,7 +1,10 @@
 import fs from 'node:fs';
 import path from 'node:path';
 
-import { FRAMEWORKS, type Framework } from './frameworks';
+import { DOCS_INTEGRATIONS, type DocsIntegration } from './docs-integrations';
+
+export type DocsExampleVariant = DocsIntegration;
+const DOCS_EXAMPLE_VARIANTS = DOCS_INTEGRATIONS;
 
 export type DocsCodeFile = {
   filename: string;
@@ -23,6 +26,7 @@ const LANGUAGE_BY_EXTENSION: Record<string, string> = {
   json: 'json',
   md: 'markdown',
   mdx: 'mdx',
+  sh: 'shellscript',
 };
 
 function isWithinDirectory(filePath: string, directory: string) {
@@ -57,9 +61,9 @@ export function readDocsCodeFile(codePath: string, githubBaseUrl?: string): Docs
   }
 }
 
-/** Resolves every framework variant of an `<Example name="topic/base" />`. */
+/** Resolves every framework/integration variant of an `<Example name="topic/base" />`. */
 export function collectSampleFiles(name: string, githubBaseUrl?: string) {
-  const byFramework: Partial<Record<Framework, DocsCodeFile[]>> = {};
+  const byVariant: Partial<Record<DocsExampleVariant, DocsCodeFile[]>> = {};
   const sampleDirectory = path.resolve(process.cwd(), 'src', 'samples', path.dirname(name));
   const base = path.basename(name);
   let entries: string[] = [];
@@ -68,23 +72,23 @@ export function collectSampleFiles(name: string, githubBaseUrl?: string) {
     entries = fs.readdirSync(sampleDirectory);
   } catch {
     console.warn(`[docs-samples] No sample directory for: ${name}`);
-    return byFramework;
+    return byVariant;
   }
 
-  for (const framework of FRAMEWORKS) {
+  for (const variant of DOCS_EXAMPLE_VARIANTS) {
     const files = entries
-      .filter((file) => file.startsWith(`${base}.${framework}.`))
+      .filter((file) => file.startsWith(`${base}.${variant}.`))
       .sort()
       .map((file) => readDocsCodeFile(`samples/${path.dirname(name)}/${file}`, githubBaseUrl))
       .filter((file): file is DocsCodeFile => file !== null)
-      // Display names hide the framework infix: basic.react.tsx → basic.tsx.
+      // Display names hide the variant infix: basic.react.tsx → basic.tsx.
       .map((file) => ({
         ...file,
-        filename: file.filename.replace(`.${framework}.`, '.'),
+        filename: file.filename.replace(`.${variant}.`, '.'),
       }));
 
-    if (files.length > 0) byFramework[framework] = files;
+    if (files.length > 0) byVariant[variant] = files;
   }
 
-  return byFramework;
+  return byVariant;
 }
