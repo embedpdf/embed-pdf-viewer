@@ -4,9 +4,10 @@
   "private": true,
   "scripts": {
     "dev": "next dev --port 3100",
-    "build": "node scripts/migrate-feedback.mjs --if-configured && next build",
+    "build": "next build",
     "start": "next start",
     "db:migrate": "node scripts/migrate-feedback.mjs",
+    "db:migrate:build": "node scripts/migrate-feedback.mjs --if-configured",
     "test": "vitest run",
     "typecheck": "tsc --noEmit && pnpm run check:samples",
     "check:samples": "tsc -p tsconfig.samples-react.json && tsc -p tsconfig.samples-angular.json"

@@ -6,6 +6,10 @@
       "dependsOn": ["^build"],
       "outputs": ["dist/**"]
     },
+    "@embedpdf/website#build": {
+      "dependsOn": ["^build"],
+      "outputs": [".next/**", "!.next/cache/**"]
+    },
     "check-types": {
       "dependsOn": ["^check-types"]
     },
