@@ -1421,6 +1421,15 @@ importers:
 
   website:
     dependencies:
+      '@embedpdf/angular':
+        specifier: workspace:*
+        version: link:../packages/framework/angular
+      '@embedpdf/engine':
+        specifier: workspace:*
+        version: link:../packages/engine/main
+      '@embedpdf/react':
+        specifier: workspace:*
+        version: link:../packages/framework/react
       '@theguild/remark-npm2yarn':
         specifier: ^0.3.3
         version: 0.3.3
@@ -1443,6 +1452,9 @@ importers:
         specifier: ^5.0.0
         version: 5.1.0
     devDependencies:
+      '@angular/core':
+        specifier: ^20.0.0
+        version: 20.2.4(@angular/compiler@20.2.4)(rxjs@7.8.2)
       '@tailwindcss/postcss':
         specifier: ^4.1.18
         version: 4.1.18
@@ -1464,6 +1476,9 @@ importers:
       tailwindcss:
         specifier: ^4.1.18
         version: 4.1.18
+      tslib:
+        specifier: ^2.6.0
+        version: 2.8.1
       typescript:
         specifier: ^5.9.3
         version: 5.9.3

@@ -2,6 +2,7 @@ import type { MDXComponents } from 'mdx/types';
 import Link from 'next/link';
 import type { AnchorHTMLAttributes, HTMLAttributes, ReactNode } from 'react';
 
+import { Example } from './example';
 import { Fw } from './framework';
 import { Pre } from './pre';
 import { Toc, type TocItem } from './toc';
@@ -110,6 +111,7 @@ export function useMDXComponents(components?: MDXComponents): MDXComponents {
     ),
     pre: Pre,
     CodeExample,
+    Example,
     Fw,
     ...components,
   };

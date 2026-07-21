@@ -66,11 +66,67 @@ function readCodeFile(codePath: string, githubBaseUrl?: string): FileInfo | null
  *   <CodeExample codePath="content/docs/.../example.tsx"><Demo /></CodeExample>
  *   <CodeExample codePaths={["a.tsx", "b.css"]}><Demo /></CodeExample>
  */
+const SAMPLE_FRAMEWORKS = ['react', 'vue', 'svelte', 'angular'] as const;
+
+/**
+ * `<Example name="topic/base" />` — the framework-resolved sample display
+ * (DOCS-ARCHITECTURE.md pillar 3). Collects `src/samples/<topic>/<base>.<fw>.*`
+ * for EVERY framework at build time (one compiled MDX serves all framework
+ * routes); the client component picks the active framework from the pathname.
+ * A missing file is an honest gap the component surfaces, not an error.
+ */
+function collectSampleFiles(name: string, githubBaseUrl?: string) {
+  const byFramework: Record<string, FileInfo[]> = {};
+  const sampleDir = path.resolve(process.cwd(), 'src', 'samples', path.dirname(name));
+  const base = path.basename(name);
+  let entries: string[] = [];
+  try {
+    entries = fs.readdirSync(sampleDir);
+  } catch {
+    console.warn(`[remark-code-example] No sample directory for: ${name}`);
+    return byFramework;
+  }
+  for (const fw of SAMPLE_FRAMEWORKS) {
+    const files = entries
+      .filter((f) => f.startsWith(`${base}.${fw}.`))
+      .map((f) =>
+        readCodeFile(
+          `samples/${path.dirname(name)}/${f}`.replace(/^samples/, 'samples'),
+          githubBaseUrl,
+        ),
+      )
+      .filter((f): f is FileInfo => f !== null)
+      // Display names hide the framework infix: basic.react.tsx → basic.tsx
+      .map((f) => ({ ...f, filename: f.filename.replace(`.${fw}.`, '.') }));
+    if (files.length > 0) byFramework[fw] = files;
+  }
+  return byFramework;
+}
+
 export const remarkCodeExample = (options: RemarkCodeExampleOptions = {}) => {
   const { githubBaseUrl } = options;
 
   return (tree: any) => {
     visit(tree, 'mdxJsxFlowElement', (node: any) => {
+      if (node.name === 'Example') {
+        const nameAttr = node.attributes?.find(
+          (attr: any) => attr.type === 'mdxJsxAttribute' && attr.name === 'name',
+        );
+        if (typeof nameAttr?.value !== 'string') return;
+        const byFramework = collectSampleFiles(nameAttr.value, githubBaseUrl);
+        node.attributes.push({
+          type: 'mdxJsxAttribute',
+          name: '__fwFiles',
+          value: JSON.stringify(byFramework),
+        });
+        node.attributes.push({
+          type: 'mdxJsxAttribute',
+          name: '__needsHighlighting',
+          value: 'true',
+        });
+        return;
+      }
+
       if (node.name !== 'CodeExample') return;
 
       const codePathAttr = node.attributes?.find(

@@ -11,9 +11,29 @@ framework, and an engine.
 
 ## Installation
 
+<Fw only="react">
 ```sh npm2yarn
 npm install @embedpdf/react @embedpdf/engine
 ```
+</Fw>
+
+<Fw only="vue">
+```sh npm2yarn
+npm install @embedpdf/vue @embedpdf/engine
+```
+</Fw>
+
+<Fw only="svelte">
+```sh npm2yarn
+npm install @embedpdf/svelte @embedpdf/engine
+```
+</Fw>
+
+<Fw only="angular">
+```sh npm2yarn
+npm install @embedpdf/angular @embedpdf/engine
+```
+</Fw>
 
 <Fw only="react">
   The React adapter exposes every feature as one import line per vertical —
@@ -39,5 +59,7 @@ npm install @embedpdf/react @embedpdf/engine
 
 ## Your first viewer
 
-> Starter page for the framework-machinery milestone. The real quickstart —
-> with per-framework compiled samples — lands with the samples pipeline.
+The engine boots in a worker in the background; the stage and render layer
+draw the pages. This is the whole app:
+
+<Example name="getting-started/basic" />

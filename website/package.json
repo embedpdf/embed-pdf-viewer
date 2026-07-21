@@ -6,7 +6,8 @@
     "dev": "next dev --port 3100",
     "build": "next build",
     "start": "next start",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit && pnpm run check:samples",
+    "check:samples": "tsc -p tsconfig.samples-react.json && tsc -p tsconfig.samples-angular.json"
   },
   "dependencies": {
     "next": "^15.4.10",
@@ -15,7 +16,10 @@
     "nextra": "^4.6.1",
     "@theguild/remark-npm2yarn": "^0.3.3",
     "shiki": "3.14.0",
-    "unist-util-visit": "^5.0.0"
+    "unist-util-visit": "^5.0.0",
+    "@embedpdf/react": "workspace:*",
+    "@embedpdf/angular": "workspace:*",
+    "@embedpdf/engine": "workspace:*"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4.1.18",
@@ -25,6 +29,8 @@
     "postcss": "^8.5.6",
     "tailwindcss": "^4.1.18",
     "typescript": "^5.9.3",
-    "@types/mdx": "^2.0.13"
+    "@types/mdx": "^2.0.13",
+    "@angular/core": "^20.0.0",
+    "tslib": "^2.6.0"
   }
 }

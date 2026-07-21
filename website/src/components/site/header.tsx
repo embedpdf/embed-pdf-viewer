@@ -32,7 +32,7 @@ export function Header() {
   }, []);
 
   return (
-    <header className="w-full bg-white">
+    <header className="sticky top-0 z-50 w-full border-b border-[#EEF2FA] bg-white/[0.86] backdrop-blur-[10px]">
       <div className="mx-auto flex h-[84px] w-full max-w-[1440px] items-center gap-6 px-[clamp(20px,4vw,78px)]">
         <Link href="/" className="flex-shrink-0">
           <Image
