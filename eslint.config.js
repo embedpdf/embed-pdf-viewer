@@ -10,7 +10,9 @@ const nextPlugin = require('@next/eslint-plugin-next');
 /** @type {import("eslint").Linter.FlatConfig[]} */
 module.exports = [
   {
-    ignores: ['node_modules', 'dist', 'build', '.turbo'],
+    // Framework samples are compiled by their dedicated tsconfig files in the
+    // website check:samples script, not the root type-aware ESLint project.
+    ignores: ['node_modules', 'dist', 'build', '.turbo', 'website/src/samples/**'],
   },
   {
     plugins: {

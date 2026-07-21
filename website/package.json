@@ -4,33 +4,38 @@
   "private": true,
   "scripts": {
     "dev": "next dev --port 3100",
-    "build": "next build",
+    "build": "node scripts/migrate-feedback.mjs --if-configured && next build",
     "start": "next start",
+    "db:migrate": "node scripts/migrate-feedback.mjs",
+    "test": "vitest run",
     "typecheck": "tsc --noEmit && pnpm run check:samples",
     "check:samples": "tsc -p tsconfig.samples-react.json && tsc -p tsconfig.samples-angular.json"
   },
   "dependencies": {
+    "@embedpdf/angular": "workspace:*",
+    "@embedpdf/engine": "workspace:*",
+    "@embedpdf/react": "workspace:*",
+    "@neondatabase/serverless": "^1.1.0",
+    "@theguild/remark-npm2yarn": "^0.3.3",
     "next": "^15.4.10",
+    "nextra": "^4.6.1",
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
-    "nextra": "^4.6.1",
-    "@theguild/remark-npm2yarn": "^0.3.3",
     "shiki": "3.14.0",
     "unist-util-visit": "^5.0.0",
-    "@embedpdf/react": "workspace:*",
-    "@embedpdf/angular": "workspace:*",
-    "@embedpdf/engine": "workspace:*"
+    "zod": "^4.3.6"
   },
   "devDependencies": {
+    "@angular/core": "^20.0.0",
     "@tailwindcss/postcss": "^4.1.18",
+    "@types/mdx": "^2.0.13",
     "@types/node": "^22.0.0",
     "@types/react": "^18.3.0",
     "@types/react-dom": "^18.3.0",
     "postcss": "^8.5.6",
     "tailwindcss": "^4.1.18",
+    "tslib": "^2.6.0",
     "typescript": "^5.9.3",
-    "@types/mdx": "^2.0.13",
-    "@angular/core": "^20.0.0",
-    "tslib": "^2.6.0"
+    "vitest": "^4.1.10"
   }
 }

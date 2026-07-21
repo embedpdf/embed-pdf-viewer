@@ -2,10 +2,11 @@ import type { MDXComponents } from 'mdx/types';
 import Link from 'next/link';
 import type { AnchorHTMLAttributes, HTMLAttributes, ReactNode } from 'react';
 
+import { DocsPage } from './docs-page';
 import { Example } from './example';
 import { Fw } from './framework';
 import { Pre } from './pre';
-import { Toc, type TocItem } from './toc';
+import type { TocItem } from './toc';
 
 import { CodeExample } from '@/components/site/code-example';
 
@@ -16,11 +17,11 @@ type WrapperProps = {
 };
 
 function Wrapper({ children, toc }: WrapperProps) {
+  const revision = process.env.VERCEL_GIT_COMMIT_SHA ?? process.env.GIT_COMMIT_SHA ?? 'local';
   return (
-    <div className="flex gap-[clamp(28px,4vw,60px)]">
-      <article className="prose-embedpdf min-w-0 flex-1 pb-20 pt-9">{children}</article>
-      <Toc toc={toc} />
-    </div>
+    <DocsPage toc={toc} revision={revision}>
+      {children}
+    </DocsPage>
   );
 }
 

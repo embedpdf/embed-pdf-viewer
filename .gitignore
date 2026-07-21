@@ -19,3 +19,7 @@ publish-summary.json
 **/.svelte-kit
 **/*/*.tgz
 temp/
+
+# Local environment files
+**/.env*
+!**/.env.example
