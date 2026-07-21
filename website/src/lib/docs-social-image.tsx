@@ -3,7 +3,7 @@ import { ImageResponse } from 'next/og';
 import { getDocsPagePresentation, type DocsPagePresentation } from './docs-page';
 import { FRAMEWORK_LABELS, type Framework } from './frameworks';
 
-import { AngularIcon, ReactIcon, SvelteIcon, VueIcon } from '@/components/site/icons';
+import { AngularIcon, EngineIcon, ReactIcon, SvelteIcon, VueIcon } from '@/components/site/icons';
 
 const FRAMEWORK_ACCENTS: Record<Framework, string> = {
   react: '#149ECA',
@@ -14,6 +14,7 @@ const FRAMEWORK_ACCENTS: Record<Framework, string> = {
 
 const VARIANT_ACCENTS = {
   docs: '#1189FA',
+  engine: '#087F73',
   headless: '#0876FD',
   viewer: '#7C3AED',
 } as const;
@@ -74,6 +75,7 @@ function SocialCard({ page }: { page: DocsPagePresentation }) {
   const accent = page.framework ? FRAMEWORK_ACCENTS[page.framework] : VARIANT_ACCENTS[page.variant];
   const titleSize = page.imageTitle.length > 56 ? 56 : page.imageTitle.length > 38 ? 64 : 72;
   const routeLabel = page.canonicalPath.replace(/^\//, '');
+  const codeLabel = page.variant === 'engine' ? 'engine.ts' : 'viewer.tsx';
 
   return (
     <div
@@ -296,7 +298,7 @@ function SocialCard({ page }: { page: DocsPagePresentation }) {
                 marginLeft: 'auto',
               }}
             >
-              viewer.tsx
+              {codeLabel}
             </div>
           </div>
 
@@ -341,6 +343,8 @@ function SocialCard({ page }: { page: DocsPagePresentation }) {
             >
               {page.framework ? (
                 <FrameworkMark framework={page.framework} size={74} />
+              ) : page.variant === 'engine' ? (
+                <EngineIcon size={74} color={accent} />
               ) : (
                 <BrandMark size={72} />
               )}

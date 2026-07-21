@@ -24,7 +24,7 @@ interface CodeFile {
 }
 
 interface CodeExampleProps {
-  children: ReactNode;
+  children?: ReactNode;
   files?: CodeFile[];
   framed?: boolean;
   background?: 'dots' | 'solid' | 'none';
@@ -86,6 +86,7 @@ export function CodeExample({
         : [];
 
   const activeFile = allFiles[activeTab];
+  const hasPreview = children !== undefined && children !== null;
   const filesWithGithub = allFiles.filter((f) => f.githubUrl);
   const repoGithubUrl = filesWithGithub[0]?.githubUrl;
 
@@ -98,27 +99,29 @@ export function CodeExample({
 
   return (
     <div className="not-prose border-ep-border my-8 overflow-hidden rounded-[16px] border bg-white shadow-[0_1px_2px_rgba(10,26,77,0.05)]">
-      {/* Live preview */}
-      <div
-        className={`relative flex items-center justify-center overflow-hidden p-6 sm:p-10 ${backgroundStyles[background]}`}
-        style={background === 'dots' ? { background: dotsBackground } : undefined}
-      >
+      {/* Live preview, omitted for source-only documentation examples. */}
+      {hasPreview ? (
         <div
-          className={`relative w-full ${
-            framed
-              ? 'border-ep-border overflow-hidden rounded-xl border bg-white shadow-[0_1px_2px_rgba(10,26,77,0.05)]'
-              : ''
-          }`}
+          className={`relative flex items-center justify-center overflow-hidden p-6 sm:p-10 ${backgroundStyles[background]}`}
+          style={background === 'dots' ? { background: dotsBackground } : undefined}
         >
-          {children}
+          <div
+            className={`relative w-full ${
+              framed
+                ? 'border-ep-border overflow-hidden rounded-xl border bg-white shadow-[0_1px_2px_rgba(10,26,77,0.05)]'
+                : ''
+            }`}
+          >
+            {children}
+          </div>
         </div>
-      </div>
+      ) : null}
 
       {/* Toolbar */}
       <div
-        className={`border-ep-border flex items-center justify-between gap-3 border-t bg-[#FBFCFE] px-3 py-2.5 ${
-          showCode ? '' : 'rounded-b-[16px]'
-        }`}
+        className={`border-ep-border flex items-center justify-between gap-3 bg-[#FBFCFE] px-3 py-2.5 ${
+          hasPreview ? 'border-t' : ''
+        } ${showCode ? '' : 'rounded-b-[16px]'}`}
       >
         <button
           type="button"

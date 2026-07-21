@@ -43,4 +43,15 @@ describe('createDocsPagePresentation', () => {
     expect(page.socialDescription).toBe('Social description.');
     expect(page.section).toBe('PDF Viewer');
   });
+
+  it('gives Engine documentation its own social variant', () => {
+    const page = createDocsPagePresentation({
+      mdxPath: ['docs', 'engine', 'getting-started'],
+      metadata: { title: 'Getting Started' },
+      resolved: { contentPath: ['docs', 'engine', 'getting-started'] },
+    });
+
+    expect(page.variant).toBe('engine');
+    expect(page.section).toBe('PDF Engine');
+  });
 });

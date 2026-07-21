@@ -1,7 +1,7 @@
 export default {
   index: {
     title: 'Overview',
-    type: 'doc',
+    type: 'page',
   },
   viewer: {
     title: 'Viewer',
@@ -9,6 +9,10 @@ export default {
   },
   headless: {
     title: 'Headless',
+    type: 'doc',
+  },
+  engine: {
+    title: 'Engine',
     type: 'doc',
   },
 };

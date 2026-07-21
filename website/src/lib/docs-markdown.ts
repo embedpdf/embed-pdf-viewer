@@ -6,6 +6,7 @@ import remarkParse from 'remark-parse';
 import remarkStringify from 'remark-stringify';
 import { unified } from 'unified';
 
+import { renderDocsOverviewMarkdown } from './docs-overview';
 import { collectSampleFiles, readDocsCodeFile, type DocsCodeFile } from './docs-samples';
 import { FRAMEWORK_LABELS, frameworkHref, isFramework, type Framework } from './frameworks';
 import { SITE_ORIGIN } from './site';
@@ -161,6 +162,11 @@ function resolveNodes(nodes: AstNode[], framework?: Framework): AstNode[] {
     if (node.type === 'yaml' || node.type === 'mdxjsEsm') return [];
 
     if (node.type === 'mdxJsxFlowElement' || node.type === 'mdxJsxTextElement') {
+      if (node.name === 'DocsOverview') {
+        const overview = markdownProcessor.parse(renderDocsOverviewMarkdown()) as AstNode;
+        return resolveNodes(overview.children ?? [], framework);
+      }
+
       if (node.name === 'Fw') {
         if (!framework) {
           throw new Error('<Fw> can only be exported from a framework-specific route.');

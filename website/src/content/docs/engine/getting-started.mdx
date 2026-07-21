@@ -1,0 +1,36 @@
+---
+title: Getting Started
+description: Create a local EmbedPDF Engine, open PDF bytes, and inspect the document.
+---
+
+# Getting Started
+
+Install the local engine package:
+
+```sh npm2yarn
+npm install @embedpdf/engine
+```
+
+## Create and use the Engine
+
+The browser implementation runs PDFium in a Web Worker. The example below
+creates the engine, opens a PDF from fetched bytes, reads the page list, and
+cleans up both handles.
+
+<CodeExample codePath="samples/engine/getting-started.ts" />
+
+The `?worker` import is supported by Vite and compatible bundlers. If your
+bundler uses a different worker convention, create a `Worker` from
+`@embedpdf/engine/worker-entry` and pass it to
+`createLocalEngineWithWorker`.
+
+## Lifecycle rules
+
+1. Create one Engine and reuse it for the documents owned by that application
+   scope.
+2. Close each document handle when the document leaves your application.
+3. Destroy the Engine when the application no longer needs PDF services.
+
+If you are building a viewer interface, continue with the
+[Headless documentation](/docs/headless/react/getting-started) instead of
+managing the Engine alone.

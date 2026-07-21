@@ -255,6 +255,26 @@ export function CopyIcon({ size = 14, ...props }: IconProps) {
 
 /* ---- Framework marks ---- */
 
+export function EngineIcon({ size = 18, ...props }: IconProps) {
+  return (
+    <svg
+      width={size}
+      height={size}
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.9"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      {...props}
+    >
+      <path d="M12 2.75 19.75 7v10L12 21.25 4.25 17V7L12 2.75Z" />
+      <circle cx="12" cy="12" r="3.25" />
+      <path d="M12 5.75v3M12 15.25v3M6.75 9l2.6 1.5M14.65 13.5l2.6 1.5M17.25 9l-2.6 1.5M9.35 13.5 6.75 15" />
+    </svg>
+  );
+}
+
 export function ReactIcon({
   size = 18,
   color = '#61DAFB',

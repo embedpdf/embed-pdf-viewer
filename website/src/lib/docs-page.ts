@@ -5,7 +5,7 @@ import { resolveDocsPath, type ResolvedDocsPath } from './docs-route';
 import { FRAMEWORK_LABELS, type Framework } from './frameworks';
 import { SITE_NAME, SITE_ORIGIN } from './site';
 
-export type DocsSocialVariant = 'docs' | 'headless' | 'viewer';
+export type DocsSocialVariant = 'docs' | 'engine' | 'headless' | 'viewer';
 
 type DocsFrontmatter = Record<string, unknown>;
 
@@ -46,16 +46,20 @@ function titleFromPath(path: string[]) {
 }
 
 function defaultVariant(contentPath: string[]): DocsSocialVariant {
+  if (contentPath[0] === 'docs' && contentPath[1] === 'engine') return 'engine';
   if (contentPath[0] === 'docs' && contentPath[1] === 'headless') return 'headless';
   if (contentPath[0] === 'docs' && contentPath[1] === 'viewer') return 'viewer';
   return 'docs';
 }
 
 function variantValue(value: unknown, fallback: DocsSocialVariant) {
-  return value === 'docs' || value === 'headless' || value === 'viewer' ? value : fallback;
+  return value === 'docs' || value === 'engine' || value === 'headless' || value === 'viewer'
+    ? value
+    : fallback;
 }
 
 function sectionLabel(variant: DocsSocialVariant) {
+  if (variant === 'engine') return 'PDF Engine';
   if (variant === 'headless') return 'Headless SDK';
   if (variant === 'viewer') return 'PDF Viewer';
   return 'Documentation';

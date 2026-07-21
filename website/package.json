@@ -10,7 +10,7 @@
     "db:migrate:build": "node scripts/migrate-feedback.mjs --if-configured",
     "test": "vitest run",
     "typecheck": "tsc --noEmit && pnpm run check:samples",
-    "check:samples": "tsc -p tsconfig.samples-react.json && ngc -p tsconfig.samples-angular.json",
+    "check:samples": "tsc -p tsconfig.samples-engine.json && tsc -p tsconfig.samples-react.json && ngc -p tsconfig.samples-angular.json",
     "build:demos": "vite build --config vite.demos.config.ts && vite build --config vite.demos-ng.config.ts"
   },
   "dependencies": {
