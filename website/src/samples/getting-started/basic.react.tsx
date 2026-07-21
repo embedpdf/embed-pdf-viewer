@@ -1,4 +1,4 @@
-import { deferredEngine, Viewer } from '@embedpdf/react/runtime';
+import { deferredEngine, DocumentGate, Viewer } from '@embedpdf/react/runtime';
 import type { Engine, OpenInput } from '@embedpdf/react/runtime';
 import { Stage, stagePlugin } from '@embedpdf/react/stage';
 import { RenderLayer, renderPlugin } from '@embedpdf/react/render';
@@ -24,7 +24,10 @@ export default function App() {
   return (
     <Viewer engine={engine} plugins={plugins} initialDocuments={[{ source: ebook }]}>
       <div style={{ height: 500 }}>
-        <Stage>{() => <RenderLayer />}</Stage>
+        {/* Document UI is defined over a document — gate it on having one. */}
+        <DocumentGate fallback={<p>Loading…</p>}>
+          <Stage style={{ height: '100%' }}>{() => <RenderLayer />}</Stage>
+        </DocumentGate>
       </div>
     </Viewer>
   );

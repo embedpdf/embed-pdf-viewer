@@ -9,7 +9,11 @@
     "experimentalDecorators": true,
     "useDefineForClassFields": false,
     "lib": ["ES2022", "DOM", "DOM.Iterable"],
-    "noEmit": true
+    "noEmit": true,
+    "types": []
   },
-  "include": ["src/samples/**/*.angular.ts", "src/samples/samples-env.d.ts"]
+  "include": ["src/samples/**/*.angular.ts", "src/samples/samples-env.d.ts"],
+  "angularCompilerOptions": {
+    "strictTemplates": true
+  }
 }

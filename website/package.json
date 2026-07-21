@@ -3,14 +3,15 @@
   "version": "0.0.0",
   "private": true,
   "scripts": {
-    "dev": "next dev --port 3100",
-    "build": "next build",
+    "dev": "pnpm run build:demos && next dev --port 3100",
+    "build": "pnpm run build:demos && next build",
     "start": "next start",
     "db:migrate": "node scripts/migrate-feedback.mjs",
     "db:migrate:build": "node scripts/migrate-feedback.mjs --if-configured",
     "test": "vitest run",
     "typecheck": "tsc --noEmit && pnpm run check:samples",
-    "check:samples": "tsc -p tsconfig.samples-react.json && tsc -p tsconfig.samples-angular.json"
+    "check:samples": "tsc -p tsconfig.samples-react.json && ngc -p tsconfig.samples-angular.json",
+    "build:demos": "vite build --config vite.demos.config.ts && vite build --config vite.demos-ng.config.ts"
   },
   "dependencies": {
     "@embedpdf/angular": "workspace:*",
@@ -27,7 +28,7 @@
     "zod": "^4.3.6"
   },
   "devDependencies": {
-    "@angular/core": "^20.0.0",
+    "@angular/core": "~20.2.0",
     "@tailwindcss/postcss": "^4.1.18",
     "@types/mdx": "^2.0.13",
     "@types/node": "^22.0.0",
@@ -36,7 +37,17 @@
     "postcss": "^8.5.6",
     "tailwindcss": "^4.1.18",
     "tslib": "^2.6.0",
-    "typescript": "^5.9.3",
-    "vitest": "^4.1.10"
+    "typescript": "~5.8.3",
+    "vitest": "^4.1.10",
+    "vite": "^6.3.5",
+    "@vitejs/plugin-react": "^4.3.4",
+    "@vitejs/plugin-vue": "^6.0.3",
+    "@sveltejs/vite-plugin-svelte": "^6.0.0",
+    "vue": "^3.5.13",
+    "svelte": "^5.39.5",
+    "@angular/common": "~20.2.0",
+    "@angular/platform-browser": "~20.2.0",
+    "@angular/compiler": "~20.2.0",
+    "@angular/compiler-cli": "~20.2.0"
   }
 }

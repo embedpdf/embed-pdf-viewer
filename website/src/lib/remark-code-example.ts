@@ -68,6 +68,22 @@ function readCodeFile(codePath: string, githubBaseUrl?: string): FileInfo | null
  */
 const SAMPLE_FRAMEWORKS = ['react', 'vue', 'svelte', 'angular'] as const;
 
+let demoManifestCache: Record<string, Record<string, string>> | null = null;
+function readDemoManifest(): Record<string, Record<string, string>> {
+  if (demoManifestCache) return demoManifestCache;
+  try {
+    demoManifestCache = JSON.parse(
+      fs.readFileSync(
+        path.resolve(process.cwd(), 'public', 'demos', 'demos-manifest.json'),
+        'utf-8',
+      ),
+    );
+  } catch {
+    demoManifestCache = {};
+  }
+  return demoManifestCache!;
+}
+
 /**
  * `<Example name="topic/base" />` — the framework-resolved sample display
  * (DOCS-ARCHITECTURE.md pillar 3). Collects `src/samples/<topic>/<base>.<fw>.*`
@@ -119,6 +135,16 @@ export const remarkCodeExample = (options: RemarkCodeExampleOptions = {}) => {
           name: '__fwFiles',
           value: JSON.stringify(byFramework),
         });
+        // Live demos: built by vite.demos.config.ts before the docs build;
+        // presence in the manifest = a mounted preview exists.
+        const demos = readDemoManifest()[nameAttr.value];
+        if (demos) {
+          node.attributes.push({
+            type: 'mdxJsxAttribute',
+            name: 'demosByFramework',
+            value: JSON.stringify(demos),
+          });
+        }
         node.attributes.push({
           type: 'mdxJsxAttribute',
           name: '__needsHighlighting',
