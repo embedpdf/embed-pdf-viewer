@@ -1,0 +1,43 @@
+---
+title: Getting Started
+description: Build your own PDF viewer UI with the EmbedPDF headless libraries.
+---
+
+# Getting Started
+
+The headless libraries give you the engine and the plugin system — you own
+every pixel of the UI. An app depends on two packages: the adapter for your
+framework, and an engine.
+
+## Installation
+
+```sh npm2yarn
+npm install @embedpdf/react @embedpdf/engine
+```
+
+<Fw only="react">
+  The React adapter exposes every feature as one import line per vertical —
+  registration, components, and hooks travel together, and deleting the line
+  removes the feature from your bundle.
+</Fw>
+
+<Fw only="vue">
+  The Vue adapter mirrors the React surface subpath-for-subpath — the same
+  verticals, exposed as components and composables.
+</Fw>
+
+<Fw only="svelte">
+  The Svelte adapter mirrors the React surface subpath-for-subpath — the same
+  verticals, exposed as components and stores.
+</Fw>
+
+<Fw only="angular">
+  The Angular adapter ships each vertical as a secondary entry point —
+  Angular's native library modularity — with inject functions instead of
+  hooks.
+</Fw>
+
+## Your first viewer
+
+> Starter page for the framework-machinery milestone. The real quickstart —
+> with per-framework compiled samples — lands with the samples pipeline.

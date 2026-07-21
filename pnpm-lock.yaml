@@ -1421,19 +1421,34 @@ importers:
 
   website:
     dependencies:
+      '@theguild/remark-npm2yarn':
+        specifier: ^0.3.3
+        version: 0.3.3
       next:
         specifier: ^15.4.10
         version: 15.5.12(react-dom@18.3.1(react@18.3.1))(react@18.3.1)(sass@1.97.3)
+      nextra:
+        specifier: ^4.6.1
+        version: 4.6.1(next@15.5.12(react-dom@18.3.1(react@18.3.1))(react@18.3.1)(sass@1.97.3))(react-dom@18.3.1(react@18.3.1))(react@18.3.1)(typescript@5.9.3)
       react:
         specifier: ^18.2.0
         version: 18.3.1
       react-dom:
         specifier: ^18.2.0
         version: 18.3.1(react@18.3.1)
+      shiki:
+        specifier: 3.14.0
+        version: 3.14.0
+      unist-util-visit:
+        specifier: ^5.0.0
+        version: 5.1.0
     devDependencies:
       '@tailwindcss/postcss':
         specifier: ^4.1.18
         version: 4.1.18
+      '@types/mdx':
+        specifier: ^2.0.13
+        version: 2.0.13
       '@types/node':
         specifier: ^22.0.0
         version: 22.19.11

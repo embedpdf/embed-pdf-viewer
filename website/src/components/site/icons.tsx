@@ -198,6 +198,61 @@ export function ExtLinkIcon({ size = 11, ...props }: IconProps) {
   );
 }
 
+export function ChevronDown({ size = 14, ...props }: IconProps) {
+  return (
+    <svg
+      width={size}
+      height={size}
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2.5"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      {...props}
+    >
+      <path d="M6 9l6 6 6-6" />
+    </svg>
+  );
+}
+
+export function CodeIcon({ size = 14, ...props }: IconProps) {
+  return (
+    <svg
+      width={size}
+      height={size}
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      {...props}
+    >
+      <path d="m7 8-4 4 4 4M17 8l4 4-4 4M14 4l-4 16" />
+    </svg>
+  );
+}
+
+export function CopyIcon({ size = 14, ...props }: IconProps) {
+  return (
+    <svg
+      width={size}
+      height={size}
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      {...props}
+    >
+      <rect x="9" y="9" width="13" height="13" rx="2" />
+      <path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1" />
+    </svg>
+  );
+}
+
 /* ---- Framework marks ---- */
 
 export function ReactIcon({
@@ -290,3 +345,12 @@ export function JsMark({ small = false }: { small?: boolean }) {
     </span>
   );
 }
+
+/* ---- Aliases for the docs components ported from ee/website (their icon
+   vocabulary). Converge the names during the docs polish pass. ---- */
+export const ArrowRight = ArrowRightIcon;
+export const ExternalLink = ExtLinkIcon;
+export const GithubIcon = GitHubIcon;
+export const ReactLogo = ReactIcon;
+export const VueLogo = VueIcon;
+export const SvelteLogo = SvelteIcon;

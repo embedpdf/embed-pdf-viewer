@@ -120,3 +120,15 @@ html {
 .ep-code .tk-num {
   color: #f78c6c;
 }
+
+/* ---- Docs prose (ported from the ee docs theme, EmbedPDF tokens) ---- */
+.prose-embedpdf :not(pre) > code {
+  border-radius: 6px;
+  background-color: #eef3fc;
+  border: 1px solid #e0e8f6;
+  padding: 0.125rem 0.4rem;
+  font-family: var(--font-mono, ui-monospace, Menlo, monospace);
+  font-size: 0.875em;
+  color: #0758b8;
+  white-space: nowrap;
+}

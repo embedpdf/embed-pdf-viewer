@@ -1,0 +1,32 @@
+---
+title: Getting Started
+description: Drop the EmbedPDF viewer into any page in minutes.
+---
+
+# Getting Started
+
+The ready-made viewer drops into any page — no build step required.
+
+## Script tag
+
+```html
+<div id="pdf-viewer" style="height: 500px"></div>
+<script async type="module">
+  import EmbedPDF from 'https://cdn.jsdelivr.net/npm/@embedpdf/snippet@2/dist/embedpdf.js';
+
+  EmbedPDF.init({
+    type: 'container',
+    target: document.getElementById('pdf-viewer'),
+    src: 'https://snippet.embedpdf.com/ebook.pdf',
+  });
+</script>
+```
+
+## Package managers
+
+```sh npm2yarn
+npm install @embedpdf/snippet
+```
+
+> This is the docs-shell starter page — the full viewer documentation lands in
+> the content phase.
