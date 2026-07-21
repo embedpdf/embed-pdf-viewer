@@ -16,6 +16,14 @@ export interface Transport {
   /** Send a request to the host. May be sync or async transport. */
   send(pack: WirePack<WorkerRequest>): void;
 
+  /**
+   * Optional warmup hook: begin booting whatever backs this transport
+   * (Worker spawn, WASM compile) without sending a request. Transports that
+   * are live from construction simply omit it. Idempotent; never rejects —
+   * boot failures surface as reject responses on subsequently sent jobs.
+   */
+  start?(): Promise<void>;
+
   /** Subscribe to responses. Returns an unsubscribe function. */
   onMessage(handler: (msg: WorkerResponse) => void): () => void;
 

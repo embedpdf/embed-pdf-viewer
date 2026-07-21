@@ -4,11 +4,10 @@ import { Stage, stagePlugin } from '@embedpdf/react/stage';
 import { RenderLayer, renderPlugin } from '@embedpdf/react/render';
 import { localEngine } from '@embedpdf/engine';
 
-// `localEngine()` is a RECIPE — a description of the engine, not a live one.
-// Hand it to <Viewer> and the viewer boots PDFium (in a worker) on mount and
-// destroys it on unmount: no worker wiring, no lifecycle to manage. The boot
-// runs in the background, so the UI renders at t≈0 and only opening a document
-// awaits it.
+// `localEngine()` IS the engine — created synchronously, costing nothing until
+// first use (no worker, no WASM). Safe at module scope, even under SSR. The
+// viewer warms it up on mount, PDFium boots in the background in a worker, and
+// only opening a document awaits it — the UI renders at t≈0.
 const engine = localEngine();
 const plugins = [stagePlugin(), renderPlugin()];
 

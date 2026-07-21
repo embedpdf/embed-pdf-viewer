@@ -9,7 +9,7 @@ import * as stageCore from '@embedpdf/core-stage';
 import * as annotationCore from '@embedpdf/core-annotation';
 
 import * as engineCore from '@embedpdf/engine-core';
-import { AbortablePromise, deferredEngine } from '@embedpdf/engine-core/runtime';
+import { AbortablePromise } from '@embedpdf/engine-core/runtime';
 import * as engineServices from '@embedpdf/engine-services';
 import * as engine from '@embedpdf/engine';
 
@@ -23,7 +23,7 @@ import { Viewer } from '@embedpdf/react/runtime';
 import * as reactAnnotation from '@embedpdf/react/annotation';
 
 ok(typeof AbortablePromise === 'function', 'engine-core/runtime AbortablePromise');
-ok(typeof deferredEngine === 'function', 'engine-core/runtime deferredEngine');
+ok(typeof engine.localEngine === 'function', 'engine localEngine');
 ok(typeof Viewer === 'function', 'react runtime Viewer');
 for (const [label, ns] of Object.entries({
   geometry,

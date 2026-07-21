@@ -48,9 +48,10 @@ export class Workspace {
   `,
 })
 export class App {
-  // `localEngine()` is a RECIPE — the viewer boots PDFium (in a worker) when
-  // the kernel materializes and destroys it on teardown. The UI renders at t≈0
-  // and only opening a document awaits the boot.
+  // `localEngine()` IS the engine — created synchronously, costing nothing
+  // until first use. The viewer warms it up when the kernel materializes;
+  // PDFium boots in a worker in the background, and only opening a document
+  // awaits it — the UI renders at t≈0.
   readonly engine = localEngine();
   readonly plugins = [stagePlugin(), renderPlugin()];
   readonly initialDocuments: EpdfInitialDocument[] = [{ source: ebook }];

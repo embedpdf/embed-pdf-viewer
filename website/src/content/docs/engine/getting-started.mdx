@@ -13,44 +13,40 @@ npm install @embedpdf/engine
 
 ## Create and use the Engine
 
-`localEngine()` returns a _recipe_ — an `EngineFactory`, a description of the
-engine that boots nothing until you call it. The browser implementation runs
-PDFium in a Web Worker, and the default worker is bundler-portable (Vite,
-webpack 5 / Next, Rollup, Parcel), so there is no worker wiring to write. The
-example below boots the engine, opens a PDF from fetched bytes, reads the page
-list, and cleans up both handles.
+`localEngine()` returns the engine itself — construction is synchronous and
+cheap, and it allocates nothing (no Worker, no WASM) until the first operation.
+The browser implementation runs PDFium in a Web Worker, and the default worker
+is bundler-portable (Vite, webpack 5 / Next, Rollup, Parcel), so there is no
+worker wiring to write. The example below opens a PDF from fetched bytes, reads
+the page list, and cleans up both handles.
 
 <CodeExample codePath="samples/engine/getting-started.ts" />
 
-## Recipes vs instances: who owns the engine
+Every engine method is async, so nothing changes at the call site whether the
+engine has booted or not: the first `open()` (or an explicit `engine.warmup()`)
+starts the boot in the background, and pending work simply resolves when PDFium
+is ready.
 
-A recipe is inert; calling it produces a live engine that _someone_ owns. The
-rule is simple — **ownership follows acquisition**:
+## Who owns the engine
 
-- Call the recipe yourself (`await localEngine()()`) and you own the engine:
-  you call `engine.destroy()` when done, as above.
-- Hand the recipe to a viewer (`<Viewer engine={localEngine()} />`) and the
-  viewer owns it: it boots on mount and destroys on unmount. You manage nothing.
+Whoever creates the engine owns it and is responsible for `engine.destroy()`.
+With a viewer, ownership follows the shape of what you pass:
 
-If you want the ergonomic recipe **and** to own the lifetime — share one engine
-across viewers, keep it alive across route changes, pre-warm the boot — wrap the
-recipe with `deferredEngine()` to get a synchronously-usable, caller-owned
-instance, then pass that instance to the viewer (which borrows it and never
-destroys it):
-
-```ts
-import { deferredEngine } from '@embedpdf/core';
-import { localEngine } from '@embedpdf/engine';
-
-// You own this — call engine.destroy() when the app is done with it.
-const engine = deferredEngine(localEngine());
-```
+- **An instance is borrowed.** `<Viewer engine={engine} />` uses your engine
+  and never destroys it. This is the common path — a module-scope
+  `const engine = localEngine()` shared across viewers and route changes, alive
+  for the lifetime of the app (so you typically never destroy it). The viewer
+  calls `engine.warmup()` on mount, overlapping the PDFium boot with the rest
+  of app initialization.
+- **A thunk is viewer-owned.** `<Viewer engine={() => localEngine()} />` makes
+  the viewer create the engine on mount and destroy it on unmount — per-mount
+  isolation with automatic cleanup.
 
 ## Fallback fonts
 
-Runtime fonts are boot configuration on the local engine — pass them to the
-recipe and they are registered before the first document opens (which is why
-`deferredEngine()` never needs to expose a `fonts` service):
+Runtime fonts are boot configuration — pass them to `localEngine()` and they
+are guaranteed to be registered before any document work runs (font URLs are
+fetched in parallel with the worker boot):
 
 ```ts
 const engine = localEngine({
@@ -64,10 +60,18 @@ substitute missing glyphs when rendering and generating appearances). Use
 without affecting automatic substitution. Give each font either inline `data`
 or a `url` fetched at boot.
 
+Fonts can also be registered at any later moment — `engine.fonts` is the live
+font service on the local engine:
+
+```ts
+const handle = await engine.fonts.register({ key: 'brand', data: bytes });
+await engine.fonts.addFallback(handle);
+```
+
 ## Local vs cloud
 
-`@cloudpdf/engine` exposes a matching `cloudEngine()` recipe with identical
-ownership rules, so swapping local for cloud is a one-import change:
+`@cloudpdf/engine` exposes a matching `cloudEngine()` with identical ownership
+rules, so swapping local for cloud is a one-import change:
 
 ```ts
 import { cloudEngine } from '@cloudpdf/engine';
@@ -84,17 +88,18 @@ Two deliberate differences surface the split:
 
 ## Server-side rendering (Next, Nuxt, SvelteKit)
 
-A recipe constructed at module scope does no work on the server — it allocates
-no Worker and touches no WASM until it is called, which only happens in the
-browser (a viewer's mount effect, or your own `await` in a client component). So
-a module-level `const engine = localEngine()` is SSR-safe. In the Next.js App
-Router, mark the component that renders the viewer `'use client'`.
+An engine constructed at module scope does no work on the server — it allocates
+no Worker and touches no WASM until something uses it, which only happens in
+the browser (a viewer's mount effect, or your own first `open()` in a client
+component). So a module-level `const engine = localEngine()` is SSR-safe. In
+the Next.js App Router, mark the component that renders the viewer
+`'use client'`.
 
 ## Custom workers
 
 For a custom worker setup — a strict CSP, a bundler without `new URL` worker
-support, a shared worker — pass your own (a `Worker`, or a `() => Worker` thunk
-called once at boot):
+support, a shared worker — pass your own as a `() => Worker` thunk (called once,
+when the engine boots):
 
 ```ts
 localEngine({ worker: () => new Worker(/* … */) });
@@ -108,7 +113,8 @@ The raw worker source is also published at `@embedpdf/engine/worker-entry`
 1. One engine serves the documents of one application scope; reuse it.
 2. Close each document handle when the document leaves your application.
 3. Destroy the engine when you own it and no longer need PDF services (viewers
-   do this for recipes automatically).
+   do this for thunk-created engines automatically; module-scope singletons
+   usually live for the app's lifetime and never need it).
 
 If you are building a viewer interface, continue with the
 [Headless documentation](/docs/headless/react/getting-started) instead of

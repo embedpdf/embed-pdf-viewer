@@ -3,7 +3,7 @@ export * from './kernel';
 export { CancelledError, isCancelled } from './scope';
 
 // Re-export the engine contracts so plugins/adapters import them from @embedpdf/core.
-export { AbortablePromise, deferredEngine } from '@embedpdf/engine-core/runtime';
+export { AbortablePromise } from '@embedpdf/engine-core/runtime';
 export type {
   PageHandle,
   PageRaster,

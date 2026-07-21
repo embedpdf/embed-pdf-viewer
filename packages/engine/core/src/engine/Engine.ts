@@ -28,6 +28,16 @@ export interface Engine {
   destroy(): AbortablePromise<void>;
 
   /**
+   * Start booting the engine's backing resources (Worker spawn, WASM compile,
+   * transport connect) without performing any work. Optional because some
+   * engines have nothing to warm (cloud). Idempotent and non-blocking:
+   * engines that boot lazily do so on first use anyway — calling `warmup()`
+   * just overlaps that boot with app/plugin initialization instead of paying
+   * for it on the first `open()`.
+   */
+  warmup?(): void;
+
+  /**
    * Runtime font registration + fallback configuration. Present on the local
    * (WASM) engine only; `undefined` on the cloud engine, where fallback fonts
    * are a server-side policy decision and cannot be configured from the
@@ -37,23 +47,23 @@ export interface Engine {
 }
 
 /**
- * A *recipe* for an engine: an async factory that boots one and resolves it.
+ * A thunk that constructs a fresh {@link Engine}. Construction is synchronous
+ * and cheap — engines allocate no live resources (no Worker, no WASM, no
+ * socket) until first use — so the thunk exists purely to express OWNERSHIP:
  *
- * This is the declarative half of the engine surface. `localEngine()` /
- * `cloudEngine()` return an {@link EngineFactory} — a description of how to
- * build an engine, carrying no live resources (no Worker, no WASM, no socket)
- * until it is called. That is what makes a recipe safe to evaluate at module
- * scope and on a server: nothing happens until someone cooks it.
+ *   - Pass an `Engine` INSTANCE to an adapter (`<Viewer>`, `provideEmbedPdf`)
+ *     and it is BORROWED: the adapter never destroys it. You own the
+ *     lifetime — the module-scope singleton case.
+ *   - Pass a THUNK (`() => localEngine()`) and the adapter OWNS the result:
+ *     it calls the thunk on mount and destroys the engine on unmount. Use
+ *     this for per-mount isolation (StrictMode/HMR-clean teardown,
+ *     multi-viewer independence).
  *
- * OWNERSHIP FOLLOWS ACQUISITION. Whoever calls the factory owns the engine it
- * returns and is responsible for `destroy()`. Two first-class consumers:
- *
- *   - An adapter (`<Viewer>`, `provideEmbedPdf`) hands a factory: the adapter
- *     calls it on mount and destroys the result on unmount. Viewer-owned.
- *   - A caller who wants to own the lifetime themselves (share one engine
- *     across viewers, keep it across route changes, pre-warm) wraps the recipe
- *     with {@link deferredEngine} to get a synchronously-usable, caller-owned
- *     {@link Engine} instance, then passes THAT to the adapter (borrowed —
- *     never destroyed by the adapter).
+ * DELIBERATELY synchronous — an async thunk would reintroduce a "maybe
+ * engine" that every consumer must await (the deferredEngine problem this
+ * design removed). Async acquisition (dynamic `import()`, remote config)
+ * belongs OUTSIDE the thunk: await it, then hand over the instance. Code
+ * that genuinely needs a lazily-resolved engine models that itself with
+ * `Engine | Promise<Engine>` (see the stamp plugin's `assetEngine`).
  */
-export type EngineFactory = () => Promise<Engine>;
+export type EngineFactory = () => Engine;

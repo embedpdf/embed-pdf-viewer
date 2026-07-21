@@ -60,20 +60,10 @@ const pickFile = (accept: string): Promise<File | null> =>
   });
 
 export function LayerLab() {
-  const [engine, setEngine] = useState<Engine | null>(null);
-  useEffect(() => {
-    let live = true;
-    createEngine().then((e) => live && setEngine(e));
-    return () => {
-      live = false;
-    };
-  }, []);
-  if (!engine)
-    return (
-      <div style={{ padding: 24, font: '13px ui-monospace' }}>booting {engineMode} engine…</div>
-    );
+  // Thunk form: the Viewer constructs the engine on mount (cheap — it boots
+  // lazily) and destroys it on unmount.
   return (
-    <Viewer engine={engine} plugins={plugins} initialDocuments={[]}>
+    <Viewer engine={createEngine} plugins={plugins} initialDocuments={[]}>
       <LayerShell />
     </Viewer>
   );

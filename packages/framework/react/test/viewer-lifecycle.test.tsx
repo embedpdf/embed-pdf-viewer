@@ -47,19 +47,27 @@ function countingEngine() {
     return Promise.resolve(made.handle);
   });
   const destroy = vi.fn(() => Promise.resolve());
-  return { engine: { open, destroy } as unknown as Engine, open, destroy, handles };
+  const warmup = vi.fn();
+  return {
+    engine: { open, destroy, warmup } as unknown as Engine,
+    open,
+    destroy,
+    warmup,
+    handles,
+  };
 }
 
-/** A recipe (EngineFactory) that mints a FRESH engine on each call and records
- *  each one's `destroy` spy — so ownership assertions can target per-boot. */
-function recipeFactory() {
-  const engines: { destroy: ReturnType<typeof vi.fn> }[] = [];
-  const recipe = vi.fn(() => {
-    const { engine, destroy } = countingEngine();
-    engines.push({ destroy });
-    return Promise.resolve(engine);
+/** A thunk (EngineFactory) that constructs a FRESH engine on each call and
+ *  records each one's `destroy` spy — so ownership assertions can target
+ *  per-mount engines. */
+function engineThunk() {
+  const engines: { destroy: ReturnType<typeof vi.fn>; warmup: ReturnType<typeof vi.fn> }[] = [];
+  const thunk = vi.fn(() => {
+    const { engine, destroy, warmup } = countingEngine();
+    engines.push({ destroy, warmup });
+    return engine;
   });
-  return { recipe, engines };
+  return { thunk, engines };
 }
 
 const bytesInput = (id: string) => ({ kind: 'bytes' as const, id, bytes: new Uint8Array() });
@@ -179,31 +187,31 @@ describe('<Viewer> lifecycle', () => {
 
 /**
  * Engine OWNERSHIP follows the shape of the `engine` prop:
- *   - a recipe (function) is VIEWER-OWNED — booted on mount, destroyed on unmount;
- *   - a live instance is BORROWED — used as-is, never destroyed here.
+ *   - a thunk (function) is VIEWER-OWNED — constructed on mount, destroyed on unmount;
+ *   - an instance is BORROWED — used as-is (warmed up), never destroyed here.
  * The union type is the flag; there is no lifecycle config.
  */
 describe('<Viewer> engine ownership', () => {
-  it('a recipe is viewer-owned: booted on mount, destroyed on unmount', async () => {
+  it('a thunk is viewer-owned: constructed on mount, destroyed on unmount', async () => {
     const { engine, destroy } = countingEngine();
-    const recipe = vi.fn(() => Promise.resolve(engine));
+    const thunk = vi.fn(() => engine);
 
     const view = render(
-      <Viewer engine={recipe} plugins={[]} initialDocuments={[{ source: bytesInput('a') }]}>
+      <Viewer engine={thunk} plugins={[]} initialDocuments={[{ source: bytesInput('a') }]}>
         <div data-testid="shell">shell</div>
       </Viewer>,
     );
 
     await waitFor(() => expect(screen.getByTestId('shell')).toBeTruthy());
-    expect(recipe).toHaveBeenCalledTimes(1); // opening the initial doc booted it
+    expect(thunk).toHaveBeenCalledTimes(1); // constructed at effect setup
     expect(destroy).not.toHaveBeenCalled(); // alive → never destroyed
 
     view.unmount();
     await waitFor(() => expect(destroy).toHaveBeenCalledTimes(1));
   });
 
-  it('a live instance is borrowed: the viewer never destroys it', async () => {
-    const { engine, destroy, handles } = countingEngine();
+  it('a live instance is borrowed: warmed up on mount, never destroyed', async () => {
+    const { engine, destroy, warmup, handles } = countingEngine();
 
     const view = render(
       <Viewer engine={engine} plugins={[]} initialDocuments={[{ source: bytesInput('a') }]}>
@@ -212,6 +220,8 @@ describe('<Viewer> engine ownership', () => {
     );
 
     await waitFor(() => expect(screen.getByTestId('shell')).toBeTruthy());
+    // Mounting overlaps the engine boot with plugin init via warmup().
+    expect(warmup).toHaveBeenCalled();
     view.unmount();
 
     // Wait for kernel teardown to complete (the handle it opened is closed)...
@@ -220,26 +230,33 @@ describe('<Viewer> engine ownership', () => {
     expect(destroy).not.toHaveBeenCalled();
   });
 
-  it('StrictMode: a recipe boots exactly once (discarded kernel never boots) and is destroyed once', async () => {
-    const { recipe, engines } = recipeFactory();
+  it('StrictMode: each setup constructs a fresh thunk engine; the discarded one is destroyed', async () => {
+    const { thunk, engines } = engineThunk();
 
     const view = render(
       <StrictMode>
-        <Viewer engine={recipe} plugins={[]} initialDocuments={[{ source: bytesInput('a') }]}>
+        <Viewer engine={thunk} plugins={[]} initialDocuments={[{ source: bytesInput('a') }]}>
           <div data-testid="shell">shell</div>
         </Viewer>
       </StrictMode>,
     );
 
     await waitFor(() => expect(screen.getByTestId('shell')).toBeTruthy());
-    // Only the surviving kernel opens documents, so only it boots an engine —
-    // the discarded StrictMode kernel's deferredEngine never booted, and its
-    // cleanup destroy() is a safe no-op (no second boot, no throw).
-    expect(recipe).toHaveBeenCalledTimes(1);
-    expect(engines).toHaveLength(1);
-    expect(engines[0].destroy).not.toHaveBeenCalled();
+    // Both StrictMode setups construct an engine (construction is cheap and
+    // inert — no worker until warmup/first use); the first setup's engine is
+    // destroyed by its own cleanup, the second survives.
+    expect(thunk).toHaveBeenCalledTimes(2);
+    expect(engines).toHaveLength(2);
+    // PINNED: BOTH engines are warmed up — StrictMode's double-mount really
+    // boots twice in dev (worker spawn, font fetches) before the first engine
+    // is destroyed. Deliberate: that is the leak-detection contract StrictMode
+    // exercises; production mounts once.
+    expect(engines[0].warmup).toHaveBeenCalledTimes(1);
+    expect(engines[1].warmup).toHaveBeenCalledTimes(1);
+    await waitFor(() => expect(engines[0].destroy).toHaveBeenCalledTimes(1));
+    expect(engines[1].destroy).not.toHaveBeenCalled();
 
     view.unmount();
-    await waitFor(() => expect(engines[0].destroy).toHaveBeenCalledTimes(1));
+    await waitFor(() => expect(engines[1].destroy).toHaveBeenCalledTimes(1));
   });
 });

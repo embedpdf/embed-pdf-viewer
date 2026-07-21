@@ -25,7 +25,7 @@ describe('renderDocsMarkdown', () => {
     expect(markdown).toContain('title: "Getting Started — React"');
     expect(markdown).toContain('\n---\n\n# Getting Started');
     expect(markdown).toContain('pnpm add @embedpdf/react @embedpdf/engine');
-    expect(markdown).toContain('import { deferredEngine, DocumentGate, Viewer }');
+    expect(markdown).toContain("import { localEngine } from '@embedpdf/engine'");
     expect(markdown).toContain('**`basic.tsx`**');
     expect(markdown).not.toContain('@embedpdf/vue');
     expect(markdown).not.toContain('@embedpdf/svelte');

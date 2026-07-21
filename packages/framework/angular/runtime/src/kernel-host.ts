@@ -30,7 +30,7 @@ import {
   type Signal,
 } from '@angular/core';
 import { isPlatformBrowser } from '@angular/common';
-import { createKernel, deferredEngine } from '@embedpdf/core';
+import { createKernel } from '@embedpdf/core';
 import type {
   AnyPlugin,
   Engine,
@@ -46,15 +46,17 @@ export type EpdfInitialDocument = InitialDocument;
 
 export interface EmbedPdfConfig {
   /**
-   * The engine, as a live instance OR a recipe ({@link EngineFactory} from
-   * `localEngine()` / `cloudEngine()`). Ownership follows the shape:
+   * The engine, as an instance or a thunk. Engines construct synchronously and
+   * boot lazily (`localEngine()` allocates nothing until first use), so
+   * ownership follows the SHAPE of what you pass:
    *
-   *   - A **recipe** (a function) is HOST-OWNED: the host calls it when the
-   *     kernel materializes and `destroy()`s the result on teardown. The common
-   *     path — pass `localEngine()` and forget about lifecycle.
-   *   - A live **instance** is BORROWED: used as-is, never destroyed here
-   *     (wrap a recipe with `deferredEngine()` to get such an instance and own
-   *     the lifetime across route changes / shared viewers).
+   *   - An **instance** is BORROWED: used as-is, never destroyed here. The
+   *     common path — a module-scope `const engine = localEngine()` shared
+   *     across viewers and route changes. The host calls `engine.warmup?.()`
+   *     when the kernel materializes so the boot overlaps initialization.
+   *   - A **thunk** (`() => localEngine()`) is HOST-OWNED: the host calls it
+   *     when the kernel materializes and `destroy()`s the result on teardown.
+   *     Use it for per-host isolation.
    *
    * Init-only: the kernel is never rebuilt for a new engine — tear the host
    * down (destroy the viewer / injector) and create a new one.
@@ -124,12 +126,25 @@ export class EpdfKernelHost implements OnDestroy {
         );
       }
       const { engine, plugins, initialDocuments } = this.config();
-      // A recipe (function) is host-owned: wrap it in deferredEngine (which
-      // boots lazily, off the critical path) and destroy it on teardown. A live
-      // instance is borrowed and left untouched.
+      // A thunk is host-owned: call it now, destroy on teardown. An instance is
+      // borrowed and left untouched. Either way construction is synchronous and
+      // inert (engines boot lazily on first use).
       this.ownsEngine = typeof engine === 'function';
-      this._engine = this.ownsEngine ? deferredEngine(engine as EngineFactory) : (engine as Engine);
-      this._kernel = createKernel({ engine: this._engine, plugins });
+      this._engine = this.ownsEngine ? (engine as EngineFactory)() : (engine as Engine);
+      try {
+        this._kernel = createKernel({ engine: this._engine, plugins });
+      } catch (error) {
+        // ngOnDestroy() only tears down via `_kernel`, which stays null on this
+        // path — so an owned engine must be destroyed HERE or it leaks.
+        if (this.ownsEngine) void this._engine.destroy();
+        this._engine = null;
+        this.ownsEngine = false;
+        throw error;
+      }
+      // Warm up only once the kernel exists (a plugin-planning throw must not
+      // start a boot we'd immediately have to unwind) — `warmup()` overlaps the
+      // WASM/transport boot with the rest of initialization.
+      this._engine.warmup?.();
       this.initialDocuments = initialDocuments;
       this.unsubscribe = this._kernel.subscribe(() => this.tick.update((n) => n + 1));
     }
@@ -182,8 +197,8 @@ export class EpdfKernelHost implements OnDestroy {
     // destroy() owns the full teardown now: it joins an in-flight start, closes
     // every document (engine handles included), and unwinds workspace plugins.
     // Async + idempotent, so fire-and-forget is safe in a sync ngOnDestroy.
-    // Then destroy the engine IF we own it (a recipe) — kernel first so handles
-    // close before the engine goes; deferredEngine.destroy() joins any in-flight
+    // Then destroy the engine IF we own it (a thunk) — kernel first so handles
+    // close before the engine goes; `engine.destroy()` joins any in-flight
     // boot or no-ops if it never started.
     if (this._kernel) {
       const engine = this._engine;

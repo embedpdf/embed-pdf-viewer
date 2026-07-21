@@ -1,20 +1,18 @@
 /**
  * The ONE place an engine is chosen — everything above speaks the engine-core
- * `Engine` contract only. `deferredEngine` makes the boot non-blocking: the
- * WASM worker spins up in the background and is only awaited inside
- * `documents.open()`, so the shell renders at t≈0.
+ * `Engine` contract only. `createLocalEngineWithWorker` constructs
+ * synchronously and boots lazily (the host's `warmup()` kicks it off in the
+ * background), so the shell renders at t≈0 and only `documents.open()` awaits
+ * the engine.
  */
-import { deferredEngine } from '@embedpdf/angular/runtime';
 import type { Engine, OpenInput } from '@embedpdf/angular/runtime';
+import { createLocalEngineWithWorker } from '@embedpdf/engine';
 
 export function createEngine(): Engine {
-  return deferredEngine(() => boot());
-}
-
-async function boot(): Promise<Engine> {
-  const { createLocalEngineWithWorker } = await import('@embedpdf/engine');
-  const worker = new Worker(new URL('./engine.worker', import.meta.url), { type: 'module' });
-  return createLocalEngineWithWorker({ worker });
+  return createLocalEngineWithWorker({
+    // Thunk: the Worker allocates when the engine boots, not at construction.
+    worker: () => new Worker(new URL('./engine.worker', import.meta.url), { type: 'module' }),
+  });
 }
 
 export const fetchBytes = async (url: string): Promise<Uint8Array> => {

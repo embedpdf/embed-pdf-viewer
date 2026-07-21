@@ -85,5 +85,10 @@
     ],
     "devExports": "development"
   },
-  "sideEffects": false
+  "sideEffects": [
+    "./src/worker/worker-entry.ts",
+    "./src/default-worker.ts",
+    "./dist/default-worker.js",
+    "./dist/default-worker.cjs"
+  ]
 }

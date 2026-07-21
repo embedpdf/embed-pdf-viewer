@@ -11,6 +11,34 @@ interface InitErrorMsg {
 }
 
 /**
+ * Latch a live worker's readiness handshake NOW, before anything else runs.
+ *
+ * A dedicated worker starts initializing the moment `new Worker()` executes,
+ * and its `ready` / `init-error` message is DROPPED if no listener is attached
+ * when it fires. Any code that accepts an already-created `Worker` but defers
+ * the transport (lazy engine boot) must therefore attach this latch
+ * synchronously at accept time, then hand the promise to
+ * {@link BrowserWorkerTransport.spawn} — otherwise a worker that finishes
+ * booting before the first engine operation would hang the handshake forever.
+ */
+export function watchWorkerReady(worker: Worker): Promise<void> {
+  return new Promise<void>((resolve, reject) => {
+    const onReady = (e: MessageEvent) => {
+      const data = e.data as InitReadyMsg | InitErrorMsg;
+      if (!data || typeof data !== 'object' || !('kind' in data)) return;
+      if (data.kind === 'ready') {
+        worker.removeEventListener('message', onReady);
+        resolve();
+      } else if (data.kind === 'init-error') {
+        worker.removeEventListener('message', onReady);
+        reject(new Error(`worker failed to initialize: ${data.error}`));
+      }
+    };
+    worker.addEventListener('message', onReady);
+  });
+}
+
+/**
  * Browser-only Web Worker transport. The worker is spawned externally and
  * passed in here, which keeps this package independent of any specific
  * bundler primitive (Vite's `?worker`, Webpack 5's `new URL(...)`, etc.).
@@ -22,9 +50,15 @@ export class BrowserWorkerTransport implements Transport {
   private readonly listeners = new Set<(msg: WorkerResponse) => void>();
   private readonly onMessageBound: (e: MessageEvent) => void;
 
-  static async spawn(worker: Worker): Promise<BrowserWorkerTransport> {
+  /**
+   * Wrap a worker and wait for its init handshake. Pass `ready` when the
+   * worker existed before this call (see {@link watchWorkerReady}); omit it
+   * only when the worker was created in the same tick, where no handshake
+   * message can have fired yet.
+   */
+  static async spawn(worker: Worker, ready?: Promise<void>): Promise<BrowserWorkerTransport> {
     const transport = new BrowserWorkerTransport(worker);
-    await transport.waitForReady();
+    await (ready ?? watchWorkerReady(worker));
     return transport;
   }
 
@@ -64,22 +98,5 @@ export class BrowserWorkerTransport implements Transport {
         // ignore subscriber errors
       }
     }
-  }
-
-  private waitForReady(): Promise<void> {
-    return new Promise<void>((resolve, reject) => {
-      const onReady = (e: MessageEvent) => {
-        const data = e.data as InitReadyMsg | InitErrorMsg;
-        if (!data || typeof data !== 'object' || !('kind' in data)) return;
-        if (data.kind === 'ready') {
-          this.worker.removeEventListener('message', onReady);
-          resolve();
-        } else if (data.kind === 'init-error') {
-          this.worker.removeEventListener('message', onReady);
-          reject(new Error(`worker failed to initialize: ${data.error}`));
-        }
-      };
-      this.worker.addEventListener('message', onReady);
-    });
   }
 }

@@ -24,10 +24,11 @@ import { EpdfKernelHost, type EpdfInitialDocument } from './kernel-host';
   template: `<ng-content />`,
 })
 export class EpdfViewer implements OnInit {
-  /** The engine, as a live instance OR a recipe ({@link EngineFactory}). A
-   *  recipe is host-owned (booted then destroyed with the viewer); an instance
-   *  is borrowed. See EmbedPdfConfig. Init-only: the kernel is built once from
-   *  the first values; recreate the viewer (e.g. with @if) to swap it. */
+  /** The engine, as an instance OR a thunk ({@link EngineFactory}). An
+   *  instance is borrowed (never destroyed here); a thunk is host-owned
+   *  (constructed then destroyed with the viewer). See EmbedPdfConfig.
+   *  Init-only: the kernel is built once from the first values; recreate the
+   *  viewer (e.g. with @if) to swap it. */
   readonly engine = input.required<Engine | EngineFactory>();
   readonly plugins = input.required<AnyPlugin[]>();
   readonly initialDocuments = input<EpdfInitialDocument[]>();

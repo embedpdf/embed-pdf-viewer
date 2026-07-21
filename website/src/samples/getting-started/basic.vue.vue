@@ -7,10 +7,10 @@ const src = ref<string>();
 const status = ref('Booting engine…');
 
 onMounted(async () => {
-  // `localEngine()` is a recipe; call it to boot a live engine (PDFium in a
-  // worker) — no worker wiring needed. The Vue adapter will own this for you.
+  // `localEngine()` IS the engine — no worker wiring needed; PDFium boots in
+  // a worker on first use. The Vue adapter will own this for you.
   const { localEngine } = await import('@embedpdf/engine');
-  const engine = await localEngine()();
+  const engine = localEngine();
 
   status.value = 'Opening document…';
   const response = await fetch('https://snippet.embedpdf.com/ebook.pdf');

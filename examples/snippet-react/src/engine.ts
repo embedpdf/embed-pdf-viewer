@@ -2,12 +2,14 @@
  * The one place the engine is chosen. Local PDFium-wasm in a worker; the rest
  * of the app only speaks the engine-core `Engine` contract.
  *
- * `createDeferredEngine()` returns a synchronously-usable facade and kicks the
- * real boot (wasm worker, fonts) off in the background — so the translated
- * chrome renders at t≈0 and only `documents.open()` awaits the engine.
+ * `createEngine()` is synchronous and inert: the worker + WASM boot lazily
+ * (kicked by the Viewer's `warmup()`), fonts are registered by the boot
+ * pipeline before any document work — so the translated chrome renders at
+ * t≈0 and only `documents.open()` awaits the engine.
  */
-import { deferredEngine } from '@embedpdf/react/runtime';
 import type { Engine, OpenInput, InitialDocument } from '@embedpdf/react/runtime';
+import { localEngine } from '@embedpdf/engine';
+import EngineWorker from '@embedpdf/engine/worker-entry?worker';
 
 /** A lazy bytes source: the tab appears at t≈0 (named), the fetch runs UNDER
  *  the loading tab, and all initial fetches run in parallel. */
@@ -23,32 +25,14 @@ const DROID_FALLBACK_FONT = {
   url: `${import.meta.env.BASE_URL}DroidSansFallbackFull.ttf`,
 } as const;
 
-export async function createEngine(): Promise<Engine> {
-  const { createLocalEngineWithWorker } = await import('@embedpdf/engine');
-  const { default: EngineWorker } = await import('@embedpdf/engine/worker-entry?worker');
-  const engine = await createLocalEngineWithWorker({ worker: new EngineWorker() });
-  await registerFallbackFonts(engine);
-  return engine;
-}
-
-export function createDeferredEngine(): Engine {
-  const booting = createEngine();
-  return deferredEngine(() => booting);
-}
-
-async function registerFallbackFonts(engine: Engine): Promise<void> {
-  if (!engine.fonts) return;
-  try {
-    const data = await fetchBytes(DROID_FALLBACK_FONT.url);
-    const handle = await engine.fonts.register({
-      key: DROID_FALLBACK_FONT.key,
-      familyName: DROID_FALLBACK_FONT.familyName,
-      data,
-    });
-    await engine.fonts.addFallback(handle);
-  } catch (error) {
-    console.warn('[snippet-react] fallback font not registered:', error);
-  }
+export function createEngine(): Engine {
+  return localEngine({
+    // Vite `?worker` import — the snippet build keeps its own worker wiring
+    // instead of the default portable worker. The thunk defers allocation to
+    // the engine's lazy boot.
+    worker: () => new EngineWorker(),
+    fallbackFonts: [DROID_FALLBACK_FONT],
+  });
 }
 
 export const fetchBytes = async (url: string): Promise<Uint8Array> =>

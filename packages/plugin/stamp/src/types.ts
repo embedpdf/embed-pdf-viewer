@@ -68,8 +68,7 @@ export interface StampConfig {
    * Omitted → the kernel's own engine is used, which is exactly right for a
    * local deployment (same WASM instance, zero extra cost). In a CLOUD
    * deployment the kernel engine cannot open local bytes, so pass a factory —
-   * it is wrapped in `deferredEngine`, so the WASM loads on the first import,
-   * never at viewer boot:
+   * it is called (and memoized) on the first import, never at viewer boot:
    *
    * ```ts
    * stampPlugin({
@@ -77,7 +76,7 @@ export interface StampConfig {
    * })
    * ```
    */
-  assetEngine?: Engine | (() => Promise<Engine>);
+  assetEngine?: Engine | (() => Engine | Promise<Engine>);
   /** Cached preview width in device px (import-time render). Default 256. */
   previewWidth?: number;
   /**

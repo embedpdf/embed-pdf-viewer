@@ -5,7 +5,6 @@
  */
 // One import line per feature (ADAPTERS.md): each subpath carries the
 // plugin AND its UI; delete a line and the feature leaves the bundle.
-import { useMemo } from 'react';
 import { Viewer } from '@embedpdf/react/runtime';
 import { stagePlugin } from '@embedpdf/react/stage';
 import { renderPlugin } from '@embedpdf/react/render';
@@ -20,7 +19,7 @@ import { searchPlugin } from '@embedpdf/react/search';
 import { i18nPlugin, negotiateLocale, useT } from '@embedpdf/react/i18n';
 import { commandsPlugin } from '@embedpdf/react/commands';
 import { shellPlugin } from '@embedpdf/react/shell';
-import { createDeferredEngine, initialDocuments } from './engine';
+import { createEngine, initialDocuments } from './engine';
 import { ThumbsStageToken } from './config/stage';
 import { commands } from './config/commands';
 import { demoToolsPlugin } from './config/demo-tools.plugin';
@@ -94,11 +93,12 @@ function Booting() {
 }
 
 export function App() {
-  const engine = useMemo(createDeferredEngine, []);
+  // Thunk form: the Viewer constructs the engine on mount (cheap — it boots
+  // lazily) and destroys it on unmount.
   return (
     <ThemeProvider>
       <Viewer
-        engine={engine}
+        engine={createEngine}
         plugins={plugins}
         initialDocuments={initialDocuments}
         fallback={<Booting />}

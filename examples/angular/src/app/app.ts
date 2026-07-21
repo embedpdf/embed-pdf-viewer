@@ -22,6 +22,8 @@ import { Workspace } from './workspace';
   `,
 })
 export class App {
-  readonly engine = createEngine();
+  // Thunk form: the host constructs the engine when the kernel materializes
+  // and destroys it on teardown.
+  readonly engine = createEngine;
   readonly plugins = [stagePlugin(), renderPlugin()];
 }

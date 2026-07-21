@@ -1,9 +1,10 @@
 import { localEngine } from '@embedpdf/engine';
 
 export async function inspectPdf(url: string) {
-  // `localEngine()` is a recipe; call it to boot a live engine (PDFium in a
-  // Web Worker). No worker wiring — the default worker is bundler-portable.
-  const engine = await localEngine()();
+  // `localEngine()` IS the engine — synchronous, nothing allocated yet. The
+  // first operation boots PDFium in a Web Worker; no worker wiring needed
+  // (the default worker is bundler-portable).
+  const engine = localEngine();
 
   try {
     const response = await fetch(url);

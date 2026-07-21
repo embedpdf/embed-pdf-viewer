@@ -5,7 +5,6 @@ import {
   wirePack,
   type DocumentHandle,
   type Engine,
-  type FontService,
   type OpenInput,
   type OpenOptions,
 } from '@embedpdf/engine-core/runtime';
@@ -45,18 +44,32 @@ export class LocalEngine implements Engine {
   /**
    * Runtime font registration + fallback configuration. Present on the local
    * engine because the developer embedding the viewer controls what fonts ship
-   * to the client; the cloud engine deliberately omits it.
+   * to the client; the cloud engine deliberately omits it. Typed as the
+   * concrete {@link LocalFontService} (which satisfies {@link FontService}) so
+   * package-internal collaborators — the boot pipeline's font seeding — can
+   * reach its internal surface without casting.
    */
-  readonly fonts: FontService;
+  readonly fonts: LocalFontService;
 
   private constructor(
-    transport: Transport,
+    private readonly transport: Transport,
     concurrency: number,
     imageEncoder: LocalImageEncoder | undefined,
   ) {
     this.queue = new WorkerQueue(transport, { concurrency });
     this.imageEncoder = imageEncoder ?? new BrowserImageEncoder();
     this.fonts = new LocalFontService(this.queue);
+  }
+
+  /**
+   * Start booting the backing transport (Worker spawn + WASM compile) without
+   * doing any work. Lazy engines boot on first use anyway; calling this
+   * overlaps the boot with app initialization instead of paying for it on the
+   * first `open()`. No-op for transports that are live from construction.
+   */
+  warmup(): void {
+    if (this.destroyed) return;
+    void this.transport.start?.();
   }
 
   open(input: OpenInput, options?: OpenOptions): AbortablePromise<DocumentHandle> {

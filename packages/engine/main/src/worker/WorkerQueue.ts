@@ -9,14 +9,10 @@ import {
 } from '@embedpdf/engine-core/runtime';
 
 import { IndexedPriorityHeap, type HeapHandle } from './IndexedPriorityHeap';
+import { nextJobId } from './jobIds';
 import { Priority } from './Priority';
 import type { JobId, WorkerRequest, WorkerResponse, WorkerResultPayload } from './protocol';
 import type { Transport } from '../transport/Transport';
-
-let _nextJobId = 1;
-function nextJobId(): JobId {
-  return _nextJobId++;
-}
 
 interface PendingJob {
   jobId: JobId;

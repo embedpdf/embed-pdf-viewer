@@ -2378,15 +2378,13 @@ function Booting() {
   );
 }
 
-// Mount at t=0. `selectedEngine()` is a RECIPE — the Viewer boots it (wasm
-// worker, fonts) on mount and destroys it on unmount, and the boot is only
-// awaited by documents.open(), so the chrome, its translations, and the locale
-// switcher never wait for it. useMemo keeps the recipe identity stable (Viewer
-// engine is init-only).
+// Mount at t=0. Passing the THUNK makes the engine viewer-owned: the Viewer
+// constructs it on mount (cheap — engines boot lazily, on warmup/first use)
+// and destroys it on unmount. The boot is only awaited by documents.open(),
+// so the chrome, its translations, and the locale switcher never wait for it.
 export function App() {
-  const engine = useMemo(selectedEngine, []);
   return (
-    <Viewer engine={engine} plugins={plugins} fallback={<Booting />}>
+    <Viewer engine={selectedEngine} plugins={plugins} fallback={<Booting />}>
       <OpenInitialDocuments />
       <Shell />
     </Viewer>

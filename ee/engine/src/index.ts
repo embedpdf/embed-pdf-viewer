@@ -21,7 +21,6 @@ export type { HttpClientOptions } from './transport/HttpClient';
 export { decodeUnverifiedClaims } from './transport/decodeUnverifiedClaims';
 export type { UnverifiedClaims } from './transport/decodeUnverifiedClaims';
 
-import type { EngineFactory } from '@embedpdf/engine-core/runtime';
 import { CloudEngine, type CloudEngineOptions } from './CloudEngine';
 
 export function createCloudEngine(opts: CloudEngineOptions): CloudEngine {
@@ -29,14 +28,14 @@ export function createCloudEngine(opts: CloudEngineOptions): CloudEngine {
 }
 
 /**
- * The cloud-engine RECIPE: describe a remote engine and get back an
- * {@link EngineFactory} you hand to `<Viewer>` (or `provideEmbedPdf`, or
- * `deferredEngine` to own the lifetime yourself).
+ * Create a cloud {@link CloudEngine} — the drop-in counterpart of
+ * `localEngine()`, so swapping local for cloud is a one-import change.
  *
- * The cloud engine has no WASM to compile and no worker to spawn, so the recipe
- * is close to instantaneous — the shape exists purely for parity with
- * `localEngine()`, so swapping local for cloud is a one-import change and the
- * ownership rules (viewer-owned vs `deferredEngine`-owned) are identical.
+ * Synchronous and cheap: no WASM to compile, no worker to spawn — the engine
+ * holds an HTTP client and nothing else. Like `localEngine()`, the returned
+ * instance is yours (call `destroy()` when done, usually never for a
+ * module-scope singleton); pass a thunk (`engine={() => cloudEngine(...)}`)
+ * to let a `<Viewer>` own the lifetime instead.
  *
  * Note the deliberate asymmetry with `localEngine()`: there is no `fonts`
  * option. Fallback fonts are a SERVER policy on the cloud (`Engine.fonts` is
@@ -48,8 +47,8 @@ export function createCloudEngine(opts: CloudEngineOptions): CloudEngine {
  * <Viewer engine={engine} plugins={[stagePlugin(), renderPlugin()]} />
  * ```
  */
-export function cloudEngine(opts: CloudEngineOptions): EngineFactory {
-  return async () => CloudEngine.fromOptions(opts);
+export function cloudEngine(opts: CloudEngineOptions): CloudEngine {
+  return CloudEngine.fromOptions(opts);
 }
 
 // Re-export the shared engine runtime surface so consumers import every

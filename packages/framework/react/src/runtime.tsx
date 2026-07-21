@@ -18,7 +18,7 @@ import {
   useState,
   useSyncExternalStore,
 } from 'react';
-import { createKernel, deferredEngine, docInfoListEquals } from '@embedpdf/core';
+import { createKernel, docInfoListEquals } from '@embedpdf/core';
 import type {
   AnyPlugin,
   CapabilityToken,
@@ -215,16 +215,19 @@ export function useDocuments() {
 
 export interface ViewerProps {
   /**
-   * The engine, as a live instance OR a recipe ({@link EngineFactory} from
-   * `localEngine()` / `cloudEngine()`). Ownership follows the shape:
+   * The engine, as an instance or a thunk. Engines construct synchronously and
+   * boot lazily (`localEngine()` allocates nothing until first use), so
+   * ownership follows the SHAPE of what you pass:
    *
-   *   - A **recipe** (a function) is VIEWER-OWNED: the Viewer calls it on mount
-   *     and `destroy()`s the result on unmount. The 99% path — pass
-   *     `localEngine()` directly and forget about lifecycle.
-   *   - A live **instance** is BORROWED: the Viewer uses it and never destroys
-   *     it, because you acquired it and therefore own it. Use this to share one
-   *     engine across viewers or keep it alive across route changes — wrap a
-   *     recipe with `deferredEngine()` to get such an instance.
+   *   - An **instance** (`engine={engine}`) is BORROWED: the Viewer uses it and
+   *     never destroys it, because you acquired it and therefore own it. The
+   *     common path — a module-scope `const engine = localEngine()` shared
+   *     across viewers and route changes. The Viewer calls `engine.warmup?.()`
+   *     on mount so the boot overlaps app initialization.
+   *   - A **thunk** (`engine={() => localEngine()}`) is VIEWER-OWNED: the
+   *     Viewer calls it on mount and `destroy()`s the result on unmount. Use it
+   *     for per-mount isolation (StrictMode/HMR-clean teardown, independent
+   *     multi-viewer engines).
    *
    * Init-only: captured on first render; later identity changes are ignored (dev warns).
    */
@@ -260,14 +263,18 @@ type BootState =
  * open in the BACKGROUND and stream into the registry (`useDocuments()` is
  * reactive); per-document loading UI is the Stage's job, not a root gate.
  *
- * ENGINE OWNERSHIP. When `engine` is a recipe (a function — `localEngine()` /
- * `cloudEngine()`), the Viewer OWNS it: each effect setup boots one engine
- * (wrapped in `deferredEngine` so boot overlaps first render, never blocking
- * it) and each cleanup destroys exactly that one — after the kernel, so handles
- * close first. When `engine` is a live instance it is BORROWED and never
- * destroyed here. StrictMode's double-mount therefore boots two independent
- * recipe engines and tears the first fully down, matching the kernel's own
- * effect-scoped lifecycle.
+ * ENGINE OWNERSHIP. When `engine` is a thunk, the Viewer OWNS it: each effect
+ * setup constructs one engine (construction is synchronous and inert — boot
+ * happens lazily inside the engine) and each cleanup destroys exactly that one
+ * — after the kernel, so handles close first. When `engine` is an instance it
+ * is BORROWED and never destroyed here; the Viewer only calls `warmup?.()` so
+ * the WASM/transport boot overlaps plugin initialization. StrictMode's
+ * double-mount therefore constructs two independent thunk engines and tears
+ * the first fully down, matching the kernel's own effect-scoped lifecycle.
+ * That means dev-only double resource use (two worker spawns, two font
+ * fetches, briefly overlapping) — deliberate, because it is exactly the
+ * leak-detection contract StrictMode exists to exercise; production mounts
+ * once and boots once.
  */
 export function Viewer({
   engine,
@@ -296,21 +303,20 @@ export function Viewer({
   const [boot, setBoot] = useState<BootState>({ phase: 'booting', kernel: null });
   useEffect(() => {
     const captured = initial.current;
-    // A recipe (function) is viewer-owned: cook it now, destroy on unmount. A
-    // live instance is borrowed: use as-is, never destroy. `deferredEngine`
-    // keeps the recipe's boot off the critical path (it resolves lazily) and
-    // gives us an Engine to destroy without awaiting the boot here.
+    // A thunk is viewer-owned: call it now, destroy on unmount. An instance is
+    // borrowed: use as-is, never destroy. Construction is synchronous and inert
+    // either way — the engine boots lazily on first use — so kick `warmup()`
+    // to overlap the WASM/transport boot with plugin initialization.
     const ownsEngine = typeof captured.engine === 'function';
     const engine: Engine = ownsEngine
-      ? deferredEngine(captured.engine as EngineFactory)
+      ? (captured.engine as EngineFactory)()
       : (captured.engine as Engine);
+    engine.warmup?.();
     let kernel: Kernel;
     try {
       kernel = createKernel({ engine, plugins: captured.plugins });
     } catch (error) {
       setBoot({ phase: 'error', error }); // plan/graph errors surface, not throw mid-render
-      // deferredEngine never booted (createKernel doesn't open) — destroy is a
-      // no-op, but call it so the contract holds regardless of future changes.
       if (ownsEngine) void engine.destroy();
       return;
     }
@@ -332,9 +338,8 @@ export function Viewer({
     return () => {
       alive = false;
       // Kernel first (closes every document handle), THEN the engine we own —
-      // ownership follows acquisition. deferredEngine.destroy() joins an
-      // in-flight boot (or no-ops if it never started), so an unmount mid-boot
-      // is safe.
+      // ownership follows acquisition. `engine.destroy()` joins an in-flight
+      // boot (or no-ops if it never started), so an unmount mid-boot is safe.
       void kernel.destroy().then(() => {
         if (ownsEngine) void engine.destroy();
       });

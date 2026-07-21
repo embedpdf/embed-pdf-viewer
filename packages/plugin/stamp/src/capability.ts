@@ -10,7 +10,7 @@ import {
   type PieceInfoEntry,
   type PieceInfoPatch,
 } from '@embedpdf/engine-core/runtime';
-import { deferredEngine, type PluginContext } from '@embedpdf/core';
+import { type PluginContext } from '@embedpdf/core';
 import { AnnotationToken } from '@embedpdf/plugin-annotation';
 import { createFormScriptingController, type FormCommitResult } from '@embedpdf/plugin-form';
 
@@ -126,16 +126,16 @@ export function createStampCapability(
     });
   };
 
-  // The ASSET ENGINE port. A configured factory is wrapped in deferredEngine
-  // (boot on first import, not at viewer start); a configured instance is used
+  // The ASSET ENGINE port. A configured factory is called (and memoized) on
+  // the first import, not at viewer start; a configured instance is used
   // as-is; nothing configured falls back to the kernel's engine — correct for
   // local deployments, and rejected with an actionable error by cloud engines
   // at the first `open({ kind: 'bytes' })`.
-  let assetEngineRef: Engine | null = null;
-  const assetEngine = (): Engine => {
+  let assetEngineRef: Engine | Promise<Engine> | null = null;
+  const assetEngine = (): Engine | Promise<Engine> => {
     if (!assetEngineRef) {
       const cfg = config.assetEngine;
-      assetEngineRef = !cfg ? ctx.engine : typeof cfg === 'function' ? deferredEngine(cfg) : cfg;
+      assetEngineRef = !cfg ? ctx.engine : typeof cfg === 'function' ? cfg() : cfg;
     }
     return assetEngineRef;
   };
@@ -145,7 +145,9 @@ export function createStampCapability(
     identity?: DocumentHandle['security']['identity'],
   ): Promise<DocumentHandle> => {
     try {
-      return await assetEngine().open(
+      return await (
+        await assetEngine()
+      ).open(
         { kind: 'bytes', id: uid('stamp-import'), bytes },
         { scope: ['*'], ...(identity ? { identity } : {}) },
       );
@@ -702,7 +704,11 @@ export function createStampCapability(
     libraryMutationTails.clear();
     const ownedAssetEngine = typeof config.assetEngine === 'function' ? assetEngineRef : null;
     assetEngineRef = null;
-    if (ownedAssetEngine) void ownedAssetEngine.destroy();
+    if (ownedAssetEngine) {
+      void Promise.resolve(ownedAssetEngine)
+        .then((engine) => engine.destroy())
+        .catch(() => {});
+    }
   });
 
   return {

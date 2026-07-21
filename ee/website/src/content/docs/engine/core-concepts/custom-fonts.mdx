@@ -28,9 +28,9 @@ Load the font bytes however you like (fetch, a bundler asset, a file input) and 
 them to `register` with a stable `key` you'll reference later.
 
 ```ts
-import { createLocalEngineWithWorker } from '@embedpdf/engine';
+import { localEngine } from '@embedpdf/engine';
 
-const engine = await createLocalEngineWithWorker({ worker });
+const engine = localEngine();
 
 const data = new Uint8Array(
   await (await fetch('/fonts/NotoSansSC-Regular.otf')).arrayBuffer(),

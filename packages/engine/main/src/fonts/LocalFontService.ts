@@ -98,6 +98,40 @@ export class LocalFontService implements FontService {
     });
   }
 
+  /**
+   * Record a font the boot pipeline already registered on the host by raw
+   * transport send (boot-config fonts bypass the queue: they must reach the
+   * worker before any buffered user job flushes, and going through the queue
+   * during boot would deadlock on the concurrency slot a buffered `open()`
+   * already holds). Keeps `list()`, idempotent `register()`, and `replay()`
+   * consistent with what the worker has.
+   *
+   * @internal — not part of the public FontService contract.
+   */
+  seedRegistered(spec: FontSpec, opts: { fallback?: boolean } = {}): FontHandle {
+    const key = spec.key;
+    let entry = this.fonts.get(key);
+    if (!entry) {
+      entry = {
+        handle: {
+          key,
+          familyName: spec.familyName ?? '',
+          weight: spec.weight ?? 0,
+          italic: spec.italic ?? false,
+        },
+        italic: spec.italic === undefined ? -1 : spec.italic ? 1 : 0,
+        weight: spec.weight ?? 0,
+        familyName: spec.familyName ?? '',
+        bytes: toArrayBuffer(spec.data),
+      };
+      this.fonts.set(key, entry);
+    }
+    if (opts.fallback && !this.fallbacks.includes(key)) {
+      this.fallbacks.push(key);
+    }
+    return entry.handle;
+  }
+
   registerAll(specs: FontSpec[]): AbortablePromise<FontHandle[]> {
     return AbortablePromise.run<FontHandle[]>(async (signal) => {
       const handles: FontHandle[] = [];
