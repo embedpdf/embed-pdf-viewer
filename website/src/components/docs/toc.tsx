@@ -1,6 +1,7 @@
 import type { ReactNode } from 'react';
 
 import { Feedback } from './feedback';
+import { PageMarkdownActions } from './page-markdown-actions';
 
 export type TocItem = {
   value: ReactNode;
@@ -43,6 +44,7 @@ export function Toc({
           );
         })}
       </ul>
+      <PageMarkdownActions />
       <Feedback site="embedpdf" sectionId={activeId} revision={revision} variant="compact" />
     </aside>
   );

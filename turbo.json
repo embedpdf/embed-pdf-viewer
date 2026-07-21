@@ -8,7 +8,7 @@
     },
     "@embedpdf/website#build": {
       "dependsOn": ["^build"],
-      "outputs": [".next/**", "!.next/cache/**"]
+      "outputs": [".next/**", "!.next/cache/**", "public/demos/**"]
     },
     "check-types": {
       "dependsOn": ["^check-types"]

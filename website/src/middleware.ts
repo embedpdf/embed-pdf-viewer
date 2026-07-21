@@ -10,6 +10,15 @@ import { DEFAULT_FRAMEWORK, FRAMEWORK_COOKIE, isFramework } from '@/lib/framewor
  */
 export function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
+
+  // Public Markdown representations are served by a statically generated
+  // Route Handler while retaining the discoverable `<page>.md` URL.
+  if (pathname.startsWith('/docs/') && pathname.endsWith('.md')) {
+    const url = request.nextUrl.clone();
+    url.pathname = `/api/docs/markdown${pathname.slice(0, -3)}`;
+    return NextResponse.rewrite(url);
+  }
+
   const segments = pathname.split('/');
   // /docs/headless or /docs/headless/<not-a-framework>/…
   if (segments[2] === 'headless' && !isFramework(segments[3])) {
@@ -24,5 +33,5 @@ export function middleware(request: NextRequest) {
 }
 
 export const config = {
-  matcher: '/docs/headless/:path*',
+  matcher: '/docs/:path*',
 };

@@ -3,13 +3,7 @@ import path from 'node:path';
 
 import { visit } from 'unist-util-visit';
 
-interface FileInfo {
-  filename: string;
-  code: string;
-  language: string;
-  fullPath: string;
-  githubUrl?: string;
-}
+import { collectSampleFiles, readDocsCodeFile, type DocsCodeFile } from './docs-samples';
 
 interface RemarkCodeExampleOptions {
   /**
@@ -20,44 +14,6 @@ interface RemarkCodeExampleOptions {
   githubBaseUrl?: string;
 }
 
-const languageMap: Record<string, string> = {
-  ts: 'typescript',
-  tsx: 'tsx',
-  js: 'javascript',
-  jsx: 'jsx',
-  vue: 'vue',
-  svelte: 'svelte',
-  css: 'css',
-  html: 'html',
-  json: 'json',
-  md: 'markdown',
-  mdx: 'mdx',
-};
-
-function readCodeFile(codePath: string, githubBaseUrl?: string): FileInfo | null {
-  const absolutePath = path.resolve(process.cwd(), 'src', codePath);
-
-  try {
-    const code = fs.readFileSync(absolutePath, 'utf-8');
-    const ext = path.extname(codePath).slice(1);
-    const filename = path.basename(codePath);
-
-    const repoRelativePath = path.relative(process.cwd(), absolutePath);
-    const normalizedPath = repoRelativePath.split(path.sep).join('/');
-
-    return {
-      filename,
-      code,
-      language: languageMap[ext] || ext,
-      fullPath: codePath,
-      githubUrl: githubBaseUrl ? `${githubBaseUrl}${normalizedPath}` : undefined,
-    };
-  } catch {
-    console.warn(`[remark-code-example] Could not read file: ${absolutePath}`);
-    return null;
-  }
-}
-
 /**
  * Remark plugin that processes <CodeExample> components, reading the referenced
  * source files from disk so they can be highlighted and displayed.
@@ -66,8 +22,6 @@ function readCodeFile(codePath: string, githubBaseUrl?: string): FileInfo | null
  *   <CodeExample codePath="content/docs/.../example.tsx"><Demo /></CodeExample>
  *   <CodeExample codePaths={["a.tsx", "b.css"]}><Demo /></CodeExample>
  */
-const SAMPLE_FRAMEWORKS = ['react', 'vue', 'svelte', 'angular'] as const;
-
 let demoManifestCache: Record<string, Record<string, string>> | null = null;
 function readDemoManifest(): Record<string, Record<string, string>> {
   if (demoManifestCache) return demoManifestCache;
@@ -82,41 +36,6 @@ function readDemoManifest(): Record<string, Record<string, string>> {
     demoManifestCache = {};
   }
   return demoManifestCache!;
-}
-
-/**
- * `<Example name="topic/base" />` — the framework-resolved sample display
- * (DOCS-ARCHITECTURE.md pillar 3). Collects `src/samples/<topic>/<base>.<fw>.*`
- * for EVERY framework at build time (one compiled MDX serves all framework
- * routes); the client component picks the active framework from the pathname.
- * A missing file is an honest gap the component surfaces, not an error.
- */
-function collectSampleFiles(name: string, githubBaseUrl?: string) {
-  const byFramework: Record<string, FileInfo[]> = {};
-  const sampleDir = path.resolve(process.cwd(), 'src', 'samples', path.dirname(name));
-  const base = path.basename(name);
-  let entries: string[] = [];
-  try {
-    entries = fs.readdirSync(sampleDir);
-  } catch {
-    console.warn(`[remark-code-example] No sample directory for: ${name}`);
-    return byFramework;
-  }
-  for (const fw of SAMPLE_FRAMEWORKS) {
-    const files = entries
-      .filter((f) => f.startsWith(`${base}.${fw}.`))
-      .map((f) =>
-        readCodeFile(
-          `samples/${path.dirname(name)}/${f}`.replace(/^samples/, 'samples'),
-          githubBaseUrl,
-        ),
-      )
-      .filter((f): f is FileInfo => f !== null)
-      // Display names hide the framework infix: basic.react.tsx → basic.tsx
-      .map((f) => ({ ...f, filename: f.filename.replace(`.${fw}.`, '.') }));
-    if (files.length > 0) byFramework[fw] = files;
-  }
-  return byFramework;
 }
 
 export const remarkCodeExample = (options: RemarkCodeExampleOptions = {}) => {
@@ -187,9 +106,9 @@ export const remarkCodeExample = (options: RemarkCodeExampleOptions = {}) => {
 
       if (paths.length === 0) return;
 
-      const files: FileInfo[] = paths
-        .map((p) => readCodeFile(p, githubBaseUrl))
-        .filter((f): f is FileInfo => f !== null);
+      const files: DocsCodeFile[] = paths
+        .map((p) => readDocsCodeFile(p, githubBaseUrl))
+        .filter((f): f is DocsCodeFile => f !== null);
 
       if (files.length === 0) return;
 
