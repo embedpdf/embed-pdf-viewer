@@ -8,8 +8,7 @@ import { unified } from 'unified';
 
 import { collectSampleFiles, readDocsCodeFile, type DocsCodeFile } from './docs-samples';
 import { FRAMEWORK_LABELS, frameworkHref, isFramework, type Framework } from './frameworks';
-
-const SITE_ORIGIN = 'https://www.embedpdf.com';
+import { SITE_ORIGIN } from './site';
 
 type AstNode = {
   type: string;

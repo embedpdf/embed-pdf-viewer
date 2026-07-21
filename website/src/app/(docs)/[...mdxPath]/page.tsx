@@ -4,8 +4,8 @@ import { Fragment } from 'react';
 
 import { useMDXComponents as getMDXComponents } from '../../../../mdx-components';
 
+import { getDocsPagePresentation } from '@/lib/docs-page';
 import { expandDocsStaticParams, resolveDocsPath } from '@/lib/docs-route';
-import { FRAMEWORK_LABELS } from '@/lib/frameworks';
 
 const nextraParams = generateStaticParamsFor('mdxPath');
 
@@ -25,17 +25,42 @@ type PageProps = Readonly<{
 }>;
 
 export async function generateMetadata(props: PageProps) {
-  const params = await props.params;
-  const resolved = resolveDocsPath(params.mdxPath);
-  if (!resolved) return {};
-  const { metadata } = await importPage(resolved.contentPath);
-  if (resolved.framework && metadata?.title) {
-    return {
-      ...metadata,
-      title: `${metadata.title} — ${FRAMEWORK_LABELS[resolved.framework]}`,
-    };
-  }
-  return metadata;
+  const { mdxPath } = await props.params;
+  const page = await getDocsPagePresentation(mdxPath);
+  if (!page) return {};
+  const socialImage = {
+    url: page.socialImagePath,
+    alt: `${page.title} | EmbedPDF documentation`,
+    width: 1200,
+    height: 630,
+    type: 'image/png',
+  };
+
+  return {
+    ...page.metadata,
+    title: page.title,
+    description: page.description,
+    alternates: {
+      ...(page.metadata.alternates ?? {}),
+      canonical: page.canonicalUrl,
+    },
+    openGraph: {
+      ...(page.metadata.openGraph ?? {}),
+      title: page.title,
+      description: page.socialDescription,
+      siteName: 'EmbedPDF',
+      type: 'article',
+      url: page.canonicalPath,
+      images: [socialImage],
+    },
+    twitter: {
+      ...(page.metadata.twitter ?? {}),
+      card: 'summary_large_image',
+      title: page.title,
+      description: page.socialDescription,
+      images: [socialImage],
+    },
+  };
 }
 
 const Wrapper = getMDXComponents().wrapper ?? Fragment;

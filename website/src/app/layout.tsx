@@ -4,6 +4,7 @@ import type { ReactNode } from 'react';
 
 import { Footer } from '@/components/site/footer';
 import { Header } from '@/components/site/header';
+import { getMetadataBase } from '@/lib/site';
 
 import './globals.css';
 
@@ -22,6 +23,7 @@ const manrope = Manrope({
 });
 
 export const metadata: Metadata = {
+  metadataBase: getMetadataBase(),
   title: 'EmbedPDF — Open Source PDF Solutions',
   description:
     'The ultimate Open Source PDF viewer for JavaScript. Choose our drop-in component for instant results, or use our headless library to build a completely custom UI. Apache-2.0 licensed.',
