@@ -121,6 +121,33 @@ html {
   color: #f78c6c;
 }
 
+/* ---- Dark code-surface scrollbar (browser defaults are built for white
+   pages and glow on the navy cards; MUI-style inset pill instead). Apply to
+   every scroll container whose background is the dark code palette. ---- */
+.ep-dark-scroll {
+  scrollbar-width: thin;
+  scrollbar-color: #2e3f6e transparent;
+}
+.ep-dark-scroll::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+.ep-dark-scroll::-webkit-scrollbar-track {
+  background: transparent;
+}
+.ep-dark-scroll::-webkit-scrollbar-thumb {
+  background: #2e3f6e;
+  border-radius: 999px;
+  border: 3px solid transparent;
+  background-clip: content-box;
+}
+.ep-dark-scroll::-webkit-scrollbar-thumb:hover {
+  background-color: #3d538f;
+}
+.ep-dark-scroll::-webkit-scrollbar-corner {
+  background: transparent;
+}
+
 /* ---- Docs prose (ported from the ee docs theme, EmbedPDF tokens) ---- */
 .prose-embedpdf :not(pre) > code {
   border-radius: 6px;

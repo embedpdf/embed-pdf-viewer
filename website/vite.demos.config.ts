@@ -7,15 +7,18 @@ import react from '@vitejs/plugin-react';
 import vue from '@vitejs/plugin-vue';
 import { defineConfig, type Plugin } from 'vite';
 
+import { discoverSampleVariants } from './src/lib/sample-discovery';
+
 /**
  * The live-demo half of the samples pipeline (DOCS-ARCHITECTURE.md pillar 3).
  *
- * Every `src/samples/<topic>/<base>.<fw>.<ext>` sample is wrapped in a
- * virtual entry exporting `mount(el) => unmount`, compiled by the framework's
- * own Vite plugin (this is how .vue/.svelte run inside a Next site with zero
- * webpack surgery), and emitted self-contained into `public/demos/` — the
- * docs load them with a NATIVE dynamic import at runtime. The engine and its
- * wasm ride along as ordinary Vite assets, exactly like the example apps.
+ * Every sample variant (single `<base>.<fw>.<ext>` file or `<base>.<fw>/`
+ * directory — see src/lib/sample-discovery.ts) is wrapped in a virtual entry
+ * exporting `mount(el) => unmount`, compiled by the framework's own Vite
+ * plugin (this is how .vue/.svelte run inside a Next site with zero webpack
+ * surgery), and emitted self-contained into `public/demos/` — the docs load
+ * them with a NATIVE dynamic import at runtime. The engine and its wasm ride
+ * along as ordinary Vite assets, exactly like the example apps.
  */
 const ROOT = path.dirname(fileURLToPath(import.meta.url));
 const SAMPLES = path.join(ROOT, 'src', 'samples');
@@ -47,27 +50,7 @@ const MOUNTABLE: Record<string, (abs: string) => string> = {
     }`,
 };
 
-type DemoEntry = { name: string; fw: string; abs: string };
-
-function discoverDemos(): DemoEntry[] {
-  const demos: DemoEntry[] = [];
-  if (!fs.existsSync(SAMPLES)) return demos;
-  for (const topic of fs.readdirSync(SAMPLES, { withFileTypes: true })) {
-    if (!topic.isDirectory()) continue;
-    for (const file of fs.readdirSync(path.join(SAMPLES, topic.name))) {
-      const match = file.match(/^(.+)\.(react|vue|svelte)\.[a-z]+$/);
-      if (!match) continue;
-      demos.push({
-        name: `${topic.name}/${match[1]}.${match[2]}`,
-        fw: match[2],
-        abs: path.join(SAMPLES, topic.name, file),
-      });
-    }
-  }
-  return demos;
-}
-
-const demos = discoverDemos();
+const demos = discoverSampleVariants(SAMPLES, ['react', 'vue', 'svelte']);
 const VIRTUAL_PREFIX = 'virtual:demo/';
 
 function demoEntriesPlugin(): Plugin {
@@ -84,7 +67,7 @@ function demoEntriesPlugin(): Plugin {
       const name = id.slice(VIRTUAL_PREFIX.length + 1).replace(/\.entry\.js$/, '');
       const demo = demos.find((d) => d.name === name);
       if (!demo) return null;
-      return MOUNTABLE[demo.fw](demo.abs);
+      return MOUNTABLE[demo.fw](demo.entry);
     },
     writeBundle() {
       // The manifest the docs build reads to know which demos exist.

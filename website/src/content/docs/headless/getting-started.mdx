@@ -66,7 +66,7 @@ in a worker in the background, so the stage and render layer draw the pages the
 moment a document is ready — no worker wiring, no lifecycle to manage. This is
 the whole app:
 
-<Example name="getting-started/basic" />
+<Example name="getting-started/basic" mode="open" />
 
 Prefer the viewer to own the engine's lifetime — created on mount, destroyed on
 unmount? Pass a thunk instead: `engine={() => localEngine()}`. See the

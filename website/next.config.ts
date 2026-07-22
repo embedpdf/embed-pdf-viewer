@@ -26,6 +26,18 @@ const overrideNpm2YarnImports = () => (tree: any) => {
   return tree;
 };
 
+// GitHub "view source" base for docs samples. Derived from Vercel's git
+// system env vars (same convention as the commit-SHA reads in mdx.tsx /
+// docs-feedback-store.ts) so every deployment — production and a preview of
+// any branch — links to the exact ref it was built from; there's no `next`→
+// `main` flip to remember at launch. Falls back to the repo default for
+// local / non-Vercel builds.
+const githubOwner = process.env.VERCEL_GIT_REPO_OWNER ?? 'embedpdf';
+const githubRepo = process.env.VERCEL_GIT_REPO_SLUG ?? 'embed-pdf-viewer';
+const githubRef = process.env.VERCEL_GIT_COMMIT_REF ?? process.env.GIT_COMMIT_REF ?? 'main';
+// The website lives at <repo>/website/; sample paths resolve relative to it.
+const githubBaseUrl = `https://github.com/${githubOwner}/${githubRepo}/blob/${githubRef}/website/`;
+
 const withNextra = nextra({
   mdxOptions: {
     rehypePrettyCodeOptions: {
@@ -42,7 +54,7 @@ const withNextra = nextra({
         },
       ],
       overrideNpm2YarnImports,
-      remarkCodeExample,
+      [remarkCodeExample, { githubBaseUrl }],
     ],
     rehypePlugins: [rehypeCodeExample],
   },

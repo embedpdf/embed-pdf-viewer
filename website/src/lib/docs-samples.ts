@@ -2,6 +2,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 
 import { DOCS_INTEGRATIONS, type DocsIntegration } from './docs-integrations';
+import { SAMPLE_ENTRY_FILENAMES } from './sample-discovery';
 
 export type DocsExampleVariant = DocsIntegration;
 const DOCS_EXAMPLE_VARIANTS = DOCS_INTEGRATIONS;
@@ -76,6 +77,26 @@ export function collectSampleFiles(name: string, githubBaseUrl?: string) {
   }
 
   for (const variant of DOCS_EXAMPLE_VARIANTS) {
+    // Multi-file shape: a `<base>.<variant>/` directory of real files. Tabs
+    // show their true names, entry (App.*) first, rest alphabetical.
+    const variantDir = path.join(sampleDirectory, `${base}.${variant}`);
+    if (entries.includes(`${base}.${variant}`) && fs.statSync(variantDir).isDirectory()) {
+      const entryName = SAMPLE_ENTRY_FILENAMES[variant];
+      const files = fs
+        .readdirSync(variantDir)
+        .sort((a, b) => (a === entryName ? -1 : b === entryName ? 1 : a.localeCompare(b)))
+        .map((file) =>
+          readDocsCodeFile(
+            `samples/${path.dirname(name)}/${base}.${variant}/${file}`,
+            githubBaseUrl,
+          ),
+        )
+        .filter((file): file is DocsCodeFile => file !== null);
+
+      if (files.length > 0) byVariant[variant] = files;
+      continue;
+    }
+
     const files = entries
       .filter((file) => file.startsWith(`${base}.${variant}.`))
       .sort()

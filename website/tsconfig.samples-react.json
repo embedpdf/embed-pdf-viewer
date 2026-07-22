@@ -11,6 +11,10 @@
     "lib": ["ES2022", "DOM", "DOM.Iterable"],
     "noEmit": true
   },
-  "include": ["src/samples/**/*.react.tsx", "src/samples/samples-env.d.ts"],
+  "include": [
+    "src/samples/**/*.react.tsx",
+    "src/samples/**/*.react/**/*",
+    "src/samples/samples-env.d.ts"
+  ],
   "exclude": ["src/samples/viewer/**/*"]
 }

@@ -12,7 +12,11 @@
     "noEmit": true,
     "types": []
   },
-  "include": ["src/samples/**/*.angular.ts", "src/samples/samples-env.d.ts"],
+  "include": [
+    "src/samples/**/*.angular.ts",
+    "src/samples/**/*.angular/**/*.ts",
+    "src/samples/samples-env.d.ts"
+  ],
   "exclude": ["src/samples/viewer/**/*"],
   "angularCompilerOptions": {
     "strictTemplates": true

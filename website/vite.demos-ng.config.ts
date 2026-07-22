@@ -4,6 +4,8 @@ import { fileURLToPath } from 'node:url';
 
 import { defineConfig, type Plugin } from 'vite';
 
+import { discoverSampleVariants } from './src/lib/sample-discovery';
+
 /**
  * The Angular half of the live-demo pipeline — a SEPARATE Vite pass because
  * Angular needs its own esbuild dialect (experimentalDecorators +
@@ -18,34 +20,15 @@ import { defineConfig, type Plugin } from 'vite';
 const ROOT = path.dirname(fileURLToPath(import.meta.url));
 const SAMPLES = path.join(ROOT, 'src', 'samples');
 
-type DemoEntry = { name: string; abs: string };
-
-function discoverAngularDemos(): DemoEntry[] {
-  const demos: DemoEntry[] = [];
-  if (!fs.existsSync(SAMPLES)) return demos;
-  for (const topic of fs.readdirSync(SAMPLES, { withFileTypes: true })) {
-    if (!topic.isDirectory()) continue;
-    for (const file of fs.readdirSync(path.join(SAMPLES, topic.name))) {
-      const match = file.match(/^(.+)\.angular\.ts$/);
-      if (!match) continue;
-      demos.push({
-        name: `${topic.name}/${match[1]}.angular`,
-        abs: path.join(SAMPLES, topic.name, file),
-      });
-    }
-  }
-  return demos;
-}
-
-const demos = discoverAngularDemos();
+const demos = discoverSampleVariants(SAMPLES, ['angular']);
 const ENTRIES_DIR = path.join(ROOT, '.demo-ng-entries');
 
-function mountWrapper(abs: string): string {
+function mountWrapper(entryAbs: string): string {
   return `
     import '@angular/compiler';
     import { provideZonelessChangeDetection } from '@angular/core';
     import { bootstrapApplication } from '@angular/platform-browser';
-    import { App } from ${JSON.stringify(abs.replace(/\.ts$/, ''))};
+    import { App } from ${JSON.stringify(entryAbs.replace(/\.ts$/, ''))};
     export function mount(el) {
       const host = document.createElement('demo-root');
       el.appendChild(host);
@@ -66,7 +49,7 @@ function writeEntryFiles(): Record<string, string> {
   const input: Record<string, string> = {};
   for (const demo of demos) {
     const file = path.join(ENTRIES_DIR, `${demo.name.replace(/\//g, '__')}.entry.ts`);
-    fs.writeFileSync(file, mountWrapper(demo.abs));
+    fs.writeFileSync(file, mountWrapper(demo.entry));
     input[demo.name] = file;
   }
   return input;

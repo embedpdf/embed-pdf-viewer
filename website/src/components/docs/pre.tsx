@@ -21,7 +21,7 @@ export function Pre({ children, className, 'data-filename': filename, ...props }
     return (
       <pre
         ref={preRef}
-        className={`m-0 overflow-x-auto px-[18px] py-[17px] font-mono text-[13px] leading-[1.8] text-[#C8D3EA] [&_code]:bg-transparent [&_code]:p-0 ${className ?? ''}`}
+        className={`ep-dark-scroll m-0 overflow-x-auto px-[18px] py-[17px] font-mono text-[13px] leading-[1.8] text-[#C8D3EA] [&_code]:bg-transparent [&_code]:p-0 ${className ?? ''}`}
         {...props}
       >
         {children}
@@ -75,7 +75,7 @@ export function Pre({ children, className, 'data-filename': filename, ...props }
 
       <pre
         ref={preRef}
-        className={`m-0 overflow-x-auto px-[18px] py-[17px] font-mono text-[13px] leading-[1.8] text-[#C8D3EA] [&_code]:bg-transparent [&_code]:p-0 ${className ?? ''}`}
+        className={`ep-dark-scroll m-0 overflow-x-auto px-[18px] py-[17px] font-mono text-[13px] leading-[1.8] text-[#C8D3EA] [&_code]:bg-transparent [&_code]:p-0 ${className ?? ''}`}
         {...props}
       >
         {children}

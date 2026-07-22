@@ -376,3 +376,43 @@ export const GithubIcon = GitHubIcon;
 export const ReactLogo = ReactIcon;
 export const VueLogo = VueIcon;
 export const SvelteLogo = SvelteIcon;
+
+export function EyeIcon({ size = 14, ...props }: IconProps) {
+  return (
+    <svg
+      width={size}
+      height={size}
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      {...props}
+    >
+      <path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7z" />
+      <circle cx="12" cy="12" r="3" />
+    </svg>
+  );
+}
+
+export function EyeOffIcon({ size = 14, ...props }: IconProps) {
+  return (
+    <svg
+      width={size}
+      height={size}
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      {...props}
+    >
+      <path d="M17.94 17.94A10.5 10.5 0 0 1 12 19c-6.5 0-10-7-10-7a19.6 19.6 0 0 1 4.06-4.94" />
+      <path d="M9.9 5.24A9.8 9.8 0 0 1 12 5c6.5 0 10 7 10 7a19.7 19.7 0 0 1-2.67 3.55" />
+      <path d="M9.88 9.88a3 3 0 1 0 4.24 4.24" />
+      <path d="M2 2l20 20" />
+    </svg>
+  );
+}
