@@ -6,7 +6,7 @@ import { describe, expect, it } from 'vitest';
 import { renderDocsMarkdown } from './docs-markdown';
 
 const gettingStarted = fs.readFileSync(
-  path.resolve(process.cwd(), 'src/content/docs/headless/getting-started.mdx'),
+  path.resolve(process.cwd(), 'src/content/docs/headless/getting-started/index.mdx'),
   'utf8',
 );
 const viewerGettingStarted = fs.readFileSync(

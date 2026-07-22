@@ -1,6 +1,4 @@
 export default {
-  'getting-started': {
-    title: 'Getting Started',
-    type: 'doc',
-  },
+  'getting-started': 'Get Started',
+  plugins: 'Plugins',
 };

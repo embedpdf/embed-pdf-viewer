@@ -9,7 +9,7 @@ import { DocsProductSwitcher } from './docs-product-switcher';
 import { IntegrationSwitcher } from './integration';
 
 import { docsIntegrationFromPath, docsIntegrationHref } from '@/lib/docs-integrations';
-import { DOCS_PRODUCTS, docsProductFromPath } from '@/lib/docs-products';
+import { docsProductFromPath } from '@/lib/docs-products';
 
 type TreeItem = {
   name: string;
@@ -82,14 +82,9 @@ export function Sidebar() {
     <aside className="sticky top-[84px] hidden h-[calc(100vh-84px)] w-[268px] shrink-0 overflow-y-auto pb-16 pr-3.5 pt-[52px] [scrollbar-color:#D5DEEF_transparent] [scrollbar-width:thin] md:block">
       <DocsProductSwitcher />
       <IntegrationSwitcher />
-      <div className="mt-7 border-t border-[#EAEFF7] pt-6 first:mt-0 first:border-t-0 first:pt-0">
-        <p className="font-display text-ep-navy px-3 pb-3 text-[12px] font-extrabold uppercase tracking-[0.11em]">
-          {DOCS_PRODUCTS[product].label}
-        </p>
-        <nav className="ml-3 flex flex-col border-l-[1.5px] border-[#E7EDF6]">
-          <SidebarTree items={docsDirectories as TreeItem[]} pathname={pathname} />
-        </nav>
-      </div>
+      <nav className="mt-7 flex flex-col border-t border-[#EAEFF7] pt-6">
+        <SidebarTree items={docsDirectories as TreeItem[]} pathname={pathname} />
+      </nav>
     </aside>
   );
 }
