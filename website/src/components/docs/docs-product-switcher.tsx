@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import type { ReactNode } from 'react';
+import { useEffect, useRef, type ReactNode } from 'react';
 
 import {
   BoltBadgeIcon,
@@ -32,9 +32,35 @@ const PRODUCT_ICON_STYLES: Record<DocsProduct, string> = {
 };
 
 export function DocsProductSwitcher() {
+  const detailsRef = useRef<HTMLDetailsElement>(null);
+  const summaryRef = useRef<HTMLElement>(null);
   const pathname = usePathname();
   const activeProduct = docsProductFromPath(pathname);
   const activeIntegration = docsIntegrationFromPath(pathname);
+
+  useEffect(() => {
+    const closeOnOutsidePointer = (event: PointerEvent) => {
+      const details = detailsRef.current;
+      if (details?.open && event.target instanceof Node && !details.contains(event.target)) {
+        details.removeAttribute('open');
+      }
+    };
+
+    const closeOnEscape = (event: KeyboardEvent) => {
+      const details = detailsRef.current;
+      if (event.key === 'Escape' && details?.open) {
+        details.removeAttribute('open');
+        summaryRef.current?.focus();
+      }
+    };
+
+    document.addEventListener('pointerdown', closeOnOutsidePointer);
+    document.addEventListener('keydown', closeOnEscape);
+    return () => {
+      document.removeEventListener('pointerdown', closeOnOutsidePointer);
+      document.removeEventListener('keydown', closeOnEscape);
+    };
+  }, []);
 
   if (!activeProduct) return null;
 
@@ -46,8 +72,11 @@ export function DocsProductSwitcher() {
         Documentation
       </span>
 
-      <details className="group relative mt-2">
-        <summary className="border-ep-border text-ep-navy hover:border-ep-blue/40 flex cursor-pointer list-none items-center gap-2.5 rounded-xl border bg-white px-3 py-2.5 font-sans text-[14px] font-bold shadow-[0_8px_24px_-22px_rgba(7,32,76,0.5)] transition-colors [&::-webkit-details-marker]:hidden">
+      <details ref={detailsRef} className="group relative mt-2">
+        <summary
+          ref={summaryRef}
+          className="border-ep-border text-ep-navy hover:border-ep-blue/40 flex cursor-pointer list-none items-center gap-2.5 rounded-xl border bg-white px-3 py-2.5 font-sans text-[14px] font-bold shadow-[0_8px_24px_-22px_rgba(7,32,76,0.5)] transition-colors [&::-webkit-details-marker]:hidden"
+        >
           <span
             className={`inline-flex h-7 w-7 items-center justify-center rounded-lg ${PRODUCT_ICON_STYLES[activeProduct]}`}
           >
