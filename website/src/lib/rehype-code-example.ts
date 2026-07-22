@@ -85,11 +85,14 @@ function highlightFile(highlighter: any, file: FileInfo): FileInfo {
       lang: file.language,
       theme: CODE_THEME,
     });
+    // Keep shiki's markup verbatim. Its lines are inline `<span class="line">`
+    // joined by real newlines, which the `<pre>` renderer turns into line
+    // breaks directly — so an empty line is one `\n` and needs no help. (Do
+    // NOT inject a `\n` into empty line spans: that only made sense for v2's
+    // `display:grid` code where inter-line whitespace is dropped; under a
+    // plain `<pre>` it double-spaces every blank line.)
     const innerMatch = highlighted.match(/<code[^>]*>([\s\S]*)<\/code>/);
-    const innerHtml = (innerMatch ? innerMatch[1] : highlighted).replace(
-      /<span class="line"><\/span>/g,
-      '<span class="line">\n</span>',
-    );
+    const innerHtml = innerMatch ? innerMatch[1] : highlighted;
     return { ...file, highlightedCode: innerHtml };
   } catch (err) {
     console.warn(`[rehype-code-example] Failed to highlight ${file.filename}:`, err);
@@ -138,27 +141,7 @@ export const rehypeCodeExample = () => {
     });
 
     for (const { node, files } of nodesToProcess) {
-      const highlightedFiles: FileInfo[] = [];
-
-      for (const file of files) {
-        try {
-          const highlighted = highlighter.codeToHtml(file.code.trim(), {
-            lang: file.language,
-            theme: CODE_THEME,
-          });
-
-          const innerMatch = highlighted.match(/<code[^>]*>([\s\S]*)<\/code>/);
-          const innerHtml = (innerMatch ? innerMatch[1] : highlighted).replace(
-            /<span class="line"><\/span>/g,
-            '<span class="line">\n</span>',
-          );
-
-          highlightedFiles.push({ ...file, highlightedCode: innerHtml });
-        } catch (err) {
-          console.warn(`[rehype-code-example] Failed to highlight ${file.filename}:`, err);
-          highlightedFiles.push(file);
-        }
-      }
+      const highlightedFiles: FileInfo[] = files.map((file) => highlightFile(highlighter, file));
 
       node.attributes = node.attributes.filter(
         (attr: any) => attr.name !== '__needsHighlighting' && attr.name !== '__codeFiles',
