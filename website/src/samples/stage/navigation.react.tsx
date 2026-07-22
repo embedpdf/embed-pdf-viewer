@@ -5,6 +5,17 @@ import { Stage, stagePlugin, usePages } from '@embedpdf/react/stage';
 import { RenderLayer, renderPlugin } from '@embedpdf/react/render';
 import { localEngine } from '@embedpdf/engine';
 
+import {
+  Demo,
+  Toolbar,
+  Button,
+  Badge,
+  TextInput,
+  Spacer,
+  StageFrame,
+  stageFill,
+} from './_shared/chrome';
+
 const engine = localEngine();
 const plugins = [stagePlugin(), renderPlugin()];
 
@@ -22,35 +33,32 @@ function PageToolbar() {
     setTyped('');
   };
   return (
-    <div style={{ display: 'flex', gap: 8, alignItems: 'center', padding: '8px 0' }}>
-      <button onClick={() => prev()}>‹ Previous</button>
-      <span>
-        Page {currentPage + 1} of {pageCount}
-      </span>
-      <button onClick={() => next()}>Next ›</button>
-      <span style={{ width: 12 }} />
-      <input
-        value={typed}
-        onChange={(e) => setTyped(e.target.value)}
-        onKeyDown={(e) => e.key === 'Enter' && jump()}
-        placeholder="Go to page…"
-        style={{ width: 100 }}
-      />
-    </div>
+    <Toolbar>
+      <Button onClick={() => prev()}>‹ Previous</Button>
+      <Badge>
+        Page{' '}
+        <strong>
+          {currentPage + 1} / {pageCount}
+        </strong>
+      </Badge>
+      <Button onClick={() => next()}>Next ›</Button>
+      <Spacer />
+      <TextInput value={typed} onChange={setTyped} onEnter={jump} placeholder="Go to page…" />
+    </Toolbar>
   );
 }
 
 export default function App() {
   return (
     <Viewer engine={engine} plugins={plugins} initialDocuments={[{ source: ebook }]}>
-      <DocumentGate fallback={<p>Loading…</p>}>
-        <PageToolbar />
-        <div style={{ height: 420 }}>
-          <Stage style={{ height: '100%', background: '#f1f5f9', borderRadius: 8 }}>
-            {() => <RenderLayer />}
-          </Stage>
-        </div>
-      </DocumentGate>
+      <Demo>
+        <DocumentGate fallback={<p>Loading…</p>}>
+          <PageToolbar />
+          <StageFrame height={420}>
+            <Stage style={stageFill}>{() => <RenderLayer />}</Stage>
+          </StageFrame>
+        </DocumentGate>
+      </Demo>
     </Viewer>
   );
 }

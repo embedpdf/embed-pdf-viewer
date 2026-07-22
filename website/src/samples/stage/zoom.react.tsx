@@ -4,6 +4,17 @@ import { Stage, stagePlugin, useZoom } from '@embedpdf/react/stage';
 import { RenderLayer, renderPlugin } from '@embedpdf/react/render';
 import { localEngine } from '@embedpdf/engine';
 
+import {
+  Demo,
+  Toolbar,
+  Button,
+  Segmented,
+  Readout,
+  Spacer,
+  StageFrame,
+  stageFill,
+} from './_shared/chrome';
+
 const engine = localEngine();
 const plugins = [stagePlugin(), renderPlugin()];
 
@@ -14,35 +25,45 @@ const ebook = async (): Promise<OpenInput> => {
 
 function ZoomToolbar() {
   const { zoom, mode, zoomIn, zoomOut, fitPage, fitWidth, automatic } = useZoom();
-  const fit = (label: string, active: boolean, onClick: () => void) => (
-    <button onClick={onClick} style={{ fontWeight: active ? 'bold' : 'normal' }}>
-      {label}
-    </button>
-  );
+  const setFit = (next: string) => {
+    if (next === 'automatic') automatic();
+    else if (next === 'fit-page') fitPage();
+    else if (next === 'fit-width') fitWidth();
+  };
   return (
-    <div style={{ display: 'flex', gap: 8, alignItems: 'center', padding: '8px 0' }}>
-      <button onClick={zoomOut}>−</button>
-      <span style={{ minWidth: 48, textAlign: 'center' }}>{Math.round(zoom * 100)}%</span>
-      <button onClick={zoomIn}>+</button>
-      <span style={{ width: 12 }} />
-      {fit('Automatic', mode === 'automatic', automatic)}
-      {fit('Fit page', mode === 'fit-page', fitPage)}
-      {fit('Fit width', mode === 'fit-width', fitWidth)}
-    </div>
+    <Toolbar>
+      <Button icon onClick={zoomOut} title="Zoom out">
+        −
+      </Button>
+      <Readout>{Math.round(zoom * 100)}%</Readout>
+      <Button icon onClick={zoomIn} title="Zoom in">
+        +
+      </Button>
+      <Spacer />
+      <Segmented
+        value={mode}
+        onChange={setFit}
+        options={[
+          { value: 'automatic', label: 'Automatic' },
+          { value: 'fit-page', label: 'Fit page' },
+          { value: 'fit-width', label: 'Fit width' },
+        ]}
+      />
+    </Toolbar>
   );
 }
 
 export default function App() {
   return (
     <Viewer engine={engine} plugins={plugins} initialDocuments={[{ source: ebook }]}>
-      <DocumentGate fallback={<p>Loading…</p>}>
-        <ZoomToolbar />
-        <div style={{ height: 420 }}>
-          <Stage style={{ height: '100%', background: '#f1f5f9', borderRadius: 8 }}>
-            {() => <RenderLayer />}
-          </Stage>
-        </div>
-      </DocumentGate>
+      <Demo>
+        <DocumentGate fallback={<p>Loading…</p>}>
+          <ZoomToolbar />
+          <StageFrame height={420}>
+            <Stage style={stageFill}>{() => <RenderLayer />}</Stage>
+          </StageFrame>
+        </DocumentGate>
+      </Demo>
     </Viewer>
   );
 }

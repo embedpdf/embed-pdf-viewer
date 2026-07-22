@@ -6,6 +6,8 @@ import type { StageSettings } from '@embedpdf/react/stage';
 import { RenderLayer, renderPlugin } from '@embedpdf/react/render';
 import { localEngine } from '@embedpdf/engine';
 
+import { Demo, Toolbar, Button, Segmented, Spacer, StageFrame, stageFill } from './_shared/chrome';
+
 const engine = localEngine();
 const plugins = [stagePlugin(), renderPlugin()];
 
@@ -26,46 +28,44 @@ const ebook = async (): Promise<OpenInput> => {
   return { kind: 'bytes', id: 'ebook', bytes: new Uint8Array(await response.arrayBuffer()) };
 };
 
+type Feel = 'reading' | 'presentation';
+
 function FeelSwitcher() {
   const { update } = useStageSettings();
   const { next, prev } = usePages();
-  const [feel, setFeel] = useState<'reading' | 'presentation'>('reading');
-  const pick = (name: 'reading' | 'presentation', preset: Partial<StageSettings>) => {
+  const [feel, setFeel] = useState<Feel>('reading');
+  const pick = (name: Feel) => {
     setFeel(name);
-    update(preset);
+    update(name === 'reading' ? READING : PRESENTATION);
   };
   return (
-    <div style={{ display: 'flex', gap: 8, alignItems: 'center', padding: '8px 0' }}>
-      <button
-        onClick={() => pick('reading', READING)}
-        style={{ fontWeight: feel === 'reading' ? 'bold' : 'normal' }}
-      >
-        Reading feel
-      </button>
-      <button
-        onClick={() => pick('presentation', PRESENTATION)}
-        style={{ fontWeight: feel === 'presentation' ? 'bold' : 'normal' }}
-      >
-        Presentation feel
-      </button>
-      <span style={{ flex: 1 }} />
-      <button onClick={() => prev()}>‹ Previous</button>
-      <button onClick={() => next()}>Next ›</button>
-    </div>
+    <Toolbar>
+      <Segmented<Feel>
+        value={feel}
+        onChange={pick}
+        options={[
+          { value: 'reading', label: 'Reading feel' },
+          { value: 'presentation', label: 'Presentation feel' },
+        ]}
+      />
+      <Spacer />
+      <Button onClick={() => prev()}>‹ Previous</Button>
+      <Button onClick={() => next()}>Next ›</Button>
+    </Toolbar>
   );
 }
 
 export default function App() {
   return (
     <Viewer engine={engine} plugins={plugins} initialDocuments={[{ source: ebook }]}>
-      <DocumentGate fallback={<p>Loading…</p>}>
-        <FeelSwitcher />
-        <div style={{ height: 420 }}>
-          <Stage style={{ height: '100%', background: '#f1f5f9', borderRadius: 8 }}>
-            {() => <RenderLayer />}
-          </Stage>
-        </div>
-      </DocumentGate>
+      <Demo>
+        <DocumentGate fallback={<p>Loading…</p>}>
+          <FeelSwitcher />
+          <StageFrame height={420}>
+            <Stage style={stageFill}>{() => <RenderLayer />}</Stage>
+          </StageFrame>
+        </DocumentGate>
+      </Demo>
     </Viewer>
   );
 }

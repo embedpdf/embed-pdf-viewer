@@ -4,6 +4,8 @@ import { Stage, stagePlugin, useStage } from '@embedpdf/react/stage';
 import { RenderLayer, renderPlugin } from '@embedpdf/react/render';
 import { localEngine } from '@embedpdf/engine';
 
+import { Demo, Toolbar, Button, StageFrame, stageFill } from './_shared/chrome';
+
 const engine = localEngine();
 const plugins = [stagePlugin(), renderPlugin()];
 
@@ -15,24 +17,24 @@ const ebook = async (): Promise<OpenInput> => {
 function RotateButtons() {
   const stage = useStage();
   return (
-    <div style={{ display: 'flex', gap: 8, padding: '8px 0' }}>
-      <button onClick={() => stage.rotateView(-90)}>⟲ Rotate left</button>
-      <button onClick={() => stage.rotateView(90)}>⟳ Rotate right</button>
-    </div>
+    <Toolbar>
+      <Button onClick={() => stage.rotateView(-90)}>⟲ Rotate left</Button>
+      <Button onClick={() => stage.rotateView(90)}>⟳ Rotate right</Button>
+    </Toolbar>
   );
 }
 
 export default function App() {
   return (
     <Viewer engine={engine} plugins={plugins} initialDocuments={[{ source: ebook }]}>
-      <DocumentGate fallback={<p>Loading…</p>}>
-        <RotateButtons />
-        <div style={{ height: 420 }}>
-          <Stage style={{ height: '100%', background: '#f1f5f9', borderRadius: 8 }}>
-            {() => <RenderLayer />}
-          </Stage>
-        </div>
-      </DocumentGate>
+      <Demo>
+        <DocumentGate fallback={<p>Loading…</p>}>
+          <RotateButtons />
+          <StageFrame height={420}>
+            <Stage style={stageFill}>{() => <RenderLayer />}</Stage>
+          </StageFrame>
+        </DocumentGate>
+      </Demo>
     </Viewer>
   );
 }

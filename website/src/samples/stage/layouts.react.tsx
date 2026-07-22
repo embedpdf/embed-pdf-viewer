@@ -5,6 +5,8 @@ import type { FlowMode, LayoutKind, SpreadMode } from '@embedpdf/react/stage';
 import { RenderLayer, renderPlugin } from '@embedpdf/react/render';
 import { localEngine } from '@embedpdf/engine';
 
+import { Demo, Toolbar, Button, Select, Spacer, StageFrame, stageFill } from './_shared/chrome';
+
 const engine = localEngine();
 const plugins = [stagePlugin(), renderPlugin()];
 
@@ -17,48 +19,58 @@ function LayoutControls() {
   const { flow, layout, spread, setFlow, setLayout, setSpread } = useLayout();
   const { next, prev } = usePages();
   return (
-    <div style={{ display: 'flex', gap: 12, alignItems: 'center', padding: '8px 0' }}>
-      <label>
-        Flow{' '}
-        <select value={flow} onChange={(e) => setFlow(e.target.value as FlowMode)}>
-          <option value="continuous">continuous</option>
-          <option value="paged">paged</option>
-        </select>
-      </label>
-      <label>
-        Layout{' '}
-        <select value={layout} onChange={(e) => setLayout(e.target.value as LayoutKind)}>
-          <option value="vertical">vertical</option>
-          <option value="horizontal">horizontal</option>
-          <option value="grid">grid</option>
-        </select>
-      </label>
-      <label>
-        Spread{' '}
-        <select value={spread} onChange={(e) => setSpread(e.target.value as SpreadMode)}>
-          <option value="none">none</option>
-          <option value="odd">odd</option>
-          <option value="even">even</option>
-        </select>
-      </label>
-      <span style={{ flex: 1 }} />
-      <button onClick={() => prev()}>‹</button>
-      <button onClick={() => next()}>›</button>
-    </div>
+    <Toolbar>
+      <Select<FlowMode>
+        label="Flow"
+        value={flow}
+        onChange={setFlow}
+        options={[
+          { value: 'continuous', label: 'continuous' },
+          { value: 'paged', label: 'paged' },
+        ]}
+      />
+      <Select<LayoutKind>
+        label="Layout"
+        value={layout}
+        onChange={setLayout}
+        options={[
+          { value: 'vertical', label: 'vertical' },
+          { value: 'horizontal', label: 'horizontal' },
+          { value: 'grid', label: 'grid' },
+        ]}
+      />
+      <Select<SpreadMode>
+        label="Spread"
+        value={spread}
+        onChange={setSpread}
+        options={[
+          { value: 'none', label: 'none' },
+          { value: 'odd', label: 'odd' },
+          { value: 'even', label: 'even' },
+        ]}
+      />
+      <Spacer />
+      <Button icon onClick={() => prev()} title="Previous">
+        ‹
+      </Button>
+      <Button icon onClick={() => next()} title="Next">
+        ›
+      </Button>
+    </Toolbar>
   );
 }
 
 export default function App() {
   return (
     <Viewer engine={engine} plugins={plugins} initialDocuments={[{ source: ebook }]}>
-      <DocumentGate fallback={<p>Loading…</p>}>
-        <LayoutControls />
-        <div style={{ height: 420 }}>
-          <Stage style={{ height: '100%', background: '#f1f5f9', borderRadius: 8 }}>
-            {() => <RenderLayer />}
-          </Stage>
-        </div>
-      </DocumentGate>
+      <Demo>
+        <DocumentGate fallback={<p>Loading…</p>}>
+          <LayoutControls />
+          <StageFrame height={420}>
+            <Stage style={stageFill}>{() => <RenderLayer />}</Stage>
+          </StageFrame>
+        </DocumentGate>
+      </Demo>
     </Viewer>
   );
 }

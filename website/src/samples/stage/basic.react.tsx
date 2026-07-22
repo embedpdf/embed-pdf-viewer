@@ -4,6 +4,8 @@ import { Stage, stagePlugin } from '@embedpdf/react/stage';
 import { RenderLayer, renderPlugin } from '@embedpdf/react/render';
 import { localEngine } from '@embedpdf/engine';
 
+import { Demo, StageFrame, stageFill } from './_shared/chrome';
+
 const engine = localEngine();
 const plugins = [stagePlugin(), renderPlugin()];
 
@@ -15,13 +17,13 @@ const ebook = async (): Promise<OpenInput> => {
 export default function App() {
   return (
     <Viewer engine={engine} plugins={plugins} initialDocuments={[{ source: ebook }]}>
-      <div style={{ height: 460 }}>
+      <Demo>
         <DocumentGate fallback={<p>Loading…</p>}>
-          <Stage style={{ height: '100%', background: '#f1f5f9', borderRadius: 8 }}>
-            {() => <RenderLayer />}
-          </Stage>
+          <StageFrame height={460}>
+            <Stage style={stageFill}>{() => <RenderLayer />}</Stage>
+          </StageFrame>
         </DocumentGate>
-      </div>
+      </Demo>
     </Viewer>
   );
 }
