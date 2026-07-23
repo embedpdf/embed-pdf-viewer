@@ -1,7 +1,7 @@
 import Image from 'next/image';
 import Link from 'next/link';
 
-import { GitHubIcon } from './icons';
+import { DiscordIcon, GitHubIcon } from './icons';
 
 const COLUMNS: { head: string; links: { label: string; href: string }[] }[] = [
   {
@@ -55,15 +55,26 @@ export function Footer() {
             <p className="m-0 max-w-[260px] font-sans text-sm leading-[1.6] text-[#9FB0D8]">
               The ultimate Open Source PDF viewer for JavaScript. Free Forever. Open Source.
             </p>
-            <a
-              href="https://github.com/embedpdf/embed-pdf-viewer"
-              target="_blank"
-              rel="noopener noreferrer"
-              aria-label="EmbedPDF on GitHub"
-              className="inline-flex h-10 w-10 items-center justify-center rounded-[10px] border border-white/15 text-white transition-colors duration-150 hover:border-white/30 hover:bg-white/10"
-            >
-              <GitHubIcon size={20} />
-            </a>
+            <div className="flex items-center gap-2.5">
+              <a
+                href="https://github.com/embedpdf/embed-pdf-viewer"
+                target="_blank"
+                rel="noopener noreferrer"
+                aria-label="EmbedPDF on GitHub"
+                className="inline-flex h-10 w-10 items-center justify-center rounded-[10px] border border-white/15 text-white transition-colors duration-150 hover:border-white/30 hover:bg-white/10"
+              >
+                <GitHubIcon size={20} />
+              </a>
+              <a
+                href="https://discord.com/invite/mHHABmmuVU"
+                target="_blank"
+                rel="noopener noreferrer"
+                aria-label="EmbedPDF on Discord"
+                className="inline-flex h-10 w-10 items-center justify-center rounded-[10px] border border-white/15 text-white transition-colors duration-150 hover:border-white/30 hover:bg-white/10"
+              >
+                <DiscordIcon size={20} />
+              </a>
+            </div>
           </div>
 
           {COLUMNS.map((col) => (
