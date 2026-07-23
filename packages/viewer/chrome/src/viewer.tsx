@@ -45,7 +45,7 @@ import { demoToolsPlugin } from './config/demo-tools.plugin';
 import { en } from './locales/en';
 import { ViewerConfigProvider, type ResolvedViewerConfig } from './config-context';
 import { ICON_PATHS, type IconDef } from './ui/icons';
-import { ThemeProvider } from './ui/theme';
+import { ThemeProvider, type ThemePreference } from './ui/theme';
 import { Shell } from './Shell';
 
 /** Lazy built-in packs — a strings override for one of these wraps its loader. */
@@ -104,6 +104,8 @@ export interface ViewerCustomization {
   /** The structure — a value you OWN: the default (pass nothing), a transform
    *  of it, or your own schema. Never merged. */
   chrome?: ChromeSchema | ((base: ChromeSchema, helpers: ChromeHelpers) => ChromeSchema);
+  /** Initial light/dark preference; 'system' (default) follows the OS. */
+  theme?: ThemePreference;
 }
 
 export interface FullViewerProps extends ViewerCustomization {
@@ -113,6 +115,10 @@ export interface FullViewerProps extends ViewerCustomization {
   initialDocuments?: InitialDocument[];
   /** Shown while the workspace boots. Default: a translated pulse line. */
   fallback?: ReactNode;
+  /** Where the theme's `.dark` class goes — a DELIVERY concern, not user
+   *  config: the custom element passes its shadow wrapper so theming never
+   *  touches the host page. Default: document.documentElement. */
+  themeTarget?: HTMLElement | null;
 }
 
 function Booting() {
@@ -134,6 +140,8 @@ export function FullViewer({
   locale = 'auto',
   disabledCategories,
   chrome,
+  theme,
+  themeTarget,
 }: FullViewerProps) {
   // Customization is INIT-ONLY, exactly like v2's `EmbedPDF.init` (and like
   // the Viewer's own engine/plugins contract): the whole config resolves ONCE
@@ -257,7 +265,7 @@ export function FullViewer({
   const config: ResolvedViewerConfig = resolved;
 
   return (
-    <ThemeProvider>
+    <ThemeProvider preference={theme} target={themeTarget}>
       <Viewer
         engine={engine}
         plugins={plugins}

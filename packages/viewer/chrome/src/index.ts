@@ -9,10 +9,14 @@
  */
 export { FullViewer } from './viewer';
 export type { FullViewerProps, ViewerCustomization } from './viewer';
+// The prop types a delivery needs to speak FullViewer's contract.
+export type { Engine, EngineFactory, InitialDocument } from '@embedpdf/react/runtime';
 
 export { defaultChrome } from './config/chrome';
 export { defaultCommands } from './config/commands';
+export { ICON_PATHS as defaultIcons } from './ui/icons';
 export type { IconDef, PathSpec } from './ui/icons';
+export type { ThemeMode, ThemePreference } from './ui/theme';
 
 // ── the schema vocabulary + transforms (ui-core, via the React adapter) ──────
 export {

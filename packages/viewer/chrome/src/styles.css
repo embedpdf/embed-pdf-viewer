@@ -13,7 +13,12 @@
    (viewers/snippet/src/config/theme.ts). Runtime CSS variables so the theme
    switches with a class; `@theme inline` below turns each into a Tailwind
    color utility (bg-surface, text-fg-muted, border-subtle, …). */
-:root {
+/* `:host` alongside `:root`: inside the <embedpdf-viewer> shadow root there is
+   no :root match, so the host carries the base tokens. The dark override stays
+   a plain `.dark` class — the element applies it to its shadow WRAPPER (and
+   apps to <html>), so one selector serves both worlds. */
+:root,
+:host {
   --app: #f3f4f6;
   --surface: #ffffff;
   --surface-alt: #f1f3f5;

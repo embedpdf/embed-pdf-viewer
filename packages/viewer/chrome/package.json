@@ -39,7 +39,8 @@
     "@types/react": "^18.3.0",
     "@types/react-dom": "^18.3.0",
     "typescript": "^5.0.0",
-    "@embedpdf/tooling-build": "workspace:*"
+    "@embedpdf/tooling-build": "workspace:*",
+    "tailwindcss": "^4.1.18"
   },
   "license": "Apache-2.0",
   "sideEffects": false,
