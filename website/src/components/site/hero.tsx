@@ -45,23 +45,23 @@ export function Hero() {
                 Live demo
               </EpButton>
             </div>
-            <div className="mt-4 inline-flex flex-wrap items-center gap-x-5 gap-y-1.5 self-start rounded-2xl border border-[#E9EEFF] bg-white px-4 py-2.5">
+            <div className="mt-4 flex flex-wrap gap-2">
               <a
                 href="https://github.com/embedpdf/embed-pdf-viewer"
                 target="_blank"
                 rel="noopener noreferrer"
-                className="hover:text-ep-navy inline-flex items-center gap-1.5 whitespace-nowrap font-sans text-[13px] font-medium text-[#3D4E75]"
+                className="hover:text-ep-navy inline-flex items-center gap-1.5 whitespace-nowrap rounded-full border border-[#E9EEFF] bg-white px-3.5 py-2 font-sans text-[13px] font-medium text-[#3D4E75] transition-colors hover:border-[#CFDCFF]"
               >
                 <StarIcon size={14} className="text-ep-blue" />
                 <b className="text-ep-navy font-bold">4K+</b>
                 <span>stars</span>
               </a>
-              <span className="inline-flex items-center gap-1.5 whitespace-nowrap font-sans text-[13px] font-medium text-[#3D4E75]">
+              <span className="inline-flex items-center gap-1.5 whitespace-nowrap rounded-full border border-[#E9EEFF] bg-white px-3.5 py-2 font-sans text-[13px] font-medium text-[#3D4E75]">
                 <DownloadIcon size={14} className="text-ep-blue" />
                 <b className="text-ep-navy font-bold">1M+</b>
                 <span>downloads</span>
               </span>
-              <span className="inline-flex items-center gap-1.5 whitespace-nowrap font-sans text-[13px] font-medium text-[#3D4E75]">
+              <span className="inline-flex items-center gap-1.5 whitespace-nowrap rounded-full border border-[#E9EEFF] bg-white px-3.5 py-2 font-sans text-[13px] font-medium text-[#3D4E75]">
                 <ShieldCheckIcon size={14} className="text-[#22C55E]" />
                 <span>Apache-2.0 licensed</span>
               </span>
