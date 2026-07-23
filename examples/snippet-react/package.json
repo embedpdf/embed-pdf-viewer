@@ -3,7 +3,7 @@
   "version": "0.0.0",
   "private": true,
   "type": "module",
-  "description": "The snippet viewer's chrome, rebuilt on the v3 commands + measured-toolbar system. Structure-only schema, auto-overflow, real icons, Tailwind v4, light/dark.",
+  "description": "Thin consumer of @embedpdf/viewer-chrome: picks the local-wasm engine, supplies demo documents, renders <FullViewer/>. The chrome itself lives in packages/viewer/chrome.",
   "scripts": {
     "dev": "vite",
     "build": "vite build",
@@ -13,6 +13,7 @@
   "dependencies": {
     "@embedpdf/engine": "workspace:*",
     "@embedpdf/react": "workspace:*",
+    "@embedpdf/viewer-chrome": "workspace:*",
     "react": "^18.3.1",
     "react-dom": "^18.3.1"
   },

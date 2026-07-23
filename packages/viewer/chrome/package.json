@@ -1,0 +1,64 @@
+{
+  "name": "@embedpdf/viewer-chrome",
+  "version": "0.0.0",
+  "private": true,
+  "description": "The full viewer's chrome — the ONE React implementation of the snippet UI (structure-only chrome schema, measured toolbar, Tailwind pixels). Consumed by @embedpdf/viewer (Preact-compiled custom element) and every framework wrapper; never published on its own for now (eject source for React users is a later call).",
+  "type": "module",
+  "main": "./dist/index.cjs",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.cts",
+  "exports": {
+    ".": "./src/index.ts",
+    "./chrome": "./src/config/chrome.ts",
+    "./commands": "./src/config/commands.ts",
+    "./package.json": "./package.json",
+    "./styles.css": "./src/styles.css"
+  },
+  "epdf": {
+    "rawExports": [
+      "./styles.css"
+    ]
+  },
+  "files": [
+    "dist",
+    "src/styles.css"
+  ],
+  "scripts": {
+    "build": "epdf-build",
+    "clean": "rimraf dist",
+    "typecheck": "tsc -p tsconfig.json --noEmit"
+  },
+  "dependencies": {
+    "@embedpdf/react": "workspace:*"
+  },
+  "peerDependencies": {
+    "react": ">=18",
+    "react-dom": ">=18"
+  },
+  "devDependencies": {
+    "@types/react": "^18.3.0",
+    "@types/react-dom": "^18.3.0",
+    "typescript": "^5.0.0",
+    "@embedpdf/tooling-build": "workspace:*"
+  },
+  "license": "Apache-2.0",
+  "sideEffects": false,
+  "publishConfig": {
+    "exports": {
+      ".": {
+        "import": "./dist/index.js",
+        "require": "./dist/index.cjs"
+      },
+      "./chrome": {
+        "import": "./dist/chrome.js",
+        "require": "./dist/chrome.cjs"
+      },
+      "./commands": {
+        "import": "./dist/commands.js",
+        "require": "./dist/commands.cjs"
+      },
+      "./package.json": "./package.json",
+      "./styles.css": "./src/styles.css"
+    }
+  }
+}
