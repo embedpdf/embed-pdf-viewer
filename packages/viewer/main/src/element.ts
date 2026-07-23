@@ -19,6 +19,8 @@ import {
   defaultCommands,
   defaultIcons,
   validateChrome,
+  type Unsubscribe,
+  type ViewerHandle,
 } from '@embedpdf/viewer-chrome';
 import { localEngine } from '@embedpdf/engine';
 import EngineWorker from '@embedpdf/engine/worker-entry?worker';
@@ -72,6 +74,8 @@ export class EmbedPdfViewerElement extends HTMLElement {
   #config: ViewerConfig | null = null;
   #wrapper: HTMLDivElement | null = null;
   #root: Root | null = null;
+  #viewer: ViewerHandle | null = null;
+  #disposers: Unsubscribe[] = [];
 
   /** Full config — takes precedence over the declarative attributes. */
   set config(config: ViewerConfig) {
@@ -80,6 +84,15 @@ export class EmbedPdfViewerElement extends HTMLElement {
   }
   get config(): ViewerConfig {
     return this.#config ?? configFromAttributes(this);
+  }
+
+  /**
+   * The DRIVE surface: public capability lenses (`viewer.get(AnnotationToken)`),
+   * one `watch` primitive, and the command trio. Null until `epdf:ready` fires
+   * (once per (re)mount); re-minted if the viewer is rebuilt by a config set.
+   */
+  get viewer(): ViewerHandle | null {
+    return this.#viewer;
   }
 
   connectedCallback(): void {
@@ -104,9 +117,27 @@ export class EmbedPdfViewerElement extends HTMLElement {
   }
 
   #unmount(): void {
+    for (const dispose of this.#disposers) dispose();
+    this.#disposers = [];
+    this.#viewer = null;
     this.#root?.unmount();
     this.#root = null;
   }
+
+  /** Handle arrival = the viewer is live. `epdf:ready` is the addEventListener
+   *  face of it; `epdf:documentchange` is sugar over `viewer.watch` — the one
+   *  reactivity primitive remains the handle itself. */
+  #onViewer = (viewer: ViewerHandle): void => {
+    this.#viewer = viewer;
+    this.#disposers.push(
+      viewer.watch(
+        () => viewer.documents.activeId(),
+        (documentId) =>
+          this.dispatchEvent(new CustomEvent('epdf:documentchange', { detail: { documentId } })),
+      ),
+    );
+    this.dispatchEvent(new CustomEvent('epdf:ready', { detail: { viewer } }));
+  };
 
   #mount(): void {
     if (!this.shadowRoot) {
@@ -131,6 +162,7 @@ export class EmbedPdfViewerElement extends HTMLElement {
         initialDocuments: initialDocumentsOf(config),
         theme,
         themeTarget: this.#wrapper,
+        onViewer: this.#onViewer,
         ...customization,
       }),
     );

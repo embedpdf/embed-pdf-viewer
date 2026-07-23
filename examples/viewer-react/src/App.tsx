@@ -40,6 +40,9 @@ export function App() {
     <PDFViewer
       src="/ebook.pdf"
       style={{ height: '100vh', display: 'block' }}
+      onReady={(viewer) =>
+        console.log('[example] viewer ready,', viewer.documents.list().length, 'document(s)')
+      }
       strings={{ en: { 'acme.status': 'Document status' } }}
       commands={[
         {

@@ -205,11 +205,40 @@ this package's own React consumers see the fallback).
 Slot names must be unique across the chrome (one `<slot name>` per shadow
 tree wins projection).
 
+### Drive — control the viewer from code
+
+The handle (`el.viewer` on the custom element, `onReady` on the wrappers) is a
+thin skin over the kernel: `get(Token)` returns each plugin's **public
+capability lens** verbatim — the same documented API the chrome's own buttons
+use — plus ONE reactivity primitive and the command trio:
+
+```ts
+el.addEventListener('epdf:ready', () => {
+  const viewer = el.viewer;
+
+  viewer.execute('zoom:in'); // commands: UI verbs
+  const annotation = viewer.get(AnnotationToken); // capabilities: the API
+  await annotation.create(pon, draft);
+
+  viewer.watch(
+    // the one primitive
+    () => annotation.getSelectionProps(),
+    (props) => myPanel.render(props),
+  );
+  viewer.documents.list(); // the tab model
+});
+```
+
+Rule of thumb: **buttons speak commands; code speaks capabilities.** The
+token re-export list in `index.ts` is the public-API act — internal lenses
+(`/internal` entries) are structurally absent from delivery bundles. Coarse
+DOM events (`epdf:ready`, `epdf:documentchange`) are sugar over `watch`.
+
 ## What's deliberately NOT here (yet)
 
 - **Theme prop beyond preference** — the `--ep-*` token set in `styles.css`
   is the styling contract; a token-override config (`theme: { tokens }`)
   maps onto it later.
-- **A slot-side viewer facade** (`ctx.execute/resolve/subscribe` for slotted
-  widgets) — slotted children currently talk to the viewer only through
-  their own app code.
+- **`frame` in the chrome value** (toolbar top/bottom, tab-bar visibility,
+  region sockets) and the **element registry** (`elements: { button: 'tag' }`)
+  — the next two moves of the six-move model.

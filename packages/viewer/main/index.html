@@ -7,13 +7,33 @@
     <style>
       body {
         margin: 0;
+        font: 13px system-ui, sans-serif;
+      }
+      /* EXTERNAL controls — plain page HTML driving el.viewer (the DRIVE door). */
+      #drive {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        padding: 6px 10px;
+        background: #111827;
+        color: #e5e7eb;
+      }
+      #drive button {
+        font: inherit;
       }
       #viewer {
-        height: 100vh;
+        height: calc(100vh - 36px);
       }
     </style>
   </head>
   <body>
+    <div id="drive">
+      <strong>page-side controls:</strong>
+      <button id="zoom-in">Zoom in</button>
+      <button id="zoom-out">Zoom out</button>
+      <span id="doc-label">no document</span>
+      <span id="selection-label"></span>
+    </div>
     <div id="viewer"></div>
     <script type="module" src="/src/dev.ts"></script>
   </body>

@@ -19,7 +19,7 @@
 // One import line per feature (ADAPTERS.md): each subpath carries the
 // plugin AND its UI; delete a line and the feature leaves the bundle.
 import { useEffect, useState, type ReactNode } from 'react';
-import { Viewer } from '@embedpdf/react/runtime';
+import { Viewer, useKernel } from '@embedpdf/react/runtime';
 import type { Engine, EngineFactory, InitialDocument } from '@embedpdf/react/runtime';
 import { stagePlugin } from '@embedpdf/react/stage';
 import { renderPlugin } from '@embedpdf/react/render';
@@ -44,6 +44,7 @@ import { defaultCommands } from './config/commands';
 import { demoToolsPlugin } from './config/demo-tools.plugin';
 import { en } from './locales/en';
 import { ViewerConfigProvider, type ResolvedViewerConfig } from './config-context';
+import { createViewerHandle, type ViewerHandle } from './handle';
 import { ICON_PATHS, type IconDef } from './ui/icons';
 import { ThemeProvider, type ThemePreference } from './ui/theme';
 import { Shell } from './Shell';
@@ -119,6 +120,23 @@ export interface FullViewerProps extends ViewerCustomization {
    *  config: the custom element passes its shadow wrapper so theming never
    *  touches the host page. Default: document.documentElement. */
   themeTarget?: HTMLElement | null;
+  /** Called once the workspace kernel is live, with the viewer handle — the
+   *  DRIVE surface (`el.viewer` on the custom element, `onReady` on the
+   *  wrappers). Capabilities resolve from the moment this fires; document-
+   *  scoped calls simply await their document. */
+  onViewer?: (viewer: ViewerHandle) => void;
+}
+
+/** Inside <Viewer>: mints the handle from the live kernel, reports it up. */
+function HandleBridge({ onViewer }: { onViewer: (viewer: ViewerHandle) => void }) {
+  const kernel = useKernel();
+  useEffect(() => {
+    onViewer(createViewerHandle(kernel));
+    // Init-only like everything else: re-fires only if the KERNEL changes
+    // (a remount), never because the callback prop identity churned.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [kernel]);
+  return null;
 }
 
 function Booting() {
@@ -142,6 +160,7 @@ export function FullViewer({
   chrome,
   theme,
   themeTarget,
+  onViewer,
 }: FullViewerProps) {
   // Customization is INIT-ONLY, exactly like v2's `EmbedPDF.init` (and like
   // the Viewer's own engine/plugins contract): the whole config resolves ONCE
@@ -273,6 +292,7 @@ export function FullViewer({
         fallback={fallback ?? <Booting />}
       >
         <ViewerConfigProvider value={config}>
+          {onViewer && <HandleBridge onViewer={onViewer} />}
           <Shell />
         </ViewerConfigProvider>
       </Viewer>

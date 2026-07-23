@@ -1,11 +1,12 @@
 /**
- * Dev harness — the vanilla one-liner PLUS one rung of the customization
- * ladder, so `pnpm dev` in this package always exercises the whole boundary:
- * init → element → preact chrome → engine worker, and the config pass-through.
+ * Dev harness — the vanilla one-liner PLUS one rung of each door, so
+ * `pnpm dev` in this package always exercises the whole boundary:
+ * init → element → preact chrome → engine worker, the config pass-through,
+ * and the DRIVE door (el.viewer from plain page script).
  */
-import EmbedPDF from './index';
+import EmbedPDF, { AnnotationToken } from './index';
 
-EmbedPDF.init({
+const el = EmbedPDF.init({
   target: '#viewer',
   src: '/ebook.pdf',
   icons: {
@@ -28,3 +29,31 @@ EmbedPDF.init({
   chrome: (base, h) =>
     h.addItem(base, { bar: 'main', section: 'end', group: 'panels', item: 'dev:send' }),
 });
+
+// ── DRIVE: plain page script, no framework, no chrome involvement ────────────
+el.addEventListener('epdf:ready', () => {
+  const viewer = el.viewer!;
+  console.log('[drive] epdf:ready — documents:', viewer.documents.list());
+
+  // commands: the UI vocabulary, from OUTSIDE the viewer
+  document.querySelector<HTMLButtonElement>('#zoom-in')!.onclick = () => viewer.execute('zoom:in');
+  document.querySelector<HTMLButtonElement>('#zoom-out')!.onclick = () =>
+    viewer.execute('zoom:out');
+
+  // watch: the one reactivity primitive — active document…
+  const docLabel = document.querySelector('#doc-label')!;
+  viewer.watch(
+    () => viewer.documents.activeId(),
+    (id) => (docLabel.textContent = id ? `active: ${id}` : 'no document'),
+  );
+
+  // …and a PUBLIC capability lens (annotation selection), fully typed
+  const selLabel = document.querySelector('#selection-label')!;
+  viewer.watch(
+    () => viewer.tryGet(AnnotationToken)?.getSelected().length ?? 0,
+    (n) => (selLabel.textContent = n ? `${n} annotation(s) selected` : ''),
+  );
+});
+el.addEventListener('epdf:documentchange', (e) =>
+  console.log('[drive] epdf:documentchange', (e as CustomEvent).detail),
+);

@@ -34,6 +34,32 @@ export {
   replaceItem,
   validateChrome,
 } from '@embedpdf/viewer-chrome';
+
+// The DRIVE door: `el.viewer` speaks these tokens (the public capability
+// lenses). This re-export list is the CDN's public-API act — see the chrome's
+// index for the curation rule.
+export {
+  AnnotationToken,
+  CommandsToken,
+  DocumentsToken,
+  FormToken,
+  I18nToken,
+  InteractionToken,
+  MetadataToken,
+  RedactionToken,
+  SearchToken,
+  SelectionToken,
+  ShellToken,
+  StageToken,
+} from '@embedpdf/viewer-chrome';
+export type {
+  CapabilityToken,
+  DocumentsCapability,
+  ResolvedCommand,
+  ScopedViewerHandle,
+  Unsubscribe,
+  ViewerHandle,
+} from '@embedpdf/viewer-chrome';
 export type {
   AddItemSpec,
   BarChild,

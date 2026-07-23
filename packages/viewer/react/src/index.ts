@@ -27,7 +27,7 @@ import {
   type ReactNode,
   type Ref,
 } from 'react';
-import type { EmbedPdfViewerElement, ViewerConfig } from '@embedpdf/viewer';
+import type { EmbedPdfViewerElement, ViewerConfig, ViewerHandle } from '@embedpdf/viewer';
 
 // Register <embedpdf-viewer> (side effect) — the wrapper is unusable without it.
 import '@embedpdf/viewer';
@@ -42,18 +42,38 @@ export interface PDFViewerProps extends ViewerConfig {
   children?: ReactNode;
   /** The underlying element, if you need the imperative surface. */
   elementRef?: Ref<EmbedPdfViewerElement>;
+  /** The DRIVE surface, once the viewer is live (v2's onReady, reborn):
+   *  capabilities via `viewer.get(Token)`, `watch`, and the command trio. */
+  onReady?: (viewer: ViewerHandle) => void;
 }
 
-export function PDFViewer({ className, style, children, elementRef, ...config }: PDFViewerProps) {
+export function PDFViewer({
+  className,
+  style,
+  children,
+  elementRef,
+  onReady,
+  ...config
+}: PDFViewerProps) {
   const ref = useRef<EmbedPdfViewerElement | null>(null);
   const configRef = useRef(config);
   configRef.current = config;
+  const onReadyRef = useRef(onReady);
+  onReadyRef.current = onReady;
 
   // Layout effects run in the insertion task, BEFORE the element's deferred
   // (microtask) declarative mount — so the viewer boots exactly once, with
-  // this config. Empty deps: config is init-only by contract.
+  // this config, and the ready listener is in place before it can fire.
+  // Empty deps: config is init-only by contract.
   useLayoutEffect(() => {
-    if (ref.current) ref.current.config = configRef.current;
+    const el = ref.current;
+    if (!el) return;
+    const onEvent = () => el.viewer && onReadyRef.current?.(el.viewer);
+    el.addEventListener('epdf:ready', onEvent);
+    el.config = configRef.current;
+    // A remount-with-key that reuses a live element cannot miss the event.
+    if (el.viewer) onEvent();
+    return () => el.removeEventListener('epdf:ready', onEvent);
   }, []);
 
   return createElement(
